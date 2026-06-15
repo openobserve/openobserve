@@ -36,6 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :label="t('traces.noEvents.expandRange')"
         :sublabel="expandRangeSublabel"
         data-test="traces-no-events-expand-range-card"
+        class="tw:w-full"
         @click="onWidenRange"
       />
       <EmptyStateActionCard

@@ -188,17 +188,9 @@
             </div>
             <div
               v-else-if="!graphData.nodes.length"
-              class="tw:flex flex-center tw:h-full tw:items-center tw:justify-center tw:p-[0.675rem]"
+              class="tw:flex tw:h-full tw:items-center tw:justify-center"
             >
-              <div class="tw:text-center">
-                <OIcon name="hub" style="width: 5em; height: 5em;" />
-                <div class="tw:text-xl tw:font-semibold tw:mt-3 tw:text-gray-400">
-                  No Service Graph Data
-                </div>
-                <div class="tw:text-sm tw:text-gray-400 tw:mt-2">
-                  Try querying a longer duration
-                </div>
-              </div>
+              <ServiceGraphNoDataState @widen-range="$emit('widen-range', $event)" />
             </div>
             <div
               v-else
@@ -294,6 +286,8 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
+import ServiceGraphNoDataState from "./ServiceGraphNoDataState.vue";
+import { getConsumableRelativeTime } from "@/utils/date";
 
 export default defineComponent({
   name: "ServiceGraph",
@@ -310,8 +304,9 @@ export default defineComponent({
     OIcon,
     OCard,
     OCardSection,
-},
-  emits: ["view-traces", "request:stream-change"],
+    ServiceGraphNoDataState,
+  },
+  emits: ["view-traces", "request:stream-change", "widen-range"],
   setup(props, { emit }) {
     const store = useStore();
     const router = useRouter();
@@ -1123,13 +1118,25 @@ export default defineComponent({
           throw new Error("No organization selected");
         }
 
+        const dt = searchObj.data.datetime;
+        let startTime: number;
+        let endTime: number;
+        if (dt.type === "relative" && dt.relativeTimePeriod) {
+          const relTime = getConsumableRelativeTime(dt.relativeTimePeriod);
+          startTime = relTime?.startTime ?? dt.startTime;
+          endTime = relTime?.endTime ?? dt.endTime;
+        } else {
+          startTime = dt.startTime;
+          endTime = dt.endTime;
+        }
+
         const response = await serviceGraphService.getCurrentTopology(orgId, {
           streamName:
             streamFilter.value && streamFilter.value !== "all"
               ? streamFilter.value
               : undefined,
-          startTime: searchObj.data.datetime.startTime,
-          endTime: searchObj.data.datetime.endTime,
+          startTime,
+          endTime,
         });
 
         // Convert API response to expected format
