@@ -100,7 +100,7 @@ test.describe("Reports Regression Bug Fixes", () => {
       // Save with schedule
       await expect(pm.reportsPage.saveButton, 'Save button should be visible').toBeVisible({ timeout: 5000 });
       await pm.reportsPage.saveButton.click({ force: true });
-      await expect(pm.reportsPage.toastAlert.first(),
+      await expect(page.getByRole('alert').first(),
         'Save success alert should appear').toBeVisible({ timeout: 15000 });
       testLogger.info('Saved report with schedule configured');
 
