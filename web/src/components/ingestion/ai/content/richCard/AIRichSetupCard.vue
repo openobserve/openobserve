@@ -19,14 +19,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
   Purely presentational: everything (hero, ordered steps, context chips, code
   chrome, supplementary accordions, footer) is rendered from a RichCardContent
-  object (see ./types.ts, ./registry.ts). Detection ("listening for the first
-  span") is delegated to useSpanDetect — live polling in production, or a
-  simulated Succeeds/Stalls flow when `demo` is set.
+  object (see ./types.ts, ./registry.ts). Detection ("have my spans arrived?")
+  is delegated to useSpanDetect — a single user-triggered check per "Test" click,
+  no background polling.
 
   Add a provider by authoring a RichCardContent — no edits here.
 -->
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, watch, nextTick } from "vue";
 import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -80,12 +80,29 @@ const detect = useSpanDetect({
     streamType: props.content.detect.streamType,
     streamName: watchedStream.value,
     filter: props.content.detect.filter,
-    pollMs: props.content.detect.pollMs,
-    timeoutMs: props.content.detect.timeoutMs,
   }),
   onConnect: () => fireConfetti(),
 });
 const detected = computed(() => detect.connected.value);
+
+// Don't surface the "most likely fix" hint on the first miss — the user may
+// simply not have run their app yet. Only after a few failed Tests does an
+// instrumentation-ordering problem become the likely cause.
+const FIX_HINT_AFTER_FAILURES = 3;
+const failedChecks = ref(0);
+watch(
+  () => detect.state.value,
+  (s) => {
+    if (s === "stalled") failedChecks.value++;
+    else if (s === "connected" || s === "idle") failedChecks.value = 0;
+  },
+);
+const showFixHint = computed(
+  () =>
+    detect.stalled.value &&
+    !!extras.value.fixSnippet &&
+    failedChecks.value >= FIX_HINT_AFTER_FAILURES,
+);
 
 // ── step completion / active-step model ─────────────────────────────────────
 const copied = ref<Record<string, boolean>>({});
@@ -101,8 +118,8 @@ const stepState = (i: number) => {
   return activeIndex.value === i ? "active" : "pending";
 };
 
-// Detection only starts when the user clicks Start in the status bar
-// (detect.start()) — never automatically.
+// Detection runs only when the user clicks Test in the status bar
+// (detect.check()) — one check per click, never automatically.
 
 // ── next-step auto-advance scroll ────────────────────────────────────────────
 const stepEls = ref<(HTMLElement | null)[]>([]);
@@ -157,6 +174,20 @@ const extras = computed(() => props.content.extras ?? {});
 const hasInstallerAccordion = computed(
   () => !!(extras.value.installs?.length || extras.value.envVars?.length),
 );
+
+// "See All Troubleshooting" (from the fix box) opens the Troubleshooting
+// accordion (controlled via v-model) and scrolls it into view.
+const troubleshootingOpen = ref(false);
+const troubleshootingRef = ref<any>(null);
+const openTroubleshooting = () => {
+  troubleshootingOpen.value = true;
+  nextTick(() =>
+    troubleshootingRef.value?.$el?.scrollIntoView({
+      behavior: prefersReducedMotion() ? "auto" : "smooth",
+      block: "start",
+    }),
+  );
+};
 
 // ── confetti (canvas burst on connect) ───────────────────────────────────────
 const CONFETTI_COLORS = ["#d97757", "#16a34a", "#2b7de9", "#f5b53d", "#7c3aed"];
@@ -331,13 +362,13 @@ function fireConfetti() {
               >
                 <span class="sb-dot" />
                 <span v-if="detect.idle.value" class="sb-txt"
-                  >Not Listening Yet<span class="sb-sub"
-                    >run your app to start streaming spans</span
+                  >Not Tested Yet<span class="sb-sub"
+                    >run your app, then test for spans</span
                   ></span
                 >
-                <span v-else-if="detect.listening.value" class="sb-txt"
-                  >Listening for your first span…<span class="sb-sub"
-                    >watching {{ watchedStream }}</span
+                <span v-else-if="detect.checking.value" class="sb-txt"
+                  >Checking for spans…<span class="sb-sub"
+                    >on {{ watchedStream }}</span
                   ></span
                 >
                 <span v-else-if="detect.connected.value" class="sb-txt"
@@ -350,8 +381,9 @@ function fireConfetti() {
                   ></span
                 >
                 <span v-else class="sb-txt sb-warn"
-                  >No Spans Yet After ~60s<span class="sb-sub"
-                    >nothing detected on {{ watchedStream }}</span
+                  >No Spans Found Yet<span class="sb-sub"
+                    >nothing on {{ watchedStream }} — run your app and test
+                    again</span
                   ></span
                 >
 
@@ -360,20 +392,19 @@ function fireConfetti() {
                   variant="primary"
                   size="sm"
                   icon-left="radio-button-checked"
-                  data-test="ai-c-start"
-                  @click="detect.start()"
+                  data-test="ai-c-test"
+                  @click="detect.check()"
                 >
-                  Start
+                  Test
                 </OButton>
                 <OButton
-                  v-else-if="detect.listening.value"
-                  variant="destructive"
+                  v-else-if="detect.checking.value"
+                  variant="secondary"
                   size="sm"
-                  icon-left="stop"
-                  data-test="ai-c-stop"
-                  @click="detect.stop()"
+                  :loading="true"
+                  data-test="ai-c-checking"
                 >
-                  Stop
+                  Checking…
                 </OButton>
                 <OButton
                   v-else-if="detect.connected.value"
@@ -390,16 +421,13 @@ function fireConfetti() {
                   size="sm"
                   icon-left="refresh"
                   data-test="ai-c-recheck"
-                  @click="detect.recheck()"
+                  @click="detect.check()"
                 >
-                  Recheck
+                  Test Again
                 </OButton>
               </div>
 
-              <div
-                v-if="detect.stalled.value && extras.fixSnippet"
-                class="fixbox tw:mt-3"
-              >
+              <div v-if="showFixHint" class="fixbox tw:mt-3">
                 <div class="fixbox-h">
                   <OIcon name="warning" size="sm" /> Most Likely Fix — Instrument
                   Before Importing The Client
@@ -409,18 +437,24 @@ function fireConfetti() {
                   loaded <b>after</b> the client was imported. Re-order so the init
                   runs first:
                 </p>
-                <CodeBlock lang="python" :code="extras.fixSnippet" />
+                <CodeBlock lang="python" :code="extras.fixSnippet || ''" />
                 <div class="fixbox-actions">
                   <OButton
                     variant="primary"
                     size="sm"
                     icon-left="refresh"
                     data-test="ai-c-fix-recheck"
-                    @click="detect.recheck()"
+                    @click="detect.check()"
                   >
-                    I Fixed It — Recheck
+                    I Fixed It — Test Again
                   </OButton>
-                  <OButton variant="ghost-primary" size="sm">
+                  <OButton
+                    v-if="extras.troubleshooting?.length"
+                    variant="ghost-primary"
+                    size="sm"
+                    data-test="ai-c-see-troubleshooting"
+                    @click="openTroubleshooting()"
+                  >
                     See All Troubleshooting
                   </OButton>
                 </div>
@@ -465,6 +499,8 @@ function fireConfetti() {
 
         <OCollapsible
           v-if="extras.troubleshooting?.length"
+          ref="troubleshootingRef"
+          v-model="troubleshootingOpen"
           label="Troubleshooting"
           icon="help-outline"
           class="acc-item"
@@ -825,7 +861,7 @@ function fireConfetti() {
   background: var(--panel);
   transition: all 0.3s;
 }
-.statusbar.listening {
+.statusbar.checking {
   border-color: var(--clay-soft);
   background: var(--clay-soft-2);
 }
@@ -847,10 +883,10 @@ function fireConfetti() {
 .statusbar.idle .sb-dot {
   background: var(--text-3);
 }
-.statusbar.listening .sb-dot {
+.statusbar.checking .sb-dot {
   background: var(--clay-bright);
 }
-.statusbar.listening .sb-dot::after {
+.statusbar.checking .sb-dot::after {
   content: "";
   position: absolute;
   inset: -5px;
@@ -869,7 +905,7 @@ function fireConfetti() {
   font-size: 13.5px;
   flex: 1;
 }
-.statusbar.listening .sb-txt {
+.statusbar.checking .sb-txt {
   color: var(--clay);
 }
 .statusbar.connected .sb-txt {

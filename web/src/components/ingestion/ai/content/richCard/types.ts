@@ -76,10 +76,6 @@ export interface RichCardDetect {
   filter: string;
   /** Shown in the connected status line (e.g. the model name). */
   modelLabel?: string;
-  /** Poll cadence (ms). Default 3000. */
-  pollMs?: number;
-  /** Give up after this long → "stalled". Default 60000. */
-  timeoutMs?: number;
 }
 
 export interface RichCardExtras {

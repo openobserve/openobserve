@@ -13,23 +13,19 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// useSpanDetect — drives the "waiting for the first span" status bar with real,
-// bounded polling.
+// useSpanDetect — backs the "have my spans arrived?" status bar with a single,
+// user-triggered check (no background polling).
 //
-// states: idle → listening → connected | stalled   ·   recheck() re-arms.
+// states: idle → checking → connected | stalled   ·   check() runs one probe.
 //
-// Detection is a two-stage gate per poll:
+// The user runs their app, then clicks "Test". Each check is a two-stage gate:
 //   1. Existence — the target stream isn't created until the first span lands,
-//      so we first check the cheap streams-list ("stream stats") API. While the
-//      stream is absent we just wait, instead of hammering _search and getting
-//      404 "stream not found" back every tick.
-//   2. Confirm — once the stream exists, a COUNT over a window that starts at
-//      listen-time (so time-partition pruning scans only the newest file(s),
-//      tiny size, no rows materialized) confirms it carries THIS provider's
-//      spans; >0 → connected.
-// Plus ~3s backoff, a hard timeout → "stalled", and polling pauses while the
-// tab is hidden. So it only works during an active, visible setup and stops on
-// the first hit / unmount.
+//      so we first hit the cheap streams-list ("stream stats") API. If the
+//      stream is absent we report "not found yet" (no _search, so no 404 noise).
+//   2. Confirm — once the stream exists, a COUNT over a recent window (so
+//      time-partition pruning scans only the newest file(s); tiny size, no rows
+//      materialized) confirms it carries THIS provider's spans; >0 → connected.
+// One check per click — nothing runs in the background, nothing to time out.
 //
 // The stream is whatever the install command writes to: when the card declares
 // a `stream_input`, the user's value drives BOTH the command's {stream}
@@ -37,11 +33,11 @@
 // back to the SDK default. TODO(detect): confirm each provider's stored span
 // attribute on the ingest side so the `filter` matches on day one.
 
-import { onUnmounted, ref, computed } from "vue";
+import { ref, computed } from "vue";
 import searchService from "@/services/search";
 import streamService from "@/services/stream";
 
-export type DetectState = "idle" | "listening" | "connected" | "stalled";
+export type DetectState = "idle" | "checking" | "connected" | "stalled";
 
 export interface SpanDetectConfig {
   orgId: string;
@@ -50,12 +46,8 @@ export interface SpanDetectConfig {
   streamName?: string;
   /** SQL WHERE fragment, e.g. "gen_ai_system = 'Anthropic'". */
   filter: string;
-  /** Poll cadence (ms). Default 3000. */
-  pollMs?: number;
-  /** Give up after this long → "stalled". Default 60000. */
-  timeoutMs?: number;
-  /** Count spans from this long BEFORE listen-start, so a span that arrived
-   *  during setup still counts. Default 60000. */
+  /** Count spans from this far back, so a span that arrived during setup still
+   *  counts. Default 600000 (10 min). */
   lookbackMs?: number;
 }
 
@@ -79,19 +71,6 @@ const nowMs = () => new Date().getTime();
 export function useSpanDetect(opts: UseSpanDetectOptions) {
   const state = ref<DetectState>("idle");
   const count = ref(0);
-  const timers: ReturnType<typeof setTimeout>[] = [];
-  let listenStartMs = 0;
-  let visibilityBound = false;
-  // Once the stream is seen to exist we skip the existence probe (streams don't
-  // vanish mid-setup) and go straight to the COUNT confirm. Re-armed if the
-  // target stream name changes (e.g. the user edits the stream-name input).
-  let streamSeen = false;
-  let lastStream = "";
-
-  const clearTimers = () => {
-    timers.forEach((t) => clearTimeout(t));
-    timers.length = 0;
-  };
 
   const succeed = (n = 1) => {
     state.value = "connected";
@@ -99,15 +78,13 @@ export function useSpanDetect(opts: UseSpanDetectOptions) {
     if (opts.onConnect && !prefersReducedMotion()) opts.onConnect();
   };
 
-  // Window start (micros): a little before listen-start so a span that landed
-  // during setup still counts. Narrow window → only the newest file(s) scanned.
+  // Window start (micros): `lookbackMs` before now, so a span that landed during
+  // setup still counts. Narrow window → only the newest file(s) scanned.
   const windowStartMicros = (cfg: SpanDetectConfig) =>
-    (listenStartMs - (cfg.lookbackMs ?? 60000)) * 1000;
+    (nowMs() - (cfg.lookbackMs ?? 600000)) * 1000;
 
   // One cheap COUNT over [windowStart, now]. >0 matches → connected.
   const countSql = (cfg: SpanDetectConfig) => {
-    // Stream comes from the md `detect.stream` (authored next to the install
-    // command so they match); "default" is the SDK's default if unset.
     const stream = cfg.streamName || "default";
     return `SELECT COUNT(*) as zo_count FROM "${stream}" WHERE (${cfg.filter}) AND _timestamp >= ${windowStartMicros(cfg)}`;
   };
@@ -134,34 +111,21 @@ export function useSpanDetect(opts: UseSpanDetectOptions) {
     }
   };
 
-  const poll = async () => {
-    if (state.value !== "listening") return;
+  // One user-triggered check. idle/stalled/connected → checking → result.
+  const check = async () => {
+    if (state.value === "checking") return; // ignore double-clicks mid-check
+    state.value = "checking";
+    count.value = 0;
     const cfg = opts.config();
-    const timeoutMs = cfg.timeoutMs ?? 60000;
-    if (nowMs() - listenStartMs > timeoutMs) {
+
+    // Stage 1 — stream must exist before we touch _search.
+    const exists = await streamExists(cfg);
+    if (state.value !== "checking") return; // reset() raced us
+    if (!exists) {
       state.value = "stalled";
       return;
     }
-    // Pause polling while the tab is hidden — resumed by the visibility handler.
-    if (typeof document !== "undefined" && document.hidden) {
-      scheduleNextPoll(cfg);
-      return;
-    }
-    // Re-arm the existence probe if the target stream changed mid-listen.
-    const stream = cfg.streamName || "default";
-    if (stream !== lastStream) {
-      lastStream = stream;
-      streamSeen = false;
-    }
-    // Stage 1 — wait for the stream to exist before touching _search.
-    if (!streamSeen) {
-      streamSeen = await streamExists(cfg);
-      if (state.value !== "listening") return;
-      if (!streamSeen) {
-        scheduleNextPoll(cfg);
-        return;
-      }
-    }
+
     // Stage 2 — stream exists: confirm it carries this provider's spans.
     try {
       const res = await searchService.search(
@@ -181,72 +145,32 @@ export function useSpanDetect(opts: UseSpanDetectOptions) {
         },
         "ui",
       );
-      if (state.value !== "listening") return;
+      if (state.value !== "checking") return;
       const n = Number(res?.data?.hits?.[0]?.zo_count ?? 0);
       if (n > 0) {
         succeed(n);
         return;
       }
     } catch {
-      // Stream may not exist yet (no spans), or a transient error — keep polling
-      // until the timeout, treating "no data" the same as a zero count.
+      // Transient error or no data — treated the same as a zero count.
     }
-    scheduleNextPoll(cfg);
+    state.value = "stalled";
   };
 
-  const scheduleNextPoll = (cfg: SpanDetectConfig) => {
-    if (state.value !== "listening") return;
-    timers.push(setTimeout(poll, cfg.pollMs ?? 3000));
-  };
-
-  const onVisible = () => {
-    if (state.value === "listening" && !document.hidden) {
-      clearTimers();
-      poll();
-    }
-  };
-
-  const start = () => {
-    clearTimers();
-    state.value = "listening";
-    count.value = 0;
-    streamSeen = false;
-    listenStartMs = nowMs();
-    if (!visibilityBound && typeof document !== "undefined") {
-      document.addEventListener("visibilitychange", onVisible);
-      visibilityBound = true;
-    }
-    poll();
-  };
-
-  // Stop polling and return to idle — no further API calls until restarted.
+  // Back to the untested state.
   const reset = () => {
-    clearTimers();
     state.value = "idle";
     count.value = 0;
-    streamSeen = false;
   };
-
-  // "I fixed it" — re-arm from now.
-  const recheck = () => start();
-
-  onUnmounted(() => {
-    clearTimers();
-    if (visibilityBound && typeof document !== "undefined") {
-      document.removeEventListener("visibilitychange", onVisible);
-    }
-  });
 
   return {
     state,
     count,
-    start,
+    /** Run one check ("Test" / "Test Again" / "I fixed it"). */
+    check,
     reset,
-    /** Manual "Stop listening" — alias for reset; halts all polling. */
-    stop: reset,
-    recheck,
     idle: computed(() => state.value === "idle"),
-    listening: computed(() => state.value === "listening"),
+    checking: computed(() => state.value === "checking"),
     connected: computed(() => state.value === "connected"),
     stalled: computed(() => state.value === "stalled"),
   };

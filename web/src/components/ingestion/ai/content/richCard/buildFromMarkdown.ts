@@ -106,8 +106,6 @@ export function buildFromMarkdown(
       streamName: str(detect.stream),
       filter: str(detect.filter) ?? "",
       modelLabel: str(detect.model_label),
-      pollMs: typeof detect.poll_ms === "number" ? detect.poll_ms : undefined,
-      timeoutMs: typeof detect.timeout_ms === "number" ? detect.timeout_ms : undefined,
     },
     extras: {
       installs: Array.isArray(extras.installs) ? extras.installs.map(String) : undefined,
