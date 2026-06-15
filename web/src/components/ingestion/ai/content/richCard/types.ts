@@ -83,8 +83,15 @@ export interface RichCardExtras {
   installs?: string[];
   /** Env vars the installer writes (pills). */
   envVars?: string[];
-  /** Correct-ordering fix shown when detection stalls. */
+  /** Code/command shown in the "most likely fix" box when detection stalls. */
   fixSnippet?: string;
+  /** Heading of the fix box (after "Most Likely Fix —"). Defaults to the
+   *  instrument-ordering wording. */
+  fixTitle?: string;
+  /** Explanatory paragraph above the fix snippet. Has a sensible default. */
+  fixBody?: string;
+  /** Highlight language for the fix snippet (e.g. "bash"). Default "python". */
+  fixLang?: string;
   troubleshooting?: { q: string; a: string }[];
 }
 

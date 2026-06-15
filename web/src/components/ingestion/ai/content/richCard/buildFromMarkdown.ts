@@ -111,6 +111,9 @@ export function buildFromMarkdown(
       installs: Array.isArray(extras.installs) ? extras.installs.map(String) : undefined,
       envVars: Array.isArray(extras.env_vars) ? extras.env_vars.map(String) : undefined,
       fixSnippet: str(data.fix_snippet),
+      fixTitle: str(data.fix_title),
+      fixBody: str(data.fix_body),
+      fixLang: str(data.fix_lang),
       troubleshooting: Array.isArray(data.troubleshooting)
         ? data.troubleshooting.map((t: any) => ({ q: String(t.q), a: String(t.a) }))
         : undefined,

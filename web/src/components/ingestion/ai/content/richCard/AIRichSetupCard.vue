@@ -33,6 +33,8 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
+import OStep from "@/lib/navigation/Stepper/OStep.vue";
 import CodeBlock from "../CodeBlock.vue";
 import type { CardSubstitutions } from "../renderMarkdown";
 import type { RichCardContent, RichCardStep, StepChipKind } from "./types";
@@ -110,27 +112,28 @@ const copied = ref<Record<string, boolean>>({});
 const isStepDone = (step: RichCardStep) =>
   step.completeOn === "copy" ? !!copied.value[step.id] : detected.value;
 
-// First not-done step is "active"; -1 once everything is done.
+// First not-done step is "active"; -1 once everything is done. OStepper's
+// model is 1-based step numbers (0 = none active, i.e. all done).
 const activeIndex = computed(() =>
   props.content.steps.findIndex((s) => !isStepDone(s)),
 );
-const stepState = (i: number) => {
-  if (isStepDone(props.content.steps[i])) return "done";
-  return activeIndex.value === i ? "active" : "pending";
-};
+const activeStepNumber = computed(() =>
+  activeIndex.value >= 0 ? activeIndex.value + 1 : 0,
+);
 
 // Detection runs only when the user clicks Test in the status bar
 // (detect.check()) — one check per click, never automatically.
 
 // ── next-step auto-advance scroll ────────────────────────────────────────────
-const stepEls = ref<(HTMLElement | null)[]>([]);
+// Refs are OStep component instances; we scroll to their root element ($el).
+const stepEls = ref<any[]>([]);
 const setStepRef = (el: unknown, i: number) => {
-  stepEls.value[i] = (el as HTMLElement) ?? null;
+  stepEls.value[i] = el ?? null;
 };
 const scrollToStep = (i: number) => {
-  const el = stepEls.value[i];
-  if (el)
-    el.scrollIntoView({
+  const node = stepEls.value[i]?.$el ?? stepEls.value[i];
+  if (node?.scrollIntoView)
+    node.scrollIntoView({
       behavior: prefersReducedMotion() ? "auto" : "smooth",
       block: "center",
     });
@@ -300,42 +303,37 @@ function fireConfetti() {
         />
       </div>
 
-      <!-- Steps -->
-      <div class="steps">
-        <div
+      <!-- Steps — lib OStepper in expanded (checklist) mode: all panels visible,
+           each step independently `done`, the first not-done step highlighted. -->
+      <OStepper
+        :model-value="activeStepNumber"
+        orientation="vertical"
+        expanded
+        :animated="false"
+        class="steps"
+      >
+        <OStep
           v-for="(step, i) in content.steps"
           :key="step.id"
-          :ref="(el) => setStepRef(el, i)"
-          class="step"
-          :class="stepState(i)"
+          :name="i + 1"
+          :title="step.title"
+          :done="isStepDone(step)"
           :data-test="`ai-step-${step.id}`"
         >
-          <div class="step-rail">
-            <div class="step-num">
-              <OIcon v-if="isStepDone(step)" name="check" size="sm" /><template
-                v-else
-                >{{ i + 1 }}</template
-              >
-            </div>
-            <div v-if="i < content.steps.length - 1" class="step-line" />
-          </div>
+          <template v-if="step.chip" #title-suffix>
+            <OBadge
+              size="sm"
+              :variant="step.required ? 'primary-soft' : 'default-outline'"
+              :icon="step.chip.kind === 'terminal' ? undefined : chipIcon(step.chip.kind)"
+            >
+              <template v-if="step.chip.kind === 'terminal'" #icon>
+                <span class="step-tag-glyph">$_</span>
+              </template>
+              {{ step.chip.label }}
+            </OBadge>
+          </template>
 
-          <div class="step-body" :class="{ 'tw:pb-0': i === content.steps.length - 1 }">
-            <div class="step-head">
-              <div class="step-title">{{ step.title }}</div>
-              <OBadge
-                v-if="step.chip"
-                size="sm"
-                :variant="step.required ? 'primary-soft' : 'default-outline'"
-                :icon="step.chip.kind === 'terminal' ? undefined : chipIcon(step.chip.kind)"
-              >
-                <template v-if="step.chip.kind === 'terminal'" #icon>
-                  <span class="step-tag-glyph">$_</span>
-                </template>
-                {{ step.chip.label }}
-              </OBadge>
-            </div>
-
+          <div class="step-content-pad" :ref="(el) => setStepRef(el, i)">
             <p class="step-desc" v-html="inlineMd(step.description)"></p>
 
             <CodeBlock
@@ -440,15 +438,19 @@ function fireConfetti() {
 
               <div v-if="showFixHint" class="fixbox tw:mt-3">
                 <div class="fixbox-h">
-                  <OIcon name="warning" size="sm" /> Most Likely Fix — Instrument
-                  Before Importing The Client
+                  <OIcon name="warning" size="sm" /> Most Likely Fix —
+                  {{ extras.fixTitle || "Instrument Before Importing The Client" }}
                 </div>
                 <p class="fixbox-p">
-                  If your app runs but no spans arrive, instrumentation likely
-                  loaded <b>after</b> the client was imported. Re-order so the init
-                  runs first:
+                  {{
+                    extras.fixBody ||
+                    "If your app runs but no spans arrive, instrumentation likely loaded after the client was imported. Re-order so the init runs first:"
+                  }}
                 </p>
-                <CodeBlock lang="python" :code="extras.fixSnippet || ''" />
+                <CodeBlock
+                  :lang="extras.fixLang || 'python'"
+                  :code="extras.fixSnippet || ''"
+                />
                 <div class="fixbox-actions">
                   <OButton
                     variant="primary"
@@ -472,8 +474,8 @@ function fireConfetti() {
               </div>
             </template>
           </div>
-        </div>
-      </div>
+        </OStep>
+      </OStepper>
 
       <!-- Supplementary accordions (shared OCollapsible) -->
       <div
@@ -696,78 +698,10 @@ function fireConfetti() {
   white-space: nowrap;
 }
 
-/* ---- numbered steps ---- */
+/* ---- steps (lib OStepper in expanded mode) — only the per-step body content
+   is styled here; the rail (indicator/connector/title) comes from OStepper. ---- */
 .steps {
   margin-top: 0;
-}
-.step {
-  display: flex;
-  gap: 16px;
-}
-.step-rail {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  flex: none;
-}
-.step-num {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  flex: none;
-  font-weight: 800;
-  font-size: 15px;
-  transition: background 0.25s, color 0.25s, border-color 0.25s;
-}
-.step.pending .step-num {
-  background: var(--track);
-  color: var(--text-3);
-  border: 1.5px solid var(--border);
-}
-.step.active .step-num {
-  background: var(--clay-bright);
-  color: #fff;
-  border: 1.5px solid var(--clay-bright);
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--clay-bright) 22%, transparent);
-}
-.step.done .step-num {
-  background: var(--ok);
-  color: #fff;
-  border: 1.5px solid var(--ok);
-}
-.step-line {
-  flex: 1;
-  width: 2px;
-  background: var(--border);
-  margin: 6px 0;
-  border-radius: 2px;
-  min-height: 16px;
-  transition: background 0.25s;
-}
-.step.done .step-line {
-  background: var(--ok);
-}
-.step.pending .step-title {
-  color: var(--text-2);
-}
-.step.pending .step-desc,
-.step.pending .step-note {
-  opacity: 0.7;
-}
-.step.active .step-title {
-  color: var(--clay);
-}
-.dark .step.active .step-title {
-  color: var(--clay-bright);
-}
-
-.step-head {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
 }
 /* Step context chip is now <OBadge> (lib). Only the terminal "$_" glyph (used
    in the badge's #icon slot) keeps a monospace style. */
@@ -775,16 +709,6 @@ function fireConfetti() {
   font-family: "JetBrains Mono", ui-monospace, monospace;
   font-weight: 800;
   font-size: 11px;
-}
-.step-body {
-  flex: 1;
-  min-width: 0;
-  padding-bottom: 18px;
-}
-.step-title {
-  font-weight: 800;
-  font-size: 15.5px;
-  margin: 4px 0 3px;
 }
 .step-desc {
   color: var(--text-2);
@@ -805,8 +729,8 @@ function fireConfetti() {
   flex: none;
   margin-top: 1px;
 }
-.step-desc :deep(code),
-.step-body :deep(code) {
+.step-content-pad :deep(code),
+.step-desc :deep(code) {
   font-family: "JetBrains Mono", ui-monospace, monospace;
   font-size: 12px;
   background: var(--track);
