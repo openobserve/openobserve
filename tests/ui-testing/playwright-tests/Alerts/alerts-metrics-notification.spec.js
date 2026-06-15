@@ -221,15 +221,12 @@ test.describe("Metrics Alert Notification Chain", () => {
 
             await ensureTemplate(page);
             await ensureDestination(page);
-            await createMetricsAlert(page);
 
-            // Ingest metrics data last so the alert has fresh data to find
-            try {
-                await ensureMetricsIngested();
-                testLogger.info('Metrics data ingested for alert test');
-            } catch (metricsErr) {
-                testLogger.warn('Metrics ingestion failed (alert may not trigger)', { error: metricsErr.message });
-            }
+            // Ingest metrics first so the stream exists before alert creation references it
+            await ensureMetricsIngested();
+            testLogger.info('Metrics data ingested for alert test');
+
+            await createMetricsAlert(page);
 
             testLogger.info('=== SETUP COMPLETE ===');
         } finally {
