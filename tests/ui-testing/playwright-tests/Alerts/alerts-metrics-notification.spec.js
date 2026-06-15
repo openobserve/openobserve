@@ -340,9 +340,7 @@ test.describe("Metrics Alert Notification Chain", () => {
         await page.goto(`${baseUrl}/web/settings/templates?org_identifier=${org}`);
         await page.waitForLoadState('domcontentloaded', { timeout: 30000 }).catch(() => {});
 
-        const searchInput = page.getByPlaceholder('Search Template');
-        await searchInput.click();
-        await searchInput.fill(TEMPLATE_NAME);
+        await pm.alertsPage.searchTemplate(TEMPLATE_NAME);
         await page.waitForTimeout(1000);
 
         const templateRow = page.getByText(TEMPLATE_NAME);
@@ -350,7 +348,7 @@ test.describe("Metrics Alert Notification Chain", () => {
 
         testLogger.info('=== PHASE 2: Open template editor and verify variables ===');
 
-        await page.locator(`[data-test="alert-template-list-${TEMPLATE_NAME}-update-template"]`).click();
+        await pm.alertsPage.clickTemplateUpdateButton(TEMPLATE_NAME);
         await page.waitForTimeout(2000);
 
         const bodyValue = await page.evaluate(() => {

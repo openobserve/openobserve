@@ -2649,6 +2649,30 @@ export class AlertsPage {
         testLogger.info('Closed editor dialog via scoped back button');
     }
 
+    // ==================== TEMPLATE LIST HELPERS ====================
+
+    /**
+     * Search for a template by name in the template list search input.
+     * Uses getByPlaceholder because OSearchInput does not expose a data-test attribute.
+     * @param {string} name - The template name to search for
+     */
+    async searchTemplate(name) {
+        const searchInput = this.page.getByPlaceholder('Search Template');
+        await searchInput.click();
+        await searchInput.fill(name);
+        testLogger.info('Searched for template', { name });
+    }
+
+    /**
+     * Click the update (edit) button for a template in the template list.
+     * @param {string} name - The template name
+     */
+    async clickTemplateUpdateButton(name) {
+        const updateBtn = this.page.locator(`[data-test="alert-template-list-${name}-update-template"]`);
+        await updateBtn.click();
+        testLogger.info('Clicked template update button', { name });
+    }
+
     // ==================== STEP 2 / QUERY CONFIG HELPERS (scheduled features) ====================
 
     /**
