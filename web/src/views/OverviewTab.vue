@@ -208,16 +208,51 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </section>
 
     <!-- Empty state — everything is healthy or no data yet -->
-    <div
+    <OEmptyState
       v-if="!isLoading && anomalies.length === 0 && incidents.length === 0 && services.length === 0 && recentEvents.length === 0"
-      class="ov-empty"
+      illustration="check"
+      size="hero"
+      :hide-action="true"
+      data-test="overview-all-clear-empty-state"
     >
-      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" class="ov-empty-icon">
-        <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-      <div class="ov-empty-title">{{ t('overview.allClear') }}</div>
-      <div class="ov-empty-desc">{{ t('overview.allClearDesc') }}</div>
-    </div>
+      <template #title>{{ t('overview.allClear') }}</template>
+      <template #description>{{ t('overview.allClearDesc') }}</template>
+      <template #actions>
+        <!-- View alerts -->
+        <button type="button" class="ov-action-card" data-test="overview-empty-alerts-card" @click="goToAlertList">
+          <span class="ov-action-card__icon ov-action-card__icon--orange">
+            <OIcon name="notifications" size="md" />
+          </span>
+          <span class="ov-action-card__body">
+            <span class="ov-action-card__label">{{ t('overview.emptyActionAlerts') }}</span>
+            <span class="ov-action-card__sublabel">{{ t('overview.emptyActionAlertsDesc') }}</span>
+          </span>
+          <OIcon name="chevron-right" size="sm" class="ov-action-card__chevron" />
+        </button>
+        <!-- Explore logs -->
+        <button type="button" class="ov-action-card" data-test="overview-empty-logs-card" @click="goToLogs">
+          <span class="ov-action-card__icon ov-action-card__icon--blue">
+            <OIcon name="search" size="md" />
+          </span>
+          <span class="ov-action-card__body">
+            <span class="ov-action-card__label">{{ t('overview.emptyActionLogs') }}</span>
+            <span class="ov-action-card__sublabel">{{ t('overview.emptyActionLogsDesc') }}</span>
+          </span>
+          <OIcon name="chevron-right" size="sm" class="ov-action-card__chevron" />
+        </button>
+        <!-- Explore traces -->
+        <button type="button" class="ov-action-card" data-test="overview-empty-traces-card" @click="goToTraces">
+          <span class="ov-action-card__icon ov-action-card__icon--purple">
+            <OIcon name="account-tree" size="md" />
+          </span>
+          <span class="ov-action-card__body">
+            <span class="ov-action-card__label">{{ t('overview.emptyActionTraces') }}</span>
+            <span class="ov-action-card__sublabel">{{ t('overview.emptyActionTracesDesc') }}</span>
+          </span>
+          <OIcon name="chevron-right" size="sm" class="ov-action-card__chevron" />
+        </button>
+      </template>
+    </OEmptyState>
 
     <!-- Loading skeleton (standard O2 wave shimmer) -->
     <div v-if="isLoading" class="ov-skeleton-wrap">
@@ -247,7 +282,9 @@ import config from "@/aws-exports";
 import DateTime from "@/components/DateTime.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ServiceGraphNodeSidePanel from "@/plugins/traces/ServiceGraphNodeSidePanel.vue";
 
 const { t } = useI18n();
@@ -708,6 +745,18 @@ const goToIncident = (inc: any) => {
     params: { id: inc.id },
     query: { org_identifier: orgId.value },
   });
+};
+
+const goToAlertList = () => {
+  router.push({ name: "alertList", query: { org_identifier: orgId.value } });
+};
+
+const goToLogs = () => {
+  router.push({ name: "logs", query: { org_identifier: orgId.value } });
+};
+
+const goToTraces = () => {
+  router.push({ name: "traces", query: { org_identifier: orgId.value } });
 };
 
 // ── Lifecycle ────────────────────────────────────────────────────────────────
@@ -1233,31 +1282,83 @@ body.body--dark {
   white-space: nowrap;
 }
 
-/* ── Empty state ── */
-.ov-empty {
+/* ── Empty state action cards ── */
+.ov-action-card {
+  position: relative;
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  width: 16rem;
+  max-width: 100%;
+  min-height: 4rem;
+  padding: 0.625rem 0.875rem 0.625rem 0.75rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--color-border-default);
+  background: var(--color-surface-base);
+  box-shadow: var(--shadow-sm);
+  text-align: left;
+  cursor: pointer;
+  transition: color 150ms, background-color 150ms, border-color 150ms, box-shadow 150ms;
+  outline: none;
+}
+.ov-action-card:hover {
+  box-shadow: var(--shadow-md);
+  border-color: var(--color-primary-400);
+  background: var(--color-tabs-hover-bg);
+}
+.ov-action-card:focus-visible {
+  box-shadow: 0 0 0 0.125rem color-mix(in srgb, var(--color-primary-500) 40%, transparent);
+}
+
+.ov-action-card__icon {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
-  padding: 3rem 1rem;
-  color: var(--o2-text-muted);
+  flex-shrink: 0;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 0.5rem;
+  transition: background-color 150ms, color 150ms;
+}
+.ov-action-card__icon--blue   { background: color-mix(in srgb, #3b82f6 12%, transparent); color: #3b82f6; }
+.ov-action-card__icon--purple { background: color-mix(in srgb, #8b5cf6 12%, transparent); color: #8b5cf6; }
+.ov-action-card__icon--orange { background: color-mix(in srgb, #f59e0b 12%, transparent); color: #d97706; }
+.ov-action-card:hover .ov-action-card__icon,
+.ov-action-card:hover .ov-action-card__icon--blue,
+.ov-action-card:hover .ov-action-card__icon--purple,
+.ov-action-card:hover .ov-action-card__icon--orange {
+  background: var(--color-primary-600);
+  color: #fff;
 }
 
-.ov-empty-icon {
-  opacity: 0.4;
+.ov-action-card__body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
 }
-
-.ov-empty-title {
-  font-size: 1rem;
+.ov-action-card__label {
+  font-size: var(--text-sm);
   font-weight: 600;
-  color: var(--o2-text-primary);
+  color: var(--color-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-
-.ov-empty-desc {
-  font-size: 0.8125rem;
-  text-align: center;
-  max-width: 23.75em;
+.ov-action-card__sublabel {
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+  line-height: 1.4;
+}
+.ov-action-card__chevron {
+  flex-shrink: 0;
+  color: var(--color-text-disabled);
+  transition: transform 150ms, color 150ms;
+}
+.ov-action-card:hover .ov-action-card__chevron {
+  transform: translateX(0.125rem);
+  color: var(--color-primary-600);
 }
 
 /* ── Loading skeleton ── */
@@ -1266,11 +1367,6 @@ body.body--dark {
   flex-direction: column;
   gap: 0.5rem;
   padding: 0.5rem 0;
-  /* The app's default skeleton base is grey-200 (#e5e5e5), but the Usage tab's
-     skeleton renders on the lighter grey-100 (#f5f5f5). Override the token here
-     so the Overview skeleton reads the same shade as Usage. OSkeleton picks this
-     up via its bg-skeleton-base (= var(--color-skeleton-base)). */
-  --color-skeleton-base: var(--color-grey-100);
 }
 
 /* Height only — OSkeleton provides the surface, rounding and wave shimmer. */

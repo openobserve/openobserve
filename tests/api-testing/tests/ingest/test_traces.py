@@ -140,8 +140,20 @@ def test_e2e_invalid_trace_ingestion(create_session, base_url):
         "missing field `resourceSpans`" in content["message"]
     ), f"Invalid trace json response expected to contain missing field, but got {content}"
 
+    # the proto3 JSON mapping allows 64-bit integers to be encoded as either
+    # JSON numbers or strings, so numeric timestamps must be accepted
     trace = valid_trace()
-    trace["resourceSpans"][0]["scopeSpans"][0]["spans"][0]["startTimeUnixNano"] = 1724898237575000000
+    span = trace["resourceSpans"][0]["scopeSpans"][0]["spans"][0]
+    span["startTimeUnixNano"] = int(span["startTimeUnixNano"])
+    span["endTimeUnixNano"] = int(span["endTimeUnixNano"])
+    resp_post_trace = session.post(f"{url}api/{org_id}/v1/traces",json=trace)
+
+    assert (
+        resp_post_trace.status_code == 200
+    ), f"Numeric span timestamps expected 200, but got {resp_post_trace.status_code} {resp_post_trace.content}"
+
+    trace = valid_trace()
+    trace["resourceSpans"][0]["scopeSpans"][0]["spans"][0]["startTimeUnixNano"] = "not-a-number"
     resp_post_trace = session.post(f"{url}api/{org_id}/v1/traces",json=trace)
 
     assert (
@@ -150,7 +162,7 @@ def test_e2e_invalid_trace_ingestion(create_session, base_url):
 
     content = resp_post_trace.json()
     assert (
-        "Invalid json: invalid type: integer `1724898237575000000`, expected a string" in content["message"]
+        "Invalid json: invalid digit found in string" in content["message"]
     ), f"Invalid trace json response expected to contain incorrect field, but got {content}"
 
 

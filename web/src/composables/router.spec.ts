@@ -24,6 +24,10 @@ vi.mock("./shared/useIngestionRoutes", () => ({
   default: vi.fn(() => mockIngestionRoutes),
 }));
 
+vi.mock("./shared/useAIRoutes", () => ({
+  default: vi.fn(() => ({ homeChildRoutes: [] })),
+}));
+
 import useOSRoutes from "./router";
 import useIngestionRoutes from "./shared/useIngestionRoutes";
 

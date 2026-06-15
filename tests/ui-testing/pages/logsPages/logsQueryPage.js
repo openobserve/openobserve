@@ -8,7 +8,7 @@ export class LogsQueryPage {
     this.dateTimeButton = '[data-test="date-time-btn"]';
     this.relative15MinButton = '[data-test="date-time-relative-15-m-btn"]';
     this.refreshButton = '[data-test="logs-search-bar-refresh-btn"]';
-    this.errorMessage = '[data-test="logs-search-error-message"]';
+    this.errorMessage = '[data-test="logs-search-error-state"]';
     this.utilitiesMenuButton = '[data-test="logs-search-bar-utilities-menu-btn"]';
     this.resetFiltersButton = '[data-test="logs-search-bar-reset-filters-btn"]';
     this.resultDetail = '[data-test="logs-search-result-detail-undefined"]';
@@ -43,8 +43,23 @@ export class LogsQueryPage {
   }
 
   async clickErrorMessage() {
-    await expect(this.page.locator(this.errorMessage)).toBeVisible({ timeout: 30000 });
-    await this.page.locator(this.errorMessage).click();
+    // Try selectors in priority order:
+    //   logs-search-no-events-found-text — LogsNoEventsState (0 results, no error)
+    //   logs-search-error-state          — LogsErrorState (query/backend error)
+    const candidates = [
+      this.page.locator('[data-test="logs-search-no-events-found-text"]'),
+      this.page.locator(this.errorMessage),
+    ];
+    for (const locator of candidates) {
+      try {
+        await locator.waitFor({ state: 'visible', timeout: 10000 });
+        await locator.click({ force: true });
+        return;
+      } catch (e) {
+        continue;
+      }
+    }
+    throw new Error('No error/no-results message found — checked: logs-search-no-events-found-text, logs-search-error-state');
   }
 
   async clickResetFilters() {
@@ -54,13 +69,13 @@ export class LogsQueryPage {
 
   async clickNoDataFound() {
     // Try data-test selectors in priority order:
-    //   logs-search-no-data-histogram — SearchResult.vue histogram empty state
-    //   logs-search-error-message     — Index.vue "No events found" heading
-    //   logs-search-result-not-found-text — Index.vue "Result not found" div
+    //   logs-search-no-events-found-text — Index.vue LogsNoEventsState (0 hits, search applied)
+    //   logs-search-no-data-histogram    — SearchResult.vue histogram empty state
+    //   logs-search-error-state          — Index.vue error banner (SQL parse / backend error)
     const locators = [
+      this.page.locator('[data-test="logs-search-no-events-found-text"]'),
       this.page.locator('[data-test="logs-search-no-data-histogram"]'),
-      this.page.locator('[data-test="logs-search-error-message"]'),
-      this.page.locator('[data-test="logs-search-result-not-found-text"]'),
+      this.page.locator('[data-test="logs-search-error-state"]'),
     ];
     for (const locator of locators) {
       try {
@@ -71,7 +86,7 @@ export class LogsQueryPage {
         continue;
       }
     }
-    throw new Error('No "no data" message found — checked: logs-search-no-data-histogram, logs-search-error-message, logs-search-result-not-found-text');
+    throw new Error('No "no data" message found — checked: logs-search-no-events-found-text, logs-search-no-data-histogram, logs-search-error-state');
   }
 
   async clickResultDetail() {

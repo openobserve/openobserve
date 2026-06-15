@@ -17,7 +17,7 @@ keywords = [
 license = "AGPL-3.0"
 name = "openobserve"
 repository = "https://github.com/openobserve/openobserve/"
-version = "0.91.0"
+version = "0.92.0"
 publish = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -36,7 +36,6 @@ profiling = [
     "dep:jemalloc_pprof",
     "dep:pprof",
 ]
-pyroscope = ["dep:pyroscope", "dep:pyroscope_pprofrs"]
 tokio-console = ["dep:console-subscriber"]
 
 [profile.release]
@@ -137,8 +136,6 @@ prost.workspace = true
 prost-wkt-types.workspace = true
 proto.workspace = true
 prettytable-rs = "0.10.0"
-pyroscope = { version = "1.0", optional = true }
-pyroscope_pprofrs = { version = "0.2.8", optional = true }
 rand.workspace = true
 rayon.workspace = true
 regex.workspace = true
@@ -363,15 +360,15 @@ md5 = "0.8.0"
 memchr = "2.7"
 murmur3 = "0.5"
 ordered-float = { version = "5.1.0", features = ["serde"] }
-opentelemetry = "0.31"
-opentelemetry_sdk = { version = "0.31", features = [
+opentelemetry = "0.32"
+opentelemetry_sdk = { version = "0.32", features = [
     "experimental_trace_batch_span_processor_with_async_runtime",
     "rt-tokio",
     "trace",
     "metrics",
     "spec_unstable_metrics_views",
 ] }
-opentelemetry-otlp = { version = "0.31", features = [
+opentelemetry-otlp = { version = "0.32", features = [
     "http-proto",
     "serialize",
     "serde",
@@ -379,7 +376,7 @@ opentelemetry-otlp = { version = "0.31", features = [
     "reqwest-client",
     "grpc-tonic",
 ] }
-opentelemetry-proto = { version = "0.31", features = [
+opentelemetry-proto = { version = "0.32", features = [
     "gen-tonic",
     "with-serde",
     "logs",
@@ -395,12 +392,15 @@ rand = "0.10"
 rayon = "1.10"
 regex = "1.11"
 regex-syntax = "0.8"
-reqwest = { version = "0.12", default-features = false, features = [
-    "rustls-tls-native-roots",
+reqwest = { version = "0.13", default-features = false, features = [
+    "rustls",
     "stream",
     "gzip",
     "brotli",
     "deflate",
+    "json",
+    "query",
+    "form",
 ] }
 roaring = "0.11.3"
 rquickjs = { version = "0.11.0", features = ["array-buffer", "classes"] }
@@ -459,7 +459,7 @@ tonic-prost = "0.14"
 tracing = "0.1.44"
 tracing-appender = "0.2.4"
 tracing-log = "0.2"
-tracing-opentelemetry = "0.32"
+tracing-opentelemetry = "0.33"
 tracing-subscriber = { version = "0.3.22", features = [
     "env-filter",
     "json",

@@ -27,7 +27,11 @@ use config::{
     ider::SnowflakeIdGenerator,
     meta::stream::{PartitionTimeLevel, StreamSettings, StreamType},
     stats::MemorySize,
-    utils::{json, schema_ext::SchemaExt, time::now_micros},
+    utils::{
+        json,
+        schema_ext::SchemaExt,
+        time::{BASE_TIME, now_micros},
+    },
 };
 use datafusion::arrow::datatypes::{DataType, Field, FieldRef, Schema, SchemaRef};
 use serde::Serialize;
@@ -401,10 +405,14 @@ pub fn get_stream_setting_bloom_filter_fields(settings: &Option<StreamSettings>)
     }
 }
 
-pub fn get_stream_setting_index_updated_at(
+pub fn get_stream_setting_index_updated_at_for_fields(
     settings: &Option<StreamSettings>,
     created_at: Option<i64>,
+    fields: &[String],
 ) -> i64 {
+    if fields.is_empty() {
+        return 0;
+    }
     let created_at = match created_at {
         Some(created_at) => created_at,
         None => {
@@ -412,16 +420,25 @@ pub fn get_stream_setting_index_updated_at(
             Utc::now().timestamp_micros()
         }
     };
-    match settings {
-        Some(settings) => {
-            if settings.index_updated_at > 0 {
-                settings.index_updated_at
+    let default_updated_at = match settings {
+        Some(settings) if settings.index_updated_at > 0 => settings.index_updated_at,
+        _ => created_at,
+    };
+    fields
+        .iter()
+        .map(|f| {
+            if SQL_SECONDARY_INDEX_SEARCH_FIELDS.contains(f) {
+                BASE_TIME.timestamp_micros()
             } else {
-                created_at
+                settings
+                    .as_ref()
+                    .and_then(|s| s.index_fields_updated_at.get(f))
+                    .copied()
+                    .unwrap_or(default_updated_at)
             }
-        }
-        None => created_at,
-    }
+        })
+        .max()
+        .unwrap_or(default_updated_at)
 }
 
 pub async fn merge(
@@ -1100,27 +1117,66 @@ mod tests {
     }
 
     #[test]
-    fn test_get_stream_setting_index_updated_at() {
-        // Test with None settings and created_at
-        let created_at = 1234567890;
-        let result = get_stream_setting_index_updated_at(&None, Some(created_at));
+    fn test_get_stream_setting_index_updated_at_for_fields() {
+        let base_time = BASE_TIME.timestamp_micros();
+        let created_at = 1_700_000_000_000_000;
+        let mut settings = StreamSettings::default();
+        settings.index_updated_at = 1_750_000_000_000_000;
+        settings
+            .index_fields_updated_at
+            .insert("user_id".to_string(), 1_760_000_000_000_000);
+        let settings = Some(settings);
+
+        // no referenced fields -> no cutoff
+        let fields = Vec::new();
+        let result =
+            get_stream_setting_index_updated_at_for_fields(&settings, Some(created_at), &fields);
+        assert_eq!(result, 0);
+
+        // a field with its own entry uses it
+        let fields = vec!["user_id".to_string()];
+        let result =
+            get_stream_setting_index_updated_at_for_fields(&settings, Some(created_at), &fields);
+        assert_eq!(result, 1_760_000_000_000_000);
+
+        // a field without an entry falls back to the stream-level value
+        let fields = vec!["level".to_string()];
+        let result =
+            get_stream_setting_index_updated_at_for_fields(&settings, Some(created_at), &fields);
+        assert_eq!(result, 1_750_000_000_000_000);
+
+        // multiple fields use the max
+        let fields = vec!["user_id".to_string(), "level".to_string()];
+        let result =
+            get_stream_setting_index_updated_at_for_fields(&settings, Some(created_at), &fields);
+        assert_eq!(result, 1_760_000_000_000_000);
+
+        // None settings falls back to created_at
+        let fields = vec!["user_id".to_string()];
+        let result =
+            get_stream_setting_index_updated_at_for_fields(&None, Some(created_at), &fields);
         assert_eq!(result, created_at);
 
-        // Test with None settings and None created_at
-        let result = get_stream_setting_index_updated_at(&None, None);
-        assert!(result > 0); // Should return current time
+        // default-enabled index fields always resolve to BASE_TIME, even with an entry
+        let mut settings = settings.unwrap();
+        settings
+            .index_fields_updated_at
+            .insert("trace_id".to_string(), 1_760_000_000_000_000);
+        let settings = Some(settings);
+        let fields = vec!["trace_id".to_string()];
+        let result =
+            get_stream_setting_index_updated_at_for_fields(&settings, Some(created_at), &fields);
+        assert_eq!(result, base_time);
+        let fields = vec!["service_name".to_string()];
+        let result =
+            get_stream_setting_index_updated_at_for_fields(&None, Some(created_at), &fields);
+        assert_eq!(result, base_time);
 
-        // Test with settings that have index_updated_at
-        let mut settings = StreamSettings::default();
-        settings.index_updated_at = 9999999999;
-        let result = get_stream_setting_index_updated_at(&Some(settings), Some(created_at));
-        assert_eq!(result, 9999999999);
-
-        // Test with settings that have index_updated_at = 0
-        let mut settings = StreamSettings::default();
-        settings.index_updated_at = 0;
-        let result = get_stream_setting_index_updated_at(&Some(settings), Some(created_at));
-        assert_eq!(result, created_at);
+        // a default field combined with a configured field still uses the max
+        let fields = vec!["trace_id".to_string(), "user_id".to_string()];
+        let result =
+            get_stream_setting_index_updated_at_for_fields(&settings, Some(created_at), &fields);
+        assert_eq!(result, 1_760_000_000_000_000);
     }
 
     #[test]

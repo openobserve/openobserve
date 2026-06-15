@@ -422,7 +422,10 @@
     "menuGroupInspect": "Inspectez",
     "validSql": "SQL valide",
     "invalidSql": "Requête non valide",
-    "menuGroupExplain": "Expliquez"
+    "menuGroupExplain": "Expliquez",
+    "fieldValuesEmpty": "Aucune valeur n'a été trouvée.",
+    "fieldValuesEmptyHint": "Essayez une plage de temps plus large pour voir les valeurs.",
+    "selectLogsStreamFirst": "Sélectionnez d'abord Logs stream"
   },
   "menu": {
     "home": "Accueil",
@@ -525,7 +528,18 @@
     "seekToMoment": "Recherchez ce moment de la session",
     "timeInSession": "Durée de la session",
     "route": "Parcours",
-    "duration": "Durée"
+    "duration": "Durée",
+    "emptyState": {
+      "title": "Surveillez vos utilisateurs grâce à Real User Monitoring",
+      "description": "RUM suit les interactions réelles des utilisateurs (chargements de pages, erreurs, appels d'API et rediffusions de session) afin que vous puissiez voir exactement comment les utilisateurs utilisent votre application.",
+      "webApp": "Instrument une application Web",
+      "webAppDesc": "Ajoutez le SDK OpenObserve RUM à n'importe quelle application JavaScript",
+      "sessionReplay": "Activer la rediffusion de session",
+      "sessionReplayDesc": "Enregistrez et rejouez les sessions utilisateur pour résoudre les problèmes d'expérience utilisateur",
+      "learnMore": "Pour en savoir plus :",
+      "quickImpl": "Guide de mise en œuvre rapide",
+      "blogPost": "Principes de base de la surveillance frontale"
+    }
   },
   "about": {
     "name": "Ouvrez Observe",
@@ -1791,7 +1805,23 @@
     "tabAiAssistant": "Assistant O2 AI",
     "tabOverview": "Vue d'ensemble",
     "tabUsage": "Utilisation",
-    "subtitle": "Votre espace de travail d'observabilité en un coup d'œil"
+    "subtitle": "Votre espace de travail d'observabilité en un coup d'œil",
+    "noDataState": {
+      "title": "Aucune donnée n'a encore été ingérée",
+      "description": "Cette organisation n'a reçu aucune donnée, il n'y a donc rien à répertorier. Une fois que les événements commencent à se dérouler, votre <strong>volume d'ingestion, votre stockage et l'utilisation des requêtes</strong> apparaîtront automatiquement ici.",
+      "logs": "Envoyer des journaux",
+      "logsDesc": "Curl, Filebeat, Fluentbit, Vector et plus",
+      "traces": "Envoyer des traces",
+      "tracesDesc": "Traçage distribué OTLP/Jaeger/Zipkin",
+      "metrics": "Envoyer des métriques",
+      "metricsDesc": "Prometheus, OTel Collector, Telegraf et bien d'autres",
+      "or": "Ou :",
+      "otel": "OpenTelemetry",
+      "kubernetes": "Kubernetes",
+      "aws": "AWS/CloudWatch",
+      "aiIntegrations": "Intégrations d'IA",
+      "shippers": "Expéditeurs de grumes"
+    }
   },
   "billing": {
     "header": "Utilisation et facturation",
@@ -3212,7 +3242,42 @@
     "openInFullView": "Ouvrir en plein écran",
     "serviceMap": "Carte des services",
     "patternView": "Affichage du motif",
-    "spanView": "Vue sur Span"
+    "spanView": "Vue sur Span",
+    "noData": {
+      "title": "Commencez à envoyer des traces à OpenObserve",
+      "description": "Aucun flux de trace n'a encore été trouvé dans cette organisation. Instruisez vos services et les traces apparaîtront automatiquement ici.",
+      "otlp": "Envoyer des traces via OTLP",
+      "otlpDesc": "Jaeger, Zipkin et tout autre SDK compatible avec OpenTelemetry",
+      "otelCollector": "Collectionneur ou agent d'hôtels",
+      "otelCollectorDesc": "Acheminez tous les signaux de télémétrie via l'OTel Collector",
+      "or": "Ou :",
+      "kubernetes": "Kubernetes",
+      "python": "Python",
+      "java": "Java",
+      "nodejs": "Node.js",
+      "askAi": "Demandez à l'IA de configurer le traçage"
+    },
+    "noStream": {
+      "title": "Choisissez un stream pour commencer à explorer",
+      "description": "Choisissez un flux de trace, puis appuyez sur <strong>Exécuter la requête</strong>. Vous pouvez filtrer par service, durée, statut de la période, etc. une fois les résultats chargés.",
+      "selectStream": "Sélectionnez un flux",
+      "selectStreamDesc": "Parcourir les flux de traces disponibles dans cette organisation",
+      "queryGuide": "Lisez le guide des traces",
+      "queryGuideDesc": "Graphique de service, filtrage des intervalles, métriques RED, etc.",
+      "recent": "Récent :"
+    },
+    "noEvents": {
+      "title": "Aucune trace trouvée",
+      "descNoFilters": "Aucune trace n'a été trouvée dans {range}. Essayez d'élargir la plage de temps pour charger les résultats.",
+      "descWithFilters": "Rien ne correspond à <strong>cette requête</strong> dans la fenêtre sélectionnée. Essayez d'élargir la plage horaire ou de supprimer un filtre.",
+      "expandRange": "Élargir la plage horaire",
+      "expandRangeDescAbsolute": "Passez à une plage de temps relative plus large",
+      "removeFilter": "Supprimer un filtre",
+      "selectedRange": "la gamme sélectionnée"
+    },
+    "showAll": "Afficher tout",
+    "filterByErrors": "Filtrer par erreur",
+    "clearErrorFilter": "Effacer le filtre d'erreur"
   },
   "invitation": {
     "pendingInvitations": "Invitations en attente",
@@ -3495,7 +3560,9 @@
     "timeRangeLabel": "Plage de temps :",
     "analyzeTooltipTraces": "Analysez les dimensions des traces pour déterminer le taux, la latence et les modèles d'erreur",
     "insightsButtonLabel": "Perspectives",
-    "searchInspectionsLabel": "Inspectez les détails de l'exécution des tâches de recherche"
+    "searchInspectionsLabel": "Inspectez les détails de l'exécution des tâches de recherche",
+    "inspectBtnLabel": "Inspectez",
+    "analyzeBtnLabel": "Perspectives"
   },
   "errorInsights": {
     "title": "Perspectives",
@@ -3973,7 +4040,13 @@
     "elevatedErrorRate": "Taux d'erreur élevé",
     "reqPerSec": "reque/s",
     "allClear": "Tout est clair",
-    "allClearDesc": "Aucune anomalie active, aucun incident ou service dégradé dans la fenêtre de temps sélectionnée."
+    "allClearDesc": "Aucune anomalie active, aucun incident ou service dégradé dans la fenêtre de temps sélectionnée.",
+    "emptyActionAlerts": "Afficher les règles d'alerte",
+    "emptyActionAlertsDesc": "Passez en revue les alertes et les seuils configurés",
+    "emptyActionLogs": "Explorez les journaux",
+    "emptyActionLogsDesc": "Recherchez et filtrez vos flux de journaux",
+    "emptyActionTraces": "Explorez les traces",
+    "emptyActionTracesDesc": "Inspectez les traces distribuées et la latence des services"
   },
   "chatHistory": {
     "title": "Discussions",
@@ -4357,6 +4430,14 @@
     "noPipelineHistory": {
       "title": "Pas encore d'historique du pipeline",
       "description": "L'historique d'exécution des pipelines apparaîtra ici une fois que vos pipelines seront exécutés."
+    },
+    "noStreamSelected": {
+      "title": "Sélectionnez un stream pour commencer",
+      "description": "Choisissez un flux dans la liste déroulante de gauche, puis appuyez sur « Exécuter la requête » pour explorer vos journaux. Vous pouvez également appliquer des filtres supplémentaires et ajuster la plage de dates."
+    },
+    "noQueryApplied": {
+      "title": "Exécutez une requête pour voir les journaux",
+      "description": "Ajustez vos filtres et cliquez sur « Exécuter la requête » pour charger les événements pour ce flux."
     }
   },
   "onlineEvals": {
@@ -4715,5 +4796,111 @@
       "scorers": "Buteurs",
       "scoreConfigs": "Configurations de score"
     }
+  },
+  "logs": {
+    "noData": {
+      "title": "Commencez à envoyer des données à OpenObserve",
+      "description": "Il n'y a pas encore de données dans cette organisation, il n'y a donc aucun flux à explorer. Envoyez vos premiers journaux et ils s'afficheront automatiquement ici. Choisissez par où vous voulez commencer.",
+      "curl": "Envoyer via l'API Curl/HTTP",
+      "curlDesc": "Méthode la plus rapide : collez une commande et les journaux commencent à circuler",
+      "shippers": "Utilisez un chargeur de grumes",
+      "shippersDesc": "Filebeat, Fluentbit, Fluentd, Vector, SysLogng et plus",
+      "otel": "OpenTelemetry",
+      "otelDesc": "Ingestion OTLP indépendante du fournisseur pour les journaux, les traces et les métriques",
+      "or": "Ou :",
+      "kubernetes": "Kubernetes",
+      "aws": "AWS/CloudWatch",
+      "linux": "Linux",
+      "windows": "Fenêtres",
+      "askAi": "Demandez à l'IA de configurer l'ingestion"
+    },
+    "noStream": {
+      "title": "Choisissez un stream pour commencer à explorer",
+      "description": "Choisissez un flux, puis appuyez sur <strong>Exécuter la requête</strong>. Vous pouvez affiner à l'aide de filtres, d'une fonction VRL et d'une plage de temps personnalisée une fois les résultats obtenus.",
+      "selectStream": "Sélectionnez un flux",
+      "selectStreamDesc": "Parcourez les journaux, les traces, les métriques et les flux RUM",
+      "queryGuide": "Lisez le guide des requêtes",
+      "queryGuideDesc": "Filtres, mode SQL, VRL et vues enregistrées",
+      "recent": "Récent :"
+    },
+    "noEvents": {
+      "title": "Aucun événement n'a été trouvé",
+      "descNoFilters": "Aucun événement n'a été trouvé dans {range}. Essayez d'élargir la plage de temps pour charger les résultats.",
+      "descWithFilters": "Rien ne correspond à <strong>cette requête</strong> dans la fenêtre sélectionnée. Essayez d'élargir la plage horaire, d'assouplir un filtre ou de réinitialiser la requête.",
+      "expandRange": "Élargir la plage horaire",
+      "expandRangeDescAbsolute": "Passez à une plage de temps relative plus large",
+      "removeFilter": "Supprimer un filtre",
+      "removeFilterDescSql": "Des conditions SQL sont appliquées à cette requête",
+      "openHistory": "Ouvrir l'historique des recherches",
+      "askAi": "Demandez à AI de corriger ma requête",
+      "selectedRange": "la gamme sélectionnée"
+    },
+    "error": {
+      "sqlError": "Erreur de syntaxe SQL",
+      "sqlErrorDesc": "Votre requête comporte une erreur de syntaxe. Consultez l'éditeur de requêtes pour détecter les erreurs surlignées.",
+      "streamNotFound": "Stream introuvable",
+      "streamNotFoundDesc": "Le flux sélectionné n'existe pas ou a été supprimé.",
+      "ftsNotConfigured": "La recherche en texte intégral n'est pas configurée",
+      "ftsNotConfiguredDesc": "Ce flux ne possède pas de champ de recherche en texte intégral. Configurez-en un pour activer la recherche par mot clé.",
+      "fieldNotFound": "Champ introuvable",
+      "fieldNotFoundDesc": "Votre requête fait référence à un ou plusieurs champs qui n'existent pas dans ce flux.",
+      "functionNotDefined": "Fonction non définie",
+      "functionNotDefinedDesc": "Votre requête appelle une fonction VRL qui n'est pas définie.",
+      "dataUnavailable": "Fichiers de données non disponibles",
+      "dataUnavailableDesc": "Certains fichiers de données correspondant à cette plage de temps sont inaccessibles. Essayez un autre créneau horaire.",
+      "dataTypeMismatch": "Incompatibilité entre les types de données",
+      "dataTypeMismatchDesc": "Un champ de votre requête est utilisé avec un type de données incompatible.",
+      "executionError": "L'exécution de la requête a échoué",
+      "executionErrorDesc": "Une erreur s'est produite lors de l'exécution de votre requête.",
+      "serverError": "Erreur du serveur",
+      "serverErrorDesc": "Une erreur interne s'est produite sur le serveur.",
+      "generic": "Erreur de recherche",
+      "genericDesc": "Une erreur s'est produite lors de la récupération des événements de recherche.",
+      "configureStream": "Configurer le flux",
+      "configureStreamDesc": "Ajouter un champ de recherche en texte intégral dans les paramètres du flux",
+      "fixQuery": "Corrigez la requête",
+      "fixQueryDesc": "Vérifiez et corrigez la requête dans l'éditeur",
+      "expandRange": "Essayez une autre plage horaire",
+      "expandRangeDesc": "Les données accessibles peuvent se trouver dans une fenêtre temporelle différente",
+      "copyError": "Copier les détails de l'erreur",
+      "traceId": "ID de trace :",
+      "askAi": "Demandez à AI de corriger ma requête",
+      "showDetail": "Afficher les détails",
+      "hideDetail": "Masquer les détails"
+    }
+  },
+  "queryError": {
+    "sqlError": "Erreur de syntaxe SQL",
+    "sqlErrorDesc": "Votre requête comporte une erreur de syntaxe. Consultez l'éditeur pour voir s'il y a des erreurs surlignées.",
+    "streamNotFound": "Stream introuvable",
+    "streamNotFoundDesc": "Le flux sélectionné n'existe pas ou a été supprimé.",
+    "ftsNotConfigured": "La recherche en texte intégral n'est pas configurée",
+    "ftsNotConfiguredDesc": "Ce flux ne possède pas de champ de recherche en texte intégral. Configurez-en un pour activer la recherche par mot clé.",
+    "fieldNotFound": "Champ introuvable",
+    "fieldNotFoundDesc": "Votre requête fait référence à un ou plusieurs champs qui n'existent pas dans ce flux.",
+    "functionNotDefined": "Fonction non définie",
+    "functionNotDefinedDesc": "Votre requête appelle une fonction VRL qui n'est pas définie.",
+    "dataUnavailable": "Fichiers de données non disponibles",
+    "dataUnavailableDesc": "Certains fichiers de données correspondant à cette plage de temps sont inaccessibles. Essayez un autre créneau horaire.",
+    "dataTypeMismatch": "Incompatibilité entre les types de données",
+    "dataTypeMismatchDesc": "Un champ de votre requête est utilisé avec un type de données incompatible.",
+    "executionError": "L'exécution de la requête a échoué",
+    "executionErrorDesc": "Une erreur s'est produite lors de l'exécution de votre requête.",
+    "serverError": "Erreur du serveur",
+    "serverErrorDesc": "Une erreur interne s'est produite sur le serveur.",
+    "generic": "Erreur de requête",
+    "genericDesc": "Une erreur s'est produite lors du traitement de votre requête.",
+    "configureResource": "Configurer le flux",
+    "configureResourceDesc": "Ajouter un champ de recherche en texte intégral dans les paramètres du flux",
+    "fixQuery": "Corrigez la requête",
+    "fixQueryDesc": "Vérifiez et corrigez la requête dans l'éditeur",
+    "expandRange": "Essayez une autre plage horaire",
+    "expandRangeDesc": "Les données accessibles peuvent se trouver dans une fenêtre temporelle différente",
+    "copyError": "Copier les détails de l'erreur",
+    "copied": "Copié !",
+    "traceId": "ID de trace :",
+    "askAi": "Demandez à AI de corriger ma requête",
+    "showDetail": "Afficher les détails",
+    "hideDetail": "Masquer les détails"
   }
 }

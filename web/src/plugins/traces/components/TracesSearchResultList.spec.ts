@@ -131,12 +131,13 @@ vi.mock("@/components/TenstackTable.vue", () => ({
     setup() {
       return { cellActionsColumn: cellActionsColumnRef };
     },
-    // Mirror the real slot behaviour used by TracesSearchResultList.
+    // Mirror the real skeleton behaviour used by TenstackTable.
     // Also render cell slots for the first row so slot-split tests can assert on rendered output.
     template: `
       <div data-test="stub-traces-table">
-        <slot v-if="loading && (!rows || rows.length === 0)" name="loading" />
-        <slot v-else name="empty" />
+        <div v-if="loading && (!$slots.loading)" data-test="tenstack-table-skeleton-body">Skeleton loading...</div>
+        <slot v-if="loading && (!rows || rows.length === 0) && $slots.loading" name="loading" />
+        <slot v-else-if="!loading" name="empty" />
         <template v-if="rows && rows.length">
           <div data-test="stub-cell-span_status"><slot name="cell-span_status" :item="rows[0]" /></div>
           <div data-test="stub-cell-status"><slot name="cell-status" :item="rows[0]" /></div>
@@ -214,10 +215,10 @@ describe("TracesSearchResultList", () => {
 
   // ─── Loading state ────────────────────────────────────────────────────────
   describe("loading state", () => {
-    it("shows a spinner while loading", () => {
+    it("shows skeleton while loading", () => {
       wrapper = mount_({ hits: [], loading: true });
       expect(
-        wrapper.find('[data-test="traces-search-result-loading-indicator"]').exists(),
+        wrapper.find('[data-test="tenstack-table-skeleton-body"]').exists(),
       ).toBe(true);
     });
 

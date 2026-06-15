@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashSet, sync::Arc};
+use std::sync::Arc;
 
 use config::meta::inverted_index::{IndexOptimizeMode, MAX_SIMPLE_TOPN_FIELDS};
 use datafusion::{
@@ -26,10 +26,11 @@ use datafusion::{
         sorts::sort_preserving_merge::SortPreservingMergeExec,
     },
 };
+use hashbrown::HashSet;
 
 use crate::service::search::datafusion::optimizer::physical_optimizer::{
     index_optimizer::utils::is_complex_plan,
-    utils::{get_column_name, is_column},
+    utils::{get_column_name, is_column, is_count_rows_aggregate},
 };
 
 #[rustfmt::skip]
@@ -144,7 +145,7 @@ impl<'n> TreeNodeVisitor<'n> for SimpleTopnVisitor {
             let group_len = aggregate.group_expr().expr().len();
             if !(1..=MAX_SIMPLE_TOPN_FIELDS).contains(&group_len)
                 || aggregate.aggr_expr().len() != 1
-                || aggregate.aggr_expr()[0].name() != "count(Int64(1))"
+                || !is_count_rows_aggregate(&aggregate.aggr_expr()[0])
                 // the projection (if any) should be exactly the group by fields + count(*)
                 || self.projection_len.is_some_and(|len| len != group_len + 1)
             {
@@ -225,6 +226,14 @@ mod tests {
                 )),
             ),
             (
+                "select name, count(_timestamp) as cnt from t where match_all('error') group by name order by cnt desc limit 10",
+                Some(IndexOptimizeMode::SimpleTopN(
+                    vec!["name".to_string()],
+                    10,
+                    false,
+                )),
+            ),
+            (
                 "select name as key, count(*) as cnt from t where match_all('error') group by key order by cnt desc limit 10",
                 Some(IndexOptimizeMode::SimpleTopN(
                     vec!["name".to_string()],
@@ -290,6 +299,12 @@ mod tests {
             // Invalid case: wrong aggregate function (not count)
             (
                 "select name, max(name) as maximum from t where match_all('error') group by name order by maximum desc limit 10",
+                None,
+            ),
+            // Invalid case: count over a nullable/non-timestamp field is not equivalent to
+            // count(*)
+            (
+                "select name, count(id) as cnt from t where match_all('error') group by name order by cnt desc limit 10",
                 None,
             ),
             ("SELECT count(*) from t", None),

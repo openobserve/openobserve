@@ -422,7 +422,10 @@
     "menuGroupInspect": "検査",
     "validSql": "有効な SQL",
     "invalidSql": "クエリが無効です",
-    "menuGroupExplain": "説明してください"
+    "menuGroupExplain": "説明してください",
+    "fieldValuesEmpty": "値が見つかりません。",
+    "fieldValuesEmptyHint": "より広い時間範囲を試して値を確認してください。",
+    "selectLogsStreamFirst": "最初に [ログストリーム] を選択します"
   },
   "menu": {
     "home": "ホーム",
@@ -525,7 +528,18 @@
     "seekToMoment": "セッションの今この瞬間を探して",
     "timeInSession": "セッション時間",
     "route": "ルート",
-    "duration": "所要時間"
+    "duration": "所要時間",
+    "emptyState": {
+      "title": "リアルユーザーモニタリングでユーザーを監視する",
+      "description": "RUM は実際のユーザーインタラクション (ページの読み込み、エラー、API 呼び出し、セッションリプレイ) を追跡するので、ユーザーがアプリケーションをどのように体験しているかを正確に把握できます。",
+      "webApp": "Web アプリをインストゥルメントする",
+      "webAppDesc": "OpenObserve RUM SDK を任意の JavaScript アプリに追加してください",
+      "sessionReplay": "セッションリプレイを有効にする",
+      "sessionReplayDesc": "ユーザーセッションを記録および再生して、UX の問題をデバッグする",
+      "learnMore": "さらに詳しく:",
+      "quickImpl": "クイック実装ガイド",
+      "blogPost": "フロントエンド監視の基本"
+    }
   },
   "about": {
     "name": "OpenObserve",
@@ -1808,7 +1822,23 @@
     "tabAiAssistant": "O2 人工知能アシスタント",
     "tabOverview": "概要",
     "tabUsage": "使い方",
-    "subtitle": "一目でわかるオブザーバビリティワークスペース"
+    "subtitle": "一目でわかるオブザーバビリティワークスペース",
+    "noDataState": {
+      "title": "データはまだ取り込まれていません",
+      "description": "この組織はまだデータを受け取っていないため、グラフ化するものはありません。イベントが流れ始めると、<strong>取り込み量、ストレージ、クエリ使用量が自動的にここに表示されます</strong>。",
+      "logs": "ログを送信",
+      "logsDesc": "カール、ファイルビート、フルーエントビット、ベクターなど",
+      "traces": "トレースを送信",
+      "tracesDesc": "OTLP/Jaeger/Zipkin ディストリビューティッド・トレーシング",
+      "metrics": "指標を送信",
+      "metricsDesc": "プロメテウス、ホテルコレクター、テレグラフなど",
+      "or": "または:",
+      "otel": "オープンテレメトリ",
+      "kubernetes": "クベルネテス",
+      "aws": "AWS/CloudWatch",
+      "aiIntegrations": "AI インテグレーション",
+      "shippers": "ログシッパー"
+    }
   },
   "billing": {
     "header": "使用状況と請求",
@@ -3233,7 +3263,42 @@
     "openInFullView": "フルビューで開く",
     "serviceMap": "サービスマップ",
     "patternView": "パターンビュー",
-    "spanView": "スパンビュー"
+    "spanView": "スパンビュー",
+    "noData": {
+      "title": "OpenObserveへのトレースの送信を開始する",
+      "description": "この組織にはまだトレースストリームが見つかりません。インストゥルメントされたサービスとトレースがここに自動的に表示されます。",
+      "otlp": "OTLP 経由でトレースを送信",
+      "otlpDesc": "イエーガー、ジプキン、その他オープンテレメトリー対応SDK",
+      "otelCollector": "ホテルコレクター/エージェント",
+      "otelCollectorDesc": "すべてのテレメトリ信号を OTel コレクター経由でルーティング",
+      "or": "または:",
+      "kubernetes": "クベルネテス",
+      "python": "Python",
+      "java": "Java",
+      "nodejs": "Node.js",
+      "askAi": "AIにトレーシングの設定を依頼"
+    },
+    "noStream": {
+      "title": "ストリームを選んで探索を始めましょう",
+      "description": "トレースストリームを選択し、[<strong>クエリの実行</strong>] を押します。結果が読み込まれたら、サービス、期間、スパンステータスなどでフィルタリングできます。",
+      "selectStream": "ストリームを選択する",
+      "selectStreamDesc": "この組織で利用可能なトレースストリームを閲覧する",
+      "queryGuide": "トレースガイドを読む",
+      "queryGuideDesc": "サービスグラフ、スパンフィルタリング、RED メトリクスなど",
+      "recent": "最近:"
+    },
+    "noEvents": {
+      "title": "トレースが見つかりません",
+      "descNoFilters": "{range} にはトレースが見つかりませんでした。結果を読み込むには、時間範囲を広げてみてください。",
+      "descWithFilters": "選択したウィンドウには、<strong>このクエリと一致するものはありません</strong>。時間範囲を広げるか、フィルターを削除してみてください。",
+      "expandRange": "時間範囲を広げる",
+      "expandRangeDescAbsolute": "より広い相対時間範囲に切り替える",
+      "removeFilter": "フィルターを削除する",
+      "selectedRange": "選択した範囲"
+    },
+    "showAll": "[すべて表示]",
+    "filterByErrors": "エラーで絞り込む",
+    "clearErrorFilter": "エラーフィルターをクリア"
   },
   "actions": {
     "testAction": "アクションをテスト",
@@ -3495,7 +3560,9 @@
     "timeRangeLabel": "時間範囲:",
     "analyzeTooltipTraces": "レート、レイテンシー、エラーパターンのトレースディメンションを分析",
     "insightsButtonLabel": "インサイト",
-    "searchInspectionsLabel": "検索ジョブの実行詳細を検査する"
+    "searchInspectionsLabel": "検索ジョブの実行詳細を検査する",
+    "inspectBtnLabel": "検査",
+    "analyzeBtnLabel": "インサイト"
   },
   "errorInsights": {
     "title": "インサイト",
@@ -3973,7 +4040,13 @@
     "elevatedErrorRate": "エラー率の上昇",
     "reqPerSec": "要求/秒",
     "allClear": "すべてクリア",
-    "allClearDesc": "選択した時間枠には、アクティブな異常、インシデント、または低下したサービスはありません。"
+    "allClearDesc": "選択した時間枠には、アクティブな異常、インシデント、または低下したサービスはありません。",
+    "emptyActionAlerts": "アラートルールを表示する",
+    "emptyActionAlertsDesc": "設定したアラートと閾値を確認",
+    "emptyActionLogs": "ログを見る",
+    "emptyActionLogsDesc": "ログストリームの検索とフィルタリング",
+    "emptyActionTraces": "トレースを調べる",
+    "emptyActionTracesDesc": "分散型トレースとサービスレイテンシーの検査"
   },
   "chatHistory": {
     "title": "チャット",
@@ -4357,6 +4430,14 @@
     "noPipelineHistory": {
       "title": "パイプライン履歴はまだありません",
       "description": "パイプラインが実行されると、パイプライン実行履歴がここに表示されます。"
+    },
+    "noStreamSelected": {
+      "title": "ストリームを選択して始めましょう",
+      "description": "左側のドロップダウンからストリームを選択し、[クエリを実行] を押してログを調べます。また、追加のフィルターを適用したり、日付範囲を調整したりすることもできます。"
+    },
+    "noQueryApplied": {
+      "title": "クエリを実行してログを確認する",
+      "description": "フィルターを調整し、[クエリを実行] をクリックしてこのストリームのイベントをロードします。"
     }
   },
   "onlineEvals": {
@@ -4715,5 +4796,111 @@
       "scorers": "スコアラー",
       "scoreConfigs": "スコア構成"
     }
+  },
+  "logs": {
+    "noData": {
+      "title": "オープンオブザーブ (OpenObserve) へのデータ送信",
+      "description": "この組織にはまだデータがないため、調べるべきストリームはありません。最初のログを送信すると、自動的にここに表示されます。開始方法を選択してください。",
+      "curl": "Curl/HTTP API 経由で送信",
+      "curlDesc": "一番手っ取り早い方法 — コマンドを1つ貼り付けるとログが流れ始める",
+      "shippers": "ログシッパーを使う",
+      "shippersDesc": "ファイルビート、フルーエントビット、フルーエント、ベクター、システムログなど",
+      "otel": "オープンテレメトリ",
+      "otelDesc": "ログ、トレース、メトリクスのベンダーに依存しないOTLPインジェスト",
+      "or": "または:",
+      "kubernetes": "クベルネテス",
+      "aws": "AWS/CloudWatch",
+      "linux": "リナックス",
+      "windows": "Windows",
+      "askAi": "AIにインジェストの設定を依頼"
+    },
+    "noStream": {
+      "title": "ストリームを選んで探索を始めましょう",
+      "description": "ストリームを選択し、[<strong>クエリの実行</strong>] を押します。結果が出たら、フィルター、VRL 関数、カスタム時間範囲を使用して絞り込むことができます。",
+      "selectStream": "ストリームを選択する",
+      "selectStreamDesc": "ログ、トレース、メトリクス、RUM ストリームを閲覧",
+      "queryGuide": "クエリガイドを読む",
+      "queryGuideDesc": "フィルター、SQL モード、VRL、保存済みビュー",
+      "recent": "最近:"
+    },
+    "noEvents": {
+      "title": "イベントが見つかりません",
+      "descNoFilters": "{range} にはイベントが見つかりませんでした。結果を読み込むには、時間範囲を広げてみてください。",
+      "descWithFilters": "選択したウィンドウには、<strong>このクエリと一致するものはありません</strong>。時間範囲を広げるか、フィルターを緩めるか、クエリをリセットしてみてください。",
+      "expandRange": "時間範囲を広げる",
+      "expandRangeDescAbsolute": "より広い相対時間範囲に切り替える",
+      "removeFilter": "フィルターを削除する",
+      "removeFilterDescSql": "このクエリには SQL 条件が適用されています",
+      "openHistory": "検索履歴を開く",
+      "askAi": "AI にクエリの修正を依頼する",
+      "selectedRange": "選択した範囲"
+    },
+    "error": {
+      "sqlError": "SQL シンタックスエラー",
+      "sqlErrorDesc": "クエリに構文エラーがあります。エラーが強調表示されていないか、クエリエディターを確認してください。",
+      "streamNotFound": "ストリームが見つかりません",
+      "streamNotFoundDesc": "選択したストリームは存在しないか、削除されました。",
+      "ftsNotConfigured": "全文検索が設定されていません",
+      "ftsNotConfiguredDesc": "このストリームには全文検索フィールドがありません。キーワード検索を有効にするように設定してください。",
+      "fieldNotFound": "フィールドが見つかりません",
+      "fieldNotFoundDesc": "クエリは、このストリームに存在しない 1 つまたは複数のフィールドを参照しています。",
+      "functionNotDefined": "関数が定義されていません",
+      "functionNotDefinedDesc": "クエリが定義されていない VRL 関数を呼び出しています。",
+      "dataUnavailable": "データファイルを使用できません",
+      "dataUnavailableDesc": "この時間範囲の一部のデータファイルにアクセスできません。別の時間枠を試してください。",
+      "dataTypeMismatch": "データ型が一致しません",
+      "dataTypeMismatchDesc": "クエリのフィールドが、互換性のないデータ型で使用されています。",
+      "executionError": "クエリの実行が失敗しました",
+      "executionErrorDesc": "クエリの実行中にエラーが発生しました。",
+      "serverError": "サーバーエラー",
+      "serverErrorDesc": "サーバーで内部エラーが発生しました。",
+      "generic": "検索エラー",
+      "genericDesc": "検索イベントの取得中にエラーが発生しました。",
+      "configureStream": "ストリームを設定",
+      "configureStreamDesc": "ストリーム設定に全文検索フィールドを追加する",
+      "fixQuery": "クエリを修正",
+      "fixQueryDesc": "エディターでクエリを確認して修正してください",
+      "expandRange": "別の時間範囲を試してください",
+      "expandRangeDesc": "アクセス可能なデータは別のタイムウィンドウにある可能性があります",
+      "copyError": "エラーの詳細をコピー",
+      "traceId": "トレース ID:",
+      "askAi": "AI にクエリの修正を依頼する",
+      "showDetail": "詳細を表示",
+      "hideDetail": "詳細を非表示にする"
+    }
+  },
+  "queryError": {
+    "sqlError": "SQL シンタックスエラー",
+    "sqlErrorDesc": "クエリに構文エラーがあります。エディターでエラーが強調表示されていないか確認してください。",
+    "streamNotFound": "ストリームが見つかりません",
+    "streamNotFoundDesc": "選択したストリームは存在しないか、削除されました。",
+    "ftsNotConfigured": "全文検索が設定されていません",
+    "ftsNotConfiguredDesc": "このストリームには全文検索フィールドがありません。キーワード検索を有効にするように設定してください。",
+    "fieldNotFound": "フィールドが見つかりません",
+    "fieldNotFoundDesc": "クエリは、このストリームに存在しない 1 つまたは複数のフィールドを参照しています。",
+    "functionNotDefined": "関数が定義されていません",
+    "functionNotDefinedDesc": "クエリが定義されていない VRL 関数を呼び出しています。",
+    "dataUnavailable": "データファイルを使用できません",
+    "dataUnavailableDesc": "この時間範囲の一部のデータファイルにアクセスできません。別の時間枠を試してください。",
+    "dataTypeMismatch": "データ型が一致しません",
+    "dataTypeMismatchDesc": "クエリのフィールドが、互換性のないデータ型で使用されています。",
+    "executionError": "クエリの実行が失敗しました",
+    "executionErrorDesc": "クエリの実行中にエラーが発生しました。",
+    "serverError": "サーバーエラー",
+    "serverErrorDesc": "サーバーで内部エラーが発生しました。",
+    "generic": "クエリーエラー",
+    "genericDesc": "クエリの処理中にエラーが発生しました。",
+    "configureResource": "ストリームを設定",
+    "configureResourceDesc": "ストリーム設定に全文検索フィールドを追加する",
+    "fixQuery": "クエリを修正",
+    "fixQueryDesc": "エディターでクエリを確認して修正してください",
+    "expandRange": "別の時間範囲を試してください",
+    "expandRangeDesc": "アクセス可能なデータは別のタイムウィンドウにある可能性があります",
+    "copyError": "エラーの詳細をコピー",
+    "copied": "コピーされました！",
+    "traceId": "トレース ID:",
+    "askAi": "AI にクエリの修正を依頼する",
+    "showDetail": "詳細を表示",
+    "hideDetail": "詳細を非表示にする"
   }
 }

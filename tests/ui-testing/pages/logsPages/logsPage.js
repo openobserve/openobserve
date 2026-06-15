@@ -120,7 +120,7 @@ export class LogsPage {
         this.savedViewByLabel = '[data-test$="-option"]';
         this.notificationMessage = '[role="alert"]';
         this.indexFieldSearchInput = '[data-test="logs-search-index-list"] [data-test="o-field-list-search-field"]';
-        this.errorMessage = '[data-test="logs-search-error-message"]';
+        this.errorMessage = '[data-test="logs-search-error-state"]';
         this.warningElement = 'text=warning Query execution';
         this.logsTable = '[data-test="logs-search-result-logs-table"]';
         // Additional locators for multistream functionality
@@ -193,8 +193,13 @@ export class LogsPage {
 
         // Error handling locators
         this.errorIcon = 'text=error';
-        this.resultErrorDetailsBtn = '[data-test="logs-page-result-error-details-btn"]';
-        this.searchDetailErrorMessage = '[data-test="logs-search-detail-error-message"]';
+        // Hero layout (logs page): error-detail-toggle-btn (ErrorDetailPanel) + error-detail-body
+        // Block layout (panels):   query-error-toggle-detail-btn + query-error-detail-expanded
+        this.resultErrorDetailsBtn = '[data-test="error-detail-toggle-btn"], [data-test="query-error-toggle-detail-btn"]';
+        this.searchDetailErrorMessage = '[data-test="error-detail-body"], [data-test="query-error-detail-expanded"]';
+        // Always-visible first sentence of the error (carries the field/function name).
+        // Hero layout: error-detail-summary · Block layout: query-error-summary
+        this.searchErrorSummary = '[data-test="error-detail-summary"], [data-test="query-error-summary"]';
 
         // Download locators (SearchBar.vue more-options dropdown + custom-download ODialog)
         this.moreOptionsBtn = '[data-test="logs-search-bar-more-options-btn"]';
@@ -341,7 +346,7 @@ export class LogsPage {
         this.dimensionSearchInputField = '[data-test="dimension-search-input-field"]';
         // Analysis dashboard states
         this.analysisDashboardLoading = '[data-test="traces-analysis-dashboard-drawer"] [data-test="traces-analysis-dashboard-loading-indicator"]';
-        this.analysisDashboardError = '[data-test="traces-analysis-dashboard-drawer"] [data-test="logs-search-error-message"], [data-test="traces-analysis-dashboard-drawer"] [role="alert"]';
+        this.analysisDashboardError = '[data-test="traces-analysis-dashboard-drawer"] [data-test="logs-search-error-state"], [data-test="traces-analysis-dashboard-drawer"] [role="alert"]';
         // Loading indicator (top-level — appears immediately on click, before drawer's scoped placement)
         this.analysisDashboardLoadingIndicator = '[data-test="traces-analysis-dashboard-loading-indicator"]';
         // Dimension checkboxes (any value)
@@ -3579,38 +3584,65 @@ export class LogsPage {
 
     async expectErrorMessageVisible() {
         // Covers two error display paths in Index.vue:
-        // - errorMsg path: data-test="logs-search-error-message" (query/backend error)
+        // - errorMsg path: data-test="logs-search-error-state" (query/backend error)
         // - filterErrMsg path: data-test="logs-search-filter-error-message" (quickmode filter parse error)
         const errorLocator = this.page.locator(
-            `[data-test="logs-search-error-message"], [data-test="logs-search-filter-error-message"]`
+            `[data-test="logs-search-error-state"], [data-test="logs-search-filter-error-message"]`
         ).first();
         return await expect(errorLocator).toBeVisible({ timeout: 30000 });
     }
 
     /**
-     * Get the detailed error dialog text
-     * Clicks on error details button if available and returns the error message text
-     * @returns {Promise<string>} The error dialog text
+     * Get the detailed error dialog text.
+     *
+     * Expands the collapsible error detail panel (best effort) and returns the
+     * FULL error message — both the always-visible summary line (which carries
+     * the offending field/function name) and the expanded detail body (e.g.
+     * "Valid fields are …"). Earlier this returned only the detail body, which
+     * after the QueryErrorState redesign omits the field name.
+     *
+     * @returns {Promise<string>} The full error dialog text (summary line + detail body)
      */
     async getDetailedErrorDialogText() {
-        // Try to click the error details button if visible
-        const detailsBtn = this.page.locator(this.resultErrorDetailsBtn);
+        // The QueryErrorState redesign splits the backend message across two
+        // elements: the summary line (data-test="error-detail-summary",
+        // always visible) carries the first sentence — which is where the
+        // offending field/function name lives (e.g. "No field named X.") —
+        // while the remainder ("Valid fields are …") is tucked behind the
+        // expand toggle in the detail body (data-test="error-detail-body").
+        // Reading only the detail body misses the field name, so we expand the
+        // panel (best effort) and return the WHOLE error container text — the
+        // summary line plus the detail body — to assert against the full message.
+
+        // Expand the collapsible detail panel if a toggle is present.
+        const detailsBtn = this.page.locator(this.resultErrorDetailsBtn).first();
         if (await detailsBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
             await detailsBtn.click();
             await this.page.waitForTimeout(500);
         }
 
-        // Try to get text from detailed error message first
-        const detailedError = this.page.locator(this.searchDetailErrorMessage);
-        if (await detailedError.isVisible({ timeout: 2000 }).catch(() => false)) {
-            return await detailedError.textContent();
+        // Prefer the full error-state container so both the summary line (which
+        // holds the field name) and the expanded detail body are captured in a
+        // single string.
+        const container = this.page.locator(this.errorMessage).first();
+        if (await container.isVisible({ timeout: 2000 }).catch(() => false)) {
+            const text = (await container.textContent()) || '';
+            if (text.trim()) return text;
         }
 
-        // Fall back to the main error message
-        const errorMsg = this.page.locator(this.errorMessage);
-        if (await errorMsg.isVisible({ timeout: 2000 }).catch(() => false)) {
-            return await errorMsg.textContent();
+        // Fallback (container unavailable, e.g. a rendering race): stitch the
+        // summary line and detail body together explicitly so the field name is
+        // never dropped — never fall back to the detail body alone, which is the
+        // exact gap that hid the field name in the first place.
+        const parts = [];
+        for (const selector of [this.searchErrorSummary, this.searchDetailErrorMessage]) {
+            const locator = this.page.locator(selector).first();
+            if (await locator.isVisible({ timeout: 2000 }).catch(() => false)) {
+                const text = (await locator.textContent()) || '';
+                if (text.trim()) parts.push(text.trim());
+            }
         }
+        if (parts.length) return parts.join(' ');
 
         // Return empty string if no error message found
         testLogger.warn('No error message found');
@@ -5133,17 +5165,17 @@ export class LogsPage {
         // Verify proper error handling for blank SQL query (the actual behavior from PR #9023)
         // Allow a longer timeout for the error banner — the backend issues a delayed
         // error response for blank queries.
-        // AGENT_RULES §2: target the data-test directly (Index.vue uses
-        // data-test="logs-search-error-message" on the error banner).
+        // Index.vue: data-test="logs-search-error-state" wraps LogsErrorState → QueryErrorState
         const errorMessage = this.page.locator(this.errorMessage).first();
         await expect(errorMessage).toBeVisible({ timeout: 30000 });
-        await expect(errorMessage).toContainText('Error occurred while retrieving search events', { timeout: 5000 });
 
-        // Verify there's a clickable error details button
-        const errorDetailsBtn = this.page.locator('[data-test="logs-page-result-error-details-btn"]');
+        // Verify there's a clickable error details toggle.
+        // Hero layout (logs page) uses error-detail-toggle-btn (in ErrorDetailPanel).
+        // Block layout uses query-error-toggle-detail-btn (in QueryErrorState).
+        const errorDetailsBtn = this.page.locator('[data-test="error-detail-toggle-btn"], [data-test="query-error-toggle-detail-btn"]').first();
         if (await errorDetailsBtn.isVisible()) {
             await errorDetailsBtn.click();
-            testLogger.info('✓ Error details button clicked successfully');
+            testLogger.info('✓ Error details toggle clicked successfully');
         }
     }
 
@@ -6617,7 +6649,7 @@ export class LogsPage {
      * @returns {Promise<boolean>}
      */
     async isNoResultsMessageVisible() {
-        return await this.page.locator('[data-test="logs-search-result-not-found-text"]').isVisible({ timeout: 5000 }).catch(() => false);
+        return await this.page.locator('[data-test="logs-search-no-events-found-text"]').isVisible({ timeout: 5000 }).catch(() => false);
     }
 
     /**
@@ -6638,8 +6670,10 @@ export class LogsPage {
     async waitForSearchResultsToLoad() {
         try {
             await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
-            // Wait for either results or no-results indicator
-            await this.page.locator(`${this.logsTable}, [data-test="logs-search-result-not-found-text"]`).first().waitFor({ state: 'visible', timeout: 15000 });
+            // Wait for results table, no-events state, or error state — any definite post-query state
+            await this.page.locator(
+                `${this.logsTable}, [data-test="logs-search-no-events-found-text"], [data-test="logs-search-error-state"], [data-test="logs-search-filter-error-message"]`
+            ).first().waitFor({ state: 'visible', timeout: 15000 });
         } catch {
             // Fallback: at least wait for any loading to finish
             testLogger.info('waitForSearchResultsToLoad: timed out waiting for results indicator');
@@ -7151,7 +7185,10 @@ export class LogsPage {
     async waitForSearchResultOrEmpty(timeout = 30000) {
         try {
             await this.page.waitForLoadState('networkidle', { timeout }).catch(() => {});
-            await this.page.locator(`${this.logsTable}, [data-test="logs-search-result-not-found-text"]`).first().waitFor({ state: 'visible', timeout });
+            // Wait for results table, no-events state, no-query-applied state, or error state
+            await this.page.locator(
+                `${this.logsTable}, [data-test="logs-search-no-events-found-text"], [data-test="logs-search-apply-search-text"], [data-test="logs-search-error-state"], [data-test="logs-search-filter-error-message"]`
+            ).first().waitFor({ state: 'visible', timeout });
             testLogger.info('Search result or empty state visible');
         } catch (e) {
             testLogger.warn('waitForSearchResultOrEmpty: timed out waiting for results indicator');
@@ -9754,7 +9791,7 @@ export class LogsPage {
      * @returns {Promise<boolean>}
      */
     async isNoResultsVisible() {
-        return await this.page.locator('[data-test="logs-search-result-not-found-text"]')
+        return await this.page.locator('[data-test="logs-search-no-events-found-text"]')
             .isVisible({ timeout: 2000 }).catch(() => false);
     }
 
@@ -9771,7 +9808,7 @@ export class LogsPage {
      * @returns {import('@playwright/test').Locator}
      */
     getLogsSearchErrorMessage() {
-        return this.page.locator('[data-test="logs-search-error-message"]').first();
+        return this.page.locator('[data-test="logs-search-error-state"]').first();
     }
 
     // ===== REGRESSION: Scroll Retention (#9044) & Undefined Length (#7354) =====
@@ -9910,7 +9947,7 @@ export class LogsPage {
      * @returns {Promise<boolean>}
      */
     async hasErrorMessage() {
-        const errorEl = this.page.locator('[data-test="logs-search-error-message"]');
+        const errorEl = this.page.locator('[data-test="logs-search-error-state"]');
         return await errorEl.isVisible().catch(() => false);
     }
 

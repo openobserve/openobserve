@@ -215,6 +215,11 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // Clear persisted stream filter so localStorage does not bleed between tests.
+    // Without this, a previous test that wrote "stream2" to localStorage causes
+    // the next component instance to initialise streamFilter = "stream2", which
+    // makes the watch guard (newStream !== streamFilter.value) skip the update.
+    localStorage.removeItem("serviceGraph_streamFilter");
     // Reset shared reactive searchObj to baseline before every test so watcher
     // state does not bleed between tests.
     mockSearchObj.meta.serviceGraphVisualizationType = "tree";
@@ -223,6 +228,7 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
     mockSearchObj.data.datetime.endTime = Date.now();
     mockSearchObj.data.datetime.relativeTimePeriod = "15m";
     mockSearchObj.data.datetime.type = "relative";
+    mockSearchObj.data.stream.selectedStream.value = "";
     vi.mocked(serviceGraphService.getCurrentTopology).mockResolvedValue(
       mockApiResponse,
     );
@@ -318,98 +324,56 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
   });
 
   describe("Cache Invalidation on Stream Filter Change", () => {
-    it("should invalidate cache when stream filter changes", async () => {
+    // onStreamFilterChange now only emits "request:stream-change" to the parent.
+    // The parent is responsible for updating the global stream, which then flows
+    // back via the watch on searchObj.data.stream.selectedStream.value.
+
+    it("should emit request:stream-change with the selected stream value", async () => {
       wrapper = createWrapper();
       await flushPromises();
 
-      const initialChartKey = wrapper.vm.chartKey;
+      wrapper.vm.onStreamFilterChange("stream1");
 
-      // Change stream filter
-      await wrapper.vm.onStreamFilterChange("stream1");
-      await flushPromises();
-
-      // Verify chartKey was incremented (which invalidates any cached data)
-      // This forces chart to regenerate with fresh data
-      expect(wrapper.vm.chartKey).toBeGreaterThan(initialChartKey);
+      expect(wrapper.emitted("request:stream-change")).toBeTruthy();
+      expect(wrapper.emitted("request:stream-change")![0]).toEqual(["stream1"]);
     });
 
-    it("should increment chartKey when stream filter changes", async () => {
+    it("should NOT update streamFilter immediately when a new stream is selected", async () => {
       wrapper = createWrapper();
       await flushPromises();
 
-      const initialChartKey = wrapper.vm.chartKey;
+      const initialStreamFilter = wrapper.vm.streamFilter;
 
-      // Change stream filter
-      await wrapper.vm.onStreamFilterChange("stream1");
+      wrapper.vm.onStreamFilterChange("stream1");
       await flushPromises();
 
-      // Verify chartKey was incremented
-      expect(wrapper.vm.chartKey).toBe(initialChartKey + 1);
+      // streamFilter stays unchanged — the parent must confirm the change first
+      expect(wrapper.vm.streamFilter).toBe(initialStreamFilter);
     });
 
-    it("should call API with new stream parameter", async () => {
+    it("should NOT call loadServiceGraph when onStreamFilterChange is invoked", async () => {
       wrapper = createWrapper();
       await flushPromises();
 
       vi.mocked(serviceGraphService.getCurrentTopology).mockClear();
 
-      // Change stream filter
-      await wrapper.vm.onStreamFilterChange("stream1");
+      wrapper.vm.onStreamFilterChange("stream1");
       await flushPromises();
 
-      // Verify API was called with new stream
-      expect(serviceGraphService.getCurrentTopology).toHaveBeenCalledWith(
-        "test-org",
-        expect.objectContaining({
-          streamName: "stream1",
-          startTime: expect.any(Number),
-          endTime: expect.any(Number),
-        }),
-      );
+      expect(serviceGraphService.getCurrentTopology).not.toHaveBeenCalled();
     });
 
-    it("should update graphData with new data from API", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      const newApiResponse = {
-        data: {
-          nodes: [
-            {
-              id: "service-c",
-              label: "Service C",
-              requests: 3000,
-              errors: 30,
-              error_rate: 1.0,
-              is_virtual: false,
-            },
-          ],
-          edges: [],
-          availableStreams: ["stream1"],
-        },
-      };
-
-      vi.mocked(serviceGraphService.getCurrentTopology).mockResolvedValue(
-        newApiResponse,
-      );
-
-      // Change stream filter
-      await wrapper.vm.onStreamFilterChange("stream1");
-      await flushPromises();
-
-      // Verify graphData was updated
-      expect(wrapper.vm.graphData.nodes).toHaveLength(1);
-      expect(wrapper.vm.graphData.nodes[0].id).toBe("service-c");
-    });
-
-    it("should persist stream filter to localStorage", async () => {
+    it("should NOT write to localStorage when onStreamFilterChange is invoked", async () => {
       const setItemSpy = vi.spyOn(Storage.prototype, "setItem");
       wrapper = createWrapper();
       await flushPromises();
 
-      await wrapper.vm.onStreamFilterChange("stream1");
+      setItemSpy.mockClear();
 
-      expect(setItemSpy).toHaveBeenCalledWith(
+      wrapper.vm.onStreamFilterChange("stream1");
+      await flushPromises();
+
+      expect(setItemSpy).not.toHaveBeenCalledWith(
         "serviceGraph_streamFilter",
         "stream1",
       );
@@ -417,22 +381,115 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       setItemSpy.mockRestore();
     });
 
-    it("should handle 'all' streams filter", async () => {
+    it("should emit request:stream-change even when 'all' is selected", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+
+      wrapper.vm.onStreamFilterChange("all");
+
+      expect(wrapper.emitted("request:stream-change")).toBeTruthy();
+      expect(wrapper.emitted("request:stream-change")![0]).toEqual(["all"]);
+    });
+  });
+
+  describe("Global Stream Watch — bidirectional stream sync", () => {
+    beforeEach(() => {
+      // Ensure selectedStream starts empty so watcher fires when we set a value
+      mockSearchObj.data.stream.selectedStream.value = "";
+    });
+
+    afterEach(() => {
+      mockSearchObj.data.stream.selectedStream.value = "";
+    });
+
+    it("should update streamFilter when global selectedStream changes", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+
+      // Confirm initial state
+      const initialStreamFilter = wrapper.vm.streamFilter;
+
+      // Simulate Traces/Spans tab changing the global stream
+      mockSearchObj.data.stream.selectedStream.value = "stream2";
+      await flushPromises();
+
+      expect(wrapper.vm.streamFilter).toBe("stream2");
+      expect(wrapper.vm.streamFilter).not.toBe(initialStreamFilter);
+    });
+
+    it("should call loadServiceGraph when global selectedStream changes", async () => {
       wrapper = createWrapper();
       await flushPromises();
 
       vi.mocked(serviceGraphService.getCurrentTopology).mockClear();
 
-      await wrapper.vm.onStreamFilterChange("all");
+      mockSearchObj.data.stream.selectedStream.value = "stream2";
       await flushPromises();
 
-      // Verify API was called without streamName parameter
+      expect(serviceGraphService.getCurrentTopology).toHaveBeenCalledTimes(1);
+    });
+
+    it("should persist the new stream to localStorage when global selectedStream changes", async () => {
+      const setItemSpy = vi.spyOn(Storage.prototype, "setItem");
+      wrapper = createWrapper();
+      await flushPromises();
+
+      setItemSpy.mockClear();
+
+      mockSearchObj.data.stream.selectedStream.value = "stream2";
+      await flushPromises();
+
+      expect(setItemSpy).toHaveBeenCalledWith(
+        "serviceGraph_streamFilter",
+        "stream2",
+      );
+
+      setItemSpy.mockRestore();
+    });
+
+    it("should NOT reload when global selectedStream changes to the same value as current streamFilter", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+
+      // Set streamFilter to "stream1" first via the global watch
+      mockSearchObj.data.stream.selectedStream.value = "stream1";
+      await flushPromises();
+
+      vi.mocked(serviceGraphService.getCurrentTopology).mockClear();
+
+      // Setting the same value again — the watch guard (newStream !== streamFilter.value) prevents a reload
+      mockSearchObj.data.stream.selectedStream.value = "stream1";
+      await flushPromises();
+
+      expect(serviceGraphService.getCurrentTopology).not.toHaveBeenCalled();
+    });
+
+    it("should NOT react when global selectedStream changes to an empty string", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+
+      vi.mocked(serviceGraphService.getCurrentTopology).mockClear();
+
+      // Empty string is falsy — the watch guard skips the update
+      mockSearchObj.data.stream.selectedStream.value = "";
+      await flushPromises();
+
+      expect(serviceGraphService.getCurrentTopology).not.toHaveBeenCalled();
+    });
+
+    it("should call loadServiceGraph with the new stream name after global stream sync", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+
+      vi.mocked(serviceGraphService.getCurrentTopology).mockClear();
+
+      mockSearchObj.data.stream.selectedStream.value = "stream2";
+      await flushPromises();
+
       expect(serviceGraphService.getCurrentTopology).toHaveBeenCalledWith(
         "test-org",
         expect.objectContaining({
-          streamName: undefined,
-          startTime: expect.any(Number),
-          endTime: expect.any(Number),
+          streamName: "stream2",
         }),
       );
     });
@@ -675,18 +732,21 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
   });
 
   describe("Chart Re-rendering", () => {
-    it("should trigger chart re-render when chartKey changes", async () => {
+    it("should trigger chart re-render when chartKey changes via global stream sync", async () => {
+      mockSearchObj.data.stream.selectedStream.value = "";
       wrapper = createWrapper();
       await flushPromises();
 
       const initialChartKey = wrapper.vm.chartKey;
 
-      // Change stream filter to trigger chartKey increment
-      await wrapper.vm.onStreamFilterChange("stream1");
+      // Stream change flows through the global watch — chartKey increments via loadServiceGraph
+      mockSearchObj.data.stream.selectedStream.value = "stream1";
       await flushPromises();
 
       // Verify chartKey changed
       expect(wrapper.vm.chartKey).not.toBe(initialChartKey);
+
+      mockSearchObj.data.stream.selectedStream.value = "";
     });
 
     it("should regenerate chartData computed property after chartKey is incremented", async () => {
@@ -717,45 +777,52 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
   });
 
   describe("Multiple Sequential Changes", () => {
-    it("should handle multiple stream changes in sequence", async () => {
+    beforeEach(() => {
+      mockSearchObj.data.stream.selectedStream.value = "";
+    });
+
+    afterEach(() => {
+      mockSearchObj.data.stream.selectedStream.value = "";
+    });
+
+    it("should handle multiple global stream changes in sequence via watch", async () => {
       wrapper = createWrapper();
       await flushPromises();
 
       const initialChartKey = wrapper.vm.chartKey;
 
-      // Make multiple stream changes
-      await wrapper.vm.onStreamFilterChange("stream1");
+      // Three distinct stream values — each triggers the global watch
+      mockSearchObj.data.stream.selectedStream.value = "stream1";
       await flushPromises();
 
-      await wrapper.vm.onStreamFilterChange("stream2");
+      mockSearchObj.data.stream.selectedStream.value = "stream2";
       await flushPromises();
 
-      await wrapper.vm.onStreamFilterChange("all");
+      mockSearchObj.data.stream.selectedStream.value = "default";
       await flushPromises();
 
-      // Verify chartKey was incremented for each change
+      // chartKey increments once per loadServiceGraph call (once per stream change)
       expect(wrapper.vm.chartKey).toBe(initialChartKey + 3);
     });
 
-    it("should handle stream change followed by refresh", async () => {
+    it("should handle global stream change followed by explicit refresh", async () => {
       wrapper = createWrapper();
       await flushPromises();
 
       const initialChartKey = wrapper.vm.chartKey;
 
-      // Change stream
-      await wrapper.vm.onStreamFilterChange("stream1");
+      // Global stream change — increments chartKey once
+      mockSearchObj.data.stream.selectedStream.value = "stream1";
       await flushPromises();
 
-      // Then refresh
+      // Explicit refresh — increments chartKey again
       await wrapper.vm.loadServiceGraph();
       await flushPromises();
 
-      // Verify chartKey was incremented twice (once for stream change, once for refresh)
       expect(wrapper.vm.chartKey).toBe(initialChartKey + 2);
     });
 
-    it("should handle time range change followed by stream change", async () => {
+    it("should handle time range change followed by global stream change", async () => {
       wrapper = createWrapper();
       await flushPromises();
 
@@ -767,11 +834,11 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       wrapper.vm.searchObj.data.datetime.relativeTimePeriod = "30m";
       await flushPromises();
 
-      // Then change stream
-      await wrapper.vm.onStreamFilterChange("stream1");
+      // Then a global stream change via the selectedStream watch
+      mockSearchObj.data.stream.selectedStream.value = "stream1";
       await flushPromises();
 
-      // Verify API was called twice with correct parameters
+      // API called once for time range change, once for stream change
       expect(serviceGraphService.getCurrentTopology).toHaveBeenCalledTimes(2);
     });
   });
