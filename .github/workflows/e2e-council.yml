@@ -11,6 +11,7 @@ name: E2E Council (Test Generation)
 #   - Manual run with `oss_branch` (a feature branch ahead of main) → that branch's diff vs main.
 #   - Manual run with neither / oss_branch=main → EMPTY diff → the run fails fast with a clear
 #     message. (Running from main triages main-against-itself = nothing.)
+#   Example: to triage PR #1234, dispatch with pr_number=1234 (leave oss_branch empty).
 #
 # IMPORTANT: both triggers read this workflow's definition from the DEFAULT BRANCH (main).
 # So this file must be merged to main before `workflow_dispatch` appears in the Actions UI or
@@ -27,11 +28,11 @@ on:
   workflow_dispatch:
     inputs:
       pr_number:
-        description: "PR number to triage (recommended). Overrides oss_branch when set."
+        description: "PR number to triage (recommended, e.g. '1234'). Overrides oss_branch when set."
         required: false
         default: ""
       oss_branch:
-        description: "OR a feature branch AHEAD of main to triage (ignored if pr_number is set). Do NOT use 'main' — it diffs against itself and triages nothing."
+        description: "OR a feature branch AHEAD of main to triage (ignored if pr_number is set). If set to 'main' (or left empty with no pr_number), the diff is empty and the run fails with a clear message."
         required: false
         default: ""
       feature_hint:
