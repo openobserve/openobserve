@@ -32,6 +32,8 @@ const TEMPLATE_BODY = JSON.stringify({
     text: "{alert_name} is active. Stream: {stream_name}. Triggered: {alert_trigger_time_str}. Value: {alert_agg_value}. URL: {alert_url}"
 });
 
+let ALERT_ID = null; // Cached after creation to avoid redundant list+detail API calls
+
 // ============================================================================
 // API HELPERS
 // ============================================================================
@@ -40,7 +42,7 @@ async function apiCall(page, method, path, body = null) {
     const baseUrl = process.env.ZO_BASE_URL || 'http://localhost:5080';
     const headers = getAuthHeaders();
 
-    return page.evaluate(async ({ url, method, headers, body }) => {
+    const result = await page.evaluate(async ({ url, method, headers, body }) => {
         const opts = {
             method,
             headers,
@@ -50,6 +52,11 @@ async function apiCall(page, method, path, body = null) {
         const data = await resp.json().catch(() => ({}));
         return { status: resp.status, data };
     }, { url: `${baseUrl}${path}`, method, headers, body });
+
+    if (result.status < 200 || result.status >= 300) {
+        throw new Error(`API call failed: ${method} ${path} returned ${result.status}: ${JSON.stringify(result.data)}`);
+    }
+    return result;
 }
 
 async function ensureTemplate(page) {
@@ -109,54 +116,47 @@ async function createMetricsAlert(page) {
 
     const resp = await apiCall(page, 'POST', `/api/v2/${org}/alerts`, payload);
     testLogger.info('Alert created', { name: ALERT_NAME, status: resp.status });
-    return resp.data?.id || resp.data?.alert_id || null;
+    ALERT_ID = resp.data?.id || resp.data?.alert_id || null;
+    return ALERT_ID;
 }
 
 async function getAlertState(page) {
+    if (!ALERT_ID) return null;
     const org = getOrgIdentifier();
-    const listResp = await apiCall(page, 'GET', `/api/v2/${org}/alerts`);
-    if (listResp.status !== 200) return null;
 
-    const alerts = listResp.data?.list || listResp.data || [];
-    const alert = alerts.find(a => (a.name || '') === ALERT_NAME);
-    if (!alert) return null;
-
-    const alertId = alert.id || alert.alert_id;
-    if (!alertId) return null;
-
-    const detailResp = await apiCall(page, 'GET', `/api/v2/${org}/alerts/${alertId}`);
+    const detailResp = await apiCall(page, 'GET', `/api/v2/${org}/alerts/${ALERT_ID}`);
     if (detailResp.status !== 200) return null;
 
     const d = detailResp.data;
     return {
-        id: alertId,
+        id: ALERT_ID,
         enabled: d.enabled,
         last_triggered_at: d.last_triggered_at,
         last_satisfied_at: d.last_satisfied_at,
+        // API returns microseconds; divide by 1000 for JS Date (ms)
         triggered: d.last_triggered_at ? new Date(d.last_triggered_at / 1000) : null,
         satisfied: d.last_satisfied_at ? new Date(d.last_satisfied_at / 1000) : null,
     };
 }
 
-async function waitForAlertTrigger(page, timeoutMs = 300000, intervalMs = 15000) {
+async function pollForAlertCondition(page, timeoutMs = 300000, intervalMs = 15000) {
     const deadline = Date.now() + timeoutMs;
     let lastState = null;
 
     while (Date.now() < deadline) {
         lastState = await getAlertState(page);
         if (lastState?.last_satisfied_at) {
-            testLogger.info('Alert triggered!', { state: lastState });
+            testLogger.info('Alert condition satisfied', { state: lastState });
             return lastState;
         }
-        testLogger.info('Waiting for alert trigger...', {
-            last_triggered_at: lastState?.last_triggered_at || null,
+        testLogger.info('Waiting for alert condition to be satisfied...', {
             last_satisfied_at: lastState?.last_satisfied_at || null,
             remainingMs: deadline - Date.now()
         });
         await new Promise(r => setTimeout(r, intervalMs));
     }
 
-    throw new Error(`Alert did not trigger within ${timeoutMs}ms. Last state: ${JSON.stringify(lastState)}`);
+    throw new Error(`Alert condition was not satisfied within ${timeoutMs}ms. Last state: ${JSON.stringify(lastState)}`);
 }
 
 // ============================================================================
@@ -164,15 +164,22 @@ async function waitForAlertTrigger(page, timeoutMs = 300000, intervalMs = 15000)
 // ============================================================================
 
 async function cleanupAlert(page) {
+    if (!ALERT_ID) return;
     const org = getOrgIdentifier();
-    const listResp = await apiCall(page, 'GET', `/api/v2/${org}/alerts`);
-    const alerts = (listResp.status === 200) ? (listResp.data?.list || listResp.data || []) : [];
-    const alert = alerts.find(a => (a.name || '') === ALERT_NAME);
-    if (alert) {
-        const alertId = alert.id || alert.alert_id || alert.name;
-        await apiCall(page, 'DELETE', `/api/v2/${org}/alerts/${alertId}`);
-        testLogger.info('Alert deleted', { name: ALERT_NAME });
+    // Verify ownership before deleting: re-fetch and check description
+    try {
+        const detailResp = await apiCall(page, 'GET', `/api/v2/${org}/alerts/${ALERT_ID}`);
+        const desc = detailResp.data?.description || '';
+        if (!desc.includes(RUN_ID)) {
+            testLogger.warn('Skipping alert deletion — description does not match RUN_ID', { alertId: ALERT_ID, desc });
+            return;
+        }
+    } catch {
+        testLogger.warn('Could not verify alert ownership, skipping deletion', { alertId: ALERT_ID });
+        return;
     }
+    await apiCall(page, 'DELETE', `/api/v2/${org}/alerts/${ALERT_ID}`);
+    testLogger.info('Alert deleted', { name: ALERT_NAME });
 }
 
 async function cleanupDestination(page) {
@@ -301,7 +308,7 @@ test.describe("Metrics Alert Notification Chain", () => {
         testLogger.info('Alert found in list', { name: ALERT_NAME });
 
         testLogger.info('=== PHASE 2: Poll for alert to trigger ===');
-        const alertState = await waitForAlertTrigger(page, 300000, 15000);
+        const alertState = await pollForAlertCondition(page, 300000, 15000);
         expect(alertState.last_satisfied_at, 'Alert condition should be satisfied').toBeTruthy();
         testLogger.info('Alert condition satisfied', {
             triggered: alertState.triggered?.toISOString(),
