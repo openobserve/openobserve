@@ -343,7 +343,8 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: write # push the generated tests to the autoe2e/<branch> (never to main)
-      issues: write # post a failure comment on the source PR (scoped GITHUB_TOKEN)
+      issues: write # (PR comments are issue comments)
+      pull-requests: write # post a failure comment on the source PR (scoped GITHUB_TOKEN; PR comments need this)
     steps:
       - name: Checkout PR head (feature source needed to generate accurate tests)
         uses: actions/checkout@v4
@@ -380,7 +381,7 @@ jobs:
           command -v opencode >/dev/null || { echo "::error::opencode not on PATH"; exit 1; }
           opencode --version || true
 
-      - name: Generate — Analyst → Architect → Engineer → Sentinel
+      - name: Generate — Analyst → Architect → Engineer
         id: gen
         env:
           DEEPSEEK_API_KEY_E2E: ${{ secrets.DEEPSEEK_API_KEY_E2E }}
@@ -389,8 +390,8 @@ jobs:
           run() { opencode run --agent "$1" --model "$PIPELINE_MODEL" "$2"; }
           run e2e-ci-analyst   "Run your spec. Read docs/test_generator/ci/run-context.json, analyze the feature's source in this checkout, and write the Feature Design Document."
           run e2e-ci-architect "Run your spec. Read run-context.json and the feature doc; write the prioritized Test Plan."
-          run e2e-ci-engineer  "Run your spec. Read run-context.json and the test plan; write the spec file + page-object changes and docs/test_generator/ci/playwright-registration.json. GENERATE ONLY — do not run tests."
-          run e2e-ci-sentinel  "Run your spec. Audit the generated spec/page objects; write docs/test_generator/ci/sentinel-verdict.json (and the audit report)."
+          run e2e-ci-engineer  "Run your spec. Read run-context.json and the test plan; write the spec file + page-object changes and docs/test_generator/ci/playwright-registration.json. Follow the MANDATORY Sentinel-compliance checklist in your spec so the audit passes first time. GENERATE ONLY — do not run tests."
+          # Sentinel runs in the self-correcting audit loop below (not here).
 
       - name: Validate hand-off artifacts (fail fast on a broken hand-off)
         # The agents hand off via files; if an agent "finished" without writing its artifact, catch
@@ -406,21 +407,40 @@ jobs:
           { [ -f "$REG" ] && jq -e '.group and .spec_filename' "$REG" >/dev/null 2>&1; } || { echo "::error::playwright-registration.json missing/invalid (engineer hand-off broken)"; exit 1; }
           echo "Hand-off OK: spec=$SPEC"
 
-      - name: Enforce Sentinel verdict (block on critical)
-        # Verdict schema (written by e2e-ci-sentinel): { "verdict": "PASS"|"FAIL",
-        # "critical_count": <int>, "warning_count": <int>, "auto_fixed": <int> }.
-        # Fail CLOSED: missing file, malformed JSON, or anything other than an explicit PASS with
-        # zero criticals blocks the pipeline (a malformed/LLM-mangled verdict must NOT pass).
+      - name: Audit + self-fix loop (Sentinel ⇄ Engineer until clean)
+        # SELF-CORRECTING quality gate (the whole point): Sentinel audits; if it's not a clean PASS,
+        # the Engineer fixes the audit findings and we RE-AUDIT — up to FIX_ATTEMPTS times. We only
+        # stop + report if it's STILL not clean after that. The deterministic workflow owns the
+        # verdict (Sentinel audits, Engineer fixes — the LLM never self-certifies its own pass).
+        # Verdict schema: { "verdict": "PASS"|"FAIL", "critical_count": <int>, ... }. Fail-closed:
+        # missing/invalid verdict counts as not-clean.
+        id: audit
+        env:
+          DEEPSEEK_API_KEY_E2E: ${{ secrets.DEEPSEEK_API_KEY_E2E }}
+          FIX_ATTEMPTS: "3"
         run: |
           v=docs/test_generator/ci/sentinel-verdict.json
-          [ -f "$v" ] || { echo "::error::Sentinel produced no verdict"; exit 1; }
-          jq empty "$v" 2>/dev/null || { echo "::error::Sentinel verdict is not valid JSON — blocking."; exit 1; }
-          verdict=$(jq -r 'if .verdict == "PASS" then "PASS" else "FAIL" end' "$v")
-          crit=$(jq -r 'if (.critical_count|type) == "number" then .critical_count else 1 end' "$v")
-          echo "Sentinel verdict=$verdict critical=$crit"
-          if [ "$verdict" != "PASS" ] || [ "$crit" -gt 0 ]; then
-            echo "::error::Sentinel blocked generation (not a clean PASS). See audit report."; exit 1
+          clean=false
+          for i in $(seq 1 "$FIX_ATTEMPTS"); do
+            echo "::group::Sentinel audit — attempt $i/$FIX_ATTEMPTS"
+            opencode run --agent e2e-ci-sentinel --model "$PIPELINE_MODEL" \
+              "Run your spec. Audit the generated spec + page objects for the feature in docs/test_generator/ci/run-context.json. Auto-fix the SAFE issues yourself. Write docs/test_generator/ci/sentinel-verdict.json and the audit report under docs/test_generator/audit-reports/."
+            { [ -f "$v" ] && jq empty "$v" 2>/dev/null; } || { echo "::error::Sentinel verdict missing/invalid"; exit 1; }
+            verdict=$(jq -r 'if .verdict == "PASS" then "PASS" else "FAIL" end' "$v")
+            crit=$(jq -r 'if (.critical_count|type) == "number" then .critical_count else 1 end' "$v")
+            echo "verdict=$verdict critical=$crit"
+            echo "::endgroup::"
+            if [ "$verdict" = "PASS" ] && [ "$crit" -eq 0 ]; then clean=true; break; fi
+            if [ "$i" -lt "$FIX_ATTEMPTS" ]; then
+              echo "Sentinel found issues — Engineer fixing them (fix attempt $i)…"
+              opencode run --agent e2e-ci-engineer --model "$PIPELINE_MODEL" \
+                "The Sentinel audit flagged issues. Read the latest audit report under docs/test_generator/audit-reports/ and FIX every critical issue + warning in the spec + page objects named in run-context.json: move ALL raw selectors out of the spec into page objects (including inside expect(...)), ensure every test has a real meaningful assertion (never expect(true).toBe(true)), replace console.log with testLogger, await all async calls, remove hardcoded credentials. Keep tests valid and meaningful — do NOT weaken or delete assertions to pass. GENERATE ONLY — do not run."
+            fi
+          done
+          if [ "$clean" != "true" ]; then
+            echo "::error::Sentinel still not a clean PASS after $FIX_ATTEMPTS fix attempts — see the audit report."; exit 1
           fi
+          echo "Sentinel clean ✓ — proceeding to register + branch."
 
       - name: Register the spec in playwright.yml (deterministic — NOT the LLM)
         # The Engineer emits playwright-registration.json; a non-LLM step applies the one-line
@@ -459,13 +479,18 @@ jobs:
           git push --force "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:refs/heads/${BRANCH}"
           echo "Pushed generated tests to $BRANCH (no PR yet — Job 4 opens it)."
 
-      - name: Upload run metadata (for Job 3/4)
+      - name: Upload run metadata (for Job 3/4 + debugging)
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: generated-meta
           retention-days: 2
-          path: docs/test_generator/ci/
+          path: |
+            docs/test_generator/ci/
+            docs/test_generator/audit-reports/
+            docs/test_generator/features/
+            docs/test_generator/test-plans/
+            docs/test_generator/generation-reports/
 
       - name: Report generation failure on the source PR
         # If any generation step failed (agent error, broken hand-off, Sentinel block, push),
@@ -479,13 +504,16 @@ jobs:
           SRC_PR: ${{ needs.triage.outputs.pr_number }}
           GEN_OUTCOME: ${{ steps.gen.outcome }}
           VALIDATE_OUTCOME: ${{ steps.validate.outcome }}
+          AUDIT_OUTCOME: ${{ steps.audit.outcome }}
         run: |
           RUN_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
           CAUSE="Generation failed before tests could be produced."
           if [ "$VALIDATE_OUTCOME" = "failure" ]; then
             CAUSE="A hand-off between agents broke — an expected artifact (spec or registration) was missing/invalid."
           elif [ "$GEN_OUTCOME" = "failure" ]; then
-            CAUSE="One of the generation agents (Analyst/Architect/Engineer/Sentinel) errored, OR the Sentinel quality gate blocked it."
+            CAUSE="One of the generation agents (Analyst/Architect/Engineer) errored."
+          elif [ "$AUDIT_OUTCOME" = "failure" ]; then
+            CAUSE="Sentinel kept finding critical issues and the Engineer could not fix them clean within the retry budget — see the audit report in this run's artifact."
           fi
           MARKER="<!-- e2e-council-testpr -->"
           printf '%s\n🤖 **E2E Council** — generation **failed** for #%s, so no test PR was opened.\n\n**Likely cause:** %s\n\n[View run for details](%s)' \
@@ -519,7 +547,8 @@ jobs:
     timeout-minutes: 90 # backstop: build (~15) + boot + heal (capped 30) + final run (15) + audit
     permissions:
       contents: write # push the healer's fixes to autoe2e/<branch>
-      issues: write # post a failure comment on the source PR (scoped GITHUB_TOKEN)
+      issues: write # (PR comments are issue comments)
+      pull-requests: write # post a failure comment on the source PR (scoped GITHUB_TOKEN; PR comments need this)
     outputs:
       heal_status: ${{ steps.finalrun.outputs.status }}
     env:

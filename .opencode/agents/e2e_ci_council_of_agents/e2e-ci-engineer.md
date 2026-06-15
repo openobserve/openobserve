@@ -129,6 +129,37 @@ deterministic (non-LLM) workflow step applies the one-line `run_files` append.
 
 ---
 
+## MANDATORY: Sentinel-compliance self-audit (do this BEFORE you finish)
+
+The Sentinel will audit your output and **reject** it on any of the issues below — which then
+forces a fix-and-re-audit loop. **Write the code right the first time, then re-read your spec and
+page objects against this exact checklist and fix every violation before you return.** Match the
+Sentinel's bar so the audit passes on attempt 1.
+
+**CRITICAL — Sentinel will FAIL the build on any of these:**
+1. **No raw selectors in the SPEC file** — none of `page.locator(`, `page.getByRole(`,
+   `page.getByText(`, `page.getByTestId(`, `page.$(`, **including inside `expect(...)`** (e.g.
+   `expect(page.locator(...))` is a violation). Every selector lives in a page object; the spec
+   calls `pm.<area>Page.<method>()` / `pm.<area>Page.expectXVisible()`. (Page-object FILES are
+   *expected* to contain selectors — that's fine; this rule is about the spec.)
+2. **Every test has ≥1 real, meaningful assertion.** Never `expect(true).toBe(true)`,
+   `expect(1).toBe(1)`, or `if (visible) {…} else { expect(true).toBe(true) }`. Assert on actual
+   feature state via a page-object expect method.
+3. **No `console.log`** — use `testLogger.info(...)`.
+4. **Every async call is `await`ed.**
+5. **No hardcoded credentials** — only `process.env.*`.
+
+**WARNINGS — avoid these too (Sentinel reports them):**
+- Locators must be declared at the **top** of each page-object file (as properties), not inline.
+- No brittle selectors (xpath, `nth-child`, framework-generated classes).
+- ≤3 `waitForTimeout` per test — prefer `waitForLoadState`/`toBeVisible`.
+- Use `PageManager` (`pm.…`) for all interactions; reuse existing page objects.
+- If a test creates data, add cleanup in `tests/ui-testing/playwright-tests/cleanup.spec.js`.
+
+Treat this as a gate on *yourself*: a spec that trips any CRITICAL above is not done.
+
+---
+
 ## OUTPUT
 
 1. The spec file at `spec_path`.
