@@ -119,6 +119,24 @@ pub async fn list_services(
     Path(org_id): Path<String>,
     Headers(_user_email): Headers<UserEmail>,
 ) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        let records = match infra::table::service_streams::list(&org_id).await {
+            Ok(r) => r,
+            Err(e) => {
+                return MetaHttpResponse::internal_error(format!("Failed to list services: {e}"));
+            }
+        };
+        let identity_config =
+            crate::service::db::system_settings::get_service_identity_config(&org_id).await;
+        let records = if identity_config.service_optional {
+            o2_enterprise::enterprise::service_streams::storage::merge_by_disambiguation(records)
+        } else {
+            records
+        };
+        return MetaHttpResponse::json(records);
+    }
+    #[cfg(not(feature = "enterprise"))]
     match infra::table::service_streams::list(&org_id).await {
         Ok(records) => MetaHttpResponse::json(records),
         Err(e) => MetaHttpResponse::internal_error(format!("Failed to list services: {e}")),
