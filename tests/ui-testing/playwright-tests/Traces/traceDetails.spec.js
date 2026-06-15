@@ -150,21 +150,64 @@ test.describe("Trace Details testcases", () => {
 
     await openTraceDetailsIfAvailable(page, pm, 'logs test');
 
-    // Check if view logs button is available
-    const viewLogsButtonVisible = await pm.tracesPage.isViewLogsButtonVisible();
-    if (viewLogsButtonVisible) {
+    // Check if log streams selector is visible (indicates non-enterprise mode)
+    const logStreamsSelectVisible = await pm.tracesPage.isLogStreamsSelectVisible();
+
+    if (logStreamsSelectVisible) {
+      testLogger.info('Non-enterprise mode detected - log streams selector visible');
+
+      // Step 1: Check initial button state (should be disabled if no streams selected)
+      const initialButtonEnabled = await pm.tracesPage.isViewLogsButtonEnabled();
+      testLogger.info(`Initial View Logs button state: ${initialButtonEnabled ? 'enabled' : 'disabled'}`);
+
+      // Step 2: Select first available log stream
+      const selectionSuccess = await pm.tracesPage.selectFirstLogStreamInTraceDetails();
+
+      if (!selectionSuccess) {
+        testLogger.warn('No log streams available for selection or selection failed');
+        // Verify we at least opened trace details
+        const detailsVisible = await pm.tracesPage.isTraceDetailsTreeVisible() || await pm.tracesPage.isAnyTraceDetailVisible();
+        expect(detailsVisible).toBeTruthy();
+        return;
+      }
+
+      testLogger.info('Successfully selected first available log stream');
+
+      // Step 3: Verify button is now enabled
+      const buttonEnabledAfterSelection = await pm.tracesPage.isViewLogsButtonEnabled();
+      expect(buttonEnabledAfterSelection).toBeTruthy();
+      testLogger.info('View Logs button is now enabled after stream selection');
+
+      // Step 4: Click the View Logs button
       await pm.tracesPage.viewRelatedLogs();
 
-      // Should navigate to logs
+      // Step 5: Verify navigation to logs page
       await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
       await pm.tracesPage.expectUrlContains(/logs/);
 
       testLogger.info('Successfully navigated to related logs');
+
     } else {
-      testLogger.info('View logs button not available');
-      // Verify we at least opened trace details
-      const detailsVisible = await pm.tracesPage.isTraceDetailsTreeVisible() || await pm.tracesPage.isAnyTraceDetailVisible();
-      expect(detailsVisible).toBeTruthy();
+      testLogger.info('Enterprise mode or log selector not visible - checking direct button availability');
+
+      // Enterprise mode or selector disabled - check if button is visible and enabled
+      const viewLogsButtonVisible = await pm.tracesPage.isViewLogsButtonVisible();
+      const viewLogsButtonEnabled = await pm.tracesPage.isViewLogsButtonEnabled();
+
+      if (viewLogsButtonVisible && viewLogsButtonEnabled) {
+        await pm.tracesPage.viewRelatedLogs();
+
+        // Should navigate to logs
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        await pm.tracesPage.expectUrlContains(/logs/);
+
+        testLogger.info('Successfully navigated to related logs (enterprise mode)');
+      } else {
+        testLogger.info(`View logs button not available (visible: ${viewLogsButtonVisible}, enabled: ${viewLogsButtonEnabled})`);
+        // Verify we at least opened trace details
+        const detailsVisible = await pm.tracesPage.isTraceDetailsTreeVisible() || await pm.tracesPage.isAnyTraceDetailVisible();
+        expect(detailsVisible).toBeTruthy();
+      }
     }
   });
 

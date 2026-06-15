@@ -424,7 +424,8 @@
     "invalidSql": "クエリが無効です",
     "menuGroupExplain": "説明してください",
     "fieldValuesEmpty": "値が見つかりません。",
-    "fieldValuesEmptyHint": "より広い時間範囲を試して値を確認してください。"
+    "fieldValuesEmptyHint": "より広い時間範囲を試して値を確認してください。",
+    "selectLogsStreamFirst": "最初に [ログストリーム] を選択します"
   },
   "menu": {
     "home": "ホーム",
