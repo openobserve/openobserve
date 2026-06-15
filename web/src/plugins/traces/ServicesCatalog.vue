@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="tw:w-[11rem] tw:flex-shrink-0"
       >
         <OSelect
-          v-model="streamFilter"
+          :model-value="streamFilter"
           :options="availableStreams.map((s) => ({ label: s, value: s }))"
           labelKey="label"
           valueKey="value"
@@ -327,35 +327,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
         </template>
 
-        <!-- Loading banner: shown above rows while a next page is fetching -->
-        <template #loading-banner>
-          <div
-            class="tw:flex tw:flex-nowrap tw:items-center tw:px-2 tw:min-w-max tw:min-h-[3.25rem] tw:bg-[var(--o2-card-bg)] tw:border-b tw:border-[var(--o2-border-2)]!"
-          >
-            <OSpinner size="xs" class="tw:mx-[0.25rem]" />
-            <span
-              class="tw:tracking-[0.03rem] tw:text-[0.85rem] tw:text-[var(--o2-text-1)] tw:font-bold"
-            >
-              {{ t("traces.servicesCatalog.loading") }}
-            </span>
-          </div>
-        </template>
-
-        <!-- Loading row: shown when no rows exist yet (first fetch) -->
-        <template #loading>
-          <div
-            data-test="services-catalog-loading"
-            class="tw:flex tw:flex-nowrap tw:items-center tw:px-2 tw:min-w-max tw:min-h-[3.25rem] tw:bg-[var(--o2-card-bg)] tw:border-b tw:border-[var(--o2-border-2)]!"
-          >
-            <OSpinner size="xs" class="tw:mr-[0.25rem]" />
-            <span
-              class="tw:tracking-[0.03rem] tw:text-[0.85rem] tw:text-[var(--o2-text-1)] tw:font-bold"
-            >
-              {{ t("traces.servicesCatalog.loading") }}
-            </span>
-          </div>
-        </template>
-
         <!-- Cell actions overlay -->
         <template #cell-actions="{ row, column, active }">
           <CellActions
@@ -429,6 +400,7 @@ const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } =
 
 const emit = defineEmits<{
   "view-traces": [data: string | Record<string, any>];
+  "request:stream-change": [stream: string];
 }>();
 
 // p99 > 1 second triggers the orange highlight
@@ -757,10 +729,7 @@ const loadAvailableStreams = async () => {
 };
 
 const onStreamFilterChange = (stream: string) => {
-  streamFilter.value = stream;
-  localStorage.setItem("servicesCatalog_streamFilter", stream);
-  hasInferColumns.value = null; // re-check schema for new stream
-  loadServicesCatalog();
+  emit("request:stream-change", stream);
 };
 
 async function loadServicesCatalog() {
@@ -906,6 +875,19 @@ ORDER BY total_requests DESC`;
 
 // Expose for parent ref access
 defineExpose({ loadServicesCatalog, streamFilter });
+
+// Keep streamFilter in sync when Traces/Spans tab changes the global stream
+watch(
+  () => searchObj.data.stream.selectedStream.value,
+  (newStream) => {
+    if (newStream && newStream !== streamFilter.value) {
+      streamFilter.value = newStream;
+      localStorage.setItem("servicesCatalog_streamFilter", newStream);
+      hasInferColumns.value = null;
+      loadServicesCatalog();
+    }
+  },
+);
 
 watch(
   () => [

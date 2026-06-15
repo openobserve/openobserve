@@ -316,9 +316,11 @@ code {
     rgba(139, 92, 246, 0.15) 0%,
     rgba(236, 72, 153, 0.15) 100%
   ) !important;
+  color: #6d28d9 !important; // violet-700 — readable on the light purple tint
   transition:
     background 0.3s ease,
-    box-shadow 0.3s ease;
+    box-shadow 0.3s ease,
+    color 0.3s ease;
 }
 
 html.dark .ai-hover-btn,
@@ -329,17 +331,20 @@ body.body--dark .ai-hover-btn {
     rgba(236, 72, 153, 0.5) 100%
   ) !important;
   box-shadow: 0 0.25rem 0.75rem 0 rgba(139, 92, 246, 0.2);
+  color: #ede9fe !important; // violet-100 — readable on the medium purple gradient
 }
 
 .ai-hover-btn:hover {
   background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%) !important;
   box-shadow: 0 0.25rem 0.75rem 0 rgba(139, 92, 246, 0.35);
+  color: white !important; // white on fully opaque gradient
 }
 
 html.dark .ai-hover-btn:hover,
 body.body--dark .ai-hover-btn:hover {
   background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%) !important;
   box-shadow: 0 0.25rem 0.75rem 0 rgba(139, 92, 246, 0.35);
+  color: white !important; // white on fully opaque gradient
 }
 
 
@@ -636,6 +641,37 @@ body.body--dark [data-destructive-icon="true"]:hover {
 
 .ai-hover-btn:hover .ai-icon {
   transform: rotate(180deg);
+}
+
+// Dark mode: calm the left navigation rail. Its inactive icons + labels use
+// `--color-tabs-inactive-text`, which has no dark override and so inherits the
+// near-white heading colour — making the whole rail blaze and steal focus.
+// Scope a mid tone (secondary, between the near-white heading and the dim
+// caption) to the nav container only, so other inactive tabs and the folder
+// rail keep their own brightness. Hover/active still brighten via MenuLink.
+:root.dark .navbar-links,
+.dark .navbar-links {
+  --color-tabs-inactive-text: var(--color-text-secondary);
+}
+
+// Dark mode: org selector + edition badge (both `outline-primary`). Their
+// shared primary-800 fill under primary-400 text was too close in luminance,
+// so the text looked blurry. Scope a higher-contrast pairing (brighter text on
+// a darker fill) to ONLY these two buttons via their data-test ids, so no other
+// ghost/outline-primary button anywhere else is affected.
+:root.dark [data-test="navbar-organizations-select-trigger"],
+:root.dark [data-test="upgrade-to-enterprise-btn"],
+.dark [data-test="navbar-organizations-select-trigger"],
+.dark [data-test="upgrade-to-enterprise-btn"] {
+  --color-button-ghost-primary-active-bg: var(--color-primary-900);
+  --color-button-ghost-primary-text: var(--color-primary-200);
+}
+
+// Force the AI sparkle <img> to white on hover so it stays visible
+// against the fully opaque purple→pink gradient background.
+.ai-hover-btn:hover img {
+  filter: brightness(0) invert(1);
+  transition: filter 0.3s ease;
 }
 
 // ═══════════════════════════════════════════════════════════════

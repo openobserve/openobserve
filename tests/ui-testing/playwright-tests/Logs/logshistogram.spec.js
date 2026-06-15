@@ -71,8 +71,10 @@ test.describe("Logs Histogram testcases", () => {
     await pm.logsPage.clickErrorMessage();
 
     // Step 2: SQL mode — query that returns 0 rows
+    // Use double quotes for the table identifier (DataFusion requires this).
+    // code > 99999 is impossible for any HTTP status code so results are always 0.
     await pm.logsPage.ensureSQLMode();
-    await pm.logsPage.clearAndFillQueryEditor("SELECT * FROM 'e2e_automate' where code > 500");
+    await pm.logsPage.clearAndFillQueryEditor('SELECT * FROM "e2e_automate" WHERE code > 99999');
     const sqlResponse = page.waitForResponse(`**/api/${orgName}/_search**`, { timeout: 60000 });
     await pm.logsPage.clickRefresh();
     await sqlResponse;
@@ -111,8 +113,10 @@ test.describe("Logs Histogram testcases", () => {
     await pm.logsPage.toggleHistogram();
 
     // Step 2: SQL mode — query that returns 0 rows, histogram ON
+    // Use double quotes for the table identifier (DataFusion requires this).
+    // code > 99999 is impossible for any HTTP status code so results are always 0.
     await pm.logsPage.ensureSQLMode();
-    await pm.logsPage.clearAndFillQueryEditor("SELECT * FROM 'e2e_automate' where code > 500");
+    await pm.logsPage.clearAndFillQueryEditor('SELECT * FROM "e2e_automate" WHERE code > 99999');
     const sqlResponse = page.waitForResponse(`**/api/${orgName}/_search**`, { timeout: 60000 });
     await pm.logsPage.clickRefresh();
     await sqlResponse;

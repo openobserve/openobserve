@@ -25,22 +25,42 @@ pub const MAX_SIMPLE_TOPN_FIELDS: usize = 4;
 pub enum IndexOptimizeMode {
     SimpleSelect(usize, bool),
     SimpleCount,
-    SimpleHistogram(i64, u64, usize),
-    SimpleMultiHistogram(i64, i64, u64, String),
+    /// (min_value, bucket_width, num_buckets, ts_offset)
+    SimpleHistogram(i64, u64, usize, i64),
+    /// (min_value, max_value, bucket_width, ts_offset, breakdown_field)
+    SimpleMultiHistogram(i64, i64, u64, i64, String),
     SimpleTopN(Vec<String>, usize, bool),
     SimpleDistinct(String, usize, bool),
 }
 
 impl IndexOptimizeMode {
+    /// Stream fields whose index data besides the fields of the index condition.
+    pub fn referenced_fields(&self) -> Vec<String> {
+        match self {
+            IndexOptimizeMode::SimpleTopN(fields, ..) => fields.clone(),
+            IndexOptimizeMode::SimpleDistinct(field, ..) => vec![field.clone()],
+            IndexOptimizeMode::SimpleMultiHistogram(.., field) => vec![field.clone()],
+            IndexOptimizeMode::SimpleSelect(..)
+            | IndexOptimizeMode::SimpleCount
+            | IndexOptimizeMode::SimpleHistogram(..) => vec![],
+        }
+    }
+
     pub fn to_rule_string(&self) -> String {
         match self {
             IndexOptimizeMode::SimpleSelect(limit, ascend) => format!("s(l:{limit},a:{ascend})"),
             IndexOptimizeMode::SimpleCount => "c".to_string(),
-            IndexOptimizeMode::SimpleHistogram(min_value, bucket_width, num_buckets) => {
-                format!("h(m:{min_value},b:{bucket_width},n:{num_buckets})")
+            IndexOptimizeMode::SimpleHistogram(min_value, bucket_width, num_buckets, ts_offset) => {
+                format!("h(m:{min_value},b:{bucket_width},n:{num_buckets},o:{ts_offset})")
             }
-            IndexOptimizeMode::SimpleMultiHistogram(min_value, max_value, bucket_width, field) => {
-                format!("mh(m:{min_value},x:{max_value},b:{bucket_width},f:{field})")
+            IndexOptimizeMode::SimpleMultiHistogram(
+                min_value,
+                max_value,
+                bucket_width,
+                ts_offset,
+                field,
+            ) => {
+                format!("mh(m:{min_value},x:{max_value},b:{bucket_width},o:{ts_offset},f:{field})")
             }
             IndexOptimizeMode::SimpleTopN(fields, limit, ascend) => {
                 let fields_str = fields.join(",");
@@ -60,16 +80,22 @@ impl std::fmt::Display for IndexOptimizeMode {
                 write!(f, "select(limit: {limit}, ascend: {ascend})")
             }
             IndexOptimizeMode::SimpleCount => write!(f, "count"),
-            IndexOptimizeMode::SimpleHistogram(min_value, bucket_width, num_buckets) => {
+            IndexOptimizeMode::SimpleHistogram(min_value, bucket_width, num_buckets, ts_offset) => {
                 write!(
                     f,
-                    "histogram(min_value: {min_value}, bucket_width: {bucket_width}, num_buckets: {num_buckets})"
+                    "histogram(min_value: {min_value}, bucket_width: {bucket_width}, num_buckets: {num_buckets}, ts_offset: {ts_offset})"
                 )
             }
-            IndexOptimizeMode::SimpleMultiHistogram(min_value, max_value, bucket_width, field) => {
+            IndexOptimizeMode::SimpleMultiHistogram(
+                min_value,
+                max_value,
+                bucket_width,
+                ts_offset,
+                field,
+            ) => {
                 write!(
                     f,
-                    "multi_histogram(min_value: {min_value}, max_value: {max_value}, bucket_width: {bucket_width}, field: {field})"
+                    "multi_histogram(min_value: {min_value}, max_value: {max_value}, bucket_width: {bucket_width}, ts_offset: {ts_offset}, field: {field})"
                 )
             }
             IndexOptimizeMode::SimpleTopN(fields, limit, ascend) => {
@@ -134,6 +160,43 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_referenced_fields() {
+        assert!(
+            IndexOptimizeMode::SimpleCount
+                .referenced_fields()
+                .is_empty()
+        );
+        assert!(
+            IndexOptimizeMode::SimpleHistogram(0, 10, 5, 0)
+                .referenced_fields()
+                .is_empty()
+        );
+        assert!(
+            IndexOptimizeMode::SimpleSelect(10, true)
+                .referenced_fields()
+                .is_empty()
+        );
+        assert_eq!(
+            IndexOptimizeMode::SimpleTopN(vec!["svc".to_string()], 10, true).referenced_fields(),
+            vec!["svc".to_string()]
+        );
+        assert_eq!(
+            IndexOptimizeMode::SimpleTopN(vec!["a".to_string(), "b".to_string()], 10, true)
+                .referenced_fields(),
+            vec!["a".to_string(), "b".to_string()]
+        );
+        assert_eq!(
+            IndexOptimizeMode::SimpleMultiHistogram(0, 1000, 10, 0, "level".to_string())
+                .referenced_fields(),
+            vec!["level".to_string()]
+        );
+        assert_eq!(
+            IndexOptimizeMode::SimpleDistinct("uid".to_string(), 10, true).referenced_fields(),
+            vec!["uid".to_string()]
+        );
+    }
+
+    #[test]
     fn test_to_rule_string_all_variants() {
         assert_eq!(
             IndexOptimizeMode::SimpleSelect(100, true).to_rule_string(),
@@ -145,17 +208,17 @@ mod tests {
         );
         assert_eq!(IndexOptimizeMode::SimpleCount.to_rule_string(), "c");
         assert_eq!(
-            IndexOptimizeMode::SimpleHistogram(0, 10, 5).to_rule_string(),
-            "h(m:0,b:10,n:5)"
+            IndexOptimizeMode::SimpleHistogram(0, 10, 5, 0).to_rule_string(),
+            "h(m:0,b:10,n:5,o:0)"
         );
         assert_eq!(
-            IndexOptimizeMode::SimpleHistogram(-100, 25, 20).to_rule_string(),
-            "h(m:-100,b:25,n:20)"
+            IndexOptimizeMode::SimpleHistogram(-100, 25, 20, 0).to_rule_string(),
+            "h(m:-100,b:25,n:20,o:0)"
         );
         assert_eq!(
-            IndexOptimizeMode::SimpleMultiHistogram(0, 1000, 10, "level".to_string())
+            IndexOptimizeMode::SimpleMultiHistogram(0, 1000, 10, 0, "level".to_string())
                 .to_rule_string(),
-            "mh(m:0,x:1000,b:10,f:level)"
+            "mh(m:0,x:1000,b:10,o:0,f:level)"
         );
         assert_eq!(
             IndexOptimizeMode::SimpleTopN(vec!["cpu".to_string()], 10, true).to_rule_string(),
@@ -190,7 +253,8 @@ mod tests {
     #[test]
     #[should_panic(expected = "Invalid IndexOptimizeMode")]
     fn test_to_rpc_simple_histogram_panics() {
-        let _: cluster_rpc::IdxOptimizeMode = IndexOptimizeMode::SimpleHistogram(0, 10, 5).into();
+        let _: cluster_rpc::IdxOptimizeMode =
+            IndexOptimizeMode::SimpleHistogram(0, 10, 5, 0).into();
     }
 
     #[test]
@@ -207,16 +271,16 @@ mod tests {
             ),
             (IndexOptimizeMode::SimpleCount, "count"),
             (
-                IndexOptimizeMode::SimpleHistogram(0, 10, 5),
-                "histogram(min_value: 0, bucket_width: 10, num_buckets: 5)",
+                IndexOptimizeMode::SimpleHistogram(0, 10, 5, 0),
+                "histogram(min_value: 0, bucket_width: 10, num_buckets: 5, ts_offset: 0)",
             ),
             (
-                IndexOptimizeMode::SimpleHistogram(-100, 25, 20),
-                "histogram(min_value: -100, bucket_width: 25, num_buckets: 20)",
+                IndexOptimizeMode::SimpleHistogram(-100, 25, 20, 0),
+                "histogram(min_value: -100, bucket_width: 25, num_buckets: 20, ts_offset: 0)",
             ),
             (
-                IndexOptimizeMode::SimpleMultiHistogram(0, 1000, 10, "level".to_string()),
-                "multi_histogram(min_value: 0, max_value: 1000, bucket_width: 10, field: level)",
+                IndexOptimizeMode::SimpleMultiHistogram(0, 1000, 10, 0, "level".to_string()),
+                "multi_histogram(min_value: 0, max_value: 1000, bucket_width: 10, ts_offset: 0, field: level)",
             ),
             (
                 IndexOptimizeMode::SimpleTopN(vec!["cpu_usage".to_string()], 10, true),

@@ -19,7 +19,7 @@ use infra::table::{self, scorers::ScorerType};
 
 use crate::common::{
     meta::authz::Authz,
-    utils::auth::{remove_ownership, set_ownership},
+    utils::auth::{is_ofga_object_visible, remove_ownership, set_ownership},
 };
 
 /// Errors that can occur when interacting with scorers.
@@ -172,12 +172,23 @@ async fn resolve_score_config_version(
 pub async fn list_scorers(
     org_id: &str,
     scorer_type: Option<&ScorerType>,
+    permitted_objects: Option<Vec<String>>,
 ) -> Result<Vec<table::scorers::Scorer>, ScorerError> {
     let scorers = match scorer_type {
         Some(t) => table::scorers::get_by_type(org_id, t).await?,
         None => table::scorers::get_all_by_org(org_id).await?,
     };
-    Ok(scorers)
+    Ok(scorers
+        .into_iter()
+        .filter(|scorer| {
+            is_ofga_object_visible(
+                org_id,
+                "scorer",
+                &scorer.entity_id,
+                permitted_objects.as_deref(),
+            )
+        })
+        .collect())
 }
 
 #[tracing::instrument()]

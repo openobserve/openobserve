@@ -54,6 +54,7 @@ export class TracesPage {
     this.traceDetailsTimelineChart = '[data-test="trace-details-timeline-chart"]';
     this.traceDetailsToggleTimelineButton = '[data-test="trace-details-toggle-timeline-btn"]';
     this.traceDetailsViewLogsButton = '[data-test="trace-details-view-logs-btn"]';
+    this.traceDetailsLogStreamsSelect = '[data-test="trace-details-log-streams-select"]';
     this.traceDetailsSearchInput = '[data-test="trace-details-search-input"]';
     this.traceDetailsSearchInputField = '[data-test="trace-details-search-input-field"]';
     this.traceDetailsSidebar = '[data-test="trace-details-sidebar"]';
@@ -65,8 +66,8 @@ export class TracesPage {
     // ===== ANALYZE DIMENSIONS SELECTORS (VERIFIED against Vue source) =====
     // TracesMetricsDashboard.vue: data-test="insights-button"
     this.insightsButton = '[data-test="insights-button"]';
-    // Traces SearchBar.vue: data-test="traces-search-bar-error-only-toggle-btn"
-    this.errorOnlyToggle = '[data-test="traces-search-bar-error-only-toggle-btn"]';
+    // SearchResult.vue: error-count badge doubles as the error-only toggle
+    this.errorOnlyToggle = '[data-test="traces-error-count-badge"]';
     // Traces SearchBar.vue: data-test="traces-search-bar-show-metrics-toggle-btn"
     this.metricsToggle = '[data-test="traces-search-bar-show-metrics-toggle-btn"]';
     // TracesAnalysisDashboard.vue was migrated to ODrawer
@@ -113,7 +114,7 @@ export class TracesPage {
 
     // Error States
     this.noStreamSelectedText = '[data-test="logs-search-no-stream-selected-text"]';
-    this.resultNotFoundText = '[data-test="logs-search-result-not-found-text"]';
+    this.resultNotFoundText = '[data-test="traces-search-result-not-found-text"]';
     this.errorMessage = '[data-test="traces-search-error-message"]';
 
     // Query Editor
@@ -1227,6 +1228,60 @@ export class TracesPage {
   }
 
   /**
+   * Check if view logs button is enabled (not disabled)
+   * @returns {Promise<boolean>}
+   */
+  async isViewLogsButtonEnabled() {
+    const button = this.page.locator(this.traceDetailsViewLogsButton);
+    if (await button.isVisible({ timeout: 5000 }).catch(() => false)) {
+      return !(await button.isDisabled());
+    }
+    return false;
+  }
+
+  /**
+   * Check if log streams selector is visible (indicates non-enterprise mode)
+   * @returns {Promise<boolean>}
+   */
+  async isLogStreamsSelectVisible() {
+    return await this.page.locator(this.traceDetailsLogStreamsSelect).isVisible({ timeout: 5000 }).catch(() => false);
+  }
+
+  /**
+   * Select first available log stream in trace details
+   * @returns {Promise<boolean>} True if selection was successful
+   */
+  async selectFirstLogStreamInTraceDetails() {
+    const wrapper = this.page.locator(this.traceDetailsLogStreamsSelect);
+    if (!(await wrapper.isVisible({ timeout: 5000 }).catch(() => false))) {
+      return false;
+    }
+
+    // Get the trigger button inside the OSelect wrapper
+    const trigger = wrapper.locator('button[type="button"]').first();
+    await trigger.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+
+    // Open the popover
+    await trigger.click({ force: false });
+
+    // Wait for popover to open
+    const popover = this.page.locator('[data-test="trace-details-log-streams-select-popover"]');
+    await popover.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+
+    // Select the first available option
+    const firstOption = this.page.locator('[data-test="trace-details-log-streams-select-option"]').first();
+    if (await firstOption.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await firstOption.click({ force: false });
+      await this.page.waitForTimeout(500);
+      return true;
+    }
+
+    // Close popover if selection failed
+    await this.page.keyboard.press('Escape').catch(() => {});
+    return false;
+  }
+
+  /**
    * Check if search input in trace details is visible
    * @returns {Promise<boolean>}
    */
@@ -1740,7 +1795,7 @@ export class TracesPage {
     return await chartPanel.first().isVisible({ timeout: 10000 }).catch(() => false);
   }
 
-  // --- Error Only Toggle (Traces SearchBar.vue) ---
+  // --- Error Only Toggle (SearchResult.vue — error-count badge) ---
 
   /**
    * Check if Error Only toggle is visible

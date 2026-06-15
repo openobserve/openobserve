@@ -422,7 +422,10 @@
     "menuGroupInspect": "Inspeccionar",
     "validSql": "SQL válido",
     "invalidSql": "Consulta no válida",
-    "menuGroupExplain": "Explique"
+    "menuGroupExplain": "Explique",
+    "fieldValuesEmpty": "No se ha encontrado ningún valor.",
+    "fieldValuesEmptyHint": "Prueba con un intervalo de tiempo más amplio para ver los valores.",
+    "selectLogsStreamFirst": "Selecciona la transmisión de registros primero"
   },
   "menu": {
     "home": "Inicio",
@@ -525,7 +528,18 @@
     "seekToMoment": "Busca este momento de la sesión",
     "timeInSession": "Tiempo de sesión",
     "route": "Ruta",
-    "duration": "Duración"
+    "duration": "Duración",
+    "emptyState": {
+      "title": "Supervise a sus usuarios con Real User Monitoring",
+      "description": "RUM rastrea las interacciones reales de los usuarios (cargas de páginas, errores, llamadas a la API y repeticiones de sesiones) para que puedas ver exactamente cómo los usuarios experimentan tu aplicación.",
+      "webApp": "Instrumente una aplicación web",
+      "webAppDesc": "Agregue el SDK RUM de OpenObserve a cualquier aplicación de JavaScript",
+      "sessionReplay": "Habilitar la reproducción de sesiones",
+      "sessionReplayDesc": "Graba y reproduce las sesiones de usuario para depurar problemas de UX",
+      "learnMore": "Obtenga más información:",
+      "quickImpl": "Guía de implementación rápida",
+      "blogPost": "Conceptos básicos de monitoreo de frontend"
+    }
   },
   "about": {
     "name": "Abrir Observe",
@@ -1791,7 +1805,23 @@
     "tabAiAssistant": "Asistente O2 AI",
     "tabOverview": "Visión general",
     "tabUsage": "Uso",
-    "subtitle": "Su espacio de trabajo de observabilidad de un vistazo"
+    "subtitle": "Su espacio de trabajo de observabilidad de un vistazo",
+    "noDataState": {
+      "title": "Aún no se han ingerido datos",
+      "description": "Esta organización no ha recibido ningún dato, por lo que no hay nada que registrar. Una vez que los eventos empiecen a fluir, el <strong>volumen de ingesta, el almacenamiento y el uso de las consultas</strong> aparecerán aquí automáticamente.",
+      "logs": "Enviar registros",
+      "logsDesc": "Curl, Filebeat, Fluentbit, Vector y más",
+      "traces": "Enviar trazas",
+      "tracesDesc": "Rastreo distribuido de OTLP/Jaeger/Zipkin",
+      "metrics": "Enviar métricas",
+      "metricsDesc": "Prometheus, Otel Collector, Telegraf y más",
+      "or": "O:",
+      "otel": "Telemetría abierta",
+      "kubernetes": "Kubernetes",
+      "aws": "AWS/CloudWatch",
+      "aiIntegrations": "Integraciones de IA",
+      "shippers": "Transportistas de troncos"
+    }
   },
   "billing": {
     "header": "Uso y facturación",
@@ -3210,7 +3240,42 @@
     "openInFullView": "Abrir a la vista",
     "serviceMap": "Mapa de servicios",
     "patternView": "Vista de patrón",
-    "spanView": "Vista de España"
+    "spanView": "Vista de España",
+    "noData": {
+      "title": "Comience a enviar rastreos a OpenObserve",
+      "description": "Aún no se han encontrado rastros en esta organización. Instrumente sus servicios y los rastros aparecerán aquí automáticamente.",
+      "otlp": "Enviar trazas mediante OTL",
+      "otlpDesc": "Jaeger, Zipkin y cualquier SDK compatible con OpenTelemetry",
+      "otelCollector": "Coleccionista de hoteles//Agente",
+      "otelCollectorDesc": "Dirija todas las señales de telemetría a través del colector Otel",
+      "or": "O:",
+      "kubernetes": "Kubernetes",
+      "python": "Pitón",
+      "java": "Java",
+      "nodejs": "Node.js",
+      "askAi": "Pídele a la IA que configure el rastreo"
+    },
+    "noStream": {
+      "title": "Elige un arroyo para empezar a explorar",
+      "description": "Elige una secuencia de seguimiento y, a continuación, pulsa <strong>Ejecutar consulta</strong>. Puedes filtrar por servicio, duración, estado del intervalo, etc. una vez que se carguen los resultados.",
+      "selectStream": "Selecciona una transmisión",
+      "selectStreamDesc": "Explore los flujos de rastreo disponibles en esta organización",
+      "queryGuide": "Lea la guía de trazas",
+      "queryGuideDesc": "Gráfico de servicio, filtrado de intervalos, métricas RED y más",
+      "recent": "Reciente:"
+    },
+    "noEvents": {
+      "title": "No se han encontrado rastros",
+      "descNoFilters": "No se encontraron rastros en {range}. Intente ampliar el intervalo de tiempo para cargar los resultados.",
+      "descWithFilters": "No hay nada que coincida con <strong>esta consulta</strong> en la ventana seleccionada. Intente ampliar el intervalo de tiempo o eliminar un filtro.",
+      "expandRange": "Amplíe el rango de tiempo",
+      "expandRangeDescAbsolute": "Cambie a un rango de tiempo relativo más amplio",
+      "removeFilter": "Eliminar un filtro",
+      "selectedRange": "el rango seleccionado"
+    },
+    "showAll": "Mostrar todo",
+    "filterByErrors": "Filtrar por errores",
+    "clearErrorFilter": "Borrar filtro de errores"
   },
   "invitation": {
     "pendingInvitations": "Invitaciones pendientes",
@@ -3493,7 +3558,9 @@
     "timeRangeLabel": "Intervalo de tiempo:",
     "analyzeTooltipTraces": "Analice las dimensiones de seguimiento para determinar la velocidad, la latencia y los patrones de error",
     "insightsButtonLabel": "Perspectivas",
-    "searchInspectionsLabel": "Inspeccione los detalles de ejecución del trabajo de búsqueda"
+    "searchInspectionsLabel": "Inspeccione los detalles de ejecución del trabajo de búsqueda",
+    "inspectBtnLabel": "Inspeccionar",
+    "analyzeBtnLabel": "Perspectivas"
   },
   "errorInsights": {
     "title": "Perspectivas",
@@ -3971,7 +4038,13 @@
     "elevatedErrorRate": "Tasa de error elevada",
     "reqPerSec": "solicitud/s",
     "allClear": "Todo despejado",
-    "allClearDesc": "No hay anomalías, incidentes ni servicios degradados activos en la ventana de tiempo seleccionada."
+    "allClearDesc": "No hay anomalías, incidentes ni servicios degradados activos en la ventana de tiempo seleccionada.",
+    "emptyActionAlerts": "Ver reglas de alertas",
+    "emptyActionAlertsDesc": "Revise las alertas y los umbrales configurados",
+    "emptyActionLogs": "Explore los registros",
+    "emptyActionLogsDesc": "Busque y filtre sus flujos de registro",
+    "emptyActionTraces": "Explora las huellas",
+    "emptyActionTracesDesc": "Inspeccione los rastros distribuidos y la latencia del servicio"
   },
   "chatHistory": {
     "title": "Charlas",
@@ -4355,6 +4428,14 @@
     "noPipelineHistory": {
       "title": "Aún no hay historial de oleoductos",
       "description": "El historial de ejecución de las canalizaciones aparecerá aquí una vez que las canalizaciones estén en funcionamiento."
+    },
+    "noStreamSelected": {
+      "title": "Selecciona una transmisión para empezar",
+      "description": "Elige una transmisión en el menú desplegable de la izquierda y, a continuación, pulsa «Ejecutar consulta» para explorar tus registros. También puedes aplicar filtros adicionales y ajustar el intervalo de fechas."
+    },
+    "noQueryApplied": {
+      "title": "Ejecute una consulta para ver los registros",
+      "description": "Ajusta los filtros y haz clic en «Ejecutar consulta» para cargar los eventos de esta transmisión."
     }
   },
   "onlineEvals": {
@@ -4713,5 +4794,111 @@
       "scorers": "Goleadores",
       "scoreConfigs": "Configuraciones de puntuación"
     }
+  },
+  "logs": {
+    "noData": {
+      "title": "Comience a enviar datos a OpenObserve",
+      "description": "Aún no hay datos en esta organización, por lo que no hay transmisiones que explorar. Envía tus primeros registros y se mostrarán aquí automáticamente. Elige cómo quieres empezar.",
+      "curl": "Enviar a través de la API Curl/HTTP",
+      "curlDesc": "La forma más rápida: pega un comando y los registros comienzan a fluir",
+      "shippers": "Utilice un transportista de troncos",
+      "shippersDesc": "Filebeat, Fluentbit, Fluentd, Vector, SysloGng y más",
+      "otel": "Telemetría abierta",
+      "otelDesc": "Ingestión de OTLP independiente del proveedor para registros, seguimientos y métricas",
+      "or": "O:",
+      "kubernetes": "Kubernetes",
+      "aws": "AWS/CloudWatch",
+      "linux": "Linux",
+      "windows": "escaparates",
+      "askAi": "Pídele a la IA que configure la ingestión"
+    },
+    "noStream": {
+      "title": "Elige un arroyo para empezar a explorar",
+      "description": "Elige una transmisión y, a continuación, pulsa <strong>Ejecutar consulta</strong>. Puedes refinarla con filtros, una función de VRL y un intervalo de tiempo personalizado una vez que recibas los resultados.",
+      "selectStream": "Selecciona una transmisión",
+      "selectStreamDesc": "Explore registros, seguimientos, métricas y flujos de RUM",
+      "queryGuide": "Lea la guía de consultas",
+      "queryGuideDesc": "Filtros, modo SQL, VRL y vistas guardadas",
+      "recent": "Reciente:"
+    },
+    "noEvents": {
+      "title": "No se ha encontrado ningún evento",
+      "descNoFilters": "No se encontró ningún evento en {range}. Intenta ampliar el intervalo de tiempo para cargar los resultados.",
+      "descWithFilters": "No hay nada que coincida con <strong>esta consulta</strong> en la ventana seleccionada. Intente ampliar el intervalo de tiempo, suavizar un filtro o restablecer la consulta.",
+      "expandRange": "Amplíe el rango de tiempo",
+      "expandRangeDescAbsolute": "Cambie a un rango de tiempo relativo más amplio",
+      "removeFilter": "Eliminar un filtro",
+      "removeFilterDescSql": "Tiene condiciones SQL aplicadas a esta consulta",
+      "openHistory": "Abrir historial de búsqueda",
+      "askAi": "Pedir a la IA que corrija mi consulta",
+      "selectedRange": "el rango seleccionado"
+    },
+    "error": {
+      "sqlError": "Error de sintaxis de SQL",
+      "sqlErrorDesc": "La consulta tiene un error de sintaxis. Revisa el editor de consultas para ver si hay errores resaltados.",
+      "streamNotFound": "No se encontró la transmisión",
+      "streamNotFoundDesc": "La transmisión seleccionada no existe o se ha eliminado.",
+      "ftsNotConfigured": "La búsqueda de texto completo no está configurada",
+      "ftsNotConfiguredDesc": "Esta transmisión no tiene un campo de búsqueda de texto completo. Configure uno para habilitar la búsqueda por palabras clave.",
+      "fieldNotFound": "No se encontró el campo",
+      "fieldNotFoundDesc": "La consulta hace referencia a uno o más campos que no existen en esta secuencia.",
+      "functionNotDefined": "Función no definida",
+      "functionNotDefinedDesc": "La consulta llama a una función VRL que no está definida.",
+      "dataUnavailable": "Archivos de datos no disponibles",
+      "dataUnavailableDesc": "No se puede acceder a algunos archivos de datos de este intervalo de tiempo. Pruebe con una ventana de tiempo diferente.",
+      "dataTypeMismatch": "Discordancia de tipos de datos",
+      "dataTypeMismatchDesc": "Un campo de la consulta se usa con un tipo de datos incompatible.",
+      "executionError": "Falló la ejecución de la consulta",
+      "executionErrorDesc": "Se ha producido un error al ejecutar la consulta.",
+      "serverError": "Error de servidor",
+      "serverErrorDesc": "Se ha producido un error interno en el servidor.",
+      "generic": "Error de búsqueda",
+      "genericDesc": "Se ha producido un error al recuperar los eventos de búsqueda.",
+      "configureStream": "Configurar transmisión",
+      "configureStreamDesc": "Añadir un campo de búsqueda de texto completo en la configuración de la transmisión",
+      "fixQuery": "Corregir la consulta",
+      "fixQueryDesc": "Revisa y corrige la consulta en el editor",
+      "expandRange": "Prueba con un intervalo de tiempo diferente",
+      "expandRangeDesc": "Los datos accesibles pueden estar en una ventana de tiempo diferente",
+      "copyError": "Copiar detalles del error",
+      "traceId": "ID de seguimiento:",
+      "askAi": "Pedir a la IA que corrija mi consulta",
+      "showDetail": "Mostrar detalles",
+      "hideDetail": "Ocultar detalles"
+    }
+  },
+  "queryError": {
+    "sqlError": "Error de sintaxis de SQL",
+    "sqlErrorDesc": "La consulta tiene un error de sintaxis. Revisa el editor para ver si hay errores resaltados.",
+    "streamNotFound": "No se encontró la transmisión",
+    "streamNotFoundDesc": "La transmisión seleccionada no existe o se ha eliminado.",
+    "ftsNotConfigured": "La búsqueda de texto completo no está configurada",
+    "ftsNotConfiguredDesc": "Esta transmisión no tiene un campo de búsqueda de texto completo. Configure uno para habilitar la búsqueda por palabras clave.",
+    "fieldNotFound": "No se encontró el campo",
+    "fieldNotFoundDesc": "La consulta hace referencia a uno o más campos que no existen en esta secuencia.",
+    "functionNotDefined": "Función no definida",
+    "functionNotDefinedDesc": "La consulta llama a una función VRL que no está definida.",
+    "dataUnavailable": "Archivos de datos no disponibles",
+    "dataUnavailableDesc": "No se puede acceder a algunos archivos de datos de este intervalo de tiempo. Pruebe con una ventana de tiempo diferente.",
+    "dataTypeMismatch": "Discordancia de tipos de datos",
+    "dataTypeMismatchDesc": "Un campo de la consulta se usa con un tipo de datos incompatible.",
+    "executionError": "Falló la ejecución de la consulta",
+    "executionErrorDesc": "Se ha producido un error al ejecutar la consulta.",
+    "serverError": "Error de servidor",
+    "serverErrorDesc": "Se ha producido un error interno en el servidor.",
+    "generic": "Error de consulta",
+    "genericDesc": "Se ha producido un error al procesar la consulta.",
+    "configureResource": "Configurar transmisión",
+    "configureResourceDesc": "Añadir un campo de búsqueda de texto completo en la configuración de la transmisión",
+    "fixQuery": "Corregir la consulta",
+    "fixQueryDesc": "Revisa y corrige la consulta en el editor",
+    "expandRange": "Prueba con un intervalo de tiempo diferente",
+    "expandRangeDesc": "Los datos accesibles pueden estar en una ventana de tiempo diferente",
+    "copyError": "Copiar detalles del error",
+    "copied": "¡Copiado!",
+    "traceId": "ID de seguimiento:",
+    "askAi": "Pedir a la IA que corrija mi consulta",
+    "showDetail": "Mostrar detalles",
+    "hideDetail": "Ocultar detalles"
   }
 }

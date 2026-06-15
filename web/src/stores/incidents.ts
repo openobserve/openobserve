@@ -20,7 +20,8 @@ export default {
     cachedData: [], // Cache the actual incidents data
     pageBeforeSearch: 1, // Track page number before search starts (for smart restoration)
     isInitialized: false,
-    shouldRefresh: false // Flag to indicate when data should be refreshed (e.g., after updates)
+    shouldRefresh: false, // Flag to indicate when data should be refreshed (e.g., after updates)
+    statusFilter: "all", // Quick filter tab selection: "all" | "open" | "acknowledged" | "resolved"
   },
   getters: {
     getIncidents(state: any) {
@@ -37,6 +38,9 @@ export default {
     },
     getShouldRefresh(state: any) {
       return state.shouldRefresh;
+    },
+    getStatusFilter(state: any) {
+      return state.statusFilter;
     },
   },
   mutations: {
@@ -55,12 +59,16 @@ export default {
     setShouldRefresh(state: any, shouldRefresh: boolean) {
       state.shouldRefresh = shouldRefresh;
     },
+    setStatusFilter(state: any, statusFilter: string) {
+      state.statusFilter = statusFilter;
+    },
     resetIncidents(state: any) {
       state.incidents = {};
       state.cachedData = [];
       state.pageBeforeSearch = 1;
       state.isInitialized = false;
       state.shouldRefresh = false;
+      state.statusFilter = "all";
     },
   },
   actions: {
@@ -78,6 +86,9 @@ export default {
     },
     setShouldRefresh(context: any, shouldRefresh: boolean) {
       context.commit('setShouldRefresh', shouldRefresh);
+    },
+    setStatusFilter(context: any, statusFilter: string) {
+      context.commit('setStatusFilter', statusFilter);
     },
     resetIncidents(context: any) {
       context.commit('resetIncidents');

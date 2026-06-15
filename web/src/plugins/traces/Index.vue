@@ -85,6 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ref="serviceGraphRef"
               class="tw:h-full"
               @view-traces="handleServiceGraphViewTraces"
+              @request:stream-change="onChildStreamChangeRequest"
             />
           </div>
 
@@ -97,6 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ref="servicesCatalogRef"
               class="tw:h-full"
               @view-traces="handleServicesCatalogViewTraces"
+              @request:stream-change="onChildStreamChangeRequest"
             />
           </div>
 
@@ -133,8 +135,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
               <template #after>
                 <div class="tw:h-full tw:pb-[0.625rem]">
-                  <div
+                  <!-- No trace streams in org yet -->
+                  <TracesNoDataState
                     v-if="
+                      !searchObj.loadingStream &&
+                      searchObj.data.stream.streamLists.length === 0 &&
+                      !searchObj.loading
+                    "
+                    :ai-enabled="isAiEnabled"
+                    data-test="traces-no-streams-in-org-text"
+                    @ask-ai="onAskAiTracing"
+                  />
+                  <div
+                    v-else-if="
                       searchObj.data.errorMsg !== '' &&
                       parseInt(searchObj.data.errorCode) !== 0 &&
                       searchObj.loading == false
@@ -215,29 +228,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="tw:pt-[1rem]"
                     />
                   </div>
-                  <div
-                    v-else-if="!isStreamSelected"
-                    class="card-container tw:h-full"
-                  >
-                    <div
-                      data-test="logs-search-no-stream-selected-text"
-                      class="tw:text-center tw:mx-[10%] tw:py-[40px] tw:mt-0 tw:text-[20px]"
-                    >
-                      <OIcon name="info" size="md" class="tw:align-middle tw:mr-1" />
-                      {{ t("search.noStreamSelectedMessage") }}
-                    </div>
+                  <div v-else-if="!isStreamSelected">
+                    <TracesNoStreamState
+                      :org-id="store.state.selectedOrganization?.identifier"
+                      data-test="traces-no-stream-selected-text"
+                      @select-stream="onSelectTracesStream"
+                      @pick-stream="onPickTracesStream"
+                    />
                   </div>
                   <div
-                    data-test="traces-search-not-started-text"
                     v-else-if="
                       isStreamSelected &&
                       !searchObj.searchApplied &&
                       !searchObj.data.queryResults?.hits?.length
                     "
-                    class="tw:text-center tw:py-[40px] tw:text-[20px] card-container tw:h-full"
                   >
-                    <OIcon name="info" size="md" />
-                    {{ t("search.applySearch") }}
+                    <OEmptyState
+                      preset="no-query-applied"
+                      size="hero"
+                      data-test="traces-search-not-started-text"
+                    />
                   </div>
                   <div
                     v-else
@@ -252,6 +262,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @shareLink="copyTracesUrl"
                       @metrics:filters-updated="onMetricsFiltersUpdated"
                       @run-query="searchData"
+                      @widen-range="onWidenTracesRange"
+                      @remove-filter="onRemoveTracesFilter"
+                      @error-only-toggled="onErrorOnlyToggled"
                     />
                   </div>
                 </div>
@@ -262,6 +275,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </OSplitter>
     </div>
+
+    <ODialog
+      v-model:open="streamChangeDialog.show"
+      title="Change stream?"
+      size="sm"
+      primary-button-label="Switch stream"
+      secondary-button-label="Cancel"
+      @click:primary="applyStreamChange(streamChangeDialog.pendingStream)"
+      @click:secondary="streamChangeDialog.show = false"
+    >
+      <p>This will also update the stream in the Traces/Spans tab and reset existing query.</p>
+    </ODialog>
   </div>
 </template>
 
@@ -307,7 +332,7 @@ import config from "@/aws-exports";
 import { logsErrorMessage } from "@/utils/common";
 import useNotifications from "@/composables/useNotifications";
 import { getConsumableRelativeTime } from "@/utils/date";
-import { cloneDeep, debounce } from "lodash-es";
+import { cloneDeep } from "lodash-es";
 import { computed } from "vue";
 import useStreams from "@/composables/useStreams";
 import { parseDurationWhereClause } from "@/composables/useDurationPercentiles";
@@ -328,8 +353,12 @@ import { useTracesTableColumns } from "./composables/useTracesTableColumns";
 import type { TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
 import { isLLMTrace } from "@/utils/llmUtils";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import TracesNoDataState from "@/plugins/traces/TracesNoDataState.vue";
+import TracesNoStreamState from "@/plugins/traces/TracesNoStreamState.vue";
 import { saveTracesStream, restoreTracesStream } from "@/utils/streamPersist";
 import { useCorrelationFilters } from "@/composables/useCorrelationDefaultSlug";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -505,18 +534,17 @@ async function getStreamList() {
         }
 
         await extractFields();
-        const queryBeforeRestore = searchObj.data.editorValue;
         correlationFilters.restore();
-        const filterWasRestored =
-          !queryBeforeRestore && !!searchObj.data.editorValue;
 
+        // Restore filter chips from the editor value. The single mount search is
+        // owned by loadPageData() (after getStreamList resolves), so we do NOT
+        // trigger a search here — that previously produced a duplicate on load.
         if (
           searchObj.data.editorValue &&
           searchObj.data.stream.selectedStreamFields.length
         )
           nextTick(() => {
             restoreFilters(searchObj.data.editorValue);
-            if (filterWasRestored) searchData();
           });
       })
       .catch((e) => {
@@ -1566,8 +1594,8 @@ function restoreUrlQueryParams() {
   const queryParams = router.currentRoute.value.query;
 
   const date = {
-    startTime: queryParams.from,
-    endTime: queryParams.to,
+    startTime: typeof queryParams.from === "string" ? Number(queryParams.from) : queryParams.from,
+    endTime: typeof queryParams.to === "string" ? Number(queryParams.to) : queryParams.to,
     relativeTimePeriod: queryParams.period || null,
     type: queryParams.period ? "relative" : "absolute",
   };
@@ -1667,13 +1695,13 @@ const onMetricsFiltersUpdated = (filters: string[]) => {
   ) {
     allFilters.push("span_status = 'ERROR'");
   }
-  // Apply each filter term independently so replace-or-append works per field
-  // Skip search only when live mode is ON (datetime trigger will handle it)
-  // Don't skip when live mode is OFF (datetime trigger won't fire)
-  const skipSearch = !!(searchObj.meta.liveMode && store.state.zoConfig?.auto_query_enabled);
-
+  // Apply each filter term independently so replace-or-append works per field.
+  // applyFilters owns the single trigger: it emits `searchdata` (one search) only
+  // in live mode. The brush also sets a time range programmatically, which the
+  // DateTime picker stamps userChangedValue=false, so it never adds a competing
+  // search — this filter apply is the sole trigger.
   if (searchBarRef.value?.applyFilters) {
-    searchBarRef.value.applyFilters(allFilters, skipSearch);
+    searchBarRef.value.applyFilters(allFilters);
   } else {
     console.warn("SearchBar not ready for filter application");
   }
@@ -1725,6 +1753,44 @@ const onFiltersReset = () => {
 const isStreamSelected = computed(() => {
   return searchObj.data.stream?.selectedStream?.value?.trim()?.length > 0;
 });
+
+const onRemoveTracesFilter = () => {
+  searchObj.data.editorValue = "";
+  searchBarRef.value?.updateQuery?.();
+  searchObj.runQuery = true;
+};
+
+const onWidenTracesRange = (period: string) => {
+  searchBarRef.value?.dateTimeRef?.setRelativeTime(period);
+  searchObj.data.datetime.relativeTimePeriod = period;
+  searchObj.data.datetime.type = "relative";
+  searchObj.runQuery = true;
+};
+
+const onSelectTracesStream = () => {
+  const trigger = document.querySelector<HTMLElement>(
+    '[data-test="log-search-index-list-select-stream"] button',
+  );
+  trigger?.click();
+};
+
+const onPickTracesStream = (streamName: string) => {
+  const match = searchObj.data.stream.streamLists.find(
+    (s: any) => s.value === streamName || s.label === streamName,
+  );
+  if (match) {
+    searchObj.data.stream.selectedStream = match;
+    searchObj.runQuery = true;
+  }
+};
+
+const isAiEnabled = computed(
+  () => config.isEnterprise === "true" && !!store.state.zoConfig.ai_enabled,
+);
+
+const onAskAiTracing = () => {
+  router.push({ name: "ingestion", query: { org_identifier: store.state.selectedOrganization?.identifier } });
+};
 
 /**
  * Extracts a plain column name from a DataFusion SQL AST column node.
@@ -1913,6 +1979,26 @@ const onChangeStream = async () => {
   runQueryFn();
 };
 
+const streamChangeDialog = ref({ show: false, pendingStream: "" });
+
+const applyStreamChange = async (newStream: string) => {
+  searchObj.data.stream.selectedStream = {
+    label: newStream,
+    value: newStream,
+  };
+  searchObj.data.editorValue = "";
+  streamChangeDialog.value.show = false;
+  await onChangeStream();
+};
+
+const onChildStreamChangeRequest = (newStream: string) => {
+  if (searchObj.data.editorValue?.trim()) {
+    streamChangeDialog.value = { show: true, pendingStream: newStream };
+  } else {
+    applyStreamChange(newStream);
+  }
+};
+
 const collapseFieldList = () => {
   if (searchObj.meta.showFields) searchObj.meta.showFields = false;
   else searchObj.meta.showFields = true;
@@ -2007,71 +2093,10 @@ watch(
   { immediate: true },
 );
 
-// Debounced auto-run on query text changes in live mode.
-const debouncedAutoRunOnQuery = debounce(() => {
-  if (
-    searchObj.meta.liveMode &&
-    store.state.zoConfig?.auto_query_enabled &&
-    !searchObj.loading
-  ) {
-    searchData();
-  }
-}, 500);
-
-// Debounced auto-run on datetime changes in live mode.
-// Traces has no existing auto-run on datetime, so no guard needed.
-const debouncedAutoRunOnDatetime = debounce(() => {
-  // Absolute time is handled by SearchBar's triggerAbsoluteQueryDebounced (2500ms).
-  // Only auto-run here for relative time to avoid double-triggering.
-  if (
-    searchObj.data.datetime.type === "relative" &&
-    searchObj.meta.liveMode &&
-    store.state.zoConfig?.auto_query_enabled &&
-    !searchObj.loading
-  ) {
-    searchData();
-  }
-}, 500);
-
-watch(
-  () => searchObj.data.query,
-  () => {
-    debouncedAutoRunOnQuery();
-  },
-);
-
-watch(
-  () => [
-    searchObj.data.datetime.type,
-    searchObj.data.datetime.startTime,
-    searchObj.data.datetime.endTime,
-    searchObj.data.datetime.relativeTimePeriod,
-  ],
-  () => {
-    debouncedAutoRunOnDatetime();
-  },
-  { deep: true },
-);
-
-// watch(
-//   changeStream,
-//   (stream, oldStream) => {
-//     if (stream.value === oldStream.value) return;
-//     if (searchObj.data.stream.selectedStream.hasOwnProperty("value")) {
-//       if (oldStream.value) {
-//         searchObj.data.query = "";
-//         searchObj.data.advanceFiltersQuery = "";
-//       }
-//       setTimeout(() => {
-//         runQueryFn();
-//         extractFields();
-//       }, 500);
-//     }
-//   },
-//   {
-//     immediate: false,
-//   },
-// );
+// NOTE: auto-run in live mode is driven by explicit triggers at each user-intent
+// handler (filter add/remove, manual date change, redirect, metrics brush) — not
+// by watching `searchObj.data.query`. A query watcher duplicated those explicit
+// triggers (every writer of `data.query` also runs a search), so it was removed.
 
 // Handler for service graph view traces event
 const handleServiceGraphViewTraces = (data: any) => {
@@ -2129,7 +2154,6 @@ const handleServiceGraphViewTraces = (data: any) => {
       filterQuery += ` AND duration <= ${data.maxDurationMicros}`;
     }
     searchObj.data.editorValue = filterQuery;
-    searchObj.data.query = filterQuery;
     searchObj.meta.sqlMode = false; // Traces doesn't use SQL mode
   }
 

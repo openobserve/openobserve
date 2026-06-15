@@ -48,6 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </AppPageHeader>
       </template>
 
+      <div class="card-container tw:h-full">
       <OTable
         data-test="log-stream-table"
         :data="logStream"
@@ -125,7 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             `dashboard-name-cell-<name>` pattern in Dashboards.vue.
           -->
           <template #cell-name="{ row }">
-            <span :data-test="`log-stream-name-cell-${row.name}`">{{ row.name }}</span>
+            <span :data-test="`log-stream-name-cell-${row.name}`" class="tw:text-text-primary">{{ row.name }}</span>
           </template>
           <template #cell-actions="{ row }">
              <div class="tw:flex tw:items-center actions-container">
@@ -189,6 +190,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
         </OTable>
+      </div>
     </PageLayout>
 
     <SchemaIndex v-if="showIndexSchemaDialog" v-model="schemaData" v-model:open="showIndexSchemaDialog" @close="showIndexSchemaDialog = false" />

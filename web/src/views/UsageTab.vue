@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Main content when data exists -->
     <div
       v-if="!no_data_ingest && !isLoadingSummary"
-      class="tw:w-full tw:h-full tw:overflow-y-auto"
+      class="usage-scroll tw:w-full tw:h-full tw:overflow-y-auto"
     >
       <!-- Banners -->
       <div class="banners-wrapper">
@@ -605,27 +605,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Empty state when no data ingested -->
     <div
       v-if="no_data_ingest && !isLoadingSummary"
-      class="tw:p-4 tw:flex tw:items-start tw:gap-4 home-no-data-panel"
+      class="tw:flex tw:flex-col tw:h-full"
       data-test="home-usage-tab-no-data"
     >
-      <TrialPeriod></TrialPeriod>
-      <div class="my-card">
-        <div align="center" class="my-card tw:py-4">
-          <div class="tw:text-xl tw:font-medium">{{ t("home.noData") }}</div>
-          <div class="tw:text-base">{{ t("home.ingestionMsg") }}</div>
-        </div>
-
-        <OSeparator />
-
-        <div class="tw:py-2 tw:text-center">
-          <OButton
-            variant="ghost-primary"
-            data-test="home-usage-tab-find-ingestion-btn"
-            @click="() => $router.push({ name: 'ingestion' })"
-            >{{ t("home.findIngestion") }}
-          </OButton>
-        </div>
-      </div>
+      <TrialPeriod />
+      <HomeNoDataState />
     </div>
 
     <!-- Loading state -->
@@ -654,6 +638,7 @@ import HomeViewSkeleton from "@/components/shared/HomeViewSkeleton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import HomeNoDataState from "@/views/HomeNoDataState.vue";
 
 const { t } = useI18n();
 const store = useStore();
@@ -1176,7 +1161,9 @@ watch(orgId, (newVal, oldVal) => {
 }
 
 @mixin dark-theme-vars {
-  --tile-bg: #2b2c2d;
+  /* No card fill in dark mode — the border alone defines each card (the solid
+     grey fill read as odd against the near-black theme). */
+  --tile-bg: transparent;
   --tile-border: #444444;
   --text-primary: #cccfd1;
   --text-secondary: #b7b7b7;
@@ -1237,6 +1224,14 @@ watch(orgId, (newVal, oldVal) => {
 }
 
 /* ===== 3. Layout Components ===== */
+
+/* The scroll container is pulled to the content-card's right edge by its panel
+   (see HomeView `.home-tab-panel--usage`) so the scrollbar sits flush at the
+   edge instead of floating inset. This padding-right restores the gap between
+   the cards and the scrollbar so the content still has breathing room. */
+.usage-scroll {
+  padding-right: 0.625rem;
+}
 
 .banners-wrapper {
   flex-shrink: 0;
