@@ -5,9 +5,10 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "type": "lldb",
+      "type": "codelldb",
       "request": "launch",
       "name": "Debug executable 'openobserve' (server)",
+      "program": "${env:HOME}/.cargo/shared-target/debug/openobserve",
       "cargo": {
         "args": ["build", "--bin=openobserve", "--package=openobserve"],
         "filter": {
@@ -17,15 +18,16 @@
       },
       "env": {
         "ZO_ROOT_USER_EMAIL": "root@example.com",
-        "ZO_ROOT_USER_PASSWORD": "Complexpass#123",
+        "ZO_ROOT_USER_PASSWORD": "Complexpass#123"
       },
       "args": [],
       "cwd": "${workspaceFolder}"
     },
     {
-      "type": "lldb",
+      "type": "codelldb",
       "request": "launch",
       "name": "Debug unit tests in library 'openobserve'",
+      "program": "${cargo:program}",
       "cargo": {
         "args": ["test", "--no-run", "--lib", "--package=openobserve"],
         "filter": {
@@ -37,9 +39,10 @@
       "cwd": "${workspaceFolder}"
     },
     {
-      "type": "lldb",
+      "type": "codelldb",
       "request": "launch",
       "name": "Debug executable 'openobserve' (bin)",
+      "program": "${env:HOME}/.cargo/shared-target/debug/openobserve",
       "cargo": {
         "args": ["build", "--bin=openobserve", "--package=openobserve"],
         "filter": {
@@ -51,9 +54,10 @@
       "cwd": "${workspaceFolder}"
     },
     {
-      "type": "lldb",
+      "type": "codelldb",
       "request": "launch",
       "name": "Debug unit tests in executable 'openobserve'",
+      "program": "${cargo:program}",
       "cargo": {
         "args": [
           "test",
@@ -66,6 +70,38 @@
           "kind": "bin"
         }
       },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "codelldb",
+      "request": "launch",
+      "name": "Debug executable 'openobserve' (enterprise)",
+      "program": "${env:HOME}/.cargo/shared-target/debug/openobserve",
+      "cargo": {
+        "args": ["build", "--bin=openobserve", "--package=openobserve"],
+        "filter": {
+          "name": "openobserve",
+          "kind": "bin"
+        }
+      },
+      "envFile": "${workspaceFolder}/.env",
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "codelldb",
+      "request": "launch",
+      "name": "Debug executable 'openobserve' (cloud)",
+      "program": "${env:HOME}/.cargo/shared-target/debug/openobserve",
+      "cargo": {
+        "args": ["build", "--bin=openobserve", "--package=openobserve"],
+        "filter": {
+          "name": "openobserve",
+          "kind": "bin"
+        }
+      },
+      "envFile": "${workspaceFolder}/.env.cloud",
       "args": [],
       "cwd": "${workspaceFolder}"
     }
