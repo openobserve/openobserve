@@ -4441,6 +4441,14 @@
     "noQueryApplied": {
       "title": "Führen Sie eine Abfrage aus, um Protokolle anzuzeigen",
       "description": "Passen Sie Ihre Filter an und klicken Sie auf „Abfrage ausführen“, um Ereignisse für diesen Stream zu laden."
+    },
+    "noServiceGraph": {
+      "title": "Keine Service-Graph-Daten",
+      "description": "Versuchen Sie, einen längeren Zeitraum abzufragen, oder stellen Sie sicher, dass Ihre Dienste Span-Metriken ausgeben."
+    },
+    "noServicesCatalog": {
+      "title": "Keine Dienste gefunden",
+      "description": "Im ausgewählten Zeitraum wurden keine Dienste erkannt. Versuche es mit einer größeren Reichweite oder einem anderen Stream."
     }
   },
   "onlineEvals": {
