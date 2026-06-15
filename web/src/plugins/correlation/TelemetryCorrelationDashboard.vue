@@ -82,7 +82,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="sourceEvent && (sourceEvent.timestamp || sourceEvent.message)"
         class="source-event-banner tw:flex tw:items-start tw:gap-3 tw:px-4 tw:py-2 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
       >
-        <span class="tw:text-xs tw:font-semibold tw:opacity-70">Source event</span>
         <OBadge
           v-if="sourceEvent.severity"
           :class="severityClass(sourceEvent.severity)"
@@ -100,33 +99,59 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </span>
       </div>
 
-      <!-- Selectable dimension chips (dialog mode) -->
+      <!-- Correlation and View sections (dialog mode) -->
       <div
-        v-if="tabFilteredChips.length > 0"
-        class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap tw:px-4 tw:py-2 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
+        v-if="contextChips.length > 0 || subjectChips.length > 0"
+        class="tw:flex tw:items-center tw:gap-6 tw:px-4 tw:py-3 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
       >
-        <OBadge
-          v-for="chip in visibleChips"
-          :key="chip.key"
-          :variant="chipBadgeVariant(chip.key, chipIsActive(chip))"
-          size="sm"
-          :icon="chipIsActive(chip) ? 'check' : 'swap-horiz'"
-          :clickable="chipIsClickable(chip) && !chipIsDisabled(chip)"
-          :disabled="chipIsDisabled(chip)"
-          :data-test="`correlation-dashboard-dim-chip-${chip.key}`"
-          @click="onChipClick(chip)"
-        >
-          {{ chip.label }} = {{ chip.value }}
-          <template v-if="chipIsDisabled(chip)">
-            <OTooltip :content="`No metric streams found for this ${chip.label.toLowerCase()}`" side="top" />
-          </template>
-        </OBadge>
-        <div
-          v-if="hiddenChipCount > 0"
-          class="dim-chip-more"
-          @click="chipOverflowExpanded = !chipOverflowExpanded"
-        >
-          {{ chipOverflowExpanded ? "show less" : `+${hiddenChipCount} more` }}
+        <!-- Correlation By section -->
+        <div v-if="contextChips.length > 0" class="tw:flex tw:items-center tw:gap-3">
+          <h4 class="tw:text-sm tw:font-semibold tw:m-0 tw:opacity-70">Correlated By</h4>
+          <div class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap">
+            <OBadge
+              v-for="chip in visibleContextChips"
+              :key="chip.key"
+              :variant="chipBadgeVariant(chip.key, chipIsActive(chip))"
+              size="sm"
+              dot
+              :clickable="chipIsClickable(chip) && !chipIsDisabled(chip)"
+              :disabled="chipIsDisabled(chip)"
+              :data-test="`correlation-dashboard-context-chip-${chip.key}`"
+              @click="onChipClick(chip)"
+            >
+              {{ chip.label }} = {{ chip.value }}
+              <template v-if="chipIsDisabled(chip)">
+                <OTooltip :content="`No metric streams found for this ${chip.label.toLowerCase()}`" side="top" />
+              </template>
+            </OBadge>
+            <div
+              v-if="hiddenContextChipCount > 0"
+              class="dim-chip-more"
+              @click="chipOverflowExpanded = !chipOverflowExpanded"
+            >
+              {{ chipOverflowExpanded ? "show less" : `+${hiddenContextChipCount} more` }}
+            </div>
+          </div>
+        </div>
+
+        <!-- View By section -->
+        <div v-if="subjectChips.length > 0" class="tw:flex tw:items-center tw:gap-3">
+          <h4 class="tw:text-sm tw:font-semibold tw:m-0 tw:opacity-70">View By</h4>
+          <OToggleGroup v-model="activeSubject" type="single" size="sm">
+            <OToggleGroupItem
+              v-for="chip in subjectChips"
+              :key="chip.key"
+              :value="chip.key"
+              :disabled="chip.disabled"
+              :data-test="`correlation-dashboard-subject-toggle-${chip.key}`"
+            >
+              {{ getSubjectButtonLabel(chip.key) }}
+              <OTooltip :content="`${chip.label} = ${chip.value}`" side="top" />
+              <template v-if="chip.disabled">
+                <OTooltip :content="`No metric streams found for this ${chip.label.toLowerCase()}`" side="top" />
+              </template>
+            </OToggleGroupItem>
+          </OToggleGroup>
         </div>
       </div>
 
@@ -610,7 +635,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="sourceEvent && (sourceEvent.timestamp || sourceEvent.message)"
       class="source-event-banner tw:flex tw:items-center tw:gap-3 tw:px-4 tw:py-2 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
     >
-      <span class="tw:text-xs tw:font-semibold tw:opacity-70">Source event</span>
       <OBadge
         v-if="sourceEvent.severity"
         :class="severityClass(sourceEvent.severity)"
@@ -628,33 +652,61 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </span>
     </div>
 
-    <!-- Selectable dimension chips (embedded mode) -->
+    <!-- Correlation and View sections (embedded mode) -->
     <div
-      v-if="tabFilteredChips.length > 0"
-      class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap tw:px-4 tw:py-2 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
+      v-if="contextChips.length > 0 || subjectChips.length > 0"
+      class="tw:flex tw:items-center tw:gap-6 tw:px-4 tw:py-1 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
     >
-      <OBadge
-        v-for="chip in visibleChips"
-        :key="chip.key"
-        :variant="chipBadgeVariant(chip.key, chipIsActive(chip))"
-        size="md"
-        :icon="chipIsActive(chip) ? 'check' : 'swap-horiz'"
-        :clickable="chipIsClickable(chip) && !chipIsDisabled(chip)"
-        :disabled="chipIsDisabled(chip)"
-        :data-test="`correlation-dashboard-dim-chip-${chip.key}`"
-        @click="onChipClick(chip)"
-      >
-        {{ chip.label }} = {{ chip.value }}
-        <template v-if="chipIsDisabled(chip)">
-          <OTooltip :content="`No metric streams found for this ${chip.label.toLowerCase()}`" side="top" />
-        </template>
-      </OBadge>
-      <div
-        v-if="hiddenChipCount > 0"
-        class="dim-chip-more"
-        @click="chipOverflowExpanded = !chipOverflowExpanded"
-      >
-        {{ chipOverflowExpanded ? "show less" : `+${hiddenChipCount} more` }}
+      <!-- Correlation By section -->
+      <div v-if="contextChips.length > 0" class="tw:flex tw:items-center tw:gap-3 tw:flex-1">
+        <span class="tw:text-2! tw:m-0 tw:opacity-70">Correlated by:</span>
+        <div class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap">
+          <OBadge
+            v-for="chip in visibleContextChips"
+            :key="chip.key"
+            :variant="chipBadgeVariant(chip.key, chipIsActive(chip))"
+            size="md"
+            dot
+            :clickable="chipIsClickable(chip) && !chipIsDisabled(chip)"
+            :disabled="chipIsDisabled(chip)"
+            :data-test="`correlation-dashboard-context-chip-${chip.key}`"
+            @click="onChipClick(chip)"
+          >
+            {{ chip.label }} = {{ chip.value }}
+            <template v-if="chipIsDisabled(chip)">
+              <OTooltip :content="`No metric streams found for this ${chip.label.toLowerCase()}`" side="top" />
+            </template>
+          </OBadge>
+          <div
+            v-if="hiddenContextChipCount > 0"
+            class="dim-chip-more"
+            @click="chipOverflowExpanded = !chipOverflowExpanded"
+          >
+            {{ chipOverflowExpanded ? "show less" : `+${hiddenContextChipCount} more` }}
+          </div>
+        </div>
+      </div>
+
+      <!-- View By section -->
+      <div v-if="subjectChips.length > 0" class="tw:flex tw:items-center tw:gap-3">
+        <OSeparator vertical class="tw:my-2" />
+        <span class="tw:text-2! tw:m-0 tw:opacity-70">View by:</span>
+        <OToggleGroup v-model="activeSubject" type="single" size="xs">
+          <OToggleGroupItem
+            v-for="chip in subjectChips"
+            :key="chip.key"
+            :value="chip.key"
+            size="sm"
+            :disabled="chip.disabled"
+            :data-test="`correlation-dashboard-subject-toggle-${chip.key}`"
+          >
+            {{ getSubjectButtonLabel(chip.key) }}
+            <OTooltip :content="`${chip.label} = ${chip.value}`" side="top" />
+            <template v-if="chip.disabled">
+              <OTooltip :content="`No metric streams found for this ${chip.label.toLowerCase()}`" side="top" />
+            </template>
+          </OToggleGroupItem>
+        </OToggleGroup>
       </div>
     </div>
 
@@ -1268,8 +1320,11 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 const RenderDashboardCharts = defineAsyncComponent(
   () => import("@/views/Dashboards/RenderDashboardCharts.vue"),
@@ -1817,6 +1872,18 @@ const chipIsClickable = (chip: DimensionChip): boolean =>
 const chipIsDisabled = (chip: DimensionChip): boolean =>
   activeTab.value === "metrics" && chip.kind === "subject" && chip.disabled;
 
+// Helper function to get shorter label from SUBJECT_BUTTONS_BY_SET
+const getSubjectButtonLabel = (semanticId: string): string => {
+  const canonical = resolveSetId(props.matchedSetId);
+  if (!canonical) return semanticId;
+
+  const specs = SUBJECT_BUTTONS_BY_SET[canonical];
+  if (!specs) return semanticId;
+
+  const spec = specs.find(s => s.semanticIds.includes(semanticId));
+  return spec?.label || semanticId;
+};
+
 const pinSubject = (newSubject: string | null, previousSubject: string | null) => {
   let next = { ...pendingDimensions.value };
   let mutated = false;
@@ -1888,6 +1955,20 @@ const visibleChips = computed(() =>
 );
 const hiddenChipCount = computed(() =>
   Math.max(0, tabFilteredChips.value.length - CHIP_OVERFLOW_THRESHOLD),
+);
+
+// Split chips by type for new UI structure
+const contextChips = computed(() =>
+  unifiedChips.value.filter(chip => chip.kind === "context")
+);
+const subjectChips = computed(() =>
+  unifiedChips.value.filter(chip => chip.kind === "subject")
+);
+const visibleContextChips = computed(() =>
+  chipOverflowExpanded.value ? contextChips.value : contextChips.value.slice(0, CHIP_OVERFLOW_THRESHOLD),
+);
+const hiddenContextChipCount = computed(() =>
+  Math.max(0, contextChips.value.length - CHIP_OVERFLOW_THRESHOLD),
 );
 
 // ── Source event banner ────────────────────────────────────────────────────
@@ -3341,6 +3422,24 @@ watch(
       if (isOpen.value) {
         loadDashboard();
       }
+    }
+  },
+);
+
+// Watch activeSubject changes from OTabs to trigger the same logic as onChipClick
+watch(
+  () => activeSubject.value,
+  (newSubject, oldSubject) => {
+    // Skip if no change or not on metrics tab
+    if (newSubject === oldSubject || activeTab.value !== "metrics") return;
+
+    // Apply the same logic as onChipClick for subject selection
+    if (newSubject) {
+      pinSubject(newSubject, oldSubject);
+      suppressNextStreamReload = true;
+      applyActivePill();
+      dashboardData.value = null;
+      applyDimensionChanges();
     }
   },
 );
