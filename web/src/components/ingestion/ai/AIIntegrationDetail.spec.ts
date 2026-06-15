@@ -27,6 +27,7 @@ vi.mock("./content", () => ({
 }));
 
 import AIIntegrationDetail from "./AIIntegrationDetail.vue";
+import store from "@/test/unit/helpers/store";
 
 const CARD_STUB = {
   name: "AIIntegrationCard",
@@ -51,6 +52,7 @@ describe("AIIntegrationDetail", () => {
     mount(AIIntegrationDetail, {
       props,
       global: {
+        plugins: [store],
         stubs: { AIIntegrationCard: CARD_STUB, CopyContent: COPY_STUB },
       },
     });
