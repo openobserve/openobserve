@@ -70,7 +70,6 @@ jobs:
       edition: ${{ steps.ctx.outputs.edition }}
       needs_e2e: ${{ steps.ctx.outputs.needs_e2e }}
       dry_run: ${{ steps.mode.outputs.dry_run }}
-      ref: ${{ steps.resolve.outputs.ref }}
       pr_number: ${{ steps.resolve.outputs.pr_number }}
     steps:
       - name: Check required secret
@@ -82,22 +81,14 @@ jobs:
             exit 1
           fi
 
-      - name: Resolve ref & PR number
+      - name: Resolve PR number
         id: resolve
         uses: actions/github-script@v7
         with:
           script: |
-            let ref, pr = '';
-            if (context.eventName === 'workflow_dispatch') {
-              ref = context.payload.inputs.oss_branch;
-            } else {
-              pr = context.payload.issue.number;
-              const { data } = await github.rest.pulls.get({
-                owner: context.repo.owner, repo: context.repo.repo, pull_number: pr,
-              });
-              ref = data.head.ref;
-            }
-            core.setOutput('ref', ref);
+            // Only the PR number is needed — we read the change as a diff (data), never check
+            // out the PR head. (See the checkout step below for the security rationale.)
+            const pr = context.eventName === 'issue_comment' ? context.payload.issue.number : '';
             core.setOutput('pr_number', pr);
 
       - name: Determine dry-run mode
@@ -111,8 +102,11 @@ jobs:
           fi
 
       - uses: actions/checkout@v4
+        # SECURITY (untrusted-checkout TOCTOU / "pwn request"): this job is privileged — the
+        # issue_comment trigger runs with repo secrets. So we check out ONLY the trusted default
+        # branch (which provides the agent files). We NEVER check out the PR head; the PR change
+        # is analyzed as a diff (inert data) fetched via the API below, and its code is never run.
         with:
-          ref: ${{ steps.resolve.outputs.ref }}
           fetch-depth: 0
 
       - uses: actions/setup-node@v4
@@ -125,17 +119,26 @@ jobs:
           command -v opencode >/dev/null || { echo "::error::opencode not on PATH after install"; exit 1; }
           opencode --version || true
 
-      - name: Build diff + untrusted inputs as files
-        # Untrusted text (PR comment, feature hint) is written to files — never interpolated into
-        # a shell command — and the agent is instructed to treat them as data, not instructions.
+      - name: Fetch diff + untrusted inputs as files
+        # The PR change is read as a DIFF via the API (data) — the PR head is never checked out.
+        # Untrusted text (comment, hint, branch name) goes through env vars + files, never
+        # interpolated into a shell command. The agent treats all of it as data, not instructions.
         env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OSS_BRANCH: ${{ github.event.inputs.oss_branch }}
+          PR_NUMBER: ${{ steps.resolve.outputs.pr_number }}
           FEATURE_HINT: ${{ github.event.inputs.feature_hint }}
           COMMENT_BODY: ${{ github.event.comment.body }}
         run: |
           mkdir -p docs/test_generator/ci
-          git fetch origin main --depth=1 || true
-          git diff origin/main...HEAD > docs/test_generator/ci/diff.patch 2>/dev/null \
-            || git diff origin/main > docs/test_generator/ci/diff.patch 2>/dev/null || true
+          if [ "${{ github.event_name }}" = "issue_comment" ]; then
+            # Read the PR's diff via API — do NOT check out its code.
+            gh pr diff "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" > docs/test_generator/ci/diff.patch || true
+          else
+            # workflow_dispatch: diff the chosen branch against main (fetch only; no checkout/run).
+            git fetch origin "$OSS_BRANCH" --depth=50 || true
+            git diff "origin/main...origin/$OSS_BRANCH" > docs/test_generator/ci/diff.patch 2>/dev/null || true
+          fi
           # Cap the diff so it can't exceed the model context window.
           if [ "$(wc -c < docs/test_generator/ci/diff.patch)" -gt "$MAX_DIFF_BYTES" ]; then
             head -c "$MAX_DIFF_BYTES" docs/test_generator/ci/diff.patch > docs/test_generator/ci/diff.trunc
