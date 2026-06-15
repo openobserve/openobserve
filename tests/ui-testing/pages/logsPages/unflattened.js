@@ -321,6 +321,9 @@ class UnflattenedPage {
                     `${baseUrl}/api/${orgId}/_search?type=logs`,
                     {
                         headers: { ...headers, 'Content-Type': 'application/json' },
+                        // Bound each poll so a hung backend can't stall the loop past
+                        // the next interval; we just retry on the next tick.
+                        timeout: 10000,
                         data: {
                             query: {
                                 sql: `SELECT * FROM "${streamName}" ORDER BY _timestamp DESC`,
@@ -340,7 +343,10 @@ class UnflattenedPage {
                     }
                 }
             } catch (e) {
-                // Transient backend/network error — keep polling until the deadline.
+                // Transient backend/network error — keep polling until the deadline,
+                // but surface it so a persistent misconfig (bad auth/endpoint) is
+                // visible in the log instead of silently burning the full timeout.
+                console.warn(`waitForO2IdQueryable poll error (will retry): ${e?.message || e}`);
             }
             await this.page.waitForTimeout(pollInterval);
         }
