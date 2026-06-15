@@ -1,5 +1,4 @@
 name: Playwright UI Tests
-
 on:
   push:
     branches:
@@ -8,11 +7,9 @@ on:
     branches:
       - "**"
   merge_group:
-
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.event.merge_group.head_ref || github.ref }}
   cancel-in-progress: true
-
 env:
   COLUMNS: 150
   ZO_ROOT_USER_EMAIL: root@example.com
@@ -47,7 +44,6 @@ env:
   ZO_SSRF_ALLOW_LOOPBACK: true
   ZO_MODEL_PRICING_ENABLED: true
   UPLOAD_TO_TESTDINO: ${{ vars.UPLOAD_TO_TESTDINO || 'false' }}
-
 jobs:
   check_changes:
     timeout-minutes: 5
@@ -61,7 +57,6 @@ jobs:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
-
       - id: check
         run: |
           CHANGED=$(git diff --name-only origin/${{ github.base_ref || 'main' }} ${{ github.sha }})
@@ -72,7 +67,6 @@ jobs:
           else
             echo "has_changes=false" >> $GITHUB_OUTPUT
           fi
-
   build_binary:
     timeout-minutes: 45
     name: build_binary
@@ -82,7 +76,6 @@ jobs:
       labels: ubicloud-standard-16
     permissions:
       contents: read
-
     steps:
       - name: Remove unused tools
         run: |
@@ -90,12 +83,10 @@ jobs:
           sudo rm -rf /opt/ghc
           sudo rm -rf "/usr/local/share/boost"
           sudo rm -rf "$AGENT_TOOLSDIRECTORY"
-
       - name: Clone the current repo
         uses: actions/checkout@v5
         with:
           fetch-depth: 0
-
       - name: Setup Rust Toolchain
         uses: dtolnay/rust-toolchain@master
         with:
@@ -106,18 +97,14 @@ jobs:
           cache-on-failure: true
           shared-key: playwright-release-ci
           save-if: ${{ github.ref == 'refs/heads/main' }}
-
       - name: Install Protoc
         run: |
           bash ./.github/protoc.sh
-
       - uses: actions/setup-node@v5
         with:
           node-version: 22
-
       - name: Lint frontend code
         run: cd web && npm ci && npm run lint:ci
-
       - name: Build binary and frontend
         env:
           NODE_OPTIONS: "--max-old-space-size=8192"
@@ -127,14 +114,12 @@ jobs:
           sed -i 's|folder = "web/dist/"|folder = "/tmp/dist/"|' src/handler/http/router/ui.rs
           cargo build --profile release-ci --target x86_64-unknown-linux-gnu
           wait
-
       - name: Upload binary artifact
         uses: actions/upload-artifact@v4
         with:
           name: release-ci-binary
           path: target/x86_64-unknown-linux-gnu/release-ci/openobserve
           retention-days: 1
-
       - name: Upload frontend artifact
         uses: actions/upload-artifact@v4
         with:
@@ -142,7 +127,6 @@ jobs:
           path: /tmp/dist
           retention-days: 1
           if-no-files-found: error
-
   ui_integration_tests:
     timeout-minutes: 45
     name: e2e / ${{ matrix.testfolder }}
@@ -162,218 +146,64 @@ jobs:
         include:
           - testfolder: "GeneralTests"
             browser: "chrome"
-            run_files:
-              [
-                "sanity.spec.js",
-                "changeOrg.spec.js",
-                "enrichment.spec.js",
-                "schema.spec.js",
-                "schemaload.spec.js",
-                "serviceAccount.spec.js",
-                "usersOrg.spec.js",
-                "org.spec.js",
-                "theme-management.spec.js",
-                "ingestion-config.spec.js",
-                "ingestionTokens.spec.js",
-                "landingPage.spec.js",
-                "languageTranslation.spec.js",
-                "model-pricing.spec.js",
-                "edition-features.spec.js",
-              ]
+            run_files: ["sanity.spec.js", "changeOrg.spec.js", "enrichment.spec.js", "schema.spec.js", "schemaload.spec.js", "serviceAccount.spec.js", "usersOrg.spec.js", "org.spec.js", "theme-management.spec.js", "ingestion-config.spec.js", "ingestionTokens.spec.js", "landingPage.spec.js", "languageTranslation.spec.js", "model-pricing.spec.js", "edition-features.spec.js", testDemo.spec.js]
           - testfolder: "Logs-Builder-Basic"
             browser: "chrome"
-            run_files:
-              [
-                "logsQueryBuilder-chart.spec.js",
-                "logsQueryBuilder-filters-basic.spec.js",
-                "pagination.spec.js",
-                "unflattened.spec.js",
-              ]
+            run_files: ["logsQueryBuilder-chart.spec.js", "logsQueryBuilder-filters-basic.spec.js", "pagination.spec.js", "unflattened.spec.js"]
           - testfolder: "Logs-Builder-Advanced"
             browser: "chrome"
-            run_files:
-              [
-                "logsQueryBuilder-editor.spec.js",
-                "logsQueryBuilder-filters-advanced.spec.js",
-                "logsquickmode.spec.js",
-                "logshistogram.spec.js",
-              ]
+            run_files: ["logsQueryBuilder-editor.spec.js", "logsQueryBuilder-filters-advanced.spec.js", "logsquickmode.spec.js", "logshistogram.spec.js"]
           - testfolder: "Logs-Core"
             browser: "chrome"
-            run_files:
-              [
-                "logspage.spec.js",
-                "logstable.spec.js",
-                "logsqueries.spec.js",
-                "join.spec.js",
-                "shareLink.spec.js",
-                "logsAnalyzeDimensions.spec.js",
-                "monaco-query-prefill.spec.js",
-                "logsqueries.matchall.spec.js",
-              ]
+            run_files: ["logspage.spec.js", "logstable.spec.js", "logsqueries.spec.js", "join.spec.js", "shareLink.spec.js", "logsAnalyzeDimensions.spec.js", "monaco-query-prefill.spec.js", "logsqueries.matchall.spec.js"]
           - testfolder: "Logs-Features"
             browser: "chrome"
-            run_files: [
-                "logs-autocomplete-suggestions.spec.js",
-                # "searchJobInspector.spec.js",  # TODO: update these tests for new correlation feature
-                "logs-sql-autocomplete.spec.js",
-                "logsqueries.cte.spec.js",
-                "logsDownloads.spec.js",
-                "secondsPrecisionAdded.spec.js",
-                "searchpartition.spec.js",
-                "indexquery.spec.js",
-                "region.spec.js",
-              ]
+            run_files: ["logs-autocomplete-suggestions.spec.js",
+              # "searchJobInspector.spec.js",  # TODO: update these tests for new correlation feature
+              "logs-sql-autocomplete.spec.js", "logsqueries.cte.spec.js", "logsDownloads.spec.js", "secondsPrecisionAdded.spec.js", "searchpartition.spec.js", "indexquery.spec.js", "region.spec.js"]
           - testfolder: "Alerts"
             browser: "chrome"
             run_files: [
-                # "alerts-e2e-flow.spec.js",
-                "alerts-ui-operations.spec.js",
-                "alerts-import.spec.js",
-                # "alerts-advanced.spec.js",
-                # "alerts-scheduled-features.spec.js",
-                "alerts-destinations-prebuilt.spec.js",
-                "alerts-vrl-encoding.spec.js",
-              ]
+              # "alerts-e2e-flow.spec.js",
+              "alerts-ui-operations.spec.js", "alerts-import.spec.js",
+              # "alerts-advanced.spec.js",
+              # "alerts-scheduled-features.spec.js",
+              "alerts-destinations-prebuilt.spec.js", "alerts-vrl-encoding.spec.js"]
           - testfolder: "Dashboards-Core"
             browser: "chrome"
-            run_files:
-              [
-                "dashboard.spec.js",
-                "dashboard2.spec.js",
-                "dashboardtype.spec.js",
-                "dashboard-folder.spec.js",
-                "dashboard-import.spec.js",
-                "maxquery.spec.js",
-                "dashboard-chartJson.spec.js",
-                "dashboard-promql-suggestions.spec.js",
-                "dashboard-sql-autocomplete.spec.js",
-                "dashboard-share-link.spec.js",
-                "crossLinking.spec.js",
-                "dashboard-multi-sql.spec.js",
-                "crossLinkMultiStream.spec.js",
-              ]
+            run_files: ["dashboard.spec.js", "dashboard2.spec.js", "dashboardtype.spec.js", "dashboard-folder.spec.js", "dashboard-import.spec.js", "maxquery.spec.js", "dashboard-chartJson.spec.js", "dashboard-promql-suggestions.spec.js", "dashboard-sql-autocomplete.spec.js", "dashboard-share-link.spec.js", "crossLinking.spec.js", "dashboard-multi-sql.spec.js", "crossLinkMultiStream.spec.js"]
           - testfolder: "Dashboards-Settings"
             browser: "chrome"
-            run_files:
-              [
-                "dashboard-filter.spec.js",
-                "dashboard-general-setting.spec.js",
-                "dashboard-tabs-setting.spec.js",
-                "dashboard-transpose.spec.js",
-                "dashboard-join.spec.js",
-                "dashboard-nested-functions.spec.js",
-                "dashboard-legends-copy.spec.js",
-                "dashboard-raw-query.spec.js",
-              ]
+            run_files: ["dashboard-filter.spec.js", "dashboard-general-setting.spec.js", "dashboard-tabs-setting.spec.js", "dashboard-transpose.spec.js", "dashboard-join.spec.js", "dashboard-nested-functions.spec.js", "dashboard-legends-copy.spec.js", "dashboard-raw-query.spec.js"]
           - testfolder: "Dashboards-Charts"
             browser: "chrome"
-            run_files:
-              [
-                "custom-charts.spec.js",
-                "dashboard-geoMap.spec.js",
-                "dashboard-maps.spec.js",
-                "dashboard-multi-y-axis.spec.js",
-                "dashboard-html-chart.spec.js",
-                "visualize.spec.js",
-                "visualize-vrl.spec.js",
-                "dashboard-create-alert.spec.js",
-                "dashboard-sankey.spec.js",
-                "dashboard-pie-donut.spec.js",
-                "dashboard-table-chart.spec.js",
-                "dashboard-table-copy-cell.spec.js",
-                "dashboard-table-csv-download.spec.js",
-                "dashboard-metric-camelcase.spec.js",
-              ]
+            run_files: ["custom-charts.spec.js", "dashboard-geoMap.spec.js", "dashboard-maps.spec.js", "dashboard-multi-y-axis.spec.js", "dashboard-html-chart.spec.js", "visualize.spec.js", "visualize-vrl.spec.js", "dashboard-create-alert.spec.js", "dashboard-sankey.spec.js", "dashboard-pie-donut.spec.js", "dashboard-table-chart.spec.js", "dashboard-table-copy-cell.spec.js", "dashboard-table-csv-download.spec.js", "dashboard-metric-camelcase.spec.js"]
           - testfolder: "Dashboards-Streaming"
             browser: "chrome"
             run_files: ["dashboard-streaming.spec.js"]
           - testfolder: "Pipelines"
             browser: "chrome"
-            run_files: [
-                "pipeline-conditions.spec.js",
-                "pipeline-conditions-validation.spec.js",
-                "pipelines.spec.js",
-                "pipeline-dynamic.spec.js",
-                "pipeline-core.spec.js",
-                "pipeline-traces.spec.js",
-                "pipeline-metrics.spec.js",
-                "pipeline-backfill.spec.js",
-                "pipeline-history.spec.js",
-                "scheduled-pipeline-query-builder.spec.js",
-                # "remotepipeline.spec.js"
-              ]
+            run_files: ["pipeline-conditions.spec.js", "pipeline-conditions-validation.spec.js", "pipelines.spec.js", "pipeline-dynamic.spec.js", "pipeline-core.spec.js", "pipeline-traces.spec.js", "pipeline-metrics.spec.js", "pipeline-backfill.spec.js", "pipeline-history.spec.js", "scheduled-pipeline-query-builder.spec.js",
+              # "remotepipeline.spec.js"
+            ]
           - testfolder: "Functions"
             browser: "chrome"
-            run_files:
-              [
-                "js-transform-type.spec.js",
-                "row-expansion.spec.js",
-                "enrichment-table-url.spec.js",
-              ]
+            run_files: ["js-transform-type.spec.js", "row-expansion.spec.js", "enrichment-table-url.spec.js"]
           - testfolder: "Reports"
             browser: "chrome"
-            run_files:
-              [
-                "reportsScheduleNow.spec.js",
-                "reportsScheduleLater.spec.js",
-                "reportFolders.spec.js",
-              ]
+            run_files: ["reportsScheduleNow.spec.js", "reportsScheduleLater.spec.js", "reportFolders.spec.js"]
           - testfolder: "Streams"
             browser: "chrome"
-            run_files:
-              [
-                "multiselect-stream.spec.js",
-                "streamname.spec.js",
-                "streaming.spec.js",
-                "stream-settings.spec.js",
-              ]
+            run_files: ["multiselect-stream.spec.js", "streamname.spec.js", "streaming.spec.js", "stream-settings.spec.js"]
           - testfolder: "Traces"
             browser: "chrome"
-            run_files:
-              [
-                "service-catalog.spec.js",
-                "tracesSearch.spec.js",
-                "traceQueryEditor.spec.js",
-                "traceErrorFilter.spec.js",
-                "traceDetails.spec.js",
-                "traceAdvancedFiltering.spec.js",
-                "tracesAnalyzeDimensions.spec.js",
-                "traces-autocomplete-suggestions.spec.js",
-              ]
+            run_files: ["service-catalog.spec.js", "tracesSearch.spec.js", "traceQueryEditor.spec.js", "traceErrorFilter.spec.js", "traceDetails.spec.js", "traceAdvancedFiltering.spec.js", "tracesAnalyzeDimensions.spec.js", "traces-autocomplete-suggestions.spec.js"]
           - testfolder: "Metrics"
             browser: "chrome"
-            run_files:
-              [
-                "metrics.spec.js",
-                "metrics-queries.spec.js",
-                "metrics-aggregations.spec.js",
-                "metrics-advanced.spec.js",
-                "metrics-config-tabs.spec.js",
-                "metrics-visualizations.spec.js",
-                "metrics-config.spec.js",
-                "metrics-promql-query-persistence.spec.js",
-                "metrics-table-column-order.spec.js",
-                "metrics-promql-builder.spec.js",
-                "promqlAutocomplete.spec.js",
-              ]
+            run_files: ["metrics.spec.js", "metrics-queries.spec.js", "metrics-aggregations.spec.js", "metrics-advanced.spec.js", "metrics-config-tabs.spec.js", "metrics-visualizations.spec.js", "metrics-config.spec.js", "metrics-promql-query-persistence.spec.js", "metrics-table-column-order.spec.js", "metrics-promql-builder.spec.js", "promqlAutocomplete.spec.js"]
           - testfolder: "Dashboards-Variables"
             browser: "chrome"
-            run_files:
-              [
-                "dashboard-variables-setting.spec.js",
-                "dashboard-variables-global.spec.js",
-                "dashboard-variables-tab-level.spec.js",
-                "dashboard-variables-panel-level.spec.js",
-                "dashboard-variables-dependency.spec.js",
-                "dashboard-variables-refresh.spec.js",
-                "dashboard-variables-url-sync.spec.js",
-                "dashboard-variables-creation-scopes.spec.js",
-                "dashboard-variables-default-values-chain.spec.js",
-                "dashboard-variables-custom-parents.spec.js",
-                "dashboard-variables-stream-field.spec.js",
-                "dashboard-mustache-variables.spec.js",
-              ]
+            run_files: ["dashboard-variables-setting.spec.js", "dashboard-variables-global.spec.js", "dashboard-variables-tab-level.spec.js", "dashboard-variables-panel-level.spec.js", "dashboard-variables-dependency.spec.js", "dashboard-variables-refresh.spec.js", "dashboard-variables-url-sync.spec.js", "dashboard-variables-creation-scopes.spec.js", "dashboard-variables-default-values-chain.spec.js", "dashboard-variables-custom-parents.spec.js", "dashboard-variables-stream-field.spec.js", "dashboard-mustache-variables.spec.js"]
           - testfolder: "Dashboard-Table-Pagination"
             browser: "chrome"
             run_files: ["dashboard-table-pagination.spec.js"]
@@ -382,32 +212,10 @@ jobs:
             run_files: ["dashboard-pivot-table.spec.js"]
           - testfolder: "Dashboards-Panel-Level-DateTime-Config"
             browser: "chrome"
-            run_files:
-              [
-                "dashboard-panel-time-config-behavior.spec.js",
-                "dashboard-panel-time-url-priority.spec.js",
-                "dashboard-panel-time-advanced-edge-cases.spec.js",
-                "dashboard-panel-time-apply-behavior.spec.js",
-                "dashboard-panel-time-variables-behavior.spec.js",
-              ]
+            run_files: ["dashboard-panel-time-config-behavior.spec.js", "dashboard-panel-time-url-priority.spec.js", "dashboard-panel-time-advanced-edge-cases.spec.js", "dashboard-panel-time-apply-behavior.spec.js", "dashboard-panel-time-variables-behavior.spec.js"]
           - testfolder: "Dashboard-Config-Settings"
             browser: "chrome"
-            run_files:
-              [
-                "dashboard-series-color-multiwindow.spec.js",
-                "dashboard-config-advanced.spec.js",
-                "dashboard-config-axis.spec.js",
-                "dashboard-config-gauge-maps.spec.js",
-                "dashboard-config-general.spec.js",
-                "dashboard-config-legends.spec.js",
-                "dashboard-config-line-style.spec.js",
-                "dashboard-config-panel-time.spec.js",
-                "dashboard-config-table.spec.js",
-                "dashboard-config-trellis.spec.js",
-                "dashboard-config-drilldown.spec.js",
-                "dashboard-config-promql.spec.js",
-                "dashboard-config-markline.spec.js",
-              ]
+            run_files: ["dashboard-series-color-multiwindow.spec.js", "dashboard-config-advanced.spec.js", "dashboard-config-axis.spec.js", "dashboard-config-gauge-maps.spec.js", "dashboard-config-general.spec.js", "dashboard-config-legends.spec.js", "dashboard-config-line-style.spec.js", "dashboard-config-panel-time.spec.js", "dashboard-config-table.spec.js", "dashboard-config-trellis.spec.js", "dashboard-config-drilldown.spec.js", "dashboard-config-promql.spec.js", "dashboard-config-markline.spec.js"]
     steps:
       - name: Kill background apt processes
         run: |
@@ -415,27 +223,22 @@ jobs:
           sudo systemctl stop apt-daily.timer apt-daily-upgrade.timer 2>/dev/null || true
           sudo systemctl disable apt-daily.service apt-daily-upgrade.service unattended-upgrades.service 2>/dev/null || true
           sudo flock --wait 30 /var/lib/dpkg/lock-frontend true 2>/dev/null || true
-
       - name: Clone the current repo
         uses: actions/checkout@v5
         with:
           fetch-depth: 0
-
       - name: Download binary artifact
         uses: actions/download-artifact@v5
         with:
           name: release-ci-binary
           path: release-ci-binary
-
       - name: Download frontend artifact
         uses: actions/download-artifact@v5
         with:
           name: frontend-dist
           path: /tmp/dist
-
       - name: Start OpenObserve
         run: chmod +x ./release-ci-binary/openobserve && ./release-ci-binary/openobserve > o2.log 2>&1 &
-
       - name: Wait for start
         run: |
           for i in $(seq 1 120); do
@@ -447,14 +250,11 @@ jobs:
           done
           echo "Server failed to start in 120s"
           exit 1
-
       - name: Ensure we are getting a reply from the server
         run: curl http://localhost:5080/web/login
-
       - uses: actions/setup-node@v5
         with:
           node-version: 22
-
       - name: Cache Playwright browser
         id: playwright-cache
         uses: actions/cache@v5
@@ -463,7 +263,6 @@ jobs:
           key: playwright-chromium-${{ runner.os }}-${{ hashFiles('tests/ui-testing/package-lock.json') }}
           restore-keys: |
             playwright-chromium-${{ runner.os }}-
-
       - name: Check if this is a rerun
         id: check_rerun
         env:
@@ -515,334 +314,11 @@ jobs:
             echo "rerun_type=none" >> $GITHUB_OUTPUT
             echo "::notice::This is the first run. Will run all tests in matrix."
           fi
-
       - name: Install dependencies and run ui-tests
         env:
           TESTDINO_TOKEN: ${{ secrets.TESTDINO_API_TOKEN }}
           GH_TOKEN: ${{ github.token }}
-        run: |
-          touch .env
-          echo "ZO_ROOT_USER_EMAIL=${ZO_ROOT_USER_EMAIL}" >> .env
-          echo "ZO_ROOT_USER_PASSWORD=${ZO_ROOT_USER_PASSWORD}" >> .env
-          echo "ZO_BASE_URL=${ZO_BASE_URL}" >> .env
-          echo "WS_ZO_BASE_URL=${WS_ZO_BASE_URL}" >> .env
-          echo "ZO_BASE_URL_SC=${ZO_BASE_URL_SC}" >> .env
-          echo "ZO_BASE_URL_SC_UI=${ZO_BASE_URL_SC_UI}" >> .env
-          echo "INGESTION_URL=${INGESTION_URL}" >> .env
-          echo "ORGNAME=${ORGNAME}" >> .env
-          echo "ZO_SMTP_ENABLED=${ZO_SMTP_ENABLED}" >> .env
-          mv .env tests/ui-testing
-          cd tests/ui-testing && npm ci
-
-          # Install apt system dependencies (always needed)
-          npx playwright install-deps chromium
-
-          # Get revision from playwright's own metadata
-          CHROMIUM_REV=$(node -pe "
-            require('./node_modules/playwright-core/browsers.json')
-              .browsers.find(b => b.name === 'chromium').revision
-          ")
-
-          install_browser() {
-            local NAME="$1"
-            local BINARY="$2"
-            local ZIP_PATH="$3"
-            local DIR="$HOME/.cache/ms-playwright/${NAME}-${CHROMIUM_REV}"
-            if [ -f "${DIR}/INSTALLATION_COMPLETE" ]; then
-              echo "${NAME} already installed (cache hit)"; return 0
-            fi
-            rm -rf "${DIR}"
-            echo "Cache miss — downloading ${NAME} r${CHROMIUM_REV} via curl + system unzip"
-            curl -fL --progress-bar \
-              "https://cdn.playwright.dev/dbazure/download/playwright/builds/${ZIP_PATH}" \
-              -o "/tmp/${NAME}.zip"
-            mkdir -p "${DIR}"
-            unzip -q "/tmp/${NAME}.zip" -d "${DIR}"
-            rm -f "/tmp/${NAME}.zip"
-            find "${DIR}" -name "${BINARY}" -type f -exec chmod 755 {} \;
-            find "${DIR}" -name 'chrome_sandbox' -type f -exec chmod 4755 {} \; 2>/dev/null || true
-            touch "${DIR}/INSTALLATION_COMPLETE"
-            echo "${NAME} installed: $(ls ${DIR}/)"
-          }
-
-          install_browser "chromium" "chrome" \
-            "chromium/${CHROMIUM_REV}/chromium-linux.zip"
-          install_browser "chromium_headless_shell" "headless_shell" \
-            "chromium/${CHROMIUM_REV}/chromium-headless-shell-linux.zip"
-
-          # ffmpeg is required for video recording (video: retain-on-failure in playwright.config.js)
-          # The custom install_browser uses CHROMIUM_REV which doesn't match ffmpeg's own revision,
-          # so use the local playwright binary (pinned via package-lock.json) to install ffmpeg only.
-          ./node_modules/.bin/playwright install ffmpeg
-
-          # Check if this is a rerun
-          IS_RERUN="${{ steps.check_rerun.outputs.is_rerun }}"
-          RERUN_TYPE="${{ steps.check_rerun.outputs.rerun_type }}"
-
-          if [ "$IS_RERUN" = "true" ]; then
-            # Check if this is "re-run all" - if so, skip TestDino and run all tests
-            if [ "$RERUN_TYPE" = "all" ]; then
-              echo "::notice::🔄 Re-run ALL jobs detected - skipping TestDino optimization"
-              echo "::notice::Will run ALL tests in this shard regardless of previous failures"
-              RERUN_MODE="normal"
-              EXTRA_PW_FLAGS=""
-            else
-              # This is "re-run failed" - use TestDino optimization
-              echo "::group::Fetching last failed tests from TestDino"
-              # Use custom cache ID that includes run_id to distinguish separate workflow runs
-              # Format: gh_openobserve_main_12345678 (for main) or gh_openobserve_feature-branch_12345678 (for PRs)
-              # Sanitize branch name by replacing slashes with underscores
-              BRANCH_NAME=$(echo "${{ github.ref_name }}" | sed 's/\//_/g')
-              CACHE_ID="gh_openobserve_${BRANCH_NAME}_${{ github.run_id }}"
-              echo "::notice::Using cache ID: $CACHE_ID"
-              # Try to get last failed tests from TestDino
-              # Use a temp file to avoid shell variable truncation for large output
-              TEMP_OUTPUT="/tmp/testdino_output_$$.txt"
-              if npx tdpw last-failed --cache-id "$CACHE_ID" > "$TEMP_OUTPUT" 2>&1; then
-                # Filter out ALL lines that don't match test file pattern
-                # Valid format: "FolderName/testfile.spec.js" or "FolderName/testfile.spec.js -g test name"
-                # This filters out debug lines, empty lines, and anything that's not a test path
-                LAST_FAILED_FLAGS="$(grep -E '^[A-Za-z_-]+/[a-zA-Z0-9_-]+\.spec\.js' "$TEMP_OUTPUT" | tail -1)"
-                rm -f "$TEMP_OUTPUT"
-
-                if [ -n "$LAST_FAILED_FLAGS" ] && [ "$LAST_FAILED_FLAGS" != "No failed tests found" ]; then
-                  echo "::notice::✅ Found failed tests from previous run."
-                  echo "::notice::TestDino flags: $LAST_FAILED_FLAGS"
-                  RERUN_MODE="optimized"
-                  EXTRA_PW_FLAGS="$LAST_FAILED_FLAGS"
-                else
-                  echo "::warning::TestDino returned no failed tests. Falling back to running all tests in this matrix job."
-                  echo "::warning::This means you'll be billed for all tests. Please investigate why last-failed returned empty."
-                  RERUN_MODE="fallback"
-                  EXTRA_PW_FLAGS=""
-                fi
-              else
-                echo "::error::Failed to fetch last failed tests from TestDino (exit code: $?)."
-                echo "::warning::Falling back to running all tests in this matrix job."
-                echo "::warning::This means you'll be billed for all tests. Please check TestDino integration."
-                RERUN_MODE="fallback"
-                EXTRA_PW_FLAGS=""
-              fi
-              echo "::endgroup::"
-            fi
-          else
-            RERUN_MODE="normal"
-            EXTRA_PW_FLAGS=""
-          fi
-
-          # Get list of files to run using join function
-          FILE_LIST="${{ join(matrix.run_files, ' ') }}"
-          echo "DEBUG: FILE_LIST = $FILE_LIST"
-          echo "DEBUG: matrix.testfolder = ${{ matrix.testfolder }}"
-
-          if [ -n "$FILE_LIST" ]; then
-            # Map logical folder names to actual directories
-            case "${{ matrix.testfolder }}" in
-              "Logs-Builder-Basic"|"Logs-Builder-Advanced"|"Logs-Core"|"Logs-Features")
-                ACTUAL_FOLDER="Logs"
-                ;;
-              "Dashboards-Core"|"Dashboards-Settings"|"Dashboards-Charts"|"Dashboards-Streaming"|"Dashboards-Variables"|"Dashboard-Table-Pagination"|"Dashboard-Pivot-Table"|"Dashboards-Panel-Level-DateTime-Config"|"Dashboard-Config-Settings")
-                ACTUAL_FOLDER="Dashboards"
-                ;;
-              *)
-                ACTUAL_FOLDER="${{ matrix.testfolder }}"
-                ;;
-            esac
-
-            echo "DEBUG: ACTUAL_FOLDER = $ACTUAL_FOLDER"
-
-            # Build file paths
-            FILE_PATHS=""
-            for file in $FILE_LIST; do
-              FILE_PATH="./playwright-tests/$ACTUAL_FOLDER/$file"
-              echo "DEBUG: Will run file: $FILE_PATH"
-              FILE_PATHS="$FILE_PATHS $FILE_PATH"
-            done
-
-            # Determine what to run based on rerun mode
-            if [ "$RERUN_MODE" = "optimized" ]; then
-              # TestDino returns ALL failed tests from the previous run
-              # Format examples:
-              # Single: "SDR/test.spec.js -g test name"
-              # Multiple: "Logs/test1.spec.js -g name1 Pipelines/test2.spec.js -g name2"
-
-              echo "DEBUG: Full TestDino output (all failed tests): $EXTRA_PW_FLAGS"
-              echo "DEBUG: Current shard folder: $ACTUAL_FOLDER"
-
-              # Strategy: Extract only tests that start with "$ACTUAL_FOLDER/"
-              # Use grep to find lines matching our shard folder
-              SHARD_TESTS=""
-
-              # Check if the TestDino output contains tests for this shard (case-insensitive)
-              # Look for pattern: $ACTUAL_FOLDER/something.spec.js
-              if echo "$EXTRA_PW_FLAGS" | grep -iq "$ACTUAL_FOLDER/.*\.spec\.js"; then
-                echo "DEBUG: Found test(s) for this shard in TestDino output"
-
-                # IMPORTANT: Based on observation, TestDino returns ONE test at a time
-                # Format: "Folder/file.spec.js -g test name"
-                # Simply check if it starts with our folder and pass it through
-
-                # Extract file path (everything before -g or end of string) - case-insensitive
-                TEST_FILE=$(echo "$EXTRA_PW_FLAGS" | grep -ioE "$ACTUAL_FOLDER/[^ ]+\.spec\.js" | head -1)
-
-                if [ -n "$TEST_FILE" ]; then
-                  # Check if file actually starts with our folder (case-insensitive)
-                  if [[ "${TEST_FILE,,}" == "${ACTUAL_FOLDER,,}/"* ]]; then
-                    # Extract just the filename from the test file path
-                    TEST_FILENAME=$(basename "$TEST_FILE")
-
-                    # Check if this file is actually in the current shard's run_files list
-                    if echo "$FILE_LIST" | grep -qw "$TEST_FILENAME"; then
-                      # Parse out the file path and test name separately for proper quoting
-                      # Extract file path (before -g)
-                      TEST_FILE_PATH=$(echo "$EXTRA_PW_FLAGS" | sed "s/ -g.*//" | sed "s|^|./playwright-tests/|")
-
-                      # Check if there's a -g flag
-                      if echo "$EXTRA_PW_FLAGS" | grep -q " -g "; then
-                        # Extract test name (after -g) and strip any surrounding quotes
-                        TEST_NAME=$(echo "$EXTRA_PW_FLAGS" | sed 's/.*-g //' | sed 's/^"\(.*\)"$/\1/')
-
-                        echo "DEBUG: File path: $TEST_FILE_PATH"
-                        echo "DEBUG: Test name (unquoted): $TEST_NAME"
-                        echo "::notice::🎯 OPTIMIZED RERUN: Running failed test from this shard"
-                        echo "DEBUG: Final command: npx playwright test \"$TEST_FILE_PATH\" -g \"$TEST_NAME\""
-
-                        # Properly quote the test name to handle spaces and special chars
-                        npx playwright test "$TEST_FILE_PATH" -g "$TEST_NAME"
-                      else
-                        # No -g flag, just run the file
-                        echo "DEBUG: File path: $TEST_FILE_PATH (no -g flag)"
-                        echo "::notice::🎯 OPTIMIZED RERUN: Running failed test file from this shard"
-                        echo "DEBUG: Final command: npx playwright test \"$TEST_FILE_PATH\""
-
-                        npx playwright test "$TEST_FILE_PATH"
-                      fi
-                    else
-                      echo "::notice::⏭️ Test file '$TEST_FILENAME' not in this shard's run_files list."
-                      echo "::notice::Checking if this shard was cancelled/abruptly ended in previous attempt..."
-
-                      # Check the status of this matrix job in the previous attempt
-                      PREV_ATTEMPT=$((${{ github.run_attempt }} - 1))
-
-                      if [ "$PREV_ATTEMPT" -ge 1 ]; then
-                        JOB_NAME="e2e / ${{ matrix.testfolder }}"
-
-                        API_RESPONSE=$(curl -s -H "Authorization: token $GH_TOKEN" \
-                          -H "Accept: application/vnd.github.v3+json" \
-                          "https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/$PREV_ATTEMPT/jobs" 2>/dev/null)
-
-                        if [ $? -eq 0 ] && [ -n "$API_RESPONSE" ]; then
-                          PREV_JOB_STATUS=$(echo "$API_RESPONSE" | jq -r ".jobs[] | select(.name == \"$JOB_NAME\") | .conclusion" 2>/dev/null)
-
-                          if [ "$PREV_JOB_STATUS" = "cancelled" ] || [ "$PREV_JOB_STATUS" = "null" ] || [ -z "$PREV_JOB_STATUS" ]; then
-                            echo "::warning::⚠️ Previous shard was cancelled/abruptly ended - running FULL test suite"
-                            npx playwright test $FILE_PATHS
-                            exit $?
-                          elif [ "$PREV_JOB_STATUS" = "success" ]; then
-                            echo "::notice::✅ Previous shard completed successfully - no tests to rerun"
-                            exit 0
-                          elif [ "$PREV_JOB_STATUS" = "failure" ]; then
-                            echo "::warning::⚠️ Previous shard failed but TestDino has no failures recorded - running FULL test suite"
-                            npx playwright test $FILE_PATHS
-                            exit $?
-                          else
-                            echo "::warning::⚠️ Unknown job status - running FULL test suite for safety"
-                            npx playwright test $FILE_PATHS
-                            exit $?
-                          fi
-                        else
-                          echo "::error::Failed to fetch job status from GitHub API - running FULL test suite"
-                          npx playwright test $FILE_PATHS
-                          exit $?
-                        fi
-                      else
-                        echo "::notice::✅ This is the first run, no previous attempt to check"
-                        echo "::notice::No failed tests to rerun. Exiting successfully."
-                        exit 0
-                      fi
-                    fi
-                  else
-                    echo "::notice::⏭️ Test file doesn't match shard folder exactly. Skipping."
-                    exit 0
-                  fi
-                else
-                  echo "::warning::Failed to extract test file path. Falling back to skip."
-                  exit 0
-                fi
-              else
-                echo "::notice::⏭️ OPTIMIZED RERUN: No failed tests found for '$ACTUAL_FOLDER' shard in TestDino output"
-                echo "::notice::Checking if this shard was cancelled/abruptly ended in previous attempt..."
-
-                # Check the status of this matrix job in the previous attempt
-                # Rule: If shard was cancelled/abruptly ended → treat as failed → run full test suite
-                PREV_ATTEMPT=$((${{ github.run_attempt }} - 1))
-
-                if [ "$PREV_ATTEMPT" -ge 1 ]; then
-                  # Job name format: "e2e / {matrix.testfolder}"
-                  JOB_NAME="e2e / ${{ matrix.testfolder }}"
-
-                  echo "DEBUG: Checking previous attempt #$PREV_ATTEMPT for job: $JOB_NAME"
-
-                  # Use GitHub REST API to get job status from specific attempt
-                  # This is guaranteed to work and provides attempt-specific data
-                  API_RESPONSE=$(curl -s -H "Authorization: token $GH_TOKEN" \
-                    -H "Accept: application/vnd.github.v3+json" \
-                    "https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/$PREV_ATTEMPT/jobs" 2>/dev/null)
-
-                  if [ $? -eq 0 ] && [ -n "$API_RESPONSE" ]; then
-                    # Successfully got API response, parse it
-                    PREV_JOB_STATUS=$(echo "$API_RESPONSE" | jq -r ".jobs[] | select(.name == \"$JOB_NAME\") | .conclusion" 2>/dev/null)
-
-                    echo "DEBUG: Previous job status: $PREV_JOB_STATUS"
-
-                    if [ "$PREV_JOB_STATUS" = "cancelled" ] || [ "$PREV_JOB_STATUS" = "null" ] || [ -z "$PREV_JOB_STATUS" ]; then
-                      echo "::warning::⚠️ Previous shard was cancelled/abruptly ended (status: ${PREV_JOB_STATUS:-not found})"
-                      echo "::warning::Treating as FAILED - running FULL test suite for this shard"
-                      echo "DEBUG: Running all matrix tests: npx playwright test $FILE_PATHS"
-                      npx playwright test $FILE_PATHS
-                      exit $?
-                    elif [ "$PREV_JOB_STATUS" = "success" ]; then
-                      echo "::notice::✅ Previous shard completed successfully - all tests passed"
-                      echo "::notice::No failed tests to rerun. Exiting successfully."
-                      exit 0
-                    elif [ "$PREV_JOB_STATUS" = "failure" ]; then
-                      echo "::warning::⚠️ Previous shard failed but TestDino has no failures recorded"
-                      echo "::warning::This shouldn't happen - running FULL test suite for safety"
-                      echo "DEBUG: Running all matrix tests: npx playwright test $FILE_PATHS"
-                      npx playwright test $FILE_PATHS
-                      exit $?
-                    else
-                      echo "::warning::⚠️ Unknown job status: $PREV_JOB_STATUS"
-                      echo "::warning::Running FULL test suite for safety"
-                      echo "DEBUG: Running all matrix tests: npx playwright test $FILE_PATHS"
-                      npx playwright test $FILE_PATHS
-                      exit $?
-                    fi
-                  else
-                    echo "::error::Failed to fetch job status from GitHub API"
-                    echo "::warning::Falling back to running FULL test suite for safety"
-                    echo "DEBUG: Running all matrix tests: npx playwright test $FILE_PATHS"
-                    npx playwright test $FILE_PATHS
-                    exit $?
-                  fi
-                else
-                  echo "::notice::✅ This is the first run, no previous attempt to check"
-                  echo "::notice::No failed tests to rerun. Exiting successfully."
-                  exit 0
-                fi
-              fi
-            else
-              # Normal run or fallback
-              if [ "$RERUN_MODE" = "fallback" ]; then
-                echo "::warning::⚠️ FALLBACK RERUN: Running all tests in matrix (TestDino optimization failed)"
-              fi
-              echo "DEBUG: Final command: npx playwright test $FILE_PATHS"
-              npx playwright test $FILE_PATHS
-            fi
-          else
-            echo "No files specified to run for ${{ matrix.testfolder }} folder"
-          fi
-
+        run: "touch .env\necho \"ZO_ROOT_USER_EMAIL=${ZO_ROOT_USER_EMAIL}\" >> .env\necho \"ZO_ROOT_USER_PASSWORD=${ZO_ROOT_USER_PASSWORD}\" >> .env\necho \"ZO_BASE_URL=${ZO_BASE_URL}\" >> .env\necho \"WS_ZO_BASE_URL=${WS_ZO_BASE_URL}\" >> .env\necho \"ZO_BASE_URL_SC=${ZO_BASE_URL_SC}\" >> .env\necho \"ZO_BASE_URL_SC_UI=${ZO_BASE_URL_SC_UI}\" >> .env\necho \"INGESTION_URL=${INGESTION_URL}\" >> .env\necho \"ORGNAME=${ORGNAME}\" >> .env\necho \"ZO_SMTP_ENABLED=${ZO_SMTP_ENABLED}\" >> .env\nmv .env tests/ui-testing\ncd tests/ui-testing && npm ci\n\n# Install apt system dependencies (always needed)\nnpx playwright install-deps chromium\n\n# Get revision from playwright's own metadata\nCHROMIUM_REV=$(node -pe \"\n  require('./node_modules/playwright-core/browsers.json')\n    .browsers.find(b => b.name === 'chromium').revision\n\")\n\ninstall_browser() {\n  local NAME=\"$1\"\n  local BINARY=\"$2\"\n  local ZIP_PATH=\"$3\"\n  local DIR=\"$HOME/.cache/ms-playwright/${NAME}-${CHROMIUM_REV}\"\n  if [ -f \"${DIR}/INSTALLATION_COMPLETE\" ]; then\n    echo \"${NAME} already installed (cache hit)\"; return 0\n  fi\n  rm -rf \"${DIR}\"\n  echo \"Cache miss — downloading ${NAME} r${CHROMIUM_REV} via curl + system unzip\"\n  curl -fL --progress-bar \\\n    \"https://cdn.playwright.dev/dbazure/download/playwright/builds/${ZIP_PATH}\" \\\n    -o \"/tmp/${NAME}.zip\"\n  mkdir -p \"${DIR}\"\n  unzip -q \"/tmp/${NAME}.zip\" -d \"${DIR}\"\n  rm -f \"/tmp/${NAME}.zip\"\n  find \"${DIR}\" -name \"${BINARY}\" -type f -exec chmod 755 {} \\;\n  find \"${DIR}\" -name 'chrome_sandbox' -type f -exec chmod 4755 {} \\; 2>/dev/null || true\n  touch \"${DIR}/INSTALLATION_COMPLETE\"\n  echo \"${NAME} installed: $(ls ${DIR}/)\"\n}\n\ninstall_browser \"chromium\" \"chrome\" \\\n  \"chromium/${CHROMIUM_REV}/chromium-linux.zip\"\ninstall_browser \"chromium_headless_shell\" \"headless_shell\" \\\n  \"chromium/${CHROMIUM_REV}/chromium-headless-shell-linux.zip\"\n\n# ffmpeg is required for video recording (video: retain-on-failure in playwright.config.js)\n# The custom install_browser uses CHROMIUM_REV which doesn't match ffmpeg's own revision,\n# so use the local playwright binary (pinned via package-lock.json) to install ffmpeg only.\n./node_modules/.bin/playwright install ffmpeg\n\n# Check if this is a rerun\nIS_RERUN=\"${{ steps.check_rerun.outputs.is_rerun }}\"\nRERUN_TYPE=\"${{ steps.check_rerun.outputs.rerun_type }}\"\n\nif [ \"$IS_RERUN\" = \"true\" ]; then\n  # Check if this is \"re-run all\" - if so, skip TestDino and run all tests\n  if [ \"$RERUN_TYPE\" = \"all\" ]; then\n    echo \"::notice::\U0001F504 Re-run ALL jobs detected - skipping TestDino optimization\"\n    echo \"::notice::Will run ALL tests in this shard regardless of previous failures\"\n    RERUN_MODE=\"normal\"\n    EXTRA_PW_FLAGS=\"\"\n  else\n    # This is \"re-run failed\" - use TestDino optimization\n    echo \"::group::Fetching last failed tests from TestDino\"\n    # Use custom cache ID that includes run_id to distinguish separate workflow runs\n    # Format: gh_openobserve_main_12345678 (for main) or gh_openobserve_feature-branch_12345678 (for PRs)\n    # Sanitize branch name by replacing slashes with underscores\n    BRANCH_NAME=$(echo \"${{ github.ref_name }}\" | sed 's/\\//_/g')\n    CACHE_ID=\"gh_openobserve_${BRANCH_NAME}_${{ github.run_id }}\"\n    echo \"::notice::Using cache ID: $CACHE_ID\"\n    # Try to get last failed tests from TestDino\n    # Use a temp file to avoid shell variable truncation for large output\n    TEMP_OUTPUT=\"/tmp/testdino_output_$$.txt\"\n    if npx tdpw last-failed --cache-id \"$CACHE_ID\" > \"$TEMP_OUTPUT\" 2>&1; then\n      # Filter out ALL lines that don't match test file pattern\n      # Valid format: \"FolderName/testfile.spec.js\" or \"FolderName/testfile.spec.js -g test name\"\n      # This filters out debug lines, empty lines, and anything that's not a test path\n      LAST_FAILED_FLAGS=\"$(grep -E '^[A-Za-z_-]+/[a-zA-Z0-9_-]+\\.spec\\.js' \"$TEMP_OUTPUT\" | tail -1)\"\n      rm -f \"$TEMP_OUTPUT\"\n\n      if [ -n \"$LAST_FAILED_FLAGS\" ] && [ \"$LAST_FAILED_FLAGS\" != \"No failed tests found\" ]; then\n        echo \"::notice::✅ Found failed tests from previous run.\"\n        echo \"::notice::TestDino flags: $LAST_FAILED_FLAGS\"\n        RERUN_MODE=\"optimized\"\n        EXTRA_PW_FLAGS=\"$LAST_FAILED_FLAGS\"\n      else\n        echo \"::warning::TestDino returned no failed tests. Falling back to running all tests in this matrix job.\"\n        echo \"::warning::This means you'll be billed for all tests. Please investigate why last-failed returned empty.\"\n        RERUN_MODE=\"fallback\"\n        EXTRA_PW_FLAGS=\"\"\n      fi\n    else\n      echo \"::error::Failed to fetch last failed tests from TestDino (exit code: $?).\"\n      echo \"::warning::Falling back to running all tests in this matrix job.\"\n      echo \"::warning::This means you'll be billed for all tests. Please check TestDino integration.\"\n      RERUN_MODE=\"fallback\"\n      EXTRA_PW_FLAGS=\"\"\n    fi\n    echo \"::endgroup::\"\n  fi\nelse\n  RERUN_MODE=\"normal\"\n  EXTRA_PW_FLAGS=\"\"\nfi\n\n# Get list of files to run using join function\nFILE_LIST=\"${{ join(matrix.run_files, ' ') }}\"\necho \"DEBUG: FILE_LIST = $FILE_LIST\"\necho \"DEBUG: matrix.testfolder = ${{ matrix.testfolder }}\"\n\nif [ -n \"$FILE_LIST\" ]; then\n  # Map logical folder names to actual directories\n  case \"${{ matrix.testfolder }}\" in\n    \"Logs-Builder-Basic\"|\"Logs-Builder-Advanced\"|\"Logs-Core\"|\"Logs-Features\")\n      ACTUAL_FOLDER=\"Logs\"\n      ;;\n    \"Dashboards-Core\"|\"Dashboards-Settings\"|\"Dashboards-Charts\"|\"Dashboards-Streaming\"|\"Dashboards-Variables\"|\"Dashboard-Table-Pagination\"|\"Dashboard-Pivot-Table\"|\"Dashboards-Panel-Level-DateTime-Config\"|\"Dashboard-Config-Settings\")\n      ACTUAL_FOLDER=\"Dashboards\"\n      ;;\n    *)\n      ACTUAL_FOLDER=\"${{ matrix.testfolder }}\"\n      ;;\n  esac\n\n  echo \"DEBUG: ACTUAL_FOLDER = $ACTUAL_FOLDER\"\n\n  # Build file paths\n  FILE_PATHS=\"\"\n  for file in $FILE_LIST; do\n    FILE_PATH=\"./playwright-tests/$ACTUAL_FOLDER/$file\"\n    echo \"DEBUG: Will run file: $FILE_PATH\"\n    FILE_PATHS=\"$FILE_PATHS $FILE_PATH\"\n  done\n\n  # Determine what to run based on rerun mode\n  if [ \"$RERUN_MODE\" = \"optimized\" ]; then\n    # TestDino returns ALL failed tests from the previous run\n    # Format examples:\n    # Single: \"SDR/test.spec.js -g test name\"\n    # Multiple: \"Logs/test1.spec.js -g name1 Pipelines/test2.spec.js -g name2\"\n\n    echo \"DEBUG: Full TestDino output (all failed tests): $EXTRA_PW_FLAGS\"\n    echo \"DEBUG: Current shard folder: $ACTUAL_FOLDER\"\n\n    # Strategy: Extract only tests that start with \"$ACTUAL_FOLDER/\"\n    # Use grep to find lines matching our shard folder\n    SHARD_TESTS=\"\"\n\n    # Check if the TestDino output contains tests for this shard (case-insensitive)\n    # Look for pattern: $ACTUAL_FOLDER/something.spec.js\n    if echo \"$EXTRA_PW_FLAGS\" | grep -iq \"$ACTUAL_FOLDER/.*\\.spec\\.js\"; then\n      echo \"DEBUG: Found test(s) for this shard in TestDino output\"\n\n      # IMPORTANT: Based on observation, TestDino returns ONE test at a time\n      # Format: \"Folder/file.spec.js -g test name\"\n      # Simply check if it starts with our folder and pass it through\n\n      # Extract file path (everything before -g or end of string) - case-insensitive\n      TEST_FILE=$(echo \"$EXTRA_PW_FLAGS\" | grep -ioE \"$ACTUAL_FOLDER/[^ ]+\\.spec\\.js\" | head -1)\n\n      if [ -n \"$TEST_FILE\" ]; then\n        # Check if file actually starts with our folder (case-insensitive)\n        if [[ \"${TEST_FILE,,}\" == \"${ACTUAL_FOLDER,,}/\"* ]]; then\n          # Extract just the filename from the test file path\n          TEST_FILENAME=$(basename \"$TEST_FILE\")\n\n          # Check if this file is actually in the current shard's run_files list\n          if echo \"$FILE_LIST\" | grep -qw \"$TEST_FILENAME\"; then\n            # Parse out the file path and test name separately for proper quoting\n            # Extract file path (before -g)\n            TEST_FILE_PATH=$(echo \"$EXTRA_PW_FLAGS\" | sed \"s/ -g.*//\" | sed \"s|^|./playwright-tests/|\")\n\n            # Check if there's a -g flag\n            if echo \"$EXTRA_PW_FLAGS\" | grep -q \" -g \"; then\n              # Extract test name (after -g) and strip any surrounding quotes\n              TEST_NAME=$(echo \"$EXTRA_PW_FLAGS\" | sed 's/.*-g //' | sed 's/^\"\\(.*\\)\"$/\\1/')\n\n              echo \"DEBUG: File path: $TEST_FILE_PATH\"\n              echo \"DEBUG: Test name (unquoted): $TEST_NAME\"\n              echo \"::notice::\U0001F3AF OPTIMIZED RERUN: Running failed test from this shard\"\n              echo \"DEBUG: Final command: npx playwright test \\\"$TEST_FILE_PATH\\\" -g \\\"$TEST_NAME\\\"\"\n\n              # Properly quote the test name to handle spaces and special chars\n              npx playwright test \"$TEST_FILE_PATH\" -g \"$TEST_NAME\"\n            else\n              # No -g flag, just run the file\n              echo \"DEBUG: File path: $TEST_FILE_PATH (no -g flag)\"\n              echo \"::notice::\U0001F3AF OPTIMIZED RERUN: Running failed test file from this shard\"\n              echo \"DEBUG: Final command: npx playwright test \\\"$TEST_FILE_PATH\\\"\"\n\n              npx playwright test \"$TEST_FILE_PATH\"\n            fi\n          else\n            echo \"::notice::⏭️ Test file '$TEST_FILENAME' not in this shard's run_files list.\"\n            echo \"::notice::Checking if this shard was cancelled/abruptly ended in previous attempt...\"\n\n            # Check the status of this matrix job in the previous attempt\n            PREV_ATTEMPT=$((${{ github.run_attempt }} - 1))\n\n            if [ \"$PREV_ATTEMPT\" -ge 1 ]; then\n              JOB_NAME=\"e2e / ${{ matrix.testfolder }}\"\n\n              API_RESPONSE=$(curl -s -H \"Authorization: token $GH_TOKEN\" \\\n                -H \"Accept: application/vnd.github.v3+json\" \\\n                \"https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/$PREV_ATTEMPT/jobs\" 2>/dev/null)\n\n              if [ $? -eq 0 ] && [ -n \"$API_RESPONSE\" ]; then\n                PREV_JOB_STATUS=$(echo \"$API_RESPONSE\" | jq -r \".jobs[] | select(.name == \\\"$JOB_NAME\\\") | .conclusion\" 2>/dev/null)\n\n                if [ \"$PREV_JOB_STATUS\" = \"cancelled\" ] || [ \"$PREV_JOB_STATUS\" = \"null\" ] || [ -z \"$PREV_JOB_STATUS\" ]; then\n                  echo \"::warning::⚠️ Previous shard was cancelled/abruptly ended - running FULL test suite\"\n                  npx playwright test $FILE_PATHS\n                  exit $?\n                elif [ \"$PREV_JOB_STATUS\" = \"success\" ]; then\n                  echo \"::notice::✅ Previous shard completed successfully - no tests to rerun\"\n                  exit 0\n                elif [ \"$PREV_JOB_STATUS\" = \"failure\" ]; then\n                  echo \"::warning::⚠️ Previous shard failed but TestDino has no failures recorded - running FULL test suite\"\n                  npx playwright test $FILE_PATHS\n                  exit $?\n                else\n                  echo \"::warning::⚠️ Unknown job status - running FULL test suite for safety\"\n                  npx playwright test $FILE_PATHS\n                  exit $?\n                fi\n              else\n                echo \"::error::Failed to fetch job status from GitHub API - running FULL test suite\"\n                npx playwright test $FILE_PATHS\n                exit $?\n              fi\n            else\n              echo \"::notice::✅ This is the first run, no previous attempt to check\"\n              echo \"::notice::No failed tests to rerun. Exiting successfully.\"\n              exit 0\n            fi\n          fi\n        else\n          echo \"::notice::⏭️ Test file doesn't match shard folder exactly. Skipping.\"\n          exit 0\n        fi\n      else\n        echo \"::warning::Failed to extract test file path. Falling back to skip.\"\n        exit 0\n      fi\n    else\n      echo \"::notice::⏭️ OPTIMIZED RERUN: No failed tests found for '$ACTUAL_FOLDER' shard in TestDino output\"\n      echo \"::notice::Checking if this shard was cancelled/abruptly ended in previous attempt...\"\n\n      # Check the status of this matrix job in the previous attempt\n      # Rule: If shard was cancelled/abruptly ended → treat as failed → run full test suite\n      PREV_ATTEMPT=$((${{ github.run_attempt }} - 1))\n\n      if [ \"$PREV_ATTEMPT\" -ge 1 ]; then\n        # Job name format: \"e2e / {matrix.testfolder}\"\n        JOB_NAME=\"e2e / ${{ matrix.testfolder }}\"\n\n        echo \"DEBUG: Checking previous attempt #$PREV_ATTEMPT for job: $JOB_NAME\"\n\n        # Use GitHub REST API to get job status from specific attempt\n        # This is guaranteed to work and provides attempt-specific data\n        API_RESPONSE=$(curl -s -H \"Authorization: token $GH_TOKEN\" \\\n          -H \"Accept: application/vnd.github.v3+json\" \\\n          \"https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/$PREV_ATTEMPT/jobs\" 2>/dev/null)\n\n        if [ $? -eq 0 ] && [ -n \"$API_RESPONSE\" ]; then\n          # Successfully got API response, parse it\n          PREV_JOB_STATUS=$(echo \"$API_RESPONSE\" | jq -r \".jobs[] | select(.name == \\\"$JOB_NAME\\\") | .conclusion\" 2>/dev/null)\n\n          echo \"DEBUG: Previous job status: $PREV_JOB_STATUS\"\n\n          if [ \"$PREV_JOB_STATUS\" = \"cancelled\" ] || [ \"$PREV_JOB_STATUS\" = \"null\" ] || [ -z \"$PREV_JOB_STATUS\" ]; then\n            echo \"::warning::⚠️ Previous shard was cancelled/abruptly ended (status: ${PREV_JOB_STATUS:-not found})\"\n            echo \"::warning::Treating as FAILED - running FULL test suite for this shard\"\n            echo \"DEBUG: Running all matrix tests: npx playwright test $FILE_PATHS\"\n            npx playwright test $FILE_PATHS\n            exit $?\n          elif [ \"$PREV_JOB_STATUS\" = \"success\" ]; then\n            echo \"::notice::✅ Previous shard completed successfully - all tests passed\"\n            echo \"::notice::No failed tests to rerun. Exiting successfully.\"\n            exit 0\n          elif [ \"$PREV_JOB_STATUS\" = \"failure\" ]; then\n            echo \"::warning::⚠️ Previous shard failed but TestDino has no failures recorded\"\n            echo \"::warning::This shouldn't happen - running FULL test suite for safety\"\n            echo \"DEBUG: Running all matrix tests: npx playwright test $FILE_PATHS\"\n            npx playwright test $FILE_PATHS\n            exit $?\n          else\n            echo \"::warning::⚠️ Unknown job status: $PREV_JOB_STATUS\"\n            echo \"::warning::Running FULL test suite for safety\"\n            echo \"DEBUG: Running all matrix tests: npx playwright test $FILE_PATHS\"\n            npx playwright test $FILE_PATHS\n            exit $?\n          fi\n        else\n          echo \"::error::Failed to fetch job status from GitHub API\"\n          echo \"::warning::Falling back to running FULL test suite for safety\"\n          echo \"DEBUG: Running all matrix tests: npx playwright test $FILE_PATHS\"\n          npx playwright test $FILE_PATHS\n          exit $?\n        fi\n      else\n        echo \"::notice::✅ This is the first run, no previous attempt to check\"\n        echo \"::notice::No failed tests to rerun. Exiting successfully.\"\n        exit 0\n      fi\n    fi\n  else\n    # Normal run or fallback\n    if [ \"$RERUN_MODE\" = \"fallback\" ]; then\n      echo \"::warning::⚠️ FALLBACK RERUN: Running all tests in matrix (TestDino optimization failed)\"\n    fi\n    echo \"DEBUG: Final command: npx playwright test $FILE_PATHS\"\n    npx playwright test $FILE_PATHS\n  fi\nelse\n  echo \"No files specified to run for ${{ matrix.testfolder }} folder\"\nfi\n"
       - name: Upload blob report to GitHub Actions Artifacts
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
@@ -850,11 +326,9 @@ jobs:
           name: blob-report-${{ matrix.testfolder }}-attempt-${{ github.run_attempt }}
           path: tests/ui-testing/blob-report
           retention-days: 1
-
       - name: Check OpenObserve logs
         if: always()
         run: cat o2.log
-
   merge_and_upload_reports:
     timeout-minutes: 15
     name: Merge Reports and Upload to TestDino
@@ -865,19 +339,15 @@ jobs:
     permissions:
       contents: read
       actions: read
-
     steps:
       - name: Clone the current repo
         uses: actions/checkout@v5
-
       - name: Setup Node.js
         uses: actions/setup-node@v5
         with:
           node-version: "22"
-
       - name: Install project dependencies
         run: cd tests/ui-testing && npm ci
-
       - name: Download blob reports from GitHub Actions Artifacts
         uses: actions/download-artifact@v4
         continue-on-error: true
@@ -886,7 +356,6 @@ jobs:
           path: tests/ui-testing/all-blob-reports
           pattern: blob-report-*-attempt-${{ github.run_attempt }}
           merge-multiple: true
-
       - name: Check if any artifacts were downloaded
         run: |
           if [ -d "tests/ui-testing/all-blob-reports" ] && [ "$(ls -A tests/ui-testing/all-blob-reports)" ]; then
@@ -896,7 +365,6 @@ jobs:
             echo "⚠️ No artifacts found or download failed completely"
             # Don't fail here - let the Merge Reports step handle this
           fi
-
       - name: Merge Reports
         env:
           GH_TOKEN: ${{ github.token }}
@@ -953,7 +421,6 @@ jobs:
           ls -la playwright-results/html-report/
           echo "Checking report.json:"
           ls -lh playwright-results/report.json
-
       - name: Cache test failures to TestDino
         if: ${{ needs.ui_integration_tests.result == 'failure' }}
         env:
@@ -997,7 +464,6 @@ jobs:
             echo "::notice::Skipping cache - no report.json found (tests may have been skipped due to rerun optimization)"
           fi
           echo "::endgroup::"
-
       - name: Upload to TestDino
         if: ${{ needs.ui_integration_tests.result == 'failure' && env.UPLOAD_TO_TESTDINO == 'true' }}
         run: |
@@ -1072,22 +538,16 @@ jobs:
             --upload-html \
             --verbose \
             --token="${{ secrets.TESTDINO_API_TOKEN }}"
-
   playwright_summary:
     timeout-minutes: 5
     runs-on:
       labels: ubicloud-standard-4
     permissions: {}
-    needs:
-      [
-        check_changes,
-        build_binary,
-        ui_integration_tests,
-      ]
+    needs: [check_changes, build_binary, ui_integration_tests]
     if: always()
     steps:
       - name: Check test results
-        run: |
+        run: |-
           # check_changes must have succeeded — if it failed, all downstream jobs skipped
           # and we would otherwise incorrectly report success.
           if [ "${{ needs.check_changes.result }}" != "success" ]; then
