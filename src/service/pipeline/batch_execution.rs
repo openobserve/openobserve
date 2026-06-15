@@ -878,6 +878,7 @@ async fn process_llm_evaluation_node(
     );
 }
 
+#[cfg(feature = "enterprise")]
 async fn process_remote_stream_node(
     remote_stream: &config::meta::stream::RemoteStreamParams,
     metadata: ProcessMetadata,
