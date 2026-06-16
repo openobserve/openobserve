@@ -155,6 +155,17 @@ test.describe("Reports form validation — valid config creates report", () => {
     test.describe.configure({ mode: 'serial' });
     let pm;
 
+    test.beforeAll(async ({ request }) => {
+        // Delete the test report if it exists from a previous run so the happy-path test can create it fresh.
+        const org  = process.env.ORGNAME || 'default';
+        const base = (process.env.INGESTION_URL || process.env.ZO_BASE_URL || 'http://localhost:5080').replace(/\/+$/, '');
+        const creds = Buffer.from(`${process.env.ZO_ROOT_USER_EMAIL}:${process.env.ZO_ROOT_USER_PASSWORD}`).toString('base64');
+        await request.delete(
+            `${base}/api/${org}/reports/test_fv_reports_001`,
+            { headers: { Authorization: `Basic ${creds}` } }
+        ).catch(() => {}); // ignore 404 if report doesn't exist
+    });
+
     test.beforeEach(async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
         await navigateToBase(page);
