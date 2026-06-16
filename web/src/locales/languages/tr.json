@@ -460,7 +460,11 @@
     "actions": "Eylemler",
     "incidents": "Olaylar",
     "evals": "Evalar",
-    "aiObservability": "Yapay Zeka Gözlemlenebilirliği"
+    "aiObservability": "Yapay Zeka Gözlemlenebilirliği",
+    "manage": "Yönetmek",
+    "aiAssistant": "AI",
+    "theme": "Tema",
+    "logout": "Oturumu Kapat"
   },
   "rum": {
     "title": "Gerçek Kullanıcı İzleme",

@@ -460,7 +460,11 @@
     "actions": "Aktionen",
     "incidents": "Vorfälle",
     "evals": "Evalen",
-    "aiObservability": "KI-Beobachtbarkeit"
+    "aiObservability": "KI-Beobachtbarkeit",
+    "manage": "Managen",
+    "aiAssistant": "AI",
+    "theme": "Thema",
+    "logout": "Abmelden"
   },
   "rum": {
     "title": "Echte Benutzerüberwachung",

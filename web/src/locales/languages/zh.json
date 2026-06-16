@@ -460,7 +460,11 @@
     "actions": "操作",
     "incidents": "事件",
     "evals": "Evals",
-    "aiObservability": "AI 可观测性"
+    "aiObservability": "AI 可观测性",
+    "manage": "管理",
+    "aiAssistant": "AI",
+    "theme": "主题",
+    "logout": "注销"
   },
   "rum": {
     "title": "用户体验监控",
