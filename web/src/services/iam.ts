@@ -106,3 +106,14 @@ export const getResourcePermission = ({
   const url = `/api/${org_identifier}/roles/${role_name}/permissions/${resource}`;
   return http().get(url);
 };
+
+export const getAllRolePermissions = ({
+  role_name,
+  org_identifier,
+}: {
+  role_name: string;
+  org_identifier: string;
+}) => {
+  const url = `/api/${org_identifier}/roles/${role_name}/permissions`;
+  return http().get(url);
+};

@@ -424,7 +424,8 @@
     "invalidSql": "Geçersiz sorgu",
     "menuGroupExplain": "Açıklamak",
     "fieldValuesEmpty": "Değer bulunamadı.",
-    "fieldValuesEmptyHint": "Değerleri görmek için daha geniş bir zaman aralığı deneyin."
+    "fieldValuesEmptyHint": "Değerleri görmek için daha geniş bir zaman aralığı deneyin.",
+    "selectLogsStreamFirst": "Önce Günlükler akışını seçin"
   },
   "menu": {
     "home": "Ana Sayfa",
@@ -847,7 +848,10 @@
     "feature_correlation_management": "Korelasyon yönetimi",
     "feature_log_patterns": "Günlük kalıpları",
     "environment_type": "Ortam Türü",
-    "license_allows_unlimited_ingestion": "Mevcut lisans sınırsız veri alımına izin verir."
+    "license_allows_unlimited_ingestion": "Mevcut lisans sınırsız veri alımına izin verir.",
+    "refresh_license_limits": "Lisans Sınırlarını Yenile",
+    "license_refresh_success": "Lisans sınırı yenileme başarıyla tetiklendi",
+    "failed_to_refresh_license": "Lisans sınırları yenilenemedi"
   },
   "login": {
     "userid": "Kullanıcı Kimliği",

@@ -1,15 +1,12 @@
 <template>
     <!-- Preview Section (only for root level) -->
     <div v-if="depth === 0 && showSqlPreview && previewString"
-         class="tw:mb-2 tw:p-2 tw:rounded tw:border tw:w-full tw:max-h-[3.2em] tw:overflow-y-auto"
-         :class="store.state.theme === 'dark' ? 'tw:bg-gray-800 tw:border-gray-700' : 'tw:bg-gray-50 tw:border-gray-300'">
+         class="tw:mb-2 tw:p-2 tw:rounded tw:border tw:w-full tw:max-h-[3.2em] tw:overflow-y-auto tw:bg-surface-panel tw:border-border-default">
       <div class="tw:flex tw:items-start tw:gap-1 tw:min-w-0">
-        <span class="tw:font-medium tw:text-xs tw:flex-shrink-0 tw:leading-[1.3]"
-              :class="store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-700'">
+        <span class="tw:font-medium tw:text-xs tw:flex-shrink-0 tw:leading-[1.3] tw:text-text-primary">
           Preview:
         </span>
-        <span class="tw:text-[10px] tw:font-mono tw:leading-[1.3] tw:min-w-0 tw:break-words"
-              :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600'">
+        <span class="tw:text-[10px] tw:font-mono tw:leading-[1.3] tw:min-w-0 tw:break-words tw:text-text-secondary">
           {{ previewString }}
         </span>
       </div>
@@ -51,7 +48,7 @@
 
       <!-- Group content -->
 
-      <div v-if="isOpen" class="tw:overflow-x-auto group-container" :class="store.state.theme === 'dark' ? 'dark-mode-group' : 'light-mode-group'">
+      <div v-if="isOpen" class="tw:overflow-x-auto group-container">
         <!-- Items in group (V2 uses 'conditions' array) -->
         <div class="tw:ml-2 tw:whitespace-nowrap " v-for="(item, index) in props.group.conditions" :key="index">
           <FilterGroup
@@ -513,13 +510,9 @@ defineExpose({
         font-size: 10px !important;
       }
     }
-    .group-container.dark-mode-group {
-    scrollbar-color: #818181 #212121; /* thumb color, track color */
+  .group-container {
+    scrollbar-color: var(--o2-text-muted) var(--o2-primary-background);
   }
-
-.group-container.light-mode-group {
-  scrollbar-color: #999 #ffffff;
-}
 
 /* For more control using WebKit scrollbar styling */
 .group-container::-webkit-scrollbar {
@@ -527,21 +520,12 @@ defineExpose({
   height: 4px !important;
 }
 
-.group-container.dark-mode-group::-webkit-scrollbar-track {
-  background: red;
+.group-container::-webkit-scrollbar-track {
+  background: var(--o2-primary-background);
 }
 
-.group-container.dark-mode-group::-webkit-scrollbar-thumb {
-  background-color: #b10000;
-  border-radius: 4px;
-}
-
-.group-container.light-mode-group::-webkit-scrollbar-track {
-  background: #ffffff;
-}
-
-.group-container.light-mode-group::-webkit-scrollbar-thumb {
-  background-color: #999;
+.group-container::-webkit-scrollbar-thumb {
+  background-color: var(--o2-text-muted);
   border-radius: 4px;
 }
 

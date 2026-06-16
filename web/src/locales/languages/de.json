@@ -424,7 +424,8 @@
     "invalidSql": "Ungültige Abfrage",
     "menuGroupExplain": "Erkläre",
     "fieldValuesEmpty": "Keine Werte gefunden.",
-    "fieldValuesEmptyHint": "Probieren Sie einen breiteren Zeitraum aus, um die Werte zu sehen."
+    "fieldValuesEmptyHint": "Probieren Sie einen breiteren Zeitraum aus, um die Werte zu sehen.",
+    "selectLogsStreamFirst": "Wählen Sie zuerst Logs-Stream aus"
   },
   "menu": {
     "home": "Startseite",
@@ -847,7 +848,10 @@
     "feature_correlation_management": "Korrelationsmanagement",
     "feature_log_patterns": "Muster protokollieren",
     "environment_type": "Art der Umgebung",
-    "license_allows_unlimited_ingestion": "Die aktuelle Lizenz ermöglicht eine unbegrenzte Datenaufnahme."
+    "license_allows_unlimited_ingestion": "Die aktuelle Lizenz ermöglicht eine unbegrenzte Datenaufnahme.",
+    "refresh_license_limits": "Lizenzlimits aktualisieren",
+    "license_refresh_success": "Die Aktualisierung des Lizenzlimits wurde erfolgreich ausgelöst",
+    "failed_to_refresh_license": "Lizenzlimits konnten nicht aktualisiert werden"
   },
   "login": {
     "userid": "Benutzer-ID",

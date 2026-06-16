@@ -19,8 +19,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div>
     <!-- Section header (title + description) is provided full-width by the
          Settings shell; this component renders only the form content. -->
-    <!-- platform settings section -->
-    <div class="tw:mx-4">
+    <!-- platform settings section. The page gutter is owned by the Settings
+         shell's ConstrainedPage; this block adds none of its own. -->
+    <div>
       <GroupHeader :title="t('settings.platformSettings')" :showIcon="false" />
       <div class="tw:w-full tw:flex tw:flex-col">
         <OForm @submit.stop="onSubmit.execute">
@@ -162,13 +163,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           store.state.selectedOrganization.identifier
       "
     >
-      <div class="tw:px-3 tw:py-2">
+      <div class="tw:py-2">
         <GroupHeader
           :title="t('settings.enterpriseFeatures')"
           :showIcon="false"
         />
       </div>
-      <div class="tw:mx-3">
+      <div>
         <div class="settings-grid-item no-border-bottom">
           <span class="individual-setting-title">
             {{ t("settings.customLogoText") }}

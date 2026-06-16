@@ -85,7 +85,6 @@ async-recursion.workspace = true
 aws-sdk-sns.workspace = true
 base64.workspace = true
 bitflags = "2.11"
-bitvec.workspace = true
 blake3 = { version = "1.8", features = ["rayon"] }
 bytes.workspace = true
 byteorder.workspace = true
@@ -308,7 +307,6 @@ aws-sdk-sns = { version = "1.97", default-features = false, features = [
     "rt-tokio",
 ] }
 base64 = "0.22"
-bitvec = "1.0"
 bytes = "1.11"
 byteorder = "1.5"
 chromiumoxide = { git = "https://github.com/mattsse/chromiumoxide", features = [

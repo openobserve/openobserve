@@ -87,7 +87,7 @@ function resetToDefault(): void {
       class="tw:py-1 tw:min-w-44"
       data-test="o2-table-column-toggle-panel"
     >
-      <p class="tw:px-3 tw:py-1 tw:text-xs tw:font-semibold tw:text-[var(--color-text-secondary)]">
+      <p class="tw:px-3 tw:py-1 tw:text-xs tw:font-medium tw:text-[var(--color-text-secondary)]">
         Columns
       </p>
 
