@@ -460,7 +460,9 @@
     "actions": "액션",
     "incidents": "인시던트",
     "evals": "평가",
-    "aiObservability": "AI 옵저버빌리티"
+    "aiObservability": "AI 옵저버빌리티",
+    "manage": "관리",
+    "more": "더 보기"
   },
   "rum": {
     "title": "실제 사용자 모니터링",

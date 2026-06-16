@@ -460,7 +460,9 @@
     "actions": "アクション",
     "incidents": "インシデント",
     "evals": "評価",
-    "aiObservability": "AI オブザーバビリティ"
+    "aiObservability": "AI オブザーバビリティ",
+    "manage": "管理",
+    "more": "もっと"
   },
   "rum": {
     "title": "リアルユーザーモニタリング",

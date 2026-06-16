@@ -460,7 +460,9 @@
     "actions": "Actions",
     "incidents": "Incidents",
     "evals": "Evals",
-    "aiObservability": "Observabilité de l'IA"
+    "aiObservability": "Observabilité de l'IA",
+    "manage": "Gérez",
+    "more": "Plus"
   },
   "rum": {
     "title": "Surveillance réelle des utilisateurs",

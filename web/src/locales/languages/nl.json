@@ -460,7 +460,9 @@
     "actions": "Acties",
     "incidents": "Incidenten",
     "evals": "Evalen",
-    "aiObservability": "AI-waarneembaarheid"
+    "aiObservability": "AI-waarneembaarheid",
+    "manage": "Beheren",
+    "more": "Meer"
   },
   "rum": {
     "title": "Monitoring van echte gebruikers",
