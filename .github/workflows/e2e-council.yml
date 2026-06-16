@@ -80,16 +80,16 @@ jobs:
   # ---------------------------------------------------------------------------
   triage:
     # Trigger gate: the actor (commenter / dispatcher) must be on the engineering-team ALLOWLIST,
-    # AND it's either a manual dispatch or a comment that is EXACTLY `/e2e` on a PR. Exact match
-    # (not `contains`) so "Generate /e2e" etc. do NOT trigger — the job never starts (no reaction,
-    # no comment, no run). Allowlist mirrors .github/workflows/auto-assign-metadata.yml — keep in
-    # sync. (PR-AUTHOR is gated separately, in the prinfo step below, so strangers' PRs are ditched.)
+    # AND it's either a manual dispatch or an EXACT `/e2e` (full run) or `/e2e-dryrun` (triage only)
+    # comment on a PR. Exact match (not `contains`) so "Generate /e2e" etc. do NOT trigger — the job
+    # never starts (no reaction, no comment, no run). Allowlist mirrors auto-assign-metadata.yml —
+    # keep in sync. (PR-AUTHOR is gated separately, in the prinfo step below, so strangers' PRs are ditched.)
     if: >
       contains(fromJSON('["bjp232004","hengfeiyang","prabhatsharma","uddhavdave","oasisk","haohuaijin","Subhra264","Loaki07","007harshmahajan","chaitanya-sistla","ktx-kirtan","omkarK06","ktx-vaidehi","ktx-abhay","neha00290","ktx-akshay","ktx-sadhna","nikhilsaikethe","YashodhanJoshi1","ktx-riya","mmosarafO2","Shrinath-O2","ktx-mihir"]'), github.actor) &&
       (github.event_name == 'workflow_dispatch' ||
        (github.event_name == 'issue_comment' &&
         github.event.issue.pull_request &&
-        github.event.comment.body == '/e2e'))
+        (github.event.comment.body == '/e2e' || github.event.comment.body == '/e2e-dryrun')))
     runs-on: ubuntu-latest
     timeout-minutes: 15
     outputs:
@@ -155,13 +155,23 @@ jobs:
 
       - name: Determine dry-run mode
         id: mode
+        # `/e2e` = full run, `/e2e-dryrun` = triage only, manual dispatch honours its dry_run input.
+        # COMMENT_BODY is attacker-controllable → passed via env and compared in-shell (never
+        # interpolated into the script) to avoid a code-injection sink. The trigger `if` already
+        # guarantees it's exactly one of the two commands.
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_DRY: ${{ github.event.inputs.dry_run }}
+          COMMENT_BODY: ${{ github.event.comment.body }}
         run: |
-          # Comment trigger is always dry-run in v1. Only manual dispatch can disable it.
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ github.event.inputs.dry_run }}" = "false" ]; then
-            echo "dry_run=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "dry_run=true" >> "$GITHUB_OUTPUT"
+          DRY=true
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            [ "$INPUT_DRY" = "false" ] && DRY=false
+          elif [ "$EVENT_NAME" = "issue_comment" ] && [ "$COMMENT_BODY" = "/e2e" ]; then
+            DRY=false
           fi
+          echo "dry_run=$DRY" >> "$GITHUB_OUTPUT"
+          echo "Mode: dry_run=$DRY (event=$EVENT_NAME)"
 
       - name: Acknowledge — react + post in-progress comment
         # Give the user immediate feedback (within seconds) that the agent is working. We post a
@@ -914,6 +924,7 @@ jobs:
           GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
           ORIG_REF: ${{ needs.triage.outputs.head_ref }}
           SRC_PR: ${{ needs.triage.outputs.pr_number }}
+          AUTHOR: ${{ needs.triage.outputs.author }}
         run: |
           set -e
           BRANCH="autoe2e/${ORIG_REF}"
@@ -947,3 +958,14 @@ jobs:
             gh api -X POST "repos/${GITHUB_REPOSITORY}/issues/${SRC_PR}/comments" -F body=@/tmp/sticky.md >/dev/null
           fi
           echo "Linked test PR #$TEST_PR on source PR #$SRC_PR."
+
+          # Assign + request review from: the original feature dev + Neha + Shrinath (all on the
+          # allowlist). Done per-user with `|| true` so one bad entry (e.g. self-review when the
+          # bot account == a listed user, or a user who can't be added) never fails the job.
+          for U in "$AUTHOR" neha00290 Shrinath-O2; do
+            [ -n "$U" ] || continue
+            gh pr edit "$TEST_PR" --repo "$GITHUB_REPOSITORY" --add-assignee "$U" >/dev/null 2>&1 \
+              && echo "assigned @$U" || echo "::warning::could not assign @$U"
+            gh pr edit "$TEST_PR" --repo "$GITHUB_REPOSITORY" --add-reviewer "$U" >/dev/null 2>&1 \
+              && echo "requested review from @$U" || echo "::notice::could not request review from @$U (self/perm)"
+          done
