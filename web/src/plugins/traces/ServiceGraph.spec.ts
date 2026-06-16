@@ -130,6 +130,21 @@ vi.mock("@/services/search", () => ({
   },
 }));
 
+// Mock @/utils/date so getConsumableRelativeTime returns deterministic values.
+// Must be declared before the component import so Vitest hoisting applies.
+const mockStartTime = 1000000;
+const mockEndTime = 2000000;
+
+const mockGetConsumableRelativeTime = vi.fn(() => ({
+  startTime: mockStartTime,
+  endTime: mockEndTime,
+}));
+
+vi.mock("@/utils/date", () => ({
+  getConsumableRelativeTime: (...args: any[]) =>
+    mockGetConsumableRelativeTime(...args),
+}));
+
 import serviceGraphService from "@/services/service_graph";
 
 // Mock store
@@ -208,6 +223,11 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
           QIcon: false,
           QTooltip: false,
           ODialog: ODialogStub,
+          ServiceGraphNoDataState: {
+            template:
+              '<div data-test="service-graph-no-data-state" />',
+            emits: ["widen-range"],
+          },
         },
       },
     });
@@ -232,6 +252,12 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
     vi.mocked(serviceGraphService.getCurrentTopology).mockResolvedValue(
       mockApiResponse,
     );
+    // Provide a default implementation for getConsumableRelativeTime so
+    // the relative-time path in loadServiceGraph resolves during existing tests.
+    mockGetConsumableRelativeTime.mockImplementation(() => ({
+      startTime: mockStartTime,
+      endTime: mockEndTime,
+    }));
   });
 
   afterEach(() => {
@@ -665,6 +691,9 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       const newStartTime = Date.now() - 7200000;
       const newEndTime = Date.now();
 
+      // Use type "absolute" so loadServiceGraph reads dt.startTime/dt.endTime
+      // directly (the relative branch calls getConsumableRelativeTime instead).
+      wrapper.vm.searchObj.data.datetime.type = "absolute";
       wrapper.vm.searchObj.data.datetime.startTime = newStartTime;
       wrapper.vm.searchObj.data.datetime.endTime = newEndTime;
       wrapper.vm.searchObj.data.datetime.relativeTimePeriod = "30m";
@@ -1778,6 +1807,197 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
 
       const series = wrapper.vm.chartData.options.series[0];
       expect(series.label.position).toBe("right");
+    });
+  });
+
+  describe("widen-range emit and live time range fix", () => {
+    it("should emit 'widen-range' when ServiceGraphNoDataState bubbles the event", async () => {
+      // Return empty nodes so the no-data state is rendered
+      vi.mocked(serviceGraphService.getCurrentTopology).mockResolvedValue({
+        data: { nodes: [], edges: [], availableStreams: [] },
+      });
+
+      // Mount with ServiceGraphNoDataState stubbed so we can trigger its event
+      const localWrapper = mount(ServiceGraph, {
+        global: {
+          mocks: { $store: createMockStore() },
+          provide: { store: createMockStore() },
+          stubs: {
+            AppTabs: true,
+            ChartRenderer: true,
+            ServiceGraphSidePanel: true,
+            QCard: false,
+            QCardSection: false,
+            QSelect: false,
+            QInput: false,
+            QBtn: false,
+            QIcon: false,
+            QTooltip: false,
+            ODialog: ODialogStub,
+            ServiceGraphNoDataState: {
+              template:
+                '<div @click="$emit(\'widen-range\', \'7d\')" data-test="service-graph-no-data-stub" />',
+              emits: ["widen-range"],
+            },
+          },
+        },
+      });
+
+      await flushPromises();
+
+      const stub = localWrapper.find(
+        '[data-test="service-graph-no-data-stub"]',
+      );
+      expect(stub.exists()).toBe(true);
+
+      await stub.trigger("click");
+
+      expect(localWrapper.emitted("widen-range")).toBeTruthy();
+      expect(localWrapper.emitted("widen-range")![0]).toEqual(["7d"]);
+
+      localWrapper.unmount();
+    });
+
+    it("should use fresh timestamps from getConsumableRelativeTime for relative ranges", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+
+      vi.mocked(serviceGraphService.getCurrentTopology).mockClear();
+
+      const freshStart = 9999;
+      const freshEnd = 9999 + 900;
+      mockGetConsumableRelativeTime.mockReturnValue({
+        startTime: freshStart,
+        endTime: freshEnd,
+      });
+
+      wrapper.vm.searchObj.data.datetime.type = "relative";
+      wrapper.vm.searchObj.data.datetime.relativeTimePeriod = "15m";
+
+      await wrapper.vm.loadServiceGraph();
+      await flushPromises();
+
+      expect(mockGetConsumableRelativeTime).toHaveBeenCalledWith("15m");
+      expect(serviceGraphService.getCurrentTopology).toHaveBeenCalledWith(
+        "test-org",
+        expect.objectContaining({
+          startTime: freshStart,
+          endTime: freshEnd,
+        }),
+      );
+    });
+
+    it("should fall back to dt.startTime/endTime for absolute ranges", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+
+      vi.mocked(serviceGraphService.getCurrentTopology).mockClear();
+      mockGetConsumableRelativeTime.mockClear();
+
+      wrapper.vm.searchObj.data.datetime.type = "absolute";
+      wrapper.vm.searchObj.data.datetime.startTime = 1111;
+      wrapper.vm.searchObj.data.datetime.endTime = 2222;
+
+      await wrapper.vm.loadServiceGraph();
+      await flushPromises();
+
+      expect(mockGetConsumableRelativeTime).not.toHaveBeenCalled();
+      expect(serviceGraphService.getCurrentTopology).toHaveBeenCalledWith(
+        "test-org",
+        expect.objectContaining({
+          startTime: 1111,
+          endTime: 2222,
+        }),
+      );
+    });
+  });
+
+  describe("Live Time Range Computation", () => {
+    it("should use getConsumableRelativeTime when datetime type is relative", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+      vi.mocked(serviceGraphService.getCurrentTopology).mockClear();
+      mockGetConsumableRelativeTime.mockReturnValueOnce({
+        startTime: 111111,
+        endTime: 222222,
+      });
+
+      mockSearchObj.data.datetime.relativeTimePeriod = "7d";
+      mockSearchObj.data.datetime.type = "relative";
+      await flushPromises();
+
+      expect(mockGetConsumableRelativeTime).toHaveBeenCalledWith("7d");
+      expect(serviceGraphService.getCurrentTopology).toHaveBeenCalledWith(
+        "test-org",
+        expect.objectContaining({ startTime: 111111, endTime: 222222 }),
+      );
+    });
+
+    it("should fall back to dt.startTime/endTime when getConsumableRelativeTime returns null", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+      vi.mocked(serviceGraphService.getCurrentTopology).mockClear();
+      mockGetConsumableRelativeTime.mockReturnValueOnce(null as any);
+
+      const fallbackStart = mockSearchObj.data.datetime.startTime;
+      const fallbackEnd = mockSearchObj.data.datetime.endTime;
+      mockSearchObj.data.datetime.relativeTimePeriod = "1h";
+      await flushPromises();
+
+      expect(serviceGraphService.getCurrentTopology).toHaveBeenCalledWith(
+        "test-org",
+        expect.objectContaining({
+          startTime: fallbackStart,
+          endTime: fallbackEnd,
+        }),
+      );
+    });
+
+    it("should use dt.startTime/endTime directly when type is absolute", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+      vi.mocked(serviceGraphService.getCurrentTopology).mockClear();
+      mockGetConsumableRelativeTime.mockClear();
+
+      const absStart = Date.now() - 86400000;
+      const absEnd = Date.now();
+      mockSearchObj.data.datetime.type = "absolute";
+      mockSearchObj.data.datetime.startTime = absStart;
+      mockSearchObj.data.datetime.endTime = absEnd;
+      await flushPromises();
+
+      expect(mockGetConsumableRelativeTime).not.toHaveBeenCalled();
+      expect(serviceGraphService.getCurrentTopology).toHaveBeenCalledWith(
+        "test-org",
+        expect.objectContaining({ startTime: absStart, endTime: absEnd }),
+      );
+    });
+  });
+
+  describe("Widen Range Emit", () => {
+    it("should emit widen-range when ServiceGraphNoDataState emits widen-range", async () => {
+      // Load empty graph so the NoDataState is shown
+      vi.mocked(serviceGraphService.getCurrentTopology).mockResolvedValueOnce({
+        data: { nodes: [], edges: [], availableStreams: [] },
+      });
+      wrapper = createWrapper();
+      await flushPromises();
+
+      // ServiceGraphNoDataState is stubbed in createWrapper — find it by data-test attribute
+      const noDataState = wrapper.find(
+        '[data-test="service-graph-no-data-state"]',
+      );
+      expect(noDataState.exists()).toBe(true);
+
+      // Trigger the widen-range event via the parent component stub element
+      const noDataStateComponent = wrapper.findComponent(
+        '[data-test="service-graph-no-data-state"]',
+      );
+      noDataStateComponent.vm.$emit("widen-range", "7d");
+      await nextTick();
+
+      expect(wrapper.emitted("widen-range")).toBeTruthy();
+      expect(wrapper.emitted("widen-range")![0]).toEqual(["7d"]);
     });
   });
 });
