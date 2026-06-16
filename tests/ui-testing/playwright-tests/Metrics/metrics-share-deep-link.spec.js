@@ -28,6 +28,8 @@ test.describe("Metrics Share & Deep-Link testcases", () => {
   async function setupTest(page, testInfo) {
     testLogger.testStart(testInfo.title, testInfo.file);
     await navigateToBase(page);
+    // Grant clipboard permissions so share-button clipboard reads work in CI
+    await page.context().grantPermissions(['clipboard-read', 'clipboard-write']).catch(() => {});
     const pm = new PageManager(page);
     await pm.metricsPage.gotoMetricsPage();
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
@@ -149,7 +151,7 @@ test.describe("Metrics Share & Deep-Link testcases", () => {
     await pm.metricsPage.expectMetricsPageVisible();
 
     // Wait for auto-run to start (the Apply button may cycle through loading)
-    await page.waitForTimeout(2000);
+    await pm.metricsPage.waitForMetricsResults();
 
     // After auto-run, URL should be normalized and contain a metrics_data blob
     // or at minimum the page should be functional
@@ -250,8 +252,8 @@ test.describe("Metrics Share & Deep-Link testcases", () => {
     // Page should load and auto-run
     await pm.metricsPage.expectMetricsPageVisible();
 
-    // Wait for auto-run
-    await page.waitForTimeout(3000);
+    // Wait for auto-run (results should render or no-data should appear)
+    await pm.metricsPage.waitForMetricsResults();
 
     // Verify from/to params are present in URL (or reflected in the date picker)
     const fromParam = pm.metricsPage.getFromParam();
@@ -288,7 +290,7 @@ test.describe("Metrics Share & Deep-Link testcases", () => {
 
     // Page should load
     await pm.metricsPage.expectMetricsPageVisible();
-    await page.waitForTimeout(3000);
+    await pm.metricsPage.waitForMetricsResults();
 
     // Date picker should be visible
     await pm.metricsPage.expectDatePickerVisible();
@@ -503,7 +505,7 @@ test.describe("Metrics Share & Deep-Link testcases", () => {
 
     // Page should load
     await pm.metricsPage.expectMetricsPageVisible();
-    await page.waitForTimeout(3000);
+    await pm.metricsPage.waitForMetricsResults();
 
     // Check the refresh param is in the URL
     const refreshParam = pm.metricsPage.getRefreshParam();
