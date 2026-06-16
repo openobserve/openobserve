@@ -163,13 +163,6 @@ const streamFields = computed(() => {
   return searchObj.data.stream.selectedStreamFields || [];
 });
 
-// Use filters from searchObj
-const showErrorOnly = computed({
-  get: () => searchObj.meta.showErrorOnly,
-  set: (val) => {
-    searchObj.meta.showErrorOnly = val;
-  },
-});
 const rangeFilters = computed(() => searchObj.meta.metricsRangeFilters);
 
 // Check if ANY RED panel has a time-based brush selection
