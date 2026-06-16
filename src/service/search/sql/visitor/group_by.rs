@@ -73,7 +73,7 @@ impl<'n> TreeNodeVisitor<'n> for GroupByFieldVisitor {
     fn f_up(&mut self, node: &'n Self::Node) -> Result<TreeNodeRecursion> {
         let name = node.name();
         if name == "AggregateExec" {
-            let aggregate = node.as_any().downcast_ref::<AggregateExec>().unwrap();
+            let aggregate = node.downcast_ref::<AggregateExec>().unwrap();
             let group_by = aggregate.group_expr();
             let fields = group_by
                 .expr()

@@ -197,6 +197,9 @@ export class LogsPage {
         // Block layout (panels):   query-error-toggle-detail-btn + query-error-detail-expanded
         this.resultErrorDetailsBtn = '[data-test="error-detail-toggle-btn"], [data-test="query-error-toggle-detail-btn"]';
         this.searchDetailErrorMessage = '[data-test="error-detail-body"], [data-test="query-error-detail-expanded"]';
+        // Always-visible first sentence of the error (carries the field/function name).
+        // Hero layout: error-detail-summary · Block layout: query-error-summary
+        this.searchErrorSummary = '[data-test="error-detail-summary"], [data-test="query-error-summary"]';
 
         // Download locators (SearchBar.vue more-options dropdown + custom-download ODialog)
         this.moreOptionsBtn = '[data-test="logs-search-bar-more-options-btn"]';
@@ -3590,29 +3593,56 @@ export class LogsPage {
     }
 
     /**
-     * Get the detailed error dialog text
-     * Clicks on error details button if available and returns the error message text
-     * @returns {Promise<string>} The error dialog text
+     * Get the detailed error dialog text.
+     *
+     * Expands the collapsible error detail panel (best effort) and returns the
+     * FULL error message — both the always-visible summary line (which carries
+     * the offending field/function name) and the expanded detail body (e.g.
+     * "Valid fields are …"). Earlier this returned only the detail body, which
+     * after the QueryErrorState redesign omits the field name.
+     *
+     * @returns {Promise<string>} The full error dialog text (summary line + detail body)
      */
     async getDetailedErrorDialogText() {
-        // Try to click the error details button if visible
-        const detailsBtn = this.page.locator(this.resultErrorDetailsBtn);
+        // The QueryErrorState redesign splits the backend message across two
+        // elements: the summary line (data-test="error-detail-summary",
+        // always visible) carries the first sentence — which is where the
+        // offending field/function name lives (e.g. "No field named X.") —
+        // while the remainder ("Valid fields are …") is tucked behind the
+        // expand toggle in the detail body (data-test="error-detail-body").
+        // Reading only the detail body misses the field name, so we expand the
+        // panel (best effort) and return the WHOLE error container text — the
+        // summary line plus the detail body — to assert against the full message.
+
+        // Expand the collapsible detail panel if a toggle is present.
+        const detailsBtn = this.page.locator(this.resultErrorDetailsBtn).first();
         if (await detailsBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
             await detailsBtn.click();
             await this.page.waitForTimeout(500);
         }
 
-        // Try to get text from detailed error message first
-        const detailedError = this.page.locator(this.searchDetailErrorMessage);
-        if (await detailedError.isVisible({ timeout: 2000 }).catch(() => false)) {
-            return await detailedError.textContent();
+        // Prefer the full error-state container so both the summary line (which
+        // holds the field name) and the expanded detail body are captured in a
+        // single string.
+        const container = this.page.locator(this.errorMessage).first();
+        if (await container.isVisible({ timeout: 2000 }).catch(() => false)) {
+            const text = (await container.textContent()) || '';
+            if (text.trim()) return text;
         }
 
-        // Fall back to the main error message
-        const errorMsg = this.page.locator(this.errorMessage);
-        if (await errorMsg.isVisible({ timeout: 2000 }).catch(() => false)) {
-            return await errorMsg.textContent();
+        // Fallback (container unavailable, e.g. a rendering race): stitch the
+        // summary line and detail body together explicitly so the field name is
+        // never dropped — never fall back to the detail body alone, which is the
+        // exact gap that hid the field name in the first place.
+        const parts = [];
+        for (const selector of [this.searchErrorSummary, this.searchDetailErrorMessage]) {
+            const locator = this.page.locator(selector).first();
+            if (await locator.isVisible({ timeout: 2000 }).catch(() => false)) {
+                const text = (await locator.textContent()) || '';
+                if (text.trim()) parts.push(text.trim());
+            }
         }
+        if (parts.length) return parts.join(' ');
 
         // Return empty string if no error message found
         testLogger.warn('No error message found');
@@ -4774,6 +4804,10 @@ export class LogsPage {
 
     async hoverMoreOptionsButton() {
         return await this.page.locator(this.moreOptionsBtn).hover();
+    }
+
+    async clickExplainQuery() {
+        return await this.page.locator('[data-test="logs-search-bar-explain-query-menu-btn"]').click();
     }
 
     async hoverDownloadResults() {

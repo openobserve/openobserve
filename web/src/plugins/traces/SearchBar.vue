@@ -103,6 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTooltip :content="t('traces.RedMetrics')" />
           </div>
 
+
         </template>
 
         <!-- More menu: Syntax Guide — always last.

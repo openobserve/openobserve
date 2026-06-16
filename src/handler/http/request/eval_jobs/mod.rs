@@ -34,9 +34,15 @@ use crate::{
 impl From<EvalJobError> for Response {
     fn from(value: EvalJobError) -> Self {
         match value {
-            EvalJobError::InfraError(err) => MetaHttpResponse::internal_error(err),
+            EvalJobError::InfraError(err) => {
+                log::error!("[EvalJob] internal error: {err}");
+                MetaHttpResponse::internal_error("Internal server error")
+            }
             EvalJobError::NotFound => MetaHttpResponse::not_found(value),
-            EvalJobError::ReconcilerError(_) => MetaHttpResponse::internal_error(value),
+            EvalJobError::ReconcilerError(err) => {
+                log::error!("[EvalJob] reconciler error: {err}");
+                MetaHttpResponse::internal_error("Internal server error")
+            }
             EvalJobError::InvalidStatus(_) | EvalJobError::InvalidStatusTransition { .. } => {
                 MetaHttpResponse::bad_request(value)
             }

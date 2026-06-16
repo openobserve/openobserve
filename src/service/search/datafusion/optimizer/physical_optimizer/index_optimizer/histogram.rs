@@ -35,7 +35,7 @@ use hashbrown::HashSet;
 
 use crate::service::search::datafusion::optimizer::physical_optimizer::{
     index_optimizer::utils::is_complex_plan,
-    utils::{get_column_name, is_column},
+    utils::{get_column_name, is_column, is_count_rows_aggregate},
 };
 
 #[rustfmt::skip]
@@ -86,11 +86,11 @@ impl<'n> TreeNodeVisitor<'n> for SimpleHistogramVisitor {
     type Node = Arc<dyn ExecutionPlan>;
 
     fn f_down(&mut self, node: &'n Self::Node) -> Result<TreeNodeRecursion> {
-        if let Some(aggregate) = node.as_any().downcast_ref::<AggregateExec>() {
+        if let Some(aggregate) = node.downcast_ref::<AggregateExec>() {
             // Check if the AggregateExec matches SimpleHistogram pattern
             if aggregate.group_expr().expr().len() == 1
                 && aggregate.aggr_expr().len() == 1
-                && aggregate.aggr_expr()[0].name() == "count(Int64(1))"
+                && is_count_rows_aggregate(&aggregate.aggr_expr()[0])
             {
                 // Check group by field
                 if let Some((group_expr, _)) = aggregate.group_expr().expr().first()
@@ -118,7 +118,7 @@ impl<'n> TreeNodeVisitor<'n> for SimpleHistogramVisitor {
             // If AggregateExec doesn't match SimpleHistogram pattern, stop visiting
             self.simple_histogram = None;
             return Ok(TreeNodeRecursion::Stop);
-        } else if let Some(projection) = node.as_any().downcast_ref::<ProjectionExec>() {
+        } else if let Some(projection) = node.downcast_ref::<ProjectionExec>() {
             // Check ProjectionExec for the structure: [histogram(_timestamp), count(*)]
             let exprs = projection.expr();
             if exprs.len() == 2 {
@@ -139,7 +139,7 @@ impl<'n> TreeNodeVisitor<'n> for SimpleHistogramVisitor {
 }
 
 fn get_data_bin(expr: &Arc<dyn PhysicalExpr>) -> Option<&ScalarFunctionExpr> {
-    if let Some(func) = expr.as_any().downcast_ref::<ScalarFunctionExpr>()
+    if let Some(func) = expr.downcast_ref::<ScalarFunctionExpr>()
         && func.fun().name().to_lowercase() == "date_bin"
     {
         Some(func)
@@ -150,7 +150,7 @@ fn get_data_bin(expr: &Arc<dyn PhysicalExpr>) -> Option<&ScalarFunctionExpr> {
 
 // unit: microseconds
 fn get_histogram_interval(expr: &Arc<dyn PhysicalExpr>) -> Option<u64> {
-    let interval = expr.as_any().downcast_ref::<Literal>()?.value();
+    let interval = expr.downcast_ref::<Literal>()?.value();
     match interval {
         ScalarValue::IntervalMonthDayNano(Some(interval)) => {
             // convert interval to nanoseconds
@@ -168,16 +168,16 @@ fn get_histogram_interval(expr: &Arc<dyn PhysicalExpr>) -> Option<u64> {
 /// `to_timestamp_micros(_timestamp + offset)` — the shape histogram() with a timezone
 /// rewrites to — yields the offset. None when the source is not the timestamp column.
 fn get_timestamp_offset(expr: &Arc<dyn PhysicalExpr>) -> Option<i64> {
-    let func = expr.as_any().downcast_ref::<ScalarFunctionExpr>()?;
+    let func = expr.downcast_ref::<ScalarFunctionExpr>()?;
     let arg = func.args().first()?;
     if get_column_name(arg) == TIMESTAMP_COL_NAME {
         return Some(0);
     }
-    let bin = arg.as_any().downcast_ref::<BinaryExpr>()?;
+    let bin = arg.downcast_ref::<BinaryExpr>()?;
     if *bin.op() != Operator::Plus || get_column_name(bin.left()) != TIMESTAMP_COL_NAME {
         return None;
     }
-    match bin.right().as_any().downcast_ref::<Literal>()?.value() {
+    match bin.right().downcast_ref::<Literal>()?.value() {
         ScalarValue::Int64(Some(ts_offset)) => Some(*ts_offset),
         _ => None,
     }
@@ -239,11 +239,11 @@ impl<'n> TreeNodeVisitor<'n> for SimpleMultiHistogramVisitor {
     type Node = Arc<dyn ExecutionPlan>;
 
     fn f_down(&mut self, node: &'n Self::Node) -> Result<TreeNodeRecursion> {
-        if let Some(aggregate) = node.as_any().downcast_ref::<AggregateExec>() {
+        if let Some(aggregate) = node.downcast_ref::<AggregateExec>() {
             // Exactly 2 group-by expressions (histogram + breakdown) and 1 aggregate (count(*))
             if aggregate.group_expr().expr().len() == 2
                 && aggregate.aggr_expr().len() == 1
-                && aggregate.aggr_expr()[0].name() == "count(Int64(1))"
+                && is_count_rows_aggregate(&aggregate.aggr_expr()[0])
             {
                 let groups = aggregate.group_expr().expr();
                 // One must be date_bin (histogram), the other must be an index field column
@@ -285,7 +285,7 @@ impl<'n> TreeNodeVisitor<'n> for SimpleMultiHistogramVisitor {
             // If AggregateExec doesn't match, stop visiting
             self.simple_multi_histogram = None;
             return Ok(TreeNodeRecursion::Stop);
-        } else if let Some(projection) = node.as_any().downcast_ref::<ProjectionExec>() {
+        } else if let Some(projection) = node.downcast_ref::<ProjectionExec>() {
             // Projection should have 3 expressions: timestamp, breakdown, count
             let exprs = projection.expr();
             if exprs.len() == 3 {
@@ -370,7 +370,20 @@ mod tests {
                 )),
             ),
             (
+                "SELECT histogram(_timestamp) as ts, count(_timestamp) as cnt from t group by ts",
+                Some(IndexOptimizeMode::SimpleHistogram(
+                    1757401680000000,
+                    60000000,
+                    16,
+                    0,
+                )),
+            ),
+            (
                 "SELECT name, histogram(_timestamp) as ts, count(*) as cnt from t group by name, ts",
+                None,
+            ),
+            (
+                "SELECT histogram(_timestamp) as ts, count(name) as cnt from t group by ts",
                 None,
             ),
         ];
@@ -442,9 +455,24 @@ mod tests {
                     "level".to_string(),
                 )),
             ),
+            (
+                "SELECT histogram(_timestamp) as ts, level, count(_timestamp) as cnt from t group by ts, level",
+                Some(IndexOptimizeMode::SimpleMultiHistogram(
+                    1757401680000000,
+                    1757402594060000,
+                    60000000,
+                    0,
+                    "level".to_string(),
+                )),
+            ),
             // level not in index_fields
             (
                 "SELECT histogram(_timestamp) as ts, name, count(*) as cnt from t group by ts, name",
+                None,
+            ),
+            // count over non-timestamp field is not equivalent to count(*)
+            (
+                "SELECT histogram(_timestamp) as ts, level, count(name) as cnt from t group by ts, level",
                 None,
             ),
             // single group by (no breakdown) - should not match multi histogram

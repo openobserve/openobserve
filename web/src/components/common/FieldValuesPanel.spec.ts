@@ -18,6 +18,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { nextTick } from "vue";
 import FieldValuesPanel from "@/components/common/FieldValuesPanel.vue";
 
+vi.mock("vue-i18n", () => ({
+  useI18n: () => ({ t: (key: string) => key }),
+}));
+
 vi.mock("@vueuse/core", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@vueuse/core")>();
   return {
@@ -141,7 +145,8 @@ describe("FieldValuesPanel.vue", () => {
       wrapper = createWrapper({
         fieldValues: { isLoading: false, values: [], errMsg: "" },
       });
-      expect(wrapper.text()).toContain("No values found");
+      expect(wrapper.text()).toContain("search.fieldValuesEmpty");
+      expect(wrapper.text()).toContain("search.fieldValuesEmptyHint");
     });
 
     it("shows custom errMsg when provided and values list is empty", () => {

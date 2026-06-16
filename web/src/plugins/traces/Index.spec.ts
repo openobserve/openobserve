@@ -162,7 +162,6 @@ const mockSearchObj = {
     liveMode: false,
     serviceColors: {},
     metricsRangeFilters: new Map(),
-    showErrorOnly: false,
   }),
   data: {
     query: "",
@@ -1046,7 +1045,7 @@ describe("Index.vue (Main Traces Page)", () => {
     beforeEach(() => {
       mockApplyFilters.mockReset();
       mockRemoveFilterByField.mockReset();
-      mockSearchObj.meta.showErrorOnly = false;
+      mockSearchObj.data.editorValue = "";
       mockSearchObj.meta.metricsRangeFilters.clear();
       // Reset auto_query_enabled to undefined for each test
       delete store.state.zoConfig.auto_query_enabled;
@@ -1068,8 +1067,8 @@ describe("Index.vue (Main Traces Page)", () => {
       ]); // applyFilters owns the single trigger; no skipSearch arg
     });
 
-    it("should append error filter to applyFilters call when showErrorOnly is enabled", async () => {
-      mockSearchObj.meta.showErrorOnly = true;
+    it("should append error filter to applyFilters call when span_status = 'ERROR' is in the query", async () => {
+      mockSearchObj.data.editorValue = "span_status = 'ERROR'";
       wrapper = mountWithSearchBarStub();
       await flushPromises();
 
@@ -1083,7 +1082,7 @@ describe("Index.vue (Main Traces Page)", () => {
     });
 
     it("should not duplicate error filter when it is already present in incoming filters", async () => {
-      mockSearchObj.meta.showErrorOnly = true;
+      mockSearchObj.data.editorValue = "span_status = 'ERROR'";
       wrapper = mountWithSearchBarStub();
       await flushPromises();
 

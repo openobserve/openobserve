@@ -10,6 +10,7 @@ export class MetricsPage {
 
         // Navigation
         this.metricsPageMenu = page.locator('[data-test="menu-link-\\/metrics-item"]');
+        this.metricsPageIndicator = page.locator('[data-test="metrics-page"]');
 
         // VERIFIED selectors from Phase 1 analysis
         // Main metrics controls

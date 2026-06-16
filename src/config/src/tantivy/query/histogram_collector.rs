@@ -13,81 +13,28 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use fastdivide::DividerU64;
-use hashbrown::HashMap;
 use tantivy::{
-    DocId, Score, SegmentOrdinal, SegmentReader,
+    SegmentOrdinal, SegmentReader,
+    aggregation::{
+        AggregationCollector, Key,
+        agg_req::{Aggregation, AggregationVariants, Aggregations},
+        agg_result::{AggregationResult, BucketEntries, BucketResult},
+        bucket::{HistogramAggregation, HistogramBounds, TermsAggregation},
+    },
     collector::{Collector, SegmentCollector},
-    columnar::{Cardinality, Column, StrColumn},
 };
-
-use super::topn_collector::{DENSE_GROUP_SPACE_LIMIT, resolve_ords, truncate_top_k};
-
-/// Fixed-width bucket math shared by the histogram collectors: shifts a raw
-/// timestamp into local wall-clock space (`ts + ts_offset`), bounds-checks it,
-/// and maps it to a bucket index with a precomputed divider instead of a
-/// per-doc hardware division.
-///
-/// `ts_offset` (microseconds east of UTC) mirrors `histogram()` with a
-/// timezone, which is rewritten to `date_bin` over `_timestamp + offset`;
-/// `min_value` is the first bucket's key in that shifted space.
-#[derive(Clone)]
-struct BucketComputer {
-    min_value: i64,
-    ts_offset: i64,
-    divider: DividerU64,
-    num_buckets: usize,
-}
-
-impl BucketComputer {
-    fn new(min_value: i64, bucket_width: u64, num_buckets: usize, ts_offset: i64) -> Self {
-        Self {
-            min_value,
-            ts_offset,
-            divider: DividerU64::divide_by(bucket_width.max(1)),
-            num_buckets,
-        }
-    }
-
-    #[inline]
-    fn bucket(&self, ts: i64) -> Option<usize> {
-        let v = ts + self.ts_offset;
-        if v < self.min_value {
-            return None;
-        }
-        let bucket = self.divider.divide((v - self.min_value) as u64) as usize;
-        (bucket < self.num_buckets).then_some(bucket)
-    }
-}
-
-/// Block-fetch the first value per doc into a reusable buffer. `first_vals`
-/// only writes present slots, so stale values are reset to None first —
-/// unless the column is Full cardinality and writes every slot anyway.
-#[inline]
-fn fetch_first_vals<T: PartialOrd + Copy + std::fmt::Debug + Send + Sync + 'static>(
-    col: &Column<T>,
-    docs: &[DocId],
-    buf: &mut Vec<Option<T>>,
-) {
-    if col.get_cardinality() != Cardinality::Full {
-        buf.clear();
-    }
-    buf.resize(docs.len(), None);
-    col.first_vals(docs, buf);
-}
 
 /// Counts matching docs into fixed-width timestamp buckets, for
 /// `SELECT histogram(_timestamp) AS ts, count(*) GROUP BY ts`.
 ///
-/// Replaces `tantivy::collector::HistogramCollector`, which fetches the fast
-/// field per doc through an `Arc<dyn ColumnValues>` and implements no
-/// `collect_block`; this version fetches timestamps block-wise.
+/// Delegates to `tantivy::collector::HistogramCollector`. `ts_offset`
+/// (microseconds east of UTC, from `histogram()` with a timezone) shifts each
+/// timestamp into local wall-clock space before bucketing; since the buckets
+/// are fixed-width, shifting the range down by the offset instead
+/// (`min_value - ts_offset`) yields the same bucket counts without touching
+/// the per-doc values.
 pub struct SimpleHistogramCollector {
-    field: String,
-    min_value: i64,
-    bucket_width: u64,
-    num_buckets: usize,
-    ts_offset: i64,
+    inner: tantivy::collector::HistogramCollector,
 }
 
 impl SimpleHistogramCollector {
@@ -99,94 +46,35 @@ impl SimpleHistogramCollector {
         ts_offset: i64,
     ) -> Self {
         Self {
-            field,
-            min_value,
-            bucket_width,
-            num_buckets,
-            ts_offset,
+            inner: tantivy::collector::HistogramCollector::new::<i64>(
+                field,
+                min_value - ts_offset,
+                bucket_width.max(1),
+                num_buckets,
+            ),
         }
     }
-}
-
-pub struct SimpleHistogramSegmentCollector {
-    /// None when the column is missing from this segment (legacy index file)
-    col: Option<Column<i64>>,
-    computer: BucketComputer,
-    counts: Vec<u32>,
-    ts_buf: Vec<Option<i64>>,
 }
 
 impl Collector for SimpleHistogramCollector {
     /// Bucket counts, always `num_buckets` long (zeros included).
     type Fruit = Vec<u64>;
-    type Child = SimpleHistogramSegmentCollector;
+    type Child = <tantivy::collector::HistogramCollector as Collector>::Child;
 
     fn for_segment(
         &self,
-        _segment_local_id: SegmentOrdinal,
+        segment_local_id: SegmentOrdinal,
         segment: &SegmentReader,
     ) -> tantivy::Result<Self::Child> {
-        let col = segment.fast_fields().column_opt::<i64>(&self.field)?;
-        Ok(SimpleHistogramSegmentCollector {
-            col,
-            computer: BucketComputer::new(
-                self.min_value,
-                self.bucket_width,
-                self.num_buckets,
-                self.ts_offset,
-            ),
-            counts: vec![0; self.num_buckets],
-            ts_buf: Vec::new(),
-        })
+        self.inner.for_segment(segment_local_id, segment)
     }
 
     fn requires_scoring(&self) -> bool {
         false
     }
 
-    fn merge_fruits(&self, mut segment_fruits: Vec<Vec<u64>>) -> tantivy::Result<Self::Fruit> {
-        debug_assert!(
-            segment_fruits.len() <= 1,
-            "SimpleHistogramCollector used on multi-segment index"
-        );
-        Ok(segment_fruits
-            .pop()
-            .unwrap_or_else(|| vec![0; self.num_buckets]))
-    }
-}
-
-impl SegmentCollector for SimpleHistogramSegmentCollector {
-    type Fruit = Vec<u64>;
-
-    fn collect(&mut self, doc: DocId, _score: Score) {
-        let Some(col) = &self.col else {
-            return;
-        };
-        if let Some(ts) = col.first(doc)
-            && let Some(bucket) = self.computer.bucket(ts)
-        {
-            self.counts[bucket] += 1;
-        }
-    }
-
-    /// Block variant of [`Self::collect`]: fetch the whole block's timestamps
-    /// at once instead of paying a per-document column lookup.
-    fn collect_block(&mut self, docs: &[DocId]) {
-        let Some(col) = &self.col else {
-            return;
-        };
-        fetch_first_vals(col, docs, &mut self.ts_buf);
-        for ts in self.ts_buf.iter().flatten() {
-            if let Some(bucket) = self.computer.bucket(*ts) {
-                self.counts[bucket] += 1;
-            }
-        }
-    }
-
-    fn harvest(self) -> Self::Fruit {
-        // counts are u32 (bounded by the segment's doc count) to halve the
-        // cache footprint of the hot loop; widen for the public result
-        self.counts.into_iter().map(u64::from).collect()
+    fn merge_fruits(&self, segment_fruits: Vec<Vec<u64>>) -> tantivy::Result<Self::Fruit> {
+        self.inner.merge_fruits(segment_fruits)
     }
 }
 
@@ -194,26 +82,15 @@ impl SegmentCollector for SimpleHistogramSegmentCollector {
 /// groups, for `SELECT histogram(_timestamp) AS ts, level, count(*) GROUP BY
 /// ts, level`.
 ///
-/// Replaces tantivy's `HistogramAggregation` + nested `TermsAggregation`,
-/// which re-dispatches every doc through a buffered sub-aggregation cache and
-/// materializes a String per (bucket, term) pair at harvest. This version
-/// counts (bucket, term-ordinal) groups in one pass — a flat array when the
-/// group space is small, a hash map otherwise — and resolves ordinals to
-/// strings once per distinct surviving term.
+/// Delegates to tantivy's `HistogramAggregation` with a nested
+/// `TermsAggregation` (keeping the top `ZO_QUERY_DEFAULT_LIMIT` terms per
+/// bucket). The aggregation runs in raw timestamp space — bounds are shifted
+/// down by `ts_offset` and the resulting bucket keys shifted back up — so the
+/// returned keys are in local wall-clock space, like the values `histogram()`
+/// with a timezone produces.
 pub struct MultiHistogramCollector {
-    ts_field: String,
-    breakdown_field: String,
-    /// first bucket's key in local wall-clock space, aligned to bucket_width
-    min_value: i64,
-    bucket_width: u64,
-    num_buckets: usize,
+    inner: AggregationCollector,
     ts_offset: i64,
-    /// top terms kept per bucket (the old TermsAggregation `size`,
-    /// ZO_QUERY_DEFAULT_LIMIT); a bucket with at most this many distinct
-    /// terms contributes exactly
-    per_bucket_limit: usize,
-    /// group space size up to which the dense counting array is used
-    dense_limit: usize,
 }
 
 impl MultiHistogramCollector {
@@ -225,115 +102,67 @@ impl MultiHistogramCollector {
         bucket_width: u64,
         ts_offset: i64,
     ) -> Self {
-        let num_buckets = if max_value > min_value {
-            ((max_value - min_value) as u64).div_ceil(bucket_width.max(1)) as usize
-        } else {
-            0
+        let limit = crate::get_config().limit.query_default_limit.max(1);
+        let bucket_width = bucket_width.max(1) as i64;
+        let raw_min = min_value - ts_offset;
+        let raw_max = max_value - ts_offset;
+        let histogram_agg = Aggregation {
+            agg: AggregationVariants::Histogram(HistogramAggregation {
+                field: ts_field,
+                interval: bucket_width as f64,
+                // min_value is bucket-aligned in local wall-clock space, so the
+                // raw-space buckets must start at raw_min: align them to its
+                // remainder instead of multiples of the interval
+                offset: Some(raw_min.rem_euclid(bucket_width) as f64),
+                min_doc_count: Some(1),
+                // HistogramBounds.contains is inclusive on both ends, but the
+                // histogram range is [min, max); timestamps are integral µs,
+                // so an inclusive max - 1 is an exclusive max
+                hard_bounds: Some(HistogramBounds {
+                    min: raw_min as f64,
+                    max: (raw_max - 1) as f64,
+                }),
+                extended_bounds: None,
+                keyed: false,
+                is_normalized_to_ns: false,
+            }),
+            sub_aggregation: Aggregations::from_iter(vec![(
+                "breakdown".to_string(),
+                Aggregation {
+                    agg: AggregationVariants::Terms(TermsAggregation {
+                        field: breakdown_field,
+                        size: Some(limit as u32),
+                        order: None,
+                        missing: None,
+                        min_doc_count: Some(1),
+                        show_term_doc_count_error: Some(false),
+                        segment_size: None,
+                        include: None,
+                        exclude: None,
+                    }),
+                    sub_aggregation: Default::default(),
+                },
+            )]),
         };
-        let per_bucket_limit = crate::get_config().limit.query_default_limit.max(1) as usize;
+        let aggregations = Aggregations::from_iter(vec![("histogram".to_string(), histogram_agg)]);
         Self {
-            ts_field,
-            breakdown_field,
-            min_value,
-            bucket_width,
-            // sparse keys pack the bucket index into 32 bits; a query needs a
-            // sub-second interval over more than an hour to even get near this
-            num_buckets: num_buckets.min(u32::MAX as usize),
+            inner: AggregationCollector::from_aggs(aggregations, Default::default()),
             ts_offset,
-            per_bucket_limit,
-            dense_limit: DENSE_GROUP_SPACE_LIMIT,
         }
     }
-
-    #[cfg(test)]
-    fn with_per_bucket_limit(mut self, limit: usize) -> Self {
-        self.per_bucket_limit = limit;
-        self
-    }
-
-    #[cfg(test)]
-    fn with_dense_limit(mut self, dense_limit: usize) -> Self {
-        self.dense_limit = dense_limit;
-        self
-    }
-}
-
-/// Per-segment (bucket, term) counters: a flat array when `num_buckets *
-/// num_terms` is small, otherwise a hash map.
-enum GroupCounts {
-    /// counts indexed by `bucket * num_terms + ord` — bucket-major because
-    /// docs within a file are roughly time-ordered, so consecutive docs stay
-    /// within one bucket's row
-    Dense { counts: Vec<u32>, num_terms: usize },
-    /// keyed by `(bucket << 32) | ord`, so sorting the keys yields
-    /// bucket-major order with ordinals ascending within each bucket
-    Sparse(HashMap<u64, u32>),
-}
-
-impl GroupCounts {
-    #[inline]
-    fn add(&mut self, bucket: usize, ord: u64) {
-        match self {
-            Self::Dense { counts, num_terms } => counts[bucket * *num_terms + ord as usize] += 1,
-            Self::Sparse(counts) => *counts.entry(((bucket as u64) << 32) | ord).or_insert(0) += 1,
-        }
-    }
-}
-
-pub struct MultiHistogramSegmentCollector {
-    /// None when either column is missing from this segment (legacy index file)
-    cols: Option<(Column<i64>, StrColumn)>,
-    computer: BucketComputer,
-    counts: GroupCounts,
-    per_bucket_limit: usize,
-    bucket_width: u64,
-    ts_buf: Vec<Option<i64>>,
-    ord_buf: Vec<Option<u64>>,
 }
 
 impl Collector for MultiHistogramCollector {
     /// `(bucket key in local wall-clock µs, breakdown value, count)` rows
     type Fruit = Vec<(i64, String, u64)>;
-    type Child = MultiHistogramSegmentCollector;
+    type Child = <AggregationCollector as Collector>::Child;
 
     fn for_segment(
         &self,
-        _segment_local_id: SegmentOrdinal,
+        segment_local_id: SegmentOrdinal,
         segment: &SegmentReader,
     ) -> tantivy::Result<Self::Child> {
-        let fast_fields = segment.fast_fields();
-        let ts_col = fast_fields.column_opt::<i64>(&self.ts_field)?;
-        let str_col = fast_fields.str(&self.breakdown_field)?;
-        let cols = ts_col.zip(str_col);
-        let counts = match &cols {
-            Some((_, str_col)) => {
-                let num_terms = str_col.num_terms();
-                match num_terms.checked_mul(self.num_buckets) {
-                    Some(space) if num_terms > 0 && space <= self.dense_limit => {
-                        GroupCounts::Dense {
-                            counts: vec![0; space],
-                            num_terms,
-                        }
-                    }
-                    _ => GroupCounts::Sparse(HashMap::new()),
-                }
-            }
-            None => GroupCounts::Sparse(HashMap::new()),
-        };
-        Ok(MultiHistogramSegmentCollector {
-            cols,
-            computer: BucketComputer::new(
-                self.min_value,
-                self.bucket_width,
-                self.num_buckets,
-                self.ts_offset,
-            ),
-            counts,
-            per_bucket_limit: self.per_bucket_limit,
-            bucket_width: self.bucket_width,
-            ts_buf: Vec::new(),
-            ord_buf: Vec::new(),
-        })
+        self.inner.for_segment(segment_local_id, segment)
     }
 
     fn requires_scoring(&self) -> bool {
@@ -342,129 +171,60 @@ impl Collector for MultiHistogramCollector {
 
     fn merge_fruits(
         &self,
-        mut segment_fruits: Vec<Vec<(i64, String, u64)>>,
+        segment_fruits: Vec<<Self::Child as SegmentCollector>::Fruit>,
     ) -> tantivy::Result<Self::Fruit> {
-        debug_assert!(
-            segment_fruits.len() <= 1,
-            "MultiHistogramCollector used on multi-segment index"
-        );
-        Ok(segment_fruits.pop().unwrap_or_default())
+        let mut res = self.inner.merge_fruits(segment_fruits)?;
+        let mut results = Vec::new();
+        let Some(AggregationResult::BucketResult(BucketResult::Histogram { buckets })) =
+            res.0.remove("histogram")
+        else {
+            return Ok(results);
+        };
+        let hist_buckets = match buckets {
+            BucketEntries::Vec(vec) => vec,
+            BucketEntries::HashMap(map) => map.into_values().collect(),
+        };
+        for mut bucket_entry in hist_buckets {
+            let timestamp = match bucket_entry.key {
+                Key::F64(k) => k as i64 + self.ts_offset,
+                _ => continue,
+            };
+            let Some(AggregationResult::BucketResult(BucketResult::Terms {
+                buckets: term_entries,
+                ..
+            })) = bucket_entry.sub_aggregation.0.remove("breakdown")
+            else {
+                continue;
+            };
+            for term_bucket in term_entries {
+                let breakdown_value = match term_bucket.key {
+                    Key::Str(s) => s,
+                    Key::F64(f) => f.to_string(),
+                    Key::I64(i) => i.to_string(),
+                    Key::U64(u) => u.to_string(),
+                };
+                results.push((timestamp, breakdown_value, term_bucket.doc_count));
+            }
+        }
+        Ok(results)
     }
 }
 
-impl SegmentCollector for MultiHistogramSegmentCollector {
-    type Fruit = Vec<(i64, String, u64)>;
-
-    fn collect(&mut self, doc: DocId, _score: Score) {
-        let Some((ts_col, str_col)) = &self.cols else {
-            return;
-        };
-        // a doc missing the breakdown value forms no group (terms agg `missing: None`)
-        if let Some(ts) = ts_col.first(doc)
-            && let Some(ord) = str_col.ords().first(doc)
-            && let Some(bucket) = self.computer.bucket(ts)
-        {
-            self.counts.add(bucket, ord);
-        }
-    }
-
-    /// Block variant of [`Self::collect`]: fetch both columns' values for the
-    /// whole block at once instead of paying per-document column lookups.
-    fn collect_block(&mut self, docs: &[DocId]) {
-        let Self {
-            cols,
-            computer,
-            counts,
-            ts_buf,
-            ord_buf,
-            ..
-        } = self;
-        let Some((ts_col, str_col)) = cols else {
-            return;
-        };
-        fetch_first_vals(ts_col, docs, ts_buf);
-        fetch_first_vals(str_col.ords(), docs, ord_buf);
-        for (ts, ord) in ts_buf.iter().zip(ord_buf.iter()) {
-            let (Some(ts), Some(ord)) = (ts, ord) else {
-                continue;
-            };
-            if let Some(bucket) = computer.bucket(*ts) {
-                counts.add(bucket, *ord);
-            }
-        }
-    }
-
-    fn harvest(self) -> Self::Fruit {
-        let Self {
-            cols,
-            computer,
-            counts,
-            per_bucket_limit,
-            bucket_width,
-            ..
-        } = self;
-        let Some((_, str_col)) = cols else {
-            return Vec::new();
-        };
-
-        // Per bucket, keep all terms when within per_bucket_limit (the bucket's
-        // contribution is exact) or only the top-k by count otherwise, on cheap
-        // integer ordinals BEFORE touching the term dictionary. Count ties break
-        // toward smaller ordinals, clustering survivors for cheaper resolution.
-        let mut groups: Vec<(u32, u64, u32)> = Vec::new();
-        let mut entries: Vec<(u64, u32)> = Vec::new();
-        let mut truncated_buckets = 0usize;
-        let mut keep_bucket =
-            |bucket: u32, entries: &mut Vec<(u64, u32)>, groups: &mut Vec<(u32, u64, u32)>| {
-                if entries.len() > per_bucket_limit {
-                    truncated_buckets += 1;
-                    truncate_top_k(entries, per_bucket_limit, false);
-                }
-                groups.extend(entries.iter().map(|(ord, count)| (bucket, *ord, *count)));
-            };
-        match counts {
-            GroupCounts::Dense { counts, num_terms } => {
-                for (bucket, row) in counts.chunks_exact(num_terms).enumerate() {
-                    entries.clear();
-                    entries.extend(
-                        row.iter()
-                            .enumerate()
-                            .filter(|(_, count)| **count > 0)
-                            .map(|(ord, count)| (ord as u64, *count)),
-                    );
-                    keep_bucket(bucket as u32, &mut entries, &mut groups);
-                }
-            }
-            GroupCounts::Sparse(counts) => {
-                let mut all = counts.into_iter().collect::<Vec<_>>();
-                all.sort_unstable_by_key(|(key, _)| *key);
-                for run in all.chunk_by(|a, b| a.0 >> 32 == b.0 >> 32) {
-                    let bucket = (run[0].0 >> 32) as u32;
-                    entries.clear();
-                    entries.extend(run.iter().map(|(key, count)| (key & 0xFFFF_FFFF, *count)));
-                    keep_bucket(bucket, &mut entries, &mut groups);
-                }
-            }
-        }
-        if truncated_buckets > 0 {
-            log::debug!(
-                "tantivy multi_histogram collector: {truncated_buckets} buckets exceeded \
-                 {per_bucket_limit} distinct terms, keeping the per-bucket top-k, the merged \
-                 counts are approximate",
-            );
-        }
-
-        // resolve the distinct surviving ordinals in one sorted dictionary pass
-        let ord_map = resolve_ords(&str_col, groups.iter().map(|(_, ord, _)| *ord).collect());
-        let mut out = Vec::with_capacity(groups.len());
-        for (bucket, ord, count) in groups {
-            if let Some(s) = ord_map.get(&ord) {
-                let key = computer.min_value + bucket as i64 * bucket_width as i64;
-                out.push((key, s.clone(), count as u64));
-            }
-        }
-        out
-    }
+// OSS stub for the enterprise histogram RANK fast path: always falls back to
+// SimpleHistogramCollector. Signature must match the enterprise version.
+#[allow(clippy::too_many_arguments)]
+pub fn simple_histogram_rank(
+    _searcher: &tantivy::Searcher,
+    _ts_field: &str,
+    _term_field: Option<(&str, &str)>,
+    _min_value: i64,
+    _bucket_width: u64,
+    _num_buckets: usize,
+    _ts_offset: i64,
+    _file_min_ts: i64,
+    _file_max_ts: i64,
+) -> tantivy::Result<Option<Vec<u64>>> {
+    Ok(None)
 }
 
 #[cfg(test)]
@@ -472,47 +232,58 @@ mod tests {
     use tantivy::{
         Index, doc,
         query::AllQuery,
-        schema::{FAST, SchemaBuilder, TextOptions},
+        schema::{FAST, IndexRecordOption, SchemaBuilder, TextFieldIndexing, TextOptions},
     };
 
     use super::*;
 
-    /// One segment: timestamps 0..50 with breakdown levels, one doc missing
-    /// the level, one doc below and one above the [0, 50) bucket range.
-    fn build_index() -> tantivy::Searcher {
+    /// Builds a single-segment index with the given `(timestamp, level)` rows
+    /// in row order.
+    fn build_index_from(rows: &[(i64, Option<&str>)]) -> tantivy::Searcher {
         let mut schema_builder = SchemaBuilder::new();
         let ts = schema_builder.add_i64_field("_timestamp", FAST);
-        let level = schema_builder.add_text_field("level", TextOptions::default().set_fast(None));
+        let level = schema_builder.add_text_field(
+            "level",
+            TextOptions::default()
+                .set_indexing_options(
+                    TextFieldIndexing::default()
+                        .set_index_option(IndexRecordOption::Basic)
+                        .set_tokenizer("raw"),
+                )
+                .set_fast(None),
+        );
         let index = Index::create_in_ram(schema_builder.build());
 
         let mut writer = index.writer_with_num_threads(1, 15_000_000).unwrap();
-        writer.add_document(doc!(ts => 0i64, level => "a")).unwrap();
-        writer.add_document(doc!(ts => 5i64, level => "b")).unwrap();
-        writer.add_document(doc!(ts => 6i64, level => "b")).unwrap();
-        // missing level: counted by the simple histogram, no group in the multi
-        writer.add_document(doc!(ts => 7i64)).unwrap();
-        writer
-            .add_document(doc!(ts => 15i64, level => "a"))
-            .unwrap();
-        writer
-            .add_document(doc!(ts => 25i64, level => "a"))
-            .unwrap();
-        writer
-            .add_document(doc!(ts => 25i64, level => "b"))
-            .unwrap();
-        writer
-            .add_document(doc!(ts => 49i64, level => "c"))
-            .unwrap();
-        // outside [min, max): dropped by both collectors
-        writer
-            .add_document(doc!(ts => 50i64, level => "a"))
-            .unwrap();
-        writer
-            .add_document(doc!(ts => -10i64, level => "a"))
-            .unwrap();
+        for (timestamp, lvl) in rows {
+            let mut doc = doc!(ts => *timestamp);
+            if let Some(lvl) = lvl {
+                doc.add_text(level, lvl);
+            }
+            writer.add_document(doc).unwrap();
+        }
         writer.commit().unwrap();
 
         index.reader().unwrap().searcher()
+    }
+
+    /// One segment: timestamps 0..50 with breakdown levels, one doc missing
+    /// the level, one doc below and one above the [0, 50) bucket range.
+    fn build_index() -> tantivy::Searcher {
+        build_index_from(&[
+            // outside [min, max): dropped by both collectors (as is -10 below)
+            (50, Some("a")),
+            (49, Some("c")),
+            (25, Some("a")),
+            (25, Some("b")),
+            (15, Some("a")),
+            // missing level: counted by the simple histogram, no group in the multi
+            (7, None),
+            (6, Some("b")),
+            (5, Some("b")),
+            (0, Some("a")),
+            (-10, Some("a")),
+        ])
     }
 
     #[test]
@@ -533,75 +304,31 @@ mod tests {
     }
 
     #[test]
-    fn test_simple_histogram_collector_missing_column() {
-        let searcher = build_index();
-        let collector = SimpleHistogramCollector::new("no_such".to_string(), 0, 10, 5, 0);
-        let res = searcher.search(&AllQuery, &collector).unwrap();
-        assert_eq!(res, vec![0; 5]);
-    }
-
-    #[test]
     fn test_multi_histogram_collector() {
         let searcher = build_index();
         let row = |ts: i64, s: &str, count: u64| (ts, s.to_string(), count);
 
-        // dense_limit usize::MAX forces the dense counting array, 0 forces the
-        // hash map; both must produce identical results
-        for dense_limit in [usize::MAX, 0] {
-            let collector = MultiHistogramCollector::new(
-                "_timestamp".to_string(),
-                "level".to_string(),
-                0,
-                50,
-                10,
-                0,
-            )
-            .with_dense_limit(dense_limit);
-            let mut res = searcher.search(&AllQuery, &collector).unwrap();
-            res.sort_unstable();
-            assert_eq!(
-                res,
-                vec![
-                    row(0, "a", 1),
-                    row(0, "b", 2),
-                    row(10, "a", 1),
-                    row(20, "a", 1),
-                    row(20, "b", 1),
-                    row(40, "c", 1),
-                ],
-                "dense_limit={dense_limit}"
-            );
-        }
-    }
-
-    #[test]
-    fn test_multi_histogram_collector_per_bucket_limit() {
-        let searcher = build_index();
-        for dense_limit in [usize::MAX, 0] {
-            let collector = MultiHistogramCollector::new(
-                "_timestamp".to_string(),
-                "level".to_string(),
-                0,
-                50,
-                10,
-                0,
-            )
-            .with_per_bucket_limit(1)
-            .with_dense_limit(dense_limit);
-            let mut res = searcher.search(&AllQuery, &collector).unwrap();
-            res.sort_unstable();
-            // bucket 0 keeps "b" (count 2 beats 1); ties keep the smaller ordinal
-            assert_eq!(
-                res,
-                vec![
-                    (0, "b".to_string(), 2),
-                    (10, "a".to_string(), 1),
-                    (20, "a".to_string(), 1),
-                    (40, "c".to_string(), 1),
-                ],
-                "dense_limit={dense_limit}"
-            );
-        }
+        let collector = MultiHistogramCollector::new(
+            "_timestamp".to_string(),
+            "level".to_string(),
+            0,
+            50,
+            10,
+            0,
+        );
+        let mut res = searcher.search(&AllQuery, &collector).unwrap();
+        res.sort_unstable();
+        assert_eq!(
+            res,
+            vec![
+                row(0, "a", 1),
+                row(0, "b", 2),
+                row(10, "a", 1),
+                row(20, "a", 1),
+                row(20, "b", 1),
+                row(40, "c", 1),
+            ],
+        );
     }
 
     #[test]
@@ -632,21 +359,6 @@ mod tests {
     }
 
     #[test]
-    fn test_multi_histogram_collector_missing_column() {
-        let searcher = build_index();
-        let collector = MultiHistogramCollector::new(
-            "_timestamp".to_string(),
-            "no_such".to_string(),
-            0,
-            50,
-            10,
-            0,
-        );
-        let res = searcher.search(&AllQuery, &collector).unwrap();
-        assert!(res.is_empty());
-    }
-
-    #[test]
     fn test_multi_histogram_collector_empty_range() {
         let searcher = build_index();
         let collector = MultiHistogramCollector::new(
@@ -659,22 +371,5 @@ mod tests {
         );
         let res = searcher.search(&AllQuery, &collector).unwrap();
         assert!(res.is_empty());
-    }
-
-    #[test]
-    fn test_bucket_computer_bounds() {
-        let computer = BucketComputer::new(100, 10, 3, 0);
-        assert_eq!(computer.bucket(99), None);
-        assert_eq!(computer.bucket(100), Some(0));
-        assert_eq!(computer.bucket(115), Some(1));
-        assert_eq!(computer.bucket(129), Some(2));
-        assert_eq!(computer.bucket(130), None);
-
-        // offset shifts the value before bucketing
-        let computer = BucketComputer::new(100, 10, 3, 50);
-        assert_eq!(computer.bucket(49), None);
-        assert_eq!(computer.bucket(50), Some(0));
-        assert_eq!(computer.bucket(79), Some(2));
-        assert_eq!(computer.bucket(80), None);
     }
 }

@@ -232,6 +232,7 @@ jobs:
                 "alerts-import.spec.js",
                 # "alerts-advanced.spec.js",
                 # "alerts-scheduled-features.spec.js",
+                "alerts-metrics-notification.spec.js",
                 "alerts-destinations-prebuilt.spec.js",
                 "alerts-vrl-encoding.spec.js",
               ]

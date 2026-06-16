@@ -165,18 +165,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- View Logs Button -->
           <span v-if="parentMode === 'standalone'" class="tw:shrink-0">
-            <OButton
-              variant="outline"
-              size="xs"
-              class="tw:h-full tw:text-[0.75rem]!"
-              :title="(config.isEnterprise === 'true' && correlationLoading) ? t('correlation.loadingCorrelation') : t('traces.viewLogs')"
-              :disabled="config.isEnterprise === 'true' && correlationLoading"
-              :loading="config.isEnterprise === 'true' && correlationLoading"
-              @click.stop="viewSpanLogs"
-              data-test="trace-details-sidebar-header-toolbar-view-logs-btn"
+            <!-- Single button with wrapper for tooltip functionality -->
+            <span
+              class="tw:inline-block"
+              tabindex="0"
             >
-              View Logs
-            </OButton>
+              <OButton
+                variant="outline"
+                size="xs"
+                class="tw:h-full tw:text-[0.75rem]!"
+                :disabled="isViewLogsDisabled"
+                :loading="config.isEnterprise === 'true' && correlationLoading"
+                @click.stop="viewSpanLogs"
+                data-test="trace-details-sidebar-header-toolbar-view-logs-btn"
+              >
+                View Logs
+              </OButton>
+              <OTooltip :content="viewLogsTooltipContent" />
+            </span>
           </span>
         </div>
       </div>
@@ -759,6 +765,9 @@ class="tw:h-5! tw:text-[0.75rem]!">
             :service-name="correlationProps.serviceName"
             :matched-dimensions="correlationProps.matchedDimensions"
             :additional-dimensions="correlationProps.additionalDimensions"
+            :matched-set-id="correlationProps.matchedSetId"
+            :chip-dimensions="correlationProps.chipDimensions"
+            :source-event="correlationProps.sourceEvent"
             :log-streams="correlationProps.logStreams"
             :source-stream="correlationProps.sourceStream"
             :source-type="correlationProps.sourceType"
@@ -870,6 +879,7 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import { cloneDeep } from "lodash-es";
 import { formatTimestamp, formatTimestampNs } from "@/utils/date";
@@ -892,6 +902,7 @@ import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 import JsonPreview from "@/components/JsonPreview.vue";
 import CorrelatedLogsTable from "@/plugins/correlation/CorrelatedLogsTable.vue";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
+import { buildChipDimensionsFromFilters } from "@/services/service_streams";
 import { buildWorkloadChipDimensions } from "@/composables/useMetricSubjectButtons";
 import { normalizeSeverity } from "@/utils/sourceEventSeverity";
 import type { TelemetryContext } from "@/utils/telemetryCorrelation";
@@ -966,6 +977,14 @@ export default defineComponent({
       type: String,
       default: "attributes",
     },
+    selectedLogStreams: {
+      type: Array,
+      default: () => [],
+    },
+    showLogStreamSelector: {
+      type: Boolean,
+      default: false,
+    },
   },
   components: {
     OSeparator,
@@ -977,6 +996,7 @@ export default defineComponent({
     OToggleGroupItem,
     OButton,
     OIcon,
+    OTooltip,
     OCollapsible,
     LogsHighLighting,
     JsonPreview,
@@ -1260,6 +1280,41 @@ export default defineComponent({
 
     // Get current theme from store
     const isDarkMode = computed(() => store.state.theme === "dark");
+
+    // Check if View Logs button should be disabled
+    const isViewLogsDisabled = computed(() => {
+      // Enterprise loading state
+      if (config.isEnterprise === 'true' && correlationLoading.value) {
+        return true;
+      }
+
+      // Non-enterprise mode with visible log stream selector, disable when no streams are selected
+      return (
+        config.isEnterprise !== "true" &&
+        props.showLogStreamSelector &&
+        props.selectedLogStreams.length === 0
+      );
+    });
+
+    // Get tooltip content based on disabled state
+    const viewLogsTooltipContent = computed(() => {
+      // Enterprise loading state
+      if (config.isEnterprise === 'true' && correlationLoading.value) {
+        return t('correlation.loadingCorrelation');
+      }
+
+      // Non-enterprise mode with no log streams selected
+      if (
+        config.isEnterprise !== "true" &&
+        props.showLogStreamSelector &&
+        props.selectedLogStreams.length === 0
+      ) {
+        return t('search.selectLogsStreamFirst');
+      }
+
+      // Default enabled state
+      return t('traces.viewLogs');
+    });
 
     const eventColumns = ref([
       {
@@ -1688,12 +1743,10 @@ export default defineComponent({
       correlationError.value = null;
 
       try {
-        // Ensure org semantic groups are loaded — buildWorkloadChipDimensions
-        // walks them to populate Pod/Node chips.
         try {
           await loadSemanticGroups();
         } catch {
-          // Non-fatal: workload chips degrade to matched/additional only.
+          // Non-fatal: semantic groups are used for metrics tab label resolution.
         }
 
         // Build telemetry context from span
@@ -1772,13 +1825,8 @@ export default defineComponent({
             additionalDimensions: {},
             matchedSetId: correlationData.matched_set_id,
             chipDimensions: {
-              ...(correlationData.matched_dimensions || {}),
-              ...(correlationData.additional_dimensions || {}),
-              ...buildWorkloadChipDimensions(
-                correlationData.matched_set_id,
-                semanticGroups.value,
-                props.span as Record<string, any>,
-              ),
+              ...buildChipDimensionsFromFilters(correlationData, semanticGroups.value),
+              ...buildWorkloadChipDimensions(correlationData.matched_set_id, semanticGroups.value, props.span as Record<string, any>),
             },
             sourceEvent: {
               timestamp: props.span?.start_time,
@@ -2080,6 +2128,8 @@ export default defineComponent({
       isFullscreen,
       toggleFullscreen,
       isDarkMode,
+      isViewLogsDisabled,
+      viewLogsTooltipContent,
       serviceIconUrl,
       getImageURL,
       copyContentToClipboard,

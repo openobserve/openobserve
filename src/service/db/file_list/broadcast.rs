@@ -317,7 +317,7 @@ mod tests {
                 key: "test_file.parquet".to_string(),
                 meta: config::meta::stream::FileMeta::default(),
                 deleted: false,
-                segment_ids: None,
+                selection: None,
                 row_group_size: None,
             },
             FileKey {
@@ -326,7 +326,7 @@ mod tests {
                 key: "test_file2.parquet".to_string(),
                 meta: config::meta::stream::FileMeta::default(),
                 deleted: true,
-                segment_ids: None,
+                selection: None,
                 row_group_size: None,
             },
         ];
@@ -356,7 +356,7 @@ mod tests {
                 key: "test.parquet".to_string(),
                 meta: config::meta::stream::FileMeta::default(),
                 deleted: false,
-                segment_ids: None,
+                selection: None,
                 row_group_size: None,
             });
 
@@ -381,7 +381,7 @@ mod tests {
             key: key.to_string(),
             meta: config::meta::stream::FileMeta::default(),
             deleted,
-            segment_ids: None,
+            selection: None,
             row_group_size: None,
         }
     }
