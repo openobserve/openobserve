@@ -1126,3 +1126,116 @@ jobs:
             if gh pr edit "$TEST_PR" --repo "$GITHUB_REPOSITORY" --add-reviewer "$U" >/dev/null 2>&1; then
               echo "requested review from @$U"; else echo "::notice::could not request review from @$U (self/perm)"; fi
           done
+
+  # ---------------------------------------------------------------------------
+  # JOB 5 — Auto-address the AI review on the test PR (OPTIONAL, OFF by default).
+  # After the test PR is opened, wait for the repo's `ai-code-review`, then a CONSERVATIVE Responder
+  # validates the findings, fixes ONLY clearly-valid ones in the test files, pushes (tests-only), and
+  # posts a rationale + minimizes the bot comment. ONE bounded pass. Gated by `vars.E2E_AUTO_REVIEW`.
+  # The repo's Playwright CI re-validates the pushed fix (the spec is registered on the PR). Uses the
+  # scoped GITHUB_TOKEN only (no ORG_ADMIN_TOKEN — this job runs an agent over test/feature code).
+  # ---------------------------------------------------------------------------
+  review_address:
+    needs: [triage, generate, verify_heal, pr_back]
+    if: >
+      vars.E2E_AUTO_REVIEW == 'true' &&
+      needs.triage.outputs.dry_run == 'false' &&
+      needs.triage.outputs.skip == 'false' &&
+      needs.triage.outputs.needs_e2e == 'true' &&
+      needs.triage.outputs.author_allowed == 'true' &&
+      needs.generate.outputs.has_changes == 'true' &&
+      needs.verify_heal.outputs.heal_status == 'passing'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write # push tests-only review fixes to autoe2e/pr-<n>
+      pull-requests: write
+      issues: write
+    steps:
+      - name: Checkout the autoe2e branch (test files to fix)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.triage.outputs.work_branch }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Restore agent files from a trusted ref (anti-hijack)
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          RESTORE_REF=main
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then RESTORE_REF="$REF_NAME"; fi
+          git fetch origin "$RESTORE_REF" --depth=1
+          git checkout "origin/$RESTORE_REF" -- .opencode opencode.jsonc
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install OpenCode
+        run: |
+          npm install -g opencode-ai@1.17.7 || { echo "::error::OpenCode install failed"; exit 1; }
+
+      - name: Wait for the AI review + capture it
+        id: review
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WORK_BRANCH: ${{ needs.triage.outputs.work_branch }}
+        run: |
+          TEST_PR=$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$WORK_BRANCH" --state open --json number --jq '.[0].number // empty')
+          [ -n "$TEST_PR" ] || { echo "::notice::no open test PR for $WORK_BRANCH — nothing to address."; echo "found=false" >> "$GITHUB_OUTPUT"; exit 0; }
+          echo "test_pr=$TEST_PR" >> "$GITHUB_OUTPUT"
+          MARKER="<!-- ai-code-review -->"
+          mkdir -p docs/test_generator/ci
+          # Poll up to ~6 min for the review bot's comment (it lands a couple minutes after the PR opens).
+          for i in $(seq 1 12); do
+            BODY=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${TEST_PR}/comments" --jq "[.[] | select(.body | startswith(\"${MARKER}\"))][-1].body // empty")
+            if [ -n "$BODY" ]; then
+              printf '%s' "$BODY" > docs/test_generator/ci/ai-review.md
+              echo "found=true" >> "$GITHUB_OUTPUT"
+              echo "::notice::Captured AI review on test PR #$TEST_PR (after ${i} polls)."
+              exit 0
+            fi
+            sleep 30
+          done
+          echo "::notice::No AI review appeared within the poll window — skipping addressal."
+          echo "found=false" >> "$GITHUB_OUTPUT"
+
+      - name: Responder — validate + fix clearly-valid findings
+        if: steps.review.outputs.found == 'true'
+        env:
+          DEEPSEEK_API_KEY_E2E: ${{ secrets.DEEPSEEK_API_KEY_E2E }}
+        run: |
+          opencode run --agent e2e-ci-responder --model "$PIPELINE_MODEL" \
+            "Read docs/test_generator/ci/ai-review.md (the repo's AI review of this test PR). Validate each finding conservatively; fix ONLY clearly-valid ones in tests/ui-testing (NEVER touch .github, .opencode, opencode.jsonc, playwright.yml, or source). Write docs/test_generator/ci/review-response.md with what you fixed / dismissed / noted."
+
+      - name: Push fixes (tests only) + post response + minimize the bot review
+        if: steps.review.outputs.found == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WORK_BRANCH: ${{ needs.triage.outputs.work_branch }}
+          TEST_PR: ${{ steps.review.outputs.test_pr }}
+        run: |
+          git config user.name "openobserve-bot"
+          git config user.email "bot@openobserve.ai"
+          # Restore staged pipeline files; commit ONLY test changes (never .opencode/workflow).
+          git restore --staged .opencode opencode.jsonc 2>/dev/null || true
+          git add tests/ui-testing
+          if ! git diff --cached --quiet; then
+            git commit -m "test(autoe2e): address AI review on #${TEST_PR} (auto)"
+            git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:refs/heads/${WORK_BRANCH}"
+            echo "Pushed review fixes to ${WORK_BRANCH} (repo Playwright CI re-validates the PR)."
+          else
+            echo "No code changes from the Responder (all findings dismissed/noted)."
+          fi
+          # Post the rationale reply on the test PR.
+          if [ -f docs/test_generator/ci/review-response.md ]; then
+            gh api -X POST "repos/${GITHUB_REPOSITORY}/issues/${TEST_PR}/comments" -F body=@docs/test_generator/ci/review-response.md >/dev/null \
+              && echo "Posted review response on #${TEST_PR}."
+          fi
+          # Minimize the AI review comment (same github-actions[bot] author → permitted). Best-effort.
+          NODE=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${TEST_PR}/comments" --jq "[.[] | select(.body | startswith(\"<!-- ai-code-review -->\"))][-1].node_id // empty")
+          if [ -n "$NODE" ]; then
+            gh api graphql -f query='mutation($id:ID!){minimizeComment(input:{subjectId:$id,classifier:RESOLVED}){minimizedComment{isMinimized}}}' -f id="$NODE" >/dev/null 2>&1 \
+              && echo "Minimized the AI review comment." || echo "::notice::could not minimize the AI review (best-effort)."
+          fi
