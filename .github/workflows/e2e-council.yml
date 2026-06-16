@@ -203,14 +203,22 @@ jobs:
               ? String(context.payload.inputs?.force_overwrite ?? 'true')
               : 'false';
             // Find the existing test branch and the source commit its tests were generated against
-            // (from the e2e-source-sha commit trailer).
+            // (from the e2e-source-sha commit trailer). IMPORTANT: the trailer is only on the
+            // GENERATE commit — heal/review-address commits sit ON TOP of it without the trailer, so
+            // reading only the branch HEAD misses it (→ reuse would never fire after a healed run).
+            // Search recent commits (newest first) for the most recent trailer.
             let branchExists = false, storedSha = '';
             try {
-              const b = await github.rest.repos.getBranch({ owner: context.repo.owner, repo: context.repo.repo, branch: workBranch });
+              await github.rest.repos.getBranch({ owner: context.repo.owner, repo: context.repo.repo, branch: workBranch });
               branchExists = true;
-              const msg = b.data.commit?.commit?.message || '';
-              const m = msg.match(/e2e-source-sha:\s*([0-9a-fA-F]{7,40})/);
-              storedSha = m ? m[1] : '';
+              // 100 (one API page) is far more than enough: every run adds a generate commit WITH the
+              // trailer, and heal/review commits only stack on top of one — so the latest trailer is
+              // always within a few commits of the tip. 100 is pure headroom at no extra cost.
+              const commits = await github.rest.repos.listCommits({ owner: context.repo.owner, repo: context.repo.repo, sha: workBranch, per_page: 100 });
+              for (const c of commits.data) {
+                const m = (c.commit.message || '').match(/e2e-source-sha:\s*([0-9a-fA-F]{7,40})/);
+                if (m) { storedSha = m[1]; break; }
+              }
             } catch (e) { branchExists = false; }
             // Reuse the existing branch (agents see prior tests → extend / leave-alone / add) ONLY
             // when the user didn't force a rebuild AND the feature is UNCHANGED since those tests
