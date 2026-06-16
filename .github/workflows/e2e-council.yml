@@ -590,8 +590,8 @@ jobs:
           SLUG=$(jq -r '.feature_slug // "feature"' docs/test_generator/ci/run-context.json | tr -cd 'a-zA-Z0-9_-')
           [ -n "$SLUG" ] || SLUG="feature"   # LLM-written; strip anything but [a-zA-Z0-9_-] before it hits the commit msg
           BRANCH="${WORK_BRANCH}"
-          git config user.name "openobserve-bot"
-          git config user.email "bot@openobserve.ai"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           if [ "$REUSE" = "true" ]; then
             echo "Reuse mode: extending the existing $BRANCH (already checked out)."
           else
@@ -909,8 +909,8 @@ jobs:
           WORK_BRANCH: ${{ needs.triage.outputs.work_branch }}
         run: |
           BRANCH="${WORK_BRANCH}"
-          git config user.name "openobserve-bot"
-          git config user.email "bot@openobserve.ai"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           # The anti-hijack restore staged .opencode/opencode.jsonc — unstage so healer commits carry
           # ONLY test changes (pipeline files must never reach the test PR).
           git restore --staged .opencode opencode.jsonc 2>/dev/null || true
@@ -1216,8 +1216,8 @@ jobs:
           WORK_BRANCH: ${{ needs.triage.outputs.work_branch }}
           TEST_PR: ${{ steps.review.outputs.test_pr }}
         run: |
-          git config user.name "openobserve-bot"
-          git config user.email "bot@openobserve.ai"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           # Restore staged pipeline files; commit ONLY test changes (never .opencode/workflow).
           git restore --staged .opencode opencode.jsonc 2>/dev/null || true
           git add tests/ui-testing
