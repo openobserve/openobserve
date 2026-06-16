@@ -132,10 +132,7 @@ describe("getUserInfo", () => {
 
   it("parses JWT with 3 parts and returns the payload", () => {
     const fakePayload = { sub: "user-123", name: "Alice" };
-    // Parts: header.payload.signature
-    vi.mocked(b64DecodeUnicode)
-      .mockReturnValueOnce(JSON.stringify({ alg: "RS256" })) // header
-      .mockReturnValueOnce(JSON.stringify(fakePayload)); // payload
+    vi.mocked(b64DecodeUnicode).mockReturnValueOnce(JSON.stringify(fakePayload));
     vi.mocked(b64EncodeStandard).mockReturnValue("encoded-session");
     vi.mocked(useLocalUserInfo).mockReturnValue(undefined);
 
@@ -144,7 +141,7 @@ describe("getUserInfo", () => {
 
     expect(result).not.toBeNull();
     expect(result.sub).toBe("user-123");
-    expect(b64DecodeUnicode).toHaveBeenCalledTimes(2);
+    expect(b64DecodeUnicode).toHaveBeenCalledTimes(1);
     expect(b64EncodeStandard).toHaveBeenCalled();
     expect(useLocalUserInfo).toHaveBeenCalled();
   });

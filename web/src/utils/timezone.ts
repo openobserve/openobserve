@@ -77,10 +77,7 @@ export const localTimeSelectedTimezoneUTCTime = async (
     timezone,
   );
 
-  const unixTimestamp = convertedDate.unix() * 1000000;
-
-  moment = null;
-  return unixTimestamp;
+  return convertedDate.unix() * 1000000;
 };
 
 export const getLocalTime = (datetime: string) => {
@@ -166,25 +163,14 @@ export const getTimezoneOffset = (timezone: string | null = null) => {
   return convertedDateTime.offset;
 };
 
-export const convertTimeFromMicroToMilli = (time: number) => {
-  const milliseconds = Math.floor(time / 1000);
-  const date = new Date(milliseconds);
-  return date.getTime();
-};
+export const convertTimeFromMicroToMilli = (time: number) =>
+  Math.floor(time / 1000);
 
-export const convertTimeFromNsToMs = (time: number) => {
-  const nanoseconds = time;
-  const milliseconds = Math.floor(nanoseconds / 1000000);
-  const date = new Date(milliseconds);
-  return date.getTime();
-};
+export const convertTimeFromNsToMs = (time: number) =>
+  Math.floor(time / 1000000);
 
-export const convertTimeFromNsToUs = (time: number) => {
-  const nanoseconds = time;
-  const microseconds = Math.floor(nanoseconds / 1000);
-  const date = new Date(microseconds);
-  return date.getTime();
-};
+export const convertTimeFromNsToUs = (time: number) =>
+  Math.floor(time / 1000);
 
 export const getTimezonesByOffset = async (offsetMinutes: number) => {
   await importMoment();
@@ -195,7 +181,6 @@ export const getTimezonesByOffset = async (offsetMinutes: number) => {
     return zoneOffset === offsetHours;
   });
 
-  moment = null;
   return filteredTimezones;
 };
 
