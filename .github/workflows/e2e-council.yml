@@ -586,8 +586,6 @@ jobs:
           REUSE: ${{ needs.triage.outputs.reuse }}
           # The feature commit the tests target (not the checked-out ref, which is the branch in reuse).
           SRC_SHA: ${{ needs.triage.outputs.source_sha }}
-          # Empty on comment/auto-on-merge → defaults to force. Untick the dispatch flag to reuse.
-          FORCE_OVERWRITE: ${{ github.event.inputs.force_overwrite }}
         run: |
           SLUG=$(jq -r '.feature_slug // "feature"' docs/test_generator/ci/run-context.json | tr -cd 'a-zA-Z0-9_-')
           [ -n "$SLUG" ] || SLUG="feature"   # LLM-written; strip anything but [a-zA-Z0-9_-] before it hits the commit msg
@@ -619,13 +617,11 @@ jobs:
           git commit -m "test(autoe2e): generated E2E tests for #${PR_NUMBER} (${SLUG})" \
             -m "e2e-source-sha: ${SRC_SHA}"
           # Explicit one-shot token (checkout used persist-credentials:false). Push only to autoe2e/*.
-          # Reuse → fast-forward (committed on top of the branch tip). Fresh → force-push unless the
-          # dispatch flag explicitly disabled it.
-          if [ "$REUSE" = "true" ]; then
-            FORCE_FLAG=""
-          else
-            FORCE_FLAG="--force"; [ "$FORCE_OVERWRITE" = "false" ] && FORCE_FLAG=""
-          fi
+          # Reuse → fast-forward (committed on top of the branch tip). Rebuild → force-push to REPLACE
+          # the branch. The reuse-vs-rebuild choice already accounts for force_overwrite (in triage),
+          # so a rebuild ALWAYS force-pushes — otherwise a plain push to an existing/diverged branch
+          # is rejected (the original footgun).
+          if [ "$REUSE" = "true" ]; then FORCE_FLAG=""; else FORCE_FLAG="--force"; fi
           git push $FORCE_FLAG "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:refs/heads/${BRANCH}"
           echo "Pushed tests to $BRANCH (reuse=$REUSE; no PR yet — Job 4 opens/refreshes it)."
 
