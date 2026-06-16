@@ -15,7 +15,8 @@ class AnomalyFormValidationPage {
 
         // ── Anomaly list ───────────────────────────────────────────────────
         this.addAnomalyBtn = '[data-test="alert-list-add-alert-btn"]';
-        this.anomalyTable  = '[data-test="anomaly-detection-list-table"]';
+        // AlertList.vue uses alert-list-table for all tabs including anomalyDetection
+        this.anomalyTable  = '[data-test="alert-list-table"]';
 
         // ── Step 1 — stream selection ──────────────────────────────────────
         // OSelect: stream type dropdown
@@ -43,14 +44,24 @@ class AnomalyFormValidationPage {
 
     // ── Navigation ─────────────────────────────────────────────────────────
 
+    /**
+     * Navigate to Anomaly Detection tab.
+     * Returns false on OSS builds where the tab is hidden by enterprise feature flag.
+     */
     async navigateToAnomalyDetection() {
         testLogger.info('Navigating to Alerts > Anomaly Detection tab');
         await this.page.locator(this.alertsMenuLink).click();
-        // Wait for alerts page to load
-        await this.page.locator(this.anomalyDetectionTab).waitFor({ state: 'visible', timeout: 10000 });
-        await this.page.locator(this.anomalyDetectionTab).click();
+        // Tab is only rendered when build_type !== "opensource" && isEnterprise === "true"
+        const tab = this.page.locator(this.anomalyDetectionTab);
+        const tabVisible = await tab.waitFor({ state: 'visible', timeout: 5000 }).then(() => true).catch(() => false);
+        if (!tabVisible) {
+            testLogger.info('Anomaly Detection tab not available (OSS build) — skipping');
+            return false;
+        }
+        await tab.click();
         await this.page.locator(this.anomalyTable).waitFor({ state: 'visible', timeout: 10000 });
         testLogger.info('Anomaly Detection tab loaded');
+        return true;
     }
 
     async openAddAnomalyWizard() {

@@ -19,7 +19,10 @@ test.describe('Anomaly Detection form validation', { tag: ['@anomaly-form-valida
         testLogger.testStart(testInfo.title, testInfo.file);
         await navigateToBase(page);
         pm = new PageManager(page);
-        await pm.anomalyFormValidation.navigateToAnomalyDetection();
+        const available = await pm.anomalyFormValidation.navigateToAnomalyDetection();
+        if (!available) {
+            test.skip(true, 'Anomaly Detection tab not available on this build (enterprise feature)');
+        }
         testLogger.info('Navigated to Anomaly Detection tab');
     });
 

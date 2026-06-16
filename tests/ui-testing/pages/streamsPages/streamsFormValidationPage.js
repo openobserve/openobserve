@@ -21,15 +21,16 @@ export class StreamsFormValidationPage {
         this.nameField = '[data-test="add-stream-name-input-field"]';
         this.nameError = '[data-test="add-stream-name-input-error"]';
 
-        // OSelect: data-test="add-stream-type-input" → -popover and -error
+        // OSelect: data-test="add-stream-type-input" → -trigger (opens dropdown), -popover (content), -error
+        this.typeTrigger = '[data-test="add-stream-type-input-trigger"]';
         this.typePopover = '[data-test="add-stream-type-input-popover"]';
         this.typeError   = '[data-test="add-stream-type-input-error"]';
 
         // Data retention wrapper div (conditionally rendered)
         this.dataRetentionWrapper = '[data-test="add-stream-data-retention-input"]';
-        // The OInput inside the wrapper does not have its own data-test; scope to the wrapper
-        this.dataRetentionField = '[data-test="add-stream-data-retention-input"] input';
-        this.dataRetentionError = '[data-test="add-stream-data-retention-input"] [class*="error"]';
+        // OInput data-test="add-stream-data-retention" → -field (native input) and -error
+        this.dataRetentionField = '[data-test="add-stream-data-retention-field"]';
+        this.dataRetentionError = '[data-test="add-stream-data-retention-error"]';
 
         // ODialog built-in primary / secondary buttons scoped to dialog
         this.saveBtn   = '[data-test="add-stream-dialog"] [data-test="o-dialog-primary-btn"]';
@@ -67,14 +68,17 @@ export class StreamsFormValidationPage {
 
     async selectStreamType(typeLabel) {
         testLogger.info(`Selecting stream type: "${typeLabel}"`);
-        // Open the select popover
-        await this.page.locator(this.typePopover).click();
-        // Click the matching option (OSelect renders options with the label text)
+        // Click the trigger to open the dropdown
+        await this.page.locator(this.typeTrigger).click();
+        // Wait for popover to open, then click the matching option
+        await this.page.locator(this.typePopover).waitFor({ state: 'visible', timeout: 5000 });
         await this.page.getByRole('option', { name: typeLabel, exact: true }).click();
     }
 
     async fillDataRetention(value) {
         testLogger.info(`Filling data retention: ${value}`);
+        // The retention field is conditionally rendered — wait for it before filling
+        await this.page.locator(this.dataRetentionField).waitFor({ state: 'visible', timeout: 5000 });
         await this.page.locator(this.dataRetentionField).fill(String(value));
     }
 
@@ -114,8 +118,8 @@ export class StreamsFormValidationPage {
     }
 
     getFieldNameErrorLocator(index) {
-        const row = this.page.locator(`[data-test="add-stream-field-row-${index}"]`);
-        return row.locator('[data-test="add-stream-field-name-input-error"]');
+        // OInput has data-test="add-stream-field-name-input-{index}" → generates -error span
+        return this.page.locator(`[data-test="add-stream-field-name-input-${index}-error"]`);
     }
 
     getFieldDataTypeErrorLocator(index) {
