@@ -88,7 +88,7 @@ class ActionScriptsFormValidationPage {
   async navigateToActionScripts(orgIdentifier) {
     const org = orgIdentifier || process.env.ORGID || 'default';
     await this.page.goto(
-      `${process.env.ZO_BASE_URL}/web/pipeline/action-scripts?org_identifier=${org}`
+      `${process.env.ZO_BASE_URL}/web/pipeline/actions?org_identifier=${org}`
     );
     await this.page.locator(this.listPage).waitFor({ state: 'visible', timeout: 15000 });
   }

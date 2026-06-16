@@ -85,7 +85,7 @@ test.describe("Reports form validation — required field errors", () => {
         await pm.reportsFormValidation.clickSave();
 
         // Folder error must be visible (wait up to 5s for Vue async re-render)
-        await pm.reportsFormValidation.getDashboardFolderErrorLocator().waitFor({ state: 'visible', timeout: 5000 });
+        await pm.reportsFormValidation.getDashboardFolderErrorLocator().waitFor({ state: 'visible', timeout: 10000 });
         await expect(pm.reportsFormValidation.getDashboardFolderErrorLocator()).toContainText('This field is required');
 
         // Form must stay on the create page

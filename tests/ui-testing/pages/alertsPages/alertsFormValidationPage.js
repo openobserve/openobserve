@@ -56,7 +56,7 @@ export class AlertsFormValidationPage {
     this.slackWebhookError = '[data-test="slack-webhook-url-input-error"]';
 
     // ── Templates list ───────────────────────────────────────────────────────
-    this.addTemplateBtn   = '[data-test="alert-template-list-add-template-btn"]';
+    this.addTemplateBtn   = '[data-test="template-list-add-btn"]';
     this.addTemplateTitle = '[data-test="add-template-title"]';
 
     // ── AddTemplate — name field ─────────────────────────────────────────────
