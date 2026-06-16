@@ -124,7 +124,7 @@ describe("IncidentDetailDrawer.vue", () => {
           TelemetryCorrelationDashboard: {
             name: 'TelemetryCorrelationDashboard',
             template: '<div class="telemetry-stub"></div>',
-            props: ['mode', 'externalActiveTab', 'serviceName', 'matchedDimensions', 'additionalDimensions', 'matchedSetId', 'chipDimensions', 'allowValuelessSubjects', 'logStreams', 'metricStreams', 'traceStreams', 'timeRange', 'hideDimensionFilters']
+            props: ['mode', 'externalActiveTab', 'serviceName', 'matchedDimensions', 'additionalDimensions', 'matchedSetId', 'chipDimensions', 'logStreams', 'metricStreams', 'traceStreams', 'timeRange', 'hideDimensionFilters']
           },
           CorrelatedLogsTable: {
             name: 'CorrelatedLogsTable',

@@ -45,14 +45,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- Chips Row -->
   <div
     v-if="hasChips || $slots['chip-actions']"
-    ref="containerRef"
     class="tw:flex tw:items-center tw:gap-6 tw:px-4 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
   >
-    <!-- Context chips (Correlated by) -->
+    <!-- Context chips (Correlated by) — flex-1 so it occupies exactly the space
+         left after the shrink-0 subject section (toggles + dynamic badge). Its
+         measured width drives the responsive overflow math. -->
     <div
       v-if="contextChips && contextChips.length > 0"
-      class="tw:flex tw:items-center tw:gap-3  tw:py-2"
-      :class="showSubjectSection ? 'tw:max-w-[calc(100%-18.75rem)]' : 'tw:max-w-full'"
+      ref="containerRef"
+      class="tw:flex tw:items-center tw:gap-3  tw:py-2 tw:flex-1 tw:min-w-0"
     >
       <span class="tw:text-2! tw:m-0 tw:text-typography-meta tw:shrink-0">Correlated by:</span>
       <div class="tw:flex tw:items-center tw:gap-2 tw:min-w-0 tw:overflow-hidden">
@@ -271,14 +272,12 @@ const displayedChips = computed<DimensionChip[]>(() => {
   if (chips.length === 0) return [];
 
   if (props.overflowMode === "responsive") {
+    // containerRef is the flex-1 context wrapper, so its measured width already
+    // excludes the (dynamic) subject section + badge — no need to reserve for them.
     const fullWidth = containerWidth.value;
-    const reservedForSubjects = showSubjectSection.value ? 300 : 0;
     const labelWidth = 90; // "Correlated by:" label
     const paddingAndGaps = 32;
-    const available = Math.max(
-      150,
-      fullWidth - reservedForSubjects - labelWidth - paddingAndGaps,
-    );
+    const available = Math.max(150, fullWidth - labelWidth - paddingAndGaps);
 
     let usedWidth = 0;
     let visibleCount = 0;
