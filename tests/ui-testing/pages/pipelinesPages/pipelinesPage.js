@@ -154,7 +154,11 @@ export class PipelinesPage {
         this.confirmButton = page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]');
         this.settingsMenu = page.locator('[data-test="menu-link-\\/settings-item"]');
         this.pipelineDestinationsTab = page.locator('button[data-test="pipeline-destinations-tab"]');
+        this.destinationListAddBtn = page.locator('[data-test="pipeline-destination-list-add-btn"]');
+        this.destinationTypeCard = page.locator('[data-test^="destination-type-card-"]');
         this.searchInput = page.locator('[data-test="destination-list-search-input"]');
+        this.toastError = page.locator('[data-test-variant="error"]');
+        this.toastSuccess = page.locator('[data-test-variant="success"]');
         this.functionNameInput = page.locator('[data-test="add-function-name-input"]');
         this.functionNameInputField = page.locator('[data-test="add-function-name-input-field"]');
         this.addConditionSaveButton = page.locator('[data-test="add-condition-drawer"] [data-test="o-drawer-primary-btn"]');
@@ -326,7 +330,7 @@ export class PipelinesPage {
 
     async addPipeline() {
         // Wait for the add pipeline button to be visible
-        await this.addPipelineButton.waitFor({ state: 'visible', timeout: 30000 });
+        await this.addPipelineButton.waitFor({ state: 'visible', timeout: 15000 });
         await this.addPipelineButton.click();
     }
 

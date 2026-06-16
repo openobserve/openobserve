@@ -170,11 +170,24 @@ test.describe("Traces Regression Bugs — Batch 1", () => {
     await page.locator('body').click({ position: { x: 10, y: 10 } });
     await page.waitForTimeout(300);
 
-    // Click the visible text surface to focus Monaco, then type
-    await queryEditor.locator(pm.tracesPage.viewLines).first().click({ force: true });
-    await page.waitForTimeout(300);
-    await page.keyboard.type('select ', { delay: 50 });
-    await page.waitForTimeout(500);
+    // Focus Monaco via its hidden textarea (.inputarea) — clicking .view-lines
+    // (the display div) does not route keyboard input to the editor model.
+    // Use Monaco's own trigger API to simulate typing, which fires the
+    // autocomplete provider and updates the editor model.
+    const editorId = 'traces-query-editor';
+    await page.evaluate(({ editorId }) => {
+      const w = /** @type {any} */ (window);
+      const editors = w.monaco?.editor?.getEditors?.();
+      if (!editors?.length) return;
+      const target = editors.find(e => {
+        const node = e.getDomNode?.();
+        return node && node.closest(`#${editorId}`);
+      }) || editors[0];
+      if (!target) return;
+      target.focus();
+      target.trigger('keyboard', 'type', { text: 'select ' });
+    }, { editorId });
+    await page.waitForTimeout(800);
 
     // Explicitly trigger autocomplete suggestions (Ctrl+Space in Monaco)
     await page.keyboard.press('Control+Space');
