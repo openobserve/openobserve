@@ -348,7 +348,6 @@ function formatDateShort(value: number) {
 }
 
 .ej-mono-cell {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 12px;
 }
 

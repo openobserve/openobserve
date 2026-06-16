@@ -404,7 +404,6 @@ function formatDateShort(microsOrMs: number): string {
 }
 
 .scd__title {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-weight: 700;
   font-size: 18px;
   letter-spacing: -0.005em;
@@ -613,7 +612,6 @@ function formatDateShort(microsOrMs: number): string {
 }
 
 .scd-mono {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-variant-numeric: tabular-nums;
 }
 
@@ -665,7 +663,6 @@ function formatDateShort(microsOrMs: number): string {
 }
 
 .scd-threshold__value {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-weight: 700;
   font-size: 14px;
   color: var(--color-text-primary, currentColor);

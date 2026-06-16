@@ -367,7 +367,6 @@ function formatKpi(kpi: DetailKpi): string {
   font-weight: 700;
   letter-spacing: -0.01em;
   font-variant-numeric: tabular-nums;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 .qdp-kpi--unhealthy .qdp-kpi__big { color: var(--o2-status-warning-text, #b25400); }

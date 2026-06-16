@@ -360,7 +360,6 @@ function usedByText(row: Scorer) {
 
 <style lang="scss">
 .sr-mono-cell {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 12px;
 }
 
