@@ -162,79 +162,27 @@ class="tw:mr-1" />
       </div> -->
     </div>
 
-    <!-- Source event banner -->
-    <div
-      v-if="props.sourceEvent && (props.sourceEvent.timestamp || props.sourceEvent.message)"
-      class="source-event-banner tw:flex tw:items-center tw:gap-3 tw:px-4 tw:py-2 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
+    <!-- Source event + chips -->
+    <CorrelationEventHeader
+      :source-event="props.sourceEvent"
+      :context-chips="unifiedChips"
+      overflow-mode="responsive"
+      :overflow-threshold="4"
     >
-      <OBadge
-        v-if="props.sourceEvent.severity"
-        :class="severityClass(props.sourceEvent.severity)"
-        class="tw:px-2"
-      >{{ props.sourceEvent.severity }}</OBadge>
-      <span class="tw:text-xs tw:font-mono tw:opacity-80">
-        {{ formatEventTimestamp(props.sourceEvent.timestamp) }}
-      </span>
-      <OSeparator 
-        v-if="props.sourceEvent.message"
-        vertical 
-        class="tw:mx-0" 
-      />
-      <span
-        v-if="props.sourceEvent.message"
-        class="tw:text-xs tw:flex-1 tw:font-mono tw:opacity-90 source-event-message"
-        :title="props.sourceEvent.message"
-      >
-        {{ props.sourceEvent.message }}
-      </span>
-    </div>
-
-    <!-- Dimension chips (always rendered when hideDimensionFilters=true to keep wrap button visible) -->
-    <div
-      v-if="unifiedChips.length > 0 || props.hideDimensionFilters"
-      class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap tw:px-4 tw:py-2 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
-    >
-      <span class="tw:text-2! tw:m-0 tw:opacity-70 tw:shrink-0">Correlated by:</span>
-      <OBadge
-        v-for="chip in visibleChips"
-        :key="chip.key"
-        :variant="chipVariant(chip.key)"
-        size="md"
-        dot
-        :data-test="`correlated-logs-table-dim-chip-${chip.key}`"
-      >
-        {{ chip.label }} = {{ chip.value }}
-      </OBadge>
-
-      <!-- Non-expandable overflow indicator with tooltip (badge-like styling) -->
-      <span v-if="hiddenChipCount > 0" class="tw:contents">
-        <OBadge
-          variant="default-soft"
-          size="md"
-          class="tw:cursor-default"
-          :data-test="`correlated-logs-table-dim-chip-overflow-${hiddenChipCount}`"
+      <template v-if="unifiedChips.length > 0 || props.hideDimensionFilters" #chip-actions>
+        <OButton
+          variant="ghost"
+          size="icon"
+          class="tw:h-5!"
+          :class="{ 'tw:text-white! tw:bg-[var(--o2-theme-color)]! tw:hover:opacity-80': wrapTableCells }"
+          data-test="correlated-logs-table-wrap-content-btn"
+          @click="wrapTableCells = !wrapTableCells"
         >
-          +{{ hiddenChipCount }}
-        </OBadge>
-        <OTooltip
-          :content="hiddenChipsTooltip"
-          side="top"
-          :disabled="hiddenChipCount === 0"
-        />
-      </span>
-      <!-- Wrap Content Button (co-located with chips) -->
-      <OButton
-        variant="ghost"
-        size="icon"
-        class="tw:ml-auto tw:h-5!"
-        :class="{ 'tw:text-white! tw:bg-[var(--o2-theme-color)]! tw:hover:opacity-80': wrapTableCells }"
-        data-test="correlated-logs-table-wrap-content-btn"
-        @click="wrapTableCells = !wrapTableCells"
-      >
-        <OIcon name="wrap-text" size="sm" />
-        <OTooltip :content="t('search.messageWrapContent')" />
-      </OButton>
-    </div>
+          <OIcon name="wrap-text" size="sm" />
+          <OTooltip :content="t('search.messageWrapContent')" />
+        </OButton>
+      </template>
+    </CorrelationEventHeader>
 
     <!-- Main Content Area -->
     <div class="tw:flex-1 tw:overflow-hidden tw:relative">
@@ -348,16 +296,10 @@ import {
   resolveSetId,
   type SubjectButton,
 } from "@/composables/useMetricSubjectButtons";
-import {
-  convertTimeFromNsToMs,
-  convertTimeFromMicroToMilli,
-  timestampToTimezoneDate,
-} from "@/utils/zincutils";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OPagination from "@/lib/navigation/Pagination/OPagination.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -368,6 +310,7 @@ import type { CorrelatedLogsProps } from "@/composables/useCorrelatedLogs";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import TenstackTable from "@/plugins/logs/TenstackTable.vue";
 import DimensionFiltersBar from "./DimensionFiltersBar.vue";
+import CorrelationEventHeader from "./CorrelationEventHeader.vue";
 import { formatDate } from "@/utils/date";
 import { copyToClipboard } from "@/utils/clipboard";
 import type { ColumnDef } from "@tanstack/vue-table";
@@ -1346,52 +1289,6 @@ const unifiedChips = computed<DimensionChip[]>(() =>
     })),
 );
 
-const hashKey = (s: string) => { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return Math.abs(h); };
-const CHIP_VARIANTS = [
-  "primary-outline", "success-outline", "warning-outline", "error-outline",
-  "teal-outline", "orange-outline", "lime-outline", "amber-outline",
-  "cyan-outline", "blue-outline", "purple-outline", "indigo-outline"
-] as const;
-const chipVariant = (key: string): (typeof CHIP_VARIANTS)[number] =>
-  CHIP_VARIANTS[hashKey(key) % CHIP_VARIANTS.length];
-
-const CHIP_OVERFLOW_THRESHOLD = 4;
-const visibleChips = computed(() =>
-  unifiedChips.value.slice(0, CHIP_OVERFLOW_THRESHOLD),
-);
-const hiddenChips = computed(() =>
-  unifiedChips.value.slice(CHIP_OVERFLOW_THRESHOLD),
-);
-const hiddenChipCount = computed(() => hiddenChips.value.length);
-
-// Tooltip content for hidden chips (badge-like format for better readability)
-const hiddenChipsTooltip = computed(() =>
-  hiddenChips.value.map((chip) => `${chip.label} = ${chip.value}`).join("\n"),
-);
-
-// Source event banner
-const TS_NS_MIN = 1e17; const TS_US_MIN = 1e14; const TS_MS_MIN = 1e11; const TS_S_MIN = 1e9;
-const formatEventTimestamp = (ts: number | string | undefined): string => {
-  if (ts == null || ts === "") return "";
-  if (typeof ts === "string" && !/^\d+$/.test(ts.trim())) return ts;
-  const n = typeof ts === "number" ? ts : Number(ts);
-  if (!Number.isFinite(n) || n <= 0) return String(ts);
-  let ms: number;
-  if (n >= TS_NS_MIN) ms = convertTimeFromNsToMs(n);
-  else if (n >= TS_US_MIN) ms = convertTimeFromMicroToMilli(n);
-  else if (n >= TS_MS_MIN) ms = n;
-  else if (n >= TS_S_MIN) ms = n * 1000;
-  else ms = n;
-  try { return `${timestampToTimezoneDate(ms, "UTC", "yyyy-MM-dd HH:mm:ss.SSS")} UTC`; } catch { return String(ts); }
-};
-const severityClass = (sev: string | undefined): string => {
-  if (!sev) return "severity-badge severity-default";
-  const s = sev.toUpperCase();
-  if (s.includes("ERROR") || s.includes("FATAL")) return "severity-badge severity-error";
-  if (s.includes("WARN")) return "severity-badge severity-warn";
-  if (s.includes("DEBUG")) return "severity-badge severity-debug";
-  return "severity-badge severity-info";
-};
 </script>
 
 <style lang="scss" scoped>
@@ -1503,33 +1400,6 @@ const severityClass = (sev: string | undefined): string => {
   }
 }
 
-.source-event-banner {
-  background: var(--o2-card-bg, var(--o2-bg-color));
-}
-.severity-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.125rem 0.5rem;
-  border-radius: 0.25rem;
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-}
-.severity-error  { background: rgba(220, 38, 38, 0.15); color: #f87171; }
-.severity-warn   { background: rgba(217, 119, 6, 0.15);  color: #fbbf24; }
-.severity-debug  { background: rgba(124, 58, 237, 0.15); color: #a78bfa; }
-.severity-info   { background: rgba(37, 99, 235, 0.15);  color: #60a5fa; }
-.severity-default { background: rgba(107, 114, 128, 0.15); color: #9ca3af; }
-.source-event-message {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  word-break: break-word;
-  line-height: 1.4;
-}
 </style>
 
 <style lang="scss">
