@@ -211,7 +211,10 @@ jobs:
             try {
               await github.rest.repos.getBranch({ owner: context.repo.owner, repo: context.repo.repo, branch: workBranch });
               branchExists = true;
-              const commits = await github.rest.repos.listCommits({ owner: context.repo.owner, repo: context.repo.repo, sha: workBranch, per_page: 30 });
+              // 100 (one API page) is far more than enough: every run adds a generate commit WITH the
+              // trailer, and heal/review commits only stack on top of one — so the latest trailer is
+              // always within a few commits of the tip. 100 is pure headroom at no extra cost.
+              const commits = await github.rest.repos.listCommits({ owner: context.repo.owner, repo: context.repo.repo, sha: workBranch, per_page: 100 });
               for (const c of commits.data) {
                 const m = (c.commit.message || '').match(/e2e-source-sha:\s*([0-9a-fA-F]{7,40})/);
                 if (m) { storedSha = m[1]; break; }
