@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :class="severityClass(sourceEvent.severity)"
       class="tw:px-2 tw:shrink-0"
     >{{ sourceEvent.severity }}</OBadge>
-    <span class="tw:text-xs tw:font-mono tw:opacity-80 tw:shrink-0">
+    <span class="tw:text-xs tw:font-mono tw:text-typography-meta tw:shrink-0">
       {{ formatEventTimestamp(sourceEvent.timestamp) }}
     </span>
     <OSeparator
@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
     <span
       v-if="sourceEvent.message"
-      class="tw:text-xs tw:flex-1 tw:font-mono tw:opacity-90 source-event-message"
+      class="tw:text-xs tw:flex-1 tw:font-mono tw:text-typography-meta source-event-message"
       :title="sourceEvent.message"
     >
       {{ sourceEvent.message }}
@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="tw:flex tw:items-center tw:gap-3  tw:py-2"
       :class="showSubjectSection ? 'tw:max-w-[calc(100%-18.75rem)]' : 'tw:max-w-full'"
     >
-      <span class="tw:text-2! tw:m-0 tw:opacity-70 tw:shrink-0">Correlated by:</span>
+      <span class="tw:text-2! tw:m-0 tw:text-typography-meta tw:shrink-0">Correlated by:</span>
       <div class="tw:flex tw:items-center tw:gap-2 tw:min-w-0 tw:overflow-hidden">
         <OBadge
           v-for="chip in displayedChips"
@@ -91,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="tw:flex tw:items-center tw:gap-3 tw:shrink-0"
     >
       <OSeparator vertical class="tw:my-2" />
-      <span class="tw:text-2! tw:m-0 tw:opacity-70">View by:</span>
+      <span class="tw:text-2! tw:m-0 tw:text-typography-meta">View by:</span>
       <OToggleGroup
         :model-value="activeSubject ?? undefined"
         type="single"
