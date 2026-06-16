@@ -118,6 +118,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </OToggleGroupItem>
       </OToggleGroup>
+
+      <!-- Selected subject as a "label = value" badge (when it carries a value) -->
+      <OBadge
+        v-if="activeSubjectChip && activeSubjectChip.value"
+        variant="amber-outline"
+        :size="badgeSize"
+        dot
+        :data-test="`correlation-event-header-active-subject-${activeSubjectChip.key}`"
+      >
+        {{ activeSubjectChip.label }} = {{ activeSubjectChip.value }}
+      </OBadge>
     </div>
 
     <!-- Slot for actions co-located with the chip row (e.g. wrap-text button) -->
@@ -130,6 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { ref, computed, watch, onBeforeUnmount } from "vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
+import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -200,7 +212,7 @@ const CHIP_VARIANTS = [
   "indigo-outline",
 ] as const;
 
-const chipBadgeVariant = (key: string): string =>
+const chipBadgeVariant = (key: string): BadgeVariant =>
   CHIP_VARIANTS[hashKey(key) % CHIP_VARIANTS.length];
 
 // ── Responsive overflow (ResizeObserver) ─────────────────────────────────────
@@ -240,6 +252,13 @@ onBeforeUnmount(() => {
 
 const showSubjectSection = computed(
   () => (props.subjectChips?.length ?? 0) > 0,
+);
+
+// The currently-selected subject chip, shown as a "label = value" badge after the
+// View-by toggles. Only meaningful when it carries a concrete value (trace/log);
+// incidents' valueless subjects leave this null so no empty badge renders.
+const activeSubjectChip = computed<DimensionChip | undefined>(() =>
+  props.subjectChips?.find((c) => c.key === props.activeSubject),
 );
 
 const hasChips = computed(

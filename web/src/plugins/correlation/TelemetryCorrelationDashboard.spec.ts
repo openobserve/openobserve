@@ -19,6 +19,7 @@ import { createI18n } from "vue-i18n";
 import TelemetryCorrelationDashboard from "./TelemetryCorrelationDashboard.vue";
 import store from "@/test/unit/helpers/store";
 import { nextTick } from "vue";
+import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 
 const mockFetchQueryDataWithHttpStream = vi.fn();
 const mockCancelStreamQueryBasedOnRequestId = vi.fn();
@@ -877,6 +878,75 @@ describe("TelemetryCorrelationDashboard.vue", () => {
       await nextTick();
 
       expect(wrapper.vm.showMetricSelector).toBe(false);
+    });
+  });
+
+  describe("allowValuelessSubjects (incidents)", () => {
+    // Incidents have no per-event Pod/Node value, so chipDimensions never carries
+    // a semantic-id-keyed pod/node value. The View-by toggles must still render
+    // from matchedSetId + matching metric streams, and selecting one must NOT pin
+    // a single pod/node value (incident telemetry spans many pods/nodes).
+    const k8sSemanticGroups = [
+      { id: "k8s-pod-name", display: "Pod", group: "Kubernetes", fields: ["k8s_pod_name", "pod_name"] },
+      { id: "k8s-node-name", display: "Node", group: "Kubernetes", fields: ["k8s_node_name", "node_name"] },
+    ];
+    const k8sMetricStreams = [
+      { stream_name: "k8s_pod_cpu_usage", stream_type: "metrics", filters: { service: "api" } },
+      { stream_name: "k8s_node_memory_usage", stream_type: "metrics", filters: { service: "api" } },
+    ];
+
+    const mountIncident = (overrides = {}) =>
+      createWrapper({
+        matchedSetId: "kubernetes",
+        allowValuelessSubjects: true,
+        externalActiveTab: "metrics",
+        matchedDimensions: { service: "api" },
+        additionalDimensions: {},
+        chipDimensions: undefined,
+        metricStreams: k8sMetricStreams,
+        ...overrides,
+      });
+
+    beforeEach(() => {
+      vi.mocked(useServiceCorrelation).mockReturnValue({
+        semanticGroups: { value: k8sSemanticGroups },
+        loadSemanticGroups: vi.fn(),
+      } as any);
+      // subjectMatchCounts prefers cached metric schemas from the shared store
+      // singleton; clear them so matching is driven deterministically by the
+      // stream-name patterns these tests rely on (not schemas leaked by prior tests).
+      if (!store.state.streams) (store.state as any).streams = {};
+      (store.state.streams as any).metrics = {};
+    });
+
+    it("should render Pod and Node subject chips with no per-event value", async () => {
+      wrapper = mountIncident();
+      await flushPromises();
+
+      const keys = wrapper.vm.subjectChips.map((c: any) => c.key);
+      expect(keys).toContain("k8s-pod-name");
+      expect(keys).toContain("k8s-node-name");
+
+      const pod = wrapper.vm.subjectChips.find((c: any) => c.key === "k8s-pod-name");
+      expect(pod.disabled).toBe(false);
+      expect(pod.value).toBe("");
+    });
+
+    it("should NOT render subject chips when allowValuelessSubjects is false", async () => {
+      wrapper = mountIncident({ allowValuelessSubjects: false });
+      await flushPromises();
+
+      expect(wrapper.vm.subjectChips).toEqual([]);
+    });
+
+    it("should not pin a concrete pod/node value into pendingDimensions", async () => {
+      wrapper = mountIncident();
+      await flushPromises();
+
+      // No event value exists, so selecting/defaulting a subject must leave the
+      // pod/node dimension unfiltered (undefined or the "All" sentinel).
+      const podDim = wrapper.vm.pendingDimensions["k8s-pod-name"];
+      expect(podDim === undefined || podDim === "_o2_all_").toBe(true);
     });
   });
 });

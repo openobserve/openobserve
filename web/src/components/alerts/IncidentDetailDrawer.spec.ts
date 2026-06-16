@@ -44,13 +44,14 @@ vi.mock("@/services/service_streams", () => ({
   default: {
     getSemanticGroups: vi.fn(),
   },
+  buildChipDimensionsFromFilters: vi.fn(() => ({})),
 }));
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
 import IncidentDetailDrawer from "./IncidentDetailDrawer.vue";
 import incidentsService, { Incident, IncidentWithAlerts, IncidentAlert } from "@/services/incidents";
-import serviceStreamsApi from "@/services/service_streams";
+import serviceStreamsApi, { buildChipDimensionsFromFilters } from "@/services/service_streams";
 import { nextTick } from "vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -123,7 +124,7 @@ describe("IncidentDetailDrawer.vue", () => {
           TelemetryCorrelationDashboard: {
             name: 'TelemetryCorrelationDashboard',
             template: '<div class="telemetry-stub"></div>',
-            props: ['mode', 'externalActiveTab', 'serviceName', 'matchedDimensions', 'additionalDimensions', 'logStreams', 'metricStreams', 'traceStreams', 'timeRange', 'hideDimensionFilters']
+            props: ['mode', 'externalActiveTab', 'serviceName', 'matchedDimensions', 'additionalDimensions', 'matchedSetId', 'chipDimensions', 'allowValuelessSubjects', 'logStreams', 'metricStreams', 'traceStreams', 'timeRange', 'hideDimensionFilters']
           },
           CorrelatedLogsTable: {
             name: 'CorrelatedLogsTable',
@@ -1234,6 +1235,90 @@ describe("IncidentDetailDrawer.vue", () => {
   // Note: Metrics and Traces Tabs integration tests removed
   // Testing child component prop bindings through complex conditional rendering is problematic
   // These should be tested through computed properties and direct prop assertions
+
+  describe("subject tabs (View by) — matchedSetId / chipDimensions", () => {
+    // Regression: the embedded TelemetryCorrelationDashboard never received
+    // matchedSetId/chipDimensions, so its "View by" subject toggle never rendered.
+    const correlatedStreamsWithSet = () => ({
+      serviceName: "checkout",
+      matchedDimensions: { "k8s-pod-name": "pod-abc" },
+      additionalDimensions: {},
+      logStreams: [],
+      metricStreams: [
+        { stream_name: "k8s_metrics", stream_type: "Metrics", filters: { k8s_pod_name: "pod-abc" } },
+      ],
+      traceStreams: [],
+      correlationData: {
+        service_name: "checkout",
+        matched_dimensions: { "k8s-pod-name": "pod-abc" },
+        additional_dimensions: {},
+        related_streams: {
+          logs: [],
+          metrics: [
+            { stream_name: "k8s_metrics", stream_type: "Metrics", filters: { k8s_pod_name: "pod-abc" } },
+          ],
+          traces: [],
+        },
+        matched_set_id: "kubernetes",
+      },
+    });
+
+    beforeEach(async () => {
+      (buildChipDimensionsFromFilters as any).mockReturnValue({ k8s_pod_name: "pod-abc" });
+      wrapper = await createWrapper({}, {}, "1");
+      await nextTick();
+      await flushPromises();
+    });
+
+    it("should expose matched_set_id as correlationMatchedSetId after correlation loads", async () => {
+      (incidentsService.getCorrelatedStreams as any).mockResolvedValue(correlatedStreamsWithSet());
+
+      await wrapper.vm.refreshCorrelation();
+      await flushPromises();
+
+      expect(wrapper.vm.correlationMatchedSetId).toBe("kubernetes");
+    });
+
+    it("should build chipDimensions from the correlation response and semantic groups", async () => {
+      (incidentsService.getCorrelatedStreams as any).mockResolvedValue(correlatedStreamsWithSet());
+
+      await wrapper.vm.refreshCorrelation();
+      await flushPromises();
+
+      // Access the (lazy) computed first so it evaluates and invokes the helper.
+      expect(wrapper.vm.correlationChipDimensions).toEqual({ k8s_pod_name: "pod-abc" });
+
+      const resp = correlatedStreamsWithSet().correlationData;
+      expect(buildChipDimensionsFromFilters).toHaveBeenCalledWith(
+        expect.objectContaining({ matched_set_id: resp.matched_set_id }),
+        expect.any(Array),
+      );
+    });
+
+    it("should yield undefined matchedSetId and empty chipDimensions when no correlation data", () => {
+      expect(wrapper.vm.correlationData).toBeNull();
+      expect(wrapper.vm.correlationMatchedSetId).toBeUndefined();
+      expect(wrapper.vm.correlationChipDimensions).toEqual({});
+    });
+
+    it("should pass matchedSetId/chipDimensions to the metrics TelemetryCorrelationDashboard", async () => {
+      (incidentsService.getCorrelatedStreams as any).mockResolvedValue(correlatedStreamsWithSet());
+
+      await wrapper.vm.refreshCorrelation();
+      // activeTab is the tabs v-model; set it directly since reaching the
+      // metrics panel via DOM tab clicks depends on brittle conditional markup.
+      wrapper.vm.activeTab = "metrics";
+      await nextTick();
+      await flushPromises();
+
+      const dashboard = wrapper
+        .findAllComponents({ name: "TelemetryCorrelationDashboard" })
+        .find((c) => c.props("externalActiveTab") === "metrics");
+      expect(dashboard?.exists()).toBe(true);
+      expect(dashboard?.props("matchedSetId")).toBe("kubernetes");
+      expect(dashboard?.props("chipDimensions")).toEqual({ k8s_pod_name: "pod-abc" });
+    });
+  });
 
   // Note: Loading State Centering tests removed
   // Testing loading state UI presentation is better handled through visual regression tests
