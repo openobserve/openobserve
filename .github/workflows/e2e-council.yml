@@ -185,7 +185,10 @@ jobs:
             //            check out the PR head, branch name keyed on the feature branch.
             //  - merged: the feature is already in main and its branch may be deleted → base = main,
             //            check out the merge commit, branch name keyed on the (stable) PR number.
-            const merged = context.eventName === 'pull_request';
+            // Keyed on the PR's ACTUAL state (data.merged), not just the auto-on-merge event — so a
+            // manual dispatch / /e2e on an already-merged PR also uses merged mode (base = main)
+            // instead of trying to open the test PR against the (deleted) feature branch.
+            const merged = (context.eventName === 'pull_request') || data.merged === true;
             core.setOutput('mode', merged ? 'merged' : 'open');
             core.setOutput('base_ref', merged ? (data.base ? data.base.ref : 'main') : headRef);
             // Branch identity is keyed on the (immutable) PR number in BOTH modes — survives a
