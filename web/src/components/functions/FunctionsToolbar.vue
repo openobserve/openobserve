@@ -74,13 +74,12 @@
         size="icon-sm"
         @click="emit('open:chat',!store.state.isAiChatEnabled)"
         data-test="menu-link-ai-item"
-        class="ai-hover-btn"
+        class="tw:![background:linear-gradient(135deg,rgba(139,92,246,0.15)_0%,rgba(236,72,153,0.15)_100%)] tw:transition-[background,box-shadow] tw:duration-300 tw:ease-in-out tw:hover:![background:linear-gradient(135deg,#8b5cf6_0%,#ec4899_100%)] tw:hover:shadow-[0_0.25rem_0.75rem_0_rgba(139,92,246,0.35)] tw:rounded-md"
         :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
-        style="border-radius: 6px;"
         @mouseenter="isHovered = true"
         @mouseleave="isHovered = false"
       >
-        <img :src="getBtnLogo" class="header-icon ai-icon tw:opacity-70 tw:transition-transform tw:duration-600" />
+        <img :src="getBtnLogo" class="tw:opacity-70 tw:transition-transform tw:duration-600 tw:[.ai-btn-active_&]:!opacity-100 tw:[.ai-hover-btn:hover_&]:rotate-180 tw:[.ai-hover-btn:hover_&]:[filter:brightness(0)_invert(1)]" />
       </OButton>
       <OButton
         data-test="add-function-fullscreen-btn"
@@ -243,40 +242,3 @@ defineExpose({
   },
 });
 </script>
-<style>
-/* ── AI button — mirrors MainLayout.vue ─────────────────────────── */
-.ai-hover-btn {
-  background: linear-gradient(
-    135deg,
-    rgba(139, 92, 246, 0.15) 0%,
-    rgba(236, 72, 153, 0.15) 100%
-  ) !important;
-  transition: background 0.3s ease, box-shadow 0.3s ease;
-}
-
-.ai-hover-btn:hover {
-  background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%) !important;
-  box-shadow: 0 0.25rem 0.75rem 0 rgba(139, 92, 246, 0.35);
-}
-
-.ai-btn-active {
-  background: linear-gradient(
-    135deg,
-    rgba(139, 92, 246, 0.15) 0%,
-    rgba(236, 72, 153, 0.15) 100%
-  ) !important;
-}
-
-.ai-btn-active .header-icon {
-  opacity: 1 !important;
-}
-
-.ai-btn-active:hover {
-  background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%) !important;
-}
-
-.ai-hover-btn:hover .ai-icon {
-  transform: rotate(180deg);
-  filter: brightness(0) invert(1);
-}
-</style>

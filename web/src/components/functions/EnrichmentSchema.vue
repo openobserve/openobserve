@@ -245,9 +245,3 @@
     },
     });
     </script>
-
-<style>
-.indexDetailsContainer .q-table {
-  border: 1px solid var(--o2-border-input);
-}
-</style>

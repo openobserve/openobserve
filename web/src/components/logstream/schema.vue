@@ -566,7 +566,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :options="indexTypeOptionsForRow(row)"
                             label-key="label"
                             value-key="value"
-                            class="mini-select tw:min-h-[24px]! tw:max-h-[24px]! tw:h-[24px]! tw:text-[0.813rem]"
+                            class="tw:min-h-[24px]! tw:max-h-[24px]! tw:h-[24px]! tw:text-[0.813rem]"
                             multiple
                             clearable
                             size="sm"
@@ -2758,72 +2758,5 @@ export default defineComponent({
   font-size: 0.875rem;
   height: 25px;
   padding: 0px 5px;
-}
-
-.indexDetailsContainer .q-list {
-  border-radius: 0 0 0.5rem 0.5rem;
-}
-
-.indexDetailsContainer .q-list .q-item {
-  height: 2.5rem;
-  padding: 0;
-}
-
-.indexDetailsContainer .q-list .q-item__section {
-  padding: 0.5rem 1rem;
-  font-size: 0.875rem;
-}
-
-.indexDetailsContainer .q-list .q-item__section:not(:first-child) {
-  border-left: 1px solid var(--o2-border-input);
-  align-items: flex-start;
-  min-width: 29%;
-}
-
-.indexDetailsContainer .q-list .q-item.list-head {
-  border: 1px solid var(--o2-border-input);
-  border-radius: 0.5rem 0.5rem 0 0;
-  border-bottom: none;
-}
-
-.indexDetailsContainer .q-list .q-item.list-item {
-  border-right: 1px solid var(--o2-border-input);
-  border-left: 1px solid var(--o2-border-input);
-  font-weight: 600;
-}
-
-.indexDetailsContainer .q-list .q-item.list-item--side {
-  font-weight: 600;
-}
-
-.indexDetailsContainer .q-list .q-item.list-item:last-of-type {
-  border-bottom: 1px solid var(--o2-border-input);
-  border-radius: 0 0 0.5rem 0.5rem;
-}
-
-.mini-select .q-field__inner {
-  min-height: 24px !important;
-  height: 24px !important;
-  max-height: 24px !important;
-}
-
-.mini-select .q-field__control {
-  min-height: 24px !important;
-  max-height: 24px !important;
-  height: 24px !important;
-  padding: 0px 8px !important;
-}
-
-.mini-select .q-field__control-container .q-field__native {
-  min-height: 24px !important;
-  height: 24px !important;
-}
-
-.mini-select .q-field__marginal {
-  height: 24px !important;
-}
-
-.mini-select .q-field__append {
-  height: 24px !important;
 }
 </style>

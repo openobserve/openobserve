@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <template v-slot:before>
             <div class="tw:px-2 tw:pt-2 tw:pb-3 card-container tw:h-full tw:flex tw:flex-col tw:min-h-0">
-              <div class="add-function-name-input tw:pb-2 o2-input tw:flex tw:flex-col tw:flex-1 tw:min-h-0">
+              <div class="tw:pb-2 o2-input tw:flex tw:flex-col tw:flex-1 tw:min-h-0">
                   <FullViewContainer
                     name="function"
                     v-model:is-expanded="expandState.functions"
@@ -85,9 +85,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                     <div
                       v-if="!formData.function && functionEditorPlaceholderFlag"
-                      class="query-editor-placeholder-overlay tw:absolute tw:inset-0 tw:flex tw:items-start tw:pt-0.75 tw:pr-2 tw:pb-0 tw:pl-[2.15rem] tw:pointer-events-none tw:z-1 tw:select-none"
+                      class="tw:absolute tw:inset-0 tw:flex tw:items-start tw:pt-0.75 tw:pr-2 tw:pb-0 tw:pl-[2.15rem] tw:pointer-events-none tw:z-1 tw:select-none"
                     >
-                      <span class="query-editor-placeholder-typewriter tw:[font-family:monospace] tw:text-[var(--text-base)] tw:[line-height:1.3125rem] tw:text-[#a0aec0] tw:whitespace-nowrap tw:overflow-hidden tw:[text-overflow:ellipsis]">{{
+                      <span class="tw:[font-family:monospace] tw:text-[var(--text-base)] tw:[line-height:1.3125rem] tw:text-[#a0aec0] tw:dark:text-[#718096] tw:whitespace-nowrap tw:overflow-hidden tw:[text-overflow:ellipsis]">{{
                         formData.transType === '1' ? jsPlaceholder : vrlPlaceholder
                       }}</span>
                     </div>
@@ -654,35 +654,7 @@ export default defineComponent({
 </script>
 
 <style>
-.add-function-name-input .q-field--dense .q-field__control {
-  height: 36px;
-  min-height: auto;
-  border-radius: 3px;
-}
-
-.add-function-name-input .q-field--dense .q-field__control .q-field__control-container {
-  height: 32px;
-}
-
-.add-function-name-input .q-field--dense .q-field__control .q-field__control-container .q-field__native {
-  height: 32px !important;
-}
-
-.add-function-name-input .q-field--dense .q-field__control .q-field__marginal {
-  height: 32px;
-  min-height: auto;
-}
-
-.add-function-name-input .q-field__bottom {
-  padding-top: 4px !important;
-  min-height: auto;
-}
-
 .ai-chat-with-offset {
   --ai-chat-offset: 75px;
-}
-
-.body--dark .query-editor-placeholder-overlay .query-editor-placeholder-typewriter {
-  color: #718096;
 }
 </style>

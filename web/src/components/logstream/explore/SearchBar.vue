@@ -15,9 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="logs-search-bar-component tw:pb-px tw:h-full tw:overflow-hidden" id="searchBarComponent">
-    <div class="tw:flex tw:flex tw:justify-end align-center">
-      <div class="col-auto tw:my-1">
+  <div class="tw:pb-px tw:h-full tw:overflow-hidden" id="searchBarComponent">
+    <div class="tw:flex tw:flex tw:justify-end">
+      <div class="tw:my-1">
         <OButton
           class="tw:mr-2"
           variant="ghost"
@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @on:date-change="updateDateTime"
           />
         </div>
-        <div class="search-time tw:pl-2 float-left tw:mr-2">
+        <div class="tw:pl-2 float-left tw:mr-2">
           <OButton
             data-test="logs-search-bar-refresh-btn"
             data-cy="search-bar-refresh-button"
@@ -228,21 +228,5 @@ export default defineComponent({
 <style>
 #logsStreamQueryEditor {
   height: calc(100% - 20px) !important;
-}
-
-.q-field--standard .q-field__control:before,
-.q-field--standard .q-field__control:focus:before,
-.q-field--standard .q-field__control:hover:before {
-  border: 0px !important;
-  border-color: none;
-  transition: none;
-}
-
-.logs-search-bar-component .search-time .q-btn-group {
-  border-radius: 3px;
-}
-
-.logs-search-bar-component .search-time .q-btn-group .q-btn {
-  min-height: auto;
 }
 </style>
