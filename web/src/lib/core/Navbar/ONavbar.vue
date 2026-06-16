@@ -22,42 +22,184 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     aria-label="Main navigation"
     data-test="navbar-main-nav"
     data-o2-navbar
-    class="left-drawer navbar-links o2-navbar-scroll tw:flex tw:flex-col tw:bg-[var(--color-surface-chrome-deeper)] tw:shrink-0 tw:min-h-0 tw:overflow-y-auto tw:w-[5.25rem] tw:py-1"
+    class="left-drawer navbar-links o2-navbar-scroll tw:flex tw:flex-col tw:bg-[var(--color-surface-chrome-deeper)] tw:shrink-0 tw:min-h-0 tw:overflow-y-auto tw:w-[10rem] tw:py-2"
     @keydown="handleKeydown"
   >
-    <!-- Each active item carries its own left accent border (see MenuLink), so
-         no separate floating indicator bar is needed. -->
-    <div class="tw:flex tw:flex-col">
-      <menu-link
-        v-for="(nav, index) in linksList"
-        :key="nav.title"
-        :link-name="nav.name"
-        :animation-index="index"
-        v-bind="{ ...nav, mini: miniMode }"
-        @mouseenter="emit('menu-hover', nav.link)"
+    <!-- TOP: Logo + org switcher -->
+    <div class="tw:flex tw:flex-col tw:px-3 tw:pb-2 tw:border-b tw:border-border-default tw:mb-2">
+      <img
+        v-if="logoSrc"
+        :src="logoSrc"
+        alt="OpenObserve"
+        class="tw:h-7 tw:max-w-[120px] tw:cursor-pointer tw:mb-2 tw:object-contain tw:object-left"
+        data-test="navbar-logo"
+        @click="emit('go-to-home')"
       />
+      <button
+        v-if="orgName"
+        class="tw:flex tw:items-center tw:gap-1.5 tw:text-[10.5px] tw:text-text-secondary tw:hover:text-text-primary tw:transition-colors tw:truncate tw:max-w-full tw:text-left tw:cursor-pointer tw:bg-transparent tw:border-none tw:p-0"
+        data-test="navbar-org-switcher"
+        @click="orgMenuOpen = !orgMenuOpen"
+      >
+        <span class="tw:truncate tw:flex-1">{{ orgName }}</span>
+        <OIcon name="expand-more" size="xs" class="tw:shrink-0" />
+      </button>
+      <!-- org dropdown -->
+      <div
+        v-if="orgMenuOpen && orgOptions && orgOptions.length > 0"
+        class="tw:absolute tw:left-[10.5rem] tw:top-10 tw:bg-surface-base tw:border tw:border-border-default tw:rounded-lg tw:shadow-lg tw:z-50 tw:min-w-[160px] tw:max-h-64 tw:overflow-y-auto tw:py-1"
+        data-test="navbar-org-menu"
+      >
+        <button
+          v-for="org in orgOptions"
+          :key="org.identifier"
+          class="tw:w-full tw:text-left tw:px-3 tw:py-2 tw:text-[11px] tw:hover:bg-surface-hover tw:transition-colors tw:truncate tw:cursor-pointer tw:bg-transparent tw:border-none"
+          @click="selectOrg(org.identifier)"
+        >
+          {{ org.label }}
+        </button>
+      </div>
+    </div>
+
+    <!-- MIDDLE: Grouped nav links -->
+    <div class="tw:flex tw:flex-col tw:flex-1">
+      <template v-for="group in orderedGroups" :key="group">
+        <template v-if="itemsByGroup[group] && itemsByGroup[group]!.length > 0">
+          <div
+            class="tw:text-[9px] tw:font-semibold tw:uppercase tw:tracking-[0.08em] tw:text-text-tertiary tw:px-3 tw:pt-3 tw:pb-1"
+            :data-test="`navbar-group-${group}`"
+          >
+            {{ groupLabels[group] }}
+          </div>
+          <menu-link
+            v-for="(nav, index) in itemsByGroup[group]"
+            :key="nav.title"
+            :link-name="nav.name"
+            :animation-index="index"
+            v-bind="{ ...nav, mini: miniMode }"
+            @mouseenter="emit('menu-hover', nav.link)"
+          />
+        </template>
+      </template>
+    </div>
+
+    <!-- FOOTER: utility controls + user -->
+    <div class="tw:flex tw:flex-col tw:border-t tw:border-border-default tw:pt-2 tw:mt-2 tw:px-1 tw:gap-0.5">
+      <!-- AI Chat toggle -->
+      <button
+        v-if="isAiEnabled"
+        class="tw:flex tw:items-center tw:gap-2.5 tw:px-2 tw:py-1.5 tw:rounded-md tw:text-[11px] tw:w-full tw:text-left tw:transition-colors tw:cursor-pointer tw:border-none"
+        :class="isAiChatActive ? 'tw:text-primary-600 tw:bg-tabs-active-bg' : 'tw:text-text-secondary tw:hover:bg-tabs-hover-bg tw:hover:text-text-primary tw:bg-transparent'"
+        data-test="navbar-ai-chat-toggle"
+        @click="emit('toggle-ai-chat')"
+      >
+        <OIcon name="auto-awesome" size="sm" class="tw:shrink-0" />
+        <span>AI Chat</span>
+      </button>
+
+      <!-- Theme toggle -->
+      <button
+        class="tw:flex tw:items-center tw:gap-2.5 tw:px-2 tw:py-1.5 tw:rounded-md tw:text-[11px] tw:text-text-secondary tw:hover:bg-tabs-hover-bg tw:hover:text-text-primary tw:transition-colors tw:w-full tw:text-left tw:cursor-pointer tw:bg-transparent tw:border-none"
+        data-test="navbar-theme-toggle"
+        @click="emit('open-predefined-themes')"
+      >
+        <OIcon :name="theme === 'dark' ? 'light-mode' : 'dark-mode'" size="sm" class="tw:shrink-0" />
+        <span>Theme</span>
+      </button>
+
+      <!-- Slack -->
+      <button
+        class="tw:flex tw:items-center tw:gap-2.5 tw:px-2 tw:py-1.5 tw:rounded-md tw:text-[11px] tw:text-text-secondary tw:hover:bg-tabs-hover-bg tw:hover:text-text-primary tw:transition-colors tw:w-full tw:text-left tw:cursor-pointer tw:bg-transparent tw:border-none"
+        data-test="navbar-slack"
+        @click="emit('open-slack')"
+      >
+        <OIcon name="forum" size="sm" class="tw:shrink-0" />
+        <span>Community</span>
+      </button>
+
+      <!-- Help -->
+      <button
+        class="tw:flex tw:items-center tw:gap-2.5 tw:px-2 tw:py-1.5 tw:rounded-md tw:text-[11px] tw:text-text-secondary tw:hover:bg-tabs-hover-bg tw:hover:text-text-primary tw:transition-colors tw:w-full tw:text-left tw:cursor-pointer tw:bg-transparent tw:border-none"
+        data-test="navbar-help"
+        @click="emit('open-help')"
+      >
+        <OIcon name="help-outline" size="sm" class="tw:shrink-0" />
+        <span>Help</span>
+      </button>
+
+      <!-- User row -->
+      <button
+        v-if="userName || userEmail"
+        class="tw:flex tw:items-center tw:gap-2 tw:px-2 tw:py-2 tw:mt-1 tw:rounded-md tw:w-full tw:text-left tw:transition-colors tw:hover:bg-tabs-hover-bg tw:border-t tw:border-border-default tw:cursor-pointer tw:bg-transparent"
+        data-test="navbar-user-menu"
+        @click="emit('signout')"
+      >
+        <div class="tw:w-7 tw:h-7 tw:rounded-full tw:bg-primary-600 tw:flex tw:items-center tw:justify-center tw:text-white tw:text-[10px] tw:font-bold tw:shrink-0">
+          {{ userInitials }}
+        </div>
+        <div class="tw:flex tw:flex-col tw:min-w-0">
+          <span class="tw:text-[10.5px] tw:font-medium tw:text-text-primary tw:truncate">{{ userName }}</span>
+          <span class="tw:text-[9.5px] tw:text-text-tertiary tw:truncate">{{ userEmail }}</span>
+        </div>
+      </button>
     </div>
   </nav>
 </template>
 
 <script setup lang="ts">
-/**
- * Left sidebar navigation bar. Renders a list of MenuLink items with keyboard
- * navigation (ArrowUp/ArrowDown) and Tab trapping.
- */
-import type { NavbarProps, NavbarEmits, NavbarSlots } from "./ONavbar.types";
+import { computed, ref } from "vue";
+import type { NavbarProps, NavbarEmits, NavbarSlots, NavGroup } from "./ONavbar.types";
 import MenuLink from "@/components/MenuLink.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 defineOptions({ inheritAttrs: false });
 
-withDefaults(defineProps<NavbarProps>(), {
+const props = withDefaults(defineProps<NavbarProps>(), {
   miniMode: false,
   visible: true,
+  isAiEnabled: false,
+  isAiChatActive: false,
+  theme: 'light',
 });
 
 const emit = defineEmits<NavbarEmits>();
-
 defineSlots<NavbarSlots>();
+
+const orgMenuOpen = ref(false);
+
+const orderedGroups: NavGroup[] = ['observe', 'analyze', 'manage', 'admin'];
+
+const groupLabels: Record<NavGroup, string> = {
+  observe: 'Observe',
+  analyze: 'Analyze',
+  manage: 'Manage',
+  admin: 'Admin',
+};
+
+const itemsByGroup = computed(() => {
+  const map: Partial<Record<NavGroup, typeof props.linksList>> = {};
+  for (const item of props.linksList) {
+    const g = item.group ?? 'manage';
+    if (!map[g]) map[g] = [];
+    map[g]!.push(item);
+  }
+  return map;
+});
+
+const userInitials = computed(() => {
+  if (!props.userName) return '?';
+  return props.userName
+    .split(' ')
+    .map((w) => w[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase();
+});
+
+function selectOrg(identifier: string) {
+  orgMenuOpen.value = false;
+  emit('update:org', identifier);
+}
 
 const NAV_KEYS = ["ArrowDown", "ArrowUp", "Tab"] as const;
 
@@ -102,9 +244,7 @@ function handleKeydown(event: KeyboardEvent) {
         : document.querySelector<HTMLElement>(
             '.o2-content-scroll a[href]:not([tabindex="-1"]), .o2-content-scroll button:not([disabled]):not([tabindex="-1"]), .o2-content-scroll input:not([disabled]):not([tabindex="-1"]), .o2-content-scroll select:not([disabled]):not([tabindex="-1"]), .o2-content-scroll [tabindex]:not([tabindex="-1"])',
           );
-      if (target) {
-        target.focus();
-      }
+      if (target) target.focus();
       break;
     }
   }
@@ -112,23 +252,13 @@ function handleKeydown(event: KeyboardEvent) {
 </script>
 
 <style scoped>
-/* Thin overlay scrollbar: hidden at rest, revealed on hover, and — crucially —
-   it never reserves layout width, so there is no empty strip beside the labels.
-
-   A styled WebKit scrollbar is normally a classic, space-reserving bar (that is
-   what previously pushed the labels inward and clipped "Management"). The only
-   way a native scrollbar floats *over* content instead of reserving space is
-   `overflow: overlay`, which Blink/WebKit honor. Firefox doesn't support it, so
-   it falls back to `scrollbar-width: none` — a hidden bar that also reserves
-   nothing. Either way the rail keeps its full width and still scrolls via
-   wheel, trackpad, and the ArrowUp/ArrowDown keyboard handler above. */
 .o2-navbar-scroll {
-  scrollbar-width: none; /* Firefox: hidden, reserves nothing */
-  -ms-overflow-style: none; /* legacy Edge/IE */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 @supports (overflow: overlay) {
   .o2-navbar-scroll {
-    overflow-y: overlay; /* Blink/WebKit: scrollbar floats over content */
+    overflow-y: overlay;
   }
 }
 .o2-navbar-scroll::-webkit-scrollbar {
@@ -142,12 +272,9 @@ function handleKeydown(event: KeyboardEvent) {
   border-radius: 9999px;
   transition: background-color 150ms ease;
 }
-/* Reveal the thumb only while the rail is hovered. */
 .o2-navbar-scroll:hover::-webkit-scrollbar-thumb {
   background-color: var(--color-border-soft, rgba(148, 163, 184, 0.5));
 }
-
-/* Right border only in dark mode — light mode uses shadow on the content card */
 :global(.body--dark) .o2-navbar-scroll {
   border-right: 1px solid var(--o2-border-color);
 }
