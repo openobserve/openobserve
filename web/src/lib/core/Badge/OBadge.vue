@@ -255,7 +255,7 @@ function handleKeydown(e: KeyboardEvent): void {
       v-if="dot"
       :class="[
         'tw:inline-block tw:shrink-0 tw:rounded-full tw:size-1.75 tw:bg-current',
-        size === 'sm' ? 'tw:me-1' : 'tw:me-1.5',
+        size === 'sm' ? 'tw:me-0' : 'tw:me-0',
       ]"
       aria-hidden="true"
     />
