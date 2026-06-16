@@ -171,6 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       
       <div class="tw:flex tw:gap-x-2 tw:items-center">
           <OInput
+            data-test="domain-management-new-domain-input"
             v-model="newDomain"
             class="domain-input"
             @keydown.enter="addDomain"
@@ -180,6 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:model-value="domainError = ''"
           />
           <OButton
+            data-test="domain-management-add-domain-btn"
             variant="primary"
             size="sm-action"
             @click="addDomain"

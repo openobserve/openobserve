@@ -199,13 +199,6 @@ export class IamFormValidationPage {
 
     // ── Add User form actions ─────────────────────────────────────────────────
 
-    async navigateToUsersTab() {
-        await this.navigateToIam();
-        await this.page.locator(this.iamUsersTab).waitFor({ state: 'visible', timeout: 10000 });
-        await this.page.locator(this.iamUsersTab).click();
-        await this.page.locator(this.addBasicUserBtn).waitFor({ state: 'visible', timeout: 10000 });
-    }
-
     async openAddUserForm() {
         await this.page.locator(this.addBasicUserBtn).click();
         await this.page.locator(this.addUserDialog).waitFor({ state: 'visible', timeout: 8000 });
@@ -266,7 +259,6 @@ export class IamFormValidationPage {
         const tab = this.page.locator(this.iamUsersTab);
         await tab.waitFor({ state: 'visible', timeout: 10000 });
         await tab.click();
-        await this.page.locator('[data-test^="edit-basic-user-"]').first()
-            .waitFor({ state: 'visible', timeout: 15000 });
+        await this.page.locator(this.addBasicUserBtn).waitFor({ state: 'visible', timeout: 10000 });
     }
 }

@@ -24,10 +24,10 @@ export class SettingsFormValidationPage {
         // inside the first/second .o2-input wrappers using the parent class selectors.
         // For robustness we use the surrounding div's class name as a scope selector and
         // locate the OInput -field and -error within it.
-        this.traceIdInputField        = '.trace-id-field-name input';
-        this.traceIdInputError        = '.trace-id-field-name .o2-input__error, .trace-id-field-name [class*="error"]';
-        this.spanIdInputField         = '.span-id-field-name input';
-        this.spanIdInputError         = '.span-id-field-name .o2-input__error, .span-id-field-name [class*="error"]';
+        this.traceIdInputField        = '[data-test="settings-org-trace-id-input-field"]';
+        this.traceIdInputError        = '[data-test="settings-org-trace-id-input-error"]';
+        this.spanIdInputField         = '[data-test="settings-org-span-id-input-field"]';
+        this.spanIdInputError         = '[data-test="settings-org-span-id-input-error"]';
         // Save button in OrganizationSettings
         this.orgSettingsSaveBtn       = '[data-test="add-alert-submit-btn"]';
 
@@ -61,9 +61,9 @@ export class SettingsFormValidationPage {
         // ── DomainManagement — domain input ──────────────────────────────────
         // OInput for new domain — no explicit data-test on the OInput in DomainManagement.vue
         // so we target it via the .domain-input class which wraps the OInput component
-        this.newDomainField           = '.domain-input input';
-        this.newDomainError           = '.domain-input .o2-input__error, .domain_management .q-field__bottom .q-field__messages';
-        this.addDomainBtn             = '[data-test="domain-management-no-domain-message"] ~ * button, .domain_management button';
+        this.newDomainField           = '[data-test="domain-management-new-domain-input-field"]';
+        this.newDomainError           = '[data-test="domain-management-new-domain-input-error"]';
+        this.addDomainBtn             = '[data-test="domain-management-add-domain-btn"]';
         this.saveDomainChangesBtn     = '.domain_management .tw\\:justify-end button:last-child';
         this.noDomainMessage          = '[data-test="domain-management-no-domain-message"]';
         this.domainRestrictionsTitle  = '[data-test="domain-management-domain-restrictions-title"]';
@@ -271,9 +271,7 @@ export class SettingsFormValidationPage {
     }
 
     getAddDomainBtnLocator() {
-        return this.page
-            .locator('.domain_management button')
-            .filter({ hasText: /add domain/i });
+        return this.page.locator(this.addDomainBtn);
     }
 
     // ── Toast locators ────────────────────────────────────────────────────────

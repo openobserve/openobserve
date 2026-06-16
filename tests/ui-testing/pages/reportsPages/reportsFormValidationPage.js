@@ -231,7 +231,9 @@ export class ReportsFormValidationPage {
     // ── Save ──────────────────────────────────────────────────────────────────
 
     async clickSave() {
-        await this.page.locator(this.saveBtn).click();
+        const btn = this.page.locator(this.saveBtn);
+        await btn.scrollIntoViewIfNeeded();
+        await btn.click();
     }
 
     // ── Locator getters for assertions ────────────────────────────────────────
