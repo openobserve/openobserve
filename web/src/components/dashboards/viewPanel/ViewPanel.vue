@@ -27,7 +27,7 @@
         <HistogramIntervalDropDown
           v-if="!promqlMode && histogramFields.length"
           v-model="histogramInterval"
-          class="viewpanel-icons tw:h-8 tw:transition-all tw:duration-200 tw:hover:bg-(--o2-hover-accent)"
+          class="tw:h-8 tw:transition-all tw:duration-200 tw:hover:bg-(--o2-hover-accent)"
           style="width: 150px"
           data-test="dashboard-viewpanel-histogram-interval-dropdown"
         />
@@ -35,7 +35,7 @@
         <DateTimePickerDashboard
           v-model="selectedDate"
           ref="dateTimePickerRef"
-          class="viewpanel-icons tw:h-8 tw:transition-all tw:duration-200 tw:hover:bg-(--o2-hover-accent)"
+          class="tw:h-8 tw:min-h-8 tw:transition-all tw:duration-200 tw:hover:bg-(--o2-hover-accent)"
           data-test="dashboard-viewpanel-date-time-picker"
           :disable="disable"
           @hide="setTimeForVariables()"
@@ -47,7 +47,7 @@
             store.state?.zoConfig?.min_auto_refresh_interval || 5
           "
           @trigger="refreshData"
-          class="viewpanel-icons tw:h-8 tw:transition-all tw:duration-200 tw:hover:bg-(--o2-hover-accent)"
+          class="tw:h-8 tw:transition-all tw:duration-200 tw:hover:bg-(--o2-hover-accent)"
           data-test="dashboard-viewpanel-refresh-interval"
         />
         <OButton
@@ -911,10 +911,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style>
-.viewpanel-icons .date-time-button {
-  height: 32px;
-  min-height: 32px;
-}
-</style>

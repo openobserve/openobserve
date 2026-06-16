@@ -157,6 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :hide-relative-timezone="true"
                   menu-align="end"
                   data-test="dashboard-config-panel-time-picker"
+                  class="tw:w-fit tw:min-w-0 tw:max-w-full tw:overflow-hidden"
                 />
                 <OTooltip :content="formattedPickerValue" max-width="320px" />
               </div>
@@ -451,7 +452,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-config-promql-legend"
         >
           <template v-slot:label>
-            <div class="tw:flex tw:items-center all-pointer-events">
+            <div class="tw:flex tw:items-center">
               {{ t("dashboard.legendLabel") }}
               <div>
                 <OIcon
@@ -1232,7 +1233,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           max-width="250px"
         />
       </template>
-      <div class="hide-child-title tw:flex tw:flex-col tw:gap-3 tw:p-2 tw:ml-3 tw:overflow-x-hidden tw:box-border">
+      <div class="tw:flex tw:flex-col tw:gap-3 tw:p-2 tw:ml-3 tw:overflow-x-hidden tw:box-border">
         <OverrideConfig
           :dashboardPanelData="dashboardPanelData"
           :panelData="panelData"
@@ -2783,13 +2784,6 @@ export default defineComponent({
 </script>
 
 <style>
-.panel-time-picker-btn .date-time-button {
-  width: fit-content;
-  min-width: 0 !important;
-  max-width: 100%;
-  overflow: hidden;
-}
-
 .panel-time-picker-btn .date-time-button .date-time-label {
   flex: 1 1 0;
   min-width: 0;

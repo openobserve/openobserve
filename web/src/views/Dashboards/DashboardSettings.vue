@@ -39,23 +39,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTabs
             v-model="activeTab"
             orientation="vertical"
+            class="tw:mt-5 tw:mx-4 tw:mb-0"
           >
             <OTab
               name="generalSettings"
               icon="settings"
               :label="t('dashboard.generalSettings')"
+              class="tw:justify-start tw:py-0 tw:pr-4 tw:pl-5 tw:capitalize"
               data-test="dashboard-settings-general-tab"
             />
             <OTab
               name="variableSettings"
               icon="data-array"
               :label="t('dashboard.variableSettings')"
+              class="tw:justify-start tw:py-0 tw:pr-4 tw:pl-5 tw:capitalize"
               data-test="dashboard-settings-variable-tab"
             />
             <OTab
               name="tabSettings"
               icon="tab"
               :label="t('dashboard.tabSettings')"
+              class="tw:justify-start tw:py-0 tw:pr-4 tw:pl-5 tw:capitalize"
               data-test="dashboard-settings-tab-tab"
             />
           </OTabs>
@@ -67,15 +71,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="activeTab"
             animated
           >
-            <OTabPanel name="generalSettings" data-test="general-tab-panels-default">
+            <OTabPanel name="generalSettings" class="tw:!p-0" data-test="general-tab-panels-default">
               <GeneralSettings @save="refreshRequired" @close="$emit('close')" />
             </OTabPanel>
 
-            <OTabPanel name="variableSettings" data-test="variable-tab-panels-default">
+            <OTabPanel name="variableSettings" class="tw:!p-0" data-test="variable-tab-panels-default">
               <VariableSettings @save="refreshRequired" />
             </OTabPanel>
 
-            <OTabPanel name="tabSettings" data-test="tab-tab-panels-default">
+            <OTabPanel name="tabSettings" class="tw:!p-0" data-test="tab-tab-panels-default">
               <TabsSettings @refresh="refreshRequired" />
             </OTabPanel>
           </OTabPanels>
@@ -144,20 +148,6 @@ export default defineComponent({
 </script>
 
 <style>
-.o-tab-panel {
-  padding: 0px !important;
-}
-
-.functions-tabs .o-tabs--vertical {
-  margin: 20px 16px 0 16px;
-}
-
-.functions-tabs .o-tabs--vertical .o-tab {
-  justify-content: flex-start;
-  padding: 0 1rem 0 1.25rem;
-  text-transform: capitalize;
-}
-
 .functions-tabs .o-tabs--vertical .o-tab__content.tab_content .o-tab__icon + .o-tab__label {
   padding-left: 0.875rem;
   font-weight: 600;

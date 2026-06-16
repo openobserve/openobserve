@@ -67,7 +67,7 @@
               </div>
               <div class="tw:relative tw:group">
                 <div
-                  class="tw:p-2 tw:rounded-lg tw:bg-[var(--o2-body-primary-bg)] tw:border tw:border-[var(--o2-border-color)] tw:font-mono tw:text-sm tw:max-h-40 tw:overflow-y-auto tw:whitespace-pre-wrap tw:break-all inspector-query-editor"
+                  class="tw:p-2 tw:rounded-lg tw:bg-[var(--o2-body-primary-bg)] tw:border tw:border-[var(--o2-border-color)] tw:font-mono tw:text-sm tw:max-h-40 tw:overflow-y-auto tw:whitespace-pre-wrap tw:break-all tw:[scrollbar-width:thin] tw:[scrollbar-color:rgba(128,128,128,0.2)_transparent]"
                   :data-test="`query-inspector-original-query-${index}`"
                   v-html="
                     highlightSearch(
@@ -97,7 +97,7 @@
               </div>
               <div class="tw:relative tw:group">
                 <div
-                  class="tw:p-2 tw:rounded-lg tw:bg-[var(--o2-body-primary-bg)] tw:border tw:border-[var(--o2-border-color)] tw:font-mono tw:text-sm tw:max-h-40 tw:overflow-y-auto tw:whitespace-pre-wrap tw:break-all inspector-query-editor"
+                  class="tw:p-2 tw:rounded-lg tw:bg-[var(--o2-body-primary-bg)] tw:border tw:border-[var(--o2-border-color)] tw:font-mono tw:text-sm tw:max-h-40 tw:overflow-y-auto tw:whitespace-pre-wrap tw:break-all tw:[scrollbar-width:thin] tw:[scrollbar-color:rgba(128,128,128,0.2)_transparent]"
                   :data-test="`query-inspector-executed-query-${index}`"
                   v-html="
                     highlightSearch(
@@ -413,12 +413,6 @@ export default defineComponent({
 
 .inspector-query-editor::-webkit-scrollbar-thumb:hover {
   background: rgba(128, 128, 128, 0.4);
-}
-
-/* Firefox scrollbar styling */
-.inspector-query-editor {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(128, 128, 128, 0.2) transparent;
 }
 
 mark {

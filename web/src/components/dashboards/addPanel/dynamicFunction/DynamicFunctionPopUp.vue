@@ -53,11 +53,13 @@
         <OTab
           name="build"
           label="Build"
+          class="tw:flex-1"
           data-test="dynamic-function-popup-tab-build"
         />
         <OTab
           name="raw"
           label="Raw"
+          class="tw:flex-1"
           data-test="dynamic-function-popup-tab-raw"
         />
       </OTabs>
@@ -299,8 +301,3 @@ export default {
   },
 };
 </script>
-<style>
-.o-tab {
-  flex: 1;
-}
-</style>

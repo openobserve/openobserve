@@ -229,9 +229,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </div>
       <div
-        class="crosslink-drilldown-menu tw:absolute tw:z-9999999 tw:min-w-50 tw:py-1 tw:px-0 tw:hidden tw:whitespace-nowrap tw:top-0 tw:left-0 tw:rounded tw:border tw:border-(--o2-border) tw:shadow-[0_2px_8px_rgba(0,0,0,0.15)]"
+        class="tw:absolute tw:z-9999999 tw:min-w-50 tw:py-1 tw:px-0 tw:hidden tw:whitespace-nowrap tw:top-0 tw:left-0 tw:rounded tw:border tw:border-(--o2-border) tw:shadow-[0_2px_8px_rgba(0,0,0,0.15)]"
         :class="{
-          'crosslink-drilldown-menu--dark tw:bg-[#2c2c2c] tw:border-[#404040] tw:shadow-[0_2px_8px_rgba(0,0,0,0.4)]': store.state.theme === 'dark',
+          'tw:group/menu tw:bg-[#2c2c2c] tw:border-[#404040] tw:shadow-[0_2px_8px_rgba(0,0,0,0.4)] crosslink-drilldown-menu--dark': store.state.theme === 'dark',
           'tw:bg-white': store.state.theme !== 'dark',
         }"
         data-test="drilldown-menu"
@@ -250,7 +250,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
           />
           <div
-            class="crosslink-drilldown-menu-item tw:flex tw:items-center tw:py-2 tw:px-4 tw:cursor-pointer tw:transition-colors tw:duration-200 tw:text-sm tw:text-[#333] tw:hover:bg-[#f5f5f5] tw:active:bg-(--o2-border)"
+            class="tw:flex tw:items-center tw:py-2 tw:px-4 tw:cursor-pointer tw:transition-colors tw:duration-200 tw:text-sm tw:text-[#333] tw:hover:bg-[#f5f5f5] tw:active:bg-(--o2-border) tw:group-[.crosslink-drilldown-menu--dark]/menu:text-[var(--o2-border)] tw:group-[.crosslink-drilldown-menu--dark]/menu:hover:bg-[#383838] tw:group-[.crosslink-drilldown-menu--dark]/menu:active:bg-[#444444]"
             :data-test="`drilldown-menu-item-${drilldown.name}`"
             @click="openDrilldown(index)"
           >
@@ -259,7 +259,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="tw:mr-2"
               :name="drilldown._isCrossLink ? 'open-in-new' : 'link'"
             />
-            <span>{{ drilldown.name }}</span>
+            <span class="tw:select-none">{{ drilldown.name }}</span>
           </div>
         </template>
       </div>
@@ -1651,21 +1651,3 @@ export default defineComponent({
 });
 </script>
 
-<style>
-/* Cross-link drilldown popup — descendant and pseudo-class rules that cannot be inlined */
-.crosslink-drilldown-menu-item span {
-  user-select: none;
-}
-
-.crosslink-drilldown-menu--dark .crosslink-drilldown-menu-item {
-  color: var(--o2-border);
-}
-
-.crosslink-drilldown-menu--dark .crosslink-drilldown-menu-item:hover {
-  background-color: #383838;
-}
-
-.crosslink-drilldown-menu--dark .crosslink-drilldown-menu-item:active {
-  background-color: #444444;
-}
-</style>

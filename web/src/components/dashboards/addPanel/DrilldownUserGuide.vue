@@ -12,7 +12,7 @@
   </div>
   <Teleport to="body">
   <div
-    class="user-guide tw:p-[10px] tw:overflow-y-auto"
+    class="user-guide tw:p-[10px] tw:overflow-y-auto tw:[scrollbar-width:thin] tw:[scrollbar-color:rgba(0,0,0,0.25)_rgba(0,0,0,0.05)]"
     v-show="showUserGuide"
     style="
       position: fixed;
@@ -186,11 +186,6 @@ export default {
 </script>
 
 <style>
-.user-guide {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(0, 0, 0, 0.25) rgba(0, 0, 0, 0.05);
-}
-
 /* Override global transparent-by-default scrollbar so it is always visible */
 .user-guide::-webkit-scrollbar {
   width: 6px;

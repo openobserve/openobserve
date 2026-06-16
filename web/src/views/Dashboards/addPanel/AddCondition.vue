@@ -22,7 +22,7 @@
             {{ computedLabel(condition) }}
           </OButton>
         </template>
-        <div class="add-condition-dropdown tw:p-4 tw:w-72">
+        <div class="tw:p-4 tw:w-72">
           <div style="display: flex; align-items: center; gap: 4px">
             <StreamFieldSelect
               class="tw:w-full"
@@ -46,11 +46,13 @@
                   <OTab
                     name="list"
                     :label="t('common.list')"
+                    class="tw:flex-1"
                     :data-test="`dashboard-add-condition-list-${conditionIndex}`"
                   ></OTab>
                   <OTab
                     name="condition"
                     :label="t('common.condition')"
+                    class="tw:flex-1"
                     :data-test="`dashboard-add-condition-condition-${conditionIndex}`"
                   ></OTab>
                 </OTabs>
@@ -278,9 +280,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style>
-.add-condition-dropdown .o-tab {
-  flex: 1;
-}
-</style>
