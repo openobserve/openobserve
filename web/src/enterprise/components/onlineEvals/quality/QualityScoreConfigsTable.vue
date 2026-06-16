@@ -1,26 +1,5 @@
 <template>
   <section class="qsc-overview" data-test="quality-score-configs-overview">
-    <header class="qsc-overview__head">
-      <div class="qsc-overview__head-text">
-        <h3 class="qsc-overview__title">{{ t("onlineEvals.quality.overview.title") }}</h3>
-        <span class="qsc-overview__count">
-          {{ t("onlineEvals.quality.overview.countSuffix", { n: filteredRows.length }) }}
-        </span>
-      </div>
-
-      <OInput
-        v-model="filter"
-        :placeholder="t('onlineEvals.quality.overview.searchPlaceholder')"
-        size="sm"
-        class="qsc-overview__filter"
-        data-test="quality-overview-filter-input"
-      >
-        <template #icon-left>
-          <OIcon name="search" size="xs" />
-        </template>
-      </OInput>
-    </header>
-
     <div v-if="isLoading && rows.length === 0" class="qsc-overview__loading">
       <OSpinner size="sm" />
       <span>{{ t("onlineEvals.quality.overview.loading") }}</span>
@@ -58,10 +37,29 @@
         :page-size="20"
         :page-size-options="[20, 50, 100]"
         :default-columns="false"
+        :enable-column-resize="true"
+        :persist-columns="true"
+        table-id="quality-score-configs"
         width="100%"
         class="tw:w-full tw:h-full"
         @row-click="(row: any) => $emit('select', row)"
       >
+        <!-- Filter moved into the table toolbar so OTable's column chooser
+             ("Manage columns") renders next to it, matching the eval lists. -->
+        <template #toolbar>
+          <OInput
+            v-model="filter"
+            :placeholder="t('onlineEvals.quality.overview.searchPlaceholder')"
+            size="sm"
+            class="tw:flex-1 tw:min-w-0"
+            data-test="quality-overview-filter-input"
+          >
+            <template #icon-left>
+              <OIcon name="search" size="xs" />
+            </template>
+          </OInput>
+        </template>
+
         <template #cell-status="{ row }">
           <span class="qsc-status" :class="`qsc-status--${row.status}`" :aria-label="row.status">●</span>
         </template>
@@ -179,6 +177,8 @@ const columns = computed(() => [
     accessorKey: "status",
     sortable: false,
     size: 40,
+    // Fixed-width status dot — no resize grip (OTable reads `resizable`).
+    resizable: false,
     meta: { align: "center" },
   },
   {
@@ -187,7 +187,8 @@ const columns = computed(() => [
     accessorKey: "name",
     sortable: true,
     size: COL.name,
-    meta: { align: "left", autoWidth: true },
+    // `flex` (not `autoWidth`): fills leftover width AND stays resizable.
+    meta: { align: "left", flex: true },
   },
   {
     id: "type",
@@ -228,7 +229,12 @@ const columns = computed(() => [
     size: COL.date,
     meta: { align: "left" },
   },
-]);
+].map((c: any) => ({
+  ...c,
+  // Offer every column except the name and the leading status dot in the
+  // "Manage columns" chooser.
+  hideable: c.id !== "name" && c.id !== "status",
+})));
 
 function shortType(type: ScoreConfigRow["dataType"]): string {
   if (type === "numeric") return "Num";
@@ -289,37 +295,6 @@ function relativeTime(timestampMs: number): string {
   gap: 10px;
   min-height: 0;
   flex: 1;
-}
-
-.qsc-overview__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.qsc-overview__head-text {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  min-width: 0;
-}
-
-.qsc-overview__title {
-  margin: 0;
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--color-text-primary, currentColor);
-}
-
-.qsc-overview__count {
-  font-size: 12px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.qsc-overview__filter {
-  min-width: 220px;
-  max-width: 320px;
 }
 
 .qsc-overview__loading {

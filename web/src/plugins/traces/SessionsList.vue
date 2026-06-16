@@ -370,7 +370,12 @@ const tableColumns = computed(() => [
     sortable: false,
     meta: { align: "center", disableCellAction: true },
   },
-]);
+].map((c: any) => ({
+  ...c,
+  // Offer every column except the session id (row identity) in OTable's
+  // "Manage columns" chooser.
+  hideable: c.id !== "sessionId",
+})));
 
 function formatTimestamp(nanos: number): string {
   if (!nanos) return "—";
