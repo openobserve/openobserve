@@ -20,12 +20,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
        another card-container would render same-bg-on-same-bg and the
        inner cards would visually disappear (no border contrast). -->
   <div
-    class="llm-insights-dashboard tw:h-full tw:flex tw:flex-col tw:px-[0.625rem]"
+    class="llm-insights-dashboard tw:h-full tw:flex tw:flex-col"
   >
-    <!-- Toolbar: stream selector — hidden when no streams are available -->
+    <!-- Toolbar: stream selector — hidden when no streams are available.
+         Padding lives on the toolbar + scroll area (not the root) so the
+         scrollbar hugs the content-area edge instead of floating inside
+         a padded box. -->
     <div
       v-if="availableStreams.length > 0"
-      class="tw:flex tw:items-center tw:gap-[0.5rem] tw:py-[0.5rem]"
+      class="tw:flex tw:items-center tw:justify-end tw:gap-[0.5rem] tw:px-4 tw:pt-3 tw:pb-2"
     >
       <div
         data-test="llm-insights-stream-selector"
@@ -33,6 +36,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <OSelect
           v-model="activeStream"
+          label="Stream"
+          label-position="inside"
           :options="availableStreams.map((s) => ({ label: s, value: s }))"
           labelKey="label"
           valueKey="value"
@@ -46,6 +51,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <OSelect
           v-model="activeAgent"
+          label="Agent"
+          label-position="inside"
           :options="agentOptions"
           labelKey="label"
           valueKey="value"
@@ -56,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Skeleton shown only while a real request is in flight -->
-    <LLMInsightsSkeleton v-if="!streamsLoaded || loading" class="tw:flex-1" />
+    <LLMInsightsSkeleton v-if="!streamsLoaded || loading" class="tw:flex-1 tw:px-4" />
 
     <!-- Generic error state — kept separate because a failed request is a
          different signal from "no data yet". Once we have a result we fall
@@ -80,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          the preset's "Instrument with OpenTelemetry" call to action. -->
     <div
       v-else-if="isEmpty"
-      class="tw:flex-1 tw:min-h-0 tw:flex tw:items-center tw:justify-center"
+      class="tw:flex-1 tw:min-h-0 tw:flex tw:items-center tw:justify-center tw:px-4"
       data-test="llm-insights-empty"
     >
       <OEmptyState
@@ -90,8 +97,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
 
-    <!-- Dashboard content — scrollable panel area -->
-    <div v-else class="tw:flex-1 tw:overflow-y-auto tw:pb-[0.625rem]">
+    <!-- Dashboard content — scrollable panel area. Horizontal padding lives
+         here (inside the scroll container) so the scrollbar sits at the
+         content-area edge with content padded away from it. -->
+    <div v-else class="tw:flex-1 tw:overflow-y-auto tw:px-4 tw:pb-3">
       <!-- KPI Cards Row -->
       <div class="tw:grid tw:grid-cols-5 tw:gap-[0.625rem] tw:mt-[0.625rem] tw:mb-[0.625rem]">
         <div
