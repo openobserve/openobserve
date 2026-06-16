@@ -167,7 +167,6 @@ class="tw:mr-1" />
       v-if="props.sourceEvent && (props.sourceEvent.timestamp || props.sourceEvent.message)"
       class="source-event-banner tw:flex tw:items-center tw:gap-3 tw:px-4 tw:py-2 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
     >
-      <span class="tw:text-xs tw:font-semibold tw:opacity-70">Source event</span>
       <OBadge
         v-if="props.sourceEvent.severity"
         :class="severityClass(props.sourceEvent.severity)"
@@ -176,6 +175,11 @@ class="tw:mr-1" />
       <span class="tw:text-xs tw:font-mono tw:opacity-80">
         {{ formatEventTimestamp(props.sourceEvent.timestamp) }}
       </span>
+      <OSeparator 
+        v-if="props.sourceEvent.message"
+        vertical 
+        class="tw:mx-0" 
+      />
       <span
         v-if="props.sourceEvent.message"
         class="tw:text-xs tw:flex-1 tw:font-mono tw:opacity-90 source-event-message"
@@ -190,28 +194,39 @@ class="tw:mr-1" />
       v-if="unifiedChips.length > 0 || props.hideDimensionFilters"
       class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap tw:px-4 tw:py-2 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
     >
+      <span class="tw:text-2! tw:m-0 tw:opacity-70 tw:shrink-0">Correlated by:</span>
       <OBadge
         v-for="chip in visibleChips"
         :key="chip.key"
         :variant="chipVariant(chip.key)"
-        size="sm"
-        icon="check"
+        size="md"
+        dot
         :data-test="`correlated-logs-table-dim-chip-${chip.key}`"
       >
         {{ chip.label }} = {{ chip.value }}
       </OBadge>
-      <div
-        v-if="hiddenChipCount > 0"
-        class="dim-chip-more"
-        @click="chipOverflowExpanded = !chipOverflowExpanded"
-      >
-        {{ chipOverflowExpanded ? "show less" : `+${hiddenChipCount} more` }}
-      </div>
+
+      <!-- Non-expandable overflow indicator with tooltip (badge-like styling) -->
+      <span v-if="hiddenChipCount > 0" class="tw:contents">
+        <OBadge
+          variant="default-soft"
+          size="md"
+          class="tw:cursor-default"
+          :data-test="`correlated-logs-table-dim-chip-overflow-${hiddenChipCount}`"
+        >
+          +{{ hiddenChipCount }}
+        </OBadge>
+        <OTooltip
+          :content="hiddenChipsTooltip"
+          side="top"
+          :disabled="hiddenChipCount === 0"
+        />
+      </span>
       <!-- Wrap Content Button (co-located with chips) -->
       <OButton
         variant="ghost"
         size="icon"
-        class="tw:ml-auto"
+        class="tw:ml-auto tw:h-5!"
         :class="{ 'tw:text-white! tw:bg-[var(--o2-theme-color)]! tw:hover:opacity-80': wrapTableCells }"
         data-test="correlated-logs-table-wrap-content-btn"
         @click="wrapTableCells = !wrapTableCells"
@@ -1333,19 +1348,26 @@ const unifiedChips = computed<DimensionChip[]>(() =>
 
 const hashKey = (s: string) => { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return Math.abs(h); };
 const CHIP_VARIANTS = [
-  "primary-soft", "success-soft", "warning-soft", "error-soft",
-  "teal-soft", "orange-soft", "lime-soft", "amber-soft",
-  "cyan-soft", "blue-soft", "purple-soft", "indigo-soft"
+  "primary-outline", "success-outline", "warning-outline", "error-outline",
+  "teal-outline", "orange-outline", "lime-outline", "amber-outline",
+  "cyan-outline", "blue-outline", "purple-outline", "indigo-outline"
 ] as const;
 const chipVariant = (key: string): (typeof CHIP_VARIANTS)[number] =>
   CHIP_VARIANTS[hashKey(key) % CHIP_VARIANTS.length];
 
 const CHIP_OVERFLOW_THRESHOLD = 4;
-const chipOverflowExpanded = ref(false);
 const visibleChips = computed(() =>
-  chipOverflowExpanded.value ? unifiedChips.value : unifiedChips.value.slice(0, CHIP_OVERFLOW_THRESHOLD),
+  unifiedChips.value.slice(0, CHIP_OVERFLOW_THRESHOLD),
 );
-const hiddenChipCount = computed(() => Math.max(0, unifiedChips.value.length - CHIP_OVERFLOW_THRESHOLD));
+const hiddenChips = computed(() =>
+  unifiedChips.value.slice(CHIP_OVERFLOW_THRESHOLD),
+);
+const hiddenChipCount = computed(() => hiddenChips.value.length);
+
+// Tooltip content for hidden chips (badge-like format for better readability)
+const hiddenChipsTooltip = computed(() =>
+  hiddenChips.value.map((chip) => `${chip.label} = ${chip.value}`).join("\n"),
+);
 
 // Source event banner
 const TS_NS_MIN = 1e17; const TS_US_MIN = 1e14; const TS_MS_MIN = 1e11; const TS_S_MIN = 1e9;
@@ -1481,18 +1503,6 @@ const severityClass = (sev: string | undefined): string => {
   }
 }
 
-.dim-chip-more {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.25rem 0.5rem;
-  font-size: 0.75rem;
-  color: var(--o2-text-3, #888);
-  cursor: pointer;
-  user-select: none;
-  border-radius: 0.5rem;
-  background: var(--o2-bg-color-2, #f4f4f4);
-  &:hover { background: var(--o2-bg-color-3, #e8e8e8); }
-}
 .source-event-banner {
   background: var(--o2-card-bg, var(--o2-bg-color));
 }

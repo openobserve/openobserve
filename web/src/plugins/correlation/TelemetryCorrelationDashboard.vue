@@ -90,6 +90,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span class="tw:text-xs tw:font-mono tw:opacity-80">
           {{ formatEventTimestamp(sourceEvent.timestamp) }}
         </span>
+        <OSeparator 
+          v-if="sourceEvent.message"
+          vertical 
+          class="tw:mx-0" 
+        />        
         <span
           v-if="sourceEvent.message"
           class="tw:text-xs tw:flex-1 tw:font-mono tw:opacity-90 source-event-message"
@@ -108,9 +113,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Context chips section - max width but only takes space it needs -->
         <div
           v-if="contextChips.length > 0"
-          class="tw:flex tw:items-center tw:gap-3 tw:max-w-[calc(100%-12.5rem)]"
+          class="tw:flex tw:items-center tw:gap-3"
+          :class="subjectChips.length > 0 ? 'tw:max-w-[calc(100%-18.75rem)]' : 'tw:max-w-full'"
         >
-          <h4 class="tw:text-sm tw:font-semibold tw:m-0 tw:opacity-70 tw:shrink-0">Correlated by:</h4>
+          <span class="tw:text-2! tw:m-0 tw:opacity-70 tw:shrink-0">Correlated by:</span>
           <div
             class="tw:flex tw:items-center tw:gap-2 tw:min-w-0 tw:overflow-hidden"
           >
@@ -663,7 +669,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:text-xs tw:font-mono tw:text-typography-meta">
         {{ formatEventTimestamp(sourceEvent.timestamp) }}
       </div>
-      <OSeparator vertical class="tw:mx-0" />
+      <OSeparator 
+        v-if="sourceEvent.message"
+        vertical 
+        class="tw:mx-0" 
+      />      
       <div
         v-if="sourceEvent.message"
         class="tw:text-xs tw:flex-1 tw:font-mono tw:opacity-90 source-event-message"
@@ -682,7 +692,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Context chips section - max width but only takes space it needs -->
       <div
         v-if="contextChips.length > 0"
-        class="tw:flex tw:items-center tw:gap-3 tw:max-w-[calc(100%-18.75rem)] tw:py-2"
+        class="tw:flex tw:items-center tw:gap-3 tw:py-2"
+        :class="subjectChips.length > 0 ? 'tw:max-w-[calc(100%-18.75rem)]' : 'tw:max-w-full'"
       >
         <span class="tw:text-2! tw:m-0 tw:opacity-70 tw:shrink-0">Correlated by:</span>
         <div
@@ -2026,7 +2037,7 @@ const visibleContextChips = computed(() => {
 
   // Calculate available space for context chips within the dimensions container
   const fullContainerWidth = dimensionsContainerWidth.value;
-  const reservedForSubjects = 300; // 18.75rem = 300px
+  const reservedForSubjects = subjectChips.value.length > 0 ? 300 : 0; // only reserve when subject chips are shown
   const labelWidth = 90; // "Correlated by:" vs "Correlated By"
   const paddingAndGaps = 32; // Container padding and gaps
 
