@@ -301,7 +301,6 @@ function sparkPoints(series: number[]): string {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 .qcs-item__type {
