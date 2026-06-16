@@ -1,0 +1,6 @@
+{
+  "group": "Metrics",
+  "spec_filename": "metrics-share-deep-link.spec.js",
+  "create_group": false,
+  "browser": "chrome"
+}

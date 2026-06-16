@@ -1,0 +1,22 @@
+{
+  "feature_slug": "metrics-share-deep-link",
+  "feature_title": "Metrics Share & Deep Link",
+  "area": "Metrics",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "metrics-share-deep-link.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Metrics/metrics-share-deep-link.spec.js",
+  "playwright_group": "Metrics",
+  "source_files": [
+    "web/src/plugins/metrics/Index.vue",
+    "web/src/composables/metrics/metricsUrlState.ts",
+    "web/src/utils/metrics/buildMetricsUrl.ts",
+    "web/src/utils/metrics/metricsParamRegistry.ts",
+    "web/src/utils/url/deepLinkParams.ts",
+    "web/src/utils/dashboard/urlTimeParams.ts"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": ""
+}

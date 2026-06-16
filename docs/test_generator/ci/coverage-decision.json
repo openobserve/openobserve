@@ -1,0 +1,12 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/Metrics/metrics-share-deep-link.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/Metrics/metrics.spec.js",
+    "tests/ui-testing/playwright-tests/Metrics/metrics-config.spec.js",
+    "tests/ui-testing/playwright-tests/Metrics/metrics-promql-query-persistence.spec.js",
+    "tests/ui-testing/playwright-tests/Dashboards/dashboard-share-link.spec.js"
+  ],
+  "needs_registration": false,
+  "rationale": "No existing Metrics test covers share/deep-link functionality. The dashboard-share-link.spec.js covers dashboard sharing (analogous pattern) but it's a separate area. The MetricsPage page object (2357 lines) has no share button methods, clipboard helpers, or URL blob validation — all must be added. This is a greenfield feature for Metrics E2E coverage. Playwright config auto-discovers tests from the testDir directory; no explicit registration needed."
+}
