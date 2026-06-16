@@ -1,0 +1,266 @@
+diff --git a/web/src/composables/shared/router.ts b/web/src/composables/shared/router.ts
+index 271eb7ce2bb..79557ff337d 100644
+--- a/web/src/composables/shared/router.ts
++++ b/web/src/composables/shared/router.ts
+@@ -132,6 +132,17 @@ const useRoutes = () => {
+         title: "Empty State Demo",
+       },
+     },
++    // THROWAWAY: test-target page for E2E Council generation. Reachable at
++    // /test-demo. Remove with src/views/TestDemo.vue — this branch is not for merge.
++    {
++      path: "test-demo",
++      name: "testDemo",
++      component: () => import("@/views/TestDemo.vue"),
++      meta: {
++        keepAlive: false,
++        title: "Test Demo",
++      },
++    },
+     {
+       path: "logs",
+       name: "logs",
+diff --git a/web/src/layouts/MainLayout.vue b/web/src/layouts/MainLayout.vue
+index d80ca3eaad8..779ef292c53 100644
+--- a/web/src/layouts/MainLayout.vue
++++ b/web/src/layouts/MainLayout.vue
+@@ -361,6 +361,14 @@ export default defineComponent({
+         link: "/logs",
+         name: "logs",
+       },
++      // THROWAWAY: nav entry for the E2E Council test-target page (/test-demo).
++      // Remove with src/views/TestDemo.vue — this branch is not for merge.
++      {
++        title: "TEST",
++        icon: "fact-check",
++        link: "/test-demo",
++        name: "testDemo",
++      },
+       {
+         title: t("menu.metrics"),
+         icon: "bar-chart",
+diff --git a/web/src/views/TestDemo.vue b/web/src/views/TestDemo.vue
+new file mode 100644
+index 00000000000..9747e069948
+--- /dev/null
++++ b/web/src/views/TestDemo.vue
+@@ -0,0 +1,219 @@
++<!-- Copyright 2026 OpenObserve Inc.
++
++  ⚠️ THROWAWAY TEST-TARGET PAGE — NOT FOR MERGE.
++
++  A deterministic, multi-mode UI surface for exercising the E2E Council
++  test-generation pipeline (non-dry-run). Reachable at /test-demo. No backend
++  dependency: every output is a pure function of the selections, so generated
++  Playwright tests are stable and self-contained.
++
++  Built with the in-house component library (@/lib/*), NOT Quasar — Quasar has
++  been removed from this codebase.
++
++  Test surface (all interactive/asserted elements carry data-test ids):
++    1. Fruit select    -> single mapping to a description line.
++    2. Country + City  -> cascading selects (city options depend on country)
++                          -> combined location sentence.
++    3. Mode toggle     -> Basic | Advanced. "Advanced" reveals an extra Priority
++                          select and a conditional banner that only appears when
++                          Fruit = Cherry AND Priority = High.
++-->
++<template>
++  <div class="test-demo-page tw:p-6 tw:flex tw:flex-col tw:gap-4" data-test="test-demo-page">
++    <div>
++      <div class="tw:text-2xl tw:font-semibold tw:text-text-primary" data-test="test-demo-title">
++        TEST — Demo Page
++      </div>
++      <div class="tw:text-sm tw:text-text-secondary tw:mt-1" data-test="test-demo-subtitle">
++        Throwaway multi-mode surface for E2E Council test generation. No backend —
++        every output is derived purely from the selections below.
++      </div>
++    </div>
++
++    <!-- ───────────── Section 1: single select -> text ───────────── -->
++    <OCard class="tw:p-4" data-test="test-demo-fruit-card">
++      <div class="tw:text-base tw:font-medium tw:mb-2 tw:text-text-primary">1. Pick a fruit</div>
++      <OSelect
++        v-model="fruit"
++        :options="fruitOptions"
++        placeholder="Select a fruit"
++        style="max-width: 320px"
++        data-test="test-demo-fruit-select"
++      />
++      <div class="tw:mt-3 tw:text-text-primary" data-test="test-demo-fruit-output">
++        {{ fruitOutput }}
++      </div>
++    </OCard>
++
++    <!-- ───────────── Section 2: cascading selects -> text ───────────── -->
++    <OCard class="tw:p-4" data-test="test-demo-location-card">
++      <div class="tw:text-base tw:font-medium tw:mb-2 tw:text-text-primary">2. Pick a location</div>
++      <div class="tw:flex tw:gap-4 tw:flex-wrap">
++        <OSelect
++          v-model="country"
++          :options="countryOptions"
++          placeholder="Select a country"
++          style="width: 280px"
++          data-test="test-demo-country-select"
++          @update:model-value="onCountryChange"
++        />
++        <OSelect
++          v-model="city"
++          :options="cityOptions"
++          placeholder="Select a city"
++          :disabled="!country"
++          style="width: 280px"
++          data-test="test-demo-city-select"
++        />
++      </div>
++      <div class="tw:mt-3 tw:text-text-primary" data-test="test-demo-location-output">
++        {{ locationOutput }}
++      </div>
++    </OCard>
++
++    <!-- ───────────── Section 3: mode toggle + conditional banner ───────────── -->
++    <OCard class="tw:p-4" data-test="test-demo-mode-card">
++      <div class="tw:text-base tw:font-medium tw:mb-2 tw:text-text-primary">3. Mode</div>
++      <OToggleGroup v-model="mode" data-test="test-demo-mode-toggle">
++        <OToggleGroupItem
++          v-for="opt in modeOptions"
++          :key="opt.value"
++          :value="opt.value"
++          size="sm"
++          :data-test="`test-demo-mode-option-${opt.value}`"
++        >
++          {{ opt.label }}
++        </OToggleGroupItem>
++      </OToggleGroup>
++
++      <div class="tw:mt-3 tw:text-text-primary" data-test="test-demo-mode-output">
++        {{ modeOutput }}
++      </div>
++
++      <!-- Advanced-only controls -->
++      <div v-if="mode === 'advanced'" class="tw:mt-4" data-test="test-demo-advanced-panel">
++        <OSelect
++          v-model="priority"
++          :options="priorityOptions"
++          placeholder="Select a priority"
++          style="max-width: 320px"
++          data-test="test-demo-priority-select"
++        />
++        <div class="tw:mt-2 tw:text-text-primary" data-test="test-demo-priority-output">
++          {{ priorityOutput }}
++        </div>
++
++        <!-- Combined rule: Fruit=Cherry AND Priority=High -->
++        <div
++          v-if="showCriticalBanner"
++          class="tw:mt-4 tw:flex tw:items-center tw:gap-2 tw:rounded-md tw:px-3 tw:py-2 tw:bg-red-100 tw:text-red-700"
++          data-test="test-demo-combined-banner"
++        >
++          <OIcon name="warning" size="sm" />
++          <span>Critical cherry alert — Cherry selected at High priority.</span>
++        </div>
++      </div>
++    </OCard>
++  </div>
++</template>
++
++<script setup lang="ts">
++import { ref, computed } from "vue";
++
++import OCard from "@/lib/core/Card/OCard.vue";
++import OIcon from "@/lib/core/Icon/OIcon.vue";
++import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
++import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
++import OSelect from "@/lib/forms/Select/OSelect.vue";
++
++// ───────────── Section 1: fruit ─────────────
++const fruit = ref<string>("");
++const fruitOptions = [
++  { label: "Apple", value: "apple" },
++  { label: "Banana", value: "banana" },
++  { label: "Cherry", value: "cherry" },
++];
++const fruitDescriptions: Record<string, string> = {
++  apple: "Apple — a crisp red pome. (You selected option A.)",
++  banana: "Banana — a soft yellow berry. (You selected option B.)",
++  cherry: "Cherry — a small red stone fruit. (You selected option C.)",
++};
++const fruitOutput = computed(() =>
++  fruit.value ? fruitDescriptions[fruit.value] : "No fruit selected yet.",
++);
++
++// ───────────── Section 2: cascading country -> city ─────────────
++const country = ref<string>("");
++const city = ref<string>("");
++const countryOptions = [
++  { label: "India", value: "india" },
++  { label: "United States", value: "usa" },
++  { label: "Japan", value: "japan" },
++];
++const citiesByCountry: Record<string, { label: string; value: string }[]> = {
++  india: [
++    { label: "Bengaluru", value: "bengaluru" },
++    { label: "Mumbai", value: "mumbai" },
++  ],
++  usa: [
++    { label: "San Francisco", value: "sf" },
++    { label: "New York", value: "ny" },
++  ],
++  japan: [
++    { label: "Tokyo", value: "tokyo" },
++    { label: "Osaka", value: "osaka" },
++  ],
++};
++const cityOptions = computed(() =>
++  country.value ? citiesByCountry[country.value] : [],
++);
++const onCountryChange = () => {
++  // reset the dependent city whenever the country changes
++  city.value = "";
++};
++const labelOf = (
++  opts: { label: string; value: string }[],
++  value: string,
++): string => opts.find((o) => o.value === value)?.label ?? "";
++const locationOutput = computed(() => {
++  if (!country.value) return "Pick a country to begin.";
++  if (!city.value) return `Country: ${labelOf(countryOptions, country.value)}. Now pick a city.`;
++  return `You selected ${labelOf(cityOptions.value, city.value)}, ${labelOf(
++    countryOptions,
++    country.value,
++  )}.`;
++});
++
++// ───────────── Section 3: mode + priority + combined rule ─────────────
++const mode = ref<string>("basic");
++const modeOptions = [
++  { label: "Basic", value: "basic" },
++  { label: "Advanced", value: "advanced" },
++];
++const modeOutput = computed(() =>
++  mode.value === "advanced"
++    ? "Advanced mode — extra controls are visible below."
++    : "Basic mode — minimal controls. Switch to Advanced for more.",
++);
++
++const priority = ref<string>("");
++const priorityOptions = [
++  { label: "Low", value: "low" },
++  { label: "Medium", value: "medium" },
++  { label: "High", value: "high" },
++];
++const priorityOutput = computed(() => {
++  if (!priority.value) return "No priority selected.";
++  return `Priority set to ${labelOf(priorityOptions, priority.value)}.`;
++});
++
++const showCriticalBanner = computed(
++  () => mode.value === "advanced" && fruit.value === "cherry" && priority.value === "high",
++);
++</script>
++
++<style scoped lang="scss">
++.test-demo-page {
++  max-width: 900px;
++}
++</style>
