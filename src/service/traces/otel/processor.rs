@@ -134,6 +134,7 @@ impl OtelIngestionProcessor {
         );
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn process_span_with_pricing_and_agent_mapping(
         &self,
         span_attributes: &mut HashMap<String, json::Value>,
