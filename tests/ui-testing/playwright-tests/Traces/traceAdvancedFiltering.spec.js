@@ -27,7 +27,7 @@ test.describe("Trace Advanced Filtering testcases", () => {
 
     await pm.tracesPage.isStreamSelectVisible()
     await pm.tracesPage.selectTraceStream('default');
-    await page.waitForTimeout(2000);
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
     testLogger.info('Test setup completed for advanced trace filtering');
   });
@@ -66,7 +66,7 @@ test.describe("Trace Advanced Filtering testcases", () => {
       let searchResult = null;
 
       while (attempts < maxAttempts && !searchResult) {
-        await page.waitForTimeout(2000);
+        await page.waitForTimeout(500);
 
         const hasResults = await pm.tracesPage.hasTraceResults();
         const noResults = await pm.tracesPage.isNoResultsVisible();
@@ -100,7 +100,6 @@ test.describe("Trace Advanced Filtering testcases", () => {
       // Set time range and run search
       await pm.tracesPage.setTimeRange('15m');
       await pm.tracesPage.runSearch();
-      await page.waitForTimeout(3000);
 
       // Check results
       const hasResults = await pm.tracesPage.hasTraceResults();
@@ -139,7 +138,6 @@ test.describe("Trace Advanced Filtering testcases", () => {
     // Set time range and run search
     await pm.tracesPage.setTimeRange('15m');
     await pm.tracesPage.runSearch();
-    await page.waitForTimeout(3000);
 
     // Check results
     const hasResults = await pm.tracesPage.hasTraceResults();
@@ -175,7 +173,6 @@ test.describe("Trace Advanced Filtering testcases", () => {
     // Set time range and run search
     await pm.tracesPage.setTimeRange('15m');
     await pm.tracesPage.runSearch();
-    await page.waitForTimeout(3000);
 
     // Check results
     const hasResults = await pm.tracesPage.hasTraceResults();
@@ -185,7 +182,7 @@ test.describe("Trace Advanced Filtering testcases", () => {
 
       // Click on first result to check duration
       await pm.tracesPage.clickFirstTraceResult();
-      await page.waitForTimeout(2000);
+      await pm.tracesPage.expectTraceDetailsVisible().catch(() => {});
 
       // Look for duration information using page object
       const durationVisible = await pm.tracesPage.isDurationCellVisible();
@@ -224,7 +221,6 @@ test.describe("Trace Advanced Filtering testcases", () => {
         await pm.tracesPage.enterTraceQuery(query);
         await pm.tracesPage.setTimeRange('15m');
         await pm.tracesPage.runSearch();
-        await page.waitForTimeout(2000);
 
         // Check if query executes without error using page object
         const errorMsg = await pm.tracesPage.isErrorMessageVisible();
@@ -253,7 +249,6 @@ test.describe("Trace Advanced Filtering testcases", () => {
       await pm.tracesPage.enterTraceQuery("service_name='API-GATEWAY'");
       await pm.tracesPage.setTimeRange('15m');
       await pm.tracesPage.runSearch();
-      await page.waitForTimeout(2000);
 
       const uppercaseResults = await pm.tracesPage.hasTraceResults();
       testLogger.info(`Uppercase query results: ${uppercaseResults}`);
@@ -262,7 +257,6 @@ test.describe("Trace Advanced Filtering testcases", () => {
       await pm.tracesPage.resetTraceFilters();
       await pm.tracesPage.enterTraceQuery("service_name='api-gateway'");
       await pm.tracesPage.runSearch();
-      await page.waitForTimeout(2000);
 
       const lowercaseResults = await pm.tracesPage.hasTraceResults();
       testLogger.info(`Lowercase query results: ${lowercaseResults}`);
@@ -296,7 +290,6 @@ test.describe("Trace Advanced Filtering testcases", () => {
       await pm.tracesPage.enterTraceQuery(query);
       await pm.tracesPage.setTimeRange('15m');
       await pm.tracesPage.runSearch();
-      await page.waitForTimeout(2000);
 
       const hasResults = await pm.tracesPage.hasTraceResults();
       const hasError = await pm.tracesPage.isErrorMessageVisible();
@@ -340,7 +333,6 @@ test.describe("Trace Advanced Filtering testcases", () => {
         await pm.tracesPage.enterTraceQuery(query);
         await pm.tracesPage.setTimeRange('15m');
         await pm.tracesPage.runSearch();
-        await page.waitForTimeout(2000);
 
         const hasResults = await pm.tracesPage.hasTraceResults();
         const noResults = await pm.tracesPage.isNoResultsVisible();
@@ -370,7 +362,6 @@ test.describe("Trace Advanced Filtering testcases", () => {
       // Set time range and run search
       await pm.tracesPage.setTimeRange('15m');
       await pm.tracesPage.runSearch();
-      await page.waitForTimeout(3000);
 
       // Now try to add a filter via field expansion
       const expanded = await pm.tracesPage.expandTraceField('service_name');
@@ -380,7 +371,7 @@ test.describe("Trace Advanced Filtering testcases", () => {
         const clicked = await pm.tracesPage.clickButtonWithText('api-gateway');
 
         if (clicked) {
-          await page.waitForTimeout(1000);
+          await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
           // Check if filter was added to query using page object
           const editorContent = await pm.tracesPage.getQueryEditorContent();
@@ -388,7 +379,6 @@ test.describe("Trace Advanced Filtering testcases", () => {
 
           // Run the combined query
           await pm.tracesPage.runSearch();
-          await page.waitForTimeout(2000);
 
           const hasResults = await pm.tracesPage.hasTraceResults();
           testLogger.info(`Combined filter results: ${hasResults}`);

@@ -11,22 +11,22 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
     testLogger.testStart(testInfo.title, testInfo.file);
     await navigateToBase(page);
     pageManager = new PageManager(page);
-    await page.waitForTimeout(500);
+    await page.waitForLoadState('domcontentloaded');
     await ingestion(page);
-    await page.waitForTimeout(500);
+    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
 
     await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
-    await page.waitForTimeout(1000);
+    await page.waitForLoadState('domcontentloaded');
     await pageManager.logsPage.selectStream("e2e_automate");
     await pageManager.logsPage.clickDateTimeButton();
     await pageManager.logsPage.clickRelative15MinButton();
-    
+
     // Switch off quick mode before starting the test
     await pageManager.logsPage.ensureQuickModeState(false);
     testLogger.info('Quick mode state ensured');
-    
+
     await pageManager.logsPage.clickSearchBarRefreshButton();
-    await page.waitForTimeout(2000);
+    await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
     
     testLogger.info('Field management test setup completed');
   });
@@ -42,14 +42,14 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
     // Search for field using POM method
     await pageManager.logsPage.fillIndexFieldSearchInput(fieldName);
     await page.waitForTimeout(500);
-    
+
     // Add field to table using POM methods
     await pageManager.logsPage.hoverOnFieldExpandButton(fieldName);
     await pageManager.logsPage.clickAddFieldToTableButton(fieldName);
-    
+
     // Verify field appears in table using POM method
     await pageManager.logsPage.expectFieldInTableHeader(fieldName);
-    
+
     // Remove field from table using POM methods
     await pageManager.logsPage.hoverOnFieldExpandButton(fieldName);
     await pageManager.logsPage.clickRemoveFieldFromTableButton(fieldName);
@@ -70,15 +70,15 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
     // Search for field using POM method
     await pageManager.logsPage.fillIndexFieldSearchInput(fieldName);
     await page.waitForTimeout(500);
-    
+
     // Add field to table using POM methods
     await pageManager.logsPage.hoverOnFieldExpandButton(fieldName);
     await pageManager.logsPage.clickAddFieldToTableButton(fieldName);
-    
+
     // Verify field appears in table
     await pageManager.logsPage.expectFieldInTableHeader(fieldName);
     testLogger.info('Field added to table successfully');
-    
+
     // Refresh the page
     await page.reload();
     await page.waitForLoadState('domcontentloaded');
@@ -103,10 +103,10 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
     for (const fieldName of fields) {
       await pageManager.logsPage.fillIndexFieldSearchInput(fieldName);
       await page.waitForTimeout(500);
-      
+
       await pageManager.logsPage.hoverOnFieldExpandButton(fieldName);
       await pageManager.logsPage.clickAddFieldToTableButton(fieldName);
-      
+
       // Clear search to see all fields for next iteration
       await pageManager.logsPage.fillIndexFieldSearchInput("");
       await page.waitForTimeout(300);
@@ -133,10 +133,10 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
     for (const fieldName of fields) {
       await pageManager.logsPage.fillIndexFieldSearchInput(fieldName);
       await page.waitForTimeout(500);
-      
+
       await pageManager.logsPage.hoverOnFieldExpandButton(fieldName);
       await pageManager.logsPage.clickAddFieldToTableButton(fieldName);
-      
+
       await pageManager.logsPage.fillIndexFieldSearchInput("");
       await page.waitForTimeout(300);
     }
@@ -150,10 +150,10 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
     for (const fieldName of fields) {
       await pageManager.logsPage.fillIndexFieldSearchInput(fieldName);
       await page.waitForTimeout(500);
-      
+
       await pageManager.logsPage.hoverOnFieldExpandButton(fieldName);
       await pageManager.logsPage.clickRemoveFieldFromTableButton(fieldName);
-      
+
       await pageManager.logsPage.fillIndexFieldSearchInput("");
       await page.waitForTimeout(300);
       
@@ -179,20 +179,20 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
     // Test field search filters correctly
     await pageManager.logsPage.fillIndexFieldSearchInput(searchTerm);
     await page.waitForTimeout(500);
-    
+
     // Verify that kubernetes fields are visible
     const fieldCount = await pageManager.logsPage.getKubernetesFieldsCount();
     expect(fieldCount).toBeGreaterThan(0);
     testLogger.info(`Found ${fieldCount} kubernetes fields`);
-    
+
     // Test more specific search
     await pageManager.logsPage.fillIndexFieldSearchInput(specificField);
     await page.waitForTimeout(500);
-    
+
     // Verify specific field is found
     const specificFieldLocator = await pageManager.logsPage.getSpecificFieldLocator(specificField);
     await expect(specificFieldLocator).toBeVisible();
-    
+
     // Clear search and verify all fields are visible again
     await pageManager.logsPage.fillIndexFieldSearchInput("");
     await page.waitForTimeout(500);
@@ -214,13 +214,13 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
     // Add field to table
     await pageManager.logsPage.fillIndexFieldSearchInput(fieldName);
     await page.waitForTimeout(500);
-    
+
     await pageManager.logsPage.hoverOnFieldExpandButton(fieldName);
     await pageManager.logsPage.clickAddFieldToTableButton(fieldName);
-    
+
     // Verify field appears in table
     await pageManager.logsPage.expectFieldInTableHeader(fieldName);
-    
+
     // Check that the field column exists in the table (basic validation)
     // Note: We verify the header exists, which means the field was successfully added
     testLogger.info(`Field ${fieldName} successfully added to table structure`);
@@ -237,17 +237,17 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
     // Add field normally
     await pageManager.logsPage.fillIndexFieldSearchInput(fieldName);
     await page.waitForTimeout(500);
-    
+
     await pageManager.logsPage.hoverOnFieldExpandButton(fieldName);
     await pageManager.logsPage.clickAddFieldToTableButton(fieldName);
-    
+
     // Verify field is added to table
     await pageManager.logsPage.expectFieldInTableHeader(fieldName);
-    
+
     // Clear search to show all fields
     await pageManager.logsPage.fillIndexFieldSearchInput("");
     await page.waitForTimeout(500);
-    
+
     // Field should still be in table even with search cleared
     await pageManager.logsPage.expectFieldInTableHeader(fieldName);
     
@@ -264,7 +264,7 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
     for (const searchTerm of searchVariations) {
       await pageManager.logsPage.fillIndexFieldSearchInput(searchTerm);
       await page.waitForTimeout(500);
-      
+
       // Verify that fields matching the search are visible regardless of case
       const fieldCount = await pageManager.logsPage.countMatchingFields();
       
@@ -342,7 +342,7 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
     // Add field to current stream
     await pageManager.logsPage.fillIndexFieldSearchInput(fieldName);
     await page.waitForTimeout(500);
-    
+
     await pageManager.logsPage.hoverOnFieldExpandButton(fieldName);
     await pageManager.logsPage.clickAddFieldToTableButton(fieldName);
     
@@ -381,10 +381,10 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
     // Add field to table first (following existing test pattern)
     await pageManager.logsPage.fillIndexFieldSearchInput(fieldName);
     await page.waitForTimeout(500);
-    
+
     await pageManager.logsPage.hoverOnFieldExpandButton(fieldName);
     await pageManager.logsPage.clickAddFieldToTableButton(fieldName);
-    
+
     // Verify field appears in table
     await pageManager.logsPage.expectFieldInTableHeader(fieldName);
     testLogger.info('✓ Field added to table successfully');

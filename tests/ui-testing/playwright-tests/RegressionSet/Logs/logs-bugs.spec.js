@@ -74,12 +74,10 @@ test.describe("Logs Regression Bug Fixes", () => {
     const fifteenMinsAgo = Date.now() - (15 * 60 * 1000);
     await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}&stream=e2e_automate&stream_type=logs&from=${fifteenMinsAgo}&to=${Date.now()}`);
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
-    await page.waitForTimeout(2000);
 
     // Run query to load data
     await pm.logsPage.clickRefreshButton();
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
-    await page.waitForTimeout(2000);
 
     // STRONG ASSERTION: Table must be visible before scroll
     await pm.logsPage.expectLogsTableVisible();
@@ -131,7 +129,6 @@ test.describe("Logs Regression Bug Fixes", () => {
     // Now click Run Query
     await pm.logsPage.clickRefreshButton();
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-    await page.waitForTimeout(2000);
 
     // STRONG ASSERTION: Search API should be called after clicking run query
     const totalCalls = searchApiCalls.length;
@@ -168,7 +165,6 @@ test.describe("Logs Regression Bug Fixes", () => {
 
     // Wait for query to complete
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-    await page.waitForTimeout(2000);
 
     // STRONG ASSERTION: Button should be enabled after query completes
     await pm.logsPage.expectRefreshButtonEnabled();
@@ -191,7 +187,6 @@ test.describe("Logs Regression Bug Fixes", () => {
     await pm.logsPage.selectStream('e2e_automate');
     await pm.logsPage.clickRefreshButton();
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-    await page.waitForTimeout(2000);
 
     // STRONG ASSERTION: Stream selector must be visible
     await pm.logsPage.expectStreamSelectorVisible();
@@ -217,13 +212,11 @@ test.describe("Logs Regression Bug Fixes", () => {
     await pm.logsPage.selectStream('e2e_automate');
     await pm.logsPage.clickRefreshButton();
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-    await page.waitForTimeout(2000);
 
     // Toggle histogram on
     await pm.logsPage.enableHistogram();
     await pm.logsPage.clickRefreshButton();
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-    await page.waitForTimeout(2000);
 
     // STRONG ASSERTION: Histogram should be visible
     await pm.logsPage.expectHistogramVisible();
@@ -318,7 +311,6 @@ test.describe("Logs Regression Bug Fixes", () => {
     // Run query
     await pm.logsPage.clickRefreshButton();
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
-    await page.waitForTimeout(2000);
 
     // Wait for logs table to be visible
     await pm.logsPage.expectLogsTableVisible();
@@ -360,7 +352,6 @@ test.describe("Logs Regression Bug Fixes", () => {
     // Run query
     await pm.logsPage.clickRefreshButton();
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
-    await page.waitForTimeout(3000);
 
     // STRONG ASSERTION: Error message should be visible
     await pm.logsPage.expectErrorMessageVisible();
@@ -437,7 +428,6 @@ test.describe("Logs Regression Bug Fixes", () => {
     // Run initial query to get log results
     await pm.logsPage.clickRefreshButton();
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-    await page.waitForTimeout(2000);
 
     // Verify logs table is visible
     await pm.logsPage.expectLogsTableVisible();
@@ -506,7 +496,6 @@ test.describe("Logs Regression Bug Fixes", () => {
     // Run the query with the include filter
     await pm.logsPage.clickRefreshButton();
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-    await page.waitForTimeout(2000);
 
     // BUG CHECK: The include button should now be disabled or show different state
     // for the already-included value
@@ -721,7 +710,6 @@ test.describe("Logs Regression Bug Fixes", () => {
     await pm.logsPage.selectStream('e2e_automate');
     await pm.logsPage.clickRefreshButton();
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-    await page.waitForTimeout(2000);
 
     testLogger.info('Logs page loaded with mocked config');
 
@@ -798,7 +786,6 @@ test.describe("Logs Regression Bug Fixes", () => {
       // Step 4: Run query to have results
       await pm.logsPage.clickRefreshButton();
       await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-      await page.waitForTimeout(2000);
 
       // Step 5: Save the view
       testLogger.info('Step 5: Saving current view');
@@ -814,7 +801,6 @@ test.describe("Logs Regression Bug Fixes", () => {
       testLogger.info('Step 6: Reloading page');
       await page.reload();
       await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-      await page.waitForTimeout(2000);
 
       // Step 7: Navigate back to logs and select the saved view
       testLogger.info('Step 7: Selecting saved view');
@@ -886,7 +872,6 @@ test.describe("Logs Regression Bug Fixes", () => {
     // Run query
     await pm.logsPage.clickRefreshButton();
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-    await page.waitForTimeout(2000);
 
     // STRONG ASSERTION: Result pagination (showing X of Y records) should be visible
     await pm.logsPage.expectResultPaginationVisible();
@@ -926,7 +911,6 @@ test.describe("Logs Regression Bug Fixes", () => {
     // Run query
     await pm.logsPage.clickRefreshButton();
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-    await page.waitForTimeout(2000);
 
     // STRONG ASSERTION: _timestamp column should be visible in the table header
     await pm.logsPage.expectTimestampColumnVisible();
@@ -946,7 +930,6 @@ test.describe("Logs Regression Bug Fixes", () => {
     // SPA state-leak across in-app navigation, which full reloads would reset)
     await pm.logsPage.clickMenuLinkLogsItem();
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-    await page.waitForTimeout(1000);
 
     // Navigate between home and logs multiple times using SPA menu clicks
     for (let i = 0; i < 4; i++) {
@@ -989,7 +972,6 @@ test.describe("Logs Regression Bug Fixes", () => {
     // Run query to load data (traces was ingested by global setup)
     await pm.logsPage.clickRefreshButton();
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-    await page.waitForTimeout(2000);
 
     // Expand a log row to reveal the detail dialog with correlation tabs
     await pm.logsPage.clickTableExpandMenuFirst();
@@ -1056,7 +1038,6 @@ test.describe("Logs Regression Bug Fixes", () => {
     // Run query
     await pm.logsPage.clickRefreshButton();
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
-    await page.waitForTimeout(3000);
 
     // Check for query-level errors
     const errorVisible = await page.locator(pm.logsPage.errorMessage).isVisible({ timeout: 3000 }).catch(() => false);
@@ -1109,7 +1090,6 @@ test.describe("Logs Regression Bug Fixes", () => {
     // Run query
     await pm.logsPage.clickRefreshButton();
     await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
-    await page.waitForTimeout(3000);
 
     // STRONG ASSERTION: Logs table should be visible (query completed)
     await pm.logsPage.expectLogsTableVisible();
@@ -1169,7 +1149,6 @@ test.describe("Logs Regression Bug Fixes", () => {
 
     // Wait for page to settle
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
-    await page.waitForTimeout(2000);
 
     // STRONG ASSERTION: No "Cannot read properties of undefined" or "partitions" errors
     const partitionsErrors = consoleErrors.filter(e =>
@@ -1228,13 +1207,11 @@ test.describe("Logs Regression Bug Fixes", () => {
     testLogger.info('Switching to streams page during query (SPA)');
     await pm.logsPage.clickMenuLinkStreamsItem();
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
-    await page.waitForTimeout(2000);
 
     // Navigate back to logs page via SPA
     testLogger.info('Switching back to logs page (SPA)');
     await pm.logsPage.clickMenuLinkLogsItem();
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
-    await page.waitForTimeout(3000);
 
     // STRONG ASSERTION: No "Cannot read properties of undefined" or "partitions" errors
     const partitionsErrors = pageErrors.filter(e =>
@@ -1273,7 +1250,6 @@ test.describe("Logs Regression Bug Fixes", () => {
 
     await pm.logsPage.clickRefreshButton();
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
-    await page.waitForTimeout(2000);
 
     await pm.logsPage.expectLogsTableVisible();
     await pm.logsPage.expectResultPaginationVisible();
@@ -1344,7 +1320,6 @@ test.describe("Logs Regression Bug Fixes", () => {
     await page.waitForTimeout(500);
     await pm.logsPage.clickRefreshButton();
     await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
-    await page.waitForTimeout(3000);
 
     // Remove route handler
     await page.unroute(`**/api/${orgName}/_search`);
@@ -1423,7 +1398,6 @@ test.describe("Logs Regression Bug Fixes", () => {
     // Run query and verify no error
     await pm.logsPage.clickRunQueryButton();
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-    await page.waitForTimeout(2000);
 
     const errorVisible = await page.locator('[class*="error"], [class*="negative"], .q-banner, .q-notification')
       .filter({ hasText: /error|failed|invalid/i })

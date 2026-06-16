@@ -28,7 +28,7 @@ test.describe("Trace Error Filter testcases", () => {
     // Select the default stream as data is ingested for it only
     await pm.tracesPage.isStreamSelectVisible()
     await pm.tracesPage.selectTraceStream('default');
-    await page.waitForTimeout(2000);
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
     testLogger.info('Test setup completed for trace error filtering');
   });
@@ -99,7 +99,6 @@ test.describe("Trace Error Filter testcases", () => {
     // Set time range and run query
     await pm.tracesPage.setTimeRange('15m');
     await pm.tracesPage.runSearch();
-    await page.waitForTimeout(3000);
 
     // Check if results show only error traces
     const hasResults = await pm.tracesPage.hasTraceResults();
@@ -137,7 +136,7 @@ test.describe("Trace Error Filter testcases", () => {
       const hasAnyResults = await pm.tracesPage.hasTraceResults();
       if (hasAnyResults) {
         await pm.tracesPage.clickFirstTraceResult();
-        await page.waitForTimeout(3000);
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
         // Check if this trace has any error indicators
         const errorStatusVisible = await pm.tracesPage.isErrorStatusVisible();
@@ -167,7 +166,7 @@ test.describe("Trace Error Filter testcases", () => {
     await pm.tracesPage.clickFirstErrorTrace();
     testLogger.info('Clicked on trace with errors');
 
-    await page.waitForTimeout(3000);
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
     // Look for ERROR status in span details using page object
     const errorStatusVisible = await pm.tracesPage.isErrorStatusVisible();
@@ -197,7 +196,6 @@ test.describe("Trace Error Filter testcases", () => {
     // Set time range and run query
     await pm.tracesPage.setTimeRange('15m');
     await pm.tracesPage.runSearch();
-    await page.waitForTimeout(3000);
 
     // Check results
     const hasResults = await pm.tracesPage.hasTraceResults();
@@ -228,7 +226,6 @@ test.describe("Trace Error Filter testcases", () => {
     // Set time range and run query
     await pm.tracesPage.setTimeRange('15m');
     await pm.tracesPage.runSearch();
-    await page.waitForTimeout(2000);
 
     // Now reset filters
     await pm.tracesPage.resetTraceFilters();
@@ -256,7 +253,6 @@ test.describe("Trace Error Filter testcases", () => {
     // Set time range and run query
     await pm.tracesPage.setTimeRange('15m');
     await pm.tracesPage.runSearch();
-    await page.waitForTimeout(3000);
 
     // Check for no results message using page object
     const noResults = await pm.tracesPage.isNoResultsVisible();
@@ -291,14 +287,12 @@ test.describe("Trace Error Filter testcases", () => {
       await pm.tracesPage.enterTraceQuery("status_code='2'");
       await pm.tracesPage.setTimeRange('15m');
       await pm.tracesPage.runSearch();
-      await page.waitForTimeout(2000);
 
       testLogger.info('Viewing error traces');
 
       // Now switch to success traces
       await pm.tracesPage.enterTraceQuery("status_code='1'");
       await pm.tracesPage.runSearch();
-      await page.waitForTimeout(2000);
 
       testLogger.info('Switched to viewing success traces');
 
@@ -325,7 +319,6 @@ test.describe("Trace Error Filter testcases", () => {
 
       await pm.tracesPage.setTimeRange('15m');
       await pm.tracesPage.runSearch();
-      await page.waitForTimeout(3000);
 
       // Check for error message using page object
       const errorMessage = await pm.tracesPage.isErrorMessageVisible();

@@ -27,7 +27,7 @@ test.describe("Trace Query Editor testcases", () => {
     // Select the default stream as data is ingested for it only
     await pm.tracesPage.isStreamSelectVisible()
     await pm.tracesPage.selectTraceStream('default');
-    await page.waitForTimeout(2000);
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
 
     testLogger.info('Test setup completed for trace query editor');
@@ -58,7 +58,7 @@ test.describe("Trace Query Editor testcases", () => {
     // Wait for search to complete with retry logic
     let searchCompleted = false;
     for (let i = 0; i < 3; i++) {
-      await page.waitForTimeout(2000);
+      await page.waitForTimeout(500);
       const hasResults = await pm.tracesPage.hasTraceResults();
       const hasNoResults = await pm.tracesPage.isNoResultsVisible();
 
@@ -109,7 +109,6 @@ test.describe("Trace Query Editor testcases", () => {
 
         // Run query with filter
         await pm.tracesPage.runSearch();
-        await page.waitForTimeout(2000);
 
         // Verify query was applied
         expect(editorContent.includes('status_code') || selected).toBeTruthy();
@@ -125,7 +124,6 @@ test.describe("Trace Query Editor testcases", () => {
       if (serviceExpanded) {
         await pm.tracesPage.selectFieldValue('service_name', 'api-gateway');
         await pm.tracesPage.runSearch();
-        await page.waitForTimeout(2000);
         expect(serviceExpanded).toBeTruthy();
       } else {
         // Verify search still works
@@ -162,7 +160,7 @@ test.describe("Trace Query Editor testcases", () => {
       await pm.tracesPage.clickFirstErrorTrace();
       testLogger.info('Clicked on trace with errors');
 
-      await page.waitForTimeout(2000);
+      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
       // Look for ERROR status in the span details using page object
       const errorCellVisible = await pm.tracesPage.isErrorStatusVisible();
@@ -212,7 +210,7 @@ test.describe("Trace Query Editor testcases", () => {
     let clickSuccessful = false;
 
     for (let attempt = 0; attempt < 3; attempt++) {
-      await page.waitForTimeout(2000);
+      await page.waitForTimeout(500);
       detailsTreeVisible = await pm.tracesPage.isTraceDetailsTreeVisible();
       anyDetailsVisible = await pm.tracesPage.isAnyTraceDetailVisible();
       clickSuccessful = await pm.tracesPage.isTraceClickSuccessful();
