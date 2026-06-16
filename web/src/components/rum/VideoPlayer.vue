@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -97,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon
               name="replay-10"
               size="md"
-              class="tw:mr-2 tw:cursor-pointer tw:text-[var(--o2-icon-color-dark)] hover:tw:text-[var(--o2-primary-btn-bg)]"
+              class="tw:mr-2 tw:cursor-pointer tw:text-[var(--o2-icon-color-dark)] tw:hover:text-[var(--o2-primary-btn-bg)]"
               @click="skipTo('backward')"
             />
             <OIcon
@@ -107,13 +107,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : 'play-circle-filled'
               "
               size="lg"
-              class="tw:cursor-pointer tw:text-[var(--o2-icon-color-dark)] hover:tw:text-[var(--o2-primary-btn-bg)]"
+              class="tw:cursor-pointer tw:text-[var(--o2-icon-color-dark)] tw:hover:text-[var(--o2-primary-btn-bg)]"
               @click="togglePlay"
             />
             <OIcon
               name="forward-10"
               size="md"
-              class="tw:ml-2 tw:cursor-pointer tw:text-[var(--o2-icon-color-dark)] hover:tw:text-[var(--o2-primary-btn-bg)]"
+              class="tw:ml-2 tw:cursor-pointer tw:text-[var(--o2-icon-color-dark)] tw:hover:text-[var(--o2-primary-btn-bg)]"
               @click="skipTo('forward')"
             />
           </div>

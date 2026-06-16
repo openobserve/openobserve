@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -121,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-for="group in diffData.additions"
                 :key="group.id"
                 data-test="semantic-groups-drawer-addition-item"
-                class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:cursor-pointer hover:tw:bg-muted/50"
+                class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:cursor-pointer tw:hover:bg-muted/50"
                 @click="toggleAddition(group.id)"
               >
                 <div class="tw:flex tw:items-center tw:shrink-0">
@@ -164,7 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-for="mod in diffData.modifications"
                 :key="mod.proposed.id"
                 data-test="semantic-groups-drawer-modification-item"
-                class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:cursor-pointer hover:tw:bg-muted/50"
+                class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:cursor-pointer tw:hover:bg-muted/50"
                 @click="toggleModification(mod.proposed.id)"
               >
                 <div class="tw:flex tw:items-center tw:shrink-0">

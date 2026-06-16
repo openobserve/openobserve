@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -131,9 +131,9 @@ const statusClass = computed(() => {
   if (!props.status) return "";
 
   const classes = {
-    good: "tw:bg-green-50 dark:tw:bg-green-900/10",
-    "needs-improvement": "tw:bg-yellow-50 dark:tw:bg-yellow-900/10",
-    poor: "tw:bg-red-50 dark:tw:bg-red-900/10",
+    good: "tw:bg-green-50 tw:dark:bg-green-900/10",
+    "needs-improvement": "tw:bg-yellow-50 tw:dark:bg-yellow-900/10",
+    poor: "tw:bg-red-50 tw:dark:bg-red-900/10",
   };
 
   return classes[props.status] || "";

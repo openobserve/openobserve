@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :content="t('alerts.deduplication.fingerprintFieldsTooltip')"
                   />
               </div>
-              <div class="tw:text-sm tw:text-gray-600 dark:tw:text-gray-400 tw:mb-2">
+              <div class="tw:text-sm tw:text-gray-600 tw:dark:text-gray-400 tw:mb-2">
                 {{ t("alerts.deduplication.fingerprintFieldsHint") }}
               </div>
               <OSelect
@@ -87,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :content="t('alerts.deduplication.timeWindowTooltip')"
                   />
               </div>
-              <div class="tw:text-sm tw:text-gray-600 dark:tw:text-gray-400 tw:mb-2">
+              <div class="tw:text-sm tw:text-gray-600 tw:dark:text-gray-400 tw:mb-2">
                 {{ t("alerts.deduplication.timeWindowHint") }}
               </div>
               <OInput

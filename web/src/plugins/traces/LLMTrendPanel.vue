@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -182,7 +182,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template v-else-if="col.format === 'view-link'">
                 <a
                   href="#"
-                  class="tw:text-[var(--q-primary)] tw:font-medium tw:no-underline hover:tw:underline"
+                  class="tw:text-[var(--q-primary)] tw:font-medium tw:no-underline tw:hover:underline"
                   @click.prevent="emit('view-trace', String(row[col.field!] || ''))"
                 >
                   View →

@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc. -->
+﻿<!-- Copyright 2026 OpenObserve Inc. -->
 
 <script setup lang="ts">
 import type { HeaderGroup, Table } from "@tanstack/vue-table";
@@ -399,7 +399,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
               'tw:rounded-full tw:transition-all tw:duration-150',
               header.column.getIsResizing()
                 ? 'tw:w-0.5 tw:h-full tw:bg-[var(--color-table-resize-handle)]'
-                : 'tw:w-px tw:h-4 tw:bg-[var(--color-border-default)] group-hover/resizer:tw:w-0.5 group-hover/resizer:tw:h-full group-hover/resizer:tw:bg-[var(--color-table-resize-handle)]',
+                : 'tw:w-px tw:h-4 tw:bg-[var(--color-border-default)] tw:group-hover/resizer:w-0.5 tw:group-hover/resizer:h-full tw:group-hover/resizer:bg-[var(--color-table-resize-handle)]',
             ]"
           />
         </div>
@@ -527,7 +527,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
               'tw:rounded-full tw:transition-all tw:duration-150',
               header.column.getIsResizing()
                 ? 'tw:w-0.5 tw:h-full tw:bg-[var(--color-table-resize-handle)]'
-                : 'tw:w-px tw:h-4 tw:bg-[var(--color-border-default)] group-hover/resizer:tw:w-0.5 group-hover/resizer:tw:h-full group-hover/resizer:tw:bg-[var(--color-table-resize-handle)]',
+                : 'tw:w-px tw:h-4 tw:bg-[var(--color-border-default)] tw:group-hover/resizer:w-0.5 tw:group-hover/resizer:h-full tw:group-hover/resizer:bg-[var(--color-table-resize-handle)]',
             ]"
           />
         </div>

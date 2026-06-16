@@ -360,7 +360,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-for="(nodeError, nodeId) in errorDialog.data.last_error
               .node_errors"
             :key="nodeId"
-            class="node-error-item tw:p-4 tw:rounded-lg tw:bg-[rgba(0,0,0,0.02)] tw:border tw:border-[rgba(0,0,0,0.08)] tw:transition-all hover:tw:bg-[rgba(0,0,0,0.04)]"
+            class="node-error-item tw:p-4 tw:rounded-lg tw:bg-[rgba(0,0,0,0.02)] tw:border tw:border-[rgba(0,0,0,0.08)] tw:transition-all tw:hover:bg-[rgba(0,0,0,0.04)]"
           >
             <div class="node-error-header tw:flex tw:items-center tw:justify-between tw:mb-2.5">
               <span class="node-name tw:font-semibold tw:text-sm">{{ nodeError.node_name || nodeId }}</span>

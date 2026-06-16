@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:pt-2 tw:pb-1 tw:flex tw:justify-start">
         <div
           data-test="back-button"
-          class="tw:flex tw:justify-center tw:items-center tw:mr-3 tw:cursor-pointer hover:tw:text-[var(--o2-primary-btn-bg)]"
+          class="tw:flex tw:justify-center tw:items-center tw:mr-3 tw:cursor-pointer tw:hover:text-[var(--o2-primary-btn-bg)]"
           style="
             border: 1.5px solid;
             border-radius: 50%;
@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon
             size="xs"
             name="content-copy"
-            class="hover:tw:text-[var(--o2-primary-btn-bg)]"
+            class="tw:hover:text-[var(--o2-primary-btn-bg)]"
             @click="copyErrorId(error.error_id)"
         /></span>
         <span class="tw:ml-4">{{ error.timestamp }}</span>

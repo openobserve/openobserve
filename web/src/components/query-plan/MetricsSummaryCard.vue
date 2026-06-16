@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OCardSection role="body">
       <div class="tw:text-sm tw:font-medium text-weight-bold tw:mb-3">{{ t("search.executionSummary") }}</div>
       <div class="tw:grid tw:[grid-template-columns:repeat(auto-fit,minmax(11.25rem,1fr))] tw:gap-4">
-        <div class="tw:flex tw:items-center tw:gap-3 tw:p-[0.875rem_1rem] tw:rounded-lg tw:bg-[var(--o2-card-bg)] tw:border tw:border-solid tw:border-[var(--o2-border-color)] tw:transition-[border-color,box-shadow] tw:duration-200 hover:tw:border-[var(--o2-primary-color)] hover:tw:shadow-[0_0.0625rem_0.1875rem_rgba(0,0,0,0.05)]">
+        <div class="tw:flex tw:items-center tw:gap-3 tw:p-[0.875rem_1rem] tw:rounded-lg tw:bg-[var(--o2-card-bg)] tw:border tw:border-solid tw:border-[var(--o2-border-color)] tw:transition-[border-color,box-shadow] tw:duration-200 tw:hover:border-[var(--o2-primary-color)] tw:hover:shadow-[0_0.0625rem_0.1875rem_rgba(0,0,0,0.05)]">
           <div class="tw:shrink-0 tw:text-[var(--o2-text-secondary)]">
             <OIcon name="schedule" size="md" />
           </div>
@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <div class="tw:flex tw:items-center tw:gap-3 tw:p-[0.875rem_1rem] tw:rounded-lg tw:bg-[var(--o2-card-bg)] tw:border tw:border-solid tw:border-[var(--o2-border-color)] tw:transition-[border-color,box-shadow] tw:duration-200 hover:tw:border-[var(--o2-primary-color)] hover:tw:shadow-[0_0.0625rem_0.1875rem_rgba(0,0,0,0.05)]">
+        <div class="tw:flex tw:items-center tw:gap-3 tw:p-[0.875rem_1rem] tw:rounded-lg tw:bg-[var(--o2-card-bg)] tw:border tw:border-solid tw:border-[var(--o2-border-color)] tw:transition-[border-color,box-shadow] tw:duration-200 tw:hover:border-[var(--o2-primary-color)] tw:hover:shadow-[0_0.0625rem_0.1875rem_rgba(0,0,0,0.05)]">
           <div class="tw:shrink-0 tw:text-[var(--o2-text-secondary)]">
             <OIcon name="format-list-numbered" size="md" />
           </div>
@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <div class="tw:flex tw:items-center tw:gap-3 tw:p-[0.875rem_1rem] tw:rounded-lg tw:bg-[var(--o2-card-bg)] tw:border tw:border-solid tw:border-[var(--o2-border-color)] tw:transition-[border-color,box-shadow] tw:duration-200 hover:tw:border-[var(--o2-primary-color)] hover:tw:shadow-[0_0.0625rem_0.1875rem_rgba(0,0,0,0.05)]">
+        <div class="tw:flex tw:items-center tw:gap-3 tw:p-[0.875rem_1rem] tw:rounded-lg tw:bg-[var(--o2-card-bg)] tw:border tw:border-solid tw:border-[var(--o2-border-color)] tw:transition-[border-color,box-shadow] tw:duration-200 tw:hover:border-[var(--o2-primary-color)] tw:hover:shadow-[0_0.0625rem_0.1875rem_rgba(0,0,0,0.05)]">
           <div class="tw:shrink-0 tw:text-[var(--o2-text-secondary)]">
             <OIcon name="memory" size="md" />
           </div>

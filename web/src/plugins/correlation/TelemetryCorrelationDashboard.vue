@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -238,7 +238,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           v-show="!collapsedGroups.has(group.id)"
                           :key="stream.stream_name"
                           data-test="telemetry-correlation-metric-stream-item"
-                          class="dimension-list-item tw:border-none! tw:flex tw:items-center tw:gap-2 tw:px-2 tw:py-1 tw:cursor-pointer hover:tw:bg-muted/50"
+                          class="dimension-list-item tw:border-none! tw:flex tw:items-center tw:gap-2 tw:px-2 tw:py-1 tw:cursor-pointer tw:hover:bg-muted/50"
                           @click="toggleMetricStream(stream)"
                         >
                           <div class="tw:flex tw:items-center tw:shrink-0">
@@ -701,7 +701,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         v-show="!collapsedGroups.has(group.id)"
                         :key="stream.stream_name"
                         data-test="telemetry-correlation-metric-stream-item"
-                        class="dimension-list-item tw:border-none! tw:flex tw:items-center tw:gap-2 tw:px-2 tw:py-1 tw:cursor-pointer hover:tw:bg-muted/50"
+                        class="dimension-list-item tw:border-none! tw:flex tw:items-center tw:gap-2 tw:px-2 tw:py-1 tw:cursor-pointer tw:hover:bg-muted/50"
                         @click="toggleMetricStream(stream)"
                       >
                         <div class="tw:flex tw:items-center tw:shrink-0">

@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -95,7 +95,7 @@ the Free Software Foundation, either version 3 of the License, or
               :class="[
                 isSelected(entry.name)
                   ? 'selected-item tw:bg-[color-mix(in_srgb,var(--o2-brand)_6%,transparent)] tw:border-primary'
-                  : 'tw:border-transparent hover:tw:bg-gray-50',
+                  : 'tw:border-transparent tw:hover:bg-gray-50',
               ]"
               :data-test="`scorer-library-item-${entry.name}`"
               @click="toggle(entry)"

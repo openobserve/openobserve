@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -444,7 +444,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <tr
                           v-for="entry in previewEntries(tier, idx as number)"
                           :key="entry.stableId"
-                          class="tw:border-b last:tw:border-none"
+                          class="tw:border-b tw:last:border-none"
                           :class="{
                             'preview-row-pending tw:opacity-50 tw:italic': entry.stableId === -1,
                           }"

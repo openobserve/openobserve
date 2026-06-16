@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Advanced Options -->
           <div class="collapsible-section card-container tw:flex tw:flex-col tw:transition-all tw:overflow-hidden tw:bg-(--o2-card-bg) tw:rounded-md tw:shadow-[0_0_5px_1px_var(--o2-hover-shadow)] tw:border tw:border-[var(--o2-border-color,rgba(0,0,0,0.08))]" data-test="advanced-options-section">
             <div
-              class="section-header tw:flex tw:items-center tw:justify-between tw:px-4 tw:py-3 tw:cursor-pointer tw:shrink-0 tw:border-b tw:border-[rgba(0,0,0,0.08)] tw:transition-all tw:rounded-t-md tw:select-none hover:tw:bg-[rgba(0,0,0,0.04)] active:tw:bg-[rgba(0,0,0,0.06)]"
+              class="section-header tw:flex tw:items-center tw:justify-between tw:px-4 tw:py-3 tw:cursor-pointer tw:shrink-0 tw:border-b tw:border-[rgba(0,0,0,0.08)] tw:transition-all tw:rounded-t-md tw:select-none tw:hover:bg-[rgba(0,0,0,0.04)] tw:active:bg-[rgba(0,0,0,0.06)]"
               @click="showAdvanced = !showAdvanced"
             >
               <div class="tw:flex tw:items-center tw:gap-2">
@@ -160,7 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ]"
                 >
                   <div class="tw:flex tw:items-start tw:gap-3">
-                    <OIcon name="warning" size="md" class="tw:mt-0.5 tw:text-orange-500 dark:tw:text-orange-400" />
+                    <OIcon name="warning" size="md" class="tw:mt-0.5 tw:text-orange-500 tw:dark:text-orange-400" />
                     <div>
                       <div :class="['tw:font-semibold tw:mb-2', store.state.theme === 'dark' ? 'tw:text-orange-200' : 'tw:text-orange-900']">Warning: Irreversible Data Deletion</div>
                       <div :class="['tw:text-xs tw:mb-3', store.state.theme === 'dark' ? 'tw:text-orange-300' : 'tw:text-orange-800']">

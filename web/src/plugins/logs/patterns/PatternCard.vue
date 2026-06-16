@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="tw:flex tw:border-b tw:border-[var(--color-border-default)] tw:cursor-pointer hover:tw:bg-[var(--o2-hover-gray)] tw:relative tw:py-1 tw:transition-colors tw:duration-150 tw:ease-in-out"
+    class="tw:flex tw:border-b tw:border-[var(--color-border-default)] tw:cursor-pointer tw:hover:bg-[var(--o2-hover-gray)] tw:relative tw:py-1 tw:transition-colors tw:duration-150 tw:ease-in-out"
     :class="wrap ? 'tw:items-start' : 'tw:items-center'"
     @click="$emit('click', pattern, index)"
     :data-test="`pattern-card-${index}`"

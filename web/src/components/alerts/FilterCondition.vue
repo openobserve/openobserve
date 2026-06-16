@@ -1,4 +1,4 @@
-<template>
+﻿<template>
     <div class="filter-condition-row tw:flex tw:items-start tw:gap-1 tw:flex-no-wrap">
       <!-- V2: Fixed-width left column for alignment -->
       <!-- All conditions have the same width for the operator/label section -->
@@ -228,12 +228,12 @@ const toggleOperator = () => {
 
 const computedInputWidth = computed(() => {
   // If custom width is provided, use it; otherwise use default responsive width
-  return props.inputWidth || (store.state.isAiChatEnabled ? '' : 'xl:tw:min-w-[200px] lg:tw:min-w-[90px] lg:tw:w-fit');
+  return props.inputWidth || (store.state.isAiChatEnabled ? '' : 'tw:xl:min-w-[200px] tw:lg:min-w-[90px] tw:lg:w-fit');
 });
 
 const computedValueWidth = computed(() => {
   // If custom width is provided, use it; otherwise use default responsive width
-  return props.inputWidth || (store.state.isAiChatEnabled ? 'tw:w-[110px]' : 'xl:tw:min-w-[200px] lg:tw:w-fit lg:tw:min-w-[80px]');
+  return props.inputWidth || (store.state.isAiChatEnabled ? 'tw:w-[110px]' : 'tw:xl:min-w-[200px] tw:lg:w-fit tw:lg:min-w-[80px]');
 });
 
 

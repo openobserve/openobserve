@@ -451,7 +451,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
 
                   <!-- Show Full Activity Button -->
-                  <div class="tw:border-t tw:border-gray-200 dark:tw:border-gray-700 tw:p-2 tw:flex tw:justify-end">
+                  <div class="tw:border-t tw:border-gray-200 tw:dark:border-gray-700 tw:p-2 tw:flex tw:justify-end">
                     <OButton
                       variant="ghost-primary"
                       size="sm"
@@ -492,7 +492,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <span class="tw:truncate tw:flex-1 tw:min-w-0">{{ incidentDetails?.id || 'N/A' }}</span>
                         <OIcon
                           :name="copiedField === 'incident_id' ? 'check' : 'content-copy'" size="sm"
-                          :class="copiedField === 'incident_id' ? 'tw:text-green-500' : 'tw:opacity-60 hover:tw:opacity-100 hover:tw:text-blue-500'"
+                          :class="copiedField === 'incident_id' ? 'tw:text-green-500' : 'tw:opacity-60 tw:hover:opacity-100 tw:hover:text-blue-500'"
                           class="tw:cursor-pointer tw:transition-all tw:flex-shrink-0"
                           style="font-size: 14px; cursor: pointer;"
                           @click="copyToClipboard(incidentDetails?.id, 'incident_id')"
@@ -516,7 +516,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <span class="tw:truncate tw:flex-1 tw:min-w-0">{{ incidentDetails?.title || 'N/A' }}</span>
                         <OIcon
                           :name="copiedField === 'incident_title' ? 'check' : 'content-copy'" size="sm"
-                          :class="copiedField === 'incident_title' ? 'tw:text-green-500' : 'tw:opacity-60 hover:tw:opacity-100 hover:tw:text-blue-500'"
+                          :class="copiedField === 'incident_title' ? 'tw:text-green-500' : 'tw:opacity-60 tw:hover:opacity-100 tw:hover:text-blue-500'"
                           class="tw:cursor-pointer tw:transition-all tw:flex-shrink-0"
                           style="font-size: 14px; cursor: pointer;"
                           @click="copyToClipboard(incidentDetails?.title, 'incident_title')"
@@ -540,7 +540,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <span class="tw:truncate tw:flex-1 tw:min-w-0">{{ getCorrelationMethodLabel(incidentDetails?.key_type) }}</span>
                         <OIcon
                           :name="copiedField === 'key_type' ? 'check' : 'content-copy'" size="sm"
-                          :class="copiedField === 'key_type' ? 'tw:text-green-500' : 'tw:opacity-60 hover:tw:opacity-100 hover:tw:text-blue-500'"
+                          :class="copiedField === 'key_type' ? 'tw:text-green-500' : 'tw:opacity-60 tw:hover:opacity-100 tw:hover:text-blue-500'"
                           class="tw:cursor-pointer tw:transition-all tw:flex-shrink-0"
                           style="font-size: 14px; cursor: pointer;"
                           @click="copyToClipboard(getCorrelationMethodLabel(incidentDetails?.key_type), 'key_type')"
@@ -2743,7 +2743,7 @@ export default defineComponent({
 
             let body = '';
             for (const row of token.rows) {
-              body += '<tr class="hover:tw:bg-gray-50">';
+              body += '<tr class="tw:hover:bg-gray-50">';
               for (let i = 0; i < row.length; i++) {
                 const cell = row[i];
                 const content = this.parser.parseInline(cell.tokens);

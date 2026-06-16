@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div>
     <OSeparator />
 
@@ -27,7 +27,7 @@
               <OIcon
                 name="info"
                 size="sm"
-                class="tw:cursor-pointer tw:absolute tw:right-2 tw:top-1/2 tw:-translate-y-1/2 tw:z-10 tw:opacity-60 hover:tw:opacity-100 tw:pointer-events-auto"
+                class="tw:cursor-pointer tw:absolute tw:right-2 tw:top-1/2 tw:-translate-y-1/2 tw:z-10 tw:opacity-60 tw:hover:opacity-100 tw:pointer-events-auto"
               >
                 <OTooltip side="top" max-width="250px">
                   <template #content>

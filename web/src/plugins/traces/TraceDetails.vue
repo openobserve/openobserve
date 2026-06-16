@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span
                     v-if="mode === 'embedded'"
                     data-test="trace-details-trace-id"
-                    class="tw:text-[var(--o2-text-primary)] tw:font-mono tw:cursor-pointer hover:tw:text-[var(--o2-theme-color)] tw:transition-colors"
+                    class="tw:text-[var(--o2-text-primary)] tw:font-mono tw:cursor-pointer tw:hover:text-[var(--o2-theme-color)] tw:transition-colors"
                     :title="t('traces.openInTraces')"
                     @click="handleExpandToFullView"
                   >
@@ -94,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="trace-details-copy-trace-id-btn"
                   name="content-copy"
                   size="xs"
-                  class="tw:cursor-pointer hover:tw:text-[var(--o2-text-primary)]"
+                  class="tw:cursor-pointer tw:hover:text-[var(--o2-text-primary)]"
                   :title="t('traces.copyTraceId')"
                   @click="copyTraceId"
                 />
@@ -118,7 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="trace-details-copy-session-id-btn"
                     name="content-copy"
                     size="xs"
-                    class="tw:cursor-pointer hover:tw:text-[var(--o2-text-primary)]"
+                    class="tw:cursor-pointer tw:hover:text-[var(--o2-text-primary)]"
                     title="Copy Session ID"
                     @click="copySessionId"
                   />
@@ -128,7 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon
                   v-if="mode === 'embedded' && showExpandButton"
                   data-test="trace-details-trace-id-open-btn"
-                  class="tw:cursor-pointer hover:tw:text-[var(--o2-theme-color)]"
+                  class="tw:cursor-pointer tw:hover:text-[var(--o2-theme-color)]"
                   size="xs"
                   name="open-in-new"
                   :title="t('traces.openInTraces')"

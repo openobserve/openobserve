@@ -1,7 +1,7 @@
-<template>
+﻿<template>
 <div class="tw:flex tw:h-screen">
   <!-- Left Banner Section -->
-  <div class="tw:hidden lg:tw:flex lg:tw:w-[40%] tw:bg-[url('@/assets/images/common/openobserve_banner_compreesed.png')] tw:bg-cover tw:bg-center tw:bg-no-repeat">
+  <div class="tw:hidden tw:lg:flex tw:lg:w-[40%] tw:bg-[url('@/assets/images/common/openobserve_banner_compreesed.png')] tw:bg-cover tw:bg-center tw:bg-no-repeat">
 
     <div style="display: flex; justify-content: start; align-items: end; height: 100%;">
     <div style="margin-bottom: 34px; margin-left: 32px;">
@@ -17,12 +17,12 @@
   <!-- Right Form Section -->
   <div :class="[
     store.state.theme == 'dark' ? 'tw:bg-black' : 'tw:bg-white'
-  ]" class="tw:w-full lg:tw:w-[60%]  tw:h-full tw:flex tw:flex-col tw:justify-center tw:items-center tw:relative">
+  ]" class="tw:w-full tw:lg:w-[60%]  tw:h-full tw:flex tw:flex-col tw:justify-center tw:items-center tw:relative">
 
     <!-- Top Section: Logo and Heading -->
     <div class="tw:flex tw:flex-col tw:items-center tw:mb-4">
       <img style="height: 64px;" src="@/assets/images/common/o2_logo.svg" alt="Get Started Banner" />
-      <div class="tw:text-[24px] md:tw:text-[32px] tw:font-semibold  tw:text-center"
+      <div class="tw:text-[24px] tw:md:text-[32px] tw:font-semibold  tw:text-center"
       :class="[
         store.state.theme == 'dark' ? 'tw:text-[#ffffff]' : 'tw:text-[#525252]'
       ]"

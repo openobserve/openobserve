@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="ghost"
           size="icon-circle-sm"
           @click="handleDocumentation()"
-          class="docs-btn tw:opacity-70 hover:tw:opacity-100 tw:transition-opacity tw:duration-200 tw:ease-in-out"
+          class="docs-btn tw:opacity-70 tw:hover:opacity-100 tw:transition-opacity tw:duration-200 tw:ease-in-out"
           :data-test="`aws-${integration.id}-docs-btn`"
         >
           <OIcon name="description" size="sm" />
@@ -87,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-for="(template, index) in integration.cloudFormationTemplates"
           :key="`cf-${index}`"
           @click="handleTemplateSelection(template)"
-          class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:mb-2 tw:cursor-pointer tw:rounded tw:border tw:border-border hover:tw:bg-muted/50"
+          class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:mb-2 tw:cursor-pointer tw:rounded tw:border tw:border-border tw:hover:bg-muted/50"
           :data-test="`aws-${integration.id}-template-option-${index}`"
         >
           <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
@@ -106,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-for="(option, index) in integration.componentOptions"
           :key="`comp-${index}`"
           @click="handleComponentSelection(option)"
-          class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:mb-2 tw:cursor-pointer tw:rounded tw:border tw:border-border hover:tw:bg-muted/50"
+          class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:mb-2 tw:cursor-pointer tw:rounded tw:border tw:border-border tw:hover:bg-muted/50"
           :data-test="`aws-${integration.id}-component-option-${index}`"
         >
           <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">

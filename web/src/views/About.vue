@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- ── Info Cards Grid ─────────────────────────────────────── -->
-        <div class="tw:grid tw:grid-cols-1 md:tw:grid-cols-2 tw:gap-4">
+        <div class="tw:grid tw:grid-cols-1 tw:md:grid-cols-2 tw:gap-4">
 
           <!-- Open Source Libraries -->
           <div class="tw:bg-(--o2-card-bg) tw:rounded-[0.625rem] tw:p-4 tw:flex tw:flex-col tw:gap-y-2">

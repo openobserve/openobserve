@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <!-- Collapsed row -->
             <div
-              class="tw:flex tw:items-center tw:gap-2.5 tw:px-3 tw:py-2 tw:cursor-pointer hover:tw:opacity-80 tw:transition-opacity"
+              class="tw:flex tw:items-center tw:gap-2.5 tw:px-3 tw:py-2 tw:cursor-pointer tw:hover:opacity-80 tw:transition-opacity"
               @click="serviceNameExpanded = !serviceNameExpanded"
             >
               <OIcon
@@ -577,7 +577,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         >
           <div
-            class="tw:flex tw:items-center tw:gap-2.5 tw:px-3 tw:py-2 tw:cursor-pointer hover:tw:opacity-80 tw:transition-opacity"
+            class="tw:flex tw:items-center tw:gap-2.5 tw:px-3 tw:py-2 tw:cursor-pointer tw:hover:opacity-80 tw:transition-opacity"
             @click="trackedAliasExpanded = !trackedAliasExpanded"
           >
             <OIcon name="check-circle" size="sm" />
@@ -773,8 +773,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ? 'tw:text-gray-500-1'
                   : 'tw:text-gray-600'
                 : store.state.theme === 'dark'
-                  ? 'tw:bg-transparent tw:text-gray-400 tw:border-transparent hover:tw:text-gray-200'
-                  : 'tw:bg-transparent tw:text-gray-400 tw:border-transparent hover:tw:text-gray-400'
+                  ? 'tw:bg-transparent tw:text-gray-400 tw:border-transparent tw:hover:text-gray-200'
+                  : 'tw:bg-transparent tw:text-gray-400 tw:border-transparent tw:hover:text-gray-400'
             "
             :style="
               activeEnvironment === env.key
@@ -841,7 +841,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span
                     v-for="val in card.values.slice(0, 5)"
                     :key="val"
-                    class="tw:max-w-[calc(50%-4px)] tw:h-[22px] tw:box-border tw:text-[11px] tw:py-0.5 tw:px-2 tw:rounded-full tw:border tw:cursor-pointer hover:tw:opacity-70 tw:transition-opacity tw:inline-flex tw:items-center tw:gap-1"
+                    class="tw:max-w-[calc(50%-4px)] tw:h-[22px] tw:box-border tw:text-[11px] tw:py-0.5 tw:px-2 tw:rounded-full tw:border tw:cursor-pointer tw:hover:opacity-70 tw:transition-opacity tw:inline-flex tw:items-center tw:gap-1"
                     :class="
                       store.state.theme === 'dark'
                         ? card.theme.pillDark
@@ -874,7 +874,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <template #trigger>
                       <span
-                        class="tw:max-w-[calc(50%-4px)] tw:h-[22px] tw:box-border tw:text-[11px] tw:py-0.5 tw:px-2 tw:rounded-full tw:cursor-pointer hover:tw:opacity-70 tw:transition-opacity"
+                        class="tw:max-w-[calc(50%-4px)] tw:h-[22px] tw:box-border tw:text-[11px] tw:py-0.5 tw:px-2 tw:rounded-full tw:cursor-pointer tw:hover:opacity-70 tw:transition-opacity"
                         :class="
                           store.state.theme === 'dark'
                             ? 'tw:text-gray-300'
@@ -892,7 +892,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <span
                         v-for="val in card.values.slice(5)"
                         :key="val"
-                        class="tw:text-[11px] tw:py-0.5 tw:px-2 tw:rounded-full tw:border tw:cursor-pointer hover:tw:opacity-70 tw:transition-opacity tw:inline-flex tw:items-center tw:gap-1"
+                        class="tw:text-[11px] tw:py-0.5 tw:px-2 tw:rounded-full tw:border tw:cursor-pointer tw:hover:opacity-70 tw:transition-opacity tw:inline-flex tw:items-center tw:gap-1"
                         :class="
                           store.state.theme === 'dark'
                             ? card.theme.pillDark
@@ -1011,7 +1011,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               variant="ghost"
               size="icon"
-              class="tw:opacity-40 hover:tw:opacity-100"
+              class="tw:opacity-40 tw:hover:opacity-100"
               @click="dismissSuggestion"
             >
               <OIcon name="cancel" size="xs" />
@@ -1361,7 +1361,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <!-- Left Pane: Streams List -->
             <div
-              class="tw:w-1/3 tw:border-r tw:bg-gray-50 dark:tw:bg-dark tw:flex tw:flex-col"
+              class="tw:w-1/3 tw:border-r tw:bg-gray-50 tw:dark:bg-dark tw:flex tw:flex-col"
             >
               <!-- Static column header — never scrolls, never gets covered -->
               <div
@@ -1394,7 +1394,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       selectedFieldAnalytics.sample_values[selectedStreamType],
                     )"
                     :key="streamName"
-                    class="tw:px-4 tw:py-3 tw:cursor-pointer tw:transition-colors tw:text-sm tw:font-mono tw:truncate hover:tw:bg-primary/10"
+                    class="tw:px-4 tw:py-3 tw:cursor-pointer tw:transition-colors tw:text-sm tw:font-mono tw:truncate tw:hover:bg-primary/10"
                     :class="{
                       'tw:bg-primary/20 tw:text-primary tw:font-medium':
                         activeStreamId === streamName,
@@ -1430,7 +1430,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         selectedFieldAnalytics.sample_values[typeName],
                       )"
                       :key="typeName + '-' + streamName"
-                      class="tw:px-4 tw:py-3 tw:cursor-pointer tw:transition-colors tw:text-sm tw:font-mono tw:truncate hover:tw:bg-primary/10"
+                      class="tw:px-4 tw:py-3 tw:cursor-pointer tw:transition-colors tw:text-sm tw:font-mono tw:truncate tw:hover:bg-primary/10"
                       :class="{
                         'tw:bg-primary/20 tw:text-primary tw:font-medium':
                           activeStreamId === streamName &&

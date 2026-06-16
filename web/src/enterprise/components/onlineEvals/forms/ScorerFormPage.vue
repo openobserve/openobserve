@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <form class="tw:flex tw:flex-col tw:flex-1 tw:min-h-0 tw:gap-2.5" @submit.prevent="save">
     <div class="tw:flex tw:items-center tw:gap-2.5 tw:min-h-12 tw:px-3.5 tw:py-2 tw:bg-(--o2-card-bg) tw:rounded-md tw:shadow-[0_0_0.313rem_0.063rem_var(--o2-hover-shadow)] tw:shrink-0">
       <OButton
@@ -55,7 +55,7 @@
       </button>
     </div>
 
-    <div class="tw:flex-1 tw:min-h-0 tw:overflow-hidden tw:grid tw:grid-cols-[minmax(0,1.6fr)_minmax(320px,0.9fr)] max-[1100px]:tw:grid-cols-1 tw:gap-2.5">
+    <div class="tw:flex-1 tw:min-h-0 tw:overflow-hidden tw:grid tw:grid-cols-[minmax(0,1.6fr)_minmax(320px,0.9fr)] tw:max-[1100px]:grid-cols-1 tw:gap-2.5">
       <div class="scorer-form__main tw:min-w-0 tw:overflow-auto tw:p-[18px_24px_24px] tw:bg-(--o2-card-bg) tw:rounded-md tw:shadow-[0_0_0.313rem_0.063rem_var(--o2-hover-shadow)]">
         <!-- Section 01: Identity -->
         <section class="tw:mb-6">
@@ -192,7 +192,7 @@
                 <template #settingsLink>
                   <router-link
                     :to="{ name: 'llmProviders' }"
-                    class="scorer-field__help-link tw:text-(--color-primary-600) tw:font-semibold tw:no-underline hover:tw:underline"
+                    class="scorer-field__help-link tw:text-(--color-primary-600) tw:font-semibold tw:no-underline tw:hover:underline"
                     target="_blank"
                   >
                     {{ t("onlineEvals.scorer.providerHelpSettingsLink") }}
@@ -317,7 +317,7 @@
             <div class="tw:flex tw:justify-between tw:gap-3">
               <button
                 type="button"
-                class="scorer-extras__add tw:border-0 tw:bg-transparent tw:py-1 tw:px-0 tw:text-xs tw:font-semibold tw:text-(--o2-primary-btn-bg) tw:cursor-pointer disabled:tw:text-(--color-text-muted) disabled:tw:cursor-not-allowed"
+                class="scorer-extras__add tw:border-0 tw:bg-transparent tw:py-1 tw:px-0 tw:text-xs tw:font-semibold tw:text-(--o2-primary-btn-bg) tw:cursor-pointer tw:disabled:text-(--color-text-muted) tw:disabled:cursor-not-allowed"
                 :disabled="form.extraMetadataFields.length >= MAX_EXTRA_FIELDS"
                 data-test="scorer-form-extra-field-add"
                 @click="addExtraField"

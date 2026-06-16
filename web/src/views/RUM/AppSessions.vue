@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -122,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OIcon
                       name="play-circle-filled"
                       size="md"
-                      class="tw:cursor-pointer session-play-icon tw:text-[var(--o2-icon-color)] hover:tw:text-[var(--o2-primary-btn-bg)]"
+                      class="tw:cursor-pointer session-play-icon tw:text-[var(--o2-icon-color)] tw:hover:text-[var(--o2-primary-btn-bg)]"
                     />
                   </template>
                   <template #cell-frustration_count="{ row }">

@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -169,7 +169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
                   <!-- Mismatch notice inside the criteria panel -->
                   <div
                     v-if="isTemplateMismatch(record)"
-                    class="tw:mt-2 tw:mb-1 tw:flex tw:items-center tw:gap-1.5 tw:text-[10px] tw:text-amber-700 dark:tw:text-amber-400"
+                    class="tw:mt-2 tw:mb-1 tw:flex tw:items-center tw:gap-1.5 tw:text-[10px] tw:text-amber-700 tw:dark:text-amber-400"
                   >
                     <OIcon name="warning" size="xs" />
                     <span>{{ $t("traces.evaluations.criteriaTemplateMismatchNote", { template: selectedTemplateData?.name, evaluated: evaluatedTemplateName(record) }) }}</span>
@@ -343,7 +343,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
               <!-- Mismatch warning: selected template ≠ template used for evaluation -->
               <div
                 v-if="isTemplateMismatch(record)"
-                class="tw:flex tw:items-start tw:gap-2 tw:p-2 tw:rounded-md tw:bg-amber-500/10 tw:border tw:border-amber-500/25 tw:text-[10px] tw:text-amber-700 dark:tw:text-amber-400"
+                class="tw:flex tw:items-start tw:gap-2 tw:p-2 tw:rounded-md tw:bg-amber-500/10 tw:border tw:border-amber-500/25 tw:text-[10px] tw:text-amber-700 tw:dark:text-amber-400"
               >
                 <OIcon name="warning" size="xs" class="tw:mt-px tw:shrink-0" />
                 <span>{{ $t("traces.evaluations.templateMismatchWarning", { selected: selectedTemplateData?.name, evaluated: evaluatedTemplateName(record) }) }}</span>

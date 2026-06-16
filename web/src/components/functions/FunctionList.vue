@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -172,7 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-for="(pipeline, index) in transformedPipelineList"
             :key="pipeline.value"
             @click="onPipelineSelect(pipeline)"
-            class="tw:flex tw:items-center tw:px-3 tw:py-2 tw:cursor-pointer hover:tw:bg-muted/50"
+            class="tw:flex tw:items-center tw:px-3 tw:py-2 tw:cursor-pointer tw:hover:bg-muted/50"
             :data-test="`function-list-pipeline-item-${pipeline.value}`"
           >
             <span class="tw:text-sm">{{ index + 1 }}. {{ pipeline.label }}</span>

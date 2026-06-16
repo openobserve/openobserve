@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -34,8 +34,8 @@ export default {
 </script>
 
 <template>
-  <div class="nodes tw:bg-[rgba(226,232,240,0.9)] tw:backdrop-blur-[12px] tw:rounded-[12px] tw:border tw:border-[rgba(226,232,240,0.8)] tw:shadow-[0_4px_16px_rgba(0,0,0,0.08)] tw:py-3 tw:px-2 tw:m-[4px_2px] tw:transition-all tw:duration-300 tw:ease-in-out hover:tw:shadow-[0_6px_20px_rgba(0,0,0,0.12)]">
-    <div v-for="node in node_types" :key="node.io_type" class="o2vf_node tw:transition-all tw:rounded-lg tw:mb-3 last:tw:mb-0">
+  <div class="nodes tw:bg-[rgba(226,232,240,0.9)] tw:backdrop-blur-[12px] tw:rounded-[12px] tw:border tw:border-[rgba(226,232,240,0.8)] tw:shadow-[0_4px_16px_rgba(0,0,0,0.08)] tw:py-3 tw:px-2 tw:m-[4px_2px] tw:transition-all tw:duration-300 tw:ease-in-out tw:hover:shadow-[0_6px_20px_rgba(0,0,0,0.12)]">
+    <div v-for="node in node_types" :key="node.io_type" class="o2vf_node tw:transition-all tw:rounded-lg tw:mb-3 tw:last:mb-0">
       <OButton
         variant="ghost"
         size="md"

@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc. -->
+﻿<!-- Copyright 2026 OpenObserve Inc. -->
 
 <script setup lang="ts">
 import type { Cell, Row } from "@tanstack/vue-table";
@@ -312,7 +312,7 @@ function handleClick() {
       v-if="enableCellCopy && !$slots.default"
       type="button"
       :data-test="`o2-table-cell-copy-${cell.column.id}`"
-      class="tw:absolute tw:right-1 tw:opacity-0 group-hover:tw:opacity-100 tw:bg-[var(--color-surface-base)] tw:border tw:border-[var(--color-border-default)] tw:rounded tw:cursor-pointer tw:p-0.5 tw:text-[var(--color-text-muted)] tw:hover:text-[var(--color-text-primary)] tw:leading-none tw:transition-opacity"
+      class="tw:absolute tw:right-1 tw:opacity-0 tw:group-hover:opacity-100 tw:bg-[var(--color-surface-base)] tw:border tw:border-[var(--color-border-default)] tw:rounded tw:cursor-pointer tw:p-0.5 tw:text-[var(--color-text-muted)] tw:hover:text-[var(--color-text-primary)] tw:leading-none tw:transition-opacity"
       :title="copied ? 'Copied!' : 'Copy'"
       @click="handleCopy"
     >

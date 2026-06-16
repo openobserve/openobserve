@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="tw:flex tw:items-center tw:gap-2.5">
           <div
             data-test="add-alert-back-btn"
-            class="tw:flex tw:justify-center tw:items-center tw:cursor-pointer tw:opacity-60 hover:tw:opacity-100 tw:transition-opacity tw:flex-shrink-0"
+            class="tw:flex tw:justify-center tw:items-center tw:cursor-pointer tw:opacity-60 tw:hover:opacity-100 tw:transition-opacity tw:flex-shrink-0"
             style="border: 1.5px solid currentColor; border-radius: 50%; width: 20px; height: 20px;"
             :title="t('common.goBack')"
             @click="closeDialog"

@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :class="[
                 isSelected(dashboard)
                   ? 'selected-item tw:bg-(--o2-tab-bg)! tw:border-primary'
-                  : 'tw:border-transparent hover:tw:bg-gray-50',
+                  : 'tw:border-transparent tw:hover:bg-gray-50',
               ]"
               data-test="add-dashboard-github-item"
             >

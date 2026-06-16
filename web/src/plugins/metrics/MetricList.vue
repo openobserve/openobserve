@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -119,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :key="value.key + value.count"
                         >
                           <ul>
-                            <label class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:cursor-pointer hover:tw:bg-muted/50 tw:pr-0">
+                            <label class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:cursor-pointer tw:hover:bg-muted/50 tw:pr-0">
                               <div
                                 class="tw:flex tw:flex wrap tw:justify-between"
                                 style="width: calc(100% - 46px)"

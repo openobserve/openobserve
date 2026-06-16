@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <!-- No card-container: the loaded UsageTab content has no outer border, so the
        skeleton must not add one (otherwise a top/outer border flashes only while
        loading and disappears once data arrives). -->
@@ -151,7 +151,7 @@
         </div>
         <!-- Chart area -->
         <div
-          class="custom-first-chart tw:my-auto xl:tw:min-h-[200px] tw:h-[calc(100vh-500px)] md:tw:h-[calc(100vh-500px)] lg:tw:h-[calc(100vh-550px)] xl:tw:h-[calc(100vh-645px)] tw:w-full"
+          class="custom-first-chart tw:my-auto tw:xl:min-h-[200px] tw:h-[calc(100vh-500px)] tw:md:h-[calc(100vh-500px)] tw:lg:h-[calc(100vh-550px)] tw:xl:h-[calc(100vh-645px)] tw:w-full"
         >
           <div
             class="skeleton-box tw:bg-[var(--color-skeleton-base,#f5f5f5)] tw:relative tw:overflow-hidden tw:rounded-lg"
@@ -203,7 +203,7 @@
         </div>
         <!-- Chart area -->
         <div
-          class="custom-second-chart tw:my-auto xl:tw:min-h-[200px] tw:h-[calc(100vh-500px)] md:tw:h-[calc(100vh-500px)] lg:tw:h-[calc(100vh-550px)] xl:tw:h-[calc(100vh-645px)]"
+          class="custom-second-chart tw:my-auto tw:xl:min-h-[200px] tw:h-[calc(100vh-500px)] tw:md:h-[calc(100vh-500px)] tw:lg:h-[calc(100vh-550px)] tw:xl:h-[calc(100vh-645px)]"
         >
           <div
             class="skeleton-box tw:bg-[var(--color-skeleton-base,#f5f5f5)] tw:relative tw:overflow-hidden tw:rounded-lg"

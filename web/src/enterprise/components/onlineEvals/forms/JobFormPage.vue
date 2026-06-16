@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <form class="tw:flex tw:flex-col tw:flex-1 tw:min-h-0 tw:gap-2.5" @submit.prevent="save(false)">
     <div class="tw:flex tw:items-center tw:gap-2.5 tw:min-h-12 tw:px-3.5 tw:py-2 tw:bg-(--o2-card-bg) tw:rounded-md tw:shadow-[0_0_0.313rem_0.063rem_var(--o2-hover-shadow)] tw:shrink-0">
       <OButton
@@ -37,7 +37,7 @@
       </button>
     </div>
 
-    <div class="tw:flex-1 tw:min-h-0 tw:overflow-hidden tw:grid tw:grid-cols-[minmax(0,1.6fr)_minmax(320px,0.9fr)] max-[1100px]:tw:grid-cols-1 tw:gap-2.5">
+    <div class="tw:flex-1 tw:min-h-0 tw:overflow-hidden tw:grid tw:grid-cols-[minmax(0,1.6fr)_minmax(320px,0.9fr)] tw:max-[1100px]:grid-cols-1 tw:gap-2.5">
       <div class="job-form__main tw:min-w-0 tw:overflow-auto tw:pt-[18px] tw:px-6 tw:pb-6 tw:bg-(--o2-card-bg) tw:rounded-md tw:shadow-[0_0_0.313rem_0.063rem_var(--o2-hover-shadow)]">
         <!-- Section 01: Target -->
         <section class="job-section tw:mb-6">
@@ -149,7 +149,7 @@
             <h3 class="job-section__title tw:m-0 tw:text-sm tw:font-semibold tw:text-(--color-text-primary,currentColor)">{{ t("onlineEvals.job.stepper.sampling") }}</h3>
           </div>
 
-          <div class="job-field-row tw:grid tw:grid-cols-2 max-[1100px]:tw:grid-cols-1 tw:gap-[14px]">
+          <div class="job-field-row tw:grid tw:grid-cols-2 tw:max-[1100px]:grid-cols-1 tw:gap-[14px]">
             <div class="job-field tw:mb-3">
               <label class="job-field__label tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary,currentColor) tw:mb-1">{{ t("onlineEvals.job.samplingModeLabel") }}</label>
               <OSelect

@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="tw:flex-1 tw:overflow-y-auto card-container tw:mb-[0.675rem] tw:p-6" style="height: calc(100vh - 172px); overflow: auto">
       <div class="tw:max-w-300 tw:mx-auto">
         <!-- Input Fields -->
-        <div class="tw:grid tw:grid-cols-1 md:tw:grid-cols-3 tw:gap-4 tw:mb-6">
+        <div class="tw:grid tw:grid-cols-1 tw:md:grid-cols-3 tw:gap-4 tw:mb-6">
           <!-- Service Input -->
           <div>
             <div class="tw:text-sm tw:font-medium text-weight-medium tw:mb-2">Service *</div>

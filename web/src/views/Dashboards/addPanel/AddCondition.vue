@@ -280,40 +280,7 @@ export default defineComponent({
 </script>
 
 <style>
-.add-condition-dropdown .q-virtual-scroll__content {
-  padding: 0.5rem;
-}
-
 .add-condition-dropdown .o-tab {
   flex: 1;
-}
-
-.condition-logical-operator .q-field__control {
-  min-height: 26px !important;
-  height: 26px !important;
-  padding: 0px 0px 0px 5px !important;
-  vertical-align: middle !important;
-  margin-top: 4px;
-  /* Nudge up slightly to align with buttons */
-}
-
-.condition-logical-operator .q-field__native {
-  min-height: 26px !important;
-  height: 26px !important;
-  padding: 0px 0px 0px 0px !important;
-}
-
-.condition-logical-operator .q-field__append {
-  min-height: 26px !important;
-  height: 26px !important;
-  padding: 0px 0px 0px 0px !important;
-}
-
-.q-panel {
-  overflow: visible !important;
-}
-
-.o2-custom-select-dashboard .q-field__bottom {
-  padding-top: 8px !important;
 }
 </style>

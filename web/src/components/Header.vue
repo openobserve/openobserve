@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -97,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <img
           data-test="header-openobserve-logo"
-          class="openobserve-logo tw:cursor-pointer tw:h-8 tw:max-w-[150px] tw:block tw:transition-opacity tw:duration-200 hover:tw:opacity-80"
+          class="openobserve-logo tw:cursor-pointer tw:h-8 tw:max-w-[150px] tw:block tw:transition-opacity tw:duration-200 tw:hover:opacity-80"
           :src="
             getImageURL(
               store.state.theme === 'dark'
@@ -115,7 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-else class="relative-position tw:relative tw:inline-flex tw:items-center tw:min-h-10">
       <img
         data-test="header-openobserve-logo"
-        class="openobserve-logo tw:cursor-pointer tw:h-8 tw:max-w-[150px] tw:block tw:transition-opacity tw:duration-200 hover:tw:opacity-80"
+        class="openobserve-logo tw:cursor-pointer tw:h-8 tw:max-w-[150px] tw:block tw:transition-opacity tw:duration-200 tw:hover:opacity-80"
         :src="
           getImageURL(
             store.state.theme === 'dark'

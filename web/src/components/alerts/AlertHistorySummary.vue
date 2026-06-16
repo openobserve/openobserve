@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #empty>
         <div class="tw:w-full tw:text-center tw:py-8">
           <OIcon name="history" size="xl" class="tw:text-gray-400" />
-          <div class="tw:mt-2 tw:text-gray-600 dark:tw:text-gray-400">
+          <div class="tw:mt-2 tw:text-gray-600 tw:dark:text-gray-400">
             {{ t("alerts.noHistoryData") }}
           </div>
         </div>

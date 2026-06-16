@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="ghost"
           size="icon-circle-sm"
           @click="handleDocumentation()"
-          class="tw:opacity-70 hover:tw:opacity-100 tw:transition-opacity tw:duration-200"
+          class="tw:opacity-70 tw:hover:opacity-100 tw:transition-opacity tw:duration-200"
           :data-test="`azure-${integration.id}-docs-btn`"
         >
           <OIcon name="description" size="sm" />

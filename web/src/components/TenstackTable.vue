@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -473,7 +473,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :key="row.id"
               :data-index="idx"
               :ref="(node: any) => measureDashboardRow(node)"
-              class="dashboard-data-row tw:cursor-pointer hover:tw:bg-[var(--o2-hover-gray)]"
+              class="dashboard-data-row tw:cursor-pointer tw:hover:bg-[var(--o2-hover-gray)]"
               :class="{ 'tw:border-b': !usesSeparateBorders }"
               data-test="dashboard-data-row"
               @click="handleDataRowClick(row.original, idx as number, $event)"
@@ -670,7 +670,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 formattedRows?.[virtualRow.index]?.original?.isExpandedRow
               "
               :ref="(node: any) => node && rowVirtualizer.measureElement(node)"
-              class="tw:absolute tw:flex tw:w-max tw:items-center tw:justify-start tw:border-b tw:border-b-[var(--o2-tag-grey-1)] tw:cursor-pointer hover:tw:bg-[var(--o2-hover-gray)] tw:transition-colors tw:duration-150 tw:ease-in-out table-row-hover"
+              class="tw:absolute tw:flex tw:w-max tw:items-center tw:justify-start tw:border-b tw:border-b-[var(--o2-tag-grey-1)] tw:cursor-pointer tw:hover:bg-[var(--o2-hover-gray)] tw:transition-colors tw:duration-150 tw:ease-in-out table-row-hover"
               :class="[
                 defaultColumns &&
                 !wrap &&

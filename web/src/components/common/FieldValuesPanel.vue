@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -136,7 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <li v-for="value in displayValues" :key="value.key" class="tw:py-1">
           <label
-            class="tw:flex tw:items-center tw:gap-1 tw:px-2 tw:py-1 tw:cursor-pointer hover:tw:bg-muted/50"
+            class="tw:flex tw:items-center tw:gap-1 tw:px-2 tw:py-1 tw:cursor-pointer tw:hover:bg-muted/50"
             :data-test="`logs-search-subfield-add-${fieldName}-${value.key}`"
           >
             <!-- Checkbox for multi-select — uses :model-value + @update to
@@ -187,7 +187,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="tw:w-full tw:flex tw:justify-center tw:border-t tw:border-(--o2-border-color) tw:pt-1 tw:px-1"
     >
       <button
-        class="tw:inline-flex tw:items-center tw:gap-1 tw:bg-transparent tw:border-0 tw:text-(--o2-primary-color) tw:text-[0.6875rem] tw:font-[inherit] tw:py-0.5 tw:px-1 tw:cursor-pointer tw:rounded-[0.1875rem] tw:transition-opacity tw:duration-150 hover:tw:opacity-80 hover:tw:bg-(--o2-hover-accent) disabled:tw:opacity-50 disabled:tw:cursor-default"
+        class="tw:inline-flex tw:items-center tw:gap-1 tw:bg-transparent tw:border-0 tw:text-(--o2-primary-color) tw:text-[0.6875rem] tw:font-[inherit] tw:py-0.5 tw:px-1 tw:cursor-pointer tw:rounded-[0.1875rem] tw:transition-opacity tw:duration-150 tw:hover:opacity-80 tw:hover:bg-(--o2-hover-accent) tw:disabled:opacity-50 tw:disabled:cursor-default"
         :disabled="isLoadingMore"
         @click="handleLoadMoreClick"
         :data-test="`log-search-subfield-load-more-${fieldName}`"

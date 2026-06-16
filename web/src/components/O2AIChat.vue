@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div
     class="chat-container tw:w-full tw:h-full tw:flex tw:flex-col tw:overflow-hidden tw:rounded-md tw:text-[var(--q-primary-text)] tw:bg-[var(--o2-card-bg-solid)] tw:[box-shadow:0_0_5px_1px_var(--o2-hover-shadow)]"
     :class="[
@@ -173,7 +173,7 @@
             v-for="chat in chatHistory"
             :key="chat.id"
             :data-test="`o2-ai-chat-history-item-${chat.id}`"
-            class="tw:flex tw:flex-col tw:px-3 tw:py-2 tw:cursor-pointer hover:tw:bg-muted/50"
+            class="tw:flex tw:flex-col tw:px-3 tw:py-2 tw:cursor-pointer tw:hover:bg-muted/50"
             @click="loadChat(chat.id)"
           >
             <span class="tw:text-sm">{{ chat.title }}</span>

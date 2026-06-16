@@ -287,7 +287,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   v-for="item in relatedResources"
                   :key="item[`${item.type}_id`] || item.id"
-                  class="tw:p-1.5 tw:mb-1 tw:bg-[var(--o2-hover-accent)] tw:rounded tw:cursor-pointer hover:tw:bg-[#e0e0e0] tw:transition-colors"
+                  class="tw:p-1.5 tw:mb-1 tw:bg-[var(--o2-hover-accent)] tw:rounded tw:cursor-pointer tw:hover:bg-[#e0e0e0] tw:transition-colors"
                   data-test="related-resource-item"
                   @click="viewResourceDetails(item)"
                 >

@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc. -->
+﻿<!-- Copyright 2026 OpenObserve Inc. -->
 
 <template>
   <div
@@ -30,7 +30,7 @@
         horizontal ? 'o-splitter__separator--horizontal' : 'o-splitter__separator--vertical',
         'tw:select-none',
         'tw:transition-colors',
-        'hover:tw:bg-[var(--o2-border-input)]',
+        'tw:hover:bg-[var(--o2-border-input)]',
         'tw:relative',
         'tw:z-10',
         'tw:focus:outline-2 tw:focus:outline-(--o2-primary-color) tw:focus:-outline-offset-2',

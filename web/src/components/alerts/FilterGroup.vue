@@ -1,4 +1,4 @@
-<template>
+﻿<template>
     <!-- Preview Section (only for root level) -->
     <div v-if="depth === 0 && showSqlPreview && previewString"
          class="tw:mb-2 tw:p-2 tw:rounded tw:border tw:w-full tw:max-h-[3.2em] tw:overflow-y-auto"
@@ -17,7 +17,7 @@
 
     <div :class="[`  tw:px-2 tw:mb-2 el-border el-border-radius `,
         'tw:mt-4',
-        store.state.isAiChatEnabled ? 'tw:w-full' : 'xl:tw:w-fit'
+        store.state.isAiChatEnabled ? 'tw:w-full' : 'tw:xl:w-fit'
     ]"
     :style="{
         opacity: computedOpacity,

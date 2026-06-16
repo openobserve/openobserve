@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -223,7 +223,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="tw:flex-1 tw:min-w-0">
                   <!-- Comment Box -->
                   <div
-                    class="tw:rounded-lg tw:overflow-hidden tw:shadow-sm hover:tw:shadow-md tw:transition-shadow"
+                    class="tw:rounded-lg tw:overflow-hidden tw:shadow-sm tw:hover:shadow-md tw:transition-shadow"
                     :style="store.state.theme === 'dark'
                       ? { backgroundColor: '#181a1b', border: '1px solid #3f4447' }
                       : { backgroundColor: '#ffffff', border: '1px solid #d1d5db' }"

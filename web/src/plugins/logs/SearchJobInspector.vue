@@ -1,4 +1,4 @@
-<!-- right 2026 OpenObserve Inc.
+﻿<!-- right 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -231,7 +231,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="tw:rounded-lg tw:p-3 tw:border tw:shadow-sm tw:h-28 tw:flex tw:flex-col tw:items-center tw:justify-center tw:transition-all"
               :class="[
                 store.state.theme === 'dark' ? 'tw:bg-[#181A1B] tw:border-gray-700' : 'tw:bg-white tw:border-gray-200',
-                hasNoData ? 'tw:opacity-50 tw:cursor-not-allowed' : 'tw:cursor-pointer hover:tw:border-primary hover:tw:shadow-lg'
+                hasNoData ? 'tw:opacity-50 tw:cursor-not-allowed' : 'tw:cursor-pointer tw:hover:border-primary tw:hover:shadow-lg'
               ]"
               @click="!hasNoData && (showSqlDialog = true)"
             >

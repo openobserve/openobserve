@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -79,7 +79,7 @@ the Free Software Foundation, either version 3 of the License, or
               :class="[
                 isSelected(entry.name)
                   ? 'tw:bg-primary/5 tw:border-primary'
-                  : 'tw:border-transparent hover:tw:bg-gray-50',
+                  : 'tw:border-transparent tw:hover:bg-gray-50',
               ]"
               :data-test="`score-config-library-item-${entry.name}`"
               @click="toggle(entry)"

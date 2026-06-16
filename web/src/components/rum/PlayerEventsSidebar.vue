@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :key="filteredEvent.id + '-' + index"
         >
           <div
-            class="tw:mb-1 tw:px-2 tw:py-2 tw:cursor-pointer tw:rounded hover:tw:bg-[#ededed] hover:tw:text-black"
+            class="tw:mb-1 tw:px-2 tw:py-2 tw:cursor-pointer tw:rounded tw:hover:bg-[#ededed] tw:hover:text-black"
             @click="handleEventClick(filteredEvent)"
             :data-test="`player-event-row-${filteredEvent.type}`"
           >

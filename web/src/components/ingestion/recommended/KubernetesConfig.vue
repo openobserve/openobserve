@@ -182,13 +182,13 @@ Make changes accordingly to the above URL.
       You can refer and install
       <a
         href="https://github.com/openobserve/hotcommerce"
-        class="hover:tw:underline text-primary"
+        class="tw:hover:underline text-primary"
         >HOT commerce</a
       >
       app as an example to understand how this works in practice. Refer to
       <a
         href="https://github.com/open-telemetry/opentelemetry-operator"
-        class="hover:tw:underline text-primary"
+        class="tw:hover:underline text-primary"
         >OpenTelemetry operator</a
       >
       for further documentation.

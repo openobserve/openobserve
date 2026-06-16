@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <!-- Page gutter is owned by the Settings shell's ConstrainedPage. -->
   <div>
     <LicensePeriod @updateLicense="showUpdateFormAndFocus"></LicensePeriod>
@@ -9,7 +9,7 @@
     </div>
     <div
       v-else
-      class="tw:grid tw:grid-cols-1 lg:tw:grid-cols-2 tw:gap-4 tw:items-start tw:pb-4"
+      class="tw:grid tw:grid-cols-1 tw:lg:grid-cols-2 tw:gap-4 tw:items-start tw:pb-4"
     >
       <div class="tw:col-span-1 tw:min-h-0">
         <div v-if="licenseData.license === null || !licenseData.license">

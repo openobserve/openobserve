@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
           <button
             v-if="selectedTrace.metadata?.start_time && props.startTime > 0"
-            class="tw:inline-flex tw:items-center tw:gap-1 tw:px-1.5 tw:py-0.5 tw:rounded tw:text-[0.6875rem] tw:bg-[var(--o2-hover-accent)] tw:text-[var(--o2-text-body)] tw:whitespace-nowrap tw:cursor-pointer hover:tw:bg-[var(--o2-border-color)]"
+            class="tw:inline-flex tw:items-center tw:gap-1 tw:px-1.5 tw:py-0.5 tw:rounded tw:text-[0.6875rem] tw:bg-[var(--o2-hover-accent)] tw:text-[var(--o2-text-body)] tw:whitespace-nowrap tw:cursor-pointer tw:hover:bg-[var(--o2-border-color)]"
             :title="t('rum.seekToMoment')"
             data-test="rum-player-traces-tab-seek-btn"
             @click="seekToTrace(selectedTrace)"

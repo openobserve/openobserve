@@ -532,7 +532,7 @@ class="tw:h-5! tw:text-[0.75rem]!">
                     v-for="action in filterActions"
                     :key="action.operator"
                     :data-test="`trace-details-sidebar-json-filter-action-${action.operator}`"
-                    class="tw:flex tw:items-center tw:gap-1 tw:px-1 tw:py-1 tw:cursor-pointer hover:tw:bg-muted/50"
+                    class="tw:flex tw:items-center tw:gap-1 tw:px-1 tw:py-1 tw:cursor-pointer tw:hover:bg-muted/50"
                     @click.stop="
                       $emit('apply-filter-immediately', {
                         field,
@@ -589,7 +589,7 @@ class="tw:h-5! tw:text-[0.75rem]!">
                         v-for="action in filterActions"
                         :key="action.operator"
                         :data-test="`trace-details-sidebar-attr-filter-action-${action.operator}`"
-                        class="tw:flex tw:items-center tw:gap-1 tw:px-1 tw:py-1 tw:cursor-pointer hover:tw:bg-muted/50"
+                        class="tw:flex tw:items-center tw:gap-1 tw:px-1 tw:py-1 tw:cursor-pointer tw:hover:bg-muted/50"
                         @click.stop="
                           $emit('apply-filter-immediately', {
                             field,

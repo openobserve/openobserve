@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div
     class="tw:fixed tw:inset-0 tw:bg-black/32 tw:z-6000 tw:flex tw:items-center tw:justify-center tw:animate-[scorer-type-scrim-in_0.15s_ease-out]"
     role="dialog"
@@ -34,7 +34,7 @@
 
       <p class="tw:m-0 tw:mb-4 tw:text-text-secondary tw:text-[13px] tw:leading-normal">{{ t("onlineEvals.scorerTypeDialog.intro") }}</p>
 
-      <div class="tw:grid tw:grid-cols-3 max-[720px]:tw:grid-cols-1 tw:gap-3">
+      <div class="tw:grid tw:grid-cols-3 tw:max-[720px]:grid-cols-1 tw:gap-3">
         <button
           type="button"
           class="scorer-type-card tw:relative tw:flex tw:flex-col tw:items-start tw:gap-[10px] tw:min-h-[180px] tw:py-4 tw:px-4 tw:pb-[14px] tw:border tw:border-(--color-dialog-header-border,var(--o2-border)) tw:rounded-lg tw:bg-(--color-card-bg) tw:text-(--color-text-primary,currentColor) tw:text-left tw:cursor-pointer tw:transition-[border-color,background,box-shadow] tw:duration-[120ms]"

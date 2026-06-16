@@ -1,6 +1,6 @@
-<template>
+﻿<template>
   <li
-    class="tw:cursor-pointer tw:py-[1px] tw:px-2 hover:tw:bg-gray-200 tw:text-[14px] tw:rounded-[2px] tw:flex tw:h-[25px] tw:group file-item"
+    class="tw:cursor-pointer tw:py-[1px] tw:px-2 tw:hover:bg-gray-200 tw:text-[14px] tw:rounded-[2px] tw:flex tw:h-[25px] tw:group file-item"
     :class="{
       'bg-primary tw:text-white': isActive,
     }"

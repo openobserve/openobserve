@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -504,12 +504,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <div
-            class="custom-first-chart tw:my-auto xl:tw:min-h-[200px] tw:h-[calc(100vh-500px)] md:tw:h-[calc(100vh-500px)] lg:tw:h-[calc(100vh-550px)] xl:tw:h-[calc(100vh-645px)] tw:w-full"
+            class="custom-first-chart tw:my-auto tw:xl:min-h-[200px] tw:h-[calc(100vh-500px)] tw:md:h-[calc(100vh-500px)] tw:lg:h-[calc(100vh-550px)] tw:xl:h-[calc(100vh-645px)] tw:w-full"
           >
             <CustomChartRenderer
               :key="alertsPanelDataKey"
               :data="alertsPanelData"
-              class="tw:w-full tw:h-full md:tw:h-[calc(100vh-400px)]"
+              class="tw:w-full tw:h-full tw:md:h-[calc(100vh-400px)]"
             />
           </div>
         </div>
@@ -590,7 +590,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <div
-            class="custom-second-chart tw:my-auto xl:tw:min-h-[200px] tw:h-[calc(100vh-500px)] md:tw:h-[calc(100vh-500px)] lg:tw:h-[calc(100vh-550px)] xl:tw:h-[calc(100vh-645px)]"
+            class="custom-second-chart tw:my-auto tw:xl:min-h-[200px] tw:h-[calc(100vh-500px)] tw:md:h-[calc(100vh-500px)] tw:lg:h-[calc(100vh-550px)] tw:xl:h-[calc(100vh-645px)]"
           >
             <CustomChartRenderer
               :key="pipelinesPanelDataKey"

@@ -85,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="tw:flex tw:items-center tw:flex-nowrap">
                 <div
                   data-test="predefined-themes-custom-color-preview-light"
-                  class="tw:w-8 tw:h-8 tw:rounded tw:border tw:border-(--o2-border-color) tw:shrink-0 tw:relative tw:cursor-pointer tw:transition-transform tw:duration-200 hover:tw:scale-110"
+                  class="tw:w-8 tw:h-8 tw:rounded tw:border tw:border-(--o2-border-color) tw:shrink-0 tw:relative tw:cursor-pointer tw:transition-transform tw:duration-200 tw:hover:scale-110"
                   :style="{ backgroundColor: customLightColor }"
                   @click="openColorPicker('light')"
                 >
@@ -167,7 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="tw:flex tw:items-center tw:flex-nowrap">
                 <div
                   data-test="predefined-themes-custom-color-preview-dark"
-                  class="tw:w-8 tw:h-8 tw:rounded tw:border tw:border-(--o2-border-color) tw:shrink-0 tw:relative tw:cursor-pointer tw:transition-transform tw:duration-200 hover:tw:scale-110"
+                  class="tw:w-8 tw:h-8 tw:rounded tw:border tw:border-(--o2-border-color) tw:shrink-0 tw:relative tw:cursor-pointer tw:transition-transform tw:duration-200 tw:hover:scale-110"
                   :style="{ backgroundColor: customDarkColor }"
                   @click="openColorPicker('dark')"
                 >
