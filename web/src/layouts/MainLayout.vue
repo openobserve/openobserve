@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     :class="[store.state.printMode === true ? 'printMode' : '', 'o2-app-root', 'tw:min-h-screen', 'tw:h-screen', 'tw:flex', 'tw:flex-col']"
   >
-    <header class="o2-app-header tw:shrink-0">
+    <header v-if="showLegacyHeader" class="o2-app-header tw:shrink-0">
       <!-- Webinar announcement bar: shown above toolbar for cloud users -->
       <div
         v-if="config.isCloud === 'true'"
@@ -63,7 +63,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :links-list="linksList"
         :mini-mode="miniMode"
         :visible="leftDrawerOpen"
+        :logo-src="navLogoSrc"
+        :org-name="navOrgName"
+        :org-options="orgOptions"
+        :user-name="navUserName"
+        :user-email="navUserEmail"
+        :is-ai-enabled="navIsAiEnabled"
+        :is-ai-chat-active="store.state.isAiChatEnabled"
+        :theme="store.state.theme"
         @menu-hover="handleMenuHover"
+        @go-to-home="goToHome"
+        @update:org="handleNavOrgSelect"
+        @toggle-ai-chat="toggleAIChat"
+        @open-slack="openSlack"
+        @open-help="navigateToDocs"
+        @open-predefined-themes="openPredefinedThemes"
+        @signout="signout"
       />
 
       <div class="tw:flex-1 tw:min-w-0 tw:flex tw:min-h-0 tw:h-full">
@@ -1146,6 +1161,38 @@ export default defineComponent({
       toggleThemes();
     };
 
+    const navLogoSrc = computed(() =>
+      getImageURL(
+        store.state.theme === 'dark'
+          ? 'images/common/openobserve_latest_dark_2.svg'
+          : 'images/common/openobserve_latest_light_2.svg',
+      )
+    );
+
+    const navOrgName = computed(() => store.state.selectedOrganization?.label ?? '');
+
+    const navUserName = computed(() => {
+      const u = store.state.userInfo;
+      if (!u) return '';
+      return u.given_name ? `${u.given_name} ${u.family_name}` : u.email;
+    });
+
+    const navUserEmail = computed(() => store.state.userInfo?.email ?? '');
+
+    const navIsAiEnabled = computed(() =>
+      config.isEnterprise === 'true' && Boolean(store.state.zoConfig?.ai_enabled)
+    );
+
+    const showLegacyHeader = ref(false);
+
+    const handleNavOrgSelect = (identifier: string) => {
+      const match = orgOptions.value.find((o: any) => o.identifier === identifier);
+      if (match) {
+        selectedOrg.value = match;
+        updateOrganization();
+      }
+    };
+
     /**
      * Prefetch route module on menu hover
      * @param routePath - The route path from the menu link
@@ -1209,6 +1256,13 @@ export default defineComponent({
       openPredefinedThemes,
       isPredefinedThemesOpen,
       handleMenuHover,
+      navLogoSrc,
+      navOrgName,
+      navUserName,
+      navUserEmail,
+      navIsAiEnabled,
+      showLegacyHeader,
+      handleNavOrgSelect,
     };
   },
   computed: {
