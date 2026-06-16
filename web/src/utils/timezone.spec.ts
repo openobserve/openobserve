@@ -280,23 +280,17 @@ describe("getTimezonesByOffset", () => {
 
 // ---------------------------------------------------------------------------
 // localTimeSelectedTimezoneUTCTime
-// NOTE: moment is null after getTimezonesByOffset ran. importMoment() won't
-// re-initialize because momentInitialized=true. We test the function's contract
-// by verifying the thrown error is from the null-moment issue (source limitation).
 // ---------------------------------------------------------------------------
 
 describe("localTimeSelectedTimezoneUTCTime", () => {
-  it("calls moment.tz with date components and timezone (verifies contract)", async () => {
-    // After getTimezonesByOffset, moment = null. importMoment() returns null.
-    // Calling localTimeSelectedTimezoneUTCTime will throw TypeError from null.tz.
-    // This documents the source limitation; the function works correctly when
-    // moment is fresh (verified by getTimezonesByOffset test above which confirms
-    // the mock is correctly set up).
+  it("calls moment.tz with date components and timezone and returns microseconds", async () => {
     const time = new Date("2023-11-14T22:13:20.000Z");
-    // We expect the call to throw because of the null-moment state
-    await expect(
-      localTimeSelectedTimezoneUTCTime(time, "UTC"),
-    ).rejects.toThrow();
+
+    const result = await localTimeSelectedTimezoneUTCTime(time, "UTC");
+
+    expect(typeof result).toBe("number");
+    // mock returns unix() = 1700000000, so result = 1700000000 * 1000000
+    expect(result).toBe(1700000000 * 1000000);
   });
 });
 

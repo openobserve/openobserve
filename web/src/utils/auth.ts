@@ -25,23 +25,22 @@ export const getUserInfo = (loginString: string) => {
     const tokens = loginString.substring(1).split("&");
     for (const token of tokens) {
       const propArr = token.split("=");
-      if (propArr[0] == "id_token") {
+      if (propArr[0] === "id_token") {
         const tokenString = propArr[1];
         const parts = tokenString.split(".");
         if (parts.length === 3) {
           try {
-            const header = JSON.parse(b64DecodeUnicode(parts[0]) || "");
             const payload = JSON.parse(b64DecodeUnicode(parts[1]) || "");
-            const signature = parts[2];
-            payload["family_name"] = payload["name"];
-            payload["given_name"] = "";
+            if (!payload || typeof payload !== "object") return null;
+            payload["family_name"] = payload["name"] || "";
+            payload["given_name"] = payload["given_name"] || "";
             const encodedSessionData: any = b64EncodeStandard(
               JSON.stringify(payload),
             );
             useLocalUserInfo(encodedSessionData);
             decToken = payload;
           } catch (error) {
-            console.error("Invalid JWT token:", error);
+            console.error("Invalid JWT token");
             return null;
           }
         } else {
@@ -56,7 +55,7 @@ export const getUserInfo = (loginString: string) => {
 
     return decToken;
   } catch (e) {
-    console.log(`Error in getUserInfo util with loginString: ${loginString}`);
+    console.log("Error in getUserInfo util");
   }
 };
 
@@ -67,7 +66,7 @@ export const invalidateLoginData = () => {
 export const getDecodedAccessToken = (token: string) => {
   try {
     const decodedString = b64DecodeStandard(token.split(".")[1]);
-    if (typeof decodedString == "string") {
+    if (typeof decodedString === "string") {
       return JSON.parse(decodedString);
     } else {
       return "";
@@ -79,7 +78,7 @@ export const getDecodedAccessToken = (token: string) => {
 
 export const getDecodedUserInfo = () => {
   try {
-    if (useLocalUserInfo() != null) {
+    if (useLocalUserInfo() !== null) {
       const userinfo: any = useLocalUserInfo();
       return b64DecodeStandard(userinfo);
     } else {
@@ -109,35 +108,41 @@ export const routeGuard = async (to: any, from: any, next: any) => {
   const store = useStore();
   if (config.isCloud) {
     if (
-      store.state.organizationData?.organizationSettings?.free_trial_expiry !=
+      store.state.organizationData?.organizationSettings?.free_trial_expiry !==
       ""
     ) {
       const trialDueDays = getDueDays(
         store.state.organizationData?.organizationSettings?.free_trial_expiry,
       );
-      if (trialDueDays <= 0 && trialPeriodAllowedPath.indexOf(to.name) == -1) {
+      if (trialDueDays <= 0 && trialPeriodAllowedPath.indexOf(to.name) === -1) {
         next({
           name: "plans",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },
         });
+        return;
       }
     }
   }
 
   if (
-    to.path.indexOf("/ingestion") == -1 &&
-    to.path.indexOf("/iam") == -1 &&
+    to.path.indexOf("/ingestion") === -1 &&
+    to.path.indexOf("/iam") === -1 &&
     to.name !== "iam" &&
-    trialPeriodAllowedPath.indexOf(to.name) == -1 &&
+    trialPeriodAllowedPath.indexOf(to.name) === -1 &&
     store.state.zoConfig.hasOwnProperty("restricted_routes_on_empty_data") &&
-    store.state.zoConfig.restricted_routes_on_empty_data == true &&
-    store.state.organizationData.isDataIngested == false
+    store.state.zoConfig.restricted_routes_on_empty_data === true &&
+    store.state.organizationData.isDataIngested === false
   ) {
     try {
+      const orgIdentifier = store.state.selectedOrganization.identifier;
+      if (!orgIdentifier) {
+        next();
+        return;
+      }
       const response = await organizationService.get_organization_summary(
-        store.state.selectedOrganization.identifier,
+        orgIdentifier,
       );
       if (!response.data?.streams?.num_streams) {
         store.dispatch("setIsDataIngested", false);
@@ -170,11 +175,6 @@ export const generateTraceContext = () => {
 };
 
 export function checkCallBackValues(url: string, key: string) {
-  const tokens = url.split("&");
-  for (const token of tokens) {
-    const propArr = token.split("=");
-    if (propArr[0] == key) {
-      return propArr[1];
-    }
-  }
+  const params = new URLSearchParams(url.startsWith("#") ? url.slice(1) : url);
+  return params.get(key) ?? undefined;
 }
