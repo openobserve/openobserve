@@ -209,6 +209,18 @@ Treat this as a gate on *yourself*: a spec that trips any CRITICAL above is not 
    (`mkdir -p` first) listing: spec path, page objects touched (new methods/locators), the
    `playwright.yml` group + filename to register, and any open risks (e.g. `NEEDS SELECTOR`
    items the Analyst flagged and how you handled them).
+5. A machine-readable **test summary** → `docs/test_generator/ci/test-summary.json`: one entry per
+   test case you **added or changed this run** (skip unchanged sibling tests), so the PR-back job
+   can render a reviewer-facing table. Shape:
+   ```json
+   [
+     { "title": "should open the demo page", "action": "new", "verifies": "demo page loads and the header is visible" },
+     { "title": "should filter rows", "action": "append", "verifies": "the filter control updates the results table" }
+   ]
+   ```
+   `action` = this case's coverage action (`new` for a new spec's tests, `append`/`extend` for ones
+   added/modified on an existing spec). `verifies` = one concise human sentence. For `action: none`
+   write `[]`. Keep `title` byte-identical to the `test("…")` name in the spec.
 
 > **Where outputs go:** you run in an ephemeral CI runner with no commit access. Your files are
 > uploaded as a build artifact and the **PR-back job (Job 4) commits them** to a `test/<slug>`
