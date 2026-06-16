@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
-    any::Any,
     collections::HashMap,
     sync::{Arc, RwLock},
 };
@@ -40,10 +39,6 @@ impl StreamTypeProvider {
 
 #[async_trait]
 impl SchemaProvider for StreamTypeProvider {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
     fn table_names(&self) -> Vec<String> {
         let tables = self.tables.read().unwrap();
         tables.keys().cloned().collect::<Vec<_>>()
@@ -104,9 +99,6 @@ mod tests {
 
     #[async_trait]
     impl TableProvider for DummyTable {
-        fn as_any(&self) -> &dyn std::any::Any {
-            self
-        }
         fn schema(&self) -> SchemaRef {
             self.0.clone()
         }
