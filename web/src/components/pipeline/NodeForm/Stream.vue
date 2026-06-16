@@ -87,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <div
             v-if="selectedNodeType == 'output'"
-            class="note-message tw:rounded-md tw:p-3 tw:flex tw:flex-col tw:gap-2"
+            class="note-message tw:bg-[#f9f290] tw:text-[#2d3748] tw:w-full tw:rounded-md tw:p-3 tw:flex tw:flex-col tw:gap-2"
           >
             <div class="tw:text-sm tw:text-gray-800">Guidelines:</div>
             <div class="tw:flex tw:flex-col tw:gap-1 tw:text-sm tw:text-gray-800">
@@ -100,14 +100,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="tw:flex tw:items-start tw:gap-2">
                 <OIcon name="info" size="sm" class="tw:shrink-0 tw:mt-0.5 tw:text-amber-500" />
                 <span>
-                  <span class="highlight">Enrichment_tables</span> as destination stream is only available for scheduled pipelines
+                  <span class="highlight tw:font-bold tw:text-[#007bff]">Enrichment_tables</span> as destination stream is only available for scheduled pipelines
                 </span>
               </div>
               <div class="tw:flex tw:items-start tw:gap-2">
                 <OIcon name="info" size="sm" class="tw:shrink-0 tw:mt-0.5 tw:text-amber-500" />
                 <span>
-                  Use curly braces <span class="code">{}</span> to configure stream name dynamically. e.g.
-                  <span class="code">static_text_{fieldname}_postfix</span>. Static text before/after <span class="code">{}</span> is optional
+                  Use curly braces <span class="code tw:[font-family:monospace] tw:py-[1px] tw:px-[4px] tw:rounded-[3px] tw:bg-[rgba(0,0,0,0.06)] tw:text-[#b30059]">{}</span> to configure stream name dynamically. e.g.
+                  <span class="code tw:[font-family:monospace] tw:py-[1px] tw:px-[4px] tw:rounded-[3px] tw:bg-[rgba(0,0,0,0.06)] tw:text-[#b30059]">static_text_{fieldname}_postfix</span>. Static text before/after <span class="code tw:[font-family:monospace] tw:py-[1px] tw:px-[4px] tw:rounded-[3px] tw:bg-[rgba(0,0,0,0.06)] tw:text-[#b30059]">{}</span> is optional
                 </span>
               </div>
             </div>
@@ -455,10 +455,6 @@ defineExpose({
 </script>
 
 <style>
-.stream-routing-title {
-  font-size: 18px;
-  padding-top: 16px;
-}
 .pipeline-add-stream {
   .add-stream-header.row {
     display: none;
@@ -481,22 +477,4 @@ defineExpose({
   font-weight: 600;
 }
 
-.note-message {
-  background-color: #f9f290;
-  color: #2d3748;
-  width: 100%;
-}
-
-.note-message .highlight {
-  font-weight: bold;
-  color: #007bff;
-}
-
-.note-message .code {
-  font-family: monospace;
-  padding: 1px 4px;
-  border-radius: 3px;
-  background-color: rgba(0, 0, 0, 0.06);
-  color: #b30059;
-}
 </style>

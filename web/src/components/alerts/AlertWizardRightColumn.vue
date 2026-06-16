@@ -16,14 +16,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <!-- Right Column: Preview & Summary (calc to account for gap) -->
-  <div class="tw:flex-[0_0_calc(32%-0.625rem)] tw:flex tw:flex-col tw:gap-2 right-column-container" style="height: calc(100vh - 302px); position: sticky; top: 0;">
+  <div class="tw:flex-[0_0_calc(32%-0.625rem)] tw:flex tw:flex-col tw:gap-2 tw:overflow-y-auto tw:overflow-x-clip" style="height: calc(100vh - 302px); position: sticky; top: 0;">
     <!-- Preview Section -->
     <div
-      class="collapsible-section card-container preview-section"
+      class="collapsible-section card-container preview-section tw:flex tw:flex-col tw:transition-all tw:duration-300 tw:bg-(--o2-card-bg) tw:rounded-md tw:shadow-[0_0_5px_1px_var(--o2-hover-shadow)] tw:border tw:border-(--o2-border-color)"
       :style="previewSectionStyle"
     >
       <div
-        class="section-header tw:flex tw:items-center tw:justify-between tw:px-4 tw:py-3 tw:cursor-pointer"
+        class="section-header tw:flex tw:items-center tw:justify-between tw:px-4 tw:py-3 tw:cursor-pointer tw:shrink-0 tw:border-b tw:border-[var(--o2-border-color,rgba(0,0,0,0.08))] tw:transition-all tw:duration-200 tw:rounded-t-md tw:select-none"
         @click="togglePreview"
       >
         <div class="tw:flex tw:items-center tw:gap-2">
@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Status Indicator -->
           <div
             v-if="evaluationStatus && !isRealTime"
-            class="alert-status-indicator tw:flex tw:items-center tw:gap-1.5 tw:px-2 tw:py-1 tw:rounded"
+            class="alert-status-indicator tw:flex tw:items-center tw:gap-1.5 tw:px-2 tw:py-1 tw:rounded tw:border-l-[0.1875rem] tw:border-l-solid tw:bg-[rgba(76,175,80,0.08)] tw:border-l-[#4caf50]"
             :class="{
               'status-would-trigger': evaluationStatus.wouldTrigger,
               'status-would-not-trigger': !evaluationStatus.wouldTrigger,
@@ -57,12 +57,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="ghost"
           size="icon-circle-sm"
           @click.stop="togglePreview"
-          class="expand-toggle-btn"
+          class="expand-toggle-btn tw:opacity-50 tw:transition-all tw:duration-200"
         >
           <OIcon :name="expandState.preview ? 'expand-less' : 'expand-more'" size="sm" />
         </OButton>
       </div>
-      <div v-show="expandState.preview" class="section-content">
+      <div v-show="expandState.preview" class="section-content tw:flex-1 tw:flex tw:flex-col">
         <keep-alive>
           <preview-alert
             style="height: 100%;"
@@ -80,11 +80,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Summary Section -->
     <div
-      class="collapsible-section card-container"
+      class="collapsible-section card-container tw:flex tw:flex-col tw:transition-all tw:duration-300 tw:bg-(--o2-card-bg) tw:rounded-md tw:shadow-[0_0_5px_1px_var(--o2-hover-shadow)] tw:border tw:border-(--o2-border-color)"
       :style="summarySectionStyle"
     >
       <div
-        class="section-header tw:flex tw:items-center tw:justify-between tw:px-4 tw:py-3 tw:cursor-pointer"
+        class="section-header tw:flex tw:items-center tw:justify-between tw:px-4 tw:py-3 tw:cursor-pointer tw:shrink-0 tw:border-b tw:border-[var(--o2-border-color,rgba(0,0,0,0.08))] tw:transition-all tw:duration-200 tw:rounded-t-md tw:select-none"
         @click="toggleSummary"
       >
         <span class="tw:text-sm tw:font-semibold">{{ t('alerts.summary.title') }}</span>
@@ -92,12 +92,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="ghost"
           size="icon-circle-sm"
           @click.stop="toggleSummary"
-          class="expand-toggle-btn"
+          class="expand-toggle-btn tw:opacity-50 tw:transition-all tw:duration-200"
         >
           <OIcon :name="expandState.summary ? 'expand-less' : 'expand-more'" size="sm" />
         </OButton>
       </div>
-      <div v-show="expandState.summary" class="summary-section-content">
+      <div v-show="expandState.summary" class="summary-section-content tw:flex-1 tw:overflow-hidden tw:flex tw:flex-col">
         <alert-summary
           style="height: 100%; overflow: auto;"
           :formData="formData"
@@ -327,71 +327,20 @@ export default defineComponent({
 });
 </script>
 
-<style scoped lang="scss">
-.right-column-container {
-  overflow-y: auto;
-  overflow-x: clip;
+<style>
+.collapsible-section .section-header:hover {
+  background: rgba(0, 0, 0, 0.04);
 }
 
-.collapsible-section {
-  display: flex;
-  flex-direction: column;
-  transition: all 0.3s ease;
-  // Ensure card-container styles are applied
-  background-color: var(--o2-card-bg);
-  border-radius: 0.375rem;
-  box-shadow: 0 0 5px 1px var(--o2-hover-shadow);
-  border: 1px solid var(--o2-border-color, rgba(0, 0, 0, 0.08));
-  // overflow: hidden;
+.collapsible-section .section-header:active {
+  background: rgba(0, 0, 0, 0.06);
+}
 
-  .section-header {
-    flex-shrink: 0;
-    border-bottom: 1px solid var(--o2-border-color, rgba(0, 0, 0, 0.08));
-    transition: all 0.2s ease;
-    border-radius: 0.375rem 0.375rem 0 0;
-    user-select: none;
-
-    &:hover {
-      background: rgba(0, 0, 0, 0.04);
-    }
-
-    &:active {
-      background: rgba(0, 0, 0, 0.06);
-    }
-  }
-
-  .section-content {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-  }
-
-
-  .summary-section-content {
-    flex: 1;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-  }
-
-
-  .expand-toggle-btn {
-    opacity: 0.5;
-    transition: all 0.2s ease;
-
-    &:hover {
-      opacity: 1;
-    }
-  }
+.collapsible-section .expand-toggle-btn:hover {
+  opacity: 1;
 }
 
 /* Status Indicator Styles */
-.alert-status-indicator {
-  border-left: 0.1875rem solid;
-  background: rgba(76, 175, 80, 0.08);
-  border-left-color: #4caf50;
-}
-
 .alert-status-indicator.status-would-not-trigger {
   background: rgba(158, 158, 158, 0.08);
   border-left-color: #9e9e9e;

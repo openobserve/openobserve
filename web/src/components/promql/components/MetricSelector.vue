@@ -1,14 +1,14 @@
 <template>
-  <div class="metric-selector">
+  <div class="tw:mb-2">
     <div style="display: flex; flex-direction: row" class="tw:pl-3">
-      <div class="layout-name">{{ t("panel.metric") }}</div>
-      <span class="layout-separator">:</span>
-      <div class="axis-container">
+      <div class="tw:text-sm tw:whitespace-nowrap tw:flex tw:items-center tw:min-w-32.5">{{ t("panel.metric") }}</div>
+      <span class="tw:flex tw:items-center tw:ml-0.5 tw:mr-0.5">:</span>
+      <div class="tw:m-1.25 tw:flex-1">
         <OSelect
           v-model="selectedMetric"
           :options="metrics"
           label="Metric Name"
-          class="showLabelOnTop metric-select"
+          class="showLabelOnTop tw:min-w-75 tw:max-w-125"
           @update:model-value="onMetricSelect"
           clearable
           data-test="metric-selector"
@@ -79,34 +79,3 @@ const onMetricSelect = (value: string | null) => {
   emit("update:metric", selectedMetric.value);
 };
 </script>
-
-<style scoped lang="scss">
-.metric-selector {
-  margin-bottom: 8px;
-}
-
-.layout-name {
-  font-size: 14px;
-  white-space: nowrap;
-  min-width: 130px;
-  display: flex;
-  align-items: center;
-}
-
-.layout-separator {
-  display: flex;
-  align-items: center;
-  margin-left: 2px;
-  margin-right: 2px;
-}
-
-.axis-container {
-  margin: 5px;
-  flex: 1;
-}
-
-.metric-select {
-  min-width: 300px;
-  max-width: 500px;
-}
-</style>

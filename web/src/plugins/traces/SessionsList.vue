@@ -502,17 +502,15 @@ onUnmounted(() => {
 });
 </script>
 
-<style lang="scss" scoped>
-.sessions-list {
-  // Match ServicesCatalog: card surface, scoped paginator + selector
-  // styles so we inherit the global table theme from TenstackTable.
-  :deep(.paginator-section .q-btn) {
-    min-width: 1.5rem;
-    min-height: 1.5rem;
-  }
+<style>
+/* Match ServicesCatalog: card surface, paginator + selector
+   styles so we inherit the global table theme from TenstackTable. */
+.sessions-list .paginator-section .q-btn {
+  min-width: 1.5rem;
+  min-height: 1.5rem;
+}
 
-  :deep(.select-pagination .q-field__control) {
-    min-height: 1.75rem;
-  }
+.sessions-list .select-pagination .q-field__control {
+  min-height: 1.75rem;
 }
 </style>

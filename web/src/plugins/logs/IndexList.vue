@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="log-search-index-list-stream-type-badge"
         variant="ghost"
         size="icon-sm"
-        class="stream-type-badge tw:shrink-0"
+        class="tw:shrink-0 tw:h-8 tw:w-8 tw:border tw:border-(--o2-border) tw:rounded tw:p-0"
         @click="onStreamTypeChange('logs')"
       >
         <OIcon :name="streamTypeIcon" size="sm" />
@@ -2043,46 +2043,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style scoped lang="scss">
-.stream-type-badge {
-  height: 32px;
-  width: 32px;
-  border: 1px solid var(--o2-border);
-  border-radius: 4px;
-  padding: 0;
-}
-
-.indexlist-search-input {
-  height: 36px;
-  .q-field__control {
-    height: 36px;
-    display: flex;
-    align-items: center;
-    font-size: 13px;
-    padding: 0px 6px !important;
-    font-weight: 500;
-  }
-  .q-field__prepend {
-    height: 36px !important;
-    padding-bottom: 4px !important;
-  }
-  .q-field__append {
-    padding-top: 8px !important;
-  }
-
-}
-</style>
-
-<style lang="scss">
-.indexlist-stream-toggle {
-  .q-toggle__inner {
-    padding: 0.325em !important;
-    font-size: 20px !important;
-  }
-
-  .q-toggle__thumb:before {
-    background: transparent !important;
-  }
-}
-</style>

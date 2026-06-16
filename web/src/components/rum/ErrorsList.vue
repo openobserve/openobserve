@@ -125,47 +125,45 @@ const rows = ref<Session[]>([]);
 const tableRows = computed(() => rows.value);
 </script>
 
-<style lang="scss">
-.sessions_page {
-  .index-menu .field_list .field_overlay .field_label,
-  .q-field__native,
-  .q-field__input,
-  .q-table tbody td {
-    font-size: 0.75rem !important;
-  }
+<style>
+.sessions_page .index-menu .field_list .field_overlay .field_label,
+.sessions_page .q-field__native,
+.sessions_page .q-field__input,
+.sessions_page .q-table tbody td {
+  font-size: 0.75rem !important;
+}
 
-  .q-splitter__after {
-    overflow: hidden;
-  }
+.sessions_page .q-splitter__after {
+  overflow: hidden;
+}
 
-  .index-table :hover::-webkit-scrollbar,
-  #tracesSearchGridComponent:hover::-webkit-scrollbar {
-    height: 0.8125rem;
-    width: 0.8125rem;
-  }
+.sessions_page .index-table :hover::-webkit-scrollbar,
+#tracesSearchGridComponent:hover::-webkit-scrollbar {
+  height: 0.8125rem;
+  width: 0.8125rem;
+}
 
-  .index-table ::-webkit-scrollbar-track,
-  #tracesSearchGridComponent::-webkit-scrollbar-track {
-    -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.3);
-    border-radius: 0.625rem;
-  }
+.sessions_page .index-table ::-webkit-scrollbar-track,
+#tracesSearchGridComponent::-webkit-scrollbar-track {
+  -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.3);
+  border-radius: 0.625rem;
+}
 
-  .index-table ::-webkit-scrollbar-thumb,
-  #tracesSearchGridComponent::-webkit-scrollbar-thumb {
-    border-radius: 0.625rem;
-    -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.5);
-  }
+.sessions_page .index-table ::-webkit-scrollbar-thumb,
+#tracesSearchGridComponent::-webkit-scrollbar-thumb {
+  border-radius: 0.625rem;
+  -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.5);
+}
 
-  .q-table__top {
-    padding: 0 !important;
-  }
+.sessions_page .q-table__top {
+  padding: 0 !important;
+}
 
-  .q-table__control {
-    width: 100%;
-  }
+.sessions_page .q-table__control {
+  width: 100%;
+}
 
-  .q-field__control-container {
-    padding-top: 0 !important;
-  }
+.sessions_page .q-field__control-container {
+  padding-top: 0 !important;
 }
 </style>

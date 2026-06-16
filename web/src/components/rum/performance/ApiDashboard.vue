@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :key="store.state.selectedOrganization.identifier"
   >
     <div
-      class="api-performance-dashboards tw:h-full"
+      class="tw:h-full tw:min-h-0! tw:max-h-[calc(100vh-196px)] tw:overflow-y-auto"
       :class="isLoading.length ? 'tw:invisible' : 'tw:visible'"
     >
       <div class="performance-dashboard">
@@ -319,47 +319,9 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
-.performance_title {
-  font-size: 24px;
-}
-.q-table {
-  &__top {
-    border-bottom: 1px solid var(--o2-border);
-    justify-content: flex-end;
-  }
-}
-
-.view-error-table {
-  margin-top: 4px;
-  border: 1px solid rgba(194, 194, 194, 0.4784313725) !important;
-  border-radius: 4px;
-  min-height: 200px;
-}
-
-.api-performance-dashboards {
-  min-height: auto !important;
-  max-height: calc(100vh - 196px);
-  overflow-y: auto;
-}
-</style>
-
-<style lang="scss">
-.view-error-table {
-  .q-table {
-    td {
-      padding: 6px 10px !important;
-      height: auto !important;
-    }
-  }
-
-  .q-table thead tr {
-    th {
-      padding: 6px 8px !important;
-      height: auto !important;
-    }
-    padding: 6px 0px !important;
-    height: auto !important;
-  }
+<style>
+.q-table__top {
+  border-bottom: 1px solid var(--o2-border);
+  justify-content: flex-end;
 }
 </style>

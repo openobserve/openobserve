@@ -119,11 +119,11 @@ const dotGridStyle =
   theme-aware color for the decorative dot grid. There is no `dark:` variant
   configured, so the dot color is set per theme via the `.dark` class.
 -->
-<style scoped>
+<style>
 .empty-state-root {
   --empty-dot: var(--color-grey-300);
 }
-:global(.dark) .empty-state-root {
+.dark .empty-state-root {
   --empty-dot: var(--color-grey-800);
 }
 </style>

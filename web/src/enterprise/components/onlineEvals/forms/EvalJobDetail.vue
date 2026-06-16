@@ -1,11 +1,20 @@
 <template>
-  <div class="jd-scrim" role="dialog" aria-modal="true" @click.self="$emit('close')">
-    <aside class="jd" @click.stop data-test="eval-job-detail">
+  <div
+    class="tw:fixed tw:inset-0 tw:bg-black/[0.32] tw:z-[1010] tw:flex tw:justify-end tw:[animation:jd-fade_0.18s_ease-out] jd-scrim"
+    role="dialog"
+    aria-modal="true"
+    @click.self="$emit('close')"
+  >
+    <aside
+      class="tw:w-[1100px] tw:max-w-[96vw] tw:h-full tw:bg-(--color-card-bg) tw:border-l tw:border-(--color-dialog-header-border) tw:flex tw:flex-col tw:[animation:jd-slide_0.22s_ease-out] jd"
+      @click.stop
+      data-test="eval-job-detail"
+    >
       <!-- ── Header ── -->
-      <header class="jd__header">
-        <div class="jd__header-text">
+      <header class="tw:flex tw:items-start tw:gap-2.5 tw:px-5 tw:pt-4 tw:pb-3.5 tw:border-b tw:border-dialog-header-border tw:bg-card-bg tw:shrink-0">
+        <div class="tw:flex-1 tw:min-w-0 tw:flex tw:flex-col tw:gap-1">
           <div class="tw:flex tw:items-center tw:gap-2 tw:flex-nowrap">
-            <span class="jd__eyebrow">{{ t("onlineEvals.job.detail.eyebrow") }}</span>
+            <span class="tw:font-semibold tw:text-[11px] tw:leading-[1.4] tw:tracking-[0.02em] tw:text-text-secondary">{{ t("onlineEvals.job.detail.eyebrow") }}</span>
             <span
               v-if="row.name"
               :class="[
@@ -23,13 +32,13 @@
               />
             </span>
           </div>
-          <div v-if="row.description" class="jd__sub-line">
+          <div v-if="row.description" class="tw:text-xs tw:text-text-secondary">
             {{ row.description }}
           </div>
         </div>
         <button
           type="button"
-          class="jd__close"
+          class="tw:shrink-0 tw:bg-transparent tw:border-0 tw:p-1 tw:rounded tw:cursor-pointer tw:text-(--color-text-secondary) tw:hover:bg-[color-mix(in_srgb,var(--color-text-primary)_8%,transparent)] tw:hover:text-(--color-text-primary)"
           :aria-label="t('onlineEvals.job.detail.close')"
           data-test="eval-job-detail-close-btn"
           @click="$emit('close')"
@@ -47,26 +56,26 @@
       </header>
 
       <!-- ── KPI strip ── -->
-      <section class="jd__kpis">
-        <article class="jd-kpi">
-          <span class="jd-kpi__title">{{ t("onlineEvals.job.detail.kpis.totalRuns") }}</span>
-          <span class="jd-kpi__value">{{ formatCount(kpis.totalRuns) }}</span>
-          <span class="jd-kpi__sub">{{ t("onlineEvals.job.detail.kpis.totalRunsSub") }}</span>
+      <section class="tw:grid tw:grid-cols-4 tw:gap-3 tw:px-5 tw:py-4 tw:bg-[color-mix(in_srgb,var(--color-text-secondary)_4%,var(--color-card-bg))] tw:border-b tw:border-dialog-header-border tw:shrink-0">
+        <article class="tw:flex tw:flex-col tw:gap-0.5 tw:py-[10px] tw:px-3 tw:bg-(--color-card-bg) tw:border tw:border-(--color-dialog-header-border) tw:rounded-md jd-kpi">
+          <span class="tw:font-semibold tw:text-[11px] tw:leading-[1.4] tw:tracking-[0.01em] tw:text-(--color-text-secondary)">{{ t("onlineEvals.job.detail.kpis.totalRuns") }}</span>
+          <span class="tw:font-bold tw:text-[22px] tw:leading-[1.1] tw:tracking-[-0.01em] tw:[font-variant-numeric:tabular-nums] tw:text-(--color-text-primary)">{{ formatCount(kpis.totalRuns) }}</span>
+          <span class="tw:text-[11px] tw:text-(--color-text-secondary)">{{ t("onlineEvals.job.detail.kpis.totalRunsSub") }}</span>
         </article>
-        <article class="jd-kpi" :class="successRateTone">
-          <span class="jd-kpi__title">{{ t("onlineEvals.job.detail.kpis.successRate") }}</span>
-          <span class="jd-kpi__value">{{ formatPercent(kpis.successRate) }}</span>
-          <span class="jd-kpi__sub">{{ t("onlineEvals.job.detail.kpis.successRateSub") }}</span>
+        <article class="tw:flex tw:flex-col tw:gap-0.5 tw:py-[10px] tw:px-3 tw:bg-(--color-card-bg) tw:border tw:border-(--color-dialog-header-border) tw:rounded-md jd-kpi" :class="successRateTone">
+          <span class="tw:font-semibold tw:text-[11px] tw:leading-[1.4] tw:tracking-[0.01em] tw:text-(--color-text-secondary)">{{ t("onlineEvals.job.detail.kpis.successRate") }}</span>
+          <span class="tw:font-bold tw:text-[22px] tw:leading-[1.1] tw:tracking-[-0.01em] tw:[font-variant-numeric:tabular-nums] jd-kpi__value">{{ formatPercent(kpis.successRate) }}</span>
+          <span class="tw:text-[11px] tw:text-(--color-text-secondary)">{{ t("onlineEvals.job.detail.kpis.successRateSub") }}</span>
         </article>
-        <article class="jd-kpi">
-          <span class="jd-kpi__title">{{ t("onlineEvals.job.detail.kpis.avgLatency") }}</span>
-          <span class="jd-kpi__value">{{ formatLatency(kpis.avgLatencyMs) }}</span>
-          <span class="jd-kpi__sub">{{ t("onlineEvals.job.detail.kpis.avgLatencySub") }}</span>
+        <article class="tw:flex tw:flex-col tw:gap-0.5 tw:py-[10px] tw:px-3 tw:bg-(--color-card-bg) tw:border tw:border-(--color-dialog-header-border) tw:rounded-md jd-kpi">
+          <span class="tw:font-semibold tw:text-[11px] tw:leading-[1.4] tw:tracking-[0.01em] tw:text-(--color-text-secondary)">{{ t("onlineEvals.job.detail.kpis.avgLatency") }}</span>
+          <span class="tw:font-bold tw:text-[22px] tw:leading-[1.1] tw:tracking-[-0.01em] tw:[font-variant-numeric:tabular-nums] tw:text-(--color-text-primary)">{{ formatLatency(kpis.avgLatencyMs) }}</span>
+          <span class="tw:text-[11px] tw:text-(--color-text-secondary)">{{ t("onlineEvals.job.detail.kpis.avgLatencySub") }}</span>
         </article>
-        <article class="jd-kpi">
-          <span class="jd-kpi__title">{{ t("onlineEvals.job.detail.kpis.scorers") }}</span>
-          <span class="jd-kpi__value">{{ resolvedScorers.length }}</span>
-          <span class="jd-kpi__sub">
+        <article class="tw:flex tw:flex-col tw:gap-0.5 tw:py-[10px] tw:px-3 tw:bg-(--color-card-bg) tw:border tw:border-(--color-dialog-header-border) tw:rounded-md jd-kpi">
+          <span class="tw:font-semibold tw:text-[11px] tw:leading-[1.4] tw:tracking-[0.01em] tw:text-(--color-text-secondary)">{{ t("onlineEvals.job.detail.kpis.scorers") }}</span>
+          <span class="tw:font-bold tw:text-[22px] tw:leading-[1.1] tw:tracking-[-0.01em] tw:[font-variant-numeric:tabular-nums] tw:text-(--color-text-primary)">{{ resolvedScorers.length }}</span>
+          <span class="tw:text-[11px] tw:text-(--color-text-secondary)">
             {{ resolvedScorers.length === 1
               ? t("onlineEvals.job.detail.kpis.scorersSubSingular")
               : t("onlineEvals.job.detail.kpis.scorersSubPlural") }}
@@ -75,12 +84,12 @@
       </section>
 
       <!-- ── Tab strip ── -->
-      <nav class="jd__tabs" role="tablist">
+      <nav class="tw:flex tw:gap-4.5 tw:px-5 tw:border-b tw:border-dialog-header-border tw:bg-card-bg tw:shrink-0" role="tablist">
         <button
           v-for="tab in tabs"
           :key="tab.id"
           type="button"
-          class="jd__tab"
+          class="tw:inline-flex tw:items-center tw:gap-1.5 tw:py-[10px] tw:px-0 tw:bg-transparent tw:border-0 tw:border-b-2 tw:border-b-transparent tw:cursor-pointer tw:text-(--color-text-secondary) tw:font-semibold tw:text-[13px] tw:-mb-px tw:hover:text-(--color-text-primary) jd__tab"
           :class="{ 'jd__tab--active': activeTab === tab.id }"
           role="tab"
           :aria-selected="activeTab === tab.id"
@@ -88,109 +97,117 @@
           @click="activeTab = tab.id"
         >
           <span>{{ tab.label }}</span>
-          <span v-if="tab.count != null" class="jd__tab-count">{{ tab.count }}</span>
+          <span
+            v-if="tab.count != null"
+            class="tw:inline-flex tw:items-center tw:justify-center tw:px-1.5 tw:min-w-[18px] tw:h-4 tw:rounded-full tw:font-semibold tw:text-[10px] tw:leading-none tw:bg-[color-mix(in_srgb,var(--color-text-secondary)_14%,transparent)] tw:text-(--color-text-secondary) jd__tab-count"
+          >{{ tab.count }}</span>
         </button>
       </nav>
 
       <!-- ── Body ── -->
-      <div class="jd__body">
+      <div class="tw:flex-1 tw:overflow-auto tw:px-5 tw:py-4.5 tw:flex tw:flex-col tw:gap-4.5 tw:min-h-0 tw:bg-card-bg">
         <!-- Configuration -->
         <template v-if="activeTab === 'configuration'">
           <!-- Target -->
-          <section class="jd-section">
-            <h4 class="jd-section__title">{{ t("onlineEvals.job.detail.targetSection") }}</h4>
-            <dl class="jd-kv">
-              <dt>{{ t("onlineEvals.job.detail.streamLabel") }}</dt>
-              <dd class="jd-mono">{{ row.stream }}</dd>
+          <section class="tw:flex tw:flex-col tw:gap-2">
+            <h4 class="tw:m-0 tw:font-semibold tw:text-[13px] tw:leading-[1.5] tw:text-(--color-text-primary) tw:pb-1.5 tw:border-b tw:border-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] tw:inline-flex tw:items-center tw:gap-1.5">{{ t("onlineEvals.job.detail.targetSection") }}</h4>
+            <dl class="tw:grid tw:grid-cols-[130px_1fr] tw:gap-y-1.5 tw:gap-x-3.5 tw:m-0">
+              <dt class="tw:text-[11px] tw:text-(--color-text-secondary)">{{ t("onlineEvals.job.detail.streamLabel") }}</dt>
+              <dd class="tw:m-0 tw:text-[13px] tw:text-(--color-text-primary) tw:break-words tw:font-[ui-monospace,SFMono-Regular,Menlo,monospace] tw:[font-variant-numeric:tabular-nums]">{{ row.stream }}</dd>
 
-              <dt>{{ t("onlineEvals.job.detail.streamTypeLabel") }}</dt>
-              <dd class="jd-mono">{{ streamType }}</dd>
+              <dt class="tw:text-[11px] tw:text-(--color-text-secondary)">{{ t("onlineEvals.job.detail.streamTypeLabel") }}</dt>
+              <dd class="tw:m-0 tw:text-[13px] tw:text-(--color-text-primary) tw:break-words tw:font-[ui-monospace,SFMono-Regular,Menlo,monospace] tw:[font-variant-numeric:tabular-nums]">{{ streamType }}</dd>
 
-              <dt>{{ t("onlineEvals.job.detail.filterLabel") }}</dt>
-              <dd>
+              <dt class="tw:text-[11px] tw:text-(--color-text-secondary)">{{ t("onlineEvals.job.detail.filterLabel") }}</dt>
+              <dd class="tw:m-0 tw:text-[13px] tw:text-(--color-text-primary) tw:break-words">
                 <pre
                   v-if="filterClauses.length > 0"
-                  class="jd-filter"
+                  class="tw:m-0 tw:py-3 tw:px-3.5 tw:bg-[color-mix(in_srgb,#6b76e3_6%,var(--color-card-bg))] tw:border tw:border-[color-mix(in_srgb,#6b76e3_22%,transparent)] tw:rounded-md tw:font-[ui-monospace,SFMono-Regular,Menlo,monospace] tw:text-[13px] tw:leading-[1.85] tw:text-(--color-text-primary) tw:max-h-[240px] tw:overflow-auto tw:whitespace-pre"
                   data-test="eval-job-detail-filter"
                 ><div
                     v-for="(clause, idx) in filterClauses"
                     :key="idx"
-                    class="jd-filter__row"
+                    class="tw:block tw:whitespace-pre"
                     :style="{ paddingLeft: `${clause.depth * 16}px` }"
-                  ><span class="jd-filter__kw">{{ clause.keyword }}</span><span class="jd-filter__col">{{ clause.column }}</span><span class="jd-filter__op">{{ clause.operator }}</span><span
-                      class="jd-filter__val"
-                      :class="{ 'jd-filter__val--str': clause.valueIsString }"
+                  ><span class="tw:inline-block tw:w-[38px] tw:mr-2 tw:text-[#7c3aed] tw:font-bold">{{ clause.keyword }}</span><span class="tw:text-[#1d4ed8] tw:mr-1.5">{{ clause.column }}</span><span class="tw:text-(--color-text-secondary) tw:mr-1.5">{{ clause.operator }}</span><span
+                      class="tw:text-(--color-text-primary)"
+                      :class="{ 'tw:text-[#b25400]': clause.valueIsString }"
                     >{{ clause.valueText }}</span></div></pre>
-                <span v-else class="jd-muted">{{ t("onlineEvals.job.detail.filterEmpty") }}</span>
+                <span v-else class="tw:text-(--color-text-secondary) tw:italic">{{ t("onlineEvals.job.detail.filterEmpty") }}</span>
               </dd>
             </dl>
           </section>
 
           <!-- Scorers -->
-          <section class="jd-section">
-            <h4 class="jd-section__title">
+          <section class="tw:flex tw:flex-col tw:gap-2">
+            <h4 class="tw:m-0 tw:font-semibold tw:text-[13px] tw:leading-[1.5] tw:text-(--color-text-primary) tw:pb-1.5 tw:border-b tw:border-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] tw:inline-flex tw:items-center tw:gap-1.5">
               {{ t("onlineEvals.job.detail.scorersSection") }}
-              <span class="jd-section__chip">{{ resolvedScorers.length }}</span>
+              <span class="tw:inline-flex tw:items-center tw:px-[5px] tw:rounded-[3px] tw:font-semibold tw:text-[10px] tw:bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] tw:text-(--color-text-secondary)">{{ resolvedScorers.length }}</span>
             </h4>
-            <div v-if="resolvedScorers.length === 0" class="jd-empty">
+            <div v-if="resolvedScorers.length === 0" class="tw:inline-flex tw:items-center tw:gap-1.5 tw:py-2 tw:px-[10px] tw:bg-[color-mix(in_srgb,var(--color-text-secondary)_6%,transparent)] tw:rounded-[5px] tw:text-xs tw:text-(--color-text-secondary)">
               <OIcon name="info" size="xs" />
               <span>{{ t("onlineEvals.job.detail.scorersEmpty") }}</span>
             </div>
-            <ul v-else class="jd-scorers">
+            <ul v-else class="tw:list-none tw:m-0 tw:p-0 tw:flex tw:flex-col tw:gap-[10px]">
               <li v-for="item in resolvedScorers" :key="item.id">
                 <button
                   type="button"
-                  class="jd-scorers__card"
+                  class="tw:w-full tw:flex tw:items-center tw:gap-3.5 tw:py-3.5 tw:px-4 tw:bg-(--color-card-bg) tw:border tw:border-[color-mix(in_srgb,var(--color-text-secondary)_16%,transparent)] tw:rounded-lg tw:text-left tw:cursor-pointer tw:transition-[border-color,background,box-shadow,transform] tw:duration-[150ms] jd-scorers__card"
                   :data-test="`eval-job-detail-scorer-item-${item.name}`"
                   :disabled="!findScorerById(item.id)"
                   @click="onScorerClick(item.id)"
                 >
                   <span
-                    class="jd-scorers__icon"
-                    :class="`jd-scorers__icon--${item.scorerType}`"
+                    class="tw:shrink-0 tw:inline-flex tw:items-center tw:justify-center tw:w-[34px] tw:h-[34px] tw:rounded-lg tw:bg-[color-mix(in_srgb,#6b76e3_14%,transparent)] tw:text-[#4f5bcf]"
+                    :class="{
+                      'tw:bg-[color-mix(in_srgb,#b25400_14%,transparent)]! tw:text-[#b25400]!': item.scorerType === 'remote',
+                      'tw:bg-[color-mix(in_srgb,var(--color-text-secondary)_14%,transparent)]! tw:text-(--color-text-secondary)!': item.scorerType === 'unknown',
+                    }"
                   >
                     <OIcon
                       :name="item.scorerType === 'remote' ? 'cloud' : 'smart-toy'"
                       size="sm"
                     />
                   </span>
-                  <div class="jd-scorers__main">
-                    <div class="jd-scorers__row">
-                      <span class="jd-mono jd-scorers__name">{{ item.name }}</span>
+                  <div class="tw:flex-1 tw:min-w-0 tw:flex tw:flex-col tw:gap-[5px]">
+                    <div class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap">
+                      <span class="tw:font-bold tw:text-sm tw:text-(--color-text-primary) tw:font-[ui-monospace,SFMono-Regular,Menlo,monospace] tw:[font-variant-numeric:tabular-nums]">{{ item.name }}</span>
                       <span
                         v-if="item.scorerTypeLabel"
-                        class="jd-scorers__type"
-                        :class="`jd-scorers__type--${item.scorerType}`"
+                        class="tw:inline-flex tw:py-px tw:px-[7px] tw:rounded-[3px] tw:font-semibold tw:text-[10px] tw:leading-[1.5] tw:bg-[color-mix(in_srgb,#6b76e3_14%,transparent)] tw:text-[#4f5bcf]"
+                        :class="{
+                          'tw:bg-[color-mix(in_srgb,#b25400_14%,transparent)]! tw:text-[#b25400]!': item.scorerType === 'remote',
+                        }"
                       >
                         {{ item.scorerTypeLabel }}
                       </span>
-                      <span class="jd-scorers__version">v{{ item.version }}</span>
+                      <span class="tw:text-[11px] tw:text-(--color-text-secondary) tw:[font-variant-numeric:tabular-nums]">v{{ item.version }}</span>
                     </div>
-                    <div v-if="item.scoreConfigName" class="jd-scorers__produces">
-                      <OIcon name="rule" size="xs" class="jd-scorers__produces-icon" />
-                      <span class="jd-scorers__produces-prefix">
+                    <div v-if="item.scoreConfigName" class="tw:flex tw:items-center tw:gap-1.5 tw:text-xs tw:text-(--color-text-secondary) tw:flex-wrap">
+                      <OIcon name="rule" size="xs" class="tw:shrink-0 tw:text-(--color-text-secondary) tw:opacity-70" />
+                      <span class="tw:font-medium">
                         {{ t("onlineEvals.job.detail.producesPrefix") }}
                       </span>
-                      <span class="jd-mono jd-scorers__produces-name">{{ item.scoreConfigName }}</span>
+                      <span class="tw:text-(--color-text-primary) tw:font-bold tw:font-[ui-monospace,SFMono-Regular,Menlo,monospace] tw:[font-variant-numeric:tabular-nums]">{{ item.scoreConfigName }}</span>
                       <template v-if="item.scoreConfigDataType">
-                        <span class="jd-scorers__sep">·</span>
-                        <span class="jd-mono jd-scorers__produces-type">
+                        <span class="tw:text-(--color-text-secondary) tw:opacity-50">·</span>
+                        <span class="tw:text-(--color-text-secondary) tw:font-[ui-monospace,SFMono-Regular,Menlo,monospace] tw:[font-variant-numeric:tabular-nums]">
                           {{ item.scoreConfigDataType }}
                         </span>
                       </template>
                       <template v-if="item.scoreConfigRangeText">
-                        <span class="jd-scorers__sep">·</span>
-                        <span class="jd-mono jd-scorers__produces-range">
+                        <span class="tw:text-(--color-text-secondary) tw:opacity-50">·</span>
+                        <span class="tw:text-(--color-text-secondary) tw:font-[ui-monospace,SFMono-Regular,Menlo,monospace] tw:[font-variant-numeric:tabular-nums]">
                           {{ item.scoreConfigRangeText }}
                         </span>
                       </template>
                     </div>
                   </div>
-                  <span class="jd-scorers__cta">
-                    <span class="jd-scorers__cta-label">
+                  <span class="tw:shrink-0 tw:inline-flex tw:items-center tw:gap-1 tw:text-(--color-text-secondary) tw:font-semibold tw:text-[11px] jd-scorers__cta">
+                    <span class="tw:opacity-0 tw:transition-opacity tw:duration-[150ms] jd-scorers__cta-label">
                       {{ t("onlineEvals.job.detail.viewScorerHint") }}
                     </span>
-                    <OIcon name="chevron-right" size="sm" class="jd-scorers__chevron" />
+                    <OIcon name="chevron-right" size="sm" class="tw:shrink-0 tw:opacity-50 tw:transition-[opacity,transform] tw:duration-[150ms] jd-scorers__chevron" />
                   </span>
                 </button>
               </li>
@@ -199,41 +216,41 @@
 
 
           <!-- Sampling -->
-          <section class="jd-section">
-            <h4 class="jd-section__title">{{ t("onlineEvals.job.detail.samplingSection") }}</h4>
-            <dl class="jd-kv">
-              <dt>{{ t("onlineEvals.job.detail.samplingModeLabel") }}</dt>
-              <dd>{{ samplingModeLabel }}</dd>
+          <section class="tw:flex tw:flex-col tw:gap-2">
+            <h4 class="tw:m-0 tw:font-semibold tw:text-[13px] tw:leading-[1.5] tw:text-(--color-text-primary) tw:pb-1.5 tw:border-b tw:border-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] tw:inline-flex tw:items-center tw:gap-1.5">{{ t("onlineEvals.job.detail.samplingSection") }}</h4>
+            <dl class="tw:grid tw:grid-cols-[130px_1fr] tw:gap-y-1.5 tw:gap-x-3.5 tw:m-0">
+              <dt class="tw:text-[11px] tw:text-(--color-text-secondary)">{{ t("onlineEvals.job.detail.samplingModeLabel") }}</dt>
+              <dd class="tw:m-0 tw:text-[13px] tw:text-(--color-text-primary) tw:break-words">{{ samplingModeLabel }}</dd>
 
-              <dt v-if="samplingValue != null">{{ t("onlineEvals.job.detail.samplingValueLabel") }}</dt>
-              <dd v-if="samplingValue != null" class="jd-mono">{{ samplingValue }}</dd>
+              <dt v-if="samplingValue != null" class="tw:text-[11px] tw:text-(--color-text-secondary)">{{ t("onlineEvals.job.detail.samplingValueLabel") }}</dt>
+              <dd v-if="samplingValue != null" class="tw:m-0 tw:text-[13px] tw:text-(--color-text-primary) tw:break-words tw:font-[ui-monospace,SFMono-Regular,Menlo,monospace] tw:[font-variant-numeric:tabular-nums]">{{ samplingValue }}</dd>
             </dl>
           </section>
 
           <!-- Metadata -->
-          <section class="jd-section">
-            <h4 class="jd-section__title">{{ t("onlineEvals.job.detail.metadataSection") }}</h4>
-            <dl class="jd-kv">
-              <dt>{{ t("onlineEvals.job.detail.versionLabel") }}</dt>
-              <dd class="jd-mono">v{{ row.version }}</dd>
-              <dt v-if="pipelineId">{{ t("onlineEvals.job.detail.pipelineLabel") }}</dt>
-              <dd v-if="pipelineId" class="jd-mono">{{ pipelineId }}</dd>
-              <dt v-if="createdAt">{{ t("onlineEvals.job.detail.createdLabel") }}</dt>
-              <dd v-if="createdAt" class="jd-mono">{{ formatTimestamp(createdAt) }}</dd>
-              <dt v-if="updatedAt">{{ t("onlineEvals.job.detail.updatedLabel") }}</dt>
-              <dd v-if="updatedAt" class="jd-mono">{{ formatTimestamp(updatedAt) }}</dd>
+          <section class="tw:flex tw:flex-col tw:gap-2">
+            <h4 class="tw:m-0 tw:font-semibold tw:text-[13px] tw:leading-[1.5] tw:text-(--color-text-primary) tw:pb-1.5 tw:border-b tw:border-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] tw:inline-flex tw:items-center tw:gap-1.5">{{ t("onlineEvals.job.detail.metadataSection") }}</h4>
+            <dl class="tw:grid tw:grid-cols-[130px_1fr] tw:gap-y-1.5 tw:gap-x-3.5 tw:m-0">
+              <dt class="tw:text-[11px] tw:text-(--color-text-secondary)">{{ t("onlineEvals.job.detail.versionLabel") }}</dt>
+              <dd class="tw:m-0 tw:text-[13px] tw:text-(--color-text-primary) tw:break-words tw:font-[ui-monospace,SFMono-Regular,Menlo,monospace] tw:[font-variant-numeric:tabular-nums]">v{{ row.version }}</dd>
+              <dt v-if="pipelineId" class="tw:text-[11px] tw:text-(--color-text-secondary)">{{ t("onlineEvals.job.detail.pipelineLabel") }}</dt>
+              <dd v-if="pipelineId" class="tw:m-0 tw:text-[13px] tw:text-(--color-text-primary) tw:break-words tw:font-[ui-monospace,SFMono-Regular,Menlo,monospace] tw:[font-variant-numeric:tabular-nums]">{{ pipelineId }}</dd>
+              <dt v-if="createdAt" class="tw:text-[11px] tw:text-(--color-text-secondary)">{{ t("onlineEvals.job.detail.createdLabel") }}</dt>
+              <dd v-if="createdAt" class="tw:m-0 tw:text-[13px] tw:text-(--color-text-primary) tw:break-words tw:font-[ui-monospace,SFMono-Regular,Menlo,monospace] tw:[font-variant-numeric:tabular-nums]">{{ formatTimestamp(createdAt) }}</dd>
+              <dt v-if="updatedAt" class="tw:text-[11px] tw:text-(--color-text-secondary)">{{ t("onlineEvals.job.detail.updatedLabel") }}</dt>
+              <dd v-if="updatedAt" class="tw:m-0 tw:text-[13px] tw:text-(--color-text-primary) tw:break-words tw:font-[ui-monospace,SFMono-Regular,Menlo,monospace] tw:[font-variant-numeric:tabular-nums]">{{ formatTimestamp(updatedAt) }}</dd>
             </dl>
           </section>
         </template>
 
         <!-- Runs -->
         <template v-else-if="activeTab === 'runs'">
-          <div class="jd__runs-toolbar">
+          <div class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap">
             <DateTimePickerDashboard
               ref="dateTimePickerRef"
               v-model="selectedDate"
               :auto-apply-dashboard="true"
-              class="jd__date-picker"
+              class="tw:shrink-0"
               data-test="eval-job-detail-runs-window"
             />
             <OButton
@@ -261,32 +278,32 @@
             class="tw:w-full"
           >
             <template #cell-timestampMs="{ row }">
-              <span class="jd-mono jd-muted-text">{{ relativeTime(row.timestampMs) }}</span>
+              <span class="tw:font-[ui-monospace,SFMono-Regular,Menlo,monospace] tw:[font-variant-numeric:tabular-nums] tw:text-(--color-text-secondary)">{{ relativeTime(row.timestampMs) }}</span>
             </template>
             <template #cell-scorerId="{ row }">
-              <span class="jd-mono">{{ scorerNameFor(row.scorerId) }}</span>
+              <span class="tw:font-[ui-monospace,SFMono-Regular,Menlo,monospace] tw:[font-variant-numeric:tabular-nums]">{{ scorerNameFor(row.scorerId) }}</span>
             </template>
             <template #cell-target="{ row }">
-              <div class="jd-target-cell">
-                <div v-if="row.targetSpanId" class="jd-target-cell__line">
-                  <span class="jd-target-cell__label">{{ t("onlineEvals.job.detail.runs.spanLabel") }}</span>
-                  <span class="jd-mono jd-target-cell__id" :title="row.targetSpanId">{{ row.targetSpanId }}</span>
+              <div class="tw:flex tw:flex-col tw:gap-0.5">
+                <div v-if="row.targetSpanId" class="tw:flex tw:items-baseline tw:gap-1.5 tw:text-[11px] tw:min-w-0">
+                  <span class="tw:shrink-0 tw:uppercase tw:tracking-[0.04em] tw:font-semibold tw:text-(--color-text-secondary)">{{ t("onlineEvals.job.detail.runs.spanLabel") }}</span>
+                  <span class="tw:font-[ui-monospace,SFMono-Regular,Menlo,monospace] tw:[font-variant-numeric:tabular-nums] tw:text-[11.5px] tw:text-(--color-text-primary) tw:truncate tw:min-w-0" :title="row.targetSpanId">{{ row.targetSpanId }}</span>
                 </div>
-                <div v-if="row.targetTraceId" class="jd-target-cell__line">
-                  <span class="jd-target-cell__label">{{ t("onlineEvals.job.detail.runs.traceLabel") }}</span>
-                  <span class="jd-mono jd-target-cell__id" :title="row.targetTraceId">{{ row.targetTraceId }}</span>
+                <div v-if="row.targetTraceId" class="tw:flex tw:items-baseline tw:gap-1.5 tw:text-[11px] tw:min-w-0">
+                  <span class="tw:shrink-0 tw:uppercase tw:tracking-[0.04em] tw:font-semibold tw:text-(--color-text-secondary)">{{ t("onlineEvals.job.detail.runs.traceLabel") }}</span>
+                  <span class="tw:font-[ui-monospace,SFMono-Regular,Menlo,monospace] tw:[font-variant-numeric:tabular-nums] tw:text-[11.5px] tw:text-(--color-text-primary) tw:truncate tw:min-w-0" :title="row.targetTraceId">{{ row.targetTraceId }}</span>
                 </div>
               </div>
             </template>
             <template #cell-scoreDisplay="{ row }">
-              <span class="jd-mono">{{ row.scoreDisplay }}</span>
+              <span class="tw:font-[ui-monospace,SFMono-Regular,Menlo,monospace] tw:[font-variant-numeric:tabular-nums]">{{ row.scoreDisplay }}</span>
             </template>
             <template #cell-latencyMs="{ row }">
-              <span class="jd-mono">{{ row.latencyMs != null ? formatLatency(row.latencyMs) : "—" }}</span>
+              <span class="tw:font-[ui-monospace,SFMono-Regular,Menlo,monospace] tw:[font-variant-numeric:tabular-nums]">{{ row.latencyMs != null ? formatLatency(row.latencyMs) : "—" }}</span>
             </template>
             <template #cell-status="{ row }">
-              <span class="jd-status-cell" :class="`jd-status-cell--${row.status}`">
-                <span class="jd-status-cell__dot" />
+              <span class="tw:inline-flex tw:items-center tw:gap-[5px] tw:text-(--color-text-secondary) jd-status-cell" :class="`jd-status-cell--${row.status}`">
+                <span class="tw:w-1.5 tw:h-1.5 tw:rounded-full tw:bg-(--color-text-secondary) jd-status-cell__dot" />
                 {{ row.status }}
               </span>
             </template>
@@ -295,12 +312,12 @@
 
         <!-- Failures -->
         <template v-else-if="activeTab === 'failures'">
-          <div class="jd__runs-toolbar">
+          <div class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap">
             <DateTimePickerDashboard
               ref="dateTimePickerRef"
               v-model="selectedDate"
               :auto-apply-dashboard="true"
-              class="jd__date-picker"
+              class="tw:shrink-0"
               data-test="eval-job-detail-failures-window"
             />
             <OButton
@@ -315,12 +332,12 @@
           </div>
 
           <!-- Failures-by-scorer rollup -->
-          <section class="jd-section">
-            <h4 class="jd-section__title">
+          <section class="tw:flex tw:flex-col tw:gap-2">
+            <h4 class="tw:m-0 tw:font-semibold tw:text-[13px] tw:leading-[1.5] tw:text-(--color-text-primary) tw:pb-1.5 tw:border-b tw:border-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] tw:inline-flex tw:items-center tw:gap-1.5">
               {{ t("onlineEvals.job.detail.failures.byScorerTitle") }}
-              <span class="jd-section__chip">{{ failureRows.length }}</span>
+              <span class="tw:inline-flex tw:items-center tw:px-[5px] tw:rounded-[3px] tw:font-semibold tw:text-[10px] tw:bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] tw:text-(--color-text-secondary)">{{ failureRows.length }}</span>
             </h4>
-            <div v-if="failureRows.length === 0" class="jd-empty">
+            <div v-if="failureRows.length === 0" class="tw:inline-flex tw:items-center tw:gap-1.5 tw:py-2 tw:px-[10px] tw:bg-[color-mix(in_srgb,var(--color-text-secondary)_6%,transparent)] tw:rounded-[5px] tw:text-xs tw:text-(--color-text-secondary)">
               <OIcon name="info" size="xs" />
               <span>{{ t("onlineEvals.job.detail.failures.byScorerEmpty") }}</span>
             </div>
@@ -337,15 +354,15 @@
               class="tw:w-full"
             >
               <template #cell-scorerId="{ row }">
-                <span class="jd-mono">{{ scorerNameFor(row.scorerId) }}</span>
+                <span class="tw:font-[ui-monospace,SFMono-Regular,Menlo,monospace] tw:[font-variant-numeric:tabular-nums]">{{ scorerNameFor(row.scorerId) }}</span>
               </template>
               <template #cell-failureRate="{ row }">
-                <span class="jd-mono" :class="failTone(row.failureRate)">
+                <span class="tw:font-[ui-monospace,SFMono-Regular,Menlo,monospace] tw:[font-variant-numeric:tabular-nums]" :class="failTone(row.failureRate)">
                   {{ formatPercent(row.failureRate) }}
                 </span>
               </template>
               <template #cell-failures="{ row }">
-                <span class="jd-mono">
+                <span class="tw:font-[ui-monospace,SFMono-Regular,Menlo,monospace] tw:[font-variant-numeric:tabular-nums]">
                   <strong>{{ row.failures }}</strong>
                   / {{ row.totalRuns }}
                 </span>
@@ -354,12 +371,12 @@
           </section>
 
           <!-- Recent failures -->
-          <section class="jd-section">
-            <h4 class="jd-section__title">
+          <section class="tw:flex tw:flex-col tw:gap-2">
+            <h4 class="tw:m-0 tw:font-semibold tw:text-[13px] tw:leading-[1.5] tw:text-(--color-text-primary) tw:pb-1.5 tw:border-b tw:border-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] tw:inline-flex tw:items-center tw:gap-1.5">
               {{ t("onlineEvals.job.detail.failures.recentTitle") }}
-              <span class="jd-section__chip">{{ failedRuns.length }}</span>
+              <span class="tw:inline-flex tw:items-center tw:px-[5px] tw:rounded-[3px] tw:font-semibold tw:text-[10px] tw:bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] tw:text-(--color-text-secondary)">{{ failedRuns.length }}</span>
             </h4>
-            <div v-if="failedRuns.length === 0 && !isLoadingRuns" class="jd-empty">
+            <div v-if="failedRuns.length === 0 && !isLoadingRuns" class="tw:inline-flex tw:items-center tw:gap-1.5 tw:py-2 tw:px-[10px] tw:bg-[color-mix(in_srgb,var(--color-text-secondary)_6%,transparent)] tw:rounded-[5px] tw:text-xs tw:text-(--color-text-secondary)">
               <OIcon name="info" size="xs" />
               <span>{{ t("onlineEvals.job.detail.failures.recentEmpty") }}</span>
             </div>
@@ -378,32 +395,32 @@
               class="tw:w-full"
             >
               <template #cell-timestampMs="{ row }">
-                <span class="jd-mono jd-muted-text">{{ relativeTime(row.timestampMs) }}</span>
+                <span class="tw:font-[ui-monospace,SFMono-Regular,Menlo,monospace] tw:[font-variant-numeric:tabular-nums] tw:text-(--color-text-secondary)">{{ relativeTime(row.timestampMs) }}</span>
               </template>
               <template #cell-scorerId="{ row }">
-                <span class="jd-mono">{{ scorerNameFor(row.scorerId) }}</span>
+                <span class="tw:font-[ui-monospace,SFMono-Regular,Menlo,monospace] tw:[font-variant-numeric:tabular-nums]">{{ scorerNameFor(row.scorerId) }}</span>
               </template>
               <template #cell-target="{ row }">
-                <div class="jd-target-cell">
-                  <div v-if="row.targetSpanId" class="jd-target-cell__line">
-                    <span class="jd-target-cell__label">{{ t("onlineEvals.job.detail.runs.spanLabel") }}</span>
-                    <span class="jd-mono jd-target-cell__id" :title="row.targetSpanId">{{ row.targetSpanId }}</span>
+                <div class="tw:flex tw:flex-col tw:gap-0.5">
+                  <div v-if="row.targetSpanId" class="tw:flex tw:items-baseline tw:gap-1.5 tw:text-[11px] tw:min-w-0">
+                    <span class="tw:shrink-0 tw:uppercase tw:tracking-[0.04em] tw:font-semibold tw:text-(--color-text-secondary)">{{ t("onlineEvals.job.detail.runs.spanLabel") }}</span>
+                    <span class="tw:font-[ui-monospace,SFMono-Regular,Menlo,monospace] tw:[font-variant-numeric:tabular-nums] tw:text-[11.5px] tw:text-(--color-text-primary) tw:truncate tw:min-w-0" :title="row.targetSpanId">{{ row.targetSpanId }}</span>
                   </div>
-                  <div v-if="row.targetTraceId" class="jd-target-cell__line">
-                    <span class="jd-target-cell__label">{{ t("onlineEvals.job.detail.runs.traceLabel") }}</span>
-                    <span class="jd-mono jd-target-cell__id" :title="row.targetTraceId">{{ row.targetTraceId }}</span>
+                  <div v-if="row.targetTraceId" class="tw:flex tw:items-baseline tw:gap-1.5 tw:text-[11px] tw:min-w-0">
+                    <span class="tw:shrink-0 tw:uppercase tw:tracking-[0.04em] tw:font-semibold tw:text-(--color-text-secondary)">{{ t("onlineEvals.job.detail.runs.traceLabel") }}</span>
+                    <span class="tw:font-[ui-monospace,SFMono-Regular,Menlo,monospace] tw:[font-variant-numeric:tabular-nums] tw:text-[11.5px] tw:text-(--color-text-primary) tw:truncate tw:min-w-0" :title="row.targetTraceId">{{ row.targetTraceId }}</span>
                   </div>
                 </div>
               </template>
               <template #cell-scoreDisplay="{ row }">
-                <span class="jd-mono">{{ row.scoreDisplay }}</span>
+                <span class="tw:font-[ui-monospace,SFMono-Regular,Menlo,monospace] tw:[font-variant-numeric:tabular-nums]">{{ row.scoreDisplay }}</span>
               </template>
               <template #cell-latencyMs="{ row }">
-                <span class="jd-mono">{{ row.latencyMs != null ? formatLatency(row.latencyMs) : "—" }}</span>
+                <span class="tw:font-[ui-monospace,SFMono-Regular,Menlo,monospace] tw:[font-variant-numeric:tabular-nums]">{{ row.latencyMs != null ? formatLatency(row.latencyMs) : "—" }}</span>
               </template>
               <template #cell-status="{ row }">
-                <span class="jd-status-cell" :class="`jd-status-cell--${row.status}`">
-                  <span class="jd-status-cell__dot" />
+                <span class="tw:inline-flex tw:items-center tw:gap-[5px] tw:text-(--color-text-secondary) jd-status-cell" :class="`jd-status-cell--${row.status}`">
+                  <span class="tw:w-1.5 tw:h-1.5 tw:rounded-full tw:bg-(--color-text-secondary) jd-status-cell__dot" />
                   {{ row.status }}
                 </span>
               </template>
@@ -904,31 +921,11 @@ function relativeTime(timestampMs: number): string {
 }
 </script>
 
-<style lang="scss" scoped>
-.jd-scrim {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.32);
-  z-index: 1010;
-  display: flex;
-  justify-content: flex-end;
-  animation: jd-fade 0.18s ease-out;
-}
-
+<style>
+/* Animation keyframes — cannot be inlined */
 @keyframes jd-fade {
   from { background: rgba(0, 0, 0, 0); }
   to   { background: rgba(0, 0, 0, 0.32); }
-}
-
-.jd {
-  width: 1100px;
-  max-width: 96vw;
-  height: 100%;
-  background: var(--color-card-bg);
-  border-left: 1px solid var(--color-dialog-header-border, var(--o2-border));
-  display: flex;
-  flex-direction: column;
-  animation: jd-slide 0.22s ease-out;
 }
 
 @keyframes jd-slide {
@@ -936,355 +933,29 @@ function relativeTime(timestampMs: number): string {
   to   { transform: translateX(0); }
 }
 
-/* — Header — */
-.jd__header {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 16px 20px 14px;
-  border-bottom: 1px solid var(--color-dialog-header-border, var(--o2-border));
-  background: var(--color-card-bg);
-  flex-shrink: 0;
-}
-
-.jd__header-text {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.jd__eyebrow {
-  font: 600 11px/1.4 var(--o2-font);
-  letter-spacing: 0.02em;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.jd__title-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-
-.jd__title {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-weight: 700;
-  font-size: 18px;
-  letter-spacing: -0.005em;
-  color: var(--color-text-primary, currentColor);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.jd__title-version {
-  font-size: 11px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  font-variant-numeric: tabular-nums;
-}
-
-.jd__status-pill {
-  display: inline-flex;
-  padding: 1px 8px;
-  border-radius: 999px;
-  font: 600 11px var(--o2-font);
-  background: color-mix(in srgb, var(--color-text-secondary) 14%, transparent);
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  text-transform: capitalize;
-}
-
-.jd__status-pill--active {
-  background: color-mix(in srgb, var(--o2-status-success-text, #2e7d32) 14%, transparent);
-  color: var(--o2-status-success-text, #2e7d32);
-}
-
-.jd__status-pill--paused {
-  background: color-mix(in srgb, #f59e0b 14%, transparent);
-  color: #b45309;
-}
-
-.jd__status-pill--degraded {
-  background: color-mix(in srgb, var(--o2-status-error-text, #c62828) 14%, transparent);
-  color: var(--o2-status-error-text, #c62828);
-}
-
-.jd__status-pill--archived {
-  background: color-mix(in srgb, var(--color-text-secondary) 14%, transparent);
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  opacity: 0.7;
-}
-
-.jd__sub-line {
-  font-size: 12px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.jd__close {
-  flex-shrink: 0;
-  background: transparent;
-  border: 0;
-  padding: 4px;
-  border-radius: 4px;
-  cursor: pointer;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.jd__close:hover {
-  background: color-mix(in srgb, var(--color-text-primary) 8%, transparent);
-  color: var(--color-text-primary, currentColor);
-}
-
-/* — KPI strip — */
-.jd__kpis {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-  padding: 16px 20px;
-  background: color-mix(in srgb, var(--color-text-secondary) 4%, var(--color-card-bg));
-  border-bottom: 1px solid var(--color-dialog-header-border, var(--o2-border));
-  flex-shrink: 0;
-}
-
-.jd-kpi {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 10px 12px;
-  background: var(--color-card-bg);
-  border: 1px solid var(--color-dialog-header-border, var(--o2-border));
-  border-radius: 6px;
-}
-
-.jd-kpi--good { background: color-mix(in srgb, var(--o2-status-success-text, #2e7d32) 4%, var(--color-card-bg)); }
-.jd-kpi--warn { background: color-mix(in srgb, #f59e0b 5%, var(--color-card-bg)); }
-.jd-kpi--bad  { background: color-mix(in srgb, var(--o2-status-error-text, #c62828) 4%, var(--color-card-bg)); }
-
-.jd-kpi__title {
-  font: 600 11px/1.4 var(--o2-font);
-  letter-spacing: 0.01em;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.jd-kpi__value {
-  font: 700 22px/1.1 var(--o2-font);
-  letter-spacing: -0.01em;
-  font-variant-numeric: tabular-nums;
-  color: var(--color-text-primary, currentColor);
-}
-
-.jd-kpi--good .jd-kpi__value { color: var(--o2-status-success-text, #2e7d32); }
-.jd-kpi--warn .jd-kpi__value { color: #b45309; }
-.jd-kpi--bad  .jd-kpi__value { color: var(--o2-status-error-text, #c62828); }
-
-.jd-kpi__sub {
-  font-size: 11px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-/* — Tab strip — */
-.jd__tabs {
-  display: flex;
-  gap: 18px;
-  padding: 0 20px;
-  border-bottom: 1px solid var(--color-dialog-header-border, var(--o2-border));
-  background: var(--color-card-bg);
-  flex-shrink: 0;
-}
-
-.jd__tab {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 10px 0;
-  background: transparent;
-  border: 0;
-  border-bottom: 2px solid transparent;
-  cursor: pointer;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  font: 600 13px var(--o2-font);
-  margin-bottom: -1px;
-}
-
-.jd__tab:hover { color: var(--color-text-primary, currentColor); }
-
+/* Tab active state — self-styles applied here for specificity alongside border-bottom-color */
 .jd__tab--active {
   color: var(--color-primary-600, #3F7994);
   border-bottom-color: var(--color-primary-600, #3F7994);
 }
 
-.jd__tab-count {
-  display: inline-flex;
-  align-items: center;
-  padding: 0 6px;
-  min-width: 18px;
-  height: 16px;
-  border-radius: 999px;
-  font: 600 10px/1 var(--o2-font);
-  background: color-mix(in srgb, var(--color-text-secondary) 14%, transparent);
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  justify-content: center;
-}
-
+/* Tab count inside active tab — descendant selector, must keep */
 .jd__tab--active .jd__tab-count {
   background: color-mix(in srgb, var(--color-primary-600, #3F7994) 18%, transparent);
   color: var(--color-primary-600, #3F7994);
 }
 
-/* — Body — */
-.jd__body {
-  flex: 1;
-  overflow: auto;
-  padding: 18px 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-  min-height: 0;
-  background: var(--color-card-bg);
-}
+/* KPI tone backgrounds — dynamic class applied via successRateTone computed */
+.jd-kpi--good { background: color-mix(in srgb, var(--o2-status-success-text, #2e7d32) 4%, var(--color-card-bg)); }
+.jd-kpi--warn { background: color-mix(in srgb, #f59e0b 5%, var(--color-card-bg)); }
+.jd-kpi--bad  { background: color-mix(in srgb, var(--o2-status-error-text, #c62828) 4%, var(--color-card-bg)); }
 
-/* — Configuration sections — */
-.jd-section {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
+/* KPI value color when inside a toned KPI card — descendant selectors, must keep */
+.jd-kpi--good .jd-kpi__value { color: var(--o2-status-success-text, #2e7d32); }
+.jd-kpi--warn .jd-kpi__value { color: #b45309; }
+.jd-kpi--bad  .jd-kpi__value { color: var(--o2-status-error-text, #c62828); }
 
-.jd-section__title {
-  margin: 0;
-  font: 600 13px/1.5 var(--o2-font);
-  color: var(--color-text-primary, currentColor);
-  padding-bottom: 6px;
-  border-bottom: 1px solid color-mix(in srgb, var(--color-text-secondary) 12%, transparent);
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.jd-section__chip {
-  display: inline-flex;
-  align-items: center;
-  padding: 0 5px;
-  border-radius: 3px;
-  font: 600 10px var(--o2-font);
-  background: color-mix(in srgb, var(--color-text-secondary) 12%, transparent);
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.jd-kv {
-  display: grid;
-  grid-template-columns: 130px 1fr;
-  gap: 6px 14px;
-  margin: 0;
-}
-
-.jd-kv dt {
-  font-size: 11px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.jd-kv dd {
-  margin: 0;
-  font-size: 13px;
-  color: var(--color-text-primary, currentColor);
-  word-break: break-word;
-}
-
-.jd-mono {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-variant-numeric: tabular-nums;
-}
-
-.jd-muted {
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  font-style: italic;
-}
-
-.jd-empty {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 10px;
-  background: color-mix(in srgb, var(--color-text-secondary) 6%, transparent);
-  border-radius: 5px;
-  font-size: 12px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.jd-filter {
-  margin: 0;
-  padding: 12px 14px;
-  background: color-mix(in srgb, #6b76e3 6%, var(--color-card-bg));
-  border: 1px solid color-mix(in srgb, #6b76e3 22%, transparent);
-  border-radius: 6px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 13px;
-  line-height: 1.85;
-  color: var(--color-text-primary, currentColor);
-  max-height: 240px;
-  overflow: auto;
-  white-space: pre;
-}
-
-.jd-filter__row {
-  display: block;
-  white-space: pre;
-}
-
-.jd-filter__kw {
-  display: inline-block;
-  width: 38px;
-  margin-right: 8px;
-  color: #7c3aed;
-  font-weight: 700;
-}
-
-.jd-filter__col {
-  color: #1d4ed8;
-  margin-right: 6px;
-}
-
-.jd-filter__op {
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  margin-right: 6px;
-}
-
-.jd-filter__val {
-  color: var(--color-text-primary, currentColor);
-}
-
-.jd-filter__val--str {
-  color: #b25400;
-}
-
-.jd-scorers {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.jd-scorers__card {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 14px 16px;
-  background: var(--color-card-bg);
-  border: 1px solid color-mix(in srgb, var(--color-text-secondary) 16%, transparent);
-  border-radius: 8px;
-  text-align: left;
-  cursor: pointer;
-  transition:
-    border-color 0.15s,
-    background 0.15s,
-    box-shadow 0.15s,
-    transform 0.15s;
-}
-
+/* Scorer card hover with :not(:disabled) — complex selector, must keep */
 .jd-scorers__card:hover:not(:disabled) {
   border-color: color-mix(in srgb, var(--color-primary-600, #3F7994) 45%, transparent);
   background: color-mix(in srgb, var(--color-primary-600, #3F7994) 4%, var(--color-card-bg));
@@ -1292,122 +963,13 @@ function relativeTime(timestampMs: number): string {
   transform: translateY(-1px);
 }
 
+/* Scorer card disabled — attribute selector, must keep */
 .jd-scorers__card:disabled {
   opacity: 0.55;
   cursor: not-allowed;
 }
 
-.jd-scorers__icon {
-  flex-shrink: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 8px;
-  background: color-mix(in srgb, #6b76e3 14%, transparent);
-  color: #4f5bcf;
-}
-
-.jd-scorers__icon--remote {
-  background: color-mix(in srgb, #b25400 14%, transparent);
-  color: #b25400;
-}
-
-.jd-scorers__icon--unknown {
-  background: color-mix(in srgb, var(--color-text-secondary) 14%, transparent);
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.jd-scorers__main {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-
-.jd-scorers__row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.jd-scorers__name {
-  font-weight: 700;
-  font-size: 14px;
-  color: var(--color-text-primary, currentColor);
-}
-
-.jd-scorers__type {
-  display: inline-flex;
-  padding: 1px 7px;
-  border-radius: 3px;
-  font: 600 10px/1.5 var(--o2-font);
-  background: color-mix(in srgb, #6b76e3 14%, transparent);
-  color: #4f5bcf;
-}
-
-.jd-scorers__type--remote {
-  background: color-mix(in srgb, #b25400 14%, transparent);
-  color: #b25400;
-}
-
-.jd-scorers__version {
-  font-size: 11px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  font-variant-numeric: tabular-nums;
-}
-
-.jd-scorers__produces {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  flex-wrap: wrap;
-}
-
-.jd-scorers__produces-icon {
-  flex-shrink: 0;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  opacity: 0.7;
-}
-
-.jd-scorers__produces-prefix {
-  font-weight: 500;
-}
-
-.jd-scorers__produces-name {
-  color: var(--color-text-primary, currentColor);
-  font-weight: 700;
-}
-
-.jd-scorers__produces-type,
-.jd-scorers__produces-range {
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.jd-scorers__sep {
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  opacity: 0.5;
-}
-
-.jd-scorers__cta {
-  flex-shrink: 0;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  font: 600 11px var(--o2-font);
-}
-
-.jd-scorers__cta-label {
-  opacity: 0;
-  transition: opacity 0.15s;
-}
-
+/* Scorer card hover affecting child elements — descendant selectors, must keep */
 .jd-scorers__card:hover:not(:disabled) .jd-scorers__cta {
   color: var(--color-primary-600, #3F7994);
 }
@@ -1416,102 +978,23 @@ function relativeTime(timestampMs: number): string {
   opacity: 1;
 }
 
-.jd-scorers__chevron {
-  flex-shrink: 0;
-  opacity: 0.5;
-  transition: opacity 0.15s, transform 0.15s;
-}
-
 .jd-scorers__card:hover:not(:disabled) .jd-scorers__chevron {
   opacity: 1;
   transform: translateX(2px);
 }
 
-
-/* — Runs / Failures tabs — */
-.jd__runs-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.jd__date-picker {
-  flex: 0 0 auto;
-}
-
-.jd__runs-meta {
-  margin-left: auto;
-  font-size: 11.5px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.jd__runs-meta strong {
-  color: var(--color-text-primary, currentColor);
-  font-variant-numeric: tabular-nums;
-}
-
-.jd-muted-text {
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.jd-target-cell {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.jd-target-cell__line {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-  font-size: 11px;
-  min-width: 0;
-}
-
-.jd-target-cell__label {
-  flex-shrink: 0;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  font-weight: 600;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.jd-target-cell__id {
-  font-size: 11.5px;
-  color: var(--color-text-primary, currentColor);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  min-width: 0;
-}
-
-.jd-status-cell {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.jd-status-cell__dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
+/* Status cell color states — dynamic class applied via jd-status-cell--${row.status} */
 .jd-status-cell--success { color: var(--o2-status-success-text, #2e7d32); }
-.jd-status-cell--success .jd-status-cell__dot { background: var(--o2-status-success-text, #2e7d32); }
-
 .jd-status-cell--error,
 .jd-status-cell--timeout { color: var(--o2-status-error-text, #c62828); }
+.jd-status-cell--warn { color: #b45309; }
+.jd-status-cell--bad { color: var(--o2-status-error-text, #c62828); }
+
+/* Status dot color inside status cells — descendant selectors, must keep */
+.jd-status-cell--success .jd-status-cell__dot { background: var(--o2-status-success-text, #2e7d32); }
 .jd-status-cell--error .jd-status-cell__dot,
 .jd-status-cell--timeout .jd-status-cell__dot { background: var(--o2-status-error-text, #c62828); }
-
 .jd-status-cell--skipped .jd-status-cell__dot {
   background: color-mix(in srgb, var(--color-text-secondary) 60%, transparent);
 }
-
-.jd-status-cell--warn { color: #b45309; }
-.jd-status-cell--bad { color: var(--o2-status-error-text, #c62828); }
 </style>

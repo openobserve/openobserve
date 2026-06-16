@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
     data-test="panel-layout-settings-content"
     class="tw:p-0"
-    :class="store.state.theme == 'dark' ? 'dark-mode' : 'tw:bg-white'"
+    :class="store.state.theme == 'dark' ? 'tw:bg-(--o2-primary-background)' : 'tw:bg-white'"
     style="min-height: inherit"
   >
     <div>
@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTooltip content="1 unit = 30px" />
         </div>
 
-     
+
       </div>
     </div>
   </div>
@@ -138,9 +138,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style scoped lang="scss">
-.dark-mode {
-  background-color: var(--o2-primary-background);
-}
-</style>

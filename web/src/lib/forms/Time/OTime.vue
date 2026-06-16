@@ -515,7 +515,7 @@ const fieldClasses = computed(() => [
   </div>
 </template>
 
-<style scoped>
+<style>
 /* Hide the native browser clock picker dropdown */
 input[type="time"]::-webkit-calendar-picker-indicator {
   display: none;

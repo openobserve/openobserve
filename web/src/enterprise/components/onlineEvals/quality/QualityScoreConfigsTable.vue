@@ -1,9 +1,9 @@
 <template>
-  <section class="qsc-overview" data-test="quality-score-configs-overview">
-    <header class="qsc-overview__head">
-      <div class="qsc-overview__head-text">
-        <h3 class="qsc-overview__title">{{ t("onlineEvals.quality.overview.title") }}</h3>
-        <span class="qsc-overview__count">
+  <section class="tw:flex tw:flex-col tw:gap-[10px] tw:min-h-0 tw:flex-1" data-test="quality-score-configs-overview">
+    <header class="tw:flex tw:items-center tw:justify-between tw:gap-3">
+      <div class="tw:flex tw:items-baseline tw:gap-[10px] tw:min-w-0">
+        <h3 class="tw:m-0 tw:text-sm tw:font-bold tw:text-[var(--color-text-primary,currentColor)]">{{ t("onlineEvals.quality.overview.title") }}</h3>
+        <span class="tw:text-xs tw:text-[var(--color-text-secondary,var(--o2-text-secondary))]">
           {{ t("onlineEvals.quality.overview.countSuffix", { n: filteredRows.length }) }}
         </span>
       </div>
@@ -12,7 +12,7 @@
         v-model="filter"
         :placeholder="t('onlineEvals.quality.overview.searchPlaceholder')"
         size="sm"
-        class="qsc-overview__filter"
+        class="tw:min-w-[220px] tw:max-w-[320px]"
         data-test="quality-overview-filter-input"
       >
         <template #icon-left>
@@ -21,7 +21,7 @@
       </OInput>
     </header>
 
-    <div v-if="isLoading && rows.length === 0" class="qsc-overview__loading">
+    <div v-if="isLoading && rows.length === 0" class="tw:flex tw:flex-col tw:items-center tw:gap-2 tw:py-8 tw:px-3 tw:border tw:border-dashed tw:border-[var(--color-dialog-header-border,var(--o2-border))] tw:rounded-md tw:text-center tw:text-[var(--color-text-secondary,var(--o2-text-secondary))]">
       <OSpinner size="sm" />
       <span>{{ t("onlineEvals.quality.overview.loading") }}</span>
     </div>
@@ -45,7 +45,7 @@
          so a fresh setup reads as "configs are here, scores will fill in"
          rather than a blank screen. -->
 
-    <div v-else class="qsc-overview__table-wrap">
+    <div v-else class="tw:flex-1 tw:min-h-0 tw:flex tw:flex-col">
       <OTable
         data-test="quality-overview-table"
         :data="filteredRows"
@@ -63,11 +63,11 @@
         @row-click="(row: any) => $emit('select', row)"
       >
         <template #cell-status="{ row }">
-          <span class="qsc-status" :class="`qsc-status--${row.status}`" :aria-label="row.status">●</span>
+          <span class="tw:inline-flex tw:text-base tw:leading-none qsc-status" :class="`qsc-status--${row.status}`" :aria-label="row.status">●</span>
         </template>
 
         <template #cell-name="{ row }">
-          <div class="qsc-name">{{ row.name }}</div>
+          <div class="tw:font-semibold tw:text-[var(--color-text-primary,currentColor)]">{{ row.name }}</div>
         </template>
 
         <template #cell-type="{ row }">
@@ -77,18 +77,18 @@
         </template>
 
         <template #cell-totalScores="{ row }">
-          <span class="qsc-mono">{{ formatCount(row.totalScores) }}</span>
+          <span class="tw:[font-variant-numeric:tabular-nums]">{{ formatCount(row.totalScores) }}</span>
         </template>
 
         <template #cell-coverage="{ row }">
-          <span v-if="row.coveragePct != null" class="qsc-mono">{{ formatPct(row.coveragePct) }}</span>
-          <span v-else class="qsc-muted">—</span>
+          <span v-if="row.coveragePct != null" class="tw:[font-variant-numeric:tabular-nums]">{{ formatPct(row.coveragePct) }}</span>
+          <span v-else class="tw:text-[var(--color-text-secondary,var(--o2-text-secondary))]">—</span>
         </template>
 
         <template #cell-trend="{ row }">
           <svg
             v-if="row.trendSparkline.length > 0"
-            class="qsc-spark"
+            class="tw:w-full tw:h-5 qsc-spark"
             :class="`qsc-spark--${row.status}`"
             viewBox="0 0 100 20"
             preserveAspectRatio="none"
@@ -101,14 +101,14 @@
               :points="sparkPoints(row.trendSparkline)"
             />
           </svg>
-          <span v-else class="qsc-muted">—</span>
+          <span v-else class="tw:text-[var(--color-text-secondary,var(--o2-text-secondary))]">—</span>
         </template>
 
         <template #cell-updated="{ row }">
-          <span v-if="row.lastUpdatedMs" class="qsc-updated">
+          <span v-if="row.lastUpdatedMs" class="tw:text-[11px] tw:text-[var(--color-text-secondary,var(--o2-text-secondary))] tw:[font-variant-numeric:tabular-nums]">
             {{ relativeTime(row.lastUpdatedMs) }}
           </span>
-          <span v-else class="qsc-muted">—</span>
+          <span v-else class="tw:text-[var(--color-text-secondary,var(--o2-text-secondary))]">—</span>
         </template>
       </OTable>
     </div>
@@ -282,88 +282,20 @@ function relativeTime(timestampMs: number): string {
 }
 </script>
 
-<style lang="scss" scoped>
-.qsc-overview {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  min-height: 0;
-  flex: 1;
-}
-
-.qsc-overview__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.qsc-overview__head-text {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  min-width: 0;
-}
-
-.qsc-overview__title {
-  margin: 0;
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--color-text-primary, currentColor);
-}
-
-.qsc-overview__count {
-  font-size: 12px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.qsc-overview__filter {
-  min-width: 220px;
-  max-width: 320px;
-}
-
-.qsc-overview__loading {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  padding: 32px 12px;
-  border: 1px dashed var(--color-dialog-header-border, var(--o2-border));
-  border-radius: 6px;
-  text-align: center;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.qsc-overview__table-wrap {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.qsc-status {
-  display: inline-flex;
-  font-size: 16px;
-  line-height: 1;
-}
-
+<style>
+/* status dot colors */
 .qsc-status--unhealthy { color: var(--o2-status-warning-text, #b25400); }
 .qsc-status--warn { color: var(--o2-status-warning-text, #b25400); opacity: 0.7; }
 .qsc-status--healthy { color: var(--o2-status-success-text, #2e7d32); }
 .qsc-status--noThreshold { color: var(--color-text-secondary, var(--o2-text-secondary)); }
 .qsc-status--noData { color: var(--color-text-secondary, var(--o2-text-secondary)); opacity: 0.55; }
 
-.qsc-name {
-  font-weight: 600;
-  color: var(--color-text-primary, currentColor);
-}
-
+/* type badge — complex color-mix values not expressible in arbitrary Tailwind */
 .qsc-type {
   display: inline-flex;
   align-items: center;
   padding: 0 3px;
   border-radius: 2px;
-  font-family: inherit;
   font-weight: 700;
   font-size: 9px;
   line-height: 14px;
@@ -371,91 +303,19 @@ function relativeTime(timestampMs: number): string {
   background: color-mix(in srgb, #6b76e3 14%, transparent);
   color: #4f5bcf;
 }
+.qsc-type--numeric   { background: color-mix(in srgb, #6b76e3 14%, transparent); color: #4f5bcf; }
+.qsc-type--categorical { background: color-mix(in srgb, #9333ea 14%, transparent); color: #7c3aed; }
+.qsc-type--boolean   { background: color-mix(in srgb, #16a34a 14%, transparent); color: #15803d; }
 
-.qsc-type--numeric {
-  background: color-mix(in srgb, #6b76e3 14%, transparent);
-  color: #4f5bcf;
-}
-
-.qsc-type--categorical {
-  background: color-mix(in srgb, #9333ea 14%, transparent);
-  color: #7c3aed;
-}
-
-.qsc-type--boolean {
-  background: color-mix(in srgb, #16a34a 14%, transparent);
-  color: #15803d;
-}
-
-.qsc-mono {
-  font-variant-numeric: tabular-nums;
-}
-
-.qsc-no-threshold {
-  font-size: 11px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  font-style: italic;
-}
-
-.qsc-unhealthy {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-variant-numeric: tabular-nums;
-}
-
-.qsc-bar {
-  flex: 0 0 80px;
-  height: 6px;
-  background: color-mix(in srgb, var(--color-text-secondary) 12%, transparent);
-  border-radius: 999px;
-  overflow: hidden;
-}
-
-.qsc-bar__fill {
-  height: 100%;
-  background: var(--o2-status-warning-text, #b25400);
-}
-
-.qsc-unhealthy__pct {
-  font-weight: 600;
-  font-size: 12px;
-  color: var(--color-text-primary, currentColor);
-}
-
-.qsc-unhealthy__count {
-  font-size: 11px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.qsc-muted {
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.qsc-updated {
-  font-size: 11px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  font-variant-numeric: tabular-nums;
-}
-
-.qsc-spark {
-  width: 100%;
-  height: 20px;
-  color: color-mix(in srgb, var(--color-text-secondary) 60%, transparent);
-}
-
+/* sparkline colors */
+.qsc-spark { color: color-mix(in srgb, var(--color-text-secondary) 60%, transparent); }
 .qsc-spark--unhealthy { color: var(--o2-status-warning-text, #b25400); }
-.qsc-spark--healthy { color: var(--o2-status-success-text, #2e7d32); }
-.qsc-spark--warn { color: var(--o2-status-warning-text, #b25400); }
+.qsc-spark--healthy   { color: var(--o2-status-success-text, #2e7d32); }
+.qsc-spark--warn      { color: var(--o2-status-warning-text, #b25400); }
 .qsc-spark--noThreshold { color: var(--color-text-secondary, var(--o2-text-secondary)); }
-.qsc-spark--noData { color: var(--color-text-secondary, var(--o2-text-secondary)); opacity: 0.55; }
+.qsc-spark--noData    { color: var(--color-text-secondary, var(--o2-text-secondary)); opacity: 0.55; }
 
-/* Dim no-data rows so active scorers stand out. `:deep` because OTable
- * renders the <tr> outside this component's scope. */
-:deep(tr.qsc-row--no-data) {
-  opacity: 0.6;
-}
-:deep(tr.qsc-row--no-data:hover) {
-  opacity: 0.85;
-}
+/* Dim no-data rows so active scorers stand out. */
+tr.qsc-row--no-data { opacity: 0.6; }
+tr.qsc-row--no-data:hover { opacity: 0.85; }
 </style>

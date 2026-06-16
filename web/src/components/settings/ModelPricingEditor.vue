@@ -46,20 +46,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div style="max-width: 760px" class="tw:flex tw:flex-col tw:gap-6">
         <!-- ── Model Details Card ── -->
-        <div class="form-card">
-          <div class="form-card-header">
+        <div class="form-card tw:border tw:border-(--o2-border-color) tw:rounded-[10px] tw:shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
+          <div class="form-card-header tw:flex tw:flex-row tw:items-center tw:justify-between tw:gap-3 tw:py-[10px] tw:px-4 tw:bg-[rgba(0,0,0,0.025)] tw:border-b tw:border-(--o2-border-color) tw:rounded-t-[10px]">
             <div>
-              <div class="form-card-title">
+              <div class="form-card-title tw:text-[13px] tw:font-semibold">
                 {{ t("modelPricing.modelDetails") }}
               </div>
-              <div class="form-card-subtitle">
+              <div class="form-card-subtitle tw:text-[11px] tw:opacity-60 tw:mt-px">
                 {{ t("modelPricing.modelDetailsDesc") }}
               </div>
             </div>
           </div>
-          <div class="form-card-body tw:flex tw:flex-row tw:gap-4">
+          <div class="form-card-body tw:flex tw:flex-row tw:gap-4 tw:px-4 tw:pt-[10px] tw:pb-2">
             <div class="tw:flex-1">
-              <div class="tw:flex tw:items-center tw:gap-1 tw:mb-1 field-label">
+              <div class="tw:flex tw:items-center tw:gap-1 tw:mb-1 field-label tw:text-xs tw:font-semibold tw:opacity-75 tw:h-5">
                 {{ t("modelPricing.modelNameField") }}
                 <OButton variant="ghost" size="icon-xs-sq" class="tw:ml-1">
                   <OIcon
@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="tw:flex-1 tw:flex tw:items-start tw:gap-1">
               <div class="tw:flex-1">
                 <div
-                  class="tw:flex tw:items-center tw:gap-1 tw:mb-1 field-label"
+                  class="tw:flex tw:items-center tw:gap-1 tw:mb-1 field-label tw:text-xs tw:font-semibold tw:opacity-75 tw:h-5"
                 >
                   {{ t("modelPricing.matchPatternField") }}
                   <OButton variant="ghost" size="icon-xs-sq" class="tw:ml-1">
@@ -122,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 variant="ghost"
                 size="icon-xs-sq"
-                class="pattern-examples-btn"
+                class="pattern-examples-btn tw:opacity-50 tw:text-(--q-primary)"
                 @click="showExamples = true"
               >
                 <OIcon name="lightbulb-outline" size="xs" />
@@ -145,22 +145,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :title="t('modelPricing.patternExamplesTitle')"
           :sub-title="t('modelPricing.patternExamplesDesc')"
         >
-          <div class="examples-table">
-            <div class="examples-table-head">
+          <div class="examples-table tw:border tw:border-(--o2-border-color) tw:rounded-lg tw:overflow-hidden">
+            <div class="examples-table-head tw:grid tw:grid-cols-[180px_1fr_auto] tw:gap-3 tw:py-[6px] tw:px-3 tw:bg-[rgba(0,0,0,0.03)] tw:border-b tw:border-(--o2-border-color) tw:text-[10px] tw:font-bold tw:uppercase tw:tracking-[0.06em] tw:opacity-45">
               <span>{{ t("modelPricing.patternExamplesModelCol") }}</span>
               <span>{{ t("modelPricing.patternExamplesPatternCol") }}</span>
             </div>
             <div
               v-for="ex in patternExamples"
               :key="ex.name"
-              class="examples-table-row"
+              class="examples-table-row tw:grid tw:grid-cols-[180px_1fr_auto] tw:gap-3 tw:items-center tw:py-2 tw:px-3 tw:border-b tw:border-(--o2-border-color) tw:text-xs"
             >
-              <span class="examples-model-name">{{ ex.name }}</span>
-              <code class="examples-pattern">{{ ex.match_pattern }}</code>
+              <span class="examples-model-name tw:font-medium">{{ ex.name }}</span>
+              <code class="examples-pattern tw:font-mono tw:text-[11px] tw:bg-[rgba(0,0,0,0.04)] tw:py-px tw:px-[6px] tw:rounded tw:break-all">{{ ex.match_pattern }}</code>
               <OButton
                 variant="ghost"
                 size="icon-xs-sq"
-                class="examples-copy-btn"
+                class="examples-copy-btn tw:opacity-40"
                 @click="copyPattern(ex.match_pattern)"
               >
                 <OIcon
@@ -190,28 +190,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </ODialog>
 
         <!-- ── Pricing Tiers ── -->
-        <div class="form-card">
-          <div class="form-card-header">
+        <div class="form-card tw:border tw:border-(--o2-border-color) tw:rounded-[10px] tw:shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
+          <div class="form-card-header tw:flex tw:flex-row tw:items-center tw:justify-between tw:gap-3 tw:py-[10px] tw:px-4 tw:bg-[rgba(0,0,0,0.025)] tw:border-b tw:border-(--o2-border-color) tw:rounded-t-[10px]">
             <div>
-              <div class="form-card-title">
+              <div class="form-card-title tw:text-[13px] tw:font-semibold">
                 {{ t("modelPricing.pricingTiers") }}
               </div>
-              <div class="form-card-subtitle">
+              <div class="form-card-subtitle tw:text-[11px] tw:opacity-60 tw:mt-px">
                 {{ t("modelPricing.pricingTiersDesc") }}
               </div>
             </div>
           </div>
 
-          <div class="form-card-body tw:flex tw:flex-col tw:gap-3">
+          <div class="form-card-body tw:flex tw:flex-col tw:gap-3 tw:px-4 tw:pt-[10px] tw:pb-2">
             <div
               v-for="(tier, idx) in model.tiers"
               :key="idx as number"
-              class="tier-card"
+              class="tier-card tw:border tw:border-(--o2-border-color) tw:rounded-[10px] tw:overflow-hidden tw:shadow-[0_1px_4px_rgba(0,0,0,0.05)]"
             >
               <!-- Tier Header -->
-              <div class="tier-header">
+              <div class="tier-header tw:flex tw:items-center tw:justify-between tw:gap-2 tw:py-2 tw:px-4 tw:bg-[rgba(0,0,0,0.025)] tw:border-b tw:border-(--o2-border-color)">
                 <div class="tw:flex tw:items-center tw:gap-2">
-                  <span class="tier-name-label">{{
+                  <span class="tier-name-label tw:text-xs tw:font-medium tw:opacity-50 tw:whitespace-nowrap tw:shrink-0">{{
                     t("modelPricing.tierName")
                   }}</span>
                   <OInput
@@ -232,13 +232,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- Tier Body -->
-              <div class="tier-body">
+              <div class="tier-body tw:p-3 tw:px-4 tw:flex tw:flex-col tw:gap-3">
                 <!-- Condition row (non-default tiers only) -->
                 <div
                   v-if="(idx as number) > 0 && tier.condition"
-                  class="condition-block"
+                  class="condition-block tw:py-3 tw:px-[14px] tw:rounded-lg tw:bg-[rgba(0,0,0,0.02)] tw:border tw:border-(--o2-border-color)"
                 >
-                  <div class="sub-label tw:mb-2">
+                  <div class="sub-label tw:mb-2 tw:text-[11px] tw:font-semibold tw:tracking-[0.06em] tw:opacity-65">
                     {{ t("modelPricing.applyTierWhen") }}
                   </div>
                   <div class="tw:flex tw:gap-2 tw:items-end tw:flex-nowrap">
@@ -269,7 +269,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <!-- Quick Setup -->
                 <div class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap">
-                  <span class="sub-label">{{
+                  <span class="sub-label tw:text-[11px] tw:font-semibold tw:tracking-[0.06em] tw:opacity-65">{{
                     t("modelPricing.quickSetup")
                   }}</span>
                   <OButton
@@ -282,14 +282,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <template #icon-left>
                       <span
-                        class="pricing-chip-dot"
+                        class="pricing-chip-dot tw:w-[7px] tw:h-[7px] tw:rounded-full tw:shrink-0 tw:inline-block"
                         :style="{ background: tpl.color }"
                       />
                     </template>
                     {{ tpl.name }}
                     <span
                       v-if="isTemplateActive(tier, tpl.keys)"
-                      class="template-chip-close"
+                      class="template-chip-close tw:text-sm tw:leading-none tw:opacity-75 tw:ml-0.5"
                       @click.stop="clearTemplate(tier, tpl.keys)"
                       >×</span
                     >
@@ -298,18 +298,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <!-- Price Table -->
                 <div>
-                  <div class="price-table-label tw:mb-2">
+                  <div class="price-table-label tw:mb-2 tw:text-[11px] tw:font-semibold tw:tracking-[0.03em]">
                     {{ t("modelPricing.tokenPrices") }}
-                    <span class="price-table-label-sub">
+                    <span class="price-table-label-sub tw:font-normal tw:opacity-55 tw:tracking-normal">
                       {{ t("modelPricing.tokenPricesUnit") }}</span
                     >
                   </div>
 
-                  <div class="price-table">
+                  <div class="price-table tw:overflow-hidden">
                     <!-- Column headers (only when rows exist) -->
                     <div
                       v-if="Object.keys(tier.prices).length"
-                      class="price-table-head"
+                      class="price-table-head tw:grid tw:grid-cols-[1fr_160px_auto] tw:gap-2 tw:py-[6px] tw:px-3 tw:text-[11px] tw:font-semibold tw:tracking-[0.01em] tw:opacity-45"
                     >
                       <span>{{ t("modelPricing.usageKeyCol") }}</span>
                       <span>{{ t("modelPricing.pricePerMillionHeader") }}</span>
@@ -321,7 +321,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div
                       v-for="(entry, entryIdx) in priceEntries(tier)"
                       :key="entry.stableId"
-                      class="price-row"
+                      class="price-row tw:grid tw:grid-cols-[1fr_160px_auto] tw:gap-2 tw:items-center tw:py-0.5 tw:px-3"
                     >
                       <OInput
                         :model-value="entry.key"
@@ -346,7 +346,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         "
                       >
                         <template #icon-left
-                          ><span class="price-dollar">$</span></template
+                          ><span class="price-dollar tw:text-xs tw:pb-0.5">$</span></template
                         >
                       </OInput>
                       <OButton
@@ -361,19 +361,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- Empty state -->
                     <div
                       v-if="!Object.keys(tier.prices).length"
-                      class="price-empty"
+                      class="price-empty tw:flex tw:flex-col tw:items-center tw:p-4 tw:gap-[3px]"
                     >
-                      <div class="price-empty-title">
+                      <div class="price-empty-title tw:text-xs tw:font-medium">
                         {{ t("modelPricing.noPricesDefined") }}
                       </div>
-                      <div class="price-empty-sub">
+                      <div class="price-empty-sub tw:text-[11px] tw:opacity-55">
                         {{ t("modelPricing.noPricesDesc") }}
                       </div>
                     </div>
 
                     <!-- Add row -->
                     <div
-                      class="price-add-row"
+                      class="price-add-row tw:grid tw:grid-cols-[1fr_160px_auto] tw:gap-2 tw:items-center tw:py-1 tw:px-3"
                       :class="{
                         'price-add-row--no-top': !Object.keys(tier.prices)
                           .length,
@@ -391,7 +391,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :placeholder="t('modelPricing.pricePlaceholder')"
                       >
                         <template #icon-left
-                          ><span class="price-dollar">$</span></template
+                          ><span class="price-dollar tw:text-xs tw:pb-0.5">$</span></template
                         >
                       </OInput>
                       <OButton
@@ -446,7 +446,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :key="entry.stableId"
                           class="tw:border-b last:tw:border-none"
                           :class="{
-                            'preview-row-pending': entry.stableId === -1,
+                            'preview-row-pending tw:opacity-50 tw:italic': entry.stableId === -1,
                           }"
                           style="border-color: var(--o2-border-color)"
                         >
@@ -482,7 +482,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Footer -->
-    <div class="page-footer">
+    <div class="page-footer tw:flex tw:items-center tw:justify-end tw:gap-2 tw:px-6 tw:h-[50px] tw:shrink-0 tw:border-t tw:border-(--o2-border-color)">
       <OButton
         variant="outline"
         size="sm-action"
@@ -978,344 +978,55 @@ onBeforeMount(async () => {
 });
 </script>
 
-<style lang="scss" scoped>
-/* ── Sticky footer ─────────────────────────────────── */
-.page-footer {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
-  padding: 0 24px;
-  height: 50px;
-  flex-shrink: 0;
-  border-top: 1px solid var(--o2-border-color);
+<style>
+/* ── Dark mode overrides (descendant selectors — cannot inline) ── */
+.body--dark .form-card {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
-/* ── Form card (Model Details) ─────────────────────── */
-.form-card {
-  border: 1px solid var(--o2-border-color);
-  border-radius: 10px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-
-  .body--dark & {
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
-  }
+.body--dark .form-card-header {
+  background: rgba(255, 255, 255, 0.04);
 }
 
-.form-card-header {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 10px 16px;
-  background: rgba(0, 0, 0, 0.025);
-  border-bottom: 1px solid var(--o2-border-color);
-  border-radius: 10px 10px 0 0;
-
-  .body--dark & {
-    background: rgba(255, 255, 255, 0.04);
-  }
+.body--dark .tier-card {
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
 }
 
-.form-card-title {
-  font-size: 13px;
-  font-weight: 600;
+.body--dark .tier-header {
+  background: rgba(255, 255, 255, 0.04);
 }
 
-.form-card-subtitle {
-  font-size: 11px;
-  opacity: 0.6;
-  margin-top: 1px;
+.body--dark .condition-block {
+  background: rgba(255, 255, 255, 0.03);
 }
 
-.form-card-body {
-  padding: 10px 16px 8px;
+.body--dark .examples-table-head {
+  background: rgba(255, 255, 255, 0.05);
 }
 
-.regex-hint-trigger {
-  cursor: default;
-  opacity: 0.4;
-
-  &:hover {
-    opacity: 0.75;
-  }
+.body--dark .examples-pattern {
+  background: rgba(255, 255, 255, 0.08);
 }
 
-/* ── Tier card ──────────────────────────────────────── */
-.tier-card {
-  border: 1px solid var(--o2-border-color);
-  border-radius: 10px;
-  overflow: hidden;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
-
-  .body--dark & {
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
-  }
+/* ── Hover pseudo-class rules (cannot inline) ── */
+.template-chip-close:hover {
+  opacity: 1;
 }
 
-.tier-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 8px 16px;
-  background: rgba(0, 0, 0, 0.025);
-  border-bottom: 1px solid var(--o2-border-color);
-
-  .body--dark & {
-    background: rgba(255, 255, 255, 0.04);
-  }
+.pattern-examples-btn:hover {
+  opacity: 1;
 }
 
-.tier-name-label {
-  font-size: 12px;
-  font-weight: 500;
-  opacity: 0.5;
-  white-space: nowrap;
-  flex-shrink: 0;
+.examples-copy-btn:hover {
+  opacity: 1;
 }
 
-.tier-name-input {
-  width: auto;
-  min-width: 80px;
-  max-width: 260px;
-
-  :deep(.q-field__control) {
-    padding: 0;
-    min-height: 30px;
-    height: 30px;
-    align-items: center;
-  }
-  :deep(.q-field__label) {
-    display: none;
-  }
-  :deep(.q-field__native) {
-    padding-top: 0;
-    padding-bottom: 0;
-    min-height: unset;
-    line-height: 30px;
-  }
-  :deep(input) {
-    font-weight: 600;
-    font-size: 14px;
-  }
+.examples-table-row:last-child {
+  border-bottom: none;
 }
 
-.tier-body {
-  padding: 12px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-/* ── Sub labels inside tier body ───────────────────── */
-.sub-label {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  opacity: 0.65;
-}
-
-/* ── Condition tw:block ───────────────────────────────── */
-.condition-block {
-  padding: 12px 14px;
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.02);
-  border: 1px solid var(--o2-border-color);
-
-  .body--dark & {
-    background: rgba(255, 255, 255, 0.03);
-  }
-}
-
-.tier-status-badge {
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  padding: 2px 8px;
-  border-radius: 10px;
-  background: rgba(34, 197, 94, 0.1);
-  color: #16a34a;
-  border: 1px solid rgba(34, 197, 94, 0.25);
-  white-space: nowrap;
-}
-
-.pricing-chip-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  flex-shrink: 0;
-  display: inline-block;
-}
-
-.template-chip-close {
-  font-size: 14px;
-  line-height: 1;
-  opacity: 0.75;
-  margin-left: 2px;
-
-  &:hover {
-    opacity: 1;
-  }
-}
-
-/* ── Price table ───────────────────────────────────── */
-.price-table {
-  overflow: hidden;
-}
-
-.price-table-head {
-  display: grid;
-  grid-template-columns: 1fr 160px auto;
-  gap: 8px;
-  padding: 6px 12px;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-  opacity: 0.45;
-}
-
-.price-row {
-  display: grid;
-  grid-template-columns: 1fr 160px auto;
-  gap: 8px;
-  align-items: center;
-  padding: 2px 12px;
-}
-
-.price-dollar {
-  font-size: 12px;
-  padding-bottom: 2px;
-}
-
-.price-table-label {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.03em;
-}
-
-.price-table-label-sub {
-  font-weight: 400;
-  opacity: 0.55;
-  letter-spacing: normal;
-}
-
-.price-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 16px;
-  gap: 3px;
-}
-
-.price-empty-title {
-  font-size: 12px;
-  font-weight: 500;
-}
-
-.price-empty-sub {
-  font-size: 11px;
-  opacity: 0.55;
-}
-
-.price-add-row {
-  display: grid;
-  grid-template-columns: 1fr 160px auto;
-  gap: 8px;
-  align-items: center;
-  padding: 4px 12px;
-}
-
-/* ── Pattern examples button & dialog ─────────────── */
-.pattern-examples-btn {
-  opacity: 0.5;
-  color: var(--q-primary);
-  &:hover {
-    opacity: 1;
-  }
-}
-
-.examples-table {
-  border: 1px solid var(--o2-border-color);
-  border-radius: 8px;
-  overflow: hidden;
-}
-
-.examples-table-head {
-  display: grid;
-  grid-template-columns: 180px 1fr auto;
-  gap: 12px;
-  padding: 6px 12px;
-  background: rgba(0, 0, 0, 0.03);
-  border-bottom: 1px solid var(--o2-border-color);
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  opacity: 0.45;
-
-  .body--dark & {
-    background: rgba(255, 255, 255, 0.05);
-  }
-}
-
-.examples-table-row {
-  display: grid;
-  grid-template-columns: 180px 1fr auto;
-  gap: 12px;
-  align-items: center;
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--o2-border-color);
-  font-size: 12px;
-
-  &:last-child {
-    border-bottom: none;
-  }
-}
-
-.examples-model-name {
-  font-weight: 500;
-}
-
-.examples-copy-btn {
-  opacity: 0.4;
-  &:hover {
-    opacity: 1;
-  }
-}
-
-.examples-pattern {
-  font-family: monospace;
-  font-size: 11px;
-  background: rgba(0, 0, 0, 0.04);
-  padding: 2px 6px;
-  border-radius: 4px;
-  word-break: break-all;
-
-  .body--dark & {
-    background: rgba(255, 255, 255, 0.08);
-  }
-}
-
-/* ── Pending preview row (typed but not yet committed) ── */
-.preview-row-pending {
-  opacity: 0.5;
-  font-style: italic;
-}
-
-/* ── Field label ────────────────────────────────────── */
-.field-label {
-  font-size: 12px;
-  font-weight: 600;
-  opacity: 0.75;
-  height: 20px;
-}
-
-/* ── showLabelOnTop input border override ───────────── */
-:deep(.q-field--labeled.showLabelOnTop) {
-  .q-field__control {
-    border: 1px solid var(--o2-border-color) !important;
-  }
+/* ── Quasar internal selector (cannot inline) ── */
+.q-field--labeled.showLabelOnTop .q-field__control {
+  border: 1px solid var(--o2-border-color) !important;
 }
 </style>

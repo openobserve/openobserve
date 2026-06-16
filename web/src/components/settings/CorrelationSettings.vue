@@ -358,8 +358,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style scoped lang="scss">
-/* .general-page-title / .general-page-subtitle removed — section title now
-   renders via the standard AppPageHeader. */
-</style>

@@ -1,6 +1,6 @@
 <template>
   <li
-    class="tw:cursor-pointer tw:py-[1px] tw:px-2 hover:tw:bg-gray-200 tw:text-[14px] tw:rounded-[2px] tw:flex tw:h-[25px] file-item"
+    class="tw:cursor-pointer tw:py-[1px] tw:px-2 hover:tw:bg-gray-200 tw:text-[14px] tw:rounded-[2px] tw:flex tw:h-[25px] tw:group file-item"
     :class="{
       'bg-primary tw:text-white': isActive,
     }"
@@ -21,7 +21,7 @@
       </template>
     </div>
     <div
-      class="tw:w-[36px] tw:flex tw:items-center tw:space-x-2 tw:ml-auto file-actions"
+      class="tw:w-[36px] tw:flex tw:items-center tw:space-x-2 tw:ml-auto tw:invisible tw:group-hover:visible file-actions"
     >
       <OButton variant="ghost" size="icon-xs-sq" @click.stop="editFile">
         <OIcon name="edit" size="sm" :class="isActive ? 'tw:text-gray-100' : 'tw:text-gray-600'" />
@@ -98,15 +98,3 @@ const deleteFile = () => {
 };
 </script>
 
-<style scoped lang="scss">
-.file-item {
-  .file-actions {
-    visibility: hidden;
-  }
-  &:hover {
-    .file-actions {
-      visibility: visible;
-    }
-  }
-}
-</style>

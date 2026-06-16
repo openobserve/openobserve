@@ -90,25 +90,32 @@
         </template>
 
         <template #cell-type="{ row }">
-          <span class="sr-type-chip" :class="`sr-type-chip--${scorerTypeOf(row)}`">
+          <span
+            class="tw:inline-flex tw:items-center tw:gap-1 tw:py-[1px] tw:px-[7px] tw:rounded-[3px] tw:font-semibold tw:text-[11px] tw:leading-[1.5]"
+            :class="{
+              'tw:bg-[color-mix(in_srgb,var(--o2-status-info-text)_14%,transparent)] tw:text-(--o2-status-info-text)': scorerTypeOf(row) === 'llm_judge',
+              'tw:bg-[color-mix(in_srgb,var(--o2-status-success-text)_14%,transparent)] tw:text-(--o2-status-success-text)': scorerTypeOf(row) === 'remote',
+              'tw:bg-[color-mix(in_srgb,var(--o2-status-warning-text)_14%,transparent)] tw:text-(--o2-status-warning-text)': scorerTypeOf(row) === 'code',
+            }"
+          >
             {{ scorerTypeLabel(scorerTypeOf(row)) }}
           </span>
         </template>
 
         <template #cell-produces="{ row }">
-          <span class="sr-mono-cell">{{ producesLabel(row) || "—" }}</span>
+          <span class="tw:font-mono tw:text-xs">{{ producesLabel(row) || "—" }}</span>
         </template>
 
         <template #cell-version="{ row }">
-          <span class="sr-mono-cell">v{{ row.version }}</span>
+          <span class="tw:font-mono tw:text-xs">v{{ row.version }}</span>
         </template>
 
         <template #cell-usedBy="{ row }">
-          <span class="sr-mono-cell">{{ usedByText(row) }}</span>
+          <span class="tw:font-mono tw:text-xs">{{ usedByText(row) }}</span>
         </template>
 
         <template #cell-lastRun>
-          <span class="sr-muted-cell">—</span>
+          <span class="tw:text-text-secondary tw:text-xs">—</span>
         </template>
 
         <template #cell-actions="{ row }">
@@ -337,37 +344,3 @@ function usedByText(row: Scorer) {
   return t("onlineEvals.scorer.usedByJobs", { count });
 }
 </script>
-
-<style lang="scss">
-.sr-type-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 1px 7px;
-  border-radius: 3px;
-  font: 600 11px/1.5 inherit;
-}
-
-.sr-type-chip--llm_judge {
-  background: color-mix(in srgb, var(--o2-status-info-text) 14%, transparent);
-  color: var(--o2-status-info-text);
-}
-.sr-type-chip--remote {
-  background: color-mix(in srgb, var(--o2-status-success-text) 14%, transparent);
-  color: var(--o2-status-success-text);
-}
-.sr-type-chip--code {
-  background: color-mix(in srgb, var(--o2-status-warning-text) 14%, transparent);
-  color: var(--o2-status-warning-text);
-}
-
-.sr-mono-cell {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 12px;
-}
-
-.sr-muted-cell {
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  font-size: 12px;
-}
-</style>

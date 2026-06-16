@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </AppPageHeader>
       <div class="tw:w-full tw:flex-1 tw:min-h-0 tw:overflow-hidden">
-        <div class="card-container tw:h-full">
+        <div class="tw:h-full">
           <OTable
             :frame="false"
             :data="visibleRows"
@@ -165,9 +165,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div
         v-if="transformedPipelineList.length > 0"
-        class="pipeline-list-container"
+        class="tw:max-h-50 tw:overflow-y-auto"
       >
-        <ul class="scrollable-list tw:flex tw:flex-col">
+        <ul class="scrollable-list tw:flex tw:flex-col tw:list-none tw:p-0 tw:m-0">
           <li
             v-for="(pipeline, index) in transformedPipelineList"
             :key="pipeline.value"
@@ -578,7 +578,7 @@ export default defineComponent({
       resultTotal.value = newVisibleRows.length;
     }, { immediate: true });
 
-    
+
     const openBulkDeleteDialog = () => {
       confirmBulkDelete.value = true;
     };
@@ -734,35 +734,21 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss">
-.pipeline-list-container {
-  max-height: 200px; /* Adjust based on item height to fit 5 items */
-  overflow-y: auto;
-}
-.dialog-heading {
-  border-bottom: 1px solid var(--o2-border);
-}
-
-.scrollable-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-
+<style>
 .scrollable-list::-webkit-scrollbar {
   width: 8px;
 }
 
 .scrollable-list::-webkit-scrollbar-thumb {
-  background-color: #888; /* Desired thumb color */
+  background-color: #888;
   border-radius: 4px;
 }
 
 .scrollable-list::-webkit-scrollbar-thumb:hover {
-  background-color: blue; /* Darker shade on hover */
+  background-color: blue;
 }
 
 .scrollable-list::-webkit-scrollbar-track {
-  background-color: blue; /* Track color */
+  background-color: blue;
 }
 </style>

@@ -22,10 +22,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div
       v-if="position === 'bottom' && maxRecords"
-      class="max-result"
+      class="max-result tw:flex tw:items-center tw:whitespace-nowrap tw:w-50 tw:justify-center"
       style="justify-content: start"
     >
-      <span class="q-table__bottom-item">{{ t("search.maxRecords") }}</span>
+      <span class="q-table__bottom-item tw:mr-4 tw:text-xs tw:font-semibold">{{ t("search.maxRecords") }}</span>
       <OInput
         v-model="maxRecords"
         class="max-records-input"
@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <div class="q-table__control tw:ml-auto">
-      <span class="q-table__bottom-item">
+      <span class="q-table__bottom-item tw:mr-4 tw:text-xs tw:font-semibold">
         {{ t("search.showing") }}
         {{
           resultTotal > 0
@@ -98,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-if="position === 'bottom'" class="tw:flex tw:items-center">
         <OSeparator vertical class="tw:my-2 tw:mr-4" />
 
-        <span class="q-table__bottom-item">
+        <span class="q-table__bottom-item tw:mr-4 tw:text-xs tw:font-semibold">
           {{ t("search.recordsPerPage") }}
         </span>
         <OSelect
@@ -212,58 +212,34 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss">
-.footer-text {
+<style>
+.q-select .q-field__native {
   margin-right: 1rem;
   font-size: 0.75rem;
   font-weight: 600;
-}
-.q-table__bottom-item {
-  @extend .footer-text;
-}
-.q-select .q-field {
-  &__native {
-    @extend .footer-text;
-    text-align: center;
-    margin-right: 0;
-  }
-  &__append {
-    padding: 0;
-  }
+  text-align: center;
+  margin-right: 0;
 }
 
-.pageNav {
-  padding: 0.125rem 0.5rem;
+.q-select .q-field__append {
+  padding: 0;
 }
 
-.max-result {
-  justify-content: center;
-  align-items: center;
-  white-space: nowrap;
-  display: flex;
-  width: 200px;
+.max-result .q-field {
+  max-width: 3.5rem;
+}
 
-  .q-field {
-    max-width: 3.5rem;
-  }
+.max-result .max-records-input .q-field__control {
+  max-width: 2.5rem;
+  height: 1.5rem;
+  padding: 0;
+}
 
-  .max-records-input {
-    .q-field {
-      &__control {
-        // background-color: #fafbfd !important;
-        max-width: 2.5rem;
-        height: 1.5rem;
-        padding: 0;
-      }
-      &__native {
-        font-size: 0.75rem;
-        text-align: center;
-        font-weight: 600;
-        // color: var(--o2-primary-background);
-        padding: 0;
-        width: fit-content;
-      }
-    }
-  }
+.max-result .max-records-input .q-field__native {
+  font-size: 0.75rem;
+  text-align: center;
+  font-weight: 600;
+  padding: 0;
+  width: fit-content;
 }
 </style>

@@ -53,22 +53,28 @@
         </template>
 
         <template #cell-status="{ row }">
-          <span class="ej-status-chip" :class="`ej-status-chip--${statusOf(row)}`">
-            <span class="ej-status-chip__dot" />
+          <span class="ej-status-chip tw:inline-flex tw:items-center tw:gap-1.25 tw:py-px tw:px-2 tw:rounded-full tw:font-semibold tw:text-[11px] tw:leading-normal tw:font-[inherit] tw:capitalize" :class="{
+              'tw:[background:color-mix(in_srgb,var(--o2-status-success-text)_14%,transparent)] tw:text-[var(--o2-status-success-text)]': statusOf(row) === 'active',
+              'tw:[background:color-mix(in_srgb,var(--color-text-secondary)_14%,transparent)] tw:text-[var(--color-text-secondary,var(--o2-text-secondary))]': statusOf(row) === 'draft',
+              'tw:[background:color-mix(in_srgb,var(--o2-status-warning-text)_14%,transparent)] tw:text-[var(--o2-status-warning-text)]': statusOf(row) === 'paused',
+              'tw:[background:color-mix(in_srgb,var(--o2-status-warning-text)_14%,transparent)] tw:text-[var(--o2-status-warning-text)]': statusOf(row) === 'degraded',
+              'tw:[background:color-mix(in_srgb,var(--color-text-secondary)_10%,transparent)] tw:text-[var(--color-text-secondary,var(--o2-text-secondary))] tw:opacity-70': statusOf(row) === 'archived',
+            }">
+            <span class="tw:w-1.5 tw:h-1.5 tw:rounded-full tw:bg-current" />
             {{ statusLabel(statusOf(row)) }}
           </span>
         </template>
 
         <template #cell-stream="{ row }">
-          <span class="ej-mono-cell">{{ row.stream }}</span>
+          <span class="tw:font-mono tw:text-xs">{{ row.stream }}</span>
         </template>
 
         <template #cell-scorers="{ row }">
-          <span class="ej-mono-cell">{{ scorerCountText(row) }}</span>
+          <span class="tw:font-mono tw:text-xs">{{ scorerCountText(row) }}</span>
         </template>
 
         <template #cell-lastRun>
-          <span class="ej-muted-cell">—</span>
+          <span class="tw:text-(--color-text-secondary,var(--o2-text-secondary)) tw:text-xs">—</span>
         </template>
 
         <template #cell-created="{ row }">
@@ -292,58 +298,3 @@ function formatDateShort(value: number) {
   return formatDate(value, "YYYY-MM-DD HH:mm:ss");
 }
 </script>
-
-<style lang="scss">
-.ej-status-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 1px 8px;
-  border-radius: 999px;
-  font: 600 11px/1.5 inherit;
-  text-transform: capitalize;
-}
-
-.ej-status-chip__dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 999px;
-  background: currentColor;
-}
-
-.ej-status-chip--active {
-  background: color-mix(in srgb, var(--o2-status-success-text) 14%, transparent);
-  color: var(--o2-status-success-text);
-}
-
-.ej-status-chip--draft {
-  background: color-mix(in srgb, var(--color-text-secondary) 14%, transparent);
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.ej-status-chip--paused {
-  background: color-mix(in srgb, var(--o2-status-warning-text) 14%, transparent);
-  color: var(--o2-status-warning-text);
-}
-
-.ej-status-chip--degraded {
-  background: color-mix(in srgb, var(--o2-status-warning-text) 14%, transparent);
-  color: var(--o2-status-warning-text);
-}
-
-.ej-status-chip--archived {
-  background: color-mix(in srgb, var(--color-text-secondary) 10%, transparent);
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  opacity: 0.7;
-}
-
-.ej-mono-cell {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 12px;
-}
-
-.ej-muted-cell {
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  font-size: 12px;
-}
-</style>

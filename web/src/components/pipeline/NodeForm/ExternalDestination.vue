@@ -224,19 +224,8 @@ defineExpose({
 });
 </script>
 
-<style lang="scss" scoped>
-.destination-method-select {
-  .q-field__native > :first-child {
-    text-transform: uppercase !important;
-  }
-}
-
-.truncate-url {
-  display: inline-block;
-  max-width: calc(40vw - 200px);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  vertical-align: bottom;
+<style>
+.destination-method-select .q-field__native > :first-child {
+  text-transform: uppercase !important;
 }
 </style>

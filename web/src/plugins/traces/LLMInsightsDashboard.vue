@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
        another card-container would render same-bg-on-same-bg and the
        inner cards would visually disappear (no border contrast). -->
   <div
-    class="llm-insights-dashboard tw:h-full tw:flex tw:flex-col tw:px-[0.625rem]"
+    class="tw:bg-transparent tw:h-full tw:flex tw:flex-col tw:px-2.5"
   >
     <!-- Toolbar: stream selector — hidden when no streams are available -->
     <div
@@ -84,29 +84,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-for="card in kpiCards"
           :key="card.label"
-          class="kpi-card card-container tw:rounded-lg tw:flex tw:flex-col tw:px-[0.875rem] tw:pt-[0.625rem] tw:pb-[0.625rem] tw:gap-[0.25rem]"
+          class="card-container tw:rounded-lg tw:flex tw:flex-col tw:px-3.5 tw:pt-2.5 tw:pb-2.5 tw:gap-1 tw:bg-(--o2-card-bg) tw:border tw:border-(--o2-border-color) tw:transition-shadow tw:duration-200 tw:hover:shadow-[0_1px_6px_rgba(0,0,0,0.08)]"
         >
           <div class="tw:flex tw:flex-col tw:gap-[0.25rem]">
-            <div class="kpi-label tw:text-[0.7rem] tw:font-semibold tw:text-[var(--o2-text-muted)]">
+            <div class="tw:text-[0.7rem] tw:font-semibold tw:text-(--o2-text-muted)">
               {{ card.label }}
             </div>
             <div class="tw:flex tw:items-baseline tw:gap-[0.2rem]">
-              <span class="tw:text-[1.4rem] tw:font-bold tw:leading-none tw:text-[var(--o2-text-primary)]">
+              <span class="tw:text-[1.4rem] tw:font-bold tw:leading-none tw:text-(--o2-text-primary)">
                 {{ card.value }}
               </span>
               <span
                 v-if="card.unit"
-                class="tw:text-[0.8rem] tw:font-semibold tw:text-[var(--o2-text-secondary)]"
+                class="tw:text-[0.8rem] tw:font-semibold tw:text-(--o2-text-secondary)"
               >
                 {{ card.unit }}
               </span>
             </div>
             <div
               v-if="card.trend"
-              class="kpi-trend tw:text-[0.65rem] tw:font-medium tw:flex tw:items-center tw:gap-[0.25rem]"
-              :class="`kpi-trend--${card.trend.sentiment}`"
+              class="tw:text-[0.65rem] tw:font-medium tw:flex tw:items-center tw:gap-1"
+              :class="{
+                'tw:text-[#16a34a]': card.trend.sentiment === 'good',
+                'tw:text-(--o2-status-error-text)': card.trend.sentiment === 'bad',
+                'tw:text-(--o2-text-muted)': card.trend.sentiment === 'neutral',
+              }"
             >
-              <span class="kpi-trend-arrow">{{ trendArrow(card.trend.direction) }}</span>
+              <span>{{ trendArrow(card.trend.direction) }}</span>
               <span>
                 {{ card.trend.deltaPct.toFixed(card.trend.deltaPct < 10 ? 1 : 0) }}%
                 vs prev{{ previousWindowLabel ? " " + previousWindowLabel : "" }}
@@ -408,36 +412,3 @@ onUnmounted(() => {
   cancelAll();
 });
 </script>
-
-<style lang="scss" scoped>
-// Page wrapper stays transparent so each inner card-container (KPI tiles
-// + trend panels) stands out against the surrounding page bg. The
-// previous solid-card-bg here matched the inner card-container bg and
-// erased every border / shadow.
-.llm-insights-dashboard {
-  background: transparent;
-}
-
-.kpi-card {
-  background: var(--o2-card-bg);
-  border: 1px solid var(--o2-border-color);
-  transition: box-shadow 0.2s ease;
-
-  &:hover {
-    box-shadow: 0 1px 6px rgba(0, 0, 0, 0.08);
-  }
-}
-
-.kpi-trend {
-  &--good {
-    color: #16a34a;
-  }
-  &--bad {
-    color: var(--o2-status-error-text);
-  }
-  &--neutral {
-    color: var(--o2-text-muted);
-  }
-}
-
-</style>

@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
 
       <slot name="before_panels" />
-      <div class="displayDiv">
+      <div class="displayDiv tw:clear-both tw:min-h-0 tw:h-auto">
         <div
           v-if="
             store.state.printMode &&
@@ -140,7 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             style="height: 100%; width: 100%"
           />
         </div>
-        <div v-else-if="panels.length > 0" ref="gridStackContainer" class="grid-stack">
+        <div v-else-if="panels.length > 0" ref="gridStackContainer" class="grid-stack tw:bg-transparent tw:m-0.5">
           <div
             v-for="item in panels"
             :key="item.id + selectedTabId"
@@ -151,12 +151,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :gs-h="getPanelLayout(item, 'h')"
             :gs-min-w="getMinimumWidth(item.type)"
             :gs-min-h="getMinimumHeight(item.type)"
-            class="grid-stack-item gridBackground"
+            class="grid-stack-item gridBackground tw:bg-transparent! tw:rounded tw:border-[#c2c2c27a]!"
             :class="store.state.theme == 'dark' ? 'dark' : ''"
           >
             <div class="grid-stack-item-content">
               <!-- Panel with Panel-Level Variables -->
-              <div class="panel-with-variables">
+              <div class="tw:h-full tw:flex tw:flex-col">
                 <!-- Original Panel Container -->
 
                 <PanelContainer
@@ -269,7 +269,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Explicit height wrapper: fills the dialog body's available space
              (90vh − body padding) so ViewPanel can use height:100% and
              flex:1 works all the way down without causing a body scrollbar. -->
-        <div class="view-panel-height-wrapper">
+        <div class="view-panel-height-wrapper tw:h-[calc(90vh-var(--spacing-dialog-content-py)*2)] tw:-my-(--spacing-dialog-content-py) tw:-mx-(--spacing-dialog-content-px) tw:flex tw:flex-col tw:overflow-hidden">
           <ViewPanel
             :folderId="folderId"
             :dashboardId="dashboardData.dashboardId"
@@ -1688,114 +1688,68 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
-// Fills the ODialog body's available space (dialog max-h:90vh minus body padding)
-// so ViewPanel can use height:100% and flex:1 chains work without a scrollbar.
-.view-panel-height-wrapper {
-  height: calc(90vh - var(--spacing-dialog-content-py) * 2);
-  margin: calc(-1 * var(--spacing-dialog-content-py)) calc(-1 * var(--spacing-dialog-content-px));
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.q-table {
-  &__top {
-    border-bottom: 1px solid var(--o2-border);
-    justify-content: flex-end;
-  }
-}
-
-.displayDiv {
-  clear: both;
-  min-height: 0;
-  height: auto;
-}
-
-.gridBackground {
-  background: transparent !important;
-  border-radius: 4px;
-  border-color: #c2c2c27a !important;
+<style>
+.q-table__top {
+  border-bottom: 1px solid var(--o2-border);
+  justify-content: flex-end;
 }
 
 .gridBackground.dark {
   border-color: rgba(204, 204, 220, 0.12) !important;
 }
 
-/* Optimized GridStack layout styles for better performance and visual feedback */
-.grid-stack {
-  background: transparent;
-  margin: 2px;
-
-  /* When grid is static (disabled), hide resize handles */
-  &.grid-stack-static {
-    .ui-resizable-handle {
-      display: none !important;
-    }
-  }
+/* When grid is static (disabled), hide resize handles */
+.grid-stack.grid-stack-static .ui-resizable-handle {
+  display: none !important;
 }
 
-.grid-stack-item {
-  background: transparent;
-
-  &.dark {
-    border-color: rgba(204, 204, 220, 0.12) !important;
-
-    /* The visible panel outline lives on the content child; in dark mode pull
-       it onto the design token (clean solid edge) instead of the bright
-       #c2c2c27a gray, which reads too light against the dark canvas. */
-    .grid-stack-item-content {
-      border-color: var(--color-border-default);
-    }
-  }
-  .grid-stack-item-content {
-    border: 1px solid #c2c2c27a;
-    border-radius: 4px;
-    overflow: visible;
-    border-radius: inherit;
-    // height: 100%;
-  }
+.grid-stack-item.dark {
+  border-color: rgba(204, 204, 220, 0.12) !important;
 }
 
-.panel-with-variables {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
+/* The visible panel outline lives on the content child; in dark mode pull
+   it onto the design token (clean solid edge) instead of the bright
+   #c2c2c27a gray, which reads too light against the dark canvas. */
+.grid-stack-item.dark .grid-stack-item-content {
+  border-color: var(--color-border-default);
+}
+
+.grid-stack-item .grid-stack-item-content {
+  border: 1px solid #c2c2c27a;
+  border-radius: 4px;
+  overflow: visible;
+  border-radius: inherit;
 }
 
 /* GridStack theme overrides */
-:deep(.grid-stack) {
-  .grid-stack-item {
-    .drag-allow {
-      cursor: move;
-    }
+.grid-stack .grid-stack-item .drag-allow {
+  cursor: move;
+}
 
-    &.ui-draggable-dragging {
-      opacity: 0.8;
-      z-index: 1000;
-      transition: transform 0.15s ease;
-    }
+.grid-stack .grid-stack-item.ui-draggable-dragging {
+  opacity: 0.8;
+  z-index: 1000;
+  transition: transform 0.15s ease;
+}
 
-    &.ui-resizable-resizing {
-      opacity: 0.9;
-    }
+.grid-stack .grid-stack-item.ui-resizable-resizing {
+  opacity: 0.9;
+}
 
-    > .ui-resizable-handle {
-      background: none;
+.grid-stack .grid-stack-item > .ui-resizable-handle {
+  background: none;
+}
 
-      &.ui-resizable-se {
-        background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'><path d='M8 2 L8 8 L2 8' stroke='%23999999' stroke-width='1.5' fill='none' stroke-linecap='round'/></svg>")
-          no-repeat center;
-        background-size: 8px 8px;
-        width: 16px;
-        height: 16px;
-        bottom: 2px;
-        right: 2px;
-        cursor: se-resize;
-        transform: rotate(0deg) !important;
-      }
-    }
-  }
+.grid-stack .grid-stack-item > .ui-resizable-handle.ui-resizable-se {
+  background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'><path d='M8 2 L8 8 L2 8' stroke='%23999999' stroke-width='1.5' fill='none' stroke-linecap='round'/></svg>")
+    no-repeat center;
+  background-size: 8px 8px;
+  width: 16px;
+  height: 16px;
+  bottom: 2px;
+  right: 2px;
+  cursor: se-resize;
+  transform: rotate(0deg) !important;
 }
 
 /* Ensure proper box-sizing */
@@ -1837,7 +1791,7 @@ export default defineComponent({
   /* Quasar virtual-scroll inserts padding divs above/below the rendered
    * rows to simulate the full scroll height. In print mode these become
    * empty white space. Hide them so no blank gaps appear in table panels. */
-  :deep(.q-virtual-scroll__padding) {
+  .q-virtual-scroll__padding {
     display: none !important;
   }
 }

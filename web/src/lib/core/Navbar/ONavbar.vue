@@ -111,7 +111,7 @@ function handleKeydown(event: KeyboardEvent) {
 }
 </script>
 
-<style scoped>
+<style>
 /* Thin overlay scrollbar: hidden at rest, revealed on hover, and — crucially —
    it never reserves layout width, so there is no empty strip beside the labels.
 

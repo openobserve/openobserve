@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="field-list-pagination-wrapper tw:justify-between tw:w-full tw:py-px tw:px-1"
+    class="tw:justify-between tw:w-full tw:py-px tw:px-1 tw:border-t tw:border-(--o2-border-color) tw:bg-(--o2-card-bg)"
     :class="showSchemaToggle || showQuickMode ? 'tw:flex' : ''"
   >
     <!-- Schema Toggle Buttons -->
@@ -133,7 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Pagination and Reset Controls -->
     <div class="tw:flex tw:items-center tw:justify-end tw:gap-1">
       <!-- Pagination -->
-      <div v-if="pagesNumber > 1" class="field-list-pagination">
+      <div v-if="pagesNumber > 1" class="tw:flex tw:items-center tw:gap-0.5">
         <OTooltip
           :data-test="`${dataTestPrefix}-fields-list-pagination-tooltip`"
           :content="'Total Fields: ' + totalFieldsCount"
@@ -180,12 +180,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Reset Fields Icon -->
-      <div class="field-list-reset">
+      <div class="tw:flex tw:items-center">
         <OIcon
           name="restart-alt"
           size="sm"
           :data-test="`${dataTestPrefix}-fields-list-reset-icon`"
-          class="tw:cursor-pointer reset-icon"
+          class="tw:cursor-pointer tw:text-sm tw:opacity-70 tw:transition-opacity tw:duration-200 tw:hover:opacity-100!"
           @click="$emit('reset-fields')"
         />
         <OTooltip
@@ -271,50 +271,14 @@ const visiblePages = computed(() => {
 });
 </script>
 
-<style scoped lang="scss">
-.field-list-pagination-wrapper {
-  border-top: 1px solid var(--o2-border-color);
-  background-color: var(--o2-card-bg);
-}
-
-.field-list-pagination {
-  display: flex;
-  align-items: center;
+<style>
+.schema-field-toggle [role="group"] {
   gap: 0.125rem;
-
-  :deep(button) {
-    height: 1.375rem;
-    width: 1.375rem;
-    min-height: unset;
-    min-width: unset;
-  }
 }
 
-.field-list-reset {
-  display: flex;
-  align-items: center;
-}
-
-.reset-icon {
-  font-size: 0.875rem;
-  cursor: pointer;
-  opacity: 0.7;
-  transition: opacity 0.2s;
-
-  &:hover {
-    opacity: 1;
-  }
-}
-
-.schema-field-toggle {
-  :deep([role="group"]) {
-    gap: 0.125rem;
-  }
-
-  :deep([role="group"] > *) {
-    gap: 0.25rem;
-    height: 1.375rem;
-    min-height: unset;
-  }
+.schema-field-toggle [role="group"] > * {
+  gap: 0.25rem;
+  height: 1.375rem;
+  min-height: unset;
 }
 </style>

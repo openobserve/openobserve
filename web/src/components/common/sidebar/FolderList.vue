@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <div class="tw:bg-surface-panel tw:h-full tw:flex tw:flex-col tw:pb-[0.3rem] tw:border-r tw:border-border-default">
-      <div class="folder-header" :class="store.state.theme === 'dark' ? 'folder-header-dark' : 'folder-header-light'">
+      <div class="folder-header tw:bg-transparent">
         <div class="tw:font-semibold tw:text-sm tw:text-text-primary tw:px-2 tw:py-2 tw:flex tw:items-center tw:justify-between tw:gap-2">
           {{ t('dashboard.folders') }}
           <div>
@@ -55,11 +55,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-for="(tab, index) in filteredTabs"
           :key="tab.folderId"
           :name="tab.folderId"
-          class="test-class"
+          class="test-class tw:min-h-[1.5rem]"
           :data-test="`dashboard-folder-tab-${tab.folderId}`"
           >
-          <div class="folder-item tw:w-full tw:flex tw:justify-between tw:flex-nowrap tw:group/row" :data-test="`dashboard-folder-tab-name-${tab.name}`">
-              <span class="folder-name" :title="tab.name" :data-test="`dashboard-folder-name-${tab.name}`">{{
+          <div class="folder-item tw:w-full tw:flex tw:justify-between tw:items-center tw:flex-nowrap tw:group/row tw:relative tw:rounded" :data-test="`dashboard-folder-tab-name-${tab.name}`">
+              <span class="tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis tw:normal-case" :title="tab.name" :data-test="`dashboard-folder-name-${tab.name}`">{{
               tab.name
               }}</span>
               <div class="tw:invisible tw:group-hover/row:visible tw:has-[[data-state=open]]:visible tw:flex tw:items-center tw:absolute tw:right-0 tw:top-1/2 tw:-translate-y-1/2">
@@ -177,7 +177,7 @@ import OSeparator from '@/lib/core/Separator/OSeparator.vue';
     return import("@/components/dashboards/AddDashboard.vue");
   });
 
-export default defineComponent({  
+export default defineComponent({
     name: "FolderList",
     components: {
       OSeparator,
@@ -231,7 +231,7 @@ export default defineComponent({
           activeFolderId.value = "default";
         }
       });
-      
+
       watch(()=> router.currentRoute.value.query.folder, (newVal)=> {
         activeFolderId.value = newVal || "default";
       })
@@ -292,7 +292,7 @@ export default defineComponent({
       emit("update:activeFolderId", newVal);
     })
 
-    const filteredTabs = computed(() => { 
+    const filteredTabs = computed(() => {
       if(!searchQuery.value || searchQuery.value == ""){
         return store.state.organizationData.foldersByType[props.type]
       }
@@ -326,84 +326,38 @@ export default defineComponent({
   });
   </script>
 
-<style lang="scss" scoped>
-.folder-header {
-  &.sticky-top {
-    position: sticky;
-    top: 0;
-    z-index: 10;
-  }
-
-  /* Inherit the rail's surface-panel bg so the folder rail reads as one calm
-     surface (matches the IAM/Settings SectionRail + prototype .l2). */
-  &.folder-header-light,
-  &.folder-header-dark {
-    background-color: transparent;
-  }
+<style>
+.folders-tabs .o-tabs {
+  height: auto !important;
+  max-height: none !important;
 }
 
-.folders-tabs {
-  .o-tabs {
-    height: auto !important;
-    max-height: none !important;
-  }
-
-  .test-class {
-    min-height: 1.5rem;
-  }
-  .folder-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    position: relative;
-    border-radius: 0.25rem;
-    transition: background-color 0.3s;
-
-    // No background change on the action button hover — it sits inside a folder
-    // item that already has its own hover/active state, so any fill looks like
-    // a stray artifact over the item background.
-    --color-button-ghost-hover-bg: transparent;
-  }
-
-  .o-tabs {
-    &--vertical {
-      margin: 0;
-
-      .o-tab {
-        justify-content: flex-start;
-        padding: 0 0.625rem;
-        border-radius: 0.5rem;
-        /* No forced capitalize — folder names render as authored. Weight 500
-           (record-name weight), not 600, so the list reads calm. Active state is
-           inherited from OTab vertical (tint bg + primary text) so the folder rail
-           matches the IAM/Settings rails exactly. */
-        font-weight: 500;
-
-        &__content.tab_content {
-          .o-tab {
-            &__icon + &__label {
-              padding-left: 0.875rem;
-              font-weight: 500;
-            }
-          }
-        }
-      }
-    }
-  }
+.folders-tabs .folder-item {
+  transition: background-color 0.3s;
+  /* No background change on the action button hover — it sits inside a folder
+     item that already has its own hover/active state, so any fill looks like
+     a stray artifact over the item background. */
+  --color-button-ghost-hover-bg: transparent;
 }
 
-.dashboards-list-page {
-  :deep(.q-table th),
-  :deep(.q-table td) {
-    padding: 0px 16px;
-    height: 32px;
-  }
+.folders-tabs .o-tabs--vertical {
+  margin: 0;
 }
 
-.folder-name {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  text-transform: none !important;
-  }
+.folders-tabs .o-tabs--vertical .o-tab {
+  justify-content: flex-start;
+  padding: 0 0.625rem;
+  border-radius: 0.5rem;
+  /* No forced capitalize — folder names render as authored. Weight 500
+     (record-name weight), not 600, so the list reads calm. Active state is
+     inherited from OTab vertical (tint bg + primary text) so the folder rail
+     matches the IAM/Settings rails exactly. */
+  font-weight: 500;
+}
+
+.folders-tabs .o-tabs--vertical .o-tab__content.tab_content .o-tab__icon + .o-tab__label {
+  padding-left: 0.875rem;
+  font-weight: 500;
+}
+
 </style>

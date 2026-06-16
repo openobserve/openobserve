@@ -11,11 +11,11 @@
           <OSeparator />
 
           <OCardSection role="body">
-            <div class="log-viewer">
+            <div class="log-viewer tw:flex tw:flex-col tw:gap-3">
               <!-- Sample Log 1 -->
-              <div class="log-line" @click="selectLog(sampleLog1)">
-                <div class="log-timestamp">2025-12-02 10:23:45</div>
-                <div class="log-content">
+              <div class="log-line tw:p-4 tw:bg-(--q-dark-page,#f5f5f5) tw:rounded-lg tw:border-2 tw:border-transparent tw:cursor-pointer tw:transition-all tw:duration-200 tw:relative tw:hover:border-(--q-primary) tw:hover:bg-(--q-dark-page,#eeeeee)" @click="selectLog(sampleLog1)">
+                <div class="log-timestamp tw:font-mono tw:text-xs tw:text-[var(--q-primary)] tw:mb-2">2025-12-02 10:23:45</div>
+                <div class="log-content tw:flex tw:flex-col tw:gap-1 tw:text-[13px]">
                   <div><strong>service.name:</strong> checkout-api</div>
                   <div><strong>k8s.cluster:</strong> prod-us-west</div>
                   <div><strong>k8s.deployment.name:</strong> checkout-v2</div>
@@ -24,13 +24,13 @@
                     timeout
                   </div>
                 </div>
-                <OIcon name="link" size="sm" class="correlation-hint" />
+                <OIcon name="link" size="sm" class="correlation-hint tw:absolute tw:top-4 tw:right-4 tw:opacity-0 tw:transition-opacity tw:duration-200 tw:text-[var(--q-primary)]" />
               </div>
 
               <!-- Sample Log 2 -->
-              <div class="log-line" @click="selectLog(sampleLog2)">
-                <div class="log-timestamp">2025-12-02 10:24:12</div>
-                <div class="log-content">
+              <div class="log-line tw:p-4 tw:bg-(--q-dark-page,#f5f5f5) tw:rounded-lg tw:border-2 tw:border-transparent tw:cursor-pointer tw:transition-all tw:duration-200 tw:relative tw:hover:border-(--q-primary) tw:hover:bg-(--q-dark-page,#eeeeee)" @click="selectLog(sampleLog2)">
+                <div class="log-timestamp tw:font-mono tw:text-xs tw:text-[var(--q-primary)] tw:mb-2">2025-12-02 10:24:12</div>
+                <div class="log-content tw:flex tw:flex-col tw:gap-1 tw:text-[13px]">
                   <div><strong>service.name:</strong> inventory-service</div>
                   <div><strong>k8s.cluster:</strong> prod-us-east</div>
                   <div><strong>environment:</strong> production</div>
@@ -38,13 +38,13 @@
                     <strong>message:</strong> Database connection timeout
                   </div>
                 </div>
-                <OIcon name="link" size="sm" class="correlation-hint" />
+                <OIcon name="link" size="sm" class="correlation-hint tw:absolute tw:top-4 tw:right-4 tw:opacity-0 tw:transition-opacity tw:duration-200 tw:text-[var(--q-primary)]" />
               </div>
 
               <!-- Sample Log 3 -->
-              <div class="log-line" @click="selectLog(sampleLog3)">
-                <div class="log-timestamp">2025-12-02 10:25:30</div>
-                <div class="log-content">
+              <div class="log-line tw:p-4 tw:bg-(--q-dark-page,#f5f5f5) tw:rounded-lg tw:border-2 tw:border-transparent tw:cursor-pointer tw:transition-all tw:duration-200 tw:relative tw:hover:border-(--q-primary) tw:hover:bg-(--q-dark-page,#eeeeee)" @click="selectLog(sampleLog3)">
+                <div class="log-timestamp tw:font-mono tw:text-xs tw:text-[var(--q-primary)] tw:mb-2">2025-12-02 10:25:30</div>
+                <div class="log-content tw:flex tw:flex-col tw:gap-1 tw:text-[13px]">
                   <div><strong>service.name:</strong> user-auth</div>
                   <div><strong>k8s.cluster:</strong> prod-us-west</div>
                   <div><strong>region:</strong> us-west-2</div>
@@ -53,7 +53,7 @@
                     user_123
                   </div>
                 </div>
-                <OIcon name="link" size="sm" class="correlation-hint" />
+                <OIcon name="link" size="sm" class="correlation-hint tw:absolute tw:top-4 tw:right-4 tw:opacity-0 tw:transition-opacity tw:duration-200 tw:text-[var(--q-primary)]" />
               </div>
             </div>
           </OCardSection>
@@ -126,7 +126,7 @@
           This query would be executed to fetch related
           {{ queryPreview.type }}:
         </div>
-        <pre class="query-preview">{{ queryPreview.sql }}</pre>
+        <pre class="query-preview tw:bg-(--q-dark-page,#f5f5f5) tw:p-4 tw:rounded tw:font-mono tw:text-xs tw:overflow-x-auto tw:whitespace-pre-wrap tw:wrap-break-word">{{ queryPreview.sql }}</pre>
       </div>
     </ODialog>
   </div>
@@ -193,73 +193,18 @@ function selectLog(log: any) {
 }
 </script>
 
-<style scoped lang="scss">
-.log-viewer {
+<style>
+.log-line .log-content div {
   display: flex;
-  flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
 
-.log-line {
-  padding: 16px;
-  background: var(--q-dark-page, #f5f5f5);
-  border-radius: 8px;
-  border: 2px solid transparent;
-  cursor: pointer;
-  transition: all 0.2s;
-  position: relative;
-
-  &:hover {
-    border-color: var(--q-primary);
-    background: var(--q-dark-page, #eeeeee);
-
-    .correlation-hint {
-      opacity: 1;
-    }
-  }
-
-  .log-timestamp {
-    font-family: monospace;
-    font-size: 12px;
-    color: var(--q-primary);
-    margin-bottom: 8px;
-  }
-
-  .log-content {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    font-size: 13px;
-
-    div {
-      display: flex;
-      gap: 8px;
-    }
-
-    strong {
-      min-width: 150px;
-      color: var(--q-text-secondary, #757575);
-    }
-  }
-
-  .correlation-hint {
-    position: absolute;
-    top: 16px;
-    right: 16px;
-    opacity: 0;
-    transition: opacity 0.2s;
-    color: var(--q-primary);
-  }
+.log-line .log-content strong {
+  min-width: 150px;
+  color: var(--q-text-secondary, #757575);
 }
 
-.query-preview {
-  background: var(--q-dark-page, #f5f5f5);
-  padding: 16px;
-  border-radius: 4px;
-  font-family: monospace;
-  font-size: 12px;
-  overflow-x: auto;
-  white-space: pre-wrap;
-  word-wrap: break-word;
+.log-line:hover .correlation-hint {
+  opacity: 1;
 }
 </style>

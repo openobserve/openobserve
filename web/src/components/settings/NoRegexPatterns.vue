@@ -25,9 +25,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         style="width: 125px; margin: 0 auto 1rem"
         alt=""
       />
-      <span class="title-text">{{ t("regex_patterns.no_data") }}</span>
-        <span class="subtitle-text">Import patterns from your Library or <span class="create-new-text" @click="createNewRegexPattern">Create New</span></span>
-        <div class="import-button-container" style="font-size: 1rem">
+      <span class="tw:font-semibold tw:text-base tw:leading-5 tw:text-left tw:tracking-[-0.6%]">{{ t("regex_patterns.no_data") }}</span>
+        <span class="tw:text-sm tw:leading-5 tw:text-left tw:tracking-[-0.6%]">Import patterns from your Library or <span class="tw:text-base tw:leading-6 tw:text-left tw:text-[#5960b2] tw:font-bold tw:cursor-pointer" @click="createNewRegexPattern">Create New</span></span>
+        <div style="font-size: 1rem">
             <OButton variant="outline" size="xs" class="tw:mt-2" @click="importRegexPattern">
               {{ t("regex_patterns.import_title") }}
             </OButton>
@@ -61,36 +61,3 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     },
   });
   </script>
-
-  <style scoped>
-  .title-text {
-    font-weight: 600;
-    font-size: 16px;
-    line-height: 20px;
-    text-align: left;
-    letter-spacing: -0.6%;
-  }
-  .subtitle-text {
-    font-size: 14px;
-    line-height: 20px;
-    letter-spacing: -0.6%;
-    text-align: left;
-  }
-  .import-button-text{
-    font-size: 16px;
-    line-height: 24px;
-    letter-spacing: 0%;
-    text-align: left;
-    color: #5960b2;
-    font-weight: 600;
-  }
-  .create-new-text{
-    font-size: 16px;
-    line-height: 24px;
-    letter-spacing: 0%;
-    text-align: left;
-    color: #5960b2;
-    font-weight: 700;
-    cursor: pointer;
-  }
-  </style>

@@ -15,12 +15,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div data-test="traces-metrics-dashboard" class="traces-metrics-dashboard tw:w-full">
+  <div data-test="traces-metrics-dashboard" class="traces-metrics-dashboard tw:w-full tw:overflow-hidden">
     <!-- Charts Section -->
     <transition name="slide-fade">
       <div
         v-if="show"
-        class="charts-wrapper tw:py-0! tw:min-h-[8.5rem] tw:h-[10rem]"
+        class="charts-wrapper tw:py-0! tw:min-h-[8.5rem] tw:h-[10rem] tw:overflow-hidden tw:will-change-[transform,opacity]"
       >
         <div class="charts-container">
           <RenderDashboardCharts
@@ -718,20 +718,16 @@ defineExpose({
 });
 </script>
 
-<style lang="scss" scoped>
-.traces-metrics-dashboard {
-  overflow: hidden;
-
-  :deep(.card-container) {
-    box-shadow: none;
-
-    :first-child {
-      padding: 0 0.0625rem !important;
-    }
-  }
+<style>
+.traces-metrics-dashboard .card-container {
+  box-shadow: none;
 }
 
-// Slide fade transition
+.traces-metrics-dashboard .card-container :first-child {
+  padding: 0 0.0625rem !important;
+}
+
+/* Slide fade transition */
 .slide-fade-enter-active,
 .slide-fade-leave-active {
   transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
@@ -761,25 +757,17 @@ defineExpose({
   max-height: 0;
 }
 
-// Charts wrapper
-.charts-wrapper {
-  overflow: hidden;
-  will-change: transform, opacity;
-
-  :deep(.render-dashboard-charts-container){
-    padding-left: 0.2rem;
-    padding-right: 0.2rem;
-  }
+.charts-wrapper .render-dashboard-charts-container {
+  padding-left: 0.2rem;
+  padding-right: 0.2rem;
 }
 
-// Dark mode support
-body.body--dark {
-  .charts-container {
-    border-color: rgba(255, 255, 255, 0.1);
+/* Dark mode support */
+body.body--dark .charts-container {
+  border-color: rgba(255, 255, 255, 0.1);
+}
 
-    &:hover {
-      box-shadow: 0 2px 8px rgba(255, 255, 255, 0.08);
-    }
-  }
+body.body--dark .charts-container:hover {
+  box-shadow: 0 2px 8px rgba(255, 255, 255, 0.08);
 }
 </style>

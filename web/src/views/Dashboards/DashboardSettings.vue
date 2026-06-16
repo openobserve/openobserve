@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     data-test="dashboard-settings-main-container"
     class="tw:p-0"
-    :class="store.state.theme == 'dark' ? 'dark-mode' : 'tw:bg-white'"
+    :class="store.state.theme == 'dark' ? 'dark-mode tw:bg-[var(--o2-primary-background)]' : 'tw:bg-white'"
     style="min-height: inherit"
   >
 
@@ -143,58 +143,45 @@ export default defineComponent({
 });
 </script>
 
-<style scoped lang="scss">
-.dark-mode {
-  background-color: var(--o2-primary-background);
-}
-.q-table {
-  &__top {
-    border-bottom: 1px solid var(--o2-border);
-    justify-content: flex-end;
-  }
+<style>
+.q-table__top {
+  border-bottom: 1px solid var(--o2-border);
+  justify-content: flex-end;
 }
 
 .o-tab-panel {
   padding: 0px !important;
 }
 
-.functions-tabs {
-  .o-tabs {
-    &--vertical {
-      margin: 20px 16px 0 16px;
-      .o-tab {
-        justify-content: flex-start;
-        padding: 0 1rem 0 1.25rem;
-        // color: var(--o2-primary-background);
-        text-transform: capitalize;
-        &__content.tab_content {
-          .o-tab {
-            &__icon + &__label {
-              padding-left: 0.875rem;
-              font-weight: 600;
-            }
-          }
-        }
-        &--active {
-          color: var(--o2-tab-text-color);
-          background-color: var(--o2-tab-bg);
-        }
-      }
-    }
-  }
+.functions-tabs .o-tabs--vertical {
+  margin: 20px 16px 0 16px;
 }
 
-:deep(.o-splitter__before) {
+.functions-tabs .o-tabs--vertical .o-tab {
+  justify-content: flex-start;
+  padding: 0 1rem 0 1.25rem;
+  text-transform: capitalize;
+}
+
+.functions-tabs .o-tabs--vertical .o-tab__content.tab_content .o-tab__icon + .o-tab__label {
+  padding-left: 0.875rem;
+  font-weight: 600;
+}
+
+.functions-tabs .o-tabs--vertical .o-tab--active {
+  color: var(--o2-tab-text-color);
+  background-color: var(--o2-tab-bg);
+}
+
+.o-splitter__before {
   border-right: 1px solid var(--o2-border);
 }
 
-.dark-mode {
-  :deep(.o-splitter__before) {
-    border-right-color: rgba(255, 255, 255, 0.12);
-  }
+.dark-mode .o-splitter__before {
+  border-right-color: rgba(255, 255, 255, 0.12);
 }
 
-:deep(.o-splitter__separator) {
+.o-splitter__separator {
   display: none !important;
 }
 </style>

@@ -16,11 +16,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <OCard
-    class="aws-integration-tile tw:border tw:border-border tw:h-full"
+    class="aws-integration-tile tw:border tw:border-border tw:h-full tw:flex tw:flex-col tw:transition-all tw:duration-200 tw:ease-in-out tw:rounded-lg tw:hover:-translate-y-0.5"
   >
     <OCardSection class="tw:p-4 tw:pb-2 tw:flex-1">
       <div class="tw:flex tw:items-start tw:justify-between tw:mb-2">
-        <div class="tile-name tw:font-semibold tw:text-base">
+        <div class="tile-name tw:font-semibold tw:text-base tw:leading-[1.4]">
           {{ integration.displayName }}
         </div>
         <OButton
@@ -28,14 +28,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="ghost"
           size="icon-circle-sm"
           @click="handleDocumentation()"
-          class="docs-btn"
+          class="docs-btn tw:opacity-70 hover:tw:opacity-100 tw:transition-opacity tw:duration-200 tw:ease-in-out"
           :data-test="`aws-${integration.id}-docs-btn`"
         >
           <OIcon name="description" size="sm" />
           <OTooltip content="View Documentation" />
         </OButton>
       </div>
-      <div class="tile-description tw:text-sm tw:text-gray-600 tw:mb-3">
+      <div class="tile-description tw:text-sm tw:text-gray-600 tw:mb-3 tw:leading-normal tw:min-h-[3em]">
         {{ integration.description }}
       </div>
     </OCardSection>
@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:text-sm tw:font-medium tw:mb-3">
         Select how you want to integrate {{ integration.displayName }}:
       </div>
-      <ul class="aws-integration-options-list tw:flex tw:flex-col">
+      <ul class="aws-integration-options-list tw:flex tw:flex-col tw:list-none tw:p-0 tw:m-0">
         <!-- CloudFormation Templates -->
         <li
           v-for="(template, index) in integration.cloudFormationTemplates"
@@ -597,68 +597,28 @@ export default defineComponent({
 });
 </script>
 
-<style scoped lang="scss">
-.aws-integration-options-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
+<style>
+.body--light .aws-integration-tile:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
-.aws-integration-tile {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  transition: all 0.2s ease;
-  border-radius: 8px;
+.body--light .aws-integration-tile .tile-name {
+  color: #1a1a1a;
+}
 
-  &:hover {
-    transform: translateY(-2px);
-  }
+.body--light .aws-integration-tile .tile-description {
+  color: #666;
+}
 
-  .body--light & {
-    &:hover {
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    }
+.body--dark .aws-integration-tile:hover {
+  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.1);
+}
 
-    .tile-name {
-      color: #1a1a1a;
-    }
+.body--dark .aws-integration-tile .tile-name {
+  color: var(--o2-border);
+}
 
-    .tile-description {
-      color: #666;
-    }
-  }
-
-  .body--dark & {
-    &:hover {
-      box-shadow: 0 4px 12px rgba(255, 255, 255, 0.1);
-    }
-
-    .tile-name {
-      color: var(--o2-border);
-    }
-
-    .tile-description {
-      color: #b0b0b0;
-    }
-  }
-
-  .tile-name {
-    line-height: 1.4;
-  }
-
-  .tile-description {
-    line-height: 1.5;
-    min-height: 3em;
-  }
-
-  .docs-btn {
-    opacity: 0.7;
-    transition: opacity 0.2s ease;
-
-    &:hover {
-      opacity: 1;
-    }
-  }
+.body--dark .aws-integration-tile .tile-description {
+  color: #b0b0b0;
 }
 </style>

@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="filter-values-container tw:py-2">
+  <div class="tw:py-2 tw:text-xs">
     <!-- Value search input — only when fetched count hits the limit -->
     <div v-if="showValueSearch" class="value-search-container tw:mb-1">
       <div class="value-search-input-wrap">
@@ -32,18 +32,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Filter mode toggle + selection count -->
     <div
       v-if="showMultiSelect"
-      class="filter-mode-bar tw:flex tw:items-center tw:justify-between tw:px-2 tw:py-1"
+      class="filter-mode-bar tw:flex tw:items-center tw:justify-between tw:px-2 tw:py-1 tw:border-b tw:border-(--o2-border-color)"
       data-test="field-values-panel-filter-mode-bar"
     >
       <div class="tw:flex tw:items-center tw:gap-1 ">
         <span
           v-if="selectedValues.length > 0"
-          class="selection-count tw:text-3!"
+          class="selection-count tw:text-3! tw:text-[0.625rem] tw:font-medium tw:text-[var(--o2-primary-color)]"
           data-test="field-values-panel-selection-count"
         >
           {{ selectedValues.length }} selected
         </span>
-        <span v-else class="selection-hint  tw:text-3!">Select to filter</span>
+        <span v-else class="selection-hint  tw:text-3! tw:text-[0.625rem] tw:text-[var(--o2-text-secondary)]">Select to filter</span>
         <OButton
           v-if="selectedValues.length > 0"
           variant="ghost"
@@ -57,13 +57,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </div>
       <div
-        class="filter-mode-toggle"
+        class="filter-mode-toggle tw:flex tw:border tw:border-[var(--o2-border-color)] tw:rounded tw:overflow-hidden"
         data-test="field-values-panel-filter-mode-toggle"
       >
         <OButton
           :variant="filterMode === 'include' ? 'primary' : 'ghost-muted'"
           size="icon-chip"
-          class="filter-mode-btn"
+          class="filter-mode-btn tw:rounded-none! tw:[transition:background_0.15s,color_0.15s]"
           :disabled="filterMode !== 'include' && isModeToggleDisabled"
           title="Include mode (=)"
           @click="setFilterMode('include')"
@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           :variant="filterMode === 'exclude' ? 'destructive' : 'ghost-muted'"
           size="icon-chip"
-          class="filter-mode-btn"
+          class="filter-mode-btn tw:rounded-none! tw:[transition:background_0.15s,color_0.15s]"
           :disabled="filterMode !== 'exclude' && isModeToggleDisabled"
           title="Exclude mode (≠)"
           @click="setFilterMode('exclude')"
@@ -90,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Scrollable values area -->
-    <div class="values-scroll-container">
+    <div class="tw:max-h-64 tw:overflow-y-auto">
       <!-- Loading state (only shown when there are no interim cached results) -->
       <div
         v-show="fieldValues?.isLoading && !displayValues.length"
@@ -184,10 +184,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- View more values / loading more indicator -->
     <div
       v-if="isLoadingMore || (fieldValues?.hasMore && !fieldValues?.isLoading)"
-      class="view-more-container tw:w-full tw:flex tw:justify-center"
+      class="tw:w-full tw:flex tw:justify-center tw:border-t tw:border-(--o2-border-color) tw:pt-1 tw:px-1"
     >
       <button
-        class="view-more-link"
+        class="tw:inline-flex tw:items-center tw:gap-1 tw:bg-transparent tw:border-0 tw:text-(--o2-primary-color) tw:text-[0.6875rem] tw:font-[inherit] tw:py-0.5 tw:px-1 tw:cursor-pointer tw:rounded-[0.1875rem] tw:transition-opacity tw:duration-150 hover:tw:opacity-80 hover:tw:bg-(--o2-hover-accent) disabled:tw:opacity-50 disabled:tw:cursor-default"
         :disabled="isLoadingMore"
         @click="handleLoadMoreClick"
         :data-test="`log-search-subfield-load-more-${fieldName}`"
@@ -467,150 +467,3 @@ const reset = () => {
 
 defineExpose({ reset });
 </script>
-
-<style scoped lang="scss">
-// ---------- compact filter panel ----------
-
-.filter-values-container {
-  font-size: 0.75rem;
-}
-
-.filter-mode-bar {
-  border-bottom: 1px solid var(--o2-border-color);
-
-  .selection-count {
-    font-size: 0.625rem;
-    font-weight: 500;
-    color: var(--o2-primary-color);
-  }
-
-  .selection-hint {
-    font-size: 0.625rem;
-    color: var(--o2-text-secondary);
-  }
-
-  .filter-mode-toggle {
-    display: flex;
-    border: 1px solid var(--o2-border-color);
-    border-radius: 0.25rem;
-    overflow: hidden;
-  }
-
-  .filter-mode-btn {
-    border-radius: 0 !important;
-    transition:
-      background 0.15s,
-      color 0.15s;
-  }
-}
-
-
-.value-search-input-wrap {
-  &:deep(.q-field__control) {
-    height: 1.5rem;
-    min-height: 1.5rem;
-    padding: 0 0.25rem;
-    display: flex;
-    align-items: center;
-    border: 1px solid var(--o2-border-color);
-    border-radius: 0.1875rem;
-  }
-
-  &:deep(.q-field__prepend),
-  &:deep(.q-field__append) {
-    height: 1.5rem;
-    display: flex;
-    align-items: center;
-    padding-right: 0.25rem;
-  }
-
-  &:deep(.q-field__native) {
-    padding: 0;
-    line-height: 1.3;
-    height: 1.5rem !important;
-    font-size: 0.6875rem;
-  }
-
-  &:deep(.q-field__append .OIcon) {
-    font-size: 0.75rem;
-  }
-}
-
-.values-scroll-container {
-  max-height: 16rem;
-  overflow-y: auto;
-}
-
-// ---------- value rows ----------
-.value-row {
-  display: flex;
-  align-items: center;
-  gap: 0.375rem;
-  padding: 0.1875rem 0.25rem;
-  border-radius: 0.1875rem;
-  cursor: pointer;
-  font-size: 0.6875rem;
-  min-height: 1.5rem;
-}
-
-.value-row-checkbox {
-  flex-shrink: 0;
-}
-
-.value-row-checkbox :deep(button) {
-  border-color: var(--o2-border-input) !important;
-}
-
-.value-row-name {
-  flex: 1;
-  min-width: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  color: var(--o2-text-primary);
-}
-
-.value-row-null {
-  font-style: italic;
-  color: var(--o2-text-muted);
-}
-
-.value-row-count {
-  flex-shrink: 0;
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-  color: var(--o2-text-secondary);
-  min-width: 3.5rem;
-}
-
-// ---------- view more ----------
-.view-more-container {
-  border-top: 1px solid var(--o2-border-color);
-  padding: 0.25rem 0.25rem 0;
-}
-
-.view-more-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  background: none;
-  border: none;
-  color: var(--o2-primary-color, #58c5d8);
-  font-size: 0.6875rem;
-  font-family: inherit;
-  padding: 0.125rem 0.25rem;
-  cursor: pointer;
-  border-radius: 0.1875rem;
-  transition: opacity 0.15s;
-}
-
-.view-more-link:hover {
-  opacity: 0.8;
-  background-color: var(--o2-hover-accent);
-}
-
-.view-more-link:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-</style>

@@ -489,92 +489,39 @@ defineExpose({
 
   </script>
 
-  <style lang="scss">
+  <style>
 
-    .condition-container {
-        overflow-x: auto;
-        max-width: 900px;
-    }
-
-
-    .group-tabs {
-      position: relative;
-
-      border-radius: 4px;
-      overflow: hidden;
-      bottom: 12px;
-      .q-tab{
-        height: 24px !important;
-        min-height: 24px !important;
-        width: 50px !important;
-        min-width: 50px !important;
-      }
-      .q-tab__label{
-        font-size: 10px !important;
-      }
-    }
     .group-container.dark-mode-group {
-    scrollbar-color: #818181 var(--o2-primary-background); /* thumb color, track color */
-  }
-
-.group-container.light-mode-group {
-  scrollbar-color: #999 #ffffff;
-}
-
-/* For more control using WebKit scrollbar styling */
-.group-container::-webkit-scrollbar {
-  width: 8px;
-  height: 4px !important;
-}
-
-.group-container.dark-mode-group::-webkit-scrollbar-track {
-  background: red;
-}
-
-.group-container.dark-mode-group::-webkit-scrollbar-thumb {
-  background-color: #b10000;
-  border-radius: 4px;
-}
-
-.group-container.light-mode-group::-webkit-scrollbar-track {
-  background: #ffffff;
-}
-
-.group-container.light-mode-group::-webkit-scrollbar-thumb {
-  background-color: #999;
-  border-radius: 4px;
-}
-
-  .group-tabs {
-      border: 1px solid var(--o2-border);
-      background-color: transparent !important;
-    .q-tab--active {
-      background-color: var(--o2-primary-btn-bg);
-      color: #FFFFFF;
+      scrollbar-color: #818181 var(--o2-primary-background); /* thumb color, track color */
     }
 
-      .q-tab__indicator {
-        display: none;
-      }
-
-  
-
-    .q-tab--inactive {
-      background-color: var(--o2-inactive-tab-bg);
+    .group-container.light-mode-group {
+      scrollbar-color: #999 #ffffff;
     }
 
-    .q-tab{
-          &:hover:not(.q-tab--active) {
-    background-color: color-mix(in srgb, var(--o2-tab-bg) 70%, var(--o2-theme-mode) 50%);
-  }
-
-    &:hover.q-tab--active {
-      background-color: var(--o2-primary-btn-bg) !important;
+    /* For more control using WebKit scrollbar styling */
+    .group-container::-webkit-scrollbar {
+      width: 8px;
+      height: 4px !important;
     }
-      }
-    }
-    
 
+    .group-container.dark-mode-group::-webkit-scrollbar-track {
+      background: red;
+    }
+
+    .group-container.dark-mode-group::-webkit-scrollbar-thumb {
+      background-color: #b10000;
+      border-radius: 4px;
+    }
+
+    .group-container.light-mode-group::-webkit-scrollbar-track {
+      background: #ffffff;
+    }
+
+    .group-container.light-mode-group::-webkit-scrollbar-thumb {
+      background-color: #999;
+      border-radius: 4px;
+    }
 
   </style>
   

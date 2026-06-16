@@ -30,18 +30,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
       </template>
     </DashboardHeader>
-    <div class="table-header tw:flex tw:justify-between tw:font-bold">
-      <div class="header-content">
-        <div class="spacer"></div>
-        <div class="name-column" data-test="dashboard-tab-settings-name">
+    <div class="tw:flex tw:justify-between tw:font-bold tw:py-2 tw:px-4 tw:border-b tw:border-b-(--o2-border-color) tw:bg-(--o2-table-header-bg)">
+      <div class="tw:grid tw:w-full tw:items-center" style="grid-template-columns: 40px minmax(0, 1fr) 80px">
+        <div></div>
+        <div class="tw:pl-2" data-test="dashboard-tab-settings-name">
           {{ t("dashboard.name") }}
         </div>
-        <div class="actions-column" data-test="dashboard-tab-settings-actions">
+        <div class="tw:justify-self-end" data-test="dashboard-tab-settings-actions">
           {{ t("dashboard.actions") }}
         </div>
       </div>
     </div>
-    <div class="table-content">
+    <div>
       <draggable
         v-model="currentDashboardData.data.tabs"
         :options="dragOptions"
@@ -52,29 +52,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-for="(tab, index) in currentDashboardData.data.tabs"
           :key="index"
-          class="draggable-row"
+          class="tw:grid tw:items-center tw:border-b tw:border-b-(--o2-border-color) tw:min-h-10 tw:hover:bg-(--o2-hover-accent)"
+          style="grid-template-columns: 40px minmax(0, 1fr)"
           data-test="dashboard-tab-settings-draggable-row"
           :data-test-tab-name="tab.name"
         >
-          <div class="draggable-handle">
+          <div class="tw:flex tw:items-center tw:justify-center tw:h-full tw:cursor-move">
             <OIcon
               name="drag-indicator" size="sm"
               class="tw:mr-1"
               data-test="dashboard-tab-settings-drag-handle"
             />
           </div>
-          <div class="draggable-content">
+          <div class="tw:grid tw:items-center tw:pr-2" style="grid-template-columns: minmax(0, 1fr) 80px">
             <span
               v-if="tab.tabId !== editTabId"
-              class="tab-name"
+              class="tw:p-2 tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap"
               data-test="dashboard-tab-settings-tab-name"
               >{{ tab.name }}</span
             >
-            <div v-else class="edit-container">
+            <div v-else class="tw:flex tw:items-center tw:py-1 tw:px-2 tw:gap-1">
               <input
                 :class="store.state.theme === 'dark' ? 'tw:bg-gray-800' : ''"
                 v-model="editTabObj.data.name"
-                class="edit-input"
+                class="tw:flex-1 tw:border tw:border-(--q-primary) tw:rounded tw:p-1 tw:outline-none tw:min-w-0 tw:focus:border-(--q-secondary)"
                 data-test="dashboard-tab-settings-tab-name-edit"
               />
               <OButton
@@ -97,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
               </OButton>
             </div>
-            <div class="actions">
+            <div class="tw:flex tw:justify-end tw:gap-1">
               <OButton
                 variant="ghost"
                 size="icon"
@@ -375,95 +376,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped>
-.table-header {
-  padding: 8px 16px;
-  border-bottom: 1px solid var(--o2-border-color);
-  background-color: var(--o2-table-header-bg);
-}
-
-.header-content {
-  display: grid;
-  grid-template-columns: 40px minmax(0, 1fr) 80px;
-  width: 100%;
-  align-items: center;
-}
-
-.name-column {
-  padding-left: 8px;
-}
-
-.actions-column {
-  justify-self: flex-end;
-}
-
-.table-content {
-  .draggable-row {
-    display: grid;
-    grid-template-columns: 40px minmax(0, 1fr);
-    align-items: center;
-    border-bottom: 1px solid var(--o2-border-color);
-    min-height: 40px;
-
-    &:hover {
-      background-color: var(--o2-hover-accent);
-    }
-  }
-}
-
-.draggable-handle {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  cursor: move;
-}
-
-.draggable-content {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 80px;
-  align-items: center;
-  padding-right: 8px;
-}
-
-.tab-name {
-  padding: 8px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.edit-container {
-  display: flex;
-  align-items: center;
-  padding: 4px 8px;
-  gap: 4px;
-}
-
-.edit-input {
-  flex: 1;
-  border: 1px solid var(--q-primary);
-  border-radius: 4px;
-  padding: 4px;
-  outline: none;
-  min-width: 0;
-
-  &:focus {
-    border-color: var(--q-secondary);
-  }
-}
-
-.actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 4px;
-}
-.q-btn {
-  transition: background-color 0.2s ease;
-
-  &:hover {
-    background-color: var(--o2-hover-accent) !important;
-  }
-}
-</style>

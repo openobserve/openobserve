@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tag-block tw:flex tw:items-center tw:flex-nowrap tw:mr-2 tw:mt-2">
+  <div class="tw:flex tw:items-center tw:flex-nowrap tw:mr-2 tw:mt-2 tw:border tw:border-solid tw:border-(--o2-border) tw:rounded">
     <div class="tw:px-3">{{ tag.key }}</div>
     <OSeparator data-test="separator" vertical />
     <div class="tw:px-3 tw:bg-[var(--o2-table-header-bg)] tw:break-all">
@@ -33,15 +33,3 @@ defineProps({
   },
 });
 </script>
-
-<style lang="scss" scoped>
-.tag-block {
-  border: 1px solid var(--o2-border);
-  border-radius: 0.25rem;
-}
-
-.tag-bg {
-  background-color: lightgray;
-  color: black;
-}
-</style>

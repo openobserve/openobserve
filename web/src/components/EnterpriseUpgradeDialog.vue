@@ -16,9 +16,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <ODialog v-model:open="showDialog" data-test="enterprise-upgrade-dialog" :show-close="false" :width="75" @update:open="(v) => !v && onDialogHide()">
-    <div class="enterprise-dialog-v3">
+    <div class="enterprise-dialog-v3" tw:overflow-hidden tw:relative tw:[margin:calc(-1*var(--spacing-dialog-content-py,1.25rem))_calc(-1*var(--spacing-dialog-content-px,1.25rem))]>
       <!-- Close Button -->
-      <div class="close-btn-top-right">
+      <div class="close-btn-top-right" tw:absolute tw:top-4 tw:right-4 tw:z-[100] tw:text-[rgba(0,0,0,0.6)]>
         <OButton
           variant="ghost"
           size="icon"
@@ -28,9 +28,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </div>
 
-      <div class="dialog-split-layout" :class="{ 'cloud-layout': dialogConfig.isCloudLayout }">
+      <div class="dialog-split-layout" :class="{ 'cloud-layout': dialogConfig.isCloudLayout }" tw:flex tw:max-h-[92vh]>
         <!-- Left Panel - Hero Section (hidden for Cloud) -->
-        <div v-if="!dialogConfig.isCloudLayout" class="hero-panel">
+        <div v-if="!dialogConfig.isCloudLayout" class="hero-panel" tw:[flex:0_0_35%] tw:bg-[linear-gradient(135deg,var(--q-primary)_0%,color-mix(in_srgb,var(--q-primary)_85%,black_15%)_100%)] tw:p-[40px] tw:flex tw:flex-col tw:relative tw:text-white tw:overflow-y-auto tw:min-h-0>
 
           <div class="hero-content">
             <div class="hero-icon">
@@ -129,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Right Panel - Features List -->
-        <div class="features-panel">
+        <div class="features-panel" tw:flex-1 tw:bg-white tw:flex tw:flex-col tw:overflow-hidden>
           <div class="features-header">
             <h4>{{ dialogConfig.featuresTitle }}</h4>
             <p class="header-subtitle">{{ dialogConfig.featuresSubtitle }}</p>
@@ -1040,444 +1040,400 @@ export default defineComponent({
 });
 </script>
 
-<style scoped lang="scss">
-.enterprise-dialog-v3 {
-  overflow: hidden;
-  position: relative;
-  margin: calc(-1 * var(--spacing-dialog-content-py, 1.25rem)) calc(-1 * var(--spacing-dialog-content-px, 1.25rem));
+<style>
+.close-btn-top-right:hover {
+  color: rgba(0, 0, 0, 0.87);
 }
 
-.close-btn-top-right {
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  z-index: 100;
-  color: rgba(0, 0, 0, 0.6);
-
-  &:hover {
-    color: rgba(0, 0, 0, 0.87);
-  }
-}
-
-.dialog-split-layout {
-  display: flex;
-  max-height: 92vh;
-
-  &.cloud-layout {
-    .features-panel {
-      flex: 1;
-      max-width: 100%;
-    }
-  }
-}
-
-// Left Panel - Hero Section
-.hero-panel {
-  flex: 0 0 35%;
-  background: linear-gradient(135deg, var(--q-primary) 0%, color-mix(in srgb, var(--q-primary) 85%, black 15%) 100%);
-  padding: 40px;
-  display: flex;
-  flex-direction: column;
-  position: relative;
-  color: white;
-  overflow-y: auto; // independent scroll when content exceeds dialog height
-  min-height: 0;
-
-  .hero-content {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    max-width: 400px;
-    width: 100%;
-    margin: auto; // vertically centered when it fits, lets panel scroll when it doesn't
-  }
-
-  .hero-icon {
-    width: 80px;
-    height: 80px;
-    background: rgba(255, 255, 255, 0.15);
-    border-radius: 16px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-bottom: 24px;
-    backdrop-filter: blur(10px);
-}
-
-  .hero-title {
-    font-size: 32px;
-    font-weight: 700;
-    margin: 0 0 16px 0;
-    line-height: 1.2;
-    text-align: center;
-    color: white; // override global h1-h6 { color: var(--o2-text-heading) } from app.scss
-  }
-
-  .offer-text {
-    margin: 0 0 24px 0;
-    font-size: 14px;
-    line-height: 1.6;
-    opacity: 0.95;
-    text-align: center;
-    color: white;
-  }
-
-  .hero-offer {
-    margin-bottom: 32px;
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    justify-content: center;
-    gap: 16px;
-
-    .usage-indicator {
-      flex-shrink: 0;
-    }
-
-    .offer-badge-skeleton {
-      flex-shrink: 0;
-    }
-
-    .offer-badge {
-      display: inline-flex;
-      align-items: center;
-      background: linear-gradient(135deg, #22c55e 0%, #4ade80 100%);
-      padding: 10px 20px;
-      border-radius: 24px;
-      font-weight: 700;
-      font-size: 15px;
-      backdrop-filter: blur(10px);
-      color: white;
-      box-shadow: 0 4px 16px rgba(34, 197, 94, 0.4);
-// Licensed badge styling - neutral white/transparent for users who already have license
-      &.licensed-badge {
-        background: rgba(255, 255, 255, 0.2);
-        color: white;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
-    }
-  }
-
-  .usage-chart-section {
-    width: 100%;
-    margin-bottom: 24px;
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 12px;
-    padding: 16px;
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-
-    .chart-wrapper {
-      position: relative;
-      width: 100%;
-    }
-
-    .usage-chart-container {
-      width: 100%;
-      overflow: visible;
-      padding: 0;
-      margin: 0 auto;
-      min-height: 150px;
-      max-height: 150px;
-
-      .grid-stack-item-content {
-        border: 0px !important;
-      }
-    }
-  }
-
-  .license-note {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-top: -8px;
-    margin-bottom: 16px;
-    padding: 8px 16px;
-    background: rgba(255, 255, 255, 0.15);
-    border-radius: 8px;
-    color: rgba(255, 255, 255, 0.9);
-    font-size: 12px;
-    font-weight: 500;
-    backdrop-filter: blur(10px);
-    white-space: nowrap;
-}
-
-  .hero-actions {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    width: 100%;
-
-    .download-btn {
-      background: white !important;
-      color: var(--q-primary) !important;
-      font-weight: 700;
-      padding: 10px 32px;
-      font-size: 15px;
-      border-radius: 8px !important;
-      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
-      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-      letter-spacing: 0.3px;
-
-      &:hover {
-        transform: translateY(-3px) scale(1.02);
-        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
-      }
-
-      &:active {
-        transform: translateY(-1px) scale(0.98);
-      }
-    }
-
-    .learn-more-btn {
-      font-weight: 600;
-      padding: 10px 24px;
-      font-size: 15px;
-      border-radius: 8px !important;
-      border: 2px solid rgba(255, 255, 255, 0.3);
-      transition: all 0.3s ease;
-      letter-spacing: 0.2px;
-      background: transparent;
-
-      &:hover {
-        background: rgba(255, 255, 255, 0.15);
-        border-color: rgba(255, 255, 255, 0.5);
-        transform: translateX(4px);
-      }
-
-      &:active {
-        transform: scale(0.96);
-      }
-    }
-  }
-}
-
-// Right Panel - Features List
-.features-panel {
+.dialog-split-layout.cloud-layout .features-panel {
   flex: 1;
-  background: white;
+  max-width: 100%;
+}
+
+/* Left Panel - Hero Section */
+.hero-panel .hero-content {
+  flex: 1;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
-
-  .features-header {
-    padding: 16px 32px 12px 32px;
-    background: white;
-    position: sticky;
-    top: 0;
-    z-index: 10;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
-    text-align: center;
-
-    .header-icon-wrapper {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 36px;
-      height: 36px;
-      background: linear-gradient(135deg, var(--q-primary), color-mix(in srgb, var(--q-primary) 85%, purple 15%));
-      border-radius: 12px;
-      margin-bottom: 8px;
-
-      .header-icon {
-        color: white;
-        font-size: 18px;
-      }
-    }
-
-    h4 {
-      font-size: 18px;
-      font-weight: 700;
-      margin: 0 0 4px 0;
-      color: rgba(0, 0, 0, 0.9);
-      letter-spacing: -0.3px;
-    }
-
-    .header-subtitle {
-      font-size: 12px;
-      color: rgba(0, 0, 0, 0.6);
-      margin: 0;
-      font-weight: 500;
-    }
-  }
-
-  .features-list {
-    flex: 1;
-    overflow-y: auto;
-    padding: 8px 32px 16px 32px;
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 7px 14px;
-    align-content: start;
-
-    &.cloud-three-column {
-      grid-template-columns: repeat(3, 1fr);
-    }
-  }
-
-  .feature-list-item {
-    display: flex;
-    gap: 10px;
-    padding: 8px 12px;
-    border-radius: 6px;
-    border: 1px solid rgba(0, 0, 0, 0.08);
-    transition: all 0.2s ease;
-
-    &:hover {
-      background: rgba(0, 0, 0, 0.03);
-      border-color: rgba(0, 0, 0, 0.12);
-    }
-
-    &.has-link {
-      cursor: pointer;
-
-      &:hover {
-        background: rgba(var(--q-primary-rgb), 0.05);
-        border-color: rgba(var(--q-primary-rgb), 0.3);
-        transform: translateX(2px);
-      }
-
-      &:active {
-        transform: translateX(0);
-      }
-    }
-
-    .feature-icon-badge {
-      flex-shrink: 0;
-      width: 30px;
-      height: 30px;
-      border-radius: 8px;
-      background: rgba(var(--q-primary-rgb), 0.1);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: var(--q-primary);
+  justify-content: center;
+  align-items: center;
+  max-width: 400px;
+  width: 100%;
+  margin: auto;
 }
 
-    .feature-content {
-      flex: 1;
-      min-width: 0;
-    }
-
-    .feature-name {
-      font-size: 13px;
-      font-weight: 600;
-      color: rgba(0, 0, 0, 0.87);
-      margin-bottom: 2px;
-      line-height: 1.25;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .external-link-icon {
-      opacity: 0.6;
-      margin-left: 4px;
-      vertical-align: middle;
-    }
-
-    .ha-badge {
-      display: inline-flex;
-      align-items: center;
-      padding: 2px 7px;
-      background: rgba(var(--q-primary-rgb), 0.15);
-      color: var(--q-primary);
-      border-radius: 4px;
-      font-size: 9px;
-      font-weight: 700;
-      letter-spacing: 0.5px;
-      line-height: 1;
-      cursor: pointer;
-      margin-left: 4px;
-    }
-
-    .beta-badge {
-      display: inline-flex;
-      align-items: center;
-      padding: 1px 4px;
-      color: var(--q-primary);
-      border: 1px solid var(--q-primary);
-      border-radius: 10px;
-      font-size: 8px;
-      font-weight: 700;
-      letter-spacing: 0.5px;
-      line-height: 1.4;
-      text-transform: uppercase;
-    }
-
-    .feature-desc {
-      font-size: 11px;
-      color: rgba(0, 0, 0, 0.55);
-      line-height: 1.25;
-    }
-  }
+.hero-panel .hero-icon {
+  width: 80px;
+  height: 80px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 24px;
+  backdrop-filter: blur(10px);
 }
 
-// Dark mode
-body.body--dark {
-  .close-btn-top-right {
-    color: rgba(255, 255, 255, 0.7);
+.hero-panel .hero-title {
+  font-size: 32px;
+  font-weight: 700;
+  margin: 0 0 16px 0;
+  line-height: 1.2;
+  text-align: center;
+  color: white;
+}
 
-    &:hover {
-      color: rgba(255, 255, 255, 0.95);
-    }
-  }
+.hero-panel .offer-text {
+  margin: 0 0 24px 0;
+  font-size: 14px;
+  line-height: 1.6;
+  opacity: 0.95;
+  text-align: center;
+  color: white;
+}
 
-  .features-panel {
-    background: #1e1e1e;
+.hero-panel .hero-offer {
+  margin-bottom: 32px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
 
-    .features-header {
-      background: #1e1e1e;
-      border-bottom-color: rgba(255, 255, 255, 0.1);
+.hero-panel .hero-offer .usage-indicator {
+  flex-shrink: 0;
+}
 
-      h4 {
-        color: rgba(255, 255, 255, 0.95);
-      }
+.hero-panel .hero-offer .offer-badge-skeleton {
+  flex-shrink: 0;
+}
 
-      .header-subtitle {
-        color: rgba(255, 255, 255, 0.6);
-      }
-    }
+.hero-panel .hero-offer .offer-badge {
+  display: inline-flex;
+  align-items: center;
+  background: linear-gradient(135deg, #22c55e 0%, #4ade80 100%);
+  padding: 10px 20px;
+  border-radius: 24px;
+  font-weight: 700;
+  font-size: 15px;
+  backdrop-filter: blur(10px);
+  color: white;
+  box-shadow: 0 4px 16px rgba(34, 197, 94, 0.4);
+}
 
-    .feature-list-item {
-      border: 1px solid rgba(255, 255, 255, 0.12);
+/* Licensed badge - neutral white/transparent for users who already have license */
+.hero-panel .hero-offer .offer-badge.licensed-badge {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
 
-      &:hover {
-        background: rgba(255, 255, 255, 0.05);
-      }
+.hero-panel .usage-chart-section {
+  width: 100%;
+  margin-bottom: 24px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 16px;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
 
-      &.has-link {
-        &:hover {
-          background: rgba(var(--q-primary-rgb), 0.1);
-          border-color: rgba(var(--q-primary-rgb), 0.4);
-        }
-      }
+.hero-panel .usage-chart-section .chart-wrapper {
+  position: relative;
+  width: 100%;
+}
 
-      .feature-icon-badge {
-        background: rgba(var(--q-primary-rgb), 0.15);
-      }
+.hero-panel .usage-chart-section .usage-chart-container {
+  width: 100%;
+  overflow: visible;
+  padding: 0;
+  margin: 0 auto;
+  min-height: 150px;
+  max-height: 150px;
+}
 
-      .feature-name {
-        color: rgba(255, 255, 255, 0.95);
-      }
+.hero-panel .usage-chart-section .usage-chart-container .grid-stack-item-content {
+  border: 0px !important;
+}
 
-      .ha-badge {
-        background: rgba(var(--q-primary-rgb), 0.2);
-        color: var(--q-primary);
-      }
+.hero-panel .license-note {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: -8px;
+  margin-bottom: 16px;
+  padding: 8px 16px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 12px;
+  font-weight: 500;
+  backdrop-filter: blur(10px);
+  white-space: nowrap;
+}
 
-      .beta-badge {
-        color: var(--q-primary);
-        border-color: var(--q-primary);
-      }
+.hero-panel .hero-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
 
-      .feature-desc {
-        color: rgba(255, 255, 255, 0.55);
-      }
-    }
-  }
+.hero-panel .hero-actions .download-btn {
+  background: white !important;
+  color: var(--q-primary) !important;
+  font-weight: 700;
+  padding: 10px 32px;
+  font-size: 15px;
+  border-radius: 8px !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  letter-spacing: 0.3px;
+}
+
+.hero-panel .hero-actions .download-btn:hover {
+  transform: translateY(-3px) scale(1.02);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+
+.hero-panel .hero-actions .download-btn:active {
+  transform: translateY(-1px) scale(0.98);
+}
+
+.hero-panel .hero-actions .learn-more-btn {
+  font-weight: 600;
+  padding: 10px 24px;
+  font-size: 15px;
+  border-radius: 8px !important;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  transition: all 0.3s ease;
+  letter-spacing: 0.2px;
+  background: transparent;
+}
+
+.hero-panel .hero-actions .learn-more-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.5);
+  transform: translateX(4px);
+}
+
+.hero-panel .hero-actions .learn-more-btn:active {
+  transform: scale(0.96);
+}
+
+/* Right Panel - Features List */
+.features-panel .features-header {
+  padding: 16px 32px 12px 32px;
+  background: white;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  text-align: center;
+}
+
+.features-panel .features-header .header-icon-wrapper {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: linear-gradient(135deg, var(--q-primary), color-mix(in srgb, var(--q-primary) 85%, purple 15%));
+  border-radius: 12px;
+  margin-bottom: 8px;
+}
+
+.features-panel .features-header .header-icon-wrapper .header-icon {
+  color: white;
+  font-size: 18px;
+}
+
+.features-panel .features-header h4 {
+  font-size: 18px;
+  font-weight: 700;
+  margin: 0 0 4px 0;
+  color: rgba(0, 0, 0, 0.9);
+  letter-spacing: -0.3px;
+}
+
+.features-panel .features-header .header-subtitle {
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.6);
+  margin: 0;
+  font-weight: 500;
+}
+
+.features-panel .features-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 32px 16px 32px;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 7px 14px;
+  align-content: start;
+}
+
+.features-panel .features-list.cloud-three-column {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.features-panel .feature-list-item {
+  display: flex;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  transition: all 0.2s ease;
+}
+
+.features-panel .feature-list-item:hover {
+  background: rgba(0, 0, 0, 0.03);
+  border-color: rgba(0, 0, 0, 0.12);
+}
+
+.features-panel .feature-list-item.has-link {
+  cursor: pointer;
+}
+
+.features-panel .feature-list-item.has-link:hover {
+  background: rgba(var(--q-primary-rgb), 0.05);
+  border-color: rgba(var(--q-primary-rgb), 0.3);
+  transform: translateX(2px);
+}
+
+.features-panel .feature-list-item.has-link:active {
+  transform: translateX(0);
+}
+
+.features-panel .feature-list-item .feature-icon-badge {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: rgba(var(--q-primary-rgb), 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--q-primary);
+}
+
+.features-panel .feature-list-item .feature-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.features-panel .feature-list-item .feature-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.87);
+  margin-bottom: 2px;
+  line-height: 1.25;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.features-panel .feature-list-item .external-link-icon {
+  opacity: 0.6;
+  margin-left: 4px;
+  vertical-align: middle;
+}
+
+.features-panel .feature-list-item .ha-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  background: rgba(var(--q-primary-rgb), 0.15);
+  color: var(--q-primary);
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  line-height: 1;
+  cursor: pointer;
+  margin-left: 4px;
+}
+
+.features-panel .feature-list-item .beta-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 4px;
+  color: var(--q-primary);
+  border: 1px solid var(--q-primary);
+  border-radius: 10px;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  line-height: 1.4;
+  text-transform: uppercase;
+}
+
+.features-panel .feature-list-item .feature-desc {
+  font-size: 11px;
+  color: rgba(0, 0, 0, 0.55);
+  line-height: 1.25;
+}
+
+/* Dark mode */
+body.body--dark .close-btn-top-right {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+body.body--dark .close-btn-top-right:hover {
+  color: rgba(255, 255, 255, 0.95);
+}
+
+body.body--dark .features-panel {
+  background: #1e1e1e;
+}
+
+body.body--dark .features-panel .features-header {
+  background: #1e1e1e;
+  border-bottom-color: rgba(255, 255, 255, 0.1);
+}
+
+body.body--dark .features-panel .features-header h4 {
+  color: rgba(255, 255, 255, 0.95);
+}
+
+body.body--dark .features-panel .features-header .header-subtitle {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+body.body--dark .features-panel .feature-list-item {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+body.body--dark .features-panel .feature-list-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+body.body--dark .features-panel .feature-list-item.has-link:hover {
+  background: rgba(var(--q-primary-rgb), 0.1);
+  border-color: rgba(var(--q-primary-rgb), 0.4);
+}
+
+body.body--dark .features-panel .feature-list-item .feature-icon-badge {
+  background: rgba(var(--q-primary-rgb), 0.15);
+}
+
+body.body--dark .features-panel .feature-list-item .feature-name {
+  color: rgba(255, 255, 255, 0.95);
+}
+
+body.body--dark .features-panel .feature-list-item .ha-badge {
+  background: rgba(var(--q-primary-rgb), 0.2);
+  color: var(--q-primary);
+}
+
+body.body--dark .features-panel .feature-list-item .beta-badge {
+  color: var(--q-primary);
+  border-color: var(--q-primary);
+}
+
+body.body--dark .features-panel .feature-list-item .feature-desc {
+  color: rgba(255, 255, 255, 0.55);
 }
 
 @media (max-width: 900px) {

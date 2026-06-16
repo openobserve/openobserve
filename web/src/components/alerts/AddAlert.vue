@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- EDIT MODE: (folder → chevron → name) -->
           <template v-if="beingUpdated || anomalyEditMode">
             <span
-              class="tw:text-xl tw:tracking-[0.005em] alert-folder-name tw:px-2 tw:cursor-pointer tw:transition-all tw:rounded-sm"
+              class="alert-folder-name tw:text-xl tw:tracking-[0.005em] tw:px-2 tw:cursor-pointer tw:transition-all tw:rounded-sm tw:text-(--o2-menu-color)! tw:hover:rounded-[0.325rem] tw:hover:bg-(--o2-tab-bg)!"
               @click="goBackToAlertsList"
             >{{ activeFolderName }}</span>
             <OIcon name="chevron-right" size="sm" class="tw:text-gray-400 tw:mt-0.5 tw:shrink-0" />
@@ -69,14 +69,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- CREATE MODE: Alert Name + Folder -->
           <template v-else>
             <div class="tw:flex tw:items-center tw:gap-1.5 tw:shrink-0">
-              <label class="alert-v3-inline-label">{{ isAnomalyMode ? t('alerts.anomalyName') : t('alerts.incidents.alertName') }} <span class="tw:text-text-primary">*</span></label>
+              <label class="tw:text-xs tw:font-semibold tw:whitespace-nowrap tw:text-[rgba(0,0,0,0.72)] alert-v3-inline-label">{{ isAnomalyMode ? t('alerts.anomalyName') : t('alerts.incidents.alertName') }} <span class="tw:text-text-primary">*</span></label>
               <OInput
                 v-if="!isAnomalyMode"
                 ref="step1Ref"
                 v-model="formData.name"
                 data-test="add-alert-name-input"
                 :placeholder="t('alerts.alertNamePlaceholder')"
-                class="alert-v3-field topbar-name-input tw:text-sm"
+                class="alert-v3-field topbar-name-input tw:text-sm tw:h-[28px]! tw:min-h-[28px]! tw:min-w-[120px] tw:max-w-[150px]"
                 :class="alertNameError ? 'field-error' : ''"
                 @update:model-value="alertNameError = false"
               />
@@ -85,17 +85,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ref="anomalyNameRef"
                 v-model="anomalyConfig.name"
                 :placeholder="t('alerts.anomalyNamePlaceholder')"
-                class="alert-v3-field topbar-name-input tw:text-sm"
+                class="alert-v3-field topbar-name-input tw:text-sm tw:h-[28px]! tw:min-h-[28px]! tw:min-w-[120px] tw:max-w-[150px]"
               />
             </div>
 
             <!-- Folder -->
             <div class="tw:flex tw:items-center tw:gap-1.5 tw:shrink-0">
-              <label class="alert-v3-inline-label">{{ t('alerts.folder') }}</label>
+              <label class="tw:text-xs tw:font-semibold tw:whitespace-nowrap tw:text-[rgba(0,0,0,0.72)] alert-v3-inline-label">{{ t('alerts.folder') }}</label>
               <InlineSelectFolderDropdown
                 :model-value="activeFolderId"
                 type="alerts"
-                class="topbar-folder-select"
+                class="topbar-folder-select tw:min-w-[60px] tw:max-w-[140px]"
                 @update:model-value="updateActiveFolderId({ value: $event })"
               />
             </div>
@@ -112,21 +112,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Stream Name & Stream Type -->
       <div class="card-container tw:shrink-0 stream-config-card">
-        <div class="section-header">
-          <div class="section-header-accent" />
-          <span class="section-header-title">Stream Config <span class="tw:text-text-primary">*</span></span>
+        <div class="section-header tw:flex tw:items-center tw:gap-0 tw:py-[10px] tw:px-3 tw:border-b tw:border-[#e6e6e6]">
+          <div class="tw:w-[3px] tw:h-4 tw:rounded-sm tw:mr-2 tw:shrink-0 tw:bg-[var(--q-primary)]" />
+          <span class="tw:text-[13px] tw:font-semibold tw:tracking-[0.01em]">Stream Config <span class="tw:text-text-primary">*</span></span>
         </div>
         <div class="tw:flex tw:items-center tw:gap-4 tw:px-3 tw:py-2">
         <!-- Stream Type -->
         <div class="tw:flex tw:items-center tw:gap-1.5">
-          <label class="alert-v3-inline-label">{{ t("alerts.streamType") }} <span class="tw:text-text-primary">*</span></label>
+          <label class="tw:text-xs tw:font-semibold tw:whitespace-nowrap tw:text-[rgba(0,0,0,0.72)] alert-v3-inline-label">{{ t("alerts.streamType") }} <span class="tw:text-text-primary">*</span></label>
           <OSelect
             ref="streamTypeRef"
             data-test="add-alert-stream-type-select-dropdown"
             v-model="formData.stream_type"
             :options="streamTypes"
             :searchable="false"
-            class="no-case alert-v3-field stream-type-select"
+            class="no-case alert-v3-field stream-type-select tw:h-[28px]! tw:min-h-[28px]! tw:w-[150px]"
             :class="streamTypeError ? 'field-error' : ''"
             :disabled="beingUpdated || anomalyEditMode"
             @update:model-value="streamTypeError = false; updateStreams()"
@@ -135,14 +135,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Stream Name -->
         <div class="tw:flex tw:items-center tw:gap-1.5">
-          <label class="alert-v3-inline-label">{{ t("alerts.stream_name") }} <span class="tw:text-text-primary">*</span></label>
+          <label class="tw:text-xs tw:font-semibold tw:whitespace-nowrap tw:text-[rgba(0,0,0,0.72)] alert-v3-inline-label">{{ t("alerts.stream_name") }} <span class="tw:text-text-primary">*</span></label>
           <OSelect
             ref="streamNameRef"
             data-test="add-alert-stream-name-select-dropdown"
             v-model="formData.stream_name"
             :options="indexOptions"
             :loading="isFetchingStreams"
-            class="no-case alert-v3-field stream-name-select"
+            class="no-case alert-v3-field stream-name-select tw:h-[28px]! tw:min-h-[28px]! tw:w-[160px]"
             :class="streamNameError ? 'field-error' : ''"
             :disabled="beingUpdated || anomalyEditMode || !formData.stream_type"
             @update:model-value="streamNameError = false; updateStreamFields($event)"
@@ -152,13 +152,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Alert Type -->
         <div class="tw:flex tw:items-center tw:gap-1.5">
-          <label class="alert-v3-inline-label">{{ t("alerts.alertType") || 'Alert Type' }}</label>
+          <label class="tw:text-xs tw:font-semibold tw:whitespace-nowrap tw:text-[rgba(0,0,0,0.72)] alert-v3-inline-label">{{ t("alerts.alertType") || 'Alert Type' }}</label>
           <OSelect
             data-test="add-alert-type-select-dropdown"
             v-model="formData.is_real_time"
             :options="alertTypeOptions"
             :disabled="beingUpdated || anomalyEditMode"
-            class="alert-v3-field alert-type-select"
+            class="alert-v3-field alert-type-select tw:h-[28px]! tw:min-h-[28px]! tw:min-w-[110px]"
             :searchable="false"
           />
         </div>
@@ -589,237 +589,71 @@ export default defineComponent({
 });
 </script>
 
-<style scoped lang="scss">
-.alert-v3-inline-label {
-  font-size: 12px;
-  font-weight: 600;
-  white-space: nowrap;
-  color: rgba(0, 0, 0, 0.72);
-}
-
+<style>
 .body--dark .alert-v3-inline-label {
   color: rgba(255, 255, 255, 0.7);
 }
 
-.alert-v3-field {
+.alert-v3-field :deep(.q-field__control) {
   height: 28px !important;
   min-height: 28px !important;
-
-  :deep(.q-field__control) {
-    height: 28px !important;
-    min-height: 28px !important;
-    border-radius: 4px !important;
-    border: 1px solid rgba(0, 0, 0, 0.2) !important;
-    background: rgba(0, 0, 0, 0.03) !important;
-    padding: 0 8px !important;
-  }
-  :deep(.q-field__native) {
-    padding: 0 0px !important;
-    font-size: 13px;
-    min-height: 28px !important;
-    height: 28px !important;
-    line-height: 28px !important;
-  }
-  :deep(.q-field__input) {
-    padding: 0 0px !important;
-    font-size: 13px;
-    min-height: 28px !important;
-    height: 28px !important;
-    line-height: 28px !important;
-  }
-  :deep(.q-field__marginal) {
-    height: 28px !important;
-    min-height: 28px !important;
-  }
-  :deep(.q-field__control-container) {
-    height: 28px !important;
-    min-height: 28px !important;
-  }
-  :deep(.q-field__append) {
-    height: 28px !important;
-    align-items: center;
-  }
+  border-radius: 4px !important;
+  border: 1px solid rgba(0, 0, 0, 0.2) !important;
+  background: rgba(0, 0, 0, 0.03) !important;
+  padding: 0 8px !important;
 }
 
-.body--dark .alert-v3-field {
-  :deep(.q-field__control) {
-    border-color: rgba(255, 255, 255, 0.2) !important;
-    background: rgba(255, 255, 255, 0.05) !important;
-  }
+.alert-v3-field :deep(.q-field__native) {
+  padding: 0 0px !important;
+  font-size: 13px;
+  min-height: 28px !important;
+  height: 28px !important;
+  line-height: 28px !important;
 }
 
-// Error highlight for topbar fields — combined selector beats .body--dark .alert-v3-field specificity
-.alert-v3-field.field-error {
-  :deep(.q-field__control) {
-    border-color: #ef5350 !important;
-    background: rgba(239, 83, 80, 0.05) !important;
-  }
-}
-.body--dark .alert-v3-field.field-error {
-  :deep(.q-field__control) {
-    border-color: #ef5350 !important;
-    background: rgba(239, 83, 80, 0.08) !important;
-  }
+.alert-v3-field :deep(.q-field__input) {
+  padding: 0 0px !important;
+  font-size: 13px;
+  min-height: 28px !important;
+  height: 28px !important;
+  line-height: 28px !important;
 }
 
-.alert-condition {
-  .__column,
-  .__value {
-    width: 250px;
-  }
-
-  .__operator {
-    width: 100px;
-  }
+.alert-v3-field :deep(.q-field__marginal) {
+  height: 28px !important;
+  min-height: 28px !important;
 }
 
-.alert-preview-datetime {
-  :deep(.q-btn) {
-    height: 26px !important;
-    min-height: 26px !important;
-    font-size: 11px;
-    padding: 0 8px !important;
-    border-radius: 1rem !important;
-  }
+.alert-v3-field :deep(.q-field__control-container) {
+  height: 28px !important;
+  min-height: 28px !important;
 }
 
-</style>
-<style lang="scss">
-// ── Section header (matches QueryConfig.vue pattern) ───────────────────────
-.section-header {
-  display: flex;
+.alert-v3-field :deep(.q-field__append) {
+  height: 28px !important;
   align-items: center;
-  gap: 0;
-  padding: 10px 12px;
-  border-bottom: 1px solid #e6e6e6;
 }
 
+.body--dark .alert-v3-field :deep(.q-field__control) {
+  border-color: rgba(255, 255, 255, 0.2) !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+}
+
+/* Error highlight for topbar fields — combined selector beats .body--dark .alert-v3-field specificity */
+.alert-v3-field.field-error :deep(.q-field__control) {
+  border-color: #ef5350 !important;
+  background: rgba(239, 83, 80, 0.05) !important;
+}
+
+.body--dark .alert-v3-field.field-error :deep(.q-field__control) {
+  border-color: #ef5350 !important;
+  background: rgba(239, 83, 80, 0.08) !important;
+}
+
+/* ── Section header (matches QueryConfig.vue pattern) ─────────────────────── */
 body.body--dark .section-header {
   border-bottom-color: #343434;
 }
-
-.section-header-accent {
-  width: 3px;
-  height: 16px;
-  border-radius: 2px;
-  margin-right: 8px;
-  flex-shrink: 0;
-  background: var(--q-primary);
-}
-
-.section-header-title {
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-}
-
-// ── Global compact 28px sizing for alert inputs/selects ────────────────────
-.alert-v3-input {
-  min-height: 28px !important;
-  height: 28px !important;
-  .q-field__control {
-    min-height: 28px !important;
-    max-height: 28px !important;
-    height: 28px !important;
-  }
-  .q-field__control-container {
-    .q-field__native {
-      height: 28px !important;
-      min-height: 28px !important;
-      &::-webkit-inner-spin-button,
-      &::-webkit-outer-spin-button {
-        height: 16px;
-        margin-block: auto;
-      }
-    }
-  }
-}
-
-.alert-v3-select {
-  min-height: 1.75rem !important;
-  .q-field__inner {
-    min-height: 1.75rem !important;
-    max-height: 1.75rem !important;
-  }
-  .q-field__control {
-    min-height: 1.75rem !important;
-    max-height: 1.75rem !important;
-    height: 1.75rem !important;
-  }
-  .q-field__control-container {
-    .q-field__native {
-      min-height: 1.75rem !important;
-      height: 1.75rem !important;
-      padding: 0px !important;
-    }
-  }
-  .q-field__marginal {
-    height: 1.75rem !important;
-  }
-  .q-field__append {
-    height: 1.75rem !important;
-  }
-}
-// ───────────────────────────────────────────────────────────────────────────
-
-// ── Global query-mode-tabs (Builder / SQL toggle used in alert forms) ───────
-.query-mode-tabs {
-  display: flex;
-  gap: 2px;
-  background: rgba(0, 0, 0, 0.05);
-  border-radius: 6px;
-  padding: 3px;
-  width: fit-content;
-
-  .query-mode-tab {
-    padding: 4px 12px;
-    border-radius: 4px;
-    border: none;
-    background: transparent;
-    color: rgba(0, 0, 0, 0.4);
-    font-size: 11px;
-    font-weight: 700;
-    cursor: pointer;
-    transition: all 0.15s ease;
-    line-height: 1.4;
-
-    &:hover { color: rgba(0, 0, 0, 0.7); }
-
-    &.active {
-      background: #fff;
-      color: #1a1a1a;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
-    }
-  }
-}
-
-body.body--dark .query-mode-tabs {
-  background: rgba(255, 255, 255, 0.05);
-
-  .query-mode-tab {
-    color: rgba(255, 255, 255, 0.6);
-
-    &:hover { color: rgba(255, 255, 255, 0.85); }
-
-    &.active {
-      background: #374151;
-      color: #e4e7eb;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
-    }
-  }
-}
-// ───────────────────────────────────────────────────────────────────────────
-
-// ── static-text: inline label/hint aligned to 28px row height ──────────────
-.static-text {
-  display: inline-flex;
-  align-items: center;
-  height: 2.3rem;
-  line-height: 1.3rem;
-  font-size: 12px;
-  margin-top: 0.1rem;
-}
-// ───────────────────────────────────────────────────────────────────────────
 
 .no-case .q-field__native span {
   text-transform: none !important;
@@ -829,217 +663,43 @@ body.body--dark .query-mode-tabs {
   text-transform: none !important;
 }
 
-.add-alert-form {
-  .q-field--dense .q-field__control {
-    .q-field__native span {
-      overflow: hidden;
-    }
-  }
-
-  .alert-condition .__column .q-field__control .q-field__native span {
-    max-width: 152px;
-    text-overflow: ellipsis;
-    text-align: left;
-    white-space: nowrap;
-  }
-
-  .q-field__bottom {
-    padding: 2px 0;
-  }
-}
-
-.silence-notification-input,
-.threshould-input {
-  .q-field--filled .q-field__control {
-    background-color: transparent !important;
-  }
-
-  .q-field--dark .q-field__control {
-    background-color: rgba(255, 255, 255, 0.07) !important;
-  }
-}
-
-.dark-mode {
-  .alert-setup-container {
-    background-color: var(--o2-primary-background);
-    padding: 8px 16px;
-    margin-left: 8px;
-    border: 1px solid #343434;
-    border-top: 0px !important;
-    border-bottom-left-radius: 4px;
-    border-bottom-right-radius: 4px;
-  }
-  .q-text-area-input > div > div {
-    background-color: rgb(30, 31, 31) !important;
-    border: 1px solid var(--o2-border-input) !important;
-  }
-  .dark-mode-row-template > div > div {
-    background-color: rgb(30, 31, 31) !important;
-    border: 1px solid var(--o2-border-input) !important;
-  }
-  .custom-input-label {
-    color: #bdbdbd;
-  }
-}
-.light-mode {
-  .alert-setup-container {
-    background-color: #ffffff;
-    padding: 8px 16px;
-    margin-left: 8px;
-    border: 1px solid #e6e6e6;
-    border-top: 0px !important;
-    border-bottom-left-radius: 4px;
-    border-bottom-right-radius: 4px;
-  }
-  .custom-input-label {
-    color: #5c5c5c;
-  }
-  .q-field--labeled.showLabelOnTop.q-field .q-field__control {
-    border: 1px solid #d4d4d4;
-  }
-  .add-folder-btn {
-    border: 1px solid #d4d4d4;
-  }
-  .dark-mode .q-text-area-input > div > div {
-    background-color: var(--o2-primary-background) !important;
-    border: 1px solid black !important;
-  }
-
-  .light-mode .q-text-area-input > div > div {
-    background-color: #ffffff !important;
-    border: 1px solid var(--o2-border) !important;
-  }
-  .dark-mode-row-template > div > div {
-    background-color: var(--o2-primary-background) !important;
-    border: 1px solid black !important;
-  }
-  .light-mode-row-template > div > div {
-    background-color: #ffffff !important;
-    border: 1px solid var(--o2-border) !important;
-  }
-}
-.q-text-area-input > div > div > div > textarea {
-  height: 80px !important;
-  resize: none !important;
-}
-.row-template-input > div > div > div > textarea {
-  height: 160px !important;
-  resize: none !important;
-}
-.bottom-sticky-dark {
-  background-color: var(--o2-primary-background);
-}
-.bottom-sticky-light {
-  background-color: #ffffff;
-  border-top: 1px solid #d4d4d4;
-}
-.input-box-bg-dark .q-field__control {
-  background-color: var(--o2-primary-background) !important;
-}
-.input-box-bg-light .q-field__control {
-  background-color: #ffffff !important;
-}
-.input-border-dark .q-field__control {
-  border: 1px solid var(--o2-primary-background) !important;
-}
-.input-border-light .q-field__control {
-  border: 1px solid #d4d4d4 !important;
-}
-
-.o2-alert-tab-border {
-  border-top: 0.0625rem solid var(--o2-border-color);
-}
-
-// Persistent step caption styles (helper text style)
-.persistent-step-caption {
-  font-size: 12px;
-  line-height: 1.6;
-  border-radius: 4px;
-  transition: all 0.2s ease;
-  font-weight: 400;
-  margin-left: 0.375rem;
-  letter-spacing: 0.01em;
-}
-
-.dark-mode-caption {
-  background-color: transparent;
-  color: #9e9e9e;
-  border-left: 3px solid #5a5a5a;
-  padding-left: 12px !important;
-}
-
-.light-mode-caption {
-  background-color: transparent;
-  color: #757575;
-  border-left: 3px solid #bdbdbd;
-  padding-left: 12px !important;
-}
-
-// ── Responsive topbar: container queries so AI chat panel triggers shrink too
+/* ── Responsive topbar: container queries so AI chat panel triggers shrink too */
 .alert-v3-topbar {
   container-type: inline-size;
   container-name: topbar;
 }
 
+/* Folder breadcrumb select — matches tw:text-xl tw:tracking-[0.005em] sizing/weight */
+.topbar-folder-select .q-field__control { padding: 0; }
 
-// Folder name — exact same as ViewDashboard.vue
-.alert-folder-name {
-  color: var(--o2-menu-color) !important;
+.topbar-folder-select .q-field__native {
+  font-size: 1.25rem;
+  font-weight: 500;
+  cursor: pointer;
 }
 
-.alert-folder-name:hover {
-  border-radius: 0.325rem;
-  background-color: var(--o2-tab-bg) !important;
-}
+/* Base (widest) — full widths */
 
-// Folder breadcrumb select — matches tw:text-xl tw:tracking-[0.005em] sizing/weight
-.topbar-folder-select {
-  min-width: 60px;
-  max-width: 140px;
-
-  :deep(.q-field__control) { padding: 0; }
-
-  :deep(.q-field__native) {
-    font-size: 1.25rem;
-    font-weight: 500;
-    cursor: pointer;
-  }
-}
-
-// Base (widest) — full widths
-.topbar-name-input  { min-width: 120px; max-width: 150px; }
-.topbar-stream-type { width: 150px; }
-.topbar-stream-name { width: 160px; }
-
-// Medium — topbar ~1050–1300px
+/* Medium — topbar ~1050–1300px */
 @container topbar (max-width: 1300px) {
   .topbar-name-input  { min-width: 100px; }
-  .topbar-stream-type { width: 90px; }
-  .topbar-stream-name { width: 110px; }
 }
 
-// Compact — AI chat open or narrow viewport
+/* Compact — AI chat open or narrow viewport */
 @container topbar (max-width: 850px) {
   .topbar-name-input  { min-width: 90px; }
-  .topbar-stream-type { width: 90px; }
-  .topbar-stream-name { width: 95px; }
 }
 
-// Minimum — very narrow
+/* Minimum — very narrow */
 @container topbar (max-width: 680px) {
   .topbar-name-input  { min-width: 70px; }
-  .topbar-stream-type { width: 75px; }
-  .topbar-stream-name { width: 80px; }
 }
-// ── Stream Config card responsive container queries ───────────────────────
+
+/* ── Stream Config card responsive container queries ─────────────────────── */
 .stream-config-card {
   container-type: inline-size;
   container-name: stream-config;
 }
-
-.stream-type-select { width: 150px; }
-.stream-name-select { width: 160px; }
-.alert-type-select  { min-width: 110px; }
 
 @container stream-config (max-width: 900px) {
   .stream-type-select { width: 110px; }
@@ -1058,5 +718,4 @@ body.body--dark .query-mode-tabs {
   .stream-name-select { width: 80px; }
   .alert-type-select  { min-width: 75px; }
 }
-// ───────────────────────────────────────────────────────────────────────────
 </style>

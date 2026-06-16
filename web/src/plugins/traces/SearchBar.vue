@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="search-bar-component tw:h-full tw:flex tw:flex-col" id="searchBarComponent">
+  <div class="search-bar-component tw:pb-px tw:h-full tw:flex tw:flex-col" id="searchBarComponent">
     <div class="tw:flex tw:m-0! tw:p-[0.375rem] tw:items-center tw:justify-between tw:w-full tw:border-b tw:border-border-default">
       <div ref="toolbarLeftRef" class="tw:flex tw:flex-row tw:items-center tw:gap-[0.375rem] tw:flex-1 tw:min-w-0 tw:overflow-hidden">
         <!-- Unified View Toggle: Service Graph / Traces / Spans -->
@@ -91,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
 
           <div
-            class="toolbar-toggle-container element-box-shadow"
+            class="toolbar-toggle-container tw:py-1 tw:px-[0.375rem] tw:flex tw:items-center tw:justify-center tw:border tw:border-(--color-button-outline-border) tw:rounded-md tw:transition-all tw:duration-200 tw:cursor-pointer tw:hover:bg-(--o2-hover-accent)"
           >
             <OSwitch
               data-test="traces-search-bar-show-metrics-toggle-btn"
@@ -164,7 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="ghost"
               data-test="traces-search-bar-cancel-btn"
               :title="t('search.cancel')"
-              class="tw:p-0 tw:h-[1.875rem]! o2-run-query-button o2-color-cancel element-box-shadow search-button-enterprise-border-radius"
+              class="tw:p-0 tw:h-[1.875rem]! tw:[transition:box-shadow_0.3s_ease,_opacity_0.2s_ease] o2-color-cancel tw:text-(--text-xs) tw:font-(--font-medium)! tw:leading-4! tw:px-1! tw:py-0! tw:w-[5.875rem]! tw:whitespace-normal tw:break-words tw:text-center tw:bg-(--o2-cancel-query-bg) tw:text-(--o2-primary-btn-text) element-box-shadow tw:![border-radius:0.375rem_0_0_0.375rem]"
               @click="cancelQueryData"
               >{{ t("search.cancel") }}</OButton
             >
@@ -174,11 +174,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="logs-search-bar-refresh-btn"
               data-cy="search-bar-refresh-button"
               :title="t('search.runQuery')"
-              class="tw:p-0 tw:h-[1.875rem]! element-box-shadow o2-run-query-button o2-color-primary"
+              class="tw:p-0 tw:h-[1.875rem]! element-box-shadow tw:[transition:box-shadow_0.3s_ease,_opacity_0.2s_ease] o2-color-primary tw:text-(--text-xs) tw:font-(--font-medium)! tw:leading-4! tw:px-1! tw:py-0! tw:w-[5.875rem]! tw:whitespace-normal tw:break-words tw:text-center tw:bg-(--o2-primary-btn-bg) tw:text-(--o2-primary-btn-text)"
               :class="
                 store.state.zoConfig.auto_query_enabled
-                  ? 'search-button-enterprise-border-radius'
-                  : 'search-button-normal-border-radius'
+                  ? 'tw:![border-radius:0.375rem_0_0_0.375rem]'
+                  : 'tw:rounded-md'
               "
               @click="searchData"
               :loading="isLoading"
@@ -217,7 +217,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     config.isEnterprise == 'true' && isLoading
                       ? 'o2-color-cancel'
                       : 'o2-color-primary',
-                    'search-button-dropdown-enterprise-border-radius',
+                    'tw:![border-radius:0_0.375rem_0.375rem_0]',
                   ]"
                 >
                   <OIcon name="arrow-drop-down" size="sm" />
@@ -401,9 +401,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             searchObj.data.editorValue == '' &&
             searchObj.meta.queryEditorPlaceholderFlag
           "
-          class="query-editor-placeholder-overlay"
+          class="query-editor-placeholder-overlay tw:absolute tw:top-0 tw:left-0 tw:right-0 tw:bottom-0 tw:flex tw:items-start tw:pt-[0.1875rem] tw:pr-2 tw:pb-0 tw:pl-[2.15rem] tw:pointer-events-none tw:z-[1] tw:select-none"
         >
-          <span class="query-editor-placeholder-typewriter">{{ traceEditorPlaceholder }}</span>
+          <span class="query-editor-placeholder-typewriter tw:font-mono tw:text-[var(--text-base)] tw:[line-height:1.3125rem] tw:text-[#a0aec0] tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis">{{ traceEditorPlaceholder }}</span>
         </div>
       </div>
     </div>
@@ -1050,252 +1050,37 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
-.more-menu-icon-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.75rem;
-  height: 1.75rem;
-  border-radius: 0.375rem;
-  background: var(--o2-section-header-bg);
-  color: var(--o2-text-secondary);
-  flex-shrink: 0;
+<style>
+.search-bar-component .q-toggle__inner {
+  font-size: 30px;
 }
 
-.search-bar-component {
-  padding-bottom: 1px;
-
-  .q-toggle__inner {
-    font-size: 30px;
-  }
-
-  .q-toggle__label {
-    font-size: 12px;
-  }
-
-  .casesensitive-btn {
-    padding: 8px;
-    margin-left: -6px;
-    background-color: var(--o2-border-input);
-    border-radius: 0px 3px 3px 0px;
-  }
-  .search-field .q-field {
-    &__control {
-      border-radius: 3px 0px 0px 3px !important;
-    }
-    &__native {
-      font-weight: 600;
-    }
-  }
-  .search-time {
-    // width: 120px;
-    .q-btn-group {
-      border-radius: 3px;
-
-      .q-btn {
-        min-height: auto;
-      }
-    }
-  }
-  .search-dropdown {
-    padding: 0px;
-    .block {
-      color: var(--o2-primary-background);
-      font-weight: 600;
-      font-size: 12px;
-    }
-    .q-btn-dropdown__arrow-container {
-      color: var(--o2-gray);
-    }
-  }
-  .refresh-rate-dropdown-container {
-    width: 220px;
-    * .q-btn {
-      font-size: 12px !important;
-      padding-left: 8px;
-      padding-right: 8px;
-    }
-  }
-
-  .flex-start {
-    justify-content: flex-start;
-    align-items: flex-start;
-    display: flex;
-  }
-
-  .resultsOverChart {
-    margin-bottom: 0.75rem;
-    font-size: 0.875rem;
-    color: var(--o2-primary-background);
-    font-weight: 700;
-  }
-
-  .ddlWrapper {
-    position: relative;
-    z-index: 10;
-
-    .listWrapper {
-      box-shadow: 0px 3px 15px rgba(0, 0, 0, 0.1);
-      transition: height 0.25s ease;
-      height: calc(100vh - 146px);
-      background-color: white;
-      position: absolute;
-      top: 2.75rem;
-      width: 100%;
-      left: 0;
-
-      &:empty {
-        height: 0;
-      }
-
-      & {
-        border-radius: 3px;
-      }
-    }
-  }
-  .fields_autocomplete {
-    max-height: 250px;
-  }
-
-  .search-button {
-    min-width: 96px;
-    line-height: 29px;
-    font-weight: bold;
-    text-transform: initial;
-    font-size: 11px;
-    color: white;
-    padding: 0px 5px;
-
-    .q-btn__content {
-      background: var(--o2-theme-color);
-      border-radius: 3px 3px 3px 3px;
-      padding: 0px 5px;
-}
-  }
-
-  .download-logs-btn {
-    height: 30px;
-  }
-
-  .app-tabs-container {
-    :deep(.o2-tabs) {
-      height: 100%;
-
-      .o2-tab {
-        height: 100%;
-        padding-top: 0;
-        padding-bottom: 0;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 0.8125rem;
-      }
-    }
-  }
-
-  .reset-filters {
-    width: 30px;
-    height: 30px;
-}
+.search-bar-component .q-toggle__label {
+  font-size: 12px;
 }
 
-.o2-run-query-button {
-  font-size: var(--text-xs);
-  font-weight: var(--font-medium) !important;
-  line-height: 1rem !important;
-  padding: 0 0.25rem !important;
-  width: 5.875rem !important;
-  white-space: normal;
-  word-break: break-word;
-  text-align: center;
-  transition:
-    box-shadow 0.3s ease,
-    opacity 0.2s ease;
+.search-bar-component .search-field .q-field__control {
+  border-radius: 3px 0px 0px 3px !important;
 }
 
-.o2-color-primary {
-  background-color: var(--o2-primary-btn-bg);
-  color: var(--o2-primary-btn-text);
-
-  &:hover {
-    opacity: 0.9;
-    box-shadow: 0 0 0.5rem
-      color-mix(in srgb, var(--o2-primary-btn-bg), transparent 30%);
-  }
+.search-bar-component .search-field .q-field__native {
+  font-weight: 600;
 }
 
-.search-button-enterprise-border-radius {
-  border-radius: 0.375rem 0 0 0.375rem !important;
+.search-bar-component .search-time .q-btn-group {
+  border-radius: 3px;
 }
 
-.search-button-normal-border-radius {
-  border-radius: 0.375rem;
+.search-bar-component .search-time .q-btn-group .q-btn {
+  min-height: auto;
 }
 
-.search-button-dropdown-enterprise-border-radius {
-  border-radius: 0 0.375rem 0.375rem 0 !important;
+.o2-color-primary:hover {
+  opacity: 0.9;
+  box-shadow: 0 0 0.5rem color-mix(in srgb, var(--o2-primary-btn-bg), transparent 30%);
 }
 
-.o2-color-cancel {
-  background-color: var(--o2-cancel-query-bg);
-  color: var(--o2-primary-btn-text);
-}
-
-.toolbar-toggle-container {
-  padding: 0.25rem 0.375rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 0.0625rem solid var(--color-button-outline-border);
-  border-radius: 0.375rem;
-  transition: all 0.2s ease;
-  cursor: pointer;
-
-  &:hover {
-    background-color: var(--o2-hover-accent);
-  }
-}
-
-:global(.body--dark) .toolbar-toggle-container {
-  border: 0.0625rem solid var(--color-button-outline-border);
-}
-
-.query-editor-placeholder-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  display: flex;
-  align-items: flex-start;
-  /* Align with Monaco's text start in CodeQueryEditor: host padding-left
-     (0.5rem) + line-number gutter (lineNumbersMinChars: 2 @ 14px ≈ 1.05rem) +
-     lineDecorationsWidth (10px ≈ 0.625rem) ≈ 2.15rem. top 0.1875rem matches the
-     editor's padding.top (3px) so it sits on line 1 next to the gutter number.
-     Keep in sync with those editor options. */
-  padding: 0.1875rem 0.5rem 0 2.15rem;
-  pointer-events: none;
-  z-index: 1;
-  user-select: none;
-
-  .query-editor-placeholder-typewriter {
-    /* Mirror Monaco's rendered text so the placeholder reads as the future
-       typed query, not a different (proportional) font on a different baseline:
-       same monospace family and same ~21px (1.5 × 14px) line height. */
-    font-family: monospace;
-    font-size: var(--text-base);
-    line-height: 1.3125rem;
-    color: #a0aec0;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-}
-
-:global(.body--dark) .query-editor-placeholder-overlay {
-  .query-editor-placeholder-typewriter {
-    color: #718096;
-  }
+.body--dark .query-editor-placeholder-overlay .query-editor-placeholder-typewriter {
+  color: #718096;
 }
 </style>

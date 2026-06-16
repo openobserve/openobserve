@@ -16,18 +16,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- src/components/PipelineFlow.vue -->
 <template>
-  <div data-test="pipeline-flow-container" class="container">
-     <div data-test="pipeline-flow-unsaved-changes-warning-text" v-show="pipelineObj.dirtyFlag" class="warning-text tw:flex  tw:items-center tw:px-2 tw:mr-3 ">
+  <div data-test="pipeline-flow-container" class="tw:flex tw:items-center tw:justify-between">
+     <div data-test="pipeline-flow-unsaved-changes-warning-text" v-show="pipelineObj.dirtyFlag" class="tw:text-[#F5A623] tw:border tw:border-[#F5A623] tw:rounded-sm tw:flex tw:items-center tw:px-2 tw:mr-3">
       <OIcon name="info" class="tw:mr-1 " size="sm" />
      Unsaved changes detected. Click "Save" to preserve your updates.
    </div>
-   
+
    <!-- Edge deletion help notification -->
-   <div v-if="showEdgeHelpNotification" class="edge-help-notification">
+   <div v-if="showEdgeHelpNotification" class="edge-help-notification tw:absolute tw:top-5 tw:left-1/2 tw:-translate-x-1/2 tw:z-[1000] tw:bg-white tw:text-[#374151] tw:py-[10px] tw:px-4 tw:rounded-lg tw:text-sm tw:shadow-[0_4px_20px_rgba(0,0,0,0.15)] tw:border tw:border-[#e5e7eb] tw:flex tw:items-center tw:dark:bg-(--o2-primary-background) tw:dark:text-[#f3f4f6] tw:dark:border-[#374151] tw:dark:shadow-[0_4px_20px_rgba(0,0,0,0.4)] tw:[animation:slideDown_0.3s_ease-out]">
      <OIcon name="info" class="tw:mr-1" size="sm" />
      Press Backspace/Delete to remove the edge
    </div>
-   
+
  </div>
 
     <VueFlow
@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :max-zoom="4"
       @dragleave="onDragLeave"
       class="basic-flow"
-      
+
     >
 
     <!-- <template #edge-button="buttonEdgeProps">
@@ -94,14 +94,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #node-default="{ id, data }">
         <CustomNode :id="id" :data="data" io_type="default" />
       </template>
-      <Controls 
+      <Controls
       :showInteractive=false
 
       class="controls-grp"
         position="top-left">
     </Controls>
     </VueFlow>
-    <div v-if="isCanvasEmpty" class="empty-text">
+    <div v-if="isCanvasEmpty" class="tw:absolute tw:top-1/2 tw:left-1/2 tw:-translate-x-1/2 tw:-translate-y-1/2 tw:text-[#888] tw:text-[1.5em] tw:text-center tw:pointer-events-none tw:z-10">
       {{ t('pipeline.dragDropNodesHere') }}
     </div>
     <!-- Add UI elements or buttons to interact with the methods -->
@@ -153,17 +153,17 @@ export default {
 
     // Handle edge click events
     const onEdgeClick = (event) => {
-      
+
       // Clear any existing timeout
       if (notificationTimeout) {
         clearTimeout(notificationTimeout)
         notificationTimeout = null
       }
-      
+
       // Always show notification on edge click (even if already visible)
       showEdgeHelpNotification.value = true
-      
-      // Auto-hide notification after 3.5 seconds 
+
+      // Auto-hide notification after 3.5 seconds
       notificationTimeout = setTimeout(() => {
         showEdgeHelpNotification.value = false
         notificationTimeout = null
@@ -189,7 +189,7 @@ export default {
         }, 100);
       });
 
-    
+
 function resetTransform() {
   setViewport({ x: 0, y: 0, zoom: 1 })
 }
@@ -227,78 +227,7 @@ function resetTransform() {
 };
 </script>
 
-<style scoped>
-#graph-container {
-  width: 1150px;
-  height: 100vh;
-}
-.container {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.button-group {
-  display: flex;
-  align-items: center;
-  margin-right: 10px;
-}
-
-.dark-theme {
-  background-color: #333;
-  color: #fff;
-}
-
-.light-theme {
-  background-color: #fff;
-  color: #000;
-}
-
-.separator {
-  width: 1px;
-  height: 24px;
-  background-color: #ccc;
-  margin: 0 8px;
-}
-
-q-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.warning-text {
-  color: #F5A623;
-  border: 1px solid #F5A623;
-  border-radius: 2px ;
-}
-
-.edge-help-notification {
-  position: absolute;
-  top: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 1000;
-  background: white;
-  color: #374151;
-  padding: 10px 16px;
-  border-radius: 8px;
-  font-size: 14px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-  border: 1px solid #e5e7eb;
-  display: flex;
-  align-items: center;
-  animation: slideDown 0.3s ease-out;
-}
-
-/* Dark mode styles */
-.body--dark .edge-help-notification {
-  background: var(--o2-primary-background);
-  color: #f3f4f6;
-  border: 1px solid #374151;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
-}
-
+<style>
 @keyframes slideDown {
   from {
     opacity: 0;
@@ -309,22 +238,4 @@ q-btn {
     transform: translateX(-50%) translateY(0);
   }
 }
-
-/* Debug notification removed */
-
-  .empty-text {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  color: #888; /* Light text color */
-  font-size: 1.5em;
-  text-align: center;
-  pointer-events: none;
-  z-index: 10;
-}
-
-
-
-
 </style>

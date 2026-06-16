@@ -65,7 +65,7 @@ withDefaults(
 );
 </script>
 
-<style scoped>
+<style>
 .es-bell {
   transform-box: view-box;
   transform-origin: 120px 48px;

@@ -434,33 +434,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped>
-/* ── Traces list section ─────────────────────────────────────────────────── */
-.traces-section {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.traces-section-header {
-  flex-shrink: 0;
-  min-height: 40px;
-  border-top: 1px solid rgba(0, 0, 0, 0.07);
-  padding: 4px 8px;
-}
-
-/* Scrollable area that holds the column header + rows */
-.traces-table-scroll-area {
-  flex: 1;
-  overflow-y: auto;
-  overflow-x: auto;
-  position: relative;
-}
-
-/* ── Leftover table styles (kept for backward compat) ────────────────────── */
-.max-result {
-  width: 170px;
-}
-</style>

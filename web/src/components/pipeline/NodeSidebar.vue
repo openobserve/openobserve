@@ -34,13 +34,13 @@ export default {
 </script>
 
 <template>
-  <div class="nodes">
-    <div v-for="node in node_types" :key="node.io_type" class="o2vf_node">
+  <div class="nodes tw:bg-[rgba(226,232,240,0.9)] tw:backdrop-blur-[12px] tw:rounded-[12px] tw:border tw:border-[rgba(226,232,240,0.8)] tw:shadow-[0_4px_16px_rgba(0,0,0,0.08)] tw:py-3 tw:px-2 tw:m-[4px_2px] tw:transition-all tw:duration-300 tw:ease-in-out hover:tw:shadow-[0_6px_20px_rgba(0,0,0,0.12)]">
+    <div v-for="node in node_types" :key="node.io_type" class="o2vf_node tw:transition-all tw:rounded-lg tw:mb-3 last:tw:mb-0">
       <OButton
         variant="ghost"
         size="md"
         :class="`o2vf_node_${node.io_type}`"
-        class="tw:p-0 btn-fixed-width node-draggable"
+        class="tw:p-0 btn-fixed-width node-draggable tw:relative tw:flex tw:items-center tw:w-full"
         style="width: 170px; justify-content: flex-start"
         :data-test="`pipeline-node-sidebar-${node.subtype}-${node.io_type}-btn`"
         :draggable="true"
@@ -49,29 +49,29 @@ export default {
       >
         <OTooltip side="right" :side-offset="10">
           <template #content>
-            <div class="tooltip-content">
-              <div class="tooltip-title">{{ node.label }}</div>
-              <div class="tooltip-description">{{ node.tooltip }}</div>
+            <div class="tw:px-2.5 tw:py-1.5">
+              <div class="tw:font-medium tw:text-[11px] tw:mb-0.5 tw:capitalize">{{ node.label }}</div>
+              <div class="tw:text-[10px] tw:leading-[1.3] tw:capitalize">{{ node.tooltip }}</div>
             </div>
           </template>
         </OTooltip>
-        <div class="node-content">
-          <div class="node-icon-section">
+        <div class="node-content tw:grid tw:items-center tw:w-full tw:py-1 tw:pr-1.5 tw:gap-2" style="grid-template-columns: auto 1fr auto">
+          <div class="node-icon-section tw:flex tw:items-center tw:gap-2">
             <img
               v-if="typeof node.icon === 'string' && node.icon.startsWith('img:')"
               :src="node.icon.slice(4)"
               alt=""
-              class="node-icon-img"
+              class="node-icon-img tw:w-[1.3em] tw:h-[1.3em] tw:object-contain tw:shrink-0"
             />
             <OIcon v-else size="md" :name="node.icon" />
-            <OSeparator vertical class="node-separator" />
+            <OSeparator vertical class="node-separator tw:h-4" />
           </div>
-          <div class="node-label tw:w-[70px]">{{ node.label }}</div>
-          <div class="drag-dots">
-            <span class="dot"></span>
-            <span class="dot"></span>
-            <span class="dot"></span>
-            <span class="dot"></span>
+          <div class="node-label tw:w-[70px] tw:text-left tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap tw:font-medium tw:text-[12px]">{{ node.label }}</div>
+          <div class="drag-dots tw:grid tw:gap-0.5 tw:w-2 tw:h-2" style="grid-template-columns: 1fr 1fr">
+            <span class="dot tw:w-0.5 tw:h-0.5 tw:rounded-full tw:transition-all tw:bg-[rgba(107,114,128,0.6)]"></span>
+            <span class="dot tw:w-0.5 tw:h-0.5 tw:rounded-full tw:transition-all tw:bg-[rgba(107,114,128,0.6)]"></span>
+            <span class="dot tw:w-0.5 tw:h-0.5 tw:rounded-full tw:transition-all tw:bg-[rgba(107,114,128,0.6)]"></span>
+            <span class="dot tw:w-0.5 tw:h-0.5 tw:rounded-full tw:transition-all tw:bg-[rgba(107,114,128,0.6)]"></span>
           </div>
         </div>
       </OButton>
@@ -85,113 +85,16 @@ export default {
   </div>
 </template>
 
-<style lang="scss" scoped>
-.nodes {
-  background: rgba(226, 232, 240, 0.9);
-  backdrop-filter: blur(12px);
-  border-radius: 12px;
-  border: 1px solid rgba(226, 232, 240, 0.8);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
-  padding: 12px 8px;
-  margin: 4px 2px;
-  transition: all 0.3s ease;
-
-  &:hover {
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
-  }
+<style>
+.o2vf_node .node-draggable:hover {
+  transform: translate(3px);
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(8px);
 }
 
-.o2vf_node {
-  transition: all 0.2s ease;
-  border-radius: 8px;
-  margin-bottom: 12px;
-
-  &:last-child {
-    margin-bottom: 0;
-  }
-
-  .node-draggable:hover {
-    transform: translate(3px);
-    background: rgba(255, 255, 255, 0.1);
-    backdrop-filter: blur(8px);
-  }
-}
-
-.node-draggable {
-  position: relative;
-  display: flex;
-  align-items: center;
-  width: 100%;
-}
-
-.node-content {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  align-items: center;
-  width: 100%;
-  padding: 4px 6px 4px 0px;
-  gap: 8px;
-}
-
-.node-icon-section {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.node-icon-img {
-  width: 1.3em;
-  height: 1.3em;
-  object-fit: contain;
-  flex-shrink: 0;
-}
-
-.node-separator {
-  height: 16px;
-}
-
-.drag-handle {
-  position: absolute;
-  right: 4px;
-  top: 50%;
-  transform: translateY(-50%);
-  z-index: 1;
-  cursor: grab;
-  padding: 4px;
-
-  &:hover .dot {
-    background: rgba(107, 114, 128, 0.8);
-    transform: scale(1.1);
-  }
-
-  &:active {
-    cursor: grabbing;
-  }
-}
-
-.drag-dots {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  grid-gap: 2px;
-  width: 8px;
-  height: 8px;
-}
-
-.dot {
-  width: 2px;
-  height: 2px;
-  background: rgba(107, 114, 128, 0.6);
-  border-radius: 50%;
-  transition: all 0.2s ease;
-}
-
-.node-label {
-  text-align: left;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-weight: 500;
-  font-size: 12px;
+.drag-handle:hover .dot {
+  background: rgba(107, 114, 128, 0.8);
+  transform: scale(1.1);
 }
 
 .o2vf_node_input {
@@ -200,12 +103,12 @@ export default {
   border-radius: 8px;
   background: rgba(239, 246, 255, 0.9);
   transition: all 0.3s ease;
+}
 
-  &:hover {
-    background: rgba(239, 246, 255, 1);
-    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
-    border-color: rgba(96, 165, 250, 0.6);
-  }
+.o2vf_node_input:hover {
+  background: rgba(239, 246, 255, 1);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
+  border-color: rgba(96, 165, 250, 0.6);
 }
 
 .o2vf_node_output {
@@ -216,12 +119,12 @@ export default {
   box-shadow: 0 2px 8px rgba(34, 197, 94, 0.1);
   transition: all 0.3s ease;
   padding: 8px 16px;
+}
 
-  &:hover {
-    background: rgba(240, 253, 244, 1);
-    box-shadow: 0 4px 12px rgba(34, 197, 94, 0.2);
-    border-color: rgba(74, 222, 128, 0.6);
-  }
+.o2vf_node_output:hover {
+  background: rgba(240, 253, 244, 1);
+  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.2);
+  border-color: rgba(74, 222, 128, 0.6);
 }
 
 .o2vf_node_default {
@@ -231,117 +134,87 @@ export default {
   background: rgba(255, 251, 235, 0.9);
   box-shadow: 0 2px 8px rgba(217, 119, 6, 0.1);
   transition: all 0.3s ease;
-
-  &:hover {
-    background: rgba(255, 251, 235, 1);
-    box-shadow: 0 4px 12px rgba(217, 119, 6, 0.2);
-    border-color: rgba(245, 158, 11, 0.6);
-  }
 }
 
-// .custom-tooltip-nodes {
-//   background: rgba(30, 35, 40, 0.95) !important;
-//   backdrop-filter: blur(10px);
-//   border-radius: 6px;
-//   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-//   border: 1px solid rgba(255, 255, 255, 0.1);
-//   font-size: 11px;
-//   max-width: 180px;
-// }
-
-.tooltip-content {
-  padding: 6px 10px;
+.o2vf_node_default:hover {
+  background: rgba(255, 251, 235, 1);
+  box-shadow: 0 4px 12px rgba(217, 119, 6, 0.2);
+  border-color: rgba(245, 158, 11, 0.6);
 }
 
-.tooltip-title {
-  // color: #ffffff;
-  font-weight: 500;
-  font-size: 11px;
-  margin-bottom: 2px;
-  text-transform: capitalize;
+.body--dark .nodes {
+  background: rgba(15, 23, 42, 0.95) !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4) !important;
+  padding: 12px 8px !important;
 }
 
-.tooltip-description {
-  // color: rgba(255, 255, 255, 0.75);
-  font-size: 10px;
-  line-height: 1.3;
-  text-transform: capitalize;
+.body--dark .nodes:hover {
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5) !important;
 }
-</style>
 
-<style lang="scss">
-// Dark mode styles (global scope to override)
-.body--dark {
-  .nodes {
-    background: rgba(15, 23, 42, 0.95) !important;
-    border: 1px solid rgba(255, 255, 255, 0.15) !important;
-    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4) !important;
-    padding: 12px 8px !important;
+.body--dark .node-draggable:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+  backdrop-filter: blur(12px) !important;
+}
 
-    &:hover {
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5) !important;
-    }
-  }
+.body--dark .q-btn.o2vf_node_default,
+.body--dark .q-btn.node-draggable.o2vf_node_default,
+.body--dark .q-btn.o2vf_node_default.q-btn--flat,
+.body--dark .o2vf_node_default,
+.body--dark .node-draggable.o2vf_node_default {
+  background: rgba(120, 53, 15, 0.2) !important;
+  border: 1px solid rgba(251, 146, 60, 0.3) !important;
+  color: rgba(255, 255, 255, 0.9) !important;
+}
 
-  .node-draggable:hover {
-    background: rgba(255, 255, 255, 0.08) !important;
-    backdrop-filter: blur(12px) !important;
-  }
+.body--dark .q-btn.o2vf_node_default:hover,
+.body--dark .q-btn.node-draggable.o2vf_node_default:hover,
+.body--dark .q-btn.o2vf_node_default.q-btn--flat:hover,
+.body--dark .o2vf_node_default:hover,
+.body--dark .node-draggable.o2vf_node_default:hover {
+  background: rgba(120, 53, 15, 0.3) !important;
+  border-color: rgba(251, 146, 60, 0.5) !important;
+  box-shadow: 0 6px 16px rgba(245, 158, 11, 0.2) !important;
+}
 
-  .q-btn.o2vf_node_default,
-  .q-btn.node-draggable.o2vf_node_default,
-  .q-btn.o2vf_node_default.q-btn--flat,
-  .o2vf_node_default,
-  .node-draggable.o2vf_node_default {
-    background: rgba(120, 53, 15, 0.2) !important;
-    border: 1px solid rgba(251, 146, 60, 0.3) !important;
-    color: rgba(255, 255, 255, 0.9) !important;
+.body--dark .q-btn.o2vf_node_default.q-btn--flat {
+  background: rgba(120, 53, 15, 0.2) !important;
+}
 
-    &:hover {
-      background: rgba(120, 53, 15, 0.3) !important;
-      border-color: rgba(251, 146, 60, 0.5) !important;
-      box-shadow: 0 6px 16px rgba(245, 158, 11, 0.2) !important;
-    }
+.body--dark .q-btn.o2vf_node_default.q-btn--flat:hover {
+  background: rgba(120, 53, 15, 0.3) !important;
+}
 
-    &.q-btn--flat {
-      background: rgba(120, 53, 15, 0.2) !important;
+.body--dark .o2vf_node_input {
+  background: rgba(30, 58, 138, 0.2) !important;
+  border: 1px solid rgba(96, 165, 250, 0.3) !important;
+  color: rgba(255, 255, 255, 0.9) !important;
+}
 
-      &:hover {
-        background: rgba(120, 53, 15, 0.3) !important;
-      }
-    }
-  }
+.body--dark .o2vf_node_input:hover {
+  background: rgba(30, 58, 138, 0.3) !important;
+  border-color: rgba(96, 165, 250, 0.5) !important;
+  box-shadow: 0 6px 16px rgba(59, 130, 246, 0.2) !important;
+}
 
-  .o2vf_node_input {
-    background: rgba(30, 58, 138, 0.2) !important;
-    border: 1px solid rgba(96, 165, 250, 0.3) !important;
-    color: rgba(255, 255, 255, 0.9) !important;
+.body--dark .o2vf_node_output {
+  background: rgba(20, 83, 45, 0.2) !important;
+  border: 1px solid rgba(74, 222, 128, 0.3) !important;
+  color: rgba(255, 255, 255, 0.9) !important;
+}
 
-    &:hover {
-      background: rgba(30, 58, 138, 0.3) !important;
-      border-color: rgba(96, 165, 250, 0.5) !important;
-      box-shadow: 0 6px 16px rgba(59, 130, 246, 0.2) !important;
-    }
-  }
+.body--dark .o2vf_node_output:hover {
+  background: rgba(20, 83, 45, 0.3) !important;
+  border-color: rgba(74, 222, 128, 0.5) !important;
+  box-shadow: 0 6px 16px rgba(34, 197, 94, 0.2) !important;
+}
 
-  .o2vf_node_output {
-    background: rgba(20, 83, 45, 0.2) !important;
-    border: 1px solid rgba(74, 222, 128, 0.3) !important;
-    color: rgba(255, 255, 255, 0.9) !important;
+.body--dark .dot {
+  background: rgba(255, 255, 255, 0.5) !important;
+}
 
-    &:hover {
-      background: rgba(20, 83, 45, 0.3) !important;
-      border-color: rgba(74, 222, 128, 0.5) !important;
-      box-shadow: 0 6px 16px rgba(34, 197, 94, 0.2) !important;
-    }
-  }
-
-  .dot {
-    background: rgba(255, 255, 255, 0.5) !important;
-  }
-
-  .drag-handle:hover .dot {
-    background: rgba(255, 255, 255, 0.7) !important;
-  }
+.body--dark .drag-handle:hover .dot {
+  background: rgba(255, 255, 255, 0.7) !important;
 }
 </style>

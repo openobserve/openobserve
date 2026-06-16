@@ -74,25 +74,3 @@ export default defineComponent({
   },
 });
 </script>
-<style lang="scss" scoped>
-.selected {
-  background-color: var(--q-primary) !important;
-  font-weight: bold;
-  color: white;
-}
-
-.no-border {
-  border: none !important;
-}
-
-.custom-border {
-  border-top: 0px solid !important;
-  border-bottom: 0px solid !important;
-  border-left: 1px solid var(--o2-border-input) !important;
-  border-right: 1px solid var(--o2-border-input) !important;
-}
-
-.q-btn {
-  border: none;
-}
-</style>

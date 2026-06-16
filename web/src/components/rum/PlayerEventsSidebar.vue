@@ -15,12 +15,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="events-container relative-position tw:h-full tw:flex tw:flex-col">
+  <div class="tw:w-[calc(100%-1px)] tw:overflow-hidden relative-position tw:h-full tw:flex tw:flex-col">
     <AppTabs :tabs="tabs" v-model:active-tab="activeTab" class="tw:px-2 tw:py-1 tw:mt-2! tw:mx-2!" />
     <template v-if="activeTab === 'tags'">
       <div
         data-test="event-metadata"
-        class="tw:flex tw:p-2 event-metadata tw:px-3"
+        class="tw:flex tw:p-2 tw:sticky tw:top-0 tw:px-3"
       >
         <div class="tw:w-full tw:flex tw:flex-col">
           <div class="tw:w-full tw:pb-2 tw:text-xs">
@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :key="filteredEvent.id + '-' + index"
         >
           <div
-            class="tw:mb-1 tw:px-2 event-container tw:py-2 tw:cursor-pointer tw:rounded"
+            class="tw:mb-1 tw:px-2 tw:py-2 tw:cursor-pointer tw:rounded hover:tw:bg-[#ededed] hover:tw:text-black"
             @click="handleEventClick(filteredEvent)"
             :data-test="`player-event-row-${filteredEvent.type}`"
           >
@@ -264,51 +264,10 @@ const handleEventClick = (event: any) => {
 };
 </script>
 
-<style scoped lang="scss">
-.inline {
-  display: inline;
-}
-
-.events-container {
-  width: calc(100% - 1px);
+<style>
+.event-type-selector .q-field__control .q-field__native span {
+  text-overflow: ellipsis;
+  white-space: nowrap;
   overflow: hidden;
-}
-
-
-.event-container:hover {
-  background-color: #ededed;
-  color: black;
-}
-
-.frustration-count-badge {
-  position: absolute;
-  top: -0.375rem;
-  right: -0.375rem;
-  font-size: 0.625rem;
-  font-weight: 600;
-  z-index: 1;
-}
-
-.event-type {
-  text-transform: capitalize;
-}
-
-.event-metadata {
-  position: sticky;
-  top: 0;
-}
-</style>
-
-<style lang="scss">
-.event-type-selector {
-  .q-field__control {
-    .q-field__native {
-      span {
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        overflow: hidden;
-      }
-    }
-  }
 }
 </style>

@@ -345,20 +345,18 @@ const priorityOptions = [
 ];
 </script>
 
-<style lang="scss" scoped>
-.prebuilt-destination-form {
-  .q-field {
-    margin-bottom: 0.5rem;
-  }
+<style>
+.prebuilt-destination-form .q-field {
+  margin-bottom: 0.5rem;
+}
 
-  .q-banner pre {
-    font-size: 0.75rem;
-    background-color: rgba(255, 255, 255, 0.1);
-    padding: 0.5rem;
-    border-radius: 4px;
-    margin-top: 0.5rem;
-    white-space: pre-wrap;
-    word-wrap: break-word;
-  }
+.prebuilt-destination-form .q-banner pre {
+  font-size: 0.75rem;
+  background-color: rgba(255, 255, 255, 0.1);
+  padding: 0.5rem;
+  border-radius: 4px;
+  margin-top: 0.5rem;
+  white-space: pre-wrap;
+  word-wrap: break-word;
 }
 </style>

@@ -127,38 +127,8 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
-.and-border {
-  padding: 4px 6px;
-  border-radius: 4px;
-  // background-color: var(--o2-border);
-  font-size: smaller;
-}
-
-.title {
-  padding: 10px 8px;
-  border-radius: 4px;
-  // background-color: var(--o2-border);
-  font-size: small;
-  font-weight: bold;
-}
-
-.operator {
-  border-left: 1px solid var(--o2-border);
-  border-right: 1px solid var(--o2-border);
-}
-
-.close {
-  height: 100%;
-  // border-top: 1px solid var(--o2-border);
-  border-left: 1px solid var(--o2-border);
-  // border-bottom: 1px solid var(--o2-border);
-  // background-color: #eeeeee;
-  border-radius: 0 !important;
-}
-.printMode {
-  .hideOnPrintMode {
-    display: none;
-  }
+<style>
+.printMode .hideOnPrintMode {
+  display: none;
 }
 </style>

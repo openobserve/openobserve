@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -19,10 +19,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="alert-history-page"
     class="tw:p-0 tw:flex"
   >
-    <div class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pt-[0.325rem]">
-      <div class="card-container tw:mb-[0.625rem]">
+    <div class="tw:w-full tw:h-full tw:px-2.5 tw:pt-[0.325rem]">
+      <div class="card-container tw:mb-2.5">
         <div
-          class="tw:flex tw:justify-between tw:w-full tw:h-[68px] tw:px-2 tw:py-3"
+          class="tw:flex tw:justify-between tw:w-full tw:h-17 tw:px-2 tw:py-3"
         >
           <div class="tw:flex tw:items-center">
             <OButton
@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="alert-history-back-btn"
             />
             <div
-              class="tw:text-xl tw:tracking-[0.005em] tw:font-[600] tw:ml-2"
+              class="tw:text-xl tw:tracking-[0.005em] tw:font-semibold tw:ml-2"
               data-test="alerts-history-title"
             >
               {{ t(`alerts.history`) }}
@@ -110,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
-    <div class="tw:w-full tw:h-full tw:px-[0.625rem]">
+    <div class="tw:w-full tw:h-full tw:px-2.5">
       <div class="alert-history-table card-container tw:h-[calc(100vh-130px)]">
         <OTable
           data-test="alert-history-table"
@@ -134,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @sort-change="onSortChange"
         >
           <template #empty>
-            <div class="tw:h-[100vh] tw:w-full">
+            <div class="tw:h-screen tw:w-full">
               <no-data />
             </div>
           </template>
@@ -163,7 +163,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #cell-is_realtime="{ value }">
             <OIcon
               :name="value ? 'check-circle' : 'schedule'"
-              :class="value ? 'tw:text-[var(--o2-positive)]' : 'tw:text-gray-500'"
+              :class="value ? 'tw:text-(--o2-positive)' : 'tw:text-gray-500'"
               size="xs"
             >
               <OTooltip :content="value ? 'Real-time' : 'Scheduled'" />
@@ -173,7 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #cell-is_silenced="{ value }">
             <OIcon
               :name="value ? 'volume-off' : 'volume-up'"
-              :class="value ? 'tw:text-gray-500' : 'tw:text-[var(--o2-positive)]'"
+              :class="value ? 'tw:text-gray-500' : 'tw:text-(--o2-positive)'"
               size="md"
             >
               <OTooltip :content="value ? 'Silenced' : 'Not Silenced'" />
@@ -261,7 +261,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div v-if="selectedRow" class="tw:gap-2">
             <!-- Basic Information -->
-            <div class="detail-section">
+            <div class="tw:py-1 tw:px-0">
               <div class="tw:flex tw:gap-3">
                 <div class="tw:w-1/2">
                   <div class="tw:text-xs tw:text-text-secondary tw:mb-1">Alert Name</div>
@@ -285,7 +285,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OSeparator class="tw:my-2" />
 
             <!-- Time Information -->
-            <div class="detail-section">
+            <div class="tw:py-1 tw:px-0">
               <div class="tw:flex tw:gap-3">
                 <div class="tw:w-1/2">
                   <div class="tw:text-xs tw:text-text-secondary tw:mb-1">Timestamp</div>
@@ -309,7 +309,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OSeparator class="tw:my-2" />
 
             <!-- Alert Configuration -->
-            <div class="detail-section">
+            <div class="tw:py-1 tw:px-0">
               <div class="tw:flex tw:gap-3">
                 <div class="tw:w-1/2">
                   <div class="tw:text-xs tw:text-text-secondary tw:mb-1">Type</div>
@@ -352,7 +352,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
             >
               <OSeparator class="tw:my-2" />
-              <div class="detail-section">
+              <div class="tw:py-1 tw:px-0">
                 <div class="tw:flex tw:gap-3">
                   <div v-if="selectedRow.evaluation_took_in_secs" class="tw:w-1/3">
                     <div class="tw:text-xs tw:text-text-secondary tw:mb-1">
@@ -381,7 +381,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Source Node (if available) -->
             <template v-if="selectedRow.source_node">
               <OSeparator class="tw:my-2" />
-              <div class="detail-section">
+              <div class="tw:py-1 tw:px-0">
                 <div class="tw:text-xs tw:text-text-secondary tw:mb-1">Source Node</div>
                 <div class="tw:text-sm tw:font-mono">
                   {{ selectedRow.source_node }}
@@ -392,7 +392,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Error Details (if available) -->
             <template v-if="selectedRow.error">
               <OSeparator class="tw:my-2" />
-              <div class="detail-section">
+              <div class="tw:py-1 tw:px-0">
                 <div class="tw:text-xs tw:text-text-secondary tw:mb-1">
                   <OIcon
                     name="error"
@@ -420,7 +420,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Success Response (if available) -->
             <template v-if="selectedRow.success_response">
               <OSeparator class="tw:my-2" />
-              <div class="detail-section">
+              <div class="tw:py-1 tw:px-0">
                 <div class="tw:text-xs tw:text-text-secondary tw:mb-1">
                   <OIcon
                     name="check-circle"
@@ -456,10 +456,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:primary="closeErrorDialog"
     >
       <template #header-left>
-        <OIcon name="error" size="sm" class="error-icon" />
+        <OIcon name="error" size="sm" class="tw:text-red-500" />
       </template>
       <template #header-right>
-        <div class="error-timestamp tw:text-xs">
+        <div class="tw:flex tw:items-center tw:text-[13px] tw:opacity-70 tw:ml-9 tw:text-xs">
           <span class="tw:mr-1">Last error:</span>
           <OIcon name="schedule" size="xs" class="tw:mr-1" />
           {{ errorMessage.last_error_timestamp && new Date(errorMessage.last_error_timestamp / 1000).toLocaleString() }}
@@ -467,8 +467,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <div class="tw:mb-4">
-        <div class="section-label tw:mb-2">Error Summary</div>
-        <div class="error-summary-box">
+        <div class="tw:text-sm tw:font-semibold tw:tracking-[0.02em] tw:opacity-80 tw:mb-2">Error Summary</div>
+        <div class="tw:p-4 tw:rounded-lg tw:font-mono tw:text-[13px] tw:leading-[1.6] tw:whitespace-pre-wrap tw:wrap-break-word tw:bg-[rgba(239,68,68,0.08)] tw:border tw:border-solid tw:border-[rgba(239,68,68,0.2)] tw:text-[#dc2626]">
           {{ errorMessage.error }}
         </div>
       </div>
@@ -902,120 +902,12 @@ watch(
 );
 </script>
 
-<style scoped lang="scss">
-.alert-history-table {
-  :deep(table) {
-    width: 100%;
-
-    td {
-      vertical-align: middle;
-    }
-  }
+<style>
+.alert-history-table :deep(table) {
+  width: 100%;
 }
 
-.alert-details-dialog {
-  :deep(.q-dialog__inner) {
-    padding: 24px;
-  }
-
-  .detail-section {
-    padding: 4px 0;
-  }
-
-  .text-mono {
-    font-family: "Courier New", monospace;
-    font-size: 13px;
-  }
-
-  .tw:bg-red-500-1 {
-    background-color: rgba(255, 0, 0, 0.05);
-  }
-
-  .tw:bg-green-500-1 {
-    background-color: rgba(0, 128, 0, 0.05);
-  }
-
-  pre {
-    max-height: 200px;
-    overflow-y: auto;
-
-    &::-webkit-scrollbar {
-      width: 6px;
-      height: 6px;
-    }
-
-    &::-webkit-scrollbar-track {
-      background: #f1f1f1;
-    }
-
-    &::-webkit-scrollbar-thumb {
-      background: #888;
-      border-radius: 3px;
-    }
-
-    &::-webkit-scrollbar-thumb:hover {
-      background: #555;
-    }
-  }
-}
-.pipeline-error-header {
-  padding: 20px 24px 16px;
-
-  .error-icon {
-    color: #ef4444;
-  }
-
-  .pipeline-name {
-    font-size: 20px;
-    font-weight: 600;
-    letter-spacing: -0.01em;
-  }
-
-  .error-timestamp {
-    display: flex;
-    align-items: center;
-    font-size: 13px;
-    opacity: 0.7;
-    margin-left: 36px;
-  }
-
-  .close-btn {
-    opacity: 0.6;
-    transition: opacity 0.2s;
-
-    &:hover {
-      opacity: 1;
-    }
-  }
-}
-
-.pipeline-error-content {
-  padding: 20px 24px;
-  max-height: 60vh;
-  overflow-y: auto;
-}
-
-.section-label {
-  font-size: var(--text-sm);
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  opacity: 0.8;
-}
-
-.error-summary-box {
-  padding: 16px;
-  border-radius: 8px;
-  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-  font-size: 13px;
-  line-height: 1.6;
-  white-space: pre-wrap;
-  word-break: break-word;
-  background: rgba(239, 68, 68, 0.08);
-  border: 1px solid rgba(239, 68, 68, 0.2);
-  color: #dc2626;
-}
-.pipeline-error-actions {
-  padding: 16px 24px;
-  justify-content: flex-end;
+.alert-history-table :deep(table) td {
+  vertical-align: middle;
 }
 </style>

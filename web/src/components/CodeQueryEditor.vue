@@ -15,10 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="code-query-editor-container" v-bind="$attrs">
+  <div class="tw:relative tw:w-full tw:h-full tw:flex tw:flex-col" v-bind="$attrs">
     <div
       data-test="query-editor"
-      class="logs-query-editor"
+      class="logs-query-editor tw:flex-1 tw:min-h-0 tw:pl-2 tw:bg-(--o2-card-bg)"
       ref="editorRef"
       :id="editorId"
     />
@@ -27,13 +27,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="showAiIcon && !disableAi"
       variant="sidebar-toggle"
       size="icon-toolbar"
-      class="ai-icon-button"
+      class="ai-icon-button tw:absolute tw:top-2 tw:right-2 tw:z-10 tw:bg-(--o2-bg-primary) tw:border tw:border-(--o2-border-color) tw:transition-all tw:duration-200"
       :class="nlpMode ? 'ai-icon-active' : ''"
       @click="toggleNlpMode"
       data-test="query-editor-ai-icon-btn"
     >
       <OIcon size="md">
-        <img :src="aiIcon" alt="AI" class="ai-icon-img" />
+        <img :src="aiIcon" alt="AI" class="tw:w-4.5 tw:h-4.5" />
       </OIcon>
       <OTooltip side="top" align="center">
         <template #content>{{ disableAiReason || t(nlpMode ? 'search.nlpModeEnabled' : 'search.nlpModeLabel') }}</template>
@@ -1231,32 +1231,8 @@ export default defineComponent({
 });
 </script>
 
-<style scoped>
-#editor {
-  width: 100%;
-  height: 78%;
-  border-radius: 5px;
-}
-
-.code-query-editor-container {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-}
-
+<style>
 /* AI Icon Button Styling */
-.ai-icon-button {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  z-index: 10;
-  background-color: var(--o2-bg-primary);
-  border: 1px solid var(--o2-border-color);
-  transition: all 0.2s ease;
-}
-
 .ai-icon-button:hover {
   background-color: var(--o2-hover-accent);
   border-color: var(--o2-color-primary);
@@ -1267,14 +1243,10 @@ export default defineComponent({
   border-color: var(--o2-color-primary);
 }
 
-.ai-icon-img {
-  width: 18px;
-  height: 18px;
-}
-
-.q-dark .ai-icon-img {
+.q-dark .ai-icon-button img {
   filter: brightness(1.2);
 }
+
 .monaco-editor,
 .monaco-diff-editor .synthetic-focus,
 .monaco-editor,
@@ -1298,212 +1270,17 @@ export default defineComponent({
   outline-width: 0px;
 }
 
-/* Generate SQL button - O2 AI Assistant gradient style (matches send-button) */
-.generate-sql-button {
-  position: absolute;
-  bottom: 0.5rem;
-  right: 0.5rem;
-  z-index: 100;
-  background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%) !important;
-  color: white !important;
-  box-shadow: 0 0.25rem 0.9375rem 0 rgba(139, 92, 246, 0.3) !important;
-  transition: all 0.3s ease !important;
-  border: none !important;
+.logs-query-editor .monaco-editor,
+.logs-query-editor .monaco-editor .monaco-editor {
+  padding: 0px 0px 0px 0px !important;
+  --vscode-focusBorder: transparent !important;
 }
 
-.generate-sql-button:hover:not(.disabled):not([disabled]):not(:disabled) {
-  background: linear-gradient(135deg, #7c3aed 0%, #db2777 100%) !important;
-  box-shadow: 0 0.375rem 1.25rem 0 rgba(139, 92, 246, 0.4) !important;
-  transform: translateY(-0.0625rem) !important;
-}
-
-.generate-sql-button:active:not(.disabled):not([disabled]):not(:disabled) {
-  transform: translateY(0) !important;
-  box-shadow: 0 0.125rem 0.625rem 0 rgba(139, 92, 246, 0.3) !important;
-}
-
-/* Fade transition for button appearance */
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.2s ease;
-}
-
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
-}
-
-/* Streaming preview card - O2 AI Assistant message style with purple border */
-.streaming-preview-card {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 56.25rem; /* 900px - matches O2 AI Assistant max-width */
-  max-width: calc(100% - 2rem);
-  max-height: 31.25rem;
-  background: var(--o2-card-bg);
-  border-radius: 0.5rem; /* 8px - matches O2 message border-radius */
-  border: 2px solid #8b5cf6; /* O2 AI Assistant purple border */
-  padding: 0.75rem; /* 12px - matches O2 message padding */
-  z-index: 99;
-  overflow: hidden;
-}
-
-/* Light mode shadow - matches O2 AI Assistant with purple glow */
-.light-mode .streaming-preview-card {
-  box-shadow: 0 0.25rem 1rem 0 rgba(139, 92, 246, 0.2);
-}
-
-/* Dark mode shadow - matches O2 AI Assistant with purple glow */
-.dark-mode .streaming-preview-card {
-  box-shadow: 0 0.25rem 1rem 0 rgba(139, 92, 246, 0.3);
-}
-
-/* Streaming preview content - O2 AI Assistant text-block style */
-.streaming-preview-content {
-  font-family:
-    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
-    Arial, sans-serif;
-  font-size: 0.875rem;
-  line-height: 1.6; /* Better readability for text content */
-  color: var(--o2-text-primary);
-  margin: 0;
-  padding: 1rem;
-  overflow-y: auto;
-  max-height: 30rem;
-  max-width: 100%;
-}
-
-/* Generating text with dynamic message */
-.generating-text {
-  font-size: 0.9375rem; /* 15px */
-  font-weight: 500;
-  color: var(--o2-text-primary);
-}
-
-/* Animated dots - ellipsis animation using pseudo-element */
-.animated-dots::after {
-  content: "";
-  animation: ellipsis 1.5s infinite;
-  display: inline-block;
-  width: 1.5em;
-  text-align: left;
-  font-size: inherit;
-  font-weight: inherit;
-  font-family: inherit;
-  color: inherit;
-  line-height: inherit;
-}
-
-@keyframes ellipsis {
-  0% {
-    content: "";
-  }
-  25% {
-    content: ".";
-  }
-  50% {
-    content: "..";
-  }
-  75%,
-  100% {
-    content: "...";
-  }
-}
-
-/* Code blocks within streaming preview */
-.streaming-preview-content :deep(pre),
-.streaming-preview-content :deep(code) {
-  font-family: "Monaco", "Menlo", "Ubuntu Mono", "Courier New", monospace;
-  white-space: pre-wrap;
-  word-break: break-word;
-  overflow-wrap: break-word;
-  line-height: 1.4;
-  padding: 0.5rem;
-  margin: 0.25rem 0;
-  border-radius: 0.25rem;
-  display: block;
-  max-width: 100%;
-  overflow-x: auto;
-}
-
-/* Lists within streaming preview */
-.streaming-preview-content :deep(ol) {
-  list-style-type: decimal;
-  padding-left: 1.5em;
-  margin: 0.5em 0;
-}
-
-.streaming-preview-content :deep(ul) {
-  list-style-type: disc;
-  padding-left: 1.5em;
-  margin: 0.5em 0;
-}
-
-.streaming-preview-content :deep(li) {
-  margin: 0.25em 0;
-}
-
-/* Paragraphs within streaming preview */
-.streaming-preview-content :deep(p) {
-  margin: 0.5em 0;
-  word-wrap: break-word;
-  overflow-wrap: break-word;
-  word-break: break-word;
-  max-width: 100%;
-}
-
-/* Slide up transition for streaming preview - centered */
-.slide-up-enter-active,
-.slide-up-leave-active {
-  transition: all 0.3s ease;
-}
-
-.slide-up-enter-from {
-  opacity: 0;
-  transform: translate(-50%, -50%) scale(0.95);
-}
-
-.slide-up-leave-to {
-  opacity: 0;
-  transform: translate(-50%, -50%) scale(0.98);
-}
-
-@keyframes typing-cursor {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.85;
-  }
-}
-</style>
-
-<style lang="scss">
-.logs-query-editor {
-  flex: 1;
-  min-height: 0;
-  /* Fixed left breathing room for the whole editor. Monaco mounts as a child of
-     this host, so padding here insets the line-number gutter (and code) by a
-     constant amount regardless of the line-number digit count — unlike
-     lineNumbersMinChars, which only pads while digits stay below the reserved
-     width and goes flush again at 2+ digits. automaticLayout measures the
-     content box, so the editor adapts to the reduced width. */
-  padding-left: 0.5rem;
-  background-color: var(--o2-card-bg);
-  .monaco-editor,
-  .monaco-editor .monaco-editor {
-    padding: 0px 0px 0px 0px !important;
-
-    .editor-widget .suggest-widget {
-      z-index: 9999;
-      display: flex !important;
-      visibility: visible !important;
-    }
-    --vscode-focusBorder: transparent !important;
-  }
+.logs-query-editor .monaco-editor .editor-widget .suggest-widget,
+.logs-query-editor .monaco-editor .monaco-editor .editor-widget .suggest-widget {
+  z-index: 9999;
+  display: flex !important;
+  visibility: visible !important;
 }
 
 .highlight-error {

@@ -24,11 +24,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div class="tw:flex tw:items-center">
       <div class="tw:flex tw:flex-col">
-        <span class="deprecation-message">
+        <span class="tw:text-base tw:font-semibold tw:leading-6 tw:text-[var(--o2-text-primary)]">
           ⚠️ MySQL support is DEPRECATED and will be removed in future.
         </span>
         <br />
-        <span class="deprecation-subtitle">
+        <span class="tw:text-sm tw:font-normal tw:leading-5 tw:text-[var(--o2-text-secondary)]">
           Please migrate to PostgreSQL to ensure continued support.
         </span>
       </div>
@@ -106,18 +106,3 @@ export default defineComponent({
 });
 </script>
 
-<style scoped>
-.deprecation-message {
-  font-size: 16px;
-  font-weight: 600;
-  line-height: 24px;
-  color: var(--o2-text-primary);
-}
-
-.deprecation-subtitle {
-  font-size: 14px;
-  font-weight: 400;
-  line-height: 20px;
-  color: var(--o2-text-secondary);
-}
-</style>

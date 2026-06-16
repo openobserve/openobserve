@@ -326,4 +326,3 @@ helm repo update`;
 });
 </script>
 
-<style scoped lang="scss"></style>

@@ -135,12 +135,12 @@ function onDblclick(event: MouseEvent) {
       'tw:group/row',
       'tw:transition-colors tw:duration-150',
       clickable ? 'tw:cursor-pointer' : '',
-      'tw:hover:bg-[var(--color-table-row-hover-bg)]',
+      'tw:hover:bg-table-row-hover-bg',
       isRowSelected
-        ? 'tw:bg-[var(--color-table-row-selected-bg)]'
+        ? 'tw:bg-table-row-selected-bg'
         : '',
       !isRowSelected && isStriped
-        ? 'tw:bg-[var(--color-table-row-striped-bg)]'
+        ? 'tw:bg-table-row-striped-bg'
         : '',
       rowClass,
     ]"
@@ -159,7 +159,7 @@ function onDblclick(event: MouseEvent) {
     <!-- Expand button cell -->
     <td
       v-if="expansionEnabled"
-      :class="['tw:w-4 tw:min-w-4 tw:px-0 tw:text-center tw:align-middle', bordered ? 'tw:border-b tw:border-[var(--color-table-row-divider)]' : '']"
+      :class="['tw:w-4 tw:min-w-4 tw:px-0 tw:text-center tw:align-middle', bordered ? 'tw:border-b tw:border-table-row-divider' : '']"
       data-test="o2-table-expand-cell"
     >
       <OTableExpandButton
@@ -175,7 +175,7 @@ function onDblclick(event: MouseEvent) {
       v-if="selectionEnabled"
       :class="[
         'tw:text-left tw:align-middle',
-        bordered ? 'tw:border-b tw:border-[var(--color-table-row-divider)]' : '',
+        bordered ? 'tw:border-b tw:border-table-row-divider' : '',
         isRowSelectable && !isRowSelectable(row.original) ? 'tw:cursor-not-allowed' : '',
       ]"
       :style="{ width: TABLE_CHECKBOX_COL_WIDTH + 'px', minWidth: TABLE_CHECKBOX_COL_WIDTH + 'px', maxWidth: TABLE_CHECKBOX_COL_WIDTH + 'px', paddingLeft: TABLE_CHECKBOX_COL_PAD_LEFT + 'px' }"
@@ -223,17 +223,17 @@ function onDblclick(event: MouseEvent) {
   <tr
     v-if="showTreeWarning"
     :data-test="`o2-table-tree-warning-${row.index}`"
-    class="o2-table-tree-warning-row"
+    class="tw:bg-(--color-warning-surface,rgba(251,191,36,0.08))"
   >
     <td
       :colspan="row.getVisibleCells().length + (expansionEnabled ? 1 : 0) + (selectionEnabled ? 1 : 0)"
       :class="[
-        'o2-table-tree-warning-cell',
-        bordered ? 'tw:border-b tw:border-[var(--color-table-row-divider)]' : '',
+        'o2-table-tree-warning-cell tw:relative',
+        bordered ? 'tw:border-b tw:border-table-row-divider' : '',
       ]"
       :style="{ '--o2-tree-connector-x': treeConnectorX + 'px' }"
     >
-      <div class="o2-table-tree-warning-content">
+      <div class="tw:relative tw:z-1 tw:flex tw:items-center tw:justify-center">
         <slot name="tree-warning" :row="row.original" />
       </div>
     </td>
@@ -243,24 +243,18 @@ function onDblclick(event: MouseEvent) {
   <tr
     v-if="hasExpansionSlot && isExpanded"
     :data-test="`o2-table-expanded-row-${row.index}`"
-    class="tw:bg-[var(--color-table-row-expanded-bg)]"
+    class="tw:bg-table-row-expanded-bg"
   >
     <td
       :colspan="row.getVisibleCells().length + (expansionEnabled ? 1 : 0) + (selectionEnabled ? 1 : 0)"
-      :class="bordered ? 'tw:border-b tw:border-[var(--color-table-row-divider)]' : ''"
+      :class="bordered ? 'tw:border-b tw:border-table-row-divider' : ''"
     >
       <slot name="expansion" :row="row.original" />
     </td>
   </tr>
 </template>
 
-<style scoped>
-.o2-table-tree-warning-row {
-  background: var(--color-warning-surface, rgba(251, 191, 36, 0.08));
-}
-.o2-table-tree-warning-cell {
-  position: relative;
-}
+<style>
 /* Continuation of the tree connector vertical line through the warning row */
 .o2-table-tree-warning-cell::after {
   content: "";
@@ -272,12 +266,5 @@ function onDblclick(event: MouseEvent) {
   background-color: var(--q-primary, #6366f1);
   opacity: 0.55;
   z-index: 0;
-}
-.o2-table-tree-warning-content {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 </style>

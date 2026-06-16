@@ -15,12 +15,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="horizontal-stepper" :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
-    <div class="stepper-container">
+  <div class="horizontal-stepper tw:w-full tw:py-6" :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
+    <div class="stepper-container tw:flex tw:justify-between tw:items-start tw:relative tw:max-w-[1200px] tw:mx-auto tw:px-4">
       <div
         v-for="(step, index) in steps"
         :key="step.id"
-        class="step-item"
+        class="step-item tw:flex tw:flex-col tw:items-center tw:flex-1 tw:relative tw:cursor-pointer tw:transition-all tw:duration-300 tw:ease-in-out"
         :class="{
           'step-active': currentStep === step.id,
           'step-completed': completedSteps.includes(step.id),
@@ -30,26 +30,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="handleStepClick(step.id)"
       >
         <!-- Step indicator -->
-        <div class="step-indicator-wrapper">
-          <div class="step-indicator">
+        <div class="step-indicator-wrapper tw:flex tw:items-center tw:w-full tw:relative">
+          <div class="step-indicator tw:w-[40px] tw:h-[40px] tw:rounded-full tw:flex tw:items-center tw:justify-center tw:font-semibold tw:text-base tw:transition-all tw:duration-300 tw:ease-in-out tw:relative tw:z-[2] tw:shrink-0">
             <OIcon
               v-if="completedSteps.includes(step.id) && currentStep !== step.id"
               name="check"
               size="sm"
-              class="step-icon-check"
+              class="step-icon-check tw:text-white"
             />
             <OIcon
               v-else-if="step.hasError"
               name="error-outline"
               size="sm"
-              class="step-icon-error"
+              class="step-icon-error tw:text-white"
             />
             <span v-else class="step-number">{{ index + 1 }}</span>
           </div>
           <!-- Connector line -->
           <div
             v-if="index < steps.length - 1"
-            class="step-connector"
+            class="step-connector tw:flex-1 tw:h-[2px] tw:mx-2 tw:transition-all tw:duration-300 tw:ease-in-out"
             :class="{
               'connector-active': completedSteps.includes(step.id)
             }"
@@ -57,9 +57,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Step label -->
-        <div class="step-label">
-          <div class="step-title">{{ step.label }}</div>
-          <div v-if="step.description" class="step-description">
+        <div class="step-label tw:mt-3 tw:text-center tw:max-w-[150px]">
+          <div class="step-title tw:text-sm tw:font-semibold tw:mb-1">{{ step.label }}</div>
+          <div v-if="step.description" class="step-description tw:text-xs tw:opacity-70">
             {{ step.description }}
           </div>
         </div>
@@ -130,245 +130,159 @@ export default defineComponent({
 });
 </script>
 
-<style scoped lang="scss">
-.horizontal-stepper {
-  width: 100%;
-  padding: 1.5rem 0;
-
-  .stepper-container {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    position: relative;
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 0 1rem;
-  }
-
-  .step-item {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    flex: 1;
-    position: relative;
-    cursor: pointer;
-    transition: all 0.3s ease;
-
-    &.step-disabled {
-      cursor: not-allowed;
-      opacity: 0.5;
-    }
-
-    &:hover:not(.step-disabled) {
-      .step-indicator {
-        transform: scale(1.1);
-      }
-    }
-  }
-
-  .step-indicator-wrapper {
-    display: flex;
-    align-items: center;
-    width: 100%;
-    position: relative;
-  }
-
-  .step-indicator {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 600;
-    font-size: 16px;
-    transition: all 0.3s ease;
-    position: relative;
-    z-index: 2;
-    flex-shrink: 0;
-  }
-
-  .step-connector {
-    flex: 1;
-    height: 2px;
-    margin: 0 0.5rem;
-    transition: all 0.3s ease;
-  }
-
-  .step-label {
-    margin-top: 0.75rem;
-    text-align: center;
-    max-width: 150px;
-  }
-
-  .step-title {
-    font-size: 14px;
-    font-weight: 600;
-    margin-bottom: 0.25rem;
-  }
-
-  .step-description {
-    font-size: 12px;
-    opacity: 0.7;
-  }
-
-  // Dark mode styles
-  &.dark-mode {
-    .step-indicator {
-      background-color: #424242;
-      color: #9e9e9e;
-      border: 2px solid #616161;
-    }
-
-    .step-connector {
-      background-color: #616161;
-    }
-
-    .step-active .step-indicator {
-      background-color: #1976d2;
-      color: #ffffff;
-      border-color: #1976d2;
-      box-shadow: 0 0 0 4px rgba(25, 118, 210, 0.2);
-    }
-
-    .step-completed .step-indicator {
-      background-color: #2e7d32;
-      color: #ffffff;
-      border-color: #2e7d32;
-    }
-
-    .step-completed .step-connector {
-      background-color: #2e7d32;
-    }
-
-    .step-error .step-indicator {
-      background-color: #d32f2f;
-      color: #ffffff;
-      border-color: #d32f2f;
-    }
-
-    .step-title {
-      color: var(--o2-border);
-    }
-
-    .step-description {
-      color: #bdbdbd;
-    }
-
-    .step-active .step-title {
-      color: #ffffff;
-    }
-  }
-
-  // Light mode styles
-  &.light-mode {
-    .step-indicator {
-      background-color: #f5f5f5;
-      color: #757575;
-      border: 2px solid var(--o2-border);
-    }
-
-    .step-connector {
-      background-color: var(--o2-border);
-    }
-
-    .step-active .step-indicator {
-      background-color: #1976d2;
-      color: #ffffff;
-      border-color: #1976d2;
-      box-shadow: 0 0 0 4px rgba(25, 118, 210, 0.1);
-    }
-
-    .step-completed .step-indicator {
-      background-color: #2e7d32;
-      color: #ffffff;
-      border-color: #2e7d32;
-    }
-
-    .step-completed .step-connector {
-      background-color: #2e7d32;
-    }
-
-    .step-error .step-indicator {
-      background-color: #d32f2f;
-      color: #ffffff;
-      border-color: #d32f2f;
-    }
-
-    .step-title {
-      color: #424242;
-    }
-
-    .step-description {
-      color: #757575;
-    }
-
-    .step-active .step-title {
-      color: #1976d2;
-      font-weight: 700;
-    }
-  }
-
-  .step-icon-check,
-  .step-icon-error {
-    color: #ffffff;
-  }
+<style>
+.horizontal-stepper .step-item.step-disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 
-// Responsive design
+.horizontal-stepper .step-item:hover:not(.step-disabled) .step-indicator {
+  transform: scale(1.1);
+}
+
+/* Dark mode styles */
+.horizontal-stepper.dark-mode .step-indicator {
+  background-color: #424242;
+  color: #9e9e9e;
+  border: 2px solid #616161;
+}
+
+.horizontal-stepper.dark-mode .step-connector {
+  background-color: #616161;
+}
+
+.horizontal-stepper.dark-mode .step-active .step-indicator {
+  background-color: #1976d2;
+  color: #ffffff;
+  border-color: #1976d2;
+  box-shadow: 0 0 0 4px rgba(25, 118, 210, 0.2);
+}
+
+.horizontal-stepper.dark-mode .step-completed .step-indicator {
+  background-color: #2e7d32;
+  color: #ffffff;
+  border-color: #2e7d32;
+}
+
+.horizontal-stepper.dark-mode .step-completed .step-connector {
+  background-color: #2e7d32;
+}
+
+.horizontal-stepper.dark-mode .step-error .step-indicator {
+  background-color: #d32f2f;
+  color: #ffffff;
+  border-color: #d32f2f;
+}
+
+.horizontal-stepper.dark-mode .step-title {
+  color: var(--o2-border);
+}
+
+.horizontal-stepper.dark-mode .step-description {
+  color: #bdbdbd;
+}
+
+.horizontal-stepper.dark-mode .step-active .step-title {
+  color: #ffffff;
+}
+
+/* Light mode styles */
+.horizontal-stepper.light-mode .step-indicator {
+  background-color: #f5f5f5;
+  color: #757575;
+  border: 2px solid var(--o2-border);
+}
+
+.horizontal-stepper.light-mode .step-connector {
+  background-color: var(--o2-border);
+}
+
+.horizontal-stepper.light-mode .step-active .step-indicator {
+  background-color: #1976d2;
+  color: #ffffff;
+  border-color: #1976d2;
+  box-shadow: 0 0 0 4px rgba(25, 118, 210, 0.1);
+}
+
+.horizontal-stepper.light-mode .step-completed .step-indicator {
+  background-color: #2e7d32;
+  color: #ffffff;
+  border-color: #2e7d32;
+}
+
+.horizontal-stepper.light-mode .step-completed .step-connector {
+  background-color: #2e7d32;
+}
+
+.horizontal-stepper.light-mode .step-error .step-indicator {
+  background-color: #d32f2f;
+  color: #ffffff;
+  border-color: #d32f2f;
+}
+
+.horizontal-stepper.light-mode .step-title {
+  color: #424242;
+}
+
+.horizontal-stepper.light-mode .step-description {
+  color: #757575;
+}
+
+.horizontal-stepper.light-mode .step-active .step-title {
+  color: #1976d2;
+  font-weight: 700;
+}
+
+/* Responsive design */
 @media (max-width: 1024px) {
-  .horizontal-stepper {
-    .step-label {
-      max-width: 100px;
-    }
+  .horizontal-stepper .step-label {
+    max-width: 100px;
+  }
 
-    .step-title {
-      font-size: 12px;
-    }
+  .horizontal-stepper .step-title {
+    font-size: 12px;
+  }
 
-    .step-description {
-      font-size: 10px;
-    }
+  .horizontal-stepper .step-description {
+    font-size: 10px;
+  }
 
-    .step-indicator {
-      width: 36px;
-      height: 36px;
-      font-size: 14px;
-    }
+  .horizontal-stepper .step-indicator {
+    width: 36px;
+    height: 36px;
+    font-size: 14px;
   }
 }
 
 @media (max-width: 768px) {
-  .horizontal-stepper {
-    .stepper-container {
-      flex-direction: column;
-      gap: 1rem;
-    }
+  .horizontal-stepper .stepper-container {
+    flex-direction: column;
+    gap: 1rem;
+  }
 
-    .step-item {
-      flex-direction: row;
-      width: 100%;
-      align-items: center;
-      justify-content: flex-start;
-    }
+  .horizontal-stepper .step-item {
+    flex-direction: row;
+    width: 100%;
+    align-items: center;
+    justify-content: flex-start;
+  }
 
-    .step-indicator-wrapper {
-      flex-direction: column;
-      width: auto;
-    }
+  .horizontal-stepper .step-indicator-wrapper {
+    flex-direction: column;
+    width: auto;
+  }
 
-    .step-connector {
-      width: 2px;
-      height: 30px;
-      margin: 0.5rem 0;
-    }
+  .horizontal-stepper .step-connector {
+    width: 2px;
+    height: 30px;
+    margin: 0.5rem 0;
+  }
 
-    .step-label {
-      margin-top: 0;
-      margin-left: 1rem;
-      text-align: left;
-      max-width: none;
-    }
+  .horizontal-stepper .step-label {
+    margin-top: 0;
+    margin-left: 1rem;
+    text-align: left;
+    max-width: none;
   }
 }
 </style>

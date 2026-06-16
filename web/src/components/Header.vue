@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:flex tw:flex-nowrap tw:items-center tw:h-10 tw:w-full tw:bg-[var(--color-surface-chrome-deeper)] tw:shrink-0">
+  <div class="tw:flex tw:flex-nowrap tw:items-center tw:h-10 tw:w-full tw:bg-surface-chrome-deeper tw:shrink-0">
     <!-- LEFT SIDE: Logo -->
     <div class="tw:flex tw:items-center tw:justify-start tw:shrink-0 tw:pl-3">
     <!-- LOGO SECTION: Displays custom or default OpenObserve logo -->
@@ -93,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- OpenObserve logo (shown alongside custom logo if configured) -->
       <div
         v-if="store.state.zoConfig.custom_hide_self_logo == false"
-        class="logo-container tw:relative tw:inline-flex tw:items-center tw:min-h-10"
+        class="tw:relative tw:inline-flex tw:items-center tw:min-h-10"
       >
         <img
           data-test="header-openobserve-logo"
@@ -112,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Default OpenObserve logo (when no custom logo) -->
-    <div v-else class="tw:flex relative-position logo-container">
+    <div v-else class="relative-position tw:relative tw:inline-flex tw:items-center tw:min-h-10">
       <img
         data-test="header-openobserve-logo"
         class="openobserve-logo tw:cursor-pointer tw:h-8 tw:max-w-[150px] tw:block tw:transition-opacity tw:duration-200 hover:tw:opacity-80"
@@ -136,7 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="tw:flex tw:items-center tw:justify-end tw:shrink-0 tw:pr-3 tw:gap-1">
     <!-- QUOTA WARNING SECTION: Shows warning when quota threshold is reached -->
     <div
-      class="headerMenu tw:flex tw:items-center tw:gap-1"
+      class="tw:mr-4 tw:flex tw:items-center tw:gap-1"
       v-if="store.state.organizationData.quotaThresholdMsg"
     >
       <div
@@ -320,17 +320,17 @@ size="xs" class="warning" />{{
           <!-- Language selector — nested sub-dropdown (click to open) -->
           <div
             data-test="header-language-submenu-trigger"
-            class="header-language-item"
+            class="header-language-item tw:relative tw:flex tw:items-center tw:gap-3 tw:py-1.5 tw:px-3 tw:text-sm tw:leading-[1.2] tw:cursor-pointer tw:select-none"
             @click.stop="showLanguageSubmenu = !showLanguageSubmenu"
           >
             <OIcon size="xs" name="language" class="padding-none" />
-            <span class="header-language-label">{{ t("menu.language") }}</span>
-            <span class="header-language-current">
+            <span class="tw:flex-1 tw:whitespace-nowrap">{{ t("menu.language") }}</span>
+            <span class="tw:inline-flex tw:items-center tw:gap-1.5 tw:opacity-75 tw:whitespace-nowrap">
               <img
                 v-if="selectedLanguage.icon && selectedLanguage.icon.startsWith('img:')"
                 :src="selectedLanguage.icon.slice(4)"
                 :alt="selectedLanguage.label"
-                class="header-language-flag"
+                class="tw:w-4 tw:h-3 tw:object-cover tw:rounded-xs tw:inline-block tw:shrink-0"
               />
               <OIcon
                 v-else-if="selectedLanguage.icon"
@@ -345,7 +345,7 @@ size="xs" class="warning" />{{
             <!-- Submenu — absolutely positioned to the left of parent dropdown -->
             <div
               v-if="showLanguageSubmenu"
-              class="language-submenu"
+              class="language-submenu tw:absolute tw:right-full tw:top-0 tw:mr-1 tw:min-w-50 tw:bg-white tw:border tw:border-black/12 tw:rounded-md tw:shadow-[0_8px_24px_rgba(0,0,0,0.15)] tw:py-1 tw:z-9999"
               data-test="language-dropdown-item"
               @click.stop
             >
@@ -354,9 +354,9 @@ size="xs" class="warning" />{{
                 :key="lang.code"
                 type="button"
                 :data-test="`language-dropdown-item-${lang.code}`"
-                class="language-submenu-item"
+                class="language-submenu-item tw:flex tw:items-center tw:gap-2.5 tw:w-full tw:py-1.5 tw:px-3 tw:text-sm tw:leading-[1.2] tw:text-left tw:bg-transparent tw:border-0 tw:cursor-pointer tw:text-inherit"
                 :class="{
-                  'is-selected': selectedLanguage.code === lang.code,
+                  'is-selected tw:font-semibold': selectedLanguage.code === lang.code,
                 }"
                 @click="changeLanguage(lang); showLanguageSubmenu = false"
               >
@@ -364,7 +364,7 @@ size="xs" class="warning" />{{
                   v-if="lang.icon && lang.icon.startsWith('img:')"
                   :src="lang.icon.slice(4)"
                   :alt="lang.label"
-                  class="header-language-flag"
+                  class="tw:w-4 tw:h-3 tw:object-cover tw:rounded-xs tw:inline-block tw:shrink-0"
                 />
                 <OIcon v-else-if="lang.icon" size="xs" :name="lang.icon" />
                 <span class="tw:flex-1">{{ lang.label }}</span>
@@ -650,138 +650,29 @@ export default defineComponent({
 });
 </script>
 
-<style scoped lang="scss">
-:deep(.header-user-tooltip) {
-  width: auto;
-  max-width: none;
-  white-space: nowrap;
+<style>
+/* Language sub-menu trigger row — hover states kept here (pseudo-class / descendant rules) */
+.header-language-item:hover {
+  background-color: rgba(0, 0, 0, 0.05);
 }
 
-/* Language sub-menu trigger row inside the user-profile dropdown */
-.header-language-item {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 6px 12px;
-  font-size: 14px;
-  line-height: 1.2;
-  cursor: pointer;
-  user-select: none;
-
-  &:hover {
-    background-color: rgba(0, 0, 0, 0.05);
-  }
-
-  body.body--dark & {
-    &:hover {
-      background-color: rgba(255, 255, 255, 0.08);
-    }
-  }
+body.body--dark .header-language-item:hover {
+  background-color: rgba(255, 255, 255, 0.08);
 }
 
-.header-language-label {
-  flex: 1;
-  white-space: nowrap;
+/* Language submenu — dark mode overrides kept here (descendant selectors) */
+body.body--dark .language-submenu {
+  background-color: #1f2937;
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
 }
 
-.header-language-current {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  opacity: 0.75;
-  white-space: nowrap;
+/* Language submenu item — hover and selected state kept here */
+.language-submenu-item:hover {
+  background-color: rgba(0, 0, 0, 0.05);
 }
 
-.header-language-flag {
-  width: 16px;
-  height: 12px;
-  object-fit: cover;
-  border-radius: 2px;
-  display: inline-block;
-  flex-shrink: 0;
+body.body--dark .language-submenu-item:hover {
+  background-color: rgba(255, 255, 255, 0.08);
 }
-
-/* The nested popover */
-.language-submenu {
-  position: absolute;
-  right: 100%;
-  top: 0;
-  margin-right: 4px;
-  min-width: 200px;
-  background-color: #ffffff;
-  border: 1px solid rgba(0, 0, 0, 0.12);
-  border-radius: 6px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
-  padding: 4px 0;
-  z-index: 9999;
-
-  body.body--dark & {
-    background-color: #1f2937;
-    border-color: rgba(255, 255, 255, 0.12);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
-  }
-}
-
-.language-submenu-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  padding: 6px 12px;
-  font-size: 14px;
-  line-height: 1.2;
-  text-align: left;
-  background: transparent;
-  border: 0;
-  cursor: pointer;
-  color: inherit;
-
-  &:hover {
-    background-color: rgba(0, 0, 0, 0.05);
-  }
-
-  &.is-selected {
-    font-weight: 600;
-  }
-
-  body.body--dark & {
-    &:hover {
-      background-color: rgba(255, 255, 255, 0.08);
-    }
-  }
-}
-
-.logo-container {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  min-height: 2.5rem;
-  /* No min-width: the wordmark is ~120px, so reserving 150px left an empty gap
-     before the breadcrumb. The enterprise custom-logo branch keeps its own
-     Tailwind min-w-[150px] where it's still wanted. */
-}
-
-.openobserve-logo {
-  height: 2rem;
-  width: auto;
-  max-width: 9.375rem;
-  display: block;
-  transition: opacity 0.2s ease;
-
-  &:hover {
-    opacity: 0.8;
-  }
-}
-
-.headerMenu {
-  margin-right: 1rem;
-
-  .block {
-    font-weight: 700;
-    color: var(--o2-text-primary);
-  }
-}
-
-
 </style>

@@ -44,12 +44,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="tw:text-sm tw:font-medium tw:mb-3" style="font-weight: 500">
             Select Destination Type <span class="text-red">*</span>
           </div>
-          <div class="destination-type-grid">
+          <div class="tw:grid tw:grid-cols-[repeat(auto-fill,minmax(140px,1fr))] tw:gap-3 tw:mb-4">
             <div
               v-for="destType in destinationTypes"
               :key="destType.value"
               :data-test="`destination-type-card-${destType.value}`"
-              class="destination-type-card"
+              class="destination-type-card tw:relative tw:flex tw:flex-col tw:items-center tw:justify-center tw:py-[20px] tw:px-3 tw:border-2 tw:border-[var(--o2-border)] tw:rounded-xl tw:bg-white tw:cursor-pointer tw:[transition:all_0.3s_ease] tw:min-h-[120px]"
               :class="{
                 selected: formData.destination_type === destType.value,
                 'dark-mode': store.state.theme === 'dark',
@@ -236,7 +236,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Destination-specific Metadata Section -->
           <div v-if="showMetadataFields" class="tw:flex tw:flex-col tw:gap-4 tw:mt-4">
-            <div class="tw:w-full tw:text-[14px] tw:font-bold header-label">
+            <div class="tw:w-full tw:text-[14px] tw:font-bold tw:text-(--o2-input-label-text-color)">
               Metadata Configuration
             </div>
 
@@ -378,7 +378,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Connection Notes Card -->
           <OCard
-            class="connection-notes-card tw:mb-6 tw:mt-4 tw:!bg-[var(--color-banner-info-bg)]"
+            class="connection-notes-card tw:rounded-lg tw:border tw:border-[#e3f2fd] tw:mb-6 tw:mt-4 tw:bg-(--color-banner-info-bg)!"
           >
             <OCardSection role="body">
               <div class="tw:flex tw:items-center tw:mb-2">
@@ -1271,168 +1271,126 @@ defineExpose({
 });
 </script>
 
-<style lang="scss" scoped>
-// Destination Type Cards Grid
-.destination-type-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 12px;
-  margin-bottom: 16px;
+<style>
+/* Destination Type Cards */
+.destination-type-card:hover {
+  border-color: var(--o2-border-color);
+  box-shadow: 0 4px 12px rgba(25, 118, 210, 0.15);
+  transform: translateY(-2px);
 }
 
-.destination-type-card {
-  position: relative;
+.destination-type-card.selected {
+  border-color: var(--o2-border-color);
+  background: linear-gradient(135deg, #e3f2fd 0%, #ffffff 100%);
+  box-shadow: 0 4px 16px rgba(25, 118, 210, 0.2);
+}
+
+.destination-type-card.selected .card-icon {
+  color: var(--o2-border-color);
+}
+
+.destination-type-card.selected .card-label {
+  color: #333333;
+}
+
+.destination-type-card.dark-mode {
+  background: #1e1e1e;
+  border-color: #424242;
+}
+
+.destination-type-card.dark-mode:hover {
+  border-color: #5d9cec;
+  box-shadow: 0 4px 12px rgba(93, 156, 236, 0.2);
+}
+
+.destination-type-card.dark-mode.selected {
+  border-color: #5d9cec;
+  background: linear-gradient(135deg, #1a3a52 0%, #1e1e1e 100%);
+  box-shadow: 0 4px 16px rgba(93, 156, 236, 0.25);
+}
+
+.destination-type-card.dark-mode.selected .card-icon {
+  color: #5d9cec;
+}
+
+.destination-type-card.dark-mode.selected .card-label {
+  color: #ffffff;
+}
+
+.destination-type-card .card-icon {
+  margin-bottom: 8px;
+  color: #666;
+  transition: color 0.3s ease;
+}
+
+.destination-type-card .card-image {
+  width: 48px;
+  height: 48px;
+  margin-bottom: 8px;
+  object-fit: contain;
+  transition: all 0.3s ease;
+}
+
+.destination-type-card .card-label {
+  font-size: 13px;
+  font-weight: 500;
+  text-align: center;
+  line-height: 1.3;
+  margin-top: 4px;
+  color: var(--o2-text-primary);
+}
+
+.destination-type-card .check-icon {
+  position: absolute;
+  top: 0.375rem;
+  right: 0.375rem;
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--o2-positive);
+  color: white;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 20px 12px;
-  border: 2px solid var(--o2-border);
-  border-radius: 12px;
-  background: #ffffff;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  min-height: 120px;
-
-  &:hover {
-    border-color: var(--o2-border-color);
-    box-shadow: 0 4px 12px rgba(25, 118, 210, 0.15);
-    transform: translateY(-2px);
-  }
-
-  &.selected {
-    border-color: var(--o2-border-color);
-    background: linear-gradient(135deg, #e3f2fd 0%, #ffffff 100%);
-    box-shadow: 0 4px 16px rgba(25, 118, 210, 0.2);
-
-    .card-icon {
-      color: var(--o2-border-color);
-    }
-
-    .card-label {
-      color: #333333;
-    }
-  }
-
-  &.dark-mode {
-    background: #1e1e1e;
-    border-color: #424242;
-
-    &:hover {
-      border-color: #5d9cec;
-      box-shadow: 0 4px 12px rgba(93, 156, 236, 0.2);
-    }
-
-    &.selected {
-      border-color: #5d9cec;
-      background: linear-gradient(135deg, #1a3a52 0%, #1e1e1e 100%);
-      box-shadow: 0 4px 16px rgba(93, 156, 236, 0.25);
-
-      .card-icon {
-        color: #5d9cec;
-      }
-
-      .card-label {
-        color: #ffffff;
-      }
-    }
-  }
-
-  .card-icon {
-    margin-bottom: 8px;
-    color: #666;
-    transition: color 0.3s ease;
-  }
-
-  .card-image {
-    width: 48px;
-    height: 48px;
-    margin-bottom: 8px;
-    object-fit: contain;
-    transition: all 0.3s ease;
-  }
-
-  .card-label {
-    font-size: 13px;
-    font-weight: 500;
-    text-align: center;
-    line-height: 1.3;
-    margin-top: 4px;
-    color: var(--o2-text-primary);
-  }
-
-  .check-icon {
-    position: absolute;
-    top: 0.375rem;
-    right: 0.375rem;
-    width: 1.25rem;
-    height: 1.25rem;
-    border-radius: 50%;
-    overflow: hidden;
-    background: var(--o2-positive);
-    color: white;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1;
-  }
+  z-index: 1;
 }
 
-// Connection Notes Card
-.connection-notes-card {
-  border-radius: 8px;
-  border: 1px solid #e3f2fd;
-
-  .connection-steps {
-    line-height: 1.8;
-
-    li {
-      margin-bottom: 8px;
-      color: inherit;
-    }
-  }
-
-  .example-url {
-    border-radius: 6px;
-    font-size: 13px;
-
-    code {
-      background: transparent;
-      padding: 0;
-      font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
-      color: #1976d2;
-    }
-  }
+/* Connection Notes Card */
+.connection-notes-card .connection-steps {
+  line-height: 1.8;
 }
 
-// Enhanced input fields
-.showLabelOnTop {
-  :deep(.q-field__prepend) {
-    padding-right: 8px;
-  }
+.connection-notes-card .connection-steps li {
+  margin-bottom: 8px;
+  color: inherit;
 }
 
-.headers-btns {
-  .q-btn {
-    &.icon-dark {
-      filter: none !important;
-    }
-  }
+.connection-notes-card .example-url {
+  border-radius: 6px;
+  font-size: 13px;
 }
 
-.header-label {
-  color: var(--o2-input-label-text-color);
+.connection-notes-card .example-url code {
+  background: transparent;
+  padding: 0;
+  font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
+  color: #1976d2;
 }
+
+/* Enhanced input fields */
+.showLabelOnTop :deep(.q-field__prepend) {
+  padding-right: 8px;
+}
+
 </style>
 
-<style lang="scss">
-.create-destination-form {
-  .q-field--labeled.showLabelOnTop .q-field__bottom {
-    padding: 0.275rem 0 0 !important;
-  }
+<style>
+.create-destination-form .q-field--labeled.showLabelOnTop .q-field__bottom {
+  padding: 0.275rem 0 0 !important;
+}
 
-  .q-field--labeled.showLabelOnTop {
-    padding-top: 24px;
-  }
+.create-destination-form .q-field--labeled.showLabelOnTop {
+  padding-top: 24px;
 }
 </style>

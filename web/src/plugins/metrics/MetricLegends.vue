@@ -17,7 +17,7 @@
       </div>
       <div class="tw:border-t tw:my-1 tw:border-dropdown-separator" />
       <div class="legends">
-        <div class="legend-grid">
+        <div class="tw:grid tw:grid-cols-2 tw:gap-2.5">
           <div
             v-for="(icon, metric) in metricsIconMapping"
             :key="metric"
@@ -65,13 +65,7 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
-.legend-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr); /* Two columns */
-  gap: 10px; /* Space between items */
-}
-
+<style>
 .q-btn:before {
   border: 0px solid var(--o2-border-input);
 }

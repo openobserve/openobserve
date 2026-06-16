@@ -606,6 +606,3 @@ watch(
 // Resizer is now handled by useResizer composable
 
 </script>
-
-<style scoped lang="scss">
-</style>

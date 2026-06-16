@@ -22,17 +22,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <button
     type="button"
-    class="es-ing-card"
+    class="es-ing-card tw:relative tw:flex tw:items-center tw:gap-3 tw:w-[18rem] tw:max-w-full tw:min-h-16 tw:py-2.5 tw:pr-3.5 tw:pl-3 tw:rounded-xl tw:border tw:border-border-default tw:bg-surface-base tw:shadow-sm tw:text-left tw:cursor-pointer tw:outline-none tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150"
     @click="emit('click')"
   >
-    <span class="es-ing-card__icon" :class="iconClass">
+    <span class="es-ing-card__icon tw:inline-flex tw:items-center tw:justify-center tw:shrink-0 tw:w-10 tw:h-10 tw:rounded-lg tw:bg-tabs-active-bg tw:text-tabs-active-text tw:transition-[background-color,color] tw:duration-150" :class="iconClass">
       <OIcon :name="icon" size="md" />
     </span>
-    <span class="es-ing-card__body">
-      <span class="es-ing-card__label">{{ label }}</span>
-      <span v-if="sublabel" class="es-ing-card__sublabel">{{ sublabel }}</span>
+    <span class="es-ing-card__body tw:flex-1 tw:min-w-0 tw:flex tw:flex-col tw:gap-0.5">
+      <span class="tw:text-sm tw:font-semibold tw:text-text-primary tw:truncate">{{ label }}</span>
+      <span v-if="sublabel" class="tw:text-xs tw:text-text-secondary tw:leading-snug">{{ sublabel }}</span>
     </span>
-    <OIcon name="chevron-right" size="sm" class="es-ing-card__chevron" />
+    <OIcon name="chevron-right" size="sm" class="es-ing-card__chevron tw:shrink-0 tw:text-text-disabled tw:transition-[transform,color] tw:duration-150" />
   </button>
 </template>
 
@@ -60,25 +60,8 @@ const iconClass = computed(() =>
 );
 </script>
 
-<style scoped>
-.es-ing-card {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  width: 18rem;
-  max-width: 100%;
-  min-height: 4rem;
-  padding: 0.625rem 0.875rem 0.625rem 0.75rem;
-  border-radius: 0.75rem;
-  border: 1px solid var(--color-border-default);
-  background: var(--color-surface-base);
-  box-shadow: var(--shadow-sm);
-  text-align: left;
-  cursor: pointer;
-  transition: color 150ms, background-color 150ms, border-color 150ms, box-shadow 150ms;
-  outline: none;
-}
+<style>
+/* hover / focus-visible states (compound selectors — can't be inlined) */
 .es-ing-card:hover {
   box-shadow: var(--shadow-md);
   border-color: var(--color-primary-400);
@@ -88,55 +71,21 @@ const iconClass = computed(() =>
   box-shadow: 0 0 0 0.125rem color-mix(in srgb, var(--color-primary-500) 40%, transparent);
 }
 
-.es-ing-card__icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  width: 2.5rem;
-  height: 2.5rem;
-  border-radius: 0.5rem;
-  background: var(--color-tabs-active-bg);
-  color: var(--color-tabs-active-text);
-  transition: background-color 150ms, color 150ms;
-}
+/* icon color variants (color-mix not expressible in Tailwind arbitrary) */
 .es-ing-card__icon--blue   { background: color-mix(in srgb, #3b82f6 12%, transparent); color: #3b82f6; }
 .es-ing-card__icon--teal   { background: color-mix(in srgb, #0d9488 12%, transparent); color: #0d9488; }
 .es-ing-card__icon--purple { background: color-mix(in srgb, #8b5cf6 12%, transparent); color: #8b5cf6; }
 .es-ing-card__icon--amber  { background: color-mix(in srgb, #d97706 12%, transparent); color: #d97706; }
 .es-ing-card__icon--orange { background: color-mix(in srgb, #f97316 12%, transparent); color: #f97316; }
 
+/* parent-context compound: icon highlight on card hover */
 .es-ing-card:hover .es-ing-card__icon,
 .es-ing-card:hover [class*="es-ing-card__icon--"] {
   background: var(--color-primary-600);
   color: #fff;
 }
 
-.es-ing-card__body {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.125rem;
-}
-.es-ing-card__label {
-  font-size: var(--text-sm);
-  font-weight: 600;
-  color: var(--color-text-primary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.es-ing-card__sublabel {
-  font-size: var(--text-xs);
-  color: var(--color-text-secondary);
-  line-height: 1.4;
-}
-.es-ing-card__chevron {
-  flex-shrink: 0;
-  color: var(--color-text-disabled);
-  transition: transform 150ms, color 150ms;
-}
+/* chevron nudge on card hover */
 .es-ing-card:hover .es-ing-card__chevron {
   transform: translateX(0.125rem);
   color: var(--color-primary-600);

@@ -1,10 +1,10 @@
 <template>
-    <div v-if="showBanner && config.isEnterprise == 'true' && config.isCloud === 'false'" class="tw:w-full usage-report-container tw:p-3" :class="bannerClass">
+    <div v-if="showBanner && config.isEnterprise == 'true' && config.isCloud === 'false'" class="tw:w-full tw:rounded-md tw:p-3" :class="bannerClass">
         <div class="tw:flex">
         <div class="tw:flex tw:flex-col">
-        <span class="o2-usage-message">{{ message }}</span>
+        <span class="tw:text-(--text-lg) tw:font-semibold tw:leading-(--leading-xl) tw:text-(--color-text-heading)">{{ message }}</span>
         <br />
-        <span class="o2-usage-subtitle">{{ subtitle }}</span>
+        <span class="tw:text-(--text-md) tw:font-normal tw:leading-(--leading-md) tw:text-(--color-text-body)">{{ subtitle }}</span>
         </div>
   </div>
     </div>
@@ -72,7 +72,7 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
+<style>
 .usage-report-warning {
   background: linear-gradient(
     to right,
@@ -91,41 +91,21 @@ export default defineComponent({
   border: 1px solid #f87171;
 }
 
-.usage-report-container {
-  border-radius: 6px;
+.body--dark .usage-report-warning {
+  background: linear-gradient(
+    to right,
+    transparent 60%,
+    #2d2a1f 70%,
+    #3d3520 100%);
+  border: 1px solid #a08530;
 }
 
-.o2-usage-message {
-  font-size: var(--text-lg);
-  font-weight: 600;
-  line-height: var(--leading-xl);
-  color: var(--color-text-heading);
-}
-
-.o2-usage-subtitle {
-  font-size: var(--text-md);
-  font-weight: 400;
-  line-height: var(--leading-md);
-  color: var(--color-text-body);
-}
-
-.body--dark {
-  .usage-report-warning {
-    background: linear-gradient(
-      to right,
-      transparent 60%,
-      #2d2a1f 70%,
-      #3d3520 100%);
-    border: 1px solid #a08530;
-  }
-
-  .usage-report-error {
-    background: linear-gradient(
-      to right,
-      transparent 60%,
-      #2d1f1f 70%,
-      #3d2020 100%);
-    border: 1px solid #dc2626;
-  }
+.body--dark .usage-report-error {
+  background: linear-gradient(
+    to right,
+    transparent 60%,
+    #2d1f1f 70%,
+    #3d2020 100%);
+  border: 1px solid #dc2626;
 }
 </style>

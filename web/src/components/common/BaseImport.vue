@@ -557,33 +557,29 @@ export default defineComponent({
 });
 </script>
 
-<style scoped lang="scss">
+<style>
 .empty-query .monaco-editor-background {
   background-image: url("../../assets/images/common/query-editor.png");
   background-repeat: no-repeat;
   background-size: 115px;
 }
 
-.editor-container-url {
-  .monaco-editor {
-    height: v-bind('editorHeights.urlEditor') !important;
-    overflow: auto;
-    resize: none;
-    border: 1px solid var(--o2-border-color);
-    border-radius: 0.375rem;
-    padding-top: 12px;
-  }
+.editor-container-url .monaco-editor {
+  height: v-bind('editorHeights.urlEditor') !important;
+  overflow: auto;
+  resize: none;
+  border: 1px solid var(--o2-border-color);
+  border-radius: 0.375rem;
+  padding-top: 12px;
 }
 
-.editor-container-json {
-  .monaco-editor {
-    height: v-bind('editorHeights.fileEditor') !important;
-    overflow: auto;
-    resize: none;
-    border: 1px solid var(--o2-border-color);
-    border-radius: 0.375rem;
-    padding-top: 12px;
-  }
+.editor-container-json .monaco-editor {
+  height: v-bind('editorHeights.fileEditor') !important;
+  overflow: auto;
+  resize: none;
+  border: 1px solid var(--o2-border-color);
+  border-radius: 0.375rem;
+  padding-top: 12px;
 }
 
 .monaco-editor {
@@ -601,22 +597,4 @@ export default defineComponent({
   resize: none;
 }
 
-.error-section {
-  padding: 10px;
-  margin-bottom: 10px;
-}
-
-.section-title {
-  font-size: 16px;
-  margin-bottom: 10px;
-  text-transform: uppercase;
-}
-
-.error-list {
-}
-
-.error-item {
-  padding: 5px 0px;
-  font-size: 14px;
-}
 </style>

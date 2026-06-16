@@ -16,14 +16,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="step-advanced"
+    class="step-advanced tw:w-full"
     :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'"
   >
-    <div class="step-content card-container">
+    <div
+      class="step-content card-container tw:rounded-lg"
+      :class="store.state.theme === 'dark' ? 'tw:bg-[var(--o2-primary-background)] tw:border tw:border-[#343434]' : 'tw:bg-white tw:border tw:border-[#e6e6e6]'"
+    >
       <!-- Section header -->
-      <div class="section-header">
-        <div class="section-header-accent" />
-        <span class="section-header-title">{{
+      <div
+        class="section-header tw:flex tw:items-center tw:py-[10px] tw:px-3"
+        :class="store.state.theme === 'dark' ? 'tw:border-b tw:border-[#343434]' : 'tw:border-b tw:border-[#eeeeee]'"
+      >
+        <div class="section-header-accent tw:w-[3px] tw:h-4 tw:rounded-[2px] tw:mr-2 tw:shrink-0 tw:bg-[var(--q-primary)]" />
+        <span
+          class="section-header-title tw:text-[13px] tw:font-semibold"
+          :class="store.state.theme === 'dark' ? 'tw:text-[var(--o2-border)]' : 'tw:text-[#374151]'"
+        >{{
           t("alerts.additional_settings") || "Additional Settings"
         }}</span>
       </div>
@@ -31,7 +40,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:px-3 tw:py-3 tw:flex tw:flex-col tw:gap-4">
         <!-- Template Override -->
         <div>
-          <div class="subsection-label tw:mb-2">
+          <div
+            class="subsection-label tw:flex tw:items-center tw:text-xs tw:font-semibold tw:mb-2"
+            :class="store.state.theme === 'dark' ? 'tw:text-[#9ca3af]' : 'tw:text-[#6b7280]'"
+          >
             <span>{{ t("alerts.template") }}</span>
             <OButton
               style="color: #a0a0a0"
@@ -66,7 +78,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Context Variables -->
         <div>
-          <div class="subsection-label tw:mb-2">
+          <div
+            class="subsection-label tw:flex tw:items-center tw:text-xs tw:font-semibold tw:mb-2"
+            :class="store.state.theme === 'dark' ? 'tw:text-[#9ca3af]' : 'tw:text-[#6b7280]'"
+          >
             <span>{{ t("alerts.additionalVariables") }}</span>
             <OButton
               style="color: #a0a0a0"
@@ -131,7 +146,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Description -->
         <div>
-          <div class="subsection-label tw:mb-2">
+          <div
+            class="subsection-label tw:flex tw:items-center tw:text-xs tw:font-semibold tw:mb-2"
+            :class="store.state.theme === 'dark' ? 'tw:text-[#9ca3af]' : 'tw:text-[#6b7280]'"
+          >
             <span>{{ t("alerts.description") }}</span>
           </div>
           <OTextarea
@@ -145,7 +163,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Row Template -->
         <div>
           <div class="tw:flex tw:items-center tw:justify-between tw:mb-2">
-            <div class="subsection-label">
+            <div
+              class="subsection-label tw:flex tw:items-center tw:text-xs tw:font-semibold"
+              :class="store.state.theme === 'dark' ? 'tw:text-[#9ca3af]' : 'tw:text-[#6b7280]'"
+            >
               <span>{{ t("alerts.row") }}</span>
               <OButton
                 data-test="add-alert-row-input-info-btn"
@@ -366,76 +387,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style scoped lang="scss">
-.step-advanced {
-  width: 100%;
-
-  .step-content {
-    border-radius: 8px;
-  }
-
-  &.dark-mode {
-    .step-content {
-      background-color: var(--o2-primary-background);
-      border: 1px solid #343434;
-    }
-    .section-header {
-      border-bottom: 1px solid #343434;
-    }
-    .section-header-title {
-      color: var(--o2-border);
-    }
-    .section-header-accent {
-      background: var(--q-primary);
-    }
-    .subsection-label {
-      color: #9ca3af;
-    }
-  }
-
-  &.light-mode {
-    .step-content {
-      background-color: #ffffff;
-      border: 1px solid #e6e6e6;
-    }
-    .section-header {
-      border-bottom: 1px solid #eeeeee;
-    }
-    .section-header-title {
-      color: #374151;
-    }
-    .section-header-accent {
-      background: var(--q-primary);
-    }
-    .subsection-label {
-      color: #6b7280;
-    }
-  }
-}
-
-.section-header {
-  display: flex;
-  align-items: center;
-  padding: 10px 12px;
-}
-.section-header-accent {
-  width: 3px;
-  height: 16px;
-  border-radius: 2px;
-  margin-right: 8px;
-  flex-shrink: 0;
-}
-.section-header-title {
-  font-size: 13px;
-  font-weight: 600;
-}
-.subsection-label {
-  display: flex;
-  align-items: center;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-
-</style>

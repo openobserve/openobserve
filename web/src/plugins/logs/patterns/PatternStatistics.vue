@@ -49,6 +49,3 @@ const summaryText = computed(() => {
   return `Showing 1 to 50 out of ${totalEvents} events & ${patternsFound} patterns found in ${logsAnalyzed} events in ${totalTimeMs} ms.`;
 });
 </script>
-
-<style scoped lang="scss">
-</style>

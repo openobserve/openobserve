@@ -26,9 +26,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data-test="`log-search-expand-${field.name}-field-btn`"
         :highlight="isFieldSelected"
       >
-        <span class="field-type-container">
+        <span class="tw:w-[0.55rem] tw:shrink-0 tw:flex tw:items-center tw:justify-center">
           <OIcon
-            class="field-expand-icon"
+            class="tw:inline-flex tw:items-center tw:justify-center tw:shrink-0 tw:w-4 tw:text-[var(--o2-text-muted)]"
             :name="isExpanded ? 'expand-more' : 'chevron-right'"
             size="sm"
           />
@@ -248,38 +248,21 @@ const handleToggle = (val: boolean) => {
 defineExpose({ reset: () => fieldValuesPanelRef.value?.reset() });
 </script>
 
-<style scoped lang="scss">
-.field-type-container {
-  width: 0.55rem;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.field-expand-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  width: 1rem;
-  color: var(--o2-text-muted);
-}
-
-:deep(.field-expansion-item button[data-state]) {
+<style>
+.field-expansion-item button[data-state] {
   min-height: 24px !important;
 }
 
-:deep(.field-expansion-item button[data-state="open"]) {
+.field-expansion-item button[data-state="open"] {
   background-color: var(--o2-hover-accent);
 }
 
-:deep(.field-expansion-item .o-collapsible-content) {
+.field-expansion-item .o-collapsible-content {
   background-color: var(--o2-hover-accent);
   width: 100%;
 }
 
-:deep(.field-expansion-item[data-state="open"]) {
+.field-expansion-item[data-state="open"] {
   border: 1px solid var(--o2-border-color);
   margin-bottom: 0.375rem;
 }

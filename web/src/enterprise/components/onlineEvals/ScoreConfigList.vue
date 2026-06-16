@@ -55,28 +55,31 @@
         </template>
 
         <template #cell-type="{ row }">
-          <span class="sc-dtype-chip" :class="`sc-dtype-chip--${dataTypeOf(row)}`">
+          <span
+            class="tw:inline-flex tw:items-center tw:gap-1 tw:py-px tw:px-1.75 tw:rounded-[3px] tw:font-semibold tw:text-[11px] tw:leading-normal tw:font-[inherit]"
+            :class="`sc-dtype-chip--${dataTypeOf(row)}`"
+          >
             {{ dataTypeOf(row) }}
           </span>
         </template>
 
         <template #cell-rangeValues="{ row }">
-          <span class="sc-mono-cell">{{ rangeOrValues(row) }}</span>
+          <span class="tw:font-[ui-monospace,SFMono-Regular,Menlo,monospace] tw:text-xs">{{ rangeOrValues(row) }}</span>
         </template>
 
         <template #cell-healthy="{ row }">
-          <span class="sc-mono-cell tw:font-semibold">{{ healthyDisplay(row) }}</span>
+          <span class="tw:font-[ui-monospace,SFMono-Regular,Menlo,monospace] tw:text-xs tw:font-semibold">{{ healthyDisplay(row) }}</span>
         </template>
 
         <template #cell-version="{ row }">
-          <span class="sc-version-cell">
-            <span class="sc-version-cell__dot" />v{{ row.version }}
-            <span class="sc-version-cell__muted">({{ t("onlineEvals.scoreConfig.active") }})</span>
+          <span class="tw:inline-flex tw:items-center tw:gap-1.5 tw:font-[ui-monospace,SFMono-Regular,Menlo,monospace] tw:text-xs">
+            <span class="tw:w-1.5 tw:h-1.5 tw:rounded-full tw:bg-(--o2-status-success-text) tw:inline-block" />v{{ row.version }}
+            <span class="tw:text-[var(--color-text-secondary,var(--o2-text-secondary))] tw:font-normal">({{ t("onlineEvals.scoreConfig.active") }})</span>
           </span>
         </template>
 
         <template #cell-usedBy="{ row }">
-          <span class="sc-mono-cell">{{ usedByText(row) }}</span>
+          <span class="tw:font-[ui-monospace,SFMono-Regular,Menlo,monospace] tw:text-xs">{{ usedByText(row) }}</span>
         </template>
 
         <template #cell-created="{ row }">
@@ -349,16 +352,7 @@ function formatDateShort(value: number) {
 }
 </script>
 
-<style lang="scss">
-.sc-dtype-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 1px 7px;
-  border-radius: 3px;
-  font: 600 11px/1.5 inherit;
-}
-
+<style>
 .sc-dtype-chip--numeric {
   background: color-mix(in srgb, var(--o2-status-info-text) 14%, transparent);
   color: var(--o2-status-info-text);
@@ -372,29 +366,4 @@ function formatDateShort(value: number) {
   color: var(--o2-status-success-text);
 }
 
-.sc-mono-cell {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 12px;
-}
-
-.sc-version-cell {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 12px;
-}
-
-.sc-version-cell__dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 99px;
-  background: var(--o2-status-success-text);
-  display: inline-block;
-}
-
-.sc-version-cell__muted {
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  font-weight: 400;
-}
 </style>

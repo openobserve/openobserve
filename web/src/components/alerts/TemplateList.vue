@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -102,13 +102,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span>{{ row.name }}</span>
             <span
               v-if="row.isPrebuilt"
-              class="dimension-badge badge-blue"
+              class="dimension-badge badge-blue tw:inline-flex tw:items-center tw:gap-0.5 tw:py-0.5 tw:px-2 tw:rounded-md tw:text-[11px] tw:font-medium tw:whitespace-nowrap tw:border tw:border-[#1d4ed8] tw:text-inherit"
               :title="t('alert_templates.prebuiltBadgeHint')"
               data-test="alert-template-prebuilt-badge"
             >{{ t('alert_templates.prebuiltBadge') }}</span>
             <span
               v-else
-              class="dimension-badge"
+              class="dimension-badge tw:inline-flex tw:items-center tw:gap-0.5 tw:py-0.5 tw:px-2 tw:rounded-md tw:text-[11px] tw:font-medium tw:whitespace-nowrap tw:border tw:border-[#d1d5db] tw:text-inherit"
               data-test="alert-template-custom-badge"
             >{{ t('alert_templates.customBadge') }}</span>
           </div>
@@ -591,40 +591,15 @@ const bulkDeleteTemplates = () => {
     });
 };
 </script>
-<style lang="scss" scoped>
-// Badge style copied from ModelPricingList.vue so the "Prebuilt" / "Default"
-// labels match the LLM-pricing list visually.
-.dimension-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  padding: 2px 8px;
-  border-radius: 6px;
-  font-size: 11px;
-  font-weight: 500;
-  white-space: nowrap;
-  border: 1px solid #d1d5db;
-  color: inherit;
-}
-
-.badge-blue {
-  border: 1px solid #1d4ed8;
-}
-
-.badge-green {
-  border: 1px solid #065f46;
-}
-
-:global(body.body--dark) .dimension-badge {
+<style>
+/* Badge style copied from ModelPricingList.vue so the "Prebuilt" / "Default"
+   labels match the LLM-pricing list visually. */
+body.body--dark .dimension-badge {
   color: #ffffff;
   border-color: #4b5563;
 }
 
-:global(body.body--dark) .badge-blue {
+body.body--dark .badge-blue {
   border-color: #93c5fd;
-}
-
-:global(body.body--dark) .badge-green {
-  border-color: #6ee7b7;
 }
 </style>

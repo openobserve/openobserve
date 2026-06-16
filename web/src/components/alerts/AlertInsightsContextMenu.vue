@@ -16,22 +16,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="context-menu"
-    :class="store.state.theme === 'dark' ? 'dark-theme' : 'light-theme'"
+    class="context-menu tw:fixed tw:z-9999 tw:min-w-55 tw:overflow-hidden tw:bg-white tw:border tw:border-(--o2-border) tw:rounded-md tw:shadow-[0_4px_12px_rgba(0,0,0,0.15)]"
+    :class="store.state.theme === 'dark' ? 'dark-theme tw:bg-[#2d2d2d] tw:border-[#444] tw:shadow-[0_4px_12px_rgba(0,0,0,0.4)]' : 'light-theme'"
     :style="{ top: `${y}px`, left: `${x}px` }"
     @click.stop
     data-test="alert-insights-context-menu"
   >
-    <div class="menu-header tw:px-4 tw:py-2 tw:text-xs tw:font-semibold">
+    <div class="menu-header tw:px-4 tw:py-2 tw:text-xs tw:font-semibold tw:bg-[#f5f5f5] tw:text-[#666]" :class="store.state.theme === 'dark' ? 'tw:bg-[#1e1e1e] tw:text-[#aaa]' : ''">
       {{ isAlertNameContext ? value : panelTitle }}
     </div>
     <OSeparator />
 
     <!-- Alert-specific actions (shown for Dedup and similar panels) -->
     <template v-if="isAlertNameContext">
-      <div class="menu-section">
+      <div class="menu-section tw:py-1 tw:px-0">
         <div
-          class="menu-item"
+          class="menu-item tw:flex tw:items-center tw:py-2 tw:px-4 tw:cursor-pointer tw:[transition:background-color_0.2s] tw:text-sm"
           @click="configureDedupForAlert"
           data-test="context-menu-configure-dedup"
         >
@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span>Configure Dedup</span>
         </div>
         <div
-          class="menu-item"
+          class="menu-item tw:flex tw:items-center tw:py-2 tw:px-4 tw:cursor-pointer tw:[transition:background-color_0.2s] tw:text-sm"
           @click="editAlert"
           data-test="context-menu-edit-alert"
         >
@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span>Edit Alert</span>
         </div>
         <div
-          class="menu-item"
+          class="menu-item tw:flex tw:items-center tw:py-2 tw:px-4 tw:cursor-pointer tw:[transition:background-color_0.2s] tw:text-sm"
           @click="viewAlertHistory"
           data-test="context-menu-view-history"
         >
@@ -56,9 +56,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <OSeparator />
-      <div class="menu-section">
+      <div class="menu-section tw:py-1 tw:px-0">
         <div
-          class="menu-item"
+          class="menu-item tw:flex tw:items-center tw:py-2 tw:px-4 tw:cursor-pointer tw:[transition:background-color_0.2s] tw:text-sm"
           @click="$emit('close')"
           data-test="context-menu-cancel"
         >
@@ -194,60 +194,20 @@ onUnmounted(() => {
 });
 </script>
 
-<style scoped lang="scss">
-.context-menu {
-  position: fixed;
-  z-index: 9999;
-  background: white;
-  border: 1px solid var(--o2-border);
-  border-radius: 6px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  min-width: 220px;
-  overflow: hidden;
+<style>
+.context-menu .menu-item:hover {
+  background-color: #f5f5f5;
+}
 
-  &.dark-theme {
-    background: #2d2d2d;
-    border-color: #444;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-  }
+.context-menu.dark-theme .menu-item:hover {
+  background-color: #383838;
+}
 
-  .menu-header {
-    background: #f5f5f5;
-    color: #666;
+.context-menu .menu-item:active {
+  background-color: #e8e8e8;
+}
 
-    .dark-theme & {
-      background: #1e1e1e;
-      color: #aaa;
-    }
-  }
-
-  .menu-section {
-    padding: 4px 0;
-  }
-
-  .menu-item {
-    display: flex;
-    align-items: center;
-    padding: 8px 16px;
-    cursor: pointer;
-    transition: background-color 0.2s;
-    font-size: 14px;
-
-    &:hover {
-      background-color: #f5f5f5;
-
-      .dark-theme & {
-        background-color: #383838;
-      }
-    }
-
-    &:active {
-      background-color: #e8e8e8;
-
-      .dark-theme & {
-        background-color: #444;
-      }
-    }
-  }
+.context-menu.dark-theme .menu-item:active {
+  background-color: #444;
 }
 </style>

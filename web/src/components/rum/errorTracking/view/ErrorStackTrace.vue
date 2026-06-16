@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="tw:flex tw:mt-4 tw:ml-1">
     <div class="tw:w-full">
-      <div class="tags-title tw:font-bold tw:mb-1">{{ t("rum.errorStack") }}</div>
+      <div class="tw:text-base tw:font-bold tw:mb-1">{{ t("rum.errorStack") }}</div>
       <div class="tw:mb-2">{{ error_stack[0] }}</div>
 
       <!-- Tabs for Pretty and Raw views -->
@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template v-for="(stack, index) in error_stack" :key="stack">
               <div
                 v-if="index"
-                class="error_stack tw:px-2"
+                class="tw:border-b tw:border-l tw:border-r tw:border-solid tw:border-(--o2-border) tw:text-[13px] tw:py-1.5 tw:px-2"
                 :style="{
                   'border-top': Number(index) === 1 ? '1px solid #e0e0e0' : '',
                   'border-radius':
@@ -93,20 +93,3 @@ defineProps({
 const activeTab = ref("raw");
 </script>
 
-<style lang="scss" scoped>
-.tags-title {
-  font-size: 16px;
-}
-
-.error_stack {
-  border-bottom: 1px solid var(--o2-border);
-  border-left: 1px solid var(--o2-border);
-  border-right: 1px solid var(--o2-border);
-  font-size: 13px;
-  padding: 6px 8px;
-}
-
-.error_stacks:first-child .error_stack {
-  border-top: 1px solid var(--o2-border);
-}
-</style>

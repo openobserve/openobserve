@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -191,11 +191,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- History Table -->
             <div
               v-else
-              class="code-block tw:flex tw:flex-col tw:flex-1 tw:overflow-hidden"
+              class="tw:rounded-lg tw:overflow-hidden tw:border tw:flex tw:flex-col tw:flex-1"
               :class="
                 store.state.theme === 'dark'
-                  ? 'code-block-dark'
-                  : 'code-block-light'
+                  ? 'tw:border-[#374151]'
+                  : 'tw:border-[#e5e7eb] tw:bg-[#f9fafb]'
               "
             >
               <OTable
@@ -210,7 +210,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :row-class="getRowClass"
                 :default-columns="false"
                 :show-global-filter="false"
-                class="history-table tw:flex-1 tw:overflow-hidden"
+                class="history-table tw:flex-1 tw:overflow-hidden tw:!border-0 tw:!shadow-none"
                 data-test="alert-details-history-table"
                 @pagination-change="onPaginationChange"
               >
@@ -312,19 +312,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Anomaly detection condition view — mirrors the alert SQL code block -->
             <template v-if="isAnomaly">
               <div
-                class="code-block tw:flex tw:flex-col tw:flex-1 tw:overflow-hidden "
+                class="tw:rounded-lg tw:overflow-hidden tw:border tw:flex tw:flex-col tw:flex-1"
                 :class="
                   store.state.theme === 'dark'
-                    ? 'code-block-dark'
-                    : 'code-block-light'
+                    ? 'tw:border-[#374151]'
+                    : 'tw:border-[#e5e7eb] tw:bg-[#f9fafb]'
                 "
               >
                 <div
-                  class="code-block-header tw:shrink-0"
+                  class="tw:flex tw:items-center tw:justify-between tw:py-1.5 tw:px-2.5 tw:border-b tw:shrink-0"
                   :class="
                     store.state.theme === 'dark'
-                      ? 'code-block-header-dark'
-                      : 'code-block-header-light'
+                      ? 'tw:border-[#374151]'
+                      : 'tw:bg-[#f3f4f6] tw:border-[#e5e7eb]'
                   "
                 >
                   <div class="tw:flex tw:items-center tw:gap-1.5">
@@ -351,7 +351,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OButton>
                 </div>
                 <pre
-                  class="code-block-content tw:text-[13px] tw:m-0 tw:leading-relaxed tw:flex-1 tw:overflow-y-auto"
+                  class="tw:p-[10px_14px] tw:font-mono tw:whitespace-pre-wrap tw:overflow-x-auto tw:text-[13px] tw:m-0 tw:leading-relaxed tw:flex-1 tw:overflow-y-auto"
                   >{{ anomalySql || t("alerts.alertDetails.noCondition") }}</pre
                 >
               </div>
@@ -360,20 +360,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Regular alert condition view -->
             <template v-else>
               <div
-                class="code-block tw:flex tw:flex-col tw:flex-1 tw:overflow-hidden"
+                class="tw:rounded-lg tw:overflow-hidden tw:border tw:flex tw:flex-col tw:flex-1"
                 :class="
                   store.state.theme === 'dark'
-                    ? 'code-block-dark'
-                    : 'code-block-light'
+                    ? 'tw:border-[#374151]'
+                    : 'tw:border-[#e5e7eb] tw:bg-[#f9fafb]'
                 "
               >
                 <!-- Code block header bar — stays fixed -->
                 <div
-                  class="code-block-header tw:shrink-0"
+                  class="tw:flex tw:items-center tw:justify-between tw:py-1.5 tw:px-2.5 tw:border-b tw:shrink-0"
                   :class="
                     store.state.theme === 'dark'
-                      ? 'code-block-header-dark'
-                      : 'code-block-header-light'
+                      ? 'tw:border-[#374151]'
+                      : 'tw:bg-[#f3f4f6] tw:border-[#e5e7eb]'
                   "
                 >
                   <div class="tw:flex tw:items-center tw:gap-1.5">
@@ -422,7 +422,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <!-- Code content — scrolls internally -->
                 <pre
-                  class="code-block-content tw:text-[13px] tw:m-0 tw:leading-relaxed tw:flex-1 tw:overflow-y-auto"
+                  class="tw:p-[10px_14px] tw:font-mono tw:whitespace-pre-wrap tw:overflow-x-auto tw:text-[13px] tw:m-0 tw:leading-relaxed tw:flex-1 tw:overflow-y-auto"
                   >{{
                     alertDetails.conditions !== "" &&
                     alertDetails.conditions !== "--"
@@ -848,46 +848,7 @@ watch(
 );
 </script>
 
-<style lang="scss" scoped>
-/* ── Code Block ── */
-.code-block {
-  border-radius: 8px;
-  overflow: hidden;
-  border: 1px solid;
-}
-.code-block-light {
-  border-color: #e5e7eb;
-  background: #f9fafb;
-}
-.code-block-dark {
-  border-color: #374151;
-  // background: #111827;
-}
-
-.code-block-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 6px 10px;
-  border-bottom: 1px solid;
-}
-.code-block-header-light {
-  background: #f3f4f6;
-  border-color: #e5e7eb;
-}
-.code-block-header-dark {
-  // background: #1f2937;
-  border-color: #374151;
-}
-
-.code-block-content {
-  padding: 10px 14px;
-  font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", monospace;
-  white-space: pre-wrap;
-  overflow-x: auto;
-  font-size: 13px;
-}
-
+<style>
 /* ── Row tints ── */
 .row-error-light {
   background: #fff5f5 !important;
@@ -896,20 +857,8 @@ watch(
   background: #2d1b1b !important;
 }
 
-/* ── Table layout ── */
-.history-table {
-  border: none !important;
-  box-shadow: none !important;
-}
-
-/* ── Tab panels fill height ── */
-:deep(.o-tab-panels) {
-  flex: 1;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-:deep(.o-tab-panel) {
+/* ── Tab panel fill height ── */
+.o-tab-panel {
   flex: 1;
 }
 </style>

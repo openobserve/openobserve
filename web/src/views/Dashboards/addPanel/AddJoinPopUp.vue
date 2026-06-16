@@ -10,16 +10,16 @@
  distributed under the License is distributed on an "AS IS" BASIS,
  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  See the License for the specific language governing permissions and
- limitations under the License. 
+ limitations under the License.
 -->
 
 <!-- eslint-disable vue/no-unused-components -->
 <template>
-  <div data-test="dashboard-join-pop-up" class="join-popup-container">
-    <div class="join-header" data-test="dashboard-join-pop-up-header">
-      <div class="join-section">
-        <div class="join-section-header">
-          <LeftJoinSvg class="tw:h-[21px]" />
+  <div data-test="dashboard-join-pop-up" class="tw:w-156">
+    <div class="tw:flex tw:justify-between tw:items-center tw:mb-3.75" data-test="dashboard-join-pop-up-header">
+      <div class="tw:flex-1 tw:gap-2">
+        <div class="tw:flex tw:items-center tw:gap-2 tw:text-(--q-primary)">
+          <LeftJoinSvg class="tw:h-5.25" />
           <label>Join</label>
         </div>
         <OSelect
@@ -31,15 +31,15 @@
         />
       </div>
 
-      <div class="join-connector">
-        <LeftJoinLineSvg class="tw:h-[40px] tw:w-[58px]" />
+      <div class="tw:flex tw:items-center tw:gap-2 tw:pt-5.25 tw:px-2.5 tw:text-(--q-primary)">
+        <LeftJoinLineSvg class="tw:h-10 tw:w-14.5" />
       </div>
 
-      <div class="join-type-section">
+      <div class="tw:flex tw:flex-col tw:items-center">
         <label for="joinType">Join type</label>
-        <div class="join-type-selector">
+        <div class="tw:flex tw:justify-center tw:items-center tw:gap-2">
           <div
-            class="join-type-option"
+            class="tw:flex tw:flex-col tw:items-center tw:cursor-pointer tw:transition-opacity tw:duration-200 tw:text-(--q-primary) tw:hover:opacity-80"
             @click="handleJoinTypeChange('left')"
             :aria-label="t('panel.leftJoin')"
             data-test="dashboard-join-type-left"
@@ -48,7 +48,7 @@
             <div :class="getJoinTypeLabelClass('left')">Left</div>
           </div>
           <div
-            class="join-type-option"
+            class="tw:flex tw:flex-col tw:items-center tw:cursor-pointer tw:transition-opacity tw:duration-200 tw:text-(--q-primary) tw:hover:opacity-80"
             @click="handleJoinTypeChange('inner')"
             :aria-label="t('panel.innerJoin')"
             data-test="dashboard-join-type-inner"
@@ -57,7 +57,7 @@
             <div :class="getJoinTypeLabelClass('inner')">Inner</div>
           </div>
           <div
-            class="join-type-option"
+            class="tw:flex tw:flex-col tw:items-center tw:cursor-pointer tw:transition-opacity tw:duration-200 tw:text-(--q-primary) tw:hover:opacity-80"
             @click="handleJoinTypeChange('right')"
             :aria-label="t('panel.rightJoin')"
             data-test="dashboard-join-type-right"
@@ -68,13 +68,13 @@
         </div>
       </div>
 
-      <div class="join-connector">
-        <RightJoinLineSvg class="tw:h-[40px] tw:w-[58px]" />
+      <div class="tw:flex tw:items-center tw:gap-2 tw:pt-5.25 tw:px-2.5 tw:text-(--q-primary)">
+        <RightJoinLineSvg class="tw:h-10 tw:w-14.5" />
       </div>
 
-      <div class="join-section">
-        <div class="join-section-header">
-          <RightJoinSvg class="tw:h-[21px]" />
+      <div class="tw:flex-1 tw:gap-2">
+        <div class="tw:flex tw:items-center tw:gap-2 tw:text-(--q-primary)">
+          <RightJoinSvg class="tw:h-5.25" />
           <label>On</label>
         </div>
 
@@ -108,10 +108,10 @@
       <div class="tw:border-t tw:border-gray-200 tw:flex-1"></div>
     </div>
 
-    <div class="clause-section">
-      <div class="clause-header">
-        <h3 class="clause-title">Joining Clause</h3>
-        <p class="clause-description">
+    <div class="tw:mb-2.5">
+      <div class="tw:mb-2.5">
+        <h3 class="tw:text-sm tw:not-italic tw:font-semibold tw:leading-normal tw:m-0">Joining Clause</h3>
+        <p class="tw:text-xs tw:not-italic tw:font-normal tw:leading-normal tw:mt-1 tw:mb-0 tw:mx-0">
           Select the fields that need to be correlated within the joining
           streams
         </p>
@@ -120,11 +120,11 @@
       <div
         v-for="(arg, argIndex) in modelValue.conditions"
         :key="argIndex + JSON.stringify(arg)"
-        class="condition-item"
+        class="tw:mb-2.5 tw:p-2.5 tw:border tw:border-border-default tw:rounded"
       >
-        <div class="condition-label">Clause {{ argIndex + 1 }}</div>
-        <div class="condition-fields">
-          <div class="field-container">
+        <div class="tw:mb-2 tw:font-medium">Clause {{ argIndex + 1 }}</div>
+        <div class="tw:flex tw:items-center tw:gap-2.5">
+          <div class="tw:flex-1">
             <StreamFieldSelect
               :streams="getStreamsBasedJoinIndex()"
               v-model="modelValue.conditions[argIndex].leftField"
@@ -132,7 +132,7 @@
             />
           </div>
 
-          <div class="field-container">
+          <div class="tw:flex-1">
             <OSelect
               :label-position="'inside'"
               v-model="modelValue.conditions[argIndex].operation"
@@ -142,7 +142,7 @@
             />
           </div>
 
-          <div class="field-container">
+          <div class="tw:flex-1">
             <StreamFieldSelect
               :streams="rightFieldStreams"
               v-model="modelValue.conditions[argIndex].rightField"
@@ -561,114 +561,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped>
-.join-popup-container {
-  width: 624px;
-}
-
-.join-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 15px;
-}
-
-.join-section {
-  flex: 1;
-  gap: 8px;
-}
-
-.join-section-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--q-primary);
-}
-
-.join-connector {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding-top: 21px;
-  padding-right: 10px;
-  padding-left: 10px;
-  color: var(--q-primary);
-}
-
-.join-type-section {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.join-type-selector {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 8px;
-}
-
-.join-type-option {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  cursor: pointer;
-  transition: opacity 0.2s;
-  color: var(--q-primary);
-
-  &:hover {
-    opacity: 0.8;
-  }
-}
-
-.full-width {
-  width: 100%;
-}
-
-.clause-section {
-  margin-bottom: 10px;
-}
-
-.clause-header {
-  margin-bottom: 10px;
-}
-
-.clause-title {
-  font-size: 14px;
-  font-style: normal;
-  font-weight: 600;
-  line-height: normal;
-  margin: 0;
-}
-
-.clause-description {
-  font-size: 12px;
-  font-style: normal;
-  font-weight: 400;
-  line-height: normal;
-  margin: 4px 0 0 0;
-}
-
-.condition-item {
-  margin-bottom: 10px;
-  padding: 10px;
-  border: 1px solid var(--color-border-default);
-  border-radius: 4px;
-}
-
-.condition-label {
-  margin-bottom: 8px;
-  font-weight: 500;
-}
-
-.condition-fields {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.field-container {
-  flex: 1;
-}
-</style>

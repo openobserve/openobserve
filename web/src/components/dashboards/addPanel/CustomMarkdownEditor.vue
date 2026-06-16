@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="dashboard-custom-markdown-editor-container"
-    class="markdown-editor card-container"
+    class="card-container"
     style="width: 100%; height: 100%; overflow: hidden"
   >
     <div
@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #separator>
           <div
             data-test="dashboard-custom-markdown-editor-splitter-separator"
-            class="splitter-vertical splitter-enabled"
+            class="tw:w-1 tw:h-full tw:bg-[var(--o2-border,#e5e7eb)] tw:transition-colors tw:hover:bg-orange-500"
           ></div>
         </template>
         <template #after>
@@ -120,29 +120,7 @@ export default defineComponent({
 });
 </script>
 
-<style scoped>
-.markdown-editor {
-  display: flex;
-  height: 100%;
-}
-
-.splitter {
-  height: 4px;
-  width: 100%;
-}
-.splitter-vertical {
-  width: 4px;
-  height: 100%;
-}
-.splitter-enabled {
-  background-color: var(--o2-border, #e5e7eb);
-  transition: background-color 0.3s;
-}
-
-.splitter-enabled:hover {
-  background-color: orange;
-}
-
+<style>
 :deep(.query-editor-splitter .q-splitter__separator) {
   background-color: transparent !important;
 }

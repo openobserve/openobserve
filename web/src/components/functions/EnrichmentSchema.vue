@@ -32,9 +32,9 @@
         >
           <OSpinner size="md" data-test="enrichment-schema-loading-indicator" />
         </div>
-        <div v-else class="indexDetailsContainer" style="height: 100vh">
+        <div v-else class="indexDetailsContainer tw:p-5 tw:w-full" style="height: 100vh">
           <div
-            class="titleContainer tw:flex tw:flex-col tw:items-flex-start tw:gap-5"
+            class="titleContainer tw:flex tw:flex-col tw:items-flex-start tw:gap-5 tw:bg-[#00000005] tw:border tw:border-[var(--o2-border-input)] tw:rounded-[5px] tw:p-4"
           >
             <div
               data-test="stream-details-container"
@@ -42,14 +42,14 @@
             >
               <div data-test="schema-stream-title-text">
                 {{ t("alerts.stream_name") }}
-                <span class="title tw:pl-1" > {{ schemaData.name }}</span>
+                <span class="title tw:pl-1 tw:mb-4 tw:font-bold" > {{ schemaData.name }}</span>
               </div>
               <div
                 v-if="store.state.zoConfig.show_stream_stats_doc_num"
                 data-test="schema-stream-title-text"
               >
                 {{ t("logStream.docsCount") }}
-                <span class="title tw:pl-1">
+                <span class="title tw:pl-1 tw:mb-4 tw:font-bold">
                   {{
                     parseInt(schemaData.stats.doc_num).toLocaleString("en-US")
                   }}
@@ -57,7 +57,7 @@
               </div>
               <div data-test="schema-stream-title-text">
                 {{ t("logStream.storageSize") }}
-                <span class="title tw:pl-1">
+                <span class="title tw:pl-1 tw:mb-4 tw:font-bold">
                   {{ formatSizeFromMB(schemaData.stats.storage_size) }}</span
                 >
               </div>
@@ -66,14 +66,14 @@
                 data-test="schema-stream-title-text"
               >
                 {{ t("logStream.compressedSize") }}
-                <span class="title tw:pl-1">
+                <span class="title tw:pl-1 tw:mb-4 tw:font-bold">
                   {{ formatSizeFromMB(schemaData.stats.compressed_size) }}</span
                 >
               </div>
             </div>
           </div>
           <div class="tw:flex tw:items-center tw:justify-between tw:gap-4 tw:mt-4">
-            <div class="tw:text-sm display-total-fields">
+            <div class="tw:text-sm tw:w-28.75 tw:h-7.5 tw:rounded-sm tw:flex tw:items-center tw:justify-center tw:bg-(--o2-theme-color) tw:text-white">
                 All Fields ({{ schemaData.schema.length }})
             </div>
                 <OSearchInput
@@ -163,7 +163,7 @@
         type: Boolean,
         default: false,
         },
-         
+
         selectedEnrichmentTable: {
         type: String,
         default: '',
@@ -246,45 +246,8 @@
     });
     </script>
 
-<style lang="scss" scoped>
-.q-card__section--vert {
-  padding: 8px 16px;
+<style>
+.indexDetailsContainer .q-table {
+  border: 1px solid var(--o2-border-input);
 }
-.indexDetailsContainer {
-  padding: 1.25rem;
-  width: 100%;
-
-  .title {
-    margin-bottom: 1rem;
-    font-weight: 700;
-  }
-
-  .titleContainer {
-    background-color: #00000005;
-    border: 1px solid var(--o2-border-input);
-    border-radius: 5px;
-    padding: 1rem;
-  }
-
-  .q-table {
-    border: 1px solid var(--o2-border-input);
-
-  }
-  .display-total-fields{
-    width: 115px;
-    height: 30px;
-    border-radius: 3px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background-color: var(--o2-theme-color);
-    color: white;
-  }
-
-
-}
-
-
-
-
 </style>

@@ -369,11 +369,9 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
-.q-table {
-  &__top {
-    border-bottom: 1px solid var(--o2-border);
-    justify-content: flex-end;
-  }
+<style>
+.q-table__top {
+  border-bottom: 1px solid var(--o2-border);
+  justify-content: flex-end;
 }
 </style>

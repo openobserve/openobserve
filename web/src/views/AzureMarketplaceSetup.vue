@@ -15,10 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="azure-marketplace-setup">
+  <div class="azure-marketplace-setup tw:min-h-screen tw:bg-(--q-background)">
     <div class="tw:flex relative-position tw-px-3 tw-pt-2">
       <img
-        class="appLogo"
+        class="tw:h-10"
         loading="lazy"
         :src="
           store?.state?.theme === 'dark'
@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
 
-    <div class="setup-container tw:p-6">
+    <div class="tw:max-w-125 tw:mx-auto tw:pt-15 tw:p-6">
       <!-- No Token Error -->
       <div v-if="state === 'no_token'" class="tw:text-center">
         <OIcon name="warning" style="width: 80px; height: 80px;" />
@@ -64,9 +64,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           Link your Azure Marketplace subscription to an organization
         </p>
 
-        <div class="options-container">
+        <div class="tw:max-w-100 tw:mx-auto">
           <!-- Create New Org -->
-          <OCard class="option-card tw:mb-4">
+          <OCard class="tw:rounded-lg tw:transition-all tw:duration-200 tw:hover:shadow-[0_4px_12px_rgba(0,0,0,0.1)] tw:mb-4">
             <OCardSection role="body">
               <div class="tw:text-xl tw:font-semibold">Create New Organization</div>
               <p class="tw:text-gray-400">
@@ -94,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Link to Existing Org (only show orgs without billing) -->
           <OCard
             v-if="eligibleOrganizations.length > 0"
-            class="option-card"
+            class="tw:rounded-lg tw:transition-all tw:duration-200 tw:hover:shadow-[0_4px_12px_rgba(0,0,0,0.1)]"
           >
             <OCardSection role="body">
               <div class="tw:text-xl tw:font-semibold">Link to Existing Organization</div>
@@ -129,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <p class="tw:text-gray-400">Please wait while we configure your account.</p>
       </div>
 
-      
+
       <!-- Success State -->
       <div v-else-if="state === 'success'" class="tw:text-center">
         <OIcon name="check-circle" style="width: 80px; height: 80px;" />
@@ -342,34 +342,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped>
-.azure-marketplace-setup {
-  min-height: 100vh;
-  background: var(--q-background);
-}
-
-.appLogo {
-  height: 40px;
-}
-
-.setup-container {
-  max-width: 500px;
-  margin: 0 auto;
-  padding-top: 60px;
-}
-
-.options-container {
-  max-width: 400px;
-  margin: 0 auto;
-}
-
-.option-card {
-  border-radius: 8px;
-  transition: all 0.2s ease;
-
-  &:hover {
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  }
-}
-</style>

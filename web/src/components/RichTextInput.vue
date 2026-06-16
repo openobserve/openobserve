@@ -1,12 +1,19 @@
 <template>
   <div
-    class="rich-text-input-wrapper"
-    :class="[theme === 'dark' ? 'dark-mode' : 'light-mode', { 'is-disabled': disabled, 'borderless': borderless }]"
+    class="rich-text-input-wrapper tw:py-1 tw:px-2 tw:pb-2 tw:rounded-xl tw:transition-all tw:duration-200 tw:ease-in-out tw:min-h-15 tw:cursor-text"
+    :class="[
+      theme === 'dark'
+        ? ['dark-mode', 'tw:bg-[#191919]', 'tw:border', 'tw:border-[#323232]', 'tw:focus-within:border-transparent', 'tw:focus-within:shadow-[0_0_0_2px_#5a6ec3]']
+        : ['light-mode', 'tw:bg-white', 'tw:border', 'tw:border-[#e4e7ec]', 'tw:focus-within:border-transparent', 'tw:focus-within:shadow-[0_0_0_2px_#8B5CF6]'],
+      disabled ? ['is-disabled', 'tw:opacity-60', 'tw:cursor-not-allowed'] : [],
+      borderless ? ['borderless', 'tw:p-0', 'tw:border-0!', 'tw:bg-transparent!', 'tw:shadow-none!', 'tw:rounded-none'] : []
+    ]"
     @click="focusInput"
   >
     <div
       ref="editableDiv"
-      class="rich-text-input"
+      class="rich-text-input tw:relative tw:outline-none tw:text-sm tw:leading-[1.6] tw:min-h-[40px] tw:max-h-[300px] tw:overflow-y-auto tw:break-words tw:whitespace-pre-wrap"
+      :class="theme === 'dark' ? 'tw:text-[#e2e8f0]' : 'tw:text-[#1a202c]'"
       contenteditable="true"
       :data-placeholder="placeholder"
       @input="handleInput"
@@ -19,8 +26,10 @@
     <!-- Detail Card -->
     <div
       v-if="showDetailCard"
-      class="chip-detail-card"
-      :class="theme === 'dark' ? 'dark-mode' : 'light-mode'"
+      class="chip-detail-card tw:fixed tw:max-w-75 tw:max-h-75 tw:border tw:rounded-lg tw:shadow-[0_8px_24px_rgba(0,0,0,0.25)] tw:z-[100000] tw:flex tw:flex-col tw:overflow-hidden"
+      :class="theme === 'dark'
+        ? ['dark-mode', 'tw:bg-(--o2-primary-background)', 'tw:border-(--o2-primary-background)']
+        : ['light-mode', 'tw:bg-white', 'tw:border-[#e4e7ec]']"
       :style="{
         top: cardPosition.top + 'px',
         left: cardPosition.left + 'px',
@@ -28,7 +37,9 @@
       }"
       @click.stop
     >
-      <div class="card-content" v-html="formatContent(detailCardContent)"></div>
+      <div class="card-content tw:overflow-y-auto tw:max-h-75 tw:py-1 tw:px-2 tw:font-[Monaco,Menlo,'Courier_New',monospace] tw:text-[11px] tw:leading-[1.5] tw:whitespace-pre-wrap tw:break-words"
+        :class="theme === 'dark' ? 'tw:text-[#e2e8f0]' : 'tw:text-[#1a202c]'"
+        v-html="formatContent(detailCardContent)"></div>
     </div>
   </div>
 </template>
@@ -202,7 +213,7 @@ export default defineComponent({
       chipWrapper.appendChild(removeBtn);
 
       // Add a zero-width space after the chip to allow cursor positioning
-      const spacer = document.createTextNode('\u200B');
+      const spacer = document.createTextNode('​');
       chipWrapper.appendChild(spacer);
 
       return chipWrapper;
@@ -305,7 +316,7 @@ export default defineComponent({
         }
       };
       editableDiv.value.childNodes.forEach(walk);
-      return text.replace(/\u200B/g, ''); // Remove zero-width spaces
+      return text.replace(/​/g, ''); // Remove zero-width spaces
     };
 
     // Get message for backend (unwrap chips with full content)
@@ -330,7 +341,7 @@ export default defineComponent({
         }
       };
       editableDiv.value.childNodes.forEach(walk);
-      return message.replace(/\u200B/g, '').trim();
+      return message.replace(/​/g, '').trim();
     };
 
     // Handle input changes from user
@@ -614,155 +625,51 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss">
-.rich-text-input-wrapper {
-  padding: 4px 8px 8px 8px;
-  border-radius: 12px;
-  transition: all 0.2s ease;
-  min-height: 60px;
-  cursor: text;
-
-  &.borderless {
-    padding: 0;
-    border: none !important;
-    background: transparent !important;
-    box-shadow: none !important;
-    border-radius: 0;
-  }
-
-  &.is-disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-
-    .rich-text-input {
-      cursor: not-allowed;
-    }
-  }
-
-  &.light-mode {
-    background: #ffffff;
-    border: 1px solid #e4e7ec;
-
-    &:focus-within {
-      border: 1px solid transparent;
-      box-shadow: 0 0 0 2px #8B5CF6;
-    }
-
-    .rich-text-input {
-      color: #1a202c;
-
-      &.is-empty:before {
-        content: attr(data-placeholder);
-        color: #a0aec0;
-        pointer-events: none;
-        position: absolute;
-        left: 0;
-        top: 4px;
-      }
-    }
-
-    .reference-chip {
-      background: #f0f4ff;
-      border: 1px solid #d0d9ff;
-      color: #4a5568;
-
-      .chip-meta {
-        color: #718096;
-      }
-
-      .chip-remove {
-        color: #a0aec0;
-
-        &:hover {
-          color: #e53e3e;
-          background: rgba(229, 62, 62, 0.1);
-        }
-      }
-
-      &:hover {
-        background: #e6edff;
-        border-color: #b8c5ff;
-      }
-    }
-  }
-
-  &.dark-mode {
-    background: #191919;
-    border: 1px solid #323232;
-
-    &:focus-within {
-      border: 1px solid transparent;
-      box-shadow: 0 0 0 2px #5a6ec3;
-    }
-
-    .rich-text-input {
-      color: #e2e8f0;
-
-      &.is-empty:before {
-        content: attr(data-placeholder);
-        color: #718096;
-        pointer-events: none;
-        position: absolute;
-        left: 0;
-        top: 4px;
-      }
-    }
-
-    .reference-chip {
-      background: #2d3748;
-      border: 1px solid #4a5568;
-      color: #e2e8f0;
-
-      .chip-meta {
-        color: #a0aec0;
-      }
-
-      .chip-remove {
-        color: #718096;
-
-        &:hover {
-          color: #fc8181;
-          background: rgba(252, 129, 129, 0.1);
-        }
-      }
-
-      &:hover {
-        background: #374151;
-        border-color: #5a6c7d;
-      }
-    }
-  }
+<style>
+/* Disabled cursor on inner input */
+.rich-text-input-wrapper.is-disabled .rich-text-input {
+  cursor: not-allowed;
 }
 
-.rich-text-input {
-  position: relative;
-  outline: none;
-  font-size: 14px;
-  line-height: 1.6;
-  min-height: 40px;
-  max-height: 300px;
-  overflow-y: auto;
-  word-wrap: break-word;
-  white-space: pre-wrap;
-
-  &::-webkit-scrollbar {
-    width: 6px;
-  }
-
-  &::-webkit-scrollbar-track {
-    background: transparent;
-  }
-
-  &::-webkit-scrollbar-thumb {
-    background: #cbd5e0;
-    border-radius: 3px;
-  }
-
-  .dark-mode &::-webkit-scrollbar-thumb {
-    background: #4a5568;
-  }
+/* Light mode placeholder */
+.rich-text-input-wrapper.light-mode .rich-text-input.is-empty:before {
+  content: attr(data-placeholder);
+  color: #a0aec0;
+  pointer-events: none;
+  position: absolute;
+  left: 0;
+  top: 4px;
 }
 
+/* Dark mode placeholder */
+.rich-text-input-wrapper.dark-mode .rich-text-input.is-empty:before {
+  content: attr(data-placeholder);
+  color: #718096;
+  pointer-events: none;
+  position: absolute;
+  left: 0;
+  top: 4px;
+}
+
+/* Scrollbar styling */
+.rich-text-input::-webkit-scrollbar {
+  width: 6px;
+}
+
+.rich-text-input::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.rich-text-input::-webkit-scrollbar-thumb {
+  background: #cbd5e0;
+  border-radius: 3px;
+}
+
+.dark-mode .rich-text-input::-webkit-scrollbar-thumb {
+  background: #4a5568;
+}
+
+/* Reference chips — dynamically created in JS */
 .reference-chip {
   position: relative;
   display: inline-flex;
@@ -782,208 +689,147 @@ export default defineComponent({
   background: #f0f4ff;
   border: 1px solid #d0d9ff;
   color: #4a5568;
-
-  .chip-preview {
-    font-weight: 500;
-    max-width: 120px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .chip-meta {
-    font-size: 10px;
-    white-space: nowrap;
-  }
-
-  .chip-remove {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 16px;
-    height: 16px;
-    padding: 0;
-    margin-left: 2px;
-    border: none;
-    background: transparent;
-    cursor: pointer;
-    font-size: 16px;
-    line-height: 1;
-    border-radius: 3px;
-    transition: all 0.15s ease;
-    color: #a0aec0;
-
-    &:hover {
-      transform: scale(1.1);
-      color: #e53e3e;
-      background: rgba(229, 62, 62, 0.1);
-    }
-  }
-
-  .chip-meta {
-    color: #718096;
-  }
-
-  &:hover {
-    background: #e6edff;
-    border-color: #b8c5ff;
-  }
-
 }
 
-// Detail Card - Positioned above chip
-.chip-detail-card {
-  position: fixed;
-  max-width: 300px;
-  max-height: 300px;
-  background: #ffffff;
-  border: 1px solid #e4e7ec;
-  border-radius: 8px; 
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
-  z-index: 100000;
-  display: flex;
-  flex-direction: column;
+.reference-chip .chip-preview {
+  font-weight: 500;
+  max-width: 120px;
   overflow: hidden;
-
-  &.dark-mode {
-    background: var(--o2-primary-background);
-    border-color: var(--o2-primary-background);
-  }
-
-  .card-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 10px 12px;
-    border-bottom: 1px solid #e4e7ec;
-    background: #f8fafc;
-
-    .dark-mode & {
-      background: #0f172a;
-      border-bottom-color: #475569;
-    }
-
-    .card-title {
-      font-size: 13px;
-      font-weight: 600;
-      color: #1a202c;
-
-      .dark-mode & {
-        color: #e2e8f0;
-      }
-    }
-
-    .card-close {
-      width: 24px;
-      height: 24px;
-      border: none;
-      background: transparent;
-      font-size: 20px;
-      line-height: 1;
-      cursor: pointer;
-      border-radius: 4px;
-      color: #64748b;
-      transition: all 0.15s ease;
-
-      &:hover {
-        background: rgba(0, 0, 0, 0.05);
-        color: #1a202c;
-      }
-
-      .dark-mode & {
-        color: #94a3b8;
-
-        &:hover {
-          background: rgba(255, 255, 255, 0.1);
-          color: #e2e8f0;
-        }
-      }
-    }
-  }
-
-  .card-content {
-    overflow-y: auto;
-    max-height: 300px;
-    padding: 4px 8px;
-    font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
-    font-size: 11px;
-    line-height: 1.5;
-    color: #1a202c;
-    white-space: pre-wrap;
-    word-wrap: break-word;
-
-    .dark-mode & {
-      color: #e2e8f0;
-    }
-
-    // JSON syntax highlighting
-    .json-key {
-      color: #0066cc;
-      font-weight: 600;
-
-      .dark-mode & {
-        color: #60a5fa;
-      }
-    }
-
-    .json-string {
-      color: #22863a;
-
-      .dark-mode & {
-        color: #86efac;
-      }
-    }
-
-    .json-number {
-      color: #005cc5;
-
-      .dark-mode & {
-        color: #7dd3fc;
-      }
-    }
-
-    .json-boolean {
-      color: #d73a49;
-      font-weight: 600;
-
-      .dark-mode & {
-        color: #fca5a5;
-      }
-    }
-
-    .json-null {
-      color: #6f42c1;
-      font-weight: 600;
-
-      .dark-mode & {
-        color: #c4b5fd;
-      }
-    }
-  }
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-/* Dark mode chip styling */
-.dark-mode .reference-chip {
+.reference-chip .chip-meta {
+  font-size: 10px;
+  white-space: nowrap;
+  color: #718096;
+}
+
+.reference-chip .chip-remove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  margin-left: 2px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  border-radius: 3px;
+  transition: all 0.15s ease;
+  color: #a0aec0;
+}
+
+.reference-chip .chip-remove:hover {
+  transform: scale(1.1);
+  color: #e53e3e;
+  background: rgba(229, 62, 62, 0.1);
+}
+
+.reference-chip:hover {
+  background: #e6edff;
+  border-color: #b8c5ff;
+}
+
+/* Light mode chip overrides */
+.rich-text-input-wrapper.light-mode .reference-chip {
+  background: #f0f4ff;
+  border: 1px solid #d0d9ff;
+  color: #4a5568;
+}
+
+.rich-text-input-wrapper.light-mode .reference-chip .chip-meta {
+  color: #718096;
+}
+
+.rich-text-input-wrapper.light-mode .reference-chip .chip-remove {
+  color: #a0aec0;
+}
+
+.rich-text-input-wrapper.light-mode .reference-chip .chip-remove:hover {
+  color: #e53e3e;
+  background: rgba(229, 62, 62, 0.1);
+}
+
+.rich-text-input-wrapper.light-mode .reference-chip:hover {
+  background: #e6edff;
+  border-color: #b8c5ff;
+}
+
+/* Dark mode chip overrides */
+.dark-mode .reference-chip,
+.rich-text-input-wrapper.dark-mode .reference-chip {
   background: #2d3748;
   border: 1px solid #4a5568;
   color: #e2e8f0;
+}
 
-  .chip-meta {
-    color: #a0aec0;
-  }
+.dark-mode .reference-chip .chip-meta,
+.rich-text-input-wrapper.dark-mode .reference-chip .chip-meta {
+  color: #a0aec0;
+}
 
-  .chip-remove {
-    color: #718096;
+.dark-mode .reference-chip .chip-remove,
+.rich-text-input-wrapper.dark-mode .reference-chip .chip-remove {
+  color: #718096;
+}
 
-    &:hover {
-      color: #fc8181;
-      background: rgba(252, 129, 129, 0.1);
-    }
-  }
+.dark-mode .reference-chip .chip-remove:hover,
+.rich-text-input-wrapper.dark-mode .reference-chip .chip-remove:hover {
+  color: #fc8181;
+  background: rgba(252, 129, 129, 0.1);
+}
 
-  &:hover {
-    background: #374151;
-    border-color: #5a6c7d;
-  }
+.dark-mode .reference-chip:hover,
+.rich-text-input-wrapper.dark-mode .reference-chip:hover {
+  background: #374151;
+  border-color: #5a6c7d;
+}
+
+/* JSON syntax highlighting in detail card (v-html injected content) */
+.chip-detail-card .card-content .json-key {
+  color: #0066cc;
+  font-weight: 600;
+}
+
+.dark-mode .chip-detail-card .card-content .json-key {
+  color: #60a5fa;
+}
+
+.chip-detail-card .card-content .json-string {
+  color: #22863a;
+}
+
+.dark-mode .chip-detail-card .card-content .json-string {
+  color: #86efac;
+}
+
+.chip-detail-card .card-content .json-number {
+  color: #005cc5;
+}
+
+.dark-mode .chip-detail-card .card-content .json-number {
+  color: #7dd3fc;
+}
+
+.chip-detail-card .card-content .json-boolean {
+  color: #d73a49;
+  font-weight: 600;
+}
+
+.dark-mode .chip-detail-card .card-content .json-boolean {
+  color: #fca5a5;
+}
+
+.chip-detail-card .card-content .json-null {
+  color: #6f42c1;
+  font-weight: 600;
+}
+
+.dark-mode .chip-detail-card .card-content .json-null {
+  color: #c4b5fd;
 }
 </style>

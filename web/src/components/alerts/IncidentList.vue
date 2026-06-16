@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -94,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template #cell-status="{ row }">
           <span
-            class="status-badge"
+            class="tw:inline-flex tw:items-center tw:py-0.5 tw:px-2 tw:rounded-md tw:text-[11px] tw:font-semibold"
             :class="getStatusColorClass(row.status)"
           >
             {{ getStatusLabel(row.status) }}
@@ -102,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template #cell-severity="{ row }">
           <span
-            class="severity-badge"
+            class="tw:inline-flex tw:items-center tw:py-0.5 tw:px-2 tw:rounded-md tw:text-[11px] tw:font-semibold"
             :class="getSeverityColorClass(row.severity)"
           >
             {{ row.severity }}
@@ -120,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span
               v-for="[key, value] in getSortedDimensions(row.group_values).slice(0, 2)"
               :key="key"
-              class="dimension-badge"
+              class="dimension-badge tw:inline-flex tw:items-center tw:gap-0.5 tw:py-0.5 tw:px-2 tw:rounded-md tw:text-[11px] tw:font-semibold tw:m-0.5 tw:max-w-45 tw:overflow-hidden"
               :class="getDimensionColorClass(key)"
             >
               <span>{{ key }}</span>=<span>{{ value }}</span>
@@ -128,7 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
             <span
               v-if="getSortedDimensions(row.group_values).length > 2"
-              class="dimension-badge badge-more"
+              class="dimension-badge tw:inline-flex tw:items-center tw:gap-0.5 tw:py-0.5 tw:px-2 tw:rounded-md tw:text-[11px] tw:font-medium tw:m-0.5 tw:max-w-45 tw:overflow-hidden tw:bg-surface-panel tw:text-(--o2-text-secondary)"
             >
               +{{ getSortedDimensions(row.group_values).length - 2 }} more
               <OTooltip :delay="300" :max-width="'28rem'">
@@ -147,7 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
         <template #cell-actions="{ row }">
-          <div class="action-buttons">
+          <div class="tw:flex tw:justify-end tw:items-center">
             <OButton
               v-if="row.status === 'open'"
               variant="ghost-warning"
@@ -187,7 +187,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Bottom -->
         <template #bottom>
-          <div class="bottom-btn tw:h-[48px]">
+          <div class="tw:flex tw:w-full tw:justify-between tw:items-center tw:h-[48px]">
             <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[100px] tw:mr-md">
               {{ visibleIncidents.length }} {{ visibleIncidents.length === 1 ? 'Incident' : 'Incidents' }}
             </div>
@@ -632,28 +632,8 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
-.bottom-btn {
-  display: flex;
-  width: 100%;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.o2-search-input {
-  width: 250px;
-}
-
+<style>
 /* Status badge styling */
-.status-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 8px;
-  border-radius: 6px;
-  font-size: 11px;
-  font-weight: 600;
-}
-
 .status-open {
   border: 1px solid #dc2626;
 }
@@ -671,15 +651,6 @@ export default defineComponent({
 }
 
 /* Severity badge styling */
-.severity-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 8px;
-  border-radius: 6px;
-  font-size: 11px;
-  font-weight: 600;
-}
-
 .severity-p1 {
   border: 1px solid #991b1b;
 }
@@ -701,43 +672,22 @@ export default defineComponent({
 }
 
 /* Dark mode adjustments for status and severity badges */
-body.body--dark {
-  .status-open { border: 1px solid #fca5a5; }
-  .status-acknowledged { border: 1px solid #fbbf24; }
-  .status-resolved { border: 1px solid #6ee7b7; }
-  .status-default { border: 1px solid #d1d5db; }
-  .severity-p1 { border: 1px solid #fca5a5; }
-  .severity-p2 { border: 1px solid #fdba74; }
-  .severity-p3 { border: 1px solid #fcd34d; }
-  .severity-p4 { border: 1px solid #d1d5db; }
-  .severity-default { border: 1px solid #d1d5db; }
-}
+body.body--dark .status-open { border: 1px solid #fca5a5; }
+body.body--dark .status-acknowledged { border: 1px solid #fbbf24; }
+body.body--dark .status-resolved { border: 1px solid #6ee7b7; }
+body.body--dark .status-default { border: 1px solid #d1d5db; }
+body.body--dark .severity-p1 { border: 1px solid #fca5a5; }
+body.body--dark .severity-p2 { border: 1px solid #fdba74; }
+body.body--dark .severity-p3 { border: 1px solid #fcd34d; }
+body.body--dark .severity-p4 { border: 1px solid #d1d5db; }
+body.body--dark .severity-default { border: 1px solid #d1d5db; }
 
-/* Dimension badge base styling */
-.dimension-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  padding: 2px 8px;
-  border-radius: 6px;
-  font-size: 11px;
-  font-weight: 600;
-  margin: 2px;
-  max-width: 180px;
+/* Dimension badge child selector */
+.dimension-badge span {
+  display: inline-block;
   overflow: hidden;
-
-  span {
-    display: inline-block;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-}
-
-.badge-more {
-  background: var(--color-surface-panel);
-  color: var(--o2-text-secondary);
-  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Color scheme matching schema.scss type badges */
@@ -757,27 +707,18 @@ body.body--dark {
 .badge-rose { border: 1px solid #e11d48; }
 
 /* Dark mode adjustments */
-body.body--dark {
-  .badge-blue { border: 1px solid #93c5fd; }
-  .badge-green { border: 1px solid #6ee7b7; }
-  .badge-yellow { border: 1px solid #fcd34d; }
-  .badge-pink { border: 1px solid #f9a8d4; }
-  .badge-purple { border: 1px solid #c4b5fd; }
-  .badge-orange { border: 1px solid #fdba74; }
-  .badge-cyan { border: 1px solid #67e8f9; }
-  .badge-indigo { border: 1px solid #a5b4fc; }
-  .badge-teal { border: 1px solid #5eead4; }
-  .badge-red { border: 1px solid #fca5a5; }
-  .badge-gray { border: 1px solid #d1d5db; }
-  .badge-amber { border: 1px solid #fbbf24; }
-  .badge-violet { border: 1px solid #c4b5fd; }
-  .badge-rose { border: 1px solid #fda4af; }
-}
-
-/* Action buttons styling */
-.action-buttons {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-}
+body.body--dark .badge-blue { border: 1px solid #93c5fd; }
+body.body--dark .badge-green { border: 1px solid #6ee7b7; }
+body.body--dark .badge-yellow { border: 1px solid #fcd34d; }
+body.body--dark .badge-pink { border: 1px solid #f9a8d4; }
+body.body--dark .badge-purple { border: 1px solid #c4b5fd; }
+body.body--dark .badge-orange { border: 1px solid #fdba74; }
+body.body--dark .badge-cyan { border: 1px solid #67e8f9; }
+body.body--dark .badge-indigo { border: 1px solid #a5b4fc; }
+body.body--dark .badge-teal { border: 1px solid #5eead4; }
+body.body--dark .badge-red { border: 1px solid #fca5a5; }
+body.body--dark .badge-gray { border: 1px solid #d1d5db; }
+body.body--dark .badge-amber { border: 1px solid #fbbf24; }
+body.body--dark .badge-violet { border: 1px solid #c4b5fd; }
+body.body--dark .badge-rose { border: 1px solid #fda4af; }
 </style>

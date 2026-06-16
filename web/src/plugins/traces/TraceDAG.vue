@@ -15,22 +15,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="trace-dag-container">
-    <div v-if="isLoading" class="tw:flex tw:items-center tw:justify-center tw:flex-col tw:p-6 loading-container">
+  <div class="tw:w-full tw:h-full tw:min-h-125">
+    <div v-if="isLoading" class="tw:flex tw:items-center tw:justify-center tw:flex-col tw:p-6 tw:h-125">
       <OSpinner size="lg" />
       <div class="tw:mt-3 tw:text-gray-400">Loading trace DAG...</div>
     </div>
 
-    <div v-else-if="error" class="error-message tw:p-3">
+    <div v-else-if="error" class="tw:p-3">
       <OBanner variant="error" icon="error" :content="`Failed to load DAG: ${error}`" />
     </div>
 
-    <div v-else-if="!dagData || !dagData.nodes || dagData.nodes.length === 0" class="tw:flex tw:items-center tw:justify-center tw:flex-col tw:p-6 empty-container">
+    <div v-else-if="!dagData || !dagData.nodes || dagData.nodes.length === 0" class="tw:flex tw:items-center tw:justify-center tw:flex-col tw:p-6 tw:h-125">
       <OIcon name="info" style="width: 48px; height: 48px;" />
       <div class="tw:mt-3 tw:text-gray-400">No DAG data available</div>
     </div>
 
-    <div v-else class="dag-wrapper">
+    <div v-else class="dag-wrapper tw:w-full tw:h-full tw:min-h-150 tw:border tw:border-(--o2-border) tw:rounded tw:relative">
       <VueFlow
         :nodes="nodes"
         :edges="edges"
@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :max-zoom="3"
         fit-view-on-init
         :fit-view-options="{ padding: 0.3, minZoom: 0.3, maxZoom: 0.7 }"
-        class="trace-dag-flow"
+        class="trace-dag-flow tw:w-full tw:h-full tw:bg-[#fafafa]"
       >
         <Background pattern-color="#aaa" :gap="16" />
         <Controls />
@@ -481,198 +481,162 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss">
-.trace-dag-container {
-  width: 100%;
-  height: 100%;
-  min-height: 500px;
+<style>
+.trace-dag-flow .vue-flow__node-custom .custom-node {
+  padding: 6px 12px;
+  border-radius: 6px;
+  background: white;
+  border: 2px solid #1976d2;
+  min-width: 80px;
+  max-width: 180px;
+  min-height: 28px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s ease;
+  cursor: pointer;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
 }
 
-.loading-container,
-.empty-container {
-  height: 500px;
+.trace-dag-flow .vue-flow__node-custom .custom-node:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transform: translateY(-2px);
 }
 
-.dag-wrapper {
-  width: 100%;
-  height: 100%;
-  min-height: 600px;
-  border: 1px solid var(--o2-border);
-  border-radius: 4px;
-  position: relative;
+.trace-dag-flow .vue-flow__node-custom .custom-node.node-error {
+  border-color: #c62828;
+  background: #ffebee;
 }
 
-.trace-dag-flow {
-  width: 100%;
-  height: 100%;
-  background-color: #fafafa;
-
-  .vue-flow__node-custom {
-    .custom-node {
-      padding: 6px 12px;
-      border-radius: 6px;
-      background: white;
-      border: 2px solid #1976d2;
-      min-width: 80px;
-      max-width: 180px;
-      min-height: 28px;
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
-      transition: all 0.2s ease;
-      cursor: pointer;
-      text-align: center;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-
-      &:hover {
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-        transform: translateY(-2px);
-      }
-
-      &.node-error {
-        border-color: #c62828;
-        background: #ffebee;
-      }
-
-      &.node-ok {
-        border-color: #2e7d32;
-      }
-
-      // LLM observation type node colors (consistent with llmUtils getObservationTypeColor)
-      &.node-llm-generation { border-color: #4caf50; background: #e8f5e9; }  // green
-      &.node-llm-embedding  { border-color: #2196f3; background: #e3f2fd; }  // blue
-      &.node-llm-agent      { border-color: #9c27b0; background: #f3e5f5; }  // purple
-      &.node-llm-tool       { border-color: #ff9800; background: #fff3e0; }  // orange
-      &.node-llm-chain      { border-color: #3f51b5; background: #e8eaf6; }  // indigo
-      &.node-llm-retriever  { border-color: #00bcd4; background: #e0f7fa; }  // cyan
-      &.node-llm-task       { border-color: #009688; background: #e0f2f1; }  // teal
-      &.node-llm-evaluator  { border-color: #e91e63; background: #fce4ec; }  // pink
-      &.node-llm-workflow   { border-color: #673ab7; background: #ede7f6; }  // deep-purple
-      &.node-llm-rerank     { border-color: #03a9f4; background: #e1f5fe; }  // light-blue
-      &.node-llm-guardrail  { border-color: #f44336; background: #ffebee; }  // red
-      &.node-llm-span       { border-color: #9e9e9e; background: #f5f5f5; }  // grey
-      &.node-llm-event      { border-color: #ffc107; background: #fff8e1; }  // amber
-      &.node-llm-default    { border-color: #9e9e9e; background: #fafafa; }
-    }
-
-    .node-operation {
-      font-size: 13px;
-      color: #1976d2;
-      font-weight: 600;
-      word-wrap: break-word;
-      overflow-wrap: break-word;
-      max-width: 160px;
-      line-height: 1.3;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-
-      &.node-llm-text-generation { color: #388e3c; }  // green-dark
-      &.node-llm-text-embedding  { color: #1976d2; }  // blue-dark
-      &.node-llm-text-agent      { color: #7b1fa2; }  // purple-dark
-      &.node-llm-text-tool       { color: #e65100; }  // orange-dark
-      &.node-llm-text-chain      { color: #283593; }  // indigo-dark
-      &.node-llm-text-retriever  { color: #00838f; }  // cyan-dark
-      &.node-llm-text-task       { color: #00796b; }  // teal-dark
-      &.node-llm-text-evaluator  { color: #c2185b; }  // pink-dark
-      &.node-llm-text-workflow   { color: #4527a0; }  // deep-purple-dark
-      &.node-llm-text-rerank     { color: #0277bd; }  // light-blue-dark
-      &.node-llm-text-guardrail  { color: #c62828; }  // red-dark
-      &.node-llm-text-span       { color: #616161; }  // grey-dark
-      &.node-llm-text-event      { color: #f57f17; }  // amber-dark
-      &.node-llm-text-default    { color: #757575; }
-    }
-
-    .dag-handle {
-      width: 8px;
-      height: 8px;
-      background: #1976d2;
-      border: 2px solid white;
-      border-radius: 50%;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
-    }
-
-    .error-chip {
-      font-size: 10px;
-      height: 14px;
-      margin-top: 2px;
-      padding: 0 4px;
-    }
-  }
+.trace-dag-flow .vue-flow__node-custom .custom-node.node-ok {
+  border-color: #2e7d32;
 }
 
-.error-message {
-  padding: 20px;
+/* LLM observation type node colors (consistent with llmUtils getObservationTypeColor) */
+.trace-dag-flow .vue-flow__node-custom .custom-node.node-llm-generation { border-color: #4caf50; background: #e8f5e9; }
+.trace-dag-flow .vue-flow__node-custom .custom-node.node-llm-embedding  { border-color: #2196f3; background: #e3f2fd; }
+.trace-dag-flow .vue-flow__node-custom .custom-node.node-llm-agent      { border-color: #9c27b0; background: #f3e5f5; }
+.trace-dag-flow .vue-flow__node-custom .custom-node.node-llm-tool       { border-color: #ff9800; background: #fff3e0; }
+.trace-dag-flow .vue-flow__node-custom .custom-node.node-llm-chain      { border-color: #3f51b5; background: #e8eaf6; }
+.trace-dag-flow .vue-flow__node-custom .custom-node.node-llm-retriever  { border-color: #00bcd4; background: #e0f7fa; }
+.trace-dag-flow .vue-flow__node-custom .custom-node.node-llm-task       { border-color: #009688; background: #e0f2f1; }
+.trace-dag-flow .vue-flow__node-custom .custom-node.node-llm-evaluator  { border-color: #e91e63; background: #fce4ec; }
+.trace-dag-flow .vue-flow__node-custom .custom-node.node-llm-workflow   { border-color: #673ab7; background: #ede7f6; }
+.trace-dag-flow .vue-flow__node-custom .custom-node.node-llm-rerank     { border-color: #03a9f4; background: #e1f5fe; }
+.trace-dag-flow .vue-flow__node-custom .custom-node.node-llm-guardrail  { border-color: #f44336; background: #ffebee; }
+.trace-dag-flow .vue-flow__node-custom .custom-node.node-llm-span       { border-color: #9e9e9e; background: #f5f5f5; }
+.trace-dag-flow .vue-flow__node-custom .custom-node.node-llm-event      { border-color: #ffc107; background: #fff8e1; }
+.trace-dag-flow .vue-flow__node-custom .custom-node.node-llm-default    { border-color: #9e9e9e; background: #fafafa; }
+
+.trace-dag-flow .vue-flow__node-custom .node-operation {
+  font-size: 13px;
+  color: #1976d2;
+  font-weight: 600;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  max-width: 160px;
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.body--dark {
-  .dag-wrapper {
-    border-color: #444;
-  }
+.trace-dag-flow .vue-flow__node-custom .node-operation.node-llm-text-generation { color: #388e3c; }
+.trace-dag-flow .vue-flow__node-custom .node-operation.node-llm-text-embedding  { color: #1976d2; }
+.trace-dag-flow .vue-flow__node-custom .node-operation.node-llm-text-agent      { color: #7b1fa2; }
+.trace-dag-flow .vue-flow__node-custom .node-operation.node-llm-text-tool       { color: #e65100; }
+.trace-dag-flow .vue-flow__node-custom .node-operation.node-llm-text-chain      { color: #283593; }
+.trace-dag-flow .vue-flow__node-custom .node-operation.node-llm-text-retriever  { color: #00838f; }
+.trace-dag-flow .vue-flow__node-custom .node-operation.node-llm-text-task       { color: #00796b; }
+.trace-dag-flow .vue-flow__node-custom .node-operation.node-llm-text-evaluator  { color: #c2185b; }
+.trace-dag-flow .vue-flow__node-custom .node-operation.node-llm-text-workflow   { color: #4527a0; }
+.trace-dag-flow .vue-flow__node-custom .node-operation.node-llm-text-rerank     { color: #0277bd; }
+.trace-dag-flow .vue-flow__node-custom .node-operation.node-llm-text-guardrail  { color: #c62828; }
+.trace-dag-flow .vue-flow__node-custom .node-operation.node-llm-text-span       { color: #616161; }
+.trace-dag-flow .vue-flow__node-custom .node-operation.node-llm-text-event      { color: #f57f17; }
+.trace-dag-flow .vue-flow__node-custom .node-operation.node-llm-text-default    { color: #757575; }
 
-  .trace-dag-flow {
-    background-color: #1e1e1e !important;
-
-    .vue-flow__background {
-      background-color: #1e1e1e !important;
-    }
-
-    .vue-flow__node-custom {
-      .custom-node {
-        background: #2a2a2a;
-        border-color: #64b5f6;
-        color: var(--o2-border);
-        border-width: 2px;
-        max-width: 180px;
-
-        &.node-error {
-          border-color: #ef5350;
-          background: #3a1a1a;
-        }
-
-        &.node-ok {
-          border-color: #66bb6a;
-        }
-
-        // LLM observation type dark mode colors (consistent with llmUtils)
-        &.node-llm-generation { border-color: #66bb6a; background: #1a2e1a; }  // green
-        &.node-llm-embedding  { border-color: #64b5f6; background: #1a2a3a; }  // blue
-        &.node-llm-agent      { border-color: #ce93d8; background: #2a1a2e; }  // purple
-        &.node-llm-tool       { border-color: #ffb74d; background: #2e2218; }  // orange
-        &.node-llm-chain      { border-color: #7986cb; background: #1a1a2e; }  // indigo
-        &.node-llm-retriever  { border-color: #4dd0e1; background: #1a2a2e; }  // cyan
-        &.node-llm-task       { border-color: #4db6ac; background: #1a2e2a; }  // teal
-        &.node-llm-evaluator  { border-color: #f48fb1; background: #2e1a22; }  // pink
-        &.node-llm-workflow   { border-color: #b39ddb; background: #221a2e; }  // deep-purple
-        &.node-llm-rerank     { border-color: #4fc3f7; background: #1a2a3a; }  // light-blue
-        &.node-llm-guardrail  { border-color: #ef5350; background: #2e1a1a; }  // red
-        &.node-llm-span       { border-color: #9e9e9e; background: #262626; }  // grey
-        &.node-llm-event      { border-color: #ffd54f; background: #2e2a18; }  // amber
-        &.node-llm-default    { border-color: #9e9e9e; background: #262626; }
-      }
-
-      .node-operation {
-        color: #90caf9;
-        font-size: 13px;
-        max-width: 160px;
-
-        &.node-llm-text-generation { color: #81c784; }  // green-light
-        &.node-llm-text-embedding  { color: #90caf9; }  // blue-light
-        &.node-llm-text-agent      { color: #ce93d8; }  // purple-light
-        &.node-llm-text-tool       { color: #ffcc80; }  // orange-light
-        &.node-llm-text-chain      { color: #9fa8da; }  // indigo-light
-        &.node-llm-text-retriever  { color: #80deea; }  // cyan-light
-        &.node-llm-text-task       { color: #80cbc4; }  // teal-light
-        &.node-llm-text-evaluator  { color: #f48fb1; }  // pink-light
-        &.node-llm-text-workflow   { color: #b39ddb; }  // deep-purple-light
-        &.node-llm-text-rerank     { color: #81d4fa; }  // light-blue-light
-        &.node-llm-text-guardrail  { color: #ef9a9a; }  // red-light
-        &.node-llm-text-span       { color: #bdbdbd; }  // grey-light
-        &.node-llm-text-event      { color: #ffe082; }  // amber-light
-        &.node-llm-text-default    { color: #bdbdbd; }
-      }
-    }
-  }
+.trace-dag-flow .vue-flow__node-custom .dag-handle {
+  width: 8px;
+  height: 8px;
+  background: #1976d2;
+  border: 2px solid white;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
 }
+
+.trace-dag-flow .vue-flow__node-custom .error-chip {
+  font-size: 10px;
+  height: 14px;
+  margin-top: 2px;
+  padding: 0 4px;
+}
+
+.body--dark .dag-wrapper {
+  border-color: #444;
+}
+
+.body--dark .trace-dag-flow {
+  background-color: #1e1e1e !important;
+}
+
+.body--dark .trace-dag-flow .vue-flow__background {
+  background-color: #1e1e1e !important;
+}
+
+.body--dark .trace-dag-flow .vue-flow__node-custom .custom-node {
+  background: #2a2a2a;
+  border-color: #64b5f6;
+  color: var(--o2-border);
+  border-width: 2px;
+  max-width: 180px;
+}
+
+.body--dark .trace-dag-flow .vue-flow__node-custom .custom-node.node-error {
+  border-color: #ef5350;
+  background: #3a1a1a;
+}
+
+.body--dark .trace-dag-flow .vue-flow__node-custom .custom-node.node-ok {
+  border-color: #66bb6a;
+}
+
+/* LLM observation type dark mode colors (consistent with llmUtils) */
+.body--dark .trace-dag-flow .vue-flow__node-custom .custom-node.node-llm-generation { border-color: #66bb6a; background: #1a2e1a; }
+.body--dark .trace-dag-flow .vue-flow__node-custom .custom-node.node-llm-embedding  { border-color: #64b5f6; background: #1a2a3a; }
+.body--dark .trace-dag-flow .vue-flow__node-custom .custom-node.node-llm-agent      { border-color: #ce93d8; background: #2a1a2e; }
+.body--dark .trace-dag-flow .vue-flow__node-custom .custom-node.node-llm-tool       { border-color: #ffb74d; background: #2e2218; }
+.body--dark .trace-dag-flow .vue-flow__node-custom .custom-node.node-llm-chain      { border-color: #7986cb; background: #1a1a2e; }
+.body--dark .trace-dag-flow .vue-flow__node-custom .custom-node.node-llm-retriever  { border-color: #4dd0e1; background: #1a2a2e; }
+.body--dark .trace-dag-flow .vue-flow__node-custom .custom-node.node-llm-task       { border-color: #4db6ac; background: #1a2e2a; }
+.body--dark .trace-dag-flow .vue-flow__node-custom .custom-node.node-llm-evaluator  { border-color: #f48fb1; background: #2e1a22; }
+.body--dark .trace-dag-flow .vue-flow__node-custom .custom-node.node-llm-workflow   { border-color: #b39ddb; background: #221a2e; }
+.body--dark .trace-dag-flow .vue-flow__node-custom .custom-node.node-llm-rerank     { border-color: #4fc3f7; background: #1a2a3a; }
+.body--dark .trace-dag-flow .vue-flow__node-custom .custom-node.node-llm-guardrail  { border-color: #ef5350; background: #2e1a1a; }
+.body--dark .trace-dag-flow .vue-flow__node-custom .custom-node.node-llm-span       { border-color: #9e9e9e; background: #262626; }
+.body--dark .trace-dag-flow .vue-flow__node-custom .custom-node.node-llm-event      { border-color: #ffd54f; background: #2e2a18; }
+.body--dark .trace-dag-flow .vue-flow__node-custom .custom-node.node-llm-default    { border-color: #9e9e9e; background: #262626; }
+
+.body--dark .trace-dag-flow .vue-flow__node-custom .node-operation {
+  color: #90caf9;
+  font-size: 13px;
+  max-width: 160px;
+}
+
+.body--dark .trace-dag-flow .vue-flow__node-custom .node-operation.node-llm-text-generation { color: #81c784; }
+.body--dark .trace-dag-flow .vue-flow__node-custom .node-operation.node-llm-text-embedding  { color: #90caf9; }
+.body--dark .trace-dag-flow .vue-flow__node-custom .node-operation.node-llm-text-agent      { color: #ce93d8; }
+.body--dark .trace-dag-flow .vue-flow__node-custom .node-operation.node-llm-text-tool       { color: #ffcc80; }
+.body--dark .trace-dag-flow .vue-flow__node-custom .node-operation.node-llm-text-chain      { color: #9fa8da; }
+.body--dark .trace-dag-flow .vue-flow__node-custom .node-operation.node-llm-text-retriever  { color: #80deea; }
+.body--dark .trace-dag-flow .vue-flow__node-custom .node-operation.node-llm-text-task       { color: #80cbc4; }
+.body--dark .trace-dag-flow .vue-flow__node-custom .node-operation.node-llm-text-evaluator  { color: #f48fb1; }
+.body--dark .trace-dag-flow .vue-flow__node-custom .node-operation.node-llm-text-workflow   { color: #b39ddb; }
+.body--dark .trace-dag-flow .vue-flow__node-custom .node-operation.node-llm-text-rerank     { color: #81d4fa; }
+.body--dark .trace-dag-flow .vue-flow__node-custom .node-operation.node-llm-text-guardrail  { color: #ef9a9a; }
+.body--dark .trace-dag-flow .vue-flow__node-custom .node-operation.node-llm-text-span       { color: #bdbdbd; }
+.body--dark .trace-dag-flow .vue-flow__node-custom .node-operation.node-llm-text-event      { color: #ffe082; }
+.body--dark .trace-dag-flow .vue-flow__node-custom .node-operation.node-llm-text-default    { color: #bdbdbd; }
 </style>

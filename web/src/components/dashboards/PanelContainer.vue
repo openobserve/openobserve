@@ -16,14 +16,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="panelcontainer"
+    class="tw:h-full tw:flex tw:flex-col"
     @mouseover="() => (isCurrentlyHoveredPanel = true)"
     @mouseleave="() => (isCurrentlyHoveredPanel = false)"
     :data-test="`dashboard-panel-container`"
     :data-test-panel-id="props.data.id"
     :data-test-panel-title="props.data.title"
   >
-    <div :class="{ 'drag-allow': !viewOnly && !simplifiedPanelView }">
+    <div :class="{ 'tw:shrink-0': !viewOnly && !simplifiedPanelView }">
       <div
         class="tw:flex tw:flex-nowrap tw:items-center tw:w-full tw:min-h-7 tw:px-1"
         :class="{ 'dark-mode': store.state.theme === 'dark' }"
@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <div
           :title="props.data.title"
-          class="panelHeader"
+          class="tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis"
           data-test="dashboard-panel-header"
         >
           {{ props.data.title }}
@@ -256,11 +256,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Panel-Level Variables (shown below drag-allow section) -->
-    <div class="panel-variables-wrapper">
+    <div class="tw:shrink-0">
       <slot name="panel-variables"></slot>
     </div>
 
-    <div class="panel-chart-wrapper">
+    <div class="tw:flex-1 tw:min-h-0">
       <PanelSchemaRenderer
         :panelSchema="props.data"
         :selectedTimeObj="props.selectedTimeDate"
@@ -980,34 +980,3 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
-.panelcontainer {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-}
-
-.drag-allow {
-  flex-shrink: 0;
-}
-
-.panel-variables-wrapper {
-  flex-shrink: 0;
-}
-
-.panel-chart-wrapper {
-  flex: 1;
-  min-height: 0;
-}
-
-.panelHeader {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.warning {
-  color: var(--q-warning);
-}
-
-</style>

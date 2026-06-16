@@ -237,7 +237,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <div class="tw:pt-3 tw:flex tw:items-center warning-text">
+      <div class="tw:pt-3 tw:flex tw:items-center tw:text-[#ec960c]">
         <OIcon name="info" class="tw:mr-1" size="sm" />
         <span class="text-p">Make sure to copy / download the token. You will not be able to see it again.</span>
       </div>
@@ -725,12 +725,3 @@ export default defineComponent({
   },
 });
 </script>
-
-
-<style lang="scss" scoped>
-.warning-text {
-  color: #ec960c;
-}
-
-
-</style>

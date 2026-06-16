@@ -11,10 +11,10 @@
       style="display: flex; flex-direction: row"
       class="tw:pl-3"
     >
-      <div class="layout-name" data-test="dashboard-filter-layout-label">{{ t("panel.filters") }}</div>
-      <span class="layout-separator" data-test="dashboard-filter-layout-separator">:</span>
+      <div class="tw:text-sm tw:whitespace-nowrap tw:min-w-32.5 tw:flex tw:items-center" data-test="dashboard-filter-layout-label">{{ t("panel.filters") }}</div>
+      <span class="tw:flex tw:items-center tw:mx-0.5" data-test="dashboard-filter-layout-separator">:</span>
       <div
-        class="axis-container droppable scroll tw:flex"
+        class="tw:m-1.25 tw:flex-wrap droppable scroll tw:flex"
         data-test="dashboard-filter-layout"
         :data-condition-count="conditionCount"
       >
@@ -299,24 +299,3 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
-.layout-name {
-  font-size: 14px;
-  white-space: nowrap;
-  min-width: 130px;
-  display: flex;
-  align-items: center;
-}
-
-.layout-separator {
-  display: flex;
-  align-items: center;
-  margin-left: 2px;
-  margin-right: 2px;
-}
-
-.axis-container {
-  margin: 5px;
-  flex-wrap: wrap;
-}
-</style>

@@ -19,13 +19,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       v-if="visible"
       ref="menuRef"
-      class="alert-context-menu"
+      class="alert-context-menu tw:fixed tw:z-9999 tw:bg-white tw:dark:bg-[#2c2c2c] tw:border tw:border-(--o2-border) tw:dark:border-[#404040] tw:rounded tw:shadow-[0_2px_8px_rgba(0,0,0,0.15)] tw:dark:shadow-[0_2px_8px_rgba(0,0,0,0.4)] tw:min-w-70 tw:py-1 tw:px-0"
       :style="menuStyle"
       @click.stop
       data-test="alert-context-menu"
     >
       <div
-        class="menu-item"
+        class="menu-item tw:flex tw:items-center tw:py-2 tw:px-4 tw:cursor-pointer tw:[transition:background-color_0.2s] tw:text-sm tw:text-[#333]"
         @click="handleMenuItemClick('above')"
         @mouseenter="hoveredItem = 'above'"
         @mouseleave="hoveredItem = null"
@@ -33,10 +33,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="alert-context-menu-above"
       >
         <OIcon name="arrow-upward" size="sm" class="tw:mr-2" />
-        <span>Create Alert with threshold above {{ formattedValue }}</span>
+        <span class="tw:select-none">Create Alert with threshold above {{ formattedValue }}</span>
       </div>
       <div
-        class="menu-item"
+        class="menu-item tw:flex tw:items-center tw:py-2 tw:px-4 tw:cursor-pointer tw:[transition:background-color_0.2s] tw:text-sm tw:text-[#333]"
         @click="handleMenuItemClick('below')"
         @mouseenter="hoveredItem = 'below'"
         @mouseleave="hoveredItem = null"
@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="alert-context-menu-below"
       >
         <OIcon name="arrow-downward" size="sm" class="tw:mr-2" />
-        <span>Create Alert with threshold below {{ formattedValue }}</span>
+        <span class="tw:select-none">Create Alert with threshold below {{ formattedValue }}</span>
       </div>
     </div>
   </teleport>
@@ -146,59 +146,26 @@ export default defineComponent({
 });
 </script>
 
-<style scoped lang="scss">
-.alert-context-menu {
-  position: fixed;
-  z-index: 9999;
-  background: white;
-  border: 1px solid var(--o2-border);
-  border-radius: 4px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  min-width: 280px;
-  padding: 4px 0;
-
-  .menu-item {
-    display: flex;
-    align-items: center;
-    padding: 8px 16px;
-    cursor: pointer;
-    transition: background-color 0.2s;
-    font-size: 14px;
-    color: #333;
-
-    &.hovered,
-    &:hover {
-      background-color: #f5f5f5;
-    }
-
-    &:active {
-      background-color: var(--o2-border);
-    }
-
-    span {
-      user-select: none;
-    }
-  }
+<style>
+.alert-context-menu .menu-item.hovered,
+.alert-context-menu .menu-item:hover {
+  background-color: #f5f5f5;
 }
 
-body.body--dark {
-  .alert-context-menu {
-    background: #2c2c2c;
-    border-color: #404040;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+.alert-context-menu .menu-item:active {
+  background-color: var(--o2-border);
+}
 
-    .menu-item {
-      color: var(--o2-border);
+body.body--dark .alert-context-menu .menu-item {
+  color: var(--o2-border);
+}
 
-      &.hovered,
-      &:hover {
-        background-color: #383838;
-      }
+body.body--dark .alert-context-menu .menu-item.hovered,
+body.body--dark .alert-context-menu .menu-item:hover {
+  background-color: #383838;
+}
 
-      &:active {
-        background-color: #404040;
-      }
-    }
-  }
+body.body--dark .alert-context-menu .menu-item:active {
+  background-color: #404040;
 }
 </style>

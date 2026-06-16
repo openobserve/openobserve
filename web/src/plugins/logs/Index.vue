@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <template>
-  <div class="tw:rounded-md logPage" id="logPage" data-test="logs-page-container">
+  <div class="tw:rounded-md tw:h-full tw:min-h-full! tw:max-h-full! tw:overflow-hidden! logPage" id="logPage" data-test="logs-page-container">
     <div
       v-show="!showSearchHistory && !showSearchScheduler"
       id="secondLevel"
@@ -3523,53 +3523,33 @@ export default defineComponent({
 }) as any;
 </script>
 
-<style lang="scss">
-.logPage {
-  // Fill the app content card (MainLayout's o2-content-scroll already sizes the
-  // available area below the nav + chrome). Computing height from 100vh here
-  // double-counts the content card's padding/border and overflows → page scroll.
-  height: 100%;
-  min-height: 100% !important;
-  max-height: 100% !important;
-  overflow: hidden !important;
+<style>
+.logPage .index-menu .field_list .field_overlay .field_label,
+.logPage .q-field__native,
+.logPage .q-field__input,
+.logPage .q-table tbody td {
+  font-size: 12px !important;
+}
 
-  .index-menu .field_list .field_overlay .field_label,
-  .q-field__native,
-  .q-field__input,
-  .q-table tbody td {
-    font-size: 12px !important;
-  }
+.logPage .q-table__top {
+  padding: 0px !important;
+}
 
-  .q-table__top {
-    padding: 0px !important;
-  }
+.logPage .q-table__control {
+  width: 100%;
+}
 
-  .q-table__control {
-    width: 100%;
-  }
+.logPage .logsPageMainSection > .q-field__control-container {
+  padding-top: 0px !important;
+}
 
-  .logsPageMainSection > .q-field__control-container {
-    padding-top: 0px !important;
-  }
-
-  .thirdlevel {
-    padding: 0 !important;
-    margin: 0 !important;
-    box-sizing: border-box !important;
-    height: 100% !important;
-    overflow: visible !important;
-    /* Changed from tw:hidden to visible for button */
-  }
-
-  // .search-result-container {
-  //   position: relative;
-  //   width: 100%;
-  //   height: 100%;
-  //   padding: 0 !important;
-  //   margin: 0 !important;
-  //   box-sizing: border-box !important;
-  //   overflow: hidden !important;
-  // }
+.logPage .thirdlevel {
+  padding: 0 !important;
+  margin: 0 !important;
+  box-sizing: border-box !important;
+  height: 100% !important;
+  overflow: visible !important;
+  /* Changed from tw:hidden to visible for button */
 }
 
 .field-list-separator::after {

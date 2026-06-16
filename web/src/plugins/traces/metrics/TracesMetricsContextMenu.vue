@@ -18,13 +18,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     v-if="visible"
     ref="menuRef"
-    class="traces-metrics-context-menu"
+    class="traces-metrics-context-menu tw:fixed tw:z-[9999] tw:bg-white tw:border tw:border-solid tw:border-[var(--o2-border)] tw:rounded tw:shadow-[0_2px_8px_rgba(0,0,0,0.15)] tw:min-w-[200px] tw:py-1"
     :style="menuStyle"
     @click.stop
     data-test="traces-metrics-context-menu"
   >
     <div
-      class="menu-item"
+      class="menu-item tw:flex tw:items-center tw:px-4 tw:py-2 tw:cursor-pointer tw:transition-colors tw:text-[13px] tw:text-[#333] tw:select-none"
       @click="handleMenuItemClick('gte')"
       @mouseenter="hoveredItem = 'gte'"
       @mouseleave="hoveredItem = null"
@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span>{{ fieldName }} >= {{ formattedValue }}</span>
     </div>
     <div
-      class="menu-item"
+      class="menu-item tw:flex tw:items-center tw:px-4 tw:py-2 tw:cursor-pointer tw:transition-colors tw:text-[13px] tw:text-[#333] tw:select-none"
       @click="handleMenuItemClick('lte')"
       @mouseenter="hoveredItem = 'lte'"
       @mouseleave="hoveredItem = null"
@@ -149,59 +149,32 @@ export default defineComponent({
 });
 </script>
 
-<style scoped lang="scss">
-.traces-metrics-context-menu {
-  position: fixed;
-  z-index: 9999;
-  background: white;
-  border: 1px solid var(--o2-border);
-  border-radius: 4px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  min-width: 200px;
-  padding: 4px 0;
-
-  .menu-item {
-    display: flex;
-    align-items: center;
-    padding: 8px 16px;
-    cursor: pointer;
-    transition: background-color 0.2s;
-    font-size: 13px;
-    color: #333;
-
-    &.hovered,
-    &:hover {
-      background-color: #f5f5f5;
-    }
-
-    &:active {
-      background-color: var(--o2-border);
-    }
-
-    span {
-      user-select: none;
-    }
-  }
+<style>
+.traces-metrics-context-menu .menu-item.hovered,
+.traces-metrics-context-menu .menu-item:hover {
+  background-color: #f5f5f5;
 }
 
-body.body--dark {
-  .traces-metrics-context-menu {
-    background: #2c2c2c;
-    border-color: #404040;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+.traces-metrics-context-menu .menu-item:active {
+  background-color: var(--o2-border);
+}
 
-    .menu-item {
-      color: var(--o2-border);
+body.body--dark .traces-metrics-context-menu {
+  background: #2c2c2c;
+  border-color: #404040;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
 
-      &.hovered,
-      &:hover {
-        background-color: #383838;
-      }
+body.body--dark .traces-metrics-context-menu .menu-item {
+  color: var(--o2-border);
+}
 
-      &:active {
-        background-color: #404040;
-      }
-    }
-  }
+body.body--dark .traces-metrics-context-menu .menu-item.hovered,
+body.body--dark .traces-metrics-context-menu .menu-item:hover {
+  background-color: #383838;
+}
+
+body.body--dark .traces-metrics-context-menu .menu-item:active {
+  background-color: #404040;
 }
 </style>

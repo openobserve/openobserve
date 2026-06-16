@@ -48,7 +48,7 @@
                 style="min-height: 200px"
               />
               <div v-if="isLicenseKeyAutoFilled" class="tw:mt-2 tw:mb-3">
-                <div class="modern-info-banner">
+                <div class="modern-info-banner tw:flex tw:items-center tw:py-3 tw:px-4 tw:bg-[rgba(34,197,94,0.08)] tw:border tw:border-solid tw:border-[rgba(34,197,94,0.2)] tw:rounded-lg tw:[backdrop-filter:blur(10px)] tw:transition-all tw:duration-200">
                   <OIcon
                     name="check-circle"
                     class="tw:text-green-600 tw:mr-2"
@@ -195,7 +195,7 @@
                 style="min-height: 150px"
               />
               <div v-if="isLicenseKeyAutoFilled" class="tw:mt-2 tw:mb-3">
-                <div class="modern-info-banner">
+                <div class="modern-info-banner tw:flex tw:items-center tw:py-3 tw:px-4 tw:bg-[rgba(34,197,94,0.08)] tw:border tw:border-solid tw:border-[rgba(34,197,94,0.2)] tw:rounded-lg tw:[backdrop-filter:blur(10px)] tw:transition-all tw:duration-200">
                   <OIcon
                     name="check-circle"
                     class="tw:text-green-600 tw:mr-2"
@@ -246,8 +246,8 @@
 
             <div class="tw:flex tw:flex-col tw:gap-2 tw:mt-3">
               <!-- Summary Message -->
-              <div class="ingestion-summary-compact">
-                <div class="summary-text-compact tw:text-sm">
+              <div class="ingestion-summary-compact tw:border tw:border-solid tw:border-[rgba(99,102,241,0.2)] tw:rounded-lg tw:py-3 tw:px-[14px] tw:[backdrop-filter:blur(10px)] tw:relative tw:overflow-hidden">
+                <div class="summary-text-compact tw:text-sm tw:leading-[1.6] tw:text-inherit tw:text-[13px]">
                   <!-- Line 1: License Info -->
                   <div class="tw:flex tw:items-center tw:gap-2 tw:mb-2">
                     <OIcon name="info" size="sm" class="tw:flex-shrink-0" />
@@ -329,7 +329,7 @@
                             licenseData?.ingestion_exceeded >
                             limitBreachAllowedCount
                           "
-                          class="warning-message"
+                          class="tw:inline-flex tw:items-center tw:text-inherit tw:font-semibold"
                           v-html="
                             DOMPurify.sanitize(
                               t('about.limit_exceeded_warning', {
@@ -342,7 +342,7 @@
                         ></span
                         ><span
                           v-else
-                          class="info-message"
+                          class="tw:text-[12px] tw:opacity-80 tw:italic"
                           v-html="
                             DOMPurify.sanitize(
                               t('about.limit_exceeded_info', {
@@ -376,8 +376,8 @@
 
               <!-- Chart -->
               <div v-if="usageDashboardData">
-                <div class="chart-wrapper">
-                  <div class="usage-chart-container">
+                <div class="chart-wrapper tw:relative">
+                  <div class="usage-chart-container tw:w-full tw:overflow-visible tw:p-0 tw:mx-auto">
                     <RenderDashboardCharts
                       :key="dashboardRenderKey"
                       :dashboardData="usageDashboardData"
@@ -952,32 +952,6 @@ export default defineComponent({
 </script>
 
 <style>
-.gradient-banner {
-  background: linear-gradient(
-    to right,
-    transparent 60%,
-    #f7f7ff 70%,
-    #cdf7e4 100%
-  );
-}
-
-.license-expiry-container {
-  border: 1px solid #d7d7d7;
-  border-radius: 6px;
-}
-
-.o2-license-message {
-  font-size: 18px;
-  font-weight: 600;
-  line-height: 32px;
-}
-
-.o2-license-subtitle {
-  font-size: 16px;
-  font-weight: 400;
-  line-height: 22px;
-}
-
 .compact-table {
   td,
   th {
@@ -987,11 +961,6 @@ export default defineComponent({
 }
 
 .usage-chart-container {
-  width: 100%;
-  overflow: visible;
-  padding: 0;
-  margin: 0 auto;
-
   .grid-stack-item-content {
     border: 0px !important;
   }
@@ -1004,39 +973,7 @@ export default defineComponent({
   }
 }
 
-.chart-wrapper {
-  position: relative;
-
-  .chart-title {
-    color: inherit;
-    opacity: 0.9;
-    font-size: 13px;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-  }
-}
-
-.limit-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 6px 12px;
-  background: rgba(249, 115, 22, 0.1);
-  border: 1px solid rgba(249, 115, 22, 0.3);
-  border-radius: 20px;
-  font-size: 12px;
-  font-weight: 600;
-  color: #f97316;
-  backdrop-filter: blur(10px);
-}
-
 .ingestion-summary-compact {
-  border: 1px solid rgba(99, 102, 241, 0.2);
-  border-radius: 8px;
-  padding: 12px 14px;
-  backdrop-filter: blur(10px);
-  position: relative;
-  overflow: hidden;
-
   &::before {
     content: "";
     position: absolute;
@@ -1053,10 +990,6 @@ export default defineComponent({
   }
 
   .summary-text-compact {
-    line-height: 1.6;
-    color: inherit;
-    font-size: 13px;
-
     strong {
       font-weight: 700;
       background: linear-gradient(
@@ -1069,46 +1002,9 @@ export default defineComponent({
       background-clip: text;
     }
   }
-
-  .warning-message {
-    display: inline-flex;
-    align-items: center;
-    color: inherit;
-    font-weight: 600;
-  }
-
-  .info-message {
-    font-size: 12px;
-    opacity: 0.8;
-    font-style: italic;
-  }
-}
-
-.modern-info-banner {
-  display: flex;
-  align-items: center;
-  padding: 12px 16px;
-  background: rgba(34, 197, 94, 0.08);
-  border: 1px solid rgba(34, 197, 94, 0.2);
-  border-radius: 8px;
-  backdrop-filter: blur(10px);
-  transition: all 0.2s ease;
 }
 
 .body--dark {
-  .gradient-banner {
-    background: linear-gradient(
-      to right,
-      transparent 60%,
-      #24262f 70%,
-      #2c3934 100%
-    );
-  }
-
-  .license-expiry-container {
-    border: 1px solid #454f5b;
-  }
-
   .modern-info-banner {
     background: rgba(34, 197, 94, 0.15);
     border: 1px solid rgba(34, 197, 94, 0.3);
@@ -1157,9 +1053,5 @@ export default defineComponent({
     }
   }
 
-  .limit-badge {
-    background: rgba(249, 115, 22, 0.15);
-    border: 1px solid rgba(249, 115, 22, 0.4);
-  }
 }
 </style>

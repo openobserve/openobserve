@@ -2039,36 +2039,3 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
-
-/* Correlation Panel Styles */
-.correlation-panel-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  z-index: 3000;
-  display: flex;
-  justify-content: flex-end;
-}
-
-.correlation-panel-container {
-  width: 450px;
-  max-width: 90vw;
-  height: 100vh;
-  background: var(--q-background, #ffffff);
-  box-shadow: -2px 0 12px rgba(0, 0, 0, 0.15);
-  animation: slideIn 0.3s ease-out;
-}
-
-@keyframes slideIn {
-  from {
-    transform: translateX(100%);
-  }
-  to {
-    transform: translateX(0);
-  }
-}
-</style>

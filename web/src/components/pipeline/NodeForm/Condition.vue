@@ -50,12 +50,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
     <div
       data-test="add-condition-section"
-      class="stream-routing-section tw:w-full"
+      class="stream-routing-section tw:w-full tw:min-h-full"
       :class="store.state.theme === 'dark' ? 'tw:bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'tw:bg-white'"
     >
 
 
-    <div class="stream-routing-container tw:px-3">
+    <div class="tw:min-w-[45vw] tw:rounded-lg tw:max-w-[47vw] tw:px-3 stream-routing-container">
       <div>
         <div
           class="showLabelOnTop tw:font-bold text-h7"
@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <div></div>
           <!-- Wrapper for FilterGroup with pipeline-specific styling -->
-          <div class="pipeline-filter-group-wrapper" @submit.stop.prevent>
+          <div class="pipeline-filter-group-wrapper tw:max-w-full tw:overflow-x-visible!" @submit.stop.prevent>
             <FilterGroup
               v-if="
                 conditionGroup &&
@@ -84,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div v-else class="tw:p-3 tw:text-gray-400">Loading conditions...</div>
           </div>
           <div
-            class="note-container tw:rounded-md tw:p-3 tw:my-3 tw:flex tw:flex-col tw:gap-2"
+            class="note-container tw:bg-[#f9f290] tw:text-[#2d3748] tw:w-full tw:rounded-md tw:p-3 tw:my-3 tw:flex tw:flex-col tw:gap-2"
             data-test="add-condition-note-container"
           >
             <div
@@ -101,23 +101,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon name="info" size="sm" class="tw:shrink-0 tw:mt-0.5 tw:text-amber-500" />
                 <span>
                   To check for an empty value, use
-                  <span class="highlight">""</span>. Example:
-                  <span class="code">app_name != ""</span>
+                  <span class="highlight tw:font-bold tw:text-[#007bff]">""</span>. Example:
+                  <span class="code tw:font-mono tw:py-[1px] tw:px-[4px] tw:rounded-[3px] tw:bg-[rgba(0,0,0,0.06)] tw:text-[#b30059]">app_name != ""</span>
                 </span>
               </div>
               <div class="tw:flex tw:items-start tw:gap-2">
                 <OIcon name="info" size="sm" class="tw:shrink-0 tw:mt-0.5 tw:text-amber-500" />
                 <span>
                   To check for an Null value, use
-                  <span class="highlight">null</span>. Example:
-                  <span class="code">app_name != null</span>
+                  <span class="highlight tw:font-bold tw:text-[#007bff]">null</span>. Example:
+                  <span class="code tw:font-mono tw:py-[1px] tw:px-[4px] tw:rounded-[3px] tw:bg-[rgba(0,0,0,0.06)] tw:text-[#b30059]">app_name != null</span>
                 </span>
               </div>
               <div class="tw:flex tw:items-start tw:gap-2">
                 <OIcon name="info" size="sm" class="tw:shrink-0 tw:mt-0.5 tw:text-amber-500" />
                 <span>
                   To add a custom column, type column name and press
-                  <span class="highlight">Enter</span>.
+                  <span class="highlight tw:font-bold tw:text-[#007bff]">Enter</span>.
                 </span>
               </div>
               <div class="tw:flex tw:items-start tw:gap-2">
@@ -773,104 +773,36 @@ const validateSqlQuery = () => {
 };
 </script>
 
-<style scoped>
-.stream-routing-title {
-  font-size: 18px;
-  padding-top: 16px;
-}
-.stream-routing-container {
-  min-width: 45vw;
-  border-radius: 8px;
-  max-width: 47vw;
-  /* box-shadow: 0px 0px 10px 0px #d2d1d1; */
-}
-
-.stream-routing-section {
-  min-height: 100%;
-}
-.previous-drop-down {
-  width: 600px;
-}
-
-.note-container {
-  background-color: #f9f290;
-  color: #2d3748;
-  width: 100%;
-}
-
-.note-container .highlight {
-  font-weight: bold;
-  color: #007bff;
-}
-
-.note-container .code {
-  font-family: monospace;
-  padding: 1px 4px;
-  border-radius: 3px;
-  background-color: rgba(0, 0, 0, 0.06);
-  color: #b30059;
-}
-
-
-
-/* Pipeline-specific FilterGroup styling for narrow sidepanel */
-.pipeline-filter-group-wrapper {
-  max-width: 100%;
-  overflow-x: visible !important;
-}
-
+<style>
 /* Override FilterGroup styles for pipeline context */
-.pipeline-filter-group-wrapper :deep(.group-container) {
+.pipeline-filter-group-wrapper .group-container {
   white-space: normal !important;
   overflow-x: visible !important;
   max-width: 100%;
-}
-
-/* Make condition rows wrap and fit in narrow space */
-.pipeline-filter-group-wrapper :deep(.tw:whitespace-nowrap) {
-  white-space: normal !important;
 }
 
 /* Reduce margins for nested groups in pipeline */
-.pipeline-filter-group-wrapper :deep([style*="margin-left"]) {
+.pipeline-filter-group-wrapper [style*="margin-left"] {
   margin-left: 10px !important;
 }
 
-/* Make condition inputs more compact */
-.pipeline-filter-group-wrapper :deep(.tw:flex-no-wrap) {
-  flex-wrap: wrap !important;
-  gap: 0.25rem;
-}
-
 /* Ensure conditions fit width */
-.pipeline-filter-group-wrapper :deep(.conditions-input) {
+.pipeline-filter-group-wrapper .conditions-input {
   min-width: 120px !important;
   max-width: 200px;
 }
 
-/* Make FilterGroup responsive for sidepanel */
-.pipeline-filter-group-wrapper :deep(.xl\\:tw:w-fit) {
-  width: 100% !important;
-  max-width: 100% !important;
-}
-
 /* Ensure group borders don't overflow */
-.pipeline-filter-group-wrapper :deep(.group-border) {
+.pipeline-filter-group-wrapper .group-border {
   max-width: calc(100% - 20px);
 }
 
-
-/* Prevent FilterGroup buttons from triggering form submit */
-.pipeline-filter-group-wrapper :deep(.q-btn:not([type="submit"])) {
-  /* This is already handled by buttons not having type="submit" */
-}
-
 /* Ensure FilterGroup container doesn't interfere with clicks */
-.pipeline-filter-group-wrapper :deep(.group-container) {
+.pipeline-filter-group-wrapper .group-container {
   pointer-events: auto;
 }
 
-.pipeline-filter-group-wrapper :deep(.q-tabs) {
+.pipeline-filter-group-wrapper .q-tabs {
   pointer-events: auto;
 }
 </style>

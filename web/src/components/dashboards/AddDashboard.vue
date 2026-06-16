@@ -220,10 +220,3 @@ export default defineComponent({
   components: { SelectFolderDropdown, OForm, OFormInput, OInput },
 });
 </script>
-<style lang="scss">
-.add-dashboard-form-card-section {
-  .add-folder-btn {
-    margin-top: 36px !important;
-  }
-}
-</style>

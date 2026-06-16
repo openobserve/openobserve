@@ -1,6 +1,6 @@
 <template>
   <div
-    class="kpi-card card-container tw:rounded-lg tw:flex tw:flex-col tw:px-[0.875rem] tw:pt-[0.625rem] tw:pb-[0.625rem] tw:gap-[0.25rem]"
+    class="card-container tw:rounded-lg tw:flex tw:flex-col tw:px-[0.875rem] tw:pt-[0.625rem] tw:pb-[0.625rem] tw:gap-[0.25rem] tw:bg-(--o2-card-bg) tw:border tw:border-(--o2-border-color) tw:transition-shadow tw:duration-200 tw:ease-in-out tw:hover:shadow-[0_1px_6px_rgba(0,0,0,0.08)]"
     :data-test="`quality-kpi-${kpi.id}`"
   >
     <div class="tw:flex tw:flex-col tw:gap-[0.25rem]">
@@ -33,8 +33,12 @@
            short history) rather than zero. -->
       <div
         v-if="kpi.value != null"
-        class="kpi-trend tw:text-[0.65rem] tw:font-medium tw:flex tw:items-center tw:gap-[0.25rem]"
-        :class="`kpi-trend--${delta != null ? trendSentiment : 'neutral'}`"
+        class="tw:text-[0.65rem] tw:font-medium tw:flex tw:items-center tw:gap-[0.25rem]"
+        :class="{
+          'tw:text-[#16a34a]': (delta != null ? trendSentiment : 'neutral') === 'good',
+          'tw:text-[var(--o2-status-error-text,#c62828)]': (delta != null ? trendSentiment : 'neutral') === 'bad',
+          'tw:text-[var(--o2-text-muted)]': (delta != null ? trendSentiment : 'neutral') === 'neutral',
+        }"
       >
         <template v-if="delta != null">
           <span class="kpi-trend-arrow">{{ trendArrow }}</span>
@@ -125,20 +129,3 @@ const sparkColor = computed(() => {
 });
 </script>
 
-<style lang="scss" scoped>
-.kpi-card {
-  background: var(--o2-card-bg);
-  border: 1px solid var(--o2-border-color);
-  transition: box-shadow 0.2s ease;
-}
-
-.kpi-card:hover {
-  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.08);
-}
-
-.kpi-trend {
-  &--good { color: #16a34a; }
-  &--bad { color: var(--o2-status-error-text, #c62828); }
-  &--neutral { color: var(--o2-text-muted); }
-}
-</style>

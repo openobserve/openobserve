@@ -19,17 +19,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <Transition name="fade">
       <div
         v-if="modelValue"
-        class="app-dialog-backdrop"
+        class="tw:fixed tw:inset-0 tw:bg-black/50 tw:flex tw:justify-center tw:items-center tw:z-9999"
         @click="handleBackdropClick"
       >
         <div
-          class="app-dialog"
+          class="tw:bg-white tw:rounded-lg tw:shadow-[0_4px_20px_rgba(0,0,0,0.15)] tw:w-[90%] tw:max-w-150 tw:max-h-[90vh] tw:flex tw:flex-col tw:overflow-hidden"
           ref="dialogRef"
           @click.stop
           role="dialog"
           aria-modal="true"
         >
-          <div class="app-dialog-content">
+          <div class="tw:overflow-y-auto tw:flex-1">
             <slot></slot>
           </div>
         </div>
@@ -166,79 +166,7 @@ export default defineComponent({
 });
 </script>
 
-<style scoped>
-.app-dialog-backdrop {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: rgba(0, 0, 0, 0.5);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 9999;
-}
-
-.app-dialog {
-  background-color: white;
-  border-radius: 8px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-  width: 90%;
-  max-width: 600px;
-  max-height: 90vh;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.app-dialog-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 16px 20px;
-  border-bottom: 1px solid #eaeaea;
-}
-
-.app-dialog-title {
-  font-size: 18px;
-  font-weight: 600;
-}
-
-.app-dialog-close {
-  background: none;
-  border: none;
-  font-size: 24px;
-  cursor: pointer;
-  color: #666;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 4px;
-  transition: background-color 0.2s;
-}
-
-.app-dialog-close:hover {
-  background-color: #f5f5f5;
-  color: #333;
-}
-
-.app-dialog-content {
-  /* padding: 20px; */
-  overflow-y: auto;
-  flex: 1;
-}
-
-.app-dialog-footer {
-  padding: 16px 20px;
-  border-top: 1px solid #eaeaea;
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-}
-
+<style>
 /* Transition effects */
 .fade-enter-active,
 .fade-leave-active {
@@ -248,56 +176,5 @@ export default defineComponent({
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
-}
-
-/* Ensure dialog slides in when it appears */
-.fade-enter-active .app-dialog {
-  animation: slide-up 0.3s ease;
-}
-
-.fade-leave-active .app-dialog {
-  animation: slide-down 0.2s ease;
-}
-
-@keyframes slide-up {
-  from {
-    transform: translateY(30px);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
-
-@keyframes slide-down {
-  from {
-    transform: translateY(0);
-    opacity: 1;
-  }
-  to {
-    transform: translateY(30px);
-    opacity: 0;
-  }
-}
-
-/* Dark theme support */
-:deep(.dark-theme) .app-dialog {
-  background-color: #2c2c2c;
-  color: #eaeaea;
-}
-
-:deep(.dark-theme) .app-dialog-header,
-:deep(.dark-theme) .app-dialog-footer {
-  border-color: #444;
-}
-
-:deep(.dark-theme) .app-dialog-close {
-  color: #aaa;
-}
-
-:deep(.dark-theme) .app-dialog-close:hover {
-  background-color: #3c3c3c;
-  color: #eaeaea;
 }
 </style>

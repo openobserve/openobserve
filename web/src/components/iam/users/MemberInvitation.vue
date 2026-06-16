@@ -183,19 +183,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped>
-.invite-user {
-  background: transparent;
-  border-radius: 4px;
-
-  .separator {
-    width: 1px;
-  }
-}
-
-.inputHint {
-  font-size: 11px;
-  color: var(--o2-text-secondary);
-}
-</style>

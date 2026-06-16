@@ -38,18 +38,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         ref="playerRef"
         id="player"
-        class="player tw:flex tw:items-center tw:cursor-pointer"
+        class="player tw:h-full tw:flex tw:items-center tw:cursor-pointer"
         @click="togglePlay"
       />
     </div>
     <div class="tw:w-full tw:p-2 tw:pt-3 controls-container">
       <div
         ref="playbackBarRef"
-        class="playback_bar tw:mt-2 tw:mb-3 tw:relative tw:cursor-pointer"
+        class="tw:w-full tw:h-[0.3125rem] tw:bg-[#ebebeb] tw:mt-2 tw:mb-3 tw:relative tw:cursor-pointer"
         @click="handlePlaybackBarClick"
       >
         <div
-          class="progressTime progress-fill tw:absolute"
+          class="tw:bg-(--o2-primary-btn-bg)! tw:absolute"
           :style="{
             width: playerState.progressWidth + 'px',
             left: 0,
@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }"
         />
         <div
-          class="progressTime progress-fill tw:absolute"
+          class="tw:bg-(--o2-primary-btn-bg)! tw:absolute"
           :style="{
             width: '2px',
             left: playerState.progressWidth - 2 + 'px',
@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-for="event in events as any[]"
           :key="event.id"
-          class="progressTime tw:absolute tw:cursor-pointer"
+          class="tw:absolute tw:cursor-pointer"
           :class="getEventMarkerClass(event)"
           :style="{
             width:
@@ -476,12 +476,12 @@ const updatePlayerState = () => {
 
 const getEventMarkerClass = (event: any) => {
   if (event.frustration_types && event.frustration_types.length > 0) {
-    return "bg-frustration-marker";
+    return "tw:bg-[#fb923c]! tw:shadow-[0_0_4px_rgba(251,146,60,0.6)]";
   }
   if (event.type === "error") {
-    return "bg-event-error";
+    return "tw:bg-[#ef4444]!";
   }
-  return "bg-event-default";
+  return "tw:bg-[#14b8a6]!";
 };
 
 const getEventTooltip = (event: any) => {
@@ -645,46 +645,15 @@ defineExpose({
 });
 </script>
 
-<style scoped lang="scss">
-.player {
-  height: 100%;
+<style>
+.speed-selector .q-field__control {
+  padding: 0 0.5rem !important;
 }
 
-.playback_bar {
-  width: 100%;
-  height: 0.3125rem;
-  background-color: #ebebeb;
-}
-
-.bg-frustration-marker {
-  background-color: #fb923c !important;
-  box-shadow: 0 0 4px rgba(251, 146, 60, 0.6);
-}
-
-.bg-event-error {
-  background-color: #ef4444 !important;
-}
-
-.bg-event-default {
-  background-color: #14b8a6 !important;
-}
-
-.progress-fill {
-  background-color: var(--o2-primary-btn-bg) !important;
-}
-</style>
-
-<style lang="scss">
-.speed-selector {
-  .q-field__control {
-    padding: 0 0.5rem !important;
-  }
-
-  .q-field__marginal,
-  .q-field__native,
-  .q-field__control {
-    min-height: 1.875rem !important;
-    height: 1.875rem !important;
-  }
+.speed-selector .q-field__marginal,
+.speed-selector .q-field__native,
+.speed-selector .q-field__control {
+  min-height: 1.875rem !important;
+  height: 1.875rem !important;
 }
 </style>

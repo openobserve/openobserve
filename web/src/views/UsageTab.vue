@@ -18,10 +18,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Main content when data exists -->
     <div
       v-if="!no_data_ingest && !isLoadingSummary"
-      class="usage-scroll tw:w-full tw:h-full tw:overflow-y-auto"
+      class="usage-scroll tw:w-full tw:h-full tw:overflow-y-auto tw:[padding-right:0.625rem]"
     >
       <!-- Banners -->
-      <div class="banners-wrapper">
+      <div class="banners-wrapper tw:shrink-0 tw:flex tw:flex-col tw:gap-2">
         <div>
           <TrialPeriod></TrialPeriod>
         </div>
@@ -44,12 +44,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         role="region"
         aria-label="Streams overview section"
       >
-        <div class="tw:flex tw:justify-between tw:items-center streams-header">
+        <div class="tw:flex tw:justify-between tw:items-center streams-header tw:mb-3">
           <div class="tw:flex tw:items-center tw:gap-2">
-            <div class="tile-icon icon-bg-blue" aria-hidden="true">
+            <div class="tile-icon icon-bg-blue tw:opacity-80 tw:flex tw:items-center tw:justify-center tw:w-[2.5rem] tw:h-[2.5rem] tw:rounded-lg" aria-hidden="true">
               <OIcon name="window" size="md" />
             </div>
-            <div class="section-header">{{ t("home.streams") }}</div>
+            <div class="section-header tw:text-[1.25rem] tw:font-semibold tw:[line-height:1.5rem]">{{ t("home.streams") }}</div>
           </div>
           <OButton
             variant="ghost"
@@ -81,8 +81,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Tiles -->
-        <div class="tiles-grid">
-          <div class="tile">
+        <div class="tiles-grid tw:grid tw:[grid-template-columns:repeat(auto-fit,minmax(15rem,1fr))] tw:gap-3">
+          <div class="tile tw:[border-radius:0.325rem] tw:border tw:border-[var(--o2-border-color)]">
             <div
               class="tile-content tw:rounded tw:text-center tw:flex tw:flex-col tw:justify-between"
               :class="
@@ -95,8 +95,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <div class="tw:flex tw:flex-col tw:justify-between">
                 <div class="tw:flex tw:justify-between">
-                  <div class="tile-title">{{ t("home.streams") }}</div>
-                  <div class="tile-icon icon-bg-blue" aria-hidden="true">
+                  <div class="tile-title tw:text-base tw:font-medium tw:[line-height:1.25rem] tw:[letter-spacing:0%]">{{ t("home.streams") }}</div>
+                  <div class="tile-icon icon-bg-blue tw:opacity-80 tw:flex tw:items-center tw:justify-center tw:w-[2.5rem] tw:h-[2.5rem] tw:rounded-lg" aria-hidden="true">
                     <img :src="streamsIcon" alt="" />
                   </div>
                 </div>
@@ -114,7 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
               <div
-                class="data-to-display tw:flex tw:items-end"
+                class="data-to-display tw:text-[1.5rem] tw:font-semibold tw:[line-height:1.75rem] tw:flex tw:items-end"
                 aria-live="polite"
                 data-test="home-usage-tab-streams-count"
               >
@@ -123,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <div class="tile">
+          <div class="tile tw:[border-radius:0.325rem] tw:border tw:border-[var(--o2-border-color)]">
             <div
               class="tile-content tw:rounded tw:text-center tw:flex tw:flex-col tw:justify-between"
               :class="
@@ -136,8 +136,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <div class="tw:flex tw:flex-col tw:justify-between">
                 <div class="tw:flex tw:justify-between">
-                  <div class="tile-title">{{ t("home.docsCountLbl") }}</div>
-                  <div class="tile-icon icon-bg-blue" aria-hidden="true">
+                  <div class="tile-title tw:text-base tw:font-medium tw:[line-height:1.25rem] tw:[letter-spacing:0%]">{{ t("home.docsCountLbl") }}</div>
+                  <div class="tile-icon icon-bg-blue tw:opacity-80 tw:flex tw:items-center tw:justify-center tw:w-[2.5rem] tw:h-[2.5rem] tw:rounded-lg" aria-hidden="true">
                     <img :src="recordsIcon" alt="" />
                   </div>
                 </div>
@@ -155,7 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
               <div
-                class="data-to-display tw:flex tw:items-end"
+                class="data-to-display tw:text-[1.5rem] tw:font-semibold tw:[line-height:1.75rem] tw:flex tw:items-end"
                 aria-live="polite"
                 data-test="home-usage-tab-events-count"
               >
@@ -164,7 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <div class="tile">
+          <div class="tile tw:[border-radius:0.325rem] tw:border tw:border-[var(--o2-border-color)]">
             <div
               class="tile-content tw:rounded tw:text-center tw:flex tw:flex-col tw:justify-between"
               :class="
@@ -177,10 +177,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <div class="tw:flex tw:flex-col tw:justify-between">
                 <div class="tw:flex tw:justify-between">
-                  <div class="tile-title">
+                  <div class="tile-title tw:text-base tw:font-medium tw:[line-height:1.25rem] tw:[letter-spacing:0%]">
                     {{ t("home.totalDataIngested") }}
                   </div>
-                  <div class="tile-icon icon-bg-blue" aria-hidden="true">
+                  <div class="tile-icon icon-bg-blue tw:opacity-80 tw:flex tw:items-center tw:justify-center tw:w-[2.5rem] tw:h-[2.5rem] tw:rounded-lg" aria-hidden="true">
                     <img :src="ingestedSizeIcon" alt="" />
                   </div>
                 </div>
@@ -198,7 +198,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
               <div
-                class="data-to-display tw:flex tw:items-end"
+                class="data-to-display tw:text-[1.5rem] tw:font-semibold tw:[line-height:1.75rem] tw:flex tw:items-end"
                 aria-live="polite"
                 data-test="home-usage-tab-ingested-size"
               >
@@ -220,10 +220,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <div class="tw:flex tw:flex-col tw:justify-between">
                 <div class="tw:flex tw:justify-between">
-                  <div class="tile-title">
+                  <div class="tile-title tw:text-base tw:font-medium tw:[line-height:1.25rem] tw:[letter-spacing:0%]">
                     {{ t("home.totalDataCompressed") }}
                   </div>
-                  <div class="tile-icon icon-bg-blue" aria-hidden="true">
+                  <div class="tile-icon icon-bg-blue tw:opacity-80 tw:flex tw:items-center tw:justify-center tw:w-[2.5rem] tw:h-[2.5rem] tw:rounded-lg" aria-hidden="true">
                     <img :src="compressedSizeIcon" alt="" />
                   </div>
                 </div>
@@ -241,7 +241,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
               <div
-                class="data-to-display tw:flex tw:items-end"
+                class="data-to-display tw:text-[1.5rem] tw:font-semibold tw:[line-height:1.75rem] tw:flex tw:items-end"
                 aria-live="polite"
                 data-test="home-usage-tab-compressed-size"
               >
@@ -263,8 +263,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <div class="tw:flex tw:flex-col tw:justify-between">
                 <div class="tw:flex tw:justify-between">
-                  <div class="tile-title">{{ t("home.indexSizeLbl") }}</div>
-                  <div class="tile-icon icon-bg-blue" aria-hidden="true">
+                  <div class="tile-title tw:text-base tw:font-medium tw:[line-height:1.25rem] tw:[letter-spacing:0%]">{{ t("home.indexSizeLbl") }}</div>
+                  <div class="tile-icon icon-bg-blue tw:opacity-80 tw:flex tw:items-center tw:justify-center tw:w-[2.5rem] tw:h-[2.5rem] tw:rounded-lg" aria-hidden="true">
                     <img :src="indexSizeIcon" alt="" />
                   </div>
                 </div>
@@ -282,7 +282,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
               <div
-                class="data-to-display tw:flex tw:items-end"
+                class="data-to-display tw:text-[1.5rem] tw:font-semibold tw:[line-height:1.75rem] tw:flex tw:items-end"
                 aria-live="polite"
                 data-test="home-usage-tab-index-size"
               >
@@ -294,10 +294,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Charts section -->
-      <div class="charts-main-container">
+      <div class="charts-main-container tw:grid tw:[grid-template-columns:minmax(min-content,max-content)_1fr_2fr] tw:gap-3 tw:mt-4 tw:items-stretch tw:flex-1 tw:min-h-0">
         <!-- Functions and Dashboards tiles -->
-        <div class="functions-dashboards-column">
-          <div class="tile-wrapper">
+        <div class="functions-dashboards-column tw:flex tw:flex-col tw:gap-4 tw:w-full">
+          <div class="tile-wrapper tw:flex-1 tw:flex tw:min-w-0 tw:w-full">
             <div
               class="feature-card tw:rounded tw:p-4 tw:bg-[var(--tile-bg)] tw:border tw:border-[var(--o2-border-color)] tw:text-center tw:flex tw:flex-col tw:justify-between"
               :class="
@@ -313,13 +313,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="tw:flex tw:items-center tw:gap-2 tw:flex-nowrap tw:w-full"
                 >
                   <div
-                    class="tile-icon icon-bg-orange tw:flex-shrink-0"
+                    class="tile-icon icon-bg-orange tw:opacity-80 tw:flex tw:items-center tw:justify-center tw:w-[2.5rem] tw:h-[2.5rem] tw:rounded-lg tw:flex-shrink-0"
                     aria-hidden="true"
                   >
                     <img :src="functionsIcon" alt="" />
                   </div>
                   <div
-                    class="tile-title tw:flex-1 tw:text-left tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis"
+                    class="tile-title tw:text-base tw:font-medium tw:[line-height:1.25rem] tw:[letter-spacing:0%] tw:flex-1 tw:text-left tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis"
                   >
                     {{ t("home.functionTitle") }}
                   </div>
@@ -354,7 +354,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
               <div
-                class="data-to-display tw:flex tw:items-end"
+                class="data-to-display tw:text-[1.5rem] tw:font-semibold tw:[line-height:1.75rem] tw:flex tw:items-end"
                 aria-live="polite"
                 data-test="home-usage-tab-functions-count"
               >
@@ -363,7 +363,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <div class="tile-wrapper">
+          <div class="tile-wrapper tw:flex-1 tw:flex tw:min-w-0 tw:w-full">
             <div
               class="feature-card tw:rounded tw:p-4 tw:bg-[var(--tile-bg)] tw:border tw:border-[var(--o2-border-color)] tw:text-center tw:flex tw:flex-col tw:justify-between"
               :class="
@@ -379,13 +379,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="tw:flex tw:items-center tw:gap-2 tw:flex-nowrap tw:w-full"
                 >
                   <div
-                    class="tile-icon icon-bg-orange tw:flex-shrink-0"
+                    class="tile-icon icon-bg-orange tw:opacity-80 tw:flex tw:items-center tw:justify-center tw:w-[2.5rem] tw:h-[2.5rem] tw:rounded-lg tw:flex-shrink-0"
                     aria-hidden="true"
                   >
                     <img :src="dashboardsIcon" alt="" />
                   </div>
                   <div
-                    class="tile-title tw:flex-1 tw:text-left tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis"
+                    class="tile-title tw:text-base tw:font-medium tw:[line-height:1.25rem] tw:[letter-spacing:0%] tw:flex-1 tw:text-left tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis"
                   >
                     {{ t("home.dashboardTitle") }}
                   </div>
@@ -420,7 +420,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
               <div
-                class="data-to-display tw:flex tw:items-end"
+                class="data-to-display tw:text-[1.5rem] tw:font-semibold tw:[line-height:1.75rem] tw:flex tw:items-end"
                 aria-live="polite"
                 data-test="home-usage-tab-dashboards-count"
               >
@@ -441,10 +441,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           role="region"
           aria-label="Alerts overview section"
         >
-          <div class="details-container">
+          <div class="details-container tw:gap-2 tw:mb-3">
             <div class="tw:flex tw:justify-between tw:items-center">
-              <span class="text-title tw:flex tw:items-center tw:gap-2">
-                <div class="tile-icon icon-bg-blue" aria-hidden="true">
+              <span class="text-title tw:text-[1.125rem] tw:font-medium tw:[line-height:1.25rem] tw:[letter-spacing:0%] tw:flex tw:items-center tw:gap-2">
+                <div class="tile-icon icon-bg-blue tw:opacity-80 tw:flex tw:items-center tw:justify-center tw:w-[2.5rem] tw:h-[2.5rem] tw:rounded-lg" aria-hidden="true">
                   <img :src="alertsIcon" alt="" />
                 </div>
                 {{ t("home.alertTitle") }}
@@ -477,13 +477,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ></router-link>
               </OButton>
             </div>
-            <div class="tw:flex tw:pt-2 home-stat-row">
+            <div class="tw:flex tw:pt-2 home-stat-row tw:gap-[1em]">
               <div class="tw:flex tw:flex-col">
-                <span class="text-subtitle">{{
+                <span class="text-subtitle tw:text-sm tw:font-normal tw:[line-height:1.25rem] tw:[letter-spacing:0%]">{{
                   t("home.scheduledAlert")
                 }}</span>
                 <span
-                  class="results-count"
+                  class="results-count tw:text-[1.25rem] tw:font-semibold tw:[line-height:1.5rem]"
                   aria-live="polite"
                   data-test="home-usage-tab-scheduled-alerts-count"
                 >{{
@@ -492,9 +492,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <OSeparator :vertical="true" />
               <div class="tw:flex tw:flex-col">
-                <span class="text-subtitle">{{ t("home.rtAlert") }}</span>
+                <span class="text-subtitle tw:text-sm tw:font-normal tw:[line-height:1.25rem] tw:[letter-spacing:0%]">{{ t("home.rtAlert") }}</span>
                 <span
-                  class="results-count"
+                  class="results-count tw:text-[1.25rem] tw:font-semibold tw:[line-height:1.5rem]"
                   aria-live="polite"
                   data-test="home-usage-tab-rt-alerts-count"
                 >{{
@@ -525,10 +525,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           role="region"
           aria-label="Pipelines overview section"
         >
-          <div class="details-container">
+          <div class="details-container tw:gap-2 tw:mb-3">
             <div class="tw:flex tw:justify-between tw:items-center">
-              <span class="text-title tw:flex tw:items-center tw:gap-2">
-                <div class="tile-icon icon-bg-blue" aria-hidden="true">
+              <span class="text-title tw:text-[1.125rem] tw:font-medium tw:[line-height:1.25rem] tw:[letter-spacing:0%] tw:flex tw:items-center tw:gap-2">
+                <div class="tile-icon icon-bg-blue tw:opacity-80 tw:flex tw:items-center tw:justify-center tw:w-[2.5rem] tw:h-[2.5rem] tw:rounded-lg" aria-hidden="true">
                   <img :src="pipelinesIcon" alt="" />
                 </div>
                 {{ t("home.pipelineTitle") }}
@@ -561,13 +561,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ></router-link>
               </OButton>
             </div>
-            <div class="tw:flex tw:pt-2 home-stat-row">
+            <div class="tw:flex tw:pt-2 home-stat-row tw:gap-[1em]">
               <div class="tw:flex tw:flex-col">
-                <span class="text-subtitle">
+                <span class="text-subtitle tw:text-sm tw:font-normal tw:[line-height:1.25rem] tw:[letter-spacing:0%]">
                   {{ t("home.schedulePipelineTitle") }}</span
                 >
                 <span
-                  class="results-count"
+                  class="results-count tw:text-[1.25rem] tw:font-semibold tw:[line-height:1.5rem]"
                   aria-live="polite"
                   data-test="home-usage-tab-scheduled-pipelines-count"
                 >{{
@@ -576,11 +576,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <OSeparator :vertical="true" />
               <div class="tw:flex tw:flex-col">
-                <span class="text-subtitle">{{
+                <span class="text-subtitle tw:text-sm tw:font-normal tw:[line-height:1.25rem] tw:[letter-spacing:0%]">{{
                   t("home.rtPipelineTitle")
                 }}</span>
                 <span
-                  class="results-count"
+                  class="results-count tw:text-[1.25rem] tw:font-semibold tw:[line-height:1.5rem]"
                   aria-live="polite"
                   data-test="home-usage-tab-rt-pipelines-count"
                 >{{
@@ -1135,19 +1135,19 @@ watch(orgId, (newVal, oldVal) => {
 });
 </script>
 
-<style scoped lang="scss">
+<style>
 /*
  * UsageTab Styles
  *
  * Structure:
- * 1. CSS Variables & Theme Mixins - Centralized theming system
- * 2. Global Transitions - Smooth theme switching
- * 3. Layout Components - Containers, grids, tiles
- * 4. Interactive States - Hover, focus, animations
- * 5. Responsive Design - Media queries and accessibility
+ * 1. CSS Variables & Theme
+ * 2. Global Transitions
+ * 3. Layout Components
+ * 4. Interactive States
+ * 5. Responsive Design
  */
 
-/* ===== 1. CSS Variables & Theme Mixins ===== */
+/* ===== 1. CSS Variables & Theme ===== */
 :root {
   --accent-blue: #397ef6;
   --accent-orange: #ee5f26;
@@ -1160,9 +1160,12 @@ watch(orgId, (newVal, oldVal) => {
   --hover-shadow: rgba(0, 0, 0, 0.3);
 }
 
-@mixin dark-theme-vars {
+/* dark-theme-vars inlined */
+.dark-stream-container,
+.dark-tile-content,
+.chart-container-dark {
   /* No card fill in dark mode — the border alone defines each card (the solid
-     grey fill read as odd against the near-black theme). */
+     grey fill reads as odd against the near-black theme). */
   --tile-bg: transparent;
   --tile-border: #444444;
   --text-primary: #cccfd1;
@@ -1170,43 +1173,15 @@ watch(orgId, (newVal, oldVal) => {
   --hover-shadow: rgba(0, 0, 0, 0.6);
 }
 
-@mixin light-theme-vars {
+/* light-theme-vars inlined */
+.light-stream-container,
+.light-tile-content,
+.chart-container-light {
   --tile-bg: #ffffff;
   --tile-border: #e7eaee;
   --text-primary: #2e3133;
   --text-secondary: #72777b;
   --hover-shadow: rgba(0, 0, 0, 0.3);
-}
-
-@mixin tile-base {
-  height: 100%;
-  padding: 0.75rem;
-  border-radius: 0.5rem;
-  transition:
-    transform 0.3s ease,
-    box-shadow 0.3s ease;
-  contain: layout style paint;
-  gap: 0.25rem;
-}
-
-@mixin container-base {
-  border-radius: 0.5rem;
-  transition:
-    transform 0.3s ease,
-    box-shadow 0.3s ease;
-  animation: fadeInUp 0.5s ease-out backwards;
-}
-
-.dark-stream-container,
-.dark-tile-content,
-.chart-container-dark {
-  @include dark-theme-vars;
-}
-
-.light-stream-container,
-.light-tile-content,
-.chart-container-light {
-  @include light-theme-vars;
 }
 
 /* ===== 2. Global Transitions ===== */
@@ -1225,33 +1200,16 @@ watch(orgId, (newVal, oldVal) => {
 
 /* ===== 3. Layout Components ===== */
 
-/* The scroll container is pulled to the content-card's right edge by its panel
-   (see HomeView `.home-tab-panel--usage`) so the scrollbar sits flush at the
-   edge instead of floating inset. This padding-right restores the gap between
-   the cards and the scrollbar so the content still has breathing room. */
-.usage-scroll {
-  padding-right: 0.625rem;
-}
-
-.banners-wrapper {
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-
-  &:has(> div) {
-    margin-bottom: 0.75rem;
-  }
-}
-
-.streams-header {
+.banners-wrapper:has(> div) {
   margin-bottom: 0.75rem;
 }
+
 .dark-stream-container,
 .light-stream-container {
   background: var(--tile-bg);
   border: 0.0625rem solid var(--o2-border-color);
 }
+
 .view-button-light {
   cursor: pointer;
   padding: 0;
@@ -1266,12 +1224,13 @@ watch(orgId, (newVal, oldVal) => {
   position: relative;
   overflow: hidden;
   transition: all 0.3s ease;
-
-  .router-link-active,
-  a {
-    z-index: 10;
-    pointer-events: all;
-  }
+}
+.view-button-light .router-link-active,
+.view-button-light a,
+.view-button-dark .router-link-active,
+.view-button-dark a {
+  z-index: 10;
+  pointer-events: all;
 }
 
 .view-arrow-icon {
@@ -1309,17 +1268,6 @@ watch(orgId, (newVal, oldVal) => {
   opacity: 1;
 }
 
-.tiles-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
-  gap: 0.75rem;
-}
-
-.tile {
-  border-radius: 0.325rem;
-  border: 0.0625rem solid var(--o2-border-color);
-}
-
 .tile:nth-child(1) {
   animation-delay: 0ms;
 }
@@ -1347,23 +1295,16 @@ watch(orgId, (newVal, oldVal) => {
   }
 }
 
+/* tile-base mixin inlined */
 .tile-content {
-  @include tile-base;
+  height: 100%;
+  padding: 0.75rem;
+  border-radius: 0.5rem;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  contain: layout style paint;
+  gap: 0.25rem;
 }
 
-.section-header {
-  font-size: 1.25rem;
-  font-weight: 600;
-  line-height: 1.5rem;
-}
-
-.tile-title {
-  font-size: 1rem;
-  font-weight: 500;
-  line-height: 1.25rem;
-  letter-spacing: 0%;
-}
 .performance-text {
   border-radius: 3.125rem;
   width: 10rem;
@@ -1392,56 +1333,35 @@ watch(orgId, (newVal, oldVal) => {
   background-color: #4a2323;
   color: #ffd6d6;
 }
-.data-to-display {
-  font-size: 1.5rem;
-  font-weight: 600;
-  line-height: 1.75rem;
-}
 
-.charts-main-container {
-  display: grid;
-  grid-template-columns: minmax(min-content, max-content) 1fr 2fr;
-  gap: 1rem;
-  margin-top: 1rem;
-  align-items: stretch;
-  flex: 1;
-  min-height: 0;
-
-  @media (max-width: 1400px) {
-    grid-template-columns: 1fr;
-    grid-template-rows: auto auto auto;
-  }
-
-  @media (max-width: 768px) {
+@media (max-width: 1400px) {
+  .charts-main-container {
     grid-template-columns: 1fr;
     grid-template-rows: auto auto auto;
   }
 }
 
-.functions-dashboards-column {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  width: 100%;
+@media (max-width: 768px) {
+  .charts-main-container {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto auto;
+  }
+}
 
-  @media (max-width: 1400px) {
+@media (max-width: 1400px) {
+  .functions-dashboards-column {
     flex-direction: row;
   }
+}
 
-  @media (max-width: 768px) {
+@media (max-width: 768px) {
+  .functions-dashboards-column {
     flex-direction: column;
   }
 }
 
-.tile-wrapper {
-  flex: 1;
-  display: flex;
-  min-width: 0;
+.tile-wrapper .feature-card {
   width: 100%;
-
-  .feature-card {
-    width: 100%;
-  }
 }
 
 @keyframes shimmer {
@@ -1453,43 +1373,8 @@ watch(orgId, (newVal, oldVal) => {
   }
 }
 
-.text-title {
-  font-size: 1.125rem;
-  font-weight: 500;
-  line-height: 1.25rem;
-  letter-spacing: 0%;
-}
-.text-subtitle {
-  font-size: 0.875rem;
-  font-weight: 400;
-  line-height: 1.25rem;
-  letter-spacing: 0%;
-}
-.results-count {
-  font-size: 1.25rem;
-  font-weight: 600;
-  line-height: 1.5rem;
-}
-.details-container {
-  gap: 0.5rem;
-  margin-bottom: 0.75rem;
-}
-.charts-main-container {
-  gap: 0.75rem;
-}
-
-.tile-icon {
-  opacity: 0.8;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 2.5rem;
-  height: 2.5rem;
-  border-radius: 0.5rem;
-
-  img {
-    height: 1.5rem;
-  }
+.tile-icon img {
+  height: 1.5rem;
 }
 
 .functions-tile-content .tile-icon img,
@@ -1542,27 +1427,6 @@ button:focus-visible {
   outline: none;
 }
 
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  gap: 0.75rem;
-  opacity: 0.6;
-}
-
-.empty-state-icon {
-  font-size: 3rem;
-  opacity: 0.5;
-}
-
-.empty-state-text {
-  font-size: 1rem;
-  font-weight: 500;
-  color: inherit;
-}
-
 /* ===== 5. Responsive Design & Accessibility ===== */
 
 @media (prefers-reduced-motion: reduce) {
@@ -1582,19 +1446,5 @@ button:focus-visible {
   .streams-container:hover {
     transform: none;
   }
-}
-
-.card-container--col {
-  display: flex;
-  flex-direction: column;
-}
-
-.home-stat-row {
-  gap: 1em;
-}
-
-.home-no-data-panel {
-  margin: 0 auto;
-  justify-content: center;
 }
 </style>

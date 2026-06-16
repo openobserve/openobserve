@@ -162,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- -- Left sidebar -- -->
             <template #before>
               <div
-                class="dimension-sidebar card-container tw:h-full tw:min-h-0 tw:flex tw:flex-col"
+                class="dimension-sidebar card-container tw:h-full tw:min-h-0 tw:flex tw:flex-col tw:bg-white"
               >
                 <!-- Search -->
                   <div
@@ -193,7 +193,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <template v-if="group.streams.length > 0">
                         <div
-                          class="metric-group-header tw:cursor-pointer"
+                          class="metric-group-header tw:flex tw:items-center tw:justify-between tw:py-1.5 tw:px-2 tw:bg-(--q-color-grey-2,#f5f5f5) tw:border-b tw:border-solid tw:border-(--o2-border) tw:sticky tw:top-0 tw:z-10 tw:cursor-pointer"
                           @click="toggleGroupCollapse(group.id)"
                         >
                           <div class="metric-group-label">
@@ -282,7 +282,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- -- Separator -- -->
             <template #separator>
-              <div class="metric-splitter-separator" />
+              <div class="metric-splitter-separator tw:w-px tw:h-full tw:bg-(--o2-border) tw:cursor-col-resize" />
             </template>
 
             <!-- -- Right area: group tabs + dashboard -- -->
@@ -294,7 +294,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-model="activeMetricGroupTab"
                   dense
                   align="left"
-                  class="metric-group-tabs tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
+                  class="metric-group-tabs tw:shrink-0 tw:bg-surface-panel tw:border-b tw:border-solid tw:border-(--o2-border-color)"
                 >
                   <OTab
                     v-for="group in groupedUniqueMetricStreams.groups.filter(
@@ -462,7 +462,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <!-- Header -->
             <div
-              class="tw:p-3 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] trace-header-bg"
+              class="trace-header-bg tw:p-3 tw:border-b tw:border-solid tw:border-(--o2-border-color) tw:bg-white"
             >
               <div class="tw:flex tw:items-center tw:gap-3">
                 <OIcon name="hub" size="md" />
@@ -538,7 +538,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </ODrawer>
 
   <!-- Embedded Tabs Mode -->
-  <div v-else class="correlation-dashboard-embedded">
+  <div v-else class="correlation-dashboard-embedded tw:flex tw:flex-col tw:h-full tw:w-full tw:bg-white!">
     <!-- Dimensions Display - Stable (matched) and Unstable (additional) -->
     <DimensionFiltersBar
       v-if="!props.hideDimensionFilters"
@@ -626,7 +626,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- -- Left sidebar -- -->
           <template #before>
             <div
-              class="dimension-sidebar card-container tw:h-full tw:min-h-0 tw:flex tw:flex-col"
+              class="dimension-sidebar card-container tw:h-full tw:min-h-0 tw:flex tw:flex-col tw:bg-white"
             >
             <div
               class="dimension-sidebar-search-container tw:p-[0.625rem] tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
@@ -656,7 +656,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <template v-if="group.streams.length > 0">
                       <div
-                        class="metric-group-header tw:cursor-pointer"
+                        class="metric-group-header tw:flex tw:items-center tw:justify-between tw:py-1.5 tw:px-2 tw:bg-(--q-color-grey-2,#f5f5f5) tw:border-b tw:border-solid tw:border-(--o2-border) tw:sticky tw:top-0 tw:z-10 tw:cursor-pointer"
                         @click="toggleGroupCollapse(group.id)"
                       >
                         <div class="metric-group-label">
@@ -745,7 +745,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- -- Separator -- -->
           <template #separator>
-            <div class="metric-splitter-separator" />
+            <div class="metric-splitter-separator tw:w-px tw:h-full tw:bg-(--o2-border) tw:cursor-col-resize" />
           </template>
 
           <!-- -- Right area: group tabs + dashboard -- -->
@@ -757,7 +757,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model="activeMetricGroupTab"
                 dense
                 align="left"
-                class="metric-group-tabs tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
+                class="metric-group-tabs tw:shrink-0 tw:bg-surface-panel tw:border-b tw:border-solid tw:border-(--o2-border-color)"
               >
                 <OTab
                   v-for="group in groupedUniqueMetricStreams.groups.filter(
@@ -924,7 +924,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <!-- Header -->
           <div
-            class="tw:p-3 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] trace-header-bg"
+            class="trace-header-bg tw:p-3 tw:border-b tw:border-solid tw:border-(--o2-border-color) tw:bg-white"
           >
             <div class="tw:flex tw:items-center tw:gap-3">
               <OIcon name="hub" size="md" />
@@ -1010,7 +1010,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="tw:w-full tw:mb-3"
     />
 
-    <div class="metric-list-container">
+    <div class="metric-list-container tw:max-h-100 tw:overflow-y-auto">
       <template
         v-if="
           groupedFilteredMetricStreams.groups.some(
@@ -1025,7 +1025,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Group section — tw:hidden when no streams match -->
           <template v-if="group.streams.length > 0">
             <!-- Group header -->
-            <div class="metric-group-header">
+            <div class="metric-group-header tw:flex tw:items-center tw:justify-between tw:py-1.5 tw:px-2 tw:bg-(--q-color-grey-2,#f5f5f5) tw:border-b tw:border-solid tw:border-(--o2-border) tw:sticky tw:top-0 tw:z-10">
               <div class="metric-group-label">
                 <OIcon v-if="typeof group.icon === 'string'" :name="group.icon" size="xs" class="tw:mr-0.5" />
                 <component v-else :is="group.icon" />
@@ -2904,226 +2904,105 @@ watch(
 );
 </script>
 
-<style lang="scss" scoped>
-.correlation-dashboard-card {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  width: 90vw;
-  max-width: 87.5rem;
-  background: #ffffff !important;
-
-  .correlation-header {
-    flex-shrink: 0;
-    background: #ffffff !important;
-    z-index: 1;
-  }
-
-  .correlation-content {
-    flex: 1;
-    overflow: auto;
-    min-height: 0;
-  }
+<style>
+.telemetry-correlation-traces .trace-details-content {
+  padding: 0 !important;
 }
 
-.telemetry-correlation-traces {
-  :deep(.trace-details-content) {
-    padding: 0 !important;
-  }
-
-  :deep(.trace-combined-header-wrapper) {
-    margin-bottom: 0 !important;
-  }
-}
-
-// Splitter separator visual divider
-.metric-splitter-separator {
-  width: 1px;
-  height: 100%;
-  background: var(--o2-border-color, var(--o2-border));
-  cursor: col-resize;
+.telemetry-correlation-traces .trace-combined-header-wrapper {
+  margin-bottom: 0 !important;
 }
 
 body.body--dark .metric-splitter-separator {
   background: rgba(255, 255, 255, 0.12);
 }
 
-// Dimension sidebar (matching TracesAnalysisDashboard style)
-.dimension-sidebar {
-  background: #ffffff;
+.dimension-list-item:hover {
+  background-color: var(--q-hover-color, rgba(0, 0, 0, 0.04));
 }
 
-.dimension-list-item {
-  border-bottom: none;
-
-  &:hover {
-    background-color: var(--q-hover-color, rgba(0, 0, 0, 0.04));
-  }
-
-  .dimension-label {
-    font-size: 0.875rem;
-    line-height: 1.25rem;
-  }
+.dimension-list-item .dimension-label {
+  font-size: 0.875rem;
+  line-height: 1.25rem;
 }
 
-// Metric group headers (used in both sidebar and selector dialog)
-.metric-group-header {
+.metric-group-header .metric-group-label {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 0.375rem 0.5rem;
-  background: var(--q-color-grey-2, #f5f5f5);
-  border-bottom: 0.0625rem solid var(--q-border-color, var(--o2-border));
-  position: sticky;
-  top: 0;
-  z-index: 1;
-
-  .metric-group-label {
-    display: flex;
-    align-items: center;
-    gap: 0.375rem;
-    font-size: 0.6875rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    opacity: 0.75;
-  }
-
-  .metric-group-actions {
-    display: flex;
-    gap: 0.25rem;
-  }
+  gap: 0.375rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.75;
 }
 
-// Metric group tabs (Infra / Network / Others sub-tabs within the metrics section)
-.metric-group-tabs {
-  flex-shrink: 0;
-  background: var(--color-surface-panel);
-
-  :deep(.o-tab) {
-    min-height: 2rem;
-    padding: 0 0.75rem;
-    font-size: 0.8125rem;
-  }
-
-  :deep(.o-tab__indicator) {
-    height: 0.125rem;
-  }
-}
-
-// Metric selector dialog
-.metric-selector-dialog {
-  min-width: 25rem;
-  max-width: 31.25rem;
-}
-
-.metric-list-container {
-  max-height: 25rem;
-  overflow-y: auto;
-
-  .metric-list-item {
-    padding: 0.5rem 1rem;
-    border-bottom: 0.0625rem solid var(--q-border-color, var(--o2-border));
-
-    &:hover {
-      background-color: var(--q-hover-color, rgba(0, 0, 0, 0.04));
-    }
-
-    .metric-label {
-      font-size: 0.875rem;
-      line-height: 1.25rem;
-      font-family: monospace;
-    }
-  }
-}
-
-// Embedded mode styling
-.correlation-dashboard-embedded {
+.metric-group-header .metric-group-actions {
   display: flex;
-  flex-direction: column;
-  height: 100%;
-  width: 100%;
-  background: #ffffff !important;
-
-  .correlation-header {
-    flex-shrink: 0;
-    background: #ffffff !important;
-    z-index: 1;
-  }
-
-  .correlation-content {
-    flex: 1;
-    overflow: auto;
-    min-height: 0;
-  }
+  gap: 0.25rem;
 }
 
-// Dimension dropdown styling
-.dimension-dropdown {
-  :deep(.q-field__control) {
-    min-height: 2rem;
-    padding: 0 0.5rem;
-  }
-
-  :deep(.q-field__native) {
-    font-size: 0.875rem;
-    padding: 0.25rem 0;
-  }
-
-  :deep(.q-field__append) {
-    padding-left: 0.25rem;
-  }
+.metric-group-tabs .o-tab {
+  min-height: 2rem;
+  padding: 0 0.75rem;
+  font-size: 0.8125rem;
 }
 
-// Trace header background - light mode
-.trace-header-bg {
-  background: #ffffff;
+.metric-group-tabs .o-tab__indicator {
+  height: 0.125rem;
 }
 
-// Dark mode support
-body.body--dark {
-  .trace-header-bg {
-    background: #1e1e1e;
-  }
-  .correlation-dashboard-embedded {
-    background: #1e1e1e !important;
+.metric-list-container .metric-list-item {
+  padding: 0.5rem 1rem;
+  border-bottom: 0.0625rem solid var(--q-border-color, var(--o2-border));
+}
 
-    .correlation-header {
-      background: #1e1e1e !important;
-    }
-  }
+.metric-list-container .metric-list-item:hover {
+  background-color: var(--q-hover-color, rgba(0, 0, 0, 0.04));
+}
 
-  .correlation-dashboard-card {
-    background: #1e1e1e !important;
+.metric-list-container .metric-list-item .metric-label {
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  font-family: monospace;
+}
 
-    .correlation-header {
-      background: #1e1e1e !important;
-    }
-  }
+.correlation-dashboard-embedded .correlation-content {
+  flex: 1;
+  overflow: auto;
+  min-height: 0;
+}
 
-  .dimension-sidebar {
-    background: #202223 !important;
-  }
+body.body--dark .trace-header-bg {
+  background: #1e1e1e;
+}
 
-  .dimension-list-item {
-    border-bottom-color: rgba(255, 255, 255, 0.06);
+body.body--dark .correlation-dashboard-embedded {
+  background: #1e1e1e !important;
+}
 
-    &:hover {
-      background-color: rgba(255, 255, 255, 0.05);
-    }
-  }
+body.body--dark .dimension-sidebar {
+  background: #202223 !important;
+}
 
-  .metric-group-header {
-    background: #202223 !important;
-    border-bottom-color: rgba(255, 255, 255, 0.1);
-  }
+body.body--dark .dimension-list-item {
+  border-bottom-color: rgba(255, 255, 255, 0.06);
+}
 
-  .metric-list-item {
-    border-bottom-color: rgba(255, 255, 255, 0.1);
+body.body--dark .dimension-list-item:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+}
 
-    &:hover {
-      background-color: rgba(255, 255, 255, 0.05);
-    }
-  }
+body.body--dark .metric-group-header {
+  background: #202223 !important;
+  border-bottom-color: rgba(255, 255, 255, 0.1);
+}
+
+body.body--dark .metric-list-item {
+  border-bottom-color: rgba(255, 255, 255, 0.1);
+}
+
+body.body--dark .metric-list-item:hover {
+  background-color: rgba(255, 255, 255, 0.05);
 }
 </style>

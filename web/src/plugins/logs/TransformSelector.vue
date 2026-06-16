@@ -335,8 +335,3 @@ const getTransformLabelTooltip = computed(() => {
 });
 </script>
 
-<style scoped lang="scss">
-.save-transform-btn {
-  border-left: 1px solid var(--o2-border-color);
-}
-</style>

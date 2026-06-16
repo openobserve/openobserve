@@ -23,7 +23,7 @@
             data-test="alert-conditions-toggle-operator-btn"
             variant="ghost"
             size="icon-circle-sm"
-            class="tw:h-[26px] tw:flex-shrink-0 operator-toggle-btn"
+            class="tw:h-[26px] tw:flex-shrink-0 tw:text-(--o2-primary-btn-bg)! tw:hover:bg-[rgba(var(--o2-primary-btn-bg-rgb),0.1)]!"
             @click="toggleOperator"
           >
             <OIcon name="restart-alt" size="sm" />
@@ -83,7 +83,7 @@
         </div>
     </div>
   </template>
-  
+
   <script setup lang="ts">
   import OButton from '@/lib/core/Button/OButton.vue';
   import OSelect from '@/lib/forms/Select/OSelect.vue';
@@ -250,17 +250,8 @@ const filterColumns = (val: string) => {
 
   </script>
 
-  <style scoped lang="scss">
-.operator-toggle-btn {
-  color: var(--o2-primary-btn-bg) !important;
-}
-
-.operator-toggle-btn:hover {
-  background-color: rgba(var(--o2-primary-btn-bg-rgb), 0.1) !important;
-}
-
+  <style>
 .filter-condition-row:has(.q-field--error) {
   padding-bottom: 20px;
 }
 </style>
-  

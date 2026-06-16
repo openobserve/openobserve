@@ -127,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Pagination and Reset Controls -->
     <div class="tw:flex tw:items-center tw:justify-end tw:gap-2">
       <!-- Pagination -->
-      <div v-if="pagesNumber > 1" class="field-list-pagination">
+      <div v-if="pagesNumber > 1" class="tw:flex tw:items-center tw:gap-1">
         <OTooltip
           data-test="logs-page-fields-list-pagination-tooltip"
           :content="'Total Fields: ' + totalFieldsCount"
@@ -173,11 +173,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Reset Fields Icon -->
-      <div class="field-list-reset">
+      <div class="tw:flex tw:items-center">
         <OIcon
           name="restart-alt" size="sm"
           data-test="logs-page-fields-list-reset-icon"
-          class="tw:cursor-pointer reset-icon"
+          class="tw:cursor-pointer tw:text-xl tw:opacity-70 tw:transition-opacity tw:duration-200 tw:hover:opacity-100"
           @click="$emit('reset-fields')"
         />
         <OTooltip
@@ -257,32 +257,8 @@ const visiblePages = computed(() => {
 });
 </script>
 
-<style scoped lang="scss">
-.field-list-pagination {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-}
-
-.field-list-reset {
-  display: flex;
-  align-items: center;
-}
-
-.reset-icon {
-  font-size: 1.25rem;
-  cursor: pointer;
-  opacity: 0.7;
-  transition: opacity 0.2s;
-
-  &:hover {
-    opacity: 1;
-  }
-}
-
-.schema-field-toggle {
-  :deep(.q-btn) {
-    padding: 0.25rem 0.5rem;
-  }
+<style>
+.schema-field-toggle .q-btn {
+  padding: 0.25rem 0.5rem;
 }
 </style>

@@ -15,9 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="built-in-patterns-container card-container">
+  <div class="built-in-patterns-container card-container tw:h-full tw:flex tw:flex-col">
     <!-- Search and Filter Bar -->
-    <div class="filters-bar tw:p-3">
+    <div class="filters-bar tw:p-3 tw:shrink-0 tw:border-b tw:border-(--o2-border-color)">
       <div class="tw:flex tw:gap-3">
         <div class="tw:w-full col-md-6">
           <OSearchInput
@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Patterns List -->
-    <div v-else class="patterns-list">
+    <div v-else class="patterns-list tw:flex-1 tw:overflow-y-auto tw:min-h-0">
       <div class="tw:p-3">
         <div class="tw:text-sm tw:font-medium tw:mb-3">
           {{
@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <li
             v-for="(pattern, index) in filteredPatterns"
             :key="`${pattern.name}-${pattern.pattern.substring(0, 20)}`"
-            class="pattern-item tw:flex tw:items-center tw:gap-3 tw:px-4 tw:py-3"
+            class="tw:flex tw:items-center tw:gap-3 tw:px-4 tw:py-3 tw:transition-colors tw:duration-150 hover:tw:bg-(--o2-hover-accent)"
             :data-test="`pattern-item-${index}`"
           >
             <div class="tw:flex tw:items-center tw:shrink-0">
@@ -117,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   +{{ pattern.tags.length - 3 }}
                 </OBadge>
               </div>
-              <div class="pattern-preview tw:line-clamp-1">
+              <div class="tw:font-mono tw:text-[0.8125rem] tw:leading-[1.4] tw:text-(--o2-text-secondary) tw:break-all tw:line-clamp-1">
                 {{ pattern.pattern.substring(0, 100)
                 }}{{ pattern.pattern.length > 100 ? "..." : "" }}
               </div>
@@ -463,37 +463,3 @@ export default defineComponent({
 });
 </script>
 
-<style scoped lang="scss">
-.built-in-patterns-container {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-}
-
-.filters-bar {
-  flex-shrink: 0;
-  border-bottom: 1px solid var(--o2-border-color);
-}
-
-.patterns-list {
-  flex: 1;
-  overflow-y: auto;
-  min-height: 0; // Important for flex scrolling
-}
-
-.pattern-item {
-  transition: background-color 0.15s ease;
-
-  &:hover {
-    background-color: var(--o2-hover-accent);
-  }
-}
-
-.pattern-preview {
-  font-family: monospace;
-  font-size: 0.8125rem;
-  line-height: 1.4;
-  color: var(--o2-text-secondary);
-  word-break: break-all;
-}
-</style>

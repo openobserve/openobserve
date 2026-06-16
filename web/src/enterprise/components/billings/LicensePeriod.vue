@@ -1,10 +1,10 @@
 <template>
-    <div v-if="showLicenseExpiryWarning && config.isEnterprise == 'true' && config.isCloud === 'false'" class="tw:w-full license-expiry-container tw:p-3 gradient-banner">
+    <div v-if="showLicenseExpiryWarning && config.isEnterprise == 'true' && config.isCloud === 'false'" class="license-expiry-container gradient-banner tw:w-full tw:p-3 tw:border tw:border-[#D7D7D7] tw:rounded-md tw:[background:linear-gradient(to_right,transparent_60%,#f7f7ff_70%,#cdf7e4_100%)]">
         <div class="tw:flex" >
         <div class="tw:flex tw:flex-col">
-        <span class="o2-license-message">{{ getLicenseExpiryMessage() }}</span>
+        <span class="tw:text-lg tw:font-semibold tw:leading-8">{{ getLicenseExpiryMessage() }}</span>
         <br />
-        <span class="o2-license-subtitle">Please update your license by contacting your administrator.</span>
+        <span class="tw:text-base tw:font-normal tw:leading-5.5">Please update your license by contacting your administrator.</span>
         </div>
   </div>
     </div>
@@ -36,7 +36,7 @@ export default defineComponent({
       const now = Date.now();
       const expiryDate = store.state.zoConfig.license_expiry / 1000;
       const daysUntilExpiry = Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24));
-      
+
       if (daysUntilExpiry > 1) {
         return `${daysUntilExpiry} days remaining until your license expires`;
       } else if (daysUntilExpiry === 1) {
@@ -55,50 +55,16 @@ export default defineComponent({
 </script>
 
 
-<style lang="scss" scoped>
-.gradient-banner {
+<style>
+.body--dark .gradient-banner {
   background: linear-gradient(
     to right,
     transparent 60%,
-    #f7f7ff 70%,
-    #cdf7e4 100%  );
+    #24262F 70%,
+    #2C3934 100%  );
 }
 
-.license-expiry-container {
-  border: 1px solid #D7D7D7;
-  border-radius: 6px;
-}
-
-.o2-license-message {
-  font-size: 18px;
-  font-weight: 600;
-  line-height: 32px;
-}
-
-.o2-license-subtitle {
-  font-size: 16px;
-  font-weight: 400;
-  line-height: 22px;
-}
-
-.compact-table {
-  td, th {
-    padding: 8px 12px !important;
-    line-height: 1.2;
-  }
-}
-
-.body--dark {
-  .gradient-banner {
-    background: linear-gradient(
-      to right,
-      transparent 60%,
-      #24262F 70%,
-      #2C3934 100%  );
-  }
-
-  .license-expiry-container {
-    border: 1px solid #454F5B;
-  }
+.body--dark .license-expiry-container {
+  border: 1px solid #454F5B;
 }
 </style>

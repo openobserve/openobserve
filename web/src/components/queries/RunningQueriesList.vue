@@ -289,36 +289,9 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
-.query-management-tabs {
-  :deep(.q-btn:before) {
-    border: none !important;
-  }
-}
-
+<style>
+/* Deep override for empty-state image spacing — must stay in CSS */
 :deep(.no-data-image) {
   margin-bottom: 0.5rem;
-}
-
-.label-container {
-  display: flex;
-  width: 100%;
-  justify-content: flex-end;
-}
-</style>
-
-<style lang="scss">
-.running-queries-page {
-  .search-input {
-    width: 250px;
-  }
-}
-
-.search-field-select {
-  .q-field__control {
-    padding-left: 12px;
-    top: -1px;
-    position: relative;
-  }
 }
 </style>

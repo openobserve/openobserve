@@ -1,33 +1,33 @@
 <template>
-  <section class="qdp" data-test="quality-detail-panel">
+  <section class="tw:flex tw:flex-col tw:gap-3 tw:px-5 tw:pt-4 tw:pb-6 tw:min-h-0 tw:overflow-auto" data-test="quality-detail-panel">
     <!-- Title row + type badge + version + description moved up into the
          ODrawer header (QualityPage) so the panel content starts straight
          from the KPI tiles without a duplicated identification block. -->
 
-    <div v-if="kpis.length === 0 && isLoading" class="qdp__loading">
+    <div v-if="kpis.length === 0 && isLoading" class="tw:flex tw:flex-col tw:items-center tw:gap-2 tw:py-[28px] tw:px-3 tw:border tw:border-dashed tw:border-(--color-dialog-header-border,var(--o2-border)) tw:rounded-md tw:text-center tw:text-(--color-text-secondary,var(--o2-text-secondary)) tw:text-xs">
       <OSpinner size="sm" />
       <span>{{ t("onlineEvals.quality.detail.loading") }}</span>
     </div>
 
-    <div v-else-if="kpis.length === 0" class="qdp__empty">
+    <div v-else-if="kpis.length === 0" class="tw:flex tw:flex-col tw:items-center tw:gap-2 tw:py-[28px] tw:px-3 tw:border tw:border-dashed tw:border-(--color-dialog-header-border,var(--o2-border)) tw:rounded-md tw:text-center tw:text-(--color-text-secondary,var(--o2-text-secondary)) tw:text-xs">
       <OIcon name="info" size="lg" />
       <p>{{ t("onlineEvals.quality.detail.noData") }}</p>
     </div>
 
     <template v-else>
-      <div class="qdp__kpis">
+      <div class="tw:grid tw:grid-cols-[repeat(auto-fit,minmax(180px,1fr))] tw:gap-2.5">
         <article
           v-for="kpi in kpis"
           :key="kpi.id"
-          class="qdp-kpi card-container"
+          class="qdp-kpi card-container tw:flex tw:flex-col tw:gap-[6px] tw:py-[10px] tw:px-[14px] tw:bg-(--o2-card-bg) tw:border tw:border-(--color-dialog-header-border,var(--o2-border)) tw:rounded-md tw:relative"
           :class="`qdp-kpi--${kpi.id}`"
           :data-test="`quality-detail-kpi-${kpi.id}`"
         >
-          <header class="qdp-kpi__head">
-            <span class="qdp-kpi__title">{{ kpiTitle(kpi) }}</span>
+          <header class="tw:flex tw:items-center tw:justify-between tw:gap-[6px]">
+            <span class="tw:text-xs tw:font-semibold tw:text-(--color-text-secondary,var(--o2-text-secondary))">{{ kpiTitle(kpi) }}</span>
             <button
               type="button"
-              class="qdp-kpi__drill"
+              class="qdp-kpi__drill tw:border-0 tw:bg-transparent tw:py-0 tw:px-1 tw:rounded tw:cursor-pointer tw:font-semibold tw:text-sm tw:text-(--color-text-secondary,var(--o2-text-secondary))"
               :aria-label="t('onlineEvals.quality.detail.drillTitle')"
               :title="t('onlineEvals.quality.detail.drillTitle')"
               data-test="quality-detail-drill"
@@ -36,15 +36,15 @@
               →
             </button>
           </header>
-          <div class="qdp-kpi__row">
-            <span class="qdp-kpi__big">{{ formatKpi(kpi) }}</span>
-            <span v-if="kpi.context" class="qdp-kpi__context">{{ kpi.context }}</span>
+          <div class="tw:flex tw:items-baseline tw:justify-between tw:gap-2">
+            <span class="qdp-kpi__big tw:text-[26px] tw:font-bold tw:tracking-[-0.01em] tw:[font-variant-numeric:tabular-nums] tw:font-mono">{{ formatKpi(kpi) }}</span>
+            <span v-if="kpi.context" class="tw:text-[11px] tw:text-(--color-text-secondary,var(--o2-text-secondary)) tw:text-right">{{ kpi.context }}</span>
           </div>
         </article>
       </div>
 
-      <div class="qdp__splits">
-        <label class="qdp__split">
+      <div class="tw:flex tw:justify-end tw:gap-3.5 tw:text-xs tw:text-text-secondary">
+        <label class="qdp__split tw:inline-flex tw:items-center tw:gap-[6px] tw:py-1 tw:px-[10px] tw:border tw:border-(--color-dialog-header-border,var(--o2-border)) tw:rounded tw:cursor-pointer tw:bg-(--o2-card-bg)">
           <input
             v-model="splitByScorer"
             type="checkbox"
@@ -52,7 +52,7 @@
           />
           <span>{{ t("onlineEvals.quality.detail.splitByScorer") }}</span>
         </label>
-        <label class="qdp__split">
+        <label class="qdp__split tw:inline-flex tw:items-center tw:gap-[6px] tw:py-1 tw:px-[10px] tw:border tw:border-(--color-dialog-header-border,var(--o2-border)) tw:rounded tw:cursor-pointer tw:bg-(--o2-card-bg)">
           <input
             v-model="splitBySourceType"
             type="checkbox"
@@ -62,14 +62,14 @@
         </label>
       </div>
 
-      <section v-if="dataType === 'numeric'" class="qdp-chart card-container">
-        <header class="qdp-chart__head">
-          <h4 class="qdp-chart__title">
+      <section v-if="dataType === 'numeric'" class="card-container tw:py-3 tw:px-[14px] tw:pb-[14px] tw:bg-(--o2-card-bg) tw:border tw:border-(--color-dialog-header-border,var(--o2-border)) tw:rounded-md">
+        <header class="tw:mb-[6px]">
+          <h4 class="tw:m-0 tw:text-[13px] tw:font-semibold tw:text-(--color-text-primary,currentColor)">
             {{ t("onlineEvals.quality.detail.trendTitle") }}
-            <span class="qdp-chart__subtitle">— {{ config.name }}</span>
+            <span class="tw:font-normal tw:text-(--color-text-secondary,var(--o2-text-secondary)) tw:text-[11px]">— {{ config.name }}</span>
           </h4>
         </header>
-        <div class="qdp-chart__body qdp-chart__body--lg">
+        <div class="tw:h-[260px]">
           <QualityTrendChart
             v-if="numericTrend.length > 0"
             :points="numericTrend"
@@ -80,15 +80,15 @@
             :legend-p95="t('onlineEvals.quality.detail.legendP95')"
             :legend-threshold-fmt="t('onlineEvals.quality.detail.legendThreshold')"
           />
-          <p v-else class="qdp-chart__empty">{{ t("onlineEvals.quality.detail.noData") }}</p>
+          <p v-else class="tw:m-0 tw:h-full tw:flex tw:items-center tw:justify-center tw:text-xs tw:text-(--color-text-secondary,var(--o2-text-secondary))">{{ t("onlineEvals.quality.detail.noData") }}</p>
         </div>
       </section>
 
-      <section v-if="dataType === 'numeric'" class="qdp-chart card-container">
-        <header class="qdp-chart__head">
-          <h4 class="qdp-chart__title">{{ t("onlineEvals.quality.detail.distributionTitle") }}</h4>
+      <section v-if="dataType === 'numeric'" class="card-container tw:py-3 tw:px-[14px] tw:pb-[14px] tw:bg-(--o2-card-bg) tw:border tw:border-(--color-dialog-header-border,var(--o2-border)) tw:rounded-md">
+        <header class="tw:mb-[6px]">
+          <h4 class="tw:m-0 tw:text-[13px] tw:font-semibold tw:text-(--color-text-primary,currentColor)">{{ t("onlineEvals.quality.detail.distributionTitle") }}</h4>
         </header>
-        <div class="qdp-chart__body">
+        <div class="tw:h-[220px]">
           <QualityDistributionChart
             v-if="numericDistribution.length > 0"
             :buckets="numericDistribution"
@@ -96,33 +96,33 @@
             :legend-healthy="t('onlineEvals.quality.detail.legendHealthy')"
             :legend-unhealthy="t('onlineEvals.quality.detail.legendUnhealthy')"
           />
-          <p v-else class="qdp-chart__empty">{{ t("onlineEvals.quality.detail.noData") }}</p>
+          <p v-else class="tw:m-0 tw:h-full tw:flex tw:items-center tw:justify-center tw:text-xs tw:text-(--color-text-secondary,var(--o2-text-secondary))">{{ t("onlineEvals.quality.detail.noData") }}</p>
         </div>
       </section>
 
-      <section v-if="dataType === 'boolean'" class="qdp-chart card-container">
-        <header class="qdp-chart__head">
-          <h4 class="qdp-chart__title">
+      <section v-if="dataType === 'boolean'" class="card-container tw:py-3 tw:px-[14px] tw:pb-[14px] tw:bg-(--o2-card-bg) tw:border tw:border-(--color-dialog-header-border,var(--o2-border)) tw:rounded-md">
+        <header class="tw:mb-[6px]">
+          <h4 class="tw:m-0 tw:text-[13px] tw:font-semibold tw:text-(--color-text-primary,currentColor)">
             {{ t("onlineEvals.quality.detail.passRateTitle") }}
-            <span class="qdp-chart__subtitle">— {{ config.name }}</span>
+            <span class="tw:font-normal tw:text-(--color-text-secondary,var(--o2-text-secondary)) tw:text-[11px]">— {{ config.name }}</span>
           </h4>
         </header>
-        <div class="qdp-chart__body qdp-chart__body--lg">
+        <div class="tw:h-[260px]">
           <QualityBooleanTrendChart
             v-if="booleanTrendSeries.length > 0"
             :series="booleanTrendSeries"
             :points="booleanTrend"
             :legend-pass-rate="t('onlineEvals.quality.detail.legendHealthy')"
           />
-          <p v-else class="qdp-chart__empty">{{ t("onlineEvals.quality.detail.noData") }}</p>
+          <p v-else class="tw:m-0 tw:h-full tw:flex tw:items-center tw:justify-center tw:text-xs tw:text-(--color-text-secondary,var(--o2-text-secondary))">{{ t("onlineEvals.quality.detail.noData") }}</p>
         </div>
       </section>
 
-      <section v-if="dataType === 'boolean'" class="qdp-chart card-container">
-        <header class="qdp-chart__head">
-          <h4 class="qdp-chart__title">{{ t("onlineEvals.quality.detail.trueFalseTitle") }}</h4>
+      <section v-if="dataType === 'boolean'" class="card-container tw:py-3 tw:px-[14px] tw:pb-[14px] tw:bg-(--o2-card-bg) tw:border tw:border-(--color-dialog-header-border,var(--o2-border)) tw:rounded-md">
+        <header class="tw:mb-[6px]">
+          <h4 class="tw:m-0 tw:text-[13px] tw:font-semibold tw:text-(--color-text-primary,currentColor)">{{ t("onlineEvals.quality.detail.trueFalseTitle") }}</h4>
         </header>
-        <div class="qdp-chart__body qdp-chart__body--sm">
+        <div class="tw:h-[120px]">
           <QualityBooleanBarsChart
             v-if="booleanCounts.trueCount + booleanCounts.falseCount > 0"
             :true-count="booleanCounts.trueCount"
@@ -130,21 +130,21 @@
             :legend-true="`true (${booleanCounts.trueCount})`"
             :legend-false="`false (${booleanCounts.falseCount})`"
           />
-          <p v-else class="qdp-chart__empty">{{ t("onlineEvals.quality.detail.noData") }}</p>
+          <p v-else class="tw:m-0 tw:h-full tw:flex tw:items-center tw:justify-center tw:text-xs tw:text-(--color-text-secondary,var(--o2-text-secondary))">{{ t("onlineEvals.quality.detail.noData") }}</p>
         </div>
       </section>
 
-      <section v-if="dataType === 'categorical'" class="qdp-chart card-container">
-        <header class="qdp-chart__head">
-          <h4 class="qdp-chart__title">{{ t("onlineEvals.quality.detail.categoryDistributionTitle") }}</h4>
+      <section v-if="dataType === 'categorical'" class="card-container tw:py-3 tw:px-[14px] tw:pb-[14px] tw:bg-(--o2-card-bg) tw:border tw:border-(--color-dialog-header-border,var(--o2-border)) tw:rounded-md">
+        <header class="tw:mb-[6px]">
+          <h4 class="tw:m-0 tw:text-[13px] tw:font-semibold tw:text-(--color-text-primary,currentColor)">{{ t("onlineEvals.quality.detail.categoryDistributionTitle") }}</h4>
         </header>
-        <div class="qdp-chart__body qdp-chart__body--lg">
+        <div class="tw:h-[260px]">
           <QualityCategoryBarsChart
             v-if="categoricalRows.length > 0"
             :rows="categoricalRows"
             :healthy-categories="healthyCategories"
           />
-          <p v-else class="qdp-chart__empty">{{ t("onlineEvals.quality.detail.noData") }}</p>
+          <p v-else class="tw:m-0 tw:h-full tw:flex tw:items-center tw:justify-center tw:text-xs tw:text-(--color-text-secondary,var(--o2-text-secondary))">{{ t("onlineEvals.quality.detail.noData") }}</p>
         </div>
       </section>
     </template>
@@ -246,51 +246,8 @@ function formatKpi(kpi: DetailKpi): string {
 }
 </script>
 
-<style lang="scss" scoped>
-.qdp {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  // The panel now renders inside an ODrawer body whose own padding is
-  // intentionally minimal, so the content sat flush against the drawer
-  // edges. Add comfortable horizontal + vertical padding so titles,
-  // KPI cards, and charts breathe inside the panel.
-  padding: 16px 20px 24px;
-  min-height: 0;
-  overflow: auto;
-}
-
-.qdp__loading,
-.qdp__empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  padding: 28px 12px;
-  border: 1px dashed var(--color-dialog-header-border, var(--o2-border));
-  border-radius: 6px;
-  text-align: center;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  font-size: 12px;
-}
-
-.qdp__kpis {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 10px;
-}
-
-.qdp-kpi {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 10px 14px;
-  background: var(--o2-card-bg);
-  border: 1px solid var(--color-dialog-header-border, var(--o2-border));
-  border-radius: 6px;
-  position: relative;
-}
-
+<style>
+/* ::before pseudo-element for KPI accent bar — cannot inline */
 .qdp-kpi::before {
   content: "";
   position: absolute;
@@ -308,121 +265,15 @@ function formatKpi(kpi: DetailKpi): string {
 .qdp-kpi--p50::before,
 .qdp-kpi--p95::before { background: var(--color-primary-600, #3F7994); }
 
-.qdp-kpi__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-}
-
-.qdp-kpi__title {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.qdp-kpi__drill {
-  border: 0;
-  background: transparent;
-  padding: 0 4px;
-  border-radius: 4px;
-  cursor: pointer;
-  font: 600 14px var(--o2-font);
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
+/* Hover state on drill button — pseudo-class with custom color-mix */
 .qdp-kpi__drill:hover {
   background: color-mix(in srgb, var(--color-primary-600, #3F7994) 12%, transparent);
   color: var(--color-primary-600, #3F7994);
 }
 
-.qdp-kpi__row {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.qdp-kpi__big {
-  font-size: 26px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  font-variant-numeric: tabular-nums;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-}
-
+/* Descendant selector — unhealthy KPI colors the big value */
 .qdp-kpi--unhealthy .qdp-kpi__big { color: var(--o2-status-warning-text, #b25400); }
 
-.qdp-kpi__context {
-  font-size: 11px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  text-align: right;
-}
-
-.qdp__splits {
-  display: flex;
-  justify-content: flex-end;
-  gap: 14px;
-  font-size: 12px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.qdp__split {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
-  border: 1px solid var(--color-dialog-header-border, var(--o2-border));
-  border-radius: 4px;
-  cursor: pointer;
-  background: var(--o2-card-bg);
-}
-
+/* Descendant selector — split label input margin reset */
 .qdp__split input { margin: 0; }
-
-.qdp-chart {
-  padding: 12px 14px 14px;
-  background: var(--o2-card-bg);
-  border: 1px solid var(--color-dialog-header-border, var(--o2-border));
-  border-radius: 6px;
-}
-
-.qdp-chart__head {
-  margin-bottom: 6px;
-}
-
-.qdp-chart__title {
-  margin: 0;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--color-text-primary, currentColor);
-}
-
-.qdp-chart__subtitle {
-  font-weight: 400;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  font-size: 11px;
-}
-
-.qdp-chart__body {
-  height: 220px;
-}
-
-.qdp-chart__body--lg {
-  height: 260px;
-}
-
-.qdp-chart__body--sm {
-  height: 120px;
-}
-
-.qdp-chart__empty {
-  margin: 0;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
 </style>

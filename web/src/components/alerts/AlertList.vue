@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #actions>
             <!-- Import button -->
             <OButton
-              :class="isCompactToolbar ? 'compact-icon-btn' : ''"
+              :class="isCompactToolbar ? 'tw:py-0! tw:px-2! tw:min-w-0!' : ''"
               variant="outline"
               size="sm"
               @click="importAlert"
@@ -468,7 +468,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
 
                 <template #bottom>
-                  <div class="bottom-btn tw:h-[48px]">
+                  <div class="tw:flex tw:w-full tw:justify-between tw:items-center tw:h-[48px]">
                     <div
                       class="o2-table-footer-title tw:flex tw:items-center tw:w-[200px] tw:mr-md"
                     >
@@ -2727,69 +2727,7 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss">
-.view-mode-tabs-container {
-  margin-right: 24px;
-
-  // Customize app-tabs for view mode switching
-  ::v-deep .app-tabs {
-    .o-tabs {
-      min-height: 36px;
-    }
-
-    .o-tab {
-      padding: 0 20px;
-      min-height: 36px;
-      text-transform: none;
-      font-weight: 600;
-
-      &__icon {
-        font-size: 18px;
-        margin-right: 8px;
-      }
-    }
-  }
-}
-
-.bottom-btn {
-  display: flex;
-  width: 100%;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.move-btn {
-  width: calc(14vw);
-}
-
-.export-btn {
-  width: calc(14vw);
-}
-
-.clone-alert-popup {
-  width: 400px;
-}
-.expand-content {
-  padding: 0 3rem;
-  max-height: 100vh; /* Set a fixed height for the container */
-  overflow: hidden; /* Hide overflow by default */
-}
-
-.scroll-content {
-  width: 100%; /* Use the full width of the parent */
-  overflow-y: auto; /* Enable vertical scrolling for long content */
-  padding: 10px; /* Optional: padding for aesthetics */
-  border: 1px solid #ddd; /* Optional: border for visibility */
-  height: 100%;
-  max-height: 200px;
-  /* Use the full height of the parent */
-  text-wrap: normal;
-  background-color: #e8e8e8;
-  color: black;
-}
-.expanded-sql {
-  border-left: #7a54a2 3px solid;
-}
+<style>
 .alert-name-tooltip {
   max-width: 400px;
   white-space: normal;
@@ -2803,61 +2741,6 @@ export default defineComponent({
     padding-right: 0.75rem !important;
     min-width: auto !important;
   }
-}
-</style>
-
-<style lang="scss" scoped>
-.dark-theme {
-  background-color: var(--o2-primary-background);
-
-  .alerts-list-tabs {
-    height: fit-content;
-
-    :deep(.rum-tabs) {
-      border: 1px solid #464646;
-    }
-
-    :deep(.rum-tab) {
-      &:hover {
-        background: #464646;
-      }
-
-      &.active {
-        background: #5960b2;
-        color: #ffffff !important;
-      }
-    }
-  }
-}
-
-.alerts-list-tabs {
-  height: fit-content;
-
-  :deep(.rum-tabs) {
-    border: 1px solid #eaeaea;
-    height: fit-content;
-    border-radius: 4px;
-    overflow: hidden;
-  }
-
-  :deep(.rum-tab) {
-    width: fit-content !important;
-    padding: 4px 12px !important;
-    border: none !important;
-
-    &:hover {
-      background: #eaeaea;
-    }
-
-    &.active {
-      background: #5960b2;
-      color: #ffffff !important;
-    }
-  }
-}
-.compact-icon-btn {
-  padding: 0 0.5rem !important;
-  min-width: 0 !important;
 }
 
 </style>

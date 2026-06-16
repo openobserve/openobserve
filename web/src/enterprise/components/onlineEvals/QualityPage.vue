@@ -1,10 +1,17 @@
 <template>
-  <div class="quality-page" data-test="quality-page">
+  <div
+    class="quality-page"
+    data-test="quality-page"
+    tw:flex tw:flex-col tw:gap-[14px] tw:p-[14px_16px_18px] tw:min-h-0 tw:flex-1
+  >
     <QualityKpiSkeleton
       v-if="showKpiSkeleton"
       :count="visibleKpis.length"
     />
-    <section v-else class="quality-page__kpis" aria-label="Tier 1 KPIs">
+    <section v-else class="quality-page__kpis" aria-label="Tier 1 KPIs"
+      tw:grid tw:gap-[10px]
+      style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr))"
+    >
       <QualityKpiCard
         v-for="kpi in visibleKpis"
         :key="kpi.id"
@@ -17,7 +24,10 @@
          row opens the detail in a right-side ODrawer (70% width) instead
          of replacing the whole page. The user keeps full context of the
          list behind the drawer. -->
-    <div class="quality-page__tier2">
+    <div class="quality-page__tier2"
+      tw:grid tw:gap-3 tw:min-h-0 tw:flex-1
+      style="grid-template-columns: minmax(0, 1fr)"
+    >
       <QualityScoreConfigsTable
         :rows="configRows"
         :is-loading="isConfigsLoading"
@@ -39,8 +49,13 @@
       <template #header-right>
         <span
           class="qpd-type"
-          :class="`qpd-type--${detailDataType}`"
+          :class="{
+            'tw:bg-[color-mix(in_srgb,#6b76e3_14%,transparent)] tw:text-[#4f5bcf]': detailDataType === 'numeric',
+            'tw:bg-[color-mix(in_srgb,#9333ea_14%,transparent)] tw:text-[#7c3aed]': detailDataType === 'categorical',
+            'tw:bg-[color-mix(in_srgb,#16a34a_14%,transparent)] tw:text-[#15803d]': detailDataType === 'boolean',
+          }"
           data-test="quality-detail-type-badge"
+          tw:inline-flex tw:py-0 tw:px-1 tw:rounded-[2px] tw:font-bold tw:text-[8px] tw:leading-[1.4] tw:tracking-[0.02em]
         >
           {{ shortType(detailDataType) }}
         </span>
@@ -48,6 +63,7 @@
           v-if="selectedConfig?.version"
           class="qpd-version"
           data-test="quality-detail-version-badge"
+          tw:ml-[6px] tw:text-[11px] tw:text-(--color-text-secondary) tw:[font-variant-numeric:tabular-nums]
         >v{{ selectedConfig.version }}</span>
       </template>
 
@@ -333,104 +349,3 @@ function shortType(type: string): string {
   return "—";
 }
 </script>
-
-<style lang="scss" scoped>
-// Type + version chrome relocated from QualityDetailPanel's `qdp__head`
-// into the drawer header (#header-right). Visuals are kept identical to
-// the previous in-panel pill so the move feels purely structural.
-.qpd-type {
-  display: inline-flex;
-  padding: 0 4px;
-  border-radius: 2px;
-  font: 700 8px/1.4 inherit;
-  letter-spacing: 0.02em;
-  background: color-mix(in srgb, #6b76e3 14%, transparent);
-  color: #4f5bcf;
-}
-
-.qpd-type--numeric {
-  background: color-mix(in srgb, #6b76e3 14%, transparent);
-  color: #4f5bcf;
-}
-
-.qpd-type--categorical {
-  background: color-mix(in srgb, #9333ea 14%, transparent);
-  color: #7c3aed;
-}
-
-.qpd-type--boolean {
-  background: color-mix(in srgb, #16a34a 14%, transparent);
-  color: #15803d;
-}
-
-.qpd-version {
-  margin-left: 6px;
-  font-size: 11px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  font-variant-numeric: tabular-nums;
-}
-</style>
-
-<style lang="scss" scoped>
-.quality-page {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  padding: 14px 16px 18px;
-  min-height: 0;
-  flex: 1;
-}
-
-.quality-page__scope-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.quality-page__scope-label {
-  font-size: 12px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  font-style: italic;
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
-.quality-page__controls {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  flex: 0 0 auto;
-}
-
-.quality-page__kpis {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 10px;
-}
-
-.quality-page__tier2 {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 12px;
-  min-height: 0;
-  flex: 1;
-}
-
-.quality-page__tier2--split {
-  grid-template-columns: 300px minmax(0, 1fr);
-}
-
-@media (max-width: 1280px) {
-  .quality-page__tier2--split {
-    grid-template-columns: 260px minmax(0, 1fr);
-  }
-}
-
-@media (max-width: 960px) {
-  .quality-page__tier2--split {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-</style>

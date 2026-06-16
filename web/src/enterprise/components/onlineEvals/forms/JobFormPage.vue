@@ -1,6 +1,6 @@
 <template>
-  <form class="job-form" @submit.prevent="save(false)">
-    <div class="job-form__top">
+  <form class="tw:flex tw:flex-col tw:flex-1 tw:min-h-0 tw:gap-2.5" @submit.prevent="save(false)">
+    <div class="tw:flex tw:items-center tw:gap-2.5 tw:min-h-12 tw:px-3.5 tw:py-2 tw:bg-(--o2-card-bg) tw:rounded-md tw:shadow-[0_0_0.313rem_0.063rem_var(--o2-hover-shadow)] tw:shrink-0">
       <OButton
         variant="outline"
         size="icon-sm"
@@ -9,13 +9,13 @@
         :title="t('onlineEvals.job.backTo')"
         @click="$emit('cancel')"
       />
-      <h1 class="job-form__title">
+      <h1 class="tw:m-0 tw:text-[17px] tw:font-semibold tw:text-text-primary tw:tracking-[0.005em] tw:whitespace-nowrap">
         {{ mode === "create" ? t("onlineEvals.job.createTitle") : t("onlineEvals.job.editTitle") }}
       </h1>
-      <div class="job-form__top-spacer" />
+      <div class="tw:flex-1 tw:min-w-2" />
       <button
         type="button"
-        class="job-form__close"
+        class="job-form__close tw:inline-flex tw:items-center tw:justify-center tw:w-7 tw:h-7 tw:p-0 tw:text-(--color-text-secondary,var(--o2-text-secondary)) tw:bg-transparent tw:border-0 tw:rounded-md tw:cursor-pointer tw:transition-[background,color] tw:duration-150"
         :aria-label="t('onlineEvals.buttons.cancel')"
         data-test="job-form-close-btn"
         @click="$emit('cancel')"
@@ -37,20 +37,20 @@
       </button>
     </div>
 
-    <div class="job-form__body">
-      <div class="job-form__main">
+    <div class="tw:flex-1 tw:min-h-0 tw:overflow-hidden tw:grid tw:grid-cols-[minmax(0,1.6fr)_minmax(320px,0.9fr)] max-[1100px]:tw:grid-cols-1 tw:gap-2.5">
+      <div class="job-form__main tw:min-w-0 tw:overflow-auto tw:pt-[18px] tw:px-6 tw:pb-6 tw:bg-(--o2-card-bg) tw:rounded-md tw:shadow-[0_0_0.313rem_0.063rem_var(--o2-hover-shadow)]">
         <!-- Section 01: Target -->
-        <section class="job-section">
-          <div class="job-section__head">
-            <span class="job-section__num">01</span>
-            <h3 class="job-section__title">{{ t("onlineEvals.job.targetSection") }}</h3>
+        <section class="job-section tw:mb-6">
+          <div class="job-section__head tw:flex tw:items-center tw:gap-[10px] tw:pb-[10px] tw:border-b tw:border-(--color-dialog-header-border,var(--o2-border)) tw:mb-3">
+            <span class="job-section__num tw:inline-flex tw:items-center tw:justify-center tw:w-[22px] tw:h-[22px] tw:rounded-full tw:bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] tw:text-(--color-text-secondary,var(--o2-text-secondary)) tw:font-bold tw:text-[11px] tw:font-mono">01</span>
+            <h3 class="job-section__title tw:m-0 tw:text-sm tw:font-semibold tw:text-(--color-text-primary,currentColor)">{{ t("onlineEvals.job.targetSection") }}</h3>
           </div>
 
-          <div class="job-field">
-            <label class="job-field__label">
+          <div class="job-field tw:mb-3">
+            <label class="job-field__label tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary,currentColor) tw:mb-1">
               {{ t("onlineEvals.job.nameLabel") }}
-              <span class="job-field__req">*</span>
-              <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="job-field__lock" />
+              <span class="job-field__req tw:text-(--o2-status-error-text) tw:ml-0.5">*</span>
+              <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="job-field__lock tw:ml-1.5 tw:text-(--color-text-secondary,var(--o2-text-secondary))" />
             </label>
             <OInput
               v-model.trim="form.name"
@@ -61,11 +61,11 @@
             />
           </div>
 
-          <div class="job-field">
-            <label class="job-field__label">
+          <div class="job-field tw:mb-3">
+            <label class="job-field__label tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary,currentColor) tw:mb-1">
               {{ t("onlineEvals.job.streamLabel") }}
-              <span class="job-field__req">*</span>
-              <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="job-field__lock" />
+              <span class="job-field__req tw:text-(--o2-status-error-text) tw:ml-0.5">*</span>
+              <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="job-field__lock tw:ml-1.5 tw:text-(--color-text-secondary,var(--o2-text-secondary))" />
             </label>
             <OSelect
               v-model="form.stream"
@@ -77,8 +77,8 @@
             />
           </div>
 
-          <div class="job-field job-field--desc">
-            <label class="job-field__label">{{ t("onlineEvals.job.descriptionLabel") }}</label>
+          <div class="job-field job-field--desc tw:mb-3">
+            <label class="job-field__label tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary,currentColor) tw:mb-1">{{ t("onlineEvals.job.descriptionLabel") }}</label>
             <OInput
               v-model.trim="form.description"
               type="textarea"
@@ -91,10 +91,10 @@
         </section>
 
         <!-- Section 02: Scorers + Filter + Mapping -->
-        <section class="job-section">
-          <div class="job-section__head">
-            <span class="job-section__num">02</span>
-            <h3 class="job-section__title">{{ t("onlineEvals.job.scorersSection") }}</h3>
+        <section class="job-section tw:mb-6">
+          <div class="job-section__head tw:flex tw:items-center tw:gap-[10px] tw:pb-[10px] tw:border-b tw:border-(--color-dialog-header-border,var(--o2-border)) tw:mb-3">
+            <span class="job-section__num tw:inline-flex tw:items-center tw:justify-center tw:w-[22px] tw:h-[22px] tw:rounded-full tw:bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] tw:text-(--color-text-secondary,var(--o2-text-secondary)) tw:font-bold tw:text-[11px] tw:font-mono">02</span>
+            <h3 class="job-section__title tw:m-0 tw:text-sm tw:font-semibold tw:text-(--color-text-primary,currentColor)">{{ t("onlineEvals.job.scorersSection") }}</h3>
           </div>
 
           <JobScorerPicker
@@ -107,11 +107,11 @@
             @update:group="filterGroup = $event"
           />
 
-          <div class="job-presets">
-            <span class="job-presets__label">{{ t("onlineEvals.job.presets.label") }}</span>
+          <div class="job-presets tw:flex tw:items-center tw:flex-wrap tw:gap-2 tw:my-3 tw:mb-4">
+            <span class="job-presets__label tw:text-xs tw:font-semibold tw:text-(--color-text-secondary,var(--o2-text-secondary))">{{ t("onlineEvals.job.presets.label") }}</span>
             <button
               type="button"
-              class="job-presets__chip"
+              class="job-presets__chip tw:inline-flex tw:items-center tw:h-6 tw:px-[10px] tw:border tw:border-(--color-dialog-header-border,var(--o2-border)) tw:rounded-full tw:bg-(--color-card-bg) tw:text-(--color-text-primary,currentColor) tw:font-medium tw:text-[11px] tw:cursor-pointer tw:transition-[border-color,background] tw:duration-[120ms]"
               data-test="job-form-preset-root-spans"
               @click="applyPreset('rootSpans')"
             >
@@ -119,7 +119,7 @@
             </button>
             <button
               type="button"
-              class="job-presets__chip"
+              class="job-presets__chip tw:inline-flex tw:items-center tw:h-6 tw:px-[10px] tw:border tw:border-(--color-dialog-header-border,var(--o2-border)) tw:rounded-full tw:bg-(--color-card-bg) tw:text-(--color-text-primary,currentColor) tw:font-medium tw:text-[11px] tw:cursor-pointer tw:transition-[border-color,background] tw:duration-[120ms]"
               data-test="job-form-preset-llm-calls"
               @click="applyPreset('llmCalls')"
             >
@@ -127,7 +127,7 @@
             </button>
             <button
               type="button"
-              class="job-presets__chip"
+              class="job-presets__chip tw:inline-flex tw:items-center tw:h-6 tw:px-[10px] tw:border tw:border-(--color-dialog-header-border,var(--o2-border)) tw:rounded-full tw:bg-(--color-card-bg) tw:text-(--color-text-primary,currentColor) tw:font-medium tw:text-[11px] tw:cursor-pointer tw:transition-[border-color,background] tw:duration-[120ms]"
               data-test="job-form-preset-tool-calls"
               @click="applyPreset('toolCalls')"
             >
@@ -143,28 +143,28 @@
         </section>
 
         <!-- Section 03: Sampling -->
-        <section class="job-section">
-          <div class="job-section__head">
-            <span class="job-section__num">03</span>
-            <h3 class="job-section__title">{{ t("onlineEvals.job.stepper.sampling") }}</h3>
+        <section class="job-section tw:mb-6">
+          <div class="job-section__head tw:flex tw:items-center tw:gap-[10px] tw:pb-[10px] tw:border-b tw:border-(--color-dialog-header-border,var(--o2-border)) tw:mb-3">
+            <span class="job-section__num tw:inline-flex tw:items-center tw:justify-center tw:w-[22px] tw:h-[22px] tw:rounded-full tw:bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] tw:text-(--color-text-secondary,var(--o2-text-secondary)) tw:font-bold tw:text-[11px] tw:font-mono">03</span>
+            <h3 class="job-section__title tw:m-0 tw:text-sm tw:font-semibold tw:text-(--color-text-primary,currentColor)">{{ t("onlineEvals.job.stepper.sampling") }}</h3>
           </div>
 
-          <div class="job-field-row">
-            <div class="job-field">
-              <label class="job-field__label">{{ t("onlineEvals.job.samplingModeLabel") }}</label>
+          <div class="job-field-row tw:grid tw:grid-cols-2 max-[1100px]:tw:grid-cols-1 tw:gap-[14px]">
+            <div class="job-field tw:mb-3">
+              <label class="job-field__label tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary,currentColor) tw:mb-1">{{ t("onlineEvals.job.samplingModeLabel") }}</label>
               <OSelect
                 v-model="form.samplingMode"
                 :options="samplingModeOptions"
                 size="md"
                 data-test="job-form-sampling-mode-select"
               />
-              <div class="job-field__help">{{ t("onlineEvals.job.samplingHelp") }}</div>
+              <div class="job-field__help tw:text-[11.5px] tw:text-(--color-text-secondary,var(--o2-text-secondary)) tw:mt-1">{{ t("onlineEvals.job.samplingHelp") }}</div>
             </div>
 
-            <div class="job-field">
-              <label class="job-field__label">
+            <div class="job-field tw:mb-3">
+              <label class="job-field__label tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary,currentColor) tw:mb-1">
                 {{ t("onlineEvals.job.samplingValueLabel") }}
-                <span v-if="form.samplingMode !== 'all'" class="job-field__req">*</span>
+                <span v-if="form.samplingMode !== 'all'" class="job-field__req tw:text-(--o2-status-error-text) tw:ml-0.5">*</span>
               </label>
               <OInput
                 v-model="form.samplingValue"
@@ -172,7 +172,7 @@
                 :disabled="form.samplingMode === 'all'"
                 data-test="job-form-sampling-value-input"
               />
-              <div class="job-field__help">
+              <div class="job-field__help tw:text-[11.5px] tw:text-(--color-text-secondary,var(--o2-text-secondary)) tw:mt-1">
                 {{ form.samplingMode === 'all'
                   ? t("onlineEvals.job.samplingValueAllHelp")
                   : t("onlineEvals.job.samplingValueHelp") }}
@@ -185,7 +185,7 @@
       <JobPreviewPanel :name="form.name" :stream-type="form.streamType" :mode="mode" />
     </div>
 
-    <footer class="job-form__foot">
+    <footer class="tw:sticky tw:bottom-0 tw:flex tw:items-center tw:justify-end tw:gap-2 tw:px-5.5 tw:py-3 tw:bg-(--o2-card-bg) tw:rounded-md tw:shadow-[0_0_0.313rem_0.063rem_var(--o2-hover-shadow)] tw:shrink-0 tw:z-1">
       <OButton
         data-test="job-form-cancel-btn"
         type="button"
@@ -470,219 +470,24 @@ async function save(activateAfter = false) {
 }
 </script>
 
-<style lang="scss" scoped>
-.job-form {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 0;
-  gap: 10px;
-}
-
-.job-form__top {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 48px;
-  padding: 8px 14px;
-  background-color: var(--o2-card-bg);
-  border-radius: 0.375rem;
-  box-shadow: 0 0 0.313rem 0.063rem var(--o2-hover-shadow);
-  flex-shrink: 0;
-}
-
-.job-form__title {
-  margin: 0;
-  font-size: 17px;
-  font-weight: 600;
-  color: var(--color-text-primary, currentColor);
-  letter-spacing: 0.005em;
-  white-space: nowrap;
-}
-
-.job-form__subtitle {
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  font-size: 12px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  min-width: 0;
-}
-
-.job-form__top-spacer {
-  flex: 1;
-  min-width: 8px;
-}
-
-.job-form__close {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  background: transparent;
-  border: 0;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s;
-}
-
+<style>
 .job-form__close:hover {
   background: color-mix(in srgb, var(--color-text-primary) 6%, transparent);
   color: var(--color-primary-600, #3F7994);
 }
 
-.job-form__body {
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-  display: grid;
-  grid-template-columns: minmax(0, 1.6fr) minmax(320px, 0.9fr);
-  gap: 10px;
-}
-
-.job-form__main {
-  min-width: 0;
-  overflow: auto;
-  padding: 18px 24px 24px;
-  background-color: var(--o2-card-bg);
-  border-radius: 0.375rem;
-  box-shadow: 0 0 0.313rem 0.063rem var(--o2-hover-shadow);
-}
-
-.job-form__foot {
-  position: sticky;
-  bottom: 0;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
-  padding: 12px 22px;
-  background-color: var(--o2-card-bg);
-  border-radius: 0.375rem;
-  box-shadow: 0 0 0.313rem 0.063rem var(--o2-hover-shadow);
-  flex-shrink: 0;
-  z-index: 1;
-}
-
-.job-form__main :deep(textarea) {
+.job-form__main textarea {
   max-height: 200px;
   overflow-y: auto;
 }
 
-.job-form__main .job-field--desc :deep(textarea) {
+.job-form__main .job-field--desc textarea {
   max-height: 120px;
-}
-
-.job-section {
-  margin-bottom: 24px;
-}
-
-.job-section__head {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid var(--color-dialog-header-border, var(--o2-border));
-  margin-bottom: 12px;
-}
-
-.job-section__num {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--color-text-secondary) 12%, transparent);
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  font: 700 11px ui-monospace, SFMono-Regular, Menlo, monospace;
-}
-
-.job-section__title {
-  margin: 0;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--color-text-primary, currentColor);
-}
-
-.job-field {
-  margin-bottom: 12px;
-}
-
-.job-field__label {
-  display: flex;
-  align-items: center;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--color-text-primary, currentColor);
-  margin-bottom: 4px;
-}
-
-.job-field__req {
-  color: var(--o2-status-error-text);
-  margin-left: 2px;
-}
-
-.job-field__help {
-  font-size: 11.5px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  margin-top: 4px;
-}
-
-.job-field-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 14px;
-}
-
-.job-field__lock {
-  margin-left: 6px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.job-presets {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin: 12px 0 16px;
-}
-
-.job-presets__label {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.job-presets__chip {
-  display: inline-flex;
-  align-items: center;
-  height: 24px;
-  padding: 0 10px;
-  border: 1px solid var(--color-dialog-header-border, var(--o2-border));
-  border-radius: 999px;
-  background: var(--color-card-bg);
-  color: var(--color-text-primary, currentColor);
-  font: 500 11px inherit;
-  cursor: pointer;
-  transition: border-color 0.12s, background 0.12s;
 }
 
 .job-presets__chip:hover {
   border-color: var(--color-primary-600, #3F7994);
   background: color-mix(in srgb, var(--color-primary-600, #3F7994) 6%, var(--color-card-bg));
   color: var(--color-primary-600, #3F7994);
-}
-
-@media (max-width: 1100px) {
-  .job-form__body {
-    grid-template-columns: 1fr;
-  }
-  .job-field-row {
-    grid-template-columns: 1fr;
-  }
 }
 </style>

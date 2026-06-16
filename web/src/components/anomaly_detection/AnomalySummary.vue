@@ -15,27 +15,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="anomaly-summary">
+  <div class="tw:h-full tw:flex tw:flex-col tw:relative">
     <div
-      class="summary-content"
+      class="tw:text-[0.8125rem] tw:leading-[2.2] tw:flex-1 tw:overflow-y-auto tw:p-4"
       ref="summaryContainer"
       @scroll="checkScrollState"
     >
       <p
         v-if="summaryText"
-        class="summary-text"
+        class="tw:m-0 tw:whitespace-pre-line tw:tracking-[0.03em]"
         v-html="summaryText"
       />
-      <p v-else class="summary-placeholder">
+      <p v-else class="tw:m-0 tw:italic tw:opacity-60">
         Fill in the setup step to see a summary.
       </p>
     </div>
 
-    <div v-show="showScrollToBottom" class="scroll-to-bottom-container">
+    <div v-show="showScrollToBottom" class="tw:absolute tw:bottom-5 tw:right-5 tw:z-1000 tw:pointer-events-none">
       <OButton
         variant="ghost"
         size="icon-sm"
-        class="scroll-to-bottom-btn"
+        class="scroll-to-bottom-btn tw:pointer-events-auto tw:backdrop-blur-sm tw:shadow-[0_2px_8px_rgba(0,0,0,0.2)]"
         data-test="anomaly-summary-scroll-btn"
         @click="scrollToBottom"
       >
@@ -93,99 +93,16 @@ onMounted(async () => {
 });
 </script>
 
-<style scoped lang="scss">
-.anomaly-summary {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  position: relative;
+<style>
+body.body--light .scroll-to-bottom-btn {
+  border: 2px solid var(--q-primary) !important;
+  color: var(--q-primary) !important;
+  background: rgba(255, 255, 255, 0.95) !important;
 }
 
-.summary-content {
-  font-size: 0.8125rem;
-  line-height: 2.2;
-  flex: 1;
-  overflow-y: auto;
-  padding: 1rem;
-}
-
-.summary-text {
-  margin: 0;
-  white-space: pre-line;
-  letter-spacing: 0.03em;
-
-  :deep(strong) {
-    display: inline;
-    font-weight: 700;
-    font-size: 0.875rem;
-  }
-
-  :deep(.summary-clickable) {
-    cursor: default;
-    color: var(--q-primary);
-    font-weight: 600;
-    padding: 0.125rem 0.375rem;
-    margin: 0 0.125rem;
-    border-radius: 0.25rem;
-    background: linear-gradient(
-      135deg,
-      color-mix(in srgb, var(--q-primary) 8%, transparent),
-      color-mix(in srgb, var(--q-primary) 12%, transparent)
-    );
-    display: inline;
-    position: relative;
-    box-shadow: 0 0 0 0.0625rem color-mix(in srgb, var(--q-primary) 15%, transparent);
-    line-height: 1.6;
-    vertical-align: baseline;
-    white-space: nowrap;
-  }
-
-  :deep(.plain-english-section) {
-    padding: 0.75rem 1rem;
-    border-radius: 0.375rem;
-    background: linear-gradient(
-      135deg,
-      color-mix(in srgb, var(--q-primary) 5%, transparent),
-      color-mix(in srgb, var(--q-primary) 8%, transparent)
-    );
-    border-left: 0.1875rem solid var(--q-primary);
-    font-size: 0.875rem;
-    line-height: 1.7;
-    font-style: italic;
-    opacity: 0.95;
-    font-weight: 500;
-  }
-}
-
-.summary-placeholder {
-  margin: 0;
-  font-style: italic;
-  opacity: 0.6;
-}
-
-.scroll-to-bottom-container {
-  position: absolute;
-  bottom: 1.25rem;
-  right: 1.25rem;
-  z-index: 1000;
-  pointer-events: none;
-}
-
-.scroll-to-bottom-btn {
-  pointer-events: auto;
-  backdrop-filter: blur(8px);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-
-  body.body--light & {
-    border: 2px solid var(--q-primary) !important;
-    color: var(--q-primary) !important;
-    background: rgba(255, 255, 255, 0.95) !important;
-  }
-
-  body.body--dark & {
-    border: 2px solid var(--q-primary) !important;
-    color: var(--q-primary) !important;
-    background: rgba(30, 30, 30, 0.9) !important;
-  }
+body.body--dark .scroll-to-bottom-btn {
+  border: 2px solid var(--q-primary) !important;
+  color: var(--q-primary) !important;
+  background: rgba(30, 30, 30, 0.9) !important;
 }
 </style>

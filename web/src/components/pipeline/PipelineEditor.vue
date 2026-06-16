@@ -51,10 +51,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
       <div class="tw:flex tw:mt-3 tw:px-2">
-        <div class="nodes-drag-container tw:pr-3">
+        <div class="nodes-drag-container tw:pr-3 tw:w-50">
           <div
             data-test="pipeline-editor-nodes-list-title"
-            class="nodes-header tw:mb-2 tw:mx-2"
+            class="nodes-header tw:mb-2 tw:mx-2 tw:text-base tw:font-semibold tw:text-[#1f2937] tw:px-1 tw:pb-2 tw:text-center tw:border-b-2 tw:border-[#e5e7eb] tw:tracking-wide tw:relative"
           >
             {{ t("pipeline.nodes") }}
           </div>
@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           id="pipelineChartContainer"
           ref="chartContainerRef"
-          class="relative-position pipeline-chart-container o2vf_node"
+          class="relative-position pipeline-chart-container o2vf_node tw:h-[82.6vh] tw:rounded-xl tw:w-[calc(100%-200px)]"
           :class="store.state.theme === 'dark' ? '' : 'tw:bg-gray-100'"
           v-show="!pipelineObj.dialog.show || pipelineObj.dialog.name != 'query'"
         >
@@ -513,12 +513,12 @@ const { getSelectedEdges, removeEdges } = useVueFlow()
 
 onMounted(async () => {
   window.addEventListener("beforeunload", beforeUnloadHandler);
-  
+
   // Add keyboard handler for edge deletion
   const handleKeydown = (event) => {
     if (event.key === 'Delete' || event.key === 'Backspace') {
       const selectedEdges = getSelectedEdges.value
-      
+
       if (selectedEdges.length > 0) {
         event.preventDefault()
         const edgeIds = selectedEdges.map(edge => edge.id)
@@ -526,15 +526,15 @@ onMounted(async () => {
       }
     }
   }
-  
+
   window.addEventListener("keydown", handleKeydown);
-  
+
   // Store handler reference for cleanup
   (window as any).pipelineKeydownHandler = handleKeydown;
-  
+
   pipelineDestinationsList.value = await getPipelineDestinations();
   usedStreamsListResponse.value = await getUsedStreamsList();
-  const { path, query } = router.currentRoute.value; 
+  const { path, query } = router.currentRoute.value;
     if (path.includes("edit") && !query.id) {
       router.push({
         name:"pipelines",
@@ -543,19 +543,19 @@ onMounted(async () => {
         }
       })
     }
-    
+
   // Setup pipelines context provider
   setupPipelinesContextProvider();
   });
 
 onUnmounted(() => {
   window.removeEventListener("beforeunload", beforeUnloadHandler);
-  
+
   // Cleanup keyboard handler
   if ((window as any).pipelineKeydownHandler) {
     window.removeEventListener("keydown", (window as any).pipelineKeydownHandler);
   }
-  
+
   // Cleanup pipelines context provider
   cleanupPipelinesContextProvider();
 });
@@ -1078,9 +1078,9 @@ const savePipelineJson = async (json: string) => {
     let usedStreamsList: any = [];
     if(pipelineObj.currentSelectedPipeline.source.source_type === "realtime"){
       try{
-        //there are couple of scenarios that we need to take care of 
-        //if user gets error that this stream is not there 
-        //2. we dont know if user selects scheduled or realtime right so we need to do this check at the time of saving only 
+        //there are couple of scenarios that we need to take care of
+        //if user gets error that this stream is not there
+        //2. we dont know if user selects scheduled or realtime right so we need to do this check at the time of saving only
         //3. TODO: store these list in the store so that unnecessary api calls will be avoided.
         const streamsListResponse: any = await getStreams(parsedPipeline.source.stream_type || "logs", false);
         streamList = streamsListResponse.list.map((stream: any) => stream.name);
@@ -1092,16 +1092,16 @@ const savePipelineJson = async (json: string) => {
     }
 
     const validationResult = validatePipelineUtil(parsedPipeline, { streamList: streamList, usedStreamsList: usedStreamsList, originalPipeline: pipelineObj.currentSelectedPipeline, pipelineDestinations: pipelineDestinationsList.value, functionsList: functionOptions.value, selectedOrgId: store.state.selectedOrganization.identifier });
-    
+
     if (!validationResult.isValid) {
       // Set validation errors to be displayed in the JsonEditor
       validationErrors.value = validationResult.errors;
       return; // Don't save if validation fails
     }
-    
+
     // Clear any previous validation errors
     validationErrors.value = [];
-    
+
     // Only save if validation passes
     pipelineObj.currentSelectedPipeline = parsedPipeline;
     savePipeline();
@@ -1116,20 +1116,20 @@ const savePipelineJson = async (json: string) => {
 
 /**
  * Setup the pipelines context provider for AI chat integration
- * 
+ *
  * Example: When user opens pipeline editor, this registers the context provider
  * that will extract pipeline information for AI context
  */
 const setupPipelinesContextProvider = () => {
   const provider = createPipelinesContextProvider(pipelineObj, store);
-  
+
   contextRegistry.register('pipelines', provider);
   contextRegistry.setActive('pipelines');
 };
 
 /**
  * Cleanup pipelines context provider when leaving pipeline editor
- * 
+ *
  * Example: When user navigates away from pipeline editor, this removes the provider
  * but keeps the default provider available for fallback
  */
@@ -1143,248 +1143,207 @@ const cleanupPipelinesContextProvider = () => {
 // [END] Pipelines Context Provider Setup
 </script>
 
-<style scoped lang="scss">
-.node-actions {
-  top: 227px;
-  left: 119px;
-}
-.diagram-container {
-  border: 1px solid #000;
-}
-
-.pipeline-chart-container {
-  height: 82.6vh;
-  border-radius: 12px;
-  width: calc(100% - 200px);
+<style>
+.nodes-header::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: #8b5cf6;
+  border-radius: 1px;
 }
 
-.nodes-drag-container {
-  width: 200px;
+/* Global rule to eliminate ALL transitions during any Vue Flow drag operation */
+.vue-flow.dragging *,
+.vue-flow:has(.vue-flow__node:active) * {
+  transition: none !important;
+  animation: none !important;
 }
 
-.nodes-header {
-  font-size: 16px;
-  font-weight: 600;
-  color: #1f2937;
-  padding: 0 4px 8px 4px;
-  text-align: center;
-  margin-bottom: 16px !important;
-  border-bottom: 2px solid #e5e7eb;
-  letter-spacing: 0.05em;
-  position: relative;
-
-  &::after {
-    content: '';
-    position: absolute;
-    bottom: -2px;
-    left: 0;
-    width: 100%;
-    height: 2px;
-    background: #8b5cf6;
-    border-radius: 1px;
-  }
-}
-
-.node-type-row {
-  cursor: grab;
-  padding: 5px;
-  border: 1px solid #e4e4e4;
-  border-radius: 8px;
-  user-select: none;
-}
-
-// Global rule to eliminate ALL transitions during any Vue Flow drag operation
-.vue-flow.dragging,
-.vue-flow:has(.vue-flow__node:active) {
-  * {
-    transition: none !important;
-    animation: none !important;
-  }
-}
-
-// Ensure dragging nodes have zero lag
+/* Ensure dragging nodes have zero lag */
 .vue-flow__node.dragging,
 .vue-flow__node:active {
   transition: none !important;
   transform: none !important;
   animation: none !important;
-  
-  * {
-    transition: none !important;
-    transform: none !important; 
-    animation: none !important;
-  }
-}
-</style>
-
-<style lang="scss">
-.stream-routing-dialog-container {
-  min-width: 540px !important;
 }
 
-.o2vf_node {
+.vue-flow__node.dragging *,
+.vue-flow__node:active * {
+  transition: none !important;
+  transform: none !important;
+  animation: none !important;
+}
+
+.o2vf_node .vue-flow__node {
+  padding: 8px 16px;
   width: auto;
-
-  .vue-flow__node {
-    padding: 8px 16px;
-    width: auto;
-    min-height: 44px;
-    transition: all 0.3s ease;
-    border-radius: 12px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-    cursor: grab;
-    display: flex;
-    align-items: center;
-    background: rgba(255, 255, 255, 0.9);
-    backdrop-filter: blur(10px);
-    
-    // Disable ALL transitions when dragging for zero lag
-    &:active,
-    &.dragging {
-      cursor: grabbing;
-      transition: none !important;
-      * {
-        transition: none !important;
-      }
-    }
-  }
-
-  .o2vf_node_input,
-  .vue-flow__node-input {
-    border: 1px solid #60a5fa;
-    color: #1f2937;
-    border-radius: 12px;
-    background: rgba(239, 246, 255, 0.8);
-    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1);
-    transition: all 0.3s ease;
-    cursor: grab;
-    min-height: 36px;
-    padding: 8px 16px;
-    
-    // Disable transitions during drag for zero lag
-    &:active,
-    &.dragging {
-      cursor: grabbing;
-      transition: none !important;
-      * {
-        transition: none !important;
-      }
-    }
-  }
-
-  .vue-flow__node-output {
-    cursor: grab;
-    min-height: 36px;
-    padding: 8px 16px;
-
-    border: 1px solid rgba(74, 222, 128, 0.4);
-    color: var(--o2-primary-background);
-    border-radius: 8px;
-    background: rgba(240, 253, 244, 0.9);
-    box-shadow: 0 2px 8px rgba(34, 197, 94, 0.1);
-    transition: all 0.3s ease;
-
-    &:hover {
-      background: rgba(240, 253, 244, 1);
-      box-shadow: 0 4px 12px rgba(34, 197, 94, 0.2);
-      border-color: rgba(74, 222, 128, 0.6);
-    }
-    // Disable transitions during drag for zero lag
-    &:active,
-    &.dragging {
-      cursor: grabbing;
-      transition: none !important;
-      * {
-        transition: none !important;
-      }
-    }
-  }
-
-
-  .o2vf_node_default,
-  .vue-flow__node-default {
-    border: 1px solid #f59e0b;
-    color: #1f2937;
-    border-radius: 12px;
-    background: rgba(255, 251, 235, 0.8);
-    box-shadow: 0 4px 12px rgba(217, 119, 6, 0.1);
-    transition: all 0.3s ease;
-    cursor: grab;
-    min-height: 36px;
-    padding: 8px 16px;
-    
-    &:hover {
-      border: 1px solid #f59e0b !important;
-      background: rgba(255, 251, 235, 0.95) !important;
-      box-shadow: 0 6px 16px rgba(217, 119, 6, 0.2) !important;
-    }
-    
-    // Disable transitions during drag for zero lag
-    &:active,
-    &.dragging {
-      cursor: grabbing;
-      transition: none !important;
-      * {
-        transition: none !important;
-      }
-    }
-  }
-
+  min-height: 44px;
+  transition: all 0.3s ease;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  cursor: grab;
+  display: flex;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(10px);
 }
 
-// Dark mode nodes header styling
-.body--dark {
-  .nodes-header {
-    color: rgba(255, 255, 255, 0.95) !important;
-    border-bottom: 2px solid rgba(255, 255, 255, 0.2) !important;
-
-    &::after {
-      background: #a855f7 !important;
-    }
-  }
-
-  // Dark mode input nodes to match NodeSidebar
-  .vue-flow__node-input,
-  .o2vf_node_input {
-    background: rgba(30, 58, 138, 0.2) !important;
-    border: 1px solid rgba(96, 165, 250, 0.3) !important;
-    color: rgba(255, 255, 255, 0.9) !important;
-    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1) !important;
-
-    &:hover {
-      background: rgba(30, 58, 138, 0.3) !important;
-      border-color: rgba(96, 165, 250, 0.5) !important;
-      box-shadow: 0 6px 16px rgba(59, 130, 246, 0.2) !important;
-    }
-  }
-
-  .vue-flow__node-output,
-  .o2vf_node_output {
-    background: rgba(20, 83, 45, 0.2) !important;
-    border: 1px solid rgba(74, 222, 128, 0.3) !important;
-    color: rgba(255, 255, 255, 0.9) !important;
-
-    &:hover {
-      background: rgba(20, 83, 45, 0.3) !important;
-      border-color: rgba(74, 222, 128, 0.5) !important;
-      box-shadow: 0 6px 16px rgba(34, 197, 94, 0.2) !important;
-    }
-  }
-
-  // Dark mode default nodes to match NodeSidebar
-  .vue-flow__node-default,
-  .o2vf_node_default {
-    background: rgba(120, 53, 15, 0.2) !important;
-    border: 1px solid rgba(251, 146, 60, 0.3) !important;
-    color: rgba(255, 255, 255, 0.9) !important;
-    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.1) !important;
-
-    &:hover {
-      background: rgba(120, 53, 15, 0.3) !important;
-      border-color: rgba(251, 146, 60, 0.5) !important;
-      box-shadow: 0 6px 16px rgba(245, 158, 11, 0.2) !important;
-    }
-  }
+.o2vf_node .vue-flow__node:active,
+.o2vf_node .vue-flow__node.dragging {
+  cursor: grabbing;
+  transition: none !important;
 }
 
+.o2vf_node .vue-flow__node:active *,
+.o2vf_node .vue-flow__node.dragging * {
+  transition: none !important;
+}
+
+.o2vf_node .o2vf_node_input,
+.o2vf_node .vue-flow__node-input {
+  border: 1px solid #60a5fa;
+  color: #1f2937;
+  border-radius: 12px;
+  background: rgba(239, 246, 255, 0.8);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1);
+  transition: all 0.3s ease;
+  cursor: grab;
+  min-height: 36px;
+  padding: 8px 16px;
+}
+
+.o2vf_node .o2vf_node_input:active,
+.o2vf_node .o2vf_node_input.dragging,
+.o2vf_node .vue-flow__node-input:active,
+.o2vf_node .vue-flow__node-input.dragging {
+  cursor: grabbing;
+  transition: none !important;
+}
+
+.o2vf_node .o2vf_node_input:active *,
+.o2vf_node .o2vf_node_input.dragging *,
+.o2vf_node .vue-flow__node-input:active *,
+.o2vf_node .vue-flow__node-input.dragging * {
+  transition: none !important;
+}
+
+.o2vf_node .vue-flow__node-output {
+  cursor: grab;
+  min-height: 36px;
+  padding: 8px 16px;
+  border: 1px solid rgba(74, 222, 128, 0.4);
+  color: var(--o2-primary-background);
+  border-radius: 8px;
+  background: rgba(240, 253, 244, 0.9);
+  box-shadow: 0 2px 8px rgba(34, 197, 94, 0.1);
+  transition: all 0.3s ease;
+}
+
+.o2vf_node .vue-flow__node-output:hover {
+  background: rgba(240, 253, 244, 1);
+  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.2);
+  border-color: rgba(74, 222, 128, 0.6);
+}
+
+.o2vf_node .vue-flow__node-output:active,
+.o2vf_node .vue-flow__node-output.dragging {
+  cursor: grabbing;
+  transition: none !important;
+}
+
+.o2vf_node .vue-flow__node-output:active *,
+.o2vf_node .vue-flow__node-output.dragging * {
+  transition: none !important;
+}
+
+.o2vf_node .o2vf_node_default,
+.o2vf_node .vue-flow__node-default {
+  border: 1px solid #f59e0b;
+  color: #1f2937;
+  border-radius: 12px;
+  background: rgba(255, 251, 235, 0.8);
+  box-shadow: 0 4px 12px rgba(217, 119, 6, 0.1);
+  transition: all 0.3s ease;
+  cursor: grab;
+  min-height: 36px;
+  padding: 8px 16px;
+}
+
+.o2vf_node .o2vf_node_default:hover,
+.o2vf_node .vue-flow__node-default:hover {
+  border: 1px solid #f59e0b !important;
+  background: rgba(255, 251, 235, 0.95) !important;
+  box-shadow: 0 6px 16px rgba(217, 119, 6, 0.2) !important;
+}
+
+.o2vf_node .o2vf_node_default:active,
+.o2vf_node .o2vf_node_default.dragging,
+.o2vf_node .vue-flow__node-default:active,
+.o2vf_node .vue-flow__node-default.dragging {
+  cursor: grabbing;
+  transition: none !important;
+}
+
+.o2vf_node .o2vf_node_default:active *,
+.o2vf_node .o2vf_node_default.dragging *,
+.o2vf_node .vue-flow__node-default:active *,
+.o2vf_node .vue-flow__node-default.dragging * {
+  transition: none !important;
+}
+
+.body--dark .nodes-header {
+  color: rgba(255, 255, 255, 0.95) !important;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.2) !important;
+}
+
+.body--dark .nodes-header::after {
+  background: #a855f7 !important;
+}
+
+.body--dark .vue-flow__node-input,
+.body--dark .o2vf_node_input {
+  background: rgba(30, 58, 138, 0.2) !important;
+  border: 1px solid rgba(96, 165, 250, 0.3) !important;
+  color: rgba(255, 255, 255, 0.9) !important;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1) !important;
+}
+
+.body--dark .vue-flow__node-input:hover,
+.body--dark .o2vf_node_input:hover {
+  background: rgba(30, 58, 138, 0.3) !important;
+  border-color: rgba(96, 165, 250, 0.5) !important;
+  box-shadow: 0 6px 16px rgba(59, 130, 246, 0.2) !important;
+}
+
+.body--dark .vue-flow__node-output,
+.body--dark .o2vf_node_output {
+  background: rgba(20, 83, 45, 0.2) !important;
+  border: 1px solid rgba(74, 222, 128, 0.3) !important;
+  color: rgba(255, 255, 255, 0.9) !important;
+}
+
+.body--dark .vue-flow__node-output:hover,
+.body--dark .o2vf_node_output:hover {
+  background: rgba(20, 83, 45, 0.3) !important;
+  border-color: rgba(74, 222, 128, 0.5) !important;
+  box-shadow: 0 6px 16px rgba(34, 197, 94, 0.2) !important;
+}
+
+.body--dark .vue-flow__node-default,
+.body--dark .o2vf_node_default {
+  background: rgba(120, 53, 15, 0.2) !important;
+  border: 1px solid rgba(251, 146, 60, 0.3) !important;
+  color: rgba(255, 255, 255, 0.9) !important;
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.1) !important;
+}
+
+.body--dark .vue-flow__node-default:hover,
+.body--dark .o2vf_node_default:hover {
+  background: rgba(120, 53, 15, 0.3) !important;
+  border-color: rgba(251, 146, 60, 0.5) !important;
+  box-shadow: 0 6px 16px rgba(245, 158, 11, 0.2) !important;
+}
 </style>

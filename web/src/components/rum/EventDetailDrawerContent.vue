@@ -768,6 +768,6 @@ defineExpose({
 });
 </script>
 
-<style lang="scss">
+<style>
 @import "@/assets/styles/log-highlighting.css";
 </style>

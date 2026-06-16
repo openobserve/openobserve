@@ -79,7 +79,7 @@
       <!-- Group header -->
       <template #group-header="{ row }">
         <div
-          class="field-group-header tw:h-7! tw:w-full tw:flex tw:justify-between tw:items-center tw:rounded-[0.25rem] tw:font-semibold tw:pl-2 tw:pr-1"
+          class="tw:h-7! tw:w-full tw:flex tw:justify-between tw:items-center tw:rounded tw:font-semibold tw:pl-2 tw:pr-1 tw:text-xs tw:cursor-default tw:select-none tw:bg-(--o2-section-header-bg) tw:text-(--o2-text-secondary)"
           :title="row.groupName"
         >
           <div class="tw:flex-1 tw:min-w-0">{{ row.groupName }}</div>
@@ -109,7 +109,7 @@
             <!-- Standard chart actions -->
             <div
               v-if="showStandardActions(row, index)"
-              class="field_icons"
+              class="tw:flex tw:items-center tw:gap-0.5"
             >
               <OButton
                 variant="ghost-neutral"
@@ -191,7 +191,7 @@
         <!-- Geomap actions -->
         <div
           v-if="showGeomapActions(row, index)"
-          class="field_icons"
+          class="tw:flex tw:items-center tw:gap-0.5"
         >
           <OButton
             variant="ghost-neutral"
@@ -255,7 +255,7 @@
         <!-- Maps actions -->
         <div
           v-if="showMapsActions(row, index)"
-          class="field_icons"
+          class="tw:flex tw:items-center tw:gap-0.5"
         >
           <OButton
             variant="ghost-neutral"
@@ -296,7 +296,7 @@
         <!-- Sankey actions -->
         <div
           v-if="showSankeyActions(row, index)"
-          class="field_icons"
+          class="tw:flex tw:items-center tw:gap-0.5"
         >
           <OButton
             variant="ghost-neutral"
@@ -1070,22 +1070,3 @@ function setPage(page: number) {
 defineExpose({ fieldListRef });
 </script>
 
-<style lang="scss" scoped>
-.field_icons {
-  display: flex;
-  align-items: center;
-  gap: 0.125rem;
-}
-
-// Stream/section header — visually distinct band so each joined stream renders
-// as its own section in the field list. Uses --o2-section-header-bg which is
-// defined for both light and dark mode in _variables.scss, so no JS theme
-// check is needed.
-.field-group-header {
-  font-size: 0.75rem;
-  cursor: default;
-  user-select: none;
-  background-color: var(--o2-section-header-bg);
-  color: var(--o2-text-secondary);
-}
-</style>

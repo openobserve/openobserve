@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="tw:flex tw:flex-col index-menu"
+    class="tw:flex tw:flex-col tw:w-full index-menu"
     :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'"
   >
     <OSelect
@@ -41,9 +41,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </li>
       </template>
     </OSelect>
-    <div class="metric-list">
+    <div class="metric-list tw:h-[calc(100vh-98px)] tw:w-full tw:overflow-x-hidden tw:overflow-y-auto">
       <div
-        class="metrics-label-table tw:mt-1"
+        class="metrics-label-table tw:mt-1 tw:w-full"
         data-test="log-search-index-list-fields-table"
       >
         <OTable
@@ -52,10 +52,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           row-key="name"
           pagination="none"
           :show-global-filter="false"
-          class="field-table"
+          class="field-table tw:w-full"
         >
           <template #cell-name="{ row }">
-            <div class="field_list">
+            <div class="field_list tw:p-0 tw:mb-0.5 tw:relative tw:overflow-visible tw:cursor-default">
               <!-- TODO OK : Repeated code make separate component to display field  -->
               <template
                 v-if="
@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <template #trigger>
                     <div class="tw:flex tw:items-center tw:min-w-0">
                       <OFieldLabel :field="row" class="tw:flex-1 tw:min-w-0" />
-                      <div class="field_overlay">
+                      <div class="field_overlay tw:absolute tw:h-full tw:right-0 tw:top-0 tw:z-[5] tw:bg-[#e8e8e8] tw:px-[6px] tw:invisible tw:flex tw:items-center">
                         <OButton
                           icon-left="add"
                           :data-test="`metrics-list-add-${row.name}-label-btn`"
@@ -500,240 +500,65 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
-.index-menu {
+<style>
+.index-menu .metrics-label-table table {
+  display: table;
+  table-layout: fixed !important;
+}
+
+.index-menu .metrics-label-table thead {
+  display: none;
+}
+
+.index-menu .metrics-label-table tr {
+  margin-bottom: 1px;
+}
+
+.index-menu .metrics-label-table tbody,
+.index-menu .metrics-label-table tr,
+.index-menu .metrics-label-table td {
   width: 100%;
-
-  .metric-list {
-    height: calc(100vh - 98px);
-    width: 100%;
-    overflow-x: hidden;
-    overflow-y: auto;
-    .metric-container {
-      width: 100%;
-
-      &:hover {
-        background-color: color-mix(in srgb, currentColor 15%, transparent);
-      }
-
-      &.selected {
-        background-color: rgba(89, 96, 178, 0.3);
-      }
-    }
-  }
+  display: block;
+  height: fit-content;
+  overflow: hidden;
 }
 
-.q-field--dense .q-field__before,
-.q-field--dense .q-field__prepend {
-  padding: 0px 0px 0px 0px;
-  height: auto;
-  line-height: auto;
-}
-.q-field__native,
-.q-field__input {
-  padding: 0px 0px 0px 0px;
-}
-
-.q-field--dense .q-field__label {
-  top: 5px;
-}
-.q-field--dense .q-field__control,
-.q-field--dense .q-field__marginal {
-  height: 34px;
-}
-</style>
-
-<style lang="scss" scoped>
-.index-menu {
+.index-menu .metrics-label-table .q-table__control,
+.index-menu .metrics-label-table label.q-field {
   width: 100%;
-
-  .q-field {
-    &__control {
-      height: 35px;
-      padding: 0px 5px;
-      min-height: auto !important;
-
-      &-container {
-        padding-top: 0px !important;
-      }
-    }
-
-    &__native :first-of-type {
-      padding-top: 0.25rem;
-    }
-  }
-
-  .metrics-label-table {
-    width: 100%;
-
-    :deep(table) {
-      display: table;
-      table-layout: fixed !important;
-    }
-
-    :deep(thead) {
-      display: none;
-    }
-
-    :deep(tr) {
-      margin-bottom: 1px;
-    }
-
-    :deep(tbody),
-    :deep(tr),
-    :deep(td) {
-      width: 100%;
-      display: block;
-      height: fit-content;
-      overflow: hidden;
-    }
-
-    :deep(.q-table__control),
-    label.q-field {
-      width: 100%;
-    }
-
-    :deep(thead tr),
-    :deep(tbody td) {
-      height: auto;
-    }
-  }
-
-  .field-table {
-    width: 100%;
-  }
-
-  .field_list {
-    padding: 0px;
-    margin-bottom: 0.125rem;
-    position: relative;
-    overflow: visible;
-    cursor: default;
-
-    .field-container {
-      height: 25px;
-    }
-
-    .field_overlay {
-      position: absolute;
-      height: 100%;
-      right: 0;
-      top: 0;
-      z-index: 5;
-      background-color: #e8e8e8;
-      padding: 0 6px;
-      visibility: hidden;
-      display: flex;
-      align-items: center;
 }
 
-    &.selected {
-      .field_overlay {
-        background-color: rgba(89, 96, 178, 0.3);
-
-        .field_icons {
-          opacity: 0;
-        }
-      }
-    }
-
-    &:hover {
-      .field-container {
-        background-color: #e8e8e8;
-      }
-    }
-  }
-}
-
-.q-field--dense .q-field__before,
-.q-field--dense .q-field__prepend {
-  padding: 0px 0px 0px 0px;
+.index-menu .metrics-label-table thead tr,
+.index-menu .metrics-label-table tbody td {
   height: auto;
-  line-height: auto;
 }
 
-.q-field__native,
-.q-field__input {
-  padding: 0px 0px 0px 0px;
+.metrics-label-table table {
+  width: 100%;
+  table-layout: fixed;
 }
 
-.q-field--dense .q-field__label {
-  top: 5px;
+.metrics-label-table table .metric-expansion-item:hover .field_overlay {
+  visibility: visible;
 }
 
-.q-field--dense .q-field__control,
-.q-field--dense .q-field__marginal {
-  height: 34px;
-}
-</style>
-
-<style lang="scss">
-.metrics-label-table {
-  table {
-    width: 100%;
-    table-layout: fixed;
-
-    .metric-expansion-item {
-      &:hover {
-        .field_overlay {
-          visibility: visible;
-}
-      }
-
-    }
-
-    .field-container {
-      &:hover {
-        .field_overlay {
-          visibility: visible;
-}
-      }
-    }
-
-    .field_list {
-      &.selected {
-        .metric-expansion-item {
-          background-color: rgba(89, 96, 178, 0.3);
-        }
-
-        .field_overlay {
-          background-color: #ffffff;
-        }
-      }
-    }
-  }
+.theme-dark .field_list:hover {
+  box-shadow: 0px 4px 15px rgb(255, 255, 255, 0.1);
 }
 
-.theme-dark {
-  .field_list {
-    &:hover {
-      box-shadow: 0px 4px 15px rgb(255, 255, 255, 0.1);
-
-      .field_overlay {
-        background-color: #3f4143;
-        opacity: 1;
-      }
-    }
-  }
+.theme-dark .field_list:hover .field_overlay {
+  background-color: #3f4143;
+  opacity: 1;
+  visibility: visible;
 }
 
-.theme-light {
-  .field_list {
-    &:hover {
-      box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.17);
-
-      .field_overlay {
-        background-color: #e8e8e8;
-        opacity: 1;
-      }
-    }
-  }
+.theme-light .field_list:hover {
+  box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.17);
 }
-</style>
 
-<style lang="scss">
-.metric-explore-metric-icon {
-  min-width: 28px !important;
-  padding-right: 8px !important;
+.theme-light .field_list:hover .field_overlay {
+  background-color: #e8e8e8;
+  opacity: 1;
+  visibility: visible;
 }
 </style>

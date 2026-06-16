@@ -1,24 +1,24 @@
 <template>
-  <div v-if="visible" class="confirmation-overlay">
+  <div v-if="visible" class="confirmation-overlay tw:w-full tw:mb-2 tw:[animation:slideUp_0.25s_ease-out]">
     <div
-      class="confirmation-dialog"
-      :class="theme === 'dark' ? 'dark-mode' : 'light-mode'"
+      class="confirmation-dialog tw:w-full tw:pt-4 tw:px-4 tw:pb-[14px] tw:rounded-xl tw:flex tw:flex-col tw:gap-[14px] tw:shadow-[0_4px_16px_rgba(0,0,0,0.2)]"
+      :class="theme === 'dark' ? 'dark-mode tw:bg-[#1e1e1e] tw:border-2 tw:border-[#323232] tw:shadow-[0_2px_8px_rgba(0,0,0,0.3)]' : 'light-mode tw:bg-white tw:border-2 tw:border-[#e4e7ec] tw:shadow-[0_2px_8px_rgba(0,0,0,0.1)]'"
       @keydown="handleDialogKeydown"
       @click="handleDialogClick"
     >
-      <div class="confirmation-header">
-        <OIcon name="help-outline" size="md" class="confirmation-icon" />
-        <span class="confirmation-title">{{ formattedMessage }}</span>
+      <div class="confirmation-header tw:flex tw:items-start tw:gap-3">
+        <OIcon name="help-outline" size="md" class="confirmation-icon tw:shrink-0 tw:mt-[2px]" :class="theme === 'dark' ? 'tw:text-[#9ca3af]' : 'tw:text-[#6b7280]'" />
+        <span class="confirmation-title tw:flex-1 tw:text-[15px] tw:font-medium tw:leading-normal" :class="theme === 'dark' ? 'tw:text-[#f3f4f6]' : 'tw:text-[#1f2937]'">{{ formattedMessage }}</span>
       </div>
 
-      <div class="confirmation-buttons">
+      <div class="confirmation-buttons tw:flex tw:flex-col tw:gap-[10px] tw:w-full tw:pt-[14px] tw:mt-1" :class="theme === 'dark' ? 'tw:border-t tw:border-[#374151]' : 'tw:border-t tw:border-[#e5e7eb]'">
         <!-- For navigation actions, show 3 buttons -->
         <template v-if="isNavigationAction">
           <OButton
             ref="yesButtonRef"
             variant="outline"
             :block="true"
-            class="confirmation-btn confirm-btn"
+            class="confirmation-btn confirm-btn tw:w-full tw:text-sm tw:font-semibold tw:rounded-md tw:normal-case tw:tracking-normal tw:transition-all tw:duration-200"
             :class="{ 'btn-focused': isFocusedYes }"
             tabindex="0"
             @click="handleConfirm"
@@ -29,7 +29,7 @@
             ref="alwaysButtonRef"
             variant="outline"
             :block="true"
-            class="confirmation-btn always-btn"
+            class="confirmation-btn always-btn tw:w-full tw:text-sm tw:font-semibold tw:rounded-md tw:normal-case tw:tracking-normal tw:transition-all tw:duration-200"
             :class="{ 'btn-focused': isFocusedAlways }"
             tabindex="1"
             @click="handleAlwaysConfirm"
@@ -40,7 +40,7 @@
             ref="noButtonRef"
             variant="outline"
             :block="true"
-            class="confirmation-btn cancel-btn"
+            class="confirmation-btn cancel-btn tw:w-full tw:text-sm tw:font-semibold tw:rounded-md tw:normal-case tw:tracking-normal tw:transition-all tw:duration-200"
             :class="{ 'btn-focused': isFocusedNo }"
             tabindex="2"
             @click="handleCancel"
@@ -55,7 +55,7 @@
             ref="yesButtonRef"
             variant="outline"
             :block="true"
-            class="confirmation-btn confirm-btn"
+            class="confirmation-btn confirm-btn tw:w-full tw:text-sm tw:font-semibold tw:rounded-md tw:normal-case tw:tracking-normal tw:transition-all tw:duration-200"
             :class="{ 'btn-focused': isFocusedYes }"
             tabindex="0"
             @click="handleConfirm"
@@ -66,7 +66,7 @@
             ref="noButtonRef"
             variant="outline"
             :block="true"
-            class="confirmation-btn cancel-btn"
+            class="confirmation-btn cancel-btn tw:w-full tw:text-sm tw:font-semibold tw:rounded-md tw:normal-case tw:tracking-normal tw:transition-all tw:duration-200"
             :class="{ 'btn-focused': isFocusedNo }"
             tabindex="1"
             @click="handleCancel"
@@ -402,13 +402,7 @@ onUnmounted(() => {
 });
 </script>
 
-<style scoped lang="scss">
-.confirmation-overlay {
-  width: 100%;
-  margin-bottom: 8px;
-  animation: slideUp 0.25s ease-out;
-}
-
+<style>
 @keyframes slideUp {
   from {
     opacity: 0;
@@ -420,198 +414,111 @@ onUnmounted(() => {
   }
 }
 
-.confirmation-dialog {
-  width: 100%;
-  padding: 16px 16px 14px 16px;
-  border-radius: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
-
-  &.light-mode {
-    background: #ffffff;
-    border: 2px solid #e4e7ec;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  }
-  &.dark-mode {
-    background: #1e1e1e;
-    border: 2px solid #323232;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-  }
+.light-mode .confirmation-btn.confirm-btn {
+  color: var(--q-primary);
+  border: 2px solid #d1d5db;
+  background: #ffffff;
 }
 
-.confirmation-header {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-
-  .confirmation-icon {
-    flex-shrink: 0;
-    margin-top: 2px;
-
-    .light-mode & {
-      color: #6b7280;
-    }
-    .dark-mode & {
-      color: #9ca3af;
-    }
-  }
-
-  .confirmation-title {
-    flex: 1;
-    font-size: 15px;
-    font-weight: 500;
-    line-height: 1.5;
-
-    .light-mode & {
-      color: #1f2937;
-    }
-    .dark-mode & {
-      color: #f3f4f6;
-    }
-  }
+.light-mode .confirmation-btn.confirm-btn:hover {
+  background: #eff6ff;
+  border-color: var(--q-primary);
 }
 
-.confirmation-buttons {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  width: 100%;
-  padding-top: 14px;
-  margin-top: 4px;
-
-  .light-mode & {
-    border-top: 1px solid #e5e7eb;
-  }
-  .dark-mode & {
-    border-top: 1px solid #374151;
-  }
-
-  .confirmation-btn {
-    width: 100%;
-    font-size: 14px;
-    font-weight: 600;
-    // padding: 11px 20px;
-    border-radius: 6px;
-    text-transform: none;
-    letter-spacing: 0;
-    transition: all 0.2s ease;
-
-    &.confirm-btn {
-      .light-mode & {
-        color: var(--q-primary);
-        border: 2px solid #d1d5db;
-        background: #ffffff;
-
-        &:hover {
-          background: #eff6ff;
-          border-color: var(--q-primary);
-        }
-
-        &.btn-focused {
-          color: #ffffff !important;
-          background-color: var(--q-primary) !important;
-          border-color: var(--q-primary) !important;
-          box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.4) !important;
-        }
-      }
-
-      .dark-mode & {
-        color: var(--q-primary);
-         border: 2px solid #4b5563;
-        background: transparent;
-
-        &:hover {
-          background: rgba(59, 130, 246, 0.1);
-          border-color: var(--q-primary);
-        }
-
-        &.btn-focused {
-          color: #ffffff !important;
-          background-color: var(--q-primary) !important;
-          border-color: var(--q-primary) !important;
-          box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.4) !important;
-        }
-      }
-    }
-
-    &.always-btn {
-      .light-mode & {
-        color: #059669;
-        border: 2px solid #d1d5db;
-        background: #ffffff;
-
-        &:hover {
-          background: #f0fdf4;
-          border-color: #34d399;
-        }
-
-        &.btn-focused {
-          color: #ffffff !important;
-          background-color: #059669 !important;
-          border-color: #059669 !important;
-          box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.4) !important;
-        }
-      }
-
-      .dark-mode & {
-        color: #34d399;
-        border: 2px solid #4b5563;
-        background: transparent;
-
-        &:hover {
-          background: rgba(5, 150, 105, 0.1);
-          border-color: #34d399;
-        }
-
-        &.btn-focused {
-          color: #ffffff !important;
-          background-color: #059669 !important;
-          border-color: #059669 !important;
-          box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.4) !important;
-        }
-      }
-    }
-
-    &.cancel-btn {
-      .light-mode & {
-        color: #374151;
-        border: 2px solid #d1d5db;
-        background: #ffffff;
-
-        &:hover {
-          background: #fef2f2;
-          border-color: #fca5a5;
-        }
-
-        &.btn-focused {
-          color: #ffffff !important;
-          background-color: #ef4444 !important;
-          border-color: #ef4444 !important;
-          box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.4) !important;
-        }
-      }
-
-      .dark-mode & {
-        color: #e5e7eb;
-        border: 2px solid #4b5563;
-        background: transparent;
-
-        &:hover {
-          background: rgba(239, 68, 68, 0.1);
-          border-color: #f87171;
-        }
-
-        &.btn-focused {
-          color: #ffffff !important;
-          background-color: #dc2626 !important;
-          border-color: #dc2626 !important;
-          box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.4) !important;
-        }
-      }
-    }
-  }
+.light-mode .confirmation-btn.confirm-btn.btn-focused {
+  color: #ffffff !important;
+  background-color: var(--q-primary) !important;
+  border-color: var(--q-primary) !important;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.4) !important;
 }
 
+.dark-mode .confirmation-btn.confirm-btn {
+  color: var(--q-primary);
+  border: 2px solid #4b5563;
+  background: transparent;
+}
+
+.dark-mode .confirmation-btn.confirm-btn:hover {
+  background: rgba(59, 130, 246, 0.1);
+  border-color: var(--q-primary);
+}
+
+.dark-mode .confirmation-btn.confirm-btn.btn-focused {
+  color: #ffffff !important;
+  background-color: var(--q-primary) !important;
+  border-color: var(--q-primary) !important;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.4) !important;
+}
+
+.light-mode .confirmation-btn.always-btn {
+  color: #059669;
+  border: 2px solid #d1d5db;
+  background: #ffffff;
+}
+
+.light-mode .confirmation-btn.always-btn:hover {
+  background: #f0fdf4;
+  border-color: #34d399;
+}
+
+.light-mode .confirmation-btn.always-btn.btn-focused {
+  color: #ffffff !important;
+  background-color: #059669 !important;
+  border-color: #059669 !important;
+  box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.4) !important;
+}
+
+.dark-mode .confirmation-btn.always-btn {
+  color: #34d399;
+  border: 2px solid #4b5563;
+  background: transparent;
+}
+
+.dark-mode .confirmation-btn.always-btn:hover {
+  background: rgba(5, 150, 105, 0.1);
+  border-color: #34d399;
+}
+
+.dark-mode .confirmation-btn.always-btn.btn-focused {
+  color: #ffffff !important;
+  background-color: #059669 !important;
+  border-color: #059669 !important;
+  box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.4) !important;
+}
+
+.light-mode .confirmation-btn.cancel-btn {
+  color: #374151;
+  border: 2px solid #d1d5db;
+  background: #ffffff;
+}
+
+.light-mode .confirmation-btn.cancel-btn:hover {
+  background: #fef2f2;
+  border-color: #fca5a5;
+}
+
+.light-mode .confirmation-btn.cancel-btn.btn-focused {
+  color: #ffffff !important;
+  background-color: #ef4444 !important;
+  border-color: #ef4444 !important;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.4) !important;
+}
+
+.dark-mode .confirmation-btn.cancel-btn {
+  color: #e5e7eb;
+  border: 2px solid #4b5563;
+  background: transparent;
+}
+
+.dark-mode .confirmation-btn.cancel-btn:hover {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: #f87171;
+}
+
+.dark-mode .confirmation-btn.cancel-btn.btn-focused {
+  color: #ffffff !important;
+  background-color: #dc2626 !important;
+  border-color: #dc2626 !important;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.4) !important;
+}
 </style>

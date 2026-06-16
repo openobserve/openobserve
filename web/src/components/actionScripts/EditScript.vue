@@ -1125,16 +1125,8 @@ onMounted(async () => {
 });
 </script>
 
-<style scoped lang="scss">
-.lookup-table-file-uploader {
-  :deep(.q-field__label) {
-    left: -30px;
-  }
-}
-
-.service-account-selector {
-  :deep(.q-field__control-container .q-field__native > :first-child) {
-    text-transform: none !important;
-  }
+<style>
+.service-account-selector .q-field__control-container .q-field__native > :first-child {
+  text-transform: none !important;
 }
 </style>

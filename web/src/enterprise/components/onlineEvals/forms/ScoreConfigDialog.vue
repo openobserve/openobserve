@@ -1,18 +1,26 @@
 <template>
-  <div class="sc-drawer-scrim" role="dialog" aria-modal="true" @click.self="$emit('cancel')">
-    <aside class="sc-drawer" @click.stop>
-      <header class="sc-drawer__header">
-        <span class="sc-drawer__title">
+  <div
+    class="sc-drawer-scrim tw:fixed tw:inset-0 tw:bg-[rgba(0,0,0,0.32)] tw:z-[6000]"
+    role="dialog"
+    aria-modal="true"
+    @click.self="$emit('cancel')"
+  >
+    <aside
+      class="sc-drawer tw:fixed tw:top-0 tw:right-0 tw:bottom-0 tw:w-[50vw] tw:min-w-[560px] tw:max-w-[760px] tw:bg-(--color-card-bg) tw:border-l tw:border-(--color-dialog-header-border) tw:shadow-[var(--o2-shadow-lg,0_8px_24px_rgba(0,0,0,0.12),0_2px_6px_rgba(0,0,0,0.08))] tw:flex tw:flex-col tw:z-[6001]"
+      @click.stop
+    >
+      <header class="tw:flex tw:items-center tw:gap-3 tw:px-5.5 tw:py-3.5 tw:border-b tw:border-dialog-header-border tw:shrink-0">
+        <span class="tw:text-base tw:font-semibold tw:text-text-primary tw:min-w-0">
           <template v-if="mode === 'edit' && row">
             {{ t("onlineEvals.scoreConfig.editTitlePrefix") }} ·
-            <span class="sc-mono">{{ row.name }}</span>
+            <span class="sc-mono tw:font-[var(--o2-font-mono)]">{{ row.name }}</span>
           </template>
           <template v-else>{{ t("onlineEvals.scoreConfig.createTitle") }}</template>
         </span>
-        <div class="sc-drawer__header-spacer" />
+        <div class="tw:flex-1" />
         <button
           type="button"
-          class="sc-drawer__close"
+          class="sc-drawer__close tw:inline-flex tw:items-center tw:justify-center tw:w-7 tw:h-7 tw:p-0 tw:text-(--color-text-secondary) tw:bg-transparent tw:border-0 tw:rounded-md tw:cursor-pointer tw:transition-[background,color] tw:duration-150"
           aria-label="Close drawer"
           data-test="score-config-close-btn"
           @click="$emit('cancel')"
@@ -35,29 +43,32 @@
         </button>
       </header>
 
-      <form class="sc-drawer__body" @submit.prevent="save">
-        <div v-if="mode === 'edit'" class="sc-callout">
+      <form class="tw:flex-1 tw:overflow-auto tw:px-5.5 tw:pt-3.5 tw:pb-2" @submit.prevent="save">
+        <div
+          v-if="mode === 'edit'"
+          class="sc-callout tw:flex tw:gap-[10px] tw:items-start tw:px-3 tw:py-[10px] tw:bg-[color-mix(in_srgb,var(--o2-status-info-text)_14%,transparent)] tw:border tw:border-[color-mix(in_srgb,var(--o2-status-info-text)_20%,transparent)] tw:rounded-md tw:text-xs tw:leading-normal tw:text-(--color-text-primary) tw:mb-4"
+        >
           <OIcon name="info" size="xs" />
-          <div class="sc-callout__text">
+          <div class="sc-callout__text tw:flex tw:flex-col tw:gap-0.5 tw:min-w-0">
             <i18n-t
               :keypath="`onlineEvals.scoreConfig.editInfoBannerEmphasis.${form.dataType}`"
               tag="span"
-              class="sc-callout__lead"
+              class="sc-callout__lead tw:font-normal"
             >
               <template #nextVersion>
                 <strong>{{ nextVersionLabel }}</strong>
               </template>
             </i18n-t>
-            <em class="sc-callout__detail">{{ t("onlineEvals.scoreConfig.editInfoBannerDetail") }}</em>
+            <em class="sc-callout__detail tw:italic tw:font-normal tw:text-(--color-text-secondary)">{{ t("onlineEvals.scoreConfig.editInfoBannerDetail") }}</em>
           </div>
         </div>
 
         <!-- Name -->
-        <div class="sc-field">
-          <label class="sc-field__label">
+        <div class="sc-field tw:mb-[10px]">
+          <label class="sc-field__label tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary) tw:mb-1">
             {{ t("onlineEvals.scoreConfig.nameLabel") }}
-            <span v-if="mode === 'create'" class="sc-field__req">*</span>
-            <span v-else class="sc-field__lock">
+            <span v-if="mode === 'create'" class="sc-field__req tw:text-(--o2-status-error-text) tw:ml-0.5">*</span>
+            <span v-else class="sc-field__lock tw:inline-flex tw:items-center tw:gap-1 tw:ml-2 tw:text-(--color-text-secondary) tw:font-normal tw:text-[11px]">
               <OIcon name="lock" size="xs" />
               {{ t("onlineEvals.scoreConfig.cannotBeRenamed") }}
             </span>
@@ -69,14 +80,14 @@
             size="sm"
             data-test="score-config-name-input"
           />
-          <div v-if="mode === 'create'" class="sc-field__help">
+          <div v-if="mode === 'create'" class="sc-field__help tw:text-[11px] tw:text-(--color-text-secondary) tw:mt-1">
             {{ t("onlineEvals.scoreConfig.nameHelp") }}
           </div>
         </div>
 
         <!-- Description -->
-        <div class="sc-field">
-          <label class="sc-field__label">{{ t("onlineEvals.scoreConfig.descriptionLabel") }}</label>
+        <div class="sc-field tw:mb-[10px]">
+          <label class="sc-field__label tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary) tw:mb-1">{{ t("onlineEvals.scoreConfig.descriptionLabel") }}</label>
           <OInput
             v-model.trim="form.description"
             type="textarea"
@@ -85,40 +96,40 @@
             :rows="3"
             data-test="score-config-description-input"
           />
-          <div v-if="mode === 'edit'" class="sc-field__help">
+          <div v-if="mode === 'edit'" class="sc-field__help tw:text-[11px] tw:text-(--color-text-secondary) tw:mt-1">
             {{ t("onlineEvals.scoreConfig.descriptionHelp") }}
           </div>
         </div>
 
         <!-- Data type -->
-        <div class="sc-field">
-          <label class="sc-field__label">
+        <div class="sc-field tw:mb-[10px]">
+          <label class="sc-field__label tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary) tw:mb-1">
             {{ t("onlineEvals.scoreConfig.dataTypeLabel") }}
-            <span v-if="mode === 'create'" class="sc-field__req">*</span>
-            <span v-else class="sc-field__lock">
+            <span v-if="mode === 'create'" class="sc-field__req tw:text-(--o2-status-error-text) tw:ml-0.5">*</span>
+            <span v-else class="sc-field__lock tw:inline-flex tw:items-center tw:gap-1 tw:ml-2 tw:text-(--color-text-secondary) tw:font-normal tw:text-[11px]">
               <OIcon name="lock" size="xs" />
               {{ t("onlineEvals.scoreConfig.dataTypeLocked") }}
             </span>
           </label>
-          <div v-if="mode === 'edit'" class="sc-locked-row">
-            <span class="sc-dtype-chip" :class="`sc-dtype-chip--${form.dataType}`">{{ form.dataType }}</span>
+          <div v-if="mode === 'edit'" class="sc-locked-row tw:inline-flex tw:items-center tw:gap-2 tw:px-[10px] tw:py-1.5 tw:bg-[color-mix(in_srgb,var(--color-text-secondary,var(--o2-text-secondary))_12%,transparent)] tw:border tw:border-(--color-dialog-header-border) tw:rounded-md">
+            <span class="sc-dtype-chip tw:inline-flex tw:items-center tw:gap-1 tw:px-[7px] tw:py-px tw:rounded-[3px] tw:font-semibold tw:text-[11px] tw:leading-normal" :class="`sc-dtype-chip--${form.dataType}`">{{ form.dataType }}</span>
           </div>
           <template v-else>
-            <div class="sc-dtype-grid">
+            <div class="sc-dtype-grid tw:grid tw:grid-cols-3 tw:gap-2 tw:mt-0.5">
               <label
                 v-for="type in (['numeric', 'categorical', 'boolean'] as const)"
                 :key="type"
-                class="sc-dtype-radio"
+                class="sc-dtype-radio tw:grid tw:grid-cols-[16px_1fr] tw:gap-2 tw:p-2 tw:px-3 tw:border tw:border-(--color-dialog-header-border) tw:rounded-md tw:bg-(--color-card-bg) tw:cursor-pointer tw:items-start tw:transition-[border-color,background] tw:duration-[120ms]"
                 :class="{ 'sc-dtype-radio--selected': form.dataType === type }"
               >
                 <input type="radio" class="sc-radio" :value="type" v-model="form.dataType" />
                 <div>
-                  <div class="sc-dtype-radio__hd">{{ t(`onlineEvals.scoreConfig.dataTypes.${type}`) }}</div>
-                  <div class="sc-dtype-radio__sub">{{ t(`onlineEvals.scoreConfig.dataTypeHelp.${type}`) }}</div>
+                  <div class="sc-dtype-radio__hd tw:text-[12.5px] tw:font-bold tw:text-(--color-text-primary)">{{ t(`onlineEvals.scoreConfig.dataTypes.${type}`) }}</div>
+                  <div class="sc-dtype-radio__sub tw:text-[11px] tw:text-(--color-text-secondary) tw:mt-[3px] tw:leading-[1.4]">{{ t(`onlineEvals.scoreConfig.dataTypeHelp.${type}`) }}</div>
                 </div>
               </label>
             </div>
-            <div class="sc-field__help sc-field__help--lock">
+            <div class="sc-field__help sc-field__help--lock tw:text-[11px] tw:text-(--color-text-secondary) tw:mt-1 tw:inline-flex tw:items-center tw:gap-1">
               <OIcon name="lock" size="xs" />
               {{ t("onlineEvals.scoreConfig.dataTypeCannotChange") }}
             </div>
@@ -126,12 +137,12 @@
         </div>
 
         <!-- Numeric range -->
-        <div v-if="form.dataType === 'numeric'" class="sc-field">
-          <label class="sc-field__label">
+        <div v-if="form.dataType === 'numeric'" class="sc-field tw:mb-[10px]">
+          <label class="sc-field__label tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary) tw:mb-1">
             {{ t("onlineEvals.scoreConfig.numericRangeLabel") }}
           </label>
-          <div class="sc-range-row">
-            <span class="sc-range-row__label">{{ t("onlineEvals.scoreConfig.minLabel") }}</span>
+          <div class="sc-range-row tw:flex tw:items-center tw:gap-[10px]">
+            <span class="sc-range-row__label tw:text-(--color-text-secondary) tw:text-[11px]">{{ t("onlineEvals.scoreConfig.minLabel") }}</span>
             <OInput
               v-model.number="form.min"
               type="number"
@@ -139,7 +150,7 @@
               field-width="xs"
               data-test="score-config-min-input"
             />
-            <span class="sc-range-row__label">{{ t("onlineEvals.scoreConfig.maxLabel") }}</span>
+            <span class="sc-range-row__label tw:text-(--color-text-secondary) tw:text-[11px]">{{ t("onlineEvals.scoreConfig.maxLabel") }}</span>
             <OInput
               v-model.number="form.max"
               type="number"
@@ -151,19 +162,27 @@
         </div>
 
         <!-- Categories -->
-        <div v-if="form.dataType === 'categorical'" class="sc-field">
-          <label class="sc-field__label">
+        <div v-if="form.dataType === 'categorical'" class="sc-field tw:mb-[10px]">
+          <label class="sc-field__label tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary) tw:mb-1">
             {{ t("onlineEvals.scoreConfig.categoriesLabel") }}
           </label>
-          <div class="sc-tag-input">
-            <span v-for="(cat, idx) in form.categories" :key="`${cat}-${idx}`" class="sc-tag">
+          <div class="sc-tag-input tw:flex tw:items-center tw:flex-wrap tw:gap-1.5 tw:min-h-8 tw:px-2 tw:py-[5px] tw:border tw:border-(--color-input-border) tw:rounded tw:bg-(--color-card-bg)">
+            <span
+              v-for="(cat, idx) in form.categories"
+              :key="`${cat}-${idx}`"
+              class="sc-tag tw:inline-flex tw:items-center tw:gap-1 tw:pl-2 tw:pr-1 tw:py-px tw:bg-[color-mix(in_srgb,var(--color-text-secondary,var(--o2-text-secondary))_12%,transparent)] tw:rounded-full tw:font-semibold tw:text-[11px] tw:text-(--color-text-primary)"
+            >
               {{ cat }}
-              <button type="button" class="sc-tag__x" @click="removeCategory(idx)">
+              <button
+                type="button"
+                class="sc-tag__x tw:w-[18px] tw:h-[18px] tw:rounded-full tw:bg-transparent tw:border-0 tw:cursor-pointer tw:text-(--color-text-secondary) tw:inline-flex tw:items-center tw:justify-center"
+                @click="removeCategory(idx)"
+              >
                 <OIcon name="close" size="xs" />
               </button>
             </span>
             <input
-              class="sc-tag-input__field"
+              class="sc-tag-input__field tw:flex-1 tw:min-w-[120px] tw:border-0 tw:outline-0 tw:bg-transparent tw:text-xs tw:text-(--color-text-primary)"
               v-model.trim="newCategory"
               :placeholder="form.categories.length ? '' : t('onlineEvals.scoreConfig.addCategoryPlaceholder')"
               @keydown.enter.prevent="addCategory"
@@ -183,7 +202,10 @@
         </div>
 
         <!-- Boolean info banner -->
-        <div v-if="form.dataType === 'boolean'" class="sc-callout sc-callout--neutral">
+        <div
+          v-if="form.dataType === 'boolean'"
+          class="sc-callout sc-callout--neutral tw:flex tw:gap-[10px] tw:items-start tw:px-3 tw:py-[10px] tw:bg-[color-mix(in_srgb,var(--color-text-secondary,var(--o2-text-secondary))_12%,transparent)] tw:border tw:border-(--color-dialog-header-border) tw:rounded-md tw:text-xs tw:leading-normal tw:text-(--color-text-primary) tw:mb-4"
+        >
           <OIcon name="info" size="xs" />
           <span>
             {{ t("onlineEvals.scoreConfig.booleanInfo", { trueLabel: "true", falseLabel: "false" }) }}
@@ -191,24 +213,24 @@
         </div>
 
         <!-- Healthy threshold -->
-        <div class="sc-ht-section">
-          <div class="sc-ht-section__head">
-            <span class="sc-ht-section__kicker">{{ t("onlineEvals.scoreConfig.healthyThresholdTitle") }}</span>
-            <span class="sc-ht-section__optional">{{ t("onlineEvals.scoreConfig.optional") }}</span>
+        <div class="sc-ht-section tw:mt-1 tw:px-3.5 tw:pt-3 tw:pb-[10px] tw:border tw:border-(--color-dialog-header-border) tw:rounded-md tw:bg-[color-mix(in_srgb,var(--color-primary-600,#3F7994)_2.5%,var(--color-card-bg))]">
+          <div class="sc-ht-section__head tw:flex tw:items-center tw:gap-[10px] tw:mb-1">
+            <span class="sc-ht-section__kicker tw:font-bold tw:text-[11px] tw:tracking-[0.02em] tw:text-(--color-text-secondary)">{{ t("onlineEvals.scoreConfig.healthyThresholdTitle") }}</span>
+            <span class="sc-ht-section__optional tw:font-semibold tw:text-[10px] tw:tracking-[0.02em] tw:text-(--color-text-secondary) tw:bg-[color-mix(in_srgb,var(--color-text-secondary,var(--o2-text-secondary))_12%,transparent)] tw:rounded-[3px] tw:px-1.5 tw:py-px">{{ t("onlineEvals.scoreConfig.optional") }}</span>
           </div>
-          <p class="sc-ht-section__intro">{{ t("onlineEvals.scoreConfig.healthyThresholdIntro") }}</p>
+          <p class="sc-ht-section__intro tw:m-0 tw:mb-[10px] tw:text-xs tw:text-(--color-text-secondary) tw:leading-normal tw:max-w-[520px]">{{ t("onlineEvals.scoreConfig.healthyThresholdIntro") }}</p>
 
           <!-- Numeric threshold -->
           <template v-if="form.dataType === 'numeric'">
-            <div class="sc-ht-field-label">{{ t("onlineEvals.scoreConfig.healthyWhenValueIs") }}</div>
-            <div class="sc-ht-radio-row">
+            <div class="sc-ht-field-label tw:text-[11.5px] tw:font-semibold tw:text-(--color-text-primary) tw:mb-1.5">{{ t("onlineEvals.scoreConfig.healthyWhenValueIs") }}</div>
+            <div class="sc-ht-radio-row tw:flex tw:flex-col tw:gap-1.5">
               <label
-                class="sc-ht-num-radio"
+                class="sc-ht-num-radio tw:grid tw:grid-cols-[18px_22px_1fr_110px] tw:items-center tw:gap-[10px] tw:px-3 tw:py-1.5 tw:border tw:border-(--color-dialog-header-border) tw:rounded-[5px] tw:bg-(--color-card-bg) tw:cursor-pointer tw:transition-[border-color,background] tw:duration-[120ms]"
                 :class="{ 'sc-ht-num-radio--selected': form.healthyDirection === 'gte' }"
               >
                 <input type="radio" class="sc-radio" value="gte" v-model="form.healthyDirection" />
-                <span class="sc-ht-sym sc-mono">≥</span>
-                <span class="sc-ht-op">{{ t("onlineEvals.scoreConfig.gteLabel") }}</span>
+                <span class="sc-ht-sym sc-mono tw:text-[17px] tw:font-bold tw:text-(--color-text-primary) tw:text-center">≥</span>
+                <span class="sc-ht-op tw:text-[12.5px] tw:text-(--color-text-primary)">{{ t("onlineEvals.scoreConfig.gteLabel") }}</span>
                 <OInput
                   v-model.number="form.healthyGteValue"
                   type="number"
@@ -220,12 +242,12 @@
                 />
               </label>
               <label
-                class="sc-ht-num-radio"
+                class="sc-ht-num-radio tw:grid tw:grid-cols-[18px_22px_1fr_110px] tw:items-center tw:gap-[10px] tw:px-3 tw:py-1.5 tw:border tw:border-(--color-dialog-header-border) tw:rounded-[5px] tw:bg-(--color-card-bg) tw:cursor-pointer tw:transition-[border-color,background] tw:duration-[120ms]"
                 :class="{ 'sc-ht-num-radio--selected': form.healthyDirection === 'lte' }"
               >
                 <input type="radio" class="sc-radio" value="lte" v-model="form.healthyDirection" />
-                <span class="sc-ht-sym sc-mono">≤</span>
-                <span class="sc-ht-op">{{ t("onlineEvals.scoreConfig.lteLabel") }}</span>
+                <span class="sc-ht-sym sc-mono tw:text-[17px] tw:font-bold tw:text-(--color-text-primary) tw:text-center">≤</span>
+                <span class="sc-ht-op tw:text-[12.5px] tw:text-(--color-text-primary)">{{ t("onlineEvals.scoreConfig.lteLabel") }}</span>
                 <OInput
                   v-model.number="form.healthyLteValue"
                   type="number"
@@ -241,15 +263,15 @@
 
           <!-- Categorical threshold -->
           <template v-else-if="form.dataType === 'categorical'">
-            <div class="sc-ht-field-label">{{ t("onlineEvals.scoreConfig.healthyCategories") }}</div>
-            <div v-if="form.categories.length === 0" class="sc-ht-empty">
+            <div class="sc-ht-field-label tw:text-[11.5px] tw:font-semibold tw:text-(--color-text-primary) tw:mb-1.5">{{ t("onlineEvals.scoreConfig.healthyCategories") }}</div>
+            <div v-if="form.categories.length === 0" class="sc-ht-empty tw:text-[11.5px] tw:italic tw:text-(--color-text-secondary) tw:px-3 tw:py-[10px] tw:border tw:border-dashed tw:border-(--color-dialog-header-border) tw:rounded-[5px] tw:bg-(--color-card-bg)">
               {{ t("onlineEvals.scoreConfig.addCategoryPlaceholder") }}…
             </div>
-            <div v-else class="sc-ht-checks">
+            <div v-else class="sc-ht-checks tw:flex tw:flex-col tw:gap-0.5 tw:border tw:border-(--color-dialog-header-border) tw:rounded-[5px] tw:bg-(--color-card-bg) tw:p-1">
               <label
                 v-for="cat in form.categories"
                 :key="cat"
-                class="sc-ht-check"
+                class="sc-ht-check tw:flex tw:items-center tw:gap-[10px] tw:px-[10px] tw:py-[7px] tw:rounded tw:cursor-pointer tw:transition-[background] tw:duration-[120ms]"
                 :class="{ 'sc-ht-check--on': form.healthyCategories.includes(cat) }"
               >
                 <input
@@ -258,10 +280,10 @@
                   :checked="form.healthyCategories.includes(cat)"
                   @change="toggleHealthyCategory(cat)"
                 />
-                <span class="sc-mono">{{ cat }}</span>
+                <span class="sc-mono tw:font-[var(--o2-font-mono)]">{{ cat }}</span>
               </label>
             </div>
-            <div class="sc-ht-example">
+            <div class="sc-ht-example tw:flex tw:items-center tw:gap-1.5 tw:mt-2 tw:text-[11px] tw:text-(--color-text-secondary)">
               <OIcon name="info" size="xs" />
               <span>{{ t("onlineEvals.scoreConfig.healthyCategoriesHint") }}</span>
             </div>
@@ -269,39 +291,39 @@
 
           <!-- Boolean threshold -->
           <template v-else>
-            <div class="sc-ht-field-label">{{ t("onlineEvals.scoreConfig.healthyValue") }}</div>
-            <div class="sc-ht-bool-radios">
+            <div class="sc-ht-field-label tw:text-[11.5px] tw:font-semibold tw:text-(--color-text-primary) tw:mb-1.5">{{ t("onlineEvals.scoreConfig.healthyValue") }}</div>
+            <div class="sc-ht-bool-radios tw:flex tw:flex-col tw:gap-1.5">
               <label
-                class="sc-ht-bool-radio"
+                class="sc-ht-bool-radio tw:grid tw:grid-cols-[16px_1fr] tw:items-start tw:gap-[10px] tw:px-3 tw:py-[7px] tw:border tw:border-(--color-dialog-header-border) tw:rounded-[5px] tw:bg-(--color-card-bg) tw:cursor-pointer tw:transition-[border-color,background] tw:duration-[120ms]"
                 :class="{ 'sc-ht-bool-radio--selected': form.healthyBool === true }"
               >
                 <input type="radio" class="sc-radio" :value="true" v-model="form.healthyBool" />
                 <div>
-                  <div class="sc-ht-bool-radio__hd">{{ t("onlineEvals.scoreConfig.trueIsHealthy") }}</div>
-                  <div class="sc-ht-bool-radio__sub">{{ t("onlineEvals.scoreConfig.trueIsHealthyHint") }}</div>
+                  <div class="sc-ht-bool-radio__hd tw:text-(--color-text-primary) tw:font-[var(--o2-font-mono)]">{{ t("onlineEvals.scoreConfig.trueIsHealthy") }}</div>
+                  <div class="sc-ht-bool-radio__sub tw:text-[11px] tw:text-(--color-text-secondary) tw:mt-0.5 tw:leading-[1.4]">{{ t("onlineEvals.scoreConfig.trueIsHealthyHint") }}</div>
                 </div>
               </label>
               <label
-                class="sc-ht-bool-radio"
+                class="sc-ht-bool-radio tw:grid tw:grid-cols-[16px_1fr] tw:items-start tw:gap-[10px] tw:px-3 tw:py-[7px] tw:border tw:border-(--color-dialog-header-border) tw:rounded-[5px] tw:bg-(--color-card-bg) tw:cursor-pointer tw:transition-[border-color,background] tw:duration-[120ms]"
                 :class="{ 'sc-ht-bool-radio--selected': form.healthyBool === false }"
               >
                 <input type="radio" class="sc-radio" :value="false" v-model="form.healthyBool" />
                 <div>
-                  <div class="sc-ht-bool-radio__hd">{{ t("onlineEvals.scoreConfig.falseIsHealthy") }}</div>
-                  <div class="sc-ht-bool-radio__sub">{{ t("onlineEvals.scoreConfig.falseIsHealthyHint") }}</div>
+                  <div class="sc-ht-bool-radio__hd tw:text-(--color-text-primary) tw:font-[var(--o2-font-mono)]">{{ t("onlineEvals.scoreConfig.falseIsHealthy") }}</div>
+                  <div class="sc-ht-bool-radio__sub tw:text-[11px] tw:text-(--color-text-secondary) tw:mt-0.5 tw:leading-[1.4]">{{ t("onlineEvals.scoreConfig.falseIsHealthyHint") }}</div>
                 </div>
               </label>
             </div>
           </template>
 
-          <div class="sc-ht-section__foot">
+          <div class="sc-ht-section__foot tw:flex tw:items-start tw:gap-1.5 tw:mt-[10px] tw:pt-2 tw:border-t tw:border-dashed tw:border-(--color-dialog-header-border) tw:text-[11px] tw:text-(--color-text-secondary) tw:leading-normal">
             <OIcon name="info" size="xs" />
             <span>{{ t("onlineEvals.scoreConfig.thresholdEmptyHint") }}</span>
           </div>
         </div>
       </form>
 
-      <footer class="sc-drawer__foot">
+      <footer class="tw:sticky tw:bottom-0 tw:flex tw:items-center tw:justify-end tw:gap-2 tw:px-5.5 tw:py-3 tw:border-t tw:border-dialog-header-border tw:bg-card-bg tw:shrink-0 tw:z-1">
         <OButton
           data-test="score-config-cancel-btn"
           type="button"
@@ -509,517 +531,114 @@ async function save() {
 }
 </script>
 
-<style lang="scss">
+<style>
+/* sc-drawer-scrim: animation cannot be inlined */
 .sc-drawer-scrim {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.32);
-  z-index: 6000;
   animation: sc-scrim-in 0.15s ease-out;
 }
 
+/* sc-drawer: animation cannot be inlined */
 .sc-drawer {
-  position: fixed;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: 50vw;
-  min-width: 560px;
-  max-width: 760px;
-  background: var(--color-card-bg);
-  border-left: 1px solid var(--color-dialog-header-border, var(--o2-border));
-  box-shadow: var(--o2-shadow-lg, 0 8px 24px rgba(0,0,0,0.12), 0 2px 6px rgba(0,0,0,0.08));
-  display: flex;
-  flex-direction: column;
-  z-index: 6001;
   animation: sc-drawer-in 0.2s ease-out;
 }
 
-.sc-drawer__header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 14px 22px;
-  border-bottom: 1px solid var(--color-dialog-header-border, var(--o2-border));
-  flex-shrink: 0;
-}
-
-.sc-drawer__title {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--color-text-primary, currentColor);
-  min-width: 0;
-}
-
-.sc-drawer__header-spacer { flex: 1; }
-
-.sc-drawer__close {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  background: transparent;
-  border: 0;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s;
-}
-
+/* hover pseudo-class: cannot be inlined */
 .sc-drawer__close:hover {
   background: color-mix(in srgb, var(--color-text-primary) 6%, transparent);
   color: var(--color-primary-600, #3F7994);
 }
 
-.sc-drawer__body {
-  flex: 1;
-  overflow: auto;
-  padding: 14px 22px 8px;
-}
-
-.sc-drawer__foot {
-  position: sticky;
-  bottom: 0;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
-  padding: 12px 22px;
-  border-top: 1px solid var(--color-dialog-header-border, var(--o2-border));
-  background: var(--color-card-bg);
-  flex-shrink: 0;
-  z-index: 1;
-}
-
-.sc-mono { font-family: var(--o2-font-mono); }
-
-.sc-callout {
-  display: flex;
-  gap: 10px;
-  align-items: flex-start;
-  padding: 10px 12px;
-  background: color-mix(in srgb, var(--o2-status-info-text) 14%, transparent);
-  border: 1px solid color-mix(in srgb, var(--o2-status-info-text) 20%, transparent);
-  border-radius: 6px;
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--color-text-primary, currentColor);
-  margin-bottom: 16px;
-}
-
+/* child selector: cannot be inlined */
 .sc-callout > :first-child {
   flex-shrink: 0;
   margin-top: 1px;
   color: var(--o2-status-info-text);
 }
 
-.sc-callout__text {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
-.sc-callout__lead { font-weight: 400; }
+/* descendant selector: cannot be inlined */
 .sc-callout__lead strong { font-weight: 700; }
 
-.sc-callout__detail {
-  font-style: italic;
-  font-weight: 400;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.sc-callout--neutral {
-  background: color-mix(in srgb, var(--color-text-secondary, var(--o2-text-secondary)) 12%, transparent);
-  border-color: var(--color-dialog-header-border, var(--o2-border));
-}
-
+/* child selector for neutral callout icon: cannot be inlined */
 .sc-callout--neutral > :first-child { color: var(--color-text-secondary, var(--o2-text-secondary)); }
 
-.sc-field {
-  margin-bottom: 10px;
-}
-
-.sc-field__label {
-  display: flex;
-  align-items: center;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--color-text-primary, currentColor);
-  margin-bottom: 4px;
-}
-
-.sc-field__req {
-  color: var(--o2-status-error-text);
-  margin-left: 2px;
-}
-
-.sc-field__lock {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  margin-left: 8px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  font-weight: 400;
-  font-size: 11px;
-}
-
-.sc-field__help {
-  font-size: 11px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  margin-top: 4px;
-}
-
-.sc-field__help--lock {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.sc-locked-row {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 10px;
-  background: color-mix(in srgb, var(--color-text-secondary, var(--o2-text-secondary)) 12%, transparent);
-  border: 1px solid var(--color-dialog-header-border, var(--o2-border));
-  border-radius: 6px;
-}
-
-.sc-dtype-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 1px 7px;
-  border-radius: 3px;
-  font: 600 11px/1.5 var(--o2-font);
-}
+/* dtype chip color variants — dynamic class applied via :class binding */
 .sc-dtype-chip--numeric { background: color-mix(in srgb, var(--o2-status-info-text) 14%, transparent); color: var(--o2-status-info-text); }
 .sc-dtype-chip--categorical { background: color-mix(in srgb, var(--o2-status-warning-text) 14%, transparent); color: var(--o2-status-warning-text); }
 .sc-dtype-chip--boolean { background: color-mix(in srgb, var(--o2-status-success-text) 14%, transparent); color: var(--o2-status-success-text); }
 
-.sc-dtype-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 8px;
-  margin-top: 2px;
-}
-
-.sc-dtype-radio {
-  display: grid;
-  grid-template-columns: 16px 1fr;
-  gap: 8px;
-  padding: 8px 12px;
-  border: 1px solid var(--color-dialog-header-border, var(--o2-border));
-  border-radius: 6px;
-  background: var(--color-card-bg);
-  cursor: pointer;
-  align-items: start;
-  transition: border-color 0.12s, background 0.12s;
-}
-
+/* hover pseudo-class: cannot be inlined */
 .sc-dtype-radio:hover {
   border-color: color-mix(in srgb, var(--color-primary-600, #3F7994) 40%, var(--color-dialog-header-border, var(--o2-border)));
 }
 
+/* dynamic selected state: cannot be inlined */
 .sc-dtype-radio--selected {
   border-color: var(--color-primary-600, #3F7994);
   background: color-mix(in srgb, var(--color-primary-600, #3F7994) 5%, var(--color-card-bg));
 }
 
-.sc-dtype-radio__hd {
-  font: 700 12.5px var(--o2-font);
-  color: var(--color-text-primary, currentColor);
-}
-
-.sc-dtype-radio__sub {
-  font-size: 11px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  margin-top: 3px;
-  line-height: 1.4;
-}
-
-.sc-range-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.sc-range-row__label {
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  font-size: 11px;
-}
-
-.sc-tag-input {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px;
-  min-height: 32px;
-  padding: 5px 8px;
-  border: 1px solid var(--color-input-border, var(--o2-border-input));
-  border-radius: 4px;
-  background: var(--color-card-bg);
-}
-
-.sc-tag-input__field {
-  flex: 1;
-  min-width: 120px;
-  border: 0;
-  outline: 0;
-  background: transparent;
-  font: 400 12px inherit;
-  color: var(--color-text-primary, currentColor);
-}
-
-.sc-tag-input__field::placeholder {
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.sc-tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 1px 4px 1px 8px;
-  background: color-mix(in srgb, var(--color-text-secondary, var(--o2-text-secondary)) 12%, transparent);
-  border-radius: 999px;
-  font: 600 11px var(--o2-font);
-  color: var(--color-text-primary, currentColor);
-}
-
-.sc-tag__x {
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  background: transparent;
-  border: 0;
-  cursor: pointer;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
+/* tag__x hover: cannot be inlined */
 .sc-tag__x:hover {
   background: color-mix(in srgb, var(--color-text-primary) 6%, transparent);
   color: var(--o2-status-error-text);
 }
 
-
-.sc-ht-section {
-  margin-top: 4px;
-  padding: 12px 14px 10px;
-  border: 1px solid var(--color-dialog-header-border, var(--o2-border));
-  border-radius: 6px;
-  background: color-mix(in srgb, var(--color-primary-600, #3F7994) 2.5%, var(--color-card-bg));
-}
-
-.sc-ht-section__head {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 4px;
-}
-
-.sc-ht-section__kicker {
-  font: 700 11px var(--o2-font);
-  letter-spacing: 0.02em;
+/* placeholder pseudo-element: cannot be inlined */
+.sc-tag-input__field::placeholder {
   color: var(--color-text-secondary, var(--o2-text-secondary));
 }
 
-.sc-ht-section__optional {
-  font: 600 10px var(--o2-font);
-  letter-spacing: 0.02em;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  background: color-mix(in srgb, var(--color-text-secondary, var(--o2-text-secondary)) 12%, transparent);
-  border-radius: 3px;
-  padding: 1px 6px;
+/* hover pseudo-class: cannot be inlined */
+.sc-ht-num-radio:hover {
+  border-color: color-mix(in srgb, var(--color-primary-600, #3F7994) 40%, var(--color-dialog-header-border, var(--o2-border)));
 }
 
-
-.sc-ht-section__intro {
-  margin: 0 0 10px;
-  font-size: 12px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  line-height: 1.5;
-  max-width: 520px;
+/* dynamic selected state: cannot be inlined */
+.sc-ht-num-radio--selected {
+  border-color: var(--color-primary-600, #3F7994);
+  background: color-mix(in srgb, var(--color-primary-600, #3F7994) 4%, var(--color-card-bg));
 }
 
-.sc-ht-section__foot {
-  display: flex;
-  align-items: flex-start;
-  gap: 6px;
-  margin-top: 10px;
-  padding-top: 8px;
-  border-top: 1px dashed var(--color-dialog-header-border, var(--o2-border));
-  font-size: 11px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  line-height: 1.5;
-}
-
+/* child selector: cannot be inlined */
 .sc-ht-section__foot > :first-child {
   flex-shrink: 0;
   margin-top: 2px;
   color: var(--color-text-secondary, var(--o2-text-secondary));
 }
 
-.sc-ht-field-label {
-  font-size: 11.5px;
-  font-weight: 600;
-  color: var(--color-text-primary, currentColor);
-  margin-bottom: 6px;
+/* hover pseudo-class: cannot be inlined */
+.sc-ht-check:hover { background: color-mix(in srgb, var(--color-text-primary) 6%, transparent); }
+
+/* dynamic checked state: cannot be inlined */
+.sc-ht-check--on {
+  background: color-mix(in srgb, color-mix(in srgb, var(--o2-status-success-text) 14%, transparent) 35%, transparent);
 }
 
-.sc-ht-radio-row {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.sc-ht-num-radio {
-  display: grid;
-  grid-template-columns: 18px 22px 1fr 110px;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 12px;
-  border: 1px solid var(--color-dialog-header-border, var(--o2-border));
-  border-radius: 5px;
-  background: var(--color-card-bg);
-  cursor: pointer;
-  transition: border-color 0.12s, background 0.12s;
-}
-
-.sc-ht-num-radio:hover {
-  border-color: color-mix(in srgb, var(--color-primary-600, #3F7994) 40%, var(--color-dialog-header-border, var(--o2-border)));
-}
-
-.sc-ht-num-radio--selected {
-  border-color: var(--color-primary-600, #3F7994);
-  background: color-mix(in srgb, var(--color-primary-600, #3F7994) 4%, var(--color-card-bg));
-}
-
-.sc-ht-sym {
-  font-size: 17px;
-  font-weight: 700;
-  color: var(--color-text-primary, currentColor);
-  text-align: center;
-}
-
-.sc-ht-op { font-size: 12.5px; color: var(--color-text-primary, currentColor); }
-
-.sc-ht-num-input { width: 100%; }
-
-.sc-ht-example {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 8px;
-  font-size: 11px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
+/* child selector: cannot be inlined */
 .sc-ht-example > :first-child {
   flex-shrink: 0;
   color: var(--o2-status-info-text);
 }
 
+/* descendant selector: cannot be inlined */
 .sc-ht-example code {
   font-family: var(--o2-font-mono);
   font-weight: 700;
   color: var(--color-text-primary, var(--o2-text));
 }
 
-.sc-ht-checks {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  border: 1px solid var(--color-dialog-header-border, var(--o2-border));
-  border-radius: 5px;
-  background: var(--color-card-bg);
-  padding: 4px;
-}
-
-.sc-ht-check {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 7px 10px;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: background 0.12s;
-}
-
-.sc-ht-check:hover { background: color-mix(in srgb, var(--color-text-primary) 6%, transparent); }
-
-.sc-ht-check--on {
-  background: color-mix(in srgb, color-mix(in srgb, var(--o2-status-success-text) 14%, transparent) 35%, transparent);
-}
-
-.sc-ht-empty {
-  font-size: 11.5px;
-  font-style: italic;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  padding: 10px 12px;
-  border: 1px dashed var(--color-dialog-header-border, var(--o2-border));
-  border-radius: 5px;
-  background: var(--color-card-bg);
-}
-
-.sc-ht-bool-radios {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.sc-ht-bool-radio {
-  display: grid;
-  grid-template-columns: 16px 1fr;
-  align-items: start;
-  gap: 10px;
-  padding: 7px 12px;
-  border: 1px solid var(--color-dialog-header-border, var(--o2-border));
-  border-radius: 5px;
-  background: var(--color-card-bg);
-  cursor: pointer;
-  transition: border-color 0.12s, background 0.12s;
-}
-
+/* hover pseudo-class: cannot be inlined */
 .sc-ht-bool-radio:hover {
   border-color: color-mix(in srgb, var(--color-primary-600, #3F7994) 40%, var(--color-dialog-header-border, var(--o2-border)));
 }
 
+/* dynamic selected state: cannot be inlined */
 .sc-ht-bool-radio--selected {
   border-color: var(--color-primary-600, #3F7994);
   background: color-mix(in srgb, var(--color-primary-600, #3F7994) 4%, var(--color-card-bg));
 }
 
-.sc-ht-bool-radio__hd {
-  color: var(--color-text-primary, currentColor);
-  font-family: var(--o2-font-mono);
-}
-
-.sc-ht-bool-radio__sub {
-  font-size: 11px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  margin-top: 2px;
-  line-height: 1.4;
-}
-
-.sc-radio {
-  appearance: none;
-  width: 14px;
-  height: 14px;
-  border: 1.5px solid var(--color-input-border, var(--o2-border-input));
-  border-radius: 50%;
-  background: var(--color-card-bg);
-  cursor: pointer;
-  display: inline-grid;
-  place-items: center;
-  flex-shrink: 0;
-}
-
+/* pseudo-class + pseudo-element: cannot be inlined */
 .sc-radio:checked { border-color: var(--color-primary-600, #3F7994); }
 
 .sc-radio:checked::after {
@@ -1030,20 +649,7 @@ async function save() {
   background: var(--color-primary-600, #3F7994);
 }
 
-.sc-checkbox {
-  appearance: none;
-  width: 14px;
-  height: 14px;
-  border: 1.5px solid var(--color-input-border, var(--o2-border-input));
-  border-radius: 3px;
-  background: var(--color-card-bg);
-  cursor: pointer;
-  display: inline-grid;
-  place-items: center;
-  vertical-align: middle;
-  flex-shrink: 0;
-}
-
+/* pseudo-class + pseudo-element: cannot be inlined */
 .sc-checkbox:checked {
   background: var(--color-primary-600, #3F7994);
   border-color: var(--color-primary-600, #3F7994);

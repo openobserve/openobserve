@@ -2429,4 +2429,3 @@ const toggleHelpSection = async () => {
   permissionJsonEditorRef.value.resetEditorLayout();
 };
 </script>
-<style scoped></style>

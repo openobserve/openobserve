@@ -1,7 +1,7 @@
 <template>
   <div data-test="add-stream-routing-section" class="tw:bg-white tw:h-full">
     <div class="tw:py-2 tw:px-3 tw:flex tw:justify-between tw:items-center">
-      <div class="stream-routing-title">Stream Routing</div>
+      <div class="tw:text-[18px]">Stream Routing</div>
       <OIcon
         data-test="stream-routing-close-dialog-btn"
         name="cancel"
@@ -11,7 +11,7 @@
       />
     </div>
     <OSeparator />
-    <div class="stream-routing-container tw:px-3 tw:pt-3">
+    <div class="tw:w-fit tw:rounded-lg tw:px-3 tw:pt-3">
       <div
         data-test="stream-routing-name-input"
         class="o2-input"
@@ -292,13 +292,3 @@ const openCancelDialog = () => {
 const saveRouting = () => {};
 </script>
 
-<style scoped>
-.stream-routing-title {
-  font-size: 18px;
-}
-.stream-routing-container {
-  width: fit-content;
-  border-radius: 8px;
-  /* box-shadow: 0px 0px 10px 0px #d2d1d1; */
-}
-</style>

@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -22,19 +22,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ref="datetimeBtn"
         data-cy="date-time-button"
         variant="outline"
-        class="date-time-button"
+        class="date-time-button tw:h-[30px] tw:min-h-[30px] tw:rounded-[3px] tw:py-0 tw:px-[5px] tw:min-w-auto tw:justify-start!"
         icon-left="schedule"
       >
-        <span class="date-time-label">{{ displayValue }}</span>
+        <span class="date-time-label tw:font-semibold tw:flex-1 tw:text-left">{{ displayValue }}</span>
         <template #icon-right
-          ><OIcon name="arrow-drop-down" size="sm" class="date-time-arrow"
+          ><OIcon name="arrow-drop-down" size="sm" class="date-time-arrow tw:ml-auto tw:transition tw:[transition:transform_0.25s_ease]"
         /></template>
       </OButton>
     </template>
-    <div id="date-time-menu" class="date-time-dialog">
+    <div id="date-time-menu" class="date-time-dialog tw:w-[325px]">
       <div class="tw:flex tw:justify-evenly tw:py-2">
         <OButton
-          class="tab-button"
+          class="tw:w-38.5"
           :variant="
             data.selectedDate.tab === 'relative' ? 'primary' : 'ghost-primary'
           "
@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
         <OSeparator vertical class="tw:my-2" />
         <OButton
-          class="tab-button"
+          class="tw:w-38.5"
           :variant="
             data.selectedDate.tab === 'absolute' ? 'primary' : 'ghost-primary'
           "
@@ -60,11 +60,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTabPanel name="relative">
           <div class="date-time-table tw:relative tw:flex tw:flex-col">
             <div
-              class="relative-row tw:px-3 tw:py-2"
+              class="relative-row tw:px-3 tw:py-2 tw:flex tw:items-center tw:border-b tw:border-[var(--o2-border)]"
               v-for="(period, index) in relativePeriods"
               :key="'date_' + index"
             >
-              <div class="relative-period-name">
+              <div class="tw:text-sm tw:font-semibold tw:min-w-18.75">
                 {{ period.value }}
               </div>
               <div
@@ -78,8 +78,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data.selectedDate.tab == 'relative' &&
                     data.selectedDate.relative.period.value == period.value &&
                     data.selectedDate.relative.value == item
-                      ? 'rp-selector-selected'
-                      : `rp-selector ${data.selectedDate.relative.period.value}`
+                      ? 'tw:h-8 tw:w-8 tw:bg-(--o2-primary-btn-bg) tw:text-white'
+                      : `tw:h-8 tw:w-8 tw:bg-black/7 ${data.selectedDate.relative.period.value}`
                   "
                   variant="ghost"
                   size="xs"
@@ -90,8 +90,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
 
-            <div class="relative-row tw:px-3 tw:py-2">
-              <div class="relative-period-name">Custom</div>
+            <div class="relative-row tw:px-3 tw:py-2 tw:flex tw:items-center tw:border-b tw:border-[var(--o2-border)]">
+              <div class="tw:text-sm tw:font-semibold tw:min-w-18.75">Custom</div>
 
               <div class="tw:flex tw:gap-2 tw:flex-1 tw:min-w-0">
                 <div class="tw:flex tw:flex-col tw:w-20">
@@ -114,7 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </OTabPanel>
         <OTabPanel name="absolute">
-          <div class="date-time-table">
+          <div class="date-time-table tw:flex tw:flex-col">
             <ODateRangeCalendar
               :start-date="data.selectedDate.absolute.date.from"
               :end-date="data.selectedDate.absolute.date.to"
@@ -122,22 +122,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @update:start-date="data.selectedDate.absolute.date.from = $event"
               @update:end-date="data.selectedDate.absolute.date.to = $event"
             />
-            <div class="notePara">{{ t("common.datetimeMessage") }}</div>
+            <div class="tw:pr-6 tw:pl-6 tw:text-[0.625rem] tw:text-(--o2-text-secondary)">{{ t("common.datetimeMessage") }}</div>
             <OSeparator class="tw:my-2" />
 
-            <table class="tw:px-3 startEndTime">
+            <table class="tw:px-3 startEndTime tw:w-[calc(100%-0.8rem)] tw:mx-[0.4rem] tw:mt-2 tw:mb-[0.3rem]">
               <tr>
-                <td class="label">{{ t("common.startTime") }}</td>
-                <td class="label">{{ t("common.endTime") }}</td>
+                <td class="label tw:w-1/2 tw:text-xs tw:font-semibold">{{ t("common.startTime") }}</td>
+                <td class="label tw:w-1/2 tw:text-xs tw:font-semibold">{{ t("common.endTime") }}</td>
               </tr>
               <tr>
-                <td>
+                <td class="tw:w-1/2">
                   <OTime
                     class="tw:w-full"
                     v-model="data.selectedDate.absolute.startTime"
                   />
                 </td>
-                <td>
+                <td class="tw:w-1/2">
                   <OTime
                     class="tw:w-full"
                     v-model="data.selectedDate.absolute.endTime"
@@ -374,232 +374,81 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
+<style>
 .q-btn--rectangle {
   border-radius: 3px;
 }
 
-.date-time-button {
-  height: 30px;
-  min-height: 30px;
-  border-radius: 3px;
-  padding: 0px 5px;
-  min-width: auto;
-  justify-content: flex-start !important;
-
-  .date-time-label {
-    font-weight: 600;
-    flex: 1;
-    text-align: left;
-  }
-
-  .date-time-arrow {
-    transition: transform 0.25s ease;
-    margin-left: auto;
-  }
-
-  &.isOpen .date-time-arrow {
-    transform: rotate(180deg);
-  }
+.date-time-button.isOpen .date-time-arrow {
+  transform: rotate(180deg);
 }
 
-.date-time-dialog {
-  width: 325px;
-
-  .tab-button {
-    &.q-btn {
-      padding-bottom: 0.6rem;
-      padding-top: 0.6rem;
-      font-size: 0.75rem;
-      font-weight: 700;
-
-      &.text-primary {
-        .q-btn__content {
-        }
-      }
-    }
-  }
+.date-time-table .relative-row .q-field__control {
+  height: 40px;
 }
 
-.date-time-table {
-  display: flex;
-  flex-direction: column;
-
-  .relative-row {
-    display: flex;
-    align-items: center;
-    border-bottom: 1px solid var(--o2-border);
-
-    .block {
-      font-weight: 700;
-    }
-
-    .q-field {
-      &__control {
-        height: 40px;
-      }
-
-      &__native {
-        color: var(--o2-gray);
-        font-size: 0.875rem;
-        font-weight: 600;
-      }
-
-      .q-select__dropdown-icon {
-        color: var(--o2-gray);
-      }
-    }
-
-    > * {
-      margin-right: 6px;
-    }
-  }
-}
-
-.absolute-calendar {
-  box-shadow: none;
-
-  .q-date__header {
-    display: none;
-  }
-
-  .q-date__view {
-    padding: 0;
-  }
-}
-
-.relative-period-name {
+.date-time-table .relative-row .q-field__native {
+  color: var(--o2-gray);
   font-size: 0.875rem;
   font-weight: 600;
-  min-width: 75px;
 }
 
-.rp-selector,
-.rp-selector-selected {
-  height: 32px;
-  width: 32px;
-  // border: var(--o2-theme-color);
-  background: rgba(0, 0, 0, 0.07);
+.date-time-table .relative-row .q-select__dropdown-icon {
+  color: var(--o2-gray);
 }
 
-.rp-selector-selected {
-  color: #ffffff;
-  background: var(--o2-primary-btn-bg);
+.date-time-table .relative-row > * {
+  margin-right: 6px;
 }
 
-.tab-button {
-  width: 154px;
+.q-date__navigation {
+  justify-content: center;
+  padding: 0 0.5rem;
 }
 
-.notePara {
-  padding-right: 1.5rem;
-  padding-left: 1.5rem;
-  font-size: 0.625rem;
+.q-date__navigation .q-date__arrow + .q-date__arrow {
+  margin-left: auto;
+}
+
+.q-date__navigation .q-date__arrow + .col {
+  flex: initial;
+}
+
+.q-date__navigation .q-btn .block {
+  font-size: 0.75rem;
+  color: var(--o2-primary-background);
+  font-weight: 700;
+}
+
+.q-date__calendar-item .block {
   color: var(--o2-text-secondary);
+  font-weight: 700;
 }
 
-.q-date {
-  &__navigation {
-    justify-content: center;
-    padding: 0 0.5rem;
-
-    .q-date__arrow {
-      & + .q-date__arrow {
-        margin-left: auto;
-      }
-
-      & + .col {
-        flex: initial;
-      }
-    }
-
-    .q-btn .block {
-      font-size: 0.75rem;
-      color: var(--o2-primary-background);
-      font-weight: 700;
-    }
-  }
-
-  &__calendar {
-    &-item .block {
-      color: var(--o2-text-secondary);
-      font-weight: 700;
-    }
-
-    &-weekdays > div {
-      font-size: 0.875rem;
-      font-weight: 700;
-      opacity: 1;
-    }
-  }
-
-  &__range {
-    &,
-    &-from,
-    &-to {
-      .block {
-        color: white;
-      }
-
-      &:before {
-        bottom: 3px;
-        top: 3px;
-      }
-    }
-
-    .block {
-      color: var(--o2-primary-background);
-    }
-  }
+.q-date__calendar-weekdays > div {
+  font-size: 0.875rem;
+  font-weight: 700;
+  opacity: 1;
 }
 
-.startEndTime {
-  width: calc(100% - 0.8rem);
-  margin: 0.5rem 0.4rem 0.3rem 0.4rem;
-  td {
-    width: 50%;
-  }
-  .q-field {
-    padding-bottom: 0.125rem;
-  }
-
-  .label {
-    font-size: 0.75rem;
-    // color: var(--o2-primary-background);
-    font-weight: 600;
-  }
-
-  .timeInput {
-    .q-field__control {
-      padding-right: 0.375rem;
-    }
-
-    .q-btn-group {
-      & > .q-btn-item {
-        border-radius: 2px;
-      }
-
-      .q-btn {
-        padding: 0 0.3125rem;
-
-        .block {
-          font-size: 0.625rem;
-          font-weight: 700;
-        }
-      }
-    }
-  }
+.q-date__range .block,
+.q-date__range-from .block,
+.q-date__range-to .block {
+  color: white;
 }
 
-.drawer-footer {
-  .q-btn {
-    font-size: 0.75rem;
-    font-weight: 700;
+.q-date__range::before,
+.q-date__range-from::before,
+.q-date__range-to::before {
+  bottom: 3px;
+  top: 3px;
+}
 
-    &.clearBtn {
-      margin-right: 1rem;
-      color: var(--o2-primary-background);
-    }
-  }
+.q-date__range .block {
+  color: var(--o2-primary-background);
+}
+
+.startEndTime .q-field {
+  padding-bottom: 0.125rem;
 }
 </style>

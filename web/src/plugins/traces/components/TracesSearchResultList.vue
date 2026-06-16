@@ -386,11 +386,8 @@ const totalPages = computed(() =>
 );
 </script>
 
-<style lang="scss" scoped>
-
-:deep(.traces-table-container) {
-  .table-container {
-    border-radius: 0 !important;
-  }
+<style>
+.traces-table-container .table-container {
+  border-radius: 0 !important;
 }
 </style>

@@ -10,43 +10,45 @@ const emit = defineEmits<{ (e: "select", prompt: string): void }>();
 </script>
 
 <template>
-  <div class="capability-grid">
+  <div class="capability-grid tw:grid tw:w-full tw:gap-[0.875rem] tw:[grid-template-columns:repeat(4,minmax(0,1fr))]">
     <OCard
       v-for="card in CAPABILITY_CARDS"
       :key="card.id"
       role="button"
       tabindex="0"
-      class="capability-card"
+      class="capability-card tw:relative tw:py-4 tw:px-4 tw:pb-[1.125rem] tw:border tw:border-(--color-border-default) tw:rounded-xl tw:cursor-pointer tw:bg-(--color-card-bg) tw:transition-[border-color,box-shadow,transform,background] tw:duration-200 tw:isolate tw:overflow-hidden tw:min-h-[132px]"
       :data-accent="card.id"
       @click="emit('select', t(`aiAssistant.capabilities.${card.id}.prompt`))"
       @keydown.enter.prevent="emit('select', t(`aiAssistant.capabilities.${card.id}.prompt`))"
       @keydown.space.prevent="emit('select', t(`aiAssistant.capabilities.${card.id}.prompt`))"
     >
-      <span class="capability-card__glow" aria-hidden="true"></span>
-      <div class="capability-card__icon" :class="card.iconBgClass">
+      <span
+        class="capability-card__glow tw:absolute tw:[-inset-px] tw:rounded-[inherit] tw:bg-[linear-gradient(135deg,rgba(var(--accent),0.45),rgba(var(--accent),0.05)_60%)] tw:opacity-0 tw:transition-opacity tw:duration-[250ms] tw:ease-[ease] tw:pointer-events-none tw:z-[-1] tw:blur-[8px]"
+        aria-hidden="true"
+      ></span>
+      <div
+        class="capability-card__icon tw:inline-flex tw:items-center tw:justify-center tw:w-[38px] tw:h-[38px] tw:rounded-[0.625rem] tw:mb-[0.625rem] tw:shadow-[inset_0_0_0_1px_rgba(var(--accent),0.18)]"
+        :class="card.iconBgClass"
+      >
         <OIcon :name="card.icon" size="md" :class="card.iconColorClass" />
       </div>
-      <h3 class="capability-card__title">
+      <h3 class="capability-card__title tw:m-0 tw:text-sm tw:font-semibold tw:leading-[1.3] tw:text-[var(--color-typography-body)] tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis">
         {{ t(`aiAssistant.capabilities.${card.id}.title`) }}
       </h3>
-      <p class="capability-card__desc">
+      <p class="capability-card__desc tw:mt-[0.375rem] tw:mb-0 tw:text-xs tw:leading-[1.45] tw:text-[var(--color-text-secondary)]">
         {{ t(`aiAssistant.capabilities.${card.id}.description`) }}
       </p>
-      <span class="capability-card__chevron" aria-hidden="true">
+      <span
+        class="capability-card__chevron tw:absolute tw:top-[0.875rem] tw:right-[0.875rem] tw:w-[22px] tw:h-[22px] tw:inline-flex tw:items-center tw:justify-center tw:rounded-full tw:bg-[rgba(var(--accent),0.15)] tw:text-[rgba(var(--accent),1)] tw:opacity-0 tw:translate-x-[-4px] tw:translate-y-[4px] tw:transition-[opacity,transform] tw:duration-200 tw:ease-[ease]"
+        aria-hidden="true"
+      >
         <OIcon name="arrow-forward" size="xs" />
       </span>
     </OCard>
   </div>
 </template>
 
-<style scoped lang="scss">
-.capability-grid {
-  display: grid;
-  width: 100%;
-  gap: 0.875rem;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-}
-
+<style>
 @media (max-width: 64rem) {
   .capability-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -61,20 +63,6 @@ const emit = defineEmits<{ (e: "select", prompt: string): void }>();
 
 .capability-card {
   --accent: 123, 97, 255;
-  position: relative;
-  padding: 1rem 1rem 1.125rem;
-  border: 1px solid var(--color-border-default);
-  border-radius: 0.75rem;
-  cursor: pointer;
-  background: var(--color-card-bg);
-  transition:
-    border-color 0.2s ease,
-    box-shadow 0.2s ease,
-    transform 0.2s ease,
-    background 0.2s ease;
-  isolation: isolate;
-  overflow: hidden;
-  min-height: 132px;
 }
 
 .capability-card[data-accent="query"] {
@@ -105,22 +93,6 @@ const emit = defineEmits<{ (e: "select", prompt: string): void }>();
   z-index: 0;
 }
 
-.capability-card__glow {
-  position: absolute;
-  inset: -1px;
-  border-radius: inherit;
-  background: linear-gradient(
-    135deg,
-    rgba(var(--accent), 0.45),
-    rgba(var(--accent), 0.05) 60%
-  );
-  opacity: 0;
-  transition: opacity 0.25s ease;
-  pointer-events: none;
-  z-index: -1;
-  filter: blur(8px);
-}
-
 .capability-card > * {
   position: relative;
   z-index: 1;
@@ -147,53 +119,5 @@ const emit = defineEmits<{ (e: "select", prompt: string): void }>();
   outline: none;
   border-color: rgba(var(--accent), 0.7);
   box-shadow: 0 0 0 2px rgba(var(--accent), 0.45);
-}
-
-.capability-card__icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 38px;
-  height: 38px;
-  border-radius: 0.625rem;
-  margin-bottom: 0.625rem;
-  box-shadow: inset 0 0 0 1px rgba(var(--accent), 0.18);
-}
-
-.capability-card__title {
-  margin: 0;
-  font-size: 14px;
-  font-weight: 600;
-  line-height: 1.3;
-  color: var(--color-typography-body);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.capability-card__desc {
-  margin: 0.375rem 0 0;
-  font-size: 12px;
-  line-height: 1.45;
-  color: var(--color-text-secondary);
-}
-
-.capability-card__chevron {
-  position: absolute;
-  top: 0.875rem;
-  right: 0.875rem;
-  width: 22px;
-  height: 22px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 9999px;
-  background: rgba(var(--accent), 0.15);
-  color: rgba(var(--accent), 1);
-  opacity: 0;
-  transform: translate(-4px, 4px);
-  transition:
-    opacity 0.2s ease,
-    transform 0.2s ease;
 }
 </style>

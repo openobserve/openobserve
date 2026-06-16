@@ -189,7 +189,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-if="row?.sql_query"
             data-test="scheduled-pipeline-expanded-content"
-            class="tw:text-left tw:px-2 tw:mb-2 expanded-content"
+            class="tw:text-left tw:px-12 tw:py-0 tw:mb-2 tw:max-h-screen tw:overflow-hidden"
           >
             <div class="tw:flex tw:items-center tw:py-2">
               <strong
@@ -199,7 +199,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="tw:flex tw:items-start tw:justify-center">
               <div
                 data-test="scheduled-pipeline-expanded-sql"
-                class="scrollable-content expanded-sql"
+                class="tw:w-full tw:overflow-y-auto tw:p-2.5 tw:border tw:border-[#ddd] tw:border-l-[3px] tw:border-l-[#7a54a2] tw:h-full tw:max-h-[200px] tw:whitespace-normal tw:bg-[#e8e8e8] tw:text-black"
               >
                 <pre style="text-wrap: wrap">{{ row?.sql_query }} </pre>
               </div>
@@ -331,16 +331,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:primary="closeErrorDialog"
   >
     <template #header-left>
-      <OIcon name="error" size="md" class="error-icon" />
+      <OIcon name="error" size="md" class="tw:text-[#ef4444]" />
     </template>
 
-    <div v-if="errorDialog.data" class="pipeline-error-content">
+    <div v-if="errorDialog.data" class="pipeline-error-content tw:px-6 tw:py-5 tw:max-h-[60vh] tw:overflow-y-auto">
       <!-- Error Summary -->
       <div v-if="errorDialog.data.last_error.error_summary" class="tw:mb-4">
-        <div class="section-label tw:mb-2">
+        <div class="section-label tw:mb-2 tw:text-[13px] tw:font-semibold tw:tracking-[0.02em] tw:opacity-80">
           {{ t("pipeline_list.error_summary") }}
         </div>
-        <div class="error-summary-box">
+        <div class="error-summary-box tw:p-4 tw:rounded-lg tw:font-mono tw:text-[13px] tw:leading-[1.6] tw:whitespace-pre-wrap tw:wrap-break-word tw:bg-[rgba(239,68,68,0.08)] tw:border tw:border-[rgba(239,68,68,0.2)] tw:text-[#dc2626]">
           {{ errorDialog.data.last_error.error_summary }}
         </div>
       </div>
@@ -352,30 +352,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           Object.keys(errorDialog.data.last_error.node_errors).length > 0
         "
       >
-        <div class="section-label tw:mb-3">
+        <div class="section-label tw:mb-3 tw:text-[13px] tw:font-semibold tw:tracking-[0.02em] tw:opacity-80">
           {{ t("pipeline_list.node_errors") }}
         </div>
-        <div class="node-errors-container">
+        <div class="node-errors-container tw:flex tw:flex-col tw:gap-3">
           <div
             v-for="(nodeError, nodeId) in errorDialog.data.last_error
               .node_errors"
             :key="nodeId"
-            class="node-error-item"
+            class="node-error-item tw:p-4 tw:rounded-lg tw:bg-[rgba(0,0,0,0.02)] tw:border tw:border-[rgba(0,0,0,0.08)] tw:transition-all hover:tw:bg-[rgba(0,0,0,0.04)]"
           >
-            <div class="node-error-header">
-              <span class="node-name">{{ nodeError.node_name || nodeId }}</span>
-              <span class="node-type">{{ nodeError.node_type }}</span>
+            <div class="node-error-header tw:flex tw:items-center tw:justify-between tw:mb-2.5">
+              <span class="node-name tw:font-semibold tw:text-sm">{{ nodeError.node_name || nodeId }}</span>
+              <span class="node-type tw:text-xs tw:px-2.5 tw:py-1 tw:rounded-xl tw:bg-[rgba(99,102,241,0.1)] tw:text-[#6366f1] tw:font-medium">{{ nodeError.node_type }}</span>
             </div>
             <div
               v-if="
                 nodeError.error_messages && nodeError.error_messages.length > 0
               "
-              class="node-error-messages"
+              class="node-error-messages tw:flex tw:flex-col tw:gap-2"
             >
               <div
                 v-for="(msg, idx) in nodeError.error_messages"
                 :key="idx"
-                class="error-message"
+                class="error-message tw:p-3 tw:rounded-md tw:bg-[rgba(239,68,68,0.06)] tw:border-l-[3px] tw:border-l-[#ef4444] tw:font-mono tw:text-xs tw:leading-[1.5] tw:whitespace-pre-wrap tw:wrap-break-word tw:text-[#991b1b]"
               >
                 {{ msg }}
               </div>
@@ -1120,115 +1120,3 @@ const onBackfillSuccess = (jobId: string) => {
   goToBackfillJobs();
 };
 </script>
-<style lang="scss" scoped>
-.expanded-content {
-  padding: 0 3rem;
-  max-height: 100vh; /* Set a fixed height for the container */
-  overflow: hidden; /* Hide overflow by default */
-}
-
-.scrollable-content {
-  width: 100%; /* Use the full width of the parent */
-  overflow-y: auto; /* Enable vertical scrolling for long content */
-  padding: 10px; /* Optional: padding for aesthetics */
-  border: 1px solid #ddd; /* Optional: border for visibility */
-  height: 100%;
-  max-height: 200px;
-  /* Use the full height of the parent */
-  text-wrap: normal;
-  background-color: #e8e8e8;
-  color: black;
-}
-.expanded-sql {
-  border-left: #7a54a2 3px solid;
-}
-
-.error-icon {
-  color: #ef4444;
-}
-
-.pipeline-error-content {
-  padding: 20px 24px;
-  max-height: 60vh;
-  overflow-y: auto;
-}
-
-.section-label {
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  opacity: 0.8;
-}
-
-.error-summary-box {
-  padding: 16px;
-  border-radius: 8px;
-  font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
-  font-size: 13px;
-  line-height: 1.6;
-  white-space: pre-wrap;
-  word-break: break-word;
-  background: rgba(239, 68, 68, 0.08);
-  border: 1px solid rgba(239, 68, 68, 0.2);
-  color: #dc2626;
-}
-
-.node-errors-container {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.node-error-item {
-  padding: 16px;
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.02);
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  transition: all 0.2s;
-
-  &:hover {
-    background: rgba(0, 0, 0, 0.04);
-  }
-}
-
-.node-error-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 10px;
-
-  .node-name {
-    font-weight: 600;
-    font-size: 14px;
-  }
-
-  .node-type {
-    font-size: 12px;
-    padding: 4px 10px;
-    border-radius: 12px;
-    background: rgba(99, 102, 241, 0.1);
-    color: #6366f1;
-    font-weight: 500;
-  }
-}
-
-.node-error-messages {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.error-message {
-  padding: 12px;
-  border-radius: 6px;
-  background: rgba(239, 68, 68, 0.06);
-  border-left: 3px solid #ef4444;
-  font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
-  font-size: 12px;
-  line-height: 1.5;
-  white-space: pre-wrap;
-  word-break: break-word;
-  color: #991b1b;
-}
-
-</style>

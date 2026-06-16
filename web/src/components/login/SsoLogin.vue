@@ -35,7 +35,7 @@
 
     <div class="tw:mb-3 tw:mt-4 tw:text-center">
       <a
-        class="tw:cursor-pointer login-internal-link"
+        class="tw:cursor-pointer tw:hover:text-[#595959]"
         style="text-decoration: underline"
         @click="showLoginInput = !showLoginInput"
         >Sign in with an internal user</a
@@ -104,21 +104,11 @@ const onSignIn = () => {
 };
 </script>
 
-<style lang="scss">
-.login-inputs {
-  .q-field__label {
-    font-weight: normal !important;
-    font-size: 12px;
-    transform: translate(-0.75rem, -155%);
-    color: #3a3a3a;
-  }
-}
-</style>
-
-<style scoped lang="scss">
-.login-internal-link {
-  &:hover {
-    color: #595959;
-  }
+<style>
+.login-inputs .q-field__label {
+  font-weight: normal !important;
+  font-size: 12px;
+  transform: translate(-0.75rem, -155%);
+  color: #3a3a3a;
 }
 </style>

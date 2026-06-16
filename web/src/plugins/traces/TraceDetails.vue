@@ -15,10 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="trace-details tw:h-[calc(100vh-2.625rem)]">
+  <div class="trace-details tw:h-[calc(100vh-2.625rem)] tw:overflow-hidden tw:w-full tw:flex tw:flex-col tw:relative">
     <!-- Original View -->
     <div
-      class="trace-details-content"
+      class="tw:flex-1 tw:flex tw:flex-col tw:min-h-0 tw:overflow-hidden tw:box-border"
       v-if="
         traceTree.length &&
         effectiveSpanList.length &&
@@ -297,7 +297,7 @@ size="sm">
                 activeTab !== 'map' &&
                 activeTab !== 'thread'
               "
-              class="unified-search-group tw:mr-1! tw:gap-1 tw:flex tw:items-center"
+              class="unified-search-group tw:mr-1! tw:gap-1 tw:flex tw:items-stretch tw:w-fit tw:rounded-md tw:transition-colors tw:duration-200"
             >
               <div class="log-stream-search-input">
                 <OSearchInput
@@ -408,14 +408,14 @@ size="sm">
           </div>
         </div>
         <div
-          class="histogram-spans-container"
+          class="tw:min-h-0 tw:relative tw:pb-2 tw:flex tw:flex-col tw:flex-1"
           :class="[
             isSidebarOpen ? 'histogram-container' : 'histogram-container-full',
             isTimelineExpanded ? '' : 'full',
           ]"
           ref="parentContainer"
         >
-          <div class="trace-tree-wrapper">
+          <div class="tw:overflow-hidden tw:flex-1 tw:min-h-0 tw:box-border tw:flex tw:flex-col">
             <!-- Waterfall View - show for waterfall tab, or when no LLM spans -->
             <div
               v-if="activeTab === 'waterfall'"
@@ -440,13 +440,13 @@ size="sm">
                 />
                 <div
                   ref="traceScrollContainer"
-                  class="relative-position trace-content-scroll"
+                  class="relative-position trace-content-scroll tw:overflow-y-auto! tw:overflow-x-hidden! tw:min-h-0! tw:[scrollbar-gutter:stable]!"
                   :style="{
                     width: isSidebarOpen ? leftWidth + 'px' : '100%',
                   }"
                 >
                   <div
-                    class="trace-tree-container tw:bg-[var(--o2-card-bg)]!"
+                    class="tw:pt-0 tw:pb-0 tw:mb-0 tw:min-h-full tw:bg-(--o2-card-bg)!"
                     data-test="trace-details-tree-container"
                   >
                     <div class="position-relative">
@@ -498,7 +498,7 @@ size="sm">
               </div>
               <div
                 v-if="isSidebarOpen && (selectedSpanId || showTraceDetails)"
-                class="histogram-sidebar-inner tw:border-l tw:border-l-solid tw:border-l-[var(--o2-border-color)]"
+                class="tw:shrink-0 tw:overflow-y-auto tw:overflow-x-hidden tw:min-h-0 tw:transition-all tw:duration-300 tw:border-l tw:border-l-solid tw:border-l-(--o2-border-color)"
                 :class="isTimelineExpanded ? '' : 'full'"
                 :style="{
                   width: `calc(100% - ${leftWidth}px)`,
@@ -531,7 +531,7 @@ size="sm">
               style="display: flex; flex: 1; min-height: 0"
             >
               <div
-                class="dag-left-panel"
+                class="tw:h-[calc(100vh-200px)] tw:p-4 tw:min-w-0 tw:overflow-hidden"
                 :style="{
                   width:
                     isSidebarOpen && (selectedSpanId || showTraceDetails)
@@ -557,14 +557,14 @@ size="sm">
               <!-- Resizable divider -->
               <div
                 v-if="isSidebarOpen && (selectedSpanId || showTraceDetails)"
-                class="dag-resizer"
+                class="dag-resizer tw:w-2 tw:cursor-col-resize tw:flex tw:items-center tw:justify-center tw:shrink-0 tw:relative tw:z-10"
                 @mousedown="startDagResize"
               >
-                <div class="dag-resizer-line"></div>
+                <div class="dag-resizer-line tw:w-0.75 tw:h-full tw:bg-(--o2-border) tw:rounded tw:transition-colors tw:duration-200"></div>
               </div>
               <div
                 v-if="isSidebarOpen && (selectedSpanId || showTraceDetails)"
-                class="dag-right-panel"
+                class="tw:h-[calc(100vh-200px)] tw:overflow-y-auto tw:overflow-x-hidden tw:min-h-0"
                 :style="{
                   width: `${100 - dagLeftWidth}%`,
                   minWidth: '300px',
@@ -2732,130 +2732,9 @@ export default defineComponent({
 });
 </script>
 
-<style scoped lang="scss">
-$sidebarWidth: 84%;
-$separatorWidth: 2px;
-$toolbarHeight: 36px;
-$traceHeaderHeight: 30px;
-$traceChartHeight: 210px;
-$appNavbarHeight: 57px;
-
-$traceChartCollapseHeight: 42px;
-
-.toolbar {
-  height: $toolbarHeight;
-}
-.trace-details {
-  overflow: hidden;
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  position: relative;
-}
-
-.trace-details-content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  overflow: hidden;
-  box-sizing: border-box;
-}
-.histogram-container-full {
-  flex: 1;
-  min-height: 0;
-}
-.histogram-container {
-  flex: 1;
-  min-height: 0;
-}
-
-.histogram-sidebar-inner {
-  flex-shrink: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
-  min-height: 0;
-  transition: all 0.3s ease-in-out;
-}
-
-.histogram-spans-container {
-  min-height: 0;
-  position: relative;
-  padding-bottom: 0.5rem;
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-}
-
-.trace-tree-wrapper {
-  overflow: hidden;
-  flex: 1;
-  min-height: 0;
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-}
-
-.trace-tree-container {
-  padding-top: 0;
-  padding-bottom: 0;
-  margin-bottom: 0;
-  min-height: 100%;
-}
-
-.trace-chart-btn {
-  cursor: pointer;
-  padding-right: 8px;
-  border-radius: 2px;
-  padding-top: 3px;
-  padding-bottom: 2px;
-
-  &:hover {
-    background-color: var(--o2-primary-btn-bg);
-    color: #ffffff;
-}
-}
-
-
-.toolbar-operation-name {
-  max-width: 225px;
-}
-
-.dag-left-panel {
-  height: calc(100vh - 200px);
-  padding: 16px;
-  min-width: 0;
-  overflow: hidden;
-}
-
-.dag-right-panel {
-  height: calc(100vh - 200px);
-  overflow-y: auto;
-  overflow-x: hidden;
-  min-height: 0;
-}
-
-.dag-resizer {
-  width: 8px;
-  cursor: col-resize;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  position: relative;
-  z-index: 10;
-
-  &:hover .dag-resizer-line {
-    background-color: var(--o2-theme-color, #1976d2);
-  }
-}
-
-.dag-resizer-line {
-  width: 3px;
-  height: 100%;
-  background-color: var(--o2-border);
-  border-radius: 2px;
-  transition: background-color 0.2s ease;
+<style>
+.dag-resizer:hover .dag-resizer-line {
+  background-color: var(--o2-theme-color, #1976d2);
 }
 
 body.body--dark .dag-resizer-line {
@@ -2866,8 +2745,9 @@ body.body--dark .dag-resizer:hover .dag-resizer-line {
   background-color: #90caf9;
 }
 </style>
-<style lang="scss">
-// Prevent parent containers from adding scrollbars
+
+<style>
+/* Prevent parent containers from adding scrollbars */
 body:has(.trace-details),
 html:has(.trace-details) {
   overflow: hidden !important;
@@ -2890,73 +2770,67 @@ html:has(.trace-details) {
   scrollbar-gutter: stable !important;
 }
 
-.trace-details {
-  .q-splitter__before,
-  .q-splitter__after {
-    overflow: revert !important;
-  }
-
-  .q-splitter__before {
-    z-index: 999 !important;
-  }
-
-  .trace-details-chart {
-    .rangeslider-slidebox {
-      fill: #7076be !important;
-      opacity: 0.3 !important;
-    }
-    .rangeslider-mask-max,
-    .rangeslider-mask-min {
-      fill: #d2d2d2 !important;
-      fill-opacity: 0.15 !important;
-    }
-    .rangeslider-grabber {
-      fill: #7076be !important;
-      stroke: #ffffff !important;
-      stroke-width: 2 !important;
-      opacity: 1 !important;
-    }
-    .rangeslider-grabber:hover {
-      fill: #5a5fa0 !important;
-      cursor: ew-resize !important;
-    }
-    // Enhance the line graph (trace duration) visibility
-    .trace {
-      stroke-width: 2 !important;
-      opacity: 0.8 !important;
-    }
-    .scatterlayer .trace {
-      opacity: 1 !important;
-    }
-  }
-
-  .visual-selection-btn {
+.trace-details .q-splitter__before,
+.trace-details .q-splitter__after {
+  overflow: revert !important;
 }
 
-  .visual-selector-container {
-    backdrop-filter: blur(0.625rem);
-    border-radius: 0.25rem;
-    border: 0.0625rem solid var(--o2-border-color);
-  }
+.trace-details .q-splitter__before {
+  z-index: 999 !important;
+}
 
-  .trace-combined-header-wrapper {
-    padding: 0.2rem 0rem;
-    flex-shrink: 0;
-  }
+.trace-details .trace-details-chart .rangeslider-slidebox {
+  fill: #7076be !important;
+  opacity: 0.3 !important;
+}
 
-  .trace-combined-header-wrapper.bg-white {
-    // background: rgba(240, 240, 245, 0.8);
-    // border: 0.125rem solid rgba(100, 100, 120, 0.3);
-  }
-  .chart-container-inner {
-    min-height: 12.5rem;
-    overflow: hidden;
-  }
+.trace-details .trace-details-chart .rangeslider-mask-max,
+.trace-details .trace-details-chart .rangeslider-mask-min {
+  fill: #d2d2d2 !important;
+  fill-opacity: 0.15 !important;
+}
 
-  .trace-chart-height {
-    height: 12.5rem !important;
-    min-height: 12.5rem !important;
-  }
+.trace-details .trace-details-chart .rangeslider-grabber {
+  fill: #7076be !important;
+  stroke: #ffffff !important;
+  stroke-width: 2 !important;
+  opacity: 1 !important;
+}
+
+.trace-details .trace-details-chart .rangeslider-grabber:hover {
+  fill: #5a5fa0 !important;
+  cursor: ew-resize !important;
+}
+
+/* Enhance the line graph (trace duration) visibility */
+.trace-details .trace-details-chart .trace {
+  stroke-width: 2 !important;
+  opacity: 0.8 !important;
+}
+
+.trace-details .trace-details-chart .scatterlayer .trace {
+  opacity: 1 !important;
+}
+
+.trace-details .visual-selector-container {
+  backdrop-filter: blur(0.625rem);
+  border-radius: 0.25rem;
+  border: 0.0625rem solid var(--o2-border-color);
+}
+
+.trace-details .trace-combined-header-wrapper {
+  padding: 0.2rem 0rem;
+  flex-shrink: 0;
+}
+
+.trace-details .chart-container-inner {
+  min-height: 12.5rem;
+  overflow: hidden;
+}
+
+.trace-details .trace-chart-height {
+  height: 12.5rem !important;
+  min-height: 12.5rem !important;
 }
 
 .no-select {
@@ -2966,39 +2840,33 @@ html:has(.trace-details) {
   -ms-user-select: none !important;
 }
 
-.trace-copy-icon {
-  &:hover {
-    &.OIcon {
-      text-shadow: 0px 2px 8px rgba(0, 0, 0, 0.5);
-    }
-  }
+.trace-copy-icon:hover.OIcon {
+  text-shadow: 0px 2px 8px rgba(0, 0, 0, 0.5);
 }
 
-.trace-logs-selector {
-  .q-field {
-    border-radius: 0.2rem 0 0 0.2rem;
-
-    span {
-      display: inline-block;
-      width: 180px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      text-align: left;
-    }
-
-    .q-field__control {
-      border-radius: 0.2rem 0 0 0.2rem !important;
-    }
-
-    .q-field__control:before,
-    .q-field__control:after {
-      border: none !important;
-    }
-  }
+.trace-logs-selector .q-field {
+  border-radius: 0.2rem 0 0 0.2rem;
 }
 
-// Unified Search Group - input and navigation as one element
+.trace-logs-selector .q-field span {
+  display: inline-block;
+  width: 180px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: left;
+}
+
+.trace-logs-selector .q-field .q-field__control {
+  border-radius: 0.2rem 0 0 0.2rem !important;
+}
+
+.trace-logs-selector .q-field .q-field__control:before,
+.trace-logs-selector .q-field .q-field__control:after {
+  border: none !important;
+}
+
+/* Unified Search Group - input and navigation as one element */
 .unified-search-group {
   display: flex;
   align-items: stretch;
@@ -3007,7 +2875,7 @@ html:has(.trace-details) {
   transition: border-color 0.2s ease;
 }
 
-// Search Navigation Container - integrated with input
+/* Search Navigation Container - integrated with input */
 .search-navigation-container {
   display: inline-flex;
   align-items: center;
@@ -3016,73 +2884,70 @@ html:has(.trace-details) {
   transition: all 0.2s ease;
   border-radius: var(--radius-md);
   border: 0.0625rem solid var(--color-input-border);
-
-  .search-results-counter {
-    display: flex;
-    align-items: center;
-    font-size: 0.75rem;
-    font-weight: 500;
-    padding: 0 0.25rem;
-    gap: 0.0625rem;
-    user-select: none;
-
-    .counter-separator {
-      color: var(--o2-text-secondary);
-      margin: 0 0.125rem;
-    }
-
-    .counter-total,
-    .counter-current {
-      color: var(--o2-text-secondary);
-    }
-  }
-
-  .navigation-buttons {
-    display: flex;
-    align-items: center;
-    height: 100%;
-    margin-left: 0.25rem;
-
-    .button-separator {
-      width: 0.0625rem;
-      height: 1.125rem;
-      background-color: var(--o2-border-color);
-      margin: 0 0.125rem;
-    }
-
-    .nav-btn {
-      min-width: 1.25rem;
-      height: 1.25rem;
-      padding: 0;
-      border-radius: 0.125rem;
-      transition: all 0.2s ease;
-&:hover:not(:disabled) {
-        background-color: var(--o2-hover-accent);
-      }
-
-      &:disabled {
-        opacity: 0.4;
-      }
-    }
-  }
 }
 
-// Dark mode support
-body.body--dark {
-  .unified-search-group {
-    background-color: var(--o2-dark-page-bg);
+.search-navigation-container .search-results-counter {
+  display: flex;
+  align-items: center;
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 0 0.25rem;
+  gap: 0.0625rem;
+  user-select: none;
+}
 
-    &:hover,
-    &:focus-within {
-      border-color: var(--o2-theme-color);
-    }
-  }
+.search-navigation-container .search-results-counter .counter-separator {
+  color: var(--o2-text-secondary);
+  margin: 0 0.125rem;
+}
 
-  .search-navigation-container {
-    &:hover {
-      border-color: var(--o2-theme-color);
-    }
-  }
+.search-navigation-container .search-results-counter .counter-total,
+.search-navigation-container .search-results-counter .counter-current {
+  color: var(--o2-text-secondary);
+}
+
+.search-navigation-container .navigation-buttons {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  margin-left: 0.25rem;
+}
+
+.search-navigation-container .navigation-buttons .button-separator {
+  width: 0.0625rem;
+  height: 1.125rem;
+  background-color: var(--o2-border-color);
+  margin: 0 0.125rem;
+}
+
+.search-navigation-container .navigation-buttons .nav-btn {
+  min-width: 1.25rem;
+  height: 1.25rem;
+  padding: 0;
+  border-radius: 0.125rem;
+  transition: all 0.2s ease;
+}
+
+.search-navigation-container .navigation-buttons .nav-btn:hover:not(:disabled) {
+  background-color: var(--o2-hover-accent);
+}
+
+.search-navigation-container .navigation-buttons .nav-btn:disabled {
+  opacity: 0.4;
+}
+
+/* Dark mode support */
+body.body--dark .unified-search-group {
+  background-color: var(--o2-dark-page-bg);
+}
+
+body.body--dark .unified-search-group:hover,
+body.body--dark .unified-search-group:focus-within {
+  border-color: var(--o2-theme-color);
+}
+
+body.body--dark .search-navigation-container:hover {
+  border-color: var(--o2-theme-color);
 }
 
 .custom-height {
@@ -3105,6 +2970,7 @@ body.body--dark {
   height: 100%; /* Ensures the input control fills the container height */
   line-height: 36px; /* Vertically centers the text inside */
 }
+
 .resize::after {
   content: " ";
   position: absolute;
@@ -3117,12 +2983,10 @@ body.body--dark {
 }
 </style>
 
-<style lang="scss">
-.trace-details-view-tabs {
-  .o2-tabs .active {
-    background-color: transparent !important;
-    color: var(--q-primary) !important;
-    border-color: var(--q-primary) !important;
-  }
+<style>
+.trace-details-view-tabs .o2-tabs .active {
+  background-color: transparent !important;
+  color: var(--q-primary) !important;
+  border-color: var(--q-primary) !important;
 }
 </style>

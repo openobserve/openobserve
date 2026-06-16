@@ -121,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           panelSchema.type != 'maps' &&
           !loading
         "
-        class="noData"
+        class="tw:absolute tw:top-[20%] tw:w-full tw:text-center"
         data-test="no-data"
       >
         {{ noData }}
@@ -131,7 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           errorDetail?.message &&
           !panelSchema?.error_config?.custom_error_handeling
         "
-        class="errorMessage"
+        class="tw:absolute tw:top-[20%] tw:w-full tw:h-[80%] tw:overflow-hidden tw:text-center tw:text-ellipsis"
         data-test="panel-schema-renderer-error-message"
       >
         <OIcon size="md" name="warning" />
@@ -150,7 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           !panelSchema?.error_config?.default_data_on_error &&
           panelSchema?.error_config?.custom_error_message
         "
-        class="customErrorMessage"
+        class="tw:absolute tw:top-[20%] tw:w-full tw:h-[80%] tw:overflow-hidden tw:text-center tw:text-ellipsis"
         data-test="panel-schema-renderer-custom-error-message"
       >
         {{ panelSchema?.error_config?.custom_error_message }}
@@ -229,9 +229,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </div>
       <div
-        class="crosslink-drilldown-menu"
+        class="crosslink-drilldown-menu tw:absolute tw:z-9999999 tw:min-w-50 tw:py-1 tw:px-0 tw:hidden tw:whitespace-nowrap tw:top-0 tw:left-0 tw:rounded tw:border tw:border-(--o2-border) tw:shadow-[0_2px_8px_rgba(0,0,0,0.15)]"
         :class="{
-          'crosslink-drilldown-menu--dark': store.state.theme === 'dark',
+          'crosslink-drilldown-menu--dark tw:bg-[#2c2c2c] tw:border-[#404040] tw:shadow-[0_2px_8px_rgba(0,0,0,0.4)]': store.state.theme === 'dark',
+          'tw:bg-white': store.state.theme !== 'dark',
         }"
         data-test="drilldown-menu"
         ref="drilldownPopUpRef"
@@ -249,7 +250,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
           />
           <div
-            class="crosslink-drilldown-menu-item"
+            class="crosslink-drilldown-menu-item tw:flex tw:items-center tw:py-2 tw:px-4 tw:cursor-pointer tw:transition-colors tw:duration-200 tw:text-sm tw:text-[#333] tw:hover:bg-[#f5f5f5] tw:active:bg-(--o2-border)"
             :data-test="`drilldown-menu-item-${drilldown.name}`"
             @click="openDrilldown(index)"
           >
@@ -277,7 +278,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           overflow-wrap: break-word;
           z-index: 9999999;
         "
-        :class="store.state.theme === 'dark' ? 'tw:bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'tw:bg-white'"
+        :class="store.state.theme === 'dark' ? 'tw:bg-(--o2-bg-card-dark,#1a1a1a)' : 'tw:bg-white'"
         ref="annotationPopupRef"
       >
         <div
@@ -1650,49 +1651,10 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
-// Cross-link drilldown popup — matches AlertContextMenu.vue exactly
-.crosslink-drilldown-menu {
-  position: absolute;
-  z-index: 9999999;
-  background: white;
-  border: 1px solid var(--o2-border);
-  border-radius: 4px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  min-width: 200px;
-  padding: 4px 0;
-  display: none;
-  white-space: nowrap;
-  top: 0;
-  left: 0;
-}
-
-.crosslink-drilldown-menu-item {
-  display: flex;
-  align-items: center;
-  padding: 8px 16px;
-  cursor: pointer;
-  transition: background-color 0.2s;
-  font-size: 14px;
-  color: #333;
-
-  &:hover {
-    background-color: #f5f5f5;
-  }
-
-  &:active {
-    background-color: var(--o2-border);
-  }
-
-  span {
-    user-select: none;
-  }
-}
-
-.crosslink-drilldown-menu--dark {
-  background: #2c2c2c;
-  border-color: #404040;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+<style>
+/* Cross-link drilldown popup — descendant and pseudo-class rules that cannot be inlined */
+.crosslink-drilldown-menu-item span {
+  user-select: none;
 }
 
 .crosslink-drilldown-menu--dark .crosslink-drilldown-menu-item {
@@ -1705,37 +1667,5 @@ export default defineComponent({
 
 .crosslink-drilldown-menu--dark .crosslink-drilldown-menu-item:active {
   background-color: #444444;
-}
-
-.drilldown-item:hover {
-  background-color: rgba(202, 201, 201, 0.908);
-}
-
-.errorMessage {
-  position: absolute;
-  top: 20%;
-  width: 100%;
-  height: 80%;
-  overflow: hidden;
-  text-align: center;
-  // color: rgba(255, 0, 0, 0.8);
-  text-overflow: ellipsis;
-}
-
-.customErrorMessage {
-  position: absolute;
-  top: 20%;
-  width: 100%;
-  height: 80%;
-  overflow: hidden;
-  text-align: center;
-  text-overflow: ellipsis;
-}
-
-.noData {
-  position: absolute;
-  top: 20%;
-  width: 100%;
-  text-align: center;
 }
 </style>

@@ -18,13 +18,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div data-test="toc-container" class="tw:px-2 tw:pt-4 tw:pb-2 tw:flex tw:flex-col tw:h-full tw:overflow-hidden">
     <div
       data-test="toc-section-container"
-      class="section-container tw:overflow-hidden tw:flex tw:flex-col tw:flex-1"
+      class="tw:overflow-hidden tw:flex tw:flex-col tw:flex-1 tw:border tw:border-[var(--o2-border-color)] tw:rounded-md"
     >
       <!-- Header -->
       <div
         data-test="toc-header"
         :class="[
-          'section-header-bg tw:px-3 tw:py-2 tw:flex tw:items-center tw:gap-2 tw:border-b tw:flex-shrink-0',
+          'tw:px-3 tw:py-2 tw:flex tw:items-center tw:gap-2 tw:border-b tw:flex-shrink-0 tw:!bg-[var(--o2-table-header-bg)]',
           isDarkMode
             ? 'tw:border-gray-700'
             : 'tw:border-gray-200'
@@ -199,14 +199,3 @@ export default defineComponent({
   emits: ['scroll-to-section', 'toggle-section'],
 });
 </script>
-
-<style lang="scss" scoped>
-.section-header-bg {
-  background: var(--o2-table-header-bg) !important;
-}
-
-.section-container {
-  border: 0.0625rem solid var(--o2-border-color);
-  border-radius: 0.375rem;
-}
-</style>

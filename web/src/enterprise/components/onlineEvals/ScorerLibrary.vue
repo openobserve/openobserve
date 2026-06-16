@@ -6,10 +6,10 @@ the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version. -->
 
 <template>
-  <div class="scorer-library" data-test="scorer-library">
+  <div class="tw:flex tw:flex-col tw:h-full tw:p-4 tw:min-h-0" data-test="scorer-library">
     <div
       v-if="isLoadingCatalog"
-      class="scorer-library__center"
+      class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:flex-1 tw:p-8"
       data-test="scorer-library-loading"
     >
       <OSpinner size="lg" />
@@ -17,7 +17,7 @@ the Free Software Foundation, either version 3 of the License, or
 
     <div
       v-else-if="loadError"
-      class="scorer-library__center scorer-library__error"
+      class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:flex-1 tw:p-8 tw:text-(--o2-text-muted)"
       data-test="scorer-library-error"
     >
       <OIcon name="error-outline" class="tw:mb-2" style="width: 3em; height: 3em" />
@@ -29,16 +29,16 @@ the Free Software Foundation, either version 3 of the License, or
 
     <div
       v-else-if="providers.length === 0"
-      class="scorer-library__center scorer-library__notice"
+      class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:flex-1 tw:p-8 tw:text-(--o2-text-muted)"
       data-test="scorer-library-no-providers"
     >
       Create a Provider first before importing LLM Judge scorers.
     </div>
 
-    <div v-else class="scorer-library__content">
-      <div class="scorer-library__top-row tw:mb-4">
-        <div class="scorer-library__provider-cell">
-          <label class="scorer-library__provider-label">Provider</label>
+    <div v-else class="tw:flex tw:flex-col tw:min-h-0 tw:flex-1">
+      <div class="tw:flex tw:items-end tw:gap-3 tw:mb-4">
+        <div class="tw:flex tw:items-center tw:gap-2 tw:shrink-0 tw:w-60">
+          <label class="tw:text-xs tw:font-semibold tw:text-(--o2-text) tw:whitespace-nowrap">Provider</label>
           <OSelect
             v-model="selectedProviderId"
             :options="providerOptions"
@@ -52,15 +52,15 @@ the Free Software Foundation, either version 3 of the License, or
           v-model="searchQuery"
           placeholder="Search Scorers..."
           clearable
-          class="scorer-library__search"
+          class="tw:flex-1 tw:min-w-0"
           data-test="scorer-library-search"
         />
       </div>
 
-      <div class="scorer-library__toolbar tw:mb-2 tw:pl-[17px] tw:pr-3">
+      <div class="tw:flex tw:items-center tw:justify-between tw:gap-3 tw:mb-2 tw:pl-4.25 tw:pr-3">
         <label
           v-if="filteredEntries.length > 0"
-          class="scorer-library__select-all"
+          class="tw:inline-flex tw:items-center tw:gap-2 tw:py-0.5 tw:px-1 tw:text-xs tw:font-medium tw:text-(--o2-text) tw:select-none"
           data-test="scorer-library-select-all"
         >
           <OCheckbox
@@ -74,19 +74,19 @@ the Free Software Foundation, either version 3 of the License, or
         </span>
       </div>
 
-      <div class="scorer-library__list">
+      <div class="tw:overflow-y-auto tw:flex-1 tw:min-h-0">
         <section
           v-for="group in groupedEntries"
           :key="group.category"
-          class="scorer-library__section"
+          class="tw:mt-4 tw:first:mt-0"
           :data-test="`scorer-library-section-${group.category}`"
         >
-          <h4 class="scorer-library__section-title">
+          <h4 class="tw:flex tw:items-baseline tw:gap-1.5 tw:m-0 tw:mb-1.5 tw:text-xs tw:font-bold tw:uppercase tw:tracking-[0.04em] tw:text-(--o2-text)">
             <span>{{ group.category }}</span>
-            <span class="scorer-library__section-count">({{ group.entries.length }})</span>
+            <span class="tw:font-medium tw:text-(--o2-text-muted)">({{ group.entries.length }})</span>
           </h4>
           <ul
-            class="scorer-library__group-list tw:flex tw:flex-col tw:rounded tw:border tw:border-border"
+            class="tw:flex tw:flex-col tw:rounded tw:border tw:border-border"
           >
             <li
               v-for="entry in group.entries"
@@ -94,7 +94,7 @@ the Free Software Foundation, either version 3 of the License, or
               class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:cursor-pointer tw:transition-colors tw:duration-200 tw:border-l-4"
               :class="[
                 isSelected(entry.name)
-                  ? 'selected-item tw:bg-primary/5 tw:border-primary'
+                  ? 'selected-item tw:bg-[color-mix(in_srgb,var(--o2-brand)_6%,transparent)] tw:border-primary'
                   : 'tw:border-transparent hover:tw:bg-gray-50',
               ]"
               :data-test="`scorer-library-item-${entry.name}`"
@@ -353,107 +353,3 @@ function scorerPayload(entry: CatalogScorer, scoreConfigId: string) {
 defineExpose({ importSelected });
 </script>
 
-<style lang="scss" scoped>
-.scorer-library {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  padding: 16px;
-  min-height: 0;
-}
-
-.scorer-library__content {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  flex: 1;
-}
-
-.scorer-library__list {
-  overflow-y: auto;
-  flex: 1;
-  min-height: 0;
-}
-
-.scorer-library__center {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  flex: 1;
-  padding: 32px;
-}
-
-.scorer-library__error,
-.scorer-library__notice {
-  color: var(--o2-text-muted);
-}
-
-.scorer-library__top-row {
-  display: flex;
-  align-items: flex-end;
-  gap: 12px;
-}
-
-.scorer-library__provider-cell {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: 0 0 240px;
-}
-
-.scorer-library__search {
-  flex: 1;
-  min-width: 0;
-}
-
-.scorer-library__provider-label {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--o2-text);
-  white-space: nowrap;
-}
-
-.scorer-library__toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.scorer-library__select-all {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 2px 4px;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--o2-text);
-  user-select: none;
-}
-
-.scorer-library__section + .scorer-library__section {
-  margin-top: 16px;
-}
-
-.scorer-library__section-title {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-  margin: 0 0 6px;
-  font-size: 12px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--o2-text);
-}
-
-.scorer-library__section-count {
-  font-weight: 500;
-  color: var(--o2-text-muted);
-}
-
-.selected-item {
-  background: color-mix(in srgb, var(--o2-brand) 6%, transparent);
-}
-</style>

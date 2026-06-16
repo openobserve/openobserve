@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="selectedDate"
               v-show="store.state.printMode === false"
               ref="dateTimePicker"
-              class="dashboard-icons"
+              class="dashboard-icons tw:h-[30px] tw:[transition:all_0.2s_ease]"
               size="sm"
               v-model="selectedDate"
               :initialTimezone="initialTimezone"
@@ -104,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 store.state?.zoConfig?.min_auto_refresh_interval || 5
               "
               @trigger="refreshData"
-              class="dashboard-icons hideOnPrintMode"
+              class="dashboard-icons hideOnPrintMode tw:h-[30px] tw:[transition:all_0.2s_ease]"
               size="sm"
             />
             <OButton
@@ -1904,33 +1904,13 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
-.printMode {
-  .hideOnPrintMode {
-    display: none;
-  }
-}
-
-.q-table {
-  &__top {
-    border-bottom: 1px solid var(--o2-border);
-    justify-content: flex-end;
-  }
-}
-
-.dark-mode {
-  background-color: var(--o2-primary-background);
-}
-
-.bg-white {
-  background-color: #FFFFFF;
-}
-
+<style>
 .stickyHeader {
   position: sticky;
   top: 0;
   z-index: 1001;
 }
+
 .stickyHeader.fullscreenHeader {
   top: 0px;
   z-index: 5100 !important;
@@ -1957,111 +1937,30 @@ export default defineComponent({
   .print-mode-container {
     height: auto !important;
     overflow: visible !important;
-    // max-height: none !important;
   }
 
   /* Make every ancestor flex/scroll container release its viewport height
    * so the absolute → block flow conversion in RenderDashboardCharts.vue's
    * print CSS can actually grow beyond one page. Without these, the .scroll
    * / overflow-y wrappers clip the dashboard at viewport-height in print. */
-  :global(.o2-app-root),
-  :global(main),
-  :global(.o2-content-scroll),
-  :global(.scroll) {
+  .o2-app-root,
+  main,
+  .o2-content-scroll,
+  .scroll {
     height: auto !important;
     min-height: 0 !important;
     overflow: visible !important;
   }
 }
 
-.dashboard-icons {
+.dashboard-icons .q-btn-dropdown {
   height: 30px;
-  transition: all 0.2s ease;
-
-  :deep(.q-btn-dropdown) {
-    height: 30px;
-    min-height: 30px;
-    padding: 0 8px;
-
-    .q-btn__content {
-      line-height: normal;
-      align-items: center;
-    }
-  }
+  min-height: 30px;
+  padding: 0 8px;
 }
 
-.folder-name {
-  color: var(--o2-menu-color) !important;
-}
-
-.folder-name:hover {
-  border-radius: 0.325rem;
-  background-color: var(--o2-tab-bg) !important;
-}
-
-.el-border {
-  transition: background-color 0.2s ease;
-
-  &:hover {
-    background-color: var(--o2-hover-accent) !important;
-  }
-}
-
-.el-border {
-  transition: background-color 0.2s ease;
-
-  &:hover {
-    background-color: var(--o2-hover-accent) !important;
-  }
-}
-
-/* Outline state borders */
-.refresh-btn-group .apply-btn-refresh.q-btn--outline::before {
-  border-right: none !important;
-}
-
-.refresh-btn-group .apply-btn-dropdown.q-btn--outline::before {
-  border-left: 1px solid var(--o2-border) !important;
-}
-
-/* Flat state borders (when loading/cancel) - using pseudo-elements to avoid layout shifts */
-.refresh-btn-group .apply-btn-refresh.q-btn--flat::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  border: 1px solid var(--o2-border) !important;
-  border-right: none !important;
-  border-radius: inherit;
-  pointer-events: none;
-}
-
-.refresh-btn-group .apply-btn-dropdown.q-btn--flat::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  border: 1px solid var(--o2-border) !important;
-  border-left: 1px solid var(--o2-border) !important;
-  border-radius: inherit;
-  pointer-events: none;
-}
-
-.apply-btn-refresh {
-  border-top-left-radius: 4px !important;
-  border-bottom-left-radius: 4px !important;
-  border-top-right-radius: 0 !important;
-  border-bottom-right-radius: 0 !important;
-}
-
-.apply-btn-dropdown {
-  border-top-left-radius: 0 !important;
-  border-bottom-left-radius: 0 !important;
-  border-top-right-radius: 4px !important;
-  border-bottom-right-radius: 4px !important;
+.dashboard-icons .q-btn-dropdown .q-btn__content {
+  line-height: normal;
+  align-items: center;
 }
 </style>

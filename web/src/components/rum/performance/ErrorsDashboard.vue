@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="tw:rounded-md relative-position">
     <div
-      class="performance-error-dashboard"
+      class="tw:min-h-0! tw:max-h-[calc(100vh-200px)] tw:overflow-y-auto"
       :class="isLoading.length ? 'tw:invisible' : 'tw:visible'"
     >
       <div class="performance-dashboard">
@@ -190,30 +190,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped>
-.performance_title {
-  font-size: 24px;
-}
-.q-table {
-  &__top {
-    border-bottom: 1px solid var(--o2-border);
-    justify-content: flex-end;
-  }
-}
-
-.view-error-table {
-  margin-top: 4px;
-  border: 1px solid rgba(194, 194, 194, 0.4784313725) !important;
-  border-radius: 4px;
-  min-height: 200px;
-}
-
-.performance-error-dashboard {
-  min-height: auto !important;
-  max-height: calc(100vh - 200px);
-  overflow-y: auto;
-}
-</style>
-
-<style lang="scss"></style>

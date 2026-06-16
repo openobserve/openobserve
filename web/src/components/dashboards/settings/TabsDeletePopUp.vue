@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="tw:mt-4"
         data-test="dashboard-tab-delete-tab-panels-container"
       >
-        <div class="radio-group" data-test="dashboard-tab-delete-radio-group">
+        <div class="tw:flex tw:flex-col" data-test="dashboard-tab-delete-radio-group">
           <ORadioGroup v-model="action" orientation="vertical" class="tw:gap-4">
             <div style="display: flex; flex-direction: row">
               <ORadio
@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 Move panels to another tab
               </ORadio>
-              <div v-if="action === 'move'" class="select-container">
+              <div v-if="action === 'move'" class="tw:ml-5 tw:min-w-50 tw:max-w-75 tw:mb-2.5">
                 <OSelect
                   v-model="selectedTabToMovePanels"
                   :options="moveTabOptions"
@@ -154,17 +154,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped>
-.radio-group {
-  display: flex;
-  flex-direction: column;
-}
-
-.select-container {
-  margin-left: 20px;
-  min-width: 200px;
-  max-width: 300px;
-  margin-bottom: 10px;
-}
-</style>

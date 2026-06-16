@@ -35,9 +35,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <div
               v-if="!errorTrackingState.data.editorValue && !editorFocused"
-              class="query-editor-placeholder-overlay"
+              class="query-editor-placeholder-overlay tw:absolute tw:top-0 tw:left-0 tw:right-0 tw:bottom-0 tw:flex tw:items-start tw:py-0.75 tw:pr-2 tw:pb-0 tw:pl-[2.15rem] tw:pointer-events-none tw:z-1 tw:select-none"
             >
-              <span class="query-editor-placeholder-typewriter">{{ editorPlaceholder }}</span>
+              <span class="query-editor-placeholder-typewriter tw:font-mono tw:text-[var(--text-base)] tw:[line-height:1.3125rem] tw:text-[#a0aec0] tw:whitespace-nowrap tw:overflow-hidden tw:[text-overflow:ellipsis]">{{ editorPlaceholder }}</span>
             </div>
           </div>
 
@@ -561,93 +561,49 @@ function updateUrlQueryParams() {
   router.push({ query });
 }
 </script>
-
-<style scoped lang="scss"></style>
-<style lang="scss">
-.sessions_page {
-  .index-menu .field_list .field_overlay .field_label,
-  .q-field__native,
-  .q-field__input,
-  .q-table tbody td {
-    font-size: 0.75rem !important;
-  }
-
-  .q-splitter__after {
-    overflow: hidden;
-  }
-
-  .index-table :hover::-webkit-scrollbar,
-  #tracesSearchGridComponent:hover::-webkit-scrollbar {
-    height: 0.8125rem;
-    width: 0.8125rem;
-  }
-
-  .index-table ::-webkit-scrollbar-track,
-  #tracesSearchGridComponent::-webkit-scrollbar-track {
-    -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.3);
-    border-radius: 0.625rem;
-  }
-
-  .index-table ::-webkit-scrollbar-thumb,
-  #tracesSearchGridComponent::-webkit-scrollbar-thumb {
-    border-radius: 0.625rem;
-    -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.5);
-  }
-
-  .q-table__top {
-    padding: 0 !important;
-  }
-
-  .q-table__control {
-    width: 100%;
-  }
-
-  .q-field__control-container {
-    padding-top: 0 !important;
-  }
-
-  .search-button {
-    width: 6rem;
-    line-height: 1.8125rem;
-    font-weight: bold;
-    text-transform: initial;
-    font-size: 0.6875rem;
-    color: white;
-
-    .q-btn__content {
-      background: var(--o2-theme-color);
-      border-radius: 0.1875rem 0.1875rem 0.1875rem 0.1875rem;
-}
-  }
+<style>
+.sessions_page .index-menu .field_list .field_overlay .field_label,
+.sessions_page .q-field__native,
+.sessions_page .q-field__input,
+.sessions_page .q-table tbody td {
+  font-size: 0.75rem !important;
 }
 
-.query-editor-placeholder-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  display: flex;
-  align-items: flex-start;
-  padding: 0.1875rem 0.5rem 0 2.15rem;
-  pointer-events: none;
-  z-index: 1;
-  user-select: none;
-
-  .query-editor-placeholder-typewriter {
-    font-family: monospace;
-    font-size: var(--text-base);
-    line-height: 1.3125rem;
-    color: #a0aec0;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
+.sessions_page .q-splitter__after {
+  overflow: hidden;
 }
 
-.body--dark .query-editor-placeholder-overlay {
-  .query-editor-placeholder-typewriter {
-    color: #718096;
-  }
+.sessions_page .index-table :hover::-webkit-scrollbar,
+.sessions_page #tracesSearchGridComponent:hover::-webkit-scrollbar {
+  height: 0.8125rem;
+  width: 0.8125rem;
+}
+
+.sessions_page .index-table ::-webkit-scrollbar-track,
+.sessions_page #tracesSearchGridComponent::-webkit-scrollbar-track {
+  -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.3);
+  border-radius: 0.625rem;
+}
+
+.sessions_page .index-table ::-webkit-scrollbar-thumb,
+.sessions_page #tracesSearchGridComponent::-webkit-scrollbar-thumb {
+  border-radius: 0.625rem;
+  -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.5);
+}
+
+.sessions_page .q-table__top {
+  padding: 0 !important;
+}
+
+.sessions_page .q-table__control {
+  width: 100%;
+}
+
+.sessions_page .q-field__control-container {
+  padding-top: 0 !important;
+}
+
+.body--dark .query-editor-placeholder-overlay .query-editor-placeholder-typewriter {
+  color: #718096;
 }
 </style>

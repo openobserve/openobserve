@@ -87,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :options="otherFieldOptions"
                 labelKey="label"
                 valueKey="value"
-                class="no-border search-input"
+                class="no-border search-input tw:w-[250px]"
                 data-test="running-queries-search-input"
               />
             </div>
@@ -852,33 +852,11 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
-.running-queries-page {
-  :deep(.q-table th),
-  :deep(.q-table td) {
-    padding: 0px 16px;
-    height: 32px;
-  }
+<style>
+/* Deep Quasar table overrides — must stay in CSS */
+.running-queries-page :deep(.q-table th),
+.running-queries-page :deep(.q-table td) {
+  padding: 0px 16px;
+  height: 32px;
 }
-.label-container {
-  display: flex;
-  width: 100%;
-}
-</style>
-
-<style lang="scss">
-.running-queries-page {
-  .search-input {
-    width: 250px;
-  }
-}
-
-.search-field-select {
-  .q-field__control {
-    padding-left: 12px;
-    top: -1px;
-    position: relative;
-  }
-}
-
 </style>

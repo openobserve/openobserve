@@ -1,6 +1,6 @@
 <template>
-  <form class="provider-form" @submit.prevent="save">
-    <div class="provider-form__top">
+  <form class="tw:flex tw:flex-col tw:flex-1 tw:min-h-0 tw:bg-card-bg tw:border tw:border-dialog-header-border tw:rounded-md" @submit.prevent="save">
+    <div class="tw:flex tw:items-center tw:gap-2.5 tw:min-h-12 tw:px-3.5 tw:py-2 tw:border-b tw:border-dialog-header-border tw:shrink-0">
       <OButton
         variant="outline"
         size="icon-sm"
@@ -9,18 +9,18 @@
         :title="t('onlineEvals.provider.backTo')"
         @click="$emit('cancel')"
       />
-      <h1 class="provider-form__title">
+      <h1 class="tw:m-0 tw:text-[17px] tw:font-semibold tw:text-text-primary tw:tracking-[0.005em] tw:whitespace-nowrap">
         {{
           mode === "create"
             ? t("onlineEvals.provider.createTitle")
             : t("onlineEvals.provider.editTitle")
         }}
       </h1>
-      <span class="provider-form__subtitle">{{ t("onlineEvals.provider.subtitle") }}</span>
-      <div class="provider-form__top-spacer" />
+      <span class="tw:text-text-secondary tw:text-xs tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap tw:min-w-0">{{ t("onlineEvals.provider.subtitle") }}</span>
+      <div class="tw:flex-1 tw:min-w-2" />
       <button
         type="button"
-        class="provider-form__close"
+        class="provider-form__close tw:inline-flex tw:items-center tw:justify-center tw:w-7 tw:h-7 tw:p-0 tw:text-text-secondary tw:bg-transparent tw:border-0 tw:rounded-md tw:cursor-pointer tw:transition-[background,color] tw:duration-150 tw:hover:bg-[color-mix(in_srgb,var(--color-text-primary)_6%,transparent)] tw:hover:text-[var(--color-primary-600,#3F7994)]"
         :aria-label="t('onlineEvals.buttons.cancel')"
         data-test="provider-form-close-btn"
         @click="$emit('cancel')"
@@ -42,19 +42,19 @@
       </button>
     </div>
 
-    <div class="provider-form__body">
-      <section class="provider-section">
-        <div class="provider-section__head">
-          <span class="provider-section__num">01</span>
-          <h3 class="provider-section__title">{{ t("onlineEvals.provider.sectionTitle") }}</h3>
+    <div class="tw:flex-1 tw:min-h-0 tw:overflow-auto tw:px-6 tw:py-4.5 [&_textarea]:tw:max-h-[220px] [&_textarea]:tw:overflow-y-auto [&_textarea]:tw:font-mono">
+      <section class="tw:mb-6">
+        <div class="tw:flex tw:items-center tw:gap-2.5 tw:pb-2.5 tw:border-b tw:border-dialog-header-border tw:mb-3">
+          <span class="tw:inline-flex tw:items-center tw:justify-center tw:w-[22px] tw:h-[22px] tw:rounded-full tw:bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] tw:text-text-secondary tw:font-bold tw:text-[11px] tw:font-[ui-monospace,SFMono-Regular,Menlo,monospace]">01</span>
+          <h3 class="tw:m-0 tw:text-sm tw:font-semibold tw:text-(--color-text-primary)">{{ t("onlineEvals.provider.sectionTitle") }}</h3>
         </div>
 
-        <div class="provider-field-row">
-          <div class="provider-field">
-            <label class="provider-field__label">
+        <div class="provider-field-row tw:grid tw:grid-cols-2 tw:gap-[14px]">
+          <div class="tw:mb-3">
+            <label class="tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary) tw:mb-1">
               {{ t("onlineEvals.provider.nameLabel") }}
-              <span class="provider-field__req">*</span>
-              <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="provider-field__lock" />
+              <span class="tw:text-(--o2-status-error-text) tw:ml-0.5">*</span>
+              <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="tw:ml-1.5 tw:text-text-secondary" />
             </label>
             <OInput
               v-model.trim="form.name"
@@ -63,16 +63,16 @@
               :disabled="mode === 'edit'"
               data-test="provider-form-name-input"
             />
-            <div v-if="mode === 'edit'" class="provider-field__help">
+            <div v-if="mode === 'edit'" class="tw:text-[11.5px] tw:text-text-secondary tw:mt-1">
               {{ t("onlineEvals.provider.cannotRename") }}
             </div>
           </div>
 
-          <div class="provider-field">
-            <label class="provider-field__label">
+          <div class="tw:mb-3">
+            <label class="tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary) tw:mb-1">
               {{ t("onlineEvals.provider.typeLabel") }}
-              <span class="provider-field__req">*</span>
-              <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="provider-field__lock" />
+              <span class="tw:text-(--o2-status-error-text) tw:ml-0.5">*</span>
+              <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="tw:ml-1.5 tw:text-text-secondary" />
             </label>
             <OSelect
               v-model="form.providerType"
@@ -84,8 +84,8 @@
           </div>
         </div>
 
-        <div class="provider-field">
-          <label class="provider-field__label">{{ t("onlineEvals.provider.endpointLabel") }}</label>
+        <div class="tw:mb-3">
+          <label class="tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary) tw:mb-1">{{ t("onlineEvals.provider.endpointLabel") }}</label>
           <OInput
             v-model.trim="form.endpoint"
             :placeholder="t('onlineEvals.provider.endpointPlaceholder')"
@@ -94,11 +94,11 @@
           />
         </div>
 
-        <div class="provider-field-row">
-          <div class="provider-field">
-            <label class="provider-field__label">
+        <div class="provider-field-row tw:grid tw:grid-cols-2 tw:gap-[14px]">
+          <div class="tw:mb-3">
+            <label class="tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary) tw:mb-1">
               {{ t("onlineEvals.provider.defaultModelLabel") }}
-              <span class="provider-field__req">*</span>
+              <span class="tw:text-(--o2-status-error-text) tw:ml-0.5">*</span>
             </label>
             <OInput
               v-model.trim="form.defaultModel"
@@ -108,35 +108,35 @@
             />
           </div>
 
-          <div class="provider-field">
-            <label class="provider-field__label">{{ t("onlineEvals.provider.availableModelsLabel") }}</label>
+          <div class="tw:mb-3">
+            <label class="tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary) tw:mb-1">{{ t("onlineEvals.provider.availableModelsLabel") }}</label>
             <OInput
               v-model.trim="form.availableModels"
               :placeholder="t('onlineEvals.provider.availableModelsPlaceholder')"
               size="sm"
               data-test="provider-form-available-models-input"
             />
-            <div class="provider-field__help">{{ t("onlineEvals.provider.availableModelsHelp") }}</div>
+            <div class="tw:text-[11.5px] tw:text-text-secondary tw:mt-1">{{ t("onlineEvals.provider.availableModelsHelp") }}</div>
           </div>
         </div>
 
       </section>
 
-      <section class="provider-section">
-        <div class="provider-section__head">
-          <span class="provider-section__num">02</span>
-          <h3 class="provider-section__title">{{ t("onlineEvals.provider.authSection") }}</h3>
+      <section class="tw:mb-6">
+        <div class="tw:flex tw:items-center tw:gap-2.5 tw:pb-2.5 tw:border-b tw:border-dialog-header-border tw:mb-3">
+          <span class="tw:inline-flex tw:items-center tw:justify-center tw:w-[22px] tw:h-[22px] tw:rounded-full tw:bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] tw:text-text-secondary tw:font-bold tw:text-[11px] tw:font-[ui-monospace,SFMono-Regular,Menlo,monospace]">02</span>
+          <h3 class="tw:m-0 tw:text-sm tw:font-semibold tw:text-(--color-text-primary)">{{ t("onlineEvals.provider.authSection") }}</h3>
         </div>
 
-        <div v-if="mode === 'edit'" class="provider-callout">
-          <OIcon name="lock" size="xs" />
+        <div v-if="mode === 'edit'" class="provider-callout tw:flex tw:gap-2 tw:items-start tw:px-3 tw:py-2 tw:mb-3 tw:bg-[color-mix(in_srgb,var(--o2-status-info-text)_12%,transparent)] tw:border tw:border-[color-mix(in_srgb,var(--o2-status-info-text)_30%,transparent)] tw:rounded-md tw:text-[11.5px] tw:text-(--color-text-primary) tw:leading-[1.4]">
+          <OIcon name="lock" size="xs" class="tw:shrink-0 tw:mt-px tw:text-[var(--o2-status-info-text)]" />
           <span>{{ t("onlineEvals.provider.authEditNote") }}</span>
         </div>
 
-        <div class="provider-field">
-          <label class="provider-field__label">
+        <div class="tw:mb-3">
+          <label class="tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary) tw:mb-1">
             {{ t("onlineEvals.provider.apiKeyLabel") }}
-            <span v-if="mode === 'create'" class="provider-field__req">*</span>
+            <span v-if="mode === 'create'" class="tw:text-(--o2-status-error-text) tw:ml-0.5">*</span>
           </label>
           <OInput
             v-model.trim="form.apiKey"
@@ -145,12 +145,12 @@
             :placeholder="t('onlineEvals.provider.apiKeyPlaceholder')"
             data-test="provider-form-api-key-input"
           />
-          <div class="provider-field__help">{{ t("onlineEvals.provider.apiKeyHelp") }}</div>
+          <div class="tw:text-[11.5px] tw:text-text-secondary tw:mt-1">{{ t("onlineEvals.provider.apiKeyHelp") }}</div>
         </div>
       </section>
     </div>
 
-    <footer class="provider-form__foot">
+    <footer class="tw:sticky tw:bottom-0 tw:flex tw:items-center tw:justify-end tw:gap-2 tw:px-5.5 tw:py-3 tw:border-t tw:border-dialog-header-border tw:bg-card-bg tw:shrink-0 tw:z-1">
       <OButton
         data-test="provider-form-cancel-btn"
         type="button"
@@ -277,184 +277,7 @@ async function save() {
 }
 </script>
 
-<style lang="scss" scoped>
-.provider-form {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 0;
-  background: var(--color-card-bg);
-  border: 1px solid var(--color-dialog-header-border, var(--o2-border));
-  border-radius: 6px;
-}
-
-.provider-form__top {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 48px;
-  padding: 8px 14px;
-  border-bottom: 1px solid var(--color-dialog-header-border, var(--o2-border));
-  flex-shrink: 0;
-}
-
-.provider-form__title {
-  margin: 0;
-  font-size: 17px;
-  font-weight: 600;
-  color: var(--color-text-primary, currentColor);
-  letter-spacing: 0.005em;
-  white-space: nowrap;
-}
-
-.provider-form__subtitle {
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  font-size: 12px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  min-width: 0;
-}
-
-.provider-form__top-spacer {
-  flex: 1;
-  min-width: 8px;
-}
-
-.provider-form__close {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  background: transparent;
-  border: 0;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s;
-}
-
-.provider-form__close:hover {
-  background: color-mix(in srgb, var(--color-text-primary) 6%, transparent);
-  color: var(--color-primary-600, #3F7994);
-}
-
-.provider-form__body {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-  padding: 18px 24px 24px;
-}
-
-.provider-form__foot {
-  position: sticky;
-  bottom: 0;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
-  padding: 12px 22px;
-  border-top: 1px solid var(--color-dialog-header-border, var(--o2-border));
-  background: var(--color-card-bg);
-  flex-shrink: 0;
-  z-index: 1;
-}
-
-.provider-form__body :deep(textarea) {
-  max-height: 220px;
-  overflow-y: auto;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-}
-
-.provider-section {
-  margin-bottom: 24px;
-}
-
-.provider-section__head {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid var(--color-dialog-header-border, var(--o2-border));
-  margin-bottom: 12px;
-}
-
-.provider-section__num {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--color-text-secondary) 12%, transparent);
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  font: 700 11px ui-monospace, SFMono-Regular, Menlo, monospace;
-}
-
-.provider-section__title {
-  margin: 0;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--color-text-primary, currentColor);
-}
-
-.provider-field {
-  margin-bottom: 12px;
-}
-
-.provider-field-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 14px;
-}
-
-.provider-field__label {
-  display: flex;
-  align-items: center;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--color-text-primary, currentColor);
-  margin-bottom: 4px;
-}
-
-.provider-field__req {
-  color: var(--o2-status-error-text);
-  margin-left: 2px;
-}
-
-.provider-field__lock {
-  margin-left: 6px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.provider-field__help {
-  font-size: 11.5px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  margin-top: 4px;
-}
-
-.provider-callout {
-  display: flex;
-  gap: 8px;
-  align-items: flex-start;
-  padding: 8px 12px;
-  margin-bottom: 12px;
-  background: color-mix(in srgb, var(--o2-status-info-text) 12%, transparent);
-  border: 1px solid color-mix(in srgb, var(--o2-status-info-text) 30%, transparent);
-  border-radius: 6px;
-  font-size: 11.5px;
-  color: var(--color-text-primary, currentColor);
-  line-height: 1.4;
-}
-
-.provider-callout > :first-child {
-  flex-shrink: 0;
-  margin-top: 1px;
-  color: var(--o2-status-info-text);
-}
-
+<style>
 @media (max-width: 900px) {
   .provider-field-row {
     grid-template-columns: 1fr;

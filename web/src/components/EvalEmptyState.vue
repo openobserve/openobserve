@@ -1,28 +1,34 @@
 <template>
   <div
     :data-test="dataTest"
-    class="ev-empty"
-    :class="{ 'ev-empty--dark': isDark }"
+    class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:flex-1 tw:min-h-[320px] tw:py-12 tw:px-6 tw:text-center"
   >
-    <div class="ev-empty__icon-outer">
+    <div
+      class="tw:w-[100px] tw:h-[100px] tw:rounded-full tw:border tw:border-dashed tw:border-[rgba(66,133,244,0.25)] tw:flex tw:items-center tw:justify-center tw:mb-7"
+      :class="isDark ? 'tw:border-[rgba(66,133,244,0.3)]' : ''"
+    >
       <div
-        class="ev-empty__icon-inner"
-        :class="{ 'ev-empty__icon-inner--dark': isDark }"
+        class="tw:w-[68px] tw:h-[68px] tw:rounded-full tw:flex tw:items-center tw:justify-center tw:border-[1.5px] tw:border-solid"
+        :class="isDark
+          ? 'tw:bg-[rgba(66,133,244,0.18)] tw:border-[rgba(66,133,244,0.35)]'
+          : 'tw:bg-[rgba(66,133,244,0.09)] tw:border-[rgba(66,133,244,0.22)]'"
       >
-        <OIcon :name="icon" size="lg" class="ev-empty__icon" />
+        <OIcon :name="icon" size="lg" class="tw:text-[var(--q-primary)] tw:opacity-[0.85]" />
       </div>
     </div>
 
-    <div class="ev-empty__title">{{ title }}</div>
+    <div class="tw:text-[1.2rem] tw:font-bold tw:tracking-[-0.2px] tw:text-[var(--color-text-primary,#111827)] tw:mb-[10px]">{{ title }}</div>
 
-    <div class="ev-empty__desc">{{ description }}</div>
+    <div class="tw:text-[0.88rem] tw:leading-[1.65] tw:text-[var(--color-text-secondary,#6b7280)] tw:max-w-[500px] tw:mb-6">{{ description }}</div>
 
-    <div v-if="chips && chips.length" class="ev-empty__chips">
+    <div v-if="chips && chips.length" class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap tw:justify-center tw:mb-8">
       <span
         v-for="(chip, idx) in chips"
         :key="idx"
-        class="ev-empty__chip"
-        :class="{ 'ev-empty__chip--dark': isDark }"
+        class="tw:inline-flex tw:items-center tw:gap-[5px] tw:text-xs tw:font-medium tw:text-(--color-text-secondary,#6b7280) tw:rounded-[20px] tw:py-1 tw:px-3 tw:border tw:border-solid"
+        :class="isDark
+          ? 'tw:bg-[rgba(255,255,255,0.06)] tw:border-[rgba(255,255,255,0.1)]'
+          : 'tw:bg-[color-mix(in_srgb,var(--color-text-secondary)_8%,transparent)] tw:border-(--color-dialog-header-border,var(--o2-border))'"
       >
         <OIcon v-if="chip.icon" :name="chip.icon" size="xs" />
         {{ chip.label }}
@@ -32,13 +38,13 @@
     <!-- Actions row is rendered only when there's something to show
          (either a primary CTA or a secondary slot). Pure informational
          empty states (e.g. "no data in window") pass neither. -->
-    <div v-if="ctaLabel || $slots.secondary" class="ev-empty__actions">
+    <div v-if="ctaLabel || $slots.secondary" class="tw:flex tw:items-center tw:gap-3">
       <OButton
         v-if="ctaLabel"
         :data-test="ctaDataTest"
         variant="primary"
         size="md"
-        class="ev-empty__btn"
+        class="tw:h-10 tw:px-6 tw:text-[0.92rem] tw:font-semibold"
         @click="$emit('create')"
       >
         {{ ctaLabel }}
@@ -75,106 +81,3 @@ defineEmits<{ (e: "create"): void }>();
 const store = useStore();
 const isDark = computed(() => store.state.theme === "dark");
 </script>
-
-<style lang="scss" scoped>
-.ev-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  flex: 1;
-  min-height: 320px;
-  padding: 48px 24px;
-  text-align: center;
-
-  &__icon-outer {
-    width: 100px;
-    height: 100px;
-    border-radius: 50%;
-    border: 1px dashed rgba(66, 133, 244, 0.25);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-bottom: 28px;
-
-    .ev-empty--dark & { border-color: rgba(66, 133, 244, 0.3); }
-  }
-
-  &__icon-inner {
-    width: 68px;
-    height: 68px;
-    border-radius: 50%;
-    background: rgba(66, 133, 244, 0.09);
-    border: 1.5px solid rgba(66, 133, 244, 0.22);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    &--dark {
-      background: rgba(66, 133, 244, 0.18);
-      border-color: rgba(66, 133, 244, 0.35);
-    }
-  }
-
-  &__icon {
-    color: var(--q-primary);
-    opacity: 0.85;
-  }
-
-  &__title {
-    font-size: 1.2rem;
-    font-weight: 700;
-    letter-spacing: -0.2px;
-    color: var(--color-text-primary, #111827);
-    margin-bottom: 10px;
-  }
-
-  &__desc {
-    font-size: 0.88rem;
-    line-height: 1.65;
-    color: var(--color-text-secondary, #6b7280);
-    max-width: 500px;
-    margin-bottom: 24px;
-  }
-
-  &__chips {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-wrap: wrap;
-    justify-content: center;
-    margin-bottom: 32px;
-  }
-
-  &__chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    font-size: 0.75rem;
-    font-weight: 500;
-    color: var(--color-text-secondary, #6b7280);
-    background: color-mix(in srgb, var(--color-text-secondary) 8%, transparent);
-    border: 1px solid var(--color-dialog-header-border, var(--o2-border));
-    border-radius: 20px;
-    padding: 4px 12px;
-
-    &--dark {
-      background: rgba(255, 255, 255, 0.06);
-      border-color: rgba(255, 255, 255, 0.1);
-    }
-  }
-
-  &__actions {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
-
-  &__btn {
-    height: 40px;
-    padding: 0 24px;
-    font-size: 0.92rem;
-    font-weight: 600;
-  }
-}
-</style>

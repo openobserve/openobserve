@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="tw:mt-4">
-    <div class="tags-title tw:font-bold tw:mb-2 tw:ml-1">{{ t("rum.events") }}</div>
+    <div class="tw:text-base tw:font-bold tw:mb-2 tw:ml-1">{{ t("rum.events") }}</div>
     <OTable
       :data="error.events || []"
       :columns="columns || []"
@@ -117,12 +117,6 @@ const getErrorCategory = (row: any) => {
 const getFormattedDate = (timestamp: number) =>
   formatDate(Math.floor(timestamp), "MMM DD, YYYY HH:mm:ss Z");
 </script>
-
-<style scoped>
-.tags-title {
-  font-size: 16px;
-}
-</style>
 
 <style>
 .description-column {

@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <label class="tw:flex q-field tw:mb-3">
         <b>{{ t('cipherKey.secret') }}</b>
       </label>
-      <pre class="pre-text">{{ formData.key.store.local }}</pre>
+      <pre class="tw:[text-wrap:auto] tw:break-words tw:border tw:border-(--o2-border-input) tw:p-[5px] tw:mb-[5px]">{{ formData.key.store.local }}</pre>
       <OButton data-test="add-cipher-key-openobserve-secret-input-update" variant="primary" size="sm-action" @click="isUpdate = true">{{ t('common.update') }}</OButton>
     </div>
   </div>
@@ -104,12 +104,3 @@ export default defineComponent({
   },
 });
 </script>
-<style lang="scss" scoped>
-.pre-text {
-  text-wrap: auto;
-  word-wrap: break-word;
-  border: 1px solid var(--o2-border-input);
-  padding: 5px;
-  margin-bottom: 5px;
-}
-</style>

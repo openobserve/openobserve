@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-for="(item, i) in filteredFunctionOptions"
             :key="'saved-view-' + i"
             :data-test="`logs-search-saved-function-${item.name}`"
-            class="saved-view-item"
+            class="saved-view-item tw:border-b tw:border-(--o2-border-color) tw:rounded-none tw:last:border-none"
             @select="applyFunction(item, true)"
           >
             {{ item.name }}
@@ -167,17 +167,3 @@ const applyFunction = (
 };
 </script>
 
-<style scoped lang="scss">
-.save-function-btn {
-  border-left: 1px solid var(--o2-border-color);
-}
-
-:deep(.saved-view-item) {
-  border-bottom: 1px solid var(--o2-border-color);
-  border-radius: 0;
-
-  &:last-child {
-    border-bottom: none;
-  }
-}
-</style>

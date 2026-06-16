@@ -80,7 +80,7 @@
         @mouseenter="isHovered = true"
         @mouseleave="isHovered = false"
       >
-        <img :src="getBtnLogo" class="header-icon ai-icon" />
+        <img :src="getBtnLogo" class="header-icon ai-icon tw:opacity-70 tw:transition-transform tw:duration-600" />
       </OButton>
       <OButton
         data-test="add-function-fullscreen-btn"
@@ -243,32 +243,7 @@ defineExpose({
   },
 });
 </script>
-<style scoped lang="scss">
-.functions-toolbar {
-  :deep(.q-field__bottom) {
-    display: none;
-  }
-
-  .add-function-actions {
-    :deep(.q-btn) {
-      padding-top: 4px !important;
-      padding-bottom: 4px !important;
-      font-size: 13px;
-    }
-    :deep(.q-btn .OIcon) {
-      margin-right: 2px;
-    }
-
-    :deep(.block) {
-      font-weight: lighter;
-    }
-
-    :deep(.cancel-btn)::before {
-      border: 1px solid var(--q-negative) !important;
-    }
-  }
-}
-
+<style>
 /* ── AI button — mirrors MainLayout.vue ─────────────────────────── */
 .ai-hover-btn {
   background: linear-gradient(
@@ -290,22 +265,14 @@ defineExpose({
     rgba(139, 92, 246, 0.15) 0%,
     rgba(236, 72, 153, 0.15) 100%
   ) !important;
+}
 
-  .header-icon {
-    opacity: 1 !important;
-  }
+.ai-btn-active .header-icon {
+  opacity: 1 !important;
 }
 
 .ai-btn-active:hover {
   background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%) !important;
-}
-
-.header-icon {
-  opacity: 0.7;
-}
-
-.ai-icon {
-  transition: transform 0.6s ease;
 }
 
 .ai-hover-btn:hover .ai-icon {

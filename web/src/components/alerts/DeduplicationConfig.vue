@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="deduplication-config tw:p-0 tw:m-0">
+  <div class="tw:w-full tw:p-0 tw:m-0">
     <div class="tw:w-full">
       <div class="tw:w-full">
         <AlertsContainer
@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
 
-      <div v-if="isExpanded" class="tw:w-full tw:flex alert-setup-container">
+      <div v-if="isExpanded" class="tw:w-full tw:flex tw:px-4">
         <OSeparator class="tw:my-2"/>
         <div class="tw:mt-2 tw:w-full tw:pl-3">
             <!-- Fingerprint Fields -->
@@ -203,12 +203,3 @@ watch(
 );
 </script>
 
-<style scoped lang="scss">
-.deduplication-config {
-  width: 100%;
-}
-
-.alert-setup-container {
-  padding: 0 16px;
-}
-</style>

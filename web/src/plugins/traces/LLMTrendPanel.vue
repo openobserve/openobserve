@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     ref="panelRootEl"
-    class="card-container llm-trend-panel tw:rounded-lg tw:p-[1rem] tw:flex tw:flex-col"
+    class="card-container tw:border tw:border-(--o2-border-color) tw:rounded-lg tw:p-4 tw:flex tw:flex-col"
   >
     <div class="tw:flex tw:items-baseline tw:justify-between tw:mb-[0.25rem]">
       <div>
@@ -41,13 +41,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div
       v-if="loading || !hasLoadedOnce"
-      class="llm-panel-skeleton"
+      class="tw:flex tw:flex-col tw:gap-2 tw:mt-2"
       :class="
         store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'
       "
     >
       <template v-if="panel.type === 'table'">
-        <div v-for="row in 5" :key="row" class="llm-panel-skeleton__row">
+        <div v-for="row in 5" :key="row" class="tw:flex tw:items-center tw:gap-3 tw:py-1">
           <SkeletonBox width="70px" height="14px" rounded />
           <SkeletonBox width="90px" height="20px" rounded />
           <SkeletonBox width="180px" height="14px" rounded />
@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-for="bar in 6"
           :key="bar"
-          class="llm-panel-skeleton__hbar"
+          class="tw:flex tw:items-center tw:gap-3"
         >
           <SkeletonBox width="100px" height="12px" rounded />
           <SkeletonBox
@@ -84,9 +84,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <template v-else>
         <!-- Line / area chart — SVG silhouette of a wavy area + line. -->
-        <div class="llm-panel-skeleton__line">
+        <div class="tw:relative tw:h-[220px] tw:overflow-hidden">
           <svg
-            class="llm-panel-skeleton__line-svg"
+            class="tw:w-full tw:h-full tw:block"
             viewBox="0 0 200 80"
             preserveAspectRatio="none"
           >
@@ -106,21 +106,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div
       v-else-if="errorMsg"
-      class="llm-trend-empty tw:flex tw:items-center tw:justify-center tw:text-[0.75rem] tw:text-[var(--o2-text-muted)]"
-      :class="panel.type === 'table' ? 'llm-trend-empty--table' : ''"
+      class="tw:flex tw:items-center tw:justify-center tw:text-[0.75rem] tw:text-(--o2-text-muted) tw:w-full"
+      :class="panel.type === 'table' ? 'tw:h-35' : 'tw:h-55'"
     >
       {{ errorMsg }}
     </div>
     <div
       v-else-if="!hasData"
-      class="llm-trend-empty tw:flex tw:items-center tw:justify-center tw:text-[0.75rem] tw:text-[var(--o2-text-muted)]"
-      :class="panel.type === 'table' ? 'llm-trend-empty--table' : ''"
+      class="tw:flex tw:items-center tw:justify-center tw:text-[0.75rem] tw:text-(--o2-text-muted) tw:w-full"
+      :class="panel.type === 'table' ? 'tw:h-35' : 'tw:h-55'"
     >
       {{ panel.emptyStateText || "No data" }}
     </div>
     <div
       v-show="!loading && !errorMsg && hasData && panel.type !== 'table'"
-      class="llm-trend-chart tw:w-full"
+      class="tw:h-55 tw:w-full"
     >
       <ChartRenderer
         :data="chartRendererData"
@@ -131,7 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div
       v-if="!loading && !errorMsg && hasData && panel.type === 'table'"
-      class="llm-trend-table tw:w-full tw:overflow-auto"
+      class="llm-trend-table tw:mt-2 tw:w-full tw:overflow-auto"
     >
       <table class="tw:w-full tw:text-[0.75rem] tw:border-collapse">
         <thead>
@@ -162,8 +162,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span class="tw:text-[var(--o2-text-secondary)]">{{ formatTimeCell(row[col.field!]) }}</span>
               </template>
               <template v-else-if="col.format === 'service-chip'">
-                <span class="service-chip">
-                  <span class="service-chip__dot" :style="{ background: chipColor(row[col.field!]) }" />
+                <span class="tw:inline-flex tw:items-center tw:gap-[0.35rem] tw:py-[0.15rem] tw:px-[0.5rem] tw:rounded-full tw:bg-[var(--o2-bg-3)] tw:text-[0.7rem]">
+                  <span class="tw:w-[6px] tw:h-[6px] tw:rounded-full tw:inline-block" :style="{ background: chipColor(row[col.field!]) }" />
                   {{ row[col.field!] }}
                 </span>
               </template>
@@ -686,106 +686,25 @@ onUnmounted(() => {
 });
 </script>
 
-<style lang="scss" scoped>
-// Match the KPI tiles' visible chrome — `.card-container`'s box-shadow
-// alone is too faint to read against the page bg, so we add an explicit
-// border the same way LLMInsightsDashboard does for `.kpi-card`.
-.llm-trend-panel {
-  border: 1px solid var(--o2-border-color);
-}
-
-.llm-trend-chart {
-  height: 220px;
-  width: 100%;
-}
-
+<style>
 /* Empty / error states match the chart height so cards stay aligned in the
    2-col grid even when one panel has no data. Table panels span both
    columns so they get their own (shorter) empty-state height. */
-.llm-trend-empty {
-  height: 220px;
-  width: 100%;
 
-  &--table {
-    height: 140px;
-  }
+.llm-trend-table table th,
+.llm-trend-table table td {
+  white-space: nowrap;
 }
 
-.llm-trend-table {
-  margin-top: 0.5rem;
-
-  table {
-    th,
-    td {
-      white-space: nowrap;
-    }
-    td {
-      color: var(--o2-text-primary);
-    }
-    tbody tr:hover {
-      background: var(--o2-bg-3);
-    }
-  }
+.llm-trend-table table td {
+  color: var(--o2-text-primary);
 }
 
-.service-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0.15rem 0.5rem;
-  border-radius: 999px;
+.llm-trend-table table tbody tr:hover {
   background: var(--o2-bg-3);
-  font-size: 0.7rem;
-
-  &__dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    display: inline-block;
-  }
 }
 
-/* Per-panel skeleton — same pattern as LLMInsightsSkeleton.vue / HomeViewSkeleton.vue */
-.llm-panel-skeleton {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  margin-top: 0.5rem;
-
-  &__chart {
-    display: flex;
-    align-items: flex-end;
-    gap: 0.4rem;
-    height: 220px;
-  }
-
-  &__line {
-    position: relative;
-    height: 220px;
-    overflow: hidden;
-  }
-
-  &__line-svg {
-    width: 100%;
-    height: 100%;
-    display: block;
-  }
-
-  &__hbar {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-  }
-
-  &__row {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 0.25rem 0;
-  }
-}
-
-:deep(.skeleton-box) {
+.skeleton-box {
   background: linear-gradient(
     90deg,
     transparent,
@@ -798,7 +717,7 @@ onUnmounted(() => {
   overflow: hidden;
 }
 
-.dark-tile-content :deep(.skeleton-box) {
+.dark-tile-content .skeleton-box {
   background: linear-gradient(
     90deg,
     rgba(255, 255, 255, 0.04),
@@ -808,7 +727,7 @@ onUnmounted(() => {
   background-size: 200% 100%;
 }
 
-.light-tile-content :deep(.skeleton-box) {
+.light-tile-content .skeleton-box {
   background: linear-gradient(
     90deg,
     rgba(0, 0, 0, 0.04),
@@ -832,6 +751,7 @@ onUnmounted(() => {
   fill: rgba(0, 0, 0, 0.08);
   animation: llm-line-pulse 1.6s ease-in-out infinite;
 }
+
 .llm-panel-skeleton__line-stroke {
   stroke: rgba(0, 0, 0, 0.18);
   animation: llm-line-pulse 1.6s ease-in-out infinite;
@@ -840,6 +760,7 @@ onUnmounted(() => {
 .dark-tile-content .llm-panel-skeleton__area-fill {
   fill: rgba(255, 255, 255, 0.08);
 }
+
 .dark-tile-content .llm-panel-skeleton__line-stroke {
   stroke: rgba(255, 255, 255, 0.22);
 }

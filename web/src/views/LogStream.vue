@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -221,7 +221,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="checkbox-delete-associated-alerts-pipelines"
             v-model="deleteAssociatedAlertsPipelines"
           />
-          <span class="delete-associated-alerts-pipelines-text">
+          <span class="tw:text-(--o2-text-secondary) tw:text-xs tw:font-medium">
             Delete all Pipelines and Alerts associated with the stream
           </span>
         </div>
@@ -247,7 +247,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="checkbox-delete-associated-alerts-pipelines"
             v-model="deleteAssociatedAlertsPipelines"
           />
-          <span class="delete-associated-alerts-pipelines-text">
+          <span class="tw:text-(--o2-text-secondary) tw:text-xs tw:font-medium">
             Delete all Pipelines and Alerts associated with the selected streams
           </span>
         </div>
@@ -889,56 +889,16 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped></style>
-
-<style lang="scss">
-.bottom-bar {
-  display: flex;
-  width: 100%;
-  justify-content: space-between;
-  align-items: center;
-}
-.delete-btn {
-  width: 10vw;
+<style>
+.checkbox-delete-associated-alerts-pipelines .q-checkbox__inner {
+  height: 28px !important;
+  min-height: 28px !important;
+  width: 28px !important;
+  min-width: 28px !important;
 }
 
-.confirmBodyLogStream {
-  padding: 22px 1.375rem 0;
-  font-size: 0.875rem;
-  text-align: center;
-  font-weight: 700;
-
-  .head {
-    line-height: 2.15em;
-    margin-bottom: 4px;
-  }
-
-  .para {
-    color: var(--o2-text-secondary);
-  }
-}
-
-.delete-associated-alerts-pipelines-text {
-  color: var(--o2-text-secondary);
-  font-size: 12px;
-  font-weight: 500;
-}
-
-.confirmActionsLogStream {
-  justify-content: center;
-  padding: 16px 22px 22px;
-  display: flex;
-}
-.checkbox-delete-associated-alerts-pipelines {
-  .q-checkbox__inner {
-    height: 28px !important;
-    min-height: 28px !important;
-    width: 28px !important;
-    min-width: 28px !important;
-  }
-  .q-checkbox__bg {
-    height: 16px !important;
-    width: 16px !important;
-  }
+.checkbox-delete-associated-alerts-pipelines .q-checkbox__bg {
+  height: 16px !important;
+  width: 16px !important;
 }
 </style>

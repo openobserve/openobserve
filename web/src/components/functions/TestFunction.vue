@@ -135,7 +135,7 @@
               data-test="vrl-function-test-sql-editor"
               ref="queryEditorRef"
               editor-id="test-function-query-input-editor"
-              class="monaco-editor"
+              class="monaco-editor tw:w-full tw:min-h-40"
               v-model:query="inputQuery"
               language="sql"
               :keywords="effectiveKeywords"
@@ -145,9 +145,9 @@
             />
             <div
               v-if="!inputQuery && queryEditorPlaceholderFlag"
-              class="query-editor-placeholder-overlay"
+              class="query-editor-placeholder-overlay tw:absolute tw:top-0 tw:left-0 tw:right-0 tw:bottom-0 tw:flex tw:items-start tw:p-[0.1875rem_0.5rem_0_2.15rem] tw:pointer-events-none tw:z-1 tw:select-none"
             >
-              <span class="query-editor-placeholder-typewriter">{{ queryEditorPlaceholder }}</span>
+              <span class="query-editor-placeholder-typewriter tw:[font-family:monospace] tw:text-[var(--text-base)] tw:[line-height:1.3125rem] tw:text-[#a0aec0] tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis" :class="store.state.theme === 'dark' ? 'tw:text-[#718096]' : ''">{{ queryEditorPlaceholder }}</span>
             </div>
             <div
               class="tw:text-red-500 tw:p-1 invalid-sql-error tw:min-h-[22px]"
@@ -213,7 +213,7 @@
           data-test="vrl-function-test-events-editor"
           ref="eventsEditorRef"
           editor-id="test-function-events-input-editor"
-          class="monaco-editor test-function-input-editor"
+          class="monaco-editor test-function-input-editor tw:w-full tw:min-h-40"
           :style="{ height: `calc((100vh - (260px + ${heightOffset}px)) / 2)` }"
           v-model:query="inputEvents"
           language="json"
@@ -284,7 +284,7 @@
           data-test="vrl-function-test-events-output-editor"
           ref="outputEventsEditorRef"
           editor-id="test-function-events-output-editor"
-          class="monaco-editor test-function-output-editor"
+          class="monaco-editor test-function-output-editor tw:w-full tw:min-h-40"
           :style="{ height: `calc((100vh - (260px + ${heightOffset}px)) / 2)` }"
           v-model:query="outputEvents"
           language="json"
@@ -838,96 +838,37 @@ defineExpose({
 });
 </script>
 
-<style lang="scss" scoped>
-.monaco-editor {
+<style>
+.test-function-query-container :deep(.test-function-run-query-btn) {
+  padding: 2px 8px !important;
+  font-size: 11px !important;
+  margin: 1px 2px !important;
+}
+
+.function-stream-select-input :deep(.q-field--auto-height .q-field__control) {
+  height: 32px;
+  min-height: auto;
+}
+
+.function-stream-select-input :deep(.q-field--auto-height .q-field__control) .q-field__control-container {
+  height: 32px;
+}
+
+.function-stream-select-input :deep(.q-field--auto-height .q-field__control) .q-field__control-container .q-field__native {
+  min-height: 32px !important;
+  height: 32px !important;
+}
+
+.function-stream-select-input :deep(.q-field--auto-height .q-field__control) .q-field__marginal {
+  height: 32px;
+  min-height: auto;
+}
+
+.functions-duration-input :deep(.date-time-button) {
   width: 100%;
-  min-height: 10rem;
 }
 
-.query-editor-placeholder-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  display: flex;
-  align-items: flex-start;
-  padding: 0.1875rem 0.5rem 0 2.15rem;
-  pointer-events: none;
-  z-index: 1;
-  user-select: none;
-
-  .query-editor-placeholder-typewriter {
-    font-family: monospace;
-    font-size: var(--text-base);
-    line-height: 1.3125rem;
-    color: #a0aec0;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-}
-
-.body--dark .query-editor-placeholder-overlay {
-  .query-editor-placeholder-typewriter {
-    color: #718096;
-  }
-}
-
-// .test-function-input-editor,
-// .test-function-output-editor {
-//   height: calc((100vh - (260px + 75px)) / 2) !important;
-// }
-
-.test-function-option-tabs {
-  :deep(.rum-tab) {
-    width: auto !important;
-    font-size: 12px;
-    padding: 3px 10px;
-    border: none !important;
-  }
-
-  :deep(.active) {
-    background-color: var(--o2-theme-color) !important;
-    color: white !important;
-  }
-}
-.test-function-query-container {
-  :deep(.test-function-run-query-btn) {
-    padding: 2px 8px !important;
-    font-size: 11px !important;
-    margin: 1px 2px !important;
-}
-}
-
-.function-stream-select-input {
-  :deep(.q-field--auto-height .q-field__control) {
-    height: 32px;
-    min-height: auto;
-
-    .q-field__control-container {
-      height: 32px;
-
-      .q-field__native {
-        min-height: 32px !important;
-        height: 32px !important;
-      }
-    }
-
-    .q-field__marginal {
-      height: 32px;
-      min-height: auto;
-    }
-  }
-}
-
-.functions-duration-input {
-  :deep(.date-time-button) {
-    width: 100%;
-
-    .OIcon.on-right {
-      margin-left: auto;
-    }
-  }
+.functions-duration-input :deep(.date-time-button) .OIcon.on-right {
+  margin-left: auto;
 }
 </style>

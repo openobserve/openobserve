@@ -1,11 +1,11 @@
 <template>
-  <div class="sd-scrim" role="dialog" aria-modal="true" @click.self="$emit('close')">
-    <aside class="sd" @click.stop data-test="scorer-detail">
+  <div class="sd-scrim tw:fixed tw:inset-0 tw:bg-[rgba(0,0,0,0.32)] tw:z-[1010] tw:flex tw:justify-end" role="dialog" aria-modal="true" @click.self="$emit('close')">
+    <aside class="sd tw:w-[1100px] tw:max-w-[96vw] tw:h-full tw:bg-[var(--color-card-bg)] tw:border-l tw:border-[var(--color-dialog-header-border,var(--o2-border))] tw:flex tw:flex-col" @click.stop data-test="scorer-detail">
       <!-- ── Header ── -->
-      <header class="sd__header">
-        <div class="sd__header-text">
+      <header class="tw:flex tw:items-start tw:gap-2.5 tw:px-5 tw:pt-4 tw:pb-3.5 tw:border-b tw:border-dialog-header-border tw:bg-card-bg tw:shrink-0">
+        <div class="tw:flex-1 tw:min-w-0 tw:flex tw:flex-col tw:gap-1">
           <div class="tw:flex tw:items-center tw:gap-2 tw:flex-nowrap">
-            <span class="sd__eyebrow">{{ t("onlineEvals.scorer.detail.eyebrow") }}</span>
+            <span class="tw:font-semibold tw:text-[11px] tw:leading-[1.4] tw:tracking-[0.02em] tw:text-text-secondary">{{ t("onlineEvals.scorer.detail.eyebrow") }}</span>
             <span
               v-if="row.name"
               :class="[
@@ -23,20 +23,20 @@
               />
             </span>
           </div>
-          <div v-if="row.description" class="sd__produces-line">
+          <div v-if="row.description" class="sd__produces-line tw:flex tw:items-center tw:gap-[6px] tw:text-xs tw:text-[var(--color-text-secondary,var(--o2-text-secondary))] tw:flex-wrap">
             <template v-if="producesConfig">
-              <span class="sd-mono sd__produces-name">{{ producesConfig.name }}</span>
-              <span class="sd__sep">·</span>
+              <span class="sd-mono sd__produces-name tw:text-[var(--color-text-primary,currentColor)] tw:font-semibold">{{ producesConfig.name }}</span>
+              <span class="sd__sep tw:opacity-50">·</span>
             </template>
-            <span class="sd__produces-desc">{{ row.description }}</span>
+            <span class="sd__produces-desc tw:text-[var(--color-text-secondary,var(--o2-text-secondary))]">{{ row.description }}</span>
           </div>
-          <div v-else-if="producesConfig" class="sd__produces-line">
-            <span class="sd-mono sd__produces-name">{{ producesConfig.name }}</span>
+          <div v-else-if="producesConfig" class="sd__produces-line tw:flex tw:items-center tw:gap-[6px] tw:text-xs tw:text-[var(--color-text-secondary,var(--o2-text-secondary))] tw:flex-wrap">
+            <span class="sd-mono sd__produces-name tw:text-[var(--color-text-primary,currentColor)] tw:font-semibold">{{ producesConfig.name }}</span>
           </div>
         </div>
         <button
           type="button"
-          class="sd__close"
+          class="sd__close tw:shrink-0 tw:bg-transparent tw:border-0 tw:p-1 tw:rounded tw:cursor-pointer tw:text-[var(--color-text-secondary,var(--o2-text-secondary))]"
           :aria-label="t('onlineEvals.scorer.detail.close')"
           data-test="scorer-detail-close-btn"
           @click="$emit('close')"
@@ -54,26 +54,26 @@
       </header>
 
       <!-- ── KPI strip ── -->
-      <section class="sd__kpis">
-        <article class="sd-kpi">
-          <span class="sd-kpi__title">{{ t("onlineEvals.scorer.detail.kpis.totalRuns") }}</span>
-          <span class="sd-kpi__value">{{ formatCount(kpis.totalRuns) }}</span>
-          <span class="sd-kpi__sub">{{ t("onlineEvals.scorer.detail.kpis.totalRunsSub") }}</span>
+      <section class="tw:grid tw:grid-cols-4 tw:gap-3 tw:px-5 tw:py-4 tw:bg-[color-mix(in_srgb,var(--color-text-secondary)_4%,var(--color-card-bg))] tw:border-b tw:border-dialog-header-border tw:shrink-0">
+        <article class="sd-kpi tw:flex tw:flex-col tw:gap-[2px] tw:p-[10px_12px] tw:bg-[var(--color-card-bg)] tw:border tw:border-[var(--color-dialog-header-border,var(--o2-border))] tw:rounded-md">
+          <span class="sd-kpi__title tw:font-semibold tw:text-xs tw:[letter-spacing:0.01em] tw:text-[var(--color-text-secondary,var(--o2-text-secondary))]">{{ t("onlineEvals.scorer.detail.kpis.totalRuns") }}</span>
+          <span class="sd-kpi__value tw:font-bold tw:text-[22px] tw:[line-height:1.1] tw:[letter-spacing:-0.01em] tw:[font-variant-numeric:tabular-nums] tw:text-[var(--color-text-primary,currentColor)]">{{ formatCount(kpis.totalRuns) }}</span>
+          <span class="sd-kpi__sub tw:text-[11px] tw:text-[var(--color-text-secondary,var(--o2-text-secondary))]">{{ t("onlineEvals.scorer.detail.kpis.totalRunsSub") }}</span>
         </article>
-        <article class="sd-kpi" :class="successRateTone">
-          <span class="sd-kpi__title">{{ t("onlineEvals.scorer.detail.kpis.successRate") }}</span>
-          <span class="sd-kpi__value">{{ formatPercent(kpis.successRate) }}</span>
-          <span class="sd-kpi__sub">{{ t("onlineEvals.scorer.detail.kpis.successRateSub") }}</span>
+        <article class="sd-kpi tw:flex tw:flex-col tw:gap-[2px] tw:p-[10px_12px] tw:bg-[var(--color-card-bg)] tw:border tw:border-[var(--color-dialog-header-border,var(--o2-border))] tw:rounded-md" :class="successRateTone">
+          <span class="sd-kpi__title tw:font-semibold tw:text-xs tw:[letter-spacing:0.01em] tw:text-[var(--color-text-secondary,var(--o2-text-secondary))]">{{ t("onlineEvals.scorer.detail.kpis.successRate") }}</span>
+          <span class="sd-kpi__value tw:font-bold tw:text-[22px] tw:[line-height:1.1] tw:[letter-spacing:-0.01em] tw:[font-variant-numeric:tabular-nums] tw:text-[var(--color-text-primary,currentColor)]">{{ formatPercent(kpis.successRate) }}</span>
+          <span class="sd-kpi__sub tw:text-[11px] tw:text-[var(--color-text-secondary,var(--o2-text-secondary))]">{{ t("onlineEvals.scorer.detail.kpis.successRateSub") }}</span>
         </article>
-        <article class="sd-kpi">
-          <span class="sd-kpi__title">{{ t("onlineEvals.scorer.detail.kpis.avgLatency") }}</span>
-          <span class="sd-kpi__value">{{ formatLatency(kpis.avgLatencyMs) }}</span>
-          <span class="sd-kpi__sub">{{ t("onlineEvals.scorer.detail.kpis.avgLatencySub") }}</span>
+        <article class="sd-kpi tw:flex tw:flex-col tw:gap-[2px] tw:p-[10px_12px] tw:bg-[var(--color-card-bg)] tw:border tw:border-[var(--color-dialog-header-border,var(--o2-border))] tw:rounded-md">
+          <span class="sd-kpi__title tw:font-semibold tw:text-xs tw:[letter-spacing:0.01em] tw:text-[var(--color-text-secondary,var(--o2-text-secondary))]">{{ t("onlineEvals.scorer.detail.kpis.avgLatency") }}</span>
+          <span class="sd-kpi__value tw:font-bold tw:text-[22px] tw:[line-height:1.1] tw:[letter-spacing:-0.01em] tw:[font-variant-numeric:tabular-nums] tw:text-[var(--color-text-primary,currentColor)]">{{ formatLatency(kpis.avgLatencyMs) }}</span>
+          <span class="sd-kpi__sub tw:text-[11px] tw:text-[var(--color-text-secondary,var(--o2-text-secondary))]">{{ t("onlineEvals.scorer.detail.kpis.avgLatencySub") }}</span>
         </article>
-        <article class="sd-kpi">
-          <span class="sd-kpi__title">{{ t("onlineEvals.scorer.detail.kpis.usedBy") }}</span>
-          <span class="sd-kpi__value">{{ usedByJobs.length }}</span>
-          <span class="sd-kpi__sub">
+        <article class="sd-kpi tw:flex tw:flex-col tw:gap-[2px] tw:p-[10px_12px] tw:bg-[var(--color-card-bg)] tw:border tw:border-[var(--color-dialog-header-border,var(--o2-border))] tw:rounded-md">
+          <span class="sd-kpi__title tw:font-semibold tw:text-xs tw:[letter-spacing:0.01em] tw:text-[var(--color-text-secondary,var(--o2-text-secondary))]">{{ t("onlineEvals.scorer.detail.kpis.usedBy") }}</span>
+          <span class="sd-kpi__value tw:font-bold tw:text-[22px] tw:[line-height:1.1] tw:[letter-spacing:-0.01em] tw:[font-variant-numeric:tabular-nums] tw:text-[var(--color-text-primary,currentColor)]">{{ usedByJobs.length }}</span>
+          <span class="sd-kpi__sub tw:text-[11px] tw:text-[var(--color-text-secondary,var(--o2-text-secondary))]">
             {{ usedByJobs.length === 1
               ? t("onlineEvals.scorer.detail.kpis.usedBySubSingular")
               : t("onlineEvals.scorer.detail.kpis.usedBySubPlural") }}
@@ -82,12 +82,12 @@
       </section>
 
       <!-- ── Tab strip ── -->
-      <nav class="sd__tabs" role="tablist">
+      <nav class="tw:flex tw:gap-4.5 tw:px-5 tw:border-b tw:border-dialog-header-border tw:bg-card-bg tw:shrink-0" role="tablist">
         <button
           v-for="tab in tabs"
           :key="tab.id"
           type="button"
-          class="sd__tab"
+          class="sd__tab tw:inline-flex tw:items-center tw:gap-[6px] tw:py-[10px] tw:px-0 tw:bg-transparent tw:border-0 tw:border-b-2 tw:border-b-transparent tw:cursor-pointer tw:text-[var(--color-text-secondary,var(--o2-text-secondary))] tw:font-semibold tw:text-[13px] tw:mb-[-1px]"
           :class="{ 'sd__tab--active': activeTab === tab.id }"
           role="tab"
           :aria-selected="activeTab === tab.id"
@@ -95,100 +95,100 @@
           @click="activeTab = tab.id"
         >
           <span>{{ tab.label }}</span>
-          <span v-if="tab.count != null" class="sd__tab-count">{{ tab.count }}</span>
+          <span v-if="tab.count != null" class="sd__tab-count tw:inline-flex tw:items-center tw:px-[6px] tw:min-w-[18px] tw:h-[16px] tw:rounded-full tw:font-semibold tw:text-[10px] tw:[line-height:1] tw:bg-[color-mix(in_srgb,var(--color-text-secondary)_14%,transparent)] tw:text-[var(--color-text-secondary,var(--o2-text-secondary))] tw:justify-center">{{ tab.count }}</span>
         </button>
       </nav>
 
       <!-- ── Body ── -->
-      <div class="sd__body">
+      <div class="tw:flex-1 tw:overflow-auto tw:px-5 tw:py-4.5 tw:flex tw:flex-col tw:gap-4.5 tw:min-h-0 tw:bg-card-bg">
         <!-- Configuration -->
         <template v-if="activeTab === 'configuration'">
-          <section class="sd-section">
-            <h4 class="sd-section__title">{{ t("onlineEvals.scorer.detail.configurationSection") }}</h4>
-            <dl class="sd-kv">
+          <section class="sd-section tw:flex tw:flex-col tw:gap-2">
+            <h4 class="sd-section__title tw:m-0 tw:font-semibold tw:text-[13px] tw:[line-height:1.5] tw:text-[var(--color-text-primary,currentColor)] tw:pb-[6px] tw:border-b tw:border-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] tw:inline-flex tw:items-center tw:gap-[6px]">{{ t("onlineEvals.scorer.detail.configurationSection") }}</h4>
+            <dl class="sd-kv tw:grid tw:[grid-template-columns:120px_1fr] tw:gap-[6px_14px] tw:m-0">
               <dt>{{ t("onlineEvals.scorer.detail.scorerTypeLabel") }}</dt>
               <dd>
-                <span class="sd-type-chip" :class="`sd-type-chip--${scorerType}`">{{ scorerTypeLabel }}</span>
-                <span class="sd-version-chip">v{{ row.version }}</span>
+                <span class="sd-type-chip tw:inline-flex tw:p-[1px_6px] tw:rounded-[3px] tw:text-[11px] tw:font-semibold tw:bg-[color-mix(in_srgb,#6b76e3_14%,transparent)] tw:text-[#4f5bcf]" :class="`sd-type-chip--${scorerType}`">{{ scorerTypeLabel }}</span>
+                <span class="sd-version-chip tw:inline-flex tw:ml-[6px] tw:p-[1px_6px] tw:rounded-[3px] tw:[font-family:ui-monospace,SFMono-Regular,Menlo,monospace] tw:text-[11px] tw:font-semibold tw:bg-[color-mix(in_srgb,var(--color-text-secondary)_10%,transparent)] tw:text-[var(--color-text-secondary,var(--o2-text-secondary))]">v{{ row.version }}</span>
               </dd>
 
               <template v-if="scorerType === 'llm_judge'">
                 <dt>{{ t("onlineEvals.scorer.detail.providerLabel") }}</dt>
                 <dd>
-                  <span v-if="provider" class="sd-mono">{{ provider.name }}</span>
-                  <span v-else class="sd-muted">{{ t("onlineEvals.scorer.detail.providerUnknown") }}</span>
+                  <span v-if="provider" class="sd-mono tw:[font-family:ui-monospace,SFMono-Regular,Menlo,monospace] tw:[font-variant-numeric:tabular-nums]">{{ provider.name }}</span>
+                  <span v-else class="sd-muted tw:text-[var(--color-text-secondary,var(--o2-text-secondary))] tw:italic">{{ t("onlineEvals.scorer.detail.providerUnknown") }}</span>
                 </dd>
 
                 <template v-if="judgeModel">
                   <dt>{{ t("onlineEvals.scorer.detail.modelLabel") }}</dt>
-                  <dd class="sd-mono">{{ judgeModel }}</dd>
+                  <dd class="sd-mono tw:[font-family:ui-monospace,SFMono-Regular,Menlo,monospace] tw:[font-variant-numeric:tabular-nums]">{{ judgeModel }}</dd>
                 </template>
               </template>
 
               <template v-if="scorerType === 'remote' && remoteEndpoint">
                 <dt>{{ t("onlineEvals.scorer.detail.endpointLabel") }}</dt>
-                <dd class="sd-mono">{{ remoteEndpoint }}</dd>
+                <dd class="sd-mono tw:[font-family:ui-monospace,SFMono-Regular,Menlo,monospace] tw:[font-variant-numeric:tabular-nums]">{{ remoteEndpoint }}</dd>
               </template>
             </dl>
           </section>
 
-          <section class="sd-section">
-            <h4 class="sd-section__title">{{ t("onlineEvals.scorer.detail.producesSection") }}</h4>
-            <div v-if="producesConfig" class="sd-produces" data-test="scorer-detail-produces">
+          <section class="sd-section tw:flex tw:flex-col tw:gap-2">
+            <h4 class="sd-section__title tw:m-0 tw:font-semibold tw:text-[13px] tw:[line-height:1.5] tw:text-[var(--color-text-primary,currentColor)] tw:pb-[6px] tw:border-b tw:border-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] tw:inline-flex tw:items-center tw:gap-[6px]">{{ t("onlineEvals.scorer.detail.producesSection") }}</h4>
+            <div v-if="producesConfig" class="sd-produces tw:flex tw:items-center tw:gap-[6px] tw:p-[10px_12px] tw:bg-[color-mix(in_srgb,var(--color-primary-600,#3F7994)_8%,transparent)] tw:border tw:border-[color-mix(in_srgb,var(--color-primary-600,#3F7994)_30%,transparent)] tw:rounded-[5px] tw:text-xs tw:text-[var(--color-text-primary,currentColor)]" data-test="scorer-detail-produces">
               <OIcon name="rule" size="xs" />
-              <span class="sd-mono sd-produces__name">{{ producesConfig.name }}</span>
-              <span class="sd-produces__version">v{{ producesConfig.version }}</span>
-              <span class="sd-produces__sep">·</span>
-              <span class="sd-produces__type">{{ dataTypeOf(producesConfig) }}</span>
+              <span class="sd-mono sd-produces__name tw:[font-family:ui-monospace,SFMono-Regular,Menlo,monospace] tw:[font-variant-numeric:tabular-nums] tw:font-bold">{{ producesConfig.name }}</span>
+              <span class="sd-produces__version tw:text-[var(--color-text-secondary,var(--o2-text-secondary))] tw:text-[11px]">v{{ producesConfig.version }}</span>
+              <span class="sd-produces__sep tw:text-[var(--color-text-secondary,var(--o2-text-secondary))] tw:text-[11px]">·</span>
+              <span class="sd-produces__type tw:text-[var(--color-text-secondary,var(--o2-text-secondary))] tw:text-[11px]">{{ dataTypeOf(producesConfig) }}</span>
             </div>
-            <div v-else class="sd-empty">
+            <div v-else class="sd-empty tw:inline-flex tw:items-center tw:gap-[6px] tw:p-[8px_10px] tw:bg-[color-mix(in_srgb,var(--color-text-secondary)_6%,transparent)] tw:rounded-[5px] tw:text-xs tw:text-[var(--color-text-secondary,var(--o2-text-secondary))]">
               <OIcon name="info" size="xs" />
               <span>{{ t("onlineEvals.scorer.detail.producesEmpty") }}</span>
             </div>
           </section>
 
-          <section v-if="row.template" class="sd-section">
-            <h4 class="sd-section__title">
+          <section v-if="row.template" class="sd-section tw:flex tw:flex-col tw:gap-2">
+            <h4 class="sd-section__title tw:m-0 tw:font-semibold tw:text-[13px] tw:[line-height:1.5] tw:text-[var(--color-text-primary,currentColor)] tw:pb-[6px] tw:border-b tw:border-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] tw:inline-flex tw:items-center tw:gap-[6px]">
               {{
                 scorerType === "llm_judge"
                   ? t("onlineEvals.scorer.detail.promptSection")
                   : t("onlineEvals.scorer.detail.requestTemplateSection")
               }}
-              <span v-if="variables.length" class="sd-section__chip">
+              <span v-if="variables.length" class="sd-section__chip tw:inline-flex tw:items-center tw:px-[5px] tw:rounded-[3px] tw:font-semibold tw:text-[10px] tw:bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] tw:text-[var(--color-text-secondary,var(--o2-text-secondary))]">
                 {{ variables.length }} {{ t("onlineEvals.scorer.detail.variablesSuffix") }}
               </span>
             </h4>
-            <pre class="sd-code" data-test="scorer-detail-template">{{ row.template }}</pre>
+            <pre class="sd-code tw:m-0 tw:p-3 tw:bg-[color-mix(in_srgb,var(--color-text-primary)_5%,transparent)] tw:border tw:border-[color-mix(in_srgb,var(--color-text-secondary)_14%,transparent)] tw:rounded-lg tw:[font-family:ui-monospace,SFMono-Regular,Menlo,monospace] tw:text-xs tw:[line-height:1.55] tw:text-[var(--color-text-primary,currentColor)] tw:whitespace-pre-wrap tw:[word-break:break-word] tw:max-h-[280px] tw:overflow-auto" data-test="scorer-detail-template">{{ row.template }}</pre>
           </section>
 
-          <section v-if="outputSchemaPretty" class="sd-section">
-            <h4 class="sd-section__title">{{ t("onlineEvals.scorer.detail.outputSchemaSection") }}</h4>
-            <pre class="sd-code sd-code--mono">{{ outputSchemaPretty }}</pre>
+          <section v-if="outputSchemaPretty" class="sd-section tw:flex tw:flex-col tw:gap-2">
+            <h4 class="sd-section__title tw:m-0 tw:font-semibold tw:text-[13px] tw:[line-height:1.5] tw:text-[var(--color-text-primary,currentColor)] tw:pb-[6px] tw:border-b tw:border-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] tw:inline-flex tw:items-center tw:gap-[6px]">{{ t("onlineEvals.scorer.detail.outputSchemaSection") }}</h4>
+            <pre class="sd-code sd-code--mono tw:m-0 tw:p-3 tw:bg-[color-mix(in_srgb,var(--color-text-primary)_5%,transparent)] tw:border tw:border-[color-mix(in_srgb,var(--color-text-secondary)_14%,transparent)] tw:rounded-lg tw:[font-family:ui-monospace,SFMono-Regular,Menlo,monospace] tw:text-xs tw:[line-height:1.55] tw:text-[var(--color-text-primary,currentColor)] tw:whitespace-pre-wrap tw:[word-break:break-word] tw:max-h-[280px] tw:overflow-auto tw:whitespace-pre">{{ outputSchemaPretty }}</pre>
           </section>
 
-          <section class="sd-section">
-            <h4 class="sd-section__title">{{ t("onlineEvals.scorer.detail.metadataSection") }}</h4>
-            <dl class="sd-kv">
+          <section class="sd-section tw:flex tw:flex-col tw:gap-2">
+            <h4 class="sd-section__title tw:m-0 tw:font-semibold tw:text-[13px] tw:[line-height:1.5] tw:text-[var(--color-text-primary,currentColor)] tw:pb-[6px] tw:border-b tw:border-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] tw:inline-flex tw:items-center tw:gap-[6px]">{{ t("onlineEvals.scorer.detail.metadataSection") }}</h4>
+            <dl class="sd-kv tw:grid tw:[grid-template-columns:120px_1fr] tw:gap-[6px_14px] tw:m-0">
               <dt v-if="createdAt">{{ t("onlineEvals.scorer.detail.createdLabel") }}</dt>
-              <dd v-if="createdAt" class="sd-mono">{{ formatTimestamp(createdAt) }}</dd>
+              <dd v-if="createdAt" class="sd-mono tw:[font-family:ui-monospace,SFMono-Regular,Menlo,monospace] tw:[font-variant-numeric:tabular-nums]">{{ formatTimestamp(createdAt) }}</dd>
               <dt v-if="updatedAt">{{ t("onlineEvals.scorer.detail.updatedLabel") }}</dt>
-              <dd v-if="updatedAt" class="sd-mono">{{ formatTimestamp(updatedAt) }}</dd>
+              <dd v-if="updatedAt" class="sd-mono tw:[font-family:ui-monospace,SFMono-Regular,Menlo,monospace] tw:[font-variant-numeric:tabular-nums]">{{ formatTimestamp(updatedAt) }}</dd>
             </dl>
           </section>
         </template>
 
         <!-- Versions -->
         <template v-else-if="activeTab === 'versions'">
-          <p class="sd__tab-intro">{{ t("onlineEvals.scorer.detail.versionsIntro") }}</p>
-          <ul class="sd-versions">
-            <li class="sd-versions__item sd-versions__item--active">
-              <div class="sd-versions__head">
-                <span class="sd-mono sd-versions__label">v{{ row.version }}</span>
-                <span class="sd-versions__chip">{{ t("onlineEvals.scorer.detail.activeVersionChip") }}</span>
+          <p class="sd__tab-intro tw:m-0 tw:text-xs tw:[line-height:1.5] tw:text-[var(--color-text-secondary,var(--o2-text-secondary))]">{{ t("onlineEvals.scorer.detail.versionsIntro") }}</p>
+          <ul class="sd-versions tw:list-none tw:m-0 tw:p-0 tw:flex tw:flex-col tw:gap-2">
+            <li class="sd-versions__item sd-versions__item--active tw:p-[12px_14px] tw:bg-[color-mix(in_srgb,var(--color-primary-600,#3F7994)_5%,var(--color-card-bg))] tw:border tw:border-[color-mix(in_srgb,var(--color-primary-600,#3F7994)_30%,transparent)] tw:rounded-lg">
+              <div class="sd-versions__head tw:flex tw:items-center tw:gap-2">
+                <span class="sd-mono sd-versions__label tw:[font-family:ui-monospace,SFMono-Regular,Menlo,monospace] tw:[font-variant-numeric:tabular-nums] tw:font-bold tw:text-[13px] tw:text-[var(--color-text-primary,currentColor)]">v{{ row.version }}</span>
+                <span class="sd-versions__chip tw:inline-flex tw:p-[1px_7px] tw:rounded-[3px] tw:font-semibold tw:text-[10px] tw:bg-[color-mix(in_srgb,var(--o2-status-success-text,#2e7d32)_14%,transparent)] tw:text-[var(--o2-status-success-text,#2e7d32)]">{{ t("onlineEvals.scorer.detail.activeVersionChip") }}</span>
               </div>
-              <div v-if="updatedAt" class="sd-versions__meta">
+              <div v-if="updatedAt" class="sd-versions__meta tw:mt-[6px] tw:text-[11.5px] tw:text-[var(--color-text-secondary,var(--o2-text-secondary))]">
                 {{ t("onlineEvals.scorer.detail.lastUpdated") }}
-                <span class="sd-mono">{{ formatTimestamp(updatedAt) }}</span>
+                <span class="sd-mono tw:[font-family:ui-monospace,SFMono-Regular,Menlo,monospace] tw:[font-variant-numeric:tabular-nums]">{{ formatTimestamp(updatedAt) }}</span>
               </div>
             </li>
           </ul>
@@ -196,12 +196,12 @@
 
         <!-- Runs -->
         <template v-else-if="activeTab === 'runs'">
-          <div class="sd__runs-toolbar">
+          <div class="sd__runs-toolbar tw:flex tw:items-center tw:gap-2 tw:flex-wrap">
             <DateTimePickerDashboard
               ref="dateTimePickerRef"
               v-model="selectedDate"
               :auto-apply-dashboard="true"
-              class="sd__date-picker"
+              class="sd__date-picker tw:shrink-0"
               data-test="scorer-detail-runs-window"
             />
             <OButton
@@ -229,32 +229,32 @@
             class="tw:w-full"
           >
             <template #cell-timestampMs="{ row }">
-              <span class="sd-mono sd-muted-text">{{ relativeTime(row.timestampMs) }}</span>
+              <span class="sd-mono sd-muted-text tw:[font-family:ui-monospace,SFMono-Regular,Menlo,monospace] tw:[font-variant-numeric:tabular-nums] tw:text-[var(--color-text-secondary,var(--o2-text-secondary))]">{{ relativeTime(row.timestampMs) }}</span>
             </template>
             <template #cell-jobId="{ row }">
-              <span class="sd-mono">{{ jobNameFor(row.jobId) }}</span>
+              <span class="sd-mono tw:[font-family:ui-monospace,SFMono-Regular,Menlo,monospace] tw:[font-variant-numeric:tabular-nums]">{{ jobNameFor(row.jobId) }}</span>
             </template>
             <template #cell-target="{ row }">
-              <div class="sd-target-cell">
-                <div v-if="row.targetSpanId" class="sd-target-cell__line">
-                  <span class="sd-target-cell__label">{{ t("onlineEvals.scorer.detail.runs.spanLabel") }}</span>
-                  <span class="sd-mono sd-target-cell__id" :title="row.targetSpanId">{{ row.targetSpanId }}</span>
+              <div class="sd-target-cell tw:flex tw:flex-col tw:gap-[2px]">
+                <div v-if="row.targetSpanId" class="sd-target-cell__line tw:flex tw:items-baseline tw:gap-[6px] tw:text-[11px] tw:min-w-0">
+                  <span class="sd-target-cell__label tw:shrink-0 tw:uppercase tw:[letter-spacing:0.04em] tw:font-semibold tw:text-[var(--color-text-secondary,var(--o2-text-secondary))]">{{ t("onlineEvals.scorer.detail.runs.spanLabel") }}</span>
+                  <span class="sd-mono sd-target-cell__id tw:[font-family:ui-monospace,SFMono-Regular,Menlo,monospace] tw:[font-variant-numeric:tabular-nums] tw:text-[11.5px] tw:text-[var(--color-text-primary,currentColor)] tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap tw:min-w-0" :title="row.targetSpanId">{{ row.targetSpanId }}</span>
                 </div>
-                <div v-if="row.targetTraceId" class="sd-target-cell__line">
-                  <span class="sd-target-cell__label">{{ t("onlineEvals.scorer.detail.runs.traceLabel") }}</span>
-                  <span class="sd-mono sd-target-cell__id" :title="row.targetTraceId">{{ row.targetTraceId }}</span>
+                <div v-if="row.targetTraceId" class="sd-target-cell__line tw:flex tw:items-baseline tw:gap-[6px] tw:text-[11px] tw:min-w-0">
+                  <span class="sd-target-cell__label tw:shrink-0 tw:uppercase tw:[letter-spacing:0.04em] tw:font-semibold tw:text-[var(--color-text-secondary,var(--o2-text-secondary))]">{{ t("onlineEvals.scorer.detail.runs.traceLabel") }}</span>
+                  <span class="sd-mono sd-target-cell__id tw:[font-family:ui-monospace,SFMono-Regular,Menlo,monospace] tw:[font-variant-numeric:tabular-nums] tw:text-[11.5px] tw:text-[var(--color-text-primary,currentColor)] tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap tw:min-w-0" :title="row.targetTraceId">{{ row.targetTraceId }}</span>
                 </div>
               </div>
             </template>
             <template #cell-scoreDisplay="{ row }">
-              <span class="sd-mono">{{ row.scoreDisplay }}</span>
+              <span class="sd-mono tw:[font-family:ui-monospace,SFMono-Regular,Menlo,monospace] tw:[font-variant-numeric:tabular-nums]">{{ row.scoreDisplay }}</span>
             </template>
             <template #cell-latencyMs="{ row }">
-              <span class="sd-mono">{{ row.latencyMs != null ? formatLatency(row.latencyMs) : "—" }}</span>
+              <span class="sd-mono tw:[font-family:ui-monospace,SFMono-Regular,Menlo,monospace] tw:[font-variant-numeric:tabular-nums]">{{ row.latencyMs != null ? formatLatency(row.latencyMs) : "—" }}</span>
             </template>
             <template #cell-status="{ row }">
-              <span class="sd-status-cell" :class="`sd-status-cell--${row.status}`">
-                <span class="sd-status-cell__dot" />
+              <span class="sd-status-cell tw:inline-flex tw:items-center tw:gap-[5px] tw:text-[var(--color-text-secondary,var(--o2-text-secondary))]" :class="`sd-status-cell--${row.status}`">
+                <span class="sd-status-cell__dot tw:w-[6px] tw:h-[6px] tw:rounded-full tw:bg-[var(--color-text-secondary,var(--o2-text-secondary))]" />
                 {{ row.status }}
               </span>
             </template>
@@ -263,23 +263,23 @@
 
         <!-- Used by -->
         <template v-else-if="activeTab === 'usedBy'">
-          <p class="sd__tab-intro">{{ t("onlineEvals.scorer.detail.usedByIntro") }}</p>
-          <div v-if="usedByJobs.length === 0" class="sd-empty">
+          <p class="sd__tab-intro tw:m-0 tw:text-xs tw:[line-height:1.5] tw:text-[var(--color-text-secondary,var(--o2-text-secondary))]">{{ t("onlineEvals.scorer.detail.usedByIntro") }}</p>
+          <div v-if="usedByJobs.length === 0" class="sd-empty tw:inline-flex tw:items-center tw:gap-[6px] tw:p-[8px_10px] tw:bg-[color-mix(in_srgb,var(--color-text-secondary)_6%,transparent)] tw:rounded-[5px] tw:text-xs tw:text-[var(--color-text-secondary,var(--o2-text-secondary))]">
             <OIcon name="info" size="xs" />
             <span>{{ t("onlineEvals.scorer.detail.usedByEmpty") }}</span>
           </div>
-          <ul v-else class="sd-used-list">
+          <ul v-else class="sd-used-list tw:list-none tw:m-0 tw:p-0 tw:flex tw:flex-col tw:gap-1">
             <li v-for="job in usedByJobs" :key="job.id">
               <OButton
                 variant="ghost"
-                class="sd-used-list__item"
+                class="sd-used-list__item tw:w-full tw:bg-[color-mix(in_srgb,var(--color-text-secondary)_5%,transparent)!important] tw:border tw:border-transparent tw:rounded-[5px] tw:[transition:border-color_0.15s,background_0.15s]"
                 :data-test="`scorer-detail-used-by-item-${job.name}`"
                 @click="emit('view-job', job)"
               >
                 <OIcon name="play-arrow" size="xs" />
-                <span class="sd-mono">{{ job.name }}</span>
-                <span class="sd-used-list__meta">{{ job.status }}</span>
-                <OIcon name="chevron-right" size="xs" class="sd-used-list__chevron" />
+                <span class="sd-mono tw:[font-family:ui-monospace,SFMono-Regular,Menlo,monospace] tw:[font-variant-numeric:tabular-nums]">{{ job.name }}</span>
+                <span class="sd-used-list__meta tw:ml-auto tw:text-[10px] tw:uppercase tw:[letter-spacing:0.04em] tw:text-[var(--color-text-secondary,var(--o2-text-secondary))]">{{ job.status }}</span>
+                <OIcon name="chevron-right" size="xs" class="sd-used-list__chevron tw:text-[var(--color-text-secondary,var(--o2-text-secondary))] tw:opacity-50" />
               </OButton>
             </li>
           </ul>
@@ -578,200 +578,33 @@ function relativeTime(timestampMs: number): string {
 }
 </script>
 
-<style lang="scss" scoped>
-.sd-scrim {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.32);
-  z-index: 1010;
-  display: flex;
-  justify-content: flex-end;
-  animation: sd-fade 0.18s ease-out;
-}
-
+<style>
 @keyframes sd-fade {
   from { background: rgba(0, 0, 0, 0); }
   to   { background: rgba(0, 0, 0, 0.32); }
 }
 
-.sd {
-  width: 1100px;
-  max-width: 96vw;
-  height: 100%;
-  background: var(--color-card-bg);
-  border-left: 1px solid var(--color-dialog-header-border, var(--o2-border));
-  display: flex;
-  flex-direction: column;
-  animation: sd-slide 0.22s ease-out;
-}
+.sd-scrim { animation: sd-fade 0.18s ease-out; }
 
 @keyframes sd-slide {
   from { transform: translateX(100%); }
   to   { transform: translateX(0); }
 }
 
-/* — Header — */
-.sd__header {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 16px 20px 14px;
-  border-bottom: 1px solid var(--color-dialog-header-border, var(--o2-border));
-  background: var(--color-card-bg);
-  flex-shrink: 0;
-}
-
-.sd__header-text {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.sd__eyebrow {
-  font: 600 11px/1.4 var(--o2-font);
-  letter-spacing: 0.02em;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.sd__title-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-
-.sd__title {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-weight: 700;
-  font-size: 18px;
-  letter-spacing: -0.005em;
-  color: var(--color-text-primary, currentColor);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.sd__title-version {
-  font-size: 11px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  font-variant-numeric: tabular-nums;
-}
-
-.sd__type-pill {
-  display: inline-flex;
-  padding: 1px 7px;
-  border-radius: 3px;
-  font-size: 11px;
-  font-weight: 600;
-  background: color-mix(in srgb, #6b76e3 14%, transparent);
-  color: #4f5bcf;
-}
-
-.sd__type-pill--remote {
-  background: color-mix(in srgb, #b25400 14%, transparent);
-  color: #b25400;
-}
-
-.sd__produces-line {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  flex-wrap: wrap;
-}
-
-.sd__produces-name { color: var(--color-text-primary, currentColor); font-weight: 600; }
-.sd__produces-desc { color: var(--color-text-secondary, var(--o2-text-secondary)); }
-.sd__sep { opacity: 0.5; }
-
-.sd__close {
-  flex-shrink: 0;
-  background: transparent;
-  border: 0;
-  padding: 4px;
-  border-radius: 4px;
-  cursor: pointer;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
+.sd { animation: sd-slide 0.22s ease-out; }
 
 .sd__close:hover {
   background: color-mix(in srgb, var(--color-text-primary) 8%, transparent);
   color: var(--color-text-primary, currentColor);
 }
 
-/* — KPI strip — */
-.sd__kpis {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-  padding: 16px 20px;
-  background: color-mix(in srgb, var(--color-text-secondary) 4%, var(--color-card-bg));
-  border-bottom: 1px solid var(--color-dialog-header-border, var(--o2-border));
-  flex-shrink: 0;
-}
-
-.sd-kpi {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 10px 12px;
-  background: var(--color-card-bg);
-  border: 1px solid var(--color-dialog-header-border, var(--o2-border));
-  border-radius: 6px;
-}
-
 .sd-kpi--good { background: color-mix(in srgb, var(--o2-status-success-text, #2e7d32) 4%, var(--color-card-bg)); }
 .sd-kpi--warn { background: color-mix(in srgb, #f59e0b 5%, var(--color-card-bg)); }
 .sd-kpi--bad  { background: color-mix(in srgb, var(--o2-status-error-text, #c62828) 4%, var(--color-card-bg)); }
 
-.sd-kpi__title {
-  font: 600 12px/1.4 var(--o2-font);
-  letter-spacing: 0.01em;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.sd-kpi__value {
-  font: 700 22px/1.1 var(--o2-font);
-  letter-spacing: -0.01em;
-  font-variant-numeric: tabular-nums;
-  color: var(--color-text-primary, currentColor);
-}
-
 .sd-kpi--good .sd-kpi__value { color: var(--o2-status-success-text, #2e7d32); }
 .sd-kpi--warn .sd-kpi__value { color: #b45309; }
 .sd-kpi--bad  .sd-kpi__value { color: var(--o2-status-error-text, #c62828); }
-
-.sd-kpi__sub {
-  font-size: 11px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-/* — Tab strip — */
-.sd__tabs {
-  display: flex;
-  gap: 18px;
-  padding: 0 20px;
-  border-bottom: 1px solid var(--color-dialog-header-border, var(--o2-border));
-  background: var(--color-card-bg);
-  flex-shrink: 0;
-}
-
-.sd__tab {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 10px 0;
-  background: transparent;
-  border: 0;
-  border-bottom: 2px solid transparent;
-  cursor: pointer;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  font: 600 13px var(--o2-font);
-  margin-bottom: -1px;
-}
 
 .sd__tab:hover { color: var(--color-text-primary, currentColor); }
 
@@ -780,76 +613,14 @@ function relativeTime(timestampMs: number): string {
   border-bottom-color: var(--color-primary-600, #3F7994);
 }
 
-.sd__tab-count {
-  display: inline-flex;
-  align-items: center;
-  padding: 0 6px;
-  min-width: 18px;
-  height: 16px;
-  border-radius: 999px;
-  font: 600 10px/1 var(--o2-font);
-  background: color-mix(in srgb, var(--color-text-secondary) 14%, transparent);
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  justify-content: center;
-}
-
 .sd__tab--active .sd__tab-count {
   background: color-mix(in srgb, var(--color-primary-600, #3F7994) 18%, transparent);
   color: var(--color-primary-600, #3F7994);
 }
 
-/* — Body — */
-.sd__body {
-  flex: 1;
-  overflow: auto;
-  padding: 18px 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-  min-height: 0;
-  background: var(--color-card-bg);
-}
-
-.sd__tab-intro {
-  margin: 0;
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-/* — Sections (Configuration tab) — */
-.sd-section {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.sd-section__title {
-  margin: 0;
-  font: 600 13px/1.5 var(--o2-font);
-  color: var(--color-text-primary, currentColor);
-  padding-bottom: 6px;
-  border-bottom: 1px solid color-mix(in srgb, var(--color-text-secondary) 12%, transparent);
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.sd-section__chip {
-  display: inline-flex;
-  align-items: center;
-  padding: 0 5px;
-  border-radius: 3px;
-  font: 600 10px var(--o2-font);
-  background: color-mix(in srgb, var(--color-text-secondary) 12%, transparent);
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.sd-kv {
-  display: grid;
-  grid-template-columns: 120px 1fr;
-  gap: 6px 14px;
-  margin: 0;
+.sd-type-chip--remote {
+  background: color-mix(in srgb, #b25400 14%, transparent);
+  color: #b25400;
 }
 
 .sd-kv dt {
@@ -861,212 +632,6 @@ function relativeTime(timestampMs: number): string {
   margin: 0;
   font-size: 13px;
   color: var(--color-text-primary, currentColor);
-}
-
-.sd-mono {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-variant-numeric: tabular-nums;
-}
-
-.sd-muted {
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  font-style: italic;
-}
-
-.sd-type-chip {
-  display: inline-flex;
-  padding: 1px 6px;
-  border-radius: 3px;
-  font-size: 11px;
-  font-weight: 600;
-  background: color-mix(in srgb, #6b76e3 14%, transparent);
-  color: #4f5bcf;
-}
-
-.sd-type-chip--remote {
-  background: color-mix(in srgb, #b25400 14%, transparent);
-  color: #b25400;
-}
-
-.sd-version-chip {
-  display: inline-flex;
-  margin-left: 6px;
-  padding: 1px 6px;
-  border-radius: 3px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 11px;
-  font-weight: 600;
-  background: color-mix(in srgb, var(--color-text-secondary) 10%, transparent);
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.sd-produces {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 10px 12px;
-  background: color-mix(in srgb, var(--color-primary-600, #3F7994) 8%, transparent);
-  border: 1px solid color-mix(in srgb, var(--color-primary-600, #3F7994) 30%, transparent);
-  border-radius: 5px;
-  font-size: 12px;
-  color: var(--color-text-primary, currentColor);
-}
-
-.sd-produces__name { font-weight: 700; }
-
-.sd-produces__version,
-.sd-produces__sep,
-.sd-produces__type {
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  font-size: 11px;
-}
-
-.sd-empty {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 10px;
-  background: color-mix(in srgb, var(--color-text-secondary) 6%, transparent);
-  border-radius: 5px;
-  font-size: 12px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.sd-code {
-  margin: 0;
-  padding: 12px;
-  background: color-mix(in srgb, var(--color-text-primary) 5%, transparent);
-  border: 1px solid color-mix(in srgb, var(--color-text-secondary) 14%, transparent);
-  border-radius: 6px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 12px;
-  line-height: 1.55;
-  color: var(--color-text-primary, currentColor);
-  white-space: pre-wrap;
-  word-break: break-word;
-  max-height: 280px;
-  overflow: auto;
-}
-
-.sd-code--mono { white-space: pre; }
-
-/* — Versions tab — */
-.sd-versions {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.sd-versions__item {
-  padding: 12px 14px;
-  background: var(--color-card-bg);
-  border: 1px solid color-mix(in srgb, var(--color-text-secondary) 16%, transparent);
-  border-radius: 6px;
-}
-
-.sd-versions__item--active {
-  border-color: color-mix(in srgb, var(--color-primary-600, #3F7994) 30%, transparent);
-  background: color-mix(in srgb, var(--color-primary-600, #3F7994) 5%, var(--color-card-bg));
-}
-
-.sd-versions__head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.sd-versions__label {
-  font-weight: 700;
-  font-size: 13px;
-  color: var(--color-text-primary, currentColor);
-}
-
-.sd-versions__chip {
-  display: inline-flex;
-  padding: 1px 7px;
-  border-radius: 3px;
-  font: 600 10px var(--o2-font);
-  background: color-mix(in srgb, var(--o2-status-success-text, #2e7d32) 14%, transparent);
-  color: var(--o2-status-success-text, #2e7d32);
-}
-
-.sd-versions__meta {
-  margin-top: 6px;
-  font-size: 11.5px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-/* — Runs tab — */
-.sd__runs-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.sd__date-picker { flex: 0 0 auto; }
-
-.sd__runs-meta {
-  margin-left: auto;
-  font-size: 11.5px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.sd__runs-meta strong {
-  color: var(--color-text-primary, currentColor);
-  font-variant-numeric: tabular-nums;
-}
-
-.sd-muted-text {
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.sd-target-cell {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.sd-target-cell__line {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-  font-size: 11px;
-  min-width: 0;
-}
-
-.sd-target-cell__label {
-  flex-shrink: 0;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  font-weight: 600;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.sd-target-cell__id {
-  font-size: 11.5px;
-  color: var(--color-text-primary, currentColor);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  min-width: 0;
-}
-
-.sd-status-cell {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.sd-status-cell__dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--color-text-secondary, var(--o2-text-secondary));
 }
 
 .sd-status-cell--success { color: var(--o2-status-success-text, #2e7d32); }
@@ -1081,49 +646,18 @@ function relativeTime(timestampMs: number): string {
   background: color-mix(in srgb, var(--color-text-secondary) 60%, transparent);
 }
 
-/* — Used by tab — */
-.sd-used-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.sd-used-list__item {
-  width: 100%;
-  background: color-mix(in srgb, var(--color-text-secondary) 5%, transparent) !important;
-  border: 1px solid transparent !important;
-  border-radius: 5px !important;
-  transition: border-color 0.15s, background 0.15s;
-}
-
 .sd-used-list__item:hover {
   border-color: color-mix(in srgb, var(--color-primary-600, #3F7994) 35%, transparent) !important;
   background: color-mix(in srgb, var(--color-primary-600, #3F7994) 5%, transparent) !important;
 }
 
-.sd-used-list__item:deep(button) {
+.sd-used-list__item button {
   height: auto !important;
   padding: 8px 10px !important;
   gap: 8px;
   font-size: 12px;
   justify-content: flex-start;
   text-align: left;
-}
-
-.sd-used-list__meta {
-  margin-left: auto;
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.sd-used-list__chevron {
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  opacity: 0.5;
 }
 
 .sd-used-list__item:hover .sd-used-list__chevron {

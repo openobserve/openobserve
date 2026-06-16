@@ -1,5 +1,5 @@
 <template>
-  <div class="promql-query-builder tw:px-[0.625rem]">
+  <div class="tw:px-2.5 tw:max-w-350 tw:mx-auto tw:h-[calc(100vh-50px)] tw:overflow-auto">
     <OCard>
       <OCardSection role="header">
         <div class="tw:text-2xl tw:font-semibold">PromQL Query Builder</div>
@@ -12,7 +12,7 @@
 
       <OCardSection role="body">
         <!-- Query Builder Section -->
-        <div class="query-builder-container">
+        <div class="tw:flex tw:flex-col tw:gap-5">
           <!-- Metric Selector -->
           <MetricSelector
             v-model:metric="visualQuery.metric"
@@ -39,7 +39,7 @@
         <div class="tw:text-base tw:font-medium tw:mb-2">Generated PromQL Query:</div>
         <OCard class="tw:bg-surface-panel">
           <OCardSection>
-            <pre class="query-output">{{ generatedQuery || "No query built yet" }}</pre>
+            <pre class="tw:m-0 tw:p-3 tw:font-mono tw:text-sm tw:leading-relaxed tw:whitespace-pre-wrap tw:wrap-break-word tw:text-[#1976d2] tw:font-medium">{{ generatedQuery || "No query built yet" }}</pre>
           </OCardSection>
         </OCard>
 
@@ -78,7 +78,7 @@
         <div class="tw:text-base tw:font-medium tw:mb-2">Query Result Preview:</div>
         <OCard class="tw:bg-surface-panel">
           <OCardSection>
-            <pre class="result-output">{{ queryResult }}</pre>
+            <pre class="tw:m-0 tw:p-3 tw:font-mono tw:text-sm tw:leading-relaxed tw:whitespace-pre-wrap tw:wrap-break-word tw:text-[#424242] tw:max-h-100 tw:overflow-y-auto">{{ queryResult }}</pre>
           </OCardSection>
         </OCard>
       </OCardSection>
@@ -165,39 +165,3 @@ const testQuery = () => {
 };
 </script>
 
-<style scoped lang="scss">
-.promql-query-builder {
-  max-width: 1400px;
-  margin: 0 auto;
-  height: calc(100vh - 50px);
-  overflow: auto;
-}
-
-.query-builder-container {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.query-output,
-.result-output {
-  margin: 0;
-  padding: 12px;
-  font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
-  font-size: 14px;
-  line-height: 1.5;
-  white-space: pre-wrap;
-  word-wrap: break-word;
-}
-
-.query-output {
-  color: #1976d2;
-  font-weight: 500;
-}
-
-.result-output {
-  color: #424242;
-  max-height: 400px;
-  overflow-y: auto;
-}
-</style>

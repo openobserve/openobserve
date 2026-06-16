@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="panel-editor tw:flex-1 tw:flex tw:min-h-0" data-test="panel-editor-container">
+  <div class="tw:flex-1 tw:flex tw:min-h-0 tw:h-full tw:w-full" data-test="panel-editor-container">
     <div class="tw:flex" :style="rowStyle">
       <!-- Chart Type Selection Sidebar -->
       <div>
@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Collapsed field list bar -->
         <div
           v-if="!dashboardPanelData.layout.showFieldList"
-          class="field-list-sidebar-header-collapsed card-container tw:bg-surface-panel!"
+          class="tw:cursor-pointer tw:overflow-y-auto tw:flex tw:flex-col tw:items-center tw:justify-start card-container tw:bg-surface-panel!"
           data-test="panel-editor-field-list-sidebar-collapsed"
           @click="collapseFieldList"
           style="width: 50px; height: 100%; flex-shrink: 0"
@@ -58,10 +58,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon
             name="expand-all"
             size="sm"
-            class="field-list-collapsed-icon rotate-90"
+            class="tw:mt-2.5 tw:text-xl rotate-90"
             data-test="panel-editor-field-list-collapsed-icon"
           />
-          <div class="field-list-collapsed-title">
+          <div class="tw:[writing-mode:vertical-rl] tw:[text-orientation:mixed] tw:font-bold tw:text-base">
             {{ t("panel.fields") }}
           </div>
         </div>
@@ -320,7 +320,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :selectedTimeDate="dashboardPanelData.meta.dateTime"
             @variablesData="handleVariablesDataUpdated"
             :initialVariableValues="initialVariableValues"
-            class="tw:flex-shrink-0 tw:mb-2"
+            class="tw:shrink-0 tw:mb-2"
             :showAddVariableButton="true"
             :showAllVisible="true"
             :tabId="tabId"
@@ -335,7 +335,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <DashboardErrorsComponent
             :errors="errorData"
-            class="tw:flex-shrink-0"
+            class="tw:shrink-0"
           />
         </div>
       </div>
@@ -355,7 +355,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :selectedTimeDate="dashboardPanelData.meta.dateTime"
             @variablesData="handleVariablesDataUpdated"
             :initialVariableValues="initialVariableValues"
-            class="tw:flex-shrink-0 tw:mb-2"
+            class="tw:shrink-0 tw:mb-2"
             :showAddVariableButton="true"
             :showAllVisible="true"
             :tabId="tabId"
@@ -370,7 +370,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <DashboardErrorsComponent
             :errors="errorData"
-            class="tw:flex-shrink-0"
+            class="tw:shrink-0"
           />
         </div>
       </div>
@@ -384,7 +384,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Collapsed field list bar for custom chart -->
         <div
           v-if="!dashboardPanelData.layout.showFieldList"
-          class="field-list-sidebar-header-collapsed card-container tw:bg-surface-panel!"
+          class="tw:cursor-pointer tw:overflow-y-auto tw:flex tw:flex-col tw:items-center tw:justify-start card-container tw:bg-surface-panel!"
           data-test="panel-editor-field-list-sidebar-collapsed"
           @click="collapseFieldList"
           style="width: 50px; height: 100%; flex-shrink: 0"
@@ -392,10 +392,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon
             name="expand-all"
             size="sm"
-            class="field-list-collapsed-icon rotate-90"
+            class="tw:mt-2.5 tw:text-xl rotate-90"
             data-test="panel-editor-field-list-collapsed-icon"
           />
-          <div class="field-list-collapsed-title">
+          <div class="tw:[writing-mode:vertical-rl] tw:[text-orientation:mixed] tw:font-bold tw:text-base">
             {{ t("panel.fields") }}
           </div>
         </div>
@@ -497,7 +497,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                     <!-- Splitter separator -->
                     <template #separator>
-                      <div class="splitter-vertical splitter-enabled"></div>
+                      <div class="tw:w-1 tw:h-full tw:bg-transparent tw:transition-colors tw:duration-300 tw:hover:bg-orange-500"></div>
                     </template>
 
                     <!-- Chart Preview -->
@@ -1208,37 +1208,8 @@ defineExpose({
 });
 </script>
 
-<style lang="scss" scoped>
-.panel-editor {
-  height: 100%;
-  width: 100%;
-}
-
-.layout-panel-container {
-  display: flex;
-  flex-direction: column;
-}
-
-.splitter {
-  height: 4px;
-  width: 100%;
-}
-
-.splitter-vertical {
-  width: 4px;
-  height: 100%;
-}
-
-.splitter-enabled {
-  background-color: transparent;
-  transition: background-color 0.3s;
-}
-
-.splitter-enabled:hover {
-  background-color: orange;
-}
-
-:deep(.field-list-separator::after) {
+<style>
+.field-list-separator::after {
   content: '';
   position: absolute;
   top: 0;
@@ -1250,57 +1221,11 @@ defineExpose({
   transition: background-color 0.3s;
 }
 
-:deep(.field-list-separator:hover::after) {
+.field-list-separator:hover::after {
   background-color: orange;
 }
 
-:deep(.query-editor-splitter .o-splitter__separator) {
+.query-editor-splitter .o-splitter__separator {
   background-color: transparent !important;
-}
-
-.field-list-sidebar-header-collapsed {
-  cursor: pointer;
-  width: 50px;
-  height: 100%;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-start;
-}
-
-.field-list-collapsed-icon {
-  margin-top: 10px;
-  font-size: 20px;
-}
-
-.field-list-collapsed-title {
-  writing-mode: vertical-rl;
-  text-orientation: mixed;
-  font-weight: bold;
-  font-size: 1rem;
-}
-
-.warning {
-  color: var(--q-warning);
-}
-
-.lastRefreshedAt {
-  font-size: 12px;
-  color: var(--q-secondary);
-}
-
-.lastRefreshedAtIcon {
-  margin-right: 4px;
-}
-
-.splitter-icon-expand {
-  position: absolute;
-  left: -12px;
-}
-
-.splitter-icon-collapse {
-  position: absolute;
-  left: -12px;
 }
 </style>

@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <ODropdown v-model:open="picker.showMenu" side="bottom" :align="props.align">
     <template #trigger>
       <OButton
@@ -8,7 +8,7 @@
         }"
         data-test="date-time-btn"
         variant="outline"
-        class="date-time-button"
+        class="date-time-button tw:h-full tw:rounded-[3px] tw:py-0 tw:px-[5px] tw:text-xs tw:min-w-auto tw:bg-[rgba(89,96,178,0.2)]!"
         :class="changeStyle ? computedClass : ''"
         :disabled="isFirstEntry"
       >
@@ -21,7 +21,7 @@
         </template>
       </OButton>
     </template>
-    <div class="date-time-dialog">
+    <div class="date-time-dialog tw:w-[341px] tw:z-[10001] tw:max-h-[600px]">
       <div class="tw:flex tw:justify-between">
         <OTabPanels v-model="picker.activeTab">
           <OTabPanel name="relative">
@@ -31,7 +31,7 @@
                 v-for="(period, periodIndex) in relativePeriods"
                 :key="'date_' + periodIndex"
               >
-                <div class="relative-period-name">{{ period.label }}</div>
+                <div class="tw:text-sm tw:font-semibold tw:min-w-18.75">{{ period.label }}</div>
                 <div
                   v-for="(item, itemIndex) in relativeDates[period.value]"
                   :key="item"
@@ -41,8 +41,8 @@
                     variant="ghost"
                     :class="
                       isSelected(item, period.value)
-                        ? 'rp-selector-selected'
-                        : 'rp-selector'
+                        ? 'tw:h-8 tw:w-8 tw:bg-[rgba(0,0,0,0.07)] tw:text-white tw:bg-(--o2-primary-btn-bg)'
+                        : 'tw:h-8 tw:w-8 tw:bg-[rgba(0,0,0,0.07)]'
                     "
                     @click="setRelativeDate(period, item)"
                     >{{ item }}</OButton
@@ -50,7 +50,7 @@
                 </div>
               </div>
               <div class="relative-row tw:px-3 tw:py-2">
-                <div class="relative-period-name">Custom</div>
+                <div class="tw:text-sm tw:font-semibold tw:min-w-18.75">Custom</div>
                 <div class="tw:flex tw:gap-2">
                   <div class="tw:flex tw:flex-col tw:w-20">
                     <OInput
@@ -227,41 +227,14 @@ const getPeriodLabel = () => {
 const computedClass = computed(() => {
   return props.changeStyle
     ? store.state.theme === "dark"
-      ? "dark-mode-date-time-picker"
-      : "light-mode-date-time-picker"
+      ? "tw:bg-[#2a2828]! tw:text-white!"
+      : "tw:bg-white!"
     : "";
 });
 </script>
 
-<style scoped>
-.relative-row {
-  /* Add your styles here */
-}
-
-.date-time-table {
-  /* Add your styles here */
-}
-.alerts-condition-action {
-  .q-btn {
-    &.icon-dark {
-      filter: none !important;
-    }
-  }
-}
-.alert-page-font {
-  background-color: red;
-  font-size: 14px;
-}
-</style>
-<style lang="scss" scoped>
+<style>
 .date-time-button {
-  height: 100%;
-  border-radius: 3px;
-  padding: 0px 5px;
-  font-size: 12px;
-  min-width: auto;
-  background: rgba(89, 96, 178, 0.2) !important;
-
   .OIcon.on-right {
     transition: transform 0.25s ease;
   }
@@ -276,197 +249,5 @@ const computedClass = computed(() => {
       font-weight: 600;
     }
   }
-}
-
-.date-time-dialog {
-  width: 341px;
-  z-index: 10001;
-  max-height: 600px;
-  .tab-button {
-    &.q-btn {
-      padding-bottom: 0.1rem;
-      padding-top: 0.1rem;
-      font-size: 0.75rem;
-      font-weight: 700;
-
-      &.text-primary {
-        .q-btn__content {
-        }
-      }
-    }
-  }
-}
-
-.date-time-table.relative {
-  display: flex;
-
-  .relative-row {
-    display: flex;
-    flex: 1;
-    align-items: center;
-    border-bottom: 1px solid var(--o2-border);
-
-    .block {
-      font-weight: 700;
-    }
-    .q-field {
-      &__control {
-        height: 40px;
-      }
-      &__native {
-        font-size: 0.875rem;
-        font-weight: 600;
-      }
-      .q-select__dropdown-icon {
-      }
-    }
-
-    > * {
-      margin-right: 6px;
-    }
-  }
-}
-
-.absolute-calendar {
-  box-shadow: none;
-  .q-date__header {
-    display: none;
-  }
-  .q-date__view {
-    padding: 0;
-  }
-}
-
-.relative-period-name {
-  font-size: 0.875rem;
-  font-weight: 600;
-  min-width: 75px;
-}
-
-.rp-selector,
-.rp-selector-selected {
-  height: 32px;
-  width: 32px;
-  // border: var(--o2-theme-color);
-  background: rgba(0, 0, 0, 0.07);
-}
-
-.rp-selector-selected {
-  color: #ffffff;
-  background: var(--o2-primary-btn-bg);
-}
-
-.tab-button {
-  width: 154px;
-}
-
-.notePara {
-  padding-right: 1.5rem;
-  padding-left: 1.5rem;
-  font-size: 0.625rem;
-}
-.q-date {
-  &__navigation {
-    justify-content: center;
-    padding: 0 0.5rem;
-
-    .q-date__arrow {
-      & + .q-date__arrow {
-        margin-left: auto;
-      }
-      & + .col {
-        flex: initial;
-      }
-    }
-
-    .q-btn .block {
-      font-size: 0.75rem;
-      font-weight: 700;
-    }
-  }
-  &__calendar {
-    &-item .block {
-      font-weight: 700;
-    }
-    &-weekdays > div {
-      font-size: 0.875rem;
-      font-weight: 700;
-      opacity: 1;
-    }
-  }
-  &__range {
-    &,
-    &-from,
-    &-to {
-      .block {
-        color: white;
-      }
-      &:before {
-        bottom: 3px;
-        top: 3px;
-      }
-    }
-    .block {
-      color: var(--o2-primary-background);
-    }
-  }
-}
-.startEndTime {
-  .q-field {
-    padding-bottom: 0.125rem;
-  }
-  .label {
-    font-size: 0.75rem;
-    // color: var(--o2-primary-background);
-    font-weight: 600;
-  }
-  .timeInput {
-    .q-field__control {
-      padding-right: 0.375rem;
-    }
-
-    .q-btn-group {
-      & > .q-btn-item {
-        border-radius: 2px;
-      }
-
-      .q-btn {
-        padding: 0 0.3125rem;
-
-        .block {
-          font-size: 0.625rem;
-          font-weight: 700;
-        }
-      }
-    }
-  }
-}
-.drawer-footer {
-  .q-btn {
-    font-size: 0.75rem;
-    font-weight: 700;
-
-    &.clearBtn {
-      margin-right: 1rem;
-      color: var(--o2-primary-background);
-    }
-  }
-}
-.dashboard-add-btn {
-  cursor: pointer;
-  padding: 0px 5px;
-}
-.alert-add-btn {
-  border-radius: 4px;
-  text-transform: capitalize;
-  background: #f2f2f2 !important;
-  color: #000 !important;
-}
-.dark-mode-date-time-picker {
-  background-color: #2a2828 !important;
-  color: #ffffff !important;
-}
-.light-mode-date-time-picker {
-  background-color: #ffffff !important;
 }
 </style>

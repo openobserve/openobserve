@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="tw:flex tw:border-b tw:border-[var(--color-border-default)] tw:cursor-pointer hover:tw:bg-[var(--o2-hover-gray)] table-row-hover tw:relative tw:py-1"
+    class="tw:flex tw:border-b tw:border-[var(--color-border-default)] tw:cursor-pointer hover:tw:bg-[var(--o2-hover-gray)] tw:relative tw:py-1 tw:transition-colors tw:duration-150 tw:ease-in-out"
     :class="wrap ? 'tw:items-start' : 'tw:items-center'"
     @click="$emit('click', pattern, index)"
     :data-test="`pattern-card-${index}`"
@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="tw:flex-1 tw:min-w-0 tw:px-2 tw:pl-3" :class="wrap ? '' : 'tw:overflow-hidden'">
       <!-- Template rendered as tokenized chips so wildcards are visually distinct -->
       <div
-        class="pattern-template-text tw:w-full"
+        class="tw:font-mono tw:text-xs tw:w-full"
         :class="[
           store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-500',
           wrap
@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <OBadge
               size="sm"
-              class="wildcard-chip tw:my-0 tw:mx-0"
+              class="tw:my-0 tw:mx-0 tw:font-mono tw:text-xs tw:font-bold tw:h-4.5 tw:py-0 tw:px-1.25 tw:rounded-[0.1875rem] tw:leading-4.5 tw:shrink-0"
               :class="wildcardChipColor(tok.value, tok.sampleValues)"
             >
               {{ wildcardLabel(tok.value, tok.sampleValues) }}
@@ -215,34 +215,6 @@ function highlightLevels(text: string): HighlightSegment[] {
 }
 </script>
 
-<style scoped lang="scss">
-
-.pattern-template-text {
-  font-family: monospace;
-  font-size: 0.75rem;
-}
-
-// Add explicit hover styles
-.table-row-hover {
-  transition: background-color 0.15s ease-in-out;
-
-  &:hover {
-    background-color: var(--o2-hover-gray) !important;
-  }
-}
-</style>
-
-<style lang="scss">
+<style>
 @import "@/assets/styles/log-highlighting.css";
-.wildcard-chip {
-  font-family: monospace;
-  font-size: 0.75rem;
-  font-weight: bold;
-  height: 1.125rem;
-  padding: 0 0.3125rem;
-  border-radius: 0.1875rem;
-  line-height: 1.125rem;
-  // Prevent chips from inheriting the truncate overflow of the parent "row"
-  flex-shrink: 0;
-}
 </style>

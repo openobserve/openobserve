@@ -16,11 +16,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="o-field-row tw:h-6 tw:flex tw:items-center tw:gap-1 tw:w-full tw:relative tw:rounded-[0.25rem] tw:hover:bg-field-list-row-hover-bg"
+    class="o-field-row tw:group tw:h-6 tw:flex tw:items-center tw:gap-1 tw:w-full tw:relative tw:rounded-[0.25rem] tw:hover:bg-field-list-row-hover-bg"
     :class="[highlight && 'tw:bg-field-list-row-hover-bg!']"
   >
     <slot />
-    <div v-if="$slots.actions" class="o-field-row__actions">
+    <div
+      v-if="$slots.actions"
+      class="o-field-row__actions tw:absolute tw:right-0 tw:top-0 tw:bottom-0 tw:hidden tw:group-hover:flex tw:items-center tw:py-0 tw:px-1 tw:gap-[0.375rem] tw:bg-(--color-field-list-actions-bg) tw:rounded tw:overflow-hidden"
+    >
       <slot name="actions" />
     </div>
   </div>
@@ -32,24 +35,3 @@ defineProps<{
 }>()
 </script>
 
-<style scoped lang="scss">
-.o-field-row {
-  &__actions {
-    position: absolute;
-    right: 0;
-    top: 0;
-    bottom: 0;
-    display: none;
-    align-items: center;
-    padding: 0 0.25rem;
-    gap: 0.375rem;
-    background: var(--color-field-list-actions-bg);
-    border-radius: 0.25rem;
-    overflow: hidden;
-  }
-
-  &:hover .o-field-row__actions {
-    display: flex;
-  }
-}
-</style>

@@ -284,7 +284,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <query-editor
               :editor-id="`cred-file-editor-${idx}`"
-              class="monaco-editor-cred"
+              class="tw:w-full tw:min-h-50! tw:rounded-[5px] tw:border tw:border-(--o2-border-color) tw:resize-y tw:overflow-auto"
               language="yaml"
               v-model:query="cred.value"
             />
@@ -311,7 +311,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <query-editor
             data-test="ai-toolset-skill-content"
             editor-id="skill-content-editor"
-            class="monaco-editor tw:mb-3"
+            class="tw:w-full tw:min-h-100! tw:rounded-[5px] tw:border tw:border-(--o2-border-color) tw:resize-y tw:overflow-auto tw:mb-3"
             language="markdown"
             v-model:query="skillData.content"
           />
@@ -671,25 +671,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped>
-/* Skill definition editor — full-height markdown area */
-.monaco-editor {
-  width: 100%;
-  min-height: 400px !important;
-  border-radius: 5px;
-  border: 1px solid var(--o2-border-color);
-  resize: vertical;
-  overflow: auto;
-}
-
-/* Credential file editor — generous but shorter than skill */
-.monaco-editor-cred {
-  width: 100%;
-  min-height: 200px !important;
-  border-radius: 5px;
-  border: 1px solid var(--o2-border-color);
-  resize: vertical;
-  overflow: auto;
-}
-</style>

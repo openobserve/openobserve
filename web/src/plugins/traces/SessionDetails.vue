@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="session-details-page tw:h-[calc(100vh-2.6rem)] tw:px-[0.625rem] tw:py-[0.375rem]"
   >
   <div
-    class="session-details card-container tw:h-full tw:flex tw:flex-col tw:px-[1rem] tw:py-[0.625rem] tw:overflow-y-auto"
+    class="session-details card-container tw:h-full tw:flex tw:flex-col tw:px-[1rem] tw:py-[0.625rem] tw:overflow-y-auto tw:bg-(--o2-card-bg-solid)"
   >
     <!-- Back nav -->
     <div class="tw:flex tw:items-center tw:gap-[0.5rem] tw:mb-[0.625rem]">
@@ -155,28 +155,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- KPI strip (5 columns) -->
-      <div class="kpi-strip tw:mb-[0.625rem]">
-        <div class="kpi-cell">
-          <div class="kpi-label">{{ t('traces.sessionDetail.kpi.turns') }}</div>
-          <div class="kpi-value">{{ detail.turns }}</div>
+      <div class="kpi-strip tw:grid tw:grid-cols-5 tw:gap-2 tw:mb-[0.625rem]">
+        <div class="kpi-cell tw:bg-(--o2-card-bg) tw:border tw:border-(--o2-border-color) tw:rounded-md tw:px-3 tw:py-[0.625rem]">
+          <div class="kpi-label tw:text-[0.7rem] tw:font-semibold tw:tracking-[0.02em] tw:text-(--o2-text-muted) tw:mb-1">{{ t('traces.sessionDetail.kpi.turns') }}</div>
+          <div class="kpi-value tw:text-[1.3rem] tw:font-semibold tw:text-(--o2-text-primary)">{{ detail.turns }}</div>
         </div>
-        <div class="kpi-cell">
-          <div class="kpi-label">{{ t('traces.sessionDetail.kpi.duration') }}</div>
-          <div class="kpi-value">
+        <div class="kpi-cell tw:bg-(--o2-card-bg) tw:border tw:border-(--o2-border-color) tw:rounded-md tw:px-3 tw:py-[0.625rem]">
+          <div class="kpi-label tw:text-[0.7rem] tw:font-semibold tw:tracking-[0.02em] tw:text-(--o2-text-muted) tw:mb-1">{{ t('traces.sessionDetail.kpi.duration') }}</div>
+          <div class="kpi-value tw:text-[1.3rem] tw:font-semibold tw:text-(--o2-text-primary)">
             {{ formatDuration(detail.durationNanos) }}
           </div>
         </div>
-        <div class="kpi-cell">
-          <div class="kpi-label">{{ t('traces.sessionDetail.kpi.inputTokens') }}</div>
-          <div class="kpi-value">{{ formatTokens(detail.inputTokens) }}</div>
+        <div class="kpi-cell tw:bg-(--o2-card-bg) tw:border tw:border-(--o2-border-color) tw:rounded-md tw:px-3 tw:py-[0.625rem]">
+          <div class="kpi-label tw:text-[0.7rem] tw:font-semibold tw:tracking-[0.02em] tw:text-(--o2-text-muted) tw:mb-1">{{ t('traces.sessionDetail.kpi.inputTokens') }}</div>
+          <div class="kpi-value tw:text-[1.3rem] tw:font-semibold tw:text-(--o2-text-primary)">{{ formatTokens(detail.inputTokens) }}</div>
         </div>
-        <div class="kpi-cell">
-          <div class="kpi-label">{{ t('traces.sessionDetail.kpi.outputTokens') }}</div>
-          <div class="kpi-value">{{ formatTokens(detail.outputTokens) }}</div>
+        <div class="kpi-cell tw:bg-(--o2-card-bg) tw:border tw:border-(--o2-border-color) tw:rounded-md tw:px-3 tw:py-[0.625rem]">
+          <div class="kpi-label tw:text-[0.7rem] tw:font-semibold tw:tracking-[0.02em] tw:text-(--o2-text-muted) tw:mb-1">{{ t('traces.sessionDetail.kpi.outputTokens') }}</div>
+          <div class="kpi-value tw:text-[1.3rem] tw:font-semibold tw:text-(--o2-text-primary)">{{ formatTokens(detail.outputTokens) }}</div>
         </div>
-        <div class="kpi-cell">
-          <div class="kpi-label">{{ t('traces.sessionDetail.kpi.cost') }}</div>
-          <div class="kpi-value">${{ detail.cost.toFixed(2) }}</div>
+        <div class="kpi-cell tw:bg-(--o2-card-bg) tw:border tw:border-(--o2-border-color) tw:rounded-md tw:px-3 tw:py-[0.625rem]">
+          <div class="kpi-label tw:text-[0.7rem] tw:font-semibold tw:tracking-[0.02em] tw:text-(--o2-text-muted) tw:mb-1">{{ t('traces.sessionDetail.kpi.cost') }}</div>
+          <div class="kpi-value tw:text-[1.3rem] tw:font-semibold tw:text-(--o2-text-primary)">${{ detail.cost.toFixed(2) }}</div>
         </div>
       </div>
 
@@ -197,15 +197,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-for="(trace, i) in filteredTraces"
           :key="trace.traceId"
-          class="turn-card"
+          class="turn-card tw:border tw:border-(--o2-border-color) tw:rounded-md tw:bg-(--o2-card-bg) tw:overflow-hidden tw:transition-[border-color] tw:duration-[150ms] tw:ease-[ease]"
           :class="{
-            'turn-card--error': trace.status === 'error',
-            'turn-card--ok': trace.status === 'ok',
+            'turn-card--error tw:border-l-[3px] tw:border-l-(--o2-service-health-critical) tw:bg-[color-mix(in_srgb,var(--o2-service-health-critical)_4%,var(--o2-card-bg))]': trace.status === 'error',
+            'turn-card--ok tw:border-l-[3px] tw:border-l-[var(--o2-service-health-healthy,#16a34a)] tw:bg-[color-mix(in_srgb,var(--o2-service-health-healthy,#16a34a)_4%,var(--o2-card-bg))]': trace.status === 'ok',
           }"
         >
           <!-- Row header (always visible, click to expand) -->
           <div
-            class="turn-header"
+            class="turn-header tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:cursor-pointer tw:hover:bg-[var(--o2-row-hover-bg,rgba(0,0,0,0.03))]"
             :data-test="`session-turn-row-${trace.traceId}`"
             @click="toggleTurn(trace.traceId)"
           >
@@ -273,27 +273,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Expanded body -->
-          <div v-if="isExpanded(trace.traceId)" class="turn-body">
+          <div v-if="isExpanded(trace.traceId)" class="turn-body tw:border-t tw:border-(--o2-border-color) tw:p-3 tw:bg-(--o2-card-bg-solid)">
             <!-- Skeleton while turn detail is loading -->
-            <div v-if="turnDetailLoading[trace.traceId]" class="turn-grid">
+            <div v-if="turnDetailLoading[trace.traceId]" class="turn-grid tw:flex tw:gap-3 tw:items-stretch tw:max-h-[28rem]">
               <!-- Messages skeleton -->
-              <div class="turn-messages">
+              <div class="turn-messages tw:flex-1 tw:flex tw:flex-col tw:gap-2 tw:min-h-0">
                 <!-- User tw:block skeleton -->
-                <div class="msg-block msg-block--user">
-                  <div class="msg-block__header">
+                <div class="msg-block msg-block--user tw:flex tw:flex-col tw:border tw:border-(--o2-border-color) tw:rounded-md tw:bg-(--o2-card-bg) tw:overflow-hidden tw:min-h-0 tw:border-[color-mix(in_srgb,#0ea5e9_35%,transparent)] tw:shrink-0">
+                  <div class="msg-block__header tw:flex tw:items-center tw:justify-between tw:px-[0.625rem] tw:py-[0.375rem] tw:border-b tw:border-(--o2-border-color) tw:bg-(--o2-card-bg-solid) tw:shrink-0">
                     <OSkeleton type="rect" class="tw:rounded" style="width: 2.5rem; height: 0.7rem" />
                   </div>
-                  <div class="msg-block__body tw:flex tw:flex-col tw:gap-[0.4rem]">
+                  <div class="msg-block__body tw:flex tw:flex-col tw:gap-[0.4rem] tw:px-3 tw:py-[0.625rem] tw:text-[0.8rem] tw:leading-normal tw:text-(--o2-text-primary) tw:whitespace-pre-wrap tw:break-words tw:flex-1 tw:min-h-0 tw:overflow-y-auto">
                     <OSkeleton type="rect" class="tw:rounded" style="width: 70%; height: 0.65rem" />
                     <OSkeleton type="rect" class="tw:rounded" style="width: 45%; height: 0.65rem" />
                   </div>
                 </div>
                 <!-- Assistant tw:block skeleton -->
-                <div class="msg-block msg-block--assistant">
-                  <div class="msg-block__header">
+                <div class="msg-block msg-block--assistant tw:flex tw:flex-col tw:border tw:border-(--o2-border-color) tw:rounded-md tw:bg-(--o2-card-bg) tw:overflow-hidden tw:min-h-0 tw:border-[color-mix(in_srgb,#16a34a_35%,transparent)] tw:flex-1">
+                  <div class="msg-block__header tw:flex tw:items-center tw:justify-between tw:px-[0.625rem] tw:py-[0.375rem] tw:border-b tw:border-(--o2-border-color) tw:bg-(--o2-card-bg-solid) tw:shrink-0">
                     <OSkeleton type="rect" class="tw:rounded" style="width: 7rem; height: 0.7rem" />
                   </div>
-                  <div class="msg-block__body tw:flex tw:flex-col tw:gap-[0.4rem]">
+                  <div class="msg-block__body tw:flex tw:flex-col tw:gap-[0.4rem] tw:px-3 tw:py-[0.625rem] tw:text-[0.8rem] tw:leading-normal tw:text-(--o2-text-primary) tw:whitespace-pre-wrap tw:break-words tw:flex-1 tw:min-h-0 tw:overflow-y-auto">
                     <OSkeleton type="rect" class="tw:rounded" style="width: 95%; height: 0.65rem" />
                     <OSkeleton type="rect" class="tw:rounded" style="width: 88%; height: 0.65rem" />
                     <OSkeleton type="rect" class="tw:rounded" style="width: 80%; height: 0.65rem" />
@@ -302,7 +302,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
               <!-- Stats skeleton -->
-              <div class="turn-stats">
+              <div class="turn-stats tw:w-[13rem] tw:shrink-0 tw:border tw:border-(--o2-border-color) tw:rounded-md tw:bg-(--o2-card-bg) tw:px-[0.625rem] tw:py-2 tw:flex tw:flex-col tw:gap-2">
                 <!-- Status -->
                 <div class="stat-section">
                   <OSkeleton type="rect" class="tw:rounded tw:mb-[0.375rem]" style="width: 3rem; height: 0.6rem" />
@@ -311,8 +311,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- Tokens -->
                 <div class="stat-section">
                   <OSkeleton type="rect" class="tw:rounded tw:mb-[0.375rem]" style="width: 3.5rem; height: 0.6rem" />
-                  <div class="stat-rows">
-                    <div v-for="n in 3" :key="n" class="stat-row">
+                  <div class="stat-rows tw:flex tw:flex-col tw:gap-[0.125rem]">
+                    <div v-for="n in 3" :key="n" class="stat-row tw:flex tw:items-center tw:justify-between tw:text-[0.75rem] tw:text-(--o2-text-muted)">
                       <OSkeleton type="rect" class="tw:rounded" style="width: 3rem; height: 0.6rem" />
                       <OSkeleton type="rect" class="tw:rounded" style="width: 3.5rem; height: 0.6rem" />
                     </div>
@@ -326,8 +326,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- Spans -->
                 <div class="stat-section">
                   <OSkeleton type="rect" class="tw:rounded tw:mb-[0.375rem]" style="width: 3rem; height: 0.6rem" />
-                  <div class="stat-rows">
-                    <div class="stat-row">
+                  <div class="stat-rows tw:flex tw:flex-col tw:gap-[0.125rem]">
+                    <div class="stat-row tw:flex tw:items-center tw:justify-between tw:text-[0.75rem] tw:text-(--o2-text-muted)">
                       <OSkeleton type="rect" class="tw:rounded" style="width: 3rem; height: 0.6rem" />
                       <OSkeleton type="rect" class="tw:rounded" style="width: 2rem; height: 0.6rem" />
                     </div>
@@ -336,13 +336,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
 
-            <div v-else class="turn-grid">
+            <div v-else class="turn-grid tw:flex tw:gap-3 tw:items-stretch tw:max-h-[28rem]">
               <!-- Messages column -->
-              <div class="turn-messages">
+              <div class="turn-messages tw:flex-1 tw:flex tw:flex-col tw:gap-2 tw:min-h-0">
                 <!-- USER tw:block -->
-                <div class="msg-block msg-block--user">
-                  <div class="msg-block__header">
-                    <span class="msg-block__role">{{ t('traces.sessionDetail.roles.user') }}</span>
+                <div class="msg-block msg-block--user tw:flex tw:flex-col tw:border tw:border-(--o2-border-color) tw:rounded-md tw:bg-(--o2-card-bg) tw:overflow-hidden tw:min-h-0 tw:border-[color-mix(in_srgb,#0ea5e9_35%,transparent)] tw:shrink-0">
+                  <div class="msg-block__header tw:flex tw:items-center tw:justify-between tw:px-[0.625rem] tw:py-[0.375rem] tw:border-b tw:border-(--o2-border-color) tw:bg-(--o2-card-bg-solid) tw:shrink-0">
+                    <span class="msg-block__role tw:text-[0.8rem] tw:font-bold tw:text-(--o2-text-primary)">{{ t('traces.sessionDetail.roles.user') }}</span>
                     <OIcon
                       v-if="turnDetail(trace.traceId)?.userMessage"
                       name="content-copy"
@@ -351,7 +351,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @click="copyText(turnDetail(trace.traceId)?.userMessage?.content)"
                     />
                   </div>
-                  <div class="msg-block__body">
+                  <div class="msg-block__body tw:px-3 tw:py-[0.625rem] tw:text-[0.8rem] tw:leading-normal tw:text-(--o2-text-primary) tw:whitespace-pre-wrap tw:break-words tw:flex-1 tw:min-h-0 tw:overflow-y-auto">
                     {{
                       turnDetail(trace.traceId)?.userMessage?.content ||
                       t('traces.sessionDetail.noUserMessage')
@@ -360,9 +360,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <!-- ASSISTANT tw:block -->
-                <div class="msg-block msg-block--assistant">
-                  <div class="msg-block__header">
-                    <span class="msg-block__role">
+                <div class="msg-block msg-block--assistant tw:flex tw:flex-col tw:border tw:border-(--o2-border-color) tw:rounded-md tw:bg-(--o2-card-bg) tw:overflow-hidden tw:min-h-0 tw:border-[color-mix(in_srgb,#16a34a_35%,transparent)] tw:flex-1">
+                  <div class="msg-block__header tw:flex tw:items-center tw:justify-between tw:px-[0.625rem] tw:py-[0.375rem] tw:border-b tw:border-(--o2-border-color) tw:bg-(--o2-card-bg-solid) tw:shrink-0">
+                    <span class="msg-block__role tw:text-[0.8rem] tw:font-bold tw:text-(--o2-text-primary)">
                       {{ t('traces.sessionDetail.roles.assistant') }}
                       <span
                         v-if="turnDetail(trace.traceId)?.model"
@@ -379,7 +379,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @click="copyText(turnDetail(trace.traceId)?.assistantMessage?.content)"
                     />
                   </div>
-                  <div class="msg-block__body">
+                  <div class="msg-block__body tw:px-3 tw:py-[0.625rem] tw:text-[0.8rem] tw:leading-normal tw:text-(--o2-text-primary) tw:whitespace-pre-wrap tw:break-words tw:flex-1 tw:min-h-0 tw:overflow-y-auto">
                     {{
                       turnDetail(trace.traceId)?.assistantMessage?.content ||
                       t('traces.sessionDetail.noAssistantMessage')
@@ -389,9 +389,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- Right-side stats column -->
-              <div class="turn-stats">
+              <div class="turn-stats tw:w-[13rem] tw:shrink-0 tw:border tw:border-(--o2-border-color) tw:rounded-md tw:bg-(--o2-card-bg) tw:px-[0.625rem] tw:py-2 tw:flex tw:flex-col tw:gap-2">
                 <div class="stat-section">
-                  <div class="stat-label">{{ t('traces.sessionDetail.stats.status') }}</div>
+                  <div class="stat-label tw:text-[0.7rem] tw:font-semibold tw:tracking-[0.02em] tw:text-(--o2-text-muted) tw:mb-1">{{ t('traces.sessionDetail.stats.status') }}</div>
                   <div
                     class="stat-value tw:inline-flex tw:items-center tw:gap-1 tw:rounded tw:px-2 tw:py-0.5 tw:text-[0.75rem] tw:font-semibold"
                     :class="statusBadgeClass(trace.status)"
@@ -404,44 +404,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
                 <div v-if="trace.model" class="stat-section">
-                  <div class="stat-label">{{ t('traces.sessionDetail.stats.model') }}</div>
-                  <div class="stat-value tw:font-mono tw:text-[0.75rem]!">
+                  <div class="stat-label tw:text-[0.7rem] tw:font-semibold tw:tracking-[0.02em] tw:text-(--o2-text-muted) tw:mb-1">{{ t('traces.sessionDetail.stats.model') }}</div>
+                  <div class="stat-value tw:text-[0.85rem] tw:font-semibold tw:text-(--o2-text-primary) tw:flex tw:items-center tw:font-mono tw:text-[0.75rem]!">
                     {{ trace.model }}
                   </div>
                 </div>
                 <div class="stat-section">
-                  <div class="stat-label">{{ t('traces.sessionDetail.stats.tokens') }}</div>
-                  <div class="stat-rows">
-                    <div class="stat-row">
+                  <div class="stat-label tw:text-[0.7rem] tw:font-semibold tw:tracking-[0.02em] tw:text-(--o2-text-muted) tw:mb-1">{{ t('traces.sessionDetail.stats.tokens') }}</div>
+                  <div class="stat-rows tw:flex tw:flex-col tw:gap-[0.125rem]">
+                    <div class="stat-row tw:flex tw:items-center tw:justify-between tw:text-[0.75rem] tw:text-(--o2-text-muted)">
                       <span>{{ t('traces.sessionDetail.stats.input') }}</span>
                       <span class="tw:tabular-nums">{{ trace.inputTokens.toLocaleString() }}</span>
                     </div>
-                    <div class="stat-row">
+                    <div class="stat-row tw:flex tw:items-center tw:justify-between tw:text-[0.75rem] tw:text-(--o2-text-muted)">
                       <span>{{ t('traces.sessionDetail.stats.output') }}</span>
                       <span class="tw:tabular-nums">{{ trace.outputTokens.toLocaleString() }}</span>
                     </div>
-                    <div class="stat-row stat-row--total">
+                    <div class="stat-row stat-row--total tw:flex tw:items-center tw:justify-between tw:text-[0.75rem] tw:text-(--o2-text-primary) tw:font-semibold tw:border-t tw:border-dashed tw:border-(--o2-border-color) tw:pt-[0.125rem] tw:mt-[0.125rem]">
                       <span>{{ t('traces.sessionDetail.stats.total') }}</span>
                       <span class="tw:tabular-nums">{{ trace.tokens.toLocaleString() }}</span>
                     </div>
                   </div>
                 </div>
-                <div class="stat-section stat-section--inline">
-                  <span class="stat-label">{{ t('traces.sessionDetail.stats.cost') }}</span>
-                  <span class="stat-value tw:text-[0.8rem]!">${{ trace.cost.toFixed(4) }}</span>
+                <div class="stat-section stat-section--inline tw:flex tw:items-center tw:justify-between">
+                  <span class="stat-label tw:text-[0.7rem] tw:font-semibold tw:tracking-[0.02em] tw:text-(--o2-text-muted) tw:mb-0">{{ t('traces.sessionDetail.stats.cost') }}</span>
+                  <span class="stat-value tw:text-[0.85rem] tw:font-semibold tw:text-(--o2-text-primary) tw:flex tw:items-center tw:text-[0.8rem]!">${{ trace.cost.toFixed(4) }}</span>
                 </div>
                 <div class="stat-section">
-                  <div class="stat-label">{{ t('traces.sessionDetail.stats.spans') }}</div>
-                  <div class="stat-rows">
-                    <div v-if="turnDetail(trace.traceId)?.llmCalls" class="stat-row">
+                  <div class="stat-label tw:text-[0.7rem] tw:font-semibold tw:tracking-[0.02em] tw:text-(--o2-text-muted) tw:mb-1">{{ t('traces.sessionDetail.stats.spans') }}</div>
+                  <div class="stat-rows tw:flex tw:flex-col tw:gap-[0.125rem]">
+                    <div v-if="turnDetail(trace.traceId)?.llmCalls" class="stat-row tw:flex tw:items-center tw:justify-between tw:text-[0.75rem] tw:text-(--o2-text-muted)">
                       <span>{{ t('traces.sessionDetail.stats.llmCalls') }}</span>
                       <span class="tw:tabular-nums">{{ turnDetail(trace.traceId)!.llmCalls }}</span>
                     </div>
-                    <div v-if="turnDetail(trace.traceId)?.toolCalls" class="stat-row">
+                    <div v-if="turnDetail(trace.traceId)?.toolCalls" class="stat-row tw:flex tw:items-center tw:justify-between tw:text-[0.75rem] tw:text-(--o2-text-muted)">
                       <span>{{ t('traces.sessionDetail.stats.toolCalls') }}</span>
                       <span class="tw:tabular-nums">{{ turnDetail(trace.traceId)!.toolCalls }}</span>
                     </div>
-                    <div v-if="turnDetail(trace.traceId)?.otherCalls" class="stat-row">
+                    <div v-if="turnDetail(trace.traceId)?.otherCalls" class="stat-row tw:flex tw:items-center tw:justify-between tw:text-[0.75rem] tw:text-(--o2-text-muted)">
                       <span class="tw:flex tw:items-center tw:gap-[0.25rem]">
                         {{ t('traces.sessionDetail.stats.otherCalls') }}
                         <OTooltip max-width="220px">
@@ -454,7 +454,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </span>
                       <span class="tw:tabular-nums">{{ turnDetail(trace.traceId)!.otherCalls }}</span>
                     </div>
-                    <div class="stat-row stat-row--total">
+                    <div class="stat-row stat-row--total tw:flex tw:items-center tw:justify-between tw:text-[0.75rem] tw:text-(--o2-text-primary) tw:font-semibold tw:border-t tw:border-dashed tw:border-(--o2-border-color) tw:pt-[0.125rem] tw:mt-[0.125rem]">
                       <span>{{ t('traces.sessionDetail.stats.total') }}</span>
                       <span class="tw:tabular-nums">{{
                         (turnDetail(trace.traceId)?.llmCalls ?? 0) +
@@ -474,13 +474,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
   <!-- Fullscreen turn dialog -->
   <ODialog v-model:open="fullscreenOpen" size="full" :show-close="false">
-    <div class="fullscreen-turn-dialog" v-if="fullscreenTraceId && fullscreenTrace">
+    <div class="fullscreen-turn-dialog tw:flex tw:flex-col tw:h-full tw:bg-(--o2-card-bg-solid)" v-if="fullscreenTraceId && fullscreenTrace">
       <!-- Header — mirrors the tw:inline turn-header row -->
       <div
-        class="fullscreen-turn-dialog__header"
+        class="fullscreen-turn-dialog__header tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:border-b tw:border-(--o2-border-color) tw:bg-(--o2-card-bg) tw:shrink-0 tw:border-l-[3px] tw:border-l-transparent"
         :class="{
-          'fullscreen-turn-dialog__header--error': fullscreenTrace.status === 'error',
-          'fullscreen-turn-dialog__header--ok': fullscreenTrace.status === 'ok',
+          'fullscreen-turn-dialog__header--ok tw:border-l-[var(--o2-service-health-healthy,#16a34a)] tw:bg-[color-mix(in_srgb,var(--o2-service-health-healthy,#16a34a)_4%,var(--o2-card-bg))]': fullscreenTrace.status === 'ok',
+          'fullscreen-turn-dialog__header--error tw:border-l-(--o2-service-health-critical) tw:bg-[color-mix(in_srgb,var(--o2-service-health-critical)_4%,var(--o2-card-bg))]': fullscreenTrace.status === 'error',
         }"
       >
         <span class="tw:text-[0.85rem] tw:font-semibold tw:text-[var(--o2-text-primary)]">
@@ -535,11 +535,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Two panels: user 50% / assistant 50% -->
-      <div class="fullscreen-turn-dialog__body">
+      <div class="fullscreen-turn-dialog__body tw:flex-1 tw:flex tw:flex-col tw:min-h-0">
         <!-- User panel -->
-        <div class="fullscreen-panel fullscreen-panel--user">
-          <div class="fullscreen-panel__header">
-            <span class="fullscreen-panel__role">{{ t('traces.sessionDetail.roles.user') }}</span>
+        <div class="fullscreen-panel fullscreen-panel--user tw:flex-1 tw:flex tw:flex-col tw:min-h-0 tw:border-l-[3px] tw:border-l-[color-mix(in_srgb,#0ea5e9_60%,transparent)]">
+          <div class="fullscreen-panel__header tw:flex tw:items-center tw:justify-between tw:px-4 tw:py-2 tw:border-b tw:border-(--o2-border-color) tw:bg-(--o2-card-bg) tw:shrink-0">
+            <span class="fullscreen-panel__role tw:text-[0.8rem] tw:font-bold tw:text-(--o2-text-primary) tw:capitalize tw:flex tw:items-center">{{ t('traces.sessionDetail.roles.user') }}</span>
             <OIcon
               v-if="turnDetail(fullscreenTraceId)?.userMessage"
               name="content-copy"
@@ -548,15 +548,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="copyText(turnDetail(fullscreenTraceId)?.userMessage?.content)"
             />
           </div>
-          <div class="fullscreen-panel__content">
+          <div class="fullscreen-panel__content tw:flex-1 tw:overflow-y-auto tw:px-5 tw:py-4 tw:text-[0.875rem] tw:leading-[1.7] tw:text-(--o2-text-primary) tw:whitespace-pre-wrap tw:break-words">
             {{ turnDetail(fullscreenTraceId)?.userMessage?.content || t('traces.sessionDetail.noUserMessage') }}
           </div>
         </div>
 
         <!-- Assistant panel -->
-        <div class="fullscreen-panel fullscreen-panel--assistant">
-          <div class="fullscreen-panel__header">
-            <span class="fullscreen-panel__role">
+        <div class="fullscreen-panel fullscreen-panel--assistant tw:flex-1 tw:flex tw:flex-col tw:min-h-0 tw:border-t tw:border-(--o2-border-color) tw:border-l-[3px] tw:border-l-[color-mix(in_srgb,#16a34a_60%,transparent)]">
+          <div class="fullscreen-panel__header tw:flex tw:items-center tw:justify-between tw:px-4 tw:py-2 tw:border-b tw:border-(--o2-border-color) tw:bg-(--o2-card-bg) tw:shrink-0">
+            <span class="fullscreen-panel__role tw:text-[0.8rem] tw:font-bold tw:text-(--o2-text-primary) tw:capitalize tw:flex tw:items-center">
               {{ t('traces.sessionDetail.roles.assistant') }}
               <span
                 v-if="turnDetail(fullscreenTraceId)?.model"
@@ -573,7 +573,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="copyText(turnDetail(fullscreenTraceId)?.assistantMessage?.content)"
             />
           </div>
-          <div class="fullscreen-panel__content">
+          <div class="fullscreen-panel__content tw:flex-1 tw:overflow-y-auto tw:px-5 tw:py-4 tw:text-[0.875rem] tw:leading-[1.7] tw:text-(--o2-text-primary) tw:whitespace-pre-wrap tw:break-words">
             {{ turnDetail(fullscreenTraceId)?.assistantMessage?.content || t('traces.sessionDetail.noAssistantMessage') }}
           </div>
         </div>
@@ -907,317 +907,33 @@ function statusDotClass(s: SessionTraceRow["status"]): string {
 onMounted(load);
 </script>
 
-<style lang="scss" scoped>
-.session-details {
-  background: var(--o2-card-bg-solid);
-}
-
-.kpi-strip {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 0.5rem;
-
-  @media (max-width: 900px) {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-.kpi-cell {
-  background: var(--o2-card-bg);
-  border: 1px solid var(--o2-border-color);
-  border-radius: 0.375rem;
-  padding: 0.625rem 0.75rem;
-}
-
-.kpi-label {
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  color: var(--o2-text-muted);
-  margin-bottom: 0.25rem;
-}
-
-.kpi-value {
-  font-size: 1.3rem;
-  font-weight: 600;
-  color: var(--o2-text-primary);
-}
-
-.turn-card {
-  border: 1px solid var(--o2-border-color);
-  border-radius: 0.375rem;
-  background: var(--o2-card-bg);
-  overflow: hidden;
-  transition: border-color 0.15s ease;
-
-  &--error {
-    border-left: 3px solid var(--o2-service-health-critical);
-    background: color-mix(
-      in srgb,
-      var(--o2-service-health-critical) 4%,
-      var(--o2-card-bg)
-    );
-  }
-
-  &--ok {
-    border-left: 3px solid var(--o2-service-health-healthy, #16a34a);
-    background: color-mix(
-      in srgb,
-      var(--o2-service-health-healthy, #16a34a) 4%,
-      var(--o2-card-bg)
-    );
-  }
-}
-
-.turn-header {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 0.75rem;
-  cursor: pointer;
-
-  &:hover {
-    background: var(--o2-row-hover-bg, rgba(0, 0, 0, 0.03));
-  }
-}
-
-.turn-body {
-  border-top: 1px solid var(--o2-border-color);
-  padding: 0.75rem;
-  background: var(--o2-card-bg-solid);
-}
-
-// Two-column grid: messages on the left, stats on the right.
-// `align-items: stretch` (flex default) makes the messages column
-// match the stats column's natural height so the user-25 / assistant-75
-// split has a real height to divide. `min-height: 0` on flex children
-// is required for nested overflow scrolling to actually clip.
-.turn-grid {
-  display: flex;
-  gap: 0.75rem;
-  align-items: stretch;
-  // Fixed cap so the expanded body doesn't push the next turn off
-  // screen on very long messages — the stats column is short and the
-  // messages column would otherwise grow with content.
-  max-height: 28rem;
-}
-
-.turn-messages {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  min-height: 0;
-}
-
-.msg-block {
-  display: flex;
-  flex-direction: column;
-  border: 1px solid var(--o2-border-color);
-  border-radius: 0.375rem;
-  background: var(--o2-card-bg);
-  overflow: hidden;
-  min-height: 0;
-
-  &--user {
-    border-color: color-mix(in srgb, #0ea5e9 35%, transparent);
-    flex-shrink: 0;
-
-    .msg-block__body {
-      // font-size 0.8rem × line-height 1.5 = 1.2rem per line; padding 0.625rem×2
-      min-height: calc(1 * 1.2rem + 1.25rem); // 1 line always visible
-      max-height: calc(3 * 1.2rem + 1.25rem); // 3 lines then scroll
-    }
-  }
-
-  &--assistant {
-    border-color: color-mix(in srgb, #16a34a 35%, transparent);
-    flex: 1 1 0;
-  }
-
-  &__header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0.375rem 0.625rem;
-    border-bottom: 1px solid var(--o2-border-color);
-    background: var(--o2-card-bg-solid);
-    flex-shrink: 0;
-  }
-
-  &__role {
-    font-size: 0.8rem;
-    font-weight: 700;
-    color: var(--o2-text-primary);
-  }
-
-  &__body {
-    padding: 0.625rem 0.75rem;
-    font-size: 0.8rem;
-    line-height: 1.5;
-    color: var(--o2-text-primary);
-    white-space: pre-wrap;
-    word-break: break-word;
-    flex: 1;
-    min-height: 0;
-    overflow-y: auto;
-  }
-}
-
-.turn-stats {
-  width: 13rem;
-  flex-shrink: 0;
-  border: 1px solid var(--o2-border-color);
-  border-radius: 0.375rem;
-  background: var(--o2-card-bg);
-  padding: 0.5rem 0.625rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
+<style>
+/* Adjacent sibling: each stat-section after another gets a top border + padding */
 .stat-section + .stat-section {
   padding-top: 0.5rem;
   border-top: 1px solid var(--o2-border-color);
 }
 
-.stat-section--inline {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-
-  .stat-label {
-    margin-bottom: 0;
-  }
+/* Descendant: stat-label inside stat-section--inline has no bottom margin */
+.stat-section--inline .stat-label {
+  margin-bottom: 0;
 }
 
-.stat-label {
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  color: var(--o2-text-muted);
-  margin-bottom: 0.25rem;
+/* Descendant: msg-block--user's body has constrained min/max height */
+.msg-block--user .msg-block__body {
+  min-height: calc(1 * 1.2rem + 1.25rem);
+  max-height: calc(3 * 1.2rem + 1.25rem);
 }
 
-.stat-value {
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--o2-text-primary);
-  display: flex;
-  align-items: center;
+/* Sibling: second fullscreen-panel gets a top border (handled by tw: on element, kept as fallback) */
+.fullscreen-panel + .fullscreen-panel {
+  border-top: 1px solid var(--o2-border-color);
 }
 
-.stat-rows {
-  display: flex;
-  flex-direction: column;
-  gap: 0.125rem;
-}
-
-.stat-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 0.75rem;
-  color: var(--o2-text-muted);
-
-  &--total {
-    color: var(--o2-text-primary);
-    font-weight: 600;
-    border-top: 1px dashed var(--o2-border-color);
-    padding-top: 0.125rem;
-    margin-top: 0.125rem;
-  }
-}
-
-.fullscreen-turn-dialog {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  background: var(--o2-card-bg-solid);
-
-  &__header {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.5rem 0.75rem;
-    border-bottom: 1px solid var(--o2-border-color);
-    background: var(--o2-card-bg);
-    flex-shrink: 0;
-    border-left: 3px solid transparent;
-
-    &--ok {
-      border-left-color: var(--o2-service-health-healthy, #16a34a);
-      background: color-mix(
-        in srgb,
-        var(--o2-service-health-healthy, #16a34a) 4%,
-        var(--o2-card-bg)
-      );
-    }
-
-    &--error {
-      border-left-color: var(--o2-service-health-critical);
-      background: color-mix(
-        in srgb,
-        var(--o2-service-health-critical) 4%,
-        var(--o2-card-bg)
-      );
-    }
-  }
-
-  &__body {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
-  }
-}
-
-.fullscreen-panel {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-
-  & + & {
-    border-top: 1px solid var(--o2-border-color);
-  }
-
-  &--user {
-    border-left: 3px solid color-mix(in srgb, #0ea5e9 60%, transparent);
-  }
-
-  &--assistant {
-    border-left: 3px solid color-mix(in srgb, #16a34a 60%, transparent);
-  }
-
-  &__header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0.5rem 1rem;
-    border-bottom: 1px solid var(--o2-border-color);
-    background: var(--o2-card-bg);
-    flex-shrink: 0;
-  }
-
-  &__role {
-    font-size: 0.8rem;
-    font-weight: 700;
-    color: var(--o2-text-primary);
-    text-transform: capitalize;
-    display: flex;
-    align-items: center;
-  }
-
-  &__content {
-    flex: 1;
-    overflow-y: auto;
-    padding: 1rem 1.25rem;
-    font-size: 0.875rem;
-    line-height: 1.7;
-    color: var(--o2-text-primary);
-    white-space: pre-wrap;
-    word-break: break-word;
+/* Responsive: kpi-strip collapses to 2 columns on narrow viewports */
+@media (max-width: 900px) {
+  .kpi-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 </style>

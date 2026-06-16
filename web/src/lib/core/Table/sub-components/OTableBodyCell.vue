@@ -216,7 +216,7 @@ function handleClick() {
             ? 'tw:whitespace-nowrap tw:overflow-hidden'
             : 'tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis',
       meta?.cellClass ?? '',
-      isTreeColumn ? 'o2-tree-cell' : '',
+      isTreeColumn ? 'tw:relative' : '',
       isTreeColumn && treeMeta?.isParent && treeMeta?.isExpanded ? 'o2-tree-parent-expanded' : '',
       isTreeColumn && treeMeta && (treeMeta.parentId !== null) ? 'o2-tree-child' : '',
       isTreeColumn && treeMeta?.isLastChild ? 'o2-tree-last-child' : '',
@@ -241,12 +241,12 @@ function handleClick() {
     >
       <span
         v-if="treeMeta?.hasChildren || (treeMeta && treeMeta.parentId !== null)"
-        class="o2-table-tree-chevron-slot"
+        class="tw:inline-flex tw:items-center tw:justify-center tw:w-[18px] tw:h-[18px] tw:shrink-0"
       >
         <button
           v-if="treeMeta?.hasChildren"
           type="button"
-          class="o2-table-tree-chevron"
+          class="tw:inline-flex tw:items-center tw:justify-center tw:w-[18px] tw:h-[18px] tw:p-0 tw:bg-transparent tw:border-0 tw:rounded tw:cursor-pointer tw:text-(--color-text-secondary,#6b7280) tw:hover:bg-(--color-table-row-hover-bg,rgba(0,0,0,0.05)) tw:hover:text-(--color-text-primary)"
           :data-test="`o2-table-tree-toggle-${cell.column.id}`"
           :aria-expanded="treeMeta?.isExpanded ? 'true' : 'false'"
           @click="onTreeToggle"
@@ -258,7 +258,7 @@ function handleClick() {
         </button>
         <span
           v-else
-          class="o2-table-tree-endpoint"
+          class="tw:w-[7px] tw:h-[7px] tw:bg-(--q-primary,#6366f1) tw:opacity-75 tw:rounded-[1px] tw:shadow-[0_0_0_2px_var(--color-table-cell-bg,#fff)] tw:z-3 tw:relative"
           aria-hidden="true"
         />
       </span>
@@ -321,48 +321,8 @@ function handleClick() {
   </td>
 </template>
 
-<style scoped>
-.o2-table-tree-chevron-slot {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
-  flex-shrink: 0;
-}
-.o2-table-tree-chevron {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
-  padding: 0;
-  background: transparent;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  color: var(--color-text-secondary, #6b7280);
-}
-.o2-table-tree-chevron:hover {
-  background: var(--color-table-row-hover-bg, rgba(0, 0, 0, 0.05));
-  color: var(--color-text-primary);
-}
-/* Small square endpoint marker on leaf child rows, sits at the line junction */
-.o2-table-tree-endpoint {
-  width: 7px;
-  height: 7px;
-  background-color: var(--q-primary, #6366f1);
-  opacity: 0.75;
-  border-radius: 1px;
-  box-shadow: 0 0 0 2px var(--color-table-cell-bg, #fff);
-  z-index: 3;
-  position: relative;
-}
-
+<style>
 /* ── Tree connector lines (parent ↓ children) ────────────────── */
-.o2-tree-cell {
-  position: relative;
-}
 
 /* Vertical line going down from below the chevron, on expanded parent rows */
 .o2-tree-parent-expanded::after {

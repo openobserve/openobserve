@@ -153,16 +153,12 @@ const onSave = () => {
 
 defineExpose({ addScriptForm });
 </script>
-<style scoped lang="scss">
-.action-scripts-toolbar {
-  :deep(.q-field__bottom) {
-    display: none;
-  }
+<style>
+.action-scripts-toolbar .q-field__bottom {
+  display: none;
+}
 
-  .add-script-actions {
-    :deep(.block) {
-      font-weight: lighter;
-    }
-  }
+.action-scripts-toolbar .add-script-actions .block {
+  font-weight: lighter;
 }
 </style>

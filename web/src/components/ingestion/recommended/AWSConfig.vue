@@ -15,12 +15,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:m-3 tw:mt-1 aws-config-page">
+  <div class="tw:m-3 tw:mt-1">
     <div class="tw:mb-4">
-      <div class="page-title">
+      <div class="tw:text-2xl tw:font-semibold tw:leading-[1.3] tw:m-0 tw:mb-1.5 tw:text-[#1a1a1a] tw:dark:text-(--o2-border)">
         AWS Integrations
       </div>
-      <div class="page-description">
+      <div class="tw:text-sm tw:m-0 tw:mb-4 tw:text-[#666] tw:dark:text-[#b0b0b0]">
         Set up AWS monitoring in one click or configure individual services for granular control.
       </div>
 
@@ -49,10 +49,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div class="tw:mt-8">
       <div class="tw:mb-3">
-        <h6 class="tw:text-base tw:font-semibold tw:m-0 section-title">
+        <h6 class="tw:text-base tw:font-semibold tw:m-0 tw:text-[#333] tw:dark:text-(--o2-border)">
           Manual Configuration
         </h6>
-        <p class="tw:text-sm tw:m-0 section-description">
+        <p class="tw:text-sm tw:m-0 tw:text-[#666] tw:dark:text-[#b0b0b0]">
           Use these credentials for custom AWS integrations or manual setup.
         </p>
       </div>
@@ -147,43 +147,3 @@ Access Key: [BASIC_PASSCODE]`;
   },
 });
 </script>
-
-<style scoped lang="scss">
-.aws-config-page {
-  .page-title {
-    font-size: 1.5rem;
-    font-weight: 600;
-    line-height: 1.3;
-    margin: 0 0 6px 0;
-    color: #1a1a1a;
-  }
-
-  .page-description {
-    font-size: 0.875rem;
-    margin: 0 0 16px 0;
-    color: #666;
-  }
-
-  .section-title {
-    font-size: 1rem;
-    font-weight: 600;
-  }
-
-  .section-description {
-    font-size: 0.875rem;
-    color: #666;
-  }
-
-  .dark &,
-  body.body--dark & {
-    .page-title {
-      color: var(--o2-border);
-    }
-
-    .page-description,
-    .section-description {
-      color: #b0b0b0;
-    }
-  }
-}
-</style>

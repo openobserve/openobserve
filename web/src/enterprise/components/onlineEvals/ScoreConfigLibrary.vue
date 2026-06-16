@@ -6,10 +6,13 @@ the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version. -->
 
 <template>
-  <div class="sc-library" data-test="score-config-library">
+  <div
+    class="tw:flex tw:flex-col tw:h-full tw:p-4 tw:min-h-0"
+    data-test="score-config-library"
+  >
     <div
       v-if="isLoadingCatalog"
-      class="sc-library__center"
+      class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:flex-1 tw:p-8"
       data-test="score-config-library-loading"
     >
       <OSpinner size="lg" />
@@ -17,7 +20,7 @@ the Free Software Foundation, either version 3 of the License, or
 
     <div
       v-else-if="loadError"
-      class="sc-library__center sc-library__error"
+      class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:flex-1 tw:p-8 tw:text-(--o2-text-muted)"
       data-test="score-config-library-error"
     >
       <OIcon name="error-outline" class="tw:mb-2" style="width: 3em; height: 3em" />
@@ -27,7 +30,7 @@ the Free Software Foundation, either version 3 of the License, or
       </OButton>
     </div>
 
-    <div v-else class="sc-library__content">
+    <div v-else class="tw:flex tw:flex-col tw:min-h-0 tw:flex-1">
       <OSearchInput
         v-model="searchQuery"
         placeholder="Search Score Configs..."
@@ -36,10 +39,10 @@ the Free Software Foundation, either version 3 of the License, or
         data-test="score-config-library-search"
       />
 
-      <div class="sc-library__toolbar tw:mb-2 tw:pl-[17px] tw:pr-3">
+      <div class="tw:flex tw:items-center tw:justify-between tw:gap-3 tw:mb-2 tw:pl-4.25 tw:pr-3">
         <label
           v-if="filteredEntries.length > 0"
-          class="sc-library__select-all"
+          class="tw:inline-flex tw:items-center tw:gap-2 tw:py-0.5 tw:px-1 tw:text-xs tw:font-medium tw:text-(--o2-text) tw:select-none"
           data-test="score-config-library-select-all"
         >
           <OCheckbox
@@ -53,19 +56,21 @@ the Free Software Foundation, either version 3 of the License, or
         </span>
       </div>
 
-      <div class="sc-library__list">
+      <div class="tw:overflow-y-auto tw:flex-1 tw:min-h-0">
         <section
-          v-for="group in groupedEntries"
+          v-for="(group, index) in groupedEntries"
           :key="group.dataType"
-          class="sc-library__section"
+          :class="{ 'tw:mt-4': index > 0 }"
           :data-test="`score-config-library-section-${group.dataType}`"
         >
-          <h4 class="sc-library__section-title">
-            <span class="sc-library__section-name">{{ group.label }}</span>
-            <span class="sc-library__section-count">({{ group.entries.length }})</span>
+          <h4
+            class="tw:flex tw:items-baseline tw:gap-1.5 tw:mt-0 tw:mx-0 tw:mb-1.5 tw:text-xs tw:font-bold tw:uppercase tw:tracking-[0.04em] tw:text-(--o2-text)"
+          >
+            <span class="tw:text-(--o2-text)">{{ group.label }}</span>
+            <span class="tw:font-medium tw:text-(--o2-text-muted)">({{ group.entries.length }})</span>
           </h4>
           <ul
-            class="sc-library__group-list tw:flex tw:flex-col tw:rounded tw:border tw:border-border"
+            class="tw:flex tw:flex-col tw:rounded tw:border tw:border-border"
           >
             <li
               v-for="entry in group.entries"
@@ -73,7 +78,7 @@ the Free Software Foundation, either version 3 of the License, or
               class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:cursor-pointer tw:transition-colors tw:duration-200 tw:border-l-4"
               :class="[
                 isSelected(entry.name)
-                  ? 'selected-item tw:bg-primary/5 tw:border-primary'
+                  ? 'tw:bg-primary/5 tw:border-primary'
                   : 'tw:border-transparent hover:tw:bg-gray-50',
               ]"
               :data-test="`score-config-library-item-${entry.name}`"
@@ -275,85 +280,3 @@ function payloadFor(entry: CatalogScoreConfig) {
 defineExpose({ importSelected });
 </script>
 
-<style lang="scss" scoped>
-.sc-library {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  padding: 16px;
-  min-height: 0;
-}
-
-.sc-library__content {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  flex: 1;
-}
-
-.sc-library__list {
-  overflow-y: auto;
-  flex: 1;
-  min-height: 0;
-}
-
-.sc-library__center {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  flex: 1;
-  padding: 32px;
-}
-
-.sc-library__error {
-  color: var(--o2-text-muted);
-}
-
-.sc-library__toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.sc-library__select-all {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 2px 4px;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--o2-text);
-  user-select: none;
-}
-
-.sc-library__section + .sc-library__section {
-  margin-top: 16px;
-}
-
-.sc-library__section-title {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-  margin: 0 0 6px;
-  font-size: 12px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--o2-text);
-}
-
-.sc-library__section-name {
-  color: var(--o2-text);
-}
-
-.sc-library__section-count {
-  font-weight: 500;
-  color: var(--o2-text-muted);
-}
-
-.selected-item {
-  background: color-mix(in srgb, var(--o2-brand) 6%, transparent);
-}
-</style>

@@ -640,4 +640,3 @@ const handleSidebarEvent = (event: string, payload: any) => {
 };
 </script>
 
-<style scoped></style>

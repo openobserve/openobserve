@@ -359,18 +359,3 @@ const bulkDeleteUserGroups = async () => {
 
 </script>
 
-<style scoped></style>
-<style lang="scss">
-.iam-table {
-  .thead-sticky,
-  .tfoot-sticky {
-    position: sticky;
-    top: 0;
-    opacity: 1;
-    z-index: 1;
-    background: transparent !important;
-  }
-
-}
-
-</style>

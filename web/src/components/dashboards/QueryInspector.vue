@@ -396,33 +396,32 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
+<style>
+.inspector-query-editor::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.inspector-query-editor::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.inspector-query-editor::-webkit-scrollbar-thumb {
+  background: rgba(128, 128, 128, 0.2);
+  border-radius: 10px;
+}
+
+.inspector-query-editor::-webkit-scrollbar-thumb:hover {
+  background: rgba(128, 128, 128, 0.4);
+}
+
+/* Firefox scrollbar styling */
 .inspector-query-editor {
-  /* Custom scrollbar styling */
-  &::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-  }
-
-  &::-webkit-scrollbar-track {
-    background: transparent;
-  }
-
-  &::-webkit-scrollbar-thumb {
-    background: rgba(128, 128, 128, 0.2);
-    border-radius: 10px;
-
-    &:hover {
-      background: rgba(128, 128, 128, 0.4);
-    }
-  }
-
-  /* Firefox scrollbar styling */
   scrollbar-width: thin;
   scrollbar-color: rgba(128, 128, 128, 0.2) transparent;
 }
 
-:deep(mark) {
+mark {
   all: unset;
   background-color: #facc15;
   color: black;
@@ -430,8 +429,8 @@ export default defineComponent({
   padding: 0;
 }
 
-// Ensure Monaco colorized content looks good
-:deep(.mtk1) {
+/* Ensure Monaco colorized content looks good */
+.mtk1 {
   color: inherit;
 }
 </style>

@@ -2215,59 +2215,55 @@ watch(
 );
 </script>
 
-<style lang="scss" scoped></style>
-<style lang="scss">
-.tracePage {
-  .index-menu .field_list .field_overlay .field_label,
-  .q-field__native,
-  .q-field__input,
-  .q-table tbody td {
-    font-size: 12px !important;
-  }
+<style>
+.tracePage .index-menu .field_list .field_overlay .field_label,
+.tracePage .q-field__native,
+.tracePage .q-field__input,
+.tracePage .q-table tbody td {
+  font-size: 12px !important;
+}
 
-  .o-splitter__after {
-    overflow: hidden;
-  }
+.tracePage .o-splitter__after {
+  overflow: hidden;
+}
 
-  .index-table :hover::-webkit-scrollbar,
-  #tracesSearchGridComponent:hover::-webkit-scrollbar {
-    height: 13px;
-    width: 13px;
-  }
+.tracePage .index-table :hover::-webkit-scrollbar,
+.tracePage #tracesSearchGridComponent:hover::-webkit-scrollbar {
+  height: 13px;
+  width: 13px;
+}
 
-  .index-table ::-webkit-scrollbar-track,
-  #tracesSearchGridComponent::-webkit-scrollbar-track {
-    -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.3);
-    border-radius: 10px;
-  }
+.tracePage .index-table ::-webkit-scrollbar-track,
+.tracePage #tracesSearchGridComponent::-webkit-scrollbar-track {
+  -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.3);
+  border-radius: 10px;
+}
 
-  .index-table ::-webkit-scrollbar-thumb,
-  #tracesSearchGridComponent::-webkit-scrollbar-thumb {
-    border-radius: 10px;
-    -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.5);
-  }
+.tracePage .index-table ::-webkit-scrollbar-thumb,
+.tracePage #tracesSearchGridComponent::-webkit-scrollbar-thumb {
+  border-radius: 10px;
+  -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.5);
+}
 
-  .q-table__top {
-    padding: 0px !important;
-  }
+.tracePage .q-table__top {
+  padding: 0px !important;
+}
 
-  .q-table__control {
-    width: 100%;
-  }
+.tracePage .q-table__control {
+  width: 100%;
+}
 
-  .q-field__control-container {
-    padding-top: 0px !important;
-  }
+.tracePage .q-field__control-container {
+  padding-top: 0px !important;
+}
 
-  .traces-horizontal-splitter .o-splitter__before {
-    z-index: auto;
-    overflow: visible;
-  }
+.tracePage .traces-horizontal-splitter .o-splitter__before {
+  z-index: auto;
+  overflow: visible;
+}
 
-  .traces-horizontal-splitter.hide-splitter-separator
-    > .o-splitter__separator {
-    background: transparent !important;
-    border: none !important;
-  }
+.tracePage .traces-horizontal-splitter.hide-splitter-separator > .o-splitter__separator {
+  background: transparent !important;
+  border: none !important;
 }
 </style>

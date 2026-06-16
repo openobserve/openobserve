@@ -21,42 +21,42 @@ limitations under the License.
     data-test="destination-preview-dialog"
   >
 
-    <div data-test="destination-preview-card" class="preview-card">
+    <div data-test="destination-preview-card" class="tw:w-full">
         <!-- Slack Preview -->
-        <div v-if="type === 'slack'" data-test="slack-preview" class="slack-message">
-          <div class="slack-message-container">
+        <div v-if="type === 'slack'" data-test="slack-preview" class="slack-message tw:max-w-[600px] tw:mx-auto tw:bg-white tw:border tw:border-(--o2-border) tw:rounded-lg tw:p-4 tw:shadow-[0_2px_8px_rgba(0,0,0,0.1)]">
+          <div class="slack-message-container tw:flex tw:gap-3">
             <div class="slack-avatar">
-              <div class="avatar-circle">OO</div>
+              <div class="avatar-circle tw:w-[36px] tw:h-[36px] tw:bg-[#4a154b] tw:text-white tw:rounded tw:flex tw:items-center tw:justify-center tw:font-bold tw:text-[0.875rem]">OO</div>
             </div>
-            <div class="slack-content">
-              <div class="slack-header">
-                <strong data-test="slack-bot-name" class="bot-name">OpenObserve Bot</strong>
-                <span class="slack-timestamp">{{ getCurrentTime() }}</span>
+            <div class="slack-content tw:flex-1">
+              <div class="slack-header tw:flex tw:items-center tw:gap-2 tw:mb-2">
+                <strong data-test="slack-bot-name" class="bot-name tw:text-[#1264a3] tw:text-[0.9rem]">OpenObserve Bot</strong>
+                <span class="slack-timestamp tw:text-[#616061] tw:text-xs">{{ getCurrentTime() }}</span>
               </div>
               <div data-test="slack-message-body" class="slack-body">
-                <div class="slack-block-header">🚨 High CPU Usage</div>
-                <div class="slack-fields">
+                <div class="slack-block-header tw:text-lg tw:font-bold tw:mb-3 tw:text-[#1d1c1d]">🚨 High CPU Usage</div>
+                <div class="slack-fields tw:grid tw:grid-cols-2 tw:gap-2 tw:mb-3">
                   <div class="slack-field">
-                    <div class="field-label">Stream:</div>
-                    <div class="field-value">system-metrics</div>
+                    <div class="field-label tw:font-bold tw:text-[#1d1c1d] tw:text-[0.875rem]">Stream:</div>
+                    <div class="field-value tw:text-[#616061] tw:text-[0.875rem]">system-metrics</div>
                   </div>
                   <div class="slack-field">
-                    <div class="field-label">Type:</div>
-                    <div class="field-value">metrics</div>
+                    <div class="field-label tw:font-bold tw:text-[#1d1c1d] tw:text-[0.875rem]">Type:</div>
+                    <div class="field-value tw:text-[#616061] tw:text-[0.875rem]">metrics</div>
                   </div>
                   <div class="slack-field">
-                    <div class="field-label">Status:</div>
-                    <div class="field-value">🔴 Firing</div>
+                    <div class="field-label tw:font-bold tw:text-[#1d1c1d] tw:text-[0.875rem]">Status:</div>
+                    <div class="field-value tw:text-[#616061] tw:text-[0.875rem]">🔴 Firing</div>
                   </div>
                   <div class="slack-field">
-                    <div class="field-label">Count:</div>
-                    <div class="field-value">15</div>
+                    <div class="field-label tw:font-bold tw:text-[#1d1c1d] tw:text-[0.875rem]">Count:</div>
+                    <div class="field-value tw:text-[#616061] tw:text-[0.875rem]">15</div>
                   </div>
                 </div>
-                <div class="slack-threshold">
+                <div class="slack-threshold tw:mb-3 tw:text-[#1d1c1d] tw:text-sm">
                   <strong>Threshold Exceeded:</strong> greater than 80%
                 </div>
-                <div class="slack-actions">
+                <div class="slack-actions tw:flex tw:justify-center tw:mt-4">
                   <OButton variant="preview-slack">View in OpenObserve</OButton>
                 </div>
               </div>
@@ -65,88 +65,88 @@ limitations under the License.
         </div>
 
         <!-- MS Teams Preview -->
-        <div v-if="type === 'msteams'" data-test="msteams-preview" class="teams-card">
+        <div v-if="type === 'msteams'" data-test="msteams-preview" class="teams-card tw:max-w-[600px] tw:mx-auto tw:bg-white tw:border tw:border-[#e1e5e9] tw:rounded-lg tw:overflow-hidden tw:shadow-[0_2px_8px_rgba(0,0,0,0.1)]">
           <div data-test="msteams-card-content" class="teams-card-content">
-            <div class="teams-header">
-              <div class="teams-title">🚨 Alert: High CPU Usage</div>
-              <div class="teams-subtitle">OpenObserve Alert Notification</div>
+            <div class="teams-header tw:bg-[#464775] tw:text-white tw:p-4">
+              <div class="teams-title tw:text-[1.125rem] tw:font-bold tw:mb-1">🚨 Alert: High CPU Usage</div>
+              <div class="teams-subtitle tw:text-[0.875rem] tw:opacity-90">OpenObserve Alert Notification</div>
             </div>
-            <div class="teams-facts">
-              <div class="teams-fact">
-                <div class="fact-name">Stream</div>
-                <div class="fact-value">system-metrics</div>
+            <div class="teams-facts tw:p-4 tw:grid tw:gap-2">
+              <div class="teams-fact tw:flex tw:justify-between tw:py-1 tw:border-b tw:border-[#f3f2f1]">
+                <div class="fact-name tw:font-bold tw:text-[#323130]">Stream</div>
+                <div class="fact-value tw:text-[#605e5c]">system-metrics</div>
               </div>
-              <div class="teams-fact">
-                <div class="fact-name">Type</div>
-                <div class="fact-value">metrics</div>
+              <div class="teams-fact tw:flex tw:justify-between tw:py-1 tw:border-b tw:border-[#f3f2f1]">
+                <div class="fact-name tw:font-bold tw:text-[#323130]">Type</div>
+                <div class="fact-value tw:text-[#605e5c]">metrics</div>
               </div>
-              <div class="teams-fact">
-                <div class="fact-name">Status</div>
-                <div class="fact-value">🔴 Firing</div>
+              <div class="teams-fact tw:flex tw:justify-between tw:py-1 tw:border-b tw:border-[#f3f2f1]">
+                <div class="fact-name tw:font-bold tw:text-[#323130]">Status</div>
+                <div class="fact-value tw:text-[#605e5c]">🔴 Firing</div>
               </div>
-              <div class="teams-fact">
-                <div class="fact-name">Count</div>
-                <div class="fact-value">15</div>
+              <div class="teams-fact tw:flex tw:justify-between tw:py-1 tw:border-b tw:border-[#f3f2f1]">
+                <div class="fact-name tw:font-bold tw:text-[#323130]">Count</div>
+                <div class="fact-value tw:text-[#605e5c]">15</div>
               </div>
-              <div class="teams-fact">
-                <div class="fact-name">Threshold</div>
-                <div class="fact-value">greater than 80%</div>
+              <div class="teams-fact tw:flex tw:justify-between tw:py-1 tw:border-b tw:border-[#f3f2f1]">
+                <div class="fact-name tw:font-bold tw:text-[#323130]">Threshold</div>
+                <div class="fact-value tw:text-[#605e5c]">greater than 80%</div>
               </div>
-              <div class="teams-fact">
-                <div class="fact-name">Time</div>
-                <div class="fact-value">{{ getCurrentTime() }}</div>
+              <div class="teams-fact tw:flex tw:justify-between tw:py-1 tw:border-b tw:border-[#f3f2f1]">
+                <div class="fact-name tw:font-bold tw:text-[#323130]">Time</div>
+                <div class="fact-value tw:text-[#605e5c]">{{ getCurrentTime() }}</div>
               </div>
             </div>
-            <div class="teams-actions">
+            <div class="teams-actions tw:flex tw:justify-center tw:p-4">
               <OButton variant="preview-teams">View in OpenObserve</OButton>
             </div>
           </div>
         </div>
 
         <!-- Email Preview -->
-        <div v-if="type === 'email'" data-test="email-preview" class="email-client">
-          <div class="email-header">
-            <div data-test="email-subject" class="email-subject">
+        <div v-if="type === 'email'" data-test="email-preview" class="email-client tw:max-w-[600px] tw:mx-auto tw:bg-white tw:border tw:border-[#ddd] tw:rounded-lg tw:overflow-hidden tw:shadow-[0_2px_8px_rgba(0,0,0,0.1)]">
+          <div class="email-header tw:bg-[#f8f9fa] tw:p-4 tw:border-b tw:border-[#e9ecef]">
+            <div data-test="email-subject" class="email-subject tw:font-bold tw:text-base tw:mb-2">
               Subject: 🚨 OpenObserve Alert Notification
             </div>
-            <div data-test="email-from" class="email-from">
+            <div data-test="email-from" class="email-from tw:text-[#6c757d] tw:text-[0.875rem] tw:mb-1">
               From: alerts@openobserve.ai
             </div>
-            <div class="email-to">To: admin@example.com</div>
-            <div class="email-time">{{ getCurrentTime() }}</div>
+            <div class="email-to tw:text-[#6c757d] tw:text-[0.875rem] tw:mb-1">To: admin@example.com</div>
+            <div class="email-time tw:text-[#6c757d] tw:text-[0.875rem] tw:mb-1">{{ getCurrentTime() }}</div>
           </div>
-          <div data-test="email-body" class="email-body">
+          <div data-test="email-body" class="email-body tw:p-6">
             <div class="email-alert-header">
-              <h1>🚨 Alert Notification</h1>
+              <h1 class="tw:text-[#d63638] tw:text-center tw:mb-4 tw:text-[1.5rem]">🚨 Alert Notification</h1>
             </div>
-            <div class="email-alert-info">
-              <h2>High CPU Usage</h2>
-              <p>An alert has been triggered in your OpenObserve monitoring system.</p>
+            <div class="email-alert-info tw:bg-[#f8f9fa] tw:border-l-4 tw:border-[#d63638] tw:p-4 tw:my-4">
+              <h2 class="tw:text-[#d63638] tw:m-0 tw:mb-2 tw:text-[1.125rem]">High CPU Usage</h2>
+              <p class="tw:m-0 tw:text-[#6c757d]">An alert has been triggered in your OpenObserve monitoring system.</p>
             </div>
-            <div class="email-details">
-              <div class="email-detail-row">
-                <span class="detail-label">Stream:</span>
-                <span class="detail-value">system-metrics</span>
+            <div class="email-details tw:my-4">
+              <div class="email-detail-row tw:flex tw:justify-between tw:py-2 tw:border-b tw:border-[#e9ecef]">
+                <span class="detail-label tw:font-bold tw:text-[#495057]">Stream:</span>
+                <span class="detail-value tw:text-[#6c757d]">system-metrics</span>
               </div>
-              <div class="email-detail-row">
-                <span class="detail-label">Type:</span>
-                <span class="detail-value">metrics</span>
+              <div class="email-detail-row tw:flex tw:justify-between tw:py-2 tw:border-b tw:border-[#e9ecef]">
+                <span class="detail-label tw:font-bold tw:text-[#495057]">Type:</span>
+                <span class="detail-value tw:text-[#6c757d]">metrics</span>
               </div>
-              <div class="email-detail-row">
-                <span class="detail-label">Status:</span>
-                <span class="detail-value">🔴 Firing</span>
+              <div class="email-detail-row tw:flex tw:justify-between tw:py-2 tw:border-b tw:border-[#e9ecef]">
+                <span class="detail-label tw:font-bold tw:text-[#495057]">Status:</span>
+                <span class="detail-value tw:text-[#6c757d]">🔴 Firing</span>
               </div>
-              <div class="email-detail-row">
-                <span class="detail-label">Count:</span>
-                <span class="detail-value">15</span>
+              <div class="email-detail-row tw:flex tw:justify-between tw:py-2 tw:border-b tw:border-[#e9ecef]">
+                <span class="detail-label tw:font-bold tw:text-[#495057]">Count:</span>
+                <span class="detail-value tw:text-[#6c757d]">15</span>
               </div>
-              <div class="email-detail-row">
-                <span class="detail-label">Threshold:</span>
-                <span class="detail-value">greater than 80%</span>
+              <div class="email-detail-row tw:flex tw:justify-between tw:py-2 tw:border-b tw:border-[#e9ecef]">
+                <span class="detail-label tw:font-bold tw:text-[#495057]">Threshold:</span>
+                <span class="detail-value tw:text-[#6c757d]">greater than 80%</span>
               </div>
-              <div class="email-detail-row">
-                <span class="detail-label">Time:</span>
-                <span class="detail-value">{{ getCurrentTime() }}</span>
+              <div class="email-detail-row tw:flex tw:justify-between tw:py-2 tw:border-b tw:border-[#e9ecef]">
+                <span class="detail-label tw:font-bold tw:text-[#495057]">Time:</span>
+                <span class="detail-value tw:text-[#6c757d]">{{ getCurrentTime() }}</span>
               </div>
             </div>
             <OButton variant="preview-email">View in OpenObserve</OButton>
@@ -154,53 +154,53 @@ limitations under the License.
         </div>
 
         <!-- PagerDuty Preview -->
-        <div v-if="type === 'pagerduty'" data-test="pagerduty-preview" class="pagerduty-incident">
-          <div class="pagerduty-header">
-            <div class="pagerduty-title">PagerDuty Incident</div>
-            <div class="pagerduty-status">Triggered</div>
+        <div v-if="type === 'pagerduty'" data-test="pagerduty-preview" class="pagerduty-incident tw:max-w-[600px] tw:mx-auto tw:bg-white tw:border tw:border-[#ddd] tw:rounded-lg tw:overflow-hidden tw:shadow-[0_2px_8px_rgba(0,0,0,0.1)]">
+          <div class="pagerduty-header tw:bg-[#06ac38] tw:text-white tw:p-4 tw:flex tw:justify-between tw:items-center">
+            <div class="pagerduty-title tw:font-bold tw:text-[1.125rem]">PagerDuty Incident</div>
+            <div class="pagerduty-status tw:bg-[#d13212] tw:py-1 tw:px-2 tw:rounded tw:text-xs tw:font-bold">Triggered</div>
           </div>
-          <div class="pagerduty-content">
-            <h3>OpenObserve Alert: High CPU Usage</h3>
+          <div class="pagerduty-content tw:p-6">
+            <h3 class="tw:m-0 tw:mb-4 tw:text-[#2d3748]">OpenObserve Alert: High CPU Usage</h3>
             <div class="pagerduty-details">
-              <div class="pagerduty-field">
+              <div class="pagerduty-field tw:mb-2 tw:text-[#4a5568]">
                 <strong>Source:</strong> openobserve
               </div>
-              <div class="pagerduty-field">
+              <div class="pagerduty-field tw:mb-2 tw:text-[#4a5568]">
                 <strong>Severity:</strong> error
               </div>
-              <div class="pagerduty-field">
+              <div class="pagerduty-field tw:mb-2 tw:text-[#4a5568]">
                 <strong>Component:</strong> system-metrics
               </div>
-              <div class="pagerduty-field">
+              <div class="pagerduty-field tw:mb-2 tw:text-[#4a5568]">
                 <strong>Time:</strong> {{ getCurrentTime() }}
               </div>
             </div>
-            <div class="pagerduty-link">
-              <a href="#">View in OpenObserve</a>
+            <div class="pagerduty-link tw:text-center tw:mt-4">
+              <a href="#" class="tw:text-[#06ac38] tw:no-underline tw:font-bold">View in OpenObserve</a>
             </div>
           </div>
         </div>
 
         <!-- ServiceNow Preview -->
-        <div v-if="type === 'servicenow'" data-test="servicenow-preview" class="servicenow-incident">
-          <div class="servicenow-header">
-            <div class="servicenow-title">ServiceNow Incident</div>
-            <div class="servicenow-number">INC0000123</div>
+        <div v-if="type === 'servicenow'" data-test="servicenow-preview" class="servicenow-incident tw:max-w-[600px] tw:mx-auto tw:bg-white tw:border tw:border-[#ddd] tw:rounded-lg tw:overflow-hidden tw:shadow-[0_2px_8px_rgba(0,0,0,0.1)]">
+          <div class="servicenow-header tw:bg-[#81b5a1] tw:text-white tw:p-4 tw:flex tw:justify-between tw:items-center">
+            <div class="servicenow-title tw:font-bold tw:text-[1.125rem]">ServiceNow Incident</div>
+            <div class="servicenow-number tw:[font-family:monospace] tw:font-bold">INC0000123</div>
           </div>
-          <div class="servicenow-content">
-            <div class="servicenow-field">
+          <div class="servicenow-content tw:p-6">
+            <div class="servicenow-field tw:mb-3 tw:text-[#4a5568]">
               <strong>Short Description:</strong> OpenObserve Alert: High CPU Usage
             </div>
-            <div class="servicenow-field">
+            <div class="servicenow-field tw:mb-3 tw:text-[#4a5568]">
               <strong>Category:</strong> Software
             </div>
-            <div class="servicenow-field">
+            <div class="servicenow-field tw:mb-3 tw:text-[#4a5568]">
               <strong>Priority:</strong> 2 - High
             </div>
-            <div class="servicenow-field">
+            <div class="servicenow-field tw:mb-3 tw:text-[#4a5568]">
               <strong>State:</strong> New
             </div>
-            <div class="servicenow-description">
+            <div class="servicenow-description tw:bg-[#f8f9fa] tw:p-4 tw:rounded tw:text-[#4a5568] tw:[white-space:pre-line] tw:mt-4">
               <strong>Description:</strong><br>
               Alert Details:<br><br>
               Stream: system-metrics<br>
@@ -214,28 +214,28 @@ limitations under the License.
         </div>
 
         <!-- Opsgenie Preview -->
-        <div v-if="type === 'opsgenie'" data-test="opsgenie-preview" class="opsgenie-alert">
-          <div class="opsgenie-header">
-            <div class="opsgenie-title">Opsgenie Alert</div>
-            <div class="opsgenie-priority">P3</div>
+        <div v-if="type === 'opsgenie'" data-test="opsgenie-preview" class="opsgenie-alert tw:max-w-[600px] tw:mx-auto tw:bg-white tw:border tw:border-[#ddd] tw:rounded-lg tw:overflow-hidden tw:shadow-[0_2px_8px_rgba(0,0,0,0.1)]">
+          <div class="opsgenie-header tw:bg-[#172b4d] tw:text-white tw:p-4 tw:flex tw:justify-between tw:items-center">
+            <div class="opsgenie-title tw:font-bold tw:text-[1.125rem]">Opsgenie Alert</div>
+            <div class="opsgenie-priority tw:bg-[#ffab00] tw:text-[#172b4d] tw:py-1 tw:px-2 tw:rounded tw:font-bold">P3</div>
           </div>
-          <div class="opsgenie-content">
-            <h3>OpenObserve Alert: High CPU Usage</h3>
+          <div class="opsgenie-content tw:p-6">
+            <h3 class="tw:m-0 tw:mb-4 tw:text-[#2d3748]">OpenObserve Alert: High CPU Usage</h3>
             <div class="opsgenie-details">
-              <div class="opsgenie-field">
+              <div class="opsgenie-field tw:mb-2 tw:text-[#4a5568]">
                 <strong>Source:</strong> OpenObserve
               </div>
-              <div class="opsgenie-field">
+              <div class="opsgenie-field tw:mb-2 tw:text-[#4a5568]">
                 <strong>Entity:</strong> system-metrics
               </div>
-              <div class="opsgenie-field">
+              <div class="opsgenie-field tw:mb-2 tw:text-[#4a5568]">
                 <strong>Tags:</strong> openobserve, metrics, system-metrics
               </div>
-              <div class="opsgenie-field">
+              <div class="opsgenie-field tw:mb-2 tw:text-[#4a5568]">
                 <strong>Time:</strong> {{ getCurrentTime() }}
               </div>
             </div>
-            <div class="opsgenie-actions">
+            <div class="opsgenie-actions tw:flex tw:justify-center tw:mt-4">
               <OButton variant="preview-action">View in OpenObserve</OButton>
             </div>
           </div>
@@ -323,452 +323,17 @@ const copyTemplate = () => {
 };
 </script>
 
-<style lang="scss" scoped>
-.preview-card {
-  width: 100%;
-}
-
-.preview-container {
-  overflow-y: auto;
-  padding: 1.5rem;
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
-}
-
-// Slack Preview Styles
-.slack-message {
-  max-width: 600px;
-  margin: 0 auto;
-  background: #ffffff;
-  border: 1px solid var(--o2-border);
-  border-radius: 8px;
-  padding: 1rem;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-}
-
-.slack-message-container {
-  display: flex;
-  gap: 0.75rem;
-}
-
-.slack-avatar .avatar-circle {
-  width: 36px;
-  height: 36px;
-  background: #4a154b;
-  color: white;
-  border-radius: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: bold;
-  font-size: 0.875rem;
-}
-
-.slack-content {
-  flex: 1;
-}
-
-.slack-header {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 0.5rem;
-}
-
-.bot-name {
-  color: #1264a3;
-  font-size: 0.9rem;
-}
-
-.slack-timestamp {
-  color: #616061;
-  font-size: 0.75rem;
-}
-
-.slack-block-header {
-  font-size: 1.125rem;
-  font-weight: bold;
-  margin-bottom: 0.75rem;
-  color: #1d1c1d;
-}
-
-.slack-fields {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.5rem;
-  margin-bottom: 0.75rem;
-}
-
-.slack-field {
-  .field-label {
-    font-weight: bold;
-    color: #1d1c1d;
-    font-size: 0.875rem;
-  }
-  .field-value {
-    color: #616061;
-    font-size: 0.875rem;
-  }
-}
-
-.slack-threshold {
-  margin-bottom: 0.75rem;
-  color: #1d1c1d;
-  font-size: 0.875rem;
-}
-
-.slack-actions {
-  display: flex;
-  justify-content: center;
-  margin-top: 1rem;
-}
-
-.slack-button {
-  background: #007a5a;
-  color: white;
-  border: none;
-  padding: 0.5rem 0.75rem;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 0.875rem;
-
-  &:hover {
-    background: #005a42;
-  }
-}
-
-// Teams Preview Styles
-.teams-card {
-  max-width: 600px;
-  margin: 0 auto;
-  background: #ffffff;
-  border: 1px solid #e1e5e9;
-  border-radius: 8px;
-  overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-}
-
-.teams-header {
-  background: #464775;
-  color: white;
-  padding: 1rem;
-
-  .teams-title {
-    font-size: 1.125rem;
-    font-weight: bold;
-    margin-bottom: 0.25rem;
-  }
-
-  .teams-subtitle {
-    font-size: 0.875rem;
-    opacity: 0.9;
-  }
-}
-
-.teams-facts {
-  padding: 1rem;
-  display: grid;
-  gap: 0.5rem;
-}
-
-.teams-fact {
-  display: flex;
-  justify-content: space-between;
-  padding: 0.25rem 0;
-  border-bottom: 1px solid #f3f2f1;
-
-  .fact-name {
-    font-weight: bold;
-    color: #323130;
-  }
-
-  .fact-value {
-    color: #605e5c;
-  }
-}
-
-.teams-actions {
-  display: flex;
-  justify-content: center;
-  padding: 1rem;
-}
-
-.teams-button {
-  background: #6264a7;
+<style>
+.opsgenie-content .opsgenie-actions button {
+  background: #172b4d;
   color: white;
   border: none;
   padding: 0.5rem 1rem;
   border-radius: 4px;
   cursor: pointer;
-
-  &:hover {
-    background: #464775;
-  }
 }
 
-// Email Preview Styles
-.email-client {
-  max-width: 600px;
-  margin: 0 auto;
-  background: #ffffff;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-}
-
-.email-header {
-  background: #f8f9fa;
-  padding: 1rem;
-  border-bottom: 1px solid #e9ecef;
-
-  .email-subject {
-    font-weight: bold;
-    font-size: 1rem;
-    margin-bottom: 0.5rem;
-  }
-
-  .email-from, .email-to, .email-time {
-    color: #6c757d;
-    font-size: 0.875rem;
-    margin-bottom: 0.25rem;
-  }
-}
-
-.email-body {
-  padding: 1.5rem;
-
-  .email-alert-header h1 {
-    color: #d63638;
-    text-align: center;
-    margin-bottom: 1rem;
-    font-size: 1.5rem;
-  }
-
-  .email-alert-info {
-    background: #f8f9fa;
-    border-left: 4px solid #d63638;
-    padding: 1rem;
-    margin: 1rem 0;
-
-    h2 {
-      color: #d63638;
-      margin: 0 0 0.5rem 0;
-      font-size: 1.125rem;
-    }
-
-    p {
-      margin: 0;
-      color: #6c757d;
-    }
-  }
-
-  .email-details {
-    margin: 1rem 0;
-  }
-
-  .email-detail-row {
-    display: flex;
-    justify-content: space-between;
-    padding: 0.5rem 0;
-    border-bottom: 1px solid #e9ecef;
-
-    .detail-label {
-      font-weight: bold;
-      color: #495057;
-    }
-
-    .detail-value {
-      color: #6c757d;
-    }
-  }
-}
-
-.email-button {
-  background: #007bff;
-  color: white;
-  border: none;
-  padding: 0.75rem 1.5rem;
-  border-radius: 4px;
-  margin: 1rem auto 0;
-  cursor: pointer;
-  display: block;
-
-  &:hover {
-    background: #0056b3;
-  }
-}
-
-// PagerDuty Preview Styles
-.pagerduty-incident {
-  max-width: 600px;
-  margin: 0 auto;
-  background: #ffffff;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-}
-
-.pagerduty-header {
-  background: #06ac38;
-  color: white;
-  padding: 1rem;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-
-  .pagerduty-title {
-    font-weight: bold;
-    font-size: 1.125rem;
-  }
-
-  .pagerduty-status {
-    background: #d13212;
-    padding: 0.25rem 0.5rem;
-    border-radius: 4px;
-    font-size: 0.75rem;
-    font-weight: bold;
-  }
-}
-
-.pagerduty-content {
-  padding: 1.5rem;
-
-  h3 {
-    margin: 0 0 1rem 0;
-    color: #2d3748;
-  }
-
-  .pagerduty-field {
-    margin-bottom: 0.5rem;
-    color: #4a5568;
-  }
-
-  .pagerduty-link {
-    text-align: center;
-    margin-top: 1rem;
-
-    a {
-      color: #06ac38;
-      text-decoration: none;
-      font-weight: bold;
-    }
-  }
-}
-
-// ServiceNow Preview Styles
-.servicenow-incident {
-  max-width: 600px;
-  margin: 0 auto;
-  background: #ffffff;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-}
-
-.servicenow-header {
-  background: #81b5a1;
-  color: white;
-  padding: 1rem;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-
-  .servicenow-title {
-    font-weight: bold;
-    font-size: 1.125rem;
-  }
-
-  .servicenow-number {
-    font-family: monospace;
-    font-weight: bold;
-  }
-}
-
-.servicenow-content {
-  padding: 1.5rem;
-
-  .servicenow-field {
-    margin-bottom: 0.75rem;
-    color: #4a5568;
-  }
-
-  .servicenow-description {
-    background: #f8f9fa;
-    padding: 1rem;
-    border-radius: 4px;
-    color: #4a5568;
-    white-space: pre-line;
-    margin-top: 1rem;
-  }
-}
-
-// Opsgenie Preview Styles
-.opsgenie-alert {
-  max-width: 600px;
-  margin: 0 auto;
-  background: #ffffff;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-}
-
-.opsgenie-header {
-  background: #172b4d;
-  color: white;
-  padding: 1rem;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-
-  .opsgenie-title {
-    font-weight: bold;
-    font-size: 1.125rem;
-  }
-
-  .opsgenie-priority {
-    background: #ffab00;
-    color: #172b4d;
-    padding: 0.25rem 0.5rem;
-    border-radius: 4px;
-    font-weight: bold;
-  }
-}
-
-.opsgenie-content {
-  padding: 1.5rem;
-
-  h3 {
-    margin: 0 0 1rem 0;
-    color: #2d3748;
-  }
-
-  .opsgenie-field {
-    margin-bottom: 0.5rem;
-    color: #4a5568;
-  }
-
-  .opsgenie-actions {
-    display: flex;
-    justify-content: center;
-    margin-top: 1rem;
-
-    button {
-      background: #172b4d;
-      color: white;
-      border: none;
-      padding: 0.5rem 1rem;
-      border-radius: 4px;
-      cursor: pointer;
-
-      &:hover {
-        background: #0f1c2e;
-      }
-    }
-  }
+.opsgenie-content .opsgenie-actions button:hover {
+  background: #0f1c2e;
 }
 </style>

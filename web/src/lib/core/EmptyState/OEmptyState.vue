@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     :class="[
-      'o2-empty-state',
+      'o2-empty-state tw:relative tw:flex tw:flex-col tw:items-center tw:justify-center tw:overflow-hidden',
       sizeClass.root,
       { 'o2-empty-state--hero': size === 'hero' },
     ]"
@@ -361,17 +361,8 @@ const SIZE_MAP: Record<
 const sizeClass = computed(() => SIZE_MAP[size.value]);
 </script>
 
-<style scoped>
-.o2-empty-state {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  --empty-dot: var(--color-grey-300);
-}
-:global(.dark) .o2-empty-state {
-  --empty-dot: var(--color-grey-800);
-}
+<style>
+/* CSS custom property for the dot-grid backdrop; dark mode overrides it. */
+.o2-empty-state { --empty-dot: var(--color-grey-300); }
+.dark .o2-empty-state { --empty-dot: var(--color-grey-800); }
 </style>

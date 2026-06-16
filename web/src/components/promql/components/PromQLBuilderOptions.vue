@@ -4,14 +4,14 @@
 
     <!-- Options Row: Query Type Tabs + Legend + Step Value -->
     <div>
-      <div style="display: flex; flex-direction: row; align-items: center" class="tw:pl-2">
-        <div class="layout-name">{{ t("panel.options") }}</div>
-        <span class="layout-separator">:</span>
-        <div class="axis-container">
+      <div class="tw:flex tw:flex-row tw:items-center tw:pl-2">
+        <div class="tw:whitespace-nowrap tw:min-w-21.5 tw:text-sm tw:flex tw:items-center">{{ t("panel.options") }}</div>
+        <span class="tw:flex tw:items-center tw:ml-0.5 tw:mr-0.5">:</span>
+        <div class="tw:my-0.5 tw:mx-1.25 tw:flex tw:gap-2 tw:flex-wrap tw:items-center">
           <!-- Legend -->
-          <div class="option-field-wrapper">
-            <span class="field-label">{{ t("dashboard.legendLabel") }}</span>
-            <div class="field-input-wrapper">
+          <div class="tw:flex tw:flex-row tw:items-center tw:gap-2 tw:ml-2.5">
+            <span class="tw:text-[11px] tw:font-medium tw:whitespace-nowrap tw:opacity-85">{{ t("dashboard.legendLabel") }}</span>
+            <div class="tw:relative tw:inline-block">
               <OCombobox
                 v-model="
                   dashboardPanelData.data.queries[
@@ -27,7 +27,7 @@
               <OIcon
                 name="info"
                 size="sm"
-                class="tw:cursor-pointer field-info-icon"
+                class="tw:cursor-pointer tw:absolute tw:right-2 tw:top-1/2 tw:-translate-y-1/2 tw:z-10 tw:opacity-60 hover:tw:opacity-100 tw:pointer-events-auto"
               >
                 <OTooltip side="top" max-width="250px">
                   <template #content>
@@ -42,8 +42,8 @@
           </div>
 
           <!-- Step Value -->
-          <div class="option-field-wrapper">
-            <span class="field-label">{{ t("dashboard.stepValue") }}</span>
+          <div class="tw:flex tw:flex-row tw:items-center tw:gap-2 tw:ml-2.5">
+            <span class="tw:text-[11px] tw:font-medium tw:whitespace-nowrap tw:opacity-85">{{ t("dashboard.stepValue") }}</span>
             <OInput
               v-model="
                 dashboardPanelData.data.queries[
@@ -73,8 +73,8 @@
           </div>
 
           <!-- Query Type Select (Range/Instant) -->
-          <div class="option-field-wrapper">
-            <span class="field-label">{{ t("common.type") }}</span>
+          <div class="tw:flex tw:flex-row tw:items-center tw:gap-2 tw:ml-2.5">
+            <span class="tw:text-[11px] tw:font-medium tw:whitespace-nowrap tw:opacity-85">{{ t("common.type") }}</span>
             <OSelect
               v-model="
                 dashboardPanelData.data.queries[
@@ -217,62 +217,3 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
-.layout-name {
-  white-space: nowrap;
-  min-width: 86px;
-  font-size: 14px;
-  display: flex;
-  align-items: center;
-}
-
-.layout-separator {
-  display: flex;
-  align-items: center;
-  margin-left: 2px;
-  margin-right: 2px;
-}
-
-.axis-container {
-  margin: 2px 5px;
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  align-items: center;
-}
-
-.option-field-wrapper {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 8px;
-  margin-left: 10px;
-}
-
-.field-label {
-  font-size: 11px;
-  font-weight: 500;
-  white-space: nowrap;
-  opacity: 0.85;
-}
-
-.field-input-wrapper {
-  position: relative;
-  display: inline-block;
-}
-
-.field-info-icon {
-  position: absolute;
-  right: 8px;
-  top: 50%;
-  transform: translateY(-50%);
-  z-index: 10;
-  pointer-events: auto;
-  color: inherit;
-  opacity: 0.6;
-}
-
-.field-info-icon:hover {
-  opacity: 1;
-}
-</style>

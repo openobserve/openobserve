@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <div class="regex-pattern-input-container">
               <div class="tw:flex tw:items-center tw:justify-between">
-                <span class="regex-pattern-input-label"> Regex Pattern </span>
+                <span class="tw:text-sm tw:font-bold tw:leading-5.25"> Regex Pattern </span>
                 <OButton
                   v-if="
                     config.isEnterprise == 'true' &&
@@ -163,7 +163,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OSeparator class="tw:my-2" />
             <div>
               <div class="tw:flex tw:items-center tw:justify-between">
-                <span class="regex-pattern-test-string-label">
+                <span class="tw:text-sm tw:font-bold tw:leading-5.25">
                   Test Regex Pattern
                 </span>
                 <OButton
@@ -244,8 +244,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-[111px]"
                   :class="
                     store.state.theme === 'dark'
-                      ? 'dark-mode-regex-no-output'
-                      : 'light-mode-regex-no-output'
+                      ? 'tw:bg-(--o2-primary-background)! tw:border-l-2! tw:border-r-2! tw:border-b-2! tw:border-(--o2-primary-background)!'
+                      : 'tw:bg-white! tw:border-l! tw:border-r! tw:border-b! tw:border-[#e6e6e6]!'
                   "
                 >
                   <div v-if="!testLoading && outputString.length === 0">
@@ -604,41 +604,7 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss">
-.add-regex-pattern-container {
-  width: 600px !important;
-}
-.add-regex-pattern-o2ai-enabled {
-  width: calc(100vw - 500px) !important;
-}
-.add-regex-pattern-title {
-  font-weight: 400;
-  font-size: 18px;
-  text-align: left;
-}
-.add-regex-pattern-light {
-  .add-regex-pattern-title {
-    color: #000000;
-  }
-}
-
-.add-regex-pattern-name-input .q-field__control {
-  display: flex;
-  align-items: center;
-  height: 44px;
-}
-.add-regex-pattern-description-input .q-field__control {
-  display: flex;
-  align-items: center;
-  height: 65px;
-}
-.regex-pattern-input-container {
-  border: 0px 1px 1px 1px solid #e6e6e6;
-}
-.regex-pattern-test-string-container {
-  border: 0px 1px 1px 1px solid #e6e6e6;
-}
-
+<style>
 .dark-mode-regex-pattern-input .q-field__control {
   background-color: var(--o2-primary-background) !important;
   border-left: 1px solid var(--o2-primary-background) !important;
@@ -673,58 +639,12 @@ export default defineComponent({
   resize: none !important;
   padding-left: 0.5rem !important;
 }
-.is-pattern-valid > div > div {
-  .q-field__native {
-    color: green !important;
-  }
-}
-</style>
 
-<style lang="scss">
-.regex-pattern-test-string-editor {
-  .lines-content {
-    padding-left: 12px !important;
-  }
+.light-mode-regex-test-string-input .monaco-editor-background {
+  background-color: #ffffff !important;
 }
-.light-mode-regex-test-string-input {
-  .monaco-editor-background {
-    background-color: #ffffff !important;
-  }
-}
-.dark-mode-regex-test-string-input {
-  .monaco-editor-background {
-    background-color: var(--o2-primary-background) !important;
-  }
-}
-.regex-pattern-input-label {
-  font-size: 14px;
-  font-weight: 700;
-  line-height: 21px;
-}
-.add-regex-pattern-dark {
-  .regex-pattern-input-label {
-    color: #ffffff;
-  }
-}
-.add-regex-pattern-light {
-  .regex-pattern-input-label {
-    color: #6b7280;
-  }
-}
-.regex-pattern-test-string-label {
-  font-size: 14px;
-  font-weight: 700;
-  line-height: 21px;
-}
-.add-regex-pattern-dark {
-  .regex-pattern-test-string-label {
-    color: #ffffff;
-  }
-}
-.add-regex-pattern-light {
-  .regex-pattern-test-string-label {
-    color: #6b7280;
-  }
+.dark-mode-regex-test-string-input .monaco-editor-background {
+  background-color: var(--o2-primary-background) !important;
 }
 .dark-test-string-container-label {
   color: #ffffff;
@@ -738,17 +658,5 @@ export default defineComponent({
   font-size: 12px;
   line-height: 21px;
   margin-left: -4px;
-}
-.dark-mode-regex-no-output {
-  background-color: var(--o2-primary-background) !important;
-  border-left: 2px solid var(--o2-primary-background) !important;
-  border-right: 2px solid var(--o2-primary-background) !important;
-  border-bottom: 2px solid var(--o2-primary-background) !important;
-}
-.light-mode-regex-no-output {
-  background-color: #ffffff !important;
-  border-left: 1px solid #e6e6e6 !important;
-  border-right: 1px solid #e6e6e6 !important;
-  border-bottom: 1px solid #e6e6e6 !important;
 }
 </style>

@@ -213,7 +213,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <!-- Customize link -->
                   <a
-                    class="config-link-btn tw:cursor-pointer tw:inline-flex tw:items-center tw:gap-1 tw:px-2 tw:py-0.5 tw:rounded tw:text-xs tw:font-semibold tw:no-underline"
+                    class="config-link-btn tw:cursor-pointer tw:inline-flex tw:items-center tw:gap-1 tw:px-2 tw:py-0.5 tw:rounded tw:text-xs tw:font-semibold tw:no-underline tw:border tw:border-blue-500 tw:text-blue-600 tw:bg-blue-500/[.08] tw:transition-[background]"
+                    :class="store.state.theme === 'dark' ? 'tw:border-[#60a5fa] tw:text-[#93c5fd] tw:bg-[rgba(96,165,250,0.12)]' : ''"
                     @click.prevent="emit('navigate-to-aliases', 'service')"
                   >
                     {{ t("settings.correlation.customizeFieldMappings") }}
@@ -626,7 +627,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 and recommendations. Fields not in this list will not influence
                 service discovery results. Cannot be empty.
                 <a
-                  class="config-link-btn tw:cursor-pointer tw:inline-block tw:mx-1 tw:px-2 tw:py-0.5 tw:rounded tw:text-xs tw:font-semibold tw:no-underline tw:align-middle"
+                  class="config-link-btn tw:cursor-pointer tw:inline-block tw:mx-1 tw:px-2 tw:py-0.5 tw:rounded tw:text-xs tw:font-semibold tw:no-underline tw:align-middle tw:border tw:border-blue-500 tw:text-blue-600 tw:bg-blue-500/[.08] tw:transition-[background]"
+                  :class="store.state.theme === 'dark' ? 'tw:border-[#60a5fa] tw:text-[#93c5fd] tw:bg-[rgba(96,165,250,0.12)]' : ''"
                   @click.prevent="emit('navigate-to-aliases', 'service')"
                   >Go to Field Aliases</a
                 >
@@ -747,7 +749,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             We discovered these deployment patterns in your streams. Use them to
             configure service correlation.
             <a
-              class="config-link-btn tw:cursor-pointer tw:inline-block tw:mx-1 tw:px-2 tw:py-0.5 tw:rounded tw:text-xs tw:font-semibold tw:no-underline tw:align-middle"
+              class="config-link-btn tw:cursor-pointer tw:inline-block tw:mx-1 tw:px-2 tw:py-0.5 tw:rounded tw:text-xs tw:font-semibold tw:no-underline tw:align-middle tw:border tw:border-blue-500 tw:text-blue-600 tw:bg-blue-500/[.08] tw:transition-[background]"
+              :class="store.state.theme === 'dark' ? 'tw:border-[#60a5fa] tw:text-[#93c5fd] tw:bg-[rgba(96,165,250,0.12)]' : ''"
               @click.prevent="emit('navigate-to-services')"
               >Go to Services</a
             >
@@ -806,7 +809,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Dim card -->
               <div
-                class="dim-stat-card tw:flex-1 tw:min-w-0 tw:rounded-lg tw:p-3"
+                class="dim-stat-card tw:flex-1 tw:min-w-0 tw:rounded-lg tw:p-3 tw:flex tw:flex-col"
                 :style="
                   store.state.theme === 'dark'
                     ? card.theme.borderDark
@@ -834,11 +837,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >{{ card.count }}</span
                   >
                 </div>
-                <div class="dim-stat-pills tw:flex tw:flex-wrap tw:gap-1">
+                <div class="dim-stat-pills tw:flex tw:flex-wrap tw:gap-1 tw:overflow-hidden">
                   <span
                     v-for="val in card.values.slice(0, 5)"
                     :key="val"
-                    class="dim-stat-pill tw:text-[11px] tw:py-0.5 tw:px-2 tw:rounded-full tw:border tw:cursor-pointer hover:tw:opacity-70 tw:transition-opacity tw:inline-flex tw:items-center tw:gap-1"
+                    class="tw:max-w-[calc(50%-4px)] tw:h-[22px] tw:box-border tw:text-[11px] tw:py-0.5 tw:px-2 tw:rounded-full tw:border tw:cursor-pointer hover:tw:opacity-70 tw:transition-opacity tw:inline-flex tw:items-center tw:gap-1"
                     :class="
                       store.state.theme === 'dark'
                         ? card.theme.pillDark
@@ -871,7 +874,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <template #trigger>
                       <span
-                        class="dim-stat-pill tw:text-[11px] tw:py-0.5 tw:px-2 tw:rounded-full tw:cursor-pointer hover:tw:opacity-70 tw:transition-opacity"
+                        class="tw:max-w-[calc(50%-4px)] tw:h-[22px] tw:box-border tw:text-[11px] tw:py-0.5 tw:px-2 tw:rounded-full tw:cursor-pointer hover:tw:opacity-70 tw:transition-opacity"
                         :class="
                           store.state.theme === 'dark'
                             ? 'tw:text-gray-300'
@@ -3676,49 +3679,12 @@ onMounted(() => {
 });
 </script>
 
-<style scoped lang="scss">
-.service-identity-setup {
-  .setup-section {
-    padding-bottom: 1.5rem;
-    border-bottom: 1px solid var(--o2-border-color);
-
-    &:last-of-type {
-      border-bottom: none;
-    }
-  }
+<style>
+.config-link-btn:hover {
+  background: rgba(59, 130, 246, 0.18);
 }
 
-.dim-stat-card {
-  display: flex;
-  flex-direction: column;
-}
-
-.dim-stat-pills {
-  overflow: hidden;
-}
-
-.dim-stat-pill {
-  max-width: calc(50% - 4px);
-  height: 22px;
-  box-sizing: border-box;
-}
-
-.config-link-btn {
-  border: 1px solid #3b82f6;
-  color: #2563eb;
-  background: rgba(59, 130, 246, 0.08);
-  transition: background 0.15s;
-  &:hover {
-    background: rgba(59, 130, 246, 0.18);
-  }
-}
-
-.sis-dark .config-link-btn {
-  border-color: #60a5fa;
-  color: #93c5fd;
-  background: rgba(96, 165, 250, 0.12);
-  &:hover {
-    background: rgba(96, 165, 250, 0.22);
-  }
+.sis-dark .config-link-btn:hover {
+  background: rgba(96, 165, 250, 0.22);
 }
 </style>

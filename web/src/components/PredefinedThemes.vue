@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OTabs>
       </OCardSection>
 
-      <OCardSection class="tw:py-2 tw:px-2 scroll-content-predefined-themes">
+      <OCardSection class="tw:py-2 tw:px-2 tw:max-h-[calc(100vh-100px)] tw:overflow-y-auto">
         <OTabPanels v-model="activeTab" animated>
           <!-- Light Mode Themes -->
           <OTabPanel name="light">
@@ -48,11 +48,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="theme in predefinedThemes"
               :key="theme.id"
               :data-test="`predefined-themes-card-light-${themeNameSlug(theme.name)}`"
-              class="theme-card-compact tw:mb-2"
+              class="tw:py-2 tw:px-3 tw:border tw:border-(--o2-border-color) tw:rounded-md tw:bg-(--o2-card-bg) tw:mb-2"
             >
               <div class="tw:flex tw:items-center tw:flex-nowrap">
                 <div
-                  class="color-preview-small"
+                  class="tw:w-8 tw:h-8 tw:rounded tw:border tw:border-(--o2-border-color) tw:shrink-0 tw:relative"
                   :style="{ backgroundColor: theme.light.themeColor }"
                 ></div>
                 <div class="tw:ml-2" style="flex: 1; min-width: 0">
@@ -79,11 +79,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Custom Color Picker -->
-            <div data-test="predefined-themes-card-light-custom-color" class="theme-card-compact tw:mb-2">
+            <div data-test="predefined-themes-card-light-custom-color" class="tw:py-2 tw:px-3 tw:border tw:border-(--o2-border-color) tw:rounded-md tw:bg-(--o2-card-bg) tw:mb-2">
               <div class="tw:flex tw:items-center tw:flex-nowrap">
                 <div
                   data-test="predefined-themes-custom-color-preview-light"
-                  class="color-preview-small clickable"
+                  class="tw:w-8 tw:h-8 tw:rounded tw:border tw:border-(--o2-border-color) tw:shrink-0 tw:relative tw:cursor-pointer tw:transition-transform tw:duration-200 hover:tw:scale-110"
                   :style="{ backgroundColor: customLightColor }"
                   @click="openColorPicker('light')"
                 >
@@ -128,11 +128,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="theme in predefinedThemes"
               :key="theme.id"
               :data-test="`predefined-themes-card-dark-${themeNameSlug(theme.name)}`"
-              class="theme-card-compact tw:mb-2"
+              class="tw:py-2 tw:px-3 tw:border tw:border-(--o2-border-color) tw:rounded-md tw:bg-(--o2-card-bg) tw:mb-2"
             >
               <div class="tw:flex tw:items-center tw:flex-nowrap">
                 <div
-                  class="color-preview-small"
+                  class="tw:w-8 tw:h-8 tw:rounded tw:border tw:border-(--o2-border-color) tw:shrink-0 tw:relative"
                   :style="{ backgroundColor: theme.dark.themeColor }"
                 ></div>
                 <div class="tw:ml-2" style="flex: 1; min-width: 0">
@@ -159,11 +159,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Custom Color Picker -->
-            <div data-test="predefined-themes-card-dark-custom-color" class="theme-card-compact tw:mb-2">
+            <div data-test="predefined-themes-card-dark-custom-color" class="tw:py-2 tw:px-3 tw:border tw:border-(--o2-border-color) tw:rounded-md tw:bg-(--o2-card-bg) tw:mb-2">
               <div class="tw:flex tw:items-center tw:flex-nowrap">
                 <div
                   data-test="predefined-themes-custom-color-preview-dark"
-                  class="color-preview-small clickable"
+                  class="tw:w-8 tw:h-8 tw:rounded tw:border tw:border-(--o2-border-color) tw:shrink-0 tw:relative tw:cursor-pointer tw:transition-transform tw:duration-200 hover:tw:scale-110"
                   :style="{ backgroundColor: customDarkColor }"
                   @click="openColorPicker('dark')"
                 >
@@ -770,49 +770,3 @@ const resetToDefaultTheme = () => {
   });
 };
 </script>
-
-<style scoped>
-.scroll-content-predefined-themes {
-  max-height: calc(100vh - 100px);
-  overflow-y: auto;
-}
-
-.theme-card-compact {
-  padding: 8px 12px;
-  border: 1px solid var(--o2-border-color);
-  border-radius: 6px;
-  background: var(--o2-card-bg);
-}
-
-.color-preview-small {
-  width: 32px;
-  height: 32px;
-  border-radius: 4px;
-  border: 1px solid var(--o2-border-color);
-  flex-shrink: 0;
-  position: relative;
-}
-
-.color-preview-small.clickable {
-  cursor: pointer;
-  transition: transform 0.2s;
-}
-
-.color-preview-small.clickable:hover {
-  transform: scale(1.1);
-}
-.predefined-theme-card {
-  width: 450px;
-  max-width: 90vw;
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
-  background-color: #ffffff;
-  color: rgba(0, 0, 0, 0.87);
-
-  body.body--dark & {
-    background: #1d1d1d;
-    color: rgba(255, 255, 255, 0.87);
-  }
-}
-</style>

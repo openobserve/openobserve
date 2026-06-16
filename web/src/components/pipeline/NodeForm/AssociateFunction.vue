@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       data-test="add-function-node-routing-section"
       class="tw:flex tw:flex-col tw:h-full"
-      :class="store.state.theme === 'dark' ? 'tw:bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'tw:bg-white'"
+      :class="store.state.theme === 'dark' ? 'tw:bg-(--o2-bg-card-dark,#1a1a1a)' : 'tw:bg-white'"
     >
 
 
@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div
       v-else
-      class="stream-routing-container tw:w-full tw:pt-3 tw:pb-3 tw:flex tw:flex-col tw:gap-4 tw:flex-1 tw:min-h-0"
+      class="tw:rounded-lg tw:w-full tw:pt-3 tw:pb-3 tw:flex tw:flex-col tw:gap-4 tw:flex-1 tw:min-h-0"
     >
       <div class="tw:flex tw:items-center tw:gap-3 tw:px-(--spacing-dialog-header-px)">
         <OSwitch
@@ -93,18 +93,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             selectedFunction &&
             pipelineObj.functions[selectedFunction]
           "
-          class="function-definition-section"
+          class="tw:mt-4 tw:mb-4"
         >
-          <OCard class="function-definition-card">
-            <OCardSection role="header" class="function-definition-header">
+          <OCard class="function-definition-card tw:border tw:border-[#e1e5e9] tw:rounded-lg tw:shadow-[0_2px_4px_rgba(0,0,0,0.05)] tw:overflow-hidden">
+            <OCardSection role="header" class="function-definition-header tw:bg-[linear-gradient(135deg,#f8fafc_0%,#f1f5f9_100%)] tw:border-b tw:border-b-[#e2e8f0]">
               <div class="tw:text-base text-weight-medium text-primary">
                 {{ t("function.function_definition") }}
               </div>
             </OCardSection>
             <OSeparator />
             <OCardSection class="tw:p-0 function-definition-content">
-              <div class="function-code-container">
-                <pre class="function-code">{{
+              <div class="function-code-container tw:bg-[#fafbfc] tw:rounded-none tw:max-w-[584px] tw:max-h-[250px] tw:overflow-y-auto tw:relative">
+                <pre class="function-code tw:text-[#2d3748] tw:bg-transparent tw:m-0 tw:p-4 tw:font-[JetBrains_Mono,Fira_Code,Monaco,Menlo,Ubuntu_Mono,monospace] tw:text-[13px] tw:leading-normal tw:whitespace-pre-wrap tw:break-words tw:border-0 tw:font-normal tw:cursor-default tw:select-text">{{
                   pipelineObj.functions[selectedFunction]?.function ||
                   "No definition available"
                 }}</pre>
@@ -134,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
 
           <!-- Info note explaining RAF/RBF -->
-          <div class="note-container tw:rounded-md tw:p-3 tw:flex tw:flex-col tw:gap-2">
+          <div class="tw:bg-[#f9f290] tw:text-[#2d3748] tw:w-full tw:rounded-md tw:p-3 tw:flex tw:flex-col tw:gap-2">
             <div class="tw:text-sm tw:text-gray-800">
               Function Execution Guidelines:
             </div>
@@ -431,84 +431,16 @@ const filterFunctions = (val: any, update: any) => {
 };
 </script>
 
-<style scoped lang="scss">
-.stream-routing-title {
-  font-size: 18px;
-  padding-top: 16px;
-}
-.stream-routing-container {
-  border-radius: 8px;
-  /* box-shadow: 0px 0px 10px 0px #d2d1d1; */
-}
-
-.pipeline-add-function {
-  :deep(.add-function-back-btn),
-  :deep(.add-function-fullscreen-btn),
-  :deep(.add-function-title) {
-    display: none;
-  }
-}
-
-.note-container {
-  background-color: #f9f290;
-  color: #2d3748;
-  width: 100%;
-}
-
-.note-container .highlight {
-  font-weight: bold;
-  color: #007bff;
-}
-
-
-
-/* Function definition display - OpenObserve style */
-.function-definition-section {
-  margin-top: 16px;
-  margin-bottom: 16px;
-}
-
-.function-definition-card {
-  border: 1px solid #e1e5e9;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-  overflow: hidden;
-}
-
-.function-definition-header {
-  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-  border-bottom: 1px solid #e2e8f0;
+<style>
+.pipeline-add-function :deep(.add-function-back-btn),
+.pipeline-add-function :deep(.add-function-fullscreen-btn),
+.pipeline-add-function :deep(.add-function-title) {
+  display: none;
 }
 
 .function-definition-header .text-primary {
   color: #2d3748 !important;
   font-weight: 600;
-}
-
-.function-code-container {
-  background-color: #fafbfc;
-  border-radius: 0;
-  max-width: 584px;
-  max-height: 250px;
-  overflow-y: auto;
-  position: relative;
-}
-
-.function-code {
-  color: #2d3748;
-  background-color: transparent;
-  margin: 0;
-  padding: 16px;
-  font-family:
-    "JetBrains Mono", "Fira Code", "Monaco", "Menlo", "Ubuntu Mono", monospace;
-  font-size: 13px;
-  line-height: 1.5;
-  white-space: pre-wrap;
-  word-wrap: break-word;
-  border: none;
-  font-weight: 400;
-  cursor: default;
-  user-select: text;
 }
 
 .function-code::selection {
@@ -589,18 +521,14 @@ const filterFunctions = (val: any, update: any) => {
 .body--dark .function-code-container::-webkit-scrollbar-thumb:hover {
   background: #718096;
 }
-</style>
 
-<style lang="scss">
-.pipeline-add-function {
-  .add-function-name-input {
-    width: 100%;
-    margin-left: 0px !important;
+.pipeline-add-function .add-function-name-input {
+  width: 100%;
+  margin-left: 0px !important;
+}
 
-    label {
-      width: 100%;
-      padding-left: 0;
-    }
-  }
+.pipeline-add-function .add-function-name-input label {
+  width: 100%;
+  padding-left: 0;
 }
 </style>

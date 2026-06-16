@@ -447,6 +447,3 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
-/* intentionally empty */
-</style>

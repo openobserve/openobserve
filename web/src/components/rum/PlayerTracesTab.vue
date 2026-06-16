@@ -563,14 +563,9 @@ watch(
 );
 </script>
 
-<style scoped lang="scss">
-.player-traces-tab {
-  height: 100%;
-  overflow: hidden;
-}
-
-:deep(.trace-details-content .card-container){
-  box-shadow: none
+<style>
+:deep(.trace-details-content .card-container) {
+  box-shadow: none;
 }
 
 :deep(.trace-row--error td:first-child) {

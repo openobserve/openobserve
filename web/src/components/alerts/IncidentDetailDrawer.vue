@@ -226,7 +226,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Tab Content Container -->
       <div class="tw:flex tw:flex-1 tw:overflow-hidden">
       <!-- Left Column: Incident Details (only show on Incident Analysis tab, HIDDEN for Overview) -->
-      <div v-if="activeTab === 'incidentAnalysis'" class="incident-details-column tw:w-[400px] tw:flex-shrink-0 tw:flex tw:flex-col tw:h-full" style="order: 1;">
+      <div v-if="activeTab === 'incidentAnalysis'" class="tw:w-[400px] tw:min-w-[400px] tw:max-w-[400px] tw:flex-shrink-0 tw:flex tw:flex-col tw:h-full" style="order: 1;">
 
         <!-- Table of Contents (only on Incident Analysis) -->
         <IncidentTableOfContents
@@ -239,7 +239,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Right Column: Content -->
-      <div class="tabs-content-column tw:flex-1 tw:flex tw:flex-col tw:overflow-hidden" style="order: 2;">
+      <div class="tw:flex-1 tw:min-w-0 tw:flex tw:flex-col tw:overflow-hidden" style="order: 2;">
         <!-- Tab Content Area -->
         <div class="tw:flex-1 tw:flex tw:flex-col tw:px-2 tw:pt-4 tw:pb-2 tw:overflow-hidden tw:relative">
 
@@ -249,7 +249,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="tw:flex tw:gap-3 tw:mb-3" style="height: 100px;">
             <!-- 1. Total Alerts Card -->
             <div
-              class="tw:flex-1 tw:flex tw:flex-col tw:justify-between el-border el-border-radius o2-incident-card-bg tw:transition-all tw:duration-200 tw:cursor-pointer tw:p-3"
+              class="tw:flex-1 tw:flex tw:flex-col tw:justify-between el-border el-border-radius tw:bg-(--o2-card-bg) tw:transition-all tw:duration-200 tw:cursor-pointer tw:p-3"
             >
               <!-- Top: Title and Icon -->
               <div class="tw:flex tw:justify-between tw:items-start">
@@ -269,7 +269,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- 2. Unique Alerts Card -->
             <div
-              class="tw:flex-1 tw:flex tw:flex-col tw:justify-between el-border el-border-radius o2-incident-card-bg tw:transition-all tw:duration-200 tw:cursor-pointer tw:p-3"
+              class="tw:flex-1 tw:flex tw:flex-col tw:justify-between el-border el-border-radius tw:bg-(--o2-card-bg) tw:transition-all tw:duration-200 tw:cursor-pointer tw:p-3"
             >
               <!-- Top: Title and Icon -->
               <div class="tw:flex tw:justify-between tw:items-start">
@@ -289,7 +289,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- 3. Affected Services Card -->
             <div
-              class="tw:flex-1 tw:flex tw:flex-col tw:justify-between el-border el-border-radius o2-incident-card-bg tw:transition-all tw:duration-200 tw:cursor-pointer tw:p-3"
+              class="tw:flex-1 tw:flex tw:flex-col tw:justify-between el-border el-border-radius tw:bg-(--o2-card-bg) tw:transition-all tw:duration-200 tw:cursor-pointer tw:p-3"
             >
               <!-- Top: Title and Icon -->
               <div class="tw:flex tw:justify-between tw:items-start">
@@ -309,7 +309,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- 4. Active Duration Card -->
             <div
-              class="tw:flex-1 tw:flex tw:flex-col tw:justify-between el-border el-border-radius o2-incident-card-bg tw:transition-all tw:duration-200 tw:cursor-pointer tw:p-3"
+              class="tw:flex-1 tw:flex tw:flex-col tw:justify-between el-border el-border-radius tw:bg-(--o2-card-bg) tw:transition-all tw:duration-200 tw:cursor-pointer tw:p-3"
             >
               <!-- Top: Title and Icon -->
               <div class="tw:flex tw:justify-between tw:items-start">
@@ -331,7 +331,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- 5. Alert Frequency Card -->
             <div
-              class="tw:flex-1 tw:flex tw:flex-col tw:justify-between el-border el-border-radius o2-incident-card-bg tw:transition-all tw:duration-200 tw:cursor-pointer tw:p-3"
+              class="tw:flex-1 tw:flex tw:flex-col tw:justify-between el-border el-border-radius tw:bg-(--o2-card-bg) tw:transition-all tw:duration-200 tw:cursor-pointer tw:p-3"
             >
               <!-- Top: Title and Icon -->
               <div class="tw:flex tw:justify-between tw:items-start">
@@ -358,7 +358,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="tw:flex tw:gap-3" style="height: 50%;">
                                <!-- Incident Timeline (33.33% width) -->
                 <div
-                  class="el-border el-border-radius o2-incident-card-bg tw:flex tw:flex-col tw:overflow-hidden"
+                  class="el-border el-border-radius tw:bg-(--o2-card-bg) tw:flex tw:flex-col tw:overflow-hidden"
                   :style="{
                     width: '33.33%'
                   }"
@@ -465,7 +465,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <!-- Incident Details (66.67% width) -->
                 <div
-                  class="el-border el-border-radius o2-incident-card-bg tw:flex tw:flex-col tw:overflow-hidden"
+                  class="el-border el-border-radius tw:bg-(--o2-card-bg) tw:flex tw:flex-col tw:overflow-hidden"
                   :style="{
                     width: '66.67%'
                   }"
@@ -576,7 +576,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- alert activity -->
                <!-- 2.1B: Alert Activity Chart (50% height, full width) -->
               <div
-                class="el-border el-border-radius o2-incident-card-bg tw:flex tw:flex-col tw:overflow-hidden"
+                class="el-border el-border-radius tw:bg-(--o2-card-bg) tw:flex tw:flex-col tw:overflow-hidden"
                 :style="{
                   height: '50%'
                 }"
@@ -607,7 +607,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="tw:flex tw:flex-col tw:gap-2" style="width: 33.33%; height: 100%;">
               <!-- 2.2A: Manage Panel (40% of available height after gaps) -->
               <div
-                class="el-border el-border-radius o2-incident-card-bg tw:flex tw:flex-col tw:overflow-hidden"
+                class="el-border el-border-radius tw:bg-(--o2-card-bg) tw:flex tw:flex-col tw:overflow-hidden"
                 :style="{
                   height: 'calc(35% - 6.4px)'
                 }"
@@ -692,7 +692,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- 2.2B: Dimensions Panel (35% when Alert Flow present, 60% when absent, or when no triggers) -->
               <div
-                class="el-border el-border-radius o2-incident-card-bg tw:flex tw:flex-col tw:overflow-hidden"
+                class="el-border el-border-radius tw:bg-(--o2-card-bg) tw:flex tw:flex-col tw:overflow-hidden"
                 :style="{
                   height: (sortedAlertsByTriggerCount?.length)
                     ? 'calc(35% - 5.6px)'
@@ -753,7 +753,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- 2.2C: Alert Flow Panel (25% of available height after gaps) - Conditional -->
               <div
                 v-if="sortedAlertsByTriggerCount?.length"
-                class="el-border el-border-radius o2-incident-card-bg tw:flex tw:flex-col tw:overflow-hidden"
+                class="el-border el-border-radius tw:bg-(--o2-card-bg) tw:flex tw:flex-col tw:overflow-hidden"
                 :style="{
                   height: 'calc(30% - 4px)'
                 }"
@@ -847,7 +847,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="tw:flex-1 tw:flex tw:flex-col tw:overflow-hidden tw:pr-2 tw:pt-4">
             <div
               :class="[
-                'section-container tw:overflow-hidden tw:flex tw:flex-col tw:flex-1'
+                'tw:border tw:border-[var(--o2-border-color)] tw:rounded-md tw:overflow-hidden tw:flex tw:flex-col tw:flex-1'
               ]"
             >
               <IncidentAlertTriggersTable
@@ -862,13 +862,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="tw:w-[400px] tw:flex-shrink-0 tw:flex tw:flex-col tw:pt-4">
             <div
               :class="[
-                'section-container tw:overflow-hidden tw:flex tw:flex-col tw:flex-1'
+                'tw:border tw:border-[var(--o2-border-color)] tw:rounded-md tw:overflow-hidden tw:flex tw:flex-col tw:flex-1'
               ]"
             >
               <!-- Header -->
               <div
                 :class="[
-                  'section-header-bg tw:px-3 tw:py-2 tw:flex tw:items-center tw:gap-2 tw:border-b tw:flex-shrink-0',
+                  'tw:!bg-[var(--o2-table-header-bg)] tw:px-3 tw:py-2 tw:flex tw:items-center tw:gap-2 tw:border-b tw:flex-shrink-0',
                   store.state.theme === 'dark'
                     ? 'tw:border-gray-700'
                     : 'tw:border-gray-200'
@@ -967,8 +967,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
 
                   <!-- Alert Conditions Section -->
-                  <div :class="['tw:rounded tw:border tw:flex tw:flex-col section-container',]" class="tw:overflow-hidden" style="height: 392px;">
-                    <div :class="['section-header-bg tw:px-2.5 tw:py-1.5 tw:border-b tw:flex tw:items-center tw:justify-between tw:flex-shrink-0', store.state.theme === 'dark' ? 'tw:border-gray-700' : 'tw:border-gray-200']">
+                  <div :class="['tw:rounded tw:border tw:flex tw:flex-col tw:border-[var(--o2-border-color)] tw:rounded-md',]" class="tw:overflow-hidden" style="height: 392px;">
+                    <div :class="['tw:!bg-[var(--o2-table-header-bg)] tw:px-2.5 tw:py-1.5 tw:border-b tw:flex tw:items-center tw:justify-between tw:flex-shrink-0', store.state.theme === 'dark' ? 'tw:border-gray-700' : 'tw:border-gray-200']">
                       <span :class="'tw:text-text-secondary'" class="tw:text-[11px] tw:font-semibold tw:uppercase tw:tracking-wide">
                         {{ alerts[selectedAlertIndex]?.query_condition?.type === 'sql' ? 'SQL Query' : alerts[selectedAlertIndex]?.query_condition?.type === 'promql' ? 'PromQL Query' : 'Conditions' }}
                       </span>
@@ -2934,100 +2934,7 @@ export default defineComponent({
 });
 </script>
 
-<style scoped>
-.incident-detail-header {
-  min-height: 60px;
-}
-
-/* Tile Styles - matching schema.vue */
-.tile-content-light {
-  background-color: #ffffff;
-  transition: all 0.2s ease;
-}
-
-.tile-content-dark {
-  background-color: #1e1e1e;
-  transition: all 0.2s ease;
-}
-
-.tile-content:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-}
-
-body.body--dark .tile-content:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-}
-
-/* Action Buttons - Compact */
-.action-btn-compact {
-  min-height: 28px;
-  padding: 4px 12px;
-  border-radius: 4px;
-  font-weight: 500;
-  transition: all 0.2s ease;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-}
-
-.action-btn-compact:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.action-btn-compact:active {
-  transform: translateY(0);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-}
-
-/* Section Header Background */
-.section-header-bg {
-  background: var(--o2-table-header-bg) !important;
-}
-
-/* Section Container Border and Radius */
-.section-container {
-  border: 0.0625rem solid var(--o2-border-color);
-  border-radius: 0.375rem;
-}
-
-/* Info Box (Stable Dimensions, Topology) - Light Mode */
-.info-box-light {
-  background-color: #f3f4f6; /* gray-100 */
-}
-
-/* Info Box - Dark Mode */
-.info-box-dark {
-  background-color: #374151; /* gray-700 */
-}
-
-/* Label text color */
-.label-text {
-  color: #6b7280; /* gray-500 in light mode */
-}
-
-body.body--dark .label-text {
-  color: #9ca3af; /* gray-400 in dark mode */
-}
-
-/* Muted text color */
-.muted-text {
-  color: #9ca3af; /* gray-400 in light mode */
-}
-
-body.body--dark .muted-text {
-  color: #6b7280; /* gray-500 in dark mode */
-}
-
-/* Two-Column Layout Styles */
-.incident-details-column {
-  min-width: 400px;
-  max-width: 400px;
-}
-
-.tabs-content-column {
-  min-width: 0; /* Allow flex shrinking */
-}
-
+<style>
 /* Responsive scrolling */
 .incident-details-column::-webkit-scrollbar,
 .tabs-content-column .tw:overflow-auto::-webkit-scrollbar {
@@ -3048,64 +2955,5 @@ body.body--dark .muted-text {
 body.body--dark .incident-details-column::-webkit-scrollbar-thumb,
 body.body--dark .tabs-content-column .tw:overflow-auto::-webkit-scrollbar-thumb {
   background: #475569;
-}
-
-/* AI Chat Panel Styles */
-.ai-chat-panel {
-  min-width: 380px;
-  max-width: 380px;
-}
-
-.ai-chat-panel::-webkit-scrollbar {
-  width: 6px;
-}
-
-.ai-chat-panel::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.ai-chat-panel::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 3px;
-}
-
-body.body--dark .ai-chat-panel::-webkit-scrollbar-thumb {
-  background: #475569;
-}
-
-/* AI Button Styles */
-.ai-btn-active {
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(236, 72, 153, 0.15) 100%) !important;
-}
-
-.ai-hover-btn {
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(236, 72, 153, 0.15) 100%) !important;
-  transition: background 0.3s ease, box-shadow 0.3s ease;
-}
-
-.ai-hover-btn:hover {
-  background: linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%) !important;
-  box-shadow: 0 0.25rem 0.75rem 0 rgba(139, 92, 246, 0.35);
-}
-
-.ai-icon {
-  transition: transform 0.6s ease, filter 0.3s ease;
-}
-
-.ai-hover-btn:hover .ai-icon,
-.ai-btn-active .ai-icon {
-  transform: rotate(180deg);
-  filter: brightness(0) invert(1);
-}
-
-.incident-action-buttons{
-  padding: 4px 6px;
-}
-</style>
-
-<style lang="scss">
-
-.o2-incident-card-bg {
-  background-color: var(--o2-card-bg);
 }
 </style>

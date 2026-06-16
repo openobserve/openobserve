@@ -36,9 +36,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <div
                 v-if="!sessionState.data.editorValue && !editorFocused"
-                class="query-editor-placeholder-overlay"
+                class="query-editor-placeholder-overlay tw:absolute tw:top-0 tw:left-0 tw:right-0 tw:bottom-0 tw:flex tw:items-start tw:pt-0.75 tw:pr-2 tw:pb-0 tw:pl-[2.15rem] tw:pointer-events-none tw:z-1 tw:select-none"
               >
-                <span class="query-editor-placeholder-typewriter">{{ editorPlaceholder }}</span>
+                <span class="query-editor-placeholder-typewriter tw:font-mono tw:text-[var(--text-base)] tw:[line-height:1.3125rem] tw:text-[#a0aec0] tw:whitespace-nowrap tw:overflow-hidden tw:[text-overflow:ellipsis]">{{ editorPlaceholder }}</span>
               </div>
             </div>
 
@@ -821,11 +821,7 @@ const getStarted = () => {
   });
 };
 </script>
-<style scoped lang="scss">
-.sessions_page {
-}
-</style>
-<style lang="scss">
+<style>
 .sessions_page {
   .index-menu .field_list .field_overlay .field_label,
   .q-field__native,
@@ -869,52 +865,6 @@ const getStarted = () => {
     padding-top: 0 !important;
   }
 
-  .search-button {
-    width: 6rem;
-    line-height: 1.8125rem;
-    font-weight: bold;
-    text-transform: initial;
-    font-size: 0.6875rem;
-    color: white;
-
-    .q-btn__content {
-      border-radius: 0.1875rem 0.1875rem 0.1875rem 0.1875rem;
-}
-  }
-
-  .app-table-container {
-    .session-play-icon {
-      .OIcon {
-        &:hover {
-          color: var(--q-primary);
-        }
-      }
-    }
-  }
-}
-
-.query-editor-placeholder-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  display: flex;
-  align-items: flex-start;
-  padding: 0.1875rem 0.5rem 0 2.15rem;
-  pointer-events: none;
-  z-index: 1;
-  user-select: none;
-
-  .query-editor-placeholder-typewriter {
-    font-family: monospace;
-    font-size: var(--text-base);
-    line-height: 1.3125rem;
-    color: #a0aec0;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
 }
 
 .body--dark .query-editor-placeholder-overlay {

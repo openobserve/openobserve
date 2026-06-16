@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="relative-position">
     <div
-      class="performance-dashboard"
+      class="tw:min-h-0! tw:max-h-[calc(100vh-200px)] tw:overflow-y-auto"
       :class="isLoading.length ? 'tw:invisible' : 'tw:visible'"
     >
       <RenderDashboardCharts
@@ -336,23 +336,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped>
-.performance_title {
-  font-size: 24px;
-}
-.q-table {
-  &__top {
-    border-bottom: 1px solid var(--o2-border);
-    justify-content: flex-end;
-  }
-}
-</style>
-
-<style lang="scss">
-.performance-dashboard {
-  min-height: auto !important;
-  max-height: calc(100vh - 200px);
-  overflow-y: auto;
-}
-</style>

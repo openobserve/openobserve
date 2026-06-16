@@ -218,7 +218,7 @@ class="tw:mr-1" />
         <tr
           v-for="r in SKEL_ROW_COUNT"
           :key="`skel-${r}`"
-          class="logs-skel-row tw:flex tw:items-center tw:w-full"
+          class="logs-skel-row tw:flex tw:items-center tw:w-full tw:opacity-0 tw:h-[29px] tw:bg-(--o2-log-table-row-bg) tw:border-b tw:border-(--o2-log-table-row-border)"
           :style="{ animationDelay: `${(r - 1) * 40}ms` }"
         >
           <!-- No columns loaded yet (first page load) — full-width shimmer bar -->
@@ -289,10 +289,10 @@ class="tw:mr-1" />
                   ? 'tw:bg-zinc-700'
                   : 'tw:bg-zinc-300'
                 : !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
-                  ? 'log-row-base'
+                  ? 'log-row-base tw:bg-(--o2-log-table-row-bg)'
                   : '',
               !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
-                ? 'table-row-hover'
+                ? 'table-row-hover tw:transition-[background-color,box-shadow] tw:duration-[120ms] tw:[transition-timing-function:ease-in-out] tw:border-b-(--o2-log-table-row-border)!'
                 : '',
             ]"
             @click="
@@ -1184,9 +1184,9 @@ defineExpose({
 <style>
 @import "@/assets/styles/log-highlighting.css";
 </style>
-<style scoped lang="scss">
+<style>
 
-// Compact expand/collapse button for log rows — matches original q-btn dense size="xs" flat
+/* Compact expand/collapse button for log rows — matches original q-btn dense size="xs" flat */
 .log-row-expand-btn {
   height: 1.25rem !important;
   width: 1.25rem !important;
@@ -1196,32 +1196,22 @@ defineExpose({
   vertical-align: middle !important;
 }
 
-:deep(.log-row-expand-btn svg) {
+.log-row-expand-btn svg {
   width: 0.75rem !important;
   height: 0.75rem !important;
 }
 
-// Log table row surface colour — uniform background, separator via border-bottom only
-.log-row-base {
-  background-color: var(--o2-log-table-row-bg);
+.table-row-hover:hover {
+  background-color: var(--o2-log-table-row-hover) !important;
+  box-shadow: inset 3px 0 0 var(--o2-primary-color) !important;
 }
 
-.table-row-hover {
-  transition: background-color 0.12s ease-in-out, box-shadow 0.12s ease-in-out;
-  border-bottom-color: var(--o2-log-table-row-border) !important;
-
-  &:hover {
-    background-color: var(--o2-log-table-row-hover) !important;
-    box-shadow: inset 3px 0 0 var(--o2-primary-color) !important;
-  }
-}
-
-// Fix: OButton base class (tw:relative) overrides tw:absolute passed via props.
-// Use top:0 + translate:-50% 0 to anchor the button flush with the row top,
-// and height:100% to fill the td height (= row height minus 1px border).
-// Overriding the CSS `translate` property (not `transform`) is required because
-// Tailwind v4 sets tw:-translate-y-1/2 via the CSS `translate` shorthand property.
-:deep(.ai-btn) {
+/* Fix: OButton base class (tw:relative) overrides tw:absolute passed via props.
+   Use top:0 + translate:-50% 0 to anchor the button flush with the row top,
+   and height:100% to fill the td height (= row height minus 1px border).
+   Overriding the CSS `translate` property (not `transform`) is required because
+   Tailwind v4 sets tw:-translate-y-1/2 via the CSS `translate` shorthand property. */
+.ai-btn {
   position: absolute !important;
   top: 50% !important;
   right: 0.875rem !important;
@@ -1233,27 +1223,23 @@ defineExpose({
   border-radius: 0.25rem !important;
 }
 
-:deep(.ai-btn img.ai-icon) {
+.ai-btn img.ai-icon {
   width: 0.75rem !important;
   height: 0.75rem !important;
 }
 
-// Suppress the hover box-shadow — it visually bleeds outside the row boundary
-:deep(.ai-btn:hover) {
+/* Suppress the hover box-shadow — it visually bleeds outside the row boundary */
+.ai-btn:hover {
   box-shadow: none !important;
 }
 
-// ── Loading skeleton ─────────────────────────────────────────────
+/* ── Loading skeleton ───────────────────────────────────────────── */
 .logs-skel-row {
-  opacity: 0;
   animation: logs-skel-row-in 320ms ease-out forwards;
-  border-bottom: 1px solid var(--o2-log-table-row-border);
-  height: 29px;
-  background-color: var(--o2-log-table-row-bg);
 }
 
+/* Light mode — matches histogram-skeleton --hsk-bar (grey-100 #f5f5f5) */
 .logs-skel-pill {
-  // Light mode — matches histogram-skeleton --hsk-bar (grey-100 #f5f5f5)
   background: linear-gradient(
     90deg,
     var(--color-grey-100)       0%,
@@ -1262,16 +1248,16 @@ defineExpose({
   );
   background-size: 200% 100%;
   animation: logs-skel-shimmer 1.5s ease-in-out infinite;
+}
 
-  // Dark mode — matches histogram-skeleton dark --hsk-bar (grey-600 #525252)
-  .body--dark & {
-    background: linear-gradient(
-      90deg,
-      var(--color-grey-600)       0%,
-      rgba(255, 255, 255, 0.03)   50%,
-      var(--color-grey-600)       100%
-    );
-  }
+/* Dark mode — matches histogram-skeleton dark --hsk-bar (grey-600 #525252) */
+.body--dark .logs-skel-pill {
+  background: linear-gradient(
+    90deg,
+    var(--color-grey-600)       0%,
+    rgba(255, 255, 255, 0.03)   50%,
+    var(--color-grey-600)       100%
+  );
 }
 
 @keyframes logs-skel-shimmer {

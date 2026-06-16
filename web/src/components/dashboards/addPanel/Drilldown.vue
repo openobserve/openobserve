@@ -10,7 +10,7 @@
  distributed under the License is distributed on an "AS IS" BASIS,
  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  See the License for the specific language governing permissions and
- limitations under the License. 
+ limitations under the License.
 -->
 
 <!-- eslint-disable vue/no-unused-components -->
@@ -21,31 +21,19 @@
       :key="JSON.stringify(data) + index"
     >
       <div
-        style="
-          display: flex;
-          justify-content: space-between;
-          margin-bottom: 5px;
-        "
+        class="tw:flex tw:justify-between tw:mb-1.25"
       >
         <div
           @click="onDrilldownClick(index)"
-          style="
-            cursor: pointer;
-            padding-left: 10px;
-            width: 250px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-          "
+          class="tw:cursor-pointer tw:pl-2.5 tw:w-62.5 tw:truncate"
           :data-test="`dashboard-addpanel-config-drilldown-name-${index}`"
         >
           {{ index + 1 }}. {{ data.name }}
         </div>
         <OIcon
-          class="tw:mr-1"
+          class="tw:mr-1 tw:cursor-pointer"
           size="sm"
           name="close"
-          style="cursor: pointer"
           @click="removeDrilldownByIndex(index)"
           :data-test="`dashboard-addpanel-config-drilldown-remove-${index}`"
         />
@@ -144,5 +132,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped></style>

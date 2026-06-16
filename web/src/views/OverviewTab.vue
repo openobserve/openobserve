@@ -13,11 +13,11 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div class="overview-tab">
+  <div class="overview-tab tw:flex tw:flex-col tw:gap-0 tw:p-[0.625rem] tw:h-full tw:overflow-y-auto tw:text-(--o2-text-primary)">
     <!-- Header: title + last-fetched + refresh + time picker -->
-    <div class="overview-header">
-      <span class="overview-title">{{ t('overview.title') }}</span>
-      <div class="overview-header-right">
+    <div class="tw:flex tw:items-center tw:justify-between tw:mb-4">
+      <span class="tw:text-base tw:font-semibold tw:text-(--o2-text-primary) tw:tracking-[0.01em]">{{ t('overview.title') }}</span>
+      <div class="tw:flex tw:items-center tw:gap-2">
         <ORefreshButton
           :last-run-at="lastFetched ? lastFetched.getTime() : null"
           :loading="isLoading"
@@ -39,25 +39,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Sections rendered top-to-bottom; each collapses when empty -->
 
     <!-- ACTIVE ANOMALIES -->
-    <section v-if="anomalies.length > 0" class="ov-section">
-      <div class="ov-section-label">{{ t('overview.activeAnomalies') }}</div>
-      <div class="ov-rows">
+    <section v-if="anomalies.length > 0" class="tw:mb-5">
+      <div class="tw:text-[0.8125rem] tw:font-semibold tw:tracking-[0.01em] tw:text-(--o2-text-muted) tw:mb-2 tw:pl-1">{{ t('overview.activeAnomalies') }}</div>
+      <div class="tw:flex tw:flex-col tw:gap-[0.375rem]">
         <div
           v-for="item in anomalies"
           :key="item.id"
-          class="ov-alert-row"
+          class="ov-alert-row tw:flex tw:items-center tw:gap-3 tw:py-[0.625rem] tw:px-[0.875rem] tw:rounded-md tw:border tw:border-(--o2-border-color) tw:bg-(--o2-card-bg-solid) tw:transition-[background] tw:duration-[150ms] tw:hover:bg-(--o2-hover-gray)"
           :class="severityRowClass(item.severity)"
         >
-          <span class="ov-row-icon">
+          <span class="ov-row-icon tw:shrink-0 tw:flex tw:items-center">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
               <path d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
           </span>
-          <div class="ov-row-body">
-            <div class="ov-row-title">{{ item.title }}</div>
-            <div class="ov-row-desc">{{ item.description }}</div>
+          <div class="tw:flex-1 tw:min-w-0">
+            <div class="tw:text-sm tw:font-medium tw:text-(--o2-text-primary) tw:flex tw:items-center tw:flex-wrap tw:gap-1">{{ item.title }}</div>
+            <div class="tw:text-xs tw:text-(--o2-text-muted) tw:mt-[0.125rem] tw:truncate">{{ item.description }}</div>
           </div>
-          <span class="ov-investigate-wrap">
+          <span class="tw:shrink-0 tw:whitespace-nowrap">
             <OButton
               variant="ghost-primary"
               size="sm"
@@ -73,25 +73,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- ACTIVE INCIDENTS (enterprise / cloud only) -->
     <section
       v-if="isIncidentsEnabled && incidents.length > 0"
-      class="ov-section"
+      class="tw:mb-5"
     >
-      <div class="ov-section-label">{{ t('overview.activeIncidents') }}</div>
-      <div class="ov-rows">
+      <div class="tw:text-[0.8125rem] tw:font-semibold tw:tracking-[0.01em] tw:text-(--o2-text-muted) tw:mb-2 tw:pl-1">{{ t('overview.activeIncidents') }}</div>
+      <div class="tw:flex tw:flex-col tw:gap-[0.375rem]">
         <div
           v-for="inc in incidents"
           :key="inc.id"
-          class="ov-alert-row"
+          class="ov-alert-row tw:flex tw:items-center tw:gap-3 tw:py-[0.625rem] tw:px-[0.875rem] tw:rounded-md tw:border tw:border-(--o2-border-color) tw:bg-(--o2-card-bg-solid) tw:transition-[background] tw:duration-[150ms] tw:hover:bg-(--o2-hover-gray)"
           :class="incidentRowClass(inc.severity)"
         >
-          <span class="ov-row-icon ov-icon-incident">
+          <span class="ov-row-icon tw:shrink-0 tw:flex tw:items-center">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
               <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
               <path d="M12 8v4m0 4h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
             </svg>
           </span>
-          <div class="ov-row-body">
-            <div class="ov-row-title">
-              <span class="ov-severity-badge" :class="`ov-sev-${(inc.severity || 'p4').toLowerCase()}`">
+          <div class="tw:flex-1 tw:min-w-0">
+            <div class="tw:text-sm tw:font-medium tw:text-(--o2-text-primary) tw:flex tw:items-center tw:flex-wrap tw:gap-1">
+              <span class="ov-severity-badge tw:inline-block tw:text-[0.625rem] tw:font-bold tw:py-[0.1rem] tw:px-[0.35rem] tw:rounded-[0.2rem] tw:tracking-[0.04em]" :class="`ov-sev-${(inc.severity || 'p4').toLowerCase()}`">
                 {{ (inc.severity || 'P4').toUpperCase() }}
               </span>
               {{ inc.title || t('overview.untitledIncident') }}
@@ -99,19 +99,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span
                   v-for="[key, val] in sortedDimensions(inc.group_values)"
                   :key="key"
-                  class="dimension-badge"
+                  class="dimension-badge tw:inline-flex tw:items-center tw:gap-[0.125em] tw:py-[0.125em] tw:px-[0.5em] tw:rounded-[0.375em] tw:text-[0.6875em] tw:font-semibold tw:mx-[0.125em] tw:max-w-[11.25em] tw:overflow-hidden"
                   :class="dimColorClass(key)"
                   :title="`${key}=${val}`"
-                ><span>{{ shortDimKey(key) }}: {{ val }}</span></span>
+                ><span class="tw:inline-block tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap">{{ shortDimKey(key) }}: {{ val }}</span></span>
               </template>
             </div>
-            <div class="ov-row-desc">
+            <div class="tw:text-xs tw:text-(--o2-text-muted) tw:mt-[0.125rem] tw:truncate">
               {{ inc.alert_count }} alert{{ inc.alert_count !== 1 ? 's' : '' }} ·
               opened {{ relativeTime_(inc.first_alert_at) }}
               <span v-if="inc.assigned_to"> · {{ inc.assigned_to }}</span>
             </div>
           </div>
-          <span class="ov-investigate-wrap">
+          <span class="tw:shrink-0 tw:whitespace-nowrap">
             <OButton
               variant="ghost-primary"
               size="sm"
@@ -125,19 +125,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </section>
 
     <!-- SERVICES (enterprise only — needs service graph data) -->
-    <section v-if="isEnterpriseOrCloud && services.length > 0" class="ov-section">
-      <div class="ov-section-label">{{ t('overview.services') }}</div>
-      <div class="ov-service-grid">
+    <section v-if="isEnterpriseOrCloud && services.length > 0" class="tw:mb-5">
+      <div class="tw:text-[0.8125rem] tw:font-semibold tw:tracking-[0.01em] tw:text-(--o2-text-muted) tw:mb-2 tw:pl-1">{{ t('overview.services') }}</div>
+      <div class="tw:grid tw:gap-2" style="grid-template-columns: repeat(auto-fill, minmax(13.75em, 1fr))">
         <div
           v-for="svc in services"
           :key="svc.id"
-          class="ov-service-card"
+          class="tw:py-3 tw:px-[0.875rem] tw:rounded-md tw:border tw:border-(--o2-border-color) tw:bg-(--o2-card-bg-solid) tw:transition-[background] tw:duration-[150ms] tw:cursor-pointer tw:hover:bg-(--o2-hover-gray)"
           :class="serviceCardClass(svc)"
           @click="goToService(svc)"
         >
-          <div class="ov-svc-header">
-            <span class="ov-svc-name">{{ svc.label }}</span>
-            <span class="ov-svc-info-wrap">
+          <div class="tw:flex tw:items-center tw:justify-between tw:mb-2">
+            <span class="tw:text-sm tw:font-medium tw:text-(--o2-text-primary) tw:flex-1 tw:min-w-0 tw:truncate">{{ svc.label }}</span>
+            <span class="tw:inline-flex tw:items-center tw:shrink-0 tw:ml-1">
               <OButton
                 variant="ghost-muted"
                 size="icon"
@@ -151,17 +151,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
             </span>
           </div>
-          <div class="ov-svc-flags">
-            <span v-if="svc.errorFlag" class="ov-svc-flag ov-flag-error" :title="t('overview.elevatedErrorRate')">
+          <div class="tw:flex tw:gap-[0.375rem] tw:items-center tw:flex-wrap tw:mb-[0.375rem]">
+            <span v-if="svc.errorFlag" class="ov-flag-error tw:text-[0.625rem] tw:font-bold tw:tracking-[0.04em] tw:py-[0.15rem] tw:px-[0.4rem] tw:rounded-[0.2rem] tw:whitespace-nowrap" :title="t('overview.elevatedErrorRate')">
               Error Rate {{ svc.error_rate.toFixed(1) }}%
             </span>
-            <span v-if="svc.latencyFlag" class="ov-svc-flag ov-flag-latency" :title="`Latency elevated vs baseline (${svc.latencyMultiplier}x)`">
+            <span v-if="svc.latencyFlag" class="ov-flag-latency tw:text-[0.625rem] tw:font-bold tw:tracking-[0.04em] tw:py-[0.15rem] tw:px-[0.4rem] tw:rounded-[0.2rem] tw:whitespace-nowrap" :title="`Latency elevated vs baseline (${svc.latencyMultiplier}x)`">
               Latency {{ svc.latencyMultiplier }}x
             </span>
           </div>
-          <div class="ov-svc-req">
-            <span class="ov-metric-label">{{ t('overview.reqPerSec') }}</span>
-            <span class="ov-metric-value">{{ formatReqRate(svc.requests) }}</span>
+          <div class="tw:flex tw:items-baseline tw:gap-[0.35rem] tw:mt-[0.375rem]">
+            <span class="tw:text-[0.6875rem] tw:text-(--o2-text-muted)">{{ t('overview.reqPerSec') }}</span>
+            <span class="tw:text-sm tw:font-semibold tw:text-(--o2-text-primary)">{{ formatReqRate(svc.requests) }}</span>
           </div>
         </div>
       </div>
@@ -171,7 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-if="isEnterpriseOrCloud && selectedService">
       <div
         v-if="servicePanelVisible"
-        class="ov-panel-backdrop"
+        class="ov-panel-backdrop tw:fixed tw:inset-0 tw:z-[99] tw:bg-transparent"
         @click="closeServicePanel"
       />
       <ServiceGraphNodeSidePanel
@@ -186,23 +186,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <!-- RECENT EVENTS (alert firing feed) -->
-    <section v-if="recentEvents.length > 0" class="ov-section">
-      <div class="ov-section-label">{{ t('overview.recentEvents') }}</div>
-      <div class="ov-event-list">
+    <section v-if="recentEvents.length > 0" class="tw:mb-5">
+      <div class="tw:text-[0.8125rem] tw:font-semibold tw:tracking-[0.01em] tw:text-(--o2-text-muted) tw:mb-2 tw:pl-1">{{ t('overview.recentEvents') }}</div>
+      <div class="tw:flex tw:flex-col tw:gap-0 tw:border tw:border-(--o2-border-color) tw:rounded-md tw:overflow-hidden tw:bg-(--o2-card-bg-solid)">
         <div
           v-for="ev in recentEvents"
           :key="ev.id"
-          class="ov-event-row"
+          class="ov-event-row tw:flex tw:items-center tw:gap-3 tw:py-2 tw:px-[0.875rem] tw:border-b tw:border-b-(--o2-border-color) tw:text-[0.8125rem] tw:transition-[background] tw:duration-[150ms] tw:hover:bg-(--o2-hover-gray)"
         >
-          <span class="ov-event-type-badge" :class="ev.typeLabel === 'Failed' ? 'ov-badge-failed' : ev.typeLabel === 'Error' ? 'ov-badge-error' : 'ov-badge-firing'">
+          <span class="ov-event-type-badge tw:shrink-0 tw:text-[0.6875rem] tw:font-semibold tw:py-[0.15rem] tw:px-[0.4rem] tw:rounded-[0.2rem] tw:tracking-[0.03em]" :class="ev.typeLabel === 'Failed' ? 'ov-badge-failed' : ev.typeLabel === 'Error' ? 'ov-badge-error' : 'ov-badge-firing'">
             {{ ev.typeLabel }}
           </span>
-          <span class="ov-event-service">{{ ev.service }}</span>
-          <span class="ov-event-desc">{{ ev.description }}</span>
-          <span v-if="ev.failCount > 1" class="ov-fail-count" :title="`Failed ${ev.failCount} times in this window`">
+          <span class="tw:font-medium tw:text-(--o2-text-primary) tw:whitespace-nowrap tw:min-w-[7.5em] tw:max-w-[12.5em] tw:overflow-hidden tw:text-ellipsis">{{ ev.service }}</span>
+          <span class="tw:flex-1 tw:text-(--o2-text-muted) tw:truncate">{{ ev.description }}</span>
+          <span v-if="ev.failCount > 1" class="ov-fail-count tw:shrink-0 tw:text-[0.6875rem] tw:font-bold tw:text-[#b91c1c] tw:bg-[rgba(239,68,68,0.1)] tw:border tw:border-[rgba(239,68,68,0.25)] tw:rounded-full tw:py-[0.1rem] tw:px-[0.4rem] tw:whitespace-nowrap" :title="`Failed ${ev.failCount} times in this window`">
             ×{{ ev.failCount }}
           </span>
-          <span class="ov-event-time">{{ ev.timeAgo }}</span>
+          <span class="tw:shrink-0 tw:text-(--o2-text-muted) tw:text-xs tw:whitespace-nowrap">{{ ev.timeAgo }}</span>
         </div>
       </div>
     </section>
@@ -219,44 +219,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #description>{{ t('overview.allClearDesc') }}</template>
       <template #actions>
         <!-- View alerts -->
-        <button type="button" class="ov-action-card" data-test="overview-empty-alerts-card" @click="goToAlertList">
-          <span class="ov-action-card__icon ov-action-card__icon--orange">
+        <button type="button" class="ov-action-card tw:relative tw:flex tw:items-center tw:gap-3 tw:w-64 tw:max-w-full tw:min-h-16 tw:py-[0.625rem] tw:pr-[0.875rem] tw:pl-3 tw:rounded-xl tw:border tw:border-(--color-border-default) tw:bg-(--color-surface-base) tw:shadow-(--shadow-sm) tw:text-left tw:cursor-pointer tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150 tw:outline-none tw:hover:shadow-(--shadow-md) tw:hover:border-(--color-primary-400) tw:hover:bg-(--color-tabs-hover-bg)" data-test="overview-empty-alerts-card" @click="goToAlertList">
+          <span class="ov-action-card__icon ov-action-card__icon--orange tw:inline-flex tw:items-center tw:justify-center tw:shrink-0 tw:w-10 tw:h-10 tw:rounded-lg tw:transition-[background-color,color] tw:duration-150">
             <OIcon name="notifications" size="md" />
           </span>
-          <span class="ov-action-card__body">
-            <span class="ov-action-card__label">{{ t('overview.emptyActionAlerts') }}</span>
-            <span class="ov-action-card__sublabel">{{ t('overview.emptyActionAlertsDesc') }}</span>
+          <span class="ov-action-card__body tw:flex-1 tw:min-w-0 tw:flex tw:flex-col tw:gap-[0.125rem]">
+            <span class="tw:text-(--text-sm) tw:font-semibold tw:text-(--color-text-primary) tw:truncate">{{ t('overview.emptyActionAlerts') }}</span>
+            <span class="tw:text-(--text-xs) tw:text-(--color-text-secondary) tw:leading-[1.4]">{{ t('overview.emptyActionAlertsDesc') }}</span>
           </span>
-          <OIcon name="chevron-right" size="sm" class="ov-action-card__chevron" />
+          <OIcon name="chevron-right" size="sm" class="ov-action-card__chevron tw:shrink-0 tw:text-(--color-text-disabled) tw:transition-[transform,color] tw:duration-150" />
         </button>
         <!-- Explore logs -->
-        <button type="button" class="ov-action-card" data-test="overview-empty-logs-card" @click="goToLogs">
-          <span class="ov-action-card__icon ov-action-card__icon--blue">
+        <button type="button" class="ov-action-card tw:relative tw:flex tw:items-center tw:gap-3 tw:w-64 tw:max-w-full tw:min-h-16 tw:py-[0.625rem] tw:pr-[0.875rem] tw:pl-3 tw:rounded-xl tw:border tw:border-(--color-border-default) tw:bg-(--color-surface-base) tw:shadow-(--shadow-sm) tw:text-left tw:cursor-pointer tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150 tw:outline-none tw:hover:shadow-(--shadow-md) tw:hover:border-(--color-primary-400) tw:hover:bg-(--color-tabs-hover-bg)" data-test="overview-empty-logs-card" @click="goToLogs">
+          <span class="ov-action-card__icon ov-action-card__icon--blue tw:inline-flex tw:items-center tw:justify-center tw:shrink-0 tw:w-10 tw:h-10 tw:rounded-lg tw:transition-[background-color,color] tw:duration-150">
             <OIcon name="search" size="md" />
           </span>
-          <span class="ov-action-card__body">
-            <span class="ov-action-card__label">{{ t('overview.emptyActionLogs') }}</span>
-            <span class="ov-action-card__sublabel">{{ t('overview.emptyActionLogsDesc') }}</span>
+          <span class="ov-action-card__body tw:flex-1 tw:min-w-0 tw:flex tw:flex-col tw:gap-[0.125rem]">
+            <span class="tw:text-(--text-sm) tw:font-semibold tw:text-(--color-text-primary) tw:truncate">{{ t('overview.emptyActionLogs') }}</span>
+            <span class="tw:text-(--text-xs) tw:text-(--color-text-secondary) tw:leading-[1.4]">{{ t('overview.emptyActionLogsDesc') }}</span>
           </span>
-          <OIcon name="chevron-right" size="sm" class="ov-action-card__chevron" />
+          <OIcon name="chevron-right" size="sm" class="ov-action-card__chevron tw:shrink-0 tw:text-(--color-text-disabled) tw:transition-[transform,color] tw:duration-150" />
         </button>
         <!-- Explore traces -->
-        <button type="button" class="ov-action-card" data-test="overview-empty-traces-card" @click="goToTraces">
-          <span class="ov-action-card__icon ov-action-card__icon--purple">
+        <button type="button" class="ov-action-card tw:relative tw:flex tw:items-center tw:gap-3 tw:w-64 tw:max-w-full tw:min-h-16 tw:py-[0.625rem] tw:pr-[0.875rem] tw:pl-3 tw:rounded-xl tw:border tw:border-(--color-border-default) tw:bg-(--color-surface-base) tw:shadow-(--shadow-sm) tw:text-left tw:cursor-pointer tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150 tw:outline-none tw:hover:shadow-(--shadow-md) tw:hover:border-(--color-primary-400) tw:hover:bg-(--color-tabs-hover-bg)" data-test="overview-empty-traces-card" @click="goToTraces">
+          <span class="ov-action-card__icon ov-action-card__icon--purple tw:inline-flex tw:items-center tw:justify-center tw:shrink-0 tw:w-10 tw:h-10 tw:rounded-lg tw:transition-[background-color,color] tw:duration-150">
             <OIcon name="account-tree" size="md" />
           </span>
-          <span class="ov-action-card__body">
-            <span class="ov-action-card__label">{{ t('overview.emptyActionTraces') }}</span>
-            <span class="ov-action-card__sublabel">{{ t('overview.emptyActionTracesDesc') }}</span>
+          <span class="ov-action-card__body tw:flex-1 tw:min-w-0 tw:flex tw:flex-col tw:gap-[0.125rem]">
+            <span class="tw:text-(--text-sm) tw:font-semibold tw:text-(--color-text-primary) tw:truncate">{{ t('overview.emptyActionTraces') }}</span>
+            <span class="tw:text-(--text-xs) tw:text-(--color-text-secondary) tw:leading-[1.4]">{{ t('overview.emptyActionTracesDesc') }}</span>
           </span>
-          <OIcon name="chevron-right" size="sm" class="ov-action-card__chevron" />
+          <OIcon name="chevron-right" size="sm" class="ov-action-card__chevron tw:shrink-0 tw:text-(--color-text-disabled) tw:transition-[transform,color] tw:duration-150" />
         </button>
       </template>
     </OEmptyState>
 
     <!-- Loading skeleton (standard O2 wave shimmer) -->
-    <div v-if="isLoading" class="ov-skeleton-wrap">
-      <OSkeleton v-for="i in 3" :key="i" class="ov-skeleton-row" />
+    <div v-if="isLoading" class="tw:flex tw:flex-col tw:gap-2 tw:py-2 tw:px-0">
+      <OSkeleton v-for="i in 3" :key="i" class="tw:h-[3.25em]" />
     </div>
   </div>
 </template>
@@ -694,9 +694,9 @@ const incidentRowClass = (severity: string) => {
 };
 
 const serviceCardClass = (svc: any) => {
-  if (svc.errorFlag && svc.error_rate >= 5) return "ov-svc-degraded";
-  if (svc.errorFlag || svc.latencyFlag) return "ov-svc-warn";
-  return "ov-svc-healthy";
+  if (svc.errorFlag && svc.error_rate >= 5) return "tw:border-l-[0.1875em] tw:border-l-[#ef4444]";
+  if (svc.errorFlag || svc.latencyFlag) return "tw:border-l-[0.1875em] tw:border-l-[#f59e0b]";
+  return "tw:border-l-[0.1875em] tw:border-l-[#22c55e]";
 };
 
 // ── Navigation ───────────────────────────────────────────────────────────────
@@ -778,551 +778,173 @@ watch(isIncidentsEnabled, (enabled) => {
 });
 </script>
 
-<style scoped lang="scss">
-.ov-panel-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 99; // just below the panel (z-index: 100)
-  background: transparent;
+<style>
+/* ── Alert row severity — kept because descendant .ov-row-icon color rules require the class name ── */
+.ov-alert-row.ov-row-critical {
+  border-left: 0.1875em solid #ef4444;
+}
+.ov-alert-row.ov-row-critical .ov-row-icon {
+  color: #ef4444;
+}
+.ov-alert-row.ov-row-warning {
+  border-left: 0.1875em solid #f59e0b;
+}
+.ov-alert-row.ov-row-warning .ov-row-icon {
+  color: #f59e0b;
+}
+.ov-alert-row.ov-row-info {
+  border-left: 0.1875em solid #3b82f6;
+}
+.ov-alert-row.ov-row-info .ov-row-icon {
+  color: #3b82f6;
 }
 
-.overview-tab {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  padding: 0.625rem;
-  height: 100%;
-  overflow-y: auto;
-  color: var(--o2-text-primary);
-}
-
-/* ── Header ── */
-.overview-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 1rem;
-}
-
-.overview-title {
-  font-size: 1rem;
-  font-weight: 600;
-  color: var(--o2-text-primary);
-  letter-spacing: 0.01em;
-}
-
-.overview-header-right {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-/* ── Section ── */
-.ov-section {
-  margin-bottom: 1.25rem;
-}
-
-.ov-section-label {
-  font-size: 0.8125rem;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-  color: var(--o2-text-muted);
-  margin-bottom: 0.5rem;
-  padding-left: 0.25rem;
-}
-
-/* ── Alert / Anomaly / Incident rows ── */
-.ov-rows {
-  display: flex;
-  flex-direction: column;
-  gap: 0.375rem;
-}
-
-.ov-alert-row {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.625rem 0.875rem;
-  border-radius: 0.375rem;
-  border: 0.0625em solid var(--o2-border-color);
-  background: var(--o2-card-bg-solid);
-  transition: background 0.15s;
-
-  &:hover {
-    background: var(--o2-hover-gray);
-  }
-
-  &.ov-row-critical {
-    border-left: 0.1875em solid #ef4444;
-    .ov-row-icon {
-      color: #ef4444;
-    }
-  }
-
-  &.ov-row-warning {
-    border-left: 0.1875em solid #f59e0b;
-    .ov-row-icon {
-      color: #f59e0b;
-    }
-  }
-
-  &.ov-row-info {
-    border-left: 0.1875em solid #3b82f6;
-    .ov-row-icon {
-      color: #3b82f6;
-    }
-  }
-}
-
-.ov-row-icon {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-}
-
-.ov-row-body {
-  flex: 1;
-  min-width: 0;
-}
-
-.ov-row-title {
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: var(--o2-text-primary);
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 0.25rem;
-  row-gap: 0.25rem;
-}
-
-.ov-row-desc {
-  font-size: 0.75rem;
-  color: var(--o2-text-muted);
-  margin-top: 0.125rem;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.ov-investigate-wrap {
-  flex-shrink: 0;
-  white-space: nowrap;
-}
-
-/* ── Dimension badges — exact match to IncidentList.vue ── */
-.dimension-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.125em;
-  padding: 0.125em 0.5em;
-  border-radius: 0.375em;
-  font-size: 0.6875em;
-  font-weight: 600;
-  margin: 0 0.125em;
-  max-width: 11.25em;
-  overflow: hidden;
-
-  span {
-    display: inline-block;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-}
-
-.badge-blue {
-  border: 0.0625em solid #1d4ed8;
-}
-.badge-green {
-  border: 0.0625em solid #065f46;
-}
-.badge-yellow {
-  border: 0.0625em solid #92400e;
-}
-.badge-pink {
-  border: 0.0625em solid #9f1239;
-}
-.badge-purple {
-  border: 0.0625em solid #7c3aed;
-}
-.badge-orange {
-  border: 0.0625em solid #c2410c;
-}
-.badge-cyan {
-  border: 0.0625em solid #0e7490;
-}
-.badge-indigo {
-  border: 0.0625em solid #4f46e5;
-}
-.badge-teal {
-  border: 0.0625em solid #0f766e;
-}
-.badge-red {
-  border: 0.0625em solid #dc2626;
-}
-.badge-gray {
-  border: 0.0625em solid #4b5563;
-}
-.badge-amber {
-  border: 0.0625em solid #d97706;
-}
-
-body.body--dark {
-  .badge-blue {
-    border-color: #93c5fd;
-  }
-  .badge-green {
-    border-color: #6ee7b7;
-  }
-  .badge-yellow {
-    border-color: #fcd34d;
-  }
-  .badge-pink {
-    border-color: #f9a8d4;
-  }
-  .badge-purple {
-    border-color: #c4b5fd;
-  }
-  .badge-orange {
-    border-color: #fdba74;
-  }
-  .badge-cyan {
-    border-color: #67e8f9;
-  }
-  .badge-indigo {
-    border-color: #a5b4fc;
-  }
-  .badge-teal {
-    border-color: #5eead4;
-  }
-  .badge-red {
-    border-color: #fca5a5;
-  }
-  .badge-gray {
-    border-color: #9ca3af;
-  }
-  .badge-amber {
-    border-color: #fcd34d;
-  }
-
-  .ov-flag-error {
-    background: #401a1a;
-    color: #f9cbcb;
-    border-color: rgba(239, 68, 68, 0.35);
-  }
-  .ov-flag-latency {
-    background: #402a10;
-    color: #fcd34d;
-    border-color: rgba(245, 158, 11, 0.35);
-  }
-
-  .ov-badge-firing {
-    background: #401a1a;
-    color: #fca5a5;
-  }
-  .ov-badge-error {
-    background: #401f10;
-    color: #fdba74;
-  }
-  .ov-badge-failed {
-    background: #401a1a;
-    color: #f9cbcb;
-  }
-
-  .ov-fail-count {
-    color: #f9cbcb;
-    background: #401a1a;
-    border-color: rgba(239, 68, 68, 0.35);
-  }
-}
-
-/* ── Severity badge ── */
-.ov-severity-badge {
+/* ── Dimension badge child span — descendant selector ── */
+.dimension-badge span {
   display: inline-block;
-  font-size: 0.625rem;
-  font-weight: 700;
-  padding: 0.1rem 0.35rem;
-  border-radius: 0.2rem;
-  letter-spacing: 0.04em;
-
-  &.ov-sev-p1 {
-    background: #fef2f2;
-    color: #b91c1c;
-    border: 0.0625em solid #fca5a5;
-  }
-  &.ov-sev-p2 {
-    background: #fff7ed;
-    color: #c2410c;
-    border: 0.0625em solid #fdba74;
-  }
-  &.ov-sev-p3 {
-    background: #fefce8;
-    color: #a16207;
-    border: 0.0625em solid #fde047;
-  }
-  &.ov-sev-p4 {
-    background: #f0f9ff;
-    color: #0369a1;
-    border: 0.0625em solid #7dd3fc;
-  }
-}
-
-/* Dark mode severity badges */
-:root.body--dark {
-  .ov-sev-p1 {
-    background: rgba(239, 68, 68, 0.15);
-    color: #fca5a5;
-    border-color: rgba(239, 68, 68, 0.3);
-  }
-  .ov-sev-p2 {
-    background: rgba(249, 115, 22, 0.15);
-    color: #fdba74;
-    border-color: rgba(249, 115, 22, 0.3);
-  }
-  .ov-sev-p3 {
-    background: rgba(234, 179, 8, 0.15);
-    color: #fde047;
-    border-color: rgba(234, 179, 8, 0.3);
-  }
-  .ov-sev-p4 {
-    background: rgba(59, 130, 246, 0.15);
-    color: #7dd3fc;
-    border-color: rgba(59, 130, 246, 0.3);
-  }
-}
-
-/* ── Services grid ── */
-.ov-service-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(13.75em, 1fr));
-  gap: 0.5rem;
-}
-
-.ov-service-card {
-  padding: 0.75rem 0.875rem;
-  border-radius: 0.375rem;
-  border: 0.0625em solid var(--o2-border-color);
-  background: var(--o2-card-bg-solid);
-  transition: background 0.15s;
-
-  &.ov-svc-degraded {
-    border-left: 0.1875em solid #ef4444;
-  }
-  &.ov-svc-warn {
-    border-left: 0.1875em solid #f59e0b;
-  }
-  &.ov-svc-healthy {
-    border-left: 0.1875em solid #22c55e;
-  }
-
-  cursor: pointer;
-  &:hover {
-    background: var(--o2-hover-gray);
-  }
-}
-
-.ov-svc-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 0.5rem;
-}
-
-.ov-svc-name {
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: var(--o2-text-primary);
-  flex: 1;
-  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.ov-svc-info-wrap {
-  display: inline-flex;
-  align-items: center;
-  flex-shrink: 0;
-  margin-left: 0.25rem;
+/* ── Badge color borders (light mode) ── */
+.badge-blue   { border: 0.0625em solid #1d4ed8; }
+.badge-green  { border: 0.0625em solid #065f46; }
+.badge-yellow { border: 0.0625em solid #92400e; }
+.badge-pink   { border: 0.0625em solid #9f1239; }
+.badge-purple { border: 0.0625em solid #7c3aed; }
+.badge-orange { border: 0.0625em solid #c2410c; }
+.badge-cyan   { border: 0.0625em solid #0e7490; }
+.badge-indigo { border: 0.0625em solid #4f46e5; }
+.badge-teal   { border: 0.0625em solid #0f766e; }
+.badge-red    { border: 0.0625em solid #dc2626; }
+.badge-gray   { border: 0.0625em solid #4b5563; }
+.badge-amber  { border: 0.0625em solid #d97706; }
+
+/* ── Badge dark mode ── */
+body.body--dark .badge-blue   { border-color: #93c5fd; }
+body.body--dark .badge-green  { border-color: #6ee7b7; }
+body.body--dark .badge-yellow { border-color: #fcd34d; }
+body.body--dark .badge-pink   { border-color: #f9a8d4; }
+body.body--dark .badge-purple { border-color: #c4b5fd; }
+body.body--dark .badge-orange { border-color: #fdba74; }
+body.body--dark .badge-cyan   { border-color: #67e8f9; }
+body.body--dark .badge-indigo { border-color: #a5b4fc; }
+body.body--dark .badge-teal   { border-color: #5eead4; }
+body.body--dark .badge-red    { border-color: #fca5a5; }
+body.body--dark .badge-gray   { border-color: #9ca3af; }
+body.body--dark .badge-amber  { border-color: #fcd34d; }
+
+/* ── Service flag dark mode ── */
+body.body--dark .ov-flag-error {
+  background: #401a1a;
+  color: #f9cbcb;
+  border-color: rgba(239, 68, 68, 0.35);
+}
+body.body--dark .ov-flag-latency {
+  background: #402a10;
+  color: #fcd34d;
+  border-color: rgba(245, 158, 11, 0.35);
 }
 
-.ov-svc-flags {
-  display: flex;
-  gap: 0.375rem;
-  align-items: center;
-  flex-wrap: wrap;
-  margin-bottom: 0.375rem;
+/* ── Event type badge dark mode ── */
+body.body--dark .ov-badge-firing {
+  background: #401a1a;
+  color: #fca5a5;
+}
+body.body--dark .ov-badge-error {
+  background: #401f10;
+  color: #fdba74;
+}
+body.body--dark .ov-badge-failed {
+  background: #401a1a;
+  color: #f9cbcb;
 }
 
-.ov-svc-flag {
-  font-size: 0.625rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  padding: 0.15rem 0.4rem;
-  border-radius: 0.2rem;
-  white-space: nowrap;
+/* ── Fail count dark mode ── */
+body.body--dark .ov-fail-count {
+  color: #f9cbcb;
+  background: #401a1a;
+  border-color: rgba(239, 68, 68, 0.35);
 }
 
+/* ── Severity badge light mode ── */
+.ov-severity-badge.ov-sev-p1 {
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 0.0625em solid #fca5a5;
+}
+.ov-severity-badge.ov-sev-p2 {
+  background: #fff7ed;
+  color: #c2410c;
+  border: 0.0625em solid #fdba74;
+}
+.ov-severity-badge.ov-sev-p3 {
+  background: #fefce8;
+  color: #a16207;
+  border: 0.0625em solid #fde047;
+}
+.ov-severity-badge.ov-sev-p4 {
+  background: #f0f9ff;
+  color: #0369a1;
+  border: 0.0625em solid #7dd3fc;
+}
+
+/* ── Severity badge dark mode ── */
+:root.body--dark .ov-sev-p1 {
+  background: rgba(239, 68, 68, 0.15);
+  color: #fca5a5;
+  border-color: rgba(239, 68, 68, 0.3);
+}
+:root.body--dark .ov-sev-p2 {
+  background: rgba(249, 115, 22, 0.15);
+  color: #fdba74;
+  border-color: rgba(249, 115, 22, 0.3);
+}
+:root.body--dark .ov-sev-p3 {
+  background: rgba(234, 179, 8, 0.15);
+  color: #fde047;
+  border-color: rgba(234, 179, 8, 0.3);
+}
+:root.body--dark .ov-sev-p4 {
+  background: rgba(59, 130, 246, 0.15);
+  color: #7dd3fc;
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
+/* ── Service flag light mode ── */
 .ov-flag-error {
   background: rgba(239, 68, 68, 0.12);
   color: #ef4444;
   border: 0.0625em solid rgba(239, 68, 68, 0.25);
 }
-
 .ov-flag-latency {
   background: rgba(245, 158, 11, 0.12);
   color: #d97706;
   border: 0.0625em solid rgba(245, 158, 11, 0.25);
 }
 
-.ov-svc-req {
-  display: flex;
-  align-items: baseline;
-  gap: 0.35rem;
-  margin-top: 0.375rem;
+/* ── Event type badge light mode ── */
+.ov-event-type-badge.ov-badge-firing {
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
 }
-
-.ov-metric-label {
-  font-size: 0.6875rem;
-  color: var(--o2-text-muted);
+.ov-event-type-badge.ov-badge-error {
+  background: rgba(249, 115, 22, 0.12);
+  color: #c2410c;
 }
-
-.ov-metric-value {
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: var(--o2-text-primary);
-}
-
-/* ── Recent events list ── */
-.ov-event-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  border: 0.0625em solid var(--o2-border-color);
-  border-radius: 0.375rem;
-  overflow: hidden;
-  background: var(--o2-card-bg-solid);
-}
-
-.ov-event-row {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.5rem 0.875rem;
-  border-bottom: 0.0625em solid var(--o2-border-color);
-  font-size: 0.8125rem;
-  transition: background 0.15s;
-
-  &:last-child {
-    border-bottom: none;
-  }
-  &:hover {
-    background: var(--o2-hover-gray);
-  }
-}
-
-.ov-event-type-badge {
-  flex-shrink: 0;
-  font-size: 0.6875rem;
-  font-weight: 600;
-  padding: 0.15rem 0.4rem;
-  border-radius: 0.2rem;
-  letter-spacing: 0.03em;
-
-  &.ov-badge-firing {
-    background: rgba(239, 68, 68, 0.12);
-    color: #ef4444;
-  }
-  &.ov-badge-error {
-    background: rgba(249, 115, 22, 0.12);
-    color: #c2410c;
-  }
-  &.ov-badge-failed {
-    background: rgba(239, 68, 68, 0.18);
-    color: #b91c1c;
-    font-weight: 700;
-  }
-}
-
-.ov-event-service {
-  font-weight: 500;
-  color: var(--o2-text-primary);
-  white-space: nowrap;
-  min-width: 7.5em;
-  max-width: 12.5em;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.ov-event-desc {
-  flex: 1;
-  color: var(--o2-text-muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.ov-fail-count {
-  flex-shrink: 0;
-  font-size: 0.6875rem;
-  font-weight: 700;
+.ov-event-type-badge.ov-badge-failed {
+  background: rgba(239, 68, 68, 0.18);
   color: #b91c1c;
-  background: rgba(239, 68, 68, 0.1);
-  border: 0.0625em solid rgba(239, 68, 68, 0.25);
-  border-radius: 0.75rem;
-  padding: 0.1rem 0.4rem;
-  white-space: nowrap;
+  font-weight: 700;
 }
 
-.ov-event-time {
-  flex-shrink: 0;
-  color: var(--o2-text-muted);
-  font-size: 0.75rem;
-  white-space: nowrap;
+/* ── Event row last-child — pseudo-class selector ── */
+.ov-event-row:last-child {
+  border-bottom: none;
 }
 
-/* ── Empty state action cards ── */
-.ov-action-card {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  width: 16rem;
-  max-width: 100%;
-  min-height: 4rem;
-  padding: 0.625rem 0.875rem 0.625rem 0.75rem;
-  border-radius: 0.75rem;
-  border: 1px solid var(--color-border-default);
-  background: var(--color-surface-base);
-  box-shadow: var(--shadow-sm);
-  text-align: left;
-  cursor: pointer;
-  transition: color 150ms, background-color 150ms, border-color 150ms, box-shadow 150ms;
-  outline: none;
-}
-.ov-action-card:hover {
-  box-shadow: var(--shadow-md);
-  border-color: var(--color-primary-400);
-  background: var(--color-tabs-hover-bg);
-}
-.ov-action-card:focus-visible {
-  box-shadow: 0 0 0 0.125rem color-mix(in srgb, var(--color-primary-500) 40%, transparent);
-}
-
-.ov-action-card__icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  width: 2.5rem;
-  height: 2.5rem;
-  border-radius: 0.5rem;
-  transition: background-color 150ms, color 150ms;
-}
-.ov-action-card__icon--blue   { background: color-mix(in srgb, #3b82f6 12%, transparent); color: #3b82f6; }
-.ov-action-card__icon--purple { background: color-mix(in srgb, #8b5cf6 12%, transparent); color: #8b5cf6; }
-.ov-action-card__icon--orange { background: color-mix(in srgb, #f59e0b 12%, transparent); color: #d97706; }
+/* ── Action card hover affecting children ── */
 .ov-action-card:hover .ov-action-card__icon,
 .ov-action-card:hover .ov-action-card__icon--blue,
 .ov-action-card:hover .ov-action-card__icon--purple,
@@ -1330,51 +952,22 @@ body.body--dark {
   background: var(--color-primary-600);
   color: #fff;
 }
-
-.ov-action-card__body {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.125rem;
-}
-.ov-action-card__label {
-  font-size: var(--text-sm);
-  font-weight: 600;
-  color: var(--color-text-primary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.ov-action-card__sublabel {
-  font-size: var(--text-xs);
-  color: var(--color-text-secondary);
-  line-height: 1.4;
-}
-.ov-action-card__chevron {
-  flex-shrink: 0;
-  color: var(--color-text-disabled);
-  transition: transform 150ms, color 150ms;
-}
 .ov-action-card:hover .ov-action-card__chevron {
   transform: translateX(0.125rem);
   color: var(--color-primary-600);
 }
 
-/* ── Loading skeleton ── */
-.ov-skeleton-wrap {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  padding: 0.5rem 0;
+/* ── Action card focus-visible — complex box-shadow ── */
+.ov-action-card:focus-visible {
+  box-shadow: 0 0 0 0.125rem color-mix(in srgb, var(--color-primary-500) 40%, transparent);
 }
 
-/* Height only — OSkeleton provides the surface, rounding and wave shimmer. */
-.ov-skeleton-row {
-  height: 3.25em;
-}
+/* ── Action card icon color variants (light mode) ── */
+.ov-action-card__icon--blue   { background: color-mix(in srgb, #3b82f6 12%, transparent); color: #3b82f6; }
+.ov-action-card__icon--purple { background: color-mix(in srgb, #8b5cf6 12%, transparent); color: #8b5cf6; }
+.ov-action-card__icon--orange { background: color-mix(in srgb, #f59e0b 12%, transparent); color: #d97706; }
 
-/* ── Scrollbar ── */
+/* ── Scrollbar pseudo-elements ── */
 .overview-tab::-webkit-scrollbar {
   width: 0.375em;
 }

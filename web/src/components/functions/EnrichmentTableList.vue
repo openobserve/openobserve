@@ -144,7 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </OIcon>
                     </span>
                     <span v-else-if="row.aggregateStatus === 'processing'">
-                      <OIcon name="sync" size="sm" class="rotate-animation">
+                      <OIcon name="sync" size="sm" class="tw:[animation:rotate_1s_linear_infinite]">
                         <OTooltip>
                           <template #content>
                             <div style="max-width: 300px;">
@@ -970,18 +970,7 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss">
-
-.search-en-table-input {
-  .q-field__inner {
-    width: 250px;
-  }
-}
-
-.rotate-animation {
-  animation: rotate 1s linear infinite;
-}
-
+<style>
 @keyframes rotate {
   from {
     transform: rotate(0deg);
@@ -990,6 +979,4 @@ export default defineComponent({
     transform: rotate(360deg);
   }
 }
-
-/* No custom styles needed - using Quasar components */
 </style>

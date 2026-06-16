@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -49,8 +49,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div
       data-test="scheduled-dashboards-container"
-      class="scheduled-dashboards"
-      :class="store.state.theme === 'dark' ? 'dark-mode' : 'tw:bg-white'"
+      class="scheduled-dashboards tw:h-fit tw:bg-white tw:dark:bg-(--o2-primary-background)"
+      :class="store.state.theme === 'dark' ? 'dark-mode' : ''"
     >
     <OTable
       data-test="scheduled-dashboard-table"
@@ -383,62 +383,48 @@ const getTimeRangeValue = (dateTime: any) => {
 };
 </script>
 
-<style lang="scss" scoped>
-.dark-mode {
-  background-color: var(--o2-primary-background);
-
-  &.scheduled-dashboards {
-    height: fit-content;
-
-    :deep(.rum-tabs) {
-      border: 1px solid #464646;
-    }
-
-    :deep(.rum-tab) {
-      &:hover {
-        background: #464646;
-      }
-
-      &.active {
-        background: #5960b2;
-        color: #ffffff !important;
-      }
-    }
-  }
+<style>
+.dark-mode.scheduled-dashboards .rum-tabs {
+  border: 1px solid #464646;
 }
 
-.scheduled-dashboards {
+.dark-mode.scheduled-dashboards .rum-tab:hover {
+  background: #464646;
+}
+
+.dark-mode.scheduled-dashboards .rum-tab.active {
+  background: #5960b2;
+  color: #ffffff !important;
+}
+
+.scheduled-dashboards .q-table__top {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.scheduled-dashboards thead tr {
+  background-color: var(--o2-table-header-bg) !important;
+}
+
+.scheduled-dashboards .rum-tabs {
+  border: 1px solid #eaeaea;
   height: fit-content;
+  border-radius: 4px;
+  overflow: hidden;
+}
 
-  :deep(.q-table__top) {
-    padding-left: 0;
-    padding-right: 0;
-  }
+.scheduled-dashboards .rum-tab {
+  width: fit-content !important;
+  padding: 4px 12px !important;
+  border: none !important;
+}
 
-  :deep(thead tr) {
-    background-color: var(--o2-table-header-bg) !important;
-  }
+.scheduled-dashboards .rum-tab:hover {
+  background: #eaeaea;
+}
 
-  :deep(.rum-tabs) {
-    border: 1px solid #eaeaea;
-    height: fit-content;
-    border-radius: 4px;
-    overflow: hidden;
-  }
-
-  :deep(.rum-tab) {
-    width: fit-content !important;
-    padding: 4px 12px !important;
-    border: none !important;
-
-    &:hover {
-      background: #eaeaea;
-    }
-
-    &.active {
-      background: #5960b2;
-      color: #ffffff !important;
-    }
-  }
+.scheduled-dashboards .rum-tab.active {
+  background: #5960b2;
+  color: #ffffff !important;
 }
 </style>

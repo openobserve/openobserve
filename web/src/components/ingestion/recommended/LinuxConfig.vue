@@ -110,5 +110,3 @@ const unselectedCardClass = computed(() =>
     : "tw:border-gray-200 tw:bg-white hover:tw:border-gray-300"
 );
 </script>
-
-<style scoped></style>

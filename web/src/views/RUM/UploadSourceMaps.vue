@@ -15,9 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="upload-source-maps-page tw:w-full tw:h-full tw:px-[0.625rem]">
+  <div class="tw:flex tw:flex-col tw:w-full tw:h-full tw:px-2.5 tw:bg-(--q-background)">
     <!-- Top Header Bar -->
-    <div class="header-bar card-container tw:flex tw:items-center tw:justify-between tw:py-[0.675rem] tw:h-[64px] tw:px-[0.675rem] tw:mb-[0.675rem]">
+    <div class="header-bar tw:shrink-0 card-container tw:flex tw:items-center tw:justify-between tw:py-[0.675rem] tw:h-16 tw:px-[0.675rem] tw:mb-[0.675rem] tw:border-b tw:border-(--q-border-color)">
       <div class="tw:flex tw:items-center tw:gap-3">
         <div
           data-test="add-alert-back-btn"
@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             border: 1.5px solid;
             border-radius: 50%;
             width: 22px;
-            height: 22px; 
+            height: 22px;
           "
           title="Go Back"
           @click="navigateBack()"
@@ -40,8 +40,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Form Content Area -->
-    <div class="form-content-area card-container tw:mb-[0.675rem] tw:p-6" style="height: calc(100vh - 172px); overflow: auto">
-      <div class="upload-form">
+    <div class="tw:flex-1 tw:overflow-y-auto card-container tw:mb-[0.675rem] tw:p-6" style="height: calc(100vh - 172px); overflow: auto">
+      <div class="tw:max-w-300 tw:mx-auto">
         <!-- Input Fields -->
         <div class="tw:grid tw:grid-cols-1 md:tw:grid-cols-3 tw:gap-4 tw:mb-6">
           <!-- Service Input -->
@@ -82,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="tw:mb-6">
           <div class="tw:text-sm tw:font-medium text-weight-medium tw:mb-2">Source Map ZIP File *</div>
           <div
-            class="upload-area"
+            class="upload-area tw:border-2 tw:border-dashed tw:border-(--q-border-color) tw:rounded-lg tw:p-8 tw:text-center tw:cursor-pointer tw:transition-all tw:duration-300 tw:bg-(--q-background) tw:hover:border-(--q-primary)"
             :class="{ 'drag-over': isDragging, 'has-file': formData.file }"
             @dragover.prevent="isDragging = true"
             @dragleave.prevent="isDragging = false"
@@ -97,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @change="handleFileInput"
             />
 
-            <div v-if="!formData.file" class="upload-content">
+            <div v-if="!formData.file" class="tw:flex tw:flex-col tw:items-center tw:justify-center">
               <OIcon name="backup" size="xl" class="tw:mb-3" />
               <div class="tw:text-xl tw:font-semibold tw:text-gray-500 tw:mb-2">Drop your file here</div>
               <div class="tw:text-sm tw:text-gray-400 tw:mb-3">or click to browse</div>
@@ -127,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Bottom Action Bar -->
-    <div class="action-bar card-container tw:flex tw:items-center tw:justify-end tw:gap-3 tw:py-3 tw:pr-3"
+    <div class="action-bar tw:shrink-0 card-container tw:flex tw:items-center tw:justify-end tw:gap-3 tw:py-3 tw:pr-3 tw:border-t tw:border-(--q-border-color)"
       style="position: sticky; z-index: 2">
       <OButton
         variant="outline"
@@ -298,87 +298,34 @@ const uploadSourceMaps = async () => {
 };
 </script>
 
-<style lang="scss" scoped>
-.upload-source-maps-page {
-  display: flex;
-  flex-direction: column;
-  background-color: var(--q-background);
+<style>
+.upload-area.drag-over {
+  border-color: var(--q-primary);
+  background-color: rgba(var(--q-primary-rgb), 0.05);
+  border-style: solid;
 }
 
-.header-bar {
-  flex-shrink: 0;
-  border-bottom: 1px solid var(--q-border-color, var(--o2-border));
+.upload-area.has-file {
+  padding: 1.5rem;
+  text-align: left;
+  border-style: solid;
+  border-color: var(--q-positive);
+  background-color: rgba(var(--q-positive-rgb), 0.02);
 }
 
-.form-content-area {
-  flex: 1;
-  overflow-y: auto;
+.q-dark .upload-area {
+  border-color: rgba(255, 255, 255, 0.1);
 }
 
-.upload-form {
-  max-width: 1200px;
-  margin: 0 auto;
+.q-dark .upload-area:hover {
+  background-color: rgba(var(--q-primary-rgb), 0.05);
 }
 
-.action-bar {
-  flex-shrink: 0;
-  border-top: 1px solid var(--q-border-color, var(--o2-border));
+.q-dark .upload-area.drag-over {
+  background-color: rgba(var(--q-primary-rgb), 0.1);
 }
 
-.upload-area {
-  border: 2px dashed var(--q-border-color, var(--o2-border));
-  border-radius: 8px;
-  padding: 2rem 2rem;
-  text-align: center;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  background-color: var(--q-background);
-
-  &:hover {
-    border-color: var(--q-primary);
-    background-color: rgba(var(--q-primary-rgb), 0.02);
-  }
-
-  &.drag-over {
-    border-color: var(--q-primary);
-    background-color: rgba(var(--q-primary-rgb), 0.05);
-    border-style: solid;
-  }
-
-  &.has-file {
-    padding: 1.5rem;
-    text-align: left;
-    border-style: solid;
-    border-color: var(--q-positive);
-    background-color: rgba(var(--q-positive-rgb), 0.02);
-  }
-}
-
-.upload-content {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-}
-
-.file-info {
-}
-
-:deep(.q-dark) {
-  .upload-area {
-    border-color: rgba(255, 255, 255, 0.1);
-
-    &:hover {
-      background-color: rgba(var(--q-primary-rgb), 0.05);
-    }
-
-    &.drag-over {
-      background-color: rgba(var(--q-primary-rgb), 0.1);
-    }
-
-    &.has-file {
-      background-color: rgba(var(--q-positive-rgb), 0.05);
-    }
-  }
+.q-dark .upload-area.has-file {
+  background-color: rgba(var(--q-positive-rgb), 0.05);
 }
 </style>

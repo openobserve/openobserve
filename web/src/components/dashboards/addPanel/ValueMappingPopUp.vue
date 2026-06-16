@@ -37,16 +37,16 @@
         <div
           v-for="(mapping, index) in editedValueMapping"
           :key="index"
-          class="draggable-row"
+          class="tw:flex tw:items-center tw:justify-between tw:border-b tw:border-b-[#cccccc70] tw:mb-2"
         >
-          <div class="draggable-handle tw:self-center">
+          <div class="tw:self-center tw:cursor-move tw:p-2">
             <OIcon
               name="drag-indicator" size="sm"
               class="tw:mr-1"
               :data-test="`dashboard-addpanel-config-value-mapping-drag-handle-${index}`"
             />
           </div>
-          <div class="draggable-content tw:flex tw:gap-x-6">
+          <div class="tw:flex tw:items-center tw:justify-between tw:flex-1 tw:gap-x-6">
             <OSelect
               v-model="mapping.type"
               :label="t('dashboard.valueMappingType')"
@@ -97,7 +97,7 @@
               :data-test="`dashboard-addpanel-config-value-mapping-text-input-${index}`"
             />
             <div
-              class="color-section tw:flex-1"
+              class="tw:flex tw:items-center tw:flex-1"
               :data-test="`dashboard-addpanel-config-value-mapping-color-section-${index}`"
             >
               <div
@@ -280,41 +280,3 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
-.draggable-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  border-bottom: 1px solid #cccccc70;
-  margin-bottom: 8px;
-
-  &:last-child {
-    border-bottom: none;
-  }
-}
-
-.draggable-handle {
-  cursor: move;
-  padding: 8px;
-}
-
-.draggable-content {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex: 1;
-}
-
-.input-spacing {
-  margin-right: 10px;
-}
-
-.color-section {
-  display: flex;
-  align-items: center;
-}
-
-.delete-btn {
-  margin-left: 10px;
-}
-</style>

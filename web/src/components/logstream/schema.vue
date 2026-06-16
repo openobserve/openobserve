@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- if we have data and no loading then we will show the data otherwise we will show the loading state -->
           <div
             v-else
-            class="indexDetailsContainer tw:flex tw:flex-col tw:min-h-0"
+            class="indexDetailsContainer tw:w-full tw:flex tw:flex-col tw:min-h-0"
             style="height: calc(100vh - 3.75rem)"
           >
             <!-- this the grid section the tiles section -->
@@ -364,7 +364,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <label
                         style="font-weight: 600"
-                        class="mapping-warning-msg"
+                        class="tw:bg-[#f9f290] tw:py-1 tw:px-4 tw:rounded tw:border tw:border-[#f5a623] tw:text-[#865300]"
                       >
                         {{ t("logStream.mapping") }} Default FTS keys used (no
                         custom keys set).</label
@@ -566,7 +566,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :options="indexTypeOptionsForRow(row)"
                             label-key="label"
                             value-key="value"
-                            class="mini-select"
+                            class="mini-select tw:min-h-[24px]! tw:max-h-[24px]! tw:h-[24px]! tw:text-[0.813rem]"
                             multiple
                             clearable
                             size="sm"
@@ -704,7 +704,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="tw:flex tw:flex-col tw:h-full tw:min-h-0 tw:overflow-hidden"
                 >
                   <div
-                    class="mapping-warning-msg tw:mt-2"
+                    class="tw:bg-[#f9f290] tw:py-1 tw:px-4 tw:rounded tw:border tw:border-[#f5a623] tw:text-[#865300] tw:mt-2"
                     style="width: fit-content"
                   >
                     <span style="font-weight: 600">
@@ -2729,187 +2729,101 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
-.q-card__section--vert {
-  padding: 8px 16px;
-}
-.indexDetailsContainer {
-  width: 100%;
-
-  .title {
-    margin-bottom: 1rem;
-    font-weight: 700;
-  }
-
-  .titleContainer {
-    background-color: #00000005;
-    border: 1px solid var(--o2-border-input);
-    border-radius: 5px;
-    padding: 1rem;
-  }
-
-  .o2-schema-table {
-    border-radius: 0.5rem;
-    position: relative;
-    border: 0.0625rem solid var(--o2-border-color);
-
-    thead tr {
-      height: 2.5rem;
-      background: var(--o2-table-header-bg) !important;
-
-      th {
-        font-size: 0.875rem;
-        // font-weight: 700;
-        height: 35px;
-      }
-    }
-
-    .o2-schema-table tbody td:after {
-      background: none !important;
-    }
-
-    tbody tr {
-      height: 15px;
-
-      td {
-        font-size: 0.875rem;
-        // font-weight: 600;
-        height: 25px;
-        padding: 0px 5px;
-      }
-    }
-  }
-
-  .q-list {
-    border-radius: 0 0 0.5rem 0.5rem;
-
-    .q-item {
-      height: 2.5rem;
-      padding: 0;
-
-      &__section {
-        padding: 0.5rem 1rem;
-        font-size: 0.875rem;
-
-        &:not(:first-child) {
-          border-left: 1px solid var(--o2-border-input);
-          align-items: flex-start;
-          min-width: 29%;
-        }
-      }
-
-      &.list-head {
-        border: 1px solid var(--o2-border-input);
-        border-radius: 0.5rem 0.5rem 0 0;
-        border-bottom: none;
-      }
-
-      &.list-item {
-        border-right: 1px solid var(--o2-border-input);
-        border-left: 1px solid var(--o2-border-input);
-
-        &,
-        &--side {
-          font-weight: 600;
-        }
-
-        &:last-of-type {
-          border-bottom: 1px solid var(--o2-border-input);
-          border-radius: 0 0 0.5rem 0.5rem;
-        }
-      }
-    }
-  }
-
-  .data-retention-input {
-    border: 1px solid var(--o2-border-input);
-    border-radius: 0.2rem;
-    width: 80px;
-    height: 39px;
-    &.q-field {
-      padding-bottom: 0 !important;
-    }
-  }
+<style>
+.indexDetailsContainer .o2-schema-table {
+  border-radius: 0.5rem;
+  position: relative;
+  border: 0.0625rem solid var(--o2-border-color);
 }
 
-.mapping-warning-msg {
-  background-color: #f9f290;
-  padding: 4px 16px;
-  border-radius: 4px;
-  border: 1px solid #f5a623;
-  color: #865300;
+.indexDetailsContainer .o2-schema-table thead tr {
+  height: 2.5rem;
+  background: var(--o2-table-header-bg) !important;
 }
 
-.q-item {
-  padding: 3px 8px;
-  margin: 0 8px;
-  border-radius: 6px;
-
-  /* Overriding default height */
-  min-height: 30px;
-
-  &.q-router-link--active {
-    background-color: var(--o2-theme-color);
-    color: white;
-
-    &::before {
-      content: " ";
-
-      position: absolute;
-      top: 0;
-      background-color: inherit;
-    }
-  }
-
-  &.ql-item-mini {
-    margin: 0;
-
-    &::before {
-      display: none;
-    }
-  }
+.indexDetailsContainer .o2-schema-table thead tr th {
+  font-size: 0.875rem;
+  height: 35px;
 }
 
-.q-item__section--avatar {
-  margin: 0;
+.indexDetailsContainer .o2-schema-table .o2-schema-table tbody td:after {
+  background: none !important;
+}
+
+.indexDetailsContainer .o2-schema-table tbody tr {
+  height: 15px;
+}
+
+.indexDetailsContainer .o2-schema-table tbody tr td {
+  font-size: 0.875rem;
+  height: 25px;
+  padding: 0px 5px;
+}
+
+.indexDetailsContainer .q-list {
+  border-radius: 0 0 0.5rem 0.5rem;
+}
+
+.indexDetailsContainer .q-list .q-item {
+  height: 2.5rem;
   padding: 0;
-  min-width: 40px;
 }
-.single-line-tab {
-  display: inline-flex;
+
+.indexDetailsContainer .q-list .q-item__section {
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
 }
-.mini-select {
+
+.indexDetailsContainer .q-list .q-item__section:not(:first-child) {
+  border-left: 1px solid var(--o2-border-input);
+  align-items: flex-start;
+  min-width: 29%;
+}
+
+.indexDetailsContainer .q-list .q-item.list-head {
+  border: 1px solid var(--o2-border-input);
+  border-radius: 0.5rem 0.5rem 0 0;
+  border-bottom: none;
+}
+
+.indexDetailsContainer .q-list .q-item.list-item {
+  border-right: 1px solid var(--o2-border-input);
+  border-left: 1px solid var(--o2-border-input);
+  font-weight: 600;
+}
+
+.indexDetailsContainer .q-list .q-item.list-item--side {
+  font-weight: 600;
+}
+
+.indexDetailsContainer .q-list .q-item.list-item:last-of-type {
+  border-bottom: 1px solid var(--o2-border-input);
+  border-radius: 0 0 0.5rem 0.5rem;
+}
+
+.mini-select .q-field__inner {
+  min-height: 24px !important;
+  height: 24px !important;
+  max-height: 24px !important;
+}
+
+.mini-select .q-field__control {
   min-height: 24px !important;
   max-height: 24px !important;
   height: 24px !important;
-  font-size: 0.813rem;
+  padding: 0px 8px !important;
+}
 
-  .q-field__inner {
-    min-height: 24px !important;
-    height: 24px !important;
-    max-height: 24px !important;
-  }
+.mini-select .q-field__control-container .q-field__native {
+  min-height: 24px !important;
+  height: 24px !important;
+}
 
-  .q-field__control {
-    min-height: 24px !important;
-    max-height: 24px !important;
-    height: 24px !important;
-    padding: 0px 8px !important;
-  }
+.mini-select .q-field__marginal {
+  height: 24px !important;
+}
 
-  .q-field__control-container {
-    .q-field__native {
-      min-height: 24px !important;
-      height: 24px !important;
-    }
-  }
-
-  .q-field__marginal {
-    height: 24px !important;
-  }
-
-  .q-field__append {
-    height: 24px !important;
-  }
+.mini-select .q-field__append {
+  height: 24px !important;
 }
 </style>

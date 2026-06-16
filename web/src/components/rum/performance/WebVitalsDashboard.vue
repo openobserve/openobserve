@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :class="isLoading.length ? 'tw:invisible' : 'tw:visible'"
     >
       <div
-        class="tw:font-bold tw:ml-3 tw:px-2 tw:rounded tw:mt-2 tw:py-1 learn-web-vitals-link tw:flex tw:items-center"
+        class="tw:font-bold tw:ml-3 tw:px-2 tw:rounded tw:mt-2 tw:py-1 tw:text-sm tw:w-fit tw:flex tw:items-center"
         :class="store.state.theme === 'dark' ? 'bg-indigo-7' : 'bg-indigo-2'"
       >
         <OIcon
@@ -266,22 +266,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped>
-.learn-web-vitals-link {
-  font-size: 14px;
-  width: fit-content;
-  border-radius: 4px;
-}
-.performance_title {
-  font-size: 24px;
-}
-.q-table {
-  &__top {
-    border-bottom: 1px solid var(--o2-border);
-    justify-content: flex-end;
-  }
-}
-</style>
-
-<style lang="scss"></style>

@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="incident-timeline tw:flex tw:flex-col tw:h-full">
+  <div class="tw:min-h-[400px] tw:flex tw:flex-col tw:h-full">
 
     <!-- Loading -->
     <div v-if="loading" class="tw:flex tw:justify-center tw:items-center tw:py-12">
@@ -647,17 +647,11 @@ defineExpose({
 });
 </script>
 
-<style scoped lang="scss">
-.incident-timeline {
-  min-height: 400px;
-}
-
-.comment-input {
-  :deep(textarea) {
-    font-size: 14px;
-    line-height: 1.5;
-    padding-right: 50px !important;
-    resize: none;
-  }
+<style>
+.comment-input :deep(textarea) {
+  font-size: 14px;
+  line-height: 1.5;
+  padding-right: 50px !important;
+  resize: none;
 }
 </style>

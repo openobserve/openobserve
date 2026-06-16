@@ -266,7 +266,7 @@ const isTopPosition = computed(() =>
   </ToastRoot>
 </template>
 
-<style scoped>
+<style>
 .toast-progress-fill {
   animation: toast-shrink linear forwards;
 }

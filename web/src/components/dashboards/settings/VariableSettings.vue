@@ -48,14 +48,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </DashboardHeader>
       <div>
-        <div class="variables-list-header" data-test="dashboard-variables-list-header">
-          <div class="header-item"></div>
-          <div class="header-item">#</div>
-          <div class="header-item">{{ t("dashboard.name") }}</div>
-          <div class="header-item">{{ t("dashboard.type") }}</div>
-          <div class="header-item">{{ t("dashboard.selectType") }}</div>
-          <div class="header-item">Scope</div>
-          <div class="header-item tw:ml-4 tw:pl-4">
+        <div class="tw:grid tw:py-2 tw:font-bold tw:border-b tw:border-b-(--o2-border-color) tw:bg-(--o2-table-header-bg)" style="grid-template-columns: 48px 80px minmax(200px, 1fr) 150px 100px 100px 120px" data-test="dashboard-variables-list-header">
+          <div class="tw:pl-4"></div>
+          <div>#</div>
+          <div>{{ t("dashboard.name") }}</div>
+          <div>{{ t("dashboard.type") }}</div>
+          <div>{{ t("dashboard.selectType") }}</div>
+          <div>Scope</div>
+          <div class="tw:ml-4 tw:pl-4">
             {{ t("dashboard.actions") }}
           </div>
         </div>
@@ -70,22 +70,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-for="(variable, index) in dashboardVariablesList"
             :key="variable.name"
-            class="draggable-row"
+            class="draggable-row tw:grid tw:items-center tw:rounded tw:border-b tw:border-b-(--o2-border-color) tw:hover:bg-(--o2-hover-accent)"
+            style="grid-template-columns: 48px minmax(0, 1fr)"
             data-test="dashboard-variable-settings-draggable-row"
           >
-            <div class="draggable-handle">
+            <div class="tw:flex tw:items-center tw:justify-center tw:h-full tw:cursor-move tw:box-border">
               <OIcon
                 name="drag-indicator" size="sm"
                 class="'tw:mr-1"
                 data-test="dashboard-variable-settings-drag-handle"
               />
             </div>
-            <div class="draggable-content">
+            <div class="tw:grid tw:items-center" style="grid-template-columns: 80px minmax(200px, 1fr) 150px 100px 100px 120px">
               <div>
                 {{ index < 9 ? `0${index + 1}` : index + 1 }}
               </div>
               <div class="item-name">
-                <span class="item-name-text">
+                <span class="tw:block tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap">
                   {{ variable.name }}
                 </span>
                 <OTooltip
@@ -103,8 +104,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     : t("dashboard.isSingleSelect")
                 }}
               </div>
-              <div class="item-scope">
-                <div class="scope-info">
+              <div>
+                <div class="tw:flex tw:items-center">
                   <OBadge
                     variant="primary-soft"
                     class="tw:ring-1 tw:ring-inset tw:ring-current"
@@ -144,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OTooltip>
                 </div>
               </div>
-              <div class="item-actions">
+              <div class="tw:flex tw:justify-end tw:gap-2">
                 <OButton
                   variant="ghost"
                   size="icon"
@@ -465,99 +466,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped>
-.column {
-  &.full-height {
-    height: 100%;
-  }
-}
-
-.variables-list-header {
-  display: grid;
-  grid-template-columns: 48px 80px minmax(200px, 1fr) 150px 100px 100px 120px;
-  padding: 8px 0;
-  font-weight: 700;
-  border-bottom: 1px solid var(--o2-border-color);
-  background-color: var(--o2-table-header-bg);
-
-  .header-item {
-    &:first-child {
-      padding-left: 16px;
-    }
-  }
-}
-
-.draggable-row {
-  display: grid;
-  grid-template-columns: 48px minmax(0, 1fr);
-  align-items: center;
-  border-radius: 4px;
-  border-bottom: 1px solid var(--o2-border-color);
-  &:hover {
-    background-color: var(--o2-hover-accent);
-  }
-}
-
-.draggable-handle {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  cursor: move;
-  box-sizing: border-box;
-}
-
-.draggable-content {
-  display: grid;
-  grid-template-columns: 80px minmax(200px, 1fr) 150px 100px 100px 120px;
-  align-items: center;
-
-  // .item-name {
-  //   padding-right: 16px;
-  // }
-
-  .item-name-text {
-    display: block;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .item-scope {
-    .scope-info {
-      display: flex;
-      align-items: center;
-    }
-  }
-
-  .item-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 8px;
-
-    .q-btn {
-      transition: background-color 0.2s ease;
-
-      &:hover {
-        background-color: var(--o2-hover-accent) !important;
-      }
-    }
-  }
-}
-
-:deep(.variable-name-tooltip) {
-  max-width: 500px !important;
-  word-break: break-all;
-}
-
-:deep(.dark-mode) {
-  .draggable-row {
-    background-color: #1e1e1e;
-  }
-
-  .draggable-row:nth-child(odd) {
-    background-color: #242424;
-  }
-}
-</style>

@@ -1,8 +1,8 @@
 <template>
     <div style="display: flex; flex-direction: row" class="tw:pl-2">
-      <div class="layout-name">{{ t("panel.operations") }}</div>
-      <span class="layout-separator">:</span>
-      <div class="axis-container scroll tw:flex">
+      <div class="tw:text-sm tw:whitespace-nowrap tw:flex tw:items-center tw:min-w-21.5">{{ t("panel.operations") }}</div>
+      <span class="tw:flex tw:items-center tw:ml-0.5 tw:mr-0.5">:</span>
+      <div class="tw:m-0.5 tw:flex tw:gap-2 tw:flex-wrap tw:items-center scroll">
         <!-- Operations with Drag and Drop -->
         <draggable
           v-if="props.operations.length"
@@ -10,10 +10,10 @@
           @update:modelValue="handleDragUpdate"
           :item-key="getItemKey"
           handle=".drag-handle"
-          class="operations-container"
+          class="tw:flex tw:gap-2 tw:flex-wrap tw:items-center"
         >
           <template v-for="(element, index) in props.operations">
-            <div class="operation-item">
+            <div>
               <OButtonGroup class="axis-field" radius="sm">
                 <OButton
                   variant="outline"
@@ -42,7 +42,7 @@
                     </OButton>
                   </template>
                   <div
-                    class="operations-list-dropdown tw:p-4"
+                    class="operations-list-dropdown tw:p-4 tw:shadow-[0px_3px_15px_rgba(0,0,0,0.1)] tw:translate-y-2 tw:rounded-none"
                     :data-test="`promql-operation-${index}-menu`"
                   >
                     <div style="width: 350px">
@@ -287,37 +287,8 @@ defineExpose({
 });
 </script>
 
-<style scoped lang="scss">
-.layout-name {
-  font-size: 14px;
-  white-space: nowrap;
-  min-width: 86px;
-  display: flex;
-  align-items: center;
-}
-
-.layout-separator {
-  display: flex;
-  align-items: center;
-  margin-left: 2px;
-  margin-right: 2px;
-}
-
-.axis-container {
-  margin: 2px;
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  align-items: center;
-}
-
-.operations-container {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  align-items: center;
-}
-
+<style>
+/* Deep Quasar override — must stay in CSS */
 :deep(
   .operation-label-selector.q-field--labeled.showLabelOnTop.q-select
     .q-field__control-container
@@ -328,17 +299,8 @@ defineExpose({
   max-width: 75% !important;
 }
 
-.drag-handle {
-  cursor: grab;
-
-  &:active {
-    cursor: grabbing;
-  }
-}
-
-.operations-list-dropdown {
-  box-shadow: 0px 3px 15px rgba(0, 0, 0, 0.1);
-  transform: translateY(0.5rem);
-  border-radius: 0px;
+/* drag-handle :active state — compound pseudo-class selector, keep in CSS */
+.drag-handle:active {
+  cursor: grabbing;
 }
 </style>
