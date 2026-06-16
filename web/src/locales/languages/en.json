@@ -3886,6 +3886,7 @@
       "multiStepAgent": "Multi-step Agent"
     },
     "sessionsList": {
+      "streamLabel": "Stream",
       "noStreamsTooltip": "No LLM streams available.",
       "session": "session",
       "sessions": "sessions",
