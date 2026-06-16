@@ -19,6 +19,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
      Mutates the ColumnOverrideUI in place; numeric-only sections hide when not numeric. -->
 <template>
   <div class="tw:divide-y tw:divide-[rgba(128,128,128,0.08)]">
+    <!-- Field type: Auto detects from data; Num/Text force the interpretation -->
+    <div class="tw:px-3 tw:py-2">
+      <div class="o-input-label tw:block tw:mb-1.5">
+        {{ t("dashboard.sectionFieldType") }}
+      </div>
+      <OToggleGroup
+        class="cf-seg tw:h-8"
+        type="single"
+        v-model="col.fieldType"
+      >
+        <OToggleGroupItem
+          v-for="ft in fieldTypeOptions"
+          :key="ft.value"
+          :value="ft.value"
+          size="sm"
+          :data-test="`${dataTestPrefix}-field-type-${ft.value}-${col.field}`"
+        >
+          {{ ft.label }}
+        </OToggleGroupItem>
+      </OToggleGroup>
+    </div>
+
     <!-- Value formatting (numeric only) -->
     <div v-if="isNumeric" class="tw:px-3 tw:py-2">
       <div class="o-input-label tw:block tw:mb-1.5">
@@ -43,24 +65,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="tw:px-3 tw:py-2">
       <div class="o-input-label tw:block tw:mb-1.5">
         {{ t("dashboard.sectionAlignment") }}
-        <span class="tw:font-normal tw:opacity-60">· {{ t("dashboard.tapActiveToClear") }}</span>
       </div>
       <OToggleGroup
         class="cf-seg tw:h-8"
         type="single"
-        :model-value="col.alignment"
-        @update:model-value="setAlignment"
+        v-model="alignmentModel"
       >
         <OToggleGroupItem
           v-for="a in alignOptions"
           :key="a.value"
           :value="a.value"
           size="sm"
-          :tooltip="a.label"
-          :icon-left="a.icon"
-          @pointerdown.capture="onAlignPointerDown"
-          @click="onAlignClickItem(a.value)"
-        />
+        >
+          {{ a.label }}
+        </OToggleGroupItem>
       </OToggleGroup>
     </div>
 
@@ -147,9 +165,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :key="ruleIdx"
         class="tw:flex tw:items-start tw:gap-1 tw:mb-1.5"
       >
-        <div class="tw:flex-1 tw:min-w-0 tw:py-[7px] tw:px-2 tw:rounded-md tw:bg-[rgba(128,128,128,0.04)] tw:border tw:border-[rgba(128,128,128,0.1)]">
-          <div class="tw:flex tw:items-center tw:gap-1.5">
-            <div class="tw:w-[64px] tw:shrink-0">
+        <div class="tw:flex-1 tw:min-w-0 tw:py-2 tw:px-2.5 tw:rounded-md tw:bg-[rgba(128,128,128,0.04)] tw:border tw:border-[rgba(128,128,128,0.1)] tw:flex tw:flex-col tw:gap-2">
+          <!-- If value is [operator] [value] -->
+          <div class="tw:flex tw:items-center tw:gap-1.5 tw:flex-wrap">
+            <span class="o-input-label tw:shrink-0">{{ t("dashboard.conditionIfValue") }}</span>
+            <div class="tw:w-[150px] tw:shrink-0">
               <OSelect
                 v-model="rule.operator"
                 :options="conditionOperators"
@@ -160,15 +180,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model="rule.threshold"
               type="number"
               :placeholder="t('dashboard.conditionThreshold')"
-              class="tw:flex-1 tw:min-w-0"
+              class="tw:flex-1 tw:min-w-[80px]"
             />
           </div>
-          <div class="tw:flex tw:items-center tw:gap-2 tw:mt-[7px]">
-            <span class="o-input-label tw:shrink-0 tw:min-w-16 tw:text-[var(--color-text-secondary,#9e9e9e)]">{{ t("dashboard.textColor") }}</span>
+          <!-- then text color [picker] -->
+          <div class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap">
+            <span class="o-input-label tw:shrink-0 tw:text-[var(--color-text-secondary,#9e9e9e)]">{{ t("dashboard.conditionThenText") }}</span>
             <ColorSwatchPicker v-model="rule.textColor" :swatches="COND_TEXT_SWATCHES" />
           </div>
-          <div class="tw:flex tw:items-center tw:gap-2 tw:mt-[7px]">
-            <span class="o-input-label tw:shrink-0 tw:min-w-16 tw:text-[var(--color-text-secondary,#9e9e9e)]">{{ t("dashboard.bgColor") }}</span>
+          <!-- and background [picker] -->
+          <div class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap">
+            <span class="o-input-label tw:shrink-0 tw:text-[var(--color-text-secondary,#9e9e9e)]">{{ t("dashboard.conditionAndBg") }}</span>
             <ColorSwatchPicker v-model="rule.bgColor" :swatches="COND_BG_SWATCHES" />
           </div>
         </div>
@@ -195,7 +217,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, PropType } from "vue";
+import { computed, defineComponent, PropType } from "vue";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -234,14 +256,26 @@ export default defineComponent({
   },
   setup(props) {
     const { t } = useI18n();
-    const { unitOptions, sparklineStyleOptions, conditionOperators } =
+    const { unitOptions, fieldTypeOptions, sparklineStyleOptions, conditionOperators } =
       useColumnFormattingOptions();
 
     const alignOptions = [
-      { value: "left", label: t("dashboard.alignLeft"), icon: "align-left" },
-      { value: "center", label: t("dashboard.alignCenter"), icon: "align-center" },
-      { value: "right", label: t("dashboard.alignRight"), icon: "align-right" },
+      // "auto" is a sentinel — null alignment means the renderer auto-aligns by
+      // type (numeric → right, text → left). The toggle group blocks
+      // null/""/undefined, so we map "auto" ⇄ null via alignmentModel below.
+      { value: "auto", label: t("dashboard.auto") },
+      { value: "left", label: t("dashboard.alignLeft") },
+      { value: "center", label: t("dashboard.alignCenter") },
+      { value: "right", label: t("dashboard.alignRight") },
     ];
+
+    // Explicit "Auto" replaces tap-to-clear: null ⇄ the "auto" sentinel item.
+    const alignmentModel = computed({
+      get: () => props.col.alignment ?? "auto",
+      set: (v: string) => {
+        props.col.alignment = v === "auto" ? null : v;
+      },
+    });
 
     const cellTypeOptionsCompact = [
       { value: "text", label: t("dashboard.cellTypeText"), icon: "text-fields" },
@@ -253,22 +287,12 @@ export default defineComponent({
       bar: "bar-chart",
     };
 
-    // Tap-active-to-clear: snapshot before reka handles the click, clear if re-clicked.
-    const setAlignment = (v: any) => {
-      props.col.alignment = (v as string) || "";
-    };
-    let alignSnapshot = "";
-    const onAlignPointerDown = () => {
-      alignSnapshot = props.col.alignment;
-    };
-    const onAlignClickItem = (v: string) => {
-      if (alignSnapshot === v) props.col.alignment = "";
-    };
-
     return {
       t,
       unitOptions,
+      fieldTypeOptions,
       alignOptions,
+      alignmentModel,
       cellTypeOptionsCompact,
       sparklineIcons,
       sparklineStyleOptions,
@@ -278,9 +302,6 @@ export default defineComponent({
       ACCENT_SWATCHES,
       COND_TEXT_SWATCHES,
       COND_BG_SWATCHES,
-      setAlignment,
-      onAlignPointerDown,
-      onAlignClickItem,
       emptyConditionalRule,
     };
   },

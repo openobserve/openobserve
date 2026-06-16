@@ -15,6 +15,11 @@
         :override-config="{
           overrideConfigs: dashboardPanelData.data.config.override_config || [],
         }"
+        :preview-data="previewData"
+        :value-mapping="dashboardPanelData.data.config.mappings || []"
+        :panel-unit="dashboardPanelData.data.config.unit ?? ''"
+        :panel-unit-custom="dashboardPanelData.data.config.unit_custom ?? ''"
+        :panel-decimals="dashboardPanelData.data.config.decimals ?? 2"
         @close="showOverrideConfigPopup = false"
         @save="saveOverrideConfigConfig"
       />
@@ -22,7 +27,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, inject, onBeforeMount } from "vue";
+import { defineComponent, ref, computed, inject, onBeforeMount } from "vue";
 import { useI18n } from "vue-i18n";
 import OverrideConfigPopup from "../OverrideConfigPopup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -54,6 +59,27 @@ export default defineComponent({
 
     const showOverrideConfigPopup = ref(false);
     const columns: any = ref<Column[]>([]);
+
+    // Sample rows + column defs per (lower-cased) alias, so the dialog can render
+    // its live preview. Built from the converted table data passed in panelData.
+    const previewData = computed(() => {
+      const cols = (props.panelData?.columns as any[]) || [];
+      const rows = (props.panelData?.rows as any[]) || [];
+      const map: Record<string, { column: any; rows: any[] }> = {};
+      for (const c of cols) {
+        const alias = String(c.alias ?? c.field ?? c.name ?? "").toLowerCase();
+        if (!alias) continue;
+        const key = c.field ?? c.alias ?? c.name;
+        const sample: any[] = [];
+        for (const row of rows) {
+          const v = row?.[key];
+          if (v !== null && v !== undefined && v !== "") sample.push(row);
+          if (sample.length >= 6) break;
+        }
+        map[alias] = { column: c, rows: sample };
+      }
+      return map;
+    });
 
     const fetchColumns = () => {
       // Different logic for PromQL vs SQL queries
@@ -164,6 +190,7 @@ export default defineComponent({
       openOverrideConfigPopup,
       saveOverrideConfigConfig,
       columns,
+      previewData,
     };
   },
 });

@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :aria-label="t('dashboard.colorNone')"
       :aria-pressed="!modelValue"
       :data-test="dataTest ? `${dataTest}-none` : undefined"
-      @click.stop="select('')"
+      @click.stop="select(null)"
     >
       <span class="swatch-slash" />
     </button>
@@ -96,7 +96,7 @@ export default defineComponent({
   name: "ColorSwatchPicker",
   components: { OIcon },
   props: {
-    modelValue: { type: String, default: "" },
+    modelValue: { type: String as PropType<string | null>, default: null },
     swatches: { type: Array as PropType<string[]>, required: true },
     dataTest: { type: String, default: "" },
   },
@@ -114,7 +114,7 @@ export default defineComponent({
         !props.swatches.some((s) => s.toLowerCase() === normalized.value),
     );
 
-    const select = (c: string) => emit("update:modelValue", c);
+    const select = (c: string | null) => emit("update:modelValue", c);
 
     return { t, isActive, isCustomActive, isDark: isColorDark, select };
   },

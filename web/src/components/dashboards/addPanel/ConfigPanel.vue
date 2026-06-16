@@ -1820,6 +1820,7 @@ import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
+import { getUnitOptions } from "@/composables/dashboard/useColumnFormatting";
 import { computed, defineComponent, inject, onBeforeMount, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import Drilldown from "./Drilldown.vue";
@@ -2227,81 +2228,8 @@ export default defineComponent({
         value: "center",
       },
     ];
-    const unitOptions = [
-      {
-        label: t("dashboard.default"),
-        value: null,
-      },
-      {
-        label: t("dashboard.numbers"),
-        value: "numbers",
-      },
-      {
-        label: t("dashboard.bytes"),
-        value: "bytes",
-      },
-      {
-        label: t("dashboard.kilobytes"),
-        value: "kilobytes",
-      },
-      {
-        label: t("dashboard.megabytes"),
-        value: "megabytes",
-      },
-      {
-        label: t("dashboard.bytesPerSecond"),
-        value: "bps",
-      },
-      {
-        label: t("dashboard.seconds"),
-        value: "seconds",
-      },
-      {
-        label: t("dashboard.milliseconds"),
-        value: "milliseconds",
-      },
-      {
-        label: t("dashboard.microseconds"),
-        value: "microseconds",
-      },
-      {
-        label: t("dashboard.nanoseconds"),
-        value: "nanoseconds",
-      },
-      {
-        label: t("dashboard.percent1"),
-        value: "percent-1",
-      },
-      {
-        label: t("dashboard.percent"),
-        value: "percent",
-      },
-      {
-        label: t("dashboard.currencyDollar"),
-        value: "currency-dollar",
-      },
-      {
-        label: t("dashboard.currencyEuro"),
-        value: "currency-euro",
-      },
-      {
-        label: t("dashboard.currencyPound"),
-        value: "currency-pound",
-      },
-      {
-        label: t("dashboard.currencyYen"),
-        value: "currency-yen",
-      },
-      {
-        label: t("dashboard.currencyRupees"),
-        value: "currency-rupee",
-      },
-
-      {
-        label: t("dashboard.custom"),
-        value: "custom",
-      },
-    ];
+    // Single source of truth — shared with the column-formatting dialog.
+    const unitOptions = getUnitOptions(t);
 
     const labelPositionOptions = [
       {

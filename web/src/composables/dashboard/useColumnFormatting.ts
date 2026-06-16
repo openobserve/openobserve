@@ -16,11 +16,9 @@
 // ---------------------------------------------------------------------------
 // Shared column-formatting model + helpers.
 //
-// Single source of truth for table-chart column formatting. BOTH the full
-// "Column Formatting" dialog (OverrideConfigPopup.vue, multi-column) and the
-// inline per-column header menu (InlineColumnFormat.vue, single-column) edit
-// the SAME persisted `config.override_config` array through these helpers, so
-// the two editors can never diverge.
+// Single source of truth for table-chart column formatting. The "Column
+// Formatting" dialog (OverrideConfigPopup.vue) edits the persisted
+// `config.override_config` array through these helpers.
 //
 // The persisted shape (per column) is:
 //   { field: { matchBy: "name", value: "<alias>" }, config: [ {type, ...}, ... ] }
@@ -31,31 +29,38 @@
 import { useI18n } from "vue-i18n";
 import { OVERRIDE_CONFIG_TYPES } from "@/utils/dashboard/tableConfigUtils";
 
+// Unset/optional fields use `null` (never ""), matching the panel-config
+// convention (useDashboardPanelDefaults: unit/colors default to null). A null
+// value means "not set" → the renderer falls back to the panel-level default.
 export interface ConditionalRuleUI {
   operator: string;
-  threshold: string;
-  textColor: string;
-  bgColor: string;
+  threshold: string; // bound to a number input; "" while empty
+  textColor: string | null; // hex or null
+  bgColor: string | null; // hex or null
 }
 
 /** A blank conditional rule row. */
 export const emptyConditionalRule = (): ConditionalRuleUI => ({
   operator: "<",
   threshold: "",
-  textColor: "",
-  bgColor: "",
+  textColor: null,
+  bgColor: null,
 });
 
 export interface ColumnOverrideUI {
   field: string; // column alias
-  unit: string; // "", "numbers", "bytes", "percent", "currency-dollar", "custom", …
-  customUnit: string;
-  alignment: string; // "left" | "center" | "right" | ""
-  textColor: string; // hex or ""
-  bgColor: string; // hex or ""
+  // "auto" === detect numeric-ness from the data; "num"/"text" force it.
+  fieldType: "auto" | "num" | "text";
+  // null === "Default" (inherit the panel-level unit). Otherwise one of
+  // "numbers", "bytes", "percent", "currency-dollar", "custom", …
+  unit: string | null;
+  customUnit: string | null;
+  alignment: string | null; // "left" | "center" | "right" | null
+  textColor: string | null; // hex or null
+  bgColor: string | null; // hex or null
   autoColor: boolean; // unique-value coloring
   cellType: string; // "text" | "progress_bar" | "sparkline"
-  progressColor: string;
+  progressColor: string | null;
   sparklineStyle: "line" | "bar";
   conditions: ConditionalRuleUI[];
 }
@@ -104,14 +109,15 @@ export const COND_BG_SWATCHES = ["#fef2f2", "#fefce8", "#f0fdf4", "#f5f8f9"];
 /** A blank UI override row, optionally bound to a column alias. */
 export const emptyColumnOverride = (field = ""): ColumnOverrideUI => ({
   field,
-  unit: "",
-  customUnit: "",
-  alignment: "",
-  textColor: "",
-  bgColor: "",
+  fieldType: "auto",
+  unit: null,
+  customUnit: null,
+  alignment: null,
+  textColor: null,
+  bgColor: null,
   autoColor: false,
   cellType: "text",
-  progressColor: "",
+  progressColor: null,
   sparklineStyle: "line",
   conditions: [],
 });
@@ -120,54 +126,40 @@ export const emptyColumnOverride = (field = ""): ColumnOverrideUI => ({
 const applyConfigItems = (col: ColumnOverrideUI, items: any[]): void => {
   for (const cfg of items ?? []) {
     switch (cfg?.type) {
+      case OVERRIDE_CONFIG_TYPES.FIELD_TYPE:
+        col.fieldType = cfg.value ?? "auto";
+        break;
       case OVERRIDE_CONFIG_TYPES.UNIT:
-        col.unit = cfg.value?.unit ?? "";
-        col.customUnit = cfg.value?.customUnit ?? "";
+        col.unit = cfg.value?.unit ?? null;
+        col.customUnit = cfg.value?.customUnit ?? null;
         break;
       case OVERRIDE_CONFIG_TYPES.UNIQUE_VALUE_COLOR:
         col.autoColor = !!cfg.autoColor;
         break;
       case OVERRIDE_CONFIG_TYPES.ALIGNMENT:
-        col.alignment = cfg.value ?? "";
+        col.alignment = cfg.value ?? null;
         break;
       case OVERRIDE_CONFIG_TYPES.TEXT_COLOR:
-        col.textColor = cfg.value ?? "";
+        col.textColor = cfg.value ?? null;
         break;
       case OVERRIDE_CONFIG_TYPES.BACKGROUND_COLOR:
-        col.bgColor = cfg.value ?? "";
+        col.bgColor = cfg.value ?? null;
         break;
       case OVERRIDE_CONFIG_TYPES.CELL_TYPE:
         col.cellType = cfg.value?.type ?? "text";
-        col.progressColor = cfg.value?.color ?? "";
+        col.progressColor = cfg.value?.color ?? null;
         col.sparklineStyle = cfg.value?.sparklineStyle ?? "line";
         break;
       case OVERRIDE_CONFIG_TYPES.CONDITIONAL_STYLES:
         col.conditions = (cfg.rules ?? []).map((r: any) => ({
           operator: r.operator ?? "<",
           threshold: r.threshold != null ? String(r.threshold) : "",
-          textColor: r.textColor ?? "",
-          bgColor: r.bgColor ?? "",
+          textColor: r.textColor ?? null,
+          bgColor: r.bgColor ?? null,
         }));
         break;
     }
   }
-};
-
-/**
- * Deserialize ONE column's UI row from the raw override_config array.
- * Used by the inline single-column menu. Returns a blank row if the column
- * has no existing overrides.
- */
-export const loadColumnFromRaw = (
-  raw: any[] | undefined,
-  field: string,
-): ColumnOverrideUI => {
-  const col = emptyColumnOverride(field);
-  for (const entry of raw ?? []) {
-    if (entry?.field?.value !== field) continue;
-    applyConfigItems(col, entry?.config ?? []);
-  }
-  return col;
 };
 
 /**
@@ -192,11 +184,12 @@ export const loadAllFromRaw = (raw: any[] | undefined): ColumnOverrideUI[] => {
  */
 export const serializeColumnOverride = (
   c: ColumnOverrideUI,
-  isNumeric: boolean,
 ): any | null => {
   const config: any[] = [];
 
-  if (c.unit && isNumeric)
+  if (c.fieldType && c.fieldType !== "auto")
+    config.push({ type: OVERRIDE_CONFIG_TYPES.FIELD_TYPE, value: c.fieldType });
+  if (c.unit)
     config.push({
       type: OVERRIDE_CONFIG_TYPES.UNIT,
       value: { unit: c.unit, customUnit: c.customUnit },
@@ -249,30 +242,41 @@ export const serializeColumnOverride = (
 
 /**
  * Serialize all UI rows to the persisted override_config array (dialog path).
- * `isNumeric(field)` gates numeric-only config items.
  */
-export const serializeOverrides = (
-  cols: ColumnOverrideUI[],
-  isNumeric: (field: string) => boolean,
-): any[] =>
+export const serializeOverrides = (cols: ColumnOverrideUI[]): any[] =>
   cols
     .filter((c) => c.field)
-    .map((c) => serializeColumnOverride(c, isNumeric(c.field)))
+    .map((c) => serializeColumnOverride(c))
     .filter((entry) => entry != null);
 
 /**
- * Merge a single column's serialized entry back into the full override_config
- * array, preserving every other column's entry (inline single-column path).
- * Pass `entry = null` to remove the column's overrides entirely (Reset column).
+ * Canonical unit dropdown options (Default + all units). Single source of truth
+ * shared by the panel config (ConfigPanel.vue) and the column-formatting dialog
+ * so the two never drift. Takes the i18n `t` so it stays framework-agnostic.
+ * `value: null` === "Default" (inherit the panel-level unit).
  */
-export const upsertColumnOverride = (
-  raw: any[] | undefined,
-  field: string,
-  entry: any | null,
-): any[] => {
-  const rest = (raw ?? []).filter((e) => e?.field?.value !== field);
-  return entry ? [...rest, entry] : rest;
-};
+export const getUnitOptions = (
+  t: (key: string) => string,
+): Array<{ label: string; value: string | null }> => [
+  { label: t("dashboard.default"), value: null },
+  { label: t("dashboard.numbers"), value: "numbers" },
+  { label: t("dashboard.bytes"), value: "bytes" },
+  { label: t("dashboard.kilobytes"), value: "kilobytes" },
+  { label: t("dashboard.megabytes"), value: "megabytes" },
+  { label: t("dashboard.bytesPerSecond"), value: "bps" },
+  { label: t("dashboard.seconds"), value: "seconds" },
+  { label: t("dashboard.milliseconds"), value: "milliseconds" },
+  { label: t("dashboard.microseconds"), value: "microseconds" },
+  { label: t("dashboard.nanoseconds"), value: "nanoseconds" },
+  { label: t("dashboard.percent1"), value: "percent-1" },
+  { label: t("dashboard.percent"), value: "percent" },
+  { label: t("dashboard.currencyDollar"), value: "currency-dollar" },
+  { label: t("dashboard.currencyEuro"), value: "currency-euro" },
+  { label: t("dashboard.currencyPound"), value: "currency-pound" },
+  { label: t("dashboard.currencyYen"), value: "currency-yen" },
+  { label: t("dashboard.currencyRupees"), value: "currency-rupee" },
+  { label: t("dashboard.custom"), value: "custom" },
+];
 
 /**
  * The option lists shown in the formatting controls. i18n-bound, so this is a
@@ -282,25 +286,12 @@ export const upsertColumnOverride = (
 export const useColumnFormattingOptions = () => {
   const { t } = useI18n();
 
-  const unitOptions = [
-    { label: t("dashboard.default"), value: "" },
-    { label: t("dashboard.numbers"), value: "numbers" },
-    { label: t("dashboard.bytes"), value: "bytes" },
-    { label: t("dashboard.kilobytes"), value: "kilobytes" },
-    { label: t("dashboard.megabytes"), value: "megabytes" },
-    { label: t("dashboard.bytesPerSecond"), value: "bps" },
-    { label: t("dashboard.seconds"), value: "seconds" },
-    { label: t("dashboard.milliseconds"), value: "milliseconds" },
-    { label: t("dashboard.microseconds"), value: "microseconds" },
-    { label: t("dashboard.nanoseconds"), value: "nanoseconds" },
-    { label: t("dashboard.percent1"), value: "percent-1" },
-    { label: t("dashboard.percent"), value: "percent" },
-    { label: t("dashboard.currencyDollar"), value: "currency-dollar" },
-    { label: t("dashboard.currencyEuro"), value: "currency-euro" },
-    { label: t("dashboard.currencyPound"), value: "currency-pound" },
-    { label: t("dashboard.currencyYen"), value: "currency-yen" },
-    { label: t("dashboard.currencyRupees"), value: "currency-rupee" },
-    { label: t("dashboard.custom"), value: "custom" },
+  const unitOptions = getUnitOptions(t);
+
+  const fieldTypeOptions = [
+    { value: "auto", label: t("dashboard.auto") },
+    { value: "num", label: t("dashboard.typeNumeric") },
+    { value: "text", label: t("dashboard.typeText") },
   ];
 
   const alignOptions = [
@@ -315,16 +306,17 @@ export const useColumnFormattingOptions = () => {
   ];
 
   const conditionOperators = [
-    { label: "<", value: "<" },
-    { label: ">", value: ">" },
-    { label: "<=", value: "<=" },
-    { label: ">=", value: ">=" },
-    { label: "=", value: "=" },
-    { label: "!=", value: "!=" },
+    { label: t("dashboard.opLessThan"), value: "<" },
+    { label: t("dashboard.opGreaterThan"), value: ">" },
+    { label: t("dashboard.opLessThanEqual"), value: "<=" },
+    { label: t("dashboard.opGreaterThanEqual"), value: ">=" },
+    { label: t("dashboard.opEqual"), value: "=" },
+    { label: t("dashboard.opNotEqual"), value: "!=" },
   ];
 
   return {
     unitOptions,
+    fieldTypeOptions,
     alignOptions,
     sparklineStyleOptions,
     conditionOperators,

@@ -197,11 +197,18 @@ describe("OverrideConfigPopup", () => {
       expect(wrapper.vm.getFieldLabel("")).toBe("");
     });
 
-    it("detects numeric columns from the columns prop", async () => {
+    it("detects numeric columns from the columns prop (fieldType 'auto')", async () => {
       wrapper = await createWrapper();
-      expect(wrapper.vm.isNumericColumn("field1")).toBe(true);
-      expect(wrapper.vm.isNumericColumn("field2")).toBe(false);
-      expect(wrapper.vm.isNumericColumn("")).toBe(false);
+      expect(wrapper.vm.isNumericColumn({ field: "field1", fieldType: "auto" })).toBe(true);
+      expect(wrapper.vm.isNumericColumn({ field: "field2", fieldType: "auto" })).toBe(false);
+      expect(wrapper.vm.isNumericColumn({ field: "", fieldType: "auto" })).toBe(false);
+    });
+
+    it("lets the field-type override win over detection", async () => {
+      wrapper = await createWrapper();
+      // field2 is detected text → force numeric; field1 is detected numeric → force text
+      expect(wrapper.vm.isNumericColumn({ field: "field2", fieldType: "num" })).toBe(true);
+      expect(wrapper.vm.isNumericColumn({ field: "field1", fieldType: "text" })).toBe(false);
     });
   });
 
@@ -224,18 +231,46 @@ describe("OverrideConfigPopup", () => {
     });
   });
 
-  describe("Preview gating", () => {
-    it("hides the preview pane when no previewData is supplied", async () => {
+  describe("Preview", () => {
+    it("produces a preview even when no previewData is supplied", async () => {
       wrapper = await createWrapper();
-      expect(wrapper.vm.hasPreviewData).toBe(false);
+      wrapper.vm.columnOverrides[0].field = "field1";
+      await wrapper.vm.$nextTick();
+      expect(wrapper.vm.previews[0]).toBeTruthy();
+      expect(wrapper.vm.previews[0].rows.length).toBeGreaterThan(0);
     });
 
-    it("shows the preview pane when previewData is supplied", async () => {
+    it("falls back to type-based dummy rows when a column has no data", async () => {
+      wrapper = await createWrapper();
+      // Select a numeric column with no previewData → numeric dummy rows.
+      wrapper.vm.columnOverrides[0].field = "field1";
+      wrapper.vm.columnOverrides[0].fieldType = "num";
+      await wrapper.vm.$nextTick();
+      const preview = wrapper.vm.previews[0];
+      expect(preview).toBeTruthy();
+      expect(preview.rows.length).toBeGreaterThan(0);
+      const key = preview.columns[0].field;
+      expect(typeof preview.rows[0][key]).toBe("number");
+    });
+
+    it("uses text dummy rows when the field type is text", async () => {
+      wrapper = await createWrapper();
+      wrapper.vm.columnOverrides[0].field = "field1";
+      wrapper.vm.columnOverrides[0].fieldType = "text";
+      await wrapper.vm.$nextTick();
+      const preview = wrapper.vm.previews[0];
+      const key = preview.columns[0].field;
+      expect(typeof preview.rows[0][key]).toBe("string");
+    });
+
+    it("uses real preview rows when supplied", async () => {
       wrapper = await createWrapper({
         previewData: { field1: { column: { field: "field1" }, rows: [{ field1: 5 }] } },
       });
-      expect(wrapper.vm.hasPreviewData).toBe(true);
-      expect(Array.isArray(wrapper.vm.previews)).toBe(true);
+      wrapper.vm.columnOverrides[0].field = "field1";
+      await wrapper.vm.$nextTick();
+      const preview = wrapper.vm.previews[0];
+      expect(preview.rows).toEqual([{ field1: 5 }]);
     });
   });
 

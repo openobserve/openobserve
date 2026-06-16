@@ -83,7 +83,15 @@ export const applySeriesColorMappings = (
 
 /** True when a hex colour is dark enough to need a light foreground. */
 export const isColorDark = (hex: string): boolean => {
-  const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex || "");
+  let h = (hex || "").replace(/^#/, "");
+  // Expand 3-digit shorthand (#abc -> #aabbcc) so short hex is handled too.
+  if (/^[a-f\d]{3}$/i.test(h)) {
+    h = h
+      .split("")
+      .map((c) => c + c)
+      .join("");
+  }
+  const m = /^([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(h);
   if (!m) return false;
   const r = parseInt(m[1], 16);
   const g = parseInt(m[2], 16);

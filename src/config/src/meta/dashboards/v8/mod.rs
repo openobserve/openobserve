@@ -1467,8 +1467,7 @@ mod tests {
             assert!(json.contains(&format!("\"type\":\"{tag}\"")), "got {json}");
         }
         // UniqueValueColor keeps camelCase on its field.
-        let json =
-            serde_json::to_string(&Config::UniqueValueColor { auto_color: true }).unwrap();
+        let json = serde_json::to_string(&Config::UniqueValueColor { auto_color: true }).unwrap();
         assert!(json.contains("\"autoColor\":true"));
     }
 }

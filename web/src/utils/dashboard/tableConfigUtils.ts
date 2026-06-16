@@ -39,7 +39,19 @@ export const OVERRIDE_CONFIG_TYPES = {
   BACKGROUND_COLOR: "background_color",
   CELL_TYPE: "cell_type",
   CONDITIONAL_STYLES: "conditional_styles",
+  FIELD_TYPE: "field_type",
 } as const;
+
+/**
+ * Resolve a column's effective numeric-ness from the auto-detected value and an
+ * optional per-column field-type override ("auto" | "num" | "text"). "auto" (or
+ * absent) keeps the detected value; "num"/"text" force it.
+ */
+export const resolveIsNumber = (
+  detected: boolean,
+  fieldType: string | undefined,
+): boolean =>
+  fieldType === "num" ? true : fieldType === "text" ? false : detected;
 
 // ---------------------------------------------------------------------------
 // Value-mapping helpers
@@ -283,6 +295,7 @@ export interface OverrideMaps {
   styleConfigMap: Record<string, ColumnStyleConfig>;
   cellTypeConfigMap: Record<string, CellTypeConfig>;
   conditionalRulesMap: Record<string, ConditionalRule[]>;
+  fieldTypeMap: Record<string, string>;
 }
 
 /**
@@ -298,8 +311,9 @@ export const parseOverrideConfigs = (
   const styleConfigMap: Record<string, ColumnStyleConfig> = {};
   const cellTypeConfigMap: Record<string, CellTypeConfig> = {};
   const conditionalRulesMap: Record<string, ConditionalRule[]> = {};
+  const fieldTypeMap: Record<string, string> = {};
 
-  if (!overrideConfigs) return { colorConfigMap, unitConfigMap, styleConfigMap, cellTypeConfigMap, conditionalRulesMap };
+  if (!overrideConfigs) return { colorConfigMap, unitConfigMap, styleConfigMap, cellTypeConfigMap, conditionalRulesMap, fieldTypeMap };
 
   for (const o of overrideConfigs) {
     const alias = o?.field?.value;
@@ -351,11 +365,14 @@ export const parseOverrideConfigs = (
             bgColor: r.bgColor ?? "",
           }));
           break;
+        case OVERRIDE_CONFIG_TYPES.FIELD_TYPE:
+          if (cfg.value) fieldTypeMap[aliasLower] = cfg.value;
+          break;
       }
     }
   }
 
-  return { colorConfigMap, unitConfigMap, styleConfigMap, cellTypeConfigMap, conditionalRulesMap };
+  return { colorConfigMap, unitConfigMap, styleConfigMap, cellTypeConfigMap, conditionalRulesMap, fieldTypeMap };
 };
 
 /**

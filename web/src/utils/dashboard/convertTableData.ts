@@ -23,6 +23,7 @@ import {
   applyProgressBarBounds,
   applyColumnOverrides,
   formatNumericValue,
+  resolveIsNumber,
 } from "./tableConfigUtils";
 
 /**
@@ -62,7 +63,7 @@ export const convertTableData = (
   const valueMappingCache = buildValueMappingCache(panelSchema.config?.mappings);
 
   const overrideMaps = parseOverrideConfigs(panelSchema.config.override_config);
-  const { colorConfigMap, unitConfigMap } = overrideMaps;
+  const { unitConfigMap, fieldTypeMap } = overrideMaps;
   const fieldNameCache: Record<string, string> = {}; // Cache for case-insensitive lookups
 
   // Cache timezone to avoid repeated store lookups
@@ -127,9 +128,12 @@ export const convertTableData = (
   if (!isTransposeEnabled) {
     columns = columnData.map((it: any) => {
       let obj: any = {};
-      const isNumber = isSampleValuesNumbers(tableRows, it.alias, 20);
       // Use cached field name lookup
       const aliasLower = it.alias.toLowerCase();
+      const isNumber = resolveIsNumber(
+        isSampleValuesNumbers(tableRows, it.alias, 20),
+        fieldTypeMap[aliasLower],
+      );
       const actualField = fieldNameCache[aliasLower] || it.alias;
 
       obj["name"] = it.label || it.alias;
@@ -270,7 +274,10 @@ export const convertTableData = (
       }, // Add label column with the first column's label
       ...uniqueTransposeColumns.map((it: any) => {
         let obj: any = {};
-        const isNumber = isSampleValuesNumbers(tableRows, it, 20);
+        const isNumber = resolveIsNumber(
+          isSampleValuesNumbers(tableRows, it, 20),
+          fieldTypeMap[String(it).toLowerCase()],
+        );
 
         // String(null) = "null", String(undefined) = "undefined" — always non-empty,
         // so the TanStack filter never strips this column. The label is blank for
@@ -278,12 +285,15 @@ export const convertTableData = (
         obj["name"] = String(it);
         obj["field"] = String(it);
         obj["label"] = it != null && it !== "" ? String(it) : "";
-        obj["align"] = !isNumber ? "left" : "right";
         obj["sortable"] = true;
-        // pass color mode info for renderer
-        if (colorConfigMap?.[it]?.autoColor) {
-          obj["colorMode"] = "auto";
-        }
+        // Apply per-column overrides keyed by the (lower-cased) transposed value,
+        // consistent with the non-transpose path.
+        applyColumnOverrides(
+          obj,
+          String(it).toLowerCase(),
+          overrideMaps,
+          !isNumber ? "left" : "right",
+        );
 
         obj["format"] = (val: any) => {
           if (val === null || val === undefined || val === "") return missingValue;
@@ -418,7 +428,7 @@ export const convertMultiQueryTableData = (
   );
 
   const overrideMaps = parseOverrideConfigs(panelSchema.config.override_config);
-  const { colorConfigMap, unitConfigMap } = overrideMaps;
+  const { unitConfigMap, fieldTypeMap } = overrideMaps;
 
   const timezone = store.state.timezone;
   const missingValue = String(panelSchema.config?.no_value_replacement ?? "");
@@ -553,17 +563,22 @@ export const convertMultiQueryTableData = (
         align: "left" as const,
       },
       ...uniqueTransposeColumns.map((it: any) => {
-        const isNumber = isSampleValuesNumbers(allRows, it, 20);
+        const isNumber = resolveIsNumber(
+          isSampleValuesNumbers(allRows, it, 20),
+          fieldTypeMap[String(it).toLowerCase()],
+        );
         const col: any = {
           name: it,
           field: it,
           label: it,
-          align: isNumber ? "right" : "left",
           sortable: true,
         };
-        if (colorConfigMap?.[it]?.autoColor) {
-          col["colorMode"] = "auto";
-        }
+        applyColumnOverrides(
+          col,
+          String(it).toLowerCase(),
+          overrideMaps,
+          isNumber ? "right" : "left",
+        );
 
         col["format"] = (val: any) => {
           const valueMapping = lookupValueMapping(val, valueMappingCache);
@@ -614,6 +629,7 @@ export const convertMultiQueryTableData = (
       return obj;
     });
 
+    applyProgressBarBounds(columns as any[], tableRows as any[]);
     return { rows: tableRows, columns };
   }
 
@@ -623,7 +639,10 @@ export const convertMultiQueryTableData = (
   orderedColumnNames.forEach((colName) => {
     const fieldConfig = knownAliases.get(colName);
     const colNameLower = colName.toLowerCase();
-    const isNumber = isSampleValuesNumbers(allRows, colName, 20);
+    const isNumber = resolveIsNumber(
+      isSampleValuesNumbers(allRows, colName, 20),
+      fieldTypeMap[colNameLower],
+    );
     const isTimestamp = detectedTimestampAliases.has(colName);
 
     const col: any = {
@@ -681,5 +700,6 @@ export const convertMultiQueryTableData = (
     columns.push(col);
   });
 
+  applyProgressBarBounds(columns, allRows);
   return { rows: allRows, columns };
 };

@@ -61,9 +61,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <span
               class="tw:shrink-0 tw:text-[9px] tw:font-bold tw:tracking-[0.05em] tw:uppercase tw:py-0.5 tw:px-[5px] tw:rounded"
-              :class="isNumericColumn(col.field) ? 'tw:text-[#2e55a3] tw:bg-[rgba(46,85,163,0.1)]' : 'tw:text-[#6b7280] tw:bg-[rgba(107,114,128,0.12)]'"
+              :class="isNumericColumn(col) ? 'tw:text-[#2e55a3] tw:bg-[rgba(46,85,163,0.1)]' : 'tw:text-[#6b7280] tw:bg-[rgba(107,114,128,0.12)]'"
             >
-              {{ isNumericColumn(col.field) ? t("dashboard.typeNumeric") : t("dashboard.typeText") }}
+              {{ isNumericColumn(col) ? t("dashboard.typeNumeric") : t("dashboard.typeText") }}
             </span>
             <span
               class="tw:shrink-0 tw:font-semibold tw:text-[length:var(--text-sm,13px)] tw:max-w-[200px] tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap"
@@ -103,11 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Expanded split editor -->
-        <div
-          v-show="isExpanded(idx)"
-          class="cf-row-body"
-          :class="{ 'cf-row-body--single': !hasPreviewData }"
-        >
+        <div v-show="isExpanded(idx)" class="cf-row-body">
           <!-- Left: controls -->
           <div class="tw:flex tw:flex-col tw:gap-2.5 tw:min-w-0">
             <div class="tw:flex tw:flex-col tw:gap-1">
@@ -123,12 +119,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <ColumnFormatControls
               v-if="col.field"
               :col="col"
-              :is-numeric="isNumericColumn(col.field)"
+              :is-numeric="isNumericColumn(col)"
             />
           </div>
 
-          <!-- Right: live preview (hidden when no sample data was supplied) -->
-          <div v-if="hasPreviewData" class="tw:min-w-0 tw:flex tw:flex-col tw:gap-1.5">
+          <!-- Right: live preview (real data, or type-based dummy data) -->
+          <div class="tw:min-w-0 tw:flex tw:flex-col tw:gap-1.5">
             <div class="tw:flex tw:items-center tw:gap-[5px] tw:text-[10px] tw:font-bold tw:tracking-[0.06em] tw:uppercase tw:text-[var(--o2-text-2,#757575)]">
               <OIcon name="visibility" size="xs" />
               <span>{{ t("dashboard.inlinePreview") }}</span>
@@ -220,6 +216,20 @@ export default defineComponent({
       type: Array as PropType<any[]>,
       default: () => [],
     },
+    // Panel-level fallbacks so the preview matches the real table when a column
+    // has no per-column unit / when the panel sets non-default decimals.
+    panelUnit: {
+      type: String,
+      default: "",
+    },
+    panelUnitCustom: {
+      type: String,
+      default: "",
+    },
+    panelDecimals: {
+      type: Number,
+      default: 2,
+    },
   },
   emits: ["close", "save"],
   setup(props: any, { emit }: any) {
@@ -274,21 +284,31 @@ export default defineComponent({
       );
     };
 
-    const isNumericColumn = (field: string): boolean => {
+    // Auto-detected numeric-ness from the query data.
+    const detectedNumeric = (field: string): boolean => {
       if (!field) return false;
       return props.columns.find((c: any) => c.alias === field)?.isNumeric ?? false;
     };
 
-    // Reset numeric-only settings when switching to a non-numeric column.
+    // Effective numeric-ness: the per-column field-type override wins over
+    // detection ("num"/"text" force it; "auto" keeps the detected value).
+    const isNumericColumn = (col: ColumnOverrideUI): boolean =>
+      col.fieldType === "num"
+        ? true
+        : col.fieldType === "text"
+          ? false
+          : detectedNumeric(col.field);
+
+    // Reset numeric-only settings when a column becomes non-numeric.
     watch(
       () => columnOverrides.value.map((c) => c.field),
       (fields, prevFields) => {
         fields.forEach((field, i) => {
-          if (field !== prevFields?.[i] && !isNumericColumn(field)) {
-            columnOverrides.value[i].unit = "";
-            columnOverrides.value[i].customUnit = "";
+          if (field !== prevFields?.[i] && !isNumericColumn(columnOverrides.value[i])) {
+            columnOverrides.value[i].unit = null;
+            columnOverrides.value[i].customUnit = null;
             columnOverrides.value[i].cellType = "text";
-            columnOverrides.value[i].progressColor = "";
+            columnOverrides.value[i].progressColor = null;
             columnOverrides.value[i].conditions = [];
           }
         });
@@ -334,18 +354,29 @@ export default defineComponent({
       delete c.conditionalRules;
 
       const aliasLower = String(col.field ?? "").toLowerCase();
-      const entry = serializeColumnOverride(col, isNumeric);
+      const entry = serializeColumnOverride(col);
       const maps = parseOverrideConfigs(entry ? [entry] : []);
       applyColumnOverrides(c, aliasLower, maps, isNumeric ? "right" : "left");
 
       if (isNumeric) {
         const cache = buildValueMappingCache(props.valueMapping);
-        const unit = maps.unitConfigMap[aliasLower]?.unit ?? "";
-        const customUnit = maps.unitConfigMap[aliasLower]?.customUnit ?? "";
-        c.format = (val: any) => formatNumericValue(val, cache, unit, customUnit, 2);
+        // Match the real converter: fall back to the panel-level unit / decimals.
+        const unit = maps.unitConfigMap[aliasLower]?.unit || props.panelUnit;
+        const customUnit =
+          maps.unitConfigMap[aliasLower]?.customUnit || props.panelUnitCustom;
+        const decimals = props.panelDecimals ?? 2;
+        c.format = (val: any) =>
+          formatNumericValue(val, cache, unit, customUnit, decimals);
       }
       return c;
     };
+
+    // Sample values used when the query returned no rows for a column, so the
+    // preview still demonstrates the formatting. Picked by the effective type.
+    const DUMMY_NUMERIC = [12, 47, 83, 100, 6];
+    const DUMMY_TEXT = ["alpha", "bravo", "charlie", "delta", "echo"];
+    const makeDummyRows = (dataKey: string, isNumeric: boolean) =>
+      (isNumeric ? DUMMY_NUMERIC : DUMMY_TEXT).map((v) => ({ [dataKey]: v }));
 
     const previewFor = (col: ColumnOverrideUI) => {
       const pd = props.previewData ?? {};
@@ -359,19 +390,28 @@ export default defineComponent({
           ),
         ) as any;
       }
-      if (!base?.column) return null;
-      const isNumeric = isNumericColumn(col.field);
-      const previewCol = buildPreviewColumn(base.column, col, isNumeric);
-      applyProgressBarBounds([previewCol], base.rows ?? []);
-      return {
-        rows: base.rows ?? [],
-        columns: [previewCol],
+      const isNumeric = isNumericColumn(col);
+      // Synthesize a column when the field isn't in the preview data (e.g. the
+      // query returned nothing), so the preview still renders.
+      const label = getFieldLabel(col.field) || col.field;
+      const baseColumn = base?.column ?? {
+        field: col.field,
+        alias: col.field,
+        name: label,
+        label,
       };
+      const dataKey = String(
+        baseColumn.field ?? baseColumn.alias ?? baseColumn.name ?? col.field,
+      );
+      // No real rows → fall back to type-appropriate dummy data so the unit,
+      // progress bar, conditional styling, etc. all have something to render.
+      const rows = base?.rows?.length
+        ? base.rows
+        : makeDummyRows(dataKey, isNumeric);
+      const previewCol = buildPreviewColumn(baseColumn, col, isNumeric);
+      applyProgressBarBounds([previewCol], rows);
+      return { rows, columns: [previewCol] };
     };
-
-    const hasPreviewData = computed(
-      () => Object.keys(props.previewData ?? {}).length > 0,
-    );
 
     const previews = computed(() =>
       columnOverrides.value.map((c) => (c.field ? previewFor(c) : null)),
@@ -397,7 +437,7 @@ export default defineComponent({
     const closePopup = () => emit("close");
 
     const saveOverrides = () => {
-      const raw = serializeOverrides(columnOverrides.value, isNumericColumn);
+      const raw = serializeOverrides(columnOverrides.value);
       props.overrideConfig.overrideConfigs = raw;
       emit("save", raw);
       emit("close");
@@ -412,7 +452,6 @@ export default defineComponent({
       getFieldLabel,
       isNumericColumn,
       summaryChips,
-      hasPreviewData,
       previews,
       addColumn,
       removeColumn,
@@ -451,10 +490,6 @@ export default defineComponent({
   @media (max-width: 900px) {
     grid-template-columns: minmax(0, 1fr);
   }
-}
-
-.cf-row-body--single {
-  grid-template-columns: minmax(0, 1fr);
 }
 
 // Hide the per-cell copy button inside the mini preview.

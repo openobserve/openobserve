@@ -1,0 +1,179 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+import { describe, it, expect } from "vitest";
+import {
+  emptyColumnOverride,
+  emptyConditionalRule,
+  serializeColumnOverride,
+  serializeOverrides,
+  loadAllFromRaw,
+  type ColumnOverrideUI,
+} from "./useColumnFormatting";
+
+describe("useColumnFormatting", () => {
+  describe("empty factories", () => {
+    it("emptyColumnOverride has the expected blank shape", () => {
+      expect(emptyColumnOverride("alias")).toEqual({
+        field: "alias",
+        fieldType: "auto",
+        unit: null,
+        customUnit: null,
+        alignment: null,
+        textColor: null,
+        bgColor: null,
+        autoColor: false,
+        cellType: "text",
+        progressColor: null,
+        sparklineStyle: "line",
+        conditions: [],
+      });
+    });
+    it("emptyConditionalRule is a blank rule", () => {
+      expect(emptyConditionalRule()).toEqual({
+        operator: "<",
+        threshold: "",
+        textColor: null,
+        bgColor: null,
+      });
+    });
+  });
+
+  describe("serializeColumnOverride", () => {
+    it("returns null when the row has no formatting", () => {
+      expect(serializeColumnOverride(emptyColumnOverride("x"))).toBeNull();
+    });
+
+    it("treats every-override-set-to-none as a zero-override field", () => {
+      // A column where the user explicitly picked the 'none'/default value for
+      // each control must serialize identically to a brand-new untouched field
+      // (i.e. produce no entry), so it leaves no residue in override_config.
+      const allNone: ColumnOverrideUI = {
+        field: "x",
+        fieldType: "auto", // detect
+        unit: null, // "Default"
+        customUnit: null,
+        alignment: null, // "None"
+        textColor: null, // None swatch
+        bgColor: null, // None swatch
+        autoColor: false, // toggle off
+        cellType: "text", // default cell type
+        progressColor: null,
+        sparklineStyle: "line",
+        conditions: [], // all rules removed
+      };
+      expect(serializeColumnOverride(allNone)).toBeNull();
+      expect(serializeColumnOverride(allNone)).toEqual(
+        serializeColumnOverride(emptyColumnOverride("x")),
+      );
+      // …and the whole-array path drops it too (no entry survives).
+      expect(serializeOverrides([allNone])).toEqual([]);
+    });
+
+    it("serializes a forced field type but omits 'auto'", () => {
+      expect(serializeColumnOverride({ ...emptyColumnOverride("x"), fieldType: "auto" })).toBeNull();
+      const num = serializeColumnOverride({ ...emptyColumnOverride("x"), fieldType: "num" });
+      expect(num.config).toEqual([{ type: "field_type", value: "num" }]);
+      const text = serializeColumnOverride({ ...emptyColumnOverride("x"), fieldType: "text" });
+      expect(text.config).toEqual([{ type: "field_type", value: "text" }]);
+    });
+
+    it("persists the unit (no longer gated on numeric-ness)", () => {
+      const col = { ...emptyColumnOverride("x"), unit: "bytes" };
+      const entry = serializeColumnOverride(col);
+      expect(entry.config).toEqual([
+        { type: "unit", value: { unit: "bytes", customUnit: null } },
+      ]);
+    });
+
+    it("drops conditional rules with a blank threshold or operator", () => {
+      const col: ColumnOverrideUI = {
+        ...emptyColumnOverride("x"),
+        conditions: [
+          { operator: ">", threshold: "", textColor: "", bgColor: "" }, // no threshold
+          { operator: "", threshold: "5", textColor: "", bgColor: "" }, // no operator
+          { operator: ">=", threshold: "9", textColor: "#f00", bgColor: "" }, // valid
+        ],
+      };
+      const entry = serializeColumnOverride(col);
+      const cond = entry.config.find((c: any) => c.type === "conditional_styles");
+      expect(cond.rules).toHaveLength(1);
+      expect(cond.rules[0]).toEqual({
+        operator: ">=",
+        threshold: 9,
+        textColor: "#f00",
+        bgColor: "",
+      });
+    });
+  });
+
+  describe("round-trip (serialize → load)", () => {
+    it("losslessly round-trips a fully-populated numeric column", () => {
+      const original: ColumnOverrideUI = {
+        field: "count",
+        fieldType: "num",
+        unit: "bytes",
+        customUnit: "",
+        alignment: "center",
+        textColor: "#111827",
+        bgColor: "#f3f4f6",
+        autoColor: true,
+        cellType: "sparkline",
+        progressColor: "#15803d",
+        sparklineStyle: "bar",
+        conditions: [
+          { operator: ">=", threshold: "90", textColor: "#b91c1c", bgColor: "#fef2f2" },
+        ],
+      };
+      const entry = serializeColumnOverride(original);
+      expect(entry.field).toEqual({ matchBy: "name", value: "count" });
+
+      const loaded = loadAllFromRaw([entry])[0];
+      expect(loaded).toEqual(original);
+    });
+
+    it("round-trips a custom unit", () => {
+      const original = {
+        ...emptyColumnOverride("c"),
+        unit: "custom",
+        customUnit: "req/s",
+      };
+      const entry = serializeColumnOverride(original);
+      expect(loadAllFromRaw([entry])[0]).toEqual(original);
+    });
+  });
+
+  describe("loadAllFromRaw / serializeOverrides", () => {
+    it("loads one UI row per column", () => {
+      const raw = [
+        serializeColumnOverride({ ...emptyColumnOverride("a"), alignment: "left" }),
+        serializeColumnOverride({ ...emptyColumnOverride("b"), textColor: "#f00" }),
+      ];
+      const rows = loadAllFromRaw(raw);
+      expect(rows.map((r) => r.field).sort()).toEqual(["a", "b"]);
+    });
+
+    it("serializeOverrides drops only blank rows", () => {
+      const cols: ColumnOverrideUI[] = [
+        { ...emptyColumnOverride("num"), unit: "bytes" },
+        { ...emptyColumnOverride("txt"), unit: "bytes" },
+        emptyColumnOverride("blank"), // no formatting → dropped
+      ];
+      const out = serializeOverrides(cols);
+      expect(out).toHaveLength(2);
+      expect(out.map((e: any) => e.field.value).sort()).toEqual(["num", "txt"]);
+    });
+  });
+});
