@@ -116,8 +116,10 @@ jobs:
       head_sha: ${{ steps.prinfo.outputs.head_sha }}
       mode: ${{ steps.prinfo.outputs.mode }}               # open | merged (auto-on-merge)
       base_ref: ${{ steps.prinfo.outputs.base_ref }}       # test-PR base: feature branch (open) or main (merged)
-      work_branch: ${{ steps.prinfo.outputs.work_branch }} # autoe2e/<feature> (open) or autoe2e/pr-<n> (merged)
-      checkout_ref: ${{ steps.prinfo.outputs.checkout_ref }} # generate checks this out: PR head (open) or merge commit (merged)
+      work_branch: ${{ steps.prinfo.outputs.work_branch }} # autoe2e/pr-<n> (both modes — rename-proof identity)
+      checkout_ref: ${{ steps.prinfo.outputs.checkout_ref }} # generate checks this out: feature commit, OR the work branch when reusing
+      source_sha: ${{ steps.prinfo.outputs.source_sha }}   # the feature commit the tests target (commit-trailer + change detection)
+      reuse: ${{ steps.prinfo.outputs.reuse }}             # true → extend the existing test branch instead of clobbering
     steps:
       - name: Check required secret
         env:
@@ -183,9 +185,26 @@ jobs:
             core.setOutput('base_ref', merged ? (data.base ? data.base.ref : 'main') : headRef);
             // Branch identity is keyed on the (immutable) PR number in BOTH modes — survives a
             // feature-branch rename, so re-runs/reuse always find the same test branch.
-            core.setOutput('work_branch', `autoe2e/pr-${pr}`);
-            core.setOutput('checkout_ref', merged ? (data.merge_commit_sha || headSha) : headSha);
-            core.info(`PR #${pr} author=@${author} allowed=${allowed} head=${data.head ? data.head.ref : '?'}`);
+            const workBranch = `autoe2e/pr-${pr}`;
+            core.setOutput('work_branch', workBranch);
+            // The feature commit these tests target — for the source-sha trailer + change detection.
+            const featureSha = merged ? (data.merge_commit_sha || headSha) : headSha;
+            core.setOutput('source_sha', featureSha);
+            // REUSE: when the user did NOT force-overwrite and the test branch already exists, base
+            // this run ON that branch (check it out) so the agents see the prior tests and EXTEND
+            // them instead of starting blank and clobbering. Otherwise check out the feature commit
+            // and build fresh. (force_overwrite defaults to 'true' when there's no dispatch input —
+            // i.e. comment/auto-on-merge runs rebuild fresh.)
+            const forceOverwrite = String((context.payload.inputs && context.payload.inputs.force_overwrite) ?? 'true');
+            let branchExists = false;
+            try {
+              await github.rest.repos.getBranch({ owner: context.repo.owner, repo: context.repo.repo, branch: workBranch });
+              branchExists = true;
+            } catch (e) { branchExists = false; }
+            const reuse = branchExists && forceOverwrite === 'false';
+            core.setOutput('reuse', reuse ? 'true' : 'false');
+            core.setOutput('checkout_ref', reuse ? workBranch : featureSha);
+            core.info(`PR #${pr} mode=${merged ? 'merged' : 'open'} author=@${author} allowed=${allowed} reuse=${reuse} (branchExists=${branchExists}, force=${forceOverwrite})`);
 
       - name: Determine dry-run mode
         id: mode
@@ -525,28 +544,33 @@ jobs:
       # ORG_ADMIN_TOKEN, which has that permission and runs no untrusted code. The Engineer's
       # playwright-registration.json (carried in the artifact) is the instruction Job 4 applies.
 
-      - name: Create autoe2e branch, commit, push (no PR yet)
-        # Branch early (silent) off the dev's PR branch so it inherits the feature code → the tests
-        # pass before the feature merges. The PR is opened later by Job 4. Force-push so a re-run of
-        # /e2e refreshes the same branch (idempotent — one test PR per source PR).
-        # Pushes ONLY tests/ui-testing — no .github/workflows change, so GITHUB_TOKEN is allowed.
+      - name: Create/extend autoe2e branch, commit, push (no PR yet)
+        # Two modes (decided by triage):
+        #  - FRESH (reuse=false): the checkout is the feature commit → create the test branch off it
+        #    and force-push (idempotent rebuild). One test PR per source PR.
+        #  - REUSE (reuse=true): the checkout IS the existing autoe2e/pr-<n> branch (prior tests
+        #    present) → the agents already EXTENDED those tests this run; commit on top and
+        #    fast-forward push (no -b, no --force). Preserves prior tests + manual edits.
+        # Pushes ONLY tests/ui-testing (+ stripped-later hand-off) — no .github/workflows change.
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           WORK_BRANCH: ${{ needs.triage.outputs.work_branch }}
           PR_NUMBER: ${{ needs.triage.outputs.pr_number }}
-          # Empty on the /e2e comment path → defaults to force (overwrite). Untick the dispatch flag
-          # to set "false" and protect an existing branch (push without --force; fails if diverged).
+          REUSE: ${{ needs.triage.outputs.reuse }}
+          # The feature commit the tests target (not the checked-out ref, which is the branch in reuse).
+          SRC_SHA: ${{ needs.triage.outputs.source_sha }}
+          # Empty on comment/auto-on-merge → defaults to force. Untick the dispatch flag to reuse.
           FORCE_OVERWRITE: ${{ github.event.inputs.force_overwrite }}
         run: |
           SLUG=$(jq -r '.feature_slug // "feature"' docs/test_generator/ci/run-context.json)
           BRANCH="${WORK_BRANCH}"
-          # The source commit these tests were generated against (the checked-out PR head / merge
-          # commit). Recorded as a commit trailer below so a later run can tell whether the feature
-          # changed since (reuse / Flow 4a) — survives the hand-off strip (it's commit metadata).
-          SRC_SHA=$(git rev-parse HEAD)
           git config user.name "openobserve-bot"
           git config user.email "bot@openobserve.ai"
-          git checkout -b "$BRANCH"
+          if [ "$REUSE" = "true" ]; then
+            echo "Reuse mode: extending the existing $BRANCH (already checked out)."
+          else
+            git checkout -b "$BRANCH"   # fresh: branch off the checked-out feature commit
+          fi
           # The anti-hijack restore staged .opencode/opencode.jsonc (trusted-ref agents) — those are
           # PIPELINE files and must NOT land in the test PR. Unstage them before committing so the
           # commit carries ONLY the generated tests + hand-off.
@@ -556,14 +580,22 @@ jobs:
           # SELF-CONTAINED: verify_heal reads it straight from the checkout, no artifact dependency.
           # Job 4 strips it back out before opening the PR, so it never reaches the PR diff or main.
           git add -f docs/test_generator/ci
+          if git diff --cached --quiet; then
+            echo "No changes to commit (reuse run produced no diff)."; exit 0
+          fi
+          # e2e-source-sha trailer = the feature commit these tests target (change detection / Flow 4a).
           git commit -m "test(autoe2e): generated E2E tests for #${PR_NUMBER} (${SLUG})" \
             -m "e2e-source-sha: ${SRC_SHA}"
           # Explicit one-shot token (checkout used persist-credentials:false). Push only to autoe2e/*.
-          # force_overwrite=false → plain push (won't clobber an existing/manually-edited branch).
-          FORCE_FLAG="--force"
-          [ "$FORCE_OVERWRITE" = "false" ] && FORCE_FLAG=""
+          # Reuse → fast-forward (committed on top of the branch tip). Fresh → force-push unless the
+          # dispatch flag explicitly disabled it.
+          if [ "$REUSE" = "true" ]; then
+            FORCE_FLAG=""
+          else
+            FORCE_FLAG="--force"; [ "$FORCE_OVERWRITE" = "false" ] && FORCE_FLAG=""
+          fi
           git push $FORCE_FLAG "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:refs/heads/${BRANCH}"
-          echo "Pushed generated tests to $BRANCH (no PR yet — Job 4 opens it; it also registers playwright.yml)."
+          echo "Pushed tests to $BRANCH (reuse=$REUSE; no PR yet — Job 4 opens/refreshes it)."
 
       - name: Upload run metadata (consumed by Job 3/4)
         # SINGLE path on purpose: with one path, the artifact root = the contents of ci/, so
