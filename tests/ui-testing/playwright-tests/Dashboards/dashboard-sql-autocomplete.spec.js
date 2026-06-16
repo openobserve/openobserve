@@ -56,7 +56,6 @@ async function openSqlPanel(page, pm, dashboardName) {
     // dashboardPanelData.meta.stream.streamResults is populated and
     // sqlUpdateStreamKeywords() fires with actual stream names.
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
-    await page.waitForTimeout(300);
 
     // Switch to SQL custom query mode through the page object and focus the editor.
     await pm.dashboardSqlAutocomplete.switchToSqlCustomQueryMode();

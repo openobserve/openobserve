@@ -30,7 +30,6 @@ test.describe("Metrics Regression Bugs", () => {
     // Navigate to metrics page
     await pm.metricsPage.gotoMetricsPage();
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-    await page.waitForTimeout(1000);
 
     testLogger.info('Metrics regression test setup completed');
   });

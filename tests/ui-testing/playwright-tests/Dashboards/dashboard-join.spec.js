@@ -55,7 +55,6 @@ const navigateToDashboards = async (page) => {
   testLogger.info(`Navigating to dashboards page with org_identifier: ${dashboardUrl}`);
   await page.goto(dashboardUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
   await page.waitForLoadState("networkidle", { timeout: 30000 }).catch(() => {});
-  await page.waitForTimeout(2000);
 };
 
 const getAuthToken = async () => {

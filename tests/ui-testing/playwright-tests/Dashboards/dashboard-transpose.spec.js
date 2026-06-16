@@ -371,7 +371,6 @@ test.describe("dashboard UI testcases", () => {
     await pm.dashboardPanelActions.waitForChartToRender();
 
     // await page.waitForLoadState("networkidle");
-    await page.waitForTimeout(1000);
 
     // Check for dashboard errors ONLY after transpose is applied
     const transposeErrorResult = await pm.logsVisualise.checkDashboardErrors(

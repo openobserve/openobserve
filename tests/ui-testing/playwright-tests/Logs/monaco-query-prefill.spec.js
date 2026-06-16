@@ -185,7 +185,6 @@ test.describe("Monaco Editor Query Pre-fill Tests", () => {
     // Step 7: Navigate away (go to home or different page)
     await page.goto(`${process.env["ZO_BASE_URL"]}/web/?org_identifier=${process.env["ORGNAME"]}`);
     await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
-    await page.waitForTimeout(2000);
 
     // Step 8: Navigate back to logs page (fresh load, triggers lazy loading)
     await page.goto(logsUrl);
@@ -246,7 +245,6 @@ test.describe("Monaco Editor Query Pre-fill Tests", () => {
     const streamsUrl = `${process.env["ZO_BASE_URL"]}/web/streams?org_identifier=${process.env["ORGNAME"]}`;
     await page.goto(streamsUrl);
     await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
-    await page.waitForTimeout(2000);
 
     // Step 2: Search for the test stream
     testLogger.info('Searching for stream', { stream: TEST_STREAM });

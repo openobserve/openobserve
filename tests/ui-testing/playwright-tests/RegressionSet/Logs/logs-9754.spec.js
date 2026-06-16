@@ -198,7 +198,6 @@ test.describe("Logs Highlighting Regression Bug Fixes", () => {
     await pm.logsPage.clickRelative15MinButton();
     await pm.logsPage.clickRefreshButton();
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-    await page.waitForTimeout(2000);
 
     // STRONG ASSERTION: Table must be visible
     await pm.logsPage.expectLogsTableVisible();
@@ -242,7 +241,6 @@ test.describe("Logs Highlighting Regression Bug Fixes", () => {
 
     await pm.logsPage.clickRefreshButton();
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-    await page.waitForTimeout(2000);
 
     // STRONG ASSERTION: Table must be visible with results
     await pm.logsPage.expectLogsTableVisible();
@@ -279,7 +277,6 @@ test.describe("Logs Highlighting Regression Bug Fixes", () => {
     await pm.logsPage.clickRelative15MinButton();
     await pm.logsPage.clickRefreshButton();
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-    await page.waitForTimeout(2000);
 
     // STRONG ASSERTION: Table must be visible
     await pm.logsPage.expectLogsTableVisible();
@@ -328,7 +325,6 @@ test.describe("Logs Highlighting Regression Bug Fixes", () => {
 
     await pm.logsPage.clickRefreshButton();
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-    await page.waitForTimeout(2000);
 
     // Get table content
     const tableContent = await pm.logsPage.getLogsTableContent();
@@ -371,7 +367,6 @@ test.describe("Logs Highlighting Regression Bug Fixes", () => {
 
     await pm.logsPage.clickRefreshButton();
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-    await page.waitForTimeout(2000);
 
     // Get table content
     const tableContent = await pm.logsPage.getLogsTableContent();

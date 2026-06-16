@@ -21,7 +21,6 @@ test.describe('Row Expansion (#ResultArray#) Tests', { tag: ['@rowExpansion', '@
     testLogger.info('Navigating to Functions page in _meta organization');
     await page.goto(`${process.env.ZO_BASE_URL}/web/pipeline/functions?org_identifier=_meta`);
     await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
-    await page.waitForTimeout(2000);
 
     // Verify we're in _meta org
     const currentUrl = page.url();
@@ -58,7 +57,6 @@ test.describe('Row Expansion (#ResultArray#) Tests', { tag: ['@rowExpansion', '@
       await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
       await page.goto(`${process.env.ZO_BASE_URL}/web/pipeline/functions?org_identifier=_meta`);
       await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-      await page.waitForTimeout(2000);
 
       // Open function and check if #ResultArray# is still there
       await pm.functionsPage.searchFunction(functionName);
@@ -186,7 +184,6 @@ if (rows.length > 0) {
       await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
       await page.goto(`${process.env.ZO_BASE_URL}/web/pipeline/functions?org_identifier=_meta`);
       await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-      await page.waitForTimeout(2000);
 
       // Open function and check type and #ResultArray# marker
       const functionType = await pm.functionsPage.openFunctionAndCheckType(functionName);

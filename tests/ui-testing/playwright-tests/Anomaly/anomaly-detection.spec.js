@@ -47,7 +47,6 @@ test.describe("Anomaly Detection testcases", () => {
       `${logData.alertUrl}?org_identifier=${getOrgIdentifier()}`
     );
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-    await page.waitForTimeout(1000);
 
     testLogger.info('Test setup completed');
   });

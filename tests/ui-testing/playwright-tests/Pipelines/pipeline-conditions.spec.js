@@ -37,7 +37,6 @@ test.describe("Pipeline Conditions - Comprehensive Tests", () => {
 
     // Post-authentication stabilization wait
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-    await page.waitForTimeout(2000);
 
     // Ingest data to worker-specific unique streams to avoid conflicts in parallel execution
     // Use only first 10 records to avoid timeout (full dataset has 3800+ records)

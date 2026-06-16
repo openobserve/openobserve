@@ -561,7 +561,6 @@ test.describe("Cross-Linking testcases", () => {
         const orgId = process.env["ORGNAME"] || 'default';
         await page.goto(`${process.env["ZO_BASE_URL"] || 'http://localhost:5080'}/web/dashboards?org_identifier=${orgId}`);
         await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
-        await page.waitForTimeout(2000);
 
         await pm.dashboardCreate.createDashboard(dashboardName);
 
@@ -1408,7 +1407,6 @@ test.describe("Cross-Linking testcases", () => {
         const orgId = process.env["ORGNAME"] || 'default';
         await page.goto(`${process.env["ZO_BASE_URL"] || 'http://localhost:5080'}/web/dashboards?org_identifier=${orgId}`);
         await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
-        await page.waitForTimeout(2000);
 
         await pm.dashboardCreate.createDashboard(dashboardName);
         testLogger.info('Dashboard created', { dashboardName });

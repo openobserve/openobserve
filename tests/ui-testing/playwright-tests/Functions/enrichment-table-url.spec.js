@@ -515,7 +515,6 @@ test.describe('Enrichment Table URL Feature Tests', () => {
 
         // Wait for table to appear and navigate to list
         await enrichmentPage.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-        await enrichmentPage.page.waitForTimeout(2000);
 
         // Step 2: Test search functionality using POM method
         testLogger.info('Testing search functionality');

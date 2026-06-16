@@ -34,7 +34,6 @@ test.describe('JavaScript Transform Type', { tag: ['@jsTransformType', '@functio
       testLogger.info('Switching to _meta organization');
       await page.goto(`${process.env.ZO_BASE_URL}/web/pipeline/functions?org_identifier=_meta`);
       await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
-      await page.waitForTimeout(2000);
 
       // Verify we're in _meta org
       const currentUrl = page.url();
@@ -68,7 +67,6 @@ test.describe('JavaScript Transform Type', { tag: ['@jsTransformType', '@functio
       // Step 3: Verify function appears in list
       await page.goto(`${process.env.ZO_BASE_URL}/web/pipeline/functions?org_identifier=_meta`);
       await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-      await page.waitForTimeout(1000);
       await pm.functionsPage.searchFunction(functionName);
       await pm.functionsPage.expectFunctionInList(functionName);
       testLogger.info('Function visible in functions list');
@@ -102,7 +100,6 @@ test.describe('JavaScript Transform Type', { tag: ['@jsTransformType', '@functio
       await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
       await page.goto(`${process.env.ZO_BASE_URL}/web/pipeline/functions?org_identifier=_meta`);
       await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-      await page.waitForTimeout(2000);
 
       const functionType = await pm.functionsPage.openFunctionAndCheckType(functionName);
       expect(functionType).toBe('js');
@@ -218,7 +215,6 @@ test.describe('JavaScript Transform Type', { tag: ['@jsTransformType', '@functio
       testLogger.info(`Switching to non-meta organization: ${nonMetaOrg}`);
       await page.goto(`${process.env.ZO_BASE_URL}/web/pipeline/functions?org_identifier=${nonMetaOrg}`);
       await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
-      await page.waitForTimeout(2000);
 
       // Verify we're in the correct org
       const currentUrl = page.url();
@@ -255,7 +251,6 @@ test.describe('JavaScript Transform Type', { tag: ['@jsTransformType', '@functio
       // Navigate back to functions list and search for the function
       await page.goto(`${process.env.ZO_BASE_URL}/web/pipeline/functions?org_identifier=${nonMetaOrg}`);
       await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-      await page.waitForTimeout(1000);
       await pm.functionsPage.searchFunction(functionName);
       await pm.functionsPage.expectFunctionInList(functionName);
       testLogger.info(`VRL function created successfully in ${nonMetaOrg} org`);
@@ -280,7 +275,6 @@ test.describe('JavaScript Transform Type', { tag: ['@jsTransformType', '@functio
       // Step 1: Non-meta org - JS hidden, VRL visible
       await page.goto(`${process.env.ZO_BASE_URL}/web/pipeline/functions?org_identifier=${nonMetaOrg}`);
       await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-      await page.waitForTimeout(2000);
 
       await pm.functionsPage.clickAddFunctionButton(nonMetaOrg);
       await pm.functionsPage.expectVrlRadioVisible();
@@ -292,7 +286,6 @@ test.describe('JavaScript Transform Type', { tag: ['@jsTransformType', '@functio
       // Step 2: Switch to _meta org - JS visible, VRL visible
       await page.goto(`${process.env.ZO_BASE_URL}/web/pipeline/functions?org_identifier=_meta`);
       await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-      await page.waitForTimeout(2000);
 
       await pm.functionsPage.clickAddFunctionButton('_meta');
       await pm.functionsPage.expectVrlRadioVisible();
@@ -304,7 +297,6 @@ test.describe('JavaScript Transform Type', { tag: ['@jsTransformType', '@functio
       // Step 3: Switch back to non-meta - JS hidden again, VRL still visible
       await page.goto(`${process.env.ZO_BASE_URL}/web/pipeline/functions?org_identifier=${nonMetaOrg}`);
       await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-      await page.waitForTimeout(2000);
 
       await pm.functionsPage.clickAddFunctionButton(nonMetaOrg);
       await pm.functionsPage.expectVrlRadioVisible();

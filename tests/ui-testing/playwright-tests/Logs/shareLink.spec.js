@@ -153,7 +153,6 @@ test.describe("Share Link Test Cases", () => {
     await page.goto(sharedUrl);
     await pm.logsPage.waitForRedirectComplete();
     await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
-    await page.waitForTimeout(2000);
 
     // Step 7: Verify SQL mode state and URL params
     const redirectedState = await pm.logsPage.captureCurrentState();

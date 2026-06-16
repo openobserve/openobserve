@@ -55,7 +55,6 @@ test.describe("Sourcemap UI Tests", { tag: '@enterprise' }, () => {
     // Navigate directly to RUM Errors page
     await page.goto(`${process.env.ZO_BASE_URL}/web/rum/errors?org_identifier=${process.env.ORGNAME}`);
     await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
-    await page.waitForTimeout(2000);  // Allow page to stabilize
 
     // Verify key elements are visible
     await pm.rumPage.expectErrorTrackingPageLoaded();
@@ -71,7 +70,6 @@ test.describe("Sourcemap UI Tests", { tag: '@enterprise' }, () => {
     // Navigate to Error Tracking page
     await page.goto(`${process.env.ZO_BASE_URL}/web/rum/errors?org_identifier=${process.env.ORGNAME}`);
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-    await page.waitForTimeout(2000);  // Allow page to stabilize
 
     // Use default time range (Past 15 Minutes) which should capture recent errors
     testLogger.info('Clicking Run Query button with default time range');
@@ -98,7 +96,6 @@ test.describe("Sourcemap UI Tests", { tag: '@enterprise' }, () => {
     // Navigate to Error Tracking page (uses default 15 min time range)
     await page.goto(`${process.env.ZO_BASE_URL}/web/rum/errors?org_identifier=${process.env.ORGNAME}`);
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-    await page.waitForTimeout(2000);  // Allow page to stabilize
 
     // Run query with default time range
     await pm.rumPage.clickRunQuery();
@@ -140,7 +137,6 @@ test.describe("Sourcemap UI Tests", { tag: '@enterprise' }, () => {
     // Navigate and load errors (uses default 15 min time range)
     await page.goto(`${process.env.ZO_BASE_URL}/web/rum/errors?org_identifier=${process.env.ORGNAME}`);
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-    await page.waitForTimeout(2000);  // Allow page to stabilize
 
     await pm.rumPage.clickRunQuery();
     await pm.rumPage.waitForQueryExecution();
@@ -172,7 +168,6 @@ test.describe("Sourcemap UI Tests", { tag: '@enterprise' }, () => {
     // Navigate to error detail (uses default 15 min time range)
     await page.goto(`${process.env.ZO_BASE_URL}/web/rum/errors?org_identifier=${process.env.ORGNAME}`);
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-    await page.waitForTimeout(2000);  // Allow page to stabilize
 
     await pm.rumPage.clickRunQuery();
     await pm.rumPage.waitForQueryExecution();
@@ -214,7 +209,6 @@ test.describe("Sourcemap UI Tests", { tag: '@enterprise' }, () => {
     // Navigate to error detail (uses default 15 min time range)
     await page.goto(`${process.env.ZO_BASE_URL}/web/rum/errors?org_identifier=${process.env.ORGNAME}`);
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-    await page.waitForTimeout(2000);  // Allow page to stabilize
 
     await pm.rumPage.clickRunQuery();
     await pm.rumPage.waitForQueryExecution();
