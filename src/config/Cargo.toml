@@ -90,10 +90,9 @@ vrl.workspace = true
 tonic.workspace = true
 tonic-prost.workspace = true
 tracing-opentelemetry.workspace = true
-# vortex = { git = "https://github.com/openobserve/vortex", branch = "develop", features = [
-#     "tokio",
-# ], optional = true }
-vortex = { version = "0.75.0", features = ["tokio"], optional = true }
+vortex = { git = "https://github.com/openobserve/vortex", branch = "0.75.0-fix", features = [
+    "tokio",
+], optional = true }
 
 [dev-dependencies]
 expect-test.workspace = true
