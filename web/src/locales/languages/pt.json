@@ -1743,7 +1743,17 @@
     "columnFormattingAddColumn": "Adicionar coluna",
     "conditionalStyling": "Estilo condicional",
     "typeNumeric": "Núm",
-    "typeText": "Texto"
+    "typeText": "Texto",
+    "sectionFieldType": "Tipo de campo",
+    "conditionIfValue": "Se o valor for",
+    "conditionThenText": "em seguida, cor do texto",
+    "conditionAndBg": "e plano de fundo",
+    "opLessThan": "menos de",
+    "opGreaterThan": "maior que",
+    "opLessThanEqual": "menor ou igual a",
+    "opGreaterThanEqual": "maior ou igual a",
+    "opEqual": "igual a",
+    "opNotEqual": "não é igual a"
   },
   "panel": {
     "header": "Painel",

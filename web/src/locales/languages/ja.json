@@ -1760,7 +1760,17 @@
     "columnFormattingAddColumn": "列を追加",
     "conditionalStyling": "条件付きスタイル",
     "typeNumeric": "数値",
-    "typeText": "テキスト"
+    "typeText": "テキスト",
+    "sectionFieldType": "フィールドタイプ",
+    "conditionIfValue": "値が",
+    "conditionThenText": "次にテキストカラー",
+    "conditionAndBg": "と背景",
+    "opLessThan": "未満",
+    "opGreaterThan": "より大きい",
+    "opLessThanEqual": "以下または等しい",
+    "opGreaterThanEqual": "より大きい、または等しい",
+    "opEqual": "等しい",
+    "opNotEqual": "等しくない"
   },
   "panel": {
     "header": "パネル",

@@ -1743,7 +1743,17 @@
     "columnFormattingAddColumn": "열 추가",
     "conditionalStyling": "조건부 스타일",
     "typeNumeric": "숫자",
-    "typeText": "텍스트"
+    "typeText": "텍스트",
+    "sectionFieldType": "필드 유형",
+    "conditionIfValue": "값이 다음과 같은 경우",
+    "conditionThenText": "그런 다음 텍스트 색상",
+    "conditionAndBg": "및 배경",
+    "opLessThan": "보다 작음",
+    "opGreaterThan": "보다 큰",
+    "opLessThanEqual": "보다 작거나 같음",
+    "opGreaterThanEqual": "보다 크거나 같음",
+    "opEqual": "과 같음",
+    "opNotEqual": "같지 않음"
   },
   "panel": {
     "header": "패널",

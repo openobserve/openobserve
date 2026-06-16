@@ -1743,7 +1743,17 @@
     "columnFormattingAddColumn": "Kolom toevoegen",
     "conditionalStyling": "Voorwaardelijke opmaak",
     "typeNumeric": "Num",
-    "typeText": "Tekst"
+    "typeText": "Tekst",
+    "sectionFieldType": "Veldtype",
+    "conditionIfValue": "Als de waarde is",
+    "conditionThenText": "dan tekstkleur",
+    "conditionAndBg": "en achtergrond",
+    "opLessThan": "minder dan",
+    "opGreaterThan": "groter dan",
+    "opLessThanEqual": "kleiner dan of gelijk aan",
+    "opGreaterThanEqual": "groter dan of gelijk aan",
+    "opEqual": "gelijk aan",
+    "opNotEqual": "niet gelijk aan"
   },
   "panel": {
     "header": "Paneel",

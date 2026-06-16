@@ -1743,7 +1743,17 @@
     "columnFormattingAddColumn": "Sütun ekle",
     "conditionalStyling": "Koşullu Biçimlendirme",
     "typeNumeric": "Sayı",
-    "typeText": "Metin"
+    "typeText": "Metin",
+    "sectionFieldType": "Alan Türü",
+    "conditionIfValue": "Değer ise",
+    "conditionThenText": "sonra metin rengi",
+    "conditionAndBg": "ve arka plan",
+    "opLessThan": "daha az",
+    "opGreaterThan": "daha büyük",
+    "opLessThanEqual": "küçük veya eşit",
+    "opGreaterThanEqual": "daha büyük veya eşit",
+    "opEqual": "eşit",
+    "opNotEqual": "eşit değil"
   },
   "panel": {
     "header": "Panel",

@@ -1743,7 +1743,17 @@
     "columnFormattingAddColumn": "添加列",
     "conditionalStyling": "条件样式",
     "typeNumeric": "数值",
-    "typeText": "文本"
+    "typeText": "文本",
+    "sectionFieldType": "字段类型",
+    "conditionIfValue": "如果值为",
+    "conditionThenText": "然后是文字颜色",
+    "conditionAndBg": "和背景",
+    "opLessThan": "小于",
+    "opGreaterThan": "大于",
+    "opLessThanEqual": "小于或等于",
+    "opGreaterThanEqual": "大于或等于",
+    "opEqual": "等于",
+    "opNotEqual": "不等于"
   },
   "panel": {
     "header": "面板",

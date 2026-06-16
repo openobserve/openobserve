@@ -1743,7 +1743,17 @@
     "columnFormattingAddColumn": "Spalte hinzufügen",
     "conditionalStyling": "Bedingte Formatierung",
     "typeNumeric": "Num",
-    "typeText": "Text"
+    "typeText": "Text",
+    "sectionFieldType": "Typ des Feldes",
+    "conditionIfValue": "Wenn der Wert",
+    "conditionThenText": "dann die Farbe des Textes",
+    "conditionAndBg": "und Hintergrund",
+    "opLessThan": "weniger als",
+    "opGreaterThan": "größer als",
+    "opLessThanEqual": "kleiner als oder gleich",
+    "opGreaterThanEqual": "größer als oder gleich",
+    "opEqual": "gleich",
+    "opNotEqual": "nicht gleich"
   },
   "panel": {
     "header": "Panel",
