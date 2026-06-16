@@ -325,6 +325,65 @@ test.describe('Alerts Form Validation', { tag: ['@alerts-form-validation', '@P0'
       await expect(columnError).toContainText('Field is required!');
       testLogger.info('FilterCondition column error shown');
     });
+
+    test('should show operator error when condition submitted without operator selected', {
+      tag: ['@alertsFormValidation', '@P1'],
+    }, async ({ page }) => {
+      await fvPage.openAddAlertWizard();
+
+      await fvPage.getWizardStreamTypeDropdownLocator().waitFor({ state: 'visible', timeout: 15000 });
+      await fvPage.selectWizardStreamType('Logs');
+      await fvPage.selectWizardStreamName('e2e_automate');
+      await fvPage.clickWizardNext();
+
+      const toggleBtn = fvPage.getFilterConditionToggleOperatorBtnLocator();
+      await toggleBtn.waitFor({ state: 'visible', timeout: 10000 });
+
+      // Open and close the operator popover without selecting to trigger blur
+      const operatorPopover = fvPage.getFilterConditionOperatorPopoverLocator();
+      await operatorPopover.click();
+      await page.keyboard.press('Escape');
+
+      // Operator error should become visible
+      const operatorError = fvPage.getFilterConditionOperatorErrorLocator();
+      const errorVisible = await operatorError.isVisible().catch(() => false);
+
+      // FilterCondition.vue: validateOperator() called on blur — error = 'Field is required!'
+      // If error isn't immediately visible, try opening/closing operator popover once more
+      if (!errorVisible) {
+        await operatorPopover.click();
+        await page.keyboard.press('Escape');
+      }
+
+      await expect(operatorError).toBeVisible({ timeout: 5000 });
+      await expect(operatorError).toContainText('Field is required!');
+      testLogger.info('FilterCondition operator error shown');
+    });
+
+    test('should show value error when condition submitted without value entered', {
+      tag: ['@alertsFormValidation', '@P1'],
+    }, async ({ page }) => {
+      await fvPage.openAddAlertWizard();
+
+      await fvPage.getWizardStreamTypeDropdownLocator().waitFor({ state: 'visible', timeout: 15000 });
+      await fvPage.selectWizardStreamType('Logs');
+      await fvPage.selectWizardStreamName('e2e_automate');
+      await fvPage.clickWizardNext();
+
+      const toggleBtn = fvPage.getFilterConditionToggleOperatorBtnLocator();
+      await toggleBtn.waitFor({ state: 'visible', timeout: 10000 });
+
+      // Trigger value field blur without entering a value
+      const valueField = fvPage.getFilterConditionValueFieldLocator();
+      await valueField.click();
+      await page.keyboard.press('Tab');
+
+      // Value error should become visible
+      const valueError = fvPage.getFilterConditionValueErrorLocator();
+      await expect(valueError).toBeVisible({ timeout: 5000 });
+      await expect(valueError).toContainText('Field is required!');
+      testLogger.info('FilterCondition value error shown');
+    });
   });
 
   // ═══════════════════════════════════════════════════════════════════════════

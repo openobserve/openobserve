@@ -241,4 +241,25 @@ test.describe('Streams StreamFieldInputs form validation', { tag: ['@streams-for
         await expect(fieldRow).not.toBeVisible({ timeout: 5000 });
         testLogger.info('Field row removed after Delete click');
     });
+
+    // ── TC-SFI-005: Empty data type → error on save ───────────────────────────
+
+    test('should show error when field data type is not selected on stream save', {
+        tag: ['@streams-form-validation', '@P1']
+    }, async ({ page }) => {
+        testLogger.info('TC-SFI-005: Data type required error when data type is not selected');
+
+        // Fill in a valid field name but leave data type empty, then attempt save
+        await pm.streamsFormValidation.fillFieldName(0, 'valid_field_name');
+        await pm.streamsFormValidation.fillStreamName('e2e_streamfv_dtype_001');
+        await pm.streamsFormValidation.clickSave();
+
+        const dataTypeError = pm.streamsFormValidation.getFieldDataTypeErrorLocator(0);
+        const errorVisible = await dataTypeError.isVisible().catch(() => false);
+        const saveBtn = pm.streamsFormValidation.getSaveBtnLocator();
+        const btnDisabled = await saveBtn.isDisabled().catch(() => false);
+
+        expect(errorVisible || btnDisabled).toBe(true);
+        testLogger.info('Data type required error or disabled save confirmed when data type is empty');
+    });
 });

@@ -118,6 +118,12 @@ export class StreamsFormValidationPage {
         return row.locator('[data-test="add-stream-field-name-input-error"]');
     }
 
+    getFieldDataTypeErrorLocator(index) {
+        const row = this.page.locator(`[data-test="add-stream-field-row-${index}"]`);
+        // OSelect auto-generates ${parentDataTest}-error from data-test="add-stream-field-data-type-select"
+        return row.locator('[data-test="add-stream-field-data-type-select-error"]');
+    }
+
     // ── Assertions ────────────────────────────────────────────────────────────
 
     getDialogLocator() {
