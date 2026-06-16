@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :title="showAdvanced ? 'Collapse' : 'Expand'"
                 :icon-left="showAdvanced ? 'unfold-less' : 'unfold-more'"
                 @click.stop="showAdvanced = !showAdvanced"
-                class="expand-toggle-btn-wrapper"
+                class="tw:opacity-50 tw:transition-all tw:duration-200 tw:hover:opacity-100"
               />
             </div>
             <div v-show="showAdvanced" class="tw:flex tw:flex-col tw:flex-1 tw:overflow-hidden tw:p-4">
@@ -440,14 +440,3 @@ const createBackfillJobRequest = async () => {
 };
 </script>
 
-<style>
-/* opacity transition on child button — parent-context, keep in CSS */
-.collapsible-section .expand-toggle-btn-wrapper {
-  opacity: 0.5;
-  transition: all 0.2s ease;
-}
-
-.collapsible-section .expand-toggle-btn-wrapper:hover {
-  opacity: 1;
-}
-</style>

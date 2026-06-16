@@ -468,13 +468,4 @@ defineExpose({
     display: none !important;
   }
 }
-.q-field--labeled.showLabelOnTop.q-select
-  .q-field__control-container
-  .q-field__native
-  > :first-child {
-  text-transform: none !important;
-  font-size: 0.875rem; /* Keep the font size and weight as needed */
-  font-weight: 600;
-}
-
 </style>

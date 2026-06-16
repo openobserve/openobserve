@@ -34,13 +34,13 @@ export default {
 </script>
 
 <template>
-  <div class="nodes tw:bg-[rgba(226,232,240,0.9)] tw:backdrop-blur-[12px] tw:rounded-[12px] tw:border tw:border-[rgba(226,232,240,0.8)] tw:shadow-[0_4px_16px_rgba(0,0,0,0.08)] tw:py-3 tw:px-2 tw:m-[4px_2px] tw:transition-all tw:duration-300 tw:ease-in-out tw:hover:shadow-[0_6px_20px_rgba(0,0,0,0.12)]">
+  <div class="nodes tw:bg-[rgba(226,232,240,0.9)] tw:backdrop-blur-[12px] tw:rounded-[12px] tw:border tw:border-[rgba(226,232,240,0.8)] tw:shadow-[0_4px_16px_rgba(0,0,0,0.08)] tw:py-3 tw:px-2 tw:m-[4px_2px] tw:transition-all tw:duration-300 tw:ease-in-out tw:hover:shadow-[0_6px_20px_rgba(0,0,0,0.12)] tw:dark:bg-[rgba(15,23,42,0.95)]! tw:dark:border! tw:dark:border-[rgba(255,255,255,0.15)]! tw:dark:shadow-[0_6px_24px_rgba(0,0,0,0.4)]! tw:dark:py-3! tw:dark:px-2! tw:dark:hover:shadow-[0_8px_32px_rgba(0,0,0,0.5)]!">
     <div v-for="node in node_types" :key="node.io_type" class="o2vf_node tw:transition-all tw:rounded-lg tw:mb-3 tw:last:mb-0">
       <OButton
         variant="ghost"
         size="md"
         :class="`o2vf_node_${node.io_type}`"
-        class="tw:p-0 btn-fixed-width node-draggable tw:relative tw:flex tw:items-center tw:w-full"
+        class="tw:p-0 btn-fixed-width tw:relative tw:flex tw:items-center tw:w-full tw:hover:translate-x-[3px] tw:hover:bg-[rgba(255,255,255,0.1)] tw:hover:backdrop-blur-[8px] tw:dark:hover:bg-[rgba(255,255,255,0.08)]! tw:dark:hover:backdrop-blur-[12px]!"
         style="width: 170px; justify-content: flex-start"
         :data-test="`pipeline-node-sidebar-${node.subtype}-${node.io_type}-btn`"
         :draggable="true"
@@ -68,10 +68,10 @@ export default {
           </div>
           <div class="node-label tw:w-[70px] tw:text-left tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap tw:font-medium tw:text-[12px]">{{ node.label }}</div>
           <div class="drag-dots tw:grid tw:gap-0.5 tw:w-2 tw:h-2" style="grid-template-columns: 1fr 1fr">
-            <span class="dot tw:w-0.5 tw:h-0.5 tw:rounded-full tw:transition-all tw:bg-[rgba(107,114,128,0.6)]"></span>
-            <span class="dot tw:w-0.5 tw:h-0.5 tw:rounded-full tw:transition-all tw:bg-[rgba(107,114,128,0.6)]"></span>
-            <span class="dot tw:w-0.5 tw:h-0.5 tw:rounded-full tw:transition-all tw:bg-[rgba(107,114,128,0.6)]"></span>
-            <span class="dot tw:w-0.5 tw:h-0.5 tw:rounded-full tw:transition-all tw:bg-[rgba(107,114,128,0.6)]"></span>
+            <span class="dot tw:w-0.5 tw:h-0.5 tw:rounded-full tw:transition-all tw:bg-[rgba(107,114,128,0.6)] tw:dark:bg-[rgba(255,255,255,0.5)]!"></span>
+            <span class="dot tw:w-0.5 tw:h-0.5 tw:rounded-full tw:transition-all tw:bg-[rgba(107,114,128,0.6)] tw:dark:bg-[rgba(255,255,255,0.5)]!"></span>
+            <span class="dot tw:w-0.5 tw:h-0.5 tw:rounded-full tw:transition-all tw:bg-[rgba(107,114,128,0.6)] tw:dark:bg-[rgba(255,255,255,0.5)]!"></span>
+            <span class="dot tw:w-0.5 tw:h-0.5 tw:rounded-full tw:transition-all tw:bg-[rgba(107,114,128,0.6)] tw:dark:bg-[rgba(255,255,255,0.5)]!"></span>
           </div>
         </div>
       </OButton>
@@ -86,12 +86,6 @@ export default {
 </template>
 
 <style>
-.o2vf_node .node-draggable:hover {
-  transform: translate(3px);
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(8px);
-}
-
 .drag-handle:hover .dot {
   background: rgba(107, 114, 128, 0.8);
   transform: scale(1.1);
@@ -142,48 +136,16 @@ export default {
   border-color: rgba(245, 158, 11, 0.6);
 }
 
-.body--dark .nodes {
-  background: rgba(15, 23, 42, 0.95) !important;
-  border: 1px solid rgba(255, 255, 255, 0.15) !important;
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4) !important;
-  padding: 12px 8px !important;
-}
-
-.body--dark .nodes:hover {
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5) !important;
-}
-
-.body--dark .node-draggable:hover {
-  background: rgba(255, 255, 255, 0.08) !important;
-  backdrop-filter: blur(12px) !important;
-}
-
-.body--dark .q-btn.o2vf_node_default,
-.body--dark .q-btn.node-draggable.o2vf_node_default,
-.body--dark .q-btn.o2vf_node_default.q-btn--flat,
-.body--dark .o2vf_node_default,
-.body--dark .node-draggable.o2vf_node_default {
+.body--dark .o2vf_node_default {
   background: rgba(120, 53, 15, 0.2) !important;
   border: 1px solid rgba(251, 146, 60, 0.3) !important;
   color: rgba(255, 255, 255, 0.9) !important;
 }
 
-.body--dark .q-btn.o2vf_node_default:hover,
-.body--dark .q-btn.node-draggable.o2vf_node_default:hover,
-.body--dark .q-btn.o2vf_node_default.q-btn--flat:hover,
-.body--dark .o2vf_node_default:hover,
-.body--dark .node-draggable.o2vf_node_default:hover {
+.body--dark .o2vf_node_default:hover {
   background: rgba(120, 53, 15, 0.3) !important;
   border-color: rgba(251, 146, 60, 0.5) !important;
   box-shadow: 0 6px 16px rgba(245, 158, 11, 0.2) !important;
-}
-
-.body--dark .q-btn.o2vf_node_default.q-btn--flat {
-  background: rgba(120, 53, 15, 0.2) !important;
-}
-
-.body--dark .q-btn.o2vf_node_default.q-btn--flat:hover {
-  background: rgba(120, 53, 15, 0.3) !important;
 }
 
 .body--dark .o2vf_node_input {
@@ -208,10 +170,6 @@ export default {
   background: rgba(20, 83, 45, 0.3) !important;
   border-color: rgba(74, 222, 128, 0.5) !important;
   box-shadow: 0 6px 16px rgba(34, 197, 94, 0.2) !important;
-}
-
-.body--dark .dot {
-  background: rgba(255, 255, 255, 0.5) !important;
 }
 
 .body--dark .drag-handle:hover .dot {

@@ -860,7 +860,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-if="!query && queryEditorPlaceholderFlag && expandState.query"
                       class="query-editor-placeholder-overlay tw:absolute tw:inset-0 tw:flex tw:items-start tw:pt-0.75 tw:pl-[2.15rem] tw:pr-2 tw:pointer-events-none tw:z-1 tw:select-none"
                     >
-                      <span class="query-editor-placeholder-typewriter tw:[font-family:monospace] tw:text-[var(--text-base)] tw:[line-height:1.3125rem] tw:text-[#a0aec0] tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis">{{ editorPlaceholder }}</span>
+                      <span class="query-editor-placeholder-typewriter tw:[font-family:monospace] tw:text-[var(--text-base)] tw:[line-height:1.3125rem] tw:text-[#a0aec0] tw:dark:text-[#718096] tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis">{{ editorPlaceholder }}</span>
                     </div>
                   </div>
 
@@ -2799,10 +2799,6 @@ defineExpose({
 </script>
 
 <style>
-.body--dark .query-editor-placeholder-overlay .query-editor-placeholder-typewriter {
-  color: #718096;
-}
-
 .scheduled-pipeline-container .o-splitter__before {
   overflow: hidden;
 }
@@ -2820,42 +2816,12 @@ defineExpose({
   height: 100% !important;
 }
 
-.scheduled-pipeline-container .q-table__control {
-  width: 100%;
-}
-
-.scheduled-pipeline-container .q-table__top {
-  padding: 0px !important;
-}
-
-.scheduled-pipeline-container .scheduled-pipeline-tabs {
-  padding: 0px !important;
-}
-
-.scheduled-pipeline-container .scheduled-pipeline-tabs .q-tab--active {
-  background-color: var(--o2-theme-color);
-  color: #FFFFFF;
-}
-
-.scheduled-pipeline-container .scheduled-pipeline-tabs .q-tab__indicator {
-  display: none;
-}
-
-.scheduled-pipeline-container .scheduled-pipeline-tabs .q-tab {
-  min-height: 28px;
-  height: 32px;
-}
-
 .scheduled-pipeline-container .scheduled-pipelines .monaco-editor {
   width: 100%;
 }
 
 .scheduled-pipeline-container .scheduled-pipelines .query-editor-container {
   width: 100% !important;
-}
-
-.scheduled-pipeline-container .scheduled-pipelines .q-btn.icon-dark {
-  filter: none !important;
 }
 
 .o2-custom-splitter > .o-splitter__separator {

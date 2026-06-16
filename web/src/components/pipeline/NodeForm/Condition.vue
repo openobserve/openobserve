@@ -801,8 +801,4 @@ const validateSqlQuery = () => {
 .pipeline-filter-group-wrapper .group-container {
   pointer-events: auto;
 }
-
-.pipeline-filter-group-wrapper .q-tabs {
-  pointer-events: auto;
-}
 </style>
