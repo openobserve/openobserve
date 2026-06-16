@@ -91,12 +91,12 @@
               class="tw:flex tw:flex-col tw:gap-3"
               data-test="test-match-no-result"
             >
-              <div class="tmm-status-card--error tw:flex tw:items-center tw:gap-3 tw:py-3 tw:px-[14px] tw:rounded-lg tw:border tw:bg-[rgba(239,68,68,0.04)] tw:border-[rgba(239,68,68,0.15)]">
-                <div class="tmm-status-icon-wrap--error tw:w-8 tw:h-8 tw:rounded-lg tw:flex tw:items-center tw:justify-center tw:shrink-0 tw:bg-[rgba(239,68,68,0.1)] tw:text-[#dc2626]">
+              <div class="tw:flex tw:items-center tw:gap-3 tw:py-3 tw:px-[14px] tw:rounded-lg tw:border tw:bg-[rgba(239,68,68,0.04)] tw:border-[rgba(239,68,68,0.15)] tw:dark:bg-[rgba(239,68,68,0.08)] tw:dark:border-[rgba(239,68,68,0.2)]">
+                <div class="tw:w-8 tw:h-8 tw:rounded-lg tw:flex tw:items-center tw:justify-center tw:shrink-0 tw:bg-[rgba(239,68,68,0.1)] tw:text-[#dc2626]">
                   <OIcon name="error-outline" size="md" />
                 </div>
                 <div>
-                  <div class="tmm-status-title tw:text-[13px] tw:font-bold">
+                  <div class="tw:text-[13px] tw:font-bold tw:text-[#b91c1c] tw:dark:text-[#fca5a5]">
                     {{ t("modelPricing.noMatchFound") }}
                   </div>
                   <div class="tw:text-xs tw:mt-0.5 tw:opacity-70">
@@ -128,12 +128,12 @@
               data-test="test-match-result"
             >
               <!-- Match status -->
-              <div class="tmm-status-card--success tw:flex tw:items-center tw:gap-3 tw:py-3 tw:px-[14px] tw:rounded-lg tw:border tw:bg-[rgba(22,163,74,0.05)] tw:border-[rgba(22,163,74,0.2)]">
-                <div class="tmm-status-icon-wrap--success tw:w-8 tw:h-8 tw:rounded-lg tw:flex tw:items-center tw:justify-center tw:shrink-0 tw:bg-[rgba(22,163,74,0.12)] tw:text-[#16a34a]">
+              <div class="tw:flex tw:items-center tw:gap-3 tw:py-3 tw:px-[14px] tw:rounded-lg tw:border tw:bg-[rgba(22,163,74,0.05)] tw:border-[rgba(22,163,74,0.2)] tw:dark:bg-[rgba(22,163,74,0.08)] tw:dark:border-[rgba(22,163,74,0.25)]">
+                <div class="tw:w-8 tw:h-8 tw:rounded-lg tw:flex tw:items-center tw:justify-center tw:shrink-0 tw:bg-[rgba(22,163,74,0.12)] tw:text-[#16a34a]">
                   <OIcon name="check-circle" size="md" />
                 </div>
                 <div class="tw:flex-1 tw:min-w-0">
-                  <div class="tmm-status-title tw:text-[13px] tw:font-bold">
+                  <div class="tw:text-[13px] tw:font-bold tw:text-[#15803d] tw:dark:text-[#4ade80]">
                     {{ t("modelPricing.matchFound") }}
                   </div>
                   <div class="tw:text-xs tw:mt-0.5 tw:opacity-70 tw:truncate">
@@ -166,7 +166,7 @@
                     <div
                       class="tw:flex tw:items-center tw:gap-[5px] tw:py-[5px] tw:px-[10px] tw:rounded-md tw:border tw:border-(--o2-border-color) tw:text-[11px] tw:font-medium tw:bg-transparent"
                       :class="{
-                        'tmm-flow-step--winner tw:border-[#16a34a] tw:bg-[rgba(22,163,74,0.06)] tw:font-bold': step.key === winnerSource,
+                        'tw:border-[#16a34a] tw:bg-[rgba(22,163,74,0.06)] tw:font-bold tw:dark:bg-[rgba(22,163,74,0.1)]': step.key === winnerSource,
                         'tw:opacity-40': step.key !== winnerSource,
                       }"
                     >
@@ -398,40 +398,7 @@ function formatRate(rate: number) {
 </script>
 
 <style>
-/* ── Status card dark mode variants ── */
-.body--dark .tmm-status-card--success {
-  background: rgba(22, 163, 74, 0.08);
-  border-color: rgba(22, 163, 74, 0.25);
-}
-
-.body--dark .tmm-status-card--error {
-  background: rgba(239, 68, 68, 0.08);
-  border-color: rgba(239, 68, 68, 0.2);
-}
-
-/* ── Status title color by card variant (child selector) ── */
-.tmm-status-card--success .tmm-status-title {
-  color: #15803d;
-}
-
-.body--dark .tmm-status-card--success .tmm-status-title {
-  color: #4ade80;
-}
-
-.tmm-status-card--error .tmm-status-title {
-  color: #b91c1c;
-}
-
-.body--dark .tmm-status-card--error .tmm-status-title {
-  color: #fca5a5;
-}
-
-/* ── Winner flow step dark mode ── */
-.body--dark .tmm-flow-step--winner {
-  background: rgba(22, 163, 74, 0.1);
-}
-
-/* ── Last cost table row ── */
+/* :last-child pseudo selector — kept in <style> per project rules */
 .tmm-cost-table-row:last-child {
   border-bottom: none;
 }

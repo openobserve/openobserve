@@ -123,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span
                   v-for="[key, price] in sortedPriceEntries(tier.prices)"
                   :key="key"
-                  class="price-chip tw:inline-flex tw:items-center tw:px-1.5 tw:py-px tw:rounded-[6px] tw:text-[11px] tw:font-semibold tw:whitespace-nowrap tw:text-[#555] tw:border tw:border-[#ccc]"
+                  class="tw:inline-flex tw:items-center tw:px-1.5 tw:py-px tw:rounded-[6px] tw:text-[11px] tw:font-semibold tw:whitespace-nowrap tw:text-[#555] tw:border tw:border-[#ccc] tw:dark:text-[#bbb] tw:dark:border-[#555]"
                 >
                   {{ fmtKey(key) }}: ${{ fmtPrice(price) }}
                 </span>
@@ -389,9 +389,5 @@ export default defineComponent({
   border-top: 1px dashed var(--o2-border);
   margin-top: 2px;
   padding-top: 2px;
-}
-body.body--dark .price-chip {
-  color: #bbb;
-  border-color: #555;
 }
 </style>

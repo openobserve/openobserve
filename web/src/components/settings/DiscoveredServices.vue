@@ -84,8 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ t("settings.correlation.discoveredServicesDescription") }}
           <a
-            class="config-link-btn tw:cursor-pointer tw:inline-block tw:mx-1 tw:px-2 tw:py-0.5 tw:rounded tw:text-xs tw:font-semibold tw:no-underline tw:align-middle tw:border tw:border-[#3b82f6] tw:text-[#2563eb] tw:bg-[rgba(59,130,246,0.08)] tw:transition-[background] tw:duration-[150ms] tw:hover:bg-[rgba(59,130,246,0.18)]"
-            :class="store.state.theme === 'dark' ? 'tw:border-[#60a5fa] tw:text-[#93c5fd] tw:bg-[rgba(96,165,250,0.12)]' : ''"
+            class="tw:cursor-pointer tw:inline-block tw:mx-1 tw:px-2 tw:py-0.5 tw:rounded tw:text-xs tw:font-semibold tw:no-underline tw:align-middle tw:border tw:border-[#3b82f6] tw:text-[#2563eb] tw:bg-[rgba(59,130,246,0.08)] tw:transition-[background] tw:duration-[150ms] tw:hover:bg-[rgba(59,130,246,0.18)] tw:dark:border-[#60a5fa] tw:dark:text-[#93c5fd] tw:dark:bg-[rgba(96,165,250,0.12)] tw:dark:hover:bg-[rgba(96,165,250,0.22)]"
             @click.prevent="$emit('navigate-to-configuration')"
             >{{ t("settings.correlation.goToConfiguration") }}</a
           >
@@ -872,42 +871,68 @@ const totalInstances = computed(() =>
   filteredGroups.value.filter((r: any) => r.__type === 'group').reduce((sum: number, g: any) => sum + g.instances.length, 0),
 );
 
+// Badge color classes — each entry: [light border, dark border]
+const BADGE_COLOR_MAP: Record<string, [string, string]> = {
+  blue:   ["tw:border-[#1d4ed8]", "tw:dark:border-[#93c5fd]"],
+  green:  ["tw:border-[#065f46]", "tw:dark:border-[#6ee7b7]"],
+  yellow: ["tw:border-[#a16207]", "tw:dark:border-[#fcd34d]"],
+  pink:   ["tw:border-[#9d174d]", "tw:dark:border-[#f9a8d4]"],
+  purple: ["tw:border-[#5b21b6]", "tw:dark:border-[#c4b5fd]"],
+  orange: ["tw:border-[#c2410c]", "tw:dark:border-[#fdba74]"],
+  cyan:   ["tw:border-[#0e7490]", "tw:dark:border-[#67e8f9]"],
+  indigo: ["tw:border-[#3730a3]", "tw:dark:border-[#a5b4fc]"],
+  teal:   ["tw:border-[#0f766e]", "tw:dark:border-[#5eead4]"],
+  red:    ["tw:border-[#b91c1c]", "tw:dark:border-[#fca5a5]"],
+  gray:   ["tw:border-[#6b7280]", "tw:dark:border-[#d1d5db]"],
+  amber:  ["tw:border-[#b45309]", "tw:dark:border-[#fbbf24]"],
+  violet: ["tw:border-[#6d28d9]", "tw:dark:border-[#c4b5fd]"],
+  rose:   ["tw:border-[#be185d]", "tw:dark:border-[#fda4af]"],
+};
+
+const KEY_COLOR_LOOKUP: Record<string, string> = {
+  "k8s-deployment": "blue",
+  "k8s-namespace": "orange",
+  "k8s-cluster": "indigo",
+  deployment: "blue",
+  namespace: "orange",
+  cluster: "indigo",
+  env: "green",
+  environment: "green",
+  host: "purple",
+  hostname: "purple",
+  service: "cyan",
+  service_name: "cyan",
+  region: "pink",
+  zone: "pink",
+  pod: "teal",
+  container: "red",
+  app: "yellow",
+  application: "yellow",
+};
+
+const FALLBACK_COLORS = ["gray", "amber", "violet", "rose"];
+
 const getDimensionColorClass = (key: string): string => {
-  const colorMap: Record<string, string> = {
-    "k8s-deployment": "badge-blue",
-    "k8s-namespace": "badge-orange",
-    "k8s-cluster": "badge-indigo",
-    deployment: "badge-blue",
-    namespace: "badge-orange",
-    cluster: "badge-indigo",
-    env: "badge-green",
-    environment: "badge-green",
-    host: "badge-purple",
-    hostname: "badge-purple",
-    service: "badge-cyan",
-    service_name: "badge-cyan",
-    region: "badge-pink",
-    zone: "badge-pink",
-    pod: "badge-teal",
-    container: "badge-red",
-    app: "badge-yellow",
-    application: "badge-yellow",
-  };
+  let colorName = KEY_COLOR_LOOKUP[key];
 
-  if (colorMap[key]) return colorMap[key];
-
-  const lowerKey = key.toLowerCase();
-  for (const [pattern, className] of Object.entries(colorMap)) {
-    if (lowerKey.includes(pattern)) return className;
+  if (!colorName) {
+    const lowerKey = key.toLowerCase();
+    for (const [pattern, name] of Object.entries(KEY_COLOR_LOOKUP)) {
+      if (lowerKey.includes(pattern)) { colorName = name; break; }
+    }
   }
 
-  const classes = ["badge-gray", "badge-amber", "badge-violet", "badge-rose"];
-  let hash = 0;
-  for (let i = 0; i < key.length; i++) {
-    hash = (hash << 5) - hash + key.charCodeAt(i);
-    hash = hash & hash;
+  if (!colorName) {
+    let hash = 0;
+    for (let i = 0; i < key.length; i++) {
+      hash = (hash << 5) - hash + key.charCodeAt(i);
+      hash = hash & hash;
+    }
+    colorName = FALLBACK_COLORS[Math.abs(hash) % FALLBACK_COLORS.length];
   }
-  return classes[Math.abs(hash) % classes.length];
+
+  const [light, dark] = BADGE_COLOR_MAP[colorName];
+  return `${light} ${dark}`;
 };
 
 const formatRelativeTime = (microseconds: number): string => {
@@ -999,25 +1024,3 @@ onMounted(() => {
 });
 </script>
 
-<style>
-/* Dark mode overrides that cannot be inlined (pseudo-classes and dynamic badge classes) */
-
-.ds-dark .config-link-btn:hover {
-  background: rgba(96, 165, 250, 0.22);
-}
-
-.ds-dark .badge-blue { border-color: #93c5fd; }
-.ds-dark .badge-green { border-color: #6ee7b7; }
-.ds-dark .badge-yellow { border-color: #fcd34d; }
-.ds-dark .badge-pink { border-color: #f9a8d4; }
-.ds-dark .badge-purple { border-color: #c4b5fd; }
-.ds-dark .badge-orange { border-color: #fdba74; }
-.ds-dark .badge-cyan { border-color: #67e8f9; }
-.ds-dark .badge-indigo { border-color: #a5b4fc; }
-.ds-dark .badge-teal { border-color: #5eead4; }
-.ds-dark .badge-red { border-color: #fca5a5; }
-.ds-dark .badge-gray { border-color: #d1d5db; }
-.ds-dark .badge-amber { border-color: #fbbf24; }
-.ds-dark .badge-violet { border-color: #c4b5fd; }
-.ds-dark .badge-rose { border-color: #fda4af; }
-</style>

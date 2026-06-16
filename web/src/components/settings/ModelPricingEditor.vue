@@ -46,8 +46,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div style="max-width: 760px" class="tw:flex tw:flex-col tw:gap-6">
         <!-- ── Model Details Card ── -->
-        <div class="form-card tw:border tw:border-(--o2-border-color) tw:rounded-[10px] tw:shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
-          <div class="form-card-header tw:flex tw:flex-row tw:items-center tw:justify-between tw:gap-3 tw:py-[10px] tw:px-4 tw:bg-[rgba(0,0,0,0.025)] tw:border-b tw:border-(--o2-border-color) tw:rounded-t-[10px]">
+        <div class="tw:border tw:border-(--o2-border-color) tw:rounded-[10px] tw:shadow-[0_1px_3px_rgba(0,0,0,0.05)] tw:dark:shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
+          <div class="tw:flex tw:flex-row tw:items-center tw:justify-between tw:gap-3 tw:py-[10px] tw:px-4 tw:bg-[rgba(0,0,0,0.025)] tw:border-b tw:border-(--o2-border-color) tw:rounded-t-[10px] tw:dark:bg-[rgba(255,255,255,0.04)]">
             <div>
               <div class="form-card-title tw:text-[13px] tw:font-semibold">
                 {{ t("modelPricing.modelDetails") }}
@@ -122,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 variant="ghost"
                 size="icon-xs-sq"
-                class="pattern-examples-btn tw:opacity-50 tw:text-(--q-primary)"
+                class="tw:opacity-50 tw:text-(--q-primary) tw:hover:opacity-100"
                 @click="showExamples = true"
               >
                 <OIcon name="lightbulb-outline" size="xs" />
@@ -146,7 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :sub-title="t('modelPricing.patternExamplesDesc')"
         >
           <div class="examples-table tw:border tw:border-(--o2-border-color) tw:rounded-lg tw:overflow-hidden">
-            <div class="examples-table-head tw:grid tw:grid-cols-[180px_1fr_auto] tw:gap-3 tw:py-[6px] tw:px-3 tw:bg-[rgba(0,0,0,0.03)] tw:border-b tw:border-(--o2-border-color) tw:text-[10px] tw:font-bold tw:uppercase tw:tracking-[0.06em] tw:opacity-45">
+            <div class="tw:grid tw:grid-cols-[180px_1fr_auto] tw:gap-3 tw:py-[6px] tw:px-3 tw:bg-[rgba(0,0,0,0.03)] tw:border-b tw:border-(--o2-border-color) tw:text-[10px] tw:font-bold tw:uppercase tw:tracking-[0.06em] tw:opacity-45 tw:dark:bg-[rgba(255,255,255,0.05)]">
               <span>{{ t("modelPricing.patternExamplesModelCol") }}</span>
               <span>{{ t("modelPricing.patternExamplesPatternCol") }}</span>
             </div>
@@ -156,11 +156,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="examples-table-row tw:grid tw:grid-cols-[180px_1fr_auto] tw:gap-3 tw:items-center tw:py-2 tw:px-3 tw:border-b tw:border-(--o2-border-color) tw:text-xs"
             >
               <span class="examples-model-name tw:font-medium">{{ ex.name }}</span>
-              <code class="examples-pattern tw:font-mono tw:text-[11px] tw:bg-[rgba(0,0,0,0.04)] tw:py-px tw:px-[6px] tw:rounded tw:break-all">{{ ex.match_pattern }}</code>
+              <code class="tw:font-mono tw:text-[11px] tw:bg-[rgba(0,0,0,0.04)] tw:py-px tw:px-[6px] tw:rounded tw:break-all tw:dark:bg-[rgba(255,255,255,0.08)]">{{ ex.match_pattern }}</code>
               <OButton
                 variant="ghost"
                 size="icon-xs-sq"
-                class="examples-copy-btn tw:opacity-40"
+                class="tw:opacity-40 tw:hover:opacity-100"
                 @click="copyPattern(ex.match_pattern)"
               >
                 <OIcon
@@ -190,8 +190,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </ODialog>
 
         <!-- ── Pricing Tiers ── -->
-        <div class="form-card tw:border tw:border-(--o2-border-color) tw:rounded-[10px] tw:shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
-          <div class="form-card-header tw:flex tw:flex-row tw:items-center tw:justify-between tw:gap-3 tw:py-[10px] tw:px-4 tw:bg-[rgba(0,0,0,0.025)] tw:border-b tw:border-(--o2-border-color) tw:rounded-t-[10px]">
+        <div class="tw:border tw:border-(--o2-border-color) tw:rounded-[10px] tw:shadow-[0_1px_3px_rgba(0,0,0,0.05)] tw:dark:shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
+          <div class="tw:flex tw:flex-row tw:items-center tw:justify-between tw:gap-3 tw:py-[10px] tw:px-4 tw:bg-[rgba(0,0,0,0.025)] tw:border-b tw:border-(--o2-border-color) tw:rounded-t-[10px] tw:dark:bg-[rgba(255,255,255,0.04)]">
             <div>
               <div class="form-card-title tw:text-[13px] tw:font-semibold">
                 {{ t("modelPricing.pricingTiers") }}
@@ -206,10 +206,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-for="(tier, idx) in model.tiers"
               :key="idx as number"
-              class="tier-card tw:border tw:border-(--o2-border-color) tw:rounded-[10px] tw:overflow-hidden tw:shadow-[0_1px_4px_rgba(0,0,0,0.05)]"
+              class="tw:border tw:border-(--o2-border-color) tw:rounded-[10px] tw:overflow-hidden tw:shadow-[0_1px_4px_rgba(0,0,0,0.05)] tw:dark:shadow-[0_1px_4px_rgba(0,0,0,0.3)]"
             >
               <!-- Tier Header -->
-              <div class="tier-header tw:flex tw:items-center tw:justify-between tw:gap-2 tw:py-2 tw:px-4 tw:bg-[rgba(0,0,0,0.025)] tw:border-b tw:border-(--o2-border-color)">
+              <div class="tw:flex tw:items-center tw:justify-between tw:gap-2 tw:py-2 tw:px-4 tw:bg-[rgba(0,0,0,0.025)] tw:border-b tw:border-(--o2-border-color) tw:dark:bg-[rgba(255,255,255,0.04)]">
                 <div class="tw:flex tw:items-center tw:gap-2">
                   <span class="tier-name-label tw:text-xs tw:font-medium tw:opacity-50 tw:whitespace-nowrap tw:shrink-0">{{
                     t("modelPricing.tierName")
@@ -236,7 +236,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- Condition row (non-default tiers only) -->
                 <div
                   v-if="(idx as number) > 0 && tier.condition"
-                  class="condition-block tw:py-3 tw:px-[14px] tw:rounded-lg tw:bg-[rgba(0,0,0,0.02)] tw:border tw:border-(--o2-border-color)"
+                  class="tw:py-3 tw:px-[14px] tw:rounded-lg tw:bg-[rgba(0,0,0,0.02)] tw:border tw:border-(--o2-border-color) tw:dark:bg-[rgba(255,255,255,0.03)]"
                 >
                   <div class="sub-label tw:mb-2 tw:text-[11px] tw:font-semibold tw:tracking-[0.06em] tw:opacity-65">
                     {{ t("modelPricing.applyTierWhen") }}
@@ -289,7 +289,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ tpl.name }}
                     <span
                       v-if="isTemplateActive(tier, tpl.keys)"
-                      class="template-chip-close tw:text-sm tw:leading-none tw:opacity-75 tw:ml-0.5"
+                      class="tw:text-sm tw:leading-none tw:opacity-75 tw:ml-0.5 tw:hover:opacity-100"
                       @click.stop="clearTemplate(tier, tpl.keys)"
                       >×</span
                     >
@@ -979,54 +979,8 @@ onBeforeMount(async () => {
 </script>
 
 <style>
-/* ── Dark mode overrides (descendant selectors — cannot inline) ── */
-.body--dark .form-card {
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
-}
-
-.body--dark .form-card-header {
-  background: rgba(255, 255, 255, 0.04);
-}
-
-.body--dark .tier-card {
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
-}
-
-.body--dark .tier-header {
-  background: rgba(255, 255, 255, 0.04);
-}
-
-.body--dark .condition-block {
-  background: rgba(255, 255, 255, 0.03);
-}
-
-.body--dark .examples-table-head {
-  background: rgba(255, 255, 255, 0.05);
-}
-
-.body--dark .examples-pattern {
-  background: rgba(255, 255, 255, 0.08);
-}
-
-/* ── Hover pseudo-class rules (cannot inline) ── */
-.template-chip-close:hover {
-  opacity: 1;
-}
-
-.pattern-examples-btn:hover {
-  opacity: 1;
-}
-
-.examples-copy-btn:hover {
-  opacity: 1;
-}
-
+/* :last-child pseudo selector — kept in <style> per project rules */
 .examples-table-row:last-child {
   border-bottom: none;
-}
-
-/* ── Quasar internal selector (cannot inline) ── */
-.q-field--labeled.showLabelOnTop .q-field__control {
-  border: 1px solid var(--o2-border-color) !important;
 }
 </style>

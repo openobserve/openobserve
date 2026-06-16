@@ -92,8 +92,3 @@ export default defineComponent({
 });
 </script>
 
-<style>
-.cipher-keys-add-encryption-mechanism .q-field--labeled.showLabelOnTop .q-field__bottom {
-  padding: 0px;
-}
-</style>

@@ -384,8 +384,4 @@ export default defineComponent({
 .cipher-keys-add-akeyless-type > * + * {
   margin-top: 0.5rem;
 }
-
-.cipher-keys-add-akeyless-type .q-field--labeled.showLabelOnTop .q-field__bottom {
-  padding: 0px;
-}
 </style>

@@ -78,12 +78,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :width="40"
       >
         <div class="tw:p-4 tw:text-sm">
-          <div class="info-box tw:mb-4 tw:p-4 tw:bg-[#f5f5f5] tw:rounded">
+          <div class="tw:mb-4 tw:p-4 tw:bg-[#f5f5f5] tw:rounded tw:dark:bg-[#2a2a2a]">
             <div class="tw:font-medium tw:mb-2">{{ t("settings.claimParserFunctionInputTitle") }}</div>
             <div>{{ t("settings.claimParserFunctionInputDescription") }}</div>
           </div>
 
-          <div class="info-box tw:mb-4 tw:p-4 tw:bg-[#f5f5f5] tw:rounded">
+          <div class="tw:mb-4 tw:p-4 tw:bg-[#f5f5f5] tw:rounded tw:dark:bg-[#2a2a2a]">
             <div class="tw:font-medium tw:mb-2">{{ t("settings.claimParserFunctionOutputTitle") }}</div>
             <div class="tw:mb-2">{{ t("settings.claimParserFunctionOutputDescription") }}</div>
             <div class="tw:ml-4">
@@ -93,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Recent Errors Section -->
-          <div v-if="claimParserFunction" class="info-box error-section tw:p-4 tw:bg-[#f5f5f5] tw:rounded tw:border-l-[3px] tw:border-l-[#c10015]">
+          <div v-if="claimParserFunction" class="tw:p-4 tw:bg-[#f5f5f5] tw:rounded tw:border-l-[3px] tw:border-l-[#c10015] tw:dark:bg-[#2a2a2a] tw:dark:border-l-[#ff6b6b]">
             <div class="tw:flex tw:items-center tw:mb-2">
               <div class="tw:flex-1 tw:font-medium">{{ t("settings.claimParserRecentErrors") }}</div>
               <div>
@@ -121,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-for="(error, index) in recentErrors.slice(0, 3)"
                 :key="index"
-                class="error-item tw:p-2 tw:mb-1 tw:bg-[#fff9f9] tw:rounded tw:border-l-2 tw:border-l-[#ff9e9e]"
+                class="tw:p-2 tw:mb-1 tw:bg-[#fff9f9] tw:rounded tw:border-l-2 tw:border-l-[#ff9e9e] tw:dark:bg-[#2a1f1f] tw:dark:border-l-[#ff6b6b]"
               >
                 <div class="tw:flex tw:items-start tw:mb-1">
                   <OIcon name="error" size="xs" class="tw:mr-1 tw:mt-1" />
@@ -130,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="tw:text-xs" style="color: var(--o2-text-muted)">{{ formatTimestamp(error._timestamp) }}</div>
                   </div>
                 </div>
-                <div class="error-message tw:text-xs tw:text-[#666] tw:wrap-break-word">{{ error.error }}</div>
+                <div class="tw:text-xs tw:text-[#666] tw:wrap-break-word tw:dark:text-[#ccc]">{{ error.error }}</div>
               </div>
 
               <!-- Show More Button -->
@@ -201,9 +201,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template v-for="(domain, index) in domains" :key="domain?.name || `domain-${index}`">
         <div
           v-if="domain && domain.name"
-          class="domain-card tw:mb-1 tw:border tw:border-(--o2-border) tw:rounded-lg tw:bg-white"
+          class="tw:mb-1 tw:border tw:border-(--o2-border) tw:rounded-lg tw:bg-white tw:dark:border-[#444] tw:dark:bg-[#1e1e1e]"
         >
-          <div class="domain-header tw:flex tw:items-center tw:justify-between tw:px-3 tw:py-2 tw:bg-[#f5f5f5] tw:border-b tw:border-b-(--o2-border) tw:rounded-t-lg">
+          <div class="tw:flex tw:items-center tw:justify-between tw:px-3 tw:py-2 tw:bg-[#f5f5f5] tw:border-b tw:border-b-(--o2-border) tw:rounded-t-lg tw:dark:bg-[#2a2a2a] tw:dark:border-b-[#444]">
           <div class="tw:text-base tw:font-bold">{{ domain.name }}</div>
           <OButton
             icon-left="close"
@@ -261,7 +261,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-for="(email, emailIndex) in domain.allowedEmails"
                 :key="email"
-                class="email-item tw:flex tw:items-center tw:justify-between tw:p-2 tw:mb-1 tw:bg-[#f9f9f9] tw:rounded tw:border tw:border-(--o2-border)"
+                class="tw:flex tw:items-center tw:justify-between tw:p-2 tw:mb-1 tw:bg-[#f9f9f9] tw:rounded tw:border tw:border-(--o2-border) tw:dark:bg-[#2a2a2a] tw:dark:border-[#444]"
               >
                 <div class="tw:text-sm">{{ email }}</div>
                 <OButton
@@ -281,7 +281,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       v-else
       data-test="domain-management-no-domain-message"
-      class="domain-card tw:text-xl tw:font-semibold tw:text-gray-400 tw:mt-3 tw:mb-4 tw:w-full tw:text-center tw:p-4 tw:border tw:border-(--o2-border) tw:rounded-lg tw:bg-white"
+      class="tw:text-xl tw:font-semibold tw:text-gray-400 tw:mt-3 tw:mb-4 tw:w-full tw:text-center tw:p-4 tw:border tw:border-(--o2-border) tw:rounded-lg tw:bg-white tw:dark:border-[#444] tw:dark:bg-[#1e1e1e]"
     >
       {{ t("settings.noDomainMessage") }}
     </div>
@@ -842,42 +842,3 @@ const resetForm = () => {
 };
 </script>
 
-<style>
-/* Dark mode — descendant selectors cannot be inlined */
-.body--dark .info-box {
-  background-color: #2a2a2a;
-}
-
-.body--dark .domain-card {
-  border-color: #444;
-  background: #1e1e1e;
-}
-
-.body--dark .domain-header {
-  background: #2a2a2a;
-  border-bottom-color: #444;
-}
-
-.body--dark .email-item {
-  background: #2a2a2a;
-  border-color: #444;
-}
-
-.body--dark .error-section {
-  border-left-color: #ff6b6b;
-}
-
-.body--dark .error-item {
-  background: #2a1f1f;
-  border-left-color: #ff6b6b;
-}
-
-.body--dark .error-message {
-  color: #ccc;
-}
-
-/* Quasar internal — descendant selector, cannot be inlined */
-.domain_management .q-field__bottom {
-  padding-left: 0px;
-}
-</style>

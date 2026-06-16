@@ -184,7 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #cell-match_pattern="{ row }">
           <div class="tw:flex tw:items-center tw:gap-1 tw:min-w-0">
             <code
-              class="tw:text-xs tw:block tw:max-w-full tw:bg-[rgba(0,0,0,0.04)] tw:border tw:border-(--o2-border-color) tw:py-[2px] tw:px-[6px] tw:rounded tw:text-inherit pattern-code"
+              class="tw:text-xs tw:block tw:max-w-full tw:bg-[rgba(0,0,0,0.04)] tw:border tw:border-(--o2-border-color) tw:py-[2px] tw:px-[6px] tw:rounded tw:text-inherit tw:dark:bg-[rgba(255,255,255,0.05)]"
               :class="{ 'tw:opacity-50 tw:[text-decoration:line-through] tw:[text-decoration-color:currentColor]': isChildRow(row) }"
               >{{ row.match_pattern }}</code
             >
@@ -209,7 +209,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span
                 v-for="(price, key) in getVisiblePrices(row)"
                 :key="key"
-                class="tw:inline-flex tw:items-center tw:gap-[2px] tw:py-[2px] tw:px-2 tw:rounded-md tw:text-[11px] tw:font-normal tw:whitespace-nowrap tw:border tw:border-[#d1d5db] tw:text-inherit dimension-badge"
+                class="tw:inline-flex tw:items-center tw:gap-[2px] tw:py-[2px] tw:px-2 tw:rounded-md tw:text-[11px] tw:font-normal tw:whitespace-nowrap tw:border tw:border-[#d1d5db] tw:text-inherit tw:dark:text-white tw:dark:border-[#4b5563]"
                 :class="getPriceKeyColorClass(key as string)"
               >
                 <span class="tw:font-medium">{{
@@ -219,7 +219,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </span>
               <span
                 v-if="getOverflowCount(row) > 0"
-                class="tw:inline-flex tw:items-center tw:gap-[2px] tw:py-[2px] tw:px-2 tw:rounded-md tw:text-[11px] tw:whitespace-nowrap tw:border-0 tw:bg-[#e5e7eb] tw:text-[#6b7280] tw:font-medium tw:cursor-pointer dimension-badge badge-more"
+                class="tw:inline-flex tw:items-center tw:gap-[2px] tw:py-[2px] tw:px-2 tw:rounded-md tw:text-[11px] tw:whitespace-nowrap tw:border-0 tw:bg-[#e5e7eb] tw:text-[#6b7280] tw:font-medium tw:cursor-pointer tw:dark:bg-[#4b5563] tw:dark:text-[#d1d5db]"
                 @click.stop="openPricingDialog(row)"
               >
                 +{{ getOverflowCount(row) }}
@@ -419,10 +419,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:p-3 tw:flex-1 tw:overflow-y-auto">
         <div v-if="pricingDialogRow">
           <div class="tw:mb-4">
-            <div class="tw:text-xs tw:font-semibold tw:mb-[6px] tw:text-[#555] pricing-section-label">
+            <div class="tw:text-xs tw:font-semibold tw:mb-[6px] tw:text-[#555] tw:dark:text-[#aaa]">
               {{ t("modelPricing.colPattern") }}
             </div>
-            <code class="tw:text-xs tw:block tw:bg-[rgba(0,0,0,0.04)] tw:border tw:border-(--o2-border-color) tw:py-[2px] tw:px-[6px] tw:rounded tw:text-inherit tw:text-[13px] tw:px-[10px] tw:py-[6px] tw:whitespace-pre-wrap tw:break-all tw:max-h-[300px] tw:overflow-y-auto pattern-code">{{
+            <code class="tw:text-xs tw:block tw:bg-[rgba(0,0,0,0.04)] tw:border tw:border-(--o2-border-color) tw:py-[2px] tw:px-[6px] tw:rounded tw:text-inherit tw:text-[13px] tw:px-[10px] tw:py-[6px] tw:whitespace-pre-wrap tw:break-all tw:max-h-[300px] tw:overflow-y-auto tw:dark:bg-[rgba(255,255,255,0.05)]">{{
               pricingDialogRow.match_pattern
             }}</code>
           </div>
@@ -949,29 +949,7 @@ onActivated(() => {
 </script>
 
 <style>
-/* Dark mode overrides for pattern-code */
-body.body--dark .pattern-code {
-  background: rgba(255, 255, 255, 0.05);
-}
-
-/* Dark mode for pricing section label */
-.body--dark .pricing-section-label {
-  color: #aaa;
-}
-
-/* Dark mode for badge-more */
-body.body--dark .badge-more {
-  background: #4b5563;
-  color: #d1d5db;
-}
-
-/* Dark mode for dimension-badge */
-body.body--dark .dimension-badge {
-  color: #ffffff;
-  border-color: #4b5563;
-}
-
-/* Dark mode for pricing panel table header */
+/* Dark mode for pricing panel table header (th element selector — cannot inline) */
 .body--dark .pricing-panel-table th {
   background: rgba(255, 255, 255, 0.04);
 }
