@@ -314,7 +314,10 @@ mod tests {
 
     /// Insert an entry into the cache under its own location.
     fn put(cache: &FileStatisticsCache, meta: ObjectMeta, stats: Arc<Statistics>) {
-        cache.put(&key(&meta.location), CachedFileMetadata::new(meta, stats, None));
+        cache.put(
+            &key(&meta.location),
+            CachedFileMetadata::new(meta, stats, None),
+        );
     }
 
     #[test]
@@ -394,7 +397,11 @@ mod tests {
 
         assert!(!cache.contains_key(&k));
 
-        put(&cache, meta, unknown_stats(vec![Field::new("col", DataType::Utf8, false)]));
+        put(
+            &cache,
+            meta,
+            unknown_stats(vec![Field::new("col", DataType::Utf8, false)]),
+        );
         assert!(cache.contains_key(&k));
         assert_eq!(cache.len(), 1);
 
@@ -408,7 +415,11 @@ mod tests {
         let cache = FileStatisticsCache::new();
         for i in 0..3u64 {
             let meta = object_meta(&format!("file_{i}"), 100 * (i + 1));
-            put(&cache, meta, unknown_stats(vec![Field::new("col", DataType::Int64, false)]));
+            put(
+                &cache,
+                meta,
+                unknown_stats(vec![Field::new("col", DataType::Int64, false)]),
+            );
         }
 
         assert_eq!(cache.len(), 3);
@@ -426,7 +437,11 @@ mod tests {
 
         assert!(FscTrait::list_entries(&cache).is_empty());
 
-        put(&cache, meta, unknown_stats(vec![Field::new("col", DataType::Utf8, false)]));
+        put(
+            &cache,
+            meta,
+            unknown_stats(vec![Field::new("col", DataType::Utf8, false)]),
+        );
         let entries = FscTrait::list_entries(&cache);
         assert_eq!(entries.len(), 1);
         assert!(entries.contains_key(&k));

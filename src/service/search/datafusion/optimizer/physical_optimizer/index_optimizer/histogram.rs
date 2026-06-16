@@ -168,16 +168,16 @@ fn get_histogram_interval(expr: &Arc<dyn PhysicalExpr>) -> Option<u64> {
 /// `to_timestamp_micros(_timestamp + offset)` — the shape histogram() with a timezone
 /// rewrites to — yields the offset. None when the source is not the timestamp column.
 fn get_timestamp_offset(expr: &Arc<dyn PhysicalExpr>) -> Option<i64> {
-    let func = expr.as_any().downcast_ref::<ScalarFunctionExpr>()?;
+    let func = expr.downcast_ref::<ScalarFunctionExpr>()?;
     let arg = func.args().first()?;
     if get_column_name(arg) == TIMESTAMP_COL_NAME {
         return Some(0);
     }
-    let bin = arg.as_any().downcast_ref::<BinaryExpr>()?;
+    let bin = arg.downcast_ref::<BinaryExpr>()?;
     if *bin.op() != Operator::Plus || get_column_name(bin.left()) != TIMESTAMP_COL_NAME {
         return None;
     }
-    match bin.right().as_any().downcast_ref::<Literal>()?.value() {
+    match bin.right().downcast_ref::<Literal>()?.value() {
         ScalarValue::Int64(Some(ts_offset)) => Some(*ts_offset),
         _ => None,
     }
