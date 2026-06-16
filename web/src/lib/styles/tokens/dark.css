@@ -108,11 +108,14 @@
     /* ---- Button overrides ---- */
 
     /* secondary (darkened surface) */
-    --color-button-secondary: var(--color-surface-overlay);
+    --o2-secondary-btn-bg: var(--color-surface-overlay);
+    --o2-secondary-btn-text: var(--color-text-primary);
+    --o2-secondary-btn-border: var(--color-border-subtle, rgba(255,255,255,0.12));
+    --color-button-secondary: var(--o2-secondary-btn-bg);
     --color-button-secondary-hover: var(--color-primary-900);
     --color-button-secondary-active: var(--color-primary-800);
     --color-button-secondary-disabled: var(--color-surface-overlay);
-    --color-button-secondary-foreground: var(--color-text-primary);
+    --color-button-secondary-foreground: var(--o2-secondary-btn-text);
 
     /* outline */
     --color-button-outline-text: var(--color-text-primary);

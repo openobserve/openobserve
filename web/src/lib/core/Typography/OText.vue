@@ -47,16 +47,14 @@ const variantClasses: Record<NonNullable<TextProps["variant"]>, string> = {
   // Page title: compact, authoritative. Designed for the page header rail.
   // Target: same visual weight as Datadog / Grafana page titles — quiet but clear.
   "page-title": [
-    "tw:text-sm tw:font-semibold",
+    "tw:text-sm tw:font-medium",
     "tw:text-typography-page-title",
     "tw:leading-tight",
   ].join(" "),
 
-  // Section group label (gray eyebrow). HANDOFF §2.3 / §0 locked decision:
-  // 11.5px / 600 / 0 tracking, SENTENCE CASE — never ALL-CAPS, never tracked.
-  // ("Cipher keys", not "CIPHER KEYS".) They recede via color + size, not caps.
+  // Section group label (gray eyebrow). Recedes via color + size, not weight.
   "section": [
-    "tw:text-[11.5px] tw:font-semibold",
+    "tw:text-[11.5px] tw:font-medium",
     "tw:text-typography-section",
     "tw:leading-none",
   ].join(" "),
@@ -75,15 +73,15 @@ const variantClasses: Record<NonNullable<TextProps["variant"]>, string> = {
     "tw:text-typography-body",
   ].join(" "),
 
-  // Emphasized body: same size as body but semibold. Names, totals, values.
+  // Emphasized body: same size as body but medium. Names, totals, values.
   "body-strong": [
-    "tw:text-sm tw:font-semibold",
+    "tw:text-sm tw:font-medium",
     "tw:text-typography-body",
   ].join(" "),
 
-  // Compact label: 12px semibold. Filter labels, column sub-labels, pill text.
+  // Compact label: 12px medium. Filter labels, column sub-labels, pill text.
   "label": [
-    "tw:text-xs tw:font-semibold",
+    "tw:text-xs tw:font-medium",
     "tw:text-typography-label",
     "tw:leading-none",
   ].join(" "),
