@@ -693,6 +693,7 @@ import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import TelemetryCorrelationDashboard from "@/plugins/correlation/TelemetryCorrelationDashboard.vue";
 import type { TelemetryContext } from "@/utils/telemetryCorrelation";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
+import { buildChipDimensionsFromFilters } from "@/services/service_streams";
 import { buildWorkloadChipDimensions } from "@/composables/useMetricSubjectButtons";
 import { extractSeverity } from "@/utils/sourceEventSeverity";
 import config from "@/aws-exports";
@@ -1500,19 +1501,14 @@ export default defineComponent({
           matchedDimensions: actualMatchedDimensions,
           additionalDimensions: {},
           matchedSetId: result.correlationData.matched_set_id,
-          // Semantic-id keyed dims for the chip row. Start from the
-          // correlate response (matched + additional), then layer in
-          // workload-specific subjects (Pod, Node, …) by walking the source
-          // row via the SUBJECT_BUTTONS_BY_SET registry — needed because
-          // pod/node aren't service-identifying and the backend drops them.
+          // Chip dimensions derived from actual per-stream filters returned by
+          // _correlate. Only fields that appear in StreamInfo.filters are shown,
+          // ensuring every chip corresponds to a real SQL WHERE condition.
           chipDimensions: {
-            ...(result.correlationData.matched_dimensions || {}),
-            ...(result.correlationData.additional_dimensions || {}),
-            ...buildWorkloadChipDimensions(
-              result.correlationData.matched_set_id,
-              semanticGroups.value,
-              logData,
-            ),
+            ...buildChipDimensionsFromFilters(result.correlationData, semanticGroups.value),
+            // Subject dims (semantic IDs) for metrics tab subject chips (Pod, Node, Host…).
+            // Keyed by semantic ID so unifiedChips recognises them as kind="subject".
+            ...buildWorkloadChipDimensions(result.correlationData.matched_set_id, semanticGroups.value, logData),
           },
           sourceEvent,
           metricStreams: result.correlationData.related_streams.metrics || [],
