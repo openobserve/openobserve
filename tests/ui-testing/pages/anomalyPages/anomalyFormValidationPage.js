@@ -11,7 +11,7 @@ class AnomalyFormValidationPage {
 
         // ── Navigation ─────────────────────────────────────────────────────
         this.alertsMenuLink = '[data-test="menu-link-\\/alerts-item"]';
-        this.anomalyDetectionTab = '[data-test="alert-anomaly-detection-tab"]';
+        this.anomalyDetectionTab = '[data-test="tab-anomalyDetection"]';
 
         // ── Anomaly list ───────────────────────────────────────────────────
         this.addAnomalyBtn = '[data-test="alert-list-add-alert-btn"]';

@@ -1,7 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 // AI Toolsets — form validation E2E tests
 //
-// Covers: AddAiToolset (name required, MCP URL required, happy path)
+// Covers: AddAiToolset (name required, MCP URL required, CLI command required, happy path)
 //         CrossLinkDialog (name required, URL required, invalid URL, happy path)
 //
 // Cleanup notes:
@@ -87,6 +87,39 @@ test.describe('AI Toolsets form validation', { tag: '@enterprise' }, () => {
         await expect(pm.aiToolsetsFormValidation.getNameErrorLocator()).not.toBeVisible();
 
         testLogger.info('Name error correctly cleared after input');
+    });
+
+    test('should show CLI command error when kind is CLI and command is empty', {
+        tag: ['@ai-toolsets-form-validation', '@P0', '@smoke']
+    }, async ({ page }) => {
+        testLogger.info('Testing CLI command required validation');
+
+        // Switch kind to CLI Tool
+        await pm.aiToolsetsFormValidation.selectKind('CLI Tool');
+        await pm.aiToolsetsFormValidation.fillName('ai_toolset_fv_cli_test');
+        // Leave command empty and submit
+        await pm.aiToolsetsFormValidation.clickSave();
+
+        await expect(pm.aiToolsetsFormValidation.getCliCommandErrorLocator()).toBeVisible();
+        await expect(pm.aiToolsetsFormValidation.getCliCommandErrorLocator()).toContainText('Command is required');
+
+        testLogger.info('CLI command required error correctly shown');
+    });
+
+    test('should show both name and CLI command errors when CLI kind is selected and form is empty', {
+        tag: ['@ai-toolsets-form-validation', '@P0', '@smoke']
+    }, async ({ page }) => {
+        testLogger.info('Testing both name and CLI command errors on empty CLI form submit');
+
+        await pm.aiToolsetsFormValidation.selectKind('CLI Tool');
+        await pm.aiToolsetsFormValidation.clickSave();
+
+        await expect(pm.aiToolsetsFormValidation.getNameErrorLocator()).toBeVisible();
+        await expect(pm.aiToolsetsFormValidation.getNameErrorLocator()).toContainText('Name is required');
+        await expect(pm.aiToolsetsFormValidation.getCliCommandErrorLocator()).toBeVisible();
+        await expect(pm.aiToolsetsFormValidation.getCliCommandErrorLocator()).toContainText('Command is required');
+
+        testLogger.info('Both name and CLI command required errors correctly shown');
     });
 
     test('should create AI Toolset successfully with valid name and MCP URL', {

@@ -73,12 +73,16 @@ export class IamFormValidationPage {
 
     async navigateToGroupsTab() {
         await this.navigateToIam();
+        await this.page.locator(this.iamGroupsTab).waitFor({ state: 'visible', timeout: 10000 });
         await this.page.locator(this.iamGroupsTab).click();
+        await this.page.locator(this.addGroupButton).waitFor({ state: 'visible', timeout: 10000 });
     }
 
     async navigateToRolesTab() {
         await this.navigateToIam();
+        await this.page.locator(this.iamRolesTab).waitFor({ state: 'visible', timeout: 10000 });
         await this.page.locator(this.iamRolesTab).click();
+        await this.page.locator(this.addRoleButton).waitFor({ state: 'visible', timeout: 10000 });
     }
 
     async navigateToServiceAccountsTab() {

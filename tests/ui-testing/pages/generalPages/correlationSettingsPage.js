@@ -935,4 +935,24 @@ export class CorrelationSettingsPage {
     async waitForQuickUpdate(ms = 300) {
         await this.page.waitForTimeout(ms);
     }
+
+    /**
+     * Opens the TimeRangeEditor dialog from the Correlation Settings page.
+     * Tries the known trigger button selectors for the time range editor.
+     * Returns true if the dialog was opened successfully, false otherwise.
+     */
+    async openTimeRangeEditor() {
+        const trigger = this.page.locator(
+            '[data-test="correlation-time-range-edit-btn"], [data-test="time-range-editor-trigger"]'
+        );
+        const triggerVisible = await trigger.isVisible({ timeout: 5000 }).catch(() => false);
+        if (!triggerVisible) {
+            testLogger.warn('TimeRangeEditor trigger not found — component may not be available in this environment');
+            return false;
+        }
+        await trigger.click();
+        const dialogVisible = await this.page.locator('[data-test="time-range-editor-dialog"]')
+            .isVisible({ timeout: 5000 }).catch(() => false);
+        return dialogVisible;
+    }
 }

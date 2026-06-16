@@ -14,7 +14,7 @@ export class SettingsFormValidationPage {
         this.page = page;
 
         // ── Navigation ────────────────────────────────────────────────────────
-        this.settingsMenuLink = '[data-test="menu-link-settings-item"]';
+        this.settingsMenuLink = '[data-test="menu-link-/settings-item"]';
 
         // ── OrganizationSettings — OInput data-test derived selectors ─────────
         // The OInput wrapper for trace ID sits inside data-test="add-role-rolename-input-btn"

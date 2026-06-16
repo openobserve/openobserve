@@ -81,7 +81,7 @@ test.describe("Reports form validation — required field errors", () => {
         // Fill valid name but leave folder empty
         await pm.reportsFormValidation.fillReportName('validname');
 
-        // Click save
+        // Click save — saveReport() calls validateReportData() which sets folderError
         await pm.reportsFormValidation.clickSave();
 
         // Folder error must be visible

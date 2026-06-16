@@ -211,7 +211,12 @@ test.describe(
             testLogger.testStart(testInfo.title, testInfo.file);
             await navigateToBase(page);
             pm = new PageManager(page);
-            nodeOpened = await pm.pipelinesFormValidation.openFirstLlmEvalNode();
+            nodeOpened = await pm.pipelinesFormValidation.openFirstLlmEvalNode().catch(() => false);
+            // If node search fails, navigate back to a clean state so serial suite
+            // tests that follow are not left on the pipeline editor page
+            if (!nodeOpened) {
+                await navigateToBase(page).catch(() => {});
+            }
         });
 
         // ── Test: empty name => error or save disabled ────────────────────────
