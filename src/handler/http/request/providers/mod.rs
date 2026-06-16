@@ -272,13 +272,24 @@ async fn test_provider_connection(
     org_id: &str,
     provider_id: &str,
 ) -> Result<String, ProviderError> {
-    let provider = providers::get_provider(org_id, provider_id).await?;
-    let provider = infra::provider::PreparedProvider::parse((&provider).into())
-        .map_err(|e| ProviderError::InvalidConfig(e.to_string()))?;
-    provider
-        .test_connection()
-        .await
-        .map_err(|e| ProviderError::InfraError(infra::errors::Error::Message(e.to_string())))
+    #[cfg(feature = "enterprise")]
+    {
+        let provider = providers::get_provider(org_id, provider_id).await?;
+        let provider =
+            o2_enterprise::enterprise::llm_evaluations::provider::PreparedProvider::parse(
+                (&provider).into(),
+            )
+            .map_err(|e| ProviderError::InvalidConfig(e.to_string()))?;
+        provider
+            .test_connection()
+            .await
+            .map_err(|e| ProviderError::InfraError(infra::errors::Error::Message(e.to_string())))
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, provider_id);
+        Err(ProviderError::NotFound)
+    }
 }
 
 #[cfg(test)]

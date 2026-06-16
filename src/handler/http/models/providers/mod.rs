@@ -25,6 +25,7 @@ pub struct ProviderRequestBody {
     pub provider_type: String,
     #[serde(default)]
     pub endpoint: Option<String>,
+    #[serde(default)]
     #[serde(alias = "default_model")]
     pub default_model: String,
     #[serde(default)]
@@ -163,5 +164,17 @@ mod tests {
         assert_eq!(body.available_models, vec!["gpt-4o", "gpt-4o-mini"]);
         assert_eq!(body.auth_config, serde_json::json!({"api_key": "k"}));
         assert!(body.is_default);
+    }
+
+    #[test]
+    fn test_provider_request_body_defaults_default_model() {
+        let body: ProviderRequestBody = serde_json::from_value(serde_json::json!({
+            "name": "Test",
+            "provider_type": "openai",
+            "auth_config": {"api_key": "k"}
+        }))
+        .unwrap();
+
+        assert!(body.default_model.is_empty());
     }
 }

@@ -358,7 +358,7 @@ async fn run_search(
         timeout: 0,
         search_type: Some(config::meta::search::SearchEventType::UI),
         search_event_context: None,
-        use_cache: false,
+        use_cache: true,
         clear_cache: false,
         local_mode: None,
     };

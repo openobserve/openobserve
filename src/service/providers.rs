@@ -47,6 +47,13 @@ fn scorer_uses_provider(scorer: &table::scorers::Scorer, provider_id: &str) -> b
     scorer.params.get("provider_id").and_then(|v| v.as_str()) == Some(provider_id)
 }
 
+#[cfg(feature = "enterprise")]
+fn validate_provider_config(provider: &table::providers::Provider) -> Result<(), ProviderError> {
+    o2_enterprise::enterprise::llm_evaluations::provider::PreparedProvider::parse(provider.into())
+        .map(|_| ())
+        .map_err(|e| ProviderError::InvalidConfig(e.to_string()))
+}
+
 #[tracing::instrument(skip(provider))]
 pub async fn save_provider(
     org_id: &str,
@@ -61,8 +68,8 @@ pub async fn save_provider(
         provider.id = ider::generate();
     }
 
-    infra::provider::PreparedProvider::parse((&provider).into())
-        .map_err(|e| ProviderError::InvalidConfig(e.to_string()))?;
+    #[cfg(feature = "enterprise")]
+    validate_provider_config(&provider)?;
 
     // Check name uniqueness within org
     let existing = table::providers::get_all_by_org(org_id).await?;
@@ -105,8 +112,8 @@ pub async fn update_provider(
 
     provider.id = provider_id.to_string();
     provider.created_at = existing.created_at;
-    infra::provider::PreparedProvider::parse((&provider).into())
-        .map_err(|e| ProviderError::InvalidConfig(e.to_string()))?;
+    #[cfg(feature = "enterprise")]
+    validate_provider_config(&provider)?;
     table::providers::update(&provider).await?;
     publish_provider_put(&provider).await;
     Ok(provider)
