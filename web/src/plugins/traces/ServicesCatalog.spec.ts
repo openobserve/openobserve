@@ -66,7 +66,6 @@ const mockSearchObj = reactive({
       string,
       { panelTitle: string; start: number; end: number }
     >(),
-    showErrorOnly: false,
     queryEditorPlaceholderFlag: true,
     liveMode: false,
     serviceGraphVisualizationType: "tree" as "tree" | "graph",

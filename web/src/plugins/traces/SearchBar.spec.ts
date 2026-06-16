@@ -116,7 +116,6 @@ const makeSearchObj = () =>
         | "spans"
         | "service-graph"
         | "services-catalog",
-      showErrorOnly: false,
       queryEditorPlaceholderFlag: true,
       metricsRangeFilters: new Map<
         string,
