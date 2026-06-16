@@ -170,23 +170,26 @@ test.describe("Traces Regression Bugs — Batch 1", () => {
     await page.locator('body').click({ position: { x: 10, y: 10 } });
     await page.waitForTimeout(300);
 
-    // Focus Monaco via its hidden textarea (.inputarea) — clicking .view-lines
-    // (the display div) does not route keyboard input to the editor model.
-    // Use Monaco's own trigger API to simulate typing, which fires the
-    // autocomplete provider and updates the editor model.
+    // page.keyboard.type() cannot route input to Monaco because Monaco
+    // listens on a hidden <textarea> (.inputarea) positioned off-screen,
+    // not on the visible .view-lines div. Use Monaco's own trigger API to
+    // simulate typed characters — this correctly updates the editor model
+    // and fires the autocomplete provider.
     const editorId = 'traces-query-editor';
-    await page.evaluate(({ editorId }) => {
+    const editorFound = await page.evaluate(({ editorId }) => {
       const w = /** @type {any} */ (window);
       const editors = w.monaco?.editor?.getEditors?.();
-      if (!editors?.length) return;
+      if (!editors?.length) throw new Error('No Monaco editors found on page');
       const target = editors.find(e => {
         const node = e.getDomNode?.();
         return node && node.closest(`#${editorId}`);
       }) || editors[0];
-      if (!target) return;
+      if (!target) throw new Error(`Monaco editor with id "${editorId}" not found`);
       target.focus();
       target.trigger('keyboard', 'type', { text: 'select ' });
+      return true;
     }, { editorId });
+    expect(editorFound, 'Monaco editor must be found and receive input').toBe(true);
     await page.waitForTimeout(800);
 
     // Explicitly trigger autocomplete suggestions (Ctrl+Space in Monaco)

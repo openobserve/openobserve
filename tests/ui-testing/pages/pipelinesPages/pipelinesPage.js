@@ -154,9 +154,12 @@ export class PipelinesPage {
         this.confirmButton = page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]');
         this.settingsMenu = page.locator('[data-test="menu-link-\\/settings-item"]');
         this.pipelineDestinationsTab = page.locator('button[data-test="pipeline-destinations-tab"]');
+        // "Add Destination" button in the pipeline destinations list
         this.destinationListAddBtn = page.locator('[data-test="pipeline-destination-list-add-btn"]');
+        // Destination type selection cards (prefix match — use .first() to avoid strict-mode violations)
         this.destinationTypeCard = page.locator('[data-test^="destination-type-card-"]');
         this.searchInput = page.locator('[data-test="destination-list-search-input"]');
+        // OToast notifications — data-test-variant is emitted by OToastProvider
         this.toastError = page.locator('[data-test-variant="error"]');
         this.toastSuccess = page.locator('[data-test-variant="success"]');
         this.functionNameInput = page.locator('[data-test="add-function-name-input"]');
@@ -329,7 +332,10 @@ export class PipelinesPage {
     }
 
     async addPipeline() {
-        // Wait for the add pipeline button to be visible
+        // Wait for the add pipeline button to be visible.
+        // Reduced from 30s to 15s — slowMo:500 in serial mode amplifies
+        // cascading delays when the page doesn't load, and 15s is still
+        // generous enough for CI variance.
         await this.addPipelineButton.waitFor({ state: 'visible', timeout: 15000 });
         await this.addPipelineButton.click();
     }
