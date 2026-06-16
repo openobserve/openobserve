@@ -156,12 +156,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="tw:flex tw:items-center tw:gap-3 tw:shrink-0"
         >
           <h4 class="tw:text-sm tw:font-semibold tw:m-0 tw:opacity-70">View by:</h4>
-          <OToggleGroup v-model="activeSubject" type="single" size="sm">
+          <OToggleGroup v-model="activeSubject" type="single" size="sm" class="tw:h-7!">
             <OToggleGroupItem
               v-for="chip in subjectChips"
               :key="chip.key"
               :value="chip.key"
               :disabled="chip.disabled"
+              class="tw:h-5.5!"
               :data-test="`correlation-dashboard-subject-toggle-${chip.key}`"
             >
               {{ getSubjectButtonLabel(chip.key) }}
@@ -730,12 +731,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <OSeparator vertical class="tw:my-2" />
         <span class="tw:text-2! tw:m-0 tw:opacity-70">View by:</span>
-        <OToggleGroup v-model="activeSubject" type="single" size="xs">
+        <OToggleGroup v-model="activeSubject" type="single" size="xs" class="tw:h-7!">
           <OToggleGroupItem
             v-for="chip in subjectChips"
             :key="chip.key"
             :value="chip.key"
             size="sm"
+            class="tw:h-5.5!"
             :disabled="chip.disabled"
             :data-test="`correlation-dashboard-subject-toggle-${chip.key}`"
           >
