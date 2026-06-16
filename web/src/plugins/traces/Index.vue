@@ -1015,10 +1015,20 @@ async function getQueryData(
         : "start_time";
     })();
 
+    // Spans are physically stored sorted by the timestamp column, and the
+    // backend has a dedicated optimizer for timestamp-sorted segments. A span's
+    // `start_time` is monotonically equivalent to the timestamp column, so
+    // ordering by the timestamp column yields the same visible order while
+    // avoiding the costly full re-sort that `ORDER BY start_time` forces.
+    const orderByCol =
+      validSortCol === "start_time"
+        ? store.state.zoConfig.timestamp_column
+        : validSortCol;
+
     const spansQueryReq = (() => {
       if (!isSpansMode) return null;
       const whereClause = combinedFilter ? ` WHERE ${combinedFilter}` : "";
-      const spansSql = `SELECT * FROM "${selectedStreamName.value}"${whereClause} ORDER BY ${validSortCol} ${sortOrd}`;
+      const spansSql = `SELECT * FROM "${selectedStreamName.value}"${whereClause} ORDER BY ${orderByCol} ${sortOrd}`;
       return {
         query: {
           sql: b64EncodeUnicode(spansSql),
