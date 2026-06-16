@@ -2813,19 +2813,18 @@ export default defineComponent({
 }
 
 .scroll-content {
-  width: 100%; /* Use the full width of the parent */
-  overflow-y: auto; /* Enable vertical scrolling for long content */
-  padding: 10px; /* Optional: padding for aesthetics */
-  border: 1px solid #ddd; /* Optional: border for visibility */
+  width: 100%;
+  overflow-y: auto;
+  padding: 0.625rem;
+  border: 1px solid var(--o2-border-color);
   height: 100%;
   max-height: 200px;
-  /* Use the full height of the parent */
   text-wrap: normal;
-  background-color: #e8e8e8;
-  color: black;
+  background-color: var(--o2-muted-background);
+  color: var(--o2-text-primary);
 }
 .expanded-sql {
-  border-left: #7a54a2 3px solid;
+  border-left: 3px solid var(--o2-primary-color);
 }
 .alert-name-tooltip {
   max-width: 400px;
@@ -2856,12 +2855,12 @@ export default defineComponent({
 
     :deep(.rum-tab) {
       &:hover {
-        background: #464646;
+        background: var(--o2-hover-gray);
       }
 
       &.active {
-        background: #5960b2;
-        color: #ffffff !important;
+        background: var(--o2-primary-color);
+        color: var(--o2-primary-foreground) !important;
       }
     }
   }
@@ -2871,7 +2870,7 @@ export default defineComponent({
   height: fit-content;
 
   :deep(.rum-tabs) {
-    border: 1px solid #eaeaea;
+    border: 1px solid var(--o2-border-color);
     height: fit-content;
     border-radius: 4px;
     overflow: hidden;
@@ -2883,12 +2882,12 @@ export default defineComponent({
     border: none !important;
 
     &:hover {
-      background: #eaeaea;
+      background: var(--o2-hover-gray);
     }
 
     &.active {
-      background: #5960b2;
-      color: #ffffff !important;
+      background: var(--o2-primary-color);
+      color: var(--o2-primary-foreground) !important;
     }
   }
 }

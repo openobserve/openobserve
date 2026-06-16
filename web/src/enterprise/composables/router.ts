@@ -21,8 +21,6 @@ import BillingGroup from "@/enterprise/components/billings/BillingGroup.vue";
 import AzureMarketplaceSetup from "@/views/AzureMarketplaceSetup.vue";
 import AwsMarketplaceSetup from "@/views/AwsMarketplaceSetup.vue";
 import OnlineEvals from "@/enterprise/components/OnlineEvals.vue";
-import EvalTemplateList from "@/enterprise/components/EvalTemplateList.vue";
-import EvalTemplateEditor from "@/enterprise/components/EvalTemplateEditor.vue";
 import { routeGuard } from "@/utils/zincutils";
 
 const AIObservabilityShell = () =>
@@ -137,42 +135,7 @@ const useEnvRoutes = () => {
     },
   ];
 
-  // Child routes to merge under pipeline/pipelines path
-  const pipelineChildren = [
-    {
-      path: "online-evals",
-      redirect: { name: "aiEvaluations" },
-    },
-    {
-      path: "eval-templates",
-      name: "evalTemplates",
-      component: EvalTemplateList,
-      meta: {
-        title: "Evaluation Templates",
-        keepAlive: false,
-      },
-    },
-    {
-      path: "eval-templates/add",
-      name: "evalTemplatesAdd",
-      component: EvalTemplateEditor,
-      meta: {
-        title: "Create Evaluation Template",
-        keepAlive: false,
-      },
-    },
-    {
-      path: "eval-templates/:id/edit",
-      name: "evalTemplatesEdit",
-      component: EvalTemplateEditor,
-      meta: {
-        title: "Edit Evaluation Template",
-        keepAlive: false,
-      },
-    },
-  ];
-
-  return { parentRoutes, homeChildRoutes, pipelineChildren };
+  return { parentRoutes, homeChildRoutes };
 };
 
 export default useEnvRoutes;

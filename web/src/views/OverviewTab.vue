@@ -853,24 +853,18 @@ watch(isIncidentsEnabled, (enabled) => {
   }
 
   &.ov-row-critical {
-    border-left: 0.1875em solid #ef4444;
-    .ov-row-icon {
-      color: #ef4444;
-    }
+    border-left: 0.1875em solid var(--o2-negative);
+    .ov-row-icon { color: var(--o2-negative); }
   }
 
   &.ov-row-warning {
-    border-left: 0.1875em solid #f59e0b;
-    .ov-row-icon {
-      color: #f59e0b;
-    }
+    border-left: 0.1875em solid var(--o2-warning);
+    .ov-row-icon { color: var(--o2-warning); }
   }
 
   &.ov-row-info {
-    border-left: 0.1875em solid #3b82f6;
-    .ov-row-icon {
-      color: #3b82f6;
-    }
+    border-left: 0.1875em solid var(--o2-status-info-text);
+    .ov-row-icon { color: var(--o2-status-info-text); }
   }
 }
 
@@ -916,7 +910,7 @@ watch(isIncidentsEnabled, (enabled) => {
   align-items: center;
   gap: 0.125em;
   padding: 0.125em 0.5em;
-  border-radius: 0.375em;
+  border-radius: 0.75em;
   font-size: 0.6875em;
   font-weight: 600;
   margin: 0 0.125em;
@@ -931,111 +925,18 @@ watch(isIncidentsEnabled, (enabled) => {
   }
 }
 
-.badge-blue {
-  border: 0.0625em solid #1d4ed8;
-}
-.badge-green {
-  border: 0.0625em solid #065f46;
-}
-.badge-yellow {
-  border: 0.0625em solid #92400e;
-}
-.badge-pink {
-  border: 0.0625em solid #9f1239;
-}
-.badge-purple {
-  border: 0.0625em solid #7c3aed;
-}
-.badge-orange {
-  border: 0.0625em solid #c2410c;
-}
-.badge-cyan {
-  border: 0.0625em solid #0e7490;
-}
-.badge-indigo {
-  border: 0.0625em solid #4f46e5;
-}
-.badge-teal {
-  border: 0.0625em solid #0f766e;
-}
-.badge-red {
-  border: 0.0625em solid #dc2626;
-}
-.badge-gray {
-  border: 0.0625em solid #4b5563;
-}
-.badge-amber {
-  border: 0.0625em solid #d97706;
-}
-
-body.body--dark {
-  .badge-blue {
-    border-color: #93c5fd;
-  }
-  .badge-green {
-    border-color: #6ee7b7;
-  }
-  .badge-yellow {
-    border-color: #fcd34d;
-  }
-  .badge-pink {
-    border-color: #f9a8d4;
-  }
-  .badge-purple {
-    border-color: #c4b5fd;
-  }
-  .badge-orange {
-    border-color: #fdba74;
-  }
-  .badge-cyan {
-    border-color: #67e8f9;
-  }
-  .badge-indigo {
-    border-color: #a5b4fc;
-  }
-  .badge-teal {
-    border-color: #5eead4;
-  }
-  .badge-red {
-    border-color: #fca5a5;
-  }
-  .badge-gray {
-    border-color: #9ca3af;
-  }
-  .badge-amber {
-    border-color: #fcd34d;
-  }
-
-  .ov-flag-error {
-    background: #401a1a;
-    color: #f9cbcb;
-    border-color: rgba(239, 68, 68, 0.35);
-  }
-  .ov-flag-latency {
-    background: #402a10;
-    color: #fcd34d;
-    border-color: rgba(245, 158, 11, 0.35);
-  }
-
-  .ov-badge-firing {
-    background: #401a1a;
-    color: #fca5a5;
-  }
-  .ov-badge-error {
-    background: #401f10;
-    color: #fdba74;
-  }
-  .ov-badge-failed {
-    background: #401a1a;
-    color: #f9cbcb;
-  }
-
-  .ov-fail-count {
-    color: #f9cbcb;
-    background: #401a1a;
-    border-color: rgba(239, 68, 68, 0.35);
-  }
-}
+.badge-blue   { border: 0.0625em solid var(--o2-status-info-text); }
+.badge-green  { border: 0.0625em solid var(--o2-positive); }
+.badge-yellow { border: 0.0625em solid var(--o2-warning); }
+.badge-pink   { border: 0.0625em solid var(--o2-negative); }
+.badge-purple { border: 0.0625em solid var(--o2-primary-color); }
+.badge-orange { border: 0.0625em solid var(--o2-status-warning-text); }
+.badge-cyan   { border: 0.0625em solid var(--o2-positive); }
+.badge-indigo { border: 0.0625em solid var(--o2-theme-color); }
+.badge-teal   { border: 0.0625em solid var(--o2-positive); }
+.badge-red    { border: 0.0625em solid var(--o2-negative); }
+.badge-gray   { border: 0.0625em solid var(--o2-border-color); }
+.badge-amber  { border: 0.0625em solid var(--o2-warning); }
 
 /* ── Severity badge ── */
 .ov-severity-badge {
@@ -1047,48 +948,24 @@ body.body--dark {
   letter-spacing: 0.04em;
 
   &.ov-sev-p1 {
-    background: #fef2f2;
-    color: #b91c1c;
-    border: 0.0625em solid #fca5a5;
+    background: var(--o2-status-error-bg);
+    color: var(--o2-status-error-text);
+    border: 0.0625em solid var(--o2-negative);
   }
   &.ov-sev-p2 {
-    background: #fff7ed;
-    color: #c2410c;
-    border: 0.0625em solid #fdba74;
+    background: var(--o2-status-warning-bg);
+    color: var(--o2-status-warning-text);
+    border: 0.0625em solid var(--o2-warning);
   }
   &.ov-sev-p3 {
-    background: #fefce8;
-    color: #a16207;
-    border: 0.0625em solid #fde047;
+    background: var(--o2-status-warning-bg);
+    color: var(--o2-status-warning-text);
+    border: 0.0625em solid var(--o2-warning);
   }
   &.ov-sev-p4 {
-    background: #f0f9ff;
-    color: #0369a1;
-    border: 0.0625em solid #7dd3fc;
-  }
-}
-
-/* Dark mode severity badges */
-:root.body--dark {
-  .ov-sev-p1 {
-    background: rgba(239, 68, 68, 0.15);
-    color: #fca5a5;
-    border-color: rgba(239, 68, 68, 0.3);
-  }
-  .ov-sev-p2 {
-    background: rgba(249, 115, 22, 0.15);
-    color: #fdba74;
-    border-color: rgba(249, 115, 22, 0.3);
-  }
-  .ov-sev-p3 {
-    background: rgba(234, 179, 8, 0.15);
-    color: #fde047;
-    border-color: rgba(234, 179, 8, 0.3);
-  }
-  .ov-sev-p4 {
-    background: rgba(59, 130, 246, 0.15);
-    color: #7dd3fc;
-    border-color: rgba(59, 130, 246, 0.3);
+    background: var(--o2-status-info-bg);
+    color: var(--o2-status-info-text);
+    border: 0.0625em solid var(--o2-status-info-text);
   }
 }
 
@@ -1107,13 +984,13 @@ body.body--dark {
   transition: background 0.15s;
 
   &.ov-svc-degraded {
-    border-left: 0.1875em solid #ef4444;
+    border-left: 0.1875em solid var(--o2-negative);
   }
   &.ov-svc-warn {
-    border-left: 0.1875em solid #f59e0b;
+    border-left: 0.1875em solid var(--o2-warning);
   }
   &.ov-svc-healthy {
-    border-left: 0.1875em solid #22c55e;
+    border-left: 0.1875em solid var(--o2-positive);
   }
 
   cursor: pointer;
@@ -1165,15 +1042,15 @@ body.body--dark {
 }
 
 .ov-flag-error {
-  background: rgba(239, 68, 68, 0.12);
-  color: #ef4444;
-  border: 0.0625em solid rgba(239, 68, 68, 0.25);
+  background: var(--o2-status-error-bg);
+  color: var(--o2-status-error-text);
+  border: 0.0625em solid var(--o2-negative);
 }
 
 .ov-flag-latency {
-  background: rgba(245, 158, 11, 0.12);
-  color: #d97706;
-  border: 0.0625em solid rgba(245, 158, 11, 0.25);
+  background: var(--o2-status-warning-bg);
+  color: var(--o2-status-warning-text);
+  border: 0.0625em solid var(--o2-warning);
 }
 
 .ov-svc-req {
@@ -1231,16 +1108,16 @@ body.body--dark {
   letter-spacing: 0.03em;
 
   &.ov-badge-firing {
-    background: rgba(239, 68, 68, 0.12);
-    color: #ef4444;
+    background: var(--o2-status-error-bg);
+    color: var(--o2-status-error-text);
   }
   &.ov-badge-error {
-    background: rgba(249, 115, 22, 0.12);
-    color: #c2410c;
+    background: var(--o2-status-warning-bg);
+    color: var(--o2-status-warning-text);
   }
   &.ov-badge-failed {
-    background: rgba(239, 68, 68, 0.18);
-    color: #b91c1c;
+    background: var(--o2-status-error-bg);
+    color: var(--o2-status-error-text);
     font-weight: 700;
   }
 }
@@ -1267,9 +1144,9 @@ body.body--dark {
   flex-shrink: 0;
   font-size: 0.6875rem;
   font-weight: 700;
-  color: #b91c1c;
-  background: rgba(239, 68, 68, 0.1);
-  border: 0.0625em solid rgba(239, 68, 68, 0.25);
+  color: var(--o2-status-error-text);
+  background: var(--o2-status-error-bg);
+  border: 0.0625em solid var(--o2-negative);
   border-radius: 0.75rem;
   padding: 0.1rem 0.4rem;
   white-space: nowrap;
@@ -1320,15 +1197,15 @@ body.body--dark {
   border-radius: 0.5rem;
   transition: background-color 150ms, color 150ms;
 }
-.ov-action-card__icon--blue   { background: color-mix(in srgb, #3b82f6 12%, transparent); color: #3b82f6; }
-.ov-action-card__icon--purple { background: color-mix(in srgb, #8b5cf6 12%, transparent); color: #8b5cf6; }
-.ov-action-card__icon--orange { background: color-mix(in srgb, #f59e0b 12%, transparent); color: #d97706; }
+.ov-action-card__icon--blue   { background: var(--o2-status-info-bg);    color: var(--o2-status-info-text); }
+.ov-action-card__icon--purple { background: var(--o2-status-info-bg);    color: var(--o2-status-info-text); }
+.ov-action-card__icon--orange { background: var(--o2-status-warning-bg); color: var(--o2-status-warning-text); }
 .ov-action-card:hover .ov-action-card__icon,
 .ov-action-card:hover .ov-action-card__icon--blue,
 .ov-action-card:hover .ov-action-card__icon--purple,
 .ov-action-card:hover .ov-action-card__icon--orange {
-  background: var(--color-primary-600);
-  color: #fff;
+  background: var(--o2-primary-color);
+  color: var(--o2-primary-foreground);
 }
 
 .ov-action-card__body {
@@ -1367,11 +1244,6 @@ body.body--dark {
   flex-direction: column;
   gap: 0.5rem;
   padding: 0.5rem 0;
-  /* The app's default skeleton base is grey-200 (#e5e5e5), but the Usage tab's
-     skeleton renders on the lighter grey-100 (#f5f5f5). Override the token here
-     so the Overview skeleton reads the same shade as Usage. OSkeleton picks this
-     up via its bg-skeleton-base (= var(--color-skeleton-base)). */
-  --color-skeleton-base: var(--color-grey-100);
 }
 
 /* Height only — OSkeleton provides the surface, rounding and wave shimmer. */

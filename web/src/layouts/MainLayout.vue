@@ -335,11 +335,14 @@ export default defineComponent({
     });
 
     // Backend `/config` flag `online_evals_enabled` — controlled by
-    // `ZO_ONLINE_EVALS_ENABLED`. Reactive so the menu picks it up regardless
+    // enterprise `O2_ONLINE_EVALS_ENABLED`. Reactive so the menu picks it up regardless
     // of whether the config response arrived before or after this component
     // mounted.
     const isOnlineEvalsEnabled = computed(() => {
-      return Boolean(store.state.zoConfig?.online_evals_enabled);
+      return (
+        (config.isEnterprise == "true" || config.isCloud == "true") &&
+        Boolean(store.state.zoConfig?.online_evals_enabled)
+      );
     });
 
     const orgOptions = ref([{ label: Number, value: String }]);

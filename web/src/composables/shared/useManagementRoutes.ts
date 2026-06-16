@@ -92,6 +92,22 @@ const useManagementRoutes = () => {
       ],
     },
   ];
+  // LLM Providers (used by the AI Observability / Online Evals flows) is an
+  // enterprise/cloud-only feature — not available in OSS builds.
+  if (config.isEnterprise == "true" || config.isCloud == "true") {
+    routes[0].children.push({
+      path: "llm_providers",
+      name: "llmProviders",
+      component: () =>
+        import("@/components/settings/LlmProvidersSettings.vue"),
+      meta: {
+        title: "LLM Providers",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    });
+  }
   if (config.isEnterprise == "true") {
     routes[0].children.push(
       ...[
@@ -150,18 +166,6 @@ const useManagementRoutes = () => {
             import("@/components/settings/OrgStorageSettings.vue"),
           meta: {
             title: "Storage Settings",
-          },
-          beforeEnter(to: any, from: any, next: any) {
-            routeGuard(to, from, next);
-          },
-        },
-        {
-          path: "llm_providers",
-          name: "llmProviders",
-          component: () =>
-            import("@/components/settings/LlmProvidersSettings.vue"),
-          meta: {
-            title: "LLM Providers",
           },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);

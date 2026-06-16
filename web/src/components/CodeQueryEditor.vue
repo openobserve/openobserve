@@ -61,8 +61,13 @@ import {
 let monaco: any = null;
 const loadMonaco = async () => {
   if (!monaco) {
-    await import("monaco-editor/esm/vs/editor/editor.all.js");
+    // editor.api must be imported first — it bootstraps StandaloneServices (the
+    // Monaco DI container). Importing editor.all.js before api causes feature
+    // contributions (ICodeLensCache, ISuggestMemories, actionWidgetService, etc.)
+    // to register against an uninitialised container, producing "[createInstance]
+    // X depends on UNKNOWN service" errors that silently degrade intellisense.
     monaco = await import("monaco-editor/esm/vs/editor/editor.api");
+    await import("monaco-editor/esm/vs/editor/editor.all.js");
   }
   return monaco;
 };
@@ -341,17 +346,6 @@ export default defineComponent({
         kind: "Text",
         insertText: (_keyword: string) =>
           `str_match_ignore_case(fieldname, '${_keyword}')`,
-      },
-      {
-        label: (_keyword: string) => `fuzzy_match(fieldname, '${_keyword}', 1)`,
-        kind: "Text",
-        insertText: (_keyword: string) =>
-          `fuzzy_match(fieldname, '${_keyword}', 1)`,
-      },
-      {
-        label: (_keyword: string) => `fuzzy_match_all('${_keyword}', 1)`,
-        kind: "Text",
-        insertText: (_keyword: string) => `fuzzy_match_all('${_keyword}', 1)`,
       },
     ];
 
@@ -1487,6 +1481,7 @@ export default defineComponent({
      width and goes flush again at 2+ digits. automaticLayout measures the
      content box, so the editor adapts to the reduced width. */
   padding-left: 0.5rem;
+  background-color: var(--o2-card-bg);
   .monaco-editor,
   .monaco-editor .monaco-editor {
     padding: 0px 0px 0px 0px !important;

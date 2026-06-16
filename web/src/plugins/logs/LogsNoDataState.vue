@@ -63,25 +63,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("logs.noData.or") }}
         </span>
         <EmptyStateIngestionChip
-          icon="layers"
           data-test="logs-no-data-kubernetes-btn"
           @click="go('ingestFromKubernetes')"
-        >{{ t("logs.noData.kubernetes") }}</EmptyStateIngestionChip>
+        >
+          <img :src="getImageURL('images/common/kubernetes.svg')" class="tw:w-3.5 tw:h-3.5 tw:shrink-0 tw:object-contain" alt="" />
+          {{ t("logs.noData.kubernetes") }}
+        </EmptyStateIngestionChip>
         <EmptyStateIngestionChip
-          icon="cloud"
           data-test="logs-no-data-aws-btn"
           @click="go('AWSConfig')"
-        >{{ t("logs.noData.aws") }}</EmptyStateIngestionChip>
+        >
+          <img :src="getImageURL('images/ingestion/aws.svg')" class="tw:w-3.5 tw:h-3.5 tw:shrink-0 tw:object-contain" alt="" />
+          {{ t("logs.noData.aws") }}
+        </EmptyStateIngestionChip>
         <EmptyStateIngestionChip
-          icon="dns"
           data-test="logs-no-data-linux-btn"
           @click="go('ingestFromLinux')"
-        >{{ t("logs.noData.linux") }}</EmptyStateIngestionChip>
+        >
+          <img :src="getImageURL('images/common/linux.svg')" class="tw:w-3.5 tw:h-3.5 tw:shrink-0 tw:object-contain" alt="" />
+          {{ t("logs.noData.linux") }}
+        </EmptyStateIngestionChip>
         <EmptyStateIngestionChip
-          icon="monitor"
           data-test="logs-no-data-windows-btn"
           @click="go('ingestFromWindows')"
-        >{{ t("logs.noData.windows") }}</EmptyStateIngestionChip>
+        >
+          <img :src="getImageURL('images/common/windows.svg')" class="tw:w-3.5 tw:h-3.5 tw:shrink-0 tw:object-contain" alt="" />
+          {{ t("logs.noData.windows") }}
+        </EmptyStateIngestionChip>
         <EmptyStateIngestionChip
           v-if="aiEnabled"
           class="ai-hover-btn"
@@ -105,6 +113,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyStateIngestionCard from "@/lib/core/EmptyState/EmptyStateIngestionCard.vue";
 import EmptyStateIngestionChip from "@/lib/core/EmptyState/EmptyStateIngestionChip.vue";
 import { useAiIcon } from "@/composables/useAiIcon";
+import { getImageURL } from "@/utils/zincutils";
 
 const props = defineProps<{
   aiEnabled: boolean;

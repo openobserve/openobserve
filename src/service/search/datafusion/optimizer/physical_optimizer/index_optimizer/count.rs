@@ -24,7 +24,9 @@ use datafusion::{
     physical_plan::{ExecutionPlan, aggregates::AggregateExec},
 };
 
-use crate::service::search::datafusion::optimizer::physical_optimizer::index_optimizer::utils::is_complex_plan;
+use crate::service::search::datafusion::optimizer::physical_optimizer::{
+    index_optimizer::utils::is_complex_plan, utils::is_count_rows_aggregate,
+};
 
 #[rustfmt::skip]
 /// check if the plan is like:
@@ -70,7 +72,7 @@ impl<'n> TreeNodeVisitor<'n> for SimpleCountVisitor {
         if let Some(aggregate) = node.as_any().downcast_ref::<AggregateExec>() {
             if aggregate.group_expr().is_empty()
                 && aggregate.aggr_expr().len() == 1
-                && aggregate.aggr_expr()[0].name() == "count(Int64(1))"
+                && is_count_rows_aggregate(&aggregate.aggr_expr()[0])
             {
                 self.is_simple_count = true;
             } else {
@@ -116,7 +118,16 @@ mod tests {
                 "SELECT count(*) as cnt from t",
                 Some(IndexOptimizeMode::SimpleCount),
             ),
+            (
+                "SELECT count(_timestamp) from t",
+                Some(IndexOptimizeMode::SimpleCount),
+            ),
+            (
+                "SELECT count(_timestamp) as cnt from t",
+                Some(IndexOptimizeMode::SimpleCount),
+            ),
             ("SELECT name, count(*) as cnt from t group by name", None),
+            ("SELECT count(name) from t", None),
         ];
 
         for (sql, expected) in cases {

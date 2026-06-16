@@ -25,8 +25,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div :class="{ 'drag-allow': !viewOnly && !simplifiedPanelView }">
       <div
-        :class="store.state.theme == 'dark' ? 'dark-mode' : ''"
         class="tw:flex tw:flex-nowrap tw:items-center tw:w-full tw:min-h-7 tw:px-1"
+        :class="{ 'dark-mode': store.state.theme === 'dark' }"
         style="border-top-left-radius: 3px; border-top-right-radius: 3px"
         data-test="dashboard-panel-bar"
       >

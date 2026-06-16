@@ -808,7 +808,7 @@ mod tests {
                 deleted: false,
                 account: "test_account".to_string(),
                 id: 1,
-                segment_ids: None,
+                selection: None,
                 row_group_size: None,
             }];
 
@@ -848,7 +848,7 @@ mod tests {
                 deleted: false,
                 account: "test_account".to_string(),
                 id: 1,
-                segment_ids: None,
+                selection: None,
                 row_group_size: None,
             }];
 

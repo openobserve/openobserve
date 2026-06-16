@@ -422,7 +422,10 @@
     "menuGroupInspect": "검사",
     "validSql": "유효한 SQL",
     "invalidSql": "잘못된 쿼리",
-    "menuGroupExplain": "설명하다"
+    "menuGroupExplain": "설명하다",
+    "fieldValuesEmpty": "값을 찾을 수 없습니다.",
+    "fieldValuesEmptyHint": "값을 보려면 더 넓은 시간 범위를 사용해 보십시오.",
+    "selectLogsStreamFirst": "먼저 로그 스트림을 선택합니다."
   },
   "menu": {
     "home": "홈",
@@ -846,7 +849,10 @@
     "feature_correlation_management": "상관관계 관리",
     "feature_log_patterns": "로그 패턴",
     "environment_type": "환경 유형",
-    "license_allows_unlimited_ingestion": "현재 라이선스는 무제한 데이터 수집을 허용합니다."
+    "license_allows_unlimited_ingestion": "현재 라이선스는 무제한 데이터 수집을 허용합니다.",
+    "refresh_license_limits": "라이선스 제한 새로고침",
+    "license_refresh_success": "라이선스 한도 새로 고침이 성공적으로 트리거됨",
+    "failed_to_refresh_license": "라이선스 제한을 새로 고치지 못했습니다."
   },
   "login": {
     "userid": "사용자 ID",

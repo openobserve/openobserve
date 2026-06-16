@@ -150,7 +150,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
         :key="'pivot-rh-' + col.id"
         :rowspan="pivotHeaderLevels.length"
         :data-test="`o2-table-pivot-th-${col.id}`"
-        class="tw:px-2 tw:text-left tw:cursor-pointer tw:font-semibold tw:text-secondary tw:text-xs"
+        class="tw:px-2 tw:text-left tw:cursor-pointer tw:font-medium tw:text-secondary tw:text-xs"
         :style="getPivotRowColStyle(col.id)"
         @click="handleSort(col.id)"
       >
@@ -192,8 +192,8 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
         class="tw:px-2"
         :class="[
           level.isLeaf
-            ? 'pivot-value-header tw:text-secondary tw:text-xs tw:font-semibold'
-            : 'pivot-group-header tw:text-center tw:font-semibold tw:text-secondary tw:text-xs',
+            ? 'pivot-value-header tw:text-secondary tw:text-xs tw:font-medium'
+            : 'pivot-group-header tw:text-center tw:font-medium tw:text-secondary tw:text-xs',
           {
             'tw:border-l tw:border-border-default':
               cell.hasBorder && !(stickyColTotals && cell._isTotalHeader),
@@ -294,7 +294,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
         :rowspan="header.rowSpan"
         :data-test="`o2-table-th-${header.id}`"
         :class="[
-          `${headerPaddingClass(header)} tw:text-left tw:font-semibold tw:text-table-header-text tw:text-xs tw:select-none tw:relative`,
+          `${headerPaddingClass(header)} tw:text-left tw:font-medium tw:text-table-header-text tw:text-xs tw:select-none tw:relative`,
           'table-head',
           dense ? 'tw:h-8' : 'tw:h-9',
           'tw:border-b tw:border-[var(--color-table-header-border)]',
@@ -438,7 +438,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
         :key="header.id"
         :data-test="`o2-table-th-${header.id}`"
         :class="[
-          `${headerPaddingClass(header)} tw:text-left tw:font-semibold tw:text-table-header-text tw:text-xs tw:select-none tw:relative`,
+          `${headerPaddingClass(header)} tw:text-left tw:font-medium tw:text-table-header-text tw:text-xs tw:select-none tw:relative`,
           dense ? 'tw:h-8 tw:group' : 'tw:h-9 tw:group',
           'tw:border-b tw:border-[var(--color-table-header-border)]',
           header.column.getIsPinned?.() ? 'tw:bg-[var(--color-table-header-bg)]' : '',

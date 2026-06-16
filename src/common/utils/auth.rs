@@ -109,6 +109,19 @@ pub fn is_ofga_unsupported(name: &str) -> bool {
     RE_OFGA_UNSUPPORTED_NAME.is_match(name)
 }
 
+#[cfg(feature = "enterprise")]
+pub(crate) fn is_ofga_object_visible(
+    org_id: &str,
+    object_type: &str,
+    object_id: &str,
+    permitted_objects: Option<&[String]>,
+) -> bool {
+    permitted_objects.is_none_or(|permitted_objects| {
+        permitted_objects.contains(&format!("{object_type}:{object_id}"))
+            || permitted_objects.contains(&format!("{object_type}:_all_{org_id}"))
+    })
+}
+
 pub(crate) fn get_hash(pass: &str, salt: &str) -> String {
     let key = format!("{pass}{salt}");
     let hash = PASSWORD_HASH.get(&key);

@@ -304,7 +304,7 @@ export default defineComponent({
             const remainingCount = selectedValue.value.length - 2;
             return `${firstTwoValues} ...+${remainingCount} more`;
           } else if (
-            props.variableItem.options.length === 0 &&
+            props?.variableItem?.options?.length === 0 &&
             selectedValue.value.length === 0
           ) {
             return "(No Data Found)";

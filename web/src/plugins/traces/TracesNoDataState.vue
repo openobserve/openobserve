@@ -51,25 +51,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("traces.noData.or") }}
         </span>
         <EmptyStateIngestionChip
-          icon="layers"
           data-test="traces-no-data-kubernetes-btn"
           @click="go('ingestFromKubernetes')"
-        >{{ t("traces.noData.kubernetes") }}</EmptyStateIngestionChip>
+        >
+          <img :src="getImageURL('images/common/kubernetes.svg')" class="tw:w-3.5 tw:h-3.5 tw:shrink-0 tw:object-contain" alt="" />
+          {{ t("traces.noData.kubernetes") }}
+        </EmptyStateIngestionChip>
         <EmptyStateIngestionChip
-          icon="code"
           data-test="traces-no-data-python-btn"
           @click="go('python')"
-        >{{ t("traces.noData.python") }}</EmptyStateIngestionChip>
+        >
+          <img :src="getImageURL('images/ingestion/python.svg')" class="tw:w-3.5 tw:h-3.5 tw:shrink-0 tw:object-contain" alt="" />
+          {{ t("traces.noData.python") }}
+        </EmptyStateIngestionChip>
         <EmptyStateIngestionChip
-          icon="code"
-          data-test="traces-no-data-java-btn"
-          @click="go('java')"
-        >{{ t("traces.noData.java") }}</EmptyStateIngestionChip>
-        <EmptyStateIngestionChip
-          icon="code"
           data-test="traces-no-data-nodejs-btn"
           @click="go('nodejs')"
-        >{{ t("traces.noData.nodejs") }}</EmptyStateIngestionChip>
+        >
+          <img :src="getImageURL('images/ingestion/nodejs.svg')" class="tw:w-3.5 tw:h-3.5 tw:shrink-0 tw:object-contain" alt="" />
+          {{ t("traces.noData.nodejs") }}
+        </EmptyStateIngestionChip>
         <EmptyStateIngestionChip
           v-if="aiEnabled"
           class="ai-hover-btn"
@@ -93,6 +94,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyStateIngestionCard from "@/lib/core/EmptyState/EmptyStateIngestionCard.vue";
 import EmptyStateIngestionChip from "@/lib/core/EmptyState/EmptyStateIngestionChip.vue";
 import { useAiIcon } from "@/composables/useAiIcon";
+import { getImageURL } from "@/utils/zincutils";
 
 const props = defineProps<{ aiEnabled: boolean }>();
 const emit = defineEmits<{ "ask-ai": [] }>();

@@ -121,4 +121,36 @@ describe("OTable flex column width", () => {
     // The invisible spacer must be 0 in the fill state — no trailing gap.
     expect(headerVar(wrapper, "--spacer--")).toBe(0);
   });
+
+  // Regression: in the FILL state (before any resize), when the columns can't
+  // fit even at their min widths the table must scroll horizontally instead of
+  // clipping the trailing columns (table-fixed otherwise grows past 100% and
+  // the overflow is hidden).
+  it("fill state: enables horizontal scroll when columns overflow the container", async () => {
+    const wrapper = mount(OTable, {
+      props: {
+        data, columns,
+        selection: "multiple",
+        showIndex: true,
+        enableColumnResize: true,
+        defaultColumns: false,
+        tableId: "flexdiag3",
+      } as any,
+    });
+    await flushPromises();
+    const st: any = (wrapper.vm.$ as any).setupState;
+
+    // Wide container: fixed (272) + flex min (160) = 432 < 1000 → fills, no scroll.
+    st.containerWidth = 1000;
+    await flushPromises();
+    expect(st.frozen).toBe(false);
+    expect(st.allowHorizontalScroll).toBe(false);
+
+    // Narrow container: 432 > 400 → even at min widths the columns overflow, so
+    // the scroll container must expose a horizontal scrollbar.
+    st.containerWidth = 400;
+    await flushPromises();
+    expect(st.frozen).toBe(false);
+    expect(st.allowHorizontalScroll).toBe(true);
+  });
 });

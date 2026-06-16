@@ -361,7 +361,12 @@ export const convertPromQLData = async (
   // Skip rotation and truncation for time-based x-axis
   // PromQL always uses time-series data, so no rotation/truncation calculations needed
   const additionalBottomSpace = 0;
-  const dynamicXAxisNameGap = 25;
+  // nameGap is the distance from the axis line to the middle-anchored axis name.
+  // The time tick labels occupy ~22px below the axis line (margin + fontSize), so a
+  // gap of 25 placed the bold axis name on top of the labels (and, with a bottom
+  // legend, on top of the legend). 35 lets the name sit clearly below the labels.
+  const dynamicXAxisNameGap = 35;
+  const hasXAxisName = !!panelSchema.queries?.[0]?.fields?.x?.[0]?.label;
 
   const options: any = {
     backgroundColor: "transparent",
@@ -373,6 +378,11 @@ export const convertPromQLData = async (
       right: 20,
       top: "15",
       bottom: (() => {
+        // Reserve space below the plot for: tick labels, the axis name (when present)
+        // and — for a horizontal bottom legend — the legend row. Without the axis name
+        // the original tight values are kept; with it we add ~25px so "Time" clears
+        // both the labels above and the legend below it.
+        const nameReserve = hasXAxisName ? 25 : 0;
         const baseBottom =
           legendConfig.orient === "horizontal" && panelSchema.config?.show_legends
             ? panelSchema.config?.axis_width == null
@@ -381,7 +391,7 @@ export const convertPromQLData = async (
             : panelSchema.config?.axis_width == null
               ? 5
               : 25;
-        return baseBottom + additionalBottomSpace;
+        return baseBottom + additionalBottomSpace + nameReserve;
       })(),
     },
     tooltip: {

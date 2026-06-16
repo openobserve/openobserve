@@ -70,5 +70,10 @@ tests/ui-testing/.env.old
 /test-assist-results/
 /tests/ui-testing/test-output/
 **/debug-login-page.png
-/.opencode
+# OpenCode: ignore everything under .opencode EXCEPT the CI council agent set,
+# which the e2e-council workflow needs available in a fresh CI checkout.
+/.opencode/*
+!/.opencode/agents/
+/.opencode/agents/*
+!/.opencode/agents/e2e_ci_council_of_agents/
 /tests/ux-audit/*
