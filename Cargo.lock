@@ -6259,28 +6259,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1d87ecb2933e8aeadb3e3a02b828fed80a7528047e68b4f424523a0981a3a084"
 
 [[package]]
-name = "multiversion"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7edb7f0ff51249dfda9ab96b5823695e15a052dc15074c9dbf3d118afaf2c201"
-dependencies = [
- "multiversion-macros",
- "target-features",
-]
-
-[[package]]
-name = "multiversion-macros"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b093064383341eb3271f42e381cb8f10a01459478446953953c75d24bd339fc0"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.117",
- "target-features",
-]
-
-[[package]]
 name = "munge"
 version = "0.4.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10552,12 +10530,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "55937e1799185b12863d447f42597ed69d9928686b8d88a1df17376a097d8369"
 
 [[package]]
-name = "target-features"
-version = "0.1.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c1bbb9f3c5c463a01705937a24fdabc5047929ac764b2d5b9cf681c1f5041ed5"
-
-[[package]]
 name = "target-lexicon"
 version = "0.13.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -11567,7 +11539,7 @@ dependencies = [
 [[package]]
 name = "vortex"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?branch=develop#c6a0b7b5cce84f472029e2daf7bbd80ec4c941f1"
+source = "git+https://github.com/openobserve/vortex?branch=0.75.0-fix#120c122e211b4dfd0bfc97231d3a27825a6d25d2"
 dependencies = [
  "vortex-alp",
  "vortex-array",
@@ -11601,7 +11573,7 @@ dependencies = [
 [[package]]
 name = "vortex-alp"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?branch=develop#c6a0b7b5cce84f472029e2daf7bbd80ec4c941f1"
+source = "git+https://github.com/openobserve/vortex?branch=0.75.0-fix#120c122e211b4dfd0bfc97231d3a27825a6d25d2"
 dependencies = [
  "itertools 0.14.0",
  "num-traits",
@@ -11619,7 +11591,7 @@ dependencies = [
 [[package]]
 name = "vortex-array"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?branch=develop#c6a0b7b5cce84f472029e2daf7bbd80ec4c941f1"
+source = "git+https://github.com/openobserve/vortex?branch=0.75.0-fix#120c122e211b4dfd0bfc97231d3a27825a6d25d2"
 dependencies = [
  "arc-swap",
  "arcref",
@@ -11643,7 +11615,6 @@ dependencies = [
  "inventory",
  "itertools 0.14.0",
  "jiff",
- "multiversion",
  "num-traits",
  "num_enum",
  "parking_lot 0.12.5",
@@ -11671,7 +11642,7 @@ dependencies = [
 [[package]]
 name = "vortex-array-macros"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?branch=develop#c6a0b7b5cce84f472029e2daf7bbd80ec4c941f1"
+source = "git+https://github.com/openobserve/vortex?branch=0.75.0-fix#120c122e211b4dfd0bfc97231d3a27825a6d25d2"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -11681,14 +11652,12 @@ dependencies = [
 [[package]]
 name = "vortex-btrblocks"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?branch=develop#c6a0b7b5cce84f472029e2daf7bbd80ec4c941f1"
+source = "git+https://github.com/openobserve/vortex?branch=0.75.0-fix#120c122e211b4dfd0bfc97231d3a27825a6d25d2"
 dependencies = [
  "itertools 0.14.0",
  "num-traits",
  "pco",
  "rand 0.10.1",
- "rustc-hash 2.1.1",
- "tracing",
  "vortex-alp",
  "vortex-array",
  "vortex-buffer",
@@ -11698,7 +11667,6 @@ dependencies = [
  "vortex-error",
  "vortex-fastlanes",
  "vortex-fsst",
- "vortex-mask",
  "vortex-pco",
  "vortex-runend",
  "vortex-sequence",
@@ -11711,7 +11679,7 @@ dependencies = [
 [[package]]
 name = "vortex-buffer"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?branch=develop#c6a0b7b5cce84f472029e2daf7bbd80ec4c941f1"
+source = "git+https://github.com/openobserve/vortex?branch=0.75.0-fix#120c122e211b4dfd0bfc97231d3a27825a6d25d2"
 dependencies = [
  "arrow-buffer",
  "bitvec",
@@ -11724,7 +11692,7 @@ dependencies = [
 [[package]]
 name = "vortex-bytebool"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?branch=develop#c6a0b7b5cce84f472029e2daf7bbd80ec4c941f1"
+source = "git+https://github.com/openobserve/vortex?branch=0.75.0-fix#120c122e211b4dfd0bfc97231d3a27825a6d25d2"
 dependencies = [
  "num-traits",
  "vortex-array",
@@ -11737,7 +11705,7 @@ dependencies = [
 [[package]]
 name = "vortex-compressor"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?branch=develop#c6a0b7b5cce84f472029e2daf7bbd80ec4c941f1"
+source = "git+https://github.com/openobserve/vortex?branch=0.75.0-fix#120c122e211b4dfd0bfc97231d3a27825a6d25d2"
 dependencies = [
  "itertools 0.14.0",
  "num-traits",
@@ -11755,7 +11723,7 @@ dependencies = [
 [[package]]
 name = "vortex-datetime-parts"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?branch=develop#c6a0b7b5cce84f472029e2daf7bbd80ec4c941f1"
+source = "git+https://github.com/openobserve/vortex?branch=0.75.0-fix#120c122e211b4dfd0bfc97231d3a27825a6d25d2"
 dependencies = [
  "num-traits",
  "prost 0.14.3",
@@ -11769,7 +11737,7 @@ dependencies = [
 [[package]]
 name = "vortex-decimal-byte-parts"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?branch=develop#c6a0b7b5cce84f472029e2daf7bbd80ec4c941f1"
+source = "git+https://github.com/openobserve/vortex?branch=0.75.0-fix#120c122e211b4dfd0bfc97231d3a27825a6d25d2"
 dependencies = [
  "num-traits",
  "prost 0.14.3",
@@ -11783,7 +11751,7 @@ dependencies = [
 [[package]]
 name = "vortex-error"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?branch=develop#c6a0b7b5cce84f472029e2daf7bbd80ec4c941f1"
+source = "git+https://github.com/openobserve/vortex?branch=0.75.0-fix#120c122e211b4dfd0bfc97231d3a27825a6d25d2"
 dependencies = [
  "arrow-schema",
  "flatbuffers",
@@ -11795,7 +11763,7 @@ dependencies = [
 [[package]]
 name = "vortex-fastlanes"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?branch=develop#c6a0b7b5cce84f472029e2daf7bbd80ec4c941f1"
+source = "git+https://github.com/openobserve/vortex?branch=0.75.0-fix#120c122e211b4dfd0bfc97231d3a27825a6d25d2"
 dependencies = [
  "fastlanes",
  "itertools 0.14.0",
@@ -11812,7 +11780,7 @@ dependencies = [
 [[package]]
 name = "vortex-file"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?branch=develop#c6a0b7b5cce84f472029e2daf7bbd80ec4c941f1"
+source = "git+https://github.com/openobserve/vortex?branch=0.75.0-fix#120c122e211b4dfd0bfc97231d3a27825a6d25d2"
 dependencies = [
  "async-trait",
  "bytes",
@@ -11855,7 +11823,7 @@ dependencies = [
 [[package]]
 name = "vortex-flatbuffers"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?branch=develop#c6a0b7b5cce84f472029e2daf7bbd80ec4c941f1"
+source = "git+https://github.com/openobserve/vortex?branch=0.75.0-fix#120c122e211b4dfd0bfc97231d3a27825a6d25d2"
 dependencies = [
  "flatbuffers",
  "vortex-buffer",
@@ -11865,7 +11833,7 @@ dependencies = [
 [[package]]
 name = "vortex-fsst"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?branch=develop#c6a0b7b5cce84f472029e2daf7bbd80ec4c941f1"
+source = "git+https://github.com/openobserve/vortex?branch=0.75.0-fix#120c122e211b4dfd0bfc97231d3a27825a6d25d2"
 dependencies = [
  "fsst-rs",
  "prost 0.14.3",
@@ -11879,7 +11847,7 @@ dependencies = [
 [[package]]
 name = "vortex-io"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?branch=develop#c6a0b7b5cce84f472029e2daf7bbd80ec4c941f1"
+source = "git+https://github.com/openobserve/vortex?branch=0.75.0-fix#120c122e211b4dfd0bfc97231d3a27825a6d25d2"
 dependencies = [
  "async-fs",
  "async-stream",
@@ -11907,7 +11875,7 @@ dependencies = [
 [[package]]
 name = "vortex-ipc"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?branch=develop#c6a0b7b5cce84f472029e2daf7bbd80ec4c941f1"
+source = "git+https://github.com/openobserve/vortex?branch=0.75.0-fix#120c122e211b4dfd0bfc97231d3a27825a6d25d2"
 dependencies = [
  "bytes",
  "flatbuffers",
@@ -11924,7 +11892,7 @@ dependencies = [
 [[package]]
 name = "vortex-layout"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?branch=develop#c6a0b7b5cce84f472029e2daf7bbd80ec4c941f1"
+source = "git+https://github.com/openobserve/vortex?branch=0.75.0-fix#120c122e211b4dfd0bfc97231d3a27825a6d25d2"
 dependencies = [
  "arcref",
  "arrow-array",
@@ -11966,7 +11934,7 @@ dependencies = [
 [[package]]
 name = "vortex-mask"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?branch=develop#c6a0b7b5cce84f472029e2daf7bbd80ec4c941f1"
+source = "git+https://github.com/openobserve/vortex?branch=0.75.0-fix#120c122e211b4dfd0bfc97231d3a27825a6d25d2"
 dependencies = [
  "itertools 0.14.0",
  "vortex-buffer",
@@ -11976,7 +11944,7 @@ dependencies = [
 [[package]]
 name = "vortex-metrics"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?branch=develop#c6a0b7b5cce84f472029e2daf7bbd80ec4c941f1"
+source = "git+https://github.com/openobserve/vortex?branch=0.75.0-fix#120c122e211b4dfd0bfc97231d3a27825a6d25d2"
 dependencies = [
  "parking_lot 0.12.5",
  "sketches-ddsketch",
@@ -11985,7 +11953,7 @@ dependencies = [
 [[package]]
 name = "vortex-pco"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?branch=develop#c6a0b7b5cce84f472029e2daf7bbd80ec4c941f1"
+source = "git+https://github.com/openobserve/vortex?branch=0.75.0-fix#120c122e211b4dfd0bfc97231d3a27825a6d25d2"
 dependencies = [
  "pco",
  "prost 0.14.3",
@@ -11999,7 +11967,7 @@ dependencies = [
 [[package]]
 name = "vortex-proto"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?branch=develop#c6a0b7b5cce84f472029e2daf7bbd80ec4c941f1"
+source = "git+https://github.com/openobserve/vortex?branch=0.75.0-fix#120c122e211b4dfd0bfc97231d3a27825a6d25d2"
 dependencies = [
  "prost 0.14.3",
  "prost-types 0.14.3",
@@ -12008,7 +11976,7 @@ dependencies = [
 [[package]]
 name = "vortex-runend"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?branch=develop#c6a0b7b5cce84f472029e2daf7bbd80ec4c941f1"
+source = "git+https://github.com/openobserve/vortex?branch=0.75.0-fix#120c122e211b4dfd0bfc97231d3a27825a6d25d2"
 dependencies = [
  "arrow-array",
  "itertools 0.14.0",
@@ -12024,7 +11992,7 @@ dependencies = [
 [[package]]
 name = "vortex-scan"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?branch=develop#c6a0b7b5cce84f472029e2daf7bbd80ec4c941f1"
+source = "git+https://github.com/openobserve/vortex?branch=0.75.0-fix#120c122e211b4dfd0bfc97231d3a27825a6d25d2"
 dependencies = [
  "async-trait",
  "futures",
@@ -12040,7 +12008,7 @@ dependencies = [
 [[package]]
 name = "vortex-sequence"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?branch=develop#c6a0b7b5cce84f472029e2daf7bbd80ec4c941f1"
+source = "git+https://github.com/openobserve/vortex?branch=0.75.0-fix#120c122e211b4dfd0bfc97231d3a27825a6d25d2"
 dependencies = [
  "num-traits",
  "prost 0.14.3",
@@ -12056,7 +12024,7 @@ dependencies = [
 [[package]]
 name = "vortex-session"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?branch=develop#c6a0b7b5cce84f472029e2daf7bbd80ec4c941f1"
+source = "git+https://github.com/openobserve/vortex?branch=0.75.0-fix#120c122e211b4dfd0bfc97231d3a27825a6d25d2"
 dependencies = [
  "dashmap",
  "lasso",
@@ -12068,7 +12036,7 @@ dependencies = [
 [[package]]
 name = "vortex-sparse"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?branch=develop#c6a0b7b5cce84f472029e2daf7bbd80ec4c941f1"
+source = "git+https://github.com/openobserve/vortex?branch=0.75.0-fix#120c122e211b4dfd0bfc97231d3a27825a6d25d2"
 dependencies = [
  "itertools 0.14.0",
  "num-traits",
@@ -12083,7 +12051,7 @@ dependencies = [
 [[package]]
 name = "vortex-utils"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?branch=develop#c6a0b7b5cce84f472029e2daf7bbd80ec4c941f1"
+source = "git+https://github.com/openobserve/vortex?branch=0.75.0-fix#120c122e211b4dfd0bfc97231d3a27825a6d25d2"
 dependencies = [
  "dashmap",
  "hashbrown 0.17.1",
@@ -12093,7 +12061,7 @@ dependencies = [
 [[package]]
 name = "vortex-zigzag"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?branch=develop#c6a0b7b5cce84f472029e2daf7bbd80ec4c941f1"
+source = "git+https://github.com/openobserve/vortex?branch=0.75.0-fix#120c122e211b4dfd0bfc97231d3a27825a6d25d2"
 dependencies = [
  "vortex-array",
  "vortex-buffer",
@@ -12106,7 +12074,7 @@ dependencies = [
 [[package]]
 name = "vortex-zstd"
 version = "0.1.0"
-source = "git+https://github.com/openobserve/vortex?branch=develop#c6a0b7b5cce84f472029e2daf7bbd80ec4c941f1"
+source = "git+https://github.com/openobserve/vortex?branch=0.75.0-fix#120c122e211b4dfd0bfc97231d3a27825a6d25d2"
 dependencies = [
  "itertools 0.14.0",
  "prost 0.14.3",

@@ -28,7 +28,7 @@ use datafusion::{
     common::{Statistics, TableReference},
     execution::cache::{
         CacheAccessor, TableScopedPath,
-        cache_manager::{CachedFileMetadata, FileStatisticsCacheEntry},
+        cache_manager::{self, CachedFileMetadata, FileStatisticsCacheEntry},
     },
 };
 use object_store::{ObjectMeta, path::Path};
@@ -224,20 +224,24 @@ impl CacheAccessor<TableScopedPath, CachedFileMetadata> for FileStatisticsCache 
         self.cacher.lock().clear();
         self.current_memory.store(0, Ordering::Relaxed);
     }
+
     fn name(&self) -> String {
         "FileStatisticsCache".to_string()
     }
 }
 
-impl datafusion::execution::cache::cache_manager::FileStatisticsCache for FileStatisticsCache {
+impl cache_manager::FileStatisticsCache for FileStatisticsCache {
     fn cache_limit(&self) -> usize {
         config::get_config()
             .limit
             .datafusion_file_stat_cache_max_size
     }
 
-    fn update_cache_limit(&self, limit: usize) {
-        self.evict(limit);
+    fn update_cache_limit(&self, _limit: usize) {
+        // No-op: this is a process-wide, long-lived global cache whose eviction
+        // budget is owned solely by `put()` via `datafusion_file_stat_cache_max_size`.
+        // DataFusion calls this once per `CacheManager::try_new` (i.e. per session /
+        // per query) with its own per-session limit;
     }
 
     fn list_entries(&self) -> HashMap<TableScopedPath, FileStatisticsCacheEntry> {
@@ -267,11 +271,8 @@ impl datafusion::execution::cache::cache_manager::FileStatisticsCache for FileSt
 
     fn drop_table_entries(
         &self,
-        table_ref: &Option<TableReference>,
+        _table_ref: &Option<TableReference>,
     ) -> datafusion::error::Result<()> {
-        if table_ref.is_none() {
-            self.clear();
-        }
         Ok(())
     }
 }

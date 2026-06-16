@@ -60,7 +60,10 @@ use super::{
     storage::file_list, udf::transform_udf::get_all_transform,
 };
 use crate::service::search::{
-    datafusion::table_provider::{listing_adapter::ListingTableAdapter, uniontable::NewUnionTable},
+    datafusion::{
+        storage::file_statistics_cache,
+        table_provider::{listing_adapter::ListingTableAdapter, uniontable::NewUnionTable},
+    },
     index::IndexCondition,
 };
 
@@ -149,9 +152,9 @@ pub async fn create_runtime_env(trace_id: &str, memory_limit: usize) -> Result<R
         RuntimeEnvBuilder::new().with_object_store_registry(Arc::new(object_store_registry));
     if cfg.limit.datafusion_file_stat_cache_max_size > 0 {
         let cache_config = CacheManagerConfig::default();
-        let cache_config = cache_config.with_file_statistics_cache(Some(
-            super::storage::file_statistics_cache::GLOBAL_CACHE.clone(),
-        ));
+        let cache_config = cache_config
+            .with_file_statistics_cache(Some(file_statistics_cache::GLOBAL_CACHE.clone()))
+            .with_file_statistics_cache_limit(cfg.limit.datafusion_file_stat_cache_max_size);
         builder = builder.with_cache_manager(cache_config);
     }
 
