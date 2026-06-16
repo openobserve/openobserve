@@ -27,8 +27,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         class="axis-container tw:flex-1 tw:w-full tw:flex tw:flex-wrap droppable tw:border-transparent tw:border-dashed tw:border-2 scroll"
         :class="{
-          'drop-target': dashboardPanelData.meta.dragAndDrop.dragging,
-          'drop-entered':
+          'tw:bg-[rgba(0,0,0,0.042)] tw:border-white tw:[border-style:dotted]': dashboardPanelData.meta.dragAndDrop.dragging,
+          'tw:transition-all tw:duration-200 tw:bg-[var(--color-field-list-row-hover-bg)]':
             dashboardPanelData.meta.dragAndDrop.dragging &&
             dashboardPanelData.meta.dragAndDrop.currentDragArea == 'name',
         }"
@@ -152,8 +152,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         class="axis-container tw:flex-1 tw:w-full tw:flex tw:flex-wrap droppable tw:border-transparent tw:border-dashed tw:border-2 scroll"
         :class="{
-          'drop-target': dashboardPanelData.meta.dragAndDrop.dragging,
-          'drop-entered':
+          'tw:bg-[rgba(0,0,0,0.042)] tw:border-white tw:[border-style:dotted]': dashboardPanelData.meta.dragAndDrop.dragging,
+          'tw:transition-all tw:duration-200 tw:bg-[var(--color-field-list-row-hover-bg)]':
             dashboardPanelData.meta.dragAndDrop.dragging &&
             dashboardPanelData.meta.dragAndDrop.currentDragArea ==
               'value_for_maps',
@@ -575,29 +575,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style>
-.axis-field .q-btn--rectangle {
-  border-radius: 0%;
-}
-
-.axis-field .q-btn:before {
-  border: 0px solid transparent;
-}
-
-.drop-target {
-  background-color: rgba(0, 0, 0, 0.042);
-  border-color: white;
-  border-style: dotted;
-}
-
-.drop-entered {
-  transition: all;
-  transition-duration: 200ms;
-  background-color: var(--color-field-list-row-hover-bg);
-}
-
-.dashboard-maps-query-builder-dropdown .q-virtual-scroll__content {
-  padding: 0.5rem;
-}
-</style>

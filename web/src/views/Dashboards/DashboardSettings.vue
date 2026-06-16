@@ -144,11 +144,6 @@ export default defineComponent({
 </script>
 
 <style>
-.q-table__top {
-  border-bottom: 1px solid var(--o2-border);
-  justify-content: flex-end;
-}
-
 .o-tab-panel {
   padding: 0px !important;
 }

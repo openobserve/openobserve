@@ -704,38 +704,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style>
-.axis-field .q-btn--rectangle {
-  border-radius: 0%;
-}
-
-.axis-field .q-btn:before {
-  border: 0px solid transparent;
-}
-
-.dashboard-geo-maps-query-builder-dropdown .q-virtual-scroll__content {
-  padding: 0.5rem;
-}
-
-.q-field--dense .q-field__before,
-.q-field--dense .q-field__prepend {
-  padding: 0px 0px 0px 0px;
-  height: auto;
-  line-height: auto;
-}
-
-.q-field__native,
-.q-field__input {
-  padding: 0px 0px 0px 0px;
-}
-
-.q-field--dense .q-field__label {
-  top: 5px;
-}
-
-.q-field--dense .q-field__control,
-.q-field--dense .q-field__marginal {
-  height: 34px;
-}
-</style>

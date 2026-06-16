@@ -2783,11 +2783,6 @@ export default defineComponent({
 </script>
 
 <style>
-/* Ensure label icons are always interactive */
-.q-field__label {
-  pointer-events: auto !important;
-}
-
 .panel-time-picker-btn .date-time-button {
   width: fit-content;
   min-width: 0 !important;

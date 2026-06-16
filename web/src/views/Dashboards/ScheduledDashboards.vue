@@ -397,11 +397,6 @@ const getTimeRangeValue = (dateTime: any) => {
   color: #ffffff !important;
 }
 
-.scheduled-dashboards .q-table__top {
-  padding-left: 0;
-  padding-right: 0;
-}
-
 .scheduled-dashboards thead tr {
   background-color: var(--o2-table-header-bg) !important;
 }

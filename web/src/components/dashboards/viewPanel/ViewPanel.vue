@@ -917,15 +917,4 @@ export default defineComponent({
   height: 32px;
   min-height: 32px;
 }
-
-.viewpanel-icons .q-btn-dropdown {
-  height: 32px;
-  min-height: 32px;
-  padding: 0 8px;
-}
-
-.viewpanel-icons .q-btn-dropdown .q-btn__content {
-  line-height: normal;
-  align-items: center;
-}
 </style>

@@ -719,16 +719,3 @@ export default defineComponent({
 });
 </script>
 
-<style>
-.axis-field .q-btn--rectangle {
-  border-radius: 0%;
-}
-
-.axis-field .q-btn:before {
-  border: 0px solid transparent;
-}
-
-.dashboard-sankey-chart-builder-dropdown .q-virtual-scroll__content {
-  padding: 0.5rem;
-}
-</style>

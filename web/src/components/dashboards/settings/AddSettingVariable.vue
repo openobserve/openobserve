@@ -1704,10 +1704,6 @@ export default defineComponent({
 </script>
 
 <style>
-.no-case .q-field__native > :first-child {
-  text-transform: none !important;
-}
-
 .scrollable-content::-webkit-scrollbar {
   width: 6px;
   background: transparent;

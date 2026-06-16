@@ -1925,7 +1925,7 @@ export default defineComponent({
   z-index: 5000 !important;
   margin: 0 !important;
   padding: 0 !important;
-  background-color: var(--q-color-page-background, #ffffff) !important;
+  background-color: var(--o2-primary-background, #ffffff) !important;
 }
 
 .print-mode-container {
@@ -1953,14 +1953,4 @@ export default defineComponent({
   }
 }
 
-.dashboard-icons .q-btn-dropdown {
-  height: 30px;
-  min-height: 30px;
-  padding: 0 8px;
-}
-
-.dashboard-icons .q-btn-dropdown .q-btn__content {
-  line-height: normal;
-  align-items: center;
-}
 </style>

@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-for="(column, index) in editColumnOrder"
           :key="`column-${index}`"
-          class="column-order-row tw:flex tw:items-center tw:px-3 tw:py-2 tw:mb-1 tw:border-b tw:border-[#cccccc70] tw:transition-colors hover:tw:bg-black/[0.02] last:tw:border-b-0"
+          class="tw:flex tw:items-center tw:px-3 tw:py-2 tw:mb-1 tw:border-b tw:border-[#cccccc70] tw:transition-colors tw:hover:bg-black/[0.02] tw:last:border-b-0 tw:dark:border-b-[rgba(255,255,255,0.12)] tw:dark:hover:bg-[rgba(255,255,255,0.05)]"
           :data-test="`column-order-row-${index}`"
         >
           <!-- Drag handle -->
@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Column number -->
-          <div class="column-order-number tw:min-w-8 tw:font-medium tw:text-[13px] tw:text-[#666]" data-test="dashboard-column-order-column-number">{{ index + 1 }}.</div>
+          <div class="tw:min-w-8 tw:font-medium tw:text-[13px] tw:text-[#666] tw:dark:text-[#aaa]" data-test="dashboard-column-order-column-number">{{ index + 1 }}.</div>
 
           <!-- Column name -->
           <div class="tw:flex-1 tw:font-medium tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap tw:text-[13px]" data-test="dashboard-column-order-column-name">{{ column }}</div>
@@ -221,17 +221,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style>
-.body--dark .column-order-row {
-  border-bottom-color: rgba(255, 255, 255, 0.12);
-}
-
-.body--dark .column-order-row:hover {
-  background-color: rgba(255, 255, 255, 0.05);
-}
-
-.body--dark .column-order-number {
-  color: #aaa;
-}
-</style>

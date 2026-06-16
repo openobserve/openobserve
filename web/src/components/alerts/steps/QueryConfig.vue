@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -173,7 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OButton
                         variant="ghost"
                         size="icon-circle-sm"
-                        class="tw:text-gray-400 hover:tw:text-red-500"
+                        class="tw:text-gray-400 tw:hover:text-red-500"
                         @click="deleteLogGroupByColumn(index)"
                       >
                         <OIcon name="close" size="sm" />
@@ -319,7 +319,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OButton
                         variant="ghost"
                         size="icon-circle-sm"
-                        class="tw:text-gray-400 hover:tw:text-red-500"
+                        class="tw:text-gray-400 tw:hover:text-red-500"
                         @click="deleteGroupByColumn(index)"
                       >
                         <OIcon name="close" size="sm" />
@@ -429,8 +429,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div
                     class="tw:flex tw:items-center tw:gap-1 tw:cursor-pointer tw:select-none filters-inline-toggle tw:px-2 tw:py-0.5 tw:rounded-md tw:transition-colors"
                     :class="store.state.theme === 'dark'
-                      ? 'tw:bg-gray-700/60 hover:tw:bg-gray-600/70'
-                      : 'tw:bg-gray-100 hover:tw:bg-gray-200'"
+                      ? 'tw:bg-gray-700/60 tw:hover:bg-gray-600/70'
+                      : 'tw:bg-gray-100 tw:hover:bg-gray-200'"
                     @click="toggleFilters"
                   >
                     <OIcon
@@ -507,8 +507,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 class="tw:flex tw:items-center tw:gap-1 tw:cursor-pointer tw:select-none filters-inline-toggle tw:px-2 tw:py-0.5 tw:rounded-md tw:transition-colors"
                 :class="store.state.theme === 'dark'
-                  ? 'tw:bg-gray-700/60 hover:tw:bg-gray-600/70'
-                  : 'tw:bg-gray-100 hover:tw:bg-gray-200'"
+                  ? 'tw:bg-gray-700/60 tw:hover:bg-gray-600/70'
+                  : 'tw:bg-gray-100 tw:hover:bg-gray-200'"
                 @click="toggleFilters"
               >
                 <OIcon

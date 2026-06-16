@@ -875,9 +875,6 @@ export default defineComponent({
   overflow: hidden;
   resize: none;
 }
-.import-folder-dropdown-container .q-field {
-  padding-top: 32px;
-}
 .import-folder-dropdown-container .add-folder-btn {
   margin-bottom: 0 !important;
   margin-top: 12px !important;

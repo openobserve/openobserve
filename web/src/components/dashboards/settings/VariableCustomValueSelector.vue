@@ -67,11 +67,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style>
-.o2-custom-select-dashboard .q-field__native {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-</style>

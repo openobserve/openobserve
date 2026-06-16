@@ -19,28 +19,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       v-if="visible"
       ref="menuRef"
-      class="alert-context-menu tw:fixed tw:z-9999 tw:bg-white tw:dark:bg-[#2c2c2c] tw:border tw:border-(--o2-border) tw:dark:border-[#404040] tw:rounded tw:shadow-[0_2px_8px_rgba(0,0,0,0.15)] tw:dark:shadow-[0_2px_8px_rgba(0,0,0,0.4)] tw:min-w-70 tw:py-1 tw:px-0"
+      class="tw:fixed tw:z-9999 tw:bg-white tw:dark:bg-[#2c2c2c] tw:border tw:border-(--o2-border) tw:dark:border-[#404040] tw:rounded tw:shadow-[0_2px_8px_rgba(0,0,0,0.15)] tw:dark:shadow-[0_2px_8px_rgba(0,0,0,0.4)] tw:min-w-70 tw:py-1 tw:px-0"
       :style="menuStyle"
       @click.stop
       data-test="alert-context-menu"
     >
       <div
-        class="menu-item tw:flex tw:items-center tw:py-2 tw:px-4 tw:cursor-pointer tw:[transition:background-color_0.2s] tw:text-sm tw:text-[#333]"
+        class="tw:flex tw:items-center tw:py-2 tw:px-4 tw:cursor-pointer tw:[transition:background-color_0.2s] tw:text-sm tw:text-[#333] tw:hover:bg-[#f5f5f5] tw:active:bg-[var(--o2-border)] tw:dark:text-[var(--o2-border)] tw:dark:hover:bg-[#383838] tw:dark:active:bg-[#404040]"
         @click="handleMenuItemClick('above')"
-        @mouseenter="hoveredItem = 'above'"
-        @mouseleave="hoveredItem = null"
-        :class="{ 'hovered': hoveredItem === 'above' }"
         data-test="alert-context-menu-above"
       >
         <OIcon name="arrow-upward" size="sm" class="tw:mr-2" />
         <span class="tw:select-none">Create Alert with threshold above {{ formattedValue }}</span>
       </div>
       <div
-        class="menu-item tw:flex tw:items-center tw:py-2 tw:px-4 tw:cursor-pointer tw:[transition:background-color_0.2s] tw:text-sm tw:text-[#333]"
+        class="tw:flex tw:items-center tw:py-2 tw:px-4 tw:cursor-pointer tw:[transition:background-color_0.2s] tw:text-sm tw:text-[#333] tw:hover:bg-[#f5f5f5] tw:active:bg-[var(--o2-border)] tw:dark:text-[var(--o2-border)] tw:dark:hover:bg-[#383838] tw:dark:active:bg-[#404040]"
         @click="handleMenuItemClick('below')"
-        @mouseenter="hoveredItem = 'below'"
-        @mouseleave="hoveredItem = null"
-        :class="{ 'hovered': hoveredItem === 'below' }"
         data-test="alert-context-menu-below"
       >
         <OIcon name="arrow-downward" size="sm" class="tw:mr-2" />
@@ -80,7 +74,6 @@ export default defineComponent({
   emits: ['select', 'close'],
   setup(props, { emit }) {
     const menuRef = ref<HTMLElement | null>(null);
-    const hoveredItem = ref<string | null>(null);
 
     const formattedValue = computed(() => {
       if (typeof props.value === 'number') {
@@ -137,7 +130,6 @@ export default defineComponent({
 
     return {
       menuRef,
-      hoveredItem,
       formattedValue,
       menuStyle,
       handleMenuItemClick,
@@ -146,26 +138,3 @@ export default defineComponent({
 });
 </script>
 
-<style>
-.alert-context-menu .menu-item.hovered,
-.alert-context-menu .menu-item:hover {
-  background-color: #f5f5f5;
-}
-
-.alert-context-menu .menu-item:active {
-  background-color: var(--o2-border);
-}
-
-body.body--dark .alert-context-menu .menu-item {
-  color: var(--o2-border);
-}
-
-body.body--dark .alert-context-menu .menu-item.hovered,
-body.body--dark .alert-context-menu .menu-item:hover {
-  background-color: #383838;
-}
-
-body.body--dark .alert-context-menu .menu-item:active {
-  background-color: #404040;
-}
-</style>

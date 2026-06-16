@@ -165,15 +165,3 @@ export default defineComponent({
 });
 </script>
 
-<style>
-/* Override q-gutter-sm margins on the container and all its children. */
-[data-test="dashboard-table-pagination-controls"] .q-gutter-sm {
-  margin-top: 0 !important;
-  margin-bottom: 0 !important;
-}
-
-[data-test="dashboard-table-pagination-controls"] .q-gutter-sm > * {
-  margin-top: 0 !important;
-  margin-bottom: 0 !important;
-}
-</style>
