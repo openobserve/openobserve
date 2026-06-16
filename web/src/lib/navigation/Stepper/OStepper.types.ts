@@ -19,6 +19,13 @@ export interface OStepperProps {
   animated?: boolean
   /** Allow clicking completed step headers to navigate back. Default: false */
   navigable?: boolean
+  /**
+   * Render ALL step panels at once (a progress checklist / timeline) instead of
+   * only the active step's panel (the default wizard behavior). `modelValue`
+   * still drives which step is highlighted as active. Works in both
+   * orientations. Default: false.
+   */
+  expanded?: boolean
 }
 
 export interface OStepperEmits {
@@ -56,6 +63,8 @@ export interface StepperContext {
   orientation: StepperOrientation
   navigable: boolean
   animated: boolean
+  /** Render every step's panel (checklist mode) rather than only the active one. */
+  expanded: boolean
   onStepClick: (name: number) => void
 }
 
