@@ -36,7 +36,7 @@ test.describe('Functions Form Validation', { tag: ['@functions-form-validation',
       testLogger.info('Test: empty function name → error on save');
       const fv = pm.functionsFormValidation;
 
-      await fv.openAddFunctionForm();
+      await fv.openAddFunctionForm(process.env.ORGNAME || 'default');
 
       // Do not fill name — click Save immediately
       await fv.clickSave();
@@ -49,7 +49,7 @@ test.describe('Functions Form Validation', { tag: ['@functions-form-validation',
       testLogger.info('Test: invalid function name → error on save');
       const fv = pm.functionsFormValidation;
 
-      await fv.openAddFunctionForm();
+      await fv.openAddFunctionForm(process.env.ORGNAME || 'default');
 
       // Fill a name that starts with a digit — invalid per the regex
       await fv.fillFunctionName('1invalid_name');
@@ -62,7 +62,7 @@ test.describe('Functions Form Validation', { tag: ['@functions-form-validation',
       testLogger.info('Test: name field cleared after focus → error visible');
       const fv = pm.functionsFormValidation;
 
-      await fv.openAddFunctionForm();
+      await fv.openAddFunctionForm(process.env.ORGNAME || 'default');
 
       // Type then clear — triggers blur validation
       await fv.fillFunctionName('test_fv_fn_001');
@@ -100,7 +100,7 @@ test.describe('Functions Form Validation', { tag: ['@functions-form-validation',
       testLogger.info('Test: VRL radio is selected by default');
       const fv = pm.functionsFormValidation;
 
-      await fv.openAddFunctionForm();
+      await fv.openAddFunctionForm(process.env.ORGNAME || 'default');
 
       await fv.assertVrlRadioSelected();
     });
@@ -109,7 +109,7 @@ test.describe('Functions Form Validation', { tag: ['@functions-form-validation',
       testLogger.info('Test: Save button enabled after valid name entry');
       const fv = pm.functionsFormValidation;
 
-      await fv.openAddFunctionForm();
+      await fv.openAddFunctionForm(process.env.ORGNAME || 'default');
 
       await fv.fillFunctionName('test_fv_tb_001');
 
@@ -122,7 +122,7 @@ test.describe('Functions Form Validation', { tag: ['@functions-form-validation',
       testLogger.info('Test: FunctionsToolbar — invalid name format shows error');
       const fv = pm.functionsFormValidation;
 
-      await fv.openAddFunctionForm();
+      await fv.openAddFunctionForm(process.env.ORGNAME || 'default');
       await fv.fillFunctionName('invalid-name-with-dashes');
       await fv.clickSave();
 
@@ -133,7 +133,7 @@ test.describe('Functions Form Validation', { tag: ['@functions-form-validation',
       testLogger.info('Test: FunctionsToolbar — Cancel navigates back');
       const fv = pm.functionsFormValidation;
 
-      await fv.openAddFunctionForm();
+      await fv.openAddFunctionForm(process.env.ORGNAME || 'default');
 
       await fv.cancelButton.waitFor({ state: 'visible' });
       await fv.cancelButton.click();
@@ -147,14 +147,17 @@ test.describe('Functions Form Validation', { tag: ['@functions-form-validation',
   // ─────────────────────────────────────────────────────────────────────────────
   // StreamRouting — form validation
   // ─────────────────────────────────────────────────────────────────────────────
-  test.describe('StreamRouting form validation', () => {
+  // StreamRouting.vue is currently not mounted in any navigation path — it was
+  // refactored into the pipeline NodeForm and is no longer reachable as a
+  // standalone page or panel. These tests are skipped until navigation is restored.
+  test.describe.skip('StreamRouting form validation', () => {
     test.describe.configure({ mode: 'serial' });
 
     test('should show name error when Save is clicked with empty destination name', async ({ page }) => {
       testLogger.info('Test: StreamRouting — empty destination name error on save');
       const fv = pm.functionsFormValidation;
 
-      await fv.openStreamRoutingForm();
+      await fv.openStreamRoutingForm(process.env.ORGNAME || 'default');
 
       await fv.clickStreamRoutingSave();
 
@@ -165,7 +168,7 @@ test.describe('Functions Form Validation', { tag: ['@functions-form-validation',
       testLogger.info('Test: StreamRouting — cancel icon closes the panel');
       const fv = pm.functionsFormValidation;
 
-      await fv.openStreamRoutingForm();
+      await fv.openStreamRoutingForm(process.env.ORGNAME || 'default');
 
       await fv.clickStreamRoutingClose();
 
@@ -178,7 +181,7 @@ test.describe('Functions Form Validation', { tag: ['@functions-form-validation',
       testLogger.info('Test: StreamRouting — stream type required error on save');
       const fv = pm.functionsFormValidation;
 
-      await fv.openStreamRoutingForm();
+      await fv.openStreamRoutingForm(process.env.ORGNAME || 'default');
 
       await fv.fillStreamRoutingDestName('test_fv_sr_001');
       await fv.clickStreamRoutingSave();
@@ -197,7 +200,7 @@ test.describe('Functions Form Validation', { tag: ['@functions-form-validation',
       testLogger.info('Test: empty enrichment table name → error on save');
       const fv = pm.functionsFormValidation;
 
-      await fv.openAddEnrichmentTableForm();
+      await fv.openAddEnrichmentTableForm(process.env.ORGNAME || 'default');
 
       // Submit without filling name
       await fv.clickEnrichmentSave();
@@ -209,7 +212,7 @@ test.describe('Functions Form Validation', { tag: ['@functions-form-validation',
       testLogger.info('Test: enrichment table — name filled but no file → error on save');
       const fv = pm.functionsFormValidation;
 
-      await fv.openAddEnrichmentTableForm();
+      await fv.openAddEnrichmentTableForm(process.env.ORGNAME || 'default');
 
       // Fill name but leave file empty
       await fv.fillEnrichmentName('test_fv_et_001');
@@ -222,7 +225,7 @@ test.describe('Functions Form Validation', { tag: ['@functions-form-validation',
       testLogger.info('Test: enrichment table URL source — invalid URL format → error visible');
       const fv = pm.functionsFormValidation;
 
-      await fv.openAddEnrichmentTableForm();
+      await fv.openAddEnrichmentTableForm(process.env.ORGNAME || 'default');
 
       // Fill name
       await fv.fillEnrichmentName('test_fv_et_002');

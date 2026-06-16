@@ -155,13 +155,25 @@ class FunctionsFormValidationPage {
   async typeInVrlEditor(code) {
     testLogger.info('Typing VRL code into editor');
     await this.functionEditor.waitFor({ state: 'visible', timeout: 15000 });
-    // Click to focus Monaco, select-all to clear any existing content, then type
+    // Click the editor to ensure Monaco is focused/initialized (lazy-loaded async component)
     await this.functionEditor.click();
-    await this.page.keyboard.press('Control+A');
-    await this.page.keyboard.type(code);
-    // Blur the editor so Monaco fires its final change event before save
-    await this.functionEditor.press('Escape');
     await this.page.waitForTimeout(300);
+    // Use Monaco's executeEdits API to set the content and trigger onDidChangeModelContent,
+    // which propagates through unified-query-editor's @update:query to formData.function.
+    // keyboard.type() and keyboard.insertText() do NOT trigger the reactive update.
+    await this.page.evaluate((vrlCode) => {
+      const editors = window.monaco?.editor?.getEditors?.();
+      const container = document.querySelector('[data-test="logs-vrl-function-editor"]');
+      const targetEditor = editors?.find(e => container?.contains(e.getContainerDomNode()));
+      if (targetEditor) {
+        targetEditor.executeEdits('playwright', [{
+          range: targetEditor.getModel().getFullModelRange(),
+          text: vrlCode
+        }]);
+      }
+    }, code);
+    // Wait for Vue reactivity to propagate from onDidChangeModelContent → emit → formData.function
+    await this.page.waitForTimeout(500);
   }
 
   async expectSuccessToast() {
