@@ -123,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="dimension-badge tw:inline-flex tw:items-center tw:gap-0.5 tw:py-0.5 tw:px-2 tw:rounded-md tw:text-[11px] tw:font-semibold tw:m-0.5 tw:max-w-45 tw:overflow-hidden"
               :class="getDimensionColorClass(key)"
             >
-              <span>{{ key }}</span>=<span>{{ value }}</span>
+              <span class="tw:inline-block tw:overflow-hidden tw:truncate">{{ key }}</span>=<span class="tw:inline-block tw:overflow-hidden tw:truncate">{{ value }}</span>
               <OTooltip :delay="300" :content="key + '=' + value" />
             </span>
             <span
@@ -138,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-for="[key, value] in getSortedDimensions(row.group_values).slice(2)"
                       :key="key"
                     >
-                      <span>{{ key }}</span>=<span>{{ value }}</span>
+                      <span class="tw:inline-block tw:overflow-hidden tw:truncate">{{ key }}</span>=<span class="tw:inline-block tw:overflow-hidden tw:truncate">{{ value }}</span>
                     </div>
                   </div>
                 </template>
@@ -681,14 +681,6 @@ body.body--dark .severity-p2 { border: 1px solid #fdba74; }
 body.body--dark .severity-p3 { border: 1px solid #fcd34d; }
 body.body--dark .severity-p4 { border: 1px solid #d1d5db; }
 body.body--dark .severity-default { border: 1px solid #d1d5db; }
-
-/* Dimension badge child selector */
-.dimension-badge span {
-  display: inline-block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 
 /* Color scheme matching schema.scss type badges */
 .badge-blue { border: 1px solid #1d4ed8; }
