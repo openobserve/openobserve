@@ -768,7 +768,11 @@
     "report": "Reports",
     "pipeline": "Pipelines",
     "language": "Language",
-    "actions": "Actions"
+    "actions": "Actions",
+    "groupObserve": "Observe",
+    "groupAnalyze": "Analyze",
+    "groupManage": "Manage",
+    "groupAdmin": "Admin"
   },
   "rum": {
     "title": "Real User Monitoring",

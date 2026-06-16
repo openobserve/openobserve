@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+export type NavGroup = 'observe' | 'analyze' | 'manage' | 'admin';
+
 export interface NavItem {
   title: string;
   icon: string;
@@ -21,16 +23,32 @@ export interface NavItem {
   name: string;
   display?: boolean;
   hide?: boolean;
+  group?: NavGroup;
 }
 
 export interface NavbarProps {
   linksList: NavItem[];
   miniMode?: boolean;
   visible?: boolean;
+  logoSrc?: string;
+  orgName?: string;
+  orgOptions?: Array<{ label: string; identifier: string }>;
+  userName?: string;
+  userEmail?: string;
+  isAiEnabled?: boolean;
+  isAiChatActive?: boolean;
+  theme?: string;
 }
 
 export interface NavbarEmits {
   (e: "menu-hover", routePath: string): void;
+  (e: "go-to-home"): void;
+  (e: "update:org", identifier: string): void;
+  (e: "toggle-ai-chat"): void;
+  (e: "open-slack"): void;
+  (e: "open-help"): void;
+  (e: "open-predefined-themes"): void;
+  (e: "signout"): void;
 }
 
 export interface NavbarSlots {
