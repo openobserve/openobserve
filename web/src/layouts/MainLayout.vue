@@ -16,32 +16,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    :class="[store.state.printMode === true ? 'printMode' : '', 'o2-app-root', 'tw:min-h-screen', 'tw:h-screen', 'tw:flex', 'tw:flex-col']"
+    :class="[store.state.printMode === true ? 'printMode' : '', 'o2-app-root', 'tw:min-h-screen', 'tw:h-screen', 'tw:flex']"
   >
-    <header class="o2-app-header tw:shrink-0">
-      <!-- Webinar announcement bar: shown above toolbar for cloud users -->
-      <div
-        v-if="config.isCloud === 'true'"
-        class="tw:bg-[var(--o2-primary-btn-bg)] tw:text-[var(--o2-primary-btn-text)] tw:text-center"
-      >
-        <WebinarBanner variant="header" />
-      </div>
-
-      <!-- Header component containing logo, navigation, and user controls -->
-      <Header
-        :store="store"
-        :router="router"
-        :config="config"
+    <ONavbar
+        v-if="store.state.printMode !== true"
+        :links-list="linksList"
+        :manage-links="manageLinks"
+        :mini-mode="miniMode"
+        :visible="leftDrawerOpen"
         :user="user"
-        :slack-icon="slackIcon"
-        :zo-backend-url="zoBackendUrl"
         :lang-list="langList"
         :selected-language="selectedLanguage"
+        :organizations="orgOptions"
         :selected-org="selectedOrg"
         :user-clicked-org="userClickedOrg"
-        :organizations="orgOptions"
-        :is-hovered="isHovered"
+        :config="config"
+        :store="store"
+        :zo-backend-url="zoBackendUrl"
+        :slack-icon="slackIcon"
         :get-btn-logo="getBtnLogo"
+        :is-hovered="isHovered"
+        @menu-hover="handleMenuHover"
         @update:selected-org="selectedOrg = $event"
         @update:is-hovered="isHovered = $event"
         @update-organization="updateOrganization"
@@ -55,22 +50,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @open-predefined-themes="openPredefinedThemes"
         @signout="signout"
       />
-    </header>
-
-    <div class="tw:flex-1 tw:flex tw:min-h-0">
-      <ONavbar
-        v-if="store.state.printMode !== true"
-        :links-list="linksList"
-        :mini-mode="miniMode"
-        :visible="leftDrawerOpen"
-        @menu-hover="handleMenuHover"
-      />
 
       <div class="tw:flex-1 tw:min-w-0 tw:flex tw:min-h-0 tw:h-full">
         <!-- Main Panel -->
         <main
           data-test="main-content"
-          class="tw:flex tw:flex-col tw:min-h-0 tw:bg-[var(--color-surface-chrome-deeper)] tw:pr-2 tw:pb-2"
+          class="tw:flex tw:flex-col tw:min-h-0 tw:bg-[var(--color-surface-chrome-deeper)] tw:pt-2 tw:pr-2 tw:pb-2"
           :style="{
             width:
               store.state.isAiChatEnabled && !store.state.isAiChatExpanded
@@ -98,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Right Panel (AI Chat - unified for both general and context-specific usage) -->
         <aside
           v-show="store.state.isAiChatEnabled && isLoading"
-          class="o2-sidebar o2-sidebar-right tw:overflow-y-auto tw:sticky tw:top-[var(--navbar-height,2.25rem)] tw:self-start tw:shrink-0"
+          class="o2-sidebar o2-sidebar-right tw:overflow-y-auto tw:sticky tw:top-0 tw:self-start tw:shrink-0"
           :class="[
             store.state.theme == 'dark'
               ? 'dark-mode-chat-container'
@@ -107,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ]"
           :style="[
             {
-              height: 'calc(100vh - var(--navbar-height, 2.25rem))',
+              height: '100vh',
             },
             store.state.isAiChatExpanded
               ? {
@@ -136,7 +121,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :aiChatPayload="aiChatPayload"
           />
         </aside>
-    </div>
     </div>
 
     <ODialog data-test="main-layout-get-started-dialog" v-model:open="showGetStarted" size="full" :show-close="false">
@@ -389,16 +373,20 @@ export default defineComponent({
         name: "dashboards",
       },
       {
-        title: t("menu.index"),
-        icon: "window",
-        link: "/streams",
-        name: "streams",
-      },
-      {
         title: t("menu.alerts"),
         icon: "shield-alert-outline",
         link: "/alerts",
         name: "alertList",
+      },
+    ]);
+
+    // Items shown in the "Manage" flyout submenu — not in the primary rail.
+    const manageLinks = ref([
+      {
+        title: t("menu.index"),
+        icon: "window",
+        link: "/streams",
+        name: "streams",
       },
       {
         title: t("menu.ingestion"),
@@ -493,18 +481,6 @@ export default defineComponent({
         console.error("Error in onBeforeMount:", error);
       }
     });
-
-    watch(
-      () => store.state.isWebinarBannerVisible,
-      (visible) => {
-        const navbarHeight = visible ? "calc(2.5rem + 1.688rem)" : "2.5rem";
-        document.documentElement.style.setProperty(
-          "--navbar-height",
-          navbarHeight,
-        );
-      },
-      { immediate: true },
-    );
 
     onMounted(async () => {
       filterMenus();
@@ -617,9 +593,22 @@ export default defineComponent({
 
       store.dispatch("setHiddenMenus", disableMenus);
 
+      // Move pipeline from linksList into manageLinks if the mixin added it
+      const pipelineIndex = linksList.value.findIndex((l: any) => l.name === "pipeline");
+      if (pipelineIndex !== -1) {
+        const [pipelineItem] = linksList.value.splice(pipelineIndex, 1);
+        if (!manageLinks.value.some((l: any) => l.name === "pipeline")) {
+          manageLinks.value.unshift(pipelineItem);
+        }
+      }
+
       linksList.value = linksList.value.filter((link: any) => {
         const hide = link.hide === undefined ? false : link.hide;
+        return !disableMenus.has(link.name) && !hide;
+      });
 
+      manageLinks.value = manageLinks.value.filter((link: any) => {
+        const hide = link.hide === undefined ? false : link.hide;
         return !disableMenus.has(link.name) && !hide;
       });
     };
@@ -631,7 +620,7 @@ export default defineComponent({
         .leftNavigationLinks(linksList, t);
       filterMenus();
     } else {
-      linksList.value.splice(7, 0, {
+      manageLinks.value.splice(2, 0, {
         title: t("menu.report"),
         icon: "description",
         link: "/reports",
@@ -1156,6 +1145,7 @@ export default defineComponent({
       langList,
       selectedLanguage,
       linksList,
+      manageLinks,
       selectedOrg,
       orgOptions,
       leftDrawerOpen: true,

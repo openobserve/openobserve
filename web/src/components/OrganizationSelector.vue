@@ -205,34 +205,24 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
 
 <template>
   <div data-test="navbar-organizations-select">
-    <ODropdown v-model:open="open" side="bottom" align="end">
+    <ODropdown v-model:open="open" side="right" align="start">
       <template #trigger>
-        <OButton
-          variant="outline-primary"
-          size="xs"
+        <button
+          type="button"
           data-test="navbar-organizations-select-trigger"
-          class="tw:w-56 tw:text-text-primary!"
-          :class="open ? 'tw:ring-1 tw:ring-inset tw:ring-primary-300' : ''"
+          class="tw:group tw:flex tw:items-center tw:gap-0.5 tw:w-full tw:py-1.5 tw:px-2 tw:cursor-pointer tw:bg-transparent tw:border-0 tw:outline-none tw:hover:bg-tabs-hover-bg tw:focus-visible:ring-2 tw:focus-visible:ring-primary-500"
+          :class="open ? 'tw:bg-tabs-hover-bg' : ''"
         >
-          <template #icon-left>
-            <OIcon
-              name="domain"
-              size="sm"
-              class="tw:opacity-60 tw:shrink-0"
-            />
-          </template>
-          <span class="tw:truncate tw:flex-1 tw:min-w-0 tw:text-left">{{
-            current?.label || ""
-          }}</span>
-          <template #icon-right>
-            <OIcon
-              name="arrow-drop-down"
-              size="sm"
-              class="tw:opacity-70 tw:shrink-0 tw:transition-transform"
-              :class="open ? 'tw:rotate-180' : ''"
-            />
-          </template>
-        </OButton>
+          <span class="tw:text-[12px] tw:font-medium tw:text-tabs-inactive-text tw:group-hover:text-primary-600 tw:flex-1 tw:min-w-0 tw:truncate tw:text-left tw:leading-tight" :class="open ? 'tw:text-primary-600' : ''">
+            {{ current?.label || "" }}
+          </span>
+          <OIcon
+            name="arrow-drop-down"
+            size="sm"
+            class="tw:shrink-0 tw:transition-transform tw:text-tabs-inactive-text tw:group-hover:text-primary-600"
+            :class="open ? 'tw:rotate-180 tw:text-primary-600' : ''"
+          />
+        </button>
       </template>
 
       <div

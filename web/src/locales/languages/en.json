@@ -768,7 +768,11 @@
     "report": "Reports",
     "pipeline": "Pipelines",
     "language": "Language",
-    "actions": "Actions"
+    "actions": "Actions",
+    "manage": "Manage",
+    "aiAssistant": "AI",
+    "theme": "Theme",
+    "logout": "Sign Out"
   },
   "rum": {
     "title": "Real User Monitoring",

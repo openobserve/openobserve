@@ -25,12 +25,37 @@ export interface NavItem {
 
 export interface NavbarProps {
   linksList: NavItem[];
+  manageLinks?: NavItem[];
   miniMode?: boolean;
   visible?: boolean;
+  user?: Record<string, any>;
+  langList?: Array<{ label: string; code: string; icon?: string }>;
+  selectedLanguage?: { label: string; code: string; icon?: string };
+  organizations?: any[];
+  selectedOrg?: any;
+  userClickedOrg?: any;
+  config?: Record<string, any>;
+  store?: any;
+  zoBackendUrl?: string;
+  slackIcon?: any;
+  getBtnLogo?: string;
+  isHovered?: boolean;
 }
 
 export interface NavbarEmits {
   (e: "menu-hover", routePath: string): void;
+  (e: "update:selected-org", org: any): void;
+  (e: "update:is-hovered", val: boolean): void;
+  (e: "update-organization"): void;
+  (e: "go-to-home"): void;
+  (e: "go-to-about"): void;
+  (e: "toggleAIChat"): void;
+  (e: "open-slack"): void;
+  (e: "navigateToOpenAPI", url: string): void;
+  (e: "navigate-to-docs"): void;
+  (e: "change-language", lang: { label: string; code: string }): void;
+  (e: "open-predefined-themes"): void;
+  (e: "signout"): void;
 }
 
 export interface NavbarSlots {
