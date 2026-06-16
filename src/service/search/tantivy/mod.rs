@@ -517,10 +517,9 @@ async fn search_tantivy_index(
     .await?;
 
     // search the index
-    let trace_id_clone = trace_id.to_string();
     let file_min_ts = parquet_file.meta.min_ts;
     let file_max_ts = parquet_file.meta.max_ts;
-    let res = tokio::task::spawn_blocking(move || match idx_optimize_rule {
+    let res = tokio::task::spawn_blocking(move || match idx_optimize_rule.clone() {
         None => TantivyResult::handle_matched_docs(&searcher, query),
         Some(IndexOptimizeMode::SimpleSelect(limit, ascend)) => {
             TantivyResult::handle_simple_select(&searcher, query, limit, ascend)
@@ -528,79 +527,35 @@ async fn search_tantivy_index(
         Some(IndexOptimizeMode::SimpleCount) => {
             TantivyResult::handle_simple_count(&searcher, query)
         }
-        Some(IndexOptimizeMode::SimpleHistogram(min_value, bucket_width, num_buckets, ts_offset)) => {
-            // fail the function if field not in tantivy schema
-            if tantivy_schema.get_field(TIMESTAMP_COL_NAME).is_err() {
-                log::warn!("[trace_id {trace_id_clone}] search->tantivy: _timestamp not index in tantivy file: {ttv_file_name}");
-                return Ok(TantivyResult::Histogram(vec![]));
-            }
-            // RANK fast path only when no extra _timestamp-range was ANDed in
-            // (file fully in range) and the filter is match-all or a single term
-            let (rank_eligible, term_field) = if file_in_range {
-                if condition.is_condition_all() {
-                    (true, None)
-                } else if let Some(tv) = condition.single_equal_term() {
-                    (true, Some(tv))
-                } else {
-                    (false, None)
-                }
-            } else {
-                (false, None)
-            };
-            TantivyResult::handle_simple_histogram(
-                &searcher,
-                query,
-                rank_eligible,
-                term_field,
-                min_value,
-                bucket_width,
-                num_buckets,
-                ts_offset,
-                file_min_ts,
-                file_max_ts,
-            )
-        }
+        Some(IndexOptimizeMode::SimpleHistogram(..)) => TantivyResult::handle_simple_histogram(
+            &searcher,
+            query,
+            &condition,
+            idx_optimize_rule.unwrap(),
+            file_in_range,
+            file_min_ts,
+            file_max_ts,
+        ),
         Some(IndexOptimizeMode::SimpleMultiHistogram(
             min_value,
             max_value,
             bucket_width,
             ts_offset,
             breakdown_field,
-        )) => {
-            if tantivy_schema.get_field(TIMESTAMP_COL_NAME).is_err() {
-                log::warn!("[trace_id {trace_id_clone}] search->tantivy: _timestamp not index in tantivy file: {ttv_file_name}");
-                return Ok(TantivyResult::MultiHistogram(vec![]));
-            }
-            if tantivy_schema.get_field(&breakdown_field).is_err() {
-                log::warn!("[trace_id {trace_id_clone}] search->tantivy: {breakdown_field} not index in tantivy file: {ttv_file_name}");
-                return Ok(TantivyResult::MultiHistogram(vec![]));
-            }
-            TantivyResult::handle_simple_multi_histogram(
-                &searcher,
-                query,
-                min_value,
-                max_value,
-                bucket_width,
-                ts_offset,
-                &breakdown_field,
-            )
-        }
+        )) => TantivyResult::handle_simple_multi_histogram(
+            &searcher,
+            query,
+            min_value,
+            max_value,
+            bucket_width,
+            ts_offset,
+            &breakdown_field,
+        ),
         Some(IndexOptimizeMode::SimpleTopN(fields, limit, ascend)) => {
-            // files indexed before a field was added to index_fields lack its column
-            if let Some(field) = fields.iter().find(|f| tantivy_schema.get_field(f).is_err()) {
-                log::warn!("[trace_id {trace_id_clone}] search->tantivy: {field} not index in tantivy file: {ttv_file_name}");
-                Ok(TantivyResult::TopN(vec![]))
-            } else {
-                TantivyResult::handle_simple_top_n(&searcher, query, &fields, limit, ascend)
-            }
+            TantivyResult::handle_simple_top_n(&searcher, query, &fields, limit, ascend)
         }
         Some(IndexOptimizeMode::SimpleDistinct(field, limit, ascend)) => {
-            if tantivy_schema.get_field(&field).is_err() {
-                log::warn!("[trace_id {trace_id_clone}] search->tantivy: {field} not index in tantivy file: {ttv_file_name}");
-                Ok(TantivyResult::Distinct(HashSet::new()))
-            } else {
-                TantivyResult::handle_simple_distinct(&searcher, &condition, &field, limit, ascend)
-            }
+            TantivyResult::handle_simple_distinct(&searcher, &condition, &field, limit, ascend)
         }
     })
     .await??;
