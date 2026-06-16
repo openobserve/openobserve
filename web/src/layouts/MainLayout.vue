@@ -357,54 +357,63 @@ export default defineComponent({
         link: "/",
         exact: true,
         name: "home",
+        group: "observe" as const,
       },
       {
         title: t("menu.search"),
         icon: "search",
         link: "/logs",
         name: "logs",
+        group: "observe" as const,
       },
       {
         title: t("menu.metrics"),
         icon: "bar-chart",
         link: "/metrics",
         name: "metrics",
+        group: "observe" as const,
       },
       {
         title: t("menu.traces"),
         icon: "account-tree",
         link: "/traces",
         name: "traces",
+        group: "observe" as const,
       },
       {
         title: t("menu.rum"),
         icon: "devices",
         link: "/rum",
         name: "rum",
-      },
-      {
-        title: t("menu.dashboard"),
-        icon: "dashboard",
-        link: "/dashboards",
-        name: "dashboards",
-      },
-      {
-        title: t("menu.index"),
-        icon: "window",
-        link: "/streams",
-        name: "streams",
+        group: "observe" as const,
       },
       {
         title: t("menu.alerts"),
         icon: "shield-alert-outline",
         link: "/alerts",
         name: "alertList",
+        group: "observe" as const,
+      },
+      {
+        title: t("menu.dashboard"),
+        icon: "dashboard",
+        link: "/dashboards",
+        name: "dashboards",
+        group: "analyze" as const,
+      },
+      {
+        title: t("menu.index"),
+        icon: "window",
+        link: "/streams",
+        name: "streams",
+        group: "manage" as const,
       },
       {
         title: t("menu.ingestion"),
         icon: "data-plus-line",
         link: "/ingestion",
         name: "ingestion",
+        group: "manage" as const,
       },
       {
         title: t("menu.iam"),
@@ -412,12 +421,14 @@ export default defineComponent({
         link: "/iam",
         display: store.state?.currentuser?.role == "admin" ? true : false,
         name: "iam",
+        group: "admin" as const,
       },
       {
         title: t("menu.settings"),
         icon: "settings",
         link: "/settings",
         name: "settings",
+        group: "admin" as const,
       },
     ]);
 
@@ -546,6 +557,7 @@ export default defineComponent({
             icon: "notifications-active",
             link: "/incidents",
             name: "incidentList",
+            group: "analyze" as const,
           });
         }
       }
@@ -567,6 +579,7 @@ export default defineComponent({
             icon: "code",
             link: "/actions",
             name: "actionScripts",
+            group: "manage" as const,
           });
         }
       }
@@ -594,6 +607,7 @@ export default defineComponent({
           icon: "auto-awesome",
           link: "/ai",
           name: "aiObservability",
+          group: "observe" as const,
         });
       } else if (existingIndex !== -1) {
         linksList.value.splice(existingIndex, 1);
@@ -636,6 +650,7 @@ export default defineComponent({
         icon: "description",
         link: "/reports",
         name: "reports",
+        group: "analyze" as const,
       });
     }
 

@@ -20,6 +20,7 @@ const MainLayoutOpenSourceMixin = {
         icon: "graph-2",
         link: "/pipeline",
         name: "pipeline",
+        group: "manage",
       });
 
       return linksList.value;

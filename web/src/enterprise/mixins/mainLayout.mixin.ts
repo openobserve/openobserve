@@ -26,6 +26,7 @@ const MainLayoutCloudMixin = {
         icon: "graph-2",
         link: "/pipeline",
         name: "pipeline",
+        group: "manage",
       });
 
       if(!store.state.zoConfig?.custom_hide_menus
@@ -36,6 +37,7 @@ const MainLayoutCloudMixin = {
           title: t("menu.billings"),
           icon: "payments",
           link: "/billings",
+          group: "manage",
         });
       }
 
