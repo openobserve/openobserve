@@ -181,7 +181,9 @@ jobs:
             const merged = context.eventName === 'pull_request';
             core.setOutput('mode', merged ? 'merged' : 'open');
             core.setOutput('base_ref', merged ? (data.base ? data.base.ref : 'main') : headRef);
-            core.setOutput('work_branch', merged ? `autoe2e/pr-${pr}` : `autoe2e/${headRef}`);
+            // Branch identity is keyed on the (immutable) PR number in BOTH modes — survives a
+            // feature-branch rename, so re-runs/reuse always find the same test branch.
+            core.setOutput('work_branch', `autoe2e/pr-${pr}`);
             core.setOutput('checkout_ref', merged ? (data.merge_commit_sha || headSha) : headSha);
             core.info(`PR #${pr} author=@${author} allowed=${allowed} head=${data.head ? data.head.ref : '?'}`);
 
@@ -538,6 +540,10 @@ jobs:
         run: |
           SLUG=$(jq -r '.feature_slug // "feature"' docs/test_generator/ci/run-context.json)
           BRANCH="${WORK_BRANCH}"
+          # The source commit these tests were generated against (the checked-out PR head / merge
+          # commit). Recorded as a commit trailer below so a later run can tell whether the feature
+          # changed since (reuse / Flow 4a) — survives the hand-off strip (it's commit metadata).
+          SRC_SHA=$(git rev-parse HEAD)
           git config user.name "openobserve-bot"
           git config user.email "bot@openobserve.ai"
           git checkout -b "$BRANCH"
@@ -550,7 +556,8 @@ jobs:
           # SELF-CONTAINED: verify_heal reads it straight from the checkout, no artifact dependency.
           # Job 4 strips it back out before opening the PR, so it never reaches the PR diff or main.
           git add -f docs/test_generator/ci
-          git commit -m "test(autoe2e): generated E2E tests for #${PR_NUMBER} (${SLUG})"
+          git commit -m "test(autoe2e): generated E2E tests for #${PR_NUMBER} (${SLUG})" \
+            -m "e2e-source-sha: ${SRC_SHA}"
           # Explicit one-shot token (checkout used persist-credentials:false). Push only to autoe2e/*.
           # force_overwrite=false → plain push (won't clobber an existing/manually-edited branch).
           FORCE_FLAG="--force"
