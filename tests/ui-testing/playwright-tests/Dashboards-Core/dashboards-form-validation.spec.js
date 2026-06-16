@@ -1068,9 +1068,94 @@ test.describe("Dashboard ConfigPanel form validation", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// AddPanel — panel name form validation
+// Creates a dashboard in beforeEach (idempotent) then opens the panel editor.
+// ─────────────────────────────────────────────────────────────────────────────
+
+test.describe("Dashboard AddPanel panel name form validation", () => {
+    test.describe.configure({ mode: 'serial' });
+
+    const dashName = 'e2e_fv_add_panel_001';
+    let pm;
+
+    test.beforeEach(async ({ page }, testInfo) => {
+        testLogger.testStart(testInfo.title, testInfo.file);
+        await navigateToBase(page);
+        pm = new PageManager(page);
+
+        await pm.dashboardList.menuItem('dashboards-item');
+        await pm.dashboardsFormValidation.getDashboardSearchLocator().waitFor({ state: 'visible', timeout: 20000 });
+
+        const dashLink = pm.dashboardsFormValidation.getDashboardByNameLocator(dashName);
+        const exists = await dashLink.isVisible().catch(() => false);
+        if (!exists) {
+            await pm.dashboardCreate.createDashboard(dashName);
+            await pm.dashboardCreate.addPanel();
+        } else {
+            await pm.dashboardsFormValidation.openDashboardByName(dashName);
+            await pm.dashboardsFormValidation.waitForTabListContainer(15000);
+            await pm.dashboardCreate.addPanelSmart();
+        }
+
+        // Confirm we are in the panel editor (apply button is the reliable anchor)
+        await pm.dashboardsFormValidation.getPanelNameFieldLocator().waitFor({ state: 'visible', timeout: 15000 });
+        testLogger.info('Panel editor opened');
+    });
+
+    test("should show error or disable save when panel name is empty", {
+        tag: ['@domainFormValidation', '@P1', '@smoke']
+    }, async ({ page }) => {
+        testLogger.info('TC-AP-001: Panel name required error on empty save');
+
+        // Clear any pre-filled name
+        await pm.dashboardsFormValidation.clearPanelName();
+
+        // Attempt to save
+        await pm.dashboardsFormValidation.getPanelSaveBtnLocator().click();
+
+        const nameError  = pm.dashboardsFormValidation.getPanelNameErrorLocator();
+        const saveBtn    = pm.dashboardsFormValidation.getPanelSaveBtnLocator();
+
+        const errorVisible = await nameError.isVisible().catch(() => false);
+        const btnDisabled  = await saveBtn.isDisabled().catch(() => false);
+
+        expect(errorVisible || btnDisabled).toBe(true);
+        if (errorVisible) {
+            await expect(nameError).toContainText(/required/i);
+        }
+        testLogger.info('Panel name required error or disabled save confirmed');
+    });
+
+    test("should enable save when a valid panel name is entered", {
+        tag: ['@domainFormValidation', '@P1', '@smoke']
+    }, async ({ page }) => {
+        testLogger.info('TC-AP-002: Save button enabled with valid panel name');
+
+        await pm.dashboardsFormValidation.fillPanelName('e2e_fv_panel_valid_001');
+
+        const saveBtn = pm.dashboardsFormValidation.getPanelSaveBtnLocator();
+        await expect(saveBtn).toBeEnabled({ timeout: 5000 });
+        testLogger.info('Save button enabled for valid panel name');
+    });
+
+    test("should discard changes and navigate back when Discard is clicked", {
+        tag: ['@domainFormValidation', '@P1']
+    }, async ({ page }) => {
+        testLogger.info('TC-AP-003: Discard button navigates away from panel editor');
+
+        await pm.dashboardsFormValidation.getPanelDiscardBtnLocator().waitFor({ state: 'visible', timeout: 5000 });
+        await pm.dashboardsFormValidation.getPanelDiscardBtnLocator().click();
+
+        // After discard we should leave the /add_panel URL
+        await page.waitForURL(url => !url.pathname.includes('add_panel'), { timeout: 10000 });
+        testLogger.info('Navigated away from panel editor after Discard');
+    });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // BuildFieldPopUp form validation
-// Opens when a user clicks on a y-axis field chip in the panel editor.
-// Tests are skipped until the y-axis field chip data-test selector is confirmed.
+// Opens when a user clicks a y-axis field chip (data-test="dashboard-y-item-y_axis_1")
+// in the panel editor. Requires e2e_automate stream with kubernetes_pod_name field.
 // ─────────────────────────────────────────────────────────────────────────────
 
 test.describe("Dashboard BuildFieldPopUp form validation", () => {
@@ -1084,7 +1169,6 @@ test.describe("Dashboard BuildFieldPopUp form validation", () => {
         await navigateToBase(page);
         pm = new PageManager(page);
 
-        // Navigate to dashboards list
         await pm.dashboardList.menuItem('dashboards-item');
         await pm.dashboardsFormValidation.getDashboardSearchLocator().waitFor({ state: 'visible', timeout: 20000 });
 
@@ -1103,20 +1187,23 @@ test.describe("Dashboard BuildFieldPopUp form validation", () => {
         await pm.chartTypeSelector.selectStreamType('logs');
         await pm.chartTypeSelector.selectStream('e2e_automate');
         await pm.chartTypeSelector.searchAndAddField('kubernetes_pod_name', 'y');
-        testLogger.info('Panel editor open with y-axis field added');
+
+        // Confirm the y-axis chip is rendered before each test
+        await pm.dashboardsFormValidation.getYAxisFieldChipFirstLocator()
+            .waitFor({ state: 'visible', timeout: 10000 });
+        testLogger.info('Panel editor open with y-axis field chip rendered');
     });
 
     test("should open BuildFieldPopUp container when a y-axis field chip is clicked", {
         tag: ['@domainFormValidation', '@P1', '@smoke']
     }, async ({ page }) => {
-        test.skip(true, 'requires identifying the y-axis field chip selector — unskip once chip data-test is known');
-
         testLogger.info('TC-BF-001: BuildFieldPopUp container opens on y-axis chip click');
 
-        // Click the y-axis field chip (selector TBD once chip data-test is confirmed)
-        // await page.locator('[data-test="dashboard-y-item-chip"]').first().click();
+        // Click the chip — alias "y_axis_1" is assigned to the first added y-axis field
+        await pm.dashboardsFormValidation.getYAxisFieldChipFirstLocator().click();
 
-        await pm.dashboardsFormValidation.getBuildFieldPopupContainerLocator().waitFor({ state: 'visible', timeout: 10000 });
+        await pm.dashboardsFormValidation.getBuildFieldPopupContainerLocator()
+            .waitFor({ state: 'visible', timeout: 10000 });
         await expect(pm.dashboardsFormValidation.getBuildFieldPopupContainerLocator()).toBeVisible();
         testLogger.info('BuildFieldPopUp container visible after chip click');
     });
@@ -1124,14 +1211,12 @@ test.describe("Dashboard BuildFieldPopUp form validation", () => {
     test("should render label input inside BuildFieldPopUp", {
         tag: ['@domainFormValidation', '@P1', '@smoke']
     }, async ({ page }) => {
-        test.skip(true, 'requires identifying the y-axis field chip selector — unskip once chip data-test is known');
-
         testLogger.info('TC-BF-002: BuildFieldPopUp label input is present');
 
-        // Click the y-axis field chip (selector TBD once chip data-test is confirmed)
-        // await page.locator('[data-test="dashboard-y-item-chip"]').first().click();
+        await pm.dashboardsFormValidation.getYAxisFieldChipFirstLocator().click();
 
-        await pm.dashboardsFormValidation.getBuildFieldPopupContainerLocator().waitFor({ state: 'visible', timeout: 10000 });
+        await pm.dashboardsFormValidation.getBuildFieldPopupContainerLocator()
+            .waitFor({ state: 'visible', timeout: 10000 });
         await expect(pm.dashboardsFormValidation.getBuildFieldLabelInputLocator()).toBeVisible();
         testLogger.info('BuildFieldPopUp label input rendered correctly');
     });

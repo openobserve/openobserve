@@ -387,6 +387,71 @@ test.describe('Alerts Form Validation', { tag: ['@alerts-form-validation', '@P0'
   });
 
   // ═══════════════════════════════════════════════════════════════════════════
+  // FieldsInput — condition row management (add / delete)
+  // Shares the alert-conditions-* namespace with FilterCondition.
+  // Requires at least one stream (e2e_automate) in the environment.
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  test.describe('FieldsInput condition management', { tag: ['@alertsFormValidation', '@P1'] }, () => {
+    test.describe.configure({ mode: 'serial' });
+
+    test('should add a second condition row when Add Condition button is clicked', {
+      tag: ['@alertsFormValidation', '@P1'],
+    }, async ({ page }) => {
+      await fvPage.openAddAlertWizard();
+
+      await fvPage.getWizardStreamTypeDropdownLocator().waitFor({ state: 'visible', timeout: 15000 });
+      await fvPage.selectWizardStreamType('Logs');
+      await fvPage.selectWizardStreamName('e2e_automate');
+      await fvPage.clickWizardNext();
+
+      // Wait for the first condition row to appear
+      const row0 = fvPage.getFieldsInputRowLocator(0);
+      await row0.waitFor({ state: 'visible', timeout: 10000 });
+      await expect(row0).toBeVisible();
+
+      // Click "Add Condition" to append a second row
+      const addConditionBtn = fvPage.getFieldsInputAddConditionBtnLocator();
+      await addConditionBtn.waitFor({ state: 'visible', timeout: 5000 });
+      await addConditionBtn.click();
+
+      // Second row (index 1 → data-test="alert-conditions-2") should now exist
+      const row1 = fvPage.getFieldsInputRowLocator(1);
+      await expect(row1).toBeVisible({ timeout: 5000 });
+      testLogger.info('Second condition row added successfully');
+    });
+
+    test('should remove a condition row when Delete button is clicked', {
+      tag: ['@alertsFormValidation', '@P1'],
+    }, async ({ page }) => {
+      await fvPage.openAddAlertWizard();
+
+      await fvPage.getWizardStreamTypeDropdownLocator().waitFor({ state: 'visible', timeout: 15000 });
+      await fvPage.selectWizardStreamType('Logs');
+      await fvPage.selectWizardStreamName('e2e_automate');
+      await fvPage.clickWizardNext();
+
+      const row0 = fvPage.getFieldsInputRowLocator(0);
+      await row0.waitFor({ state: 'visible', timeout: 10000 });
+
+      // Add a second row so we have two, then delete the first
+      const addConditionBtn = fvPage.getFieldsInputAddConditionBtnLocator();
+      await addConditionBtn.waitFor({ state: 'visible', timeout: 5000 });
+      await addConditionBtn.click();
+      await fvPage.getFieldsInputRowLocator(1).waitFor({ state: 'visible', timeout: 5000 });
+
+      // Delete the first condition row
+      const deleteBtn = fvPage.getFieldsInputDeleteConditionBtnLocator().first();
+      await deleteBtn.waitFor({ state: 'visible', timeout: 5000 });
+      await deleteBtn.click();
+
+      // After deletion only one row remains — row index 1 should no longer exist
+      await expect(fvPage.getFieldsInputRowLocator(1)).not.toBeVisible({ timeout: 5000 });
+      testLogger.info('Condition row deleted; only one row remains');
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
   // ImportDestination
   // ═══════════════════════════════════════════════════════════════════════════
 

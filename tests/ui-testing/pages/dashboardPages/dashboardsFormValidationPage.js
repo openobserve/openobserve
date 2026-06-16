@@ -155,6 +155,15 @@ export class DashboardsFormValidationPage {
         // ── BuildFieldPopUp ───────────────────────────────────────────────────
         this.buildFieldPopupContainer = '[data-test="dashboard-build-field-popup-container"]';
         this.buildFieldLabelInput     = '[data-test="dashboard-x-item-input-field"]';
+        // Y-axis field chip: data-test="dashboard-y-item-${alias}" where alias = y_axis_1 for the first added field
+        this.yAxisFieldChipFirst      = '[data-test="dashboard-y-item-y_axis_1"]';
+
+        // ── AddPanel / PanelEditor toolbar ───────────────────────────────────
+        // OInput data-test="dashboard-panel-name" → -field (fill), -error (error)
+        this.panelNameField   = '[data-test="dashboard-panel-name-field"]';
+        this.panelNameError   = '[data-test="dashboard-panel-name-error"]';
+        this.panelSaveBtn     = '[data-test="dashboard-panel-save"]';
+        this.panelDiscardBtn  = '[data-test="dashboard-panel-discard"]';
     }
 
     // ── Navigation ────────────────────────────────────────────────────────────
@@ -535,4 +544,26 @@ export class DashboardsFormValidationPage {
 
     getBuildFieldPopupContainerLocator(){ return this.page.locator(this.buildFieldPopupContainer); }
     getBuildFieldLabelInputLocator()    { return this.page.locator(this.buildFieldLabelInput); }
+    getYAxisFieldChipFirstLocator()     { return this.page.locator(this.yAxisFieldChipFirst); }
+
+    // ── AddPanel / PanelEditor helpers ────────────────────────────────────────
+
+    getPanelNameFieldLocator()  { return this.page.locator(this.panelNameField); }
+    getPanelNameErrorLocator()  { return this.page.locator(this.panelNameError); }
+    getPanelSaveBtnLocator()    { return this.page.locator(this.panelSaveBtn); }
+    getPanelDiscardBtnLocator() { return this.page.locator(this.panelDiscardBtn); }
+
+    async fillPanelName(name) {
+        const field = this.page.locator(this.panelNameField);
+        await field.waitFor({ state: 'visible', timeout: 10000 });
+        await field.click({ clickCount: 3 });
+        await field.fill(name);
+    }
+
+    async clearPanelName() {
+        const field = this.page.locator(this.panelNameField);
+        await field.waitFor({ state: 'visible', timeout: 10000 });
+        await field.click({ clickCount: 3 });
+        await field.fill('');
+    }
 }

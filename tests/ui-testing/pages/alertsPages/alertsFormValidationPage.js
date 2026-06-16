@@ -129,6 +129,16 @@ export class AlertsFormValidationPage {
     // Value input: OInput → fill via -field, error via -error
     this.filterConditionValueField = '[data-test="alert-conditions-value-input-field"]';
     this.filterConditionValueError = '[data-test="alert-conditions-value-input-error"]';
+
+    // ── FieldsInput — condition management buttons ─────────────────────────────
+    // FieldsInput.vue wraps condition rows; same alert-conditions-* namespace
+    // Initial "Add" button shown when no conditions exist
+    this.fieldsInputAddBtn         = '[data-test="alert-conditions-add-btn"]';
+    // Per-row Add / Delete buttons (inside each condition row)
+    this.fieldsInputAddConditionBtn    = '[data-test="alert-conditions-add-condition-btn"]';
+    this.fieldsInputDeleteConditionBtn = '[data-test="alert-conditions-delete-condition-btn"]';
+    // Row wrapper (1-indexed): data-test="alert-conditions-${index+1}"
+    // Use getFieldsInputRowLocator(index) below (0-based → selector is index+1)
   }
 
   // ── Navigation helpers ─────────────────────────────────────────────────────
@@ -343,6 +353,13 @@ export class AlertsFormValidationPage {
   getFilterConditionOperatorErrorLocator()     { return this.page.locator(this.filterConditionOperatorError); }
   getFilterConditionValueFieldLocator()        { return this.page.locator(this.filterConditionValueField); }
   getFilterConditionValueErrorLocator()        { return this.page.locator(this.filterConditionValueError); }
+
+  // ── FieldsInput locator getters ───────────────────────────────────────────
+  getFieldsInputAddBtnLocator()            { return this.page.locator(this.fieldsInputAddBtn); }
+  getFieldsInputAddConditionBtnLocator()   { return this.page.locator(this.fieldsInputAddConditionBtn); }
+  getFieldsInputDeleteConditionBtnLocator(){ return this.page.locator(this.fieldsInputDeleteConditionBtn); }
+  // 0-based index — selector uses 1-based (index+1)
+  getFieldsInputRowLocator(index)          { return this.page.locator(`[data-test="alert-conditions-${index + 1}"]`); }
 
   // ── Alert wizard helpers ───────────────────────────────────────────────────
 
