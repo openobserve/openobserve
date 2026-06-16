@@ -16,7 +16,7 @@ the Free Software Foundation, either version 3 of the License, or
       v-if="formPage?.entity === 'scorers'"
       :org-id="orgId"
       :mode="formPage.mode"
-      :row="dialog.row as Scorer | null"
+      :row="scorerFormRow"
       :scorer-type="pendingScorerType"
       :providers="providers"
       :score-configs="scoreConfigs"
@@ -31,7 +31,7 @@ the Free Software Foundation, either version 3 of the License, or
       v-else-if="formPage?.entity === 'jobs'"
       :org-id="orgId"
       :mode="formPage.mode"
-      :row="dialog.row as EvalJob | null"
+      :row="jobFormRow"
       :scorers="scorers"
       @saved="handleSaved"
       @cancel="closeFormPage"
@@ -261,7 +261,7 @@ the Free Software Foundation, either version 3 of the License, or
         v-if="dialog.open && activeTab === 'scoreConfigs'"
         :org-id="orgId"
         :mode="dialog.mode"
-        :row="dialog.row as ScoreConfig | null"
+        :row="scoreConfigDialogRow"
         @saved="handleSaved"
         @cancel="closeDialog"
       />
@@ -459,6 +459,12 @@ const dialog = ref<{
   mode: "create",
   row: null,
 });
+
+const scorerFormRow = computed(() => dialog.value.row as Scorer | null);
+const jobFormRow = computed(() => dialog.value.row as EvalJob | null);
+const scoreConfigDialogRow = computed(
+  () => dialog.value.row as ScoreConfig | null,
+);
 
 const viewRow = ref<ScoreConfig | null>(null);
 const scorerViewRow = ref<Scorer | null>(null);

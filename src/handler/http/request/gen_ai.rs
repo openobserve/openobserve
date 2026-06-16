@@ -24,17 +24,16 @@ use axum::{
 use config::meta::gen_ai::GenAiAgentMappingConfig;
 #[cfg(feature = "enterprise")]
 use config::meta::stream::StreamType;
-#[cfg(not(feature = "enterprise"))]
-use serde::{Deserialize, Serialize};
-#[cfg(not(feature = "enterprise"))]
-use utoipa::{IntoParams, ToSchema};
-
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::llm_evaluations::agents;
 #[cfg(feature = "enterprise")]
 pub use o2_enterprise::enterprise::llm_evaluations::agents::{
     AgentListQuery, GenAiAgentListItem, GenAiAgentListResponse,
 };
+#[cfg(not(feature = "enterprise"))]
+use serde::{Deserialize, Serialize};
+#[cfg(not(feature = "enterprise"))]
+use utoipa::{IntoParams, ToSchema};
 
 #[cfg(feature = "enterprise")]
 use crate::common::utils::auth::check_permissions;

@@ -36,6 +36,9 @@ const mockGetStreams = vi.fn().mockResolvedValue({
   ],
 });
 const mockRouterPush = vi.fn();
+const mockListAgents = vi.hoisted(() =>
+  vi.fn().mockResolvedValue({ agents: [] }),
+);
 
 import { ref } from "vue";
 
@@ -91,6 +94,12 @@ vi.mock("@/composables/useStreams", () => ({
   default: () => ({
     getStreams: mockGetStreams,
   }),
+}));
+
+vi.mock("@/services/gen-ai-agent-mapping.service", () => ({
+  default: {
+    listAgents: mockListAgents,
+  },
 }));
 
 vi.mock("vue-router", () => ({
@@ -154,6 +163,11 @@ function mountDashboard(
   });
 }
 
+async function flushDashboard() {
+  await flushPromises();
+  await flushPromises();
+}
+
 beforeEach(() => {
   // Fresh mock state for every test.
   vi.clearAllMocks();
@@ -189,6 +203,7 @@ beforeEach(() => {
       { name: "other", settings: { is_llm_stream: false } },
     ],
   });
+  mockListAgents.mockResolvedValue({ agents: [] });
 });
 
 afterEach(() => {
@@ -205,7 +220,7 @@ describe("LLMInsightsDashboard — loadInsights guards", () => {
   // race during initial mount before loadTraceStreams resolves.
   it("does not call fetchAll when activeStream is empty", async () => {
     const wrapper = mountDashboard();
-    await flushPromises();
+    await flushDashboard();
     // Manually clear activeStream (loadTraceStreams may have set it).
     (wrapper.vm as any).activeStream = "";
     mockFetchAll.mockClear();
@@ -218,7 +233,7 @@ describe("LLMInsightsDashboard — loadInsights guards", () => {
   // dashboard is in a "bootstrap" state — bail without firing SQL.
   it("does not call fetchAll when start is missing", async () => {
     const wrapper = mountDashboard({ startTime: 0 });
-    await flushPromises();
+    await flushDashboard();
     mockFetchAll.mockClear();
     await (wrapper.vm as any).loadInsights();
     expect(mockFetchAll).not.toHaveBeenCalled();
@@ -226,7 +241,7 @@ describe("LLMInsightsDashboard — loadInsights guards", () => {
 
   it("does not call fetchAll when end is missing", async () => {
     const wrapper = mountDashboard({ endTime: 0 });
-    await flushPromises();
+    await flushDashboard();
     mockFetchAll.mockClear();
     await (wrapper.vm as any).loadInsights();
     expect(mockFetchAll).not.toHaveBeenCalled();
@@ -236,7 +251,7 @@ describe("LLMInsightsDashboard — loadInsights guards", () => {
   // uses on Refresh to side-step Vue's next-tick prop propagation lag.
   it("accepts explicit start/end args overriding props", async () => {
     const wrapper = mountDashboard();
-    await flushPromises();
+    await flushDashboard();
     mockFetchAll.mockClear();
     await (wrapper.vm as any).loadInsights(123, 456);
     expect(mockFetchAll).toHaveBeenCalledWith("default", 123, 456);
@@ -245,7 +260,7 @@ describe("LLMInsightsDashboard — loadInsights guards", () => {
   // Default path — no args means use props.
   it("falls back to props when no args passed", async () => {
     const wrapper = mountDashboard();
-    await flushPromises();
+    await flushDashboard();
     mockFetchAll.mockClear();
     await (wrapper.vm as any).loadInsights();
     expect(mockFetchAll).toHaveBeenCalledWith(
@@ -260,7 +275,7 @@ describe("LLMInsightsDashboard — loadInsights guards", () => {
   // verify both ordering and content.
   it("writes the active stream to localStorage before fetching", async () => {
     const wrapper = mountDashboard();
-    await flushPromises();
+    await flushDashboard();
     localStorage.clear();
     mockFetchAll.mockClear();
     await (wrapper.vm as any).loadInsights();
@@ -279,7 +294,7 @@ describe("LLMInsightsDashboard — refresh (parent entry point)", () => {
   // fetch with the previous window. Verify the args reach fetchAll.
   it("forwards explicit start/end through to fetchAll", async () => {
     const wrapper = mountDashboard();
-    await flushPromises();
+    await flushDashboard();
     mockFetchAll.mockClear();
     await (wrapper.vm as any).refresh(999, 1999);
     expect(mockFetchAll).toHaveBeenCalledWith("default", 999, 1999);
@@ -288,7 +303,7 @@ describe("LLMInsightsDashboard — refresh (parent entry point)", () => {
   // No args → behaves like a normal loadInsights (falls back to props).
   it("falls back to props when called with no args", async () => {
     const wrapper = mountDashboard();
-    await flushPromises();
+    await flushDashboard();
     mockFetchAll.mockClear();
     await (wrapper.vm as any).refresh();
     expect(mockFetchAll).toHaveBeenCalledWith(
@@ -308,11 +323,11 @@ describe("LLMInsightsDashboard — onStreamChange", () => {
   // Persists to localStorage as a side-effect of loadInsights.
   it("fetches with the new active stream", async () => {
     const wrapper = mountDashboard();
-    await flushPromises();
+    await flushDashboard();
     mockFetchAll.mockClear();
     (wrapper.vm as any).activeStream = "other";
     (wrapper.vm as any).onStreamChange();
-    await flushPromises();
+    await flushDashboard();
     expect(mockFetchAll).toHaveBeenCalledWith(
       "other",
       1_700_000_000_000_000,
@@ -332,7 +347,7 @@ describe("LLMInsightsDashboard — onMounted", () => {
   // (so the dashboard discovered LLM streams) and fetchAll fired.
   it("fetches streams then loads insights on first mount", async () => {
     mountDashboard();
-    await flushPromises();
+    await flushDashboard();
     expect(mockGetStreams).toHaveBeenCalled();
     expect(mockFetchAll).toHaveBeenCalled();
   });
@@ -349,7 +364,7 @@ describe("LLMInsightsDashboard — onMounted", () => {
       ],
     });
     const wrapper = mountDashboard();
-    await flushPromises();
+    await flushDashboard();
     expect((wrapper.vm as any).availableStreams).toEqual(["a", "c"]);
   });
 
@@ -361,7 +376,7 @@ describe("LLMInsightsDashboard — onMounted", () => {
       list: [{ name: "default", settings: { is_llm_stream: true } }],
     });
     const wrapper = mountDashboard();
-    await flushPromises();
+    await flushDashboard();
     expect((wrapper.vm as any).activeStream).toBe("default");
   });
 
@@ -374,7 +389,7 @@ describe("LLMInsightsDashboard — onMounted", () => {
       list: [{ name: "alive", settings: { is_llm_stream: true } }],
     });
     const wrapper = mountDashboard();
-    await flushPromises();
+    await flushDashboard();
     expect((wrapper.vm as any).activeStream).toBe("alive");
   });
 
@@ -382,7 +397,7 @@ describe("LLMInsightsDashboard — onMounted", () => {
   it("falls back to empty stream list when getStreams rejects", async () => {
     mockGetStreams.mockRejectedValueOnce(new Error("boom"));
     const wrapper = mountDashboard();
-    await flushPromises();
+    await flushDashboard();
     expect((wrapper.vm as any).availableStreams).toEqual([]);
     expect((wrapper.vm as any).activeStream).toBe("");
     // No fetchAll because no active stream.
@@ -401,7 +416,7 @@ describe("LLMInsightsDashboard — onUnmounted", () => {
   // streaming results to a component that's no longer rendered.
   it("calls cancelAll on unmount", async () => {
     const wrapper = mountDashboard();
-    await flushPromises();
+    await flushDashboard();
     mockCancelAll.mockClear();
     wrapper.unmount();
     expect(mockCancelAll).toHaveBeenCalledTimes(1);
@@ -418,7 +433,7 @@ describe("LLMInsightsDashboard — onViewTrace", () => {
   // detail page shows the same time range as the dashboard.
   it("routes to traceDetails with the current window", async () => {
     const wrapper = mountDashboard();
-    await flushPromises();
+    await flushDashboard();
     mockRouterPush.mockClear();
     (wrapper.vm as any).onViewTrace("trace-123");
     expect(mockRouterPush).toHaveBeenCalledWith({
@@ -437,7 +452,7 @@ describe("LLMInsightsDashboard — onViewTrace", () => {
   // "view-link" column receiving a row without a trace_id field.
   it("does nothing when traceId is empty", async () => {
     const wrapper = mountDashboard();
-    await flushPromises();
+    await flushDashboard();
     mockRouterPush.mockClear();
     (wrapper.vm as any).onViewTrace("");
     expect(mockRouterPush).not.toHaveBeenCalled();
