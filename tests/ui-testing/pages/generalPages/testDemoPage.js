@@ -31,7 +31,7 @@ export class TestDemoPage {
         this.priorityTrigger = page.locator('[data-test="test-demo-priority-select-trigger"]');
         this.priorityOutput = page.locator('[data-test="test-demo-priority-output"]');
         this.combinedBanner = page.locator('[data-test="test-demo-combined-banner"]');
-        this.combinedBannerIcon = page.locator('[data-test="test-demo-combined-banner"] [data-destructive-icon="true"]');
+        this.combinedBannerIcon = page.locator('[data-test="test-demo-combined-banner"] svg');
         this.priorityPopover = page.locator('[data-test="test-demo-priority-select-popover"]');
     }
 
@@ -62,7 +62,7 @@ export class TestDemoPage {
 
     // ===== NAVIGATION =====
     async navigateToTestDemo() {
-        await this.page.goto(`/test-demo?org_identifier=${process.env["ORGNAME"]}`);
+        await this.page.goto(`/web/test-demo?org_identifier=${process.env["ORGNAME"]}`);
         await this.pageRoot.waitFor({ state: 'visible', timeout: 10000 });
     }
 
@@ -145,11 +145,11 @@ export class TestDemoPage {
     }
 
     async expectCityTriggerDisabled() {
-        await expect(this.cityTrigger).toHaveAttribute('data-disabled');
+        await expect(this.cityTrigger).toBeDisabled();
     }
 
     async expectCityTriggerEnabled() {
-        await expect(this.cityTrigger).not.toHaveAttribute('data-disabled');
+        await expect(this.cityTrigger).toBeEnabled();
     }
 
     async expectCityTriggerPlaceholder(expectedPlaceholder) {
