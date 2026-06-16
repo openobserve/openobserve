@@ -437,16 +437,14 @@ class="tw:mr-1" />
                 <span v-else>
                   {{ cell.renderValue() }}
                 </span>
-                <O2AIContextAddBtn
-                  v-if="
-                    cell.column.columnDef.id ===
-                    store.state.zoConfig.timestamp_column
-                  "
-                  class="tw:absolute tw:right-0 tw:top-1/2 tw:transform tw:invisible tw:-translate-y-1/2 tw:-translate-x-1/2 ai-btn"
-                  @send-to-ai-chat="
-                    sendToAiChat(JSON.stringify(cell.row.original), true)
-                  "
-                />
+                <div
+                  v-if="cell.column.columnDef.id === store.state.zoConfig.timestamp_column"
+                  class="tw:absolute tw:right-0 tw:top-1/2 tw:-translate-y-1/2 tw:invisible ai-btn"
+                >
+                  <O2AIContextAddBtn
+                    @send-to-ai-chat="sendToAiChat(JSON.stringify(cell.row.original), true)"
+                  />
+                </div>
               </td>
             </template>
           </tr>
