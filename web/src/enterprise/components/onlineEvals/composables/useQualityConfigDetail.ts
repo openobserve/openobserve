@@ -392,10 +392,26 @@ export function useQualityConfigDetail(
     return [];
   });
 
+  // True when at least one score landed for this config in the window. Drives
+  // the detail panel's empty state so a freshly-created (but never-scored)
+  // config reads as "waiting for scores" instead of a wall of dashes.
+  const hasScores = computed<boolean>(() => {
+    if (dataType.value === "numeric")
+      return (toNumber(numericAgg.value?.total) ?? 0) > 0;
+    if (dataType.value === "boolean")
+      return (toNumber(booleanAgg.value?.total) ?? 0) > 0;
+    if (dataType.value === "categorical")
+      return (
+        categoricalRows.value.reduce((s, r) => s + (toNumber(r.c) ?? 0), 0) > 0
+      );
+    return false;
+  });
+
   return {
     isLoading,
     dataType,
     kpis,
+    hasScores,
     booleanAgg,
     categoricalRows,
     refresh,
