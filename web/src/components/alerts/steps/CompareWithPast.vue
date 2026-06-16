@@ -100,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OTooltip :content="t('alerts.compareWithPast.timeFrameTooltip')" side="right" align="center" max-width="300px" />
             </span>
           </div>
-          <div class="datetime-picker-wrapper tw:mt-2 tw:border tw:rounded">
+          <div class="datetime-picker-wrapper tw:mt-2 tw:border tw:rounded tw:!border-[#d0d0d0] tw:dark:!border-[#4a4a4a]">
             <CustomDateTimePicker
               v-model="picker.offSet"
               :picker="picker"
@@ -324,12 +324,3 @@ export default defineComponent({
 });
 </script>
 
-<style>
-.dark-mode-multi-window .datetime-picker-wrapper {
-  border-color: #4a4a4a !important;
-}
-
-.light-mode-multi-window .datetime-picker-wrapper {
-  border-color: #d0d0d0 !important;
-}
-</style>

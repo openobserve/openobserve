@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         variant="ghost"
         size="icon-sm"
-        class="scroll-to-bottom-btn tw:pointer-events-auto tw:backdrop-blur-sm tw:shadow-[0_2px_8px_rgba(0,0,0,0.2)]"
+        class="tw:pointer-events-auto tw:backdrop-blur-sm tw:shadow-[0_2px_8px_rgba(0,0,0,0.2)] tw:!border-2 tw:!border-[var(--o2-primary-color)] tw:!text-[var(--o2-primary-color)] tw:!bg-white/95 tw:dark:!bg-[rgba(30,30,30,0.9)]"
         data-test="anomaly-summary-scroll-btn"
         @click="scrollToBottom"
       >
@@ -92,17 +92,3 @@ onMounted(async () => {
   checkScrollState();
 });
 </script>
-
-<style>
-body.body--light .scroll-to-bottom-btn {
-  border: 2px solid var(--q-primary) !important;
-  color: var(--q-primary) !important;
-  background: rgba(255, 255, 255, 0.95) !important;
-}
-
-body.body--dark .scroll-to-bottom-btn {
-  border: 2px solid var(--q-primary) !important;
-  color: var(--q-primary) !important;
-  background: rgba(30, 30, 30, 0.9) !important;
-}
-</style>

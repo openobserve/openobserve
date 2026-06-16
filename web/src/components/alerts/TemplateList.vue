@@ -102,13 +102,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span>{{ row.name }}</span>
             <span
               v-if="row.isPrebuilt"
-              class="dimension-badge badge-blue tw:inline-flex tw:items-center tw:gap-0.5 tw:py-0.5 tw:px-2 tw:rounded-md tw:text-[11px] tw:font-medium tw:whitespace-nowrap tw:border tw:border-[#1d4ed8] tw:text-inherit"
+              class="tw:inline-flex tw:items-center tw:gap-0.5 tw:py-0.5 tw:px-2 tw:rounded-md tw:text-[11px] tw:font-medium tw:whitespace-nowrap tw:border tw:border-[#1d4ed8] tw:text-inherit tw:dark:text-white tw:dark:border-[#93c5fd]"
               :title="t('alert_templates.prebuiltBadgeHint')"
               data-test="alert-template-prebuilt-badge"
             >{{ t('alert_templates.prebuiltBadge') }}</span>
             <span
               v-else
-              class="dimension-badge tw:inline-flex tw:items-center tw:gap-0.5 tw:py-0.5 tw:px-2 tw:rounded-md tw:text-[11px] tw:font-medium tw:whitespace-nowrap tw:border tw:border-[#d1d5db] tw:text-inherit"
+              class="tw:inline-flex tw:items-center tw:gap-0.5 tw:py-0.5 tw:px-2 tw:rounded-md tw:text-[11px] tw:font-medium tw:whitespace-nowrap tw:border tw:border-[#d1d5db] tw:text-inherit tw:dark:text-white tw:dark:border-[#4b5563]"
               data-test="alert-template-custom-badge"
             >{{ t('alert_templates.customBadge') }}</span>
           </div>
@@ -591,15 +591,3 @@ const bulkDeleteTemplates = () => {
     });
 };
 </script>
-<style>
-/* Badge style copied from ModelPricingList.vue so the "Prebuilt" / "Default"
-   labels match the LLM-pricing list visually. */
-body.body--dark .dimension-badge {
-  color: #ffffff;
-  border-color: #4b5563;
-}
-
-body.body--dark .badge-blue {
-  border-color: #93c5fd;
-}
-</style>

@@ -145,6 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           name="history"
           layout="flex-col"
           stretch
+          class="tw:flex-1"
         >
           <div
             class="tw:flex tw:h-full tw:flex-col tw:flex-1 tw:overflow-hidden tw:px-2 tw:py-2"
@@ -307,6 +308,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           name="condition"
           layout="flex-col"
           stretch
+          class="tw:flex-1"
         >
           <div
             class="tw:flex tw:flex-col tw:flex-1 tw:overflow-hidden tw:px-2 tw:py-2"
@@ -671,7 +673,7 @@ const getRowClass = (row: any) => {
       case "firing":
       case "error":
       case "anomaly":
-        return "row-error-dark";
+        return "tw:!bg-[#2d1b1b]";
       default:
         return "";
     }
@@ -680,7 +682,7 @@ const getRowClass = (row: any) => {
       case "firing":
       case "error":
       case "anomaly":
-        return "row-error-light";
+        return "tw:!bg-[#fff5f5]";
       default:
         return "";
     }
@@ -849,18 +851,3 @@ watch(
   { immediate: true },
 );
 </script>
-
-<style>
-/* ── Row tints ── */
-.row-error-light {
-  background: #fff5f5 !important;
-}
-.row-error-dark {
-  background: #2d1b1b !important;
-}
-
-/* ── Tab panel fill height ── */
-.o-tab-panel {
-  flex: 1;
-}
-</style>

@@ -207,7 +207,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OTooltip
                     v-if="row.name"
                     :content="row.name"
-                    content-class="alert-name-tooltip"
+                    content-class="tw:max-w-[400px] tw:whitespace-normal tw:break-words tw:text-xs"
                   />
                 </template>
 
@@ -216,7 +216,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OTooltip
                     v-if="row.owner?.length > 15"
                     :content="row.owner"
-                    content-class="alert-name-tooltip"
+                    content-class="tw:max-w-[400px] tw:whitespace-normal tw:break-words tw:text-xs"
                   />
                 </template>
 
@@ -2728,13 +2728,6 @@ export default defineComponent({
 </script>
 
 <style>
-.alert-name-tooltip {
-  max-width: 400px;
-  white-space: normal;
-  word-wrap: break-word;
-  font-size: 12px;
-}
-
 @media (max-width: 1440px) {
   .app-tabs-container .o2-tab {
     padding-left: 0.75rem !important;

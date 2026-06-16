@@ -79,19 +79,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="card-container tw:p-2 tw:mb-2">
             <div class="tw:flex tw:items-center tw:gap-2">
               <div class="col-auto">
-                <OBadge variant="success" class="summary-chip tw:text-sm!">
-                  <strong>{{ diffData.additions.length }}</strong
+                <OBadge variant="success" class="tw:text-sm!">
+                  <strong class="tw:text-[15px]">{{ diffData.additions.length }}</strong
                   >&nbsp;New
                 </OBadge>
               </div>
               <div class="col-auto">
-                <OBadge variant="warning" class="summary-chip tw:text-sm!">
-                  <strong>{{ diffData.modifications.length }}</strong
+                <OBadge variant="warning" class="tw:text-sm!">
+                  <strong class="tw:text-[15px]">{{ diffData.modifications.length }}</strong
                   >&nbsp;Modified
                 </OBadge>
               </div>
               <div class="col-auto">
-                <OBadge variant="default" class="summary-chip tw:text-sm!">
+                <OBadge variant="default" class="tw:text-sm!">
                   {{ diffData.unchanged.length }} Unchanged
                 </OBadge>
               </div>
@@ -293,7 +293,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="tw:text-xs tw:mb-1">
           {{ selectedModification?.current.fields.length }} fields
         </div>
-        <div class="field-chips-container tw:max-h-[250px] tw:overflow-y-auto tw:p-2 tw:bg-[var(--q-dark)] tw:rounded">
+        <div class="field-chips-container tw:max-h-[250px] tw:overflow-y-auto tw:p-2 tw:bg-[var(--o2-primary-background)] tw:rounded">
           <OBadge
             v-for="field in selectedModification?.current.fields"
             :key="`current-${field}`"
@@ -310,7 +310,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="tw:text-xs tw:mb-1">
           {{ selectedModification?.proposed.fields.length }} fields
         </div>
-        <div class="field-chips-container tw:max-h-[250px] tw:overflow-y-auto tw:p-2 tw:bg-[var(--q-dark)] tw:rounded">
+        <div class="field-chips-container tw:max-h-[250px] tw:overflow-y-auto tw:p-2 tw:bg-[var(--o2-primary-background)] tw:rounded">
           <OBadge
             v-for="field in selectedModification?.proposed.fields"
             :key="`proposed-${field}`"
@@ -580,25 +580,21 @@ const handleJsonUpdate = async (jsonArray: any[]) => {
 </script>
 
 <style>
-.compact-file-input .q-field__control {
-  min-height: 40px;
-}
-
 .groups-scroll-container::-webkit-scrollbar {
   width: 8px;
 }
 
 .groups-scroll-container::-webkit-scrollbar-track {
-  background: var(--q-dark-page);
+  background: var(--o2-primary-background);
 }
 
 .groups-scroll-container::-webkit-scrollbar-thumb {
-  background: var(--q-primary);
+  background: var(--o2-primary-color);
   border-radius: 4px;
 }
 
 .groups-scroll-container::-webkit-scrollbar-thumb:hover {
-  background: var(--q-primary-dark);
+  background: var(--o2-primary-dark, var(--o2-primary-color));
 }
 
 .field-chips-container::-webkit-scrollbar {
@@ -606,15 +602,12 @@ const handleJsonUpdate = async (jsonArray: any[]) => {
 }
 
 .field-chips-container::-webkit-scrollbar-track {
-  background: var(--q-dark-page);
+  background: var(--o2-primary-background);
 }
 
 .field-chips-container::-webkit-scrollbar-thumb {
-  background: var(--q-primary);
+  background: var(--o2-primary-color);
   border-radius: 3px;
 }
 
-.summary-chip strong {
-  font-size: 15px;
-}
 </style>

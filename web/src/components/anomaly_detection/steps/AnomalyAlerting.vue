@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               valueKey="name"
               multiple
               searchable
-              class="destination-select tw:min-h-auto! tw:h-auto!"
+              class="tw:min-h-auto! tw:h-auto!"
               style="min-width: 300px; max-width: 420px"
               data-test="anomaly-destination"
             >
@@ -201,32 +201,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style>
-/* Override the compact 28px from alert-v3-select — chips need flexible height */
-.destination-select .q-field__inner {
-  min-height: auto !important;
-  max-height: none !important;
-  height: auto !important;
-}
-
-.destination-select .q-field__control {
-  min-height: 1.75rem !important;
-  max-height: none !important;
-  height: auto !important;
-  flex-wrap: nowrap;
-}
-
-.destination-select .q-field__control-container {
-  flex-wrap: nowrap;
-  overflow: hidden;
-}
-
-.destination-select .q-field__marginal {
-  height: auto !important;
-}
-
-.destination-select .q-field__append {
-  height: auto !important;
-}
-</style>

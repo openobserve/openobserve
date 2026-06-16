@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :style="previewSectionStyle"
     >
       <div
-        class="section-header tw:flex tw:items-center tw:justify-between tw:px-4 tw:py-3 tw:cursor-pointer tw:shrink-0 tw:border-b tw:border-[var(--o2-border-color,rgba(0,0,0,0.08))] tw:transition-all tw:duration-200 tw:rounded-t-md tw:select-none"
+        class="tw:flex tw:items-center tw:justify-between tw:px-4 tw:py-3 tw:cursor-pointer tw:shrink-0 tw:border-b tw:border-[var(--o2-border-color,rgba(0,0,0,0.08))] tw:transition-all tw:duration-200 tw:rounded-t-md tw:select-none tw:hover:bg-black/4 tw:active:bg-black/[0.06]"
         @click="togglePreview"
       >
         <div class="tw:flex tw:items-center tw:gap-2">
@@ -31,11 +31,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Status Indicator -->
           <div
             v-if="evaluationStatus && !isRealTime"
-            class="alert-status-indicator tw:flex tw:items-center tw:gap-1.5 tw:px-2 tw:py-1 tw:rounded tw:border-l-[0.1875rem] tw:border-l-solid tw:bg-[rgba(76,175,80,0.08)] tw:border-l-[#4caf50]"
+            class="alert-status-indicator tw:group tw:flex tw:items-center tw:gap-1.5 tw:px-2 tw:py-1 tw:rounded tw:border-l-[0.1875rem] tw:border-l-solid tw:bg-[rgba(76,175,80,0.08)] tw:border-l-[#4caf50]"
             :class="{
-              'status-would-trigger': evaluationStatus.wouldTrigger,
-              'status-would-not-trigger': !evaluationStatus.wouldTrigger,
-              'status-indicator-light': store.state.theme !== 'dark'
+              'status-indicator-light': store.state.theme !== 'dark',
+              'tw:bg-[rgba(158,158,158,0.08)] tw:border-l-[#9e9e9e]': !evaluationStatus.wouldTrigger,
+              'tw:bg-[rgba(76,175,80,0.04)]': store.state.theme !== 'dark' && evaluationStatus.wouldTrigger,
+              'tw:bg-[rgba(158,158,158,0.04)]': store.state.theme !== 'dark' && !evaluationStatus.wouldTrigger,
             }"
             data-test="alert-status-indicator"
           >
@@ -47,8 +48,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="tw:text-xs tw:font-semibold tw:tracking-wide tw:uppercase tw:flex-shrink-0 tw:whitespace-nowrap">
               {{ evaluationStatus.wouldTrigger ? t('alerts.wouldTrigger') : t('alerts.wouldNotTrigger') }}
             </span>
-            <span class="status-separator tw:text-xs tw:flex-shrink-0">•</span>
-            <span class="tw:text-xs">
+            <span class="tw:text-xs tw:flex-shrink-0 tw:text-[rgba(255,255,255,0.3)] tw:group-[.status-indicator-light]:text-[rgba(0,0,0,0.3)]">•</span>
+            <span class="tw:text-xs tw:text-[rgba(255,255,255,0.65)] tw:group-[.status-indicator-light]:text-[rgba(0,0,0,0.6)]">
               {{ evaluationStatus.reason }}
             </span>
           </div>
@@ -57,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="ghost"
           size="icon-circle-sm"
           @click.stop="togglePreview"
-          class="expand-toggle-btn tw:opacity-50 tw:transition-all tw:duration-200"
+          class="expand-toggle-btn tw:opacity-50 tw:transition-all tw:duration-200 tw:hover:opacity-100"
         >
           <OIcon :name="expandState.preview ? 'expand-less' : 'expand-more'" size="sm" />
         </OButton>
@@ -84,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :style="summarySectionStyle"
     >
       <div
-        class="section-header tw:flex tw:items-center tw:justify-between tw:px-4 tw:py-3 tw:cursor-pointer tw:shrink-0 tw:border-b tw:border-[var(--o2-border-color,rgba(0,0,0,0.08))] tw:transition-all tw:duration-200 tw:rounded-t-md tw:select-none"
+        class="tw:flex tw:items-center tw:justify-between tw:px-4 tw:py-3 tw:cursor-pointer tw:shrink-0 tw:border-b tw:border-[var(--o2-border-color,rgba(0,0,0,0.08))] tw:transition-all tw:duration-200 tw:rounded-t-md tw:select-none tw:hover:bg-black/4 tw:active:bg-black/[0.06]"
         @click="toggleSummary"
       >
         <span class="tw:text-sm tw:font-semibold">{{ t('alerts.summary.title') }}</span>
@@ -92,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="ghost"
           size="icon-circle-sm"
           @click.stop="toggleSummary"
-          class="expand-toggle-btn tw:opacity-50 tw:transition-all tw:duration-200"
+          class="expand-toggle-btn tw:opacity-50 tw:transition-all tw:duration-200 tw:hover:opacity-100"
         >
           <OIcon :name="expandState.summary ? 'expand-less' : 'expand-more'" size="sm" />
         </OButton>
@@ -326,47 +327,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style>
-.collapsible-section .section-header:hover {
-  background: rgba(0, 0, 0, 0.04);
-}
-
-.collapsible-section .section-header:active {
-  background: rgba(0, 0, 0, 0.06);
-}
-
-.collapsible-section .expand-toggle-btn:hover {
-  opacity: 1;
-}
-
-/* Status Indicator Styles */
-.alert-status-indicator.status-would-not-trigger {
-  background: rgba(158, 158, 158, 0.08);
-  border-left-color: #9e9e9e;
-}
-
-.alert-status-indicator.status-indicator-light {
-  background: rgba(76, 175, 80, 0.04);
-}
-
-.alert-status-indicator.status-would-not-trigger.status-indicator-light {
-  background: rgba(158, 158, 158, 0.04);
-}
-
-.alert-status-indicator .status-separator {
-  color: rgba(255, 255, 255, 0.3);
-}
-
-.alert-status-indicator.status-indicator-light .status-separator {
-  color: rgba(0, 0, 0, 0.3);
-}
-
-.alert-status-indicator span:last-child {
-  color: rgba(255, 255, 255, 0.65);
-}
-
-.alert-status-indicator.status-indicator-light span:last-child {
-  color: rgba(0, 0, 0, 0.6);
-}
-</style>

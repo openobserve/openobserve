@@ -21,14 +21,14 @@ limitations under the License. -->
         :key="type.id"
         data-test="destination-type-card"
         :data-type="type.id"
-        class="destination-card tw:relative tw:py-5 tw:px-3 tw:border-2 tw:border-[var(--o2-border-color)] tw:rounded-xl tw:bg-[var(--o2-card-bg)] tw:cursor-pointer tw:transition-all tw:duration-300 tw:[min-height:7.5rem] tw:flex tw:flex-col"
-        :class="{ selected: selectedType === type.id }"
+        class="destination-card tw:group/dest-card tw:relative tw:py-5 tw:px-3 tw:border-2 tw:border-[var(--o2-border-color)] tw:rounded-xl tw:bg-[var(--o2-card-bg)] tw:cursor-pointer tw:transition-all tw:duration-300 tw:[min-height:7.5rem] tw:flex tw:flex-col tw:hover:-translate-y-0.5 tw:hover:shadow-[0_0.25rem_0.75rem_rgba(25,118,210,0.15)] tw:hover:border-[var(--o2-primary-color)]"
+        :class="{ selected: selectedType === type.id, 'tw:border-[var(--o2-primary-color)] tw:bg-[color-mix(in_srgb,var(--o2-primary-color)_10%,var(--o2-card-bg))] tw:shadow-[0_0.25rem_1rem_rgba(25,118,210,0.2)]': selectedType === type.id }"
         @click="selectType(type.id)"
       >
         <!-- Card Content -->
         <div class="card-content tw:flex tw:flex-col tw:items-center tw:text-center tw:h-full tw:relative">
           <!-- Icon/Image -->
-          <div class="card-icon tw:mb-2 tw:text-[var(--o2-icon-color)]">
+          <div class="tw:mb-2 tw:text-[var(--o2-icon-color)] tw:group-[.selected]/dest-card:text-[var(--o2-primary-color)]">
             <img
               v-if="type.image"
               :src="type.image"
@@ -66,12 +66,12 @@ limitations under the License. -->
       <div
         data-test="destination-type-card"
         data-type="custom"
-        class="destination-card custom-card tw:relative tw:py-5 tw:px-3 tw:border-2 tw:border-[var(--o2-border-color)] tw:border-dashed tw:rounded-xl tw:bg-[var(--o2-card-bg)] tw:cursor-pointer tw:transition-all tw:duration-300 tw:[min-height:7.5rem] tw:flex tw:flex-col"
-        :class="{ selected: selectedType === 'custom' }"
+        class="destination-card custom-card tw:group/dest-card tw:relative tw:py-5 tw:px-3 tw:border-2 tw:border-[var(--o2-border-color)] tw:border-dashed tw:rounded-xl tw:bg-[var(--o2-card-bg)] tw:cursor-pointer tw:transition-all tw:duration-300 tw:[min-height:7.5rem] tw:flex tw:flex-col tw:hover:-translate-y-0.5 tw:hover:shadow-[0_0.25rem_0.75rem_rgba(25,118,210,0.15)] tw:hover:border-[var(--o2-primary-color)]"
+        :class="{ selected: selectedType === 'custom', 'tw:border-[var(--o2-primary-color)] tw:bg-[color-mix(in_srgb,var(--o2-primary-color)_10%,var(--o2-card-bg))] tw:shadow-[0_0.25rem_1rem_rgba(25,118,210,0.2)]': selectedType === 'custom' }"
         @click="selectType('custom')"
       >
         <div class="card-content tw:flex tw:flex-col tw:items-center tw:text-center tw:h-full tw:relative">
-          <div class="card-icon tw:mb-2 tw:text-[var(--o2-icon-color)]">
+          <div class="tw:mb-2 tw:text-[var(--o2-icon-color)] tw:group-[.selected]/dest-card:text-[var(--o2-primary-color)]">
             <OIcon name="settings" size="md" />
           </div>
           <h3 data-test="destination-type-name" class="card-title tw:text-[0.8125rem] tw:font-medium tw:mt-1 tw:mb-0 tw:text-[var(--q-text-primary)] tw:[line-height:1.3] tw:text-center">
@@ -154,22 +154,6 @@ function getIconName(icon: string): string {
 </script>
 
 <style>
-.destination-selector .destination-card:hover {
-  transform: translateY(-0.125rem);
-  box-shadow: 0 0.25rem 0.75rem rgba(25, 118, 210, 0.15);
-  border-color: var(--q-primary);
-}
-
-.destination-selector .destination-card.selected {
-  border-color: var(--q-primary);
-  background: color-mix(in srgb, var(--q-primary) 10%, var(--o2-card-bg));
-  box-shadow: 0 0.25rem 1rem rgba(25, 118, 210, 0.2);
-}
-
-.destination-selector .destination-card.selected .card-icon {
-  color: var(--q-primary);
-}
-
 @media (min-width: 75rem) {
   .destination-selector .destination-card .card-description {
     display: block;

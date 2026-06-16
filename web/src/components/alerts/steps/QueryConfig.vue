@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :options="numericColumns"
                       searchable
                       :placeholder="t('alerts.placeholders.selectColumn')"
-                      :class="['tw:min-w-[140px] tw:max-w-[200px]', columnSelectError ? 'column-select-error' : '']"
+                      :class="['tw:min-w-[140px] tw:max-w-[200px]']"
                       @update:model-value="columnSelectError = false; onLogMeasureColumnChange($event)"
                     />
                   </template>
@@ -166,7 +166,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :options="columns"
                         searchable
                         :placeholder="t('alerts.placeholders.selectColumn')"
-                        class="alert-v3-select"
                         style="min-width: 120px; max-width: 180px;"
                         :data-test="`alert-group-by-select-${index}`"
                         @update:model-value="onLogGroupByChange"
@@ -231,7 +230,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :options="logFunctionOptions"
                       labelKey="label"
                       valueKey="value"
-                      class="alert-v3-select"
                       @update:model-value="onMetricFunctionChange"
                     />
                     <OTooltip :content="logFunctionOptions.find((o: any) => o.value === selectedFunction)?.tooltip || ''" :delay="400" />
@@ -249,8 +247,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :readonly="inputData.aggregation.having.column === 'value' && columns.some((c: any) => (typeof c === 'string' ? c : c.value) === 'value')"
                         :disable="inputData.aggregation.having.column === 'value' && columns.some((c: any) => (typeof c === 'string' ? c : c.value) === 'value')"
                         @update:model-value="columnSelectError = false; emitAggregationUpdate()"
-                        class="alert-v3-select"
-                        :class="columnSelectError ? 'column-select-error' : ''"
                         style="min-width: 140px; max-width: 200px;"
                       />
                       <OTooltip v-if="inputData.aggregation.having.column === 'value' && columns.some((c: any) => (typeof c === 'string' ? c : c.value) === 'value')" content="Metrics streams store their measurement in the &quot;value&quot; field by default" :delay="300" side="bottom" />
@@ -264,14 +260,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-model="triggerOperator"
                       :options="numericOperators"
                       :searchable="false"
-                      class="alert-v3-select"
                       style="min-width: 70px; max-width: 120px;"
                       @update:model-value="onTriggerOperatorChange"
                     />
                     <OInput
                       v-model="triggerThreshold"
                       type="number"
-                      class="alert-v3-input"
                       style="min-width: 80px; max-width: 120px;"
                       :error="!!triggerThresholdError"
                       :error-message="triggerThresholdError"
@@ -286,7 +280,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-model="conditionOperator"
                       :options="numericOperators"
                       :searchable="false"
-                      class="alert-v3-select"
                       style="min-width: 70px; max-width: 120px;"
                       @update:model-value="onConditionOperatorChange"
                     />
@@ -294,7 +287,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-model="conditionValue"
                       type="number"
                       :placeholder="t('alerts.placeholders.value')"
-                      class="alert-v3-input"
                       style="min-width: 80px; max-width: 120px;"
                       :error="!!conditionValueError"
                       :error-message="conditionValueError"
@@ -321,7 +313,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :options="columns"
                         searchable
                         :placeholder="t('alerts.placeholders.selectColumn')"
-                        class="alert-v3-select"
                         style="min-width: 120px; max-width: 180px;"
                         @update:model-value="emitAggregationUpdate"
                       />
@@ -385,7 +376,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OInput
                       v-model="checkEveryFrequency"
                       type="number"
-                      class="alert-v3-input"
                       style="min-width: 100px; max-width: 100px;"
                       min="1"
                       :error="!!checkEveryFrequencyError"
@@ -398,7 +388,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <template v-else>
                     <OInput
                       v-model="cronExpression"
-                      class="alert-v3-input"
                       placeholder="0 */10 * * * *"
                       style="min-width: 100px; max-width: 100px;"
                       @update:model-value="onCronExpressionChange"
@@ -412,7 +401,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     labelKey="label"
                     valueKey="value"
                     :searchable="false"
-                    class="alert-v3-select frequency-unit-select"
                     style="min-width: 80px; max-width: 100px;"
                     @update:model-value="onFrequencyUnitChange"
                   />
@@ -425,7 +413,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :options="filteredTimezones"
                         searchable
                         placeholder="timezone"
-                        class="alert-v3-select"
                         style="min-width: 150px; max-width: 150px;"
                         @update:model-value="onCronTimezoneChange"
                       />
@@ -648,7 +635,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       labelKey="name"
                       valueKey="name"
                       clearable
-                      class="mini-select alert-v3-select"
                       style="width: 130px;"
                       :placeholder="t('alerts.placeholders.savedFunctions')"
                       @update:model-value="(name: any) => { const fn = functionsList.find((f: any) => f.name === name); if (fn) vrlFunctionContent = fn.function || fn.body || ''; }"
@@ -727,7 +713,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OInput
                       v-model="checkEveryFrequency"
                       type="number"
-                      class="alert-v3-input"
                       style="min-width: 100px; max-width: 100px;"
                       min="1"
                       :error="!!checkEveryFrequencyError"
@@ -739,7 +724,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <template v-else>
                     <OInput
                       v-model="cronExpression"
-                      class="alert-v3-input"
                       placeholder="0 */10 * * * *"
                       style="min-width: 100px; max-width: 100px;"
                       @update:model-value="onCronExpressionChange"
@@ -751,7 +735,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     labelKey="label"
                     valueKey="value"
                     :searchable="false"
-                    class="alert-v3-select frequency-unit-select"
                     style="min-width: 80px; max-width: 100px;"
                     @update:model-value="onFrequencyUnitChange"
                   />
@@ -762,7 +745,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :options="filteredTimezones"
                         searchable
                         placeholder="timezone"
-                        class="alert-v3-select"
                         style="min-width: 150px; max-width: 150px;"
                         @update:model-value="onCronTimezoneChange"
                       />
@@ -793,7 +775,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-model="triggerOperator"
                   :options="numericOperators"
                   :searchable="false"
-                  class="alert-v3-select"
                   data-test="alert-trigger-operator-select"
                   style="min-width: 70px; max-width: 120px;"
                   @update:model-value="onTriggerOperatorChange"
@@ -801,7 +782,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OInput
                   v-model="triggerThreshold"
                   type="number"
-                  class="alert-v3-input"
                   style="min-width: 60px; max-width: 80px;"
                   min="1"
                   :error="!!triggerThresholdError"
@@ -823,7 +803,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-model="promqlCondition.operator"
                     :options="numericOperators"
                     :searchable="false"
-                    class="alert-v3-select"
                     data-test="alert-threshold-operator-select"
                     style="min-width: 70px; max-width: 120px;"
                     :error="!!promqlOperatorError"
@@ -833,7 +812,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OInput
                     v-model.number="promqlCondition.value"
                     type="number"
-                    class="alert-v3-input"
                     data-test="alert-threshold-value-input"
                     style="min-width: 60px; max-width: 120px;"
                     :debounce="300"
@@ -852,14 +830,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-model="triggerOperator"
                     :options="numericOperators"
                     :searchable="false"
-                    class="alert-v3-select"
                     style="min-width: 70px; max-width: 120px;"
                     @update:model-value="onTriggerOperatorChange"
                   />
                   <OInput
                     v-model="triggerThreshold"
                     type="number"
-                    class="alert-v3-input"
                     style="min-width: 60px; max-width: 80px;"
                     min="1"
                     :error="!!triggerThresholdError"

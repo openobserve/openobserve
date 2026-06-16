@@ -630,7 +630,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       { value: 75, label: '75' },
                       { value: 100, label: '100' },
                     ]"
-                    class="sensitivity-range-slider tw:mt-[14px] tw:h-[145px]!"
+                    class="sensitivity-range-slider tw:mt-[14px] tw:h-[145px]! tw:[--color-slider-track-fill:var(--o2-primary-color)] tw:[--color-slider-thumb:var(--o2-primary-color)] tw:[--color-slider-thumb-border:white] tw:[--color-slider-value:var(--o2-text-secondary)]"
                     data-test="anomaly-threshold-range"
                     @update:model-value="onThresholdRangeChange"
                   />
@@ -1266,22 +1266,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style>
-.filter-field-select .q-field__native span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.filter-field-select .q-field__input {
-  text-overflow: ellipsis;
-}
-
-.sensitivity-range-slider {
-  --color-slider-track-fill: var(--o2-primary-color);
-  --color-slider-thumb: var(--o2-primary-color);
-  --color-slider-thumb-border: white;
-  --color-slider-value: var(--o2-text-secondary);
-}
-</style>

@@ -15,8 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="horizontal-stepper tw:w-full tw:py-6" :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
-    <div class="stepper-container tw:flex tw:justify-between tw:items-start tw:relative tw:max-w-[1200px] tw:mx-auto tw:px-4">
+  <div class="tw:w-full tw:py-6">
+    <div class="tw:flex tw:justify-between tw:items-start tw:relative tw:max-w-[1200px] tw:mx-auto tw:px-4 stepper-container">
       <div
         v-for="(step, index) in steps"
         :key="step.id"
@@ -25,41 +25,76 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           'step-active': currentStep === step.id,
           'step-completed': completedSteps.includes(step.id),
           'step-disabled': !canNavigateToStep(step.id),
-          'step-error': step.hasError
+          'step-error': step.hasError,
+          'tw:cursor-not-allowed tw:opacity-50': !canNavigateToStep(step.id)
         }"
         @click="handleStepClick(step.id)"
       >
         <!-- Step indicator -->
         <div class="step-indicator-wrapper tw:flex tw:items-center tw:w-full tw:relative">
-          <div class="step-indicator tw:w-[40px] tw:h-[40px] tw:rounded-full tw:flex tw:items-center tw:justify-center tw:font-semibold tw:text-base tw:transition-all tw:duration-300 tw:ease-in-out tw:relative tw:z-[2] tw:shrink-0">
+          <div
+            class="step-indicator tw:w-[40px] tw:h-[40px] tw:rounded-full tw:flex tw:items-center tw:justify-center tw:font-semibold tw:text-base tw:transition-all tw:duration-300 tw:ease-in-out tw:relative tw:z-[2] tw:shrink-0 tw:border-2"
+            :class="
+              step.hasError
+                ? 'tw:bg-[#d32f2f] tw:text-white tw:border-[#d32f2f]'
+                : completedSteps.includes(step.id) && currentStep !== step.id
+                  ? 'tw:bg-[#2e7d32] tw:text-white tw:border-[#2e7d32]'
+                  : currentStep === step.id
+                    ? isDarkMode
+                      ? 'tw:bg-[#1976d2] tw:text-white tw:border-[#1976d2] tw:shadow-[0_0_0_4px_rgba(25,118,210,0.2)]'
+                      : 'tw:bg-[#1976d2] tw:text-white tw:border-[#1976d2] tw:shadow-[0_0_0_4px_rgba(25,118,210,0.1)]'
+                    : isDarkMode
+                      ? 'tw:bg-[#424242] tw:text-[#9e9e9e] tw:border-[#616161]'
+                      : 'tw:bg-[#f5f5f5] tw:text-[#757575] tw:border-[var(--o2-border)]'
+            "
+          >
             <OIcon
               v-if="completedSteps.includes(step.id) && currentStep !== step.id"
               name="check"
               size="sm"
-              class="step-icon-check tw:text-white"
+              class="tw:text-white"
             />
             <OIcon
               v-else-if="step.hasError"
               name="error-outline"
               size="sm"
-              class="step-icon-error tw:text-white"
+              class="tw:text-white"
             />
-            <span v-else class="step-number">{{ index + 1 }}</span>
+            <span v-else>{{ index + 1 }}</span>
           </div>
           <!-- Connector line -->
           <div
             v-if="index < steps.length - 1"
             class="step-connector tw:flex-1 tw:h-[2px] tw:mx-2 tw:transition-all tw:duration-300 tw:ease-in-out"
-            :class="{
-              'connector-active': completedSteps.includes(step.id)
-            }"
+            :class="
+              completedSteps.includes(step.id)
+                ? 'tw:bg-[#2e7d32]'
+                : isDarkMode
+                  ? 'tw:bg-[#616161]'
+                  : 'tw:bg-[var(--o2-border)]'
+            "
           ></div>
         </div>
 
         <!-- Step label -->
         <div class="step-label tw:mt-3 tw:text-center tw:max-w-[150px]">
-          <div class="step-title tw:text-sm tw:font-semibold tw:mb-1">{{ step.label }}</div>
-          <div v-if="step.description" class="step-description tw:text-xs tw:opacity-70">
+          <div
+            class="tw:text-sm tw:font-semibold tw:mb-1"
+            :class="
+              currentStep === step.id
+                ? isDarkMode
+                  ? 'tw:text-white'
+                  : 'tw:text-[#1976d2] tw:font-bold'
+                : isDarkMode
+                  ? 'tw:text-[var(--o2-border)]'
+                  : 'tw:text-[#424242]'
+            "
+          >{{ step.label }}</div>
+          <div
+            v-if="step.description"
+            class="tw:text-xs tw:opacity-70"
+            :class="isDarkMode ? 'tw:text-[#bdbdbd]' : 'tw:text-[#757575]'"
+          >
             {{ step.description }}
           </div>
         </div>
@@ -69,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, type PropType } from "vue";
+import { defineComponent, computed, type PropType } from "vue";
 import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
@@ -103,6 +138,8 @@ export default defineComponent({
   setup(props, { emit }) {
     const store = useStore();
 
+    const isDarkMode = computed(() => store.state.theme === "dark");
+
     const canNavigateToStep = (stepId: number): boolean => {
       // Can always navigate to completed steps or current step
       if (props.completedSteps.includes(stepId) || stepId === props.currentStep) {
@@ -122,7 +159,7 @@ export default defineComponent({
     };
 
     return {
-      store,
+      isDarkMode,
       canNavigateToStep,
       handleStepClick,
     };
@@ -131,123 +168,17 @@ export default defineComponent({
 </script>
 
 <style>
-.horizontal-stepper .step-item.step-disabled {
-  cursor: not-allowed;
-  opacity: 0.5;
-}
-
-.horizontal-stepper .step-item:hover:not(.step-disabled) .step-indicator {
+.step-item:hover:not(.step-disabled) .step-indicator {
   transform: scale(1.1);
-}
-
-/* Dark mode styles */
-.horizontal-stepper.dark-mode .step-indicator {
-  background-color: #424242;
-  color: #9e9e9e;
-  border: 2px solid #616161;
-}
-
-.horizontal-stepper.dark-mode .step-connector {
-  background-color: #616161;
-}
-
-.horizontal-stepper.dark-mode .step-active .step-indicator {
-  background-color: #1976d2;
-  color: #ffffff;
-  border-color: #1976d2;
-  box-shadow: 0 0 0 4px rgba(25, 118, 210, 0.2);
-}
-
-.horizontal-stepper.dark-mode .step-completed .step-indicator {
-  background-color: #2e7d32;
-  color: #ffffff;
-  border-color: #2e7d32;
-}
-
-.horizontal-stepper.dark-mode .step-completed .step-connector {
-  background-color: #2e7d32;
-}
-
-.horizontal-stepper.dark-mode .step-error .step-indicator {
-  background-color: #d32f2f;
-  color: #ffffff;
-  border-color: #d32f2f;
-}
-
-.horizontal-stepper.dark-mode .step-title {
-  color: var(--o2-border);
-}
-
-.horizontal-stepper.dark-mode .step-description {
-  color: #bdbdbd;
-}
-
-.horizontal-stepper.dark-mode .step-active .step-title {
-  color: #ffffff;
-}
-
-/* Light mode styles */
-.horizontal-stepper.light-mode .step-indicator {
-  background-color: #f5f5f5;
-  color: #757575;
-  border: 2px solid var(--o2-border);
-}
-
-.horizontal-stepper.light-mode .step-connector {
-  background-color: var(--o2-border);
-}
-
-.horizontal-stepper.light-mode .step-active .step-indicator {
-  background-color: #1976d2;
-  color: #ffffff;
-  border-color: #1976d2;
-  box-shadow: 0 0 0 4px rgba(25, 118, 210, 0.1);
-}
-
-.horizontal-stepper.light-mode .step-completed .step-indicator {
-  background-color: #2e7d32;
-  color: #ffffff;
-  border-color: #2e7d32;
-}
-
-.horizontal-stepper.light-mode .step-completed .step-connector {
-  background-color: #2e7d32;
-}
-
-.horizontal-stepper.light-mode .step-error .step-indicator {
-  background-color: #d32f2f;
-  color: #ffffff;
-  border-color: #d32f2f;
-}
-
-.horizontal-stepper.light-mode .step-title {
-  color: #424242;
-}
-
-.horizontal-stepper.light-mode .step-description {
-  color: #757575;
-}
-
-.horizontal-stepper.light-mode .step-active .step-title {
-  color: #1976d2;
-  font-weight: 700;
 }
 
 /* Responsive design */
 @media (max-width: 1024px) {
-  .horizontal-stepper .step-label {
+  .step-label {
     max-width: 100px;
   }
 
-  .horizontal-stepper .step-title {
-    font-size: 12px;
-  }
-
-  .horizontal-stepper .step-description {
-    font-size: 10px;
-  }
-
-  .horizontal-stepper .step-indicator {
+  .step-indicator {
     width: 36px;
     height: 36px;
     font-size: 14px;
@@ -255,30 +186,30 @@ export default defineComponent({
 }
 
 @media (max-width: 768px) {
-  .horizontal-stepper .stepper-container {
+  .stepper-container {
     flex-direction: column;
     gap: 1rem;
   }
 
-  .horizontal-stepper .step-item {
+  .step-item {
     flex-direction: row;
     width: 100%;
     align-items: center;
     justify-content: flex-start;
   }
 
-  .horizontal-stepper .step-indicator-wrapper {
+  .step-indicator-wrapper {
     flex-direction: column;
     width: auto;
   }
 
-  .horizontal-stepper .step-connector {
+  .step-connector {
     width: 2px;
     height: 30px;
     margin: 0.5rem 0;
   }
 
-  .horizontal-stepper .step-label {
+  .step-label {
     margin-top: 0;
     margin-left: 1rem;
     text-align: left;
