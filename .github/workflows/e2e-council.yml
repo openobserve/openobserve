@@ -458,12 +458,22 @@ jobs:
         run: |
           RC=docs/test_generator/ci/run-context.json
           { [ -f "$RC" ] && jq empty "$RC" 2>/dev/null; } || { echo "::error::run-context.json missing/invalid (triage hand-off broken)"; exit 1; }
-          SPEC=$(jq -r '.spec_path // empty' "$RC")
-          [ -n "$SPEC" ] || { echo "::error::run-context.json has no spec_path"; exit 1; }
-          [ -f "$SPEC" ] || { echo "::error::Engineer did not write the spec at $SPEC (engineer hand-off broken)"; exit 1; }
+          # Coverage decision (Architect): action=new|append|extend + the file actually written/edited.
+          CD=docs/test_generator/ci/coverage-decision.json
+          ACTION=new; TARGET=""
+          if [ -f "$CD" ]; then ACTION=$(jq -r '.action // "new"' "$CD"); TARGET=$(jq -r '.target_spec // empty' "$CD"); fi
+          SPEC="$TARGET"
+          [ -n "$SPEC" ] || SPEC=$(jq -r '.spec_path // empty' "$RC")
+          [ -n "$SPEC" ] || { echo "::error::no spec path (coverage target_spec / run-context.spec_path both empty)"; exit 1; }
+          [ -f "$SPEC" ] || { echo "::error::Engineer did not write/edit the spec at $SPEC (engineer hand-off broken)"; exit 1; }
+          # Registration is required ONLY for a brand-new spec; append/extend edit an already-listed file.
           REG=docs/test_generator/ci/playwright-registration.json
-          { [ -f "$REG" ] && jq -e '.group and .spec_filename' "$REG" >/dev/null 2>&1; } || { echo "::error::playwright-registration.json missing/invalid (engineer hand-off broken)"; exit 1; }
-          echo "Hand-off OK: spec=$SPEC"
+          if [ "$ACTION" = "new" ]; then
+            { [ -f "$REG" ] && jq -e '.group and .spec_filename' "$REG" >/dev/null 2>&1; } || { echo "::error::new spec but playwright-registration.json missing/invalid (engineer hand-off broken)"; exit 1; }
+          else
+            echo "action=$ACTION → existing spec edited in place; no registration expected."
+          fi
+          echo "Hand-off OK: action=$ACTION spec=$SPEC"
 
       - name: Audit + self-fix loop (Sentinel ⇄ Engineer until clean)
         # SELF-CORRECTING quality gate (the whole point): Sentinel audits; if it's not a clean PASS,
@@ -745,9 +755,15 @@ jobs:
       - name: Resolve + validate spec path
         id: spec
         run: |
-          SPEC=$(jq -r '.spec_path' docs/test_generator/ci/run-context.json)
+          # Prefer the Architect's coverage decision (the file actually written/edited — for
+          # append/extend that's an EXISTING spec, not run-context.spec_path). Fall back to
+          # run-context.spec_path (the new-spec/greenfield case).
+          CD=docs/test_generator/ci/coverage-decision.json
+          SPEC=""
+          [ -f "$CD" ] && SPEC=$(jq -r '.target_spec // empty' "$CD")
+          [ -n "$SPEC" ] || SPEC=$(jq -r '.spec_path' docs/test_generator/ci/run-context.json)
           echo "$SPEC" | grep -Eq '^tests/ui-testing/playwright-tests/[A-Za-z0-9._/-]+\.spec\.js$' \
-            || { echo "::error::invalid spec_path: $SPEC"; exit 1; }
+            || { echo "::error::invalid spec path: $SPEC"; exit 1; }
           echo "spec=$SPEC" >> "$GITHUB_OUTPUT"
           echo "rel=${SPEC#tests/ui-testing/}" >> "$GITHUB_OUTPUT"
 
@@ -923,8 +939,13 @@ jobs:
           set -euo pipefail
           BRANCH="${WORK_BRANCH}"
           PW=.github/workflows/playwright.yml
-          { [ -f "$REG" ] && jq -e 'has("group") and has("spec_filename")' "$REG" >/dev/null 2>&1; } \
-            || { echo "::error::playwright-registration.json missing/invalid"; exit 1; }
+          # No registration file → append/extend of an already-listed spec → nothing to register.
+          if [ ! -f "$REG" ]; then
+            echo "::notice::No playwright-registration.json (append/extend) — spec already registered, skipping."
+            exit 0
+          fi
+          jq -e 'has("group") and has("spec_filename")' "$REG" >/dev/null 2>&1 \
+            || { echo "::error::playwright-registration.json present but invalid"; exit 1; }
           GROUP=$(jq -r '.group' "$REG"); FNAME=$(jq -r '.spec_filename' "$REG")
           echo "$FNAME" | grep -Eq '^[A-Za-z0-9._-]+\.spec\.js$' || { echo "::error::unsafe spec_filename: $FNAME"; exit 1; }
           export GROUP FNAME

@@ -16,6 +16,7 @@ tests that follow the framework conventions exactly, then **register the new spe
 
 ```bash
 cat docs/test_generator/ci/run-context.json
+cat docs/test_generator/ci/coverage-decision.json          # the Architect's extend/append/new decision
 cat docs/test_generator/test-plans/<feature_slug>-test-plan.md
 cat docs/test_generator/features/<feature_slug>-feature.md   # for verified selectors
 ```
@@ -24,6 +25,30 @@ If `run-context.json` is missing or `skip: true`, stop. Use `spec_path`, `spec_f
 
 **Never guess selectors.** Use selectors from the feature doc / test plan, or extract from
 source: `grep -oE 'data-test="[^"]*"' web/src/path/to/Component.vue | sort -u`.
+
+---
+
+## COVERAGE ACTION — write a new spec, or edit an existing one
+
+Read `coverage-decision.json` and honour its `action`:
+
+- **`new`** — create a brand-new spec at `target_spec` (= run-context `spec_path`) using the
+  required structure below. This is the only case that needs registration (see below).
+- **`append`** — **open the existing `target_spec` and ADD a new `test()` inside its existing
+  `describe`**, reusing its imports, `describe.configure`, and `beforeEach`. Do NOT rewrite the
+  file, re-order, or touch unrelated tests — make a minimal, surgical addition. Match the file's
+  existing style/tags. **No registration** (the file is already in playwright.yml).
+- **`extend`** — **open the existing `target_spec` and modify the specific test** named in the
+  decision: add the missing steps/assertions for the new behavior. Keep all other tests byte-for-
+  byte unchanged. **No registration.**
+
+For `append`/`extend`: any new locators/methods still go in the **page object** (never raw
+selectors in the spec), exactly as for new specs. Preserve `mode: 'parallel'` — never switch a
+file to serial. If the existing file is somehow `serial`, leave its mode as-is but keep your
+added test independent.
+
+> **Minimal-diff rule for append/extend:** the goal is the smallest possible change to the
+> existing file — a reviewer should see only the added/changed test, nothing else.
 
 ---
 
@@ -99,7 +124,12 @@ xpath / nth-child / framework classes.
 
 ## REGISTER THE SPEC IN `playwright.yml` (emit structured data — do NOT edit the file)
 
-A generated spec only runs in CI if it's listed in `.github/workflows/playwright.yml`. For
+> **ONLY for `action: new`.** For `append`/`extend` the target spec is already in playwright.yml,
+> so **skip this section entirely and do NOT write `playwright-registration.json`** (a deterministic
+> step treats a missing file as "nothing to register"). Registering an already-listed file would
+> create a no-op or duplicate.
+
+A brand-new spec only runs in CI if it's listed in `.github/workflows/playwright.yml`. For
 security, **you do not edit that workflow file directly** — an LLM editing a CI workflow file is
 a code-execution risk. Instead you **describe** the change as structured JSON, and a
 deterministic (non-LLM) workflow step applies the one-line `run_files` append.
