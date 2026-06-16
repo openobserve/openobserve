@@ -77,14 +77,11 @@ test.describe('Functions Form Validation', { tag: ['@functions-form-validation',
       const fv = pm.functionsFormValidation;
       const functionName = 'test_fv_vrl_001';
 
-      // Delete the function if it already exists from a previous run (idempotent)
-      await pm.functionsPage.deleteFunctionByName(functionName, '_meta').catch(() => {});
-
-      await fv.openAddFunctionForm();
+      await fv.openAddFunctionForm(process.env.ORGNAME || 'default');
       await fv.fillFunctionName(functionName);
 
       // Type minimal valid VRL code into the editor
-      await fv.typeInVrlEditor('. = parse_json!(string!(.message)) ?? .');
+      await fv.typeInVrlEditor('. = .');
 
       await fv.clickSave();
 

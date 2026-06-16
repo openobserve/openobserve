@@ -155,12 +155,13 @@ class FunctionsFormValidationPage {
   async typeInVrlEditor(code) {
     testLogger.info('Typing VRL code into editor');
     await this.functionEditor.waitFor({ state: 'visible', timeout: 15000 });
-    // Monaco editor textarea
-    const textarea = this.page.locator('[data-test="logs-vrl-function-editor"] textarea').first();
-    await textarea.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
-    // Click editor area and type
+    // Click to focus Monaco, select-all to clear any existing content, then type
     await this.functionEditor.click();
+    await this.page.keyboard.press('Control+A');
     await this.page.keyboard.type(code);
+    // Blur the editor so Monaco fires its final change event before save
+    await this.functionEditor.press('Escape');
+    await this.page.waitForTimeout(300);
   }
 
   async expectSuccessToast() {

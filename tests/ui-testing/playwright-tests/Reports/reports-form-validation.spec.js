@@ -182,9 +182,10 @@ test.describe("Reports form validation — valid config creates report", () => {
         // Step 1: Continue to step 2
         await pm.reportsFormValidation.clickContinueStep1();
 
-        // Step 2: frequency defaults to "once" — no extra input needed
-        // Select timezone (required)
-        await pm.reportsFormValidation.selectFirstTimezone();
+        // Step 2: frequency defaults to "once" + scheduleNow — timezone is
+        // auto-filled by saveReport() from the browser timezone. The timezone
+        // OSelect is only rendered for cron frequency or scheduleLater tab, so
+        // there is nothing to interact with here.
 
         // Step 2: Continue to step 3
         await pm.reportsFormValidation.clickContinueStep2();

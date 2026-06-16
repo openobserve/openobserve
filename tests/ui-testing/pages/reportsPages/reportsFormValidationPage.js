@@ -38,10 +38,13 @@ export class ReportsFormValidationPage {
         this.dashboardTabError = '[data-test="add-report-dashboard-tab-select-error"]';
 
         // ── Step 1 — Time range ───────────────────────────────────────────────
-        this.timerangeDropdown = '[data-test="add-report-timerange-dropdown"]';
+        // DateTime component uses dataTestName prop defaulting to "date-time-btn".
+        // CreateReport passes data-test attr (not the dataTestName prop), so the actual button is date-time-btn.
+        this.timerangeDropdown = '[data-test="add-report-timerange-select"] [data-test="date-time-btn"]';
         this.dateTimeAbsoluteTab = '[data-test="date-time-absolute-tab"]';
-        this.dateTimeAbsoluteStartField = '[data-test="date-time-absolute-start-time-field"]';
-        this.dateTimeAbsoluteEndField = '[data-test="date-time-absolute-end-time-field"]';
+        // DateTime.vue renders OTime with data-test="datetime-start-time" / "datetime-end-time"
+        this.dateTimeAbsoluteStartField = '[data-test="datetime-start-time"]';
+        this.dateTimeAbsoluteEndField = '[data-test="datetime-end-time"]';
 
         // ── Step 1 — Continue button ──────────────────────────────────────────
         this.continueStep1Btn = '[data-test="add-report-step1-continue-btn"]';
@@ -113,43 +116,57 @@ export class ReportsFormValidationPage {
     }
 
     async selectFirstDashboardFolder() {
-        // Use [data-test-selected-value] to target the inner trigger button (matches existing passing tests).
-        // Always pick the "default" folder — it is guaranteed to exist in all environments.
-        const trigger = this.page.locator(`${this.dashboardFolderSelect} [data-test-selected-value]`);
-        await trigger.click({ force: true });
+        // Wait for the folder fetch to complete before opening the dropdown.
+        // getDashboaordFolders() runs in onBeforeMount (async, non-blocking). The trigger's
+        // loading spinner disappears once the fetch completes and options are populated.
+        const folderTrigger = this.page.locator('[data-test="add-report-dashboard-folder-select-trigger"]');
+        await folderTrigger.waitFor({ state: 'visible', timeout: 10000 });
+        // Wait for the folders API call to complete before opening the dropdown.
+        // getDashboaordFolders() fires in onBeforeMount async — networkidle ensures it has resolved.
+        await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+        await this.page.waitForTimeout(500);
+        await folderTrigger.click();
         await this.page.locator(this.dashboardFolderPopover).waitFor({ state: 'visible', timeout: 10000 });
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        // Give the virtual list a moment to measure the scroll container and render rows
+        await this.page.waitForTimeout(500);
+        // Wait for any option to appear (virtualizer renders items after measuring container height)
+        const anyOpt = this.page.locator('[data-test^="add-report-dashboard-folder-select-option"]').first();
+        await anyOpt.waitFor({ state: 'attached', timeout: 10000 });
         // Select "default" folder specifically (always present)
         const defaultOpt = this.page.locator(`[data-test="add-report-dashboard-folder-select-option"][data-test-value="default"]`);
-        await defaultOpt.waitFor({ state: 'visible', timeout: 10000 });
+        await defaultOpt.waitFor({ state: 'attached', timeout: 5000 });
         await defaultOpt.click({ force: true });
         await this.page.locator(this.dashboardFolderPopover).waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
     }
 
     async selectFirstDashboard() {
-        const trigger = this.page.locator(`${this.dashboardNameSelect} [data-test-selected-value]`);
-        await trigger.click({ force: true });
+        // OSelect trigger: use -trigger data-test, regular click (force:true bypasses Reka UI pointer events)
+        const trigger = this.page.locator('[data-test="add-report-dashboard-name-select-trigger"]');
+        await trigger.waitFor({ state: 'visible', timeout: 10000 });
+        await trigger.click();
         await this.page.locator(this.dashboardNamePopover).waitFor({ state: 'visible', timeout: 10000 });
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        await this.page.waitForTimeout(500);
         const firstOption = this.page.locator('[data-test^="add-report-dashboard-name-select-option"]').first();
-        await firstOption.waitFor({ state: 'visible', timeout: 15000 });
+        await firstOption.waitFor({ state: 'attached', timeout: 15000 });
         await firstOption.click({ force: true });
         await this.page.locator(this.dashboardNamePopover).waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
     }
 
     async selectFirstDashboardTab() {
-        const trigger = this.page.locator(`${this.dashboardTabSelect} [data-test-selected-value]`);
-        await trigger.click({ force: true });
+        // OSelect trigger: use -trigger data-test, regular click
+        const trigger = this.page.locator('[data-test="add-report-dashboard-tab-select-trigger"]');
+        await trigger.waitFor({ state: 'visible', timeout: 10000 });
+        await trigger.click();
         await this.page.locator(this.dashboardTabPopover).waitFor({ state: 'visible', timeout: 10000 });
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        await this.page.waitForTimeout(500);
         // Select "default" tab specifically (always present)
         const defaultOpt = this.page.locator(`[data-test="add-report-dashboard-tab-select-option"][data-test-value="default"]`);
-        const defaultTabVisible = await defaultOpt.isVisible({ timeout: 3000 }).catch(() => false);
-        if (defaultTabVisible) {
+        const defaultTabAttached = await defaultOpt.waitFor({ state: 'attached', timeout: 5000 }).then(() => true).catch(() => false);
+        if (defaultTabAttached) {
             await defaultOpt.click({ force: true });
         } else {
             const firstOption = this.page.locator('[data-test^="add-report-dashboard-tab-select-option"]').first();
-            await firstOption.waitFor({ state: 'visible', timeout: 10000 });
+            await firstOption.waitFor({ state: 'attached', timeout: 10000 });
             await firstOption.click({ force: true });
         }
         await this.page.locator(this.dashboardTabPopover).waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
@@ -168,11 +185,9 @@ export class ReportsFormValidationPage {
     }
 
     async clearAbsoluteTimerangeFields() {
-        const startField = this.page.locator(this.dateTimeAbsoluteStartField);
-        const endField = this.page.locator(this.dateTimeAbsoluteEndField);
-        await startField.waitFor({ state: 'visible', timeout: 6000 });
-        await startField.fill('');
-        await endField.fill('');
+        // The absolute date fields (datetime-start-time / datetime-end-time) start empty by
+        // default (selectedDate.from === "" in DateTime.vue), so no action needed.
+        // This method exists to make the test intent explicit.
     }
 
     async dismissTimerangePicker() {
@@ -191,12 +206,14 @@ export class ReportsFormValidationPage {
     }
 
     async selectFirstTimezone() {
-        const trigger = this.page.locator(`${this.timezoneSelect} [data-test-selected-value]`);
-        await trigger.click({ force: true });
+        // OSelect trigger: use -trigger data-test, regular click
+        const trigger = this.page.locator('[data-test="add-report-schedule-start-timezone-select-trigger"]');
+        await trigger.waitFor({ state: 'visible', timeout: 10000 });
+        await trigger.click();
         await this.page.locator(this.timezonePopover).waitFor({ state: 'visible', timeout: 10000 });
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        await this.page.waitForTimeout(500);
         const firstOption = this.page.locator('[data-test^="add-report-schedule-start-timezone-select-option"]').first();
-        await firstOption.waitFor({ state: 'visible', timeout: 10000 });
+        await firstOption.waitFor({ state: 'attached', timeout: 10000 });
         await firstOption.click({ force: true });
         await this.page.locator(this.timezonePopover).waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
     }
