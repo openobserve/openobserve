@@ -1,7 +1,0 @@
-{
-  "action": "new",
-  "target_spec": "tests/ui-testing/playwright-tests/GeneralTests/testDemo.spec.js",
-  "existing_tests_considered": [],
-  "needs_registration": true,
-  "rationale": "No existing test covers the Test Demo page. This is a brand-new standalone feature (no backend, self-contained Vue SFC). GeneralTests/ has 18 specs but none overlap — all target other pages (sanity, org, schema, etc.). A new spec is appropriate."
-}

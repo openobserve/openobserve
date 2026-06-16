@@ -18,7 +18,7 @@ export class TestDemoPage {
         // ===== SECTION 2: CASCADING COUNTRY→CITY =====
         this.locationCard = page.locator('[data-test="test-demo-location-card"]');
         this.countrySelectTrigger = page.locator('[data-test="test-demo-country-select"]');
-        this.citySelectTrigger = page.locator('[data-test="test-demo-city-select"]');
+        this.citySelectTrigger = page.locator('[data-test="test-demo-city-select-trigger"]');
         this.locationOutput = page.locator('[data-test="test-demo-location-output"]');
 
         // ===== SECTION 3: MODE TOGGLE + ADVANCED =====
