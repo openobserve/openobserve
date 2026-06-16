@@ -89,6 +89,7 @@ test.describe("Onboarding GetStarted form validation", () => {
 
         await pm.onboardingFormValidation.triggerEmptyValidationOnHearAboutUs();
         await expect(pm.onboardingFormValidation.getHearAboutUsErrorLocator()).toBeVisible();
+        await expect(pm.onboardingFormValidation.getHearAboutUsErrorLocator()).toContainText('This field is required');
 
         await pm.onboardingFormValidation.fillHearAboutUs('From a colleague');
 

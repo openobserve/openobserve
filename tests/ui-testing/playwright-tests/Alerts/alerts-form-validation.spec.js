@@ -134,6 +134,7 @@ test.describe('Alerts Form Validation', { tag: ['@alerts-form-validation', '@P0'
         testLogger.info('Destination created successfully');
       } else if (result === 'template-error') {
         await expect(templateError).toBeVisible();
+        await expect(templateError).toContainText('Template is required!');
         testLogger.info('Template required error shown — no templates exist yet');
       }
     });
@@ -321,9 +322,8 @@ test.describe('Alerts Form Validation', { tag: ['@alerts-form-validation', '@P0'
       const columnError = fvPage.getFilterConditionColumnErrorLocator();
       await columnError.waitFor({ state: 'visible', timeout: 5000 });
       await expect(columnError).toBeVisible();
-      const columnErrorText = (await columnError.textContent()).trim();
-      expect(columnErrorText.length).toBeGreaterThan(0);
-      testLogger.info('FilterCondition column error shown', { error: columnErrorText });
+      await expect(columnError).toContainText('Field is required!');
+      testLogger.info('FilterCondition column error shown');
     });
   });
 
@@ -488,9 +488,8 @@ test.describe('Alerts Form Validation', { tag: ['@alerts-form-validation', '@P0'
 
       if (errorVisible) {
         await expect(silenceError).toBeVisible();
-        const errorText = await silenceError.textContent();
-        expect(errorText.trim().length).toBeGreaterThan(0);
-        testLogger.info('Silence duration error shown for value 0', { error: errorText.trim() });
+        await expect(silenceError).toContainText('This field is required');
+        testLogger.info('Silence duration error shown for value 0');
       } else {
         // No inline error — acceptable if the UI prevents saving another way
         testLogger.info('No inline silence duration error for value 0 — UI may block save elsewhere');

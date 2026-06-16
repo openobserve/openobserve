@@ -1059,6 +1059,7 @@ test.describe("Dashboard ConfigPanel form validation", () => {
         await field.fill('200');
         await field.blur();
         await expect(pm.dashboardsFormValidation.getConfigPanelDecimalsErrorLocator()).toBeVisible();
+        await expect(pm.dashboardsFormValidation.getConfigPanelDecimalsErrorLocator()).toContainText('Decimals must be between 0 and 100');
         await field.fill('2');
         await field.blur();
         await expect(pm.dashboardsFormValidation.getConfigPanelDecimalsErrorLocator()).not.toBeVisible();
