@@ -1,5 +1,5 @@
 ---
-description: "CI Healer (Phase 5). Runs the generated spec headless against a local OSS binary, diagnoses failures, fixes selectors/timing/flow, and re-runs until passing — capped at 3 iterations and <6 min/test. Writes a machine-readable result. Non-interactive."
+description: "CI Healer (Phase 5). Runs the generated spec headless against a local OSS binary, diagnoses failures, fixes selectors/timing/flow, and re-runs until passing — capped at 6 iterations and <6 min/test. Writes a machine-readable result. Non-interactive."
 mode: primary
 ---
 
@@ -11,16 +11,23 @@ passes — within strict caps. This is the one agent with an accumulating, multi
 is **bounded**. You run non-interactively.
 
 ## Caps (hard limits)
-- **Max 3 healing iterations.** After the 3rd failed run, stop and report `status: "failing"`.
+- **Max 6 healing iterations.** After the 6th failed run, stop and report `status: "failing"`.
+- **Stop early on NO PROGRESS.** If a test fails the **same way twice in a row** (same test, same
+  error), more attempts won't help — stop and report it failing rather than burning iterations.
+  (Spend your budget on tests you're actually making progress on.)
 - **<6 minutes per test.** If a test exceeds this, treat it as a failure to fix (or mark the
   test for splitting) — do not let it run unbounded.
-- On cap exhaustion the workflow opens the PR as **draft** with failures noted. Do not loop
-  forever; do not lower coverage to force a pass.
+- Do not loop forever; do not lower coverage or weaken assertions to force a pass.
 
 ## Environment (provided by the job)
 - A local OpenObserve OSS binary is already built and booted at `ZO_BASE_URL`
   (default `http://localhost:5080`); auth env (`ZO_ROOT_USER_EMAIL`, `ZO_ROOT_USER_PASSWORD`,
   `ORGNAME`) is set. Tests run **headless** (CI has no display — never use `--headed`).
+- **Sandbox: stay INSIDE the repo.** The runner **auto-rejects** any command that touches a path
+  outside the workspace (e.g. `/tmp/*`) — the whole command fails with `permission ...
+  external_directory; auto-rejecting`. So **never** write/read `/tmp` (no `mkdir /tmp/...`, no
+  `tee /tmp/...`). Run commands plainly (stdout is captured); if you need a scratch file, put it
+  under the repo (e.g. `tests/ui-testing/test-results/`).
 
 ## Input (read first)
 
@@ -38,16 +45,21 @@ Heal the spec at `spec_path` (+ its page objects). If `run-context.json` is miss
 
 ---
 
-## Healing loop (≤ 3 iterations)
+## Healing loop (≤ 6 iterations)
 
-For iteration `i` in 1..3:
+For iteration `i` in 1..6:
 
 1. **Run headless:**
    ```bash
    cd tests/ui-testing && npx playwright test "<spec_path relative to tests/ui-testing>" \
-     --workers=4 --reporter=line --timeout=360000 2>&1 | tee /tmp/heal-run-$i.log
+     --workers=4 --reporter=line --timeout=360000
    ```
    (`--workers=4` matches the authoritative run; `--timeout=360000` = 6 min/test cap.)
+   Read the command's output **directly** — the runner captures stdout. Do **NOT** pipe/`tee` to
+   `/tmp` (or any path outside the repo): the CI sandbox **blocks external directories** and the
+   whole command will be auto-rejected (you'll see `permission ... external_directory (/tmp/*);
+   auto-rejecting`). If you must persist a log, write it **inside the repo** (e.g.
+   `tests/ui-testing/test-results/heal-run-$i.log`).
 2. **If all tests pass →** record success and exit the loop.
 3. **Diagnose** the failure from the log and the page. Classify:
    - **Selector** — "element not found", "Timeout waiting for selector", "strict mode
@@ -82,7 +94,7 @@ ever do it, state the concrete reason in the execution report.
    ```markdown
    # Execution Report: <feature_title>
    ## Run Details
-   - Iterations used: <n>/3
+   - Iterations used: <n>/6
    - Environment: <ZO_BASE_URL>
    ## Results
    | Test | Status | Duration | Notes |

@@ -4,7 +4,7 @@ name: E2E Council (Test Generation)
 # v1 scope: OSS only. In dry-run it posts a triage decision comment and stops. With dry_run=false:
 #   Job 1 triage → Job 2 generate (branch autoe2e/<orig> + commit + push)
 #   → Job 3 verify/heal: build+boot a real OpenObserve, run ONLY the generated spec, heal until it
-#     passes (<=3 iters) — so the PR contains WORKING tests, not junk.
+#     passes (<=6 iters) — so the PR contains WORKING tests, not junk.
 #   → Job 4 open the test PR (ONLY if healed/passing) via ORG_ADMIN_TOKEN so the repo's existing
 #     playwright.yml re-validates it. If healing fails, no PR is opened — just a comment.
 #
@@ -718,7 +718,7 @@ jobs:
 
   # ---------------------------------------------------------------------------
   # JOB 3 — Verify / Heal (HEAVY). Build + boot a REAL OpenObserve from the autoe2e
-  # branch, run ONLY the generated spec, and have the Healer fix it (<=3 iters) until it
+  # branch, run ONLY the generated spec, and have the Healer fix it (<=6 iters) until it
   # passes — BEFORE the PR is opened. Goal: the PR contains WORKING tests, so review is
   # about quality/coverage, not debugging junk. Build/boot mirror playwright.yml.
   # (CodeQL will flag this PR-head checkout like Jobs 1-2 — same allowlist-author false
@@ -734,7 +734,7 @@ jobs:
       needs.generate.outputs.has_changes == 'true'
     runs-on:
       labels: ubicloud-standard-16
-    timeout-minutes: 90 # backstop: build (~15) + boot + heal (capped 30) + final run (15) + audit
+    timeout-minutes: 100 # backstop: build (~15-20) + boot + heal (capped 40) + final run (15) + audit
     permissions:
       contents: write # push the healer's fixes to autoe2e/<branch>
       issues: write # (PR comments are issue comments)
@@ -869,12 +869,13 @@ jobs:
           echo "spec=$SPEC" >> "$GITHUB_OUTPUT"
           echo "rel=${SPEC#tests/ui-testing/}" >> "$GITHUB_OUTPUT"
 
-      - name: Heal — run ONLY the generated spec, fix until passing (<=3 iters)
+      - name: Heal — run ONLY the generated spec, fix until passing (<=6 iters)
         id: heal
         # HARD-GATED: timeout-minutes kills a runaway/hung healer; continue-on-error lets the
         # pipeline proceed to the authoritative run + comment instead of getting stuck. Any
         # fixes the healer wrote to disk before the cap are kept (committed below).
-        timeout-minutes: 30
+        # 40m gives the 6-iteration cap headroom (the no-progress bail usually ends it sooner).
+        timeout-minutes: 40
         continue-on-error: true
         env:
           DEEPSEEK_API_KEY_E2E: ${{ secrets.DEEPSEEK_API_KEY_E2E }}
@@ -884,7 +885,7 @@ jobs:
           REL: ${{ steps.spec.outputs.rel }}
         run: |
           opencode run --agent e2e-ci-healer --model "$PIPELINE_MODEL" \
-            "Run your spec. A live OpenObserve is booted at ${ZO_BASE_URL}. Heal ONLY this one spec (do NOT run the whole suite): ${SPEC}. Run it with 'cd tests/ui-testing && npx playwright test ${REL} --workers=4', diagnose failures, fix the spec/page objects, re-run — HARD CAP 3 iterations, then stop. Keep your reasoning concise to avoid exhausting context. Write docs/test_generator/ci/heal-result.json."
+            "Run your spec. A live OpenObserve is booted at ${ZO_BASE_URL}. Heal ONLY this one spec (do NOT run the whole suite): ${SPEC}. Run it with 'cd tests/ui-testing && npx playwright test ${REL} --workers=4', diagnose failures, fix the spec/page objects, re-run — HARD CAP 6 iterations, then stop. STOP EARLY if you make no progress (the same test fails the same way twice in a row) — more attempts won't help; report it failing instead of burning iterations. Keep your reasoning concise (summarize, don't paste full logs) to avoid exhausting context. Write docs/test_generator/ci/heal-result.json."
 
       - name: Authoritative final run (the workflow decides pass/fail, not the LLM)
         id: finalrun
