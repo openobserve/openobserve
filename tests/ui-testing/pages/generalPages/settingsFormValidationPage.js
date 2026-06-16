@@ -106,8 +106,8 @@ export class SettingsFormValidationPage {
      */
     async navigateToOrganizationSettings() {
         await this.navigateToSettings(this.page);
-        // Try the log-details / org settings nav link (Settings shell tabs)
-        const orgTab = this.page.locator('[data-test="settings-log-details-tab"], [href*="log_details"], [data-test*="log-details"]');
+        // The SectionRail item for Organization Settings uses dataTest: "organization-settings-tab"
+        const orgTab = this.page.locator('[data-test="organization-settings-tab"]');
         const found = await orgTab.count();
         if (found > 0) {
             await orgTab.first().click();
@@ -322,14 +322,13 @@ export class SettingsFormValidationPage {
      */
     async navigateToModelPricing() {
         await this.navigateToSettings(this.page);
-        // Model Pricing lives in the General settings tab
-        const generalTab = this.page.locator('[data-test="settings-general-tab"], [href*="general"], [data-test*="general"]');
-        const found = await generalTab.count();
-        if (found > 0) {
-            await generalTab.first().click();
-        }
-        // Wait for the model pricing editor save button to be present
-        await this.page.locator(this.modelPricingSaveBtn).waitFor({ state: 'visible', timeout: 15000 });
+        const modelPricingTab = this.page.locator('[data-test="model-pricing-tab"]');
+        await modelPricingTab.waitFor({ state: 'visible', timeout: 10000 });
+        await modelPricingTab.click();
+        const addBtn = this.page.locator('[data-test="model-pricing-add-btn"]');
+        await addBtn.waitFor({ state: 'visible', timeout: 10000 });
+        await addBtn.click();
+        await this.page.locator(this.modelPricingSaveBtn).waitFor({ state: 'visible', timeout: 10000 });
     }
 
     async clearModelPricingName() {

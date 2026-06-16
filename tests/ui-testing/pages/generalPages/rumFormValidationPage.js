@@ -35,9 +35,9 @@ export class RumFormValidationPage {
     // The hidden <input type="file"> inside the dropzone
     this.fileInput = page.locator('[data-test="rum-upload-source-maps-file-input"]');
     // Error shown when no file is selected and Upload is clicked (toast)
-    this.toastError = page.locator('[data-test="o-toast-error"]');
+    this.toastError = page.locator('[data-test-variant="error"]');
     this.toastMessage = page.locator('[data-test="o-toast-message"]');
-    this.toastSuccess = page.locator('[data-test="o-toast-success"]');
+    this.toastSuccess = page.locator('[data-test-variant="success"]');
 
     // ── Action bar buttons ─────────────────────────────────────────────────────
     this.uploadBtn  = page.locator('[data-test="rum-upload-source-maps-upload-btn"]');
