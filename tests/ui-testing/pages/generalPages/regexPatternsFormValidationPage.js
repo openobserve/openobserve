@@ -43,7 +43,7 @@ export class RegexPatternsFormValidationPage {
     async navigateToRegexPatterns() {
         const orgName = process.env.ORGNAME || 'default';
         const baseUrl = process.env.ZO_BASE_URL;
-        const targetUrl = `${baseUrl}/web/settings/regex_patterns?org_identifier=${orgName}`;
+        const targetUrl = `${baseUrl}/web/management/regex_patterns?org_identifier=${orgName}`;
         await this.page.goto(targetUrl);
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.locator(this.addPatternButton).waitFor({ state: 'visible', timeout: 10000 });

@@ -4,7 +4,7 @@ const testLogger = require('../../playwright-tests/utils/test-logger.js');
 
 /**
  * Page Object for Correlation Settings page
- * Route: /web/settings/correlation_settings?org_identifier={orgId}
+ * Route: /web/settings/correlation?org_identifier={orgId}
  *
  * Tabs:
  * - Service Identity (identity)
@@ -25,7 +25,7 @@ export class CorrelationSettingsPage {
         this.servicesTabName = 'Services';
         this.serviceDiscoveryTabName = 'Configuration';
         this.alertCorrelationTabName = 'Alert Correlation';
-        this.fieldAliasesTabName = 'Field Aliases';
+        this.fieldAliasesTabName = 'Field Mappings';
 
         // ==================== Service Identity Tab Selectors ====================
         this.serviceIdentityBackwardBtn = '[data-test="correlation-service-identity-backward-btn"]';
@@ -156,8 +156,8 @@ export class CorrelationSettingsPage {
     // ==================== Navigation ====================
 
     async navigateToCorrelationSettings(orgId) {
-        const baseUrl = process.env.INGESTION_URL || process.env.ZO_BASE_URL;
-        await this.page.goto(`${baseUrl}/web/settings/correlation_settings?org_identifier=${orgId}`);
+        const baseUrl = process.env.ZO_BASE_URL || 'http://localhost:5080';
+        await this.page.goto(`${baseUrl}/web/settings/correlation?org_identifier=${orgId}`);
         await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
     }
 

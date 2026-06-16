@@ -385,17 +385,18 @@ test.describe("Correlation Settings SemanticGroupItem display name validation", 
 
         await pm.correlationSettingsPage.clickAddCustomGroupButton();
 
-        // The new group row's display name input should be visible
-        const displayInput = page.locator('[data-test="semantic-group-display-input"]').last();
+        // The new group row's display name input (native <input>) should be visible.
+        // addGroup() unshifts the new group to the front of the list → use .first()
+        const displayInput = page.locator('[data-test="semantic-group-display-input-field"]').first();
         await expect(displayInput).toBeVisible({ timeout: 8000 });
 
-        // Focus and immediately blur (tab away) with an empty value to trigger error
+        // Click to focus, then blur the native input to trigger handleDisplayBlur
         await displayInput.click();
         await displayInput.blur();
 
         // handleDisplayBlur sets displayError when display is empty
-        const displayError = page.locator('[data-test="semantic-group-display-input-error"]').last();
-        await expect(displayError).toBeVisible();
+        const displayError = page.locator('[data-test="semantic-group-display-input-error"]').first();
+        await expect(displayError).toBeVisible({ timeout: 5000 });
         await expect(displayError).toContainText('Name is required');
 
         testLogger.info('Display name required error correctly shown on blur');
@@ -408,15 +409,15 @@ test.describe("Correlation Settings SemanticGroupItem display name validation", 
 
         await pm.correlationSettingsPage.clickAddCustomGroupButton();
 
-        const displayInput = page.locator('[data-test="semantic-group-display-input"]').last();
+        const displayInput = page.locator('[data-test="semantic-group-display-input-field"]').first();
         await expect(displayInput).toBeVisible({ timeout: 8000 });
 
         // Trigger error first
         await displayInput.click();
         await displayInput.blur();
 
-        const displayError = page.locator('[data-test="semantic-group-display-input-error"]').last();
-        await expect(displayError).toBeVisible();
+        const displayError = page.locator('[data-test="semantic-group-display-input-error"]').first();
+        await expect(displayError).toBeVisible({ timeout: 5000 });
         await expect(displayError).toContainText('Name is required');
 
         // Fill name — handleDisplayChange clears displayError

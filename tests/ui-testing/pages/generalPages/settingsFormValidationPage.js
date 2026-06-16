@@ -76,7 +76,7 @@ export class SettingsFormValidationPage {
 
         // ── Storage tab / add-storage button (OrgStorageEditor setup) ─────────
         this.storageTab               = '[data-test="storage-settings-tab"]';
-        this.addStorageBtnBase        = '[data-test="storage-settings-add-btn"], button';
+        this.addStorageBtnBase        = '[data-test="storage-settings-configure-btn"]';
 
         // ── Domain Management tab ─────────────────────────────────────────────
         this.domainTab                = '[data-test="domain-management-tab"]';
@@ -105,13 +105,10 @@ export class SettingsFormValidationPage {
      * The tab name varies by build; we click the nav item and wait for the save button.
      */
     async navigateToOrganizationSettings() {
-        await this.navigateToSettings(this.page);
-        // The SectionRail item for Organization Settings uses dataTest: "organization-settings-tab"
-        const orgTab = this.page.locator('[data-test="organization-settings-tab"]');
-        const found = await orgTab.count();
-        if (found > 0) {
-            await orgTab.first().click();
-        }
+        const org = process.env.ORGNAME || 'default';
+        const base = process.env.ZO_BASE_URL || 'http://localhost:5080';
+        await this.page.goto(`${base}/web/settings/organization?org_identifier=${org}`);
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.locator(this.orgSettingsSaveBtn).waitFor({ state: 'visible', timeout: 10000 });
     }
 
@@ -252,10 +249,7 @@ export class SettingsFormValidationPage {
      * The button is adjacent to the domain input and has text "Add Domain".
      */
     async clickAddDomainBtn() {
-        await this.page
-            .locator('.domain_management button')
-            .filter({ hasText: /add domain/i })
-            .click();
+        await this.page.locator(this.addDomainBtn).click();
     }
 
     async clickSaveDomainChanges() {
@@ -291,7 +285,7 @@ export class SettingsFormValidationPage {
     }
 
     getAddStorageBtnLocator() {
-        return this.page.locator(this.addStorageBtnBase).filter({ hasText: /add|new|configure/i }).first();
+        return this.page.locator(this.addStorageBtnBase).first();
     }
 
     getStep1ContinueBtnLocator() {
@@ -362,7 +356,7 @@ export class SettingsFormValidationPage {
     }
 
     async clickModelPricingSave() {
-        await this.page.locator(this.modelPricingSaveBtn).click();
+        await this.page.locator(this.modelPricingSaveBtn).click({ force: true });
     }
 
     async clickModelPricingCancel() {
