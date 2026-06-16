@@ -1,0 +1,26 @@
+{
+  "verdict": "PASS",
+  "critical_count": 0,
+  "warning_count": 1,
+  "auto_fixed": 1,
+  "feature_slug": "test-demo",
+  "feature_title": "Test Demo Page",
+  "spec_path": "tests/ui-testing/playwright-tests/GeneralTests/testDemo.spec.js",
+  "files_audited": [
+    "tests/ui-testing/playwright-tests/GeneralTests/testDemo.spec.js",
+    "tests/ui-testing/pages/generalPages/testDemoPage.js",
+    "tests/ui-testing/pages/page-manager.js"
+  ],
+  "issues": {
+    "critical": [],
+    "warnings": [
+      {
+        "file": "tests/ui-testing/playwright-tests/GeneralTests/testDemo.spec.js",
+        "line": 311,
+        "rule": "Page Manager encapsulation — direct property access",
+        "description": "Spec accessed pm.testDemoPage.fruitTrigger.click() directly instead of using pm.testDemoPage.openFruitDropdown()",
+        "auto_fixed": true
+      }
+    ]
+  }
+}

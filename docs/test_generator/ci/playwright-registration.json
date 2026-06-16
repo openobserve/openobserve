@@ -1,0 +1,6 @@
+{
+  "group": "GeneralTests",
+  "spec_filename": "testDemo.spec.js",
+  "create_group": false,
+  "browser": "chrome"
+}

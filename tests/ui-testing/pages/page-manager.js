@@ -65,6 +65,7 @@ import { CorrelationSettingsPage } from "./generalPages/correlationSettingsPage.
 import { CrossLinkPage } from "./generalPages/crossLinkPage.js";
 import { ModelPricingPage } from "./generalPages/modelPricingPage.js";
 import { EditionFeaturesPage } from "./generalPages/editionFeaturesPage.js";
+import { TestDemoPage } from "./generalPages/testDemoPage.js";
 const SchemaPage = require("./generalPages/schemaPage.js");
 const SchemaLoadPage = require("./generalPages/schemaLoadPage.js");
 const APICleanup = require("./apiCleanup.js");
@@ -161,6 +162,7 @@ class PageManager {
     this.crossLinkPage = new CrossLinkPage(page);
     this.modelPricingPage = new ModelPricingPage(page);
     this.editionFeaturesPage = new EditionFeaturesPage(page);
+    this.testDemoPage = new TestDemoPage(page);
     this.schemaPage = new SchemaPage(page);
     this.schemaLoadPage = new SchemaLoadPage(page);
 

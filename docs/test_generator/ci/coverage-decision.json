@@ -1,0 +1,7 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/GeneralTests/testDemo.spec.js",
+  "existing_tests_considered": [],
+  "needs_registration": false,
+  "rationale": "No existing test covers the /test-demo page or any test-demo selectors. The TestDemo.vue component, route, and nav entry are all net-new (see diff.patch). A new spec file is required. Playwright auto-discovers spec files under testDir so no registration is needed."
+}
