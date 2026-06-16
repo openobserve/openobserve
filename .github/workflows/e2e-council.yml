@@ -18,9 +18,11 @@ name: E2E Council (Test Generation)
 #
 # EVERY RUN IS TIED TO A PR — by design. A PR is the unit of change + review; generating tests
 # detached from a PR is not allowed. There are exactly two entry points, both PR-bound:
-#   - a comment that is EXACTLY `/e2e` on a PR → triages that PR's diff (extra text won't match).
+#   - a PR comment, EXACTLY one of (extra text won't match):
+#       /e2e         → FULL run: triage → generate → heal → open the test PR
+#       /e2e-dryrun  → triage only: posts the decision comment, generates nothing
 #   - Manual run with `pr_number`   → triages that PR's diff (pr_number is REQUIRED; accepts a
-#                                     bare number, "#123", or a full PR URL).
+#                                     bare number, "#123", or a full PR URL; honours the dry_run input).
 # No PR ⇒ no run. (There is intentionally no free-form branch option.)
 #   Example: dispatch with pr_number=1234 (or .../pull/1234).
 #
@@ -55,6 +57,16 @@ on:
         default: true
   issue_comment:
     types: [created]
+  # Auto-on-merge (Trigger 3) — OFF by default. Fires only when the repo variable
+  # E2E_AUTO_ON_MERGE == 'true' (gated in the triage `if`). Runs when a PR targeting main is
+  # CLOSED; the `if` further requires it was actually merged. Lets the pipeline auto-generate
+  # tests for a feature once it lands, without anyone typing /e2e.
+  # ⚠️ ENABLING THIS generates a test PR for (potentially) EVERY merged PR to main — only flip
+  #    E2E_AUTO_ON_MERGE on if the team has capacity to review the resulting test PRs. The triage
+  #    candidate-criteria filters out non-UI/ENT/docs changes, but expect more test-PR volume.
+  pull_request:
+    types: [closed]
+    branches: [main]
 
 # Least privilege at the top level: the live (triage) path only reads code and posts comments.
 # Jobs that need to write code/PRs (pr_back) request elevated permissions at the job level.
@@ -64,7 +76,9 @@ permissions:
   issues: write
 
 concurrency:
-  group: e2e-council-${{ github.event.issue.number || github.event.inputs.pr_number || github.ref }}
+  # One run at a time per source PR (covers comment, dispatch, and auto-on-merge events) so two
+  # triggers can't race on the same autoe2e/pr-<n> branch.
+  group: e2e-council-${{ github.event.issue.number || github.event.pull_request.number || github.event.inputs.pr_number || github.ref }}
   cancel-in-progress: true
 
 env:
@@ -80,16 +94,19 @@ jobs:
   # ---------------------------------------------------------------------------
   triage:
     # Trigger gate: the actor (commenter / dispatcher) must be on the engineering-team ALLOWLIST,
-    # AND it's either a manual dispatch or a comment that is EXACTLY `/e2e` on a PR. Exact match
-    # (not `contains`) so "Generate /e2e" etc. do NOT trigger — the job never starts (no reaction,
-    # no comment, no run). Allowlist mirrors .github/workflows/auto-assign-metadata.yml — keep in
-    # sync. (PR-AUTHOR is gated separately, in the prinfo step below, so strangers' PRs are ditched.)
+    # AND it's either a manual dispatch or an EXACT `/e2e` (full run) or `/e2e-dryrun` (triage only)
+    # comment on a PR. Exact match (not `contains`) so "Generate /e2e" etc. do NOT trigger — the job
+    # never starts (no reaction, no comment, no run). Allowlist mirrors auto-assign-metadata.yml —
+    # keep in sync. (PR-AUTHOR is gated separately, in the prinfo step below, so strangers' PRs are ditched.)
     if: >
       contains(fromJSON('["bjp232004","hengfeiyang","prabhatsharma","uddhavdave","oasisk","haohuaijin","Subhra264","Loaki07","007harshmahajan","chaitanya-sistla","ktx-kirtan","omkarK06","ktx-vaidehi","ktx-abhay","neha00290","ktx-akshay","ktx-sadhna","nikhilsaikethe","YashodhanJoshi1","ktx-riya","mmosarafO2","Shrinath-O2","ktx-mihir"]'), github.actor) &&
       (github.event_name == 'workflow_dispatch' ||
        (github.event_name == 'issue_comment' &&
         github.event.issue.pull_request &&
-        github.event.comment.body == '/e2e'))
+        (github.event.comment.body == '/e2e' || github.event.comment.body == '/e2e-dryrun')) ||
+       (github.event_name == 'pull_request' &&
+        github.event.pull_request.merged == true &&
+        vars.E2E_AUTO_ON_MERGE == 'true'))
     runs-on: ubuntu-latest
     timeout-minutes: 15
     outputs:
@@ -99,9 +116,15 @@ jobs:
       dry_run: ${{ steps.mode.outputs.dry_run }}
       pr_number: ${{ steps.resolve.outputs.pr_number }}
       author_allowed: ${{ steps.prinfo.outputs.author_allowed }}
-      author: ${{ steps.prinfo.outputs.author }}
+      author: ${{ steps.prinfo.outputs.author }} # source-PR author login; used to auto-assign the test PR (pr_back)
       head_ref: ${{ steps.prinfo.outputs.head_ref }}
       head_sha: ${{ steps.prinfo.outputs.head_sha }}
+      mode: ${{ steps.prinfo.outputs.mode }}               # open | merged (auto-on-merge)
+      base_ref: ${{ steps.prinfo.outputs.base_ref }}       # test-PR base: feature branch (open) or main (merged)
+      work_branch: ${{ steps.prinfo.outputs.work_branch }} # autoe2e/pr-<n> (both modes — rename-proof identity)
+      checkout_ref: ${{ steps.prinfo.outputs.checkout_ref }} # generate checks this out: feature commit, OR the work branch when reusing
+      source_sha: ${{ steps.prinfo.outputs.source_sha }}   # the feature commit the tests target (commit-trailer + change detection)
+      reuse: ${{ steps.prinfo.outputs.reuse }}             # true → extend the existing test branch instead of clobbering
     steps:
       - name: Check required secret
         env:
@@ -119,11 +142,14 @@ jobs:
           script: |
             // Only the PR number is needed — we read the change as a diff (data), never check
             // out the PR head. (See the checkout step below for the security rationale.)
-            // issue_comment → the commented PR; workflow_dispatch → the required pr_number input,
-            // which accepts a bare number, "#123", or a full PR URL. Normalize to a bare integer
-            // so downstream (gh pr diff, comment posting, concurrency) always gets a number.
+            // issue_comment → the commented PR; pull_request (auto-on-merge) → the merged PR;
+            // workflow_dispatch → the required pr_number input, which accepts a bare number,
+            // "#123", or a full PR URL. Normalize to a bare integer so downstream (gh pr diff,
+            // comment posting, concurrency) always gets a number.
             const raw = context.eventName === 'issue_comment'
               ? String(context.payload.issue.number)
+              : context.eventName === 'pull_request'
+              ? String(context.payload.pull_request.number)
               : String(context.payload.inputs.pr_number || '');
             const urlMatch = raw.match(/\/pull\/(\d+)/);   // PR URL → the /pull/<n> segment
             const numMatch = raw.match(/\d+/);             // else first run of digits ("#123", "123")
@@ -149,19 +175,74 @@ jobs:
             const allowed = ALLOW.includes(author.toLowerCase());
             core.setOutput('author', author);
             core.setOutput('author_allowed', allowed ? 'true' : 'false');
-            core.setOutput('head_ref', data.head ? data.head.ref : '');
-            core.setOutput('head_sha', data.head ? data.head.sha : '');  // immutable — pinned by generate to avoid TOCTOU
-            core.info(`PR #${pr} author=@${author} allowed=${allowed} head=${data.head ? data.head.ref : '?'}`);
+            const headRef = data.head ? data.head.ref : '';
+            const headSha = data.head ? data.head.sha : '';
+            core.setOutput('head_ref', headRef);
+            core.setOutput('head_sha', headSha);  // immutable — pinned by generate to avoid TOCTOU
+
+            // MODE — open (comment/dispatch on a live PR) vs merged (auto-on-merge). They differ:
+            //  - open:   stack the test branch on the still-open feature branch (base = head_ref),
+            //            check out the PR head, branch name keyed on the feature branch.
+            //  - merged: the feature is already in main and its branch may be deleted → base = main,
+            //            check out the merge commit, branch name keyed on the (stable) PR number.
+            const merged = context.eventName === 'pull_request';
+            core.setOutput('mode', merged ? 'merged' : 'open');
+            core.setOutput('base_ref', merged ? (data.base ? data.base.ref : 'main') : headRef);
+            // Branch identity is keyed on the (immutable) PR number in BOTH modes — survives a
+            // feature-branch rename, so re-runs/reuse always find the same test branch.
+            const workBranch = `autoe2e/pr-${pr}`;
+            core.setOutput('work_branch', workBranch);
+            // The feature commit these tests target — for the source-sha trailer + change detection.
+            const featureSha = merged ? (data.merge_commit_sha || headSha) : headSha;
+            core.setOutput('source_sha', featureSha);
+            // REUSE vs REBUILD.
+            // Manual dispatch honours its force_overwrite box (default true = rebuild, untick = reuse).
+            // Comment (/e2e) and auto-on-merge have no box → they DEFAULT to reuse, so re-running
+            // /e2e on a PR checks the existing tests and extends/leaves-them rather than clobbering.
+            const forceOverwrite = (context.eventName === 'workflow_dispatch')
+              ? String(context.payload.inputs?.force_overwrite ?? 'true')
+              : 'false';
+            // Find the existing test branch and the source commit its tests were generated against
+            // (from the e2e-source-sha commit trailer).
+            let branchExists = false, storedSha = '';
+            try {
+              const b = await github.rest.repos.getBranch({ owner: context.repo.owner, repo: context.repo.repo, branch: workBranch });
+              branchExists = true;
+              const msg = b.data.commit?.commit?.message || '';
+              const m = msg.match(/e2e-source-sha:\s*([0-9a-fA-F]{7,40})/);
+              storedSha = m ? m[1] : '';
+            } catch (e) { branchExists = false; }
+            // Reuse the existing branch (agents see prior tests → extend / leave-alone / add) ONLY
+            // when the user didn't force a rebuild AND the feature is UNCHANGED since those tests
+            // were generated — that avoids extending tests against stale code. If the feature moved
+            // (or we can't tell / no branch), rebuild fresh against the latest commit.
+            const unchanged = !!storedSha && (featureSha === storedSha || featureSha.startsWith(storedSha) || storedSha.startsWith(featureSha));
+            const reuse = branchExists && forceOverwrite !== 'true' && unchanged;
+            core.setOutput('reuse', reuse ? 'true' : 'false');
+            core.setOutput('checkout_ref', reuse ? workBranch : featureSha);
+            core.info(`PR #${pr} mode=${merged ? 'merged' : 'open'} author=@${author} allowed=${allowed} reuse=${reuse} (exists=${branchExists}, unchanged=${unchanged}, force=${forceOverwrite})`);
 
       - name: Determine dry-run mode
         id: mode
+        # `/e2e` = full run, `/e2e-dryrun` = triage only, manual dispatch honours its dry_run input.
+        # The trigger `if` already guarantees COMMENT_BODY is exactly `/e2e` or `/e2e-dryrun`; we
+        # still pass it via env and compare in-shell (never interpolated into the script) as
+        # defense-in-depth against code injection.
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_DRY: ${{ github.event.inputs.dry_run }}
+          COMMENT_BODY: ${{ github.event.comment.body }}
         run: |
-          # Comment trigger is always dry-run in v1. Only manual dispatch can disable it.
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ github.event.inputs.dry_run }}" = "false" ]; then
-            echo "dry_run=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "dry_run=true" >> "$GITHUB_OUTPUT"
+          DRY=true
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            [ "$INPUT_DRY" = "false" ] && DRY=false
+          elif [ "$EVENT_NAME" = "issue_comment" ] && [ "$COMMENT_BODY" = "/e2e" ]; then
+            DRY=false
+          elif [ "$EVENT_NAME" = "pull_request" ]; then
+            DRY=false   # auto-on-merge is always a full run (gated by E2E_AUTO_ON_MERGE in the trigger if)
           fi
+          echo "dry_run=$DRY" >> "$GITHUB_OUTPUT"
+          echo "Mode: dry_run=$DRY (event=$EVENT_NAME)"
 
       - name: Acknowledge — react + post in-progress comment
         # Give the user immediate feedback (within seconds) that the agent is working. We post a
@@ -346,6 +427,10 @@ jobs:
       needs.triage.outputs.author_allowed == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    outputs:
+      # false when the run produced no test changes (Architect action=none / already covered) →
+      # verify_heal + pr_back skip the heavy build and the PR refresh.
+      has_changes: ${{ steps.push.outputs.has_changes }}
     permissions:
       contents: write # push the generated tests to the autoe2e/<branch> (never to main)
       issues: write # (PR comments are issue comments)
@@ -358,7 +443,7 @@ jobs:
           # to close the TOCTOU window, and do NOT persist the token in the workspace while we run
           # on PR-authored code. (This job runs only via workflow_dispatch — dry_run=false is
           # dispatch-only — and only for allowlisted PR authors; it never runs from issue_comment.)
-          ref: ${{ needs.triage.outputs.head_sha }}
+          ref: ${{ needs.triage.outputs.checkout_ref }}
           fetch-depth: 1
           persist-credentials: false
 
@@ -414,12 +499,28 @@ jobs:
         run: |
           RC=docs/test_generator/ci/run-context.json
           { [ -f "$RC" ] && jq empty "$RC" 2>/dev/null; } || { echo "::error::run-context.json missing/invalid (triage hand-off broken)"; exit 1; }
-          SPEC=$(jq -r '.spec_path // empty' "$RC")
-          [ -n "$SPEC" ] || { echo "::error::run-context.json has no spec_path"; exit 1; }
-          [ -f "$SPEC" ] || { echo "::error::Engineer did not write the spec at $SPEC (engineer hand-off broken)"; exit 1; }
+          # Coverage decision (Architect): action=new|append|extend + the file actually written/edited.
+          CD=docs/test_generator/ci/coverage-decision.json
+          ACTION=new; TARGET=""
+          if [ -f "$CD" ]; then
+            # Normalize the LLM-written action (lowercase, strip spaces) + validate — a stray "New"
+            # or " extend" must not silently mis-route registration.
+            ACTION=$(jq -r '.action // "new"' "$CD" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')
+            TARGET=$(jq -r '.target_spec // empty' "$CD")
+          fi
+          case "$ACTION" in new|append|extend) ;; *) echo "::error::invalid coverage action: $ACTION"; exit 1 ;; esac
+          SPEC="$TARGET"
+          [ -n "$SPEC" ] || SPEC=$(jq -r '.spec_path // empty' "$RC")
+          [ -n "$SPEC" ] || { echo "::error::no spec path (coverage target_spec / run-context.spec_path both empty)"; exit 1; }
+          [ -f "$SPEC" ] || { echo "::error::Engineer did not write/edit the spec at $SPEC (engineer hand-off broken)"; exit 1; }
+          # Registration is required ONLY for a brand-new spec; append/extend edit an already-listed file.
           REG=docs/test_generator/ci/playwright-registration.json
-          { [ -f "$REG" ] && jq -e '.group and .spec_filename' "$REG" >/dev/null 2>&1; } || { echo "::error::playwright-registration.json missing/invalid (engineer hand-off broken)"; exit 1; }
-          echo "Hand-off OK: spec=$SPEC"
+          if [ "$ACTION" = "new" ]; then
+            { [ -f "$REG" ] && jq -e '.group and .spec_filename' "$REG" >/dev/null 2>&1; } || { echo "::error::new spec but playwright-registration.json missing/invalid (engineer hand-off broken)"; exit 1; }
+          else
+            echo "action=$ACTION → existing spec edited in place; no registration expected."
+          fi
+          echo "Hand-off OK: action=$ACTION spec=$SPEC"
 
       - name: Audit + self-fix loop (Sentinel ⇄ Engineer until clean)
         # SELF-CORRECTING quality gate (the whole point): Sentinel audits; if it's not a clean PASS,
@@ -469,24 +570,33 @@ jobs:
       # ORG_ADMIN_TOKEN, which has that permission and runs no untrusted code. The Engineer's
       # playwright-registration.json (carried in the artifact) is the instruction Job 4 applies.
 
-      - name: Create autoe2e branch, commit, push (no PR yet)
-        # Branch early (silent) off the dev's PR branch so it inherits the feature code → the tests
-        # pass before the feature merges. The PR is opened later by Job 4. Force-push so a re-run of
-        # /e2e refreshes the same branch (idempotent — one test PR per source PR).
-        # Pushes ONLY tests/ui-testing — no .github/workflows change, so GITHUB_TOKEN is allowed.
+      - name: Create/extend autoe2e branch, commit, push (no PR yet)
+        id: push
+        # Two modes (decided by triage):
+        #  - FRESH (reuse=false): the checkout is the feature commit → create the test branch off it
+        #    and force-push (idempotent rebuild). One test PR per source PR.
+        #  - REUSE (reuse=true): the checkout IS the existing autoe2e/pr-<n> branch (prior tests
+        #    present) → the agents already EXTENDED those tests this run; commit on top and
+        #    fast-forward push (no -b, no --force). Preserves prior tests + manual edits.
+        # Pushes ONLY tests/ui-testing (+ stripped-later hand-off) — no .github/workflows change.
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ORIG_REF: ${{ needs.triage.outputs.head_ref }}
+          WORK_BRANCH: ${{ needs.triage.outputs.work_branch }}
           PR_NUMBER: ${{ needs.triage.outputs.pr_number }}
-          # Empty on the /e2e comment path → defaults to force (overwrite). Untick the dispatch flag
-          # to set "false" and protect an existing branch (push without --force; fails if diverged).
-          FORCE_OVERWRITE: ${{ github.event.inputs.force_overwrite }}
+          REUSE: ${{ needs.triage.outputs.reuse }}
+          # The feature commit the tests target (not the checked-out ref, which is the branch in reuse).
+          SRC_SHA: ${{ needs.triage.outputs.source_sha }}
         run: |
-          SLUG=$(jq -r '.feature_slug // "feature"' docs/test_generator/ci/run-context.json)
-          BRANCH="autoe2e/${ORIG_REF}"
-          git config user.name "openobserve-bot"
-          git config user.email "bot@openobserve.ai"
-          git checkout -b "$BRANCH"
+          SLUG=$(jq -r '.feature_slug // "feature"' docs/test_generator/ci/run-context.json | tr -cd 'a-zA-Z0-9_-')
+          [ -n "$SLUG" ] || SLUG="feature"   # LLM-written; strip anything but [a-zA-Z0-9_-] before it hits the commit msg
+          BRANCH="${WORK_BRANCH}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if [ "$REUSE" = "true" ]; then
+            echo "Reuse mode: extending the existing $BRANCH (already checked out)."
+          else
+            git checkout -b "$BRANCH"   # fresh: branch off the checked-out feature commit
+          fi
           # The anti-hijack restore staged .opencode/opencode.jsonc (trusted-ref agents) — those are
           # PIPELINE files and must NOT land in the test PR. Unstage them before committing so the
           # commit carries ONLY the generated tests + hand-off.
@@ -496,13 +606,44 @@ jobs:
           # SELF-CONTAINED: verify_heal reads it straight from the checkout, no artifact dependency.
           # Job 4 strips it back out before opening the PR, so it never reaches the PR diff or main.
           git add -f docs/test_generator/ci
-          git commit -m "test(autoe2e): generated E2E tests for #${PR_NUMBER} (${SLUG})"
+          if git diff --cached --quiet; then
+            # Architect chose action=none (already covered) or the run produced no diff → nothing to
+            # do. Tell downstream to skip the heavy build + PR refresh.
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+            echo "No changes to commit — existing tests already cover this; skipping build/PR."; exit 0
+          fi
+          echo "has_changes=true" >> "$GITHUB_OUTPUT"
+          # e2e-source-sha trailer = the feature commit these tests target (change detection / Flow 4a).
+          git commit -m "test(autoe2e): generated E2E tests for #${PR_NUMBER} (${SLUG})" \
+            -m "e2e-source-sha: ${SRC_SHA}"
           # Explicit one-shot token (checkout used persist-credentials:false). Push only to autoe2e/*.
-          # force_overwrite=false → plain push (won't clobber an existing/manually-edited branch).
-          FORCE_FLAG="--force"
-          [ "$FORCE_OVERWRITE" = "false" ] && FORCE_FLAG=""
+          # Reuse → fast-forward (committed on top of the branch tip). Rebuild → force-push to REPLACE
+          # the branch. The reuse-vs-rebuild choice already accounts for force_overwrite (in triage),
+          # so a rebuild ALWAYS force-pushes — otherwise a plain push to an existing/diverged branch
+          # is rejected (the original footgun).
+          if [ "$REUSE" = "true" ]; then FORCE_FLAG=""; else FORCE_FLAG="--force"; fi
           git push $FORCE_FLAG "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:refs/heads/${BRANCH}"
-          echo "Pushed generated tests to $BRANCH (no PR yet — Job 4 opens it; it also registers playwright.yml)."
+          echo "Pushed tests to $BRANCH (reuse=$REUSE; no PR yet — Job 4 opens/refreshes it)."
+
+      - name: Comment "already covered" when there's nothing to do
+        # Leave-alone path (Architect action=none / no diff): the existing tests already cover this,
+        # so verify_heal + pr_back are skipped. Let the dev know on the PR instead of going silent.
+        if: success() && steps.push.outputs.has_changes == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SRC_PR: ${{ needs.triage.outputs.pr_number }}
+        run: |
+          MARKER="<!-- e2e-council-testpr -->"
+          printf '%s\n🤖 **E2E Council** — looked at #%s and the existing E2E tests already cover this change, so there is **nothing to add**. ✅' \
+            "$MARKER" "$SRC_PR" > /tmp/covered.md
+          CID=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${SRC_PR}/comments" \
+            --jq "[.[] | select(.body | startswith(\"${MARKER}\"))][0].id // empty")
+          if [ -n "$CID" ]; then
+            gh api -X PATCH "repos/${GITHUB_REPOSITORY}/issues/comments/${CID}" -F body=@/tmp/covered.md >/dev/null
+          else
+            gh api -X POST "repos/${GITHUB_REPOSITORY}/issues/${SRC_PR}/comments" -F body=@/tmp/covered.md >/dev/null
+          fi
+          echo "Posted 'already covered' note on #${SRC_PR}."
 
       - name: Upload run metadata (consumed by Job 3/4)
         # SINGLE path on purpose: with one path, the artifact root = the contents of ci/, so
@@ -578,7 +719,8 @@ jobs:
       needs.triage.outputs.dry_run == 'false' &&
       needs.triage.outputs.skip == 'false' &&
       needs.triage.outputs.needs_e2e == 'true' &&
-      needs.triage.outputs.author_allowed == 'true'
+      needs.triage.outputs.author_allowed == 'true' &&
+      needs.generate.outputs.has_changes == 'true'
     runs-on:
       labels: ubicloud-standard-16
     timeout-minutes: 90 # backstop: build (~15) + boot + heal (capped 30) + final run (15) + audit
@@ -619,7 +761,7 @@ jobs:
       - name: Checkout the autoe2e branch (feature code + generated tests)
         uses: actions/checkout@v4
         with:
-          ref: autoe2e/${{ needs.triage.outputs.head_ref }}
+          ref: ${{ needs.triage.outputs.work_branch }}
           fetch-depth: 0
           persist-credentials: false
 
@@ -701,9 +843,18 @@ jobs:
       - name: Resolve + validate spec path
         id: spec
         run: |
-          SPEC=$(jq -r '.spec_path' docs/test_generator/ci/run-context.json)
+          # Prefer the Architect's coverage decision (the file actually written/edited — for
+          # append/extend that's an EXISTING spec, not run-context.spec_path). Fall back to
+          # run-context.spec_path (the new-spec/greenfield case).
+          CD=docs/test_generator/ci/coverage-decision.json
+          SPEC=""
+          [ -f "$CD" ] && SPEC=$(jq -r '.target_spec // empty' "$CD")
+          [ -n "$SPEC" ] || SPEC=$(jq -r '.spec_path' docs/test_generator/ci/run-context.json)
           echo "$SPEC" | grep -Eq '^tests/ui-testing/playwright-tests/[A-Za-z0-9._/-]+\.spec\.js$' \
-            || { echo "::error::invalid spec_path: $SPEC"; exit 1; }
+            || { echo "::error::invalid spec path: $SPEC"; exit 1; }
+          # The regex permits '/', so reject any '..' segment explicitly — a path like
+          # tests/ui-testing/playwright-tests/../../etc/x.spec.js would otherwise pass.
+          case "$SPEC" in *..*) echo "::error::spec path contains '..': $SPEC"; exit 1 ;; esac
           echo "spec=$SPEC" >> "$GITHUB_OUTPUT"
           echo "rel=${SPEC#tests/ui-testing/}" >> "$GITHUB_OUTPUT"
 
@@ -755,11 +906,11 @@ jobs:
       - name: Commit + push healer fixes to autoe2e branch
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ORIG_REF: ${{ needs.triage.outputs.head_ref }}
+          WORK_BRANCH: ${{ needs.triage.outputs.work_branch }}
         run: |
-          BRANCH="autoe2e/${ORIG_REF}"
-          git config user.name "openobserve-bot"
-          git config user.email "bot@openobserve.ai"
+          BRANCH="${WORK_BRANCH}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           # The anti-hijack restore staged .opencode/opencode.jsonc — unstage so healer commits carry
           # ONLY test changes (pipeline files must never reach the test PR).
           git restore --staged .opencode opencode.jsonc 2>/dev/null || true
@@ -873,14 +1024,19 @@ jobs:
         # runner, so there is no untrusted-checkout surface here. The LLM never edits the workflow.
         env:
           GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
-          ORIG_REF: ${{ needs.triage.outputs.head_ref }}
+          WORK_BRANCH: ${{ needs.triage.outputs.work_branch }}
           REG: meta/playwright-registration.json
         run: |
           set -euo pipefail
-          BRANCH="autoe2e/${ORIG_REF}"
+          BRANCH="${WORK_BRANCH}"
           PW=.github/workflows/playwright.yml
-          { [ -f "$REG" ] && jq -e 'has("group") and has("spec_filename")' "$REG" >/dev/null 2>&1; } \
-            || { echo "::error::playwright-registration.json missing/invalid"; exit 1; }
+          # No registration file → append/extend of an already-listed spec → nothing to register.
+          if [ ! -f "$REG" ]; then
+            echo "::notice::No playwright-registration.json (append/extend) — spec already registered, skipping."
+            exit 0
+          fi
+          jq -e 'has("group") and has("spec_filename")' "$REG" >/dev/null 2>&1 \
+            || { echo "::error::playwright-registration.json present but invalid"; exit 1; }
           GROUP=$(jq -r '.group' "$REG"); FNAME=$(jq -r '.spec_filename' "$REG")
           echo "$FNAME" | grep -Eq '^[A-Za-z0-9._-]+\.spec\.js$' || { echo "::error::unsafe spec_filename: $FNAME"; exit 1; }
           export GROUP FNAME
@@ -912,16 +1068,26 @@ jobs:
           # ORG_ADMIN_TOKEN (already used by auto-assign-metadata.yml) so the test PR triggers
           # the repo's existing playwright.yml. A PR opened with GITHUB_TOKEN would not.
           GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
-          ORIG_REF: ${{ needs.triage.outputs.head_ref }}
+          WORK_BRANCH: ${{ needs.triage.outputs.work_branch }}
+          BASE_REF: ${{ needs.triage.outputs.base_ref }}
           SRC_PR: ${{ needs.triage.outputs.pr_number }}
+          AUTHOR: ${{ needs.triage.outputs.author }}
         run: |
           set -e
-          BRANCH="autoe2e/${ORIG_REF}"
-          SLUG=$(jq -r '.feature_slug // "feature"' meta/run-context.json 2>/dev/null || echo feature)
+          BRANCH="${WORK_BRANCH}"
+          SLUG=$(jq -r '.feature_slug // "feature"' meta/run-context.json 2>/dev/null | tr -cd 'a-zA-Z0-9_-')
+          [ -n "$SLUG" ] || SLUG="feature"   # sanitize LLM-written slug before it hits the PR title
           SPEC=$(jq -r '.spec_path // "(see branch)"' meta/run-context.json 2>/dev/null || echo "(see branch)")
 
+          # Reviewer-facing summary table of the test cases added/changed (Engineer's test-summary.json).
+          TABLE=""
+          if [ -f meta/test-summary.json ] && [ "$(jq 'length' meta/test-summary.json 2>/dev/null || echo 0)" -gt 0 ]; then
+            TABLE=$(jq -r '"\n\n**Test cases added / changed:**\n\n| Test case | Type | What it verifies |\n|---|---|---|\n" + ([.[] | "| `\(.title)` | \(.action) | \(.verifies) |"] | join("\n"))' meta/test-summary.json 2>/dev/null || echo "")
+          fi
+
           printf '🤖 Auto-generated E2E tests for #%s — **healed to passing** against a live OpenObserve before this PR was opened.\n\n- Branch `%s` (stacked on `%s`), so the tests run against the feature code and pass before it merges.\n- Spec: `%s`\n\nThe repo Playwright CI re-validates here. Review is for **quality + coverage** — the tests already pass.\n\n_Generated by the E2E Council pipeline._\n' \
-            "$SRC_PR" "$BRANCH" "$ORIG_REF" "$SPEC" > /tmp/pr-body.md
+            "$SRC_PR" "$BRANCH" "$BASE_REF" "$SPEC" > /tmp/pr-body.md
+          printf '%s\n' "$TABLE" >> /tmp/pr-body.md
 
           # Idempotent: re-runs force-update the branch, so an existing PR auto-reflects it.
           EXISTING=$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$BRANCH" --state open --json number --jq '.[0].number // empty')
@@ -929,7 +1095,7 @@ jobs:
             echo "Test PR #$EXISTING already open; branch was force-updated. No new PR."
             TEST_PR="$EXISTING"
           else
-            URL=$(gh pr create --repo "$GITHUB_REPOSITORY" --head "$BRANCH" --base "$ORIG_REF" \
+            URL=$(gh pr create --repo "$GITHUB_REPOSITORY" --head "$BRANCH" --base "$BASE_REF" \
               --title "test(autoe2e): generated E2E tests for #${SRC_PR} (${SLUG})" --body-file /tmp/pr-body.md)
             echo "Opened test PR: $URL"
             TEST_PR=$(echo "$URL" | grep -oE '[0-9]+$' || echo "")
@@ -937,8 +1103,9 @@ jobs:
 
           [ -n "$TEST_PR" ] || { echo "::warning::could not resolve test PR number"; exit 0; }
           MARKER="<!-- e2e-council-testpr -->"
-          printf '%s\n🤖 **E2E Council** → healed, passing E2E tests are in #%s (branch `%s`).' \
+          printf '%s\n🤖 **E2E Council** → healed, passing E2E tests are in #%s (branch `%s`).\n' \
             "$MARKER" "$TEST_PR" "$BRANCH" > /tmp/sticky.md
+          printf '%s\n' "$TABLE" >> /tmp/sticky.md
           CID=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${SRC_PR}/comments" \
             --jq "[.[] | select(.body | startswith(\"${MARKER}\"))][0].id // empty")
           if [ -n "$CID" ]; then
@@ -947,3 +1114,128 @@ jobs:
             gh api -X POST "repos/${GITHUB_REPOSITORY}/issues/${SRC_PR}/comments" -F body=@/tmp/sticky.md >/dev/null
           fi
           echo "Linked test PR #$TEST_PR on source PR #$SRC_PR."
+
+          # Assign + request review from the original feature dev + Neha + Shrinath (all allowlisted)
+          # so every auto-generated test PR lands on the right desks. Per-user, each gh call wrapped
+          # in if/then/else so a single bad entry (e.g. a user who can't be assigned, or self-review
+          # when the bot account == a listed user) is logged but never fails the job — even under set -e.
+          for U in "$AUTHOR" neha00290 Shrinath-O2; do
+            [ -n "$U" ] || continue
+            if gh pr edit "$TEST_PR" --repo "$GITHUB_REPOSITORY" --add-assignee "$U" >/dev/null 2>&1; then
+              echo "assigned @$U"; else echo "::warning::could not assign @$U"; fi
+            if gh pr edit "$TEST_PR" --repo "$GITHUB_REPOSITORY" --add-reviewer "$U" >/dev/null 2>&1; then
+              echo "requested review from @$U"; else echo "::notice::could not request review from @$U (self/perm)"; fi
+          done
+
+  # ---------------------------------------------------------------------------
+  # JOB 5 — Auto-address the AI review on the test PR (OPTIONAL, OFF by default).
+  # After the test PR is opened, wait for the repo's `ai-code-review`, then a CONSERVATIVE Responder
+  # validates the findings, fixes ONLY clearly-valid ones in the test files, pushes (tests-only), and
+  # posts a rationale + minimizes the bot comment. ONE bounded pass. Gated by `vars.E2E_AUTO_REVIEW`.
+  # The repo's Playwright CI re-validates the pushed fix (the spec is registered on the PR). Uses the
+  # scoped GITHUB_TOKEN only (no ORG_ADMIN_TOKEN — this job runs an agent over test/feature code).
+  # ---------------------------------------------------------------------------
+  review_address:
+    needs: [triage, generate, verify_heal, pr_back]
+    if: >
+      vars.E2E_AUTO_REVIEW == 'true' &&
+      needs.triage.outputs.dry_run == 'false' &&
+      needs.triage.outputs.skip == 'false' &&
+      needs.triage.outputs.needs_e2e == 'true' &&
+      needs.triage.outputs.author_allowed == 'true' &&
+      needs.generate.outputs.has_changes == 'true' &&
+      needs.verify_heal.outputs.heal_status == 'passing'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write # push tests-only review fixes to autoe2e/pr-<n>
+      pull-requests: write
+      issues: write
+    steps:
+      - name: Checkout the autoe2e branch (test files to fix)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.triage.outputs.work_branch }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Restore agent files from a trusted ref (anti-hijack)
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          RESTORE_REF=main
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then RESTORE_REF="$REF_NAME"; fi
+          git fetch origin "$RESTORE_REF" --depth=1
+          git checkout "origin/$RESTORE_REF" -- .opencode opencode.jsonc
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install OpenCode
+        run: |
+          npm install -g opencode-ai@1.17.7 || { echo "::error::OpenCode install failed"; exit 1; }
+
+      - name: Wait for the AI review + capture it
+        id: review
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WORK_BRANCH: ${{ needs.triage.outputs.work_branch }}
+        run: |
+          TEST_PR=$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$WORK_BRANCH" --state open --json number --jq '.[0].number // empty')
+          [ -n "$TEST_PR" ] || { echo "::notice::no open test PR for $WORK_BRANCH — nothing to address."; echo "found=false" >> "$GITHUB_OUTPUT"; exit 0; }
+          echo "test_pr=$TEST_PR" >> "$GITHUB_OUTPUT"
+          MARKER="<!-- ai-code-review -->"
+          mkdir -p docs/test_generator/ci
+          # Poll up to ~6 min for the review bot's comment (it lands a couple minutes after the PR opens).
+          for i in $(seq 1 12); do
+            BODY=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${TEST_PR}/comments" --jq "[.[] | select(.body | startswith(\"${MARKER}\"))][-1].body // empty")
+            if [ -n "$BODY" ]; then
+              printf '%s' "$BODY" > docs/test_generator/ci/ai-review.md
+              echo "found=true" >> "$GITHUB_OUTPUT"
+              echo "::notice::Captured AI review on test PR #$TEST_PR (after ${i} polls)."
+              exit 0
+            fi
+            sleep 30
+          done
+          echo "::notice::No AI review appeared within the poll window — skipping addressal."
+          echo "found=false" >> "$GITHUB_OUTPUT"
+
+      - name: Responder — validate + fix clearly-valid findings
+        if: steps.review.outputs.found == 'true'
+        env:
+          DEEPSEEK_API_KEY_E2E: ${{ secrets.DEEPSEEK_API_KEY_E2E }}
+        run: |
+          opencode run --agent e2e-ci-responder --model "$PIPELINE_MODEL" \
+            "Read docs/test_generator/ci/ai-review.md (the repo's AI review of this test PR). Validate each finding conservatively; fix ONLY clearly-valid ones in tests/ui-testing (NEVER touch .github, .opencode, opencode.jsonc, playwright.yml, or source). Write docs/test_generator/ci/review-response.md with what you fixed / dismissed / noted."
+
+      - name: Push fixes (tests only) + post response + minimize the bot review
+        if: steps.review.outputs.found == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WORK_BRANCH: ${{ needs.triage.outputs.work_branch }}
+          TEST_PR: ${{ steps.review.outputs.test_pr }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Restore staged pipeline files; commit ONLY test changes (never .opencode/workflow).
+          git restore --staged .opencode opencode.jsonc 2>/dev/null || true
+          git add tests/ui-testing
+          if ! git diff --cached --quiet; then
+            git commit -m "test(autoe2e): address AI review on #${TEST_PR} (auto)"
+            git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:refs/heads/${WORK_BRANCH}"
+            echo "Pushed review fixes to ${WORK_BRANCH} (repo Playwright CI re-validates the PR)."
+          else
+            echo "No code changes from the Responder (all findings dismissed/noted)."
+          fi
+          # Post the rationale reply on the test PR.
+          if [ -f docs/test_generator/ci/review-response.md ]; then
+            gh api -X POST "repos/${GITHUB_REPOSITORY}/issues/${TEST_PR}/comments" -F body=@docs/test_generator/ci/review-response.md >/dev/null \
+              && echo "Posted review response on #${TEST_PR}."
+          fi
+          # Minimize the AI review comment (same github-actions[bot] author → permitted). Best-effort.
+          NODE=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${TEST_PR}/comments" --jq "[.[] | select(.body | startswith(\"<!-- ai-code-review -->\"))][-1].node_id // empty")
+          if [ -n "$NODE" ]; then
+            gh api graphql -f query='mutation($id:ID!){minimizeComment(input:{subjectId:$id,classifier:RESOLVED}){minimizedComment{isMinimized}}}' -f id="$NODE" >/dev/null 2>&1 \
+              && echo "Minimized the AI review comment." || echo "::notice::could not minimize the AI review (best-effort)."
+          fi
