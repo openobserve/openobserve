@@ -187,13 +187,14 @@ function handleBulkExport() {
   emit("export-bulk", ids);
 }
 
-// Map a score-config data type to a design-system OBadge soft variant
-// (numeric → blue, categorical → orange, boolean → green) so the Type chip
-// matches the rest of the app instead of carrying bespoke chip CSS.
+// Map a score-config data type to a neutral design-system OBadge soft variant
+// (numeric → blue, categorical → purple, boolean → teal). Data types are just
+// labels, so use neutral palette colors rather than semantic success/warning
+// variants that would imply a good/bad meaning.
 function dataTypeBadgeVariant(type: DataType | string) {
-  if (type === "categorical") return "warning-soft" as const;
-  if (type === "boolean") return "success-soft" as const;
-  return "primary-soft" as const; // numeric
+  if (type === "categorical") return "purple-soft" as const;
+  if (type === "boolean") return "teal-soft" as const;
+  return "blue-soft" as const; // numeric
 }
 
 const typeOptions = computed(() => [

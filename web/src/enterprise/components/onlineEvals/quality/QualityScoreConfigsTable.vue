@@ -31,7 +31,6 @@
         :columns="columns"
         row-key="configId"
         :loading="isLoading"
-        :row-class="rowClassOf"
         :footer-title="t('onlineEvals.quality.overview.title')"
         :show-global-filter="false"
         :page-size="20"
@@ -65,13 +64,23 @@
         </template>
 
         <template #cell-name="{ row }">
-          <div class="qsc-name">{{ row.name }}</div>
+          <div
+            class="qsc-name"
+            :class="{ 'qsc-name--no-data': row.status === 'noData' }"
+          >
+            {{ row.name }}
+          </div>
         </template>
 
         <template #cell-type="{ row }">
-          <span class="qsc-type" :class="`qsc-type--${row.dataType}`">
-            {{ shortType(row.dataType) }}
-          </span>
+          <OBadge
+            v-if="shortType(row.dataType) !== '—'"
+            :variant="dataTypeBadgeVariant(row.dataType)"
+            size="sm"
+          >
+            {{ row.dataType }}
+          </OBadge>
+          <span v-else class="qsc-muted">—</span>
         </template>
 
         <template #cell-totalScores="{ row }">
@@ -121,6 +130,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
 import { useRoute, useRouter } from "vue-router";
 import type { ScoreConfigRow } from "../composables/useQualityScoreConfigs";
@@ -162,13 +172,6 @@ const filteredRows = computed(() => {
     (r) => r.name.toLowerCase().includes(q) || r.description.toLowerCase().includes(q),
   );
 });
-
-// De-emphasize configs that have no scores in the selected window. They
-// stay visible (so users can spot a scorer they defined but never wired
-// up) but visually recede beneath active rows.
-function rowClassOf(row: ScoreConfigRow): string {
-  return row.status === "noData" ? "qsc-row--no-data" : "";
-}
 
 const columns = computed(() => [
   {
@@ -241,6 +244,15 @@ function shortType(type: ScoreConfigRow["dataType"]): string {
   if (type === "categorical") return "Cat";
   if (type === "boolean") return "Bool";
   return "—";
+}
+
+// Map a score-config data type to a neutral design-system OBadge soft variant
+// (numeric → blue, categorical → purple, boolean → teal). Data types are just
+// labels, so use neutral palette colors rather than semantic variants.
+function dataTypeBadgeVariant(type: ScoreConfigRow["dataType"]) {
+  if (type === "categorical") return "purple-soft" as const;
+  if (type === "boolean") return "teal-soft" as const;
+  return "blue-soft" as const; // numeric
 }
 
 function formatCount(n: number | null): string {
@@ -333,33 +345,11 @@ function relativeTime(timestampMs: number): string {
   color: var(--color-text-primary, currentColor);
 }
 
-.qsc-type {
-  display: inline-flex;
-  align-items: center;
-  padding: 0 3px;
-  border-radius: 2px;
-  font-family: inherit;
-  font-weight: 700;
-  font-size: 9px;
-  line-height: 14px;
-  letter-spacing: 0.02em;
-  background: color-mix(in srgb, #6b76e3 14%, transparent);
-  color: #4f5bcf;
-}
-
-.qsc-type--numeric {
-  background: color-mix(in srgb, #6b76e3 14%, transparent);
-  color: #4f5bcf;
-}
-
-.qsc-type--categorical {
-  background: color-mix(in srgb, #9333ea 14%, transparent);
-  color: #7c3aed;
-}
-
-.qsc-type--boolean {
-  background: color-mix(in srgb, #16a34a 14%, transparent);
-  color: #15803d;
+/* De-emphasize the name of configs that have no scores in the selected
+ * window. The row stays at full opacity (so counts/coverage stay readable);
+ * only the name recedes to flag the inactive scorer. */
+.qsc-name--no-data {
+  opacity: 0.55;
 }
 
 .qsc-mono {
@@ -424,13 +414,4 @@ function relativeTime(timestampMs: number): string {
 .qsc-spark--warn { color: var(--o2-status-warning-text, #b25400); }
 .qsc-spark--noThreshold { color: var(--color-text-secondary, var(--o2-text-secondary)); }
 .qsc-spark--noData { color: var(--color-text-secondary, var(--o2-text-secondary)); opacity: 0.55; }
-
-/* Dim no-data rows so active scorers stand out. `:deep` because OTable
- * renders the <tr> outside this component's scope. */
-:deep(tr.qsc-row--no-data) {
-  opacity: 0.6;
-}
-:deep(tr.qsc-row--no-data:hover) {
-  opacity: 0.85;
-}
 </style>
