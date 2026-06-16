@@ -110,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="contextChips.length > 0"
           class="tw:flex tw:items-center tw:gap-3 tw:max-w-[calc(100%-12.5rem)]"
         >
-          <h4 class="tw:text-sm tw:font-semibold tw:m-0 tw:opacity-70 tw:shrink-0">Correlated By</h4>
+          <h4 class="tw:text-sm tw:font-semibold tw:m-0 tw:opacity-70 tw:shrink-0">Correlated by:</h4>
           <div
             class="tw:flex tw:items-center tw:gap-2 tw:min-w-0 tw:overflow-hidden"
           >
@@ -134,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Non-expandable overflow indicator with tooltip (badge-like styling) -->
             <span v-if="hiddenContextChipCount > 0" class="tw:contents">
               <OBadge
-                variant="secondary"
+                variant="default-soft"
                 size="sm"
                 class="tw:cursor-default"
                 :data-test="`correlation-dashboard-context-overflow-${hiddenContextChipCount}`"
@@ -155,7 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="subjectChips.length > 0"
           class="tw:flex tw:items-center tw:gap-3 tw:shrink-0"
         >
-          <h4 class="tw:text-sm tw:font-semibold tw:m-0 tw:opacity-70">View By</h4>
+          <h4 class="tw:text-sm tw:font-semibold tw:m-0 tw:opacity-70">View by:</h4>
           <OToggleGroup v-model="activeSubject" type="single" size="sm">
             <OToggleGroupItem
               v-for="chip in subjectChips"
@@ -676,12 +676,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       v-if="contextChips.length > 0 || subjectChips.length > 0"
       ref="dimensionsContainerRef"
-      class="tw:flex tw:items-center tw:gap-6 tw:px-4 tw:py-1 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
+      class="tw:flex tw:items-center tw:gap-6 tw:px-4 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
     >
       <!-- Context chips section - max width but only takes space it needs -->
       <div
         v-if="contextChips.length > 0"
-        class="tw:flex tw:items-center tw:gap-3 tw:max-w-[calc(100%-15.625rem)]"
+        class="tw:flex tw:items-center tw:gap-3 tw:max-w-[calc(100%-18.75rem)] tw:py-2"
       >
         <span class="tw:text-2! tw:m-0 tw:opacity-70 tw:shrink-0">Correlated by:</span>
         <div
@@ -707,7 +707,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Non-expandable overflow indicator with tooltip (badge-like styling) -->
           <span v-if="hiddenContextChipCount > 0" class="tw:contents">
             <OBadge
-              variant="secondary"
+              variant="default-soft"
               size="md"
               class="tw:cursor-default"
               :data-test="`correlation-dashboard-context-overflow-${hiddenContextChipCount}`"
@@ -726,7 +726,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Subject chips section - positioned right after context chips -->
       <div
         v-if="subjectChips.length > 0"
-        class="tw:flex tw:items-center tw:gap-3 tw:shrink-0"
+        class="tw:flex tw:items-center tw:gap-3 tw:shrink-0 tw:py-1"
       >
         <OSeparator vertical class="tw:my-2" />
         <span class="tw:text-2! tw:m-0 tw:opacity-70">View by:</span>
@@ -1996,11 +1996,13 @@ const CHIP_GAP = 8; // tw:gap-2 = 0.5rem = 8px
 const OVERFLOW_INDICATOR_WIDTH = 40; // Estimated "+N" indicator width (smaller since non-clickable)
 
 // Chip width estimation function
-function estimateChipWidth(chip: any, badgeSize: 'sm' | 'md' = 'sm'): number {
+function estimateChipWidth(chip: any): number {
   const text = `${chip.label} = ${chip.value}`;
-  const baseCharWidth = badgeSize === 'sm' ? 6.5 : 7.5;
+  const baseCharWidth = 7.5;
   const labelWidth = Math.min(Math.ceil(text.length * baseCharWidth), 200);
-  const paddingAndDot = badgeSize === 'sm' ? 24 : 28; // padding + dot space
+  const paddingAndDot = 10; // padding + dot space
+  console.log(chip, labelWidth);
+  // debugger;
   return labelWidth + paddingAndDot;
 }
 
@@ -2022,18 +2024,17 @@ const visibleContextChips = computed(() => {
 
   // Calculate available space for context chips within the dimensions container
   const fullContainerWidth = dimensionsContainerWidth.value;
-  const reservedForSubjects = 200; // 15.625rem = 250px, 12.5rem = 200px
-  const labelWidth = 120; // "Correlated by:" vs "Correlated By"
+  const reservedForSubjects = 300; // 18.75rem = 300px
+  const labelWidth = 90; // "Correlated by:" vs "Correlated By"
   const paddingAndGaps = 32; // Container padding and gaps
 
   const availableWidth = Math.max(150, fullContainerWidth - reservedForSubjects - labelWidth - paddingAndGaps);
-  const badgeSize = 'sm';
 
   let usedWidth = 0;
   let visibleCount = 0;
 
   for (let i = 0; i < contextChips.value.length; i++) {
-    const chipWidth = estimateChipWidth(contextChips.value[i], badgeSize);
+    const chipWidth = estimateChipWidth(contextChips.value[i]);
     const remaining = contextChips.value.length - i - 1;
     const overflowSpace = remaining > 0 ? OVERFLOW_INDICATOR_WIDTH + CHIP_GAP : 0;
     const neededWidth = chipWidth + (i > 0 ? CHIP_GAP : 0) + overflowSpace;
