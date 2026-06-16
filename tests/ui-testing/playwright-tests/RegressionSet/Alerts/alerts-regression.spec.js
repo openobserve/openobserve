@@ -1,9 +1,9 @@
-const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
-const testLogger = require('../utils/test-logger.js');
-const PageManager = require('../../pages/page-manager.js');
-const { getHeaders, getIngestionUrl, sendRequest } = require('../utils/data-ingestion.js');
-const logData = require("../../fixtures/log.json");
-const { getOrgIdentifier } = require('../utils/cloud-auth.js');
+const { test, expect, navigateToBase } = require('../../utils/enhanced-baseFixtures.js');
+const testLogger = require('../../utils/test-logger.js');
+const PageManager = require('../../../pages/page-manager.js');
+const { getHeaders, getIngestionUrl, sendRequest } = require('../../utils/data-ingestion.js');
+const logData = require("../../../fixtures/log.json");
+const { getOrgIdentifier } = require('../../utils/cloud-auth.js');
 
 /**
  * Alerts Regression Bugs Test Suite

@@ -5,9 +5,9 @@
  * - #11682: On clicking on AI integration the credentials disappear
  */
 
-const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
-const testLogger = require('../utils/test-logger.js');
-const PageManager = require('../../pages/page-manager.js');
+const { test, expect, navigateToBase } = require('../../utils/enhanced-baseFixtures.js');
+const testLogger = require('../../utils/test-logger.js');
+const PageManager = require('../../../pages/page-manager.js');
 
 test.describe("Data Sources Regression Bug Fixes", () => {
   test.describe.configure({ mode: 'parallel' });

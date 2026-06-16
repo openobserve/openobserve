@@ -1,9 +1,9 @@
-const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
-const testLogger = require('../utils/test-logger.js');
-const PageManager = require('../../pages/page-manager.js');
-const { getOrgIdentifier } = require('../utils/cloud-auth.js');
-const logData = require("../../fixtures/log.json");
-const { ingestTestData } = require('../utils/data-ingestion.js');
+const { test, expect, navigateToBase } = require('../../utils/enhanced-baseFixtures.js');
+const testLogger = require('../../utils/test-logger.js');
+const PageManager = require('../../../pages/page-manager.js');
+const { getOrgIdentifier } = require('../../utils/cloud-auth.js');
+const logData = require("../../../fixtures/log.json");
+const { ingestTestData } = require('../../utils/data-ingestion.js');
 
 /**
  * Alerts Stream Switching Regression Tests

@@ -1,9 +1,9 @@
-const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
-const logData = require("../../fixtures/log.json");
-const PageManager = require('../../pages/page-manager.js');
-const testLogger = require('../utils/test-logger.js');
-const { getOrgIdentifier } = require('../utils/cloud-auth.js');
-const logsdata = require('../../../test-data/logs_data.json');
+const { test, expect, navigateToBase } = require('../../utils/enhanced-baseFixtures.js');
+const logData = require("../../../fixtures/log.json");
+const PageManager = require('../../../pages/page-manager.js');
+const testLogger = require('../../utils/test-logger.js');
+const { getOrgIdentifier } = require('../../utils/cloud-auth.js');
+const logsdata = require('../../../../test-data/logs_data.json');
 
 test.describe.configure({ mode: "serial" });
 

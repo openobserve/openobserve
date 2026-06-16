@@ -1,7 +1,7 @@
-const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
-const PageManager = require('../../pages/page-manager.js');
-const testLogger = require('../utils/test-logger.js');
-const logData = require('../../fixtures/log.json');
+const { test, expect, navigateToBase } = require('../../utils/enhanced-baseFixtures.js');
+const PageManager = require('../../../pages/page-manager.js');
+const testLogger = require('../../utils/test-logger.js');
+const logData = require('../../../fixtures/log.json');
 test.describe('Regression: Scroll Retention on Logs page (#9044)', () => {
   test.describe.configure({ mode: 'parallel' });
   let pm;

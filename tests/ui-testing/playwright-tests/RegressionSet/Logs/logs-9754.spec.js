@@ -8,11 +8,11 @@
  *          Example: "QueryEditor.spec.ts[2m" would lose the 's' from '.ts'
  */
 
-const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
-const testLogger = require('../utils/test-logger.js');
-const PageManager = require('../../pages/page-manager.js');
-const { getHeaders, getIngestionUrl, sendRequest } = require('../utils/data-ingestion.js');
-const { getOrgIdentifier } = require('../utils/cloud-auth.js');
+const { test, expect, navigateToBase } = require('../../utils/enhanced-baseFixtures.js');
+const testLogger = require('../../utils/test-logger.js');
+const PageManager = require('../../../pages/page-manager.js');
+const { getHeaders, getIngestionUrl, sendRequest } = require('../../utils/data-ingestion.js');
+const { getOrgIdentifier } = require('../../utils/cloud-auth.js');
 
 // Test data containing edge cases for bug #9754
 // PR fixes issue when user has [ , { , < , ' , ( as single char without closing character

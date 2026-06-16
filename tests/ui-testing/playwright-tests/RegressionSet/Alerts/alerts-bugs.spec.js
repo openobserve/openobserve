@@ -11,10 +11,10 @@
  * the right panel when stream type + name are selected.
  */
 
-const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
-const testLogger = require('../utils/test-logger.js');
-const PageManager = require('../../pages/page-manager.js');
-const { getOrgIdentifier } = require('../utils/cloud-auth.js');
+const { test, expect, navigateToBase } = require('../../utils/enhanced-baseFixtures.js');
+const testLogger = require('../../utils/test-logger.js');
+const PageManager = require('../../../pages/page-manager.js');
+const { getOrgIdentifier } = require('../../utils/cloud-auth.js');
 
 let DESTINATION_NAME;
 let TEMPLATE_NAME;
