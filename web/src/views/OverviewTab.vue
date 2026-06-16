@@ -271,7 +271,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from "vue";
+import { ref, computed, defineAsyncComponent, onMounted, watch } from "vue";
 
 // Module-level cache for anomaly history — survives re-renders, cleared on org change
 const ANOMALY_CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes
@@ -295,7 +295,9 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ServiceGraphNodeSidePanel from "@/plugins/traces/ServiceGraphNodeSidePanel.vue";
-import AlertHistoryDrawer from "@/components/alerts/AlertHistoryDrawer.vue";
+const AlertHistoryDrawer = defineAsyncComponent(
+  () => import("@/components/alerts/AlertHistoryDrawer.vue"),
+);
 
 const { t } = useI18n();
 const store = useStore();
