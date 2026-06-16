@@ -128,60 +128,60 @@ jobs:
           - testfolder: "Logs-Regression"
             run_files:
               [
-                "Logs/logs-regression.spec.js",
-                "Logs/logs-bugs.spec.js",
-                "Logs/logs-9754.spec.js",
-                "Logs/logs-9044-7354.spec.js",
+                "logs-regression.spec.js",
+                "logs-bugs.spec.js",
+                "logs-9754.spec.js",
+                "logs-9044-7354.spec.js",
               ]
           - testfolder: "Alerts-Regression"
             run_files:
               [
-                "Alerts/alerts-regression.spec.js",
-                "Alerts/alerts-stream-switching.spec.js",
-                "Alerts/alerts-bugs.spec.js",
+                "alerts-regression.spec.js",
+                "alerts-stream-switching.spec.js",
+                "alerts-bugs.spec.js",
               ]
           - testfolder: "Dashboard-Regression"
             run_files:
               [
-                "Dashboards/dashboard-regression.spec.js",
+                "dashboard-regression.spec.js",
               ]
           - testfolder: "Streams-Regression"
             run_files:
               [
-                "Streams/streams-regression.spec.js",
+                "streams-regression.spec.js",
               ]
           - testfolder: "Pipelines-Regression"
             run_files:
               [
-                "Pipelines/enrichment-regression.spec.js",
-                "Pipelines/pipeline-regression.spec.js",
+                "enrichment-regression.spec.js",
+                "pipeline-regression.spec.js",
               ]
           - testfolder: "Traces-Regression"
             run_files:
               [
-                "Traces/traces-regression.spec.js",
-                "Traces/traces-bugs.spec.js",
+                "traces-regression.spec.js",
+                "traces-bugs.spec.js",
               ]
           - testfolder: "Metrics-Regression"
             run_files:
               [
-                "Metrics/metrics-regression.spec.js",
+                "metrics-regression.spec.js",
               ]
           - testfolder: "GeneralTests-Regression"
             run_files:
               [
-                "General/ui-regression.spec.js",
-                "General/landing-regression.spec.js",
+                "ui-regression.spec.js",
+                "landing-regression.spec.js",
               ]
           - testfolder: "DataSources-Regression"
             run_files:
               [
-                "DataSources/datasources-regression.spec.js",
+                "datasources-regression.spec.js",
               ]
           - testfolder: "Reports-Regression"
             run_files:
               [
-                "Reports/reports-regression-bugs.spec.js",
+                "reports-regression-bugs.spec.js",
               ]
 
     steps:
@@ -351,8 +351,23 @@ jobs:
           echo "DEBUG: matrix.testfolder = ${{ matrix.testfolder }}"
 
           if [ -n "$FILE_LIST" ]; then
-            ACTUAL_FOLDER="RegressionSet"
+            # Derive feature subfolder from testfolder (maps testfolder name → directory under RegressionSet/)
+            case "${{ matrix.testfolder }}" in
+              "Dashboard-Regression")   FEATURE="Dashboards" ;;
+              "Pipelines-Regression")   FEATURE="Pipelines" ;;
+              "Alerts-Regression")      FEATURE="Alerts" ;;
+              "Logs-Regression")        FEATURE="Logs" ;;
+              "Traces-Regression")      FEATURE="Traces" ;;
+              "Metrics-Regression")     FEATURE="Metrics" ;;
+              "Streams-Regression")     FEATURE="Streams" ;;
+              "Reports-Regression")     FEATURE="Reports" ;;
+              "DataSources-Regression") FEATURE="DataSources" ;;
+              "GeneralTests-Regression") FEATURE="General" ;;
+              *)                        FEATURE="RegressionSet" ;;
+            esac
+            ACTUAL_FOLDER="RegressionSet/$FEATURE"
             echo "DEBUG: ACTUAL_FOLDER = $ACTUAL_FOLDER"
+            echo "DEBUG: FEATURE = $FEATURE"
 
             FILE_PATHS=""
             for file in $FILE_LIST; do
