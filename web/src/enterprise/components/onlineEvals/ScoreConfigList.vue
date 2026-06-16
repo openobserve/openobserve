@@ -371,7 +371,6 @@ function formatDateShort(value: number) {
 
 <style lang="scss">
 .sc-mono-cell {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 12px;
 }
 
@@ -379,7 +378,6 @@ function formatDateShort(value: number) {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 12px;
 }
 

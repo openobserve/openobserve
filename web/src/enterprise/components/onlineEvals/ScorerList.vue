@@ -372,7 +372,6 @@ function usedByText(row: Scorer) {
 }
 
 .sr-mono-cell {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 12px;
 }
 
