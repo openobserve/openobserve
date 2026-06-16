@@ -13,18 +13,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashSet, fmt::Display};
+use std::{collections::HashSet, fmt::Display, sync::Arc};
 
+use arrow::buffer::BooleanBuffer;
 #[cfg(not(feature = "enterprise"))]
 use config::tantivy::query::histogram_collector::{
     MultiHistogramCollector, SimpleHistogramCollector, simple_histogram_rank,
 };
 use config::{
     TIMESTAMP_COL_NAME,
-    meta::{
-        bitvec::BitVec,
-        inverted_index::{IndexOptimizeMode, MAX_SIMPLE_TOPN_FIELDS},
-    },
+    meta::inverted_index::{IndexOptimizeMode, MAX_SIMPLE_TOPN_FIELDS},
     tantivy::query::{
         contains_query::ContainsAutomaton, ids_collector::SingleSegmentDocIdCollector,
         topn_collector::TopNCollector,
@@ -45,8 +43,14 @@ use crate::service::search::index::IndexCondition;
 #[derive(Debug, Clone)]
 pub enum TantivyResult {
     RowIds(Vec<u32>),
-    /// (row_id_bitvec, matched_row_count, row_group_size_from_index_file)
-    RowIdsBitVec(BitVec, usize, Option<u32>),
+    RowIdsSelection {
+        row_ids: Arc<BooleanBuffer>, // per-row match bitmap, length num_rows
+        row_group_size: Option<u32>,
+    },
+    NoMatch, // the file should be excluded without building a bitmap
+    Skipped {
+        percent: usize, // skipped tantivy search, with the percentage
+    },
     Count(usize),                            // simple count optimization
     Histogram(Vec<u64>),                     // simple histogram optimization
     MultiHistogram(Vec<(i64, String, u64)>), // multi histogram optimization (with breakdown)
@@ -58,7 +62,7 @@ impl TantivyResult {
     // used for skip tantivy search
     pub fn percent(&self) -> usize {
         match self {
-            Self::RowIdsBitVec(_, percent, _) => *percent,
+            Self::Skipped { percent } => *percent,
             _ => 0,
         }
     }
@@ -68,9 +72,11 @@ impl TantivyResult {
             Self::RowIds(row_ids) => {
                 row_ids.capacity() * std::mem::size_of::<u32>() + std::mem::size_of::<Vec<u32>>()
             }
-            Self::RowIdsBitVec(bitvec, ..) => {
-                bitvec.capacity().div_ceil(8) + std::mem::size_of::<BitVec>()
+            Self::RowIdsSelection { row_ids, .. } => {
+                row_ids.inner().len() + std::mem::size_of::<BooleanBuffer>()
             }
+            Self::NoMatch => 0,
+            Self::Skipped { .. } => std::mem::size_of::<usize>(),
             Self::Count(_) => std::mem::size_of::<usize>(),
             Self::Histogram(histogram) => {
                 histogram.capacity() * std::mem::size_of::<u64>() + std::mem::size_of::<Vec<u64>>()
@@ -449,13 +455,13 @@ impl TantivyMultiResult {
 mod tests {
     use std::collections::HashSet;
 
-    use config::meta::{bitvec::BitVec, inverted_index::IndexOptimizeMode};
+    use config::meta::inverted_index::IndexOptimizeMode;
 
     use super::*;
 
     #[test]
     fn test_tantivy_result_percent() {
-        let result = TantivyResult::RowIdsBitVec(BitVec::repeat(false, 100), 75, None);
+        let result = TantivyResult::Skipped { percent: 75 };
         assert_eq!(result.percent(), 75);
 
         let result = TantivyResult::RowIds(Vec::new());
@@ -828,9 +834,12 @@ mod tests {
     #[test]
     fn test_memory_size_edge_cases() {
         // Test with empty collections
-        let result = TantivyResult::RowIdsBitVec(BitVec::repeat(false, 0), 0, None);
+        let result = TantivyResult::RowIdsSelection {
+            row_ids: Arc::new(BooleanBuffer::new_unset(0)),
+            row_group_size: None,
+        };
         let memory_size = result.get_memory_size();
-        assert_eq!(memory_size, std::mem::size_of::<BitVec>());
+        assert_eq!(memory_size, std::mem::size_of::<BooleanBuffer>());
 
         let result = TantivyResult::RowIds(Vec::new());
         let memory_size = result.get_memory_size();
