@@ -32,6 +32,9 @@ source: `grep -oE 'data-test="[^"]*"' web/src/path/to/Component.vue | sort -u`.
 
 Read `coverage-decision.json` and honour its `action`:
 
+- **`none`** — the existing tests already cover this. **Write nothing, change nothing, register
+  nothing** — just print a one-line "already covered, no changes" summary and stop. (The workflow
+  detects the empty result and skips the rest, reporting "already covered.")
 - **`new`** — create a brand-new spec at `target_spec` (= run-context `spec_path`) using the
   required structure below. This is the only case that needs registration (see below).
 - **`append`** — **open the existing `target_spec` and ADD a new `test()` inside its existing

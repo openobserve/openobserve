@@ -44,6 +44,9 @@ already (partly) covered and choose the **least-duplicative** action.
    `existing_tests_in_diff: true` in run-context, **also read the dev's own test changes** from
    `docs/test_generator/ci/diff.patch` — they show what the dev already tried.
 3. **Decide one `action`:**
+   - **`none`** — the existing tests **already cover** this feature/change adequately. Leave them
+     alone: nothing to write. Use this when a re-run finds the behaviour is already well-tested
+     (don't manufacture redundant tests). The pipeline will simply report "already covered."
    - **`extend`** — an existing test covers this flow but misses the new behavior/assertion.
      Modify that test (add steps/assertions). Cheapest; prefer when a test is *almost* there.
    - **`append`** — the area's spec exists and fits, but no test covers this scenario. Add a

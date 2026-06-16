@@ -195,21 +195,32 @@ jobs:
             // The feature commit these tests target — for the source-sha trailer + change detection.
             const featureSha = merged ? (data.merge_commit_sha || headSha) : headSha;
             core.setOutput('source_sha', featureSha);
-            // REUSE: when the user did NOT force-overwrite and the test branch already exists, base
-            // this run ON that branch (check it out) so the agents see the prior tests and EXTEND
-            // them instead of starting blank and clobbering. Otherwise check out the feature commit
-            // and build fresh. (force_overwrite defaults to 'true' when there's no dispatch input —
-            // i.e. comment/auto-on-merge runs rebuild fresh.)
-            const forceOverwrite = String((context.payload.inputs && context.payload.inputs.force_overwrite) ?? 'true');
-            let branchExists = false;
+            // REUSE vs REBUILD.
+            // Manual dispatch honours its force_overwrite box (default true = rebuild, untick = reuse).
+            // Comment (/e2e) and auto-on-merge have no box → they DEFAULT to reuse, so re-running
+            // /e2e on a PR checks the existing tests and extends/leaves-them rather than clobbering.
+            const forceOverwrite = (context.eventName === 'workflow_dispatch')
+              ? String(context.payload.inputs?.force_overwrite ?? 'true')
+              : 'false';
+            // Find the existing test branch and the source commit its tests were generated against
+            // (from the e2e-source-sha commit trailer).
+            let branchExists = false, storedSha = '';
             try {
-              await github.rest.repos.getBranch({ owner: context.repo.owner, repo: context.repo.repo, branch: workBranch });
+              const b = await github.rest.repos.getBranch({ owner: context.repo.owner, repo: context.repo.repo, branch: workBranch });
               branchExists = true;
+              const msg = b.data.commit?.commit?.message || '';
+              const m = msg.match(/e2e-source-sha:\s*([0-9a-fA-F]{7,40})/);
+              storedSha = m ? m[1] : '';
             } catch (e) { branchExists = false; }
-            const reuse = branchExists && forceOverwrite === 'false';
+            // Reuse the existing branch (agents see prior tests → extend / leave-alone / add) ONLY
+            // when the user didn't force a rebuild AND the feature is UNCHANGED since those tests
+            // were generated — that avoids extending tests against stale code. If the feature moved
+            // (or we can't tell / no branch), rebuild fresh against the latest commit.
+            const unchanged = !!storedSha && (featureSha === storedSha || featureSha.startsWith(storedSha) || storedSha.startsWith(featureSha));
+            const reuse = branchExists && forceOverwrite !== 'true' && unchanged;
             core.setOutput('reuse', reuse ? 'true' : 'false');
             core.setOutput('checkout_ref', reuse ? workBranch : featureSha);
-            core.info(`PR #${pr} mode=${merged ? 'merged' : 'open'} author=@${author} allowed=${allowed} reuse=${reuse} (branchExists=${branchExists}, force=${forceOverwrite})`);
+            core.info(`PR #${pr} mode=${merged ? 'merged' : 'open'} author=@${author} allowed=${allowed} reuse=${reuse} (exists=${branchExists}, unchanged=${unchanged}, force=${forceOverwrite})`);
 
       - name: Determine dry-run mode
         id: mode
@@ -416,6 +427,10 @@ jobs:
       needs.triage.outputs.author_allowed == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    outputs:
+      # false when the run produced no test changes (Architect action=none / already covered) →
+      # verify_heal + pr_back skip the heavy build and the PR refresh.
+      has_changes: ${{ steps.push.outputs.has_changes }}
     permissions:
       contents: write # push the generated tests to the autoe2e/<branch> (never to main)
       issues: write # (PR comments are issue comments)
@@ -556,6 +571,7 @@ jobs:
       # playwright-registration.json (carried in the artifact) is the instruction Job 4 applies.
 
       - name: Create/extend autoe2e branch, commit, push (no PR yet)
+        id: push
         # Two modes (decided by triage):
         #  - FRESH (reuse=false): the checkout is the feature commit → create the test branch off it
         #    and force-push (idempotent rebuild). One test PR per source PR.
@@ -593,8 +609,12 @@ jobs:
           # Job 4 strips it back out before opening the PR, so it never reaches the PR diff or main.
           git add -f docs/test_generator/ci
           if git diff --cached --quiet; then
-            echo "No changes to commit (reuse run produced no diff)."; exit 0
+            # Architect chose action=none (already covered) or the run produced no diff → nothing to
+            # do. Tell downstream to skip the heavy build + PR refresh.
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+            echo "No changes to commit — existing tests already cover this; skipping build/PR."; exit 0
           fi
+          echo "has_changes=true" >> "$GITHUB_OUTPUT"
           # e2e-source-sha trailer = the feature commit these tests target (change detection / Flow 4a).
           git commit -m "test(autoe2e): generated E2E tests for #${PR_NUMBER} (${SLUG})" \
             -m "e2e-source-sha: ${SRC_SHA}"
@@ -608,6 +628,26 @@ jobs:
           fi
           git push $FORCE_FLAG "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:refs/heads/${BRANCH}"
           echo "Pushed tests to $BRANCH (reuse=$REUSE; no PR yet — Job 4 opens/refreshes it)."
+
+      - name: Comment "already covered" when there's nothing to do
+        # Leave-alone path (Architect action=none / no diff): the existing tests already cover this,
+        # so verify_heal + pr_back are skipped. Let the dev know on the PR instead of going silent.
+        if: success() && steps.push.outputs.has_changes == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SRC_PR: ${{ needs.triage.outputs.pr_number }}
+        run: |
+          MARKER="<!-- e2e-council-testpr -->"
+          printf '%s\n🤖 **E2E Council** — looked at #%s and the existing E2E tests already cover this change, so there is **nothing to add**. ✅' \
+            "$MARKER" "$SRC_PR" > /tmp/covered.md
+          CID=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${SRC_PR}/comments" \
+            --jq "[.[] | select(.body | startswith(\"${MARKER}\"))][0].id // empty")
+          if [ -n "$CID" ]; then
+            gh api -X PATCH "repos/${GITHUB_REPOSITORY}/issues/comments/${CID}" -F body=@/tmp/covered.md >/dev/null
+          else
+            gh api -X POST "repos/${GITHUB_REPOSITORY}/issues/${SRC_PR}/comments" -F body=@/tmp/covered.md >/dev/null
+          fi
+          echo "Posted 'already covered' note on #${SRC_PR}."
 
       - name: Upload run metadata (consumed by Job 3/4)
         # SINGLE path on purpose: with one path, the artifact root = the contents of ci/, so
@@ -683,7 +723,8 @@ jobs:
       needs.triage.outputs.dry_run == 'false' &&
       needs.triage.outputs.skip == 'false' &&
       needs.triage.outputs.needs_e2e == 'true' &&
-      needs.triage.outputs.author_allowed == 'true'
+      needs.triage.outputs.author_allowed == 'true' &&
+      needs.generate.outputs.has_changes == 'true'
     runs-on:
       labels: ubicloud-standard-16
     timeout-minutes: 90 # backstop: build (~15) + boot + heal (capped 30) + final run (15) + audit
