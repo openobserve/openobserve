@@ -85,6 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ref="serviceGraphRef"
               class="tw:h-full"
               @view-traces="handleServiceGraphViewTraces"
+              @request:stream-change="onChildStreamChangeRequest"
             />
           </div>
 
@@ -97,6 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ref="servicesCatalogRef"
               class="tw:h-full"
               @view-traces="handleServicesCatalogViewTraces"
+              @request:stream-change="onChildStreamChangeRequest"
             />
           </div>
 
@@ -273,6 +275,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </OSplitter>
     </div>
+
+    <ODialog
+      v-model:open="streamChangeDialog.show"
+      title="Change stream?"
+      size="sm"
+      primary-button-label="Switch stream"
+      secondary-button-label="Cancel"
+      @click:primary="applyStreamChange(streamChangeDialog.pendingStream)"
+      @click:secondary="streamChangeDialog.show = false"
+    >
+      <p>This will also update the stream in the Traces/Spans tab and reset existing query.</p>
+    </ODialog>
   </div>
 </template>
 
@@ -339,6 +353,7 @@ import { useTracesTableColumns } from "./composables/useTracesTableColumns";
 import type { TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
 import { isLLMTrace } from "@/utils/llmUtils";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -1962,6 +1977,26 @@ const getMoreData = () => {
 const onChangeStream = async () => {
   await extractFields();
   runQueryFn();
+};
+
+const streamChangeDialog = ref({ show: false, pendingStream: "" });
+
+const applyStreamChange = async (newStream: string) => {
+  searchObj.data.stream.selectedStream = {
+    label: newStream,
+    value: newStream,
+  };
+  searchObj.data.editorValue = "";
+  streamChangeDialog.value.show = false;
+  await onChangeStream();
+};
+
+const onChildStreamChangeRequest = (newStream: string) => {
+  if (searchObj.data.editorValue?.trim()) {
+    streamChangeDialog.value = { show: true, pendingStream: newStream };
+  } else {
+    applyStreamChange(newStream);
+  }
 };
 
 const collapseFieldList = () => {

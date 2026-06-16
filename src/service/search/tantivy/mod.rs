@@ -19,15 +19,18 @@ pub mod search;
 
 use std::{collections::HashSet, ops::Bound, sync::Arc};
 
+use arrow::{
+    buffer::{BooleanBuffer, MutableBuffer},
+    util::bit_util,
+};
 use config::{
     INDEX_FIELD_NAME_FOR_ALL, TIMESTAMP_COL_NAME,
     cluster::LOCAL_NODE,
     get_config,
     meta::{
-        bitvec::BitVec,
         inverted_index::IndexOptimizeMode,
         search::ScanStats,
-        stream::{FileKey, StreamType},
+        stream::{FileKey, FileSelection, StreamType},
     },
     metrics::{self, QUERY_PARQUET_CACHE_RATIO_NODE},
     tantivy::tokenizer::{CollectType, O2_TOKENIZER, o2_tokenizer_build},
@@ -37,7 +40,6 @@ use futures::{StreamExt, stream};
 use hashbrown::HashMap;
 use infra::{cache::file_data, errors::Error};
 use itertools::Itertools;
-use roaring::RoaringBitmap;
 pub use search::{TantivyMultiResult, TantivyMultiResultBuilder, TantivyResult};
 use tantivy::{
     Directory, ReloadPolicy, Term,
@@ -167,6 +169,13 @@ pub async fn tantivy_search(
 
     let search_start = std::time::Instant::now();
     let mut is_add_filter_back = file_list_map.len() != index_file_names.len();
+    if is_add_filter_back {
+        log::info!(
+            "[trace_id {trace_id}] search->tantivy: {} of {} files have no tantivy index, the filter will be added back to datafusion for them",
+            file_list_map.len() - index_file_names.len(),
+            file_list_map.len(),
+        );
+    }
     let time_range = query.time_range;
     let index_parquet_files = index_file_names.into_iter().map(|(_, f)| f).collect_vec();
     let (index_parquet_files, query_limit) =
@@ -264,16 +273,17 @@ pub async fn tantivy_search(
                         continue;
                     }
                     match result {
-                        TantivyResult::RowIdsBitVec(bitvec, num_rows, row_group_size) => {
-                            if num_rows == 0 {
-                                // if the bitmap is empty then we remove the file from the list
-                                file_list_map.remove(&file_name);
-                            } else {
-                                // Replace the segment IDs in the existing `FileKey` with the found
-                                tantivy_result_builder.add_row_nums(num_rows as u64);
-                                let file = file_list_map.get_mut(&file_name).unwrap();
-                                file.with_segment_ids(bitvec, row_group_size);
-                            }
+                        TantivyResult::RowIdsSelection {
+                            row_ids,
+                            row_group_size,
+                        } => {
+                            let matched = row_ids.count_set_bits() as u64;
+                            tantivy_result_builder.add_row_nums(matched);
+                            let file = file_list_map.get_mut(&file_name).unwrap();
+                            file.with_selection(FileSelection::Rows(row_ids), row_group_size);
+                        }
+                        TantivyResult::NoMatch => {
+                            file_list_map.remove(&file_name);
                         }
                         TantivyResult::Count(count) => {
                             tantivy_result_builder.add_row_nums(count as u64);
@@ -297,6 +307,11 @@ pub async fn tantivy_search(
                         }
                         TantivyResult::RowIds(_) => {
                             unreachable!("RowIds should not be returned");
+                        }
+                        TantivyResult::Skipped { .. } => {
+                            // skipped results always come with an empty file
+                            // name and are handled before this match
+                            unreachable!("Skipped should not be returned with a file name");
                         }
                     }
                 }
@@ -511,7 +526,7 @@ async fn search_tantivy_index(
         Some(IndexOptimizeMode::SimpleCount) => {
             TantivyResult::handle_simple_count(&searcher, query)
         }
-        Some(IndexOptimizeMode::SimpleHistogram(min_value, bucket_width, num_buckets)) => {
+        Some(IndexOptimizeMode::SimpleHistogram(min_value, bucket_width, num_buckets, ts_offset)) => {
             // fail the function if field not in tantivy schema
             if tantivy_schema.get_field(TIMESTAMP_COL_NAME).is_err() {
                 log::warn!("[trace_id {trace_id_clone}] search->tantivy: _timestamp not index in tantivy file: {ttv_file_name}");
@@ -523,12 +538,14 @@ async fn search_tantivy_index(
                 min_value,
                 bucket_width,
                 num_buckets,
+                ts_offset,
             )
         }
         Some(IndexOptimizeMode::SimpleMultiHistogram(
             min_value,
             max_value,
             bucket_width,
+            ts_offset,
             breakdown_field,
         )) => {
             if tantivy_schema.get_field(TIMESTAMP_COL_NAME).is_err() {
@@ -545,6 +562,7 @@ async fn search_tantivy_index(
                 min_value,
                 max_value,
                 bucket_width,
+                ts_offset,
                 &breakdown_field,
             )
         }
@@ -569,7 +587,6 @@ async fn search_tantivy_index(
     .await??;
 
     let key = parquet_file.key.to_string();
-    let mut percent = 0.0;
     let result = match res {
         TantivyResult::Count(count) => TantivyResult::Count(count),
         TantivyResult::Histogram(histogram) => TantivyResult::Histogram(histogram),
@@ -579,49 +596,16 @@ async fn search_tantivy_index(
         TantivyResult::TopN(top_n) => TantivyResult::TopN(top_n),
         TantivyResult::Distinct(distinct) => TantivyResult::Distinct(distinct),
         TantivyResult::RowIds(row_ids) => {
-            if row_ids.is_empty() || parquet_file.meta.records == 0 {
-                return Ok((
-                    key,
-                    TantivyResult::RowIdsBitVec(BitVec::EMPTY, 0, row_group_size),
-                    false,
-                ));
+            match build_row_ids_selection(trace_id, parquet_file, row_ids, row_group_size)? {
+                RowIdsOutcome::Return(key, result, has_skipped) => {
+                    return Ok((key, result, has_skipped));
+                }
+                RowIdsOutcome::Selection { result } => result,
             }
-            // return early if the number of matched docs is too large
-            let skip_threshold = cfg.limit.inverted_index_skip_threshold;
-            let row_ids_percent = row_ids.len() as f64 / parquet_file.meta.records as f64 * 100.0;
-            if skip_threshold > 0 && row_ids_percent > skip_threshold as f64 {
-                // return empty file name means we need to add filter back and skip tantivy search
-                log::info!(
-                    "[trace_id {trace_id}] search->tantivy: file: {}, result percent {row_ids_percent}% is too large, back to datafusion",
-                    parquet_file.key
-                );
-                return Ok((
-                    "".to_string(),
-                    TantivyResult::RowIdsBitVec(
-                        BitVec::EMPTY,
-                        row_ids_percent as usize,
-                        row_group_size,
-                    ),
-                    true,
-                ));
-            }
-            percent = row_ids_percent;
-            let max_doc_id = row_ids.iter().copied().max().unwrap_or(0) as i64;
-            if max_doc_id >= parquet_file.meta.records {
-                return Err(anyhow::anyhow!(
-                    "doc_id {max_doc_id} is out of range, records {}",
-                    parquet_file.meta.records,
-                ));
-            }
-            // NOTE: the BitVec's length should equal to the number of records in the parquet file
-            let mut res = BitVec::repeat(false, parquet_file.meta.records as usize);
-            let num_rows = row_ids.len();
-            for id in row_ids {
-                res.set(id as usize, true);
-            }
-            TantivyResult::RowIdsBitVec(res, num_rows, row_group_size)
         }
-        TantivyResult::RowIdsBitVec(..) => {
+        TantivyResult::RowIdsSelection { .. }
+        | TantivyResult::NoMatch
+        | TantivyResult::Skipped { .. } => {
             unreachable!("unsupported tantivy search result in search_tantivy_index")
         }
     };
@@ -631,13 +615,75 @@ async fn search_tantivy_index(
     if cfg.common.inverted_index_result_cache_enabled
         && !cache_key.is_empty()
         && !has_skipped_conditions
-        && (result.get_memory_size() < cfg.limit.inverted_index_result_cache_max_entry_size
-            || percent < 1.0)
+        && result.get_memory_size() < cfg.limit.inverted_index_result_cache_max_entry_size
     {
-        let entry = get_cache_entry(result.clone(), percent, parquet_file.meta.records as usize);
+        let entry = get_cache_entry(result.clone());
         tantivy_result_cache::GLOBAL_CACHE.put(cache_key, entry);
     }
     Ok((key, result, has_skipped_conditions))
+}
+
+/// Outcome of turning tantivy row-id hits into a parquet access plan.
+enum RowIdsOutcome {
+    /// Return immediately from `search_tantivy_index`, bypassing the result
+    /// cache (either no match, or too many hits so we fall back to datafusion).
+    Return(String, TantivyResult, bool),
+    /// A row-id selection to cache and return.
+    Selection { result: TantivyResult },
+}
+
+/// Convert the matched tantivy row ids into a `RowIdsSelection` access plan,
+/// or signal an early return when there is no match or too many hits.
+fn build_row_ids_selection(
+    trace_id: &str,
+    parquet_file: &FileKey,
+    row_ids: Vec<u32>,
+    row_group_size: Option<u32>,
+) -> anyhow::Result<RowIdsOutcome> {
+    if row_ids.is_empty() || parquet_file.meta.records == 0 {
+        return Ok(RowIdsOutcome::Return(
+            parquet_file.key.to_string(),
+            TantivyResult::NoMatch,
+            false,
+        ));
+    }
+    // return early if the number of matched docs is too large
+    let skip_threshold = get_config().limit.inverted_index_skip_threshold;
+    let row_ids_percent = row_ids.len() as f64 / parquet_file.meta.records as f64 * 100.0;
+    if skip_threshold > 0 && row_ids_percent > skip_threshold as f64 {
+        // return empty file name means we need to add filter back and skip tantivy search
+        log::info!(
+            "[trace_id {trace_id}] search->tantivy: file: {}, result percent {row_ids_percent}% is too large, back to datafusion",
+            parquet_file.key
+        );
+        return Ok(RowIdsOutcome::Return(
+            "".to_string(),
+            TantivyResult::Skipped {
+                percent: row_ids_percent as usize,
+            },
+            true,
+        ));
+    }
+    let max_doc_id = row_ids.iter().copied().max().unwrap() as i64;
+    if max_doc_id >= parquet_file.meta.records {
+        return Err(anyhow::anyhow!(
+            "doc_id {max_doc_id} is out of range, records {}",
+            parquet_file.meta.records,
+        ));
+    }
+    let num_rows = parquet_file.meta.records as usize;
+    let mut buffer = MutableBuffer::from_len_zeroed(bit_util::ceil(num_rows, 8));
+    let slice = buffer.as_slice_mut();
+    for &id in &row_ids {
+        bit_util::set_bit(slice, id as usize);
+    }
+    let row_ids = BooleanBuffer::new(buffer.into(), 0, num_rows);
+    Ok(RowIdsOutcome::Selection {
+        result: TantivyResult::RowIdsSelection {
+            row_ids: Arc::new(row_ids),
+            row_group_size,
+        },
+    })
 }
 
 /// if simple distinct without filter, we need to warm up the field
@@ -649,24 +695,15 @@ fn get_simple_distinct_field(idx_optimize_rule: &Option<IndexOptimizeMode>) -> V
     }
 }
 
-fn get_cache_entry(tantivy_result: TantivyResult, percent: f64, parquet_rows: usize) -> CacheEntry {
+fn get_cache_entry(tantivy_result: TantivyResult) -> CacheEntry {
     match tantivy_result {
-        TantivyResult::RowIdsBitVec(bitvec, num_rows, row_group_size) => {
-            // if the percent is less than 1.0, we use roaring bitmap to store the row ids
-            // otherwise, we use bitvec to store the row ids.
-            // because the bitvec is not efficient for small percent, and the roaring bitmap is not
-            // efficient for large percent.
-            if percent < 1.0 {
-                let mut roaring = RoaringBitmap::new();
-                for (i, bit) in bitvec.into_iter().enumerate() {
-                    if bit {
-                        roaring.insert(i as u32);
-                    }
-                }
-                CacheEntry::RowIdsRoaring(roaring, num_rows, parquet_rows, row_group_size)
-            } else {
-                CacheEntry::RowIdsBitVec(bitvec, num_rows, row_group_size)
-            }
+        TantivyResult::RowIdsSelection {
+            row_ids,
+            row_group_size,
+        } => {
+            // the packed ids are immutable and shared via Arc, so caching is
+            // a refcount bump
+            CacheEntry::RowIds(row_ids, row_group_size)
         }
         TantivyResult::Count(count) => CacheEntry::Count(count),
         TantivyResult::Histogram(histogram) => CacheEntry::Histogram(histogram),
@@ -675,7 +712,7 @@ fn get_cache_entry(tantivy_result: TantivyResult, percent: f64, parquet_rows: us
         }
         TantivyResult::TopN(top_n) => CacheEntry::TopN(top_n),
         TantivyResult::Distinct(distinct) => CacheEntry::Distinct(distinct),
-        TantivyResult::RowIds(_) => {
+        TantivyResult::RowIds(_) | TantivyResult::NoMatch | TantivyResult::Skipped { .. } => {
             unreachable!("unsupported tantivy search result in search_tantivy_index")
         }
     }
@@ -699,6 +736,7 @@ fn generate_cache_key(
 
 #[cfg(test)]
 mod tests {
+    use arrow::buffer::BooleanBuffer;
     use config::{TIMESTAMP_COL_NAME, meta::stream::FileMeta};
 
     use super::*;
@@ -815,58 +853,30 @@ mod tests {
     }
 
     #[test]
-    fn test_get_cache_entry_row_ids_bitvec_small_percent() {
-        let mut bitvec = BitVec::repeat(false, 4);
-        bitvec.set(0, true);
-        bitvec.set(2, true);
-        let result = TantivyResult::RowIdsBitVec(bitvec, 2, None);
-        let percent = 0.5; // Less than 1.0, should use roaring bitmap
-        let parquet_rows = 4;
+    fn test_get_cache_entry_row_ids_selection() {
+        let result = TantivyResult::RowIdsSelection {
+            row_ids: Arc::new(BooleanBuffer::from_iter(
+                (0..4u32).map(|i| [0u32, 2].contains(&i)),
+            )),
+            row_group_size: Some(1024),
+        };
 
-        let entry = get_cache_entry(result, percent, parquet_rows);
+        let entry = get_cache_entry(result);
         match entry {
-            CacheEntry::RowIdsRoaring(roaring, num_rows, rows, _) => {
-                assert_eq!(num_rows, 2);
-                assert_eq!(rows, 4);
-                assert_eq!(roaring.len(), 2); // Should contain positions 0 and 2
-                assert!(roaring.contains(0));
-                assert!(roaring.contains(2));
+            CacheEntry::RowIds(packed, row_group_size) => {
+                assert_eq!(packed.count_set_bits(), 2);
+                assert_eq!(packed.set_indices().collect::<Vec<_>>(), vec![0, 2]);
+                assert_eq!(row_group_size, Some(1024));
             }
-            _ => panic!("Expected RowIdsRoaring cache entry"),
-        }
-    }
-
-    #[test]
-    fn test_get_cache_entry_row_ids_bitvec_large_percent() {
-        let mut bitvec = BitVec::repeat(false, 4);
-        bitvec.set(0, true);
-        bitvec.set(1, true);
-        bitvec.set(3, true);
-        let result = TantivyResult::RowIdsBitVec(bitvec, 3, None);
-        let percent = 2.0; // Greater than 1.0, should use bitvec
-        let parquet_rows = 4;
-
-        let entry = get_cache_entry(result, percent, parquet_rows);
-        match entry {
-            CacheEntry::RowIdsBitVec(returned_bitvec, num_rows, _) => {
-                assert_eq!(num_rows, 3);
-                assert_eq!(returned_bitvec.len(), 4);
-                assert_eq!(returned_bitvec.get(0).unwrap(), true);
-                assert_eq!(returned_bitvec.get(1).unwrap(), true);
-                assert_eq!(returned_bitvec.get(2).unwrap(), false);
-                assert_eq!(returned_bitvec.get(3).unwrap(), true);
-            }
-            _ => panic!("Expected RowIdsBitVec cache entry"),
+            _ => panic!("Expected RowIds cache entry"),
         }
     }
 
     #[test]
     fn test_get_cache_entry_count() {
         let result = TantivyResult::Count(42);
-        let percent = 1.0;
-        let parquet_rows = 100;
 
-        let entry = get_cache_entry(result, percent, parquet_rows);
+        let entry = get_cache_entry(result);
         match entry {
             CacheEntry::Count(count) => {
                 assert_eq!(count, 42);
@@ -879,10 +889,8 @@ mod tests {
     fn test_get_cache_entry_histogram() {
         let histogram_data = vec![1, 2, 3, 4];
         let result = TantivyResult::Histogram(histogram_data.clone());
-        let percent = 1.0;
-        let parquet_rows = 100;
 
-        let entry = get_cache_entry(result, percent, parquet_rows);
+        let entry = get_cache_entry(result);
         match entry {
             CacheEntry::Histogram(histogram) => {
                 assert_eq!(histogram, histogram_data);
@@ -897,10 +905,8 @@ mod tests {
         distinct_values.insert("value1".to_string());
         distinct_values.insert("value2".to_string());
         let result = TantivyResult::Distinct(distinct_values.clone());
-        let percent = 1.0;
-        let parquet_rows = 100;
 
-        let entry = get_cache_entry(result, percent, parquet_rows);
+        let entry = get_cache_entry(result);
         match entry {
             CacheEntry::Distinct(distinct) => {
                 assert_eq!(distinct, distinct_values);

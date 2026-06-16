@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Main content when data exists -->
     <div
       v-if="!no_data_ingest && !isLoadingSummary"
-      class="tw:w-full tw:h-full tw:overflow-y-auto"
+      class="usage-scroll tw:w-full tw:h-full tw:overflow-y-auto"
     >
       <!-- Banners -->
       <div class="banners-wrapper">
@@ -299,7 +299,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="functions-dashboards-column">
           <div class="tile-wrapper">
             <div
-              class="feature-card tw:rounded tw:p-4 tw:bg-[var(--tile-bg)] tw:border tw:border-[var(--o2-border-color)] tw:text-center tw:flex tw:flex-col tw:justify-between"
+              class="feature-card tw:rounded tw:p-4 tw:bg-[var(--o2-card-bg)] tw:border tw:border-[var(--o2-border-color)] tw:text-center tw:flex tw:flex-col tw:justify-between"
               :class="
                 store.state.theme === 'dark'
                   ? 'dark-tile-content'
@@ -365,7 +365,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <div class="tile-wrapper">
             <div
-              class="feature-card tw:rounded tw:p-4 tw:bg-[var(--tile-bg)] tw:border tw:border-[var(--o2-border-color)] tw:text-center tw:flex tw:flex-col tw:justify-between"
+              class="feature-card tw:rounded tw:p-4 tw:bg-[var(--o2-card-bg)] tw:border tw:border-[var(--o2-border-color)] tw:text-center tw:flex tw:flex-col tw:justify-between"
               :class="
                 store.state.theme === 'dark'
                   ? 'dark-tile-content'
@@ -432,7 +432,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Alerts chart -->
         <div
-          class="feature-card first-chart-container tw:rounded tw:p-4 tw:bg-[var(--tile-bg)] tw:border tw:border-[var(--o2-border-color)]"
+          class="feature-card first-chart-container tw:rounded tw:p-4 tw:bg-[var(--o2-card-bg)] tw:border tw:border-[var(--o2-border-color)]"
           :class="
             store.state.theme === 'dark'
               ? 'chart-container-dark'
@@ -516,7 +516,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Pipelines chart -->
         <div
-          class="feature-card second-chart-container tw:rounded tw:p-4 tw:bg-[var(--tile-bg)] tw:border tw:border-[var(--o2-border-color)]"
+          class="feature-card second-chart-container tw:rounded tw:p-4 tw:bg-[var(--o2-card-bg)] tw:border tw:border-[var(--o2-border-color)]"
           :class="
             store.state.theme === 'dark'
               ? 'chart-container-dark'
@@ -621,7 +621,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- UsageTab: self-contained home usage dashboard showing streams, functions, dashboards, alerts, and pipelines summary with animated counters and charts. -->
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -644,10 +644,15 @@ const { t } = useI18n();
 const store = useStore();
 const router = useRouter();
 
+const getCssVar = (name: string) =>
+  getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
 const summary = ref<any>([]);
 const no_data_ingest = ref(false);
 const alertsPanelDataKey = ref(0);
 const pipelinesPanelDataKey = ref(0);
+// Incremented on themeColorChanged to invalidate getCssVar snapshots in computed properties
+const themeVersion = ref(0);
 const isLoadingSummary = ref(false);
 
 // Animated counters
@@ -847,9 +852,13 @@ const showUsageReportBanner = computed(() => {
 });
 
 const alertsPanelData = computed(() => {
+  void themeVersion.value; // reactive dependency — re-runs when theme changes
   const healthyAlerts = summary.value.healthy_alerts || 0;
   const failedAlerts = summary.value.failed_alerts || 0;
   const total = healthyAlerts + failedAlerts;
+
+  const textMuted = getCssVar("--o2-text-muted");
+  const textPrimary = getCssVar("--o2-text-primary");
 
   if (total === 0) {
     return {
@@ -859,9 +868,9 @@ const alertsPanelData = computed(() => {
         left: "center",
         top: "center",
         textStyle: {
-          fontSize: 16,
+          fontSize: 13,
           fontWeight: "normal",
-          color: store.state.theme === "dark" ? "#B7B7B7" : "#72777B",
+          color: textMuted,
         },
       },
     };
@@ -874,9 +883,9 @@ const alertsPanelData = computed(() => {
       left: "65%",
       top: "50%",
       textStyle: {
-        fontSize: 16,
+        fontSize: 13,
         fontWeight: "normal",
-        color: store.state.theme === "dark" ? "#D9D9D9" : "#262626",
+        color: textPrimary,
       },
     },
     tooltip: {
@@ -887,7 +896,8 @@ const alertsPanelData = computed(() => {
       orient: "vertical",
       left: "65%",
       textStyle: {
-        color: store.state.theme === "dark" ? "#DCDCDC" : "#232323",
+        color: textPrimary,
+        fontSize: 12,
       },
     },
     series: [
@@ -901,8 +911,8 @@ const alertsPanelData = computed(() => {
         label: {
           formatter: "{d}%",
           show: true,
-          fontSize: 14,
-          color: store.state.theme === "dark" ? "#ffffff" : "#000000",
+          fontSize: 12,
+          color: textPrimary,
         },
         labelLine: {
           show: true,
@@ -916,14 +926,12 @@ const alertsPanelData = computed(() => {
           {
             value: healthyAlerts,
             name: "Success Alerts",
-            itemStyle: {
-            },
+            itemStyle: {},
           },
           {
             value: failedAlerts,
             name: "Failed Alerts",
-            itemStyle: {
-            },
+            itemStyle: {},
           },
         ],
       },
@@ -932,10 +940,19 @@ const alertsPanelData = computed(() => {
 });
 
 const pipelinesPanelData = computed(() => {
+  void themeVersion.value; // reactive dependency — re-runs when theme changes
   const healthyPipelines = summary.value.healthy_pipelines || 0;
   const failedPipelines = summary.value.failed_pipelines || 0;
   const warningPipelines = summary.value.warning_pipelines || 0;
   const total = healthyPipelines + failedPipelines + warningPipelines;
+
+  const textMuted = getCssVar("--o2-text-muted");
+  const textPrimary = getCssVar("--o2-text-primary");
+  const textSecondary = getCssVar("--o2-text-secondary");
+  const borderColor = getCssVar("--o2-border-color");
+  const colorSuccess = getCssVar("--o2-positive");
+  const colorError = getCssVar("--o2-negative");
+  const colorWarning = getCssVar("--o2-warning");
 
   if (total === 0) {
     return {
@@ -945,9 +962,9 @@ const pipelinesPanelData = computed(() => {
         left: "center",
         top: "center",
         textStyle: {
-          fontSize: 16,
+          fontSize: 13,
           fontWeight: "normal",
-          color: store.state.theme === "dark" ? "#B7B7B7" : "#72777B",
+          color: textMuted,
         },
       },
     };
@@ -962,13 +979,13 @@ const pipelinesPanelData = computed(() => {
       nameLocation: "middle",
       nameGap: 30,
       nameTextStyle: {
-        fontSize: 16,
+        fontSize: 13,
         fontWeight: "normal",
-        color: store.state.theme === "dark" ? "#B7B7B7" : "#72777B",
+        color: textSecondary,
       },
       axisLabel: {
-        fontSize: 14,
-        color: store.state.theme === "dark" ? "#CCCFD1" : "#2E3133",
+        fontSize: 12,
+        color: textPrimary,
       },
     },
     yAxis: {
@@ -984,17 +1001,17 @@ const pipelinesPanelData = computed(() => {
       nameGap: 60,
       nameRotate: 90,
       nameTextStyle: {
-        fontSize: 16,
+        fontSize: 13,
         fontWeight: "normal",
-        color: store.state.theme === "dark" ? "#B7B7B7" : "#72777B",
+        color: textSecondary,
       },
       axisLabel: {
         fontSize: 12,
-        color: store.state.theme === "dark" ? "#B7B7B7" : "#72777B",
+        color: textSecondary,
       },
       splitLine: {
         lineStyle: {
-          color: store.state.theme === "dark" ? "#444" : "#e0e0e0",
+          color: borderColor,
         },
       },
       offset: -20,
@@ -1007,13 +1024,13 @@ const pipelinesPanelData = computed(() => {
         label: {
           show: true,
           position: "top",
-          fontSize: 14,
+          fontSize: 12,
           fontWeight: "bold",
-          color: store.state.theme === "dark" ? "#CCCFD1" : "#2E3133",
+          color: textPrimary,
         },
         itemStyle: {
           color: function (params: any) {
-            const colors = ["#16b26a", "#db373b", "#ffc328"];
+            const colors = [colorSuccess, colorError, colorWarning];
             return colors[params.dataIndex];
           },
         },
@@ -1117,6 +1134,8 @@ const formattedAnimatedIndexSize = computed(() => {
 const orgId = computed(() => store.state.selectedOrganization?.identifier);
 
 // Initial load
+const onThemeColorChanged = () => { themeVersion.value++; };
+
 onMounted(() => {
   if (
     Object.keys(store.state.selectedOrganization).length > 0 &&
@@ -1124,6 +1143,11 @@ onMounted(() => {
   ) {
     getSummary(orgId.value);
   }
+  window.addEventListener("themeColorChanged", onThemeColorChanged);
+});
+
+onUnmounted(() => {
+  window.removeEventListener("themeColorChanged", onThemeColorChanged);
 });
 
 // Re-fetch when org changes
@@ -1148,33 +1172,12 @@ watch(orgId, (newVal, oldVal) => {
  */
 
 /* ===== 1. CSS Variables & Theme Mixins ===== */
-:root {
-  --accent-blue: #397ef6;
-  --accent-orange: #ee5f26;
-  --accent-purple: #9333ea;
 
-  --tile-bg: #ffffff;
-  --tile-border: #e7eaee;
-  --text-primary: #2e3133;
-  --text-secondary: #72777b;
-  --hover-shadow: rgba(0, 0, 0, 0.3);
-}
 
-@mixin dark-theme-vars {
-  --tile-bg: #2b2c2d;
-  --tile-border: #444444;
-  --text-primary: #cccfd1;
-  --text-secondary: #b7b7b7;
-  --hover-shadow: rgba(0, 0, 0, 0.6);
-}
-
-@mixin light-theme-vars {
-  --tile-bg: #ffffff;
-  --tile-border: #e7eaee;
-  --text-primary: #2e3133;
-  --text-secondary: #72777b;
-  --hover-shadow: rgba(0, 0, 0, 0.3);
-}
+/* dark/light-theme-vars mixins kept for structural class hooks used by JS
+   theme toggling; CSS var overrides are now handled globally via --o2-*. */
+@mixin dark-theme-vars {}
+@mixin light-theme-vars {}
 
 @mixin tile-base {
   height: 100%;
@@ -1223,6 +1226,14 @@ watch(orgId, (newVal, oldVal) => {
 
 /* ===== 3. Layout Components ===== */
 
+/* The scroll container is pulled to the content-card's right edge by its panel
+   (see HomeView `.home-tab-panel--usage`) so the scrollbar sits flush at the
+   edge instead of floating inset. This padding-right restores the gap between
+   the cards and the scrollbar so the content still has breathing room. */
+.usage-scroll {
+  padding-right: 0.625rem;
+}
+
 .banners-wrapper {
   flex-shrink: 0;
   display: flex;
@@ -1239,7 +1250,7 @@ watch(orgId, (newVal, oldVal) => {
 }
 .dark-stream-container,
 .light-stream-container {
-  background: var(--tile-bg);
+  background: var(--o2-card-bg);
   border: 0.0625rem solid var(--o2-border-color);
 }
 .view-button-light {
@@ -1265,7 +1276,7 @@ watch(orgId, (newVal, oldVal) => {
 }
 
 .view-arrow-icon {
-  font-size: 1.125rem;
+  font-size: var(--text-md);
   transition:
     transform 0.4s ease-in-out,
     opacity 0.4s ease-in-out;
@@ -1343,15 +1354,15 @@ watch(orgId, (newVal, oldVal) => {
 }
 
 .section-header {
-  font-size: 1.25rem;
+  font-size: var(--text-lg);
   font-weight: 600;
-  line-height: 1.5rem;
+  line-height: 1.4;
 }
 
 .tile-title {
-  font-size: 1rem;
+  font-size: var(--text-base);
   font-weight: 500;
-  line-height: 1.25rem;
+  line-height: 1.4;
   letter-spacing: 0%;
 }
 .performance-text {
@@ -1360,32 +1371,26 @@ watch(orgId, (newVal, oldVal) => {
   padding: 0 0.5rem;
   display: flex;
   align-items: center;
-  background-color: #ebfdf5;
-  color: #0e6842;
+  background-color: var(--o2-status-success-bg);
+  color: var(--o2-status-success-text);
   font-size: 0.75rem !important;
 }
-.positive-increase-light {
-  background-color: #ebfdf5;
-  border: 0.0625rem solid #e4e7ec;
-  color: #0e6842;
-}
-.negative-increase-light {
-  background-color: #ffebe9;
-  border: 0.0625rem solid #e4e7ec;
-  color: #b42318;
-}
+.positive-increase-light,
 .positive-increase-dark {
-  background-color: #254421;
-  color: #a1ffd6;
+  background-color: var(--o2-status-success-bg);
+  border: 0.0625rem solid var(--o2-border-color);
+  color: var(--o2-status-success-text);
 }
+.negative-increase-light,
 .negative-increase-dark {
-  background-color: #4a2323;
-  color: #ffd6d6;
+  background-color: var(--o2-status-error-bg);
+  border: 0.0625rem solid var(--o2-border-color);
+  color: var(--o2-status-error-text);
 }
 .data-to-display {
-  font-size: 1.5rem;
+  font-size: var(--text-xl);
   font-weight: 600;
-  line-height: 1.75rem;
+  line-height: 1.3;
 }
 
 .charts-main-container {
@@ -1444,21 +1449,21 @@ watch(orgId, (newVal, oldVal) => {
 }
 
 .text-title {
-  font-size: 1.125rem;
+  font-size: var(--text-base);
   font-weight: 500;
-  line-height: 1.25rem;
+  line-height: 1.4;
   letter-spacing: 0%;
 }
 .text-subtitle {
-  font-size: 0.875rem;
+  font-size: var(--text-sm);
   font-weight: 400;
-  line-height: 1.25rem;
+  line-height: 1.4;
   letter-spacing: 0%;
 }
 .results-count {
-  font-size: 1.25rem;
+  font-size: var(--text-md);
   font-weight: 600;
-  line-height: 1.5rem;
+  line-height: 1.4;
 }
 .details-container {
   gap: 0.5rem;
@@ -1509,22 +1514,22 @@ watch(orgId, (newVal, oldVal) => {
 }
 
 .tile-icon.icon-bg-purple {
-  background: rgba(242, 220, 245, 0.25);
-  border: 0.0625rem solid rgba(242, 220, 245, 0.45);
+  background: rgba(147, 51, 234, 0.25);
+  border: 0.0625rem solid rgba(147, 51, 234, 0.45);
 }
 
 /* ===== 4. Interactive States ===== */
 
 .view-button-light:focus-visible,
 .view-button-dark:focus-visible {
-  outline: 2px solid var(--accent-blue);
+  outline: 2px solid var(--o2-focus-ring);
   outline-offset: 2px;
   border-radius: 0.25rem;
 }
 
 a:focus-visible,
 button:focus-visible {
-  outline: 2px solid var(--accent-blue);
+  outline: 2px solid var(--o2-focus-ring);
   outline-offset: 2px;
 }
 

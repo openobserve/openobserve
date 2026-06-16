@@ -1101,7 +1101,7 @@ export default defineComponent({
         // This ensures child variables update based on parent changes, not initial custom/all values
         if (
           isCurrentlyReset &&
-          (v.isVariableLoadingPending || v.options.length === 0)
+          (v.isVariableLoadingPending || (v?.options?.length === 0))
         ) {
           // For child variables, always clear oldVariablesData on reset regardless of custom/all config
           // For parent variables, only clear if not custom/all default

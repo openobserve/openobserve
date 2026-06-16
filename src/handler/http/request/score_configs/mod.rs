@@ -15,8 +15,15 @@
 
 use axum::{extract::Path, response::Response};
 
+#[cfg(feature = "enterprise")]
+use crate::common::utils::auth::UserEmail;
+#[cfg(feature = "enterprise")]
+use crate::handler::http::extractors::Headers;
 use crate::{
-    common::meta::http::HttpResponse as MetaHttpResponse,
+    common::{
+        meta::{authz::Authz, http::HttpResponse as MetaHttpResponse},
+        utils::auth::{is_ofga_object_visible, remove_ownership, set_ownership},
+    },
     handler::http::models::score_configs::{
         ListScoreConfigVersionsResponseBody, ListScoreConfigsResponseBody, ScoreConfigRequestBody,
         ScoreConfigResponseBody, ScoreConfigUpdateRequestBody,
@@ -24,19 +31,20 @@ use crate::{
     service::llm_evaluations::score_configs::{self, ScoreConfigError},
 };
 
-impl From<ScoreConfigError> for Response {
-    fn from(value: ScoreConfigError) -> Self {
-        match value {
-            ScoreConfigError::InfraError(err) => MetaHttpResponse::internal_error(err),
-            ScoreConfigError::MissingName => {
-                MetaHttpResponse::bad_request("Score config name cannot be empty")
-            }
-            ScoreConfigError::NotFound => MetaHttpResponse::not_found("Score config not found"),
-            ScoreConfigError::DuplicateName => {
-                MetaHttpResponse::conflict("Score config name already exists")
-            }
-            ScoreConfigError::InUseByScorer => MetaHttpResponse::conflict(value),
+fn score_config_error_response(value: ScoreConfigError) -> Response {
+    match value {
+        ScoreConfigError::InfraError(err) => {
+            log::error!("[ScoreConfig] internal error: {err}");
+            MetaHttpResponse::internal_error("Internal server error")
         }
+        ScoreConfigError::MissingName => {
+            MetaHttpResponse::bad_request("Score config name cannot be empty")
+        }
+        ScoreConfigError::NotFound => MetaHttpResponse::not_found("Score config not found"),
+        ScoreConfigError::DuplicateName => {
+            MetaHttpResponse::conflict("Score config name already exists")
+        }
+        ScoreConfigError::InUseByScorer => MetaHttpResponse::conflict(value),
     }
 }
 
@@ -58,13 +66,41 @@ impl From<ScoreConfigError> for Response {
         ("x-o2-ratelimit" = json!({"module": "ScoreConfigs", "operation": "list"})),
     ),
 )]
-pub async fn list_score_configs(Path(org_id): Path<String>) -> Response {
+pub async fn list_score_configs(
+    Path(org_id): Path<String>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    let permitted_objects = {
+        match crate::handler::http::auth::validator::list_objects_for_user(
+            &org_id,
+            &user_email.user_id,
+            "GET",
+            "score_config",
+        )
+        .await
+        {
+            Ok(list) => list,
+            Err(e) => return MetaHttpResponse::forbidden(e.to_string()),
+        }
+    };
     match score_configs::list_score_configs(&org_id).await {
         Ok(list) => {
+            let list: Vec<infra::table::score_configs::ScoreConfig> = list
+                .into_iter()
+                .filter(|config| {
+                    is_ofga_object_visible(
+                        &org_id,
+                        "score_config",
+                        &config.entity_id,
+                        permitted_objects.as_deref(),
+                    )
+                })
+                .collect();
             let body: ListScoreConfigsResponseBody = list.into();
             MetaHttpResponse::json(body)
         }
-        Err(err) => err.into(),
+        Err(err) => score_config_error_response(err),
     }
 }
 
@@ -96,10 +132,11 @@ pub async fn create_score_config(
     let config: infra::table::score_configs::ScoreConfig = body.into();
     match score_configs::save_score_config(&org_id, config).await {
         Ok(c) => {
+            set_ownership(&org_id, "score_configs", Authz::new(&c.entity_id)).await;
             let resp: ScoreConfigResponseBody = c.into();
             MetaHttpResponse::json(resp)
         }
-        Err(err) => err.into(),
+        Err(err) => score_config_error_response(err),
     }
 }
 
@@ -131,7 +168,7 @@ pub async fn get_score_config(Path((org_id, entity_id)): Path<(String, String)>)
             let resp: ScoreConfigResponseBody = c.into();
             MetaHttpResponse::json(resp)
         }
-        Err(err) => err.into(),
+        Err(err) => score_config_error_response(err),
     }
 }
 
@@ -164,7 +201,7 @@ pub async fn list_score_config_versions(
             let body: ListScoreConfigVersionsResponseBody = versions.into();
             MetaHttpResponse::json(body)
         }
-        Err(err) => err.into(),
+        Err(err) => score_config_error_response(err),
     }
 }
 
@@ -201,7 +238,7 @@ pub async fn update_score_config(
             let resp: ScoreConfigResponseBody = c.into();
             MetaHttpResponse::json(resp)
         }
-        Err(err) => err.into(),
+        Err(err) => score_config_error_response(err),
     }
 }
 
@@ -230,8 +267,11 @@ pub async fn update_score_config(
 )]
 pub async fn delete_score_config(Path((org_id, entity_id)): Path<(String, String)>) -> Response {
     match score_configs::delete_score_config(&org_id, &entity_id).await {
-        Ok(()) => MetaHttpResponse::ok("Score config deactivated"),
-        Err(err) => err.into(),
+        Ok(()) => {
+            remove_ownership(&org_id, "score_configs", Authz::new(&entity_id)).await;
+            MetaHttpResponse::ok("Score config deactivated")
+        }
+        Err(err) => score_config_error_response(err),
     }
 }
 
@@ -248,7 +288,7 @@ mod tests {
             (ScoreConfigError::InUseByScorer, 409),
         ];
         for (err, expected) in cases {
-            let resp: Response = err.into();
+            let resp = score_config_error_response(err);
             assert_eq!(resp.status().as_u16(), expected);
         }
     }
@@ -256,7 +296,7 @@ mod tests {
     #[test]
     fn test_score_config_error_infra_is_500() {
         let err = ScoreConfigError::InfraError(infra::errors::Error::Message("db".to_string()));
-        let resp: Response = err.into();
+        let resp = score_config_error_response(err);
         assert_eq!(resp.status().as_u16(), 500);
     }
 }

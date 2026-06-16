@@ -35,8 +35,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="constrained-page"
   >
     <div
-      class="tw:mx-auto tw:w-full"
-      :class="[maxWidthClass, padded ? 'tw:px-6 tw:py-6' : '']"
+      class="tw:w-full"
+      :class="[alignClass, maxWidthClass, padded ? 'tw:px-6 tw:py-6' : '']"
     >
       <slot />
     </div>
@@ -52,10 +52,13 @@ const props = withDefaults(
     size?: "sm" | "md" | "lg" | "xl";
     /** Apply the default page gutter (px-6 py-6). Off → child owns padding. */
     padded?: boolean;
+    /** Column placement. `center` (default) for hubs; `left` for form pages. */
+    align?: "center" | "left";
   }>(),
   {
     size: "lg",
     padded: true,
+    align: "center",
   },
 );
 
@@ -68,4 +71,10 @@ const SIZE_CLASS = {
 } as const;
 
 const maxWidthClass = computed(() => SIZE_CLASS[props.size]);
+
+// `center` keeps the column centered (mx-auto); `left` pins it to the start so
+// form pages read left-aligned instead of floating in the middle of wide screens.
+const alignClass = computed(() =>
+  props.align === "left" ? "tw:mr-auto" : "tw:mx-auto",
+);
 </script>

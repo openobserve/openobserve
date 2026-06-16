@@ -18,7 +18,7 @@ use infra::table;
 
 use crate::common::{
     meta::authz::Authz,
-    utils::auth::{remove_ownership, set_ownership},
+    utils::auth::{is_ofga_object_visible, remove_ownership, set_ownership},
 };
 
 /// Errors that can occur when interacting with LLM providers.
@@ -83,6 +83,9 @@ pub async fn update_provider(
     let existing = table::providers::get(provider_id)
         .await?
         .ok_or(ProviderError::NotFound)?;
+    if existing.org_id != org_id {
+        return Err(ProviderError::NotFound);
+    }
 
     // Check name uniqueness excluding self
     let all = table::providers::get_all_by_org(org_id).await?;
@@ -105,9 +108,20 @@ pub async fn update_provider(
 #[tracing::instrument()]
 pub async fn list_providers(
     org_id: &str,
+    permitted_objects: Option<Vec<String>>,
 ) -> Result<Vec<table::providers::Provider>, ProviderError> {
     let providers = table::providers::get_all_by_org(org_id).await?;
-    Ok(providers)
+    Ok(providers
+        .into_iter()
+        .filter(|provider| {
+            is_ofga_object_visible(
+                org_id,
+                "provider",
+                &provider.id,
+                permitted_objects.as_deref(),
+            )
+        })
+        .collect())
 }
 
 #[tracing::instrument()]

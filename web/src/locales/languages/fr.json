@@ -422,7 +422,10 @@
     "menuGroupInspect": "Inspectez",
     "validSql": "SQL valide",
     "invalidSql": "Requête non valide",
-    "menuGroupExplain": "Expliquez"
+    "menuGroupExplain": "Expliquez",
+    "fieldValuesEmpty": "Aucune valeur n'a été trouvée.",
+    "fieldValuesEmptyHint": "Essayez une plage de temps plus large pour voir les valeurs.",
+    "selectLogsStreamFirst": "Sélectionnez d'abord Logs stream"
   },
   "menu": {
     "home": "Accueil",
@@ -845,7 +848,10 @@
     "feature_correlation_management": "Gestion des corrélations",
     "feature_log_patterns": "Modèles de journaux",
     "environment_type": "Type d'environnement",
-    "license_allows_unlimited_ingestion": "La licence actuelle permet une ingestion de données illimitée."
+    "license_allows_unlimited_ingestion": "La licence actuelle permet une ingestion de données illimitée.",
+    "refresh_license_limits": "Actualiser les limites de licence",
+    "license_refresh_success": "Actualisation de la limite de licence déclenchée avec succès",
+    "failed_to_refresh_license": "Impossible d'actualiser les limites de licence"
   },
   "login": {
     "userid": "ID utilisateur",

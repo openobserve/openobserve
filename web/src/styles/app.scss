@@ -50,6 +50,8 @@ body {
   font-size: var(--text-sm);
   font-weight: var(--font-normal);
   line-height: var(--leading-base);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -70,23 +72,21 @@ h1, h2, h3, h4, h5, h6 {
 
 h1 {
   font-size: var(--text-2xl);
-  // Design-system weight scale (HANDOFF.md §2.2): the title peak is 700.
-  // Never 800/900 — when everything is heavy, nothing stands out.
-  font-weight: var(--font-bold);
+  font-weight: var(--font-semibold);
   line-height: var(--leading-2xl);
   letter-spacing: var(--tracking-tight);
 }
 
 h2 {
   font-size: var(--text-xl);
-  font-weight: var(--font-semibold);
+  font-weight: var(--font-medium);
   line-height: var(--leading-xl);
   letter-spacing: var(--tracking-normal);
 }
 
 h3 {
   font-size: var(--text-lg);
-  font-weight: var(--font-semibold);
+  font-weight: var(--font-medium);
   line-height: var(--leading-lg);
   letter-spacing: var(--tracking-normal);
 }
@@ -153,8 +153,37 @@ code {
   letter-spacing: -0.2px;
 }
 
+pre,
+kbd,
+samp,
+.log-line {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  line-height: 1.6;
+}
+
+::selection {
+  background: var(--color-primary-200);
+  color: var(--color-primary-900);
+}
+
+html.dark ::selection,
+body.body--dark ::selection {
+  background: var(--color-primary-800);
+  color: var(--color-primary-100);
+}
+
 ::placeholder {
   color: var(--o2-text-placeholder);
+}
+
+// Suppress :focus-visible ring on dropdown triggers when Reka returns focus
+// after a pointer-based close. The data attribute is set by ODropdown.vue and
+// removed on blur — keyboard closes never set it so a11y is unaffected.
+[data-no-focus-visible]:focus,
+[data-no-focus-visible]:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -316,9 +345,11 @@ code {
     rgba(139, 92, 246, 0.15) 0%,
     rgba(236, 72, 153, 0.15) 100%
   ) !important;
+  color: #6d28d9 !important; // violet-700 — readable on the light purple tint
   transition:
     background 0.3s ease,
-    box-shadow 0.3s ease;
+    box-shadow 0.3s ease,
+    color 0.3s ease;
 }
 
 html.dark .ai-hover-btn,
@@ -329,17 +360,20 @@ body.body--dark .ai-hover-btn {
     rgba(236, 72, 153, 0.5) 100%
   ) !important;
   box-shadow: 0 0.25rem 0.75rem 0 rgba(139, 92, 246, 0.2);
+  color: #ede9fe !important; // violet-100 — readable on the medium purple gradient
 }
 
 .ai-hover-btn:hover {
   background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%) !important;
   box-shadow: 0 0.25rem 0.75rem 0 rgba(139, 92, 246, 0.35);
+  color: white !important; // white on fully opaque gradient
 }
 
 html.dark .ai-hover-btn:hover,
 body.body--dark .ai-hover-btn:hover {
   background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%) !important;
   box-shadow: 0 0.25rem 0.75rem 0 rgba(139, 92, 246, 0.35);
+  color: white !important; // white on fully opaque gradient
 }
 
 
@@ -636,6 +670,37 @@ body.body--dark [data-destructive-icon="true"]:hover {
 
 .ai-hover-btn:hover .ai-icon {
   transform: rotate(180deg);
+}
+
+// Dark mode: calm the left navigation rail. Its inactive icons + labels use
+// `--color-tabs-inactive-text`, which has no dark override and so inherits the
+// near-white heading colour — making the whole rail blaze and steal focus.
+// Scope a mid tone (secondary, between the near-white heading and the dim
+// caption) to the nav container only, so other inactive tabs and the folder
+// rail keep their own brightness. Hover/active still brighten via MenuLink.
+:root.dark .navbar-links,
+.dark .navbar-links {
+  --color-tabs-inactive-text: var(--color-text-secondary);
+}
+
+// Dark mode: org selector + edition badge (both `outline-primary`). Their
+// shared primary-800 fill under primary-400 text was too close in luminance,
+// so the text looked blurry. Scope a higher-contrast pairing (brighter text on
+// a darker fill) to ONLY these two buttons via their data-test ids, so no other
+// ghost/outline-primary button anywhere else is affected.
+:root.dark [data-test="navbar-organizations-select-trigger"],
+:root.dark [data-test="upgrade-to-enterprise-btn"],
+.dark [data-test="navbar-organizations-select-trigger"],
+.dark [data-test="upgrade-to-enterprise-btn"] {
+  --color-button-ghost-primary-active-bg: var(--color-primary-900);
+  --color-button-ghost-primary-text: var(--color-primary-200);
+}
+
+// Force the AI sparkle <img> to white on hover so it stays visible
+// against the fully opaque purple→pink gradient background.
+.ai-hover-btn:hover img {
+  filter: brightness(0) invert(1);
+  transition: filter 0.3s ease;
 }
 
 // ═══════════════════════════════════════════════════════════════

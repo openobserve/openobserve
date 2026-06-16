@@ -422,7 +422,10 @@
     "menuGroupInspect": "検査",
     "validSql": "有効な SQL",
     "invalidSql": "クエリが無効です",
-    "menuGroupExplain": "説明してください"
+    "menuGroupExplain": "説明してください",
+    "fieldValuesEmpty": "値が見つかりません。",
+    "fieldValuesEmptyHint": "より広い時間範囲を試して値を確認してください。",
+    "selectLogsStreamFirst": "最初に [ログストリーム] を選択します"
   },
   "menu": {
     "home": "ホーム",
@@ -845,7 +848,10 @@
     "feature_correlation_management": "相関管理",
     "feature_log_patterns": "ログパターン",
     "environment_type": "環境タイプ",
-    "license_allows_unlimited_ingestion": "現在のライセンスでは、無制限のデータ取り込みが可能です。"
+    "license_allows_unlimited_ingestion": "現在のライセンスでは、無制限のデータ取り込みが可能です。",
+    "refresh_license_limits": "ライセンス制限を更新",
+    "license_refresh_success": "ライセンス制限の更新が正常にトリガーされました",
+    "failed_to_refresh_license": "ライセンス制限を更新できませんでした"
   },
   "login": {
     "userid": "ユーザーID",

@@ -2,6 +2,24 @@
 // Nunito Sans variable font — self-hosted woff2, split by unicode range.
 // Mirrors the @font-face declarations from the Quasar-based main branch.
 
+// Geist variable fonts — served locally from /public/fonts/
+@font-face {
+  font-family: 'Geist';
+  src: url('./fonts/Geist-Variable.woff2') format('woff2-variations');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Geist Mono';
+  src: url('./fonts/GeistMono-Variable.woff2') format('woff2-variations');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+
 /* cyrillic-ext */
 @font-face {
   font-family: 'Nunito Sans';

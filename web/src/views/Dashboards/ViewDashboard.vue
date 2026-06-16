@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           fullscreen: isFullscreen,
           'print-mode-container': store.state.printMode,
         },
-        store.state.printMode === true ? 'tw:px-6 tw:pb-6' : '',
+        store.state.printMode === true ? 'tw:pb-6' : '',
       ]"
       class="tw:h-full"
     >
@@ -213,7 +213,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <RenderDashboardCharts
         :frame="false"
-        :class="store.state.printMode ? '' : 'tw:flex-1 tw:min-h-0'"
+        :class="store.state.printMode ? 'tw:px-6' : 'tw:flex-1 tw:min-h-0'"
         :key="
           currentDashboardData.data?.dashboardId + '-' + dashboardRemountKey
         "
@@ -1758,6 +1758,15 @@ export default defineComponent({
     onUnmounted(() => {
       document.removeEventListener("fullscreenchange", onFullscreenChange);
 
+      // Reset print mode on leave. Print mode hides the global chrome
+      // (left nav sidebar). The close button resets it, but navigating away
+      // via the browser back button skips that, leaving the sidebar hidden on
+      // other pages until a manual refresh. Resetting here guarantees the
+      // chrome is restored whenever the dashboard view is destroyed.
+      if (store.state.printMode === true) {
+        setPrint(false);
+      }
+
       // Clean up AI dashboard event listener
       offDashboardEvent(handleAiDashboardEvent);
 
@@ -1926,12 +1935,16 @@ export default defineComponent({
   background-color: $white;
 }
 
-.stickyHeader {
+// The header wrapper is rendered inside PageLayout (a child component), so these
+// rules must use :deep() to cross the scope boundary. Without it the scoped class
+// names passed via `header-class` never match, position:sticky is never applied,
+// and the header scrolls away in print/fullscreen mode.
+:deep(.stickyHeader) {
   position: sticky;
   top: 0;
   z-index: 1001;
 }
-.stickyHeader.fullscreenHeader {
+:deep(.stickyHeader.fullscreenHeader) {
   top: 0px;
   z-index: 5100 !important;
 }
@@ -1949,8 +1962,15 @@ export default defineComponent({
 }
 
 .print-mode-container {
-  height: 100vh !important;
-  overflow-y: auto !important;
+  // Grow to the dashboard's natural content height and let the app's outer
+  // scroll wrapper (MainLayout's .o2-content-scroll) do the scrolling — the same
+  // model the @media print block below relies on. Pinning a viewport height here
+  // (100vh or 100%) capped the subtree, and PageLayout's body (overflow-hidden)
+  // then clipped the trailing panels, so tall dashboards could never be scrolled
+  // to the bottom. `overflow: visible` keeps the sticky header pinned to the
+  // outer scroll wrapper rather than to a dead inner scroll box.
+  height: auto !important;
+  overflow: visible !important;
 }
 
 @media print {
