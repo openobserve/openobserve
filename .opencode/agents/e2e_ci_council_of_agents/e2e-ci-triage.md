@@ -81,6 +81,10 @@ Set `skip: true` with a clear `skip_reason` if **any** of these hold:
 > tests may be partial, improvable, or may not cover the new behavior. Instead set
 > `existing_tests_in_diff: true` (route = *enhance*) and **continue**; the Architect reads those
 > tests and decides whether to extend, append to, or complement them.
+>
+> **Priority when both apply:** an **explicit** opt-out (condition 2 — `tests-added` label or a
+> "skip" comment) always wins → skip, even if the diff also adds tests. The "don't auto-skip" rule
+> only overrides the *automatic* detection of test files, never an explicit human opt-out.
 > ```bash
 > grep -E '^\+\+\+ b/tests/ui-testing/playwright-tests/' docs/test_generator/ci/diff.patch
 > ```
