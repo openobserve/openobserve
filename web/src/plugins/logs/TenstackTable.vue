@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :style="
               !defaultColumns && headerIndex === headerGroup.headers.length - 1
                 ? { flex: '1 1 auto', minWidth: `calc(var(--header-${header?.id}-size) * 1px)`, width: 'auto', overflow: 'hidden' }
-                : { width: `calc(var(--header-${header?.id}-size) * 1px)` }
+                : { width: `calc(var(--header-${header?.id}-size) * 1px)`, minWidth: `calc(var(--header-${header?.id}-size) * 1px)`, flexShrink: '0' }
             "
             :data-test="`log-search-result-table-th-${header.id}`"
           >
@@ -374,6 +374,12 @@ class="tw:mr-1" />
                             : wrap
                               ? width - 260 - 12 + 'px'
                               : 'auto',
+                        minWidth:
+                          cell.column.columnDef.id !== 'source' ||
+                          cell.column.columnDef.enableResizing
+                            ? `calc(var(--col-${cell.column.columnDef.id}-size) * 1px)`
+                            : undefined,
+                        flexShrink: '0',
                         height: wrap ? '100%' : '20px',
                       }
                 "
@@ -431,16 +437,14 @@ class="tw:mr-1" />
                 <span v-else>
                   {{ cell.renderValue() }}
                 </span>
-                <O2AIContextAddBtn
-                  v-if="
-                    cell.column.columnDef.id ===
-                    store.state.zoConfig.timestamp_column
-                  "
-                  class="tw:absolute tw:right-0 tw:top-1/2 tw:transform tw:invisible tw:-translate-y-1/2 tw:-translate-x-1/2 ai-btn"
-                  @send-to-ai-chat="
-                    sendToAiChat(JSON.stringify(cell.row.original), true)
-                  "
-                />
+                <div
+                  v-if="cell.column.columnDef.id === store.state.zoConfig.timestamp_column"
+                  class="tw:absolute tw:right-0 tw:top-1/2 tw:-translate-y-1/2 tw:invisible ai-btn"
+                >
+                  <O2AIContextAddBtn
+                    @send-to-ai-chat="sendToAiChat(JSON.stringify(cell.row.original), true)"
+                  />
+                </div>
               </td>
             </template>
           </tr>

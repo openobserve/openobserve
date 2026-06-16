@@ -333,7 +333,10 @@ export default defineComponent({
     // of whether the config response arrived before or after this component
     // mounted.
     const isOnlineEvalsEnabled = computed(() => {
-      return Boolean(store.state.zoConfig?.online_evals_enabled);
+      return (
+        (config.isEnterprise == "true" || config.isCloud == "true") &&
+        Boolean(store.state.zoConfig?.online_evals_enabled)
+      );
     });
 
     const orgOptions = ref([{ label: Number, value: String }]);
