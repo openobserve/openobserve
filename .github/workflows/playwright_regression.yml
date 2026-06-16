@@ -128,61 +128,62 @@ jobs:
           - testfolder: "Logs-Regression"
             run_files:
               [
-                "logs-regression.spec.js",
-                "logs-regression-bugs.spec.js",
-                "logs-regression-bugs-2.spec.js",
-                "logs-9754.spec.js",
-                "logs-regression-9044-7354.spec.js",
+                "Logs/logs-regression.spec.js",
+                "Logs/logs-bugs.spec.js",
+                "Logs/logs-9754.spec.js",
+                "Logs/logs-9044-7354.spec.js",
+                "Logs/logs-ent.spec.js",
               ]
           - testfolder: "Alerts-Regression"
             run_files:
               [
-                "alerts-regression.spec.js",
-                "alerts-stream-switching-regression.spec.js",
-                "alerts-regression-bugs.spec.js",
+                "Alerts/alerts-regression.spec.js",
+                "Alerts/alerts-stream-switching.spec.js",
+                "Alerts/alerts-bugs.spec.js",
               ]
           - testfolder: "Dashboard-Regression"
             run_files:
               [
-                "dashboard-regression.spec.js",
+                "Dashboards/dashboard-regression.spec.js",
               ]
           - testfolder: "Streams-Regression"
             run_files:
               [
-                "streams-regression.spec.js",
+                "Streams/streams-regression.spec.js",
               ]
           - testfolder: "Pipelines-Regression"
             run_files:
               [
-                "enrichment-regression.spec.js",
-                "pipeline-regression.spec.js",
+                "Pipelines/enrichment-regression.spec.js",
+                "Pipelines/pipeline-regression.spec.js",
               ]
           - testfolder: "Traces-Regression"
             run_files:
               [
-                "traces-regression.spec.js",
-                "traces-regression-bugs.spec.js",
+                "Traces/traces-regression.spec.js",
+                "Traces/traces-bugs.spec.js",
+                "Traces/traces-ent.spec.js",
               ]
           - testfolder: "Metrics-Regression"
             run_files:
               [
-                "metrics-regression.spec.js",
+                "Metrics/metrics-regression.spec.js",
               ]
           - testfolder: "GeneralTests-Regression"
             run_files:
               [
-                "ui-regression.spec.js",
-                "landing-regression.spec.js",
+                "General/ui-regression.spec.js",
+                "General/landing-regression.spec.js",
               ]
           - testfolder: "DataSources-Regression"
             run_files:
               [
-                "datasources-regression.spec.js",
+                "DataSources/datasources-regression.spec.js",
               ]
           - testfolder: "Reports-Regression"
             run_files:
               [
-                "reports-regression-bugs.spec.js",
+                "Reports/reports-regression-bugs.spec.js",
               ]
 
     steps:
