@@ -98,16 +98,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OEmptyState size="hero" preset="no-llm-sessions" @action="onEmptyAction" />
         </div>
       </template>
-        <!-- Timestamp -->
         <template #cell-firstSeenNanos="{ row }">
-          <span class="tw:font-mono tw:text-[0.75rem]">
+          <span class="tw:text-[0.75rem] tw:tabular-nums">
             {{ formatTimestamp(row.firstSeenNanos) }}
           </span>
         </template>
 
         <!-- Session ID -->
         <template #cell-sessionId="{ row }">
-          <span class="tw:font-mono tw:text-[0.75rem]">
+          <span class="tw:text-[0.75rem]">
             {{ shortId(row.sessionId) }}
             <OTooltip :content="row.sessionId" />
           </span>

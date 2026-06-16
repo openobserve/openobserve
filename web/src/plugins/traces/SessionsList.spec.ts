@@ -62,18 +62,32 @@ vi.mock("vue-i18n", () => ({
   })),
 }));
 
-// The component now renders sessions through the design-system OTable
-// (props: `data`/`columns`/`loading`, emits `row-click`, cell slots receive
-// `{ row }`). The mock mirrors just that contract.
+// The component now renders sessions through the design-system OTable in
+// server-pagination mode (props add `currentPage`/`totalCount`/`pageSize`,
+// emits `pagination-change`). It also drives the toolbar (stream filter) and
+// empty/error body through OTable's `#toolbar` / `#empty` slots. The mock
+// mirrors that contract: rows when data is present, the `#empty` slot when
+// it's not, and always the `#toolbar` slot.
 vi.mock("@/lib/core/Table/OTable.vue", () => ({
   default: {
     name: "OTable",
-    props: ["data", "columns", "loading", "rowKey"],
-    emits: ["row-click"],
+    props: [
+      "data",
+      "columns",
+      "loading",
+      "rowKey",
+      "currentPage",
+      "totalCount",
+      "pageSize",
+      "pageSizeOptions",
+      "pagination",
+    ],
+    emits: ["row-click", "pagination-change"],
     template: `
       <div class="otable-mock">
+        <div class="otable-toolbar"><slot name="toolbar" /></div>
         <div v-if="loading" data-test="sessions-list-loading" class="otable-loading" />
-        <template v-else>
+        <template v-else-if="data && data.length">
           <div
             v-for="row in data"
             :key="row.sessionId"
@@ -90,6 +104,7 @@ vi.mock("@/lib/core/Table/OTable.vue", () => ({
             <slot name="cell-status" :row="row">{{ row.status }}</slot>
           </div>
         </template>
+        <div v-else class="otable-empty"><slot name="empty" /></div>
       </div>
     `,
   },
@@ -183,9 +198,12 @@ describe("SessionsList — no LLM streams", () => {
     mockGetStreams.mockResolvedValue({ list: [] });
     const wrapper = await mountComponent();
 
-    // "No LLM streams" and "no sessions in the window" now collapse into the
-    // single consolidated OEmptyState branch.
-    expect(wrapper.find("[data-test='sessions-empty']").exists()).toBe(true);
+    // No streams at all → the dedicated empty state renders on its own (the
+    // table — and its toolbar/selector — is not shown when there's nothing
+    // to select).
+    expect(
+      wrapper.find("[data-test='sessions-empty-no-streams']").exists(),
+    ).toBe(true);
   });
 });
 
@@ -256,17 +274,23 @@ describe("SessionsList — sessions table", () => {
     expect(rows).toHaveLength(2);
   });
 
-  it("count pill shows sessions count text when sessions present", async () => {
+  it("drives OTable server pagination from the total count", async () => {
     mockHasLoadedOnce.value = true;
     mockLoading.value = false;
     mockSessions.value = [makeSession()];
     mockTotal.value = 42;
 
     const wrapper = await mountComponent();
-    const pill = wrapper.find("[data-test='sessions-list-count-pill']");
-    expect(pill.exists()).toBe(true);
-    // The t() mock returns key+params — just verify the count pill is rendered
-    expect(pill.text()).toContain("traces.sessionsList.countPill");
+    // The count pill + custom paginator were replaced by OTable's built-in
+    // server-pagination footer: assert the table is wired with the totals
+    // rather than re-implementing pagination in this component.
+    const table = wrapper.findComponent({ name: "OTable" });
+    expect(table.exists()).toBe(true);
+    expect(table.props("pagination")).toBe("server");
+    expect(table.props("totalCount")).toBe(42);
+    expect(wrapper.find("[data-test='sessions-list-count-pill']").exists()).toBe(
+      false,
+    );
   });
 
   it("status badge shows 'ok' status for ok sessions", async () => {
