@@ -1,5 +1,6 @@
 <template>
-  <div class="tw:p-3">
+  <!-- Page gutter is owned by the Settings shell's ConstrainedPage. -->
+  <div>
     <LicensePeriod @updateLicense="showUpdateFormAndFocus"></LicensePeriod>
 
     <div v-if="loading" class="tw:p-3 tw:flex tw:flex-col tw:items-center tw:justify-center">

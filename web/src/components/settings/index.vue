@@ -41,7 +41,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span :data-test="`settings-${activeSectionItem?.key}-page-title`">{{ activeSectionItem?.label || '' }}</span>
         </template>
       </AppPageHeader>
-      <ConstrainedPage size="lg" class="tw:flex-1 tw:min-h-0">
+      <ConstrainedPage
+        size="lg"
+        align="left"
+        :padded="false"
+        class="tw:flex-1 tw:min-h-0 tw:px-4 tw:py-3"
+      >
         <router-view title="" />
       </ConstrainedPage>
     </div>
