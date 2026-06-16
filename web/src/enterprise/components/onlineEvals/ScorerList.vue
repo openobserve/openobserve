@@ -93,9 +93,9 @@
         </template>
 
         <template #cell-type="{ row }">
-          <span class="sr-type-chip" :class="`sr-type-chip--${scorerTypeOf(row)}`">
+          <OBadge :variant="scorerTypeBadgeVariant(scorerTypeOf(row))" size="sm">
             {{ scorerTypeLabel(scorerTypeOf(row)) }}
-          </span>
+          </OBadge>
         </template>
 
         <template #cell-produces="{ row }">
@@ -165,6 +165,7 @@ import type {
 } from "@/services/online-evals.service";
 import { entityId, scorerTypeOf, valueOf } from "./utils/evalEntity";
 import EvalListShell from "./EvalListShell.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import { useNumberedRows } from "./composables/useNumberedRows";
 
 const props = defineProps<{
@@ -323,6 +324,15 @@ function scorerTypeLabel(type: ScorerType) {
   return t("onlineEvals.scorer.badgeLlm");
 }
 
+// Map a scorer type to a neutral design-system OBadge soft variant
+// (llm_judge → blue, remote → teal, code → purple). Types are just labels,
+// so use neutral palette colors rather than semantic success/warning variants.
+function scorerTypeBadgeVariant(type: ScorerType | string) {
+  if (type === "remote") return "teal-soft" as const;
+  if (type === "code") return "purple-soft" as const;
+  return "blue-soft" as const; // llm_judge
+}
+
 function producesLabel(row: Scorer) {
   const id = String(
     valueOf(row, "producesScoreConfigId", "produces_score_config_id") || "",
@@ -349,28 +359,6 @@ function usedByText(row: Scorer) {
 </script>
 
 <style lang="scss">
-.sr-type-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 1px 7px;
-  border-radius: 3px;
-  font: 600 11px/1.5 inherit;
-}
-
-.sr-type-chip--llm_judge {
-  background: color-mix(in srgb, var(--o2-status-info-text) 14%, transparent);
-  color: var(--o2-status-info-text);
-}
-.sr-type-chip--remote {
-  background: color-mix(in srgb, var(--o2-status-success-text) 14%, transparent);
-  color: var(--o2-status-success-text);
-}
-.sr-type-chip--code {
-  background: color-mix(in srgb, var(--o2-status-warning-text) 14%, transparent);
-  color: var(--o2-status-warning-text);
-}
-
 .sr-mono-cell {
   font-size: 12px;
 }
