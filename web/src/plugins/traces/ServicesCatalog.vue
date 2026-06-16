@@ -378,8 +378,7 @@ import {
   formatLargeNumber,
   formatTimeWithSuffix,
 } from "@/utils/zincutils";
-import { getConsumableRelativeTime } from "@/utils/date";
-import { cloneDeep } from "lodash-es";
+import { getEffectiveTimeRange } from "@/utils/date";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -699,20 +698,8 @@ function viewTraces(data: string | Record<string, any>) {
 }
 
 function getTimeRange(): { start_time: number; end_time: number } {
-  if (searchObj.data.datetime.type === "relative") {
-    const relTime = getConsumableRelativeTime(
-      searchObj.data.datetime.relativeTimePeriod,
-    );
-    return {
-      start_time: relTime.startTime,
-      end_time: relTime.endTime,
-    };
-  }
-  const dt = cloneDeep(searchObj.data.datetime);
-  return {
-    start_time: dt.startTime,
-    end_time: dt.endTime,
-  };
+  const { startTime, endTime } = getEffectiveTimeRange(searchObj.data.datetime);
+  return { start_time: startTime, end_time: endTime };
 }
 
 // Load trace streams using the same method as the Traces search page

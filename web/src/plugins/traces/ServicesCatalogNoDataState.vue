@@ -36,65 +36,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
 import useTraces from "@/composables/useTraces";
+import useWidenRange from "@/composables/useWidenRange";
 
 const { t } = useI18n();
 const emit = defineEmits<{ "widen-range": [period: string] }>();
 const { searchObj } = useTraces();
-
-function periodToLabel(period: string): string {
-  if (!period) return "";
-  const value = parseInt(period, 10);
-  const unit = period.slice(-1);
-  const units: Record<string, [string, string]> = {
-    s: ["Second", "Seconds"],
-    m: ["Minute", "Minutes"],
-    h: ["Hour", "Hours"],
-    d: ["Day", "Days"],
-    w: ["Week", "Weeks"],
-    M: ["Month", "Months"],
-  };
-  const [sg, pl] = units[unit] ?? ["unit", "units"];
-  return `Past ${value} ${value === 1 ? sg : pl}`;
-}
-
-function nextWiderPeriod(period: string): string {
-  const value = parseInt(period, 10);
-  const unit = period.slice(-1);
-  const toMins: Record<string, number> = {
-    s: 1 / 60,
-    m: 1,
-    h: 60,
-    d: 1440,
-    w: 10080,
-    M: 43200,
-  };
-  const mins = value * (toMins[unit] ?? 1);
-  if (mins <= 60) return "1d";
-  if (mins <= 1440) return "7d";
-  return "30d";
-}
-
-const relPeriod = computed(
-  () => searchObj.data?.datetime?.relativeTimePeriod || "",
+const { suggestedPeriod, expandRangeSublabel } = useWidenRange(
+  () => searchObj.data?.datetime?.type ?? "",
+  () => searchObj.data?.datetime?.relativeTimePeriod ?? "",
+  { absoluteExpandDesc: t("traces.noEvents.expandRangeDescAbsolute") },
 );
-const isRelative = computed(
-  () => searchObj.data?.datetime?.type === "relative" && !!relPeriod.value,
-);
-const suggestedPeriod = computed(() =>
-  isRelative.value ? nextWiderPeriod(relPeriod.value) : "7d",
-);
-
-const expandRangeSublabel = computed(() => {
-  if (!isRelative.value) return t("traces.noEvents.expandRangeDescAbsolute");
-  const current = periodToLabel(relPeriod.value);
-  const next = periodToLabel(suggestedPeriod.value);
-  return `${current} → ${next}`;
-});
 
 const onWidenRange = () => emit("widen-range", suggestedPeriod.value);
 </script>

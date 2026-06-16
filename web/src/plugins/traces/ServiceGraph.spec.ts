@@ -130,19 +130,21 @@ vi.mock("@/services/search", () => ({
   },
 }));
 
-// Mock @/utils/date so getConsumableRelativeTime returns deterministic values.
+// Mock @/utils/date so getEffectiveTimeRange returns deterministic values.
 // Must be declared before the component import so Vitest hoisting applies.
 const mockStartTime = 1000000;
 const mockEndTime = 2000000;
 
-const mockGetConsumableRelativeTime = vi.fn(() => ({
-  startTime: mockStartTime,
-  endTime: mockEndTime,
-}));
+// Smart default: absolute type passes through actual dt values; relative returns mocked constants.
+const mockGetEffectiveTimeRange = vi.fn((dt: any) => {
+  if (dt?.type !== "relative") {
+    return { startTime: dt?.startTime ?? mockStartTime, endTime: dt?.endTime ?? mockEndTime };
+  }
+  return { startTime: mockStartTime, endTime: mockEndTime };
+});
 
 vi.mock("@/utils/date", () => ({
-  getConsumableRelativeTime: (...args: any[]) =>
-    mockGetConsumableRelativeTime(...args),
+  getEffectiveTimeRange: (...args: any[]) => mockGetEffectiveTimeRange(...args),
 }));
 
 import serviceGraphService from "@/services/service_graph";
@@ -252,12 +254,13 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
     vi.mocked(serviceGraphService.getCurrentTopology).mockResolvedValue(
       mockApiResponse,
     );
-    // Provide a default implementation for getConsumableRelativeTime so
-    // the relative-time path in loadServiceGraph resolves during existing tests.
-    mockGetConsumableRelativeTime.mockImplementation(() => ({
-      startTime: mockStartTime,
-      endTime: mockEndTime,
-    }));
+    // Reset to smart-default implementation for each test.
+    mockGetEffectiveTimeRange.mockImplementation((dt: any) => {
+      if (dt?.type !== "relative") {
+        return { startTime: dt?.startTime ?? mockStartTime, endTime: dt?.endTime ?? mockEndTime };
+      }
+      return { startTime: mockStartTime, endTime: mockEndTime };
+    });
   });
 
   afterEach(() => {
@@ -691,8 +694,7 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       const newStartTime = Date.now() - 7200000;
       const newEndTime = Date.now();
 
-      // Use type "absolute" so loadServiceGraph reads dt.startTime/dt.endTime
-      // directly (the relative branch calls getConsumableRelativeTime instead).
+      // Use type "absolute" so getEffectiveTimeRange passes through dt.startTime/dt.endTime.
       wrapper.vm.searchObj.data.datetime.type = "absolute";
       wrapper.vm.searchObj.data.datetime.startTime = newStartTime;
       wrapper.vm.searchObj.data.datetime.endTime = newEndTime;
@@ -1858,7 +1860,7 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       localWrapper.unmount();
     });
 
-    it("should use fresh timestamps from getConsumableRelativeTime for relative ranges", async () => {
+    it("should use fresh timestamps from getEffectiveTimeRange for relative ranges", async () => {
       wrapper = createWrapper();
       await flushPromises();
 
@@ -1866,7 +1868,7 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
 
       const freshStart = 9999;
       const freshEnd = 9999 + 900;
-      mockGetConsumableRelativeTime.mockReturnValue({
+      mockGetEffectiveTimeRange.mockReturnValueOnce({
         startTime: freshStart,
         endTime: freshEnd,
       });
@@ -1877,7 +1879,9 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       await wrapper.vm.loadServiceGraph();
       await flushPromises();
 
-      expect(mockGetConsumableRelativeTime).toHaveBeenCalledWith("15m");
+      expect(mockGetEffectiveTimeRange).toHaveBeenCalledWith(
+        expect.objectContaining({ type: "relative", relativeTimePeriod: "15m" }),
+      );
       expect(serviceGraphService.getCurrentTopology).toHaveBeenCalledWith(
         "test-org",
         expect.objectContaining({
@@ -1887,12 +1891,11 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       );
     });
 
-    it("should fall back to dt.startTime/endTime for absolute ranges", async () => {
+    it("should pass absolute dt.startTime/endTime through getEffectiveTimeRange", async () => {
       wrapper = createWrapper();
       await flushPromises();
 
       vi.mocked(serviceGraphService.getCurrentTopology).mockClear();
-      mockGetConsumableRelativeTime.mockClear();
 
       wrapper.vm.searchObj.data.datetime.type = "absolute";
       wrapper.vm.searchObj.data.datetime.startTime = 1111;
@@ -1901,7 +1904,9 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       await wrapper.vm.loadServiceGraph();
       await flushPromises();
 
-      expect(mockGetConsumableRelativeTime).not.toHaveBeenCalled();
+      expect(mockGetEffectiveTimeRange).toHaveBeenCalledWith(
+        expect.objectContaining({ type: "absolute", startTime: 1111, endTime: 2222 }),
+      );
       expect(serviceGraphService.getCurrentTopology).toHaveBeenCalledWith(
         "test-org",
         expect.objectContaining({
@@ -1913,11 +1918,11 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
   });
 
   describe("Live Time Range Computation", () => {
-    it("should use getConsumableRelativeTime when datetime type is relative", async () => {
+    it("should use getEffectiveTimeRange when datetime type is relative", async () => {
       wrapper = createWrapper();
       await flushPromises();
       vi.mocked(serviceGraphService.getCurrentTopology).mockClear();
-      mockGetConsumableRelativeTime.mockReturnValueOnce({
+      mockGetEffectiveTimeRange.mockReturnValueOnce({
         startTime: 111111,
         endTime: 222222,
       });
@@ -1926,21 +1931,27 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       mockSearchObj.data.datetime.type = "relative";
       await flushPromises();
 
-      expect(mockGetConsumableRelativeTime).toHaveBeenCalledWith("7d");
+      expect(mockGetEffectiveTimeRange).toHaveBeenCalledWith(
+        expect.objectContaining({ relativeTimePeriod: "7d" }),
+      );
       expect(serviceGraphService.getCurrentTopology).toHaveBeenCalledWith(
         "test-org",
         expect.objectContaining({ startTime: 111111, endTime: 222222 }),
       );
     });
 
-    it("should fall back to dt.startTime/endTime when getConsumableRelativeTime returns null", async () => {
+    it("should use whatever getEffectiveTimeRange returns (fallback logic is inside utility)", async () => {
       wrapper = createWrapper();
       await flushPromises();
       vi.mocked(serviceGraphService.getCurrentTopology).mockClear();
-      mockGetConsumableRelativeTime.mockReturnValueOnce(null as any);
 
-      const fallbackStart = mockSearchObj.data.datetime.startTime;
-      const fallbackEnd = mockSearchObj.data.datetime.endTime;
+      const fallbackStart = 555;
+      const fallbackEnd = 666;
+      mockGetEffectiveTimeRange.mockReturnValueOnce({
+        startTime: fallbackStart,
+        endTime: fallbackEnd,
+      });
+
       mockSearchObj.data.datetime.relativeTimePeriod = "1h";
       await flushPromises();
 
@@ -1953,20 +1964,18 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       );
     });
 
-    it("should use dt.startTime/endTime directly when type is absolute", async () => {
+    it("should pass absolute dt values through getEffectiveTimeRange", async () => {
       wrapper = createWrapper();
       await flushPromises();
       vi.mocked(serviceGraphService.getCurrentTopology).mockClear();
-      mockGetConsumableRelativeTime.mockClear();
 
-      const absStart = Date.now() - 86400000;
-      const absEnd = Date.now();
+      const absStart = 86400000;
+      const absEnd = 86400000 + 3600000;
       mockSearchObj.data.datetime.type = "absolute";
       mockSearchObj.data.datetime.startTime = absStart;
       mockSearchObj.data.datetime.endTime = absEnd;
       await flushPromises();
 
-      expect(mockGetConsumableRelativeTime).not.toHaveBeenCalled();
       expect(serviceGraphService.getCurrentTopology).toHaveBeenCalledWith(
         "test-org",
         expect.objectContaining({ startTime: absStart, endTime: absEnd }),

@@ -17,6 +17,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { reactive, defineComponent, h } from "vue";
 import i18n from "@/locales";
+import store from "@/test/unit/helpers/store";
 
 // ---------------------------------------------------------------------------
 // Reactive mock — mutated directly in tests; vi.mock factory closes over it.
@@ -29,6 +30,15 @@ const mockSearchObj = reactive({
       endTime: Date.now(),
       relativeTimePeriod: "15m",
       type: "relative" as "relative" | "absolute",
+    },
+    stream: {
+      selectedStream: [] as { label: string; value: string }[],
+    },
+    streamResults: {
+      list: [] as {
+        name: string;
+        stats?: { doc_time_min: number; doc_time_max: number };
+      }[],
     },
   },
 });
@@ -84,12 +94,26 @@ const EmptyStateActionCardStub = defineComponent({
 });
 
 // ---------------------------------------------------------------------------
-// Mount factory
+// Mount factories
 // ---------------------------------------------------------------------------
 function mountComponent() {
   return mount(TracesNoEventsState, {
     global: {
       plugins: [i18n],
+      stubs: {
+        OEmptyState: OEmptyStateStub,
+        EmptyStateActionCard: EmptyStateActionCardStub,
+      },
+    },
+  });
+}
+
+/** Used by jump-to-stream-data tests: the store is required because
+ *  jumpTargetSublabel reads store.state.timezone via useStore(). */
+function mountComponentWithStore() {
+  return mount(TracesNoEventsState, {
+    global: {
+      plugins: [i18n, store],
       stubs: {
         OEmptyState: OEmptyStateStub,
         EmptyStateActionCard: EmptyStateActionCardStub,
@@ -119,6 +143,8 @@ describe("TracesNoEventsState", () => {
 
   beforeEach(() => {
     mockSearchObj.data.editorValue = "";
+    mockSearchObj.data.stream.selectedStream = [];
+    mockSearchObj.data.streamResults.list = [];
     setRelative("15m");
     wrapper = mountComponent();
   });

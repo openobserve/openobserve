@@ -287,7 +287,7 @@ import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import ServiceGraphNoDataState from "./ServiceGraphNoDataState.vue";
-import { getConsumableRelativeTime } from "@/utils/date";
+import { getEffectiveTimeRange } from "@/utils/date";
 
 export default defineComponent({
   name: "ServiceGraph",
@@ -1118,17 +1118,9 @@ export default defineComponent({
           throw new Error("No organization selected");
         }
 
-        const dt = searchObj.data.datetime;
-        let startTime: number;
-        let endTime: number;
-        if (dt.type === "relative" && dt.relativeTimePeriod) {
-          const relTime = getConsumableRelativeTime(dt.relativeTimePeriod);
-          startTime = relTime?.startTime ?? dt.startTime;
-          endTime = relTime?.endTime ?? dt.endTime;
-        } else {
-          startTime = dt.startTime;
-          endTime = dt.endTime;
-        }
+        const { startTime, endTime } = getEffectiveTimeRange(
+          searchObj.data.datetime,
+        );
 
         const response = await serviceGraphService.getCurrentTopology(orgId, {
           streamName:
