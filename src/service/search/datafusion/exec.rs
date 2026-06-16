@@ -107,6 +107,17 @@ pub fn create_session_config(
         .execution
         .skip_physical_aggregate_schema_check = true;
 
+    // DataFusion 54 executes uncorrelated scalar subqueries physically via
+    // `ScalarSubqueryExec`/`ScalarSubqueryExpr` instead of rewriting them into joins.
+    // `ScalarSubqueryExpr` can only be (de)serialized inside its surrounding
+    // `ScalarSubqueryExec`, which breaks our distributed plan splitting across the Flight
+    // boundary. Disable the physical path so `ScalarSubqueryToJoin` decorrelates them into
+    // joins again, keeping the serialized follower plans valid.
+    config
+        .options_mut()
+        .optimizer
+        .enable_physical_uncorrelated_scalar_subquery = false;
+
     Ok(config)
 }
 
