@@ -84,8 +84,8 @@ test.describe("Reports form validation — required field errors", () => {
         // Click save — saveReport() calls validateReportData() which sets folderError
         await pm.reportsFormValidation.clickSave();
 
-        // Folder error must be visible
-        await expect(pm.reportsFormValidation.getDashboardFolderErrorLocator()).toBeVisible();
+        // Folder error must be visible (wait up to 5s for Vue async re-render)
+        await pm.reportsFormValidation.getDashboardFolderErrorLocator().waitFor({ state: 'visible', timeout: 5000 });
         await expect(pm.reportsFormValidation.getDashboardFolderErrorLocator()).toContainText('This field is required');
 
         // Form must stay on the create page
@@ -174,7 +174,7 @@ test.describe("Reports form validation — valid config creates report", () => {
         // Step 1: Fill report name
         await pm.reportsFormValidation.fillReportName(reportName);
 
-        // Step 1: Select dashboard folder, dashboard, and tab (all required)
+        // Step 1: Select dashboard folder (default), dashboard, and tab
         await pm.reportsFormValidation.selectFirstDashboardFolder();
         await pm.reportsFormValidation.selectFirstDashboard();
         await pm.reportsFormValidation.selectFirstDashboardTab();
@@ -192,7 +192,7 @@ test.describe("Reports form validation — valid config creates report", () => {
         // Step 3: Fill share title and a valid recipient email
         await pm.reportsFormValidation.fillShareTitle('E2E Form Validation Report');
         await pm.reportsFormValidation.fillShareRecipients(
-            process.env['ZO_USER_EMAIL'] || 'test@example.com'
+            process.env['ZO_ROOT_USER_EMAIL'] || process.env['ZO_USER_EMAIL'] || 'test@example.com'
         );
 
         // Save the report

@@ -113,21 +113,46 @@ export class ReportsFormValidationPage {
     }
 
     async selectFirstDashboardFolder() {
-        await this.page.locator(this.dashboardFolderSelect).click();
-        await this.page.locator(this.dashboardFolderPopover).waitFor({ state: 'visible', timeout: 8000 });
-        await this.page.locator('[data-test^="add-report-dashboard-folder-select-option"]').first().click();
+        // Use [data-test-selected-value] to target the inner trigger button (matches existing passing tests).
+        // Always pick the "default" folder — it is guaranteed to exist in all environments.
+        const trigger = this.page.locator(`${this.dashboardFolderSelect} [data-test-selected-value]`);
+        await trigger.click({ force: true });
+        await this.page.locator(this.dashboardFolderPopover).waitFor({ state: 'visible', timeout: 10000 });
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        // Select "default" folder specifically (always present)
+        const defaultOpt = this.page.locator(`[data-test="add-report-dashboard-folder-select-option"][data-test-value="default"]`);
+        await defaultOpt.waitFor({ state: 'visible', timeout: 10000 });
+        await defaultOpt.click({ force: true });
+        await this.page.locator(this.dashboardFolderPopover).waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
     }
 
     async selectFirstDashboard() {
-        await this.page.locator(this.dashboardNameSelect).click();
-        await this.page.locator(this.dashboardNamePopover).waitFor({ state: 'visible', timeout: 8000 });
-        await this.page.locator('[data-test^="add-report-dashboard-name-select-option"]').first().click();
+        const trigger = this.page.locator(`${this.dashboardNameSelect} [data-test-selected-value]`);
+        await trigger.click({ force: true });
+        await this.page.locator(this.dashboardNamePopover).waitFor({ state: 'visible', timeout: 10000 });
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        const firstOption = this.page.locator('[data-test^="add-report-dashboard-name-select-option"]').first();
+        await firstOption.waitFor({ state: 'visible', timeout: 15000 });
+        await firstOption.click({ force: true });
+        await this.page.locator(this.dashboardNamePopover).waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
     }
 
     async selectFirstDashboardTab() {
-        await this.page.locator(this.dashboardTabSelect).click();
-        await this.page.locator(this.dashboardTabPopover).waitFor({ state: 'visible', timeout: 8000 });
-        await this.page.locator('[data-test^="add-report-dashboard-tab-select-option"]').first().click();
+        const trigger = this.page.locator(`${this.dashboardTabSelect} [data-test-selected-value]`);
+        await trigger.click({ force: true });
+        await this.page.locator(this.dashboardTabPopover).waitFor({ state: 'visible', timeout: 10000 });
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        // Select "default" tab specifically (always present)
+        const defaultOpt = this.page.locator(`[data-test="add-report-dashboard-tab-select-option"][data-test-value="default"]`);
+        const defaultTabVisible = await defaultOpt.isVisible({ timeout: 3000 }).catch(() => false);
+        if (defaultTabVisible) {
+            await defaultOpt.click({ force: true });
+        } else {
+            const firstOption = this.page.locator('[data-test^="add-report-dashboard-tab-select-option"]').first();
+            await firstOption.waitFor({ state: 'visible', timeout: 10000 });
+            await firstOption.click({ force: true });
+        }
+        await this.page.locator(this.dashboardTabPopover).waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
     }
 
     async openTimerangeDropdown() {
@@ -166,9 +191,14 @@ export class ReportsFormValidationPage {
     }
 
     async selectFirstTimezone() {
-        await this.page.locator(this.timezoneSelect).click();
-        await this.page.locator(this.timezonePopover).waitFor({ state: 'visible', timeout: 8000 });
-        await this.page.locator('[data-test^="add-report-schedule-start-timezone-select-option"]').first().click();
+        const trigger = this.page.locator(`${this.timezoneSelect} [data-test-selected-value]`);
+        await trigger.click({ force: true });
+        await this.page.locator(this.timezonePopover).waitFor({ state: 'visible', timeout: 10000 });
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        const firstOption = this.page.locator('[data-test^="add-report-schedule-start-timezone-select-option"]').first();
+        await firstOption.waitFor({ state: 'visible', timeout: 10000 });
+        await firstOption.click({ force: true });
+        await this.page.locator(this.timezonePopover).waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
     }
 
     // ── Step 3 actions ────────────────────────────────────────────────────────

@@ -21,6 +21,17 @@ test.describe('Functions Form Validation', { tag: ['@functions-form-validation',
   test.describe('AddFunction form validation', () => {
     test.describe.configure({ mode: 'serial' });
 
+    test.beforeAll(async ({ request }) => {
+      // Delete the test function if it exists from a previous run so the happy-path test can create it fresh.
+      const org   = process.env.ORGNAME || 'default';
+      const base  = (process.env.INGESTION_URL || process.env.ZO_BASE_URL || 'http://localhost:5080').replace(/\/+$/, '');
+      const creds = Buffer.from(`${process.env.ZO_ROOT_USER_EMAIL}:${process.env.ZO_ROOT_USER_PASSWORD}`).toString('base64');
+      await request.delete(
+        `${base}/api/${org}/functions/test_fv_vrl_001`,
+        { headers: { Authorization: `Basic ${creds}` } }
+      ).catch(() => {}); // ignore 404 if function doesn't exist
+    });
+
     test('should show error when function name is empty on save', async ({ page }) => {
       testLogger.info('Test: empty function name → error on save');
       const fv = pm.functionsFormValidation;

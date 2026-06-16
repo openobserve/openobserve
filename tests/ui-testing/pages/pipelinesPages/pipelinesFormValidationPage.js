@@ -429,7 +429,9 @@ export class PipelinesFormValidationPage {
         testLogger.info('Navigating to Add Destination page');
         const orgId = process.env['ORGNAME'] || 'default';
         const baseUrl = process.env['ZO_BASE_URL'] || 'http://localhost:5080';
-        await this.page.goto(`${baseUrl}/web/?org_identifier=${orgId}#/pipeline/destination/add`);
+        // PipelinesDestinationList lives at /web/settings/pipeline_destinations.
+        // Passing ?action=add triggers editDestination(null) in onMounted → shows CreateDestinationForm.
+        await this.page.goto(`${baseUrl}/web/settings/pipeline_destinations?action=add&org_identifier=${orgId}`);
         await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
     }
 
