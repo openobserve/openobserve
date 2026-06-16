@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     aria-label="Main navigation"
     data-test="navbar-main-nav"
     data-o2-navbar
-    class="left-drawer navbar-links o2-navbar-scroll tw:flex tw:flex-col tw:bg-[var(--color-surface-chrome-deeper)] tw:shrink-0 tw:min-h-0 tw:overflow-y-auto tw:w-[10rem] tw:py-2"
+    class="left-drawer navbar-links tw:flex tw:flex-col tw:bg-[var(--color-surface-chrome-deeper)] tw:shrink-0 tw:min-h-0 tw:overflow-hidden tw:w-[10rem] tw:py-2"
     @keydown="handleKeydown"
   >
     <!-- TOP: Logo + org switcher -->
@@ -35,52 +35,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="navbar-logo"
         @click="emit('go-to-home')"
       />
-      <button
-        v-if="orgName"
-        class="tw:flex tw:items-center tw:gap-1.5 tw:text-[10.5px] tw:text-text-secondary tw:hover:text-text-primary tw:transition-colors tw:truncate tw:max-w-full tw:text-left tw:cursor-pointer tw:bg-transparent tw:border-none tw:p-0"
+      <organization-selector
+        v-if="organizations && organizations.length > 0"
+        :organizations="organizations"
+        :current="currentOrg ?? null"
         data-test="navbar-org-switcher"
-        @click="orgMenuOpen = !orgMenuOpen"
-      >
-        <span class="tw:truncate tw:flex-1">{{ orgName }}</span>
-        <OIcon name="expand-more" size="xs" class="tw:shrink-0" />
-      </button>
-      <!-- org dropdown -->
-      <div
-        v-if="orgMenuOpen && orgOptions && orgOptions.length > 0"
-        class="tw:absolute tw:left-[10.5rem] tw:top-10 tw:bg-surface-base tw:border tw:border-border-default tw:rounded-lg tw:shadow-lg tw:z-50 tw:min-w-[160px] tw:max-h-64 tw:overflow-y-auto tw:py-1"
-        data-test="navbar-org-menu"
-      >
-        <button
-          v-for="org in orgOptions"
-          :key="org.identifier"
-          class="tw:w-full tw:text-left tw:px-3 tw:py-2 tw:text-[11px] tw:hover:bg-surface-hover tw:transition-colors tw:truncate tw:cursor-pointer tw:bg-transparent tw:border-none"
-          @click="selectOrg(org.identifier)"
-        >
-          {{ org.label }}
-        </button>
-      </div>
+        @select="(org) => emit('update:org', org.identifier)"
+      />
     </div>
 
-    <!-- MIDDLE: Grouped nav links -->
+    <!-- MIDDLE: Flat nav links -->
     <div class="tw:flex tw:flex-col tw:flex-1">
-      <template v-for="group in orderedGroups" :key="group">
-        <template v-if="itemsByGroup[group] && itemsByGroup[group]!.length > 0">
-          <div
-            class="tw:text-[9px] tw:font-semibold tw:uppercase tw:tracking-[0.08em] tw:text-text-tertiary tw:px-3 tw:pt-3 tw:pb-1"
-            :data-test="`navbar-group-${group}`"
-          >
-            {{ groupLabels[group] }}
-          </div>
-          <menu-link
-            v-for="(nav, index) in itemsByGroup[group]"
-            :key="nav.title"
-            :link-name="nav.name"
-            :animation-index="index"
-            v-bind="{ ...nav, mini: miniMode }"
-            @mouseenter="emit('menu-hover', nav.link)"
-          />
-        </template>
-      </template>
+      <menu-link
+        v-for="(nav, index) in visibleLinks"
+        :key="nav.title"
+        :link-name="nav.name"
+        :animation-index="index"
+        v-bind="{ ...nav, mini: miniMode }"
+        @mouseenter="emit('menu-hover', nav.link)"
+      />
     </div>
 
     <!-- FOOTER: utility controls + user -->
@@ -95,16 +68,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <OIcon name="auto-awesome" size="sm" class="tw:shrink-0" />
         <span>AI Chat</span>
-      </button>
-
-      <!-- Theme toggle -->
-      <button
-        class="tw:flex tw:items-center tw:gap-2.5 tw:px-2 tw:py-1.5 tw:rounded-md tw:text-[11px] tw:text-text-secondary tw:hover:bg-tabs-hover-bg tw:hover:text-text-primary tw:transition-colors tw:w-full tw:text-left tw:cursor-pointer tw:bg-transparent tw:border-none"
-        data-test="navbar-theme-toggle"
-        @click="emit('open-predefined-themes')"
-      >
-        <OIcon :name="theme === 'dark' ? 'light-mode' : 'dark-mode'" size="sm" class="tw:shrink-0" />
-        <span>Theme</span>
       </button>
 
       <!-- Slack -->
@@ -127,30 +90,102 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span>Help</span>
       </button>
 
-      <!-- User row -->
-      <button
+      <!-- User row dropdown -->
+      <ODropdown
         v-if="userName || userEmail"
-        class="tw:flex tw:items-center tw:gap-2 tw:px-2 tw:py-2 tw:mt-1 tw:rounded-md tw:w-full tw:text-left tw:transition-colors tw:hover:bg-tabs-hover-bg tw:border-t tw:border-border-default tw:cursor-pointer tw:bg-transparent"
-        data-test="navbar-user-menu"
-        @click="emit('signout')"
+        side="top"
+        align="start"
+        @update:open="(open) => { if (!open) showLanguageSubmenu = false; }"
       >
-        <div class="tw:w-7 tw:h-7 tw:rounded-full tw:bg-primary-600 tw:flex tw:items-center tw:justify-center tw:text-white tw:text-[10px] tw:font-bold tw:shrink-0">
-          {{ userInitials }}
+        <template #trigger>
+          <button
+            class="tw:flex tw:items-center tw:gap-2 tw:px-2 tw:py-2 tw:mt-1 tw:rounded-md tw:w-full tw:text-left tw:transition-colors tw:hover:bg-tabs-hover-bg tw:border-t tw:border-border-default tw:cursor-pointer tw:bg-transparent tw:border-none"
+            data-test="navbar-user-menu"
+          >
+            <div class="tw:w-7 tw:h-7 tw:rounded-full tw:bg-primary-600 tw:flex tw:items-center tw:justify-center tw:text-white tw:text-[10px] tw:font-bold tw:shrink-0">
+              {{ userInitials }}
+            </div>
+            <div class="tw:flex tw:flex-col tw:min-w-0">
+              <span class="tw:text-[10.5px] tw:font-medium tw:text-text-primary tw:truncate">{{ userName }}</span>
+              <span class="tw:text-[9.5px] tw:text-text-tertiary tw:truncate">{{ userEmail }}</span>
+            </div>
+          </button>
+        </template>
+        <div class="tw:min-w-[220px]">
+          <!-- User info (non-clickable) -->
+          <div class="tw:flex tw:items-center tw:gap-2.5 tw:px-3 tw:py-2.5">
+            <div class="tw:w-6 tw:h-6 tw:rounded-full tw:bg-primary-600 tw:flex tw:items-center tw:justify-center tw:text-white tw:text-[9px] tw:font-bold tw:shrink-0">
+              {{ userInitials }}
+            </div>
+            <span class="tw:text-[11px] tw:truncate tw:text-text-primary">{{ userName || userEmail }}</span>
+          </div>
+          <ODropdownSeparator />
+          <!-- Language submenu -->
+          <div
+            v-if="langList && langList.length > 0"
+            class="tw:relative tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:cursor-pointer tw:text-[11px] tw:text-text-primary tw:hover:bg-tabs-hover-bg tw:select-none"
+            data-test="navbar-language-trigger"
+            @click.stop="showLanguageSubmenu = !showLanguageSubmenu"
+          >
+            <OIcon size="xs" name="language" class="tw:shrink-0" />
+            <span class="tw:flex-1">{{ selectedLanguage?.label ?? 'Language' }}</span>
+            <OIcon size="xs" name="chevron-right" />
+            <div
+              v-if="showLanguageSubmenu"
+              class="tw:absolute tw:left-full tw:bottom-0 tw:bg-surface-base tw:border tw:border-border-default tw:rounded-lg tw:shadow-lg tw:z-50 tw:min-w-[140px] tw:py-1"
+              @click.stop
+            >
+              <button
+                v-for="lang in langList"
+                :key="lang.code"
+                type="button"
+                class="tw:flex tw:items-center tw:gap-2 tw:w-full tw:px-3 tw:py-2 tw:text-[11px] tw:text-text-primary tw:hover:bg-tabs-hover-bg tw:cursor-pointer tw:bg-transparent tw:border-none tw:text-left"
+                :class="{ 'tw:text-primary-600': selectedLanguage?.code === lang.code }"
+                @click="emit('change-language', lang); showLanguageSubmenu = false"
+              >
+                <img
+                  v-if="lang.icon && lang.icon.startsWith('img:')"
+                  :src="lang.icon.slice(4)"
+                  :alt="lang.label"
+                  class="tw:w-4 tw:h-4 tw:object-contain tw:shrink-0"
+                />
+                <OIcon v-else-if="lang.icon" size="xs" :name="lang.icon" class="tw:shrink-0" />
+                <span class="tw:flex-1">{{ lang.label }}</span>
+                <OIcon v-if="selectedLanguage?.code === lang.code" size="xs" name="check" />
+              </button>
+            </div>
+          </div>
+          <ODropdownSeparator />
+          <!-- Theme -->
+          <ODropdownItem data-test="navbar-theme-in-user-menu" @select="emit('open-predefined-themes')">
+            <template #icon-left>
+              <OIcon size="xs" :name="theme === 'dark' ? 'light-mode' : 'dark-mode'" />
+            </template>
+            Theme
+          </ODropdownItem>
+          <ODropdownSeparator />
+          <!-- Signout -->
+          <ODropdownItem variant="destructive" data-test="navbar-signout" @select="emit('signout')">
+            <template #icon-left>
+              <OIcon size="xs" name="exit-to-app" />
+            </template>
+            Sign out
+          </ODropdownItem>
         </div>
-        <div class="tw:flex tw:flex-col tw:min-w-0">
-          <span class="tw:text-[10.5px] tw:font-medium tw:text-text-primary tw:truncate">{{ userName }}</span>
-          <span class="tw:text-[9.5px] tw:text-text-tertiary tw:truncate">{{ userEmail }}</span>
-        </div>
-      </button>
+      </ODropdown>
     </div>
   </nav>
 </template>
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import type { NavbarProps, NavbarEmits, NavbarSlots, NavGroup } from "./ONavbar.types";
+import type { NavbarProps, NavbarEmits, NavbarSlots } from "./ONavbar.types";
 import MenuLink from "@/components/MenuLink.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OrganizationSelector from "@/components/OrganizationSelector.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 
 defineOptions({ inheritAttrs: false });
 
@@ -165,26 +200,11 @@ const props = withDefaults(defineProps<NavbarProps>(), {
 const emit = defineEmits<NavbarEmits>();
 defineSlots<NavbarSlots>();
 
-const orgMenuOpen = ref(false);
+const showLanguageSubmenu = ref(false);
 
-const orderedGroups: NavGroup[] = ['observe', 'analyze', 'manage', 'admin'];
-
-const groupLabels: Record<NavGroup, string> = {
-  observe: 'Observe',
-  analyze: 'Analyze',
-  manage: 'Manage',
-  admin: 'Admin',
-};
-
-const itemsByGroup = computed(() => {
-  const map: Partial<Record<NavGroup, typeof props.linksList>> = {};
-  for (const item of props.linksList) {
-    const g = item.group ?? 'manage';
-    if (!map[g]) map[g] = [];
-    map[g]!.push(item);
-  }
-  return map;
-});
+const visibleLinks = computed(() =>
+  props.linksList.filter((item) => item.hide !== true && item.display !== false),
+);
 
 const userInitials = computed(() => {
   if (!props.userName) return '?';
@@ -195,11 +215,6 @@ const userInitials = computed(() => {
     .join('')
     .toUpperCase();
 });
-
-function selectOrg(identifier: string) {
-  orgMenuOpen.value = false;
-  emit('update:org', identifier);
-}
 
 const NAV_KEYS = ["ArrowDown", "ArrowUp", "Tab"] as const;
 
@@ -252,30 +267,7 @@ function handleKeydown(event: KeyboardEvent) {
 </script>
 
 <style scoped>
-.o2-navbar-scroll {
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-@supports (overflow: overlay) {
-  .o2-navbar-scroll {
-    overflow-y: overlay;
-  }
-}
-.o2-navbar-scroll::-webkit-scrollbar {
-  width: 6px;
-}
-.o2-navbar-scroll::-webkit-scrollbar-track {
-  background: transparent;
-}
-.o2-navbar-scroll::-webkit-scrollbar-thumb {
-  background-color: transparent;
-  border-radius: 9999px;
-  transition: background-color 150ms ease;
-}
-.o2-navbar-scroll:hover::-webkit-scrollbar-thumb {
-  background-color: var(--color-border-soft, rgba(148, 163, 184, 0.5));
-}
-:global(.body--dark) .o2-navbar-scroll {
+:global(.body--dark) nav[data-o2-navbar] {
   border-right: 1px solid var(--o2-border-color);
 }
 </style>

@@ -43,6 +43,22 @@ describe("ONavbar", () => {
             inheritAttrs: true,
           },
           "OIcon": { template: '<span />', props: ["name", "size"] },
+          "OrganizationSelector": {
+            template: '<div data-test="navbar-org-switcher"><slot /></div>',
+            props: ["organizations", "current"],
+            emits: ["select"],
+          },
+          "ODropdown": {
+            template: '<div><slot name="trigger" /><slot /></div>',
+            props: ["side", "align"],
+            emits: ["update:open"],
+          },
+          "ODropdownItem": {
+            template: '<button @click="$emit(\'select\')"><slot name="icon-left" /><slot /></button>',
+            props: ["variant"],
+            emits: ["select"],
+          },
+          "ODropdownSeparator": { template: '<hr />' },
         },
       },
     });
@@ -87,37 +103,29 @@ describe("ONavbar", () => {
     });
   });
 
-  describe("group labels", () => {
-    it("renders group label for observe group", () => {
+  describe("flat link list", () => {
+    it("renders all links without group labels", () => {
       wrapper = mountNavbar();
-      expect(wrapper.find('[data-test="navbar-group-observe"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="navbar-group-observe"]').text()).toContain("Observe");
-    });
-
-    it("renders group label for analyze group", () => {
-      wrapper = mountNavbar();
-      expect(wrapper.find('[data-test="navbar-group-analyze"]').exists()).toBe(true);
-    });
-
-    it("renders group label for admin group", () => {
-      wrapper = mountNavbar();
-      expect(wrapper.find('[data-test="navbar-group-admin"]').exists()).toBe(true);
-    });
-
-    it("does not render manage group label when no manage items exist", () => {
-      wrapper = mountNavbar();
-      // mockLinks has no manage items
+      expect(wrapper.find('[data-test="navbar-group-observe"]').exists()).toBe(false);
       expect(wrapper.find('[data-test="navbar-group-manage"]').exists()).toBe(false);
     });
 
-    it("renders items under their correct group — observe label comes before logs link", () => {
+    it("renders links in order", () => {
       wrapper = mountNavbar();
       const allDataTests = wrapper.findAll('[data-test]').map((el) => el.attributes('data-test'));
-      const observeIdx = allDataTests.indexOf('navbar-group-observe');
+      const homeIdx = allDataTests.indexOf('menu-link-home-item');
       const logsIdx = allDataTests.indexOf('menu-link-logs-item');
-      expect(observeIdx).toBeGreaterThanOrEqual(0);
-      expect(logsIdx).toBeGreaterThanOrEqual(0);
-      expect(observeIdx).toBeLessThan(logsIdx);
+      expect(homeIdx).toBeGreaterThanOrEqual(0);
+      expect(homeIdx).toBeLessThan(logsIdx);
+    });
+
+    it("does not render hidden links", () => {
+      const links = [
+        ...mockLinks,
+        { title: "Hidden", icon: "x", link: "/hidden", name: "hidden", hide: true },
+      ];
+      wrapper = mountNavbar({ linksList: links });
+      expect(wrapper.find('[data-test="menu-link-hidden-item"]').exists()).toBe(false);
     });
   });
 
@@ -134,11 +142,13 @@ describe("ONavbar", () => {
       expect(wrapper.find('[data-test="navbar-logo"]').exists()).toBe(false);
     });
 
-    it("renders org switcher when orgName is provided", () => {
-      wrapper = mountNavbar({ orgName: "my-org" });
+    it("renders org switcher when organizations are provided", () => {
+      wrapper = mountNavbar({
+        organizations: [{ label: "my-org", identifier: "my-org" }],
+        currentOrg: { label: "my-org", identifier: "my-org" },
+      });
       const switcher = wrapper.find('[data-test="navbar-org-switcher"]');
       expect(switcher.exists()).toBe(true);
-      expect(switcher.text()).toContain("my-org");
     });
 
     it("emits go-to-home when logo is clicked", async () => {
@@ -170,14 +180,14 @@ describe("ONavbar", () => {
       expect(userMenu.text()).toContain("Ashish K.");
     });
 
-    it("renders theme toggle button", () => {
-      wrapper = mountNavbar();
-      expect(wrapper.find('[data-test="navbar-theme-toggle"]').exists()).toBe(true);
+    it("renders theme item in user dropdown when user is provided", () => {
+      wrapper = mountNavbar({ userName: "Ashish", userEmail: "ashish@openobserve.ai" });
+      expect(wrapper.find('[data-test="navbar-theme-in-user-menu"]').exists()).toBe(true);
     });
 
-    it("emits open-predefined-themes when theme button is clicked", async () => {
-      wrapper = mountNavbar();
-      await wrapper.find('[data-test="navbar-theme-toggle"]').trigger("click");
+    it("emits open-predefined-themes when theme item is clicked in user dropdown", async () => {
+      wrapper = mountNavbar({ userName: "Ashish", userEmail: "ashish@openobserve.ai" });
+      await wrapper.find('[data-test="navbar-theme-in-user-menu"]').trigger("click");
       expect(wrapper.emitted("open-predefined-themes")).toBeTruthy();
     });
 

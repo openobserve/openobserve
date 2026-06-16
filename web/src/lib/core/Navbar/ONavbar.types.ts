@@ -31,14 +31,18 @@ export interface NavbarProps {
   miniMode?: boolean;
   visible?: boolean;
   logoSrc?: string;
-  orgName?: string;
-  orgOptions?: Array<{ label: string; identifier: string }>;
+  organizations?: Array<{ label: string; identifier: string; [key: string]: any }>;
+  currentOrg?: { label: string; identifier: string; [key: string]: any } | null;
   userName?: string;
   userEmail?: string;
   isAiEnabled?: boolean;
   isAiChatActive?: boolean;
   theme?: string;
+  langList?: Array<{ code: string; label: string; icon?: string }>;
+  selectedLanguage?: { code: string; label: string; icon?: string };
 }
+
+
 
 export interface NavbarEmits {
   (e: "menu-hover", routePath: string): void;
@@ -48,6 +52,7 @@ export interface NavbarEmits {
   (e: "open-slack"): void;
   (e: "open-help"): void;
   (e: "open-predefined-themes"): void;
+  (e: "change-language", lang: { code: string; label: string; icon?: string }): void;
   (e: "signout"): void;
 }
 
