@@ -30,12 +30,12 @@
  * - #4091: Cancel query on visualize page
  */
 
-const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
-const testLogger = require('../utils/test-logger.js');
-const PageManager = require('../../pages/page-manager.js');
-const logData = require("../../fixtures/log.json");
-const { ingestTestData, sendRequest, getHeaders, getIngestionUrl } = require('../utils/data-ingestion.js');
-const { getOrgIdentifier, isCloudEnvironment } = require('../utils/cloud-auth.js');
+const { test, expect, navigateToBase } = require('../../utils/enhanced-baseFixtures.js');
+const testLogger = require('../../utils/test-logger.js');
+const PageManager = require('../../../pages/page-manager.js');
+const logData = require("../../../fixtures/log.json");
+const { ingestTestData, sendRequest, getHeaders, getIngestionUrl } = require('../../utils/data-ingestion.js');
+const { getOrgIdentifier, isCloudEnvironment } = require('../../utils/cloud-auth.js');
 
 test.describe("Logs Regression Bug Fixes", () => {
   // Changed from serial to parallel - tests are independent (each gets own page/PM in beforeEach)
@@ -1895,7 +1895,6 @@ test.describe("Logs Regression Bug Fixes", () => {
   });
 
 
->>>>>>> 2f56154761 (test: restructure RegressionSet/ into feature subdirectories):tests/ui-testing/playwright-tests/RegressionSet/Logs/logs-bugs.spec.js
   test.afterEach(async () => {
     // Cleanup new stream created by field cache test (e2e_automate is never deleted)
     if (fieldCacheStreamsToCleanup.length > 0 && pm) {

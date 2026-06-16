@@ -6,10 +6,10 @@
  * https://github.com/openobserve/openobserve/issues/9308
  */
 
-const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
-const testLogger = require('../utils/test-logger.js');
-const PageManager = require('../../pages/page-manager.js');
-const { getOrgIdentifier, isCloudEnvironment } = require('../utils/cloud-auth.js');
+const { test, expect, navigateToBase } = require('../../utils/enhanced-baseFixtures.js');
+const testLogger = require('../../utils/test-logger.js');
+const PageManager = require('../../../pages/page-manager.js');
+const { getOrgIdentifier, isCloudEnvironment } = require('../../utils/cloud-auth.js');
 
 test.describe("UI Regression Bugs", () => {
   test.describe.configure({ mode: 'parallel' });

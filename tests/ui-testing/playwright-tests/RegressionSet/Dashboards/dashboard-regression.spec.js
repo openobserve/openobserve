@@ -12,18 +12,18 @@ const {
   test,
   expect,
   navigateToBase,
-} = require("../utils/enhanced-baseFixtures.js");
-import PageManager from "../../pages/page-manager.js";
-import DashboardVariablesScoped from "../../pages/dashboardPages/dashboard-variables-scoped.js";
-import { ingestion } from "../Dashboards/utils/dashIngestion.js";
-import { waitForDashboardPage, deleteDashboard } from "../Dashboards/utils/dashCreation.js";
-const { safeWaitForHidden, safeWaitForNetworkIdle } = require("../utils/wait-helpers.js");
+} = require("../../utils/enhanced-baseFixtures.js");
+import PageManager from "../../../pages/page-manager.js";
+import DashboardVariablesScoped from "../../../pages/dashboardPages/dashboard-variables-scoped.js";
+import { ingestion } from "../../Dashboards/utils/dashIngestion.js";
+import { waitForDashboardPage, deleteDashboard } from "../../Dashboards/utils/dashCreation.js";
+const { safeWaitForHidden, safeWaitForNetworkIdle } = require("../../utils/wait-helpers.js");
 const {
   SELECTORS,
   getVariableSelector,
   getEditVariableBtn,
-} = require("../../pages/dashboardPages/dashboard-selectors.js");
-const testLogger = require("../utils/test-logger.js");
+} = require("../../../pages/dashboardPages/dashboard-selectors.js");
+const testLogger = require("../../utils/test-logger.js");
 
 // =============================================================================
 // Bug #11134: Same-dashboard drilldown URL clobbering

@@ -5,11 +5,11 @@
  * They are excluded from the OSS regression workflow and run only via the enterprise CI.
  */
 
-const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
-const PageManager = require('../../pages/page-manager.js');
-const testLogger = require('../utils/test-logger.js');
-const logData = require('../../fixtures/log.json');
-const { getAuthHeaders, getOrgIdentifier } = require('../utils/cloud-auth.js');
+const { test, expect, navigateToBase } = require('../../utils/enhanced-baseFixtures.js');
+const PageManager = require('../../../pages/page-manager.js');
+const testLogger = require('../../utils/test-logger.js');
+const logData = require('../../../fixtures/log.json');
+const { getAuthHeaders, getOrgIdentifier } = require('../../utils/cloud-auth.js');
 
 test.describe('Regression: Undefined Length error on Logs -> Scheduled Search -> Streams -> Logs (#7354)', () => {
   test.describe.configure({ mode: 'parallel' });

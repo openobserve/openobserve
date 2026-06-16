@@ -5,9 +5,9 @@
  * - #11231: Each save shifts the timestamp by the timezone offset
  */
 
-const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
-const testLogger = require('../utils/test-logger.js');
-const PageManager = require('../../pages/page-manager.js');
+const { test, expect, navigateToBase } = require('../../utils/enhanced-baseFixtures.js');
+const testLogger = require('../../utils/test-logger.js');
+const PageManager = require('../../../pages/page-manager.js');
 
 test.describe("Reports Regression Bug Fixes", () => {
   test.describe.configure({ mode: 'parallel' });

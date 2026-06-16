@@ -6,10 +6,10 @@
  * Tests run in PARALLEL.
  */
 
-const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
-const testLogger = require('../utils/test-logger.js');
-const PageManager = require('../../pages/page-manager.js');
-const { ingestTestData } = require('../utils/data-ingestion.js');
+const { test, expect, navigateToBase } = require('../../utils/enhanced-baseFixtures.js');
+const testLogger = require('../../utils/test-logger.js');
+const PageManager = require('../../../pages/page-manager.js');
+const { ingestTestData } = require('../../utils/data-ingestion.js');
 
 test.describe("Traces Regression Bugs — Batch 1", () => {
   test.describe.configure({ mode: 'parallel' });

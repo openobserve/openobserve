@@ -7,11 +7,11 @@
  * Tests run in PARALLEL for efficiency - setup/cleanup handled via hooks.
  */
 
-const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
-const testLogger = require('../utils/test-logger.js');
-const PageManager = require('../../pages/page-manager.js');
-const logData = require('../../fixtures/log.json');
-const { ensureMetricsIngested } = require('../utils/shared-metrics-setup.js');
+const { test, expect, navigateToBase } = require('../../utils/enhanced-baseFixtures.js');
+const testLogger = require('../../utils/test-logger.js');
+const PageManager = require('../../../pages/page-manager.js');
+const logData = require('../../../fixtures/log.json');
+const { ensureMetricsIngested } = require('../../utils/shared-metrics-setup.js');
 
 test.describe("Metrics Regression Bugs", () => {
   test.describe.configure({ mode: 'parallel' });
