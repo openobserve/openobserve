@@ -1,7 +1,0 @@
-{
-  "action": "new",
-  "target_spec": "tests/ui-testing/playwright-tests/GeneralTests/testDemo.spec.js",
-  "existing_tests_considered": [],
-  "needs_registration": false,
-  "rationale": "Zero existing tests or page objects reference 'test-demo'. The page is brand-new (no grep hits in the test suite). Playwright auto-discovers specs via testDir, so no yml registration needed — the file just needs to exist in GeneralTests/."
-}

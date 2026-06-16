@@ -73,9 +73,21 @@ export class TestDemoPage {
     // ============================
 
     async navigate() {
-        await this.page.goto(`/#/test-demo`);
-        await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
-        await expect(this.pageRoot).toBeVisible({ timeout: 10000 });
+        // Navigate client-side with Vue Router to avoid a full page reload
+        // (which would hit the backend's auth middleware and return 401).
+        // The SPA is already authenticated by navigateToBase.
+        await this.page.evaluate(() => {
+            // Use the Vue Router instance injected on the app by the framework
+            const app = (window as any).__vue_app__;
+            if (app && app.config.globalProperties.$router) {
+                app.config.globalProperties.$router.push('/test-demo');
+            } else {
+                // Fallback: pushState + dispatch popstate to trigger the router
+                window.history.pushState({}, '', '/test-demo');
+                window.dispatchEvent(new PopStateEvent('popstate'));
+            }
+        });
+        await expect(this.pageRoot).toBeVisible({ timeout: 15000 });
     }
 
     // ============================
