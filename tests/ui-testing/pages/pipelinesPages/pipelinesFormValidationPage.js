@@ -118,7 +118,7 @@ export class PipelinesFormValidationPage {
         // The import pipeline page is typically reached via a route/button; navigate directly
         const orgId = process.env['ORGNAME'] || 'default';
         const baseUrl = process.env['ZO_BASE_URL'] || 'http://localhost:5080';
-        await this.page.goto(`${baseUrl}/web/?org_identifier=${orgId}#/pipeline/import`);
+        await this.page.goto(`${baseUrl}/web/pipeline/pipelines/import?org_identifier=${orgId}`);
         await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
     }
 
@@ -135,7 +135,9 @@ export class PipelinesFormValidationPage {
 
     async uploadPipelineFile(filePath) {
         testLogger.info('Uploading pipeline file', { filePath });
-        await this.page.locator(this.importPipelineFileInput).setInputFiles(filePath);
+        // OFile (q-file) wraps a hidden native <input type="file"> — target it directly
+        const nativeInput = this.page.locator(`${this.importPipelineFileInput} input[type="file"]`);
+        await nativeInput.setInputFiles(filePath);
     }
 
     async clickImportButton() {
