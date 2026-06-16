@@ -56,6 +56,7 @@
         :config="selectedConfig"
         :data-type="detailDataType"
         :kpis="detailKpis"
+        :has-scores="detailHasScores"
         :is-loading="isDetailLoading"
         :numeric-trend="numericTrend"
         :numeric-distribution="numericDistribution"
@@ -145,6 +146,7 @@ const {
   isLoading: isDetailLoading,
   dataType: detailDataType,
   kpis: detailKpis,
+  hasScores: detailHasScores,
   booleanAgg,
   categoricalRows,
   refresh: refreshDetail,
