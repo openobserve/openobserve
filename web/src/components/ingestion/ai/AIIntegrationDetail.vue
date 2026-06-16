@@ -87,6 +87,7 @@ const richContent = computed(() =>
       :content="richContent"
       :subs="subs"
       :logo-url="integration.logo"
+      :logo-url-dark="integration.logoDark"
     />
     <AIIntegrationCard
       v-else-if="cardContent"

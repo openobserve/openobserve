@@ -79,8 +79,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <template #icon>
                         <img
-                          v-if="integration.logo && !failedLogos.has(integration.slug)"
-                          :src="integration.logo"
+                          v-if="(integration.logo || integration.logoDark) && !failedLogos.has(integration.slug)"
+                          :src="(store.state.theme === 'dark' && integration.logoDark) || integration.logo"
                           :alt="`${integration.name} logo`"
                           class="ai-menu-logo"
                           loading="lazy"

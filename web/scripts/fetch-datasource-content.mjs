@@ -121,12 +121,22 @@ function writeCards(srcRoot, sha, destDir) {
 
   rmSync(destDir, { recursive: true, force: true });
   mkdirSync(destDir, { recursive: true });
+  // Logo image formats co-located in a slug folder that we bundle alongside the
+  // card (e.g. logo.svg / logo-dark.png). The UI resolves the frontmatter/manifest
+  // `logo` filename to these bundled assets.
+  const LOGO_EXT = /\.(svg|png|webp|jpe?g)$/i;
   for (const slug of slugs) {
     mkdirSync(join(destDir, slug), { recursive: true });
     cpSync(
       join(root, slug, "data-source-ui.md"),
       join(destDir, slug, "data-source-ui.md"),
     );
+    // Copy any logo image files present in the slug folder.
+    for (const f of readdirSync(join(root, slug))) {
+      if (LOGO_EXT.test(f)) {
+        cpSync(join(root, slug, f), join(destDir, slug, f));
+      }
+    }
   }
 
   // Placement manifest (tab/category + order) comes from the content repo and

@@ -51,6 +51,8 @@ const props = defineProps<{
   subs: CardSubstitutions;
   /** Optional logo URL (e.g. from the manifest) — overrides the content logo. */
   logoUrl?: string;
+  /** Optional dark-mode logo URL (manifest) — overrides the content dark logo. */
+  logoUrlDark?: string;
 }>();
 
 const store = useStore();
@@ -98,12 +100,20 @@ const viewData = async () => {
     .catch(() => {});
 };
 
-// Logo precedence: manifest override → content (frontmatter/bundled) → none.
-// `logoFailed` falls back to the monogram if the remote image can't load.
+// Logo precedence per theme: manifest override → content (frontmatter) → none.
+// In dark mode the dark variant is preferred, falling back to the light logo.
+// `logoFailed` falls back to the monogram if the image can't load.
 const logoFailed = ref(false);
-const logoSrc = computed(() =>
-  logoFailed.value ? "" : props.logoUrl || props.content.provider.logo,
+const logoLight = computed(
+  () => props.logoUrl || props.content.provider.logo || "",
 );
+const logoDark = computed(
+  () => props.logoUrlDark || props.content.provider.logoDark || "",
+);
+const logoSrc = computed(() => {
+  if (logoFailed.value) return "";
+  return (isDark.value && logoDark.value) || logoLight.value;
+});
 
 const confettiCanvas = ref<HTMLCanvasElement | null>(null);
 

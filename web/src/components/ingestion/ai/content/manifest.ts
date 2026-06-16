@@ -31,9 +31,12 @@ export interface ManifestEntry {
   docURL?: string;
   /** Sidebar search keywords. */
   keywords?: string[];
-  /** Brand logo URL — shown in the sidebar list and the card hero. Omitted →
-   *  a lettered monogram tile is used instead. */
+  /** Brand logo — filename co-located in the slug folder (e.g. "logo.svg") or an
+   *  absolute URL. Shown in the sidebar list and card hero. Omitted → a lettered
+   *  monogram tile is used instead. */
   logo?: string;
+  /** Optional dark-mode logo variant; used only in dark mode, falls back to `logo`. */
+  logoDark?: string;
 }
 
 export interface ManifestCategory {

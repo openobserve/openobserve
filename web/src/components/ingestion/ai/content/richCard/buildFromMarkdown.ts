@@ -27,6 +27,7 @@ import type { CardSubstitutions } from "../renderMarkdown";
 import type { RichCardContent, RichCardStep, StepCompleteOn } from "./types";
 import { parseFrontmatter } from "./parseFrontmatter";
 import { applySubs, applySubsMasked } from "./subs";
+import { resolveAICardLogo } from "../index";
 
 const str = (v: unknown): string | undefined =>
   typeof v === "string" ? v : undefined;
@@ -85,9 +86,11 @@ export function buildFromMarkdown(
     provider: {
       name: str(card.name) ?? slug,
       tagline: str(card.tagline) ?? "",
-      // Logo URL from the md frontmatter (else ""). A manifest `logo` overrides
-      // at render; with neither, the card shows a lettered monogram.
-      logo: str(card.logo) ?? "",
+      // Logo from the md frontmatter, resolved to a bundled asset URL (or an
+      // absolute URL as-is). A manifest `logo` overrides at render; with neither,
+      // the card shows a lettered monogram. `logo_dark` is used only in dark mode.
+      logo: resolveAICardLogo(slug, str(card.logo)),
+      logoDark: resolveAICardLogo(slug, str(card.logo_dark)) || undefined,
       tone: str(card.tone) ?? "#d97757",
       runtime: str(card.runtime),
       setupTime: str(card.setup_time),

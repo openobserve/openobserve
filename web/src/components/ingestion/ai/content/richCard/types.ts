@@ -99,8 +99,10 @@ export interface RichCardExtras {
 export interface RichCardProvider {
   name: string;
   tagline: string;
-  /** Imported logo asset URL (rendered on a neutral tile). */
+  /** Resolved logo asset URL for light mode (rendered on a neutral tile). */
   logo: string;
+  /** Optional resolved logo URL used only in dark mode; falls back to `logo`. */
+  logoDark?: string;
   /** Brand accent (clay etc.) — reserved for future per-provider theming. */
   tone: string;
   runtime?: string;

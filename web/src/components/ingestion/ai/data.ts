@@ -5,6 +5,7 @@ import {
   manifestCategories,
   type ManifestEntry,
 } from "./content/manifest";
+import { resolveAICardLogo, getAICardLogos } from "./content";
 
 export interface AIIntegration {
   slug: string;
@@ -20,9 +21,11 @@ export interface AIIntegration {
    * This is the bridge that lets a manifest entry match this catalog entry.
    */
   contentSlug?: string;
-  /** Brand logo URL (from the manifest). Shown in the sidebar + card hero;
-   *  omitted → lettered monogram fallback. */
+  /** Resolved brand logo URL (from the manifest). Shown in the sidebar + card
+   *  hero; omitted → lettered monogram fallback. */
   logo?: string;
+  /** Optional resolved dark-mode logo URL; used only in dark mode, else `logo`. */
+  logoDark?: string;
 }
 
 export interface AICategory {
@@ -755,6 +758,7 @@ for (const category of realCategories) {
 
 const toCard = (entry: ManifestEntry): AIIntegration => {
   const existing = existingByContentSlug.get(entry.slug);
+  const fmLogos = getAICardLogos(entry.slug);
   return {
     slug: entry.slug,
     name: entry.name,
@@ -762,7 +766,19 @@ const toCard = (entry: ManifestEntry): AIIntegration => {
     docURL: entry.docURL ?? existing?.docURL ?? "",
     keywords: entry.keywords ?? existing?.keywords ?? [],
     contentSlug: entry.slug,
-    logo: entry.logo ?? existing?.logo,
+    // Logo precedence: manifest entry → the card's frontmatter logo → a
+    // hardcoded fallback. (Manifest filename → bundled asset URL, or absolute
+    // URL as-is.) `logo_dark`/`logoDark` is the optional dark-mode variant.
+    // Falling back to the frontmatter means a single `logo:` in the md shows in
+    // both the sidebar menu and the card hero — one authoring spot.
+    logo:
+      resolveAICardLogo(entry.slug, entry.logo) ||
+      fmLogos.logo ||
+      existing?.logo,
+    logoDark:
+      resolveAICardLogo(entry.slug, entry.logoDark ?? (entry as any).logo_dark) ||
+      fmLogos.logoDark ||
+      existing?.logoDark,
   };
 };
 
