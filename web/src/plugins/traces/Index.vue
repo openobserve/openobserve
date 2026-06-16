@@ -256,6 +256,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <search-result
                       ref="searchResultRef"
+                      :show-error-only="showErrorOnly"
                       @update:datetime="setHistogramDate"
                       @update:scroll="getMoreData"
                       @update:sort="runQueryOnSort"
@@ -1698,9 +1699,9 @@ const setHistogramDate = async (date: any) => {
 // User can manually add their own filters before clicking "Run Query"
 const onMetricsFiltersUpdated = (filters: string[]) => {
   const allFilters = [...filters];
-  // Add error filter only if toggle is on and not already present from Error panel brush
+  // Add error filter only if span_status='ERROR' is currently active and not already present
   if (
-    searchObj.meta.showErrorOnly &&
+    showErrorOnly.value &&
     !allFilters.includes("span_status = 'ERROR'")
   ) {
     allFilters.push("span_status = 'ERROR'");
@@ -1930,6 +1931,10 @@ const activeExcludeFilterValues = computed((): Record<string, string[]> => {
   }
   return result;
 });
+
+const showErrorOnly = computed(
+  () => activeIncludeFilterValues.value["span_status"]?.includes("ERROR") ?? false,
+);
 
 const searchData = () => {
   if (
