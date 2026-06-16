@@ -27,8 +27,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="showAiIcon && !disableAi"
       variant="sidebar-toggle"
       size="icon-toolbar"
-      class="ai-icon-button tw:absolute tw:top-2 tw:right-2 tw:z-10 tw:bg-(--o2-bg-primary) tw:border tw:border-(--o2-border-color) tw:transition-all tw:duration-200"
-      :class="nlpMode ? 'ai-icon-active' : ''"
+      class="tw:absolute tw:top-2 tw:right-2 tw:z-10 tw:bg-(--o2-bg-primary) tw:border tw:border-(--o2-border-color) tw:transition-all tw:duration-200 tw:hover:bg-[var(--o2-hover-accent)] tw:hover:border-[var(--o2-color-primary)]"
+      :class="nlpMode ? 'tw:bg-[var(--o2-color-primary-light)] tw:border-[var(--o2-color-primary)]' : ''"
       @click="toggleNlpMode"
       data-test="query-editor-ai-icon-btn"
     >
@@ -1221,21 +1221,6 @@ export default defineComponent({
 </script>
 
 <style>
-/* AI Icon Button Styling */
-.ai-icon-button:hover {
-  background-color: var(--o2-hover-accent);
-  border-color: var(--o2-color-primary);
-}
-
-.ai-icon-button.ai-icon-active {
-  background-color: var(--o2-color-primary-light);
-  border-color: var(--o2-color-primary);
-}
-
-.q-dark .ai-icon-button img {
-  filter: brightness(1.2);
-}
-
 .monaco-editor,
 .monaco-diff-editor .synthetic-focus,
 .monaco-editor,

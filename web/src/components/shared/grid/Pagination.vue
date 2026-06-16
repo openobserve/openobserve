@@ -18,17 +18,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     :class="position === 'bottom' ? 'tw:py-2' : 'tw:pt-2'"
-    class="q-table__control tw:w-full tw:flex tw:justify-between"
+    class="tw:w-full tw:flex tw:justify-between"
   >
     <div
       v-if="position === 'bottom' && maxRecords"
-      class="max-result tw:flex tw:items-center tw:whitespace-nowrap tw:w-50 tw:justify-center"
+      class="tw:flex tw:items-center tw:whitespace-nowrap tw:w-50 tw:justify-center"
       style="justify-content: start"
     >
-      <span class="q-table__bottom-item tw:mr-4 tw:text-xs tw:font-semibold">{{ t("search.maxRecords") }}</span>
+      <span class="tw:mr-4 tw:text-xs tw:font-semibold">{{ t("search.maxRecords") }}</span>
       <OInput
         v-model="maxRecords"
-        class="max-records-input"
         @blur="changeMaxRecordToReturn"
       />
     </div>
@@ -73,8 +72,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ pageTitle.slice(-1) == "s" ? pageTitle.slice(0, -1) : pageTitle }}(s)
       </div>
     </div>
-    <div class="q-table__control tw:ml-auto">
-      <span class="q-table__bottom-item tw:mr-4 tw:text-xs tw:font-semibold">
+    <div class="tw:ml-auto">
+      <span class="tw:mr-4 tw:text-xs tw:font-semibold">
         {{ t("search.showing") }}
         {{
           resultTotal > 0
@@ -98,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-if="position === 'bottom'" class="tw:flex tw:items-center">
         <OSeparator vertical class="tw:my-2 tw:mr-4" />
 
-        <span class="q-table__bottom-item tw:mr-4 tw:text-xs tw:font-semibold">
+        <span class="tw:mr-4 tw:text-xs tw:font-semibold">
           {{ t("search.recordsPerPage") }}
         </span>
         <OSelect
@@ -212,34 +211,3 @@ export default defineComponent({
 });
 </script>
 
-<style>
-.q-select .q-field__native {
-  margin-right: 1rem;
-  font-size: 0.75rem;
-  font-weight: 600;
-  text-align: center;
-  margin-right: 0;
-}
-
-.q-select .q-field__append {
-  padding: 0;
-}
-
-.max-result .q-field {
-  max-width: 3.5rem;
-}
-
-.max-result .max-records-input .q-field__control {
-  max-width: 2.5rem;
-  height: 1.5rem;
-  padding: 0;
-}
-
-.max-result .max-records-input .q-field__native {
-  font-size: 0.75rem;
-  text-align: center;
-  font-weight: 600;
-  padding: 0;
-  width: fit-content;
-}
-</style>

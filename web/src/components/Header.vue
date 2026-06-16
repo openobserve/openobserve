@@ -320,7 +320,7 @@ size="xs" class="warning" />{{
           <!-- Language selector — nested sub-dropdown (click to open) -->
           <div
             data-test="header-language-submenu-trigger"
-            class="header-language-item tw:relative tw:flex tw:items-center tw:gap-3 tw:py-1.5 tw:px-3 tw:text-sm tw:leading-[1.2] tw:cursor-pointer tw:select-none"
+            class="tw:relative tw:flex tw:items-center tw:gap-3 tw:py-1.5 tw:px-3 tw:text-sm tw:leading-[1.2] tw:cursor-pointer tw:select-none tw:hover:bg-[rgba(0,0,0,0.05)] tw:dark:hover:bg-[rgba(255,255,255,0.08)]"
             @click.stop="showLanguageSubmenu = !showLanguageSubmenu"
           >
             <OIcon size="xs" name="language" class="padding-none" />
@@ -345,7 +345,7 @@ size="xs" class="warning" />{{
             <!-- Submenu — absolutely positioned to the left of parent dropdown -->
             <div
               v-if="showLanguageSubmenu"
-              class="language-submenu tw:absolute tw:right-full tw:top-0 tw:mr-1 tw:min-w-50 tw:bg-white tw:border tw:border-black/12 tw:rounded-md tw:shadow-[0_8px_24px_rgba(0,0,0,0.15)] tw:py-1 tw:z-9999"
+              class="tw:absolute tw:right-full tw:top-0 tw:mr-1 tw:min-w-50 tw:bg-white tw:border tw:border-black/12 tw:rounded-md tw:shadow-[0_8px_24px_rgba(0,0,0,0.15)] tw:py-1 tw:z-9999 tw:dark:bg-[#1f2937] tw:dark:border-[rgba(255,255,255,0.12)] tw:dark:shadow-[0_8px_24px_rgba(0,0,0,0.5)]"
               data-test="language-dropdown-item"
               @click.stop
             >
@@ -354,9 +354,9 @@ size="xs" class="warning" />{{
                 :key="lang.code"
                 type="button"
                 :data-test="`language-dropdown-item-${lang.code}`"
-                class="language-submenu-item tw:flex tw:items-center tw:gap-2.5 tw:w-full tw:py-1.5 tw:px-3 tw:text-sm tw:leading-[1.2] tw:text-left tw:bg-transparent tw:border-0 tw:cursor-pointer tw:text-inherit"
+                class="tw:flex tw:items-center tw:gap-2.5 tw:w-full tw:py-1.5 tw:px-3 tw:text-sm tw:leading-[1.2] tw:text-left tw:bg-transparent tw:border-0 tw:cursor-pointer tw:text-inherit tw:hover:bg-[rgba(0,0,0,0.05)] tw:dark:hover:bg-[rgba(255,255,255,0.08)]"
                 :class="{
-                  'is-selected tw:font-semibold': selectedLanguage.code === lang.code,
+                  'tw:font-semibold': selectedLanguage.code === lang.code,
                 }"
                 @click="changeLanguage(lang); showLanguageSubmenu = false"
               >
@@ -650,29 +650,3 @@ export default defineComponent({
 });
 </script>
 
-<style>
-/* Language sub-menu trigger row — hover states kept here (pseudo-class / descendant rules) */
-.header-language-item:hover {
-  background-color: rgba(0, 0, 0, 0.05);
-}
-
-body.body--dark .header-language-item:hover {
-  background-color: rgba(255, 255, 255, 0.08);
-}
-
-/* Language submenu — dark mode overrides kept here (descendant selectors) */
-body.body--dark .language-submenu {
-  background-color: #1f2937;
-  border-color: rgba(255, 255, 255, 0.12);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
-}
-
-/* Language submenu item — hover and selected state kept here */
-.language-submenu-item:hover {
-  background-color: rgba(0, 0, 0, 0.05);
-}
-
-body.body--dark .language-submenu-item:hover {
-  background-color: rgba(255, 255, 255, 0.08);
-}
-</style>

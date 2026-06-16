@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODialog v-model:open="showDialog" data-test="enterprise-upgrade-dialog" :show-close="false" :width="75" @update:open="(v) => !v && onDialogHide()">
     <div class="enterprise-dialog-v3" tw:overflow-hidden tw:relative tw:[margin:calc(-1*var(--spacing-dialog-content-py,1.25rem))_calc(-1*var(--spacing-dialog-content-px,1.25rem))]>
       <!-- Close Button -->
-      <div class="close-btn-top-right" tw:absolute tw:top-4 tw:right-4 tw:z-[100] tw:text-[rgba(0,0,0,0.6)]>
+      <div tw:absolute tw:top-4 tw:right-4 tw:z-[100] tw:text-[rgba(0,0,0,0.6)] tw:hover:text-[rgba(0,0,0,0.87)] tw:dark:text-[rgba(255,255,255,0.7)] tw:dark:hover:text-[rgba(255,255,255,0.95)]>
         <OButton
           variant="ghost"
           size="icon"
@@ -32,27 +32,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Left Panel - Hero Section (hidden for Cloud) -->
         <div v-if="!dialogConfig.isCloudLayout" class="hero-panel" tw:[flex:0_0_35%] tw:bg-[linear-gradient(135deg,var(--q-primary)_0%,color-mix(in_srgb,var(--q-primary)_85%,black_15%)_100%)] tw:p-[40px] tw:flex tw:flex-col tw:relative tw:text-white tw:overflow-y-auto tw:min-h-0>
 
-          <div class="hero-content">
-            <div class="hero-icon">
+          <div class="tw:flex-1 tw:flex tw:flex-col tw:justify-center tw:items-center tw:max-w-[400px] tw:w-full tw:m-auto">
+            <div class="tw:w-[80px] tw:h-[80px] tw:bg-[rgba(255,255,255,0.15)] tw:rounded-[16px] tw:flex tw:items-center tw:justify-center tw:mb-6 tw:backdrop-blur-[10px]">
               <OIcon name="workspace-premium" size="xl" />
             </div>
 
-            <h2 class="hero-title">{{ dialogConfig.heroTitle }}</h2>
+            <h2 class="tw:text-[32px] tw:font-bold tw:m-0 tw:mb-4 tw:leading-[1.2] tw:text-center tw:text-white">{{ dialogConfig.heroTitle }}</h2>
 
-            <p class="offer-text">
+            <p class="tw:m-0 tw:mb-6 tw:text-sm tw:leading-[1.6] tw:opacity-[0.95] tw:text-center tw:text-white">
               {{ dialogConfig.offerText }}
             </p>
 
-            <div class="hero-offer">
+            <div class="tw:mb-8 tw:flex tw:flex-row tw:items-center tw:justify-center tw:gap-4">
               <!-- Loading State: Show skeleton -->
               <template v-if="isLoadingLicense && dialogConfig.showUsageIndicator">
                 <OSkeleton
-                  class="usage-indicator tw:rounded-full"
+                  class="tw:shrink-0 tw:rounded-full"
                   style="width: 40px; height: 40px;"
                   data-test="enterprise-upgrade-usage-indicator-skeleton"
                 />
                 <OSkeleton
-                  class="offer-badge-skeleton tw:rounded-3xl"
+                  class="tw:shrink-0 tw:rounded-3xl"
                   style="width: 200px; height: 44px;"
                   data-test="enterprise-upgrade-offer-badge-skeleton"
                 />
@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Loaded State: Show actual data -->
               <template v-else>
-                <div class="offer-badge" :class="{ 'licensed-badge': dialogConfig.isLicensed }">
+                <div class="tw:inline-flex tw:items-center tw:bg-[linear-gradient(135deg,#22c55e_0%,#4ade80_100%)] tw:py-[10px] tw:px-5 tw:rounded-[24px] tw:font-bold tw:text-[15px] tw:backdrop-blur-[10px] tw:text-white tw:shadow-[0_4px_16px_rgba(34,197,94,0.4)]" :class="{ 'tw:bg-[rgba(255,255,255,0.2)]! tw:shadow-[0_4px_12px_rgba(0,0,0,0.15)]!': dialogConfig.isLicensed }">
                   <OIcon v-if="!dialogConfig.showUsageIndicator" :name="dialogConfig.badgeIcon" size="md" class="tw:mr-1" />
                   <span>{{ dialogConfig.badgeText }}</span>
                 </div>
@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Usage Chart (only for Enterprise with license) -->
-            <div v-if="dialogConfig.isLicensed" class="usage-chart-section">
+            <div v-if="dialogConfig.isLicensed" class="tw:w-full tw:mb-6 tw:bg-[rgba(255,255,255,0.1)] tw:rounded-[12px] tw:p-4 tw:backdrop-blur-[10px] tw:border tw:border-[rgba(255,255,255,0.2)]">
               <!-- Loading skeleton -->
               <template v-if="isLoadingLicense">
                 <OSkeleton
@@ -79,8 +79,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
               <!-- Loaded chart -->
               <template v-else-if="chartData">
-                <div class="chart-wrapper">
-                  <div class="usage-chart-container" style="height: 150px; width: 100%;">
+                <div class="tw:relative tw:w-full">
+                  <div class="usage-chart-container tw:w-full tw:overflow-visible tw:p-0 tw:mx-auto tw:min-h-[150px] tw:max-h-[150px]" style="height: 150px; width: 100%;">
                     <ChartRenderer
                       :key="dashboardRenderKey"
                       :data="chartData"
@@ -93,13 +93,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
             </div>
 
-            <div class="hero-actions">
+            <div class="tw:flex tw:flex-col tw:gap-3 tw:w-full">
               <OButton
                 v-if="dialogConfig.showPrimaryButton"
                 variant="on-dark-primary"
                 size="lg"
                 @click="handlePrimaryButtonClick"
-                class="download-btn"
+                class="tw:bg-white! tw:text-[var(--q-primary)]! tw:font-bold tw:py-[10px] tw:px-8 tw:text-[15px] tw:rounded-lg! tw:shadow-[0_4px_16px_rgba(0,0,0,0.15)] tw:transition-all tw:duration-300 tw:[transition-timing-function:cubic-bezier(0.4,0,0.2,1)] tw:[letter-spacing:0.3px] tw:hover:[transform:translateY(-3px)_scale(1.02)] tw:hover:shadow-[0_8px_24px_rgba(0,0,0,0.25)] tw:active:[transform:translateY(-1px)_scale(0.98)]"
               >
                 {{ dialogConfig.primaryButtonText }}
                 <template v-if="dialogConfig.primaryButtonIcon" #icon-right>
@@ -111,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="on-dark-ghost"
                 size="lg"
                 @click="contactSales"
-                class="learn-more-btn"
+                class="tw:font-semibold tw:py-[10px] tw:px-6 tw:text-[15px] tw:rounded-lg! tw:border-2 tw:border-[rgba(255,255,255,0.3)] tw:transition-all tw:duration-300 tw:bg-transparent tw:[letter-spacing:0.2px] tw:hover:bg-[rgba(255,255,255,0.15)] tw:hover:border-[rgba(255,255,255,0.5)] tw:hover:[transform:translateX(4px)] tw:active:[transform:scale(0.96)]"
               >
                 {{ t('about.enterprise_offer.buttons.contact_sales') }}
               </OButton>
@@ -120,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="on-dark-ghost"
                 size="lg"
                 @click="openDocsLink"
-                class="learn-more-btn"
+                class="tw:font-semibold tw:py-[10px] tw:px-6 tw:text-[15px] tw:rounded-lg! tw:border-2 tw:border-[rgba(255,255,255,0.3)] tw:transition-all tw:duration-300 tw:bg-transparent tw:[letter-spacing:0.2px] tw:hover:bg-[rgba(255,255,255,0.15)] tw:hover:border-[rgba(255,255,255,0.5)] tw:hover:[transform:translateX(4px)] tw:active:[transform:scale(0.96)]"
               >
                 {{ t('about.enterprise_offer.buttons.learn_more') }}
               </OButton>
@@ -129,31 +129,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Right Panel - Features List -->
-        <div class="features-panel" tw:flex-1 tw:bg-white tw:flex tw:flex-col tw:overflow-hidden>
-          <div class="features-header">
-            <h4>{{ dialogConfig.featuresTitle }}</h4>
-            <p class="header-subtitle">{{ dialogConfig.featuresSubtitle }}</p>
+        <div tw:flex-1 tw:bg-white tw:dark:bg-[#1e1e1e] tw:flex tw:flex-col tw:overflow-hidden :class="{ 'tw:max-w-full': dialogConfig.isCloudLayout }">
+          <div class="tw:pt-4 tw:pb-3 tw:px-8 tw:bg-white tw:dark:bg-[#1e1e1e] tw:sticky tw:top-0 tw:z-10 tw:border-b tw:border-b-[rgba(0,0,0,0.08)] tw:dark:border-b-[rgba(255,255,255,0.1)] tw:text-center">
+            <h4 class="tw:text-[18px] tw:font-bold tw:m-0 tw:mb-1 tw:text-[rgba(0,0,0,0.9)] tw:dark:text-[rgba(255,255,255,0.95)] tw:[letter-spacing:-0.3px]">{{ dialogConfig.featuresTitle }}</h4>
+            <p class="tw:text-xs tw:text-[rgba(0,0,0,0.6)] tw:dark:text-[rgba(255,255,255,0.6)] tw:m-0 tw:font-medium">{{ dialogConfig.featuresSubtitle }}</p>
           </div>
 
           <!-- Cloud 3-column layout -->
-          <div v-if="dialogConfig.isCloudLayout" class="features-list cloud-three-column">
+          <div v-if="dialogConfig.isCloudLayout" class="tw:flex-1 tw:overflow-y-auto tw:pt-2 tw:pb-4 tw:px-8 tw:grid tw:grid-cols-3 tw:gap-y-[7px] tw:gap-x-[14px] tw:content-start">
             <!-- Column 1: Core Features -->
             <div
               v-for="feature in coreFeatures"
               :key="feature.name"
-              class="feature-list-item"
-              :class="{ 'has-link': feature.link }"
+              class="tw:flex tw:gap-[10px] tw:p-[8px_12px] tw:rounded-md tw:border tw:border-[rgba(0,0,0,0.08)] tw:dark:border-[rgba(255,255,255,0.12)] tw:transition-all tw:duration-200"
+              :class="feature.link ? 'tw:cursor-pointer tw:hover:bg-[rgba(var(--q-primary-rgb),0.05)] tw:hover:border-[rgba(var(--q-primary-rgb),0.3)] tw:hover:[transform:translateX(2px)] tw:active:[transform:translateX(0)] tw:dark:hover:bg-[rgba(var(--q-primary-rgb),0.1)] tw:dark:hover:border-[rgba(var(--q-primary-rgb),0.4)]' : 'tw:hover:bg-[rgba(0,0,0,0.03)] tw:hover:border-[rgba(0,0,0,0.12)] tw:dark:hover:bg-[rgba(255,255,255,0.05)]'"
               @click="feature.link && openFeatureLink(feature.link)"
             >
-              <div class="feature-icon-badge">
+              <div class="tw:shrink-0 tw:w-[30px] tw:h-[30px] tw:rounded-lg tw:bg-[rgba(var(--q-primary-rgb),0.1)] tw:dark:bg-[rgba(var(--q-primary-rgb),0.15)] tw:flex tw:items-center tw:justify-center tw:text-[var(--q-primary)]">
                 <OIcon :name="feature.icon" size="sm" />
               </div>
-              <div class="feature-content">
-                <div class="feature-name">
+              <div class="tw:flex-1 tw:min-w-0">
+                <div class="tw:text-[13px] tw:font-semibold tw:text-[rgba(0,0,0,0.87)] tw:dark:text-[rgba(255,255,255,0.95)] tw:mb-0.5 tw:leading-[1.25] tw:flex tw:items-center tw:gap-1.5">
                   {{ feature.name }}
-                  <OIcon v-if="feature.link" name="open-in-new" size="xs" class="external-link-icon" />
+                  <OIcon v-if="feature.link" name="open-in-new" size="xs" class="tw:opacity-60 tw:ml-1 tw:align-middle" />
                 </div>
-                <div class="feature-desc">{{ feature.note }}</div>
+                <div class="tw:text-[11px] tw:text-[rgba(0,0,0,0.55)] tw:dark:text-[rgba(255,255,255,0.55)] tw:leading-[1.25]">{{ feature.note }}</div>
               </div>
             </div>
 
@@ -162,48 +162,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="feature in enterpriseFeatures"
               v-show="!feature.cloudHidden"
               :key="feature.name"
-              class="feature-list-item"
-              :class="{ 'has-link': feature.link }"
+              class="tw:flex tw:gap-[10px] tw:p-[8px_12px] tw:rounded-md tw:border tw:border-[rgba(0,0,0,0.08)] tw:dark:border-[rgba(255,255,255,0.12)] tw:transition-all tw:duration-200"
+              :class="feature.link ? 'tw:cursor-pointer tw:hover:bg-[rgba(var(--q-primary-rgb),0.05)] tw:hover:border-[rgba(var(--q-primary-rgb),0.3)] tw:hover:[transform:translateX(2px)] tw:active:[transform:translateX(0)] tw:dark:hover:bg-[rgba(var(--q-primary-rgb),0.1)] tw:dark:hover:border-[rgba(var(--q-primary-rgb),0.4)]' : 'tw:hover:bg-[rgba(0,0,0,0.03)] tw:hover:border-[rgba(0,0,0,0.12)] tw:dark:hover:bg-[rgba(255,255,255,0.05)]'"
               @click="feature.link && openFeatureLink(feature.link)"
             >
-              <div class="feature-icon-badge">
+              <div class="tw:shrink-0 tw:w-[30px] tw:h-[30px] tw:rounded-lg tw:bg-[rgba(var(--q-primary-rgb),0.1)] tw:dark:bg-[rgba(var(--q-primary-rgb),0.15)] tw:flex tw:items-center tw:justify-center tw:text-[var(--q-primary)]">
                 <OIcon :name="feature.icon" size="sm" />
               </div>
-              <div class="feature-content">
-                <div class="feature-name">
+              <div class="tw:flex-1 tw:min-w-0">
+                <div class="tw:text-[13px] tw:font-semibold tw:text-[rgba(0,0,0,0.87)] tw:dark:text-[rgba(255,255,255,0.95)] tw:mb-0.5 tw:leading-[1.25] tw:flex tw:items-center tw:gap-1.5">
                   {{ feature.name }}
-                  <OIcon v-if="feature.link" name="open-in-new" size="xs" class="external-link-icon" />
-                  <span v-if="feature.beta" class="beta-badge">BETA</span>
+                  <OIcon v-if="feature.link" name="open-in-new" size="xs" class="tw:opacity-60 tw:ml-1 tw:align-middle" />
+                  <span v-if="feature.beta" class="tw:inline-flex tw:items-center tw:py-px tw:px-1 tw:text-[var(--q-primary)] tw:border tw:border-[var(--q-primary)] tw:rounded-[10px] tw:text-[8px] tw:font-bold tw:[letter-spacing:0.5px] tw:leading-[1.4] tw:uppercase">BETA</span>
                 </div>
-                <div class="feature-desc">{{ feature.note }}</div>
+                <div class="tw:text-[11px] tw:text-[rgba(0,0,0,0.55)] tw:dark:text-[rgba(255,255,255,0.55)] tw:leading-[1.25]">{{ feature.note }}</div>
               </div>
             </div>
           </div>
 
           <!-- Standard 2-column layout for non-Cloud -->
-          <div v-else class="features-list">
+          <div v-else class="tw:flex-1 tw:overflow-y-auto tw:pt-2 tw:pb-4 tw:px-8 tw:grid tw:grid-cols-2 tw:gap-y-[7px] tw:gap-x-[14px] tw:content-start">
             <div
               v-for="feature in enterpriseFeatures"
               v-show="!feature.cloudOnly"
               :key="feature.name"
-              class="feature-list-item"
-              :class="{ 'has-link': feature.link }"
+              class="tw:flex tw:gap-[10px] tw:p-[8px_12px] tw:rounded-md tw:border tw:border-[rgba(0,0,0,0.08)] tw:dark:border-[rgba(255,255,255,0.12)] tw:transition-all tw:duration-200"
+              :class="feature.link ? 'tw:cursor-pointer tw:hover:bg-[rgba(var(--q-primary-rgb),0.05)] tw:hover:border-[rgba(var(--q-primary-rgb),0.3)] tw:hover:[transform:translateX(2px)] tw:active:[transform:translateX(0)] tw:dark:hover:bg-[rgba(var(--q-primary-rgb),0.1)] tw:dark:hover:border-[rgba(var(--q-primary-rgb),0.4)]' : 'tw:hover:bg-[rgba(0,0,0,0.03)] tw:hover:border-[rgba(0,0,0,0.12)] tw:dark:hover:bg-[rgba(255,255,255,0.05)]'"
               @click="feature.link && openFeatureLink(feature.link)"
             >
-              <div class="feature-icon-badge">
+              <div class="tw:shrink-0 tw:w-[30px] tw:h-[30px] tw:rounded-lg tw:bg-[rgba(var(--q-primary-rgb),0.1)] tw:dark:bg-[rgba(var(--q-primary-rgb),0.15)] tw:flex tw:items-center tw:justify-center tw:text-[var(--q-primary)]">
                 <OIcon :name="feature.icon" size="sm" />
               </div>
-              <div class="feature-content">
-                <div class="feature-name">
+              <div class="tw:flex-1 tw:min-w-0">
+                <div class="tw:text-[13px] tw:font-semibold tw:text-[rgba(0,0,0,0.87)] tw:dark:text-[rgba(255,255,255,0.95)] tw:mb-0.5 tw:leading-[1.25] tw:flex tw:items-center tw:gap-1.5">
                   {{ feature.name }}
-                  <OIcon v-if="feature.link" name="open-in-new" size="xs" class="external-link-icon" />
-                  <span v-if="feature.beta" class="beta-badge">BETA</span>
-                  <span v-if="feature.requiresHA" class="ha-badge">
+                  <OIcon v-if="feature.link" name="open-in-new" size="xs" class="tw:opacity-60 tw:ml-1 tw:align-middle" />
+                  <span v-if="feature.beta" class="tw:inline-flex tw:items-center tw:py-px tw:px-1 tw:text-[var(--q-primary)] tw:border tw:border-[var(--q-primary)] tw:rounded-[10px] tw:text-[8px] tw:font-bold tw:[letter-spacing:0.5px] tw:leading-[1.4] tw:uppercase">BETA</span>
+                  <span v-if="feature.requiresHA" class="tw:inline-flex tw:items-center tw:py-0.5 tw:px-[7px] tw:bg-[rgba(var(--q-primary-rgb),0.15)] tw:dark:bg-[rgba(var(--q-primary-rgb),0.2)] tw:text-[var(--q-primary)] tw:rounded tw:text-[9px] tw:font-bold tw:[letter-spacing:0.5px] tw:leading-none tw:cursor-pointer tw:ml-1">
                     HA
                     <OTooltip side="top" align="center" :sideOffset="8" :content="t('about.enterprise_offer.tooltip.high_availability_mode_only')" />
                   </span>
                 </div>
-                <div class="feature-desc">{{ feature.note }}</div>
+                <div class="tw:text-[11px] tw:text-[rgba(0,0,0,0.55)] tw:dark:text-[rgba(255,255,255,0.55)] tw:leading-[1.25]">{{ feature.note }}</div>
               </div>
             </div>
           </div>
@@ -1041,399 +1041,8 @@ export default defineComponent({
 </script>
 
 <style>
-.close-btn-top-right:hover {
-  color: rgba(0, 0, 0, 0.87);
-}
-
-.dialog-split-layout.cloud-layout .features-panel {
-  flex: 1;
-  max-width: 100%;
-}
-
-/* Left Panel - Hero Section */
-.hero-panel .hero-content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  max-width: 400px;
-  width: 100%;
-  margin: auto;
-}
-
-.hero-panel .hero-icon {
-  width: 80px;
-  height: 80px;
-  background: rgba(255, 255, 255, 0.15);
-  border-radius: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 24px;
-  backdrop-filter: blur(10px);
-}
-
-.hero-panel .hero-title {
-  font-size: 32px;
-  font-weight: 700;
-  margin: 0 0 16px 0;
-  line-height: 1.2;
-  text-align: center;
-  color: white;
-}
-
-.hero-panel .offer-text {
-  margin: 0 0 24px 0;
-  font-size: 14px;
-  line-height: 1.6;
-  opacity: 0.95;
-  text-align: center;
-  color: white;
-}
-
-.hero-panel .hero-offer {
-  margin-bottom: 32px;
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
-}
-
-.hero-panel .hero-offer .usage-indicator {
-  flex-shrink: 0;
-}
-
-.hero-panel .hero-offer .offer-badge-skeleton {
-  flex-shrink: 0;
-}
-
-.hero-panel .hero-offer .offer-badge {
-  display: inline-flex;
-  align-items: center;
-  background: linear-gradient(135deg, #22c55e 0%, #4ade80 100%);
-  padding: 10px 20px;
-  border-radius: 24px;
-  font-weight: 700;
-  font-size: 15px;
-  backdrop-filter: blur(10px);
-  color: white;
-  box-shadow: 0 4px 16px rgba(34, 197, 94, 0.4);
-}
-
-/* Licensed badge - neutral white/transparent for users who already have license */
-.hero-panel .hero-offer .offer-badge.licensed-badge {
-  background: rgba(255, 255, 255, 0.2);
-  color: white;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
-
-.hero-panel .usage-chart-section {
-  width: 100%;
-  margin-bottom: 24px;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
-  padding: 16px;
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-.hero-panel .usage-chart-section .chart-wrapper {
-  position: relative;
-  width: 100%;
-}
-
-.hero-panel .usage-chart-section .usage-chart-container {
-  width: 100%;
-  overflow: visible;
-  padding: 0;
-  margin: 0 auto;
-  min-height: 150px;
-  max-height: 150px;
-}
-
-.hero-panel .usage-chart-section .usage-chart-container .grid-stack-item-content {
+.usage-chart-container .grid-stack-item-content {
   border: 0px !important;
-}
-
-.hero-panel .license-note {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-top: -8px;
-  margin-bottom: 16px;
-  padding: 8px 16px;
-  background: rgba(255, 255, 255, 0.15);
-  border-radius: 8px;
-  color: rgba(255, 255, 255, 0.9);
-  font-size: 12px;
-  font-weight: 500;
-  backdrop-filter: blur(10px);
-  white-space: nowrap;
-}
-
-.hero-panel .hero-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  width: 100%;
-}
-
-.hero-panel .hero-actions .download-btn {
-  background: white !important;
-  color: var(--q-primary) !important;
-  font-weight: 700;
-  padding: 10px 32px;
-  font-size: 15px;
-  border-radius: 8px !important;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  letter-spacing: 0.3px;
-}
-
-.hero-panel .hero-actions .download-btn:hover {
-  transform: translateY(-3px) scale(1.02);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
-}
-
-.hero-panel .hero-actions .download-btn:active {
-  transform: translateY(-1px) scale(0.98);
-}
-
-.hero-panel .hero-actions .learn-more-btn {
-  font-weight: 600;
-  padding: 10px 24px;
-  font-size: 15px;
-  border-radius: 8px !important;
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  transition: all 0.3s ease;
-  letter-spacing: 0.2px;
-  background: transparent;
-}
-
-.hero-panel .hero-actions .learn-more-btn:hover {
-  background: rgba(255, 255, 255, 0.15);
-  border-color: rgba(255, 255, 255, 0.5);
-  transform: translateX(4px);
-}
-
-.hero-panel .hero-actions .learn-more-btn:active {
-  transform: scale(0.96);
-}
-
-/* Right Panel - Features List */
-.features-panel .features-header {
-  padding: 16px 32px 12px 32px;
-  background: white;
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
-  text-align: center;
-}
-
-.features-panel .features-header .header-icon-wrapper {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  background: linear-gradient(135deg, var(--q-primary), color-mix(in srgb, var(--q-primary) 85%, purple 15%));
-  border-radius: 12px;
-  margin-bottom: 8px;
-}
-
-.features-panel .features-header .header-icon-wrapper .header-icon {
-  color: white;
-  font-size: 18px;
-}
-
-.features-panel .features-header h4 {
-  font-size: 18px;
-  font-weight: 700;
-  margin: 0 0 4px 0;
-  color: rgba(0, 0, 0, 0.9);
-  letter-spacing: -0.3px;
-}
-
-.features-panel .features-header .header-subtitle {
-  font-size: 12px;
-  color: rgba(0, 0, 0, 0.6);
-  margin: 0;
-  font-weight: 500;
-}
-
-.features-panel .features-list {
-  flex: 1;
-  overflow-y: auto;
-  padding: 8px 32px 16px 32px;
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 7px 14px;
-  align-content: start;
-}
-
-.features-panel .features-list.cloud-three-column {
-  grid-template-columns: repeat(3, 1fr);
-}
-
-.features-panel .feature-list-item {
-  display: flex;
-  gap: 10px;
-  padding: 8px 12px;
-  border-radius: 6px;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  transition: all 0.2s ease;
-}
-
-.features-panel .feature-list-item:hover {
-  background: rgba(0, 0, 0, 0.03);
-  border-color: rgba(0, 0, 0, 0.12);
-}
-
-.features-panel .feature-list-item.has-link {
-  cursor: pointer;
-}
-
-.features-panel .feature-list-item.has-link:hover {
-  background: rgba(var(--q-primary-rgb), 0.05);
-  border-color: rgba(var(--q-primary-rgb), 0.3);
-  transform: translateX(2px);
-}
-
-.features-panel .feature-list-item.has-link:active {
-  transform: translateX(0);
-}
-
-.features-panel .feature-list-item .feature-icon-badge {
-  flex-shrink: 0;
-  width: 30px;
-  height: 30px;
-  border-radius: 8px;
-  background: rgba(var(--q-primary-rgb), 0.1);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--q-primary);
-}
-
-.features-panel .feature-list-item .feature-content {
-  flex: 1;
-  min-width: 0;
-}
-
-.features-panel .feature-list-item .feature-name {
-  font-size: 13px;
-  font-weight: 600;
-  color: rgba(0, 0, 0, 0.87);
-  margin-bottom: 2px;
-  line-height: 1.25;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.features-panel .feature-list-item .external-link-icon {
-  opacity: 0.6;
-  margin-left: 4px;
-  vertical-align: middle;
-}
-
-.features-panel .feature-list-item .ha-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 7px;
-  background: rgba(var(--q-primary-rgb), 0.15);
-  color: var(--q-primary);
-  border-radius: 4px;
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.5px;
-  line-height: 1;
-  cursor: pointer;
-  margin-left: 4px;
-}
-
-.features-panel .feature-list-item .beta-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 1px 4px;
-  color: var(--q-primary);
-  border: 1px solid var(--q-primary);
-  border-radius: 10px;
-  font-size: 8px;
-  font-weight: 700;
-  letter-spacing: 0.5px;
-  line-height: 1.4;
-  text-transform: uppercase;
-}
-
-.features-panel .feature-list-item .feature-desc {
-  font-size: 11px;
-  color: rgba(0, 0, 0, 0.55);
-  line-height: 1.25;
-}
-
-/* Dark mode */
-body.body--dark .close-btn-top-right {
-  color: rgba(255, 255, 255, 0.7);
-}
-
-body.body--dark .close-btn-top-right:hover {
-  color: rgba(255, 255, 255, 0.95);
-}
-
-body.body--dark .features-panel {
-  background: #1e1e1e;
-}
-
-body.body--dark .features-panel .features-header {
-  background: #1e1e1e;
-  border-bottom-color: rgba(255, 255, 255, 0.1);
-}
-
-body.body--dark .features-panel .features-header h4 {
-  color: rgba(255, 255, 255, 0.95);
-}
-
-body.body--dark .features-panel .features-header .header-subtitle {
-  color: rgba(255, 255, 255, 0.6);
-}
-
-body.body--dark .features-panel .feature-list-item {
-  border: 1px solid rgba(255, 255, 255, 0.12);
-}
-
-body.body--dark .features-panel .feature-list-item:hover {
-  background: rgba(255, 255, 255, 0.05);
-}
-
-body.body--dark .features-panel .feature-list-item.has-link:hover {
-  background: rgba(var(--q-primary-rgb), 0.1);
-  border-color: rgba(var(--q-primary-rgb), 0.4);
-}
-
-body.body--dark .features-panel .feature-list-item .feature-icon-badge {
-  background: rgba(var(--q-primary-rgb), 0.15);
-}
-
-body.body--dark .features-panel .feature-list-item .feature-name {
-  color: rgba(255, 255, 255, 0.95);
-}
-
-body.body--dark .features-panel .feature-list-item .ha-badge {
-  background: rgba(var(--q-primary-rgb), 0.2);
-  color: var(--q-primary);
-}
-
-body.body--dark .features-panel .feature-list-item .beta-badge {
-  color: var(--q-primary);
-  border-color: var(--q-primary);
-}
-
-body.body--dark .features-panel .feature-list-item .feature-desc {
-  color: rgba(255, 255, 255, 0.55);
 }
 
 @media (max-width: 900px) {

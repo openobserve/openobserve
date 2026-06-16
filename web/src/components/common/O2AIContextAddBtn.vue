@@ -6,12 +6,12 @@
         size="icon-toolbar"
         @click.stop="sendToAiChat"
         data-test="o2-ai-context-add-btn"
-        :class="['o2-ai-context-btn', props.class]"
+        :class="['tw:group', props.class]"
         :style="props.style"
         class="tw:bg-[linear-gradient(135deg,rgba(139,92,246,0.15)_0%,rgba(236,72,153,0.15)_100%)]! tw:text-white! tw:[transition:background_0.3s_ease,box-shadow_0.3s_ease]! tw:w-7.5! tw:h-7.5! tw:min-w-7.5! tw:min-h-7.5! tw:rounded-md! tw:hover:bg-[linear-gradient(135deg,#8B5CF6_0%,#EC4899_100%)]! tw:hover:shadow-[0_0.25rem_0.75rem_0_rgba(139,92,246,0.35)]!"
         >
         <div class="tw:flex tw:items-center tw:flex-nowrap">
-            <img :height="props.imageHeight" :width="props.imageWidth" :src="getBtnLogo" class="header-icon ai-icon tw:[transition:transform_0.6s_ease]" />
+            <img :height="props.imageHeight" :width="props.imageWidth" :src="getBtnLogo" class="tw:[transition:transform_0.6s_ease,filter_0.6s_ease] tw:group-hover:brightness-0 tw:group-hover:invert tw:group-hover:rotate-180" />
         </div>
     </OButton>
 </template>
@@ -68,9 +68,3 @@ const sendToAiChat = () => {
 }
 </script>
 
-<style>
-.o2-ai-context-btn:hover .ai-icon {
-  filter: brightness(0) invert(1);
-  transform: rotate(180deg);
-}
-</style>

@@ -8,7 +8,7 @@
         }"
         data-test="date-time-btn"
         variant="outline"
-        class="date-time-button tw:h-full tw:rounded-[3px] tw:py-0 tw:px-[5px] tw:text-xs tw:min-w-auto tw:bg-[rgba(89,96,178,0.2)]!"
+        class="tw:h-full tw:rounded-[3px] tw:py-0 tw:px-[5px] tw:text-xs tw:min-w-auto tw:bg-[rgba(89,96,178,0.2)]!"
         :class="changeStyle ? computedClass : ''"
         :disabled="isFirstEntry"
       >
@@ -17,7 +17,9 @@
         </template>
         {{ changeStyle ? getTrimmedDisplayValue() : getDisplayValue() }}
         <template #icon-right>
-          <OIcon name="arrow-drop-down" size="sm" />
+          <OIcon name="arrow-drop-down" size="sm"
+            class="tw:transition-transform tw:duration-[250ms] tw:ease-in-out"
+            :class="picker.showMenu ? 'tw:rotate-180' : ''" />
         </template>
       </OButton>
     </template>
@@ -233,21 +235,3 @@ const computedClass = computed(() => {
 });
 </script>
 
-<style>
-.date-time-button {
-  .OIcon.on-right {
-    transition: transform 0.25s ease;
-  }
-  &.isOpen .OIcon.on-right {
-    transform: rotate(180deg);
-  }
-
-  .q-btn__content {
-    justify-content: flex-start;
-
-    .block {
-      font-weight: 600;
-    }
-  }
-}
-</style>

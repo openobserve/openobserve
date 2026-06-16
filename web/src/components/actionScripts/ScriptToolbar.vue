@@ -1,9 +1,9 @@
 <template>
   <div
-    class="action-scripts-toolbar tw:pb-1.5 tw:w-full tw:flex tw:justify-between tw:items-center"
+    class="tw:pb-1.5 tw:w-full tw:flex tw:justify-between tw:items-center"
   >
     <div class="tw:flex tw:items-center">
-      <div class="tw:mr-2 add-script-back-btn">
+      <div class="tw:mr-2">
         <div
           data-test="add-script-back-btn"
           class="tw:flex tw:justify-center tw:items-center tw:cursor-pointer"
@@ -19,10 +19,10 @@
           <OIcon name="arrow-back-ios-new" size="xs" />
         </div>
       </div>
-      <div class="tw:text-lg tw:w-full add-script-title tw:mr-3">
+      <div class="tw:text-lg tw:w-full tw:mr-3">
         Add Action
       </div>
-      <div class="o2-input">
+      <div>
         <div class="tw:flex tw:items-center">
           <OInput
             data-test="add-script-name-input"
@@ -50,7 +50,7 @@
         </div>
       </div>
     </div>
-    <div class="add-script-actions tw:flex tw:items-center tw:gap-2">
+    <div class="tw:flex tw:items-center tw:gap-2">
       <OButton
         data-test="add-script-fullscreen-btn"
         v-close-popup="true"
@@ -153,12 +153,3 @@ const onSave = () => {
 
 defineExpose({ addScriptForm });
 </script>
-<style>
-.action-scripts-toolbar .q-field__bottom {
-  display: none;
-}
-
-.action-scripts-toolbar .add-script-actions .block {
-  font-weight: lighter;
-}
-</style>
