@@ -17,6 +17,7 @@ export class HomePage {
         this.ingestionMenu = page.locator('[data-test="menu-link-\\/ingestion-item"]');
         this.iamMenu = page.locator('[data-test="menu-link-\\/iam-item"]');
         this.reportsMenu = page.locator('[data-test="menu-link-\\/reports-item"]');
+        this.testDemoMenu = page.locator('[data-test="menu-link-\\/test-demo-item"]');
 
         // ===== HEADER SELECTORS (VERIFIED) =====
         this.orgSelector = page.locator('[data-test="navbar-organizations-select"]');

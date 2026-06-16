@@ -1,0 +1,20 @@
+{
+  "feature_slug": "test-demo",
+  "feature_title": "Test Demo Page",
+  "area": "GeneralTests",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "testDemo.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/GeneralTests/testDemo.spec.js",
+  "playwright_group": "GeneralTests",
+  "source_files": [
+    "web/src/views/TestDemo.vue",
+    "web/src/composables/shared/router.ts",
+    "web/src/layouts/MainLayout.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": "OSS edition confirmed — all changed files are under web/src/ with no enterprise path prefixes. The diff adds a new routed, navigable UI page at /test-demo (TestDemo.vue) with deterministic interactive controls (fruit select, cascading country→city selects, basic/advanced mode toggle, conditional priority select, and a combined-rule banner). All interactive elements carry data-test attributes. No REST endpoints or API contract changes. The page is a standalone test-surface, best placed in the GeneralTests area alongside other cross-cutting specs. No explicit opt-out found in feature_hint.txt or trigger_comment.txt. E2E generation is warranted; the downstream Architect should generate a self-contained Playwright spec exercising all four interactive sections."
+}
