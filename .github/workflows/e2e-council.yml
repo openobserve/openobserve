@@ -18,9 +18,11 @@ name: E2E Council (Test Generation)
 #
 # EVERY RUN IS TIED TO A PR — by design. A PR is the unit of change + review; generating tests
 # detached from a PR is not allowed. There are exactly two entry points, both PR-bound:
-#   - a comment that is EXACTLY `/e2e` on a PR → triages that PR's diff (extra text won't match).
+#   - a PR comment, EXACTLY one of (extra text won't match):
+#       /e2e         → FULL run: triage → generate → heal → open the test PR
+#       /e2e-dryrun  → triage only: posts the decision comment, generates nothing
 #   - Manual run with `pr_number`   → triages that PR's diff (pr_number is REQUIRED; accepts a
-#                                     bare number, "#123", or a full PR URL).
+#                                     bare number, "#123", or a full PR URL; honours the dry_run input).
 # No PR ⇒ no run. (There is intentionally no free-form branch option.)
 #   Example: dispatch with pr_number=1234 (or .../pull/1234).
 #
@@ -99,7 +101,7 @@ jobs:
       dry_run: ${{ steps.mode.outputs.dry_run }}
       pr_number: ${{ steps.resolve.outputs.pr_number }}
       author_allowed: ${{ steps.prinfo.outputs.author_allowed }}
-      author: ${{ steps.prinfo.outputs.author }}
+      author: ${{ steps.prinfo.outputs.author }} # source-PR author login; used to auto-assign the test PR (pr_back)
       head_ref: ${{ steps.prinfo.outputs.head_ref }}
       head_sha: ${{ steps.prinfo.outputs.head_sha }}
     steps:
@@ -156,9 +158,9 @@ jobs:
       - name: Determine dry-run mode
         id: mode
         # `/e2e` = full run, `/e2e-dryrun` = triage only, manual dispatch honours its dry_run input.
-        # COMMENT_BODY is attacker-controllable → passed via env and compared in-shell (never
-        # interpolated into the script) to avoid a code-injection sink. The trigger `if` already
-        # guarantees it's exactly one of the two commands.
+        # The trigger `if` already guarantees COMMENT_BODY is exactly `/e2e` or `/e2e-dryrun`; we
+        # still pass it via env and compare in-shell (never interpolated into the script) as
+        # defense-in-depth against code injection.
         env:
           EVENT_NAME: ${{ github.event_name }}
           INPUT_DRY: ${{ github.event.inputs.dry_run }}
@@ -959,13 +961,14 @@ jobs:
           fi
           echo "Linked test PR #$TEST_PR on source PR #$SRC_PR."
 
-          # Assign + request review from: the original feature dev + Neha + Shrinath (all on the
-          # allowlist). Done per-user with `|| true` so one bad entry (e.g. self-review when the
-          # bot account == a listed user, or a user who can't be added) never fails the job.
+          # Assign + request review from the original feature dev + Neha + Shrinath (all allowlisted)
+          # so every auto-generated test PR lands on the right desks. Per-user, each gh call wrapped
+          # in if/then/else so a single bad entry (e.g. a user who can't be assigned, or self-review
+          # when the bot account == a listed user) is logged but never fails the job — even under set -e.
           for U in "$AUTHOR" neha00290 Shrinath-O2; do
             [ -n "$U" ] || continue
-            gh pr edit "$TEST_PR" --repo "$GITHUB_REPOSITORY" --add-assignee "$U" >/dev/null 2>&1 \
-              && echo "assigned @$U" || echo "::warning::could not assign @$U"
-            gh pr edit "$TEST_PR" --repo "$GITHUB_REPOSITORY" --add-reviewer "$U" >/dev/null 2>&1 \
-              && echo "requested review from @$U" || echo "::notice::could not request review from @$U (self/perm)"
+            if gh pr edit "$TEST_PR" --repo "$GITHUB_REPOSITORY" --add-assignee "$U" >/dev/null 2>&1; then
+              echo "assigned @$U"; else echo "::warning::could not assign @$U"; fi
+            if gh pr edit "$TEST_PR" --repo "$GITHUB_REPOSITORY" --add-reviewer "$U" >/dev/null 2>&1; then
+              echo "requested review from @$U"; else echo "::notice::could not request review from @$U (self/perm)"; fi
           done
