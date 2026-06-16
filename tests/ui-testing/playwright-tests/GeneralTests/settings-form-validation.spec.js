@@ -9,6 +9,7 @@
 //   OrgStorageEditor     : empty required fields → required errors on submit
 //                          (storage is @enterprise-only — all tests tagged accordingly)
 //   DomainManagement     : invalid domain format → error; valid domain → added
+//   SemanticGroupItem    : blur empty display name → "Name is required" error
 
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
@@ -353,5 +354,75 @@ test.describe("Settings ModelPricingEditor form validation", () => {
         await expect(saveBtn).not.toBeVisible({ timeout: 5000 });
 
         testLogger.info('Model pricing editor closed after cancel button click');
+    });
+});
+
+// ── SemanticGroupItem display name validation ─────────────────────────────────
+//
+// SemanticGroupItem.vue sets displayError = t('common.name') + ' is required'
+// ("Name is required") on blur when the display name input is empty.
+// Navigation: Correlation Settings → Field Aliases tab → Add Custom Group.
+
+test.describe("Correlation Settings SemanticGroupItem display name validation", () => {
+    test.describe.configure({ mode: 'serial' });
+    let pm;
+    const orgId = process.env['ORGNAME'] || 'default';
+
+    test.beforeEach(async ({ page }, testInfo) => {
+        testLogger.testStart(testInfo.title, testInfo.file);
+        await navigateToBase(page);
+        pm = new PageManager(page);
+        await pm.correlationSettingsPage.navigateToCorrelationSettings(orgId);
+        await pm.correlationSettingsPage.clickFieldAliasesTab();
+        await pm.correlationSettingsPage.expectAddCustomGroupButtonVisible();
+        testLogger.info('Navigated to Field Aliases tab');
+    });
+
+    test('should show display name error when custom group is added and display name is blurred empty', {
+        tag: ['@settingsFormValidation', '@P0', '@smoke']
+    }, async ({ page }) => {
+        testLogger.info('Testing empty display name required error on blur');
+
+        await pm.correlationSettingsPage.clickAddCustomGroupButton();
+
+        // The new group row's display name input should be visible
+        const displayInput = page.locator('[data-test="semantic-group-display-input"]').last();
+        await expect(displayInput).toBeVisible({ timeout: 8000 });
+
+        // Focus and immediately blur (tab away) with an empty value to trigger error
+        await displayInput.click();
+        await displayInput.blur();
+
+        // handleDisplayBlur sets displayError when display is empty
+        const displayError = page.locator('[data-test="semantic-group-display-input-error"]').last();
+        await expect(displayError).toBeVisible();
+        await expect(displayError).toContainText('Name is required');
+
+        testLogger.info('Display name required error correctly shown on blur');
+    });
+
+    test('should clear display name error when name is filled after blur', {
+        tag: ['@settingsFormValidation', '@P1', '@smoke']
+    }, async ({ page }) => {
+        testLogger.info('Testing display name error clears when name is entered');
+
+        await pm.correlationSettingsPage.clickAddCustomGroupButton();
+
+        const displayInput = page.locator('[data-test="semantic-group-display-input"]').last();
+        await expect(displayInput).toBeVisible({ timeout: 8000 });
+
+        // Trigger error first
+        await displayInput.click();
+        await displayInput.blur();
+
+        const displayError = page.locator('[data-test="semantic-group-display-input-error"]').last();
+        await expect(displayError).toBeVisible();
+        await expect(displayError).toContainText('Name is required');
+
+        // Fill name — handleDisplayChange clears displayError
+        await displayInput.fill('Test Group');
+        await expect(displayError).not.toBeVisible();
+
+        testLogger.info('Display name error correctly cleared after name entry');
     });
 });

@@ -64,11 +64,12 @@ test.describe('Functions Form Validation', { tag: ['@functions-form-validation',
     test('should create function successfully with valid VRL code', async ({ page }) => {
       testLogger.info('Test: valid VRL function → created successfully');
       const fv = pm.functionsFormValidation;
+      const functionName = 'test_fv_vrl_001';
+
+      // Delete the function if it already exists from a previous run (idempotent)
+      await pm.functionsPage.deleteFunctionByName(functionName, '_meta').catch(() => {});
 
       await fv.openAddFunctionForm();
-
-      // Use a static name with a fixed suffix to avoid timestamp calls
-      const functionName = 'test_fv_vrl_001';
       await fv.fillFunctionName(functionName);
 
       // Type minimal valid VRL code into the editor

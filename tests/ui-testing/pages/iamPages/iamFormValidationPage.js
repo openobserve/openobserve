@@ -54,6 +54,23 @@ export class IamFormValidationPage {
         this.saSubmitBtn           = '[data-test="add-service-account-dialog"] [data-test="o-dialog-primary-btn"]';
         this.saCancelBtn           = '[data-test="add-service-account-dialog"] [data-test="o-dialog-secondary-btn"]';
 
+        // ── Add User form ─────────────────────────────────────────────────────
+        this.iamUsersTab           = '[data-test="iam-users-tab"]';
+        this.addBasicUserBtn       = '[data-test="add-basic-user"]';
+        this.addUserDialog         = '[data-test="add-user-dialog"]';
+        // AddUser.vue uses data-test="user-email-field", "user-password-field", "user-role-field"
+        // OInput auto-generates -field / -error suffixes
+        // OInput data-test="user-email-field" → error span: data-test="user-email-field-error"
+        this.userEmailInput        = '[data-test="user-email-field"]';
+        this.userEmailError        = '[data-test="user-email-field-error"]';
+        // OInput data-test="user-password-field" → error span: data-test="user-password-field-error"
+        this.userPasswordInput     = '[data-test="user-password-field"]';
+        this.userPasswordError     = '[data-test="user-password-field-error"]';
+        // OSelect data-test="user-role-field" → error span: data-test="user-role-field-error"
+        this.userRoleError         = '[data-test="user-role-field-error"]';
+        this.addUserSubmitBtn      = '[data-test="add-user-dialog"] [data-test="o-dialog-primary-btn"]';
+        this.addUserCancelBtn      = '[data-test="add-user-dialog"] [data-test="o-dialog-secondary-btn"]';
+
         // ── Toast / success messages ──────────────────────────────────────────
         this.toastSuccess          = '[data-test="o-toast-success"]';
         this.toastMessage          = '[data-test="o-toast-message"]';
@@ -171,18 +188,52 @@ export class IamFormValidationPage {
         await this.page.locator(this.saCancelBtn).click();
     }
 
+    // ── Add User form actions ─────────────────────────────────────────────────
+
+    async navigateToUsersTab() {
+        await this.navigateToIam();
+        await this.page.locator(this.iamUsersTab).waitFor({ state: 'visible', timeout: 10000 });
+        await this.page.locator(this.iamUsersTab).click();
+        await this.page.locator(this.addBasicUserBtn).waitFor({ state: 'visible', timeout: 10000 });
+    }
+
+    async openAddUserForm() {
+        await this.page.locator(this.addBasicUserBtn).click();
+        await this.page.locator(this.addUserDialog).waitFor({ state: 'visible', timeout: 8000 });
+    }
+
+    async fillUserEmail(email) {
+        await this.page.locator(this.userEmailInput).fill(email);
+    }
+
+    async fillUserPassword(password) {
+        await this.page.locator(this.userPasswordInput).fill(password);
+    }
+
+    async submitAddUserForm() {
+        await this.page.locator(this.addUserSubmitBtn).click();
+    }
+
+    async cancelAddUserForm() {
+        await this.page.locator(this.addUserCancelBtn).click();
+    }
+
     // ── Assertion-ready locator getters ──────────────────────────────────────
 
-    getOrgNameErrorLocator()   { return this.page.locator(this.orgNameError); }
-    getOrgSubmitBtnLocator()   { return this.page.locator(this.orgSubmitBtn); }
-    getGroupNameErrorLocator() { return this.page.locator(this.groupNameError); }
-    getGroupSubmitBtnLocator() { return this.page.locator(this.groupSubmitBtn); }
-    getRoleNameErrorLocator()  { return this.page.locator(this.roleNameError); }
-    getRoleSubmitBtnLocator()  { return this.page.locator(this.roleSubmitBtn); }
-    getSaEmailErrorLocator()   { return this.page.locator(this.saEmailError); }
-    getToastMessageLocator()   { return this.page.locator(this.toastMessage); }
-    getOrgDialogLocator()      { return this.page.locator(this.orgDialog); }
-    getGroupDialogLocator()    { return this.page.locator(this.groupDialog); }
-    getRoleDialogLocator()     { return this.page.locator(this.roleDialog); }
-    getSaDialogLocator()       { return this.page.locator(this.saDialog); }
+    getOrgNameErrorLocator()      { return this.page.locator(this.orgNameError); }
+    getOrgSubmitBtnLocator()      { return this.page.locator(this.orgSubmitBtn); }
+    getGroupNameErrorLocator()    { return this.page.locator(this.groupNameError); }
+    getGroupSubmitBtnLocator()    { return this.page.locator(this.groupSubmitBtn); }
+    getRoleNameErrorLocator()     { return this.page.locator(this.roleNameError); }
+    getRoleSubmitBtnLocator()     { return this.page.locator(this.roleSubmitBtn); }
+    getSaEmailErrorLocator()      { return this.page.locator(this.saEmailError); }
+    getToastMessageLocator()      { return this.page.locator(this.toastMessage); }
+    getOrgDialogLocator()         { return this.page.locator(this.orgDialog); }
+    getGroupDialogLocator()       { return this.page.locator(this.groupDialog); }
+    getRoleDialogLocator()        { return this.page.locator(this.roleDialog); }
+    getSaDialogLocator()          { return this.page.locator(this.saDialog); }
+    getAddUserDialogLocator()     { return this.page.locator(this.addUserDialog); }
+    getUserEmailErrorLocator()    { return this.page.locator(this.userEmailError); }
+    getUserPasswordErrorLocator() { return this.page.locator(this.userPasswordError); }
+    getUserRoleErrorLocator()     { return this.page.locator(this.userRoleError); }
 }

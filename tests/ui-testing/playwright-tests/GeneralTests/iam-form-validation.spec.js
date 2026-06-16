@@ -331,3 +331,80 @@ test.describe("IAM Service Account email format validation", () => {
         testLogger.info('Service account email error correctly cleared');
     });
 });
+
+// ── AddUser form validation ───────────────────────────────────────────────────
+//
+// When the "Add User" button is clicked with no existing user selected,
+// AddUser renders the email field (existingUser=true, beingUpdated=false).
+// Submitting with an empty or malformed email shows "Please enter a valid
+// email address." via emailError ref in AddUser.vue.
+
+test.describe("IAM Add User form validation", () => {
+    test.describe.configure({ mode: 'serial' });
+    let pm;
+
+    test.beforeEach(async ({ page }, testInfo) => {
+        testLogger.testStart(testInfo.title, testInfo.file);
+        await navigateToBase(page);
+        pm = new PageManager(page);
+        await pm.iamFormValidation.navigateToUsersTab();
+        await pm.iamFormValidation.openAddUserForm();
+        testLogger.info('Add User dialog opened');
+    });
+
+    test('should show email error when submitted with empty email', {
+        tag: ['@iamFormValidation', '@P0', '@smoke']
+    }, async ({ page }) => {
+        testLogger.info('Testing empty email required error on Add User submit');
+
+        await pm.iamFormValidation.submitAddUserForm();
+
+        await expect(pm.iamFormValidation.getUserEmailErrorLocator()).toBeVisible();
+        await expect(pm.iamFormValidation.getUserEmailErrorLocator()).toContainText('Please enter a valid email address.');
+
+        testLogger.info('Empty email error correctly shown');
+    });
+
+    test('should show email error when submitted with invalid email format', {
+        tag: ['@iamFormValidation', '@P0', '@smoke']
+    }, async ({ page }) => {
+        testLogger.info('Testing invalid email format error on Add User submit');
+
+        await pm.iamFormValidation.fillUserEmail('notavalidemail');
+        await pm.iamFormValidation.submitAddUserForm();
+
+        await expect(pm.iamFormValidation.getUserEmailErrorLocator()).toBeVisible();
+        await expect(pm.iamFormValidation.getUserEmailErrorLocator()).toContainText('Please enter a valid email address.');
+
+        testLogger.info('Invalid email format error correctly shown');
+    });
+
+    test('should clear email error when a valid email is entered', {
+        tag: ['@iamFormValidation', '@P1', '@smoke']
+    }, async ({ page }) => {
+        testLogger.info('Testing email error clears on valid input');
+
+        await pm.iamFormValidation.submitAddUserForm();
+        await expect(pm.iamFormValidation.getUserEmailErrorLocator()).toBeVisible();
+        await expect(pm.iamFormValidation.getUserEmailErrorLocator()).toContainText('Please enter a valid email address.');
+
+        // @update:model-value="emailError = ''" clears the error on input change
+        await pm.iamFormValidation.fillUserEmail('valid@example.com');
+        await expect(pm.iamFormValidation.getUserEmailErrorLocator()).not.toBeVisible();
+
+        testLogger.info('Email error correctly cleared after valid input');
+    });
+
+    test('should close dialog without saving when cancel is clicked', {
+        tag: ['@iamFormValidation', '@P2', '@smoke']
+    }, async ({ page }) => {
+        testLogger.info('Testing Add User dialog closes on cancel');
+
+        await pm.iamFormValidation.fillUserEmail('cancel@example.com');
+        await pm.iamFormValidation.cancelAddUserForm();
+
+        await expect(pm.iamFormValidation.getAddUserDialogLocator()).not.toBeVisible({ timeout: 5000 });
+
+        testLogger.info('Add User dialog correctly closed on cancel');
+    });
+});
