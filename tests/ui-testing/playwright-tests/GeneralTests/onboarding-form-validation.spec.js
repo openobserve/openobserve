@@ -75,7 +75,9 @@ test.describe("Onboarding GetStarted form validation", () => {
         await pm.onboardingFormValidation.triggerEmptyValidationOnWhereDoYouWork();
 
         await expect(pm.onboardingFormValidation.getHearAboutUsErrorLocator()).toBeVisible();
+        await expect(pm.onboardingFormValidation.getHearAboutUsErrorLocator()).toContainText('This field is required');
         await expect(pm.onboardingFormValidation.getWhereDoYouWorkErrorLocator()).toBeVisible();
+        await expect(pm.onboardingFormValidation.getWhereDoYouWorkErrorLocator()).toContainText('This field is required');
 
         testLogger.info('Both required errors shown correctly');
     });

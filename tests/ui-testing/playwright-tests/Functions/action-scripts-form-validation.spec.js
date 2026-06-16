@@ -102,7 +102,7 @@ test.describe(
         await pm.actionScriptsFormValidation.clickSave();
 
         // The component sets nameError = t('common.nameRequired') when name is blank
-        await pm.actionScriptsFormValidation.expectNameError(null);
+        await pm.actionScriptsFormValidation.expectNameError('Name is required');
         testLogger.info('Name required error visible after save with empty name');
       });
 
@@ -129,7 +129,7 @@ test.describe(
         await pm.actionScriptsFormValidation.clickSave();
 
         // Expect the type-select error to become visible
-        await pm.actionScriptsFormValidation.expectTypeError();
+        await pm.actionScriptsFormValidation.expectTypeError('Field is required!');
         testLogger.info('Type required error visible when type not selected');
       });
 

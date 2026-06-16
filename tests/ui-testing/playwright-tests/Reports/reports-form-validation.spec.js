@@ -42,6 +42,7 @@ test.describe("Reports form validation — required field errors", () => {
 
         // Name error must be visible
         await expect(pm.reportsFormValidation.getReportNameErrorLocator()).toBeVisible();
+        await expect(pm.reportsFormValidation.getReportNameErrorLocator()).toContainText('Name is required');
 
         // Form must stay on the create page (save was blocked)
         await expect(pm.reportsFormValidation.getAddReportSectionLocator()).toBeVisible();
@@ -85,6 +86,7 @@ test.describe("Reports form validation — required field errors", () => {
 
         // Folder error must be visible
         await expect(pm.reportsFormValidation.getDashboardFolderErrorLocator()).toBeVisible();
+        await expect(pm.reportsFormValidation.getDashboardFolderErrorLocator()).toContainText('This field is required');
 
         // Form must stay on the create page
         await expect(pm.reportsFormValidation.getAddReportSectionLocator()).toBeVisible();

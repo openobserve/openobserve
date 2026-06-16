@@ -236,6 +236,7 @@ test.describe('Cipher Keys — AddEncryptionMechanism form validation', {
     // Provider type error should appear
     const providerError = pm.cipherKeysFormValidation.encryptionProviderTypeError;
     await expect(providerError).toBeVisible({ timeout: 5000 });
+    await expect(providerError).toContainText('Provider type is required');
     testLogger.info('Provider type required error correctly shown');
   });
 
@@ -263,6 +264,7 @@ test.describe('Cipher Keys — AddEncryptionMechanism form validation', {
 
     const algorithmError = pm.cipherKeysFormValidation.encryptionAlgorithmError;
     await expect(algorithmError).toBeVisible({ timeout: 5000 });
+    await expect(algorithmError).toContainText('Algorithm is required');
     testLogger.info('Algorithm required error correctly shown for Simple provider type');
   });
 });

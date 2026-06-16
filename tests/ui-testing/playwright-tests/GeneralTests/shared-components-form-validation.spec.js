@@ -140,6 +140,7 @@ test.describe("TimeRangeEditor form validation", () => {
         const endErrorLocator = pm.sharedComponentsFormValidation.getCustomEndErrorLocator();
         await endErrorLocator.waitFor({ state: 'visible' });
         await expect(endErrorLocator).toBeVisible();
+        await expect(endErrorLocator).toContainText('End time must be after start time');
 
         // Apply button must be disabled (isValid = false)
         await expect(
@@ -169,6 +170,7 @@ test.describe("TimeRangeEditor form validation", () => {
         const startErrorLocator = pm.sharedComponentsFormValidation.getCustomStartErrorLocator();
         await startErrorLocator.waitFor({ state: 'visible' });
         await expect(startErrorLocator).toBeVisible();
+        await expect(startErrorLocator).toContainText('Start time must be before end time');
 
         await expect(
             pm.sharedComponentsFormValidation.getTimeRangeApplyBtnLocator()

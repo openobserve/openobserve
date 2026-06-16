@@ -39,6 +39,7 @@ test.describe('AI Toolsets form validation', { tag: '@enterprise' }, () => {
         await pm.aiToolsetsFormValidation.clickSave();
 
         await expect(pm.aiToolsetsFormValidation.getNameErrorLocator()).toBeVisible();
+        await expect(pm.aiToolsetsFormValidation.getNameErrorLocator()).toContainText('Name is required');
 
         testLogger.info('Name required error correctly shown');
     });
@@ -53,6 +54,7 @@ test.describe('AI Toolsets form validation', { tag: '@enterprise' }, () => {
         await pm.aiToolsetsFormValidation.clickSave();
 
         await expect(pm.aiToolsetsFormValidation.getMcpUrlErrorLocator()).toBeVisible();
+        await expect(pm.aiToolsetsFormValidation.getMcpUrlErrorLocator()).toContainText('Endpoint URL is required');
 
         testLogger.info('MCP URL required error correctly shown');
     });
@@ -65,7 +67,9 @@ test.describe('AI Toolsets form validation', { tag: '@enterprise' }, () => {
         await pm.aiToolsetsFormValidation.clickSave();
 
         await expect(pm.aiToolsetsFormValidation.getNameErrorLocator()).toBeVisible();
+        await expect(pm.aiToolsetsFormValidation.getNameErrorLocator()).toContainText('Name is required');
         await expect(pm.aiToolsetsFormValidation.getMcpUrlErrorLocator()).toBeVisible();
+        await expect(pm.aiToolsetsFormValidation.getMcpUrlErrorLocator()).toContainText('Endpoint URL is required');
 
         testLogger.info('Both name and MCP URL required errors correctly shown');
     });
@@ -77,6 +81,7 @@ test.describe('AI Toolsets form validation', { tag: '@enterprise' }, () => {
 
         await pm.aiToolsetsFormValidation.clickSave();
         await expect(pm.aiToolsetsFormValidation.getNameErrorLocator()).toBeVisible();
+        await expect(pm.aiToolsetsFormValidation.getNameErrorLocator()).toContainText('Name is required');
 
         await pm.aiToolsetsFormValidation.fillName('ai_toolset_fv_fix');
         await expect(pm.aiToolsetsFormValidation.getNameErrorLocator()).not.toBeVisible();

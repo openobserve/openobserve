@@ -122,6 +122,9 @@ test.describe(
                 await expect(
                     pm.pipelinesFormValidation.getChunkPeriodInputErrorLocator()
                 ).toBeVisible({ timeout: 5000 });
+                await expect(
+                    pm.pipelinesFormValidation.getChunkPeriodInputErrorLocator()
+                ).toContainText('Must be between 1 and 1440');
             }
         );
 
@@ -141,6 +144,9 @@ test.describe(
                 await expect(
                     pm.pipelinesFormValidation.getDelayBetweenChunksErrorLocator()
                 ).toBeVisible({ timeout: 5000 });
+                await expect(
+                    pm.pipelinesFormValidation.getDelayBetweenChunksErrorLocator()
+                ).toContainText('Must be between 1 and 3600');
             }
         );
 
@@ -416,6 +422,9 @@ test.describe(
                 await expect(
                     pm.pipelinesFormValidation.getAddDestinationUrlErrorLocator()
                 ).toBeVisible({ timeout: 5000 });
+                await expect(
+                    pm.pipelinesFormValidation.getAddDestinationUrlErrorLocator()
+                ).toContainText('URL should not end with a trailing slash');
             }
         );
 
@@ -500,6 +509,9 @@ test.describe(
                 await expect(
                     pm.pipelinesFormValidation.getEditChunkPeriodErrorLocator()
                 ).toBeVisible({ timeout: 5000 });
+                await expect(
+                    pm.pipelinesFormValidation.getEditChunkPeriodErrorLocator()
+                ).toContainText('Must be between 1 and 1440');
             }
         );
     }

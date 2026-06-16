@@ -49,6 +49,7 @@ test.describe('Alerts Form Validation', { tag: ['@alerts-form-validation', '@P0'
       await fvPage.waitForDestinationNameError();
       const nameError = fvPage.getDestNameErrorLocator();
       await expect(nameError).toBeVisible();
+      await expect(nameError).toContainText('Name is required');
       const nameErrorText = await nameError.textContent();
       expect(nameErrorText.trim().length).toBeGreaterThan(0);
     });
@@ -69,6 +70,7 @@ test.describe('Alerts Form Validation', { tag: ['@alerts-form-validation', '@P0'
       await fvPage.waitForDestinationUrlError();
       const urlError = fvPage.getDestUrlErrorLocator();
       await expect(urlError).toBeVisible();
+      await expect(urlError).toContainText('Field is required!');
       const urlErrorText = await urlError.textContent();
       expect(urlErrorText.trim().length).toBeGreaterThan(0);
     });
@@ -97,6 +99,7 @@ test.describe('Alerts Form Validation', { tag: ['@alerts-form-validation', '@P0'
       await fvPage.waitForSlackWebhookError();
       const webhookError = fvPage.getSlackWebhookErrorLocator();
       await expect(webhookError).toBeVisible();
+      await expect(webhookError).toContainText('Invalid Slack webhook URL');
       const webhookErrorText = await webhookError.textContent();
       expect(webhookErrorText.trim().length).toBeGreaterThan(0);
     });
@@ -156,6 +159,7 @@ test.describe('Alerts Form Validation', { tag: ['@alerts-form-validation', '@P0'
       await fvPage.waitForTemplateNameError();
       const nameError = fvPage.getTemplateNameErrorLocator();
       await expect(nameError).toBeVisible();
+      await expect(nameError).toContainText('Name is required');
       const nameErrorText = await nameError.textContent();
       expect(nameErrorText.trim().length).toBeGreaterThan(0);
     });

@@ -56,8 +56,10 @@ test.describe("Regex Patterns form validation", () => {
 
         // OFormInput validator: '* Name is required'
         await expect(pm.regexPatternsFormValidation.getNameErrorLocator()).toBeVisible();
+        await expect(pm.regexPatternsFormValidation.getNameErrorLocator()).toContainText('* Name is required');
         // OFormTextarea validator: '* Pattern is required'
         await expect(pm.regexPatternsFormValidation.getPatternErrorLocator()).toBeVisible();
+        await expect(pm.regexPatternsFormValidation.getPatternErrorLocator()).toContainText('* Pattern is required');
 
         testLogger.info('Name and pattern required errors correctly shown for empty form');
     });

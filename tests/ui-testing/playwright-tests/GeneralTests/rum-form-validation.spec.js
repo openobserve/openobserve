@@ -115,6 +115,7 @@ test.describe('RUM Source Maps upload form validation', () => {
     await pm.rumFormValidation.clickUpload();
 
     await expect(pm.rumFormValidation.getVersionErrorLocator()).toBeVisible({ timeout: 5000 });
+    await expect(pm.rumFormValidation.getVersionErrorLocator()).toContainText('Version is required');
 
     testLogger.info('Version required error correctly shown');
   });
@@ -132,6 +133,7 @@ test.describe('RUM Source Maps upload form validation', () => {
     await pm.rumFormValidation.clickUpload();
 
     await expect(pm.rumFormValidation.getServiceErrorLocator()).toBeVisible({ timeout: 5000 });
+    await expect(pm.rumFormValidation.getServiceErrorLocator()).toContainText('Service is required');
 
     testLogger.info('Service required error correctly shown');
   });

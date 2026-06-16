@@ -128,9 +128,12 @@ class ActionScriptsFormValidationPage {
     }
   }
 
-  async expectTypeError() {
+  async expectTypeError(message) {
     await this.page.locator(this.typeSelectError).waitFor({ state: 'visible' });
     await expect(this.page.locator(this.typeSelectError)).toBeVisible();
+    if (message) {
+      await expect(this.page.locator(this.typeSelectError)).toContainText(message);
+    }
   }
 
   async selectType(value) {
@@ -173,9 +176,12 @@ class ActionScriptsFormValidationPage {
     await this.page.locator(this.cloneNameField).fill('');
   }
 
-  async expectCloneNameError() {
+  async expectCloneNameError(message) {
     await this.page.locator(this.cloneNameError).waitFor({ state: 'visible' });
     await expect(this.page.locator(this.cloneNameError)).toBeVisible();
+    if (message) {
+      await expect(this.page.locator(this.cloneNameError)).toContainText(message);
+    }
   }
 
   async clickCloneSave() {

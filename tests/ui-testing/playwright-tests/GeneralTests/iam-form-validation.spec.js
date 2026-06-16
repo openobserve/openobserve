@@ -67,6 +67,7 @@ test.describe("IAM Organization form validation", () => {
         await pm.iamFormValidation.openOrganizationForm();
         await pm.iamFormValidation.fillOrgName('bad@name!');
         await expect(pm.iamFormValidation.getOrgNameErrorLocator()).toBeVisible();
+        await expect(pm.iamFormValidation.getOrgNameErrorLocator()).toContainText('Use alphanumeric characters, space and underscore only.');
 
         await pm.iamFormValidation.fillOrgName('valid_name');
         await expect(pm.iamFormValidation.getOrgNameErrorLocator()).not.toBeVisible();
@@ -101,6 +102,7 @@ test.describe("IAM Organization form validation", () => {
         await pm.iamFormValidation.openOrganizationForm();
         await pm.iamFormValidation.fillOrgName('bad@name!');
         await expect(pm.iamFormValidation.getOrgNameErrorLocator()).toBeVisible();
+        await expect(pm.iamFormValidation.getOrgNameErrorLocator()).toContainText('Use alphanumeric characters, space and underscore only.');
 
         await pm.iamFormValidation.cancelOrgForm();
         await expect(pm.iamFormValidation.getOrgDialogLocator()).not.toBeVisible();
@@ -159,6 +161,7 @@ test.describe("IAM Group form validation", { tag: '@enterprise' }, () => {
         await pm.iamFormValidation.openGroupForm();
         await pm.iamFormValidation.fillGroupName('group@name!');
         await expect(pm.iamFormValidation.getGroupNameErrorLocator()).toBeVisible();
+        await expect(pm.iamFormValidation.getGroupNameErrorLocator()).toContainText("Use alphanumeric and '_' characters only, without spaces.");
         await expect(pm.iamFormValidation.getGroupSubmitBtnLocator()).toBeDisabled();
 
         testLogger.info('Group special-char error correctly shown');
@@ -231,6 +234,7 @@ test.describe("IAM Role form validation", { tag: '@enterprise' }, () => {
         await pm.iamFormValidation.openRoleForm();
         await pm.iamFormValidation.fillRoleName('bad role name!');
         await expect(pm.iamFormValidation.getRoleNameErrorLocator()).toBeVisible();
+        await expect(pm.iamFormValidation.getRoleNameErrorLocator()).toContainText("Use alphanumeric and '_' characters only, without spaces.");
 
         await pm.iamFormValidation.fillRoleName('valid_role_name');
         await expect(pm.iamFormValidation.getRoleNameErrorLocator()).not.toBeVisible();
@@ -318,6 +322,7 @@ test.describe("IAM Service Account email format validation", () => {
         await pm.iamFormValidation.fillSaEmail('bademail');
         await pm.iamFormValidation.submitSaForm();
         await expect(pm.iamFormValidation.getSaEmailErrorLocator()).toBeVisible();
+        await expect(pm.iamFormValidation.getSaEmailErrorLocator()).toContainText('Please enter a valid email address');
 
         // Correct the email — error should clear on input change (@update:model-value="emailError = ''")
         await pm.iamFormValidation.fillSaEmail(`e2e_sa_${Date.now()}@example.com`);

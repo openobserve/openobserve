@@ -40,6 +40,7 @@ test.describe("Settings OrganizationSettings form validation", () => {
 
         const traceError = pm.settingsFormValidation.getTraceIdErrorLocator();
         await expect(traceError).toBeVisible({ timeout: 5000 });
+        await expect(traceError).toContainText('Name is required');
 
         testLogger.info('Required error correctly shown for empty trace ID');
     });
@@ -56,6 +57,7 @@ test.describe("Settings OrganizationSettings form validation", () => {
 
         const traceError = pm.settingsFormValidation.getTraceIdErrorLocator();
         await expect(traceError).toBeVisible({ timeout: 5000 });
+        await expect(traceError).toContainText("Use alphanumeric and '+=,.@-_' characters only, without spaces.");
 
         testLogger.info('Format error correctly shown for invalid trace ID characters');
     });
@@ -71,6 +73,7 @@ test.describe("Settings OrganizationSettings form validation", () => {
 
         const spanError = pm.settingsFormValidation.getSpanIdErrorLocator();
         await expect(spanError).toBeVisible({ timeout: 5000 });
+        await expect(spanError).toContainText('Name is required');
 
         testLogger.info('Required error correctly shown for empty span ID');
     });
@@ -147,6 +150,7 @@ test.describe("Settings OrgStorageEditor form validation", {
         // At least the bucket name error should appear
         const bucketError = pm.settingsFormValidation.getBucketNameErrorLocator();
         await expect(bucketError).toBeVisible({ timeout: 5000 });
+        await expect(bucketError).toContainText('Bucket name is required');
 
         testLogger.info('Bucket name required error correctly shown for empty AWS fields');
     });
@@ -164,6 +168,7 @@ test.describe("Settings OrgStorageEditor form validation", {
 
         const accessKeyError = pm.settingsFormValidation.getAccessKeyErrorLocator();
         await expect(accessKeyError).toBeVisible({ timeout: 5000 });
+        await expect(accessKeyError).toContainText('Access key is required');
 
         testLogger.info('Access key required error correctly shown');
     });
@@ -182,6 +187,7 @@ test.describe("Settings OrgStorageEditor form validation", {
 
         const secretKeyError = pm.settingsFormValidation.getSecretKeyErrorLocator();
         await expect(secretKeyError).toBeVisible({ timeout: 5000 });
+        await expect(secretKeyError).toContainText('Secret key is required');
 
         testLogger.info('Secret key required error correctly shown');
     });
@@ -326,6 +332,7 @@ test.describe("Settings ModelPricingEditor form validation", () => {
         const patternError = pm.settingsFormValidation.getModelPricingPatternErrorLocator();
         await patternError.waitFor({ state: 'visible', timeout: 5000 });
         await expect(patternError).toBeVisible();
+        await expect(patternError).toContainText('Match pattern is required');
 
         testLogger.info('Pattern error correctly shown when pattern field is empty');
     });

@@ -42,6 +42,7 @@ test.describe("Dashboard AddDashboard form validation", () => {
         await pm.dashboardsFormValidation.submitDashboardForm();
 
         await expect(pm.dashboardsFormValidation.getDashboardNameErrorLocator()).toBeVisible();
+        await expect(pm.dashboardsFormValidation.getDashboardNameErrorLocator()).toContainText('Name is required');
 
         testLogger.info('Required error correctly shown for empty dashboard name');
     });
@@ -55,6 +56,7 @@ test.describe("Dashboard AddDashboard form validation", () => {
         // Trigger validation by submitting empty
         await pm.dashboardsFormValidation.submitDashboardForm();
         await expect(pm.dashboardsFormValidation.getDashboardNameErrorLocator()).toBeVisible();
+        await expect(pm.dashboardsFormValidation.getDashboardNameErrorLocator()).toContainText('Name is required');
 
         // Fill in a valid name — error should disappear
         await pm.dashboardsFormValidation.fillDashboardName('e2e_dash_fv_temp');
@@ -123,6 +125,7 @@ test.describe("Dashboard AddFolder form validation", () => {
         await pm.dashboardsFormValidation.submitFolderForm();
 
         await expect(pm.dashboardsFormValidation.getFolderNameErrorLocator()).toBeVisible();
+        await expect(pm.dashboardsFormValidation.getFolderNameErrorLocator()).toContainText('Name is required');
 
         testLogger.info('Required error correctly shown for empty folder name');
     });
@@ -135,6 +138,7 @@ test.describe("Dashboard AddFolder form validation", () => {
         await pm.dashboardsFormValidation.openAddFolderForm();
         await pm.dashboardsFormValidation.submitFolderForm();
         await expect(pm.dashboardsFormValidation.getFolderNameErrorLocator()).toBeVisible();
+        await expect(pm.dashboardsFormValidation.getFolderNameErrorLocator()).toContainText('Name is required');
 
         await pm.dashboardsFormValidation.fillFolderName('e2e_fold_fv_temp');
         await expect(pm.dashboardsFormValidation.getFolderNameErrorLocator()).not.toBeVisible();
@@ -224,6 +228,7 @@ test.describe("Dashboard AddTab form validation", () => {
         await pm.dashboardsFormValidation.submitTabForm();
 
         await expect(pm.dashboardsFormValidation.getTabNameErrorLocator()).toBeVisible();
+        await expect(pm.dashboardsFormValidation.getTabNameErrorLocator()).toContainText('Name is required');
 
         testLogger.info('Required error correctly shown for empty tab name');
     });
@@ -236,6 +241,7 @@ test.describe("Dashboard AddTab form validation", () => {
         await pm.dashboardsFormValidation.openAddTabForm();
         await pm.dashboardsFormValidation.submitTabForm();
         await expect(pm.dashboardsFormValidation.getTabNameErrorLocator()).toBeVisible();
+        await expect(pm.dashboardsFormValidation.getTabNameErrorLocator()).toContainText('Name is required');
 
         await pm.dashboardsFormValidation.fillTabName('Tab Temp');
         await expect(pm.dashboardsFormValidation.getTabNameErrorLocator()).not.toBeVisible();
@@ -337,6 +343,7 @@ test.describe("Dashboard DrilldownPopup form validation", () => {
 
         // Navigate into panel edit → drilldown section, then verify the name field error
         await expect(pm.dashboardsFormValidation.getDrilldownNameErrorLocator()).toBeVisible();
+        await expect(pm.dashboardsFormValidation.getDrilldownNameErrorLocator()).toContainText('A value is required');
 
         testLogger.info('Drilldown name error correctly shown for empty name');
     });
@@ -352,6 +359,7 @@ test.describe("Dashboard DrilldownPopup form validation", () => {
 
         await pm.dashboardsFormValidation.fillDrilldownUrl('not-a-valid-url');
         await expect(pm.dashboardsFormValidation.getDrilldownUrlErrorLocator()).toBeVisible();
+        await expect(pm.dashboardsFormValidation.getDrilldownUrlErrorLocator()).toContainText('Invalid URL');
 
         testLogger.info('Drilldown URL format error shown correctly for invalid URL');
     });
@@ -410,6 +418,7 @@ test.describe("Dashboard AddSettingVariable form validation", () => {
         testLogger.info('Testing variable name required error on empty save');
         await pm.dashboardsFormValidation.clickVariableSave();
         await expect(pm.dashboardsFormValidation.getVariableNameErrorLocator()).toBeVisible();
+        await expect(pm.dashboardsFormValidation.getVariableNameErrorLocator()).toContainText('Variable name is required.');
         testLogger.info('Variable name required error shown correctly');
     });
 
@@ -648,6 +657,7 @@ test.describe("Dashboard AddAnnotation form validation", () => {
 
         const titleError = pm.dashboardsFormValidation.getAnnotationTitleErrorLocator();
         await expect(titleError).toBeVisible({ timeout: 5000 });
+        await expect(titleError).toContainText('Title is required.');
         const errorText = (await titleError.textContent()).trim();
         expect(errorText.length).toBeGreaterThan(0);
         testLogger.info('Annotation title required error shown');
