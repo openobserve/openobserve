@@ -25,6 +25,7 @@ export interface NavItem {
 
 export interface NavbarProps {
   linksList: NavItem[];
+  manageLinks?: NavItem[];
   miniMode?: boolean;
   visible?: boolean;
 }

@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="title"
     @click.prevent="openWebPage(link)"
   >
-    <div v-if="icon" class="nav-menu-item-avatar tw:flex tw:flex-col tw:items-center tw:gap-0.5 tw:w-full">
+    <div v-if="icon" class="nav-menu-item-avatar tw:flex tw:items-center tw:w-full" :class="inline ? 'tw:flex-row tw:gap-2 tw:px-2' : 'tw:flex-col tw:gap-0.5'">
       <div
         class="icon-wrapper tw:relative tw:inline-flex tw:items-center tw:justify-center tw:rounded-lg tw:p-0.5 tw:transition-colors tw:duration-250"
         :class="'tw:text-tabs-inactive-text tw:group-hover:bg-tabs-hover-bg tw:group-hover:text-primary-600'"
@@ -51,11 +51,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div
-        class="nav-menu-item-label tw:text-[10.5px] tw:font-medium tw:tracking-[0.01em] tw:transition-colors tw:duration-250 tw:w-full tw:text-center tw:leading-tight"
-        :class="'tw:text-tabs-inactive-text tw:group-hover:text-primary-600'"
+        class="nav-menu-item-label tw:text-[12px] tw:font-medium tw:tracking-[0.01em] tw:transition-colors tw:duration-250 tw:leading-tight"
+        :class="[inline ? 'tw:text-left tw:flex-1' : 'tw:w-full tw:text-center', 'tw:text-tabs-inactive-text tw:group-hover:text-primary-600']"
       >{{ title }}</div>
     </div>
-    <div v-else-if="iconComponent" class="nav-menu-item-avatar tw:flex tw:flex-col tw:items-center tw:gap-0.5 tw:w-full">
+    <div v-else-if="iconComponent" class="nav-menu-item-avatar tw:flex tw:items-center tw:w-full" :class="inline ? 'tw:flex-row tw:gap-2 tw:px-2' : 'tw:flex-col tw:gap-0.5'">
       <div
         class="icon-wrapper tw:relative tw:inline-block tw:transition-colors tw:duration-250"
         :class="'tw:text-tabs-inactive-text tw:group-hover:text-primary-600'"
@@ -74,8 +74,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div
-        class="nav-menu-item-label tw:text-[10.5px] tw:font-medium tw:tracking-[0.01em] tw:transition-colors tw:duration-250 tw:w-full tw:text-center tw:leading-tight"
-        :class="'tw:text-tabs-inactive-text tw:group-hover:text-primary-600'"
+        class="nav-menu-item-label tw:text-[12px] tw:font-medium tw:tracking-[0.01em] tw:transition-colors tw:duration-250 tw:leading-tight"
+        :class="[inline ? 'tw:text-left tw:flex-1' : 'tw:w-full tw:text-center', 'tw:text-tabs-inactive-text tw:group-hover:text-primary-600']"
       >{{ title }}</div>
     </div>
   </a>
@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :aria-label="ariaLabel"
     :title="title"
   >
-    <div v-if="icon" class="nav-menu-item-avatar tw:flex tw:flex-col tw:items-center tw:gap-0.5 tw:w-full">
+    <div v-if="icon" class="nav-menu-item-avatar tw:flex tw:items-center tw:w-full" :class="inline ? 'tw:flex-row tw:gap-2 tw:px-2' : 'tw:flex-col tw:gap-0.5'">
       <div
         class="icon-wrapper tw:relative tw:inline-flex tw:items-center tw:justify-center tw:rounded-lg tw:p-0.5 tw:transition-colors tw:duration-250"
         :class="isActive
@@ -124,13 +124,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div
-        class="nav-menu-item-label tw:text-[10.5px] tw:tracking-[0.01em] tw:transition-colors tw:duration-250 tw:w-full tw:text-center tw:leading-tight"
-        :class="isActive
-          ? activeLabelClass
-          : 'tw:font-medium tw:text-tabs-inactive-text tw:group-hover:text-primary-600'"
+        class="nav-menu-item-label tw:text-[12px] tw:tracking-[0.01em] tw:transition-colors tw:duration-250 tw:leading-tight"
+        :class="[inline ? 'tw:text-left tw:flex-1' : 'tw:w-full tw:text-center', isActive ? activeLabelClass : 'tw:font-medium tw:text-tabs-inactive-text tw:group-hover:text-primary-600']"
       >{{ title }}</div>
     </div>
-    <div v-else-if="iconComponent" class="nav-menu-item-avatar tw:flex tw:flex-col tw:items-center tw:gap-0.5 tw:w-full">
+    <div v-else-if="iconComponent" class="nav-menu-item-avatar tw:flex tw:items-center tw:w-full" :class="inline ? 'tw:flex-row tw:gap-2 tw:px-2' : 'tw:flex-col tw:gap-0.5'">
       <div
         class="icon-wrapper tw:relative tw:inline-flex tw:items-center tw:justify-center tw:rounded-lg tw:p-0.5 tw:transition-colors tw:duration-250"
         :class="[
@@ -151,10 +149,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div
-        class="nav-menu-item-label tw:text-[10.5px] tw:tracking-[0.01em] tw:transition-colors tw:duration-250 tw:w-full tw:text-center tw:leading-tight"
-        :class="isActive
-          ? activeLabelClass
-          : 'tw:font-medium tw:text-tabs-inactive-text tw:group-hover:text-primary-600'"
+        class="nav-menu-item-label tw:text-[12px] tw:tracking-[0.01em] tw:transition-colors tw:duration-250 tw:leading-tight"
+        :class="[inline ? 'tw:text-left tw:flex-1' : 'tw:w-full tw:text-center', isActive ? activeLabelClass : 'tw:font-medium tw:text-tabs-inactive-text tw:group-hover:text-primary-600']"
       >{{ title }}</div>
     </div>
   </router-link>
@@ -214,6 +210,11 @@ export default defineComponent({
     badge: {
       type: Number,
       default: 0,
+    },
+
+    inline: {
+      type: Boolean,
+      default: false,
     },
   },
   setup(props) {

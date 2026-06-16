@@ -36,6 +36,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-bind="{ ...nav, mini: miniMode }"
         @mouseenter="emit('menu-hover', nav.link)"
       />
+
+      <!-- Manage group — flyout opens to the right -->
+      <ODropdown
+        v-if="manageLinks && manageLinks.length > 0"
+        side="right"
+        align="start"
+        :side-offset="4"
+      >
+        <template #trigger>
+          <button
+            type="button"
+            :class="[
+              'nav-menu-item',
+              'tw:group tw:flex tw:flex-col tw:items-center tw:gap-0.5 tw:mx-1 tw:px-0 tw:py-1 tw:min-h-0 tw:rounded-lg tw:transition-colors tw:duration-150 tw:ease-out tw:cursor-pointer tw:select-none tw:w-[calc(100%-0.5rem)] tw:border-0 tw:bg-transparent tw:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-primary-500',
+              isManageActive
+                ? manageTriggerActiveClass
+                : 'tw:text-tabs-inactive-text tw:border-l-2 tw:border-transparent tw:hover:bg-tabs-hover-bg',
+            ]"
+          >
+            <div
+              class="icon-wrapper tw:relative tw:inline-flex tw:items-center tw:justify-center tw:rounded-lg tw:p-0.5 tw:transition-colors tw:duration-250"
+              :class="isManageActive
+                ? (isDark ? 'tw:text-tabs-active-text!' : 'tw:text-primary-700!')
+                : 'tw:text-tabs-inactive-text tw:group-hover:text-primary-600'"
+            >
+              <OIcon name="more-horiz" size="md" />
+            </div>
+            <div
+              class="nav-menu-item-label tw:text-[14px] tw:font-medium tw:tracking-[0.01em] tw:transition-colors tw:duration-250 tw:w-full tw:text-center tw:leading-tight"
+              :class="isManageActive
+                ? (isDark ? 'tw:font-semibold tw:text-tabs-active-text!' : 'tw:font-semibold tw:text-primary-600!')
+                : 'tw:text-tabs-inactive-text tw:group-hover:text-primary-600'"
+            >{{ t('menu.more') }}</div>
+          </button>
+        </template>
+        <div class="tw:min-w-[180px] tw:bg-[var(--color-surface-chrome-deeper)] tw:rounded-lg tw:overflow-hidden tw:py-1">
+          <menu-link
+            v-for="(link, index) in manageLinks"
+            :key="link.name"
+            :link-name="link.name"
+            :animation-index="index"
+            v-bind="{ ...link, mini: miniMode, inline: true }"
+            @mouseenter="emit('menu-hover', link.link)"
+          />
+        </div>
+      </ODropdown>
     </div>
   </nav>
 </template>
@@ -47,13 +93,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 import type { NavbarProps, NavbarEmits, NavbarSlots } from "./ONavbar.types";
 import MenuLink from "@/components/MenuLink.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import { computed } from "vue";
+import { useRouter } from "vue-router";
+import { useI18n } from "vue-i18n";
+import { useStore } from "vuex";
 
 defineOptions({ inheritAttrs: false });
 
-withDefaults(defineProps<NavbarProps>(), {
+const props = withDefaults(defineProps<NavbarProps>(), {
   miniMode: false,
   visible: true,
+  manageLinks: () => [],
 });
+
+const { t } = useI18n();
+const router = useRouter();
+const store = useStore();
+
+const isDark = computed(() => store.state.theme === "dark");
+
+const manageTriggerActiveClass = computed(() =>
+  isDark.value
+    ? "tw:text-tabs-active-text tw:bg-tabs-active-bg tw:shadow-sm tw:border-l-2 tw:border-primary-400"
+    : "tw:text-primary-700 tw:bg-surface-base tw:shadow-sm tw:border-l-2 tw:border-primary-600"
+);
+
+function isLinkActive(link: string): boolean {
+  return router.currentRoute.value.path.indexOf(link) === 0;
+}
+
+const isManageActive = computed(() =>
+  (props.manageLinks ?? []).some((l) => isLinkActive(l.link))
+);
 
 const emit = defineEmits<NavbarEmits>();
 

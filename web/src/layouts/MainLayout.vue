@@ -61,6 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <ONavbar
         v-if="store.state.printMode !== true"
         :links-list="linksList"
+        :manage-links="manageLinks"
         :mini-mode="miniMode"
         :visible="leftDrawerOpen"
         @menu-hover="handleMenuHover"
@@ -400,6 +401,9 @@ export default defineComponent({
         link: "/alerts",
         name: "alertList",
       },
+    ]);
+
+    const manageLinks = ref([
       {
         title: t("menu.ingestion"),
         icon: "data-plus-line",
@@ -622,6 +626,12 @@ export default defineComponent({
 
         return !disableMenus.has(link.name) && !hide;
       });
+
+      manageLinks.value = manageLinks.value.filter((link: any) => {
+        const hide = link.hide === undefined ? false : link.hide;
+
+        return !disableMenus.has(link.name) && !hide;
+      });
     };
 
     // additional links based on environment and conditions
@@ -631,7 +641,7 @@ export default defineComponent({
         .leftNavigationLinks(linksList, t);
       filterMenus();
     } else {
-      linksList.value.splice(7, 0, {
+      manageLinks.value.splice(0, 0, {
         title: t("menu.report"),
         icon: "description",
         link: "/reports",
@@ -1156,6 +1166,7 @@ export default defineComponent({
       langList,
       selectedLanguage,
       linksList,
+      manageLinks,
       selectedOrg,
       orgOptions,
       leftDrawerOpen: true,
