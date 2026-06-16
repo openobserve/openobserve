@@ -172,6 +172,17 @@ jobs:
             run_files:
               [
                 "ui-regression.spec.js",
+                "landing-regression.spec.js",
+              ]
+          - testfolder: "DataSources-Regression"
+            run_files:
+              [
+                "datasources-regression.spec.js",
+              ]
+          - testfolder: "Reports-Regression"
+            run_files:
+              [
+                "reports-regression-bugs.spec.js",
               ]
 
     steps:

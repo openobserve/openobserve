@@ -114,8 +114,8 @@ export default createStore({
     // These are the application's default colors used as fallback when no custom colors are set
     // Centralized here so they can be updated in one place instead of duplicating across components
     defaultThemeColors: {
-      light: "#3F7994",  // Default light mode color (Blue)
-      dark: "#5B9FBE",   // Default dark mode color (Light Blue)
+      light: "#3F7994",  // Blue-teal — matches --color-primary-600
+      dark: "#79a1b4",   // Blue-teal 400 for dark mode (brighter on dark surfaces)
     },
     // GitHub dashboard gallery cache
     githubDashboardGallery: {

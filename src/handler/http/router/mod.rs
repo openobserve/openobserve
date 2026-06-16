@@ -850,35 +850,41 @@ pub fn service_routes() -> Router {
         // sourcemaps
         .route("/{org_id}/sourcemaps",get(sourcemaps::list).post(sourcemaps::upload_maps).delete(sourcemaps::delete))
         .route("/{org_id}/sourcemaps/values",get(sourcemaps::list_values))
-        .route("/{org_id}/sourcemaps/stacktrace",post(sourcemaps::translate_stacktrace))
+        .route("/{org_id}/sourcemaps/stacktrace",post(sourcemaps::translate_stacktrace));
 
-        // LLM Providers (Online Eval Phase 2)
-        .route("/{org_id}/providers", get(providers::list_providers).post(providers::create_provider))
-        .route("/{org_id}/providers/{provider_id}", get(providers::get_provider).put(providers::update_provider).delete(providers::delete_provider))
-        .route("/{org_id}/providers/{provider_id}/test", post(providers::test_provider))
+    #[cfg(feature = "enterprise")]
+    {
+        if get_o2_config().common.online_evals_enabled {
+            router = router
+                // LLM Providers (Online Eval Phase 2)
+                .route("/{org_id}/providers", get(providers::list_providers).post(providers::create_provider))
+                .route("/{org_id}/providers/{provider_id}", get(providers::get_provider).put(providers::update_provider).delete(providers::delete_provider))
+                .route("/{org_id}/providers/{provider_id}/test", post(providers::test_provider))
 
-        // Score Configs (Online Eval Phase 2)
-        // NOTE: /{entity_id}/versions must precede /{entity_id} for routing correctness
-        .route("/{org_id}/score_configs", get(score_configs::list_score_configs).post(score_configs::create_score_config))
-        .route("/{org_id}/score_configs/{entity_id}/versions", get(score_configs::list_score_config_versions))
-        .route("/{org_id}/score_configs/{entity_id}", get(score_configs::get_score_config).put(score_configs::update_score_config).delete(score_configs::delete_score_config))
+                // Score Configs (Online Eval Phase 2)
+                // NOTE: /{entity_id}/versions must precede /{entity_id} for routing correctness
+                .route("/{org_id}/score_configs", get(score_configs::list_score_configs).post(score_configs::create_score_config))
+                .route("/{org_id}/score_configs/{entity_id}/versions", get(score_configs::list_score_config_versions))
+                .route("/{org_id}/score_configs/{entity_id}", get(score_configs::get_score_config).put(score_configs::update_score_config).delete(score_configs::delete_score_config))
 
-        // Scorers (Online Eval Phase 2)
-        // NOTE: static and nested routes must precede /{entity_id}
-        .route("/{org_id}/scorers", get(scorers::list_scorers).post(scorers::create_scorer))
-        .route("/{org_id}/scorers/test", post(scorers::test_scorer))
-        .route("/{org_id}/scorers/llm_judge/output_schema", post(scorers::preview_llm_judge_output_schema))
-        .route("/{org_id}/scorers/{entity_id}/versions", get(scorers::list_scorer_versions))
-        .route("/{org_id}/scorers/{entity_id}", get(scorers::get_scorer).put(scorers::update_scorer).delete(scorers::delete_scorer))
+                // Scorers (Online Eval Phase 2)
+                // NOTE: static and nested routes must precede /{entity_id}
+                .route("/{org_id}/scorers", get(scorers::list_scorers).post(scorers::create_scorer))
+                .route("/{org_id}/scorers/test", post(scorers::test_scorer))
+                .route("/{org_id}/scorers/llm_judge/output_schema", post(scorers::preview_llm_judge_output_schema))
+                .route("/{org_id}/scorers/{entity_id}/versions", get(scorers::list_scorer_versions))
+                .route("/{org_id}/scorers/{entity_id}", get(scorers::get_scorer).put(scorers::update_scorer).delete(scorers::delete_scorer))
 
-        // Online Eval Jobs (Online Eval Phase 2)
-        // NOTE: /activate, /pause, /resume, /archive must precede /{job_id}
-        .route("/{org_id}/eval_jobs", get(eval_jobs::list_eval_jobs).post(eval_jobs::create_eval_job))
-        .route("/{org_id}/eval_jobs/{job_id}/activate", post(eval_jobs::activate_eval_job))
-        .route("/{org_id}/eval_jobs/{job_id}/pause", post(eval_jobs::pause_eval_job))
-        .route("/{org_id}/eval_jobs/{job_id}/resume", post(eval_jobs::resume_eval_job))
-        .route("/{org_id}/eval_jobs/{job_id}/archive", post(eval_jobs::archive_eval_job))
-        .route("/{org_id}/eval_jobs/{job_id}", get(eval_jobs::get_eval_job).put(eval_jobs::update_eval_job).delete(eval_jobs::delete_eval_job));
+                // Online Eval Jobs (Online Eval Phase 2)
+                // NOTE: /activate, /pause, /resume, /archive must precede /{job_id}
+                .route("/{org_id}/eval_jobs", get(eval_jobs::list_eval_jobs).post(eval_jobs::create_eval_job))
+                .route("/{org_id}/eval_jobs/{job_id}/activate", post(eval_jobs::activate_eval_job))
+                .route("/{org_id}/eval_jobs/{job_id}/pause", post(eval_jobs::pause_eval_job))
+                .route("/{org_id}/eval_jobs/{job_id}/resume", post(eval_jobs::resume_eval_job))
+                .route("/{org_id}/eval_jobs/{job_id}/archive", post(eval_jobs::archive_eval_job))
+                .route("/{org_id}/eval_jobs/{job_id}", get(eval_jobs::get_eval_job).put(eval_jobs::update_eval_job).delete(eval_jobs::delete_eval_job));
+        }
+    }
 
     #[cfg(feature = "enterprise")]
     {
@@ -940,6 +946,7 @@ pub fn service_routes() -> Router {
 
             // License
             .route("/license", get(license::get_license_info).post(license::store_license))
+            .route("/license/refresh", post(license::refresh_license_limits))
 
             // Topology
             .route("/{org_id}/traces/service_graph/topology/current", get(traces::get_current_topology))

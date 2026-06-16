@@ -40,7 +40,7 @@ use crate::{
 pub enum PipelineError {
     // internal
     #[error("InfraError# {0}")]
-    InfraError(#[from] infra::errors::Error),
+    InfraError(infra::errors::Error),
     // not found
     #[error("Pipeline with ID {0} not found.")]
     NotFound(String),
@@ -58,6 +58,17 @@ pub enum PipelineError {
     PipelineDoesNotApply,
     #[error("Error deleting previous DerivedStream: {0}")]
     DeleteDerivedStream(String),
+}
+
+impl From<infra::errors::Error> for PipelineError {
+    fn from(value: infra::errors::Error) -> Self {
+        match value {
+            infra::errors::Error::DbError(infra::errors::DbError::KeyNotExists(key)) => {
+                PipelineError::NotFound(key)
+            }
+            err => PipelineError::InfraError(err),
+        }
+    }
 }
 
 /// Stores a new pipeline to database.
@@ -630,5 +641,14 @@ mod tests {
 
         // Clean up
         remove_scheduled_pipeline_from_cache(scheduled_id).await;
+    }
+
+    #[test]
+    fn test_key_not_exists_maps_to_not_found() {
+        let err = PipelineError::from(infra::errors::Error::DbError(
+            infra::errors::DbError::KeyNotExists("0".to_string()),
+        ));
+
+        assert!(matches!(err, PipelineError::NotFound(id) if id == "0"));
     }
 }

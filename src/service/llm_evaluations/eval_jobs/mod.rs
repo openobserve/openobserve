@@ -29,8 +29,8 @@ use crate::common::{
     utils::auth::{is_ofga_object_visible, remove_ownership, set_ownership},
 };
 
-pub mod executor_runtime;
 pub mod reconciler;
+pub use o2_enterprise::enterprise::llm_evaluations::eval_jobs::executor_runtime;
 
 /// Errors that can occur when interacting with online eval jobs.
 #[derive(Debug, thiserror::Error)]

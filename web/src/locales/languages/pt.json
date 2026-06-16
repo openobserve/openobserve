@@ -851,7 +851,10 @@
     "feature_correlation_management": "Gerenciamento de correlações",
     "feature_log_patterns": "Padrões de registro",
     "environment_type": "Tipo de ambiente",
-    "license_allows_unlimited_ingestion": "A licença atual permite a ingestão ilimitada de dados."
+    "license_allows_unlimited_ingestion": "A licença atual permite a ingestão ilimitada de dados.",
+    "refresh_license_limits": "Atualizar limites de licença",
+    "license_refresh_success": "A atualização do limite de licença foi acionada com sucesso",
+    "failed_to_refresh_license": "Falha ao atualizar os limites da licença"
   },
   "login": {
     "userid": "ID do usuário",

@@ -851,7 +851,10 @@
     "feature_correlation_management": "关联管理",
     "feature_log_patterns": "日志模式",
     "environment_type": "环境类型",
-    "license_allows_unlimited_ingestion": "当前的许可证允许无限制地写入数据。"
+    "license_allows_unlimited_ingestion": "当前的许可证允许无限制地写入数据。",
+    "refresh_license_limits": "刷新许可证限制",
+    "license_refresh_success": "成功触发许可证限制刷新",
+    "failed_to_refresh_license": "未能刷新许可限制"
   },
   "login": {
     "userid": "账号",
