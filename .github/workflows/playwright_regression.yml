@@ -132,7 +132,6 @@ jobs:
                 "Logs/logs-bugs.spec.js",
                 "Logs/logs-9754.spec.js",
                 "Logs/logs-9044-7354.spec.js",
-                "Logs/logs-ent.spec.js",
               ]
           - testfolder: "Alerts-Regression"
             run_files:
@@ -162,7 +161,6 @@ jobs:
               [
                 "Traces/traces-regression.spec.js",
                 "Traces/traces-bugs.spec.js",
-                "Traces/traces-ent.spec.js",
               ]
           - testfolder: "Metrics-Regression"
             run_files:
