@@ -75,13 +75,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="tw:cursor-default"
             :data-test="`correlation-event-header-overflow-${hiddenChipCount}`"
           >
-            +{{ hiddenChipCount }}
+            <template v-if="hiddenChipCount !== contextChips.length">+</template>{{ hiddenChipCount }}<template v-if="hiddenChipCount === contextChips.length"> Fields</template>
           </OBadge>
-          <OTooltip
-            :content="hiddenChipsTooltip"
-            side="top"
-            :disabled="hiddenChipCount === 0"
-          />
+          <OTooltip side="top" :disabled="hiddenChipCount === 0">
+            <template #content>
+              <div class="tw:flex tw:flex-col tw:items-start tw:gap-1">
+                <OBadge
+                  v-for="chip in hiddenChips"
+                  :key="chip.key"
+                  :variant="chipBadgeVariant(chip.key)"
+                  :size="badgeSize"
+                  dot
+                  :data-test="`correlation-event-header-hidden-chip-${chip.key}`"
+                >
+                  {{ chip.label }} = {{ chip.value }}
+                </OBadge>
+              </div>
+            </template>
+          </OTooltip>
         </span>
       </div>
     </div>
@@ -276,8 +287,8 @@ const displayedChips = computed<DimensionChip[]>(() => {
     // excludes the (dynamic) subject section + badge — no need to reserve for them.
     const fullWidth = containerWidth.value;
     const labelWidth = 90; // "Correlated by:" label
-    const paddingAndGaps = 32;
-    const available = Math.max(150, fullWidth - labelWidth - paddingAndGaps);
+    const paddingAndGaps = 8;
+    const available = fullWidth - labelWidth - paddingAndGaps;
 
     let usedWidth = 0;
     let visibleCount = 0;
@@ -288,11 +299,11 @@ const displayedChips = computed<DimensionChip[]>(() => {
         remaining > 0 ? OVERFLOW_INDICATOR_WIDTH + CHIP_GAP : 0;
       const neededWidth =
         chipWidth + (i > 0 ? CHIP_GAP : 0) + overflowSpace;
-      if (usedWidth + neededWidth > available && visibleCount > 0) break;
+      if (usedWidth + neededWidth > available) break;
       usedWidth += chipWidth + (i > 0 ? CHIP_GAP : 0);
       visibleCount++;
     }
-    return chips.slice(0, Math.max(1, visibleCount));
+    return chips.slice(0, visibleCount);
   }
 
   return chips.slice(0, props.overflowThreshold);
@@ -304,10 +315,6 @@ const hiddenChips = computed<DimensionChip[]>(() => {
 });
 
 const hiddenChipCount = computed(() => hiddenChips.value.length);
-
-const hiddenChipsTooltip = computed(() =>
-  hiddenChips.value.map((chip) => `${chip.label} = ${chip.value}`).join("\n"),
-);
 
 // ── Source event banner helpers ───────────────────────────────────────────────
 
