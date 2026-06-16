@@ -126,17 +126,6 @@ const tableRows = computed(() => rows.value);
 </script>
 
 <style>
-.sessions_page .index-menu .field_list .field_overlay .field_label,
-.sessions_page .q-field__native,
-.sessions_page .q-field__input,
-.sessions_page .q-table tbody td {
-  font-size: 0.75rem !important;
-}
-
-.sessions_page .q-splitter__after {
-  overflow: hidden;
-}
-
 .sessions_page .index-table :hover::-webkit-scrollbar,
 #tracesSearchGridComponent:hover::-webkit-scrollbar {
   height: 0.8125rem;
@@ -153,17 +142,5 @@ const tableRows = computed(() => rows.value);
 #tracesSearchGridComponent::-webkit-scrollbar-thumb {
   border-radius: 0.625rem;
   -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.5);
-}
-
-.sessions_page .q-table__top {
-  padding: 0 !important;
-}
-
-.sessions_page .q-table__control {
-  width: 100%;
-}
-
-.sessions_page .q-field__control-container {
-  padding-top: 0 !important;
 }
 </style>

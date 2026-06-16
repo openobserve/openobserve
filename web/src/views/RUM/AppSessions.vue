@@ -36,9 +36,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <div
                 v-if="!sessionState.data.editorValue && !editorFocused"
-                class="query-editor-placeholder-overlay tw:absolute tw:top-0 tw:left-0 tw:right-0 tw:bottom-0 tw:flex tw:items-start tw:pt-0.75 tw:pr-2 tw:pb-0 tw:pl-[2.15rem] tw:pointer-events-none tw:z-1 tw:select-none"
+                class="tw:absolute tw:top-0 tw:left-0 tw:right-0 tw:bottom-0 tw:flex tw:items-start tw:pt-0.75 tw:pr-2 tw:pb-0 tw:pl-[2.15rem] tw:pointer-events-none tw:z-1 tw:select-none"
               >
-                <span class="query-editor-placeholder-typewriter tw:font-mono tw:text-[var(--text-base)] tw:[line-height:1.3125rem] tw:text-[#a0aec0] tw:whitespace-nowrap tw:overflow-hidden tw:[text-overflow:ellipsis]">{{ editorPlaceholder }}</span>
+                <span class="tw:font-mono tw:text-[var(--text-base)] tw:[line-height:1.3125rem] tw:text-[#a0aec0] tw:dark:text-[#718096] tw:whitespace-nowrap tw:overflow-hidden tw:[text-overflow:ellipsis]">{{ editorPlaceholder }}</span>
               </div>
             </div>
 
@@ -823,18 +823,6 @@ const getStarted = () => {
 </script>
 <style>
 .sessions_page {
-  .index-menu .field_list .field_overlay .field_label,
-  .q-field__native,
-  .q-field__input,
-  .q-table tbody td {
-    font-size: 0.75rem !important;
-  }
-
-  .q-splitter__after {
-    overflow: hidden;
-    height: 100%;
-  }
-
   .index-table :hover::-webkit-scrollbar,
   #tracesSearchGridComponent:hover::-webkit-scrollbar {
     height: 0.8125rem;
@@ -851,25 +839,6 @@ const getStarted = () => {
   #tracesSearchGridComponent::-webkit-scrollbar-thumb {
     border-radius: 0.625rem;
     -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.5);
-  }
-
-  .q-table__top {
-    padding: 0 !important;
-  }
-
-  .q-table__control {
-    width: 100%;
-  }
-
-  .q-field__control-container {
-    padding-top: 0 !important;
-  }
-
-}
-
-.body--dark .query-editor-placeholder-overlay {
-  .query-editor-placeholder-typewriter {
-    color: #718096;
   }
 }
 </style>

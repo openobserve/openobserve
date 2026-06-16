@@ -131,7 +131,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:model-value="toggleSkipInactive"
           />
           <OSelect
-            class="speed-selector"
             v-model="playerState.speed"
             :options="speedOptions"
             :searchable="false"
@@ -645,15 +644,3 @@ defineExpose({
 });
 </script>
 
-<style>
-.speed-selector .q-field__control {
-  padding: 0 0.5rem !important;
-}
-
-.speed-selector .q-field__marginal,
-.speed-selector .q-field__native,
-.speed-selector .q-field__control {
-  min-height: 1.875rem !important;
-  height: 1.875rem !important;
-}
-</style>

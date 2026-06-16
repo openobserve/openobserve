@@ -82,8 +82,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="tw:mb-6">
           <div class="tw:text-sm tw:font-medium text-weight-medium tw:mb-2">Source Map ZIP File *</div>
           <div
-            class="upload-area tw:border-2 tw:border-dashed tw:border-(--q-border-color) tw:rounded-lg tw:p-8 tw:text-center tw:cursor-pointer tw:transition-all tw:duration-300 tw:bg-(--q-background) tw:hover:border-(--q-primary)"
-            :class="{ 'drag-over': isDragging, 'has-file': formData.file }"
+            class="tw:border-2 tw:border-dashed tw:border-(--q-border-color) tw:rounded-lg tw:p-8 tw:text-center tw:cursor-pointer tw:transition-all tw:duration-300 tw:bg-(--q-background) tw:hover:border-(--q-primary) tw:dark:border-[rgba(255,255,255,0.1)] tw:dark:hover:bg-[rgba(var(--q-primary-rgb),0.05)]"
+            :class="[
+              isDragging ? 'tw:border-[var(--q-primary)]! tw:bg-[rgba(var(--q-primary-rgb),0.05)]! tw:border-solid! tw:dark:bg-[rgba(var(--q-primary-rgb),0.1)]!' : '',
+              formData.file ? 'tw:p-6! tw:text-left! tw:border-solid! tw:border-[var(--q-positive)]! tw:bg-[rgba(var(--q-positive-rgb),0.02)]! tw:dark:bg-[rgba(var(--q-positive-rgb),0.05)]!' : ''
+            ]"
             @dragover.prevent="isDragging = true"
             @dragleave.prevent="isDragging = false"
             @drop.prevent="handleDrop"
@@ -298,34 +301,3 @@ const uploadSourceMaps = async () => {
 };
 </script>
 
-<style>
-.upload-area.drag-over {
-  border-color: var(--q-primary);
-  background-color: rgba(var(--q-primary-rgb), 0.05);
-  border-style: solid;
-}
-
-.upload-area.has-file {
-  padding: 1.5rem;
-  text-align: left;
-  border-style: solid;
-  border-color: var(--q-positive);
-  background-color: rgba(var(--q-positive-rgb), 0.02);
-}
-
-.q-dark .upload-area {
-  border-color: rgba(255, 255, 255, 0.1);
-}
-
-.q-dark .upload-area:hover {
-  background-color: rgba(var(--q-primary-rgb), 0.05);
-}
-
-.q-dark .upload-area.drag-over {
-  background-color: rgba(var(--q-primary-rgb), 0.1);
-}
-
-.q-dark .upload-area.has-file {
-  background-color: rgba(var(--q-positive-rgb), 0.05);
-}
-</style>

@@ -84,14 +84,14 @@ const columns = ref<OTableColumnDef[]>([
     cell: " ",
     sortable: true,
     size: COL.description,
-    meta: { align: "left", cellClass: "description-column", autoWidth: true },
+    meta: { align: "left", cellClass: "tw:max-w-[60vw]", autoWidth: true },
   },
   {
     id: "level",
     header: t("rum.level"),
     accessorFn: (row: any) => (row["type"] === "error" ? "error" : "info"),
     size: COL.status,
-    meta: { align: "left", cellClass: "error-level" },
+    meta: { align: "left", cellClass: "tw:border tw:border-[var(--o2-border)]" },
   },
   {
     id: "timestamp",
@@ -118,12 +118,3 @@ const getFormattedDate = (timestamp: number) =>
   formatDate(Math.floor(timestamp), "MMM DD, YYYY HH:mm:ss Z");
 </script>
 
-<style>
-.description-column {
-  max-width: 60vw;
-}
-
-.error-level {
-  border: 1px solid var(--o2-border);
-}
-</style>
