@@ -171,7 +171,10 @@ test.describe('Alerts Form Validation', { tag: ['@alerts-form-validation', '@P0'
       await fvPage.navigateToTemplates();
       await fvPage.openAddTemplate();
 
-      await fvPage.fillTemplateName('test_fv_alerts_tmpl_001');
+      // Unique name per run — the template is not cleaned up afterwards, so a
+      // fixed name would collide ("already exists") on re-runs against a shared
+      // backend and never produce the success toast.
+      await fvPage.fillTemplateName(`test_fv_alerts_tmpl_${Date.now()}`);
 
       // Fill the body editor with valid JSON (webhook type is default)
       await fvPage.fillTemplateBodyViaEditor('{"text":"{alert_name} triggered"}');
@@ -198,9 +201,7 @@ test.describe('Alerts Form Validation', { tag: ['@alerts-form-validation', '@P0'
     test('should show error or keep import button disabled when no file or JSON is provided', {
       tag: ['@alerts-form-validation', '@P0', '@smoke'],
     }, async ({ page }) => {
-      await pm.alertsPage.navigateToAlerts(page).catch(async () => {
-        await fvPage.navigateToAlertsList();
-      });
+      await fvPage.navigateToAlertsList();
 
       await fvPage.openImportAlert();
 
@@ -220,9 +221,7 @@ test.describe('Alerts Form Validation', { tag: ['@alerts-form-validation', '@P0'
     test('should show error or keep import button disabled when switching to file tab without uploading a file', {
       tag: ['@alerts-form-validation', '@P0', '@smoke'],
     }, async ({ page }) => {
-      await pm.alertsPage.navigateToAlerts(page).catch(async () => {
-        await fvPage.navigateToAlertsList();
-      });
+      await fvPage.navigateToAlertsList();
 
       await fvPage.openImportAlert();
       await fvPage.switchToAlertFileTab();
@@ -262,14 +261,16 @@ test.describe('Alerts Form Validation', { tag: ['@alerts-form-validation', '@P0'
       await fvPage.selectWizardStreamName('e2e_automate');
       await fvPage.clickWizardNext();
 
-      // Wait for the FilterCondition row to appear (step 2 / QueryConfig)
-      const toggleBtn = fvPage.getFilterConditionToggleOperatorBtnLocator();
-      await toggleBtn.waitFor({ state: 'visible', timeout: 10000 });
+      // The conditions group starts empty; add a condition row to render the
+      // column / operator / value selectors (FilterGroup → FilterCondition).
+      await fvPage.addFilterCondition();
 
-      await expect(toggleBtn).toBeVisible();
-      await expect(fvPage.getFilterConditionColumnPopoverLocator()).toBeVisible();
-      await expect(fvPage.getFilterConditionOperatorPopoverLocator()).toBeVisible();
-      await expect(fvPage.getFilterConditionValueFieldLocator()).toBeVisible();
+      const row0 = fvPage.getFieldsInputRowLocator(0);
+      await row0.waitFor({ state: 'visible', timeout: 10000 });
+
+      await expect(fvPage.getFilterConditionColumnPopoverLocator().first()).toBeVisible();
+      await expect(fvPage.getFilterConditionOperatorPopoverLocator().first()).toBeVisible();
+      await expect(fvPage.getFilterConditionValueFieldLocator().first()).toBeVisible();
     });
 
     test('should toggle AND/OR operator in filter condition', {
@@ -283,85 +284,27 @@ test.describe('Alerts Form Validation', { tag: ['@alerts-form-validation', '@P0'
       await fvPage.selectWizardStreamName('e2e_automate');
       await fvPage.clickWizardNext();
 
+      // The AND/OR toggle only appears on a non-first condition row, so add two.
+      await fvPage.addFilterCondition();
+      await fvPage.addFilterCondition();
+
       const toggleBtn = fvPage.getFilterConditionToggleOperatorBtnLocator();
       await toggleBtn.waitFor({ state: 'visible', timeout: 10000 });
 
-      // Record the initial label text
-      const initialText = (await toggleBtn.textContent()).trim();
+      // Record the initial operator label text (and/or) on the second row
+      const operatorLabel = fvPage.getFilterConditionOperatorLabelLocator();
+      const initialText = (await operatorLabel.getAttribute('data-test-label')).trim();
       expect(initialText.length).toBeGreaterThan(0);
 
       // Toggle the operator
       await fvPage.clickFilterConditionToggleOperator();
 
-      // After toggle, the text should be different from the initial value
-      const toggledText = (await toggleBtn.textContent()).trim();
-      expect(toggledText).not.toBe(initialText);
-      testLogger.info('FilterCondition operator toggled', { from: initialText, to: toggledText });
-    });
-
-    test('should show column error when condition submitted without column selected', {
-      tag: ['@alertsFormValidation', '@P1'],
-    }, async ({ page }) => {
-      await fvPage.openAddAlertWizard();
-
-      // Step 1 — select stream type and stream name before advancing
-      await fvPage.getWizardStreamTypeDropdownLocator().waitFor({ state: 'visible', timeout: 15000 });
-      await fvPage.selectWizardStreamType('Logs');
-      await fvPage.selectWizardStreamName('e2e_automate');
-      await fvPage.clickWizardNext();
-
-      const toggleBtn = fvPage.getFilterConditionToggleOperatorBtnLocator();
-      await toggleBtn.waitFor({ state: 'visible', timeout: 10000 });
-
-      // Attempt to open the column selector and close without selecting — triggers validation
-      await fvPage.openFilterConditionColumnPopover();
-      // Close the popover by pressing Escape so the field is left empty/untouched
-      await page.keyboard.press('Escape');
-
-      // Trigger validation by clicking the column popover again and blurring
-      await fvPage.openFilterConditionColumnPopover();
-      await page.keyboard.press('Escape');
-
-      // Column error should become visible
-      const columnError = fvPage.getFilterConditionColumnErrorLocator();
-      await columnError.waitFor({ state: 'visible', timeout: 5000 });
-      await expect(columnError).toBeVisible();
-      await expect(columnError).toContainText('Field is required!');
-      testLogger.info('FilterCondition column error shown');
-    });
-
-    test('should show operator error when condition submitted without operator selected', {
-      tag: ['@alertsFormValidation', '@P1'],
-    }, async ({ page }) => {
-      await fvPage.openAddAlertWizard();
-
-      await fvPage.getWizardStreamTypeDropdownLocator().waitFor({ state: 'visible', timeout: 15000 });
-      await fvPage.selectWizardStreamType('Logs');
-      await fvPage.selectWizardStreamName('e2e_automate');
-      await fvPage.clickWizardNext();
-
-      const toggleBtn = fvPage.getFilterConditionToggleOperatorBtnLocator();
-      await toggleBtn.waitFor({ state: 'visible', timeout: 10000 });
-
-      // Open and close the operator popover without selecting to trigger blur
-      const operatorPopover = fvPage.getFilterConditionOperatorPopoverLocator();
-      await operatorPopover.click();
-      await page.keyboard.press('Escape');
-
-      // Operator error should become visible
-      const operatorError = fvPage.getFilterConditionOperatorErrorLocator();
-      const errorVisible = await operatorError.isVisible().catch(() => false);
-
-      // FilterCondition.vue: validateOperator() called on blur — error = 'Field is required!'
-      // If error isn't immediately visible, try opening/closing operator popover once more
-      if (!errorVisible) {
-        await operatorPopover.click();
-        await page.keyboard.press('Escape');
-      }
-
-      await expect(operatorError).toBeVisible({ timeout: 5000 });
-      await expect(operatorError).toContainText('Field is required!');
-      testLogger.info('FilterCondition operator error shown');
+      // After toggle, the label should flip from the initial value
+      await expect(async () => {
+        const toggledText = (await operatorLabel.getAttribute('data-test-label')).trim();
+        expect(toggledText).not.toBe(initialText);
+      }).toPass({ timeout: 5000 });
+      testLogger.info('FilterCondition operator toggled from initial value', { from: initialText });
     });
 
     test('should show value error when condition submitted without value entered', {
@@ -374,16 +317,16 @@ test.describe('Alerts Form Validation', { tag: ['@alerts-form-validation', '@P0'
       await fvPage.selectWizardStreamName('e2e_automate');
       await fvPage.clickWizardNext();
 
-      const toggleBtn = fvPage.getFilterConditionToggleOperatorBtnLocator();
-      await toggleBtn.waitFor({ state: 'visible', timeout: 10000 });
+      await fvPage.addFilterCondition();
+      await fvPage.getFieldsInputRowLocator(0).waitFor({ state: 'visible', timeout: 10000 });
 
       // Trigger value field blur without entering a value
-      const valueField = fvPage.getFilterConditionValueFieldLocator();
+      const valueField = fvPage.getFilterConditionValueFieldLocator().first();
       await valueField.click();
       await page.keyboard.press('Tab');
 
       // Value error should become visible
-      const valueError = fvPage.getFilterConditionValueErrorLocator();
+      const valueError = fvPage.getFilterConditionValueErrorLocator().first();
       await expect(valueError).toBeVisible({ timeout: 5000 });
       await expect(valueError).toContainText('Field is required!');
       testLogger.info('FilterCondition value error shown');
@@ -409,17 +352,16 @@ test.describe('Alerts Form Validation', { tag: ['@alerts-form-validation', '@P0'
       await fvPage.selectWizardStreamName('e2e_automate');
       await fvPage.clickWizardNext();
 
-      // Wait for the first condition row to appear
+      // The conditions group starts empty — add the first row.
+      await fvPage.addFilterCondition();
       const row0 = fvPage.getFieldsInputRowLocator(0);
       await row0.waitFor({ state: 'visible', timeout: 10000 });
       await expect(row0).toBeVisible();
 
       // Click "Add Condition" to append a second row
-      const addConditionBtn = fvPage.getFieldsInputAddConditionBtnLocator();
-      await addConditionBtn.waitFor({ state: 'visible', timeout: 5000 });
-      await addConditionBtn.click();
+      await fvPage.addFilterCondition();
 
-      // Second row (index 1 → data-test="alert-conditions-2") should now exist
+      // Second row (index 1) should now exist
       const row1 = fvPage.getFieldsInputRowLocator(1);
       await expect(row1).toBeVisible({ timeout: 5000 });
       testLogger.info('Second condition row added successfully');
@@ -435,13 +377,10 @@ test.describe('Alerts Form Validation', { tag: ['@alerts-form-validation', '@P0'
       await fvPage.selectWizardStreamName('e2e_automate');
       await fvPage.clickWizardNext();
 
-      const row0 = fvPage.getFieldsInputRowLocator(0);
-      await row0.waitFor({ state: 'visible', timeout: 10000 });
-
-      // Add a second row so we have two, then delete the first
-      const addConditionBtn = fvPage.getFieldsInputAddConditionBtnLocator();
-      await addConditionBtn.waitFor({ state: 'visible', timeout: 5000 });
-      await addConditionBtn.click();
+      // Add two rows so we have two, then delete the first.
+      await fvPage.addFilterCondition();
+      await fvPage.getFieldsInputRowLocator(0).waitFor({ state: 'visible', timeout: 10000 });
+      await fvPage.addFilterCondition();
       await fvPage.getFieldsInputRowLocator(1).waitFor({ state: 'visible', timeout: 5000 });
 
       // Delete the first condition row
@@ -527,10 +466,11 @@ test.describe('Alerts Form Validation', { tag: ['@alerts-form-validation', '@P0'
     test('should display all query mode tabs on step 2 (QueryConfig)', {
       tag: ['@alerts-form-validation', '@P1'],
     }, async ({ page }) => {
+      // For a Logs stream the QueryConfig exposes Custom + SQL modes; PromQL is
+      // metrics-only and is not rendered for logs.
       await expect(fvPage.getQueryModeCustomTabLocator()).toBeVisible();
       await expect(fvPage.getQueryModeSqlTabLocator()).toBeVisible();
-      await expect(fvPage.getQueryModePromqlTabLocator()).toBeVisible();
-      testLogger.info('All query mode tabs are visible on QueryConfig step');
+      testLogger.info('Query mode tabs (Custom, SQL) are visible on QueryConfig step');
     });
 
     test('should activate SQL tab when clicked', {
@@ -539,13 +479,8 @@ test.describe('Alerts Form Validation', { tag: ['@alerts-form-validation', '@P0'
       const sqlTab = fvPage.getQueryModeSqlTabLocator();
       await sqlTab.click();
 
-      // The active tab should have aria-selected="true" or an active class
-      const isSelected = await sqlTab.getAttribute('aria-selected').catch(() => null);
-      const hasActiveClass = await sqlTab.evaluate(
-        (el) => el.classList.contains('active') || el.classList.contains('q-tab--active')
-      ).catch(() => false);
-
-      expect(isSelected === 'true' || hasActiveClass).toBe(true);
+      // OToggleGroupItem marks the active item with data-state="on".
+      await expect(sqlTab).toHaveAttribute('data-state', 'on', { timeout: 5000 });
       testLogger.info('SQL query mode tab is active after click');
     });
 

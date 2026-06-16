@@ -74,7 +74,7 @@ export class AlertsFormValidationPage {
 
     // ── ImportAlert ───────────────────────────────────────────────────────────
     // The Import button on the Alerts list page
-    this.alertImportBtn         = '[data-test="alert-list-import-alert-btn"]';
+    this.alertImportBtn         = '[data-test="alert-import"]';
     // BaseImport shared buttons (test-prefix="alert")
     this.alertImportJsonBtn     = '[data-test="alert-import-json-btn"]';
     this.alertImportJsonFileTab = '[data-test="tab-import_json_file"]';
@@ -96,8 +96,10 @@ export class AlertsFormValidationPage {
     // ── Alert wizard — navigation ─────────────────────────────────────────────
     // Add Alert button on the Alerts list page
     this.alertListAddBtn = '[data-test="alert-list-add-alert-btn"]';
-    // Wizard "Next" button (step 1 → step 2)
-    this.alertWizardNextBtn = '[data-test="alert-wizard-next-btn"]';
+    // Redesigned form uses OToggleGroup tabs (no Next button). The default
+    // active tab is "condition", which already renders FilterCondition,
+    // QueryConfig and AlertSettings content once a stream is selected.
+    this.alertTabCondition = '[data-test="add-alert-tab-condition"]';
 
     // ── AlertSettings (step 3 of alert wizard) ───────────────────────────────
     this.alertSettingsSilenceDuration = '[data-test="alert-settings-silence-duration-input-field"]';
@@ -116,29 +118,42 @@ export class AlertsFormValidationPage {
     // ── Alert wizard step 1 stream selectors ─────────────────────────────────
     this.wizardStreamTypeDropdown     = '[data-test="add-alert-stream-type-select-dropdown"]';
     this.wizardStreamNameDropdown     = '[data-test="add-alert-stream-name-select-dropdown"]';
+    // OSelect popovers — options carry `data-test-value` for value-specific picks
+    this.wizardStreamTypePopover      = '[data-test="add-alert-stream-type-select-dropdown-popover"]';
+    this.wizardStreamNamePopover      = '[data-test="add-alert-stream-name-select-dropdown-popover"]';
 
     // ── FilterCondition — condition row elements ──────────────────────────────
     // AND/OR toggle button
     this.filterConditionToggleOperatorBtn = '[data-test="alert-conditions-toggle-operator-btn"]';
-    // Column selector: OSelect → open via -popover, error via -error
+    // Column selector: OSelect → trigger to open, -popover panel, -error message
+    this.filterConditionColumnTrigger = '[data-test="alert-conditions-select-column-trigger"]';
     this.filterConditionColumnPopover = '[data-test="alert-conditions-select-column-popover"]';
     this.filterConditionColumnError   = '[data-test="alert-conditions-select-column-error"]';
-    // Operator selector: OSelect → open via -popover, error via -error
+    // Operator selector: OSelect → trigger to open, -popover panel, -error message
+    this.filterConditionOperatorTrigger = '[data-test="alert-conditions-operator-select-trigger"]';
     this.filterConditionOperatorPopover = '[data-test="alert-conditions-operator-select-popover"]';
     this.filterConditionOperatorError   = '[data-test="alert-conditions-operator-select-error"]';
     // Value input: OInput → fill via -field, error via -error
+    this.filterConditionValueTrigger = '[data-test="alert-conditions-value-input"]';
     this.filterConditionValueField = '[data-test="alert-conditions-value-input-field"]';
     this.filterConditionValueError = '[data-test="alert-conditions-value-input-error"]';
+    // AND/OR label span (FilterCondition.vue) — readable operator text for the
+    // row, used to assert the toggle button flipped the logical operator.
+    this.filterConditionOperatorLabel = '[data-test="alert-conditions-operator-label"]';
 
     // ── FieldsInput — condition management buttons ─────────────────────────────
-    // FieldsInput.vue wraps condition rows; same alert-conditions-* namespace
+    // The redesigned form renders conditions via FilterGroup.vue → FilterCondition.vue
+    // (FieldsInput.vue is unused by alerts). The conditions group starts EMPTY —
+    // an "Add Condition" button creates each FilterCondition row.
     // Initial "Add" button shown when no conditions exist
     this.fieldsInputAddBtn         = '[data-test="alert-conditions-add-btn"]';
-    // Per-row Add / Delete buttons (inside each condition row)
+    // Add Condition button (FilterGroup.vue) — appends a FilterCondition row
     this.fieldsInputAddConditionBtn    = '[data-test="alert-conditions-add-condition-btn"]';
+    // Per-row Delete button (FilterGroup.vue) — one per condition row
     this.fieldsInputDeleteConditionBtn = '[data-test="alert-conditions-delete-condition-btn"]';
-    // Row wrapper (1-indexed): data-test="alert-conditions-${index+1}"
-    // Use getFieldsInputRowLocator(index) below (0-based → selector is index+1)
+    // Condition rows have no wrapper data-test; count them via the per-row column
+    // OSelect trigger which is present once per FilterCondition row.
+    this.fieldsInputRowMarker      = '[data-test="alert-conditions-select-column-trigger"]';
   }
 
   // ── Navigation helpers ─────────────────────────────────────────────────────
@@ -206,7 +221,8 @@ export class AlertsFormValidationPage {
 
     const selector = this.page.locator(this.prebuiltDestinationSelector);
     await selector.waitFor({ state: 'visible', timeout: 10000 });
-    await selector.getByText('Slack', { exact: false }).first().click();
+    // Prebuilt cards expose data-type="<type.id>" (slack/custom/…) — pick by id.
+    await selector.locator('[data-test="destination-type-card"][data-type="slack"]').click();
     await this.page.locator(this.slackWebhookField).waitFor({ state: 'visible', timeout: 10000 });
   }
 
@@ -367,9 +383,11 @@ export class AlertsFormValidationPage {
 
   // ── FilterCondition locator getters ───────────────────────────────────────
   getFilterConditionToggleOperatorBtnLocator() { return this.page.locator(this.filterConditionToggleOperatorBtn); }
-  getFilterConditionColumnPopoverLocator()     { return this.page.locator(this.filterConditionColumnPopover); }
+  // The always-present clickable OSelect trigger (the popover panel only exists
+  // in the DOM while it is open), so these getters return the trigger element.
+  getFilterConditionColumnPopoverLocator()     { return this.page.locator(this.filterConditionColumnTrigger); }
   getFilterConditionColumnErrorLocator()       { return this.page.locator(this.filterConditionColumnError); }
-  getFilterConditionOperatorPopoverLocator()   { return this.page.locator(this.filterConditionOperatorPopover); }
+  getFilterConditionOperatorPopoverLocator()   { return this.page.locator(this.filterConditionOperatorTrigger); }
   getFilterConditionOperatorErrorLocator()     { return this.page.locator(this.filterConditionOperatorError); }
   getFilterConditionValueFieldLocator()        { return this.page.locator(this.filterConditionValueField); }
   getFilterConditionValueErrorLocator()        { return this.page.locator(this.filterConditionValueError); }
@@ -378,8 +396,26 @@ export class AlertsFormValidationPage {
   getFieldsInputAddBtnLocator()            { return this.page.locator(this.fieldsInputAddBtn); }
   getFieldsInputAddConditionBtnLocator()   { return this.page.locator(this.fieldsInputAddConditionBtn); }
   getFieldsInputDeleteConditionBtnLocator(){ return this.page.locator(this.fieldsInputDeleteConditionBtn); }
-  // 0-based index — selector uses 1-based (index+1)
-  getFieldsInputRowLocator(index)          { return this.page.locator(`[data-test="alert-conditions-${index + 1}"]`); }
+  // Condition rows have no wrapper data-test; resolve the Nth row via the
+  // per-row column trigger marker (0-based index).
+  getFieldsInputRowLocator(index)          { return this.page.locator(this.fieldsInputRowMarker).nth(index); }
+
+  // ── FilterCondition row helpers (FilterGroup-rendered rows) ───────────────
+  getFilterConditionOperatorLabelLocator() { return this.page.locator(this.filterConditionOperatorLabel); }
+  // Nth-row value OInput field (0-based)
+  getFilterConditionValueFieldByRow(index) { return this.page.locator(this.filterConditionValueField).nth(index); }
+  // Nth-row column OSelect trigger (0-based)
+  getFilterConditionColumnTriggerByRow(index) { return this.page.locator(this.filterConditionColumnTrigger).nth(index); }
+
+  /**
+   * Appends a new FilterCondition row via the "Add Condition" button.
+   */
+  async addFilterCondition() {
+    testLogger.info('Clicking Add Condition to append a FilterCondition row');
+    const addBtn = this.page.locator(this.fieldsInputAddConditionBtn);
+    await addBtn.waitFor({ state: 'visible', timeout: 10000 });
+    await addBtn.click();
+  }
 
   // ── Alert wizard helpers ───────────────────────────────────────────────────
 
@@ -395,11 +431,18 @@ export class AlertsFormValidationPage {
 
   /**
    * Clicks the Next button in the alert wizard to advance from step 1 to step 2.
+   *
+   * The redesigned alert form is no longer a multi-step wizard with a Next
+   * button. It is a single tabbed form whose default active tab ("condition")
+   * already renders the FilterCondition / QueryConfig / AlertSettings content
+   * once a stream type + name are chosen. This method now simply ensures that
+   * the condition tab is the active tab so the downstream assertions resolve.
    */
   async clickWizardNext() {
-    testLogger.info('Clicking wizard Next button');
-    await this.page.locator(this.alertWizardNextBtn).waitFor({ state: 'visible', timeout: 10000 });
-    await this.page.locator(this.alertWizardNextBtn).click();
+    testLogger.info('Ensuring condition tab is active (no wizard Next button)');
+    const conditionTab = this.page.locator(this.alertTabCondition);
+    await conditionTab.waitFor({ state: 'visible', timeout: 10000 });
+    await conditionTab.click();
   }
 
   /**
@@ -411,16 +454,33 @@ export class AlertsFormValidationPage {
     await this.page.locator(this.filterConditionToggleOperatorBtn).click();
   }
 
+  // OSelect option factories — pick by `data-test-value` (§4) rather than text.
+  getWizardStreamTypeOption(value) {
+    return this.page.locator(
+      `[data-test="add-alert-stream-type-select-dropdown-option"][data-test-value="${value}"]`,
+    );
+  }
+
+  getWizardStreamNameOption(value) {
+    return this.page.locator(
+      `[data-test="add-alert-stream-name-select-dropdown-option"][data-test-value="${value}"]`,
+    );
+  }
+
   async selectWizardStreamType(typeLabel) {
     testLogger.info('Selecting alert wizard stream type: ' + typeLabel);
+    // streamTypes are the lowercase values logs/metrics/traces (AddAlert.vue)
+    const value = typeLabel.trim().toLowerCase();
     await this.page.locator(this.wizardStreamTypeDropdown).click();
-    await this.page.getByRole('option', { name: typeLabel, exact: true }).click();
+    await this.page.locator(this.wizardStreamTypePopover).waitFor({ state: 'visible', timeout: 10000 });
+    await this.getWizardStreamTypeOption(value).click();
   }
 
   async selectWizardStreamName(streamName) {
     testLogger.info('Selecting alert wizard stream name: ' + streamName);
     await this.page.locator(this.wizardStreamNameDropdown).click();
-    await this.page.getByRole('option', { name: streamName, exact: true }).click();
+    await this.page.locator(this.wizardStreamNamePopover).waitFor({ state: 'visible', timeout: 10000 });
+    await this.getWizardStreamNameOption(streamName).click();
   }
 
   /**
@@ -428,7 +488,7 @@ export class AlertsFormValidationPage {
    */
   async openFilterConditionColumnPopover() {
     testLogger.info('Opening FilterCondition column selector popover');
-    await this.page.locator(this.filterConditionColumnPopover).waitFor({ state: 'visible', timeout: 10000 });
-    await this.page.locator(this.filterConditionColumnPopover).click();
+    await this.page.locator(this.filterConditionColumnTrigger).waitFor({ state: 'visible', timeout: 10000 });
+    await this.page.locator(this.filterConditionColumnTrigger).click();
   }
 }
