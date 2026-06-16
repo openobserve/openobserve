@@ -142,21 +142,9 @@ the Free Software Foundation, either version 3 of the License, or
           </OButton>
         </template>
         <template v-else-if="activeTab === 'quality'" #actions>
-          <!-- OSelect renders width:100% of its container, so it needs a
-               definite-width wrapper here — sizing the select directly with
-               `tw:w-[14rem]` is overridden by the component's internal
-               `tw:w-full`, which collapses the flex actions box and pushes the
-               date picker + refresh off-screen. -->
-          <div class="tw:w-[14rem] tw:flex-shrink-0">
-            <OSelect
-              v-model="qualityAgentKey"
-              :options="qualityAgentOptions"
-              labelKey="label"
-              valueKey="value"
-              class="tw:rounded"
-              data-test="quality-agent-filter"
-            />
-          </div>
+          <!-- Agent filter is rendered inside QualityPage (right-aligned, above
+               the KPIs) so it sits within the content container alongside the
+               data it filters — only the date picker + refresh stay here. -->
           <DateTimePickerDashboard
             ref="qualityDatePickerRef"
             v-model="qualitySelectedDate"
@@ -193,6 +181,8 @@ the Free Software Foundation, either version 3 of the License, or
           <QualityPage
             v-if="activeTab === 'quality'"
             ref="qualityPageRef"
+            v-model:agent-key="qualityAgentKey"
+            :agent-options="qualityAgentOptions"
             :date-window="qualityDateWindow"
             :agent-filter="selectedQualityAgent"
             :score-configs="scoreConfigs"

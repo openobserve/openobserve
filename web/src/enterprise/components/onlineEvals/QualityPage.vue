@@ -1,5 +1,22 @@
 <template>
   <div class="quality-page" data-test="quality-page">
+    <!-- Agent filter — right-aligned at the top of the content container so it
+         sits with the KPIs + table it scopes (matches LLM Insights). -->
+    <div class="tw:flex tw:items-center tw:justify-end">
+      <div class="tw:w-[14rem] tw:flex-shrink-0">
+        <OSelect
+          v-model="agentModel"
+          label="Agent"
+          label-position="inside"
+          :options="agentOptions || []"
+          labelKey="label"
+          valueKey="value"
+          class="tw:rounded"
+          data-test="quality-agent-filter"
+        />
+      </div>
+    </div>
+
     <QualityKpiSkeleton v-if="showKpiSkeleton" :count="visibleKpis.length" />
     <section v-else class="quality-page__kpis" aria-label="Tier 1 KPIs">
       <QualityKpiCard
@@ -92,6 +109,7 @@ import QualityKpiSkeleton from "./quality/QualityKpiSkeleton.vue";
 import QualityScoreConfigsTable from "./quality/QualityScoreConfigsTable.vue";
 import QualityDetailPanel from "./quality/QualityDetailPanel.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { AgentFilterSelection } from "./utils/agentFilterSql";
 
 const props = defineProps<{
@@ -101,7 +119,21 @@ const props = defineProps<{
   // input to its data loaders.
   dateWindow: DateWindow;
   agentFilter?: AgentFilterSelection | null;
+  // Agent filter dropdown — state stays in OnlineEvals (it owns the agent
+  // list + derives `agentFilter`); QualityPage just renders the control and
+  // emits the selected key back via v-model.
+  agentKey?: string;
+  agentOptions?: { label: string; value: string }[];
 }>();
+
+const emit = defineEmits<{
+  (e: "update:agentKey", value: string): void;
+}>();
+
+const agentModel = computed<string>({
+  get: () => props.agentKey ?? "",
+  set: (value) => emit("update:agentKey", value),
+});
 
 const { t } = useI18n();
 const route = useRoute();
