@@ -316,8 +316,8 @@ function onDrill(kpiId: string) {
     quick_mode: "false",
     show_histogram: "true",
     refresh: "0",
-    from: String(dateWindow.value.startUs),
-    to: String(dateWindow.value.endUs),
+    from: String(props.dateWindow.startUs),
+    to: String(props.dateWindow.endUs),
     query: encoded,
     type: "ai_chat_query",
   };
