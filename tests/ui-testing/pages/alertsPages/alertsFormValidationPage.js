@@ -262,11 +262,31 @@ export class AlertsFormValidationPage {
 
   async fillTemplateBodyViaEditor(content) {
     testLogger.info('Filling template body via Monaco editor');
-    // Monaco editor — click to focus, then select-all and type
+    // Drive Monaco via window.monaco — typing char-by-char triggers Monaco's
+    // bracket/quote auto-close and mangles the JSON. setValue writes the literal
+    // string and fires onDidChangeModelContent so the editor's v-model updates.
     const editor = this.page.locator(this.templateBodyEditor);
     await editor.click();
-    await this.page.keyboard.press('Control+a');
-    await this.page.keyboard.type(content);
+    await this.page.waitForFunction(
+      () => Boolean(window.monaco?.editor?.getEditors?.()?.length),
+      null,
+      { timeout: 15000 },
+    );
+    await this.page.evaluate((value) => {
+      const eds = window.monaco.editor.getEditors();
+      const ed = eds[eds.length - 1];
+      ed.setValue(value);
+    }, content);
+    // The editor's update:query emit is debounced (500ms). Wait until Monaco
+    // actually holds the value before allowing the submit to read formData.body.
+    await this.page.waitForFunction(
+      (value) => {
+        const eds = window.monaco?.editor?.getEditors?.() || [];
+        return eds.some((e) => (e.getValue?.() || '').trim() === value.trim());
+      },
+      content,
+      { timeout: 10000 },
+    );
   }
 
   async waitForTemplateNameError() {

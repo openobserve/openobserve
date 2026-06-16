@@ -176,10 +176,14 @@ test.describe('Alerts Form Validation', { tag: ['@alerts-form-validation', '@P0'
       // Fill the body editor with valid JSON (webhook type is default)
       await fvPage.fillTemplateBodyViaEditor('{"text":"{alert_name} triggered"}');
 
-      await fvPage.clickTemplateSubmit();
-
-      // Expect success toast
-      await expect(fvPage.getToastSuccessLocator()).toBeVisible({ timeout: 10000 });
+      // The body editor's v-model is debounced (500ms). A click that lands before
+      // the debounce flushes hits the "Please fill required fields" guard, which
+      // returns BEFORE any API call. Retrying the submit is therefore safe — no
+      // duplicate is created — and deterministic against the debounce timing.
+      await expect(async () => {
+        await fvPage.clickTemplateSubmit();
+        await expect(fvPage.getToastSuccessLocator()).toBeVisible({ timeout: 2000 });
+      }).toPass({ timeout: 15000 });
       testLogger.info('Template created successfully');
     });
   });
