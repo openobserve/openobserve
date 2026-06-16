@@ -71,6 +71,15 @@ export class IamFormValidationPage {
         this.addUserSubmitBtn      = '[data-test="add-user-dialog"] [data-test="o-dialog-primary-btn"]';
         this.addUserCancelBtn      = '[data-test="add-user-dialog"] [data-test="o-dialog-secondary-btn"]';
 
+        // ── UpdateRole dialog ─────────────────────────────────────────────────
+        // Trigger: row action button data-test="edit-basic-user-${email}"
+        this.updateRoleDialog      = '[data-test="update-role-dialog"]';
+        // OSelect data-test="iam-update-role-select" → -error (manual error from roleError ref)
+        this.updateRoleSelect      = '[data-test="iam-update-role-select-popover"]';
+        this.updateRoleError       = '[data-test="iam-update-role-select-error"]';
+        this.updateRoleSaveBtn     = '[data-test="iam-update-role-save-btn"]';
+        this.updateRoleCancelBtn   = '[data-test="iam-update-role-cancel-btn"]';
+
         // ── Toast / success messages ──────────────────────────────────────────
         this.toastSuccess          = '[data-test-variant="success"]';
         this.toastMessage          = '[data-test="o-toast-message"]';
@@ -236,4 +245,28 @@ export class IamFormValidationPage {
     getUserEmailErrorLocator()    { return this.page.locator(this.userEmailError); }
     getUserPasswordErrorLocator() { return this.page.locator(this.userPasswordError); }
     getUserRoleErrorLocator()     { return this.page.locator(this.userRoleError); }
+
+    // ── UpdateRole locator getters ────────────────────────────────────────────
+    getUpdateRoleDialogLocator()   { return this.page.locator(this.updateRoleDialog); }
+    getUpdateRoleSelectLocator()   { return this.page.locator(this.updateRoleSelect); }
+    getUpdateRoleErrorLocator()    { return this.page.locator(this.updateRoleError); }
+    getUpdateRoleSaveBtnLocator()  { return this.page.locator(this.updateRoleSaveBtn); }
+    getUpdateRoleCancelBtnLocator(){ return this.page.locator(this.updateRoleCancelBtn); }
+
+    // Open the UpdateRole dialog for the first user visible in the Users list
+    async openUpdateRoleDialogForFirstUser() {
+        const editBtn = this.page.locator('[data-test^="edit-basic-user-"]').first();
+        await editBtn.waitFor({ state: 'visible', timeout: 10000 });
+        await editBtn.click();
+        await this.page.locator(this.updateRoleDialog).waitFor({ state: 'visible', timeout: 10000 });
+    }
+
+    async navigateToUsersTab() {
+        await this.navigateToIam();
+        const tab = this.page.locator(this.iamUsersTab);
+        await tab.waitFor({ state: 'visible', timeout: 10000 });
+        await tab.click();
+        await this.page.locator('[data-test^="edit-basic-user-"]').first()
+            .waitFor({ state: 'visible', timeout: 15000 });
+    }
 }
