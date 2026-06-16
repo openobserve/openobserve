@@ -17,7 +17,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     class="step-alert-conditions"
-    :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'"
   >
     <!-- Section header -->
     <div class="section-header">
@@ -65,10 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     height: 28px;
                     font-size: 13px;
                   "
-                  :class="
-                    store.state.theme === 'dark' ? 'tw:bg-gray-700' : 'tw:bg-gray-100'
-                  "
-                  class="tw:flex tw:justify-center tw:items-center"
+                  class="tw:flex tw:justify-center tw:items-center tw:bg-input-addon-bg tw:text-input-addon-text"
                 >
                   {{ t("alerts.minutes") }}
                 </div>
@@ -183,10 +179,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     font-weight: normal;
                     font-size: 13px;
                   "
-                  :class="
-                    store.state.theme === 'dark' ? 'tw:bg-gray-700' : 'tw:bg-gray-100'
-                  "
-                  class="tw:flex tw:justify-center tw:items-center"
+                  class="tw:flex tw:justify-center tw:items-center tw:bg-input-addon-bg tw:text-input-addon-text"
                 >
                   {{ t("alerts.minutes") }}
                 </div>
@@ -236,10 +229,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     height: 28px;
                     font-size: 13px;
                   "
-                  :class="
-                    store.state.theme === 'dark' ? 'tw:bg-gray-700' : 'tw:bg-gray-100'
-                  "
-                  class="tw:flex tw:justify-center tw:items-center"
+                  class="tw:flex tw:justify-center tw:items-center tw:bg-input-addon-bg tw:text-input-addon-text"
                 >
                   {{ t("alerts.minutes") }}
                 </div>
@@ -1003,50 +993,23 @@ export default defineComponent({
     }
   }
 
-  &.dark-mode {
-    background-color: #212121;
-    border: 1px solid #343434;
+  background-color: var(--color-surface-overlay);
+  border: 1px solid var(--color-border-default);
 
-    .section-header {
-      border-bottom: 1px solid #343434;
-    }
-    .section-header-title {
-      color: #e0e0e0;
-    }
-    .section-header-accent {
-      background: var(--q-primary);
-    }
-
-    .step-title {
-      color: #ffffff;
-    }
-
-    .step-subtitle {
-      color: #bdbdbd;
-    }
+  .section-header {
+    border-bottom: 1px solid var(--color-border-default);
   }
-
-  &.light-mode {
-    background-color: #ffffff;
-    border: 1px solid #e6e6e6;
-
-    .section-header {
-      border-bottom: 1px solid #eeeeee;
-    }
-    .section-header-title {
-      color: #374151;
-    }
-    .section-header-accent {
-      background: var(--q-primary);
-    }
-
-    .step-title {
-      color: #1a1a1a;
-    }
-
-    .step-subtitle {
-      color: #5c5c5c;
-    }
+  .section-header-title {
+    color: var(--color-text-primary);
+  }
+  .section-header-accent {
+    background: var(--q-primary);
+  }
+  .step-title {
+    color: var(--color-text-heading);
+  }
+  .step-subtitle {
+    color: var(--color-text-secondary);
   }
 }
 

@@ -136,36 +136,6 @@ describe("AlertSettings.vue", () => {
       expect(wrapper.exists()).toBe(true);
     });
 
-    it("should render with correct theme class (light mode)", () => {
-      expect(wrapper.find(".step-alert-conditions.light-mode").exists()).toBe(
-        true
-      );
-    });
-
-    it("should render with correct theme class (dark mode)", async () => {
-      const darkStore = createMockStore({ theme: "dark" });
-      const darkWrapper = mount(AlertSettings, {
-        global: {
-          mocks: { $store: darkStore, $router: mockRouter },
-          provide: { store: darkStore, router: mockRouter },
-          plugins: [i18n],
-        },
-        props: {
-          formData: mockFormData,
-          isRealTime: "false",
-          columns: [],
-          isAggregationEnabled: false,
-          destinations: [],
-          formattedDestinations: [],
-        },
-      });
-
-      expect(darkWrapper.find(".step-alert-conditions.dark-mode").exists()).toBe(
-        true
-      );
-      darkWrapper.unmount();
-    });
-
     it("should initialize with scheduled alert mode by default", () => {
       expect(wrapper.props().isRealTime).toBe("false");
     });
@@ -872,60 +842,6 @@ describe("AlertSettings.vue", () => {
         "NotContains",
       ];
       expect(wrapper.vm.triggerOperators).toEqual(operators);
-    });
-  });
-
-  describe("Theme Switching", () => {
-    it("should apply light mode theme", () => {
-      expect(wrapper.find(".light-mode").exists()).toBe(true);
-    });
-
-    it("should apply dark mode theme", async () => {
-      const darkStore = createMockStore({ theme: "dark" });
-      const darkWrapper = mount(AlertSettings, {
-        global: {
-          mocks: { $store: darkStore, $router: mockRouter },
-          provide: { store: darkStore, router: mockRouter },
-          plugins: [i18n],
-        },
-        props: {
-          formData: mockFormData,
-          isRealTime: "false",
-          columns: [],
-          isAggregationEnabled: false,
-          destinations: [],
-          formattedDestinations: [],
-        },
-      });
-
-      expect(darkWrapper.find(".dark-mode").exists()).toBe(true);
-      darkWrapper.unmount();
-    });
-
-    it("should apply correct input styles in light mode", () => {
-      expect(wrapper.html()).toContain("tw:bg-gray-100");
-    });
-
-    it("should apply correct input styles in dark mode", async () => {
-      const darkStore = createMockStore({ theme: "dark" });
-      const darkWrapper = mount(AlertSettings, {
-        global: {
-          mocks: { $store: darkStore, $router: mockRouter },
-          provide: { store: darkStore, router: mockRouter },
-          plugins: [i18n],
-        },
-        props: {
-          formData: mockFormData,
-          isRealTime: "false",
-          columns: [],
-          isAggregationEnabled: false,
-          destinations: [],
-          formattedDestinations: [],
-        },
-      });
-
-      expect(darkWrapper.html()).toContain("tw:bg-gray-700");
-      darkWrapper.unmount();
     });
   });
 
