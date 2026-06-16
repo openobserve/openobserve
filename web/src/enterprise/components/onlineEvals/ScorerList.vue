@@ -36,6 +36,9 @@
         :page-size="20"
         :page-size-options="[20, 50, 100, 250, 500]"
         :default-columns="false"
+        :enable-column-resize="true"
+        :persist-columns="true"
+        table-id="scorer-list"
         width="100%"
         class="tw:w-full tw:h-full"
         @row-click="(row: any) => $emit('view', row)"
@@ -219,7 +222,9 @@ const columns = computed(() => [
     accessorKey: "name",
     sortable: true,
     size: COL.name,
-    meta: { align: "left", autoWidth: true },
+    // `flex` (not `autoWidth`): fills leftover width on load AND stays
+    // resizable — matches Dashboards/AlertList; `autoWidth` has no resize grip.
+    meta: { align: "left", flex: true },
   },
   {
     id: "type",
@@ -268,7 +273,12 @@ const columns = computed(() => [
     size: 140,
     meta: { align: "center", cellClass: "actions-column", actionCount: 3 },
   },
-]);
+].map((c: any) => ({
+  ...c,
+  // Every column except the row index, the name (row identity) and the
+  // actions column is offered in OTable's "Manage columns" chooser.
+  hideable: c.id !== "#" && c.id !== "name" && !c.isAction,
+})));
 
 const filteredRows = computed(() =>
   typeFilter.value
