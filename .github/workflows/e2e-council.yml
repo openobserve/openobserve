@@ -869,12 +869,13 @@ jobs:
           echo "spec=$SPEC" >> "$GITHUB_OUTPUT"
           echo "rel=${SPEC#tests/ui-testing/}" >> "$GITHUB_OUTPUT"
 
-      - name: Heal — run ONLY the generated spec, fix until passing (<=6 iters)
+      - name: Heal — fresh-context loop until the spec passes
         id: heal
-        # HARD-GATED: timeout-minutes kills a runaway/hung healer; continue-on-error lets the
-        # pipeline proceed to the authoritative run + comment instead of getting stuck. Any
-        # fixes the healer wrote to disk before the cap are kept (committed below).
-        # 40m gives the 6-iteration cap headroom (the no-progress bail usually ends it sooner).
+        # Up to 3 FRESH healer invocations (clean context each). Each does a few internal iterations;
+        # if it stalls it appends what it tried to heal-notes.md and stops, then we spawn a FRESH
+        # context that reads those notes and tries differently — a stuck context usually just needs a
+        # clean slate. continue-on-error: the authoritative run below is the real pass/fail gate.
+        # timeout-minutes is the hard wall (per-attempt no-progress bail usually ends it sooner).
         timeout-minutes: 40
         continue-on-error: true
         env:
@@ -884,8 +885,19 @@ jobs:
           SPEC: ${{ steps.spec.outputs.spec }}
           REL: ${{ steps.spec.outputs.rel }}
         run: |
-          opencode run --agent e2e-ci-healer --model "$PIPELINE_MODEL" \
-            "Run your spec. A live OpenObserve is booted at ${ZO_BASE_URL}. Heal ONLY this one spec (do NOT run the whole suite): ${SPEC}. Run it with 'cd tests/ui-testing && npx playwright test ${REL} --workers=4', diagnose failures, fix the spec/page objects, re-run — HARD CAP 6 iterations, then stop. STOP EARLY if you make no progress (the same test fails the same way twice in a row) — more attempts won't help; report it failing instead of burning iterations. Keep your reasoning concise (summarize, don't paste full logs) to avoid exhausting context. Write docs/test_generator/ci/heal-result.json."
+          rm -f docs/test_generator/ci/heal-notes.md   # start clean (notes accumulate within THIS run only)
+          for attempt in 1 2 3; do
+            echo "::group::Heal attempt ${attempt}/3 (fresh context)"
+            opencode run --agent e2e-ci-healer --model "$PIPELINE_MODEL" \
+              "Heal attempt ${attempt} of 3 — you have a FRESH context. Heal ONLY this spec (do NOT run the whole suite): ${SPEC}. A live OpenObserve is booted at ${ZO_BASE_URL}. FIRST, if docs/test_generator/ci/heal-notes.md exists, read it — it lists what earlier attempts already tried; do NOT repeat those approaches. Run 'cd tests/ui-testing && npx playwright test ${REL} --workers=4 --reporter=line', diagnose, fix the spec/page objects, re-run — up to 3 internal iterations. NEVER touch /tmp or any path outside the repo (the sandbox blocks it and the command fails); read stdout directly. If you get it passing, write docs/test_generator/ci/heal-result.json with status=passing. If still failing after your iterations, APPEND a concise note (test name, the failure, what you tried) to docs/test_generator/ci/heal-notes.md, write heal-result.json status=failing, and stop. Keep reasoning concise."
+            echo "::endgroup::"
+            STATUS=$(jq -r '.status // "failing"' docs/test_generator/ci/heal-result.json 2>/dev/null || echo failing)
+            if [ "$STATUS" = "passing" ]; then
+              echo "::notice::Healer reports passing on attempt ${attempt}."; break
+            fi
+            if [ "$attempt" -lt 3 ]; then echo "::notice::Attempt ${attempt} did not pass → retrying with a fresh context.";
+            else echo "::notice::3 fresh-context attempts exhausted — leaving it to the authoritative run."; fi
+          done
 
       - name: Authoritative final run (the workflow decides pass/fail, not the LLM)
         id: finalrun
