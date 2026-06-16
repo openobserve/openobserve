@@ -1103,7 +1103,7 @@ jobs:
 
           [ -n "$TEST_PR" ] || { echo "::warning::could not resolve test PR number"; exit 0; }
           MARKER="<!-- e2e-council-testpr -->"
-          printf '%s\n🤖 **E2E Council** → healed, passing E2E tests are in #%s (branch `%s`).' \
+          printf '%s\n🤖 **E2E Council** → healed, passing E2E tests are in #%s (branch `%s`).\n' \
             "$MARKER" "$TEST_PR" "$BRANCH" > /tmp/sticky.md
           printf '%s\n' "$TABLE" >> /tmp/sticky.md
           CID=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${SRC_PR}/comments" \

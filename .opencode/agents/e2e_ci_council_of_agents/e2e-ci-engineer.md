@@ -221,6 +221,8 @@ Treat this as a gate on *yourself*: a spec that trips any CRITICAL above is not 
    `action` = this case's coverage action (`new` for a new spec's tests, `append`/`extend` for ones
    added/modified on an existing spec). `verifies` = one concise human sentence. For `action: none`
    write `[]`. Keep `title` byte-identical to the `test("…")` name in the spec.
+   > It must be valid JSON. `pr_back` renders it as a table but **skips it gracefully** (no table) if
+   > the file is missing, empty `[]`, or unparseable — so never block generation on it.
 
 > **Where outputs go:** you run in an ephemeral CI runner with no commit access. Your files are
 > uploaded as a build artifact and the **PR-back job (Job 4) commits them** to a `test/<slug>`
