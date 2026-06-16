@@ -510,7 +510,7 @@ jobs:
         run: |
           RC=docs/test_generator/ci/run-context.json
           { [ -f "$RC" ] && jq empty "$RC" 2>/dev/null; } || { echo "::error::run-context.json missing/invalid (triage hand-off broken)"; exit 1; }
-          # Coverage decision (Architect): action=new|append|extend + the file actually written/edited.
+          # Coverage decision (Architect): action=none|new|append|extend + the file written/edited.
           CD=docs/test_generator/ci/coverage-decision.json
           ACTION=new; TARGET=""
           if [ -f "$CD" ]; then
@@ -519,7 +519,15 @@ jobs:
             ACTION=$(jq -r '.action // "new"' "$CD" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')
             TARGET=$(jq -r '.target_spec // empty' "$CD")
           fi
-          case "$ACTION" in new|append|extend) ;; *) echo "::error::invalid coverage action: $ACTION"; exit 1 ;; esac
+          case "$ACTION" in none|new|append|extend) ;; *) echo "::error::invalid coverage action: $ACTION"; exit 1 ;; esac
+          echo "action=$ACTION" >> "$GITHUB_OUTPUT"
+          # action=none → existing tests already cover this; nothing was generated. Valid hand-off —
+          # the audit + branch steps are gated (if: action != none) to skip it, and a later step posts
+          # 'already covered' instead. So just pass validation here.
+          if [ "$ACTION" = "none" ]; then
+            echo "Hand-off OK: action=none — existing tests already cover this; nothing to generate."
+            exit 0
+          fi
           SPEC="$TARGET"
           [ -n "$SPEC" ] || SPEC=$(jq -r '.spec_path // empty' "$RC")
           [ -n "$SPEC" ] || { echo "::error::no spec path (coverage target_spec / run-context.spec_path both empty)"; exit 1; }
@@ -541,6 +549,7 @@ jobs:
         # Verdict schema: { "verdict": "PASS"|"FAIL", "critical_count": <int>, ... }. Fail-closed:
         # missing/invalid verdict counts as not-clean.
         id: audit
+        if: steps.validate.outputs.action != 'none'   # nothing was generated when already-covered
         env:
           DEEPSEEK_API_KEY_E2E: ${{ secrets.DEEPSEEK_API_KEY_E2E }}
           FIX_ATTEMPTS: "3" # max Sentinel→Engineer fix rounds before we stop + report (safety cap)
@@ -583,6 +592,7 @@ jobs:
 
       - name: Create/extend autoe2e branch, commit, push (no PR yet)
         id: push
+        if: steps.validate.outputs.action != 'none'   # nothing generated when already-covered → no branch
         # Two modes (decided by triage):
         #  - FRESH (reuse=false): the checkout is the feature commit → create the test branch off it
         #    and force-push (idempotent rebuild). One test PR per source PR.
@@ -637,9 +647,10 @@ jobs:
           echo "Pushed tests to $BRANCH (reuse=$REUSE; no PR yet — Job 4 opens/refreshes it)."
 
       - name: Comment "already covered" when there's nothing to do
-        # Leave-alone path (Architect action=none / no diff): the existing tests already cover this,
-        # so verify_heal + pr_back are skipped. Let the dev know on the PR instead of going silent.
-        if: success() && steps.push.outputs.has_changes == 'false'
+        # Leave-alone path: Architect action=none (audit+push were skipped) OR push ran but produced
+        # no diff. Either way the existing tests already cover this → verify_heal + pr_back skip. Tell
+        # the dev on the PR instead of going silent.
+        if: success() && (steps.validate.outputs.action == 'none' || steps.push.outputs.has_changes == 'false')
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SRC_PR: ${{ needs.triage.outputs.pr_number }}
