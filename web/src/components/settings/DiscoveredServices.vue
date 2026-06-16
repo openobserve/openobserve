@@ -179,6 +179,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             expansion="multi"
             :expand-on-row-click="(row: any) => row.__type === 'group'"
             :get-row-expansion-enabled="(row: any) => row.__type === 'group'"
+            :keep-page-on-data-change="true"
             class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky services-table"
             :class="filteredGroupCount > 0 ? 'services-table-full-height' : ''"
             data-test="services-list-table"
