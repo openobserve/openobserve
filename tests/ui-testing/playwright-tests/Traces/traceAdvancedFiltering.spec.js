@@ -60,30 +60,15 @@ test.describe("Trace Advanced Filtering testcases", () => {
       await pm.tracesPage.setTimeRange('15m');
       await pm.tracesPage.runSearch();
 
-      // Wait for results with enhanced error handling
-      let attempts = 0;
-      const maxAttempts = 3;
-      let searchResult = null;
-
-      while (attempts < maxAttempts && !searchResult) {
-        await page.waitForTimeout(500);
-
-        const hasResults = await pm.tracesPage.hasTraceResults();
-        const noResults = await pm.tracesPage.isNoResultsVisible();
-        const errorMsg = await pm.tracesPage.isErrorMessageVisible();
-
-        if (hasResults || noResults || errorMsg) {
-          searchResult = { hasResults, noResults, errorMsg };
-          break;
-        }
-
-        attempts++;
-        testLogger.info(`Search attempt ${attempts} of ${maxAttempts}`);
-      }
-
-      // Verify search completed
-      expect(searchResult).not.toBeNull();
-      testLogger.info(`Complex search completed: Results=${searchResult?.hasResults}, NoResults=${searchResult?.noResults}, Error=${searchResult?.errorMsg}`);
+      // Wait for one of the terminal search states to appear
+      const searchResult = { hasResults: false, noResults: false, errorMsg: false };
+      await expect(async () => {
+        searchResult.hasResults = await pm.tracesPage.hasTraceResults();
+        searchResult.noResults = await pm.tracesPage.isNoResultsVisible();
+        searchResult.errorMsg = await pm.tracesPage.isErrorMessageVisible();
+        expect(searchResult.hasResults || searchResult.noResults || searchResult.errorMsg).toBeTruthy();
+      }).toPass({ timeout: 30000, intervals: [1000, 2000, 5000] });
+      testLogger.info(`Complex search completed: Results=${searchResult.hasResults}, NoResults=${searchResult.noResults}, Error=${searchResult.errorMsg}`);
     });
 
     // Reset filters before next test
@@ -182,7 +167,7 @@ test.describe("Trace Advanced Filtering testcases", () => {
 
       // Click on first result to check duration
       await pm.tracesPage.clickFirstTraceResult();
-      await pm.tracesPage.expectTraceDetailsVisible().catch(() => {});
+      await pm.tracesPage.expectTraceDetailsVisible().catch(e => testLogger.warn(`Trace details not visible: ${e.message}`));
 
       // Look for duration information using page object
       const durationVisible = await pm.tracesPage.isDurationCellVisible();

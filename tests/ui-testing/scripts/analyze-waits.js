@@ -13,7 +13,6 @@
 
 const fs = require('fs');
 const path = require('path');
-const { execSync } = require('child_process');
 
 const TESTS_ROOT = path.resolve(__dirname, '../playwright-tests');
 const CONTEXT_LINES_ABOVE = 5;
@@ -121,10 +120,6 @@ function classify(precedingLines) {
     if (rule.pattern.test(ctx)) return rule;
   }
   return UNCATEGORIZED;
-}
-
-function msWasted(ms) {
-  return typeof ms === 'number' ? ms : 0;
 }
 
 // ─── Main ────────────────────────────────────────────────────────────────────

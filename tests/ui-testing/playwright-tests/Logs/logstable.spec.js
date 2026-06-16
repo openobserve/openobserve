@@ -11,12 +11,12 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
     testLogger.testStart(testInfo.title, testInfo.file);
     await navigateToBase(page);
     pageManager = new PageManager(page);
-    await page.waitForLoadState('domcontentloaded');
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     await ingestion(page);
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
 
     await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
-    await page.waitForLoadState('domcontentloaded');
+    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
     await pageManager.logsPage.selectStream("e2e_automate");
     await pageManager.logsPage.clickDateTimeButton();
     await pageManager.logsPage.clickRelative15MinButton();

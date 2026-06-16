@@ -55,22 +55,15 @@ test.describe("Trace Query Editor testcases", () => {
     await pm.tracesPage.setTimeRange('15m');
     await pm.tracesPage.runSearch();
 
-    // Wait for search to complete with retry logic
-    let searchCompleted = false;
-    for (let i = 0; i < 3; i++) {
-      await page.waitForTimeout(500);
+    // Wait for search to reach a terminal state
+    await expect(async () => {
       const hasResults = await pm.tracesPage.hasTraceResults();
       const hasNoResults = await pm.tracesPage.isNoResultsVisible();
-
       if (hasResults || hasNoResults) {
-        searchCompleted = true;
-        testLogger.info(`Search completed on attempt ${i + 1}: Results=${hasResults}, NoResults=${hasNoResults}`);
-        break;
+        testLogger.info(`Search completed: Results=${hasResults}, NoResults=${hasNoResults}`);
       }
-    }
-
-    // Verify search completed
-    expect(searchCompleted).toBeTruthy();
+      expect(hasResults || hasNoResults).toBeTruthy();
+    }).toPass({ timeout: 30000, intervals: [1000, 2000, 5000] });
 
     // If results exist, verify they match the filter using page object
     if (await pm.tracesPage.hasTraceResults()) {
@@ -209,25 +202,17 @@ test.describe("Trace Query Editor testcases", () => {
     let anyDetailsVisible = false;
     let clickSuccessful = false;
 
-    for (let attempt = 0; attempt < 3; attempt++) {
-      await page.waitForTimeout(500);
+    await expect(async () => {
       detailsTreeVisible = await pm.tracesPage.isTraceDetailsTreeVisible();
       anyDetailsVisible = await pm.tracesPage.isAnyTraceDetailVisible();
       clickSuccessful = await pm.tracesPage.isTraceClickSuccessful();
-
       if (detailsTreeVisible || anyDetailsVisible) {
-        testLogger.info(`Trace details visible on attempt ${attempt + 1}`);
-        break;
+        testLogger.info('Trace details visible');
+      } else if (clickSuccessful) {
+        testLogger.info('Trace click successful — UI may show details inline');
       }
-
-      // If click was successful, UI may show trace details inline
-      if (clickSuccessful) {
-        testLogger.info(`Trace click successful on attempt ${attempt + 1} - UI may show details inline`);
-        break;
-      }
-
-      testLogger.info(`Waiting for trace details, attempt ${attempt + 1}`);
-    }
+      expect(detailsTreeVisible || anyDetailsVisible || clickSuccessful).toBeTruthy();
+    }).toPass({ timeout: 15000, intervals: [1000, 2000, 5000] }).catch(e => testLogger.warn(`Trace details wait timed out: ${e.message}`));
 
     // Look for common trace attributes using page object
     const attributes = ['status_code', 'service_name', 'span_name', 'duration'];

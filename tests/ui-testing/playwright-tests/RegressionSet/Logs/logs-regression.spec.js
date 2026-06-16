@@ -329,10 +329,10 @@ test.describe("Logs Regression Bugs", () => {
 
     // Navigate to streams page (has many items and search functionality)
     await pm.logsPage.clickStreamsMenuItem();
-    await page.waitForTimeout(2000);
+    // waitForLoadState('networkidle') handles the page load; no fixed sleep needed
+    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
 
     // Get initial pagination text (shows total count) - using POM method
-    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
     const initialPaginationText = await pm.logsPage.getPaginationText();
     testLogger.info(`Initial pagination text: ${initialPaginationText}`);
