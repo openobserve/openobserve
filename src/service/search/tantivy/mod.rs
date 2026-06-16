@@ -503,6 +503,8 @@ async fn search_tantivy_index(
 
     // search the index
     let trace_id_clone = trace_id.to_string();
+    let file_min_ts = parquet_file.meta.min_ts;
+    let file_max_ts = parquet_file.meta.max_ts;
     let res = tokio::task::spawn_blocking(move || match idx_optimize_rule {
         None => TantivyResult::handle_matched_docs(&searcher, query),
         Some(IndexOptimizeMode::SimpleSelect(limit, ascend)) => {
@@ -517,13 +519,30 @@ async fn search_tantivy_index(
                 log::warn!("[trace_id {trace_id_clone}] search->tantivy: _timestamp not index in tantivy file: {ttv_file_name}");
                 return Ok(TantivyResult::Histogram(vec![]));
             }
+            // RANK fast path only when no extra _timestamp-range was ANDed in
+            // (file fully in range) and the filter is match-all or a single term
+            let (rank_eligible, term_field) = if file_in_range {
+                if condition.is_condition_all() {
+                    (true, None)
+                } else if let Some(tv) = condition.single_equal_term() {
+                    (true, Some(tv))
+                } else {
+                    (false, None)
+                }
+            } else {
+                (false, None)
+            };
             TantivyResult::handle_simple_histogram(
                 &searcher,
                 query,
+                rank_eligible,
+                term_field,
                 min_value,
                 bucket_width,
                 num_buckets,
                 ts_offset,
+                file_min_ts,
+                file_max_ts,
             )
         }
         Some(IndexOptimizeMode::SimpleMultiHistogram(

@@ -17,7 +17,7 @@ use std::{collections::HashSet, fmt::Display};
 
 #[cfg(not(feature = "enterprise"))]
 use config::tantivy::query::histogram_collector::{
-    MultiHistogramCollector, SimpleHistogramCollector,
+    MultiHistogramCollector, SimpleHistogramCollector, simple_histogram_rank,
 };
 use config::{
     TIMESTAMP_COL_NAME,
@@ -32,7 +32,7 @@ use config::{
 };
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::search::tantivy::histogram_collector::{
-    MultiHistogramCollector, SimpleHistogramCollector,
+    MultiHistogramCollector, SimpleHistogramCollector, simple_histogram_rank,
 };
 use tantivy::{
     DocId, Score, Searcher,
@@ -142,14 +142,36 @@ impl TantivyResult {
         Ok(Self::Count(res))
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn handle_simple_histogram(
         searcher: &Searcher,
         query: Box<dyn Query>,
+        rank_eligible: bool,
+        term_field: Option<(String, String)>,
         min_value: i64,
         bucket_width: u64,
         num_buckets: usize,
         ts_offset: i64,
+        file_min_ts: i64,
+        file_max_ts: i64,
     ) -> anyhow::Result<Self> {
+        // RANK fast path (enterprise); None falls back to the collector below
+        if rank_eligible
+            && let Some(counts) = simple_histogram_rank(
+                searcher,
+                TIMESTAMP_COL_NAME,
+                term_field.as_ref().map(|(f, v)| (f.as_str(), v.as_str())),
+                min_value,
+                bucket_width,
+                num_buckets,
+                ts_offset,
+                file_min_ts,
+                file_max_ts,
+            )?
+        {
+            return Ok(Self::Histogram(counts));
+        }
+
         let res = searcher.search(
             &query,
             &SimpleHistogramCollector::new(
