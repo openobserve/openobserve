@@ -33,8 +33,8 @@ export class RegexPatternsFormValidationPage {
         this.cancelButton           = '[data-test="add-regex-pattern-drawer"] [data-test="o-drawer-secondary-btn"]';
 
         // ── Toast feedback ───────────────────────────────────────────────────
-        this.toastSuccess           = '[data-test="o-toast-success"]';
-        this.toastError             = '[data-test="o-toast-error"]';
+        this.toastSuccess           = '[data-test-variant="success"]';
+        this.toastError             = '[data-test-variant="error"]';
         this.toastMessage           = '[data-test="o-toast-message"]';
     }
 
@@ -70,6 +70,20 @@ export class RegexPatternsFormValidationPage {
 
     async clickCancel() {
         await this.page.locator(this.cancelButton).click();
+    }
+
+    async touchNameField() {
+        // Fill then clear: OFormInput calls field.handleBlur() on every update:model-value,
+        // so this sets isTouched=true with an empty value, revealing the required error.
+        const input = this.page.locator(this.nameInput);
+        await input.fill('x');
+        await input.fill('');
+    }
+
+    async touchPatternField() {
+        const input = this.page.locator(this.patternInput);
+        await input.fill('x');
+        await input.fill('');
     }
 
     async triggerNameValidation() {

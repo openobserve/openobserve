@@ -55,8 +55,8 @@ export class PipelinesFormValidationPage {
         this.deleteConfirmSecondaryBtn   = '[data-test="create-backfill-job-delete-confirmation-dialog"] [data-test="o-dialog-secondary-btn"]';
 
         // Toast notifications
-        this.toastError                  = '[data-test="o-toast-error"]';
-        this.toastSuccess                = '[data-test="o-toast-success"]';
+        this.toastError                  = '[data-test-variant="error"]';
+        this.toastSuccess                = '[data-test-variant="success"]';
 
         // Pipeline list / tab selectors
         this.pipelineScheduledTab        = '[data-test="pipeline-section-tab-scheduledPipelines"]';

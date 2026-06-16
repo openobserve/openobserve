@@ -70,16 +70,16 @@ export class SettingsFormValidationPage {
         this.claimParserTitle         = '[data-test="domain-management-claim-parser-title"]';
 
         // ── Toast notifications ───────────────────────────────────────────────
-        this.toastSuccess             = '[data-test="o-toast-success"]';
-        this.toastError               = '[data-test="o-toast-error"]';
+        this.toastSuccess             = '[data-test-variant="success"]';
+        this.toastError               = '[data-test-variant="error"]';
         this.toastMessage             = '[data-test="o-toast-message"]';
 
         // ── Storage tab / add-storage button (OrgStorageEditor setup) ─────────
-        this.storageTab               = '[data-test="settings-storage-tab"], [href*="storage"], [data-test*="storage"]';
+        this.storageTab               = '[data-test="storage-settings-tab"]';
         this.addStorageBtnBase        = '[data-test="storage-settings-add-btn"], button';
 
         // ── Domain Management tab ─────────────────────────────────────────────
-        this.domainTab                = '[data-test="settings-domain-management-tab"], [href*="domain"], [data-test*="domain"]';
+        this.domainTab                = '[data-test="domain-management-tab"]';
         this.domainRestrictionsTitle2 = '[data-test="domain-management-domain-restrictions-title"]';
 
         // ── ModelPricingEditor ────────────────────────────────────────────────

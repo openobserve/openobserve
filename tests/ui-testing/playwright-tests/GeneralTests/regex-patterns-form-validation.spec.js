@@ -43,16 +43,11 @@ test.describe("Regex Patterns form validation", () => {
 
         testLogger.info('Save button correctly disabled for empty form');
 
-        // Trigger OForm submission to surface inline field-level validation messages
-        // The OForm submit is wired to the form-id on the drawer primary button,
-        // but since the button is disabled we force form submission via the native form
-        await page.evaluate(() => {
-            const form = document.getElementById('add-regex-pattern-form');
-            if (form) {
-                const submitEvent = new Event('submit', { bubbles: true, cancelable: true });
-                form.dispatchEvent(submitEvent);
-            }
-        });
+        // OFormInput shows errors only when isTouched=true AND value is invalid.
+        // isTouched is set via field.handleBlur(), which OFormInput calls on every
+        // update:model-value event (fill → clear sequence triggers it reliably).
+        await pm.regexPatternsFormValidation.touchNameField();
+        await pm.regexPatternsFormValidation.touchPatternField();
 
         // OFormInput validator: '* Name is required'
         await expect(pm.regexPatternsFormValidation.getNameErrorLocator()).toBeVisible();

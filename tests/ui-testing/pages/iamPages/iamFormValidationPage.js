@@ -72,7 +72,7 @@ export class IamFormValidationPage {
         this.addUserCancelBtn      = '[data-test="add-user-dialog"] [data-test="o-dialog-secondary-btn"]';
 
         // ── Toast / success messages ──────────────────────────────────────────
-        this.toastSuccess          = '[data-test="o-toast-success"]';
+        this.toastSuccess          = '[data-test-variant="success"]';
         this.toastMessage          = '[data-test="o-toast-message"]';
     }
 

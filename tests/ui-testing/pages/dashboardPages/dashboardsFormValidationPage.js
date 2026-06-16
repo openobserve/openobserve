@@ -68,7 +68,7 @@ export class DashboardsFormValidationPage {
         this.tabListContainer       = '[data-test="dashboard-tab-list-container"]';
 
         // ── Toast ─────────────────────────────────────────────────────────────
-        this.toastSuccess           = '[data-test="o-toast-success"]';
+        this.toastSuccess           = '[data-test-variant="success"]';
 
         // ── DrilldownPopup ────────────────────────────────────────────────────
         // OFormInput data-test="dashboard-config-panel-drilldown-name" → -field / -error

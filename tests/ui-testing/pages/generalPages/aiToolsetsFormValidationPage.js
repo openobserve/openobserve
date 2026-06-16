@@ -44,7 +44,7 @@ export class AiToolsetsFormValidationPage {
         this.cancelBtn      = '[data-test="ai-toolset-cancel-btn"]';
 
         // Toast
-        this.toastSuccess   = '[data-test="o-toast-success"]';
+        this.toastSuccess   = '[data-test-variant="success"]';
         this.toastMessage   = '[data-test="o-toast-message"]';
     }
 

@@ -36,7 +36,7 @@ export class StreamsFormValidationPage {
         this.cancelBtn = '[data-test="add-stream-dialog"] [data-test="o-dialog-secondary-btn"]';
 
         // Toast selectors
-        this.toastSuccess = '[data-test="o-toast-success"]';
+        this.toastSuccess = '[data-test-variant="success"]';
     }
 
     // ── Navigation ────────────────────────────────────────────────────────────

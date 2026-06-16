@@ -65,8 +65,8 @@ class ActionScriptsFormValidationPage {
     this.rowDeleteBtnSelector    = (name) => `[data-test="alert-list-${name}-delete-alert"]`;
 
     // Toast
-    this.toastSuccess            = '[data-test="o-toast-success"]';
-    this.toastError              = '[data-test="o-toast-error"]';
+    this.toastSuccess            = '[data-test-variant="success"]';
+    this.toastError              = '[data-test-variant="error"]';
   }
 
   // ── Locator getters ───────────────────────────────────────────────────────
