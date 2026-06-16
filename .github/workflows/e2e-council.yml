@@ -57,6 +57,13 @@ on:
         default: true
   issue_comment:
     types: [created]
+  # Auto-on-merge (Trigger 3) — OFF by default. Fires only when the repo variable
+  # E2E_AUTO_ON_MERGE == 'true' (gated in the triage `if`). Runs when a PR targeting main is
+  # CLOSED; the `if` further requires it was actually merged. Lets the pipeline auto-generate
+  # tests for a feature once it lands, without anyone typing /e2e.
+  pull_request:
+    types: [closed]
+    branches: [main]
 
 # Least privilege at the top level: the live (triage) path only reads code and posts comments.
 # Jobs that need to write code/PRs (pr_back) request elevated permissions at the job level.
@@ -91,7 +98,10 @@ jobs:
       (github.event_name == 'workflow_dispatch' ||
        (github.event_name == 'issue_comment' &&
         github.event.issue.pull_request &&
-        (github.event.comment.body == '/e2e' || github.event.comment.body == '/e2e-dryrun')))
+        (github.event.comment.body == '/e2e' || github.event.comment.body == '/e2e-dryrun')) ||
+       (github.event_name == 'pull_request' &&
+        github.event.pull_request.merged == true &&
+        vars.E2E_AUTO_ON_MERGE == 'true'))
     runs-on: ubuntu-latest
     timeout-minutes: 15
     outputs:
@@ -104,6 +114,10 @@ jobs:
       author: ${{ steps.prinfo.outputs.author }} # source-PR author login; used to auto-assign the test PR (pr_back)
       head_ref: ${{ steps.prinfo.outputs.head_ref }}
       head_sha: ${{ steps.prinfo.outputs.head_sha }}
+      mode: ${{ steps.prinfo.outputs.mode }}               # open | merged (auto-on-merge)
+      base_ref: ${{ steps.prinfo.outputs.base_ref }}       # test-PR base: feature branch (open) or main (merged)
+      work_branch: ${{ steps.prinfo.outputs.work_branch }} # autoe2e/<feature> (open) or autoe2e/pr-<n> (merged)
+      checkout_ref: ${{ steps.prinfo.outputs.checkout_ref }} # generate checks this out: PR head (open) or merge commit (merged)
     steps:
       - name: Check required secret
         env:
@@ -121,11 +135,14 @@ jobs:
           script: |
             // Only the PR number is needed — we read the change as a diff (data), never check
             // out the PR head. (See the checkout step below for the security rationale.)
-            // issue_comment → the commented PR; workflow_dispatch → the required pr_number input,
-            // which accepts a bare number, "#123", or a full PR URL. Normalize to a bare integer
-            // so downstream (gh pr diff, comment posting, concurrency) always gets a number.
+            // issue_comment → the commented PR; pull_request (auto-on-merge) → the merged PR;
+            // workflow_dispatch → the required pr_number input, which accepts a bare number,
+            // "#123", or a full PR URL. Normalize to a bare integer so downstream (gh pr diff,
+            // comment posting, concurrency) always gets a number.
             const raw = context.eventName === 'issue_comment'
               ? String(context.payload.issue.number)
+              : context.eventName === 'pull_request'
+              ? String(context.payload.pull_request.number)
               : String(context.payload.inputs.pr_number || '');
             const urlMatch = raw.match(/\/pull\/(\d+)/);   // PR URL → the /pull/<n> segment
             const numMatch = raw.match(/\d+/);             // else first run of digits ("#123", "123")
@@ -151,8 +168,21 @@ jobs:
             const allowed = ALLOW.includes(author.toLowerCase());
             core.setOutput('author', author);
             core.setOutput('author_allowed', allowed ? 'true' : 'false');
-            core.setOutput('head_ref', data.head ? data.head.ref : '');
-            core.setOutput('head_sha', data.head ? data.head.sha : '');  // immutable — pinned by generate to avoid TOCTOU
+            const headRef = data.head ? data.head.ref : '';
+            const headSha = data.head ? data.head.sha : '';
+            core.setOutput('head_ref', headRef);
+            core.setOutput('head_sha', headSha);  // immutable — pinned by generate to avoid TOCTOU
+
+            // MODE — open (comment/dispatch on a live PR) vs merged (auto-on-merge). They differ:
+            //  - open:   stack the test branch on the still-open feature branch (base = head_ref),
+            //            check out the PR head, branch name keyed on the feature branch.
+            //  - merged: the feature is already in main and its branch may be deleted → base = main,
+            //            check out the merge commit, branch name keyed on the (stable) PR number.
+            const merged = context.eventName === 'pull_request';
+            core.setOutput('mode', merged ? 'merged' : 'open');
+            core.setOutput('base_ref', merged ? (data.base ? data.base.ref : 'main') : headRef);
+            core.setOutput('work_branch', merged ? `autoe2e/pr-${pr}` : `autoe2e/${headRef}`);
+            core.setOutput('checkout_ref', merged ? (data.merge_commit_sha || headSha) : headSha);
             core.info(`PR #${pr} author=@${author} allowed=${allowed} head=${data.head ? data.head.ref : '?'}`);
 
       - name: Determine dry-run mode
@@ -171,6 +201,8 @@ jobs:
             [ "$INPUT_DRY" = "false" ] && DRY=false
           elif [ "$EVENT_NAME" = "issue_comment" ] && [ "$COMMENT_BODY" = "/e2e" ]; then
             DRY=false
+          elif [ "$EVENT_NAME" = "pull_request" ]; then
+            DRY=false   # auto-on-merge is always a full run (gated by E2E_AUTO_ON_MERGE in the trigger if)
           fi
           echo "dry_run=$DRY" >> "$GITHUB_OUTPUT"
           echo "Mode: dry_run=$DRY (event=$EVENT_NAME)"
@@ -370,7 +402,7 @@ jobs:
           # to close the TOCTOU window, and do NOT persist the token in the workspace while we run
           # on PR-authored code. (This job runs only via workflow_dispatch — dry_run=false is
           # dispatch-only — and only for allowlisted PR authors; it never runs from issue_comment.)
-          ref: ${{ needs.triage.outputs.head_sha }}
+          ref: ${{ needs.triage.outputs.checkout_ref }}
           fetch-depth: 1
           persist-credentials: false
 
@@ -488,14 +520,14 @@ jobs:
         # Pushes ONLY tests/ui-testing — no .github/workflows change, so GITHUB_TOKEN is allowed.
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ORIG_REF: ${{ needs.triage.outputs.head_ref }}
+          WORK_BRANCH: ${{ needs.triage.outputs.work_branch }}
           PR_NUMBER: ${{ needs.triage.outputs.pr_number }}
           # Empty on the /e2e comment path → defaults to force (overwrite). Untick the dispatch flag
           # to set "false" and protect an existing branch (push without --force; fails if diverged).
           FORCE_OVERWRITE: ${{ github.event.inputs.force_overwrite }}
         run: |
           SLUG=$(jq -r '.feature_slug // "feature"' docs/test_generator/ci/run-context.json)
-          BRANCH="autoe2e/${ORIG_REF}"
+          BRANCH="${WORK_BRANCH}"
           git config user.name "openobserve-bot"
           git config user.email "bot@openobserve.ai"
           git checkout -b "$BRANCH"
@@ -631,7 +663,7 @@ jobs:
       - name: Checkout the autoe2e branch (feature code + generated tests)
         uses: actions/checkout@v4
         with:
-          ref: autoe2e/${{ needs.triage.outputs.head_ref }}
+          ref: ${{ needs.triage.outputs.work_branch }}
           fetch-depth: 0
           persist-credentials: false
 
@@ -767,9 +799,9 @@ jobs:
       - name: Commit + push healer fixes to autoe2e branch
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ORIG_REF: ${{ needs.triage.outputs.head_ref }}
+          WORK_BRANCH: ${{ needs.triage.outputs.work_branch }}
         run: |
-          BRANCH="autoe2e/${ORIG_REF}"
+          BRANCH="${WORK_BRANCH}"
           git config user.name "openobserve-bot"
           git config user.email "bot@openobserve.ai"
           # The anti-hijack restore staged .opencode/opencode.jsonc — unstage so healer commits carry
@@ -885,11 +917,11 @@ jobs:
         # runner, so there is no untrusted-checkout surface here. The LLM never edits the workflow.
         env:
           GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
-          ORIG_REF: ${{ needs.triage.outputs.head_ref }}
+          WORK_BRANCH: ${{ needs.triage.outputs.work_branch }}
           REG: meta/playwright-registration.json
         run: |
           set -euo pipefail
-          BRANCH="autoe2e/${ORIG_REF}"
+          BRANCH="${WORK_BRANCH}"
           PW=.github/workflows/playwright.yml
           { [ -f "$REG" ] && jq -e 'has("group") and has("spec_filename")' "$REG" >/dev/null 2>&1; } \
             || { echo "::error::playwright-registration.json missing/invalid"; exit 1; }
@@ -924,17 +956,18 @@ jobs:
           # ORG_ADMIN_TOKEN (already used by auto-assign-metadata.yml) so the test PR triggers
           # the repo's existing playwright.yml. A PR opened with GITHUB_TOKEN would not.
           GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
-          ORIG_REF: ${{ needs.triage.outputs.head_ref }}
+          WORK_BRANCH: ${{ needs.triage.outputs.work_branch }}
+          BASE_REF: ${{ needs.triage.outputs.base_ref }}
           SRC_PR: ${{ needs.triage.outputs.pr_number }}
           AUTHOR: ${{ needs.triage.outputs.author }}
         run: |
           set -e
-          BRANCH="autoe2e/${ORIG_REF}"
+          BRANCH="${WORK_BRANCH}"
           SLUG=$(jq -r '.feature_slug // "feature"' meta/run-context.json 2>/dev/null || echo feature)
           SPEC=$(jq -r '.spec_path // "(see branch)"' meta/run-context.json 2>/dev/null || echo "(see branch)")
 
           printf '🤖 Auto-generated E2E tests for #%s — **healed to passing** against a live OpenObserve before this PR was opened.\n\n- Branch `%s` (stacked on `%s`), so the tests run against the feature code and pass before it merges.\n- Spec: `%s`\n\nThe repo Playwright CI re-validates here. Review is for **quality + coverage** — the tests already pass.\n\n_Generated by the E2E Council pipeline._\n' \
-            "$SRC_PR" "$BRANCH" "$ORIG_REF" "$SPEC" > /tmp/pr-body.md
+            "$SRC_PR" "$BRANCH" "$BASE_REF" "$SPEC" > /tmp/pr-body.md
 
           # Idempotent: re-runs force-update the branch, so an existing PR auto-reflects it.
           EXISTING=$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$BRANCH" --state open --json number --jq '.[0].number // empty')
@@ -942,7 +975,7 @@ jobs:
             echo "Test PR #$EXISTING already open; branch was force-updated. No new PR."
             TEST_PR="$EXISTING"
           else
-            URL=$(gh pr create --repo "$GITHUB_REPOSITORY" --head "$BRANCH" --base "$ORIG_REF" \
+            URL=$(gh pr create --repo "$GITHUB_REPOSITORY" --head "$BRANCH" --base "$BASE_REF" \
               --title "test(autoe2e): generated E2E tests for #${SRC_PR} (${SLUG})" --body-file /tmp/pr-body.md)
             echo "Opened test PR: $URL"
             TEST_PR=$(echo "$URL" | grep -oE '[0-9]+$' || echo "")
