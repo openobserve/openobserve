@@ -75,7 +75,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :key="header.id"
             :id="header.id"
             class="tw:px-2 tw:relative table-head tw:text-ellipsis"
-            :style="{ width: `calc(var(--header-${header?.id}-size) * 1px)` }"
+            :style="
+              !defaultColumns && headerIndex === headerGroup.headers.length - 1
+                ? { flex: '1 1 auto', minWidth: `calc(var(--header-${header?.id}-size) * 1px)`, width: 'auto', overflow: 'hidden' }
+                : { width: `calc(var(--header-${header?.id}-size) * 1px)`, minWidth: `calc(var(--header-${header?.id}-size) * 1px)`, flexShrink: '0' }
+            "
             :data-test="`log-search-result-table-th-${header.id}`"
           >
             <div
@@ -351,16 +355,32 @@ class="tw:mr-1" />
                 "
                 class="tw:py-none tw:px-2 tw:flex tw:items-center tw:justify-start tw:relative table-cell"
                 :class="[...tableCellClass, { 'tw:pl-4': cellIndex === 0 }]"
-                :style="{
-                  width:
-                    cell.column.columnDef.id !== 'source' ||
-                    cell.column.columnDef.enableResizing
-                      ? `calc(var(--col-${cell.column.columnDef.id}-size) * 1px)`
-                      : wrap
-                        ? width - 260 - 12 + 'px'
-                        : 'auto',
-                  height: wrap ? '100%' : '20px',
-                }"
+                :style="
+                  !defaultColumns && cellIndex === formattedRows[virtualRow.index].getVisibleCells().length - 1
+                    ? {
+                        flex: '1 1 auto',
+                        minWidth: `calc(var(--col-${cell.column.columnDef.id}-size) * 1px)`,
+                        width: 'auto',
+                        overflow: 'hidden',
+                        height: wrap ? '100%' : '20px',
+                      }
+                    : {
+                        width:
+                          cell.column.columnDef.id !== 'source' ||
+                          cell.column.columnDef.enableResizing
+                            ? `calc(var(--col-${cell.column.columnDef.id}-size) * 1px)`
+                            : wrap
+                              ? width - 260 - 12 + 'px'
+                              : 'auto',
+                        minWidth:
+                          cell.column.columnDef.id !== 'source' ||
+                          cell.column.columnDef.enableResizing
+                            ? `calc(var(--col-${cell.column.columnDef.id}-size) * 1px)`
+                            : undefined,
+                        flexShrink: '0',
+                        height: wrap ? '100%' : '20px',
+                      }
+                "
                 @mouseover="handleCellMouseOver(cell)"
                 @mouseleave="handleCellMouseLeave()"
               >
