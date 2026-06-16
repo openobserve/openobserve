@@ -118,6 +118,18 @@ pub fn create_session_config(
         .optimizer
         .enable_physical_uncorrelated_scalar_subquery = false;
 
+    // DataFusion 54 builds a runtime `DynamicFilterPhysicalExpr` from a `HashJoinExec`'s
+    // build-side join keys and pushes it into the probe-side scan. That runtime state can't
+    // cross our distributed RemoteScan/Flight boundary, and after our custom join rewrites
+    // (`swap_inputs` + broadcast/enrichment join) the filter ends up referencing build-side
+    // columns by index against the projected probe-side batch, producing
+    // "PhysicalExpr Column references column ... but input schema only has N columns" at
+    // execution time. Disable join dynamic filter pushdown to keep the split plans valid.
+    config
+        .options_mut()
+        .optimizer
+        .enable_join_dynamic_filter_pushdown = false;
+
     Ok(config)
 }
 
@@ -625,6 +637,14 @@ mod tests {
         assert_eq!(config.options().sql_parser.dialect, Dialect::PostgreSQL);
         assert!(!config.options().execution.listing_table_ignore_subdirectory);
         assert!(config.information_schema());
+        // Join dynamic filter pushdown must stay disabled: its runtime filter can't cross our
+        // distributed RemoteScan/Flight boundary and breaks our custom join rewrites.
+        assert!(
+            !config
+                .options()
+                .optimizer
+                .enable_join_dynamic_filter_pushdown
+        );
 
         Ok(())
     }
