@@ -18,18 +18,12 @@ export interface GenAiAgentMappingConfig {
 export interface GenAiAgentListItem {
   name: string;
   id?: string | null;
-  source_stream?: string;
-  source_stream_type?: string;
-}
-
-export interface GenAiSourceStreamItem {
-  name: string;
-  stream_type: string;
+  source_stream: string;
+  source_stream_type: string;
 }
 
 export interface GenAiAgentListResponse {
   agents: GenAiAgentListItem[];
-  source_streams: GenAiSourceStreamItem[];
 }
 
 const emptyConfig = (): GenAiAgentMappingConfig => ({
@@ -70,28 +64,23 @@ const genAiAgentMappingService = {
         end_time: endTime,
       },
     });
-    const agents = Array.isArray(response.data?.agents) ? response.data.agents : [];
-    const sourceStreams = Array.isArray(response.data?.source_streams)
-      ? response.data.source_streams
+    const agents = Array.isArray(response.data?.agents)
+      ? response.data.agents
       : [];
     return {
       agents: agents
-        .filter((agent: any) => typeof agent?.name === "string" && agent.name.length > 0)
+        .filter(
+          (agent: any) =>
+            typeof agent?.name === "string" &&
+            agent.name.length > 0 &&
+            typeof agent.source_stream === "string" &&
+            typeof agent.source_stream_type === "string",
+        )
         .map((agent: any) => ({
           name: agent.name,
           id: typeof agent.id === "string" ? agent.id : null,
-          source_stream: typeof agent.source_stream === "string" ? agent.source_stream : undefined,
-          source_stream_type:
-            typeof agent.source_stream_type === "string" ? agent.source_stream_type : undefined,
-        })),
-      source_streams: sourceStreams
-        .filter(
-          (source: any) =>
-            typeof source?.name === "string" && typeof source.stream_type === "string",
-        )
-        .map((source: any) => ({
-          name: source.name,
-          stream_type: source.stream_type,
+          source_stream: agent.source_stream,
+          source_stream_type: agent.source_stream_type,
         })),
     };
   },

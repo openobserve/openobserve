@@ -5,6 +5,11 @@
 
 import { computed, ref, watch, type Ref } from "vue";
 import { useLLMStreamQuery } from "@/plugins/traces/composables/useLLMStreamQuery";
+import {
+  buildEvaluatorAgentFilterWhere,
+  combineWhere,
+  type AgentFilterSelection,
+} from "../utils/agentFilterSql";
 
 export type RunStatus = "success" | "error" | "timeout" | "skipped" | "unknown";
 
@@ -25,8 +30,6 @@ export interface RunRow {
   targetTraceId: string;
   targetStream: string;
   targetStreamType: string;
-  targetAgentName: string;
-  targetAgentId: string;
   latencyMs: number | null;
   /** Parsed from `attributes_response`. One of these will be filled if the
    * judge actually returned a score; otherwise all null and `scoreDisplay` is
@@ -67,7 +70,8 @@ function bucketToMs(bucket: unknown): number {
 
 function parseStatus(raw: unknown): RunStatus {
   const s = typeof raw === "string" ? raw.toLowerCase() : "";
-  if (s === "success" || s === "error" || s === "timeout" || s === "skipped") return s;
+  if (s === "success" || s === "error" || s === "timeout" || s === "skipped")
+    return s;
   return "unknown";
 }
 
@@ -135,8 +139,6 @@ interface RawRunRow {
   attributes_target_trace_id?: string | null;
   attributes_target_stream?: string | null;
   attributes_target_stream_type?: string | null;
-  attributes_target_agent_name?: string | null;
-  attributes_target_agent_id?: string | null;
   attributes_response?: any;
   span_id?: string;
 }
@@ -154,6 +156,7 @@ export function useScorerRuns(
    * the (heavier) runs hits query; KPIs always fire when `scorerId` is set
    * since the KPI strip is visible in every tab. */
   runsEnabled: Ref<boolean>,
+  agentFilter?: Ref<AgentFilterSelection | null | undefined>,
 ) {
   const { executeQuery } = useLLMStreamQuery();
   const isLoadingKpis = ref(false);
@@ -164,6 +167,10 @@ export function useScorerRuns(
   const kpiSql = computed<string | null>(() => {
     const id = scorerId.value;
     if (!id) return null;
+    const where = combineWhere(
+      `CAST(attributes_scorer_id AS VARCHAR) = '${escapeSqlString(id)}'`,
+      buildEvaluatorAgentFilterWhere(agentFilter?.value ?? null),
+    );
     return [
       "SELECT",
       "  COUNT(*) AS total_runs,",
@@ -173,13 +180,17 @@ export function useScorerRuns(
       // page — TRY_CAST so AVG can swallow the string-typed values.
       "  AVG(TRY_CAST(attributes_latency_ms AS DOUBLE)) AS avg_latency_ms",
       'FROM "_evaluator"',
-      `WHERE CAST(attributes_scorer_id AS VARCHAR) = '${escapeSqlString(id)}'`,
+      `WHERE ${where}`,
     ].join("\n");
   });
 
   const runsSql = computed<string | null>(() => {
     const id = scorerId.value;
     if (!id) return null;
+    const where = combineWhere(
+      `CAST(attributes_scorer_id AS VARCHAR) = '${escapeSqlString(id)}'`,
+      buildEvaluatorAgentFilterWhere(agentFilter?.value ?? null),
+    );
     return [
       "SELECT",
       "  span_id,",
@@ -191,11 +202,9 @@ export function useScorerRuns(
       "  attributes_target_trace_id,",
       "  attributes_target_stream,",
       "  attributes_target_stream_type,",
-      "  attributes_target_agent_name,",
-      "  attributes_target_agent_id,",
       "  attributes_response",
       'FROM "_evaluator"',
-      `WHERE CAST(attributes_scorer_id AS VARCHAR) = '${escapeSqlString(id)}'`,
+      `WHERE ${where}`,
       "ORDER BY _timestamp DESC",
       "LIMIT 200",
     ].join("\n");
@@ -250,7 +259,9 @@ export function useScorerRuns(
       runs.value = (runHits as RawRunRow[]).map((r): RunRow => {
         const score = extractScore(r.attributes_response);
         return {
-          id: r.span_id ?? `${r._timestamp ?? ""}-${r.attributes_target_span_id ?? ""}`,
+          id:
+            r.span_id ??
+            `${r._timestamp ?? ""}-${r.attributes_target_span_id ?? ""}`,
           timestampMs: bucketToMs(r._timestamp),
           status: parseStatus(r.attributes_status),
           jobId: r.attributes_job_id ?? "",
@@ -258,8 +269,6 @@ export function useScorerRuns(
           targetTraceId: r.attributes_target_trace_id ?? "",
           targetStream: r.attributes_target_stream ?? "",
           targetStreamType: r.attributes_target_stream_type ?? "traces",
-          targetAgentName: r.attributes_target_agent_name ?? "",
-          targetAgentId: r.attributes_target_agent_id ?? "",
           latencyMs: toNumber(r.attributes_latency_ms),
           scoreNumeric: score.numeric,
           scoreBoolean: score.boolean,
@@ -278,7 +287,7 @@ export function useScorerRuns(
 
   // KPIs are eager — fire whenever scorerId or window changes, regardless of tab.
   watch(
-    [scorerId, dateWindow],
+    [scorerId, dateWindow, agentFilter ?? ref(null)],
     () => {
       if (scorerId.value) void refreshKpis();
       else kpis.value = { ...EMPTY_KPIS };
@@ -288,7 +297,7 @@ export function useScorerRuns(
 
   // Runs hits are lazy — only fire when the Runs tab is active.
   watch(
-    [scorerId, runsEnabled, dateWindow],
+    [scorerId, runsEnabled, dateWindow, agentFilter ?? ref(null)],
     () => {
       if (runsEnabled.value) void refreshRuns();
       else runs.value = [];

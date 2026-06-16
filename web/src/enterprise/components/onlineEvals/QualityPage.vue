@@ -1,9 +1,6 @@
 <template>
   <div class="quality-page" data-test="quality-page">
-    <QualityKpiSkeleton
-      v-if="showKpiSkeleton"
-      :count="visibleKpis.length"
-    />
+    <QualityKpiSkeleton v-if="showKpiSkeleton" :count="visibleKpis.length" />
     <section v-else class="quality-page__kpis" aria-label="Tier 1 KPIs">
       <QualityKpiCard
         v-for="kpi in visibleKpis"
@@ -48,7 +45,8 @@
           v-if="selectedConfig?.version"
           class="qpd-version"
           data-test="quality-detail-version-badge"
-        >v{{ selectedConfig.version }}</span>
+          >v{{ selectedConfig.version }}</span
+        >
       </template>
 
       <QualityDetailPanel
@@ -94,6 +92,7 @@ import QualityKpiSkeleton from "./quality/QualityKpiSkeleton.vue";
 import QualityScoreConfigsTable from "./quality/QualityScoreConfigsTable.vue";
 import QualityDetailPanel from "./quality/QualityDetailPanel.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import type { AgentFilterSelection } from "./utils/agentFilterSql";
 
 const props = defineProps<{
   scoreConfigs: ScoreConfig[];
@@ -101,6 +100,7 @@ const props = defineProps<{
   // in the embedded AppPageHeader). Quality just consumes it as a reactive
   // input to its data loaders.
   dateWindow: DateWindow;
+  agentFilter?: AgentFilterSelection | null;
 }>();
 
 const { t } = useI18n();
@@ -109,11 +109,12 @@ const router = useRouter();
 const store = useStore();
 
 const dateWindowRef = toRef(props, "dateWindow");
+const agentFilterRef = toRef(props, "agentFilter");
 
-// `sourceStream` is intentionally not destructured — the composable keeps its
-// internal default ("__all__"), which is correct now that the UI selector is
-// hidden and we only have one score sink (`_llm_scores`).
-const { isLoading, kpis, deltaByKpi, refresh } = useQualityData(dateWindowRef);
+const { isLoading, kpis, deltaByKpi, refresh } = useQualityData(
+  dateWindowRef,
+  agentFilterRef,
+);
 
 // Evaluation cost is intentionally hidden until the backend writes cost data.
 // To restore it, remove this filter and re-add `kpis` to the v-for.
@@ -122,14 +123,16 @@ const { isLoading, kpis, deltaByKpi, refresh } = useQualityData(dateWindowRef);
 // hidden. Keep the set in place so future placeholder KPIs can be
 // hidden the same way without touching the render loop.
 const HIDDEN_KPI_IDS = new Set<string>();
-const visibleKpis = computed(() => kpis.value.filter((k) => !HIDDEN_KPI_IDS.has(k.id)));
+const visibleKpis = computed(() =>
+  kpis.value.filter((k) => !HIDDEN_KPI_IDS.has(k.id)),
+);
 
 const scoreConfigsRef = toRef(props, "scoreConfigs");
 const {
   rows: configRows,
   isLoading: isConfigsLoading,
   refresh: refreshConfigs,
-} = useQualityScoreConfigs(scoreConfigsRef, dateWindowRef);
+} = useQualityScoreConfigs(scoreConfigsRef, dateWindowRef, agentFilterRef);
 
 const selectedConfigId = ref<string | null>(routeConfigId());
 const splitByScorer = ref(false);
@@ -148,7 +151,7 @@ const {
   booleanAgg,
   categoricalRows,
   refresh: refreshDetail,
-} = useQualityConfigDetail(selectedConfig, dateWindowRef);
+} = useQualityConfigDetail(selectedConfig, dateWindowRef, agentFilterRef);
 
 const {
   isLoading: isChartsLoading,
@@ -157,14 +160,24 @@ const {
   booleanTrend,
   booleanTrendSeries,
   refresh: refreshCharts,
-} = useQualityDetailCharts(selectedConfig, dateWindowRef, splitByScorer, splitBySourceType);
+} = useQualityDetailCharts(
+  selectedConfig,
+  dateWindowRef,
+  splitByScorer,
+  splitBySourceType,
+  agentFilterRef,
+);
 
 const numericThreshold = computed(() => {
   const cfg = selectedConfig.value;
   if (!cfg) return null;
-  const ht: any = (cfg as any).healthyThreshold ?? (cfg as any).healthy_threshold;
+  const ht: any =
+    (cfg as any).healthyThreshold ?? (cfg as any).healthy_threshold;
   if (!ht || ht.value == null || !ht.direction) return null;
-  return { value: Number(ht.value), direction: ht.direction === "gte" ? "gte" : "lte" } as const;
+  return {
+    value: Number(ht.value),
+    direction: ht.direction === "gte" ? "gte" : "lte",
+  } as const;
 });
 
 const numericRange = computed(() => {
@@ -176,7 +189,12 @@ const numericRange = computed(() => {
 });
 
 async function refreshAll() {
-  await Promise.all([refresh(), refreshConfigs(), refreshDetail(), refreshCharts()]);
+  await Promise.all([
+    refresh(),
+    refreshConfigs(),
+    refreshDetail(),
+    refreshCharts(),
+  ]);
 }
 
 const isAnyLoading = computed(
@@ -210,6 +228,10 @@ watch(dateWindowRef, () => {
   void refreshAll();
 });
 
+watch(agentFilterRef, () => {
+  void refreshAll();
+});
+
 watch(scoreConfigsRef, () => {
   void refreshConfigs();
 });
@@ -230,7 +252,10 @@ watch(
 
 function selectConfig(row: ScoreConfigRow) {
   selectedConfigId.value = String(row.config.id);
-  const query: Record<string, any> = { ...route.query, config: selectedConfigId.value };
+  const query: Record<string, any> = {
+    ...route.query,
+    config: selectedConfigId.value,
+  };
   router.push({ name: route.name as string, query }).catch(() => {});
 }
 
@@ -258,7 +283,8 @@ function escapeSqlString(s: string): string {
 
 /** Build the unhealthy SQL fragment that matches the config's `healthy_threshold`. */
 function unhealthySqlFor(config: ScoreConfig): string | null {
-  const ht: any = (config as any).healthyThreshold ?? (config as any).healthy_threshold;
+  const ht: any =
+    (config as any).healthyThreshold ?? (config as any).healthy_threshold;
   const type = (config as any).dataType ?? (config as any).data_type;
   if (!ht) return null;
   if (type === "numeric") {
@@ -269,7 +295,9 @@ function unhealthySqlFor(config: ScoreConfig): string | null {
   if (type === "categorical") {
     const list: string[] = ht.healthy_categories || ht.healthyCategories || [];
     if (!Array.isArray(list) || list.length === 0) return null;
-    const inList = list.map((c) => `'${escapeSqlString(String(c))}'`).join(", ");
+    const inList = list
+      .map((c) => `'${escapeSqlString(String(c))}'`)
+      .join(", ");
     return `value_categorical NOT IN (${inList})`;
   }
   if (type === "boolean") {

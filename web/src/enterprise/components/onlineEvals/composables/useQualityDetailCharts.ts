@@ -7,6 +7,11 @@ import { useLLMStreamQuery } from "@/plugins/traces/composables/useLLMStreamQuer
 import type { ScoreConfig } from "@/services/online-evals.service";
 import { dataTypeOf, entityId } from "../utils/evalEntity";
 import { chooseBucketInterval, type DateWindow } from "./useQualityData";
+import {
+  buildScoresAgentFilterWhere,
+  combineWhere,
+  type AgentFilterSelection,
+} from "../utils/agentFilterSql";
 
 export interface TrendPoint {
   /** Bucket end in milliseconds */
@@ -77,12 +82,18 @@ interface RawBooleanTrendRow {
   trues?: number | string;
 }
 
-function valueOf<T = any>(row: any, camel: string, snake: string): T | undefined {
+function valueOf<T = any>(
+  row: any,
+  camel: string,
+  snake: string,
+): T | undefined {
   if (row == null) return undefined;
   return row[camel] ?? row[snake];
 }
 
-function numericRangeOf(config: ScoreConfig): { min: number; max: number } | null {
+function numericRangeOf(
+  config: ScoreConfig,
+): { min: number; max: number } | null {
   const r = valueOf<any>(config, "numericRange", "numeric_range");
   if (!r) return null;
   const min = toNumber(r.min);
@@ -91,7 +102,9 @@ function numericRangeOf(config: ScoreConfig): { min: number; max: number } | nul
   return { min, max };
 }
 
-function healthyThresholdValue(config: ScoreConfig): { value: number; direction: "gte" | "lte" } | null {
+function healthyThresholdValue(
+  config: ScoreConfig,
+): { value: number; direction: "gte" | "lte" } | null {
   const ht = valueOf<any>(config, "healthyThreshold", "healthy_threshold");
   if (!ht || ht.value == null || !ht.direction) return null;
   const v = toNumber(ht.value);
@@ -104,6 +117,7 @@ export function useQualityDetailCharts(
   dateWindow: Ref<DateWindow>,
   splitByScorer: Ref<boolean>,
   splitBySourceType: Ref<boolean>,
+  agentFilter?: Ref<AgentFilterSelection | null | undefined>,
 ) {
   const { executeQuery } = useLLMStreamQuery();
   const isLoading = ref(false);
@@ -182,7 +196,10 @@ export function useQualityDetailCharts(
       // queries survive version bumps.
       const configId = escapeSqlString(entityId(cfg));
       const type = dataTypeOf(cfg);
-      const where = `CAST(score_config_id AS VARCHAR) = '${configId}'`;
+      const where = combineWhere(
+        `CAST(score_config_id AS VARCHAR) = '${configId}'`,
+        buildScoresAgentFilterWhere(agentFilter?.value ?? null),
+      )!;
 
       if (type === "numeric") {
         const trendSql = [
@@ -203,8 +220,18 @@ export function useQualityDetailCharts(
         ].join("\n");
 
         const [trendRows, valueRows] = await Promise.all([
-          runQuery<RawNumericTrendRow>(trendSql, "numeric.trend", startUs, endUs),
-          runQuery<{ v?: number | string }>(valuesSql, "numeric.values", startUs, endUs),
+          runQuery<RawNumericTrendRow>(
+            trendSql,
+            "numeric.trend",
+            startUs,
+            endUs,
+          ),
+          runQuery<{ v?: number | string }>(
+            valuesSql,
+            "numeric.values",
+            startUs,
+            endUs,
+          ),
         ]);
 
         numericTrend.value = trendRows
@@ -237,7 +264,8 @@ export function useQualityDetailCharts(
         let seriesKeyExpr = "'__default__'";
         const splitParts: string[] = [];
         if (splitByScorer.value) splitParts.push("CAST(scorer_id AS VARCHAR)");
-        if (splitBySourceType.value) splitParts.push("CAST(source_type AS VARCHAR)");
+        if (splitBySourceType.value)
+          splitParts.push("CAST(source_type AS VARCHAR)");
         if (splitParts.length === 1) {
           seriesKeyExpr = `COALESCE(${splitParts[0]}, '(unknown)')`;
         } else if (splitParts.length === 2) {
@@ -255,11 +283,17 @@ export function useQualityDetailCharts(
           "GROUP BY bucket, series_key",
           "ORDER BY bucket",
         ].join("\n");
-        const rows = await runQuery<RawBooleanSplitRow>(trendSql, "boolean.trend", startUs, endUs);
+        const rows = await runQuery<RawBooleanSplitRow>(
+          trendSql,
+          "boolean.trend",
+          startUs,
+          endUs,
+        );
 
         const groupedByKey = new Map<string, BooleanTrendPoint[]>();
         for (const r of rows) {
-          const key = r.series_key != null ? String(r.series_key) : "__default__";
+          const key =
+            r.series_key != null ? String(r.series_key) : "__default__";
           const total = toNumber(r.total) ?? 0;
           const trues = toNumber(r.trues) ?? 0;
           const point: BooleanTrendPoint = {
@@ -272,13 +306,13 @@ export function useQualityDetailCharts(
           groupedByKey.get(key)!.push(point);
         }
 
-        const series: BooleanTrendSeries[] = Array.from(groupedByKey.entries()).map(
-          ([key, points]) => ({
-            id: key,
-            label: key === "__default__" ? "Pass rate" : key,
-            points: points.sort((a, b) => a.t - b.t),
-          }),
-        );
+        const series: BooleanTrendSeries[] = Array.from(
+          groupedByKey.entries(),
+        ).map(([key, points]) => ({
+          id: key,
+          label: key === "__default__" ? "Pass rate" : key,
+          points: points.sort((a, b) => a.t - b.t),
+        }));
         // Sort by total volume descending so the dominant series renders first.
         series.sort(
           (a, b) =>
@@ -305,7 +339,13 @@ export function useQualityDetailCharts(
   }
 
   watch(
-    [selectedConfig, dateWindow, splitByScorer, splitBySourceType],
+    [
+      selectedConfig,
+      dateWindow,
+      splitByScorer,
+      splitBySourceType,
+      agentFilter ?? ref(null),
+    ],
     () => {
       void refresh();
     },

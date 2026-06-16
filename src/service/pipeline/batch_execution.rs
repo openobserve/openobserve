@@ -665,7 +665,7 @@ async fn process_node(
     error_sender: Sender<(String, String, String, Option<String>)>,
     pipeline_name: String,
     stream_name: Option<String>,
-    source_stream_name: String,
+    _source_stream_name: String,
     source_stream_type: StreamType,
     _leaf_dest_stream: Option<StreamParams>,
 ) -> Result<()> {
@@ -1394,7 +1394,7 @@ async fn process_node(
                         &org_id,
                         job_id,
                         &item.record,
-                        &source_stream_name,
+                        &_source_stream_name,
                         &source_stream_type.to_string(),
                     )
                 {
@@ -1415,8 +1415,6 @@ async fn process_node(
                                     target_trace_id: ctx.trace_id.clone(),
                                     target_stream: ctx.source_stream.clone(),
                                     target_stream_type: ctx.source_stream_type.clone(),
-                                    target_agent_name: ctx.target_agent_name.clone(),
-                                    target_agent_id: ctx.target_agent_id.clone(),
                                     scorer_id: None,
                                     scorer_version: None,
                                     scorer_type: None,

@@ -16,7 +16,7 @@ the Free Software Foundation, either version 3 of the License, or
       v-if="formPage?.entity === 'scorers'"
       :org-id="orgId"
       :mode="formPage.mode"
-      :row="(dialog.row as Scorer | null)"
+      :row="dialog.row as Scorer | null"
       :scorer-type="pendingScorerType"
       :providers="providers"
       :score-configs="scoreConfigs"
@@ -31,7 +31,7 @@ the Free Software Foundation, either version 3 of the License, or
       v-else-if="formPage?.entity === 'jobs'"
       :org-id="orgId"
       :mode="formPage.mode"
-      :row="(dialog.row as EvalJob | null)"
+      :row="dialog.row as EvalJob | null"
       :scorers="scorers"
       @saved="handleSaved"
       @cancel="closeFormPage"
@@ -93,7 +93,9 @@ the Free Software Foundation, either version 3 of the License, or
                 <span>
                   {{ t(`onlineEvals.${importI18nKey}.import.customLabel`) }}
                 </span>
-                <span class="tw:text-xs tw:text-dropdown-item-text tw:opacity-60">
+                <span
+                  class="tw:text-xs tw:text-dropdown-item-text tw:opacity-60"
+                >
                   {{ t(`onlineEvals.${importI18nKey}.import.customSubtitle`) }}
                 </span>
               </div>
@@ -110,7 +112,9 @@ the Free Software Foundation, either version 3 of the License, or
                 <span>
                   {{ t(`onlineEvals.${importI18nKey}.import.libraryLabel`) }}
                 </span>
-                <span class="tw:text-xs tw:text-dropdown-item-text tw:opacity-60">
+                <span
+                  class="tw:text-xs tw:text-dropdown-item-text tw:opacity-60"
+                >
                   {{ t(`onlineEvals.${importI18nKey}.import.librarySubtitle`) }}
                 </span>
               </div>
@@ -138,6 +142,14 @@ the Free Software Foundation, either version 3 of the License, or
           </OButton>
         </template>
         <template v-else-if="activeTab === 'quality'" #actions>
+          <OSelect
+            v-model="qualityAgentKey"
+            :options="qualityAgentOptions"
+            labelKey="label"
+            valueKey="value"
+            class="tw:w-[14rem] tw:flex-shrink-0 tw:rounded"
+            data-test="quality-agent-filter"
+          />
           <DateTimePickerDashboard
             ref="qualityDatePickerRef"
             v-model="qualitySelectedDate"
@@ -175,11 +187,12 @@ the Free Software Foundation, either version 3 of the License, or
             v-if="activeTab === 'quality'"
             ref="qualityPageRef"
             :date-window="qualityDateWindow"
+            :agent-filter="selectedQualityAgent"
             :score-configs="scoreConfigs"
           />
           <ScoreConfigList
             v-else-if="activeTab === 'scoreConfigs'"
-            :rows="(filteredRows as ScoreConfig[])"
+            :rows="filteredRows as ScoreConfig[]"
             :all-score-configs="scoreConfigs"
             :scorers="scorers"
             :search="filterQuery"
@@ -196,7 +209,7 @@ the Free Software Foundation, either version 3 of the License, or
           />
           <ScorerList
             v-else-if="activeTab === 'scorers'"
-            :rows="(filteredRows as Scorer[])"
+            :rows="filteredRows as Scorer[]"
             :all-scorers="scorers"
             :jobs="jobs"
             :score-configs="scoreConfigs"
@@ -216,7 +229,7 @@ the Free Software Foundation, either version 3 of the License, or
           />
           <EvalJobList
             v-else-if="activeTab === 'jobs'"
-            :rows="(filteredRows as EvalJob[])"
+            :rows="filteredRows as EvalJob[]"
             :search="filterQuery"
             :loading="isLoading"
             :pending-status-id="pendingJobStatusId"
@@ -241,7 +254,7 @@ the Free Software Foundation, either version 3 of the License, or
         v-if="dialog.open && activeTab === 'scoreConfigs'"
         :org-id="orgId"
         :mode="dialog.mode"
-        :row="(dialog.row as ScoreConfig | null)"
+        :row="dialog.row as ScoreConfig | null"
         @saved="handleSaved"
         @cancel="closeDialog"
       />
@@ -262,7 +275,9 @@ the Free Software Foundation, either version 3 of the License, or
         <ScoreConfigLibrary
           ref="scoreConfigLibraryRef"
           :org-id="orgId"
-          @update:selected-count="(n: number) => (scoreConfigLibrarySelectedCount = n)"
+          @update:selected-count="
+            (n: number) => (scoreConfigLibrarySelectedCount = n)
+          "
           @imported="handleScoreConfigLibraryImported"
         />
       </ODrawer>
@@ -286,7 +301,9 @@ the Free Software Foundation, either version 3 of the License, or
           :score-configs="scoreConfigs"
           :scorers="scorers"
           :providers="providers"
-          @update:selected-count="(n: number) => (scorerLibrarySelectedCount = n)"
+          @update:selected-count="
+            (n: number) => (scorerLibrarySelectedCount = n)
+          "
           @imported="handleScorerLibraryImported"
         />
       </ODrawer>
@@ -321,7 +338,11 @@ the Free Software Foundation, either version 3 of the License, or
       <ConfirmDialog
         v-model="confirmDeleteOpen"
         :title="pendingDeleteLabel"
-        :message="t('onlineEvals.deleteConfirmMessage', { name: pendingDeleteRow?.name ?? '' })"
+        :message="
+          t('onlineEvals.deleteConfirmMessage', {
+            name: pendingDeleteRow?.name ?? '',
+          })
+        "
         @update:ok="performDelete"
         @update:cancel="cancelDelete"
       />
@@ -342,10 +363,7 @@ import onlineEvalsService, {
   type ScorerType,
 } from "@/services/online-evals.service";
 import { useOnlineEvalsData } from "./onlineEvals/composables/useOnlineEvalsData";
-import {
-  entityId,
-  statusOf,
-} from "./onlineEvals/utils/evalEntity";
+import { entityId, statusOf } from "./onlineEvals/utils/evalEntity";
 import { showError } from "./onlineEvals/utils/evalFormat";
 import {
   buildCrossNavigationQuery,
@@ -385,7 +403,15 @@ import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import type { DateWindow } from "./onlineEvals/composables/useQualityData";
 import { useAiDateRange } from "@/enterprise/composables/useAiDateRange";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import genAiAgentMappingService from "@/services/gen-ai-agent-mapping.service";
 import { downloadFile } from "@/utils/dom";
+import {
+  ALL_AGENTS_VALUE,
+  agentFilterKey,
+  agentFilterLabel,
+  type AgentFilterSelection,
+} from "./onlineEvals/utils/agentFilterSql";
 import {
   bulkExportFileName as bulkExportScoreConfigFileName,
   exportScoreConfigFileName,
@@ -412,9 +438,16 @@ const activeTab = ref<ActiveTab>(parseTabFromRoute(route.query.tab));
 const filterQuery = ref("");
 const scorerTypeDialog = ref(false);
 const pendingScorerType = ref<ScorerType>("llm_judge");
-const formPage = ref<{ entity: FullPageEntity; mode: "create" | "edit" } | null>(null);
+const formPage = ref<{
+  entity: FullPageEntity;
+  mode: "create" | "edit";
+} | null>(null);
 
-const dialog = ref<{ open: boolean; mode: "create" | "edit"; row: AnyRow | null }>({
+const dialog = ref<{
+  open: boolean;
+  mode: "create" | "edit";
+  row: AnyRow | null;
+}>({
   open: false,
   mode: "create",
   row: null,
@@ -432,7 +465,9 @@ const catalogOpenTab = ref<ActiveTab | null>(null);
 const showScoreConfigLibrary = ref(false);
 const scoreConfigLibrarySelectedCount = ref(0);
 const scoreConfigLibraryImporting = ref(false);
-const scoreConfigLibraryRef = ref<InstanceType<typeof ScoreConfigLibrary> | null>(null);
+const scoreConfigLibraryRef = ref<InstanceType<
+  typeof ScoreConfigLibrary
+> | null>(null);
 const showScorerLibrary = ref(false);
 const scorerLibrarySelectedCount = ref(0);
 const scorerLibraryImporting = ref(false);
@@ -482,7 +517,9 @@ const filteredRows = computed<AnyRow[]>(() => {
   );
 });
 
-const tabs = computed<Array<{ value: ActiveTab; label: string; badge?: string }>>(() => [
+const tabs = computed<
+  Array<{ value: ActiveTab; label: string; badge?: string }>
+>(() => [
   { value: "quality", label: t("onlineEvals.tabs.quality") },
   { value: "jobs", label: t("onlineEvals.tabs.jobs") },
   { value: "scorers", label: t("onlineEvals.tabs.scorers") },
@@ -492,18 +529,23 @@ const tabs = computed<Array<{ value: ActiveTab; label: string; badge?: string }>
 // Header chrome shown only when embedded in the AI Observability shell —
 // mirrors the LLM Insights / Sessions pages so every section in the rail
 // shares the same title strip. Title + icon track the active rail item.
-const EMBEDDED_HEADER_META: Record<ActiveTab, { i18nKey: string; icon: IconName }> = {
+const EMBEDDED_HEADER_META: Record<
+  ActiveTab,
+  { i18nKey: string; icon: IconName }
+> = {
   quality: { i18nKey: "aiObservability.nav.quality", icon: "star-rate" },
   jobs: { i18nKey: "aiObservability.nav.evalJobs", icon: "event" },
   scorers: { i18nKey: "aiObservability.nav.scorers", icon: "rule" },
   scoreConfigs: { i18nKey: "aiObservability.nav.scoreConfigs", icon: "tune" },
 };
 
-const embeddedHeader = computed<{ title: string; icon: IconName } | null>(() => {
-  const meta = EMBEDDED_HEADER_META[activeTab.value];
-  if (!meta) return null;
-  return { title: t(meta.i18nKey), icon: meta.icon };
-});
+const embeddedHeader = computed<{ title: string; icon: IconName } | null>(
+  () => {
+    const meta = EMBEDDED_HEADER_META[activeTab.value];
+    if (!meta) return null;
+    return { title: t(meta.i18nKey), icon: meta.icon };
+  },
+);
 
 // Per-tab "create" button label for the embedded AppPageHeader. Quality has
 // no list-style create, so it returns an empty string and the button is
@@ -542,6 +584,8 @@ const qualityDateWindow = ref<DateWindow>({
   startUs: (Date.now() - 15 * 60 * 1000) * 1000,
   endUs: Date.now() * 1000,
 });
+const qualityAgents = ref<AgentFilterSelection[]>([]);
+const qualityAgentKey = ref(ALL_AGENTS_VALUE);
 const qualityDatePickerRef = ref<{
   getConsumableDateTime: () => { startTime: number; endTime: number };
 } | null>(null);
@@ -550,11 +594,57 @@ const qualityPageRef = ref<{
   isAnyLoading: boolean;
 } | null>(null);
 
+const qualityAgentOptions = computed(() => [
+  { label: "All Agents", value: ALL_AGENTS_VALUE },
+  ...qualityAgents.value.map((agent) => ({
+    label: agentFilterLabel(agent),
+    value: agentFilterKey(agent),
+  })),
+]);
+
+const selectedQualityAgent = computed<AgentFilterSelection | null>(() => {
+  if (qualityAgentKey.value === ALL_AGENTS_VALUE) return null;
+  return (
+    qualityAgents.value.find(
+      (agent) => agentFilterKey(agent) === qualityAgentKey.value,
+    ) ?? null
+  );
+});
+
+async function loadQualityAgents() {
+  const { startUs, endUs } = qualityDateWindow.value;
+  if (!orgId.value || !startUs || !endUs) return;
+  try {
+    const response = await genAiAgentMappingService.listAgents(
+      orgId.value,
+      startUs,
+      endUs,
+    );
+    qualityAgents.value = response.agents;
+    if (
+      qualityAgentKey.value !== ALL_AGENTS_VALUE &&
+      !qualityAgents.value.some(
+        (agent) => agentFilterKey(agent) === qualityAgentKey.value,
+      )
+    ) {
+      qualityAgentKey.value = ALL_AGENTS_VALUE;
+    }
+  } catch (err) {
+    console.warn("Failed to load GenAI agents", err);
+    qualityAgents.value = [];
+    qualityAgentKey.value = ALL_AGENTS_VALUE;
+  }
+}
+
 function syncQualityDateWindow() {
   const picker = qualityDatePickerRef.value;
   if (!picker) return;
   const dt = picker.getConsumableDateTime();
-  if (dt && typeof dt.startTime === "number" && typeof dt.endTime === "number") {
+  if (
+    dt &&
+    typeof dt.startTime === "number" &&
+    typeof dt.endTime === "number"
+  ) {
     qualityDateWindow.value = { startUs: dt.startTime, endUs: dt.endTime };
   }
 }
@@ -566,6 +656,19 @@ function syncQualityDateWindow() {
 // top-level ref identity changes and this watch fires.
 watch(qualitySelectedDate, () => {
   syncQualityDateWindow();
+});
+
+watch(
+  qualityDateWindow,
+  () => {
+    void loadQualityAgents();
+  },
+  { immediate: true },
+);
+
+watch(orgId, () => {
+  qualityAgentKey.value = ALL_AGENTS_VALUE;
+  void loadQualityAgents();
 });
 
 // Aggregated "is any quality query in flight" — exposed by QualityPage so the
@@ -599,12 +702,16 @@ watch(qualityDatePickerRef, (next) => {
   if (next) syncQualityDateWindow();
 });
 
-const currentSingularLabel = computed(() => t(`onlineEvals.singular.${activeTab.value}`));
+const currentSingularLabel = computed(() =>
+  t(`onlineEvals.singular.${activeTab.value}`),
+);
 
 const pendingDeleteLabel = computed(() => {
   const tab = pendingDeleteTab.value;
   if (!tab || tab === "quality") return t("onlineEvals.actions.delete");
-  return t("onlineEvals.deleteTitle", { label: t(`onlineEvals.singular.${tab}`) });
+  return t("onlineEvals.deleteTitle", {
+    label: t(`onlineEvals.singular.${tab}`),
+  });
 });
 
 watch(activeTab, (next) => {
@@ -708,12 +815,20 @@ function closeJobView() {
  * and overwrite the `action` / `id` params. The URL → state watcher then
  * syncs activeTab + opens the right drawer. */
 function crossNavigateToScorer(row: Scorer) {
-  const query = buildCrossNavigationQuery({ ...route.query }, "scorers", entityId(row));
+  const query = buildCrossNavigationQuery(
+    { ...route.query },
+    "scorers",
+    entityId(row),
+  );
   router.push({ name: route.name as string, query }).catch(() => {});
 }
 
 function crossNavigateToJob(row: EvalJob) {
-  const query = buildCrossNavigationQuery({ ...route.query }, "jobs", String(row.id));
+  const query = buildCrossNavigationQuery(
+    { ...route.query },
+    "jobs",
+    String(row.id),
+  );
   router.push({ name: route.name as string, query }).catch(() => {});
 }
 
@@ -878,8 +993,8 @@ function exportScorerRow(row: Scorer) {
 }
 
 function exportScorerBulk(ids: string[]) {
-  const selected = scorers.value.filter((row) =>
-    ids.includes(entityId(row)) || ids.includes(row.id),
+  const selected = scorers.value.filter(
+    (row) => ids.includes(entityId(row)) || ids.includes(row.id),
   );
   if (selected.length === 0) {
     toast({ variant: "warning", message: "No scorers selected" });
@@ -907,8 +1022,8 @@ function exportScorerBulk(ids: string[]) {
 }
 
 function exportScoreConfigBulk(ids: string[]) {
-  const selected = scoreConfigs.value.filter((row) =>
-    ids.includes(entityId(row)) || ids.includes(row.id),
+  const selected = scoreConfigs.value.filter(
+    (row) => ids.includes(entityId(row)) || ids.includes(row.id),
   );
   if (selected.length === 0) {
     toast({ variant: "warning", message: "No score configs selected" });
@@ -981,7 +1096,12 @@ function syncFromRoute() {
 }
 
 watch(
-  () => [route.query.action, route.query.id, route.query.scorer_type, route.query.tab],
+  () => [
+    route.query.action,
+    route.query.id,
+    route.query.scorer_type,
+    route.query.tab,
+  ],
   () => syncFromRoute(),
 );
 
@@ -1004,9 +1124,15 @@ async function performDelete() {
   const singular = t(`onlineEvals.singular.${tab}`);
   try {
     if (tab === "scoreConfigs")
-      await onlineEvalsService.scoreConfigs.delete(orgId.value, entityId(row as ScoreConfig));
+      await onlineEvalsService.scoreConfigs.delete(
+        orgId.value,
+        entityId(row as ScoreConfig),
+      );
     else if (tab === "scorers")
-      await onlineEvalsService.scorers.delete(orgId.value, entityId(row as Scorer));
+      await onlineEvalsService.scorers.delete(
+        orgId.value,
+        entityId(row as Scorer),
+      );
     else if (tab === "jobs")
       await onlineEvalsService.jobs.delete(orgId.value, (row as EvalJob).id);
 
@@ -1016,14 +1142,16 @@ async function performDelete() {
     });
     await loadAll(orgId.value);
   } catch (err: any) {
-    showError(err, t("onlineEvals.deleteError", { label: singular.toLowerCase() }));
+    showError(
+      err,
+      t("onlineEvals.deleteError", { label: singular.toLowerCase() }),
+    );
   } finally {
     pendingDeleteRow.value = null;
     pendingDeleteTab.value = null;
   }
 }
 </script>
-
 
 <style lang="scss">
 .online-evals {

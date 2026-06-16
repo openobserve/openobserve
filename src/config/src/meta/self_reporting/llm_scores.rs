@@ -184,6 +184,10 @@ mod tests {
         assert!(obj.contains_key("source_type"));
         assert!(obj.contains_key("source_stream"));
         assert!(obj.contains_key("source_stream_type"));
+        assert!(!obj.contains_key("agent_name"));
+        assert!(!obj.contains_key("agent_id"));
+        assert!(!obj.contains_key("target_agent_name"));
+        assert!(!obj.contains_key("target_agent_id"));
         assert!(obj.contains_key("job_id"));
         assert!(obj.contains_key("reasoning"));
         assert!(obj.contains_key("metadata"));

@@ -1,11 +1,18 @@
 <template>
-  <div class="jd-scrim" role="dialog" aria-modal="true" @click.self="$emit('close')">
+  <div
+    class="jd-scrim"
+    role="dialog"
+    aria-modal="true"
+    @click.self="$emit('close')"
+  >
     <aside class="jd" @click.stop data-test="eval-job-detail">
       <!-- ── Header ── -->
       <header class="jd__header">
         <div class="jd__header-text">
           <div class="tw:flex tw:items-center tw:gap-2 tw:flex-nowrap">
-            <span class="jd__eyebrow">{{ t("onlineEvals.job.detail.eyebrow") }}</span>
+            <span class="jd__eyebrow">{{
+              t("onlineEvals.job.detail.eyebrow")
+            }}</span>
             <span
               v-if="row.name"
               :class="[
@@ -36,9 +43,15 @@
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
-            width="16" height="16" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" stroke-width="2"
-            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
           >
             <line x1="18" y1="6" x2="6" y2="18" />
             <line x1="6" y1="6" x2="18" y2="18" />
@@ -49,27 +62,47 @@
       <!-- ── KPI strip ── -->
       <section class="jd__kpis">
         <article class="jd-kpi">
-          <span class="jd-kpi__title">{{ t("onlineEvals.job.detail.kpis.totalRuns") }}</span>
+          <span class="jd-kpi__title">{{
+            t("onlineEvals.job.detail.kpis.totalRuns")
+          }}</span>
           <span class="jd-kpi__value">{{ formatCount(kpis.totalRuns) }}</span>
-          <span class="jd-kpi__sub">{{ t("onlineEvals.job.detail.kpis.totalRunsSub") }}</span>
+          <span class="jd-kpi__sub">{{
+            t("onlineEvals.job.detail.kpis.totalRunsSub")
+          }}</span>
         </article>
         <article class="jd-kpi" :class="successRateTone">
-          <span class="jd-kpi__title">{{ t("onlineEvals.job.detail.kpis.successRate") }}</span>
-          <span class="jd-kpi__value">{{ formatPercent(kpis.successRate) }}</span>
-          <span class="jd-kpi__sub">{{ t("onlineEvals.job.detail.kpis.successRateSub") }}</span>
+          <span class="jd-kpi__title">{{
+            t("onlineEvals.job.detail.kpis.successRate")
+          }}</span>
+          <span class="jd-kpi__value">{{
+            formatPercent(kpis.successRate)
+          }}</span>
+          <span class="jd-kpi__sub">{{
+            t("onlineEvals.job.detail.kpis.successRateSub")
+          }}</span>
         </article>
         <article class="jd-kpi">
-          <span class="jd-kpi__title">{{ t("onlineEvals.job.detail.kpis.avgLatency") }}</span>
-          <span class="jd-kpi__value">{{ formatLatency(kpis.avgLatencyMs) }}</span>
-          <span class="jd-kpi__sub">{{ t("onlineEvals.job.detail.kpis.avgLatencySub") }}</span>
+          <span class="jd-kpi__title">{{
+            t("onlineEvals.job.detail.kpis.avgLatency")
+          }}</span>
+          <span class="jd-kpi__value">{{
+            formatLatency(kpis.avgLatencyMs)
+          }}</span>
+          <span class="jd-kpi__sub">{{
+            t("onlineEvals.job.detail.kpis.avgLatencySub")
+          }}</span>
         </article>
         <article class="jd-kpi">
-          <span class="jd-kpi__title">{{ t("onlineEvals.job.detail.kpis.scorers") }}</span>
+          <span class="jd-kpi__title">{{
+            t("onlineEvals.job.detail.kpis.scorers")
+          }}</span>
           <span class="jd-kpi__value">{{ resolvedScorers.length }}</span>
           <span class="jd-kpi__sub">
-            {{ resolvedScorers.length === 1
-              ? t("onlineEvals.job.detail.kpis.scorersSubSingular")
-              : t("onlineEvals.job.detail.kpis.scorersSubPlural") }}
+            {{
+              resolvedScorers.length === 1
+                ? t("onlineEvals.job.detail.kpis.scorersSubSingular")
+                : t("onlineEvals.job.detail.kpis.scorersSubPlural")
+            }}
           </span>
         </article>
       </section>
@@ -88,7 +121,9 @@
           @click="activeTab = tab.id"
         >
           <span>{{ tab.label }}</span>
-          <span v-if="tab.count != null" class="jd__tab-count">{{ tab.count }}</span>
+          <span v-if="tab.count != null" class="jd__tab-count">{{
+            tab.count
+          }}</span>
         </button>
       </nav>
 
@@ -98,7 +133,9 @@
         <template v-if="activeTab === 'configuration'">
           <!-- Target -->
           <section class="jd-section">
-            <h4 class="jd-section__title">{{ t("onlineEvals.job.detail.targetSection") }}</h4>
+            <h4 class="jd-section__title">
+              {{ t("onlineEvals.job.detail.targetSection") }}
+            </h4>
             <dl class="jd-kv">
               <dt>{{ t("onlineEvals.job.detail.streamLabel") }}</dt>
               <dd class="jd-mono">{{ row.stream }}</dd>
@@ -121,7 +158,9 @@
                       class="jd-filter__val"
                       :class="{ 'jd-filter__val--str': clause.valueIsString }"
                     >{{ clause.valueText }}</span></div></pre>
-                <span v-else class="jd-muted">{{ t("onlineEvals.job.detail.filterEmpty") }}</span>
+                <span v-else class="jd-muted">{{
+                  t("onlineEvals.job.detail.filterEmpty")
+                }}</span>
               </dd>
             </dl>
           </section>
@@ -150,13 +189,17 @@
                     :class="`jd-scorers__icon--${item.scorerType}`"
                   >
                     <OIcon
-                      :name="item.scorerType === 'remote' ? 'cloud' : 'smart-toy'"
+                      :name="
+                        item.scorerType === 'remote' ? 'cloud' : 'smart-toy'
+                      "
                       size="sm"
                     />
                   </span>
                   <div class="jd-scorers__main">
                     <div class="jd-scorers__row">
-                      <span class="jd-mono jd-scorers__name">{{ item.name }}</span>
+                      <span class="jd-mono jd-scorers__name">{{
+                        item.name
+                      }}</span>
                       <span
                         v-if="item.scorerTypeLabel"
                         class="jd-scorers__type"
@@ -164,14 +207,25 @@
                       >
                         {{ item.scorerTypeLabel }}
                       </span>
-                      <span class="jd-scorers__version">v{{ item.version }}</span>
+                      <span class="jd-scorers__version"
+                        >v{{ item.version }}</span
+                      >
                     </div>
-                    <div v-if="item.scoreConfigName" class="jd-scorers__produces">
-                      <OIcon name="rule" size="xs" class="jd-scorers__produces-icon" />
+                    <div
+                      v-if="item.scoreConfigName"
+                      class="jd-scorers__produces"
+                    >
+                      <OIcon
+                        name="rule"
+                        size="xs"
+                        class="jd-scorers__produces-icon"
+                      />
                       <span class="jd-scorers__produces-prefix">
                         {{ t("onlineEvals.job.detail.producesPrefix") }}
                       </span>
-                      <span class="jd-mono jd-scorers__produces-name">{{ item.scoreConfigName }}</span>
+                      <span class="jd-mono jd-scorers__produces-name">{{
+                        item.scoreConfigName
+                      }}</span>
                       <template v-if="item.scoreConfigDataType">
                         <span class="jd-scorers__sep">·</span>
                         <span class="jd-mono jd-scorers__produces-type">
@@ -190,38 +244,59 @@
                     <span class="jd-scorers__cta-label">
                       {{ t("onlineEvals.job.detail.viewScorerHint") }}
                     </span>
-                    <OIcon name="chevron-right" size="sm" class="jd-scorers__chevron" />
+                    <OIcon
+                      name="chevron-right"
+                      size="sm"
+                      class="jd-scorers__chevron"
+                    />
                   </span>
                 </button>
               </li>
             </ul>
           </section>
 
-
           <!-- Sampling -->
           <section class="jd-section">
-            <h4 class="jd-section__title">{{ t("onlineEvals.job.detail.samplingSection") }}</h4>
+            <h4 class="jd-section__title">
+              {{ t("onlineEvals.job.detail.samplingSection") }}
+            </h4>
             <dl class="jd-kv">
               <dt>{{ t("onlineEvals.job.detail.samplingModeLabel") }}</dt>
               <dd>{{ samplingModeLabel }}</dd>
 
-              <dt v-if="samplingValue != null">{{ t("onlineEvals.job.detail.samplingValueLabel") }}</dt>
-              <dd v-if="samplingValue != null" class="jd-mono">{{ samplingValue }}</dd>
+              <dt v-if="samplingValue != null">
+                {{ t("onlineEvals.job.detail.samplingValueLabel") }}
+              </dt>
+              <dd v-if="samplingValue != null" class="jd-mono">
+                {{ samplingValue }}
+              </dd>
             </dl>
           </section>
 
           <!-- Metadata -->
           <section class="jd-section">
-            <h4 class="jd-section__title">{{ t("onlineEvals.job.detail.metadataSection") }}</h4>
+            <h4 class="jd-section__title">
+              {{ t("onlineEvals.job.detail.metadataSection") }}
+            </h4>
             <dl class="jd-kv">
               <dt>{{ t("onlineEvals.job.detail.versionLabel") }}</dt>
               <dd class="jd-mono">v{{ row.version }}</dd>
-              <dt v-if="pipelineId">{{ t("onlineEvals.job.detail.pipelineLabel") }}</dt>
+              <dt v-if="pipelineId">
+                {{ t("onlineEvals.job.detail.pipelineLabel") }}
+              </dt>
               <dd v-if="pipelineId" class="jd-mono">{{ pipelineId }}</dd>
-              <dt v-if="createdAt">{{ t("onlineEvals.job.detail.createdLabel") }}</dt>
-              <dd v-if="createdAt" class="jd-mono">{{ formatTimestamp(createdAt) }}</dd>
-              <dt v-if="updatedAt">{{ t("onlineEvals.job.detail.updatedLabel") }}</dt>
-              <dd v-if="updatedAt" class="jd-mono">{{ formatTimestamp(updatedAt) }}</dd>
+              <dt v-if="createdAt">
+                {{ t("onlineEvals.job.detail.createdLabel") }}
+              </dt>
+              <dd v-if="createdAt" class="jd-mono">
+                {{ formatTimestamp(createdAt) }}
+              </dd>
+              <dt v-if="updatedAt">
+                {{ t("onlineEvals.job.detail.updatedLabel") }}
+              </dt>
+              <dd v-if="updatedAt" class="jd-mono">
+                {{ formatTimestamp(updatedAt) }}
+              </dd>
             </dl>
           </section>
         </template>
@@ -229,6 +304,14 @@
         <!-- Runs -->
         <template v-else-if="activeTab === 'runs'">
           <div class="jd__runs-toolbar">
+            <OSelect
+              v-model="agentKey"
+              :options="agentOptions"
+              labelKey="label"
+              valueKey="value"
+              class="tw:w-[14rem] tw:flex-shrink-0 tw:rounded"
+              data-test="eval-job-detail-runs-agent-filter"
+            />
             <DateTimePickerDashboard
               ref="dateTimePickerRef"
               v-model="selectedDate"
@@ -261,28 +344,34 @@
             class="tw:w-full"
           >
             <template #cell-timestampMs="{ row }">
-              <span class="jd-mono jd-muted-text">{{ relativeTime(row.timestampMs) }}</span>
+              <span class="jd-mono jd-muted-text">{{
+                relativeTime(row.timestampMs)
+              }}</span>
             </template>
             <template #cell-scorerId="{ row }">
               <span class="jd-mono">{{ scorerNameFor(row.scorerId) }}</span>
             </template>
             <template #cell-target="{ row }">
               <div class="jd-target-cell">
-                <div v-if="row.targetAgentName" class="jd-target-cell__line">
-                  <span class="jd-target-cell__label">Agent</span>
-                  <span class="jd-mono jd-target-cell__id" :title="row.targetAgentName">{{ row.targetAgentName }}</span>
-                </div>
-                <div v-if="row.targetAgentId" class="jd-target-cell__line">
-                  <span class="jd-target-cell__label">Agent ID</span>
-                  <span class="jd-mono jd-target-cell__id" :title="row.targetAgentId">{{ row.targetAgentId }}</span>
-                </div>
                 <div v-if="row.targetSpanId" class="jd-target-cell__line">
-                  <span class="jd-target-cell__label">{{ t("onlineEvals.job.detail.runs.spanLabel") }}</span>
-                  <span class="jd-mono jd-target-cell__id" :title="row.targetSpanId">{{ row.targetSpanId }}</span>
+                  <span class="jd-target-cell__label">{{
+                    t("onlineEvals.job.detail.runs.spanLabel")
+                  }}</span>
+                  <span
+                    class="jd-mono jd-target-cell__id"
+                    :title="row.targetSpanId"
+                    >{{ row.targetSpanId }}</span
+                  >
                 </div>
                 <div v-if="row.targetTraceId" class="jd-target-cell__line">
-                  <span class="jd-target-cell__label">{{ t("onlineEvals.job.detail.runs.traceLabel") }}</span>
-                  <span class="jd-mono jd-target-cell__id" :title="row.targetTraceId">{{ row.targetTraceId }}</span>
+                  <span class="jd-target-cell__label">{{
+                    t("onlineEvals.job.detail.runs.traceLabel")
+                  }}</span>
+                  <span
+                    class="jd-mono jd-target-cell__id"
+                    :title="row.targetTraceId"
+                    >{{ row.targetTraceId }}</span
+                  >
                 </div>
               </div>
             </template>
@@ -290,10 +379,15 @@
               <span class="jd-mono">{{ row.scoreDisplay }}</span>
             </template>
             <template #cell-latencyMs="{ row }">
-              <span class="jd-mono">{{ row.latencyMs != null ? formatLatency(row.latencyMs) : "—" }}</span>
+              <span class="jd-mono">{{
+                row.latencyMs != null ? formatLatency(row.latencyMs) : "—"
+              }}</span>
             </template>
             <template #cell-status="{ row }">
-              <span class="jd-status-cell" :class="`jd-status-cell--${row.status}`">
+              <span
+                class="jd-status-cell"
+                :class="`jd-status-cell--${row.status}`"
+              >
                 <span class="jd-status-cell__dot" />
                 {{ row.status }}
               </span>
@@ -304,6 +398,14 @@
         <!-- Failures -->
         <template v-else-if="activeTab === 'failures'">
           <div class="jd__runs-toolbar">
+            <OSelect
+              v-model="agentKey"
+              :options="agentOptions"
+              labelKey="label"
+              valueKey="value"
+              class="tw:w-[14rem] tw:flex-shrink-0 tw:rounded"
+              data-test="eval-job-detail-failures-agent-filter"
+            />
             <DateTimePickerDashboard
               ref="dateTimePickerRef"
               v-model="selectedDate"
@@ -330,7 +432,9 @@
             </h4>
             <div v-if="failureRows.length === 0" class="jd-empty">
               <OIcon name="info" size="xs" />
-              <span>{{ t("onlineEvals.job.detail.failures.byScorerEmpty") }}</span>
+              <span>{{
+                t("onlineEvals.job.detail.failures.byScorerEmpty")
+              }}</span>
             </div>
             <OTable
               v-else
@@ -367,9 +471,14 @@
               {{ t("onlineEvals.job.detail.failures.recentTitle") }}
               <span class="jd-section__chip">{{ failedRuns.length }}</span>
             </h4>
-            <div v-if="failedRuns.length === 0 && !isLoadingRuns" class="jd-empty">
+            <div
+              v-if="failedRuns.length === 0 && !isLoadingRuns"
+              class="jd-empty"
+            >
               <OIcon name="info" size="xs" />
-              <span>{{ t("onlineEvals.job.detail.failures.recentEmpty") }}</span>
+              <span>{{
+                t("onlineEvals.job.detail.failures.recentEmpty")
+              }}</span>
             </div>
             <OTable
               v-else
@@ -386,28 +495,34 @@
               class="tw:w-full"
             >
               <template #cell-timestampMs="{ row }">
-                <span class="jd-mono jd-muted-text">{{ relativeTime(row.timestampMs) }}</span>
+                <span class="jd-mono jd-muted-text">{{
+                  relativeTime(row.timestampMs)
+                }}</span>
               </template>
               <template #cell-scorerId="{ row }">
                 <span class="jd-mono">{{ scorerNameFor(row.scorerId) }}</span>
               </template>
               <template #cell-target="{ row }">
                 <div class="jd-target-cell">
-                  <div v-if="row.targetAgentName" class="jd-target-cell__line">
-                    <span class="jd-target-cell__label">Agent</span>
-                    <span class="jd-mono jd-target-cell__id" :title="row.targetAgentName">{{ row.targetAgentName }}</span>
-                  </div>
-                  <div v-if="row.targetAgentId" class="jd-target-cell__line">
-                    <span class="jd-target-cell__label">Agent ID</span>
-                    <span class="jd-mono jd-target-cell__id" :title="row.targetAgentId">{{ row.targetAgentId }}</span>
-                  </div>
                   <div v-if="row.targetSpanId" class="jd-target-cell__line">
-                    <span class="jd-target-cell__label">{{ t("onlineEvals.job.detail.runs.spanLabel") }}</span>
-                    <span class="jd-mono jd-target-cell__id" :title="row.targetSpanId">{{ row.targetSpanId }}</span>
+                    <span class="jd-target-cell__label">{{
+                      t("onlineEvals.job.detail.runs.spanLabel")
+                    }}</span>
+                    <span
+                      class="jd-mono jd-target-cell__id"
+                      :title="row.targetSpanId"
+                      >{{ row.targetSpanId }}</span
+                    >
                   </div>
                   <div v-if="row.targetTraceId" class="jd-target-cell__line">
-                    <span class="jd-target-cell__label">{{ t("onlineEvals.job.detail.runs.traceLabel") }}</span>
-                    <span class="jd-mono jd-target-cell__id" :title="row.targetTraceId">{{ row.targetTraceId }}</span>
+                    <span class="jd-target-cell__label">{{
+                      t("onlineEvals.job.detail.runs.traceLabel")
+                    }}</span>
+                    <span
+                      class="jd-mono jd-target-cell__id"
+                      :title="row.targetTraceId"
+                      >{{ row.targetTraceId }}</span
+                    >
                   </div>
                 </div>
               </template>
@@ -415,10 +530,15 @@
                 <span class="jd-mono">{{ row.scoreDisplay }}</span>
               </template>
               <template #cell-latencyMs="{ row }">
-                <span class="jd-mono">{{ row.latencyMs != null ? formatLatency(row.latencyMs) : "—" }}</span>
+                <span class="jd-mono">{{
+                  row.latencyMs != null ? formatLatency(row.latencyMs) : "—"
+                }}</span>
               </template>
               <template #cell-status="{ row }">
-                <span class="jd-status-cell" :class="`jd-status-cell--${row.status}`">
+                <span
+                  class="jd-status-cell"
+                  :class="`jd-status-cell--${row.status}`"
+                >
                   <span class="jd-status-cell__dot" />
                   {{ row.status }}
                 </span>
@@ -439,7 +559,9 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
+import genAiAgentMappingService from "@/services/gen-ai-agent-mapping.service";
 import type {
   EvalJob,
   Scorer,
@@ -447,7 +569,16 @@ import type {
 } from "@/services/online-evals.service";
 import { entityId } from "../utils/evalEntity";
 import { normalizeJobFilterCondition } from "../utils/jobFilter";
-import { useEvalJobRuns, type JobRunsWindow } from "../composables/useEvalJobRuns";
+import {
+  useEvalJobRuns,
+  type JobRunsWindow,
+} from "../composables/useEvalJobRuns";
+import {
+  ALL_AGENTS_VALUE,
+  agentFilterKey,
+  agentFilterLabel,
+  type AgentFilterSelection,
+} from "../utils/agentFilterSql";
 
 const props = defineProps<{
   row: EvalJob;
@@ -462,11 +593,18 @@ const emit = defineEmits<{
 
 const { t } = useI18n();
 const store = useStore();
+const orgId = computed(
+  () => store.state.selectedOrganization?.identifier ?? "default",
+);
 
 type TabId = "configuration" | "runs" | "failures";
 const activeTab = ref<TabId>("configuration");
 
-function valueOf<T = any>(row: any, camel: string, snake: string): T | undefined {
+function valueOf<T = any>(
+  row: any,
+  camel: string,
+  snake: string,
+): T | undefined {
   if (row == null) return undefined;
   return row[camel] ?? row[snake];
 }
@@ -513,7 +651,10 @@ function flattenFilter(node: any, depth: number): FilterClause[] {
     const op: "AND" | "OR" = node.logicalOperator === "OR" ? "OR" : "AND";
     const out: FilterClause[] = [];
     for (let i = 0; i < node.conditions.length; i += 1) {
-      const child = flattenFilter(node.conditions[i], depth + (out.length > 0 ? 1 : 0));
+      const child = flattenFilter(
+        node.conditions[i],
+        depth + (out.length > 0 ? 1 : 0),
+      );
       if (child.length === 0) continue;
       if (out.length > 0 && child.length > 0) {
         child[0].keyword = op;
@@ -528,17 +669,23 @@ function flattenFilter(node: any, depth: number): FilterClause[] {
 
 function formatConditionParts(
   node: any,
-): Pick<FilterClause, "column" | "operator" | "valueText" | "valueIsString"> | null {
+): Pick<
+  FilterClause,
+  "column" | "operator" | "valueText" | "valueIsString"
+> | null {
   const column = String(node.column ?? "").trim();
   const operator = String(node.operator ?? "=").trim();
   if (!column) return null;
 
-  const valuesList: string[] = Array.isArray(node.values) ? node.values.filter(Boolean) : [];
+  const valuesList: string[] = Array.isArray(node.values)
+    ? node.values.filter(Boolean)
+    : [];
   const rawValue = node.value;
   const opUpper = operator.toUpperCase();
 
   if (opUpper === "IN" || opUpper === "NOT IN") {
-    const items = valuesList.length > 0 ? valuesList : rawValue ? [String(rawValue)] : [];
+    const items =
+      valuesList.length > 0 ? valuesList : rawValue ? [String(rawValue)] : [];
     if (items.length === 0) {
       return { column, operator, valueText: "(…)", valueIsString: false };
     }
@@ -575,13 +722,15 @@ const samplingMode = computed(
   () => valueOf<string>(props.row, "samplingMode", "sampling_mode") ?? "all",
 );
 
-const samplingValue = computed(
-  () => valueOf<any>(props.row, "samplingValue", "sampling_value"),
+const samplingValue = computed(() =>
+  valueOf<any>(props.row, "samplingValue", "sampling_value"),
 );
 
 const samplingModeLabel = computed(() => {
-  if (samplingMode.value === "rate") return t("onlineEvals.job.detail.samplingRate");
-  if (samplingMode.value === "count") return t("onlineEvals.job.detail.samplingCount");
+  if (samplingMode.value === "rate")
+    return t("onlineEvals.job.detail.samplingRate");
+  if (samplingMode.value === "count")
+    return t("onlineEvals.job.detail.samplingCount");
   return t("onlineEvals.job.detail.samplingAll");
 });
 
@@ -601,12 +750,9 @@ function describeScoreConfig(cfg: ScoreConfig | null): {
   rangeText: string;
 } {
   if (!cfg) return { dataType: "", rangeText: "" };
-  const dataType = String(
-    valueOf<string>(cfg, "dataType", "data_type") ?? "",
-  );
+  const dataType = String(valueOf<string>(cfg, "dataType", "data_type") ?? "");
   if (dataType === "numeric") {
-    const range: any =
-      valueOf<any>(cfg, "numericRange", "numeric_range") ?? {};
+    const range: any = valueOf<any>(cfg, "numericRange", "numeric_range") ?? {};
     if (range && range.min != null && range.max != null) {
       return { dataType, rangeText: `${range.min}–${range.max}` };
     }
@@ -633,8 +779,8 @@ function describeScoreConfig(cfg: ScoreConfig | null): {
 const resolvedScorers = computed<ResolvedScorer[]>(() => {
   if (!Array.isArray(props.row.scorers)) return [];
   return props.row.scorers.map((ref): ResolvedScorer => {
-    const refId = typeof ref === "string" ? ref : ref?.id ?? "";
-    const refVersion = typeof ref === "object" ? ref?.version ?? null : null;
+    const refId = typeof ref === "string" ? ref : (ref?.id ?? "");
+    const refVersion = typeof ref === "object" ? (ref?.version ?? null) : null;
     const found = props.scorers.find((s) => entityId(s) === refId);
     if (!found) {
       return {
@@ -654,7 +800,7 @@ const resolvedScorers = computed<ResolvedScorer[]>(() => {
       "produces_score_config_id",
     );
     const cfg = cfgId
-      ? props.scoreConfigs.find((c) => entityId(c) === cfgId) ?? null
+      ? (props.scoreConfigs.find((c) => entityId(c) === cfgId) ?? null)
       : null;
     const cfgMeta = describeScoreConfig(cfg);
     const rawType =
@@ -747,12 +893,56 @@ const dateWindow = ref<JobRunsWindow>({
   startUs: (Date.now() - 24 * 60 * 60 * 1000) * 1000,
   endUs: Date.now() * 1000,
 });
+const agents = ref<AgentFilterSelection[]>([]);
+const agentKey = ref(ALL_AGENTS_VALUE);
+
+const agentOptions = computed(() => [
+  { label: "All Agents", value: ALL_AGENTS_VALUE },
+  ...agents.value.map((agent) => ({
+    label: agentFilterLabel(agent),
+    value: agentFilterKey(agent),
+  })),
+]);
+
+const selectedAgent = computed<AgentFilterSelection | null>(() => {
+  if (agentKey.value === ALL_AGENTS_VALUE) return null;
+  return (
+    agents.value.find((agent) => agentFilterKey(agent) === agentKey.value) ??
+    null
+  );
+});
+
+async function loadAgents() {
+  const { startUs, endUs } = dateWindow.value;
+  try {
+    const response = await genAiAgentMappingService.listAgents(
+      orgId.value,
+      startUs,
+      endUs,
+    );
+    agents.value = response.agents;
+    if (
+      agentKey.value !== ALL_AGENTS_VALUE &&
+      !agents.value.some((agent) => agentFilterKey(agent) === agentKey.value)
+    ) {
+      agentKey.value = ALL_AGENTS_VALUE;
+    }
+  } catch (err) {
+    console.warn("Failed to load GenAI agents", err);
+    agents.value = [];
+    agentKey.value = ALL_AGENTS_VALUE;
+  }
+}
 
 function syncDateWindow() {
   const picker = dateTimePickerRef.value;
   if (!picker) return;
   const dt = picker.getConsumableDateTime();
-  if (dt && typeof dt.startTime === "number" && typeof dt.endTime === "number") {
+  if (
+    dt &&
+    typeof dt.startTime === "number" &&
+    typeof dt.endTime === "number"
+  ) {
     dateWindow.value = { startUs: dt.startTime, endUs: dt.endTime };
   }
 }
@@ -760,6 +950,17 @@ function syncDateWindow() {
 // The DateTimePicker emits `update:modelValue` on apply; sync the resolved
 // window on every change so the queries refire.
 watch(selectedDate, () => syncDateWindow(), { deep: true });
+watch(
+  dateWindow,
+  () => {
+    void loadAgents();
+  },
+  { immediate: true },
+);
+watch(orgId, () => {
+  agentKey.value = ALL_AGENTS_VALUE;
+  void loadAgents();
+});
 
 const tableEnabled = computed(
   () => activeTab.value === "runs" || activeTab.value === "failures",
@@ -772,7 +973,7 @@ const {
   failuresByScorer,
   isLoading: isLoadingRuns,
   refresh: refreshRunsData,
-} = useEvalJobRuns(jobIdRef, dateWindow, tableEnabled);
+} = useEvalJobRuns(jobIdRef, dateWindow, tableEnabled, selectedAgent);
 
 async function refreshRuns() {
   syncDateWindow();
@@ -783,7 +984,9 @@ const failedRuns = computed(() =>
   runs.value.filter((r) => r.status === "error" || r.status === "timeout"),
 );
 
-const failureRows = computed(() => failuresByScorer.value.filter((r) => r.failures > 0));
+const failureRows = computed(() =>
+  failuresByScorer.value.filter((r) => r.failures > 0),
+);
 
 // — KPI tone —
 const successRateTone = computed(() => {
@@ -932,8 +1135,12 @@ function relativeTime(timestampMs: number): string {
 }
 
 @keyframes jd-fade {
-  from { background: rgba(0, 0, 0, 0); }
-  to   { background: rgba(0, 0, 0, 0.32); }
+  from {
+    background: rgba(0, 0, 0, 0);
+  }
+  to {
+    background: rgba(0, 0, 0, 0.32);
+  }
 }
 
 .jd {
@@ -948,8 +1155,12 @@ function relativeTime(timestampMs: number): string {
 }
 
 @keyframes jd-slide {
-  from { transform: translateX(100%); }
-  to   { transform: translateX(0); }
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
 }
 
 /* — Header — */
@@ -1012,7 +1223,11 @@ function relativeTime(timestampMs: number): string {
 }
 
 .jd__status-pill--active {
-  background: color-mix(in srgb, var(--o2-status-success-text, #2e7d32) 14%, transparent);
+  background: color-mix(
+    in srgb,
+    var(--o2-status-success-text, #2e7d32) 14%,
+    transparent
+  );
   color: var(--o2-status-success-text, #2e7d32);
 }
 
@@ -1022,7 +1237,11 @@ function relativeTime(timestampMs: number): string {
 }
 
 .jd__status-pill--degraded {
-  background: color-mix(in srgb, var(--o2-status-error-text, #c62828) 14%, transparent);
+  background: color-mix(
+    in srgb,
+    var(--o2-status-error-text, #c62828) 14%,
+    transparent
+  );
   color: var(--o2-status-error-text, #c62828);
 }
 
@@ -1058,7 +1277,11 @@ function relativeTime(timestampMs: number): string {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
   padding: 16px 20px;
-  background: color-mix(in srgb, var(--color-text-secondary) 4%, var(--color-card-bg));
+  background: color-mix(
+    in srgb,
+    var(--color-text-secondary) 4%,
+    var(--color-card-bg)
+  );
   border-bottom: 1px solid var(--color-dialog-header-border, var(--o2-border));
   flex-shrink: 0;
 }
@@ -1073,9 +1296,23 @@ function relativeTime(timestampMs: number): string {
   border-radius: 6px;
 }
 
-.jd-kpi--good { background: color-mix(in srgb, var(--o2-status-success-text, #2e7d32) 4%, var(--color-card-bg)); }
-.jd-kpi--warn { background: color-mix(in srgb, #f59e0b 5%, var(--color-card-bg)); }
-.jd-kpi--bad  { background: color-mix(in srgb, var(--o2-status-error-text, #c62828) 4%, var(--color-card-bg)); }
+.jd-kpi--good {
+  background: color-mix(
+    in srgb,
+    var(--o2-status-success-text, #2e7d32) 4%,
+    var(--color-card-bg)
+  );
+}
+.jd-kpi--warn {
+  background: color-mix(in srgb, #f59e0b 5%, var(--color-card-bg));
+}
+.jd-kpi--bad {
+  background: color-mix(
+    in srgb,
+    var(--o2-status-error-text, #c62828) 4%,
+    var(--color-card-bg)
+  );
+}
 
 .jd-kpi__title {
   font: 600 11px/1.4 var(--o2-font);
@@ -1090,9 +1327,15 @@ function relativeTime(timestampMs: number): string {
   color: var(--color-text-primary, currentColor);
 }
 
-.jd-kpi--good .jd-kpi__value { color: var(--o2-status-success-text, #2e7d32); }
-.jd-kpi--warn .jd-kpi__value { color: #b45309; }
-.jd-kpi--bad  .jd-kpi__value { color: var(--o2-status-error-text, #c62828); }
+.jd-kpi--good .jd-kpi__value {
+  color: var(--o2-status-success-text, #2e7d32);
+}
+.jd-kpi--warn .jd-kpi__value {
+  color: #b45309;
+}
+.jd-kpi--bad .jd-kpi__value {
+  color: var(--o2-status-error-text, #c62828);
+}
 
 .jd-kpi__sub {
   font-size: 11px;
@@ -1123,11 +1366,13 @@ function relativeTime(timestampMs: number): string {
   margin-bottom: -1px;
 }
 
-.jd__tab:hover { color: var(--color-text-primary, currentColor); }
+.jd__tab:hover {
+  color: var(--color-text-primary, currentColor);
+}
 
 .jd__tab--active {
-  color: var(--color-primary-600, #3F7994);
-  border-bottom-color: var(--color-primary-600, #3F7994);
+  color: var(--color-primary-600, #3f7994);
+  border-bottom-color: var(--color-primary-600, #3f7994);
 }
 
 .jd__tab-count {
@@ -1144,8 +1389,12 @@ function relativeTime(timestampMs: number): string {
 }
 
 .jd__tab--active .jd__tab-count {
-  background: color-mix(in srgb, var(--color-primary-600, #3F7994) 18%, transparent);
-  color: var(--color-primary-600, #3F7994);
+  background: color-mix(
+    in srgb,
+    var(--color-primary-600, #3f7994) 18%,
+    transparent
+  );
+  color: var(--color-primary-600, #3f7994);
 }
 
 /* — Body — */
@@ -1172,7 +1421,8 @@ function relativeTime(timestampMs: number): string {
   font: 600 13px/1.5 var(--o2-font);
   color: var(--color-text-primary, currentColor);
   padding-bottom: 6px;
-  border-bottom: 1px solid color-mix(in srgb, var(--color-text-secondary) 12%, transparent);
+  border-bottom: 1px solid
+    color-mix(in srgb, var(--color-text-secondary) 12%, transparent);
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -1290,7 +1540,8 @@ function relativeTime(timestampMs: number): string {
   gap: 14px;
   padding: 14px 16px;
   background: var(--color-card-bg);
-  border: 1px solid color-mix(in srgb, var(--color-text-secondary) 16%, transparent);
+  border: 1px solid
+    color-mix(in srgb, var(--color-text-secondary) 16%, transparent);
   border-radius: 8px;
   text-align: left;
   cursor: pointer;
@@ -1302,9 +1553,18 @@ function relativeTime(timestampMs: number): string {
 }
 
 .jd-scorers__card:hover:not(:disabled) {
-  border-color: color-mix(in srgb, var(--color-primary-600, #3F7994) 45%, transparent);
-  background: color-mix(in srgb, var(--color-primary-600, #3F7994) 4%, var(--color-card-bg));
-  box-shadow: 0 1px 3px color-mix(in srgb, var(--color-primary-600, #3F7994) 12%, transparent);
+  border-color: color-mix(
+    in srgb,
+    var(--color-primary-600, #3f7994) 45%,
+    transparent
+  );
+  background: color-mix(
+    in srgb,
+    var(--color-primary-600, #3f7994) 4%,
+    var(--color-card-bg)
+  );
+  box-shadow: 0 1px 3px
+    color-mix(in srgb, var(--color-primary-600, #3f7994) 12%, transparent);
   transform: translateY(-1px);
 }
 
@@ -1425,7 +1685,7 @@ function relativeTime(timestampMs: number): string {
 }
 
 .jd-scorers__card:hover:not(:disabled) .jd-scorers__cta {
-  color: var(--color-primary-600, #3F7994);
+  color: var(--color-primary-600, #3f7994);
 }
 
 .jd-scorers__card:hover:not(:disabled) .jd-scorers__cta-label {
@@ -1435,14 +1695,15 @@ function relativeTime(timestampMs: number): string {
 .jd-scorers__chevron {
   flex-shrink: 0;
   opacity: 0.5;
-  transition: opacity 0.15s, transform 0.15s;
+  transition:
+    opacity 0.15s,
+    transform 0.15s;
 }
 
 .jd-scorers__card:hover:not(:disabled) .jd-scorers__chevron {
   opacity: 1;
   transform: translateX(2px);
 }
-
 
 /* — Runs / Failures tabs — */
 .jd__runs-toolbar {
@@ -1516,18 +1777,30 @@ function relativeTime(timestampMs: number): string {
   background: var(--color-text-secondary, var(--o2-text-secondary));
 }
 
-.jd-status-cell--success { color: var(--o2-status-success-text, #2e7d32); }
-.jd-status-cell--success .jd-status-cell__dot { background: var(--o2-status-success-text, #2e7d32); }
+.jd-status-cell--success {
+  color: var(--o2-status-success-text, #2e7d32);
+}
+.jd-status-cell--success .jd-status-cell__dot {
+  background: var(--o2-status-success-text, #2e7d32);
+}
 
 .jd-status-cell--error,
-.jd-status-cell--timeout { color: var(--o2-status-error-text, #c62828); }
+.jd-status-cell--timeout {
+  color: var(--o2-status-error-text, #c62828);
+}
 .jd-status-cell--error .jd-status-cell__dot,
-.jd-status-cell--timeout .jd-status-cell__dot { background: var(--o2-status-error-text, #c62828); }
+.jd-status-cell--timeout .jd-status-cell__dot {
+  background: var(--o2-status-error-text, #c62828);
+}
 
 .jd-status-cell--skipped .jd-status-cell__dot {
   background: color-mix(in srgb, var(--color-text-secondary) 60%, transparent);
 }
 
-.jd-status-cell--warn { color: #b45309; }
-.jd-status-cell--bad { color: var(--o2-status-error-text, #c62828); }
+.jd-status-cell--warn {
+  color: #b45309;
+}
+.jd-status-cell--bad {
+  color: var(--o2-status-error-text, #c62828);
+}
 </style>

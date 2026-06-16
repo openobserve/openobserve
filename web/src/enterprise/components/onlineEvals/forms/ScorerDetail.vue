@@ -1,11 +1,18 @@
 <template>
-  <div class="sd-scrim" role="dialog" aria-modal="true" @click.self="$emit('close')">
+  <div
+    class="sd-scrim"
+    role="dialog"
+    aria-modal="true"
+    @click.self="$emit('close')"
+  >
     <aside class="sd" @click.stop data-test="scorer-detail">
       <!-- ── Header ── -->
       <header class="sd__header">
         <div class="sd__header-text">
           <div class="tw:flex tw:items-center tw:gap-2 tw:flex-nowrap">
-            <span class="sd__eyebrow">{{ t("onlineEvals.scorer.detail.eyebrow") }}</span>
+            <span class="sd__eyebrow">{{
+              t("onlineEvals.scorer.detail.eyebrow")
+            }}</span>
             <span
               v-if="row.name"
               :class="[
@@ -25,13 +32,17 @@
           </div>
           <div v-if="row.description" class="sd__produces-line">
             <template v-if="producesConfig">
-              <span class="sd-mono sd__produces-name">{{ producesConfig.name }}</span>
+              <span class="sd-mono sd__produces-name">{{
+                producesConfig.name
+              }}</span>
               <span class="sd__sep">·</span>
             </template>
             <span class="sd__produces-desc">{{ row.description }}</span>
           </div>
           <div v-else-if="producesConfig" class="sd__produces-line">
-            <span class="sd-mono sd__produces-name">{{ producesConfig.name }}</span>
+            <span class="sd-mono sd__produces-name">{{
+              producesConfig.name
+            }}</span>
           </div>
         </div>
         <button
@@ -43,9 +54,15 @@
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
-            width="16" height="16" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" stroke-width="2"
-            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
           >
             <line x1="18" y1="6" x2="6" y2="18" />
             <line x1="6" y1="6" x2="18" y2="18" />
@@ -56,27 +73,47 @@
       <!-- ── KPI strip ── -->
       <section class="sd__kpis">
         <article class="sd-kpi">
-          <span class="sd-kpi__title">{{ t("onlineEvals.scorer.detail.kpis.totalRuns") }}</span>
+          <span class="sd-kpi__title">{{
+            t("onlineEvals.scorer.detail.kpis.totalRuns")
+          }}</span>
           <span class="sd-kpi__value">{{ formatCount(kpis.totalRuns) }}</span>
-          <span class="sd-kpi__sub">{{ t("onlineEvals.scorer.detail.kpis.totalRunsSub") }}</span>
+          <span class="sd-kpi__sub">{{
+            t("onlineEvals.scorer.detail.kpis.totalRunsSub")
+          }}</span>
         </article>
         <article class="sd-kpi" :class="successRateTone">
-          <span class="sd-kpi__title">{{ t("onlineEvals.scorer.detail.kpis.successRate") }}</span>
-          <span class="sd-kpi__value">{{ formatPercent(kpis.successRate) }}</span>
-          <span class="sd-kpi__sub">{{ t("onlineEvals.scorer.detail.kpis.successRateSub") }}</span>
+          <span class="sd-kpi__title">{{
+            t("onlineEvals.scorer.detail.kpis.successRate")
+          }}</span>
+          <span class="sd-kpi__value">{{
+            formatPercent(kpis.successRate)
+          }}</span>
+          <span class="sd-kpi__sub">{{
+            t("onlineEvals.scorer.detail.kpis.successRateSub")
+          }}</span>
         </article>
         <article class="sd-kpi">
-          <span class="sd-kpi__title">{{ t("onlineEvals.scorer.detail.kpis.avgLatency") }}</span>
-          <span class="sd-kpi__value">{{ formatLatency(kpis.avgLatencyMs) }}</span>
-          <span class="sd-kpi__sub">{{ t("onlineEvals.scorer.detail.kpis.avgLatencySub") }}</span>
+          <span class="sd-kpi__title">{{
+            t("onlineEvals.scorer.detail.kpis.avgLatency")
+          }}</span>
+          <span class="sd-kpi__value">{{
+            formatLatency(kpis.avgLatencyMs)
+          }}</span>
+          <span class="sd-kpi__sub">{{
+            t("onlineEvals.scorer.detail.kpis.avgLatencySub")
+          }}</span>
         </article>
         <article class="sd-kpi">
-          <span class="sd-kpi__title">{{ t("onlineEvals.scorer.detail.kpis.usedBy") }}</span>
+          <span class="sd-kpi__title">{{
+            t("onlineEvals.scorer.detail.kpis.usedBy")
+          }}</span>
           <span class="sd-kpi__value">{{ usedByJobs.length }}</span>
           <span class="sd-kpi__sub">
-            {{ usedByJobs.length === 1
-              ? t("onlineEvals.scorer.detail.kpis.usedBySubSingular")
-              : t("onlineEvals.scorer.detail.kpis.usedBySubPlural") }}
+            {{
+              usedByJobs.length === 1
+                ? t("onlineEvals.scorer.detail.kpis.usedBySubSingular")
+                : t("onlineEvals.scorer.detail.kpis.usedBySubPlural")
+            }}
           </span>
         </article>
       </section>
@@ -95,7 +132,9 @@
           @click="activeTab = tab.id"
         >
           <span>{{ tab.label }}</span>
-          <span v-if="tab.count != null" class="sd__tab-count">{{ tab.count }}</span>
+          <span v-if="tab.count != null" class="sd__tab-count">{{
+            tab.count
+          }}</span>
         </button>
       </nav>
 
@@ -104,19 +143,29 @@
         <!-- Configuration -->
         <template v-if="activeTab === 'configuration'">
           <section class="sd-section">
-            <h4 class="sd-section__title">{{ t("onlineEvals.scorer.detail.configurationSection") }}</h4>
+            <h4 class="sd-section__title">
+              {{ t("onlineEvals.scorer.detail.configurationSection") }}
+            </h4>
             <dl class="sd-kv">
               <dt>{{ t("onlineEvals.scorer.detail.scorerTypeLabel") }}</dt>
               <dd>
-                <span class="sd-type-chip" :class="`sd-type-chip--${scorerType}`">{{ scorerTypeLabel }}</span>
+                <span
+                  class="sd-type-chip"
+                  :class="`sd-type-chip--${scorerType}`"
+                  >{{ scorerTypeLabel }}</span
+                >
                 <span class="sd-version-chip">v{{ row.version }}</span>
               </dd>
 
               <template v-if="scorerType === 'llm_judge'">
                 <dt>{{ t("onlineEvals.scorer.detail.providerLabel") }}</dt>
                 <dd>
-                  <span v-if="provider" class="sd-mono">{{ provider.name }}</span>
-                  <span v-else class="sd-muted">{{ t("onlineEvals.scorer.detail.providerUnknown") }}</span>
+                  <span v-if="provider" class="sd-mono">{{
+                    provider.name
+                  }}</span>
+                  <span v-else class="sd-muted">{{
+                    t("onlineEvals.scorer.detail.providerUnknown")
+                  }}</span>
                 </dd>
 
                 <template v-if="judgeModel">
@@ -133,13 +182,25 @@
           </section>
 
           <section class="sd-section">
-            <h4 class="sd-section__title">{{ t("onlineEvals.scorer.detail.producesSection") }}</h4>
-            <div v-if="producesConfig" class="sd-produces" data-test="scorer-detail-produces">
+            <h4 class="sd-section__title">
+              {{ t("onlineEvals.scorer.detail.producesSection") }}
+            </h4>
+            <div
+              v-if="producesConfig"
+              class="sd-produces"
+              data-test="scorer-detail-produces"
+            >
               <OIcon name="rule" size="xs" />
-              <span class="sd-mono sd-produces__name">{{ producesConfig.name }}</span>
-              <span class="sd-produces__version">v{{ producesConfig.version }}</span>
+              <span class="sd-mono sd-produces__name">{{
+                producesConfig.name
+              }}</span>
+              <span class="sd-produces__version"
+                >v{{ producesConfig.version }}</span
+              >
               <span class="sd-produces__sep">·</span>
-              <span class="sd-produces__type">{{ dataTypeOf(producesConfig) }}</span>
+              <span class="sd-produces__type">{{
+                dataTypeOf(producesConfig)
+              }}</span>
             </div>
             <div v-else class="sd-empty">
               <OIcon name="info" size="xs" />
@@ -155,36 +216,57 @@
                   : t("onlineEvals.scorer.detail.requestTemplateSection")
               }}
               <span v-if="variables.length" class="sd-section__chip">
-                {{ variables.length }} {{ t("onlineEvals.scorer.detail.variablesSuffix") }}
+                {{ variables.length }}
+                {{ t("onlineEvals.scorer.detail.variablesSuffix") }}
               </span>
             </h4>
-            <pre class="sd-code" data-test="scorer-detail-template">{{ row.template }}</pre>
+            <pre class="sd-code" data-test="scorer-detail-template">{{
+              row.template
+            }}</pre>
           </section>
 
           <section v-if="outputSchemaPretty" class="sd-section">
-            <h4 class="sd-section__title">{{ t("onlineEvals.scorer.detail.outputSchemaSection") }}</h4>
+            <h4 class="sd-section__title">
+              {{ t("onlineEvals.scorer.detail.outputSchemaSection") }}
+            </h4>
             <pre class="sd-code sd-code--mono">{{ outputSchemaPretty }}</pre>
           </section>
 
           <section class="sd-section">
-            <h4 class="sd-section__title">{{ t("onlineEvals.scorer.detail.metadataSection") }}</h4>
+            <h4 class="sd-section__title">
+              {{ t("onlineEvals.scorer.detail.metadataSection") }}
+            </h4>
             <dl class="sd-kv">
-              <dt v-if="createdAt">{{ t("onlineEvals.scorer.detail.createdLabel") }}</dt>
-              <dd v-if="createdAt" class="sd-mono">{{ formatTimestamp(createdAt) }}</dd>
-              <dt v-if="updatedAt">{{ t("onlineEvals.scorer.detail.updatedLabel") }}</dt>
-              <dd v-if="updatedAt" class="sd-mono">{{ formatTimestamp(updatedAt) }}</dd>
+              <dt v-if="createdAt">
+                {{ t("onlineEvals.scorer.detail.createdLabel") }}
+              </dt>
+              <dd v-if="createdAt" class="sd-mono">
+                {{ formatTimestamp(createdAt) }}
+              </dd>
+              <dt v-if="updatedAt">
+                {{ t("onlineEvals.scorer.detail.updatedLabel") }}
+              </dt>
+              <dd v-if="updatedAt" class="sd-mono">
+                {{ formatTimestamp(updatedAt) }}
+              </dd>
             </dl>
           </section>
         </template>
 
         <!-- Versions -->
         <template v-else-if="activeTab === 'versions'">
-          <p class="sd__tab-intro">{{ t("onlineEvals.scorer.detail.versionsIntro") }}</p>
+          <p class="sd__tab-intro">
+            {{ t("onlineEvals.scorer.detail.versionsIntro") }}
+          </p>
           <ul class="sd-versions">
             <li class="sd-versions__item sd-versions__item--active">
               <div class="sd-versions__head">
-                <span class="sd-mono sd-versions__label">v{{ row.version }}</span>
-                <span class="sd-versions__chip">{{ t("onlineEvals.scorer.detail.activeVersionChip") }}</span>
+                <span class="sd-mono sd-versions__label"
+                  >v{{ row.version }}</span
+                >
+                <span class="sd-versions__chip">{{
+                  t("onlineEvals.scorer.detail.activeVersionChip")
+                }}</span>
               </div>
               <div v-if="updatedAt" class="sd-versions__meta">
                 {{ t("onlineEvals.scorer.detail.lastUpdated") }}
@@ -197,6 +279,14 @@
         <!-- Runs -->
         <template v-else-if="activeTab === 'runs'">
           <div class="sd__runs-toolbar">
+            <OSelect
+              v-model="agentKey"
+              :options="agentOptions"
+              labelKey="label"
+              valueKey="value"
+              class="tw:w-[14rem] tw:flex-shrink-0 tw:rounded"
+              data-test="scorer-detail-runs-agent-filter"
+            />
             <DateTimePickerDashboard
               ref="dateTimePickerRef"
               v-model="selectedDate"
@@ -229,28 +319,34 @@
             class="tw:w-full"
           >
             <template #cell-timestampMs="{ row }">
-              <span class="sd-mono sd-muted-text">{{ relativeTime(row.timestampMs) }}</span>
+              <span class="sd-mono sd-muted-text">{{
+                relativeTime(row.timestampMs)
+              }}</span>
             </template>
             <template #cell-jobId="{ row }">
               <span class="sd-mono">{{ jobNameFor(row.jobId) }}</span>
             </template>
             <template #cell-target="{ row }">
               <div class="sd-target-cell">
-                <div v-if="row.targetAgentName" class="sd-target-cell__line">
-                  <span class="sd-target-cell__label">Agent</span>
-                  <span class="sd-mono sd-target-cell__id" :title="row.targetAgentName">{{ row.targetAgentName }}</span>
-                </div>
-                <div v-if="row.targetAgentId" class="sd-target-cell__line">
-                  <span class="sd-target-cell__label">Agent ID</span>
-                  <span class="sd-mono sd-target-cell__id" :title="row.targetAgentId">{{ row.targetAgentId }}</span>
-                </div>
                 <div v-if="row.targetSpanId" class="sd-target-cell__line">
-                  <span class="sd-target-cell__label">{{ t("onlineEvals.scorer.detail.runs.spanLabel") }}</span>
-                  <span class="sd-mono sd-target-cell__id" :title="row.targetSpanId">{{ row.targetSpanId }}</span>
+                  <span class="sd-target-cell__label">{{
+                    t("onlineEvals.scorer.detail.runs.spanLabel")
+                  }}</span>
+                  <span
+                    class="sd-mono sd-target-cell__id"
+                    :title="row.targetSpanId"
+                    >{{ row.targetSpanId }}</span
+                  >
                 </div>
                 <div v-if="row.targetTraceId" class="sd-target-cell__line">
-                  <span class="sd-target-cell__label">{{ t("onlineEvals.scorer.detail.runs.traceLabel") }}</span>
-                  <span class="sd-mono sd-target-cell__id" :title="row.targetTraceId">{{ row.targetTraceId }}</span>
+                  <span class="sd-target-cell__label">{{
+                    t("onlineEvals.scorer.detail.runs.traceLabel")
+                  }}</span>
+                  <span
+                    class="sd-mono sd-target-cell__id"
+                    :title="row.targetTraceId"
+                    >{{ row.targetTraceId }}</span
+                  >
                 </div>
               </div>
             </template>
@@ -258,10 +354,15 @@
               <span class="sd-mono">{{ row.scoreDisplay }}</span>
             </template>
             <template #cell-latencyMs="{ row }">
-              <span class="sd-mono">{{ row.latencyMs != null ? formatLatency(row.latencyMs) : "—" }}</span>
+              <span class="sd-mono">{{
+                row.latencyMs != null ? formatLatency(row.latencyMs) : "—"
+              }}</span>
             </template>
             <template #cell-status="{ row }">
-              <span class="sd-status-cell" :class="`sd-status-cell--${row.status}`">
+              <span
+                class="sd-status-cell"
+                :class="`sd-status-cell--${row.status}`"
+              >
                 <span class="sd-status-cell__dot" />
                 {{ row.status }}
               </span>
@@ -271,7 +372,9 @@
 
         <!-- Used by -->
         <template v-else-if="activeTab === 'usedBy'">
-          <p class="sd__tab-intro">{{ t("onlineEvals.scorer.detail.usedByIntro") }}</p>
+          <p class="sd__tab-intro">
+            {{ t("onlineEvals.scorer.detail.usedByIntro") }}
+          </p>
           <div v-if="usedByJobs.length === 0" class="sd-empty">
             <OIcon name="info" size="xs" />
             <span>{{ t("onlineEvals.scorer.detail.usedByEmpty") }}</span>
@@ -287,7 +390,11 @@
                 <OIcon name="play-arrow" size="xs" />
                 <span class="sd-mono">{{ job.name }}</span>
                 <span class="sd-used-list__meta">{{ job.status }}</span>
-                <OIcon name="chevron-right" size="xs" class="sd-used-list__chevron" />
+                <OIcon
+                  name="chevron-right"
+                  size="xs"
+                  class="sd-used-list__chevron"
+                />
               </OButton>
             </li>
           </ul>
@@ -305,7 +412,9 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
+import genAiAgentMappingService from "@/services/gen-ai-agent-mapping.service";
 import type {
   EvalJob,
   Provider,
@@ -313,7 +422,16 @@ import type {
   ScoreConfig,
 } from "@/services/online-evals.service";
 import { dataTypeOf, entityId } from "../utils/evalEntity";
-import { useScorerRuns, type ScorerRunsWindow } from "../composables/useScorerRuns";
+import {
+  useScorerRuns,
+  type ScorerRunsWindow,
+} from "../composables/useScorerRuns";
+import {
+  ALL_AGENTS_VALUE,
+  agentFilterKey,
+  agentFilterLabel,
+  type AgentFilterSelection,
+} from "../utils/agentFilterSql";
 
 const props = defineProps<{
   row: Scorer;
@@ -329,17 +447,25 @@ const emit = defineEmits<{
 
 const { t } = useI18n();
 const store = useStore();
+const orgId = computed(
+  () => store.state.selectedOrganization?.identifier ?? "default",
+);
 
 type TabId = "configuration" | "versions" | "runs" | "usedBy";
 const activeTab = ref<TabId>("configuration");
 
-function valueOf<T = any>(row: any, camel: string, snake: string): T | undefined {
+function valueOf<T = any>(
+  row: any,
+  camel: string,
+  snake: string,
+): T | undefined {
   if (row == null) return undefined;
   return row[camel] ?? row[snake];
 }
 
 const scorerType = computed<"llm_judge" | "remote">(() => {
-  const raw = valueOf<string>(props.row, "scorerType", "scorer_type") ?? "llm_judge";
+  const raw =
+    valueOf<string>(props.row, "scorerType", "scorer_type") ?? "llm_judge";
   return raw === "remote" ? "remote" : "llm_judge";
 });
 
@@ -367,8 +493,11 @@ const remoteEndpoint = computed<string>(
 
 const producesId = computed(
   () =>
-    valueOf<string>(props.row, "producesScoreConfigId", "produces_score_config_id") ??
-    null,
+    valueOf<string>(
+      props.row,
+      "producesScoreConfigId",
+      "produces_score_config_id",
+    ) ?? null,
 );
 
 const producesConfig = computed<ScoreConfig | null>(() => {
@@ -450,28 +579,84 @@ const dateWindow = ref<ScorerRunsWindow>({
   startUs: (Date.now() - 24 * 60 * 60 * 1000) * 1000,
   endUs: Date.now() * 1000,
 });
+const agents = ref<AgentFilterSelection[]>([]);
+const agentKey = ref(ALL_AGENTS_VALUE);
+
+const agentOptions = computed(() => [
+  { label: "All Agents", value: ALL_AGENTS_VALUE },
+  ...agents.value.map((agent) => ({
+    label: agentFilterLabel(agent),
+    value: agentFilterKey(agent),
+  })),
+]);
+
+const selectedAgent = computed<AgentFilterSelection | null>(() => {
+  if (agentKey.value === ALL_AGENTS_VALUE) return null;
+  return (
+    agents.value.find((agent) => agentFilterKey(agent) === agentKey.value) ??
+    null
+  );
+});
+
+async function loadAgents() {
+  const { startUs, endUs } = dateWindow.value;
+  try {
+    const response = await genAiAgentMappingService.listAgents(
+      orgId.value,
+      startUs,
+      endUs,
+    );
+    agents.value = response.agents;
+    if (
+      agentKey.value !== ALL_AGENTS_VALUE &&
+      !agents.value.some((agent) => agentFilterKey(agent) === agentKey.value)
+    ) {
+      agentKey.value = ALL_AGENTS_VALUE;
+    }
+  } catch (err) {
+    console.warn("Failed to load GenAI agents", err);
+    agents.value = [];
+    agentKey.value = ALL_AGENTS_VALUE;
+  }
+}
 
 function syncDateWindow() {
   const picker = dateTimePickerRef.value;
   if (!picker) return;
   const dt = picker.getConsumableDateTime();
-  if (dt && typeof dt.startTime === "number" && typeof dt.endTime === "number") {
+  if (
+    dt &&
+    typeof dt.startTime === "number" &&
+    typeof dt.endTime === "number"
+  ) {
     dateWindow.value = { startUs: dt.startTime, endUs: dt.endTime };
   }
 }
 
 watch(selectedDate, () => syncDateWindow(), { deep: true });
+watch(
+  dateWindow,
+  () => {
+    void loadAgents();
+  },
+  { immediate: true },
+);
+watch(orgId, () => {
+  agentKey.value = ALL_AGENTS_VALUE;
+  void loadAgents();
+});
 
 const runsEnabled = computed(() => activeTab.value === "runs");
 // `_evaluator.attributes_scorer_id` stores the per-version row `id`, not
 // `entity_id`. Using entityId here returns 0 runs even when runs exist.
 const scorerIdRef = computed(() => String(props.row.id));
 
-const { kpis, runs, isLoadingRuns, refresh: refreshRunsData } = useScorerRuns(
-  scorerIdRef,
-  dateWindow,
-  runsEnabled,
-);
+const {
+  kpis,
+  runs,
+  isLoadingRuns,
+  refresh: refreshRunsData,
+} = useScorerRuns(scorerIdRef, dateWindow, runsEnabled, selectedAgent);
 
 async function refreshRuns() {
   syncDateWindow();
@@ -598,8 +783,12 @@ function relativeTime(timestampMs: number): string {
 }
 
 @keyframes sd-fade {
-  from { background: rgba(0, 0, 0, 0); }
-  to   { background: rgba(0, 0, 0, 0.32); }
+  from {
+    background: rgba(0, 0, 0, 0);
+  }
+  to {
+    background: rgba(0, 0, 0, 0.32);
+  }
 }
 
 .sd {
@@ -614,8 +803,12 @@ function relativeTime(timestampMs: number): string {
 }
 
 @keyframes sd-slide {
-  from { transform: translateX(100%); }
-  to   { transform: translateX(0); }
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
 }
 
 /* — Header — */
@@ -691,9 +884,16 @@ function relativeTime(timestampMs: number): string {
   flex-wrap: wrap;
 }
 
-.sd__produces-name { color: var(--color-text-primary, currentColor); font-weight: 600; }
-.sd__produces-desc { color: var(--color-text-secondary, var(--o2-text-secondary)); }
-.sd__sep { opacity: 0.5; }
+.sd__produces-name {
+  color: var(--color-text-primary, currentColor);
+  font-weight: 600;
+}
+.sd__produces-desc {
+  color: var(--color-text-secondary, var(--o2-text-secondary));
+}
+.sd__sep {
+  opacity: 0.5;
+}
 
 .sd__close {
   flex-shrink: 0;
@@ -716,7 +916,11 @@ function relativeTime(timestampMs: number): string {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
   padding: 16px 20px;
-  background: color-mix(in srgb, var(--color-text-secondary) 4%, var(--color-card-bg));
+  background: color-mix(
+    in srgb,
+    var(--color-text-secondary) 4%,
+    var(--color-card-bg)
+  );
   border-bottom: 1px solid var(--color-dialog-header-border, var(--o2-border));
   flex-shrink: 0;
 }
@@ -731,9 +935,23 @@ function relativeTime(timestampMs: number): string {
   border-radius: 6px;
 }
 
-.sd-kpi--good { background: color-mix(in srgb, var(--o2-status-success-text, #2e7d32) 4%, var(--color-card-bg)); }
-.sd-kpi--warn { background: color-mix(in srgb, #f59e0b 5%, var(--color-card-bg)); }
-.sd-kpi--bad  { background: color-mix(in srgb, var(--o2-status-error-text, #c62828) 4%, var(--color-card-bg)); }
+.sd-kpi--good {
+  background: color-mix(
+    in srgb,
+    var(--o2-status-success-text, #2e7d32) 4%,
+    var(--color-card-bg)
+  );
+}
+.sd-kpi--warn {
+  background: color-mix(in srgb, #f59e0b 5%, var(--color-card-bg));
+}
+.sd-kpi--bad {
+  background: color-mix(
+    in srgb,
+    var(--o2-status-error-text, #c62828) 4%,
+    var(--color-card-bg)
+  );
+}
 
 .sd-kpi__title {
   font: 600 12px/1.4 var(--o2-font);
@@ -748,9 +966,15 @@ function relativeTime(timestampMs: number): string {
   color: var(--color-text-primary, currentColor);
 }
 
-.sd-kpi--good .sd-kpi__value { color: var(--o2-status-success-text, #2e7d32); }
-.sd-kpi--warn .sd-kpi__value { color: #b45309; }
-.sd-kpi--bad  .sd-kpi__value { color: var(--o2-status-error-text, #c62828); }
+.sd-kpi--good .sd-kpi__value {
+  color: var(--o2-status-success-text, #2e7d32);
+}
+.sd-kpi--warn .sd-kpi__value {
+  color: #b45309;
+}
+.sd-kpi--bad .sd-kpi__value {
+  color: var(--o2-status-error-text, #c62828);
+}
 
 .sd-kpi__sub {
   font-size: 11px;
@@ -781,11 +1005,13 @@ function relativeTime(timestampMs: number): string {
   margin-bottom: -1px;
 }
 
-.sd__tab:hover { color: var(--color-text-primary, currentColor); }
+.sd__tab:hover {
+  color: var(--color-text-primary, currentColor);
+}
 
 .sd__tab--active {
-  color: var(--color-primary-600, #3F7994);
-  border-bottom-color: var(--color-primary-600, #3F7994);
+  color: var(--color-primary-600, #3f7994);
+  border-bottom-color: var(--color-primary-600, #3f7994);
 }
 
 .sd__tab-count {
@@ -802,8 +1028,12 @@ function relativeTime(timestampMs: number): string {
 }
 
 .sd__tab--active .sd__tab-count {
-  background: color-mix(in srgb, var(--color-primary-600, #3F7994) 18%, transparent);
-  color: var(--color-primary-600, #3F7994);
+  background: color-mix(
+    in srgb,
+    var(--color-primary-600, #3f7994) 18%,
+    transparent
+  );
+  color: var(--color-primary-600, #3f7994);
 }
 
 /* — Body — */
@@ -837,7 +1067,8 @@ function relativeTime(timestampMs: number): string {
   font: 600 13px/1.5 var(--o2-font);
   color: var(--color-text-primary, currentColor);
   padding-bottom: 6px;
-  border-bottom: 1px solid color-mix(in srgb, var(--color-text-secondary) 12%, transparent);
+  border-bottom: 1px solid
+    color-mix(in srgb, var(--color-text-secondary) 12%, transparent);
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -913,14 +1144,21 @@ function relativeTime(timestampMs: number): string {
   align-items: center;
   gap: 6px;
   padding: 10px 12px;
-  background: color-mix(in srgb, var(--color-primary-600, #3F7994) 8%, transparent);
-  border: 1px solid color-mix(in srgb, var(--color-primary-600, #3F7994) 30%, transparent);
+  background: color-mix(
+    in srgb,
+    var(--color-primary-600, #3f7994) 8%,
+    transparent
+  );
+  border: 1px solid
+    color-mix(in srgb, var(--color-primary-600, #3f7994) 30%, transparent);
   border-radius: 5px;
   font-size: 12px;
   color: var(--color-text-primary, currentColor);
 }
 
-.sd-produces__name { font-weight: 700; }
+.sd-produces__name {
+  font-weight: 700;
+}
 
 .sd-produces__version,
 .sd-produces__sep,
@@ -944,7 +1182,8 @@ function relativeTime(timestampMs: number): string {
   margin: 0;
   padding: 12px;
   background: color-mix(in srgb, var(--color-text-primary) 5%, transparent);
-  border: 1px solid color-mix(in srgb, var(--color-text-secondary) 14%, transparent);
+  border: 1px solid
+    color-mix(in srgb, var(--color-text-secondary) 14%, transparent);
   border-radius: 6px;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 12px;
@@ -956,7 +1195,9 @@ function relativeTime(timestampMs: number): string {
   overflow: auto;
 }
 
-.sd-code--mono { white-space: pre; }
+.sd-code--mono {
+  white-space: pre;
+}
 
 /* — Versions tab — */
 .sd-versions {
@@ -971,13 +1212,22 @@ function relativeTime(timestampMs: number): string {
 .sd-versions__item {
   padding: 12px 14px;
   background: var(--color-card-bg);
-  border: 1px solid color-mix(in srgb, var(--color-text-secondary) 16%, transparent);
+  border: 1px solid
+    color-mix(in srgb, var(--color-text-secondary) 16%, transparent);
   border-radius: 6px;
 }
 
 .sd-versions__item--active {
-  border-color: color-mix(in srgb, var(--color-primary-600, #3F7994) 30%, transparent);
-  background: color-mix(in srgb, var(--color-primary-600, #3F7994) 5%, var(--color-card-bg));
+  border-color: color-mix(
+    in srgb,
+    var(--color-primary-600, #3f7994) 30%,
+    transparent
+  );
+  background: color-mix(
+    in srgb,
+    var(--color-primary-600, #3f7994) 5%,
+    var(--color-card-bg)
+  );
 }
 
 .sd-versions__head {
@@ -997,7 +1247,11 @@ function relativeTime(timestampMs: number): string {
   padding: 1px 7px;
   border-radius: 3px;
   font: 600 10px var(--o2-font);
-  background: color-mix(in srgb, var(--o2-status-success-text, #2e7d32) 14%, transparent);
+  background: color-mix(
+    in srgb,
+    var(--o2-status-success-text, #2e7d32) 14%,
+    transparent
+  );
   color: var(--o2-status-success-text, #2e7d32);
 }
 
@@ -1015,7 +1269,9 @@ function relativeTime(timestampMs: number): string {
   flex-wrap: wrap;
 }
 
-.sd__date-picker { flex: 0 0 auto; }
+.sd__date-picker {
+  flex: 0 0 auto;
+}
 
 .sd__runs-meta {
   margin-left: auto;
@@ -1077,13 +1333,21 @@ function relativeTime(timestampMs: number): string {
   background: var(--color-text-secondary, var(--o2-text-secondary));
 }
 
-.sd-status-cell--success { color: var(--o2-status-success-text, #2e7d32); }
-.sd-status-cell--success .sd-status-cell__dot { background: var(--o2-status-success-text, #2e7d32); }
+.sd-status-cell--success {
+  color: var(--o2-status-success-text, #2e7d32);
+}
+.sd-status-cell--success .sd-status-cell__dot {
+  background: var(--o2-status-success-text, #2e7d32);
+}
 
 .sd-status-cell--error,
-.sd-status-cell--timeout { color: var(--o2-status-error-text, #c62828); }
+.sd-status-cell--timeout {
+  color: var(--o2-status-error-text, #c62828);
+}
 .sd-status-cell--error .sd-status-cell__dot,
-.sd-status-cell--timeout .sd-status-cell__dot { background: var(--o2-status-error-text, #c62828); }
+.sd-status-cell--timeout .sd-status-cell__dot {
+  background: var(--o2-status-error-text, #c62828);
+}
 
 .sd-status-cell--skipped .sd-status-cell__dot {
   background: color-mix(in srgb, var(--color-text-secondary) 60%, transparent);
@@ -1101,15 +1365,29 @@ function relativeTime(timestampMs: number): string {
 
 .sd-used-list__item {
   width: 100%;
-  background: color-mix(in srgb, var(--color-text-secondary) 5%, transparent) !important;
+  background: color-mix(
+    in srgb,
+    var(--color-text-secondary) 5%,
+    transparent
+  ) !important;
   border: 1px solid transparent !important;
   border-radius: 5px !important;
-  transition: border-color 0.15s, background 0.15s;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
 }
 
 .sd-used-list__item:hover {
-  border-color: color-mix(in srgb, var(--color-primary-600, #3F7994) 35%, transparent) !important;
-  background: color-mix(in srgb, var(--color-primary-600, #3F7994) 5%, transparent) !important;
+  border-color: color-mix(
+    in srgb,
+    var(--color-primary-600, #3f7994) 35%,
+    transparent
+  ) !important;
+  background: color-mix(
+    in srgb,
+    var(--color-primary-600, #3f7994) 5%,
+    transparent
+  ) !important;
 }
 
 .sd-used-list__item:deep(button) {
@@ -1135,7 +1413,7 @@ function relativeTime(timestampMs: number): string {
 }
 
 .sd-used-list__item:hover .sd-used-list__chevron {
-  color: var(--color-primary-600, #3F7994);
+  color: var(--color-primary-600, #3f7994);
   opacity: 1;
 }
 </style>

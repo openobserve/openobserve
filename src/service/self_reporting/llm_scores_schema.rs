@@ -134,6 +134,10 @@ mod tests {
         assert!(obj.contains_key("score_config_id"));
         assert!(obj.contains_key("scorer_id"));
         assert!(obj.contains_key("source_stream_type"));
+        assert!(!obj.contains_key("agent_name"));
+        assert!(!obj.contains_key("agent_id"));
+        assert!(!obj.contains_key("target_agent_name"));
+        assert!(!obj.contains_key("target_agent_id"));
         assert!(obj.contains_key("_timestamp"));
     }
 }

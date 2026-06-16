@@ -662,10 +662,6 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/llm/models/test", post(model_pricing::test_model_match))
         .route("/{org_id}/llm/models/{model_id}", get(model_pricing::get).put(model_pricing::update).delete(model_pricing::delete))
 
-        // Gen-AI settings
-        .route("/{org_id}/settings/gen_ai/agent_mapping", get(gen_ai::get_agent_mapping).put(gen_ai::save_agent_mapping))
-        .route("/{org_id}/gen_ai/agents", get(gen_ai::list_scored_agents))
-
         // Metrics
         .route("/{org_id}/ingest/metrics/_json", post(metrics::ingest::json))
 
@@ -861,6 +857,10 @@ pub fn service_routes() -> Router {
     {
         if get_o2_config().common.online_evals_enabled {
             router = router
+                // Gen-AI settings and scored agents
+                .route("/{org_id}/settings/gen_ai/agent_mapping", get(gen_ai::get_agent_mapping).put(gen_ai::save_agent_mapping))
+                .route("/{org_id}/gen_ai/agents", get(gen_ai::list_scored_agents))
+
                 // LLM Providers (Online Eval Phase 2)
                 .route("/{org_id}/providers", get(providers::list_providers).post(providers::create_provider))
                 .route("/{org_id}/providers/{provider_id}", get(providers::get_provider).put(providers::update_provider).delete(providers::delete_provider))
