@@ -193,6 +193,17 @@ impl IndexCondition {
     pub fn is_condition_all(&self) -> bool {
         self.conditions.len() == 1 && matches!(self.conditions[0], Condition::All())
     }
+
+    // use for the simple histogram RANK fast path: the single `field = value` term
+    pub fn single_equal_term(&self) -> Option<(String, String)> {
+        if self.conditions.len() == 1
+            && let Condition::Equal(field, value) = &self.conditions[0]
+        {
+            Some((field.clone(), value.clone()))
+        } else {
+            None
+        }
+    }
 }
 
 // single condition

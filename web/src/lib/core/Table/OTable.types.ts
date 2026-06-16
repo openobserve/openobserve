@@ -168,6 +168,8 @@ export interface OTableProps<TData = any> {
   currentPage?: number;
   /** Total record count (required for server-side pagination) */
   totalCount?: number;
+  /** When true, the page index is NOT reset when the data array changes (e.g. on row expand/collapse). Defaults to false. */
+  keepPageOnDataChange?: boolean;
 
   // ── Sorting ──
   sorting?: OTableSortingMode;
