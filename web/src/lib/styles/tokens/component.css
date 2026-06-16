@@ -25,11 +25,14 @@
   --color-button-primary-focus-ring: var(--color-primary-400);
 
   /* Button — secondary */
-  --color-button-secondary: var(--color-surface-panel);
+  --o2-secondary-btn-bg: var(--color-surface-panel);
+  --o2-secondary-btn-text: var(--color-text-primary);
+  --o2-secondary-btn-border: var(--color-border-subtle, #e5e7eb);
+  --color-button-secondary: var(--o2-secondary-btn-bg);
   --color-button-secondary-hover: var(--color-primary-50);
   --color-button-secondary-active: var(--color-primary-100);
   --color-button-secondary-disabled: var(--color-surface-panel);
-  --color-button-secondary-foreground: var(--color-text-primary);
+  --color-button-secondary-foreground: var(--o2-secondary-btn-text);
   --color-button-secondary-focus-ring: var(--color-primary-400);
 
   /* Button — outline */
@@ -179,7 +182,7 @@
   /* OFieldList / OFieldRow / OFieldLabel */
   --color-field-list-row-hover-bg:     var(--color-primary-100);
   --color-field-list-group-text:       var(--color-text-secondary);
-  --color-field-list-label-text:       var(--color-text-primary);
+  --color-field-list-label-text:       var(--color-grey-text-primary);
   --color-field-list-label-icon:       var(--color-text-secondary);
   --color-field-list-drag-icon:        var(--color-text-secondary);
   --color-field-list-expand-icon:      var(--color-text-secondary);
@@ -397,6 +400,7 @@
   --color-input-hint: var(--color-text-secondary);
   --color-input-help-text: var(--color-text-secondary);
   --color-input-error-text: var(--color-error-600);
+  --color-input-addon-bg: var(--color-surface-panel);
   --color-input-addon-text: var(--color-text-secondary);
   --color-input-clear-btn: var(--color-text-secondary);
   --color-input-clear-btn-hover: var(--color-text-primary);
@@ -829,6 +833,7 @@
   --color-input-hint: var(--color-input-hint);
   --color-input-help-text: var(--color-input-help-text);
   --color-input-error-text: var(--color-input-error-text);
+  --color-input-addon-bg: var(--color-input-addon-bg);
   --color-input-addon-text: var(--color-input-addon-text);
   --color-input-clear-btn: var(--color-input-clear-btn);
   --color-input-clear-btn-hover: var(--color-input-clear-btn-hover);
@@ -994,7 +999,7 @@
   /* OFieldList / OFieldRow / OFieldLabel */
   --color-field-list-row-hover-bg:     var(--color-field-list-row-hover-bg);
   --color-field-list-group-text:       var(--color-field-list-group-text);
-  --color-field-list-label-text:       var(--color-field-list-label-text);
+  --color-field-list-label-text:       var(--color-text-primary);
   --color-field-list-label-icon:       var(--color-field-list-label-icon);
   --color-field-list-drag-icon:        var(--color-field-list-drag-icon);
   --color-field-list-expand-icon:      var(--color-field-list-expand-icon);

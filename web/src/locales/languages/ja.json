@@ -848,7 +848,10 @@
     "feature_correlation_management": "相関管理",
     "feature_log_patterns": "ログパターン",
     "environment_type": "環境タイプ",
-    "license_allows_unlimited_ingestion": "現在のライセンスでは、無制限のデータ取り込みが可能です。"
+    "license_allows_unlimited_ingestion": "現在のライセンスでは、無制限のデータ取り込みが可能です。",
+    "refresh_license_limits": "ライセンス制限を更新",
+    "license_refresh_success": "ライセンス制限の更新が正常にトリガーされました",
+    "failed_to_refresh_license": "ライセンス制限を更新できませんでした"
   },
   "login": {
     "userid": "ユーザーID",

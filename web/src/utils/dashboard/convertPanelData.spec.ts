@@ -46,7 +46,8 @@ vi.mock("./convertSankeyData", () => ({
 }));
 
 vi.mock("./convertCustomChartData", () => ({
-  runJavaScriptCode: vi.fn().mockResolvedValue({ customData: [] })
+  runJavaScriptCode: vi.fn().mockResolvedValue({ customData: [] }),
+  validateUserCode: vi.fn().mockReturnValue(null)
 }));
 
 describe("convertPanelData", () => {

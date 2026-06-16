@@ -1,5 +1,6 @@
 <template>
-  <div class="tw:p-3">
+  <!-- Page gutter is owned by the Settings shell's ConstrainedPage. -->
+  <div>
     <LicensePeriod @updateLicense="showUpdateFormAndFocus"></LicensePeriod>
 
     <div v-if="loading" class="tw:p-3 tw:flex tw:flex-col tw:items-center tw:justify-center">
@@ -177,6 +178,15 @@
                   @click="showUpdateFormAndFocus"
                 >
                   {{ t("about.add_new_license_key") }}
+                </OButton>
+                <OButton
+                  data-test="refresh-license-limits-btn"
+                  variant="primary"
+                  size="sm-action"
+                  v-if="licenseData.license != null"
+                  @click="triggerLimitRefresh"
+                >
+                  {{ t("about.refresh_license_limits") }}
                 </OButton>
               </div>
             </OCardSection>
@@ -546,6 +556,25 @@ export default defineComponent({
         }
       }, 100);
     };
+
+    const triggerLimitRefresh = async () => {
+      try {
+        await licenseServer.refresh_license_limits();
+        toast({
+          variant: "success",
+          message: t("about.license_refresh_success"),
+        });
+      }catch(error){
+        console.error("Error refreshing license:", error);
+        toast({
+          variant: "error",
+          message:
+            t("about.failed_to_refresh_license") +
+            " : " +
+            (error?.response?.data?.message || "unexpected error"),
+        }); 
+      }
+    }
 
     const maskKey = (key: string) => {
       if (!key) return "";
@@ -933,6 +962,7 @@ export default defineComponent({
       showLicenseExpiryWarning,
       getLicenseExpiryMessage,
       showUpdateFormAndFocus,
+      triggerLimitRefresh,
       maskKey,
       getMaskedLicenseKey,
       copyLicenseKey,

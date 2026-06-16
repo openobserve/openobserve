@@ -502,44 +502,59 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                     <!-- Chart Preview -->
                     <template #after>
-                      <PanelSchemaRenderer
-                        v-if="chartData"
-                        ref="panelSchemaRendererRef"
-                        :key="dashboardPanelData.data.type"
-                        :panelSchema="chartData"
-                        :dashboard-id="dashboardId"
-                        :folder-id="folderId"
-                        :selectedTimeObj="dashboardPanelData.meta.dateTime"
-                        :variablesData="resolvedVariablesData"
-                        :width="6"
-                        :shouldRefreshWithoutCache="shouldRefreshWithoutCache"
-                        :regionClusterParams="props.regionClusterParams"
-                        :showLegendsButton="true"
-                        :searchType="searchType"
-                        :searchResponse="props.searchResponse"
-                        :is_ui_histogram="props.isUiHistogram"
-                        @metadata-update="metaDataValue"
-                        @result-metadata-update="handleResultMetadataUpdate"
-                        @limit-number-of-series-warning-message-update="
-                          handleLimitNumberOfSeriesWarningMessage
-                        "
-                        @error="handleChartApiError"
-                        @updated:data-zoom="handleDataZoom"
-                        @updated:vrl-function-field-list="
-                          updateVrlFunctionFieldList
-                        "
-                        @last-triggered-at-update="handleLastTriggeredAtUpdate"
-                        @series-data-update="seriesDataUpdate"
-                        @show-legends="showLegendsDialog = true"
-                        @is-partial-data-update="handleIsPartialDataUpdate"
-                        @loading-state-change="handleLoadingStateChange"
-                        @is-cached-data-differ-with-current-time-range-update="
-                          handleIsCachedDataDifferWithCurrentTimeRangeUpdate
-                        "
-                        @update:initial-variable-values="
-                          handleInitialVariableValuesUpdate
-                        "
-                      />
+                      <div class="tw:flex tw:flex-col tw:h-full">
+                        <div class="tw:flex tw:justify-end tw:mr-2 tw:mt-1 tw:items-center tw:gap-2">
+                          <PanelErrorButtons
+                            :error="errorMessage"
+                            :maxQueryRangeWarning="maxQueryRangeWarning"
+                            :limitNumberOfSeriesWarningMessage="limitNumberOfSeriesWarningMessage"
+                            :isCachedDataDifferWithCurrentTimeRange="isCachedDataDifferWithCurrentTimeRange"
+                            :isPartialData="isPartialData"
+                            :isPanelLoading="isPanelLoading"
+                            :lastTriggeredAt="null"
+                            :viewOnly="false"
+                            :xAliasInconsistencyWarning="hasInconsistentXAlias"
+                          />
+                        </div>
+                        <PanelSchemaRenderer
+                          v-if="chartData"
+                          ref="panelSchemaRendererRef"
+                          :key="dashboardPanelData.data.type"
+                          :panelSchema="chartData"
+                          :dashboard-id="dashboardId"
+                          :folder-id="folderId"
+                          :selectedTimeObj="dashboardPanelData.meta.dateTime"
+                          :variablesData="resolvedVariablesData"
+                          :width="6"
+                          :shouldRefreshWithoutCache="shouldRefreshWithoutCache"
+                          :regionClusterParams="props.regionClusterParams"
+                          :showLegendsButton="true"
+                          :searchType="searchType"
+                          :searchResponse="props.searchResponse"
+                          :is_ui_histogram="props.isUiHistogram"
+                          @metadata-update="metaDataValue"
+                          @result-metadata-update="handleResultMetadataUpdate"
+                          @limit-number-of-series-warning-message-update="
+                            handleLimitNumberOfSeriesWarningMessage
+                          "
+                          @error="handleChartApiError"
+                          @updated:data-zoom="handleDataZoom"
+                          @updated:vrl-function-field-list="
+                            updateVrlFunctionFieldList
+                          "
+                          @last-triggered-at-update="handleLastTriggeredAtUpdate"
+                          @series-data-update="seriesDataUpdate"
+                          @show-legends="showLegendsDialog = true"
+                          @is-partial-data-update="handleIsPartialDataUpdate"
+                          @loading-state-change="handleLoadingStateChange"
+                          @is-cached-data-differ-with-current-time-range-update="
+                            handleIsCachedDataDifferWithCurrentTimeRangeUpdate
+                          "
+                          @update:initial-variable-values="
+                            handleInitialVariableValuesUpdate
+                          "
+                        />
+                      </div>
                     </template>
                   </OSplitter>
                 </div>

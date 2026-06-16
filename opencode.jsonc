@@ -23,5 +23,39 @@
 
   // Default model for runs that don't pass --model explicitly.
   // The workflow passes --model deepseek/deepseek-v4-pro per agent invocation.
-  "model": "deepseek/deepseek-v4-pro"
+  "model": "deepseek/deepseek-v4-pro",
+
+  // Register the CI agents explicitly so `--agent e2e-ci-*` resolves deterministically.
+  // OpenCode does NOT auto-discover agents nested in .opencode/agents/<subdir>/ (the first CI
+  // run fell back to the default agent), so we point each name at its prompt file here.
+  "agent": {
+    "e2e-ci-triage": {
+      "mode": "primary",
+      "prompt": "{file:./.opencode/agents/e2e_ci_council_of_agents/e2e-ci-triage.md}"
+    },
+    "e2e-ci-analyst": {
+      "mode": "primary",
+      "prompt": "{file:./.opencode/agents/e2e_ci_council_of_agents/e2e-ci-analyst.md}"
+    },
+    "e2e-ci-architect": {
+      "mode": "primary",
+      "prompt": "{file:./.opencode/agents/e2e_ci_council_of_agents/e2e-ci-architect.md}"
+    },
+    "e2e-ci-engineer": {
+      "mode": "primary",
+      "prompt": "{file:./.opencode/agents/e2e_ci_council_of_agents/e2e-ci-engineer.md}"
+    },
+    "e2e-ci-sentinel": {
+      "mode": "primary",
+      "prompt": "{file:./.opencode/agents/e2e_ci_council_of_agents/e2e-ci-sentinel.md}"
+    },
+    "e2e-ci-healer": {
+      "mode": "primary",
+      "prompt": "{file:./.opencode/agents/e2e_ci_council_of_agents/e2e-ci-healer.md}"
+    },
+    "e2e-ci-responder": {
+      "mode": "primary",
+      "prompt": "{file:./.opencode/agents/e2e_ci_council_of_agents/e2e-ci-responder.md}"
+    }
+  }
 }

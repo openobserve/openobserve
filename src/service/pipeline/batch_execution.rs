@@ -13,9 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+#[cfg(feature = "enterprise")]
+use std::hash::{Hash, Hasher};
 use std::{
     collections::{HashMap, HashSet},
-    hash::{Hash, Hasher},
     sync::LazyLock as Lazy,
 };
 
@@ -65,6 +66,7 @@ struct BatchBuffer {
     last_write: Instant,
 }
 
+#[cfg(feature = "enterprise")]
 fn should_sample_eval_record(record: &json::Value, idx: usize, sampling_rate: f64) -> bool {
     if sampling_rate >= 1.0 {
         return true;
@@ -1341,7 +1343,22 @@ async fn process_node(
                 );
             }
         }
+        #[cfg(feature = "enterprise")]
         NodeData::LlmEvaluation(params) => {
+            if !o2_enterprise::enterprise::common::config::get_config()
+                .common
+                .online_evals_enabled
+            {
+                log::warn!(
+                    "[Pipeline]: LLM evaluation node {node_idx} skipped because online evals are disabled"
+                );
+                while receiver.recv().await.is_some() {
+                    count += 1;
+                }
+                log::info!("[Pipeline]: LLM evaluation node {node_idx} skipped {count} records");
+                return Ok(());
+            }
+
             log::info!("[Pipeline]: LLM evaluation node {node_idx} starts processing");
 
             if let Err(e) =
@@ -1468,6 +1485,19 @@ async fn process_node(
 
             log::info!(
                 "[Pipeline]: LLM evaluation node {node_idx} done processing {count} records"
+            );
+        }
+        #[cfg(not(feature = "enterprise"))]
+        NodeData::LlmEvaluation(_) => {
+            log::warn!(
+                "[Pipeline]: LLM evaluation node {node_idx} skipped because online evals are enterprise-only"
+            );
+            let mut skipped_count = 0usize;
+            while receiver.recv().await.is_some() {
+                skipped_count += 1;
+            }
+            log::info!(
+                "[Pipeline]: LLM evaluation node {node_idx} skipped {skipped_count} records"
             );
         }
     }

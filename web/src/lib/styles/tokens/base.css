@@ -487,9 +487,8 @@
 
 :root {
   /* --- Font family tokens --- */
-  --font-sans: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu,
-    Cantarell, 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
-  --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Ubuntu Mono', 'Liberation Mono', 'Courier New', monospace;
+  --font-sans: 'Geist', -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
+  --font-mono: 'Geist Mono', 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
 
   /* --- Font size scale --- */
   --text-xs:   0.75rem;   /* 12px */
@@ -525,18 +524,18 @@
   --font-semibold: 600;
   --font-bold: 700;
   --font-black: 900;
-  /* --- Primary palette — brand color #3F7994 (HSL 199°, 40%, 41%) --- */
-  --color-primary-50:  #f5f8f9;
-  --color-primary-100: #e4edf1;
-  --color-primary-200: #bad3de;
-  --color-primary-300: #8eb9cc;
-  --color-primary-400: #629fbc;
-  --color-primary-500: #4b8faf;
-  --color-primary-600: #3f7994;
-  --color-primary-700: #316177;
-  --color-primary-800: #224758;
-  --color-primary-900: #16303c;
-  --color-primary-950: #0e1f27;   /* darkest — referenced by dark-mode hover/drag bgs */
+  /* --- Primary palette — blue-teal #3F7994 --- */
+  --color-primary-50:  #f5f8fa;
+  --color-primary-100: #e2ebef;
+  --color-primary-200: #c5d7df;
+  --color-primary-300: #9fbcca;
+  --color-primary-400: #79a1b4;
+  --color-primary-500: #5c8da4;
+  --color-primary-600: #3F7994;   /* brand accent — buttons, links, active tabs */
+  --color-primary-700: #326176;   /* hover */
+  --color-primary-800: #264959;
+  --color-primary-900: #19303b;
+  --color-primary-950: #0d181e;   /* darkest — dark-mode hover/drag bgs */
 
   /* --- Grey palette --- */
   /* Tailwind "neutral" palette — true greys with no blue undertone.
@@ -634,8 +633,10 @@
   --radius-xl:   0.75rem;   /* 12px */
   --radius-full: 9999px;
 
-  /* --- Shadow scale --- */
-  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  /* --- Shadow scale — hairline-border philosophy ---
+     sm is intentionally none: cards use a 1px border, not a drop shadow.
+     md/lg retained for overlays (dialogs, menus) that need real elevation. */
+  --shadow-sm: none;
+  --shadow-md: 0 4px 12px -2px rgb(0 0 0 / 0.08), 0 2px 6px -2px rgb(0 0 0 / 0.06);
+  --shadow-lg: 0 12px 24px -4px rgb(0 0 0 / 0.10), 0 4px 8px -4px rgb(0 0 0 / 0.06);
 }

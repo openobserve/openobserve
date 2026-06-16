@@ -55,8 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OBadge v-if="anomalyConfig.status" :variant="anomalyStatusVariant" class="tw:text-xs">{{ anomalyConfig.status }}</OBadge>
               <span
                 v-if="anomalyConfig.last_detection_run && anomalyConfig.last_detection_run > 0"
-                class="tw:text-[11px] tw:whitespace-nowrap"
-                :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'"
+                class="tw:text-[11px] tw:whitespace-nowrap tw:text-text-secondary"
               >
                 Last run: {{ anomalyFormatTs(anomalyConfig.last_detection_run) }}
               </span>
@@ -340,12 +339,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Preview Card -->
         <div class="card-container tw:overflow-hidden tw:flex tw:flex-col" style="flex: 1; min-height: 0;">
           <div
-            class="tw:flex tw:items-center tw:px-3 tw:py-[0.625rem] tw:select-none tw:border-b tw:shrink-0 tw:gap-2"
-            :class="store.state.theme === 'dark' ? 'tw:border-gray-700' : 'tw:border-gray-200'"
+            class="tw:flex tw:items-center tw:px-3 tw:py-[0.625rem] tw:select-none tw:border-b tw:border-border-default tw:shrink-0 tw:gap-2"
           >
             <span class="tw:text-sm tw:font-medium">{{ isAnomalyMode ? t('alerts.sqlPreview') : (t('alerts.preview') || 'Preview') }}</span>
             <template v-if="!isAnomalyMode && activeEvaluationStatus">
-              <div class="tw:w-px tw:h-4" :class="store.state.theme === 'dark' ? 'tw:bg-gray-600' : 'tw:bg-gray-300'" />
+              <div class="tw:w-px tw:h-4 tw:bg-border-default" />
               <OIcon :name="activeEvaluationStatus.wouldTrigger ? 'check-circle' : 'cancel'" :class="activeEvaluationStatus.wouldTrigger ? 'tw:text-[var(--o2-positive)]' : 'tw:text-[var(--o2-gray)]'" size="sm" />
               <span class="tw:text-xs tw:font-semibold" :class="activeEvaluationStatus.wouldTrigger ? 'tw:text-[var(--o2-positive)]' : 'tw:text-[var(--o2-gray)]'">
                 {{ activeEvaluationStatus.wouldTrigger ? t('alerts.wouldTrigger') : t('alerts.wouldNotTrigger') }}
@@ -360,7 +358,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template v-else>
               <div v-if="!formData.stream_name" class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:gap-2">
                 <OIcon name="query-stats" size="lg" class="tw:opacity-20" />
-                <span class="tw:text-sm tw:font-medium" :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'">
+                <span class="tw:text-sm tw:font-medium tw:text-text-secondary">
                   {{ t('alerts.previewEmptyState') }}
                 </span>
               </div>
@@ -383,8 +381,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Summary Card -->
         <div class="card-container tw:overflow-hidden tw:flex tw:flex-col" style="flex: 1; min-height: 0;">
           <div
-            class="tw:flex tw:items-center tw:px-3 tw:py-[0.625rem] tw:select-none tw:border-b tw:shrink-0"
-            :class="store.state.theme === 'dark' ? 'tw:border-gray-700' : 'tw:border-gray-200'"
+            class="tw:flex tw:items-center tw:px-3 tw:py-[0.625rem] tw:select-none tw:border-b tw:border-border-default tw:shrink-0"
           >
             <span class="tw:text-sm tw:font-medium">{{ t('alerts.summary.title') || 'Summary' }}</span>
           </div>
@@ -632,6 +629,9 @@ export default defineComponent({
 .alert-v3-field :deep(.q-field__append) {
   height: 28px !important;
   align-items: center;
+  gap: 0;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--color-border-default, #e6e6e6);
 }
 
 .body--dark .alert-v3-field :deep(.q-field__control) {
@@ -652,7 +652,7 @@ export default defineComponent({
 
 /* ── Section header (matches QueryConfig.vue pattern) ─────────────────────── */
 body.body--dark .section-header {
-  border-bottom-color: #343434;
+  border-bottom-color: var(--color-border-default, #343434);
 }
 
 .no-case .q-field__native span {

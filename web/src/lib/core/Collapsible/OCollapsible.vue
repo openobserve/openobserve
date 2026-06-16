@@ -139,7 +139,7 @@ watch(
         <span class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
           <span
             :class="[
-              'tw:font-semibold tw:text-collapsible-label tw:truncate',
+              'tw:font-medium tw:text-collapsible-label tw:truncate',
               variant === 'sidebar' ? 'tw:text-[13px]' : 'tw:text-sm',
             ]"
             >{{ label }}</span

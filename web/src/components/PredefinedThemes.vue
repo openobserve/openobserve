@@ -53,7 +53,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="tw:flex tw:items-center tw:flex-nowrap">
                 <div
                   class="tw:w-8 tw:h-8 tw:rounded tw:border tw:border-(--o2-border-color) tw:shrink-0 tw:relative"
-                  :style="{ backgroundColor: theme.light.themeColor }"
+                  :style="theme.light.semanticColors
+                    ? { background: `linear-gradient(135deg, ${theme.light.themeColor} 33%, ${theme.light.semanticColors.error} 33% 66%, ${theme.light.semanticColors.success} 66%)` }
+                    : { backgroundColor: theme.light.themeColor }"
                 ></div>
                 <div class="tw:ml-2" style="flex: 1; min-width: 0">
                   <div class="tw:text-sm tw:font-medium">{{ theme.name }}</div>
@@ -133,7 +135,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="tw:flex tw:items-center tw:flex-nowrap">
                 <div
                   class="tw:w-8 tw:h-8 tw:rounded tw:border tw:border-(--o2-border-color) tw:shrink-0 tw:relative"
-                  :style="{ backgroundColor: theme.dark.themeColor }"
+                  :style="theme.dark.semanticColors
+                    ? { background: `linear-gradient(135deg, ${theme.dark.themeColor} 33%, ${theme.dark.semanticColors.error} 33% 66%, ${theme.dark.semanticColors.success} 66%)` }
+                    : { backgroundColor: theme.dark.themeColor }"
                 ></div>
                 <div class="tw:ml-2" style="flex: 1; min-width: 0">
                   <div class="tw:text-sm tw:font-medium">{{ theme.name }}</div>
@@ -250,7 +254,7 @@ import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OColor from "@/lib/forms/Color/OColor.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import { useStore } from "vuex";
-import { hexToRgba, applyThemeColors } from "@/utils/theme";
+import { hexToRgba, applyThemeColors, type SemanticColors } from "@/utils/theme";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 const store = useStore();
@@ -467,7 +471,7 @@ onMounted(() => {
         const theme = predefinedThemes.find((t) => t.id === appliedTheme);
         if (theme) {
           const modeColors = currentMode === "light" ? theme.light : theme.dark;
-          applyThemeColors(modeColors.themeColor, currentMode, false);
+          applyThemeColors(modeColors.themeColor, currentMode, false, modeColors.semanticColors as SemanticColors | undefined);
         }
       }
     }
@@ -522,7 +526,7 @@ onMounted(() => {
             if (theme) {
               const modeColors =
                 currentMode === "light" ? theme.light : theme.dark;
-              applyThemeColors(modeColors.themeColor, currentMode, false);
+              applyThemeColors(modeColors.themeColor, currentMode, false, modeColors.semanticColors as SemanticColors | undefined);
             }
           }
         } else {
@@ -579,6 +583,18 @@ onUnmounted(() => {
 // - themeColorOpacity: opacity value (always 10 = fully opaque)
 const predefinedThemes = [
   {
+    id: 10,
+    name: "O2 Signature",
+    light: {
+      themeColor: "#6B76E3",
+      themeColorOpacity: 10,
+    },
+    dark: {
+      themeColor: "#8B8DF0",
+      themeColorOpacity: 10,
+    },
+  },
+  {
     id: 2,
     name: "Ocean Breeze",
     light: {
@@ -626,6 +642,46 @@ const predefinedThemes = [
       themeColorOpacity: 10,
     },
   },
+  {
+    id: 14,
+    name: "O2 Crimson Ink",
+    light: {
+      themeColor: "#E11D48",
+      themeColorOpacity: 10,
+      semanticColors: {
+        error: "#F97316",
+        errorBg: "#FFF7ED",
+        errorText: "#C2410C",
+        success: "#6366F1",
+        successBg: "#EEF2FF",
+        successText: "#3730A3",
+        secondaryBtnBg: "#FFE4E6",
+        secondaryBtnText: "#BE123C",
+        secondaryBtnBorder: "#FECDD3",
+        outlineText: "#BE123C",
+        outlineBorder: "#FECDD3",
+        ghostText: "#BE123C",
+      },
+    },
+    dark: {
+      themeColor: "#FB7185",
+      themeColorOpacity: 10,
+      semanticColors: {
+        error: "#FB923C",
+        errorBg: "#3A1A08",
+        errorText: "#FB923C",
+        success: "#818CF8",
+        successBg: "#1E1B4B",
+        successText: "#A5B4FC",
+        secondaryBtnBg: "#3D0617",
+        secondaryBtnText: "#FECDD3",
+        secondaryBtnBorder: "#9F1239",
+        outlineText: "#FECDD3",
+        outlineBorder: "#9F1239",
+        ghostText: "#FECDD3",
+      },
+    },
+  },
 ];
 
 // Slugify a theme name into a kebab-case identifier for data-test attributes
@@ -637,17 +693,27 @@ const applyTheme = (theme: any, mode: "light" | "dark") => {
   const modeColors = mode === "light" ? theme.light : theme.dark;
 
   // Apply theme colors directly (predefined themes are never "default")
-  applyThemeColors(modeColors.themeColor, mode, false);
+  applyThemeColors(modeColors.themeColor, mode, false, modeColors.semanticColors as SemanticColors | undefined);
 
   // Store the hex color value in localStorage (not the theme ID)
   if (mode === "light") {
     appliedLightTheme.value = theme.id;
     localStorage.setItem("appliedLightTheme", theme.id.toString());
     localStorage.setItem("customLightColor", modeColors.themeColor);
+    if (modeColors.semanticColors) {
+      localStorage.setItem("lightSemanticColors", JSON.stringify(modeColors.semanticColors));
+    } else {
+      localStorage.removeItem("lightSemanticColors");
+    }
   } else {
     appliedDarkTheme.value = theme.id;
     localStorage.setItem("appliedDarkTheme", theme.id.toString());
     localStorage.setItem("customDarkColor", modeColors.themeColor);
+    if (modeColors.semanticColors) {
+      localStorage.setItem("darkSemanticColors", JSON.stringify(modeColors.semanticColors));
+    } else {
+      localStorage.removeItem("darkSemanticColors");
+    }
   }
 
   // Show success notification
@@ -743,6 +809,7 @@ const resetToDefaultTheme = () => {
   customLightColor.value = lightResetColor;
   localStorage.removeItem("customLightColor");
   localStorage.removeItem("appliedLightTheme");
+  localStorage.removeItem("lightSemanticColors");
   appliedLightTheme.value = -1;
   localStorage.setItem("appliedLightTheme", "-1");
 
@@ -751,6 +818,7 @@ const resetToDefaultTheme = () => {
   customDarkColor.value = darkResetColor;
   localStorage.removeItem("customDarkColor");
   localStorage.removeItem("appliedDarkTheme");
+  localStorage.removeItem("darkSemanticColors");
   appliedDarkTheme.value = -1;
   localStorage.setItem("appliedDarkTheme", "-1");
 
