@@ -91,7 +91,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Scrollable values area -->
     <div class="values-scroll-container">
-      <!-- Loading state (only shown when there are no interim cached results) -->
+      <!-- Loading state (only shown when there are no interim cached results).
+           tw:relative is required: OInnerLoading is `absolute inset-0`, so this
+           wrapper must be its positioning context — otherwise the overlay escapes
+           to the nearest positioned ancestor (.o-field-list__row) and covers the
+           field row, blocking the click that collapses/cancels the request. -->
       <div
         v-show="fieldValues?.isLoading && !displayValues.length"
         class="tw:relative tw:pl-3 tw:py-1"
