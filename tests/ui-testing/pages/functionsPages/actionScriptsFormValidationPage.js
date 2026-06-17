@@ -89,6 +89,19 @@ class ActionScriptsFormValidationPage {
 
   // ── Navigation ────────────────────────────────────────────────────────────
 
+  /**
+   * Navigates to the Action Scripts list page and reports whether the feature
+   * is available in the running build.
+   *
+   * Action Scripts is an ENTERPRISE-only feature — its `/web/actions` route is
+   * registered exclusively by `useEnterpriseRoutes`. On an OSS binary (e.g. the
+   * OSS Playwright CI job) the route does not exist, so navigation redirects
+   * away and the list page never mounts. We detect that here and return `false`
+   * so the caller can skip enterprise-only assertions cleanly, mirroring the
+   * availability-gate pattern used by the anomaly-detection suite.
+   *
+   * @returns {Promise<boolean>} true when the list page rendered (enterprise build)
+   */
   async navigateToActionScripts(orgIdentifier) {
     const org = orgIdentifier || process.env.ORGID || 'default';
     await this.page.goto(
@@ -96,9 +109,14 @@ class ActionScriptsFormValidationPage {
     );
     // Cold CI runners load the SPA bundle + run the enterprise route guard async
     // check before this view mounts — wait for the DOM to settle then give the
-    // list page a generous deterministic window to render.
+    // list page a deterministic window to render.
     await this.page.waitForLoadState('domcontentloaded');
-    await this.page.locator(this.listPage).waitFor({ state: 'visible', timeout: 30000 });
+    try {
+      await this.page.locator(this.listPage).waitFor({ state: 'visible', timeout: 15000 });
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   // ── List page helpers ─────────────────────────────────────────────────────

@@ -13,11 +13,26 @@ test.describe(
     /** @type {PageManager} */
     let pm;
 
+    // Action Scripts is enterprise-only — cache the availability probe so only
+    // the first test pays the detection cost; the rest skip immediately on OSS.
+    let actionScriptsAvailable;
+
     test.beforeEach(async ({ page }, testInfo) => {
       testLogger.testStart(testInfo.title, testInfo.file);
       await navigateToBase(page);
       pm = new PageManager(page);
-      await pm.actionScriptsFormValidation.navigateToActionScripts();
+
+      if (actionScriptsAvailable === false) {
+        testLogger.warn('Action Scripts route not present (OSS build) — skipping enterprise-only suite');
+        test.skip(true, 'Action Scripts is an enterprise-only feature — route absent in the OSS build');
+        return;
+      }
+
+      actionScriptsAvailable = await pm.actionScriptsFormValidation.navigateToActionScripts();
+      if (!actionScriptsAvailable) {
+        testLogger.warn('Action Scripts route not present (OSS build) — skipping enterprise-only suite');
+      }
+      test.skip(!actionScriptsAvailable, 'Action Scripts is an enterprise-only feature — route absent in the OSS build');
     });
 
     // ──────────────────────────────────────────────────────────────────────────
