@@ -87,10 +87,21 @@ def _replace_match_all(sql: str) -> str:
 
     Single word:  match_all('warehouse') → log LIKE '%warehouse%'
     Multi-word:   match_all('ACK batch') → (log LIKE '%ACK%' AND log LIKE '%batch%')
+
+    Note: This is an approximation — Tantivy's actual tokenization may
+    differ from whitespace splitting (stemming, stop words, case folding).
+    The per-token content assertion in the test runner provides a
+    correctness backstop that is independent of this oracle.
     """
+    def _escape_like(s: str) -> str:
+        # Escape LIKE wildcards and single quotes to prevent unintended
+        # matches and SQL syntax breaks.  Not a parameterized query, but
+        # this is test infrastructure against a local in-memory DuckDB.
+        return s.replace("'", "''").replace("%", "\\%").replace("_", "\\_")
+
     def _build_like(m: re.Match) -> str:
         term = m.group(1)
-        words = term.split()
+        words = [_escape_like(w) for w in term.split()]
         if len(words) == 1:
             return f"log LIKE '%{words[0]}%'"
         clauses = " AND ".join(f"log LIKE '%{w}%'" for w in words)

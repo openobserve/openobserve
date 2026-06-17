@@ -69,17 +69,19 @@ def load_all_queries():
 
 # ── FTS Content Verification ────────────────────────────────────────────────
 def _verify_fts_content(sql, hits, qid):
-    """Verify match_all results: returned rows contain the search terms.
+    """Verify match_all results: every returned hit contains the search terms.
 
     Tantivy full-text search tokenizes and indexes text fields.  When the
     DataFusion access plan is bypassed (e.g. after an upgrade), match_all
     can silently return wrong results — rows that don't contain the search
     terms at all.  This check catches that.
 
-    Only fires for queries that use match_all() and return the ``log``
-    field (the primary FTS-indexed field in test data).  For queries that
-    SELECT specific columns without ``log``, we skip verification since
-    the match may have been in a non-returned field.
+    Precondition: ``hits`` is non-empty (no-op otherwise).
+
+    Only fires for queries that use ``match_all()`` and where the first
+    hit includes a ``log`` field (the primary FTS-indexed field).  Queries
+    that SELECT specific columns without ``log`` are skipped since the
+    match may have been against a non-returned field.
     """
     terms = re.findall(r"match_all\('([^']*)'\)", sql, re.IGNORECASE)
     if not terms or not hits:
@@ -90,17 +92,18 @@ def _verify_fts_content(sql, hits, qid):
     if "log" not in hits[0]:
         return
 
+    # Pre-compute lowercased words once outside the hit loop
+    search_words = [w.lower() for term in terms for w in term.split()]
+
     for hit in hits:
         log_val = str(hit.get("log", "")).lower()
-        for term in terms:
-            for word in term.split():
-                if word.lower() not in log_val:
-                    raise AssertionError(
-                        f"{qid}: FTS content verification failed — "
-                        f"match_all('{term}') returned a row where "
-                        f"'{word}' is not in log field. "
-                        f"log={hit.get('log', '')[:150]}"
-                    )
+        for word in search_words:
+            if word not in log_val:
+                raise AssertionError(
+                    f"{qid}: FTS content verification failed — "
+                    f"match_all term word '{word}' is not in log field. "
+                    f"log={hit.get('log', '')[:150]}"
+                )
 
 
 # ── Shared query runner ────────────────────────────────────────────────────
