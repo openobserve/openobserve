@@ -179,6 +179,7 @@ jobs:
                 "languageTranslation.spec.js",
                 "model-pricing.spec.js",
                 "edition-features.spec.js",
+                "logsqueries.sql-comments.spec.js",
                 "iam-form-validation.spec.js",
                 "regex-patterns-form-validation.spec.js",
                 "cipher-keys-form-validation.spec.js",
