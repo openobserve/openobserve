@@ -801,6 +801,14 @@ export default defineComponent({
         description: "shortcuts.actions.runningQueriesRefresh",
         handler: () => { if (!isInputFocused()) refreshData(); },
       },
+      {
+        key: "/",
+        scope: "running-queries",
+        description: "shortcuts.actions.focusSearch",
+        handler: () => {
+          (document.querySelector('[data-test="running-queries-search-input"] input') as HTMLInputElement)?.focus();
+        },
+      },
     ]);
 
     return {

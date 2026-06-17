@@ -2251,6 +2251,21 @@ useShortcutsWithMac([
       runQueryFn();
     },
   },
+  {
+    key: "/",
+    scope: "traces",
+    description: "shortcuts.actions.focusSearch",
+    handler: () => {
+      const el = document.querySelector<HTMLElement>('[data-test="logs-search-bar"] .cm-editor');
+      el?.focus();
+    },
+  },
+  {
+    key: "ctrl+shift+c",
+    scope: "traces",
+    description: "shortcuts.actions.tracesCopyUrl",
+    handler: () => copyTracesUrl(),
+  },
 ]);
 </script>
 

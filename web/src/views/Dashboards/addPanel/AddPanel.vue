@@ -243,7 +243,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import { useShortcutScope } from "@/lib/vue-shortcut-manager";
-import { useShortcutsWithMac } from "@/utils/keyboardShortcuts";
+import { isInputFocused, useShortcutsWithMac } from "@/utils/keyboardShortcuts";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import type { BreadcrumbItem } from "@/components/common/AppBreadcrumb.vue";
 
@@ -1741,6 +1741,15 @@ export default defineComponent({
         scope: "panel-editor",
         description: "shortcuts.actions.panelEditorBack",
         handler: () => goBack(),
+      },
+      {
+        key: "i",
+        scope: "panel-editor",
+        description: "shortcuts.actions.panelEditorQueryInspector",
+        handler: () => {
+          if (isInputFocused()) return;
+          showViewPanel.value = true;
+        },
       },
     ]);
 

@@ -5508,9 +5508,11 @@
       "tableRowExport": "Export hovered row",
       "tableRowDelete": "Delete hovered row (opens confirm dialog)",
       "panelView": "View panel fullscreen",
+      "panelQueryInspector": "Open query inspector",
       "panelEdit": "Edit panel",
       "panelDuplicate": "Duplicate panel",
       "panelDelete": "Delete panel",
+      "panelEditorQueryInspector": "Open query inspector",
       "metricsRunQuery": "Run PromQL query",
       "metricsRefresh": "Refresh",
       "tracesSearch": "Search traces",
@@ -5548,8 +5550,15 @@
       "tracePrevSpan": "Previous span",
       "runningQueriesRefresh": "Refresh query list",
       "ingestionTokensAdd": "Create new token",
+      "ingestionTokensRefresh": "Refresh token list",
       "aiChatToggle": "Toggle AI chat",
-      "dashboardEdit": "Enter / exit edit mode"
+      "dashboardEdit": "Enter / exit edit mode",
+      "logsSaveView": "Save as saved view",
+      "logsCopyQuery": "Copy current query to clipboard",
+      "logsExport": "Export results as CSV",
+      "tableRowOpen": "Open / expand hovered row",
+      "tableRowInspect": "Inspect hovered row",
+      "tracesCopyUrl": "Copy trace share URL"
     }
   }
 }

@@ -138,6 +138,7 @@ const isHovered = ref(false);
 const ROW_ACTION_KEYS: Record<string, string> = {
   e: "edit",
   d: "duplicate",
+  i: "inspect",
   p: "pause",
   r: "resume",
   v: "view",
@@ -159,6 +160,13 @@ const handleKeydown = (e: KeyboardEvent) => {
       sibling.dispatchEvent(new MouseEvent("mouseenter", { bubbles: true }));
       sibling.focus();
     }
+    return;
+  }
+
+  // Enter triggers the row's click handler (same as a mouse click)
+  if (e.key === "Enter") {
+    e.preventDefault();
+    rowRef.value?.closest("tr")?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     return;
   }
 

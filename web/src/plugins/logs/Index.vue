@@ -3257,6 +3257,32 @@ export default defineComponent({
           searchObj.meta.showFields = !searchObj.meta.showFields;
         },
       },
+      {
+        key: "s",
+        scope: "logs",
+        description: "shortcuts.actions.logsSaveView",
+        handler: () => {
+          if (isInputFocused()) return;
+          (searchBarRef.value as any)?.fnSavedView?.();
+        },
+      },
+      {
+        key: "ctrl+shift+c",
+        scope: "logs",
+        description: "shortcuts.actions.logsCopyQuery",
+        handler: () => {
+          const query: string = searchObj.data?.query ?? "";
+          navigator.clipboard.writeText(query);
+        },
+      },
+      {
+        key: "ctrl+shift+d",
+        scope: "logs",
+        description: "shortcuts.actions.logsExport",
+        handler: () => {
+          (searchBarRef.value as any)?.downloadLogs?.(searchObj.data?.queryResults?.hits ?? [], "csv");
+        },
+      },
     ]);
 
     return {

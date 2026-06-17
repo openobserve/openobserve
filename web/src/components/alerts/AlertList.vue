@@ -2629,7 +2629,7 @@ export default defineComponent({
       {
         key: "n",
         scope: "alerts",
-        description: "Create new alert",
+        description: "shortcuts.actions.alertsCreate",
         handler: () => {
           if (isInputFocused()) return;
           addAlert();
@@ -2647,10 +2647,18 @@ export default defineComponent({
       {
         key: "r",
         scope: "alerts",
-        description: "Refresh alert list",
+        description: "shortcuts.actions.alertsRefresh",
         handler: () => {
           if (isInputFocused()) return;
           refreshAlerts();
+        },
+      },
+      {
+        key: "/",
+        scope: "alerts",
+        description: "shortcuts.actions.focusSearch",
+        handler: () => {
+          (document.querySelector('[data-test="alert-list-search-input"] input') as HTMLInputElement)?.focus();
         },
       },
     ]);

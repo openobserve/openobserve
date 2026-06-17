@@ -874,6 +874,9 @@ export default defineComponent({
       if (e.key === "v" || e.key === "V") {
         e.preventDefault();
         emit("onViewPanel", props.data.id);
+      } else if (e.key === "i" || e.key === "I") {
+        e.preventDefault();
+        showViewPanel.value = true;
       } else if (e.key === "e" || e.key === "E") {
         e.preventDefault();
         onEditPanel(props.data);

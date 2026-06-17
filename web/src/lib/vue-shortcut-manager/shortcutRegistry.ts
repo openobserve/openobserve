@@ -39,8 +39,10 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
     pageKey: "shortcuts.pages.tableRow",
     shortcuts: [
       { key: "↑ / ↓",    descriptionKey: "shortcuts.actions.tableRowNavigate" },
+      { key: "enter",    descriptionKey: "shortcuts.actions.tableRowOpen" },
       { key: "e",        descriptionKey: "shortcuts.actions.tableRowEdit" },
       { key: "d",        descriptionKey: "shortcuts.actions.tableRowDuplicate" },
+      { key: "i",        descriptionKey: "shortcuts.actions.tableRowInspect" },
       { key: "p",        descriptionKey: "shortcuts.actions.tableRowPause" },
       { key: "r",        descriptionKey: "shortcuts.actions.tableRowResume" },
       { key: "v",        descriptionKey: "shortcuts.actions.tableRowView" },
@@ -53,12 +55,15 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.logs",
     shortcuts: [
-      { key: "ctrl+enter", descriptionKey: "shortcuts.actions.logsRunQuery" },
-      { key: "r",          descriptionKey: "shortcuts.actions.logsRefresh" },
-      { key: "h",          descriptionKey: "shortcuts.actions.logsToggleHistogram" },
-      { key: "ctrl+/",     descriptionKey: "shortcuts.actions.logsToggleSidebar" },
-      { key: "ctrl+h",     descriptionKey: "shortcuts.actions.logsSearchHistory" },
-      { key: "/",          descriptionKey: "shortcuts.actions.focusSearch" },
+      { key: "ctrl+enter",   descriptionKey: "shortcuts.actions.logsRunQuery" },
+      { key: "r",            descriptionKey: "shortcuts.actions.logsRefresh" },
+      { key: "h",            descriptionKey: "shortcuts.actions.logsToggleHistogram" },
+      { key: "ctrl+/",       descriptionKey: "shortcuts.actions.logsToggleSidebar" },
+      { key: "ctrl+h",       descriptionKey: "shortcuts.actions.logsSearchHistory" },
+      { key: "/",            descriptionKey: "shortcuts.actions.focusSearch" },
+      { key: "s",            descriptionKey: "shortcuts.actions.logsSaveView" },
+      { key: "ctrl+shift+c", descriptionKey: "shortcuts.actions.logsCopyQuery" },
+      { key: "ctrl+shift+d", descriptionKey: "shortcuts.actions.logsExport" },
     ],
   },
 
@@ -89,6 +94,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
     pageKey: "shortcuts.pages.dashboardsPanel",
     shortcuts: [
       { key: "v",        descriptionKey: "shortcuts.actions.panelView" },
+      { key: "i",        descriptionKey: "shortcuts.actions.panelQueryInspector" },
       { key: "e",        descriptionKey: "shortcuts.actions.panelEdit" },
       { key: "d",        descriptionKey: "shortcuts.actions.panelDuplicate" },
       { key: "del / ⌫", descriptionKey: "shortcuts.actions.panelDelete" },
@@ -102,6 +108,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
       { key: "ctrl+enter", descriptionKey: "shortcuts.actions.panelEditorRun" },
       { key: "ctrl+s",     descriptionKey: "shortcuts.actions.panelEditorSave" },
       { key: "alt+left",   descriptionKey: "shortcuts.actions.panelEditorBack" },
+      { key: "i",          descriptionKey: "shortcuts.actions.panelEditorQueryInspector" },
     ],
   },
 
@@ -118,8 +125,10 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.traces",
     shortcuts: [
-      { key: "ctrl+enter", descriptionKey: "shortcuts.actions.tracesSearch" },
-      { key: "r",          descriptionKey: "shortcuts.actions.tracesRefresh" },
+      { key: "ctrl+enter",   descriptionKey: "shortcuts.actions.tracesSearch" },
+      { key: "r",            descriptionKey: "shortcuts.actions.tracesRefresh" },
+      { key: "/",            descriptionKey: "shortcuts.actions.focusSearch" },
+      { key: "ctrl+shift+c", descriptionKey: "shortcuts.actions.tracesCopyUrl" },
     ],
   },
 
@@ -139,6 +148,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
       { key: "n", descriptionKey: "shortcuts.actions.alertsCreate" },
       { key: "i", descriptionKey: "shortcuts.actions.alertsImport" },
       { key: "r", descriptionKey: "shortcuts.actions.alertsRefresh" },
+      { key: "/", descriptionKey: "shortcuts.actions.focusSearch" },
     ],
   },
 
@@ -248,6 +258,8 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
     pageKey: "shortcuts.pages.ingestionTokens",
     shortcuts: [
       { key: "n", descriptionKey: "shortcuts.actions.ingestionTokensAdd" },
+      { key: "r", descriptionKey: "shortcuts.actions.ingestionTokensRefresh" },
+      { key: "/", descriptionKey: "shortcuts.actions.focusSearch" },
     ],
   },
 
@@ -256,6 +268,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
     pageKey: "shortcuts.pages.runningQueries",
     shortcuts: [
       { key: "r", descriptionKey: "shortcuts.actions.runningQueriesRefresh" },
+      { key: "/", descriptionKey: "shortcuts.actions.focusSearch" },
     ],
   },
 ];

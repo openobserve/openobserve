@@ -75,6 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model="filterQuery"
                 :placeholder="t('ingestion.searchToken', 'Search tokens')"
                 class="tw:flex-1"
+                data-test="ingestion-tokens-search-input"
               />
             </div>
           </template>
@@ -367,6 +368,20 @@ export default defineComponent({
         scope: "ingestion-tokens",
         description: "shortcuts.actions.ingestionTokensAdd",
         handler: () => { if (!isInputFocused()) showCreateForm.value = true; },
+      },
+      {
+        key: "r",
+        scope: "ingestion-tokens",
+        description: "shortcuts.actions.ingestionTokensRefresh",
+        handler: () => { if (!isInputFocused()) fetchTokens(); },
+      },
+      {
+        key: "/",
+        scope: "ingestion-tokens",
+        description: "shortcuts.actions.focusSearch",
+        handler: () => {
+          (document.querySelector('[data-test="ingestion-tokens-search-input"] input') as HTMLInputElement)?.focus();
+        },
       },
     ]);
 
