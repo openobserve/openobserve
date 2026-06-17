@@ -116,31 +116,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :render="header.column.columnDef.header"
                 :props="header.getContext()"
               />
+            </div>
 
-              <div
-                :data-test="`log-add-data-from-column-${header.column.columnDef.header}`"
-                class="tw:invisible tw:items-center tw:absolute tw:right-2 tw:top-0 tw:px-2 column-actions"
-                :class="
-                  store.state.theme === 'dark' ? 'field_overlay_dark' : ''
-                "
-                v-if="
+            <div
+              v-if="
+                !header.isPlaceholder &&
+                (
                   (header.column.columnDef.meta as any).closable ||
                   (header.column.columnDef.meta as any).showWrap
+                )
+              "
+              :data-test="`log-add-data-from-column-${header.column.columnDef.header}`"
+              class="tw:invisible tw:flex tw:items-center tw:absolute tw:right-2 tw:top-0 tw:px-2 column-actions"
+            >
+              <OIcon
+                v-if="(header.column.columnDef.meta as any).closable"
+                :data-test="`logs-search-result-table-th-remove-${header.column.columnDef.header}-btn`"
+                name="close"
+                class="tw:m-0 tw:mt-[0.125rem]! close-icon tw:cursor-pointer"
+                :class="
+                  store.state.theme === 'dark' ? 'text-white' : 'tw:text-gray-700'
                 "
-              >
-                <OIcon
-                  v-if="(header.column.columnDef.meta as any).closable"
-                  :data-test="`logs-search-result-table-th-remove-${header.column.columnDef.header}-btn`"
-                  name="close"
-                  class="tw:m-0 close-icon tw:cursor-pointer"
-                  :class="
-                    store.state.theme === 'dark' ? 'text-white' : 'tw:text-gray-400'
-                  "
-                  :title="t('common.close')"
-                  size="sm"
-                  @click="closeColumn(header.column.columnDef)"
-                 />
-              </div>
+                :title="t('common.close')"
+                size="sm"
+                @click.stop="closeColumn(header.column.columnDef)"
+              />
             </div>
           </th>
         </vue-draggable>
