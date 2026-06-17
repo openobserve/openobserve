@@ -695,15 +695,15 @@
         ],
         "results": [
           [
-            "LANE-B",
-            "ZONE-1",
+            "LANE-C",
+            "ZONE-2",
             "4",
             "3.5",
             "0.5"
           ],
           [
-            "LANE-C",
-            "ZONE-2",
+            "LANE-B",
+            "ZONE-1",
             "4",
             "3.5",
             "0.5"
@@ -1232,14 +1232,14 @@
         ],
         "results": [
           [
-            "ZONE-1",
-            "4",
-            "258.0"
-          ],
-          [
             "ZONE-4",
             "4",
             "483.0"
+          ],
+          [
+            "ZONE-1",
+            "4",
+            "258.0"
           ],
           [
             "ZONE-3",
@@ -1560,16 +1560,16 @@
             "66.0"
           ],
           [
-            "ZONE-2",
-            "SORT-Q5",
+            "ZONE-4",
+            "SORT-A7",
             "low_tput",
             "1",
             "150.0",
             "45.3"
           ],
           [
-            "ZONE-4",
-            "SORT-A7",
+            "ZONE-2",
+            "SORT-Q5",
             "low_tput",
             "1",
             "150.0",
@@ -1698,12 +1698,12 @@
         ],
         "results": [
           [
-            "itemPage::performanceMetric",
+            "https://shop.example.com/item/1006::performanceMetric",
             "1",
             "1"
           ],
           [
-            "https://shop.example.com/item/1006::performanceMetric",
+            "itemPage::performanceMetric",
             "1",
             "1"
           ]
@@ -1753,22 +1753,22 @@
         ],
         "results": [
           [
-            "SecurityException: unauthorized access to control_center CC-ALPHA",
-            "2",
-            "1"
-          ],
-          [
             "NetworkException: connection to batch sync failed",
             "2",
             "1"
           ],
           [
-            "ResourceExhaustedException: sorter_model SORT-M3 queue full",
-            "1",
+            "SecurityException: unauthorized access to control_center CC-ALPHA",
+            "2",
             "1"
           ],
           [
             "ConfigurationException: missing facility_zone ZONE-3 override",
+            "1",
+            "1"
+          ],
+          [
+            "ResourceExhaustedException: sorter_model SORT-M3 queue full",
             "1",
             "1"
           ]
@@ -1814,6 +1814,11 @@
         ],
         "results": [
           [
+            "interaction",
+            "searchPage",
+            "2"
+          ],
+          [
             "navigation",
             "itemPage",
             "2"
@@ -1821,11 +1826,6 @@
           [
             "performanceMetric",
             "itemPage",
-            "2"
-          ],
-          [
-            "interaction",
-            "searchPage",
             "2"
           ],
           [
@@ -1931,13 +1931,13 @@
         ],
         "results": [
           [
-            "sess_001",
-            "4",
+            "sess_003",
+            "1",
             "0"
           ],
           [
-            "sess_003",
-            "1",
+            "sess_001",
+            "4",
             "0"
           ],
           [
@@ -1992,22 +1992,22 @@
         "results": [
           [
             "fast",
-            "ok",
+            "unknown",
             "2"
           ],
           [
             "fast",
-            "unknown",
+            "ok",
             "2"
           ],
           [
             "degraded",
-            "unknown",
+            "ok",
             "1"
           ],
           [
             "degraded",
-            "ok",
+            "unknown",
             "1"
           ],
           [
@@ -2142,6 +2142,16 @@
         ],
         "results": [
           [
+            "navigation",
+            "itemPage",
+            "1"
+          ],
+          [
+            "performanceMetric",
+            "checkoutPage",
+            "1"
+          ],
+          [
             "performanceMetric",
             "searchPage",
             "1"
@@ -2152,18 +2162,8 @@
             "1"
           ],
           [
-            "navigation",
-            "itemPage",
-            "1"
-          ],
-          [
             "performanceMetric",
             "cartPage",
-            "1"
-          ],
-          [
-            "performanceMetric",
-            "checkoutPage",
             "1"
           ]
         ],
@@ -2249,12 +2249,6 @@
         ],
         "results": [
           [
-            "cartPage",
-            "2",
-            "1450.0",
-            "2"
-          ],
-          [
             "searchPage",
             "1",
             "230.0",
@@ -2265,6 +2259,12 @@
             "1",
             "89.0",
             "1"
+          ],
+          [
+            "cartPage",
+            "2",
+            "1450.0",
+            "2"
           ]
         ],
         "results_mode": "rowsort"
@@ -2944,22 +2944,16 @@
         ],
         "results": [
           [
-            "warehouse-south",
-            "2",
-            "45.0",
-            "2"
-          ],
-          [
             "warehouse-west",
             "2",
             "15.0",
             "0"
           ],
           [
-            "warehouse-east",
-            "1",
-            "1900.0",
-            "0"
+            "warehouse-south",
+            "2",
+            "45.0",
+            "2"
           ],
           [
             "warehouse-central",
@@ -2972,6 +2966,12 @@
             "1",
             "12.0",
             "1"
+          ],
+          [
+            "warehouse-east",
+            "1",
+            "1900.0",
+            "0"
           ]
         ],
         "results_mode": "rowsort"

@@ -15,11 +15,11 @@
             "4"
           ],
           [
-            "ZONE-3",
+            "ZONE-1",
             "3"
           ],
           [
-            "ZONE-1",
+            "ZONE-3",
             "3"
           ],
           [
@@ -639,7 +639,7 @@
           [
             "ZONE-2",
             "2",
-            "manual"
+            "auto"
           ],
           [
             "ZONE-3",
@@ -849,21 +849,6 @@
           [
             "0",
             "1",
-            "0",
-            "1",
-            "0",
-            "1",
-            "E005",
-            "@warehouse-iOS-sort-v2",
-            "UP-E009",
-            "ConfigurationException: missing facility_zone ZONE-3 override",
-            "SORT-X1-UP-E009-E005",
-            "SORT-X1",
-            "iOS"
-          ],
-          [
-            "0",
-            "1",
             "1",
             "0",
             "1",
@@ -889,6 +874,21 @@
             "ConfigurationException: missing facility_zone ZONE-3 override",
             "SORT-M3--E005",
             "SORT-M3",
+            "iOS"
+          ],
+          [
+            "0",
+            "1",
+            "0",
+            "1",
+            "0",
+            "1",
+            "E005",
+            "@warehouse-iOS-sort-v2",
+            "UP-E009",
+            "ConfigurationException: missing facility_zone ZONE-3 override",
+            "SORT-X1-UP-E009-E005",
+            "SORT-X1",
             "iOS"
           ]
         ],
@@ -988,14 +988,6 @@
             "0"
           ],
           [
-            "US-WEST",
-            "1",
-            "0.0",
-            "320.0",
-            "19.2",
-            "0"
-          ],
-          [
             "AP-CENTRAL",
             "1",
             "0.0",
@@ -1025,6 +1017,14 @@
             "290.0",
             "0.0",
             "18.5",
+            "0"
+          ],
+          [
+            "US-WEST",
+            "1",
+            "0.0",
+            "320.0",
+            "19.2",
             "0"
           ],
           [
@@ -1074,19 +1074,19 @@
             "42.42640687119285"
           ],
           [
-            "AUTO",
-            "ZONE-1-SORT-M3",
-            "2",
-            "148",
-            "2.0",
-            "205.0609665440988"
-          ],
-          [
             "HYBRID",
             "ZONE-4-SORT-A7",
             "2",
             "615",
             "1.5",
+            "205.0609665440988"
+          ],
+          [
+            "AUTO",
+            "ZONE-1-SORT-M3",
+            "2",
+            "148",
+            "2.0",
             "205.0609665440988"
           ],
           [
@@ -1272,17 +1272,17 @@
         ],
         "results": [
           [
+            "batch-sync",
+            "1",
+            "1"
+          ],
+          [
             "pallet-mapper",
             "2",
             "1"
           ],
           [
             "lane-monitor",
-            "1",
-            "1"
-          ],
-          [
-            "batch-sync",
             "1",
             "1"
           ],
@@ -1316,12 +1316,12 @@
             "1"
           ],
           [
-            "OverflowException: throughput_rate 999.0 exceeds max capacity",
+            "ConfigurationException: missing facility_zone ZONE-3 override",
             "1",
             "1"
           ],
           [
-            "ConfigurationException: missing facility_zone ZONE-3 override",
+            "OverflowException: throughput_rate 999.0 exceeds max capacity",
             "1",
             "1"
           ]
@@ -1577,11 +1577,11 @@
             "2"
           ],
           [
-            "E004",
+            "E006",
             "1"
           ],
           [
-            "E006",
+            "E004",
             "1"
           ]
         ],
@@ -1624,7 +1624,7 @@
         "results": [
           [
             "itemPage",
-            "E009, E001"
+            "E001, E009"
           ]
         ],
         "results_mode": "rowsort",
@@ -1783,6 +1783,11 @@
         ],
         "results": [
           [
+            "checkoutPage",
+            "2",
+            "2"
+          ],
+          [
             "searchPage",
             "1",
             "1"
@@ -1791,11 +1796,6 @@
             "itemPage",
             "2",
             "1"
-          ],
-          [
-            "checkoutPage",
-            "2",
-            "2"
           ],
           [
             "cartPage",
@@ -2434,11 +2434,11 @@
         ],
         "results": [
           [
-            "temp-regulator",
+            "pallet-mapper",
             "2"
           ],
           [
-            "pallet-mapper",
+            "temp-regulator",
             "2"
           ],
           [
@@ -2446,11 +2446,11 @@
             "1"
           ],
           [
-            "batch-sync",
+            "lane-monitor",
             "1"
           ],
           [
-            "lane-monitor",
+            "batch-sync",
             "1"
           ]
         ],
@@ -2474,22 +2474,16 @@
         ],
         "results": [
           [
-            "warehouse-central",
-            "outbound",
-            "2",
-            "78.0"
-          ],
-          [
             "warehouse-west",
             "inbound",
             "2",
             "15.0"
           ],
           [
-            "warehouse-east",
-            "internal",
-            "1",
-            "1900.0"
+            "warehouse-central",
+            "outbound",
+            "2",
+            "78.0"
           ],
           [
             "warehouse-north",
@@ -2502,6 +2496,12 @@
             "inbound",
             "1",
             "3200.0"
+          ],
+          [
+            "warehouse-east",
+            "internal",
+            "1",
+            "1900.0"
           ]
         ],
         "results_mode": "rowsort"
