@@ -72,7 +72,7 @@
                   <ODropdownItem
                     v-for="chat in filteredChatHistory"
                     :key="chat.id"
-                    class="history-item tw:relative"
+                    class="history-item tw:relative tw:group"
                     @select="loadChat(chat.id)"
                   >
                     <div
@@ -89,7 +89,7 @@
                       <OButton
                         variant="ghost"
                         size="icon-xs-circle"
-                        class="delete-history-btn"
+                        class="delete-history-btn tw:opacity-0 tw:transition-opacity tw:duration-200 tw:group-hover:opacity-100"
                         @click.stop="deleteChat(chat.id)"
                       >
                         <OIcon name="delete" size="sm" />
@@ -113,7 +113,7 @@
                   <ODropdownSeparator />
                   <OButton
                     variant="ghost"
-                    class="clear-all-btn"
+                    class="clear-all-btn tw:w-full tw:text-[var(--q-negative)] tw:text-[13px] tw:hover:bg-[rgba(var(--q-negative-rgb),0.1)]"
                     @click.stop="clearAllConversations"
                   >
                     <template #icon-left>
@@ -1002,7 +1002,7 @@
                       <img
                         :src="'data:' + img.mimeType + ';base64,' + img.data"
                         :alt="img.filename"
-                        class="tw:max-w-[200px] tw:max-h-[150px] tw:object-contain tw:rounded tw:border tw:border-gray-300 tw:cursor-pointer"
+                        class="tw:max-w-[200px] tw:max-h-[150px] tw:object-contain tw:rounded-lg tw:border tw:border-gray-300 tw:cursor-pointer tw:[transition:transform_0.2s_ease,box-shadow_0.2s_ease]"
                         @click="openImagePreview(img)"
                       />
                       <OTooltip :content="img.filename" />
@@ -1164,7 +1164,7 @@
           <OButton
             variant="ghost"
             size="icon-sm"
-            class="scroll-to-bottom-btn"
+            class="scroll-to-bottom-btn tw:transition-all tw:duration-300 tw:[animation:fadeInUp_0.3s_ease] tw:pointer-events-auto tw:[backdrop-filter:blur(8px)] tw:shadow-[0_2px_8px_rgba(0,0,0,0.2)] tw:border-2! tw:border-[#2563eb]! tw:text-[#2563eb]! tw:bg-[rgba(255,255,255,0.95)]! tw:dark:border-[#8b5cf6]! tw:dark:text-[#8b5cf6]! tw:dark:bg-[rgba(30,30,30,0.9)]! tw:hover:scale-110 tw:hover:shadow-[0_4px_12px_rgba(0,0,0,0.3)] tw:hover:border-[#1d4ed8]! tw:hover:text-[#1d4ed8]! tw:hover:bg-white! tw:dark:hover:border-[#5a6fd8]! tw:dark:hover:text-[#5a6fd8]! tw:dark:hover:bg-[rgba(40,40,40,0.95)]! tw:active:scale-100"
             @click="scrollToBottomSmooth"
           >
             <OIcon name="arrow-downward" size="sm" />
@@ -1224,17 +1224,17 @@
             <div
               v-for="(img, index) in pendingImages"
               :key="index"
-              class="image-preview-item"
+              class="image-preview-item tw:relative tw:inline-block"
             >
               <img
                 :src="'data:' + img.mimeType + ';base64,' + img.data"
                 :alt="img.filename"
-                class="preview-image"
+                class="preview-image tw:w-16 tw:h-16 tw:object-cover tw:rounded-lg tw:border tw:border-[#d1d5db] tw:[transition:transform_0.2s_ease]"
               />
               <OButton
                 variant="ghost"
                 size="icon-xs-circle"
-                class="image-remove-btn"
+                class="image-remove-btn tw:absolute! tw:top-[-6px]! tw:right-[-6px]! tw:w-5! tw:h-5! tw:min-w-5! tw:min-h-5! tw:p-0! tw:bg-[#ef4444]! tw:z-10"
                 @click.stop="removeImage(index)"
               >
                 <OIcon name="close" size="xs" />
@@ -1267,7 +1267,7 @@
                 @click.stop="triggerImageUpload"
                 variant="ghost"
                 size="icon-sm"
-                class="image-upload-btn"
+                class="image-upload-btn tw:opacity-70 tw:transition-opacity tw:duration-200 tw:hover:opacity-100"
               >
                 <OIcon
                   name="image"
@@ -1284,7 +1284,7 @@
                 @click.stop="isAutoNavigationEnabled = !isAutoNavigationEnabled"
                 variant="ghost"
                 size="sm"
-                class="auto-nav-toggle-btn"
+                class="auto-nav-toggle-btn tw:flex tw:items-center tw:gap-1.5 tw:px-2 tw:py-1 tw:rounded-md tw:transition-all tw:duration-200 tw:hover:bg-[#f3f4f6] tw:dark:hover:bg-[#374151]"
                 :class="{ 'auto-nav-enabled': isAutoNavigationEnabled }"
               >
                 <OIcon
@@ -1301,7 +1301,7 @@
                       : ''
                   ]"
                 />
-                <span class="auto-nav-label tw:ml-1">Auto Navigation</span>
+                <span class="auto-nav-label tw:ml-1 tw:text-xs tw:font-medium tw:text-[#6b7280] tw:dark:text-[#9ca3af]">Auto Navigation</span>
                 <OTooltip
                   :content="
                     isAutoNavigationEnabled
@@ -1320,7 +1320,7 @@
                 @click="sendMessage"
                 variant="ai-gradient"
                 size="icon-xs-circle"
-                class="send-button"
+                class="send-button tw:bg-[linear-gradient(135deg,#8b5cf6_0%,#ec4899_100%)]! tw:[transition:all_0.3s_ease]! tw:shadow-[0_4px_15px_0_rgba(139,92,246,0.3)]!"
               >
                 <OIcon name="send" size="sm" />
               </OButton>
@@ -1331,7 +1331,7 @@
                 @click="cancelCurrentRequest"
                 variant="ghost"
                 size="icon-xs-circle"
-                class="stop-button"
+                class="stop-button tw:bg-[linear-gradient(135deg,#f56565_0%,#e53e3e_100%)]! tw:[transition:all_0.3s_ease]! tw:shadow-[0_4px_15px_0_rgba(245,101,101,0.3)]!"
               >
                 <OIcon name="stop" size="sm" />
               </OButton>
@@ -5986,27 +5986,6 @@ export default defineComponent({
   padding-top: 8px;
 }
 
-.chat-container .auto-nav-toggle-btn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 8px;
-  border-radius: 6px;
-  transition: all 0.2s ease;
-}
-
-.chat-container .auto-nav-toggle-btn .auto-nav-label {
-  font-size: 12px;
-  font-weight: 500;
-}
-
-.light-mode .auto-nav-toggle-btn:hover {
-  background: #f3f4f6;
-}
-
-.dark-mode .auto-nav-toggle-btn:hover {
-  background: #374151;
-}
 
 .chat-container .auto-nav-toggle-btn.auto-nav-enabled .auto-nav-icon {
   color: var(--q-primary) !important;
@@ -6016,19 +5995,12 @@ export default defineComponent({
   color: var(--q-primary);
 }
 
-.light-mode .auto-nav-toggle-btn .auto-nav-label {
-  color: #6b7280;
-}
 
-.dark-mode .auto-nav-toggle-btn .auto-nav-label {
-  color: #9ca3af;
-}
-
-.chat-container .light-mode .message {
+.chat-container .message {
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
-.chat-container .dark-mode .message {
+.dark .chat-container .message {
   box-shadow: 0 1px 2px rgba(255, 255, 255, 0.1);
 }
 
@@ -6221,11 +6193,11 @@ export default defineComponent({
   background: rgba(var(--q-primary-rgb), 0.1);
 }
 
-.light-mode .code-type-label {
+.code-type-label {
   color: var(--q-primary);
 }
 
-.dark-mode .code-type-label {
+.dark .code-type-label {
   color: #e2e2e2;
 }
 
@@ -6244,13 +6216,13 @@ export default defineComponent({
   display: block;
 }
 
-.dark-mode .generated-code-block code {
+.dark .generated-code-block code {
   background-color: var(--o2-primary-background);
   border: 0.5px solid #e1e1e124;
   border-top: none;
 }
 
-.light-mode .generated-code-block code {
+.generated-code-block code {
   background-color: #ffffff;
   border: 0.5px solid #00000024;
   border-top: none;
@@ -6262,7 +6234,7 @@ export default defineComponent({
   display: flex;
 }
 
-.chat-container .light-mode .message.user {
+.chat-container .message.user {
   background: linear-gradient(135deg, #f8f9ff 0%, #e8edff 100%);
   border: 1px solid #e0e6ff;
   border-radius: 12px;
@@ -6271,7 +6243,7 @@ export default defineComponent({
   width: calc(100% - 40px);
 }
 
-.chat-container .light-mode .message.assistant {
+.chat-container .message.assistant {
   background: #ffffff;
   border: 1px solid #e5e7eb;
   border-radius: 12px;
@@ -6280,7 +6252,7 @@ export default defineComponent({
   width: 100%;
 }
 
-.chat-container .dark-mode .message.user {
+.dark .chat-container .message.user {
   background: linear-gradient(135deg, #2a2d47 0%, #1e213a 100%);
   border: 1px solid #3a3d5c;
   border-radius: 12px;
@@ -6289,7 +6261,7 @@ export default defineComponent({
   width: calc(100% - 40px);
 }
 
-.chat-container .dark-mode .message.assistant {
+.dark .chat-container .message.assistant {
   background: #1a1a1a;
   border: 1px solid #333333;
   border-radius: 12px;
@@ -6318,11 +6290,6 @@ export default defineComponent({
    ============================================= */
 
 
-.send-button {
-  background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%) !important;
-  transition: all 0.3s ease !important;
-  box-shadow: 0 4px 15px 0 rgba(139, 92, 246, 0.3) !important;
-}
 
 .send-button:hover:not(.disabled):not([disabled]):not(:disabled) {
   background: linear-gradient(135deg, #7c3aed 0%, #db2777 100%) !important;
@@ -6335,11 +6302,6 @@ export default defineComponent({
   box-shadow: 0 2px 10px 0 rgba(139, 92, 246, 0.3) !important;
 }
 
-.stop-button {
-  background: linear-gradient(135deg, #f56565 0%, #e53e3e 100%) !important;
-  transition: all 0.3s ease !important;
-  box-shadow: 0 4px 15px 0 rgba(245, 101, 101, 0.3) !important;
-}
 
 .stop-button:hover {
   background: linear-gradient(135deg, #e53e3e 0%, #c53030 100%) !important;
@@ -6352,56 +6314,13 @@ export default defineComponent({
   box-shadow: 0 2px 10px 0 rgba(245, 101, 101, 0.3) !important;
 }
 
-.image-upload-btn {
-  opacity: 0.7;
-  transition: opacity 0.2s ease;
-}
 
-.image-upload-btn:hover {
-  opacity: 1;
-}
-
-
-.image-preview-strip .image-preview-item {
-  position: relative;
-  display: inline-block;
-}
-
-.image-preview-strip .image-preview-item .preview-image {
-  width: 64px;
-  height: 64px;
-  object-fit: cover;
-  border-radius: 8px;
-  border: 1px solid #d1d5db;
-  transition: transform 0.2s ease;
-}
-
-.image-preview-strip .image-preview-item .preview-image:hover {
+.preview-image:hover {
   transform: scale(1.05);
 }
 
-.image-preview-strip .image-preview-item .image-remove-btn {
-  position: absolute !important;
-  top: -6px !important;
-  right: -6px !important;
-  width: 20px !important;
-  height: 20px !important;
-  min-width: 20px !important;
-  min-height: 20px !important;
-  padding: 0 !important;
-  background-color: #ef4444 !important;
-  z-index: 10;
-}
-
-.image-preview-strip .image-preview-item .image-remove-btn:hover {
+.image-remove-btn:hover {
   background-color: #dc2626 !important;
-}
-
-.message-images .message-image-item img {
-  border-radius: 8px;
-  transition:
-    transform 0.2s ease,
-    box-shadow 0.2s ease;
 }
 
 .message-images .message-image-item img:hover {
@@ -6410,81 +6329,13 @@ export default defineComponent({
 }
 
 
-.dark-mode .code-block-header {
-  background-color: #3b3b3b;
-  border: 1px 1px 0px 1px solid var(--o2-border-input);
-}
-
-.light-mode .code-block-header {
+.code-block-header {
   background-color: #ecf0f5;
 }
 
-
-
-
-
-
-
-.history-item .delete-history-btn {
-  opacity: 0;
-  transition: opacity 0.2s;
-}
-
-.history-item:hover .delete-history-btn {
-  opacity: 1;
-}
-
-
-.clear-all-container .clear-all-btn {
-  width: 100%;
-  color: var(--q-negative);
-  font-size: 13px;
-}
-
-.clear-all-container .clear-all-btn:hover {
-  background-color: rgba(var(--q-negative-rgb), 0.1);
-}
-
-
-.scroll-to-bottom-btn {
-  transition: all 0.3s ease;
-  animation: fadeInUp 0.3s ease;
-  pointer-events: auto;
-  backdrop-filter: blur(8px);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-}
-
-body.body--light .scroll-to-bottom-btn {
-  border: 2px solid #2563eb !important;
-  color: #2563eb !important;
-  background: rgba(255, 255, 255, 0.95) !important;
-}
-
-body.body--dark .scroll-to-bottom-btn {
-  border: 2px solid #8b5cf6 !important;
-  color: #8b5cf6 !important;
-  background: rgba(30, 30, 30, 0.9) !important;
-}
-
-.scroll-to-bottom-btn:hover {
-  transform: scale(1.1);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-}
-
-body.body--light .scroll-to-bottom-btn:hover {
-  border: 2px solid #1d4ed8 !important;
-  color: #1d4ed8 !important;
-  background: rgba(255, 255, 255, 1) !important;
-}
-
-body.body--dark .scroll-to-bottom-btn:hover {
-  border: 2px solid #5a6fd8 !important;
-  color: #5a6fd8 !important;
-  background: rgba(40, 40, 40, 0.95) !important;
-}
-
-.scroll-to-bottom-btn:active {
-  transform: scale(1);
+.dark .code-block-header {
+  background-color: #3b3b3b;
+  border: 1px 1px 0px 1px solid var(--o2-border-input);
 }
 
 @keyframes bounce {
@@ -6555,11 +6406,11 @@ body.body--dark .scroll-to-bottom-btn:hover {
   margin-bottom: 2px;
 }
 
-.light-mode .tool-call-indicator .tool-call-status {
+.tool-call-indicator .tool-call-status {
   color: #6b7280;
 }
 
-.dark-mode .tool-call-indicator .tool-call-status {
+.dark .tool-call-indicator .tool-call-status {
   color: #9ca3af;
 }
 
@@ -6568,11 +6419,11 @@ body.body--dark .scroll-to-bottom-btn:hover {
   font-size: 14px;
 }
 
-.light-mode .tool-call-indicator .tool-call-message {
+.tool-call-indicator .tool-call-message {
   color: #4a5568;
 }
 
-.dark-mode .tool-call-indicator .tool-call-message {
+.dark .tool-call-indicator .tool-call-message {
   color: #e2e8f0;
 }
 
@@ -6599,13 +6450,13 @@ body.body--dark .scroll-to-bottom-btn:hover {
   overflow: hidden;
 }
 
-.light-mode .tool-call-indicator .context-query {
+.tool-call-indicator .context-query {
   background: #ffffff;
   color: #2d3748;
   border: 1px solid #e2e8f0;
 }
 
-.dark-mode .tool-call-indicator .context-query {
+.dark .tool-call-indicator .context-query {
   background: #1a1a1a;
   color: #a0aec0;
   border: 1px solid #333;
@@ -6620,12 +6471,12 @@ body.body--dark .scroll-to-bottom-btn:hover {
   font-weight: 500;
 }
 
-.light-mode .tool-call-indicator .context-tag {
+.tool-call-indicator .context-tag {
   background: rgba(139, 92, 246, 0.1);
   color: #8b5cf6;
 }
 
-.dark-mode .tool-call-indicator .context-tag {
+.dark .tool-call-indicator .context-tag {
   background: rgba(139, 92, 246, 0.2);
   color: #a0aec0;
 }
@@ -6745,12 +6596,12 @@ body.body--dark .scroll-to-bottom-btn:hover {
   gap: 12px;
 }
 
-.light-mode .tool-call-item .tool-confirmation-inline .confirmation-content {
+.tool-call-item .tool-confirmation-inline .confirmation-content {
   background: #fffbeb;
   border: 1px solid #fde68a;
 }
 
-.dark-mode .tool-call-item .tool-confirmation-inline .confirmation-content {
+.dark .tool-call-item .tool-confirmation-inline .confirmation-content {
   background: rgba(251, 191, 36, 0.15);
   border: 1px solid rgba(251, 191, 36, 0.3);
 }
@@ -6773,11 +6624,11 @@ body.body--dark .scroll-to-bottom-btn:hover {
   border-radius: 3px;
 }
 
-.light-mode .tool-call-item .tool-call-name code {
+.tool-call-item .tool-call-name code {
   background: rgba(0, 0, 0, 0.06);
 }
 
-.dark-mode .tool-call-item .tool-call-name code {
+.dark .tool-call-item .tool-call-name code {
   background: rgba(255, 255, 255, 0.1);
 }
 
@@ -6864,11 +6715,11 @@ body.body--dark .scroll-to-bottom-btn:hover {
   cursor: text;
 }
 
-.light-mode .tool-call-item .tool-call-details .detail-value.query-value {
+.tool-call-item .tool-call-details .detail-value.query-value {
   background: rgba(0, 0, 0, 0.04);
 }
 
-.dark-mode .tool-call-item .tool-call-details .detail-value.query-value {
+.dark .tool-call-item .tool-call-details .detail-value.query-value {
   background: rgba(255, 255, 255, 0.06);
 }
 
@@ -6933,13 +6784,13 @@ body.body--dark .scroll-to-bottom-btn:hover {
   overflow: hidden;
 }
 
-.light-mode .log-entry-item .log-entry-content {
+.log-entry-item .log-entry-content {
   background: #ffffff;
   border-color: #e4e7ec;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
-.dark-mode .log-entry-item .log-entry-content {
+.dark .log-entry-item .log-entry-content {
   background: #1e293b;
   border-color: #475569;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
@@ -6960,11 +6811,11 @@ body.body--dark .scroll-to-bottom-btn:hover {
   opacity: 1;
 }
 
-.light-mode .log-entry-item .log-entry-content .copy-btn:hover {
+.log-entry-item .log-entry-content .copy-btn:hover {
   background: rgba(0, 0, 0, 0.08);
 }
 
-.dark-mode .log-entry-item .log-entry-content .copy-btn:hover {
+.dark .log-entry-item .log-entry-content .copy-btn:hover {
   background: rgba(255, 255, 255, 0.15);
 }
 
@@ -6983,12 +6834,12 @@ body.body--dark .scroll-to-bottom-btn:hover {
   overflow-y: auto;
 }
 
-.light-mode .log-entry-item .log-entry-content .log-entry-code {
+.log-entry-item .log-entry-content .log-entry-code {
   background: #f8fafc;
   color: #1a202c;
 }
 
-.dark-mode .log-entry-item .log-entry-content .log-entry-code {
+.dark .log-entry-item .log-entry-content .log-entry-code {
   background: #0d1017;
   color: #e2e8f0;
 }
@@ -7016,23 +6867,23 @@ body.body--dark .scroll-to-bottom-btn:hover {
   font-weight: 600;
 }
 
-.dark-mode .log-entry-code .json-key {
+.dark .log-entry-code .json-key {
   color: #60a5fa;
 }
 
-.dark-mode .log-entry-code .json-string {
+.dark .log-entry-code .json-string {
   color: #86efac;
 }
 
-.dark-mode .log-entry-code .json-number {
+.dark .log-entry-code .json-number {
   color: #7dd3fc;
 }
 
-.dark-mode .log-entry-code .json-boolean {
+.dark .log-entry-code .json-boolean {
   color: #fca5a5;
 }
 
-.dark-mode .log-entry-code .json-null {
+.dark .log-entry-code .json-null {
   color: #c4b5fd;
 }
 
@@ -7048,11 +6899,11 @@ body.body--dark .scroll-to-bottom-btn:hover {
   overflow-y: auto;
 }
 
-.light-mode .tool-call-item .tool-response-hits {
+.tool-call-item .tool-response-hits {
   background: rgba(0, 0, 0, 0.04);
 }
 
-.dark-mode .tool-call-item .tool-response-hits {
+.dark .tool-call-item .tool-response-hits {
   background: rgba(255, 255, 255, 0.06);
 }
 
@@ -7123,12 +6974,12 @@ body.body--dark .scroll-to-bottom-btn:hover {
   white-space: nowrap;
 }
 
-.light-mode .tool-call-item .tool-call-query {
+.tool-call-item .tool-call-query {
   background: rgba(0, 0, 0, 0.05);
   color: #666;
 }
 
-.dark-mode .tool-call-item .tool-call-query {
+.dark .tool-call-item .tool-call-query {
   background: rgba(255, 255, 255, 0.08);
   color: #888;
 }
@@ -7191,7 +7042,7 @@ body.body--dark .scroll-to-bottom-btn:hover {
 /* =============================================
    Syntax highlighting — light mode
    ============================================= */
-.light-mode .hljs {
+.hljs {
   display: block;
   overflow-x: auto;
   padding: 0.5em;
@@ -7199,89 +7050,89 @@ body.body--dark .scroll-to-bottom-btn:hover {
   background: #ffffff;
 }
 
-.light-mode .hljs-doctag,
-.light-mode .hljs-keyword,
-.light-mode .hljs-meta .hljs-keyword,
-.light-mode .hljs-template-tag,
-.light-mode .hljs-template-variable,
-.light-mode .hljs-type,
-.light-mode .hljs-variable.language_ {
+.hljs-doctag,
+.hljs-keyword,
+.hljs-meta .hljs-keyword,
+.hljs-template-tag,
+.hljs-template-variable,
+.hljs-type,
+.hljs-variable.language_ {
   color: #d73a49;
 }
 
-.light-mode .hljs-title,
-.light-mode .hljs-title.class_,
-.light-mode .hljs-title.class_.inherited__,
-.light-mode .hljs-title.function_ {
+.hljs-title,
+.hljs-title.class_,
+.hljs-title.class_.inherited__,
+.hljs-title.function_ {
   color: #6f42c1;
 }
 
-.light-mode .hljs-attr,
-.light-mode .hljs-attribute,
-.light-mode .hljs-literal,
-.light-mode .hljs-meta,
-.light-mode .hljs-number,
-.light-mode .hljs-operator,
-.light-mode .hljs-variable,
-.light-mode .hljs-selector-attr,
-.light-mode .hljs-selector-class,
-.light-mode .hljs-selector-id {
+.hljs-attr,
+.hljs-attribute,
+.hljs-literal,
+.hljs-meta,
+.hljs-number,
+.hljs-operator,
+.hljs-variable,
+.hljs-selector-attr,
+.hljs-selector-class,
+.hljs-selector-id {
   color: #005cc5;
 }
 
-.light-mode .hljs-regexp,
-.light-mode .hljs-string,
-.light-mode .hljs-meta .hljs-string {
+.hljs-regexp,
+.hljs-string,
+.hljs-meta .hljs-string {
   color: #032f62;
 }
 
-.light-mode .hljs-built_in,
-.light-mode .hljs-symbol {
+.hljs-built_in,
+.hljs-symbol {
   color: #e36209;
 }
 
-.light-mode .hljs-comment,
-.light-mode .hljs-code,
-.light-mode .hljs-formula {
+.hljs-comment,
+.hljs-code,
+.hljs-formula {
   color: #6a737d;
 }
 
-.light-mode .hljs-name,
-.light-mode .hljs-quote,
-.light-mode .hljs-selector-tag,
-.light-mode .hljs-selector-pseudo {
+.hljs-name,
+.hljs-quote,
+.hljs-selector-tag,
+.hljs-selector-pseudo {
   color: #22863a;
 }
 
-.light-mode .hljs-subst {
+.hljs-subst {
   color: #24292e;
 }
 
-.light-mode .hljs-section {
+.hljs-section {
   color: #005cc5;
   font-weight: bold;
 }
 
-.light-mode .hljs-bullet {
+.hljs-bullet {
   color: #735c0f;
 }
 
-.light-mode .hljs-emphasis {
+.hljs-emphasis {
   color: #24292e;
   font-style: italic;
 }
 
-.light-mode .hljs-strong {
+.hljs-strong {
   color: #24292e;
   font-weight: bold;
 }
 
-.light-mode .hljs-addition {
+.hljs-addition {
   color: #22863a;
   background-color: #f0fff4;
 }
 
-.light-mode .hljs-deletion {
+.hljs-deletion {
   color: #b31d28;
   background-color: #ffeef0;
 }
@@ -7289,7 +7140,7 @@ body.body--dark .scroll-to-bottom-btn:hover {
 /* =============================================
    Syntax highlighting — dark mode
    ============================================= */
-.dark-mode .hljs {
+.dark .hljs {
   display: block;
   overflow-x: auto;
   padding: 0.5em;
@@ -7297,89 +7148,89 @@ body.body--dark .scroll-to-bottom-btn:hover {
   background: #0d1117;
 }
 
-.dark-mode .hljs-doctag,
-.dark-mode .hljs-keyword,
-.dark-mode .hljs-meta .hljs-keyword,
-.dark-mode .hljs-template-tag,
-.dark-mode .hljs-template-variable,
-.dark-mode .hljs-type,
-.dark-mode .hljs-variable.language_ {
+.dark .hljs-doctag,
+.dark .hljs-keyword,
+.dark .hljs-meta .hljs-keyword,
+.dark .hljs-template-tag,
+.dark .hljs-template-variable,
+.dark .hljs-type,
+.dark .hljs-variable.language_ {
   color: #ff7b72;
 }
 
-.dark-mode .hljs-title,
-.dark-mode .hljs-title.class_,
-.dark-mode .hljs-title.class_.inherited__,
-.dark-mode .hljs-title.function_ {
+.dark .hljs-title,
+.dark .hljs-title.class_,
+.dark .hljs-title.class_.inherited__,
+.dark .hljs-title.function_ {
   color: #d2a8ff;
 }
 
-.dark-mode .hljs-attr,
-.dark-mode .hljs-attribute,
-.dark-mode .hljs-literal,
-.dark-mode .hljs-meta,
-.dark-mode .hljs-number,
-.dark-mode .hljs-operator,
-.dark-mode .hljs-variable,
-.dark-mode .hljs-selector-attr,
-.dark-mode .hljs-selector-class,
-.dark-mode .hljs-selector-id {
+.dark .hljs-attr,
+.dark .hljs-attribute,
+.dark .hljs-literal,
+.dark .hljs-meta,
+.dark .hljs-number,
+.dark .hljs-operator,
+.dark .hljs-variable,
+.dark .hljs-selector-attr,
+.dark .hljs-selector-class,
+.dark .hljs-selector-id {
   color: #79c0ff;
 }
 
-.dark-mode .hljs-regexp,
-.dark-mode .hljs-string,
-.dark-mode .hljs-meta .hljs-string {
+.dark .hljs-regexp,
+.dark .hljs-string,
+.dark .hljs-meta .hljs-string {
   color: #a5d6ff;
 }
 
-.dark-mode .hljs-built_in,
-.dark-mode .hljs-symbol {
+.dark .hljs-built_in,
+.dark .hljs-symbol {
   color: #ffa657;
 }
 
-.dark-mode .hljs-comment,
-.dark-mode .hljs-code,
-.dark-mode .hljs-formula {
+.dark .hljs-comment,
+.dark .hljs-code,
+.dark .hljs-formula {
   color: #8b949e;
 }
 
-.dark-mode .hljs-name,
-.dark-mode .hljs-quote,
-.dark-mode .hljs-selector-tag,
-.dark-mode .hljs-selector-pseudo {
+.dark .hljs-name,
+.dark .hljs-quote,
+.dark .hljs-selector-tag,
+.dark .hljs-selector-pseudo {
   color: #7ee787;
 }
 
-.dark-mode .hljs-subst {
+.dark .hljs-subst {
   color: #c9d1d9;
 }
 
-.dark-mode .hljs-section {
+.dark .hljs-section {
   color: #1f6feb;
   font-weight: bold;
 }
 
-.dark-mode .hljs-bullet {
+.dark .hljs-bullet {
   color: #f2cc60;
 }
 
-.dark-mode .hljs-emphasis {
+.dark .hljs-emphasis {
   color: #c9d1d9;
   font-style: italic;
 }
 
-.dark-mode .hljs-strong {
+.dark .hljs-strong {
   color: #c9d1d9;
   font-weight: bold;
 }
 
-.dark-mode .hljs-addition {
+.dark .hljs-addition {
   color: #aff5b4;
   background-color: #033a16;
 }
 
-.dark-mode .hljs-deletion {
+.dark .hljs-deletion {
   color: #ffdcd7;
   background-color: #67060c;
 }
