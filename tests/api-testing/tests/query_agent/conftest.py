@@ -156,7 +156,9 @@ def run_query(client, query, *, skip_fts_count=False):
     # After a DataFusion upgrade, the Tantivy access plan can be bypassed
     # silently — this content check catches wrong results that row-count
     # comparisons alone would miss.
-    _verify_fts_content(sql, hits, qid)
+    # Only run post-flush when Tantivy indexes are expected to exist.
+    if not skip_fts_count:
+        _verify_fts_content(sql, hits, qid)
 
     if "results" in expected and not (skip_fts_count and is_fts) and not expected.get("skip_sqllogictest"):
         # ── sqllogictest mode: result-set comparison with float tolerance ─
