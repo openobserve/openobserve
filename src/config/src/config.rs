@@ -719,6 +719,8 @@ pub struct Http {
     pub addr: String,
     #[env_config(name = "ZO_HTTP_IPV6_ENABLED", default = false)]
     pub ipv6_enabled: bool,
+    #[env_config(name = "ZO_HTTP_TLS_SKIP_VERIFY", default = false)]
+    pub tls_skip_verify: bool,
     #[env_config(name = "ZO_HTTP_TLS_ENABLED", default = false)]
     pub tls_enabled: bool,
     #[env_config(name = "ZO_HTTP_TLS_CERT_PATH", default = "")]
