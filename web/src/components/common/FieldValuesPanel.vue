@@ -94,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Loading state (only shown when there are no interim cached results) -->
       <div
         v-show="fieldValues?.isLoading && !displayValues.length"
-        class="tw:pl-3 tw:py-1"
+        class="tw:relative tw:pl-3 tw:py-1"
         style="height: 3.75rem"
       >
         <OInnerLoading
