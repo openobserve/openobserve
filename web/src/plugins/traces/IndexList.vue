@@ -621,19 +621,6 @@ export default defineComponent({
 </script>
 
 <style>
-.index-menu .q-field__control {
-  height: 35px;
-  padding: 0px 5px;
-  min-height: auto !important;
-}
-
-.index-menu .q-field__control-container {
-  padding-top: 0px !important;
-}
-
-.index-menu .q-field__native:first-of-type {
-  padding-top: 0.25rem;
-}
 
 .index-menu .index-table table {
   display: table;
@@ -657,10 +644,6 @@ export default defineComponent({
   overflow: hidden;
 }
 
-.index-menu .index-table .q-table__control,
-.index-menu .index-table label.q-field {
-  width: 100%;
-}
 
 .index-menu .index-table thead tr,
 .index-menu .index-table tbody td {
@@ -714,40 +697,12 @@ export default defineComponent({
   opacity: 0;
 }
 
-.q-field--dense .q-field__before,
-.q-field--dense .q-field__prepend {
-  padding: 0px 0px 0px 0px;
-  height: auto;
-  line-height: auto;
-}
-
-.q-field__native,
-.q-field__input {
-  padding: 0px 0px 0px 0px;
-}
-
-.q-field--dense .q-field__label {
-  top: 5px;
-}
-
-.q-field--dense .q-field__control,
-.q-field--dense .q-field__marginal {
-  height: 34px;
-}
 
 .index-table table {
   width: 100%;
   table-layout: fixed;
 }
 
-.index-table table .q-expansion-item .q-item-type:hover .field_overlay {
-  visibility: visible;
-}
-
-.index-table table .q-expansion-item .field-expansion-icon img {
-  width: 12px;
-  height: 12px;
-}
 
 .index-table table .field-container:hover .field_overlay {
   visibility: visible;

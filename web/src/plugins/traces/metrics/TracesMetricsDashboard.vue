@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="show"
         class="charts-wrapper tw:py-0! tw:min-h-[8.5rem] tw:h-[10rem] tw:overflow-hidden tw:will-change-[transform,opacity]"
       >
-        <div class="charts-container">
+        <div class="tw:dark:border-[rgba(255,255,255,0.1)] tw:dark:hover:shadow-[0_2px_8px_rgba(255,255,255,0.08)]">
           <RenderDashboardCharts
             v-if="show"
             ref="dashboardChartsRef"
@@ -762,12 +762,4 @@ defineExpose({
   padding-right: 0.2rem;
 }
 
-/* Dark mode support */
-body.body--dark .charts-container {
-  border-color: rgba(255, 255, 255, 0.1);
-}
-
-body.body--dark .charts-container:hover {
-  box-shadow: 0 2px 8px rgba(255, 255, 255, 0.08);
-}
 </style>

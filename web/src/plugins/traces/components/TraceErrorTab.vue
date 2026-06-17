@@ -168,13 +168,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Exception Type -->
             <div class="tw:space-y-1">
               <span class="tw:block tw:font-semibold tw:text-[var(--o2-text-secondary)] tw:text-sm tw:mb-1">{{ t("traces.typeLabel") }}</span>
-              <span class="exception-type tw:text-[#d32f2f] tw:font-semibold tw:bg-[rgba(211,47,47,0.1)] tw:py-1 tw:px-2 tw:rounded tw:inline-block tw:text-sm">{{ row["exception.type"] }}</span>
+              <span class="tw:text-[#d32f2f] tw:font-semibold tw:bg-[rgba(211,47,47,0.1)] tw:py-1 tw:px-2 tw:rounded tw:inline-block tw:text-sm tw:dark:text-[#ef5350] tw:dark:bg-[rgba(239,83,80,0.15)]">{{ row["exception.type"] }}</span>
             </div>
 
             <!-- Exception Message -->
             <div class="tw:space-y-1">
               <span class="tw:block tw:font-semibold tw:text-[var(--o2-text-secondary)] tw:text-sm tw:mb-1">{{ t("traces.messageLabel") }}</span>
-              <div class="exception-message tw:text-(--o2-text-secondary) tw:bg-(--o2-code-bg) tw:p-2 tw:rounded tw:border-l-[3px] tw:border-l-[#ff9800] tw:whitespace-pre-wrap tw:break-words tw:leading-normal tw:text-sm">
+              <div class="tw:text-(--o2-text-secondary) tw:bg-(--o2-code-bg) tw:p-2 tw:rounded tw:border-l-[3px] tw:border-l-[#ff9800] tw:whitespace-pre-wrap tw:break-words tw:leading-normal tw:text-sm tw:dark:bg-[rgba(255,255,255,0.05)] tw:dark:border-l-[#ffb74d] tw:dark:text-[var(--o2-border)]">
                 {{ formatExceptionMessage(row["exception.message"]) }}
               </div>
             </div>
@@ -203,12 +203,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 v-if="row['exception.stacktrace'] && row['exception.stacktrace'].trim()"
-                class="stacktrace-container tw:bg-(--o2-code-bg) tw:rounded tw:border tw:border-(--o2-border) tw:p-3 tw:overflow-x-auto tw:max-h-[600px] tw:overflow-y-auto"
+                class="tw:bg-(--o2-code-bg) tw:rounded tw:border tw:border-(--o2-border) tw:p-3 tw:overflow-x-auto tw:max-h-[600px] tw:overflow-y-auto tw:dark:bg-[#0d0d0d] tw:dark:border-[#2a2a2a]"
                 data-test="exception-stacktrace-container"
               >
-                <div class="stacktrace-content tw:m-0 tw:p-0 tw:text-[11px] tw:leading-[1.6] tw:text-[#2c3e50] tw:font-[Monaco,Menlo,'Ubuntu_Mono',Consolas,'source-code-pro',monospace] tw:whitespace-pre-wrap tw:break-words" v-html="formatStackTrace(row['exception.stacktrace'])" />
+                <div class="stacktrace-content tw:m-0 tw:p-0 tw:text-[11px] tw:leading-[1.6] tw:text-[#2c3e50] tw:font-[Monaco,Menlo,'Ubuntu_Mono',Consolas,'source-code-pro',monospace] tw:whitespace-pre-wrap tw:break-words tw:dark:text-[#d4d4d4]" v-html="formatStackTrace(row['exception.stacktrace'])" />
               </div>
-              <div v-else class="stacktrace-empty tw:flex tw:items-center tw:justify-center tw:bg-(--o2-code-bg) tw:text-[#6c757d] tw:text-xs tw:italic tw:py-4 tw:px-3 tw:border tw:border-dashed tw:border-(--o2-border) tw:rounded" data-test="exception-stacktrace-empty">
+              <div v-else class="tw:flex tw:items-center tw:justify-center tw:bg-(--o2-code-bg) tw:text-[#6c757d] tw:text-xs tw:italic tw:py-4 tw:px-3 tw:border tw:border-dashed tw:border-(--o2-border) tw:rounded tw:dark:bg-[rgba(255,255,255,0.05)] tw:dark:border-[#4a5568] tw:dark:text-[#a0aec0]" data-test="exception-stacktrace-empty">
                 <OIcon name="info" size="sm" class="tw:mr-1" />
                 <span>{{ t("traces.noStacktraceAvailable") }}</span>
               </div>
@@ -564,27 +564,6 @@ function copyStackTrace(stacktrace: string) {
 </script>
 
 <style>
-/* Dark Mode Adjustments */
-body.body--dark .exception-type {
-  color: #ef5350;
-  background: rgba(239, 83, 80, 0.15);
-}
-
-body.body--dark .exception-message {
-  background: rgba(255, 255, 255, 0.05);
-  border-left-color: #ffb74d;
-  color: var(--o2-border);
-}
-
-body.body--dark .stacktrace-container {
-  background: #0d0d0d;
-  border-color: #2a2a2a;
-}
-
-body.body--dark .stacktrace-content {
-  color: #d4d4d4;
-}
-
 body.body--dark .stacktrace-content .stack-file {
   color: #9cdcfe;
 }
@@ -639,12 +618,6 @@ body.body--dark .stacktrace-content .stack-error-msg {
 
 body.body--dark .stacktrace-content .stack-raise {
   color: #f48771;
-}
-
-body.body--dark .stacktrace-empty {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: #4a5568;
-  color: #a0aec0;
 }
 
 /* Child/descendant selectors for stacktrace-content */

@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:mt-3 tw:text-gray-400">No DAG data available</div>
     </div>
 
-    <div v-else class="dag-wrapper tw:w-full tw:h-full tw:min-h-150 tw:border tw:border-(--o2-border) tw:rounded tw:relative">
+    <div v-else class="tw:w-full tw:h-full tw:min-h-150 tw:border tw:border-(--o2-border) tw:rounded tw:relative tw:dark:border-[#444]">
       <VueFlow
         :nodes="nodes"
         :edges="edges"
@@ -39,35 +39,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :max-zoom="3"
         fit-view-on-init
         :fit-view-options="{ padding: 0.3, minZoom: 0.3, maxZoom: 0.7 }"
-        class="trace-dag-flow tw:w-full tw:h-full tw:bg-[#fafafa]"
+        class="trace-dag-flow tw:w-full tw:h-full tw:bg-[#fafafa] tw:dark:bg-[#1e1e1e]!"
       >
         <Background pattern-color="#aaa" :gap="16" />
         <Controls />
 
         <template #node-custom="{ data }">
-          <Handle v-if="data.hasIncoming" type="target" :position="Position.Top" class="dag-handle" />
+          <Handle v-if="data.hasIncoming" type="target" :position="Position.Top"
+            class="tw:w-2 tw:h-2 tw:bg-[#1976d2] tw:border-2 tw:border-white tw:rounded-full tw:shadow-[0_1px_3px_rgba(0,0,0,0.15)]" />
           <div
-            class="custom-node"
+            class="tw:p-[6px_12px] tw:rounded-md tw:bg-white tw:border-2 tw:border-[#1976d2] tw:min-w-[80px] tw:max-w-[180px] tw:min-h-[28px] tw:shadow-[0_2px_6px_rgba(0,0,0,0.1)] tw:transition-all tw:duration-200 tw:cursor-pointer tw:text-center tw:flex tw:flex-col tw:items-center tw:justify-center tw:hover:shadow-[0_4px_12px_rgba(0,0,0,0.15)] tw:hover:[transform:translateY(-2px)] tw:dark:bg-[#2a2a2a] tw:dark:border-[#64b5f6] tw:dark:text-[var(--o2-border)]"
             :class="[
-              getObservationTypeClass(data.gen_ai_operation_name),
               {
-                'node-error': data.span_status === 'ERROR',
-                'node-ok': data.span_status === 'OK' && !data.gen_ai_operation_name,
-              }
+                'tw:border-[#c62828]! tw:bg-[#ffebee]! tw:dark:border-[#ef5350]! tw:dark:bg-[#3a1a1a]!': data.span_status === 'ERROR',
+                'tw:border-[#2e7d32]! tw:dark:border-[#66bb6a]!': data.span_status === 'OK' && !data.gen_ai_operation_name,
+              },
+              getObservationTypeClass(data.gen_ai_operation_name),
             ]"
             @click="handleNodeClick(data.span_id)"
           >
-            <div class="node-operation" :class="getObservationTypeTextClass(data.gen_ai_operation_name)">{{ data.operation_name }}</div>
+            <div
+              class="tw:text-[13px] tw:text-[#1976d2] tw:font-semibold tw:break-words tw:max-w-[160px] tw:leading-[1.3] tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis tw:dark:text-[#90caf9]"
+              :class="getObservationTypeTextClass(data.gen_ai_operation_name)"
+            >{{ data.operation_name }}</div>
             <OBadge
               v-if="data.span_status === 'ERROR'"
               size="sm"
               variant="error"
-              class="error-chip"
+              class="tw:text-[10px] tw:h-[14px] tw:mt-0.5 tw:px-1"
             >
               ERR
             </OBadge>
           </div>
-          <Handle v-if="data.hasOutgoing" type="source" :position="Position.Bottom" class="dag-handle" />
+          <Handle v-if="data.hasOutgoing" type="source" :position="Position.Bottom"
+            class="tw:w-2 tw:h-2 tw:bg-[#1976d2] tw:border-2 tw:border-white tw:rounded-full tw:shadow-[0_1px_3px_rgba(0,0,0,0.15)]" />
         </template>
       </VueFlow>
     </div>
@@ -438,18 +443,50 @@ export default defineComponent({
       event: "event",
     };
 
+    const llmNodeStyles: Record<string, string> = {
+      generation: 'tw:border-[#4caf50] tw:bg-[#e8f5e9] tw:dark:border-[#66bb6a] tw:dark:bg-[#1a2e1a]',
+      embedding:  'tw:border-[#2196f3] tw:bg-[#e3f2fd] tw:dark:border-[#64b5f6] tw:dark:bg-[#1a2a3a]',
+      agent:      'tw:border-[#9c27b0] tw:bg-[#f3e5f5] tw:dark:border-[#ce93d8] tw:dark:bg-[#2a1a2e]',
+      tool:       'tw:border-[#ff9800] tw:bg-[#fff3e0] tw:dark:border-[#ffb74d] tw:dark:bg-[#2e2218]',
+      chain:      'tw:border-[#3f51b5] tw:bg-[#e8eaf6] tw:dark:border-[#7986cb] tw:dark:bg-[#1a1a2e]',
+      retriever:  'tw:border-[#00bcd4] tw:bg-[#e0f7fa] tw:dark:border-[#4dd0e1] tw:dark:bg-[#1a2a2e]',
+      task:       'tw:border-[#009688] tw:bg-[#e0f2f1] tw:dark:border-[#4db6ac] tw:dark:bg-[#1a2e2a]',
+      evaluator:  'tw:border-[#e91e63] tw:bg-[#fce4ec] tw:dark:border-[#f48fb1] tw:dark:bg-[#2e1a22]',
+      workflow:   'tw:border-[#673ab7] tw:bg-[#ede7f6] tw:dark:border-[#b39ddb] tw:dark:bg-[#221a2e]',
+      rerank:     'tw:border-[#03a9f4] tw:bg-[#e1f5fe] tw:dark:border-[#4fc3f7] tw:dark:bg-[#1a2a3a]',
+      guardrail:  'tw:border-[#f44336] tw:bg-[#ffebee] tw:dark:border-[#ef5350] tw:dark:bg-[#2e1a1a]',
+      span:       'tw:border-[#9e9e9e] tw:bg-[#f5f5f5] tw:dark:border-[#9e9e9e] tw:dark:bg-[#262626]',
+      event:      'tw:border-[#ffc107] tw:bg-[#fff8e1] tw:dark:border-[#ffd54f] tw:dark:bg-[#2e2a18]',
+      default:    'tw:border-[#9e9e9e] tw:bg-[#fafafa] tw:dark:border-[#9e9e9e] tw:dark:bg-[#262626]',
+    };
+
+    const llmTextStyles: Record<string, string> = {
+      generation: 'tw:text-[#388e3c] tw:dark:text-[#81c784]',
+      embedding:  'tw:text-[#1976d2] tw:dark:text-[#90caf9]',
+      agent:      'tw:text-[#7b1fa2] tw:dark:text-[#ce93d8]',
+      tool:       'tw:text-[#e65100] tw:dark:text-[#ffcc80]',
+      chain:      'tw:text-[#283593] tw:dark:text-[#9fa8da]',
+      retriever:  'tw:text-[#00838f] tw:dark:text-[#80deea]',
+      task:       'tw:text-[#00796b] tw:dark:text-[#80cbc4]',
+      evaluator:  'tw:text-[#c2185b] tw:dark:text-[#f48fb1]',
+      workflow:   'tw:text-[#4527a0] tw:dark:text-[#b39ddb]',
+      rerank:     'tw:text-[#0277bd] tw:dark:text-[#81d4fa]',
+      guardrail:  'tw:text-[#c62828] tw:dark:text-[#ef9a9a]',
+      span:       'tw:text-[#616161] tw:dark:text-[#bdbdbd]',
+      event:      'tw:text-[#f57f17] tw:dark:text-[#ffe082]',
+      default:    'tw:text-[#757575] tw:dark:text-[#bdbdbd]',
+    };
+
     const getObservationTypeClass = (type: string | null): string => {
       if (!type) return '';
       const cssSuffix = specToCssSuffix[type.toLowerCase()];
-      if (cssSuffix) return `node-llm-${cssSuffix}`;
-      return 'node-llm-default';
+      return llmNodeStyles[cssSuffix] || llmNodeStyles.default;
     };
 
     const getObservationTypeTextClass = (type: string | null): string => {
       if (!type) return '';
       const cssSuffix = specToCssSuffix[type.toLowerCase()];
-      if (cssSuffix) return `node-llm-text-${cssSuffix}`;
-      return 'node-llm-text-default';
+      return llmTextStyles[cssSuffix] || llmTextStyles.default;
     };
 
     // Watch for sidebar state changes and re-center the DAG
@@ -482,161 +519,8 @@ export default defineComponent({
 </script>
 
 <style>
-.trace-dag-flow .vue-flow__node-custom .custom-node {
-  padding: 6px 12px;
-  border-radius: 6px;
-  background: white;
-  border: 2px solid #1976d2;
-  min-width: 80px;
-  max-width: 180px;
-  min-height: 28px;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
-  transition: all 0.2s ease;
-  cursor: pointer;
-  text-align: center;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-}
-
-.trace-dag-flow .vue-flow__node-custom .custom-node:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  transform: translateY(-2px);
-}
-
-.trace-dag-flow .vue-flow__node-custom .custom-node.node-error {
-  border-color: #c62828;
-  background: #ffebee;
-}
-
-.trace-dag-flow .vue-flow__node-custom .custom-node.node-ok {
-  border-color: #2e7d32;
-}
-
-/* LLM observation type node colors (consistent with llmUtils getObservationTypeColor) */
-.trace-dag-flow .vue-flow__node-custom .custom-node.node-llm-generation { border-color: #4caf50; background: #e8f5e9; }
-.trace-dag-flow .vue-flow__node-custom .custom-node.node-llm-embedding  { border-color: #2196f3; background: #e3f2fd; }
-.trace-dag-flow .vue-flow__node-custom .custom-node.node-llm-agent      { border-color: #9c27b0; background: #f3e5f5; }
-.trace-dag-flow .vue-flow__node-custom .custom-node.node-llm-tool       { border-color: #ff9800; background: #fff3e0; }
-.trace-dag-flow .vue-flow__node-custom .custom-node.node-llm-chain      { border-color: #3f51b5; background: #e8eaf6; }
-.trace-dag-flow .vue-flow__node-custom .custom-node.node-llm-retriever  { border-color: #00bcd4; background: #e0f7fa; }
-.trace-dag-flow .vue-flow__node-custom .custom-node.node-llm-task       { border-color: #009688; background: #e0f2f1; }
-.trace-dag-flow .vue-flow__node-custom .custom-node.node-llm-evaluator  { border-color: #e91e63; background: #fce4ec; }
-.trace-dag-flow .vue-flow__node-custom .custom-node.node-llm-workflow   { border-color: #673ab7; background: #ede7f6; }
-.trace-dag-flow .vue-flow__node-custom .custom-node.node-llm-rerank     { border-color: #03a9f4; background: #e1f5fe; }
-.trace-dag-flow .vue-flow__node-custom .custom-node.node-llm-guardrail  { border-color: #f44336; background: #ffebee; }
-.trace-dag-flow .vue-flow__node-custom .custom-node.node-llm-span       { border-color: #9e9e9e; background: #f5f5f5; }
-.trace-dag-flow .vue-flow__node-custom .custom-node.node-llm-event      { border-color: #ffc107; background: #fff8e1; }
-.trace-dag-flow .vue-flow__node-custom .custom-node.node-llm-default    { border-color: #9e9e9e; background: #fafafa; }
-
-.trace-dag-flow .vue-flow__node-custom .node-operation {
-  font-size: 13px;
-  color: #1976d2;
-  font-weight: 600;
-  word-wrap: break-word;
-  overflow-wrap: break-word;
-  max-width: 160px;
-  line-height: 1.3;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.trace-dag-flow .vue-flow__node-custom .node-operation.node-llm-text-generation { color: #388e3c; }
-.trace-dag-flow .vue-flow__node-custom .node-operation.node-llm-text-embedding  { color: #1976d2; }
-.trace-dag-flow .vue-flow__node-custom .node-operation.node-llm-text-agent      { color: #7b1fa2; }
-.trace-dag-flow .vue-flow__node-custom .node-operation.node-llm-text-tool       { color: #e65100; }
-.trace-dag-flow .vue-flow__node-custom .node-operation.node-llm-text-chain      { color: #283593; }
-.trace-dag-flow .vue-flow__node-custom .node-operation.node-llm-text-retriever  { color: #00838f; }
-.trace-dag-flow .vue-flow__node-custom .node-operation.node-llm-text-task       { color: #00796b; }
-.trace-dag-flow .vue-flow__node-custom .node-operation.node-llm-text-evaluator  { color: #c2185b; }
-.trace-dag-flow .vue-flow__node-custom .node-operation.node-llm-text-workflow   { color: #4527a0; }
-.trace-dag-flow .vue-flow__node-custom .node-operation.node-llm-text-rerank     { color: #0277bd; }
-.trace-dag-flow .vue-flow__node-custom .node-operation.node-llm-text-guardrail  { color: #c62828; }
-.trace-dag-flow .vue-flow__node-custom .node-operation.node-llm-text-span       { color: #616161; }
-.trace-dag-flow .vue-flow__node-custom .node-operation.node-llm-text-event      { color: #f57f17; }
-.trace-dag-flow .vue-flow__node-custom .node-operation.node-llm-text-default    { color: #757575; }
-
-.trace-dag-flow .vue-flow__node-custom .dag-handle {
-  width: 8px;
-  height: 8px;
-  background: #1976d2;
-  border: 2px solid white;
-  border-radius: 50%;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
-}
-
-.trace-dag-flow .vue-flow__node-custom .error-chip {
-  font-size: 10px;
-  height: 14px;
-  margin-top: 2px;
-  padding: 0 4px;
-}
-
-.body--dark .dag-wrapper {
-  border-color: #444;
-}
-
-.body--dark .trace-dag-flow {
-  background-color: #1e1e1e !important;
-}
-
 .body--dark .trace-dag-flow .vue-flow__background {
   background-color: #1e1e1e !important;
 }
 
-.body--dark .trace-dag-flow .vue-flow__node-custom .custom-node {
-  background: #2a2a2a;
-  border-color: #64b5f6;
-  color: var(--o2-border);
-  border-width: 2px;
-  max-width: 180px;
-}
-
-.body--dark .trace-dag-flow .vue-flow__node-custom .custom-node.node-error {
-  border-color: #ef5350;
-  background: #3a1a1a;
-}
-
-.body--dark .trace-dag-flow .vue-flow__node-custom .custom-node.node-ok {
-  border-color: #66bb6a;
-}
-
-/* LLM observation type dark mode colors (consistent with llmUtils) */
-.body--dark .trace-dag-flow .vue-flow__node-custom .custom-node.node-llm-generation { border-color: #66bb6a; background: #1a2e1a; }
-.body--dark .trace-dag-flow .vue-flow__node-custom .custom-node.node-llm-embedding  { border-color: #64b5f6; background: #1a2a3a; }
-.body--dark .trace-dag-flow .vue-flow__node-custom .custom-node.node-llm-agent      { border-color: #ce93d8; background: #2a1a2e; }
-.body--dark .trace-dag-flow .vue-flow__node-custom .custom-node.node-llm-tool       { border-color: #ffb74d; background: #2e2218; }
-.body--dark .trace-dag-flow .vue-flow__node-custom .custom-node.node-llm-chain      { border-color: #7986cb; background: #1a1a2e; }
-.body--dark .trace-dag-flow .vue-flow__node-custom .custom-node.node-llm-retriever  { border-color: #4dd0e1; background: #1a2a2e; }
-.body--dark .trace-dag-flow .vue-flow__node-custom .custom-node.node-llm-task       { border-color: #4db6ac; background: #1a2e2a; }
-.body--dark .trace-dag-flow .vue-flow__node-custom .custom-node.node-llm-evaluator  { border-color: #f48fb1; background: #2e1a22; }
-.body--dark .trace-dag-flow .vue-flow__node-custom .custom-node.node-llm-workflow   { border-color: #b39ddb; background: #221a2e; }
-.body--dark .trace-dag-flow .vue-flow__node-custom .custom-node.node-llm-rerank     { border-color: #4fc3f7; background: #1a2a3a; }
-.body--dark .trace-dag-flow .vue-flow__node-custom .custom-node.node-llm-guardrail  { border-color: #ef5350; background: #2e1a1a; }
-.body--dark .trace-dag-flow .vue-flow__node-custom .custom-node.node-llm-span       { border-color: #9e9e9e; background: #262626; }
-.body--dark .trace-dag-flow .vue-flow__node-custom .custom-node.node-llm-event      { border-color: #ffd54f; background: #2e2a18; }
-.body--dark .trace-dag-flow .vue-flow__node-custom .custom-node.node-llm-default    { border-color: #9e9e9e; background: #262626; }
-
-.body--dark .trace-dag-flow .vue-flow__node-custom .node-operation {
-  color: #90caf9;
-  font-size: 13px;
-  max-width: 160px;
-}
-
-.body--dark .trace-dag-flow .vue-flow__node-custom .node-operation.node-llm-text-generation { color: #81c784; }
-.body--dark .trace-dag-flow .vue-flow__node-custom .node-operation.node-llm-text-embedding  { color: #90caf9; }
-.body--dark .trace-dag-flow .vue-flow__node-custom .node-operation.node-llm-text-agent      { color: #ce93d8; }
-.body--dark .trace-dag-flow .vue-flow__node-custom .node-operation.node-llm-text-tool       { color: #ffcc80; }
-.body--dark .trace-dag-flow .vue-flow__node-custom .node-operation.node-llm-text-chain      { color: #9fa8da; }
-.body--dark .trace-dag-flow .vue-flow__node-custom .node-operation.node-llm-text-retriever  { color: #80deea; }
-.body--dark .trace-dag-flow .vue-flow__node-custom .node-operation.node-llm-text-task       { color: #80cbc4; }
-.body--dark .trace-dag-flow .vue-flow__node-custom .node-operation.node-llm-text-evaluator  { color: #f48fb1; }
-.body--dark .trace-dag-flow .vue-flow__node-custom .node-operation.node-llm-text-workflow   { color: #b39ddb; }
-.body--dark .trace-dag-flow .vue-flow__node-custom .node-operation.node-llm-text-rerank     { color: #81d4fa; }
-.body--dark .trace-dag-flow .vue-flow__node-custom .node-operation.node-llm-text-guardrail  { color: #ef9a9a; }
-.body--dark .trace-dag-flow .vue-flow__node-custom .node-operation.node-llm-text-span       { color: #bdbdbd; }
-.body--dark .trace-dag-flow .vue-flow__node-custom .node-operation.node-llm-text-event      { color: #ffe082; }
-.body--dark .trace-dag-flow .vue-flow__node-custom .node-operation.node-llm-text-default    { color: #bdbdbd; }
 </style>

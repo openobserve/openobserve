@@ -158,7 +158,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @on:date-change="updateDateTime"
           @on:timezone-change="updateTimezone"
         />
-        <div class="search-time">
+        <div>
           <div class="tw:flex tw:items-center">
             <OButton
               v-if="config.isEnterprise == 'true' && isLoading"
@@ -175,7 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="logs-search-bar-refresh-btn"
               data-cy="search-bar-refresh-button"
               :title="t('search.runQuery')"
-              class="tw:p-0 tw:h-[1.875rem]! element-box-shadow tw:[transition:box-shadow_0.3s_ease,_opacity_0.2s_ease] o2-color-primary tw:text-(--text-xs) tw:font-(--font-medium)! tw:leading-4! tw:px-1! tw:py-0! tw:w-[5.875rem]! tw:whitespace-normal tw:break-words tw:text-center tw:bg-(--o2-primary-btn-bg) tw:text-(--o2-primary-btn-text)"
+              class="tw:p-0 tw:h-[1.875rem]! element-box-shadow tw:[transition:box-shadow_0.3s_ease,_opacity_0.2s_ease] tw:hover:opacity-90 tw:hover:shadow-[0_0_0.5rem_color-mix(in_srgb,var(--o2-primary-btn-bg),transparent_30%)] tw:text-(--text-xs) tw:font-(--font-medium)! tw:leading-4! tw:px-1! tw:py-0! tw:w-[5.875rem]! tw:whitespace-normal tw:break-words tw:text-center tw:bg-(--o2-primary-btn-bg) tw:text-(--o2-primary-btn-text)"
               :class="
                 store.state.zoConfig.auto_query_enabled
                   ? 'tw:![border-radius:0.375rem_0_0_0.375rem]'
@@ -217,7 +217,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :class="[
                     config.isEnterprise == 'true' && isLoading
                       ? 'o2-color-cancel'
-                      : 'o2-color-primary',
+                      : 'tw:hover:opacity-90 tw:hover:shadow-[0_0_0.5rem_color-mix(in_srgb,var(--o2-primary-btn-bg),transparent_30%)]',
                     'tw:![border-radius:0_0.375rem_0.375rem_0]',
                   ]"
                 >
@@ -402,9 +402,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             searchObj.data.editorValue == '' &&
             searchObj.meta.queryEditorPlaceholderFlag
           "
-          class="query-editor-placeholder-overlay tw:absolute tw:top-0 tw:left-0 tw:right-0 tw:bottom-0 tw:flex tw:items-start tw:pt-[0.1875rem] tw:pr-2 tw:pb-0 tw:pl-[2.15rem] tw:pointer-events-none tw:z-[1] tw:select-none"
+          class="tw:absolute tw:top-0 tw:left-0 tw:right-0 tw:bottom-0 tw:flex tw:items-start tw:pt-[0.1875rem] tw:pr-2 tw:pb-0 tw:pl-[2.15rem] tw:pointer-events-none tw:z-[1] tw:select-none"
         >
-          <span class="query-editor-placeholder-typewriter tw:font-mono tw:text-[var(--text-base)] tw:[line-height:1.3125rem] tw:text-[#a0aec0] tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis">{{ traceEditorPlaceholder }}</span>
+          <span class="tw:font-mono tw:text-[var(--text-base)] tw:[line-height:1.3125rem] tw:text-[#a0aec0] tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis tw:dark:text-[#718096]">{{ traceEditorPlaceholder }}</span>
         </div>
       </div>
     </div>
@@ -1051,37 +1051,3 @@ export default defineComponent({
 });
 </script>
 
-<style>
-.search-bar-component .q-toggle__inner {
-  font-size: 30px;
-}
-
-.search-bar-component .q-toggle__label {
-  font-size: 12px;
-}
-
-.search-bar-component .search-field .q-field__control {
-  border-radius: 3px 0px 0px 3px !important;
-}
-
-.search-bar-component .search-field .q-field__native {
-  font-weight: 600;
-}
-
-.search-bar-component .search-time .q-btn-group {
-  border-radius: 3px;
-}
-
-.search-bar-component .search-time .q-btn-group .q-btn {
-  min-height: auto;
-}
-
-.o2-color-primary:hover {
-  opacity: 0.9;
-  box-shadow: 0 0 0.5rem color-mix(in srgb, var(--o2-primary-btn-bg), transparent 30%);
-}
-
-.body--dark .query-editor-placeholder-overlay .query-editor-placeholder-typewriter {
-  color: #718096;
-}
-</style>

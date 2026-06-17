@@ -38,8 +38,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :separatorStyle="{ height: '9px', marginTop: '-5px', marginBottom: '-5px', zIndex: '10' }"
         :before-class="
           activeTab === 'service-graph' || activeTab === 'services-catalog'
-            ? 'tw:max-h-[3.125rem]!'
-            : ''
+            ? 'tw:z-auto tw:overflow-visible tw:max-h-[3.125rem]!'
+            : 'tw:z-auto tw:overflow-visible'
         "
         @update:model-value="onSplitterUpdate"
       >
@@ -2216,16 +2216,6 @@ watch(
 </script>
 
 <style>
-.tracePage .index-menu .field_list .field_overlay .field_label,
-.tracePage .q-field__native,
-.tracePage .q-field__input,
-.tracePage .q-table tbody td {
-  font-size: 12px !important;
-}
-
-.tracePage .o-splitter__after {
-  overflow: hidden;
-}
 
 .tracePage .index-table :hover::-webkit-scrollbar,
 .tracePage #tracesSearchGridComponent:hover::-webkit-scrollbar {
@@ -2245,23 +2235,10 @@ watch(
   -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.5);
 }
 
-.tracePage .q-table__top {
-  padding: 0px !important;
-}
 
-.tracePage .q-table__control {
-  width: 100%;
+.tracePage .index-menu .field_list .field_overlay .field_label {
+  font-size: 12px !important;
 }
-
-.tracePage .q-field__control-container {
-  padding-top: 0px !important;
-}
-
-.tracePage .traces-horizontal-splitter .o-splitter__before {
-  z-index: auto;
-  overflow: visible;
-}
-
 .tracePage .traces-horizontal-splitter.hide-splitter-separator > .o-splitter__separator {
   background: transparent !important;
   border: none !important;

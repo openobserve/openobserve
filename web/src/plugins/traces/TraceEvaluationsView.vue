@@ -234,7 +234,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
                   v-for="dim in getDimensionScores(record).filter(d => d.reasoning).slice().sort((a, b) => (isTemplateDimension(b.dimension) ? 1 : 0) - (isTemplateDimension(a.dimension) ? 1 : 0))"
                   :key="dim.dimension"
                   class="tw:p-3 tw:rounded-md tw:flex tw:flex-col tw:gap-1"
-                  :class="isTemplateDimension(dim.dimension) ? 'dim-reasoning-template' : 'tw:bg-[var(--o2-border-color)]'"
+                  :class="isTemplateDimension(dim.dimension) ? 'tw:bg-[rgba(25,118,210,0.05)] tw:border tw:border-[rgba(25,118,210,0.2)] tw:dark:bg-[rgba(96,165,250,0.07)] tw:dark:border-[rgba(96,165,250,0.25)]' : 'tw:bg-[var(--o2-border-color)]'"
                 >
                   <div class="tw:flex tw:items-center tw:gap-1.5">
                     <div class="tw:text-[10px] tw:font-bold tw:text-[var(--o2-text-secondary)] tw:uppercase tw:tracking-wider">
@@ -354,7 +354,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
                   v-for="dim in getDimensionScores(record)"
                   :key="dim.dimension"
                   class="tw:flex tw:flex-col tw:gap-1.5"
-                  :class="isTemplateDimension(dim.dimension) ? 'dim-template-highlight' : ''"
+                  :class="isTemplateDimension(dim.dimension) ? 'tw:p-[6px_8px] tw:rounded-md tw:border tw:border-[rgba(25,118,210,0.2)] tw:bg-[rgba(25,118,210,0.04)] tw:dark:border-[rgba(96,165,250,0.25)] tw:dark:bg-[rgba(96,165,250,0.06)]' : ''"
                 >
                   <div class="tw:flex tw:justify-between tw:items-center">
                     <div class="tw:flex tw:items-center tw:gap-2">
@@ -1071,65 +1071,6 @@ export default defineComponent({
 </script>
 
 <style>
-.eval-container::-webkit-scrollbar {
-  width: 6px;
-}
-
-.eval-container::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.eval-container::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 3px;
-}
-
-body.body--dark .eval-container::-webkit-scrollbar-thumb {
-  background: #475569;
-}
-
-/* Reasoning card for template dimensions
-   Light: O2 primary blue (25, 118, 210). Dark: softer blue-400 (96, 165, 250). */
-.dim-reasoning-template {
-  background: rgba(25, 118, 210, 0.05);
-  border: 1px solid rgba(25, 118, 210, 0.2);
-}
-
-body.body--dark .dim-reasoning-template {
-  background: rgba(96, 165, 250, 0.07);
-  border-color: rgba(96, 165, 250, 0.25);
-}
-
-/* Template dimension highlight */
-.dim-template-highlight {
-  padding: 6px 8px;
-  border-radius: 6px;
-  border: 1px solid rgba(25, 118, 210, 0.2);
-  background: rgba(25, 118, 210, 0.04);
-}
-
-body.body--dark .dim-template-highlight {
-  border-color: rgba(96, 165, 250, 0.25);
-  background: rgba(96, 165, 250, 0.06);
-}
-
-/* Modern Template Selector */
-.eval-template-dropdown .q-field__control {
-  height: 36px;
-  border-radius: 6px;
-}
-
-/* LLM Content Renderer Tweaks */
-.llm-content-renderer {
-  background: transparent !important;
-}
-
-.llm-content-renderer .plain-text-content {
-  background: transparent !important;
-  padding: 0 !important;
-  font-size: 13px;
-}
-
 /* Ungrounded highlighting */
 .ungrounded-highlight {
   background-color: rgba(239, 68, 68, 0.15);
