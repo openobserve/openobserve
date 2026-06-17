@@ -244,9 +244,7 @@ fn handler_tantivy_index(
                     .into_inner()
                     .into_iter()
                     .map(|mut file| {
-                        if let Some(access_plan) = generate_access_plan(&file) {
-                            file = file.with_extension(access_plan);
-                        }
+                        generate_access_plan(&mut file);
                         file
                     })
                     .collect();
