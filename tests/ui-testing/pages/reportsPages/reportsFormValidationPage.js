@@ -94,6 +94,28 @@ export class ReportsFormValidationPage {
         await this.page.locator(this.addReportSection).waitFor({ state: 'visible', timeout: 10000 });
     }
 
+    /**
+     * Opens the Create Report form via direct URL **without** a `?folder=` query
+     * param. The Add-Report button always navigates with `folder=<activeFolder>`
+     * (defaults to "default"), which makes CreateReport.vue auto-pre-fill the
+     * dashboard folder once `getDashboaordFolders()` resolves in onBeforeMount.
+     * That pre-fill races the test: locally the save fires before folders load
+     * (folder still empty → error shows), but on a fast CI backend folders load
+     * first (folder pre-filled → folder-required error never fires → flake).
+     *
+     * Landing here without a folder param keeps the folder deterministically
+     * empty, so the folder-required validation is reachable on every run. This
+     * is the legitimate entry point a user hits when no folder is pre-scoped.
+     */
+    async openCreateReportFormDirect() {
+        const org = process.env.ORGNAME || 'default';
+        await this.page.goto(
+            `${process.env.ZO_BASE_URL}/web/reports/create?org_identifier=${org}`
+        );
+        await this.page.waitForLoadState('domcontentloaded');
+        await this.page.locator(this.addReportSection).waitFor({ state: 'visible', timeout: 15000 });
+    }
+
     // ── Step 1 actions ────────────────────────────────────────────────────────
 
     async fillReportName(name) {
@@ -124,18 +146,18 @@ export class ReportsFormValidationPage {
         // Wait for the folders API call to complete before opening the dropdown.
         // getDashboaordFolders() fires in onBeforeMount async — networkidle ensures it has resolved.
         await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
-        await this.page.waitForTimeout(500);
         await folderTrigger.click();
         await this.page.locator(this.dashboardFolderPopover).waitFor({ state: 'visible', timeout: 10000 });
-        // Give the virtual list a moment to measure the scroll container and render rows
-        await this.page.waitForTimeout(500);
-        // Wait for any option to appear (virtualizer renders items after measuring container height)
+        // Wait for any option to appear (virtualizer renders items after measuring
+        // the container height) — this attached-state wait is the deterministic
+        // readiness signal that replaces a fixed settle delay.
         const anyOpt = this.page.locator('[data-test^="add-report-dashboard-folder-select-option"]').first();
         await anyOpt.waitFor({ state: 'attached', timeout: 10000 });
-        // Select "default" folder specifically (always present)
+        // Prefer the "default" folder, but fall back to the first rendered option
+        // when the virtualizer has not materialised "default" into the DOM window.
         const defaultOpt = this.page.locator(`[data-test="add-report-dashboard-folder-select-option"][data-test-value="default"]`);
-        await defaultOpt.waitFor({ state: 'attached', timeout: 5000 });
-        await defaultOpt.click({ force: true });
+        const hasDefault = await defaultOpt.waitFor({ state: 'attached', timeout: 5000 }).then(() => true).catch(() => false);
+        await (hasDefault ? defaultOpt : anyOpt).click({ force: true });
         await this.page.locator(this.dashboardFolderPopover).waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
     }
 
@@ -145,7 +167,6 @@ export class ReportsFormValidationPage {
         await trigger.waitFor({ state: 'visible', timeout: 10000 });
         await trigger.click();
         await this.page.locator(this.dashboardNamePopover).waitFor({ state: 'visible', timeout: 10000 });
-        await this.page.waitForTimeout(500);
         const firstOption = this.page.locator('[data-test^="add-report-dashboard-name-select-option"]').first();
         await firstOption.waitFor({ state: 'attached', timeout: 15000 });
         await firstOption.click({ force: true });
@@ -158,7 +179,6 @@ export class ReportsFormValidationPage {
         await trigger.waitFor({ state: 'visible', timeout: 10000 });
         await trigger.click();
         await this.page.locator(this.dashboardTabPopover).waitFor({ state: 'visible', timeout: 10000 });
-        await this.page.waitForTimeout(500);
         // Select "default" tab specifically (always present)
         const defaultOpt = this.page.locator(`[data-test="add-report-dashboard-tab-select-option"][data-test-value="default"]`);
         const defaultTabAttached = await defaultOpt.waitFor({ state: 'attached', timeout: 5000 }).then(() => true).catch(() => false);
@@ -211,7 +231,6 @@ export class ReportsFormValidationPage {
         await trigger.waitFor({ state: 'visible', timeout: 10000 });
         await trigger.click();
         await this.page.locator(this.timezonePopover).waitFor({ state: 'visible', timeout: 10000 });
-        await this.page.waitForTimeout(500);
         const firstOption = this.page.locator('[data-test^="add-report-schedule-start-timezone-select-option"]').first();
         await firstOption.waitFor({ state: 'attached', timeout: 10000 });
         await firstOption.click({ force: true });

@@ -24,8 +24,10 @@ test.describe("Reports form validation — required field errors", () => {
         testLogger.testStart(testInfo.title, testInfo.file);
         await navigateToBase(page);
         pm = new PageManager(page);
-        await pm.reportsFormValidation.navigateToReports();
-        await pm.reportsFormValidation.openCreateReportForm();
+        // Open the form without a ?folder= param so the dashboard folder stays
+        // deterministically empty — the Add-Report button would pre-scope it to
+        // "default" and race the folder-required validation (CI flake).
+        await pm.reportsFormValidation.openCreateReportFormDirect();
         testLogger.info('Navigated to Create Report form');
     });
 
