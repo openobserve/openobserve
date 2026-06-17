@@ -87,8 +87,23 @@ Your job is "green **for the right reason**." A deterministic gate now compares 
 assertions before vs. after you heal, and a green run that tests nothing is **rejected** — so
 weakening is not a shortcut, it's a guaranteed block.
 
-**You MAY** fix: selectors, locators (in page objects), timing/waits, navigation, setup, data
-freshness, test independence. These make a test *run* correctly.
+### 🚫 SCOPE LOCK — you may ONLY touch files under `tests/ui-testing/`
+
+You fix **tests**, not the product. This is an absolute boundary, enforced deterministically (a
+gate fails the run + reverts your changes if you cross it — so crossing it is pointless):
+- **NEVER edit, create, or delete any file outside `tests/ui-testing/`** — in particular **never**
+  touch product code (`src/**`, `web/src/**`, `*.rs`, `*.vue`, `*.ts` outside the test dir),
+  config, `Cargo.*`, `package.json`, `.github/**`, `.opencode/**`, or `playwright.yml`.
+- **NEVER build, compile, or restart the product** — no `cargo build`/`cargo check`/`cargo run`,
+  no `npm run build`, no rebuilding/relaunching OpenObserve. The binary is already booted; you run
+  Playwright against it, nothing more.
+- If a test fails because the **product/feature is broken or incomplete**, that is **NOT yours to
+  fix** — report `status: "feature-incomplete"` with evidence (below). Patching `src/` or `web/src/`
+  to make a test pass produces a fake green that never reproduces (those edits are not committed)
+  and **will be rejected**.
+
+**You MAY** fix (ONLY within `tests/ui-testing/`): selectors, locators (in page objects),
+timing/waits, navigation, setup, data freshness, test independence. These make a test *run* correctly.
 
 **You may NOT**, to force a pass:
 - **Delete an assertion** or remove a test. (Assertion count must not drop.)

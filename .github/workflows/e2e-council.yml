@@ -920,7 +920,7 @@ jobs:
           for attempt in 1 2 3; do
             echo "::group::Heal attempt ${attempt}/3 (fresh context)"
             opencode run --agent e2e-ci-healer --model "$PIPELINE_MODEL" \
-              "Heal attempt ${attempt} of 3 — you have a FRESH context. Heal ONLY this spec (do NOT run the whole suite): ${SPEC}. A live OpenObserve is booted at ${ZO_BASE_URL}. FIRST, if docs/test_generator/ci/heal-notes.md exists, read it — it lists what earlier attempts already tried; do NOT repeat those approaches. Run 'cd tests/ui-testing && npx playwright test ${REL} --workers=4 --reporter=line', diagnose, fix the spec/page objects, re-run — up to 3 internal iterations. NEVER touch /tmp or any path outside the repo (the sandbox blocks it and the command fails); read stdout directly. If you get it passing HONESTLY (no deleted/inverted/conditionalized assertions), write docs/test_generator/ci/heal-result.json with status=passing. If a test cannot pass because the FEATURE is not wired in this build (component never renders / code path commented out), do NOT weaken it — mark it test.fixme('reason, see #issue'), keep the assertion intact, and write status=feature-incomplete with an 'evidence' field naming the file:line that proves the gap. If still failing for an ordinary reason after your iterations, APPEND a concise note (test name, failure, what you tried) to docs/test_generator/ci/heal-notes.md, write heal-result.json status=failing, and stop. NEVER weaken an assertion to force green — a deterministic gate compares assertions before/after heal and will reject it. Keep reasoning concise."
+              "Heal attempt ${attempt} of 3 — you have a FRESH context. Heal ONLY this spec (do NOT run the whole suite): ${SPEC}. A live OpenObserve is booted at ${ZO_BASE_URL}. FIRST, if docs/test_generator/ci/heal-notes.md exists, read it — it lists what earlier attempts already tried; do NOT repeat those approaches. Run 'cd tests/ui-testing && npx playwright test ${REL} --workers=4 --reporter=line', diagnose, fix the spec/page objects, re-run — up to 3 internal iterations. NEVER touch /tmp or any path outside the repo (the sandbox blocks it and the command fails); read stdout directly. SCOPE LOCK: change ONLY files under tests/ui-testing/. NEVER edit product code (src/**, web/src/**, *.rs, *.vue), config, or playwright.yml, and NEVER build/compile/restart the product (no cargo build/check, no npm run build) — the binary is already booted; a gate reverts+rejects any out-of-scope change. If you get it passing HONESTLY (no deleted/inverted/conditionalized assertions, no product edits), write docs/test_generator/ci/heal-result.json with status=passing. If a test cannot pass because the FEATURE is not wired in this build (component never renders / code path commented out), do NOT weaken it — mark it test.fixme('reason, see #issue'), keep the assertion intact, and write status=feature-incomplete with an 'evidence' field naming the file:line that proves the gap. If still failing for an ordinary reason after your iterations, APPEND a concise note (test name, failure, what you tried) to docs/test_generator/ci/heal-notes.md, write heal-result.json status=failing, and stop. NEVER weaken an assertion to force green — a deterministic gate compares assertions before/after heal and will reject it. Keep reasoning concise."
             echo "::endgroup::"
             STATUS=$(jq -r '.status // "failing"' docs/test_generator/ci/heal-result.json 2>/dev/null || echo failing)
             if [ "$STATUS" = "passing" ]; then
@@ -932,6 +932,30 @@ jobs:
             if [ "$attempt" -lt 3 ]; then echo "::notice::Attempt ${attempt} did not pass → retrying with a fresh context.";
             else echo "::notice::3 fresh-context attempts exhausted — leaving it to the authoritative run."; fi
           done
+
+      - name: Healer scope-lock (deterministic — only tests/ui-testing may change)
+        id: scope
+        # HARD boundary: the Healer fixes TESTS, not the product. If it edited anything outside
+        # tests/ui-testing/ (most often it tried to patch src/** or web/src/** and rebuild the binary
+        # to force a green — a fake pass that never reproduces, since those edits aren't committed), we
+        # REVERT those changes and BLOCK the run. docs/test_generator/ (handoff) + the restored pipeline
+        # files (.opencode/opencode.jsonc/.github) are exempt — they're stripped/restored anyway.
+        run: |
+          VIOL=$(git status --porcelain -- . \
+            ':(exclude)tests/ui-testing/**' ':(exclude)docs/test_generator/**' \
+            ':(exclude).opencode/**' ':(exclude)opencode.jsonc' ':(exclude).github/**' \
+            | sed 's/^...//')
+          if [ -n "$VIOL" ]; then
+            echo "status=violation" >> "$GITHUB_OUTPUT"
+            echo "::error::Healer SCOPE VIOLATION — it changed files OUTSIDE tests/ui-testing/ (likely patched the product to force a green). Reverting + blocking:"
+            printf '%s\n' "$VIOL"
+            # Revert tracked edits and remove any new untracked files so nothing leaks to the branch.
+            printf '%s\n' "$VIOL" | while IFS= read -r f; do [ -n "$f" ] && git checkout -- "$f" 2>/dev/null || true; done
+            git clean -fd -- $(printf '%s ' $VIOL) 2>/dev/null || true
+          else
+            echo "status=clean" >> "$GITHUB_OUTPUT"
+            echo "Scope OK — the Healer touched only tests/ui-testing/ (+ handoff)."
+          fi
 
       - name: Authoritative final run (the workflow decides pass/fail, not the LLM)
         id: finalrun
@@ -999,7 +1023,15 @@ jobs:
         if: steps.finalrun.outputs.status == 'passing'
         env:
           INTEGRITY: ${{ steps.integrity.outputs.status }}
+          SCOPE: ${{ steps.scope.outputs.status }}
         run: |
+          # Healer scope violation (edited product code) → never trust the green; block. (A passing
+          # final run here may be against a Healer-patched binary that won't reproduce.)
+          if [ "$SCOPE" = "violation" ]; then
+            echo "status=fail" >> "$GITHUB_OUTPUT"
+            echo "::error::Quality gate FAILED — Healer scope violation (edited files outside tests/). No PR."
+            exit 0
+          fi
           # feature-incomplete: the Healer honestly parked tests because the feature isn't wired.
           # The final run is "green" only because those tests are fixme — do NOT open a normal PR;
           # block here so the report step surfaces the Healer's evidence to the dev instead.
@@ -1072,6 +1104,7 @@ jobs:
           HEAL_OUTCOME: ${{ steps.heal.outcome }}
           FINAL_STATUS: ${{ steps.finalrun.outputs.status }}
           QUALITY_STATUS: ${{ steps.quality.outputs.status }}
+          SCOPE_STATUS: ${{ steps.scope.outputs.status }}
         run: |
           RUN_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
           EXTRA=""   # optional appended detail (integrity findings / feature-incomplete evidence)
@@ -1088,6 +1121,8 @@ jobs:
             CAUSE="The healer hit its time cap (hung or too-slow heal loop) and was stopped before the tests passed."
           elif [ "$FINAL_STATUS" = "failing" ]; then
             CAUSE="The generated spec still failed after healing — likely a genuinely broken/flaky test or a real product issue."
+          elif [ "$SCOPE_STATUS" = "violation" ]; then
+            CAUSE="🚫 The Healer tried to **edit product code** (outside \`tests/ui-testing/\`) to force the tests green — that's blocked. This almost always means the **feature itself is broken/incomplete**: fix the feature, then the generated tests should pass. The Healer's product edits were reverted and **no PR was opened**."
           elif [ "$QUALITY_STATUS" = "fail" ]; then
             # The most valuable outcome: tests went green but DON'T meaningfully test the feature.
             HSTATUS=$(jq -r '.status // ""' docs/test_generator/ci/heal-result.json 2>/dev/null || echo "")
