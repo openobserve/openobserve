@@ -44,11 +44,8 @@ use crate::service::search::{datafusion::storage, index::IndexCondition};
 /// existed. Any .ttv file without the property was produced with this value.
 const LEGACY_ROW_GROUP_SIZE: usize = 1024 * 1024;
 
-pub fn generate_access_plan(_file: &mut PartitionedFile) {}
-
 /// Attach the access plan for this file as a typed [`PartitionedFile`] extension.
-#[allow(dead_code)]
-pub fn _generate_access_plan(file: &mut PartitionedFile) {
+pub fn generate_access_plan(file: &mut PartitionedFile) {
     let Some(storage::file_list::ScanSelection {
         selection,
         row_group_size,
