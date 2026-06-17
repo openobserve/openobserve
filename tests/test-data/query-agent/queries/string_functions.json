@@ -362,7 +362,7 @@
           [
             "CC-GAMMA",
             "SORT-A7",
-            "hybrid, auto",
+            "auto, hybrid",
             "4"
           ],
           [
@@ -901,9 +901,16 @@
         ],
         "results": [
           [
-            "ZONE-2",
+            "ZONE-1",
             "auto",
-            "SORT-ZONE-2",
+            "SORT-ZONE-1",
+            "29",
+            "2"
+          ],
+          [
+            "ZONE-4",
+            "auto",
+            "SORT-ZONE-4",
             "29",
             "2"
           ],
@@ -915,16 +922,9 @@
             "2"
           ],
           [
-            "ZONE-4",
+            "ZONE-2",
             "auto",
-            "SORT-ZONE-4",
-            "29",
-            "2"
-          ],
-          [
-            "ZONE-1",
-            "auto",
-            "SORT-ZONE-1",
+            "SORT-ZONE-2",
             "29",
             "2"
           ],
@@ -939,6 +939,27 @@
             "ZONE-3",
             "hybrid",
             "SORT-ZONE-3",
+            "29",
+            "1"
+          ],
+          [
+            "ZONE-3",
+            "manual",
+            "SORT-ZONE-3",
+            "58",
+            "1"
+          ],
+          [
+            "ZONE-3",
+            "manual",
+            "SORT-ZONE-3",
+            "29",
+            "1"
+          ],
+          [
+            "ZONE-4",
+            "hybrid",
+            "SORT-ZONE-4",
             "29",
             "1"
           ],
@@ -947,27 +968,6 @@
             "manual",
             "SORT-ZONE-2",
             "58",
-            "1"
-          ],
-          [
-            "ZONE-3",
-            "manual",
-            "SORT-ZONE-3",
-            "29",
-            "1"
-          ],
-          [
-            "ZONE-3",
-            "manual",
-            "SORT-ZONE-3",
-            "58",
-            "1"
-          ],
-          [
-            "ZONE-4",
-            "hybrid",
-            "SORT-ZONE-4",
-            "29",
             "1"
           ]
         ],
@@ -992,6 +992,13 @@
         ],
         "results": [
           [
+            "RetryScan",
+            "RETRYS",
+            "False",
+            "2",
+            "15.0"
+          ],
+          [
             "MergeBatch",
             "MERGEB",
             "False",
@@ -1006,11 +1013,11 @@
             "230.0"
           ],
           [
-            "RetryScan",
-            "RETRYS",
+            "ArchiveLog",
+            "ARCHIV",
             "False",
             "2",
-            "15.0"
+            "1900.0"
           ],
           [
             "SearchItems",
@@ -1020,13 +1027,6 @@
             "45.0"
           ],
           [
-            "ArchiveLog",
-            "ARCHIV",
-            "False",
-            "2",
-            "1900.0"
-          ],
-          [
             "DeleteRecord",
             "DELETE",
             "False",
@@ -1034,11 +1034,11 @@
             "1450.0"
           ],
           [
-            "RerouteTrack",
-            "REROUT",
+            "CheckThreshold",
+            "CHECKT",
             "False",
             "1",
-            "567.0"
+            "78.0"
           ],
           [
             "SyncZone",
@@ -1048,11 +1048,11 @@
             "12.0"
           ],
           [
-            "CheckThreshold",
-            "CHECKT",
+            "RerouteTrack",
+            "REROUT",
             "False",
             "1",
-            "78.0"
+            "567.0"
           ]
         ],
         "results_mode": "rowsort"
@@ -1090,20 +1090,6 @@
             "120.0"
           ],
           [
-            "US-CENTRAL-ZONE-3-HYB",
-            "1",
-            "0",
-            "0",
-            "200.0"
-          ],
-          [
-            "EU-NORTH-ZONE-1-MAN",
-            "1",
-            "0",
-            "0",
-            "60.0"
-          ],
-          [
             "AP-CENTRAL-ZONE-3-MAN",
             "1",
             "1",
@@ -1116,6 +1102,48 @@
             "0",
             "0",
             "155.0"
+          ],
+          [
+            "AP-SOUTH-ZONE-2-AUT",
+            "1",
+            "0",
+            "0",
+            "500.0"
+          ],
+          [
+            "AP-EAST-ZONE-3-MAN",
+            "1",
+            "1",
+            "0",
+            "50.0"
+          ],
+          [
+            "EU-NORTH-ZONE-1-MAN",
+            "1",
+            "0",
+            "0",
+            "60.0"
+          ],
+          [
+            "US-WEST-ZONE-1-AUT",
+            "1",
+            "0",
+            "0",
+            "410.0"
+          ],
+          [
+            "EU-WEST-ZONE-4-AUT",
+            "1",
+            "1",
+            "0",
+            "275.0"
+          ],
+          [
+            "SA-EAST-ZONE-2-MAN",
+            "1",
+            "0",
+            "0",
+            "120.0"
           ],
           [
             "US-EAST-ZONE-2-AUT",
@@ -1139,39 +1167,11 @@
             "50.0"
           ],
           [
-            "AP-SOUTH-ZONE-2-AUT",
+            "US-CENTRAL-ZONE-3-HYB",
             "1",
             "0",
             "0",
-            "500.0"
-          ],
-          [
-            "AP-EAST-ZONE-3-MAN",
-            "1",
-            "1",
-            "0",
-            "50.0"
-          ],
-          [
-            "US-WEST-ZONE-1-AUT",
-            "1",
-            "0",
-            "0",
-            "410.0"
-          ],
-          [
-            "EU-WEST-ZONE-4-AUT",
-            "1",
-            "1",
-            "0",
-            "275.0"
-          ],
-          [
-            "SA-EAST-ZONE-2-MAN",
-            "1",
-            "0",
-            "0",
-            "120.0"
+            "200.0"
           ]
         ],
         "results_mode": "rowsort"
@@ -1433,16 +1433,16 @@
         ],
         "results": [
           [
-            "cartPage",
-            "E004"
-          ],
-          [
             "searchPage",
             "E003"
           ],
           [
             "itemPage",
             "E005"
+          ],
+          [
+            "cartPage",
+            "E004"
           ],
           [
             "checkoutPage",
@@ -2059,12 +2059,16 @@
         ],
         "results": [
           [
+            "TimeoutException:",
+            "2"
+          ],
+          [
             "ResourceExhaustedException:",
             "2"
           ],
           [
-            "TimeoutException:",
-            "2"
+            "SecurityException:",
+            "1"
           ],
           [
             "DataIntegrityException:",
@@ -2072,10 +2076,6 @@
           ],
           [
             "NullPointerException",
-            "1"
-          ],
-          [
-            "SecurityException:",
             "1"
           ]
         ],
@@ -2135,15 +2135,15 @@
             "2"
           ],
           [
+            "lane-monitor/rk-warehouse-005 (internal)",
+            "1"
+          ],
+          [
             "conveyor-driver/rk-warehouse-009 (inbound)",
             "1"
           ],
           [
             "charge-checker/rk-warehouse-007 (outbound)",
-            "1"
-          ],
-          [
-            "lane-monitor/rk-warehouse-005 (internal)",
             "1"
           ]
         ],
@@ -2199,15 +2199,15 @@
             "2"
           ],
           [
+            "staging-critical",
+            "1"
+          ],
+          [
             "dev-medium",
             "1"
           ],
           [
             "prod-critical",
-            "1"
-          ],
-          [
-            "staging-critical",
             "1"
           ]
         ],
@@ -2230,18 +2230,18 @@
         ],
         "results": [
           [
-            "WAREHOUSE-NORTH",
-            "internal",
-            "2"
-          ],
-          [
             "WAREHOUSE-CENTRAL",
             "outbound",
             "2"
           ],
           [
-            "WAREHOUSE-EAST",
+            "WAREHOUSE-NORTH",
             "internal",
+            "2"
+          ],
+          [
+            "WAREHOUSE-WEST",
+            "outbound",
             "1"
           ],
           [
@@ -2250,8 +2250,8 @@
             "1"
           ],
           [
-            "WAREHOUSE-WEST",
-            "outbound",
+            "WAREHOUSE-EAST",
+            "internal",
             "1"
           ]
         ],
@@ -2273,11 +2273,11 @@
         ],
         "results": [
           [
-            "shop.example.com/item/1006",
+            "shop.example.com/item/1001",
             "2"
           ],
           [
-            "shop.example.com/item/1001",
+            "shop.example.com/item/1006",
             "2"
           ],
           [
@@ -2304,12 +2304,12 @@
         ],
         "results": [
           [
-            "BS-2026-C3",
+            "BS-2025-D4",
             "BS-2",
             "2"
           ],
           [
-            "BS-2025-D4",
+            "BS-2026-C3",
             "BS-2",
             "2"
           ],

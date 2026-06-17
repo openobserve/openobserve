@@ -432,14 +432,14 @@
         ],
         "results": [
           [
-            "PL-004",
-            "ZONE-2",
+            "PL-006",
+            "ZONE-4",
             "88.1",
             "day_shift"
           ],
           [
-            "PL-006",
-            "ZONE-4",
+            "PL-004",
+            "ZONE-2",
             "88.1",
             "day_shift"
           ],
@@ -447,12 +447,6 @@
             "PL-002",
             "ZONE-4",
             "55.2",
-            "day_shift"
-          ],
-          [
-            "PL-007",
-            "ZONE-1",
-            "33.0",
             "day_shift"
           ],
           [
@@ -464,18 +458,24 @@
           [
             "PL-007",
             "ZONE-1",
-            "94.6",
-            "night_shift"
+            "33.0",
+            "day_shift"
           ],
           [
-            "PL-003",
+            "PL-007",
             "ZONE-1",
-            "72.8",
+            "94.6",
             "night_shift"
           ],
           [
             "PL-005",
             "ZONE-3",
+            "72.8",
+            "night_shift"
+          ],
+          [
+            "PL-003",
+            "ZONE-1",
             "72.8",
             "night_shift"
           ],
@@ -839,14 +839,14 @@
           ],
           [
             "US-WEST",
-            "ZONE-3",
+            "ZONE-1",
             "1",
             "320.0",
             "67.9"
           ],
           [
             "US-WEST",
-            "ZONE-1",
+            "ZONE-3",
             "1",
             "320.0",
             "67.9"
@@ -988,12 +988,12 @@
           ],
           [
             "desktop",
-            "navigation",
+            "performanceMetric",
             "1"
           ],
           [
             "desktop",
-            "performanceMetric",
+            "navigation",
             "1"
           ]
         ],
@@ -1017,17 +1017,17 @@
         "results": [
           [
             "errors",
+            "E001",
+            "1"
+          ],
+          [
+            "errors",
             "E009",
             "1"
           ],
           [
             "errors",
             "E003",
-            "1"
-          ],
-          [
-            "errors",
-            "E001",
             "1"
           ],
           [
@@ -1055,14 +1055,14 @@
         ],
         "results": [
           [
-            "non-Android",
-            "0",
-            "4"
-          ],
-          [
             "Android",
             "1",
             "2"
+          ],
+          [
+            "non-Android",
+            "0",
+            "4"
           ],
           [
             "TOTAL",
@@ -1168,17 +1168,17 @@
           ],
           [
             "component_err",
-            "pallet-mapper",
-            "1"
-          ],
-          [
-            "component_err",
             "batch-sync",
             "2"
           ],
           [
             "component_err",
             "track-router",
+            "1"
+          ],
+          [
+            "component_err",
+            "pallet-mapper",
             "1"
           ]
         ],
@@ -1271,12 +1271,12 @@
           ],
           [
             "error_bucket",
-            "E003",
+            "E001",
             "1"
           ],
           [
             "error_bucket",
-            "E001",
+            "E003",
             "1"
           ],
           [

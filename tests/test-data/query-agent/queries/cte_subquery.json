@@ -47,13 +47,13 @@
         ],
         "results": [
           [
-            "ZONE-2",
+            "ZONE-1",
             "4",
             "2",
             "50.0"
           ],
           [
-            "ZONE-1",
+            "ZONE-2",
             "4",
             "2",
             "50.0"
@@ -346,7 +346,7 @@
             "4",
             "581.25",
             "27.53",
-            "manual",
+            "hybrid",
             "2"
           ],
           [
@@ -695,15 +695,15 @@
         ],
         "results": [
           [
-            "LANE-C",
-            "ZONE-2",
+            "LANE-B",
+            "ZONE-1",
             "4",
             "3.5",
             "0.5"
           ],
           [
-            "LANE-B",
-            "ZONE-1",
+            "LANE-C",
+            "ZONE-2",
             "4",
             "3.5",
             "0.5"
@@ -1560,16 +1560,16 @@
             "66.0"
           ],
           [
-            "ZONE-4",
-            "SORT-A7",
+            "ZONE-2",
+            "SORT-Q5",
             "low_tput",
             "1",
             "150.0",
             "45.3"
           ],
           [
-            "ZONE-2",
-            "SORT-Q5",
+            "ZONE-4",
+            "SORT-A7",
             "low_tput",
             "1",
             "150.0",
@@ -1698,12 +1698,12 @@
         ],
         "results": [
           [
-            "https://shop.example.com/item/1006::performanceMetric",
+            "itemPage::performanceMetric",
             "1",
             "1"
           ],
           [
-            "itemPage::performanceMetric",
+            "https://shop.example.com/item/1006::performanceMetric",
             "1",
             "1"
           ]
@@ -1814,17 +1814,17 @@
         ],
         "results": [
           [
+            "performanceMetric",
+            "itemPage",
+            "2"
+          ],
+          [
             "interaction",
             "searchPage",
             "2"
           ],
           [
             "navigation",
-            "itemPage",
-            "2"
-          ],
-          [
-            "performanceMetric",
             "itemPage",
             "2"
           ],
@@ -2034,11 +2034,11 @@
         ],
         "results": [
           [
-            "E001",
+            "E003",
             "2"
           ],
           [
-            "E003",
+            "E001",
             "2"
           ],
           [
@@ -2148,11 +2148,6 @@
           ],
           [
             "performanceMetric",
-            "checkoutPage",
-            "1"
-          ],
-          [
-            "performanceMetric",
             "searchPage",
             "1"
           ],
@@ -2164,6 +2159,11 @@
           [
             "performanceMetric",
             "cartPage",
+            "1"
+          ],
+          [
+            "performanceMetric",
+            "checkoutPage",
             "1"
           ]
         ],
@@ -2287,16 +2287,16 @@
         ],
         "results": [
           [
-            "itemPage",
-            "2",
-            "1",
-            "89.0"
-          ],
-          [
             "checkoutPage",
             "1",
             "1",
             "567.0"
+          ],
+          [
+            "itemPage",
+            "2",
+            "1",
+            "89.0"
           ]
         ],
         "results_mode": "rowsort"
@@ -2346,11 +2346,11 @@
         ],
         "results": [
           [
-            "zone-controller",
+            "track-router",
             "2"
           ],
           [
-            "track-router",
+            "zone-controller",
             "2"
           ]
         ],
