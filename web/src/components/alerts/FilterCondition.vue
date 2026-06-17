@@ -1,5 +1,5 @@
 ﻿<template>
-    <div class="filter-condition-row tw:flex tw:items-start tw:gap-1 tw:flex-no-wrap">
+    <div class="tw:flex tw:items-start tw:gap-1 tw:flex-no-wrap">
       <!-- V2: Fixed-width left column for alignment -->
       <!-- All conditions have the same width for the operator/label section -->
       <div class="tw:flex tw:items-center tw:justify-center tw:mt-1 tw:min-w-[60px]">
@@ -249,9 +249,3 @@ const filterColumns = (val: string) => {
 };
 
   </script>
-
-  <style>
-.filter-condition-row:has(.q-field--error) {
-  padding-bottom: 20px;
-}
-</style>
