@@ -83,7 +83,7 @@ pub(crate) mod tests {
         let mut visitor = AggregateVisitor::new();
         let _ = plan.visit(&mut visitor);
         let data = visitor.get_data();
-        data.map(|v| v.as_any().downcast_ref::<AggregateExec>().unwrap().clone())
+        data.map(|v| v.downcast_ref::<AggregateExec>().unwrap().clone())
     }
 
     struct AggregateVisitor {
@@ -111,7 +111,7 @@ pub(crate) mod tests {
 
         fn f_up(&mut self, node: &'n Self::Node) -> Result<TreeNodeRecursion> {
             if node.name() == "AggregateExec" {
-                let agg = node.as_any().downcast_ref::<AggregateExec>().unwrap();
+                let agg = node.downcast_ref::<AggregateExec>().unwrap();
                 if *agg.mode() == AggregateMode::Partial {
                     self.data = Some(node.clone());
                     Ok(TreeNodeRecursion::Stop)
@@ -155,7 +155,7 @@ pub(crate) mod tests {
 
         fn f_up(&mut self, node: &'n Self::Node) -> Result<TreeNodeRecursion> {
             if node.name() == "RemoteScanExec" {
-                let remote_scan = node.as_any().downcast_ref::<RemoteScanExec>().unwrap();
+                let remote_scan = node.downcast_ref::<RemoteScanExec>().unwrap();
                 self.data.push(Arc::new(remote_scan.clone()));
             }
             Ok(TreeNodeRecursion::Continue)

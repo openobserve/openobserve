@@ -1,0 +1,116 @@
+<!-- Copyright 2026 OpenObserve Inc.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
+
+<!--
+  EmptyServicesCatalog — object-only "no services" illustration: a table card
+  with a header row and three service rows, each with a status dot and text
+  placeholder bars. Status dots pulse in staggered sequence. CSS motion gated
+  by `animated` + prefers-reduced-motion.
+-->
+<template>
+  <svg
+    :width="width"
+    viewBox="0 0 240 180"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    role="img"
+    aria-label="No services found"
+    :class="['es-root', { 'es-static': !animated }]"
+  >
+    <!-- Ground shadow -->
+    <ellipse cx="120" cy="156" rx="66" ry="9" fill="var(--color-primary-900)" opacity="0.1" />
+    <!-- Ambient dots -->
+    <g fill="var(--color-border-default)" opacity="0.5">
+      <circle cx="26" cy="46" r="2" /><circle cx="214" cy="120" r="2" /><circle cx="210" cy="42" r="1.6" />
+    </g>
+
+    <!-- Card background -->
+    <rect x="36" y="28" width="168" height="122" rx="10" fill="var(--color-surface-base)" stroke="var(--color-border-strong)" stroke-width="2" />
+
+    <!-- Header row divider -->
+    <line x1="36" y1="52" x2="204" y2="52" stroke="var(--color-border-default)" stroke-width="1.25" opacity="0.6" />
+
+    <!-- Header labels (placeholder bars) -->
+    <rect x="50" y="38" width="30" height="7" rx="3.5" fill="var(--color-border-default)" opacity="0.5" />
+    <rect x="100" y="38" width="50" height="7" rx="3.5" fill="var(--color-border-default)" opacity="0.5" />
+    <rect x="166" y="38" width="26" height="7" rx="3.5" fill="var(--color-border-default)" opacity="0.5" />
+
+    <!-- Row 1 -->
+    <circle class="es-dot es-dot-1" cx="50" cy="72" r="5" fill="var(--color-primary-500)" />
+    <rect x="62" y="68" width="52" height="8" rx="4" fill="var(--color-border-strong)" opacity="0.45" />
+    <rect x="122" y="68" width="32" height="8" rx="4" fill="var(--color-border-default)" opacity="0.4" />
+    <rect x="166" y="68" width="22" height="8" rx="4" fill="var(--color-border-default)" opacity="0.35" />
+
+    <!-- Row 1 divider -->
+    <line x1="44" y1="84" x2="196" y2="84" stroke="var(--color-border-default)" stroke-width="1" opacity="0.3" />
+
+    <!-- Row 2 -->
+    <circle class="es-dot es-dot-2" cx="50" cy="100" r="5" fill="var(--color-primary-400)" />
+    <rect x="62" y="96" width="40" height="8" rx="4" fill="var(--color-border-strong)" opacity="0.45" />
+    <rect x="110" y="96" width="42" height="8" rx="4" fill="var(--color-border-default)" opacity="0.4" />
+    <rect x="166" y="96" width="22" height="8" rx="4" fill="var(--color-border-default)" opacity="0.35" />
+
+    <!-- Row 2 divider -->
+    <line x1="44" y1="112" x2="196" y2="112" stroke="var(--color-border-default)" stroke-width="1" opacity="0.3" />
+
+    <!-- Row 3 -->
+    <circle class="es-dot es-dot-3" cx="50" cy="128" r="5" fill="var(--color-primary-300)" />
+    <rect x="62" y="124" width="60" height="8" rx="4" fill="var(--color-border-strong)" opacity="0.45" />
+    <rect x="130" y="124" width="28" height="8" rx="4" fill="var(--color-border-default)" opacity="0.4" />
+    <rect x="166" y="124" width="22" height="8" rx="4" fill="var(--color-border-default)" opacity="0.35" />
+  </svg>
+</template>
+
+<script setup lang="ts">
+withDefaults(
+  defineProps<{ width?: number; animated?: boolean }>(),
+  { width: 260, animated: true },
+);
+</script>
+
+<style scoped>
+.es-dot {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.es-dot-1 {
+  animation: es-pulse 2.4s ease-in-out infinite;
+}
+.es-dot-2 {
+  animation: es-pulse 2.4s ease-in-out infinite 0.8s;
+}
+.es-dot-3 {
+  animation: es-pulse 2.4s ease-in-out infinite 1.6s;
+}
+@keyframes es-pulse {
+  0%, 100% {
+    opacity: 0.4;
+    transform: scale(0.9);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+}
+.es-static :where(.es-dot-1, .es-dot-2, .es-dot-3) {
+  animation: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  :where(.es-dot-1, .es-dot-2, .es-dot-3) {
+    animation: none;
+  }
+}
+</style>

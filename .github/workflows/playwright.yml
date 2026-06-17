@@ -358,6 +358,7 @@ jobs:
                 "metrics-table-column-order.spec.js",
                 "metrics-promql-builder.spec.js",
                 "promqlAutocomplete.spec.js",
+                "metrics-share-deep-link.spec.js",
               ]
           - testfolder: "Dashboards-Variables"
             browser: "chrome"

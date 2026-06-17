@@ -91,7 +91,6 @@ const defaultObject = {
       string,
       { panelTitle: string; start: number; end: number }
     >(),
-    showErrorOnly: false,
     queryEditorPlaceholderFlag: true,
     liveMode: localStorage.getItem("oo_toggle_auto_run") === "true",
     searchMode: "spans" as TraceSearchMode,

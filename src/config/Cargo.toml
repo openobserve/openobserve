@@ -90,7 +90,7 @@ vrl.workspace = true
 tonic.workspace = true
 tonic-prost.workspace = true
 tracing-opentelemetry.workspace = true
-vortex = { git = "https://github.com/openobserve/vortex", rev = "13423ca204f81dc1b20ca040da2aeb386220a312", features = [
+vortex = { git = "https://github.com/openobserve/vortex", branch = "0.75.0-fix", features = [
     "tokio",
 ], optional = true }
 

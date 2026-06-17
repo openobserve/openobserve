@@ -132,11 +132,7 @@ impl TreeNodeRewriter for FollowerIndexOptimizer {
             return Ok(Transformed::new(plan, false, TreeNodeRecursion::Stop));
         }
 
-        if plan
-            .as_any()
-            .downcast_ref::<SortPreservingMergeExec>()
-            .is_some()
-        {
+        if plan.downcast_ref::<SortPreservingMergeExec>().is_some() {
             // Check for SimpleSelect
             if let Some(index_optimize_mode) = is_simple_select(Arc::clone(&plan)) {
                 *self.index_optimizer_mode.lock() = Some(index_optimize_mode);
@@ -158,7 +154,7 @@ impl TreeNodeRewriter for FollowerIndexOptimizer {
                 }
             }
             return Ok(Transformed::new(plan, false, TreeNodeRecursion::Continue));
-        } else if plan.as_any().downcast_ref::<AggregateExec>().is_some() {
+        } else if plan.downcast_ref::<AggregateExec>().is_some() {
             // Check for SimpleCount
             if let Some(index_optimize_mode) = is_simple_count(Arc::clone(&plan)) {
                 *self.index_optimizer_mode.lock() = Some(index_optimize_mode);
@@ -242,11 +238,7 @@ impl TreeNodeRewriter for LeaderIndexOptimizer {
             return Ok(Transformed::new(plan, false, TreeNodeRecursion::Stop));
         }
 
-        if plan
-            .as_any()
-            .downcast_ref::<SortPreservingMergeExec>()
-            .is_some()
-        {
+        if plan.downcast_ref::<SortPreservingMergeExec>().is_some() {
             // Get the index fields of the underlying table
             let mut visitor = TableNameVisitor::new();
             plan.visit(&mut visitor)?;
@@ -298,7 +290,7 @@ impl TreeNodeRewriter for IndexOptimizerRewrite {
     type Node = Arc<dyn ExecutionPlan>;
 
     fn f_up(&mut self, node: Arc<dyn ExecutionPlan>) -> Result<Transformed<Self::Node>> {
-        if let Some(remote) = node.as_any().downcast_ref::<RemoteScanExec>() {
+        if let Some(remote) = node.downcast_ref::<RemoteScanExec>() {
             let remote = Arc::new(
                 remote
                     .clone()
@@ -327,7 +319,7 @@ impl<'n> TreeNodeVisitor<'n> for TableNameVisitor {
     fn f_up(&mut self, node: &'n Self::Node) -> Result<TreeNodeRecursion> {
         let name = node.name();
         if name == "NewEmptyExec" {
-            let table = node.as_any().downcast_ref::<NewEmptyExec>().unwrap();
+            let table = node.downcast_ref::<NewEmptyExec>().unwrap();
             self.table_name = Some(TableReference::from(table.name()));
             Ok(TreeNodeRecursion::Stop)
         } else {
@@ -402,11 +394,7 @@ mod tests {
         let result = plan.rewrite(&mut rewriter).unwrap();
         assert!(result.transformed, "plan should be marked as transformed");
         assert_eq!(result.data.name(), "RemoteScanExec");
-        let remote_scan = result
-            .data
-            .as_any()
-            .downcast_ref::<RemoteScanExec>()
-            .unwrap();
+        let remote_scan = result.data.downcast_ref::<RemoteScanExec>().unwrap();
         assert_eq!(remote_scan.index_optimize_mode(), Some(mode));
     }
 
