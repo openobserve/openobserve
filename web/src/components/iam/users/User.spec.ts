@@ -183,7 +183,7 @@ const UpdateUserRoleStub = {
 
 const AddUserStub = {
   name: "AddUser",
-  props: ["open", "modelValue", "isUpdated", "userRole", "roles", "customRoles"],
+  props: ["open", "modelValue", "isUpdated", "userRole", "roles", "customRoles", "isCloud"],
   emits: ["update:open", "update:modelValue", "updated"],
   template: `<div class="add-user-stub" :data-open="String(open)" />`,
 };
@@ -691,6 +691,65 @@ describe("User Component", () => {
     it("should allow editing for non-root users", () => {
       expect(wrapper.vm.shouldAllowEdit({ email: "a@example.com", role: "admin" })).toBe(true);
       expect(wrapper.vm.shouldAllowEdit({ email: "b@example.com", role: "member" })).toBe(true);
+    });
+
+    describe("shouldAllowEdit — cloud mode", () => {
+      // config is imported from "@/aws-exports" which is mocked as a mutable object.
+      // We flip config.isCloud to "true" for each cloud test and restore it in afterEach.
+      let config: any;
+
+      beforeEach(async () => {
+        config = (await import("@/aws-exports")).default;
+        config.isCloud = "true";
+      });
+
+      afterEach(() => {
+        config.isCloud = "false";
+      });
+
+      it("returns false when the current user tries to edit themselves on cloud", () => {
+        // Arrange — user email matches store.state.userInfo.email ("example@gmail.com")
+        const selfUser = { email: "example@gmail.com", role: "admin" };
+
+        // Act
+        const result = wrapper.vm.shouldAllowEdit(selfUser);
+
+        // Assert
+        expect(result).toBe(false);
+      });
+
+      it("returns true when editing another non-root user on cloud", () => {
+        // Arrange
+        const otherUser = { email: "other@example.com", role: "member" };
+
+        // Act
+        const result = wrapper.vm.shouldAllowEdit(otherUser);
+
+        // Assert
+        expect(result).toBe(true);
+      });
+
+      it("returns true for root self-edit on cloud because root check fires before cloud check", () => {
+        // Arrange — root user whose email matches the logged-in user
+        const selfRootUser = { email: "example@gmail.com", role: "root" };
+
+        // Act
+        const result = wrapper.vm.shouldAllowEdit(selfRootUser);
+
+        // Assert — root self-edit always allowed regardless of cloud flag
+        expect(result).toBe(true);
+      });
+
+      it("performs case-insensitive email comparison on cloud — mixed-case self email returns false", () => {
+        // Arrange — same address as "example@gmail.com" but different casing
+        const selfUserMixedCase = { email: "Example@Gmail.com", role: "admin" };
+
+        // Act
+        const result = wrapper.vm.shouldAllowEdit(selfUserMixedCase);
+
+        // Assert — treated as same user, editing blocked
+        expect(result).toBe(false);
+      });
     });
   });
 
