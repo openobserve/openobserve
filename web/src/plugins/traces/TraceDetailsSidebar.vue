@@ -765,6 +765,9 @@ class="tw:h-5! tw:text-[0.75rem]!">
             :service-name="correlationProps.serviceName"
             :matched-dimensions="correlationProps.matchedDimensions"
             :additional-dimensions="correlationProps.additionalDimensions"
+            :matched-set-id="correlationProps.matchedSetId"
+            :chip-dimensions="correlationProps.chipDimensions"
+            :source-event="correlationProps.sourceEvent"
             :log-streams="correlationProps.logStreams"
             :source-stream="correlationProps.sourceStream"
             :source-type="correlationProps.sourceType"
@@ -899,6 +902,7 @@ import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 import JsonPreview from "@/components/JsonPreview.vue";
 import CorrelatedLogsTable from "@/plugins/correlation/CorrelatedLogsTable.vue";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
+import { buildChipDimensionsFromFilters } from "@/services/service_streams";
 import { buildWorkloadChipDimensions } from "@/composables/useMetricSubjectButtons";
 import { normalizeSeverity } from "@/utils/sourceEventSeverity";
 import type { TelemetryContext } from "@/utils/telemetryCorrelation";
@@ -1739,12 +1743,10 @@ export default defineComponent({
       correlationError.value = null;
 
       try {
-        // Ensure org semantic groups are loaded — buildWorkloadChipDimensions
-        // walks them to populate Pod/Node chips.
         try {
           await loadSemanticGroups();
         } catch {
-          // Non-fatal: workload chips degrade to matched/additional only.
+          // Non-fatal: semantic groups are used for metrics tab label resolution.
         }
 
         // Build telemetry context from span
@@ -1823,13 +1825,8 @@ export default defineComponent({
             additionalDimensions: {},
             matchedSetId: correlationData.matched_set_id,
             chipDimensions: {
-              ...(correlationData.matched_dimensions || {}),
-              ...(correlationData.additional_dimensions || {}),
-              ...buildWorkloadChipDimensions(
-                correlationData.matched_set_id,
-                semanticGroups.value,
-                props.span as Record<string, any>,
-              ),
+              ...buildChipDimensionsFromFilters(correlationData, semanticGroups.value),
+              ...buildWorkloadChipDimensions(correlationData.matched_set_id, semanticGroups.value, props.span as Record<string, any>),
             },
             sourceEvent: {
               timestamp: props.span?.start_time,

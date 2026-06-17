@@ -4440,6 +4440,14 @@
     "noQueryApplied": {
       "title": "Ejecute una consulta para ver los registros",
       "description": "Ajusta los filtros y haz clic en «Ejecutar consulta» para cargar los eventos de esta transmisión."
+    },
+    "noServiceGraph": {
+      "title": "No hay datos gráficos de servicio",
+      "description": "Intente consultar un intervalo de tiempo más largo o asegúrese de que sus servicios emitan métricas de intervalo."
+    },
+    "noServicesCatalog": {
+      "title": "No se ha encontrado ningún servicio",
+      "description": "No se detectó ningún servicio en el intervalo de tiempo seleccionado. Prueba con un rango más amplio o con una transmisión diferente."
     }
   },
   "onlineEvals": {

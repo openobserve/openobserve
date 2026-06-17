@@ -86,6 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="tw:h-full"
               @view-traces="handleServiceGraphViewTraces"
               @request:stream-change="onChildStreamChangeRequest"
+              @widen-range="onWidenTracesRange"
             />
           </div>
 
@@ -99,6 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="tw:h-full"
               @view-traces="handleServicesCatalogViewTraces"
               @request:stream-change="onChildStreamChangeRequest"
+              @widen-range="onWidenTracesRange"
             />
           </div>
 
@@ -256,6 +258,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <search-result
                       ref="searchResultRef"
+                      :show-error-only="showErrorOnly"
                       @update:datetime="setHistogramDate"
                       @update:scroll="getMoreData"
                       @update:sort="runQueryOnSort"
@@ -1017,10 +1020,20 @@ async function getQueryData(
         : "start_time";
     })();
 
+    // Spans are physically stored sorted by the timestamp column, and the
+    // backend has a dedicated optimizer for timestamp-sorted segments. A span's
+    // `start_time` is monotonically equivalent to the timestamp column, so
+    // ordering by the timestamp column yields the same visible order while
+    // avoiding the costly full re-sort that `ORDER BY start_time` forces.
+    const orderByCol =
+      validSortCol === "start_time"
+        ? store.state.zoConfig.timestamp_column
+        : validSortCol;
+
     const spansQueryReq = (() => {
       if (!isSpansMode) return null;
       const whereClause = combinedFilter ? ` WHERE ${combinedFilter}` : "";
-      const spansSql = `SELECT * FROM "${selectedStreamName.value}"${whereClause} ORDER BY ${validSortCol} ${sortOrd}`;
+      const spansSql = `SELECT * FROM "${selectedStreamName.value}"${whereClause} ORDER BY ${orderByCol} ${sortOrd}`;
       return {
         query: {
           sql: b64EncodeUnicode(spansSql),
@@ -1690,9 +1703,9 @@ const setHistogramDate = async (date: any) => {
 // User can manually add their own filters before clicking "Run Query"
 const onMetricsFiltersUpdated = (filters: string[]) => {
   const allFilters = [...filters];
-  // Add error filter only if toggle is on and not already present from Error panel brush
+  // Add error filter only if span_status='ERROR' is currently active and not already present
   if (
-    searchObj.meta.showErrorOnly &&
+    showErrorOnly.value &&
     !allFilters.includes("span_status = 'ERROR'")
   ) {
     allFilters.push("span_status = 'ERROR'");
@@ -1922,6 +1935,10 @@ const activeExcludeFilterValues = computed((): Record<string, string[]> => {
   }
   return result;
 });
+
+const showErrorOnly = computed(
+  () => activeIncludeFilterValues.value["span_status"]?.includes("ERROR") ?? false,
+);
 
 const searchData = () => {
   if (

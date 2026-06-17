@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{any::Any, sync::LazyLock as Lazy};
+use std::sync::LazyLock as Lazy;
 
 use arrow::datatypes::DataType;
 use datafusion::{
@@ -44,10 +44,6 @@ impl MatchAllUdf {
 }
 
 impl ScalarUDFImpl for MatchAllUdf {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
     fn name(&self) -> &str {
         MATCH_ALL_UDF_NAME
     }
@@ -87,10 +83,6 @@ impl FuzzyMatchAllUdf {
 }
 
 impl ScalarUDFImpl for FuzzyMatchAllUdf {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
     fn name(&self) -> &str {
         FUZZY_MATCH_ALL_UDF_NAME
     }

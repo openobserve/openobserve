@@ -254,6 +254,7 @@ const {
     rowHeight: props.rowHeight,
     filterMode: props.filterMode,
     get horizontalScroll() { return props.horizontalScroll; },
+    get keepPageOnDataChange() { return props.keepPageOnDataChange; },
   },
   emit,
 );

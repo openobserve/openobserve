@@ -330,6 +330,28 @@ describe("Users Service", () => {
     });
   });
 
+  describe("getAllUserRoles", () => {
+    it("should fetch roles for all users in a single request", async () => {
+      const mockAllUserRoles = {
+        data: {
+          "user1@example.com": ["admin"],
+          "user2@example.com": ["viewer", "nmcdev"],
+        },
+      };
+
+      mockHttp.mockReturnValue({
+        get: vi.fn().mockResolvedValue(mockAllUserRoles)
+      } as any);
+
+      const result = await users.getAllUserRoles(mockOrgId);
+
+      expect(mockHttp().get).toHaveBeenCalledWith(
+        `api/${mockOrgId}/users/roles/all`
+      );
+      expect(result).toEqual(mockAllUserRoles);
+    });
+  });
+
   describe("invitedUsers", () => {
     it("should fetch invited users", async () => {
       const mockInvites = {

@@ -4455,6 +4455,14 @@
     "noQueryApplied": {
       "title": "Voer een query uit om logboeken te bekijken",
       "description": "Pas je filters aan en klik op 'Query uitvoeren' om gebeurtenissen voor deze stream te laden."
+    },
+    "noServiceGraph": {
+      "title": "Geen servicegrafiekgegevens",
+      "description": "Probeer een groter tijdsbereik op te vragen, of zorg ervoor dat uw services span-statistieken uitzenden."
+    },
+    "noServicesCatalog": {
+      "title": "Geen services gevonden",
+      "description": "Er zijn geen services gevonden in het geselecteerde tijdbereik. Probeer een groter bereik of een andere stream."
     }
   },
   "onlineEvals": {

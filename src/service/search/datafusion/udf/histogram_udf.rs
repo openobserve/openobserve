@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{any::Any, sync::LazyLock as Lazy};
+use std::sync::LazyLock as Lazy;
 
 use arrow::datatypes::{DataType, DataType::Timestamp, TimeUnit::Microsecond};
 use datafusion::{
@@ -40,10 +40,6 @@ impl HistogramUdf {
 }
 
 impl ScalarUDFImpl for HistogramUdf {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
     fn name(&self) -> &str {
         HISTOGRAM_UDF_NAME
     }
