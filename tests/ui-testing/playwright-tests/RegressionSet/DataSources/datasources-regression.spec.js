@@ -7,13 +7,16 @@
 
 const { test, expect, navigateToBase } = require('../../utils/enhanced-baseFixtures.js');
 const testLogger = require('../../utils/test-logger.js');
+const PageManager = require('../../../pages/page-manager.js');
 
 test.describe("Data Sources Regression Bug Fixes", () => {
   test.describe.configure({ mode: 'parallel' });
+  let pm;
 
   test.beforeEach(async ({ page }, testInfo) => {
     testLogger.testStart(testInfo.title, testInfo.file);
     await navigateToBase(page);
+    pm = new PageManager(page);
     await page.waitForLoadState('networkidle', { timeout: 10000 });
     testLogger.info('Data sources regression test setup completed');
   });
@@ -30,27 +33,22 @@ test.describe("Data Sources Regression Bug Fixes", () => {
     // Navigate to Data Sources → AI Integrations.
     // The empty child redirect auto-selects the first integration so the detail
     // pane is already populated — no click needed for the initial render.
-    const aiUrl = `${process.env.ZO_BASE_URL || 'http://localhost:5080'}/web/ingestion/ai-integrations?org_identifier=${process.env.ORGNAME || 'default'}`;
-    await page.goto(aiUrl, { timeout: 15000 });
-    await page.waitForLoadState('networkidle', { timeout: 10000 });
+    await pm.dataPage.navigateToAIIntegrations(process.env.ZO_BASE_URL, process.env.ORGNAME);
     testLogger.info('Navigated to AI Integrations');
 
     // Click the first available AI integration item to view its detail
-    const firstIntegration = page.locator('[data-test^="ai-integrations-item-"]').first();
-    await expect(firstIntegration, 'At least one AI integration should be visible').toBeVisible({ timeout: 5000 });
-    await firstIntegration.click();
-    await page.waitForTimeout(1500);
+    await pm.dataPage.clickFirstAIIntegration();
     testLogger.info('Clicked first AI integration item');
 
     // Verify detail content rendered (any of the three rendering paths:
     // AIRichSetupCard, AIIntegrationCard, or the legacy CopyContent fallback).
     // The "Select an integration" placeholder must NOT be visible, and the
-    // detail pane (.card-container) must contain text.
-    const placeholder = page.getByText('Select an integration to view details.');
-    await expect(placeholder, 'Bug #11682: placeholder should not show after clicking an integration').not.toBeVisible({ timeout: 5000 });
+    // detail pane must contain text.
+    await expect(pm.dataPage.aiIntegrationPlaceholder,
+      'Bug #11682: placeholder should not show after clicking an integration'
+    ).not.toBeVisible({ timeout: 5000 });
 
-    const detailPane = page.locator('.card-container');
-    const contentBefore = (await detailPane.textContent())?.trim() || '';
+    const contentBefore = (await pm.dataPage.aiIntegrationDetailPane.textContent())?.trim() || '';
     testLogger.info(`Detail content length before re-click: ${contentBefore.length}`);
 
     expect(contentBefore.length,
@@ -58,13 +56,15 @@ test.describe("Data Sources Regression Bug Fixes", () => {
     ).toBeGreaterThan(0);
 
     // Re-click the same integration — this was the bug trigger (#11682)
-    await firstIntegration.click();
+    await pm.dataPage.aiIntegrationFirstItem.click();
     await page.waitForTimeout(1500);
 
     // Verify content is still present after re-click (not blank)
-    await expect(placeholder, 'Bug #11682: placeholder should not show after re-click').not.toBeVisible({ timeout: 5000 });
+    await expect(pm.dataPage.aiIntegrationPlaceholder,
+      'Bug #11682: placeholder should not show after re-click'
+    ).not.toBeVisible({ timeout: 5000 });
 
-    const contentAfter = (await detailPane.textContent())?.trim() || '';
+    const contentAfter = (await pm.dataPage.aiIntegrationDetailPane.textContent())?.trim() || '';
     testLogger.info(`Detail content length after re-click: ${contentAfter.length}`);
 
     expect(contentAfter.length,
