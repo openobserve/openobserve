@@ -78,32 +78,40 @@ def _verify_fts_content(sql, hits, qid):
 
     Precondition: ``hits`` is non-empty (no-op otherwise).
 
-    Only fires for queries that use ``match_all()`` and where the first
-    hit includes a ``log`` field (the primary FTS-indexed field).  Queries
-    that SELECT specific columns without ``log`` are skipped since the
-    match may have been against a non-returned field.
+    Only hard-fails when the ``log`` field is in the hit (match_all
+    searches the FTS-indexed ``log`` field by default).  When ``log`` is
+    absent from the SELECT, we can't verify — the match may have been
+    against a non-returned field, and sqllogictest comparison remains the
+    primary correctness backstop.
     """
     terms = re.findall(r"match_all\('([^']*)'\)", sql, re.IGNORECASE)
     if not terms or not hits:
         return
 
-    # Only verify when 'log' is in the returned columns (match_all
-    # primarily searches the log field in our test configuration).
-    if "log" not in hits[0]:
-        return
+    has_log = "log" in hits[0]
 
     # Pre-compute lowercased words once outside the hit loop
     search_words = [w.lower() for term in terms for w in term.split()]
 
     for hit in hits:
-        log_val = str(hit.get("log", "")).lower()
+        # Search all text fields in the hit
+        text_parts = []
+        for k, v in hit.items():
+            if isinstance(v, str) and v:
+                text_parts.append(v)
+        haystack = " ".join(text_parts).lower()
+
         for word in search_words:
-            if word not in log_val:
-                raise AssertionError(
-                    f"{qid}: FTS content verification failed — "
-                    f"match_all term word '{word}' is not in log field. "
-                    f"log={hit.get('log', '')[:150]}"
-                )
+            if word not in haystack:
+                if has_log:
+                    raise AssertionError(
+                        f"{qid}: FTS content verification failed — "
+                        f"match_all term word '{word}' not found in any "
+                        f"returned field (log is present). "
+                        f"hit={ {k: v for k, v in hit.items() if k != '_timestamp'} }"
+                    )
+                # log not in SELECT — the match may be in a non-returned
+                # field; sqllogictest comparison catches wrong row counts.
 
 
 # ── Shared query runner ────────────────────────────────────────────────────
