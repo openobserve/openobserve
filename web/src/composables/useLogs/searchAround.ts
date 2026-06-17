@@ -68,6 +68,7 @@ export const useSearchAround = () => {
   const searchAroundData = (params: SearchAroundParams): void => {
     try {
       searchObj.loading = true;
+      searchObj.loadingProgressPercentage = 0;
       searchObj.data.errorCode = 0;
       searchObj.data.functionError = "";
       const sqlContext: string[] = [];
