@@ -439,10 +439,12 @@ class="tw:mr-1" />
                 </span>
                 <div
                   v-if="cell.column.columnDef.id === store.state.zoConfig.timestamp_column"
-                  class="tw:absolute tw:right-0 tw:top-1/2 tw:-translate-y-1/2 tw:invisible ai-btn"
+                  class="tw:absolute tw:right-0 tw:top-1/2 tw:-translate-y-1/2 tw:invisible"
                 >
                   <O2AIContextAddBtn
+                    class="tw:right-0 ai-btn"
                     @send-to-ai-chat="sendToAiChat(JSON.stringify(cell.row.original), true)"
+                    :size="'2px'"
                   />
                 </div>
               </td>
