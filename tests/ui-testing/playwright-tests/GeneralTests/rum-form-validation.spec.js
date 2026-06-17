@@ -145,7 +145,32 @@ test.describe('RUM Source Maps upload form validation', () => {
     testLogger.info('Service required error correctly shown');
   });
 
-  // ── Test 5: Valid inputs → upload succeeds ──────────────────────────────────
+  // ── Test 5: Fully empty submit → all required errors surface together ───────
+
+  test('should surface all required errors at once when Upload is clicked on an empty form', {
+    tag: ['@rum-form-validation', '@P0', '@smoke']
+  }, async ({ page }) => {
+    testLogger.info('Testing that an empty submit reports every required field, not just the first');
+
+    // Submit with nothing filled — Service/Version inline errors and the ZIP
+    // file toast must all appear in the same pass (validation no longer stops at
+    // the first missing field).
+    await pm.rumFormValidation.clickUpload();
+
+    await expect(pm.rumFormValidation.getServiceErrorLocator()).toBeVisible({ timeout: 5000 });
+    await expect(pm.rumFormValidation.getServiceErrorLocator()).toContainText('Service is required');
+
+    await expect(pm.rumFormValidation.getVersionErrorLocator()).toBeVisible({ timeout: 5000 });
+    await expect(pm.rumFormValidation.getVersionErrorLocator()).toContainText('Version is required');
+
+    await expect(pm.rumFormValidation.getToastErrorLocator()).toBeVisible({ timeout: 5000 });
+    const toastText = await pm.rumFormValidation.getToastMessageLocator().textContent();
+    expect(toastText).toContain('Please select a ZIP file to upload');
+
+    testLogger.info('All required errors (service, version, file) shown together on empty submit');
+  });
+
+  // ── Test 6: Valid inputs → upload succeeds ──────────────────────────────────
 
   test('should upload source maps successfully when all required fields are valid', {
     tag: ['@rum-form-validation', '@P0', '@smoke']

@@ -258,19 +258,22 @@ const formatFileSize = (bytes: number): string => {
 
 // Upload source maps
 const uploadSourceMaps = async () => {
+  // Validate every required field top-to-bottom and surface all errors at once:
+  // Service / Version as inline field errors, the ZIP file as a toast.
+  serviceError.value = formData.value.service ? "" : "Service is required";
+  versionError.value = formData.value.version ? "" : "Version is required";
+
+  let hasError = !formData.value.service || !formData.value.version;
+
   if (!formData.value.file) {
     toast({
       variant: "error",
       message: "Please select a ZIP file to upload",
     });
-    return;
+    hasError = true;
   }
 
-  if (!formData.value.service || !formData.value.version) {
-    serviceError.value = formData.value.service ? "" : "Service is required";
-    versionError.value = formData.value.version ? "" : "Version is required";
-    return;
-  }
+  if (hasError) return;
 
   isUploading.value = true;
 
