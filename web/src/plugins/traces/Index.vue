@@ -86,6 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="tw:h-full"
               @view-traces="handleServiceGraphViewTraces"
               @request:stream-change="onChildStreamChangeRequest"
+              @widen-range="onWidenTracesRange"
             />
           </div>
 
@@ -99,6 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="tw:h-full"
               @view-traces="handleServicesCatalogViewTraces"
               @request:stream-change="onChildStreamChangeRequest"
+              @widen-range="onWidenTracesRange"
             />
           </div>
 

@@ -105,6 +105,7 @@ import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue
 import OButton from "@/lib/core/Button/OButton.vue";
 import { useAiIcon } from "@/composables/useAiIcon";
 import { DateTime } from "luxon";
+import { periodToLabel, nextWiderPeriod } from "@/composables/useWidenRange";
 
 const FIFTEEN_MINS_US = 15 * 60 * 1_000_000;
 // Backend uses exclusive end boundary, so nudge end by 1s to include the record at doc_time_max.
@@ -185,34 +186,6 @@ const jumpTargetSublabel = computed(() => {
 });
 
 // --- time-range helpers (fallback expand) -----------------------------------
-
-function periodToLabel(period: string): string {
-  if (!period || period === "absolute") return "";
-  const value = parseInt(period, 10);
-  const unit = period.slice(-1);
-  const units: Record<string, [string, string]> = {
-    s: ["Second", "Seconds"],
-    m: ["Minute", "Minutes"],
-    h: ["Hour", "Hours"],
-    d: ["Day", "Days"],
-    w: ["Week", "Weeks"],
-    M: ["Month", "Months"],
-  };
-  const [sg, pl] = units[unit] ?? ["unit", "units"];
-  return `Past ${value} ${value === 1 ? sg : pl}`;
-}
-
-function nextWiderPeriod(period: string): string {
-  const value = parseInt(period, 10);
-  const unit = period.slice(-1);
-  const toMins: Record<string, number> = {
-    s: 1 / 60, m: 1, h: 60, d: 1440, w: 10080, M: 43200,
-  };
-  const mins = value * (toMins[unit] ?? 1);
-  if (mins <= 60) return "1d";
-  if (mins <= 1440) return "7d";
-  return "30d";
-}
 
 const isRelative = computed(() => props.dateType === "relative" && !!props.relativeTimePeriod);
 const currentPeriodLabel = computed(() =>

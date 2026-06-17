@@ -44,39 +44,56 @@ use crate::service::search::{datafusion::storage, index::IndexCondition};
 /// existed. Any .ttv file without the property was produced with this value.
 const LEGACY_ROW_GROUP_SIZE: usize = 1024 * 1024;
 
-pub fn generate_access_plan(
-    file: &PartitionedFile,
-) -> Option<Arc<dyn std::any::Any + Send + Sync>> {
-    let storage::file_list::ScanSelection {
+/// Attach the access plan for this file as a typed [`PartitionedFile`] extension.
+pub fn generate_access_plan(file: &mut PartitionedFile) {
+    let Some(storage::file_list::ScanSelection {
         selection,
         row_group_size,
-    } = storage::file_list::get_scan_selection(file.path().as_ref())?;
-    let file_format = FileFormat::from_extension(file.path().as_ref())?;
+    }) = storage::file_list::get_scan_selection(file.path().as_ref())
+    else {
+        return;
+    };
+
+    let Some(file_format) = FileFormat::from_extension(file.path().as_ref()) else {
+        return;
+    };
+
     match file_format {
         FileFormat::Parquet => match selection {
             FileSelection::Rows(row_ids) => {
-                generate_parquet_access_plan(file, &row_ids, row_group_size)
+                if let Some(access_plan) =
+                    generate_parquet_access_plan(file, &row_ids, row_group_size)
+                {
+                    file.extensions.insert(access_plan);
+                }
             }
             #[cfg(feature = "enterprise")]
             FileSelection::RowGroups(row_group_ids) => {
-                let (num_rows, row_group_size) = parquet_file_layout(file, row_group_size)?;
-                Some(generate_row_group_access_plan(
-                    &row_group_ids,
-                    num_rows.div_ceil(row_group_size),
-                    file.path().as_ref(),
-                ))
+                if let Some((num_rows, row_group_size)) = parquet_file_layout(file, row_group_size)
+                {
+                    let access_plan = generate_row_group_access_plan(
+                        &row_group_ids,
+                        num_rows.div_ceil(row_group_size),
+                        file.path().as_ref(),
+                    );
+                    file.extensions.insert_arc(access_plan);
+                }
             }
             #[cfg(not(feature = "enterprise"))]
-            FileSelection::RowGroups(_) => None,
+            FileSelection::RowGroups(_) => {}
         },
         #[cfg(all(feature = "enterprise", feature = "vortex"))]
         FileFormat::Vortex => match selection {
-            FileSelection::Rows(row_ids) => generate_vortex_access_plan(&row_ids),
+            FileSelection::Rows(row_ids) => {
+                if let Some(access_plan) = generate_vortex_access_plan(&row_ids) {
+                    file.extensions.insert(access_plan);
+                }
+            }
             // row-group sampling is parquet only; vortex falls back to a full scan
-            FileSelection::RowGroups(_) => None,
+            FileSelection::RowGroups(_) => {}
         },
         #[cfg(not(all(feature = "enterprise", feature = "vortex")))]
-        FileFormat::Vortex => None,
+        FileFormat::Vortex => {}
     }
 }
 
@@ -84,7 +101,7 @@ fn generate_parquet_access_plan(
     file: &PartitionedFile,
     row_ids: &BooleanBuffer,
     row_group_size: Option<u32>,
-) -> Option<Arc<dyn std::any::Any + Send + Sync>> {
+) -> Option<ParquetAccessPlan> {
     let (num_rows, row_group_size) = parquet_file_layout(file, row_group_size)?;
     let row_group_count = num_rows.div_ceil(row_group_size);
 
@@ -105,7 +122,7 @@ fn generate_parquet_access_plan(
         "file path: file={:?}, row_group_count={row_group_count}, access_plan={access_plan:?}",
         file.path().as_ref()
     );
-    Some(Arc::new(access_plan))
+    Some(access_plan)
 }
 
 struct RowGroupSelectionBuilder<'a> {
@@ -284,10 +301,6 @@ mod tests {
         file
     }
 
-    fn downcast_plan(plan: &Arc<dyn std::any::Any + Send + Sync>) -> &ParquetAccessPlan {
-        plan.downcast_ref::<ParquetAccessPlan>().unwrap()
-    }
-
     #[test]
     fn test_generate_parquet_access_plan_from_sorted_row_ids() {
         // 10 rows, row groups of 4: rg0=[0..4), rg1=[4..8), rg2=[8..10)
@@ -316,7 +329,7 @@ mod tests {
             2,
             RowSelection::from(vec![RowSelector::skip(1), RowSelector::select(1)]),
         );
-        assert_eq!(downcast_plan(&plan), &expected);
+        assert_eq!(plan, expected);
     }
 
     #[test]
@@ -330,7 +343,7 @@ mod tests {
         let mut expected = ParquetAccessPlan::new_none(3);
         expected.scan(1);
         expected.scan_selection(1, RowSelection::from(vec![RowSelector::select(4)]));
-        assert_eq!(downcast_plan(&plan), &expected);
+        assert_eq!(plan, expected);
     }
 
     #[test]
@@ -351,7 +364,7 @@ mod tests {
                 RowSelector::skip(1),
             ]),
         );
-        assert_eq!(downcast_plan(&plan), &expected);
+        assert_eq!(plan, expected);
     }
 
     #[test]
@@ -374,7 +387,7 @@ mod tests {
             1,
             RowSelection::from(vec![RowSelector::select(2), RowSelector::skip(2)]),
         );
-        assert_eq!(downcast_plan(&plan), &expected);
+        assert_eq!(plan, expected);
     }
 
     fn make_exec() -> Arc<dyn ExecutionPlan> {
