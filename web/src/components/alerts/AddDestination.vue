@@ -343,7 +343,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </div>
               <div
-                class="tw:py-1 destination-method-select"
+                class="tw:py-1"
                 :class="{ 'tw:w-1/4': !isAlerts, 'tw:w-1/2': isAlerts }"
               >
                 <OSelect
@@ -359,7 +359,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 v-if="!isAlerts"
-                class="tw:w-1/4 tw:py-1 destination-method-select"
+                class="tw:w-1/4 tw:py-1"
               >
                 <OSelect
                   data-test="add-destination-output-format-select"
@@ -1357,8 +1357,3 @@ const filterActions = (val: string, update: any) => {
   filterColumns(actionOptions.value, val, update);
 };
 </script>
-<style>
-.destination-method-select .q-field__native > :first-child {
-  text-transform: uppercase !important;
-}
-</style>
