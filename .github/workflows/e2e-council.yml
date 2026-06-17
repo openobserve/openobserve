@@ -119,7 +119,7 @@ jobs:
       author: ${{ steps.prinfo.outputs.author }} # source-PR author login; used to auto-assign the test PR (pr_back)
       head_ref: ${{ steps.prinfo.outputs.head_ref }}
       head_sha: ${{ steps.prinfo.outputs.head_sha }}
-      mode: ${{ steps.prinfo.outputs.mode }}               # open | merged (auto-on-merge)
+      mode: ${{ steps.prinfo.outputs.mode }}               # open | merged (auto-on-merge OR a merged PR targeted by /e2e/dispatch)
       base_ref: ${{ steps.prinfo.outputs.base_ref }}       # test-PR base: feature branch (open) or main (merged)
       work_branch: ${{ steps.prinfo.outputs.work_branch }} # autoe2e/pr-<n> (both modes — rename-proof identity)
       checkout_ref: ${{ steps.prinfo.outputs.checkout_ref }} # generate checks this out: feature commit, OR the work branch when reusing
@@ -180,12 +180,17 @@ jobs:
             core.setOutput('head_ref', headRef);
             core.setOutput('head_sha', headSha);  // immutable — pinned by generate to avoid TOCTOU
 
-            // MODE — open (comment/dispatch on a live PR) vs merged (auto-on-merge). They differ:
+            // MODE — open (live PR) vs merged. They differ:
             //  - open:   stack the test branch on the still-open feature branch (base = head_ref),
             //            check out the PR head, branch name keyed on the feature branch.
             //  - merged: the feature is already in main and its branch may be deleted → base = main,
             //            check out the merge commit, branch name keyed on the (stable) PR number.
-            const merged = context.eventName === 'pull_request';
+            // Merged mode fires on the auto-on-merge `pull_request` event AND whenever a /e2e
+            // comment or manual dispatch targets an ALREADY-MERGED PR (data.merged === true). Without
+            // the latter, base_ref defaults to the feature branch — which a merged PR has usually had
+            // deleted — so `gh pr create` in pr_back dies with blank head/base SHAs ("Base ref must be
+            // a branch"). data.merged (from pulls.get) is the authoritative, trigger-agnostic signal.
+            const merged = context.eventName === 'pull_request' || data.merged === true;
             core.setOutput('mode', merged ? 'merged' : 'open');
             core.setOutput('base_ref', merged ? (data.base ? data.base.ref : 'main') : headRef);
             // Branch identity is keyed on the (immutable) PR number in BOTH modes — survives a
