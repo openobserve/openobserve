@@ -45,14 +45,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- Chips Row -->
   <div
     v-if="hasChips || $slots['chip-actions']"
-    ref="containerRef"
     class="tw:flex tw:items-center tw:gap-6 tw:px-4 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
   >
-    <!-- Context chips (Correlated by) -->
+    <!-- Context chips (Correlated by) — flex-1 so it occupies exactly the space
+         left after the shrink-0 subject section (toggles + dynamic badge). Its
+         measured width drives the responsive overflow math. -->
     <div
       v-if="contextChips && contextChips.length > 0"
-      class="tw:flex tw:items-center tw:gap-3  tw:py-2"
-      :class="showSubjectSection ? 'tw:max-w-[calc(100%-18.75rem)]' : 'tw:max-w-full'"
+      ref="containerRef"
+      class="tw:flex tw:items-center tw:gap-3  tw:py-2 tw:flex-1 tw:min-w-0"
     >
       <span class="tw:text-2! tw:m-0 tw:text-typography-meta tw:shrink-0">Correlated by:</span>
       <div class="tw:flex tw:items-center tw:gap-2 tw:min-w-0 tw:overflow-hidden">
@@ -74,13 +75,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="tw:cursor-default"
             :data-test="`correlation-event-header-overflow-${hiddenChipCount}`"
           >
-            +{{ hiddenChipCount }}
+            <template v-if="hiddenChipCount !== contextChips.length">+</template>{{ hiddenChipCount }}<template v-if="hiddenChipCount === contextChips.length"> Fields</template>
           </OBadge>
-          <OTooltip
-            :content="hiddenChipsTooltip"
-            side="top"
-            :disabled="hiddenChipCount === 0"
-          />
+          <OTooltip side="top" :disabled="hiddenChipCount === 0">
+            <template #content>
+              <div class="tw:flex tw:flex-col tw:items-start tw:gap-1">
+                <OBadge
+                  v-for="chip in hiddenChips"
+                  :key="chip.key"
+                  :variant="chipBadgeVariant(chip.key)"
+                  :size="badgeSize"
+                  dot
+                  :data-test="`correlation-event-header-hidden-chip-${chip.key}`"
+                >
+                  {{ chip.label }} = {{ chip.value }}
+                </OBadge>
+              </div>
+            </template>
+          </OTooltip>
         </span>
       </div>
     </div>
@@ -118,6 +130,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </OToggleGroupItem>
       </OToggleGroup>
+
+      <!-- Selected subject as a "label = value" badge (when it carries a value) -->
+      <OBadge
+        v-if="activeSubjectChip && activeSubjectChip.value"
+        variant="amber-outline"
+        :size="badgeSize"
+        dot
+        :data-test="`correlation-event-header-active-subject-${activeSubjectChip.key}`"
+      >
+        {{ activeSubjectChip.label }} = {{ activeSubjectChip.value }}
+      </OBadge>
     </div>
 
     <!-- Slot for actions co-located with the chip row (e.g. wrap-text button) -->
@@ -130,6 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { ref, computed, watch, onBeforeUnmount } from "vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
+import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -200,7 +224,7 @@ const CHIP_VARIANTS = [
   "indigo-outline",
 ] as const;
 
-const chipBadgeVariant = (key: string): string =>
+const chipBadgeVariant = (key: string): BadgeVariant =>
   CHIP_VARIANTS[hashKey(key) % CHIP_VARIANTS.length];
 
 // ── Responsive overflow (ResizeObserver) ─────────────────────────────────────
@@ -242,6 +266,13 @@ const showSubjectSection = computed(
   () => (props.subjectChips?.length ?? 0) > 0,
 );
 
+// The currently-selected subject chip, shown as a "label = value" badge after the
+// View-by toggles. Only meaningful when it carries a concrete value (trace/log);
+// incidents' valueless subjects leave this null so no empty badge renders.
+const activeSubjectChip = computed<DimensionChip | undefined>(() =>
+  props.subjectChips?.find((c) => c.key === props.activeSubject),
+);
+
 const hasChips = computed(
   () =>
     (props.contextChips?.length ?? 0) > 0 || showSubjectSection.value,
@@ -252,14 +283,12 @@ const displayedChips = computed<DimensionChip[]>(() => {
   if (chips.length === 0) return [];
 
   if (props.overflowMode === "responsive") {
+    // containerRef is the flex-1 context wrapper, so its measured width already
+    // excludes the (dynamic) subject section + badge — no need to reserve for them.
     const fullWidth = containerWidth.value;
-    const reservedForSubjects = showSubjectSection.value ? 300 : 0;
     const labelWidth = 90; // "Correlated by:" label
-    const paddingAndGaps = 32;
-    const available = Math.max(
-      150,
-      fullWidth - reservedForSubjects - labelWidth - paddingAndGaps,
-    );
+    const paddingAndGaps = 8;
+    const available = fullWidth - labelWidth - paddingAndGaps;
 
     let usedWidth = 0;
     let visibleCount = 0;
@@ -270,11 +299,11 @@ const displayedChips = computed<DimensionChip[]>(() => {
         remaining > 0 ? OVERFLOW_INDICATOR_WIDTH + CHIP_GAP : 0;
       const neededWidth =
         chipWidth + (i > 0 ? CHIP_GAP : 0) + overflowSpace;
-      if (usedWidth + neededWidth > available && visibleCount > 0) break;
+      if (usedWidth + neededWidth > available) break;
       usedWidth += chipWidth + (i > 0 ? CHIP_GAP : 0);
       visibleCount++;
     }
-    return chips.slice(0, Math.max(1, visibleCount));
+    return chips.slice(0, visibleCount);
   }
 
   return chips.slice(0, props.overflowThreshold);
@@ -286,10 +315,6 @@ const hiddenChips = computed<DimensionChip[]>(() => {
 });
 
 const hiddenChipCount = computed(() => hiddenChips.value.length);
-
-const hiddenChipsTooltip = computed(() =>
-  hiddenChips.value.map((chip) => `${chip.label} = ${chip.value}`).join("\n"),
-);
 
 // ── Source event banner helpers ───────────────────────────────────────────────
 
