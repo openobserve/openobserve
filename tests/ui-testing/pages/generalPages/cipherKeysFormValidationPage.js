@@ -18,6 +18,7 @@ export class CipherKeysFormValidationPage {
     // AddCipherKey — store type select
     this.storeTypeSelect = page.locator('[data-test="add-cipher-key-type-input"]');
     this.storeTypeError = page.locator('[data-test="add-cipher-key-type-input-error"]');
+    this.storeTypeAkeylessOption = page.locator('[data-test="add-cipher-key-type-input-option"][data-test-value="akeyless"]');
 
     // AddCipherKey — step buttons
     this.continueButton = page.locator('[data-test="add-report-step1-continue-btn"]');
@@ -27,7 +28,7 @@ export class CipherKeysFormValidationPage {
 
     // AddOpenobserveType — secret textarea
     this.secretInput = page.locator('[data-test="add-cipher-key-openobserve-secret-input-field"]');
-    this.secretError = page.locator('[data-test="add-cipher-key-openobserve-secret-input"] [role="alert"]');
+    this.secretError = page.locator('[data-test="add-cipher-key-openobserve-secret-input-error"]');
 
     // AddAkeylessType — base URL
     this.akeylessBaseUrlInput = page.locator('[data-test="add-cipher-key-akeyless-baseurl-input-field"]');
@@ -37,9 +38,12 @@ export class CipherKeysFormValidationPage {
     this.akeylessAccessIdInput = page.locator('[data-test="add-cipher-key-akeyless-access-id-input-field"]');
     this.akeylessAccessIdError = page.locator('[data-test="add-cipher-key-akeyless-access-id-input-error"]');
 
-    // AddAkeylessType — auth method select
-    this.authMethodSelect = page.locator('[data-test="add-cipher-key-auth-method-input"]').first();
-    this.authMethodError = page.locator('[data-test="add-cipher-key-auth-method-input-error"]').first();
+    // AddAkeylessType — auth method select (akeyless step 1 sub-form).
+    // NOTE: shares the data-test "add-cipher-key-auth-method-input" with the
+    // AddEncryptionMechanism provider-type select, but the two are never mounted
+    // at the same time (akeyless = step 1 sub-form, mechanism = step 2).
+    this.authMethodSelect = page.locator('[data-test="add-cipher-key-auth-method-input"]');
+    this.authMethodError = page.locator('[data-test="add-cipher-key-auth-method-input-error"]');
 
     // AddAkeylessType — access key
     this.akeylessAccessKeyInput = page.locator('[data-test="add-cipher-key-akeyless-access-key-input-field"]');
@@ -53,14 +57,26 @@ export class CipherKeysFormValidationPage {
     this.staticSecretNameInput = page.locator('[data-test="add-cipher-key-akeyless-static-secret-name-input-field"]');
     this.staticSecretNameError = page.locator('[data-test="add-cipher-key-akeyless-static-secret-name-input-error"]');
 
-    // AddEncryptionMechanism — provider type select and algorithm select
-    this.encryptionProviderTypeSelect = page.locator('[data-test="add-cipher-key-auth-method-input"]').last();
-    this.encryptionProviderTypeError = page.locator('[data-test="add-cipher-key-auth-method-input-error"]').last();
+    // AddEncryptionMechanism — provider type select and algorithm select (step 2)
+    this.encryptionProviderTypeSelect = page.locator('[data-test="add-cipher-key-auth-method-input"]');
+    this.encryptionProviderTypeError = page.locator('[data-test="add-cipher-key-auth-method-input-error"]');
+    this.encryptionProviderTypeTrigger = page.locator('[data-test="add-cipher-key-auth-method-input-trigger"]');
     this.encryptionAlgorithmSelect = page.locator('[data-test="add-cipher-algorithm-input"]');
     this.encryptionAlgorithmError = page.locator('[data-test="add-cipher-algorithm-input-error"]');
+    this.encryptionAlgorithmTrigger = page.locator('[data-test="add-cipher-algorithm-input-trigger"]');
 
     // Toast
     this.toastMessages = page.locator('[data-test="o-toast-message"]');
+  }
+
+  // ── Per-value option factory (runtime-dynamic value) ─────────────────────────
+
+  /**
+   * Returns the listbox option for a select identified by its parent data-test
+   * and the option's `data-test-value` (the OSelect value-specific convention).
+   */
+  getSelectOptionByValue(parentDataTest, value) {
+    return this.page.locator(`[data-test="${parentDataTest}-option"][data-test-value="${value}"]`);
   }
 
   // ── Navigation ──────────────────────────────────────────────────────────────
@@ -98,14 +114,11 @@ export class CipherKeysFormValidationPage {
 
   // ── Store type ──────────────────────────────────────────────────────────────
 
-  async selectStoreType(label) {
+  async selectAkeylessStoreType() {
     await this.storeTypeSelect.waitFor({ state: 'visible' });
     await this.storeTypeSelect.click();
-    await this.page.locator('[data-test="add-cipher-key-type-input-option"]', { hasText: label }).first().click();
-  }
-
-  async selectAkeylessStoreType() {
-    await this.selectStoreType('Akeyless');
+    await this.storeTypeAkeylessOption.waitFor({ state: 'visible' });
+    await this.storeTypeAkeylessOption.click();
   }
 
   // ── Continue / Save ─────────────────────────────────────────────────────────
@@ -132,63 +145,53 @@ export class CipherKeysFormValidationPage {
   async fillAkeylessBaseUrl(url) {
     await this.akeylessBaseUrlInput.waitFor({ state: 'attached' });
     await this.akeylessBaseUrlInput.fill(url, { force: true });
-    // Trigger change event so validation fires
-    await this.akeylessBaseUrlInput.dispatchEvent('input');
   }
 
   async fillAkeylessAccessId(id) {
     await this.akeylessAccessIdInput.waitFor({ state: 'attached' });
     await this.akeylessAccessIdInput.fill(id, { force: true });
-    await this.akeylessAccessIdInput.dispatchEvent('input');
   }
 
   async fillAkeylessAccessKey(key) {
     await this.akeylessAccessKeyInput.waitFor({ state: 'attached' });
     await this.akeylessAccessKeyInput.fill(key, { force: true });
-    await this.akeylessAccessKeyInput.dispatchEvent('input');
   }
 
   async fillStaticSecretName(name) {
     await this.staticSecretNameInput.waitFor({ state: 'attached' });
     await this.staticSecretNameInput.fill(name, { force: true });
-    await this.staticSecretNameInput.dispatchEvent('input');
   }
 
-  async selectAuthMethod(label) {
+  async selectAuthMethod(value) {
     await this.authMethodSelect.waitFor({ state: 'visible' });
     await this.authMethodSelect.click();
-    await this.page.locator('[data-test="add-cipher-key-auth-method-input-option"]', { hasText: label }).first().click();
+    const option = this.getSelectOptionByValue('add-cipher-key-auth-method-input', value);
+    await option.waitFor({ state: 'visible' });
+    await option.click();
   }
 
-  async selectSecretType(label) {
+  async selectSecretType(value) {
     await this.secretTypeSelect.waitFor({ state: 'visible' });
     await this.secretTypeSelect.click();
-    await this.page.locator('[data-test="add-cipher-key-secret-type-input-option"]', { hasText: label }).first().click();
+    const option = this.getSelectOptionByValue('add-cipher-key-secret-type-input', value);
+    await option.waitFor({ state: 'visible' });
+    await option.click();
   }
 
   // ── Toast assertion ─────────────────────────────────────────────────────────
 
   async verifyToastMessage(expectedText) {
-    const timeout = 12000;
-    const interval = 300;
-    let elapsed = 0;
-    let lastSeenTexts = [];
-
-    const lowerExpected = expectedText.toLowerCase();
-    while (elapsed < timeout) {
-      const texts = await this.toastMessages.allTextContents().catch(() => []);
-      lastSeenTexts = texts;
-      if (texts.some(t => t && t.toLowerCase().includes(lowerExpected))) {
-        return;
-      }
-      await new Promise(resolve => setTimeout(resolve, interval));
-      elapsed += interval;
-    }
-
-    const seen = lastSeenTexts.length > 0
-      ? `Last visible toasts: ${JSON.stringify(lastSeenTexts)}`
-      : 'No toasts were visible at last check.';
-    throw new Error(`Expected toast message "${expectedText}" not found within ${timeout}ms. ${seen}`);
+    // Deterministic wait: poll the visible toast text contents until the expected
+    // message appears (or the assertion times out).
+    await expect
+      .poll(
+        async () => {
+          const texts = await this.toastMessages.allTextContents().catch(() => []);
+          return texts.map((t) => (t || '').toLowerCase());
+        },
+        { timeout: 12000, intervals: [300] },
+      )
+      .toEqual(expect.arrayContaining([expect.stringContaining(expectedText.toLowerCase())]));
   }
 
   // ── Assertion helpers ────────────────────────────────────────────────────────
@@ -227,18 +230,36 @@ export class CipherKeysFormValidationPage {
 
   // ── AddEncryptionMechanism helpers ──────────────────────────────────────────
 
-  async selectEncryptionProviderType(label) {
+  async selectEncryptionProviderType(value) {
     await this.encryptionProviderTypeSelect.waitFor({ state: 'visible', timeout: 10000 });
     await this.encryptionProviderTypeSelect.click();
-    await this.page.locator('[data-test="add-cipher-key-auth-method-input-option"]', { hasText: label }).first().click();
+    const option = this.getSelectOptionByValue('add-cipher-key-auth-method-input', value);
+    await option.waitFor({ state: 'visible' });
+    await option.click();
   }
 
   async assertEncryptionProviderTypeErrorVisible() {
     await expect(this.encryptionProviderTypeError).toBeVisible({ timeout: 5000 });
   }
 
+  async assertEncryptionProviderTypeErrorHidden() {
+    await expect(this.encryptionProviderTypeError).toHaveCount(0);
+  }
+
+  async assertEncryptionProviderTypeSelected(label) {
+    await expect(this.encryptionProviderTypeTrigger).toHaveAttribute('data-test-selected-label', label, { timeout: 5000 });
+  }
+
   async assertEncryptionAlgorithmErrorVisible() {
     await expect(this.encryptionAlgorithmError).toBeVisible({ timeout: 5000 });
+  }
+
+  async assertEncryptionAlgorithmErrorHidden() {
+    await expect(this.encryptionAlgorithmError).toHaveCount(0);
+  }
+
+  async assertEncryptionAlgorithmSelected(label) {
+    await expect(this.encryptionAlgorithmTrigger).toHaveAttribute('data-test-selected-label', label, { timeout: 5000 });
   }
 
   async assertSaveButtonDisabled() {

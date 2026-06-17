@@ -430,9 +430,6 @@ test.describe('IAM UpdateRole form validation', { tag: ['@iamFormValidation', '@
     }, async ({ page }) => {
         testLogger.info('TC-UR-001: UpdateRole dialog opens on edit click');
 
-        const isCloud = await page.locator('[data-test^="edit-basic-user-"]').count();
-        test.skip(isCloud === 0, 'UpdateRole not rendered in cloud mode or no users visible');
-
         await pm.iamFormValidation.openUpdateRoleDialogForFirstUser();
 
         await expect(pm.iamFormValidation.getUpdateRoleDialogLocator()).toBeVisible();
@@ -444,9 +441,6 @@ test.describe('IAM UpdateRole form validation', { tag: ['@iamFormValidation', '@
         tag: ['@iamFormValidation', '@P1']
     }, async ({ page }) => {
         testLogger.info('TC-UR-002: Role required error when role is cleared');
-
-        const editBtnCount = await page.locator('[data-test^="edit-basic-user-"]').count();
-        test.skip(editBtnCount === 0, 'UpdateRole not rendered in cloud mode or no users visible');
 
         await pm.iamFormValidation.openUpdateRoleDialogForFirstUser();
 
@@ -481,9 +475,6 @@ test.describe('IAM UpdateRole form validation', { tag: ['@iamFormValidation', '@
         tag: ['@iamFormValidation', '@P1']
     }, async ({ page }) => {
         testLogger.info('TC-UR-003: Successful role update saves and closes dialog');
-
-        const editBtnCount = await page.locator('[data-test^="edit-basic-user-"]').count();
-        test.skip(editBtnCount === 0, 'UpdateRole not rendered in cloud mode or no users visible');
 
         await pm.iamFormValidation.openUpdateRoleDialogForFirstUser();
 

@@ -95,8 +95,9 @@ test.describe("Regex Patterns form validation", () => {
         await pm.regexPatternsFormValidation.openAddPatternDrawer();
         await expect(pm.regexPatternsFormValidation.getDrawerLocator()).toBeVisible();
 
-        // Use a stable, unique-enough name with a static suffix per the UNIQUE NAMES rule
-        await pm.regexPatternsFormValidation.fillName('test_fv_regex_001');
+        // Unique name per run so re-runs don't hit a duplicate-name backend
+        // rejection (which keeps the drawer open and fails the close assertion).
+        await pm.regexPatternsFormValidation.fillName(`test_fv_regex_${Date.now()}`);
         // Valid regex pattern matching digits
         await pm.regexPatternsFormValidation.fillPattern('\\d{4}-\\d{2}-\\d{2}');
 

@@ -54,7 +54,7 @@ export class AiToolsetsFormValidationPage {
         testLogger.debug('Navigating to AI Toolsets page via URL');
         const orgId = process.env['ORGNAME'] || 'default';
         const baseUrl = process.env['ZO_BASE_URL'] || 'http://localhost:5080';
-        await this.page.goto(`${baseUrl}/web/management/ai_toolsets?org_identifier=${orgId}`);
+        await this.page.goto(`${baseUrl}/web/settings/ai_toolsets?org_identifier=${orgId}`);
         await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
         await this.page.locator(this.addToolsetBtn).waitFor({ state: 'visible', timeout: 15000 });
         testLogger.debug('AI Toolsets list page ready');
@@ -86,10 +86,17 @@ export class AiToolsetsFormValidationPage {
         await this.page.locator(this.mcpUrlInput).fill(url);
     }
 
+    getKindOptionLocator(value) {
+        return this.page.locator(`${this.kindSelectOption}[data-test-value="${value}"]`);
+    }
+
     async selectKind(label) {
         testLogger.debug('Selecting toolset kind', { label });
-        await this.page.locator(this.kindSelectPopover).click();
-        await this.page.locator(this.kindSelectOption, { hasText: label }).first().click();
+        const labelToValue = { 'MCP Server': 'mcp', 'CLI Tool': 'cli', 'Skill': 'skill' };
+        const value = labelToValue[label] || label;
+        await this.page.locator(this.kindSelect).click();
+        await this.page.locator(this.kindSelectPopover).waitFor({ state: 'visible', timeout: 8000 });
+        await this.getKindOptionLocator(value).click();
     }
 
     async fillCliCommand(command) {

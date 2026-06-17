@@ -13,7 +13,7 @@ export class RegexPatternsFormValidationPage {
         this.addPatternButton       = '[data-test="regex-pattern-list-add-pattern-btn"]';
 
         // ── Drawer ───────────────────────────────────────────────────────────
-        this.drawer                 = '[data-test="add-regex-pattern-drawer"]';
+        this.drawer                 = '[data-test="regex-pattern-list-add-regex-pattern-drawer"]';
 
         // ── Name field (OFormInput — generates -field and -error suffixes) ───
         // data-test="add-regex-pattern-name-input" on OFormInput
@@ -29,8 +29,8 @@ export class RegexPatternsFormValidationPage {
         this.patternError           = '[data-test="add-regex-pattern-input-error"]';
 
         // ── ODrawer built-in action buttons scoped to drawer ─────────────────
-        this.saveButton             = '[data-test="add-regex-pattern-drawer"] [data-test="o-drawer-primary-btn"]';
-        this.cancelButton           = '[data-test="add-regex-pattern-drawer"] [data-test="o-drawer-secondary-btn"]';
+        this.saveButton             = '[data-test="regex-pattern-list-add-regex-pattern-drawer"] [data-test="o-drawer-primary-btn"]';
+        this.cancelButton           = '[data-test="regex-pattern-list-add-regex-pattern-drawer"] [data-test="o-drawer-secondary-btn"]';
 
         // ── Toast feedback ───────────────────────────────────────────────────
         this.toastSuccess           = '[data-test-variant="success"]';
@@ -43,7 +43,7 @@ export class RegexPatternsFormValidationPage {
     async navigateToRegexPatterns() {
         const orgName = process.env.ORGNAME || 'default';
         const baseUrl = process.env.ZO_BASE_URL;
-        const targetUrl = `${baseUrl}/web/management/regex_patterns?org_identifier=${orgName}`;
+        const targetUrl = `${baseUrl}/web/settings/regex_patterns?org_identifier=${orgName}`;
         await this.page.goto(targetUrl);
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.locator(this.addPatternButton).waitFor({ state: 'visible', timeout: 10000 });

@@ -206,7 +206,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="domain-card tw:mb-1"
         >
           <div class="domain-header tw:flex tw:items-center tw:justify-between tw:px-3 tw:py-2">
-          <div class="tw:text-base tw:font-bold">{{ domain.name }}</div>
+          <div
+            :data-test="`domain-management-domain-name-${domain.name}`"
+            class="tw:text-base tw:font-bold"
+          >{{ domain.name }}</div>
           <OButton
             icon-left="close"
             variant="ghost-destructive"
@@ -297,6 +300,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="resetForm"
       >{{ t('common.cancel') }}</OButton>
       <OButton
+        data-test="domain-management-save-changes-btn"
         variant="primary"
         size="sm-action"
         @click="saveChanges"

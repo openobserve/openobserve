@@ -212,10 +212,10 @@ test.describe('Cipher Keys — AddEncryptionMechanism form validation', {
     testLogger.info('Navigated to Add Cipher Key form (encryption mechanism step)');
   });
 
-  test('should show provider type error when encryption mechanism provider is not selected', {
+  test('should default the encryption mechanism provider type to Simple with no error', {
     tag: ['@cipher-keys-form-validation', '@P0', '@smoke'],
   }, async ({ page }) => {
-    testLogger.info('Testing AddEncryptionMechanism — empty provider type on Continue');
+    testLogger.info('Testing AddEncryptionMechanism — provider type default state');
 
     // Advance past step 1 with a valid name and secret so the encryption mechanism
     // step becomes visible
@@ -223,49 +223,32 @@ test.describe('Cipher Keys — AddEncryptionMechanism form validation', {
     await pm.cipherKeysFormValidation.fillSecret(process.env.ZO_CIPHER_KEY_SECRET || 'test_secret_fv');
     await pm.cipherKeysFormValidation.clickContinue();
 
-    // On step 2, try to save without selecting a provider type
-    const saveEnabled = await pm.cipherKeysFormValidation.saveButton.isEnabled().catch(() => false);
-    if (!saveEnabled) {
-      testLogger.info('Save disabled before provider type selection — test passes by state check');
-      await expect(pm.cipherKeysFormValidation.saveButton).toBeDisabled();
-      return;
-    }
-
-    await pm.cipherKeysFormValidation.clickSave();
-
-    // Provider type error should appear
-    const providerError = pm.cipherKeysFormValidation.encryptionProviderTypeError;
-    await expect(providerError).toBeVisible({ timeout: 5000 });
-    await expect(providerError).toContainText('Provider type is required');
-    testLogger.info('Provider type required error correctly shown');
+    // The provider type pre-selects "Simple" by default, so the
+    // "Provider type is required" error path is never reachable from the UI —
+    // assert the default selection and the absence of the required error.
+    await pm.cipherKeysFormValidation.assertEncryptionProviderTypeSelected('Simple');
+    await pm.cipherKeysFormValidation.assertEncryptionProviderTypeErrorHidden();
+    testLogger.info('Provider type defaults to Simple with no required error');
   });
 
-  test('should show algorithm error when Simple provider is selected but algorithm is empty', {
+  test('should default the Simple provider algorithm to AES 256 SIV with no error', {
     tag: ['@cipher-keys-form-validation', '@P0', '@smoke'],
   }, async ({ page }) => {
-    testLogger.info('Testing AddEncryptionMechanism — Simple provider without algorithm');
+    testLogger.info('Testing AddEncryptionMechanism — Simple provider algorithm default');
 
     await pm.cipherKeysFormValidation.fillName('test_fv_em_algo_001');
     await pm.cipherKeysFormValidation.fillSecret(process.env.ZO_CIPHER_KEY_SECRET || 'test_secret_fv');
     await pm.cipherKeysFormValidation.clickContinue();
 
-    // Select the "Simple" provider type in the encryption mechanism step
-    await pm.cipherKeysFormValidation.selectEncryptionProviderType('Simple');
+    // Re-select the "Simple" provider type in the encryption mechanism step
+    await pm.cipherKeysFormValidation.selectEncryptionProviderType('simple');
 
-    // Attempt to save without choosing an algorithm
-    const saveEnabled = await pm.cipherKeysFormValidation.saveButton.isEnabled().catch(() => false);
-    if (!saveEnabled) {
-      testLogger.info('Save disabled before algorithm selection — test passes by state check');
-      await expect(pm.cipherKeysFormValidation.saveButton).toBeDisabled();
-      return;
-    }
-
-    await pm.cipherKeysFormValidation.clickSave();
-
-    const algorithmError = pm.cipherKeysFormValidation.encryptionAlgorithmError;
-    await expect(algorithmError).toBeVisible({ timeout: 5000 });
-    await expect(algorithmError).toContainText('Algorithm is required');
-    testLogger.info('Algorithm required error correctly shown for Simple provider type');
+    // The algorithm pre-selects "AES 256 SIV" for the Simple provider, so the
+    // "Algorithm is required" error path is never reachable — assert the default
+    // selection and the absence of the required error.
+    await pm.cipherKeysFormValidation.assertEncryptionAlgorithmSelected('AES 256 SIV');
+    await pm.cipherKeysFormValidation.assertEncryptionAlgorithmErrorHidden();
+    testLogger.info('Simple provider algorithm defaults to AES 256 SIV with no required error');
   });
 });
 
@@ -291,11 +274,16 @@ test.describe('Cipher Keys — valid OpenObserve key creation', {
   }, async ({ page }) => {
     testLogger.info('Testing successful OpenObserve cipher key creation');
 
-    const keyName = 'test_fv_ck_oo_001';
+    const keyName = `test_fv_ck_oo_${Date.now()}`;
 
-    // Step 1: fill name, leave store type as OpenObserve (local — default), fill secret
+    // Step 1: fill name, leave store type as OpenObserve (local — default), fill secret.
+    // The mechanism defaults to Simple / AES-256-SIV, which requires a 64-byte
+    // key. The secret must therefore be a base64-encoded 64-byte value, otherwise
+    // the backend rejects it with "Failed to decode the key …".
+    const validAes256SivSecret =
+      'AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQ==';
     await pm.cipherKeysFormValidation.fillName(keyName);
-    await pm.cipherKeysFormValidation.fillSecret(process.env.ZO_CIPHER_KEY_SECRET || 'test_secret_value_for_fv');
+    await pm.cipherKeysFormValidation.fillSecret(process.env.ZO_CIPHER_KEY_SECRET || validAes256SivSecret);
 
     // Proceed to step 2
     await pm.cipherKeysFormValidation.clickContinue();

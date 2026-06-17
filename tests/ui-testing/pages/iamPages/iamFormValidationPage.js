@@ -61,24 +61,28 @@ export class IamFormValidationPage {
         // AddUser.vue uses data-test="user-email-field", "user-password-field", "user-role-field"
         // OInput auto-generates -field / -error suffixes
         // OInput data-test="user-email-field" → error span: data-test="user-email-field-error"
-        this.userEmailInput        = '[data-test="user-email-field"]';
+        this.userEmailInput        = '[data-test="user-email-field-field"]';
         this.userEmailError        = '[data-test="user-email-field-error"]';
         // OInput data-test="user-password-field" → error span: data-test="user-password-field-error"
-        this.userPasswordInput     = '[data-test="user-password-field"]';
+        this.userPasswordInput     = '[data-test="user-password-field-field"]';
         this.userPasswordError     = '[data-test="user-password-field-error"]';
         // OSelect data-test="user-role-field" → error span: data-test="user-role-field-error"
         this.userRoleError         = '[data-test="user-role-field-error"]';
         this.addUserSubmitBtn      = '[data-test="add-user-dialog"] [data-test="o-dialog-primary-btn"]';
         this.addUserCancelBtn      = '[data-test="add-user-dialog"] [data-test="o-dialog-secondary-btn"]';
 
-        // ── UpdateRole dialog ─────────────────────────────────────────────────
-        // Trigger: row action button data-test="edit-basic-user-${email}"
-        this.updateRoleDialog      = '[data-test="update-role-dialog"]';
-        // OSelect data-test="iam-update-role-select" → -error (manual error from roleError ref)
-        this.updateRoleSelect      = '[data-test="iam-update-role-select-popover"]';
-        this.updateRoleError       = '[data-test="iam-update-role-select-error"]';
-        this.updateRoleSaveBtn     = '[data-test="iam-update-role-save-btn"]';
-        this.updateRoleCancelBtn   = '[data-test="iam-update-role-cancel-btn"]';
+        // ── UpdateRole (edit user) dialog ─────────────────────────────────────
+        // Trigger: row action button data-test="edit-basic-user-${email}" which,
+        // in OSS / enterprise (non-cloud) mode, opens the AddUser dialog in update
+        // mode (data-test="add-user-dialog"). The legacy UpdateRole.vue dialog is
+        // not reachable from this edit button in the current build.
+        this.editBasicUserFirstBtn = '[data-test^="edit-basic-user-"]';
+        this.updateRoleDialog      = '[data-test="add-user-dialog"]';
+        // OSelect data-test="user-role-field" → -trigger to open, -error span on validation
+        this.updateRoleSelect      = '[data-test="user-role-field-trigger"]';
+        this.updateRoleError       = '[data-test="user-role-field-error"]';
+        this.updateRoleSaveBtn     = '[data-test="add-user-dialog"] [data-test="o-dialog-primary-btn"]';
+        this.updateRoleCancelBtn   = '[data-test="add-user-dialog"] [data-test="o-dialog-secondary-btn"]';
 
         // ── Toast / success messages ──────────────────────────────────────────
         this.toastSuccess          = '[data-test-variant="success"]';
@@ -246,12 +250,17 @@ export class IamFormValidationPage {
     getUpdateRoleSaveBtnLocator()  { return this.page.locator(this.updateRoleSaveBtn); }
     getUpdateRoleCancelBtnLocator(){ return this.page.locator(this.updateRoleCancelBtn); }
 
-    // Open the UpdateRole dialog for the first user visible in the Users list
+    // Open the UpdateRole (edit user) dialog for the first user visible in the list
     async openUpdateRoleDialogForFirstUser() {
-        const editBtn = this.page.locator('[data-test^="edit-basic-user-"]').first();
+        const editBtn = this.page.locator(this.editBasicUserFirstBtn).first();
         await editBtn.waitFor({ state: 'visible', timeout: 10000 });
         await editBtn.click();
         await this.page.locator(this.updateRoleDialog).waitFor({ state: 'visible', timeout: 10000 });
+    }
+
+    // Count of user-row edit buttons currently rendered in the Users list
+    async getEditUserButtonCount() {
+        return this.page.locator(this.editBasicUserFirstBtn).count();
     }
 
     async navigateToUsersTab() {
@@ -260,5 +269,7 @@ export class IamFormValidationPage {
         await tab.waitFor({ state: 'visible', timeout: 10000 });
         await tab.click();
         await this.page.locator(this.addBasicUserBtn).waitFor({ state: 'visible', timeout: 10000 });
+        // Wait for the user rows to render so edit-button presence checks are stable
+        await this.page.locator(this.editBasicUserFirstBtn).first().waitFor({ state: 'visible', timeout: 10000 });
     }
 }

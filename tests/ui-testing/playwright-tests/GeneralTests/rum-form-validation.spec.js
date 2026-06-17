@@ -61,8 +61,15 @@ test.describe('RUM Source Maps upload form validation', () => {
 
   // Create temp files once before the suite runs
   test.beforeAll(async () => {
-    // Minimal valid zip content (PK header)
-    tempZipPath = createTempFile('test_sourcemaps_fv.zip', 'PK\x03\x04');
+    // Minimal *valid* empty ZIP archive: a single End-Of-Central-Directory
+    // record (22 bytes). A bare local-file signature ("PK\x03\x04") is rejected
+    // by the backend with "Could not find EOCD", so the upload happy-path needs
+    // a structurally valid archive.
+    const emptyZip = Buffer.from([
+      0x50, 0x4b, 0x05, 0x06, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    ]);
+    tempZipPath = createTempFile('test_sourcemaps_fv.zip', emptyZip);
     // Non-zip file used to trigger format error
     tempTxtPath = createTempFile('invalid_sourcemaps_fv.txt', 'not a zip');
   });

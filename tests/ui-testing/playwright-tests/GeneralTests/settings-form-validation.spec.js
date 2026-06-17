@@ -89,21 +89,14 @@ test.describe("Settings OrganizationSettings form validation", () => {
         await pm.settingsFormValidation.fillSpanIdField('span_id_fv_001');
         await pm.settingsFormValidation.clickOrgSettingsSave();
 
-        // Expect success toast — either direct success or no error toast
+        // Saving with valid identifiers surfaces a success toast and no error toast
         const toastSuccess = pm.settingsFormValidation.getToastSuccessLocator();
         const toastError   = pm.settingsFormValidation.getToastErrorLocator();
 
-        // Wait briefly for a toast to appear
-        await page.waitForTimeout(1500);
+        await expect(toastSuccess.first()).toBeVisible({ timeout: 10000 });
+        await expect(toastError).toHaveCount(0);
 
-        // If a success toast appears it should not contain an error
-        const successCount = await toastSuccess.count();
-        const errorCount   = await toastError.count();
-
-        // At least one of these should be true: success appeared OR no error appeared
-        expect(successCount > 0 || errorCount === 0).toBe(true);
-
-        testLogger.info('Save with valid identifiers completed without client-side validation errors');
+        testLogger.info('Save with valid identifiers completed successfully');
     });
 });
 
@@ -120,20 +113,10 @@ test.describe("Settings OrgStorageEditor form validation", {
         testLogger.testStart(testInfo.title, testInfo.file);
         await navigateToBase(page);
         pm = new PageManager(page);
-        // Navigate to Settings — storage tab
+        // Navigate to Settings then open the storage editor (handles both the
+        // empty-state "configure" entry and the configured-org "update" entry).
         await pm.settingsFormValidation.navigateToSettings(page);
-        // Click the storage settings tab (Settings shell)
-        const storageTab = pm.settingsFormValidation.getStorageTabLocator();
-        const found = await storageTab.count();
-        if (found > 0) {
-            await storageTab.first().click();
-        }
-        // Wait for the "Add Storage" or storage list page to be ready
-        const addStorageBtn = pm.settingsFormValidation.getAddStorageBtnLocator();
-        await addStorageBtn.waitFor({ state: 'visible', timeout: 10000 });
-        await addStorageBtn.click();
-        // Wait for step 1 (provider selection)
-        await pm.settingsFormValidation.getStep1ContinueBtnLocator().waitFor({ state: 'visible', timeout: 10000 });
+        await pm.settingsFormValidation.openStorageEditor();
         testLogger.info('Navigated to OrgStorageEditor (step 1)');
     });
 
@@ -207,15 +190,8 @@ test.describe("Settings DomainManagement form validation", {
         testLogger.testStart(testInfo.title, testInfo.file);
         await navigateToBase(page);
         pm = new PageManager(page);
-        await pm.settingsFormValidation.navigateToSettings(page);
-        // Click the domain management tab
-        const domainTab = pm.settingsFormValidation.getDomainTabLocator();
-        const found = await domainTab.count();
-        if (found > 0) {
-            await domainTab.first().click();
-        }
-        // Wait for either the "no domain" message or the domain restrictions title
-        await pm.settingsFormValidation.getDomainRestrictionsTitleLocator().waitFor({ state: 'visible', timeout: 10000 });
+        // Domain Management only renders in the _meta org — switch there first.
+        await pm.settingsFormValidation.navigateToDomainManagement();
         testLogger.info('Navigated to Settings > Domain Management');
     });
 
@@ -263,8 +239,8 @@ test.describe("Settings DomainManagement form validation", {
         const noDomainMsg = pm.settingsFormValidation.getNoDomainMessageLocator();
         await expect(noDomainMsg).not.toBeVisible({ timeout: 5000 });
 
-        // The domain name should appear somewhere in the page
-        await expect(page.getByText(validDomain)).toBeVisible({ timeout: 5000 });
+        // The domain name should appear in the rendered domain card
+        await expect(pm.settingsFormValidation.getDomainNameLocator(validDomain)).toBeVisible({ timeout: 5000 });
 
         testLogger.info('Valid domain successfully added to the list');
     });
