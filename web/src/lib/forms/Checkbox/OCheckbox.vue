@@ -229,7 +229,7 @@ const labelSizeClasses: Record<NonNullable<CheckboxProps["size"]>, string> = {
         isDisabled && 'o-input-label--disabled',
       ]"
     >
-      <slot name="label">{{ label }}</slot>
+      <slot name="label">{{ label }}</slot><span v-if="required" aria-hidden="true">&nbsp;*</span>
     </span>
   </label>
 </template>

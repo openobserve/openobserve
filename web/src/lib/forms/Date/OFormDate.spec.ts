@@ -5,6 +5,7 @@ import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { h } from "vue";
 import OFormDate from "./OFormDate.vue";
 import OForm from "../Form/OForm.vue";
+import { z } from "zod";
 
 describe("OFormDate", () => {
   let wrapper: VueWrapper;
@@ -38,21 +39,20 @@ describe("OFormDate", () => {
     );
   });
 
-  it.skip("shows validator error after change", async () => {
+  it("shows schema error after submit when empty", async () => {
     wrapper = mount(OForm, {
-      props: { defaultValues: { dob: "" } },
+      props: {
+        defaultValues: { dob: "" },
+        schema: z.object({ dob: z.string().min(1, "Required") }),
+      },
       slots: {
-        default: () =>
-          h(OFormDate, {
-            name: "dob",
-            validators: [(v: string) => (!v ? "Required" : undefined)],
-          }),
+        default: () => h(OFormDate, { name: "dob" }),
       },
       global: { components: { OFormDate } },
     });
-    const input = wrapper.find("input");
-    await input.setValue("");
-    await input.trigger("blur");
+    await (
+      wrapper.vm as unknown as { form: { handleSubmit: () => Promise<unknown> } }
+    ).form.handleSubmit();
     await flushPromises();
     expect(wrapper.text()).toContain("Required");
   });

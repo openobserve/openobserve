@@ -29,6 +29,8 @@ export interface TimeProps {
   readonly?: boolean;
   /** Prevents interaction */
   disabled?: boolean;
+  /** Marks the field required — renders a `*` after the label (no manual ` *`). */
+  required?: boolean;
   /** Control size */
   size?: TimeSize;
   /** HTML id */

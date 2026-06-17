@@ -5,6 +5,7 @@ import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { h } from "vue";
 import OFormRange from "./OFormRange.vue";
 import OForm from "../Form/OForm.vue";
+import { z } from "zod";
 
 describe("OFormRange", () => {
   let wrapper: VueWrapper;
@@ -45,25 +46,25 @@ describe("OFormRange", () => {
     expect(Number((inputs[1].element as HTMLInputElement).value)).toBe(65);
   });
 
-  it("shows validator error after change", async () => {
+  it("shows schema error after submit when the range is too narrow", async () => {
     wrapper = mount(OForm, {
-      props: { defaultValues: { priceRange: { min: 10, max: 20 } } },
+      props: {
+        defaultValues: { priceRange: { min: 10, max: 20 } },
+        schema: z.object({
+          priceRange: z
+            .object({ min: z.number(), max: z.number() })
+            .refine((r) => r.max - r.min >= 30, "Range too narrow"),
+        }),
+      },
       slots: {
         default: () =>
-          h(OFormRange, {
-            name: "priceRange",
-            min: 0,
-            max: 100,
-            validators: [
-              (v: { min: number; max: number }) =>
-                v.max - v.min < 30 ? "Range too narrow" : undefined,
-            ],
-          }),
+          h(OFormRange, { name: "priceRange", min: 0, max: 100 }),
       },
       global: { components: { OFormRange } },
     });
-    const inputs = wrapper.findAll("input");
-    await inputs[1].setValue("25");
+    await (
+      wrapper.vm as unknown as { form: { handleSubmit: () => Promise<unknown> } }
+    ).form.handleSubmit();
     await flushPromises();
     expect(wrapper.text()).toContain("Range too narrow");
   });
