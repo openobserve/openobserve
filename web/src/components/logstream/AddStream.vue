@@ -60,6 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div data-test="add-stream-data-retention-input" v-if="showDataRetention" class="tw:mt-2">
           <OInput
+            data-test="add-stream-data-retention"
             v-model="streamInputs.dataRetentionDays"
             :label="t('logStream.dataRetention') + ' *'"
             class="showLabelOnTop"
@@ -115,6 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div data-test="add-stream-data-retention-input" v-if="showDataRetention" class="tw:mt-2">
           <OInput
+            data-test="add-stream-data-retention"
             v-model="streamInputs.dataRetentionDays"
             :label="t('logStream.dataRetention') + ' *'"
             class="showLabelOnTop"
