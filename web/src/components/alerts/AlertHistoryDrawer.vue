@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <ODrawer data-test="alert-history-drawer"
     :open="open"
-    :width="60"
+    :width="65"
     :title="t('alert_list.alert_history')"
     @update:open="emit('update:open', $event)"
   >
@@ -25,14 +25,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          tab toggle, and datetime picker — too complex for title + sub-slots -->
     <template #header-left>
           <div
-            class="tw:flex tw:items-center tw:gap-2"
+            class="tw:flex tw:items-center tw:gap-2 tw:flex-1 tw:min-w-0"
             data-test="alert-details-title"
           >
-            <!-- Alert Name Badge -->
+            <!-- Alert Name Badge — truncates so a long name can never push the
+                 tab toggle into the datetime picker; full name stays in tooltip -->
             <span
               v-if="alertDetails"
               :class="[
-                'tw:font-semibold tw:text-[18px] tw:mr-2 tw:px-2 tw:py-1 tw:rounded-md tw:ml-2 tw:inline-block',
+                'tw:font-semibold tw:text-[18px] tw:mr-2 tw:px-2 tw:py-1 tw:rounded-md tw:ml-2 tw:min-w-0 tw:truncate',
                 store.state.theme === 'dark'
                   ? 'tw:text-blue-400 tw:bg-blue-900/50'
                   : 'tw:text-blue-600 tw:bg-blue-50',
@@ -41,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ alertDetails.name }}
               <OTooltip
-                v-if="alertDetails.name && alertDetails.name.length > 35"
+                v-if="alertDetails.name"
                 :content="alertDetails.name"
               />
             </span>
@@ -49,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-if="alertDetails"
               :class="[
-                'tw:flex tw:items-center tw:gap-1 tw:px-2 tw:py-1 tw:rounded-md tw:border',
+                'tw:flex tw:items-center tw:gap-1 tw:px-2 tw:py-1 tw:rounded-md tw:border tw:shrink-0',
                 store.state.theme === 'dark'
                   ? 'tw:bg-gray-800/50 tw:border-gray-600'
                   : 'tw:bg-gray-50 tw:border-gray-200',
@@ -85,6 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <!-- Tab toggle -->
             <OToggleGroup
+              class="tw:shrink-0"
               :model-value="activeTab"
               @update:model-value="activeTab = $event as string"
             >

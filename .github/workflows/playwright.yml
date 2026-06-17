@@ -232,6 +232,7 @@ jobs:
                 "alerts-import.spec.js",
                 # "alerts-advanced.spec.js",
                 # "alerts-scheduled-features.spec.js",
+                "alerts-metrics-notification.spec.js",
                 "alerts-destinations-prebuilt.spec.js",
                 "alerts-vrl-encoding.spec.js",
               ]
@@ -356,6 +357,7 @@ jobs:
                 "metrics-table-column-order.spec.js",
                 "metrics-promql-builder.spec.js",
                 "promqlAutocomplete.spec.js",
+                "metrics-share-deep-link.spec.js",
               ]
           - testfolder: "Dashboards-Variables"
             browser: "chrome"

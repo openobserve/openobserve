@@ -391,3 +391,19 @@ export const convertDateToTimestamp = (
     return { timestamp: 0, offset: 0 };
   }
 };
+
+export function getEffectiveTimeRange(dt: {
+  type: string;
+  relativeTimePeriod: string;
+  startTime: number;
+  endTime: number;
+}): { startTime: number; endTime: number } {
+  if (dt.type === "relative" && dt.relativeTimePeriod) {
+    const rel = getConsumableRelativeTime(dt.relativeTimePeriod);
+    return {
+      startTime: rel?.startTime ?? dt.startTime,
+      endTime: rel?.endTime ?? dt.endTime,
+    };
+  }
+  return { startTime: dt.startTime, endTime: dt.endTime };
+}

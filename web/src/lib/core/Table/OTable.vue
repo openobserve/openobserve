@@ -254,6 +254,7 @@ const {
     rowHeight: props.rowHeight,
     filterMode: props.filterMode,
     get horizontalScroll() { return props.horizontalScroll; },
+    get keepPageOnDataChange() { return props.keepPageOnDataChange; },
   },
   emit,
 );
@@ -502,8 +503,13 @@ const hasFillColumn = computed(() =>
 const allowHorizontalScroll = computed(() => {
   if (props.horizontalScroll) return true;
   if (!hasFillColumn.value) return true;
-  if (useComputedWidth.value && frozen.value) {
-    return realSum() > containerWidth.value + 1;
+  if (useComputedWidth.value) {
+    if (containerWidth.value <= 0) return false;
+    // Frozen → scroll once the resized columns exceed the container.
+    if (frozen.value) return realSum() > containerWidth.value + 1;
+    // Fill → scroll once the columns can't fit even at their min widths
+    // (table-fixed otherwise grows past 100% and the overflow is clipped).
+    return fillMinSum() > containerWidth.value + 1;
   }
   return false;
 });
@@ -581,6 +587,17 @@ function realSum(): number {
   return (
     nonFlexFixedSum() +
     flexColIds.value.reduce((a, id) => a + frozenFlexWidth(id), 0)
+  );
+}
+
+// Minimum width the table needs in the FILL state: fixed columns + every flex
+// column shrunk to its minSize. When this exceeds the container the flex fill
+// can no longer absorb the overflow (table-fixed grows the table past 100%), so
+// the table must scroll horizontally instead of clipping the trailing columns.
+function fillMinSum(): number {
+  return (
+    nonFlexFixedSum() +
+    flexColIds.value.reduce((a, id) => a + colMinSize(id), 0)
   );
 }
 

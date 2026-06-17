@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{any::Any, sync::Arc};
+use std::sync::Arc;
 
 use arrow::array::RecordBatch;
 use arrow_schema::{DataType, SchemaRef, SortOptions};
@@ -120,10 +120,6 @@ mod tests {
 
 #[async_trait]
 impl TableProvider for NewMemTable {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
     fn schema(&self) -> SchemaRef {
         self.mem_table.schema()
     }

@@ -65,12 +65,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="error"
           :clickable="true"
           class="tw:text-xs tw:rounded! tw:py-[0.4rem]! tw:px-[0.625rem]! tw:text-[0.75rem]!"
-          :class="!searchObj.meta.showErrorOnly ? 'tw:bg-[var(--o2-error-tag-bg)]! tw:text-[var(--o2-error-tag-text)]!' : ''"
+          :class="!showErrorOnly ? 'tw:bg-[var(--o2-error-tag-bg)]! tw:text-[var(--o2-error-tag-text)]!' : ''"
           @click="toggleErrorOnly"
         >
           {{ `${formatLargeNumber(searchObj.data.queryResults.errorCount)} ${searchObj.meta.searchMode === 'traces' ? t('traces.errorTraces') : t('traces.errorSpans')}` }}
           <OTooltip
-            :content="searchObj.meta.showErrorOnly ? t('traces.clearErrorFilter') : t('traces.filterByErrors')"
+            :content="showErrorOnly ? t('traces.clearErrorFilter') : t('traces.filterByErrors')"
             side="bottom"
           />
           <template #trailing>
@@ -224,6 +224,12 @@ export default defineComponent({
     ),
     OIcon,
 },
+  props: {
+    showErrorOnly: {
+      type: Boolean,
+      default: false,
+    },
+  },
   emits: [
     "update:scroll",
     "update:datetime",
@@ -239,9 +245,7 @@ export default defineComponent({
   ],
   methods: {
     toggleErrorOnly() {
-      const newVal = !this.searchObj.meta.showErrorOnly;
-      this.searchObj.meta.showErrorOnly = newVal;
-      this.$emit("error-only-toggled", newVal);
+      this.$emit("error-only-toggled", !this.showErrorOnly);
     },
     closeColumn(col: any) {
       const RGIndex = this.searchObj.data.resultGrid.columns.indexOf(col.name);
@@ -268,6 +272,7 @@ export default defineComponent({
     const router = useRouter();
 
     const { searchObj, updatedLocalLogFilterField } = useTraces();
+
     const metricsDashboardRef: any = ref(null);
 
     const sectionHeaderRef = ref<HTMLElement | null>(null);

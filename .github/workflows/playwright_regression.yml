@@ -129,17 +129,16 @@ jobs:
             run_files:
               [
                 "logs-regression.spec.js",
-                "logs-regression-bugs.spec.js",
-                "logs-regression-bugs-2.spec.js",
+                "logs-bugs.spec.js",
                 "logs-9754.spec.js",
-                "logs-regression-9044-7354.spec.js",
+                "logs-9044-7354.spec.js",
               ]
           - testfolder: "Alerts-Regression"
             run_files:
               [
                 "alerts-regression.spec.js",
-                "alerts-stream-switching-regression.spec.js",
-                "alerts-regression-bugs.spec.js",
+                "alerts-stream-switching.spec.js",
+                "alerts-bugs.spec.js",
               ]
           - testfolder: "Dashboard-Regression"
             run_files:
@@ -161,7 +160,7 @@ jobs:
             run_files:
               [
                 "traces-regression.spec.js",
-                "traces-regression-bugs.spec.js",
+                "traces-bugs.spec.js",
               ]
           - testfolder: "Metrics-Regression"
             run_files:
@@ -352,8 +351,23 @@ jobs:
           echo "DEBUG: matrix.testfolder = ${{ matrix.testfolder }}"
 
           if [ -n "$FILE_LIST" ]; then
-            ACTUAL_FOLDER="RegressionSet"
+            # Derive feature subfolder from testfolder (maps testfolder name → directory under RegressionSet/)
+            case "${{ matrix.testfolder }}" in
+              "Dashboard-Regression")   FEATURE="Dashboards" ;;
+              "Pipelines-Regression")   FEATURE="Pipelines" ;;
+              "Alerts-Regression")      FEATURE="Alerts" ;;
+              "Logs-Regression")        FEATURE="Logs" ;;
+              "Traces-Regression")      FEATURE="Traces" ;;
+              "Metrics-Regression")     FEATURE="Metrics" ;;
+              "Streams-Regression")     FEATURE="Streams" ;;
+              "Reports-Regression")     FEATURE="Reports" ;;
+              "DataSources-Regression") FEATURE="DataSources" ;;
+              "GeneralTests-Regression") FEATURE="General" ;;
+              *)                        FEATURE="RegressionSet" ;;
+            esac
+            ACTUAL_FOLDER="RegressionSet/$FEATURE"
             echo "DEBUG: ACTUAL_FOLDER = $ACTUAL_FOLDER"
+            echo "DEBUG: FEATURE = $FEATURE"
 
             FILE_PATHS=""
             for file in $FILE_LIST; do
