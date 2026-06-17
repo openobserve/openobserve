@@ -336,6 +336,7 @@ sqlparser = { version = "0.61", features = ["serde", "visitor"] }
 dotenv_config = "0.2"
 dotenvy = "0.15"
 env_logger = "0.11"
+fastdivide = "0.4"
 faststr = { version = "0.2", features = ["serde"] }
 flate2 = { version = "1.0", features = ["zlib"] }
 futures = "0.3"

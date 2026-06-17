@@ -511,7 +511,7 @@ async fn search_tantivy_index(
         Some(IndexOptimizeMode::SimpleCount) => {
             TantivyResult::handle_simple_count(&searcher, query)
         }
-        Some(IndexOptimizeMode::SimpleHistogram(min_value, bucket_width, num_buckets)) => {
+        Some(IndexOptimizeMode::SimpleHistogram(min_value, bucket_width, num_buckets, ts_offset)) => {
             // fail the function if field not in tantivy schema
             if tantivy_schema.get_field(TIMESTAMP_COL_NAME).is_err() {
                 log::warn!("[trace_id {trace_id_clone}] search->tantivy: _timestamp not index in tantivy file: {ttv_file_name}");
@@ -523,12 +523,14 @@ async fn search_tantivy_index(
                 min_value,
                 bucket_width,
                 num_buckets,
+                ts_offset,
             )
         }
         Some(IndexOptimizeMode::SimpleMultiHistogram(
             min_value,
             max_value,
             bucket_width,
+            ts_offset,
             breakdown_field,
         )) => {
             if tantivy_schema.get_field(TIMESTAMP_COL_NAME).is_err() {
@@ -545,6 +547,7 @@ async fn search_tantivy_index(
                 min_value,
                 max_value,
                 bucket_width,
+                ts_offset,
                 &breakdown_field,
             )
         }
