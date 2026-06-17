@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         round
         variant="ghost"
         size="icon-circle-sm"
-        class="scroll-to-bottom-btn tw:transition-all tw:duration-300 tw:ease-[ease] tw:pointer-events-auto tw:backdrop-blur-sm tw:shadow-[0_2px_8px_rgba(0,0,0,0.2)]"
+        class="scroll-to-bottom-btn tw:transition-all tw:duration-300 tw:ease-[ease] tw:pointer-events-auto tw:backdrop-blur-sm tw:shadow-[0_2px_8px_rgba(0,0,0,0.2)] tw:border-2! tw:border-[var(--q-primary)]! tw:text-[var(--q-primary)]! tw:bg-[rgba(255,255,255,0.95)]! tw:dark:bg-[rgba(30,30,30,0.9)]! tw:hover:scale-110 tw:hover:shadow-[0_4px_12px_rgba(0,0,0,0.3)] tw:hover:bg-white! tw:hover:opacity-80 tw:dark:hover:bg-[rgba(40,40,40,0.95)]! tw:dark:hover:opacity-80 tw:active:scale-100"
         @click="scrollToBottomSmooth"
       >
         <OIcon name="arrow-downward" size="sm" />
@@ -201,39 +201,4 @@ onMounted(async () => {
   font-weight: 500;
 }
 
-/* Scroll to bottom button styling */
-body.body--light .scroll-to-bottom-btn {
-  border: 2px solid var(--q-primary) !important;
-  color: var(--q-primary) !important;
-  background: rgba(255, 255, 255, 0.95) !important;
-}
-
-body.body--dark .scroll-to-bottom-btn {
-  border: 2px solid var(--q-primary) !important;
-  color: var(--q-primary) !important;
-  background: rgba(30, 30, 30, 0.9) !important;
-}
-
-.scroll-to-bottom-btn:hover {
-  transform: scale(1.1);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-}
-
-body.body--light .scroll-to-bottom-btn:hover {
-  border: 2px solid var(--q-primary) !important;
-  color: var(--q-primary) !important;
-  background: rgba(255, 255, 255, 1) !important;
-  opacity: 0.8;
-}
-
-body.body--dark .scroll-to-bottom-btn:hover {
-  border: 2px solid var(--q-primary) !important;
-  color: var(--q-primary) !important;
-  background: rgba(40, 40, 40, 0.95) !important;
-  opacity: 0.8;
-}
-
-.scroll-to-bottom-btn:active {
-  transform: scale(1);
-}
 </style>

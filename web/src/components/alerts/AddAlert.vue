@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- ═══════════════════════════════════════════════════════════════════ -->
       <div class="tw:flex tw:flex-col tw:h-full">
       <AppPageHeader
-        class="alert-v3-topbar tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+        class="alert-v3-topbar tw:[container-type:inline-size] tw:[container-name:topbar] tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
         :back="{
           label: activeFolderName || t('alerts.header'),
           onClick: goBackToAlertsList,
@@ -110,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div style="flex: 6.5; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 8px; padding: 8px 0;">
 
       <!-- Stream Name & Stream Type -->
-      <div class="card-container tw:shrink-0 stream-config-card">
+      <div class="card-container tw:shrink-0 stream-config-card tw:[container-type:inline-size] tw:[container-name:stream-config]">
         <div class="tw:flex tw:items-center tw:gap-0 tw:py-[10px] tw:px-3 tw:border-b tw:border-[#e6e6e6] tw:dark:border-[var(--color-border-default)]">
           <div class="tw:w-[3px] tw:h-4 tw:rounded-sm tw:mr-2 tw:shrink-0 tw:bg-[var(--q-primary)]" />
           <span class="tw:text-[13px] tw:font-semibold tw:tracking-[0.01em]">Stream Config <span class="tw:text-text-primary">*</span></span>
@@ -587,13 +587,6 @@ export default defineComponent({
 </script>
 
 <style>
-/* ── Responsive topbar: container queries so AI chat panel triggers shrink too */
-.alert-v3-topbar {
-  container-type: inline-size;
-  container-name: topbar;
-}
-
-/* Medium — topbar ~1050–1300px */
 @container topbar (max-width: 1300px) {
   .topbar-name-input  { min-width: 100px; }
 }
@@ -606,12 +599,6 @@ export default defineComponent({
 /* Minimum — very narrow */
 @container topbar (max-width: 680px) {
   .topbar-name-input  { min-width: 70px; }
-}
-
-/* ── Stream Config card responsive container queries ─────────────────────── */
-.stream-config-card {
-  container-type: inline-size;
-  container-name: stream-config;
 }
 
 @container stream-config (max-width: 900px) {
