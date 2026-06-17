@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="edition-comparison">
+  <div>
 
     <!-- ── Header ──────────────────────────────────────────────────────── -->
     <div class="tw:flex tw:items-start tw:gap-3 tw:mb-2">
@@ -38,8 +38,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-for="ed in editionList"
         :key="ed.id"
-        class="edition-card tw:relative tw:flex tw:flex-col tw:bg-(--o2-card-bg) tw:rounded-xl tw:p-6 tw:border tw:border-(--o2-border-color)"
-        :class="{ 'edition-card--active tw:border-2 tw:border-(--o2-primary-color) tw:pt-7': buildType === ed.id }"
+        class="tw:relative tw:flex tw:flex-col tw:bg-(--o2-card-bg) tw:rounded-xl tw:p-6 tw:max-[1024px]:p-4 tw:border tw:border-(--o2-border-color)"
+        :class="{ 'tw:border-2 tw:border-(--o2-primary-color) tw:pt-7 tw:max-[1024px]:pt-5': buildType === ed.id }"
       >
         <!-- Your Plan badge (floats above the card top border) -->
         <div v-if="buildType === ed.id" class="tw:absolute tw:top-[-14px] tw:left-1/2 tw:-translate-x-1/2 tw:inline-flex tw:items-center tw:py-1 tw:px-[0.875rem] tw:rounded-full tw:text-[0.625rem] tw:font-bold tw:uppercase tw:tracking-[0.08em] tw:whitespace-nowrap tw:bg-(--o2-primary-color) tw:text-(--o2-primary-foreground)">
@@ -71,10 +71,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <li
             v-for="feature in listFeatures"
             :key="feature.id"
-            class="feature-item tw:flex tw:items-start tw:gap-2 tw:py-[0.4375rem] tw:text-[0.8125rem] tw:border-b tw:border-(--o2-border-color)"
-            :class="`feature-item--${getFeatureStatus(feature, ed.id)}`"
+            class="tw:flex tw:items-start tw:gap-2 tw:py-[0.4375rem] tw:text-[0.8125rem] tw:border-b tw:border-(--o2-border-color) tw:last:border-b-0"
+            :class="{
+              'tw:text-[var(--o2-text-body)]': getFeatureStatus(feature, ed.id) !== 'unavailable',
+              'tw:text-[var(--o2-text-muted)]': getFeatureStatus(feature, ed.id) === 'unavailable',
+            }"
           >
-            <span class="feature-item__icon tw:shrink-0 tw:mt-[0.125rem] tw:leading-none">
+            <span class="tw:shrink-0 tw:mt-[0.125rem] tw:leading-none"
+              :class="{
+                'tw:text-[var(--o2-positive)]': getFeatureStatus(feature, ed.id) !== 'unavailable',
+                'tw:text-[var(--o2-text-muted)]': getFeatureStatus(feature, ed.id) === 'unavailable',
+              }"
+            >
               <OIcon
                 v-if="getFeatureStatus(feature, ed.id) !== 'unavailable'"
                 name="check-circle"
@@ -112,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="ed.ctaUrl"
             :href="ed.ctaUrl"
             target="_blank"
-            class="cta-btn--action tw:block tw:w-full tw:py-2 tw:px-4 tw:rounded-md tw:text-sm tw:font-semibold tw:text-center tw:no-underline tw:cursor-pointer tw:transition-all tw:duration-200 tw:border-[1.5px] tw:border-solid tw:bg-[color-mix(in_srgb,var(--o2-primary-color)_10%,var(--o2-card-bg))] tw:text-(--o2-primary-color) tw:border-[color-mix(in_srgb,var(--o2-primary-color)_30%,transparent)]"
+            class="tw:block tw:w-full tw:py-2 tw:px-4 tw:rounded-md tw:text-sm tw:font-semibold tw:text-center tw:no-underline tw:cursor-pointer tw:transition-all tw:duration-200 tw:border-[1.5px] tw:border-solid tw:bg-[color-mix(in_srgb,var(--o2-primary-color)_10%,var(--o2-card-bg))] tw:text-(--o2-primary-color) tw:border-[color-mix(in_srgb,var(--o2-primary-color)_30%,transparent)] tw:hover:bg-[color-mix(in_srgb,var(--o2-primary-color)_18%,var(--o2-card-bg))] tw:hover:border-(--o2-primary-color)"
           >
             {{ ed.ctaLabel }}
           </a>
@@ -222,59 +230,3 @@ function getFeatureNote(feature: FeatureDefinition, editionId: string): string {
 }
 </script>
 
-<style>
-/* ── Feature item states (descendant selectors — cannot inline) ────────────── */
-
-/* Remove bottom border from last feature item */
-.edition-comparison .feature-item:last-child {
-  border-bottom: none;
-}
-
-/* Available: green icon */
-.edition-comparison .feature-item--available {
-  color: var(--o2-text-body);
-}
-
-.edition-comparison .feature-item--available .feature-item__icon {
-  color: var(--o2-positive);
-}
-
-/* Conditional: green icon + muted note */
-.edition-comparison .feature-item--conditional {
-  color: var(--o2-text-body);
-}
-
-.edition-comparison .feature-item--conditional .feature-item__icon {
-  color: var(--o2-positive);
-}
-
-/* Unavailable: gray icon + muted text */
-.edition-comparison .feature-item--unavailable {
-  color: var(--o2-text-muted);
-}
-
-.edition-comparison .feature-item--unavailable .feature-item__icon {
-  color: var(--o2-text-muted);
-}
-
-/* CTA hover (child element hover) */
-.edition-comparison .cta-btn--action:hover {
-  background: color-mix(in srgb, var(--o2-primary-color) 18%, var(--o2-card-bg));
-  border-color: var(--o2-primary-color);
-}
-
-/* ─── Responsive ─────────────────────────────────────────────────────────── */
-@media (max-width: 1024px) {
-  .edition-comparison .edition-card {
-    padding: 1rem;
-  }
-
-  .edition-comparison .edition-card--active {
-    padding-top: 1.25rem;
-  }
-
-  .edition-comparison .edition-price {
-    font-size: 1.375rem;
-  }
-}
-</style>

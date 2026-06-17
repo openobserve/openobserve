@@ -241,9 +241,9 @@ const buttonClasses = computed(() => {
   ];
 
   if (isAIMode.value) {
-    classes.push('o2-ai-generate-button');
+    classes.push('tw:bg-[linear-gradient(135deg,#8B5CF6_0%,#EC4899_100%)]! tw:text-white! tw:border-none! tw:text-[0.6875rem]! tw:font-semibold! tw:leading-[1rem]! tw:transition-all! tw:duration-300! tw:ease-[ease]! tw:shadow-[0_0.25rem_0.9375rem_0_rgba(139,92,246,0.3)]! tw:px-3! tw:w-[92px]! tw:hover:shadow-[0_0.375rem_1.25rem_0_rgba(139,92,246,0.5)]! tw:hover:-translate-y-px tw:active:translate-y-0');
   } else {
-    classes.push('o2-run-query-button', 'o2-color-primary');
+    classes.push('tw:w-[92px]!', 'o2-color-primary');
   }
 
   if (props.borderRadius === 'enterprise') {
@@ -430,61 +430,3 @@ defineExpose({
 });
 </script>
 
-<style>
-/* AI Generate Button Styling (matches O2 AI Assistant - purple gradient) */
-.o2-ai-generate-button {
-  background: linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%) !important;
-  color: white !important;
-  border: none !important;
-  font-size: 0.6875rem !important; /* 11px */
-  font-weight: 600 !important;
-  line-height: 1rem !important; /* 16px */
-  transition: all 0.3s ease !important;
-  box-shadow: 0 0.25rem 0.9375rem 0 rgba(139, 92, 246, 0.3) !important; /* 0 4px 15px */
-  padding: 0 0.75rem !important; /* 0 12px */
-  width: 92px !important; /* Fixed width to prevent layout shift */
-}
-
-.o2-ai-generate-button:hover {
-  box-shadow: 0 0.375rem 1.25rem 0 rgba(139, 92, 246, 0.5) !important; /* 0 6px 20px */
-  transform: translateY(-1px);
-}
-
-.o2-ai-generate-button:active {
-  transform: translateY(0);
-}
-
-/* Run Query Button - Fixed width to match AI button and prevent layout shift */
-.o2-run-query-button {
-  width: 92px !important; /* Same as AI button */
-}
-
-.ai-input-field .q-field__control {
-  background: white;
-  border-radius: 8px;
-  padding: 4px 8px;
-}
-
-/* Remove focus border */
-.ai-input-field .q-field__control::before,
-.ai-input-field .q-field__control::after {
-  border: none !important;
-}
-
-.ai-input-field .q-field__prepend {
-  padding-right: 8px;
-}
-
-/* Dark mode styling */
-.q-dark .ai-input-field .q-field__control {
-  background: var(--q-dark);
-}
-
-.q-dark .ai-bar-streaming {
-  background: var(--q-dark);
-}
-
-.q-dark .ai-bar-streaming span {
-  color: #ccc;
-}
-</style>

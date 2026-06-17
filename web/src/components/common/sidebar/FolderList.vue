@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="test-class tw:min-h-[1.5rem]"
           :data-test="`dashboard-folder-tab-${tab.folderId}`"
           >
-          <div class="folder-item tw:w-full tw:flex tw:justify-between tw:items-center tw:flex-nowrap tw:group/row tw:relative tw:rounded" :data-test="`dashboard-folder-tab-name-${tab.name}`">
+          <div class="tw:w-full tw:flex tw:justify-between tw:items-center tw:flex-nowrap tw:group/row tw:relative tw:rounded tw:[transition:background-color_0.3s] tw:[--color-button-ghost-hover-bg:transparent]" :data-test="`dashboard-folder-tab-name-${tab.name}`">
               <span class="tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis tw:normal-case" :title="tab.name" :data-test="`dashboard-folder-name-${tab.name}`">{{
               tab.name
               }}</span>
@@ -332,13 +332,6 @@ export default defineComponent({
   max-height: none !important;
 }
 
-.folders-tabs .folder-item {
-  transition: background-color 0.3s;
-  /* No background change on the action button hover — it sits inside a folder
-     item that already has its own hover/active state, so any fill looks like
-     a stray artifact over the item background. */
-  --color-button-ghost-hover-bg: transparent;
-}
 
 .folders-tabs .o-tabs--vertical {
   margin: 0;

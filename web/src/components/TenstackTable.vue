@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="col in pivotRowColumns"
               :key="'rh_' + col.name"
               :rowspan="pivotHeaderLevels.length"
-              class="pivot-group-header tw:cursor-pointer tw:px-2 tw:text-left tw:text-center tw:font-semibold tw:align-middle tw:whitespace-nowrap tw:py-[5px] tw:[border-right:1px_solid_rgba(0,0,0,0.15)] tw:[border-bottom:1px_solid_rgba(0,0,0,0.15)] tw:bg-(--o2-border)"
+              class="tw:cursor-pointer tw:px-2 tw:text-left tw:text-center tw:font-semibold tw:align-middle tw:whitespace-nowrap tw:py-[5px] tw:[border-right:1px_solid_rgba(0,0,0,0.15)] tw:[border-bottom:1px_solid_rgba(0,0,0,0.15)] tw:bg-(--o2-border) tw:dark:bg-[#565656] tw:dark:[border-right-color:rgba(255,255,255,0.12)] tw:dark:[border-bottom-color:rgba(255,255,255,0.12)]"
               :style="getStickyColumnStyle(col) as any"
               @click="handlePivotSort(col.name)"
             >
@@ -86,9 +86,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   pivotSortState.descending ? 'arrow-downward' : 'arrow-upward'
                 "
                 size="xs"
-                class="tw:ml-1 pivot-sort-icon tw:align-middle tw:opacity-0 tw:transition-opacity tw:duration-200"
+                class="tw:ml-1 tw:align-middle tw:opacity-0 tw:transition-opacity tw:duration-200"
                 :class="{
-                  'pivot-sort-active': pivotSortState.sortBy === col.name,
+                  'tw:opacity-100! tw:text-[var(--o2-primary-color)]': pivotSortState.sortBy === col.name,
                 }"
               />
             </th>
@@ -102,8 +102,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="tw:px-2"
               :class="[
                 level.isLeaf
-                  ? 'pivot-value-header tw:text-center tw:font-medium tw:text-[0.85em] tw:align-middle tw:py-[5px] tw:[border-right:1px_solid_rgba(0,0,0,0.15)] tw:[border-bottom:1px_solid_rgba(0,0,0,0.15)] tw:bg-(--o2-border)'
-                  : 'pivot-group-header tw:text-center tw:font-semibold tw:align-middle tw:whitespace-nowrap tw:py-[5px] tw:[border-right:1px_solid_rgba(0,0,0,0.15)] tw:[border-bottom:1px_solid_rgba(0,0,0,0.15)] tw:bg-(--o2-border)',
+                  ? 'tw:text-center tw:font-medium tw:text-[0.85em] tw:align-middle tw:py-[5px] tw:[border-right:1px_solid_rgba(0,0,0,0.15)] tw:[border-bottom:1px_solid_rgba(0,0,0,0.15)] tw:bg-(--o2-border) tw:dark:bg-[#565656] tw:dark:[border-right-color:rgba(255,255,255,0.12)] tw:dark:[border-bottom-color:rgba(255,255,255,0.12)]'
+                  : 'tw:text-center tw:font-semibold tw:align-middle tw:whitespace-nowrap tw:py-[5px] tw:[border-right:1px_solid_rgba(0,0,0,0.15)] tw:[border-bottom:1px_solid_rgba(0,0,0,0.15)] tw:bg-(--o2-border) tw:dark:bg-[#565656] tw:dark:[border-right-color:rgba(255,255,255,0.12)] tw:dark:[border-bottom-color:rgba(255,255,255,0.12)]',
                 {
                   'pivot-section-border tw:[border-left:2px_solid_rgba(0,0,0,0.2)]!':
                     cell.hasBorder && !(stickyColTotals && cell._isTotalHeader),
@@ -125,9 +125,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   pivotSortState.descending ? 'arrow-downward' : 'arrow-upward'
                 "
                 size="xs"
-                class="tw:ml-1 pivot-sort-icon tw:align-middle tw:opacity-0 tw:transition-opacity tw:duration-200"
+                class="tw:ml-1 tw:align-middle tw:opacity-0 tw:transition-opacity tw:duration-200"
                 :class="{
-                  'pivot-sort-active':
+                  'tw:opacity-100! tw:text-[var(--o2-primary-color)]':
                     pivotSortState.sortBy === cell._sortColumn,
                 }"
               />
@@ -404,7 +404,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <tr
             v-for="r in SKEL_ROW_COUNT"
             :key="`skel-${r}`"
-            class="o2-skel-row tw:flex tw:items-center tw:w-full tw:opacity-0 tw:border-b tw:border-b-[var(--o2-tag-grey-1)] tw:h-7"
+            class="tw:flex tw:items-center tw:w-full tw:opacity-0 tw:border-b tw:border-b-[var(--o2-tag-grey-1)] tw:h-7 tw:[animation:o2-skel-row-in_320ms_ease-out_forwards] tw:motion-reduce:opacity-100 tw:motion-reduce:animate-none"
             :style="{ animationDelay: `${(r - 1) * 40}ms` }"
           >
             <!-- No columns yet (first paint) — full-width shimmer bar -->
@@ -413,7 +413,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="tw:w-full tw:px-4 tw:overflow-hidden"
             >
               <span
-                class="o2-skel-pill tw:inline-block tw:h-3 tw:rounded-md"
+                class="tw:inline-block tw:h-3 tw:rounded-md tw:[background:linear-gradient(90deg,var(--color-grey-100)_0%,rgba(255,255,255,0.65)_50%,var(--color-grey-100)_100%)] tw:[background-size:200%_100%] tw:[animation:o2-skel-shimmer_1.5s_ease-in-out_infinite] tw:dark:[background:linear-gradient(90deg,var(--color-grey-600)_0%,rgba(255,255,255,0.03)_50%,var(--color-grey-600)_100%)] tw:motion-reduce:animate-none"
                 :style="{ width: `${skelCellWidth(r - 1, 0)}%` }"
                 aria-hidden="true"
               />
@@ -428,7 +428,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :style="skelTdStyle(header, c)"
               >
                 <span
-                  class="o2-skel-pill tw:inline-block tw:h-3 tw:rounded-md"
+                  class="tw:inline-block tw:h-3 tw:rounded-md tw:[background:linear-gradient(90deg,var(--color-grey-100)_0%,rgba(255,255,255,0.65)_50%,var(--color-grey-100)_100%)] tw:[background-size:200%_100%] tw:[animation:o2-skel-shimmer_1.5s_ease-in-out_infinite] tw:dark:[background:linear-gradient(90deg,var(--color-grey-600)_0%,rgba(255,255,255,0.03)_50%,var(--color-grey-600)_100%)] tw:motion-reduce:animate-none"
                   :style="{
                     width:
                       c === 0
@@ -482,7 +482,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-for="(cell, cellIndex) in row.getVisibleCells()"
                 :key="cell.id"
                 data-test="dashboard-data-row-cell"
-                class="tw:py-1 tw:px-2 tw:overflow-hidden tw:relative table-cell copy-cell-td"
+                class="tw:py-1 tw:px-2 tw:overflow-hidden tw:relative table-cell tw:group/copy"
                 :class="[
                   (cell.column.columnDef.meta as any)?.align === 'center'
                     ? 'tw:text-center!'
@@ -551,13 +551,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           'right' &&
                         shouldShowCopyButton(cell.getValue())
                       "
-                      class="copy-btn tw:mr-1"
+                      class="tw:mr-1 tw:opacity-0 tw:transition-opacity tw:duration-[150ms] tw:inline-flex tw:items-center tw:leading-none tw:group-hover/copy:opacity-100"
                       data-test="dashboard-table-cell-copy-btn"
                       :data-copied="isCellCopied(idx as number, cell.column.id) ? 'true' : undefined"
                     >
                       <OButton
                         variant="ghost"
                         size="icon-xs-sq"
+                        class="tw:h-[16px]! tw:w-[16px]! tw:min-h-0!"
                         @click.stop="
                           copyCellContent(
                             getCellDisplayValue(cell),
@@ -604,13 +605,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           'right' &&
                         shouldShowCopyButton(cell.getValue())
                       "
-                      class="copy-btn tw:ml-1"
+                      class="tw:ml-1 tw:opacity-0 tw:transition-opacity tw:duration-[150ms] tw:inline-flex tw:items-center tw:leading-none tw:group-hover/copy:opacity-100"
                       data-test="dashboard-table-cell-copy-btn"
                       :data-copied="isCellCopied(idx as number, cell.column.id) ? 'true' : undefined"
                     >
                       <OButton
                         variant="ghost"
                         size="icon-xs-sq"
+                        class="tw:h-[16px]! tw:w-[16px]! tw:min-h-0!"
                         @click.stop="
                           copyCellContent(
                             getCellDisplayValue(cell),
@@ -670,7 +672,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 formattedRows?.[virtualRow.index]?.original?.isExpandedRow
               "
               :ref="(node: any) => node && rowVirtualizer.measureElement(node)"
-              class="tw:absolute tw:flex tw:w-max tw:items-center tw:justify-start tw:border-b tw:border-b-[var(--o2-tag-grey-1)] tw:cursor-pointer tw:hover:bg-[var(--o2-hover-gray)] tw:transition-colors tw:duration-150 tw:ease-in-out table-row-hover"
+              class="tw:absolute tw:flex tw:w-max tw:items-center tw:justify-start tw:border-b tw:border-b-[var(--o2-tag-grey-1)] tw:cursor-pointer tw:hover:bg-[var(--o2-hover-gray)] tw:transition-colors tw:duration-150 tw:ease-in-out"
               :class="[
                 defaultColumns &&
                 !wrap &&
@@ -745,7 +747,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     '-' +
                     cell.column.columnDef.id
                   "
-                  class="tw:py-none tw:px-2 tw:items-center tw:justify-start tw:relative table-cell copy-cell-td"
+                  class="tw:py-none tw:px-2 tw:items-center tw:justify-start tw:relative table-cell tw:group/copy"
                   :class="[
                     ...tableCellClass,
                     { 'tw:pl-2': cellIndex === 0 },
@@ -860,13 +862,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               'right' &&
                             shouldShowCopyButton(cell.getValue())
                           "
-                          class="copy-btn tw:mr-1"
+                          class="tw:mr-1 tw:opacity-0 tw:transition-opacity tw:duration-[150ms] tw:inline-flex tw:items-center tw:leading-none tw:group-hover/copy:opacity-100"
                           data-test="dashboard-table-cell-copy-btn"
                           :data-copied="isCellCopied(virtualRow.index, cell.column.id) ? 'true' : undefined"
                         >
                           <OButton
                             variant="ghost"
                             size="icon-xs-sq"
+                            class="tw:h-[16px]! tw:w-[16px]! tw:min-h-0!"
                             @click.stop="
                               copyCellContent(
                                 getCellDisplayValue(cell),
@@ -952,13 +955,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               'right' &&
                             shouldShowCopyButton(cell.getValue())
                           "
-                          class="copy-btn tw:ml-1"
+                          class="tw:ml-1 tw:opacity-0 tw:transition-opacity tw:duration-[150ms] tw:inline-flex tw:items-center tw:leading-none tw:group-hover/copy:opacity-100"
                           data-test="dashboard-table-cell-copy-btn"
                           :data-copied="isCellCopied(virtualRow.index, cell.column.id) ? 'true' : undefined"
                         >
                           <OButton
                             variant="ghost"
                             size="icon-xs-sq"
+                            class="tw:h-[16px]! tw:w-[16px]! tw:min-h-0!"
                             @click.stop="
                               copyCellContent(
                                 getCellDisplayValue(cell),
@@ -1002,11 +1006,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.1);
           "
         >
-          <tr class="pivot-total-row pivot-sticky-total-row tw:font-bold tw:sticky tw:bottom-0 tw:z-[9] tw:shadow-[0_-2px_4px_rgba(0,0,0,0.1)]">
+          <tr class="pivot-total-row tw:font-bold tw:sticky tw:bottom-0 tw:z-[9] tw:shadow-[0_-2px_4px_rgba(0,0,0,0.1)]">
             <td
               v-for="col in (columns as any[]) || []"
               :key="'ft_' + col.name"
-              class="tw:px-2"
+              class="tw:px-2 tw:bg-[#f5f5f5] tw:sticky tw:bottom-0"
               :class="[
                 col.align === 'right'
                   ? 'tw:text-right'
@@ -2341,67 +2345,6 @@ defineExpose({
 @import "@/assets/styles/log-highlighting.css";
 </style>
 <style>
-/* Add explicit hover styles for log rows */
-.table-row-hover:hover {
-  background-color: var(--o2-hover-gray) !important;
-}
-
-/* ── Dashboard / pivot table styles ─────────────────────────────────────── */
-
-/* Dark mode overrides for pivot headers (base styles inlined as tw: classes) */
-.body--dark .pivot-group-header {
-  background-color: #565656;
-  border-right-color: rgba(255, 255, 255, 0.12);
-  border-bottom-color: rgba(255, 255, 255, 0.12);
-}
-
-.body--dark .pivot-value-header {
-  background-color: #565656;
-  border-right-color: rgba(255, 255, 255, 0.12);
-  border-bottom-color: rgba(255, 255, 255, 0.12);
-}
-
-/* Sort icon active state (base opacity/transition inlined as tw: classes) */
-.pivot-sort-icon.pivot-sort-active {
-  opacity: 1 !important;
-  color: var(--q-primary);
-}
-
-/* Sticky total row descendant td styles */
-.pivot-sticky-total-row td {
-  background-color: var(--q-color-grey-2, #f5f5f5);
-  position: sticky;
-  bottom: 0;
-}
-
-/* ── Loading skeleton ───────────────────────────────────────── */
-.o2-skel-row {
-  animation: o2-skel-row-in 320ms ease-out forwards;
-}
-
-.o2-skel-pill {
-  /* Light mode — grey-100 shimmer (matches logs/histogram skeletons) */
-  background: linear-gradient(
-    90deg,
-    var(--color-grey-100) 0%,
-    rgba(255, 255, 255, 0.65) 50%,
-    var(--color-grey-100) 100%
-  );
-  background-size: 200% 100%;
-  animation: o2-skel-shimmer 1.5s ease-in-out infinite;
-}
-
-/* Dark mode — grey-600 shimmer */
-.body--dark .o2-skel-pill {
-  background: linear-gradient(
-    90deg,
-    var(--color-grey-600) 0%,
-    rgba(255, 255, 255, 0.03) 50%,
-    var(--color-grey-600) 100%
-  );
-  background-size: 200% 100%;
-}
-
 @keyframes o2-skel-shimmer {
   0% {
     background-position: 200% 0;
@@ -2420,35 +2363,5 @@ defineExpose({
     opacity: 1;
     transform: translateY(0);
   }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .o2-skel-row {
-    opacity: 1;
-    animation: none;
-  }
-  .o2-skel-pill {
-    animation: none;
-  }
-}
-
-/* Copy button — only visible on cell hover, sized to match text so it
-   doesn't inflate the row height. */
-.copy-cell-td .copy-btn {
-  opacity: 0;
-  transition: opacity 0.15s;
-  display: inline-flex;
-  align-items: center;
-  line-height: 1;
-}
-
-.copy-cell-td .copy-btn button {
-  height: 16px !important;
-  width: 16px !important;
-  min-height: unset !important;
-}
-
-.copy-cell-td:hover .copy-btn {
-  opacity: 1;
 }
 </style>

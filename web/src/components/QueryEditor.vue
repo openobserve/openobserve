@@ -48,7 +48,7 @@
           :disabled="!aiInputText.trim() || props.disableAi"
           :data-test="`${dataTestPrefix}-ai-send-btn`"
           @click="handleAIGenerate"
-          class="ai-send-button tw:bg-[linear-gradient(135deg,#8B5CF6_0%,#EC4899_100%)]! tw:text-white! tw:transition-all! tw:duration-200! tw:min-w-7! tw:min-h-7! tw:w-7! tw:h-7!"
+          class="tw:bg-[linear-gradient(135deg,#8B5CF6_0%,#EC4899_100%)]! tw:text-white! tw:transition-all! tw:duration-200! tw:min-w-7! tw:min-h-7! tw:w-7! tw:h-7! tw:enabled:hover:-translate-y-px tw:enabled:hover:shadow-[0_0.25rem_0.75rem_0_rgba(139,92,246,0.4)]! tw:enabled:active:translate-y-0 tw:disabled:opacity-40! tw:disabled:bg-[#ccc]!"
         >
           <OTooltip v-if="props.disableAi && props.disableAiReason" :content="props.disableAiReason" />
           <OTooltip v-else-if="!aiInputText.trim()" :content="props.aiTooltip || t('search.enterPrompt')" />
@@ -99,10 +99,10 @@
         size="icon-toolbar"
         :disabled="props.disableAi"
         @click="nlpMode = true"
-        class="ai-floating-button tw:absolute tw:top-0.75 tw:z-100 tw:bg-[linear-gradient(135deg,rgba(139,92,246,0.15)_0%,rgba(236,72,153,0.15)_100%)]! tw:text-white! tw:[transition:background_0.3s_ease,box-shadow_0.3s_ease]! tw:w-7.5! tw:h-7.5! tw:min-w-7.5! tw:min-h-7.5! tw:rounded-md tw:hover:bg-[linear-gradient(135deg,#8B5CF6_0%,#EC4899_100%)]! tw:hover:shadow-[0_0.25rem_0.75rem_0_rgba(139,92,246,0.35)]!"
+        class="tw:group tw:absolute tw:top-0.75 tw:z-100 tw:bg-[linear-gradient(135deg,rgba(139,92,246,0.15)_0%,rgba(236,72,153,0.15)_100%)]! tw:text-white! tw:[transition:background_0.3s_ease,box-shadow_0.3s_ease]! tw:w-7.5! tw:h-7.5! tw:min-w-7.5! tw:min-h-7.5! tw:rounded-md tw:hover:bg-[linear-gradient(135deg,#8B5CF6_0%,#EC4899_100%)]! tw:hover:shadow-[0_0.25rem_0.75rem_0_rgba(139,92,246,0.35)]!"
         :style="props.hasExpandButton ? { right: '2.375rem' } : { right: '0.25rem' }"
       >
-        <img :src="nlpIcon" alt="AI Mode" class="tw:w-[18px] tw:h-[18px] ai-icon" />
+        <img :src="nlpIcon" alt="AI Mode" class="tw:w-[18px] tw:h-[18px] tw:transition-transform tw:duration-[600ms] tw:ease-[ease] tw:group-hover:rotate-180 tw:group-hover:brightness-0 tw:group-hover:invert" />
         <OTooltip :content="props.disableAi && props.disableAiReason ? props.disableAiReason : t('nlMode.toggle')" />
       </OButton>
     </div>
@@ -233,18 +233,7 @@ const nlpIcon = computed(() => {
 });
 
 // Computed: AI input field class based on theme
-const aiInputFieldClass = computed(() => {
-  return store.state.theme === 'dark'
-    ? 'ai-input-field tw:h-7! ai-input-field--dark tw:flex-1 tw:my-px'
-    : 'ai-input-field tw:h-7! tw:flex-1 tw:my-px';
-});
-
-// Computed: AI streaming bar class based on theme
-const aiBarStreamingClass = computed(() => {
-  return store.state.theme === 'dark'
-    ? 'ai-bar-streaming ai-bar-streaming--dark tw:flex tw:items-center tw:gap-2'
-    : 'ai-bar-streaming tw:flex tw:items-center tw:gap-2';
-});
+const aiInputFieldClass = computed(() => 'tw:h-7! tw:flex-1 tw:my-px');
 
 // Computed: Is in AI mode?
 // When externally controlled (nlpMode prop passed), only show AI bar when nlpMode is explicitly ON.
@@ -562,67 +551,3 @@ defineExpose({
 });
 </script>
 
-<style>
-/* Child element selectors — cannot be expressed as inline tw: on the parent button */
-.ai-floating-button .ai-icon {
-  transition: transform 0.6s ease;
-}
-
-.ai-floating-button:hover .ai-icon {
-  filter: brightness(0) invert(1);
-  transform: rotate(180deg);
-}
-
-/* Complex selectors with :not() and attribute selector */
-.ai-send-button:hover:not([disabled]) {
-  transform: translateY(-1px);
-  box-shadow: 0 0.25rem 0.75rem 0 rgba(139, 92, 246, 0.4) !important;
-}
-
-.ai-send-button:active:not([disabled]) {
-  transform: translateY(0);
-}
-
-.ai-send-button[disabled] {
-  opacity: 0.4 !important;
-  background: #ccc !important;
-}
-
-/* Quasar component internal overrides — cannot be expressed as inline tw: classes */
-.ai-input-field .tw\:h-8 {
-  height: 1.75rem !important;
-}
-
-.ai-input-field .q-field__control {
-  background: white;
-  border-radius: 6px;
-  padding: 0 8px;
-  min-height: 18px;
-  height: 18px;
-}
-
-.ai-input-field .q-field__control::before,
-.ai-input-field .q-field__control::after {
-  border: none !important;
-}
-
-.ai-input-field .q-field__prepend {
-  padding-right: 8px;
-}
-
-/* Dark mode Quasar overrides */
-.ai-input-field--dark .q-field__control {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-.ai-input-field--dark .q-field__native,
-.ai-input-field--dark input {
-  color: #fff !important;
-}
-
-.ai-input-field--dark .q-field__native::placeholder,
-.ai-input-field--dark input::placeholder {
-  color: rgba(255, 255, 255, 0.5) !important;
-}
-</style>
