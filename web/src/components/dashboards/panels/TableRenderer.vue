@@ -179,18 +179,21 @@ export default defineComponent({
         return `background-color: ${hex}; color: ${isColorDark(hex) ? "#ffffff" : "#000000"}`;
       }
 
-      // 3) Conditional styling rules — first matching rule wins.
+      // 3) Conditional styling rules — last matching rule wins, so later rules
+      // override earlier ones (e.g. >1000 takes precedence over >400 for 2301).
       const conditionalRules = col?.conditionalRules as any[] | undefined;
       if (conditionalRules?.length) {
         const numVal = parseFloat(String(value));
         if (!isNaN(numVal)) {
+          let matched: any = null;
           for (const rule of conditionalRules) {
-            if (evalCondition(numVal, rule.operator, rule.threshold)) {
-              const parts: string[] = [];
-              if (rule.bgColor) parts.push(`background-color: ${rule.bgColor}`);
-              if (rule.textColor) parts.push(`color: ${rule.textColor}`);
-              if (parts.length) return parts.join("; ");
-            }
+            if (evalCondition(numVal, rule.operator, rule.threshold)) matched = rule;
+          }
+          if (matched) {
+            const parts: string[] = [];
+            if (matched.bgColor) parts.push(`background-color: ${matched.bgColor}`);
+            if (matched.textColor) parts.push(`color: ${matched.textColor}`);
+            if (parts.length) return parts.join("; ");
           }
         }
       }
