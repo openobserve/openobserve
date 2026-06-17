@@ -1768,7 +1768,18 @@ export class MetricsPage {
     }
 
     async getAddToDashboardButton() {
-        return this.page.locator('button:has-text("Add to Dashboard"), [aria-label*="dashboard"]').first();
+        return this.page.locator('[data-test="panel-editor-add-to-dashboard-btn"]').first();
+    }
+
+    /**
+     * Opens the AddToDashboard dialog by clicking the toolbar button.
+     * The button is inside the PanelEditor component on the Metrics page.
+     */
+    async openAddToDashboardDialog() {
+        const btn = this.page.locator('[data-test="panel-editor-add-to-dashboard-btn"]');
+        await btn.waitFor({ state: 'visible', timeout: 10000 });
+        await btn.click();
+        await this.page.locator('[data-test="add-to-dashboard-dialog"]').waitFor({ state: 'visible', timeout: 10000 });
     }
 
     async getDashboardModal() {

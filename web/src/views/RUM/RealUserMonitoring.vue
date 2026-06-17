@@ -205,7 +205,7 @@ onMounted(async () => {
 
   // This is temporary fix, as we have kept sessionViewer keep-alive as false.
   // So on routing to sessionViewer, this hook is called triggered and it routes to Session page again
-  const ignoreRoutes = ["SessionViewer", "ErrorViewer"];
+  const ignoreRoutes = ["SessionViewer", "ErrorViewer", "UploadSourceMaps"];
 
   if (!ignoreRoutes.includes(routeName.value as string))
     changeTab(activeTab.value);
@@ -234,7 +234,7 @@ onUpdated(async () => {
 
     // This is temporary fix, as we have kept sessionViewer keep-alive as false.
     // So on routing to sessionViewer, this hook is called triggered and it routes to Session page again
-    const ignoreRoutes = ["SessionViewer", "ErrorViewer"];
+    const ignoreRoutes = ["SessionViewer", "ErrorViewer", "UploadSourceMaps"];
 
     if (!ignoreRoutes.includes(routeName.value as string))
       changeTab(activeTab.value);
