@@ -45,6 +45,9 @@ pub fn get_val(attr_val: &Option<&AnyValue>) -> json::Value {
                     let s = String::from_utf8(inner_val.to_owned()).unwrap_or_default();
                     json::Value::String(s)
                 }
+                // dictionary-encoded string index, not resolvable without the
+                // request-level string table; classic OTLP signals never use it
+                Value::StringValueStrindex(_) => json::Value::Null,
             },
             None => json::Value::Null,
         },
@@ -145,6 +148,9 @@ pub fn get_val_with_type_retained(attr_val: &Option<&AnyValue>) -> json::Value {
                 Value::BytesValue(val) => {
                     json::json!(val)
                 }
+                // dictionary-encoded string index, not resolvable without the
+                // request-level string table; classic OTLP signals never use it
+                Value::StringValueStrindex(_) => json::Value::Null,
             },
             None => json::Value::Null,
         },
@@ -201,6 +207,7 @@ mod tests {
                     values: vec![opentelemetry_proto::tonic::common::v1::KeyValue {
                         key: in_str.clone(),
                         value: Some(int_val.clone()),
+                        ..Default::default()
                     }],
                 },
             )),
@@ -263,6 +270,7 @@ mod tests {
                     values: vec![opentelemetry_proto::tonic::common::v1::KeyValue {
                         key: in_str.clone(),
                         value: Some(int_val.clone()),
+                        ..Default::default()
                     }],
                 },
             )),
