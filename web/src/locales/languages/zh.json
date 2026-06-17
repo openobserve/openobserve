@@ -4455,6 +4455,21 @@
       "description": "在所选时间范围内未检测到任何服务。尝试更大的范围或不同的直播。"
     }
   },
+  "aiObservability": {
+    "title": "AI",
+    "sections": {
+      "monitor": "观测",
+      "evaluate": "评测"
+    },
+    "nav": {
+      "llmInsights": "洞察",
+      "sessions": "会话",
+      "quality": "质量",
+      "evalJobs": "评测任务",
+      "scorers": "评分器",
+      "scoreConfigs": "评分配置"
+    }
+  },
   "onlineEvals": {
     "title": "评估",
     "description": "配置 LLM 提供商、分数定义、评分器和实时评测任务。",
@@ -4795,21 +4810,6 @@
     "empty": {
       "title": "还没有 LLM 提供商",
       "description": "LLM 提供商存储您的 LLM Judge 评分器调用的语言模型的连接详细信息（端点 + 凭据）。添加一个即可开始进行基于法官的评估。"
-    }
-  },
-  "aiObservability": {
-    "title": "LLM 可观测性",
-    "sections": {
-      "monitor": "监视器",
-      "evaluate": "评估"
-    },
-    "nav": {
-      "overview": "概述",
-      "sessions": "会话",
-      "quality": "质量",
-      "evalJobs": "评测任务",
-      "scorers": "评分器",
-      "scoreConfigs": "分数配置"
     }
   },
   "logs": {
