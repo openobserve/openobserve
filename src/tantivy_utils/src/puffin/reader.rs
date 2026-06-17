@@ -62,7 +62,8 @@ pub fn parse_puffin_footer_from_bytes(data: &[u8]) -> Result<PuffinMeta> {
 
     let mut flags_bytes = [0u8; 4];
     flags_bytes.copy_from_slice(
-        &footer[(FOOTER_SIZE - MAGIC_SIZE - FLAGS_SIZE) as usize..(FOOTER_SIZE - MAGIC_SIZE) as usize],
+        &footer
+            [(FOOTER_SIZE - MAGIC_SIZE - FLAGS_SIZE) as usize..(FOOTER_SIZE - MAGIC_SIZE) as usize],
     );
     let flags = PuffinFooterFlags::from_bits(u32::from_le_bytes(flags_bytes))
         .ok_or_else(|| anyhow!("Error parsing Puffin flags from bytes"))?;
@@ -87,7 +88,8 @@ pub fn parse_puffin_footer_from_bytes(data: &[u8]) -> Result<PuffinMeta> {
 
     if flags.contains(PuffinFooterFlags::COMPRESSED) {
         let decoder = zstd::Decoder::new(payload)?;
-        serde_json::from_reader(decoder).map_err(|e| anyhow!("Error decompressing footer payload {e}"))
+        serde_json::from_reader(decoder)
+            .map_err(|e| anyhow!("Error decompressing footer payload {e}"))
     } else {
         serde_json::from_slice(payload).map_err(|e| anyhow!("Error parsing footer payload {e}"))
     }

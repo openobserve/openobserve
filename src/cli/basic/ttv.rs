@@ -19,10 +19,9 @@
 //! index) by path, parses its footer locally — no object-store / DB needed —
 //! and prints:
 //!   * file-level puffin properties (e.g. `row_group_size`),
-//!   * every blob (the wrapped tantivy files: `*.term`, `*.idx`, `*.pos`,
-//!     `*.fast`, `meta.json`, `footer_cache`) with its type, offset and length,
-//!   * a digest of the embedded tantivy `meta.json`: segments + doc counts and
-//!     the schema fields.
+//!   * every blob (the wrapped tantivy files: `*.term`, `*.idx`, `*.pos`, `*.fast`, `meta.json`,
+//!     `footer_cache`) with its type, offset and length,
+//!   * a digest of the embedded tantivy `meta.json`: segments + doc counts and the schema fields.
 //!
 //! Use it to debug index builds — what got indexed, how many docs/segments a
 //! file holds, and which row-group size it was built against.
@@ -206,10 +205,7 @@ fn field_flags(field: &serde_json::Value) -> String {
     };
     let mut flags: Vec<&str> = Vec::new();
     // text: presence of a non-null `indexing` object means it's indexed
-    let text_indexed = opts
-        .get("indexing")
-        .map(|v| !v.is_null())
-        .unwrap_or(false);
+    let text_indexed = opts.get("indexing").map(|v| !v.is_null()).unwrap_or(false);
     // numeric/date/bool/ip: explicit `indexed` bool
     let numeric_indexed = opts.get("indexed").and_then(|v| v.as_bool()) == Some(true);
     if text_indexed || numeric_indexed {
