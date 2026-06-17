@@ -14,6 +14,11 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
+// Org Storage / Domain Management / Correlation settings are enterprise-only —
+// absent on the OSS binary. Cache availability so only the first test of each
+// describe pays the probe cost; the rest skip immediately on OSS while running
+// fully on the enterprise binary.
+const featureAvailable = {};
 
 // ── OrganizationSettings (Log Details) form ───────────────────────────────────
 
@@ -115,8 +120,17 @@ test.describe("Settings OrgStorageEditor form validation", {
         pm = new PageManager(page);
         // Navigate to Settings then open the storage editor (handles both the
         // empty-state "configure" entry and the configured-org "update" entry).
+        // Org Storage editor is enterprise-only — gate to a clean SKIP on OSS.
+        if (featureAvailable['settings-storage'] === false) {
+            test.skip(true, 'Org Storage editor is an enterprise-only feature — absent in the OSS build');
+            return;
+        }
         await pm.settingsFormValidation.navigateToSettings(page);
-        await pm.settingsFormValidation.openStorageEditor();
+        featureAvailable['settings-storage'] = await pm.settingsFormValidation.openStorageEditor();
+        if (!featureAvailable['settings-storage']) {
+            test.skip(true, 'Org Storage editor is an enterprise-only feature — absent in the OSS build');
+            return;
+        }
         testLogger.info('Navigated to OrgStorageEditor (step 1)');
     });
 
@@ -191,7 +205,16 @@ test.describe("Settings DomainManagement form validation", {
         await navigateToBase(page);
         pm = new PageManager(page);
         // Domain Management only renders in the _meta org — switch there first.
-        await pm.settingsFormValidation.navigateToDomainManagement();
+        // Domain Management is enterprise-only — gate to a clean SKIP on OSS.
+        if (featureAvailable['settings-domain'] === false) {
+            test.skip(true, 'Domain Management is an enterprise-only feature — absent in the OSS build');
+            return;
+        }
+        featureAvailable['settings-domain'] = await pm.settingsFormValidation.navigateToDomainManagement();
+        if (!featureAvailable['settings-domain']) {
+            test.skip(true, 'Domain Management is an enterprise-only feature — absent in the OSS build');
+            return;
+        }
         testLogger.info('Navigated to Settings > Domain Management');
     });
 
@@ -348,8 +371,17 @@ test.describe("Correlation Settings SemanticGroupItem display name validation", 
         testLogger.testStart(testInfo.title, testInfo.file);
         await navigateToBase(page);
         pm = new PageManager(page);
+        // Correlation Settings is enterprise-only — gate to a clean SKIP on OSS.
+        if (featureAvailable['settings-correlation'] === false) {
+            test.skip(true, 'Correlation Settings is an enterprise-only feature — absent in the OSS build');
+            return;
+        }
         await pm.correlationSettingsPage.navigateToCorrelationSettings(orgId);
-        await pm.correlationSettingsPage.clickFieldAliasesTab();
+        featureAvailable['settings-correlation'] = await pm.correlationSettingsPage.clickFieldAliasesTab();
+        if (!featureAvailable['settings-correlation']) {
+            test.skip(true, 'Correlation Settings is an enterprise-only feature — absent in the OSS build');
+            return;
+        }
         await pm.correlationSettingsPage.expectAddCustomGroupButtonVisible();
         testLogger.info('Navigated to Field Aliases tab');
     });

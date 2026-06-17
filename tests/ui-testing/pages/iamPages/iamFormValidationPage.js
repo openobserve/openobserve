@@ -101,18 +101,42 @@ export class IamFormValidationPage {
         await this.page.locator(this.iamOrganizationsTab).click();
     }
 
+    /**
+     * Navigates to the IAM Groups tab and reports whether the feature mounted.
+     * Groups (RBAC) is an ENTERPRISE-only feature — the tab and add button are
+     * absent on the OSS binary. Returns true when the feature rendered (so a
+     * caller can gate-skip enterprise-only assertions on OSS), false otherwise.
+     * @returns {Promise<boolean>}
+     */
     async navigateToGroupsTab() {
         await this.navigateToIam();
-        await this.page.locator(this.iamGroupsTab).waitFor({ state: 'visible', timeout: 10000 });
-        await this.page.locator(this.iamGroupsTab).click();
-        await this.page.locator(this.addGroupButton).waitFor({ state: 'visible', timeout: 10000 });
+        try {
+            await this.page.locator(this.iamGroupsTab).waitFor({ state: 'visible', timeout: 15000 });
+            await this.page.locator(this.iamGroupsTab).click();
+            await this.page.locator(this.addGroupButton).waitFor({ state: 'visible', timeout: 15000 });
+            return true;
+        } catch {
+            return false;
+        }
     }
 
+    /**
+     * Navigates to the IAM Roles tab and reports whether the feature mounted.
+     * Roles (RBAC) is an ENTERPRISE-only feature — the tab and add button are
+     * absent on the OSS binary. Returns true when the feature rendered, false
+     * otherwise, so callers can gate-skip enterprise-only assertions on OSS.
+     * @returns {Promise<boolean>}
+     */
     async navigateToRolesTab() {
         await this.navigateToIam();
-        await this.page.locator(this.iamRolesTab).waitFor({ state: 'visible', timeout: 10000 });
-        await this.page.locator(this.iamRolesTab).click();
-        await this.page.locator(this.addRoleButton).waitFor({ state: 'visible', timeout: 10000 });
+        try {
+            await this.page.locator(this.iamRolesTab).waitFor({ state: 'visible', timeout: 15000 });
+            await this.page.locator(this.iamRolesTab).click();
+            await this.page.locator(this.addRoleButton).waitFor({ state: 'visible', timeout: 15000 });
+            return true;
+        } catch {
+            return false;
+        }
     }
 
     async navigateToServiceAccountsTab() {

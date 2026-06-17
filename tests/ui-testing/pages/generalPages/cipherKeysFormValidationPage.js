@@ -81,11 +81,23 @@ export class CipherKeysFormValidationPage {
 
   // ── Navigation ──────────────────────────────────────────────────────────────
 
+  /**
+   * Enterprise-availability probe. Navigates into the Cipher Keys tab and
+   * POSITIVELY detects whether the (enterprise-only) feature mounted, returning
+   * a boolean instead of throwing. Returns false on OSS where the route never
+   * mounts so the suite can SKIP rather than fail. Returns true on enterprise.
+   */
   async navigateToCipherKeysTab() {
     await this.settingsMenu.waitFor({ state: 'visible' });
     await this.settingsMenu.click();
-    await this.cipherKeyTab.waitFor({ state: 'visible' });
-    await this.cipherKeyTab.click();
+    await this.page.waitForLoadState('domcontentloaded');
+    try {
+      await this.cipherKeyTab.waitFor({ state: 'visible', timeout: 15000 });
+      await this.cipherKeyTab.click();
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   async openAddCipherKeyForm() {

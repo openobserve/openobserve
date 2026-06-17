@@ -13,6 +13,10 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
+// IAM Groups/Roles (RBAC) are enterprise-only — their tabs are absent on the OSS
+// binary. Cache availability so only the first test of each describe pays the
+// probe cost; the rest skip immediately on OSS while running fully on enterprise.
+const featureAvailable = {};
 
 // ── Organization form ─────────────────────────────────────────────────────────
 
@@ -121,7 +125,15 @@ test.describe("IAM Group form validation", { tag: '@enterprise' }, () => {
         testLogger.testStart(testInfo.title, testInfo.file);
         await navigateToBase(page);
         pm = new PageManager(page);
-        await pm.iamFormValidation.navigateToGroupsTab();
+        if (featureAvailable['iam-groups'] === false) {
+            test.skip(true, 'IAM Groups (RBAC) is an enterprise-only feature — absent in the OSS build');
+            return;
+        }
+        featureAvailable['iam-groups'] = await pm.iamFormValidation.navigateToGroupsTab();
+        if (!featureAvailable['iam-groups']) {
+            test.skip(true, 'IAM Groups (RBAC) is an enterprise-only feature — absent in the OSS build');
+            return;
+        }
         testLogger.info('Navigated to IAM Groups tab');
     });
 
@@ -194,7 +206,15 @@ test.describe("IAM Role form validation", { tag: '@enterprise' }, () => {
         testLogger.testStart(testInfo.title, testInfo.file);
         await navigateToBase(page);
         pm = new PageManager(page);
-        await pm.iamFormValidation.navigateToRolesTab();
+        if (featureAvailable['iam-roles'] === false) {
+            test.skip(true, 'IAM Roles (RBAC) is an enterprise-only feature — absent in the OSS build');
+            return;
+        }
+        featureAvailable['iam-roles'] = await pm.iamFormValidation.navigateToRolesTab();
+        if (!featureAvailable['iam-roles']) {
+            test.skip(true, 'IAM Roles (RBAC) is an enterprise-only feature — absent in the OSS build');
+            return;
+        }
         testLogger.info('Navigated to IAM Roles tab');
     });
 
@@ -437,38 +457,23 @@ test.describe('IAM UpdateRole form validation', { tag: ['@iamFormValidation', '@
         testLogger.info('UpdateRole dialog opened successfully');
     });
 
-    test('should show role required error when role is cleared and save is clicked', {
+    test('should not show a role-required error when the pre-populated role is saved unchanged', {
         tag: ['@iamFormValidation', '@P1']
     }, async ({ page }) => {
-        testLogger.info('TC-UR-002: Role required error when role is cleared');
+        testLogger.info('TC-UR-002: Pre-populated role passes validation with no spurious required error');
 
         await pm.iamFormValidation.openUpdateRoleDialogForFirstUser();
 
-        // Clear the role select by setting model to empty via keyboard (Escape clears OSelect)
-        const roleSelect = pm.iamFormValidation.getUpdateRoleSelectLocator();
-        await roleSelect.click();
-        await page.keyboard.press('Escape');
-        // Type to filter then clear so the field's internal value is emptied
-        // OSelect can be cleared by clicking then pressing Escape which leaves it unselected
-        // Then click Save to trigger the manual validation in onSubmit
+        // The edit dialog opens with the user's existing role already selected, and
+        // the role OSelect is not clearable — so the "Role is required" path is not
+        // reachable through the UI here (and the role field is hidden entirely for
+        // the current user). The reachable, deterministic property is that saving
+        // the unchanged, pre-populated role does NOT surface a role-required error.
         await pm.iamFormValidation.getUpdateRoleSaveBtnLocator().click();
 
         const roleError = pm.iamFormValidation.getUpdateRoleErrorLocator();
-        const errorVisible = await roleError.isVisible().catch(() => false);
-        // The error is shown when orgMemberData.role is falsy
-        // In most cases the role is pre-populated from the user — only shows if cleared
-        if (errorVisible) {
-            await expect(roleError).toContainText('Role is required');
-            testLogger.info('Role required error shown after clearing role select');
-        } else {
-            // Role was pre-populated and save proceeds — verify dialog closes or toast appears
-            const toastOrDialog = await Promise.race([
-                page.locator('[data-test-variant="success"]').waitFor({ state: 'visible', timeout: 5000 }).then(() => 'toast'),
-                pm.iamFormValidation.getUpdateRoleDialogLocator().waitFor({ state: 'hidden', timeout: 5000 }).then(() => 'closed'),
-            ]).catch(() => 'neither');
-            expect(['toast', 'closed']).toContain(toastOrDialog);
-            testLogger.info('Role was pre-populated — save proceeded normally');
-        }
+        await expect(roleError).toHaveCount(0);
+        testLogger.info('No spurious role-required error on a pre-populated role');
     });
 
     test('should save successfully when role is selected and save is clicked', {

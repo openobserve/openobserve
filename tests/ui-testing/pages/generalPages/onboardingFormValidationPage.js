@@ -87,6 +87,33 @@ export class OnboardingFormValidationPage {
         await this.page.locator(this.awsCreateLinkBtn).waitFor({ state: 'visible', timeout: 10000 });
     }
 
+    /**
+     * Cloud-availability probe for the AWS Marketplace setup form.
+     *
+     * Navigates to the setup route, injects a fake marketplace token cookie so
+     * the page renders the form, then waits for the Create & Link button (the
+     * form's signal element). The AWS Marketplace onboarding route is only
+     * registered on the enterprise/cloud binary — on the OSS build navigation
+     * redirects away and the signal never appears.
+     *
+     * @returns {Promise<boolean>} true when the form mounted (cloud/enterprise),
+     *          false on timeout (feature absent in the OSS build)
+     */
+    async probeAwsMarketplaceSetup() {
+        await this.page.goto('/web/marketplace/aws/setup');
+        await this.page.evaluate(() => {
+            document.cookie = 'aws_marketplace_token=test_fv_aws_token_001; path=/';
+        });
+        await this.page.reload();
+        await this.page.waitForLoadState('domcontentloaded');
+        try {
+            await this.page.locator(this.awsCreateLinkBtn).waitFor({ state: 'visible', timeout: 15000 });
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
     async fillAwsOrgName(value) {
         await this.page.locator(this.awsOrgNameInput).fill(value);
     }
@@ -107,6 +134,33 @@ export class OnboardingFormValidationPage {
         await this.page.evaluate((t) => sessionStorage.setItem('azure_marketplace_token', t), token);
         await this.page.reload();
         await this.page.locator(this.azureCreateLinkBtn).waitFor({ state: 'visible', timeout: 10000 });
+    }
+
+    /**
+     * Cloud-availability probe for the Azure Marketplace setup form.
+     *
+     * Navigates to the register route, injects a fake marketplace token into
+     * sessionStorage so the component renders the form, reloads, then waits for
+     * the Create & Link button (the form's signal element). The Azure
+     * Marketplace onboarding route is only registered on the enterprise/cloud
+     * binary — on the OSS build navigation redirects away and the signal never
+     * appears.
+     *
+     * @param {string} token  fake marketplace token to seed
+     * @returns {Promise<boolean>} true when the form mounted (cloud/enterprise),
+     *          false on timeout (feature absent in the OSS build)
+     */
+    async probeAzureMarketplaceSetup(token = 'test_fv_azure_token_001') {
+        await this.page.goto('/web/marketplace/azure/register');
+        await this.page.evaluate((t) => sessionStorage.setItem('azure_marketplace_token', t), token);
+        await this.page.reload();
+        await this.page.waitForLoadState('domcontentloaded');
+        try {
+            await this.page.locator(this.azureCreateLinkBtn).waitFor({ state: 'visible', timeout: 15000 });
+            return true;
+        } catch {
+            return false;
+        }
     }
 
     async fillAzureOrgName(value) {

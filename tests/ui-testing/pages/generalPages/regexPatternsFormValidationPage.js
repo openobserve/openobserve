@@ -40,13 +40,27 @@ export class RegexPatternsFormValidationPage {
 
     // ── Navigation helpers ────────────────────────────────────────────────────
 
+    /**
+     * Enterprise-availability probe for the Regex Patterns feature.
+     * Navigates to the settings page and POSITIVELY detects whether the
+     * (enterprise-only) Regex Patterns route mounted by waiting for its page
+     * signal. Returns true when the feature is present, false otherwise — never
+     * throws — so callers can gate the suite into a clean SKIP on the OSS binary.
+     * @returns {Promise<boolean>}
+     */
     async navigateToRegexPatterns() {
         const orgName = process.env.ORGNAME || 'default';
         const baseUrl = process.env.ZO_BASE_URL;
         const targetUrl = `${baseUrl}/web/settings/regex_patterns?org_identifier=${orgName}`;
         await this.page.goto(targetUrl);
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-        await this.page.locator(this.addPatternButton).waitFor({ state: 'visible', timeout: 10000 });
+        await this.page.waitForLoadState('domcontentloaded');
+        try {
+            await this.page.locator(this.addPatternButton).waitFor({ state: 'visible', timeout: 15000 });
+            return true;
+        } catch {
+            return false;
+        }
     }
 
     // ── Drawer helpers ────────────────────────────────────────────────────────

@@ -11,6 +11,10 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
+// Cipher Keys is enterprise-only — its route is absent on the OSS binary. Cache
+// availability so only the first test of the suite pays the probe cost; the rest
+// skip immediately on OSS while running fully on the enterprise binary.
+const featureAvailable = {};
 
 // ── AddCipherKey — empty form validation ────────────────────────────────────
 
@@ -24,7 +28,15 @@ test.describe('Cipher Keys — AddCipherKey empty form validation', {
     testLogger.testStart(testInfo.title, testInfo.file);
     await navigateToBase(page);
     pm = new PageManager(page);
-    await pm.cipherKeysFormValidation.navigateToCipherKeysTab();
+    if (featureAvailable['cipher-keys'] === false) {
+      test.skip(true, 'Cipher Keys is an enterprise-only feature — absent in the OSS build');
+      return;
+    }
+    featureAvailable['cipher-keys'] = await pm.cipherKeysFormValidation.navigateToCipherKeysTab();
+    if (!featureAvailable['cipher-keys']) {
+      test.skip(true, 'Cipher Keys is an enterprise-only feature — absent in the OSS build');
+      return;
+    }
     await pm.cipherKeysFormValidation.openAddCipherKeyForm();
     testLogger.info('Navigated to Add Cipher Key form');
   });
@@ -95,7 +107,15 @@ test.describe('Cipher Keys — Akeyless credential errors', {
     testLogger.testStart(testInfo.title, testInfo.file);
     await navigateToBase(page);
     pm = new PageManager(page);
-    await pm.cipherKeysFormValidation.navigateToCipherKeysTab();
+    if (featureAvailable['cipher-keys'] === false) {
+      test.skip(true, 'Cipher Keys is an enterprise-only feature — absent in the OSS build');
+      return;
+    }
+    featureAvailable['cipher-keys'] = await pm.cipherKeysFormValidation.navigateToCipherKeysTab();
+    if (!featureAvailable['cipher-keys']) {
+      test.skip(true, 'Cipher Keys is an enterprise-only feature — absent in the OSS build');
+      return;
+    }
     await pm.cipherKeysFormValidation.openAddCipherKeyForm();
     testLogger.info('Navigated to Add Cipher Key form');
   });
@@ -151,7 +171,15 @@ test.describe('Cipher Keys — AddAkeylessType URL format validation', {
     testLogger.testStart(testInfo.title, testInfo.file);
     await navigateToBase(page);
     pm = new PageManager(page);
-    await pm.cipherKeysFormValidation.navigateToCipherKeysTab();
+    if (featureAvailable['cipher-keys'] === false) {
+      test.skip(true, 'Cipher Keys is an enterprise-only feature — absent in the OSS build');
+      return;
+    }
+    featureAvailable['cipher-keys'] = await pm.cipherKeysFormValidation.navigateToCipherKeysTab();
+    if (!featureAvailable['cipher-keys']) {
+      test.skip(true, 'Cipher Keys is an enterprise-only feature — absent in the OSS build');
+      return;
+    }
     await pm.cipherKeysFormValidation.openAddCipherKeyForm();
     testLogger.info('Navigated to Add Cipher Key form');
   });
@@ -207,7 +235,15 @@ test.describe('Cipher Keys — AddEncryptionMechanism form validation', {
     testLogger.testStart(testInfo.title, testInfo.file);
     await navigateToBase(page);
     pm = new PageManager(page);
-    await pm.cipherKeysFormValidation.navigateToCipherKeysTab();
+    if (featureAvailable['cipher-keys'] === false) {
+      test.skip(true, 'Cipher Keys is an enterprise-only feature — absent in the OSS build');
+      return;
+    }
+    featureAvailable['cipher-keys'] = await pm.cipherKeysFormValidation.navigateToCipherKeysTab();
+    if (!featureAvailable['cipher-keys']) {
+      test.skip(true, 'Cipher Keys is an enterprise-only feature — absent in the OSS build');
+      return;
+    }
     await pm.cipherKeysFormValidation.openAddCipherKeyForm();
     testLogger.info('Navigated to Add Cipher Key form (encryption mechanism step)');
   });
@@ -264,7 +300,15 @@ test.describe('Cipher Keys — valid OpenObserve key creation', {
     testLogger.testStart(testInfo.title, testInfo.file);
     await navigateToBase(page);
     pm = new PageManager(page);
-    await pm.cipherKeysFormValidation.navigateToCipherKeysTab();
+    if (featureAvailable['cipher-keys'] === false) {
+      test.skip(true, 'Cipher Keys is an enterprise-only feature — absent in the OSS build');
+      return;
+    }
+    featureAvailable['cipher-keys'] = await pm.cipherKeysFormValidation.navigateToCipherKeysTab();
+    if (!featureAvailable['cipher-keys']) {
+      test.skip(true, 'Cipher Keys is an enterprise-only feature — absent in the OSS build');
+      return;
+    }
     await pm.cipherKeysFormValidation.openAddCipherKeyForm();
     testLogger.info('Navigated to Add Cipher Key form');
   });

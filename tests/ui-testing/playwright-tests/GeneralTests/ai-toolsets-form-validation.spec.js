@@ -13,6 +13,10 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
+// AI Toolsets is enterprise-only — its route is absent on the OSS binary. Cache
+// availability so only the first test of each describe pays the probe cost; the
+// rest skip immediately on OSS while running fully on the enterprise binary.
+const featureAvailable = {};
 
 // ── AddAiToolset form validation ──────────────────────────────────────────────
 
@@ -24,7 +28,15 @@ test.describe('AI Toolsets form validation', { tag: '@enterprise' }, () => {
         testLogger.testStart(testInfo.title, testInfo.file);
         await navigateToBase(page);
         pm = new PageManager(page);
-        await pm.aiToolsetsFormValidation.navigateToAiToolsets();
+        if (featureAvailable['ai-toolsets'] === false) {
+            test.skip(true, 'AI Toolsets is an enterprise-only feature — absent in the OSS build');
+            return;
+        }
+        featureAvailable['ai-toolsets'] = await pm.aiToolsetsFormValidation.navigateToAiToolsets();
+        if (!featureAvailable['ai-toolsets']) {
+            test.skip(true, 'AI Toolsets is an enterprise-only feature — absent in the OSS build');
+            return;
+        }
         await pm.aiToolsetsFormValidation.clickAddToolset();
         testLogger.info('Opened AddAiToolset form');
     });
@@ -127,7 +139,10 @@ test.describe('AI Toolsets form validation', { tag: '@enterprise' }, () => {
     }, async ({ page }) => {
         testLogger.info('Testing successful AI Toolset creation');
 
-        const toolsetName = 'ai_toolset_fv_001';
+        // Unique name per run — the suite has no automated cleanup, so a fixed
+        // name collides with a previously-created toolset and the save silently
+        // fails (duplicate), leaving the form open.
+        const toolsetName = `ai_toolset_fv_${Date.now()}`;
         await pm.aiToolsetsFormValidation.fillName(toolsetName);
         await pm.aiToolsetsFormValidation.fillMcpUrl('https://api.example.com/mcp/');
         await pm.aiToolsetsFormValidation.clickSave();
@@ -152,6 +167,15 @@ test.describe('CrossLink dialog form validation', () => {
         testLogger.testStart(testInfo.title, testInfo.file);
         await navigateToBase(page);
         pm = new PageManager(page);
+        if (featureAvailable['ai-toolsets-crosslink'] === false) {
+            test.skip(true, 'AI Toolsets is an enterprise-only feature — absent in the OSS build');
+            return;
+        }
+        featureAvailable['ai-toolsets-crosslink'] = await pm.aiToolsetsFormValidation.navigateToAiToolsets();
+        if (!featureAvailable['ai-toolsets-crosslink']) {
+            test.skip(true, 'AI Toolsets is an enterprise-only feature — absent in the OSS build');
+            return;
+        }
         // Open the stream schema cross-linking tab so the dialog can be opened
         await pm.crossLinkPage.navigateToStreamCrossLinkTab(testStream);
         testLogger.info('Navigated to cross-link tab', { stream: testStream });

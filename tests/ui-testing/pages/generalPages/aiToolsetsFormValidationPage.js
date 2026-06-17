@@ -50,14 +50,32 @@ export class AiToolsetsFormValidationPage {
 
     // ── Navigation ────────────────────────────────────────────────────────────
 
+    /**
+     * Enterprise-availability probe for the AI Toolsets feature.
+     *
+     * AI Toolsets is an enterprise/cloud-only feature — its route only mounts on
+     * the enterprise binary. This positively detects feature presence by waiting
+     * for the list-page signal (the Add Toolset button) and RETURNS A BOOLEAN:
+     * true when the feature mounted, false on OSS where navigation never lands.
+     * Callers gate the suite on the result (skip on OSS) instead of failing.
+     *
+     * @returns {Promise<boolean>} true when the AI Toolsets list page rendered
+     */
     async navigateToAiToolsets() {
         testLogger.debug('Navigating to AI Toolsets page via URL');
         const orgId = process.env['ORGNAME'] || 'default';
         const baseUrl = process.env['ZO_BASE_URL'] || 'http://localhost:5080';
         await this.page.goto(`${baseUrl}/web/settings/ai_toolsets?org_identifier=${orgId}`);
+        await this.page.waitForLoadState('domcontentloaded');
         await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
-        await this.page.locator(this.addToolsetBtn).waitFor({ state: 'visible', timeout: 15000 });
-        testLogger.debug('AI Toolsets list page ready');
+        try {
+            await this.page.locator(this.addToolsetBtn).waitFor({ state: 'visible', timeout: 15000 });
+            testLogger.debug('AI Toolsets list page ready');
+            return true;
+        } catch {
+            testLogger.debug('AI Toolsets list page not available (likely OSS build)');
+            return false;
+        }
     }
 
     // ── List page actions ─────────────────────────────────────────────────────

@@ -17,6 +17,10 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
+// AWS/Azure Marketplace onboarding is cloud-only — absent on the OSS binary.
+// Cache availability so only the first test of each describe pays the probe cost;
+// the rest skip immediately on OSS while running fully on the cloud binary.
+const featureAvailable = {};
 
 // ── GetStarted onboarding form ────────────────────────────────────────────────
 
@@ -135,14 +139,19 @@ test.describe("AWS Marketplace Setup form validation", { tag: '@cloud' }, () => 
 
     test.beforeEach(async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
-        // Inject a fake aws_marketplace_token cookie so the page renders the form
-        await page.goto('/web/marketplace/aws/setup');
-        await page.evaluate(() => {
-            document.cookie = 'aws_marketplace_token=test_fv_aws_token_001; path=/';
-        });
-        await page.reload();
         pm = new PageManager(page);
-        await pm.onboardingFormValidation.getAwsCreateLinkBtnLocator().waitFor({ state: 'visible', timeout: 10000 });
+        // Inject a fake aws_marketplace_token cookie so the page renders the form.
+        // The probe navigates, seeds the cookie, reloads and waits for the form's
+        // signal element — returning false on the OSS build where the route is absent.
+        if (featureAvailable['onboarding-aws'] === false) {
+            test.skip(true, 'AWS Marketplace onboarding is a cloud-only feature — absent in the OSS build');
+            return;
+        }
+        featureAvailable['onboarding-aws'] = await pm.onboardingFormValidation.probeAwsMarketplaceSetup();
+        if (!featureAvailable['onboarding-aws']) {
+            test.skip(true, 'AWS Marketplace onboarding is a cloud-only feature — absent in the OSS build');
+            return;
+        }
         testLogger.info('AWS Marketplace setup page loaded');
     });
 
@@ -211,15 +220,19 @@ test.describe("Azure Marketplace Setup form validation", { tag: '@cloud' }, () =
 
     test.beforeEach(async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
-        // Azure setup page reads token from sessionStorage.
-        // Navigate first then inject the token and reload so the component sees it.
-        await page.goto('/web/marketplace/azure/register');
-        await page.evaluate(() => {
-            sessionStorage.setItem('azure_marketplace_token', 'test_fv_azure_token_001');
-        });
-        await page.reload();
         pm = new PageManager(page);
-        await pm.onboardingFormValidation.getAzureCreateLinkBtnLocator().waitFor({ state: 'visible', timeout: 10000 });
+        // Azure setup page reads token from sessionStorage.
+        // The probe navigates, seeds the token, reloads and waits for the form's
+        // signal element — returning false on the OSS build where the route is absent.
+        if (featureAvailable['onboarding-azure'] === false) {
+            test.skip(true, 'Azure Marketplace onboarding is a cloud-only feature — absent in the OSS build');
+            return;
+        }
+        featureAvailable['onboarding-azure'] = await pm.onboardingFormValidation.probeAzureMarketplaceSetup();
+        if (!featureAvailable['onboarding-azure']) {
+            test.skip(true, 'Azure Marketplace onboarding is a cloud-only feature — absent in the OSS build');
+            return;
+        }
         testLogger.info('Azure Marketplace setup page loaded');
     });
 

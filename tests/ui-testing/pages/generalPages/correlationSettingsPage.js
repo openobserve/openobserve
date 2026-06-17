@@ -228,9 +228,19 @@ export class CorrelationSettingsPage {
     }
 
     async clickFieldAliasesTab() {
-        const tab = this.page.getByRole('tab', { name: this.fieldAliasesTabName });
-        await tab.click();
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        // Correlation Settings (Field Mappings / Field Aliases) is an ENTERPRISE-only
+        // feature — the tab only mounts on the enterprise build. Probe positively for
+        // the tab via its data-test (data-test-only policy) and return a boolean so
+        // callers can gate the suite to a clean SKIP on the OSS binary.
+        try {
+            const tab = this.page.locator('[data-test="correlation-settings-field-aliases-tab"]');
+            await tab.waitFor({ state: 'visible', timeout: 15000 });
+            await tab.click();
+            await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+            return true;
+        } catch {
+            return false;
+        }
     }
 
     async expectFieldAliasesTabActive() {

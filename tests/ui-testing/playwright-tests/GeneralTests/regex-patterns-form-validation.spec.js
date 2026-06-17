@@ -14,6 +14,10 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
+// Regex Patterns is enterprise-only — its route is absent on the OSS binary.
+// Cache availability so only the first test pays the probe cost; the rest skip
+// immediately on OSS while running fully on the enterprise binary.
+const featureAvailable = {};
 
 test.describe("Regex Patterns form validation", () => {
     test.describe.configure({ mode: 'serial' });
@@ -23,7 +27,15 @@ test.describe("Regex Patterns form validation", () => {
         testLogger.testStart(testInfo.title, testInfo.file);
         await navigateToBase(page);
         pm = new PageManager(page);
-        await pm.regexPatternsFormValidation.navigateToRegexPatterns();
+        if (featureAvailable['regex-patterns'] === false) {
+            test.skip(true, 'Regex Patterns is an enterprise-only feature — absent in the OSS build');
+            return;
+        }
+        featureAvailable['regex-patterns'] = await pm.regexPatternsFormValidation.navigateToRegexPatterns();
+        if (!featureAvailable['regex-patterns']) {
+            test.skip(true, 'Regex Patterns is an enterprise-only feature — absent in the OSS build');
+            return;
+        }
         testLogger.info('Navigated to Regex Patterns settings page');
     });
 

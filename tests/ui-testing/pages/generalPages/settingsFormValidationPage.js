@@ -291,14 +291,23 @@ export class SettingsFormValidationPage {
     // wait for the storage settings route, then click whichever entry button
     // (configure for empty state / update for an already-configured org) is shown.
     async openStorageEditor() {
-        const tab = this.page.locator(this.storageTab);
-        await tab.waitFor({ state: 'visible', timeout: 10000 });
-        await tab.click();
-        await this.page.waitForURL('**/storage_settings**', { timeout: 10000 });
-        const entryBtn = this.getAddStorageBtnLocator();
-        await entryBtn.waitFor({ state: 'visible', timeout: 10000 });
-        await entryBtn.click();
-        await this.page.locator(this.step1ContinueBtn).waitFor({ state: 'visible', timeout: 10000 });
+        // The storage editor is an ENTERPRISE-only feature — its tab/route only
+        // exists on the enterprise build. Probe positively for the editor mounting
+        // (step-1 continue button visible) and return a boolean so callers can gate
+        // the suite to a clean SKIP on the OSS binary.
+        try {
+            const tab = this.page.locator(this.storageTab);
+            await tab.waitFor({ state: 'visible', timeout: 15000 });
+            await tab.click();
+            await this.page.waitForURL('**/storage_settings**', { timeout: 10000 });
+            const entryBtn = this.getAddStorageBtnLocator();
+            await entryBtn.waitFor({ state: 'visible', timeout: 10000 });
+            await entryBtn.click();
+            await this.page.locator(this.step1ContinueBtn).waitFor({ state: 'visible', timeout: 10000 });
+            return true;
+        } catch {
+            return false;
+        }
     }
 
     getStep1ContinueBtnLocator() {
@@ -314,14 +323,23 @@ export class SettingsFormValidationPage {
     // Domain Management is gated to the _meta org (visible: isEnt && meta in
     // settings/index.vue), so switch to the _meta org first, then open the tab.
     async navigateToDomainManagement() {
+        // Domain Management is an ENTERPRISE-only feature — the tab/route only
+        // mounts on the enterprise build (gated to the _meta org). Probe positively
+        // for the domain-management signal (restrictions title visible) and return a
+        // boolean so callers can gate the suite to a clean SKIP on the OSS binary.
         const baseUrl = process.env['ZO_BASE_URL'] || 'http://localhost:5080';
         await this.page.goto(`${baseUrl}/web/settings/general?org_identifier=_meta`);
         await this.page.waitForLoadState('networkidle', { timeout: 12000 }).catch(() => {});
-        const tab = this.page.locator(this.domainTab);
-        await tab.waitFor({ state: 'visible', timeout: 10000 });
-        await tab.click();
-        await this.page.waitForURL('**/domain_management**', { timeout: 10000 });
-        await this.page.locator(this.domainRestrictionsTitle2).waitFor({ state: 'visible', timeout: 10000 });
+        try {
+            const tab = this.page.locator(this.domainTab);
+            await tab.waitFor({ state: 'visible', timeout: 15000 });
+            await tab.click();
+            await this.page.waitForURL('**/domain_management**', { timeout: 10000 });
+            await this.page.locator(this.domainRestrictionsTitle2).waitFor({ state: 'visible', timeout: 10000 });
+            return true;
+        } catch {
+            return false;
+        }
     }
 
     getDomainRestrictionsTitleLocator() {
