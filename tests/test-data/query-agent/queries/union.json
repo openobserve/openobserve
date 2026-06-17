@@ -38,11 +38,11 @@
         "results": [
           [
             "SORT-A7",
-            "2"
+            "1"
           ],
           [
             "SORT-A7",
-            "1"
+            "2"
           ],
           [
             "SORT-M3",
@@ -125,12 +125,12 @@
           ],
           [
             "SORT-M3",
-            "manual",
+            "auto",
             "2"
           ],
           [
             "SORT-M3",
-            "auto",
+            "manual",
             "2"
           ],
           [
@@ -839,14 +839,14 @@
           ],
           [
             "US-WEST",
-            "ZONE-1",
+            "ZONE-3",
             "1",
             "320.0",
             "67.9"
           ],
           [
             "US-WEST",
-            "ZONE-3",
+            "ZONE-1",
             "1",
             "320.0",
             "67.9"
@@ -988,12 +988,12 @@
           ],
           [
             "desktop",
-            "navigation",
+            "performanceMetric",
             "1"
           ],
           [
             "desktop",
-            "performanceMetric",
+            "navigation",
             "1"
           ]
         ],
@@ -1055,14 +1055,14 @@
         ],
         "results": [
           [
-            "Android",
-            "1",
-            "2"
-          ],
-          [
             "non-Android",
             "0",
             "4"
+          ],
+          [
+            "Android",
+            "1",
+            "2"
           ],
           [
             "TOTAL",
@@ -1168,6 +1168,11 @@
           ],
           [
             "component_err",
+            "batch-sync",
+            "2"
+          ],
+          [
+            "component_err",
             "track-router",
             "1"
           ],
@@ -1175,11 +1180,6 @@
             "component_err",
             "pallet-mapper",
             "1"
-          ],
-          [
-            "component_err",
-            "batch-sync",
-            "2"
           ]
         ],
         "results_mode": "rowsort"
@@ -1271,12 +1271,12 @@
           ],
           [
             "error_bucket",
-            "E001",
+            "E003",
             "1"
           ],
           [
             "error_bucket",
-            "E003",
+            "E001",
             "1"
           ],
           [

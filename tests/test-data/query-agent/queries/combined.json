@@ -864,15 +864,11 @@
           ],
           [
             "2",
-            "updateBatch"
+            "checkThreshold"
           ],
           [
             "2",
-            "syncZone"
-          ],
-          [
-            "2",
-            "retryScan"
+            "deleteRecord"
           ],
           [
             "1",
@@ -884,11 +880,15 @@
           ],
           [
             "2",
-            "checkThreshold"
+            "retryScan"
           ],
           [
             "2",
-            "deleteRecord"
+            "syncZone"
+          ],
+          [
+            "2",
+            "updateBatch"
           ]
         ],
         "results_mode": "rowsort"
@@ -1026,16 +1026,22 @@
         ],
         "results": [
           [
+            "RetryScan",
+            "ok",
+            "2",
+            "15.0"
+          ],
+          [
             "MergeBatch",
             "queued",
             "2",
             "3200.0"
           ],
           [
-            "RetryScan",
+            "CheckThreshold",
             "ok",
             "2",
-            "15.0"
+            "78.0"
           ],
           [
             "ScanPallet",
@@ -1050,18 +1056,6 @@
             "12.0"
           ],
           [
-            "CheckThreshold",
-            "ok",
-            "2",
-            "78.0"
-          ],
-          [
-            "SearchItems",
-            "syncing",
-            "1",
-            "45.0"
-          ],
-          [
             "RerouteTrack",
             "ok",
             "1",
@@ -1072,6 +1066,12 @@
             "warning",
             "1",
             "1900.0"
+          ],
+          [
+            "SearchItems",
+            "syncing",
+            "1",
+            "45.0"
           ],
           [
             "DeleteRecord",
@@ -1114,16 +1114,6 @@
             "114.0"
           ],
           [
-            "ZONE-4",
-            "HYBRID",
-            "2",
-            "54.75",
-            "26.3",
-            "670.0",
-            "61.5",
-            "84.0"
-          ],
-          [
             "ZONE-3",
             "HYBRID",
             "2",
@@ -1134,7 +1124,17 @@
             "84.0"
           ],
           [
-            "ZONE-2",
+            "ZONE-4",
+            "HYBRID",
+            "2",
+            "54.75",
+            "26.3",
+            "670.0",
+            "61.5",
+            "84.0"
+          ],
+          [
+            "ZONE-4",
             "AUTO",
             "1",
             "45.3",
@@ -1144,7 +1144,7 @@
             "0.0"
           ],
           [
-            "ZONE-4",
+            "ZONE-2",
             "AUTO",
             "1",
             "45.3",
@@ -1176,20 +1176,20 @@
         ],
         "results": [
           [
-            "MED_LOAD",
-            "MED_TPUT",
-            "4",
-            "18.85",
-            "1060",
-            "2.8"
-          ],
-          [
             "HIGH_LOAD",
             "HIGH_TPUT",
             "4",
             "25.45",
             "520",
             "3.5"
+          ],
+          [
+            "MED_LOAD",
+            "MED_TPUT",
+            "4",
+            "18.85",
+            "1060",
+            "2.8"
           ],
           [
             "LOW_LOAD",
@@ -1323,7 +1323,7 @@
         ],
         "results": [
           [
-            "https://shop.example.com/item/1003",
+            "https://shop.example.com/item/1004",
             "2",
             "1"
           ],
@@ -1333,7 +1333,7 @@
             "2"
           ],
           [
-            "https://shop.example.com/item/1004",
+            "https://shop.example.com/item/1003",
             "2",
             "1"
           ],
@@ -1396,13 +1396,6 @@
         ],
         "results": [
           [
-            "zone-controller",
-            "itemPage",
-            "1",
-            "12.0",
-            "12"
-          ],
-          [
             "conveyor-driver",
             "searchPage",
             "2",
@@ -1429,6 +1422,13 @@
             "1",
             "230.0",
             "230"
+          ],
+          [
+            "zone-controller",
+            "itemPage",
+            "1",
+            "12.0",
+            "12"
           ]
         ],
         "results_mode": "rowsort"
@@ -1479,12 +1479,12 @@
         ],
         "results": [
           [
-            "E009",
+            "E005",
             "1",
             "1"
           ],
           [
-            "E005",
+            "E009",
             "1",
             "1"
           ],
@@ -1540,16 +1540,16 @@
         ],
         "results": [
           [
-            "Mobile",
-            "4",
-            "4",
-            "747.5"
-          ],
-          [
             "Computer",
             "1",
             "1",
             "230.0"
+          ],
+          [
+            "Mobile",
+            "4",
+            "4",
+            "747.5"
           ]
         ],
         "results_mode": "rowsort"
@@ -1571,22 +1571,22 @@
         ],
         "results": [
           [
-            "timeout",
-            "success",
-            "2"
-          ],
-          [
             "fast",
             "error",
             "2"
           ],
           [
             "timeout",
+            "success",
+            "2"
+          ],
+          [
+            "slow",
             "error",
             "1"
           ],
           [
-            "slow",
+            "timeout",
             "error",
             "1"
           ],
@@ -1680,7 +1680,13 @@
         ],
         "results": [
           [
-            "cartPage",
+            "searchPage",
+            "1",
+            "1",
+            "100.0"
+          ],
+          [
+            "itemPage",
             "2",
             "2",
             "100.0"
@@ -1692,13 +1698,7 @@
             "100.0"
           ],
           [
-            "searchPage",
-            "1",
-            "1",
-            "100.0"
-          ],
-          [
-            "itemPage",
+            "cartPage",
             "2",
             "2",
             "100.0"
@@ -2310,12 +2310,12 @@
         ],
         "results": [
           [
-            "auth_failure",
+            "app_error",
             "3",
             "2"
           ],
           [
-            "app_error",
+            "auth_failure",
             "3",
             "2"
           ],
@@ -2385,20 +2385,20 @@
         ],
         "results": [
           [
-            "Mobile",
-            "itemPage",
-            "3",
-            "1566666.6666666667",
-            "166666.66666666666",
-            "0.15000000099341074"
-          ],
-          [
             "Computer",
             "searchPage",
             "3",
             "1866666.6666666667",
             "193333.33333333334",
             "0.08666666721304257"
+          ],
+          [
+            "Mobile",
+            "itemPage",
+            "3",
+            "1566666.6666666667",
+            "166666.66666666666",
+            "0.15000000099341074"
           ],
           [
             "Tablet",

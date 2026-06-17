@@ -79,10 +79,26 @@ def _replace_re_match(sql: str) -> str:
 
 
 def _replace_match_all(sql: str) -> str:
-    """Replace match_all('term') with log LIKE '%term%'."""
+    """Replace match_all('term') with DuckDB LIKE conditions.
+
+    Tantivy tokenizes the term and matches each token independently
+    across all indexed text fields.  We emulate this with per-word LIKE
+    conditions on the log field (the primary FTS field in test data).
+
+    Single word:  match_all('warehouse') → log LIKE '%warehouse%'
+    Multi-word:   match_all('ACK batch') → (log LIKE '%ACK%' AND log LIKE '%batch%')
+    """
+    def _build_like(m: re.Match) -> str:
+        term = m.group(1)
+        words = term.split()
+        if len(words) == 1:
+            return f"log LIKE '%{words[0]}%'"
+        clauses = " AND ".join(f"log LIKE '%{w}%'" for w in words)
+        return f"({clauses})"
+
     return re.sub(
         r"match_all\('([^']*)'\)",
-        r"log LIKE '%\1%'",
+        _build_like,
         sql,
         flags=re.IGNORECASE,
     )
