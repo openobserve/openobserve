@@ -1848,7 +1848,7 @@ export default defineComponent({
       {
         key: "r",
         scope: "dashboard",
-        description: "Refresh all panels",
+        description: "shortcuts.actions.dashboardRefresh",
         handler: () => {
           if (isInputFocused()) return;
           refreshData();
@@ -1857,7 +1857,7 @@ export default defineComponent({
       {
         key: "n",
         scope: "dashboard",
-        description: "Add new panel",
+        description: "shortcuts.actions.dashboardAddPanel",
         handler: () => {
           if (isInputFocused()) return;
           addPanelData();
@@ -1866,13 +1866,13 @@ export default defineComponent({
       {
         key: "ctrl+s",
         scope: "dashboard",
-        description: "Save dashboard",
+        description: "shortcuts.actions.dashboardSave",
         handler: () => savePanelLayout(null),
       },
       {
         key: "f",
         scope: "dashboard",
-        description: "Toggle fullscreen",
+        description: "shortcuts.actions.dashboardFullscreen",
         handler: () => {
           if (isInputFocused()) return;
           toggleFullscreen();

@@ -2239,13 +2239,13 @@ useShortcutsWithMac([
   {
     key: "ctrl+enter",
     scope: "traces",
-    description: "Search traces",
+    description: "shortcuts.actions.tracesSearch",
     handler: () => runQueryFn(),
   },
   {
     key: "r",
     scope: "traces",
-    description: "Refresh traces",
+    description: "shortcuts.actions.tracesRefresh",
     handler: () => {
       if (isInputFocused()) return;
       runQueryFn();

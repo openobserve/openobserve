@@ -2604,30 +2604,45 @@ export default defineComponent({
 
     // ── Keyboard shortcuts — span navigation ─────────────────────────────
     useShortcutScope("trace-detail");
+    const nextSpanHandler = () => {
+      if (isInputFocused()) return;
+      const list = spanList.value;
+      if (!list?.length) return;
+      const idx = list.findIndex((s: any) => s.span_id === selectedSpanId.value);
+      if (idx < list.length - 1) updateSelectedSpan(list[idx + 1].span_id);
+    };
+    const prevSpanHandler = () => {
+      if (isInputFocused()) return;
+      const list = spanList.value;
+      if (!list?.length) return;
+      const idx = list.findIndex((s: any) => s.span_id === selectedSpanId.value);
+      if (idx > 0) updateSelectedSpan(list[idx - 1].span_id);
+    };
+
     useShortcutsWithMac([
       {
         key: "j",
         scope: "trace-detail",
         description: "shortcuts.actions.traceNextSpan",
-        handler: () => {
-          if (isInputFocused()) return;
-          const list = spanList.value;
-          if (!list?.length) return;
-          const idx = list.findIndex((s: any) => s.span_id === selectedSpanId.value);
-          if (idx < list.length - 1) updateSelectedSpan(list[idx + 1].span_id);
-        },
+        handler: nextSpanHandler,
+      },
+      {
+        key: "down",
+        scope: "trace-detail",
+        description: "shortcuts.actions.traceNextSpan",
+        handler: nextSpanHandler,
       },
       {
         key: "k",
         scope: "trace-detail",
         description: "shortcuts.actions.tracePrevSpan",
-        handler: () => {
-          if (isInputFocused()) return;
-          const list = spanList.value;
-          if (!list?.length) return;
-          const idx = list.findIndex((s: any) => s.span_id === selectedSpanId.value);
-          if (idx > 0) updateSelectedSpan(list[idx - 1].span_id);
-        },
+        handler: prevSpanHandler,
+      },
+      {
+        key: "up",
+        scope: "trace-detail",
+        description: "shortcuts.actions.tracePrevSpan",
+        handler: prevSpanHandler,
       },
     ]);
     return {

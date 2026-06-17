@@ -3232,7 +3232,7 @@ export default defineComponent({
       {
         key: "r",
         scope: "logs",
-        description: "Refresh / re-run search",
+        description: "shortcuts.actions.logsRefresh",
         handler: () => {
           if (isInputFocused()) return;
           if (searchObj.loading) return;
@@ -3243,7 +3243,7 @@ export default defineComponent({
       {
         key: "h",
         scope: "logs",
-        description: "Toggle histogram",
+        description: "shortcuts.actions.logsToggleHistogram",
         handler: () => {
           if (isInputFocused()) return;
           searchObj.meta.showHistogram = !searchObj.meta.showHistogram;
@@ -3252,7 +3252,7 @@ export default defineComponent({
       {
         key: "ctrl+/",
         scope: "logs",
-        description: "Toggle fields sidebar",
+        description: "shortcuts.actions.logsToggleSidebar",
         handler: () => {
           searchObj.meta.showFields = !searchObj.meta.showFields;
         },

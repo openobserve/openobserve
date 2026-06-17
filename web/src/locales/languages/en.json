@@ -5499,6 +5499,7 @@
       "dashboardAddPanel": "Add new panel",
       "dashboardSave": "Save dashboard",
       "dashboardFullscreen": "Toggle fullscreen",
+      "tableRowNavigate": "Move to next / previous row",
       "tableRowEdit": "Edit hovered row",
       "tableRowDuplicate": "Duplicate hovered row",
       "tableRowPause": "Pause hovered row",

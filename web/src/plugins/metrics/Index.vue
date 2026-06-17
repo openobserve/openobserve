@@ -606,13 +606,13 @@ export default defineComponent({
       {
         key: "ctrl+enter",
         scope: "metrics",
-        description: "Run PromQL query",
+        description: "shortcuts.actions.metricsRunQuery",
         handler: () => runQuery(),
       },
       {
         key: "r",
         scope: "metrics",
-        description: "Refresh metrics",
+        description: "shortcuts.actions.metricsRefresh",
         handler: () => {
           if (isInputFocused()) return;
           runQuery();

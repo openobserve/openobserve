@@ -146,6 +146,21 @@ const ROW_ACTION_KEYS: Record<string, string> = {
 const handleKeydown = (e: KeyboardEvent) => {
   if (!isHovered.value || isInputFocused()) return;
 
+  // Arrow up/down — move hover focus to the adjacent row
+  if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+    const tr = rowRef.value?.closest("tr");
+    if (!tr) return;
+    const sibling = e.key === "ArrowDown"
+      ? tr.nextElementSibling
+      : tr.previousElementSibling;
+    if (sibling instanceof HTMLElement) {
+      e.preventDefault();
+      sibling.dispatchEvent(new MouseEvent("mouseenter", { bubbles: true }));
+      sibling.focus();
+    }
+    return;
+  }
+
   const action =
     e.key === "Delete" || e.key === "Backspace"
       ? "delete"

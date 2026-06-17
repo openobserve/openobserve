@@ -38,12 +38,13 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.tableRow",
     shortcuts: [
-      { key: "e",   descriptionKey: "shortcuts.actions.tableRowEdit" },
-      { key: "d",   descriptionKey: "shortcuts.actions.tableRowDuplicate" },
-      { key: "p",   descriptionKey: "shortcuts.actions.tableRowPause" },
-      { key: "r",   descriptionKey: "shortcuts.actions.tableRowResume" },
-      { key: "v",   descriptionKey: "shortcuts.actions.tableRowView" },
-      { key: "x",   descriptionKey: "shortcuts.actions.tableRowExport" },
+      { key: "↑ / ↓",    descriptionKey: "shortcuts.actions.tableRowNavigate" },
+      { key: "e",        descriptionKey: "shortcuts.actions.tableRowEdit" },
+      { key: "d",        descriptionKey: "shortcuts.actions.tableRowDuplicate" },
+      { key: "p",        descriptionKey: "shortcuts.actions.tableRowPause" },
+      { key: "r",        descriptionKey: "shortcuts.actions.tableRowResume" },
+      { key: "v",        descriptionKey: "shortcuts.actions.tableRowView" },
+      { key: "x",        descriptionKey: "shortcuts.actions.tableRowExport" },
       { key: "del / ⌫", descriptionKey: "shortcuts.actions.tableRowDelete" },
     ],
   },
@@ -126,8 +127,8 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.traceDetail",
     shortcuts: [
-      { key: "j", descriptionKey: "shortcuts.actions.traceNextSpan" },
-      { key: "k", descriptionKey: "shortcuts.actions.tracePrevSpan" },
+      { key: "j / ↓", descriptionKey: "shortcuts.actions.traceNextSpan" },
+      { key: "k / ↑", descriptionKey: "shortcuts.actions.tracePrevSpan" },
     ],
   },
 
