@@ -789,10 +789,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- floating footer for the table -->
                 <div class="floating-buttons tw:flex-shrink-0 tw:px-2 tw:py-1">
                   <div
-                    v-if="indexData.schema.length > 0"
                     class="tw:flex tw:items-center tw:justify-between"
                   >
-                    <div class="tw:flex tw:items-center tw:gap-2">
+                    <div v-if="indexData.schema.length > 0" class="tw:flex tw:items-center tw:gap-2">
                       <span
                         v-if="activeMainTab == 'schemaSettings'"
                         class="tw:px-2 tw:py-2"
