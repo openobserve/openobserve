@@ -361,7 +361,7 @@
     "noResultsFound": "未找到任何结果",
     "errorFetchingResults": "获取结果时出错",
     "somethingWentWrong": "出了点问题",
-    "selectStreamForAI": "先选择一个直播来使用 AI",
+    "selectStreamForAI": "先选择一个数据流来使用 AI",
     "collapseFields": "折叠字段",
     "openFields": "打开字段",
     "createAlertFromPattern": "使用此模式创建警报",
@@ -392,19 +392,19 @@
     "patternWildcardSampleValues": "样本值",
     "wildcardSampleValues": "样本值",
     "patternZScore": "Z 分数：{zScore}（平均频率：{avgFrequency}）",
-    "liveMode": "直播",
+    "liveMode": "数据流",
     "liveModeTooltip": "在过滤器/时间更改时自动运行查询",
-    "turnOnLiveMode": "开启直播模式",
-    "turnOffLiveMode": "关闭直播模式",
+    "turnOnLiveMode": "开启数据流模式",
+    "turnOffLiveMode": "关闭数据流模式",
     "autoRunEnabled": "自动运行已启用",
-    "selectStreamFirst": "先选择一个直播",
+    "selectStreamFirst": "先选择一个数据流",
     "traces": "追踪",
     "switchToLogs": "点击切换回日志",
     "patternNoValuesAvailable": "没有可用值",
     "selectLogStream": "选择日志流",
     "noData": "无可用数据",
     "functionEditorLabel": "函数编辑器",
-    "loadingStream": "正在加载直播...",
+    "loadingStream": "正在加载数据流...",
     "askAIPlaceholderRotation": {
       "one": "让我看看过去一小时的错误...",
       "two": "查找耗时超过 5 秒的慢速查询...",
@@ -425,7 +425,7 @@
     "menuGroupExplain": "解释一下",
     "fieldValuesEmpty": "未找到任何值。",
     "fieldValuesEmptyHint": "尝试更宽的时间范围来查看数值。",
-    "selectLogsStreamFirst": "先选择日志直播"
+    "selectLogsStreamFirst": "先选择日志数据流"
   },
   "menu": {
     "home": "主页",
@@ -1810,7 +1810,7 @@
     "tabUsage": "用法",
     "subtitle": "您的可观测性工作空间一览",
     "noDataState": {
-      "title": "尚未摄取任何数据",
+      "title": "尚未写入任何数据",
       "description": "该组织尚未收到任何数据，因此没有什么可绘制的。一旦事件开始流动，您的<strong>摄取量、存储空间和查询使用</strong>量将自动显示在此处。",
       "logs": "发送日志",
       "logsDesc": "Curl、Filebeat、Fluentbit、Vector 等",
@@ -1819,11 +1819,11 @@
       "metrics": "发送指标",
       "metricsDesc": "Prometheus、oTel Collector、Telegraf 等",
       "or": "或者：",
-      "otel": "打开遥测",
+      "otel": "OTEL",
       "kubernetes": "Kubernetes",
       "aws": "AWS/CloudWatch",
-      "aiIntegrations": "人工智能集成",
-      "shippers": "原木托运人"
+      "aiIntegrations": "AI集成",
+      "shippers": "Shippers"
     }
   },
   "billing": {
@@ -2416,7 +2416,7 @@
     "runQuery": "运行查询",
     "onStream": "上",
     "streamLabel": "流",
-    "noStreamSelected": "未选择任何直播",
+    "noStreamSelected": "未选择任何数据流",
     "resultsIncludeAllWindows": "结果包括所有多窗口新增内容",
     "runQueryForOutput": "请单击 “运行查询” 以查看输出",
     "applyVRLForOutput": "请单击 Apply VRL 查看组合输出",
@@ -2451,7 +2451,7 @@
       "disabled": "已禁用"
     },
     "anomalyStepCaptions": {
-      "alertSetup": "为您的探测器命名并选择要监视的直播",
+      "alertSetup": "为您的探测器命名并选择要监视的数据流",
       "detectionConfig": "配置查询和检测参数",
       "alerting": "在检测到异常时设置通知"
     },
@@ -2464,8 +2464,8 @@
     "nameNoSpecialChars": "警报名称不能包含 ':'、'#'、'?'、'&'、'%'、引号或空格字符，请使用下划线 (_) 代替。",
     "anomalyNamePlaceholder": "异常名称",
     "folder": "文件夹",
-    "selectStreamTypeFirst": "请先选择直播类型",
-    "previewEmptyState": "选择直播类型和直播名称以查看预览",
+    "selectStreamTypeFirst": "请先选择数据流类型",
+    "previewEmptyState": "选择数据流类型和数据流名称以查看预览",
     "queryConfig": {
       "sectionTitle": "条件",
       "openFullEditor": "打开完整版编辑器",
@@ -2481,7 +2481,7 @@
       "filters": "过滤器",
       "fieldPlaceholder": "字段",
       "noFieldsFound": "未找到字段",
-      "selectStreamFirst": "先选择一个直播",
+      "selectStreamFirst": "先选择一个数据流",
       "addFilter": "添加过滤器",
       "sqlRequired": "自定义 SQL 模式下需要 SQL",
       "detectionResolution": "探测分辨率",
@@ -2495,7 +2495,7 @@
       "sensitivityTooltip": "调整异常分数范围以控制灵敏度。分数超出此范围的分数不会触发警报。使用图表可视化历史数据并进行相应调整。",
       "anomalyScoreRange": "异常分数范围：",
       "loadData": "加载数据",
-      "selectStreamFirstTooltip": "先选择一个直播",
+      "selectStreamFirstTooltip": "先选择一个数据流",
       "enterSqlFirst": "先输入 SQL 查询",
       "clickLoadDataHint": "单击 “加载数据” 预览时间序列",
       "seasonalityWeekly": "一小时 + 一周中的某一天",
@@ -2909,18 +2909,18 @@
     "savePipeline": "保存流水线",
     "savePipelineConfirm": "你确定要保存这个流水线吗，因为它没有任何影响？",
     "sourceNode": "来源",
-    "streamNode": "直播",
+    "streamNode": "数据流",
     "queryNode": "查询",
     "transformNode": "转型",
     "functionNode": "函数",
     "conditionNode": "状况",
     "destinationNode": "目标",
     "remoteNode": "远程",
-    "sourceStreamTooltip": "来源：直播节点",
+    "sourceStreamTooltip": "来源：数据流节点",
     "sourceQueryTooltip": "来源：查询节点",
     "functionTooltip": "函数节点",
     "conditionTooltip": "条件节点",
-    "destinationStreamTooltip": "目标：直播节点",
+    "destinationStreamTooltip": "目标：数据流节点",
     "destinationExternalTooltip": "目标：外部目标节点",
     "pipelineNotFound": "未找到流水线",
     "pipelineNameRequired": "流水线名称为必填项",
@@ -2989,8 +2989,8 @@
     "noTemplatesFound": "未找到评估模板。在 “评估模板” 页面中创建一个。",
     "evalTemplatesRefreshed": "评估模板已成功刷新",
     "subtitle": "在飞行中转换、丰富和路由数据",
-    "selectStream": "选择一个直播...",
-    "queryEditorPlaceholder": "在此处选择直播或编写 SQL 查询..."
+    "selectStream": "选择一个数据流...",
+    "queryEditorPlaceholder": "在此处选择数据流或编写 SQL 查询..."
   },
   "reports": {
     "header": "报表",
@@ -3050,7 +3050,7 @@
     "loadingStream": "正在加载数据流...",
     "viewRelated": "查看相关",
     "noTracesFound": "未找到结果。",
-    "configureFullTextSearch": "为直播配置全文搜索字段。",
+    "configureFullTextSearch": "为数据流配置全文搜索字段。",
     "collapseFields": "折叠字段",
     "openFields": "打开字段",
     "timeRangeUpdated": "所选时间范围不包括此跟踪。时间范围已更新，以匹配跟踪的时间戳。",
@@ -3096,7 +3096,7 @@
     "evaluations": {
       "loading": "正在加载评估数据...",
       "noDataTitle": "没有评估数据",
-      "noDataSubtitle": "这条线索尚未经过评估。为该直播配置 LLM 评估以查看质量分数和分析。",
+      "noDataSubtitle": "这条线索尚未经过评估。为该数据流配置 LLM 评估以查看质量分数和分析。",
       "templateLabel": "评估模板：",
       "qualityScore": "质量得分",
       "verdict": "判决",
@@ -3179,17 +3179,17 @@
     "stacktraceCopied": "Stacktrace 已复制到剪贴板",
     "stacktraceCopyFailed": "无法复制堆栈跟踪",
     "sessionsList": {
-      "noStreamsTooltip": "没有 LLM 直播可用。",
+      "noStreamsTooltip": "没有 LLM 数据流可用。",
       "session": "会话",
       "sessions": "会议",
       "countPill": "{总计} {单位} 的 {数量}",
-      "noStreamsFound": "未找到 LLM 直播",
+      "noStreamsFound": "未找到 LLM 数据流",
       "noStreamsDescription1": "会话组跨度为",
-      "noStreamsDescription2": "跨越标记为 LLM 流的跟踪流。要么不存在这样的直播，要么尚未写入任何跨度。",
+      "noStreamsDescription2": "跨越标记为 LLM 流的跟踪流。要么不存在这样的数据流，要么尚未写入任何跨度。",
       "failedToLoad": "加载会话失败",
       "retry": "重试",
       "noSessionsFound": "未找到会话",
-      "noSessionsDescription": "在此时间范围内，{stream} 上未录制任何 LLM 会话。尝试扩大时间范围或切换到其他直播。",
+      "noSessionsDescription": "在此时间范围内，{stream} 上未录制任何 LLM 会话。尝试扩大时间范围或切换到其他数据流。",
       "loading": "正在加载会话...",
       "tokenTooltip": "输入：{输入} · 输出：{输出} · 总计：{总计}",
       "durationNs": "ns",
@@ -3198,7 +3198,7 @@
         "sessionId": "会话 ID",
         "turns": "回合",
         "duration": "持续时间",
-        "tokens": "令牌",
+        "tokens": "词元",
         "cost": "成本",
         "status": "状态"
       }
@@ -3222,8 +3222,8 @@
       "kpi": {
         "turns": "回合",
         "duration": "持续时间",
-        "inputTokens": "输入令牌",
-        "outputTokens": "输出令牌",
+        "inputTokens": "输入词元",
+        "outputTokens": "输出词元",
         "cost": "成本"
       },
       "conversation": "对话",
@@ -3238,7 +3238,7 @@
       "stats": {
         "status": "状态",
         "model": "模型",
-        "tokens": "令牌",
+        "tokens": "词元",
         "input": "输入",
         "output": "输出",
         "total": "总计",
@@ -3259,15 +3259,15 @@
       "otelCollectorDesc": "通过 oTel Collector 路由所有遥测信号",
       "or": "或者：",
       "kubernetes": "Kubernetes",
-      "python": "巨蟒蛇",
-      "java": "爪哇",
+      "python": "Python",
+      "java": "Java",
       "nodejs": "Node.js",
       "askAi": "让 AI 设置追踪"
     },
     "noStream": {
-      "title": "选择直播开始探索",
+      "title": "选择数据流开始探索",
       "description": "选择跟踪流，然后按<strong>运行查询</strong>。加载结果后，您可以按服务、持续时间、跨度状态等进行筛选。",
-      "selectStream": "选择一个直播",
+      "selectStream": "选择一个数据流",
       "selectStreamDesc": "浏览该组织中可用的追踪流",
       "queryGuide": "阅读追踪指南",
       "queryGuideDesc": "服务图、跨度过滤、RED 指标等",
@@ -3769,12 +3769,12 @@
     "emptyState": "未配置交叉链接。单击 “{addLabel}” 创建一个。",
     "update": "更新",
     "add": "添加",
-    "streamCrossLinks": "直播交叉链接",
-    "streamCrossLinksSubtitle": "特定于此直播的链接。这些链接优先于组织级别的链接。",
+    "streamCrossLinks": "数据流交叉链接",
+    "streamCrossLinksSubtitle": "特定于此数据流的链接。这些链接优先于组织级别的链接。",
     "orgCrossLinks": "组织级链接（只读）",
     "orgCrossLinksSubtitle": "这些链接是在组织级别定义的。转到组织参数进行修改。",
     "orgConfigTitle": "交叉链接配置",
-    "orgConfigSubtitle": "定义适用于所有直播的全局交叉链接。",
+    "orgConfigSubtitle": "定义适用于所有数据流的全局交叉链接。",
     "userGuide": "用户指南",
     "guideIntro": "您可以在 URL 模板中使用以下变量：",
     "guideFieldHeader": "实地信息",
@@ -3973,7 +3973,7 @@
     "matchFound": "已找到匹配项",
     "matchPriority": "比赛优先级",
     "defaultPricingTier": "默认定价等级",
-    "pricePerMTokens": "价格/1M 令牌",
+    "pricePerMTokens": "价格/1M 词元",
     "noPricingForTier": "没有为该等级定义定价。",
     "close": "关闭",
     "testMatch": "测试赛",
@@ -4157,7 +4157,7 @@
     "suggestions": {
       "vrlParseJson": "编写 VRL 来解析我的 nginx 日志中的 JSON",
       "regexRedact": "生成用于编辑电子邮件的正则表达式模式",
-      "mapStreamSchema": "映射我的 “默认” 直播架构",
+      "mapStreamSchema": "映射我的 “默认” 数据流架构",
       "promqlCpu": "使用 > 80% 的 CPU 为 pod 编写 PromQL",
       "datadogToO2": "将此 Datadog 查询转换为 OpenObserve SQL",
       "lastAlertFired": "为什么我最后一次警报被触发？"
@@ -4177,7 +4177,7 @@
     },
     "noLogs": {
       "title": "此范围内没有日志",
-      "description": "我们没有找到所选直播和时间范围的任何日志。尝试更宽的时间范围或其他直播。",
+      "description": "我们没有找到所选数据流和时间范围的任何日志。尝试更宽的时间范围或其他数据流。",
       "action": "扩大时间范围",
       "actionDesc": "在更长的时间内搜索"
     },
@@ -4193,7 +4193,7 @@
     },
     "noPipelines": {
       "title": "创建你的第一个管道",
-      "description": "管道会在数据到达时对其进行转换和路由。设置一个即可开始塑造您的直播。",
+      "description": "管道会在数据到达时对其进行转换和路由。设置一个即可开始塑造您的数据流。",
       "action": "新管道",
       "actionDesc": "从头开始构建流程",
       "import": "导入管道",
@@ -4207,7 +4207,7 @@
     },
     "noStreams": {
       "title": "等待你的第一批数据",
-      "description": "尚未收到任何数据。连接来源，您的直播将自动显示在此处。",
+      "description": "尚未收到任何数据。连接来源，您的数据流将自动显示在此处。",
       "action": "设置摄取",
       "actionDesc": "连接数据源"
     },
@@ -4273,7 +4273,7 @@
       "fallbackNoun": "结果"
     },
     "nouns": {
-      "logs": "圆木",
+      "logs": "Logs",
       "dashboards": "仪表板",
       "pipelines": "管道",
       "functions": "功能",
@@ -4325,7 +4325,7 @@
       "description": "角色限制定义了适用于组织内单个角色的采集和查询配额。"
     },
     "noIngestionTokens": {
-      "title": "还没有摄取令牌",
+      "title": "还没有写入令牌",
       "description": "在发送日志、指标和跟踪时，摄取令牌对数据源进行身份验证。",
       "action": "新代币",
       "actionDesc": "生成摄取令牌"
@@ -4418,9 +4418,9 @@
     },
     "noEvalJobs": {
       "title": "尚无评测任务",
-      "description": "在 LLM 直播中安排评分器。创建一个，开始按节奏对对话进行评分。",
+      "description": "在 LLM 数据流中安排评分器。创建一个，开始按节奏对对话进行评分。",
       "action": "创建评测任务",
-      "actionDesc": "选择直播 + 得分手 + 节奏"
+      "actionDesc": "选择数据流 + 得分手 + 节奏"
     },
     "noScoreConfigs": {
       "title": "还没有分数配置",
@@ -4439,12 +4439,12 @@
       "description": "管道运行后，管道执行历史记录将显示在此处。"
     },
     "noStreamSelected": {
-      "title": "选择直播开始",
-      "description": "从左侧的下拉列表中选择一个直播，然后按 “运行查询” 来浏览您的日志。您还可以应用其他筛选条件并调整日期范围。"
+      "title": "选择数据流开始",
+      "description": "从左侧的下拉列表中选择一个数据流，然后按 “运行查询” 来浏览您的日志。您还可以应用其他筛选条件并调整日期范围。"
     },
     "noQueryApplied": {
       "title": "运行查询以查看日志",
-      "description": "调整您的过滤器并单击 “运行查询” 以加载此直播的事件。"
+      "description": "调整您的过滤器并单击 “运行查询” 以加载此数据流的事件。"
     },
     "noServiceGraph": {
       "title": "没有服务图数据",
@@ -4628,7 +4628,7 @@
       "backTo": "返回评测任务",
       "createTitle": "创建在线评测任务",
       "editTitle": "编辑在线评测任务",
-      "subtitle": "为该评测任务选择直播、评分器、映射和采样行为。",
+      "subtitle": "为该评测任务选择数据流、评分器、映射和采样行为。",
       "stepper": {
         "target": "目标",
         "scorers": "评分器",
@@ -4830,9 +4830,9 @@
       "askAi": "让 AI 设置摄取"
     },
     "noStream": {
-      "title": "选择直播开始探索",
-      "description": "选择一个直播，然后按<strong>运行查询</strong>。结果出来后，您可以使用过滤器、VRL 函数和自定义时间范围进行优化。",
-      "selectStream": "选择一个直播",
+      "title": "选择数据流开始探索",
+      "description": "选择一个数据流，然后按<strong>运行查询</strong>。结果出来后，您可以使用过滤器、VRL 函数和自定义时间范围进行优化。",
+      "selectStream": "选择一个数据流",
       "selectStreamDesc": "浏览日志、跟踪、指标和 RUM 流",
       "queryGuide": "阅读查询指南",
       "queryGuideDesc": "过滤器、SQL 模式、VRL 和保存的视图",
@@ -4853,10 +4853,10 @@
     "error": {
       "sqlError": "SQL 语法错误",
       "sqlErrorDesc": "您的查询存在语法错误。查看查询编辑器中是否存在突出显示的错误。",
-      "streamNotFound": "未找到直播",
-      "streamNotFoundDesc": "所选直播不存在或已被删除。",
+      "streamNotFound": "未找到数据流",
+      "streamNotFoundDesc": "所选数据流不存在或已被删除。",
       "ftsNotConfigured": "未配置全文搜索",
-      "ftsNotConfiguredDesc": "此直播没有全文搜索字段。配置一个以启用关键字搜索。",
+      "ftsNotConfiguredDesc": "此数据流没有全文搜索字段。配置一个以启用关键字搜索。",
       "fieldNotFound": "未找到字段",
       "fieldNotFoundDesc": "您的查询引用了此流中不存在的一个或多个字段。",
       "functionNotDefined": "未定义函数",
@@ -4871,8 +4871,8 @@
       "serverErrorDesc": "服务器上出现内部错误。",
       "generic": "搜索错误",
       "genericDesc": "检索搜索事件时出错。",
-      "configureStream": "配置直播",
-      "configureStreamDesc": "在直播设置中添加全文搜索字段",
+      "configureStream": "配置数据流",
+      "configureStreamDesc": "在数据流设置中添加全文搜索字段",
       "fixQuery": "修复查询",
       "fixQueryDesc": "在编辑器中查看并更正查询",
       "expandRange": "尝试不同的时间范围",
@@ -4887,10 +4887,10 @@
   "queryError": {
     "sqlError": "SQL 语法错误",
     "sqlErrorDesc": "您的查询存在语法错误。查看编辑器中是否存在突出显示的错误。",
-    "streamNotFound": "未找到直播",
-    "streamNotFoundDesc": "所选直播不存在或已被删除。",
+    "streamNotFound": "未找到数据流",
+    "streamNotFoundDesc": "所选数据流不存在或已被删除。",
     "ftsNotConfigured": "未配置全文搜索",
-    "ftsNotConfiguredDesc": "此直播没有全文搜索字段。配置一个以启用关键字搜索。",
+    "ftsNotConfiguredDesc": "此数据流没有全文搜索字段。配置一个以启用关键字搜索。",
     "fieldNotFound": "未找到字段",
     "fieldNotFoundDesc": "您的查询引用了此流中不存在的一个或多个字段。",
     "functionNotDefined": "未定义函数",
@@ -4905,8 +4905,8 @@
     "serverErrorDesc": "服务器上出现内部错误。",
     "generic": "查询错误",
     "genericDesc": "处理您的查询时出错。",
-    "configureResource": "配置直播",
-    "configureResourceDesc": "在直播设置中添加全文搜索字段",
+    "configureResource": "配置数据流",
+    "configureResourceDesc": "在数据流设置中添加全文搜索字段",
     "fixQuery": "修复查询",
     "fixQueryDesc": "在编辑器中查看并更正查询",
     "expandRange": "尝试不同的时间范围",
