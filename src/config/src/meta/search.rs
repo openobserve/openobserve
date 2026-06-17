@@ -578,6 +578,8 @@ pub struct SearchPartitionRequest {
     pub histogram_interval: i64,
     #[serde(default)]
     pub sampling_ratio: Option<f64>,
+    #[serde(default)]
+    pub search_type: Option<SearchEventType>,
 }
 
 impl SearchPartitionRequest {
@@ -612,6 +614,7 @@ impl From<&Request> for SearchPartitionRequest {
             streaming_output: req.query.streaming_output,
             histogram_interval: req.query.histogram_interval,
             sampling_ratio: req.query.sampling_ratio,
+            search_type: req.search_type,
         }
     }
 }
@@ -2206,6 +2209,7 @@ mod tests {
             streaming_output: false,
             histogram_interval: 0,
             sampling_ratio: None,
+            search_type: None,
         };
 
         req.decode().unwrap();
