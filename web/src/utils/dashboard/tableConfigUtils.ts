@@ -26,11 +26,7 @@ import { toZonedTime } from "date-fns-tz";
 import { formatDate, isTimeSeries, isTimeStamp } from "./dateTimeUtils";
 import { getDataValue } from "./aliasUtils";
 
-/**
- * Persisted `override_config` item type discriminants. Single source of truth
- * shared by the renderer parser (parseOverrideConfigs), the UI (de)serializers
- * (useColumnFormatting), and the Rust schema, so a rename can't silently desync.
- */
+/** Persisted `override_config` item type discriminants (mirrored in the Rust schema). */
 export const OVERRIDE_CONFIG_TYPES = {
   UNIT: "unit",
   UNIQUE_VALUE_COLOR: "unique_value_color",
@@ -41,11 +37,7 @@ export const OVERRIDE_CONFIG_TYPES = {
   FIELD_TYPE: "field_type",
 } as const;
 
-/**
- * Resolve a column's effective numeric-ness from the auto-detected value and an
- * optional per-column field-type override ("auto" | "num" | "text"). "auto" (or
- * absent) keeps the detected value; "num"/"text" force it.
- */
+/** Apply a per-column field-type override ("num"/"text" force; "auto"/absent keep detected). */
 export const resolveIsNumber = (
   detected: boolean,
   fieldType: string | undefined,
@@ -70,11 +62,7 @@ export const parseRegexPattern = (
   return { pattern: input, flags: "" };
 };
 
-/**
- * Build a fast-lookup cache from the panel's `config.mappings` array, keyed by
- * value / range / regex. Stores the full mapping object so both `text` and
- * `color` are recoverable (single engine for text and color resolution).
- */
+/** Build a fast-lookup cache from `config.mappings`, storing the full mapping object. */
 export const buildValueMappingCache = (
   mappings: any,
 ): Map<any, any> | null => {
@@ -105,9 +93,8 @@ export const buildValueMappingCache = (
 };
 
 /**
- * Look up the first mapping object matching `value` (direct, then range, then
- * regex). When `requireField` is given, only mappings whose field is non-empty
- * match — mirroring the field-aware semantics of the previous linear scan.
+ * Look up the first mapping matching `value` (direct, then range, then regex).
+ * `requireField` restricts matches to mappings whose field is non-empty.
  */
 export const lookupValueMappingFull = (
   value: any,
@@ -127,14 +114,16 @@ export const lookupValueMappingFull = (
   m = cache.get(strValue);
   if (m !== undefined && ok(m)) return m;
 
-  // Range match (numbers only)
-  if (typeof value === "number") {
+  // Range match — coerce the cell value to a number so numeric strings match too.
+  const numValue =
+    value === "" || value === null || value === undefined ? NaN : Number(value);
+  if (!Number.isNaN(numValue)) {
     for (const [key, mapping] of cache.entries()) {
       if (typeof key === "string" && key.startsWith("__range_")) {
         const parts = key.split("_");
         const from = parseFloat(parts[3]);
         const to = parseFloat(parts[4]);
-        if (!isNaN(from) && !isNaN(to) && value >= from && value <= to && ok(mapping)) {
+        if (!isNaN(from) && !isNaN(to) && numValue >= from && numValue <= to && ok(mapping)) {
           return mapping;
         }
       }
@@ -290,11 +279,7 @@ export interface OverrideMaps {
   fieldTypeMap: Record<string, string>;
 }
 
-/**
- * Parse `config.override_config` into colour, unit, and style lookup maps
- * keyed by lower-cased field alias.
- * Each override entry may carry multiple config items in its `config[]` array.
- */
+/** Parse `config.override_config` into lookup maps keyed by lower-cased field alias. */
 export const parseOverrideConfigs = (
   overrideConfigs: any[] | undefined,
 ): OverrideMaps => {
@@ -359,12 +344,7 @@ export const parseOverrideConfigs = (
   return { colorConfigMap, unitConfigMap, styleConfigMap, conditionalRulesMap, fieldTypeMap };
 };
 
-/**
- * Apply parsed override maps (alignment, auto-color, text/bg color,
- * conditional rules) onto a renderer column object, keyed by lower-cased alias.
- * Shared by the table converters so override application can't drift between
- * the SQL, multi-query and PromQL paths.
- */
+/** Apply parsed override maps onto a renderer column object, keyed by lower-cased alias. */
 export const applyColumnOverrides = (
   obj: any,
   aliasLower: string,
@@ -400,13 +380,12 @@ export const formatNumericValue = (
   missingValue = "",
 ): string => {
   if (val === null || val === undefined || val === "")
-    return String(missingValue ?? "");
+    return String(missingValue);
 
   const mapped = lookupValueMapping(val, valueMappingCache);
   if (mapped != null) return mapped;
 
-  // !Number.isNaN (not typeof number) so numeric strings format too, matching
-  // the converter's inline closures.
+  // !Number.isNaN (not typeof number) so numeric strings format too.
   return !Number.isNaN(val)
     ? `${formatUnitValue(getUnitValue(val, unit, customUnit, decimals)) ?? 0}`
     : val;

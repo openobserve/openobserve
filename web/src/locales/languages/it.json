@@ -1699,18 +1699,12 @@
     "tableFiltering": "Filtraggio delle colonne",
     "columnFormattingTitle": "Formattazione delle colonne",
     "sectionValueFormatting": "Formattazione dei valori",
-    "cellTypeProgressBar": "Barra di avanzamento",
-    "cellTypeSparkline": "Sparkline",
     "configSectionFieldOverridesAliases": [
       "Field Overrides",
       "Override Config",
       "Override",
       "Column Formatting"
     ],
-    "sectionProgressBar": "Configurazione della barra di avanzamento",
-    "progressMin": "Min",
-    "progressMax": "Max",
-    "progressColor": "Colore della barra",
     "sectionAlignment": "Allineamento",
     "alignLeft": "Left",
     "alignCenter": "Center",

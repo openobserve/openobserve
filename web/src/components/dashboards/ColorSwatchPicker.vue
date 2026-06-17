@@ -14,12 +14,6 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!--
-  ColorSwatchPicker — a compact curated color picker used by the inline column
-  formatting menu and the redesigned dialog. Shows a "none" option, a row of
-  brand-aligned swatches, and a custom (native picker) option. v-model is a hex
-  string ("" === no color).
--->
 <template>
   <div class="swatch-row" :data-test="dataTest">
     <!-- None -->

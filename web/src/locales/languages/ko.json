@@ -1699,18 +1699,12 @@
     "tableFiltering": "컬럼 필터링",
     "columnFormattingTitle": "열 형식 지정",
     "sectionValueFormatting": "값 형식 지정",
-    "cellTypeProgressBar": "진행률 표시줄",
-    "cellTypeSparkline": "스파크라인",
     "configSectionFieldOverridesAliases": [
       "Field Overrides",
       "Override Config",
       "Override",
       "Column Formatting"
     ],
-    "sectionProgressBar": "진행률 표시줄 구성",
-    "progressMin": "최소",
-    "progressMax": "맥스",
-    "progressColor": "바 색상",
     "sectionAlignment": "얼라인먼트",
     "alignLeft": "Left",
     "alignCenter": "Center",

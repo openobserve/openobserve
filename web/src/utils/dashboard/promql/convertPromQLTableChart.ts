@@ -23,6 +23,7 @@ import { formatDate } from "../dateTimeUtils";
 import { toZonedTime } from "date-fns-tz";
 import {
   parseOverrideConfigs,
+  applyColumnOverrides,
   buildValueMappingCache,
   lookupValueMapping,
 } from "../tableConfigUtils";
@@ -101,19 +102,11 @@ export class TableConverter implements PromQLChartConverter {
     const config = panelSchema.config || {};
     const tableMode = config.promql_table_mode || "single";
 
-    // Build override maps (color/unit/style/conditionalRules) to mimic SQL table behavior
-    const { colorConfigMap, unitConfigMap, styleConfigMap, conditionalRulesMap } = parseOverrideConfigs(
-      panelSchema.config?.override_config,
-    );
+    // fieldType isn't applied here — PromQL column types are fixed.
+    const maps = parseOverrideConfigs(panelSchema.config?.override_config);
+    const { unitConfigMap } = maps;
 
-    const colOverrides = (keyLower: string) => {
-      const condRules = conditionalRulesMap?.[keyLower];
-      return {
-        ...(condRules?.length ? { conditionalRules: condRules } : {}),
-      };
-    };
-
-    // Mappings for value text replacements (single shared lookup engine)
+    // Value text-replacement mappings.
     const mappings = panelSchema.config?.mappings || [];
     const valueMappingCache = buildValueMappingCache(mappings);
 
@@ -123,19 +116,9 @@ export class TableConverter implements PromQLChartConverter {
       label: string,
       defaultAlign: string,
     ): any => {
-      const keyLower = name.toLowerCase();
-      const st = styleConfigMap[keyLower];
-      return {
-        name,
-        field: name,
-        label,
-        align: st?.alignment || defaultAlign,
-        sortable: true,
-        colorMode: colorConfigMap[keyLower]?.autoColor ? "auto" : undefined,
-        ...(st?.textColor ? { textColor: st.textColor } : {}),
-        ...(st?.bgColor ? { bgColor: st.bgColor } : {}),
-        ...colOverrides(keyLower),
-      };
+      const col: any = { name, field: name, label, sortable: true };
+      applyColumnOverrides(col, name.toLowerCase(), maps, defaultAlign);
+      return col;
     };
 
     const textFormat = (val: any) => {

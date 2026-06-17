@@ -1699,18 +1699,12 @@
     "tableFiltering": "Kolomfiltering",
     "columnFormattingTitle": "Kolomopmaak",
     "sectionValueFormatting": "Waardeopmaak",
-    "cellTypeProgressBar": "Voortgangsbalk",
-    "cellTypeSparkline": "Sparkline",
     "configSectionFieldOverridesAliases": [
       "Field Overrides",
       "Override Config",
       "Override",
       "Column Formatting"
     ],
-    "sectionProgressBar": "Configuratie van de voortgangsbalk",
-    "progressMin": "Min",
-    "progressMax": "Max",
-    "progressColor": "Kleur van de balk",
     "sectionAlignment": "Uitlijning",
     "alignLeft": "Left",
     "alignCenter": "Center",

@@ -79,6 +79,7 @@ describe("tableConfigUtils", () => {
       ]);
       expect(lookupValueMapping(0, cache)).toBe("low");
       expect(lookupValueMapping(5, cache)).toBe("low");
+      expect(lookupValueMapping("5", cache)).toBe("low"); // numeric string cell
       expect(lookupValueMapping(11, cache)).toBeNull();
     });
 

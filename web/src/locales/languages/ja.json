@@ -1716,18 +1716,12 @@
     "tableFiltering": "列フィルタリング",
     "columnFormattingTitle": "列のフォーマット",
     "sectionValueFormatting": "値のフォーマット",
-    "cellTypeProgressBar": "プログレスバー",
-    "cellTypeSparkline": "スパークライン",
     "configSectionFieldOverridesAliases": [
       "Field Overrides",
       "Override Config",
       "Override",
       "Column Formatting"
     ],
-    "sectionProgressBar": "プログレスバー設定",
-    "progressMin": "最小",
-    "progressMax": "マックス",
-    "progressColor": "バーカラー",
     "sectionAlignment": "アラインメント",
     "alignLeft": "Left",
     "alignCenter": "Center",

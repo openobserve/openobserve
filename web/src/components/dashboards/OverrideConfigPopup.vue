@@ -14,9 +14,6 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!-- "Edit all" column-formatting dialog (Variant B split editor): an accordion
-     of columns, each expanding into shared controls (left) + a live preview
-     (right). The ODialog body is the single, fixed-height scroll region. -->
 <template>
   <ODialog
     data-test="override-config-popup-dialog"
@@ -123,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
 
-          <!-- Right: live preview (real data, or type-based dummy data) -->
+          <!-- Right: live preview -->
           <div class="tw:min-w-0 tw:flex tw:flex-col tw:gap-1.5">
             <div class="tw:flex tw:items-center tw:gap-[5px] tw:text-[10px] tw:font-bold tw:tracking-[0.06em] tw:uppercase tw:text-[var(--o2-text-2,#757575)]">
               <OIcon name="visibility" size="xs" />
@@ -215,8 +212,7 @@ export default defineComponent({
       type: Array as PropType<any[]>,
       default: () => [],
     },
-    // Panel-level fallbacks so the preview matches the real table when a column
-    // has no per-column unit / when the panel sets non-default decimals.
+    // Panel-level fallbacks so the preview matches the real table.
     panelUnit: {
       type: String,
       default: "",
@@ -283,14 +279,11 @@ export default defineComponent({
       );
     };
 
-    // Auto-detected numeric-ness from the query data.
     const detectedNumeric = (field: string): boolean => {
       if (!field) return false;
       return props.columns.find((c: any) => c.alias === field)?.isNumeric ?? false;
     };
 
-    // Effective numeric-ness: the per-column field-type override wins over
-    // detection ("num"/"text" force it; "auto" keeps the detected value).
     const isNumericColumn = (col: ColumnOverrideUI): boolean =>
       col.fieldType === "num"
         ? true
@@ -300,10 +293,10 @@ export default defineComponent({
 
     // Reset numeric-only settings when a column becomes non-numeric.
     watch(
-      () => columnOverrides.value.map((c) => c.field),
-      (fields, prevFields) => {
-        fields.forEach((field, i) => {
-          if (field !== prevFields?.[i] && !isNumericColumn(columnOverrides.value[i])) {
+      () => columnOverrides.value.map((c) => `${c.field}|${c.fieldType}`),
+      (keys, prevKeys) => {
+        keys.forEach((key, i) => {
+          if (key !== prevKeys?.[i] && !isNumericColumn(columnOverrides.value[i])) {
             columnOverrides.value[i].unit = null;
             columnOverrides.value[i].customUnit = null;
             columnOverrides.value[i].conditions = [];
@@ -335,9 +328,6 @@ export default defineComponent({
       return chips;
     };
 
-    // Build a preview column def from the in-progress override, routing through
-    // the SAME serialize -> parse -> apply pipeline the real table uses so the
-    // preview can never diverge from the rendered result.
     const buildPreviewColumn = (base: any, col: ColumnOverrideUI, isNumeric: boolean) => {
       const c: any = { ...base };
       delete c.colorMode;
@@ -363,8 +353,6 @@ export default defineComponent({
       return c;
     };
 
-    // Sample values used when the query returned no rows for a column, so the
-    // preview still demonstrates the formatting. Picked by the effective type.
     const DUMMY_NUMERIC = [12, 47, 83, 100, 6];
     const DUMMY_TEXT = ["alpha", "bravo", "charlie", "delta", "echo"];
     const makeDummyRows = (dataKey: string, isNumeric: boolean) =>
@@ -383,8 +371,6 @@ export default defineComponent({
         ) as any;
       }
       const isNumeric = isNumericColumn(col);
-      // Synthesize a column when the field isn't in the preview data (e.g. the
-      // query returned nothing), so the preview still renders.
       const label = getFieldLabel(col.field) || col.field;
       const baseColumn = base?.column ?? {
         field: col.field,
@@ -395,8 +381,6 @@ export default defineComponent({
       const dataKey = String(
         baseColumn.field ?? baseColumn.alias ?? baseColumn.name ?? col.field,
       );
-      // No real rows → fall back to type-appropriate dummy data so the unit,
-      // conditional styling, etc. all have something to render.
       const rows = base?.rows?.length
         ? base.rows
         : makeDummyRows(dataKey, isNumeric);

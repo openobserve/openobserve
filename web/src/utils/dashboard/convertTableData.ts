@@ -138,8 +138,7 @@ export const convertTableData = (
       obj["name"] = it.label || it.alias;
       obj["field"] = actualField;
       obj["label"] = it.label || it.alias;
-      // alias + isNumeric power inline column formatting: override_config is keyed
-      // by the column alias, while the TanStack column id is the data field.
+      // override_config is keyed by alias; the TanStack column id is the data field.
       obj["alias"] = it.alias;
       obj["isNumeric"] = isNumber;
       obj["sortable"] = true;
@@ -285,8 +284,7 @@ export const convertTableData = (
         obj["field"] = String(it);
         obj["label"] = it != null && it !== "" ? String(it) : "";
         obj["sortable"] = true;
-        // Apply per-column overrides keyed by the (lower-cased) transposed value,
-        // consistent with the non-transpose path.
+        // Overrides keyed by the lower-cased transposed value (transpose path).
         applyColumnOverrides(
           obj,
           String(it).toLowerCase(),
@@ -358,7 +356,6 @@ export const convertTableData = (
       return obj;
     });
   }
-
 
   return {
     rows: tableRows,

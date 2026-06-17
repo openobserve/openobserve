@@ -60,8 +60,7 @@ export default defineComponent({
     const showOverrideConfigPopup = ref(false);
     const columns: any = ref<Column[]>([]);
 
-    // Sample rows + column defs per (lower-cased) alias, so the dialog can render
-    // its live preview. Built from the converted table data passed in panelData.
+    // Per-alias sample rows + column defs for the dialog's live preview.
     const previewData = computed(() => {
       const cols = (props.panelData?.columns as any[]) || [];
       const rows = (props.panelData?.rows as any[]) || [];
@@ -88,8 +87,7 @@ export default defineComponent({
         // This ensures we get exactly what's shown in the table
         const columnNames = new Set<string>();
 
-        // Numeric detection is name-based ("value"/"value_*"), not alignment —
-        // alignment can be overridden by the user's column formatting.
+        // Numeric detection is name-based, not alignment (alignment is user-overridable).
         if (props.panelData?.options?.columns) {
           props.panelData.options.columns.forEach((col: any) => {
             if (col.name) columnNames.add(col.name);

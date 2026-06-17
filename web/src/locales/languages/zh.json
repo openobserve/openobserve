@@ -1699,18 +1699,12 @@
     "tableFiltering": "列过滤",
     "columnFormattingTitle": "列格式",
     "sectionValueFormatting": "值格式",
-    "cellTypeProgressBar": "进度栏",
-    "cellTypeSparkline": "Sparkline",
     "configSectionFieldOverridesAliases": [
       "Field Overrides",
       "Override Config",
       "Override",
       "Column Formatting"
     ],
-    "sectionProgressBar": "进度栏配置",
-    "progressMin": "最小",
-    "progressMax": "马克斯",
-    "progressColor": "条形颜色",
     "sectionAlignment": "对齐",
     "alignLeft": "Left",
     "alignCenter": "Center",

@@ -159,12 +159,12 @@ export default defineComponent({
 
       // 1) Auto color mode — stable palette per distinct string value.
       if (col?.colorMode === "auto") {
-        const palette = getColorForTable;
         const key = String(value);
         const colKey = col.field ?? col.name;
         if (!autoColorCache.has(colKey)) autoColorCache.set(colKey, new Map<string, string>());
         const map = autoColorCache.get(colKey)!;
-        if (!map.has(key)) map.set(key, palette[map.size % palette.length]);
+        if (!map.has(key))
+          map.set(key, getColorForTable[map.size % getColorForTable.length]);
         const hex = map.get(key) as string;
         return `background-color: ${hex}; color: ${isColorDark(hex) ? "#ffffff" : "#000000"}`;
       }

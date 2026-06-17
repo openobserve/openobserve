@@ -1699,18 +1699,12 @@
     "tableFiltering": "Sütun Filtreleme",
     "columnFormattingTitle": "Sütun Biçimlendirme",
     "sectionValueFormatting": "Değer Biçimlendirme",
-    "cellTypeProgressBar": "İlerleme Çubuğu",
-    "cellTypeSparkline": "Sparkline",
     "configSectionFieldOverridesAliases": [
       "Field Overrides",
       "Override Config",
       "Override",
       "Column Formatting"
     ],
-    "sectionProgressBar": "İlerleme çubuğu yapılandırması",
-    "progressMin": "Min",
-    "progressMax": "maksimum",
-    "progressColor": "Çubuk Rengi",
     "sectionAlignment": "Hizalama",
     "alignLeft": "Left",
     "alignCenter": "Center",

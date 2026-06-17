@@ -603,9 +603,9 @@ pub struct ConditionalRule {
     pub bg_color: Option<String>,
 }
 
-// serde_json is built with `arbitrary_precision`, under which numbers buffered by
-// the internally-tagged `Config` enum surface as a map token; OrderedFloat's
-// derived f64 deserialize then fails. Accept number, map, or string forms.
+// Under serde_json's `arbitrary_precision`, numbers buffered by the
+// internally-tagged `Config` enum surface as a map token, breaking OrderedFloat's
+// derived deserialize. Accept number, map, or string forms.
 fn deserialize_flexible_ordf64<'de, D>(deserializer: D) -> Result<OrdF64, D::Error>
 where
     D: serde::Deserializer<'de>,

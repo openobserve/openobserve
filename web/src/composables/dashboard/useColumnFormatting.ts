@@ -13,33 +13,21 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// ---------------------------------------------------------------------------
-// Shared column-formatting model + helpers.
-//
-// Single source of truth for table-chart column formatting. The "Column
-// Formatting" dialog (OverrideConfigPopup.vue) edits the persisted
-// `config.override_config` array through these helpers.
-//
-// The persisted shape (per column) is:
-//   { field: { matchBy: "name", value: "<alias>" }, config: [ {type, ...}, ... ] }
-// The UI works on the flat `ColumnOverrideUI` shape below and (de)serializes
-// to/from the persisted shape on load/save.
-// ---------------------------------------------------------------------------
+// Shared column-formatting model + helpers. UI works on the flat
+// `ColumnOverrideUI` shape and (de)serializes to/from the persisted
+// `config.override_config` array on load/save.
 
 import { useI18n } from "vue-i18n";
 import { OVERRIDE_CONFIG_TYPES } from "@/utils/dashboard/tableConfigUtils";
 
-// Unset/optional fields use `null` (never ""), matching the panel-config
-// convention (useDashboardPanelDefaults: unit/colors default to null). A null
-// value means "not set" → the renderer falls back to the panel-level default.
+// null means "not set" → renderer falls back to the panel-level default.
 export interface ConditionalRuleUI {
   operator: string;
-  threshold: string; // bound to a number input; "" while empty
-  textColor: string | null; // hex or null
-  bgColor: string | null; // hex or null
+  threshold: string; // "" while empty
+  textColor: string | null;
+  bgColor: string | null;
 }
 
-/** A blank conditional rule row. */
 export const emptyConditionalRule = (): ConditionalRuleUI => ({
   operator: "<",
   threshold: "",
@@ -48,25 +36,18 @@ export const emptyConditionalRule = (): ConditionalRuleUI => ({
 });
 
 export interface ColumnOverrideUI {
-  field: string; // column alias
-  // "auto" === detect numeric-ness from the data; "num"/"text" force it.
+  field: string;
+  // "auto" detects numeric-ness from the data; "num"/"text" force it.
   fieldType: "auto" | "num" | "text";
-  // null === "Default" (inherit the panel-level unit). Otherwise one of
-  // "numbers", "bytes", "percent", "currency-dollar", "custom", …
-  unit: string | null;
+  unit: string | null; // null === inherit panel-level unit
   customUnit: string | null;
-  alignment: string | null; // "left" | "center" | "right" | null
-  textColor: string | null; // hex or null
-  bgColor: string | null; // hex or null
+  alignment: string | null;
+  textColor: string | null;
+  bgColor: string | null;
   autoColor: boolean; // unique-value coloring
   conditions: ConditionalRuleUI[];
 }
 
-// ── Curated color palettes (from the Column Formatting redesign mockup) ───────
-// Small, brand-aligned swatch sets shown in the color pickers, plus a custom
-// option. Kept here so the inline menu and the dialog offer identical choices.
-
-/** Text-color swatches (foreground). */
 export const TEXT_SWATCHES = [
   "#b91c1c",
   "#a16207",
@@ -77,7 +58,6 @@ export const TEXT_SWATCHES = [
   "#6b7280",
 ];
 
-/** Background-color swatches (soft tints + white). */
 export const BG_SWATCHES = [
   "#fef2f2",
   "#fefce8",
@@ -88,12 +68,9 @@ export const BG_SWATCHES = [
   "#ffffff",
 ];
 
-/** Compact text/bg swatch sets for conditional rules (kept short so the
- *  per-rule pickers stay on a single row). */
 export const COND_TEXT_SWATCHES = ["#b91c1c", "#a16207", "#15803d", "#316177"];
 export const COND_BG_SWATCHES = ["#fef2f2", "#fefce8", "#f0fdf4", "#f5f8f9"];
 
-/** A blank UI override row, optionally bound to a column alias. */
 export const emptyColumnOverride = (field = ""): ColumnOverrideUI => ({
   field,
   fieldType: "auto",
@@ -106,7 +83,7 @@ export const emptyColumnOverride = (field = ""): ColumnOverrideUI => ({
   conditions: [],
 });
 
-/** Apply the persisted `config[]` items of one entry onto a UI override row. */
+/** Apply persisted config items onto a UI override row. */
 const applyConfigItems = (col: ColumnOverrideUI, items: any[]): void => {
   for (const cfg of items ?? []) {
     switch (cfg?.type) {
@@ -141,10 +118,7 @@ const applyConfigItems = (col: ColumnOverrideUI, items: any[]): void => {
   }
 };
 
-/**
- * Deserialize ALL columns from the raw override_config array, one UI row per
- * column. Used by the full dialog.
- */
+/** Deserialize all columns from the raw override_config array. */
 export const loadAllFromRaw = (raw: any[] | undefined): ColumnOverrideUI[] => {
   const byColumn: Record<string, ColumnOverrideUI> = {};
   for (const entry of raw ?? []) {
@@ -156,11 +130,7 @@ export const loadAllFromRaw = (raw: any[] | undefined): ColumnOverrideUI[] => {
   return Object.values(byColumn);
 };
 
-/**
- * Serialize a single UI row to its persisted override_config entry, pushing
- * only the config items the user actually set. Returns `null` when the row
- * carries no formatting (so callers can drop it).
- */
+/** Serialize a UI row to a persisted entry, or null if it has no formatting. */
 export const serializeColumnOverride = (
   c: ColumnOverrideUI,
 ): any | null => {
@@ -207,21 +177,13 @@ export const serializeColumnOverride = (
   return { field: { matchBy: "name", value: c.field }, config };
 };
 
-/**
- * Serialize all UI rows to the persisted override_config array (dialog path).
- */
 export const serializeOverrides = (cols: ColumnOverrideUI[]): any[] =>
   cols
     .filter((c) => c.field)
     .map((c) => serializeColumnOverride(c))
     .filter((entry) => entry != null);
 
-/**
- * Canonical unit dropdown options (Default + all units). Single source of truth
- * shared by the panel config (ConfigPanel.vue) and the column-formatting dialog
- * so the two never drift. Takes the i18n `t` so it stays framework-agnostic.
- * `value: null` === "Default" (inherit the panel-level unit).
- */
+/** Canonical unit dropdown options shared by panel config and the dialog. */
 export const getUnitOptions = (
   t: (key: string) => string,
 ): Array<{ label: string; value: string | null }> => [
@@ -245,11 +207,7 @@ export const getUnitOptions = (
   { label: t("dashboard.custom"), value: "custom" },
 ];
 
-/**
- * The option lists shown in the formatting controls. i18n-bound, so this is a
- * composable. Shared by the dialog and the inline menu so the choices stay
- * identical in both.
- */
+/** i18n-bound option lists for the formatting controls. */
 export const useColumnFormattingOptions = () => {
   const { t } = useI18n();
 
@@ -261,7 +219,9 @@ export const useColumnFormattingOptions = () => {
     { value: "text", label: t("dashboard.typeText") },
   ];
 
+  // "auto" maps to null alignment (renderer auto-aligns by type).
   const alignOptions = [
+    { value: "auto", label: t("dashboard.auto") },
     { value: "left", label: t("dashboard.alignLeft") },
     { value: "center", label: t("dashboard.alignCenter") },
     { value: "right", label: t("dashboard.alignRight") },

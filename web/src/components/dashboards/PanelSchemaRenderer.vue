@@ -1564,7 +1564,6 @@ export default defineComponent({
       emit("is-partial-data-update", newValue);
     });
 
-    // Computed property for table data
     const tableRendererData = computed(() => {
       if (panelSchema.value.type === "table") {
         if (panelSchema.value.queryType === "promql") {
