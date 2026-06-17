@@ -74,9 +74,17 @@ export const useSearchResponseHandler = () => {
   ) => {
     // Backend streaming progress (already mapped from "progress" to
     // "event_progress" by useStreamingSearch). Drives the top progress bar
-    // while results stream in. Mirrors the dashboard panel handling.
+    // while results stream in. Mirrors the dashboard panel handling. The
+    // histogram runs as a separate stream, so its progress is tracked on a
+    // dedicated field to avoid clobbering the results progress (they can run
+    // concurrently).
     if (response?.type === "event_progress") {
-      searchObj.loadingProgressPercentage = response?.content?.percent ?? 0;
+      const percent = response?.content?.percent ?? 0;
+      if (payload.type === "histogram") {
+        searchObj.loadingHistogramProgressPercentage = percent;
+      } else {
+        searchObj.loadingProgressPercentage = percent;
+      }
       return;
     }
 
