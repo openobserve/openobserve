@@ -863,18 +863,6 @@
             "scanPallet"
           ],
           [
-            "2",
-            "updateBatch"
-          ],
-          [
-            "2",
-            "syncZone"
-          ],
-          [
-            "2",
-            "retryScan"
-          ],
-          [
             "1",
             "mergeBatch"
           ],
@@ -884,11 +872,23 @@
           ],
           [
             "2",
+            "retryScan"
+          ],
+          [
+            "2",
             "checkThreshold"
           ],
           [
             "2",
             "deleteRecord"
+          ],
+          [
+            "2",
+            "syncZone"
+          ],
+          [
+            "2",
+            "updateBatch"
           ]
         ],
         "results_mode": "rowsort"
@@ -985,17 +985,17 @@
         ],
         "results": [
           [
-            "ZONE-2",
-            "4",
-            "421.25",
-            "2",
-            "2"
-          ],
-          [
             "ZONE-3",
             "4",
             "653.75",
             "0",
+            "2"
+          ],
+          [
+            "ZONE-2",
+            "4",
+            "421.25",
+            "2",
             "2"
           ],
           [
@@ -1026,16 +1026,10 @@
         ],
         "results": [
           [
-            "MergeBatch",
-            "queued",
-            "2",
-            "3200.0"
-          ],
-          [
-            "RetryScan",
+            "CheckThreshold",
             "ok",
             "2",
-            "15.0"
+            "78.0"
           ],
           [
             "ScanPallet",
@@ -1050,16 +1044,16 @@
             "12.0"
           ],
           [
-            "CheckThreshold",
-            "ok",
+            "MergeBatch",
+            "queued",
             "2",
-            "78.0"
+            "3200.0"
           ],
           [
-            "SearchItems",
-            "syncing",
-            "1",
-            "45.0"
+            "RetryScan",
+            "ok",
+            "2",
+            "15.0"
           ],
           [
             "RerouteTrack",
@@ -1078,6 +1072,12 @@
             "pending",
             "1",
             "1450.0"
+          ],
+          [
+            "SearchItems",
+            "syncing",
+            "1",
+            "45.0"
           ]
         ],
         "results_mode": "rowsort"
@@ -1328,14 +1328,14 @@
             "1"
           ],
           [
-            "itemPage-fallback",
-            "2",
-            "2"
-          ],
-          [
             "https://shop.example.com/item/1004",
             "2",
             "1"
+          ],
+          [
+            "itemPage-fallback",
+            "2",
+            "2"
           ],
           [
             "https://shop.example.com/search?q=test",
@@ -1403,20 +1403,6 @@
             "12"
           ],
           [
-            "conveyor-driver",
-            "searchPage",
-            "2",
-            "15.0",
-            "15"
-          ],
-          [
-            "sorter-engine",
-            "itemPage",
-            "1",
-            "1900.0",
-            "1900"
-          ],
-          [
             "scan-hub",
             "itemPage",
             "2",
@@ -1429,6 +1415,20 @@
             "1",
             "230.0",
             "230"
+          ],
+          [
+            "conveyor-driver",
+            "searchPage",
+            "2",
+            "15.0",
+            "15"
+          ],
+          [
+            "sorter-engine",
+            "itemPage",
+            "1",
+            "1900.0",
+            "1900"
           ]
         ],
         "results_mode": "rowsort"
@@ -1450,14 +1450,14 @@
         ],
         "results": [
           [
-            "browse",
-            "1",
-            "1"
-          ],
-          [
             "monitoring",
             "6",
             "2"
+          ],
+          [
+            "browse",
+            "1",
+            "1"
           ]
         ],
         "results_mode": "rowsort"
@@ -1479,12 +1479,12 @@
         ],
         "results": [
           [
-            "E009",
+            "E005",
             "1",
             "1"
           ],
           [
-            "E005",
+            "E009",
             "1",
             "1"
           ],
@@ -1540,16 +1540,16 @@
         ],
         "results": [
           [
-            "Mobile",
-            "4",
-            "4",
-            "747.5"
-          ],
-          [
             "Computer",
             "1",
             "1",
             "230.0"
+          ],
+          [
+            "Mobile",
+            "4",
+            "4",
+            "747.5"
           ]
         ],
         "results_mode": "rowsort"
@@ -1581,11 +1581,6 @@
             "2"
           ],
           [
-            "timeout",
-            "error",
-            "1"
-          ],
-          [
             "slow",
             "error",
             "1"
@@ -1593,6 +1588,11 @@
           [
             "fast",
             "success",
+            "1"
+          ],
+          [
+            "timeout",
+            "error",
             "1"
           ]
         ],
@@ -1614,11 +1614,11 @@
         ],
         "results": [
           [
-            "vitalsInp",
+            "clickEvent",
             "1"
           ],
           [
-            "clickEvent",
+            "vitalsInp",
             "1"
           ]
         ],
@@ -1642,14 +1642,14 @@
         ],
         "results": [
           [
-            "zone-controller",
-            "E001",
+            "track-router",
+            "E003",
             "2",
             "medium"
           ],
           [
-            "track-router",
-            "E003",
+            "zone-controller",
+            "E001",
             "2",
             "medium"
           ],
@@ -1686,12 +1686,6 @@
             "100.0"
           ],
           [
-            "checkoutPage",
-            "2",
-            "2",
-            "100.0"
-          ],
-          [
             "searchPage",
             "1",
             "1",
@@ -1699,6 +1693,12 @@
           ],
           [
             "itemPage",
+            "2",
+            "2",
+            "100.0"
+          ],
+          [
+            "checkoutPage",
             "2",
             "2",
             "100.0"
@@ -1767,13 +1767,13 @@
         ],
         "results": [
           [
-            "android",
-            "mobile",
+            "ios",
+            "desktop",
             "3"
           ],
           [
-            "ios",
-            "desktop",
+            "android",
+            "mobile",
             "3"
           ]
         ],
@@ -1837,14 +1837,14 @@
             "0.0"
           ],
           [
-            "warehouse-north",
-            "2",
+            "warehouse-east",
+            "1",
             "0",
             "0.0"
           ],
           [
-            "warehouse-east",
-            "1",
+            "warehouse-north",
+            "2",
             "0",
             "0.0"
           ]
@@ -2473,6 +2473,12 @@
             "658.5"
           ],
           [
+            "none",
+            "passthrough",
+            "1",
+            "3200.0"
+          ],
+          [
             "Allowlisted",
             "threat",
             "1",
@@ -2483,12 +2489,6 @@
             "threat",
             "1",
             "567.0"
-          ],
-          [
-            "none",
-            "passthrough",
-            "1",
-            "3200.0"
           ]
         ],
         "results_mode": "rowsort"

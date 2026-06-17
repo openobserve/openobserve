@@ -177,14 +177,7 @@ export function useQueryPlaceholder(
     // 6. match_all postfix variant
     result.push(`match_all('*${term}')`);
 
-    // 7. str_match combined with match_all prefix
-    if (sf0) {
-      result.push(`str_match(${sf0.name}, '${strVal(sf0)}') AND match_all('${term}*')`);
-    } else if (kf0) {
-      result.push(`${fieldExpr(kf0)} AND match_all('${term}*')`);
-    }
-
-    // 7a. standalone str_match — no match_all, shown on all pages including traces
+    // 7. standalone str_match — no match_all, shown on all pages including traces
     if (sf0) result.push(`str_match(${sf0.name}, '${strVal(sf0)}')`);
 
     // 8. Raw filter OR match_all postfix
