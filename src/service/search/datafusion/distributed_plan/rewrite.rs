@@ -41,25 +41,32 @@ pub fn tantivy_optimize_rewrite(
     index_optimize_mode: IndexOptimizeMode,
     mut physical_plan: Arc<dyn ExecutionPlan>,
 ) -> Result<Arc<dyn ExecutionPlan>> {
-    let tantivy_exec = Arc::new(TantivyOptimizeExec::new(
-        query,
-        physical_plan.schema(),
-        file_list,
-        index_condition,
-        index_optimize_mode,
-    ));
-    let mut visitor = TantivyOptimizeRewriter::new(tantivy_exec);
+    let mut visitor =
+        TantivyOptimizeRewriter::new(query, file_list, index_condition, index_optimize_mode);
     physical_plan = physical_plan.rewrite(&mut visitor)?.data;
     Ok(physical_plan)
 }
 
 pub struct TantivyOptimizeRewriter {
-    tantivy_exec: Arc<TantivyOptimizeExec>,
+    query: Arc<QueryParams>,
+    file_list: Vec<FileKey>,
+    index_condition: Option<IndexCondition>,
+    index_optimize_mode: IndexOptimizeMode,
 }
 
 impl TantivyOptimizeRewriter {
-    pub fn new(tantivy_exec: Arc<TantivyOptimizeExec>) -> Self {
-        Self { tantivy_exec }
+    pub fn new(
+        query: Arc<QueryParams>,
+        file_list: Vec<FileKey>,
+        index_condition: Option<IndexCondition>,
+        index_optimize_mode: IndexOptimizeMode,
+    ) -> Self {
+        Self {
+            query,
+            file_list,
+            index_condition,
+            index_optimize_mode,
+        }
     }
 }
 
@@ -70,7 +77,14 @@ impl TreeNodeRewriter for TantivyOptimizeRewriter {
         if node.name() == "AggregateExec" {
             let aggregate = node.as_any().downcast_ref::<AggregateExec>().unwrap();
             if *aggregate.mode() == AggregateMode::Partial {
-                let new_node = UnionExec::try_new(vec![node, self.tantivy_exec.clone() as _])?;
+                let tantivy_exec = Arc::new(TantivyOptimizeExec::new(
+                    self.query.clone(),
+                    node.schema(),
+                    std::mem::take(&mut self.file_list),
+                    std::mem::take(&mut self.index_condition),
+                    self.index_optimize_mode.clone(),
+                ));
+                let new_node = UnionExec::try_new(vec![node, tantivy_exec as _])?;
                 Ok(Transformed::new(new_node, true, TreeNodeRecursion::Stop))
             } else {
                 unreachable!("AggregateExec should be partial mode");

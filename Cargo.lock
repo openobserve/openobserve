@@ -3543,9 +3543,9 @@ dependencies = [
 
 [[package]]
 name = "datasketches"
-version = "0.2.0"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c286de4e81ea2590afc24d754e0f83810c566f50a1388fa75ebd57928c0d9745"
+checksum = "46c4cf71a36b46dcfc00e5014c0c20ccad2b1b6a008304d7d57d2749b2d41b3d"
 
 [[package]]
 name = "dbl"
@@ -6243,9 +6243,9 @@ checksum = "9252111cf132ba0929b6f8e030cac2a24b507f3a4d6db6fb2896f27b354c714b"
 
 [[package]]
 name = "murmurhash32"
-version = "0.3.1"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2195bf6aa996a481483b29d62a7663eed3fe39600c460e323f8ff41e90bdd89b"
+checksum = "a8afc6df942f4c022d70c5725e18df1a705773870e5b7f96fde94ca0334ce77a"
 
 [[package]]
 name = "ndk-context"
@@ -7085,8 +7085,7 @@ checksum = "1a80800c0488c3a21695ea981a54918fbb37abf04f4d0720c453632255e2ff0e"
 [[package]]
 name = "ownedbytes"
 version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2fbd56f7631767e61784dc43f8580f403f4475bd4aaa4da003e6295e1bab4a7e"
+source = "git+https://github.com/openobserve/tantivy?branch=perf%2Fopenobserve#679ab092944c4a73ae2f40c09d6d06f3ec39c409"
 dependencies = [
  "stable_deref_trait",
 ]
@@ -7762,7 +7761,7 @@ version = "0.14.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "343d3bd7056eda839b03204e68deff7d1b13aba7af2b2fd16890697274262ee7"
 dependencies = [
- "heck 0.4.1",
+ "heck 0.5.0",
  "itertools 0.14.0",
  "log",
  "multimap",
@@ -7853,7 +7852,7 @@ version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fe500dc80e757a75e1e8fb7290e448d62dfba3105ece1d058579cb00b58151cd"
 dependencies = [
- "heck 0.4.1",
+ "heck 0.5.0",
  "prost 0.14.3",
  "prost-build",
  "prost-types 0.14.3",
@@ -9727,7 +9726,7 @@ version = "0.8.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c1c97747dbf44bb1ca44a561ece23508e99cb592e862f22222dcf42f51d1e451"
 dependencies = [
- "heck 0.4.1",
+ "heck 0.5.0",
  "proc-macro2",
  "quote",
  "syn 2.0.117",
@@ -9739,7 +9738,7 @@ version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "54254b8531cafa275c5e096f62d48c81435d1015405a91198ddb11e967301d40"
 dependencies = [
- "heck 0.4.1",
+ "heck 0.5.0",
  "proc-macro2",
  "quote",
  "syn 2.0.117",
@@ -10298,8 +10297,7 @@ checksum = "7b2093cf4c8eb1e67749a6762251bc9cd836b6fc171623bd0a9d324d37af2417"
 [[package]]
 name = "tantivy"
 version = "0.26.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "edde6a10743fff00a4e1a8c9ef020bf5f3cbad301b7d2d39f2b07f123c4eac07"
+source = "git+https://github.com/openobserve/tantivy?branch=perf%2Fopenobserve#679ab092944c4a73ae2f40c09d6d06f3ec39c409"
 dependencies = [
  "aho-corasick",
  "arc-swap",
@@ -10354,8 +10352,7 @@ dependencies = [
 [[package]]
 name = "tantivy-bitpacker"
 version = "0.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4fed3d674429bcd2de5d0a6d1aa5495fed8afd9c5ecce993019caf7615f53fa4"
+source = "git+https://github.com/openobserve/tantivy?branch=perf%2Fopenobserve#679ab092944c4a73ae2f40c09d6d06f3ec39c409"
 dependencies = [
  "bitpacking",
 ]
@@ -10363,8 +10360,7 @@ dependencies = [
 [[package]]
 name = "tantivy-columnar"
 version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c57166f5bcfd478f370ab8445afb4678dce44801fa5ce5c451aaf8595583c5dc"
+source = "git+https://github.com/openobserve/tantivy?branch=perf%2Fopenobserve#679ab092944c4a73ae2f40c09d6d06f3ec39c409"
 dependencies = [
  "downcast-rs",
  "fastdivide",
@@ -10379,8 +10375,7 @@ dependencies = [
 [[package]]
 name = "tantivy-common"
 version = "0.11.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bbf10915aa75da3c3b0d58b58853d2e889efbaf32d4982a4c3715dde6bba23e5"
+source = "git+https://github.com/openobserve/tantivy?branch=perf%2Fopenobserve#679ab092944c4a73ae2f40c09d6d06f3ec39c409"
 dependencies = [
  "async-trait",
  "byteorder",
@@ -10403,8 +10398,7 @@ dependencies = [
 [[package]]
 name = "tantivy-query-grammar"
 version = "0.26.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dfadb8526b6da90704feb293b0701a6aae62ea14983143344be2dc5ce30f1d82"
+source = "git+https://github.com/openobserve/tantivy?branch=perf%2Fopenobserve#679ab092944c4a73ae2f40c09d6d06f3ec39c409"
 dependencies = [
  "fnv",
  "nom 7.1.3",
@@ -10416,8 +10410,7 @@ dependencies = [
 [[package]]
 name = "tantivy-sstable"
 version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8a2cfc3ac5164cbadc28965ffb145a8f47582a60ae5897859ad8d4316596c606"
+source = "git+https://github.com/openobserve/tantivy?branch=perf%2Fopenobserve#679ab092944c4a73ae2f40c09d6d06f3ec39c409"
 dependencies = [
  "futures-util",
  "itertools 0.14.0",
@@ -10430,8 +10423,7 @@ dependencies = [
 [[package]]
 name = "tantivy-stacker"
 version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6cbb051742da9d53ca9e8fff43a9b10e319338b24e2c0e15d0372df19ffeb951"
+source = "git+https://github.com/openobserve/tantivy?branch=perf%2Fopenobserve#679ab092944c4a73ae2f40c09d6d06f3ec39c409"
 dependencies = [
  "murmurhash32",
  "tantivy-common",
@@ -10440,8 +10432,7 @@ dependencies = [
 [[package]]
 name = "tantivy-tokenizer-api"
 version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eac258c2c6390673f2685813afeeafcb8c4e0ee7de8dd3fc46838dcc37263f98"
+source = "git+https://github.com/openobserve/tantivy?branch=perf%2Fopenobserve#679ab092944c4a73ae2f40c09d6d06f3ec39c409"
 dependencies = [
  "serde",
 ]
