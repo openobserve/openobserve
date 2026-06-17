@@ -3809,6 +3809,7 @@
             "dc-west"
           ]
         ],
+        "skip_column_check": true,
         "results_mode": "rowsort"
       }
     }

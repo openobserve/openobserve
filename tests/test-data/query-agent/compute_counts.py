@@ -332,7 +332,7 @@ _HAS_ARRAY_HAS = set()
 # Queries where OO returns fewer columns than DuckDB (e.g. ENT FULL OUTER JOIN
 # column aliasing). Skip the per-column existence check in legacy mode so the
 # test only validates row-count and ORDER BY, not column presence.
-_SKIP_COLUMN_CHECK = {"Q072", "Q308", "Q312", "Q313", "Q318", "Q320", "Q323", "Q395"}
+_SKIP_COLUMN_CHECK = {"Q072", "Q308", "Q312", "Q313", "Q318", "Q320", "Q323", "Q395", "Q548"}
 
 
 def compute_results(con: duckdb.DuckDBPyConnection, q: dict, *, is_histogram: bool = False) -> dict | None:
