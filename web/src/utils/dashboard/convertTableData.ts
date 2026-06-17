@@ -20,7 +20,6 @@ import {
   parseOverrideConfigs,
   parseTimestampValue,
   detectTimestampFields,
-  applyProgressBarBounds,
   applyColumnOverrides,
   formatNumericValue,
   resolveIsNumber,
@@ -360,8 +359,6 @@ export const convertTableData = (
     });
   }
 
-  // Auto-compute progress bar min/max from column data (after final tableRows are set)
-  applyProgressBarBounds(columns as any[], tableRows as any[]);
 
   return {
     rows: tableRows,
@@ -629,7 +626,6 @@ export const convertMultiQueryTableData = (
       return obj;
     });
 
-    applyProgressBarBounds(columns as any[], tableRows as any[]);
     return { rows: tableRows, columns };
   }
 
@@ -700,6 +696,5 @@ export const convertMultiQueryTableData = (
     columns.push(col);
   });
 
-  applyProgressBarBounds(columns, allRows);
   return { rows: allRows, columns };
 };

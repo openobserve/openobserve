@@ -23,7 +23,6 @@ import {
   parseTimestampValue,
   parseOverrideConfigs,
   applyColumnOverrides,
-  applyProgressBarBounds,
   formatNumericValue,
   resolveIsNumber,
 } from "./tableConfigUtils";
@@ -130,7 +129,6 @@ describe("tableConfigUtils", () => {
       expect(maps.colorConfigMap).toEqual({});
       expect(maps.unitConfigMap).toEqual({});
       expect(maps.styleConfigMap).toEqual({});
-      expect(maps.cellTypeConfigMap).toEqual({});
       expect(maps.conditionalRulesMap).toEqual({});
     });
 
@@ -145,10 +143,6 @@ describe("tableConfigUtils", () => {
             { type: OVERRIDE_CONFIG_TYPES.BACKGROUND_COLOR, value: "#eee" },
             { type: OVERRIDE_CONFIG_TYPES.UNIQUE_VALUE_COLOR, autoColor: true },
             {
-              type: OVERRIDE_CONFIG_TYPES.CELL_TYPE,
-              value: { type: "progress_bar", color: "#0a0", sparklineStyle: "line" },
-            },
-            {
               type: OVERRIDE_CONFIG_TYPES.CONDITIONAL_STYLES,
               rules: [{ operator: ">", threshold: 5, textColor: "#f00", bgColor: "#fee" }],
             },
@@ -160,8 +154,6 @@ describe("tableConfigUtils", () => {
       expect(maps.styleConfigMap.count.textColor).toBe("#111");
       expect(maps.styleConfigMap.count.bgColor).toBe("#eee");
       expect(maps.colorConfigMap.count.autoColor).toBe(true);
-      expect(maps.cellTypeConfigMap.count.type).toBe("progress_bar");
-      expect(maps.cellTypeConfigMap.count.progressColor).toBe("#0a0");
       expect(maps.conditionalRulesMap.count[0]).toMatchObject({
         operator: ">",
         threshold: 5,
@@ -214,7 +206,6 @@ describe("tableConfigUtils", () => {
           { type: "unique_value_color", autoColor: true },
           { type: "text_color", value: "#111" },
           { type: "background_color", value: "#eee" },
-          { type: "cell_type", value: { type: "progress_bar", color: "#0a0" } },
           { type: "conditional_styles", rules: [{ operator: ">", threshold: 5 }] },
         ],
       },
@@ -227,8 +218,6 @@ describe("tableConfigUtils", () => {
       expect(col.colorMode).toBe("auto");
       expect(col.textColor).toBe("#111");
       expect(col.bgColor).toBe("#eee");
-      expect(col.cellType).toBe("progress_bar");
-      expect(col.progressColor).toBe("#0a0");
       expect(col.conditionalRules).toHaveLength(1);
     });
 
@@ -237,40 +226,6 @@ describe("tableConfigUtils", () => {
       applyColumnOverrides(col, "missing", maps, "right");
       expect(col.align).toBe("right");
       expect(col.colorMode).toBeUndefined();
-    });
-  });
-
-  describe("applyProgressBarBounds", () => {
-    it("computes min(0,…)/max for progress_bar columns from the rows", () => {
-      const columns: any[] = [{ field: "v", cellType: "progress_bar" }];
-      applyProgressBarBounds(columns, [
-        { v: 10 },
-        { v: 50 },
-        { v: 30 },
-      ]);
-      expect(columns[0].progressMin).toBe(0);
-      expect(columns[0].progressMax).toBe(50);
-    });
-
-    it("extends the floor for negative-only data", () => {
-      const columns: any[] = [{ field: "v", cellType: "progress_bar" }];
-      applyProgressBarBounds(columns, [{ v: -10 }, { v: -2 }]);
-      expect(columns[0].progressMin).toBe(-10);
-      expect(columns[0].progressMax).toBe(-2);
-    });
-
-    it("falls back to 0..100 when there is no numeric data", () => {
-      const columns: any[] = [{ field: "v", cellType: "progress_bar" }];
-      applyProgressBarBounds(columns, [{ v: "n/a" }, {}]);
-      expect(columns[0].progressMin).toBe(0);
-      expect(columns[0].progressMax).toBe(100);
-    });
-
-    it("leaves non-progress_bar columns untouched", () => {
-      const columns: any[] = [{ field: "v", cellType: "text" }];
-      applyProgressBarBounds(columns, [{ v: 10 }]);
-      expect(columns[0].progressMin).toBeUndefined();
-      expect(columns[0].progressMax).toBeUndefined();
     });
   });
 
@@ -304,7 +259,6 @@ describe("tableConfigUtils", () => {
         ALIGNMENT: "alignment",
         TEXT_COLOR: "text_color",
         BACKGROUND_COLOR: "background_color",
-        CELL_TYPE: "cell_type",
         CONDITIONAL_STYLES: "conditional_styles",
         FIELD_TYPE: "field_type",
       });

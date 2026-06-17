@@ -579,26 +579,14 @@ pub enum Config {
         #[serde(skip_serializing_if = "Option::is_none")]
         value: Option<String>,
     },
-    CellType {
+    FieldType {
         #[serde(skip_serializing_if = "Option::is_none")]
-        value: Option<CellTypeValue>,
+        value: Option<String>,
     },
     ConditionalStyles {
         #[serde(skip_serializing_if = "Option::is_none")]
         rules: Option<Vec<ConditionalRule>>,
     },
-}
-
-#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
-#[serde(default)]
-#[serde(rename_all = "camelCase")]
-pub struct CellTypeValue {
-    #[serde(rename = "type")]
-    pub type_field: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub color: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub sparkline_style: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
@@ -1379,25 +1367,6 @@ mod tests {
     }
 
     #[test]
-    fn test_config_cell_type_roundtrip() {
-        let cfg = Config::CellType {
-            value: Some(CellTypeValue {
-                type_field: "sparkline".to_string(),
-                color: Some("#3f7994".to_string()),
-                sparkline_style: Some("line".to_string()),
-            }),
-        };
-        let json = serde_json::to_string(&cfg).unwrap();
-        assert!(json.contains("\"type\":\"cell_type\""));
-        // Inner CellTypeValue.type_field must serialize as "type", not "typeField".
-        assert!(json.contains("\"type\":\"sparkline\""));
-        assert!(json.contains("\"sparklineStyle\":\"line\""));
-        assert!(json.contains("\"color\":\"#3f7994\""));
-        let back: Config = serde_json::from_str(&json).unwrap();
-        assert_eq!(back, cfg);
-    }
-
-    #[test]
     fn test_config_conditional_styles_roundtrip() {
         let cfg = Config::ConditionalStyles {
             rules: Some(vec![ConditionalRule {
@@ -1425,7 +1394,7 @@ mod tests {
             r##"{"type":"text_color","value":"#ffffff"}"##,
             r##"{"type":"background_color","value":"#000000"}"##,
             r##"{"type":"unique_value_color","autoColor":true}"##,
-            r##"{"type":"cell_type","value":{"type":"progress_bar","color":"#15803d"}}"##,
+            r##"{"type":"field_type","value":"num"}"##,
             r##"{"type":"conditional_styles","rules":[{"operator":"<=","threshold":0.5,"textColor":"#a16207","bgColor":"#fefce8"}]}"##,
         ];
         for p in payloads {

@@ -35,9 +35,6 @@ describe("useColumnFormatting", () => {
         textColor: null,
         bgColor: null,
         autoColor: false,
-        cellType: "text",
-        progressColor: null,
-        sparklineStyle: "line",
         conditions: [],
       });
     });
@@ -69,9 +66,6 @@ describe("useColumnFormatting", () => {
         textColor: null, // None swatch
         bgColor: null, // None swatch
         autoColor: false, // toggle off
-        cellType: "text", // default cell type
-        progressColor: null,
-        sparklineStyle: "line",
         conditions: [], // all rules removed
       };
       expect(serializeColumnOverride(allNone)).toBeNull();
@@ -130,9 +124,6 @@ describe("useColumnFormatting", () => {
         textColor: "#111827",
         bgColor: "#f3f4f6",
         autoColor: true,
-        cellType: "sparkline",
-        progressColor: "#15803d",
-        sparklineStyle: "bar",
         conditions: [
           { operator: ">=", threshold: "90", textColor: "#b91c1c", bgColor: "#fef2f2" },
         ],

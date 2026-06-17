@@ -37,7 +37,6 @@ export const OVERRIDE_CONFIG_TYPES = {
   ALIGNMENT: "alignment",
   TEXT_COLOR: "text_color",
   BACKGROUND_COLOR: "background_color",
-  CELL_TYPE: "cell_type",
   CONDITIONAL_STYLES: "conditional_styles",
   FIELD_TYPE: "field_type",
 } as const;
@@ -283,17 +282,10 @@ export interface ConditionalRule {
   bgColor?: string;
 }
 
-export interface CellTypeConfig {
-  type: "text" | "progress_bar" | "sparkline";
-  progressColor?: string;
-  sparklineStyle?: "line" | "bar";
-}
-
 export interface OverrideMaps {
   colorConfigMap: Record<string, ColorConfig>;
   unitConfigMap: Record<string, UnitConfig>;
   styleConfigMap: Record<string, ColumnStyleConfig>;
-  cellTypeConfigMap: Record<string, CellTypeConfig>;
   conditionalRulesMap: Record<string, ConditionalRule[]>;
   fieldTypeMap: Record<string, string>;
 }
@@ -309,11 +301,10 @@ export const parseOverrideConfigs = (
   const colorConfigMap: Record<string, ColorConfig> = {};
   const unitConfigMap: Record<string, UnitConfig> = {};
   const styleConfigMap: Record<string, ColumnStyleConfig> = {};
-  const cellTypeConfigMap: Record<string, CellTypeConfig> = {};
   const conditionalRulesMap: Record<string, ConditionalRule[]> = {};
   const fieldTypeMap: Record<string, string> = {};
 
-  if (!overrideConfigs) return { colorConfigMap, unitConfigMap, styleConfigMap, cellTypeConfigMap, conditionalRulesMap, fieldTypeMap };
+  if (!overrideConfigs) return { colorConfigMap, unitConfigMap, styleConfigMap, conditionalRulesMap, fieldTypeMap };
 
   for (const o of overrideConfigs) {
     const alias = o?.field?.value;
@@ -350,13 +341,6 @@ export const parseOverrideConfigs = (
             bgColor: cfg.value,
           };
           break;
-        case OVERRIDE_CONFIG_TYPES.CELL_TYPE:
-          cellTypeConfigMap[aliasLower] = {
-            type: cfg.value?.type ?? "text",
-            progressColor: cfg.value?.color ?? "",
-            sparklineStyle: cfg.value?.sparklineStyle ?? "line",
-          };
-          break;
         case OVERRIDE_CONFIG_TYPES.CONDITIONAL_STYLES:
           conditionalRulesMap[aliasLower] = (cfg.rules ?? []).map((r: any) => ({
             operator: r.operator ?? "<",
@@ -372,11 +356,11 @@ export const parseOverrideConfigs = (
     }
   }
 
-  return { colorConfigMap, unitConfigMap, styleConfigMap, cellTypeConfigMap, conditionalRulesMap, fieldTypeMap };
+  return { colorConfigMap, unitConfigMap, styleConfigMap, conditionalRulesMap, fieldTypeMap };
 };
 
 /**
- * Apply parsed override maps (alignment, auto-color, text/bg color, cell type,
+ * Apply parsed override maps (alignment, auto-color, text/bg color,
  * conditional rules) onto a renderer column object, keyed by lower-cased alias.
  * Shared by the table converters so override application can't drift between
  * the SQL, multi-query and PromQL paths.
@@ -394,49 +378,8 @@ export const applyColumnOverrides = (
   if (colStyle?.textColor) obj.textColor = colStyle.textColor;
   if (colStyle?.bgColor) obj.bgColor = colStyle.bgColor;
 
-  const cellTypeCfg = maps.cellTypeConfigMap?.[aliasLower];
-  if (cellTypeCfg?.type && cellTypeCfg.type !== "text") {
-    obj.cellType = cellTypeCfg.type;
-    if (cellTypeCfg.progressColor) obj.progressColor = cellTypeCfg.progressColor;
-    if (cellTypeCfg.sparklineStyle) obj.sparklineStyle = cellTypeCfg.sparklineStyle;
-  }
-
   const condRules = maps.conditionalRulesMap?.[aliasLower];
   if (condRules?.length) obj.conditionalRules = condRules;
-};
-
-/**
- * Auto-compute `progressMin`/`progressMax` for every `progress_bar` column from
- * the row data (min clamped to 0, extended for negative-only data). Mutates the
- * column objects. Shared by the SQL and PromQL converters.
- */
-export const applyProgressBarBounds = (
-  columns: any[] | undefined,
-  rows: any[] | undefined,
-): void => {
-  if (!Array.isArray(columns) || !Array.isArray(rows)) return;
-
-  for (const col of columns) {
-    if (col?.cellType !== "progress_bar") continue;
-
-    const fieldKey = col.field;
-    let min = Infinity;
-    let max = -Infinity;
-    for (const row of rows) {
-      const v = parseFloat(String(row?.[fieldKey]));
-      if (Number.isNaN(v)) continue;
-      if (v < min) min = v;
-      if (v > max) max = v;
-    }
-
-    if (max === -Infinity) {
-      col.progressMin = 0;
-      col.progressMax = 100;
-    } else {
-      col.progressMin = Math.min(0, min);
-      col.progressMax = max;
-    }
-  }
 };
 
 // ---------------------------------------------------------------------------

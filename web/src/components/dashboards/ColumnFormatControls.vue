@@ -82,47 +82,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OToggleGroup>
     </div>
 
-    <!-- Cell type (numeric only) -->
-    <div v-if="isNumeric" class="tw:px-3 tw:py-2">
-      <div class="o-input-label tw:block tw:mb-1.5">
-        {{ t("dashboard.sectionCellType") }}
-      </div>
-      <OToggleGroup v-model="col.cellType" type="single" class="cf-seg tw:h-8">
-        <OToggleGroupItem
-          v-for="ct in cellTypeOptionsCompact"
-          :key="ct.value"
-          :value="ct.value"
-          size="sm"
-          :icon-left="ct.icon"
-        >
-          {{ ct.label }}
-        </OToggleGroupItem>
-      </OToggleGroup>
-
-      <div
-        v-if="col.cellType === 'progress_bar' || col.cellType === 'sparkline'"
-        class="tw:flex tw:flex-col tw:gap-3 tw:mt-2.5"
-      >
-        <div v-if="col.cellType === 'sparkline'" class="tw:flex tw:flex-col tw:gap-1.5">
-          <span class="o-input-label">{{ t("dashboard.sparklineStyle") }}</span>
-          <OToggleGroup v-model="col.sparklineStyle" type="single" class="cf-seg tw:h-8 tw:self-start">
-            <OToggleGroupItem
-              v-for="s in sparklineStyleOptions"
-              :key="s.value"
-              :value="s.value"
-              size="sm"
-              :icon-left="sparklineIcons[s.value]"
-            >
-              {{ s.label }}
-            </OToggleGroupItem>
-          </OToggleGroup>
-        </div>
-        <div class="tw:flex tw:flex-col tw:gap-1.5">
-          <span class="o-input-label">{{ t("dashboard.cellColor") }}</span>
-          <ColorSwatchPicker v-model="col.progressColor" :swatches="ACCENT_SWATCHES" />
-        </div>
-      </div>
-    </div>
 
     <!-- Styling -->
     <div class="tw:px-3 tw:py-2">
@@ -232,7 +191,6 @@ import {
   useColumnFormattingOptions,
   TEXT_SWATCHES,
   BG_SWATCHES,
-  ACCENT_SWATCHES,
   COND_TEXT_SWATCHES,
   COND_BG_SWATCHES,
 } from "@/composables/dashboard/useColumnFormatting";
@@ -256,7 +214,7 @@ export default defineComponent({
   },
   setup(props) {
     const { t } = useI18n();
-    const { unitOptions, fieldTypeOptions, sparklineStyleOptions, conditionOperators } =
+    const { unitOptions, fieldTypeOptions, conditionOperators } =
       useColumnFormattingOptions();
 
     const alignOptions = [
@@ -277,29 +235,15 @@ export default defineComponent({
       },
     });
 
-    const cellTypeOptionsCompact = [
-      { value: "text", label: t("dashboard.cellTypeText"), icon: "text-fields" },
-      { value: "progress_bar", label: t("dashboard.cellTypeBar"), icon: "bar-chart" },
-      { value: "sparkline", label: t("dashboard.cellTypeSpark"), icon: "show-chart" },
-    ];
-    const sparklineIcons: Record<string, string> = {
-      line: "show-chart",
-      bar: "bar-chart",
-    };
-
     return {
       t,
       unitOptions,
       fieldTypeOptions,
       alignOptions,
       alignmentModel,
-      cellTypeOptionsCompact,
-      sparklineIcons,
-      sparklineStyleOptions,
       conditionOperators,
       TEXT_SWATCHES,
       BG_SWATCHES,
-      ACCENT_SWATCHES,
       COND_TEXT_SWATCHES,
       COND_BG_SWATCHES,
       emptyConditionalRule,

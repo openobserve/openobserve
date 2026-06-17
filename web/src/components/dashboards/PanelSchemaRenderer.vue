@@ -1564,22 +1564,17 @@ export default defineComponent({
       emit("is-partial-data-update", newValue);
     });
 
-    // Computed property for table data with logging
+    // Computed property for table data
     const tableRendererData = computed(() => {
       if (panelSchema.value.type === "table") {
-        let tableData;
-
         if (panelSchema.value.queryType === "promql") {
           // For PromQL tables, the data is in panelData.options (same as pie/donut)
           // The TableConverter returns {columns, rows, ...} which gets placed in options
-          tableData = panelData.value?.options || { rows: [], columns: [] };
+          return panelData.value?.options || { rows: [], columns: [] };
         } else if (panelData.value?.chartType == "table") {
-          tableData = panelData.value;
-        } else {
-          tableData = { options: { backgroundColor: "transparent" } };
+          return panelData.value;
         }
-
-        return tableData;
+        return { options: { backgroundColor: "transparent" } };
       }
       return { options: { backgroundColor: "transparent" } };
     });

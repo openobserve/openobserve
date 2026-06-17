@@ -179,7 +179,6 @@ import {
 import {
   parseOverrideConfigs,
   applyColumnOverrides,
-  applyProgressBarBounds,
   buildValueMappingCache,
   formatNumericValue,
 } from "@/utils/dashboard/tableConfigUtils";
@@ -307,8 +306,6 @@ export default defineComponent({
           if (field !== prevFields?.[i] && !isNumericColumn(columnOverrides.value[i])) {
             columnOverrides.value[i].unit = null;
             columnOverrides.value[i].customUnit = null;
-            columnOverrides.value[i].cellType = "text";
-            columnOverrides.value[i].progressColor = null;
             columnOverrides.value[i].conditions = [];
           }
         });
@@ -322,8 +319,6 @@ export default defineComponent({
 
     const summaryChips = (col: ColumnOverrideUI) => {
       const chips: Array<{ text: string; swatch?: string }> = [];
-      if (col.cellType === "progress_bar") chips.push({ text: t("dashboard.cellTypeBar") });
-      else if (col.cellType === "sparkline") chips.push({ text: t("dashboard.cellTypeSpark") });
       if (col.unit)
         chips.push({
           text:
@@ -345,9 +340,6 @@ export default defineComponent({
     // preview can never diverge from the rendered result.
     const buildPreviewColumn = (base: any, col: ColumnOverrideUI, isNumeric: boolean) => {
       const c: any = { ...base };
-      delete c.cellType;
-      delete c.progressColor;
-      delete c.sparklineStyle;
       delete c.colorMode;
       delete c.textColor;
       delete c.bgColor;
@@ -404,12 +396,11 @@ export default defineComponent({
         baseColumn.field ?? baseColumn.alias ?? baseColumn.name ?? col.field,
       );
       // No real rows → fall back to type-appropriate dummy data so the unit,
-      // progress bar, conditional styling, etc. all have something to render.
+      // conditional styling, etc. all have something to render.
       const rows = base?.rows?.length
         ? base.rows
         : makeDummyRows(dataKey, isNumeric);
       const previewCol = buildPreviewColumn(baseColumn, col, isNumeric);
-      applyProgressBarBounds([previewCol], rows);
       return { rows, columns: [previewCol] };
     };
 

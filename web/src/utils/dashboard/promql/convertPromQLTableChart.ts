@@ -23,7 +23,6 @@ import { formatDate } from "../dateTimeUtils";
 import { toZonedTime } from "date-fns-tz";
 import {
   parseOverrideConfigs,
-  applyProgressBarBounds,
   buildValueMappingCache,
   lookupValueMapping,
 } from "../tableConfigUtils";
@@ -47,8 +46,6 @@ export class TableConverter implements PromQLChartConverter {
 
     // Build rows from series data
     const rows = this.buildRows(processedData, panelSchema, store);
-
-    applyProgressBarBounds(columns, rows);
 
     // Return the same structure as SQL tables (convertTableData)
     // TableRenderer component (q-table) handles pagination, sorting, filtering automatically
@@ -104,20 +101,14 @@ export class TableConverter implements PromQLChartConverter {
     const config = panelSchema.config || {};
     const tableMode = config.promql_table_mode || "single";
 
-    // Build override maps (color/unit/style/cellType/conditionalRules) to mimic SQL table behavior
-    const { colorConfigMap, unitConfigMap, styleConfigMap, cellTypeConfigMap, conditionalRulesMap } = parseOverrideConfigs(
+    // Build override maps (color/unit/style/conditionalRules) to mimic SQL table behavior
+    const { colorConfigMap, unitConfigMap, styleConfigMap, conditionalRulesMap } = parseOverrideConfigs(
       panelSchema.config?.override_config,
     );
 
     const colOverrides = (keyLower: string) => {
-      const cellTypeCfg = cellTypeConfigMap?.[keyLower];
       const condRules = conditionalRulesMap?.[keyLower];
       return {
-        ...(cellTypeCfg?.type && cellTypeCfg.type !== "text" ? {
-          cellType: cellTypeCfg.type,
-          ...(cellTypeCfg.progressColor ? { progressColor: cellTypeCfg.progressColor } : {}),
-          ...(cellTypeCfg.sparklineStyle ? { sparklineStyle: cellTypeCfg.sparklineStyle } : {}),
-        } : {}),
         ...(condRules?.length ? { conditionalRules: condRules } : {}),
       };
     };

@@ -59,9 +59,6 @@ export interface ColumnOverrideUI {
   textColor: string | null; // hex or null
   bgColor: string | null; // hex or null
   autoColor: boolean; // unique-value coloring
-  cellType: string; // "text" | "progress_bar" | "sparkline"
-  progressColor: string | null;
-  sparklineStyle: "line" | "bar";
   conditions: ConditionalRuleUI[];
 }
 
@@ -91,16 +88,6 @@ export const BG_SWATCHES = [
   "#ffffff",
 ];
 
-/** Accent swatches for progress-bar / sparkline color. */
-export const ACCENT_SWATCHES = [
-  "#3f7994",
-  "#643cb8",
-  "#15803d",
-  "#a16207",
-  "#b91c1c",
-  "#2e55a3",
-];
-
 /** Compact text/bg swatch sets for conditional rules (kept short so the
  *  per-rule pickers stay on a single row). */
 export const COND_TEXT_SWATCHES = ["#b91c1c", "#a16207", "#15803d", "#316177"];
@@ -116,9 +103,6 @@ export const emptyColumnOverride = (field = ""): ColumnOverrideUI => ({
   textColor: null,
   bgColor: null,
   autoColor: false,
-  cellType: "text",
-  progressColor: null,
-  sparklineStyle: "line",
   conditions: [],
 });
 
@@ -144,11 +128,6 @@ const applyConfigItems = (col: ColumnOverrideUI, items: any[]): void => {
         break;
       case OVERRIDE_CONFIG_TYPES.BACKGROUND_COLOR:
         col.bgColor = cfg.value ?? null;
-        break;
-      case OVERRIDE_CONFIG_TYPES.CELL_TYPE:
-        col.cellType = cfg.value?.type ?? "text";
-        col.progressColor = cfg.value?.color ?? null;
-        col.sparklineStyle = cfg.value?.sparklineStyle ?? "line";
         break;
       case OVERRIDE_CONFIG_TYPES.CONDITIONAL_STYLES:
         col.conditions = (cfg.rules ?? []).map((r: any) => ({
@@ -208,18 +187,6 @@ export const serializeColumnOverride = (
       type: OVERRIDE_CONFIG_TYPES.UNIQUE_VALUE_COLOR,
       autoColor: true,
     });
-
-  if (c.cellType && c.cellType !== "text") {
-    config.push({
-      type: OVERRIDE_CONFIG_TYPES.CELL_TYPE,
-      value: {
-        type: c.cellType,
-        color: c.progressColor || "",
-        sparklineStyle:
-          c.cellType === "sparkline" ? c.sparklineStyle || "line" : undefined,
-      },
-    });
-  }
 
   const validConditions = c.conditions.filter(
     (r) => r.threshold !== "" && r.operator,
@@ -300,11 +267,6 @@ export const useColumnFormattingOptions = () => {
     { value: "right", label: t("dashboard.alignRight") },
   ];
 
-  const sparklineStyleOptions = [
-    { value: "line", label: t("dashboard.sparklineStyleLine") },
-    { value: "bar", label: t("dashboard.sparklineStyleBar") },
-  ];
-
   const conditionOperators = [
     { label: t("dashboard.opLessThan"), value: "<" },
     { label: t("dashboard.opGreaterThan"), value: ">" },
@@ -318,7 +280,6 @@ export const useColumnFormattingOptions = () => {
     unitOptions,
     fieldTypeOptions,
     alignOptions,
-    sparklineStyleOptions,
     conditionOperators,
   };
 };
