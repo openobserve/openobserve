@@ -130,9 +130,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="tw:flex tw:items-start tw:gap-1 tw:mb-1.5"
       >
         <div class="tw:flex-1 tw:min-w-0 tw:py-2 tw:px-2.5 tw:rounded-md tw:bg-[rgba(128,128,128,0.04)] tw:border tw:border-[rgba(128,128,128,0.1)] tw:flex tw:flex-col tw:gap-2">
-          <div class="tw:flex tw:items-center tw:gap-2">
+          <div class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap">
             <span class="o-input-label tw:shrink-0 tw:w-[110px]">{{ t("dashboard.conditionIfValue") }}</span>
-            <div class="tw:w-[210px] tw:shrink-0">
+            <div class="tw:flex-1 tw:min-w-[150px] tw:max-w-[210px]">
               <OSelect
                 v-model="rule.operator"
                 :options="conditionOperators"
