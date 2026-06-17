@@ -11,10 +11,14 @@ export function isInputFocused(): boolean {
   const el = document.activeElement;
   if (!el || el === document.body) return false;
   const tag = el.tagName.toLowerCase();
-  return (
-    ["input", "textarea", "select"].includes(tag) ||
-    (el as HTMLElement).isContentEditable
-  );
+  // Only treat contentEditable as an input when it has role="textbox"
+  // (CodeMirror, ProseMirror, etc.). Generic contentEditable containers
+  // (e.g. panel drag handles) should not block shortcuts.
+  const isContentEditableInput =
+    (el as HTMLElement).isContentEditable &&
+    (el.getAttribute("role") === "textbox" ||
+      el.closest('[role="textbox"]') !== null);
+  return ["input", "textarea", "select"].includes(tag) || isContentEditableInput;
 }
 
 /**
