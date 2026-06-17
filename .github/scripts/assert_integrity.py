@@ -133,6 +133,14 @@ def check(spec_path, baseline=None, allow_weakening=False):
         findings.append({'severity': 'critical', 'rule': 'conditional-only-assertions', 'line': line_no,
                          'detail': f'all {total} expect() in this test are inside if/else — the test can pass asserting nothing'})
 
+    # No real coverage: a spec with tests where EVERY one is skip/fixme is a green run that ran
+    # nothing (e.g. "fixme everything" to dodge a gap). A genuinely feature-incomplete spec should
+    # be blocked anyway — so flag it here too. (Applies even with --allow-weakening: this is static.)
+    fp0 = fingerprint(src)
+    if fp0['tests'] > 0 and fp0['skips'] >= fp0['tests']:
+        findings.append({'severity': 'critical', 'rule': 'no-runnable-tests',
+                         'detail': f"every test is skip/fixme ({fp0['skips']} skip/fixme vs {fp0['tests']} tests) — the spec asserts nothing at runtime"})
+
     # --- diff-aware heal-weakening guard ---
     fp = fingerprint(src)
     if isinstance(baseline, dict) and not allow_weakening:

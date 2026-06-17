@@ -84,6 +84,20 @@ distinct coverage; merge near-duplicates into one.
 
 ---
 
+## Honour the Analyst's wiring map (WIRED vs UNWIRED)
+
+Read the **Behavior Reachability** table in the feature design doc. Plan each behavior by its status —
+this is how we produce green tests AND avoid both green-washing and over-blocking:
+- **WIRED** → plan a normal test that exercises **the exact path the Analyst named** (the one that
+  actually sets the gating state). This test should go green.
+- **UNWIRED (feature-incomplete)** → do **NOT** plan a test that will fail or a weakened/negative one.
+  Plan it as a **`fixme` placeholder** with the Analyst's evidence (file:line of the missing/commented
+  wiring) so the Engineer writes `test.fixme('<behavior> — not wired: <evidence>')`. Mark the scenario
+  `Wiring: UNWIRED`. The pipeline surfaces these as a feature-gap report, not a failed run.
+
+If **every** headline behavior is UNWIRED, the feature is genuinely incomplete — say so plainly in the
+plan; do not pad with tautological/always-green filler just to have "tests."
+
 ## Write the Test Plan
 
 Write to: `docs/test_generator/test-plans/<feature_slug>-test-plan.md`
@@ -109,6 +123,7 @@ Structure:
 ### P0 — <critical path scenario>
 #### <Test Case Name>
 **Objective:** <what it verifies>
+**Wiring:** WIRED (path: `file:line`) | UNWIRED (fixme — evidence: `file:line`)
 **Pre-conditions:** <setup>
 **Steps:** 1. <action> 2. <action>
 **Expected Results:** - <outcome>

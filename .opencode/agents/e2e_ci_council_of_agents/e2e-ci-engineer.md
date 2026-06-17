@@ -50,6 +50,19 @@ selectors in the spec), exactly as for new specs. Preserve `mode: 'parallel'` �
 file to serial. If the existing file is somehow `serial`, leave its mode as-is but keep your
 added test independent.
 
+### Honour each scenario's `Wiring:` marker (from the test plan)
+The Architect tags every scenario WIRED or UNWIRED (from the Analyst's reachability trace):
+- **WIRED** → write a normal, real test that exercises the **named working path** (the one that sets
+  the gating state). It should pass.
+- **UNWIRED (feature-incomplete)** → write the test as **`test.fixme('<name> — not wired: <evidence file:line>')`**
+  with the **real assertion body kept intact** (so it goes green when the feature is finished). Do NOT
+  weaken it, invert it, or turn it into a tautology, and do NOT write a passing test that asserts the
+  feature is absent. A `fixme` with evidence is the honest representation of a gap.
+
+This is the balance: green tests for what works + honest `fixme`s for what doesn't, in ONE spec — so a
+PR opens with real coverage instead of being blocked, and the Healer never has to discover gaps later.
+Only when **every** scenario is UNWIRED is the feature genuinely incomplete (no PR; the plan says so).
+
 > **Minimal-diff rule for append/extend:** the goal is the smallest possible change to the
 > existing file — a reviewer should see only the added/changed test, nothing else.
 
