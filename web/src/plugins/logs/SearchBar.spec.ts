@@ -15,6 +15,7 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { queryIndexSplit } from "@/utils/zincutils";
+import { isSqlQuery } from "@/utils/query/sqlUtils";
 
 const quoteSqlIdentifierForTest = (field: string) =>
   field === "user" ? `"${field}"` : field;
@@ -1315,6 +1316,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
           refreshHistogram: false,
           toggleFunction: true,
           sqlModeManualTrigger: false,
+          sqlModeEditTransition: false,
         },
         config: {
           fnSplitterModel: 99.5,
@@ -1442,7 +1444,24 @@ describe("SearchBar.vue Actual Component Methods", () => {
           // Quick mode logic
         }
 
-        // Matches real guard logic in SearchBar.vue ~line 3151
+        // Turn off SQL mode when query is completely cleared
+        if (value.trim() === "" && componentInstance.searchObj.meta.sqlMode === true) {
+          componentInstance.searchObj.meta.sqlMode = false;
+        }
+
+        // Turn off SQL mode when query is no longer a SQL statement (user
+        // removed the SELECT/WITH prefix). Set sqlModeEditTransition so the
+        // Index.vue watcher preserves the remaining filter expression.
+        if (
+          value.trim() !== "" &&
+          componentInstance.searchObj.meta.sqlMode === true &&
+          !isSqlQuery(value)
+        ) {
+          componentInstance.searchObj.meta.sqlModeEditTransition = true;
+          componentInstance.searchObj.meta.sqlMode = false;
+        }
+
+        // Matches real guard logic in SearchBar.vue — auto-enable SQL mode
         if (componentInstance.searchObj.meta.sqlMode === false &&
             componentInstance.searchObj.meta.logsVisualizeToggle !== "build" &&
             value.toLowerCase().includes("select") &&
@@ -3913,6 +3932,7 @@ describe("SearchBar.vue SQL mode auto-detection guard", () => {
         meta: {
           sqlMode: false,
           sqlModeManualTrigger: false,
+          sqlModeEditTransition: false,
           logsVisualizeToggle: "logs",
           quickMode: false,
         },
@@ -3920,9 +3940,26 @@ describe("SearchBar.vue SQL mode auto-detection guard", () => {
           editorValue: "",
         },
       },
-      // Mirrors the real guard logic in SearchBar.vue ~line 3151
+      // Mirrors the real logic in SearchBar.vue updateQueryValue
       updateQueryValue(value: string) {
         componentInstance.searchObj.data.editorValue = value;
+
+        // Turn off when completely cleared
+        if (value.trim() === "" && componentInstance.searchObj.meta.sqlMode === true) {
+          componentInstance.searchObj.meta.sqlMode = false;
+        }
+
+        // Turn off when query is no longer a SQL statement
+        if (
+          value.trim() !== "" &&
+          componentInstance.searchObj.meta.sqlMode === true &&
+          !isSqlQuery(value)
+        ) {
+          componentInstance.searchObj.meta.sqlModeEditTransition = true;
+          componentInstance.searchObj.meta.sqlMode = false;
+        }
+
+        // Auto-enable SQL mode when query starts with SELECT/WITH
         if (componentInstance.searchObj.meta.sqlMode === false &&
             componentInstance.searchObj.meta.logsVisualizeToggle !== "build" &&
             value.toLowerCase().includes("select") &&
@@ -3965,6 +4002,226 @@ describe("SearchBar.vue SQL mode auto-detection guard", () => {
     componentInstance.updateQueryValue('SELECT * FROM "test"');
     // visualize mode is not "build", so auto-detection applies
     expect(componentInstance.searchObj.meta.sqlMode).toBe(true);
+  });
+});
+
+/**
+ * SQL mode auto-disable on non-SQL edit (sqlModeEditTransition)
+ *
+ * When the user has a full SQL query in the editor (sqlMode = true) and then
+ * edits it down to a plain filter expression — removing the SELECT/FROM prefix
+ * — updateQueryValue must:
+ *   1. set sqlModeEditTransition = true  (so Index.vue watcher keeps the text)
+ *   2. set sqlMode = false               (triggers the watcher)
+ *
+ * These tests cover the new branch added in SearchBar.vue updateQueryValue.
+ */
+describe("SearchBar.vue SQL mode → filter expression transition", () => {
+  let instance: any;
+
+  beforeEach(() => {
+    instance = {
+      searchObj: {
+        meta: {
+          sqlMode: false,
+          sqlModeManualTrigger: false,
+          sqlModeEditTransition: false,
+          logsVisualizeToggle: "logs",
+          quickMode: false,
+        },
+        data: { editorValue: "" },
+      },
+      updateQueryValue(value: string) {
+        instance.searchObj.data.editorValue = value;
+
+        if (value.trim() === "" && instance.searchObj.meta.sqlMode === true) {
+          instance.searchObj.meta.sqlMode = false;
+        }
+
+        if (
+          value.trim() !== "" &&
+          instance.searchObj.meta.sqlMode === true &&
+          !isSqlQuery(value)
+        ) {
+          instance.searchObj.meta.sqlModeEditTransition = true;
+          instance.searchObj.meta.sqlMode = false;
+        }
+
+        if (
+          instance.searchObj.meta.sqlMode === false &&
+          instance.searchObj.meta.logsVisualizeToggle !== "build" &&
+          value.toLowerCase().includes("select") &&
+          value.toLowerCase().includes("from")
+        ) {
+          instance.searchObj.meta.sqlMode = true;
+          instance.searchObj.meta.sqlModeManualTrigger = true;
+        }
+      },
+    };
+  });
+
+  // ── Core scenario described in the bug report ───────────────────────────
+
+  it("turns off sqlMode and sets sqlModeEditTransition when user removes SELECT prefix", () => {
+    // Arrange — user previously had a full SQL query
+    instance.searchObj.meta.sqlMode = true;
+
+    // Act — user deleted everything before the WHERE clause
+    instance.updateQueryValue("match_all('error')");
+
+    // Assert
+    expect(instance.searchObj.meta.sqlMode).toBe(false);
+    expect(instance.searchObj.meta.sqlModeEditTransition).toBe(true);
+    expect(instance.searchObj.data.editorValue).toBe("match_all('error')");
+  });
+
+  it("preserves the filter expression text in the editor after transition", () => {
+    // Arrange
+    instance.searchObj.meta.sqlMode = true;
+
+    // Act
+    instance.updateQueryValue("level = 'error'");
+
+    // Assert — editorValue must contain the filter, not be cleared
+    expect(instance.searchObj.data.editorValue).toBe("level = 'error'");
+    expect(instance.searchObj.meta.sqlMode).toBe(false);
+    expect(instance.searchObj.meta.sqlModeEditTransition).toBe(true);
+  });
+
+  // ── sqlModeEditTransition is NOT set for the empty-query turn-off ───────
+
+  it("turns off sqlMode without setting sqlModeEditTransition when query is cleared", () => {
+    // Arrange
+    instance.searchObj.meta.sqlMode = true;
+
+    // Act
+    instance.updateQueryValue("");
+
+    // Assert — empty clear must not set the transition flag
+    expect(instance.searchObj.meta.sqlMode).toBe(false);
+    expect(instance.searchObj.meta.sqlModeEditTransition).toBe(false);
+  });
+
+  it("turns off sqlMode without sqlModeEditTransition for whitespace-only input", () => {
+    instance.searchObj.meta.sqlMode = true;
+
+    instance.updateQueryValue("   ");
+
+    expect(instance.searchObj.meta.sqlMode).toBe(false);
+    expect(instance.searchObj.meta.sqlModeEditTransition).toBe(false);
+  });
+
+  // ── sqlModeEditTransition is NOT set when sqlMode was already false ─────
+
+  it("does NOT set sqlModeEditTransition when sqlMode is already off", () => {
+    // Arrange — sqlMode already off
+    instance.searchObj.meta.sqlMode = false;
+    instance.searchObj.meta.sqlModeEditTransition = false;
+
+    // Act
+    instance.updateQueryValue("match_all('error')");
+
+    // Assert — no spurious transition flag
+    expect(instance.searchObj.meta.sqlModeEditTransition).toBe(false);
+    expect(instance.searchObj.meta.sqlMode).toBe(false);
+  });
+
+  // ── SQL query stays in SQL mode ─────────────────────────────────────────
+
+  it("keeps sqlMode true when query is still a valid SELECT statement", () => {
+    instance.searchObj.meta.sqlMode = true;
+
+    instance.updateQueryValue("SELECT * FROM otel_demo WHERE level = 'error'");
+
+    expect(instance.searchObj.meta.sqlMode).toBe(true);
+    expect(instance.searchObj.meta.sqlModeEditTransition).toBe(false);
+  });
+
+  it("keeps sqlMode true when query is a WITH ... SELECT statement", () => {
+    instance.searchObj.meta.sqlMode = true;
+
+    instance.updateQueryValue("WITH cte AS (SELECT * FROM logs) SELECT * FROM cte");
+
+    expect(instance.searchObj.meta.sqlMode).toBe(true);
+    expect(instance.searchObj.meta.sqlModeEditTransition).toBe(false);
+  });
+
+  // ── WITH-query removal transitions to filter mode ──────────────────────
+
+  it("turns off sqlMode when WITH prefix is removed, leaving a filter expression", () => {
+    instance.searchObj.meta.sqlMode = true;
+
+    instance.updateQueryValue("match_all('critical')");
+
+    expect(instance.searchObj.meta.sqlMode).toBe(false);
+    expect(instance.searchObj.meta.sqlModeEditTransition).toBe(true);
+  });
+
+  // ── Case-insensitive SELECT detection ──────────────────────────────────
+
+  it("keeps sqlMode true for lowercase select … from query", () => {
+    instance.searchObj.meta.sqlMode = true;
+
+    instance.updateQueryValue("select * from otel_demo");
+
+    expect(instance.searchObj.meta.sqlMode).toBe(true);
+    expect(instance.searchObj.meta.sqlModeEditTransition).toBe(false);
+  });
+
+  it("keeps sqlMode true for mixed-case Select … From query", () => {
+    instance.searchObj.meta.sqlMode = true;
+
+    instance.updateQueryValue("Select * From otel_demo");
+
+    expect(instance.searchObj.meta.sqlMode).toBe(true);
+    expect(instance.searchObj.meta.sqlModeEditTransition).toBe(false);
+  });
+
+  // ── Leading whitespace in non-SQL query does not prevent turn-off ───────
+
+  it("turns off sqlMode when non-SQL query has leading whitespace", () => {
+    instance.searchObj.meta.sqlMode = true;
+
+    instance.updateQueryValue("  match_all('timeout')");
+
+    expect(instance.searchObj.meta.sqlMode).toBe(false);
+    expect(instance.searchObj.meta.sqlModeEditTransition).toBe(true);
+  });
+
+  // ── Auto-detection still works after a transition ───────────────────────
+
+  it("re-enables sqlMode when user types a new SQL query after a transition", () => {
+    // Start in SQL mode
+    instance.searchObj.meta.sqlMode = true;
+
+    // User edits to a filter → mode turns off
+    instance.updateQueryValue("match_all('error')");
+    expect(instance.searchObj.meta.sqlMode).toBe(false);
+
+    // Reset transition flag (as Index.vue watcher would do)
+    instance.searchObj.meta.sqlModeEditTransition = false;
+
+    // User now types a full SQL query
+    instance.updateQueryValue("SELECT * FROM logs WHERE level = 'error'");
+
+    expect(instance.searchObj.meta.sqlMode).toBe(true);
+    expect(instance.searchObj.meta.sqlModeManualTrigger).toBe(true);
+  });
+
+  // ── Realistic user scenario from the bug report ─────────────────────────
+
+  it("full user scenario: SQL query → remove SELECT/FROM → run as filter", () => {
+    // Step 1: user types full SQL query — auto-detect turns on SQL mode
+    instance.updateQueryValue("select * from otel_demo where match_all('error')");
+    expect(instance.searchObj.meta.sqlMode).toBe(true);
+
+    // Step 2: user removes 'select * from otel_demo where ', leaving filter
+    instance.updateQueryValue("match_all('error')");
+
+    // Step 3: sqlMode must be off so run-query uses filter mode
+    expect(instance.searchObj.meta.sqlMode).toBe(false);
+    expect(instance.searchObj.meta.sqlModeEditTransition).toBe(true);
+    expect(instance.searchObj.data.editorValue).toBe("match_all('error')");
   });
 });
 

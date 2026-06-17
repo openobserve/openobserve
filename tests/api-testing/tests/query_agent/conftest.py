@@ -67,6 +67,53 @@ def load_all_queries():
     return categories
 
 
+# ── FTS Content Verification ────────────────────────────────────────────────
+def _verify_fts_content(sql, hits, qid):
+    """Verify match_all results: every returned hit contains the search terms.
+
+    Tantivy full-text search tokenizes and indexes text fields.  When the
+    DataFusion access plan is bypassed (e.g. after an upgrade), match_all
+    can silently return wrong results — rows that don't contain the search
+    terms at all.  This check catches that.
+
+    Precondition: ``hits`` is non-empty (no-op otherwise).
+
+    Only hard-fails when the ``log`` field is in the hit (match_all
+    searches the FTS-indexed ``log`` field by default).  When ``log`` is
+    absent from the SELECT, we can't verify — the match may have been
+    against a non-returned field, and sqllogictest comparison remains the
+    primary correctness backstop.
+    """
+    terms = re.findall(r"match_all\('([^']*)'\)", sql, re.IGNORECASE)
+    if not terms or not hits:
+        return
+
+    has_log = "log" in hits[0]
+
+    # Pre-compute lowercased words once outside the hit loop
+    search_words = [w.lower() for term in terms for w in term.split()]
+
+    for hit in hits:
+        # Search all text fields in the hit
+        text_parts = []
+        for k, v in hit.items():
+            if isinstance(v, str) and v:
+                text_parts.append(v)
+        haystack = " ".join(text_parts).lower()
+
+        for word in search_words:
+            if word not in haystack:
+                if has_log:
+                    raise AssertionError(
+                        f"{qid}: FTS content verification failed — "
+                        f"match_all term word '{word}' not found in any "
+                        f"returned field (log is present). "
+                        f"hit={ {k: v for k, v in hit.items() if k != '_timestamp'} }"
+                    )
+                # log not in SELECT — the match may be in a non-returned
+                # field; sqllogictest comparison catches wrong row counts.
+
+
 # ── Shared query runner ────────────────────────────────────────────────────
 def run_query(client, query, *, skip_fts_count=False):
     """Execute a single query via _search and assert expected results.
@@ -104,6 +151,14 @@ def run_query(client, query, *, skip_fts_count=False):
 
     expected = query.get("expected", {})
     is_fts = query.get("category") == "full_text_search"
+
+    # Verify match_all results actually contain the search terms.
+    # After a DataFusion upgrade, the Tantivy access plan can be bypassed
+    # silently — this content check catches wrong results that row-count
+    # comparisons alone would miss.
+    # Only run post-flush when Tantivy indexes are expected to exist.
+    if not skip_fts_count:
+        _verify_fts_content(sql, hits, qid)
 
     if "results" in expected and not (skip_fts_count and is_fts) and not expected.get("skip_sqllogictest"):
         # ── sqllogictest mode: result-set comparison with float tolerance ─
