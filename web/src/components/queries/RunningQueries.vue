@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     v-if="isMetaOrg"
-    class="running-queries-page tw:rounded-md tw:p-0 tw:flex tw:flex-col tw:h-full"
+    class="tw:rounded-md tw:p-0 tw:flex tw:flex-col tw:h-full"
   >
     <div class="tw:flex-none">
       <div class="card-container">
@@ -851,12 +851,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style>
-/* Deep Quasar table overrides — must stay in CSS */
-.running-queries-page :deep(.q-table th),
-.running-queries-page :deep(.q-table td) {
-  padding: 0px 16px;
-  height: 32px;
-}
-</style>
