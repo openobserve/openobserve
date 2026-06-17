@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div
       data-test="override-config-accordion"
-      class="tw:grid tw:grid-cols-[264px_minmax(0,1fr)_360px] tw:max-[900px]:grid-cols-[220px_minmax(0,1fr)] tw:h-[calc(86vh-150px)] tw:overflow-hidden"
+      class="tw:grid tw:grid-cols-[264px_minmax(0,1fr)_360px] tw:max-[900px]:grid-cols-[220px_minmax(0,1fr)] tw:h-[calc(86vh-150px)] tw:overflow-hidden tw:-mx-(--spacing-dialog-content-px) tw:-my-(--spacing-dialog-content-py)"
     >
       <!-- Left: add-field dropdown + list of added fields -->
       <div
@@ -75,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             role="button"
             tabindex="0"
             :data-test="`override-config-row-${idx}`"
-            class="tw:group tw:flex tw:items-center tw:gap-2 tw:w-full tw:py-2 tw:pl-[9px] tw:pr-1.5 tw:rounded-lg tw:border-l-[3px] tw:border-transparent tw:cursor-pointer tw:outline-none tw:transition-colors tw:hover:bg-[rgba(128,128,128,0.05)]"
+            class="tw:group tw:relative tw:flex tw:items-center tw:gap-2 tw:w-full tw:py-2 tw:pl-[9px] tw:pr-1.5 tw:rounded-lg tw:border-l-[3px] tw:border-transparent tw:cursor-pointer tw:outline-none tw:transition-colors tw:hover:bg-[rgba(128,128,128,0.05)]"
             :class="
               idx === selectedIdx
                 ? 'tw:bg-[rgba(46,85,163,0.06)] tw:border-l-[var(--color-primary-600,#1976d2)]!'
@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ isNumericColumn(col) ? t("dashboard.typeNumeric") : t("dashboard.typeText") }}
             </span>
             <span
-              class="tw:flex-1 tw:min-w-0 tw:font-semibold tw:text-[length:var(--text-sm,13px)] tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap"
+              class="tw:flex-1 tw:min-w-0 tw:font-semibold tw:text-[length:var(--text-sm,13px)] tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap tw:group-hover:pr-7"
             >
               {{ getFieldLabel(col.field) || t("dashboard.columnFormattingPick") }}
             </span>
@@ -99,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               icon-left="close"
               :title="t('common.remove')"
               :data-test="`dashboard-addpanel-config-delete-column-${idx}`"
-              class="tw:shrink-0 tw:opacity-0 tw:group-hover:opacity-100 tw:transition-opacity"
+              class="tw:absolute! tw:right-1 tw:top-1/2 tw:-translate-y-1/2 tw:opacity-0 tw:group-hover:opacity-100 tw:transition-opacity"
               @click.stop="removeColumn(idx)"
             />
           </div>
@@ -188,6 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <ODropdownItem
                   v-for="opt in availableToAdd"
                   :key="opt.value"
+                  :data-test="`dashboard-addpanel-config-add-field-empty-${opt.value}`"
                   @select="addField(opt.value)"
                 >
                   <span class="tw:flex tw:items-center tw:gap-2">

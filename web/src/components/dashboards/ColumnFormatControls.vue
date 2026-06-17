@@ -85,11 +85,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="o-input-label tw:block tw:mb-1.5">{{ t("dashboard.sectionStyling") }}</div>
       <div class="tw:flex tw:items-center tw:gap-2 tw:mt-2 tw:flex-wrap">
         <span class="o-input-label tw:shrink-0 tw:min-w-16">{{ t("dashboard.textColor") }}</span>
-        <ColorSwatchPicker v-model="col.textColor" :swatches="TEXT_SWATCHES" />
+        <ColorSwatchPicker
+          v-model="col.textColor"
+          :swatches="TEXT_SWATCHES"
+          :data-test="`o2-format-text-color-${col.field}`"
+        />
       </div>
       <div class="tw:flex tw:items-center tw:gap-2 tw:mt-2 tw:flex-wrap">
         <span class="o-input-label tw:shrink-0 tw:min-w-16">{{ t("dashboard.bgColor") }}</span>
-        <ColorSwatchPicker v-model="col.bgColor" :swatches="BG_SWATCHES" />
+        <ColorSwatchPicker
+          v-model="col.bgColor"
+          :swatches="BG_SWATCHES"
+          :data-test="`o2-format-bg-color-${col.field}`"
+        />
       </div>
       <button
         type="button"
@@ -141,11 +149,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="tw:flex tw:items-center tw:gap-x-4 tw:gap-y-2 tw:flex-wrap">
             <div class="tw:flex tw:items-center tw:gap-2">
               <span class="o-input-label tw:shrink-0 tw:w-[110px] tw:text-[var(--color-text-secondary,#9e9e9e)]">{{ t("dashboard.conditionThenText") }}</span>
-              <ColorSwatchPicker v-model="rule.textColor" :swatches="TEXT_SWATCHES" />
+              <ColorSwatchPicker
+                v-model="rule.textColor"
+                :swatches="TEXT_SWATCHES"
+                :data-test="`o2-format-cond-text-${col.field}-${ruleIdx}`"
+              />
             </div>
             <div class="tw:flex tw:items-center tw:gap-2">
               <span class="o-input-label tw:shrink-0 tw:text-[var(--color-text-secondary,#9e9e9e)]">{{ t("dashboard.conditionAndBg") }}</span>
-              <ColorSwatchPicker v-model="rule.bgColor" :swatches="BG_SWATCHES" />
+              <ColorSwatchPicker
+                v-model="rule.bgColor"
+                :swatches="BG_SWATCHES"
+                :data-test="`o2-format-cond-bg-${col.field}-${ruleIdx}`"
+              />
             </div>
           </div>
         </div>

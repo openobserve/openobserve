@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ref="tableRendererRef"
           :data="tableRendererData"
           :config="panelSchema.config"
-          :enable-filtering="!!panelSchema.config?.table_filtering"
+          :enable-filtering="!!panelSchema.config?.table_filtering && !store.state.printMode"
           @row-click="onChartClick"
         />
         <TableRenderer
@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             panelSchema.config?.table_pagination && !store.state.printMode
           "
           :rows-per-page="panelSchema.config?.table_pagination_rows_per_page"
-          :enable-filtering="!!panelSchema.config?.table_filtering"
+          :enable-filtering="!!panelSchema.config?.table_filtering && !store.state.printMode"
         />
         <div
           v-else-if="panelSchema.type == 'html'"
