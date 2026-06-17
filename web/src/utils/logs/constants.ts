@@ -90,6 +90,7 @@ export const DEFAULT_LOGS_CONFIG = {
   loadingStream: false,
   loadingSavedView: false,
   loadingProgressPercentage: 0,
+  loadingHistogramProgressPercentage: 0,
   shouldIgnoreWatcher: false,
   communicationMethod: "streaming" as const,
   config: {
