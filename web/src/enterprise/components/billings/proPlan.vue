@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OCard class="tw:flex tw:flex-col tw:shadow-none tw:border tw:border-(--o2-border-color) tw:bg-(--o2-card-bg) tw:rounded-lg tw:w-full tw:h-full card-wrapper">
+  <OCard class="tw:flex tw:flex-col tw:shadow-none tw:border tw:border-(--o2-border-color) tw:bg-(--o2-card-bg) tw:rounded-lg tw:w-full tw:h-full tw:dark:bg-[var(--o2-card-background)] tw:dark:border-[var(--o2-border)]">
     <div class="tw:flex tw:items-center tw:justify-between tw:px-3 tw:py-2">
       <div>
         <h3 class="tw:pt-2 tw:text-base tw:font-semibold tw:leading-6 tw:text-(--o2-text-heading) tw:m-0">{{ t("billing.proPlanLabel") }}</h3>
@@ -202,10 +202,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style>
-.body--dark .card-wrapper {
-  background: var(--o2-card-background);
-  border-color: var(--o2-border);
-}
-</style>

@@ -57,7 +57,7 @@
         <template #cell-type="{ row }">
           <span
             class="tw:inline-flex tw:items-center tw:gap-1 tw:py-px tw:px-1.75 tw:rounded-[3px] tw:font-semibold tw:text-[11px] tw:leading-normal tw:font-[inherit]"
-            :class="`sc-dtype-chip--${dataTypeOf(row)}`"
+            :class="dtypeChipClass(dataTypeOf(row))"
           >
             {{ dataTypeOf(row) }}
           </span>
@@ -350,20 +350,11 @@ function formatDateShort(value: number) {
   if (!value) return "—";
   return formatDate(value, "YYYY-MM-DD HH:mm:ss");
 }
+
+function dtypeChipClass(dataType: string): string {
+  if (dataType === 'numeric') return 'tw:bg-[color-mix(in_srgb,var(--o2-status-info-text)_14%,transparent)] tw:text-(--o2-status-info-text)';
+  if (dataType === 'categorical') return 'tw:bg-[color-mix(in_srgb,var(--o2-status-warning-text)_14%,transparent)] tw:text-(--o2-status-warning-text)';
+  if (dataType === 'boolean') return 'tw:bg-[color-mix(in_srgb,var(--o2-status-success-text)_14%,transparent)] tw:text-(--o2-status-success-text)';
+  return '';
+}
 </script>
-
-<style>
-.sc-dtype-chip--numeric {
-  background: color-mix(in srgb, var(--o2-status-info-text) 14%, transparent);
-  color: var(--o2-status-info-text);
-}
-.sc-dtype-chip--categorical {
-  background: color-mix(in srgb, var(--o2-status-warning-text) 14%, transparent);
-  color: var(--o2-status-warning-text);
-}
-.sc-dtype-chip--boolean {
-  background: color-mix(in srgb, var(--o2-status-success-text) 14%, transparent);
-  color: var(--o2-status-success-text);
-}
-
-</style>

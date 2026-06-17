@@ -1,5 +1,5 @@
 <template>
-    <div v-if="showLicenseExpiryWarning && config.isEnterprise == 'true' && config.isCloud === 'false'" class="license-expiry-container gradient-banner tw:w-full tw:p-3 tw:border tw:border-[#D7D7D7] tw:rounded-md tw:[background:linear-gradient(to_right,transparent_60%,#f7f7ff_70%,#cdf7e4_100%)]">
+    <div v-if="showLicenseExpiryWarning && config.isEnterprise == 'true' && config.isCloud === 'false'" class="tw:w-full tw:p-3 tw:border tw:border-[#D7D7D7] tw:rounded-md tw:[background:linear-gradient(to_right,transparent_60%,#f7f7ff_70%,#cdf7e4_100%)] tw:dark:[background:linear-gradient(to_right,transparent_60%,#24262F_70%,#2C3934_100%)] tw:dark:border-[#454F5B]">
         <div class="tw:flex" >
         <div class="tw:flex tw:flex-col">
         <span class="tw:text-lg tw:font-semibold tw:leading-8">{{ getLicenseExpiryMessage() }}</span>
@@ -53,18 +53,3 @@ export default defineComponent({
   },
 });
 </script>
-
-
-<style>
-.body--dark .gradient-banner {
-  background: linear-gradient(
-    to right,
-    transparent 60%,
-    #24262F 70%,
-    #2C3934 100%  );
-}
-
-.body--dark .license-expiry-container {
-  border: 1px solid #454F5B;
-}
-</style>

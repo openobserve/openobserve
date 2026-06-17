@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="card-container tw:h-full tw:flex tw:flex-col tw:pb-[0.3rem]">
     <!-- Current org section (if super org, not a member) -->
     <div v-if="currentOrgToShow" class="tw:mb-3">
-      <div class="member-header tw:rounded-[0.625rem] tw:bg-(--o2-card-bg)">
+      <div class="tw:rounded-[0.625rem] tw:bg-(--o2-card-bg) tw:dark:bg-[var(--o2-card-background)]">
         <div class="tw:font-semibold tw:px-2 tw:py-2">
           {{ t("billing.billingGroup.currentOrgTitle") }}
         </div>
@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Member organizations section -->
     <div class="tw:flex-1 tw:flex tw:flex-col tw:min-h-0">
-      <div class="member-header tw:rounded-[0.625rem] tw:bg-(--o2-card-bg)">
+      <div class="tw:rounded-[0.625rem] tw:bg-(--o2-card-bg) tw:dark:bg-[var(--o2-card-background)]">
         <div class="tw:font-semibold tw:px-2 tw:py-2">
           {{ t("billing.billingGroup.memberOrgsTitle") }}
         </div>
@@ -196,10 +196,6 @@ export default defineComponent({
 </script>
 
 <style>
-.body--dark .member-header {
-  background-color: var(--o2-card-background);
-}
-
 .card-container .o-tabs--vertical {
   margin: 5px;
 }

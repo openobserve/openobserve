@@ -46,7 +46,7 @@
         {{ t("onlineEvals.scorer.testPanel.disabledHint") }}
       </p>
 
-      <div class="eval-test-panel__result tw:flex tw:flex-col tw:gap-2 tw:min-h-[84px] tw:mt-4 tw:p-3 tw:border tw:border-(--o2-border) tw:rounded-md tw:bg-(--o2-card-bg-solid) tw:text-(--o2-text-muted) tw:text-xs" :class="`is-${state}`" data-test="scorer-test-result">
+      <div class="tw:flex tw:flex-col tw:gap-2 tw:min-h-[84px] tw:mt-4 tw:p-3 tw:border tw:border-(--o2-border) tw:rounded-md tw:bg-(--o2-card-bg-solid) tw:text-(--o2-text-muted) tw:text-xs" :class="{ 'tw:border-[color-mix(in_srgb,var(--o2-status-success-text)_35%,var(--o2-border))] tw:text-(--o2-status-success-text)': state === 'success', 'tw:border-[color-mix(in_srgb,var(--o2-status-error-text)_35%,var(--o2-border))] tw:text-(--o2-status-error-text)': state === 'error' }" data-test="scorer-test-result">
         <template v-if="state === 'idle'">
           {{ t("onlineEvals.scorer.testPanel.stateIdle") }}
         </template>
@@ -192,15 +192,3 @@ const errorText = computed(
   () => props.errorMessage || props.result?.error || t("onlineEvals.scorer.testPanel.errorFallback"),
 );
 </script>
-
-<style>
-.eval-test-panel__result.is-success {
-  border-color: color-mix(in srgb, var(--o2-status-success-text) 35%, var(--o2-border));
-  color: var(--o2-status-success-text);
-}
-
-.eval-test-panel__result.is-error {
-  border-color: color-mix(in srgb, var(--o2-status-error-text) 35%, var(--o2-border));
-  color: var(--o2-status-error-text);
-}
-</style>

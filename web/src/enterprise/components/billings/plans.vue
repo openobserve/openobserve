@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <trial-period class="tw:mb-3" currentPage="billing"></trial-period>
     <!-- AI Credits card -->
     <div v-if="aiUsage" class="tw:grid tw:grid-cols-1 tw:gap-4 tw:w-full tw:mb-4">
-      <div class="feature-card tw:bg-(--o2-card-bg) tw:border tw:border-(--o2-border-color) tw:rounded-lg tw:p-4 tw:shadow-none tw:transition-shadow tw:duration-200 tw:hover:shadow-[0_1px_3px_rgba(0,0,0,0.1)]">
+      <div class="tw:bg-(--o2-card-bg) tw:border tw:border-(--o2-border-color) tw:rounded-lg tw:p-4 tw:shadow-none tw:transition-shadow tw:duration-200 tw:hover:shadow-[0_1px_3px_rgba(0,0,0,0.1)] tw:dark:bg-[var(--o2-card-background)] tw:dark:border-[var(--o2-border)]">
         <div class="tw:min-h-full tw:rounded-lg tw:transition-all tw:duration-300 tw:ease-[cubic-bezier(0.4,0,0.2,1)] tw:text-center tw:flex tw:flex-col tw:justify-between">
           <div class="tw:flex tw:flex-col tw:justify-between">
             <div class="tw:flex tw:justify-between tw:items-center">
@@ -463,9 +463,3 @@ export default defineComponent({
   },
 });
 </script>
-<style>
-.body--dark .feature-card {
-  background: var(--o2-card-background);
-  border-color: var(--o2-border);
-}
-</style>

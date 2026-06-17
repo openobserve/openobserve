@@ -63,7 +63,7 @@
         @row-click="(row: any) => $emit('select', row)"
       >
         <template #cell-status="{ row }">
-          <span class="tw:inline-flex tw:text-base tw:leading-none qsc-status" :class="`qsc-status--${row.status}`" :aria-label="row.status">●</span>
+          <span class="tw:inline-flex tw:text-base tw:leading-none" :class="statusClass(row.status)" :aria-label="row.status">●</span>
         </template>
 
         <template #cell-name="{ row }">
@@ -71,7 +71,7 @@
         </template>
 
         <template #cell-type="{ row }">
-          <span class="qsc-type" :class="`qsc-type--${row.dataType}`">
+          <span class="tw:inline-flex tw:items-center tw:px-[3px] tw:rounded-[2px] tw:font-bold tw:text-[9px] tw:leading-[14px] tw:tracking-[0.02em]" :class="typeChipClass(row.dataType)">
             {{ shortType(row.dataType) }}
           </span>
         </template>
@@ -88,8 +88,8 @@
         <template #cell-trend="{ row }">
           <svg
             v-if="row.trendSparkline.length > 0"
-            class="tw:w-full tw:h-5 qsc-spark"
-            :class="`qsc-spark--${row.status}`"
+            class="tw:w-full tw:h-5"
+            :class="sparkClass(row.status)"
             viewBox="0 0 100 20"
             preserveAspectRatio="none"
             aria-hidden="true"
@@ -168,8 +168,30 @@ const filteredRows = computed(() => {
 // De-emphasize configs that have no scores in the selected window. They
 // stay visible (so users can spot a scorer they defined but never wired
 // up) but visually recede beneath active rows.
+function statusClass(status: string): string {
+  if (status === 'unhealthy') return 'tw:text-[var(--o2-status-warning-text,#b25400)]';
+  if (status === 'warn') return 'tw:text-[var(--o2-status-warning-text,#b25400)] tw:opacity-[0.7]';
+  if (status === 'healthy') return 'tw:text-[var(--o2-status-success-text,#2e7d32)]';
+  if (status === 'noData') return 'tw:text-[var(--color-text-secondary,var(--o2-text-secondary))] tw:opacity-[0.55]';
+  return 'tw:text-[var(--color-text-secondary,var(--o2-text-secondary))]';
+}
+
+function typeChipClass(dataType: string): string {
+  if (dataType === 'numeric') return 'tw:bg-[color-mix(in_srgb,#6b76e3_14%,transparent)] tw:text-[#4f5bcf]';
+  if (dataType === 'categorical') return 'tw:bg-[color-mix(in_srgb,#9333ea_14%,transparent)] tw:text-[#7c3aed]';
+  if (dataType === 'boolean') return 'tw:bg-[color-mix(in_srgb,#16a34a_14%,transparent)] tw:text-[#15803d]';
+  return 'tw:bg-[color-mix(in_srgb,#6b76e3_14%,transparent)] tw:text-[#4f5bcf]';
+}
+
+function sparkClass(status: string): string {
+  if (status === 'unhealthy' || status === 'warn') return 'tw:text-[var(--o2-status-warning-text,#b25400)]';
+  if (status === 'healthy') return 'tw:text-[var(--o2-status-success-text,#2e7d32)]';
+  if (status === 'noData') return 'tw:text-[var(--color-text-secondary,var(--o2-text-secondary))] tw:opacity-[0.55]';
+  return 'tw:text-[var(--color-text-secondary,var(--o2-text-secondary))]';
+}
+
 function rowClassOf(row: ScoreConfigRow): string {
-  return row.status === "noData" ? "qsc-row--no-data" : "";
+  return row.status === "noData" ? "tw:opacity-[0.6] tw:hover:opacity-[0.85]" : "";
 }
 
 const columns = computed(() => [
@@ -281,41 +303,3 @@ function relativeTime(timestampMs: number): string {
   return `${mo}mo ago`;
 }
 </script>
-
-<style>
-/* status dot colors */
-.qsc-status--unhealthy { color: var(--o2-status-warning-text, #b25400); }
-.qsc-status--warn { color: var(--o2-status-warning-text, #b25400); opacity: 0.7; }
-.qsc-status--healthy { color: var(--o2-status-success-text, #2e7d32); }
-.qsc-status--noThreshold { color: var(--color-text-secondary, var(--o2-text-secondary)); }
-.qsc-status--noData { color: var(--color-text-secondary, var(--o2-text-secondary)); opacity: 0.55; }
-
-/* type badge — complex color-mix values not expressible in arbitrary Tailwind */
-.qsc-type {
-  display: inline-flex;
-  align-items: center;
-  padding: 0 3px;
-  border-radius: 2px;
-  font-weight: 700;
-  font-size: 9px;
-  line-height: 14px;
-  letter-spacing: 0.02em;
-  background: color-mix(in srgb, #6b76e3 14%, transparent);
-  color: #4f5bcf;
-}
-.qsc-type--numeric   { background: color-mix(in srgb, #6b76e3 14%, transparent); color: #4f5bcf; }
-.qsc-type--categorical { background: color-mix(in srgb, #9333ea 14%, transparent); color: #7c3aed; }
-.qsc-type--boolean   { background: color-mix(in srgb, #16a34a 14%, transparent); color: #15803d; }
-
-/* sparkline colors */
-.qsc-spark { color: color-mix(in srgb, var(--color-text-secondary) 60%, transparent); }
-.qsc-spark--unhealthy { color: var(--o2-status-warning-text, #b25400); }
-.qsc-spark--healthy   { color: var(--o2-status-success-text, #2e7d32); }
-.qsc-spark--warn      { color: var(--o2-status-warning-text, #b25400); }
-.qsc-spark--noThreshold { color: var(--color-text-secondary, var(--o2-text-secondary)); }
-.qsc-spark--noData    { color: var(--color-text-secondary, var(--o2-text-secondary)); opacity: 0.55; }
-
-/* Dim no-data rows so active scorers stand out. */
-tr.qsc-row--no-data { opacity: 0.6; }
-tr.qsc-row--no-data:hover { opacity: 0.85; }
-</style>
