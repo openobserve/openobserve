@@ -108,6 +108,11 @@ describe("OverrideConfigPopup", () => {
           ColumnFormatControls: { template: "<div data-test-stub='cfc' />" },
           TableRenderer: { template: "<div data-test-stub='table-renderer' />" },
           OIcon: { template: '<span class="OIcon">{{ $attrs.name }}</span>' },
+          ODropdown: { template: '<div><slot name="trigger" /><slot /></div>' },
+          ODropdownItem: {
+            template: "<div @click=\"$emit('select')\"><slot /></div>",
+            emits: ["select"],
+          },
         },
         mocks: { $t: (key: string) => key },
       },
@@ -132,56 +137,43 @@ describe("OverrideConfigPopup", () => {
       expect(row.alignment).toBe("center");
     });
 
-    it("starts with a single blank row when there is no config", async () => {
+    it("starts empty when there is no config", async () => {
       wrapper = await createWrapper({ overrideConfig: { overrideConfigs: [] } });
-      expect(wrapper.vm.columnOverrides).toHaveLength(1);
-      expect(wrapper.vm.columnOverrides[0].field).toBe("");
+      expect(wrapper.vm.columnOverrides).toHaveLength(0);
+      expect(wrapper.vm.selectedCol).toBeNull();
     });
 
-    it("expands the first row by default", async () => {
+    it("selects the first field by default", async () => {
       wrapper = await createWrapper();
-      expect(wrapper.vm.isExpanded(0)).toBe(true);
+      expect(wrapper.vm.selectedIdx).toBe(0);
+      expect(wrapper.vm.selectedCol?.field).toBe("field1");
     });
   });
 
   describe("Column management", () => {
-    it("adds a new column row and expands it", async () => {
+    it("adds a field via addField and selects it", async () => {
       wrapper = await createWrapper();
       const before = wrapper.vm.columnOverrides.length;
-      wrapper.vm.addColumn();
+      wrapper.vm.addField("field2");
       expect(wrapper.vm.columnOverrides).toHaveLength(before + 1);
-      expect(wrapper.vm.isExpanded(before)).toBe(true);
+      expect(wrapper.vm.selectedIdx).toBe(before);
+      expect(wrapper.vm.columnOverrides[before].field).toBe("field2");
     });
 
     it("removes a column row", async () => {
       wrapper = await createWrapper();
-      wrapper.vm.addColumn();
+      wrapper.vm.addField("field2");
       const before = wrapper.vm.columnOverrides.length;
       wrapper.vm.removeColumn(0);
       expect(wrapper.vm.columnOverrides).toHaveLength(before - 1);
     });
 
-    it("excludes already-used columns from the option list", async () => {
+    it("excludes already-used columns from the add list", async () => {
       wrapper = await createWrapper();
-      // field1 is used by row 0, so it must not be offered to a second row.
-      wrapper.vm.addColumn();
-      const opts = wrapper.vm.columnOptionsFor(1).map((o: any) => o.value);
+      // field1 is used by the loaded row, so it must not be offered again.
+      const opts = wrapper.vm.availableToAdd.map((o: any) => o.value);
       expect(opts).not.toContain("field1");
       expect(opts).toContain("field2");
-    });
-
-    it("offers all columns to the row that currently uses one", async () => {
-      wrapper = await createWrapper();
-      const opts = wrapper.vm.columnOptionsFor(0).map((o: any) => o.value);
-      expect(opts).toContain("field1");
-    });
-
-    it("toggles row expansion", async () => {
-      wrapper = await createWrapper();
-      wrapper.vm.toggle(0);
-      expect(wrapper.vm.isExpanded(0)).toBe(false);
-      wrapper.vm.toggle(0);
-      expect(wrapper.vm.isExpanded(0)).toBe(true);
     });
   });
 
@@ -212,41 +204,20 @@ describe("OverrideConfigPopup", () => {
     });
   });
 
-  describe("Summary chips", () => {
-    it("builds chips from unit / alignment overrides", async () => {
-      wrapper = await createWrapper();
-      const chips = wrapper.vm
-        .summaryChips(wrapper.vm.columnOverrides[0])
-        .map((c: any) => c.text);
-      // bytes unit + center alignment, both resolved via shared option labels.
-      expect(chips.some((t: string) => /bytes/i.test(t))).toBe(true);
-      expect(chips.length).toBeGreaterThanOrEqual(2);
-    });
-
-    it("uses the custom unit text for custom units", async () => {
-      wrapper = await createWrapper();
-      const col = { ...wrapper.vm.columnOverrides[0], unit: "custom", customUnit: "req/s", alignment: "", conditions: [] };
-      const chips = wrapper.vm.summaryChips(col).map((c: any) => c.text);
-      expect(chips).toContain("req/s");
-    });
-  });
-
   describe("Preview", () => {
-    it("produces a preview even when no previewData is supplied", async () => {
+    it("produces a preview for the selected field even with no previewData", async () => {
       wrapper = await createWrapper();
-      wrapper.vm.columnOverrides[0].field = "field1";
       await wrapper.vm.$nextTick();
-      expect(wrapper.vm.previews[0]).toBeTruthy();
-      expect(wrapper.vm.previews[0].rows.length).toBeGreaterThan(0);
+      expect(wrapper.vm.selectedPreview).toBeTruthy();
+      expect(wrapper.vm.selectedPreview.rows.length).toBeGreaterThan(0);
     });
 
     it("falls back to type-based dummy rows when a column has no data", async () => {
       wrapper = await createWrapper();
-      // Select a numeric column with no previewData → numeric dummy rows.
-      wrapper.vm.columnOverrides[0].field = "field1";
+      // The selected numeric column with no previewData → numeric dummy rows.
       wrapper.vm.columnOverrides[0].fieldType = "num";
       await wrapper.vm.$nextTick();
-      const preview = wrapper.vm.previews[0];
+      const preview = wrapper.vm.selectedPreview;
       expect(preview).toBeTruthy();
       expect(preview.rows.length).toBeGreaterThan(0);
       const key = preview.columns[0].field;
@@ -255,10 +226,9 @@ describe("OverrideConfigPopup", () => {
 
     it("uses text dummy rows when the field type is text", async () => {
       wrapper = await createWrapper();
-      wrapper.vm.columnOverrides[0].field = "field1";
       wrapper.vm.columnOverrides[0].fieldType = "text";
       await wrapper.vm.$nextTick();
-      const preview = wrapper.vm.previews[0];
+      const preview = wrapper.vm.selectedPreview;
       const key = preview.columns[0].field;
       expect(typeof preview.rows[0][key]).toBe("string");
     });
@@ -267,9 +237,8 @@ describe("OverrideConfigPopup", () => {
       wrapper = await createWrapper({
         previewData: { field1: { column: { field: "field1" }, rows: [{ field1: 5 }] } },
       });
-      wrapper.vm.columnOverrides[0].field = "field1";
       await wrapper.vm.$nextTick();
-      const preview = wrapper.vm.previews[0];
+      const preview = wrapper.vm.selectedPreview;
       expect(preview.rows).toEqual([{ field1: 5 }]);
     });
   });

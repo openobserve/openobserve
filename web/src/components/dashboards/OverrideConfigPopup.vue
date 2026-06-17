@@ -21,139 +21,217 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:open="(v: boolean) => { if (!v) closePopup() }"
     :title="t('dashboard.columnFormattingTitle')"
     :sub-title="t('dashboard.columnFormattingSubtitle')"
-    :width="74"
-    :neutral-button-label="t('dashboard.cancel')"
-    neutral-button-variant="outline"
-    :primary-button-label="t('dashboard.overrideConfigSave')"
-    @click:neutral="closePopup"
-    @click:primary="saveOverrides"
+    :width="80"
   >
     <div
-      class="cf-body tw:flex tw:flex-col tw:gap-2 tw:px-0.5 tw:py-1 tw:h-[calc(86vh-150px)] tw:overflow-y-auto"
       data-test="override-config-accordion"
+      class="tw:grid tw:grid-cols-[264px_minmax(0,1fr)_360px] tw:max-[900px]:grid-cols-[220px_minmax(0,1fr)] tw:h-[calc(86vh-150px)] tw:overflow-hidden"
     >
-      <!-- Accordion of column overrides -->
+      <!-- Left: add-field dropdown + list of added fields -->
       <div
-        v-for="(col, idx) in columnOverrides"
-        :key="idx"
-        class="tw:border tw:border-[rgba(128,128,128,0.2)] tw:rounded-lg tw:overflow-hidden tw:shrink-0 tw:transition-colors"
-        :class="isExpanded(idx) ? 'tw:border-[var(--color-primary-600)]!' : ''"
-        :data-test="`override-config-row-${idx}`"
+        class="tw:flex tw:flex-col tw:gap-2.5 tw:min-w-0 tw:p-3 tw:border-r tw:border-[rgba(128,128,128,0.18)]"
       >
-        <!-- Row header: clickable toggle + sibling delete (no nested <button>) -->
-        <div
-          class="tw:flex tw:items-center tw:gap-1 tw:pr-2"
-          :class="isExpanded(idx) ? 'tw:border-b tw:border-[rgba(128,128,128,0.14)] tw:bg-[rgba(128,128,128,0.06)]' : ''"
-        >
-          <button
-            type="button"
-            class="tw:flex tw:items-center tw:gap-2 tw:flex-1 tw:min-w-0 tw:py-2 tw:pl-2.5 tw:pr-1 tw:bg-transparent tw:border-0 tw:cursor-pointer tw:text-left tw:text-inherit tw:hover:bg-[rgba(128,128,128,0.05)]"
-            :data-test="`override-config-row-toggle-${idx}`"
-            @click="toggle(idx)"
-          >
-            <OIcon
-              :name="isExpanded(idx) ? 'expand-more' : 'chevron-right'"
-              size="sm"
-              class="tw:shrink-0 tw:text-[var(--o2-text-2,#757575)]"
-            />
-            <span
-              class="tw:shrink-0 tw:text-[9px] tw:font-bold tw:tracking-[0.05em] tw:uppercase tw:py-0.5 tw:px-[5px] tw:rounded"
-              :class="isNumericColumn(col) ? 'tw:text-[#2e55a3] tw:bg-[rgba(46,85,163,0.1)]' : 'tw:text-[#6b7280] tw:bg-[rgba(107,114,128,0.12)]'"
+        <ODropdown v-model:open="addOpenLeft" align="start">
+          <template #trigger>
+            <button
+              type="button"
+              data-test="dashboard-addpanel-config-add-column"
+              class="tw:flex tw:items-center tw:justify-center tw:gap-1.5 tw:w-full tw:shrink-0 tw:p-[9px] tw:rounded-lg tw:border tw:border-dashed tw:border-[rgba(25,118,210,0.5)] tw:bg-transparent tw:cursor-pointer tw:text-[length:var(--text-sm,13px)] tw:font-medium tw:text-[var(--color-primary-600,#1976d2)] tw:transition-colors tw:hover:bg-[rgba(25,118,210,0.05)] tw:hover:border-[var(--color-primary-600,#1976d2)]"
             >
+              <OIcon name="add" size="sm" />
+              {{ t("dashboard.columnFormattingAddField") }}
+            </button>
+          </template>
+          <div class="tw:min-w-[200px] tw:max-h-[280px] tw:overflow-y-auto tw:p-1">
+            <ODropdownItem
+              v-for="opt in availableToAdd"
+              :key="opt.value"
+              :data-test="`dashboard-addpanel-config-add-field-${opt.value}`"
+              @select="addField(opt.value)"
+            >
+              <span class="tw:flex tw:items-center tw:gap-2">
+                <span :class="['cf-badge-base', badgeClass(opt.isNumeric)]">
+                  {{ opt.isNumeric ? t("dashboard.typeNumeric") : t("dashboard.typeText") }}
+                </span>
+                <span>{{ opt.label }}</span>
+              </span>
+            </ODropdownItem>
+            <div
+              v-if="!availableToAdd.length"
+              class="tw:py-2 tw:px-2.5 tw:text-xs tw:text-[var(--o2-text-2,#9e9e9e)]"
+            >
+              {{ t("dashboard.columnFormattingAllAdded") }}
+            </div>
+          </div>
+        </ODropdown>
+
+        <div
+          v-if="columnOverrides.length"
+          class="tw:flex-1 tw:min-h-0 tw:overflow-y-auto tw:flex tw:flex-col tw:gap-1"
+        >
+          <div
+            v-for="(col, idx) in columnOverrides"
+            :key="idx"
+            role="button"
+            tabindex="0"
+            :data-test="`override-config-row-${idx}`"
+            class="tw:group tw:flex tw:items-center tw:gap-2 tw:w-full tw:py-2 tw:pl-[9px] tw:pr-1.5 tw:rounded-lg tw:border-l-[3px] tw:border-transparent tw:cursor-pointer tw:outline-none tw:transition-colors tw:hover:bg-[rgba(128,128,128,0.05)]"
+            :class="
+              idx === selectedIdx
+                ? 'tw:bg-[rgba(46,85,163,0.06)] tw:border-l-[var(--color-primary-600,#1976d2)]!'
+                : ''
+            "
+            @click="selectedIdx = idx"
+            @keydown.enter.prevent="selectedIdx = idx"
+            @keydown.space.prevent="selectedIdx = idx"
+          >
+            <span :class="['cf-badge-base', badgeClass(isNumericColumn(col))]">
               {{ isNumericColumn(col) ? t("dashboard.typeNumeric") : t("dashboard.typeText") }}
             </span>
             <span
-              class="tw:shrink-0 tw:font-semibold tw:text-[length:var(--text-sm,13px)] tw:max-w-[200px] tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap"
-              :title="getFieldLabel(col.field)"
+              class="tw:flex-1 tw:min-w-0 tw:font-semibold tw:text-[length:var(--text-sm,13px)] tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap"
             >
               {{ getFieldLabel(col.field) || t("dashboard.columnFormattingPick") }}
             </span>
-
-            <!-- Collapsed summary chips -->
-            <span
-              v-if="!isExpanded(idx) && col.field"
-              class="tw:flex tw:items-center tw:gap-[5px] tw:overflow-hidden tw:flex-nowrap"
-            >
-              <span
-                v-for="(chip, ci) in summaryChips(col)"
-                :key="ci"
-                class="tw:inline-flex tw:items-center tw:gap-1 tw:shrink-0 tw:text-[11px] tw:text-[var(--o2-text-2,#757575)] tw:bg-[rgba(128,128,128,0.08)] tw:py-px tw:px-[7px] tw:rounded-full tw:whitespace-nowrap"
-              >
-                <span
-                  v-if="chip.swatch"
-                  class="tw:inline-block tw:w-2.5 tw:h-2.5 tw:rounded-[3px] tw:border tw:border-[rgba(128,128,128,0.3)]"
-                  :style="{ background: chip.swatch }"
-                />
-                {{ chip.text }}
-              </span>
-            </span>
-          </button>
-
-          <OButton
-            variant="ghost"
-            size="icon-sm"
-            icon-left="delete-outline"
-            :data-test="`dashboard-addpanel-config-delete-column-${idx}`"
-            class="tw:shrink-0"
-            @click.stop="removeColumn(idx)"
-          />
-        </div>
-
-        <!-- Expanded split editor -->
-        <div v-show="isExpanded(idx)" class="cf-row-body">
-          <!-- Left: controls -->
-          <div class="tw:flex tw:flex-col tw:gap-2.5 tw:min-w-0">
-            <div class="tw:flex tw:flex-col tw:gap-1">
-              <label class="o-input-label">{{ t("dashboard.overrideConfigFieldLabel") }}</label>
-              <OSelect
-                v-model="col.field"
-                :options="columnOptionsFor(idx)"
-                :placeholder="t('dashboard.columnFormattingPick')"
-                :data-test="`dashboard-addpanel-config-field-select-${idx}`"
-              />
-            </div>
-
-            <ColumnFormatControls
-              v-if="col.field"
-              :col="col"
-              :is-numeric="isNumericColumn(col)"
+            <OButton
+              variant="ghost"
+              size="icon-xs"
+              icon-left="close"
+              :title="t('common.remove')"
+              :data-test="`dashboard-addpanel-config-delete-column-${idx}`"
+              class="tw:shrink-0 tw:opacity-0 tw:group-hover:opacity-100 tw:transition-opacity"
+              @click.stop="removeColumn(idx)"
             />
           </div>
-
-          <!-- Right: live preview -->
-          <div class="tw:min-w-0 tw:flex tw:flex-col tw:gap-1.5">
-            <div class="tw:flex tw:items-center tw:gap-[5px] tw:text-[10px] tw:font-bold tw:tracking-[0.06em] tw:uppercase tw:text-[var(--o2-text-2,#757575)]">
-              <OIcon name="visibility" size="xs" />
-              <span>{{ t("dashboard.inlinePreview") }}</span>
-            </div>
-            <div class="cf-preview-table tw:border tw:border-[rgba(128,128,128,0.18)] tw:rounded-md tw:overflow-hidden">
-              <TableRenderer
-                v-if="col.field && previews[idx]"
-                :data="previews[idx]"
-                :value-mapping="valueMapping"
-                :wrap-cells="true"
-                :show-pagination="false"
-              />
-              <div v-else class="tw:p-4 tw:text-center tw:text-xs tw:text-[var(--o2-text-2,#9e9e9e)]">
-                {{ t("dashboard.columnFormattingPick") }}
-              </div>
-            </div>
-            <div class="tw:text-[11px] tw:text-[var(--o2-text-2,#9e9e9e)]">{{ t("dashboard.columnFormattingSampleNote") }}</div>
+        </div>
+        <div
+          v-else
+          class="tw:flex-1 tw:flex tw:flex-col tw:items-center tw:justify-center tw:gap-1.5 tw:text-center tw:p-4"
+        >
+          <OIcon
+            name="format-color-text"
+            size="lg"
+            class="tw:text-[var(--o2-text-2,#b0bec5)]"
+          />
+          <div class="tw:font-semibold tw:text-[length:var(--text-sm,13px)]">
+            {{ t("dashboard.columnFormattingNoFields") }}
+          </div>
+          <div class="tw:text-xs tw:text-[var(--o2-text-2,#9e9e9e)] tw:leading-[1.4]">
+            {{ t("dashboard.columnFormattingNoFieldsHint") }}
           </div>
         </div>
       </div>
 
-      <!-- Add column -->
-      <button
-        type="button"
-        class="tw:flex tw:items-center tw:justify-center tw:gap-1.5 tw:w-full tw:shrink-0 tw:p-[9px] tw:rounded-lg tw:border tw:border-[rgba(128,128,128,0.35)] tw:bg-transparent tw:cursor-pointer tw:text-[length:var(--text-sm,13px)] tw:font-medium tw:text-[var(--color-primary-600,#1976d2)] tw:transition-colors tw:hover:bg-[rgba(25,118,210,0.05)] tw:hover:border-[var(--color-primary-600)]"
-        data-test="dashboard-addpanel-config-add-column"
-        @click="addColumn"
+      <!-- Detail: controls + live preview for the selected field -->
+      <template v-if="selectedCol">
+        <div class="tw:min-w-0 tw:overflow-y-auto">
+          <ColumnFormatControls
+            :col="selectedCol"
+            :is-numeric="isNumericColumn(selectedCol)"
+          />
+        </div>
+        <div
+          class="tw:flex tw:flex-col tw:gap-2 tw:min-w-0 tw:overflow-y-auto tw:p-3 tw:border-l tw:border-[rgba(128,128,128,0.18)]"
+        >
+          <div
+            class="tw:flex tw:items-center tw:gap-[5px] tw:text-[10px] tw:font-bold tw:tracking-[0.06em] tw:uppercase tw:text-[var(--o2-text-2,#757575)]"
+          >
+            <OIcon name="visibility" size="xs" />
+            <span>{{ t("dashboard.inlinePreview") }}</span>
+          </div>
+          <div
+            class="cf-preview-table tw:border tw:border-[rgba(128,128,128,0.18)] tw:rounded-md tw:overflow-hidden"
+          >
+            <TableRenderer
+              v-if="selectedPreview"
+              :data="selectedPreview"
+              :value-mapping="valueMapping"
+              :wrap-cells="true"
+              :show-pagination="false"
+            />
+          </div>
+          <div class="tw:text-[11px] tw:text-[var(--o2-text-2,#9e9e9e)]">
+            {{ t("dashboard.columnFormattingSampleNote") }}
+          </div>
+        </div>
+      </template>
+
+      <!-- Empty state: nothing added yet -->
+      <div
+        v-else
+        class="tw:col-start-2 tw:col-end-4 tw:max-[900px]:col-end-3 tw:flex tw:items-center tw:justify-center tw:p-6"
       >
-        <OIcon name="add" size="sm" />
-        {{ t("dashboard.columnFormattingAddColumn") }}
-      </button>
+        <OEmptyState
+          size="block"
+          :title="t('dashboard.columnFormattingEmptyTitle')"
+          :description="t('dashboard.columnFormattingEmptyHint')"
+        >
+          <template #illustration>
+            <div
+              class="tw:w-[72px] tw:h-[72px] tw:rounded-2xl tw:bg-[rgba(128,128,128,0.08)] tw:flex tw:items-center tw:justify-center tw:text-[var(--o2-text-2,#90a4ae)]"
+            >
+              <OIcon name="tune" size="xl" />
+            </div>
+          </template>
+          <template #actions>
+            <ODropdown v-model:open="addOpenCenter" align="center">
+              <template #trigger>
+                <OButton
+                  variant="primary"
+                  icon-left="add"
+                  data-test="dashboard-addpanel-config-add-column-empty"
+                >
+                  {{ t("dashboard.columnFormattingAddField") }}
+                </OButton>
+              </template>
+              <div class="tw:min-w-[200px] tw:max-h-[280px] tw:overflow-y-auto tw:p-1">
+                <ODropdownItem
+                  v-for="opt in availableToAdd"
+                  :key="opt.value"
+                  @select="addField(opt.value)"
+                >
+                  <span class="tw:flex tw:items-center tw:gap-2">
+                    <span :class="['cf-badge-base', badgeClass(opt.isNumeric)]">
+                      {{ opt.isNumeric ? t("dashboard.typeNumeric") : t("dashboard.typeText") }}
+                    </span>
+                    <span>{{ opt.label }}</span>
+                  </span>
+                </ODropdownItem>
+                <div
+                  v-if="!availableToAdd.length"
+                  class="tw:py-2 tw:px-2.5 tw:text-xs tw:text-[var(--o2-text-2,#9e9e9e)]"
+                >
+                  {{ t("dashboard.columnFormattingAllAdded") }}
+                </div>
+              </div>
+            </ODropdown>
+          </template>
+        </OEmptyState>
+      </div>
     </div>
+
+    <template #footer>
+      <div class="tw:flex tw:items-center tw:justify-between tw:w-full">
+        <span class="tw:text-xs tw:text-[var(--o2-text-2,#9e9e9e)]">{{ footerSummary }}</span>
+        <div class="tw:flex tw:gap-2">
+          <OButton
+            variant="outline"
+            data-test="override-config-popup-cancel"
+            @click="closePopup"
+          >
+            {{ t("dashboard.cancel") }}
+          </OButton>
+          <OButton
+            variant="primary"
+            :disabled="!columnOverrides.length"
+            data-test="override-config-popup-save"
+            @click="saveOverrides"
+          >
+            {{ t("dashboard.overrideConfigSave") }}
+          </OButton>
+        </div>
+      </div>
+    </template>
   </ODialog>
 </template>
 
@@ -163,7 +241,9 @@ import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ColumnFormatControls from "./ColumnFormatControls.vue";
 import {
   type ColumnOverrideUI,
@@ -171,7 +251,6 @@ import {
   loadAllFromRaw,
   serializeOverrides,
   serializeColumnOverride,
-  useColumnFormattingOptions,
 } from "@/composables/dashboard/useColumnFormatting";
 import {
   parseOverrideConfigs,
@@ -187,7 +266,7 @@ const TableRenderer = defineAsyncComponent(
 
 export default defineComponent({
   name: "OverrideConfigPopup",
-  components: { OButton, OIcon, ODialog, OSelect, ColumnFormatControls, TableRenderer },
+  components: { OButton, OIcon, ODialog, ODropdown, ODropdownItem, OEmptyState, ColumnFormatControls, TableRenderer },
   props: {
     open: {
       type: Boolean,
@@ -229,18 +308,17 @@ export default defineComponent({
   emits: ["close", "save"],
   setup(props: any, { emit }: any) {
     const { t } = useI18n();
-    const { unitOptions, alignOptions } = useColumnFormattingOptions();
 
     const columnOverrides = ref<ColumnOverrideUI[]>([]);
-    // Multi-expand: any number of rows can be open at once (indices).
-    const expanded = ref<Set<number>>(new Set([0]));
-    const isExpanded = (idx: number) => expanded.value.has(idx);
+    const selectedIdx = ref<number>(-1);
+    const addOpenLeft = ref(false);
+    const addOpenCenter = ref(false);
 
     const initFromProps = () => {
-      const loaded = loadAllFromRaw(props.overrideConfig.overrideConfigs ?? []);
-      columnOverrides.value =
-        loaded.length > 0 ? loaded : [emptyColumnOverride()];
-      expanded.value = new Set([0]);
+      columnOverrides.value = loadAllFromRaw(
+        props.overrideConfig.overrideConfigs ?? [],
+      );
+      selectedIdx.value = columnOverrides.value.length ? 0 : -1;
     };
 
     watch(
@@ -251,25 +329,40 @@ export default defineComponent({
       { immediate: true },
     );
 
-    const toggle = (idx: number) => {
-      const next = new Set(expanded.value);
-      if (next.has(idx)) next.delete(idx);
-      else next.add(idx);
-      expanded.value = next;
-    };
+    const allColumnOptions = computed(() => {
+      const seen = new Set<string>();
+      const out: Array<{ label: string; value: string; isNumeric: boolean }> = [];
+      for (const c of props.columns as any[]) {
+        if (!c?.alias || seen.has(c.alias)) continue;
+        seen.add(c.alias);
+        out.push({ label: c.label, value: c.alias, isNumeric: !!c.isNumeric });
+      }
+      return out;
+    });
 
-    const allColumnOptions = computed(() =>
-      props.columns.map((c: any) => ({ label: c.label, value: c.alias })),
-    );
-
-    const columnOptionsFor = (idx: number) => {
+    const availableToAdd = computed(() => {
       const used = new Set(
-        columnOverrides.value
-          .map((c, i) => (i !== idx ? c.field : null))
-          .filter(Boolean),
+        columnOverrides.value.map((c) => c.field).filter(Boolean),
       );
       return allColumnOptions.value.filter((o: any) => !used.has(o.value));
-    };
+    });
+
+    const selectedCol = computed(
+      () => columnOverrides.value[selectedIdx.value] ?? null,
+    );
+
+    const footerSummary = computed(() => {
+      const n = columnOverrides.value.length;
+      if (n === 0) return t("dashboard.columnFormattingNoFieldsToFormat");
+      if (n === 1) return t("dashboard.columnFormattingOneFieldToFormat");
+      return `${n} ${t("dashboard.columnFormattingFieldsToFormat")}`;
+    });
+
+    // Field-type badge colour (num = blue, text = grey).
+    const badgeClass = (isNum: boolean) =>
+      isNum
+        ? "tw:text-[#2e55a3] tw:bg-[rgba(46,85,163,0.1)]"
+        : "tw:text-[#6b7280] tw:bg-[rgba(107,114,128,0.12)]";
 
     const getFieldLabel = (alias: string) => {
       if (!alias) return "";
@@ -305,29 +398,6 @@ export default defineComponent({
       },
     );
 
-    const unitLabel = (unit: string) =>
-      unitOptions.find((o) => o.value === unit)?.label ?? unit;
-    const alignLabel = (align: string) =>
-      alignOptions.find((o) => o.value === align)?.label ?? align;
-
-    const summaryChips = (col: ColumnOverrideUI) => {
-      const chips: Array<{ text: string; swatch?: string }> = [];
-      if (col.unit)
-        chips.push({
-          text:
-            col.unit === "custom"
-              ? col.customUnit || t("dashboard.custom")
-              : unitLabel(col.unit),
-        });
-      if (col.alignment) chips.push({ text: alignLabel(col.alignment) });
-      if (col.autoColor) chips.push({ text: t("dashboard.overrideConfigUniqueValueColor") });
-      else if (col.bgColor) chips.push({ text: "", swatch: col.bgColor });
-      else if (col.textColor) chips.push({ text: "", swatch: col.textColor });
-      if (col.conditions?.length)
-        chips.push({ text: `${col.conditions.length} ${t("dashboard.conditionalStyling").toLowerCase()}` });
-      return chips;
-    };
-
     const buildPreviewColumn = (base: any, col: ColumnOverrideUI, isNumeric: boolean) => {
       const c: any = { ...base };
       delete c.colorMode;
@@ -342,7 +412,6 @@ export default defineComponent({
 
       if (isNumeric) {
         const cache = buildValueMappingCache(props.valueMapping);
-        // Match the real converter: fall back to the panel-level unit / decimals.
         const unit = maps.unitConfigMap[aliasLower]?.unit || props.panelUnit;
         const customUnit =
           maps.unitConfigMap[aliasLower]?.customUnit || props.panelUnitCustom;
@@ -361,7 +430,6 @@ export default defineComponent({
     const previewFor = (col: ColumnOverrideUI) => {
       const pd = props.previewData ?? {};
       const key = String(col.field ?? "").toLowerCase();
-      // Fast path by alias key, else match alias/field/name case-insensitively.
       let base = pd[key];
       if (!base?.column) {
         base = Object.values(pd).find((d: any) =>
@@ -388,25 +456,26 @@ export default defineComponent({
       return { rows, columns: [previewCol] };
     };
 
-    const previews = computed(() =>
-      columnOverrides.value.map((c) => (c.field ? previewFor(c) : null)),
-    );
+    const selectedPreview = computed(() => {
+      const c = selectedCol.value;
+      return c && c.field ? previewFor(c) : null;
+    });
 
-    const addColumn = () => {
-      columnOverrides.value.push(emptyColumnOverride());
-      const next = new Set(expanded.value);
-      next.add(columnOverrides.value.length - 1);
-      expanded.value = next;
+    const addField = (alias: string) => {
+      if (!alias) return;
+      columnOverrides.value.push(emptyColumnOverride(alias));
+      selectedIdx.value = columnOverrides.value.length - 1;
+      addOpenLeft.value = false;
+      addOpenCenter.value = false;
     };
+
     const removeColumn = (idx: number) => {
       columnOverrides.value.splice(idx, 1);
-      // Drop the removed index and shift higher ones down by one.
-      const next = new Set<number>();
-      expanded.value.forEach((i) => {
-        if (i < idx) next.add(i);
-        else if (i > idx) next.add(i - 1);
-      });
-      expanded.value = next;
+      if (selectedIdx.value >= columnOverrides.value.length) {
+        selectedIdx.value = columnOverrides.value.length - 1;
+      } else if (selectedIdx.value > idx) {
+        selectedIdx.value -= 1;
+      }
     };
 
     const closePopup = () => emit("close");
@@ -421,14 +490,17 @@ export default defineComponent({
     return {
       t,
       columnOverrides,
-      isExpanded,
-      toggle,
-      columnOptionsFor,
+      selectedIdx,
+      selectedCol,
+      footerSummary,
+      availableToAdd,
+      addOpenLeft,
+      addOpenCenter,
+      badgeClass,
       getFieldLabel,
       isNumericColumn,
-      summaryChips,
-      previews,
-      addColumn,
+      selectedPreview,
+      addField,
       removeColumn,
       closePopup,
       saveOverrides,
@@ -438,36 +510,18 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
-// Single fixed-height scroll region (scrollbar only; layout is utilities).
-.cf-body {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(128, 128, 128, 0.4) transparent;
-
-  &::-webkit-scrollbar {
-    width: 6px;
-  }
-  &::-webkit-scrollbar-track {
-    background: transparent;
-  }
-  &::-webkit-scrollbar-thumb {
-    background: rgba(128, 128, 128, 0.35);
-    border-radius: 3px;
-  }
+// Shared field-type badge base (variant colour comes from badgeClass()).
+.cf-badge-base {
+  flex-shrink: 0;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 2px 5px;
+  border-radius: 4px;
 }
 
-// Expanded split editor — stacks to one column on narrow screens.
-.cf-row-body {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 16px;
-  padding: 12px;
-
-  @media (max-width: 900px) {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
-// Hide the per-cell copy button inside the mini preview.
+// :deep needed to reach the renderer's copy button inside the mini preview.
 .cf-preview-table :deep([data-test="dashboard-table-cell-copy-btn"]) {
   display: none !important;
 }

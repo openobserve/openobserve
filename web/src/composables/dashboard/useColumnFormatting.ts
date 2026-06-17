@@ -68,8 +68,6 @@ export const BG_SWATCHES = [
   "#ffffff",
 ];
 
-export const COND_TEXT_SWATCHES = ["#b91c1c", "#a16207", "#15803d", "#316177"];
-export const COND_BG_SWATCHES = ["#fef2f2", "#fefce8", "#f0fdf4", "#f5f8f9"];
 
 export const emptyColumnOverride = (field = ""): ColumnOverrideUI => ({
   field,
