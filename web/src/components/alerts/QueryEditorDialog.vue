@@ -40,17 +40,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Stream Type + Stream Name -->
           <div class="tw:flex tw:items-center tw:gap-2">
-            <div v-if="streamType" class="tw:inline-flex tw:flex-row tw:items-center tw:gap-[5px] tw:py-[3px] tw:px-[10px] tw:rounded-md topbar-info-chip" :class="store.state.theme === 'dark' ? 'topbar-info-chip--type-dark' : 'topbar-info-chip--type-light'">
-              <span class="tw:text-[11px] tw:font-semibold topbar-info-chip__label">Stream Type</span>
-              <span class="tw:text-[11px] tw:opacity-30 topbar-info-chip__sep">:</span>
-              <span class="tw:text-xs tw:font-bold topbar-info-chip__value">{{ streamType }}</span>
+            <div v-if="streamType" class="tw:inline-flex tw:flex-row tw:items-center tw:gap-[5px] tw:py-[3px] tw:px-[10px] tw:rounded-md" :class="store.state.theme === 'dark' ? 'tw:bg-[rgba(59,130,246,0.12)] tw:border tw:border-[rgba(59,130,246,0.3)]' : 'tw:bg-[rgba(59,130,246,0.08)] tw:border tw:border-[rgba(59,130,246,0.25)]'">
+              <span class="tw:text-[11px] tw:font-semibold" :class="store.state.theme === 'dark' ? 'tw:text-[#94a3b8]' : 'tw:text-[#64748b]'">Stream Type</span>
+              <span class="tw:text-[11px] tw:opacity-30" :class="store.state.theme === 'dark' ? 'tw:text-[#64748b]' : 'tw:text-[#94a3b8]'">:</span>
+              <span class="tw:text-xs tw:font-bold" :class="store.state.theme === 'dark' ? 'tw:text-[#60a5fa]' : 'tw:text-[#2563eb]'">{{ streamType }}</span>
             </div>
             <span v-if="streamType && streamName" class="tw:opacity-20 tw:select-none">|</span>
-            <div class="tw:inline-flex tw:flex-row tw:items-center tw:gap-[5px] tw:py-[3px] tw:px-[10px] tw:rounded-md topbar-info-chip" :class="store.state.theme === 'dark' ? 'topbar-info-chip--name-dark' : 'topbar-info-chip--name-light'">
-              <span class="tw:text-[11px] tw:font-semibold topbar-info-chip__label">Stream Name</span>
-              <span class="tw:text-[11px] tw:opacity-30 topbar-info-chip__sep">:</span>
-              <span v-if="streamName" class="tw:text-xs tw:font-bold topbar-info-chip__value">{{ streamName }}</span>
-              <span v-else class="tw:text-xs tw:font-bold tw:opacity-40 tw:italic topbar-info-chip__value">none</span>
+            <div class="tw:inline-flex tw:flex-row tw:items-center tw:gap-[5px] tw:py-[3px] tw:px-[10px] tw:rounded-md" :class="store.state.theme === 'dark' ? 'tw:bg-[rgba(139,92,246,0.12)] tw:border tw:border-[rgba(139,92,246,0.3)]' : 'tw:bg-[rgba(139,92,246,0.08)] tw:border tw:border-[rgba(139,92,246,0.25)]'">
+              <span class="tw:text-[11px] tw:font-semibold" :class="store.state.theme === 'dark' ? 'tw:text-[#94a3b8]' : 'tw:text-[#64748b]'">Stream Name</span>
+              <span class="tw:text-[11px] tw:opacity-30" :class="store.state.theme === 'dark' ? 'tw:text-[#64748b]' : 'tw:text-[#94a3b8]'">:</span>
+              <span v-if="streamName" class="tw:text-xs tw:font-bold" :class="store.state.theme === 'dark' ? 'tw:text-[#a78bfa]' : 'tw:text-[#7c3aed]'">{{ streamName }}</span>
+              <span v-else class="tw:text-xs tw:font-bold tw:opacity-40 tw:italic" :class="store.state.theme === 'dark' ? 'tw:text-[#a78bfa]' : 'tw:text-[#7c3aed]'">none</span>
             </div>
           </div>
         </div>
@@ -67,12 +67,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="menu-link-ai-item"
             variant="ghost"
             size="icon-toolbar"
-            class="ai-hover-btn"
-            :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
+            class="tw:[background:linear-gradient(135deg,rgba(139,92,246,0.15)_0%,rgba(236,72,153,0.15)_100%)]! tw:transition-[background,box-shadow] tw:duration-300 tw:ease-[ease] tw:hover:[background:linear-gradient(135deg,#8B5CF6_0%,#EC4899_100%)]! tw:hover:shadow-[0_0.25rem_0.75rem_0_rgba(139,92,246,0.35)] tw:group"
             @mouseenter="isHovered = true"
             @mouseleave="isHovered = false"
           >
-            <img :src="getBtnLogo" class="ai-icon" style="width: 18px; height: 18px;" />
+            <img :src="getBtnLogo" class="tw:transition-transform tw:duration-[600ms] tw:ease-[ease] tw:group-hover:rotate-180" style="width: 18px; height: 18px;" />
           </OButton>
         </div>
       </template>
@@ -176,7 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div
                     class="tw:relative tw:h-[22px] tw:shrink-0 tw:text-[13px] tw:font-medium tw:cursor-default"
                     :class="[
-                      sqlStatusState,
+                      sqlStatusBarClasses,
                       store.state.theme === 'dark'
                         ? 'tw:border-l tw:border-r tw:border-b tw:border-[#2d3748] tw:rounded-bl-lg tw:rounded-br-lg'
                         : 'tw:border-l tw:border-r tw:border-b tw:border-[#e5e7eb] tw:rounded-bl-lg tw:rounded-br-lg'
@@ -562,6 +561,18 @@ const sqlStatusState = computed(() => {
   if (!tempRunQuery.value) return 'sql-status-bar--idle';
   if (outputEvents.value) return 'sql-status-bar--success';
   return 'sql-status-bar--empty';
+});
+
+const sqlStatusBarClasses = computed(() => {
+  const map: Record<string, string> = {
+    'sql-status-bar--hint':    'tw:bg-[#f3f4f6] tw:text-[#6b7280]',
+    'sql-status-bar--idle':    'tw:bg-[#f3f4f6] tw:text-[#6b7280]',
+    'sql-status-bar--loading': 'tw:bg-[rgba(139,92,246,0.06)] tw:text-[#8b5cf6]',
+    'sql-status-bar--error':   'tw:bg-[rgba(239,68,68,0.08)] tw:text-[#ef4444] tw:cursor-pointer',
+    'sql-status-bar--empty':   'tw:bg-[rgba(245,158,11,0.06)] tw:text-[#f59e0b]',
+    'sql-status-bar--success': 'tw:bg-[rgba(16,185,129,0.06)] tw:text-[#10b981]',
+  };
+  return map[sqlStatusState.value] ?? '';
 });
 
 const sqlResultCount = computed(() => queryHitCount.value);
@@ -1160,82 +1171,6 @@ const getBtnLogo = computed(() => {
 </script>
 
 <style>
-.body--dark .query-editor-placeholder-overlay .query-editor-placeholder-typewriter {
-  color: #718096;
-}
-
-/* Stream Type chip — blue: descendant color rules */
-.topbar-info-chip--type-light {
-  background: rgba(59, 130, 246, 0.08);
-  border: 1px solid rgba(59, 130, 246, 0.25);
-}
-.topbar-info-chip--type-light .topbar-info-chip__label { color: #64748b; }
-.topbar-info-chip--type-light .topbar-info-chip__sep   { color: #94a3b8; }
-.topbar-info-chip--type-light .topbar-info-chip__value { color: #2563eb; }
-
-.topbar-info-chip--type-dark {
-  background: rgba(59, 130, 246, 0.12);
-  border: 1px solid rgba(59, 130, 246, 0.3);
-}
-.topbar-info-chip--type-dark .topbar-info-chip__label { color: #94a3b8; }
-.topbar-info-chip--type-dark .topbar-info-chip__sep   { color: #64748b; }
-.topbar-info-chip--type-dark .topbar-info-chip__value { color: #60a5fa; }
-
-/* Stream Name chip — violet: descendant color rules */
-.topbar-info-chip--name-light {
-  background: rgba(139, 92, 246, 0.08);
-  border: 1px solid rgba(139, 92, 246, 0.25);
-}
-.topbar-info-chip--name-light .topbar-info-chip__label { color: #64748b; }
-.topbar-info-chip--name-light .topbar-info-chip__sep   { color: #94a3b8; }
-.topbar-info-chip--name-light .topbar-info-chip__value { color: #7c3aed; }
-
-.topbar-info-chip--name-dark {
-  background: rgba(139, 92, 246, 0.12);
-  border: 1px solid rgba(139, 92, 246, 0.3);
-}
-.topbar-info-chip--name-dark .topbar-info-chip__label { color: #94a3b8; }
-.topbar-info-chip--name-dark .topbar-info-chip__sep   { color: #64748b; }
-.topbar-info-chip--name-dark .topbar-info-chip__value { color: #a78bfa; }
-
-/* Status bar state colors — dynamically applied via computed sqlStatusState */
-.sql-status-bar--hint    { background: #f3f4f6; color: #6b7280; }
-.sql-status-bar--idle    { background: #f3f4f6; color: #6b7280; }
-.sql-status-bar--loading { background: rgba(139, 92, 246, 0.06); color: #8b5cf6; }
-.sql-status-bar--error   { background: rgba(239, 68, 68, 0.08); color: #ef4444; cursor: pointer; }
-.sql-status-bar--empty   { background: rgba(245, 158, 11, 0.06); color: #f59e0b; }
-.sql-status-bar--success { background: rgba(16, 185, 129, 0.06); color: #10b981; }
-
-/* Dark hint/idle override — multi-class compound selector */
-.sql-status-bar--dark.sql-status-bar--hint,
-.sql-status-bar--dark.sql-status-bar--idle {
-  background: rgba(255, 255, 255, 0.04);
-  color: #d1d5db;
-}
-
-:deep(.ai-hover-btn) {
-  opacity: 1;
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(236, 72, 153, 0.15) 100%) !important;
-  transition: background 0.3s ease, box-shadow 0.3s ease;
-}
-
-:deep(.ai-hover-btn):hover {
-  background: linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%) !important;
-  box-shadow: 0 0.25rem 0.75rem 0 rgba(139, 92, 246, 0.35);
-}
-
-:deep(.ai-hover-btn) .ai-icon {
-  transition: transform 0.6s ease;
-}
-
-:deep(.ai-hover-btn):hover .ai-icon {
-  transform: rotate(180deg);
-}
-
-:deep(.ai-btn-active) {
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(236, 72, 153, 0.15) 100%) !important;
-}
-
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50%       { opacity: 0.3; }
