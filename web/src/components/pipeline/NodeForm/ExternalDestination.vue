@@ -52,7 +52,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="selectedDestination"
           :label="'Destination *'"
           :options="getFormattedDestinations"
-          class="destination-method-select"
           tabindex="0"
         />
       </template>
@@ -223,9 +222,3 @@ defineExpose({
   handleCancel,
 });
 </script>
-
-<style>
-.destination-method-select .q-field__native > :first-child {
-  text-transform: uppercase !important;
-}
-</style>
