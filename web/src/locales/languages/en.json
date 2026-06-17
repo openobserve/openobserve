@@ -221,6 +221,14 @@
       "title": "No traces found",
       "description": "No traces match the selected service and time range. Try a wider time range or a different service."
     },
+    "noServiceGraph": {
+      "title": "No service graph data",
+      "description": "Try querying a longer time range, or ensure your services are emitting span metrics."
+    },
+    "noServicesCatalog": {
+      "title": "No services found",
+      "description": "No services were detected in the selected time range. Try a wider range or a different stream."
+    },
     "noSearchHistory": {
       "title": "No search history yet",
       "description": "Searches you run will be listed here so you can revisit and re-run them."

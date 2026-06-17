@@ -4441,6 +4441,14 @@
     "noQueryApplied": {
       "title": "Exécutez une requête pour voir les journaux",
       "description": "Ajustez vos filtres et cliquez sur « Exécuter la requête » pour charger les événements pour ce flux."
+    },
+    "noServiceGraph": {
+      "title": "Aucune donnée graphique de service",
+      "description": "Essayez d'interroger une plage de temps plus longue ou assurez-vous que vos services émettent des métriques d'intervalle."
+    },
+    "noServicesCatalog": {
+      "title": "Aucun service n'a été trouvé",
+      "description": "Aucun service n'a été détecté au cours de la période sélectionnée. Essayez une gamme plus large ou un flux différent."
     }
   },
   "onlineEvals": {

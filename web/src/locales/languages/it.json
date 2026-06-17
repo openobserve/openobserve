@@ -4452,6 +4452,14 @@
     "noQueryApplied": {
       "title": "Esegui una query per visualizzare i log",
       "description": "Modifica i filtri e fai clic su «Esegui query» per caricare gli eventi per questo stream."
+    },
+    "noServiceGraph": {
+      "title": "Nessun dato del grafico del servizio",
+      "description": "Prova a interrogare un intervallo di tempo più lungo o assicurati che i tuoi servizi emettano metriche di intervallo."
+    },
+    "noServicesCatalog": {
+      "title": "Nessun servizio trovato",
+      "description": "Nessun servizio è stato rilevato nell'intervallo di tempo selezionato. Prova con un intervallo più ampio o con uno stream diverso."
     }
   },
   "onlineEvals": {
