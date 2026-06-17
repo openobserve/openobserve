@@ -119,18 +119,21 @@ test.describe(
         testLogger.info('Invalid character error visible for name with spaces/colons');
       });
 
-      test('should show type required error when type is not selected and save is clicked', async ({ page }) => {
-        testLogger.info('Test: EditScript empty type shows required error on save');
+      test('should keep the type pre-filled with a valid default and not raise a type error', async ({ page }) => {
+        testLogger.info('Test: EditScript type select is pre-filled and passes type validation');
 
         // Fill a valid name so name validation passes
         await pm.actionScriptsFormValidation.fillName('test_fv_actions_001');
 
-        // Do NOT select a type — click Save directly
+        // The type OSelect defaults to "Scheduled" and is not clearable, so a new
+        // action script always has a valid type selected.
+        await pm.actionScriptsFormValidation.expectTypeDefaulted('Scheduled');
+
+        // Click Save — type validation must pass (no type-required error surfaces)
         await pm.actionScriptsFormValidation.clickSave();
 
-        // Expect the type-select error to become visible
-        await pm.actionScriptsFormValidation.expectTypeError('Field is required!');
-        testLogger.info('Type required error visible when type not selected');
+        await pm.actionScriptsFormValidation.expectTypeErrorHidden();
+        testLogger.info('Type select keeps its default value and raises no type error');
       });
 
       test('should show file required error when no zip file is provided on step 1 continue', async ({ page }) => {

@@ -36,13 +36,17 @@ class ActionScriptsFormValidationPage {
 
     // OInput data-test="add-action-script-name-input" wraps OInput:
     // OInput generates -field (native <input>) and -error (error message)
-    this.nameInputWrapper        = '[data-test="add-action-script-name-input"]';
+    this.nameInputWrapper        = '[data-test="add-action-script-name-input-wrapper"]';
     this.nameField               = '[data-test="add-action-script-name-input-field"]';
     this.nameError               = '[data-test="add-action-script-name-input-error"]';
 
-    // OSelect data-test="add-action-script-type-select" → -popover / -error
+    // OSelect data-test="add-action-script-type-select" → -popover / -error / -trigger
     this.typeSelectPopover       = '[data-test="add-action-script-type-select-popover"]';
     this.typeSelectError         = '[data-test="add-action-script-type-select-error"]';
+    this.typeSelectTrigger       = '[data-test="add-action-script-type-select-trigger"]';
+    // OSelect listbox option — keyed off the option's data-test-label
+    this.typeSelectOptionByLabel = (label) =>
+      this.page.locator(`[data-test="add-action-script-type-select-option"][data-test-label="${label}"]`);
 
     // Stepper steps
     this.step1                   = '[data-test="add-action-script-step-1"]';
@@ -90,7 +94,11 @@ class ActionScriptsFormValidationPage {
     await this.page.goto(
       `${process.env.ZO_BASE_URL}/web/actions?org_identifier=${org}`
     );
-    await this.page.locator(this.listPage).waitFor({ state: 'visible', timeout: 15000 });
+    // Cold CI runners load the SPA bundle + run the enterprise route guard async
+    // check before this view mounts — wait for the DOM to settle then give the
+    // list page a generous deterministic window to render.
+    await this.page.waitForLoadState('domcontentloaded');
+    await this.page.locator(this.listPage).waitFor({ state: 'visible', timeout: 30000 });
   }
 
   // ── List page helpers ─────────────────────────────────────────────────────
@@ -136,11 +144,27 @@ class ActionScriptsFormValidationPage {
     }
   }
 
-  async selectType(value) {
+  async expectTypeDefaulted(label) {
+    // The type OSelect is pre-filled (defaults to "Scheduled") and is not
+    // clearable, so a new action script always has a valid type selected.
+    await this.page.locator(this.typeSelectTrigger).waitFor({ state: 'visible' });
+    await expect(this.page.locator(this.typeSelectTrigger)).toHaveAttribute(
+      'data-test-selected-label',
+      label
+    );
+  }
+
+  async expectTypeErrorHidden() {
+    await expect(this.page.locator(this.typeSelectError)).toHaveCount(0);
+  }
+
+  async selectType(label) {
+    // Open the OSelect by clicking its trigger, wait for the popover to render,
+    // then pick the option keyed off its data-test-label.
+    await this.page.locator(this.typeSelectTrigger).waitFor({ state: 'visible' });
+    await this.page.locator(this.typeSelectTrigger).click();
     await this.page.locator(this.typeSelectPopover).waitFor({ state: 'visible' });
-    await this.page.locator(this.typeSelectPopover).click();
-    // Select option by text inside the opened dropdown
-    await this.page.getByRole('option', { name: value }).click();
+    await this.typeSelectOptionByLabel(label).click();
   }
 
   async clickSave() {
