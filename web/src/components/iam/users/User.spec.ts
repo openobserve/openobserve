@@ -297,6 +297,9 @@ describe("User Component", () => {
     mockUsersService.getUserRoles.mockResolvedValue({
       data: ["role1", "role2"],
     } as any);
+    mockUsersService.getAllUserRoles.mockResolvedValue({
+      data: {},
+    } as any);
     mockUsersService.delete.mockResolvedValue({ data: { code: 200 } } as any);
     mockUsersService.bulkDelete.mockResolvedValue({
       data: { successful: [], unsuccessful: [] },

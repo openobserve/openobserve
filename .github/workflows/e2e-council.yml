@@ -1274,3 +1274,157 @@ jobs:
             gh api graphql -f query='mutation($id:ID!){minimizeComment(input:{subjectId:$id,classifier:RESOLVED}){minimizedComment{isMinimized}}}' -f id="$NODE" >/dev/null 2>&1 \
               && echo "Minimized the AI review comment." || echo "::notice::could not minimize the AI review (best-effort)."
           fi
+
+  # ---------------------------------------------------------------------------
+  # JOB 6 — ENT sister flow (ALWAYS ON — every OSS spec must also validate on enterprise).
+  # OpenObserve's Playwright specs live in OSS but ALSO run on the ENTERPRISE binary: the ENT
+  # repo's playwright.yml does a branch-of-SAME-NAME lookup in OSS ("Determine OSS Branch"),
+  # checks it out, merges the ENT test tree over it, and runs ITS OWN run_files matrix. So to
+  # validate an OSS-generated spec on enterprise we reuse the SAME branch name (autoe2e/pr-<n>)
+  # on the ENT side and make sure the spec is in ENT's run_files.
+  #   - Spec NOT yet in ENT run_files  → CASE 1: register it in the right ENT group on a new
+  #     ENT branch autoe2e/pr-<n>, open a (non-blocking) ENT PR, cross-link it on the OSS PRs.
+  #     ENT CI on that PR pulls the same-named OSS branch → runs the new spec on enterprise.
+  #   - Spec ALREADY in ENT run_files  → CASE 2: no PR — workflow_dispatch ENT's playwright with
+  #     o2_opensource_repo=autoe2e/pr-<n>, which pulls the modified spec and runs it. Post the
+  #     run link on the OSS PR.
+  # No merge gate (decided): we LINK, we don't block. Async by design — ENT builds take ~20-30m,
+  # too long to hold a job, so we post the PR/run link and let a human confirm green.
+  # SECURITY: like pr_back, this job NEVER checks out or runs PR code — it's pure GitHub API +
+  # the trusted generate artifact. ORG_ADMIN_TOKEN is used only here + pr_back (cross-repo write
+  # + actions:write to dispatch), never in a job that builds/runs untrusted code.
+  # ---------------------------------------------------------------------------
+  ent_sister:
+    needs: [triage, generate, verify_heal, pr_back]
+    # Always runs once the OSS spec is healed-passing — there is no OSS-only spec; everything must
+    # also pass on the enterprise build. (Gated only by the same correctness conditions as pr_back.)
+    if: >
+      needs.triage.outputs.dry_run == 'false' &&
+      needs.triage.outputs.skip == 'false' &&
+      needs.triage.outputs.needs_e2e == 'true' &&
+      needs.triage.outputs.author_allowed == 'true' &&
+      needs.generate.outputs.has_changes == 'true' &&
+      needs.verify_heal.outputs.heal_status == 'passing'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Download run metadata (registration + run context)
+        uses: actions/download-artifact@v4
+        with:
+          name: generated-meta
+          path: meta/
+
+      - name: Validate the spec on the enterprise binary (register+PR, or dispatch)
+        env:
+          GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}   # cross-repo write to o2-enterprise + dispatch
+          ENT_REPO: openobserve/o2-enterprise
+          OSS_REPO: ${{ github.repository }}
+          WORK_BRANCH: ${{ needs.triage.outputs.work_branch }}
+          SRC_PR: ${{ needs.triage.outputs.pr_number }}
+        run: |
+          set -eo pipefail
+          ENT_PW=".github/workflows/playwright.yml"
+
+          # --- Resolve the spec filename (and OSS group, if the Engineer emitted a registration). ---
+          GROUP=""; FNAME=""
+          if [ -f meta/playwright-registration.json ]; then
+            FNAME=$(jq -r '.spec_filename // empty' meta/playwright-registration.json)
+            GROUP=$(jq -r '.group // empty' meta/playwright-registration.json)
+          fi
+          if [ -z "$FNAME" ] || [ "$FNAME" = "null" ]; then
+            SP=$(jq -r '.spec_path // empty' meta/run-context.json 2>/dev/null || echo "")
+            FNAME=$(basename "$SP" 2>/dev/null || echo "")
+          fi
+          echo "$FNAME" | grep -Eq '^[A-Za-z0-9._-]+\.spec\.js$' \
+            || { echo "::error::could not resolve a valid spec filename for the ENT sister flow (got '$FNAME')"; exit 1; }
+          echo "spec=$FNAME  oss-group=${GROUP:-<none>}  branch=$WORK_BRANCH"
+
+          # --- Confirm the org token can reach o2-enterprise (fail with a clear message if not). ---
+          gh api "repos/${ENT_REPO}" --jq '.full_name' >/dev/null 2>&1 \
+            || { echo "::error::ORG_ADMIN_TOKEN cannot access ${ENT_REPO} (needs Contents+PR+Actions write). ENT sister skipped."; exit 1; }
+
+          # --- Read ENT's playwright.yml (main) and decide CASE 1 (register+PR) vs CASE 2 (dispatch). ---
+          gh api "repos/${ENT_REPO}/contents/${ENT_PW}?ref=main" --jq '.content' | tr -d '\n' | base64 -d > /tmp/ent_pw.yml
+          if grep -q "\"${FNAME}\"" /tmp/ent_pw.yml; then
+            # ===== CASE 2 — already registered in ENT → dispatch a validation run, no PR. =====
+            echo "${FNAME} is already in ENT run_files → CASE 2 (workflow_dispatch)."
+            gh workflow run playwright.yml --repo "${ENT_REPO}" \
+              -f o2_opensource_repo="${WORK_BRANCH}" -f o2_enterprise_repo=main \
+              || { echo "::error::failed to dispatch ENT playwright.yml"; exit 1; }
+            sleep 10  # give the run a moment to register so we can capture its URL
+            RUN_URL=$(gh run list --repo "${ENT_REPO}" --workflow playwright.yml --event workflow_dispatch \
+              --limit 1 --json url --jq '.[0].url // empty' 2>/dev/null || echo "")
+            [ -n "$RUN_URL" ] || RUN_URL="https://github.com/${ENT_REPO}/actions/workflows/playwright.yml"
+            LINK_BODY=$(printf '<!-- e2e-council-ent-sister -->\n🏢 **ENT validation** — `%s` already runs on enterprise, so I dispatched the ENT Playwright suite against the OSS branch `%s` (no ENT PR needed).\n\n➡️ %s\n\n_No merge gate — this is a heads-up so you can confirm the spec passes on the enterprise build too._\n' "$FNAME" "$WORK_BRANCH" "$RUN_URL")
+          else
+            # ===== CASE 1 — not in ENT yet → register in the right ENT group + open a (non-blocking) PR. =====
+            echo "${FNAME} is NOT in ENT run_files → CASE 1 (register + ENT PR)."
+            # Pick the ENT group: prefer the OSS group (ENT mirrors the names); else derive from the
+            # spec's folder; else fall back to the always-present GeneralTests (and warn).
+            if [ -z "$GROUP" ] || ! grep -q "testfolder: \"${GROUP}\"" /tmp/ent_pw.yml; then
+              SP=$(jq -r '.spec_path // empty' meta/run-context.json 2>/dev/null || echo "")
+              CAND=$(basename "$(dirname "$SP")" 2>/dev/null || echo "")
+              if [ -n "$CAND" ] && grep -q "testfolder: \"${CAND}\"" /tmp/ent_pw.yml; then GROUP="$CAND"
+              else GROUP="GeneralTests"; echo "::warning::no matching ENT group for ${FNAME} — placed in GeneralTests; a human may want to move it."; fi
+            fi
+            echo "ENT group = ${GROUP}"
+
+            # Create the ENT branch off main (idempotent on re-runs).
+            MAIN_SHA=$(gh api "repos/${ENT_REPO}/git/ref/heads/main" --jq '.object.sha')
+            gh api -X POST "repos/${ENT_REPO}/git/refs" -f ref="refs/heads/${WORK_BRANCH}" -f sha="${MAIN_SHA}" >/dev/null 2>&1 \
+              && echo "Created ENT branch ${WORK_BRANCH}." || echo "ENT branch ${WORK_BRANCH} already exists — reusing."
+
+            # Re-read playwright.yml FROM THE BRANCH (a prior run may already have edited it).
+            RESP=$(gh api "repos/${ENT_REPO}/contents/${ENT_PW}?ref=${WORK_BRANCH}")
+            BSHA=$(echo "$RESP" | jq -r '.sha')
+            echo "$RESP" | jq -r '.content' | tr -d '\n' | base64 -d > /tmp/ent_pw.yml
+            if grep -q "\"${FNAME}\"" /tmp/ent_pw.yml; then
+              echo "${FNAME} already registered on ${WORK_BRANCH} — skipping the edit."
+            else
+              # Same surgical line-based inserter pr_back uses for OSS (adds exactly ONE run_files entry).
+              REGISTER_PY_B64="aW1wb3J0IHN5cywgcmUKZ3JvdXAsIGZuYW1lLCBwYXRoID0gc3lzLmFyZ3ZbMV0sIHN5cy5hcmd2WzJdLCBzeXMuYXJndlszXQpsaW5lcyA9IG9wZW4ocGF0aCkucmVhZCgpLnNwbGl0KCdcbicpCm91dCwgaW5fZ3JvdXAsIGRvbmUsIGksIG4gPSBbXSwgRmFsc2UsIEZhbHNlLCAwLCBsZW4obGluZXMpCndoaWxlIGkgPCBuOgogICAgbGluZSA9IGxpbmVzW2ldCiAgICBpZiByZS5zZWFyY2gocictXHMqdGVzdGZvbGRlcjpccyoiJXMiJyAlIHJlLmVzY2FwZShncm91cCksIGxpbmUpOgogICAgICAgIGluX2dyb3VwID0gVHJ1ZQogICAgZWxpZiByZS5zZWFyY2gocictXHMqdGVzdGZvbGRlcjpccyoiJywgbGluZSk6CiAgICAgICAgaW5fZ3JvdXAgPSBGYWxzZQogICAgaWYgaW5fZ3JvdXAgYW5kIG5vdCBkb25lIGFuZCAncnVuX2ZpbGVzOicgaW4gbGluZToKICAgICAgICBtID0gcmUuc2VhcmNoKHIncnVuX2ZpbGVzOlxzKlxbKC4qKVxdXHMqJCcsIGxpbmUpCiAgICAgICAgaWYgbTogICMgaW5saW5lIGZvcm0KICAgICAgICAgICAgb3V0LmFwcGVuZChyZS5zdWIocidcXVxzKiQnLCAnLCAiJXMiXScgJSBmbmFtZSwgbGluZSkpOyBkb25lID0gVHJ1ZTsgaSArPSAxOyBjb250aW51ZQogICAgICAgIG91dC5hcHBlbmQobGluZSk7IGkgKz0gMSAgIyBtdWx0aWxpbmUgZm9ybQogICAgICAgIHdoaWxlIGkgPCBuOgogICAgICAgICAgICBsMiA9IGxpbmVzW2ldCiAgICAgICAgICAgIGlmIHJlLm1hdGNoKHInXlxzKlxdXHMqJCcsIGwyKToKICAgICAgICAgICAgICAgIGluZGVudCA9IHJlLm1hdGNoKHInXihccyopJywgbDIpLmdyb3VwKDEpCiAgICAgICAgICAgICAgICBvdXQuYXBwZW5kKCclcyAgIiVzIiwnICUgKGluZGVudCwgZm5hbWUpKTsgb3V0LmFwcGVuZChsMik7IGRvbmUgPSBUcnVlOyBpICs9IDE7IGJyZWFrCiAgICAgICAgICAgIG91dC5hcHBlbmQobDIpOyBpICs9IDEKICAgICAgICBjb250aW51ZQogICAgb3V0LmFwcGVuZChsaW5lKTsgaSArPSAxCmlmIG5vdCBkb25lOgogICAgc3lzLnN0ZGVyci53cml0ZSgiZ3JvdXAgJXIgLyBydW5fZmlsZXMgbm90IGZvdW5kXG4iICUgZ3JvdXApOyBzeXMuZXhpdCgyKQpvcGVuKHBhdGgsICd3Jykud3JpdGUoJ1xuJy5qb2luKG91dCkpCg=="
+              printf '%s' "$REGISTER_PY_B64" | base64 -d > /tmp/register_spec.py
+              python3 /tmp/register_spec.py "$GROUP" "$FNAME" /tmp/ent_pw.yml \
+                || { echo "::error::ENT registration did not apply (group '$GROUP' / run_files not found)"; exit 1; }
+              grep -q "\"${FNAME}\"" /tmp/ent_pw.yml || { echo "::error::ENT registration did not apply"; exit 1; }
+              NEWB64=$(base64 -w0 /tmp/ent_pw.yml)
+              gh api -X PUT "repos/${ENT_REPO}/contents/${ENT_PW}" \
+                -f message="test(autoe2e): register ${FNAME} on enterprise (sister of ${OSS_REPO}#${SRC_PR})" \
+                -f content="$NEWB64" -f sha="$BSHA" -f branch="$WORK_BRANCH" >/dev/null
+              echo "Registered ${FNAME} in ENT playwright.yml on ${WORK_BRANCH} (group ${GROUP})."
+            fi
+
+            # Open the ENT PR (idempotent — re-runs reuse the existing one).
+            ENT_PR=$(gh pr list --repo "${ENT_REPO}" --head "${WORK_BRANCH}" --state open --json number --jq '.[0].number // empty')
+            if [ -z "$ENT_PR" ]; then
+              printf '🤖 Auto-generated **ENT sister PR** for %s#%s.\n\n- Registers `%s` (group `%s`) in the enterprise Playwright matrix.\n- ENT CI pulls the same-named OSS branch `%s` (the generated spec) and runs it on the **enterprise** binary.\n- **No merge gate** — merge when you are happy the spec passes on enterprise. Closing it is fine too.\n\n_Generated by the E2E Council pipeline._\n' \
+                "$OSS_REPO" "$SRC_PR" "$FNAME" "$GROUP" "$WORK_BRANCH" > /tmp/ent-pr-body.md
+              ENT_PR_URL=$(gh pr create --repo "${ENT_REPO}" --base main --head "${WORK_BRANCH}" \
+                --title "test(autoe2e): enterprise validation for ${OSS_REPO}#${SRC_PR} (${FNAME})" \
+                --body-file /tmp/ent-pr-body.md)
+              echo "Opened ENT PR: ${ENT_PR_URL}"
+            else
+              ENT_PR_URL="https://github.com/${ENT_REPO}/pull/${ENT_PR}"
+              echo "ENT PR already open: ${ENT_PR_URL}"
+            fi
+            LINK_BODY=$(printf '<!-- e2e-council-ent-sister -->\n🏢 **ENT validation** — opened a sister PR so these tests also run on the **enterprise** build: %s\n\n_No merge gate — merge/close it once enterprise CI is green._\n' "$ENT_PR_URL")
+          fi
+
+          # --- Cross-link on the OSS source PR (sticky) + the OSS test PR, both via the org token. ---
+          printf '%s' "$LINK_BODY" > /tmp/ent-link.md
+          MARKER="<!-- e2e-council-ent-sister -->"
+          CID=$(gh api "repos/${OSS_REPO}/issues/${SRC_PR}/comments" \
+            --jq "[.[] | select(.body | startswith(\"${MARKER}\"))][0].id // empty" 2>/dev/null || echo "")
+          if [ -n "$CID" ]; then
+            gh api -X PATCH "repos/${OSS_REPO}/issues/comments/${CID}" -F body=@/tmp/ent-link.md >/dev/null
+          else
+            gh api -X POST "repos/${OSS_REPO}/issues/${SRC_PR}/comments" -F body=@/tmp/ent-link.md >/dev/null
+          fi
+          TEST_PR=$(gh pr list --repo "${OSS_REPO}" --head "${WORK_BRANCH}" --state open --json number --jq '.[0].number // empty' 2>/dev/null || echo "")
+          if [ -n "$TEST_PR" ]; then
+            gh api -X POST "repos/${OSS_REPO}/issues/${TEST_PR}/comments" -F body=@/tmp/ent-link.md >/dev/null 2>&1 \
+              && echo "Cross-linked ENT validation on OSS test PR #${TEST_PR}." || true
+          fi
+          echo "ENT sister flow complete."
