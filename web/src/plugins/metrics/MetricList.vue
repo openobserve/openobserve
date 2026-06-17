@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="field-table tw:w-full"
         >
           <template #cell-name="{ row }">
-            <div class="field_list tw:p-0 tw:mb-0.5 tw:relative tw:overflow-visible tw:cursor-default">
+            <div class="tw:p-0 tw:mb-0.5 tw:relative tw:overflow-visible tw:cursor-default tw:group tw:hover:shadow-[0px_4px_15px_rgba(0,0,0,0.17)] tw:dark:hover:shadow-[0px_4px_15px_rgb(255,255,255,0.1)]">
               <!-- TODO OK : Repeated code make separate component to display field  -->
               <template
                 v-if="
@@ -67,14 +67,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template v-else>
                 <OCollapsible
                   variant="sidebar"
-                  class="metric-expansion-item"
                   :model-value="openMetricRows[row.name] === true"
                   @update:model-value="(v) => { openMetricRows[row.name] = v; if (v) openFilterCreator(null, row); }"
                 >
                   <template #trigger>
                     <div class="tw:flex tw:items-center tw:min-w-0">
                       <OFieldLabel :field="row" class="tw:flex-1 tw:min-w-0" />
-                      <div class="field_overlay tw:absolute tw:h-full tw:right-0 tw:top-0 tw:z-[5] tw:bg-[#e8e8e8] tw:px-[6px] tw:invisible tw:flex tw:items-center">
+                      <div class="tw:absolute tw:h-full tw:right-0 tw:top-0 tw:z-[5] tw:bg-[#e8e8e8] tw:px-[6px] tw:invisible tw:flex tw:items-center tw:group-hover:visible tw:group-hover:opacity-100 tw:dark:group-hover:bg-[#3f4143]">
                         <OButton
                           icon-left="add"
                           :data-test="`metrics-list-add-${row.name}-label-btn`"
@@ -523,11 +522,6 @@ export default defineComponent({
   overflow: hidden;
 }
 
-.index-menu .metrics-label-table .q-table__control,
-.index-menu .metrics-label-table label.q-field {
-  width: 100%;
-}
-
 .index-menu .metrics-label-table thead tr,
 .index-menu .metrics-label-table tbody td {
   height: auto;
@@ -538,27 +532,4 @@ export default defineComponent({
   table-layout: fixed;
 }
 
-.metrics-label-table table .metric-expansion-item:hover .field_overlay {
-  visibility: visible;
-}
-
-.theme-dark .field_list:hover {
-  box-shadow: 0px 4px 15px rgb(255, 255, 255, 0.1);
-}
-
-.theme-dark .field_list:hover .field_overlay {
-  background-color: #3f4143;
-  opacity: 1;
-  visibility: visible;
-}
-
-.theme-light .field_list:hover {
-  box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.17);
-}
-
-.theme-light .field_list:hover .field_overlay {
-  background-color: #e8e8e8;
-  opacity: 1;
-  visibility: visible;
-}
 </style>

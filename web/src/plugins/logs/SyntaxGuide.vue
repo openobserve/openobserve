@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="ghost"
           size="sm"
           :class="[
-            noBorder ? 'syntax-guide-no-border' : 'tw:ml-1',
+            noBorder ? 'tw:display-none!' : 'tw:ml-1',
             sqlmode ? 'sql-mode' : 'normal-mode',
             noBorder ? 'tw:border-0! tw:bg-transparent! tw:p-0! tw:m-0! tw:w-full tw:justify-start tw:hover:bg-transparent!' : '',
           ]"
@@ -253,16 +253,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style>
-.syntax-guide-no-border .q-btn__content {
-  padding: 0 !important;
-  gap: 0;
-  justify-content: flex-start;
-  width: 100%;
-}
-
-.syntax-guide-no-border:before {
-  display: none !important;
-}
-</style>

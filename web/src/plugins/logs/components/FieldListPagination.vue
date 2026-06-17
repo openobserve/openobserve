@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :model-value="useUserDefinedSchemas"
         @update:model-value="$emit('toggle-schema', $event)"
         data-test="logs-page-field-list-user-defined-schema-toggle"
-        class="schema-field-toggle tw:mr-1 tw:p-0"
+        class="tw:mr-1 tw:p-0"
       >
         <OToggleGroupItem
           v-for="opt in userDefinedSchemaBtnGroupOption"
@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :model-value="showOnlyInterestingFields"
         @update:model-value="$emit('toggle-interesting-fields', $event)"
         data-test="logs-page-field-list-user-defined-schema-toggle"
-        class="schema-field-toggle tw:mr-1"
+        class="tw:mr-1"
       >
         <OToggleGroupItem
           v-for="opt in selectedFieldsBtnGroupOption"
@@ -256,9 +256,3 @@ const visiblePages = computed(() => {
   return pages;
 });
 </script>
-
-<style>
-.schema-field-toggle .q-btn {
-  padding: 0.25rem 0.5rem;
-}
-</style>
