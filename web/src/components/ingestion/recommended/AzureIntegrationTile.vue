@@ -15,10 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OCard class="azure-integration-tile tw:h-full tw:flex tw:flex-col tw:transition-all tw:duration-200 tw:rounded-lg tw:hover:-translate-y-0.5">
+  <OCard class="tw:h-full tw:flex tw:flex-col tw:transition-all tw:duration-200 tw:rounded-lg tw:hover:-translate-y-0.5 tw:hover:shadow-[0_4px_12px_rgba(0,0,0,0.1)] tw:dark:hover:shadow-[0_4px_12px_rgba(255,255,255,0.1)]">
     <OCardSection class="tw:pb-2">
       <div class="tw:flex tw:items-start tw:justify-between tw:mb-2">
-        <div class="tile-name tw:font-semibold tw:text-base tw:leading-[1.4]">
+        <div class="tw:font-semibold tw:text-base tw:leading-[1.4] tw:text-[#1a1a1a] tw:dark:text-[var(--o2-border)]">
           {{ integration.displayName }}
         </div>
         <OButton
@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTooltip content="View Documentation" />
         </OButton>
       </div>
-      <div class="tile-description tw:text-sm tw:text-gray-600 tw:mb-3 tw:leading-normal tw:min-h-[3em]">
+      <div class="tw:text-sm tw:text-[#666] tw:dark:text-[#b0b0b0] tw:mb-3 tw:leading-normal tw:min-h-[3em]">
         {{ integration.description }}
       </div>
     </OCardSection>
@@ -233,29 +233,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style>
-.body--light .azure-integration-tile:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-}
-
-.body--light .azure-integration-tile .tile-name {
-  color: #1a1a1a;
-}
-
-.body--light .azure-integration-tile .tile-description {
-  color: #666;
-}
-
-.body--dark .azure-integration-tile:hover {
-  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.1);
-}
-
-.body--dark .azure-integration-tile .tile-name {
-  color: var(--o2-border);
-}
-
-.body--dark .azure-integration-tile .tile-description {
-  color: #b0b0b0;
-}
-</style>

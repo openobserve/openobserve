@@ -41,7 +41,7 @@
         >Sign in with an internal user</a
       >
 
-      <div v-show="showLoginInput" class="o2-input login-inputs tw:pt-4">
+      <div v-show="showLoginInput" class="o2-input tw:pt-4">
         <div class="tw:gap-3">
           <OInput
             v-model="name"
@@ -103,12 +103,3 @@ const onSignIn = () => {
   console.log("onSignIn");
 };
 </script>
-
-<style>
-.login-inputs .q-field__label {
-  font-weight: normal !important;
-  font-size: 12px;
-  transform: translate(-0.75rem, -155%);
-  color: #3a3a3a;
-}
-</style>

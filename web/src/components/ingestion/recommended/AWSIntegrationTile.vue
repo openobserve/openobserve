@@ -16,11 +16,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <OCard
-    class="aws-integration-tile tw:border tw:border-border tw:h-full tw:flex tw:flex-col tw:transition-all tw:duration-200 tw:ease-in-out tw:rounded-lg tw:hover:-translate-y-0.5"
+    class="tw:border tw:border-border tw:h-full tw:flex tw:flex-col tw:transition-all tw:duration-200 tw:ease-in-out tw:rounded-lg tw:hover:-translate-y-0.5 tw:hover:shadow-[0_4px_12px_rgba(0,0,0,0.1)] tw:dark:hover:shadow-[0_4px_12px_rgba(255,255,255,0.1)]"
   >
     <OCardSection class="tw:p-4 tw:pb-2 tw:flex-1">
       <div class="tw:flex tw:items-start tw:justify-between tw:mb-2">
-        <div class="tile-name tw:font-semibold tw:text-base tw:leading-[1.4]">
+        <div class="tw:font-semibold tw:text-base tw:leading-[1.4] tw:text-[#1a1a1a] tw:dark:text-[var(--o2-border)]">
           {{ integration.displayName }}
         </div>
         <OButton
@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTooltip content="View Documentation" />
         </OButton>
       </div>
-      <div class="tile-description tw:text-sm tw:text-gray-600 tw:mb-3 tw:leading-normal tw:min-h-[3em]">
+      <div class="tw:text-sm tw:text-[#666] tw:dark:text-[#b0b0b0] tw:mb-3 tw:leading-normal tw:min-h-[3em]">
         {{ integration.description }}
       </div>
     </OCardSection>
@@ -596,29 +596,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style>
-.body--light .aws-integration-tile:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-}
-
-.body--light .aws-integration-tile .tile-name {
-  color: #1a1a1a;
-}
-
-.body--light .aws-integration-tile .tile-description {
-  color: #666;
-}
-
-.body--dark .aws-integration-tile:hover {
-  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.1);
-}
-
-.body--dark .aws-integration-tile .tile-name {
-  color: var(--o2-border);
-}
-
-.body--dark .aws-integration-tile .tile-description {
-  color: #b0b0b0;
-}
-</style>

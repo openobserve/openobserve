@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="aws-quick-setup">
+  <div>
     <div class="setup-card tw:max-w-225 tw:mx-auto">
       <!-- Header -->
       <div class="tw:mb-6 tw:p-4 tw:rounded-lg" :class="quickInstallBgClass">
@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Step: Services -->
       <div class="tw:mb-6">
         <div
-          class="tw:flex tw:items-center tw:justify-between tw:cursor-pointer region-collapsible-header tw:py-2 tw:px-3 tw:rounded tw:bg-[#f0f4ff] tw:border tw:border-[#d0d9f0]"
+          class="tw:flex tw:items-center tw:justify-between tw:cursor-pointer tw:py-2 tw:px-3 tw:rounded tw:bg-[#f0f4ff] tw:border tw:border-[#d0d9f0] tw:hover:bg-[#e8eeff] tw:dark:bg-[rgba(255,255,255,0.06)] tw:dark:border-[#404040] tw:dark:hover:bg-[rgba(255,255,255,0.09)]"
           @click="showServices = !showServices"
         >
           <div class="tw:flex tw:items-center tw:gap-2">
@@ -146,7 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div class="tw:mb-6">
           <div
-            class="tw:flex tw:items-center tw:justify-between tw:cursor-pointer region-collapsible-header tw:py-2 tw:px-3 tw:rounded tw:bg-[#f0f4ff] tw:border tw:border-[#d0d9f0]"
+            class="tw:flex tw:items-center tw:justify-between tw:cursor-pointer tw:py-2 tw:px-3 tw:rounded tw:bg-[#f0f4ff] tw:border tw:border-[#d0d9f0] tw:hover:bg-[#e8eeff] tw:dark:bg-[rgba(255,255,255,0.06)] tw:dark:border-[#404040] tw:dark:hover:bg-[rgba(255,255,255,0.09)]"
             @click="showTargetRegions = !showTargetRegions"
           >
             <div class="tw:flex tw:items-center tw:gap-2">
@@ -591,12 +591,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style>
-/* Hover states for collapsible headers (cannot be inlined) */
-.aws-quick-setup .region-collapsible-header:hover { background: #e8eeff; }
-.dark .aws-quick-setup .region-collapsible-header,
-body.body--dark .aws-quick-setup .region-collapsible-header { background: rgba(255, 255, 255, 0.06); border: 1px solid #404040; }
-.dark .aws-quick-setup .region-collapsible-header:hover,
-body.body--dark .aws-quick-setup .region-collapsible-header:hover { background: rgba(255, 255, 255, 0.09); }
-</style>

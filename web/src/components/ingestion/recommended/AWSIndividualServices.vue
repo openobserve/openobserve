@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div
       v-if="filteredIntegrations.length === 0"
-      class="tw:text-center tw:py-12 empty-state"
+      class="tw:text-center tw:py-12 tw:text-[#666] tw:dark:text-[#999]"
     >
       <OIcon name="search-off" class="tw:mb-2" style="width: 3rem; height: 3rem;" />
       <div class="tw:text-base">No integrations found matching your search</div>
@@ -160,11 +160,4 @@ export default defineComponent({
   }
 }
 
-.body--light .aws-integration-grid .empty-state {
-  color: #666;
-}
-
-.body--dark .aws-integration-grid .empty-state {
-  color: #999;
-}
 </style>
