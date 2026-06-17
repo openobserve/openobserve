@@ -277,13 +277,6 @@
         "results": [
           [
             "2026-06-06T07:20:00",
-            "SORT-X1",
-            "3",
-            "320.0",
-            "900.0"
-          ],
-          [
-            "2026-06-06T07:20:00",
             "SORT-M3",
             "2",
             "555.0",
@@ -291,16 +284,23 @@
           ],
           [
             "2026-06-06T07:20:00",
-            "SORT-A7",
-            "2",
-            "190.0",
-            "290.0"
+            "SORT-X1",
+            "3",
+            "320.0",
+            "900.0"
           ],
           [
             "2026-06-06T07:20:00",
             "SORT-Z9",
             "2",
             "150.0",
+            "290.0"
+          ],
+          [
+            "2026-06-06T07:20:00",
+            "SORT-A7",
+            "2",
+            "190.0",
             "290.0"
           ]
         ],
@@ -397,10 +397,10 @@
         "results": [
           [
             "2026-06-06T07:24:00",
-            "LANE-B",
-            "auto",
+            "LANE-C",
+            "manual",
             "1",
-            "4.0"
+            "2.0"
           ],
           [
             "2026-06-06T07:24:00",
@@ -411,17 +411,17 @@
           ],
           [
             "2026-06-06T07:24:00",
-            "LANE-D",
-            "hybrid",
+            "LANE-B",
+            "auto",
             "1",
             "4.0"
           ],
           [
             "2026-06-06T07:24:00",
-            "LANE-C",
-            "manual",
+            "LANE-D",
+            "hybrid",
             "1",
-            "2.0"
+            "4.0"
           ],
           [
             "2026-06-06T07:24:00",
@@ -439,17 +439,17 @@
           ],
           [
             "2026-06-06T07:27:00",
-            "LANE-D",
-            "hybrid",
+            "LANE-B",
+            "manual",
             "1",
             "2.0"
           ],
           [
             "2026-06-06T07:27:00",
-            "LANE-A",
-            "auto",
+            "LANE-D",
+            "manual",
             "1",
-            "1.0"
+            "3.0"
           ],
           [
             "2026-06-06T07:27:00",
@@ -461,9 +461,16 @@
           [
             "2026-06-06T07:27:00",
             "LANE-D",
-            "manual",
+            "hybrid",
             "1",
-            "3.0"
+            "2.0"
+          ],
+          [
+            "2026-06-06T07:27:00",
+            "LANE-A",
+            "auto",
+            "1",
+            "1.0"
           ],
           [
             "2026-06-06T07:27:00",
@@ -476,13 +483,6 @@
             "2026-06-06T07:27:00",
             "LANE-A",
             "hybrid",
-            "1",
-            "2.0"
-          ],
-          [
-            "2026-06-06T07:27:00",
-            "LANE-B",
-            "manual",
             "1",
             "2.0"
           ]
@@ -893,13 +893,13 @@
         "results": [
           [
             "2026-06-06T11:32:00",
-            "ResourceExhaustedExc...",
-            "2"
+            "SecurityException: u...",
+            "1"
           ],
           [
             "2026-06-06T11:32:00",
-            "SecurityException: u...",
-            "1"
+            "ResourceExhaustedExc...",
+            "2"
           ],
           [
             "2026-06-06T11:32:00",
@@ -1179,12 +1179,12 @@
           ],
           [
             "2026-06-06T11:42:00",
-            "503",
+            "403",
             "1"
           ],
           [
             "2026-06-06T11:42:00",
-            "403",
+            "503",
             "1"
           ],
           [
@@ -1245,13 +1245,13 @@
         "results": [
           [
             "2026-06-06T11:44:00",
-            "slow",
-            "2"
+            "fast",
+            "1"
           ],
           [
             "2026-06-06T11:44:00",
-            "fast",
-            "1"
+            "slow",
+            "2"
           ],
           [
             "2026-06-06T11:45:00",
@@ -1628,12 +1628,12 @@
           ],
           [
             "2026-06-06T14:43:30",
-            "temp-regulator",
+            "charge-checker",
             "1"
           ],
           [
             "2026-06-06T14:43:30",
-            "charge-checker",
+            "temp-regulator",
             "1"
           ],
           [
@@ -1930,6 +1930,330 @@
         "skip_sqllogictest": true,
         "skip_row_count": true,
         "skip_column_check": true
+      }
+    },
+    {
+      "id": "Q667",
+      "sql": "SELECT histogram(_timestamp, '30 second') AS _time, COUNT(*) FILTER (WHERE re_match(log, 'ACK')) AS ack_logs, COUNT(*) FILTER (WHERE re_match(log, 'error')) AS error_logs, COUNT(*) AS total FROM \"{stream}\" GROUP BY _time ORDER BY _time",
+      "category": "histogram",
+      "time_offset": {
+        "start_offset": 39900000000,
+        "end_offset": 40080000000
+      },
+      "expected": {
+        "columns": [
+          "_time",
+          "ack_logs",
+          "error_logs",
+          "total"
+        ],
+        "results": [
+          [
+            "2026-06-06T17:01:00",
+            "1",
+            "0",
+            "3"
+          ],
+          [
+            "2026-06-06T17:01:30",
+            "1",
+            "0",
+            "2"
+          ],
+          [
+            "2026-06-06T17:02:00",
+            "1",
+            "0",
+            "3"
+          ],
+          [
+            "2026-06-06T17:02:30",
+            "1",
+            "0",
+            "2"
+          ],
+          [
+            "2026-06-06T17:03:00",
+            "1",
+            "0",
+            "3"
+          ],
+          [
+            "2026-06-06T17:03:30",
+            "1",
+            "0",
+            "2"
+          ],
+          [
+            "2026-06-06T17:04:00",
+            "1",
+            "0",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q668",
+      "sql": "SELECT histogram(_timestamp, '1 minute') AS _time, CASE WHEN re_match(facility_zone, 'ZONE-[1-2]') THEN 'front' ELSE 'back' END AS zone_group, COUNT(*) AS cnt, ROUND(AVG(throughput_rate), 1) AS avg_tput FROM \"{stream}\" GROUP BY _time, zone_group ORDER BY _time, zone_group",
+      "category": "histogram",
+      "time_offset": {
+        "start_offset": 39960000000,
+        "end_offset": 40140000000
+      },
+      "expected": {
+        "columns": [
+          "_time",
+          "zone_group",
+          "cnt",
+          "avg_tput"
+        ],
+        "results": [
+          [
+            "2026-06-06T17:02:00",
+            "back",
+            "2",
+            "667.5"
+          ],
+          [
+            "2026-06-06T17:02:00",
+            "front",
+            "3",
+            "643.3"
+          ],
+          [
+            "2026-06-06T17:03:00",
+            "back",
+            "2",
+            "565.0"
+          ],
+          [
+            "2026-06-06T17:03:00",
+            "front",
+            "3",
+            "345.0"
+          ],
+          [
+            "2026-06-06T17:04:00",
+            "back",
+            "3",
+            "470.0"
+          ],
+          [
+            "2026-06-06T17:04:00",
+            "front",
+            "2",
+            "525.0"
+          ],
+          [
+            "2026-06-06T17:05:00",
+            "front",
+            "1",
+            "320.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q669",
+      "sql": "SELECT _timestamp - (_timestamp % 30000000) AS bucket, COUNT(*) AS cnt, COUNT(*) FILTER (WHERE re_match(exception_message, 'Exception')) AS exceptions FROM \"{stream}\" GROUP BY bucket ORDER BY bucket",
+      "category": "histogram",
+      "time_offset": {
+        "start_offset": 40020000000,
+        "end_offset": 40200000000
+      },
+      "expected": {
+        "columns": [
+          "bucket",
+          "cnt",
+          "exceptions"
+        ],
+        "results": [
+          [
+            "1780765380000000",
+            "3",
+            "3"
+          ],
+          [
+            "1780765410000000",
+            "2",
+            "2"
+          ],
+          [
+            "1780765440000000",
+            "3",
+            "3"
+          ],
+          [
+            "1780765470000000",
+            "2",
+            "2"
+          ],
+          [
+            "1780765500000000",
+            "3",
+            "3"
+          ],
+          [
+            "1780765530000000",
+            "2",
+            "2"
+          ],
+          [
+            "1780765560000000",
+            "1",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q670",
+      "sql": "SELECT histogram(_timestamp, '2 minute') AS _time, COALESCE(bot_flag, 'unknown') AS is_bot, COUNT(*) AS cnt FROM \"{stream}\" WHERE re_match(COALESCE(action_subcategory, ''), 'vitals|metric|interaction') GROUP BY _time, is_bot ORDER BY _time, is_bot",
+      "category": "histogram",
+      "time_offset": {
+        "start_offset": 40080000000,
+        "end_offset": 40260000000
+      },
+      "expected": {
+        "columns": [
+          "_time",
+          "is_bot",
+          "cnt"
+        ],
+        "results": [
+          [
+            "2026-06-06T17:04:00",
+            "unknown",
+            "7"
+          ],
+          [
+            "2026-06-06T17:04:00",
+            "verified_bot",
+            "1"
+          ],
+          [
+            "2026-06-06T17:06:00",
+            "unknown",
+            "4"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q671",
+      "sql": "SELECT histogram(_timestamp, '15 second') AS _time, COUNT(*) AS total, ROUND(AVG(throughput_rate), 1) AS avg_tput, ROUND(MAX(throughput_rate), 1) AS max_tput, ROUND(MIN(throughput_rate), 1) AS min_tput FROM \"{stream}\" WHERE re_match(facility_zone, 'ZONE-[1-4]') GROUP BY _time ORDER BY _time",
+      "category": "histogram",
+      "time_offset": {
+        "start_offset": 40140000000,
+        "end_offset": 40320000000
+      },
+      "expected": {
+        "columns": [
+          "_time",
+          "total",
+          "avg_tput",
+          "max_tput",
+          "min_tput"
+        ],
+        "results": [
+          [
+            "2026-06-06T17:05:00",
+            "2",
+            "400.0",
+            "480.0",
+            "320.0"
+          ],
+          [
+            "2026-06-06T17:05:15",
+            "1",
+            "480.0",
+            "480.0",
+            "480.0"
+          ],
+          [
+            "2026-06-06T17:05:30",
+            "1",
+            "610.0",
+            "610.0",
+            "610.0"
+          ],
+          [
+            "2026-06-06T17:05:45",
+            "1",
+            "725.0",
+            "725.0",
+            "725.0"
+          ],
+          [
+            "2026-06-06T17:06:00",
+            "2",
+            "782.5",
+            "840.0",
+            "725.0"
+          ],
+          [
+            "2026-06-06T17:06:15",
+            "1",
+            "840.0",
+            "840.0",
+            "840.0"
+          ],
+          [
+            "2026-06-06T17:06:30",
+            "1",
+            "290.0",
+            "290.0",
+            "290.0"
+          ],
+          [
+            "2026-06-06T17:06:45",
+            "1",
+            "555.0",
+            "555.0",
+            "555.0"
+          ],
+          [
+            "2026-06-06T17:07:00",
+            "2",
+            "372.5",
+            "555.0",
+            "190.0"
+          ],
+          [
+            "2026-06-06T17:07:15",
+            "1",
+            "190.0",
+            "190.0",
+            "190.0"
+          ],
+          [
+            "2026-06-06T17:07:30",
+            "1",
+            "900.0",
+            "900.0",
+            "900.0"
+          ],
+          [
+            "2026-06-06T17:07:45",
+            "1",
+            "150.0",
+            "150.0",
+            "150.0"
+          ],
+          [
+            "2026-06-06T17:08:00",
+            "1",
+            "150.0",
+            "150.0",
+            "150.0"
+          ]
+        ],
+        "results_mode": "rowsort"
       }
     }
   ],

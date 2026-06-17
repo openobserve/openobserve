@@ -14,13 +14,6 @@
         ],
         "results": [
           [
-            "ZONE-3",
-            "4",
-            "2905.0",
-            "74.85",
-            "25.0"
-          ],
-          [
             "ZONE-2",
             "4",
             "1645.0",
@@ -28,17 +21,24 @@
             "25.0"
           ],
           [
-            "ZONE-1",
-            "3",
-            "1770.0",
-            "66.63",
-            "0.0"
+            "ZONE-3",
+            "4",
+            "2905.0",
+            "74.85",
+            "25.0"
           ],
           [
             "ZONE-4",
             "3",
             "920.0",
             "40.63",
+            "0.0"
+          ],
+          [
+            "ZONE-1",
+            "3",
+            "1770.0",
+            "66.63",
             "0.0"
           ]
         ],
@@ -152,16 +152,16 @@
         ],
         "results": [
           [
-            "ZONE-1",
-            "4",
-            "667.5",
-            "SORT-M3"
-          ],
-          [
             "ZONE-4",
             "4",
             "277.5",
             "SORT-A7"
+          ],
+          [
+            "ZONE-1",
+            "4",
+            "667.5",
+            "SORT-M3"
           ],
           [
             "ZONE-3",
@@ -738,17 +738,17 @@
             "0.0"
           ],
           [
-            "ZONE-1",
-            "SORT-M3",
-            "581.25",
-            "68.18",
-            "0.0"
-          ],
-          [
             "ZONE-4",
             "SORT-A7",
             "498.33",
             "29.7",
+            "0.0"
+          ],
+          [
+            "ZONE-1",
+            "SORT-M3",
+            "581.25",
+            "68.18",
             "0.0"
           ],
           [
@@ -863,16 +863,12 @@
             "scanPallet"
           ],
           [
-            "1",
-            "mergeBatch"
-          ],
-          [
-            "1",
-            "archiveLog"
+            "2",
+            "updateBatch"
           ],
           [
             "2",
-            "retryScan"
+            "syncZone"
           ],
           [
             "2",
@@ -883,12 +879,16 @@
             "deleteRecord"
           ],
           [
-            "2",
-            "syncZone"
+            "1",
+            "mergeBatch"
+          ],
+          [
+            "1",
+            "archiveLog"
           ],
           [
             "2",
-            "updateBatch"
+            "retryScan"
           ]
         ],
         "results_mode": "rowsort"
@@ -985,17 +985,17 @@
         ],
         "results": [
           [
-            "ZONE-3",
-            "4",
-            "653.75",
-            "0",
-            "2"
-          ],
-          [
             "ZONE-2",
             "4",
             "421.25",
             "2",
+            "2"
+          ],
+          [
+            "ZONE-3",
+            "4",
+            "653.75",
+            "0",
             "2"
           ],
           [
@@ -1026,24 +1026,6 @@
         ],
         "results": [
           [
-            "CheckThreshold",
-            "ok",
-            "2",
-            "78.0"
-          ],
-          [
-            "ScanPallet",
-            "failed",
-            "2",
-            "89.0"
-          ],
-          [
-            "SyncZone",
-            "retrying",
-            "2",
-            "12.0"
-          ],
-          [
             "MergeBatch",
             "queued",
             "2",
@@ -1056,10 +1038,28 @@
             "15.0"
           ],
           [
-            "RerouteTrack",
+            "ScanPallet",
+            "failed",
+            "2",
+            "89.0"
+          ],
+          [
+            "CheckThreshold",
             "ok",
+            "2",
+            "78.0"
+          ],
+          [
+            "SyncZone",
+            "retrying",
+            "2",
+            "12.0"
+          ],
+          [
+            "DeleteRecord",
+            "pending",
             "1",
-            "567.0"
+            "1450.0"
           ],
           [
             "ArchiveLog",
@@ -1068,10 +1068,10 @@
             "1900.0"
           ],
           [
-            "DeleteRecord",
-            "pending",
+            "RerouteTrack",
+            "ok",
             "1",
-            "1450.0"
+            "567.0"
           ],
           [
             "SearchItems",
@@ -1176,14 +1176,6 @@
         ],
         "results": [
           [
-            "MED_LOAD",
-            "MED_TPUT",
-            "4",
-            "18.85",
-            "1060",
-            "2.8"
-          ],
-          [
             "HIGH_LOAD",
             "HIGH_TPUT",
             "4",
@@ -1192,12 +1184,28 @@
             "3.5"
           ],
           [
+            "MED_LOAD",
+            "MED_TPUT",
+            "4",
+            "18.85",
+            "1060",
+            "2.8"
+          ],
+          [
             "LOW_LOAD",
             "HIGH_TPUT",
             "3",
             "35.0",
             "1050",
             "1.2"
+          ],
+          [
+            "LOW_LOAD",
+            "MED_TPUT",
+            "1",
+            "24.8",
+            "275",
+            "2.5"
           ],
           [
             "MED_LOAD",
@@ -1214,14 +1222,6 @@
             "26.3",
             "340",
             "0.5"
-          ],
-          [
-            "LOW_LOAD",
-            "MED_TPUT",
-            "1",
-            "24.8",
-            "275",
-            "2.5"
           ]
         ],
         "results_mode": "rowsort"
@@ -1292,15 +1292,15 @@
         ],
         "results": [
           [
-            "Android 14",
-            "navigation",
-            "1",
-            "100.0"
-          ],
-          [
             "Windows 11",
             "performanceMetric",
             "2",
+            "100.0"
+          ],
+          [
+            "Android 14",
+            "navigation",
+            "1",
             "100.0"
           ]
         ],
@@ -1396,11 +1396,18 @@
         ],
         "results": [
           [
-            "zone-controller",
+            "conveyor-driver",
+            "searchPage",
+            "2",
+            "15.0",
+            "15"
+          ],
+          [
+            "sorter-engine",
             "itemPage",
             "1",
-            "12.0",
-            "12"
+            "1900.0",
+            "1900"
           ],
           [
             "scan-hub",
@@ -1417,18 +1424,11 @@
             "230"
           ],
           [
-            "conveyor-driver",
-            "searchPage",
-            "2",
-            "15.0",
-            "15"
-          ],
-          [
-            "sorter-engine",
+            "zone-controller",
             "itemPage",
             "1",
-            "1900.0",
-            "1900"
+            "12.0",
+            "12"
           ]
         ],
         "results_mode": "rowsort"
@@ -1479,12 +1479,12 @@
         ],
         "results": [
           [
-            "E005",
+            "E009",
             "1",
             "1"
           ],
           [
-            "E009",
+            "E005",
             "1",
             "1"
           ],
@@ -1571,27 +1571,27 @@
         ],
         "results": [
           [
+            "fast",
+            "error",
+            "2"
+          ],
+          [
             "timeout",
             "success",
             "2"
           ],
           [
-            "fast",
+            "timeout",
             "error",
-            "2"
+            "1"
+          ],
+          [
+            "fast",
+            "success",
+            "1"
           ],
           [
             "slow",
-            "error",
-            "1"
-          ],
-          [
-            "fast",
-            "success",
-            "1"
-          ],
-          [
-            "timeout",
             "error",
             "1"
           ]
@@ -1614,11 +1614,11 @@
         ],
         "results": [
           [
-            "clickEvent",
+            "vitalsInp",
             "1"
           ],
           [
-            "vitalsInp",
+            "clickEvent",
             "1"
           ]
         ],
@@ -1642,14 +1642,14 @@
         ],
         "results": [
           [
-            "track-router",
-            "E003",
+            "zone-controller",
+            "E001",
             "2",
             "medium"
           ],
           [
-            "zone-controller",
-            "E001",
+            "track-router",
+            "E003",
             "2",
             "medium"
           ],
@@ -1680,12 +1680,6 @@
         ],
         "results": [
           [
-            "cartPage",
-            "2",
-            "2",
-            "100.0"
-          ],
-          [
             "searchPage",
             "1",
             "1",
@@ -1699,6 +1693,12 @@
           ],
           [
             "checkoutPage",
+            "2",
+            "2",
+            "100.0"
+          ],
+          [
+            "cartPage",
             "2",
             "2",
             "100.0"
@@ -1801,13 +1801,13 @@
             "2"
           ],
           [
-            "track",
-            "navigation",
+            "sort",
+            "performanceMetric",
             "1"
           ],
           [
-            "sort",
-            "performanceMetric",
+            "track",
+            "navigation",
             "1"
           ]
         ],
@@ -1837,14 +1837,14 @@
             "0.0"
           ],
           [
-            "warehouse-east",
-            "1",
+            "warehouse-north",
+            "2",
             "0",
             "0.0"
           ],
           [
-            "warehouse-north",
-            "2",
+            "warehouse-east",
+            "1",
             "0",
             "0.0"
           ]
@@ -2479,16 +2479,16 @@
             "3200.0"
           ],
           [
-            "Allowlisted",
-            "threat",
-            "1",
-            "78.0"
-          ],
-          [
             "none",
             "threat",
             "1",
             "567.0"
+          ],
+          [
+            "Allowlisted",
+            "threat",
+            "1",
+            "78.0"
           ]
         ],
         "results_mode": "rowsort"
@@ -2521,6 +2521,1054 @@
             "2",
             "0",
             "0.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q592",
+      "sql": "SELECT histogram(_timestamp, '1 minute') AS _time, SUM(CASE WHEN re_match(exception_message, 'Exception|Error|Timeout') THEN 1 ELSE 0 END) AS error_count, COUNT(*) AS total, ROUND(SUM(CASE WHEN re_match(exception_message, 'Exception|Error|Timeout') THEN 1 ELSE 0 END) * 100.0 / NULLIF(COUNT(*), 0), 2) AS error_pct FROM \"{stream}\" GROUP BY _time ORDER BY _time",
+      "category": "combined",
+      "time_offset": {
+        "start_offset": 35400000000,
+        "end_offset": 35580000000
+      },
+      "expected": {
+        "columns": [
+          "_time",
+          "error_count",
+          "total",
+          "error_pct"
+        ],
+        "results": [
+          [
+            "2026-06-06T15:46:00",
+            "5",
+            "5",
+            "100.0"
+          ],
+          [
+            "2026-06-06T15:47:00",
+            "5",
+            "5",
+            "100.0"
+          ],
+          [
+            "2026-06-06T15:48:00",
+            "5",
+            "5",
+            "100.0"
+          ],
+          [
+            "2026-06-06T15:49:00",
+            "1",
+            "1",
+            "100.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q593",
+      "sql": "SELECT _timestamp, COALESCE(upstream_error_code, error_code, 'NO_ERROR') AS effective_error, COALESCE(endpoint_path, resource_path, uri_path, '/unknown') AS effective_path FROM \"{stream}\" ORDER BY _timestamp LIMIT 15",
+      "category": "combined",
+      "time_offset": {
+        "start_offset": 35460000000,
+        "end_offset": 35640000000
+      },
+      "expected": {
+        "columns": [
+          "effective_error",
+          "effective_path"
+        ],
+        "results": [
+          [
+            "UP-E001",
+            "/api/v2/sorter/merge"
+          ],
+          [
+            "UP-E002",
+            "/api/v1/health/check"
+          ],
+          [
+            "E008",
+            "/ip/10.0.0.1"
+          ],
+          [
+            "UP-E003",
+            "/api/v1/archive/log"
+          ],
+          [
+            "UP-E004",
+            "/api/v2/sorter/retry"
+          ],
+          [
+            "E010",
+            "/swag/graphql"
+          ],
+          [
+            "E001",
+            "/ip/192.168.1.1"
+          ],
+          [
+            "UP-E005",
+            "/api/v1/zone/sync"
+          ],
+          [
+            "UP-E006",
+            "/api/v1/warehouse/search"
+          ],
+          [
+            "E003",
+            "/api/v2/search"
+          ],
+          [
+            "UP-E007",
+            "/api/v1/warehouse/update"
+          ],
+          [
+            "UP-E008",
+            "/api/v1/warehouse/delete"
+          ],
+          [
+            "UP-E008",
+            "/api/v1/warehouse/delete"
+          ],
+          [
+            "E005",
+            "/swag/graphql"
+          ],
+          [
+            "UP-E010",
+            "/api/v2/sorter/reroute"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q594",
+      "sql": "SELECT _timestamp, COALESCE(visitor_session_id, cookie_id, 'anon') AS session_key, COALESCE(page_url, 'about:blank') AS nav_target FROM \"{stream}\" ORDER BY _timestamp LIMIT 15",
+      "category": "combined",
+      "time_offset": {
+        "start_offset": 35520000000,
+        "end_offset": 35700000000
+      },
+      "expected": {
+        "columns": [
+          "session_key",
+          "nav_target"
+        ],
+        "results": [
+          [
+            "sess_004",
+            "about:blank"
+          ],
+          [
+            "sess_003",
+            "about:blank"
+          ],
+          [
+            "sess_003",
+            "https://shop.example.com/item/1001"
+          ],
+          [
+            "sess_005",
+            "https://shop.example.com/item/1002"
+          ],
+          [
+            "sess_001",
+            "about:blank"
+          ],
+          [
+            "sess_001",
+            "https://shop.example.com/search?q=test"
+          ],
+          [
+            "sess_001",
+            "https://shop.example.com/item/1003"
+          ],
+          [
+            "sess_001",
+            "https://shop.example.com/item/1003"
+          ],
+          [
+            "sess_001",
+            "about:blank"
+          ],
+          [
+            "sess_002",
+            "https://shop.example.com/item/1004"
+          ],
+          [
+            "sess_002",
+            "https://shop.example.com/item/1004"
+          ],
+          [
+            "sess_003",
+            "about:blank"
+          ],
+          [
+            "sess_003",
+            "about:blank"
+          ],
+          [
+            "sess_002",
+            "https://shop.example.com/item/1005"
+          ],
+          [
+            "sess_001",
+            "about:blank"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q595",
+      "sql": "SELECT CASE WHEN throughput_rate < 200 THEN 'low' WHEN throughput_rate < 500 THEN 'medium' WHEN throughput_rate < 800 THEN 'high' ELSE 'extreme' END AS tput_bucket, COUNT(*) AS cnt, ROUND(AVG(load_factor), 2) AS avg_load FROM \"{stream}\" GROUP BY tput_bucket ORDER BY tput_bucket",
+      "category": "combined",
+      "time_offset": {
+        "start_offset": 35580000000,
+        "end_offset": 35760000000
+      },
+      "expected": {
+        "columns": [
+          "tput_bucket",
+          "cnt",
+          "avg_load"
+        ],
+        "results": [
+          [
+            "extreme",
+            "3",
+            "74.07"
+          ],
+          [
+            "high",
+            "5",
+            "53.92"
+          ],
+          [
+            "low",
+            "3",
+            "59.57"
+          ],
+          [
+            "medium",
+            "5",
+            "44.22"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q596",
+      "sql": "SELECT CASE WHEN latency_ms < 100 THEN 'fast' WHEN latency_ms < 1000 THEN 'normal' ELSE 'slow' END AS speed, action_category, COUNT(*) AS cnt FROM \"{stream}\" GROUP BY speed, action_category ORDER BY speed, action_category",
+      "category": "combined",
+      "time_offset": {
+        "start_offset": 35640000000,
+        "end_offset": 35820000000
+      },
+      "expected": {
+        "columns": [
+          "speed",
+          "action_category",
+          "cnt"
+        ],
+        "results": [
+          [
+            "fast",
+            "interaction",
+            "2"
+          ],
+          [
+            "fast",
+            "navigation",
+            "3"
+          ],
+          [
+            "fast",
+            "performanceMetric",
+            "3"
+          ],
+          [
+            "normal",
+            "performanceMetric",
+            "3"
+          ],
+          [
+            "slow",
+            "interaction",
+            "2"
+          ],
+          [
+            "slow",
+            "performanceMetric",
+            "3"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q597",
+      "sql": "SELECT _timestamp, exception_message, error_code FROM \"{stream}\" WHERE re_match(exception_message, 'Exception') AND re_not_match(exception_message, 'Timeout') ORDER BY _timestamp LIMIT 10",
+      "category": "combined",
+      "time_offset": {
+        "start_offset": 35700000000,
+        "end_offset": 35880000000
+      },
+      "expected": {
+        "columns": [
+          "exception_message",
+          "error_code"
+        ],
+        "results": [
+          [
+            "OverflowException: throughput_rate 999.0 exceeds max capacity",
+            "E009"
+          ],
+          [
+            "NullPointerException at ConveyorController.handle()",
+            "E010"
+          ],
+          [
+            "NullPointerException at ConveyorController.handle()",
+            "E010"
+          ],
+          [
+            "DataIntegrityException: pallet_id PL-002 checksum mismatch",
+            "E002"
+          ],
+          [
+            "DataIntegrityException: pallet_id PL-002 checksum mismatch",
+            "E002"
+          ],
+          [
+            "ResourceExhaustedException: sorter_model SORT-M3 queue full",
+            "E003"
+          ],
+          [
+            "ResourceExhaustedException: sorter_model SORT-M3 queue full",
+            "E003"
+          ],
+          [
+            "SecurityException: unauthorized access to control_center CC-ALPHA",
+            "E004"
+          ],
+          [
+            "ConfigurationException: missing facility_zone ZONE-3 override",
+            "E005"
+          ],
+          [
+            "ConfigurationException: missing facility_zone ZONE-3 override",
+            "E005"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q598",
+      "sql": "SELECT COUNT(*) AS cnt FROM \"{stream}\" WHERE re_match(org_name, 'warehouse') AND re_not_match(org_name, 'central') AND re_not_match(org_name, 'north')",
+      "category": "combined",
+      "time_offset": {
+        "start_offset": 35760000000,
+        "end_offset": 35940000000
+      },
+      "expected": {
+        "columns": [
+          "cnt"
+        ],
+        "results": [
+          [
+            "8"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q599",
+      "sql": "SELECT _timestamp, json_get_str(request_payload, 'endpoint') AS ep, json_get_str(request_payload, 'status') AS st FROM \"{stream}\" WHERE request_payload IS NOT NULL ORDER BY _timestamp LIMIT 10",
+      "category": "combined",
+      "time_offset": {
+        "start_offset": 35820000000,
+        "end_offset": 36000000000
+      },
+      "expected": {
+        "skip_sqllogictest": true,
+        "skip_row_count": true,
+        "skip_column_check": true,
+        "columns": [
+          "ep",
+          "st"
+        ]
+      }
+    },
+    {
+      "id": "Q600",
+      "sql": "SELECT histogram(_timestamp, '2 minute') AS _time, facility_zone, COUNT(*) AS cnt, ROUND(AVG(throughput_rate), 1) AS avg_tput FROM \"{stream}\" WHERE re_match(facility_zone, 'ZONE-[1-4]') GROUP BY _time, facility_zone ORDER BY _time, facility_zone",
+      "category": "combined",
+      "time_offset": {
+        "start_offset": 35880000000,
+        "end_offset": 36060000000
+      },
+      "expected": {
+        "columns": [
+          "_time",
+          "facility_zone",
+          "cnt",
+          "avg_tput"
+        ],
+        "results": [
+          [
+            "2026-06-06T15:54:00",
+            "ZONE-1",
+            "3",
+            "610.0"
+          ],
+          [
+            "2026-06-06T15:54:00",
+            "ZONE-2",
+            "3",
+            "465.0"
+          ],
+          [
+            "2026-06-06T15:54:00",
+            "ZONE-3",
+            "2",
+            "610.0"
+          ],
+          [
+            "2026-06-06T15:54:00",
+            "ZONE-4",
+            "2",
+            "315.0"
+          ],
+          [
+            "2026-06-06T15:56:00",
+            "ZONE-1",
+            "2",
+            "697.5"
+          ],
+          [
+            "2026-06-06T15:56:00",
+            "ZONE-2",
+            "1",
+            "290.0"
+          ],
+          [
+            "2026-06-06T15:56:00",
+            "ZONE-3",
+            "2",
+            "697.5"
+          ],
+          [
+            "2026-06-06T15:56:00",
+            "ZONE-4",
+            "1",
+            "725.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q601",
+      "sql": "SELECT _timestamp, os_platform, CASE WHEN os_platform LIKE 'Android%' THEN 'Android' WHEN os_platform LIKE 'iOS%' THEN 'iOS' WHEN os_platform LIKE 'Windows%' THEN 'Windows' WHEN os_platform LIKE 'Linux%' THEN 'Linux' ELSE 'Other' END AS os_family FROM \"{stream}\" ORDER BY _timestamp LIMIT 15",
+      "category": "combined",
+      "time_offset": {
+        "start_offset": 35940000000,
+        "end_offset": 36120000000
+      },
+      "expected": {
+        "columns": [
+          "os_platform",
+          "os_family"
+        ],
+        "results": [
+          [
+            "Windows 11",
+            "Windows"
+          ],
+          [
+            "Android 14",
+            "Android"
+          ],
+          [
+            "Android 14",
+            "Android"
+          ],
+          [
+            "iOS 18.1",
+            "iOS"
+          ],
+          [
+            "Android 12",
+            "Android"
+          ],
+          [
+            "Android 12",
+            "Android"
+          ],
+          [
+            "Mac OS X (iPhone)",
+            "Other"
+          ],
+          [
+            "Mac OS X (iPhone)",
+            "Other"
+          ],
+          [
+            "Android 14",
+            "Android"
+          ],
+          [
+            "Android 14",
+            "Android"
+          ],
+          [
+            "Android 14",
+            "Android"
+          ],
+          [
+            "iOS 17.4",
+            "iOS"
+          ],
+          [
+            "iOS 17.4",
+            "iOS"
+          ],
+          [
+            "Android 13",
+            "Android"
+          ],
+          [
+            "Mac OS X (iPhone)",
+            "Other"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q602",
+      "sql": "SELECT facility_zone, COUNT(*) AS total, COUNT(*) FILTER (WHERE re_match(error_code, 'E00[1-4]')) AS minor_errors, COUNT(*) FILTER (WHERE re_match(error_code, 'E00[5-9]|E010')) AS major_errors FROM \"{stream}\" GROUP BY facility_zone ORDER BY facility_zone",
+      "category": "combined",
+      "time_offset": {
+        "start_offset": 36000000000,
+        "end_offset": 36180000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "total",
+          "minor_errors",
+          "major_errors"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "4",
+            "2",
+            "2"
+          ],
+          [
+            "ZONE-2",
+            "3",
+            "0",
+            "3"
+          ],
+          [
+            "ZONE-3",
+            "5",
+            "2",
+            "3"
+          ],
+          [
+            "ZONE-4",
+            "4",
+            "2",
+            "2"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q603",
+      "sql": "SELECT _timestamp, COALESCE(NULLIF(upstream_error_code, 'UP-E001'), error_code) AS deduped_error FROM \"{stream}\" ORDER BY _timestamp LIMIT 15",
+      "category": "combined",
+      "time_offset": {
+        "start_offset": 36060000000,
+        "end_offset": 36240000000
+      },
+      "expected": {
+        "columns": [
+          "deduped_error"
+        ],
+        "results": [
+          [
+            "E007"
+          ],
+          [
+            "UP-E002"
+          ],
+          [
+            "E008"
+          ],
+          [
+            "UP-E003"
+          ],
+          [
+            "UP-E004"
+          ],
+          [
+            "E010"
+          ],
+          [
+            "E001"
+          ],
+          [
+            "UP-E005"
+          ],
+          [
+            "UP-E006"
+          ],
+          [
+            "E003"
+          ],
+          [
+            "UP-E007"
+          ],
+          [
+            "UP-E008"
+          ],
+          [
+            "UP-E008"
+          ],
+          [
+            "E005"
+          ],
+          [
+            "UP-E010"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q604",
+      "sql": "SELECT _timestamp, sorter_model, throughput_rate, ROUND(throughput_rate / NULLIF((SELECT AVG(throughput_rate) FROM \"{stream}\" t2 WHERE t2.facility_zone = t1.facility_zone), 0), 2) AS zone_ratio FROM \"{stream}\" t1 ORDER BY _timestamp LIMIT 10",
+      "category": "combined",
+      "time_offset": {
+        "start_offset": 36120000000,
+        "end_offset": 36300000000
+      },
+      "expected": {
+        "columns": [
+          "sorter_model",
+          "throughput_rate",
+          "zone_ratio"
+        ],
+        "results": [
+          [
+            "SORT-Z9",
+            "150.0",
+            "0.44"
+          ],
+          [
+            "SORT-M3",
+            "320.0",
+            "0.5"
+          ],
+          [
+            "SORT-X1",
+            "320.0",
+            "0.54"
+          ],
+          [
+            "SORT-A7",
+            "480.0",
+            "0.96"
+          ],
+          [
+            "SORT-M3",
+            "610.0",
+            "0.95"
+          ],
+          [
+            "SORT-X1",
+            "610.0",
+            "1.02"
+          ],
+          [
+            "SORT-Q5",
+            "725.0",
+            "2.14"
+          ],
+          [
+            "SORT-A7",
+            "725.0",
+            "1.45"
+          ],
+          [
+            "SORT-M3",
+            "840.0",
+            "1.3"
+          ],
+          [
+            "SORT-Z9",
+            "290.0",
+            "0.86"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q605",
+      "sql": "SELECT COALESCE(page_slug, 'unknown') AS page, action_category, COUNT(*) AS cnt FROM \"{stream}\" WHERE re_match(COALESCE(action_subcategory, ''), 'vitals|metric') GROUP BY page, action_category ORDER BY page, action_category",
+      "category": "combined",
+      "time_offset": {
+        "start_offset": 36180000000,
+        "end_offset": 36360000000
+      },
+      "expected": {
+        "columns": [
+          "page",
+          "action_category",
+          "cnt"
+        ],
+        "results": [
+          [
+            "cartPage",
+            "performanceMetric",
+            "2"
+          ],
+          [
+            "checkoutPage",
+            "performanceMetric",
+            "2"
+          ],
+          [
+            "homePage",
+            "navigation",
+            "1"
+          ],
+          [
+            "itemPage",
+            "interaction",
+            "2"
+          ],
+          [
+            "itemPage",
+            "navigation",
+            "2"
+          ],
+          [
+            "itemPage",
+            "performanceMetric",
+            "2"
+          ],
+          [
+            "searchPage",
+            "interaction",
+            "2"
+          ],
+          [
+            "searchPage",
+            "performanceMetric",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q606",
+      "sql": "SELECT histogram(_timestamp, '1 minute') AS _time, COUNT(*) FILTER (WHERE str_match_ignore_case(log, 'error')) AS error_hits, COUNT(*) FILTER (WHERE str_match_ignore_case(log, 'ack')) AS ack_hits, COUNT(*) AS total FROM \"{stream}\" GROUP BY _time ORDER BY _time",
+      "category": "combined",
+      "time_offset": {
+        "start_offset": 36240000000,
+        "end_offset": 36420000000
+      },
+      "expected": {
+        "columns": [
+          "_time",
+          "error_hits",
+          "ack_hits",
+          "total"
+        ],
+        "results": [
+          [
+            "2026-06-06T16:00:00",
+            "0",
+            "2",
+            "5"
+          ],
+          [
+            "2026-06-06T16:01:00",
+            "0",
+            "2",
+            "5"
+          ],
+          [
+            "2026-06-06T16:02:00",
+            "0",
+            "2",
+            "5"
+          ],
+          [
+            "2026-06-06T16:03:00",
+            "0",
+            "1",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q607",
+      "sql": "SELECT _timestamp, COALESCE(bot_flag, 'unknown') AS bot, passthrough_flag, CASE WHEN bot_flag = 'true' THEN 'automated' WHEN passthrough_flag = 'true' THEN 'forwarded' ELSE 'direct' END AS traffic_type FROM \"{stream}\" ORDER BY _timestamp LIMIT 15",
+      "category": "combined",
+      "time_offset": {
+        "start_offset": 36300000000,
+        "end_offset": 36480000000
+      },
+      "expected": {
+        "columns": [
+          "bot",
+          "passthrough_flag",
+          "traffic_type"
+        ],
+        "results": [
+          [
+            "unknown",
+            "false",
+            "direct"
+          ],
+          [
+            "suspicious",
+            "false",
+            "direct"
+          ],
+          [
+            "suspicious",
+            "false",
+            "direct"
+          ],
+          [
+            "unknown",
+            "false",
+            "direct"
+          ],
+          [
+            "unknown",
+            "false",
+            "direct"
+          ],
+          [
+            "unknown",
+            "false",
+            "direct"
+          ],
+          [
+            "verified_bot",
+            "true",
+            "forwarded"
+          ],
+          [
+            "unknown",
+            "true",
+            "forwarded"
+          ],
+          [
+            "unknown",
+            "false",
+            "direct"
+          ],
+          [
+            "unknown",
+            "false",
+            "direct"
+          ],
+          [
+            "unknown",
+            "false",
+            "direct"
+          ],
+          [
+            "unknown",
+            "false",
+            "direct"
+          ],
+          [
+            "unknown",
+            "false",
+            "direct"
+          ],
+          [
+            "unknown",
+            "true",
+            "forwarded"
+          ],
+          [
+            "unknown",
+            "false",
+            "direct"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q608",
+      "sql": "SELECT org_name, COUNT(*) AS cnt FROM \"{stream}\" WHERE re_match(org_name, 'warehouse') GROUP BY org_name HAVING COUNT(*) >= 3 ORDER BY cnt DESC",
+      "category": "combined",
+      "time_offset": {
+        "start_offset": 36360000000,
+        "end_offset": 36540000000
+      },
+      "expected": {
+        "columns": [
+          "org_name",
+          "cnt"
+        ],
+        "results": [
+          [
+            "warehouse-north",
+            "4"
+          ],
+          [
+            "warehouse-central",
+            "4"
+          ],
+          [
+            "warehouse-east",
+            "3"
+          ],
+          [
+            "warehouse-west",
+            "3"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q609",
+      "sql": "SELECT histogram(_timestamp, '30 second') AS _time, COUNT(*) FILTER (WHERE re_match(log, 'ACK')) AS ack_logs, COUNT(*) FILTER (WHERE re_match(log, 'error')) AS error_logs FROM \"{stream}\" GROUP BY _time ORDER BY _time",
+      "category": "combined",
+      "time_offset": {
+        "start_offset": 36420000000,
+        "end_offset": 36600000000
+      },
+      "expected": {
+        "columns": [
+          "_time",
+          "ack_logs",
+          "error_logs"
+        ],
+        "results": [
+          [
+            "2026-06-06T16:03:00",
+            "1",
+            "0"
+          ],
+          [
+            "2026-06-06T16:03:30",
+            "1",
+            "0"
+          ],
+          [
+            "2026-06-06T16:04:00",
+            "1",
+            "0"
+          ],
+          [
+            "2026-06-06T16:04:30",
+            "1",
+            "0"
+          ],
+          [
+            "2026-06-06T16:05:00",
+            "1",
+            "0"
+          ],
+          [
+            "2026-06-06T16:05:30",
+            "1",
+            "0"
+          ],
+          [
+            "2026-06-06T16:06:00",
+            "1",
+            "0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q610",
+      "sql": "SELECT _timestamp, log, exception_message FROM \"{stream}\" WHERE str_match_ignore_case(log, 'warehouse') AND re_match(exception_message, 'Exception|Error') ORDER BY _timestamp LIMIT 10",
+      "category": "combined",
+      "time_offset": {
+        "start_offset": 36480000000,
+        "end_offset": 36660000000
+      },
+      "expected": {
+        "columns": [
+          "log",
+          "exception_message"
+        ],
+        "results": [
+          [
+            "Q609 warehouse event record 0 ACK batch batchIdList:Q609-0",
+            "StateTransitionException: operation_mode hybrid invalid state"
+          ],
+          [
+            "Q608 warehouse event record 4",
+            "OverflowException: throughput_rate 999.0 exceeds max capacity"
+          ],
+          [
+            "Q609 warehouse event record 1",
+            "OverflowException: throughput_rate 999.0 exceeds max capacity"
+          ],
+          [
+            "Q609 warehouse event record 2",
+            "NullPointerException at ConveyorController.handle()"
+          ],
+          [
+            "Q609 warehouse event record 3 ACK batch batchIdList:Q609-3",
+            "TimeoutException: lane LANE-A did not respond within 5000ms"
+          ],
+          [
+            "Q610 warehouse event record 0 ACK batch batchIdList:Q610-0",
+            "TimeoutException: lane LANE-A did not respond within 5000ms"
+          ],
+          [
+            "Q609 warehouse event record 4",
+            "DataIntegrityException: pallet_id PL-002 checksum mismatch"
+          ],
+          [
+            "Q610 warehouse event record 1",
+            "DataIntegrityException: pallet_id PL-002 checksum mismatch"
+          ],
+          [
+            "Q610 warehouse event record 2",
+            "ResourceExhaustedException: sorter_model SORT-M3 queue full"
+          ],
+          [
+            "Q610 warehouse event record 3 ACK batch batchIdList:Q610-3",
+            "SecurityException: unauthorized access to control_center CC-ALPHA"
           ]
         ],
         "results_mode": "rowsort"
