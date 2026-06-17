@@ -38,6 +38,61 @@ impl PuffinBytesReader {
     }
 }
 
+/// Parse the Puffin footer ([`PuffinMeta`]) from a complete in-memory copy of a
+/// puffin (`.ttv`) file.
+///
+/// This is the storage-independent companion to [`PuffinFooterBytesReader`]:
+/// it takes the whole file as a byte slice instead of issuing ranged reads
+/// through the object-store layer. It exists for offline / diagnostic tooling
+/// (e.g. the `ttv-inspect` CLI) that opens a local file directly. The footer
+/// layout it decodes is `HeadMagic Payload PayloadSize Flags FootMagic`.
+pub fn parse_puffin_footer_from_bytes(data: &[u8]) -> Result<PuffinMeta> {
+    let total = data.len() as u64;
+    ensure!(
+        total >= MIN_FILE_SIZE,
+        "file too small to be a puffin/.ttv file: {total} bytes (min {MIN_FILE_SIZE})"
+    );
+
+    // Footer tail: ... PayloadSize[4] Flags[4] FootMagic[4]
+    let footer = &data[(total - FOOTER_SIZE) as usize..];
+    ensure!(
+        footer[(FOOTER_SIZE - MAGIC_SIZE) as usize..].to_vec() == MAGIC,
+        "Footer MAGIC mismatch (not a puffin/.ttv file?)"
+    );
+
+    let mut flags_bytes = [0u8; 4];
+    flags_bytes.copy_from_slice(
+        &footer[(FOOTER_SIZE - MAGIC_SIZE - FLAGS_SIZE) as usize..(FOOTER_SIZE - MAGIC_SIZE) as usize],
+    );
+    let flags = PuffinFooterFlags::from_bits(u32::from_le_bytes(flags_bytes))
+        .ok_or_else(|| anyhow!("Error parsing Puffin flags from bytes"))?;
+
+    let mut payload_size_bytes = [0u8; 4];
+    payload_size_bytes.copy_from_slice(&footer[0..FOOTER_PAYLOAD_SIZE_SIZE as usize]);
+    let payload_size = i32::from_le_bytes(payload_size_bytes) as u64;
+
+    ensure!(
+        total >= FOOTER_SIZE + payload_size + MAGIC_SIZE,
+        "Unexpected payload size: {payload_size} vs file size {total}"
+    );
+
+    // Payload region: HeadMagic[4] Payload[payload_size]
+    let payload_start = (total - FOOTER_SIZE - payload_size - MAGIC_SIZE) as usize;
+    let json_start = payload_start + MAGIC_SIZE as usize;
+    ensure!(
+        data[payload_start..json_start].to_vec() == MAGIC,
+        "Payload MAGIC mismatch"
+    );
+    let payload = &data[json_start..(total - FOOTER_SIZE) as usize];
+
+    if flags.contains(PuffinFooterFlags::COMPRESSED) {
+        let decoder = zstd::Decoder::new(payload)?;
+        serde_json::from_reader(decoder).map_err(|e| anyhow!("Error decompressing footer payload {e}"))
+    } else {
+        serde_json::from_slice(payload).map_err(|e| anyhow!("Error parsing footer payload {e}"))
+    }
+}
+
 impl PuffinBytesReader {
     pub async fn read_blob_bytes(
         &self,
