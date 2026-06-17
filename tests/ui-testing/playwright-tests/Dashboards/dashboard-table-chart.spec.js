@@ -373,9 +373,23 @@ test.describe("Dashboard Table Chart - Core Features", () => {
       await pm.chartTypeSelector.searchAndAddField("code", "y");
       await pm.chartTypeSelector.configureYAxisFunction("y_axis_1", "count");
 
-      const streamPromise = waitForStreamComplete(page);
+      // Register the response waiter BEFORE clicking Apply so the request isn't missed.
+      // Matches both _search_stream (raw logs) and _histogram_stream (aggregated).
+      const apiResponsePromise = page.waitForResponse(
+        (r) =>
+          (r.url().includes("_search_stream") ||
+            r.url().includes("_histogram_stream")) &&
+          r.status() === 200,
+        { timeout: 15000 }
+      );
+
       await pm.dashboardPanelActions.applyDashboardBtn();
-      await streamPromise;
+
+      // Assert the backend returned 200 — catches auth/query errors early.
+      const apiResponse = await apiResponsePromise;
+      expect(apiResponse.status()).toBe(200);
+
+      // Wait for table DOM to reflect the streamed data.
       await pm.chartTypeSelector.waitForTableDataLoad();
 
       // Verify headers — should have at least 2 columns (Timestamp + Code)
