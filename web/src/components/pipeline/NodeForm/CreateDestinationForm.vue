@@ -49,10 +49,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="destType in destinationTypes"
               :key="destType.value"
               :data-test="`destination-type-card-${destType.value}`"
-              class="destination-type-card tw:relative tw:flex tw:flex-col tw:items-center tw:justify-center tw:py-[20px] tw:px-3 tw:border-2 tw:border-[var(--o2-border)] tw:rounded-xl tw:bg-white tw:cursor-pointer tw:[transition:all_0.3s_ease] tw:min-h-[120px]"
+              class="destination-type-card tw:relative tw:flex tw:flex-col tw:items-center tw:justify-center tw:py-[20px] tw:px-3 tw:border-2 tw:border-[var(--o2-border)] tw:dark:border-[#424242] tw:rounded-xl tw:bg-white tw:dark:bg-[#1e1e1e] tw:cursor-pointer tw:[transition:all_0.3s_ease] tw:min-h-[120px] tw:hover:border-[var(--o2-border-color)] tw:hover:shadow-[0_4px_12px_rgba(25,118,210,0.15)] tw:hover:-translate-y-0.5 tw:dark:hover:border-[#5d9cec] tw:dark:hover:shadow-[0_4px_12px_rgba(93,156,236,0.2)]"
               :class="{
                 selected: formData.destination_type === destType.value,
-                'dark-mode': store.state.theme === 'dark',
               }"
               @click="formData.destination_type = destType.value"
             >
@@ -60,18 +59,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="destType.image"
                 :src="destType.image"
                 :alt="destType.label"
-                class="card-image"
+                class="tw:w-12 tw:h-12 tw:mb-2 tw:object-contain tw:[transition:all_0.3s_ease]"
               />
               <OIcon
                 v-else
                 :name="destType.icon"
                 size="lg"
-                class="card-icon"
+                class="card-icon tw:mb-2 tw:text-[#666] tw:[transition:color_0.3s_ease]"
               />
-              <div class="card-label">{{ destType.label }}</div>
+              <div class="card-label tw:text-[13px] tw:font-medium tw:text-center tw:leading-[1.3] tw:mt-1 tw:text-[var(--o2-text-primary)]">{{ destType.label }}</div>
               <div
                 v-if="formData.destination_type === destType.value"
-                class="check-icon"
+                class="tw:absolute tw:top-[0.375rem] tw:right-[0.375rem] tw:w-5 tw:h-5 tw:rounded-full tw:overflow-hidden tw:bg-[var(--o2-positive)] tw:text-white tw:flex tw:items-center tw:justify-center tw:z-[1]"
               >
                 <!-- eslint-disable-next-line vue/max-attributes-per-line -->
                 <OIcon name="check" size="xs" />
@@ -387,29 +386,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="md"
                   class="tw:mr-2"
                 />
-                <div class="tw:text-sm tw:font-medium text-weight-medium">
+                <div class="tw:text-sm tw:font-medium">
                   {{ connectionNotes.title }}
                 </div>
               </div>
               <div class="tw:text-sm">
-                <ol class="connection-steps tw:pl-3 tw:mb-0">
+                <ol class="tw:leading-[1.8] tw:pl-3 tw:mb-0">
                   <li
                     v-for="(stepText, index) in connectionNotes.steps"
                     :key="index"
-                    class="tw:mb-1"
+                    class="tw:mb-2"
                   >
                     {{ stepText }}
                   </li>
                 </ol>
                 <div
                   v-if="connectionNotes.example"
-                  class="tw:mt-2 tw:p-2 example-url"
-                  :class="
-                    store.state.theme === 'dark' ? 'tw:bg-gray-600' : 'tw:bg-white'
-                  "
+                  class="tw:mt-2 tw:p-2 tw:rounded-md tw:text-[13px] tw:bg-white tw:dark:bg-gray-600"
                 >
                   <strong>Example:</strong>
-                  <code class="tw:ml-1">{{ connectionNotes.example }}</code>
+                  <code class="tw:ml-1 tw:bg-transparent tw:p-0 tw:font-[Monaco,Menlo,'Ubuntu_Mono',monospace] tw:text-[#1976d2]">{{ connectionNotes.example }}</code>
                 </div>
               </div>
             </OCardSection>
@@ -1272,13 +1268,6 @@ defineExpose({
 </script>
 
 <style>
-/* Destination Type Cards */
-.destination-type-card:hover {
-  border-color: var(--o2-border-color);
-  box-shadow: 0 4px 12px rgba(25, 118, 210, 0.15);
-  transform: translateY(-2px);
-}
-
 .destination-type-card.selected {
   border-color: var(--o2-border-color);
   background: linear-gradient(135deg, #e3f2fd 0%, #ffffff 100%);
@@ -1293,104 +1282,17 @@ defineExpose({
   color: #333333;
 }
 
-.destination-type-card.dark-mode {
-  background: #1e1e1e;
-  border-color: #424242;
-}
-
-.destination-type-card.dark-mode:hover {
-  border-color: #5d9cec;
-  box-shadow: 0 4px 12px rgba(93, 156, 236, 0.2);
-}
-
-.destination-type-card.dark-mode.selected {
+.dark .destination-type-card.selected {
   border-color: #5d9cec;
   background: linear-gradient(135deg, #1a3a52 0%, #1e1e1e 100%);
   box-shadow: 0 4px 16px rgba(93, 156, 236, 0.25);
 }
 
-.destination-type-card.dark-mode.selected .card-icon {
+.dark .destination-type-card.selected .card-icon {
   color: #5d9cec;
 }
 
-.destination-type-card.dark-mode.selected .card-label {
+.dark .destination-type-card.selected .card-label {
   color: #ffffff;
-}
-
-.destination-type-card .card-icon {
-  margin-bottom: 8px;
-  color: #666;
-  transition: color 0.3s ease;
-}
-
-.destination-type-card .card-image {
-  width: 48px;
-  height: 48px;
-  margin-bottom: 8px;
-  object-fit: contain;
-  transition: all 0.3s ease;
-}
-
-.destination-type-card .card-label {
-  font-size: 13px;
-  font-weight: 500;
-  text-align: center;
-  line-height: 1.3;
-  margin-top: 4px;
-  color: var(--o2-text-primary);
-}
-
-.destination-type-card .check-icon {
-  position: absolute;
-  top: 0.375rem;
-  right: 0.375rem;
-  width: 1.25rem;
-  height: 1.25rem;
-  border-radius: 50%;
-  overflow: hidden;
-  background: var(--o2-positive);
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1;
-}
-
-/* Connection Notes Card */
-.connection-notes-card .connection-steps {
-  line-height: 1.8;
-}
-
-.connection-notes-card .connection-steps li {
-  margin-bottom: 8px;
-  color: inherit;
-}
-
-.connection-notes-card .example-url {
-  border-radius: 6px;
-  font-size: 13px;
-}
-
-.connection-notes-card .example-url code {
-  background: transparent;
-  padding: 0;
-  font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
-  color: #1976d2;
-}
-
-/* Enhanced input fields */
-.showLabelOnTop :deep(.q-field__prepend) {
-  padding-right: 8px;
-}
-
-</style>
-
-<style>
-.create-destination-form .q-field--labeled.showLabelOnTop .q-field__bottom {
-  padding: 0.275rem 0 0 !important;
-}
-
-.create-destination-form .q-field--labeled.showLabelOnTop {
-  padding-top: 24px;
 }
 </style>

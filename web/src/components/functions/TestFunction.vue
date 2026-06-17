@@ -845,30 +845,7 @@ defineExpose({
   margin: 1px 2px !important;
 }
 
-.function-stream-select-input :deep(.q-field--auto-height .q-field__control) {
-  height: 32px;
-  min-height: auto;
-}
-
-.function-stream-select-input :deep(.q-field--auto-height .q-field__control) .q-field__control-container {
-  height: 32px;
-}
-
-.function-stream-select-input :deep(.q-field--auto-height .q-field__control) .q-field__control-container .q-field__native {
-  min-height: 32px !important;
-  height: 32px !important;
-}
-
-.function-stream-select-input :deep(.q-field--auto-height .q-field__control) .q-field__marginal {
-  height: 32px;
-  min-height: auto;
-}
-
 .functions-duration-input :deep(.date-time-button) {
   width: 100%;
-}
-
-.functions-duration-input :deep(.date-time-button) .OIcon.on-right {
-  margin-left: auto;
 }
 </style>

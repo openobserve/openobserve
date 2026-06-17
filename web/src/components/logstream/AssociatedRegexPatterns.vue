@@ -327,11 +327,6 @@
                         data-test="add-regex-test-string-input"
                         v-model="testString"
                         class="regex-test-string-input"
-                        :class="
-                          store.state.theme === 'dark'
-                            ? 'dark-mode-regex-test-string-input'
-                            : 'light-mode-regex-test-string-input'
-                        "
                         type="textarea"
                         placeholder="Eg. 1234567890"
                         :rows="5"
@@ -361,11 +356,6 @@
                         data-test="add-regex-test-string-input"
                         v-model="outputString"
                         class="regex-test-string-input"
-                        :class="
-                          store.state.theme === 'dark'
-                            ? 'dark-mode-regex-test-string-input'
-                            : 'light-mode-regex-test-string-input'
-                        "
                         type="textarea"
                         placeholder="Output String"
                         :rows="5"
@@ -947,19 +937,5 @@ export default defineComponent({
 <style>
 .regex-test-string-input > div > div > div > textarea {
   resize: none !important;
-}
-.dark-mode-regex-test-string-input .q-field__control {
-  background-color: var(--o2-primary-background) !important;
-  border-top: 1px solid #666666 !important;
-  border-left: 1px solid #666666 !important;
-  border-right: 1px solid #666666 !important;
-  border-bottom: 1px solid #666666 !important;
-}
-.light-mode-regex-test-string-input .q-field__control {
-  background-color: #ffffff !important;
-  border-top: 1px solid #e6e6e6 !important;
-  border-left: 1px solid #e6e6e6 !important;
-  border-right: 1px solid #e6e6e6 !important;
-  border-bottom: 1px solid #e6e6e6 !important;
 }
 </style>

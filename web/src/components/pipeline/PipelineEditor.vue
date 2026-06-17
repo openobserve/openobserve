@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="nodes-drag-container tw:pr-3 tw:w-50">
           <div
             data-test="pipeline-editor-nodes-list-title"
-            class="nodes-header tw:mb-2 tw:mx-2 tw:text-base tw:font-semibold tw:text-[#1f2937] tw:px-1 tw:pb-2 tw:text-center tw:border-b-2 tw:border-[#e5e7eb] tw:tracking-wide tw:relative"
+            class="nodes-header tw:mb-2 tw:mx-2 tw:text-base tw:font-semibold tw:text-[#1f2937] tw:dark:text-[rgba(255,255,255,0.95)] tw:px-1 tw:pb-2 tw:text-center tw:border-b-2 tw:border-[#e5e7eb] tw:dark:border-[rgba(255,255,255,0.2)] tw:tracking-wide tw:relative"
           >
             {{ t("pipeline.nodes") }}
           </div>
@@ -1294,54 +1294,49 @@ const cleanupPipelinesContextProvider = () => {
   transition: none !important;
 }
 
-.body--dark .nodes-header {
-  color: rgba(255, 255, 255, 0.95) !important;
-  border-bottom: 2px solid rgba(255, 255, 255, 0.2) !important;
-}
-
-.body--dark .nodes-header::after {
+.dark .nodes-header::after {
   background: #a855f7 !important;
 }
 
-.body--dark .vue-flow__node-input,
-.body--dark .o2vf_node_input {
+.dark .vue-flow__node-input,
+.dark .o2vf_node_input {
   background: rgba(30, 58, 138, 0.2) !important;
   border: 1px solid rgba(96, 165, 250, 0.3) !important;
   color: rgba(255, 255, 255, 0.9) !important;
   box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1) !important;
 }
 
-.body--dark .vue-flow__node-input:hover,
-.body--dark .o2vf_node_input:hover {
+.dark .vue-flow__node-input:hover,
+.dark .o2vf_node_input:hover {
   background: rgba(30, 58, 138, 0.3) !important;
   border-color: rgba(96, 165, 250, 0.5) !important;
   box-shadow: 0 6px 16px rgba(59, 130, 246, 0.2) !important;
 }
 
-.body--dark .vue-flow__node-output,
-.body--dark .o2vf_node_output {
+.dark .vue-flow__node-output,
+.dark .o2vf_node_output {
   background: rgba(20, 83, 45, 0.2) !important;
   border: 1px solid rgba(74, 222, 128, 0.3) !important;
   color: rgba(255, 255, 255, 0.9) !important;
 }
 
-.body--dark .vue-flow__node-output:hover,
-.body--dark .o2vf_node_output:hover {
+.dark .vue-flow__node-output:hover,
+.dark .o2vf_node_output:hover {
   background: rgba(20, 83, 45, 0.3) !important;
   border-color: rgba(74, 222, 128, 0.5) !important;
   box-shadow: 0 6px 16px rgba(34, 197, 94, 0.2) !important;
 }
 
-.body--dark .vue-flow__node-default,
-.body--dark .o2vf_node_default {
+.dark .vue-flow__node-default,
+.dark .o2vf_node_default {
   background: rgba(120, 53, 15, 0.2) !important;
   border: 1px solid rgba(251, 146, 60, 0.3) !important;
   color: rgba(255, 255, 255, 0.9) !important;
   box-shadow: 0 4px 12px rgba(245, 158, 11, 0.1) !important;
 }
 
-.body--dark .vue-flow__node-default:hover,
-.body--dark .o2vf_node_default:hover {
+.dark .vue-flow__node-default:hover,
+.dark .o2vf_node_default:hover {
   background: rgba(120, 53, 15, 0.3) !important;
   border-color: rgba(251, 146, 60, 0.5) !important;
   box-shadow: 0 6px 16px rgba(245, 158, 11, 0.2) !important;

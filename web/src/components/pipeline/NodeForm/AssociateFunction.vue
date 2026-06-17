@@ -95,16 +95,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           class="tw:mt-4 tw:mb-4"
         >
-          <OCard class="function-definition-card tw:border tw:border-[#e1e5e9] tw:rounded-lg tw:shadow-[0_2px_4px_rgba(0,0,0,0.05)] tw:overflow-hidden">
-            <OCardSection role="header" class="function-definition-header tw:bg-[linear-gradient(135deg,#f8fafc_0%,#f1f5f9_100%)] tw:border-b tw:border-b-[#e2e8f0]">
-              <div class="tw:text-base text-weight-medium text-primary">
+          <OCard class="function-definition-card tw:border tw:border-[#e1e5e9] tw:dark:border-[#2d3748] tw:rounded-lg tw:shadow-[0_2px_4px_rgba(0,0,0,0.05)] tw:dark:shadow-[0_4px_12px_rgba(0,0,0,0.4)] tw:overflow-hidden tw:dark:bg-[#1a202c]">
+            <OCardSection role="header" class="function-definition-header tw:bg-[linear-gradient(135deg,#f8fafc_0%,#f1f5f9_100%)] tw:dark:bg-[linear-gradient(135deg,#2d3748_0%,#1a202c_100%)] tw:border-b tw:border-b-[#e2e8f0] tw:dark:border-b-[#4a5568]">
+              <div class="tw:text-base tw:font-semibold tw:text-[#2d3748] tw:dark:text-white">
                 {{ t("function.function_definition") }}
               </div>
             </OCardSection>
             <OSeparator />
             <OCardSection class="tw:p-0 function-definition-content">
-              <div class="function-code-container tw:bg-[#fafbfc] tw:rounded-none tw:max-w-[584px] tw:max-h-[250px] tw:overflow-y-auto tw:relative">
-                <pre class="function-code tw:text-[#2d3748] tw:bg-transparent tw:m-0 tw:p-4 tw:font-[JetBrains_Mono,Fira_Code,Monaco,Menlo,Ubuntu_Mono,monospace] tw:text-[13px] tw:leading-normal tw:whitespace-pre-wrap tw:break-words tw:border-0 tw:font-normal tw:cursor-default tw:select-text">{{
+              <div class="function-code-container tw:bg-[#fafbfc] tw:dark:bg-[#0d1117] tw:dark:border tw:dark:border-[#21262d] tw:rounded-none tw:max-w-[584px] tw:max-h-[250px] tw:overflow-y-auto tw:relative">
+                <pre class="function-code tw:text-[#2d3748] tw:dark:text-[#f7fafc] tw:bg-transparent tw:m-0 tw:p-4 tw:font-[JetBrains_Mono,Fira_Code,Monaco,Menlo,Ubuntu_Mono,monospace] tw:text-[13px] tw:leading-normal tw:whitespace-pre-wrap tw:break-words tw:border-0 tw:font-normal tw:cursor-default tw:select-text">{{
                   pipelineObj.functions[selectedFunction]?.function ||
                   "No definition available"
                 }}</pre>
@@ -438,11 +438,6 @@ const filterFunctions = (val: any, update: any) => {
   display: none;
 }
 
-.function-definition-header .text-primary {
-  color: #2d3748 !important;
-  font-weight: 600;
-}
-
 .function-code::selection {
   background-color: #bee3f8;
 }
@@ -465,60 +460,27 @@ const filterFunctions = (val: any, update: any) => {
   background: #a0aec0;
 }
 
-/* Dark mode - Enhanced OpenObserve style */
-.body--dark .function-definition-card {
-  border-color: #2d3748;
-  background-color: #1a202c;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-}
-
-.body--dark .function-definition-header {
-  background: linear-gradient(135deg, #2d3748 0%, #1a202c 100%);
-  border-bottom-color: #4a5568;
-}
-
-.body--dark .function-definition-header .text-primary {
-  color: #ffffff !important;
-  font-weight: 600;
-}
-
-.body--dark .readonly-chip {
-  background-color: #2d3748 !important;
-  border-color: #4a5568 !important;
-  color: #a0aec0 !important;
-}
-
-.body--dark .function-code-container {
-  background-color: #0d1117;
-  border: 1px solid #21262d;
-}
-
-.body--dark .function-code {
-  color: #f7fafc;
-  background-color: transparent;
-}
-
-.body--dark .function-code::selection {
+.dark .function-code::selection {
   background-color: #2b6cb0;
   color: #ffffff;
 }
 
-.body--dark .function-code-container::-webkit-scrollbar {
+.dark .function-code-container::-webkit-scrollbar {
   width: 8px;
 }
 
-.body--dark .function-code-container::-webkit-scrollbar-track {
+.dark .function-code-container::-webkit-scrollbar-track {
   background: #0d1117;
   border-radius: 4px;
 }
 
-.body--dark .function-code-container::-webkit-scrollbar-thumb {
+.dark .function-code-container::-webkit-scrollbar-thumb {
   background: #4a5568;
   border-radius: 4px;
   border: 1px solid #2d3748;
 }
 
-.body--dark .function-code-container::-webkit-scrollbar-thumb:hover {
+.dark .function-code-container::-webkit-scrollbar-thumb:hover {
   background: #718096;
 }
 
