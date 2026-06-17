@@ -1738,7 +1738,16 @@
     "opLessThanEqual": "kleiner dan of gelijk aan",
     "opGreaterThanEqual": "groter dan of gelijk aan",
     "opEqual": "gelijk aan",
-    "opNotEqual": "niet gelijk aan"
+    "opNotEqual": "niet gelijk aan",
+    "columnFormattingAddField": "Veld toevoegen",
+    "columnFormattingAllAdded": "Alle velden zijn toegevoegd",
+    "columnFormattingNoFields": "Geen velden toegevoegd",
+    "columnFormattingNoFieldsHint": "Gebruik „\" Veld toevoegen \"” hierboven om te beginnen met het opmaken van een kolom.”",
+    "columnFormattingEmptyTitle": "Een kolom opmaken",
+    "columnFormattingEmptyHint": "Kies een veld om eenheden, uitlijning, kleuren en voorwaardelijke regels toe te passen.",
+    "columnFormattingNoFieldsToFormat": "Nog geen velden geformatteerd",
+    "columnFormattingOneFieldToFormat": "1 veld geformatteerd",
+    "columnFormattingFieldsToFormat": "geformatteerde velden"
   },
   "panel": {
     "header": "Paneel",

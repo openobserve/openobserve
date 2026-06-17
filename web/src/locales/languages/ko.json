@@ -1738,7 +1738,16 @@
     "opLessThanEqual": "보다 작거나 같음",
     "opGreaterThanEqual": "보다 크거나 같음",
     "opEqual": "과 같음",
-    "opNotEqual": "같지 않음"
+    "opNotEqual": "같지 않음",
+    "columnFormattingAddField": "필드 추가",
+    "columnFormattingAllAdded": "모든 필드 추가됨",
+    "columnFormattingNoFields": "추가된 필드 없음",
+    "columnFormattingNoFieldsHint": "위의 “필드 추가”를 사용하여 열 서식 지정을 시작합니다.",
+    "columnFormattingEmptyTitle": "컬럼 포맷 지정하기",
+    "columnFormattingEmptyHint": "단위, 정렬, 색상 및 조건부 규칙을 적용할 필드를 선택합니다.",
+    "columnFormattingNoFieldsToFormat": "아직 서식이 지정된 필드 없음",
+    "columnFormattingOneFieldToFormat": "서식 지정된 필드 1개",
+    "columnFormattingFieldsToFormat": "서식이 지정된 필드"
   },
   "panel": {
     "header": "패널",

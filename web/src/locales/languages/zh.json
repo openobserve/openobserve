@@ -1738,7 +1738,16 @@
     "opLessThanEqual": "小于或等于",
     "opGreaterThanEqual": "大于或等于",
     "opEqual": "等于",
-    "opNotEqual": "不等于"
+    "opNotEqual": "不等于",
+    "columnFormattingAddField": "添加字段",
+    "columnFormattingAllAdded": "已添加所有字段",
+    "columnFormattingNoFields": "未添加任何字段",
+    "columnFormattingNoFieldsHint": "使用上面的 “添加字段” 开始格式化列。",
+    "columnFormattingEmptyTitle": "格式化一列",
+    "columnFormattingEmptyHint": "选择一个字段来应用单位、对齐方式、颜色和条件规则。",
+    "columnFormattingNoFieldsToFormat": "尚未格式化任何字段",
+    "columnFormattingOneFieldToFormat": "1 个字段已格式化",
+    "columnFormattingFieldsToFormat": "格式化的字段"
   },
   "panel": {
     "header": "面板",

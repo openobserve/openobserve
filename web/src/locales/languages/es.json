@@ -1738,7 +1738,16 @@
     "opLessThanEqual": "menor o igual a",
     "opGreaterThanEqual": "mayor o igual a",
     "opEqual": "igual a",
-    "opNotEqual": "no igual a"
+    "opNotEqual": "no igual a",
+    "columnFormattingAddField": "Agregar campo",
+    "columnFormattingAllAdded": "Se han añadido todos los campos",
+    "columnFormattingNoFields": "No se han añadido campos",
+    "columnFormattingNoFieldsHint": "Usa la opción «Agregar campo» de arriba para empezar a formatear una columna.",
+    "columnFormattingEmptyTitle": "Dar formato a una columna",
+    "columnFormattingEmptyHint": "Elija un campo para aplicar unidades, alineación, colores y reglas condicionales.",
+    "columnFormattingNoFieldsToFormat": "Aún no hay campos formateados",
+    "columnFormattingOneFieldToFormat": "1 campo formateado",
+    "columnFormattingFieldsToFormat": "campos formateados"
   },
   "panel": {
     "header": "Panel",

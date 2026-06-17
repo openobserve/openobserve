@@ -1755,7 +1755,16 @@
     "opLessThanEqual": "以下または等しい",
     "opGreaterThanEqual": "より大きい、または等しい",
     "opEqual": "等しい",
-    "opNotEqual": "等しくない"
+    "opNotEqual": "等しくない",
+    "columnFormattingAddField": "フィールドを追加",
+    "columnFormattingAllAdded": "すべてのフィールドが追加されました",
+    "columnFormattingNoFields": "フィールドは追加されていません",
+    "columnFormattingNoFieldsHint": "上記の [フィールドを追加] を使用して、列のフォーマットを開始します。",
+    "columnFormattingEmptyTitle": "列をフォーマットする",
+    "columnFormattingEmptyHint": "フィールドを選択して、単位、配置、色、条件付きルールを適用します。",
+    "columnFormattingNoFieldsToFormat": "まだフォーマットされたフィールドはありません",
+    "columnFormattingOneFieldToFormat": "1 フィールドフォーマット済み",
+    "columnFormattingFieldsToFormat": "フォーマットされたフィールド"
   },
   "panel": {
     "header": "パネル",
