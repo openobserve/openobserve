@@ -1,0 +1,117 @@
+{
+  "version": 1,
+  "integrations": [
+    {
+      "slug": "openai",
+      "name": "OpenAI",
+      "category": "popular",
+      "order": 1,
+      "docURL": "https://openobserve.ai/docs/integration/ai/providers/openai/",
+      "keywords": ["openai", "gpt", "python", "model provider"]
+    },
+    {
+      "slug": "anthropic",
+      "name": "Anthropic",
+      "category": "popular",
+      "order": 2,
+      "docURL": "https://openobserve.ai/docs/integration/ai/providers/anthropic/",
+      "keywords": ["anthropic", "claude", "python", "model provider"]
+    },
+    {
+      "slug": "gemini",
+      "name": "Google Gemini",
+      "category": "popular",
+      "order": 3,
+      "docURL": "https://openobserve.ai/docs/integration/ai/providers/google-gemini/",
+      "keywords": ["google", "gemini", "model provider"]
+    },
+    {
+      "slug": "claude-code",
+      "name": "Claude Code",
+      "category": "popular",
+      "order": 4,
+      "docURL": "https://openobserve.ai/docs/integration/ai/claude-code-tracing/",
+      "keywords": ["claude", "code", "cli", "anthropic", "tracing"]
+    },
+    {
+      "slug": "codex",
+      "name": "OpenAI Codex",
+      "category": "popular",
+      "order": 5,
+      "docURL": "",
+      "keywords": ["codex", "openai", "cli", "agent"]
+    },
+    {
+      "slug": "cursor",
+      "name": "Cursor",
+      "category": "popular",
+      "order": 6,
+      "docURL": "",
+      "keywords": ["cursor", "ide", "agent", "editor"]
+    },
+    {
+      "slug": "opencode",
+      "name": "OpenCode",
+      "category": "popular",
+      "order": 7,
+      "docURL": "",
+      "keywords": ["opencode", "cli", "agent"]
+    },
+    {
+      "slug": "claude-agent-sdk",
+      "name": "Claude Agent SDK",
+      "category": "popular",
+      "order": 8,
+      "docURL": "https://openobserve.ai/docs/integration/ai/frameworks/claude-agent-sdk/",
+      "keywords": ["claude", "agent", "sdk", "anthropic"]
+    },
+    {
+      "slug": "langchain",
+      "name": "LangChain",
+      "category": "popular",
+      "order": 9,
+      "docURL": "https://openobserve.ai/docs/integration/ai/frameworks/langchain/",
+      "keywords": ["langchain", "langgraph", "llm", "chain"]
+    },
+    {
+      "slug": "crewai",
+      "name": "CrewAI",
+      "category": "popular",
+      "order": 10,
+      "docURL": "https://openobserve.ai/docs/integration/ai/frameworks/crewai/",
+      "keywords": ["crewai", "crew", "multi-agent"]
+    },
+    {
+      "slug": "google-adk",
+      "name": "Google ADK",
+      "category": "popular",
+      "order": 11,
+      "docURL": "https://openobserve.ai/docs/integration/ai/frameworks/google-adk/",
+      "keywords": ["google", "adk", "agent development kit"]
+    },
+    {
+      "slug": "openai-agents",
+      "name": "OpenAI Agents",
+      "category": "popular",
+      "order": 12,
+      "docURL": "https://openobserve.ai/docs/integration/ai/frameworks/openai-agents/",
+      "keywords": ["openai", "agents", "agent sdk"]
+    },
+    {
+      "slug": "openrouter",
+      "name": "OpenRouter",
+      "category": "popular",
+      "order": 13,
+      "docURL": "https://openobserve.ai/docs/integration/ai/gateways/openrouter/",
+      "keywords": ["openrouter", "router", "gateway"]
+    },
+    {
+      "slug": "litellm",
+      "name": "LiteLLM",
+      "category": "popular",
+      "order": 14,
+      "docURL": "https://openobserve.ai/docs/integration/ai/gateways/litellm-proxy/",
+      "keywords": ["litellm", "proxy", "gateway", "llm"]
+    }
+  ]
+}

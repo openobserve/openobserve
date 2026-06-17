@@ -1,0 +1,23 @@
+{
+  "repo": "https://github.com/openobserve/o2-datasource.git",
+  "ref": "main",
+  "sha": "fe9f94a73b737a5686ca869eb424d453049c9f30",
+  "fetchedAt": "2026-06-16T10:42:25.216Z",
+  "count": 14,
+  "slugs": [
+    "anthropic",
+    "claude-agent-sdk",
+    "claude-code",
+    "codex",
+    "crewai",
+    "cursor",
+    "gemini",
+    "google-adk",
+    "langchain",
+    "litellm",
+    "openai",
+    "openai-agents",
+    "opencode",
+    "openrouter"
+  ]
+}
