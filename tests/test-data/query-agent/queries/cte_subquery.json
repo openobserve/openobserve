@@ -346,7 +346,7 @@
             "4",
             "581.25",
             "27.53",
-            "hybrid",
+            "manual",
             "2"
           ],
           [
@@ -354,7 +354,7 @@
             "4",
             "386.25",
             "29.83",
-            "manual",
+            "auto",
             "2"
           ],
           [
@@ -1242,14 +1242,14 @@
             "483.0"
           ],
           [
-            "ZONE-2",
-            "3",
-            "620.0"
-          ],
-          [
             "ZONE-3",
             "3",
             "94.0"
+          ],
+          [
+            "ZONE-2",
+            "3",
+            "620.0"
           ]
         ],
         "results_mode": "rowsort"
@@ -1508,14 +1508,14 @@
             "88.1"
           ],
           [
-            "ZONE-2",
+            "ZONE-4",
             "auto",
             "1",
             "150.0",
             "45.3"
           ],
           [
-            "ZONE-4",
+            "ZONE-2",
             "auto",
             "1",
             "150.0",
@@ -1560,16 +1560,16 @@
             "66.0"
           ],
           [
-            "ZONE-4",
-            "SORT-A7",
+            "ZONE-2",
+            "SORT-Q5",
             "low_tput",
             "1",
             "150.0",
             "45.3"
           ],
           [
-            "ZONE-2",
-            "SORT-Q5",
+            "ZONE-4",
+            "SORT-A7",
             "low_tput",
             "1",
             "150.0",
@@ -1753,22 +1753,22 @@
         ],
         "results": [
           [
-            "NetworkException: connection to batch sync failed",
-            "2",
-            "1"
-          ],
-          [
             "SecurityException: unauthorized access to control_center CC-ALPHA",
             "2",
             "1"
           ],
           [
-            "ConfigurationException: missing facility_zone ZONE-3 override",
-            "1",
+            "NetworkException: connection to batch sync failed",
+            "2",
             "1"
           ],
           [
             "ResourceExhaustedException: sorter_model SORT-M3 queue full",
+            "1",
+            "1"
+          ],
+          [
+            "ConfigurationException: missing facility_zone ZONE-3 override",
             "1",
             "1"
           ]
@@ -1814,12 +1814,12 @@
         ],
         "results": [
           [
-            "performanceMetric",
+            "navigation",
             "itemPage",
             "2"
           ],
           [
-            "navigation",
+            "performanceMetric",
             "itemPage",
             "2"
           ],
@@ -2006,13 +2006,13 @@
             "1"
           ],
           [
-            "fast",
-            "client_error",
+            "degraded",
+            "ok",
             "1"
           ],
           [
-            "degraded",
-            "ok",
+            "fast",
+            "client_error",
             "1"
           ]
         ],
@@ -2034,11 +2034,11 @@
         ],
         "results": [
           [
-            "E003",
+            "E001",
             "2"
           ],
           [
-            "E001",
+            "E003",
             "2"
           ],
           [
@@ -2142,11 +2142,6 @@
         ],
         "results": [
           [
-            "navigation",
-            "itemPage",
-            "1"
-          ],
-          [
             "performanceMetric",
             "searchPage",
             "1"
@@ -2157,13 +2152,18 @@
             "1"
           ],
           [
-            "performanceMetric",
-            "checkoutPage",
+            "navigation",
+            "itemPage",
             "1"
           ],
           [
             "performanceMetric",
             "cartPage",
+            "1"
+          ],
+          [
+            "performanceMetric",
+            "checkoutPage",
             "1"
           ]
         ],
@@ -2249,6 +2249,12 @@
         ],
         "results": [
           [
+            "cartPage",
+            "2",
+            "1450.0",
+            "2"
+          ],
+          [
             "searchPage",
             "1",
             "230.0",
@@ -2259,12 +2265,6 @@
             "1",
             "89.0",
             "1"
-          ],
-          [
-            "cartPage",
-            "2",
-            "1450.0",
-            "2"
           ]
         ],
         "results_mode": "rowsort"
@@ -2956,16 +2956,16 @@
             "0"
           ],
           [
-            "warehouse-central",
-            "1",
-            "230.0",
-            "1"
-          ],
-          [
             "warehouse-east",
             "1",
             "1900.0",
             "0"
+          ],
+          [
+            "warehouse-central",
+            "1",
+            "230.0",
+            "1"
           ],
           [
             "warehouse-north",

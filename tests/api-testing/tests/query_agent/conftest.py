@@ -67,6 +67,42 @@ def load_all_queries():
     return categories
 
 
+# ── FTS Content Verification ────────────────────────────────────────────────
+def _verify_fts_content(sql, hits, qid):
+    """Verify match_all results: returned rows contain the search terms.
+
+    Tantivy full-text search tokenizes and indexes text fields.  When the
+    DataFusion access plan is bypassed (e.g. after an upgrade), match_all
+    can silently return wrong results — rows that don't contain the search
+    terms at all.  This check catches that.
+
+    Only fires for queries that use match_all() and return the ``log``
+    field (the primary FTS-indexed field in test data).  For queries that
+    SELECT specific columns without ``log``, we skip verification since
+    the match may have been in a non-returned field.
+    """
+    terms = re.findall(r"match_all\('([^']*)'\)", sql, re.IGNORECASE)
+    if not terms or not hits:
+        return
+
+    # Only verify when 'log' is in the returned columns (match_all
+    # primarily searches the log field in our test configuration).
+    if "log" not in hits[0]:
+        return
+
+    for hit in hits:
+        log_val = str(hit.get("log", "")).lower()
+        for term in terms:
+            for word in term.split():
+                if word.lower() not in log_val:
+                    raise AssertionError(
+                        f"{qid}: FTS content verification failed — "
+                        f"match_all('{term}') returned a row where "
+                        f"'{word}' is not in log field. "
+                        f"log={hit.get('log', '')[:150]}"
+                    )
+
+
 # ── Shared query runner ────────────────────────────────────────────────────
 def run_query(client, query, *, skip_fts_count=False):
     """Execute a single query via _search and assert expected results.
@@ -104,6 +140,12 @@ def run_query(client, query, *, skip_fts_count=False):
 
     expected = query.get("expected", {})
     is_fts = query.get("category") == "full_text_search"
+
+    # Verify match_all results actually contain the search terms.
+    # After a DataFusion upgrade, the Tantivy access plan can be bypassed
+    # silently — this content check catches wrong results that row-count
+    # comparisons alone would miss.
+    _verify_fts_content(sql, hits, qid)
 
     if "results" in expected and not (skip_fts_count and is_fts) and not expected.get("skip_sqllogictest"):
         # ── sqllogictest mode: result-set comparison with float tolerance ─
