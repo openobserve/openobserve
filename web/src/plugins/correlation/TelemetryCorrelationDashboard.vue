@@ -162,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- -- Left sidebar -- -->
             <template #before>
               <div
-                class="dimension-sidebar card-container tw:h-full tw:min-h-0 tw:flex tw:flex-col tw:bg-white"
+                class="card-container tw:h-full tw:min-h-0 tw:flex tw:flex-col tw:bg-white tw:dark:bg-[#202223]!"
               >
                 <!-- Search -->
                   <div
@@ -193,10 +193,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <template v-if="group.streams.length > 0">
                         <div
-                          class="metric-group-header tw:flex tw:items-center tw:justify-between tw:py-1.5 tw:px-2 tw:bg-(--q-color-grey-2,#f5f5f5) tw:border-b tw:border-solid tw:border-(--o2-border) tw:sticky tw:top-0 tw:z-10 tw:cursor-pointer"
+                          class="tw:flex tw:items-center tw:justify-between tw:py-1.5 tw:px-2 tw:bg-(--q-color-grey-2,#f5f5f5) tw:border-b tw:border-solid tw:border-(--o2-border) tw:sticky tw:top-0 tw:z-10 tw:cursor-pointer tw:dark:bg-[#202223]! tw:dark:border-[rgba(255,255,255,0.1)]"
                           @click="toggleGroupCollapse(group.id)"
                         >
-                          <div class="metric-group-label">
+                          <div class="tw:flex tw:items-center tw:gap-[0.375rem] tw:text-[0.6875rem] tw:font-bold tw:uppercase tw:tracking-[0.05em] tw:opacity-75">
                             <OIcon
                               :name="
                                 collapsedGroups.has(group.id)
@@ -214,7 +214,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               class="tw:ml-1"
                             >{{ group.streams.length }}</OBadge>
                           </div>
-                          <div class="metric-group-actions">
+                          <div class="tw:flex tw:gap-1">
                             <OButton
                               variant="ghost"
                               size="chip"
@@ -238,7 +238,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           v-show="!collapsedGroups.has(group.id)"
                           :key="stream.stream_name"
                           data-test="telemetry-correlation-metric-stream-item"
-                          class="dimension-list-item tw:border-none! tw:flex tw:items-center tw:gap-2 tw:px-2 tw:py-1 tw:cursor-pointer tw:hover:bg-muted/50"
+                          class="tw:border-none! tw:flex tw:items-center tw:gap-2 tw:px-2 tw:py-1 tw:cursor-pointer tw:hover:bg-[rgba(0,0,0,0.04)] tw:dark:hover:bg-[rgba(255,255,255,0.05)]"
                           @click="toggleMetricStream(stream)"
                         >
                           <div class="tw:flex tw:items-center tw:shrink-0">
@@ -254,7 +254,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </div>
                           <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
                             <span
-                              class="dimension-label tw:truncate tw:cursor-pointer tw:text-[var(--o2-text-2)]! tw:text-sm"
+                              class="tw:truncate tw:cursor-pointer tw:text-[var(--o2-text-2)]! tw:text-sm"
                               >{{ stream.stream_name }}</span
                             >
                           </div>
@@ -282,7 +282,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- -- Separator -- -->
             <template #separator>
-              <div class="metric-splitter-separator tw:w-px tw:h-full tw:bg-(--o2-border) tw:cursor-col-resize" />
+              <div class="tw:w-px tw:h-full tw:bg-(--o2-border) tw:cursor-col-resize tw:dark:bg-[rgba(255,255,255,0.12)]" />
             </template>
 
             <!-- -- Right area: group tabs + dashboard -- -->
@@ -462,7 +462,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <!-- Header -->
             <div
-              class="trace-header-bg tw:p-3 tw:border-b tw:border-solid tw:border-(--o2-border-color) tw:bg-white"
+              class="tw:p-3 tw:border-b tw:border-solid tw:border-(--o2-border-color) tw:bg-white tw:dark:bg-[#1e1e1e]"
             >
               <div class="tw:flex tw:items-center tw:gap-3">
                 <OIcon name="hub" size="md" />
@@ -538,7 +538,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </ODrawer>
 
   <!-- Embedded Tabs Mode -->
-  <div v-else class="correlation-dashboard-embedded tw:flex tw:flex-col tw:h-full tw:w-full tw:bg-white!">
+  <div v-else class="tw:flex tw:flex-col tw:h-full tw:w-full tw:bg-white! tw:dark:bg-[#1e1e1e]!">
     <!-- Dimensions Display - Stable (matched) and Unstable (additional) -->
     <DimensionFiltersBar
       v-if="!props.hideDimensionFilters"
@@ -554,8 +554,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Tab Panels (no tabs in embedded mode, controlled by parent) -->
     <OCard
-      class="correlation-content tw:flex-1"
-      style="display: flex; flex-direction: column; overflow: auto"
+      class="tw:flex tw:flex-col tw:flex-1 tw:min-h-0 tw:overflow-auto"
     >
       <div
         v-if="activeTab == 'logs'"
@@ -626,7 +625,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- -- Left sidebar -- -->
           <template #before>
             <div
-              class="dimension-sidebar card-container tw:h-full tw:min-h-0 tw:flex tw:flex-col tw:bg-white"
+              class="card-container tw:h-full tw:min-h-0 tw:flex tw:flex-col tw:bg-white tw:dark:bg-[#202223]!"
             >
             <div
               class="dimension-sidebar-search-container tw:p-[0.625rem] tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
@@ -656,10 +655,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <template v-if="group.streams.length > 0">
                       <div
-                        class="metric-group-header tw:flex tw:items-center tw:justify-between tw:py-1.5 tw:px-2 tw:bg-(--q-color-grey-2,#f5f5f5) tw:border-b tw:border-solid tw:border-(--o2-border) tw:sticky tw:top-0 tw:z-10 tw:cursor-pointer"
+                        class="tw:flex tw:items-center tw:justify-between tw:py-1.5 tw:px-2 tw:bg-(--q-color-grey-2,#f5f5f5) tw:border-b tw:border-solid tw:border-(--o2-border) tw:sticky tw:top-0 tw:z-10 tw:cursor-pointer tw:dark:bg-[#202223]! tw:dark:border-[rgba(255,255,255,0.1)]"
                         @click="toggleGroupCollapse(group.id)"
                       >
-                        <div class="metric-group-label">
+                        <div class="tw:flex tw:items-center tw:gap-[0.375rem] tw:text-[0.6875rem] tw:font-bold tw:uppercase tw:tracking-[0.05em] tw:opacity-75">
                           <OIcon
                             :name="
                               collapsedGroups.has(group.id)
@@ -677,7 +676,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             class="tw:ml-1"
                           >{{ group.streams.length }}</OBadge>
                         </div>
-                        <div class="metric-group-actions">
+                        <div class="tw:flex tw:gap-1">
                           <OButton
                             variant="ghost"
                             size="chip"
@@ -701,7 +700,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         v-show="!collapsedGroups.has(group.id)"
                         :key="stream.stream_name"
                         data-test="telemetry-correlation-metric-stream-item"
-                        class="dimension-list-item tw:border-none! tw:flex tw:items-center tw:gap-2 tw:px-2 tw:py-1 tw:cursor-pointer tw:hover:bg-muted/50"
+                        class="tw:border-none! tw:flex tw:items-center tw:gap-2 tw:px-2 tw:py-1 tw:cursor-pointer tw:hover:bg-[rgba(0,0,0,0.04)] tw:dark:hover:bg-[rgba(255,255,255,0.05)]"
                         @click="toggleMetricStream(stream)"
                       >
                         <div class="tw:flex tw:items-center tw:shrink-0">
@@ -717,7 +716,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </div>
                         <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
                           <span
-                            class="dimension-label tw:truncate tw:cursor-pointer tw:text-[var(--o2-text-2)]! tw:text-sm"
+                            class="tw:truncate tw:cursor-pointer tw:text-[var(--o2-text-2)]! tw:text-sm"
                             >{{ stream.stream_name }}</span
                           >
                         </div>
@@ -745,7 +744,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- -- Separator -- -->
           <template #separator>
-            <div class="metric-splitter-separator tw:w-px tw:h-full tw:bg-(--o2-border) tw:cursor-col-resize" />
+            <div class="tw:w-px tw:h-full tw:bg-(--o2-border) tw:cursor-col-resize tw:dark:bg-[rgba(255,255,255,0.12)]" />
           </template>
 
           <!-- -- Right area: group tabs + dashboard -- -->
@@ -924,7 +923,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <!-- Header -->
           <div
-            class="trace-header-bg tw:p-3 tw:border-b tw:border-solid tw:border-(--o2-border-color) tw:bg-white"
+            class="tw:p-3 tw:border-b tw:border-solid tw:border-(--o2-border-color) tw:bg-white tw:dark:bg-[#1e1e1e]"
           >
             <div class="tw:flex tw:items-center tw:gap-3">
               <OIcon name="hub" size="md" />
@@ -1025,8 +1024,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Group section — tw:hidden when no streams match -->
           <template v-if="group.streams.length > 0">
             <!-- Group header -->
-            <div class="metric-group-header tw:flex tw:items-center tw:justify-between tw:py-1.5 tw:px-2 tw:bg-(--q-color-grey-2,#f5f5f5) tw:border-b tw:border-solid tw:border-(--o2-border) tw:sticky tw:top-0 tw:z-10">
-              <div class="metric-group-label">
+            <div class="tw:flex tw:items-center tw:justify-between tw:py-1.5 tw:px-2 tw:bg-(--q-color-grey-2,#f5f5f5) tw:border-b tw:border-solid tw:border-(--o2-border) tw:sticky tw:top-0 tw:z-10 tw:dark:bg-[#202223]! tw:dark:border-[rgba(255,255,255,0.1)]">
+              <div class="tw:flex tw:items-center tw:gap-[0.375rem] tw:text-[0.6875rem] tw:font-bold tw:uppercase tw:tracking-[0.05em] tw:opacity-75">
                 <OIcon v-if="typeof group.icon === 'string'" :name="group.icon" size="xs" class="tw:mr-0.5" />
                 <component v-else :is="group.icon" />
                 <span>{{ group.label }}</span>
@@ -1035,7 +1034,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="tw:ml-1"
                 >{{ group.streams.length }}</OBadge>
               </div>
-              <div class="metric-group-actions">
+              <div class="tw:flex tw:gap-1">
                 <OButton
                   variant="ghost"
                   size="chip"
@@ -1059,7 +1058,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-for="stream in group.streams"
               :key="stream.stream_name"
-              class="metric-list-item tw:flex tw:items-center tw:gap-2"
+              class="tw:flex tw:items-center tw:gap-2 tw:py-2 tw:px-4 tw:border-b tw:border-solid tw:border-[var(--o2-border)] tw:hover:bg-[rgba(0,0,0,0.04)] tw:dark:border-[rgba(255,255,255,0.1)] tw:dark:hover:bg-[rgba(255,255,255,0.05)]"
             >
               <div class="tw:flex tw:items-center tw:shrink-0">
                 <OCheckbox
@@ -1073,7 +1072,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </div>
               <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
-                <span class="metric-label">{{ stream.stream_name }}</span>
+                <span class="tw:text-sm tw:font-[monospace]">{{ stream.stream_name }}</span>
               </div>
             </div>
           </template>
@@ -2908,101 +2907,15 @@ watch(
 .telemetry-correlation-traces .trace-details-content {
   padding: 0 !important;
 }
-
 .telemetry-correlation-traces .trace-combined-header-wrapper {
   margin-bottom: 0 !important;
 }
-
-body.body--dark .metric-splitter-separator {
-  background: rgba(255, 255, 255, 0.12);
-}
-
-.dimension-list-item:hover {
-  background-color: var(--q-hover-color, rgba(0, 0, 0, 0.04));
-}
-
-.dimension-list-item .dimension-label {
-  font-size: 0.875rem;
-  line-height: 1.25rem;
-}
-
-.metric-group-header .metric-group-label {
-  display: flex;
-  align-items: center;
-  gap: 0.375rem;
-  font-size: 0.6875rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  opacity: 0.75;
-}
-
-.metric-group-header .metric-group-actions {
-  display: flex;
-  gap: 0.25rem;
-}
-
 .metric-group-tabs .o-tab {
   min-height: 2rem;
   padding: 0 0.75rem;
   font-size: 0.8125rem;
 }
-
 .metric-group-tabs .o-tab__indicator {
   height: 0.125rem;
-}
-
-.metric-list-container .metric-list-item {
-  padding: 0.5rem 1rem;
-  border-bottom: 0.0625rem solid var(--q-border-color, var(--o2-border));
-}
-
-.metric-list-container .metric-list-item:hover {
-  background-color: var(--q-hover-color, rgba(0, 0, 0, 0.04));
-}
-
-.metric-list-container .metric-list-item .metric-label {
-  font-size: 0.875rem;
-  line-height: 1.25rem;
-  font-family: monospace;
-}
-
-.correlation-dashboard-embedded .correlation-content {
-  flex: 1;
-  overflow: auto;
-  min-height: 0;
-}
-
-body.body--dark .trace-header-bg {
-  background: #1e1e1e;
-}
-
-body.body--dark .correlation-dashboard-embedded {
-  background: #1e1e1e !important;
-}
-
-body.body--dark .dimension-sidebar {
-  background: #202223 !important;
-}
-
-body.body--dark .dimension-list-item {
-  border-bottom-color: rgba(255, 255, 255, 0.06);
-}
-
-body.body--dark .dimension-list-item:hover {
-  background-color: rgba(255, 255, 255, 0.05);
-}
-
-body.body--dark .metric-group-header {
-  background: #202223 !important;
-  border-bottom-color: rgba(255, 255, 255, 0.1);
-}
-
-body.body--dark .metric-list-item {
-  border-bottom-color: rgba(255, 255, 255, 0.1);
-}
-
-body.body--dark .metric-list-item:hover {
-  background-color: rgba(255, 255, 255, 0.05);
 }
 </style>

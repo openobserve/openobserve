@@ -68,14 +68,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- CREATE MODE: Alert Name + Folder -->
           <template v-else>
             <div class="tw:flex tw:items-center tw:gap-1.5 tw:shrink-0">
-              <label class="tw:text-xs tw:font-semibold tw:whitespace-nowrap tw:text-[rgba(0,0,0,0.72)] alert-v3-inline-label">{{ isAnomalyMode ? t('alerts.anomalyName') : t('alerts.incidents.alertName') }} <span class="tw:text-text-primary">*</span></label>
+              <label class="tw:text-xs tw:font-semibold tw:whitespace-nowrap tw:text-[rgba(0,0,0,0.72)] tw:dark:text-[rgba(255,255,255,0.7)]">{{ isAnomalyMode ? t('alerts.anomalyName') : t('alerts.incidents.alertName') }} <span class="tw:text-text-primary">*</span></label>
               <OInput
                 v-if="!isAnomalyMode"
                 ref="step1Ref"
                 v-model="formData.name"
                 data-test="add-alert-name-input"
                 :placeholder="t('alerts.alertNamePlaceholder')"
-                class="alert-v3-field topbar-name-input tw:text-sm tw:h-[28px]! tw:min-h-[28px]! tw:min-w-[120px] tw:max-w-[150px]"
+                class="topbar-name-input tw:text-sm tw:h-[28px]! tw:min-h-[28px]! tw:min-w-[120px] tw:max-w-[150px]"
                 :class="alertNameError ? 'field-error' : ''"
                 @update:model-value="alertNameError = false"
               />
@@ -84,17 +84,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ref="anomalyNameRef"
                 v-model="anomalyConfig.name"
                 :placeholder="t('alerts.anomalyNamePlaceholder')"
-                class="alert-v3-field topbar-name-input tw:text-sm tw:h-[28px]! tw:min-h-[28px]! tw:min-w-[120px] tw:max-w-[150px]"
+                class="topbar-name-input tw:text-sm tw:h-[28px]! tw:min-h-[28px]! tw:min-w-[120px] tw:max-w-[150px]"
               />
             </div>
 
             <!-- Folder -->
             <div class="tw:flex tw:items-center tw:gap-1.5 tw:shrink-0">
-              <label class="tw:text-xs tw:font-semibold tw:whitespace-nowrap tw:text-[rgba(0,0,0,0.72)] alert-v3-inline-label">{{ t('alerts.folder') }}</label>
+              <label class="tw:text-xs tw:font-semibold tw:whitespace-nowrap tw:text-[rgba(0,0,0,0.72)] tw:dark:text-[rgba(255,255,255,0.7)]">{{ t('alerts.folder') }}</label>
               <InlineSelectFolderDropdown
                 :model-value="activeFolderId"
                 type="alerts"
-                class="topbar-folder-select tw:min-w-[60px] tw:max-w-[140px]"
+                class="tw:min-w-[60px] tw:max-w-[140px]"
                 @update:model-value="updateActiveFolderId({ value: $event })"
               />
             </div>
@@ -111,21 +111,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Stream Name & Stream Type -->
       <div class="card-container tw:shrink-0 stream-config-card">
-        <div class="section-header tw:flex tw:items-center tw:gap-0 tw:py-[10px] tw:px-3 tw:border-b tw:border-[#e6e6e6]">
+        <div class="tw:flex tw:items-center tw:gap-0 tw:py-[10px] tw:px-3 tw:border-b tw:border-[#e6e6e6] tw:dark:border-[var(--color-border-default)]">
           <div class="tw:w-[3px] tw:h-4 tw:rounded-sm tw:mr-2 tw:shrink-0 tw:bg-[var(--q-primary)]" />
           <span class="tw:text-[13px] tw:font-semibold tw:tracking-[0.01em]">Stream Config <span class="tw:text-text-primary">*</span></span>
         </div>
         <div class="tw:flex tw:items-center tw:gap-4 tw:px-3 tw:py-2">
         <!-- Stream Type -->
         <div class="tw:flex tw:items-center tw:gap-1.5">
-          <label class="tw:text-xs tw:font-semibold tw:whitespace-nowrap tw:text-[rgba(0,0,0,0.72)] alert-v3-inline-label">{{ t("alerts.streamType") }} <span class="tw:text-text-primary">*</span></label>
+          <label class="tw:text-xs tw:font-semibold tw:whitespace-nowrap tw:text-[rgba(0,0,0,0.72)] tw:dark:text-[rgba(255,255,255,0.7)]">{{ t("alerts.streamType") }} <span class="tw:text-text-primary">*</span></label>
           <OSelect
             ref="streamTypeRef"
             data-test="add-alert-stream-type-select-dropdown"
             v-model="formData.stream_type"
             :options="streamTypes"
             :searchable="false"
-            class="no-case alert-v3-field stream-type-select tw:h-[28px]! tw:min-h-[28px]! tw:w-[150px]"
+            class="stream-type-select tw:h-[28px]! tw:min-h-[28px]! tw:w-[150px]"
             :class="streamTypeError ? 'field-error' : ''"
             :disabled="beingUpdated || anomalyEditMode"
             @update:model-value="streamTypeError = false; updateStreams()"
@@ -134,14 +134,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Stream Name -->
         <div class="tw:flex tw:items-center tw:gap-1.5">
-          <label class="tw:text-xs tw:font-semibold tw:whitespace-nowrap tw:text-[rgba(0,0,0,0.72)] alert-v3-inline-label">{{ t("alerts.stream_name") }} <span class="tw:text-text-primary">*</span></label>
+          <label class="tw:text-xs tw:font-semibold tw:whitespace-nowrap tw:text-[rgba(0,0,0,0.72)] tw:dark:text-[rgba(255,255,255,0.7)]">{{ t("alerts.stream_name") }} <span class="tw:text-text-primary">*</span></label>
           <OSelect
             ref="streamNameRef"
             data-test="add-alert-stream-name-select-dropdown"
             v-model="formData.stream_name"
             :options="indexOptions"
             :loading="isFetchingStreams"
-            class="no-case alert-v3-field stream-name-select tw:h-[28px]! tw:min-h-[28px]! tw:w-[160px]"
+            class="stream-name-select tw:h-[28px]! tw:min-h-[28px]! tw:w-[160px]"
             :class="streamNameError ? 'field-error' : ''"
             :disabled="beingUpdated || anomalyEditMode || !formData.stream_type"
             @update:model-value="streamNameError = false; updateStreamFields($event)"
@@ -151,13 +151,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Alert Type -->
         <div class="tw:flex tw:items-center tw:gap-1.5">
-          <label class="tw:text-xs tw:font-semibold tw:whitespace-nowrap tw:text-[rgba(0,0,0,0.72)] alert-v3-inline-label">{{ t("alerts.alertType") || 'Alert Type' }}</label>
+          <label class="tw:text-xs tw:font-semibold tw:whitespace-nowrap tw:text-[rgba(0,0,0,0.72)] tw:dark:text-[rgba(255,255,255,0.7)]">{{ t("alerts.alertType") || 'Alert Type' }}</label>
           <OSelect
             data-test="add-alert-type-select-dropdown"
             v-model="formData.is_real_time"
             :options="alertTypeOptions"
             :disabled="beingUpdated || anomalyEditMode"
-            class="alert-v3-field alert-type-select tw:h-[28px]! tw:min-h-[28px]! tw:min-w-[110px]"
+            class="alert-type-select tw:h-[28px]! tw:min-h-[28px]! tw:min-w-[110px]"
             :searchable="false"
           />
         </div>
@@ -587,98 +587,11 @@ export default defineComponent({
 </script>
 
 <style>
-.body--dark .alert-v3-inline-label {
-  color: rgba(255, 255, 255, 0.7);
-}
-
-.alert-v3-field :deep(.q-field__control) {
-  height: 28px !important;
-  min-height: 28px !important;
-  border-radius: 4px !important;
-  border: 1px solid rgba(0, 0, 0, 0.2) !important;
-  background: rgba(0, 0, 0, 0.03) !important;
-  padding: 0 8px !important;
-}
-
-.alert-v3-field :deep(.q-field__native) {
-  padding: 0 0px !important;
-  font-size: 13px;
-  min-height: 28px !important;
-  height: 28px !important;
-  line-height: 28px !important;
-}
-
-.alert-v3-field :deep(.q-field__input) {
-  padding: 0 0px !important;
-  font-size: 13px;
-  min-height: 28px !important;
-  height: 28px !important;
-  line-height: 28px !important;
-}
-
-.alert-v3-field :deep(.q-field__marginal) {
-  height: 28px !important;
-  min-height: 28px !important;
-}
-
-.alert-v3-field :deep(.q-field__control-container) {
-  height: 28px !important;
-  min-height: 28px !important;
-}
-
-.alert-v3-field :deep(.q-field__append) {
-  height: 28px !important;
-  align-items: center;
-  gap: 0;
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--color-border-default, #e6e6e6);
-}
-
-.body--dark .alert-v3-field :deep(.q-field__control) {
-  border-color: rgba(255, 255, 255, 0.2) !important;
-  background: rgba(255, 255, 255, 0.05) !important;
-}
-
-/* Error highlight for topbar fields — combined selector beats .body--dark .alert-v3-field specificity */
-.alert-v3-field.field-error :deep(.q-field__control) {
-  border-color: #ef5350 !important;
-  background: rgba(239, 83, 80, 0.05) !important;
-}
-
-.body--dark .alert-v3-field.field-error :deep(.q-field__control) {
-  border-color: #ef5350 !important;
-  background: rgba(239, 83, 80, 0.08) !important;
-}
-
-/* ── Section header (matches QueryConfig.vue pattern) ─────────────────────── */
-body.body--dark .section-header {
-  border-bottom-color: var(--color-border-default, #343434);
-}
-
-.no-case .q-field__native span {
-  text-transform: none !important;
-}
-
-.no-case .q-field__input {
-  text-transform: none !important;
-}
-
 /* ── Responsive topbar: container queries so AI chat panel triggers shrink too */
 .alert-v3-topbar {
   container-type: inline-size;
   container-name: topbar;
 }
-
-/* Folder breadcrumb select — matches tw:text-xl tw:tracking-[0.005em] sizing/weight */
-.topbar-folder-select .q-field__control { padding: 0; }
-
-.topbar-folder-select .q-field__native {
-  font-size: 1.25rem;
-  font-weight: 500;
-  cursor: pointer;
-}
-
-/* Base (widest) — full widths */
 
 /* Medium — topbar ~1050–1300px */
 @container topbar (max-width: 1300px) {

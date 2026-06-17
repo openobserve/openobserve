@@ -218,7 +218,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="tw:w-full tw:flex tw:items-center tw:gap-2 tw:text-sm tw:text-gray-500"
         >
           <OCheckbox
-            class="checkbox-delete-associated-alerts-pipelines"
             v-model="deleteAssociatedAlertsPipelines"
           />
           <span class="tw:text-(--o2-text-secondary) tw:text-xs tw:font-medium">
@@ -244,7 +243,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="tw:w-full tw:flex tw:items-center tw:gap-2 tw:text-sm tw:text-gray-500"
         >
           <OCheckbox
-            class="checkbox-delete-associated-alerts-pipelines"
             v-model="deleteAssociatedAlertsPipelines"
           />
           <span class="tw:text-(--o2-text-secondary) tw:text-xs tw:font-medium">
@@ -888,17 +886,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style>
-.checkbox-delete-associated-alerts-pipelines .q-checkbox__inner {
-  height: 28px !important;
-  min-height: 28px !important;
-  width: 28px !important;
-  min-width: 28px !important;
-}
-
-.checkbox-delete-associated-alerts-pipelines .q-checkbox__bg {
-  height: 16px !important;
-  width: 16px !important;
-}
-</style>

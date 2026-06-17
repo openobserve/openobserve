@@ -38,33 +38,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style>
-.q-table__top {
-  border-bottom: 1px solid var(--o2-border);
-  justify-content: flex-end;
-}
-
-.alerts-tabs .q-tabs--vertical {
-  margin: 16px 8px 0 8px;
-}
-
-.alerts-tabs .q-tabs--vertical .q-tab {
-  justify-content: flex-start;
-  padding: 0 1rem 0 1.25rem;
-  border-radius: 0.5rem;
-  margin-bottom: 0.5rem;
-  text-transform: capitalize;
-  min-height: 40px !important;
-}
-
-.alerts-tabs .q-tabs--vertical .q-tab__content.tab_content .q-tab__icon + .q-tab__label {
-  padding-left: 0.875rem;
-  font-weight: 600;
-}
-
-.alerts-tabs .q-tabs--vertical .q-tab--active {
-  background-color: #F5F5F5;
-  color: black;
-}
-</style>

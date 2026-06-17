@@ -45,10 +45,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-for="item in anomalies"
           :key="item.id"
-          class="ov-alert-row tw:flex tw:items-center tw:gap-3 tw:py-[0.625rem] tw:px-[0.875rem] tw:rounded-md tw:border tw:border-(--o2-border-color) tw:bg-(--o2-card-bg-solid) tw:transition-[background] tw:duration-[150ms] tw:hover:bg-(--o2-hover-gray)"
+          class="tw:flex tw:items-center tw:gap-3 tw:py-[0.625rem] tw:px-[0.875rem] tw:rounded-md tw:border tw:border-(--o2-border-color) tw:bg-(--o2-card-bg-solid) tw:transition-[background] tw:duration-[150ms] tw:hover:bg-(--o2-hover-gray)"
           :class="severityRowClass(item.severity)"
         >
-          <span class="ov-row-icon tw:shrink-0 tw:flex tw:items-center">
+          <span class="tw:shrink-0 tw:flex tw:items-center" :class="severityIconClass(item.severity)">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
               <path d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
@@ -80,10 +80,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-for="inc in incidents"
           :key="inc.id"
-          class="ov-alert-row tw:flex tw:items-center tw:gap-3 tw:py-[0.625rem] tw:px-[0.875rem] tw:rounded-md tw:border tw:border-(--o2-border-color) tw:bg-(--o2-card-bg-solid) tw:transition-[background] tw:duration-[150ms] tw:hover:bg-(--o2-hover-gray)"
+          class="tw:flex tw:items-center tw:gap-3 tw:py-[0.625rem] tw:px-[0.875rem] tw:rounded-md tw:border tw:border-(--o2-border-color) tw:bg-(--o2-card-bg-solid) tw:transition-[background] tw:duration-[150ms] tw:hover:bg-(--o2-hover-gray)"
           :class="incidentRowClass(inc.severity)"
         >
-          <span class="ov-row-icon tw:shrink-0 tw:flex tw:items-center">
+          <span class="tw:shrink-0 tw:flex tw:items-center" :class="incidentIconClass(inc.severity)">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
               <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
               <path d="M12 8v4m0 4h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
@@ -91,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
           <div class="tw:flex-1 tw:min-w-0">
             <div class="tw:text-sm tw:font-medium tw:text-(--o2-text-primary) tw:flex tw:items-center tw:flex-wrap tw:gap-1">
-              <span class="ov-severity-badge tw:inline-block tw:text-[0.625rem] tw:font-bold tw:py-[0.1rem] tw:px-[0.35rem] tw:rounded-[0.2rem] tw:tracking-[0.04em]" :class="`ov-sev-${(inc.severity || 'p4').toLowerCase()}`">
+              <span class="tw:inline-block tw:text-[0.625rem] tw:font-bold tw:py-[0.1rem] tw:px-[0.35rem] tw:rounded-[0.2rem] tw:tracking-[0.04em]" :class="severityBadgeClass(inc.severity)">
                 {{ (inc.severity || 'P4').toUpperCase() }}
               </span>
               {{ inc.title || t('overview.untitledIncident') }}
@@ -99,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span
                   v-for="[key, val] in sortedDimensions(inc.group_values)"
                   :key="key"
-                  class="dimension-badge tw:inline-flex tw:items-center tw:gap-[0.125em] tw:py-[0.125em] tw:px-[0.5em] tw:rounded-[0.375em] tw:text-[0.6875em] tw:font-semibold tw:mx-[0.125em] tw:max-w-[11.25em] tw:overflow-hidden"
+                  class="tw:inline-flex tw:items-center tw:gap-[0.125em] tw:py-[0.125em] tw:px-[0.5em] tw:rounded-[0.375em] tw:text-[0.6875em] tw:font-semibold tw:mx-[0.125em] tw:max-w-[11.25em] tw:overflow-hidden"
                   :class="dimColorClass(key)"
                   :title="`${key}=${val}`"
                 ><span class="tw:inline-block tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap">{{ shortDimKey(key) }}: {{ val }}</span></span>
@@ -152,10 +152,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
           </div>
           <div class="tw:flex tw:gap-[0.375rem] tw:items-center tw:flex-wrap tw:mb-[0.375rem]">
-            <span v-if="svc.errorFlag" class="ov-flag-error tw:text-[0.625rem] tw:font-bold tw:tracking-[0.04em] tw:py-[0.15rem] tw:px-[0.4rem] tw:rounded-[0.2rem] tw:whitespace-nowrap" :title="t('overview.elevatedErrorRate')">
+            <span v-if="svc.errorFlag" class="tw:text-[0.625rem] tw:font-bold tw:tracking-[0.04em] tw:py-[0.15rem] tw:px-[0.4rem] tw:rounded-[0.2rem] tw:whitespace-nowrap tw:bg-[rgba(239,68,68,0.12)] tw:text-[#ef4444] tw:border tw:border-[rgba(239,68,68,0.25)] tw:dark:bg-[#401a1a] tw:dark:text-[#f9cbcb] tw:dark:border-[rgba(239,68,68,0.35)]" :title="t('overview.elevatedErrorRate')">
               Error Rate {{ svc.error_rate.toFixed(1) }}%
             </span>
-            <span v-if="svc.latencyFlag" class="ov-flag-latency tw:text-[0.625rem] tw:font-bold tw:tracking-[0.04em] tw:py-[0.15rem] tw:px-[0.4rem] tw:rounded-[0.2rem] tw:whitespace-nowrap" :title="`Latency elevated vs baseline (${svc.latencyMultiplier}x)`">
+            <span v-if="svc.latencyFlag" class="tw:text-[0.625rem] tw:font-bold tw:tracking-[0.04em] tw:py-[0.15rem] tw:px-[0.4rem] tw:rounded-[0.2rem] tw:whitespace-nowrap tw:bg-[rgba(245,158,11,0.12)] tw:text-[#d97706] tw:border tw:border-[rgba(245,158,11,0.25)] tw:dark:bg-[#402a10] tw:dark:text-[#fcd34d] tw:dark:border-[rgba(245,158,11,0.35)]" :title="`Latency elevated vs baseline (${svc.latencyMultiplier}x)`">
               Latency {{ svc.latencyMultiplier }}x
             </span>
           </div>
@@ -194,12 +194,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :key="ev.id"
           class="ov-event-row tw:flex tw:items-center tw:gap-3 tw:py-2 tw:px-[0.875rem] tw:border-b tw:border-b-(--o2-border-color) tw:text-[0.8125rem] tw:transition-[background] tw:duration-[150ms] tw:hover:bg-(--o2-hover-gray)"
         >
-          <span class="ov-event-type-badge tw:shrink-0 tw:text-[0.6875rem] tw:font-semibold tw:py-[0.15rem] tw:px-[0.4rem] tw:rounded-[0.2rem] tw:tracking-[0.03em]" :class="ev.typeLabel === 'Failed' ? 'ov-badge-failed' : ev.typeLabel === 'Error' ? 'ov-badge-error' : 'ov-badge-firing'">
+          <span class="tw:shrink-0 tw:text-[0.6875rem] tw:font-semibold tw:py-[0.15rem] tw:px-[0.4rem] tw:rounded-[0.2rem] tw:tracking-[0.03em]" :class="ev.typeLabel === 'Failed' ? 'tw:bg-[rgba(239,68,68,0.18)] tw:text-[#b91c1c] tw:font-bold tw:dark:bg-[#401a1a] tw:dark:text-[#f9cbcb]' : ev.typeLabel === 'Error' ? 'tw:bg-[rgba(249,115,22,0.12)] tw:text-[#c2410c] tw:dark:bg-[#401f10] tw:dark:text-[#fdba74]' : 'tw:bg-[rgba(239,68,68,0.12)] tw:text-[#ef4444] tw:dark:bg-[#401a1a] tw:dark:text-[#fca5a5]'">
             {{ ev.typeLabel }}
           </span>
           <span class="tw:font-medium tw:text-(--o2-text-primary) tw:whitespace-nowrap tw:min-w-[7.5em] tw:max-w-[12.5em] tw:overflow-hidden tw:text-ellipsis">{{ ev.service }}</span>
           <span class="tw:flex-1 tw:text-(--o2-text-muted) tw:truncate">{{ ev.description }}</span>
-          <span v-if="ev.failCount > 1" class="ov-fail-count tw:shrink-0 tw:text-[0.6875rem] tw:font-bold tw:text-[#b91c1c] tw:bg-[rgba(239,68,68,0.1)] tw:border tw:border-[rgba(239,68,68,0.25)] tw:rounded-full tw:py-[0.1rem] tw:px-[0.4rem] tw:whitespace-nowrap" :title="`Failed ${ev.failCount} times in this window`">
+          <span v-if="ev.failCount > 1" class="tw:shrink-0 tw:text-[0.6875rem] tw:font-bold tw:text-[#b91c1c] tw:bg-[rgba(239,68,68,0.1)] tw:border tw:border-[rgba(239,68,68,0.25)] tw:rounded-full tw:py-[0.1rem] tw:px-[0.4rem] tw:whitespace-nowrap tw:dark:text-[#f9cbcb] tw:dark:bg-[#401a1a] tw:dark:border-[rgba(239,68,68,0.35)]" :title="`Failed ${ev.failCount} times in this window`">
             ×{{ ev.failCount }}
           </span>
           <span class="tw:shrink-0 tw:text-(--o2-text-muted) tw:text-xs tw:whitespace-nowrap">{{ ev.timeAgo }}</span>
@@ -219,37 +219,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #description>{{ t('overview.allClearDesc') }}</template>
       <template #actions>
         <!-- View alerts -->
-        <button type="button" class="ov-action-card tw:relative tw:flex tw:items-center tw:gap-3 tw:w-64 tw:max-w-full tw:min-h-16 tw:py-[0.625rem] tw:pr-[0.875rem] tw:pl-3 tw:rounded-xl tw:border tw:border-(--color-border-default) tw:bg-(--color-surface-base) tw:shadow-(--shadow-sm) tw:text-left tw:cursor-pointer tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150 tw:outline-none tw:hover:shadow-(--shadow-md) tw:hover:border-(--color-primary-400) tw:hover:bg-(--color-tabs-hover-bg)" data-test="overview-empty-alerts-card" @click="goToAlertList">
-          <span class="ov-action-card__icon ov-action-card__icon--orange tw:inline-flex tw:items-center tw:justify-center tw:shrink-0 tw:w-10 tw:h-10 tw:rounded-lg tw:transition-[background-color,color] tw:duration-150">
+        <button type="button" class="ov-action-card tw:group tw:relative tw:flex tw:items-center tw:gap-3 tw:w-64 tw:max-w-full tw:min-h-16 tw:py-[0.625rem] tw:pr-[0.875rem] tw:pl-3 tw:rounded-xl tw:border tw:border-(--color-border-default) tw:bg-(--color-surface-base) tw:shadow-(--shadow-sm) tw:text-left tw:cursor-pointer tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150 tw:outline-none tw:hover:shadow-(--shadow-md) tw:hover:border-(--color-primary-400) tw:hover:bg-(--color-tabs-hover-bg)" data-test="overview-empty-alerts-card" @click="goToAlertList">
+          <span class="tw:inline-flex tw:items-center tw:justify-center tw:shrink-0 tw:w-10 tw:h-10 tw:rounded-lg tw:transition-[background-color,color] tw:duration-150 tw:bg-[color-mix(in_srgb,#f59e0b_12%,transparent)] tw:text-[#d97706] tw:group-hover:bg-(--color-primary-600) tw:group-hover:text-white">
             <OIcon name="notifications" size="md" />
           </span>
-          <span class="ov-action-card__body tw:flex-1 tw:min-w-0 tw:flex tw:flex-col tw:gap-[0.125rem]">
+          <span class="tw:flex-1 tw:min-w-0 tw:flex tw:flex-col tw:gap-[0.125rem]">
             <span class="tw:text-(--text-sm) tw:font-semibold tw:text-(--color-text-primary) tw:truncate">{{ t('overview.emptyActionAlerts') }}</span>
             <span class="tw:text-(--text-xs) tw:text-(--color-text-secondary) tw:leading-[1.4]">{{ t('overview.emptyActionAlertsDesc') }}</span>
           </span>
-          <OIcon name="chevron-right" size="sm" class="ov-action-card__chevron tw:shrink-0 tw:text-(--color-text-disabled) tw:transition-[transform,color] tw:duration-150" />
+          <OIcon name="chevron-right" size="sm" class="tw:shrink-0 tw:text-(--color-text-disabled) tw:transition-[transform,color] tw:duration-150 tw:group-hover:translate-x-[0.125rem] tw:group-hover:text-(--color-primary-600)" />
         </button>
         <!-- Explore logs -->
-        <button type="button" class="ov-action-card tw:relative tw:flex tw:items-center tw:gap-3 tw:w-64 tw:max-w-full tw:min-h-16 tw:py-[0.625rem] tw:pr-[0.875rem] tw:pl-3 tw:rounded-xl tw:border tw:border-(--color-border-default) tw:bg-(--color-surface-base) tw:shadow-(--shadow-sm) tw:text-left tw:cursor-pointer tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150 tw:outline-none tw:hover:shadow-(--shadow-md) tw:hover:border-(--color-primary-400) tw:hover:bg-(--color-tabs-hover-bg)" data-test="overview-empty-logs-card" @click="goToLogs">
-          <span class="ov-action-card__icon ov-action-card__icon--blue tw:inline-flex tw:items-center tw:justify-center tw:shrink-0 tw:w-10 tw:h-10 tw:rounded-lg tw:transition-[background-color,color] tw:duration-150">
+        <button type="button" class="ov-action-card tw:group tw:relative tw:flex tw:items-center tw:gap-3 tw:w-64 tw:max-w-full tw:min-h-16 tw:py-[0.625rem] tw:pr-[0.875rem] tw:pl-3 tw:rounded-xl tw:border tw:border-(--color-border-default) tw:bg-(--color-surface-base) tw:shadow-(--shadow-sm) tw:text-left tw:cursor-pointer tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150 tw:outline-none tw:hover:shadow-(--shadow-md) tw:hover:border-(--color-primary-400) tw:hover:bg-(--color-tabs-hover-bg)" data-test="overview-empty-logs-card" @click="goToLogs">
+          <span class="tw:inline-flex tw:items-center tw:justify-center tw:shrink-0 tw:w-10 tw:h-10 tw:rounded-lg tw:transition-[background-color,color] tw:duration-150 tw:bg-[color-mix(in_srgb,#3b82f6_12%,transparent)] tw:text-[#3b82f6] tw:group-hover:bg-(--color-primary-600) tw:group-hover:text-white">
             <OIcon name="search" size="md" />
           </span>
-          <span class="ov-action-card__body tw:flex-1 tw:min-w-0 tw:flex tw:flex-col tw:gap-[0.125rem]">
+          <span class="tw:flex-1 tw:min-w-0 tw:flex tw:flex-col tw:gap-[0.125rem]">
             <span class="tw:text-(--text-sm) tw:font-semibold tw:text-(--color-text-primary) tw:truncate">{{ t('overview.emptyActionLogs') }}</span>
             <span class="tw:text-(--text-xs) tw:text-(--color-text-secondary) tw:leading-[1.4]">{{ t('overview.emptyActionLogsDesc') }}</span>
           </span>
-          <OIcon name="chevron-right" size="sm" class="ov-action-card__chevron tw:shrink-0 tw:text-(--color-text-disabled) tw:transition-[transform,color] tw:duration-150" />
+          <OIcon name="chevron-right" size="sm" class="tw:shrink-0 tw:text-(--color-text-disabled) tw:transition-[transform,color] tw:duration-150 tw:group-hover:translate-x-[0.125rem] tw:group-hover:text-(--color-primary-600)" />
         </button>
         <!-- Explore traces -->
-        <button type="button" class="ov-action-card tw:relative tw:flex tw:items-center tw:gap-3 tw:w-64 tw:max-w-full tw:min-h-16 tw:py-[0.625rem] tw:pr-[0.875rem] tw:pl-3 tw:rounded-xl tw:border tw:border-(--color-border-default) tw:bg-(--color-surface-base) tw:shadow-(--shadow-sm) tw:text-left tw:cursor-pointer tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150 tw:outline-none tw:hover:shadow-(--shadow-md) tw:hover:border-(--color-primary-400) tw:hover:bg-(--color-tabs-hover-bg)" data-test="overview-empty-traces-card" @click="goToTraces">
-          <span class="ov-action-card__icon ov-action-card__icon--purple tw:inline-flex tw:items-center tw:justify-center tw:shrink-0 tw:w-10 tw:h-10 tw:rounded-lg tw:transition-[background-color,color] tw:duration-150">
+        <button type="button" class="ov-action-card tw:group tw:relative tw:flex tw:items-center tw:gap-3 tw:w-64 tw:max-w-full tw:min-h-16 tw:py-[0.625rem] tw:pr-[0.875rem] tw:pl-3 tw:rounded-xl tw:border tw:border-(--color-border-default) tw:bg-(--color-surface-base) tw:shadow-(--shadow-sm) tw:text-left tw:cursor-pointer tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150 tw:outline-none tw:hover:shadow-(--shadow-md) tw:hover:border-(--color-primary-400) tw:hover:bg-(--color-tabs-hover-bg)" data-test="overview-empty-traces-card" @click="goToTraces">
+          <span class="tw:inline-flex tw:items-center tw:justify-center tw:shrink-0 tw:w-10 tw:h-10 tw:rounded-lg tw:transition-[background-color,color] tw:duration-150 tw:bg-[color-mix(in_srgb,#8b5cf6_12%,transparent)] tw:text-[#8b5cf6] tw:group-hover:bg-(--color-primary-600) tw:group-hover:text-white">
             <OIcon name="account-tree" size="md" />
           </span>
-          <span class="ov-action-card__body tw:flex-1 tw:min-w-0 tw:flex tw:flex-col tw:gap-[0.125rem]">
+          <span class="tw:flex-1 tw:min-w-0 tw:flex tw:flex-col tw:gap-[0.125rem]">
             <span class="tw:text-(--text-sm) tw:font-semibold tw:text-(--color-text-primary) tw:truncate">{{ t('overview.emptyActionTraces') }}</span>
             <span class="tw:text-(--text-xs) tw:text-(--color-text-secondary) tw:leading-[1.4]">{{ t('overview.emptyActionTracesDesc') }}</span>
           </span>
-          <OIcon name="chevron-right" size="sm" class="ov-action-card__chevron tw:shrink-0 tw:text-(--color-text-disabled) tw:transition-[transform,color] tw:duration-150" />
+          <OIcon name="chevron-right" size="sm" class="tw:shrink-0 tw:text-(--color-text-disabled) tw:transition-[transform,color] tw:duration-150 tw:group-hover:translate-x-[0.125rem] tw:group-hover:text-(--color-primary-600)" />
         </button>
       </template>
     </OEmptyState>
@@ -653,44 +653,78 @@ const sortedDimensions = (dims: Record<string, string>): [string, string][] =>
 const shortDimKey = (key: string): string =>
   key.replace(/^k8s-/, "").replace(/^kubernetes[_-]/, "");
 
-const DIM_COLOR_MAP: Record<string, string> = {
-  deployment: "badge-blue",
-  "k8s-deployment": "badge-blue",
-  namespace: "badge-orange",
-  "k8s-namespace": "badge-orange",
-  env: "badge-green",
-  environment: "badge-green",
-  host: "badge-purple",
-  hostname: "badge-purple",
-  service: "badge-cyan",
-  service_name: "badge-cyan",
-  region: "badge-pink",
-  zone: "badge-pink",
-  cluster: "badge-indigo",
-  "k8s-cluster": "badge-indigo",
-  pod: "badge-teal",
-  container: "badge-red",
-  app: "badge-yellow",
-  application: "badge-yellow",
+// Full Tailwind class strings per named color — must be complete strings for Tailwind to scan them
+const DIM_BORDER_CLASSES = {
+  blue:   "tw:border-[0.0625em] tw:border-[#1d4ed8] tw:dark:border-[#93c5fd]",
+  orange: "tw:border-[0.0625em] tw:border-[#c2410c] tw:dark:border-[#fdba74]",
+  green:  "tw:border-[0.0625em] tw:border-[#065f46] tw:dark:border-[#6ee7b7]",
+  purple: "tw:border-[0.0625em] tw:border-[#7c3aed] tw:dark:border-[#c4b5fd]",
+  cyan:   "tw:border-[0.0625em] tw:border-[#0e7490] tw:dark:border-[#67e8f9]",
+  pink:   "tw:border-[0.0625em] tw:border-[#9f1239] tw:dark:border-[#f9a8d4]",
+  indigo: "tw:border-[0.0625em] tw:border-[#4f46e5] tw:dark:border-[#a5b4fc]",
+  teal:   "tw:border-[0.0625em] tw:border-[#0f766e] tw:dark:border-[#5eead4]",
+  red:    "tw:border-[0.0625em] tw:border-[#dc2626] tw:dark:border-[#fca5a5]",
+  amber:  "tw:border-[0.0625em] tw:border-[#92400e] tw:dark:border-[#fcd34d]",
+  gray:   "tw:border-[0.0625em] tw:border-[#4b5563] tw:dark:border-[#9ca3af]",
+} as const;
+
+type DimColor = keyof typeof DIM_BORDER_CLASSES;
+
+// Dimension key → named color (aliases share the same color name)
+const DIM_COLOR_KEY: Record<string, DimColor> = {
+  deployment:       "blue",
+  "k8s-deployment": "blue",
+  namespace:        "orange",
+  "k8s-namespace":  "orange",
+  env:              "green",
+  environment:      "green",
+  host:             "purple",
+  hostname:         "purple",
+  service:          "cyan",
+  service_name:     "cyan",
+  region:           "pink",
+  zone:             "pink",
+  cluster:          "indigo",
+  "k8s-cluster":    "indigo",
+  pod:              "teal",
+  container:        "red",
+  app:              "amber",
+  application:      "amber",
 };
 
 const dimColorClass = (key: string): string => {
-  if (DIM_COLOR_MAP[key]) return DIM_COLOR_MAP[key];
-  const lower = key.toLowerCase();
-  for (const [pattern, cls] of Object.entries(DIM_COLOR_MAP)) {
-    if (lower.includes(pattern)) return cls;
-  }
-  return "badge-gray";
+  const colorKey = DIM_COLOR_KEY[key]
+    ?? (Object.entries(DIM_COLOR_KEY).find(([k]) => key.toLowerCase().includes(k))?.[1] as DimColor | undefined)
+    ?? "gray";
+  return DIM_BORDER_CLASSES[colorKey];
 };
 
 const severityRowClass = (severity: string) =>
-  severity === "critical" ? "ov-row-critical" : "ov-row-warning";
+  severity === "critical" ? "tw:border-l-[0.1875em] tw:border-l-[#ef4444]" : "tw:border-l-[0.1875em] tw:border-l-[#f59e0b]";
+
+const severityIconClass = (severity: string) =>
+  severity === "critical" ? "tw:text-[#ef4444]" : "tw:text-[#f59e0b]";
 
 const incidentRowClass = (severity: string) => {
   const s = (severity ?? "").toLowerCase();
-  if (s === "p1") return "ov-row-critical";
-  if (s === "p2") return "ov-row-warning";
-  return "ov-row-info";
+  if (s === "p1") return "tw:border-l-[0.1875em] tw:border-l-[#ef4444]";
+  if (s === "p2") return "tw:border-l-[0.1875em] tw:border-l-[#f59e0b]";
+  return "tw:border-l-[0.1875em] tw:border-l-[#3b82f6]";
+};
+
+const incidentIconClass = (severity: string) => {
+  const s = (severity ?? "").toLowerCase();
+  if (s === "p1") return "tw:text-[#ef4444]";
+  if (s === "p2") return "tw:text-[#f59e0b]";
+  return "tw:text-[#3b82f6]";
+};
+
+const severityBadgeClass = (sev: string): string => {
+  const s = (sev || "p4").toLowerCase();
+  if (s === "p1") return "tw:bg-[#fef2f2] tw:text-[#b91c1c] tw:border-[0.0625em] tw:border-[#fca5a5] tw:dark:bg-[rgba(239,68,68,0.15)] tw:dark:text-[#fca5a5] tw:dark:border-[rgba(239,68,68,0.3)]";
+  if (s === "p2") return "tw:bg-[#fff7ed] tw:text-[#c2410c] tw:border-[0.0625em] tw:border-[#fdba74] tw:dark:bg-[rgba(249,115,22,0.15)] tw:dark:text-[#fdba74] tw:dark:border-[rgba(249,115,22,0.3)]";
+  if (s === "p3") return "tw:bg-[#fefce8] tw:text-[#a16207] tw:border-[0.0625em] tw:border-[#fde047] tw:dark:bg-[rgba(234,179,8,0.15)] tw:dark:text-[#fde047] tw:dark:border-[rgba(234,179,8,0.3)]";
+  return "tw:bg-[#f0f9ff] tw:text-[#0369a1] tw:border-[0.0625em] tw:border-[#7dd3fc] tw:dark:bg-[rgba(59,130,246,0.15)] tw:dark:text-[#7dd3fc] tw:dark:border-[rgba(59,130,246,0.3)]";
 };
 
 const serviceCardClass = (svc: any) => {
@@ -779,203 +813,13 @@ watch(isIncidentsEnabled, (enabled) => {
 </script>
 
 <style>
-/* ── Alert row severity — kept because descendant .ov-row-icon color rules require the class name ── */
-.ov-alert-row.ov-row-critical {
-  border-left: 0.1875em solid #ef4444;
-}
-.ov-alert-row.ov-row-critical .ov-row-icon {
-  color: #ef4444;
-}
-.ov-alert-row.ov-row-warning {
-  border-left: 0.1875em solid #f59e0b;
-}
-.ov-alert-row.ov-row-warning .ov-row-icon {
-  color: #f59e0b;
-}
-.ov-alert-row.ov-row-info {
-  border-left: 0.1875em solid #3b82f6;
-}
-.ov-alert-row.ov-row-info .ov-row-icon {
-  color: #3b82f6;
-}
-
-/* ── Dimension badge child span — descendant selector ── */
-.dimension-badge span {
-  display: inline-block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* ── Badge color borders (light mode) ── */
-.badge-blue   { border: 0.0625em solid #1d4ed8; }
-.badge-green  { border: 0.0625em solid #065f46; }
-.badge-yellow { border: 0.0625em solid #92400e; }
-.badge-pink   { border: 0.0625em solid #9f1239; }
-.badge-purple { border: 0.0625em solid #7c3aed; }
-.badge-orange { border: 0.0625em solid #c2410c; }
-.badge-cyan   { border: 0.0625em solid #0e7490; }
-.badge-indigo { border: 0.0625em solid #4f46e5; }
-.badge-teal   { border: 0.0625em solid #0f766e; }
-.badge-red    { border: 0.0625em solid #dc2626; }
-.badge-gray   { border: 0.0625em solid #4b5563; }
-.badge-amber  { border: 0.0625em solid #d97706; }
-
-/* ── Badge dark mode ── */
-body.body--dark .badge-blue   { border-color: #93c5fd; }
-body.body--dark .badge-green  { border-color: #6ee7b7; }
-body.body--dark .badge-yellow { border-color: #fcd34d; }
-body.body--dark .badge-pink   { border-color: #f9a8d4; }
-body.body--dark .badge-purple { border-color: #c4b5fd; }
-body.body--dark .badge-orange { border-color: #fdba74; }
-body.body--dark .badge-cyan   { border-color: #67e8f9; }
-body.body--dark .badge-indigo { border-color: #a5b4fc; }
-body.body--dark .badge-teal   { border-color: #5eead4; }
-body.body--dark .badge-red    { border-color: #fca5a5; }
-body.body--dark .badge-gray   { border-color: #9ca3af; }
-body.body--dark .badge-amber  { border-color: #fcd34d; }
-
-/* ── Service flag dark mode ── */
-body.body--dark .ov-flag-error {
-  background: #401a1a;
-  color: #f9cbcb;
-  border-color: rgba(239, 68, 68, 0.35);
-}
-body.body--dark .ov-flag-latency {
-  background: #402a10;
-  color: #fcd34d;
-  border-color: rgba(245, 158, 11, 0.35);
-}
-
-/* ── Event type badge dark mode ── */
-body.body--dark .ov-badge-firing {
-  background: #401a1a;
-  color: #fca5a5;
-}
-body.body--dark .ov-badge-error {
-  background: #401f10;
-  color: #fdba74;
-}
-body.body--dark .ov-badge-failed {
-  background: #401a1a;
-  color: #f9cbcb;
-}
-
-/* ── Fail count dark mode ── */
-body.body--dark .ov-fail-count {
-  color: #f9cbcb;
-  background: #401a1a;
-  border-color: rgba(239, 68, 68, 0.35);
-}
-
-/* ── Severity badge light mode ── */
-.ov-severity-badge.ov-sev-p1 {
-  background: #fef2f2;
-  color: #b91c1c;
-  border: 0.0625em solid #fca5a5;
-}
-.ov-severity-badge.ov-sev-p2 {
-  background: #fff7ed;
-  color: #c2410c;
-  border: 0.0625em solid #fdba74;
-}
-.ov-severity-badge.ov-sev-p3 {
-  background: #fefce8;
-  color: #a16207;
-  border: 0.0625em solid #fde047;
-}
-.ov-severity-badge.ov-sev-p4 {
-  background: #f0f9ff;
-  color: #0369a1;
-  border: 0.0625em solid #7dd3fc;
-}
-
-/* ── Severity badge dark mode ── */
-:root.body--dark .ov-sev-p1 {
-  background: rgba(239, 68, 68, 0.15);
-  color: #fca5a5;
-  border-color: rgba(239, 68, 68, 0.3);
-}
-:root.body--dark .ov-sev-p2 {
-  background: rgba(249, 115, 22, 0.15);
-  color: #fdba74;
-  border-color: rgba(249, 115, 22, 0.3);
-}
-:root.body--dark .ov-sev-p3 {
-  background: rgba(234, 179, 8, 0.15);
-  color: #fde047;
-  border-color: rgba(234, 179, 8, 0.3);
-}
-:root.body--dark .ov-sev-p4 {
-  background: rgba(59, 130, 246, 0.15);
-  color: #7dd3fc;
-  border-color: rgba(59, 130, 246, 0.3);
-}
-
-/* ── Service flag light mode ── */
-.ov-flag-error {
-  background: rgba(239, 68, 68, 0.12);
-  color: #ef4444;
-  border: 0.0625em solid rgba(239, 68, 68, 0.25);
-}
-.ov-flag-latency {
-  background: rgba(245, 158, 11, 0.12);
-  color: #d97706;
-  border: 0.0625em solid rgba(245, 158, 11, 0.25);
-}
-
-/* ── Event type badge light mode ── */
-.ov-event-type-badge.ov-badge-firing {
-  background: rgba(239, 68, 68, 0.12);
-  color: #ef4444;
-}
-.ov-event-type-badge.ov-badge-error {
-  background: rgba(249, 115, 22, 0.12);
-  color: #c2410c;
-}
-.ov-event-type-badge.ov-badge-failed {
-  background: rgba(239, 68, 68, 0.18);
-  color: #b91c1c;
-  font-weight: 700;
-}
-
-/* ── Event row last-child — pseudo-class selector ── */
 .ov-event-row:last-child {
   border-bottom: none;
 }
-
-/* ── Action card hover affecting children ── */
-.ov-action-card:hover .ov-action-card__icon,
-.ov-action-card:hover .ov-action-card__icon--blue,
-.ov-action-card:hover .ov-action-card__icon--purple,
-.ov-action-card:hover .ov-action-card__icon--orange {
-  background: var(--color-primary-600);
-  color: #fff;
-}
-.ov-action-card:hover .ov-action-card__chevron {
-  transform: translateX(0.125rem);
-  color: var(--color-primary-600);
-}
-
-/* ── Action card focus-visible — complex box-shadow ── */
 .ov-action-card:focus-visible {
   box-shadow: 0 0 0 0.125rem color-mix(in srgb, var(--color-primary-500) 40%, transparent);
 }
-
-/* ── Action card icon color variants (light mode) ── */
-.ov-action-card__icon--blue   { background: color-mix(in srgb, #3b82f6 12%, transparent); color: #3b82f6; }
-.ov-action-card__icon--purple { background: color-mix(in srgb, #8b5cf6 12%, transparent); color: #8b5cf6; }
-.ov-action-card__icon--orange { background: color-mix(in srgb, #f59e0b 12%, transparent); color: #d97706; }
-
-/* ── Scrollbar pseudo-elements ── */
-.overview-tab::-webkit-scrollbar {
-  width: 0.375em;
-}
-.overview-tab::-webkit-scrollbar-track {
-  background: transparent;
-}
-.overview-tab::-webkit-scrollbar-thumb {
-  background: var(--o2-border-color);
-  border-radius: 0.1875em;
-}
+.overview-tab::-webkit-scrollbar { width: 0.375em; }
+.overview-tab::-webkit-scrollbar-track { background: transparent; }
+.overview-tab::-webkit-scrollbar-thumb { background: var(--o2-border-color); border-radius: 0.1875em; }
 </style>

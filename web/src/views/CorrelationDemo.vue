@@ -13,7 +13,7 @@
           <OCardSection role="body">
             <div class="log-viewer tw:flex tw:flex-col tw:gap-3">
               <!-- Sample Log 1 -->
-              <div class="log-line tw:p-4 tw:bg-(--q-dark-page,#f5f5f5) tw:rounded-lg tw:border-2 tw:border-transparent tw:cursor-pointer tw:transition-all tw:duration-200 tw:relative tw:hover:border-(--q-primary) tw:hover:bg-(--q-dark-page,#eeeeee)" @click="selectLog(sampleLog1)">
+              <div class="log-line tw:group tw:p-4 tw:bg-(--q-dark-page,#f5f5f5) tw:rounded-lg tw:border-2 tw:border-transparent tw:cursor-pointer tw:transition-all tw:duration-200 tw:relative tw:hover:border-(--q-primary) tw:hover:bg-(--q-dark-page,#eeeeee)" @click="selectLog(sampleLog1)">
                 <div class="log-timestamp tw:font-mono tw:text-xs tw:text-[var(--q-primary)] tw:mb-2">2025-12-02 10:23:45</div>
                 <div class="log-content tw:flex tw:flex-col tw:gap-1 tw:text-[13px]">
                   <div><strong>service.name:</strong> checkout-api</div>
@@ -24,11 +24,11 @@
                     timeout
                   </div>
                 </div>
-                <OIcon name="link" size="sm" class="correlation-hint tw:absolute tw:top-4 tw:right-4 tw:opacity-0 tw:transition-opacity tw:duration-200 tw:text-[var(--q-primary)]" />
+                <OIcon name="link" size="sm" class="tw:absolute tw:top-4 tw:right-4 tw:opacity-0 tw:transition-opacity tw:duration-200 tw:text-[var(--q-primary)] tw:group-hover:opacity-100" />
               </div>
 
               <!-- Sample Log 2 -->
-              <div class="log-line tw:p-4 tw:bg-(--q-dark-page,#f5f5f5) tw:rounded-lg tw:border-2 tw:border-transparent tw:cursor-pointer tw:transition-all tw:duration-200 tw:relative tw:hover:border-(--q-primary) tw:hover:bg-(--q-dark-page,#eeeeee)" @click="selectLog(sampleLog2)">
+              <div class="log-line tw:group tw:p-4 tw:bg-(--q-dark-page,#f5f5f5) tw:rounded-lg tw:border-2 tw:border-transparent tw:cursor-pointer tw:transition-all tw:duration-200 tw:relative tw:hover:border-(--q-primary) tw:hover:bg-(--q-dark-page,#eeeeee)" @click="selectLog(sampleLog2)">
                 <div class="log-timestamp tw:font-mono tw:text-xs tw:text-[var(--q-primary)] tw:mb-2">2025-12-02 10:24:12</div>
                 <div class="log-content tw:flex tw:flex-col tw:gap-1 tw:text-[13px]">
                   <div><strong>service.name:</strong> inventory-service</div>
@@ -38,11 +38,11 @@
                     <strong>message:</strong> Database connection timeout
                   </div>
                 </div>
-                <OIcon name="link" size="sm" class="correlation-hint tw:absolute tw:top-4 tw:right-4 tw:opacity-0 tw:transition-opacity tw:duration-200 tw:text-[var(--q-primary)]" />
+                <OIcon name="link" size="sm" class="tw:absolute tw:top-4 tw:right-4 tw:opacity-0 tw:transition-opacity tw:duration-200 tw:text-[var(--q-primary)] tw:group-hover:opacity-100" />
               </div>
 
               <!-- Sample Log 3 -->
-              <div class="log-line tw:p-4 tw:bg-(--q-dark-page,#f5f5f5) tw:rounded-lg tw:border-2 tw:border-transparent tw:cursor-pointer tw:transition-all tw:duration-200 tw:relative tw:hover:border-(--q-primary) tw:hover:bg-(--q-dark-page,#eeeeee)" @click="selectLog(sampleLog3)">
+              <div class="log-line tw:group tw:p-4 tw:bg-(--q-dark-page,#f5f5f5) tw:rounded-lg tw:border-2 tw:border-transparent tw:cursor-pointer tw:transition-all tw:duration-200 tw:relative tw:hover:border-(--q-primary) tw:hover:bg-(--q-dark-page,#eeeeee)" @click="selectLog(sampleLog3)">
                 <div class="log-timestamp tw:font-mono tw:text-xs tw:text-[var(--q-primary)] tw:mb-2">2025-12-02 10:25:30</div>
                 <div class="log-content tw:flex tw:flex-col tw:gap-1 tw:text-[13px]">
                   <div><strong>service.name:</strong> user-auth</div>
@@ -53,7 +53,7 @@
                     user_123
                   </div>
                 </div>
-                <OIcon name="link" size="sm" class="correlation-hint tw:absolute tw:top-4 tw:right-4 tw:opacity-0 tw:transition-opacity tw:duration-200 tw:text-[var(--q-primary)]" />
+                <OIcon name="link" size="sm" class="tw:absolute tw:top-4 tw:right-4 tw:opacity-0 tw:transition-opacity tw:duration-200 tw:text-[var(--q-primary)] tw:group-hover:opacity-100" />
               </div>
             </div>
           </OCardSection>
@@ -204,7 +204,4 @@ function selectLog(log: any) {
   color: var(--q-text-secondary, #757575);
 }
 
-.log-line:hover .correlation-hint {
-  opacity: 1;
-}
 </style>
