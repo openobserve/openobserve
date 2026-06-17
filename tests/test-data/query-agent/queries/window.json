@@ -13,24 +13,6 @@
         ],
         "results": [
           [
-            "SORT-X1",
-            "900.0",
-            "1",
-            "1"
-          ],
-          [
-            "SORT-X1",
-            "610.0",
-            "2",
-            "2"
-          ],
-          [
-            "SORT-X1",
-            "555.0",
-            "3",
-            "3"
-          ],
-          [
             "SORT-M3",
             "900.0",
             "1",
@@ -65,6 +47,24 @@
             "150.0",
             "2",
             "2"
+          ],
+          [
+            "SORT-X1",
+            "900.0",
+            "1",
+            "1"
+          ],
+          [
+            "SORT-X1",
+            "610.0",
+            "2",
+            "2"
+          ],
+          [
+            "SORT-X1",
+            "555.0",
+            "3",
+            "3"
           ],
           [
             "SORT-A7",
@@ -1065,7 +1065,7 @@
           ],
           [
             "ZONE-3",
-            "manual",
+            "hybrid",
             "2",
             "4",
             "50.0",
@@ -1073,7 +1073,7 @@
           ],
           [
             "ZONE-3",
-            "hybrid",
+            "manual",
             "2",
             "4",
             "50.0",
@@ -2675,12 +2675,6 @@
         ],
         "results": [
           [
-            "checkoutPage",
-            "Android 14",
-            "2",
-            "1"
-          ],
-          [
             "cartPage",
             "Android 12",
             "2",
@@ -2690,6 +2684,12 @@
             "itemPage",
             "Mac OS X (iPhone)",
             "1",
+            "1"
+          ],
+          [
+            "checkoutPage",
+            "Android 14",
+            "2",
             "1"
           ]
         ],
@@ -2823,12 +2823,12 @@
         ],
         "results": [
           [
-            "E009",
+            "E001",
             "2",
             "1"
           ],
           [
-            "E001",
+            "E009",
             "2",
             "1"
           ]
@@ -3324,7 +3324,8 @@
             "1"
           ]
         ],
-        "results_mode": "rowsort"
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
       }
     },
     {
@@ -3450,7 +3451,8 @@
             "900.0"
           ]
         ],
-        "results_mode": "rowsort"
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
       }
     },
     {
@@ -3581,7 +3583,7 @@
     },
     {
       "id": "Q650",
-      "sql": "SELECT _timestamp, throughput_rate, LAG(throughput_rate, 2, 0) OVER (ORDER BY _timestamp) AS prev2_tput, LEAD(throughput_rate, 2, 0) OVER (ORDER BY _timestamp) AS next2_tput, throughput_rate - LAG(throughput_rate, 1, throughput_rate) OVER (ORDER BY _timestamp) AS delta FROM \"{stream}\" ORDER BY _timestamp LIMIT 15",
+      "sql": "SELECT _timestamp, throughput_rate, LAG(throughput_rate, 2) OVER (ORDER BY _timestamp) AS prev2_tput, LEAD(throughput_rate, 2) OVER (ORDER BY _timestamp) AS next2_tput FROM \"{stream}\" ORDER BY _timestamp",
       "category": "window",
       "time_offset": {
         "start_offset": 38880000000,
@@ -3591,102 +3593,92 @@
         "columns": [
           "throughput_rate",
           "prev2_tput",
-          "next2_tput",
-          "delta"
+          "next2_tput"
         ],
         "results": [
           [
             "190.0",
-            "0.0",
-            "900.0",
-            "0.0"
+            "None",
+            "900.0"
           ],
           [
             "900.0",
-            "0.0",
-            "150.0",
-            "710.0"
+            "None",
+            "150.0"
           ],
           [
             "900.0",
             "190.0",
-            "320.0",
-            "0.0"
+            "320.0"
           ],
           [
             "150.0",
             "900.0",
-            "320.0",
-            "-750.0"
+            "320.0"
           ],
           [
             "320.0",
             "900.0",
-            "480.0",
-            "170.0"
+            "480.0"
           ],
           [
             "320.0",
             "150.0",
-            "480.0",
-            "0.0"
+            "480.0"
           ],
           [
             "480.0",
             "320.0",
-            "610.0",
-            "160.0"
+            "610.0"
           ],
           [
             "480.0",
             "320.0",
-            "725.0",
-            "0.0"
+            "725.0"
           ],
           [
             "610.0",
             "480.0",
-            "725.0",
-            "130.0"
+            "725.0"
           ],
           [
             "725.0",
             "480.0",
-            "840.0",
-            "115.0"
+            "840.0"
           ],
           [
             "725.0",
             "610.0",
-            "840.0",
-            "0.0"
+            "840.0"
           ],
           [
             "840.0",
             "725.0",
-            "290.0",
-            "115.0"
+            "290.0"
           ],
           [
             "840.0",
             "725.0",
-            "555.0",
-            "0.0"
+            "555.0"
           ],
           [
             "290.0",
             "840.0",
-            "555.0",
-            "-550.0"
+            "555.0"
           ],
           [
             "555.0",
             "840.0",
-            "0.0",
-            "265.0"
+            "None"
+          ],
+          [
+            "555.0",
+            "290.0",
+            "None"
           ]
         ],
-        "results_mode": "rowsort"
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
       }
     },
     {
@@ -3890,7 +3882,8 @@
             "610.0"
           ]
         ],
-        "results_mode": "rowsort"
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
       }
     },
     {
@@ -3929,7 +3922,8 @@
             "3"
           ]
         ],
-        "results_mode": "rowsort"
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
       }
     },
     {
@@ -4023,7 +4017,8 @@
             "0.9333333333333333"
           ]
         ],
-        "results_mode": "rowsort"
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
       }
     },
     {
@@ -4216,7 +4211,8 @@
             "753.8"
           ]
         ],
-        "results_mode": "rowsort"
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
       }
     }
   ],

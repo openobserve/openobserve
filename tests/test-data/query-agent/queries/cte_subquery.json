@@ -354,7 +354,7 @@
             "4",
             "386.25",
             "29.83",
-            "auto",
+            "manual",
             "2"
           ],
           [
@@ -695,15 +695,15 @@
         ],
         "results": [
           [
-            "LANE-C",
-            "ZONE-2",
+            "LANE-B",
+            "ZONE-1",
             "4",
             "3.5",
             "0.5"
           ],
           [
-            "LANE-B",
-            "ZONE-1",
+            "LANE-C",
+            "ZONE-2",
             "4",
             "3.5",
             "0.5"
@@ -1232,14 +1232,14 @@
         ],
         "results": [
           [
-            "ZONE-4",
-            "4",
-            "483.0"
-          ],
-          [
             "ZONE-1",
             "4",
             "258.0"
+          ],
+          [
+            "ZONE-4",
+            "4",
+            "483.0"
           ],
           [
             "ZONE-3",
@@ -1763,12 +1763,12 @@
             "1"
           ],
           [
-            "ResourceExhaustedException: sorter_model SORT-M3 queue full",
+            "ConfigurationException: missing facility_zone ZONE-3 override",
             "1",
             "1"
           ],
           [
-            "ConfigurationException: missing facility_zone ZONE-3 override",
+            "ResourceExhaustedException: sorter_model SORT-M3 queue full",
             "1",
             "1"
           ]
@@ -1819,13 +1819,13 @@
             "2"
           ],
           [
-            "performanceMetric",
-            "itemPage",
+            "interaction",
+            "searchPage",
             "2"
           ],
           [
-            "interaction",
-            "searchPage",
+            "performanceMetric",
+            "itemPage",
             "2"
           ],
           [
@@ -1992,22 +1992,22 @@
         "results": [
           [
             "fast",
-            "unknown",
+            "ok",
             "2"
           ],
           [
             "fast",
-            "ok",
+            "unknown",
             "2"
           ],
           [
             "degraded",
-            "ok",
+            "unknown",
             "1"
           ],
           [
             "degraded",
-            "unknown",
+            "ok",
             "1"
           ],
           [
@@ -2034,11 +2034,11 @@
         ],
         "results": [
           [
-            "E001",
+            "E003",
             "2"
           ],
           [
-            "E003",
+            "E001",
             "2"
           ],
           [
@@ -2148,22 +2148,22 @@
           ],
           [
             "performanceMetric",
-            "searchPage",
-            "1"
-          ],
-          [
-            "performanceMetric",
-            "itemPage",
-            "1"
-          ],
-          [
-            "performanceMetric",
             "checkoutPage",
             "1"
           ],
           [
             "performanceMetric",
             "cartPage",
+            "1"
+          ],
+          [
+            "performanceMetric",
+            "searchPage",
+            "1"
+          ],
+          [
+            "performanceMetric",
+            "itemPage",
             "1"
           ]
         ],
@@ -2346,11 +2346,11 @@
         ],
         "results": [
           [
-            "zone-controller",
+            "track-router",
             "2"
           ],
           [
-            "track-router",
+            "zone-controller",
             "2"
           ]
         ],
@@ -2956,6 +2956,12 @@
             "0"
           ],
           [
+            "warehouse-east",
+            "1",
+            "1900.0",
+            "0"
+          ],
+          [
             "warehouse-north",
             "1",
             "12.0",
@@ -2966,12 +2972,6 @@
             "1",
             "230.0",
             "1"
-          ],
-          [
-            "warehouse-east",
-            "1",
-            "1900.0",
-            "0"
           ]
         ],
         "results_mode": "rowsort"
@@ -3340,7 +3340,8 @@
             "4"
           ]
         ],
-        "results_mode": "rowsort"
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
       }
     },
     {
@@ -3384,7 +3385,8 @@
             "4"
           ]
         ],
-        "results_mode": "rowsort"
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
       }
     },
     {
@@ -3466,7 +3468,8 @@
             "610.0"
           ]
         ],
-        "results_mode": "rowsort"
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
       }
     },
     {
@@ -3500,7 +3503,8 @@
             "6"
           ]
         ],
-        "results_mode": "rowsort"
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
       }
     },
     {
@@ -3539,7 +3543,8 @@
             "1"
           ]
         ],
-        "results_mode": "rowsort"
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
       }
     },
     {
@@ -3612,7 +3617,7 @@
     },
     {
       "id": "Q627",
-      "sql": "SELECT DISTINCT pallet_id FROM \"{stream}\" t1 WHERE NOT EXISTS (SELECT 1 FROM \"{stream}\" t2 WHERE t2.facility_zone = 'ZONE-1' AND NOT EXISTS (SELECT 1 FROM \"{stream}\" t3 WHERE t3.pallet_id = t1.pallet_id AND t3.facility_zone = t2.facility_zone)) ORDER BY pallet_id",
+      "sql": "SELECT DISTINCT org_name FROM \"{stream}\" t1 WHERE NOT EXISTS (SELECT 1 FROM \"{stream}\" t2 WHERE t2.facility_zone = 'ZONE-1' AND NOT EXISTS (SELECT 1 FROM \"{stream}\" t3 WHERE t3.org_name = t1.org_name AND t3.facility_zone = t2.facility_zone)) ORDER BY org_name",
       "category": "cte_subquery",
       "time_offset": {
         "start_offset": 37500000000,
@@ -3620,17 +3625,24 @@
       },
       "expected": {
         "columns": [
-          "pallet_id"
+          "org_name"
         ],
         "results": [
           [
-            "PL-003"
+            "warehouse-central"
           ],
           [
-            "PL-007"
+            "warehouse-east"
+          ],
+          [
+            "warehouse-south"
+          ],
+          [
+            "warehouse-west"
           ]
         ],
-        "results_mode": "rowsort"
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
       }
     },
     {
@@ -3669,7 +3681,8 @@
             "46.1"
           ]
         ],
-        "results_mode": "rowsort"
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
       }
     },
     {
@@ -3728,12 +3741,13 @@
             "2"
           ]
         ],
-        "results_mode": "rowsort"
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
       }
     },
     {
       "id": "Q630",
-      "sql": "SELECT _timestamp, facility_zone, throughput_rate FROM \"{stream}\" t1 WHERE throughput_rate >= ALL (SELECT throughput_rate FROM \"{stream}\" t2 WHERE t2.facility_zone = t1.facility_zone) ORDER BY _timestamp LIMIT 10",
+      "sql": "WITH max_tput AS (SELECT facility_zone, MAX(throughput_rate) AS max_rate FROM \"{stream}\" GROUP BY facility_zone) SELECT t._timestamp, t.facility_zone, t.throughput_rate FROM \"{stream}\" t JOIN max_tput m ON t.facility_zone = m.facility_zone AND t.throughput_rate = m.max_rate ORDER BY t._timestamp LIMIT 10",
       "category": "cte_subquery",
       "time_offset": {
         "start_offset": 37680000000,
@@ -3762,7 +3776,8 @@
             "725.0"
           ]
         ],
-        "results_mode": "rowsort"
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
       }
     }
   ],

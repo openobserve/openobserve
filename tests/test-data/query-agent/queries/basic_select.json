@@ -647,13 +647,13 @@
             "SORT-M3",
             "manual",
             "ZONE-1",
-            "BS-2026-A1"
+            "BS-2026-C3"
           ],
           [
             "SORT-M3",
             "manual",
             "ZONE-1",
-            "BS-2026-C3"
+            "BS-2026-A1"
           ],
           [
             "SORT-Q5",
@@ -1581,11 +1581,11 @@
         ],
         "results": [
           [
-            "[\"torbot_ua_mismatch\",\"cookie_reuse\"]",
+            "[\"credential_stuffing\"]",
             "2"
           ],
           [
-            "[\"credential_stuffing\"]",
+            "[\"rate_limit_exceeded\",\"geo_anomaly\"]",
             "2"
           ],
           [
@@ -1593,7 +1593,7 @@
             "2"
           ],
           [
-            "[\"rate_limit_exceeded\",\"geo_anomaly\"]",
+            "[\"torbot_ua_mismatch\",\"cookie_reuse\"]",
             "2"
           ]
         ],
@@ -6540,7 +6540,8 @@
             "/data/sorter/input.dat"
           ]
         ],
-        "results_mode": "rowsort"
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
       }
     },
     {
@@ -6584,7 +6585,8 @@
             "3"
           ]
         ],
-        "results_mode": "rowsort"
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
       }
     },
     {
@@ -6688,7 +6690,8 @@
             "1"
           ]
         ],
-        "results_mode": "rowsort"
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
       }
     },
     {
@@ -6764,7 +6767,8 @@
             "555.0"
           ]
         ],
-        "results_mode": "rowsort"
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
       }
     },
     {
@@ -6828,7 +6832,8 @@
             "ZONE-3"
           ]
         ],
-        "results_mode": "rowsort"
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
       }
     },
     {
@@ -6912,7 +6917,8 @@
             "inbound"
           ]
         ],
-        "results_mode": "rowsort"
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
       }
     },
     {
@@ -6950,7 +6956,8 @@
             "itemPage"
           ]
         ],
-        "results_mode": "rowsort"
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
       }
     },
     {

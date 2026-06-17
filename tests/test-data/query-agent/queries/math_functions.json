@@ -1218,12 +1218,12 @@
         ],
         "results": [
           [
-            "pallet-mapper",
+            "batch-sync",
             "100.0",
-            "2"
+            "1"
           ],
           [
-            "track-router",
+            "pallet-mapper",
             "100.0",
             "2"
           ],
@@ -1233,9 +1233,9 @@
             "1"
           ],
           [
-            "batch-sync",
+            "track-router",
             "100.0",
-            "1"
+            "2"
           ]
         ],
         "results_mode": "rowsort"
