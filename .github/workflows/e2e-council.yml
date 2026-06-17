@@ -752,6 +752,7 @@ jobs:
       pull-requests: write # post a failure comment on the source PR (scoped GITHUB_TOKEN; PR comments need this)
     outputs:
       heal_status: ${{ steps.finalrun.outputs.status }}
+      quality_status: ${{ steps.quality.outputs.status }} # pass only if integrity + Sentinel both clear
     env:
       ZO_ROOT_USER_EMAIL: root@example.com
       ZO_ROOT_USER_PASSWORD: Complexpass#123
@@ -798,6 +799,11 @@ jobs:
           if [ "$EVENT_NAME" = "workflow_dispatch" ]; then RESTORE_REF="$REF_NAME"; fi
           git fetch origin "$RESTORE_REF" --depth=1
           git checkout "origin/$RESTORE_REF" -- .opencode opencode.jsonc
+          # Also restore the deterministic assertion-integrity analyzer from the SAME trusted ref — it
+          # must never be the PR tree's (untrusted) copy, since it gates whether the PR is opened.
+          git checkout "origin/$RESTORE_REF" -- .github/scripts/assert_integrity.py 2>/dev/null \
+            && echo "Restored assert_integrity.py from origin/$RESTORE_REF" \
+            || echo "::warning::assert_integrity.py not on origin/$RESTORE_REF — integrity gate will no-op this run"
           echo "Restored pipeline agents/config from origin/$RESTORE_REF"
 
       # No artifact download here on purpose: the hand-off (docs/test_generator/ci/) is committed on
@@ -880,6 +886,20 @@ jobs:
           echo "spec=$SPEC" >> "$GITHUB_OUTPUT"
           echo "rel=${SPEC#tests/ui-testing/}" >> "$GITHUB_OUTPUT"
 
+      - name: Fingerprint assertions (pre-heal baseline)
+        # Snapshot the GENERATED spec's assertion shape BEFORE healing, so the integrity gate (after
+        # the final run) can detect heal-by-weakening — assertions deleted, positives flipped to
+        # negatives, or tests skipped — by comparing against this baseline.
+        env:
+          SPEC: ${{ steps.spec.outputs.spec }}
+        run: |
+          if [ -f .github/scripts/assert_integrity.py ]; then
+            python3 .github/scripts/assert_integrity.py fingerprint "$SPEC" > docs/test_generator/ci/assert-baseline.json \
+              && echo "pre-heal baseline: $(cat docs/test_generator/ci/assert-baseline.json)"
+          else
+            echo "::warning::analyzer missing — no assertion baseline (diff-weakening guard disabled this run)"
+          fi
+
       - name: Heal — fresh-context loop until the spec passes
         id: heal
         # Up to 3 FRESH healer invocations (clean context each). Each does a few internal iterations;
@@ -900,11 +920,14 @@ jobs:
           for attempt in 1 2 3; do
             echo "::group::Heal attempt ${attempt}/3 (fresh context)"
             opencode run --agent e2e-ci-healer --model "$PIPELINE_MODEL" \
-              "Heal attempt ${attempt} of 3 — you have a FRESH context. Heal ONLY this spec (do NOT run the whole suite): ${SPEC}. A live OpenObserve is booted at ${ZO_BASE_URL}. FIRST, if docs/test_generator/ci/heal-notes.md exists, read it — it lists what earlier attempts already tried; do NOT repeat those approaches. Run 'cd tests/ui-testing && npx playwright test ${REL} --workers=4 --reporter=line', diagnose, fix the spec/page objects, re-run — up to 3 internal iterations. NEVER touch /tmp or any path outside the repo (the sandbox blocks it and the command fails); read stdout directly. If you get it passing, write docs/test_generator/ci/heal-result.json with status=passing. If still failing after your iterations, APPEND a concise note (test name, the failure, what you tried) to docs/test_generator/ci/heal-notes.md, write heal-result.json status=failing, and stop. Keep reasoning concise."
+              "Heal attempt ${attempt} of 3 — you have a FRESH context. Heal ONLY this spec (do NOT run the whole suite): ${SPEC}. A live OpenObserve is booted at ${ZO_BASE_URL}. FIRST, if docs/test_generator/ci/heal-notes.md exists, read it — it lists what earlier attempts already tried; do NOT repeat those approaches. Run 'cd tests/ui-testing && npx playwright test ${REL} --workers=4 --reporter=line', diagnose, fix the spec/page objects, re-run — up to 3 internal iterations. NEVER touch /tmp or any path outside the repo (the sandbox blocks it and the command fails); read stdout directly. If you get it passing HONESTLY (no deleted/inverted/conditionalized assertions), write docs/test_generator/ci/heal-result.json with status=passing. If a test cannot pass because the FEATURE is not wired in this build (component never renders / code path commented out), do NOT weaken it — mark it test.fixme('reason, see #issue'), keep the assertion intact, and write status=feature-incomplete with an 'evidence' field naming the file:line that proves the gap. If still failing for an ordinary reason after your iterations, APPEND a concise note (test name, failure, what you tried) to docs/test_generator/ci/heal-notes.md, write heal-result.json status=failing, and stop. NEVER weaken an assertion to force green — a deterministic gate compares assertions before/after heal and will reject it. Keep reasoning concise."
             echo "::endgroup::"
             STATUS=$(jq -r '.status // "failing"' docs/test_generator/ci/heal-result.json 2>/dev/null || echo failing)
             if [ "$STATUS" = "passing" ]; then
               echo "::notice::Healer reports passing on attempt ${attempt}."; break
+            fi
+            if [ "$STATUS" = "feature-incomplete" ]; then
+              echo "::notice::Healer reports feature-incomplete — the feature isn't wired in this build; retrying won't help. Stopping the loop."; break
             fi
             if [ "$attempt" -lt 3 ]; then echo "::notice::Attempt ${attempt} did not pass → retrying with a fresh context.";
             else echo "::notice::3 fresh-context attempts exhausted — leaving it to the authoritative run."; fi
@@ -925,10 +948,40 @@ jobs:
             echo "::warning::Generated spec still failing after healing."
           fi
 
+      - name: Assertion-integrity gate (deterministic — blocks weak / gamed-green specs)
+        id: integrity
+        # A spec can exit 0 yet test NOTHING (tautologies like `count >= 0`, assertions only inside
+        # `if` blocks) OR have been healed to green by deleting/inverting the assertions that catch the
+        # bug (#12719). This deterministic check (no LLM) is the teeth: green is necessary, not
+        # sufficient. Runs only when the authoritative run passed — a failing run is handled below.
+        if: steps.finalrun.outputs.status == 'passing'
+        env:
+          SPEC: ${{ steps.spec.outputs.spec }}
+        run: |
+          if [ ! -f .github/scripts/assert_integrity.py ]; then
+            echo "::warning::analyzer missing — integrity gate skipped (treating as pass)"
+            echo "status=pass" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          # The Healer's HONEST 'feature-incomplete' path is allowed to park tests as fixme — only then
+          # relax the diff-weakening guard. Static tautology/conditional-only checks ALWAYS apply.
+          HSTATUS=$(jq -r '.status // ""' docs/test_generator/ci/heal-result.json 2>/dev/null || echo "")
+          ALLOW=""; [ "$HSTATUS" = "feature-incomplete" ] && ALLOW="--allow-weakening"
+          BASE=""; [ -f docs/test_generator/ci/assert-baseline.json ] && BASE="--baseline docs/test_generator/ci/assert-baseline.json"
+          if python3 .github/scripts/assert_integrity.py check "$SPEC" $BASE $ALLOW > docs/test_generator/ci/assert-verdict.json; then
+            echo "status=pass" >> "$GITHUB_OUTPUT"
+            echo "::notice::Assertion-integrity gate PASSED — assertions are real and were not weakened by healing."
+          else
+            echo "status=fail" >> "$GITHUB_OUTPUT"
+            echo "::error::Assertion-integrity gate FAILED — spec is green but does not meaningfully test the feature:"
+            jq -r '.findings[] | "  - [\(.rule)] line \(.line // "-"): \(.detail)"' docs/test_generator/ci/assert-verdict.json 2>/dev/null \
+              || cat docs/test_generator/ci/assert-verdict.json
+          fi
+
       - name: Sentinel re-audit (post-heal)
-        # ADVISORY ONLY: the authoritative final run already decided pass/fail. This re-audit is a
-        # quality annotation, so it must NEVER abort the job — continue-on-error keeps a green heal
-        # from being flipped to "failed" just because the audit (or opencode) hiccuped.
+        # The Sentinel's verdict now FEEDS the blocking quality gate below (it is no longer purely
+        # advisory). The STEP itself stays continue-on-error so an opencode hiccup never crashes the
+        # job — if no fresh verdict is written we fall back to the (PASS) generate-time verdict, i.e.
+        # LLM flakiness fails OPEN. The deterministic integrity gate above is the hard, no-flake teeth.
         continue-on-error: true
         if: steps.finalrun.outputs.status == 'passing'
         env:
@@ -936,7 +989,35 @@ jobs:
           SPEC: ${{ steps.spec.outputs.spec }}
         run: |
           opencode run --agent e2e-ci-sentinel --model "$PIPELINE_MODEL" \
-            "Re-audit the healed spec/page objects for ${SPEC}; update docs/test_generator/ci/sentinel-verdict.json."
+            "Re-audit the healed spec/page objects for ${SPEC}. Apply ALL critical checks, especially the assertion-quality ones (tautologies, conditional-only assertions, negative-only assertions on the feature under test, test-name/assertion mismatch). Update docs/test_generator/ci/sentinel-verdict.json with an honest verdict."
+
+      - name: Quality gate decision (deterministic integrity + Sentinel verdict)
+        id: quality
+        # The single source of truth for "is this PR allowed to open." Blocks if EITHER the
+        # deterministic integrity gate failed OR the Sentinel returned a FAIL/critical verdict. pr_back
+        # gates on this output, so a green-but-worthless spec never becomes a PR.
+        if: steps.finalrun.outputs.status == 'passing'
+        env:
+          INTEGRITY: ${{ steps.integrity.outputs.status }}
+        run: |
+          # feature-incomplete: the Healer honestly parked tests because the feature isn't wired.
+          # The final run is "green" only because those tests are fixme — do NOT open a normal PR;
+          # block here so the report step surfaces the Healer's evidence to the dev instead.
+          HSTATUS=$(jq -r '.status // ""' docs/test_generator/ci/heal-result.json 2>/dev/null || echo "")
+          if [ "$HSTATUS" = "feature-incomplete" ]; then
+            echo "status=fail" >> "$GITHUB_OUTPUT"
+            echo "::warning::Healer reported feature-incomplete — no PR; the dev gets the evidence comment."
+            exit 0
+          fi
+          SENT=$(jq -r '.verdict // "PASS"' docs/test_generator/ci/sentinel-verdict.json 2>/dev/null || echo PASS)
+          SENT_CRIT=$(jq -r '.critical_count // 0' docs/test_generator/ci/sentinel-verdict.json 2>/dev/null || echo 0)
+          if [ "$INTEGRITY" = "fail" ] || [ "$SENT" = "FAIL" ] || { [ "$SENT_CRIT" -gt 0 ] 2>/dev/null; }; then
+            echo "status=fail" >> "$GITHUB_OUTPUT"
+            echo "::error::Quality gate FAILED (integrity=$INTEGRITY, sentinel=$SENT, critical=$SENT_CRIT) — no test PR will be opened."
+          else
+            echo "status=pass" >> "$GITHUB_OUTPUT"
+            echo "::notice::Quality gate PASSED (integrity=$INTEGRITY, sentinel=$SENT)."
+          fi
 
       - name: Commit + push healer fixes to autoe2e branch
         env:
@@ -974,10 +1055,10 @@ jobs:
             tests/ui-testing/test-results/
 
       - name: Report heal failure on the source PR (root cause + run link)
-        # Runs whenever the spec did NOT end up passing (build error, boot error, healer timeout,
-        # or still-failing). Posts the ROOT CAUSE + run link on the dev's PR, then logs the
-        # comment URL as the final step (so the dev can go verify). No PR is opened in this case.
-        if: always() && steps.finalrun.outputs.status != 'passing'
+        # Runs when no PR will open: the spec didn't pass (build/boot/timeout/still-failing) OR it
+        # passed but the QUALITY GATE blocked it (gamed-green / healed-by-weakening / feature-incomplete).
+        # Posts the ROOT CAUSE + run link on the dev's PR. No PR is opened in any of these cases.
+        if: always() && (steps.finalrun.outputs.status != 'passing' || steps.quality.outputs.status == 'fail')
         env:
           # GITHUB_TOKEN (NOT ORG_ADMIN_TOKEN): this job BUILDS + RUNS the PR's code, so an
           # org-admin token must never be present here (a malicious build could intercept it).
@@ -990,9 +1071,11 @@ jobs:
           SPEC_OUTCOME: ${{ steps.spec.outcome }}
           HEAL_OUTCOME: ${{ steps.heal.outcome }}
           FINAL_STATUS: ${{ steps.finalrun.outputs.status }}
+          QUALITY_STATUS: ${{ steps.quality.outputs.status }}
         run: |
           RUN_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
-          # Root cause = the most-upstream failing stage (build -> boot -> pw-setup -> spec-resolve -> heal -> final).
+          EXTRA=""   # optional appended detail (integrity findings / feature-incomplete evidence)
+          # Root cause = the most-upstream failing stage (build -> boot -> pw-setup -> spec-resolve -> heal -> final -> quality).
           if [ "$BUILD_OUTCOME" = "failure" ]; then
             CAUSE="Building OpenObserve from the feature branch failed (compile / frontend build error)."
           elif [ "$BOOT_OUTCOME" = "failure" ]; then
@@ -1002,18 +1085,33 @@ jobs:
           elif [ "$SPEC_OUTCOME" = "failure" ]; then
             CAUSE="Could not resolve the generated spec path from run metadata (generation/hand-off problem — run-context.json missing or spec_path invalid)."
           elif [ "$HEAL_OUTCOME" = "failure" ] || [ "$HEAL_OUTCOME" = "cancelled" ]; then
-            CAUSE="The healer hit its 30-minute cap (hung or too-slow heal loop) and was stopped before the tests passed."
+            CAUSE="The healer hit its time cap (hung or too-slow heal loop) and was stopped before the tests passed."
           elif [ "$FINAL_STATUS" = "failing" ]; then
-            CAUSE="The generated spec still failed after healing (<=3 iterations) — likely a genuinely broken/flaky test or a real product issue."
+            CAUSE="The generated spec still failed after healing — likely a genuinely broken/flaky test or a real product issue."
+          elif [ "$QUALITY_STATUS" = "fail" ]; then
+            # The most valuable outcome: tests went green but DON'T meaningfully test the feature.
+            HSTATUS=$(jq -r '.status // ""' docs/test_generator/ci/heal-result.json 2>/dev/null || echo "")
+            if [ "$HSTATUS" = "feature-incomplete" ]; then
+              CAUSE="⚠️ The tests can't pass honestly because the **feature appears incomplete in this build** — so they were NOT certified (no green-washing)."
+              EV=$(jq -r '.evidence // empty' docs/test_generator/ci/heal-result.json 2>/dev/null || echo "")
+              [ -n "$EV" ] && EXTRA=$(printf '\n\n**Healer evidence:** %s' "$EV")
+            else
+              CAUSE="The spec is green but the **assertion-integrity gate blocked it** — it does not meaningfully test the feature (tautologies, conditional-only assertions, or assertions weakened/inverted during healing)."
+            fi
+            if [ -f docs/test_generator/ci/assert-verdict.json ]; then
+              F=$(jq -r '.findings[]? | "- `\(.rule)`\(if .line then " (line \(.line))" else "" end): \(.detail)"' docs/test_generator/ci/assert-verdict.json 2>/dev/null || echo "")
+              [ -n "$F" ] && EXTRA=$(printf '%s\n\n**Findings:**\n%s' "$EXTRA" "$F")
+            fi
           else
             CAUSE="Verify/heal did not complete (see the run)."
           fi
           MARKER="<!-- e2e-council-testpr -->"
           {
             printf '%s\n' "$MARKER"
-            printf '🤖 **E2E Council** — I generated E2E tests for #%s but could **not** get them passing, so **no test PR was opened** (working code only).\n\n' "$SRC_PR"
-            printf '**Root cause:** %s\n\n' "$CAUSE"
-            printf '[View run + logs](%s)\n' "$RUN_URL"
+            printf '🤖 **E2E Council** — I generated E2E tests for #%s, but **no test PR was opened** (working code only).\n\n' "$SRC_PR"
+            printf '**Root cause:** %s\n' "$CAUSE"
+            [ -n "$EXTRA" ] && printf '%s\n' "$EXTRA"
+            printf '\n[View run + logs](%s)\n' "$RUN_URL"
           } > /tmp/healfail.md
           CID=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${SRC_PR}/comments" \
             --jq "[.[] | select(.body | startswith(\"${MARKER}\"))][0].id // empty")
@@ -1041,7 +1139,8 @@ jobs:
       needs.triage.outputs.skip == 'false' &&
       needs.triage.outputs.needs_e2e == 'true' &&
       needs.triage.outputs.author_allowed == 'true' &&
-      needs.verify_heal.outputs.heal_status == 'passing'
+      needs.verify_heal.outputs.heal_status == 'passing' &&
+      needs.verify_heal.outputs.quality_status == 'pass'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -1114,7 +1213,35 @@ jobs:
           [ -n "$SLUG" ] || SLUG="feature"   # sanitize LLM-written slug before it hits the PR title
           SPEC=$(jq -r '.spec_path // "(see branch)"' meta/run-context.json 2>/dev/null || echo "(see branch)")
 
-          # Reviewer-facing summary table of the test cases added/changed (Engineer's test-summary.json).
+          # --- Reconcile the summary against the FINAL healed spec (truthful PR body). ---
+          # test-summary.json is written from the Engineer's INTENT; the Healer may have changed the
+          # spec afterward. Fetch the committed spec and DROP any row whose test title isn't actually
+          # in it — so the PR body can never claim tests/assertions that don't exist (#12719 §1.3).
+          SUMMARY=meta/test-summary.json
+          if [ -f "$SUMMARY" ] && [ "$(jq 'length' "$SUMMARY" 2>/dev/null || echo 0)" -gt 0 ]; then
+            SPEC_PATH="$SPEC"
+            if [ -f meta/coverage-decision.json ]; then
+              CDS=$(jq -r '.target_spec // empty' meta/coverage-decision.json 2>/dev/null || echo "")
+              [ -n "$CDS" ] && SPEC_PATH="$CDS"
+            fi
+            if echo "$SPEC_PATH" | grep -Eq '^tests/ui-testing/playwright-tests/[A-Za-z0-9._/-]+\.spec\.js$' \
+               && gh api "repos/${GITHUB_REPOSITORY}/contents/${SPEC_PATH}?ref=${BRANCH}" --jq '.content' 2>/dev/null | tr -d '\n' | base64 -d > /tmp/final_spec.js; then
+              KEPT='[]'
+              while IFS= read -r row; do
+                T=$(printf '%s' "$row" | jq -r '.title // empty')
+                if [ -n "$T" ] && grep -Fq "$T" /tmp/final_spec.js; then
+                  KEPT=$(printf '%s' "$KEPT" | jq --argjson r "$row" '. + [$r]')
+                else
+                  echo "::warning::Dropping phantom summary row (no matching test in the final spec): ${T:-<empty>}"
+                fi
+              done < <(jq -c '.[]' "$SUMMARY")
+              printf '%s' "$KEPT" > "$SUMMARY"
+            else
+              echo "::notice::Could not fetch the final spec to reconcile the summary — leaving it as-is."
+            fi
+          fi
+
+          # Reviewer-facing summary table of the test cases added/changed (reconciled to the final spec).
           TABLE=""
           if [ -f meta/test-summary.json ] && [ "$(jq 'length' meta/test-summary.json 2>/dev/null || echo 0)" -gt 0 ]; then
             TABLE=$(jq -r '"\n\n**Test cases added / changed:**\n\n| Test case | Type | What it verifies |\n|---|---|---|\n" + ([.[] | "| `\(.title)` | \(.action) | \(.verifies) |"] | join("\n"))' meta/test-summary.json 2>/dev/null || echo "")
@@ -1179,7 +1306,8 @@ jobs:
       needs.triage.outputs.needs_e2e == 'true' &&
       needs.triage.outputs.author_allowed == 'true' &&
       needs.generate.outputs.has_changes == 'true' &&
-      needs.verify_heal.outputs.heal_status == 'passing'
+      needs.verify_heal.outputs.heal_status == 'passing' &&
+      needs.verify_heal.outputs.quality_status == 'pass'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -1304,7 +1432,8 @@ jobs:
       needs.triage.outputs.needs_e2e == 'true' &&
       needs.triage.outputs.author_allowed == 'true' &&
       needs.generate.outputs.has_changes == 'true' &&
-      needs.verify_heal.outputs.heal_status == 'passing'
+      needs.verify_heal.outputs.heal_status == 'passing' &&
+      needs.verify_heal.outputs.quality_status == 'pass'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
