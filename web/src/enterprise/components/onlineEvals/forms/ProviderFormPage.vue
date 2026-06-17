@@ -9,13 +9,13 @@
         :title="t('onlineEvals.provider.backTo')"
         @click="$emit('cancel')"
       />
-      <h1 class="tw:m-0 tw:text-[17px] tw:font-semibold tw:text-text-primary tw:tracking-[0.005em] tw:whitespace-nowrap">
+      <div class="tw:m-0 tw:text-[17px] tw:font-semibold tw:text-text-primary tw:tracking-[0.005em] tw:whitespace-nowrap">
         {{
           mode === "create"
             ? t("onlineEvals.provider.createTitle")
             : t("onlineEvals.provider.editTitle")
         }}
-      </h1>
+      </div>
       <span class="tw:text-text-secondary tw:text-xs tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap tw:min-w-0">{{ t("onlineEvals.provider.subtitle") }}</span>
       <div class="tw:flex-1 tw:min-w-2" />
       <button

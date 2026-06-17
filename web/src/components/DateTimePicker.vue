@@ -375,80 +375,11 @@ export default defineComponent({
 </script>
 
 <style>
-.q-btn--rectangle {
-  border-radius: 3px;
-}
-
 .date-time-button.isOpen .date-time-arrow {
   transform: rotate(180deg);
 }
 
-.date-time-table .relative-row .q-field__control {
-  height: 40px;
-}
-
-.date-time-table .relative-row .q-field__native {
-  color: var(--o2-gray);
-  font-size: 0.875rem;
-  font-weight: 600;
-}
-
-.date-time-table .relative-row .q-select__dropdown-icon {
-  color: var(--o2-gray);
-}
-
 .date-time-table .relative-row > * {
   margin-right: 6px;
-}
-
-.q-date__navigation {
-  justify-content: center;
-  padding: 0 0.5rem;
-}
-
-.q-date__navigation .q-date__arrow + .q-date__arrow {
-  margin-left: auto;
-}
-
-.q-date__navigation .q-date__arrow + .col {
-  flex: initial;
-}
-
-.q-date__navigation .q-btn .block {
-  font-size: 0.75rem;
-  color: var(--o2-primary-background);
-  font-weight: 700;
-}
-
-.q-date__calendar-item .block {
-  color: var(--o2-text-secondary);
-  font-weight: 700;
-}
-
-.q-date__calendar-weekdays > div {
-  font-size: 0.875rem;
-  font-weight: 700;
-  opacity: 1;
-}
-
-.q-date__range .block,
-.q-date__range-from .block,
-.q-date__range-to .block {
-  color: white;
-}
-
-.q-date__range::before,
-.q-date__range-from::before,
-.q-date__range-to::before {
-  bottom: 3px;
-  top: 3px;
-}
-
-.q-date__range .block {
-  color: var(--o2-primary-background);
-}
-
-.startEndTime .q-field {
-  padding-bottom: 0.125rem;
 }
 </style>

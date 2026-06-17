@@ -9,7 +9,7 @@
         :title="t('onlineEvals.scorer.backTo')"
         @click="$emit('cancel')"
       />
-      <h1 class="tw:m-0 tw:text-[17px] tw:font-semibold tw:text-text-primary tw:tracking-[0.005em] tw:whitespace-nowrap">{{ titleText }}</h1>
+      <div class="tw:m-0 tw:text-[17px] tw:font-semibold tw:text-text-primary tw:tracking-[0.005em] tw:whitespace-nowrap">{{ titleText }}</div>
       <span class="tw:text-text-secondary tw:text-xs tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap tw:min-w-0">
         {{
           form.scorerType === "remote"
@@ -33,7 +33,7 @@
       </span>
       <button
         type="button"
-        class="scorer-form__close tw:inline-flex tw:items-center tw:justify-center tw:w-7 tw:h-7 tw:p-0 tw:text-(--color-text-secondary) tw:bg-transparent tw:border-0 tw:rounded-md tw:cursor-pointer tw:transition-[background,color] tw:duration-[150ms]"
+        class="tw:inline-flex tw:items-center tw:justify-center tw:w-7 tw:h-7 tw:p-0 tw:text-(--color-text-secondary) tw:bg-transparent tw:border-0 tw:rounded-md tw:cursor-pointer tw:transition-[background,color] tw:duration-[150ms] tw:hover:bg-[color-mix(in_srgb,var(--color-text-primary)_6%,transparent)] tw:hover:text-[var(--color-primary-600,#3F7994)]"
         :aria-label="t('onlineEvals.buttons.cancel')"
         data-test="scorer-form-close-btn"
         @click="$emit('cancel')"
@@ -304,7 +304,7 @@
                 />
                 <button
                   type="button"
-                  class="scorer-extras__remove tw:w-6 tw:h-6 tw:border-0 tw:bg-transparent tw:text-(--color-text-secondary) tw:text-base tw:cursor-pointer tw:rounded"
+                  class="tw:w-6 tw:h-6 tw:border-0 tw:bg-transparent tw:text-(--color-text-secondary) tw:text-base tw:cursor-pointer tw:rounded tw:hover:bg-[color-mix(in_srgb,var(--o2-status-error-text)_12%,transparent)] tw:hover:text-(--o2-status-error-text)"
                   :aria-label="t('onlineEvals.buttons.remove')"
                   :data-test="`scorer-form-extra-field-remove-${idx}`"
                   @click="removeExtraField(idx)"
@@ -317,7 +317,7 @@
             <div class="tw:flex tw:justify-between tw:gap-3">
               <button
                 type="button"
-                class="scorer-extras__add tw:border-0 tw:bg-transparent tw:py-1 tw:px-0 tw:text-xs tw:font-semibold tw:text-(--o2-primary-btn-bg) tw:cursor-pointer tw:disabled:text-(--color-text-muted) tw:disabled:cursor-not-allowed"
+                class="tw:border-0 tw:bg-transparent tw:py-1 tw:px-0 tw:text-xs tw:font-semibold tw:text-(--o2-primary-btn-bg) tw:cursor-pointer tw:disabled:text-(--color-text-muted) tw:disabled:cursor-not-allowed"
                 :disabled="form.extraMetadataFields.length >= MAX_EXTRA_FIELDS"
                 data-test="scorer-form-extra-field-add"
                 @click="addExtraField"
@@ -551,7 +551,7 @@
                 />
                 <button
                   type="button"
-                  class="scorer-extras__remove tw:w-6 tw:h-6 tw:border-0 tw:bg-transparent tw:text-(--color-text-secondary) tw:text-base tw:cursor-pointer tw:rounded"
+                  class="tw:w-6 tw:h-6 tw:border-0 tw:bg-transparent tw:text-(--color-text-secondary) tw:text-base tw:cursor-pointer tw:rounded tw:hover:bg-[color-mix(in_srgb,var(--o2-status-error-text)_12%,transparent)] tw:hover:text-(--o2-status-error-text)"
                   :aria-label="t('onlineEvals.buttons.remove')"
                   :data-test="`scorer-form-remote-header-remove-${idx}`"
                   @click="removeCustomHeader(idx)"
@@ -564,7 +564,7 @@
             <div class="tw:flex tw:justify-between tw:gap-3">
               <button
                 type="button"
-                class="scorer-extras__add tw:border-0 tw:bg-transparent tw:py-1 tw:px-0 tw:text-xs tw:font-semibold tw:text-(--o2-primary-btn-bg) tw:cursor-pointer"
+                class="tw:border-0 tw:bg-transparent tw:py-1 tw:px-0 tw:text-xs tw:font-semibold tw:text-(--o2-primary-btn-bg) tw:cursor-pointer"
                 data-test="scorer-form-remote-header-add"
                 @click="addCustomHeader"
               >
@@ -1284,35 +1284,9 @@ async function save() {
 </script>
 
 <style>
-/* Cap all textareas in the form so they scroll internally instead of pushing layout */
 .scorer-form__main textarea {
   max-height: 280px;
   overflow-y: auto;
-}
-
-/* Specific per-field caps that match each field's role */
-.scorer-form__main .scorer-field--desc textarea { max-height: 120px; }
-.scorer-form__main .scorer-field--prompt textarea { max-height: 280px; }
-.scorer-form__main .scorer-field--schema textarea { max-height: 220px; }
-.scorer-form__main .scorer-field--request-body textarea { max-height: 280px; }
-
-.scorer-form__close:hover {
-  background: color-mix(in srgb, var(--color-text-primary) 6%, transparent);
-  color: var(--color-primary-600, #3F7994);
-}
-
-.scorer-extras__row .has-error input {
-  border-color: var(--o2-status-error-text);
-}
-
-.scorer-extras__remove:hover {
-  background: color-mix(in srgb, var(--o2-status-error-text) 12%, transparent);
-  color: var(--o2-status-error-text);
-}
-
-.scorer-extras__add:disabled {
-  color: var(--color-text-muted, var(--o2-text-muted));
-  cursor: not-allowed;
 }
 
 .scorer-url-bar .o-select__trigger,
@@ -1325,5 +1299,4 @@ async function save() {
   border-top-left-radius: 0;
   border-bottom-left-radius: 0;
 }
-
 </style>

@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Section header (title + description) is provided full-width by the
          Settings shell; this component renders only the form content. -->
     <!-- platform settings section -->
-    <div class="tw:mx-4">
+    <div class="">
       <GroupHeader :title="t('settings.platformSettings')" :showIcon="false" />
       <div class="tw:w-full tw:flex tw:flex-col">
         <OForm @submit.stop="onSubmit.execute">
@@ -75,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Manage Theme section -->
-          <div class="settings-grid-item tw:grid tw:grid-cols-3 tw:gap-4 tw:items-start tw:py-4 tw:border-b tw:border-(--o2-border-color)">
+          <div class="settings-grid-item tw:grid tw:grid-cols-3 tw:gap-4 tw:items-center tw:py-4 tw:border-b tw:border-(--o2-border-color)">
             <span class="individual-setting-title tw:text-sm tw:font-medium tw:leading-5">
               {{ t("settings.manageTheme") }}
             </span>
@@ -85,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <!-- Light Mode Theme -->
               <div
-                class="theme-color-chip tw:inline-flex tw:items-center tw:gap-2 tw:py-[6px] tw:pr-3 tw:pl-[6px] tw:rounded-[20px] tw:cursor-pointer tw:transition-all tw:duration-200 tw:bg-[rgba(0,0,0,0.04)] tw:border tw:border-[rgba(0,0,0,0.1)]"
+                class="tw:group/chip tw:inline-flex tw:items-center tw:gap-2 tw:py-[6px] tw:pr-3 tw:pl-[6px] tw:rounded-[20px] tw:cursor-pointer tw:transition-all tw:duration-200 tw:bg-[rgba(0,0,0,0.04)] tw:border tw:border-[rgba(0,0,0,0.1)] tw:hover:bg-[rgba(0,0,0,0.06)] tw:hover:border-(--o2-primary-color) tw:hover:-translate-y-px tw:hover:shadow-[0_2px_8px_rgba(0,0,0,0.1)] tw:dark:bg-[rgba(255,255,255,0.05)] tw:dark:border-[rgba(255,255,255,0.15)] tw:dark:hover:bg-[rgba(255,255,255,0.08)] tw:dark:hover:shadow-[0_2px_8px_rgba(0,0,0,0.3)]"
                 @click="handleThemeChipClick('light')"
                 data-test="theme-light-chip"
               >
@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OIcon
                     name="palette"
                     size="xs"
-                    class="palette-icon tw:opacity-0 tw:transition-opacity tw:duration-200 tw:[filter:drop-shadow(0_1px_1px_rgba(0,0,0,0.3))]"
+                    class="tw:opacity-0 tw:transition-opacity tw:duration-200 tw:[filter:drop-shadow(0_1px_1px_rgba(0,0,0,0.3))] tw:group-hover/chip:opacity-90"
                   />
                 </div>
                 <span class="chip-label tw:text-[11px] tw:font-semibold tw:opacity-50 tw:tracking-[0.5px]">{{ t("settings.light") }}</span>
@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Dark Mode Theme -->
               <div
-                class="theme-color-chip tw:inline-flex tw:items-center tw:gap-2 tw:py-[6px] tw:pr-3 tw:pl-[6px] tw:rounded-[20px] tw:cursor-pointer tw:transition-all tw:duration-200 tw:bg-[rgba(0,0,0,0.04)] tw:border tw:border-[rgba(0,0,0,0.1)]"
+                class="tw:group/chip tw:inline-flex tw:items-center tw:gap-2 tw:py-[6px] tw:pr-3 tw:pl-[6px] tw:rounded-[20px] tw:cursor-pointer tw:transition-all tw:duration-200 tw:bg-[rgba(0,0,0,0.04)] tw:border tw:border-[rgba(0,0,0,0.1)] tw:hover:bg-[rgba(0,0,0,0.06)] tw:hover:border-(--o2-primary-color) tw:hover:-translate-y-px tw:hover:shadow-[0_2px_8px_rgba(0,0,0,0.1)] tw:dark:bg-[rgba(255,255,255,0.05)] tw:dark:border-[rgba(255,255,255,0.15)] tw:dark:hover:bg-[rgba(255,255,255,0.08)] tw:dark:hover:shadow-[0_2px_8px_rgba(0,0,0,0.3)]"
                 @click="handleThemeChipClick('dark')"
                 data-test="theme-dark-chip"
               >
@@ -116,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OIcon
                     name="palette"
                     size="xs"
-                    class="palette-icon tw:opacity-0 tw:transition-opacity tw:duration-200 tw:[filter:drop-shadow(0_1px_1px_rgba(0,0,0,0.3))]"
+                    class="tw:opacity-0 tw:transition-opacity tw:duration-200 tw:[filter:drop-shadow(0_1px_1px_rgba(0,0,0,0.3))] tw:group-hover/chip:opacity-90"
                   />
                 </div>
                 <span class="chip-label tw:text-[11px] tw:font-semibold tw:opacity-50 tw:tracking-[0.5px]">{{ t("settings.dark") }}</span>
@@ -125,11 +125,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Reset Button -->
               <div
-                class="theme-reset-chip tw:inline-flex tw:items-center tw:justify-center tw:w-8 tw:h-8 tw:rounded-full tw:cursor-pointer tw:transition-all tw:duration-200 tw:bg-transparent tw:border tw:border-dashed tw:border-[rgba(0,0,0,0.2)] tw:opacity-60"
+                class="tw:group/resetChip tw:inline-flex tw:items-center tw:justify-center tw:w-8 tw:h-8 tw:rounded-full tw:cursor-pointer tw:transition-all tw:duration-200 tw:bg-transparent tw:border tw:border-dashed tw:border-[rgba(0,0,0,0.2)] tw:opacity-60 tw:hover:bg-[rgba(239,68,68,0.08)] tw:hover:border-[rgba(239,68,68,0.4)] tw:hover:border-solid tw:hover:opacity-100 tw:hover:-translate-y-px tw:hover:rotate-180 tw:dark:border-[rgba(255,255,255,0.25)] tw:dark:hover:bg-[rgba(239,68,68,0.15)] tw:dark:hover:border-[rgba(239,68,68,0.5)]"
                 @click="resetThemeColors"
                 data-test="reset-theme-colors-btn"
               >
-                <OIcon name="refresh" size="sm" />
+                <OIcon name="refresh" size="sm" class="tw:group-hover/resetChip:text-[rgb(239,68,68)] tw:dark:group-hover/resetChip:text-[rgb(248,113,113)]" />
                 <OTooltip :content="t('settings.resetToDefaultColors')" side="top" />
               </div>
             </div>
@@ -162,13 +162,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           store.state.selectedOrganization.identifier
       "
     >
-      <div class="tw:px-3 tw:py-2">
+      <div class="tw:py-2">
         <GroupHeader
           :title="t('settings.enterpriseFeatures')"
           :showIcon="false"
         />
       </div>
-      <div class="tw:mx-3">
+      <div class="">
         <div class="settings-grid-item no-border-bottom tw:grid tw:grid-cols-3 tw:gap-4 tw:items-center tw:py-4 tw:border-b tw:border-(--o2-border-color)">
           <span class="individual-setting-title tw:text-sm tw:font-medium tw:leading-5">
             {{ t("settings.customLogoText") }}
@@ -1076,58 +1076,3 @@ export default defineComponent({
 });
 </script>
 
-<style>
-/* .general-page-title / .general-page-subtitle removed — the section title now
-   renders via the standard AppPageHeader (title + subtitle props). */
-
-.dark-settings-theme .settings-grid-item {
-  border-bottom: 1px solid var(--o2-border-color) !important;
-}
-
-/* Theme management styles - hover and dark-mode variants that cannot be inlined */
-.theme-color-chip:hover {
-  background: rgba(0, 0, 0, 0.06);
-  border-color: var(--q-primary);
-  transform: translateY(-1px);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-body.body--dark .theme-color-chip {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(255, 255, 255, 0.15);
-}
-
-body.body--dark .theme-color-chip:hover {
-  background: rgba(255, 255, 255, 0.08);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-}
-
-.theme-color-chip:hover .palette-icon {
-  opacity: 0.9;
-}
-
-.theme-reset-chip:hover {
-  background: rgba(239, 68, 68, 0.08);
-  border-color: rgba(239, 68, 68, 0.4);
-  border-style: solid;
-  opacity: 1;
-  transform: translateY(-1px) rotate(180deg);
-}
-
-.theme-reset-chip:hover .OIcon {
-  color: rgb(239, 68, 68);
-}
-
-body.body--dark .theme-reset-chip {
-  border-color: rgba(255, 255, 255, 0.25);
-}
-
-body.body--dark .theme-reset-chip:hover {
-  background: rgba(239, 68, 68, 0.15);
-  border-color: rgba(239, 68, 68, 0.5);
-}
-
-body.body--dark .theme-reset-chip:hover .OIcon {
-  color: rgb(248, 113, 113);
-}
-</style>

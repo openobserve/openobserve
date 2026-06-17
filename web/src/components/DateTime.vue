@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ref="datetimeBtn"
           data-cy="date-time-button"
           :variant="variant"
-          class="date-time-button tw:h-7.5 tw:min-h-7.5 tw:rounded-md tw:py-0 tw:px-1.25 tw:text-xs tw:min-w-fit tw:justify-start!"
+          class="date-time-button tw:h-7.5 tw:min-h-7.5 tw:rounded-md tw:py-0 tw:px-1.25 tw:text-xs tw:min-w-fit tw:justify-start! tw:hover:bg-[var(--o2-hover-accent)]!"
           :class="{
             [selectedType + 'type']: !disableRelative,
             hideRelative: disableRelative,
@@ -1151,84 +1151,11 @@ export default defineComponent({
 </script>
 
 <style>
-.date-time-button {
-  &.isOpen .date-time-arrow {
-    transform: rotate(180deg);
-  }
-
-  &:hover {
-    background: var(--o2-hover-accent) !important;
-  }
+.date-time-button.isOpen .date-time-arrow {
+  transform: rotate(180deg);
 }
 
-.date-time-table {
-  .relative-row {
-    > * {
-      margin-right: 6px;
-    }
-    .q-field {
-      &__control {
-        height: 40px;
-      }
-      &__native {
-        font-size: 0.875rem;
-        font-weight: 600;
-      }
-    }
-  }
-}
-
-.q-date {
-  &__navigation {
-    justify-content: center;
-    padding: 0 0.5rem;
-
-    .q-date__arrow {
-      & + .q-date__arrow {
-        margin-left: auto;
-      }
-      & + .col {
-        flex: initial;
-      }
-    }
-
-    .q-btn .block {
-      font-size: 0.75rem;
-      font-weight: 700;
-    }
-  }
-  &__calendar {
-    &-item .block {
-      font-weight: 700;
-    }
-    &-weekdays > div {
-      font-size: 0.875rem;
-      font-weight: 700;
-      opacity: 1;
-    }
-  }
-  &__range {
-    &,
-    &-from,
-    &-to {
-      .block {
-        color: white;
-      }
-      &:before {
-        bottom: 3px;
-        top: 3px;
-      }
-    }
-    .block {
-      color: var(--o2-primary-background);
-    }
-  }
-}
-
-.startEndTime {
-  .q-field__control-container {
-    min-height: 32px;
-    height: 32px;
-  }
+.date-time-table .relative-row > * {
+  margin-right: 6px;
 }
 </style>

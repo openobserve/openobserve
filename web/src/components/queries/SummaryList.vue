@@ -186,15 +186,4 @@ export default defineComponent({
 :deep(.no-data-image) {
   margin-bottom: 0.5rem;
 }
-
-/* Parent-context Quasar overrides — must stay in CSS */
-.running-queries-page .search-input {
-  width: 250px;
-}
-
-.search-field-select .q-field__control {
-  padding-left: 12px;
-  top: -1px;
-  position: relative;
-}
 </style>

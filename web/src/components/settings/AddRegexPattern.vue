@@ -147,11 +147,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="add-regex-pattern-input"
                   v-model="regexPatternInputs.pattern"
                   class="regex-pattern-input"
-                  :class="
-                    store.state.theme === 'dark'
-                      ? 'dark-mode-regex-pattern-input'
-                      : 'light-mode-regex-pattern-input'
-                  "
                   tabindex="0"
                   style="width: 100%; resize: none"
                   placeholder="Eg. \d....\d "
@@ -184,9 +179,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="tw:mt-1 tw:py-md tw:h-[24px]"
                 :labelClass="
                   store.state.theme === 'dark'
-                    ? 'dark-test-string-container-label'
-                    : 'light-test-string-container-label'
-                "
+                    ? 'tw:text-white tw:font-medium tw:text-xs tw:leading-[21px]'
+                    : 'tw:text-[#6b7280] tw:font-medium tw:text-xs tw:leading-[21px] tw:-ml-1'"
               >
                 <template #right> </template>
               </FullViewContainer>
@@ -201,8 +195,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :class="
                     store.state.theme === 'dark'
                       ? 'dark-mode-regex-test-string-input'
-                      : 'light-mode-regex-test-string-input'
-                  "
+                      : 'light-mode-regex-test-string-input tw:bg-white! tw:border-l! tw:border-l-[#e6e6e6]! tw:border-r! tw:border-r-[#e6e6e6]! tw:border-b! tw:border-b-[#e6e6e6]!'"
                   tabindex="0"
                   style="width: 100%; resize: none"
                   placeholder="Eg. 1234567890"
@@ -218,9 +211,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="tw:mt-1 tw:py-md tw:h-[24px]"
                 :labelClass="
                   store.state.theme === 'dark'
-                    ? 'dark-test-string-container-label'
-                    : 'light-test-string-container-label'
-                "
+                    ? 'tw:text-white tw:font-medium tw:text-xs tw:leading-[21px]'
+                    : 'tw:text-[#6b7280] tw:font-medium tw:text-xs tw:leading-[21px] tw:-ml-1'"
               >
               </FullViewContainer>
               <div v-if="expandState.outputString" class="regex-pattern-input">
@@ -232,8 +224,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :class="
                     store.state.theme === 'dark'
                       ? 'dark-mode-regex-test-string-input'
-                      : 'light-mode-regex-test-string-input'
-                  "
+                      : 'light-mode-regex-test-string-input tw:bg-white! tw:border-l! tw:border-l-[#e6e6e6]! tw:border-r! tw:border-r-[#e6e6e6]! tw:border-b! tw:border-b-[#e6e6e6]!'"
                   tabindex="0"
                   style="width: 100%; resize: none"
                   placeholder="Output String"
@@ -605,36 +596,12 @@ export default defineComponent({
 </script>
 
 <style>
-.dark-mode-regex-pattern-input .q-field__control {
-  background-color: var(--o2-primary-background) !important;
-  border-left: 1px solid var(--o2-primary-background) !important;
-  border-right: 1px solid var(--o2-primary-background) !important;
-  border-bottom: 1px solid var(--o2-primary-background) !important;
-}
-.light-mode-regex-pattern-input .q-field__control {
-  background-color: #ffffff !important;
-  border-left: 1px solid #e6e6e6 !important;
-  border-right: 1px solid #e6e6e6 !important;
-  border-bottom: 1px solid #e6e6e6 !important;
-}
 .regex-pattern-input > div > div > div > textarea {
   height: 200px !important;
   resize: none !important;
   padding-left: 0.5rem !important;
 }
 
-.dark-mode-regex-test-string-input .q-field__control {
-  background-color: var(--o2-primary-background) !important;
-  border-left: 2px solid var(--o2-primary-background) !important;
-  border-right: 2px solid var(--o2-primary-background) !important;
-  border-bottom: 2px solid var(--o2-primary-background) !important;
-}
-.light-mode-regex-test-string-input {
-  background-color: #ffffff !important;
-  border-left: 1px solid #e6e6e6 !important;
-  border-right: 1px solid #e6e6e6 !important;
-  border-bottom: 1px solid #e6e6e6 !important;
-}
 .regex-test-string-input > div > div > div > textarea {
   resize: none !important;
   padding-left: 0.5rem !important;
@@ -645,18 +612,5 @@ export default defineComponent({
 }
 .dark-mode-regex-test-string-input .monaco-editor-background {
   background-color: var(--o2-primary-background) !important;
-}
-.dark-test-string-container-label {
-  color: #ffffff;
-  font-weight: 500;
-  font-size: 12px;
-  line-height: 21px;
-}
-.light-test-string-container-label {
-  color: #6b7280;
-  font-weight: 500;
-  font-size: 12px;
-  line-height: 21px;
-  margin-left: -4px;
 }
 </style>

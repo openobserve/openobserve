@@ -151,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :gs-h="getPanelLayout(item, 'h')"
             :gs-min-w="getMinimumWidth(item.type)"
             :gs-min-h="getMinimumHeight(item.type)"
-            class="grid-stack-item gridBackground tw:bg-transparent! tw:rounded tw:border-[#c2c2c27a]!"
+            class="grid-stack-item tw:bg-transparent! tw:rounded tw:border-[#c2c2c27a]! tw:dark:border-[rgba(204,204,220,0.12)]!"
             :class="store.state.theme == 'dark' ? 'dark' : ''"
           >
             <div class="grid-stack-item-content">
@@ -1689,22 +1689,9 @@ export default defineComponent({
 </script>
 
 <style>
-.q-table__top {
-  border-bottom: 1px solid var(--o2-border);
-  justify-content: flex-end;
-}
-
-.gridBackground.dark {
-  border-color: rgba(204, 204, 220, 0.12) !important;
-}
-
 /* When grid is static (disabled), hide resize handles */
 .grid-stack.grid-stack-static .ui-resizable-handle {
   display: none !important;
-}
-
-.grid-stack-item.dark {
-  border-color: rgba(204, 204, 220, 0.12) !important;
 }
 
 /* The visible panel outline lives on the content child; in dark mode pull
@@ -1788,12 +1775,6 @@ export default defineComponent({
     overflow: visible !important;
   }
 
-  /* Quasar virtual-scroll inserts padding divs above/below the rendered
-   * rows to simulate the full scroll height. In print mode these become
-   * empty white space. Hide them so no blank gaps appear in table panels. */
-  .q-virtual-scroll__padding {
-    display: none !important;
-  }
 }
 
 /* Print page setup — landscape A4 fits the dashboard width better than

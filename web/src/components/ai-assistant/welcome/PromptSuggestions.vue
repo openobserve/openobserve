@@ -18,7 +18,7 @@ function selectPrompt(id: string) {
       {{ t("aiAssistant.welcome.tryOneOfThese") }}
     </p>
 
-    <div class="suggestions-grid tw:grid tw:w-full tw:gap-2 tw:grid-cols-3 tw:lg:grid-cols-2 tw:sm:grid-cols-1">
+    <div class="suggestions-grid tw:grid tw:w-full tw:gap-2 tw:md:grid-cols-2 tw:lg:grid-cols-3 tw:sm:grid-cols-1">
       <button
         v-for="s in PROMPT_SUGGESTIONS"
         :key="s.id"

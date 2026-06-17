@@ -9,7 +9,7 @@
     </div>
     <div
       v-else
-      class="tw:grid tw:grid-cols-1 tw:lg:grid-cols-2 tw:gap-4 tw:items-start tw:pb-4"
+      class="tw:grid tw:grid-cols-1 lg:tw:grid-cols-2 tw:gap-4 tw:items-start tw:pb-4"
     >
       <div class="tw:col-span-1 tw:min-h-0">
         <div v-if="licenseData.license === null || !licenseData.license">
@@ -49,7 +49,7 @@
                 style="min-height: 200px"
               />
               <div v-if="isLicenseKeyAutoFilled" class="tw:mt-2 tw:mb-3">
-                <div class="modern-info-banner tw:flex tw:items-center tw:py-3 tw:px-4 tw:bg-[rgba(34,197,94,0.08)] tw:border tw:border-solid tw:border-[rgba(34,197,94,0.2)] tw:rounded-lg tw:[backdrop-filter:blur(10px)] tw:transition-all tw:duration-200">
+                <div class="tw:flex tw:items-center tw:py-3 tw:px-4 tw:bg-[rgba(34,197,94,0.08)] tw:border tw:border-solid tw:border-[rgba(34,197,94,0.2)] tw:rounded-lg tw:[backdrop-filter:blur(10px)] tw:transition-all tw:duration-200 tw:dark:bg-[rgba(34,197,94,0.15)] tw:dark:border-[rgba(34,197,94,0.3)] tw:dark:shadow-[0_2px_8px_rgba(0,0,0,0.2)]">
                   <OIcon
                     name="check-circle"
                     class="tw:text-green-600 tw:mr-2"
@@ -79,25 +79,25 @@
           <OCard class="tw:border tw:border-solid tw:border-[var(--o2-border-color)]">
             <OCardSection role="body">
               <div class="tw:text-xl tw:font-semibold tw:mb-3">{{ t("about.license_info") }}</div>
-              <table class="tw:w-full tw:border-collapse tw:border tw:border-solid tw:border-[var(--o2-border-color)] compact-table">
+              <table class="tw:w-full tw:border-collapse tw:border tw:border-solid tw:border-[var(--o2-border-color)]">
                 <tbody>
                   <tr class="tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]">
-                    <td class="tw:font-bold tw:px-3 tw:py-2 tw:border-r tw:border-solid tw:border-[var(--o2-border-color)]">
+                    <td class="tw:font-bold tw:px-3 tw:py-2 tw:leading-[1.2] tw:border-r tw:border-solid tw:border-[var(--o2-border-color)]">
                       {{ t("about.installation_id") }}
                     </td>
-                    <td class="tw:px-3 tw:py-2">{{ licenseData.installation_id }}</td>
+                    <td class="tw:px-3 tw:py-2 tw:leading-[1.2]">{{ licenseData.installation_id }}</td>
                   </tr>
                   <tr class="tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]">
-                    <td class="tw:font-bold tw:px-3 tw:py-2 tw:border-r tw:border-solid tw:border-[var(--o2-border-color)]">
+                    <td class="tw:font-bold tw:px-3 tw:py-2 tw:leading-[1.2] tw:border-r tw:border-solid tw:border-[var(--o2-border-color)]">
                       {{ t("about.license_id") }}
                     </td>
-                    <td class="tw:px-3 tw:py-2">{{ licenseData.license.license_id }}</td>
+                    <td class="tw:px-3 tw:py-2 tw:leading-[1.2]">{{ licenseData.license.license_id }}</td>
                   </tr>
                   <tr class="tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]">
-                    <td class="tw:font-bold tw:px-3 tw:py-2 tw:border-r tw:border-solid tw:border-[var(--o2-border-color)]">
+                    <td class="tw:font-bold tw:px-3 tw:py-2 tw:leading-[1.2] tw:border-r tw:border-solid tw:border-[var(--o2-border-color)]">
                       {{ t("about.status_lbl") }}
                     </td>
-                    <td class="tw:px-3 tw:py-2">
+                    <td class="tw:px-3 tw:py-2 tw:leading-[1.2]">
                       <OBadge :variant="licenseData?.expired ? 'error' : 'success'">
                         {{
                           licenseData?.expired
@@ -108,26 +108,26 @@
                     </td>
                   </tr>
                   <tr class="tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]">
-                    <td class="tw:font-bold tw:px-3 tw:py-2 tw:border-r tw:border-solid tw:border-[var(--o2-border-color)]">
+                    <td class="tw:font-bold tw:px-3 tw:py-2 tw:leading-[1.2] tw:border-r tw:border-solid tw:border-[var(--o2-border-color)]">
                       {{ t("about.create_at_lbl") }}
                     </td>
-                    <td class="tw:px-3 tw:py-2">{{ formatDate(licenseData.license.created_at) }}</td>
+                    <td class="tw:px-3 tw:py-2 tw:leading-[1.2]">{{ formatDate(licenseData.license.created_at) }}</td>
                   </tr>
                   <tr class="tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]">
-                    <td class="tw:font-bold tw:px-3 tw:py-2 tw:border-r tw:border-solid tw:border-[var(--o2-border-color)]">
+                    <td class="tw:font-bold tw:px-3 tw:py-2 tw:leading-[1.2] tw:border-r tw:border-solid tw:border-[var(--o2-border-color)]">
                       {{ t("about.expires_at_lbl") }}
                     </td>
-                    <td class="tw:px-3 tw:py-2">{{ formatDate(licenseData.license.expires_at) }}</td>
+                    <td class="tw:px-3 tw:py-2 tw:leading-[1.2]">{{ formatDate(licenseData.license.expires_at) }}</td>
                   </tr>
                   <tr class="tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]">
-                    <td class="tw:font-bold tw:px-3 tw:py-2 tw:border-r tw:border-solid tw:border-[var(--o2-border-color)]">{{ t("about.company") }}</td>
-                    <td class="tw:px-3 tw:py-2">{{ licenseData.license.company }}</td>
+                    <td class="tw:font-bold tw:px-3 tw:py-2 tw:leading-[1.2] tw:border-r tw:border-solid tw:border-[var(--o2-border-color)]">{{ t("about.company") }}</td>
+                    <td class="tw:px-3 tw:py-2 tw:leading-[1.2]">{{ licenseData.license.company }}</td>
                   </tr>
                   <tr v-if="licenseData.key" class="tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]">
-                    <td class="tw:font-bold tw:px-3 tw:py-2 tw:border-r tw:border-solid tw:border-[var(--o2-border-color)]">
+                    <td class="tw:font-bold tw:px-3 tw:py-2 tw:leading-[1.2] tw:border-r tw:border-solid tw:border-[var(--o2-border-color)]">
                       {{ t("about.license_key") }}
                     </td>
-                    <td class="tw:px-3 tw:py-2">
+                    <td class="tw:px-3 tw:py-2 tw:leading-[1.2]">
                       <div class="tw:flex tw:items-center tw:gap-2">
                         <span>{{ getMaskedLicenseKey() }}</span>
                         <OButton
@@ -143,22 +143,22 @@
                     </td>
                   </tr>
                   <tr v-if="licenseData.license.contact_name" class="tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]">
-                    <td class="tw:font-bold tw:px-3 tw:py-2 tw:border-r tw:border-solid tw:border-[var(--o2-border-color)]">
+                    <td class="tw:font-bold tw:px-3 tw:py-2 tw:leading-[1.2] tw:border-r tw:border-solid tw:border-[var(--o2-border-color)]">
                       {{ t("about.contact_name") }}
                     </td>
-                    <td class="tw:px-3 tw:py-2">{{ licenseData.license.contact_name }}</td>
+                    <td class="tw:px-3 tw:py-2 tw:leading-[1.2]">{{ licenseData.license.contact_name }}</td>
                   </tr>
                   <tr v-if="licenseData.license.contact_email" class="tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]">
-                    <td class="tw:font-bold tw:px-3 tw:py-2 tw:border-r tw:border-solid tw:border-[var(--o2-border-color)]">
+                    <td class="tw:font-bold tw:px-3 tw:py-2 tw:leading-[1.2] tw:border-r tw:border-solid tw:border-[var(--o2-border-color)]">
                       {{ t("about.contact_email") }}
                     </td>
-                    <td class="tw:px-3 tw:py-2">{{ licenseData.license.contact_email }}</td>
+                    <td class="tw:px-3 tw:py-2 tw:leading-[1.2]">{{ licenseData.license.contact_email }}</td>
                   </tr>
                   <tr v-if="licenseData.license.environment_type">
-                    <td class="tw:font-bold tw:px-3 tw:py-2 tw:border-r tw:border-solid tw:border-[var(--o2-border-color)]">
+                    <td class="tw:font-bold tw:px-3 tw:py-2 tw:leading-[1.2] tw:border-r tw:border-solid tw:border-[var(--o2-border-color)]">
                       {{ t("about.environment_type") }}
                     </td>
-                    <td class="tw:px-3 tw:py-2">{{ licenseData.license.environment_type }}</td>
+                    <td class="tw:px-3 tw:py-2 tw:leading-[1.2]">{{ licenseData.license.environment_type }}</td>
                   </tr>
                 </tbody>
               </table>
@@ -205,7 +205,7 @@
                 style="min-height: 150px"
               />
               <div v-if="isLicenseKeyAutoFilled" class="tw:mt-2 tw:mb-3">
-                <div class="modern-info-banner tw:flex tw:items-center tw:py-3 tw:px-4 tw:bg-[rgba(34,197,94,0.08)] tw:border tw:border-solid tw:border-[rgba(34,197,94,0.2)] tw:rounded-lg tw:[backdrop-filter:blur(10px)] tw:transition-all tw:duration-200">
+                <div class="tw:flex tw:items-center tw:py-3 tw:px-4 tw:bg-[rgba(34,197,94,0.08)] tw:border tw:border-solid tw:border-[rgba(34,197,94,0.2)] tw:rounded-lg tw:[backdrop-filter:blur(10px)] tw:transition-all tw:duration-200 tw:dark:bg-[rgba(34,197,94,0.15)] tw:dark:border-[rgba(34,197,94,0.3)] tw:dark:shadow-[0_2px_8px_rgba(0,0,0,0.2)]">
                   <OIcon
                     name="check-circle"
                     class="tw:text-green-600 tw:mr-2"
@@ -245,10 +245,10 @@
       </div>
 
       <div class="tw:col-span-1 tw:self-start">
-        <OCard class="futuristic-card tw:border tw:border-solid tw:border-[var(--o2-border-color)]">
+        <OCard class="futuristic-card tw:border tw:border-solid tw:border-[var(--o2-border-color)] tw:dark:bg-[linear-gradient(135deg,rgba(99,102,241,0.08)_0%,rgba(168,85,247,0.08)_100%)] tw:dark:border-[rgba(99,102,241,0.25)]">
           <OCardSection class="tw:p-3">
-            <div class="futuristic-header">
-              <div class="header-glow"></div>
+            <div>
+              <div class="tw:dark:bg-[radial-gradient(ellipse_at_center,rgba(99,102,241,0.15)_0%,transparent_70%)]"></div>
               <div class="tw:text-xl tw:font-semibold tw:relative tw:z-10">
                 {{ t("about.usage_information") }}
               </div>
@@ -256,7 +256,7 @@
 
             <div class="tw:flex tw:flex-col tw:gap-2 tw:mt-3">
               <!-- Summary Message -->
-              <div class="ingestion-summary-compact tw:border tw:border-solid tw:border-[rgba(99,102,241,0.2)] tw:rounded-lg tw:py-3 tw:px-[14px] tw:[backdrop-filter:blur(10px)] tw:relative tw:overflow-hidden">
+              <div class="ingestion-summary-compact tw:border tw:border-solid tw:border-[rgba(99,102,241,0.2)] tw:rounded-lg tw:py-3 tw:px-[14px] tw:[backdrop-filter:blur(10px)] tw:relative tw:overflow-hidden tw:dark:bg-[linear-gradient(135deg,rgba(99,102,241,0.1)_0%,rgba(168,85,247,0.1)_100%)] tw:dark:border-[rgba(99,102,241,0.3)]">
                 <div class="summary-text-compact tw:text-sm tw:leading-[1.6] tw:text-inherit tw:text-[13px]">
                   <!-- Line 1: License Info -->
                   <div class="tw:flex tw:items-center tw:gap-2 tw:mb-2">
@@ -982,106 +982,48 @@ export default defineComponent({
 </script>
 
 <style>
-.compact-table {
-  td,
-  th {
-    padding: 8px 12px !important;
-    line-height: 1.2;
-  }
+.usage-chart-container .grid-stack-item-content {
+  border: 0px !important;
 }
 
-.usage-chart-container {
-  .grid-stack-item-content {
-    border: 0px !important;
-  }
+.ingestion-summary-compact::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 3px;
+  height: 100%;
+  background: linear-gradient(
+    180deg,
+    var(--o2-menu-color) 0%,
+    var(--o2-menu-color) 100%
+  );
+  opacity: 0.6;
 }
 
-@media (max-width: 1023px) {
-  .usage-chart-container {
-    height: 320px !important;
-    min-height: 320px !important;
-  }
+.ingestion-summary-compact .summary-text-compact strong {
+  font-weight: 700;
+  background: linear-gradient(
+    135deg,
+    var(--o2-menu-color) 0%,
+    var(--o2-menu-color) 100%
+  );
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
-.ingestion-summary-compact {
-  &::before {
-    content: "";
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 3px;
-    height: 100%;
-    background: linear-gradient(
-      180deg,
-      var(--o2-menu-color) 0%,
-      var(--o2-menu-color) 100%
-    );
-    opacity: 0.6;
-  }
-
-  .summary-text-compact {
-    strong {
-      font-weight: 700;
-      background: linear-gradient(
-        135deg,
-        var(--o2-menu-color) 0%,
-        var(--o2-menu-color) 100%
-      );
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-  }
+.dark .futuristic-card::before {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(99, 102, 241, 0.7) 20%,
+    rgba(168, 85, 247, 0.7) 80%,
+    transparent 100%
+  );
 }
 
-.body--dark {
-  .modern-info-banner {
-    background: rgba(34, 197, 94, 0.15);
-    border: 1px solid rgba(34, 197, 94, 0.3);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-  }
-
-  .futuristic-card {
-    background: linear-gradient(
-      135deg,
-      rgba(99, 102, 241, 0.08) 0%,
-      rgba(168, 85, 247, 0.08) 100%
-    );
-    border: 1px solid rgba(99, 102, 241, 0.25);
-
-    &::before {
-      background: linear-gradient(
-        90deg,
-        transparent 0%,
-        rgba(99, 102, 241, 0.7) 20%,
-        rgba(168, 85, 247, 0.7) 80%,
-        transparent 100%
-      );
-    }
-  }
-
-  .futuristic-header {
-    .header-glow {
-      background: radial-gradient(
-        ellipse at center,
-        rgba(99, 102, 241, 0.15) 0%,
-        transparent 70%
-      );
-    }
-  }
-
-  .ingestion-summary-compact {
-    background: linear-gradient(
-      135deg,
-      rgba(99, 102, 241, 0.1) 0%,
-      rgba(168, 85, 247, 0.1) 100%
-    );
-    border: 1px solid rgba(99, 102, 241, 0.3);
-
-    &::before {
-      opacity: 0.8;
-    }
-  }
-
+.dark .ingestion-summary-compact::before {
+  opacity: 0.8;
 }
 </style>
