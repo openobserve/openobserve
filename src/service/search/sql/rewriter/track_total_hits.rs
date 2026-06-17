@@ -89,7 +89,7 @@ impl VisitorMut for TrackTotalHitsVisitor {
                         value_table_mode: None,
                         exclude: None,
                         flavor: SelectFlavor::Standard,
-                        optimizer_hint: None,
+                        optimizer_hints: vec![],
                         select_modifiers: None,
                     })));
                     *query = Query {
@@ -177,7 +177,7 @@ impl VisitorMut for TrackTotalHitsVisitor {
                     value_table_mode: None,
                     exclude: None,
                     flavor: SelectFlavor::Standard,
-                    optimizer_hint: None,
+                    optimizer_hints: vec![],
                     select_modifiers: None,
                 })));
                 *query = Query {

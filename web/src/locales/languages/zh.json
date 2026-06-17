@@ -4497,6 +4497,14 @@
     "noQueryApplied": {
       "title": "运行查询以查看日志",
       "description": "调整您的过滤器并单击 “运行查询” 以加载此直播的事件。"
+    },
+    "noServiceGraph": {
+      "title": "没有服务图数据",
+      "description": "尝试查询更长的时间范围，或者确保您的服务发布跨度指标。"
+    },
+    "noServicesCatalog": {
+      "title": "未找到任何服务",
+      "description": "在所选时间范围内未检测到任何服务。尝试更大的范围或不同的直播。"
     }
   },
   "onlineEvals": {

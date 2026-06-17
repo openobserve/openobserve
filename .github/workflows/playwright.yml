@@ -179,6 +179,7 @@ jobs:
                 "languageTranslation.spec.js",
                 "model-pricing.spec.js",
                 "edition-features.spec.js",
+                "logsqueries.sql-comments.spec.js",
               ]
           - testfolder: "Logs-Builder-Basic"
             browser: "chrome"
@@ -357,6 +358,7 @@ jobs:
                 "metrics-table-column-order.spec.js",
                 "metrics-promql-builder.spec.js",
                 "promqlAutocomplete.spec.js",
+                "metrics-share-deep-link.spec.js",
               ]
           - testfolder: "Dashboards-Variables"
             browser: "chrome"

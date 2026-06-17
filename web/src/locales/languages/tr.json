@@ -4506,6 +4506,14 @@
     "noQueryApplied": {
       "title": "Günlükleri görmek için bir sorgu çalıştırın",
       "description": "Filtrelerinizi ayarlayın ve bu akış için olayları yüklemek için “Sorgu çalıştır\"ı tıklayın."
+    },
+    "noServiceGraph": {
+      "title": "Servis grafiği verisi yok",
+      "description": "Daha uzun bir zaman aralığı sorgulamayı deneyin veya hizmetlerinizin aralık ölçümleri yaydığından emin olun."
+    },
+    "noServicesCatalog": {
+      "title": "Hizmet bulunamadı",
+      "description": "Seçilen zaman aralığında hiçbir hizmet algılanmadı. Daha geniş bir aralık veya farklı bir akış deneyin."
     }
   },
   "onlineEvals": {

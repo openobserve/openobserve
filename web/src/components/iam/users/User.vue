@@ -143,7 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon name="cancel" size="sm" />
             </OButton>
             <OButton
-              v-if="row.enableEdit && row.status != 'pending' && config.isCloud == 'false'"
+              v-if="row.enableEdit && row.status != 'pending'"
               :title="t('user.update')"
               variant="ghost"
               size="icon-sm"
@@ -179,12 +179,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <add-user
       v-model:open="showAddUserDialog"
-      v-if="config.isCloud == 'false'"
       v-model="selectedUser"
       :isUpdated="isUpdated"
       :userRole="currentUserRole"
       :roles="options"
       :customRoles="customRoles"
+      :isCloud="config.isCloud == 'true'"
       @updated="addMember"
     />
 
@@ -676,25 +676,25 @@ export default defineComponent({
             // Enterprise/cloud: the org-members API only returns a single
             // `role` per user, so users with multiple role assignments
             // (e.g. Viewer + custom "nmcdev") look incomplete. Fetch the
-            // full per-user role list in the background — fire-and-forget —
-            // and re-render the rows when each fetch completes. This keeps
-            // the table responsive instead of blocking the whole UI on the
-            // role API.
+            // full role list for *all* users in a single request — fire-and-
+            // forget — and re-render the rows when it resolves. This replaces
+            // the previous one-request-per-user pattern (N auth checks + N
+            // OpenFGA reads) with a single batched call, and keeps the table
+            // responsive instead of blocking the whole UI on the role API.
             if (isEnterpriseOrCloud) {
               const orgId = store.state.selectedOrganization.identifier;
-              const realUsers = usersState.users.filter(
-                (u: any) => u.email && u.status !== "pending",
-              );
-              // Don't await — let the role fetches run in the background.
-              Promise.allSettled(
-                realUsers.map(async (u: any) => {
-                  try {
-                    const resp: any = await usersService.getUserRoles(
-                      orgId,
-                      u.email,
-                    );
-                    const fetched: string[] = Array.isArray(resp?.data)
-                      ? resp.data.filter(Boolean).map(String)
+              // Don't await — let the batched role fetch run in the background.
+              usersService
+                .getAllUserRoles(orgId)
+                .then((resp: any) => {
+                  // Response is a map of user email -> role list.
+                  const roleMap: Record<string, any> = resp?.data || {};
+                  usersState.users.forEach((u: any) => {
+                    if (u.status === "pending") return;
+                    const fetched: string[] = Array.isArray(
+                      roleMap[u.rawEmail],
+                    )
+                      ? roleMap[u.rawEmail].filter(Boolean).map(String)
                       : [];
                     if (fetched.length) {
                       const merged = new Set<string>([
@@ -703,15 +703,14 @@ export default defineComponent({
                       ]);
                       u.roles = Array.from(merged);
                     }
-                  } catch {
-                    // Per-user role fetch failures are non-fatal — fall back
-                    // to whatever role string came with the org-members row.
-                  }
-                }),
-              ).then(() => {
-                rows.value = [...usersState.users];
-                tableKey.value++;
-              });
+                  });
+                  rows.value = [...usersState.users];
+                  tableKey.value++;
+                })
+                .catch(() => {
+                  // Batched role fetch failures are non-fatal — fall back to
+                  // whatever role string came with the org-members rows.
+                });
             }
           })
           .catch((err: any) => {
@@ -773,6 +772,12 @@ export default defineComponent({
       // Allow editing for root users only if the current user is root
       if (user.role?.toLowerCase() === "root") {
         return store.state.userInfo.email === user.email;
+      }
+      // Cloud: cannot edit self (same as delete behavior)
+      if (config.isCloud == "true") {
+        return (
+          store.state.userInfo.email.toLowerCase() !== user.email.toLowerCase()
+        );
       }
       // Allow editing for all other users
       return true;

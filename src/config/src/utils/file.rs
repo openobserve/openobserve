@@ -431,7 +431,9 @@ mod tests {
         assert!(result.is_err());
 
         // Test range where start > end (this should not cause overflow)
-        let result = get_file_contents(file_path.to_str().unwrap(), Some(5..3));
+        let start = 5;
+        let end = 3;
+        let result = get_file_contents(file_path.to_str().unwrap(), Some(start..end));
         assert!(result.is_err());
     }
 

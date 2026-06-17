@@ -1082,6 +1082,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :serviceName="correlationData.serviceName"
               :matchedDimensions="correlationData.matchedDimensions"
               :additionalDimensions="correlationData.additionalDimensions"
+              :matched-set-id="correlationMatchedSetId"
+              :chip-dimensions="correlationChipDimensions"
               :logStreams="correlationData.logStreams"
               :metricStreams="correlationData.metricStreams"
               :traceStreams="correlationData.traceStreams"
@@ -1174,7 +1176,9 @@ import incidentsService, {
   IncidentCorrelatedStreams,
 } from "@/services/incidents";
 import streamService from "@/services/stream";
-import serviceStreamsApi from "@/services/service_streams";
+import serviceStreamsApi, {
+  buildChipDimensionsFromFilters,
+} from "@/services/service_streams";
 import { getImageURL } from "@/utils/zincutils";
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
@@ -1323,6 +1327,19 @@ export default defineComponent({
     const getSemanticGroupDisplayName = (id: string): string => {
       return semanticGroupDisplayMap.value.get(id) || id;
     };
+
+    // Identity set + chip dimensions powering the "View by" subject tabs in the
+    // embedded TelemetryCorrelationDashboard (metrics tab). Without matchedSetId
+    // the dashboard cannot build subject chips, so the toggle never renders.
+    // Both derive from the correlate API response; chip dimensions stay reactive
+    // to semanticGroups (used only for dedup) so they refresh if groups load late.
+    const correlationMatchedSetId = computed(
+      () => correlationData.value?.correlationData?.matched_set_id ?? undefined,
+    );
+    const correlationChipDimensions = computed<Record<string, string>>(() => {
+      const resp = correlationData.value?.correlationData;
+      return resp ? buildChipDimensionsFromFilters(resp, semanticGroups.value) : {};
+    });
 
     // True when a background AI analysis run has started but not yet completed.
     // Updated whenever events are fetched (load, tab switch, reopen, etc.) — no polling.
@@ -2867,6 +2884,8 @@ export default defineComponent({
       expandedSections,
       formattedRcaContent,
       correlationData,
+      correlationMatchedSetId,
+      correlationChipDimensions,
       correlationLoading,
       correlationError,
       hasCorrelatedData,

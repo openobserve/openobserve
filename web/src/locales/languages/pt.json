@@ -4493,6 +4493,14 @@
     "noQueryApplied": {
       "title": "Execute uma consulta para ver os registros",
       "description": "Ajuste seus filtros e clique em “Executar consulta” para carregar eventos para esse stream."
+    },
+    "noServiceGraph": {
+      "title": "Sem dados do gráfico de serviço",
+      "description": "Tente consultar um intervalo de tempo maior ou garanta que seus serviços estejam emitindo métricas de abrangência."
+    },
+    "noServicesCatalog": {
+      "title": "Nenhum serviço encontrado",
+      "description": "Nenhum serviço foi detectado no intervalo de tempo selecionado. Experimente um alcance maior ou um stream diferente."
     }
   },
   "onlineEvals": {
