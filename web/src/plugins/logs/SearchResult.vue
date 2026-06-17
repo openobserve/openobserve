@@ -490,6 +490,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :width="getTableWidth"
             :err-msg="searchObj.data.missingStreamMessage"
             :loading="searchObj.loading"
+            :loadingProgressPercentage="searchObj.loadingProgressPercentage || 0"
             :functionErrorMsg="searchObj?.data?.functionError"
             :expandedRows="expandedLogs"
             :highlight-timestamp="searchObj.data?.searchAround?.indexTimestamp"

@@ -72,6 +72,14 @@ export const useSearchResponseHandler = () => {
     payload: WebSocketSearchPayload,
     response: WebSocketSearchResponse,
   ) => {
+    // Backend streaming progress (already mapped from "progress" to
+    // "event_progress" by useStreamingSearch). Drives the top progress bar
+    // while results stream in. Mirrors the dashboard panel handling.
+    if (response?.type === "event_progress") {
+      searchObj.loadingProgressPercentage = response?.content?.percent ?? 0;
+      return;
+    }
+
     if (
       payload.type === "search" &&
       response?.type === "search_response_hits"
