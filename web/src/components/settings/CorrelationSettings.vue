@@ -44,6 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <OTab
           name="field-aliases"
+          data-test="correlation-settings-field-aliases-tab"
           :label="t('settings.correlation.fieldAliasesTab')"
         />
       </OTabs>

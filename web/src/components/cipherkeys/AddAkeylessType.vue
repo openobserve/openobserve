@@ -294,7 +294,7 @@ export default defineComponent({
     const validateAkeylessFields = (): boolean => {
       const akeyless = props.formData.key.store.akeyless;
       baseUrlError.value = !akeyless.base_url ? 'Base URL is required'
-        : !validateUrl(akeyless.base_url) ? 'Please provide correct URL.'
+        : validateUrl(akeyless.base_url) !== true ? 'Please provide correct URL.'
         : /<[^>]*>/.test(akeyless.base_url) ? 'HTML tags are not allowed'
         : '';
       accessIdError.value = !akeyless.access_id ? 'Access ID is required'
