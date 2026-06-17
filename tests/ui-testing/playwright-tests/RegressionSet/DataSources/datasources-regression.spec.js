@@ -7,17 +7,14 @@
 
 const { test, expect, navigateToBase } = require('../../utils/enhanced-baseFixtures.js');
 const testLogger = require('../../utils/test-logger.js');
-const PageManager = require('../../../pages/page-manager.js');
 
 test.describe("Data Sources Regression Bug Fixes", () => {
   test.describe.configure({ mode: 'parallel' });
-  let pm;
 
   test.beforeEach(async ({ page }, testInfo) => {
     testLogger.testStart(testInfo.title, testInfo.file);
     await navigateToBase(page);
-    pm = new PageManager(page);
-    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    await page.waitForLoadState('networkidle', { timeout: 10000 });
     testLogger.info('Data sources regression test setup completed');
   });
 
@@ -30,12 +27,12 @@ test.describe("Data Sources Regression Bug Fixes", () => {
   }, async ({ page }) => {
     testLogger.info('Test: Verify AI integration content persists on re-click (Bug #11682)');
 
-    // Navigate to Data Sources → AI Integrations
-    // AI Integrations is an ORouteTab inside the Ingestion page (not a sidebar MenuLink),
-    // so we navigate directly to its URL instead of clicking a tab selector.
+    // Navigate to Data Sources → AI Integrations.
+    // The empty child redirect auto-selects the first integration so the detail
+    // pane is already populated — no click needed for the initial render.
     const aiUrl = `${process.env.ZO_BASE_URL || 'http://localhost:5080'}/web/ingestion/ai-integrations?org_identifier=${process.env.ORGNAME || 'default'}`;
-    await page.goto(aiUrl, { timeout: 15000 }).catch(() => {});
-    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    await page.goto(aiUrl, { timeout: 15000 });
+    await page.waitForLoadState('networkidle', { timeout: 10000 });
     testLogger.info('Navigated to AI Integrations');
 
     // Click the first available AI integration item to view its detail
@@ -45,9 +42,15 @@ test.describe("Data Sources Regression Bug Fixes", () => {
     await page.waitForTimeout(1500);
     testLogger.info('Clicked first AI integration item');
 
-    // Verify the detail content rendered (CopyContent shows markdown/instructions)
-    const detailContent = page.locator('[data-test="rum-content-text"]');
-    const contentBefore = await detailContent.textContent().catch(() => '');
+    // Verify detail content rendered (any of the three rendering paths:
+    // AIRichSetupCard, AIIntegrationCard, or the legacy CopyContent fallback).
+    // The "Select an integration" placeholder must NOT be visible, and the
+    // detail pane (.card-container) must contain text.
+    const placeholder = page.getByText('Select an integration to view details.');
+    await expect(placeholder, 'Bug #11682: placeholder should not show after clicking an integration').not.toBeVisible({ timeout: 5000 });
+
+    const detailPane = page.locator('.card-container');
+    const contentBefore = (await detailPane.textContent())?.trim() || '';
     testLogger.info(`Detail content length before re-click: ${contentBefore.length}`);
 
     expect(contentBefore.length,
@@ -59,7 +62,9 @@ test.describe("Data Sources Regression Bug Fixes", () => {
     await page.waitForTimeout(1500);
 
     // Verify content is still present after re-click (not blank)
-    const contentAfter = await detailContent.textContent().catch(() => '');
+    await expect(placeholder, 'Bug #11682: placeholder should not show after re-click').not.toBeVisible({ timeout: 5000 });
+
+    const contentAfter = (await detailPane.textContent())?.trim() || '';
     testLogger.info(`Detail content length after re-click: ${contentAfter.length}`);
 
     expect(contentAfter.length,
