@@ -899,6 +899,14 @@ jobs:
           else
             echo "::warning::analyzer missing — no assertion baseline (diff-weakening guard disabled this run)"
           fi
+          # Snapshot files ALREADY dirty outside tests/ BEFORE heal — the build step seds product
+          # files (e.g. src/handler/http/router/ui.rs → /tmp/dist). The scope-lock subtracts this so it
+          # only flags files the HEALER changed, never the build's own pre-heal modifications.
+          git status --porcelain -- . \
+            ':(exclude)tests/ui-testing/**' ':(exclude)docs/test_generator/**' \
+            ':(exclude).opencode/**' ':(exclude)opencode.jsonc' ':(exclude).github/**' \
+            | sed 's/^...//' | sort > docs/test_generator/ci/pre-heal-dirty.txt
+          echo "pre-heal out-of-scope dirty (build artifacts, baselined out): $(wc -l < docs/test_generator/ci/pre-heal-dirty.txt) file(s)"
 
       - name: Heal — fresh-context loop until the spec passes
         id: heal
@@ -941,10 +949,16 @@ jobs:
         # REVERT those changes and BLOCK the run. docs/test_generator/ (handoff) + the restored pipeline
         # files (.opencode/opencode.jsonc/.github) are exempt — they're stripped/restored anyway.
         run: |
-          VIOL=$(git status --porcelain -- . \
+          # Current out-of-scope dirty files…
+          CUR=$(git status --porcelain -- . \
             ':(exclude)tests/ui-testing/**' ':(exclude)docs/test_generator/**' \
             ':(exclude).opencode/**' ':(exclude)opencode.jsonc' ':(exclude).github/**' \
-            | sed 's/^...//')
+            | sed 's/^...//' | sort)
+          # …minus the files the BUILD already dirtied before heal (e.g. ui.rs sed). Whatever remains
+          # was changed by the HEALER — a genuine scope violation.
+          PRE=docs/test_generator/ci/pre-heal-dirty.txt
+          [ -f "$PRE" ] || : > "$PRE"   # ensure it exists (empty) so comm has a left/right operand
+          VIOL=$(comm -23 <(printf '%s\n' "$CUR" | sed '/^$/d') <(sort "$PRE"))
           if [ -n "$VIOL" ]; then
             echo "status=violation" >> "$GITHUB_OUTPUT"
             echo "::error::Healer SCOPE VIOLATION — it changed files OUTSIDE tests/ui-testing/ (likely patched the product to force a green). Reverting + blocking:"
