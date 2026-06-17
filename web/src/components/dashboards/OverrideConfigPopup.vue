@@ -384,15 +384,20 @@ export default defineComponent({
           ? false
           : detectedNumeric(col.field);
 
-    // Reset numeric-only settings when a column becomes non-numeric.
     watch(
       () => columnOverrides.value.map((c) => `${c.field}|${c.fieldType}`),
       (keys, prevKeys) => {
-        keys.forEach((key, i) => {
-          if (key !== prevKeys?.[i] && !isNumericColumn(columnOverrides.value[i])) {
-            columnOverrides.value[i].unit = null;
-            columnOverrides.value[i].customUnit = null;
-            columnOverrides.value[i].conditions = [];
+        const prevTypeByField = new Map<string, string>();
+        (prevKeys ?? []).forEach((k) => {
+          const sep = k.lastIndexOf("|");
+          prevTypeByField.set(k.slice(0, sep), k.slice(sep + 1));
+        });
+        columnOverrides.value.forEach((c) => {
+          const prevType = prevTypeByField.get(c.field);
+          if (prevType !== undefined && prevType !== c.fieldType && !isNumericColumn(c)) {
+            c.unit = null;
+            c.customUnit = null;
+            c.conditions = [];
           }
         });
       },
