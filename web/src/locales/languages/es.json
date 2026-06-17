@@ -4848,7 +4848,12 @@
       "reportsRefresh": "Actualizar lista"
     },
     "search": "Atajos de búsqueda...",
-    "noResults": "No se han encontrado atajos"
+    "noResults": "No se han encontrado atajos",
+    "subtitle": "¿Prensa? en cualquier lugar · haga clic en cualquier fila para activarla",
+    "footerClose": "cerca",
+    "footerReopen": "volver a abrir",
+    "footerRun": "haga clic en la fila para ejecutar",
+    "footerMacHint": "⌘ = Cmd en Mac · Ctrl en Windows"
   },
   "aiObservability": {
     "title": "LLM Observabilidad",

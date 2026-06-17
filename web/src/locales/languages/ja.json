@@ -4850,7 +4850,12 @@
       "reportsRefresh": "リストを更新"
     },
     "search": "ショートカットを検索...",
-    "noResults": "ショートカットが見つかりません"
+    "noResults": "ショートカットが見つかりません",
+    "subtitle": "プレス?どこでも。任意の行をクリックするとトリガーされます",
+    "footerClose": "閉じる",
+    "footerReopen": "再度開きます",
+    "footerRun": "行をクリックして実行",
+    "footerMacHint": "⌘ = Mac の場合はコマンド·ウィンドウズの場合は Ctrl"
   },
   "aiObservability": {
     "title": "LLM オブザーバビリティ",

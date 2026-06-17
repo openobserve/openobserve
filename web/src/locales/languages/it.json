@@ -4861,7 +4861,12 @@
       "reportsRefresh": "Aggiorna elenco"
     },
     "search": "Scorciatoie per la ricerca...",
-    "noResults": "Nessuna scorciatoia trovata"
+    "noResults": "Nessuna scorciatoia trovata",
+    "subtitle": "Stampa? ovunque · fai clic su una riga per attivarla",
+    "footerClose": "vicino",
+    "footerReopen": "riaprire",
+    "footerRun": "fai clic sulla riga per eseguire",
+    "footerMacHint": "= Cmd su Mac · Ctrl su Windows"
   },
   "aiObservability": {
     "title": "Osservabilità LLM",

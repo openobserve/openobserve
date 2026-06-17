@@ -4850,7 +4850,12 @@
       "reportsRefresh": "Actualiser la liste"
     },
     "search": "Raccourcis de recherche...",
-    "noResults": "Aucun raccourci n'a été trouvé"
+    "noResults": "Aucun raccourci n'a été trouvé",
+    "subtitle": "Presse ? n'importe où · cliquez sur n'importe quelle ligne pour déclencher",
+    "footerClose": "proche",
+    "footerReopen": "rouvrir",
+    "footerRun": "cliquez sur la ligne pour exécuter",
+    "footerMacHint": "⌘= Cmd sur Mac · Ctrl sur Windows"
   },
   "aiObservability": {
     "title": "Observabilité LLM",

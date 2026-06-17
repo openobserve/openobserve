@@ -4457,18 +4457,18 @@
     }
   },
   "aiObservability": {
-    "title": "AI",
+    "title": "LLM 可观测性",
     "sections": {
-      "monitor": "观测",
-      "evaluate": "评测"
+      "monitor": "监视器",
+      "evaluate": "评估"
     },
     "nav": {
-      "llmInsights": "洞察",
+      "overview": "概述",
       "sessions": "会话",
       "quality": "质量",
-      "evalJobs": "评测任务",
-      "scorers": "评分器",
-      "scoreConfigs": "评分配置"
+      "evalJobs": "评估职位",
+      "scorers": "记分员",
+      "scoreConfigs": "分数配置"
     }
   },
   "onlineEvals": {
@@ -4869,22 +4869,12 @@
       "reportsRefresh": "刷新清单"
     },
     "search": "搜索快捷方式...",
-    "noResults": "未找到快捷方式"
-  },
-  "aiObservability": {
-    "title": "LLM 可观测性",
-    "sections": {
-      "monitor": "监视器",
-      "evaluate": "评估"
-    },
-    "nav": {
-      "overview": "概述",
-      "sessions": "会话",
-      "quality": "质量",
-      "evalJobs": "评估职位",
-      "scorers": "记分员",
-      "scoreConfigs": "分数配置"
-    }
+    "noResults": "未找到快捷方式",
+    "subtitle": "按？任何地方·点击任一行即可触发",
+    "footerClose": "关闭",
+    "footerReopen": "重新打开",
+    "footerRun": "点击行即可运行",
+    "footerMacHint": "▼ = Mac 上的 Cmd · Windows 上的 Ctrl"
   },
   "logs": {
     "noData": {

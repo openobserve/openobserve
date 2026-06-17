@@ -4850,7 +4850,12 @@
       "reportsRefresh": "Atualizar lista"
     },
     "search": "Atalhos de pesquisa...",
-    "noResults": "Nenhum atalho encontrado"
+    "noResults": "Nenhum atalho encontrado",
+    "subtitle": "Imprensa? em qualquer lugar · clique em qualquer linha para acionar",
+    "footerClose": "fechar",
+    "footerReopen": "reabrir",
+    "footerRun": "clique na linha para executar",
+    "footerMacHint": "⌘ = Cmd no Mac · Ctrl no Windows"
   },
   "aiObservability": {
     "title": "Observabilidade do LLM",

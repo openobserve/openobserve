@@ -4863,7 +4863,12 @@
       "reportsRefresh": "Listeyi yenileme"
     },
     "search": "Kısayolları ara...",
-    "noResults": "Kısayol bulunamadı"
+    "noResults": "Kısayol bulunamadı",
+    "subtitle": "Basın mı? herhangi bir yerde · tetiklemek için herhangi bir satırı tıklayın",
+    "footerClose": "kapat",
+    "footerReopen": "yeniden açmak",
+    "footerRun": "çalıştırmak için satırı tıklayın",
+    "footerMacHint": "⌘ = Mac'te Cmd · Windows'ta Ctrl"
   },
   "aiObservability": {
     "title": "LLM Gözlemlenebilirlik",

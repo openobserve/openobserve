@@ -4850,7 +4850,12 @@
       "reportsRefresh": "Liste aktualisieren"
     },
     "search": "Kurzbefehle suchen...",
-    "noResults": "Keine Abkürzungen gefunden"
+    "noResults": "Keine Abkürzungen gefunden",
+    "subtitle": "Drücken? irgendwo · klicken Sie auf eine beliebige Zeile, um sie auszulösen",
+    "footerClose": "nahe",
+    "footerReopen": "erneut öffnen",
+    "footerRun": "Klicken Sie auf die Zeile, um sie auszuführen",
+    "footerMacHint": "⌘ = Cmd auf dem Mac · Strg auf Windows"
   },
   "aiObservability": {
     "title": "LLM Beobachtbarkeit",

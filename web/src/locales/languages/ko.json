@@ -4863,7 +4863,12 @@
       "reportsRefresh": "목록 새로 고침"
     },
     "search": "검색 단축키...",
-    "noResults": "단축키를 찾을 수 없습니다"
+    "noResults": "단축키를 찾을 수 없습니다",
+    "subtitle": "언론?아무 곳이나 · 아무 행이나 클릭하면 트리거됩니다.",
+    "footerClose": "닫기",
+    "footerReopen": "다시 엽니다",
+    "footerRun": "행을 클릭하여 실행",
+    "footerMacHint": "⌘ = 맥에서는 Cmd · 윈도우에서는 Ctrl"
   },
   "aiObservability": {
     "title": "LLM 옵저버빌리티",

@@ -4863,7 +4863,12 @@
       "reportsRefresh": "Lijst verversen"
     },
     "search": "Sneltoetsen zoeken...",
-    "noResults": "Geen sneltoetsen gevonden"
+    "noResults": "Geen sneltoetsen gevonden",
+    "subtitle": "Druk op? overal · klik op een willekeurige rij om te activeren",
+    "footerClose": "dichtbij",
+    "footerReopen": "heropenen",
+    "footerRun": "klik op de rij om uit te voeren",
+    "footerMacHint": "⌘ = Cmd op Mac · Ctrl op Windows"
   },
   "aiObservability": {
     "title": "LLM-waarneembaarheid",
