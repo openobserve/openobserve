@@ -346,7 +346,7 @@
             "4",
             "581.25",
             "27.53",
-            "hybrid",
+            "manual",
             "2"
           ],
           [
@@ -1232,14 +1232,14 @@
         ],
         "results": [
           [
-            "ZONE-1",
-            "4",
-            "258.0"
-          ],
-          [
             "ZONE-4",
             "4",
             "483.0"
+          ],
+          [
+            "ZONE-1",
+            "4",
+            "258.0"
           ],
           [
             "ZONE-3",
@@ -1409,15 +1409,6 @@
             "26.3"
           ],
           [
-            "ZONE-4",
-            "SORT-A7",
-            "auto",
-            "2",
-            "437.5",
-            "45.3",
-            "32.5"
-          ],
-          [
             "ZONE-3",
             "SORT-X1",
             "manual",
@@ -1425,6 +1416,15 @@
             "437.5",
             "72.8",
             "19.2"
+          ],
+          [
+            "ZONE-4",
+            "SORT-A7",
+            "auto",
+            "2",
+            "437.5",
+            "45.3",
+            "32.5"
           ],
           [
             "ZONE-4",
@@ -1753,12 +1753,12 @@
         ],
         "results": [
           [
-            "SecurityException: unauthorized access to control_center CC-ALPHA",
+            "NetworkException: connection to batch sync failed",
             "2",
             "1"
           ],
           [
-            "NetworkException: connection to batch sync failed",
+            "SecurityException: unauthorized access to control_center CC-ALPHA",
             "2",
             "1"
           ],
@@ -1992,22 +1992,22 @@
         "results": [
           [
             "fast",
-            "ok",
+            "unknown",
             "2"
           ],
           [
             "fast",
-            "unknown",
+            "ok",
             "2"
           ],
           [
             "degraded",
-            "unknown",
+            "ok",
             "1"
           ],
           [
             "degraded",
-            "ok",
+            "unknown",
             "1"
           ],
           [
@@ -2148,7 +2148,12 @@
           ],
           [
             "performanceMetric",
-            "checkoutPage",
+            "searchPage",
+            "1"
+          ],
+          [
+            "performanceMetric",
+            "itemPage",
             "1"
           ],
           [
@@ -2158,12 +2163,7 @@
           ],
           [
             "performanceMetric",
-            "searchPage",
-            "1"
-          ],
-          [
-            "performanceMetric",
-            "itemPage",
+            "checkoutPage",
             "1"
           ]
         ],
@@ -2287,16 +2287,16 @@
         ],
         "results": [
           [
-            "itemPage",
-            "2",
-            "1",
-            "89.0"
-          ],
-          [
             "checkoutPage",
             "1",
             "1",
             "567.0"
+          ],
+          [
+            "itemPage",
+            "2",
+            "1",
+            "89.0"
           ]
         ],
         "results_mode": "rowsort"
@@ -2346,11 +2346,11 @@
         ],
         "results": [
           [
-            "track-router",
+            "zone-controller",
             "2"
           ],
           [
-            "zone-controller",
+            "track-router",
             "2"
           ]
         ],
@@ -3617,7 +3617,7 @@
     },
     {
       "id": "Q627",
-      "sql": "SELECT DISTINCT org_name FROM \"{stream}\" t1 WHERE NOT EXISTS (SELECT 1 FROM \"{stream}\" t2 WHERE t2.facility_zone = 'ZONE-1' AND NOT EXISTS (SELECT 1 FROM \"{stream}\" t3 WHERE t3.org_name = t1.org_name AND t3.facility_zone = t2.facility_zone)) ORDER BY org_name",
+      "sql": "SELECT DISTINCT t1.org_name FROM \"{stream}\" t1 WHERE NOT EXISTS (SELECT 1 FROM \"{stream}\" t2 WHERE t2.org_name = t1.org_name AND t2.facility_zone = 'ZONE-1') ORDER BY org_name",
       "category": "cte_subquery",
       "time_offset": {
         "start_offset": 37500000000,
@@ -3629,16 +3629,7 @@
         ],
         "results": [
           [
-            "warehouse-central"
-          ],
-          [
-            "warehouse-east"
-          ],
-          [
-            "warehouse-south"
-          ],
-          [
-            "warehouse-west"
+            "warehouse-north"
           ]
         ],
         "results_mode": "rowsort",

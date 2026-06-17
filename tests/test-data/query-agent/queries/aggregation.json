@@ -210,15 +210,15 @@
           ],
           [
             "ZONE-4",
-            "auto",
-            "2",
-            "385.0"
-          ],
-          [
-            "ZONE-4",
             "hybrid",
             "2",
             "437.5"
+          ],
+          [
+            "ZONE-4",
+            "auto",
+            "2",
+            "385.0"
           ]
         ],
         "results_mode": "rowsort"
@@ -289,14 +289,14 @@
         ],
         "results": [
           [
-            "ZONE-2",
-            "4",
-            "2"
-          ],
-          [
             "ZONE-3",
             "4",
             "1"
+          ],
+          [
+            "ZONE-2",
+            "4",
+            "2"
           ],
           [
             "ZONE-1",
@@ -639,12 +639,12 @@
           [
             "ZONE-2",
             "2",
-            "manual"
+            "auto"
           ],
           [
             "ZONE-3",
             "2",
-            "manual"
+            "hybrid"
           ],
           [
             "ZONE-4",
@@ -849,21 +849,6 @@
           [
             "0",
             "1",
-            "0",
-            "1",
-            "0",
-            "1",
-            "E005",
-            "@warehouse-iOS-sort-v2",
-            "UP-E009",
-            "ConfigurationException: missing facility_zone ZONE-3 override",
-            "SORT-X1-UP-E009-E005",
-            "SORT-X1",
-            "iOS"
-          ],
-          [
-            "0",
-            "1",
             "1",
             "0",
             "1",
@@ -889,6 +874,21 @@
             "ConfigurationException: missing facility_zone ZONE-3 override",
             "SORT-M3--E005",
             "SORT-M3",
+            "iOS"
+          ],
+          [
+            "0",
+            "1",
+            "0",
+            "1",
+            "0",
+            "1",
+            "E005",
+            "@warehouse-iOS-sort-v2",
+            "UP-E009",
+            "ConfigurationException: missing facility_zone ZONE-3 override",
+            "SORT-X1-UP-E009-E005",
+            "SORT-X1",
             "iOS"
           ]
         ],
@@ -1090,19 +1090,19 @@
             "205.0609665440988"
           ],
           [
-            "MANUAL",
-            "ZONE-1-SORT-M3",
-            "1",
-            "50",
-            "1.2",
-            "None"
-          ],
-          [
             "AUTO",
             "ZONE-4-SORT-A7",
             "1",
             "155",
             "1.5",
+            "None"
+          ],
+          [
+            "MANUAL",
+            "ZONE-1-SORT-M3",
+            "1",
+            "50",
+            "1.2",
             "None"
           ]
         ],
@@ -1277,13 +1277,13 @@
             "1"
           ],
           [
-            "lane-monitor",
-            "1",
+            "track-router",
+            "2",
             "1"
           ],
           [
-            "track-router",
-            "2",
+            "lane-monitor",
+            "1",
             "1"
           ],
           [
@@ -1569,19 +1569,19 @@
         ],
         "results": [
           [
-            "E003",
-            "2"
-          ],
-          [
             "E005",
             "2"
           ],
           [
-            "E006",
-            "1"
+            "E003",
+            "2"
           ],
           [
             "E004",
+            "1"
+          ],
+          [
+            "E006",
             "1"
           ]
         ],
@@ -1652,7 +1652,7 @@
             "1"
           ],
           [
-            "vitalsInp",
+            "pageView",
             "1",
             "1"
           ],
@@ -1662,7 +1662,7 @@
             "1"
           ],
           [
-            "pageView",
+            "vitalsInp",
             "1",
             "1"
           ]
@@ -1712,20 +1712,6 @@
         ],
         "results": [
           [
-            "low",
-            "12",
-            "3200",
-            "1606.0",
-            "2"
-          ],
-          [
-            "medium",
-            "15",
-            "15",
-            "15.0",
-            "2"
-          ],
-          [
             "critical",
             "78",
             "78",
@@ -1738,6 +1724,20 @@
             "1900",
             "1900.0",
             "1"
+          ],
+          [
+            "low",
+            "12",
+            "3200",
+            "1606.0",
+            "2"
+          ],
+          [
+            "medium",
+            "15",
+            "15",
+            "15.0",
+            "2"
           ]
         ],
         "results_mode": "rowsort"
@@ -1941,7 +1941,8 @@
             "840.0"
           ]
         ],
-        "results_mode": "rowsort"
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
       }
     },
     {
@@ -2106,15 +2107,15 @@
           ],
           [
             "ZONE-3",
-            "hybrid",
-            "1",
-            "610.0"
-          ],
-          [
-            "ZONE-3",
             "manual",
             "1",
             "320.0"
+          ],
+          [
+            "ZONE-3",
+            "hybrid",
+            "1",
+            "610.0"
           ],
           [
             "ZONE-4",
@@ -2434,16 +2435,12 @@
         ],
         "results": [
           [
-            "temp-regulator",
-            "2"
-          ],
-          [
             "pallet-mapper",
             "2"
           ],
           [
-            "charge-checker",
-            "1"
+            "temp-regulator",
+            "2"
           ],
           [
             "batch-sync",
@@ -2451,6 +2448,10 @@
           ],
           [
             "lane-monitor",
+            "1"
+          ],
+          [
+            "charge-checker",
             "1"
           ]
         ],

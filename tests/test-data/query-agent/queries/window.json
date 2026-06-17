@@ -13,42 +13,6 @@
         ],
         "results": [
           [
-            "SORT-M3",
-            "900.0",
-            "1",
-            "1"
-          ],
-          [
-            "SORT-M3",
-            "610.0",
-            "2",
-            "2"
-          ],
-          [
-            "SORT-M3",
-            "555.0",
-            "3",
-            "3"
-          ],
-          [
-            "SORT-M3",
-            "320.0",
-            "4",
-            "4"
-          ],
-          [
-            "SORT-Z9",
-            "725.0",
-            "1",
-            "1"
-          ],
-          [
-            "SORT-Z9",
-            "150.0",
-            "2",
-            "2"
-          ],
-          [
             "SORT-X1",
             "900.0",
             "1",
@@ -83,6 +47,42 @@
             "150.0",
             "3",
             "3"
+          ],
+          [
+            "SORT-Z9",
+            "725.0",
+            "1",
+            "1"
+          ],
+          [
+            "SORT-Z9",
+            "150.0",
+            "2",
+            "2"
+          ],
+          [
+            "SORT-M3",
+            "900.0",
+            "1",
+            "1"
+          ],
+          [
+            "SORT-M3",
+            "610.0",
+            "2",
+            "2"
+          ],
+          [
+            "SORT-M3",
+            "555.0",
+            "3",
+            "3"
+          ],
+          [
+            "SORT-M3",
+            "320.0",
+            "4",
+            "4"
           ],
           [
             "SORT-Q5",
@@ -1081,7 +1081,7 @@
           ],
           [
             "ZONE-4",
-            "auto",
+            "hybrid",
             "2",
             "4",
             "50.0",
@@ -1089,7 +1089,7 @@
           ],
           [
             "ZONE-4",
-            "hybrid",
+            "auto",
             "2",
             "4",
             "50.0",
@@ -2675,6 +2675,12 @@
         ],
         "results": [
           [
+            "checkoutPage",
+            "Android 14",
+            "2",
+            "1"
+          ],
+          [
             "cartPage",
             "Android 12",
             "2",
@@ -2684,12 +2690,6 @@
             "itemPage",
             "Mac OS X (iPhone)",
             "1",
-            "1"
-          ],
-          [
-            "checkoutPage",
-            "Android 14",
-            "2",
             "1"
           ]
         ],
@@ -2823,12 +2823,12 @@
         ],
         "results": [
           [
-            "E001",
+            "E009",
             "2",
             "1"
           ],
           [
-            "E009",
+            "E001",
             "2",
             "1"
           ]
@@ -3583,7 +3583,7 @@
     },
     {
       "id": "Q650",
-      "sql": "SELECT _timestamp, throughput_rate, LAG(throughput_rate, 2) OVER (ORDER BY _timestamp) AS prev2_tput, LEAD(throughput_rate, 2) OVER (ORDER BY _timestamp) AS next2_tput FROM \"{stream}\" ORDER BY _timestamp",
+      "sql": "SELECT _timestamp, facility_zone, throughput_rate, ROW_NUMBER() OVER (PARTITION BY facility_zone ORDER BY throughput_rate DESC) AS rank_by_tput, SUM(throughput_rate) OVER (PARTITION BY facility_zone ORDER BY _timestamp ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING) AS rolling_sum FROM \"{stream}\" ORDER BY _timestamp",
       "category": "window",
       "time_offset": {
         "start_offset": 38880000000,
@@ -3591,90 +3591,107 @@
       },
       "expected": {
         "columns": [
+          "facility_zone",
           "throughput_rate",
-          "prev2_tput",
-          "next2_tput"
+          "rank_by_tput",
+          "rolling_sum"
         ],
         "results": [
           [
+            "ZONE-4",
             "190.0",
-            "None",
-            "900.0"
+            "4",
+            "670.0"
           ],
           [
+            "ZONE-3",
             "900.0",
-            "None",
-            "150.0"
+            "1",
+            "1220.0"
           ],
           [
+            "ZONE-1",
             "900.0",
-            "190.0",
-            "320.0"
+            "1",
+            "1220.0"
           ],
           [
+            "ZONE-2",
             "150.0",
-            "900.0",
-            "320.0"
+            "3",
+            "630.0"
           ],
           [
+            "ZONE-3",
             "320.0",
-            "900.0",
-            "480.0"
+            "5",
+            "1830.0"
           ],
           [
+            "ZONE-1",
             "320.0",
-            "150.0",
-            "480.0"
+            "4",
+            "2060.0"
           ],
           [
+            "ZONE-4",
             "480.0",
-            "320.0",
-            "610.0"
+            "2",
+            "1395.0"
           ],
           [
+            "ZONE-2",
             "480.0",
-            "320.0",
-            "725.0"
+            "2",
+            "1355.0"
           ],
           [
+            "ZONE-3",
             "610.0",
-            "480.0",
-            "725.0"
+            "3",
+            "1770.0"
           ],
           [
+            "ZONE-4",
             "725.0",
-            "480.0",
-            "840.0"
+            "1",
+            "1495.0"
           ],
           [
+            "ZONE-2",
             "725.0",
-            "610.0",
-            "840.0"
+            "1",
+            "1205.0"
           ],
           [
+            "ZONE-1",
             "840.0",
-            "725.0",
-            "290.0"
+            "2",
+            "1715.0"
           ],
           [
+            "ZONE-3",
             "840.0",
-            "725.0",
-            "555.0"
+            "2",
+            "2005.0"
           ],
           [
+            "ZONE-4",
             "290.0",
-            "840.0",
-            "555.0"
+            "3",
+            "1015.0"
           ],
           [
+            "ZONE-1",
             "555.0",
-            "840.0",
-            "None"
+            "3",
+            "1395.0"
           ],
           [
+            "ZONE-3",
             "555.0",
-            "290.0",
-            "None"
+            "4",
+            "1395.0"
           ]
         ],
         "results_mode": "rowsort",

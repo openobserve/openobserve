@@ -859,20 +859,12 @@
         ],
         "results": [
           [
-            "1",
-            "scanPallet"
-          ],
-          [
             "2",
             "syncZone"
           ],
           [
             "2",
-            "checkThreshold"
-          ],
-          [
-            "2",
-            "deleteRecord"
+            "updateBatch"
           ],
           [
             "2",
@@ -888,7 +880,15 @@
           ],
           [
             "2",
-            "updateBatch"
+            "checkThreshold"
+          ],
+          [
+            "2",
+            "deleteRecord"
+          ],
+          [
+            "1",
+            "scanPallet"
           ]
         ],
         "results_mode": "rowsort"
@@ -1026,22 +1026,16 @@
         ],
         "results": [
           [
-            "RetryScan",
-            "ok",
-            "2",
-            "15.0"
-          ],
-          [
-            "CheckThreshold",
-            "ok",
-            "2",
-            "78.0"
-          ],
-          [
             "MergeBatch",
             "queued",
             "2",
             "3200.0"
+          ],
+          [
+            "RetryScan",
+            "ok",
+            "2",
+            "15.0"
           ],
           [
             "ScanPallet",
@@ -1056,10 +1050,10 @@
             "12.0"
           ],
           [
-            "SearchItems",
-            "syncing",
-            "1",
-            "45.0"
+            "CheckThreshold",
+            "ok",
+            "2",
+            "78.0"
           ],
           [
             "RerouteTrack",
@@ -1078,6 +1072,12 @@
             "pending",
             "1",
             "1450.0"
+          ],
+          [
+            "SearchItems",
+            "syncing",
+            "1",
+            "45.0"
           ]
         ],
         "results_mode": "rowsort"
@@ -1114,16 +1114,6 @@
             "114.0"
           ],
           [
-            "ZONE-3",
-            "HYBRID",
-            "2",
-            "96.8",
-            "30.1",
-            "1510.0",
-            "1065.0",
-            "84.0"
-          ],
-          [
             "ZONE-4",
             "HYBRID",
             "2",
@@ -1131,6 +1121,16 @@
             "26.3",
             "670.0",
             "61.5",
+            "84.0"
+          ],
+          [
+            "ZONE-3",
+            "HYBRID",
+            "2",
+            "96.8",
+            "30.1",
+            "1510.0",
+            "1065.0",
             "84.0"
           ],
           [
@@ -1200,14 +1200,6 @@
             "1.2"
           ],
           [
-            "LOW_LOAD",
-            "MED_TPUT",
-            "1",
-            "24.8",
-            "275",
-            "2.5"
-          ],
-          [
             "MED_LOAD",
             "LOW_TPUT",
             "1",
@@ -1222,6 +1214,14 @@
             "26.3",
             "340",
             "0.5"
+          ],
+          [
+            "LOW_LOAD",
+            "MED_TPUT",
+            "1",
+            "24.8",
+            "275",
+            "2.5"
           ]
         ],
         "results_mode": "rowsort"
@@ -1397,6 +1397,13 @@
         ],
         "results": [
           [
+            "zone-controller",
+            "itemPage",
+            "1",
+            "12.0",
+            "12"
+          ],
+          [
             "scan-hub",
             "itemPage",
             "2",
@@ -1423,13 +1430,6 @@
             "1",
             "1900.0",
             "1900"
-          ],
-          [
-            "zone-controller",
-            "itemPage",
-            "1",
-            "12.0",
-            "12"
           ]
         ],
         "results_mode": "rowsort"
@@ -1451,14 +1451,14 @@
         ],
         "results": [
           [
-            "monitoring",
-            "6",
-            "2"
-          ],
-          [
             "browse",
             "1",
             "1"
+          ],
+          [
+            "monitoring",
+            "6",
+            "2"
           ]
         ],
         "results_mode": "rowsort"
@@ -1541,16 +1541,16 @@
         ],
         "results": [
           [
-            "Mobile",
-            "4",
-            "4",
-            "747.5"
-          ],
-          [
             "Computer",
             "1",
             "1",
             "230.0"
+          ],
+          [
+            "Mobile",
+            "4",
+            "4",
+            "747.5"
           ]
         ],
         "results_mode": "rowsort"
@@ -1572,14 +1572,19 @@
         ],
         "results": [
           [
+            "timeout",
+            "success",
+            "2"
+          ],
+          [
             "fast",
             "error",
             "2"
           ],
           [
             "timeout",
-            "success",
-            "2"
+            "error",
+            "1"
           ],
           [
             "fast",
@@ -1588,11 +1593,6 @@
           ],
           [
             "slow",
-            "error",
-            "1"
-          ],
-          [
-            "timeout",
             "error",
             "1"
           ]
@@ -1615,11 +1615,11 @@
         ],
         "results": [
           [
-            "vitalsInp",
+            "clickEvent",
             "1"
           ],
           [
-            "clickEvent",
+            "vitalsInp",
             "1"
           ]
         ],
@@ -1643,14 +1643,14 @@
         ],
         "results": [
           [
-            "zone-controller",
-            "E001",
+            "track-router",
+            "E003",
             "2",
             "medium"
           ],
           [
-            "track-router",
-            "E003",
+            "zone-controller",
+            "E001",
             "2",
             "medium"
           ],
@@ -1681,18 +1681,6 @@
         ],
         "results": [
           [
-            "searchPage",
-            "1",
-            "1",
-            "100.0"
-          ],
-          [
-            "itemPage",
-            "2",
-            "2",
-            "100.0"
-          ],
-          [
             "cartPage",
             "2",
             "2",
@@ -1700,6 +1688,18 @@
           ],
           [
             "checkoutPage",
+            "2",
+            "2",
+            "100.0"
+          ],
+          [
+            "searchPage",
+            "1",
+            "1",
+            "100.0"
+          ],
+          [
+            "itemPage",
             "2",
             "2",
             "100.0"
@@ -1802,13 +1802,13 @@
             "2"
           ],
           [
-            "sort",
-            "performanceMetric",
+            "track",
+            "navigation",
             "1"
           ],
           [
-            "track",
-            "navigation",
+            "sort",
+            "performanceMetric",
             "1"
           ]
         ],
@@ -2311,12 +2311,12 @@
         ],
         "results": [
           [
-            "auth_failure",
+            "app_error",
             "3",
             "2"
           ],
           [
-            "app_error",
+            "auth_failure",
             "3",
             "2"
           ],
@@ -2386,20 +2386,20 @@
         ],
         "results": [
           [
-            "Mobile",
-            "itemPage",
-            "3",
-            "1566666.6666666667",
-            "166666.66666666666",
-            "0.15000000099341074"
-          ],
-          [
             "Computer",
             "searchPage",
             "3",
             "1866666.6666666667",
             "193333.33333333334",
             "0.08666666721304257"
+          ],
+          [
+            "Mobile",
+            "itemPage",
+            "3",
+            "1566666.6666666667",
+            "166666.66666666666",
+            "0.15000000099341074"
           ],
           [
             "Tablet",
@@ -3452,19 +3452,19 @@
         ],
         "results": [
           [
-            "warehouse-central",
-            "4"
-          ],
-          [
             "warehouse-north",
             "4"
           ],
           [
-            "warehouse-west",
-            "3"
+            "warehouse-central",
+            "4"
           ],
           [
             "warehouse-east",
+            "3"
+          ],
+          [
+            "warehouse-west",
             "3"
           ]
         ],

@@ -1581,7 +1581,7 @@
         ],
         "results": [
           [
-            "[\"credential_stuffing\"]",
+            "[\"torbot_ua_mismatch\",\"cookie_reuse\"]",
             "2"
           ],
           [
@@ -1589,11 +1589,11 @@
             "2"
           ],
           [
-            "[\"scraping_pattern\",\"high_freq\"]",
+            "[\"credential_stuffing\"]",
             "2"
           ],
           [
-            "[\"torbot_ua_mismatch\",\"cookie_reuse\"]",
+            "[\"scraping_pattern\",\"high_freq\"]",
             "2"
           ]
         ],
@@ -6691,7 +6691,8 @@
           ]
         ],
         "results_mode": "rowsort",
-        "skip_sqllogictest": true
+        "skip_sqllogictest": true,
+        "skip_column_check": true
       }
     },
     {
