@@ -22,7 +22,10 @@ use std::{
 };
 
 #[cfg(feature = "vortex")]
-use arrow::{array::StructArray, datatypes::DataType};
+use arrow::{
+    array::StructArray,
+    datatypes::{DataType, Field},
+};
 use arrow::{error::ArrowError, record_batch::RecordBatch};
 use arrow_schema::Schema;
 #[cfg(feature = "vortex")]
@@ -36,7 +39,7 @@ use parquet::{
 #[cfg(feature = "vortex")]
 use vortex::{
     VortexSessionDefault,
-    array::{ArrayRef, arrow::IntoArrowArray},
+    array::{ArrayRef, VortexSessionExecute, arrow::ArrowSessionExt},
     buffer::Buffer,
     file::OpenOptionsSessionExt,
     io::session::RuntimeSessionExt,
@@ -144,11 +147,15 @@ pub type RecordBatchStream = Pin<Box<dyn Stream<Item = Result<RecordBatch, Arrow
 /// Convert a single vortex [`ArrayRef`] to an Arrow [`RecordBatch`].
 #[cfg(feature = "vortex")]
 pub fn vortex_array_to_record_batch(
+    session: &VortexSession,
     array: ArrayRef,
     data_type: &DataType,
 ) -> Result<RecordBatch, ArrowError> {
-    let array = array
-        .into_arrow(data_type)
+    let mut ctx = session.create_execution_ctx();
+    let target = Field::new("", data_type.clone(), array.dtype().is_nullable());
+    let array = session
+        .arrow()
+        .execute_arrow(array, Some(&target), &mut ctx)
         .map_err(|e| ArrowError::ExternalError(Box::new(e)))?;
     let struct_array = array
         .as_any()
@@ -183,9 +190,12 @@ pub async fn get_recordbatch_reader_from_bytes(
 
             let stream = vortex_stream.then(move |result| {
                 let arrow_data_type = arrow_data_type.clone();
+                let session = session.clone();
                 async move {
                     match result {
-                        Ok(array) => vortex_array_to_record_batch(array, &arrow_data_type),
+                        Ok(array) => {
+                            vortex_array_to_record_batch(&session, array, &arrow_data_type)
+                        }
                         Err(e) => Err(ArrowError::ExternalError(Box::new(e))),
                     }
                 }

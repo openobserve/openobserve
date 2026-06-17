@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
-    any::Any,
     sync::Arc,
     task::{Context, Poll},
 };
@@ -111,10 +110,6 @@ impl ExecutionPlan for DeduplicationExec {
         "DeduplicationExec"
     }
 
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
     fn properties(&self) -> &Arc<PlanProperties> {
         &self.cache
     }
@@ -161,7 +156,7 @@ impl ExecutionPlan for DeduplicationExec {
         )))
     }
 
-    fn partition_statistics(&self, partition: Option<usize>) -> Result<Statistics> {
+    fn partition_statistics(&self, partition: Option<usize>) -> Result<Arc<Statistics>> {
         self.input.partition_statistics(partition)
     }
 
@@ -455,7 +450,8 @@ mod tests {
     #[test]
     fn test_deduplication_exec_as_any() {
         let exec = make_exec();
-        assert!(exec.as_any().downcast_ref::<DeduplicationExec>().is_some());
+        let exec_plan: &dyn ExecutionPlan = &exec;
+        assert!(exec_plan.downcast_ref::<DeduplicationExec>().is_some());
     }
 
     #[test]

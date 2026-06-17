@@ -247,10 +247,6 @@ impl RegxpMatchToFields {
 }
 
 impl ScalarUDFImpl for RegxpMatchToFields {
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
-
     fn name(&self) -> &str {
         "regexp_match_to_fields"
     }
