@@ -80,7 +80,7 @@ export const useSearchResponseHandler = () => {
     // concurrently).
     if (response?.type === "event_progress") {
       const percent = response?.content?.percent ?? 0;
-      if (payload.type === "histogram") {
+      if (payload.type === "histogram" || payload.type === "pageCount") {
         searchObj.loadingHistogramProgressPercentage = percent;
       } else {
         searchObj.loadingProgressPercentage = percent;
@@ -183,6 +183,9 @@ export const useSearchResponseHandler = () => {
     if (response.type === "cancel_response") {
       searchObj.loading = false;
       searchObj.loadingHistogram = false;
+      // Clear streaming progress so a re-run after cancel starts from 0.
+      searchObj.loadingProgressPercentage = 0;
+      searchObj.loadingHistogramProgressPercentage = 0;
       searchObj.data.isOperationCancelled = false;
 
       showCancelSearchNotification();
@@ -617,6 +620,9 @@ export const useSearchResponseHandler = () => {
   const handleSearchError = async (request: any, err: WebSocketErrorResponse) => {
     searchObj.loading = false;
     searchObj.loadingHistogram = false;
+    // Clear streaming progress so the next search starts from 0, not a stale value.
+    searchObj.loadingProgressPercentage = 0;
+    searchObj.loadingHistogramProgressPercentage = 0;
 
     const { message, trace_id, code, error_detail, error } = err.content;
 

@@ -312,6 +312,21 @@ describe("useSearchResponseHandler", () => {
       expect(mockState.searchObj.data.errorMsg).toContain("Search failed");
     });
 
+    it("should reset streaming progress to 0 on error", () => {
+      mockState.searchObj.loadingProgressPercentage = 80;
+      mockState.searchObj.loadingHistogramProgressPercentage = 60;
+
+      const request = { type: "search" };
+      const error = {
+        content: { message: "boom", trace_id: "t", code: 500 },
+      };
+
+      responseHandler.handleSearchError(request, error as any);
+
+      expect(mockState.searchObj.loadingProgressPercentage).toBe(0);
+      expect(mockState.searchObj.loadingHistogramProgressPercentage).toBe(0);
+    });
+
     it("should handle cancelled search error", () => {
       // Use mockState directly
       const notifications = useNotifications();
@@ -471,6 +486,19 @@ describe("useSearchResponseHandler", () => {
       responseHandler.handleSearchResponse(payload as any, response as any);
 
       expect(mockState.searchObj.loadingProgressPercentage).toBe(0);
+    });
+
+    it("should reset streaming progress to 0 on cancel_response", () => {
+      mockState.searchObj.loadingProgressPercentage = 80;
+      mockState.searchObj.loadingHistogramProgressPercentage = 45;
+
+      const payload = { type: "search", traceId: "trace-cancel" };
+      const response = { type: "cancel_response", content: {} };
+
+      responseHandler.handleSearchResponse(payload as any, response as any);
+
+      expect(mockState.searchObj.loadingProgressPercentage).toBe(0);
+      expect(mockState.searchObj.loadingHistogramProgressPercentage).toBe(0);
     });
 
     it("should handle search_response_metadata", () => {
