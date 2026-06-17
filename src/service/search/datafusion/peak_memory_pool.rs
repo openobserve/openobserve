@@ -13,9 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::{
-    Arc,
-    atomic::{AtomicUsize, Ordering},
+use std::{
+    fmt,
+    sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    },
 };
 
 use datafusion::execution::memory_pool::{
@@ -51,6 +54,10 @@ impl PeakMemoryPool {
 }
 
 impl MemoryPool for PeakMemoryPool {
+    fn name(&self) -> &str {
+        "PeakMemoryPool"
+    }
+
     fn register(&self, consumer: &MemoryConsumer) {
         self.inner.register(consumer);
     }
@@ -88,6 +95,12 @@ impl MemoryPool for PeakMemoryPool {
 
     fn memory_limit(&self) -> MemoryLimit {
         self.inner.memory_limit()
+    }
+}
+
+impl fmt::Display for PeakMemoryPool {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}({})", self.name(), self.inner)
     }
 }
 

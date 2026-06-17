@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{any::Any, sync::LazyLock as Lazy};
+use std::sync::LazyLock as Lazy;
 
 use arrow_schema::TimeUnit;
 use datafusion::{
@@ -47,10 +47,6 @@ impl CastToTimestampUdf {
 }
 
 impl ScalarUDFImpl for CastToTimestampUdf {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
     fn name(&self) -> &str {
         CAST_TO_TIMESTAMP_UDF_NAME
     }

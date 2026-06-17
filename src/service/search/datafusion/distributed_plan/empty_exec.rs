@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{any::Any, sync::Arc};
+use std::sync::Arc;
 
 use arrow_schema::SortOptions;
 use config::TIMESTAMP_COL_NAME;
@@ -196,11 +196,6 @@ impl ExecutionPlan for NewEmptyExec {
         "NewEmptyExec"
     }
 
-    /// Return a reference to Any that can be used for downcasting
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
     fn properties(&self) -> &Arc<PlanProperties> {
         &self.cache
     }
@@ -314,12 +309,10 @@ mod tests {
 
     #[test]
     fn test_as_any_downcasts() {
-        use datafusion::physical_plan::ExecutionPlan;
-
         let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int32, false)]));
         let exec = NewEmptyExec::new("t", schema.clone(), None, &[], None, false, schema);
-        let any = exec.as_any();
-        assert!(any.downcast_ref::<NewEmptyExec>().is_some());
+        let exec_plan: &dyn ExecutionPlan = &exec;
+        assert!(exec_plan.downcast_ref::<NewEmptyExec>().is_some());
     }
 
     #[test]

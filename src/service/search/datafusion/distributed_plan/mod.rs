@@ -54,7 +54,6 @@ impl NewEmptyExecVisitor {
         self.plan
             .as_ref()
             .unwrap()
-            .as_any()
             .downcast_ref::<NewEmptyExec>()
             .unwrap()
     }
@@ -107,7 +106,7 @@ impl TreeNodeRewriter for ReplaceTableScanExec {
 
 #[cfg(test)]
 mod tests {
-    use std::{any::Any, sync::Arc};
+    use std::sync::Arc;
 
     use datafusion::physical_plan::{ExecutionPlan, PlanProperties};
 
@@ -127,9 +126,6 @@ mod tests {
     impl ExecutionPlan for MockExecPlan {
         fn name(&self) -> &'static str {
             "NewEmptyExec"
-        }
-        fn as_any(&self) -> &dyn Any {
-            self
         }
         fn properties(&self) -> &Arc<PlanProperties> {
             panic!("not needed")

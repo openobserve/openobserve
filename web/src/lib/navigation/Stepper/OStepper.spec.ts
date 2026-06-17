@@ -16,6 +16,7 @@ function mountStepper(options: {
   orientation?: OStepperProps['orientation']
   navigable?: boolean
   animated?: boolean
+  expanded?: boolean
   stepCount?: number
 } = {}) {
   const {
@@ -23,6 +24,7 @@ function mountStepper(options: {
     orientation = 'horizontal',
     navigable = false,
     animated = false, // disable animations in tests to avoid async waits
+    expanded = false,
     stepCount = 2,
   } = options
 
@@ -37,7 +39,7 @@ function mountStepper(options: {
       const done1 = computed(() => active.value > 1)
       const done2 = computed(() => active.value > 2)
       const done3 = computed(() => active.value > 3)
-      return { active, orientation, navigable, animated, stepCount, done1, done2, done3 }
+      return { active, orientation, navigable, animated, expanded, stepCount, done1, done2, done3 }
     },
     template: `
       <OStepper
@@ -45,6 +47,7 @@ function mountStepper(options: {
         :orientation="orientation"
         :navigable="navigable"
         :animated="animated"
+        :expanded="expanded"
       >
         <OStep :name="1" title="First" :done="done1">Step 1 content</OStep>
         <OStep v-if="stepCount >= 2" :name="2" title="Second" :done="done2">Step 2 content</OStep>
@@ -156,5 +159,35 @@ describe('OStepper', () => {
     await wrapper.vm.$nextTick()
     // Horizontal header uses role="list" ΓÇö should not be present in vertical mode
     expect(wrapper.find('[role="list"]').exists()).toBe(false)
+  })
+
+  // --- Expanded (checklist) mode ---
+
+  it('wizard mode (default) shows only the active step content', async () => {
+    const wrapper = mountStepper({ modelValue: 1, stepCount: 2 })
+    await wrapper.vm.$nextTick()
+    expect(wrapper.text()).toContain('Step 1 content')
+    expect(wrapper.text()).not.toContain('Step 2 content')
+  })
+
+  it('expanded mode renders ALL step content at once (horizontal)', async () => {
+    const wrapper = mountStepper({ modelValue: 1, stepCount: 3, expanded: true })
+    await wrapper.vm.$nextTick()
+    expect(wrapper.text()).toContain('Step 1 content')
+    expect(wrapper.text()).toContain('Step 2 content')
+    expect(wrapper.text()).toContain('Step 3 content')
+  })
+
+  it('expanded mode renders ALL step content at once (vertical)', async () => {
+    const wrapper = mountStepper({
+      orientation: 'vertical',
+      modelValue: 1,
+      stepCount: 3,
+      expanded: true,
+    })
+    await wrapper.vm.$nextTick()
+    expect(wrapper.text()).toContain('Step 1 content')
+    expect(wrapper.text()).toContain('Step 2 content')
+    expect(wrapper.text()).toContain('Step 3 content')
   })
 })

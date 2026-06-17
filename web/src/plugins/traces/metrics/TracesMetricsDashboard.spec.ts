@@ -53,7 +53,6 @@ const mockSearchObj = reactive({
   },
   meta: {
     showHistogram: true,
-    showErrorOnly: false,
     metricsRangeFilters: mockMetricsRangeFilters,
     searchMode: "traces" as "traces" | "spans",
   },
@@ -173,7 +172,6 @@ describe("TracesMetricsDashboard", () => {
     // Reset all shared state before every test
     mockMetricsRangeFilters.clear();
     mockSearchObj.meta.showHistogram = true;
-    mockSearchObj.meta.showErrorOnly = false;
     mockSearchObj.meta.searchMode = "traces";
     mockSearchObj.data.stream.selectedStream.value = "default";
     mockSearchObj.data.stream.selectedStreamFields = [];
@@ -640,16 +638,14 @@ describe("TracesMetricsDashboard", () => {
       expect(filters[0]).toBe("duration >= 100 and duration <= 500");
     });
 
-    it("should include span_status = 'ERROR' when showErrorOnly is true and filter prop contains it", () => {
+    it("should include span_status = 'ERROR' when filter prop contains it", () => {
       wrapper.unmount();
-      mockSearchObj.meta.showErrorOnly = true;
       wrapper = mountComponent({ filter: "span_status = 'ERROR'" });
       const filters = wrapper.vm.getBaseFilters();
       expect(filters).toContain("span_status = 'ERROR'");
     });
 
-    it("should NOT include span_status = 'ERROR' from toggle alone when filter prop does not contain it", () => {
-      mockSearchObj.meta.showErrorOnly = true;
+    it("should NOT include span_status = 'ERROR' when filter prop does not contain it", () => {
       const filters = wrapper.vm.getBaseFilters();
       expect(filters).not.toContain("span_status = 'ERROR'");
     });

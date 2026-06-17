@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{any::Any, sync::Arc};
+use std::sync::Arc;
 
 use arrow_schema::{SchemaRef, SortOptions};
 use config::{TIMESTAMP_COL_NAME, get_config};
@@ -74,10 +74,6 @@ impl ListingTableAdapter {
 
 #[async_trait]
 impl TableProvider for ListingTableAdapter {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
     fn schema(&self) -> SchemaRef {
         Arc::clone(&self.listing_table.schema())
     }
@@ -188,10 +184,9 @@ fn handler_tantivy_index(
     order_by_time_desc: bool,
     target_partitions: usize,
 ) -> Arc<dyn ExecutionPlan> {
-    if let Some(data_source_exec) = plan.as_any().downcast_ref::<DataSourceExec>()
+    if let Some(data_source_exec) = plan.downcast_ref::<DataSourceExec>()
         && let Some(config) = data_source_exec
             .data_source()
-            .as_any()
             .downcast_ref::<FileScanConfig>()
     {
         let mut file_groups = config.file_groups.clone();
@@ -249,9 +244,7 @@ fn handler_tantivy_index(
                     .into_inner()
                     .into_iter()
                     .map(|mut file| {
-                        if let Some(access_plan) = generate_access_plan(&file) {
-                            file = file.with_extensions(access_plan);
-                        }
+                        generate_access_plan(&mut file);
                         file
                     })
                     .collect();

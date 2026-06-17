@@ -116,31 +116,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :render="header.column.columnDef.header"
                 :props="header.getContext()"
               />
+            </div>
 
-              <div
-                :data-test="`log-add-data-from-column-${header.column.columnDef.header}`"
-                class="tw:invisible tw:items-center tw:absolute tw:right-2 tw:top-0 tw:px-2 column-actions"
-                :class="
-                  store.state.theme === 'dark' ? 'field_overlay_dark' : ''
-                "
-                v-if="
+            <div
+              v-if="
+                !header.isPlaceholder &&
+                (
                   (header.column.columnDef.meta as any).closable ||
                   (header.column.columnDef.meta as any).showWrap
+                )
+              "
+              :data-test="`log-add-data-from-column-${header.column.columnDef.header}`"
+              class="tw:invisible tw:flex tw:items-center tw:absolute tw:right-2 tw:top-0 tw:px-2 column-actions"
+            >
+              <OIcon
+                v-if="(header.column.columnDef.meta as any).closable"
+                :data-test="`logs-search-result-table-th-remove-${header.column.columnDef.header}-btn`"
+                name="close"
+                class="tw:m-0 tw:mt-[0.125rem]! close-icon tw:cursor-pointer"
+                :class="
+                  store.state.theme === 'dark' ? 'text-white' : 'tw:text-gray-700'
                 "
-              >
-                <OIcon
-                  v-if="(header.column.columnDef.meta as any).closable"
-                  :data-test="`logs-search-result-table-th-remove-${header.column.columnDef.header}-btn`"
-                  name="close"
-                  class="tw:m-0 close-icon tw:cursor-pointer"
-                  :class="
-                    store.state.theme === 'dark' ? 'text-white' : 'tw:text-gray-400'
-                  "
-                  :title="t('common.close')"
-                  size="sm"
-                  @click="closeColumn(header.column.columnDef)"
-                 />
-              </div>
+                :title="t('common.close')"
+                size="sm"
+                @click.stop="closeColumn(header.column.columnDef)"
+              />
             </div>
           </th>
         </vue-draggable>
@@ -437,16 +437,16 @@ class="tw:mr-1" />
                 <span v-else>
                   {{ cell.renderValue() }}
                 </span>
-                <O2AIContextAddBtn
-                  v-if="
-                    cell.column.columnDef.id ===
-                    store.state.zoConfig.timestamp_column
-                  "
-                  class="tw:absolute tw:right-0 tw:top-1/2 tw:transform tw:invisible tw:-translate-y-1/2 tw:-translate-x-1/2 ai-btn"
-                  @send-to-ai-chat="
-                    sendToAiChat(JSON.stringify(cell.row.original), true)
-                  "
-                />
+                <div
+                  v-if="cell.column.columnDef.id === store.state.zoConfig.timestamp_column"
+                  class="tw:absolute tw:right-0 tw:top-1/2 tw:-translate-y-1/2 tw:invisible"
+                >
+                  <O2AIContextAddBtn
+                    class="tw:right-0 ai-btn"
+                    @send-to-ai-chat="sendToAiChat(JSON.stringify(cell.row.original), true)"
+                    :size="'2px'"
+                  />
+                </div>
               </td>
             </template>
           </tr>

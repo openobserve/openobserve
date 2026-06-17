@@ -60,6 +60,33 @@ def post_flush_vortex(ingest_query_agent_data):  # noqa: ARG001
                msg=f"{STREAM} data not searchable after flush")
     logging.info("Post-flush vortex: data searchable")
 
+    # Tantivy readiness: vortex files may be searchable before Tantivy
+    # indexes are built.  Run a match_all query to confirm FTS is ready.
+    _poll_end_us = int(datetime.now(UTC).timestamp() * 1_000_000)
+    _poll_start_us = int((datetime.now(UTC) - timedelta(weeks=4)).timestamp() * 1_000_000)
+
+    def _fts_ready():
+        r = client.post("_search?type=logs", json={
+            "query": {
+                "sql": f'SELECT * FROM "{STREAM}" WHERE match_all(\'warehouse\') LIMIT 1',
+                "start_time": _poll_start_us,
+                "end_time": _poll_end_us,
+                "from": 0,
+                "size": 1,
+            }
+        })
+        if r.status_code != 200:
+            return False
+        hits = r.json().get("hits", [])
+        if not hits:
+            return False
+        log_val = str(hits[0].get("log", "")).lower()
+        return "warehouse" in log_val
+
+    wait_until(_fts_ready, timeout=120, interval=2.0,
+               msg=f"Tantivy FTS not ready for {STREAM} after flush")
+    logging.info("Post-flush vortex: Tantivy FTS ready")
+
 
 class TestVortexJoin:
     """Scenario 39: self-join on a vortex stream returns correct results.

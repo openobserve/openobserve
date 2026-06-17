@@ -62,6 +62,38 @@ def post_flush(ingest_query_agent_data):
                msg=f"{STREAM} data not searchable after flush")
     logging.info("Post-flush: data searchable")
 
+    # Tantivy readiness: Parquet files may be searchable before Tantivy
+    # indexes are built (ZO_MAX_FILE_RETENTION_TIME defaults to 600s).
+    # Run a match_all query to confirm FTS is actually working.
+    # 120s timeout accounts for the default 600s retention time;
+    # CI environments typically set ZO_MAX_FILE_RETENTION_TIME=1.
+    # Compute time bounds once — they're constant across poll iterations.
+    _poll_end_us = int(datetime.now(UTC).timestamp() * 1_000_000)
+    _poll_start_us = int((datetime.now(UTC) - timedelta(weeks=4)).timestamp() * 1_000_000)
+
+    def _fts_ready():
+        r = client.post("_search?type=logs", json={
+            "query": {
+                "sql": f'SELECT * FROM "{STREAM}" WHERE match_all(\'warehouse\') LIMIT 1',
+                "start_time": _poll_start_us,
+                "end_time": _poll_end_us,
+                "from": 0,
+                "size": 1,
+            }
+        })
+        if r.status_code != 200:
+            return False
+        hits = r.json().get("hits", [])
+        if not hits:
+            return False
+        # Verify the returned row actually contains the search term
+        log_val = str(hits[0].get("log", "")).lower()
+        return "warehouse" in log_val
+
+    wait_until(_fts_ready, timeout=120, interval=2.0,
+               msg=f"Tantivy FTS not ready for {STREAM} after flush")
+    logging.info("Post-flush: Tantivy FTS ready")
+
 
 # ── Query helpers ────────────────────────────────────────────────────────
 def _make_test(cat, queries):

@@ -30,6 +30,47 @@ Note reusable page objects (e.g. `pm.loginPage`, `pm.logsPage`, `pm.alertsPage`,
 
 ---
 
+## COVERAGE SCAN — decide how to fit into the EXISTING test suite (do this before planning)
+
+Do **not** assume a greenfield. Before writing the plan, determine whether this feature is
+already (partly) covered and choose the **least-duplicative** action.
+
+1. **Find candidate specs** in the feature's area and by keyword:
+   ```bash
+   ls tests/ui-testing/playwright-tests/<area>/ 2>/dev/null
+   grep -rl -iE '<feature_slug>|<key UI term>' tests/ui-testing/playwright-tests/ 2>/dev/null
+   ```
+2. **Read the closest matches** + their `describe`/`test` titles and tags. If
+   `existing_tests_in_diff: true` in run-context, **also read the dev's own test changes** from
+   `docs/test_generator/ci/diff.patch` — they show what the dev already tried.
+3. **Decide one `action`:**
+   - **`none`** — the existing tests **already cover** this feature/change adequately. Leave them
+     alone: nothing to write. Use this when a re-run finds the behaviour is already well-tested
+     (don't manufacture redundant tests). The pipeline will simply report "already covered."
+   - **`extend`** — an existing test covers this flow but misses the new behavior/assertion.
+     Modify that test (add steps/assertions). Cheapest; prefer when a test is *almost* there.
+   - **`append`** — the area's spec exists and fits, but no test covers this scenario. Add a
+     **new `test()`** inside that existing spec file (reuse its imports/`describe`/setup).
+   - **`new`** — no existing spec fits the area/feature. Create a new spec (use `spec_path`).
+   - When torn between append vs new: **append** to an existing area spec to avoid sprawl,
+     unless the feature is clearly its own area.
+
+**Write the decision** → `docs/test_generator/ci/coverage-decision.json` (the Engineer reads it):
+```json
+{
+  "action": "append",
+  "target_spec": "tests/ui-testing/playwright-tests/Logs/shareLink.spec.js",
+  "existing_tests_considered": ["tests/ui-testing/playwright-tests/Logs/sanity.spec.js"],
+  "needs_registration": false,
+  "rationale": "shareLink.spec.js already covers the Logs share flow; the new copy-link button just needs one more test() there."
+}
+```
+- `target_spec`: for `new` = run-context `spec_path`; for `append`/`extend` = the existing file.
+- `needs_registration`: **true ONLY for `action: new`** (a brand-new spec must be added to
+  playwright.yml). For `append`/`extend` the file is already registered → **false**.
+
+---
+
 ## Write the Test Plan
 
 Write to: `docs/test_generator/test-plans/<feature_slug>-test-plan.md`
