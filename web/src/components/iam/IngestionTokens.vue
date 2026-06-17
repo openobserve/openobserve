@@ -201,6 +201,8 @@ import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
 import organizationsService from "@/services/organizations";
+import { useShortcutScope } from "@/lib/vue-shortcut-manager";
+import { isInputFocused, useShortcutsWithMac } from "@/utils/keyboardShortcuts";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 
 interface Token {

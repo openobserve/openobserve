@@ -199,6 +199,8 @@ import RunningQueriesList from "./RunningQueriesList.vue";
 import SummaryList from "./SummaryList.vue";
 import { getDuration } from "@/utils/zincutils";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useShortcutScope } from "@/lib/vue-shortcut-manager";
+import { isInputFocused, useShortcutsWithMac } from "@/utils/keyboardShortcuts";
 
 export default defineComponent({
   name: "RunningQueries",
