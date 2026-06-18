@@ -99,6 +99,7 @@ export const useSearchHistogramManager = () => {
         resetHistogramError();
 
         searchObj.loadingHistogram = true;
+        searchObj.loadingHistogramProgressPercentage = 0;
 
         await generateHistogramSkeleton();
 
@@ -359,6 +360,7 @@ export const useSearchHistogramManager = () => {
     }
 
     searchObj.loadingHistogram = true;
+    searchObj.loadingHistogramProgressPercentage = 0;
 
     const requestId = initializeSearchConnection(payload);
 
