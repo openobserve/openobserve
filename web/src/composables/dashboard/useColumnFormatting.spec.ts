@@ -92,12 +92,13 @@ describe("useColumnFormatting", () => {
       ]);
     });
 
-    it("drops conditional rules with a blank threshold or operator", () => {
+    it("drops conditional rules with a blank/non-numeric threshold or no operator", () => {
       const col: ColumnOverrideUI = {
         ...emptyColumnOverride("x"),
         conditions: [
           { operator: ">", threshold: "", textColor: "", bgColor: "" }, // no threshold
           { operator: "", threshold: "5", textColor: "", bgColor: "" }, // no operator
+          { operator: "<", threshold: "abc", textColor: "", bgColor: "" }, // NaN threshold
           { operator: ">=", threshold: "9", textColor: "#f00", bgColor: "" }, // valid
         ],
       };
@@ -106,10 +107,25 @@ describe("useColumnFormatting", () => {
       expect(cond.rules).toHaveLength(1);
       expect(cond.rules[0]).toEqual({
         operator: ">=",
-        threshold: 9,
+        threshold: 9, // always a finite number, never NaN/null
         textColor: "#f00",
         bgColor: "",
       });
+    });
+
+    it("omits the conditional_styles entry entirely when no rule is valid", () => {
+      const col: ColumnOverrideUI = {
+        ...emptyColumnOverride("x"),
+        unit: "bytes", // some other formatting so the entry isn't null overall
+        conditions: [
+          { operator: "<", threshold: "abc", textColor: "#f00", bgColor: "" }, // NaN
+          { operator: "", threshold: "5", textColor: "", bgColor: "" }, // no operator
+        ],
+      };
+      const entry = serializeColumnOverride(col);
+      expect(
+        entry.config.some((c: any) => c.type === "conditional_styles"),
+      ).toBe(false);
     });
   });
 

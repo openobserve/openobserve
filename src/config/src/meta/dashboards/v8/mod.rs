@@ -595,7 +595,6 @@ pub enum Config {
 pub struct ConditionalRule {
     pub operator: String,
     #[schema(value_type = f64)]
-    #[serde(deserialize_with = "deserialize_flexible_ordf64")]
     pub threshold: OrdF64,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub text_color: Option<String>,
@@ -603,49 +602,6 @@ pub struct ConditionalRule {
     pub bg_color: Option<String>,
 }
 
-// Under serde_json's `arbitrary_precision`, numbers buffered by the
-// internally-tagged `Config` enum surface as a map token, breaking OrderedFloat's
-// derived deserialize. Accept number, map, or string forms.
-fn deserialize_flexible_ordf64<'de, D>(deserializer: D) -> Result<OrdF64, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    struct NumVisitor;
-    impl<'de> serde::de::Visitor<'de> for NumVisitor {
-        type Value = f64;
-        fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-            f.write_str("a number")
-        }
-        fn visit_f64<E>(self, v: f64) -> Result<f64, E> {
-            Ok(v)
-        }
-        fn visit_i64<E>(self, v: i64) -> Result<f64, E> {
-            Ok(v as f64)
-        }
-        fn visit_u64<E>(self, v: u64) -> Result<f64, E> {
-            Ok(v as f64)
-        }
-        fn visit_str<E>(self, v: &str) -> Result<f64, E>
-        where
-            E: serde::de::Error,
-        {
-            v.parse::<f64>().map_err(serde::de::Error::custom)
-        }
-        fn visit_map<A>(self, mut map: A) -> Result<f64, A::Error>
-        where
-            A: serde::de::MapAccess<'de>,
-        {
-            // arbitrary_precision shape: {"$serde_json::private::Number": "0.5"}
-            let mut parsed: Option<f64> = None;
-            while let Some(_k) = map.next_key::<String>()? {
-                let s: String = map.next_value()?;
-                parsed = s.parse::<f64>().ok();
-            }
-            parsed.ok_or_else(|| serde::de::Error::custom("invalid number"))
-        }
-    }
-    deserializer.deserialize_any(NumVisitor).map(OrdF64::from)
-}
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
 #[serde(default)]

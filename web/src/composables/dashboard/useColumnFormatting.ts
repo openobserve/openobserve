@@ -157,7 +157,10 @@ export const serializeColumnOverride = (
     });
 
   const validConditions = c.conditions.filter(
-    (r) => r.threshold !== "" && r.operator,
+    (r) =>
+      r.operator &&
+      r.threshold !== "" &&
+      !Number.isNaN(parseFloat(r.threshold)),
   );
   if (validConditions.length) {
     config.push({
