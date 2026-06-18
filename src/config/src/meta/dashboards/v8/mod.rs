@@ -1392,6 +1392,7 @@ mod tests {
         // Exactly the shapes the web serializer / PromQL colOverrides emit.
         let payloads = [
             r##"{"type":"unit","value":{"unit":"bytes","customUnit":""}}"##,
+            r##"{"type":"unit","value":{"unit":"bytes","customUnit":null}}"##,
             r##"{"type":"alignment","value":"center"}"##,
             r##"{"type":"text_color","value":"#ffffff"}"##,
             r##"{"type":"background_color","value":"#000000"}"##,
