@@ -44,17 +44,37 @@ use crate::service::search::{datafusion::storage, index::IndexCondition};
 /// existed. Any .ttv file without the property was produced with this value.
 const LEGACY_ROW_GROUP_SIZE: usize = 1024 * 1024;
 
+/// Pull the trace_id prefix out of a PartitionedFile path. Paths are produced
+/// by `file_list::set()` as `{trace_id}/schema=.../format=.../$$/...`, so the
+/// trace_id is everything before the first `/`. Returns the whole path if no
+/// slash is present, so log lines never go blank.
+fn trace_id_from_path(path: &str) -> &str {
+    path.split_once('/').map(|(t, _)| t).unwrap_or(path)
+}
+
 /// Attach the access plan for this file as a typed [`PartitionedFile`] extension.
+///
+/// IMPORTANT: every silent fall-through past this point means "we had a row
+/// selection but couldn't apply it" — the parquet reader will fall back to a
+/// full row-group scan and over-return rows. Each such branch logs a WARN so
+/// the failure isn't invisible.
 pub fn generate_access_plan(file: &mut PartitionedFile) {
     let Some(storage::file_list::ScanSelection {
         selection,
         row_group_size,
     }) = storage::file_list::get_scan_selection(file.path().as_ref())
     else {
+        // Already logged inside `get_scan_selection` when this is suspicious.
         return;
     };
 
-    let Some(file_format) = FileFormat::from_extension(file.path().as_ref()) else {
+    let path = file.path().as_ref().to_string();
+    let trace_id = trace_id_from_path(&path);
+
+    let Some(file_format) = FileFormat::from_extension(&path) else {
+        log::warn!(
+            "[trace_id {trace_id}] access_plan dropped: unrecognised file extension, selection won't be applied; path={path}"
+        );
         return;
     };
 
@@ -65,6 +85,12 @@ pub fn generate_access_plan(file: &mut PartitionedFile) {
                     generate_parquet_access_plan(file, &row_ids, row_group_size)
                 {
                     file.extensions.insert(access_plan);
+                } else {
+                    log::warn!(
+                        "[trace_id {trace_id}] access_plan dropped: parquet layout unknown (missing/inexact statistics), \
+                         row-id selection cannot be applied; path={path}, set_bits={}",
+                        row_ids.count_set_bits(),
+                    );
                 }
             }
             #[cfg(feature = "enterprise")]
@@ -74,26 +100,50 @@ pub fn generate_access_plan(file: &mut PartitionedFile) {
                     let access_plan = generate_row_group_access_plan(
                         &row_group_ids,
                         num_rows.div_ceil(row_group_size),
-                        file.path().as_ref(),
+                        &path,
                     );
                     file.extensions.insert_arc(access_plan);
+                } else {
+                    log::warn!(
+                        "[trace_id {trace_id}] access_plan dropped: parquet layout unknown, row-group selection cannot be applied; path={path}, row_groups={}",
+                        row_group_ids.len(),
+                    );
                 }
             }
             #[cfg(not(feature = "enterprise"))]
-            FileSelection::RowGroups(_) => {}
+            FileSelection::RowGroups(_) => {
+                log::warn!(
+                    "[trace_id {trace_id}] access_plan dropped: RowGroups selection requires the `enterprise` build; \
+                     selection ignored; path={path}"
+                );
+            }
         },
         #[cfg(all(feature = "enterprise", feature = "vortex"))]
         FileFormat::Vortex => match selection {
             FileSelection::Rows(row_ids) => {
                 if let Some(access_plan) = generate_vortex_access_plan(&row_ids) {
                     file.extensions.insert(access_plan);
+                } else {
+                    log::warn!(
+                        "[trace_id {trace_id}] access_plan dropped: vortex layout could not build access plan; path={path}, set_bits={}",
+                        row_ids.count_set_bits(),
+                    );
                 }
             }
             // row-group sampling is parquet only; vortex falls back to a full scan
-            FileSelection::RowGroups(_) => {}
+            FileSelection::RowGroups(_) => {
+                log::warn!(
+                    "[trace_id {trace_id}] access_plan dropped: RowGroups selection not supported on Vortex; \
+                     selection ignored; path={path}"
+                );
+            }
         },
         #[cfg(not(all(feature = "enterprise", feature = "vortex")))]
-        FileFormat::Vortex => {}
+        FileFormat::Vortex => {
+            log::warn!(
+                "[trace_id {trace_id}] access_plan dropped: Vortex format support not built in, selection ignored; path={path}"
+            );
+        }
     }
 }
 
