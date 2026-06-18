@@ -210,6 +210,7 @@ jobs:
                 "logsAnalyzeDimensions.spec.js",
                 "monaco-query-prefill.spec.js",
                 "logsqueries.matchall.spec.js",
+                "queryErrorState.spec.js",
               ]
           - testfolder: "Logs-Features"
             browser: "chrome"
