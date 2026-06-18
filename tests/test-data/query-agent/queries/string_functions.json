@@ -1,0 +1,3333 @@
+{
+  "queries": [
+    {
+      "id": "Q113",
+      "sql": "SELECT _timestamp, COALESCE(facility_zone, 'UNKNOWN_ZONE') AS safe_zone, CONCAT(sorter_model, ' @ ', control_center) AS sorter_op_label FROM \"{stream}\" ORDER BY _timestamp ASC LIMIT 12",
+      "category": "string_functions",
+      "expected": {
+        "columns": [
+          "safe_zone",
+          "sorter_op_label"
+        ],
+        "results": [
+          [
+            "ZONE-4",
+            "SORT-A7 @ CC-GAMMA"
+          ],
+          [
+            "ZONE-3",
+            "SORT-X1 @ CC-BETA"
+          ],
+          [
+            "ZONE-1",
+            "SORT-M3 @ CC-DELTA"
+          ],
+          [
+            "ZONE-2",
+            "SORT-Z9 @ CC-ALPHA"
+          ],
+          [
+            "ZONE-3",
+            "SORT-X1 @ CC-BETA"
+          ],
+          [
+            "ZONE-1",
+            "SORT-M3 @ CC-DELTA"
+          ],
+          [
+            "ZONE-4",
+            "SORT-A7 @ CC-GAMMA"
+          ],
+          [
+            "ZONE-2",
+            "SORT-Q5 @ CC-ALPHA"
+          ],
+          [
+            "ZONE-3",
+            "SORT-X1 @ CC-BETA"
+          ],
+          [
+            "ZONE-4",
+            "SORT-A7 @ CC-GAMMA"
+          ],
+          [
+            "ZONE-2",
+            "SORT-Z9 @ CC-ALPHA"
+          ],
+          [
+            "ZONE-1",
+            "SORT-M3 @ CC-DELTA"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 6719000000,
+        "end_offset": 6883000000
+      }
+    },
+    {
+      "id": "Q114",
+      "sql": "SELECT _timestamp, re_match(log, 'warehouse|event') AS matched, split_part(log, ' ', 1) AS first_word FROM \"{stream}\" WHERE log IS NOT NULL ORDER BY _timestamp DESC LIMIT 12",
+      "category": "string_functions",
+      "expected": {
+        "columns": [
+          "matched",
+          "first_word"
+        ],
+        "results": [
+          [
+            "True",
+            "Q116"
+          ],
+          [
+            "True",
+            "Q116"
+          ],
+          [
+            "True",
+            "Q115"
+          ],
+          [
+            "True",
+            "Q116"
+          ],
+          [
+            "True",
+            "Q115"
+          ],
+          [
+            "True",
+            "Q115"
+          ],
+          [
+            "True",
+            "Q115"
+          ],
+          [
+            "True",
+            "Q114"
+          ],
+          [
+            "True",
+            "Q115"
+          ],
+          [
+            "True",
+            "Q114"
+          ],
+          [
+            "True",
+            "Q114"
+          ],
+          [
+            "True",
+            "Q114"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 6779000000,
+        "end_offset": 6943000000
+      }
+    },
+    {
+      "id": "Q115",
+      "sql": "SELECT _timestamp, UPPER(pallet_id) AS pallet_upper, LOWER(conveyor_lane) AS lane_lower, CONCAT(sorter_model, '-', operation_mode) AS sorter_op, TRIM(COALESCE(build_signature, '')) AS clean_build, LENGTH(CONCAT(facility_zone, '-', control_center)) AS label_len FROM \"{stream}\" WHERE pallet_id IS NOT NULL ORDER BY _timestamp DESC LIMIT 12",
+      "category": "string_functions",
+      "expected": {
+        "columns": [
+          "pallet_upper",
+          "lane_lower",
+          "sorter_op",
+          "clean_build",
+          "label_len"
+        ],
+        "results": [
+          [
+            "PL-004",
+            "lane-c",
+            "SORT-Q5-auto",
+            "BS-2026-B2",
+            "15"
+          ],
+          [
+            "PL-003",
+            "lane-b",
+            "SORT-M3-manual",
+            "BS-2026-A1",
+            "15"
+          ],
+          [
+            "PL-001",
+            "lane-d",
+            "SORT-X1-hybrid",
+            "BS-2026-A1",
+            "14"
+          ],
+          [
+            "PL-002",
+            "lane-a",
+            "SORT-A7-auto",
+            "BS-2025-D4",
+            "15"
+          ],
+          [
+            "PL-008",
+            "lane-c",
+            "SORT-Z9-manual",
+            "BS-2025-D4",
+            "15"
+          ],
+          [
+            "PL-007",
+            "lane-b",
+            "SORT-M3-auto",
+            "BS-2026-C3",
+            "15"
+          ],
+          [
+            "PL-006",
+            "lane-a",
+            "SORT-A7-hybrid",
+            "BS-2026-B2",
+            "15"
+          ],
+          [
+            "PL-004",
+            "lane-c",
+            "SORT-Q5-auto",
+            "BS-2026-B2",
+            "15"
+          ],
+          [
+            "PL-005",
+            "lane-d",
+            "SORT-X1-manual",
+            "BS-2026-A1",
+            "14"
+          ],
+          [
+            "PL-003",
+            "lane-b",
+            "SORT-M3-manual",
+            "BS-2026-A1",
+            "15"
+          ],
+          [
+            "PL-002",
+            "lane-a",
+            "SORT-A7-auto",
+            "BS-2026-B2",
+            "15"
+          ],
+          [
+            "PL-001",
+            "lane-d",
+            "SORT-X1-hybrid",
+            "BS-2026-A1",
+            "14"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 6839000000,
+        "end_offset": 7003000000
+      }
+    },
+    {
+      "id": "Q116",
+      "sql": "SELECT _timestamp, pallet_id, re_match(pallet_id, 'PL-00[1-4]') AS is_front_pallet, split_part(pallet_id, '-', 1) AS prefix, split_part(pallet_id, '-', 2) AS suffix_num FROM \"{stream}\" WHERE re_match(pallet_id, 'PL-00[1-8]') = TRUE ORDER BY suffix_num ASC",
+      "category": "string_functions",
+      "expected": {
+        "columns": [
+          "pallet_id",
+          "is_front_pallet",
+          "prefix",
+          "suffix_num"
+        ],
+        "results": [
+          [
+            "PL-001",
+            "True",
+            "PL",
+            "001"
+          ],
+          [
+            "PL-001",
+            "True",
+            "PL",
+            "001"
+          ],
+          [
+            "PL-002",
+            "True",
+            "PL",
+            "002"
+          ],
+          [
+            "PL-003",
+            "True",
+            "PL",
+            "003"
+          ],
+          [
+            "PL-004",
+            "True",
+            "PL",
+            "004"
+          ],
+          [
+            "PL-004",
+            "True",
+            "PL",
+            "004"
+          ],
+          [
+            "PL-005",
+            "False",
+            "PL",
+            "005"
+          ],
+          [
+            "PL-005",
+            "False",
+            "PL",
+            "005"
+          ],
+          [
+            "PL-006",
+            "False",
+            "PL",
+            "006"
+          ],
+          [
+            "PL-006",
+            "False",
+            "PL",
+            "006"
+          ],
+          [
+            "PL-007",
+            "False",
+            "PL",
+            "007"
+          ],
+          [
+            "PL-007",
+            "False",
+            "PL",
+            "007"
+          ],
+          [
+            "PL-008",
+            "False",
+            "PL",
+            "008"
+          ],
+          [
+            "PL-008",
+            "False",
+            "PL",
+            "008"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 6899000000,
+        "end_offset": 7063000000
+      }
+    },
+    {
+      "id": "Q117",
+      "sql": "SELECT control_center, STRING_AGG(DISTINCT sorter_model, ' | ' ORDER BY sorter_model ASC) AS sorter_models, STRING_AGG(DISTINCT operation_mode, ', ') AS op_modes, COUNT(*) AS event_cnt FROM \"{stream}\" WHERE control_center IS NOT NULL GROUP BY control_center HAVING COUNT(*) >= 2 ORDER BY event_cnt DESC",
+      "category": "string_functions",
+      "expected": {
+        "columns": [
+          "control_center",
+          "sorter_models",
+          "op_modes",
+          "event_cnt"
+        ],
+        "results": [
+          [
+            "CC-BETA",
+            "SORT-X1",
+            "manual, hybrid",
+            "4"
+          ],
+          [
+            "CC-GAMMA",
+            "SORT-A7",
+            "hybrid, auto",
+            "4"
+          ],
+          [
+            "CC-DELTA",
+            "SORT-M3",
+            "auto, manual",
+            "3"
+          ],
+          [
+            "CC-ALPHA",
+            "SORT-Q5 | SORT-Z9",
+            "manual, auto",
+            "3"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
+      },
+      "time_offset": {
+        "start_offset": 6959000000,
+        "end_offset": 7123000000
+      }
+    },
+    {
+      "id": "Q118",
+      "sql": "SELECT _timestamp, pallet_id, build_signature, SUBSTR(build_signature, 1, 8) AS build_prefix, SUBSTR(build_signature, 10, 2) AS build_suffix, REPLACE(build_signature, 'BS-', 'BUILD_') AS replaced_sig FROM \"{stream}\" WHERE build_signature LIKE 'BS-2026-%' ORDER BY build_signature ASC, _timestamp ASC",
+      "category": "string_functions",
+      "expected": {
+        "columns": [
+          "pallet_id",
+          "build_signature",
+          "build_prefix",
+          "build_suffix",
+          "replaced_sig"
+        ],
+        "results": [
+          [
+            "PL-001",
+            "BS-2026-A1",
+            "BS-2026-",
+            "1",
+            "BUILD_2026-A1"
+          ],
+          [
+            "PL-003",
+            "BS-2026-A1",
+            "BS-2026-",
+            "1",
+            "BUILD_2026-A1"
+          ],
+          [
+            "PL-005",
+            "BS-2026-A1",
+            "BS-2026-",
+            "1",
+            "BUILD_2026-A1"
+          ],
+          [
+            "PL-003",
+            "BS-2026-A1",
+            "BS-2026-",
+            "1",
+            "BUILD_2026-A1"
+          ],
+          [
+            "PL-002",
+            "BS-2026-B2",
+            "BS-2026-",
+            "2",
+            "BUILD_2026-B2"
+          ],
+          [
+            "PL-004",
+            "BS-2026-B2",
+            "BS-2026-",
+            "2",
+            "BUILD_2026-B2"
+          ],
+          [
+            "PL-006",
+            "BS-2026-B2",
+            "BS-2026-",
+            "2",
+            "BUILD_2026-B2"
+          ],
+          [
+            "PL-007",
+            "BS-2026-C3",
+            "BS-2026-",
+            "3",
+            "BUILD_2026-C3"
+          ],
+          [
+            "PL-007",
+            "BS-2026-C3",
+            "BS-2026-",
+            "3",
+            "BUILD_2026-C3"
+          ],
+          [
+            "PL-001",
+            "BS-2026-C3",
+            "BS-2026-",
+            "3",
+            "BUILD_2026-C3"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 7019000000,
+        "end_offset": 7183000000
+      }
+    },
+    {
+      "id": "Q119",
+      "sql": "SELECT _timestamp, pallet_id, conveyor_lane, facility_zone, LOWER(CONCAT(SUBSTR(conveyor_lane, 1, 4), '-', SUBSTR(facility_zone, 5, 1))) AS short_code, CASE WHEN re_match(CONCAT(conveyor_lane, '-', facility_zone), 'LANE-[AB]-ZONE-[12]') THEN 'core' ELSE 'edge' END AS location_type FROM \"{stream}\" WHERE conveyor_lane IS NOT NULL AND facility_zone IS NOT NULL ORDER BY location_type ASC, short_code ASC",
+      "category": "string_functions",
+      "expected": {
+        "columns": [
+          "pallet_id",
+          "conveyor_lane",
+          "facility_zone",
+          "short_code",
+          "location_type"
+        ],
+        "results": [
+          [
+            "PL-003",
+            "LANE-B",
+            "ZONE-1",
+            "lane--",
+            "core"
+          ],
+          [
+            "PL-007",
+            "LANE-B",
+            "ZONE-1",
+            "lane--",
+            "core"
+          ],
+          [
+            "PL-003",
+            "LANE-B",
+            "ZONE-1",
+            "lane--",
+            "core"
+          ],
+          [
+            "PL-007",
+            "LANE-B",
+            "ZONE-1",
+            "lane--",
+            "core"
+          ],
+          [
+            "PL-004",
+            "LANE-C",
+            "ZONE-2",
+            "lane--",
+            "edge"
+          ],
+          [
+            "PL-005",
+            "LANE-D",
+            "ZONE-3",
+            "lane--",
+            "edge"
+          ],
+          [
+            "PL-006",
+            "LANE-A",
+            "ZONE-4",
+            "lane--",
+            "edge"
+          ],
+          [
+            "PL-008",
+            "LANE-C",
+            "ZONE-2",
+            "lane--",
+            "edge"
+          ],
+          [
+            "PL-001",
+            "LANE-D",
+            "ZONE-3",
+            "lane--",
+            "edge"
+          ],
+          [
+            "PL-002",
+            "LANE-A",
+            "ZONE-4",
+            "lane--",
+            "edge"
+          ],
+          [
+            "PL-004",
+            "LANE-C",
+            "ZONE-2",
+            "lane--",
+            "edge"
+          ],
+          [
+            "PL-005",
+            "LANE-D",
+            "ZONE-3",
+            "lane--",
+            "edge"
+          ],
+          [
+            "PL-006",
+            "LANE-A",
+            "ZONE-4",
+            "lane--",
+            "edge"
+          ],
+          [
+            "PL-008",
+            "LANE-C",
+            "ZONE-2",
+            "lane--",
+            "edge"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 7079000000,
+        "end_offset": 7243000000
+      }
+    },
+    {
+      "id": "Q120",
+      "sql": "SELECT _timestamp, pallet_id, sorter_model, COALESCE(sorter_model, 'UNKNOWN_SORTER') AS safe_sorter, NULLIF(sorter_model, 'SORT-Q5') AS exclude_q5, COALESCE(NULLIF(sorter_model, 'SORT-Q5'), 'FILTERED') AS filtered_sorter FROM \"{stream}\" ORDER BY _timestamp ASC LIMIT 12",
+      "category": "string_functions",
+      "expected": {
+        "columns": [
+          "pallet_id",
+          "sorter_model",
+          "safe_sorter",
+          "exclude_q5",
+          "filtered_sorter"
+        ],
+        "results": [
+          [
+            "PL-001",
+            "SORT-X1",
+            "SORT-X1",
+            "SORT-X1",
+            "SORT-X1"
+          ],
+          [
+            "PL-008",
+            "SORT-Z9",
+            "SORT-Z9",
+            "SORT-Z9",
+            "SORT-Z9"
+          ],
+          [
+            "PL-002",
+            "SORT-A7",
+            "SORT-A7",
+            "SORT-A7",
+            "SORT-A7"
+          ],
+          [
+            "PL-003",
+            "SORT-M3",
+            "SORT-M3",
+            "SORT-M3",
+            "SORT-M3"
+          ],
+          [
+            "PL-004",
+            "SORT-Q5",
+            "SORT-Q5",
+            "None",
+            "FILTERED"
+          ],
+          [
+            "PL-006",
+            "SORT-A7",
+            "SORT-A7",
+            "SORT-A7",
+            "SORT-A7"
+          ],
+          [
+            "PL-005",
+            "SORT-X1",
+            "SORT-X1",
+            "SORT-X1",
+            "SORT-X1"
+          ],
+          [
+            "PL-007",
+            "SORT-M3",
+            "SORT-M3",
+            "SORT-M3",
+            "SORT-M3"
+          ],
+          [
+            "PL-008",
+            "SORT-Z9",
+            "SORT-Z9",
+            "SORT-Z9",
+            "SORT-Z9"
+          ],
+          [
+            "PL-001",
+            "SORT-X1",
+            "SORT-X1",
+            "SORT-X1",
+            "SORT-X1"
+          ],
+          [
+            "PL-003",
+            "SORT-M3",
+            "SORT-M3",
+            "SORT-M3",
+            "SORT-M3"
+          ],
+          [
+            "PL-002",
+            "SORT-A7",
+            "SORT-A7",
+            "SORT-A7",
+            "SORT-A7"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 7139000000,
+        "end_offset": 7303000000
+      }
+    },
+    {
+      "id": "Q121",
+      "sql": "SELECT _timestamp, log, pallet_id, re_match(log, 'warehouse|event') AS has_keyword, re_match(log, '[0-9]+') AS has_digit, LENGTH(log) AS msg_length, POSITION('record' IN log) AS record_pos FROM \"{stream}\" WHERE re_match(log, 'warehouse') = TRUE ORDER BY msg_length DESC LIMIT 12",
+      "category": "string_functions",
+      "expected": {
+        "columns": [
+          "log",
+          "pallet_id",
+          "has_keyword",
+          "has_digit",
+          "msg_length",
+          "record_pos"
+        ],
+        "results": [
+          [
+            "Q121 warehouse event record 0 ACK batch batchIdList:Q121-0",
+            "PL-006",
+            "True",
+            "True",
+            "58",
+            "22"
+          ],
+          [
+            "Q121 warehouse event record 3 ACK batch batchIdList:Q121-3",
+            "PL-001",
+            "True",
+            "True",
+            "58",
+            "22"
+          ],
+          [
+            "Q122 warehouse event record 0 ACK batch batchIdList:Q122-0",
+            "PL-003",
+            "True",
+            "True",
+            "58",
+            "22"
+          ],
+          [
+            "Q122 warehouse event record 3 ACK batch batchIdList:Q122-3",
+            "PL-006",
+            "True",
+            "True",
+            "58",
+            "22"
+          ],
+          [
+            "Q123 warehouse event record 0 ACK batch batchIdList:Q123-0",
+            "PL-008",
+            "True",
+            "True",
+            "58",
+            "22"
+          ],
+          [
+            "Q120 warehouse event record 4",
+            "PL-005",
+            "True",
+            "True",
+            "29",
+            "22"
+          ],
+          [
+            "Q121 warehouse event record 1",
+            "PL-007",
+            "True",
+            "True",
+            "29",
+            "22"
+          ],
+          [
+            "Q121 warehouse event record 2",
+            "PL-008",
+            "True",
+            "True",
+            "29",
+            "22"
+          ],
+          [
+            "Q121 warehouse event record 4",
+            "PL-002",
+            "True",
+            "True",
+            "29",
+            "22"
+          ],
+          [
+            "Q122 warehouse event record 1",
+            "PL-004",
+            "True",
+            "True",
+            "29",
+            "22"
+          ],
+          [
+            "Q122 warehouse event record 2",
+            "PL-005",
+            "True",
+            "True",
+            "29",
+            "22"
+          ],
+          [
+            "Q122 warehouse event record 4",
+            "PL-007",
+            "True",
+            "True",
+            "29",
+            "22"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
+      },
+      "time_offset": {
+        "start_offset": 7199000000,
+        "end_offset": 7363000000
+      }
+    },
+    {
+      "id": "Q122",
+      "sql": "SELECT facility_zone, STRING_AGG(DISTINCT CONCAT(operation_mode, ':', CAST(ROUND(throughput_rate, 0) AS VARCHAR)), '; ' ORDER BY throughput_rate DESC) AS mode_tput_list, COUNT(DISTINCT operation_mode) AS distinct_modes FROM \"{stream}\" WHERE throughput_rate IS NOT NULL GROUP BY facility_zone ORDER BY distinct_modes DESC",
+      "category": "string_functions",
+      "expected": {
+        "row_count": 0,
+        "note": "STRING_AGG with CONCAT of mode + rounded throughput, ORDER BY inside STRING_AGG \u2014 zero rows, columns unverifiable",
+        "skip_row_count": true,
+        "assertions": []
+      },
+      "time_offset": {
+        "start_offset": 7259000000,
+        "end_offset": 7423000000
+      }
+    },
+    {
+      "id": "Q162",
+      "sql": "SELECT rtrim(ltrim(spath(array_element(cast_to_arr(db_info), 1), 'cid'), '[\"'), '\"]') as cid, count(_timestamp) as count_s FROM \"{stream}\" WHERE str_match_ignore_case(api_name, 'sams') GROUP BY cid",
+      "category": "string_functions",
+      "expected": {
+        "columns": [
+          "cid",
+          "count_s"
+        ],
+        "note": "String trimming with rtrim/ltrim, spath, array_element, cast_to_arr \u2014 OO-specific, skip_sqllogictest"
+      },
+      "time_offset": {
+        "start_offset": 9659000000,
+        "end_offset": 9823000000
+      }
+    },
+    {
+      "id": "Q168",
+      "sql": "SELECT source_ip, visitor_session_id, cookie_id, COUNT(*) AS cnt FROM \"{stream}\" WHERE source_ip IS NOT NULL   AND TRIM(CAST(source_ip AS VARCHAR)) <> ''   AND visitor_session_id IS NOT NULL   AND TRIM(CAST(visitor_session_id AS VARCHAR)) <> ''   AND LENGTH(CAST(visitor_session_id AS VARCHAR)) >= 8   AND cookie_id IS NOT NULL   AND TRIM(CAST(cookie_id AS VARCHAR)) <> ''   AND LENGTH(CAST(cookie_id AS VARCHAR)) >= 8   AND graphql_operation = 'verifyPayment' GROUP BY source_ip, visitor_session_id, cookie_id ORDER BY cnt DESC LIMIT 5",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 10019000000,
+        "end_offset": 10183000000
+      },
+      "expected": {
+        "columns": [
+          "source_ip",
+          "visitor_session_id",
+          "cookie_id",
+          "cnt"
+        ],
+        "results": [
+          [
+            "192.168.1.10",
+            "sess_002",
+            "var2_mno345",
+            "2"
+          ],
+          [
+            "192.168.1.13",
+            "sess_003",
+            "ctl_vwx901",
+            "2"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q194",
+      "sql": "SELECT\n  UPPER(TRIM(facility_zone)) AS clean_zone,\n  LOWER(operation_mode) AS lower_mode,\n  CONCAT(UPPER(SUBSTR(sorter_model, 1, 4)), '-', facility_zone) AS model_zone,\n  LENGTH(log) AS log_length,\n  COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE log LIKE '%warehouse%'\n  AND LENGTH(log) > 20\nGROUP BY\n  UPPER(TRIM(facility_zone)),\n  LOWER(operation_mode),\n  CONCAT(UPPER(SUBSTR(sorter_model, 1, 4)), '-', facility_zone),\n  LENGTH(log)\nHAVING COUNT(*) >= 1\nORDER BY cnt DESC\nLIMIT 15",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 11579000000,
+        "end_offset": 11743000000
+      },
+      "expected": {
+        "columns": [
+          "clean_zone",
+          "lower_mode",
+          "model_zone",
+          "log_length",
+          "cnt"
+        ],
+        "results": [
+          [
+            "ZONE-4",
+            "auto",
+            "SORT-ZONE-4",
+            "29",
+            "2"
+          ],
+          [
+            "ZONE-1",
+            "manual",
+            "SORT-ZONE-1",
+            "58",
+            "2"
+          ],
+          [
+            "ZONE-2",
+            "auto",
+            "SORT-ZONE-2",
+            "29",
+            "2"
+          ],
+          [
+            "ZONE-1",
+            "auto",
+            "SORT-ZONE-1",
+            "29",
+            "2"
+          ],
+          [
+            "ZONE-3",
+            "manual",
+            "SORT-ZONE-3",
+            "29",
+            "1"
+          ],
+          [
+            "ZONE-3",
+            "manual",
+            "SORT-ZONE-3",
+            "58",
+            "1"
+          ],
+          [
+            "ZONE-4",
+            "hybrid",
+            "SORT-ZONE-4",
+            "29",
+            "1"
+          ],
+          [
+            "ZONE-2",
+            "manual",
+            "SORT-ZONE-2",
+            "58",
+            "1"
+          ],
+          [
+            "ZONE-4",
+            "hybrid",
+            "SORT-ZONE-4",
+            "58",
+            "1"
+          ],
+          [
+            "ZONE-3",
+            "hybrid",
+            "SORT-ZONE-3",
+            "29",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q195",
+      "sql": "SELECT api_name,\n  UPPER(SUBSTR(api_name, 1, 6)) AS api_prefix,\n  str_match_ignore_case(log, 'error') AS has_error,\n  COUNT(*) AS cnt,\n  AVG(latency_ms) AS avg_latency\nFROM \"{stream}\"\nWHERE LENGTH(api_name) > 3\n  AND latency_ms > 0\nGROUP BY api_name, UPPER(SUBSTR(api_name, 1, 6)), str_match_ignore_case(log, 'error')\nHAVING COUNT(*) >= 1\nORDER BY cnt DESC\nLIMIT 15",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 11639000000,
+        "end_offset": 11803000000
+      },
+      "expected": {
+        "columns": [
+          "api_name",
+          "api_prefix",
+          "has_error",
+          "cnt",
+          "avg_latency"
+        ],
+        "results": [
+          [
+            "SearchItems",
+            "SEARCH",
+            "False",
+            "2",
+            "45.0"
+          ],
+          [
+            "MergeBatch",
+            "MERGEB",
+            "False",
+            "2",
+            "3200.0"
+          ],
+          [
+            "RetryScan",
+            "RETRYS",
+            "False",
+            "2",
+            "15.0"
+          ],
+          [
+            "UpdateBatch",
+            "UPDATE",
+            "False",
+            "2",
+            "230.0"
+          ],
+          [
+            "ArchiveLog",
+            "ARCHIV",
+            "False",
+            "2",
+            "1900.0"
+          ],
+          [
+            "CheckThreshold",
+            "CHECKT",
+            "False",
+            "1",
+            "78.0"
+          ],
+          [
+            "DeleteRecord",
+            "DELETE",
+            "False",
+            "1",
+            "1450.0"
+          ],
+          [
+            "RerouteTrack",
+            "REROUT",
+            "False",
+            "1",
+            "567.0"
+          ],
+          [
+            "SyncZone",
+            "SYNCZO",
+            "False",
+            "1",
+            "12.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q196",
+      "sql": "SELECT\n  CONCAT(region_code, '-', facility_zone, '-', UPPER(SUBSTR(operation_mode, 1, 3))) AS location_tag,\n  COUNT(*) AS cnt,\n  SUM(CASE WHEN str_match_ignore_case(log, 'ACK') THEN 1 ELSE 0 END) AS ack_count,\n  SUM(CASE WHEN str_match_ignore_case(log, 'error') THEN 1 ELSE 0 END) AS error_count,\n  AVG(item_count) AS avg_items\nFROM \"{stream}\"\nWHERE LENGTH(region_code) > 2\nGROUP BY CONCAT(region_code, '-', facility_zone, '-', UPPER(SUBSTR(operation_mode, 1, 3)))\nHAVING COUNT(*) >= 1\nORDER BY cnt DESC\nLIMIT 15",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 11699000000,
+        "end_offset": 11863000000
+      },
+      "expected": {
+        "columns": [
+          "location_tag",
+          "cnt",
+          "ack_count",
+          "error_count",
+          "avg_items"
+        ],
+        "results": [
+          [
+            "AP-SOUTH-ZONE-2-AUT",
+            "1",
+            "0",
+            "0",
+            "500.0"
+          ],
+          [
+            "AP-EAST-ZONE-3-MAN",
+            "1",
+            "1",
+            "0",
+            "50.0"
+          ],
+          [
+            "EU-WEST-ZONE-2-MAN",
+            "1",
+            "1",
+            "0",
+            "275.0"
+          ],
+          [
+            "SA-EAST-ZONE-4-HYB",
+            "1",
+            "0",
+            "0",
+            "120.0"
+          ],
+          [
+            "US-WEST-ZONE-1-AUT",
+            "1",
+            "0",
+            "0",
+            "410.0"
+          ],
+          [
+            "EU-WEST-ZONE-4-AUT",
+            "1",
+            "1",
+            "0",
+            "275.0"
+          ],
+          [
+            "SA-EAST-ZONE-2-MAN",
+            "1",
+            "0",
+            "0",
+            "120.0"
+          ],
+          [
+            "US-EAST-ZONE-2-AUT",
+            "1",
+            "0",
+            "0",
+            "155.0"
+          ],
+          [
+            "EU-NORTH-ZONE-3-HYB",
+            "1",
+            "0",
+            "0",
+            "60.0"
+          ],
+          [
+            "AP-EAST-ZONE-1-AUT",
+            "1",
+            "1",
+            "0",
+            "50.0"
+          ],
+          [
+            "AP-CENTRAL-ZONE-3-MAN",
+            "1",
+            "1",
+            "0",
+            "88.0"
+          ],
+          [
+            "US-EAST-ZONE-4-HYB",
+            "1",
+            "0",
+            "0",
+            "155.0"
+          ],
+          [
+            "US-CENTRAL-ZONE-3-HYB",
+            "1",
+            "0",
+            "0",
+            "200.0"
+          ],
+          [
+            "EU-NORTH-ZONE-1-MAN",
+            "1",
+            "0",
+            "0",
+            "60.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q366",
+      "sql": "SELECT concat(action_category, '-', action_subcategory, ' :: ', coalesce(exception_message, 'ok')) AS event_summary, _timestamp, visitor_session_id FROM \"{stream}\" WHERE action_category = 'performanceMetric'",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 21899000000,
+        "end_offset": 21973000000
+      },
+      "expected": {
+        "columns": [
+          "event_summary",
+          "visitor_session_id"
+        ],
+        "results": [
+          [
+            "performanceMetric-vitalsInp :: OverflowException: throughput_rate 999.0 exceeds max capacity",
+            "sess_001"
+          ],
+          [
+            "performanceMetric-clickEvent :: TimeoutException: lane LANE-A did not respond within 5000ms",
+            "sess_003"
+          ],
+          [
+            "performanceMetric-vitalsInp :: ResourceExhaustedException: sorter_model SORT-M3 queue full",
+            "sess_001"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q367",
+      "sql": "SELECT _timestamp, coalesce(exception_message, upstream_error_code, error_code, 'no_error') AS display_error, coalesce(page_url, resource_path, endpoint_path) AS source FROM \"{stream}\" WHERE action_category = 'performanceMetric'",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 21959000000,
+        "end_offset": 22033000000
+      },
+      "expected": {
+        "columns": [
+          "display_error",
+          "source"
+        ],
+        "results": [
+          [
+            "ResourceExhaustedException: sorter_model SORT-M3 queue full",
+            "https://shop.example.com/search?q=test"
+          ],
+          [
+            "ResourceExhaustedException: sorter_model SORT-M3 queue full",
+            "None"
+          ],
+          [
+            "SecurityException: unauthorized access to control_center CC-ALPHA",
+            "https://shop.example.com/item/1003"
+          ],
+          [
+            "ConfigurationException: missing facility_zone ZONE-3 override",
+            "https://shop.example.com/cart"
+          ],
+          [
+            "NetworkException: connection to batch sync failed",
+            "None"
+          ],
+          [
+            "ConfigurationException: missing facility_zone ZONE-3 override",
+            "None"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q368",
+      "sql": "SELECT _timestamp, UPPER(error_code) AS err, LOWER(exception_message) AS msg, action_category FROM \"{stream}\" WHERE action_category = 'performanceMetric' AND LOWER(exception_message) LIKE '%exception%'",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 22019000000,
+        "end_offset": 22093000000
+      },
+      "expected": {
+        "columns": [
+          "err",
+          "msg",
+          "action_category"
+        ],
+        "results": [
+          [
+            "E006",
+            "networkexception: connection to batch sync failed",
+            "performanceMetric"
+          ],
+          [
+            "E005",
+            "configurationexception: missing facility_zone zone-3 override",
+            "performanceMetric"
+          ],
+          [
+            "E006",
+            "networkexception: connection to batch sync failed",
+            "performanceMetric"
+          ],
+          [
+            "E009",
+            "overflowexception: throughput_rate 999.0 exceeds max capacity",
+            "performanceMetric"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q369",
+      "sql": "SELECT _timestamp, (CASE WHEN char_length(exception_message) > 30 THEN substring(exception_message, 1, 30) || '...' ELSE exception_message END) AS truncated_error, error_code FROM \"{stream}\" WHERE action_category = 'performanceMetric' AND exception_message IS NOT NULL",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 22079000000,
+        "end_offset": 22153000000
+      },
+      "expected": {
+        "columns": [
+          "truncated_error",
+          "error_code"
+        ],
+        "results": [
+          [
+            "OverflowException: throughput_...",
+            "E009"
+          ],
+          [
+            "OverflowException: throughput_...",
+            "E009"
+          ],
+          [
+            "TimeoutException: lane LANE-A ...",
+            "E001"
+          ],
+          [
+            "TimeoutException: lane LANE-A ...",
+            "E001"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q370",
+      "sql": "SELECT concat(page_slug, '/', action_category) AS path, COUNT(*) AS cnt FROM \"{stream}\" WHERE concat(page_slug, '/', action_category) LIKE '%itemPage%' GROUP BY path ORDER BY cnt DESC",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 22139000000,
+        "end_offset": 22213000000
+      },
+      "expected": {
+        "columns": [
+          "path",
+          "cnt"
+        ],
+        "results": [
+          [
+            "itemPage/navigation",
+            "2"
+          ],
+          [
+            "itemPage/performanceMetric",
+            "2"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q371",
+      "sql": "SELECT _timestamp, action_category, error_code FROM \"{stream}\" WHERE LOWER(TRIM(error_code)) IN ('e001', 'e003', 'e005') AND action_category = 'performanceMetric'",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 22199000000,
+        "end_offset": 22273000000
+      },
+      "expected": {
+        "columns": [
+          "action_category",
+          "error_code"
+        ],
+        "results": [
+          [
+            "performanceMetric",
+            "E005"
+          ],
+          [
+            "performanceMetric",
+            "E005"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q372",
+      "sql": "SELECT _timestamp, REPLACE(component_name, '-engine', '') AS comp_short, REPLACE(exception_message, 'Exception', 'ERR') AS short_msg FROM \"{stream}\" WHERE action_category = 'performanceMetric' AND component_name LIKE '%engine%'",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 22259000000,
+        "end_offset": 22333000000
+      },
+      "expected": {
+        "columns": [
+          "comp_short",
+          "short_msg"
+        ],
+        "results": [
+          [
+            "sorter",
+            "OverflowERR: throughput_rate 999.0 exceeds max capacity"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q373",
+      "sql": "SELECT (CASE WHEN char_length(exception_message) > 40 THEN 'long_msg' WHEN char_length(exception_message) > 10 THEN 'medium_msg' WHEN char_length(exception_message) > 0 THEN 'short_msg' ELSE 'no_msg' END) AS msg_length_class, COUNT(*) AS cnt FROM \"{stream}\" WHERE action_category = 'performanceMetric' GROUP BY msg_length_class",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 22319000000,
+        "end_offset": 22393000000
+      },
+      "expected": {
+        "columns": [
+          "msg_length_class",
+          "cnt"
+        ],
+        "results": [
+          [
+            "long_msg",
+            "5"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q374",
+      "sql": "SELECT page_slug, STRING_AGG(DISTINCT error_code, ' | ' ORDER BY error_code ASC) AS error_list FROM \"{stream}\" WHERE action_category = 'performanceMetric' AND error_code IS NOT NULL GROUP BY page_slug",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 22379000000,
+        "end_offset": 22453000000
+      },
+      "expected": {
+        "columns": [
+          "page_slug",
+          "error_list"
+        ],
+        "results": [
+          [
+            "cartPage",
+            "E004"
+          ],
+          [
+            "searchPage",
+            "E003"
+          ],
+          [
+            "itemPage",
+            "E005"
+          ],
+          [
+            "checkoutPage",
+            "E006"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q375",
+      "sql": "SELECT _timestamp, concat(coalesce(page_url, page_slug), ' | ', coalesce(exception_message, 'ok')) AS display_text, visitor_session_id FROM \"{stream}\" WHERE org_name = 'warehouse-east' AND action_category = 'performanceMetric' LIMIT 20",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 22439000000,
+        "end_offset": 22513000000
+      },
+      "expected": {
+        "columns": [
+          "display_text",
+          "visitor_session_id"
+        ],
+        "results": [
+          [
+            "itemPage | OverflowException: throughput_rate 999.0 exceeds max capacity",
+            "sess_001"
+          ],
+          [
+            "itemPage | OverflowException: throughput_rate 999.0 exceeds max capacity",
+            "sess_001"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q376",
+      "sql": "SELECT _timestamp, concat(UPPER(action_category), ':', LOWER(error_code)) AS type_code, exception_message FROM \"{stream}\" WHERE action_category = 'performanceMetric' AND error_code IS NOT NULL",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 22499000000,
+        "end_offset": 22573000000
+      },
+      "expected": {
+        "columns": [
+          "type_code",
+          "exception_message"
+        ],
+        "results": [
+          [
+            "PERFORMANCEMETRIC:e009",
+            "OverflowException: throughput_rate 999.0 exceeds max capacity"
+          ],
+          [
+            "PERFORMANCEMETRIC:e001",
+            "TimeoutException: lane LANE-A did not respond within 5000ms"
+          ],
+          [
+            "PERFORMANCEMETRIC:e003",
+            "ResourceExhaustedException: sorter_model SORT-M3 queue full"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q377",
+      "sql": "SELECT concat(substring(exception_message, 1, 25), '... [', error_code, ']') AS summary, action_category FROM \"{stream}\" WHERE action_category = 'performanceMetric' AND char_length(exception_message) > 10",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 22559000000,
+        "end_offset": 22633000000
+      },
+      "expected": {
+        "columns": [
+          "summary",
+          "action_category"
+        ],
+        "results": [
+          [
+            "ResourceExhaustedExceptio... [E003]",
+            "performanceMetric"
+          ],
+          [
+            "ResourceExhaustedExceptio... [E003]",
+            "performanceMetric"
+          ],
+          [
+            "SecurityException: unauth... [E004]",
+            "performanceMetric"
+          ],
+          [
+            "ConfigurationException: m... [E005]",
+            "performanceMetric"
+          ],
+          [
+            "NetworkException: connect... [E006]",
+            "performanceMetric"
+          ],
+          [
+            "ConfigurationException: m... [E005]",
+            "performanceMetric"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q378",
+      "sql": "SELECT _timestamp, exception_message FROM \"{stream}\" WHERE action_category = 'performanceMetric' AND LOWER(exception_message) LIKE '%exception%' AND LOWER(component_name) LIKE '%engine%'",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 22619000000,
+        "end_offset": 22693000000
+      },
+      "expected": {
+        "columns": [
+          "exception_message"
+        ],
+        "results": [
+          [
+            "OverflowException: throughput_rate 999.0 exceeds max capacity"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q379",
+      "sql": "SELECT _timestamp, concat(page_slug, ' -> ', action_category, ' -> ', action_subcategory) AS full_path, latency_ms FROM \"{stream}\" WHERE action_category = 'navigation' ORDER BY _timestamp DESC LIMIT 15",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 22679000000,
+        "end_offset": 22753000000
+      },
+      "expected": {
+        "columns": [
+          "full_path",
+          "latency_ms"
+        ],
+        "results": [
+          [
+            "itemPage -> navigation -> vitalsLcp",
+            "45"
+          ],
+          [
+            "homePage -> navigation -> vitalsLcp",
+            "78"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q380",
+      "sql": "SELECT _timestamp, concat(coalesce(page_url, resource_path, endpoint_path, page_slug), '?', coalesce(http_method, 'GET')) AS full_url, visitor_session_id, action_category FROM \"{stream}\" WHERE org_name = 'warehouse-east' AND action_category IN ('performanceMetric', 'navigation') LIMIT 20",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 22739000000,
+        "end_offset": 22813000000
+      },
+      "expected": {
+        "columns": [
+          "full_url",
+          "visitor_session_id",
+          "action_category"
+        ],
+        "results": [
+          [
+            "cartPage?POST",
+            "sess_001",
+            "performanceMetric"
+          ],
+          [
+            "cartPage?POST",
+            "sess_001",
+            "performanceMetric"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q490",
+      "sql": "SELECT _timestamp, concat(COALESCE(page_slug, 'unknown'), '|', COALESCE(action_category, 'unknown'), '|', COALESCE(action_subcategory, 'unknown')) AS full_path, latency_ms FROM \"{stream}\" WHERE latency_ms > 0 ORDER BY _timestamp DESC LIMIT 12",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 29339000000,
+        "end_offset": 29413000000
+      },
+      "expected": {
+        "columns": [
+          "full_path",
+          "latency_ms"
+        ],
+        "results": [
+          [
+            "itemPage|performanceMetric|pageView",
+            "89"
+          ],
+          [
+            "cartPage|performanceMetric|vitalsCls",
+            "1450"
+          ],
+          [
+            "cartPage|performanceMetric|vitalsCls",
+            "1450"
+          ],
+          [
+            "searchPage|performanceMetric|vitalsInp",
+            "230"
+          ],
+          [
+            "itemPage|navigation|vitalsLcp",
+            "45"
+          ],
+          [
+            "itemPage|navigation|vitalsLcp",
+            "45"
+          ],
+          [
+            "itemPage|performanceMetric|clickEvent",
+            "12"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q491",
+      "sql": "SELECT _timestamp, UPPER(component_name) AS comp_upper, LOWER(exception_message) AS exc_lower, LENGTH(COALESCE(exception_message, '')) AS exc_len FROM \"{stream}\" WHERE action_category = 'performanceMetric' AND component_name IS NOT NULL ORDER BY exc_len DESC, _timestamp ASC LIMIT 10",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 29399000000,
+        "end_offset": 29473000000
+      },
+      "expected": {
+        "columns": [
+          "comp_upper",
+          "exc_lower",
+          "exc_len"
+        ],
+        "results": [
+          [
+            "BATCH-SYNC",
+            "securityexception: unauthorized access to control_center cc-alpha",
+            "65"
+          ],
+          [
+            "PALLET-MAPPER",
+            "configurationexception: missing facility_zone zone-3 override",
+            "61"
+          ],
+          [
+            "PALLET-MAPPER",
+            "configurationexception: missing facility_zone zone-3 override",
+            "61"
+          ],
+          [
+            "LANE-MONITOR",
+            "networkexception: connection to batch sync failed",
+            "49"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q492",
+      "sql": "SELECT _timestamp, SUBSTRING(COALESCE(client_agent, ''), 1, 30) AS agent_short, SUBSTRING(COALESCE(exception_message, ''), 1, 40) AS exc_short FROM \"{stream}\" WHERE action_category = 'performanceMetric' ORDER BY _timestamp ASC LIMIT 10",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 29459000000,
+        "end_offset": 29533000000
+      },
+      "expected": {
+        "columns": [
+          "agent_short",
+          "exc_short"
+        ],
+        "results": [
+          [
+            "axios/1.6.0 (Node.js; warehous",
+            "OverflowException: throughput_rate 999.0"
+          ],
+          [
+            "Alamofire/5.8.0 (iOS; scan-app",
+            "TimeoutException: lane LANE-A did not re"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q493",
+      "sql": "SELECT _timestamp, TRIM(COALESCE(page_slug, '')) AS clean_page, TRIM(COALESCE(error_code, '')) AS clean_error, REPLACE(COALESCE(component_name, ''), '-', '_') AS comp_name_normalized FROM \"{stream}\" WHERE action_category = 'performanceMetric' ORDER BY _timestamp ASC LIMIT 10",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 29519000000,
+        "end_offset": 29593000000
+      },
+      "expected": {
+        "columns": [
+          "clean_page",
+          "clean_error",
+          "comp_name_normalized"
+        ],
+        "results": [
+          [
+            "itemPage",
+            "E001",
+            "zone_controller"
+          ],
+          [
+            "itemPage",
+            "E001",
+            "zone_controller"
+          ],
+          [
+            "searchPage",
+            "E003",
+            "track_router"
+          ],
+          [
+            "searchPage",
+            "E003",
+            "track_router"
+          ],
+          [
+            "cartPage",
+            "E004",
+            "batch_sync"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q494",
+      "sql": "SELECT _timestamp, CONCAT(COALESCE(os_platform, 'Unknown'), ' / ', COALESCE(device_type, 'Unknown')) AS platform_device, action_category, page_slug FROM \"{stream}\" WHERE action_category = 'performanceMetric' ORDER BY _timestamp DESC LIMIT 12",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 29579000000,
+        "end_offset": 29653000000
+      },
+      "expected": {
+        "columns": [
+          "platform_device",
+          "action_category",
+          "page_slug"
+        ],
+        "results": [
+          [
+            "Android 14 / Computer",
+            "performanceMetric",
+            "checkoutPage"
+          ],
+          [
+            "Android 14 / Computer",
+            "performanceMetric",
+            "checkoutPage"
+          ],
+          [
+            "Mac OS X (iPhone) / Tablet",
+            "performanceMetric",
+            "itemPage"
+          ],
+          [
+            "Android 12 / Mobile",
+            "performanceMetric",
+            "cartPage"
+          ],
+          [
+            "Android 12 / Mobile",
+            "performanceMetric",
+            "cartPage"
+          ],
+          [
+            "iOS 18.1 / Computer",
+            "performanceMetric",
+            "searchPage"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q495",
+      "sql": "SELECT _timestamp, array_extract(regexp_match(exception_message, '([A-Za-z]+Exception)'), 1) AS exc_type, action_category FROM \"{stream}\" WHERE action_category = 'performanceMetric' AND exception_message IS NOT NULL AND re_match(exception_message, 'Exception') ORDER BY exc_type ASC, _timestamp ASC LIMIT 10",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 29639000000,
+        "end_offset": 29713000000
+      },
+      "expected": {
+        "columns": [
+          "exc_type",
+          "action_category"
+        ],
+        "results": [
+          [
+            "NetworkException",
+            "performanceMetric"
+          ],
+          [
+            "OverflowException",
+            "performanceMetric"
+          ],
+          [
+            "OverflowException",
+            "performanceMetric"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q496",
+      "sql": "SELECT _timestamp, (CASE WHEN LENGTH(COALESCE(page_url, '')) > 20 THEN SUBSTRING(page_url, 1, 20) || '...' ELSE COALESCE(page_url, page_slug) END) AS short_url, action_category FROM \"{stream}\" WHERE action_category IN ('navigation', 'interaction') ORDER BY _timestamp ASC LIMIT 12",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 29699000000,
+        "end_offset": 29773000000
+      },
+      "expected": {
+        "columns": [
+          "short_url",
+          "action_category"
+        ],
+        "results": [
+          [
+            "https://shop.example...",
+            "interaction"
+          ],
+          [
+            "https://shop.example...",
+            "interaction"
+          ],
+          [
+            "https://shop.example...",
+            "navigation"
+          ],
+          [
+            "https://shop.example...",
+            "navigation"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q497",
+      "sql": "SELECT _timestamp, concat(COALESCE(org_name, 'unknown-org'), '/', COALESCE(site_name, 'unknown-site'), '/', COALESCE(region_code, 'unknown-region')) AS location_hierarchy, COUNT(*) OVER () AS total FROM \"{stream}\" WHERE action_category = 'performanceMetric' ORDER BY _timestamp ASC LIMIT 10",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 29759000000,
+        "end_offset": 29833000000
+      },
+      "expected": {
+        "columns": [
+          "location_hierarchy",
+          "total"
+        ],
+        "results": [
+          [
+            "warehouse-central/site-sfo-05/EU-NORTH",
+            "6"
+          ],
+          [
+            "warehouse-central/site-sfo-05/EU-NORTH",
+            "6"
+          ],
+          [
+            "warehouse-east/site-ber-06/AP-SOUTH",
+            "6"
+          ],
+          [
+            "warehouse-west/site-dub-07/AP-EAST",
+            "6"
+          ],
+          [
+            "warehouse-west/site-dub-07/AP-EAST",
+            "6"
+          ],
+          [
+            "warehouse-north/site-sin-08/SA-EAST",
+            "6"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q498",
+      "sql": "SELECT _timestamp, REPLACE(REPLACE(COALESCE(resource_path, ''), '/logs/', ''), '/data/', '') AS clean_resource, action_category FROM \"{stream}\" WHERE action_category = 'performanceMetric' AND resource_path IS NOT NULL ORDER BY clean_resource ASC, _timestamp ASC LIMIT 10",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 29819000000,
+        "end_offset": 29893000000
+      },
+      "expected": {
+        "columns": [
+          "clean_resource",
+          "action_category"
+        ],
+        "results": [
+          [
+            "/config/zone/ZONE-3.yaml",
+            "performanceMetric"
+          ],
+          [
+            "sorter/output.dat",
+            "performanceMetric"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q499",
+      "sql": "SELECT _timestamp, (CASE WHEN re_match(os_platform, 'Android') THEN 'Android' WHEN re_match(os_platform, 'iPhone|iOS|Mac OS X') THEN 'iOS' WHEN re_match(os_platform, 'Windows') THEN 'Windows' ELSE COALESCE(os_platform, 'Other') END) AS platform_group, page_slug, latency_ms FROM \"{stream}\" WHERE action_category = 'performanceMetric' AND latency_ms > 0 ORDER BY platform_group ASC, _timestamp ASC LIMIT 15",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 29879000000,
+        "end_offset": 29953000000
+      },
+      "expected": {
+        "columns": [
+          "platform_group",
+          "page_slug",
+          "latency_ms"
+        ],
+        "results": [
+          [
+            "Android",
+            "itemPage",
+            "1900"
+          ],
+          [
+            "Android",
+            "itemPage",
+            "1900"
+          ],
+          [
+            "Windows",
+            "itemPage",
+            "12"
+          ],
+          [
+            "Windows",
+            "itemPage",
+            "12"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q511",
+      "sql": "SELECT spath(request_payload, 'message.endpoint') AS endpoint, COUNT(*) AS cnt FROM \"{stream}\" WHERE str_match_ignore_case(request_payload, 'endpoint') GROUP BY endpoint ORDER BY cnt DESC LIMIT 5",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 30599000000,
+        "end_offset": 30673000000
+      },
+      "expected": {
+        "columns": [
+          "endpoint",
+          "cnt"
+        ],
+        "note": "spath() is OO-specific; DuckDB cannot replicate",
+        "skip_sqllogictest": true,
+        "skip_row_count": true
+      }
+    },
+    {
+      "id": "Q512",
+      "sql": "SELECT spath(request_payload, 'message.status') AS msg_status, COUNT(*) AS cnt FROM \"{stream}\" WHERE str_match_ignore_case(request_payload, 'status') GROUP BY msg_status ORDER BY cnt DESC LIMIT 5",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 30659000000,
+        "end_offset": 30733000000
+      },
+      "expected": {
+        "row_count": 4,
+        "columns": [
+          "msg_status",
+          "cnt"
+        ],
+        "assertions": [
+          {
+            "type": "row_contains",
+            "match": {
+              "msg_status": "ok"
+            }
+          }
+        ],
+        "note": "spath() is OO-specific; DuckDB cannot replicate",
+        "skip_sqllogictest": true
+      }
+    },
+    {
+      "id": "Q513",
+      "sql": "SELECT split_part(exception_message, chr(32), 1) AS first_word, COUNT(*) AS cnt FROM \"{stream}\" GROUP BY first_word ORDER BY cnt DESC LIMIT 10",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 30719000000,
+        "end_offset": 30793000000
+      },
+      "expected": {
+        "columns": [
+          "first_word",
+          "cnt"
+        ],
+        "results": [
+          [
+            "ResourceExhaustedException:",
+            "2"
+          ],
+          [
+            "TimeoutException:",
+            "2"
+          ],
+          [
+            "NullPointerException",
+            "1"
+          ],
+          [
+            "SecurityException:",
+            "1"
+          ],
+          [
+            "DataIntegrityException:",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q514",
+      "sql": "SELECT COALESCE(bot_flag, info_tag, passthrough_flag, CAST(auth_result AS VARCHAR)) AS fallback_tag, COUNT(*) AS cnt FROM \"{stream}\" GROUP BY fallback_tag ORDER BY cnt DESC",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 30779000000,
+        "end_offset": 30853000000
+      },
+      "expected": {
+        "columns": [
+          "fallback_tag",
+          "cnt"
+        ],
+        "results": [
+          [
+            "false",
+            "5"
+          ],
+          [
+            "verified_bot",
+            "1"
+          ],
+          [
+            "true",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q515",
+      "sql": "SELECT CONCAT(component_name, '/', COALESCE(route_key, 'no-route'), ' (', scan_category, ')') AS full_route, COUNT(*) AS cnt FROM \"{stream}\" GROUP BY full_route ORDER BY cnt DESC LIMIT 10",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 30839000000,
+        "end_offset": 30913000000
+      },
+      "expected": {
+        "columns": [
+          "full_route",
+          "cnt"
+        ],
+        "results": [
+          [
+            "temp-regulator/rk-warehouse-006 (inbound)",
+            "2"
+          ],
+          [
+            "sorter-engine/rk-warehouse-008 (internal)",
+            "2"
+          ],
+          [
+            "conveyor-driver/rk-warehouse-009 (inbound)",
+            "1"
+          ],
+          [
+            "lane-monitor/rk-warehouse-005 (internal)",
+            "1"
+          ],
+          [
+            "charge-checker/rk-warehouse-007 (outbound)",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q516",
+      "sql": "SELECT CASE WHEN length(CONCAT(COALESCE(exception_message, ''), COALESCE(log_message, ''))) < 50 THEN 'short' WHEN length(CONCAT(COALESCE(exception_message, ''), COALESCE(log_message, ''))) < 100 THEN 'medium' ELSE 'long' END AS msg_class, COUNT(*) AS cnt FROM \"{stream}\" GROUP BY msg_class ORDER BY cnt DESC",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 30899000000,
+        "end_offset": 30973000000
+      },
+      "expected": {
+        "columns": [
+          "msg_class",
+          "cnt"
+        ],
+        "results": [
+          [
+            "long",
+            "6"
+          ],
+          [
+            "medium",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q517",
+      "sql": "SELECT CAST(tag_a AS VARCHAR) || '-' || CAST(tag_b AS VARCHAR) AS combined_tag, COUNT(*) AS cnt FROM \"{stream}\" GROUP BY combined_tag ORDER BY cnt DESC LIMIT 10",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 30959000000,
+        "end_offset": 31033000000
+      },
+      "expected": {
+        "columns": [
+          "combined_tag",
+          "cnt"
+        ],
+        "results": [
+          [
+            "dev-high",
+            "2"
+          ],
+          [
+            "staging-high",
+            "2"
+          ],
+          [
+            "prod-critical",
+            "1"
+          ],
+          [
+            "staging-critical",
+            "1"
+          ],
+          [
+            "dev-medium",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q518",
+      "sql": "SELECT UPPER(COALESCE(org_name, site_name, region_code, 'UNKNOWN')) AS location, LOWER(scan_category) AS scan_type, COUNT(*) AS cnt FROM \"{stream}\" GROUP BY location, scan_type ORDER BY cnt DESC LIMIT 15",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 31019000000,
+        "end_offset": 31093000000
+      },
+      "expected": {
+        "columns": [
+          "location",
+          "scan_type",
+          "cnt"
+        ],
+        "results": [
+          [
+            "WAREHOUSE-NORTH",
+            "internal",
+            "2"
+          ],
+          [
+            "WAREHOUSE-CENTRAL",
+            "outbound",
+            "2"
+          ],
+          [
+            "WAREHOUSE-EAST",
+            "internal",
+            "1"
+          ],
+          [
+            "WAREHOUSE-WEST",
+            "outbound",
+            "1"
+          ],
+          [
+            "WAREHOUSE-SOUTH",
+            "inbound",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q519",
+      "sql": "SELECT REPLACE(REPLACE(COALESCE(page_url, endpoint_path, '/'), 'https://', ''), 'http://', '') AS clean_path, COUNT(*) AS cnt FROM \"{stream}\" WHERE page_url IS NOT NULL OR endpoint_path IS NOT NULL GROUP BY clean_path ORDER BY cnt DESC LIMIT 10",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 31079000000,
+        "end_offset": 31153000000
+      },
+      "expected": {
+        "columns": [
+          "clean_path",
+          "cnt"
+        ],
+        "results": [
+          [
+            "shop.example.com/item/1001",
+            "2"
+          ],
+          [
+            "shop.example.com/item/1006",
+            "2"
+          ],
+          [
+            "shop.example.com/item/1005",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q520",
+      "sql": "SELECT TRIM(COALESCE(build_signature, build_version)) AS build_id, SUBSTRING(COALESCE(build_signature, build_version), 1, 4) AS prefix, COUNT(*) AS cnt FROM \"{stream}\" GROUP BY build_id, prefix ORDER BY cnt DESC LIMIT 10",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 31139000000,
+        "end_offset": 31213000000
+      },
+      "expected": {
+        "columns": [
+          "build_id",
+          "prefix",
+          "cnt"
+        ],
+        "results": [
+          [
+            "BS-2025-D4",
+            "BS-2",
+            "2"
+          ],
+          [
+            "BS-2026-B2",
+            "BS-2",
+            "2"
+          ],
+          [
+            "BS-2026-C3",
+            "BS-2",
+            "2"
+          ],
+          [
+            "BS-2026-A1",
+            "BS-2",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q572",
+      "sql": "SELECT _timestamp, pallet_id FROM \"{stream}\" WHERE re_match(pallet_id, 'PL-00[1-4]') ORDER BY _timestamp",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 34200000000,
+        "end_offset": 34380000000
+      },
+      "expected": {
+        "columns": [
+          "pallet_id"
+        ],
+        "results": [
+          [
+            "PL-001"
+          ],
+          [
+            "PL-002"
+          ],
+          [
+            "PL-003"
+          ],
+          [
+            "PL-004"
+          ],
+          [
+            "PL-002"
+          ],
+          [
+            "PL-001"
+          ],
+          [
+            "PL-003"
+          ],
+          [
+            "PL-004"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q573",
+      "sql": "SELECT _timestamp, error_code FROM \"{stream}\" WHERE re_match(error_code, 'E00\\d') ORDER BY _timestamp",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 34260000000,
+        "end_offset": 34440000000
+      },
+      "expected": {
+        "columns": [
+          "error_code"
+        ],
+        "results": [
+          [
+            "E007"
+          ],
+          [
+            "E008"
+          ],
+          [
+            "E008"
+          ],
+          [
+            "E009"
+          ],
+          [
+            "E001"
+          ],
+          [
+            "E001"
+          ],
+          [
+            "E002"
+          ],
+          [
+            "E003"
+          ],
+          [
+            "E003"
+          ],
+          [
+            "E004"
+          ],
+          [
+            "E004"
+          ],
+          [
+            "E005"
+          ],
+          [
+            "E006"
+          ],
+          [
+            "E006"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
+      }
+    },
+    {
+      "id": "Q574",
+      "sql": "SELECT _timestamp, log FROM \"{stream}\" WHERE re_match(log, '^Q[0-9]+ warehouse') ORDER BY _timestamp LIMIT 10",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 34320000000,
+        "end_offset": 34500000000
+      },
+      "expected": {
+        "columns": [
+          "log"
+        ],
+        "results": [
+          [
+            "Q573 warehouse event record 0 ACK batch batchIdList:Q573-0"
+          ],
+          [
+            "Q572 warehouse event record 4"
+          ],
+          [
+            "Q573 warehouse event record 1"
+          ],
+          [
+            "Q573 warehouse event record 2"
+          ],
+          [
+            "Q573 warehouse event record 3 ACK batch batchIdList:Q573-3"
+          ],
+          [
+            "Q574 warehouse event record 0 ACK batch batchIdList:Q574-0"
+          ],
+          [
+            "Q573 warehouse event record 4"
+          ],
+          [
+            "Q574 warehouse event record 1"
+          ],
+          [
+            "Q574 warehouse event record 2"
+          ],
+          [
+            "Q574 warehouse event record 3 ACK batch batchIdList:Q574-3"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q575",
+      "sql": "SELECT _timestamp, sorter_model FROM \"{stream}\" WHERE re_match(sorter_model, 'SORT-[AX]') ORDER BY _timestamp",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 34380000000,
+        "end_offset": 34560000000
+      },
+      "expected": {
+        "columns": [
+          "sorter_model"
+        ],
+        "results": [
+          [
+            "SORT-A7"
+          ],
+          [
+            "SORT-X1"
+          ],
+          [
+            "SORT-A7"
+          ],
+          [
+            "SORT-X1"
+          ],
+          [
+            "SORT-A7"
+          ],
+          [
+            "SORT-X1"
+          ],
+          [
+            "SORT-A7"
+          ],
+          [
+            "SORT-A7"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
+      }
+    },
+    {
+      "id": "Q576",
+      "sql": "SELECT _timestamp, build_signature FROM \"{stream}\" WHERE re_match(build_signature, 'BS-202[56]') ORDER BY _timestamp",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 34440000000,
+        "end_offset": 34620000000
+      },
+      "expected": {
+        "columns": [
+          "build_signature"
+        ],
+        "results": [
+          [
+            "BS-2025-D4"
+          ],
+          [
+            "BS-2026-A1"
+          ],
+          [
+            "BS-2026-A1"
+          ],
+          [
+            "BS-2026-B2"
+          ],
+          [
+            "BS-2026-A1"
+          ],
+          [
+            "BS-2026-A1"
+          ],
+          [
+            "BS-2026-B2"
+          ],
+          [
+            "BS-2026-B2"
+          ],
+          [
+            "BS-2026-C3"
+          ],
+          [
+            "BS-2025-D4"
+          ],
+          [
+            "BS-2025-D4"
+          ],
+          [
+            "BS-2026-A1"
+          ],
+          [
+            "BS-2026-A1"
+          ],
+          [
+            "BS-2026-B2"
+          ],
+          [
+            "BS-2026-C3"
+          ],
+          [
+            "BS-2026-C3"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
+      }
+    },
+    {
+      "id": "Q577",
+      "sql": "SELECT _timestamp, CAST(throughput_rate AS VARCHAR) AS tput_str FROM \"{stream}\" WHERE re_match(CAST(throughput_rate AS VARCHAR), '^[1-9]') ORDER BY _timestamp LIMIT 10",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 34500000000,
+        "end_offset": 34680000000
+      },
+      "expected": {
+        "columns": [
+          "tput_str"
+        ],
+        "results": [
+          [
+            "900.0"
+          ],
+          [
+            "150.0"
+          ],
+          [
+            "150.0"
+          ],
+          [
+            "320.0"
+          ],
+          [
+            "480.0"
+          ],
+          [
+            "480.0"
+          ],
+          [
+            "610.0"
+          ],
+          [
+            "610.0"
+          ],
+          [
+            "725.0"
+          ],
+          [
+            "840.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q578",
+      "sql": "SELECT _timestamp, CAST(latency_ms AS VARCHAR) AS lat_str FROM \"{stream}\" WHERE re_match(CAST(latency_ms AS VARCHAR), '^[0-9]+$') ORDER BY _timestamp LIMIT 10",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 34560000000,
+        "end_offset": 34740000000
+      },
+      "expected": {
+        "columns": [
+          "lat_str"
+        ],
+        "results": [
+          [
+            "45"
+          ],
+          [
+            "230"
+          ],
+          [
+            "230"
+          ],
+          [
+            "1450"
+          ],
+          [
+            "89"
+          ],
+          [
+            "89"
+          ],
+          [
+            "567"
+          ],
+          [
+            "567"
+          ],
+          [
+            "3200"
+          ],
+          [
+            "78"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q579",
+      "sql": "SELECT _timestamp, re_match(os_platform, 'Android|iOS') AS is_mobile, os_platform FROM \"{stream}\" ORDER BY _timestamp LIMIT 10",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 34620000000,
+        "end_offset": 34800000000
+      },
+      "expected": {
+        "columns": [
+          "is_mobile",
+          "os_platform"
+        ],
+        "results": [
+          [
+            "False",
+            "Mac OS X (iPhone)"
+          ],
+          [
+            "True",
+            "Android 14"
+          ],
+          [
+            "True",
+            "Android 14"
+          ],
+          [
+            "True",
+            "Android 14"
+          ],
+          [
+            "True",
+            "iOS 17.4"
+          ],
+          [
+            "True",
+            "iOS 17.4"
+          ],
+          [
+            "True",
+            "Android 13"
+          ],
+          [
+            "True",
+            "Android 13"
+          ],
+          [
+            "False",
+            "Mac OS X (iPhone)"
+          ],
+          [
+            "False",
+            "Windows 11"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q580",
+      "sql": "SELECT _timestamp, re_match(api_name, '^(Get|Update|Search)') AS is_crud, api_name FROM \"{stream}\" ORDER BY _timestamp LIMIT 10",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 34680000000,
+        "end_offset": 34860000000
+      },
+      "expected": {
+        "columns": [
+          "is_crud",
+          "api_name"
+        ],
+        "results": [
+          [
+            "False",
+            "CheckThreshold"
+          ],
+          [
+            "False",
+            "ArchiveLog"
+          ],
+          [
+            "False",
+            "ArchiveLog"
+          ],
+          [
+            "False",
+            "RetryScan"
+          ],
+          [
+            "False",
+            "SyncZone"
+          ],
+          [
+            "False",
+            "SyncZone"
+          ],
+          [
+            "True",
+            "SearchItems"
+          ],
+          [
+            "True",
+            "SearchItems"
+          ],
+          [
+            "True",
+            "UpdateBatch"
+          ],
+          [
+            "False",
+            "DeleteRecord"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q581",
+      "sql": "SELECT _timestamp, COALESCE(upstream_error_code, 'NONE') AS ue_code, CASE WHEN re_match(COALESCE(upstream_error_code, 'NONE'), 'UP-E00[1-5]') THEN 'critical' ELSE 'minor' END AS severity FROM \"{stream}\" ORDER BY _timestamp LIMIT 15",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 34740000000,
+        "end_offset": 34920000000
+      },
+      "expected": {
+        "columns": [
+          "ue_code",
+          "severity"
+        ],
+        "results": [
+          [
+            "UP-E005",
+            "critical"
+          ],
+          [
+            "NONE",
+            "minor"
+          ],
+          [
+            "NONE",
+            "minor"
+          ],
+          [
+            "UP-E007",
+            "minor"
+          ],
+          [
+            "NONE",
+            "minor"
+          ],
+          [
+            "NONE",
+            "minor"
+          ],
+          [
+            "UP-E009",
+            "minor"
+          ],
+          [
+            "UP-E009",
+            "minor"
+          ],
+          [
+            "NONE",
+            "minor"
+          ],
+          [
+            "UP-E001",
+            "critical"
+          ],
+          [
+            "UP-E001",
+            "critical"
+          ],
+          [
+            "UP-E002",
+            "critical"
+          ],
+          [
+            "NONE",
+            "minor"
+          ],
+          [
+            "UP-E003",
+            "critical"
+          ],
+          [
+            "UP-E004",
+            "critical"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q582",
+      "sql": "SELECT _timestamp, COALESCE(endpoint_path, '/unknown') AS ep, CASE WHEN re_match(COALESCE(endpoint_path, ''), '/api/v[12]/') THEN 'v1v2' WHEN re_match(COALESCE(endpoint_path, ''), '/api/v[34]/') THEN 'v3v4' ELSE 'other' END AS api_version FROM \"{stream}\" ORDER BY _timestamp LIMIT 15",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 34800000000,
+        "end_offset": 34980000000
+      },
+      "expected": {
+        "columns": [
+          "ep",
+          "api_version"
+        ],
+        "results": [
+          [
+            "/unknown",
+            "other"
+          ],
+          [
+            "/api/v2/sorter/scan",
+            "v1v2"
+          ],
+          [
+            "/api/v2/sorter/scan",
+            "v1v2"
+          ],
+          [
+            "/unknown",
+            "other"
+          ],
+          [
+            "/api/v2/sorter/merge",
+            "v1v2"
+          ],
+          [
+            "/api/v2/sorter/merge",
+            "v1v2"
+          ],
+          [
+            "/api/v1/health/check",
+            "v1v2"
+          ],
+          [
+            "/unknown",
+            "other"
+          ],
+          [
+            "/api/v1/archive/log",
+            "v1v2"
+          ],
+          [
+            "/api/v2/sorter/retry",
+            "v1v2"
+          ],
+          [
+            "/unknown",
+            "other"
+          ],
+          [
+            "/unknown",
+            "other"
+          ],
+          [
+            "/api/v1/zone/sync",
+            "v1v2"
+          ],
+          [
+            "/api/v1/warehouse/search",
+            "v1v2"
+          ],
+          [
+            "/unknown",
+            "other"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q583",
+      "sql": "SELECT _timestamp, log, component_name FROM \"{stream}\" WHERE NOT re_match(component_name, '^(sorter|conveyor)') ORDER BY _timestamp LIMIT 10",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 34860000000,
+        "end_offset": 35040000000
+      },
+      "expected": {
+        "columns": [
+          "log",
+          "component_name"
+        ],
+        "results": [
+          [
+            "Q582 warehouse event record 0 ACK batch batchIdList:Q582-0",
+            "temp-regulator"
+          ],
+          [
+            "Q581 warehouse event record 4",
+            "charge-checker"
+          ],
+          [
+            "Q582 warehouse event record 1",
+            "charge-checker"
+          ],
+          [
+            "Q582 warehouse event record 4",
+            "zone-controller"
+          ],
+          [
+            "Q583 warehouse event record 1",
+            "zone-controller"
+          ],
+          [
+            "Q583 warehouse event record 2",
+            "scan-hub"
+          ],
+          [
+            "Q583 warehouse event record 3 ACK batch batchIdList:Q583-3",
+            "track-router"
+          ],
+          [
+            "Q584 warehouse event record 0 ACK batch batchIdList:Q584-0",
+            "track-router"
+          ],
+          [
+            "Q583 warehouse event record 4",
+            "batch-sync"
+          ],
+          [
+            "Q584 warehouse event record 1",
+            "batch-sync"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q584",
+      "sql": "SELECT _timestamp, exception_message, error_code FROM \"{stream}\" WHERE NOT re_match(error_code, '^E00[1-5]') ORDER BY _timestamp LIMIT 10",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 34920000000,
+        "end_offset": 35100000000
+      },
+      "expected": {
+        "columns": [
+          "exception_message",
+          "error_code"
+        ],
+        "results": [
+          [
+            "NullPointerException at ConveyorController.handle()",
+            "E010"
+          ],
+          [
+            "NetworkException: connection to batch sync failed",
+            "E006"
+          ],
+          [
+            "NetworkException: connection to batch sync failed",
+            "E006"
+          ],
+          [
+            "ValidationException: item_count exceeds defect_limit bounds",
+            "E007"
+          ],
+          [
+            "ValidationException: item_count exceeds defect_limit bounds",
+            "E007"
+          ],
+          [
+            "StateTransitionException: operation_mode hybrid invalid state",
+            "E008"
+          ],
+          [
+            "OverflowException: throughput_rate 999.0 exceeds max capacity",
+            "E009"
+          ],
+          [
+            "OverflowException: throughput_rate 999.0 exceeds max capacity",
+            "E009"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
+      }
+    },
+    {
+      "id": "Q585",
+      "sql": "SELECT _timestamp, log, facility_zone FROM \"{stream}\" WHERE re_match(facility_zone, 'ZONE-[12]') AND log LIKE '%warehouse%' ORDER BY _timestamp LIMIT 10",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 34980000000,
+        "end_offset": 35160000000
+      },
+      "expected": {
+        "columns": [
+          "log",
+          "facility_zone"
+        ],
+        "results": [
+          [
+            "Q583 warehouse event record 4",
+            "ZONE-2"
+          ],
+          [
+            "Q584 warehouse event record 2",
+            "ZONE-1"
+          ],
+          [
+            "Q584 warehouse event record 3 ACK batch batchIdList:Q584-3",
+            "ZONE-2"
+          ],
+          [
+            "Q585 warehouse event record 1",
+            "ZONE-1"
+          ],
+          [
+            "Q585 warehouse event record 2",
+            "ZONE-2"
+          ],
+          [
+            "Q586 warehouse event record 0 ACK batch batchIdList:Q586-0",
+            "ZONE-1"
+          ],
+          [
+            "Q586 warehouse event record 1",
+            "ZONE-2"
+          ],
+          [
+            "Q587 warehouse event record 0 ACK batch batchIdList:Q587-0",
+            "ZONE-2"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
+      }
+    },
+    {
+      "id": "Q586",
+      "sql": "SELECT _timestamp, user_agent_str FROM \"{stream}\" WHERE re_match(user_agent_str, 'Mozilla|Chrome|Firefox|curl') ORDER BY _timestamp LIMIT 10",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 35040000000,
+        "end_offset": 35220000000
+      },
+      "expected": {
+        "columns": [
+          "user_agent_str"
+        ],
+        "results": [
+          [
+            "Mozilla/5.0 Chrome/120"
+          ],
+          [
+            "curl/7.88.1"
+          ],
+          [
+            "curl/7.88.1"
+          ],
+          [
+            "Mozilla/5.0 Firefox/121"
+          ],
+          [
+            "Mozilla/5.0 Firefox/121"
+          ],
+          [
+            "Mozilla/5.0 Safari/17.2"
+          ],
+          [
+            "Mozilla/5.0 Edge/120"
+          ],
+          [
+            "Mozilla/5.0 Edge/120"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
+      }
+    },
+    {
+      "id": "Q587",
+      "sql": "SELECT _timestamp, attack_name FROM \"{stream}\" WHERE re_match(attack_name, '^(SQL|XSS|CSRF)') ORDER BY _timestamp LIMIT 10",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 35100000000,
+        "end_offset": 35280000000
+      },
+      "expected": {
+        "columns": [
+          "attack_name"
+        ],
+        "results": [
+          [
+            "SQL Injection (Param)"
+          ],
+          [
+            "SQL Injection (Param)"
+          ],
+          [
+            "XSS Reflected (Header)"
+          ],
+          [
+            "CSRF Attempt"
+          ],
+          [
+            "CSRF Attempt"
+          ],
+          [
+            "XSS Stored (Body)"
+          ],
+          [
+            "XSS Stored (Body)"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q588",
+      "sql": "SELECT _timestamp, geo_country, geo_org FROM \"{stream}\" WHERE re_match(geo_country, '^(US|UK|DE|JP)$') ORDER BY _timestamp LIMIT 10",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 35160000000,
+        "end_offset": 35340000000
+      },
+      "expected": {
+        "columns": [
+          "geo_country",
+          "geo_org"
+        ],
+        "results": [
+          [
+            "US",
+            "Acme Corp"
+          ],
+          [
+            "US",
+            "DigitalOcean LLC"
+          ],
+          [
+            "US",
+            "FastHost Ltd"
+          ],
+          [
+            "US",
+            "FastHost Ltd"
+          ],
+          [
+            "DE",
+            "CloudServe GmbH"
+          ],
+          [
+            "DE",
+            "CloudServe GmbH"
+          ],
+          [
+            "UK",
+            "Acme Corp"
+          ],
+          [
+            "US",
+            "NetGuard AS"
+          ],
+          [
+            "US",
+            "NetGuard AS"
+          ],
+          [
+            "US",
+            "CloudServe GmbH"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q589",
+      "sql": "SELECT COUNT(*) AS cnt FROM \"{stream}\" WHERE re_match(org_name, 'warehouse-(east|west)')",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 35220000000,
+        "end_offset": 35400000000
+      },
+      "expected": {
+        "columns": [
+          "cnt"
+        ],
+        "results": [
+          [
+            "6"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
+      }
+    },
+    {
+      "id": "Q590",
+      "sql": "SELECT facility_zone, COUNT(*) AS cnt FROM \"{stream}\" WHERE re_match(facility_zone, 'ZONE-[1-3]') GROUP BY facility_zone ORDER BY facility_zone",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 35280000000,
+        "end_offset": 35460000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "cnt"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "4"
+          ],
+          [
+            "ZONE-2",
+            "3"
+          ],
+          [
+            "ZONE-3",
+            "5"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
+      }
+    },
+    {
+      "id": "Q591",
+      "sql": "SELECT _timestamp, CONCAT(pallet_id, '-', facility_zone) AS location_key FROM \"{stream}\" WHERE re_match(CONCAT(pallet_id, '-', facility_zone), 'PL-00[1-4]-ZONE-[12]') ORDER BY _timestamp LIMIT 10",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 35340000000,
+        "end_offset": 35520000000
+      },
+      "expected": {
+        "columns": [
+          "location_key"
+        ],
+        "results": [
+          [
+            "PL-004-ZONE-2"
+          ],
+          [
+            "PL-003-ZONE-1"
+          ],
+          [
+            "PL-003-ZONE-1"
+          ],
+          [
+            "PL-004-ZONE-2"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    }
+  ],
+  "last_query_id": 366
+}
