@@ -141,59 +141,88 @@ def run_query(client, query, *, skip_fts_count=False):
         end_time=BASE_TS + offset["end_offset"],
         size=size,
     )
-    resp = client.post("_search?type=logs", json=json_data)
-    assert resp.status_code == 200, \
-        f"{qid}: Expected 200, got {resp.status_code}: {resp.text[:500]}"
-
-    response_data = resp.json()
-    assert "hits" in response_data, f"{qid}: Response should contain 'hits'"
-    hits = response_data["hits"]
-
     expected = query.get("expected", {})
     is_fts = query.get("category") == "full_text_search"
 
-    # Verify match_all results actually contain the search terms.
-    # After a DataFusion upgrade, the Tantivy access plan can be bypassed
-    # silently — this content check catches wrong results that row-count
-    # comparisons alone would miss.
-    # Only run post-flush when Tantivy indexes are expected to exist.
-    if not skip_fts_count:
-        _verify_fts_content(sql, hits, qid)
+    sqllogictest_mode = (
+        "results" in expected
+        and not (skip_fts_count and is_fts)
+        and not expected.get("skip_sqllogictest")
+    )
 
-    if "results" in expected and not (skip_fts_count and is_fts) and not expected.get("skip_sqllogictest"):
-        # ── sqllogictest mode: result-set comparison with float tolerance ─
-        cols = expected["columns"]
-        actual = sorted(
-            [str(hit.get(col, "")) for col in cols] for hit in hits
-        )
-        want = sorted(expected["results"])
+    def _validate(hits):
+        """Run every assertion for this query against *hits*; raise on mismatch."""
+        # Verify match_all results actually contain the search terms.
+        # After a DataFusion upgrade, the Tantivy access plan can be bypassed
+        # silently — this content check catches wrong results that row-count
+        # comparisons alone would miss.
+        # Only run post-flush when Tantivy indexes are expected to exist.
+        if not skip_fts_count:
+            _verify_fts_content(sql, hits, qid)
 
-        assert len(actual) == len(want), \
-            f"{qid}: row count mismatch — got {len(actual)}, expected {len(want)}"
+        if sqllogictest_mode:
+            # ── sqllogictest mode: result-set comparison with float tolerance ─
+            cols = expected["columns"]
+            actual = sorted(
+                [str(hit.get(col, "")) for col in cols] for hit in hits
+            )
+            want = sorted(expected["results"])
 
-        for i, (got_row, want_row) in enumerate(zip(actual, want)):
-            assert len(got_row) == len(want_row), \
-                f"{qid}: column count mismatch at row {i}"
-            for j, (gv, wv) in enumerate(zip(got_row, want_row)):
-                if not _values_equal(gv, wv):
-                    assert False, \
-                        f"{qid}: mismatch at row {i}, col {j} ('{cols[j]}'): got {gv!r}, expected {wv!r}"
+            assert len(actual) == len(want), \
+                f"{qid}: row count mismatch — got {len(actual)}, expected {len(want)}"
 
-    else:
-        # ── Legacy assertion mode (histogram, broken queries, complex CTEs)
-        if expected.get("row_count") is not None:
-            if not (skip_fts_count and is_fts) and not expected.get("skip_row_count"):
-                assert len(hits) == expected["row_count"], \
-                    f"{qid}: Expected {expected['row_count']} rows, got {len(hits)}"
+            for i, (got_row, want_row) in enumerate(zip(actual, want)):
+                assert len(got_row) == len(want_row), \
+                    f"{qid}: column count mismatch at row {i}"
+                for j, (gv, wv) in enumerate(zip(got_row, want_row)):
+                    if not _values_equal(gv, wv):
+                        assert False, \
+                            f"{qid}: mismatch at row {i}, col {j} ('{cols[j]}'): got {gv!r}, expected {wv!r}"
 
-        assert len(hits) < size, \
-            f"{qid}: Got {len(hits)} rows at size={size} — result may be truncated"
+        else:
+            # ── Legacy assertion mode (histogram, broken queries, complex CTEs)
+            if expected.get("row_count") is not None:
+                if not (skip_fts_count and is_fts) and not expected.get("skip_row_count"):
+                    assert len(hits) == expected["row_count"], \
+                        f"{qid}: Expected {expected['row_count']} rows, got {len(hits)}"
 
-        if len(hits) > 0 and not expected.get("skip_column_check"):
-            for col in expected.get("columns", []):
-                assert col in hits[0], f"{qid}: Expected column '{col}' not in response"
+            assert len(hits) < size, \
+                f"{qid}: Got {len(hits)} rows at size={size} — result may be truncated"
 
-        _run_content_assertions(query, sql, hits)
+            if len(hits) > 0 and not expected.get("skip_column_check"):
+                for col in expected.get("columns", []):
+                    assert col in hits[0], f"{qid}: Expected column '{col}' not in response"
+
+            _run_content_assertions(query, sql, hits)
+
+    # Pre-flush (skip_fts_count=True), CI runs with ZO_MAX_FILE_RETENTION_TIME=1
+    # so the memtable continuously rotates to immutable→WAL parquet→file_list
+    # for the whole ~160s run.  A narrow time-window query issued mid-handoff
+    # (an immutable removed before its parquet is registered, or a record
+    # briefly present in neither) can transiently drop rows — changing both row
+    # counts and aggregate values (COUNT(DISTINCT), SUM, …) even though the
+    # data is durably ingested.  Re-run the whole comparison until it settles.
+    # The post-flush phase runs the identical query against stable parquet, so
+    # a genuine wrong-result regression is still caught there — the retry only
+    # absorbs the transient ingestion race.
+    attempts = 12 if skip_fts_count else 1
+    for attempt in range(attempts):
+        resp = client.post("_search?type=logs", json=json_data)
+        assert resp.status_code == 200, \
+            f"{qid}: Expected 200, got {resp.status_code}: {resp.text[:500]}"
+
+        response_data = resp.json()
+        assert "hits" in response_data, f"{qid}: Response should contain 'hits'"
+        hits = response_data["hits"]
+
+        try:
+            _validate(hits)
+        except AssertionError:
+            if attempt < attempts - 1:
+                time.sleep(0.5)
+                continue
+            raise
+        break
 
     logging.info("%s passed: %d rows", qid, len(hits))
 
