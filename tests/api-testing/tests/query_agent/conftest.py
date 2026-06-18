@@ -72,7 +72,7 @@ def load_all_queries():
             data = json.load(f)
         queries = data["queries"]
         if not single_node_opt:
-            queries = [q for q in queries if not q.get("skip_without_single_node_opt")]
+            queries = [q for q in queries if not q.get("expected", {}).get("skip_without_single_node_opt")]
         categories[fp.stem] = queries
     return categories
 
