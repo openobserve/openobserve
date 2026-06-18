@@ -136,8 +136,8 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.traceDetail",
     shortcuts: [
-      { key: "j / ↓", descriptionKey: "shortcuts.actions.traceNextSpan" },
-      { key: "k / ↑", descriptionKey: "shortcuts.actions.tracePrevSpan" },
+      { key: "J / ↓", descriptionKey: "shortcuts.actions.traceNextSpan" },
+      { key: "K / ↑", descriptionKey: "shortcuts.actions.tracePrevSpan" },
     ],
   },
 

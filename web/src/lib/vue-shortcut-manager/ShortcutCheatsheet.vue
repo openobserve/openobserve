@@ -7,51 +7,48 @@
     :max-height="85"
     data-test="shortcut-cheatsheet-dialog"
   >
-    <!-- ── Sticky header: title row + search ── -->
+    <!-- ── Sticky header: icon + title | search | close ── -->
     <template #header>
-      <div class="tw:flex tw:flex-col tw:gap-3 tw:w-full">
-        <!-- Title row -->
-        <div class="tw:flex tw:items-center tw:justify-between">
-          <div class="tw:flex tw:items-center tw:gap-2.5">
-            <div
-              class="tw:flex tw:items-center tw:justify-center tw:w-8 tw:h-8 tw:rounded-lg tw:shrink-0"
-              style="background: color-mix(in srgb, var(--o2-primary-color) 12%, transparent)"
-            >
-              <OIcon
-                name="key"
-                class="tw:text-[var(--o2-primary-color)] tw:w-4 tw:h-4"
-              />
+      <div class="tw:flex tw:items-center tw:gap-3 tw:w-full">
+        <div class="tw:flex tw:items-center tw:gap-2.5 tw:shrink-0">
+          <div
+            class="tw:flex tw:items-center tw:justify-center tw:w-8 tw:h-8 tw:rounded-lg tw:shrink-0"
+            style="background: color-mix(in srgb, var(--o2-primary-color) 12%, transparent)"
+          >
+            <OIcon name="key" class="tw:text-[var(--o2-primary-color)] tw:w-4 tw:h-4" />
+          </div>
+          <div>
+            <div class="tw:text-[15px] tw:font-semibold tw:leading-tight tw:text-[var(--o2-text-primary)]">
+              {{ t("shortcuts.title") }}
             </div>
-            <div>
-              <div class="tw:text-[15px] tw:font-semibold tw:leading-tight tw:text-[var(--o2-text-primary)]">
-                {{ t("shortcuts.title") }}
-              </div>
-              <div class="tw:text-[11px] tw:text-[var(--o2-text-secondary)] tw:mt-0.5">
-                {{ t("shortcuts.subtitle") }}
-              </div>
+            <div class="tw:text-[11px] tw:text-[var(--o2-text-secondary)] tw:mt-0.5">
+              {{ t("shortcuts.subtitle") }}
             </div>
           </div>
-          <OButton
-            variant="ghost"
-            icon-left="close"
-            size="icon"
-            data-test="shortcut-cheatsheet-close-btn"
-            @click="open = false"
+        </div>
+
+        <div class="tw:flex-1" />
+
+        <div class="tw:w-56 tw:shrink-0">
+          <OSearchInput
+            v-model="search"
+            :placeholder="t('shortcuts.search')"
+            data-test="shortcut-cheatsheet-search"
           />
         </div>
 
-        <!-- Sticky search -->
-        <OSearchInput
-          v-model="search"
-          :placeholder="t('shortcuts.search')"
-          class="tw:w-full"
-          data-test="shortcut-cheatsheet-search"
+        <OButton
+          variant="ghost"
+          icon-left="close"
+          size="icon"
+          class="tw:shrink-0"
+          data-test="shortcut-cheatsheet-close-btn"
+          @click="open = false"
         />
       </div>
     </template>
 
     <!-- ── Scrollable body ── -->
-    <!-- No results -->
     <div
       v-if="filteredColumns[0].length === 0 && filteredColumns[1].length === 0"
       class="tw:text-center tw:py-10 tw:text-[13px] tw:text-[var(--o2-text-secondary)]"
@@ -60,30 +57,24 @@
       {{ t("shortcuts.noResults") }}
     </div>
 
-    <!-- Two-column layout -->
-    <div
-      v-else
-      class="tw:grid tw:grid-cols-2 tw:gap-x-8 tw:gap-y-0"
-    >
+    <div v-else class="tw:grid tw:grid-cols-2 tw:gap-x-8 tw:gap-y-0">
       <!-- Left column -->
       <div class="tw:flex tw:flex-col">
         <template v-for="group in filteredColumns[0]" :key="group.title">
-          <!-- Section header -->
           <div
             class="tw:flex tw:items-center tw:gap-2 tw:pt-4 tw:pb-1.5 tw:px-1"
             data-test="shortcut-cheatsheet-category"
           >
-            <span
-              class="tw:text-[10px] tw:font-bold tw:uppercase tw:tracking-widest tw:text-[var(--o2-primary-color)]"
-            >{{ group.title }}</span>
+            <span class="tw:text-[11px] tw:font-semibold tw:tracking-wide tw:text-[var(--o2-primary-color)]">
+              {{ group.title }}
+            </span>
             <div class="tw:flex-1 tw:h-px tw:bg-[var(--o2-border)]" />
           </div>
-          <!-- Shortcut rows -->
           <ul class="tw:list-none tw:p-0 tw:m-0">
             <li
               v-for="entry in group.entries"
               :key="entry.key + entry.label"
-              class="tw:group tw:flex tw:justify-between tw:items-center tw:py-1.5 tw:px-2 tw:rounded-md tw:cursor-pointer tw:transition-colors tw:duration-100 hover:tw:bg-[var(--o2-primary-background)]"
+              class="tw:flex tw:justify-between tw:items-center tw:py-1.5 tw:px-2 tw:rounded-md tw:cursor-pointer tw:transition-colors tw:duration-100 hover:tw:bg-[var(--o2-primary-background)]"
               :data-test="`shortcut-cheatsheet-row-${entry.label.toLowerCase().replace(/\s+/g, '-')}`"
               @click="triggerEntry(entry)"
             >
@@ -112,22 +103,20 @@
       <!-- Right column -->
       <div class="tw:flex tw:flex-col tw:border-l tw:border-[var(--o2-border)] tw:pl-8">
         <template v-for="group in filteredColumns[1]" :key="group.title">
-          <!-- Section header -->
           <div
             class="tw:flex tw:items-center tw:gap-2 tw:pt-4 tw:pb-1.5 tw:px-1"
             data-test="shortcut-cheatsheet-category"
           >
-            <span
-              class="tw:text-[10px] tw:font-bold tw:uppercase tw:tracking-widest tw:text-[var(--o2-primary-color)]"
-            >{{ group.title }}</span>
+            <span class="tw:text-[11px] tw:font-semibold tw:tracking-wide tw:text-[var(--o2-primary-color)]">
+              {{ group.title }}
+            </span>
             <div class="tw:flex-1 tw:h-px tw:bg-[var(--o2-border)]" />
           </div>
-          <!-- Shortcut rows -->
           <ul class="tw:list-none tw:p-0 tw:m-0">
             <li
               v-for="entry in group.entries"
               :key="entry.key + entry.label"
-              class="tw:group tw:flex tw:justify-between tw:items-center tw:py-1.5 tw:px-2 tw:rounded-md tw:cursor-pointer tw:transition-colors tw:duration-100 hover:tw:bg-[var(--o2-primary-background)]"
+              class="tw:flex tw:justify-between tw:items-center tw:py-1.5 tw:px-2 tw:rounded-md tw:cursor-pointer tw:transition-colors tw:duration-100 hover:tw:bg-[var(--o2-primary-background)]"
               :data-test="`shortcut-cheatsheet-row-${entry.label.toLowerCase().replace(/\s+/g, '-')}`"
               @click="triggerEntry(entry)"
             >
@@ -160,14 +149,14 @@
         <div class="tw:flex tw:items-center tw:gap-1.5 tw:flex-wrap">
           <kbd class="tw:inline-flex tw:items-center tw:justify-center tw:h-5 tw:px-1.5 tw:bg-[var(--o2-card-background)] tw:border tw:border-[var(--o2-border)] tw:rounded tw:font-mono tw:text-[11px] tw:shadow-[0_1px_0_0_var(--o2-border)]">Esc</kbd>
           <span>{{ t("shortcuts.footerClose") }}</span>
-          <span class="tw:text-[var(--o2-border)]">·</span>
+          <span class="tw:opacity-40">·</span>
           <kbd class="tw:inline-flex tw:items-center tw:justify-center tw:h-5 tw:px-1.5 tw:bg-[var(--o2-card-background)] tw:border tw:border-[var(--o2-border)] tw:rounded tw:font-mono tw:text-[11px] tw:shadow-[0_1px_0_0_var(--o2-border)]">?</kbd>
           <span>{{ t("shortcuts.footerReopen") }}</span>
-          <span class="tw:text-[var(--o2-border)]">·</span>
+          <span class="tw:opacity-40">·</span>
           <kbd class="tw:inline-flex tw:items-center tw:justify-center tw:h-5 tw:px-1.5 tw:bg-[var(--o2-card-background)] tw:border tw:border-[var(--o2-border)] tw:rounded tw:font-mono tw:text-[11px] tw:shadow-[0_1px_0_0_var(--o2-border)]">↵</kbd>
           <span>{{ t("shortcuts.footerRun") }}</span>
         </div>
-        <div class="tw:text-[var(--o2-text-secondary)] tw:opacity-70">{{ t("shortcuts.footerMacHint") }}</div>
+        <div class="tw:opacity-60">{{ t("shortcuts.footerMacHint") }}</div>
       </div>
     </template>
   </ODialog>
@@ -243,13 +232,13 @@ const filteredGroups = computed<DisplayGroup[]>(() => {
   });
 });
 
-/** Split groups into two columns balanced by total entry count, not group count. */
+/** Split groups into two columns balanced by total entry count. */
 const filteredColumns = computed<[DisplayGroup[], DisplayGroup[]]>(() => {
   const groups = filteredGroups.value;
   const totalEntries = groups.reduce((sum, g) => sum + g.entries.length, 0);
   const target = totalEntries / 2;
   let accumulated = 0;
-  let splitAt = groups.length; // default: everything left
+  let splitAt = groups.length;
   for (let i = 0; i < groups.length; i++) {
     accumulated += groups[i].entries.length;
     if (accumulated >= target) {
