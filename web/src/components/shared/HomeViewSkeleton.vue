@@ -3,17 +3,12 @@
        skeleton must not add one (otherwise a top/outer border flashes only while
        loading and disappears once data arrives). -->
   <div
-    class="tw:w-full tw:px-[0.625rem] tw:py-[0.625rem]"
+    class="home-view-skeleton tw:w-full tw:px-[0.625rem] tw:py-[0.625rem]"
     style="display: flex; flex-direction: column; height: calc(100vh - 52px)"
   >
     <!-- 1st section - Streams container -->
     <div
       class="feature-card tw:bg-(--tile-bg) tw:border-[0.0625rem] tw:border-(--o2-border-color) tw:rounded-lg tw:p-4"
-      :class="
-        store.state.theme === 'dark'
-          ? 'dark-stream-container'
-          : 'light-stream-container'
-      "
     >
       <!-- Header -->
       <div class="tw:flex tw:justify-between tw:items-center tw:mb-4">
@@ -28,12 +23,7 @@
       <div class="tiles-grid tw:grid tw:gap-4" style="grid-template-columns: repeat(auto-fit, minmax(240px, 1fr))">
         <div v-for="n in 5" :key="n" class="tw:rounded-[0.325rem] tw:border-[0.0625rem] tw:border-(--o2-border-color)">
           <div
-            class="tile-content tw:h-full tw:p-4 tw:rounded-lg tw:gap-2 tw:rounded tw:text-center tw:flex tw:flex-col tw:justify-between"
-            :class="
-              store.state.theme === 'dark'
-                ? 'dark-tile-content'
-                : 'light-tile-content'
-            "
+            class="tile-content tw:h-full tw:p-4 tw:rounded-lg tw:gap-2 tw:rounded tw:text-center tw:flex tw:flex-col tw:justify-between tw:bg-(--tile-bg) tw:border tw:border-(--tile-border) tw:text-(--text-primary) tw:[--tile-bg:#ffffff] tw:[--tile-border:#e7eaee] tw:[--text-primary:#2e3133] tw:dark:[--tile-bg:#2b2c2d] tw:dark:[--tile-border:#444444] tw:dark:[--text-primary:#cccfd1]"
           >
             <!-- Top Section (60%) -->
             <div class="tw:flex tw:flex-col tw:justify-between">
@@ -60,12 +50,7 @@
         <!-- Functions tile -->
         <div class="tile-wrapper tw:flex-1 tw:flex tw:min-w-0 tw:w-full">
           <div
-            class="feature-card tw:bg-(--tile-bg) tw:border-[0.0625rem] tw:border-(--o2-border-color) tw:rounded-lg tw:p-4 tw:w-full tw:rounded tw:text-center tw:flex tw:flex-col tw:justify-between"
-            :class="
-              store.state.theme === 'dark'
-                ? 'dark-tile-content'
-                : 'light-tile-content'
-            "
+            class="feature-card tw:bg-(--tile-bg) tw:border-[0.0625rem] tw:border-(--tile-border) tw:rounded-lg tw:p-4 tw:w-full tw:rounded tw:text-center tw:flex tw:flex-col tw:justify-between tw:text-(--text-primary) tw:[--tile-bg:#ffffff] tw:[--tile-border:#e7eaee] tw:[--text-primary:#2e3133] tw:dark:[--tile-bg:#2b2c2d] tw:dark:[--tile-border:#444444] tw:dark:[--text-primary:#cccfd1]"
           >
             <div class="tw:flex tw:flex-col tw:justify-between">
               <div
@@ -85,12 +70,7 @@
         <!-- Dashboards tile -->
         <div class="tile-wrapper tw:flex-1 tw:flex tw:min-w-0 tw:w-full">
           <div
-            class="feature-card tw:bg-(--tile-bg) tw:border-[0.0625rem] tw:border-(--o2-border-color) tw:rounded-lg tw:p-4 tw:w-full tw:rounded tw:text-center tw:flex tw:flex-col tw:justify-between"
-            :class="
-              store.state.theme === 'dark'
-                ? 'dark-tile-content'
-                : 'light-tile-content'
-            "
+            class="feature-card tw:bg-(--tile-bg) tw:border-[0.0625rem] tw:border-(--tile-border) tw:rounded-lg tw:p-4 tw:w-full tw:rounded tw:text-center tw:flex tw:flex-col tw:justify-between tw:text-(--text-primary) tw:[--tile-bg:#ffffff] tw:[--tile-border:#e7eaee] tw:[--text-primary:#2e3133] tw:dark:[--tile-bg:#2b2c2d] tw:dark:[--tile-border:#444444] tw:dark:[--text-primary:#cccfd1]"
           >
             <div class="tw:flex tw:flex-col tw:justify-between">
               <div
@@ -110,12 +90,7 @@
 
       <!-- Alerts Chart -->
       <div
-        class="feature-card first-chart-container tw:bg-(--tile-bg) tw:border-[0.0625rem] tw:border-(--o2-border-color) tw:rounded-lg tw:rounded tw:p-4"
-        :class="
-          store.state.theme === 'dark'
-            ? 'chart-container-dark'
-            : 'chart-container-light'
-        "
+        class="feature-card first-chart-container tw:bg-(--tile-bg) tw:border-[0.0625rem] tw:border-(--tile-border) tw:rounded-lg tw:rounded tw:p-4 tw:[--tile-bg:#ffffff] tw:[--tile-border:#e7eaee] tw:dark:[--tile-bg:#2b2c2d] tw:dark:[--tile-border:#444444]"
       >
         <div class="details-container tw:flex tw:flex-col tw:gap-3 tw:mb-4">
           <!-- Header -->
@@ -162,12 +137,7 @@
 
       <!-- Pipelines Chart -->
       <div
-        class="feature-card second-chart-container tw:bg-(--tile-bg) tw:border-[0.0625rem] tw:border-(--o2-border-color) tw:rounded-lg tw:rounded tw:p-4"
-        :class="
-          store.state.theme === 'dark'
-            ? 'chart-container-dark'
-            : 'chart-container-light'
-        "
+        class="feature-card second-chart-container tw:bg-(--tile-bg) tw:border-[0.0625rem] tw:border-(--tile-border) tw:rounded-lg tw:rounded tw:p-4 tw:[--tile-bg:#ffffff] tw:[--tile-border:#e7eaee] tw:dark:[--tile-bg:#2b2c2d] tw:dark:[--tile-border:#444444]"
       >
         <div class="details-container tw:flex tw:flex-col tw:gap-3 tw:mb-4">
           <!-- Header -->
@@ -216,47 +186,11 @@
 </template>
 
 <script setup lang="ts">
-import { useStore } from "vuex";
 import SkeletonBox from "./SkeletonBox.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
-
-const store = useStore();
 </script>
 
 <style>
-.dark-tile-content,
-.light-tile-content {
-  background: var(--tile-bg);
-  border: 1px solid var(--tile-border);
-  color: var(--text-primary);
-}
-
-.dark-tile-content {
-  --tile-bg: #2b2c2d;
-  --tile-border: #444444;
-  --text-primary: #cccfd1;
-}
-
-.light-tile-content {
-  --tile-bg: #ffffff;
-  --tile-border: #e7eaee;
-  --text-primary: #2e3133;
-}
-
-.chart-container-light {
-  border: 1px solid var(--tile-border);
-  background: var(--tile-bg);
-  --tile-bg: #ffffff;
-  --tile-border: #e7eaee;
-}
-
-.chart-container-dark {
-  border: 1px solid var(--tile-border);
-  background: var(--tile-bg);
-  --tile-bg: #2b2c2d;
-  --tile-border: #444444;
-}
-
 /* Responsive overrides for charts-main-container */
 @media (max-width: 1280px) {
   .charts-main-container {
@@ -278,39 +212,20 @@ const store = useStore();
   }
 }
 
-/* Descendant selector: tile-wrapper > feature-card must be full width */
-.tile-wrapper .feature-card {
-  width: 100%;
+/* Skeleton base/shimmer theming for the child SkeletonBox component.
+   The base ::after overlay + keyframes live in SkeletonBox.vue; these only
+   override the surface colour + dim the shimmer per theme, scoped to this
+   component so they don't leak to other SkeletonBox usages. The explicit
+   colours guard against this legacy view loading before the token root. */
+.home-view-skeleton .skeleton-box {
+  background-color: #f5f5f5;
 }
 
-/* Flat base + sliding ::after overlay — same pattern as OSkeleton/SkeletonBox.
-   Dark/light theme overrides set the base colour explicitly since this is
-   a legacy component that may load before the O2 token root is applied. */
-.skeleton-box::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    90deg,
-    transparent       0%,
-    transparent      30%,
-    var(--color-skeleton-shimmer, rgba(255, 255, 255, 0.8)) 50%,
-    transparent      70%,
-    transparent     100%
-  );
-  animation: skeleton-shimmer 1.8s ease-in-out infinite;
-}
-
-/* Dark theme — swap to dark surface base, dimmer shimmer */
-.dark-stream-container .skeleton-box,
-.dark-tile-content .skeleton-box,
-.chart-container-dark .skeleton-box {
+.dark .home-view-skeleton .skeleton-box {
   background-color: #262626;
 }
 
-.dark-stream-container .skeleton-box::after,
-.dark-tile-content .skeleton-box::after,
-.chart-container-dark .skeleton-box::after {
+.dark .home-view-skeleton .skeleton-box::after {
   background: linear-gradient(
     90deg,
     transparent                   0%,
@@ -319,17 +234,5 @@ const store = useStore();
     transparent                  70%,
     transparent                 100%
   );
-}
-
-/* Light theme — explicit override in case token isn't resolved */
-.light-stream-container .skeleton-box,
-.light-tile-content .skeleton-box,
-.chart-container-light .skeleton-box {
-  background-color: #f5f5f5;
-}
-
-@keyframes skeleton-shimmer {
-  0%   { transform: translateX(-100%); }
-  100% { transform: translateX(100%); }
 }
 </style>

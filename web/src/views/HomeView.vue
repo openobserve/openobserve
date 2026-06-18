@@ -326,11 +326,11 @@ export default defineComponent({
     0 18px 44px -10px rgba(123, 97, 255, 0.3) !important;
 }
 
-.home-ai-panel .unified-input-box.light-mode {
+.home-ai-panel .unified-input-box {
   --o2-ai-input-bg: #ffffff;
 }
 
-.home-ai-panel .unified-input-box.dark-mode {
+.dark .home-ai-panel .unified-input-box {
   --o2-ai-input-bg: #191919;
   box-shadow:
     0 2px 4px rgba(0, 0, 0, 0.45),
@@ -359,7 +359,7 @@ export default defineComponent({
     0 16px 40px -8px rgba(123, 97, 255, 0.32) !important;
 }
 
-.home-ai-panel .unified-input-box.dark-mode:focus-within {
+.dark .home-ai-panel .unified-input-box:focus-within {
   box-shadow:
     0 1px 2px rgba(0, 0, 0, 0.4),
     0 6px 20px -2px rgba(0, 0, 0, 0.55),

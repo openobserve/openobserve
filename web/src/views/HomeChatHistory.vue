@@ -92,7 +92,7 @@ function formatTime(ts: string): string {
 
 <template>
   <div
-    class="tw:flex tw:flex-col tw:h-full tw:text-base tw:w-[15em] tw:shrink-0 tw:border-r tw:border-[0.0625em] tw:border-(--o2-border-color) tw:bg-(--o2-card-bg) tw:overflow-hidden"
+    class="tw:flex tw:flex-col tw:h-full tw:text-base tw:w-[15em] tw:shrink-0 tw:border-r tw:border-r-[0.0625em] tw:border-(--o2-border-color) tw:bg-(--o2-card-bg) tw:overflow-hidden"
     :class="store.state.theme === 'dark' ? 'hch-dark' : 'hch-light'"
   >
     <!-- Header -->
@@ -170,18 +170,17 @@ function formatTime(ts: string): string {
       <div
         v-for="chat in filtered"
         :key="chat.id"
-        class="hch-item tw:flex tw:items-center tw:gap-1 tw:py-[0.4375em] tw:px-2 tw:rounded-md tw:cursor-pointer tw:transition-[background] tw:duration-[120ms] tw:hover:bg-[var(--o2-hover-color,rgba(128,128,128,0.1))]"
+        class="tw:group tw:flex tw:items-center tw:gap-1 tw:py-[0.4375em] tw:px-2 tw:rounded-md tw:cursor-pointer tw:transition-[background] tw:duration-[120ms] tw:hover:bg-[var(--o2-hover-color,rgba(128,128,128,0.1))]"
         :class="{
-          'hch-item-active': activeChatId === chat.id,
           'tw:bg-[var(--o2-selected-color,rgba(57,126,246,0.12))]!': activeChatId === chat.id,
         }"
         @click="selectChat(chat.id)"
       >
         <div class="tw:flex-1 tw:min-w-0">
-          <div class="hch-item-title tw:text-[0.8125em] tw:leading-[1.35] tw:truncate tw:text-(--o2-text-body)">{{ chat.title }}</div>
+          <div class="tw:text-[0.8125em] tw:leading-[1.35] tw:truncate tw:text-(--o2-text-body)" :class="{ 'tw:font-medium': activeChatId === chat.id }">{{ chat.title }}</div>
           <div class="tw:text-[0.6875em] tw:text-(--o2-text-caption) tw:mt-[0.0625em]">{{ formatTime(chat.timestamp) }}</div>
         </div>
-        <span class="hch-delete-wrap tw:inline-flex tw:items-center tw:shrink-0 tw:opacity-0 tw:transition-opacity tw:duration-[120ms]">
+        <span class="tw:inline-flex tw:items-center tw:shrink-0 tw:opacity-0 tw:transition-opacity tw:duration-[120ms] tw:group-hover:opacity-100">
           <OButton
             variant="ghost-destructive"
             size="icon"
@@ -216,7 +215,7 @@ function formatTime(ts: string): string {
     </div>
 
     <!-- Clear all -->
-    <div v-if="history.length > 0" class="tw:shrink-0 tw:py-[0.375em] tw:px-2 tw:border-t tw:border-[0.0625em] tw:border-(--o2-border-color)">
+    <div v-if="history.length > 0" class="tw:shrink-0 tw:py-[0.375em] tw:px-2 tw:border-t tw:border-t-[0.0625em] tw:border-t-(--o2-border-color)">
       <OButton variant="ghost-subtle" :block="true" @click="clearAll">
         <svg
           width="0.875em"
@@ -242,16 +241,5 @@ function formatTime(ts: string): string {
 .hch-search-input::placeholder {
   color: var(--o2-text-muted);
   opacity: 0.7;
-}
-
-/* descendant selector — cannot be inlined on parent */
-.hch-item:hover .hch-delete-wrap {
-  opacity: 1;
-}
-
-/* descendant selector — cannot be inlined on parent */
-.hch-item-active .hch-item-title {
-  color: var(--o2-text-body);
-  font-weight: 500;
 }
 </style>
