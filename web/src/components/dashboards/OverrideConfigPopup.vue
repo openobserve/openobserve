@@ -31,7 +31,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         class="tw:flex tw:flex-col tw:gap-2.5 tw:min-w-0 tw:p-3 tw:border-r tw:border-[rgba(128,128,128,0.18)]"
       >
-        <ODropdown v-model:open="addOpenLeft" align="start">
+        <ODropdown
+          v-model:open="addOpenLeft"
+          align="start"
+          content-class="tw:min-w-(--reka-popper-anchor-width)!"
+        >
           <template #trigger>
             <button
               type="button"
@@ -42,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("dashboard.columnFormattingAddField") }}
             </button>
           </template>
-          <div class="tw:min-w-[200px] tw:max-h-[280px] tw:overflow-y-auto tw:p-1">
+          <div class="tw:max-h-[17.5rem] tw:overflow-y-auto">
             <ODropdownItem
               v-for="opt in availableToAdd"
               :key="opt.value"
@@ -174,7 +178,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <template #actions>
-            <ODropdown v-model:open="addOpenCenter" align="center">
+            <ODropdown
+              v-model:open="addOpenCenter"
+              align="start"
+              content-class="tw:min-w-(--reka-popper-anchor-width)!"
+            >
               <template #trigger>
                 <OButton
                   variant="primary"
@@ -184,7 +192,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ t("dashboard.columnFormattingAddField") }}
                 </OButton>
               </template>
-              <div class="tw:min-w-[200px] tw:max-h-[280px] tw:overflow-y-auto tw:p-1">
+              <div class="tw:max-h-[17.5rem] tw:overflow-y-auto">
                 <ODropdownItem
                   v-for="opt in availableToAdd"
                   :key="opt.value"

@@ -46,14 +46,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OSelect
         v-model="col.unit"
         :options="unitOptions"
-        class="tw:w-full tw:max-w-[360px]"
+        class="tw:w-full tw:max-w-[22.5rem]"
         :data-test="`o2-format-unit-${col.field}`"
       />
       <OInput
         v-if="col.unit === 'custom'"
         v-model="col.customUnit"
         :label="t('dashboard.customunitLabel')"
-        class="tw:w-full tw:max-w-[360px] tw:mt-2"
+        class="tw:w-full tw:max-w-[22.5rem] tw:mt-2"
         :data-test="`o2-format-custom-unit-${col.field}`"
       />
     </div>
@@ -84,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="tw:px-3 tw:py-2">
       <div class="o-input-label tw:block tw:mb-1.5">{{ t("dashboard.sectionStyling") }}</div>
       <div class="tw:flex tw:items-center tw:gap-2 tw:mt-2 tw:flex-wrap">
-        <span class="o-input-label tw:shrink-0 tw:min-w-16">{{ t("dashboard.textColor") }}</span>
+        <span class="o-input-label tw:shrink-0 tw:w-24">{{ t("dashboard.textColor") }}</span>
         <ColorSwatchPicker
           v-model="col.textColor"
           :swatches="TEXT_SWATCHES"
@@ -92,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
       <div class="tw:flex tw:items-center tw:gap-2 tw:mt-2 tw:flex-wrap">
-        <span class="o-input-label tw:shrink-0 tw:min-w-16">{{ t("dashboard.bgColor") }}</span>
+        <span class="o-input-label tw:shrink-0 tw:w-24">{{ t("dashboard.bgColor") }}</span>
         <ColorSwatchPicker
           v-model="col.bgColor"
           :swatches="BG_SWATCHES"
@@ -127,52 +127,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-for="(rule, ruleIdx) in col.conditions"
         :key="ruleIdx"
-        class="tw:flex tw:items-start tw:gap-1 tw:mb-1.5"
+        class="tw:flex tw:flex-col tw:gap-2 tw:py-2 tw:px-2.5 tw:mb-1.5 tw:rounded-md tw:bg-[rgba(128,128,128,0.04)] tw:border tw:border-[rgba(128,128,128,0.1)]"
       >
-        <div class="tw:flex-1 tw:min-w-0 tw:py-2 tw:px-2.5 tw:rounded-md tw:bg-[rgba(128,128,128,0.04)] tw:border tw:border-[rgba(128,128,128,0.1)] tw:flex tw:flex-col tw:gap-2">
-          <div class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap">
-            <span class="o-input-label tw:shrink-0 tw:w-[110px]">{{ t("dashboard.conditionIfValue") }}</span>
-            <div class="tw:flex-1 tw:min-w-[150px] tw:max-w-[210px]">
-              <OSelect
-                v-model="rule.operator"
-                :options="conditionOperators"
-                class="tw:w-full"
-              />
-            </div>
+        <div class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap">
+          <span class="o-input-label tw:shrink-0 tw:w-28">{{ t("dashboard.conditionIfValue") }}</span>
+          <div class="tw:w-52 tw:shrink-0">
+            <OSelect
+              v-model="rule.operator"
+              :options="conditionOperators"
+              class="tw:w-full"
+            />
+          </div>
+          <div class="tw:w-28 tw:shrink-0">
             <OInput
               v-model="rule.threshold"
               type="number"
               :placeholder="t('dashboard.conditionThreshold')"
-              class="tw:flex-1 tw:min-w-[80px]"
+              class="tw:w-full"
             />
           </div>
-          <div class="tw:flex tw:items-center tw:gap-x-4 tw:gap-y-2 tw:flex-wrap">
-            <div class="tw:flex tw:items-center tw:gap-2">
-              <span class="o-input-label tw:shrink-0 tw:w-[110px] tw:text-[var(--color-text-secondary,#9e9e9e)]">{{ t("dashboard.conditionThenText") }}</span>
-              <ColorSwatchPicker
-                v-model="rule.textColor"
-                :swatches="TEXT_SWATCHES"
-                :data-test="`o2-format-cond-text-${col.field}-${ruleIdx}`"
-              />
-            </div>
-            <div class="tw:flex tw:items-center tw:gap-2">
-              <span class="o-input-label tw:shrink-0 tw:text-[var(--color-text-secondary,#9e9e9e)]">{{ t("dashboard.conditionAndBg") }}</span>
-              <ColorSwatchPicker
-                v-model="rule.bgColor"
-                :swatches="BG_SWATCHES"
-                :data-test="`o2-format-cond-bg-${col.field}-${ruleIdx}`"
-              />
-            </div>
-          </div>
+          <OButton
+            variant="ghost"
+            size="icon-xs"
+            icon-left="close"
+            :title="t('common.remove')"
+            class="tw:shrink-0 tw:ml-auto"
+            @click="col.conditions.splice(ruleIdx, 1)"
+          />
         </div>
-        <OButton
-          variant="ghost"
-          size="icon-xs"
-          icon-left="close"
-          :title="t('common.remove')"
-          class="tw:shrink-0 tw:mt-2"
-          @click="col.conditions.splice(ruleIdx, 1)"
-        />
+        <div class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap">
+          <span class="o-input-label tw:shrink-0 tw:w-28 tw:text-[var(--color-text-secondary,#9e9e9e)]">{{ t("dashboard.conditionThenText") }}</span>
+          <ColorSwatchPicker
+            v-model="rule.textColor"
+            :swatches="TEXT_SWATCHES"
+            :data-test="`o2-format-cond-text-${col.field}-${ruleIdx}`"
+          />
+        </div>
+        <div class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap">
+          <span class="o-input-label tw:shrink-0 tw:w-28 tw:text-[var(--color-text-secondary,#9e9e9e)]">{{ t("dashboard.conditionAndBg") }}</span>
+          <ColorSwatchPicker
+            v-model="rule.bgColor"
+            :swatches="BG_SWATCHES"
+            :data-test="`o2-format-cond-bg-${col.field}-${ruleIdx}`"
+          />
+        </div>
       </div>
       <OButton
         variant="outline"
