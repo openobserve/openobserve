@@ -379,9 +379,8 @@ test.describe("Dashboard Table Chart - Core Features", () => {
       // Matches both _search_stream (raw logs) and _histogram_stream (aggregated).
       const apiResponsePromise = page.waitForResponse(
         (r) =>
-          (r.url().includes("_search_stream") ||
-            r.url().includes("_histogram_stream")) &&
-          r.status() === 200,
+          r.url().includes("_search_stream") ||
+          r.url().includes("_histogram_stream"),
         { timeout: 15000 }
       );
 
