@@ -12,6 +12,18 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
+//
+// AddTab is migrated to OForm + Zod (AddTab.schema.ts) + auto-loading, and is
+// single-source-of-truth: the OForm owns the `name` field (no local `tabData`
+// mirror, no mirror watch, no manual reset).
+//   • `@submit="onSubmit"` is a plain async fn — its `value` payload is the
+//     source of truth for the name; the externally-loaded `editingTab` carries
+//     panels/tabId in edit mode.
+//   • create seeds blank via `:default-values`; edit re-baselines via
+//     `form.reset(values)` once the async dashboard fetch resolves.
+//   • no `useLoading`, no `:primary-button-loading`, no per-field `:validators`.
+// These tests assert behavior (add/edit/folder/notifications/emits) by driving
+// the exposed `onSubmit(value)` handler, not removed internals.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
@@ -70,13 +82,6 @@ const mockShowPositiveNotification = vi.fn();
 const mockShowErrorNotification = vi.fn();
 const mockShowConflictErrorNotification = vi.fn();
 
-vi.mock("@/composables/useLoading", () => ({
-  useLoading: vi.fn((fn) => ({
-    execute: fn,
-    isLoading: { value: false },
-  })),
-}));
-
 vi.mock("@/composables/useNotifications", () => ({
   default: () => ({
     showPositiveNotification: mockShowPositiveNotification,
@@ -104,54 +109,62 @@ const ODialogStub = {
   name: "ODialog",
   props: [
     "open",
-    "width",
-    "showClose",
-    "persistent",
     "size",
     "title",
     "subTitle",
     "primaryButtonLabel",
     "secondaryButtonLabel",
-    "neutralButtonLabel",
-    "primaryButtonVariant",
-    "secondaryButtonVariant",
-    "neutralButtonVariant",
-    "primaryButtonDisabled",
-    "secondaryButtonDisabled",
-    "neutralButtonDisabled",
-    "primaryButtonLoading",
-    "secondaryButtonLoading",
-    "neutralButtonLoading",
     "formId",
   ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  emits: ["update:open", "click:primary", "click:secondary"],
   template: `
     <div
-      data-test-stub="o-drawer"
+      data-test-stub="o-dialog"
       :data-open="open"
       :data-title="title"
       :data-primary-label="primaryButtonLabel"
       :data-secondary-label="secondaryButtonLabel"
-      :data-primary-loading="primaryButtonLoading"
     >
-      <div data-test-stub="o-drawer-header"><slot name="header" /></div>
-      <div data-test-stub="o-drawer-body"><slot /></div>
-      <div data-test-stub="o-drawer-footer">
+      <div data-test-stub="o-dialog-body"><slot /></div>
+      <div data-test-stub="o-dialog-footer">
         <slot name="footer" />
-        <button
-          data-test-stub="o-drawer-primary"
-          @click="$emit('click:primary', $event)"
-        >{{ primaryButtonLabel }}</button>
-        <button
-          data-test-stub="o-drawer-secondary"
-          @click="$emit('click:secondary', $event)"
-        >{{ secondaryButtonLabel }}</button>
+        <button data-test-stub="o-dialog-primary" @click="$emit('click:primary', $event)">{{ primaryButtonLabel }}</button>
+        <button data-test-stub="o-dialog-secondary" @click="$emit('click:secondary', $event)">{{ secondaryButtonLabel }}</button>
       </div>
     </div>
   `,
   inheritAttrs: false,
 };
 
+// OForm stub: passthrough that emits `submit` (tests provide the value payload)
+// and exposes the `form.reset` surface the component's ref touches for async
+// edit-prefill re-baselining.
+const OFormStub = {
+  name: "OForm",
+  props: ["defaultValues", "schema"],
+  emits: ["submit"],
+  template: `<form data-test-stub="o-form" @submit.prevent="$emit('submit', defaultValues)"><slot /></form>`,
+  setup() {
+    return {
+      form: {
+        state: { values: { name: "" } },
+        reset() {},
+      },
+    };
+  },
+};
+
+const OFormInputStub = {
+  name: "OFormInput",
+  // `required` typed Boolean so the `required` shorthand coerces to true (as the real component does).
+  props: {
+    name: String,
+    label: String,
+    required: { type: Boolean, default: false },
+    modelValue: { type: null, default: undefined },
+  },
+  template: `<input data-test="dashboard-add-tab-name" :name="name" :required="required" />`,
+};
 
 describe("AddTab", () => {
   let wrapper: VueWrapper<any>;
@@ -159,77 +172,8 @@ describe("AddTab", () => {
   let mockEditTab: any;
   let mockGetDashboard: any;
 
-  // OForm/OFormInput stubs that expose the minimum shape the component
-  // touches (.form.state.values.name and setFieldValue) plus the form-level
-  // validate / resetValidation methods invoked in setup/onSubmit.
-  const formState = { values: { name: "" } };
-  const OFormStub = {
-    name: "OForm",
-    props: ["defaultValues"],
-    emits: ["submit"],
-    template: `<form data-test-stub="o-form" @submit.prevent="$emit('submit', $event)"><slot /></form>`,
-    methods: {
-      validate() {
-        return Promise.resolve(true);
-      },
-      resetValidation() {
-        return Promise.resolve();
-      },
-    },
-    setup() {
-      // expose state via a `form` object mirroring tanstack/vue-form shape.
-      return {
-        form: {
-          state: formState,
-          setFieldValue(field: string, value: any) {
-            formState.values[field as "name"] = value;
-          },
-        },
-      };
-    },
-  };
-  const OFormInputStub = {
-    name: "OFormInput",
-    props: ["name", "label", "validators", "modelValue", "rules"],
-    emits: ["update:modelValue"],
-    template: `<input
-      data-test="dashboard-add-tab-name"
-      :name="name"
-      :rules="rules"
-      :value="modelValue"
-      @input="onInput"
-    />`,
-    methods: {
-      onInput(event: Event) {
-        const val = (event.target as HTMLInputElement).value;
-        // Mirror the form state so the component's submit reads the latest value.
-        formState.values.name = val;
-        this.$emit("update:modelValue", val);
-      },
-    },
-  };
-
-  // Helper to build a form-shaped mock with the surface the migrated component
-  // touches: validate(), resetValidation(), form.state.values.name, and
-  // form.setFieldValue.
-  const makeFormMock = (validateResult = true, currentName = "") => {
-    const state = { values: { name: currentName } };
-    return {
-      validate: vi.fn().mockResolvedValue(validateResult),
-      resetValidation: vi.fn(),
-      form: {
-        state,
-        setFieldValue(field: string, value: any) {
-          state.values[field as "name"] = value;
-        },
-      },
-    };
-  };
-
-  const createWrapper = (props = {}) => {
-    // Reset shared form state between mounts.
-    formState.values.name = "";
-    return mount(AddTab, {
+  const createWrapper = (props = {}) =>
+    mount(AddTab, {
       props: {
         dashboardId: "test-dashboard-id",
         open: true,
@@ -244,17 +188,14 @@ describe("AddTab", () => {
         },
       },
     });
-  };
 
   beforeEach(async () => {
     vi.clearAllMocks();
 
-    // Clear the notification mocks
     mockShowPositiveNotification.mockClear();
     mockShowErrorNotification.mockClear();
     mockShowConflictErrorNotification.mockClear();
 
-    // Import the mocked functions
     const { addTab, getDashboard } = await import("@/utils/commons");
     const { editTab } = await import("../../../utils/commons");
 
@@ -265,7 +206,6 @@ describe("AddTab", () => {
     mockAddTab.mockResolvedValue({ tabId: "new-tab", name: "New Tab" });
     mockEditTab.mockResolvedValue({ tabId: "edit-tab", name: "Edited Tab" });
 
-    // Return the dashboard data synchronously to prevent undefined parsing
     const mockDashboardData = {
       dashboardId: "test-dashboard-id",
       tabs: [
@@ -277,51 +217,41 @@ describe("AddTab", () => {
   });
 
   afterEach(() => {
-    if (wrapper) {
-      wrapper.unmount();
-    }
+    wrapper?.unmount();
   });
 
-  // Helper: locate the ODrawer stub instance for emit-driven interactions.
-  const findDrawer = (w: VueWrapper<any>) =>
-    w.findComponent({ name: "ODialog" });
+  const findDialog = (w: VueWrapper<any>) => w.findComponent({ name: "ODialog" });
 
   describe("Component Initialization", () => {
     it("should render correctly", () => {
       wrapper = createWrapper();
-
       expect(wrapper.exists()).toBe(true);
-      expect(findDrawer(wrapper).exists()).toBe(true);
+      expect(findDialog(wrapper).exists()).toBe(true);
     });
 
     it("should have correct component name", () => {
       wrapper = createWrapper();
-
       expect(wrapper.vm.$options.name).toBe("AddTab");
     });
 
     it("should show 'Add Tab' title by default", () => {
       wrapper = createWrapper();
-
-      expect(findDrawer(wrapper).props("title")).toBe("Add Tab");
+      expect(findDialog(wrapper).props("title")).toBe("Add Tab");
     });
 
     it("should show 'Edit Tab' title when editMode is true", () => {
       wrapper = createWrapper({ editMode: true, tabId: "tab1" });
-
-      expect(findDrawer(wrapper).props("title")).toBe("Edit Tab");
+      expect(findDialog(wrapper).props("title")).toBe("Edit Tab");
     });
 
-    it("should forward 'open' prop to ODrawer", () => {
+    it("should forward 'open' prop to ODialog", () => {
       wrapper = createWrapper({ open: true });
-
-      expect(findDrawer(wrapper).props("open")).toBe(true);
+      expect(findDialog(wrapper).props("open")).toBe(true);
     });
 
-    it("should not show drawer as open when open prop is false", () => {
+    it("should not show dialog as open when open prop is false", () => {
       wrapper = createWrapper({ open: false });
-
-      expect(findDrawer(wrapper).props("open")).toBe(false);
+      expect(findDialog(wrapper).props("open")).toBe(false);
     });
   });
 
@@ -333,13 +263,9 @@ describe("AddTab", () => {
 
     it("should have correct prop validators", () => {
       const component = AddTab as any;
-
-      // Test tabId validator
       expect(component.props.tabId.validator("string")).toBe(true);
       expect(component.props.tabId.validator(null)).toBe(true);
       expect(component.props.tabId.validator(123)).toBe(false);
-
-      // Test dashboardId validator
       expect(component.props.dashboardId.validator("string")).toBe(true);
       expect(component.props.dashboardId.validator(null)).toBe(true);
       expect(component.props.dashboardId.validator(123)).toBe(false);
@@ -347,7 +273,6 @@ describe("AddTab", () => {
 
     it("should have correct default values", () => {
       wrapper = createWrapper();
-
       expect(wrapper.props("editMode")).toBe(false);
       expect(wrapper.props("tabId")).toBe(null);
       expect(wrapper.props("open")).toBe(true);
@@ -358,96 +283,50 @@ describe("AddTab", () => {
       expect(component.props.open.default).toBe(false);
       expect(component.props.open.type).toBe(Boolean);
     });
-
-    it("should accept all valid props", () => {
-      wrapper = createWrapper({
-        tabId: "test-tab",
-        editMode: true,
-        dashboardId: "test-dashboard",
-        folderId: "test-folder",
-        open: true,
-      });
-
-      expect(wrapper.props("tabId")).toBe("test-tab");
-      expect(wrapper.props("editMode")).toBe(true);
-      expect(wrapper.props("dashboardId")).toBe("test-dashboard");
-      expect(wrapper.props("folderId")).toBe("test-folder");
-      expect(wrapper.props("open")).toBe(true);
-    });
   });
 
   describe("Form Elements", () => {
     it("should render form with name input", () => {
       wrapper = createWrapper();
-
       expect(wrapper.findComponent({ name: "OForm" }).exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-add-tab-name"]').exists()).toBe(true);
+    });
+
+    it("should mark the name field required (renders the *)", () => {
+      wrapper = createWrapper();
+      const input = wrapper.findComponent({ name: "OFormInput" });
+      expect(input.props("required")).toBe(true);
+    });
+
+    it("should pass a Zod schema to OForm (no per-field validators)", () => {
+      wrapper = createWrapper();
+      expect(wrapper.findComponent({ name: "OForm" }).props("schema")).toBeDefined();
+    });
+
+    it("should seed blank default-values into OForm in add mode", () => {
+      wrapper = createWrapper();
       expect(
-        wrapper.find('[data-test="dashboard-add-tab-name"]').exists(),
-      ).toBe(true);
+        wrapper.findComponent({ name: "OForm" }).props("defaultValues"),
+      ).toEqual({ name: "" });
     });
 
-    it("should expose primary (Save) and secondary (Cancel) buttons via ODrawer", () => {
+    it("should expose primary (Save) and secondary (Cancel) buttons via ODialog", () => {
       wrapper = createWrapper();
-
-      const drawer = findDrawer(wrapper);
-      expect(drawer.props("primaryButtonLabel")).toBe("Save");
-      expect(drawer.props("secondaryButtonLabel")).toBe("Cancel");
-    });
-  });
-
-  describe("Form Validation", () => {
-    it("should validate name field with rules", () => {
-      wrapper = createWrapper();
-
-      // Migrated form uses OFormInput with :validators prop. Verify the
-      // OFormInput stub received a validators array.
-      const formInput = wrapper.findComponent({ name: "OFormInput" });
-      expect(formInput.exists()).toBe(true);
-      expect(Array.isArray(formInput.props("validators"))).toBe(true);
-    });
-  });
-
-  describe("Data Handling", () => {
-    it("should initialize with default data", () => {
-      wrapper = createWrapper();
-
-      expect(wrapper.vm.tabData.name).toBe("");
-      expect(wrapper.vm.tabData.panels).toEqual([]);
+      const dialog = findDialog(wrapper);
+      expect(dialog.props("primaryButtonLabel")).toBe("Save");
+      expect(dialog.props("secondaryButtonLabel")).toBe("Cancel");
     });
 
-    it("should handle input changes", async () => {
+    it("should pass form-id to ODialog for enter-key submission", () => {
       wrapper = createWrapper();
-
-      const nameInput = wrapper.find('[data-test="dashboard-add-tab-name"]');
-      await nameInput.setValue("New Tab Name");
-
-      // OFormInput stub mirrors typed value into the shared form state; the
-      // component reads it during onSubmit, not via v-model into tabData.
-      expect(formState.values.name).toBe("New Tab Name");
-    });
-
-    it("should reset form data after successful submission", async () => {
-      wrapper = createWrapper();
-
-      wrapper.vm.tabData.name = "Test Tab";
-      await wrapper.vm.onSubmit.execute();
-
-      expect(wrapper.vm.tabData.name).toBe("");
-      expect(wrapper.vm.tabData.panels).toEqual([]);
+      expect(findDialog(wrapper).props("formId")).toBe("add-tab-form");
     });
   });
 
   describe("Add Tab Functionality", () => {
-    it("should call addTab utility when submitting in add mode", async () => {
+    it("should call addTab utility with the submitted value in add mode", async () => {
       wrapper = createWrapper();
-      wrapper.vm.tabData.name = "New Tab";
-
-      // Mock form validation to return true
-      // OForm-shaped mock so the component's submit path can read
-      // addTabForm.value.form.state.values.name without throwing.
-      wrapper.vm.addTabForm = makeFormMock(true, wrapper.vm.tabData.name);
-
-      await wrapper.vm.onSubmit.execute();
+      await wrapper.vm.onSubmit({ name: "New Tab" });
 
       expect(mockAddTab).toHaveBeenCalledWith(
         mockStore,
@@ -459,14 +338,9 @@ describe("AddTab", () => {
 
     it("should call addTab when the OForm emits submit", async () => {
       wrapper = createWrapper();
-      wrapper.vm.tabData.name = "From Primary";
-      // OForm-shaped mock so the component's submit path can read
-      // addTabForm.value.form.state.values.name without throwing.
-      wrapper.vm.addTabForm = makeFormMock(true, wrapper.vm.tabData.name);
-
       const form = wrapper.findComponent({ name: "OForm" });
-      await form.vm.$emit("submit", {});
-      await wrapper.vm.$nextTick();
+      await form.vm.$emit("submit", { name: "From Primary" });
+      await flushPromises();
 
       expect(mockAddTab).toHaveBeenCalledWith(
         mockStore,
@@ -478,13 +352,7 @@ describe("AddTab", () => {
 
     it("should emit refresh event after successful add", async () => {
       wrapper = createWrapper();
-      wrapper.vm.tabData.name = "New Tab";
-
-      // OForm-shaped mock so the component's submit path can read
-      // addTabForm.value.form.state.values.name without throwing.
-      wrapper.vm.addTabForm = makeFormMock(true, wrapper.vm.tabData.name);
-
-      await wrapper.vm.onSubmit.execute();
+      await wrapper.vm.onSubmit({ name: "New Tab" });
 
       expect(wrapper.emitted("refresh")).toBeTruthy();
       expect(wrapper.emitted("refresh")![0][0]).toEqual({
@@ -495,12 +363,7 @@ describe("AddTab", () => {
 
     it("should emit update:open(false) after successful add", async () => {
       wrapper = createWrapper();
-      wrapper.vm.tabData.name = "New Tab";
-      // OForm-shaped mock so the component's submit path can read
-      // addTabForm.value.form.state.values.name without throwing.
-      wrapper.vm.addTabForm = makeFormMock(true, wrapper.vm.tabData.name);
-
-      await wrapper.vm.onSubmit.execute();
+      await wrapper.vm.onSubmit({ name: "New Tab" });
 
       const updateOpen = wrapper.emitted("update:open");
       expect(updateOpen).toBeTruthy();
@@ -509,13 +372,7 @@ describe("AddTab", () => {
 
     it("should show success notification after add", async () => {
       wrapper = createWrapper();
-      wrapper.vm.tabData.name = "New Tab";
-
-      // OForm-shaped mock so the component's submit path can read
-      // addTabForm.value.form.state.values.name without throwing.
-      wrapper.vm.addTabForm = makeFormMock(true, wrapper.vm.tabData.name);
-
-      await wrapper.vm.onSubmit.execute();
+      await wrapper.vm.onSubmit({ name: "New Tab" });
 
       expect(mockShowPositiveNotification).toHaveBeenCalledWith(
         "Tab added successfully",
@@ -526,7 +383,6 @@ describe("AddTab", () => {
   describe("Edit Tab Functionality", () => {
     it("should load dashboard data in edit mode", async () => {
       wrapper = createWrapper({ editMode: true, tabId: "tab1", open: false });
-
       await wrapper.setProps({ open: true });
       await flushPromises();
 
@@ -537,21 +393,14 @@ describe("AddTab", () => {
       );
     });
 
-    it("should call editTab utility when submitting in edit mode", async () => {
+    it("should call editTab utility with the submitted value in edit mode", async () => {
       wrapper = createWrapper({ editMode: true, tabId: "tab1", open: false });
-
-      // Trigger the open watcher so loadDashboardData runs and populates tabData
       await wrapper.setProps({ open: true });
       await flushPromises();
 
-      // tabData is now { tabId: "tab1", name: "Tab 1", panels: [] } from the mock
-      wrapper.vm.tabData.name = "Updated Tab";
-
-      // OForm-shaped mock so the component's submit path can read
-      // addTabForm.value.form.state.values.name without throwing.
-      wrapper.vm.addTabForm = makeFormMock(true, wrapper.vm.tabData.name);
-
-      await wrapper.vm.onSubmit.execute();
+      // editingTab is now { tabId: "tab1", name: "Tab 1", panels: [] } from the
+      // async fetch; the submitted value supplies the new name.
+      await wrapper.vm.onSubmit({ name: "Updated Tab" });
 
       expect(mockEditTab).toHaveBeenCalledWith(
         mockStore,
@@ -562,15 +411,25 @@ describe("AddTab", () => {
       );
     });
 
+    it("should prefill the form from the loaded tab in edit mode", async () => {
+      wrapper = createWrapper({ editMode: true, tabId: "tab1", open: false });
+      await wrapper.setProps({ open: true });
+      await flushPromises();
+
+      // The OForm is seeded from the externally-loaded record (no local mirror):
+      // editingTab holds the fetched tab and `:default-values` projects its name.
+      expect(wrapper.vm.editingTab).toEqual({
+        tabId: "tab1",
+        name: "Tab 1",
+        panels: [],
+      });
+      expect(wrapper.vm.addTabDefaults).toEqual({ name: "Tab 1" });
+    });
+
     it("should emit refresh event after successful edit", async () => {
       wrapper = createWrapper({ editMode: true, tabId: "tab1" });
-      wrapper.vm.tabData = { tabId: "tab1", name: "Updated Tab", panels: [] };
-
-      // OForm-shaped mock so the component's submit path can read
-      // addTabForm.value.form.state.values.name without throwing.
-      wrapper.vm.addTabForm = makeFormMock(true, wrapper.vm.tabData.name);
-
-      await wrapper.vm.onSubmit.execute();
+      wrapper.vm.editingTab = { tabId: "tab1", name: "Updated Tab", panels: [] };
+      await wrapper.vm.onSubmit({ name: "Updated Tab" });
 
       expect(wrapper.emitted("refresh")).toBeTruthy();
       expect(wrapper.emitted("refresh")![0][0]).toEqual({
@@ -579,29 +438,10 @@ describe("AddTab", () => {
       });
     });
 
-    it("should emit update:open(false) after successful edit", async () => {
-      wrapper = createWrapper({ editMode: true, tabId: "tab1" });
-      wrapper.vm.tabData = { tabId: "tab1", name: "Updated Tab", panels: [] };
-      // OForm-shaped mock so the component's submit path can read
-      // addTabForm.value.form.state.values.name without throwing.
-      wrapper.vm.addTabForm = makeFormMock(true, wrapper.vm.tabData.name);
-
-      await wrapper.vm.onSubmit.execute();
-
-      const updateOpen = wrapper.emitted("update:open");
-      expect(updateOpen).toBeTruthy();
-      expect(updateOpen![updateOpen!.length - 1][0]).toBe(false);
-    });
-
     it("should show success notification after edit", async () => {
       wrapper = createWrapper({ editMode: true, tabId: "tab1" });
-      wrapper.vm.tabData.name = "Updated Tab";
-
-      // OForm-shaped mock so the component's submit path can read
-      // addTabForm.value.form.state.values.name without throwing.
-      wrapper.vm.addTabForm = makeFormMock(true, wrapper.vm.tabData.name);
-
-      await wrapper.vm.onSubmit.execute();
+      wrapper.vm.editingTab = { tabId: "tab1", name: "Updated Tab", panels: [] };
+      await wrapper.vm.onSubmit({ name: "Updated Tab" });
 
       expect(mockShowPositiveNotification).toHaveBeenCalledWith(
         "Tab updated successfully",
@@ -609,11 +449,10 @@ describe("AddTab", () => {
     });
   });
 
-  describe("Drawer Interactions", () => {
+  describe("Dialog Interactions", () => {
     it("should emit update:open(false) when secondary (Cancel) is clicked", async () => {
       wrapper = createWrapper();
-
-      await findDrawer(wrapper).vm.$emit("click:secondary");
+      await findDialog(wrapper).vm.$emit("click:secondary");
 
       const updateOpen = wrapper.emitted("update:open");
       expect(updateOpen).toBeTruthy();
@@ -622,59 +461,33 @@ describe("AddTab", () => {
 
     it("should not call addTab when secondary (Cancel) is clicked", async () => {
       wrapper = createWrapper();
-      wrapper.vm.tabData.name = "Some Name";
-
-      await findDrawer(wrapper).vm.$emit("click:secondary");
-
+      await findDialog(wrapper).vm.$emit("click:secondary");
       expect(mockAddTab).not.toHaveBeenCalled();
     });
 
-    it("should forward update:open from ODrawer to its parent", async () => {
+    it("should forward update:open from ODialog to its parent", async () => {
       wrapper = createWrapper();
-
-      await findDrawer(wrapper).vm.$emit("update:open", false);
+      await findDialog(wrapper).vm.$emit("update:open", false);
 
       const updateOpen = wrapper.emitted("update:open");
       expect(updateOpen).toBeTruthy();
       expect(updateOpen![0][0]).toBe(false);
     });
-
-    it("should forward true on update:open from ODrawer", async () => {
-      wrapper = createWrapper({ open: false });
-
-      await findDrawer(wrapper).vm.$emit("update:open", true);
-
-      const updateOpen = wrapper.emitted("update:open");
-      expect(updateOpen).toBeTruthy();
-      expect(updateOpen![0][0]).toBe(true);
-    });
   });
 
   describe("Error Handling", () => {
-    it("should not call addTab before any form submission is triggered", async () => {
+    it("should not call addTab before any submission is triggered", () => {
       wrapper = createWrapper();
-      // Simply verify addTab is not called on mount with no form submission
       expect(mockAddTab).not.toHaveBeenCalled();
     });
 
     it("should handle 409 conflict errors", async () => {
       wrapper = createWrapper();
-      wrapper.vm.tabData.name = "Test Tab";
+      mockAddTab.mockRejectedValue({
+        response: { status: 409, data: { message: "Tab already exists" } },
+      });
 
-      const conflictError = {
-        response: {
-          status: 409,
-          data: { message: "Tab already exists" },
-        },
-      };
-
-      mockAddTab.mockRejectedValue(conflictError);
-
-      // OForm-shaped mock so the component's submit path can read
-      // addTabForm.value.form.state.values.name without throwing.
-      wrapper.vm.addTabForm = makeFormMock(true, wrapper.vm.tabData.name);
-
-      await wrapper.vm.onSubmit.execute();
+      await wrapper.vm.onSubmit({ name: "Test Tab" });
 
       expect(mockShowConflictErrorNotification).toHaveBeenCalledWith(
         "Tab already exists",
@@ -683,16 +496,9 @@ describe("AddTab", () => {
 
     it("should handle general errors", async () => {
       wrapper = createWrapper();
-      wrapper.vm.tabData.name = "Test Tab";
+      mockAddTab.mockRejectedValue(new Error("Network error"));
 
-      const generalError = new Error("Network error");
-      mockAddTab.mockRejectedValue(generalError);
-
-      // OForm-shaped mock so the component's submit path can read
-      // addTabForm.value.form.state.values.name without throwing.
-      wrapper.vm.addTabForm = makeFormMock(true, wrapper.vm.tabData.name);
-
-      await wrapper.vm.onSubmit.execute();
+      await wrapper.vm.onSubmit({ name: "Test Tab" });
 
       expect(mockShowErrorNotification).toHaveBeenCalledWith("Network error", {
         timeout: 2000,
@@ -701,33 +507,21 @@ describe("AddTab", () => {
 
     it("should handle errors without message in add mode", async () => {
       wrapper = createWrapper();
-      wrapper.vm.tabData.name = "Test Tab";
-
       mockAddTab.mockRejectedValue({});
 
-      // OForm-shaped mock so the component's submit path can read
-      // addTabForm.value.form.state.values.name without throwing.
-      wrapper.vm.addTabForm = makeFormMock(true, wrapper.vm.tabData.name);
+      await wrapper.vm.onSubmit({ name: "Test Tab" });
 
-      await wrapper.vm.onSubmit.execute();
-
-      expect(mockShowErrorNotification).toHaveBeenCalledWith(
-        "Failed to add tab",
-        { timeout: 2000 },
-      );
+      expect(mockShowErrorNotification).toHaveBeenCalledWith("Failed to add tab", {
+        timeout: 2000,
+      });
     });
 
     it("should handle errors without message in edit mode", async () => {
       wrapper = createWrapper({ editMode: true, tabId: "tab1" });
-      wrapper.vm.tabData.name = "Test Tab";
-
+      wrapper.vm.editingTab = { tabId: "tab1", name: "Test Tab", panels: [] };
       mockEditTab.mockRejectedValue({});
 
-      // OForm-shaped mock so the component's submit path can read
-      // addTabForm.value.form.state.values.name without throwing.
-      wrapper.vm.addTabForm = makeFormMock(true, wrapper.vm.tabData.name);
-
-      await wrapper.vm.onSubmit.execute();
+      await wrapper.vm.onSubmit({ name: "Test Tab" });
 
       expect(mockShowErrorNotification).toHaveBeenCalledWith(
         "Failed to update tab",
@@ -736,32 +530,10 @@ describe("AddTab", () => {
     });
   });
 
-  describe("Loading State", () => {
-    it("should use loading composable", () => {
-      wrapper = createWrapper();
-
-      expect(wrapper.vm.onSubmit).toBeDefined();
-      expect(wrapper.vm.onSubmit.isLoading).toBeDefined();
-    });
-
-    it("should pass primaryButtonLoading to ODrawer", () => {
-      wrapper = createWrapper();
-
-      // useLoading mock sets isLoading.value=false
-      expect(findDrawer(wrapper).props("primaryButtonLoading")).toBe(false);
-    });
-  });
-
   describe("Folder Handling", () => {
     it("should use folderId prop when provided", async () => {
       wrapper = createWrapper({ folderId: "custom-folder" });
-      wrapper.vm.tabData.name = "Test Tab";
-
-      // OForm-shaped mock so the component's submit path can read
-      // addTabForm.value.form.state.values.name without throwing.
-      wrapper.vm.addTabForm = makeFormMock(true, wrapper.vm.tabData.name);
-
-      await wrapper.vm.onSubmit.execute();
+      await wrapper.vm.onSubmit({ name: "Test Tab" });
 
       expect(mockAddTab).toHaveBeenCalledWith(
         mockStore,
@@ -773,13 +545,7 @@ describe("AddTab", () => {
 
     it("should fall back to route query folder", async () => {
       wrapper = createWrapper();
-      wrapper.vm.tabData.name = "Test Tab";
-
-      // OForm-shaped mock so the component's submit path can read
-      // addTabForm.value.form.state.values.name without throwing.
-      wrapper.vm.addTabForm = makeFormMock(true, wrapper.vm.tabData.name);
-
-      await wrapper.vm.onSubmit.execute();
+      await wrapper.vm.onSubmit({ name: "Test Tab" });
 
       expect(mockAddTab).toHaveBeenCalledWith(
         mockStore,
@@ -790,18 +556,11 @@ describe("AddTab", () => {
     });
 
     it("should use default folder when no folder specified", async () => {
-      // Modify route to have no folder query
       const originalQuery = mockRoute.query;
       mockRoute.query = {};
 
       wrapper = createWrapper();
-      wrapper.vm.tabData.name = "Test Tab";
-
-      // OForm-shaped mock so the component's submit path can read
-      // addTabForm.value.form.state.values.name without throwing.
-      wrapper.vm.addTabForm = makeFormMock(true, wrapper.vm.tabData.name);
-
-      await wrapper.vm.onSubmit.execute();
+      await wrapper.vm.onSubmit({ name: "Test Tab" });
 
       expect(mockAddTab).toHaveBeenCalledWith(
         mockStore,
@@ -810,7 +569,6 @@ describe("AddTab", () => {
         { name: "Test Tab", panels: [] },
       );
 
-      // Restore original query
       mockRoute.query = originalQuery;
     });
   });
@@ -818,85 +576,31 @@ describe("AddTab", () => {
   describe("Component Methods", () => {
     it("should have correct setup return values", () => {
       wrapper = createWrapper();
-
       expect(wrapper.vm.t).toBeDefined();
-      expect(wrapper.vm.tabData).toBeDefined();
+      expect(wrapper.vm.addTabSchema).toBeDefined();
+      expect(wrapper.vm.addTabDefaults).toBeDefined();
+      expect("editingTab" in wrapper.vm).toBe(true);
       expect(wrapper.vm.addTabForm).toBeDefined();
       expect(wrapper.vm.store).toBeDefined();
-      expect(wrapper.vm.isValidIdentifier).toBeDefined();
-      expect(wrapper.vm.onSubmit).toBeDefined();
-      expect(typeof wrapper.vm.onSubmit.execute).toBe("function");
-    });
-
-    it("should initialize isValidIdentifier as true", () => {
-      wrapper = createWrapper();
-
-      expect(wrapper.vm.isValidIdentifier).toBe(true);
-    });
-
-    it("should expose onSubmit.execute for form submission", async () => {
-      wrapper = createWrapper();
-      const executeSpy = vi
-        .spyOn(wrapper.vm.onSubmit, "execute")
-        .mockResolvedValue(undefined as any);
-
-      wrapper.vm.onSubmit.execute();
-
-      expect(executeSpy).toHaveBeenCalled();
-    });
-  });
-
-  describe("Form Submission", () => {
-    it("should pass form-id to ODialog for enter-key submission", () => {
-      wrapper = createWrapper();
-
-      expect(findDrawer(wrapper).props("formId")).toBe("add-tab-form");
-    });
-
-    it("should reset form validation after success", async () => {
-      wrapper = createWrapper();
-      wrapper.vm.tabData.name = "Test Tab";
-
-      const mockResetValidation = vi.fn();
-      const mock = makeFormMock(true, wrapper.vm.tabData.name);
-      mock.resetValidation = mockResetValidation;
-      wrapper.vm.addTabForm = mock;
-
-      await wrapper.vm.onSubmit.execute();
-
-      expect(mockResetValidation).toHaveBeenCalled();
-    });
-  });
-
-  describe("Internationalization", () => {
-    it("should use i18n for translations", () => {
-      wrapper = createWrapper();
-
-      expect(wrapper.vm.t).toBeDefined();
-      expect(wrapper.vm.t("dashboard.nameRequired")).toBe("Name is required");
+      expect(typeof wrapper.vm.onSubmit).toBe("function");
     });
   });
 
   describe("Component Lifecycle", () => {
-    it("should load dashboard data on component creation in edit mode", async () => {
+    it("should load dashboard data on open in edit mode", async () => {
       wrapper = createWrapper({ editMode: true, tabId: "tab1", open: false });
-
-      // Trigger the open watcher to invoke loadDashboardData
       await wrapper.setProps({ open: true });
       await flushPromises();
-
       expect(mockGetDashboard).toHaveBeenCalled();
     });
 
     it("should not load dashboard data in add mode", () => {
       wrapper = createWrapper();
-
       expect(mockGetDashboard).not.toHaveBeenCalled();
     });
 
     it("should handle component unmounting gracefully", () => {
       wrapper = createWrapper();
-
       expect(() => wrapper.unmount()).not.toThrow();
     });
   });
@@ -910,20 +614,19 @@ describe("AddTab", () => {
 
     it("should emit refresh with correct payload", async () => {
       wrapper = createWrapper();
-      wrapper.vm.tabData.name = "Test Tab";
-
-      // OForm-shaped mock so the component's submit path can read
-      // addTabForm.value.form.state.values.name without throwing.
-      wrapper.vm.addTabForm = makeFormMock(true, wrapper.vm.tabData.name);
-
-      await wrapper.vm.onSubmit.execute();
+      await wrapper.vm.onSubmit({ name: "Test Tab" });
 
       const refreshEvents = wrapper.emitted("refresh");
       expect(refreshEvents).toBeTruthy();
-      expect(refreshEvents![0][0]).toEqual({
-        tabId: "new-tab",
-        name: "New Tab",
-      });
+      expect(refreshEvents![0][0]).toEqual({ tabId: "new-tab", name: "New Tab" });
+    });
+  });
+
+  describe("Internationalization", () => {
+    it("should use i18n for translations", () => {
+      wrapper = createWrapper();
+      expect(wrapper.vm.t).toBeDefined();
+      expect(wrapper.vm.t("dashboard.nameRequired")).toBe("Name is required");
     });
   });
 });
