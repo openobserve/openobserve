@@ -401,7 +401,22 @@ jobs:
                 body += `- **Skip:** ${clean(t.skip, 10)}${t.skip_reason ? ` — _${clean(t.skip_reason)}_` : ''}\n`;
                 if (t.feature_title) body += `- **Feature:** ${clean(t.feature_title, 120)} (area: ${clean(t.area, 40) || '?'})\n`;
                 if (t.spec_path) body += `- **Would write:** \`${clean(t.spec_path, 200)}\`\n`;
-                body += `\n**Rationale:** ${clean(t.rationale, 4000)}\n`;
+                // Rationale is rendered DETERMINISTICALLY from a structured object so the format is
+                // identical every run (the LLM only supplies the prose per field, never the layout).
+                // Falls back to a legacy free-form string if `rationale` isn't an object.
+                const r = t.rationale;
+                if (r && typeof r === 'object') {
+                  const yn = (v) => (v === true || v === 'true') ? 'Yes' : 'No';
+                  const sec = (label, val, reason) => reason ? `\n**${label}: ${val}** — ${clean(reason, 1500)}\n` : '';
+                  body += sec('EDITION', (String(t.edition || '').toUpperCase() || '?'), r.edition);
+                  body += sec('SKIP', yn(t.skip), r.skip || t.skip_reason);
+                  body += sec('E2E WARRANTED', yn(t.needs_e2e), r.e2e);
+                  body += sec('AREA', (clean(t.area, 40) || '?'), r.area);
+                  body += sec('GROUP', (clean(t.playwright_group, 40) || '?'), r.group);
+                  body += sec('EXISTING TESTS', yn(t.existing_tests_in_diff), r.existing_tests);
+                } else {
+                  body += `\n**Rationale:** ${clean(t.rationale, 4000)}\n`;
+                }
                 if ('${{ steps.mode.outputs.dry_run }}' === 'true') {
                   body += `\n_Dry-run (v1 manual-first): no tests generated._`;
                 }
