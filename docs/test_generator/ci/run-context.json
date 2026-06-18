@@ -1,0 +1,21 @@
+{
+  "feature_slug": "query-error-state",
+  "feature_title": "Query Error State Refactor",
+  "area": "Logs",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "queryErrorState.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Logs/queryErrorState.spec.js",
+  "playwright_group": "Logs-Core",
+  "source_files": [
+    "web/src/components/common/QueryErrorState.vue",
+    "web/src/components/common/ErrorDetailPanel.vue",
+    "web/src/composables/useQueryError.ts",
+    "web/src/plugins/logs/Index.vue",
+    "web/src/components/alerts/IncidentList.vue"
+  ],
+  "existing_tests_in_diff": true,
+  "skip": false,
+  "skip_reason": ""
+}

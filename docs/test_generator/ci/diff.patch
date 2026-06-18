@@ -1,0 +1,3197 @@
+diff --git a/tests/ui-testing/pages/generalPages/schemaPage.js b/tests/ui-testing/pages/generalPages/schemaPage.js
+index ff602e89f27..6147e13799c 100644
+--- a/tests/ui-testing/pages/generalPages/schemaPage.js
++++ b/tests/ui-testing/pages/generalPages/schemaPage.js
+@@ -55,7 +55,7 @@ class SchemaPage {
+         // Logs page query / search bar
+         this.logsSearchBarQueryEditor = page.locator('[data-test="logs-search-bar-query-editor"]');
+         this.logsSearchBarRefreshBtn = page.locator('[data-test="logs-search-bar-refresh-btn"]');
+-        this.logsSearchErrorMessage = page.locator('[data-test="logs-search-error-message"]');
++        this.logsSearchErrorMessage = page.locator('[data-test="logs-search-error-state"]');
+         this.dateTimeBtn = page.locator('[data-test="date-time-btn"]');
+         this.dateTimeRelativeTab = page.locator('[data-test="date-time-relative-tab"]');
+         this.logTableExpandMenu = page.locator('[data-test="log-table-column-1-_timestamp"] [data-test="table-row-expand-menu"]');
+@@ -134,7 +134,7 @@ class SchemaPage {
+             logExpandDetailAllKey: '[data-test="log-expand-detail-key-_all"]',
+             logsSearchBarQueryEditor: '[data-test="logs-search-bar-query-editor"]',
+             logsSearchBarRefreshBtn: '[data-test="logs-search-bar-refresh-btn"]',
+-            logsSearchErrorMessage: '[data-test="logs-search-error-message"]',
++            logsSearchErrorMessage: '[data-test="logs-search-error-state"]',
+             showQueryToggleBtn: '[data-test="logs-search-bar-show-query-toggle-btn"] div',
+             // Stream creation locators
+             logStreamAddStreamBtn: '[data-test="log-stream-add-stream-btn"]',
+diff --git a/tests/ui-testing/pages/logsPages/logsPage.js b/tests/ui-testing/pages/logsPages/logsPage.js
+index 6c2f6d9586f..9ed0e136efa 100644
+--- a/tests/ui-testing/pages/logsPages/logsPage.js
++++ b/tests/ui-testing/pages/logsPages/logsPage.js
+@@ -120,7 +120,7 @@ export class LogsPage {
+         this.savedViewByLabel = '[data-test$="-option"]';
+         this.notificationMessage = '[role="alert"]';
+         this.indexFieldSearchInput = '[data-test="logs-search-index-list"] [data-test="o-field-list-search-field"]';
+-        this.errorMessage = '[data-test="logs-search-error-message"]';
++        this.errorMessage = '[data-test="logs-search-error-state"]';
+         this.warningElement = 'text=warning Query execution';
+         this.logsTable = '[data-test="logs-search-result-logs-table"]';
+         // Additional locators for multistream functionality
+@@ -193,8 +193,10 @@ export class LogsPage {
+ 
+         // Error handling locators
+         this.errorIcon = 'text=error';
+-        this.resultErrorDetailsBtn = '[data-test="logs-page-result-error-details-btn"]';
+-        this.searchDetailErrorMessage = '[data-test="logs-search-detail-error-message"]';
++        // Hero layout (logs page): error-detail-toggle-btn (ErrorDetailPanel) + error-detail-body
++        // Block layout (panels):   query-error-toggle-detail-btn + query-error-detail-expanded
++        this.resultErrorDetailsBtn = '[data-test="error-detail-toggle-btn"], [data-test="query-error-toggle-detail-btn"]';
++        this.searchDetailErrorMessage = '[data-test="error-detail-body"], [data-test="query-error-detail-expanded"]';
+ 
+         // Download locators (SearchBar.vue more-options dropdown + custom-download ODialog)
+         this.moreOptionsBtn = '[data-test="logs-search-bar-more-options-btn"]';
+@@ -341,7 +343,7 @@ export class LogsPage {
+         this.dimensionSearchInputField = '[data-test="dimension-search-input-field"]';
+         // Analysis dashboard states
+         this.analysisDashboardLoading = '[data-test="traces-analysis-dashboard-drawer"] [data-test="traces-analysis-dashboard-loading-indicator"]';
+-        this.analysisDashboardError = '[data-test="traces-analysis-dashboard-drawer"] [data-test="logs-search-error-message"], [data-test="traces-analysis-dashboard-drawer"] [role="alert"]';
++        this.analysisDashboardError = '[data-test="traces-analysis-dashboard-drawer"] [data-test="logs-search-error-state"], [data-test="traces-analysis-dashboard-drawer"] [role="alert"]';
+         // Loading indicator (top-level — appears immediately on click, before drawer's scoped placement)
+         this.analysisDashboardLoadingIndicator = '[data-test="traces-analysis-dashboard-loading-indicator"]';
+         // Dimension checkboxes (any value)
+@@ -3579,10 +3581,10 @@ export class LogsPage {
+ 
+     async expectErrorMessageVisible() {
+         // Covers two error display paths in Index.vue:
+-        // - errorMsg path: data-test="logs-search-error-message" (query/backend error)
++        // - errorMsg path: data-test="logs-search-error-state" (query/backend error)
+         // - filterErrMsg path: data-test="logs-search-filter-error-message" (quickmode filter parse error)
+         const errorLocator = this.page.locator(
+-            `[data-test="logs-search-error-message"], [data-test="logs-search-filter-error-message"]`
++            `[data-test="logs-search-error-state"], [data-test="logs-search-filter-error-message"]`
+         ).first();
+         return await expect(errorLocator).toBeVisible({ timeout: 30000 });
+     }
+@@ -5133,17 +5135,17 @@ export class LogsPage {
+         // Verify proper error handling for blank SQL query (the actual behavior from PR #9023)
+         // Allow a longer timeout for the error banner — the backend issues a delayed
+         // error response for blank queries.
+-        // AGENT_RULES §2: target the data-test directly (Index.vue uses
+-        // data-test="logs-search-error-message" on the error banner).
++        // Index.vue: data-test="logs-search-error-state" wraps LogsErrorState → QueryErrorState
+         const errorMessage = this.page.locator(this.errorMessage).first();
+         await expect(errorMessage).toBeVisible({ timeout: 30000 });
+-        await expect(errorMessage).toContainText('Error occurred while retrieving search events', { timeout: 5000 });
+ 
+-        // Verify there's a clickable error details button
+-        const errorDetailsBtn = this.page.locator('[data-test="logs-page-result-error-details-btn"]');
++        // Verify there's a clickable error details toggle.
++        // Hero layout (logs page) uses error-detail-toggle-btn (in ErrorDetailPanel).
++        // Block layout uses query-error-toggle-detail-btn (in QueryErrorState).
++        const errorDetailsBtn = this.page.locator('[data-test="error-detail-toggle-btn"], [data-test="query-error-toggle-detail-btn"]').first();
+         if (await errorDetailsBtn.isVisible()) {
+             await errorDetailsBtn.click();
+-            testLogger.info('✓ Error details button clicked successfully');
++            testLogger.info('✓ Error details toggle clicked successfully');
+         }
+     }
+ 
+@@ -6617,7 +6619,7 @@ export class LogsPage {
+      * @returns {Promise<boolean>}
+      */
+     async isNoResultsMessageVisible() {
+-        return await this.page.locator('[data-test="logs-search-result-not-found-text"]').isVisible({ timeout: 5000 }).catch(() => false);
++        return await this.page.locator('[data-test="logs-search-no-events-found-text"]').isVisible({ timeout: 5000 }).catch(() => false);
+     }
+ 
+     /**
+@@ -6638,8 +6640,10 @@ export class LogsPage {
+     async waitForSearchResultsToLoad() {
+         try {
+             await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+-            // Wait for either results or no-results indicator
+-            await this.page.locator(`${this.logsTable}, [data-test="logs-search-result-not-found-text"]`).first().waitFor({ state: 'visible', timeout: 15000 });
++            // Wait for results table, no-events state, or error state — any definite post-query state
++            await this.page.locator(
++                `${this.logsTable}, [data-test="logs-search-no-events-found-text"], [data-test="logs-search-error-state"], [data-test="logs-search-filter-error-message"]`
++            ).first().waitFor({ state: 'visible', timeout: 15000 });
+         } catch {
+             // Fallback: at least wait for any loading to finish
+             testLogger.info('waitForSearchResultsToLoad: timed out waiting for results indicator');
+@@ -7151,7 +7155,10 @@ export class LogsPage {
+     async waitForSearchResultOrEmpty(timeout = 30000) {
+         try {
+             await this.page.waitForLoadState('networkidle', { timeout }).catch(() => {});
+-            await this.page.locator(`${this.logsTable}, [data-test="logs-search-result-not-found-text"]`).first().waitFor({ state: 'visible', timeout });
++            // Wait for results table, no-events state, no-query-applied state, or error state
++            await this.page.locator(
++                `${this.logsTable}, [data-test="logs-search-no-events-found-text"], [data-test="logs-search-apply-search-text"], [data-test="logs-search-error-state"], [data-test="logs-search-filter-error-message"]`
++            ).first().waitFor({ state: 'visible', timeout });
+             testLogger.info('Search result or empty state visible');
+         } catch (e) {
+             testLogger.warn('waitForSearchResultOrEmpty: timed out waiting for results indicator');
+@@ -9754,7 +9761,7 @@ export class LogsPage {
+      * @returns {Promise<boolean>}
+      */
+     async isNoResultsVisible() {
+-        return await this.page.locator('[data-test="logs-search-result-not-found-text"]')
++        return await this.page.locator('[data-test="logs-search-no-events-found-text"]')
+             .isVisible({ timeout: 2000 }).catch(() => false);
+     }
+ 
+@@ -9771,7 +9778,7 @@ export class LogsPage {
+      * @returns {import('@playwright/test').Locator}
+      */
+     getLogsSearchErrorMessage() {
+-        return this.page.locator('[data-test="logs-search-error-message"]').first();
++        return this.page.locator('[data-test="logs-search-error-state"]').first();
+     }
+ 
+     // ===== REGRESSION: Scroll Retention (#9044) & Undefined Length (#7354) =====
+@@ -9910,7 +9917,7 @@ export class LogsPage {
+      * @returns {Promise<boolean>}
+      */
+     async hasErrorMessage() {
+-        const errorEl = this.page.locator('[data-test="logs-search-error-message"]');
++        const errorEl = this.page.locator('[data-test="logs-search-error-state"]');
+         return await errorEl.isVisible().catch(() => false);
+     }
+ 
+diff --git a/tests/ui-testing/pages/logsPages/logsQueryPage.js b/tests/ui-testing/pages/logsPages/logsQueryPage.js
+index 025707ce9dd..91cb03c072e 100644
+--- a/tests/ui-testing/pages/logsPages/logsQueryPage.js
++++ b/tests/ui-testing/pages/logsPages/logsQueryPage.js
+@@ -8,7 +8,7 @@ export class LogsQueryPage {
+     this.dateTimeButton = '[data-test="date-time-btn"]';
+     this.relative15MinButton = '[data-test="date-time-relative-15-m-btn"]';
+     this.refreshButton = '[data-test="logs-search-bar-refresh-btn"]';
+-    this.errorMessage = '[data-test="logs-search-error-message"]';
++    this.errorMessage = '[data-test="logs-search-error-state"]';
+     this.utilitiesMenuButton = '[data-test="logs-search-bar-utilities-menu-btn"]';
+     this.resetFiltersButton = '[data-test="logs-search-bar-reset-filters-btn"]';
+     this.resultDetail = '[data-test="logs-search-result-detail-undefined"]';
+@@ -44,13 +44,11 @@ export class LogsQueryPage {
+ 
+   async clickErrorMessage() {
+     // Try selectors in priority order:
+-    //   logs-search-no-events-found-text — new LogsNoEventsState (0 results, no error)
+-    //   logs-search-error-message        — actual query error path
+-    //   logs-search-result-not-found-text — legacy "Result not found" fallback
++    //   logs-search-no-events-found-text — LogsNoEventsState (0 results, no error)
++    //   logs-search-error-state          — LogsErrorState (query/backend error)
+     const candidates = [
+       this.page.locator('[data-test="logs-search-no-events-found-text"]'),
+       this.page.locator(this.errorMessage),
+-      this.page.locator('[data-test="logs-search-result-not-found-text"]'),
+     ];
+     for (const locator of candidates) {
+       try {
+@@ -61,7 +59,7 @@ export class LogsQueryPage {
+         continue;
+       }
+     }
+-    throw new Error('No error/no-results message found — checked: logs-search-no-events-found-text, logs-search-error-message, logs-search-result-not-found-text');
++    throw new Error('No error/no-results message found — checked: logs-search-no-events-found-text, logs-search-error-state');
+   }
+ 
+   async clickResetFilters() {
+@@ -71,13 +69,13 @@ export class LogsQueryPage {
+ 
+   async clickNoDataFound() {
+     // Try data-test selectors in priority order:
+-    //   logs-search-no-data-histogram — SearchResult.vue histogram empty state
+-    //   logs-search-error-message     — Index.vue "No events found" heading
+-    //   logs-search-result-not-found-text — Index.vue "Result not found" div
++    //   logs-search-no-events-found-text — Index.vue LogsNoEventsState (0 hits, search applied)
++    //   logs-search-no-data-histogram    — SearchResult.vue histogram empty state
++    //   logs-search-error-state          — Index.vue error banner (SQL parse / backend error)
+     const locators = [
++      this.page.locator('[data-test="logs-search-no-events-found-text"]'),
+       this.page.locator('[data-test="logs-search-no-data-histogram"]'),
+-      this.page.locator('[data-test="logs-search-error-message"]'),
+-      this.page.locator('[data-test="logs-search-result-not-found-text"]'),
++      this.page.locator('[data-test="logs-search-error-state"]'),
+     ];
+     for (const locator of locators) {
+       try {
+@@ -88,7 +86,7 @@ export class LogsQueryPage {
+         continue;
+       }
+     }
+-    throw new Error('No "no data" message found — checked: logs-search-no-data-histogram, logs-search-error-message, logs-search-result-not-found-text');
++    throw new Error('No "no data" message found — checked: logs-search-no-events-found-text, logs-search-no-data-histogram, logs-search-error-state');
+   }
+ 
+   async clickResultDetail() {
+diff --git a/tests/ui-testing/pages/logsPages/unflattened.js b/tests/ui-testing/pages/logsPages/unflattened.js
+index 3bd00bf0187..bbdbd4cdd84 100644
+--- a/tests/ui-testing/pages/logsPages/unflattened.js
++++ b/tests/ui-testing/pages/logsPages/unflattened.js
+@@ -216,15 +216,20 @@ class UnflattenedPage {
+ 
+     /**
+      * Open the log detail drawer for the row at index `rowIndex` (0-based, as
+-     * rendered by the virtualized table).  Expands the row via its expand
+-     * button and then opens the source column to render the JSON detail.
++     * rendered by the virtualized table).  Clicks the source cell to trigger
++     * the row's click handler, which opens the side detail drawer.
++     *
++     * Do NOT click the expand button first.  Clicking the expand button inserts
++     * a new virtual row at rowIndex+1 in the TenstackTable, which shifts all
++     * subsequent row indices by 1.  After row 0 is expanded,
++     * log-table-column-1-_timestamp no longer exists (index 1 is the inline
++     * expanded-content row), so findRowWithO2Id breaks after the first row and
++     * never scans the rest of the table.
+      */
+     async openLogRowDetail(rowIndex) {
+-        const expandBtn = this.page.locator(
+-            `[data-test="log-table-column-${rowIndex}-_timestamp"] [data-test="table-row-expand-menu"]`
+-        );
+-        await expandBtn.waitFor({ state: 'visible', timeout: 15000 });
+-        await expandBtn.click();
++        // Clicking the source <td> bubbles up to the <tr> @click handler
++        // (handleDataRowClick → emits click:dataRow → openLogDetails in
++        // SearchResult.vue), which opens the side detail drawer.
+         const sourceCell = this.page.locator(`[data-test="log-table-column-${rowIndex}-source"]`);
+         await sourceCell.waitFor({ state: 'visible', timeout: 15000 });
+         await sourceCell.click();
+diff --git a/tests/ui-testing/pages/tracesPages/tracesPage.js b/tests/ui-testing/pages/tracesPages/tracesPage.js
+index 021f4661071..dddd5829d0f 100644
+--- a/tests/ui-testing/pages/tracesPages/tracesPage.js
++++ b/tests/ui-testing/pages/tracesPages/tracesPage.js
+@@ -65,8 +65,8 @@ export class TracesPage {
+     // ===== ANALYZE DIMENSIONS SELECTORS (VERIFIED against Vue source) =====
+     // TracesMetricsDashboard.vue: data-test="insights-button"
+     this.insightsButton = '[data-test="insights-button"]';
+-    // Traces SearchBar.vue: data-test="traces-search-bar-error-only-toggle-btn"
+-    this.errorOnlyToggle = '[data-test="traces-search-bar-error-only-toggle-btn"]';
++    // SearchResult.vue: error-count badge doubles as the error-only toggle
++    this.errorOnlyToggle = '[data-test="traces-error-count-badge"]';
+     // Traces SearchBar.vue: data-test="traces-search-bar-show-metrics-toggle-btn"
+     this.metricsToggle = '[data-test="traces-search-bar-show-metrics-toggle-btn"]';
+     // TracesAnalysisDashboard.vue was migrated to ODrawer
+@@ -113,7 +113,7 @@ export class TracesPage {
+ 
+     // Error States
+     this.noStreamSelectedText = '[data-test="logs-search-no-stream-selected-text"]';
+-    this.resultNotFoundText = '[data-test="logs-search-result-not-found-text"]';
++    this.resultNotFoundText = '[data-test="traces-search-result-not-found-text"]';
+     this.errorMessage = '[data-test="traces-search-error-message"]';
+ 
+     // Query Editor
+@@ -1740,7 +1740,7 @@ export class TracesPage {
+     return await chartPanel.first().isVisible({ timeout: 10000 }).catch(() => false);
+   }
+ 
+-  // --- Error Only Toggle (Traces SearchBar.vue) ---
++  // --- Error Only Toggle (SearchResult.vue — error-count badge) ---
+ 
+   /**
+    * Check if Error Only toggle is visible
+diff --git a/tests/ui-testing/playwright-tests/Logs/logshistogram.spec.js b/tests/ui-testing/playwright-tests/Logs/logshistogram.spec.js
+index b55230b6b06..91852614473 100644
+--- a/tests/ui-testing/playwright-tests/Logs/logshistogram.spec.js
++++ b/tests/ui-testing/playwright-tests/Logs/logshistogram.spec.js
+@@ -71,8 +71,10 @@ test.describe("Logs Histogram testcases", () => {
+     await pm.logsPage.clickErrorMessage();
+ 
+     // Step 2: SQL mode — query that returns 0 rows
++    // Use double quotes for the table identifier (DataFusion requires this).
++    // code > 99999 is impossible for any HTTP status code so results are always 0.
+     await pm.logsPage.ensureSQLMode();
+-    await pm.logsPage.clearAndFillQueryEditor("SELECT * FROM 'e2e_automate' where code > 500");
++    await pm.logsPage.clearAndFillQueryEditor('SELECT * FROM "e2e_automate" WHERE code > 99999');
+     const sqlResponse = page.waitForResponse(`**/api/${orgName}/_search**`, { timeout: 60000 });
+     await pm.logsPage.clickRefresh();
+     await sqlResponse;
+@@ -111,8 +113,10 @@ test.describe("Logs Histogram testcases", () => {
+     await pm.logsPage.toggleHistogram();
+ 
+     // Step 2: SQL mode — query that returns 0 rows, histogram ON
++    // Use double quotes for the table identifier (DataFusion requires this).
++    // code > 99999 is impossible for any HTTP status code so results are always 0.
+     await pm.logsPage.ensureSQLMode();
+-    await pm.logsPage.clearAndFillQueryEditor("SELECT * FROM 'e2e_automate' where code > 500");
++    await pm.logsPage.clearAndFillQueryEditor('SELECT * FROM "e2e_automate" WHERE code > 99999');
+     const sqlResponse = page.waitForResponse(`**/api/${orgName}/_search**`, { timeout: 60000 });
+     await pm.logsPage.clickRefresh();
+     await sqlResponse;
+diff --git a/tests/ui-testing/playwright-tests/Logs/logsquickmode.spec.js b/tests/ui-testing/playwright-tests/Logs/logsquickmode.spec.js
+index 41a94fae52c..39b45cbc2c9 100644
+--- a/tests/ui-testing/playwright-tests/Logs/logsquickmode.spec.js
++++ b/tests/ui-testing/playwright-tests/Logs/logsquickmode.spec.js
+@@ -13,8 +13,10 @@ async function applyQueryButton(page) {
+   testLogger.step('Applying query button');
+   const pm = new PageManager(page);
+   await pm.logsPage.runQueryAndWaitForResults();
+-  await pm.logsPage.waitForSearchResults();
+-  testLogger.debug('Query applied and results confirmed');
++  // Accept any definite post-query state: results table, no-events, or error.
++  // Tests that require actual rows call waitForSearchResults() in their body.
++  await pm.logsPage.waitForSearchResultOrEmpty();
++  testLogger.debug('Query applied and page reached a definite state');
+ }
+ 
+ 
+diff --git a/web/src/components/alerts/IncidentList.vue b/web/src/components/alerts/IncidentList.vue
+index c20d201f448..0bc257ef1a1 100644
+--- a/web/src/components/alerts/IncidentList.vue
++++ b/web/src/components/alerts/IncidentList.vue
+@@ -60,13 +60,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+         @row-click="viewIncident"
+       >
+         <template #toolbar>
+-          <OSearchInput
+-            v-model="searchQuery"
+-            class="tw:w-64"
+-            :placeholder="t('alerts.incidents.search')"
+-            data-test="incident-search-input"
+-            clearable
+-          />
++          <div class="tw:flex tw:items-center tw:justify-between tw:gap-2 tw:w-full">
++            <OToggleGroup
++              :model-value="statusFilter"
++              @update:model-value="(v) => filterByStatus(v as string)"
++              data-test="incident-status-filter-group"
++            >
++              <OToggleGroupItem value="all" size="sm" data-test="incident-status-filter-all">
++                <template #icon-left><OIcon name="format-list-bulleted" size="sm" /></template>
++                {{ t("alerts.incidents.allStatuses") }}
++              </OToggleGroupItem>
++              <OToggleGroupItem value="open" size="sm" data-test="incident-status-filter-open">
++                <template #icon-left><OIcon name="radio-button-unchecked" size="sm" /></template>
++                {{ t("alerts.incidents.statusOpen") }}
++              </OToggleGroupItem>
++              <OToggleGroupItem value="acknowledged" size="sm" data-test="incident-status-filter-acknowledged">
++                <template #icon-left><OIcon name="visibility" size="sm" /></template>
++                {{ t("alerts.incidents.statusAcknowledged") }}
++              </OToggleGroupItem>
++              <OToggleGroupItem value="resolved" size="sm" data-test="incident-status-filter-resolved">
++                <template #icon-left><OIcon name="task-alt" size="sm" /></template>
++                {{ t("alerts.incidents.statusResolved") }}
++              </OToggleGroupItem>
++            </OToggleGroup>
++            <OSearchInput
++              v-model="searchQuery"
++              class="tw:w-64"
++              :placeholder="t('alerts.incidents.search')"
++              data-test="incident-search-input"
++              clearable
++            />
++          </div>
+         </template>
+         <template #cell-status="{ row }">
+           <span
+@@ -154,9 +178,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+             <OEmptyState
+               size="hero"
+               preset="no-incidents"
+-              :filtered="!!searchQuery"
+-              :hide-action="!searchQuery"
+-              @action="(id) => id === 'clear-filters' ? (searchQuery = '') : null"
++              :filtered="!!searchQuery || statusFilter !== 'all'"
++              :hide-action="!searchQuery && statusFilter === 'all'"
++              @action="(id) => id === 'clear-filters' ? clearFilters() : null"
+             />
+           </div>
+         </template>
+@@ -190,6 +214,8 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+ import OTable from "@/lib/core/Table/OTable.vue";
++import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
++import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+ import { toast } from "@/lib/feedback/Toast/useToast";
+ import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
+@@ -206,6 +232,8 @@ export default defineComponent({
+     OTooltip,
+     OIcon,
+     OTable,
++    OToggleGroup,
++    OToggleGroupItem,
+ },
+   setup() {
+     const { t } = useI18n();
+@@ -216,6 +244,7 @@ export default defineComponent({
+     const loading = ref(false);
+     const allIncidents = ref<Incident[]>([]);
+     const searchQuery = ref("");
++    const statusFilter = ref("all");
+     const isRestoringState = ref(false);
+     const pageSize = ref(20);
+ 
+@@ -317,7 +346,11 @@ export default defineComponent({
+     };
+ 
+     const visibleIncidents = computed(() => {
+-      const filtered = applyFrontendSearch(allIncidents.value, searchQuery.value);
++      let filtered = allIncidents.value;
++      if (statusFilter.value !== "all") {
++        filtered = filtered.filter((incident) => incident.status === statusFilter.value);
++      }
++      filtered = applyFrontendSearch(filtered, searchQuery.value);
+       return filtered.map((incident, i) => ({ ...incident, "#": i + 1 }));
+     });
+ 
+@@ -353,6 +386,7 @@ export default defineComponent({
+     const viewIncident = (incident: Incident) => {
+       store.dispatch('incidents/setIncidents', {
+         searchQuery: searchQuery.value,
++        statusFilter: statusFilter.value,
+         pagination: { page: 1, rowsPerPage: 20 },
+         organizationIdentifier: store.state.selectedOrganization.identifier
+       });
+@@ -364,6 +398,27 @@ export default defineComponent({
+       });
+     };
+ 
++    const savePageState = () => {
++      if (isRestoringState.value) return;
++      store.dispatch('incidents/setIncidents', {
++        searchQuery: searchQuery.value,
++        statusFilter: statusFilter.value,
++        pagination: { page: 1, rowsPerPage: 20 },
++        organizationIdentifier: store.state.selectedOrganization.identifier
++      });
++    };
++
++    const filterByStatus = (value: string) => {
++      statusFilter.value = value;
++      store.dispatch('incidents/setStatusFilter', value);
++      savePageState();
++    };
++
++    const clearFilters = () => {
++      searchQuery.value = "";
++      filterByStatus("all");
++    };
++
+     const updateStatus = async (incident: Incident, newStatus: "open" | "acknowledged" | "resolved") => {
+       try {
+         const org = store.state.selectedOrganization.identifier;
+@@ -499,6 +554,9 @@ export default defineComponent({
+         if (savedState.searchQuery !== undefined) {
+           searchQuery.value = savedState.searchQuery;
+         }
++        if (savedState.statusFilter !== undefined) {
++          statusFilter.value = savedState.statusFilter;
++        }
+         return true;
+       }
+       return false;
+@@ -522,6 +580,7 @@ export default defineComponent({
+       if (hasRestoredState) {
+         store.dispatch('incidents/setIncidents', {
+           searchQuery: searchQuery.value,
++          statusFilter: statusFilter.value,
+           pagination: { page: 1, rowsPerPage: 20 },
+           organizationIdentifier: store.state.selectedOrganization.identifier
+         });
+@@ -531,14 +590,7 @@ export default defineComponent({
+       isRestoringState.value = false;
+     });
+ 
+-    watch(() => searchQuery.value, () => {
+-      if (isRestoringState.value) return;
+-      store.dispatch('incidents/setIncidents', {
+-        searchQuery: searchQuery.value,
+-        pagination: { page: 1, rowsPerPage: 20 },
+-        organizationIdentifier: store.state.selectedOrganization.identifier
+-      });
+-    });
++    watch(() => searchQuery.value, savePageState);
+ 
+     const refreshIncidents = async () => {
+       await loadIncidents();
+@@ -555,6 +607,9 @@ export default defineComponent({
+       allIncidents,
+       visibleIncidents,
+       searchQuery,
++      statusFilter,
++      filterByStatus,
++      clearFilters,
+       columns,
+       pageSize,
+       loadIncidents,
+diff --git a/web/src/components/common/ErrorDetailPanel.vue b/web/src/components/common/ErrorDetailPanel.vue
+new file mode 100644
+index 00000000000..d18b878dd0a
+--- /dev/null
++++ b/web/src/components/common/ErrorDetailPanel.vue
+@@ -0,0 +1,98 @@
++<!-- Copyright 2026 OpenObserve Inc.
++
++This program is free software: you can redistribute it and/or modify
++it under the terms of the GNU Affero General Public License as published by
++the Free Software Foundation, either version 3 of the License, or
++(at your option) any later version.
++
++This program is distributed in the hope that it will be useful
++but WITHOUT ANY WARRANTY; without even the implied warranty of
++MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++GNU Affero General Public License for more details.
++
++You should have received a copy of the GNU Affero General Public License
++along with this program.  If not, see <http://www.gnu.org/licenses/>.
++-->
++
++<!--
++  ErrorDetailPanel — collapsible error detail card used inside QueryErrorState.
++
++  Shows:
++    • summaryLine  — first sentence of the error message (always visible)
++    • traceId      — backend trace ID for support / debugging
++    • detailBody   — expanded full message + raw SQL detail (hidden by default)
++
++  The parent owns the showDetail boolean and toggles it via @toggle-detail.
++-->
++<template>
++  <div
++    class="tw:text-left tw:rounded-lg tw:border tw:border-border-default tw:bg-surface-panel tw:flex tw:flex-col"
++    data-test="error-detail-panel"
++  >
++    <!-- Summary row (always shown) -->
++    <div class="tw:px-4 tw:py-3 tw:flex tw:flex-col tw:gap-1">
++      <p
++        v-if="summaryLine"
++        class="tw:text-sm tw:font-medium tw:text-text-body tw:m-0"
++        data-test="error-detail-summary"
++      >
++        {{ summaryLine }}
++      </p>
++      <small
++        v-if="traceId"
++        class="tw:text-text-caption"
++        data-test="error-detail-trace-id"
++      >
++        <span class="tw:font-medium">{{ t("queryError.traceId") }}</span>
++        {{ traceId }}
++      </small>
++    </div>
++
++    <!-- Toggle row -->
++    <template v-if="hasDetail">
++      <div class="tw:border-t tw:border-border-default tw:px-4 tw:py-1">
++        <button
++          type="button"
++          class="tw:flex tw:items-center tw:gap-1.5 tw:text-xs tw:text-text-secondary tw:py-1.5 tw:cursor-pointer tw:bg-transparent tw:border-0 tw:p-0 tw:hover:text-text-body tw:transition-colors"
++          data-test="error-detail-toggle-btn"
++          @click="emit('toggle-detail')"
++        >
++          <OIcon
++            :name="showDetail ? 'expand-less' : 'expand-more'"
++            size="xs"
++          />
++          {{ showDetail ? t("queryError.hideDetail") : t("queryError.showDetail") }}
++        </button>
++      </div>
++
++      <!-- Expanded body — scrollable, capped height -->
++      <div
++        v-if="showDetail"
++        class="tw:border-t tw:border-border-default tw:px-4 tw:py-3 tw:max-h-52 tw:overflow-y-auto"
++        data-test="error-detail-body"
++      >
++        <p
++          class="tw:text-xs tw:font-mono tw:text-text-secondary tw:m-0 tw:whitespace-pre-wrap tw:break-all"
++        >
++          {{ detailBody }}
++        </p>
++      </div>
++    </template>
++  </div>
++</template>
++
++<script setup lang="ts">
++import { useI18n } from "vue-i18n";
++import OIcon from "@/lib/core/Icon/OIcon.vue";
++
++defineProps<{
++  summaryLine: string;
++  detailBody: string;
++  hasDetail: boolean;
++  traceId: string;
++  showDetail: boolean;
++}>();
++
++const emit = defineEmits<{ "toggle-detail": [] }>();
++const { t } = useI18n();
++</script>
+diff --git a/web/src/components/common/QueryErrorState.vue b/web/src/components/common/QueryErrorState.vue
+new file mode 100644
+index 00000000000..80c06c6b513
+--- /dev/null
++++ b/web/src/components/common/QueryErrorState.vue
+@@ -0,0 +1,419 @@
++<!-- Copyright 2026 OpenObserve Inc.
++
++This program is free software: you can redistribute it and/or modify
++it under the terms of the GNU Affero General Public License as published by
++the Free Software Foundation, either version 3 of the License, or
++(at your option) any later version.
++
++This program is distributed in the hope that it will be useful
++but WITHOUT ANY WARRANTY; without even the implied warranty of
++MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++GNU Affero General Public License for more details.
++
++You should have received a copy of the GNU Affero General Public License
++along with this program.  If not, see <http://www.gnu.org/licenses/>.
++-->
++
++<!--
++  QueryErrorState — universal query-error display for logs, metrics, traces,
++  dashboards, RUM, and alerts.
++
++  ┌─ Sizes ─────────────────────────────────────────────────────────────────┐
++  │  hero   Full-page context (logs, traces, metrics explorer).             │
++  │         Animated illustration + title + description + action cards.     │
++  │                                                                         │
++  │  block  Panel / card context (dashboard panels, alert test queries).    │
++  │         Compact: no illustration, smaller type, inline action buttons.  │
++  └─────────────────────────────────────────────────────────────────────────┘
++
++  ┌─ Smart error parsing ────────────────────────────────────────────────────┐
++  │  Backed by useQueryError composable:                                     │
++  │  • Strips HTML from backend messages                                     │
++  │  • Extracts TraceID from embedded <span>                                 │
++  │  • Splits long messages (field lists) into summary + expandable detail   │
++  │  • Maps error codes to human-readable titles / descriptions              │
++  │  • Classifies which codes warrant a "Fix query" recovery action          │
++  └─────────────────────────────────────────────────────────────────────────┘
++
++  ┌─ Default actions per error code ────────────────────────────────────────┐
++  │  20001 SQL syntax       → Fix query card  + Ask AI                      │
++  │  20002 Stream not found → (informational)                               │
++  │  20003 FTS not set      → Configure resource card                       │
++  │  20004 Field not found  → Fix query card  + Ask AI                      │
++  │  20005 Fn not defined   → Fix query card  + Ask AI                      │
++  │  20006 Data unavailable → Try wider range card                          │
++  │  20007 Type mismatch    → Fix query card  + Ask AI                      │
++  │  20008 Execute error    → Fix query card  + Ask AI                      │
++  │  10001 Server error     → (informational)                               │
++  │  0 / other              → (informational) + Ask AI (if aiEnabled)       │
++  └─────────────────────────────────────────────────────────────────────────┘
++
++  ┌─ Customisation ──────────────────────────────────────────────────────────┐
++  │  Slot #actions  — override the default action cards entirely.           │
++  │  Slot #extra    — append content below the detail panel (hero only).    │
++  │                                                                         │
++  │  Props title / description override the i18n defaults.                  │
++  │  Prop  illustration overrides the "broken-panel" default.               │
++  └─────────────────────────────────────────────────────────────────────────┘
++
++  Usage examples:
++    <!-- Logs / Traces / Metrics (full page) -->
++    <QueryErrorState
++      :error-code="searchObj.data.errorCode"
++      :error-msg="searchObj.data.errorMsg"
++      :error-detail="searchObj.data.errorDetail"
++      :ai-enabled="isAiEnabled"
++      size="hero"
++      @ask-ai="onAskAi"
++      @fix-query="onFixQuery"
++      @configure-resource="onConfigureStream"
++      @widen-range="onWidenRange"
++    />
++
++    <!-- Dashboard panel (compact) -->
++    <QueryErrorState
++      :error-code="state.errorDetail.code"
++      :error-msg="state.errorDetail.message"
++      size="block"
++    />
++
++    <!-- Alert test query result -->
++    <QueryErrorState
++      :error-msg="testResult.error"
++      size="block"
++      :ai-enabled="isAiEnabled"
++      @ask-ai="onAskAi"
++    />
++-->
++<template>
++  <!-- ── HERO layout ──────────────────────────────────────────────────── -->
++  <div
++    v-if="size === 'hero'"
++    class="tw:w-full tw:h-full tw:overflow-y-auto tw:flex tw:flex-col tw:items-center tw:pb-8"
++    data-test="query-error-state"
++  >
++    <!-- Illustration + title + description + action cards -->
++    <OEmptyState
++      :illustration="illustration ?? 'broken-panel'"
++      size="block"
++      :hide-action="true"
++      class="tw:w-full tw:shrink-0"
++    >
++      <template #title>{{ resolvedTitle }}</template>
++      <template #description>{{ resolvedDescription }}</template>
++      <template #actions>
++        <!-- Caller can replace all action cards via #actions slot -->
++        <slot name="actions" v-bind="slotProps">
++          <EmptyStateActionCard
++            v-if="errorCode === 20003"
++            icon="settings"
++            :label="t('queryError.configureResource')"
++            :sublabel="t('queryError.configureResourceDesc')"
++            data-test="query-error-configure-resource-card"
++            @click="emit('configure-resource')"
++          />
++          <EmptyStateActionCard
++            v-else-if="isQueryError"
++            icon="edit"
++            :label="t('queryError.fixQuery')"
++            :sublabel="t('queryError.fixQueryDesc')"
++            data-test="query-error-fix-query-card"
++            @click="emit('fix-query')"
++          />
++          <EmptyStateActionCard
++            v-else-if="errorCode === 20006"
++            icon="schedule"
++            :label="t('queryError.expandRange')"
++            :sublabel="t('queryError.expandRangeDesc')"
++            data-test="query-error-expand-range-card"
++            @click="emit('widen-range')"
++          />
++        </slot>
++      </template>
++    </OEmptyState>
++
++    <!-- Detail panel + buttons (outside OEmptyState — avoids its overflow:hidden) -->
++    <div
++      v-if="hasAnyContent"
++      class="tw:w-full tw:max-w-2xl tw:mx-auto tw:px-6 tw:flex tw:flex-col tw:gap-3"
++    >
++      <ErrorDetailPanel
++        :summary-line="summaryLine"
++        :detail-body="detailBody"
++        :has-detail="hasDetail"
++        :trace-id="traceId"
++        :show-detail="showDetail"
++        @toggle-detail="showDetail = !showDetail"
++      />
++
++      <div class="tw:flex tw:items-center tw:justify-center tw:gap-2 tw:flex-wrap">
++        <OButton
++          variant="ghost"
++          size="sm"
++          :icon-left="copied ? 'check' : 'content-copy'"
++          data-test="query-error-copy-btn"
++          @click="handleCopy"
++        >
++          {{ copied ? t("queryError.copied") : t("queryError.copyError") }}
++        </OButton>
++        <OButton
++          v-if="aiEnabled && (isQueryError || errorCode === 0)"
++          variant="ghost"
++          size="sm"
++          class="ai-hover-btn"
++          data-test="query-error-ask-ai-btn"
++          @click="emit('ask-ai')"
++        >
++          <template #icon-left>
++            <img :src="aiIconSrc" class="tw:w-4 tw:h-4 tw:shrink-0" alt="" />
++          </template>
++          {{ t("queryError.askAi") }}
++        </OButton>
++      </div>
++    </div>
++
++    <!-- AI button when there's nothing to show in the detail panel -->
++    <div
++      v-else-if="aiEnabled && (isQueryError || errorCode === 0)"
++      class="tw:flex tw:justify-center tw:mt-2"
++    >
++      <OButton
++        variant="ghost"
++        size="sm"
++        icon-left="bolt"
++        class="ai-hover-btn"
++        data-test="query-error-ask-ai-btn"
++        @click="emit('ask-ai')"
++      >
++        {{ t("queryError.askAi") }}
++      </OButton>
++    </div>
++
++    <!-- Caller-supplied extra content (below everything) -->
++    <slot name="extra" />
++  </div>
++
++  <!-- ── BLOCK layout (dashboard panels, alerts) ───────────────────────── -->
++  <div
++    v-else
++    class="tw:w-full tw:flex tw:flex-col tw:gap-3 tw:p-4"
++    data-test="query-error-state"
++  >
++    <!-- Title row -->
++    <div class="tw:flex tw:items-start tw:gap-2">
++      <OIcon
++        name="error-outline"
++        size="sm"
++        class="tw:text-status-error tw:shrink-0 tw:mt-0.5"
++      />
++      <div class="tw:flex tw:flex-col tw:gap-0.5 tw:min-w-0">
++        <p class="tw:text-sm tw:font-semibold tw:text-text-body tw:m-0">
++          {{ resolvedTitle }}
++        </p>
++        <p
++          v-if="summaryLine"
++          class="tw:text-xs tw:text-text-secondary tw:m-0 tw:break-words"
++          data-test="query-error-summary"
++        >
++          {{ summaryLine }}
++        </p>
++      </div>
++    </div>
++
++    <!-- Expandable detail -->
++    <template v-if="hasDetail">
++      <button
++        type="button"
++        class="tw:flex tw:items-center tw:gap-1 tw:text-xs tw:text-text-secondary tw:cursor-pointer tw:bg-transparent tw:border-0 tw:p-0 tw:self-start tw:hover:text-text-body tw:transition-colors"
++        data-test="query-error-toggle-detail-btn"
++        @click="showDetail = !showDetail"
++      >
++        <OIcon :name="showDetail ? 'expand-less' : 'expand-more'" size="xs" />
++        {{ showDetail ? t("queryError.hideDetail") : t("queryError.showDetail") }}
++      </button>
++      <div
++        v-if="showDetail"
++        class="tw:rounded tw:bg-surface-panel tw:border tw:border-border-default tw:px-3 tw:py-2 tw:max-h-40 tw:overflow-y-auto"
++        data-test="query-error-detail-expanded"
++      >
++        <p
++          class="tw:text-xs tw:font-mono tw:text-text-secondary tw:m-0 tw:whitespace-pre-wrap tw:break-all"
++        >
++          {{ detailBody }}
++        </p>
++      </div>
++    </template>
++
++    <!-- Trace ID (block) -->
++    <small v-if="traceId" class="tw:text-text-caption" data-test="query-error-trace-id">
++      <span class="tw:font-medium">{{ t("queryError.traceId") }}</span>
++      {{ traceId }}
++    </small>
++
++    <!-- Action row (block) -->
++    <div class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap">
++      <!-- Default slot for module-specific actions -->
++      <slot name="actions" v-bind="slotProps">
++        <OButton
++          v-if="errorCode === 20003"
++          variant="outline"
++          size="sm"
++          icon-left="settings"
++          data-test="query-error-configure-resource-btn"
++          @click="emit('configure-resource')"
++        >
++          {{ t("queryError.configureResource") }}
++        </OButton>
++        <OButton
++          v-else-if="isQueryError"
++          variant="outline"
++          size="sm"
++          icon-left="edit"
++          data-test="query-error-fix-query-btn"
++          @click="emit('fix-query')"
++        >
++          {{ t("queryError.fixQuery") }}
++        </OButton>
++        <OButton
++          v-else-if="errorCode === 20006"
++          variant="outline"
++          size="sm"
++          icon-left="schedule"
++          data-test="query-error-expand-range-btn"
++          @click="emit('widen-range')"
++        >
++          {{ t("queryError.expandRange") }}
++        </OButton>
++      </slot>
++
++      <OButton
++        variant="ghost"
++        size="sm"
++        :icon-left="copied ? 'check' : 'content-copy'"
++        data-test="query-error-copy-btn"
++        @click="handleCopy"
++      >
++        {{ copied ? t("queryError.copied") : t("queryError.copyError") }}
++      </OButton>
++      <OButton
++        v-if="aiEnabled && (isQueryError || errorCode === 0)"
++        variant="ghost"
++        size="sm"
++        icon-left="bolt"
++        class="ai-hover-btn"
++        data-test="query-error-ask-ai-btn"
++        @click="emit('ask-ai')"
++      >
++        {{ t("queryError.askAi") }}
++      </OButton>
++    </div>
++  </div>
++</template>
++
++<script setup lang="ts">
++import { computed, ref } from "vue";
++import { useI18n } from "vue-i18n";
++import { useAiIcon } from "@/composables/useAiIcon";
++import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
++import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
++import OButton from "@/lib/core/Button/OButton.vue";
++import OIcon from "@/lib/core/Icon/OIcon.vue";
++import type { IllustrationName } from "@/lib/core/EmptyState/illustrations/index";
++import { useQueryError } from "@/composables/useQueryError";
++import ErrorDetailPanel from "./ErrorDetailPanel.vue";
++
++// ── Props ──────────────────────────────────────────────────────────────────
++
++const props = withDefaults(
++  defineProps<{
++    /** Backend error code (0 = generic/unknown). */
++    errorCode?: number | string;
++    /** Raw error message from backend. May contain HTML and embedded TraceID. */
++    errorMsg?: string;
++    /** Raw SQL parse position or DataFusion execution detail. */
++    errorDetail?: string;
++    /** Show the "Ask AI" ghost button (enterprise + ai_enabled). */
++    aiEnabled?: boolean;
++    /** Resource name (stream, metric) for the 20003 configure CTA. */
++    resourceName?: string;
++    /**
++     * hero  — full-page layout: illustration + action cards + detail panel.
++     * block — compact inline layout for panels, cards, and form results.
++     */
++    size?: "hero" | "block";
++    /** Override the default "broken-panel" illustration (hero size only). */
++    illustration?: IllustrationName;
++    /** Override the error code's default title. */
++    title?: string;
++    /** Override the error code's default description. */
++    description?: string;
++  }>(),
++  { size: "hero", aiEnabled: false },
++);
++
++// ── Emits ──────────────────────────────────────────────────────────────────
++
++const emit = defineEmits<{
++  /** User clicked "Ask AI to fix my query". */
++  "ask-ai": [];
++  /** User clicked "Fix the query" — parent should focus the editor. */
++  "fix-query": [];
++  /** User clicked "Configure resource" (FTS error 20003). */
++  "configure-resource": [];
++  /** User clicked "Try a different time range". */
++  "widen-range": [];
++}>();
++
++// ── Error parsing ──────────────────────────────────────────────────────────
++
++const {
++  errorCode,
++  traceId,
++  summaryLine,
++  detailBody,
++  hasDetail,
++  hasAnyContent,
++  isQueryError,
++  defaultTitle,
++  defaultDescription,
++  showDetail,
++  copyErrorDetails,
++} = useQueryError({
++  errorCode: () => props.errorCode,
++  errorMsg: () => props.errorMsg,
++  errorDetail: () => props.errorDetail,
++});
++
++// ── Resolved copy ──────────────────────────────────────────────────────────
++
++const { t } = useI18n();
++const resolvedTitle = computed(() => props.title ?? defaultTitle.value);
++const resolvedDescription = computed(
++  () => props.description ?? defaultDescription.value,
++);
++
++// ── Copy feedback — show "Copied!" for 2 s after the user clicks ───────────
++
++const copied = ref(false);
++let copyTimer: ReturnType<typeof setTimeout> | null = null;
++
++const handleCopy = () => {
++  copyErrorDetails();
++  copied.value = true;
++  if (copyTimer) clearTimeout(copyTimer);
++  copyTimer = setTimeout(() => {
++    copied.value = false;
++    copyTimer = null;
++  }, 2000);
++};
++
++// ── Slot binding (passed to #actions slot so callers can read state) ───────
++
++const slotProps = computed(() => ({
++  errorCode: errorCode.value,
++  isQueryError: isQueryError.value,
++  emit,
++}));
++
++const { aiIconSrc } = useAiIcon();
++</script>
+diff --git a/web/src/composables/useAiIcon.ts b/web/src/composables/useAiIcon.ts
+new file mode 100644
+index 00000000000..cef2abe5036
+--- /dev/null
++++ b/web/src/composables/useAiIcon.ts
+@@ -0,0 +1,44 @@
++// Copyright 2026 OpenObserve Inc.
++//
++// This program is free software: you can redistribute it and/or modify
++// it under the terms of the GNU Affero General Public License as published by
++// the Free Software Foundation, either version 3 of the License, or
++// (at your option) any later version.
++//
++// This program is distributed in the hope that it will be useful
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU Affero General Public License for more details.
++//
++// You should have received a copy of the GNU Affero General Public License
++// along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++/**
++ * useAiIcon — returns the theme-aware AI button icon src.
++ *
++ * Light mode → ai_icon_gradient.svg  (colour gradient sparkle)
++ * Dark mode  → ai_icon_dark.svg      (light sparkle for dark backgrounds)
++ *
++ * Use in any component that renders an "Ask AI" button to keep the icon
++ * consistent with the header AI button.
++ *
++ * Usage:
++ *   const { aiIconSrc } = useAiIcon()
++ *   <img :src="aiIconSrc" class="tw:w-4 tw:h-4 tw:shrink-0" />
++ */
++
++import { computed } from "vue";
++import { useStore } from "vuex";
++import { getImageURL } from "@/utils/zincutils";
++
++export function useAiIcon() {
++  const store = useStore();
++
++  const aiIconSrc = computed<string>(() =>
++    store.state.theme === "dark"
++      ? getImageURL("images/common/ai_icon_dark.svg")
++      : getImageURL("images/common/ai_icon_gradient.svg"),
++  );
++
++  return { aiIconSrc };
++}
+diff --git a/web/src/composables/useQueryError.ts b/web/src/composables/useQueryError.ts
+new file mode 100644
+index 00000000000..59903747854
+--- /dev/null
++++ b/web/src/composables/useQueryError.ts
+@@ -0,0 +1,246 @@
++// Copyright 2026 OpenObserve Inc.
++//
++// This program is free software: you can redistribute it and/or modify
++// it under the terms of the GNU Affero General Public License as published by
++// the Free Software Foundation, either version 3 of the License, or
++// (at your option) any later version.
++//
++// This program is distributed in the hope that it will be useful
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU Affero General Public License for more details.
++//
++// You should have received a copy of the GNU Affero General Public License
++// along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++/**
++ * useQueryError — shared composable for parsing and classifying backend query errors.
++ *
++ * Used by logs, metrics, traces, dashboards, RUM, and alerts to produce a
++ * consistent, human-readable error presentation from the raw backend response.
++ *
++ * Accepts MaybeRefOrGetter for all inputs so it works with:
++ *   - defineProps() reactive objects  → pass getter:  () => props.errorCode
++ *   - Vuex store / composable state   → pass computed: computed(() => searchObj.data.errorCode)
++ *   - Static strings / numbers        → pass plain value directly
++ *
++ * Example:
++ *   const err = useQueryError({
++ *     errorCode: () => props.errorCode,
++ *     errorMsg:  () => props.errorMsg,
++ *     errorDetail: () => props.errorDetail,
++ *   });
++ */
++
++import DOMPurify from "dompurify";
++import { computed, ref, type MaybeRefOrGetter, toValue } from "vue";
++import { useI18n } from "vue-i18n";
++
++// ── Types ──────────────────────────────────────────────────────────────────
++
++export interface QueryErrorInput {
++  /** Backend error code. Accepts number, numeric string, or undefined (→ 0). */
++  errorCode?: MaybeRefOrGetter<number | string | undefined>;
++  /**
++   * Raw error message from the backend. May contain HTML tags and an embedded
++   * TraceID as <span class="text-subtitle1">TraceID: abc123</span>.
++   */
++  errorMsg?: MaybeRefOrGetter<string | undefined>;
++  /** SQL parse positions, DataFusion detail, or other raw technical detail. */
++  errorDetail?: MaybeRefOrGetter<string | undefined>;
++}
++
++export interface QueryErrorResult {
++  /** Normalized numeric error code (0 = generic). */
++  errorCode: ReturnType<typeof computed<number>>;
++  /** Plain text of the error message — HTML stripped, TraceID removed. */
++  cleanMessage: ReturnType<typeof computed<string>>;
++  /**
++   * First sentence (≤ 160 chars) — safe to show inline without overwhelming
++   * the UI when the backend appends the full list of valid field names.
++   */
++  summaryLine: ReturnType<typeof computed<string>>;
++  /**
++   * Everything beyond the summary line + raw errorDetail.
++   * Shown in the collapsible "Show details" section.
++   */
++  detailBody: ReturnType<typeof computed<string>>;
++  /** Whether there is expandable detail content. */
++  hasDetail: ReturnType<typeof computed<boolean>>;
++  /** Whether there is any displayable content at all. */
++  hasAnyContent: ReturnType<typeof computed<boolean>>;
++  /** TraceID extracted from the backend HTML response. */
++  traceId: ReturnType<typeof computed<string>>;
++  /** True for error codes where "Fix the query" is the right recovery action. */
++  isQueryError: ReturnType<typeof computed<boolean>>;
++  /** Default i18n title for the error code. */
++  defaultTitle: ReturnType<typeof computed<string>>;
++  /** Default i18n description for the error code. */
++  defaultDescription: ReturnType<typeof computed<string>>;
++  /** UI toggle for the expandable detail section. */
++  showDetail: ReturnType<typeof ref<boolean>>;
++  /** Copy all error detail to the clipboard. */
++  copyErrorDetails: () => void;
++}
++
++// ── Constants ──────────────────────────────────────────────────────────────
++
++/** Error codes where "Fix the query" is the correct recovery action. */
++export const QUERY_ERROR_CODES = new Set([20001, 20004, 20005, 20007, 20008]);
++
++/** Per-code i18n keys. Falls back to generic keys for unknown codes. */
++const ERROR_META: Record<number, { titleKey: string; descKey: string }> = {
++  20001: {
++    titleKey: "queryError.sqlError",
++    descKey: "queryError.sqlErrorDesc",
++  },
++  20002: {
++    titleKey: "queryError.streamNotFound",
++    descKey: "queryError.streamNotFoundDesc",
++  },
++  20003: {
++    titleKey: "queryError.ftsNotConfigured",
++    descKey: "queryError.ftsNotConfiguredDesc",
++  },
++  20004: {
++    titleKey: "queryError.fieldNotFound",
++    descKey: "queryError.fieldNotFoundDesc",
++  },
++  20005: {
++    titleKey: "queryError.functionNotDefined",
++    descKey: "queryError.functionNotDefinedDesc",
++  },
++  20006: {
++    titleKey: "queryError.dataUnavailable",
++    descKey: "queryError.dataUnavailableDesc",
++  },
++  20007: {
++    titleKey: "queryError.dataTypeMismatch",
++    descKey: "queryError.dataTypeMismatchDesc",
++  },
++  20008: {
++    titleKey: "queryError.executionError",
++    descKey: "queryError.executionErrorDesc",
++  },
++  10001: {
++    titleKey: "queryError.serverError",
++    descKey: "queryError.serverErrorDesc",
++  },
++};
++
++// ── Composable ─────────────────────────────────────────────────────────────
++
++export function useQueryError(input: QueryErrorInput): QueryErrorResult {
++  const { t } = useI18n();
++  const showDetail = ref(false);
++
++  // ── Input normalization ────────────────────────────────────────────────
++
++  const errorCode = computed<number>(() => {
++    const raw = toValue(input.errorCode);
++    if (raw === undefined || raw === null) return 0;
++    const n = typeof raw === "string" ? parseInt(raw, 10) : raw;
++    return isNaN(n) ? 0 : n;
++  });
++
++  const rawMsg = computed<string>(() => toValue(input.errorMsg) ?? "");
++  const rawDetail = computed<string>(() => toValue(input.errorDetail) ?? "");
++
++  // ── Message extraction ─────────────────────────────────────────────────
++
++  /**
++   * TraceID embedded by the backend as:
++   *   <span class="text-subtitle1">TraceID: abc123def456</span>
++   */
++  const traceId = computed<string>(() => {
++    const match = rawMsg.value.match(/TraceID:\s*([a-f0-9A-F-]+)/i);
++    return match ? match[1] : "";
++  });
++
++  /** Human-readable message — all HTML stripped, TraceID fragment removed. */
++  const cleanMessage = computed<string>(() => {
++    if (!rawMsg.value) return "";
++    return DOMPurify.sanitize(rawMsg.value, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] })
++      .replace(/TraceID:\s*[a-f0-9A-F-]+/gi, "")
++      .replace(/\s+/g, " ")
++      .trim();
++  });
++
++  /**
++   * First sentence of cleanMessage, capped at 160 chars.
++   *
++   * The backend often appends the full list of valid field names after the
++   * first sentence (e.g. "No field named X. Valid fields are …"). Showing
++   * only the first sentence keeps the summary line tight while the full list
++   * is available in the expandable detail section.
++   */
++  const summaryLine = computed<string>(() => {
++    const msg = cleanMessage.value;
++    if (!msg) return "";
++    const dotIdx = msg.indexOf(". ");
++    if (dotIdx > 0 && dotIdx < 160) return msg.slice(0, dotIdx + 1);
++    if (msg.length <= 160) return msg;
++    return msg.slice(0, 157) + "…";
++  });
++
++  /**
++   * Everything past the first sentence + the raw errorDetail.
++   * Displayed in the collapsible "Show details" panel.
++   */
++  const detailBody = computed<string>(() => {
++    const msg = cleanMessage.value;
++    const dotIdx = msg.indexOf(". ");
++    const remainder =
++      dotIdx > 0 && dotIdx < 160 ? msg.slice(dotIdx + 2).trim() : "";
++    const parts = [remainder, rawDetail.value].filter(Boolean);
++    return parts.join("\n\n");
++  });
++
++  const hasDetail = computed(() => detailBody.value.length > 0);
++
++  const hasAnyContent = computed(
++    () => !!(cleanMessage.value || rawDetail.value || traceId.value),
++  );
++
++  // ── Classification ─────────────────────────────────────────────────────
++
++  const isQueryError = computed(() => QUERY_ERROR_CODES.has(errorCode.value));
++
++  // ── Title / description ────────────────────────────────────────────────
++
++  const meta = computed(
++    () =>
++      ERROR_META[errorCode.value] ?? {
++        titleKey: "queryError.generic",
++        descKey: "queryError.genericDesc",
++      },
++  );
++
++  const defaultTitle = computed(() => t(meta.value.titleKey));
++  const defaultDescription = computed(() => t(meta.value.descKey));
++
++  // ── Clipboard ──────────────────────────────────────────────────────────
++
++  const copyErrorDetails = () => {
++    const parts: string[] = [];
++    if (cleanMessage.value) parts.push(cleanMessage.value);
++    if (rawDetail.value) parts.push(rawDetail.value);
++    if (traceId.value) parts.push(`TraceID: ${traceId.value}`);
++    navigator.clipboard?.writeText(parts.join("\n"));
++  };
++
++  return {
++    errorCode,
++    cleanMessage,
++    summaryLine,
++    detailBody,
++    hasDetail,
++    hasAnyContent,
++    traceId,
++    isQueryError,
++    defaultTitle,
++    defaultDescription,
++    showDetail,
++    copyErrorDetails,
++  };
++}
+diff --git a/web/src/locales/languages/de.json b/web/src/locales/languages/de.json
+index 9d00eda1161..5d791b46ed9 100644
+--- a/web/src/locales/languages/de.json
++++ b/web/src/locales/languages/de.json
+@@ -3271,7 +3271,10 @@
+       "expandRangeDescAbsolute": "Wechseln Sie zu einem breiteren relativen Zeitbereich",
+       "removeFilter": "Einen Filter entfernen",
+       "selectedRange": "der gewählte Bereich"
+-    }
++    },
++    "showAll": "Zeige alles",
++    "filterByErrors": "Nach Fehlern filtern",
++    "clearErrorFilter": "Fehlerfilter löschen"
+   },
+   "invitation": {
+     "pendingInvitations": "Ausstehende Einladungen",
+@@ -3554,7 +3557,9 @@
+     "timeRangeLabel": "Zeitbereich:",
+     "analyzeTooltipTraces": "Analysieren Sie die Trace-Dimensionen auf Rate, Latenz und Fehlermuster",
+     "insightsButtonLabel": "Einblicke",
+-    "searchInspectionsLabel": "Überprüfen Sie die Ausführungsdetails des Suchauftrags"
++    "searchInspectionsLabel": "Überprüfen Sie die Ausführungsdetails des Suchauftrags",
++    "inspectBtnLabel": "Inspizieren",
++    "analyzeBtnLabel": "Einblicke"
+   },
+   "errorInsights": {
+     "title": "Einblicke",
+@@ -4826,6 +4831,73 @@
+       "openHistory": "Suchverlauf öffnen",
+       "askAi": "Bitten Sie AI, meine Anfrage zu korrigieren",
+       "selectedRange": "der gewählte Bereich"
++    },
++    "error": {
++      "sqlError": "SQL-Syntaxfehler",
++      "sqlErrorDesc": "Ihre Abfrage hat einen Syntaxfehler. Überprüfen Sie den Abfrage-Editor auf hervorgehobene Fehler.",
++      "streamNotFound": "Stream nicht gefunden",
++      "streamNotFoundDesc": "Der ausgewählte Stream existiert nicht oder wurde entfernt.",
++      "ftsNotConfigured": "Volltextsuche nicht konfiguriert",
++      "ftsNotConfiguredDesc": "Dieser Stream hat kein Volltextsuchfeld. Konfigurieren Sie eines, um die Stichwortsuche zu aktivieren.",
++      "fieldNotFound": "Feld wurde nicht gefunden",
++      "fieldNotFoundDesc": "Ihre Abfrage verweist auf ein oder mehrere Felder, die in diesem Stream nicht existieren.",
++      "functionNotDefined": "Funktion nicht definiert",
++      "functionNotDefinedDesc": "Ihre Abfrage ruft eine VRL-Funktion auf, die nicht definiert ist.",
++      "dataUnavailable": "Datendateien nicht verfügbar",
++      "dataUnavailableDesc": "Auf einige Datendateien für diesen Zeitraum kann nicht zugegriffen werden. Versuchen Sie es mit einem anderen Zeitfenster.",
++      "dataTypeMismatch": "Datentyp stimmt nicht überein",
++      "dataTypeMismatchDesc": "Ein Feld in Ihrer Abfrage wird mit einem inkompatiblen Datentyp verwendet.",
++      "executionError": "Die Ausführung der Abfrage ist fehlgeschlagen",
++      "executionErrorDesc": "Bei der Ausführung Ihrer Abfrage ist ein Fehler aufgetreten.",
++      "serverError": "Serverfehler",
++      "serverErrorDesc": "Auf dem Server ist ein interner Fehler aufgetreten.",
++      "generic": "Fehler bei der Suche",
++      "genericDesc": "Beim Abrufen von Suchereignissen ist ein Fehler aufgetreten.",
++      "configureStream": "Stream konfigurieren",
++      "configureStreamDesc": "Fügen Sie in den Stream-Einstellungen ein Volltextsuchfeld hinzu",
++      "fixQuery": "Korrigiere die Abfrage",
++      "fixQueryDesc": "Überprüfen und korrigieren Sie die Abfrage im Editor",
++      "expandRange": "Versuchen Sie es mit einem anderen Zeitraum",
++      "expandRangeDesc": "Zugreifbare Daten befinden sich möglicherweise in einem anderen Zeitfenster",
++      "copyError": "Fehlerdetails kopieren",
++      "traceId": "Trace-ID:",
++      "askAi": "Bitten Sie AI, meine Anfrage zu korrigieren",
++      "showDetail": "Zeige Details",
++      "hideDetail": "Details ausblenden"
+     }
++  },
++  "queryError": {
++    "sqlError": "SQL-Syntaxfehler",
++    "sqlErrorDesc": "Ihre Abfrage hat einen Syntaxfehler. Überprüfen Sie den Editor auf hervorgehobene Fehler.",
++    "streamNotFound": "Stream nicht gefunden",
++    "streamNotFoundDesc": "Der ausgewählte Stream existiert nicht oder wurde entfernt.",
++    "ftsNotConfigured": "Volltextsuche nicht konfiguriert",
++    "ftsNotConfiguredDesc": "Dieser Stream hat kein Volltextsuchfeld. Konfigurieren Sie eines, um die Stichwortsuche zu aktivieren.",
++    "fieldNotFound": "Feld wurde nicht gefunden",
++    "fieldNotFoundDesc": "Ihre Abfrage verweist auf ein oder mehrere Felder, die in diesem Stream nicht existieren.",
++    "functionNotDefined": "Funktion nicht definiert",
++    "functionNotDefinedDesc": "Ihre Abfrage ruft eine VRL-Funktion auf, die nicht definiert ist.",
++    "dataUnavailable": "Datendateien nicht verfügbar",
++    "dataUnavailableDesc": "Auf einige Datendateien für diesen Zeitraum kann nicht zugegriffen werden. Versuchen Sie es mit einem anderen Zeitfenster.",
++    "dataTypeMismatch": "Datentyp stimmt nicht überein",
++    "dataTypeMismatchDesc": "Ein Feld in Ihrer Abfrage wird mit einem inkompatiblen Datentyp verwendet.",
++    "executionError": "Die Ausführung der Abfrage ist fehlgeschlagen",
++    "executionErrorDesc": "Bei der Ausführung Ihrer Abfrage ist ein Fehler aufgetreten.",
++    "serverError": "Serverfehler",
++    "serverErrorDesc": "Auf dem Server ist ein interner Fehler aufgetreten.",
++    "generic": "Abfragefehler",
++    "genericDesc": "Bei der Bearbeitung Ihrer Anfrage ist ein Fehler aufgetreten.",
++    "configureResource": "Stream konfigurieren",
++    "configureResourceDesc": "Fügen Sie in den Stream-Einstellungen ein Volltextsuchfeld hinzu",
++    "fixQuery": "Korrigiere die Abfrage",
++    "fixQueryDesc": "Überprüfen und korrigieren Sie die Abfrage im Editor",
++    "expandRange": "Versuchen Sie es mit einem anderen Zeitraum",
++    "expandRangeDesc": "Zugreifbare Daten befinden sich möglicherweise in einem anderen Zeitfenster",
++    "copyError": "Fehlerdetails kopieren",
++    "copied": "Kopiert!",
++    "traceId": "Trace-ID:",
++    "askAi": "Bitten Sie AI, meine Anfrage zu korrigieren",
++    "showDetail": "Zeige Details",
++    "hideDetail": "Details ausblenden"
+   }
+ }
+\ No newline at end of file
+diff --git a/web/src/locales/languages/en.json b/web/src/locales/languages/en.json
+index db83d54d4b9..695cbb7892e 100644
+--- a/web/src/locales/languages/en.json
++++ b/web/src/locales/languages/en.json
+@@ -1688,12 +1688,14 @@
+     "tabLabel": "Rate",
+     "analyzeButton": "Rate Analysis",
+     "analyzeTooltip": "Analyze trace rate patterns across dimensions",
+-    "analyzeTooltipLogs": "Analyze dimension distribution for current time range",
++    "analyzeTooltipLogs": "View insights for current time range",
+     "analyzeTooltipTraces": "Analyze trace dimensions for rate, latency, and error patterns",
+     "insightsButtonLabel": "Insights",
+     "rateLabel": "Rate:",
+     "timeRangeLabel": "Time Range:",
+-    "searchInspectionsLabel": "Inspect search job execution details"
++    "searchInspectionsLabel": "Inspect search job execution details",
++    "inspectBtnLabel": "Inspect",
++    "analyzeBtnLabel": "Insights"
+   },
+   "errorInsights": {
+     "title": "Insights",
+@@ -3037,7 +3039,7 @@
+       "correlatedBySemanticGroups": "Dimensions",
+       "correlatedByAlertId": "Alert ID",
+       "filterByStatus": "Filter by status",
+-      "allStatuses": "All Statuses",
++      "allStatuses": "All",
+       "loading": "Loading incidents...",
+       "errorLoading": "Failed to load incidents",
+       "statusUpdated": "Incident status updated",
+@@ -3767,6 +3769,9 @@
+     "spansTruncatedWarning": "Showing {count} of {total} spans, trace may be incomplete. Contact your administrator to increase the span limit.",
+     "errorTraces": "Error Traces",
+     "errorSpans": "Error Spans",
++    "showAll": "Show All",
++    "filterByErrors": "Filter by errors",
++    "clearErrorFilter": "Clear error filter",
+     "error": "ERROR",
+     "errors": "ERRORS",
+     "success": "SUCCESS",
+@@ -5364,6 +5369,73 @@
+       "openHistory": "Open search history",
+       "askAi": "Ask AI to fix my query",
+       "selectedRange": "the selected range"
++    },
++    "error": {
++      "sqlError": "SQL syntax error",
++      "sqlErrorDesc": "Your query has a syntax error. Review the query editor for highlighted errors.",
++      "streamNotFound": "Stream not found",
++      "streamNotFoundDesc": "The selected stream does not exist or was removed.",
++      "ftsNotConfigured": "Full-text search not configured",
++      "ftsNotConfiguredDesc": "This stream does not have a full-text search field. Configure one to enable keyword search.",
++      "fieldNotFound": "Field not found",
++      "fieldNotFoundDesc": "Your query references one or more fields that do not exist in this stream.",
++      "functionNotDefined": "Function not defined",
++      "functionNotDefinedDesc": "Your query calls a VRL function that is not defined.",
++      "dataUnavailable": "Data files unavailable",
++      "dataUnavailableDesc": "Some data files for this time range are inaccessible. Try a different time window.",
++      "dataTypeMismatch": "Data type mismatch",
++      "dataTypeMismatchDesc": "A field in your query is used with an incompatible data type.",
++      "executionError": "Query execution failed",
++      "executionErrorDesc": "An error occurred while executing your query.",
++      "serverError": "Server error",
++      "serverErrorDesc": "An internal error occurred on the server.",
++      "generic": "Search error",
++      "genericDesc": "An error occurred while retrieving search events.",
++      "configureStream": "Configure stream",
++      "configureStreamDesc": "Add a full-text search field in stream settings",
++      "fixQuery": "Fix the query",
++      "fixQueryDesc": "Review and correct the query in the editor",
++      "expandRange": "Try a different time range",
++      "expandRangeDesc": "Accessible data may be in a different time window",
++      "copyError": "Copy error details",
++      "traceId": "Trace ID:",
++      "askAi": "Ask AI to fix my query",
++      "showDetail": "Show details",
++      "hideDetail": "Hide details"
+     }
++  },
++  "queryError": {
++    "sqlError": "SQL syntax error",
++    "sqlErrorDesc": "Your query has a syntax error. Review the editor for highlighted errors.",
++    "streamNotFound": "Stream not found",
++    "streamNotFoundDesc": "The selected stream does not exist or was removed.",
++    "ftsNotConfigured": "Full-text search not configured",
++    "ftsNotConfiguredDesc": "This stream does not have a full-text search field. Configure one to enable keyword search.",
++    "fieldNotFound": "Field not found",
++    "fieldNotFoundDesc": "Your query references one or more fields that do not exist in this stream.",
++    "functionNotDefined": "Function not defined",
++    "functionNotDefinedDesc": "Your query calls a VRL function that is not defined.",
++    "dataUnavailable": "Data files unavailable",
++    "dataUnavailableDesc": "Some data files for this time range are inaccessible. Try a different time window.",
++    "dataTypeMismatch": "Data type mismatch",
++    "dataTypeMismatchDesc": "A field in your query is used with an incompatible data type.",
++    "executionError": "Query execution failed",
++    "executionErrorDesc": "An error occurred while executing your query.",
++    "serverError": "Server error",
++    "serverErrorDesc": "An internal error occurred on the server.",
++    "generic": "Query error",
++    "genericDesc": "An error occurred while processing your query.",
++    "configureResource": "Configure stream",
++    "configureResourceDesc": "Add a full-text search field in stream settings",
++    "fixQuery": "Fix the query",
++    "fixQueryDesc": "Review and correct the query in the editor",
++    "expandRange": "Try a different time range",
++    "expandRangeDesc": "Accessible data may be in a different time window",
++    "copyError": "Copy error details",
++    "copied": "Copied!",
++    "traceId": "Trace ID:",
++    "askAi": "Ask AI to fix my query",
++    "showDetail": "Show details",
++    "hideDetail": "Hide details"
+   }
+ }
+diff --git a/web/src/locales/languages/es.json b/web/src/locales/languages/es.json
+index 1e4e9138646..c69f637f4ba 100644
+--- a/web/src/locales/languages/es.json
++++ b/web/src/locales/languages/es.json
+@@ -3269,7 +3269,10 @@
+       "expandRangeDescAbsolute": "Cambie a un rango de tiempo relativo más amplio",
+       "removeFilter": "Eliminar un filtro",
+       "selectedRange": "el rango seleccionado"
+-    }
++    },
++    "showAll": "Mostrar todo",
++    "filterByErrors": "Filtrar por errores",
++    "clearErrorFilter": "Borrar filtro de errores"
+   },
+   "invitation": {
+     "pendingInvitations": "Invitaciones pendientes",
+@@ -3552,7 +3555,9 @@
+     "timeRangeLabel": "Intervalo de tiempo:",
+     "analyzeTooltipTraces": "Analice las dimensiones de seguimiento para determinar la velocidad, la latencia y los patrones de error",
+     "insightsButtonLabel": "Perspectivas",
+-    "searchInspectionsLabel": "Inspeccione los detalles de ejecución del trabajo de búsqueda"
++    "searchInspectionsLabel": "Inspeccione los detalles de ejecución del trabajo de búsqueda",
++    "inspectBtnLabel": "Inspeccionar",
++    "analyzeBtnLabel": "Perspectivas"
+   },
+   "errorInsights": {
+     "title": "Perspectivas",
+@@ -4824,6 +4829,73 @@
+       "openHistory": "Abrir historial de búsqueda",
+       "askAi": "Pedir a la IA que corrija mi consulta",
+       "selectedRange": "el rango seleccionado"
++    },
++    "error": {
++      "sqlError": "Error de sintaxis de SQL",
++      "sqlErrorDesc": "La consulta tiene un error de sintaxis. Revisa el editor de consultas para ver si hay errores resaltados.",
++      "streamNotFound": "No se encontró la transmisión",
++      "streamNotFoundDesc": "La transmisión seleccionada no existe o se ha eliminado.",
++      "ftsNotConfigured": "La búsqueda de texto completo no está configurada",
++      "ftsNotConfiguredDesc": "Esta transmisión no tiene un campo de búsqueda de texto completo. Configure uno para habilitar la búsqueda por palabras clave.",
++      "fieldNotFound": "No se encontró el campo",
++      "fieldNotFoundDesc": "La consulta hace referencia a uno o más campos que no existen en esta secuencia.",
++      "functionNotDefined": "Función no definida",
++      "functionNotDefinedDesc": "La consulta llama a una función VRL que no está definida.",
++      "dataUnavailable": "Archivos de datos no disponibles",
++      "dataUnavailableDesc": "No se puede acceder a algunos archivos de datos de este intervalo de tiempo. Pruebe con una ventana de tiempo diferente.",
++      "dataTypeMismatch": "Discordancia de tipos de datos",
++      "dataTypeMismatchDesc": "Un campo de la consulta se usa con un tipo de datos incompatible.",
++      "executionError": "Falló la ejecución de la consulta",
++      "executionErrorDesc": "Se ha producido un error al ejecutar la consulta.",
++      "serverError": "Error de servidor",
++      "serverErrorDesc": "Se ha producido un error interno en el servidor.",
++      "generic": "Error de búsqueda",
++      "genericDesc": "Se ha producido un error al recuperar los eventos de búsqueda.",
++      "configureStream": "Configurar transmisión",
++      "configureStreamDesc": "Añadir un campo de búsqueda de texto completo en la configuración de la transmisión",
++      "fixQuery": "Corregir la consulta",
++      "fixQueryDesc": "Revisa y corrige la consulta en el editor",
++      "expandRange": "Prueba con un intervalo de tiempo diferente",
++      "expandRangeDesc": "Los datos accesibles pueden estar en una ventana de tiempo diferente",
++      "copyError": "Copiar detalles del error",
++      "traceId": "ID de seguimiento:",
++      "askAi": "Pedir a la IA que corrija mi consulta",
++      "showDetail": "Mostrar detalles",
++      "hideDetail": "Ocultar detalles"
+     }
++  },
++  "queryError": {
++    "sqlError": "Error de sintaxis de SQL",
++    "sqlErrorDesc": "La consulta tiene un error de sintaxis. Revisa el editor para ver si hay errores resaltados.",
++    "streamNotFound": "No se encontró la transmisión",
++    "streamNotFoundDesc": "La transmisión seleccionada no existe o se ha eliminado.",
++    "ftsNotConfigured": "La búsqueda de texto completo no está configurada",
++    "ftsNotConfiguredDesc": "Esta transmisión no tiene un campo de búsqueda de texto completo. Configure uno para habilitar la búsqueda por palabras clave.",
++    "fieldNotFound": "No se encontró el campo",
++    "fieldNotFoundDesc": "La consulta hace referencia a uno o más campos que no existen en esta secuencia.",
++    "functionNotDefined": "Función no definida",
++    "functionNotDefinedDesc": "La consulta llama a una función VRL que no está definida.",
++    "dataUnavailable": "Archivos de datos no disponibles",
++    "dataUnavailableDesc": "No se puede acceder a algunos archivos de datos de este intervalo de tiempo. Pruebe con una ventana de tiempo diferente.",
++    "dataTypeMismatch": "Discordancia de tipos de datos",
++    "dataTypeMismatchDesc": "Un campo de la consulta se usa con un tipo de datos incompatible.",
++    "executionError": "Falló la ejecución de la consulta",
++    "executionErrorDesc": "Se ha producido un error al ejecutar la consulta.",
++    "serverError": "Error de servidor",
++    "serverErrorDesc": "Se ha producido un error interno en el servidor.",
++    "generic": "Error de consulta",
++    "genericDesc": "Se ha producido un error al procesar la consulta.",
++    "configureResource": "Configurar transmisión",
++    "configureResourceDesc": "Añadir un campo de búsqueda de texto completo en la configuración de la transmisión",
++    "fixQuery": "Corregir la consulta",
++    "fixQueryDesc": "Revisa y corrige la consulta en el editor",
++    "expandRange": "Prueba con un intervalo de tiempo diferente",
++    "expandRangeDesc": "Los datos accesibles pueden estar en una ventana de tiempo diferente",
++    "copyError": "Copiar detalles del error",
++    "copied": "¡Copiado!",
++    "traceId": "ID de seguimiento:",
++    "askAi": "Pedir a la IA que corrija mi consulta",
++    "showDetail": "Mostrar detalles",
++    "hideDetail": "Ocultar detalles"
+   }
+ }
+\ No newline at end of file
+diff --git a/web/src/locales/languages/fr.json b/web/src/locales/languages/fr.json
+index 603f48e97b5..a914d94f5c7 100644
+--- a/web/src/locales/languages/fr.json
++++ b/web/src/locales/languages/fr.json
+@@ -3271,7 +3271,10 @@
+       "expandRangeDescAbsolute": "Passez à une plage de temps relative plus large",
+       "removeFilter": "Supprimer un filtre",
+       "selectedRange": "la gamme sélectionnée"
+-    }
++    },
++    "showAll": "Afficher tout",
++    "filterByErrors": "Filtrer par erreur",
++    "clearErrorFilter": "Effacer le filtre d'erreur"
+   },
+   "invitation": {
+     "pendingInvitations": "Invitations en attente",
+@@ -3554,7 +3557,9 @@
+     "timeRangeLabel": "Plage de temps :",
+     "analyzeTooltipTraces": "Analysez les dimensions des traces pour déterminer le taux, la latence et les modèles d'erreur",
+     "insightsButtonLabel": "Perspectives",
+-    "searchInspectionsLabel": "Inspectez les détails de l'exécution des tâches de recherche"
++    "searchInspectionsLabel": "Inspectez les détails de l'exécution des tâches de recherche",
++    "inspectBtnLabel": "Inspectez",
++    "analyzeBtnLabel": "Perspectives"
+   },
+   "errorInsights": {
+     "title": "Perspectives",
+@@ -4826,6 +4831,73 @@
+       "openHistory": "Ouvrir l'historique des recherches",
+       "askAi": "Demandez à AI de corriger ma requête",
+       "selectedRange": "la gamme sélectionnée"
++    },
++    "error": {
++      "sqlError": "Erreur de syntaxe SQL",
++      "sqlErrorDesc": "Votre requête comporte une erreur de syntaxe. Consultez l'éditeur de requêtes pour détecter les erreurs surlignées.",
++      "streamNotFound": "Stream introuvable",
++      "streamNotFoundDesc": "Le flux sélectionné n'existe pas ou a été supprimé.",
++      "ftsNotConfigured": "La recherche en texte intégral n'est pas configurée",
++      "ftsNotConfiguredDesc": "Ce flux ne possède pas de champ de recherche en texte intégral. Configurez-en un pour activer la recherche par mot clé.",
++      "fieldNotFound": "Champ introuvable",
++      "fieldNotFoundDesc": "Votre requête fait référence à un ou plusieurs champs qui n'existent pas dans ce flux.",
++      "functionNotDefined": "Fonction non définie",
++      "functionNotDefinedDesc": "Votre requête appelle une fonction VRL qui n'est pas définie.",
++      "dataUnavailable": "Fichiers de données non disponibles",
++      "dataUnavailableDesc": "Certains fichiers de données correspondant à cette plage de temps sont inaccessibles. Essayez un autre créneau horaire.",
++      "dataTypeMismatch": "Incompatibilité entre les types de données",
++      "dataTypeMismatchDesc": "Un champ de votre requête est utilisé avec un type de données incompatible.",
++      "executionError": "L'exécution de la requête a échoué",
++      "executionErrorDesc": "Une erreur s'est produite lors de l'exécution de votre requête.",
++      "serverError": "Erreur du serveur",
++      "serverErrorDesc": "Une erreur interne s'est produite sur le serveur.",
++      "generic": "Erreur de recherche",
++      "genericDesc": "Une erreur s'est produite lors de la récupération des événements de recherche.",
++      "configureStream": "Configurer le flux",
++      "configureStreamDesc": "Ajouter un champ de recherche en texte intégral dans les paramètres du flux",
++      "fixQuery": "Corrigez la requête",
++      "fixQueryDesc": "Vérifiez et corrigez la requête dans l'éditeur",
++      "expandRange": "Essayez une autre plage horaire",
++      "expandRangeDesc": "Les données accessibles peuvent se trouver dans une fenêtre temporelle différente",
++      "copyError": "Copier les détails de l'erreur",
++      "traceId": "ID de trace :",
++      "askAi": "Demandez à AI de corriger ma requête",
++      "showDetail": "Afficher les détails",
++      "hideDetail": "Masquer les détails"
+     }
++  },
++  "queryError": {
++    "sqlError": "Erreur de syntaxe SQL",
++    "sqlErrorDesc": "Votre requête comporte une erreur de syntaxe. Consultez l'éditeur pour voir s'il y a des erreurs surlignées.",
++    "streamNotFound": "Stream introuvable",
++    "streamNotFoundDesc": "Le flux sélectionné n'existe pas ou a été supprimé.",
++    "ftsNotConfigured": "La recherche en texte intégral n'est pas configurée",
++    "ftsNotConfiguredDesc": "Ce flux ne possède pas de champ de recherche en texte intégral. Configurez-en un pour activer la recherche par mot clé.",
++    "fieldNotFound": "Champ introuvable",
++    "fieldNotFoundDesc": "Votre requête fait référence à un ou plusieurs champs qui n'existent pas dans ce flux.",
++    "functionNotDefined": "Fonction non définie",
++    "functionNotDefinedDesc": "Votre requête appelle une fonction VRL qui n'est pas définie.",
++    "dataUnavailable": "Fichiers de données non disponibles",
++    "dataUnavailableDesc": "Certains fichiers de données correspondant à cette plage de temps sont inaccessibles. Essayez un autre créneau horaire.",
++    "dataTypeMismatch": "Incompatibilité entre les types de données",
++    "dataTypeMismatchDesc": "Un champ de votre requête est utilisé avec un type de données incompatible.",
++    "executionError": "L'exécution de la requête a échoué",
++    "executionErrorDesc": "Une erreur s'est produite lors de l'exécution de votre requête.",
++    "serverError": "Erreur du serveur",
++    "serverErrorDesc": "Une erreur interne s'est produite sur le serveur.",
++    "generic": "Erreur de requête",
++    "genericDesc": "Une erreur s'est produite lors du traitement de votre requête.",
++    "configureResource": "Configurer le flux",
++    "configureResourceDesc": "Ajouter un champ de recherche en texte intégral dans les paramètres du flux",
++    "fixQuery": "Corrigez la requête",
++    "fixQueryDesc": "Vérifiez et corrigez la requête dans l'éditeur",
++    "expandRange": "Essayez une autre plage horaire",
++    "expandRangeDesc": "Les données accessibles peuvent se trouver dans une fenêtre temporelle différente",
++    "copyError": "Copier les détails de l'erreur",
++    "copied": "Copié !",
++    "traceId": "ID de trace :",
++    "askAi": "Demandez à AI de corriger ma requête",
++    "showDetail": "Afficher les détails",
++    "hideDetail": "Masquer les détails"
+   }
+ }
+\ No newline at end of file
+diff --git a/web/src/locales/languages/it.json b/web/src/locales/languages/it.json
+index 8e842a14602..0f674b188e1 100644
+--- a/web/src/locales/languages/it.json
++++ b/web/src/locales/languages/it.json
+@@ -3282,7 +3282,10 @@
+       "expandRangeDescAbsolute": "Passa a un intervallo di tempo relativo più ampio",
+       "removeFilter": "Rimuovi un filtro",
+       "selectedRange": "la gamma selezionata"
+-    }
++    },
++    "showAll": "Mostra tutto",
++    "filterByErrors": "Filtra per errori",
++    "clearErrorFilter": "Cancella filtro errori"
+   },
+   "invitation": {
+     "pendingInvitations": "Inviti in sospeso",
+@@ -3565,7 +3568,9 @@
+     "timeRangeLabel": "Intervallo di tempo:",
+     "analyzeTooltipTraces": "Analizza le dimensioni delle tracce per individuare velocità, latenza e modelli di errore",
+     "insightsButtonLabel": "Approfondimenti",
+-    "searchInspectionsLabel": "Ispeziona i dettagli di esecuzione del lavoro di ricerca"
++    "searchInspectionsLabel": "Ispeziona i dettagli di esecuzione del lavoro di ricerca",
++    "inspectBtnLabel": "Ispezionare",
++    "analyzeBtnLabel": "Approfondimenti"
+   },
+   "errorInsights": {
+     "title": "Approfondimenti",
+@@ -4837,6 +4842,73 @@
+       "openHistory": "Apri la cronologia delle ricerche",
+       "askAi": "Chiedi all'IA di risolvere la mia domanda",
+       "selectedRange": "la gamma selezionata"
++    },
++    "error": {
++      "sqlError": "Errore di sintassi SQL",
++      "sqlErrorDesc": "La tua query ha un errore di sintassi. Controlla l'editor di query per individuare eventuali errori evidenziati.",
++      "streamNotFound": "Stream non trovato",
++      "streamNotFoundDesc": "Lo stream selezionato non esiste o è stato rimosso.",
++      "ftsNotConfigured": "Ricerca full-text non configurata",
++      "ftsNotConfiguredDesc": "Questo stream non dispone di un campo di ricerca full-text. Configurane uno per abilitare la ricerca per parola chiave.",
++      "fieldNotFound": "Campo non trovato",
++      "fieldNotFoundDesc": "La tua query fa riferimento a uno o più campi che non esistono in questo stream.",
++      "functionNotDefined": "Funzione non definita",
++      "functionNotDefinedDesc": "L'interrogazione richiama una funzione VRL non definita.",
++      "dataUnavailable": "File di dati non disponibili",
++      "dataUnavailableDesc": "Alcuni file di dati per questo intervallo di tempo non sono accessibili. Prova con una finestra temporale diversa.",
++      "dataTypeMismatch": "Mancata corrispondenza del tipo di dati",
++      "dataTypeMismatchDesc": "Un campo della query viene utilizzato con un tipo di dati incompatibile.",
++      "executionError": "Esecuzione della query non riuscita",
++      "executionErrorDesc": "Si è verificato un errore durante l'esecuzione della query.",
++      "serverError": "Errore del server",
++      "serverErrorDesc": "Si è verificato un errore interno sul server.",
++      "generic": "Errore di ricerca",
++      "genericDesc": "Si è verificato un errore durante il recupero degli eventi di ricerca.",
++      "configureStream": "Configurazione dello stream",
++      "configureStreamDesc": "Aggiungi un campo di ricerca full-text nelle impostazioni dello stream",
++      "fixQuery": "Correggi la domanda",
++      "fixQueryDesc": "Rivedi e correggi la query nell'editor",
++      "expandRange": "Prova un intervallo di tempo diverso",
++      "expandRangeDesc": "I dati accessibili possono trovarsi in una finestra temporale diversa",
++      "copyError": "Copia i dettagli dell'errore",
++      "traceId": "ID di tracciamento:",
++      "askAi": "Chiedi all'IA di risolvere la mia domanda",
++      "showDetail": "Mostra dettagli",
++      "hideDetail": "Nascondi dettagli"
+     }
++  },
++  "queryError": {
++    "sqlError": "Errore di sintassi SQL",
++    "sqlErrorDesc": "La tua query ha un errore di sintassi. Controlla l'editor per individuare eventuali errori evidenziati.",
++    "streamNotFound": "Stream non trovato",
++    "streamNotFoundDesc": "Lo stream selezionato non esiste o è stato rimosso.",
++    "ftsNotConfigured": "Ricerca full-text non configurata",
++    "ftsNotConfiguredDesc": "Questo stream non dispone di un campo di ricerca full-text. Configurane uno per abilitare la ricerca per parola chiave.",
++    "fieldNotFound": "Campo non trovato",
++    "fieldNotFoundDesc": "La tua query fa riferimento a uno o più campi che non esistono in questo stream.",
++    "functionNotDefined": "Funzione non definita",
++    "functionNotDefinedDesc": "L'interrogazione richiama una funzione VRL non definita.",
++    "dataUnavailable": "File di dati non disponibili",
++    "dataUnavailableDesc": "Alcuni file di dati per questo intervallo di tempo non sono accessibili. Prova con una finestra temporale diversa.",
++    "dataTypeMismatch": "Mancata corrispondenza del tipo di dati",
++    "dataTypeMismatchDesc": "Un campo della query viene utilizzato con un tipo di dati incompatibile.",
++    "executionError": "Esecuzione della query non riuscita",
++    "executionErrorDesc": "Si è verificato un errore durante l'esecuzione della query.",
++    "serverError": "Errore del server",
++    "serverErrorDesc": "Si è verificato un errore interno sul server.",
++    "generic": "Errore di interrogazione",
++    "genericDesc": "Si è verificato un errore durante l'elaborazione della richiesta.",
++    "configureResource": "Configurazione dello stream",
++    "configureResourceDesc": "Aggiungi un campo di ricerca full-text nelle impostazioni dello stream",
++    "fixQuery": "Correggi la domanda",
++    "fixQueryDesc": "Rivedi e correggi la query nell'editor",
++    "expandRange": "Prova un intervallo di tempo diverso",
++    "expandRangeDesc": "I dati accessibili possono trovarsi in una finestra temporale diversa",
++    "copyError": "Copia i dettagli dell'errore",
++    "copied": "Copiato!",
++    "traceId": "ID di tracciamento:",
++    "askAi": "Chiedi all'IA di risolvere la mia domanda",
++    "showDetail": "Mostra dettagli",
++    "hideDetail": "Nascondi dettagli"
+   }
+ }
+\ No newline at end of file
+diff --git a/web/src/locales/languages/ja.json b/web/src/locales/languages/ja.json
+index fc1be1dc85a..a15a65c5b7a 100644
+--- a/web/src/locales/languages/ja.json
++++ b/web/src/locales/languages/ja.json
+@@ -3292,7 +3292,10 @@
+       "expandRangeDescAbsolute": "より広い相対時間範囲に切り替える",
+       "removeFilter": "フィルターを削除する",
+       "selectedRange": "選択した範囲"
+-    }
++    },
++    "showAll": "[すべて表示]",
++    "filterByErrors": "エラーで絞り込む",
++    "clearErrorFilter": "エラーフィルターをクリア"
+   },
+   "actions": {
+     "testAction": "アクションをテスト",
+@@ -3554,7 +3557,9 @@
+     "timeRangeLabel": "時間範囲:",
+     "analyzeTooltipTraces": "レート、レイテンシー、エラーパターンのトレースディメンションを分析",
+     "insightsButtonLabel": "インサイト",
+-    "searchInspectionsLabel": "検索ジョブの実行詳細を検査する"
++    "searchInspectionsLabel": "検索ジョブの実行詳細を検査する",
++    "inspectBtnLabel": "検査",
++    "analyzeBtnLabel": "インサイト"
+   },
+   "errorInsights": {
+     "title": "インサイト",
+@@ -4826,6 +4831,73 @@
+       "openHistory": "検索履歴を開く",
+       "askAi": "AI にクエリの修正を依頼する",
+       "selectedRange": "選択した範囲"
++    },
++    "error": {
++      "sqlError": "SQL シンタックスエラー",
++      "sqlErrorDesc": "クエリに構文エラーがあります。エラーが強調表示されていないか、クエリエディターを確認してください。",
++      "streamNotFound": "ストリームが見つかりません",
++      "streamNotFoundDesc": "選択したストリームは存在しないか、削除されました。",
++      "ftsNotConfigured": "全文検索が設定されていません",
++      "ftsNotConfiguredDesc": "このストリームには全文検索フィールドがありません。キーワード検索を有効にするように設定してください。",
++      "fieldNotFound": "フィールドが見つかりません",
++      "fieldNotFoundDesc": "クエリは、このストリームに存在しない 1 つまたは複数のフィールドを参照しています。",
++      "functionNotDefined": "関数が定義されていません",
++      "functionNotDefinedDesc": "クエリが定義されていない VRL 関数を呼び出しています。",
++      "dataUnavailable": "データファイルを使用できません",
++      "dataUnavailableDesc": "この時間範囲の一部のデータファイルにアクセスできません。別の時間枠を試してください。",
++      "dataTypeMismatch": "データ型が一致しません",
++      "dataTypeMismatchDesc": "クエリのフィールドが、互換性のないデータ型で使用されています。",
++      "executionError": "クエリの実行が失敗しました",
++      "executionErrorDesc": "クエリの実行中にエラーが発生しました。",
++      "serverError": "サーバーエラー",
++      "serverErrorDesc": "サーバーで内部エラーが発生しました。",
++      "generic": "検索エラー",
++      "genericDesc": "検索イベントの取得中にエラーが発生しました。",
++      "configureStream": "ストリームを設定",
++      "configureStreamDesc": "ストリーム設定に全文検索フィールドを追加する",
++      "fixQuery": "クエリを修正",
++      "fixQueryDesc": "エディターでクエリを確認して修正してください",
++      "expandRange": "別の時間範囲を試してください",
++      "expandRangeDesc": "アクセス可能なデータは別のタイムウィンドウにある可能性があります",
++      "copyError": "エラーの詳細をコピー",
++      "traceId": "トレース ID:",
++      "askAi": "AI にクエリの修正を依頼する",
++      "showDetail": "詳細を表示",
++      "hideDetail": "詳細を非表示にする"
+     }
++  },
++  "queryError": {
++    "sqlError": "SQL シンタックスエラー",
++    "sqlErrorDesc": "クエリに構文エラーがあります。エディターでエラーが強調表示されていないか確認してください。",
++    "streamNotFound": "ストリームが見つかりません",
++    "streamNotFoundDesc": "選択したストリームは存在しないか、削除されました。",
++    "ftsNotConfigured": "全文検索が設定されていません",
++    "ftsNotConfiguredDesc": "このストリームには全文検索フィールドがありません。キーワード検索を有効にするように設定してください。",
++    "fieldNotFound": "フィールドが見つかりません",
++    "fieldNotFoundDesc": "クエリは、このストリームに存在しない 1 つまたは複数のフィールドを参照しています。",
++    "functionNotDefined": "関数が定義されていません",
++    "functionNotDefinedDesc": "クエリが定義されていない VRL 関数を呼び出しています。",
++    "dataUnavailable": "データファイルを使用できません",
++    "dataUnavailableDesc": "この時間範囲の一部のデータファイルにアクセスできません。別の時間枠を試してください。",
++    "dataTypeMismatch": "データ型が一致しません",
++    "dataTypeMismatchDesc": "クエリのフィールドが、互換性のないデータ型で使用されています。",
++    "executionError": "クエリの実行が失敗しました",
++    "executionErrorDesc": "クエリの実行中にエラーが発生しました。",
++    "serverError": "サーバーエラー",
++    "serverErrorDesc": "サーバーで内部エラーが発生しました。",
++    "generic": "クエリーエラー",
++    "genericDesc": "クエリの処理中にエラーが発生しました。",
++    "configureResource": "ストリームを設定",
++    "configureResourceDesc": "ストリーム設定に全文検索フィールドを追加する",
++    "fixQuery": "クエリを修正",
++    "fixQueryDesc": "エディターでクエリを確認して修正してください",
++    "expandRange": "別の時間範囲を試してください",
++    "expandRangeDesc": "アクセス可能なデータは別のタイムウィンドウにある可能性があります",
++    "copyError": "エラーの詳細をコピー",
++    "copied": "コピーされました！",
++    "traceId": "トレース ID:",
++    "askAi": "AI にクエリの修正を依頼する",
++    "showDetail": "詳細を表示",
++    "hideDetail": "詳細を非表示にする"
+   }
+ }
+\ No newline at end of file
+diff --git a/web/src/locales/languages/ko.json b/web/src/locales/languages/ko.json
+index d6b160b65a1..c8c6e819440 100644
+--- a/web/src/locales/languages/ko.json
++++ b/web/src/locales/languages/ko.json
+@@ -3284,7 +3284,10 @@
+       "expandRangeDescAbsolute": "더 넓은 상대 시간 범위로 전환",
+       "removeFilter": "필터 제거",
+       "selectedRange": "선택한 범위"
+-    }
++    },
++    "showAll": "모두 보기",
++    "filterByErrors": "오류별 필터링",
++    "clearErrorFilter": "오류 필터 지우기"
+   },
+   "invitation": {
+     "pendingInvitations": "보류 중인 초대",
+@@ -3567,7 +3570,9 @@
+     "timeRangeLabel": "시간 범위:",
+     "analyzeTooltipTraces": "속도, 지연 및 오류 패턴에 대한 트레이스 차원 분석",
+     "insightsButtonLabel": "인사이트",
+-    "searchInspectionsLabel": "검색 작업 실행 세부 정보 검사"
++    "searchInspectionsLabel": "검색 작업 실행 세부 정보 검사",
++    "inspectBtnLabel": "검사",
++    "analyzeBtnLabel": "인사이트"
+   },
+   "errorInsights": {
+     "title": "인사이트",
+@@ -4839,6 +4844,73 @@
+       "openHistory": "검색 기록 열기",
+       "askAi": "AI에게 쿼리 수정 요청하기",
+       "selectedRange": "선택한 범위"
++    },
++    "error": {
++      "sqlError": "SQL 구문 오류",
++      "sqlErrorDesc": "쿼리에 구문 오류가 있습니다.쿼리 편집기에서 강조 표시된 오류가 있는지 검토하세요.",
++      "streamNotFound": "스트림을 찾을 수 없음",
++      "streamNotFoundDesc": "선택한 스트림이 존재하지 않거나 제거되었습니다.",
++      "ftsNotConfigured": "전체 텍스트 검색이 구성되지 않음",
++      "ftsNotConfiguredDesc": "이 스트림에는 전체 텍스트 검색 필드가 없습니다.키워드 검색을 활성화하도록 하나를 구성하세요.",
++      "fieldNotFound": "필드를 찾을 수 없음",
++      "fieldNotFoundDesc": "쿼리는 이 스트림에 없는 하나 이상의 필드를 참조합니다.",
++      "functionNotDefined": "함수가 정의되지 않음",
++      "functionNotDefinedDesc": "쿼리는 정의되지 않은 VRL 함수를 호출합니다.",
++      "dataUnavailable": "데이터 파일을 사용할 수 없음",
++      "dataUnavailableDesc": "이 시간 범위의 일부 데이터 파일에 액세스할 수 없습니다.다른 시간대를 사용해 보십시오.",
++      "dataTypeMismatch": "데이터 유형 불일치",
++      "dataTypeMismatchDesc": "쿼리의 필드가 호환되지 않는 데이터 유형과 함께 사용되었습니다.",
++      "executionError": "쿼리 실행 실패",
++      "executionErrorDesc": "쿼리를 실행하는 동안 오류가 발생했습니다.",
++      "serverError": "서버 오류",
++      "serverErrorDesc": "서버에 내부 오류가 발생했습니다.",
++      "generic": "검색 오류",
++      "genericDesc": "검색 이벤트를 가져오는 동안 오류가 발생했습니다.",
++      "configureStream": "스트림 구성",
++      "configureStreamDesc": "스트림 설정에 전체 텍스트 검색 필드 추가",
++      "fixQuery": "쿼리 수정",
++      "fixQueryDesc": "편집기에서 쿼리 검토 및 수정",
++      "expandRange": "다른 시간 범위를 사용해 보십시오.",
++      "expandRangeDesc": "액세스 가능한 데이터는 다른 시간대에 있을 수 있습니다.",
++      "copyError": "오류 세부 정보 복사",
++      "traceId": "트레이스 ID:",
++      "askAi": "AI에게 쿼리 수정 요청하기",
++      "showDetail": "세부 정보 보기",
++      "hideDetail": "세부 정보 숨기기"
+     }
++  },
++  "queryError": {
++    "sqlError": "SQL 구문 오류",
++    "sqlErrorDesc": "쿼리에 구문 오류가 있습니다.편집기에서 강조 표시된 오류가 있는지 검토하세요.",
++    "streamNotFound": "스트림을 찾을 수 없음",
++    "streamNotFoundDesc": "선택한 스트림이 존재하지 않거나 제거되었습니다.",
++    "ftsNotConfigured": "전체 텍스트 검색이 구성되지 않음",
++    "ftsNotConfiguredDesc": "이 스트림에는 전체 텍스트 검색 필드가 없습니다.키워드 검색을 활성화하도록 하나를 구성하세요.",
++    "fieldNotFound": "필드를 찾을 수 없음",
++    "fieldNotFoundDesc": "쿼리는 이 스트림에 없는 하나 이상의 필드를 참조합니다.",
++    "functionNotDefined": "함수가 정의되지 않음",
++    "functionNotDefinedDesc": "쿼리는 정의되지 않은 VRL 함수를 호출합니다.",
++    "dataUnavailable": "데이터 파일을 사용할 수 없음",
++    "dataUnavailableDesc": "이 시간 범위의 일부 데이터 파일에 액세스할 수 없습니다.다른 시간대를 사용해 보십시오.",
++    "dataTypeMismatch": "데이터 유형 불일치",
++    "dataTypeMismatchDesc": "쿼리의 필드가 호환되지 않는 데이터 유형과 함께 사용되었습니다.",
++    "executionError": "쿼리 실행 실패",
++    "executionErrorDesc": "쿼리를 실행하는 동안 오류가 발생했습니다.",
++    "serverError": "서버 오류",
++    "serverErrorDesc": "서버에 내부 오류가 발생했습니다.",
++    "generic": "쿼리 오류",
++    "genericDesc": "쿼리를 처리하는 동안 오류가 발생했습니다.",
++    "configureResource": "스트림 구성",
++    "configureResourceDesc": "스트림 설정에 전체 텍스트 검색 필드 추가",
++    "fixQuery": "쿼리 수정",
++    "fixQueryDesc": "편집기에서 쿼리 검토 및 수정",
++    "expandRange": "다른 시간 범위를 사용해 보십시오.",
++    "expandRangeDesc": "액세스 가능한 데이터는 다른 시간대에 있을 수 있습니다.",
++    "copyError": "오류 세부 정보 복사",
++    "copied": "복사 완료!",
++    "traceId": "트레이스 ID:",
++    "askAi": "AI에게 쿼리 수정 요청하기",
++    "showDetail": "세부 정보 보기",
++    "hideDetail": "세부 정보 숨기기"
+   }
+ }
+\ No newline at end of file
+diff --git a/web/src/locales/languages/nl.json b/web/src/locales/languages/nl.json
+index 87deae6cdfa..86e7b4ebcbc 100644
+--- a/web/src/locales/languages/nl.json
++++ b/web/src/locales/languages/nl.json
+@@ -3284,7 +3284,10 @@
+       "expandRangeDescAbsolute": "Overschakelen naar een breder relatief tijdsbereik",
+       "removeFilter": "Een filter verwijderen",
+       "selectedRange": "het geselecteerde bereik"
+-    }
++    },
++    "showAll": "Alles weergeven",
++    "filterByErrors": "Filteren op fouten",
++    "clearErrorFilter": "Foutfilter wissen"
+   },
+   "invitation": {
+     "pendingInvitations": "Uitnodigingen in behandeling",
+@@ -3567,7 +3570,9 @@
+     "timeRangeLabel": "Tijdbereik:",
+     "analyzeTooltipTraces": "Analyseer de traceerdimensies voor snelheid, latentie en foutpatronen",
+     "insightsButtonLabel": "Inzichten",
+-    "searchInspectionsLabel": "Bekijk de details van de uitvoering van de zoekopdracht"
++    "searchInspectionsLabel": "Bekijk de details van de uitvoering van de zoekopdracht",
++    "inspectBtnLabel": "Inspecteer",
++    "analyzeBtnLabel": "Inzichten"
+   },
+   "errorInsights": {
+     "title": "Inzichten",
+@@ -4839,6 +4844,73 @@
+       "openHistory": "Zoekgeschiedenis openen",
+       "askAi": "Vraag AI om mijn vraag op te lossen",
+       "selectedRange": "het geselecteerde bereik"
++    },
++    "error": {
++      "sqlError": "SQL-syntaxisfout",
++      "sqlErrorDesc": "Uw zoekopdracht bevat een syntaxisfout. Controleer de query-editor op gemarkeerde fouten.",
++      "streamNotFound": "Stream niet gevonden",
++      "streamNotFoundDesc": "De geselecteerde stream bestaat niet of is verwijderd.",
++      "ftsNotConfigured": "Zoeken in volledige tekst is niet geconfigureerd",
++      "ftsNotConfiguredDesc": "Deze stream heeft geen zoekveld in de volledige tekst. Configureer een om zoeken op trefwoorden mogelijk te maken.",
++      "fieldNotFound": "Veld niet gevonden",
++      "fieldNotFoundDesc": "Je zoekopdracht verwijst naar een of meer velden die niet bestaan in deze stream.",
++      "functionNotDefined": "Functie niet gedefinieerd",
++      "functionNotDefinedDesc": "Uw zoekopdracht roept een VRL-functie aan die niet is gedefinieerd.",
++      "dataUnavailable": "Gegevensbestanden zijn niet beschikbaar",
++      "dataUnavailableDesc": "Sommige gegevensbestanden voor deze periode zijn niet toegankelijk. Probeer een ander tijdvenster.",
++      "dataTypeMismatch": "Het gegevenstype komt niet overeen",
++      "dataTypeMismatchDesc": "Een veld in uw zoekopdracht wordt gebruikt met een incompatibel gegevenstype.",
++      "executionError": "Uitvoering van de query is mislukt",
++      "executionErrorDesc": "Er is een fout opgetreden tijdens het uitvoeren van uw zoekopdracht.",
++      "serverError": "Serverfout",
++      "serverErrorDesc": "Er is een interne fout opgetreden op de server.",
++      "generic": "Zoekfout",
++      "genericDesc": "Er is een fout opgetreden tijdens het ophalen van zoekgebeurtenissen.",
++      "configureStream": "Stream configureren",
++      "configureStreamDesc": "Een zoekveld met volledige tekst toevoegen in de streaminstellingen",
++      "fixQuery": "De vraag corrigeren",
++      "fixQueryDesc": "Controleer en corrigeer de zoekopdracht in de editor",
++      "expandRange": "Probeer een ander tijdbereik",
++      "expandRangeDesc": "Toegankelijke gegevens bevinden zich mogelijk in een ander tijdvenster",
++      "copyError": "Foutgegevens kopiëren",
++      "traceId": "Traceer-ID:",
++      "askAi": "Vraag AI om mijn vraag op te lossen",
++      "showDetail": "Details weergeven",
++      "hideDetail": "Details verbergen"
+     }
++  },
++  "queryError": {
++    "sqlError": "SQL-syntaxisfout",
++    "sqlErrorDesc": "Uw zoekopdracht bevat een syntaxisfout. Controleer de editor op gemarkeerde fouten.",
++    "streamNotFound": "Stream niet gevonden",
++    "streamNotFoundDesc": "De geselecteerde stream bestaat niet of is verwijderd.",
++    "ftsNotConfigured": "Zoeken in volledige tekst is niet geconfigureerd",
++    "ftsNotConfiguredDesc": "Deze stream heeft geen zoekveld in de volledige tekst. Configureer een om zoeken op trefwoorden mogelijk te maken.",
++    "fieldNotFound": "Veld niet gevonden",
++    "fieldNotFoundDesc": "Je zoekopdracht verwijst naar een of meer velden die niet bestaan in deze stream.",
++    "functionNotDefined": "Functie niet gedefinieerd",
++    "functionNotDefinedDesc": "Uw zoekopdracht roept een VRL-functie aan die niet is gedefinieerd.",
++    "dataUnavailable": "Gegevensbestanden zijn niet beschikbaar",
++    "dataUnavailableDesc": "Sommige gegevensbestanden voor deze periode zijn niet toegankelijk. Probeer een ander tijdvenster.",
++    "dataTypeMismatch": "Het gegevenstype komt niet overeen",
++    "dataTypeMismatchDesc": "Een veld in uw zoekopdracht wordt gebruikt met een incompatibel gegevenstype.",
++    "executionError": "Uitvoering van de query is mislukt",
++    "executionErrorDesc": "Er is een fout opgetreden tijdens het uitvoeren van uw zoekopdracht.",
++    "serverError": "Serverfout",
++    "serverErrorDesc": "Er is een interne fout opgetreden op de server.",
++    "generic": "Fout bij de zoekopdracht",
++    "genericDesc": "Er is een fout opgetreden tijdens het verwerken van uw vraag.",
++    "configureResource": "Stream configureren",
++    "configureResourceDesc": "Een zoekveld met volledige tekst toevoegen in de streaminstellingen",
++    "fixQuery": "De vraag corrigeren",
++    "fixQueryDesc": "Controleer en corrigeer de zoekopdracht in de editor",
++    "expandRange": "Probeer een ander tijdbereik",
++    "expandRangeDesc": "Toegankelijke gegevens bevinden zich mogelijk in een ander tijdvenster",
++    "copyError": "Foutgegevens kopiëren",
++    "copied": "Gekopieerd!",
++    "traceId": "Traceer-ID:",
++    "askAi": "Vraag AI om mijn vraag op te lossen",
++    "showDetail": "Details weergeven",
++    "hideDetail": "Details verbergen"
+   }
+ }
+\ No newline at end of file
+diff --git a/web/src/locales/languages/pt.json b/web/src/locales/languages/pt.json
+index a1237a40e1a..a0fc05a0e73 100644
+--- a/web/src/locales/languages/pt.json
++++ b/web/src/locales/languages/pt.json
+@@ -3271,7 +3271,10 @@
+       "expandRangeDescAbsolute": "Mudar para um intervalo de tempo relativo mais amplo",
+       "removeFilter": "Remover um filtro",
+       "selectedRange": "o intervalo selecionado"
+-    }
++    },
++    "showAll": "Mostrar tudo",
++    "filterByErrors": "Filtrar por erros",
++    "clearErrorFilter": "Limpar filtro de erro"
+   },
+   "invitation": {
+     "pendingInvitations": "Convites pendentes",
+@@ -3554,7 +3557,9 @@
+     "timeRangeLabel": "Intervalo de tempo:",
+     "analyzeTooltipTraces": "Analise as dimensões do rastreamento para padrões de taxa, latência e erro",
+     "insightsButtonLabel": "Percepções",
+-    "searchInspectionsLabel": "Inspecione os detalhes da execução do trabalho de pesquisa"
++    "searchInspectionsLabel": "Inspecione os detalhes da execução do trabalho de pesquisa",
++    "inspectBtnLabel": "Inspecionar",
++    "analyzeBtnLabel": "Percepções"
+   },
+   "errorInsights": {
+     "title": "Percepções",
+@@ -4826,6 +4831,73 @@
+       "openHistory": "Abrir histórico de pesquisa",
+       "askAi": "Peça à IA que corrija minha consulta",
+       "selectedRange": "o intervalo selecionado"
++    },
++    "error": {
++      "sqlError": "Erro de sintaxe SQL",
++      "sqlErrorDesc": "Sua consulta tem um erro de sintaxe. Consulte o editor de consultas para ver os erros destacados.",
++      "streamNotFound": "Stream não encontrado",
++      "streamNotFoundDesc": "O fluxo selecionado não existe ou foi removido.",
++      "ftsNotConfigured": "Pesquisa de texto completo não configurada",
++      "ftsNotConfiguredDesc": "Esse fluxo não tem um campo de pesquisa de texto completo. Configure um para ativar a pesquisa por palavra-chave.",
++      "fieldNotFound": "Campo não encontrado",
++      "fieldNotFoundDesc": "Sua consulta faz referência a um ou mais campos que não existem nesse fluxo.",
++      "functionNotDefined": "Função não definida",
++      "functionNotDefinedDesc": "Sua consulta chama uma função VRL que não está definida.",
++      "dataUnavailable": "Arquivos de dados indisponíveis",
++      "dataUnavailableDesc": "Alguns arquivos de dados desse intervalo de tempo estão inacessíveis. Experimente uma janela de tempo diferente.",
++      "dataTypeMismatch": "Incompatibilidade de tipos de dados",
++      "dataTypeMismatchDesc": "Um campo na sua consulta é usado com um tipo de dados incompatível.",
++      "executionError": "Falha na execução da consulta",
++      "executionErrorDesc": "Ocorreu um erro ao executar sua consulta.",
++      "serverError": "Erro no servidor",
++      "serverErrorDesc": "Ocorreu um erro interno no servidor.",
++      "generic": "Erro de pesquisa",
++      "genericDesc": "Ocorreu um erro ao recuperar eventos de pesquisa.",
++      "configureStream": "Configurar stream",
++      "configureStreamDesc": "Adicione um campo de pesquisa de texto completo nas configurações do stream",
++      "fixQuery": "Corrija a consulta",
++      "fixQueryDesc": "Revise e corrija a consulta no editor",
++      "expandRange": "Experimente um intervalo de tempo diferente",
++      "expandRangeDesc": "Os dados acessíveis podem estar em uma janela de tempo diferente",
++      "copyError": "Copiar detalhes do erro",
++      "traceId": "ID de rastreamento:",
++      "askAi": "Peça à IA que corrija minha consulta",
++      "showDetail": "Mostrar detalhes",
++      "hideDetail": "Ocultar detalhes"
+     }
++  },
++  "queryError": {
++    "sqlError": "Erro de sintaxe SQL",
++    "sqlErrorDesc": "Sua consulta tem um erro de sintaxe. Examine o editor para ver se há erros destacados.",
++    "streamNotFound": "Stream não encontrado",
++    "streamNotFoundDesc": "O fluxo selecionado não existe ou foi removido.",
++    "ftsNotConfigured": "Pesquisa de texto completo não configurada",
++    "ftsNotConfiguredDesc": "Esse fluxo não tem um campo de pesquisa de texto completo. Configure um para ativar a pesquisa por palavra-chave.",
++    "fieldNotFound": "Campo não encontrado",
++    "fieldNotFoundDesc": "Sua consulta faz referência a um ou mais campos que não existem nesse fluxo.",
++    "functionNotDefined": "Função não definida",
++    "functionNotDefinedDesc": "Sua consulta chama uma função VRL que não está definida.",
++    "dataUnavailable": "Arquivos de dados indisponíveis",
++    "dataUnavailableDesc": "Alguns arquivos de dados desse intervalo de tempo estão inacessíveis. Experimente uma janela de tempo diferente.",
++    "dataTypeMismatch": "Incompatibilidade de tipos de dados",
++    "dataTypeMismatchDesc": "Um campo na sua consulta é usado com um tipo de dados incompatível.",
++    "executionError": "Falha na execução da consulta",
++    "executionErrorDesc": "Ocorreu um erro ao executar sua consulta.",
++    "serverError": "Erro no servidor",
++    "serverErrorDesc": "Ocorreu um erro interno no servidor.",
++    "generic": "Erro de consulta",
++    "genericDesc": "Ocorreu um erro ao processar sua consulta.",
++    "configureResource": "Configurar stream",
++    "configureResourceDesc": "Adicione um campo de pesquisa de texto completo nas configurações do stream",
++    "fixQuery": "Corrija a consulta",
++    "fixQueryDesc": "Revise e corrija a consulta no editor",
++    "expandRange": "Experimente um intervalo de tempo diferente",
++    "expandRangeDesc": "Os dados acessíveis podem estar em uma janela de tempo diferente",
++    "copyError": "Copiar detalhes do erro",
++    "copied": "Copiado!",
++    "traceId": "ID de rastreamento:",
++    "askAi": "Peça à IA que corrija minha consulta",
++    "showDetail": "Mostrar detalhes",
++    "hideDetail": "Ocultar detalhes"
+   }
+ }
+\ No newline at end of file
+diff --git a/web/src/locales/languages/tr.json b/web/src/locales/languages/tr.json
+index 33d88d17318..723b99c6e3e 100644
+--- a/web/src/locales/languages/tr.json
++++ b/web/src/locales/languages/tr.json
+@@ -3284,7 +3284,10 @@
+       "expandRangeDescAbsolute": "Daha geniş bir göreceli zaman aralığına geçin",
+       "removeFilter": "Filtreyi kaldırma",
+       "selectedRange": "Seçilen aralık"
+-    }
++    },
++    "showAll": "Tümünü Göster",
++    "filterByErrors": "Hatalara göre filtrele",
++    "clearErrorFilter": "Hata filtresini temizle"
+   },
+   "invitation": {
+     "pendingInvitations": "Bekleyen Davetiyeler",
+@@ -3567,7 +3570,9 @@
+     "timeRangeLabel": "Zaman Aralığı:",
+     "analyzeTooltipTraces": "Hız, gecikme süresi ve hata kalıpları için izleme boyutlarını analiz edin",
+     "insightsButtonLabel": "İçgörüler",
+-    "searchInspectionsLabel": "Arama işi yürütme ayrıntılarını inceleyin"
++    "searchInspectionsLabel": "Arama işi yürütme ayrıntılarını inceleyin",
++    "inspectBtnLabel": "İnceleyin",
++    "analyzeBtnLabel": "İçgörüler"
+   },
+   "errorInsights": {
+     "title": "İçgörüler",
+@@ -4839,6 +4844,73 @@
+       "openHistory": "Arama geçmişini aç",
+       "askAi": "AI'dan sorgumu düzeltmesini isteyin",
+       "selectedRange": "Seçilen aralık"
++    },
++    "error": {
++      "sqlError": "SQL sözdizimi hatası",
++      "sqlErrorDesc": "Sorgunuzda bir sözdizimi hatası var. Vurgulanan hatalar için sorgu düzenleyicisini inceleyin.",
++      "streamNotFound": "Akış bulunamadı",
++      "streamNotFoundDesc": "Seçilen akış mevcut değil veya kaldırıldı.",
++      "ftsNotConfigured": "Tam metin arama yapılandırılmadı",
++      "ftsNotConfiguredDesc": "Bu akışın tam metin arama alanı yoktur. Anahtar kelime aramayı etkinleştirmek için birini yapılandırın.",
++      "fieldNotFound": "Alan bulunamadı",
++      "fieldNotFoundDesc": "Sorgunuz bu akışta bulunmayan bir veya daha fazla alana başvurur.",
++      "functionNotDefined": "Fonksiyon tanımlanmadı",
++      "functionNotDefinedDesc": "Sorgunuz tanımlanmamış bir VRL işlevini çağırır.",
++      "dataUnavailable": "Veri dosyaları kullanılamıyor",
++      "dataUnavailableDesc": "Bu zaman aralığı için bazı veri dosyalarına erişilemez. Farklı bir zaman penceresi deneyin.",
++      "dataTypeMismatch": "Veri türü uyumsuzluğu",
++      "dataTypeMismatchDesc": "Sorgunuzdaki bir alan uyumsuz bir veri türüyle kullanılır.",
++      "executionError": "Sorgu yürütme başarısız oldu",
++      "executionErrorDesc": "Sorgunuzu yürütürken bir hata oluştu.",
++      "serverError": "Sunucu hatası",
++      "serverErrorDesc": "Sunucuda dahili bir hata oluştu.",
++      "generic": "Arama hatası",
++      "genericDesc": "Arama olayları alınırken bir hata oluştu.",
++      "configureStream": "Akışı yapılandırma",
++      "configureStreamDesc": "Akış ayarlarında tam metin arama alanı ekleme",
++      "fixQuery": "Sorguyu düzeltin",
++      "fixQueryDesc": "Editördeki sorguyu gözden geçirin ve düzeltin",
++      "expandRange": "Farklı bir zaman aralığı deneyin",
++      "expandRangeDesc": "Erişilebilir veriler farklı bir zaman aralığında olabilir",
++      "copyError": "Hata ayrıntılarını kopyala",
++      "traceId": "İzleme kimliği:",
++      "askAi": "AI'dan sorgumu düzeltmesini isteyin",
++      "showDetail": "Ayrıntıları göster",
++      "hideDetail": "Ayrıntıları gizle"
+     }
++  },
++  "queryError": {
++    "sqlError": "SQL sözdizimi hatası",
++    "sqlErrorDesc": "Sorgunuzda bir sözdizimi hatası var. Vurgulanan hatalar için düzenleyiciyi inceleyin.",
++    "streamNotFound": "Akış bulunamadı",
++    "streamNotFoundDesc": "Seçilen akış mevcut değil veya kaldırıldı.",
++    "ftsNotConfigured": "Tam metin arama yapılandırılmadı",
++    "ftsNotConfiguredDesc": "Bu akışın tam metin arama alanı yoktur. Anahtar kelime aramayı etkinleştirmek için birini yapılandırın.",
++    "fieldNotFound": "Alan bulunamadı",
++    "fieldNotFoundDesc": "Sorgunuz bu akışta bulunmayan bir veya daha fazla alana başvurur.",
++    "functionNotDefined": "Fonksiyon tanımlanmadı",
++    "functionNotDefinedDesc": "Sorgunuz tanımlanmamış bir VRL işlevini çağırır.",
++    "dataUnavailable": "Veri dosyaları kullanılamıyor",
++    "dataUnavailableDesc": "Bu zaman aralığı için bazı veri dosyalarına erişilemez. Farklı bir zaman penceresi deneyin.",
++    "dataTypeMismatch": "Veri türü uyumsuzluğu",
++    "dataTypeMismatchDesc": "Sorgunuzdaki bir alan uyumsuz bir veri türüyle kullanılır.",
++    "executionError": "Sorgu yürütme başarısız oldu",
++    "executionErrorDesc": "Sorgunuzu yürütürken bir hata oluştu.",
++    "serverError": "Sunucu hatası",
++    "serverErrorDesc": "Sunucuda dahili bir hata oluştu.",
++    "generic": "Sorgu hatası",
++    "genericDesc": "Sorgunuz işlenirken bir hata oluştu.",
++    "configureResource": "Akışı yapılandırma",
++    "configureResourceDesc": "Akış ayarlarında tam metin arama alanı ekleme",
++    "fixQuery": "Sorguyu düzeltin",
++    "fixQueryDesc": "Editördeki sorguyu gözden geçirin ve düzeltin",
++    "expandRange": "Farklı bir zaman aralığı deneyin",
++    "expandRangeDesc": "Erişilebilir veriler farklı bir zaman aralığında olabilir",
++    "copyError": "Hata ayrıntılarını kopyala",
++    "copied": "Kopyalandı!",
++    "traceId": "İzleme kimliği:",
++    "askAi": "AI'dan sorgumu düzeltmesini isteyin",
++    "showDetail": "Ayrıntıları göster",
++    "hideDetail": "Ayrıntıları gizle"
+   }
+ }
+\ No newline at end of file
+diff --git a/web/src/locales/languages/zh.json b/web/src/locales/languages/zh.json
+index 29624cc1eeb..29f78c798f9 100644
+--- a/web/src/locales/languages/zh.json
++++ b/web/src/locales/languages/zh.json
+@@ -3275,7 +3275,10 @@
+       "expandRangeDescAbsolute": "切换到更宽的相对时间范围",
+       "removeFilter": "移除过滤器",
+       "selectedRange": "所选范围"
+-    }
++    },
++    "showAll": "显示全部",
++    "filterByErrors": "按错误筛选",
++    "clearErrorFilter": "清除错误过滤器"
+   },
+   "invitation": {
+     "pendingInvitations": "待处理的邀请",
+@@ -3558,7 +3561,9 @@
+     "timeRangeLabel": "时间范围：",
+     "analyzeTooltipTraces": "分析跟踪维度的速率、延迟和错误模式",
+     "insightsButtonLabel": "见解",
+-    "searchInspectionsLabel": "检查搜索任务执行详情"
++    "searchInspectionsLabel": "检查搜索任务执行详情",
++    "inspectBtnLabel": "检查",
++    "analyzeBtnLabel": "见解"
+   },
+   "errorInsights": {
+     "title": "标题",
+@@ -4830,6 +4835,73 @@
+       "openHistory": "打开搜索记录",
+       "askAi": "让 AI 修复我的查询",
+       "selectedRange": "所选范围"
++    },
++    "error": {
++      "sqlError": "SQL 语法错误",
++      "sqlErrorDesc": "您的查询存在语法错误。查看查询编辑器中是否存在突出显示的错误。",
++      "streamNotFound": "未找到直播",
++      "streamNotFoundDesc": "所选直播不存在或已被删除。",
++      "ftsNotConfigured": "未配置全文搜索",
++      "ftsNotConfiguredDesc": "此直播没有全文搜索字段。配置一个以启用关键字搜索。",
++      "fieldNotFound": "未找到字段",
++      "fieldNotFoundDesc": "您的查询引用了此流中不存在的一个或多个字段。",
++      "functionNotDefined": "未定义函数",
++      "functionNotDefinedDesc": "您的查询调用了未定义的 VRL 函数。",
++      "dataUnavailable": "数据文件不可用",
++      "dataUnavailableDesc": "此时间范围内的某些数据文件无法访问。尝试不同的时间窗口。",
++      "dataTypeMismatch": "数据类型不匹配",
++      "dataTypeMismatchDesc": "您的查询中的字段与不兼容的数据类型一起使用。",
++      "executionError": "查询执行失败",
++      "executionErrorDesc": "执行查询时出错。",
++      "serverError": "服务器错误",
++      "serverErrorDesc": "服务器上出现内部错误。",
++      "generic": "搜索错误",
++      "genericDesc": "检索搜索事件时出错。",
++      "configureStream": "配置直播",
++      "configureStreamDesc": "在直播设置中添加全文搜索字段",
++      "fixQuery": "修复查询",
++      "fixQueryDesc": "在编辑器中查看并更正查询",
++      "expandRange": "尝试不同的时间范围",
++      "expandRangeDesc": "可访问的数据可能处于不同的时间窗口",
++      "copyError": "复制错误详情",
++      "traceId": "追踪编号：",
++      "askAi": "让 AI 修复我的查询",
++      "showDetail": "显示详情",
++      "hideDetail": "隐藏细节"
+     }
++  },
++  "queryError": {
++    "sqlError": "SQL 语法错误",
++    "sqlErrorDesc": "您的查询存在语法错误。查看编辑器中是否存在突出显示的错误。",
++    "streamNotFound": "未找到直播",
++    "streamNotFoundDesc": "所选直播不存在或已被删除。",
++    "ftsNotConfigured": "未配置全文搜索",
++    "ftsNotConfiguredDesc": "此直播没有全文搜索字段。配置一个以启用关键字搜索。",
++    "fieldNotFound": "未找到字段",
++    "fieldNotFoundDesc": "您的查询引用了此流中不存在的一个或多个字段。",
++    "functionNotDefined": "未定义函数",
++    "functionNotDefinedDesc": "您的查询调用了未定义的 VRL 函数。",
++    "dataUnavailable": "数据文件不可用",
++    "dataUnavailableDesc": "此时间范围内的某些数据文件无法访问。尝试不同的时间窗口。",
++    "dataTypeMismatch": "数据类型不匹配",
++    "dataTypeMismatchDesc": "您的查询中的字段与不兼容的数据类型一起使用。",
++    "executionError": "查询执行失败",
++    "executionErrorDesc": "执行查询时出错。",
++    "serverError": "服务器错误",
++    "serverErrorDesc": "服务器上出现内部错误。",
++    "generic": "查询错误",
++    "genericDesc": "处理您的查询时出错。",
++    "configureResource": "配置直播",
++    "configureResourceDesc": "在直播设置中添加全文搜索字段",
++    "fixQuery": "修复查询",
++    "fixQueryDesc": "在编辑器中查看并更正查询",
++    "expandRange": "尝试不同的时间范围",
++    "expandRangeDesc": "可访问的数据可能处于不同的时间窗口",
++    "copyError": "复制错误详情",
++    "copied": "已复制！",
++    "traceId": "追踪编号：",
++    "askAi": "让 AI 修复我的查询",
++    "showDetail": "显示详情",
++    "hideDetail": "隐藏细节"
+   }
+ }
+\ No newline at end of file
+diff --git a/web/src/plugins/logs/Index.spec.ts b/web/src/plugins/logs/Index.spec.ts
+index accf2caedfd..2f7dee556c4 100644
+--- a/web/src/plugins/logs/Index.spec.ts
++++ b/web/src/plugins/logs/Index.spec.ts
+@@ -816,12 +816,6 @@ describe("Logs Index", async () => {
+     }
+   });
+ 
+-  it("Should toggle error details visibility", async () => {
+-    expect(wrapper.vm.disableMoreErrorDetails).toBe(false);
+-    wrapper.vm.toggleErrorDetails();
+-    expect(wrapper.vm.disableMoreErrorDetails).toBe(true);
+-  });
+-
+   it("Should emit sendToAiChat event with payload", async () => {
+     wrapper.vm.sendToAiChat({ foo: 'bar' });
+     expect(wrapper.emitted('sendToAiChat')?.[0]?.[0]).toEqual({ foo: 'bar' });
+diff --git a/web/src/plugins/logs/Index.vue b/web/src/plugins/logs/Index.vue
+index 83ca5e42425..2bc41105e73 100644
+--- a/web/src/plugins/logs/Index.vue
++++ b/web/src/plugins/logs/Index.vue
+@@ -110,87 +110,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+                         searchObj.data.filterErrMsg !== '' &&
+                         searchObj.loading == false
+                       "
+-                      class="tw:justify-center"
++                      data-test="logs-search-filter-error-message"
+                     >
+-                      <h5 class="tw:text-center">
+-                        <OIcon
+-                          name="warning" style="width: 10rem; height: 10rem;" /><br />
+-                        <div
+-                          data-test="logs-search-filter-error-message"
+-                          style="white-space: pre-line"
+-                        >
+-                          {{ searchObj.data.filterErrMsg }}
+-                        </div>
+-                      </h5>
++                      <LogsErrorState
++                        :error-code="0"
++                        :error-msg="searchObj.data.filterErrMsg"
++                        :ai-enabled="isAiEnabled"
++                        @ask-ai="onAskAiFixQuery"
++                        @fix-query="onFixQuery"
++                        @configure-stream="onConfigureStream"
++                        @widen-range="onWidenRange"
++                      />
+                     </div>
+                     <div
+                       v-else-if="
+                         searchObj.data.errorMsg !== '' &&
+                         searchObj.loading == false
+                       "
+-                      class="tw:justify-center"
++                      data-test="logs-search-error-state"
+                     >
+-                      <h5 class="tw:text-center tw:m-0 tw:pt-[2rem]">
+-                        <div
+-                          data-test="logs-search-result-not-found-text"
+-                          class="tw:pt-4"
+-                          v-if="
+-                            searchObj.data.errorCode == 0 &&
+-                            searchObj.data.errorMsg == ''
+-                          "
+-                        >
+-                          Result not found.
+-                          <OButton
+-                            v-if="
+-                              searchObj.data.errorMsg != '' ||
+-                              searchObj?.data?.functionError != ''
+-                            "
+-                            @click="toggleErrorDetails"
+-                            variant="outline"
+-                            size="sm-action"
+-                            data-test="logs-page-result-error-details-btn-result-not-found"
+-                            >{{ t("search.functionErrorBtnLabel") }}</OButton
+-                          >
+-                        </div>
+-                        <div
+-                          data-test="logs-search-error-message"
+-                          class="tw:pt-4"
+-                          v-else
+-                        >
+-                          Error occurred while retrieving search events.
+-                          <OButton
+-                            v-if="
+-                              searchObj.data.errorMsg != '' ||
+-                              searchObj?.data?.functionError != ''
+-                            "
+-                            @click="toggleErrorDetails"
+-                            variant="outline"
+-                            size="sm-action"
+-                            style="font-size: 0.875rem"
+-                            data-test="logs-page-result-error-details-btn"
+-                            >{{ t("search.histogramErrorBtnLabel") }}</OButton
+-                          >
+-                        </div>
+-                        <div
+-                          data-test="logs-search-error-20003"
+-                          v-if="parseInt(searchObj.data.errorCode) == 20003"
+-                        >
+-                          <OButton
+-                            variant="primary"
+-                            size="sm-action"
+-                            as="RouterLink"
+-                            :to="
+-                              '/streams?dialog=' +
+-                              searchObj.data.stream.selectedStream.label
+-                            "
+-                            >Click here</OButton
+-                          >
+-                          to configure a full text search field to the stream.
+-                        </div>
+-                        <span class="tw:text-sm">{{
+-                          searchObj.data.additionalErrorMsg
+-                        }}</span>
+-                      </h5>
++                      <LogsErrorState
++                        :error-code="parseInt(searchObj.data.errorCode) || 0"
++                        :error-msg="searchObj.data.errorMsg"
++                        :error-detail="searchObj.data.errorDetail"
++                        :ai-enabled="isAiEnabled"
++                        :stream-name="searchObj.data.stream.selectedStream[0]"
++                        @ask-ai="onAskAiFixQuery"
++                        @fix-query="onFixQuery"
++                        @configure-stream="onConfigureStream"
++                        @widen-range="onWidenRange"
++                      />
+                     </div>
+                     <div
+                       v-else-if="
+@@ -213,6 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+                         searchObj.loading == false &&
+                         searchObj.meta.searchApplied == true
+                       "
++                      data-test="logs-search-no-events-found-text"
+                     >
+                       <LogsNoEventsState
+                         :sql-mode="searchObj.meta.sqlMode"
+@@ -221,7 +171,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+                         :relative-time-period="searchObj.data.datetime.relativeTimePeriod || ''"
+                         :date-type="searchObj.data.datetime.type || 'relative'"
+                         :ai-enabled="isAiEnabled"
+-                        data-test="logs-search-no-events-found-text"
+                         @widen-range="onWidenRange"
+                         @remove-filter="onRemoveFilter"
+                         @open-history="showSearchHistoryfn"
+@@ -273,23 +222,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+                         @run-query="searchData"
+                       />
+                     </div>
+-                    <div class="tw:text-center tw:w-5/6 tw:mx-auto">
+-                      <h5 class="tw:my-none">
+-                        <span v-if="disableMoreErrorDetails">
+-                          <SanitizedHtmlRenderer
+-                            data-test="logs-search-detail-error-message"
+-                            :htmlContent="searchObj?.data?.errorMsg"
+-                          />
+-                          <div class="error-display__message">
+-                            {{ searchObj?.data?.errorDetail }}
+-                          </div>
+-                          <SanitizedHtmlRenderer
+-                            data-test="logs-search-detail-function-error-message"
+-                            :htmlContent="searchObj?.data?.functionError"
+-                          />
+-                        </span>
+-                      </h5>
+-                    </div>
+                   </div>
+                 </div>
+               </template>
+@@ -421,7 +353,6 @@ import {
+   addSpacesToOperators,
+ } from "@/utils/zincutils";
+ import MainLayoutCloudMixin from "@/enterprise/mixins/mainLayout.mixin";
+-import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
+ import useLogs from "@/composables/useLogs";
+ import useStreamFields from "@/composables/useLogs/useStreamFields";
+ import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
+@@ -470,6 +401,7 @@ import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
+ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+ import LogsNoEventsState from "@/plugins/logs/LogsNoEventsState.vue";
+ import LogsNoDataState from "@/plugins/logs/LogsNoDataState.vue";
++import LogsErrorState from "@/plugins/logs/LogsErrorState.vue";
+ import {
+   saveLogsStream,
+   restoreLogsStream,
+@@ -489,7 +421,6 @@ export default defineComponent({
+     SearchSchedulersList: defineAsyncComponent(
+       () => import("@/plugins/logs/SearchSchedulersList.vue"),
+     ),
+-    SanitizedHtmlRenderer,
+     VisualizeLogsQuery: defineAsyncComponent(
+       () => import("@/plugins/logs/VisualizeLogsQuery.vue"),
+     ),
+@@ -504,6 +435,7 @@ export default defineComponent({
+     OEmptyState,
+     LogsNoEventsState,
+     LogsNoDataState,
++    LogsErrorState,
+ },
+   mixins: [MainLayoutCloudMixin],
+   emits: ["sendToAiChat"],
+@@ -626,15 +558,11 @@ export default defineComponent({
+         }
+       }
+     },
+-    toggleErrorDetails() {
+-      this.disableMoreErrorDetails = !this.disableMoreErrorDetails;
+-    },
+   },
+   setup(props: any, { emit }: any) {
+     const { t } = useI18n();
+     const store = useStore();
+     const router = useRouter();
+-    const disableMoreErrorDetails: boolean = ref(false);
+     const searchHistoryRef = ref(null);
+     const {
+       searchObj,
+@@ -1588,13 +1516,32 @@ export default defineComponent({
+       const queryContext = searchObj.meta.sqlMode
+         ? searchObj.data.editorValue
+         : searchObj.data.query;
++      const errorContext = searchObj.data.errorMsg
++        ? (() => {
++            const el = document.createElement("div");
++            el.innerHTML = searchObj.data.errorMsg;
++            const text = (el.textContent ?? "").trim();
++            return text ? ` Error: ${text}.` : "";
++          })()
++        : "";
+       emit(
+         "sendToAiChat",
+-        `My logs query returned no results. Query: ${queryContext || "(none)"}. Time range: ${searchObj.data.datetime.relativeTimePeriod || "custom"}. Can you help me fix it?`,
++        `My logs query failed.${errorContext} Query: ${queryContext || "(none)"}. Time range: ${searchObj.data.datetime.relativeTimePeriod || "custom"}. Can you help me fix it?`,
+         false,
+       );
+     };
+ 
++    const onFixQuery = () => {
++      searchBarRef.value?.focusEditor?.();
++    };
++
++    const onConfigureStream = () => {
++      const stream = searchObj.data.stream.selectedStream?.[0];
++      if (stream) {
++        router.push(`/streams?dialog=${stream}`);
++      }
++    };
++
+     const redirectBackToLogs = () => {
+       router.push({
+         name: "logs",
+@@ -3241,6 +3188,8 @@ export default defineComponent({
+       onWidenRange,
+       onRemoveFilter,
+       onAskAiFixQuery,
++      onFixQuery,
++      onConfigureStream,
+       redirectBackToLogs,
+       handleRunQuery,
+       refreshTimezone,
+@@ -3252,7 +3201,6 @@ export default defineComponent({
+       visualizeChartData,
+       handleChartApiError,
+       visualizeErrorData,
+-      disableMoreErrorDetails,
+       closeSearchHistoryfn,
+       resetHistogramWithError,
+       fnParsedSQL,
+diff --git a/web/src/plugins/logs/LogsErrorState.vue b/web/src/plugins/logs/LogsErrorState.vue
+new file mode 100644
+index 00000000000..2cb2668d4c1
+--- /dev/null
++++ b/web/src/plugins/logs/LogsErrorState.vue
+@@ -0,0 +1,58 @@
++<!-- Copyright 2026 OpenObserve Inc.
++
++This program is free software: you can redistribute it and/or modify
++it under the terms of the GNU Affero General Public License as published by
++the Free Software Foundation, either version 3 of the License, or
++(at your option) any later version.
++
++This program is distributed in the hope that it will be useful
++but WITHOUT ANY WARRANTY; without even the implied warranty of
++MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++GNU Affero General Public License for more details.
++
++You should have received a copy of the GNU Affero General Public License
++along with this program.  If not, see <http://www.gnu.org/licenses/>.
++-->
++
++<!--
++  LogsErrorState — thin wrapper around the shared QueryErrorState component,
++  scoped to the logs search page context.
++
++  Passes through all props and events. The "configure-resource" event is
++  handled here to build the correct stream-settings route; all other actions
++  bubble up to Index.vue.
++-->
++<template>
++  <QueryErrorState
++    :error-code="errorCode"
++    :error-msg="errorMsg"
++    :error-detail="errorDetail"
++    :ai-enabled="aiEnabled"
++    :resource-name="streamName"
++    size="hero"
++    illustration="broken-panel"
++    @ask-ai="emit('ask-ai')"
++    @fix-query="emit('fix-query')"
++    @configure-resource="emit('configure-stream')"
++    @widen-range="emit('widen-range')"
++  />
++</template>
++
++<script setup lang="ts">
++import QueryErrorState from "@/components/common/QueryErrorState.vue";
++
++const props = defineProps<{
++  errorCode: number;
++  errorMsg: string;
++  errorDetail?: string;
++  aiEnabled: boolean;
++  streamName?: string;
++}>();
++
++const emit = defineEmits<{
++  "ask-ai": [];
++  "fix-query": [];
++  "configure-stream": [];
++  "widen-range": [];
++}>();
++</script>
+diff --git a/web/src/plugins/logs/LogsNoDataState.vue b/web/src/plugins/logs/LogsNoDataState.vue
+index eff84db4ee3..bf51cab3e25 100644
+--- a/web/src/plugins/logs/LogsNoDataState.vue
++++ b/web/src/plugins/logs/LogsNoDataState.vue
+@@ -84,10 +84,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+         >{{ t("logs.noData.windows") }}</EmptyStateIngestionChip>
+         <EmptyStateIngestionChip
+           v-if="aiEnabled"
+-          icon="bolt"
++          class="ai-hover-btn"
+           data-test="logs-no-data-ask-ai-btn"
+           @click="emit('ask-ai')"
+-        >{{ t("logs.noData.askAi") }}</EmptyStateIngestionChip>
++        >
++          <img :src="aiIconSrc" class="tw:w-3.5 tw:h-3.5 tw:shrink-0" alt="" />
++          {{ t("logs.noData.askAi") }}
++        </EmptyStateIngestionChip>
+       </div>
+     </template>
+   </OEmptyState>
+@@ -101,6 +104,7 @@ import { useStore } from "vuex";
+ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+ import EmptyStateIngestionCard from "@/lib/core/EmptyState/EmptyStateIngestionCard.vue";
+ import EmptyStateIngestionChip from "@/lib/core/EmptyState/EmptyStateIngestionChip.vue";
++import { useAiIcon } from "@/composables/useAiIcon";
+ 
+ const props = defineProps<{
+   aiEnabled: boolean;
+@@ -113,6 +117,7 @@ const emit = defineEmits<{
+ const { t } = useI18n();
+ const router = useRouter();
+ const store = useStore();
++const { aiIconSrc } = useAiIcon();
+ 
+ const orgQuery = computed(() => ({
+   org_identifier: store.state.selectedOrganization.identifier,
+diff --git a/web/src/plugins/logs/LogsNoEventsState.vue b/web/src/plugins/logs/LogsNoEventsState.vue
+index d698ca6bd2f..6ff5d4e9e2c 100644
+--- a/web/src/plugins/logs/LogsNoEventsState.vue
++++ b/web/src/plugins/logs/LogsNoEventsState.vue
+@@ -67,10 +67,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+           v-if="aiEnabled"
+           variant="ghost"
+           size="sm"
+-          icon-left="bolt"
++          class="ai-hover-btn"
+           data-test="logs-no-events-ask-ai-btn"
+           @click="emit('ask-ai')"
+         >
++          <template #icon-left>
++            <img :src="aiIconSrc" class="tw:w-4 tw:h-4 tw:shrink-0" alt="" />
++          </template>
+           {{ t("logs.noEvents.askAi") }}
+         </OButton>
+       </div>
+@@ -84,6 +87,7 @@ import { useI18n } from "vue-i18n";
+ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+ import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
+ import OButton from "@/lib/core/Button/OButton.vue";
++import { useAiIcon } from "@/composables/useAiIcon";
+ 
+ const props = defineProps<{
+   /** True when SQL mode is active; affects how filter presence is detected. */
+@@ -108,6 +112,7 @@ const emit = defineEmits<{
+ }>();
+ 
+ const { t } = useI18n();
++const { aiIconSrc } = useAiIcon();
+ 
+ // --- filter detection -------------------------------------------------------
+ 
+diff --git a/web/src/plugins/logs/SearchResult.vue b/web/src/plugins/logs/SearchResult.vue
+index 4efd5aef7e5..59adeb61df3 100644
+--- a/web/src/plugins/logs/SearchResult.vue
++++ b/web/src/plugins/logs/SearchResult.vue
+@@ -203,22 +203,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+               <OButton
+                 v-if="showInspectBtn"
+                 variant="outline"
+-                size="icon-chip"
++                :size="showActionLabels ? 'chip' : 'icon-chip'"
+                 @click="openSearchJobInspector"
+                 data-test="logs-inspect-button"
+               >
+                 <OIcon name="troubleshoot" size="sm" />
+-                <OTooltip :content="t('volumeInsights.searchInspectionsLabel')" />
++                <span v-if="showActionLabels" class="tw:whitespace-nowrap">{{ t('volumeInsights.inspectBtnLabel') }}</span>
++                <OTooltip v-if="!showActionLabels" :content="t('volumeInsights.searchInspectionsLabel')" />
+               </OButton>
+               <OButton
+                 v-if="showAnalyzeBtn"
+                 variant="outline"
+-                size="icon-chip"
++                :size="showActionLabels ? 'chip' : 'icon-chip'"
+                 @click="openVolumeAnalysisDashboard"
+                 data-test="logs-analyze-dimensions-button"
+               >
+                 <OIcon name="timeline" size="sm" />
+-                <OTooltip :content="t('volumeInsights.analyzeTooltipLogs')" />
++                <span v-if="showActionLabels" class="tw:whitespace-nowrap">{{ t('volumeInsights.analyzeBtnLabel') }}</span>
++                <OTooltip v-if="!showActionLabels" :content="t('volumeInsights.analyzeTooltipLogs')" />
+               </OButton>
+               <OButton
+                 v-if="showWrapBtn"
+@@ -1994,6 +1996,10 @@ export default defineComponent({
+     shouldMoveActionsToMenu() {
+       return this.containerWidth < 700;
+     },
++    // Show icon + label on action buttons when container is wide enough
++    showActionLabels() {
++      return this.containerWidth >= 900;
++    },
+     showInspectBtn() {
+       return (
+         this.searchObj.data?.queryResults?.hits?.length > 0 &&
+diff --git a/web/src/plugins/traces/Index.vue b/web/src/plugins/traces/Index.vue
+index f0f7bbf32d0..2bcd7ff32c6 100644
+--- a/web/src/plugins/traces/Index.vue
++++ b/web/src/plugins/traces/Index.vue
+@@ -262,6 +262,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+                       @run-query="searchData"
+                       @widen-range="onWidenTracesRange"
+                       @remove-filter="onRemoveTracesFilter"
++                      @error-only-toggled="onErrorOnlyToggled"
+                     />
+                   </div>
+                 </div>
+diff --git a/web/src/plugins/traces/SearchBar.spec.ts b/web/src/plugins/traces/SearchBar.spec.ts
+index 1f023d9c843..a1384295fd4 100644
+--- a/web/src/plugins/traces/SearchBar.spec.ts
++++ b/web/src/plugins/traces/SearchBar.spec.ts
+@@ -638,7 +638,7 @@ describe("SearchBar", () => {
+ 
+   // -------------------------------------------------------------------------
+   describe("error-only toggle", () => {
+-    it("should render the error-only toggle", async () => {
++    it("should not render the error-only toggle in SearchBar (moved to SearchResult)", async () => {
+       wrapper = mountSearchBar();
+       await flushPromises();
+ 
+@@ -646,7 +646,7 @@ describe("SearchBar", () => {
+         wrapper
+           .find('[data-test="traces-search-bar-error-only-toggle-btn"]')
+           .exists(),
+-      ).toBe(true);
++      ).toBe(false);
+     });
+ 
+     it("should emit error-only-toggled with true when onErrorOnlyToggle(true) is called", async () => {
+diff --git a/web/src/plugins/traces/SearchBar.vue b/web/src/plugins/traces/SearchBar.vue
+index da05d2c8e91..bd8fc7df507 100644
+--- a/web/src/plugins/traces/SearchBar.vue
++++ b/web/src/plugins/traces/SearchBar.vue
+@@ -103,22 +103,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+             <OTooltip :content="t('traces.RedMetrics')" />
+           </div>
+ 
+-          <!-- Error Only Toggle -->
+-          <div
+-            class="toolbar-toggle-container element-box-shadow"
+-            data-test="traces-toolbar-toggle-container"
+-          >
+-            <OSwitch
+-              data-test="traces-search-bar-error-only-toggle-btn"
+-              v-model="searchObj.meta.showErrorOnly"
+-              class="o2-toggle-button-xs tw:flex tw:items-center tw:justify-center tw:pr-1"
+-              size="lg"
+-              @update:model-value="onErrorOnlyToggle"
+-            />
+-            <OIcon v-if="shouldHideToggleText" name="error" size="sm" class="tw:shrink-0 tw:text-[var(--o2-status-error)]" />
+-            <span v-else class="tw:text-sm tw:font-medium tw:whitespace-nowrap">{{ t('traces.showErrorOnly') }}</span>
+-            <OTooltip v-if="shouldHideToggleText" :content="t('traces.showErrorOnly')" />
+-          </div>
+         </template>
+ 
+         <!-- More menu: Syntax Guide — always last.
+diff --git a/web/src/plugins/traces/SearchResult.spec.ts b/web/src/plugins/traces/SearchResult.spec.ts
+index aeadcdae518..c06ba2a16b0 100644
+--- a/web/src/plugins/traces/SearchResult.spec.ts
++++ b/web/src/plugins/traces/SearchResult.spec.ts
+@@ -338,6 +338,7 @@ describe("SearchResult", () => {
+         "run-query",
+         "widen-range",
+         "remove-filter",
++        "error-only-toggled",
+       ];
+ 
+       expect(wrapper.vm.$options.emits).toEqual(expectedEmits);
+diff --git a/web/src/plugins/traces/SearchResult.vue b/web/src/plugins/traces/SearchResult.vue
+index 113758df957..620b3867518 100644
+--- a/web/src/plugins/traces/SearchResult.vue
++++ b/web/src/plugins/traces/SearchResult.vue
+@@ -28,6 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+           !searchObj.data.errorMsg?.trim()?.length &&
+           searchObj.searchApplied
+         "
++        ref="sectionHeaderRef"
+         data-test="traces-section-header"
+         class="tw:flex tw:items-center tw:px-[0.4rem]! tw:h-[2.25rem] tw:shrink-0 tw:border-b tw:border-[rgba(0,0,0,0.07)]"
+       >
+@@ -62,8 +63,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+           "
+           data-test="traces-error-count-badge"
+           variant="error"
+-          class="tw:text-xs tw:rounded! tw:bg-[var(--o2-error-tag-bg)]! tw:py-[0.4rem]! tw:px-[0.625rem]! tw:text-[0.75rem] tw:text-[var(--o2-error-tag-text)]!"
+-        >{{ `${formatLargeNumber(searchObj.data.queryResults.errorCount)} ${searchObj.meta.searchMode === 'traces' ? t('traces.errorTraces') : t('traces.errorSpans')}` }}</OBadge>
++          :clickable="true"
++          class="tw:text-xs tw:rounded! tw:py-[0.4rem]! tw:px-[0.625rem]! tw:text-[0.75rem]!"
++          :class="!searchObj.meta.showErrorOnly ? 'tw:bg-[var(--o2-error-tag-bg)]! tw:text-[var(--o2-error-tag-text)]!' : ''"
++          @click="toggleErrorOnly"
++        >
++          {{ `${formatLargeNumber(searchObj.data.queryResults.errorCount)} ${searchObj.meta.searchMode === 'traces' ? t('traces.errorTraces') : t('traces.errorSpans')}` }}
++          <OTooltip
++            :content="searchObj.meta.showErrorOnly ? t('traces.clearErrorFilter') : t('traces.filterByErrors')"
++            side="bottom"
++          />
++          <template #trailing>
++            <OIcon name="filter-alt" size="xs" class="tw:shrink-0" />
++          </template>
++        </OBadge>
+ 
+         <div class="tw:flex-1" />
+ 
+@@ -78,12 +91,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+         </div>
+         <OButton
+           variant="outline"
+-          size="icon-chip"
++          :size="showActionLabels ? 'chip' : 'icon-chip'"
+           @click.stop="openUnifiedAnalysisDashboard"
+           data-test="insights-button"
+         >
+           <OIcon name="timeline" size="sm" />
+-          <OTooltip :content="t('volumeInsights.analyzeTooltipTraces')" />
++          <span v-if="showActionLabels" class="tw:whitespace-nowrap">{{ t('volumeInsights.analyzeBtnLabel') }}</span>
++          <OTooltip v-if="!showActionLabels" :content="t('volumeInsights.analyzeTooltipTraces')" />
+         </OButton>
+         <template v-if="searchObj.meta.resultGrid.showPagination">
+           <OSelect
+@@ -175,6 +189,8 @@ import {
+   computed,
+   defineAsyncComponent,
+   defineComponent,
++  onBeforeUnmount,
++  onMounted,
+   ref,
+   watch,
+ } from "vue";
+@@ -219,8 +235,14 @@ export default defineComponent({
+     "run-query",
+     "widen-range",
+     "remove-filter",
++    "error-only-toggled",
+   ],
+   methods: {
++    toggleErrorOnly() {
++      const newVal = !this.searchObj.meta.showErrorOnly;
++      this.searchObj.meta.showErrorOnly = newVal;
++      this.$emit("error-only-toggled", newVal);
++    },
+     closeColumn(col: any) {
+       const RGIndex = this.searchObj.data.resultGrid.columns.indexOf(col.name);
+       this.searchObj.data.resultGrid.columns.splice(RGIndex, 1);
+@@ -248,6 +270,26 @@ export default defineComponent({
+     const { searchObj, updatedLocalLogFilterField } = useTraces();
+     const metricsDashboardRef: any = ref(null);
+ 
++    const sectionHeaderRef = ref<HTMLElement | null>(null);
++    const containerWidth = ref(9999);
++    let headerResizeObserver: ResizeObserver | null = null;
++    const showActionLabels = computed(() => containerWidth.value >= 900);
++
++    onMounted(() => {
++      if (sectionHeaderRef.value) {
++        containerWidth.value = sectionHeaderRef.value.getBoundingClientRect().width;
++        headerResizeObserver = new ResizeObserver((entries) => {
++          containerWidth.value = entries[0]?.contentRect.width ?? 0;
++        });
++        headerResizeObserver.observe(sectionHeaderRef.value);
++      }
++    });
++    
++    //Before unmount
++    onBeforeUnmount(() => {
++      headerResizeObserver?.disconnect();
++    });
++
+     watch(
+       () => searchObj.loading,
+       (loading, wasLoading) => {
+@@ -372,6 +414,8 @@ export default defineComponent({
+       searchObj,
+       updatedLocalLogFilterField,
+       metricsDashboardRef,
++      sectionHeaderRef,
++      showActionLabels,
+       expandRowDetail,
+       onMetricsTimeRangeSelected,
+       onMetricsFiltersUpdated,
+diff --git a/web/src/plugins/traces/TracesNoDataState.vue b/web/src/plugins/traces/TracesNoDataState.vue
+index 3daecdc34a0..6af2799c95e 100644
+--- a/web/src/plugins/traces/TracesNoDataState.vue
++++ b/web/src/plugins/traces/TracesNoDataState.vue
+@@ -72,10 +72,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+         >{{ t("traces.noData.nodejs") }}</EmptyStateIngestionChip>
+         <EmptyStateIngestionChip
+           v-if="aiEnabled"
+-          icon="bolt"
++          class="ai-hover-btn"
+           data-test="traces-no-data-ask-ai-btn"
+           @click="emit('ask-ai')"
+-        >{{ t("traces.noData.askAi") }}</EmptyStateIngestionChip>
++        >
++          <img :src="aiIconSrc" class="tw:w-3.5 tw:h-3.5 tw:shrink-0" alt="" />
++          {{ t("traces.noData.askAi") }}
++        </EmptyStateIngestionChip>
+       </div>
+     </template>
+   </OEmptyState>
+@@ -89,6 +92,7 @@ import { useStore } from "vuex";
+ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+ import EmptyStateIngestionCard from "@/lib/core/EmptyState/EmptyStateIngestionCard.vue";
+ import EmptyStateIngestionChip from "@/lib/core/EmptyState/EmptyStateIngestionChip.vue";
++import { useAiIcon } from "@/composables/useAiIcon";
+ 
+ const props = defineProps<{ aiEnabled: boolean }>();
+ const emit = defineEmits<{ "ask-ai": [] }>();
+@@ -96,6 +100,7 @@ const emit = defineEmits<{ "ask-ai": [] }>();
+ const { t } = useI18n();
+ const router = useRouter();
+ const store = useStore();
++const { aiIconSrc } = useAiIcon();
+ 
+ const orgQuery = computed(() => ({
+   org_identifier: store.state.selectedOrganization?.identifier,
+diff --git a/web/src/stores/incidents.ts b/web/src/stores/incidents.ts
+index e362b1f5660..b6acfc4372c 100644
+--- a/web/src/stores/incidents.ts
++++ b/web/src/stores/incidents.ts
+@@ -20,7 +20,8 @@ export default {
+     cachedData: [], // Cache the actual incidents data
+     pageBeforeSearch: 1, // Track page number before search starts (for smart restoration)
+     isInitialized: false,
+-    shouldRefresh: false // Flag to indicate when data should be refreshed (e.g., after updates)
++    shouldRefresh: false, // Flag to indicate when data should be refreshed (e.g., after updates)
++    statusFilter: "all", // Quick filter tab selection: "all" | "open" | "acknowledged" | "resolved"
+   },
+   getters: {
+     getIncidents(state: any) {
+@@ -38,6 +39,9 @@ export default {
+     getShouldRefresh(state: any) {
+       return state.shouldRefresh;
+     },
++    getStatusFilter(state: any) {
++      return state.statusFilter;
++    },
+   },
+   mutations: {
+     setIncidents(state: any, incidents: any) {
+@@ -55,12 +59,16 @@ export default {
+     setShouldRefresh(state: any, shouldRefresh: boolean) {
+       state.shouldRefresh = shouldRefresh;
+     },
++    setStatusFilter(state: any, statusFilter: string) {
++      state.statusFilter = statusFilter;
++    },
+     resetIncidents(state: any) {
+       state.incidents = {};
+       state.cachedData = [];
+       state.pageBeforeSearch = 1;
+       state.isInitialized = false;
+       state.shouldRefresh = false;
++      state.statusFilter = "all";
+     },
+   },
+   actions: {
+@@ -79,6 +87,9 @@ export default {
+     setShouldRefresh(context: any, shouldRefresh: boolean) {
+       context.commit('setShouldRefresh', shouldRefresh);
+     },
++    setStatusFilter(context: any, statusFilter: string) {
++      context.commit('setStatusFilter', statusFilter);
++    },
+     resetIncidents(context: any) {
+       context.commit('resetIncidents');
+     },

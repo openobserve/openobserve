@@ -198,6 +198,22 @@ export class LogsPage {
         this.resultErrorDetailsBtn = '[data-test="error-detail-toggle-btn"], [data-test="query-error-toggle-detail-btn"]';
         this.searchDetailErrorMessage = '[data-test="error-detail-body"], [data-test="query-error-detail-expanded"]';
 
+        // QueryErrorState component selectors (hero layout)
+        this.queryErrorStateRoot = '[data-test="query-error-state"]';
+        this.queryErrorFixQueryCard = '[data-test="query-error-fix-query-card"]';
+        this.queryErrorConfigureResourceCard = '[data-test="query-error-configure-resource-card"]';
+        this.queryErrorExpandRangeCard = '[data-test="query-error-expand-range-card"]';
+        this.queryErrorCopyBtn = '[data-test="query-error-copy-btn"]';
+        this.errorDetailPanelRoot = '[data-test="error-detail-panel"]';
+        this.errorDetailSummaryText = '[data-test="error-detail-summary"]';
+        this.errorDetailTraceIdEl = '[data-test="error-detail-trace-id"]';
+        this.logsFilterErrorContainer = '[data-test="logs-search-filter-error-message"]';
+
+        // QueryErrorState block layout selectors
+        this.queryErrorSummary = '[data-test="query-error-summary"]';
+        this.queryErrorFixQueryBtn = '[data-test="query-error-fix-query-btn"]';
+        this.queryErrorAskAiBtn = '[data-test="query-error-ask-ai-btn"]';
+
         // Download locators (SearchBar.vue more-options dropdown + custom-download ODialog)
         this.moreOptionsBtn = '[data-test="logs-search-bar-more-options-btn"]';
         // Hover trigger for the nested CSV/JSON submenu (data-test added on the wrapper div).
@@ -5147,6 +5163,101 @@ export class LogsPage {
             await errorDetailsBtn.click();
             testLogger.info('✓ Error details toggle clicked successfully');
         }
+    }
+
+    // ===== QueryErrorState Component Methods =====
+
+    async expectQueryErrorStateVisible() {
+        await expect(this.page.locator(this.queryErrorStateRoot)).toBeVisible({ timeout: 30000 });
+    }
+
+    async expectQueryErrorFixQueryCardVisible() {
+        await expect(this.page.locator(this.queryErrorFixQueryCard)).toBeVisible({ timeout: 15000 });
+    }
+
+    async expectQueryErrorFixQueryCardNotVisible() {
+        await expect(this.page.locator(this.queryErrorFixQueryCard)).not.toBeVisible();
+    }
+
+    async expectQueryErrorConfigureResourceCardNotVisible() {
+        await expect(this.page.locator(this.queryErrorConfigureResourceCard)).not.toBeVisible();
+    }
+
+    async expectQueryErrorExpandRangeCardNotVisible() {
+        await expect(this.page.locator(this.queryErrorExpandRangeCard)).not.toBeVisible();
+    }
+
+    async expectErrorDetailPanelVisible() {
+        await expect(this.page.locator(this.errorDetailPanelRoot)).toBeVisible({ timeout: 15000 });
+    }
+
+    async clickErrorDetailToggleBtn() {
+        const btn = this.page.locator(this.resultErrorDetailsBtn).first();
+        await btn.waitFor({ state: 'visible', timeout: 10000 });
+        await btn.click();
+    }
+
+    async expectErrorDetailBodyVisible() {
+        await expect(this.page.locator(this.searchDetailErrorMessage).first()).toBeVisible({ timeout: 10000 });
+    }
+
+    async expectErrorDetailBodyNotVisible() {
+        await expect(this.page.locator(this.searchDetailErrorMessage).first()).not.toBeVisible();
+    }
+
+    async clickQueryErrorFixQueryCard() {
+        const card = this.page.locator(this.queryErrorFixQueryCard);
+        await card.waitFor({ state: 'visible', timeout: 10000 });
+        await card.click();
+    }
+
+    async clickQueryErrorCopyBtn() {
+        const btn = this.page.locator(this.queryErrorCopyBtn);
+        await btn.waitFor({ state: 'visible', timeout: 10000 });
+        await btn.click();
+    }
+
+    async getQueryErrorCopyBtnText() {
+        return await this.page.locator(this.queryErrorCopyBtn).textContent();
+    }
+
+    async expectQueryEditorFocused() {
+        // The query editor is the Monaco editor host; check the inner textarea (.inputarea) for focus
+        const inputArea = this.page.locator(`${this.logsSearchBarQueryEditor} .inputarea`);
+        await expect(inputArea).toBeFocused({ timeout: 10000 });
+    }
+
+    async getQueryErrorStateText() {
+        return await this.page.locator(this.queryErrorStateRoot).textContent();
+    }
+
+    async expectErrorDetailSummaryNotEmpty() {
+        const summary = this.page.locator(this.errorDetailSummaryText);
+        await summary.waitFor({ state: 'visible', timeout: 10000 });
+        const text = await summary.textContent();
+        expect(text).toBeTruthy();
+        expect(text.trim().length).toBeGreaterThan(0);
+    }
+
+    async expectLogsFilterErrorContainerVisible() {
+        await expect(this.page.locator(this.logsFilterErrorContainer)).toBeVisible({ timeout: 15000 });
+    }
+
+    async expectLogsTableNotVisible() {
+        await expect(this.page.locator(this.logsTable)).not.toBeVisible();
+    }
+
+    // Block layout methods (for future integration, currently fixme'd)
+    async expectQueryErrorAskAiBtnVisible() {
+        await expect(this.page.locator(this.queryErrorAskAiBtn)).toBeVisible({ timeout: 5000 });
+    }
+
+    async expectQueryErrorSummaryVisible() {
+        await expect(this.page.locator(this.queryErrorSummary)).toBeVisible({ timeout: 5000 });
+    }
+
+    async expectQueryErrorFixQueryBtnVisible() {
+        await expect(this.page.locator(this.queryErrorFixQueryBtn)).toBeVisible({ timeout: 5000 });
     }
 
     async openFirstLogDetails() {
