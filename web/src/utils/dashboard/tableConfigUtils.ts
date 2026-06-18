@@ -78,10 +78,19 @@ export const buildValueMappingCache = (
     const hasColor = mapping.color != null && mapping.color !== "";
     if (!hasText && !hasColor) return;
 
-    if (mapping.type === "regex") {
+    const hasRange =
+      mapping.from !== undefined &&
+      mapping.from !== "" &&
+      mapping.to !== undefined &&
+      mapping.to !== "";
+
+    const type =
+      mapping.type ?? (mapping.pattern ? "regex" : hasRange ? "range" : "value");
+
+    if (type === "regex") {
       // Regex mapping – stored with a special prefix; pattern tested during lookup
       cache.set(`__regex_${mapping.pattern ?? ""}`, mapping);
-    } else if (mapping.from !== undefined && mapping.to !== undefined) {
+    } else if (type === "range") {
       // Range mapping – encoded key so direct + range share the same Map
       cache.set(`__range_${mapping.from}_${mapping.to}`, mapping);
     } else if (mapping.value !== undefined && mapping.value !== null) {

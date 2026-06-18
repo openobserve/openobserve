@@ -73,6 +73,69 @@ describe("tableConfigUtils", () => {
       expect(lookupValueMapping(6, cache)).toBeNull();
     });
 
+    it("matches a value mapping that carries empty-string from/to/pattern siblings (real popup shape)", () => {
+      // ValueMappingPopUp writes every sibling key (from/to/pattern = "") on each
+      // mapping. Routing must use `type` — presence checks would mis-route "value"
+      // mappings into the range branch and they would never match.
+      const cache = buildValueMappingCache([
+        { type: "value", value: "1", from: "", to: "", pattern: "", color: "#aaaaaa", text: "No Logs" },
+        { type: "value", value: "22", from: "", to: "", pattern: "", color: "#e02f44", text: "High" },
+      ]);
+      expect([...(cache?.keys() ?? [])]).toEqual(["1", "22"]);
+      expect(lookupValueMapping(1, cache)).toBe("No Logs");
+      expect(lookupValueMapping("1", cache)).toBe("No Logs");
+      expect(lookupValueMapping(22, cache)).toBe("High");
+      expect(lookupValueMapping(99, cache)).toBeNull();
+    });
+
+    it("keeps multiple value mappings distinct in the real popup shape (no __range__ collision)", () => {
+      // The bug routed both into the range branch under the same key "__range__",
+      // so the second overwrote the first and neither matched.
+      const cache = buildValueMappingCache([
+        { type: "value", value: "1", from: "", to: "", pattern: "", text: "one" },
+        { type: "value", value: "2", from: "", to: "", pattern: "", text: "two" },
+        { type: "value", value: "3", from: "", to: "", pattern: "", text: "three" },
+      ]);
+      expect(cache?.size).toBe(3);
+      expect(lookupValueMapping(1, cache)).toBe("one");
+      expect(lookupValueMapping(2, cache)).toBe("two");
+      expect(lookupValueMapping(3, cache)).toBe("three");
+    });
+
+    it("routes a range mapping by type even with empty value/pattern siblings", () => {
+      const cache = buildValueMappingCache([
+        { type: "range", value: "", from: "0", to: "10", pattern: "", text: "low" },
+      ]);
+      expect(lookupValueMapping(0, cache)).toBe("low");
+      expect(lookupValueMapping(5, cache)).toBe("low");
+      expect(lookupValueMapping(11, cache)).toBeNull();
+    });
+
+    it("routes a regex mapping by type even with empty value/from/to siblings", () => {
+      const cache = buildValueMappingCache([
+        { type: "regex", value: "", from: "", to: "", pattern: "^err", text: "error" },
+      ]);
+      expect(lookupValueMapping("err_500", cache)).toBe("error");
+      expect(lookupValueMapping("ok", cache)).toBeNull();
+    });
+
+    it("recovers a color-only value mapping in the real popup shape", () => {
+      const cache = buildValueMappingCache([
+        { type: "value", value: "22", from: "", to: "", pattern: "", color: "#e02f44", text: "" },
+      ]);
+      expect(lookupValueMapping(22, cache)).toBeNull(); // no text
+      expect(lookupValueMappingFull(22, cache, "color")?.color).toBe("#e02f44");
+    });
+
+    it("infers type for legacy untyped mappings (treating '' as absent)", () => {
+      const value = buildValueMappingCache([{ value: "5", text: "five" }]);
+      expect(lookupValueMapping(5, value)).toBe("five");
+      const range = buildValueMappingCache([{ from: "0", to: "10", text: "low" }]);
+      expect(lookupValueMapping(5, range)).toBe("low");
+      const regex = buildValueMappingCache([{ pattern: "^err", text: "error" }]);
+      expect(lookupValueMapping("err1", regex)).toBe("error");
+    });
+
     it("matches a numeric range, including a from of 0", () => {
       const cache = buildValueMappingCache([
         { type: "range", from: "0", to: "10", text: "low" },
