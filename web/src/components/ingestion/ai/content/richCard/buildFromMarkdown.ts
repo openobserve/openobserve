@@ -23,10 +23,14 @@
 // The stream the installer writes to and `detect.stream` are BOTH authored in this
 // md, so they're kept in lockstep by the content (no frontend capability gate).
 
-import type { CardSubstitutions } from "../renderMarkdown";
-import type { RichCardContent, RichCardStep, StepCompleteOn } from "./types";
+import type {
+  CardSubstitutions,
+  RichCardContent,
+  RichCardStep,
+  StepCompleteOn,
+} from "@/components/ingestion/setupCard/types";
 import { parseFrontmatter } from "./parseFrontmatter";
-import { applySubs, applySubsMasked } from "./subs";
+import { applySubs, applySubsMasked } from "@/components/ingestion/setupCard/subs";
 import { resolveAICardLogo } from "../index";
 
 const str = (v: unknown): string | undefined =>
@@ -105,7 +109,13 @@ export function buildFromMarkdown(
         }
       : undefined,
     detect: {
-      streamType: detect.stream_type === "logs" ? "logs" : "traces",
+      streamType:
+        detect.stream_type === "logs"
+          ? "logs"
+          : detect.stream_type === "metrics"
+            ? "metrics"
+            : "traces",
+      match: detect.match === "keyword" ? "keyword" : undefined,
       streamName: str(detect.stream),
       filter: str(detect.filter) ?? "",
       modelLabel: str(detect.model_label),

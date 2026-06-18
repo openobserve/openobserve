@@ -15,21 +15,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <IngestionContent>
-    <CopyContent :content="content" />
-    <IngestionDocLink :href="docURL" />
-  </IngestionContent>
+  <DataSourceSetupCard slug="oracle" />
 </template>
 
 <script setup lang="ts">
-import { useStore } from "vuex";
-import CopyContent from "@/components/CopyContent.vue";
-import IngestionContent from "@/components/ingestion/IngestionContent.vue";
-import IngestionDocLink from "@/components/ingestion/IngestionDocLink.vue";
-import useIngestion from "@/composables/useIngestion";
-const name = "oracle";
-const store = useStore();
-const { endpoint, databaseContent, databaseDocURLs } = useIngestion();
-const content = databaseContent.replace("[STREAM_NAME]", name.replace(" ", "_").toLowerCase());
-const docURL = databaseDocURLs[name];
+import DataSourceSetupCard from "@/components/ingestion/setupCard/DataSourceSetupCard.vue";
+
+defineProps<{
+  currOrgIdentifier?: string;
+  currUserEmail?: string;
+}>();
 </script>
