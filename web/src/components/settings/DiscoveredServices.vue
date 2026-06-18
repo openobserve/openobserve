@@ -205,7 +205,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #cell-service_name="{ row }">
               <div v-if="row.__type === 'group'" class="tw:flex tw:items-center tw:gap-2">
                 <span class="tw:font-semibold">{{ row.service_name }}</span>
-                <span class="instance-count-badge tw:inline-flex tw:items-center tw:py-[0.0625rem] tw:px-2 tw:rounded-[0.625rem] tw:text-[0.6875rem] tw:font-medium tw:bg-[#e5e7eb] tw:text-[#6b7280]" :class="store.state.theme === 'dark' ? 'tw:bg-[#4b5563] tw:text-[#d1d5db]' : ''"
+                <span class="instance-count-badge tw:inline-flex tw:items-center tw:py-[0.0625rem] tw:px-2 tw:rounded-[0.625rem] tw:text-[0.6875rem] tw:font-medium tw:bg-[#e5e7eb] tw:text-[#6b7280]" :class="store.state.theme === 'dark' ? 'tw:bg-[#4b5563] tw:text-[#d1d5db]' : ''">
                   {{ row.instances.length }}
                   {{
                     row.instances.length === 1
