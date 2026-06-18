@@ -1,12 +1,12 @@
 <template>
   <div
-    class="sc-drawer-scrim tw:fixed tw:inset-0 tw:bg-[rgba(0,0,0,0.32)] tw:z-[6000]"
+    class="tw:fixed tw:inset-0 tw:bg-[rgba(0,0,0,0.32)] tw:z-[6000] tw:[animation:sc-scrim-in_0.15s_ease-out]"
     role="dialog"
     aria-modal="true"
     @click.self="$emit('cancel')"
   >
     <aside
-      class="sc-drawer tw:fixed tw:top-0 tw:right-0 tw:bottom-0 tw:w-[50vw] tw:min-w-[560px] tw:max-w-[760px] tw:bg-(--color-card-bg) tw:border-l tw:border-(--color-dialog-header-border) tw:shadow-[var(--o2-shadow-lg,0_8px_24px_rgba(0,0,0,0.12),0_2px_6px_rgba(0,0,0,0.08))] tw:flex tw:flex-col tw:z-[6001]"
+      class="tw:fixed tw:top-0 tw:right-0 tw:bottom-0 tw:w-[50vw] tw:min-w-[560px] tw:max-w-[760px] tw:bg-(--color-card-bg) tw:border-l tw:border-(--color-dialog-header-border) tw:shadow-[var(--o2-shadow-lg,0_8px_24px_rgba(0,0,0,0.12),0_2px_6px_rgba(0,0,0,0.08))] tw:flex tw:flex-col tw:z-[6001] tw:[animation:sc-drawer-in_0.2s_ease-out]"
       @click.stop
     >
       <header class="tw:flex tw:items-center tw:gap-3 tw:px-5.5 tw:py-3.5 tw:border-b tw:border-dialog-header-border tw:shrink-0">
@@ -532,16 +532,6 @@ async function save() {
 </script>
 
 <style>
-/* sc-drawer-scrim: animation cannot be inlined */
-.sc-drawer-scrim {
-  animation: sc-scrim-in 0.15s ease-out;
-}
-
-/* sc-drawer: animation cannot be inlined */
-.sc-drawer {
-  animation: sc-drawer-in 0.2s ease-out;
-}
-
 /* hover pseudo-class: cannot be inlined */
 .sc-drawer__close:hover {
   background: color-mix(in srgb, var(--color-text-primary) 6%, transparent);

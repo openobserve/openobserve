@@ -1,6 +1,6 @@
 <template>
-  <div class="sd-scrim tw:fixed tw:inset-0 tw:bg-[rgba(0,0,0,0.32)] tw:z-[1010] tw:flex tw:justify-end" role="dialog" aria-modal="true" @click.self="$emit('close')">
-    <aside class="sd tw:w-[1100px] tw:max-w-[96vw] tw:h-full tw:bg-[var(--color-card-bg)] tw:border-l tw:border-[var(--color-dialog-header-border,var(--o2-border))] tw:flex tw:flex-col" @click.stop data-test="scorer-detail">
+  <div class="tw:fixed tw:inset-0 tw:bg-[rgba(0,0,0,0.32)] tw:z-[1010] tw:flex tw:justify-end tw:[animation:sd-fade_0.18s_ease-out]" role="dialog" aria-modal="true" @click.self="$emit('close')">
+    <aside class="tw:w-[1100px] tw:max-w-[96vw] tw:h-full tw:bg-[var(--color-card-bg)] tw:border-l tw:border-[var(--color-dialog-header-border,var(--o2-border))] tw:flex tw:flex-col tw:[animation:sd-slide_0.22s_ease-out]" @click.stop data-test="scorer-detail">
       <!-- ── Header ── -->
       <header class="tw:flex tw:items-start tw:gap-2.5 tw:px-5 tw:pt-4 tw:pb-3.5 tw:border-b tw:border-dialog-header-border tw:bg-card-bg tw:shrink-0">
         <div class="tw:flex-1 tw:min-w-0 tw:flex tw:flex-col tw:gap-1">
@@ -584,14 +584,10 @@ function relativeTime(timestampMs: number): string {
   to   { background: rgba(0, 0, 0, 0.32); }
 }
 
-.sd-scrim { animation: sd-fade 0.18s ease-out; }
-
 @keyframes sd-slide {
   from { transform: translateX(100%); }
   to   { transform: translateX(0); }
 }
-
-.sd { animation: sd-slide 0.22s ease-out; }
 
 .sd__close:hover {
   background: color-mix(in srgb, var(--color-text-primary) 8%, transparent);
