@@ -91,6 +91,9 @@ export interface SearchObject {
   meta: any;
   data: SearchObjectData;
   runQuery: boolean;
+  // Streaming progress (0-100) for the results table and histogram bars
+  loadingProgressPercentage: number;
+  loadingHistogramProgressPercentage: number;
 }
 
 // Main search object containing all search state
