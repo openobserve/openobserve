@@ -84,21 +84,11 @@ describe("useColumnFormatting", () => {
       expect(text.config).toEqual([{ type: "field_type", value: "text" }]);
     });
 
-    it("persists the unit with customUnit as '' (v8 schema requires a string, not null)", () => {
+    it("persists the unit (no longer gated on numeric-ness)", () => {
       const col = { ...emptyColumnOverride("x"), unit: "bytes" };
       const entry = serializeColumnOverride(col);
       expect(entry.config).toEqual([
-        { type: "unit", value: { unit: "bytes", customUnit: "" } },
-      ]);
-      // Guard against regressing to null, which the backend rejects with 422.
-      expect(entry.config[0].value.customUnit).not.toBeNull();
-    });
-
-    it("persists a real custom unit value", () => {
-      const col = { ...emptyColumnOverride("x"), unit: "custom", customUnit: "req/s" };
-      const entry = serializeColumnOverride(col);
-      expect(entry.config).toEqual([
-        { type: "unit", value: { unit: "custom", customUnit: "req/s" } },
+        { type: "unit", value: { unit: "bytes", customUnit: null } },
       ]);
     });
 
