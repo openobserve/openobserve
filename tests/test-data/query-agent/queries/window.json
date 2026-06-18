@@ -2804,7 +2804,8 @@
           ]
         ],
         "results_mode": "rowsort",
-        "skip_sqllogictest": true
+        "skip_sqllogictest": true,
+        "skip_without_single_node_opt": true
       }
     },
     {
