@@ -1581,10 +1581,6 @@
         ],
         "results": [
           [
-            "[\"scraping_pattern\",\"high_freq\"]",
-            "2"
-          ],
-          [
             "[\"torbot_ua_mismatch\",\"cookie_reuse\"]",
             "2"
           ],
@@ -1594,6 +1590,10 @@
           ],
           [
             "[\"credential_stuffing\"]",
+            "2"
+          ],
+          [
+            "[\"scraping_pattern\",\"high_freq\"]",
             "2"
           ]
         ],
@@ -6403,6 +6403,706 @@
             "NullPointerException at ConveyorController.handle()",
             "204",
             "15"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q632",
+      "sql": "SELECT _timestamp, pallet_id FROM \"{stream}\" WHERE pallet_id = 'NONEXISTENT' ORDER BY _timestamp",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 37800000000,
+        "end_offset": 37980000000
+      },
+      "expected": {
+        "columns": [
+          "pallet_id"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q633",
+      "sql": "SELECT facility_zone, ROUND(SUM(throughput_rate) / NULLIF(COUNT(*) FILTER (WHERE load_factor < 0), 0), 2) AS ratio FROM \"{stream}\" GROUP BY facility_zone ORDER BY facility_zone",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 37860000000,
+        "end_offset": 38040000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "ratio"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "None"
+          ],
+          [
+            "ZONE-2",
+            "None"
+          ],
+          [
+            "ZONE-3",
+            "None"
+          ],
+          [
+            "ZONE-4",
+            "None"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q634",
+      "sql": "SELECT _timestamp, log FROM \"{stream}\" ORDER BY _timestamp LIMIT 5 OFFSET 9999",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 37920000000,
+        "end_offset": 38100000000
+      },
+      "expected": {
+        "columns": [
+          "log"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q635",
+      "sql": "SELECT _timestamp, COALESCE(upstream_error_code, 'N/A') AS ue, COALESCE(endpoint_path, 'N/A') AS ep, COALESCE(resource_path, 'N/A') AS rp FROM \"{stream}\" WHERE upstream_error_code IS NOT NULL OR endpoint_path IS NOT NULL OR resource_path IS NOT NULL ORDER BY _timestamp LIMIT 10",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 37980000000,
+        "end_offset": 38160000000
+      },
+      "expected": {
+        "columns": [
+          "ue",
+          "ep",
+          "rp"
+        ],
+        "results": [
+          [
+            "UP-E007",
+            "/api/v1/warehouse/update",
+            "/config/zone/ZONE-2.yaml"
+          ],
+          [
+            "UP-E008",
+            "/api/v1/warehouse/delete",
+            "/logs/warehouse/access.log"
+          ],
+          [
+            "UP-E008",
+            "/api/v1/warehouse/delete",
+            "/logs/warehouse/access.log"
+          ],
+          [
+            "UP-E010",
+            "/api/v2/sorter/reroute",
+            "/config/zone/ZONE-3.yaml"
+          ],
+          [
+            "UP-E010",
+            "/api/v2/sorter/reroute",
+            "/config/zone/ZONE-3.yaml"
+          ],
+          [
+            "UP-E002",
+            "/api/v1/health/check",
+            "/logs/warehouse/app.log"
+          ],
+          [
+            "UP-E004",
+            "/api/v2/sorter/retry",
+            "/config/zone/ZONE-1.yaml"
+          ],
+          [
+            "UP-E004",
+            "/api/v2/sorter/retry",
+            "/config/zone/ZONE-1.yaml"
+          ],
+          [
+            "UP-E006",
+            "/api/v1/warehouse/search",
+            "/data/sorter/input.dat"
+          ],
+          [
+            "UP-E006",
+            "/api/v1/warehouse/search",
+            "/data/sorter/input.dat"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
+      }
+    },
+    {
+      "id": "Q636",
+      "sql": "SELECT facility_zone, ROUND(STDDEV(throughput_rate), 2) AS tput_stddev, ROUND(STDDEV(load_factor), 2) AS load_stddev, COUNT(*) AS n FROM \"{stream}\" GROUP BY facility_zone ORDER BY facility_zone",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 38040000000,
+        "end_offset": 38220000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "tput_stddev",
+          "load_stddev",
+          "n"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "233.45",
+            "26.3",
+            "5"
+          ],
+          [
+            "ZONE-2",
+            "249.08",
+            "19.98",
+            "4"
+          ],
+          [
+            "ZONE-3",
+            "169.28",
+            "30.16",
+            "4"
+          ],
+          [
+            "ZONE-4",
+            "180.09",
+            "33.79",
+            "3"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
+      }
+    },
+    {
+      "id": "Q637",
+      "sql": "SELECT _timestamp, COALESCE(bot_flag, 'NULL_FLAG') AS bot, COALESCE(info_tag, 'NULL_TAG') AS tag FROM \"{stream}\" ORDER BY _timestamp LIMIT 15",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 38100000000,
+        "end_offset": 38280000000
+      },
+      "expected": {
+        "columns": [
+          "bot",
+          "tag"
+        ],
+        "results": [
+          [
+            "NULL_FLAG",
+            "NULL_TAG"
+          ],
+          [
+            "suspicious",
+            "NULL_TAG"
+          ],
+          [
+            "suspicious",
+            "NULL_TAG"
+          ],
+          [
+            "NULL_FLAG",
+            "NULL_TAG"
+          ],
+          [
+            "NULL_FLAG",
+            "Blocklisted"
+          ],
+          [
+            "NULL_FLAG",
+            "Blocklisted"
+          ],
+          [
+            "verified_bot",
+            "NULL_TAG"
+          ],
+          [
+            "NULL_FLAG",
+            "NULL_TAG"
+          ],
+          [
+            "NULL_FLAG",
+            "NULL_TAG"
+          ],
+          [
+            "NULL_FLAG",
+            "NULL_TAG"
+          ],
+          [
+            "NULL_FLAG",
+            "NULL_TAG"
+          ],
+          [
+            "NULL_FLAG",
+            "NULL_TAG"
+          ],
+          [
+            "NULL_FLAG",
+            "NULL_TAG"
+          ],
+          [
+            "NULL_FLAG",
+            "NULL_TAG"
+          ],
+          [
+            "NULL_FLAG",
+            "NULL_TAG"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q638",
+      "sql": "SELECT bot_flag, COUNT(*) AS cnt FROM \"{stream}\" GROUP BY bot_flag ORDER BY cnt DESC",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 38160000000,
+        "end_offset": 38340000000
+      },
+      "expected": {
+        "columns": [
+          "bot_flag",
+          "cnt"
+        ],
+        "results": [
+          [
+            "None",
+            "15"
+          ],
+          [
+            "verified_bot",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true,
+        "skip_column_check": true
+      }
+    },
+    {
+      "id": "Q639",
+      "sql": "SELECT _timestamp, pallet_id, facility_zone, throughput_rate FROM \"{stream}\" WHERE throughput_rate > 700 AND load_factor > 80 AND re_match(facility_zone, 'ZONE-[1-3]') AND response_code IN (200, 201) AND action_category = 'performanceMetric' ORDER BY _timestamp LIMIT 10",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 38220000000,
+        "end_offset": 38400000000
+      },
+      "expected": {
+        "columns": [
+          "pallet_id",
+          "facility_zone",
+          "throughput_rate"
+        ],
+        "results": [
+          [
+            "PL-003",
+            "ZONE-1",
+            "900.0"
+          ],
+          [
+            "PL-005",
+            "ZONE-3",
+            "900.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q640",
+      "sql": "SELECT _timestamp, throughput_rate FROM \"{stream}\" WHERE throughput_rate BETWEEN 200 AND 800 AND _timestamp BETWEEN (SELECT MIN(_timestamp) FROM \"{stream}\") AND (SELECT MAX(_timestamp) FROM \"{stream}\" WHERE throughput_rate > 500) ORDER BY _timestamp LIMIT 10",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 38280000000,
+        "end_offset": 38460000000
+      },
+      "expected": {
+        "columns": [
+          "throughput_rate"
+        ],
+        "results": [
+          [
+            "320.0"
+          ],
+          [
+            "320.0"
+          ],
+          [
+            "480.0"
+          ],
+          [
+            "480.0"
+          ],
+          [
+            "610.0"
+          ],
+          [
+            "725.0"
+          ],
+          [
+            "725.0"
+          ],
+          [
+            "290.0"
+          ],
+          [
+            "555.0"
+          ],
+          [
+            "555.0"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
+      }
+    },
+    {
+      "id": "Q641",
+      "sql": "SELECT MAX(throughput_rate) AS max_tput, MIN(throughput_rate) AS min_tput FROM \"{stream}\" WHERE facility_zone = 'ZONE-99'",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 38340000000,
+        "end_offset": 38520000000
+      },
+      "expected": {
+        "skip_sqllogictest": true,
+        "skip_row_count": true,
+        "skip_column_check": true,
+        "columns": [
+          "max_tput",
+          "min_tput"
+        ]
+      }
+    },
+    {
+      "id": "Q642",
+      "sql": "SELECT _timestamp, pallet_id, facility_zone FROM \"{stream}\" WHERE pallet_id IN (SELECT pallet_id FROM \"{stream}\" WHERE throughput_rate > 600) AND facility_zone IN ('ZONE-1', 'ZONE-2', 'ZONE-3') ORDER BY _timestamp LIMIT 10",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 38400000000,
+        "end_offset": 38580000000
+      },
+      "expected": {
+        "columns": [
+          "pallet_id",
+          "facility_zone"
+        ],
+        "results": [
+          [
+            "PL-005",
+            "ZONE-3"
+          ],
+          [
+            "PL-007",
+            "ZONE-1"
+          ],
+          [
+            "PL-003",
+            "ZONE-1"
+          ],
+          [
+            "PL-005",
+            "ZONE-3"
+          ],
+          [
+            "PL-007",
+            "ZONE-1"
+          ],
+          [
+            "PL-003",
+            "ZONE-1"
+          ],
+          [
+            "PL-005",
+            "ZONE-3"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
+      }
+    },
+    {
+      "id": "Q643",
+      "sql": "SELECT DISTINCT facility_zone, operation_mode, scan_category FROM \"{stream}\" ORDER BY facility_zone, operation_mode, scan_category",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 38460000000,
+        "end_offset": 38640000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "operation_mode",
+          "scan_category"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "auto",
+            "inbound"
+          ],
+          [
+            "ZONE-1",
+            "auto",
+            "outbound"
+          ],
+          [
+            "ZONE-1",
+            "manual",
+            "inbound"
+          ],
+          [
+            "ZONE-1",
+            "manual",
+            "internal"
+          ],
+          [
+            "ZONE-2",
+            "auto",
+            "inbound"
+          ],
+          [
+            "ZONE-2",
+            "auto",
+            "outbound"
+          ],
+          [
+            "ZONE-2",
+            "manual",
+            "inbound"
+          ],
+          [
+            "ZONE-2",
+            "manual",
+            "internal"
+          ],
+          [
+            "ZONE-3",
+            "hybrid",
+            "inbound"
+          ],
+          [
+            "ZONE-3",
+            "manual",
+            "internal"
+          ],
+          [
+            "ZONE-4",
+            "auto",
+            "internal"
+          ],
+          [
+            "ZONE-4",
+            "auto",
+            "outbound"
+          ],
+          [
+            "ZONE-4",
+            "hybrid",
+            "inbound"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
+      }
+    },
+    {
+      "id": "Q644",
+      "sql": "SELECT _timestamp, org_name, page_slug FROM \"{stream}\" WHERE org_name NOT IN ('warehouse-central', 'warehouse-north', 'warehouse-south') AND page_slug NOT IN ('homePage', 'searchPage') ORDER BY _timestamp LIMIT 10",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 38520000000,
+        "end_offset": 38700000000
+      },
+      "expected": {
+        "columns": [
+          "org_name",
+          "page_slug"
+        ],
+        "results": [
+          [
+            "warehouse-east",
+            "cartPage"
+          ],
+          [
+            "warehouse-east",
+            "cartPage"
+          ],
+          [
+            "warehouse-west",
+            "itemPage"
+          ],
+          [
+            "warehouse-east",
+            "itemPage"
+          ],
+          [
+            "warehouse-east",
+            "itemPage"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
+      }
+    },
+    {
+      "id": "Q645",
+      "sql": "SELECT _timestamp, log, CHAR_LENGTH(log) AS len, CHAR_LENGTH(TRIM(log)) AS trimmed_len FROM \"{stream}\" ORDER BY _timestamp LIMIT 10",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 38580000000,
+        "end_offset": 38760000000
+      },
+      "expected": {
+        "columns": [
+          "log",
+          "len",
+          "trimmed_len"
+        ],
+        "results": [
+          [
+            "Q644 warehouse event record 0 ACK batch batchIdList:Q644-0",
+            "58",
+            "58"
+          ],
+          [
+            "Q643 warehouse event record 4",
+            "29",
+            "29"
+          ],
+          [
+            "Q644 warehouse event record 1",
+            "29",
+            "29"
+          ],
+          [
+            "Q644 warehouse event record 2",
+            "29",
+            "29"
+          ],
+          [
+            "Q644 warehouse event record 3 ACK batch batchIdList:Q644-3",
+            "58",
+            "58"
+          ],
+          [
+            "Q645 warehouse event record 0 ACK batch batchIdList:Q645-0",
+            "58",
+            "58"
+          ],
+          [
+            "Q644 warehouse event record 4",
+            "29",
+            "29"
+          ],
+          [
+            "Q645 warehouse event record 1",
+            "29",
+            "29"
+          ],
+          [
+            "Q645 warehouse event record 2",
+            "29",
+            "29"
+          ],
+          [
+            "Q645 warehouse event record 3 ACK batch batchIdList:Q645-3",
+            "58",
+            "58"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q646",
+      "sql": "SELECT _timestamp, UPPER(org_name) AS org_upper, LOWER(scan_category) AS scan_lower FROM \"{stream}\" WHERE re_match(LOWER(org_name), 'warehouse') ORDER BY _timestamp LIMIT 15",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 38640000000,
+        "end_offset": 38820000000
+      },
+      "expected": {
+        "columns": [
+          "org_upper",
+          "scan_lower"
+        ],
+        "results": [
+          [
+            "WAREHOUSE-NORTH",
+            "internal"
+          ],
+          [
+            "WAREHOUSE-SOUTH",
+            "inbound"
+          ],
+          [
+            "WAREHOUSE-SOUTH",
+            "inbound"
+          ],
+          [
+            "WAREHOUSE-CENTRAL",
+            "outbound"
+          ],
+          [
+            "WAREHOUSE-EAST",
+            "internal"
+          ],
+          [
+            "WAREHOUSE-EAST",
+            "internal"
+          ],
+          [
+            "WAREHOUSE-WEST",
+            "inbound"
+          ],
+          [
+            "WAREHOUSE-WEST",
+            "inbound"
+          ],
+          [
+            "WAREHOUSE-NORTH",
+            "inbound"
+          ],
+          [
+            "WAREHOUSE-SOUTH",
+            "outbound"
+          ],
+          [
+            "WAREHOUSE-SOUTH",
+            "outbound"
+          ],
+          [
+            "WAREHOUSE-CENTRAL",
+            "internal"
+          ],
+          [
+            "WAREHOUSE-CENTRAL",
+            "internal"
+          ],
+          [
+            "WAREHOUSE-EAST",
+            "inbound"
+          ],
+          [
+            "WAREHOUSE-WEST",
+            "outbound"
           ]
         ],
         "results_mode": "rowsort"

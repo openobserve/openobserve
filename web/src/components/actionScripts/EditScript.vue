@@ -61,11 +61,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="create-report-form"
           >
             <div
-              data-test="add-action-script-name-input"
+              data-test="add-action-script-name-input-wrapper"
               class="report-name-input"
               style="padding-top: 12px"
             >
               <OInput
+                data-test="add-action-script-name-input"
                 v-model.trim="formData.name"
                 :label="t('alerts.name') + ' *'"
                 class="showLabelOnTop"

@@ -8,6 +8,7 @@
     <div class="tw:p-3 filter-container">
       <OCardSection class="tw:p-0">
         <OSelect
+          data-test="filter-creator-popup-operator-select"
           v-model="selectedOperator"
           :options="operators"
           :label="t('filter.operator')"
