@@ -372,7 +372,7 @@ export default defineComponent({
       },
       {
         title: t("menu.traces"),
-        icon: "account-tree",
+        icon: "traces",
         link: "/traces",
         name: "traces",
       },
