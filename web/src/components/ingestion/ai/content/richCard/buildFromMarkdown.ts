@@ -23,14 +23,25 @@
 // The stream the installer writes to and `detect.stream` are BOTH authored in this
 // md, so they're kept in lockstep by the content (no frontend capability gate).
 
-import type { CardSubstitutions } from "../renderMarkdown";
-import type { RichCardContent, RichCardStep, StepCompleteOn } from "./types";
+import type {
+  CardSubstitutions,
+  RichCardContent,
+  RichCardStep,
+  StepCompleteOn,
+} from "@/components/ingestion/setupCard/types";
 import { parseFrontmatter } from "./parseFrontmatter";
-import { applySubs, applySubsMasked } from "./subs";
+import { applySubs, applySubsMasked } from "@/components/ingestion/setupCard/subs";
 import { resolveAICardLogo } from "../index";
 
 const str = (v: unknown): string | undefined =>
   typeof v === "string" ? v : undefined;
+
+/** Maps md `stream_type` to the detect streamType union (else traces). */
+const STREAM_TYPES: Record<string, "logs" | "metrics" | "traces"> = {
+  logs: "logs",
+  metrics: "metrics",
+  traces: "traces",
+};
 const trimTrailing = (s: string) => s.replace(/\n+$/, "");
 
 function buildStep(raw: any, slug: string, i: number, subs: CardSubstitutions): RichCardStep {
@@ -105,7 +116,15 @@ export function buildFromMarkdown(
         }
       : undefined,
     detect: {
-      streamType: detect.stream_type === "logs" ? "logs" : "traces",
+      // Unknown/absent stream types fall back to traces (the AI default).
+      streamType: STREAM_TYPES[detect.stream_type] ?? "traces",
+      // Only the two valid match modes pass through (else exact via undefined).
+      match:
+        detect.match === "keyword"
+          ? "keyword"
+          : detect.match === "exact"
+            ? "exact"
+            : undefined,
       streamName: str(detect.stream),
       filter: str(detect.filter) ?? "",
       modelLabel: str(detect.model_label),

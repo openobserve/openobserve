@@ -13,338 +13,43 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { mount } from '@vue/test-utils';
-import { createStore } from 'vuex';
-import { createI18n } from 'vue-i18n';
-import { describe, expect, it, vi, beforeEach } from 'vitest';
-import Databricks from './Databricks.vue';
-import useIngestion from '@/composables/useIngestion';
-import * as zincutils from '@/utils/zincutils';
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { mount, VueWrapper } from "@vue/test-utils";
+import { createStore } from "vuex";
+import { createI18n } from "vue-i18n";
+import { ref } from "vue";
+import Databricks from "./Databricks.vue";
+import databricksCard from "@/components/ingestion/setupCard/content/databricks";
+import { getDataSourceCard } from "@/components/ingestion/setupCard/registry";
 
-// Mock the composable
-vi.mock('@/composables/useIngestion');
-vi.mock('@/utils/zincutils');
-vi.mock('../../../aws-exports', () => ({
-  default: {
-    REGION: 'us-west-2',
-    API_ENDPOINT: 'https://test.openobserve.ai'
-  }
+const mockEndpoint = ref({ url: "https://test.openobserve.ai", host: "h", port: 443, protocol: "https", tls: true });
+vi.mock("@/composables/useIngestion", () => ({ default: vi.fn(() => ({ endpoint: mockEndpoint })) }));
+vi.mock("@/components/ingestion/setupCard/SetupCardRenderer.vue", () => ({
+  default: { name: "SetupCardRenderer", props: ["content", "subs", "logoUrl", "logoUrlDark"], template: '<div data-test="rich-card-stub" />' },
 }));
+const mockStore = createStore({ state: { selectedOrganization: { identifier: "test-org" }, userInfo: { email: "t@e.com" }, organizationData: { organizationPasscode: "pc" }, theme: "light" } });
+const mockI18n = createI18n({ locale: "en", messages: { en: {} } });
+const SUBS = { url: "https://test.openobserve.ai", org: "test-org", token: "dGVzdEB0b2tlbg==" };
 
-// Mock Quasar
-vi.mock('quasar', async () => {
-  const actual = await vi.importActual('quasar');
-  return {
-    ...actual,
-    useQuasar: vi.fn(() => ({
-      notify: vi.fn(),
-    })),
-  };
+describe("databricksCard builder", () => {
+  it("builds a logs card posting to the org's logs endpoint", () => {
+    const card = databricksCard(SUBS);
+    expect(card.provider.name).toBe("Databricks");
+    expect(card.provider.metaBadges).toEqual(["Logs"]);
+    expect(card.detect).toMatchObject({ streamType: "logs", match: "keyword", streamName: "databricks" });
+    expect(card.steps.map((s) => s.id)).toEqual(["notebook", "verify"]);
+    const code = card.steps.find((s) => s.id === "notebook")!.code!;
+    expect(code.raw).toContain(`${SUBS.url}/api/${SUBS.org}/databricks_logs/_json`);
+    expect(code.raw).toContain(`Basic ${SUBS.token}`);
+    expect(code.masked).not.toContain(SUBS.token);
+  });
 });
-
-const createMockStore = () => {
-  return createStore({
-    state: {
-      selectedOrganization: {
-        identifier: 'test-org',
-        label: 'Test Organization'
-      }
-    }
-  });
-};
-
-const createMockI18n = () => {
-  return createI18n({
-    locale: 'en',
-    messages: {
-      en: {
-        common: {
-          copy: 'Copy',
-          copied: 'Copied'
-        }
-      }
-    }
-  });
-};
-
-const mockIngestionData = {
-  endpoint: {
-    url: 'https://test.openobserve.ai',
-    host: 'test.openobserve.ai',
-    port: '443',
-    protocol: 'https',
-    tls: true
-  },
-  databaseContent: `exporters:
-  otlphttp/openobserve:
-    endpoint: https://test.openobserve.ai/api/test-org/[STREAM_NAME]
-    headers:
-      Authorization: Basic [BASIC_PASSCODE]
-      stream-name: [STREAM_NAME]`,
-  databaseDocURLs: {
-    databricks: 'https://short.openobserve.ai/databricks'
-  }
-};
-
-
-describe('Databricks.vue', () => {
-  let wrapper: any;
-  let store: any;
-  let i18n: any;
-
-  beforeEach(() => {
-    store = createMockStore();
-    i18n = createMockI18n();
-    vi.mocked(useIngestion).mockReturnValue(mockIngestionData as any);
-    vi.mocked(zincutils.getImageURL).mockReturnValue('https://test.com/image.png');
-  });
-
-  const getGlobalConfig = (props = {}) => ({
-    props,
-    global: {
-      plugins: [store, i18n, ],
-      stubs: {
-        CopyContent: {
-          template: '<div class="copy-content-stub" data-test="copy-content"><slot /></div>',
-          props: ['content']
-        }
-      }
-    }
-  });
-
-  // Test 1: Component mounts successfully
-  it('should mount successfully', () => {
-    wrapper = mount(Databricks, getGlobalConfig());
-    expect(wrapper.exists()).toBe(true);
-  });
-
-  // Test 2: Component name is correct
-  it('should have correct component name', () => {
-    wrapper = mount(Databricks, getGlobalConfig());
-    expect(wrapper.vm.$options.name).toBe('PostgresPage');
-  });
-
-  // Test 3: Props are defined correctly
-  it('should define currOrgIdentifier prop', () => {
-    const Component = Databricks as any;
-    expect(Component.props.currOrgIdentifier).toBeDefined();
-    expect(Component.props.currOrgIdentifier.type).toBe(String);
-  });
-
-  // Test 4: Props are defined correctly for currUserEmail
-  it('should define currUserEmail prop', () => {
-    const Component = Databricks as any;
-    expect(Component.props.currUserEmail).toBeDefined();
-    expect(Component.props.currUserEmail.type).toBe(String);
-  });
-
-  // Test 5: Template renders main container
-  it('should render main container with correct class', () => {
-    wrapper = mount(Databricks, getGlobalConfig());
-    const container = wrapper.find('.tw\\:p-3');
-    expect(container.exists()).toBe(true);
-  });
-
-  // Test 6: CopyContent component is present
-  it('should render CopyContent component', () => {
-    wrapper = mount(Databricks, getGlobalConfig());
-    const copyContent = wrapper.find('.copy-content-stub');
-    expect(copyContent.exists()).toBe(true);
-  });
-
-  // Test 7: CopyContent receives correct content prop
-  it('should pass correct content to CopyContent component', () => {
-    wrapper = mount(Databricks, getGlobalConfig());
-    expect(wrapper.vm.content).toContain('databricks');
-  });
-
-  // Test 8: Documentation link is rendered
-  it('should render documentation link', () => {
-    wrapper = mount(Databricks, {
-      ...getGlobalConfig()
-    });
-    const link = wrapper.find('a[target="_blank"]');
-    expect(link.exists()).toBe(true);
-  });
-
-  // Test 9: Documentation link has correct href
-  it('should have correct documentation URL', () => {
-    wrapper = mount(Databricks, {
-      ...getGlobalConfig()
-    });
-    const link = wrapper.find('a[target="_blank"]');
-    expect(link.attributes('href')).toBe('https://short.openobserve.ai/databricks');
-  });
-
-  // Test 10: Documentation link has correct text
-  it('should have correct documentation link text', () => {
-    wrapper = mount(Databricks, {
-      ...getGlobalConfig()
-    });
-    const linkText = wrapper.find('a[target="_blank"]').text();
-    expect(linkText).toBe('here');
-  });
-
-  // Test 11: Documentation link has correct styling
-  it('should have correct styling for documentation link', () => {
-    wrapper = mount(Databricks, {
-      ...getGlobalConfig()
-    });
-    const link = wrapper.find('a[target="_blank"]');
-    expect(link.classes()).toContain('tw:text-text-link');
-    expect(link.classes()).toContain('hover:tw:text-text-link-hover');
-    expect(link.classes()).toContain('tw:underline');
-    expect(link.classes()).toContain('tw:font-medium');
-  });
-
-  // Test 12: Setup function returns correct values
-  it('should return correct values from setup function', () => {
-    wrapper = mount(Databricks, {
-      ...getGlobalConfig()
-    });
-    expect(wrapper.vm.config).toBeDefined();
-    expect(wrapper.vm.docURL).toBe('https://short.openobserve.ai/databricks');
-    expect(wrapper.vm.getImageURL).toBeDefined();
-    expect(wrapper.vm.content).toBeDefined();
-  });
-
-  // Test 14: Name variable is set correctly
-  it('should set name variable to databricks', () => {
-    const mockSetup = vi.fn().mockImplementation(() => {
-      const name = 'databricks';
-      return { name };
-    });
-    
-    const component = { ...Databricks, setup: mockSetup };
-    mount(component, {
-      ...getGlobalConfig()
-    });
-    
-    expect(mockSetup).toHaveBeenCalled();
-  });
-
-  // Test 15: useIngestion composable is called
-  it('should call useIngestion composable', () => {
-    mount(Databricks, {
-      ...getGlobalConfig()
-    });
-    expect(useIngestion).toHaveBeenCalled();
-  });
-
-  // Test 16: Component imports are correct
-  it('should import CopyContent component correctly', () => {
-    wrapper = mount(Databricks, getGlobalConfig());
-    expect(wrapper.find('.copy-content-stub').exists()).toBe(true);
-  });
-
-  // Test 17: Props can be passed to component
-  it('should accept currOrgIdentifier prop', () => {
-    wrapper = mount(Databricks, getGlobalConfig({ currOrgIdentifier: 'test-org-123' }));
-    expect(wrapper.exists()).toBe(true);
-  });
-
-  // Test 18: Props can be passed to component for email
-  it('should accept currUserEmail prop', () => {
-    wrapper = mount(Databricks, getGlobalConfig({ currUserEmail: 'test@example.com' }));
-    expect(wrapper.exists()).toBe(true);
-  });
-
-  // Test 19: Component structure matches expected layout
-  it('should have correct component structure', () => {
-    wrapper = mount(Databricks, getGlobalConfig());
-    const container = wrapper.find('.tw\\:p-3');
-    const copyContent = wrapper.find('.copy-content-stub');
-    const link = wrapper.find('a[target="_blank"]');
-
-    expect(container.exists()).toBe(true);
-    expect(copyContent.exists()).toBe(true);
-    expect(link.exists()).toBe(true);
-  });
-
-  // Test 20: CopyContent component renders
-  it('should render CopyContent component within structure', () => {
-    wrapper = mount(Databricks, getGlobalConfig());
-    const copyContent = wrapper.find('.copy-content-stub');
-    expect(copyContent.exists()).toBe(true);
-  });
-
-  // Test 21: Documentation section renders link
-  it('should render the documentation section with link', () => {
-    wrapper = mount(Databricks, {
-      ...getGlobalConfig()
-    });
-    const link = wrapper.find('a[target="_blank"]');
-    expect(link.exists()).toBe(true);
-    expect(wrapper.text()).toContain('to check further documentation');
-  });
-
-  // Test 22: Template text content
-  it('should display correct documentation text', () => {
-    wrapper = mount(Databricks, {
-      ...getGlobalConfig()
-    });
-    const docText = wrapper.text();
-    expect(docText).toContain('Click');
-    expect(docText).toContain('to check further documentation');
-  });
-
-  // Test 23: Link styling attributes
-  it('should have underline styling for documentation link', () => {
-    wrapper = mount(Databricks, {
-      ...getGlobalConfig()
-    });
-    const link = wrapper.find('a[target="_blank"]');
-    expect(link.classes()).toContain('tw:underline');
-  });
-
-  // Test 24: Component reactive data
-  it('should have reactive content data', async () => {
-    wrapper = mount(Databricks, {
-      ...getGlobalConfig()
-    });
-    
-    const initialContent = wrapper.vm.content;
-    expect(typeof initialContent).toBe('string');
-    expect(initialContent.length).toBeGreaterThan(0);
-  });
-
-  // Test 25: Error handling for missing props
-  it('should handle undefined props gracefully', () => {
-    wrapper = mount(Databricks, getGlobalConfig({ 
-      currOrgIdentifier: undefined,
-      currUserEmail: undefined
-    }));
-    expect(wrapper.exists()).toBe(true);
-    expect(wrapper.exists()).toBe(true);
-    expect(wrapper.exists()).toBe(true);
-  });
-
-  // Test 26: Component instance methods access
-  it('should expose getImageURL function', () => {
-    wrapper = mount(Databricks, {
-      ...getGlobalConfig()
-    });
-    expect(wrapper.vm.getImageURL).toBeDefined();
-    expect(typeof wrapper.vm.getImageURL).toBe('function');
-  });
-
-  // Test 27: Config object availability
-  it('should expose config object', () => {
-    wrapper = mount(Databricks, {
-      ...getGlobalConfig()
-    });
-    expect(wrapper.vm.config).toBeDefined();
-    expect(typeof wrapper.vm.config).toBe('object');
-  });
-
-  // Test 28: Component cleanup
-  it('should clean up properly when unmounted', () => {
-    wrapper = mount(Databricks, {
-      ...getGlobalConfig()
-    });
-    
-    expect(wrapper.exists()).toBe(true);
-    wrapper.unmount();
-    expect(wrapper.exists()).toBe(false);
+describe("Databricks.vue", () => {
+  let wrapper: VueWrapper<any>;
+  afterEach(() => { if (wrapper) wrapper.unmount(); });
+  it("renders the shared card", () => {
+    expect(getDataSourceCard("databricks", SUBS)?.provider.name).toBe("Databricks");
+    wrapper = mount(Databricks, { global: { plugins: [mockStore, mockI18n] } });
+    expect(wrapper.findComponent({ name: "SetupCardRenderer" }).exists()).toBe(true);
   });
 });
