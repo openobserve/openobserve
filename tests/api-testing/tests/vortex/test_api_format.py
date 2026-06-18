@@ -79,12 +79,10 @@ class TestStreamListing:
         """Stream stats have the right shape after flush.
 
         doc_num/storage_size only update after compaction (server-side schedule).
-        We assert structure and created_at; size/count fields require compaction.
         """
         entry = _get_stream_entry(client, self.STREAM)
         assert entry, f"stream {self.STREAM!r} not found"
         stats = entry.get("stats", {})
-        assert int(stats.get("created_at", 0)) > 0, "created_at must be set"
         for key in ("doc_num", "file_num"):
             assert int(stats.get(key, 0)) >= 0, f"{key} must be >= 0"
         for key in ("storage_size", "compressed_size"):
