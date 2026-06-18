@@ -47,13 +47,13 @@
         ],
         "results": [
           [
-            "ZONE-1",
+            "ZONE-2",
             "4",
             "2",
             "50.0"
           ],
           [
-            "ZONE-2",
+            "ZONE-1",
             "4",
             "2",
             "50.0"
@@ -346,7 +346,7 @@
             "4",
             "581.25",
             "27.53",
-            "hybrid",
+            "manual",
             "2"
           ],
           [
@@ -354,7 +354,7 @@
             "4",
             "386.25",
             "29.83",
-            "auto",
+            "manual",
             "2"
           ],
           [
@@ -1560,16 +1560,16 @@
             "66.0"
           ],
           [
-            "ZONE-2",
-            "SORT-Q5",
+            "ZONE-4",
+            "SORT-A7",
             "low_tput",
             "1",
             "150.0",
             "45.3"
           ],
           [
-            "ZONE-4",
-            "SORT-A7",
+            "ZONE-2",
+            "SORT-Q5",
             "low_tput",
             "1",
             "150.0",
@@ -1698,12 +1698,12 @@
         ],
         "results": [
           [
-            "itemPage::performanceMetric",
+            "https://shop.example.com/item/1006::performanceMetric",
             "1",
             "1"
           ],
           [
-            "https://shop.example.com/item/1006::performanceMetric",
+            "itemPage::performanceMetric",
             "1",
             "1"
           ]
@@ -1814,7 +1814,7 @@
         ],
         "results": [
           [
-            "performanceMetric",
+            "navigation",
             "itemPage",
             "2"
           ],
@@ -1824,7 +1824,7 @@
             "2"
           ],
           [
-            "navigation",
+            "performanceMetric",
             "itemPage",
             "2"
           ],
@@ -1931,13 +1931,13 @@
         ],
         "results": [
           [
-            "sess_003",
-            "1",
+            "sess_001",
+            "4",
             "0"
           ],
           [
-            "sess_001",
-            "4",
+            "sess_003",
+            "1",
             "0"
           ],
           [
@@ -2346,11 +2346,11 @@
         ],
         "results": [
           [
-            "track-router",
+            "zone-controller",
             "2"
           ],
           [
-            "zone-controller",
+            "track-router",
             "2"
           ]
         ],
@@ -2944,22 +2944,22 @@
         ],
         "results": [
           [
-            "warehouse-west",
-            "2",
-            "15.0",
-            "0"
-          ],
-          [
             "warehouse-south",
             "2",
             "45.0",
             "2"
           ],
           [
-            "warehouse-central",
+            "warehouse-west",
+            "2",
+            "15.0",
+            "0"
+          ],
+          [
+            "warehouse-east",
             "1",
-            "230.0",
-            "1"
+            "1900.0",
+            "0"
           ],
           [
             "warehouse-north",
@@ -2968,10 +2968,10 @@
             "1"
           ],
           [
-            "warehouse-east",
+            "warehouse-central",
             "1",
-            "1900.0",
-            "0"
+            "230.0",
+            "1"
           ]
         ],
         "results_mode": "rowsort"
@@ -3047,7 +3047,728 @@
             "1900.0"
           ]
         ],
+        "results_mode": "rowsort",
+        "skip_column_check": true
+      }
+    },
+    {
+      "id": "Q612",
+      "sql": "SELECT _timestamp, facility_zone, throughput_rate, (SELECT ROUND(AVG(load_factor), 2) FROM \"{stream}\" t2 WHERE t2.facility_zone = t1.facility_zone AND t2.throughput_rate > (SELECT AVG(throughput_rate) FROM \"{stream}\" t3 WHERE t3.facility_zone = t2.facility_zone)) AS avg_load_above_avg_tput FROM \"{stream}\" t1 ORDER BY _timestamp LIMIT 5",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 36600000000,
+        "end_offset": 36780000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "throughput_rate",
+          "avg_load_above_avg_tput"
+        ],
+        "results": [
+          [
+            "ZONE-2",
+            "725.0",
+            "16.95"
+          ],
+          [
+            "ZONE-1",
+            "840.0",
+            "63.8"
+          ],
+          [
+            "ZONE-3",
+            "840.0",
+            "66.0"
+          ],
+          [
+            "ZONE-4",
+            "290.0",
+            "55.2"
+          ],
+          [
+            "ZONE-1",
+            "555.0",
+            "63.8"
+          ]
+        ],
         "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q613",
+      "sql": "SELECT facility_zone, ROUND(AVG(throughput_rate), 1) AS avg_tput FROM \"{stream}\" GROUP BY facility_zone HAVING AVG(throughput_rate) > (SELECT AVG(throughput_rate) * 0.5 FROM \"{stream}\") ORDER BY avg_tput DESC",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 36660000000,
+        "end_offset": 36840000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "avg_tput"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "610.0"
+          ],
+          [
+            "ZONE-3",
+            "581.3"
+          ],
+          [
+            "ZONE-2",
+            "367.0"
+          ],
+          [
+            "ZONE-4",
+            "338.8"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q614",
+      "sql": "WITH zone_stats AS (SELECT facility_zone, AVG(throughput_rate) AS avg_tput, AVG(load_factor) AS avg_load FROM \"{stream}\" GROUP BY facility_zone), high_tput AS (SELECT facility_zone, avg_tput, avg_load FROM zone_stats WHERE avg_tput > 300), low_load AS (SELECT facility_zone, avg_tput, avg_load FROM zone_stats WHERE avg_load < 50) SELECT h.facility_zone, h.avg_tput, l.avg_load FROM high_tput h JOIN low_load l ON h.facility_zone = l.facility_zone ORDER BY h.avg_tput DESC",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 36720000000,
+        "end_offset": 36900000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "avg_tput",
+          "avg_load"
+        ],
+        "results": [
+          [
+            "ZONE-2",
+            "498.3333333333333",
+            "29.7"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q615",
+      "sql": "SELECT pallet_id FROM \"{stream}\" WHERE facility_zone = 'ZONE-1' INTERSECT SELECT pallet_id FROM \"{stream}\" WHERE facility_zone = 'ZONE-2' ORDER BY pallet_id",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 36780000000,
+        "end_offset": 36960000000
+      },
+      "expected": {
+        "columns": [
+          "pallet_id"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q616",
+      "sql": "SELECT pallet_id FROM \"{stream}\" WHERE facility_zone = 'ZONE-1' EXCEPT SELECT pallet_id FROM \"{stream}\" WHERE facility_zone = 'ZONE-2' ORDER BY pallet_id",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 36840000000,
+        "end_offset": 37020000000
+      },
+      "expected": {
+        "columns": [
+          "pallet_id"
+        ],
+        "results": [
+          [
+            "PL-003"
+          ],
+          [
+            "PL-007"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q617",
+      "sql": "SELECT _timestamp, pallet_id, throughput_rate, (SELECT MAX(throughput_rate) FROM \"{stream}\" t2 WHERE t2.facility_zone = t1.facility_zone) AS zone_max_tput FROM \"{stream}\" t1 ORDER BY _timestamp LIMIT 10",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 36900000000,
+        "end_offset": 37080000000
+      },
+      "expected": {
+        "columns": [
+          "pallet_id",
+          "throughput_rate",
+          "zone_max_tput"
+        ],
+        "results": [
+          [
+            "PL-001",
+            "900.0",
+            "900.0"
+          ],
+          [
+            "PL-008",
+            "150.0",
+            "725.0"
+          ],
+          [
+            "PL-002",
+            "150.0",
+            "480.0"
+          ],
+          [
+            "PL-003",
+            "320.0",
+            "840.0"
+          ],
+          [
+            "PL-004",
+            "480.0",
+            "725.0"
+          ],
+          [
+            "PL-006",
+            "480.0",
+            "480.0"
+          ],
+          [
+            "PL-005",
+            "610.0",
+            "900.0"
+          ],
+          [
+            "PL-007",
+            "610.0",
+            "840.0"
+          ],
+          [
+            "PL-008",
+            "725.0",
+            "725.0"
+          ],
+          [
+            "PL-001",
+            "840.0",
+            "900.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q618",
+      "sql": "SELECT DISTINCT facility_zone FROM \"{stream}\" t1 WHERE NOT EXISTS (SELECT 1 FROM \"{stream}\" t2 WHERE t2.facility_zone = t1.facility_zone AND t2.throughput_rate > 800) ORDER BY facility_zone",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 36960000000,
+        "end_offset": 37140000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone"
+        ],
+        "results": [
+          [
+            "ZONE-2"
+          ],
+          [
+            "ZONE-4"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q619",
+      "sql": "WITH combined_zones AS (SELECT pallet_id, facility_zone, 'high' AS category FROM \"{stream}\" WHERE throughput_rate > 500 UNION ALL SELECT pallet_id, facility_zone, 'low' AS category FROM \"{stream}\" WHERE throughput_rate <= 500) SELECT category, facility_zone, COUNT(*) AS cnt FROM combined_zones GROUP BY category, facility_zone ORDER BY category, facility_zone",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 37020000000,
+        "end_offset": 37200000000
+      },
+      "expected": {
+        "columns": [
+          "category",
+          "facility_zone",
+          "cnt"
+        ],
+        "results": [
+          [
+            "high",
+            "ZONE-1",
+            "3"
+          ],
+          [
+            "high",
+            "ZONE-2",
+            "1"
+          ],
+          [
+            "high",
+            "ZONE-3",
+            "2"
+          ],
+          [
+            "high",
+            "ZONE-4",
+            "1"
+          ],
+          [
+            "low",
+            "ZONE-1",
+            "1"
+          ],
+          [
+            "low",
+            "ZONE-2",
+            "3"
+          ],
+          [
+            "low",
+            "ZONE-3",
+            "1"
+          ],
+          [
+            "low",
+            "ZONE-4",
+            "4"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
+      }
+    },
+    {
+      "id": "Q620",
+      "sql": "WITH base AS (SELECT _timestamp, facility_zone, throughput_rate, load_factor FROM \"{stream}\"), zone_avgs AS (SELECT facility_zone, ROUND(AVG(throughput_rate), 1) AS avg_tput, ROUND(AVG(load_factor), 1) AS avg_load FROM base GROUP BY facility_zone), ranked AS (SELECT facility_zone, avg_tput, avg_load, ROW_NUMBER() OVER (ORDER BY avg_tput DESC) AS rn FROM zone_avgs) SELECT facility_zone, avg_tput, avg_load, rn FROM ranked WHERE rn <= 5 ORDER BY rn",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 37080000000,
+        "end_offset": 37260000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "avg_tput",
+          "avg_load",
+          "rn"
+        ],
+        "results": [
+          [
+            "ZONE-3",
+            "653.8",
+            "67.1",
+            "1"
+          ],
+          [
+            "ZONE-1",
+            "645.0",
+            "73.5",
+            "2"
+          ],
+          [
+            "ZONE-4",
+            "451.7",
+            "26.4",
+            "3"
+          ],
+          [
+            "ZONE-2",
+            "421.3",
+            "44.3",
+            "4"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
+      }
+    },
+    {
+      "id": "Q621",
+      "sql": "SELECT DISTINCT org_name FROM \"{stream}\" t1 WHERE EXISTS (SELECT 1 FROM \"{stream}\" t2 WHERE t2.org_name = t1.org_name AND re_match(t2.error_code, 'E00[5-9]')) ORDER BY org_name",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 37140000000,
+        "end_offset": 37320000000
+      },
+      "expected": {
+        "columns": [
+          "org_name"
+        ],
+        "results": [
+          [
+            "warehouse-central"
+          ],
+          [
+            "warehouse-east"
+          ],
+          [
+            "warehouse-north"
+          ],
+          [
+            "warehouse-south"
+          ],
+          [
+            "warehouse-west"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q622",
+      "sql": "SELECT _timestamp, pallet_id, throughput_rate FROM \"{stream}\" WHERE throughput_rate > (SELECT AVG(throughput_rate) FROM \"{stream}\" WHERE facility_zone IN (SELECT facility_zone FROM \"{stream}\" WHERE load_factor > (SELECT AVG(load_factor) FROM \"{stream}\"))) ORDER BY _timestamp LIMIT 10",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 37200000000,
+        "end_offset": 37380000000
+      },
+      "expected": {
+        "columns": [
+          "pallet_id",
+          "throughput_rate"
+        ],
+        "results": [
+          [
+            "PL-002",
+            "725.0"
+          ],
+          [
+            "PL-001",
+            "840.0"
+          ],
+          [
+            "PL-003",
+            "840.0"
+          ],
+          [
+            "PL-005",
+            "555.0"
+          ],
+          [
+            "PL-007",
+            "555.0"
+          ],
+          [
+            "PL-001",
+            "900.0"
+          ],
+          [
+            "PL-007",
+            "610.0"
+          ],
+          [
+            "PL-001",
+            "610.0"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
+      }
+    },
+    {
+      "id": "Q623",
+      "sql": "WITH pairs AS (SELECT a.pallet_id AS p1, b.pallet_id AS p2, a.facility_zone FROM \"{stream}\" a JOIN \"{stream}\" b ON a.facility_zone = b.facility_zone AND a.pallet_id < b.pallet_id) SELECT facility_zone, COUNT(*) AS pair_count FROM pairs GROUP BY facility_zone ORDER BY facility_zone",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 37260000000,
+        "end_offset": 37440000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "pair_count"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "4"
+          ],
+          [
+            "ZONE-2",
+            "4"
+          ],
+          [
+            "ZONE-3",
+            "2"
+          ],
+          [
+            "ZONE-4",
+            "6"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
+      }
+    },
+    {
+      "id": "Q624",
+      "sql": "SELECT facility_zone, COUNT(*) AS zone_total, (SELECT COUNT(*) FROM \"{stream}\" t2 WHERE t2.facility_zone = t1.facility_zone AND t2.throughput_rate > 500) AS high_tput_count FROM \"{stream}\" t1 GROUP BY facility_zone ORDER BY facility_zone",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 37320000000,
+        "end_offset": 37500000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "zone_total",
+          "high_tput_count"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "5",
+            "4"
+          ],
+          [
+            "ZONE-2",
+            "4",
+            "1"
+          ],
+          [
+            "ZONE-3",
+            "4",
+            "3"
+          ],
+          [
+            "ZONE-4",
+            "3",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
+      }
+    },
+    {
+      "id": "Q625",
+      "sql": "WITH numbered AS (SELECT _timestamp, facility_zone, throughput_rate, ROW_NUMBER() OVER (PARTITION BY facility_zone ORDER BY _timestamp) AS rn FROM \"{stream}\"), latest AS (SELECT facility_zone, throughput_rate FROM numbered WHERE rn <= 3) SELECT facility_zone, ROUND(AVG(throughput_rate), 1) AS avg_recent_tput FROM latest GROUP BY facility_zone ORDER BY facility_zone",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 37380000000,
+        "end_offset": 37560000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "avg_recent_tput"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "765.0"
+          ],
+          [
+            "ZONE-2",
+            "401.7"
+          ],
+          [
+            "ZONE-3",
+            "688.3"
+          ],
+          [
+            "ZONE-4",
+            "388.3"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q626",
+      "sql": "SELECT zone, MAX(tput) AS peak_tput FROM (SELECT facility_zone AS zone, throughput_rate AS tput FROM \"{stream}\" WHERE re_match(operation_mode, 'auto|hybrid')) AS sub GROUP BY zone ORDER BY peak_tput DESC",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 37440000000,
+        "end_offset": 37620000000
+      },
+      "expected": {
+        "columns": [
+          "zone",
+          "peak_tput"
+        ],
+        "results": [
+          [
+            "ZONE-3",
+            "900.0"
+          ],
+          [
+            "ZONE-4",
+            "725.0"
+          ],
+          [
+            "ZONE-1",
+            "610.0"
+          ],
+          [
+            "ZONE-2",
+            "150.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q627",
+      "sql": "SELECT DISTINCT t1.org_name FROM \"{stream}\" t1 WHERE NOT EXISTS (SELECT 1 FROM \"{stream}\" t2 WHERE t2.org_name = t1.org_name AND t2.facility_zone = 'ZONE-1') ORDER BY org_name",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 37500000000,
+        "end_offset": 37680000000
+      },
+      "expected": {
+        "columns": [
+          "org_name"
+        ],
+        "results": [
+          [
+            "warehouse-north"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
+      }
+    },
+    {
+      "id": "Q628",
+      "sql": "WITH raw AS (SELECT _timestamp, facility_zone, throughput_rate, load_factor FROM \"{stream}\"), hourly AS (SELECT facility_zone, histogram(_timestamp, '1 minute') AS _time, AVG(throughput_rate) AS avg_tput, AVG(load_factor) AS avg_load FROM raw GROUP BY facility_zone, _time), summary AS (SELECT facility_zone, ROUND(AVG(avg_tput), 1) AS overall_tput, ROUND(AVG(avg_load), 1) AS overall_load FROM hourly GROUP BY facility_zone) SELECT facility_zone, overall_tput, overall_load FROM summary ORDER BY overall_tput DESC",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 37560000000,
+        "end_offset": 37740000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "overall_tput",
+          "overall_load"
+        ],
+        "results": [
+          [
+            "ZONE-3",
+            "686.7",
+            "71.1"
+          ],
+          [
+            "ZONE-1",
+            "625.0",
+            "75.3"
+          ],
+          [
+            "ZONE-4",
+            "401.7",
+            "51.9"
+          ],
+          [
+            "ZONE-2",
+            "290.0",
+            "46.1"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
+      }
+    },
+    {
+      "id": "Q629",
+      "sql": "WITH errors AS (SELECT _timestamp, facility_zone, error_code, exception_message FROM \"{stream}\" WHERE re_match(exception_message, 'Exception|Error|Overflow')), classified AS (SELECT facility_zone, CASE WHEN re_match(error_code, 'E00[1-4]') THEN 'minor' ELSE 'major' END AS severity FROM errors) SELECT facility_zone, severity, COUNT(*) AS cnt FROM classified GROUP BY facility_zone, severity ORDER BY facility_zone, severity",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 37620000000,
+        "end_offset": 37800000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "severity",
+          "cnt"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "major",
+            "2"
+          ],
+          [
+            "ZONE-1",
+            "minor",
+            "1"
+          ],
+          [
+            "ZONE-2",
+            "major",
+            "3"
+          ],
+          [
+            "ZONE-2",
+            "minor",
+            "2"
+          ],
+          [
+            "ZONE-3",
+            "major",
+            "2"
+          ],
+          [
+            "ZONE-3",
+            "minor",
+            "2"
+          ],
+          [
+            "ZONE-4",
+            "major",
+            "2"
+          ],
+          [
+            "ZONE-4",
+            "minor",
+            "2"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
+      }
+    },
+    {
+      "id": "Q630",
+      "sql": "WITH max_tput AS (SELECT facility_zone, MAX(throughput_rate) AS max_rate FROM \"{stream}\" GROUP BY facility_zone) SELECT t._timestamp, t.facility_zone, t.throughput_rate FROM \"{stream}\" t JOIN max_tput m ON t.facility_zone = m.facility_zone AND t.throughput_rate = m.max_rate ORDER BY t._timestamp LIMIT 10",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 37680000000,
+        "end_offset": 37860000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "throughput_rate"
+        ],
+        "results": [
+          [
+            "ZONE-3",
+            "900.0"
+          ],
+          [
+            "ZONE-1",
+            "900.0"
+          ],
+          [
+            "ZONE-4",
+            "725.0"
+          ],
+          [
+            "ZONE-2",
+            "725.0"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
       }
     }
   ],
