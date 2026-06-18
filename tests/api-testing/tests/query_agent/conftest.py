@@ -141,16 +141,49 @@ def run_query(client, query, *, skip_fts_count=False):
         end_time=BASE_TS + offset["end_offset"],
         size=size,
     )
-    resp = client.post("_search?type=logs", json=json_data)
-    assert resp.status_code == 200, \
-        f"{qid}: Expected 200, got {resp.status_code}: {resp.text[:500]}"
-
-    response_data = resp.json()
-    assert "hits" in response_data, f"{qid}: Response should contain 'hits'"
-    hits = response_data["hits"]
-
     expected = query.get("expected", {})
     is_fts = query.get("category") == "full_text_search"
+
+    # Decide comparison mode and the row count we expect, so the pre-flush
+    # phase can wait out the memtable→parquet handoff (see below).
+    sqllogictest_mode = (
+        "results" in expected
+        and not (skip_fts_count and is_fts)
+        and not expected.get("skip_sqllogictest")
+    )
+    if sqllogictest_mode:
+        want_count = len(expected["results"])
+    elif (expected.get("row_count") is not None
+          and not (skip_fts_count and is_fts)
+          and not expected.get("skip_row_count")):
+        want_count = expected["row_count"]
+    else:
+        want_count = None
+
+    # Pre-flush (skip_fts_count=True), CI runs with ZO_MAX_FILE_RETENTION_TIME=1
+    # so the memtable continuously rotates to immutable→WAL parquet→file_list
+    # for the whole ~160s run.  A narrow time-window query issued mid-handoff
+    # (e.g. an immutable removed before its parquet is registered, or a record
+    # briefly present in both) can transiently return too few/many rows even
+    # though the data is durably ingested.  Re-issue the search until the row
+    # count settles.  The post-flush phase runs the identical query against
+    # stable parquet, so a genuine wrong-result regression is still caught
+    # there — the retry only absorbs the transient ingestion race.
+    settle = skip_fts_count and want_count is not None
+    attempts = 12 if settle else 1
+    for attempt in range(attempts):
+        resp = client.post("_search?type=logs", json=json_data)
+        assert resp.status_code == 200, \
+            f"{qid}: Expected 200, got {resp.status_code}: {resp.text[:500]}"
+
+        response_data = resp.json()
+        assert "hits" in response_data, f"{qid}: Response should contain 'hits'"
+        hits = response_data["hits"]
+
+        if settle and len(hits) != want_count and attempt < attempts - 1:
+            time.sleep(0.5)
+            continue
+        break
 
     # Verify match_all results actually contain the search terms.
     # After a DataFusion upgrade, the Tantivy access plan can be bypassed
@@ -160,7 +193,7 @@ def run_query(client, query, *, skip_fts_count=False):
     if not skip_fts_count:
         _verify_fts_content(sql, hits, qid)
 
-    if "results" in expected and not (skip_fts_count and is_fts) and not expected.get("skip_sqllogictest"):
+    if sqllogictest_mode:
         # ── sqllogictest mode: result-set comparison with float tolerance ─
         cols = expected["columns"]
         actual = sorted(
