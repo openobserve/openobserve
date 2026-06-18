@@ -399,15 +399,16 @@ export default class DashboardPanelConfigs {
     await firstField.waitFor({ state: "visible", timeout: 5000 });
     await firstField.click();
 
-    // Force the field numeric so Value Formatting (unit) is available
-    const numType = this.page
-      .locator('[data-test^="o2-format-field-type-num-"]')
-      .first();
-    await numType.waitFor({ state: "visible", timeout: 5000 });
-    await numType.click();
+    const unitSelect = this.page.locator('[data-test^="o2-format-unit-"]').first();
+    if (!(await unitSelect.isVisible().catch(() => false))) {
+      const numType = this.page
+        .locator('[data-test^="o2-format-field-type-num-"]')
+        .first();
+      await numType.waitFor({ state: "visible", timeout: 5000 });
+      await numType.click();
+    }
 
     // Select the unit (OSelect forwards parent data-test to `*-option`)
-    const unitSelect = this.page.locator('[data-test^="o2-format-unit-"]').first();
     await unitSelect.waitFor({ state: "visible", timeout: 5000 });
     await unitSelect.click();
     const unitOption = this.page

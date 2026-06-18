@@ -139,7 +139,7 @@ export const serializeColumnOverride = (
   if (c.unit)
     config.push({
       type: OVERRIDE_CONFIG_TYPES.UNIT,
-      value: { unit: c.unit, customUnit: c.customUnit },
+      value: { unit: c.unit, customUnit: c.customUnit ?? "" },
     });
   if (c.alignment)
     config.push({ type: OVERRIDE_CONFIG_TYPES.ALIGNMENT, value: c.alignment });
