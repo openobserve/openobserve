@@ -4853,7 +4853,21 @@
     "footerClose": "cerca",
     "footerReopen": "volver a abrir",
     "footerRun": "haga clic en la fila para ejecutar",
-    "footerMacHint": "⌘ = Cmd en Mac · Ctrl en Windows"
+    "footerMacHint": "⌘ = Cmd en Mac · Ctrl en Windows",
+    "modules": {
+      "global": "Global",
+      "logs": "Registros",
+      "dashboards": "Tableros",
+      "metrics": "Métricas",
+      "traces": "Huellas",
+      "alerts": "Alertas",
+      "streams": "Transmisiones",
+      "pipelines": "Tuberías",
+      "functions": "Funciones",
+      "reports": "Informes",
+      "iam": "SOY YO",
+      "runningQueries": "Ejecución de consultas"
+    }
   },
   "aiObservability": {
     "title": "LLM Observabilidad",

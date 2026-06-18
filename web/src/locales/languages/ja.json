@@ -4855,7 +4855,21 @@
     "footerClose": "閉じる",
     "footerReopen": "再度開きます",
     "footerRun": "行をクリックして実行",
-    "footerMacHint": "⌘ = Mac の場合はコマンド·ウィンドウズの場合は Ctrl"
+    "footerMacHint": "⌘ = Mac の場合はコマンド·ウィンドウズの場合は Ctrl",
+    "modules": {
+      "global": "グローバル",
+      "logs": "ログ",
+      "dashboards": "ダッシュボード",
+      "metrics": "指標",
+      "traces": "トレース",
+      "alerts": "アラート",
+      "streams": "ストリーム",
+      "pipelines": "パイプライン",
+      "functions": "機能",
+      "reports": "レポート",
+      "iam": "IAM",
+      "runningQueries": "クエリの実行"
+    }
   },
   "aiObservability": {
     "title": "LLM オブザーバビリティ",

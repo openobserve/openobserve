@@ -4868,7 +4868,21 @@
     "footerClose": "닫기",
     "footerReopen": "다시 엽니다",
     "footerRun": "행을 클릭하여 실행",
-    "footerMacHint": "⌘ = 맥에서는 Cmd · 윈도우에서는 Ctrl"
+    "footerMacHint": "⌘ = 맥에서는 Cmd · 윈도우에서는 Ctrl",
+    "modules": {
+      "global": "글로벌",
+      "logs": "로그",
+      "dashboards": "대시보드",
+      "metrics": "측정항목",
+      "traces": "트레이스",
+      "alerts": "알림",
+      "streams": "스트림",
+      "pipelines": "파이프라인",
+      "functions": "함수",
+      "reports": "보고서",
+      "iam": "IAM",
+      "runningQueries": "쿼리 실행"
+    }
   },
   "aiObservability": {
     "title": "LLM 옵저버빌리티",

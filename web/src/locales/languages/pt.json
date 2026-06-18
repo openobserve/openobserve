@@ -4855,7 +4855,21 @@
     "footerClose": "fechar",
     "footerReopen": "reabrir",
     "footerRun": "clique na linha para executar",
-    "footerMacHint": "⌘ = Cmd no Mac · Ctrl no Windows"
+    "footerMacHint": "⌘ = Cmd no Mac · Ctrl no Windows",
+    "modules": {
+      "global": "Global",
+      "logs": "Registros",
+      "dashboards": "Painéis",
+      "metrics": "Métricas",
+      "traces": "Traços",
+      "alerts": "Alertas",
+      "streams": "Fluxos",
+      "pipelines": "Oleodutos",
+      "functions": "Funções",
+      "reports": "Relatórios",
+      "iam": "IAM",
+      "runningQueries": "Executando consultas"
+    }
   },
   "aiObservability": {
     "title": "Observabilidade do LLM",

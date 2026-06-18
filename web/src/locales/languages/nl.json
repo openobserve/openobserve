@@ -4868,7 +4868,21 @@
     "footerClose": "dichtbij",
     "footerReopen": "heropenen",
     "footerRun": "klik op de rij om uit te voeren",
-    "footerMacHint": "⌘ = Cmd op Mac · Ctrl op Windows"
+    "footerMacHint": "⌘ = Cmd op Mac · Ctrl op Windows",
+    "modules": {
+      "global": "Globaal",
+      "logs": "Logboeken",
+      "dashboards": "Dashboards",
+      "metrics": "Metrieken",
+      "traces": "Sporen",
+      "alerts": "Waarschuwingen",
+      "streams": "Streams",
+      "pipelines": "Pijpleidingen",
+      "functions": "Functies",
+      "reports": "Rapporten",
+      "iam": "IAM",
+      "runningQueries": "Zoekopdrachten uitvoeren"
+    }
   },
   "aiObservability": {
     "title": "LLM-waarneembaarheid",

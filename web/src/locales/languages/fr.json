@@ -4855,7 +4855,21 @@
     "footerClose": "proche",
     "footerReopen": "rouvrir",
     "footerRun": "cliquez sur la ligne pour exécuter",
-    "footerMacHint": "⌘= Cmd sur Mac · Ctrl sur Windows"
+    "footerMacHint": "⌘= Cmd sur Mac · Ctrl sur Windows",
+    "modules": {
+      "global": "Mondial",
+      "logs": "Journaux",
+      "dashboards": "Tableaux de bord",
+      "metrics": "Métriques",
+      "traces": "Des traces",
+      "alerts": "Alertes",
+      "streams": "Ruisseaux",
+      "pipelines": "Canalisations",
+      "functions": "Fonctions",
+      "reports": "Rapports",
+      "iam": "GIA",
+      "runningQueries": "Exécution de requêtes"
+    }
   },
   "aiObservability": {
     "title": "Observabilité LLM",

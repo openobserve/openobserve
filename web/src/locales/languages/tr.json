@@ -4868,7 +4868,21 @@
     "footerClose": "kapat",
     "footerReopen": "yeniden açmak",
     "footerRun": "çalıştırmak için satırı tıklayın",
-    "footerMacHint": "⌘ = Mac'te Cmd · Windows'ta Ctrl"
+    "footerMacHint": "⌘ = Mac'te Cmd · Windows'ta Ctrl",
+    "modules": {
+      "global": "Küresel",
+      "logs": "Günlükler",
+      "dashboards": "Gösterge panoları",
+      "metrics": "Metrikler",
+      "traces": "İzleri",
+      "alerts": "Uyarılar",
+      "streams": "Akışlar",
+      "pipelines": "Boru hatları",
+      "functions": "Fonksiyonlar",
+      "reports": "Raporlar",
+      "iam": "IAM",
+      "runningQueries": "Çalışan Sorgular"
+    }
   },
   "aiObservability": {
     "title": "LLM Gözlemlenebilirlik",

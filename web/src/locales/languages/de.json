@@ -4855,7 +4855,21 @@
     "footerClose": "nahe",
     "footerReopen": "erneut öffnen",
     "footerRun": "Klicken Sie auf die Zeile, um sie auszuführen",
-    "footerMacHint": "⌘ = Cmd auf dem Mac · Strg auf Windows"
+    "footerMacHint": "⌘ = Cmd auf dem Mac · Strg auf Windows",
+    "modules": {
+      "global": "Weltweit",
+      "logs": "Logs",
+      "dashboards": "Dashboards",
+      "metrics": "Metriken",
+      "traces": "Spuren",
+      "alerts": "Warnmeldungen",
+      "streams": "Streams",
+      "pipelines": "Rohrleitungen",
+      "functions": "Funktionen",
+      "reports": "Berichte",
+      "iam": "IAM",
+      "runningQueries": "Abfragen ausführen"
+    }
   },
   "aiObservability": {
     "title": "LLM Beobachtbarkeit",

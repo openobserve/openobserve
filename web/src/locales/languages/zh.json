@@ -4874,7 +4874,21 @@
     "footerClose": "关闭",
     "footerReopen": "重新打开",
     "footerRun": "点击行即可运行",
-    "footerMacHint": "▼ = Mac 上的 Cmd · Windows 上的 Ctrl"
+    "footerMacHint": "▼ = Mac 上的 Cmd · Windows 上的 Ctrl",
+    "modules": {
+      "global": "全球",
+      "logs": "日志",
+      "dashboards": "仪表板",
+      "metrics": "指标",
+      "traces": "痕迹",
+      "alerts": "警报",
+      "streams": "直播",
+      "pipelines": "管道",
+      "functions": "函数",
+      "reports": "报告",
+      "iam": "IAM",
+      "runningQueries": "运行查询"
+    }
   },
   "logs": {
     "noData": {

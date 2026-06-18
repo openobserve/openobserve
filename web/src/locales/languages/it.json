@@ -4866,7 +4866,21 @@
     "footerClose": "vicino",
     "footerReopen": "riaprire",
     "footerRun": "fai clic sulla riga per eseguire",
-    "footerMacHint": "= Cmd su Mac · Ctrl su Windows"
+    "footerMacHint": "= Cmd su Mac · Ctrl su Windows",
+    "modules": {
+      "global": "Globale",
+      "logs": "Registri",
+      "dashboards": "Dashboard",
+      "metrics": "Metriche",
+      "traces": "Tracce",
+      "alerts": "Avvisi",
+      "streams": "Stream",
+      "pipelines": "Oleodotti",
+      "functions": "Funzioni",
+      "reports": "Rapporti",
+      "iam": "IAM",
+      "runningQueries": "Interrogazioni in esecuzione"
+    }
   },
   "aiObservability": {
     "title": "Osservabilità LLM",
