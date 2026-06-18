@@ -311,18 +311,18 @@ size="sm">
                 />
               </div>
               <!-- Search Results Navigation -->
-              <div class="search-navigation-container tw:h-8.2! tw:py-[0.125px]!">
+              <div class="tw:inline-flex tw:items-center tw:bg-transparent tw:px-[0.125rem] tw:[transition:all_0.2s_ease] tw:rounded-[var(--radius-md)] tw:border tw:border-[var(--color-input-border)] tw:dark:hover:border-[var(--o2-theme-color)] tw:h-8.2! tw:py-[0.125px]!">
                 <div
-                  class="search-results-counter"
+                  class="tw:flex tw:items-center tw:text-xs tw:font-medium tw:px-1 tw:gap-[0.0625rem] tw:select-none"
                   data-test="trace-details-search-results"
                 >
-                  <span class="counter-current">{{
+                  <span class="tw:text-[var(--o2-text-secondary)]">{{
                     searchResults ? currentIndex + 1 : 0
                   }}</span>
-                  <span class="counter-separator">/</span>
-                  <span class="counter-total">{{ searchResults }}</span>
+                  <span class="tw:text-[var(--o2-text-secondary)] tw:mx-[0.125rem]">/</span>
+                  <span class="tw:text-[var(--o2-text-secondary)]">{{ searchResults }}</span>
                 </div>
-                <div class="navigation-buttons">
+                <div class="tw:flex tw:items-center tw:h-full tw:ml-1">
                   <OButton
                     data-test="trace-details-search-prev-btn"
                     :disabled="!searchResults || currentIndex === 0"
@@ -333,7 +333,7 @@ size="sm">
                     <OIcon name="keyboard-arrow-up" size="sm" />
                     <OTooltip :content="t('traces.previousMatch')" />
                   </OButton>
-                  <div class="button-separator"></div>
+                  <div class="tw:w-px tw:h-[1.125rem] tw:bg-[var(--o2-border-color)] tw:mx-[0.125rem]"></div>
                   <OButton
                     data-test="trace-details-search-next-btn"
                     :disabled="
@@ -2770,100 +2770,14 @@ html:has(.trace-details) {
   scrollbar-gutter: stable !important;
 }
 
-.trace-details .q-splitter__before,
-.trace-details .q-splitter__after {
-  overflow: revert !important;
-}
-
-.trace-details .q-splitter__before {
-  z-index: 999 !important;
-}
-
-.trace-details .trace-details-chart .rangeslider-slidebox {
-  fill: #7076be !important;
-  opacity: 0.3 !important;
-}
-
-.trace-details .trace-details-chart .rangeslider-mask-max,
-.trace-details .trace-details-chart .rangeslider-mask-min {
-  fill: #d2d2d2 !important;
-  fill-opacity: 0.15 !important;
-}
-
-.trace-details .trace-details-chart .rangeslider-grabber {
-  fill: #7076be !important;
-  stroke: #ffffff !important;
-  stroke-width: 2 !important;
-  opacity: 1 !important;
-}
-
-.trace-details .trace-details-chart .rangeslider-grabber:hover {
-  fill: #5a5fa0 !important;
-  cursor: ew-resize !important;
-}
-
-/* Enhance the line graph (trace duration) visibility */
-.trace-details .trace-details-chart .trace {
-  stroke-width: 2 !important;
-  opacity: 0.8 !important;
-}
-
-.trace-details .trace-details-chart .scatterlayer .trace {
-  opacity: 1 !important;
-}
-
-.trace-details .visual-selector-container {
-  backdrop-filter: blur(0.625rem);
-  border-radius: 0.25rem;
-  border: 0.0625rem solid var(--o2-border-color);
-}
-
 .trace-details .trace-combined-header-wrapper {
   padding: 0.2rem 0rem;
   flex-shrink: 0;
 }
 
-.trace-details .chart-container-inner {
-  min-height: 12.5rem;
-  overflow: hidden;
-}
-
 .trace-details .trace-chart-height {
   height: 12.5rem !important;
   min-height: 12.5rem !important;
-}
-
-.no-select {
-  user-select: none !important;
-  -moz-user-select: none !important;
-  -webkit-user-select: none !important;
-  -ms-user-select: none !important;
-}
-
-.trace-copy-icon:hover.OIcon {
-  text-shadow: 0px 2px 8px rgba(0, 0, 0, 0.5);
-}
-
-.trace-logs-selector .q-field {
-  border-radius: 0.2rem 0 0 0.2rem;
-}
-
-.trace-logs-selector .q-field span {
-  display: inline-block;
-  width: 180px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  text-align: left;
-}
-
-.trace-logs-selector .q-field .q-field__control {
-  border-radius: 0.2rem 0 0 0.2rem !important;
-}
-
-.trace-logs-selector .q-field .q-field__control:before,
-.trace-logs-selector .q-field .q-field__control:after {
-  border: none !important;
 }
 
 /* Unified Search Group - input and navigation as one element */
@@ -2873,67 +2787,6 @@ html:has(.trace-details) {
   width: fit-content;
   border-radius: var(--radius-md);
   transition: border-color 0.2s ease;
-}
-
-/* Search Navigation Container - integrated with input */
-.search-navigation-container {
-  display: inline-flex;
-  align-items: center;
-  background-color: transparent;
-  padding: 0 0.125rem;
-  transition: all 0.2s ease;
-  border-radius: var(--radius-md);
-  border: 0.0625rem solid var(--color-input-border);
-}
-
-.search-navigation-container .search-results-counter {
-  display: flex;
-  align-items: center;
-  font-size: 0.75rem;
-  font-weight: 500;
-  padding: 0 0.25rem;
-  gap: 0.0625rem;
-  user-select: none;
-}
-
-.search-navigation-container .search-results-counter .counter-separator {
-  color: var(--o2-text-secondary);
-  margin: 0 0.125rem;
-}
-
-.search-navigation-container .search-results-counter .counter-total,
-.search-navigation-container .search-results-counter .counter-current {
-  color: var(--o2-text-secondary);
-}
-
-.search-navigation-container .navigation-buttons {
-  display: flex;
-  align-items: center;
-  height: 100%;
-  margin-left: 0.25rem;
-}
-
-.search-navigation-container .navigation-buttons .button-separator {
-  width: 0.0625rem;
-  height: 1.125rem;
-  background-color: var(--o2-border-color);
-  margin: 0 0.125rem;
-}
-
-.search-navigation-container .navigation-buttons .nav-btn {
-  min-width: 1.25rem;
-  height: 1.25rem;
-  padding: 0;
-  border-radius: 0.125rem;
-  transition: all 0.2s ease;
-}
-
-.search-navigation-container .navigation-buttons .nav-btn:hover:not(:disabled) {
-  background-color: var(--o2-hover-accent);
-}
-
-.search-navigation-container .navigation-buttons .nav-btn:disabled {
-  opacity: 0.4;
 }
 
 /* Dark mode support */
@@ -2946,31 +2799,6 @@ body.body--dark .unified-search-group:focus-within {
   border-color: var(--o2-theme-color);
 }
 
-body.body--dark .search-navigation-container:hover {
-  border-color: var(--o2-theme-color);
-}
-
-.custom-height {
-  height: 30px;
-}
-
-.trace-search-container {
-  border-radius: 0.5rem;
-}
-
-.trace-back-btn {
-  border: 0.09375rem solid;
-  border-radius: 50%;
-  width: 1.375rem;
-  height: 1.375rem;
-}
-
-.custom-height .q-field__control,
-.custom-height .q-field__append {
-  height: 100%; /* Ensures the input control fills the container height */
-  line-height: 36px; /* Vertically centers the text inside */
-}
-
 .resize::after {
   content: " ";
   position: absolute;
@@ -2980,13 +2808,5 @@ body.body--dark .search-navigation-container:hover {
   top: 0;
   bottom: 0;
   z-index: 999;
-}
-</style>
-
-<style>
-.trace-details-view-tabs .o2-tabs .active {
-  background-color: transparent !important;
-  color: var(--q-primary) !important;
-  border-color: var(--q-primary) !important;
 }
 </style>

@@ -142,7 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #trigger>
             <OButton
               data-test="logs-search-bar-utilities-menu-btn"
-              class="group-menu-btn element-box-shadow"
+              class="tw:p-1! tw:ml-1 tw:[border:0.0625rem_solid_var(--color-button-outline-border)]! tw:rounded-md tw:[transition:all_0.2s_ease] tw:min-h-[1.875rem]! tw:text-xs tw:font-medium tw:hover:bg-[var(--o2-hover-accent)] element-box-shadow"
               icon-left="more-horiz"
               variant="outline"
               size="xs"
@@ -346,8 +346,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :aria-disabled="isDownloadDisabled || undefined"
               @mouseenter="!isDownloadDisabled && (showDownloadSubmenu = true)"
               @mouseleave="showDownloadSubmenu = false"
-              class="tw:relative tw:flex tw:items-center tw:gap-2 tw:py-[0.375rem] tw:px-3 tw:text-[var(--text-base)] tw:[line-height:1.2] tw:cursor-pointer tw:select-none search-download-item"
-              :class="{ 'search-download-item--disabled tw:cursor-not-allowed! tw:text-(--o2-text-muted)': isDownloadDisabled }"
+              class="tw:relative tw:flex tw:items-center tw:gap-2 tw:py-[0.375rem] tw:px-3 tw:text-[var(--text-base)] tw:[line-height:1.2] tw:cursor-pointer tw:select-none tw:hover:bg-[var(--o2-hover-accent)] search-download-item"
+              :class="{ 'tw:cursor-not-allowed! tw:text-(--o2-text-muted) tw:hover:bg-transparent!': isDownloadDisabled }"
             >
               <span class="tw:inline-flex tw:items-center tw:justify-center tw:w-7 tw:h-7 tw:rounded-md tw:bg-(--o2-section-header-bg) tw:text-(--o2-text-secondary) tw:shrink-0">
                 <OIcon size="sm" name="download" />
@@ -363,7 +363,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <button
                   type="button"
                   data-test="search-download-csv-btn"
-                  class="search-download-submenu-item tw:flex tw:items-center tw:gap-[0.625rem] tw:w-full tw:py-[0.375rem] tw:px-3 tw:text-[var(--text-base)] tw:[line-height:1.2] tw:text-left tw:bg-transparent tw:border-0 tw:cursor-pointer tw:text-(--o2-text-body)"
+                  class="tw:flex tw:items-center tw:gap-[0.625rem] tw:w-full tw:py-[0.375rem] tw:px-3 tw:text-[var(--text-base)] tw:[line-height:1.2] tw:text-left tw:bg-transparent tw:border-0 tw:cursor-pointer tw:text-(--o2-text-body) tw:hover:bg-[var(--o2-hover-accent)]"
                   @click="downloadLogs(searchObj.data.queryResults.hits, 'csv'); showDownloadSubmenu = false"
                 >
                   <OIcon name="grid-on" size="sm" />
@@ -372,7 +372,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <button
                   type="button"
                   data-test="search-download-json-btn"
-                  class="search-download-submenu-item tw:flex tw:items-center tw:gap-[0.625rem] tw:w-full tw:py-[0.375rem] tw:px-3 tw:text-[var(--text-base)] tw:[line-height:1.2] tw:text-left tw:bg-transparent tw:border-0 tw:cursor-pointer tw:text-(--o2-text-body)"
+                  class="tw:flex tw:items-center tw:gap-[0.625rem] tw:w-full tw:py-[0.375rem] tw:px-3 tw:text-[var(--text-base)] tw:[line-height:1.2] tw:text-left tw:bg-transparent tw:border-0 tw:cursor-pointer tw:text-(--o2-text-body) tw:hover:bg-[var(--o2-hover-accent)]"
                   @click="downloadLogs(searchObj.data.queryResults.hits, 'json'); showDownloadSubmenu = false"
                 >
                   <OIcon name="data-object" size="sm" />
@@ -584,7 +584,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="logs-search-bar-visualize-cancel-btn"
                   :title="t('search.cancel')"
                   variant="ghost"
-                  class="tw:p-0 tw:h-[1.875rem]! o2-run-query-button o2-color-cancel element-box-shadow search-button-enterprise-border-radius"
+                  class="tw:p-0 tw:h-[1.875rem]! tw:text-[var(--text-xs)] tw:[font-weight:var(--font-medium)]! tw:leading-4! tw:px-1! tw:w-[5.875rem]! tw:whitespace-normal tw:break-words tw:text-center tw:[transition:box-shadow_0.3s_ease,opacity_0.2s_ease] tw:bg-[var(--o2-cancel-query-bg)] tw:text-[var(--o2-primary-btn-text)] element-box-shadow tw:[border-radius:0.375rem_0_0_0.375rem]!"
                   @click="cancelVisualizeQueries"
                   >{{ t("search.cancel") }}</OButton
                 >
@@ -608,10 +608,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :class="[
                     isNaturalLanguageDetected && !searchObj.meta.nlpMode
                       ? 'o2-ai-generate-button'
-                      : 'o2-run-query-button o2-color-primary',
+                      : 'tw:text-[var(--text-xs)] tw:[font-weight:var(--font-medium)]! tw:leading-4! tw:px-1! tw:w-[5.875rem]! tw:whitespace-normal tw:break-words tw:text-center tw:[transition:box-shadow_0.3s_ease,opacity_0.2s_ease] tw:bg-[var(--o2-primary-btn-bg)] tw:text-[var(--o2-primary-btn-text)] tw:hover:opacity-90 tw:hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--o2-primary-btn-bg),transparent_30%)]',
                     config.isEnterprise == 'true'
-                      ? 'search-button-enterprise-border-radius'
-                      : 'search-button-normal-border-radius',
+                      ? 'tw:[border-radius:0.375rem_0_0_0.375rem]!'
+                      : 'tw:rounded-md',
                   ]"
                   @click="
                     isNaturalLanguageDetected && !searchObj.meta.nlpMode
@@ -637,16 +637,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         ) &&
                         config.isEnterprise == 'true' &&
                         visualizeSearchRequestTraceIds.length
-                          ? 'o2-color-cancel'
+                          ? 'tw:bg-[var(--o2-cancel-query-bg)] tw:text-[var(--o2-primary-btn-text)]'
                           : !(
                                 isNaturalLanguageDetected &&
                                 !searchObj.meta.nlpMode
                               )
-                            ? 'o2-color-primary'
+                            ? 'tw:bg-[var(--o2-primary-btn-bg)] tw:text-[var(--o2-primary-btn-text)] tw:hover:opacity-90 tw:hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--o2-primary-btn-bg),transparent_30%)]'
                             : '',
                         config.isEnterprise == 'true'
-                          ? 'search-button-dropdown-enterprise-border-radius'
-                          : 'search-button-normal-border-radius',
+                          ? 'tw:[border-radius:0_0.375rem_0.375rem_0]!'
+                          : 'tw:rounded-md',
                       ]"
                     >
                       <OIcon name="arrow-drop-down" size="sm" />
@@ -684,7 +684,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="logs-search-bar-visualize-cancel-btn"
                   variant="ghost"
                   :title="t('search.cancel')"
-                  class="tw:p-0 tw:h-[1.875rem]! o2-run-query-button o2-color-cancel element-box-shadow search-button-enterprise-border-radius"
+                  class="tw:p-0 tw:h-[1.875rem]! tw:text-[var(--text-xs)] tw:[font-weight:var(--font-medium)]! tw:leading-4! tw:px-1! tw:w-[5.875rem]! tw:whitespace-normal tw:break-words tw:text-center tw:[transition:box-shadow_0.3s_ease,opacity_0.2s_ease] tw:bg-[var(--o2-cancel-query-bg)] tw:text-[var(--o2-primary-btn-text)] element-box-shadow tw:[border-radius:0.375rem_0_0_0.375rem]!"
                   @click="cancelVisualizeQueries"
                   >{{ t("search.cancel") }}</OButton
                 >
@@ -709,10 +709,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :class="[
                     isNaturalLanguageDetected && !searchObj.meta.nlpMode
                       ? 'o2-ai-generate-button'
-                      : 'o2-run-query-button o2-color-primary',
+                      : 'tw:text-[var(--text-xs)] tw:[font-weight:var(--font-medium)]! tw:leading-4! tw:px-1! tw:w-[5.875rem]! tw:whitespace-normal tw:break-words tw:text-center tw:[transition:box-shadow_0.3s_ease,opacity_0.2s_ease] tw:bg-[var(--o2-primary-btn-bg)] tw:text-[var(--o2-primary-btn-text)] tw:hover:opacity-90 tw:hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--o2-primary-btn-bg),transparent_30%)]',
                     config.isEnterprise == 'true'
-                      ? 'search-button-enterprise-border-radius'
-                      : 'search-button-normal-border-radius',
+                      ? 'tw:[border-radius:0.375rem_0_0_0.375rem]!'
+                      : 'tw:rounded-md',
                   ]"
                   @click="
                     isNaturalLanguageDetected && !searchObj.meta.nlpMode
@@ -738,16 +738,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         ) &&
                         config.isEnterprise == 'true' &&
                         visualizeSearchRequestTraceIds.length
-                          ? 'o2-color-cancel'
+                          ? 'tw:bg-[var(--o2-cancel-query-bg)] tw:text-[var(--o2-primary-btn-text)]'
                           : !(
                                 isNaturalLanguageDetected &&
                                 !searchObj.meta.nlpMode
                               )
-                            ? 'o2-color-primary'
+                            ? 'tw:bg-[var(--o2-primary-btn-bg)] tw:text-[var(--o2-primary-btn-text)] tw:hover:opacity-90 tw:hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--o2-primary-btn-bg),transparent_30%)]'
                             : '',
                         config.isEnterprise == 'true'
-                          ? 'search-button-dropdown-enterprise-border-radius'
-                          : 'search-button-normal-border-radius',
+                          ? 'tw:[border-radius:0_0.375rem_0.375rem_0]!'
+                          : 'tw:rounded-md',
                       ]"
                     >
                       <OIcon name="arrow-drop-down" size="sm" />
@@ -789,7 +789,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="logs-search-bar-patterns-cancel-btn"
                 variant="ghost"
                 :title="t('search.cancel')"
-                class="tw:p-0 tw:h-[1.875rem]! o2-run-query-button o2-color-cancel element-box-shadow search-button-normal-border-radius"
+                class="tw:p-0 tw:h-[1.875rem]! tw:text-[var(--text-xs)] tw:[font-weight:var(--font-medium)]! tw:leading-4! tw:px-1! tw:w-[5.875rem]! tw:whitespace-normal tw:break-words tw:text-center tw:[transition:box-shadow_0.3s_ease,opacity_0.2s_ease] tw:bg-[var(--o2-cancel-query-bg)] tw:text-[var(--o2-primary-btn-text)] element-box-shadow tw:rounded-md"
                 @click="cancelPatterns"
                 >{{ t("search.cancel") }}</OButton
               >
@@ -806,11 +806,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-cy="search-bar-refresh-button"
                 variant="ghost"
                 :title="t('search.cancel')"
-                class="tw:p-0 tw:h-[1.875rem]! o2-run-query-button o2-color-cancel element-box-shadow"
+                class="tw:p-0 tw:h-[1.875rem]! tw:text-[var(--text-xs)] tw:[font-weight:var(--font-medium)]! tw:leading-4! tw:px-1! tw:w-[5.875rem]! tw:whitespace-normal tw:break-words tw:text-center tw:[transition:box-shadow_0.3s_ease,opacity_0.2s_ease] tw:bg-[var(--o2-cancel-query-bg)] tw:text-[var(--o2-primary-btn-text)] element-box-shadow"
                 :class="
                   config.isEnterprise == 'true'
-                    ? 'search-button-enterprise-border-radius'
-                    : 'search-button-normal-border-radius'
+                    ? 'tw:[border-radius:0.375rem_0_0_0.375rem]!'
+                    : 'tw:rounded-md'
                 "
                 @click="cancelQuery"
                 >{{ t("search.cancel") }}</OButton
@@ -830,10 +830,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :class="[
                   isNaturalLanguageDetected && !searchObj.meta.nlpMode
                     ? 'o2-ai-generate-button'
-                    : 'o2-run-query-button o2-color-primary',
+                    : 'tw:text-[var(--text-xs)] tw:[font-weight:var(--font-medium)]! tw:leading-4! tw:px-1! tw:w-[5.875rem]! tw:whitespace-normal tw:break-words tw:text-center tw:[transition:box-shadow_0.3s_ease,opacity_0.2s_ease] tw:bg-[var(--o2-primary-btn-bg)] tw:text-[var(--o2-primary-btn-text)] tw:hover:opacity-90 tw:hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--o2-primary-btn-bg),transparent_30%)]',
                   store.state.zoConfig.auto_query_enabled
-                    ? 'search-button-enterprise-border-radius'
-                    : 'search-button-normal-border-radius',
+                    ? 'tw:[border-radius:0.375rem_0_0_0.375rem]!'
+                    : 'tw:rounded-md',
                 ]"
                 @click="
                   isNaturalLanguageDetected && !searchObj.meta.nlpMode
@@ -899,16 +899,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           !!searchObj.data.searchWebSocketTraceIds.length) &&
                         (searchObj.loading == true ||
                           searchObj.loadingHistogram == true))
-                        ? 'o2-color-cancel'
+                        ? 'tw:bg-[var(--o2-cancel-query-bg)] tw:text-[var(--o2-primary-btn-text)]'
                         : !(
                               isNaturalLanguageDetected &&
                               !searchObj.meta.nlpMode
                             )
-                          ? 'o2-color-primary'
+                          ? 'tw:bg-[var(--o2-primary-btn-bg)] tw:text-[var(--o2-primary-btn-text)] tw:hover:opacity-90 tw:hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--o2-primary-btn-bg),transparent_30%)]'
                           : '',
                       store.state.zoConfig.auto_query_enabled
-                        ? 'search-button-dropdown-enterprise-border-radius'
-                        : 'search-button-normal-border-radius',
+                        ? 'tw:[border-radius:0_0.375rem_0.375rem_0]!'
+                        : 'tw:rounded-md',
                     ]"
                   >
                     <OIcon name="arrow-drop-down" size="sm" />
@@ -1000,7 +1000,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       ref="editorContainerRef"
       class="tw:flex tw:relative query-editor-container tw:w-full tw:overflow-visible"
-      :class="{ 'editor-fullscreen': isFocused }"
+      :class="{ 'tw:overflow-hidden! tw:bg-[var(--o2-body-primary-bg)]! tw:border tw:border-[var(--o2-border-color)] tw:rounded-md tw:[box-shadow:0_0.5rem_2rem_rgba(0,0,0,0.18)]': isFocused }"
       :style="editorFullscreenStyle"
     >
       <!-- Expand / collapse button — always top-right of the full editor area -->
@@ -1018,7 +1018,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="tw:flex tw:flex-col tw:h-full tw:w-full tw:min-w-0"
       >
         <OSplitter
-          class="logs-search-splitter tw:h-full!"
+          class="tw:h-full!"
           v-model="searchObj.config.fnSplitterModel"
           :limits="searchObj.config.fnSplitterLimit"
           :horizontal="false"
@@ -1137,7 +1137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- VRL disabled warning for non-table charts -->
                     <div
                       v-if="isVrlEditorDisabled"
-                      class="tw:absolute tw:bottom-0 tw:w-full tw:mt-3 tw:flex tw:items-center tw:bg-black/10 vrl-disabled-warning"
+                      class="tw:absolute tw:bottom-0 tw:w-full tw:mt-3 tw:flex tw:items-center tw:bg-black/10 tw:dark:bg-[rgba(255,255,255,0.1)]"
                       data-test="vrl-editor-disabled-warning"
                     >
                       <OIcon name="warning" size="md" class="tw:mx-2" />
@@ -1219,8 +1219,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :label="t('search.range')"
         class="tw:py-2"
       />
-      <div class="file-type">
-        <label class="o-input-label tw:text-sm tw:font-semibold tw:leading-tight tw:pr-2">{{ t("search.fileType") }}</label
+      <div>
+        <label class="o-input-label tw:text-sm tw:font-semibold tw:leading-tight tw:pr-2 tw:text-[#262626] tw:dark:text-[#e5e5e5]">{{ t("search.fileType") }}</label
         ><br />
         <OButtonGroup
           data-test="custom-download-file-type-button-group"
@@ -5225,21 +5225,6 @@ export default defineComponent({
 </script>
 
 <style>
-/* "Download results" item with hover-triggered CSV/JSON sub-popover.
-   Matches the language sub-menu pattern in Header.vue. */
-.search-download-item:hover {
-  background-color: var(--o2-hover-accent);
-}
-
-.search-download-item--disabled:hover {
-  background-color: transparent;
-}
-
-/* Invisible hover bridge extending to the LEFT of the parent item,
-   covering the gap between the parent and the submenu. Without this,
-   moving the cursor leftward toward the submenu briefly enters dead
-   space, fires mouseleave on the parent, and closes the submenu
-   before the cursor can land on it. */
 .search-download-item::before {
   content: "";
   position: absolute;
@@ -5247,102 +5232,14 @@ export default defineComponent({
   right: 100%;
   width: 0.625rem;
   height: 100%;
-  /* Stays transparent — only present to extend the hover hit-test area */
 }
 
-body.body--dark .search-download-item:hover {
-  background-color: var(--o2-hover-accent);
-}
-
-.search-download-submenu-item:hover {
-  background-color: var(--o2-hover-accent);
-}
-
-body.body--dark .search-download-submenu-item:hover {
-  background-color: var(--o2-hover-accent);
-}
-
-.file-type label {
-  font-weight: 600;
-  font-size: 0.875rem;
-  color: #262626;
-}
-html.dark .file-type label,
-.body--dark .file-type label {
-  color: #e5e5e5;
-}
-
-.group-menu-btn {
-  padding: 0.25rem 0.25rem !important;
-  margin-left: 0.25rem;
-  border: 0.0625rem solid var(--color-button-outline-border) !important;
-  border-radius: 0.375rem;
-  transition: all 0.2s ease;
-  min-height: 1.875rem !important;
-  font-size: 0.75rem;
-  font-weight: 500;
-}
-
-.group-menu-btn:hover {
-  background-color: var(--o2-hover-accent);
-}
-
-.o2-run-query-button {
-  font-size: var(--text-xs);
-  font-weight: var(--font-medium) !important;
-  line-height: 1rem !important;
-  padding: 0 0.25rem !important;
-  width: 5.875rem !important;
-  white-space: normal;
-  word-break: break-word;
-  text-align: center;
-  transition:
-    box-shadow 0.3s ease,
-    opacity 0.2s ease;
-}
-
-.o2-color-primary {
-  background-color: var(--o2-primary-btn-bg);
-  color: var(--o2-primary-btn-text);
-}
-
-.o2-color-primary:hover {
-  opacity: 0.9;
-  box-shadow: 0 0 8px
-    color-mix(in srgb, var(--o2-primary-btn-bg), transparent 30%);
-}
-
-.search-button-enterprise-border-radius {
-  border-radius: 0.375rem 0px 0px 0.375rem !important;
-}
-.search-button-normal-border-radius {
-  border-radius: 0.375rem;
-}
-.search-button-dropdown-enterprise-border-radius {
-  border-radius: 0px 0.375rem 0.375rem 0px !important;
-}
-
-.o2-color-cancel {
-  background-color: var(--o2-cancel-query-bg);
-  color: var(--o2-primary-btn-text);
-}
-
-.logs-search-splitter .q-splitter__separator {
-  height: 100%;
-}
 
 /* When function editor is open, move AI button flush to the right of the query panel */
 .fn-editor-open .ai-floating-button {
   right: 0.25rem;
 }
 
-.editor-fullscreen {
-  overflow: hidden !important;
-  background: var(--o2-body-primary-bg) !important;
-  border: 1px solid var(--o2-border-color);
-  border-radius: 0.375rem;
-  box-shadow: 0 0.5rem 2rem rgba(0, 0, 0, 0.18);
-}
 
 .o2-table-hide-header thead {
   display: none;
@@ -5381,10 +5278,6 @@ html.dark .file-type label,
   display: none;
 }
 
-/* VRL disabled warning background — theme-aware via CSS cascade */
-.body--dark .vrl-disabled-warning {
-  background-color: rgba(255, 255, 255, 0.1);
-}
 
 /* Query editor placeholder — descendant text styling */
 .query-editor-placeholder-overlay .query-editor-placeholder-typewriter {
