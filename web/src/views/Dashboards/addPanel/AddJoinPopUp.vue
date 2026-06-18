@@ -670,5 +670,9 @@ export default defineComponent({
 
 .field-container {
   flex: 1;
+  // Allow flex children to shrink below their content width so long field
+  // names truncate inside the select instead of overflowing the layout.
+  min-width: 0;
+  overflow: hidden;
 }
 </style>
