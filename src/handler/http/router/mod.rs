@@ -21,7 +21,7 @@ use axum::{
     http::{Method, StatusCode, header},
     middleware::{self, Next},
     response::{IntoResponse, Redirect, Response},
-    routing::{delete, get, patch, post, put},
+    routing::{any, delete, get, patch, post, put},
 };
 use config::get_config;
 use tower_http::{
@@ -933,6 +933,9 @@ pub fn service_routes() -> Router {
             .route("/{org_id}/ai/confirm/{session_id}", post(ai::chat::confirm_action))
             .route("/{org_id}/ai/toolsets", get(ai::toolsets::list).post(ai::toolsets::create))
             .route("/{org_id}/ai/toolsets/{id}", get(ai::toolsets::get).put(ai::toolsets::update).delete(ai::toolsets::delete))
+            // OpenCode proxy — root-only, forwards all methods and sub-paths to the OpenCode server
+            .route("/{org_id}/ai/opencode", any(ai::chat::opencode_proxy))
+            .route("/{org_id}/ai/opencode/{*path}", any(ai::chat::opencode_proxy_path))
 
             // RE patterns
             .route("/{org_id}/re_patterns", get(re_pattern::list).post(re_pattern::save))

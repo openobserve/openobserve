@@ -1086,6 +1086,139 @@ pub async fn confirm_action(
     }
 }
 
+/// Proxy `GET/POST/... /api/{org_id}/ai/opencode` (no sub-path) to the OpenCode server.
+/// Root-only. See [`opencode_proxy_inner`].
+pub async fn opencode_proxy(
+    Path(org_id): Path<String>,
+    in_req: axum::extract::Request,
+) -> Response {
+    opencode_proxy_inner(org_id, String::new(), in_req).await
+}
+
+/// Proxy `GET/POST/... /api/{org_id}/ai/opencode/{*path}` to the OpenCode server.
+/// Root-only. See [`opencode_proxy_inner`].
+pub async fn opencode_proxy_path(
+    Path((org_id, path)): Path<(String, String)>,
+    in_req: axum::extract::Request,
+) -> Response {
+    opencode_proxy_inner(org_id, path, in_req).await
+}
+
+/// Shared implementation for the OpenCode reverse proxy.
+/// Checks root role, then forwards the full request (method, headers, body, query string)
+/// to `O2_OPENCODE_URL/{path}` and streams the response back verbatim.
+async fn opencode_proxy_inner(
+    org_id: String,
+    path: String,
+    in_req: axum::extract::Request,
+) -> Response {
+    let (mut parts, body) = in_req.into_parts();
+
+    let auth_data = match Headers::<TraceInfo>::from_request_parts(&mut parts, &()).await {
+        Ok(Headers(data)) => data,
+        Err(e) => return e.into_response(),
+    };
+
+    let body_bytes = match axum::body::to_bytes(body, usize::MAX).await {
+        Ok(b) => b,
+        Err(e) => {
+            return MetaHttpResponse::bad_request(format!("Failed to read request body: {e}"));
+        }
+    };
+
+    #[cfg(feature = "enterprise")]
+    {
+        use crate::common::utils::auth::is_root_user;
+
+        let user_id = &auth_data.user_id;
+
+        if !is_root_user(user_id) {
+            return MetaHttpResponse::forbidden("Root access required");
+        }
+
+        let o2_cfg = get_o2_config();
+        if !o2_cfg.ai.enabled {
+            return MetaHttpResponse::bad_request("AI is not enabled");
+        }
+
+        let opencode_base = if o2_cfg.ai.opencode_url.is_empty() {
+            // Auto-derive: o2ai service exposes opencode under /opencode
+            if o2_cfg.ai.agent_url.is_empty() {
+                return MetaHttpResponse::bad_request("AI agent URL is not configured");
+            }
+            format!("{}/opencode", o2_cfg.ai.agent_url.trim_end_matches('/'))
+        } else {
+            o2_cfg.ai.opencode_url.trim_end_matches('/').to_string()
+        };
+
+        let target_path = if path.is_empty() {
+            opencode_base.clone()
+        } else {
+            format!("{opencode_base}/{path}")
+        };
+
+        let query = parts
+            .uri
+            .query()
+            .map(|q| format!("?{q}"))
+            .unwrap_or_default();
+        let target_url = format!("{target_path}{query}");
+
+        let client = reqwest::Client::new();
+        let method = reqwest::Method::from_bytes(parts.method.as_str().as_bytes())
+            .unwrap_or(reqwest::Method::GET);
+
+        let mut req_builder = client.request(method, &target_url);
+        for (key, value) in &parts.headers {
+            let k = key.as_str().to_lowercase();
+            if matches!(k.as_str(), "host" | "connection" | "transfer-encoding") {
+                continue;
+            }
+            if let Ok(v) = value.to_str() {
+                req_builder = req_builder.header(key.as_str(), v);
+            }
+        }
+        req_builder = req_builder.body(body_bytes.to_vec());
+
+        match req_builder.send().await {
+            Ok(resp) => {
+                let status = axum::http::StatusCode::from_u16(resp.status().as_u16())
+                    .unwrap_or(axum::http::StatusCode::INTERNAL_SERVER_ERROR);
+                let mut response_builder = axum::response::Response::builder().status(status);
+                for (key, value) in resp.headers() {
+                    let k = key.as_str().to_lowercase();
+                    if matches!(k.as_str(), "transfer-encoding" | "connection") {
+                        continue;
+                    }
+                    response_builder = response_builder.header(key.as_str(), value);
+                }
+                let resp_body = resp.bytes().await.unwrap_or_default();
+                response_builder
+                    .body(Body::from(resp_body))
+                    .unwrap_or_else(|_| {
+                        MetaHttpResponse::internal_error("Failed to build response")
+                    })
+            }
+            Err(e) => {
+                log::error!(
+                    "[user_id:{user_id}] [org_id:{org_id}] Failed to proxy to OpenCode: {e}"
+                );
+                MetaHttpResponse::internal_error(format!("Failed to reach OpenCode server: {e}"))
+            }
+        }
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    {
+        drop(org_id);
+        drop(path);
+        drop(auth_data);
+        drop(body_bytes);
+        drop(parts);
+        MetaHttpResponse::bad_request("OpenCode proxy is only available in enterprise version")
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
