@@ -209,7 +209,6 @@ const onCopy = () => {
 
 .o2-code-pre {
   margin: 0;
-  padding: 0.85rem 1rem;
   overflow-x: auto;
   background: transparent;
 }

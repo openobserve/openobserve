@@ -23,44 +23,22 @@
 
 import { Marked } from "marked";
 import DOMPurify from "dompurify";
+import type { CardSubstitutions } from "@/components/ingestion/setupCard/types";
+
+// CardSubstitutions and safeHttpUrl now live in the shared setup-card module.
+// Re-exported here so the many existing `from ".../renderMarkdown"` importers
+// (traces, chat, AI cards) keep working unchanged.
+export type { CardSubstitutions } from "@/components/ingestion/setupCard/types";
+export { safeHttpUrl } from "@/components/ingestion/setupCard/subs";
 
 // One reusable parser for this module (a Marked instance is stateless across
 // parse calls). Kept separate from the app-wide `marked` singleton so our
 // options never leak into it.
 const marked = new Marked({ gfm: true, breaks: false });
 
-export interface CardSubstitutions {
-  url: string;
-  org: string;
-  /**
-   * OpenObserve ingestion token: base64 of `email:<org ingestion passcode>`,
-   * WITHOUT the leading "Basic " (snippets add it). This is the same Basic-auth
-   * token shown on every other Data Sources card — not the user's login
-   * password. Substituted only into runnable code, never into prose.
-   */
-  token: string;
-}
-
 export type CardSegment =
   | { type: "html"; html: string }
   | { type: "code"; code: string; lang: string };
-
-/**
- * Returns `url` only if it's a safe http(s)/mailto link, else "#". External
- * content (manifest / md frontmatter) can supply these hrefs, and Vue does NOT
- * sanitize `:href` — so this blocks `javascript:` / `data:` URL XSS on click.
- */
-export function safeHttpUrl(url?: string): string {
-  if (!url) return "#";
-  try {
-    const proto = new URL(url, window.location.origin).protocol;
-    return proto === "http:" || proto === "https:" || proto === "mailto:"
-      ? url
-      : "#";
-  } catch {
-    return "#";
-  }
-}
 
 function substitute(md: string, subs: CardSubstitutions): string {
   return md
