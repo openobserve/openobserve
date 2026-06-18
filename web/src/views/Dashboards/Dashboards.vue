@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="outline"
               size="sm"
               data-test="dashboard-import"
-              icon-left="upload-file"
+              icon-left="action-import"
               icon-right="expand-more"
             >
               {{ t(`dashboard.import`) }}
@@ -230,7 +230,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <OButton
                   v-if="row.actions == 'true'"
-                  icon-left="drive-file-move"
+                  icon-left="action-move-to-folder"
                   :title="t('dashboard.move_to_another_folder')"
                   variant="ghost"
                   size="icon-xs-sq"
@@ -239,7 +239,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <OButton
                   v-if="row.actions == 'true'"
-                  icon-left="content-copy"
+                  icon-left="action-duplicate"
                   :title="t('dashboard.duplicate')"
                   variant="ghost"
                   size="icon-xs-sq"
@@ -248,7 +248,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <OButton
                   v-if="row.actions == 'true'"
-                  icon-left="delete"
+                  icon-left="action-delete"
                   :title="t('dashboard.delete')"
                   variant="ghost-destructive"
                   size="icon-xs-sq"

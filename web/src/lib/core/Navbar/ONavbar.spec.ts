@@ -11,11 +11,30 @@ const router = createRouter({
   routes: [{ path: "/", component: { template: "<div />" } }],
 });
 
+// All daily-use (top-level) names — none of these belong to a flyout group, so
+// each renders as a standalone MenuLink. See navGroups.ts for membership.
 const mockLinks: NavItem[] = [
   { title: "Home", icon: "home", link: "/home", name: "home" },
   { title: "Logs", icon: "list", link: "/logs", name: "logs" },
-  { title: "Settings", icon: "settings", link: "/settings", name: "settings" },
+  { title: "Metrics", icon: "bar-chart", link: "/metrics", name: "metrics" },
 ];
+
+const menuLinkStub = {
+  template:
+    '<a class="q-item" :data-test="\'menu-link-\' + linkName + \'-item\'" @mouseenter="$emit(\'menu-hover\', link)"><slot /></a>',
+  props: ["linkName", "mini", "title", "icon", "link", "name", "exact", "display", "hide"],
+  emits: ["menu-hover"],
+  inheritAttrs: true,
+};
+
+// Lightweight ONavGroup stub — surfaces the group key, its children, and whether
+// it was rendered in link+subnav mode (parentItem) so we can assert ONavbar
+// wires entries correctly without a vuex store or the real flyout machinery.
+const navGroupStub = {
+  template:
+    '<div :data-test="\'nav-group-\' + groupKey" :data-children="children.map(c => c.name).join(\',\')" :data-mode="parentItem ? \'link\' : \'group\'" />',
+  props: ["groupKey", "title", "icon", "children", "parentItem"],
+};
 
 describe("ONavbar", () => {
   let wrapper: VueWrapper;
@@ -34,13 +53,8 @@ describe("ONavbar", () => {
       global: {
         plugins: [router],
         stubs: {
-          "menu-link": {
-            template:
-              '<a class="q-item" :data-test="\'menu-link-\' + linkName + \'-item\'" @mouseenter="$emit(\'menu-hover\', link)"><slot /></a>',
-            props: ["linkName", "mini", "animationIndex", "title", "icon", "link", "name", "exact", "display", "hide"],
-            emits: ["menu-hover"],
-            inheritAttrs: true,
-          },
+          "menu-link": menuLinkStub,
+          ONavGroup: navGroupStub,
         },
       },
     });
@@ -67,7 +81,7 @@ describe("ONavbar", () => {
       wrapper = mountNavbar();
       expect(wrapper.find('[data-test="menu-link-home-item"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="menu-link-logs-item"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="menu-link-settings-item"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="menu-link-metrics-item"]').exists()).toBe(true);
     });
 
     it("should pass mini prop to menu links", () => {
@@ -81,6 +95,58 @@ describe("ONavbar", () => {
       const nav = wrapper.find('[data-test="navbar-main-nav"]');
       expect(nav.attributes("role")).toBe("navigation");
       expect(nav.attributes("aria-label")).toBe("Main navigation");
+    });
+  });
+
+  describe("grouping", () => {
+    it("absorbs streams+pipeline into Data; RUM and Reports stay top-level", () => {
+      wrapper = mountNavbar({
+        linksList: [
+          { title: "Home", icon: "home", link: "/home", name: "home" },
+          { title: "Logs", icon: "list", link: "/logs", name: "logs" },
+          { title: "RUM", icon: "devices", link: "/rum", name: "rum" },
+          { title: "Streams", icon: "window", link: "/streams", name: "streams" },
+          { title: "Pipeline", icon: "graph-2", link: "/pipeline", name: "pipeline" },
+          { title: "Reports", icon: "description", link: "/reports", name: "reports" },
+          { title: "IAM", icon: "manage-accounts", link: "/iam", name: "iam" },
+        ],
+      });
+
+      // RUM and Reports are top-level links.
+      expect(wrapper.find('[data-test="menu-link-rum-item"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="menu-link-reports-item"]').exists()).toBe(true);
+      // Streams and Pipeline are absorbed into Data — not top-level links.
+      expect(wrapper.find('[data-test="menu-link-streams-item"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="menu-link-pipeline-item"]').exists()).toBe(false);
+
+      const data = wrapper.find('[data-test="nav-group-data"]');
+      expect(data.exists()).toBe(true);
+      // Data now behaves like the other link+subnav tiles (click navigates).
+      expect(data.attributes("data-mode")).toBe("link");
+      // Streams + pipeline sub-pages inside the Data flyout.
+      expect(data.attributes("data-children")).toBe(
+        "logstreams,pipelines,functionList,enrichmentTables",
+      );
+    });
+
+    it("renders IAM as a link+subnav group (navigates, hover reveals sub-pages)", () => {
+      wrapper = mountNavbar({
+        linksList: [
+          { title: "Home", icon: "home", link: "/home", name: "home" },
+          { title: "IAM", icon: "manage-accounts", link: "/iam", name: "iam" },
+        ],
+      });
+      const iam = wrapper.find('[data-test="nav-group-iam"]');
+      expect(iam.exists()).toBe(true);
+      expect(iam.attributes("data-mode")).toBe("link");
+      expect(iam.attributes("data-children")).toContain("users");
+      // It is NOT rendered as a plain top-level menu link.
+      expect(wrapper.find('[data-test="menu-link-/iam-item"]').exists()).toBe(false);
+    });
+
+    it("drops the Data group entirely when no data items are present", () => {
+      wrapper = mountNavbar(); // only home/logs/metrics
+      expect(wrapper.find('[data-test="nav-group-data"]').exists()).toBe(false);
     });
   });
 
