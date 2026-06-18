@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Toolbar: stream selector — hidden when no streams are available -->
     <div
       v-if="availableStreams.length > 0"
-      class="tw:flex tw:items-center tw:gap-[0.5rem] tw:py-[0.5rem]"
+      class="tw:flex tw:items-center tw:justify-end tw:gap-[0.5rem] tw:py-[0.5rem]"
     >
       <div
         data-test="llm-insights-stream-selector"
@@ -33,6 +33,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <OSelect
           v-model="activeStream"
+          :label="t('traces.sessionsList.streamLabel')"
+          label-position="inside"
           :options="availableStreams.map((s) => ({ label: s, value: s }))"
           labelKey="label"
           valueKey="value"
@@ -147,6 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, computed, onMounted, onUnmounted } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
+import { useI18n } from "vue-i18n";
 import { useLLMInsights } from "./composables/useLLMInsights";
 import {
   computeTrend,
@@ -169,6 +172,7 @@ import { LLM_INSIGHTS_PANELS } from "./config/llmInsightsPanels";
 import useStreams from "@/composables/useStreams";
 
 const { getStreams } = useStreams();
+const { t } = useI18n();
 const router = useRouter();
 const store = useStore();
 
