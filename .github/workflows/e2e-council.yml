@@ -1061,15 +1061,12 @@ jobs:
             echo "::error::Quality gate FAILED — Healer scope violation (edited files outside tests/). No PR."
             exit 0
           fi
-          # feature-incomplete: the Healer honestly parked tests because the feature isn't wired.
-          # The final run is "green" only because those tests are fixme — do NOT open a normal PR;
-          # block here so the report step surfaces the Healer's evidence to the dev instead.
+          # feature-incomplete does NOT block on its own (the balance): as long as SOME real tests
+          # pass, open the PR with the green tests + fixme placeholders. The "every test is fixme →
+          # zero real coverage" case is caught by the integrity gate's `no-runnable-tests` check
+          # below, which fails. Evidence for the gaps rides in the fixme test titles.
           HSTATUS=$(jq -r '.status // ""' docs/test_generator/ci/heal-result.json 2>/dev/null || echo "")
-          if [ "$HSTATUS" = "feature-incomplete" ]; then
-            echo "status=fail" >> "$GITHUB_OUTPUT"
-            echo "::warning::Healer reported feature-incomplete — no PR; the dev gets the evidence comment."
-            exit 0
-          fi
+          [ "$HSTATUS" = "feature-incomplete" ] && echo "::notice::Healer parked some tests as fixme (feature-incomplete) — opening a PR with the passing tests + fixme placeholders, provided real coverage exists."
           SENT=$(jq -r '.verdict // "PASS"' docs/test_generator/ci/sentinel-verdict.json 2>/dev/null || echo PASS)
           SENT_CRIT=$(jq -r '.critical_count // 0' docs/test_generator/ci/sentinel-verdict.json 2>/dev/null || echo 0)
           if [ "$INTEGRITY" = "fail" ] || [ "$SENT" = "FAIL" ] || { [ "$SENT_CRIT" -gt 0 ] 2>/dev/null; }; then
