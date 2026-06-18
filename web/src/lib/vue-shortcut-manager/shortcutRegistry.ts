@@ -24,10 +24,7 @@ export interface ShortcutModule {
  * is one chip + one block in the listing; its `pages` render as sub-sections.
  */
 export const SHORTCUT_MODULES: ShortcutModule[] = [
-  {
-    titleKey: "shortcuts.modules.global",
-    pages: ["shortcuts.pages.global", "shortcuts.pages.tableRow"],
-  },
+  { titleKey: "shortcuts.modules.global", pages: ["shortcuts.pages.global"] },
   { titleKey: "shortcuts.modules.logs", pages: ["shortcuts.pages.logs"] },
   {
     titleKey: "shortcuts.modules.dashboards",
@@ -93,23 +90,6 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
     ],
   },
 
-  // ── Table row (hover) ────────────────────────────────────────────────────
-  {
-    pageKey: "shortcuts.pages.tableRow",
-    shortcuts: [
-      { key: "↑ / ↓",    descriptionKey: "shortcuts.actions.tableRowNavigate" },
-      { key: "enter",    descriptionKey: "shortcuts.actions.tableRowOpen" },
-      { key: "e",        descriptionKey: "shortcuts.actions.tableRowEdit" },
-      { key: "d",        descriptionKey: "shortcuts.actions.tableRowDuplicate" },
-      { key: "i",        descriptionKey: "shortcuts.actions.tableRowInspect" },
-      { key: "p",        descriptionKey: "shortcuts.actions.tableRowPause" },
-      { key: "r",        descriptionKey: "shortcuts.actions.tableRowResume" },
-      { key: "v",        descriptionKey: "shortcuts.actions.tableRowView" },
-      { key: "x",        descriptionKey: "shortcuts.actions.tableRowExport" },
-      { key: "del / ⌫", descriptionKey: "shortcuts.actions.tableRowDelete" },
-    ],
-  },
-
   // ── Logs ────────────────────────────────────────────────────────────────
   {
     pageKey: "shortcuts.pages.logs",
@@ -134,6 +114,10 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
       { key: "i", descriptionKey: "shortcuts.actions.dashboardsListImport" },
       { key: "r", descriptionKey: "shortcuts.actions.dashboardsListRefresh" },
       { key: "/", descriptionKey: "shortcuts.actions.focusSearch" },
+      { key: "e",        descriptionKey: "shortcuts.actions.tableRowEdit" },
+      { key: "d",        descriptionKey: "shortcuts.actions.tableRowDuplicate" },
+      { key: "x",        descriptionKey: "shortcuts.actions.tableRowExport" },
+      { key: "del / ⌫", descriptionKey: "shortcuts.actions.tableRowDelete" },
     ],
   },
 
@@ -208,6 +192,11 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
       { key: "i", descriptionKey: "shortcuts.actions.alertsImport" },
       { key: "r", descriptionKey: "shortcuts.actions.alertsRefresh" },
       { key: "/", descriptionKey: "shortcuts.actions.focusSearch" },
+      { key: "e",        descriptionKey: "shortcuts.actions.tableRowEdit" },
+      { key: "d",        descriptionKey: "shortcuts.actions.tableRowDuplicate" },
+      { key: "p",        descriptionKey: "shortcuts.actions.tableRowPause" },
+      { key: "x",        descriptionKey: "shortcuts.actions.tableRowExport" },
+      { key: "del / ⌫", descriptionKey: "shortcuts.actions.tableRowDelete" },
     ],
   },
 
@@ -218,6 +207,9 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
       { key: "n", descriptionKey: "shortcuts.actions.alertDestinationsAdd" },
       { key: "r", descriptionKey: "shortcuts.actions.alertDestinationsRefresh" },
       { key: "/", descriptionKey: "shortcuts.actions.focusSearch" },
+      { key: "e",        descriptionKey: "shortcuts.actions.tableRowEdit" },
+      { key: "x",        descriptionKey: "shortcuts.actions.tableRowExport" },
+      { key: "del / ⌫", descriptionKey: "shortcuts.actions.tableRowDelete" },
     ],
   },
 
@@ -228,6 +220,9 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
       { key: "n", descriptionKey: "shortcuts.actions.alertTemplatesAdd" },
       { key: "r", descriptionKey: "shortcuts.actions.alertTemplatesRefresh" },
       { key: "/", descriptionKey: "shortcuts.actions.focusSearch" },
+      { key: "e",        descriptionKey: "shortcuts.actions.tableRowEdit" },
+      { key: "x",        descriptionKey: "shortcuts.actions.tableRowExport" },
+      { key: "del / ⌫", descriptionKey: "shortcuts.actions.tableRowDelete" },
     ],
   },
 
@@ -238,6 +233,8 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
       { key: "n", descriptionKey: "shortcuts.actions.streamsAdd" },
       { key: "r", descriptionKey: "shortcuts.actions.streamsRefresh" },
       { key: "/", descriptionKey: "shortcuts.actions.focusSearch" },
+      { key: "e",        descriptionKey: "shortcuts.actions.tableRowEdit" },
+      { key: "del / ⌫", descriptionKey: "shortcuts.actions.tableRowDelete" },
     ],
   },
 
@@ -249,6 +246,10 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
       { key: "i", descriptionKey: "shortcuts.actions.pipelinesImport" },
       { key: "r", descriptionKey: "shortcuts.actions.pipelinesRefresh" },
       { key: "/", descriptionKey: "shortcuts.actions.focusSearch" },
+      { key: "e",        descriptionKey: "shortcuts.actions.tableRowEdit" },
+      { key: "p",        descriptionKey: "shortcuts.actions.tableRowPause" },
+      { key: "x",        descriptionKey: "shortcuts.actions.tableRowExport" },
+      { key: "del / ⌫", descriptionKey: "shortcuts.actions.tableRowDelete" },
     ],
   },
 
@@ -259,6 +260,8 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
       { key: "n", descriptionKey: "shortcuts.actions.functionsAdd" },
       { key: "r", descriptionKey: "shortcuts.actions.functionsRefresh" },
       { key: "/", descriptionKey: "shortcuts.actions.focusSearch" },
+      { key: "e",        descriptionKey: "shortcuts.actions.tableRowEdit" },
+      { key: "del / ⌫", descriptionKey: "shortcuts.actions.tableRowDelete" },
     ],
   },
 
@@ -269,6 +272,8 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
       { key: "n", descriptionKey: "shortcuts.actions.reportsAdd" },
       { key: "r", descriptionKey: "shortcuts.actions.reportsRefresh" },
       { key: "/", descriptionKey: "shortcuts.actions.focusSearch" },
+      { key: "e",        descriptionKey: "shortcuts.actions.tableRowEdit" },
+      { key: "del / ⌫", descriptionKey: "shortcuts.actions.tableRowDelete" },
     ],
   },
 
@@ -279,6 +284,8 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
       { key: "n", descriptionKey: "shortcuts.actions.iamUsersAdd" },
       { key: "r", descriptionKey: "shortcuts.actions.iamUsersRefresh" },
       { key: "/", descriptionKey: "shortcuts.actions.focusSearch" },
+      { key: "e",        descriptionKey: "shortcuts.actions.tableRowEdit" },
+      { key: "del / ⌫", descriptionKey: "shortcuts.actions.tableRowDelete" },
     ],
   },
 
@@ -289,6 +296,8 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
       { key: "n", descriptionKey: "shortcuts.actions.iamRolesAdd" },
       { key: "r", descriptionKey: "shortcuts.actions.iamRolesRefresh" },
       { key: "/", descriptionKey: "shortcuts.actions.focusSearch" },
+      { key: "e",        descriptionKey: "shortcuts.actions.tableRowEdit" },
+      { key: "del / ⌫", descriptionKey: "shortcuts.actions.tableRowDelete" },
     ],
   },
 
@@ -299,6 +308,8 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
       { key: "n", descriptionKey: "shortcuts.actions.iamGroupsAdd" },
       { key: "r", descriptionKey: "shortcuts.actions.iamGroupsRefresh" },
       { key: "/", descriptionKey: "shortcuts.actions.focusSearch" },
+      { key: "e",        descriptionKey: "shortcuts.actions.tableRowEdit" },
+      { key: "del / ⌫", descriptionKey: "shortcuts.actions.tableRowDelete" },
     ],
   },
 
@@ -309,6 +320,8 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
       { key: "n", descriptionKey: "shortcuts.actions.iamServiceAccountsAdd" },
       { key: "r", descriptionKey: "shortcuts.actions.iamServiceAccountsRefresh" },
       { key: "/", descriptionKey: "shortcuts.actions.focusSearch" },
+      { key: "e",        descriptionKey: "shortcuts.actions.tableRowEdit" },
+      { key: "del / ⌫", descriptionKey: "shortcuts.actions.tableRowDelete" },
     ],
   },
 
@@ -319,6 +332,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
       { key: "n", descriptionKey: "shortcuts.actions.ingestionTokensAdd" },
       { key: "r", descriptionKey: "shortcuts.actions.ingestionTokensRefresh" },
       { key: "/", descriptionKey: "shortcuts.actions.focusSearch" },
+      { key: "del / ⌫", descriptionKey: "shortcuts.actions.tableRowDelete" },
     ],
   },
 
