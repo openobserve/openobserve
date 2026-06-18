@@ -374,6 +374,8 @@ test.describe("Dashboard Table Chart - Core Features", () => {
       await pm.chartTypeSelector.configureYAxisFunction("y_axis_1", "count");
 
       // Register the response waiter BEFORE clicking Apply so the request isn't missed.
+      // Uses waitForResponse instead of waitForStreamComplete so the HTTP status
+      // is asserted directly — waitForStreamComplete silently times out on non-200s.
       // Matches both _search_stream (raw logs) and _histogram_stream (aggregated).
       const apiResponsePromise = page.waitForResponse(
         (r) =>
