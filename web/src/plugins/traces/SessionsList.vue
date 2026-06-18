@@ -204,6 +204,9 @@ interface Props {
   streamName: string;
   startTime: number; // microseconds
   endTime: number; // microseconds
+  // Route to open on row click. Defaults to the Traces session-details route;
+  // the AI/LLM Sessions page passes its own route so it stays in the AI menu.
+  detailRouteName?: string;
 }
 
 const props = defineProps<Props>();
@@ -451,7 +454,7 @@ function onPaginationChange({ page, size }: { page: number; size: number }) {
 function handleRowClick(row: SessionRow) {
   emit("sessionSelected", row);
   router.push({
-    name: "sessionDetails",
+    name: props.detailRouteName || "sessionDetails",
     query: {
       stream: activeStream.value,
       session_id: row.sessionId,
