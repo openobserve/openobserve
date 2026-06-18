@@ -31,6 +31,36 @@
             "3"
           ],
           [
+            "SORT-A7",
+            "480.0",
+            "1",
+            "1"
+          ],
+          [
+            "SORT-A7",
+            "190.0",
+            "2",
+            "2"
+          ],
+          [
+            "SORT-A7",
+            "150.0",
+            "3",
+            "3"
+          ],
+          [
+            "SORT-Z9",
+            "725.0",
+            "1",
+            "1"
+          ],
+          [
+            "SORT-Z9",
+            "150.0",
+            "2",
+            "2"
+          ],
+          [
             "SORT-M3",
             "900.0",
             "1",
@@ -53,36 +83,6 @@
             "320.0",
             "4",
             "4"
-          ],
-          [
-            "SORT-Z9",
-            "725.0",
-            "1",
-            "1"
-          ],
-          [
-            "SORT-Z9",
-            "150.0",
-            "2",
-            "2"
-          ],
-          [
-            "SORT-A7",
-            "480.0",
-            "1",
-            "1"
-          ],
-          [
-            "SORT-A7",
-            "190.0",
-            "2",
-            "2"
-          ],
-          [
-            "SORT-A7",
-            "150.0",
-            "3",
-            "3"
           ],
           [
             "SORT-Q5",
@@ -1081,7 +1081,7 @@
           ],
           [
             "ZONE-4",
-            "auto",
+            "hybrid",
             "2",
             "4",
             "50.0",
@@ -1089,7 +1089,7 @@
           ],
           [
             "ZONE-4",
-            "hybrid",
+            "auto",
             "2",
             "4",
             "50.0",
@@ -2823,12 +2823,12 @@
         ],
         "results": [
           [
-            "E001",
+            "E009",
             "2",
             "1"
           ],
           [
-            "E009",
+            "E001",
             "2",
             "1"
           ]
@@ -3199,6 +3199,1037 @@
           ]
         ],
         "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q647",
+      "sql": "SELECT _timestamp, facility_zone, throughput_rate, ROW_NUMBER() OVER (PARTITION BY facility_zone ORDER BY _timestamp) AS rn, RANK() OVER (PARTITION BY facility_zone ORDER BY throughput_rate DESC) AS tput_rank, DENSE_RANK() OVER (PARTITION BY facility_zone ORDER BY load_factor DESC) AS load_drank FROM \"{stream}\" ORDER BY _timestamp LIMIT 15",
+      "category": "window",
+      "time_offset": {
+        "start_offset": 38700000000,
+        "end_offset": 38880000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "throughput_rate",
+          "rn",
+          "tput_rank",
+          "load_drank"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "900.0",
+            "1",
+            "1",
+            "2"
+          ],
+          [
+            "ZONE-4",
+            "150.0",
+            "1",
+            "5",
+            "3"
+          ],
+          [
+            "ZONE-2",
+            "150.0",
+            "1",
+            "4",
+            "3"
+          ],
+          [
+            "ZONE-3",
+            "320.0",
+            "1",
+            "3",
+            "2"
+          ],
+          [
+            "ZONE-4",
+            "480.0",
+            "2",
+            "2",
+            "4"
+          ],
+          [
+            "ZONE-2",
+            "480.0",
+            "2",
+            "1",
+            "4"
+          ],
+          [
+            "ZONE-1",
+            "610.0",
+            "2",
+            "3",
+            "1"
+          ],
+          [
+            "ZONE-3",
+            "610.0",
+            "2",
+            "2",
+            "1"
+          ],
+          [
+            "ZONE-4",
+            "725.0",
+            "3",
+            "1",
+            "5"
+          ],
+          [
+            "ZONE-1",
+            "840.0",
+            "3",
+            "2",
+            "4"
+          ],
+          [
+            "ZONE-3",
+            "840.0",
+            "3",
+            "1",
+            "3"
+          ],
+          [
+            "ZONE-2",
+            "290.0",
+            "3",
+            "2",
+            "2"
+          ],
+          [
+            "ZONE-4",
+            "290.0",
+            "4",
+            "3",
+            "2"
+          ],
+          [
+            "ZONE-1",
+            "555.0",
+            "4",
+            "4",
+            "3"
+          ],
+          [
+            "ZONE-2",
+            "190.0",
+            "4",
+            "3",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
+      }
+    },
+    {
+      "id": "Q648",
+      "sql": "SELECT _timestamp, facility_zone, throughput_rate, AVG(throughput_rate) OVER w AS mov_avg, MIN(throughput_rate) OVER w AS mov_min, MAX(throughput_rate) OVER w AS mov_max FROM \"{stream}\" WINDOW w AS (PARTITION BY facility_zone ORDER BY _timestamp ROWS BETWEEN 2 PRECEDING AND 2 FOLLOWING) ORDER BY _timestamp LIMIT 15",
+      "category": "window",
+      "time_offset": {
+        "start_offset": 38760000000,
+        "end_offset": 38940000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "throughput_rate",
+          "mov_avg",
+          "mov_min",
+          "mov_max"
+        ],
+        "results": [
+          [
+            "ZONE-2",
+            "480.0",
+            "320.0",
+            "190.0",
+            "480.0"
+          ],
+          [
+            "ZONE-1",
+            "610.0",
+            "668.3333333333334",
+            "555.0",
+            "840.0"
+          ],
+          [
+            "ZONE-3",
+            "610.0",
+            "783.3333333333334",
+            "610.0",
+            "900.0"
+          ],
+          [
+            "ZONE-4",
+            "725.0",
+            "401.6666666666667",
+            "190.0",
+            "725.0"
+          ],
+          [
+            "ZONE-1",
+            "840.0",
+            "726.25",
+            "555.0",
+            "900.0"
+          ],
+          [
+            "ZONE-3",
+            "840.0",
+            "667.5",
+            "320.0",
+            "900.0"
+          ],
+          [
+            "ZONE-2",
+            "290.0",
+            "277.5",
+            "150.0",
+            "480.0"
+          ],
+          [
+            "ZONE-4",
+            "290.0",
+            "401.6666666666667",
+            "190.0",
+            "725.0"
+          ],
+          [
+            "ZONE-1",
+            "555.0",
+            "645.0",
+            "320.0",
+            "900.0"
+          ],
+          [
+            "ZONE-2",
+            "190.0",
+            "277.5",
+            "150.0",
+            "480.0"
+          ],
+          [
+            "ZONE-4",
+            "190.0",
+            "401.6666666666667",
+            "190.0",
+            "725.0"
+          ],
+          [
+            "ZONE-3",
+            "900.0",
+            "667.5",
+            "320.0",
+            "900.0"
+          ],
+          [
+            "ZONE-1",
+            "900.0",
+            "653.75",
+            "320.0",
+            "900.0"
+          ],
+          [
+            "ZONE-2",
+            "150.0",
+            "210.0",
+            "150.0",
+            "290.0"
+          ],
+          [
+            "ZONE-3",
+            "320.0",
+            "686.6666666666666",
+            "320.0",
+            "900.0"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
+      }
+    },
+    {
+      "id": "Q649",
+      "sql": "SELECT _timestamp, facility_zone, operation_mode, throughput_rate, ROW_NUMBER() OVER (PARTITION BY facility_zone, operation_mode ORDER BY _timestamp) AS rn, SUM(throughput_rate) OVER (PARTITION BY facility_zone, operation_mode ORDER BY _timestamp ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS cumsum FROM \"{stream}\" ORDER BY _timestamp LIMIT 15",
+      "category": "window",
+      "time_offset": {
+        "start_offset": 38820000000,
+        "end_offset": 39000000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "operation_mode",
+          "throughput_rate",
+          "rn",
+          "cumsum"
+        ],
+        "results": [
+          [
+            "ZONE-3",
+            "hybrid",
+            "840.0",
+            "1",
+            "840.0"
+          ],
+          [
+            "ZONE-2",
+            "manual",
+            "290.0",
+            "1",
+            "290.0"
+          ],
+          [
+            "ZONE-4",
+            "auto",
+            "290.0",
+            "1",
+            "290.0"
+          ],
+          [
+            "ZONE-1",
+            "manual",
+            "555.0",
+            "1",
+            "555.0"
+          ],
+          [
+            "ZONE-2",
+            "auto",
+            "190.0",
+            "1",
+            "190.0"
+          ],
+          [
+            "ZONE-4",
+            "hybrid",
+            "190.0",
+            "1",
+            "190.0"
+          ],
+          [
+            "ZONE-3",
+            "manual",
+            "900.0",
+            "1",
+            "900.0"
+          ],
+          [
+            "ZONE-1",
+            "auto",
+            "900.0",
+            "1",
+            "900.0"
+          ],
+          [
+            "ZONE-2",
+            "manual",
+            "150.0",
+            "2",
+            "440.0"
+          ],
+          [
+            "ZONE-3",
+            "hybrid",
+            "320.0",
+            "2",
+            "1160.0"
+          ],
+          [
+            "ZONE-1",
+            "manual",
+            "320.0",
+            "2",
+            "875.0"
+          ],
+          [
+            "ZONE-4",
+            "auto",
+            "480.0",
+            "2",
+            "770.0"
+          ],
+          [
+            "ZONE-2",
+            "auto",
+            "480.0",
+            "2",
+            "670.0"
+          ],
+          [
+            "ZONE-3",
+            "manual",
+            "610.0",
+            "2",
+            "1510.0"
+          ],
+          [
+            "ZONE-4",
+            "hybrid",
+            "725.0",
+            "2",
+            "915.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q650",
+      "sql": "SELECT _timestamp, facility_zone, throughput_rate, ROW_NUMBER() OVER (PARTITION BY facility_zone ORDER BY throughput_rate DESC) AS rank_by_tput, SUM(throughput_rate) OVER (PARTITION BY facility_zone ORDER BY _timestamp ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING) AS rolling_sum FROM \"{stream}\" ORDER BY _timestamp",
+      "category": "window",
+      "time_offset": {
+        "start_offset": 38880000000,
+        "end_offset": 39060000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "throughput_rate",
+          "rank_by_tput",
+          "rolling_sum"
+        ],
+        "results": [
+          [
+            "ZONE-4",
+            "190.0",
+            "4",
+            "670.0"
+          ],
+          [
+            "ZONE-3",
+            "900.0",
+            "1",
+            "1220.0"
+          ],
+          [
+            "ZONE-1",
+            "900.0",
+            "1",
+            "1220.0"
+          ],
+          [
+            "ZONE-2",
+            "150.0",
+            "3",
+            "630.0"
+          ],
+          [
+            "ZONE-3",
+            "320.0",
+            "5",
+            "1830.0"
+          ],
+          [
+            "ZONE-1",
+            "320.0",
+            "4",
+            "2060.0"
+          ],
+          [
+            "ZONE-4",
+            "480.0",
+            "2",
+            "1395.0"
+          ],
+          [
+            "ZONE-2",
+            "480.0",
+            "2",
+            "1355.0"
+          ],
+          [
+            "ZONE-3",
+            "610.0",
+            "3",
+            "1770.0"
+          ],
+          [
+            "ZONE-4",
+            "725.0",
+            "1",
+            "1495.0"
+          ],
+          [
+            "ZONE-2",
+            "725.0",
+            "1",
+            "1205.0"
+          ],
+          [
+            "ZONE-1",
+            "840.0",
+            "2",
+            "1715.0"
+          ],
+          [
+            "ZONE-3",
+            "840.0",
+            "2",
+            "2005.0"
+          ],
+          [
+            "ZONE-4",
+            "290.0",
+            "3",
+            "1015.0"
+          ],
+          [
+            "ZONE-1",
+            "555.0",
+            "3",
+            "1395.0"
+          ],
+          [
+            "ZONE-3",
+            "555.0",
+            "4",
+            "1395.0"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
+      }
+    },
+    {
+      "id": "Q651",
+      "sql": "SELECT _timestamp, facility_zone, throughput_rate, NTH_VALUE(throughput_rate, 2) OVER (PARTITION BY facility_zone ORDER BY _timestamp ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS second_tput FROM \"{stream}\" ORDER BY _timestamp LIMIT 15",
+      "category": "window",
+      "time_offset": {
+        "start_offset": 38940000000,
+        "end_offset": 39120000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "throughput_rate",
+          "second_tput"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "320.0",
+            "840.0"
+          ],
+          [
+            "ZONE-4",
+            "480.0",
+            "725.0"
+          ],
+          [
+            "ZONE-2",
+            "480.0",
+            "725.0"
+          ],
+          [
+            "ZONE-3",
+            "610.0",
+            "840.0"
+          ],
+          [
+            "ZONE-4",
+            "725.0",
+            "725.0"
+          ],
+          [
+            "ZONE-2",
+            "725.0",
+            "725.0"
+          ],
+          [
+            "ZONE-1",
+            "840.0",
+            "840.0"
+          ],
+          [
+            "ZONE-3",
+            "840.0",
+            "840.0"
+          ],
+          [
+            "ZONE-4",
+            "290.0",
+            "725.0"
+          ],
+          [
+            "ZONE-1",
+            "555.0",
+            "840.0"
+          ],
+          [
+            "ZONE-3",
+            "555.0",
+            "840.0"
+          ],
+          [
+            "ZONE-2",
+            "190.0",
+            "725.0"
+          ],
+          [
+            "ZONE-4",
+            "190.0",
+            "725.0"
+          ],
+          [
+            "ZONE-1",
+            "900.0",
+            "840.0"
+          ],
+          [
+            "ZONE-2",
+            "150.0",
+            "725.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q652",
+      "sql": "SELECT _timestamp, facility_zone, throughput_rate, FIRST_VALUE(throughput_rate) OVER (PARTITION BY facility_zone ORDER BY _timestamp) AS first_tput, LAST_VALUE(throughput_rate) OVER (PARTITION BY facility_zone ORDER BY _timestamp ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS last_tput FROM \"{stream}\" ORDER BY _timestamp LIMIT 15",
+      "category": "window",
+      "time_offset": {
+        "start_offset": 39000000000,
+        "end_offset": 39180000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "throughput_rate",
+          "first_tput",
+          "last_tput"
+        ],
+        "results": [
+          [
+            "ZONE-2",
+            "725.0",
+            "725.0",
+            "480.0"
+          ],
+          [
+            "ZONE-1",
+            "840.0",
+            "840.0",
+            "610.0"
+          ],
+          [
+            "ZONE-3",
+            "840.0",
+            "840.0",
+            "610.0"
+          ],
+          [
+            "ZONE-4",
+            "290.0",
+            "290.0",
+            "150.0"
+          ],
+          [
+            "ZONE-1",
+            "555.0",
+            "840.0",
+            "610.0"
+          ],
+          [
+            "ZONE-3",
+            "555.0",
+            "840.0",
+            "610.0"
+          ],
+          [
+            "ZONE-2",
+            "190.0",
+            "725.0",
+            "480.0"
+          ],
+          [
+            "ZONE-4",
+            "190.0",
+            "290.0",
+            "150.0"
+          ],
+          [
+            "ZONE-1",
+            "900.0",
+            "840.0",
+            "610.0"
+          ],
+          [
+            "ZONE-2",
+            "150.0",
+            "725.0",
+            "480.0"
+          ],
+          [
+            "ZONE-4",
+            "150.0",
+            "290.0",
+            "150.0"
+          ],
+          [
+            "ZONE-3",
+            "320.0",
+            "840.0",
+            "610.0"
+          ],
+          [
+            "ZONE-1",
+            "320.0",
+            "840.0",
+            "610.0"
+          ],
+          [
+            "ZONE-2",
+            "480.0",
+            "725.0",
+            "480.0"
+          ],
+          [
+            "ZONE-3",
+            "610.0",
+            "840.0",
+            "610.0"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
+      }
+    },
+    {
+      "id": "Q653",
+      "sql": "WITH ranked AS (SELECT _timestamp, facility_zone, throughput_rate, load_factor, ROW_NUMBER() OVER (PARTITION BY facility_zone ORDER BY throughput_rate DESC) AS rn FROM \"{stream}\") SELECT facility_zone, ROUND(AVG(throughput_rate), 1) AS avg_top_tput, COUNT(*) AS top_count FROM ranked WHERE rn <= 3 GROUP BY facility_zone ORDER BY facility_zone",
+      "category": "window",
+      "time_offset": {
+        "start_offset": 39060000000,
+        "end_offset": 39240000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "avg_top_tput",
+          "top_count"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "610.0",
+            "3"
+          ],
+          [
+            "ZONE-2",
+            "498.3",
+            "3"
+          ],
+          [
+            "ZONE-3",
+            "668.3",
+            "3"
+          ],
+          [
+            "ZONE-4",
+            "401.7",
+            "3"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
+      }
+    },
+    {
+      "id": "Q654",
+      "sql": "SELECT _timestamp, throughput_rate, CUME_DIST() OVER (ORDER BY throughput_rate) AS cume_dist, PERCENT_RANK() OVER (ORDER BY throughput_rate) AS pct_rank FROM \"{stream}\" ORDER BY _timestamp LIMIT 15",
+      "category": "window",
+      "time_offset": {
+        "start_offset": 39120000000,
+        "end_offset": 39300000000
+      },
+      "expected": {
+        "columns": [
+          "throughput_rate",
+          "cume_dist",
+          "pct_rank"
+        ],
+        "results": [
+          [
+            "150.0",
+            "0.0625",
+            "0.0"
+          ],
+          [
+            "320.0",
+            "0.375",
+            "0.26666666666666666"
+          ],
+          [
+            "320.0",
+            "0.375",
+            "0.26666666666666666"
+          ],
+          [
+            "480.0",
+            "0.4375",
+            "0.4"
+          ],
+          [
+            "610.0",
+            "0.6875",
+            "0.6"
+          ],
+          [
+            "610.0",
+            "0.6875",
+            "0.6"
+          ],
+          [
+            "725.0",
+            "0.8125",
+            "0.7333333333333333"
+          ],
+          [
+            "725.0",
+            "0.8125",
+            "0.7333333333333333"
+          ],
+          [
+            "840.0",
+            "0.875",
+            "0.8666666666666667"
+          ],
+          [
+            "290.0",
+            "0.25",
+            "0.13333333333333333"
+          ],
+          [
+            "290.0",
+            "0.25",
+            "0.13333333333333333"
+          ],
+          [
+            "555.0",
+            "0.5625",
+            "0.4666666666666667"
+          ],
+          [
+            "555.0",
+            "0.5625",
+            "0.4666666666666667"
+          ],
+          [
+            "190.0",
+            "0.125",
+            "0.06666666666666667"
+          ],
+          [
+            "900.0",
+            "1.0",
+            "0.9333333333333333"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
+      }
+    },
+    {
+      "id": "Q655",
+      "sql": "SELECT _timestamp, facility_zone, throughput_rate, NTILE(3) OVER (PARTITION BY facility_zone ORDER BY throughput_rate) AS tput_tertile FROM \"{stream}\" ORDER BY _timestamp LIMIT 15",
+      "category": "window",
+      "time_offset": {
+        "start_offset": 39180000000,
+        "end_offset": 39360000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "throughput_rate",
+          "tput_tertile"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "610.0",
+            "2"
+          ],
+          [
+            "ZONE-4",
+            "725.0",
+            "3"
+          ],
+          [
+            "ZONE-2",
+            "725.0",
+            "3"
+          ],
+          [
+            "ZONE-3",
+            "840.0",
+            "2"
+          ],
+          [
+            "ZONE-4",
+            "290.0",
+            "2"
+          ],
+          [
+            "ZONE-2",
+            "290.0",
+            "1"
+          ],
+          [
+            "ZONE-1",
+            "555.0",
+            "1"
+          ],
+          [
+            "ZONE-3",
+            "555.0",
+            "1"
+          ],
+          [
+            "ZONE-4",
+            "190.0",
+            "1"
+          ],
+          [
+            "ZONE-1",
+            "900.0",
+            "3"
+          ],
+          [
+            "ZONE-3",
+            "900.0",
+            "3"
+          ],
+          [
+            "ZONE-2",
+            "150.0",
+            "1"
+          ],
+          [
+            "ZONE-4",
+            "150.0",
+            "1"
+          ],
+          [
+            "ZONE-1",
+            "320.0",
+            "1"
+          ],
+          [
+            "ZONE-2",
+            "480.0",
+            "2"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q656",
+      "sql": "SELECT _timestamp, throughput_rate, SUM(throughput_rate) OVER (ORDER BY _timestamp ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS running_total, ROUND(AVG(throughput_rate) OVER (ORDER BY _timestamp ROWS BETWEEN 3 PRECEDING AND 3 FOLLOWING), 1) AS moving_avg7 FROM \"{stream}\" ORDER BY _timestamp LIMIT 20",
+      "category": "window",
+      "time_offset": {
+        "start_offset": 39240000000,
+        "end_offset": 39420000000
+      },
+      "expected": {
+        "columns": [
+          "throughput_rate",
+          "running_total",
+          "moving_avg7"
+        ],
+        "results": [
+          [
+            "290.0",
+            "290.0",
+            "397.5"
+          ],
+          [
+            "555.0",
+            "845.0",
+            "498.0"
+          ],
+          [
+            "555.0",
+            "1400.0",
+            "565.0"
+          ],
+          [
+            "190.0",
+            "1590.0",
+            "505.7"
+          ],
+          [
+            "900.0",
+            "2490.0",
+            "485.7"
+          ],
+          [
+            "900.0",
+            "3390.0",
+            "452.1"
+          ],
+          [
+            "150.0",
+            "3540.0",
+            "441.4"
+          ],
+          [
+            "150.0",
+            "3690.0",
+            "482.9"
+          ],
+          [
+            "320.0",
+            "4010.0",
+            "441.4"
+          ],
+          [
+            "480.0",
+            "4490.0",
+            "400.0"
+          ],
+          [
+            "480.0",
+            "4970.0",
+            "482.1"
+          ],
+          [
+            "610.0",
+            "5580.0",
+            "580.7"
+          ],
+          [
+            "610.0",
+            "6190.0",
+            "655.0"
+          ],
+          [
+            "725.0",
+            "6915.0",
+            "684.2"
+          ],
+          [
+            "840.0",
+            "7755.0",
+            "725.0"
+          ],
+          [
+            "840.0",
+            "8595.0",
+            "753.8"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
       }
     }
   ],

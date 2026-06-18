@@ -1,3 +1,4 @@
+<!-- Copyright 2026 OpenObserve Inc. -->
 <template>
   <ODialog data-test="add-annotation-dialog" v-model:open="isOpen" persistent size="lg" :title="isEditMode ? 'Edit Annotation' : 'Add Annotation'">
     <OForm id="add-annotation-form" :default-values="{ title: annotationData.title }" @submit="saveAnnotation.execute()">
@@ -7,11 +8,13 @@
           v-model="annotationData.title"
           label="Title *"
           :validators="[(val) => !val ? 'Title is required.' : undefined]"
+          data-test="dashboard-add-annotation-title-input"
         />
         <OTextarea
           v-model="annotationData.text"
           label="Description"
           :rows="3"
+          data-test="dashboard-add-annotation-text-input"
         />
 
         <OSelect
@@ -23,6 +26,7 @@
             style="min-width: 150px"
             label="Select Panels"
             class="textbox tw:flex tw:flex-col no-case showLabelOnTop"
+            data-test="dashboard-add-annotation-panels-select"
           />
         <div class="tw:text-xs tw:mt-3">
           Timestamp: {{ annotationDateString }}
@@ -36,10 +40,11 @@
           variant="destructive"
           size="sm-action"
           @click="handleDeleteWithConfirm"
+          data-test="dashboard-add-annotation-delete-btn"
           >Delete</OButton
         >
         <div class="tw:flex-1"></div>
-        <OButton variant="outline" size="sm-action" @click="handleClose"
+        <OButton variant="outline" size="sm-action" @click="handleClose" data-test="dashboard-add-annotation-cancel-btn"
           >Cancel</OButton
         >
         <OButton
@@ -49,6 +54,7 @@
           form="add-annotation-form"
           :loading="saveAnnotation.isLoading?.value"
           :disabled="!annotationData.title"
+          data-test="dashboard-add-annotation-save-btn"
           >{{ annotationData.annotation_id ? "Update" : "Save" }}</OButton
         >
       </div>
