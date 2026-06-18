@@ -16,6 +16,7 @@
 use std::{
     collections::{HashMap, HashSet},
     sync::LazyLock as Lazy,
+    time::{Duration, Instant},
 };
 
 use anyhow::{Result, anyhow};
@@ -41,10 +42,7 @@ use o2_enterprise::enterprise::pipeline::pipeline_wal_writer::get_pipeline_wal_w
 use proto::cluster_rpc;
 use tokio::sync::mpsc::{Receiver, Sender, channel};
 #[cfg(feature = "enterprise")]
-use tokio::{
-    sync::Mutex,
-    time::{Duration, Instant},
-};
+use tokio::sync::Mutex;
 
 use crate::{
     common::{infra::config::QUERY_FUNCTIONS, utils::js::JSRuntimeConfig},
@@ -295,6 +293,10 @@ impl ExecutablePipeline {
         let pipeline_name = self.name.clone();
         // Unique invocation ID to correlate logs across concurrent pipeline runs
         let inv_id = &format!("{:08x}", rand::random::<u32>());
+        // Gated detailed timing logs (ZO_PRINT_KEY_EVENT). Per-batch / per-node only,
+        // never per-record, to stay safe under high ingestion rate.
+        let print_event = config::get_config().common.print_key_event;
+        let batch_start = Instant::now();
         log::info!("[Pipeline] {pipeline_name} [inv={inv_id}]: process batch of size {batch_size}");
         if batch_size == 0 {
             return Ok(HashMap::default());
@@ -308,6 +310,18 @@ impl ExecutablePipeline {
             .sum::<f64>()
             / config::SIZE_IN_MB;
 
+        if print_event {
+            log::info!(
+                "[Pipeline:Timing] [inv={inv_id}] start id={} name={} org={org_id} stream={:?} batch_size={batch_size} source_size_mb={source_size:.4} num_nodes={} num_funcs={}",
+                self.id,
+                pipeline_name,
+                stream_name,
+                self.sorted_nodes.len(),
+                self.num_of_func(),
+            );
+        }
+
+        let usage_report_start = Instant::now();
         if source_size > 0.0 {
             let req_stats = config::meta::self_reporting::usage::RequestStats {
                 size: source_size,
@@ -327,6 +341,7 @@ impl ExecutablePipeline {
             )
             .await;
         }
+        let usage_report_ms = usage_report_start.elapsed().as_millis();
 
         // result_channel
         let (result_sender, mut result_receiver) =
@@ -363,6 +378,7 @@ impl ExecutablePipeline {
                 self.function_map.get(node_id).cloned();
             let pipeline_name = pipeline_name.clone();
             let stream_name = stream_name.clone();
+            let inv_id_cp = inv_id.to_string();
 
             // WARN: Do not change. Processing node can only be done in a task, as the internals of
             // remote wal writer depends on the task id.
@@ -395,6 +411,8 @@ impl ExecutablePipeline {
                 stream_name,
                 source_stream_type,
                 _leaf_dest_stream,
+                inv_id_cp,
+                print_event,
             ));
             node_tasks.push(task);
         }
@@ -471,15 +489,18 @@ impl ExecutablePipeline {
         log::info!(
             "[Pipeline] {pipeline_name} [inv={inv_id}]: waiting for all node tasks to complete"
         );
+        let node_tasks_start = Instant::now();
         if let Err(e) = try_join_all(node_tasks).await {
             log::error!(
                 "[Pipeline] {pipeline_name} [inv={inv_id}]: node processing jobs failed: {e}"
             );
         }
+        let node_tasks_ms = node_tasks_start.elapsed().as_millis();
         log::info!("[Pipeline] {pipeline_name} [inv={inv_id}]: all node tasks completed");
 
         // Publish errors if received any
         log::info!("[Pipeline] {pipeline_name} [inv={inv_id}]: awaiting error task");
+        let error_task_start = Instant::now();
         if let Some(pipeline_errors) = error_task.await.map_err(|e| {
             log::error!(
                 "[Pipeline] {pipeline_name} [inv={inv_id}]: error collecting job failed: {e}"
@@ -501,18 +522,37 @@ impl ExecutablePipeline {
             log::debug!("[Pipeline]: execution errors occurred and published");
             publish_error(error_data).await;
         }
+        let error_collect_ms = error_task_start.elapsed().as_millis();
 
         log::info!("[Pipeline] {pipeline_name} [inv={inv_id}]: awaiting result collector");
+        let result_task_start = Instant::now();
         let results = result_task.await.map_err(|e| {
             log::error!(
                 "[Pipeline] {pipeline_name} [inv={inv_id}]: result collecting job failed: {e}"
             );
             anyhow!("[Pipeline] result collecting job failed: {}", e)
         })?;
+        let result_collect_ms = result_task_start.elapsed().as_millis();
         log::info!(
             "[Pipeline] {pipeline_name} [inv={inv_id}]: result collector returned {} stream groups",
             results.len()
         );
+
+        if print_event {
+            let total_ms = batch_start.elapsed().as_millis();
+            let out_records: usize = results.values().map(|v| v.len()).sum();
+            let secs = batch_start.elapsed().as_secs_f64();
+            let (records_per_sec, mb_per_sec) = if secs > 0.0 {
+                (batch_size as f64 / secs, source_size / secs)
+            } else {
+                (0.0, 0.0)
+            };
+            log::info!(
+                "[Pipeline:Timing] [inv={inv_id}] done id={} name={} batch_size={batch_size} source_size_mb={source_size:.4} out_records={out_records} total_ms={total_ms} node_tasks_ms={node_tasks_ms} result_collect_ms={result_collect_ms} error_collect_ms={error_collect_ms} usage_report_ms={usage_report_ms} records_per_sec={records_per_sec:.1} mb_per_sec={mb_per_sec:.4}",
+                self.id,
+                pipeline_name,
+            );
+        }
 
         // Cross-type leaf nodes ingest directly via ingestion_service inside process_node,
         // so results here only contain same-type records for the caller to handle.
@@ -564,6 +604,20 @@ impl ExecutablePipeline {
 impl ExecutableNode {
     pub fn node_type(&self) -> String {
         self.to_string()
+    }
+
+    /// Human-readable label for timing logs, e.g. "function:my_vrl_fn" or
+    /// "stream:logs:default", so node latencies can be told apart in pipelines
+    /// with many nodes.
+    fn timing_label(&self) -> String {
+        match &self.node_data {
+            NodeData::Function(p) => format!("function:{}", p.name),
+            NodeData::Stream(p) => format!("stream:{}:{}", p.stream_type, p.stream_name),
+            NodeData::RemoteStream(p) => format!("remote_stream:{}", p.destination_name),
+            NodeData::Condition(_) => "condition".to_string(),
+            NodeData::Query(_) => "query".to_string(),
+            NodeData::LlmEvaluation(p) => format!("llm_evaluation:{}", p.name),
+        }
     }
 }
 
@@ -633,9 +687,20 @@ async fn process_node(
     stream_name: Option<String>,
     source_stream_type: StreamType,
     _leaf_dest_stream: Option<StreamParams>,
+    inv_id: String,
+    print_event: bool,
 ) -> Result<()> {
     let cfg = config::get_config();
     let mut count: usize = 0;
+    // Per-node timing (gated by ZO_PRINT_KEY_EVENT). Aggregated per batch, never
+    // per-record. `node_label` distinguishes nodes (e.g. the VRL fn name) so node
+    // latencies can be told apart in pipelines with many nodes.
+    let node_label = node.timing_label();
+    let node_type = node.node_type();
+    let node_start = Instant::now();
+    // wall time spent doing CPU work inside this node's loop (flatten + fn/eval),
+    // excluding time blocked on `recv().await` from upstream.
+    let mut busy = Duration::ZERO;
     match &node.node_data {
         NodeData::Stream(stream_params) => {
             if node.children.is_empty() {
@@ -657,10 +722,11 @@ async fn process_node(
                         flattened,
                     } = pipeline_item;
                     if !flattened && !record.is_null() && record.is_object() {
-                        record = match flatten::flatten_with_level(
-                            record,
-                            cfg.limit.ingest_flatten_level,
-                        ) {
+                        let flatten_timer = Instant::now();
+                        let flatten_res =
+                            flatten::flatten_with_level(record, cfg.limit.ingest_flatten_level);
+                        busy += flatten_timer.elapsed();
+                        record = match flatten_res {
                             Ok(flattened) => flattened,
                             Err(e) => {
                                 let err_msg = format!("LeafNode error with flattening: {e}");
@@ -801,10 +867,11 @@ async fn process_node(
                 } = pipeline_item;
                 // value must be flattened before condition params can take effect
                 if !flattened && !record.is_null() && record.is_object() {
-                    record = match flatten::flatten_with_level(
-                        record,
-                        cfg.limit.ingest_flatten_level,
-                    ) {
+                    let flatten_timer = Instant::now();
+                    let flatten_res =
+                        flatten::flatten_with_level(record, cfg.limit.ingest_flatten_level);
+                    busy += flatten_timer.elapsed();
+                    record = match flatten_res {
                         Ok(flattened) => flattened,
                         Err(e) => {
                             let err_msg = format!("ConditionNode error with flattening: {e}");
@@ -824,6 +891,7 @@ async fn process_node(
                 }
 
                 // Evaluate based on condition version
+                let eval_timer = Instant::now();
                 let passes = match condition_params {
                     config::meta::pipeline::components::ConditionParams::V1 { conditions } => {
                         // v1: Use tree-based ConditionList evaluation
@@ -834,6 +902,7 @@ async fn process_node(
                         conditions.evaluate(record.as_object().unwrap()).await
                     }
                 };
+                busy += eval_timer.elapsed();
 
                 // only send to children when passing all condition evaluations
                 if passes {
@@ -872,10 +941,11 @@ async fn process_node(
                         && !record.is_null()
                         && record.is_object()
                     {
-                        record = match flatten::flatten_with_level(
-                            record,
-                            cfg.limit.ingest_flatten_level,
-                        ) {
+                        let flatten_timer = Instant::now();
+                        let flatten_res =
+                            flatten::flatten_with_level(record, cfg.limit.ingest_flatten_level);
+                        busy += flatten_timer.elapsed();
+                        record = match flatten_res {
                             Ok(flattened) => flattened,
                             Err(e) => {
                                 let err_msg = format!("FunctionNode error with flattening: {e}");
@@ -904,13 +974,16 @@ async fn process_node(
                         CompiledFunctionRuntime::VRL(vrl_resolver, is_result_array) => {
                             if !is_result_array {
                                 // Single record processing with VRL
-                                record = match apply_vrl_fn(
+                                let vrl_timer = Instant::now();
+                                let vrl_res = apply_vrl_fn(
                                     &mut vrl_runtime_state,
                                     vrl_resolver,
                                     record,
                                     &org_id,
                                     std::slice::from_ref(&stream_name),
-                                ) {
+                                );
+                                busy += vrl_timer.elapsed();
+                                record = match vrl_res {
                                     (res, None) => res,
                                     (res, Some(error)) => {
                                         let err_msg = format!(
@@ -953,12 +1026,15 @@ async fn process_node(
                         CompiledFunctionRuntime::JS(js_config, is_result_array) => {
                             if !is_result_array {
                                 // Single record processing with JS
-                                record = match apply_js_fn(
+                                let js_timer = Instant::now();
+                                let js_res = apply_js_fn(
                                     js_config,
                                     record,
                                     &org_id,
                                     std::slice::from_ref(&stream_name),
-                                ) {
+                                );
+                                busy += js_timer.elapsed();
+                                record = match js_res {
                                     (res, None) => res,
                                     (res, Some(error)) => {
                                         let err_msg = format!(
@@ -1010,13 +1086,16 @@ async fn process_node(
                 match runtime {
                     CompiledFunctionRuntime::VRL(vrl_resolver, true) => {
                         // VRL result array processing
-                        let result = match apply_vrl_fn(
+                        let vrl_arr_timer = Instant::now();
+                        let vrl_arr_res = apply_vrl_fn(
                             &mut vrl_runtime_state,
                             vrl_resolver,
                             json::Value::Array(result_array_records),
                             &org_id,
                             std::slice::from_ref(&stream_name),
-                        ) {
+                        );
+                        busy += vrl_arr_timer.elapsed();
+                        let result = match vrl_arr_res {
                             (res, None) => res,
                             (res, Some(error)) => {
                                 let err_msg = format!(
@@ -1057,12 +1136,15 @@ async fn process_node(
                     }
                     CompiledFunctionRuntime::JS(js_config, true) => {
                         // JS result array processing
-                        let result = match apply_js_fn(
+                        let js_arr_timer = Instant::now();
+                        let js_arr_res = apply_js_fn(
                             js_config,
                             json::Value::Array(result_array_records),
                             &org_id,
                             std::slice::from_ref(&stream_name),
-                        ) {
+                        );
+                        busy += js_arr_timer.elapsed();
+                        let result = match js_arr_res {
                             (res, None) => res,
                             (res, Some(error)) => {
                                 let err_msg = format!(
@@ -1551,6 +1633,17 @@ async fn process_node(
         "[Pipeline] {pipeline_name}: node {node_idx} ({:?}) task returning",
         node.node_data
     );
+
+    if print_event {
+        let node_ms = node_start.elapsed().as_millis();
+        let busy_ms = busy.as_millis();
+        // wait_ms ~= time blocked on upstream (channel recv). High wait_ms with low
+        // busy_ms under low CPU points at upstream/downstream stalls, not this node.
+        let wait_ms = node_ms.saturating_sub(busy_ms);
+        log::info!(
+            "[Pipeline:Timing] [inv={inv_id}] node idx={node_idx} type={node_type} label={node_label} records={count} node_ms={node_ms} busy_ms={busy_ms} wait_ms={wait_ms}"
+        );
+    }
 
     Ok(())
 }
