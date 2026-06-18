@@ -20,7 +20,10 @@ use arrow_schema::{DataType, SchemaRef};
 use config::{FileFormat, TIMESTAMP_COL_NAME, meta::stream::FileSelection};
 use datafusion::{
     common::{DataFusionError, Result, project_schema, stats::Precision},
-    datasource::{listing::PartitionedFile, physical_plan::parquet::ParquetAccessPlan},
+    datasource::{
+        listing::PartitionedFile,
+        physical_plan::parquet::{ParquetAccessPlan, RowGroupAccess},
+    },
     logical_expr::Operator,
     parquet::arrow::arrow_reader::RowSelection,
     physical_expr::conjunction,
@@ -71,6 +74,18 @@ pub fn generate_access_plan(file: &mut PartitionedFile) {
     let path = file.path().as_ref().to_string();
     let trace_id = trace_id_from_path(&path);
 
+    log::info!(
+        "[trace_id {trace_id}] generating access plan for file with selection: path={path}, selection={selection:?}, row_group_size={row_group_size:?}",
+        selection = match &selection {
+            FileSelection::Rows(row_ids) => format!(
+                "Rows with {:?} set bits",
+                row_ids.set_indices().collect::<Vec<_>>()
+            ),
+            FileSelection::RowGroups(row_group_ids) =>
+                format!("RowGroups with {} groups", row_group_ids.len()),
+        }
+    );
+
     let Some(file_format) = FileFormat::from_extension(&path) else {
         log::warn!(
             "[trace_id {trace_id}] access_plan dropped: unrecognised file extension, selection won't be applied; path={path}"
@@ -84,6 +99,15 @@ pub fn generate_access_plan(file: &mut PartitionedFile) {
                 if let Some(access_plan) =
                     generate_parquet_access_plan(file, &row_ids, row_group_size)
                 {
+                    let total_rows = parquet_access_plan_scanned_rows(
+                        &access_plan,
+                        parquet_file_layout(file, row_group_size),
+                    );
+                    log::info!(
+                        "[trace_id {trace_id}] parquet access_plan generated successfully; path={path}, set_bits={}, total_rows={}",
+                        row_ids.count_set_bits(),
+                        total_rows,
+                    );
                     file.extensions.insert(access_plan);
                 } else {
                     log::warn!(
@@ -173,6 +197,38 @@ fn generate_parquet_access_plan(
         file.path().as_ref()
     );
     Some(access_plan)
+}
+
+fn parquet_access_plan_scanned_rows(
+    access_plan: &ParquetAccessPlan,
+    layout: Option<(usize, usize)>,
+) -> usize {
+    let Some((num_rows, row_group_size)) = layout else {
+        return 0;
+    };
+
+    access_plan
+        .inner()
+        .iter()
+        .enumerate()
+        .map(|(row_group_id, access)| match access {
+            RowGroupAccess::Skip => 0,
+            RowGroupAccess::Scan => row_group_row_count(row_group_id, num_rows, row_group_size),
+            RowGroupAccess::Selection(selection) => selection
+                .iter()
+                .filter(|selector| !selector.skip)
+                .map(|selector| selector.row_count)
+                .sum(),
+        })
+        .sum()
+}
+
+fn row_group_row_count(row_group_id: usize, num_rows: usize, row_group_size: usize) -> usize {
+    let row_group_start = row_group_id * row_group_size;
+    if row_group_start >= num_rows {
+        return 0;
+    }
+    (row_group_start + row_group_size).min(num_rows) - row_group_start
 }
 
 struct RowGroupSelectionBuilder<'a> {
@@ -358,6 +414,8 @@ mod tests {
         let row_ids = BooleanBuffer::from_iter((0..10u32).map(|i| [0u32, 1, 5, 9].contains(&i)));
 
         let plan = generate_parquet_access_plan(&file, &row_ids, Some(4)).unwrap();
+        let scanned_rows =
+            parquet_access_plan_scanned_rows(&plan, parquet_file_layout(&file, Some(4)));
 
         let mut expected = ParquetAccessPlan::new_none(3);
         expected.scan(0);
@@ -380,6 +438,7 @@ mod tests {
             RowSelection::from(vec![RowSelector::skip(1), RowSelector::select(1)]),
         );
         assert_eq!(plan, expected);
+        assert_eq!(scanned_rows, 4);
     }
 
     #[test]
@@ -389,11 +448,14 @@ mod tests {
         let row_ids = BooleanBuffer::from_iter((0..12u32).map(|i| [4u32, 5, 6, 7].contains(&i)));
 
         let plan = generate_parquet_access_plan(&file, &row_ids, Some(4)).unwrap();
+        let scanned_rows =
+            parquet_access_plan_scanned_rows(&plan, parquet_file_layout(&file, Some(4)));
 
         let mut expected = ParquetAccessPlan::new_none(3);
         expected.scan(1);
         expected.scan_selection(1, RowSelection::from(vec![RowSelector::select(4)]));
         assert_eq!(plan, expected);
+        assert_eq!(scanned_rows, 4);
     }
 
     #[test]
@@ -402,6 +464,8 @@ mod tests {
         let row_ids = BooleanBuffer::from_iter((0..8u32).map(|i| [0u32, 2].contains(&i)));
 
         let plan = generate_parquet_access_plan(&file, &row_ids, Some(4)).unwrap();
+        let scanned_rows =
+            parquet_access_plan_scanned_rows(&plan, parquet_file_layout(&file, Some(4)));
 
         let mut expected = ParquetAccessPlan::new_none(2);
         expected.scan(0);
@@ -415,6 +479,7 @@ mod tests {
             ]),
         );
         assert_eq!(plan, expected);
+        assert_eq!(scanned_rows, 2);
     }
 
     #[test]
@@ -425,6 +490,8 @@ mod tests {
         let row_ids = BooleanBuffer::from_iter((0..10u32).map(|i| [2u32, 3, 4, 5].contains(&i)));
 
         let plan = generate_parquet_access_plan(&file, &row_ids, Some(4)).unwrap();
+        let scanned_rows =
+            parquet_access_plan_scanned_rows(&plan, parquet_file_layout(&file, Some(4)));
 
         let mut expected = ParquetAccessPlan::new_none(3);
         expected.scan(0);
@@ -438,6 +505,7 @@ mod tests {
             RowSelection::from(vec![RowSelector::select(2), RowSelector::skip(2)]),
         );
         assert_eq!(plan, expected);
+        assert_eq!(scanned_rows, 4);
     }
 
     fn make_exec() -> Arc<dyn ExecutionPlan> {
