@@ -13,10 +13,27 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import type { CardSubstitutions } from "../renderMarkdown";
+import type { CardSubstitutions } from "./types";
 
 /** Placeholder shown in masked code instead of the base64 token. */
 export const MASKED_TOKEN = "••••••••••••••••••••••••••••";
+
+/**
+ * Returns `url` only if it's a safe http(s)/mailto link, else "#". External
+ * content (manifest / md frontmatter) can supply these hrefs, and Vue does NOT
+ * sanitize `:href` — so this blocks `javascript:` / `data:` URL XSS on click.
+ */
+export function safeHttpUrl(url?: string): string {
+  if (!url) return "#";
+  try {
+    const proto = new URL(url, window.location.origin).protocol;
+    return proto === "http:" || proto === "https:" || proto === "mailto:"
+      ? url
+      : "#";
+  } catch {
+    return "#";
+  }
+}
 
 /** Replace {url}/{org}/{token} in a code template with the given values. */
 export function applySubs(template: string, subs: CardSubstitutions): string {
