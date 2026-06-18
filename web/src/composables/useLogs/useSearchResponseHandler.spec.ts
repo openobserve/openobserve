@@ -312,6 +312,21 @@ describe("useSearchResponseHandler", () => {
       expect(mockState.searchObj.data.errorMsg).toContain("Search failed");
     });
 
+    it("should reset streaming progress to 0 on error", () => {
+      mockState.searchObj.loadingProgressPercentage = 80;
+      mockState.searchObj.loadingHistogramProgressPercentage = 60;
+
+      const request = { type: "search" };
+      const error = {
+        content: { message: "boom", trace_id: "t", code: 500 },
+      };
+
+      responseHandler.handleSearchError(request, error as any);
+
+      expect(mockState.searchObj.loadingProgressPercentage).toBe(0);
+      expect(mockState.searchObj.loadingHistogramProgressPercentage).toBe(0);
+    });
+
     it("should handle cancelled search error", () => {
       // Use mockState directly
       const notifications = useNotifications();
@@ -441,6 +456,49 @@ describe("useSearchResponseHandler", () => {
       responseHandler.handleSearchResponse(payload as any, response as any);
 
       expect(mockSearchPartitionMap["trace-1"].chunks[1]).toBe(1);
+    });
+
+    it("should set results progress on event_progress for a search payload", () => {
+      const payload = { type: "search", traceId: "trace-progress" };
+      const response = { type: "event_progress", content: { percent: 42 } };
+
+      responseHandler.handleSearchResponse(payload as any, response as any);
+
+      expect(mockState.searchObj.loadingProgressPercentage).toBe(42);
+    });
+
+    it("should route event_progress to the histogram field for a histogram payload", () => {
+      mockState.searchObj.loadingProgressPercentage = 0;
+      const payload = { type: "histogram", traceId: "trace-hist" };
+      const response = { type: "event_progress", content: { percent: 73 } };
+
+      responseHandler.handleSearchResponse(payload as any, response as any);
+
+      // Histogram progress is tracked separately; results progress is untouched.
+      expect(mockState.searchObj.loadingHistogramProgressPercentage).toBe(73);
+      expect(mockState.searchObj.loadingProgressPercentage).toBe(0);
+    });
+
+    it("should default event_progress percent to 0 when missing", () => {
+      const payload = { type: "search", traceId: "trace-progress-2" };
+      const response = { type: "event_progress", content: {} };
+
+      responseHandler.handleSearchResponse(payload as any, response as any);
+
+      expect(mockState.searchObj.loadingProgressPercentage).toBe(0);
+    });
+
+    it("should reset streaming progress to 0 on cancel_response", () => {
+      mockState.searchObj.loadingProgressPercentage = 80;
+      mockState.searchObj.loadingHistogramProgressPercentage = 45;
+
+      const payload = { type: "search", traceId: "trace-cancel" };
+      const response = { type: "cancel_response", content: {} };
+
+      responseHandler.handleSearchResponse(payload as any, response as any);
+
+      expect(mockState.searchObj.loadingProgressPercentage).toBe(0);
+      expect(mockState.searchObj.loadingHistogramProgressPercentage).toBe(0);
     });
 
     it("should handle search_response_metadata", () => {
