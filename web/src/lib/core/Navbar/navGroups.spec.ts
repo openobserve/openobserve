@@ -34,7 +34,7 @@ const dataGroup = (entries: RailEntry[]) =>
 describe("groupNavLinks", () => {
   it("keeps daily items top-level in RAIL_ORDER order", () => {
     const entries = groupNavLinks([
-      link("alertList"),
+      link("rum"),
       link("home"),
       link("traces"),
       link("logs"),
@@ -47,21 +47,18 @@ describe("groupNavLinks", () => {
       "link:logs",
       "link:metrics",
       "link:traces",
+      "link:rum",
       "link:dashboards",
-      "link:alertList",
     ]);
   });
 
-  it("absorbs streams/pipeline/ingestion into Data; Reports stays top-level", () => {
+  it("absorbs streams/pipeline/ingestion into Data", () => {
     const entries = groupNavLinks([
       link("home"),
       link("streams"),
       link("pipeline"),
       link("ingestion"),
-      link("reports"),
     ]);
-    // Reports remains a daily top-level link; the rest are absorbed.
-    expect(keysOf(entries)).toContain("link:reports");
     expect(keysOf(entries)).not.toContain("link:streams");
     expect(keysOf(entries)).not.toContain("link:pipeline");
     expect(keysOf(entries)).not.toContain("link:ingestion");
@@ -78,6 +75,29 @@ describe("groupNavLinks", () => {
       "functionList",
       "enrichmentTables",
       "ingestion",
+    ]);
+  });
+
+  it("merges Alerts and Reports under the Monitoring group", () => {
+    const entries = groupNavLinks([
+      link("home"),
+      link("alertList"),
+      link("reports"),
+    ]);
+    // Alerts and Reports are absorbed — no longer standalone links.
+    expect(keysOf(entries)).not.toContain("link:alertList");
+    expect(keysOf(entries)).not.toContain("link:reports");
+
+    const monitoring = entries.find(
+      (e): e is Extract<RailEntry, { type: "linkGroup" }> =>
+        e.type === "linkGroup" && e.item.name === "monitoring",
+    );
+    expect(monitoring).toBeTruthy();
+    // Clicking the Monitoring tile navigates to its first item, Alerts.
+    expect(monitoring?.item.link).toBe("/alerts");
+    expect(monitoring?.children.map((c) => c.name)).toEqual([
+      "alertList",
+      "reports",
     ]);
   });
 
@@ -98,25 +118,22 @@ describe("groupNavLinks", () => {
     expect(entries.every((e) => e.type === "link")).toBe(true);
   });
 
-  it("makes AI / IAM / Management link+subnav with their sub-pages", () => {
+  it("renders AI / IAM / Management as plain links (no submenu)", () => {
     const entries = groupNavLinks([
       link("home"),
       link("aiObservability"),
       link("iam"),
       link("settings"),
     ]);
-    const linkGroups = entries.filter(
-      (e): e is Extract<RailEntry, { type: "linkGroup" }> =>
-        e.type === "linkGroup",
-    );
-    const names = linkGroups.map((e) => e.item.name).sort();
-    expect(names).toEqual(["aiObservability", "iam", "settings"]);
-
-    const iam = linkGroups.find((e) => e.item.name === "iam");
-    // groupNavLinks returns the full curated subnav; router.hasRoute gating
-    // happens later in the component.
-    expect(iam?.children).toBe(NAV_SUBNAV.iam);
-    expect(iam?.children.some((c) => c.name === "users")).toBe(true);
+    expect(keysOf(entries)).toEqual([
+      "link:home",
+      "link:aiObservability",
+      "link:iam",
+      "link:settings",
+    ]);
+    // None of them carry a hover submenu anymore.
+    expect(entries.some((e) => e.type === "linkGroup")).toBe(false);
+    expect(NAV_SUBNAV).toEqual({});
   });
 
   it("appends present items not in RAIL_ORDER at the end as links", () => {
@@ -130,7 +147,6 @@ describe("groupNavLinks", () => {
       link("logs"),
       link("rum"),
       link("aiObservability"),
-      link("alertList"),
       link("incidentList"),
       link("actionScripts"),
       link("iam"),

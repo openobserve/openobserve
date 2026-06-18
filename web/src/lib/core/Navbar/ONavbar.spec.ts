@@ -99,7 +99,7 @@ describe("ONavbar", () => {
   });
 
   describe("grouping", () => {
-    it("absorbs streams+pipeline into Data; RUM and Reports stay top-level", () => {
+    it("absorbs streams+pipeline into Data; RUM stays top-level", () => {
       wrapper = mountNavbar({
         linksList: [
           { title: "Home", icon: "home", link: "/home", name: "home" },
@@ -107,41 +107,60 @@ describe("ONavbar", () => {
           { title: "RUM", icon: "devices", link: "/rum", name: "rum" },
           { title: "Streams", icon: "window", link: "/streams", name: "streams" },
           { title: "Pipeline", icon: "graph-2", link: "/pipeline", name: "pipeline" },
-          { title: "Reports", icon: "description", link: "/reports", name: "reports" },
-          { title: "IAM", icon: "manage-accounts", link: "/iam", name: "iam" },
         ],
       });
 
-      // RUM and Reports are top-level links.
+      // RUM is a top-level link.
       expect(wrapper.find('[data-test="menu-link-rum-item"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="menu-link-reports-item"]').exists()).toBe(true);
       // Streams and Pipeline are absorbed into Data — not top-level links.
       expect(wrapper.find('[data-test="menu-link-streams-item"]').exists()).toBe(false);
       expect(wrapper.find('[data-test="menu-link-pipeline-item"]').exists()).toBe(false);
 
       const data = wrapper.find('[data-test="nav-group-data"]');
       expect(data.exists()).toBe(true);
-      // Data now behaves like the other link+subnav tiles (click navigates).
+      // Data behaves like a link+subnav tile (click navigates, hover reveals).
       expect(data.attributes("data-mode")).toBe("link");
-      // Streams + pipeline sub-pages inside the Data flyout.
       expect(data.attributes("data-children")).toBe(
         "logstreams,pipelines,functionList,enrichmentTables",
       );
     });
 
-    it("renders IAM as a link+subnav group (navigates, hover reveals sub-pages)", () => {
+    it("merges Alerts and Reports under the Monitoring group", () => {
+      wrapper = mountNavbar({
+        linksList: [
+          { title: "Home", icon: "home", link: "/home", name: "home" },
+          { title: "Alerts", icon: "shield-alert-outline", link: "/alerts", name: "alertList" },
+          { title: "Reports", icon: "description", link: "/reports", name: "reports" },
+        ],
+      });
+
+      // Alerts and Reports are absorbed — not standalone links.
+      expect(wrapper.find('[data-test="menu-link-alertList-item"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="menu-link-reports-item"]').exists()).toBe(false);
+
+      const mon = wrapper.find('[data-test="nav-group-monitoring"]');
+      expect(mon.exists()).toBe(true);
+      expect(mon.attributes("data-mode")).toBe("link");
+      expect(mon.attributes("data-children")).toBe("alertList,reports");
+    });
+
+    it("renders IAM / Management / AI as plain links (no submenu)", () => {
       wrapper = mountNavbar({
         linksList: [
           { title: "Home", icon: "home", link: "/home", name: "home" },
           { title: "IAM", icon: "manage-accounts", link: "/iam", name: "iam" },
+          { title: "Management", icon: "settings", link: "/settings", name: "settings" },
+          { title: "AI", icon: "auto-awesome", link: "/ai", name: "aiObservability" },
         ],
       });
-      const iam = wrapper.find('[data-test="nav-group-iam"]');
-      expect(iam.exists()).toBe(true);
-      expect(iam.attributes("data-mode")).toBe("link");
-      expect(iam.attributes("data-children")).toContain("users");
-      // It is NOT rendered as a plain top-level menu link.
-      expect(wrapper.find('[data-test="menu-link-/iam-item"]').exists()).toBe(false);
+      // Plain top-level links …
+      expect(wrapper.find('[data-test="menu-link-iam-item"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="menu-link-settings-item"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="menu-link-aiObservability-item"]').exists()).toBe(true);
+      // … not flyout groups.
+      expect(wrapper.find('[data-test="nav-group-iam"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="nav-group-settings"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="nav-group-aiObservability"]').exists()).toBe(false);
     });
 
     it("drops the Data group entirely when no data items are present", () => {

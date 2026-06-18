@@ -105,53 +105,29 @@ export const NAV_GROUPS: NavGroupDef[] = [
       { titleKey: "menu.ingestion", icon: "data-plus-line", name: "ingestion", requires: "ingestion" },
     ],
   },
+  {
+    key: "monitoring",
+    title: "Monitoring",
+    icon: "monitor-heart",
+    parentLink: "/alerts",
+    absorbs: ["alertList", "reports"],
+    children: [
+      { titleKey: "menu.alerts", icon: "shield-alert-outline", name: "alertList", requires: "alertList" },
+      { titleKey: "menu.report", icon: "description", name: "reports", requires: "reports" },
+    ],
+  },
 ];
 
 /**
- * Top-level links that also reveal their own in-page section nav on hover.
- * Keyed by the top-level item's `name`. Mirrors each page's SectionRail exactly
- * (see IdentityAccessManagement.vue, settings/index.vue,
- * AIObservability/Index.vue). `router.hasRoute()` filtering drops any section
- * not registered in the current build.
+ * Top-level links that ALSO reveal their own in-page section nav on hover,
+ * keyed by the top-level item's `name`.
+ *
+ * Currently empty: AI / IAM / Management are intentionally plain links (no rail
+ * submenu) — their in-page SectionRail is the place to switch sections. Re-add
+ * an entry here (mirroring the page's SectionRail) to restore a hover flyout.
+ * The `gate` machinery (GATE_PREDICATES) remains available for any future entry.
  */
-export const NAV_SUBNAV: Record<string, SubnavChild[]> = {
-  iam: [
-    { category: "Access", titleKey: "iam.basicUsers", icon: "person", name: "users" },
-    { category: "Access", titleKey: "iam.serviceAccounts", icon: "manage-accounts", name: "serviceAccounts", gate: "serviceAccount" },
-    { category: "Access", titleKey: "iam.ingestionTokens", icon: "key", name: "ingestionTokens" },
-    { category: "Access", titleKey: "iam.invitations", icon: "mail", name: "invitations", gate: "cloud" },
-    { category: "Permissions", titleKey: "iam.groups", icon: "group", name: "groups", gate: "rbac" },
-    { category: "Permissions", titleKey: "iam.roles", icon: "shield", name: "roles", gate: "rbac" },
-    { category: "Permissions", titleKey: "iam.quota", icon: "speed", name: "quota", gate: "rbacMeta" },
-    { category: "Organization", titleKey: "iam.organizations", icon: "corporate-fare", name: "organizations" },
-  ],
-  settings: [
-    { category: "General", titleKey: "settings.generalLabel", icon: "settings", name: "general" },
-    { category: "General", titleKey: "settings.orgLabel", icon: "business", name: "organization" },
-    { category: "Access & Security", titleKey: "settings.cipherKeys", icon: "key", name: "cipherKeys", gate: "enterprise" },
-    { category: "Access & Security", titleKey: "regex_patterns.title", icon: "pattern", name: "regexPatterns", gate: "enterprise" },
-    { category: "Access & Security", titleKey: "settings.ssoDomainRestrictions", icon: "dns", name: "domainManagement", gate: "enterpriseMeta" },
-    { category: "Destinations & Templates", titleKey: "alert_destinations.header", icon: "location-on", name: "alertDestinations" },
-    { category: "Destinations & Templates", titleKey: "pipeline_destinations.header", icon: "person-pin-circle", name: "pipelineDestinations", gate: "enterprise" },
-    { category: "Destinations & Templates", titleKey: "alert_templates.header", icon: "description", name: "alertTemplates" },
-    { category: "Data & AI", titleKey: "storage_settings.tabLabel", icon: "cloud", name: "storageSettings", gate: "storage" },
-    { category: "Data & AI", titleKey: "settings.llmModelPricing", icon: "paid", name: "modelPricing", gate: "modelPricing" },
-    { category: "Data & AI", titleKey: "settings.correlationSettings", icon: "group-work", name: "correlationSettings", gate: "correlation" },
-    { category: "Data & AI", titleKey: "llmProviders.tabLabel", icon: "smart-toy", name: "llmProviders", gate: "llmProviders" },
-    { category: "Operations", titleKey: "settings.queryManagement", icon: "query-stats", name: "queryManagement", gate: "enterpriseMeta" },
-    { category: "Operations", titleKey: "settings.nodes", icon: "hub", name: "nodes", gate: "enterpriseMeta" },
-    { category: "Account", titleKey: "settings.license", icon: "card-membership", name: "license", gate: "enterpriseMeta" },
-    { category: "Account", titleKey: "settings.organizationManagement", icon: "lan", name: "orgnizationManagement", gate: "cloudMeta" },
-  ],
-  aiObservability: [
-    { category: "Monitor", titleKey: "aiObservability.nav.llmInsights", icon: "dashboard", name: "aiLLMInsights" },
-    { category: "Monitor", titleKey: "aiObservability.nav.sessions", icon: "forum", name: "aiSessions" },
-    { category: "Evaluate", titleKey: "aiObservability.nav.quality", icon: "star-rate", name: "aiEvaluations", tab: "quality" },
-    { category: "Evaluate", titleKey: "aiObservability.nav.evalJobs", icon: "event", name: "aiEvaluations", tab: "jobs" },
-    { category: "Evaluate", titleKey: "aiObservability.nav.scorers", icon: "rule", name: "aiEvaluations", tab: "scorers" },
-    { category: "Evaluate", titleKey: "aiObservability.nav.scoreConfigs", icon: "tune", name: "aiEvaluations", tab: "scoreConfigs" },
-  ],
-};
+export const NAV_SUBNAV: Record<string, SubnavChild[]> = {};
 
 /**
  * Desired top-level rail order. `@<groupKey>` tokens mark where a pure group is
@@ -166,9 +142,8 @@ const RAIL_ORDER: string[] = [
   "rum",
   "aiObservability",
   "dashboards",
-  "reports",
   "@data",
-  "alertList",
+  "@monitoring",
   "incidentList",
   "actionScripts",
   "billings",

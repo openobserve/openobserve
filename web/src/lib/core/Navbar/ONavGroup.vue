@@ -65,6 +65,19 @@ const { t } = useI18n();
 
 const isLinkMode = computed(() => !!props.parentItem);
 
+// Submenu text is pure black in light mode (the dropdown-item-text token is
+// grey-900, which reads as "not quite black"); dark mode keeps the token so the
+// text stays legible on the dark surface.
+//
+// `!` is REQUIRED: the flyout items are <router-link> (<a>) and the app's global
+// `a { color: var(--o2-text-link) }` rule (app.scss, unlayered) otherwise wins
+// over the layered Tailwind color utility, tinting the link text/icon primary.
+const isDark = computed(() => store.state.theme === "dark");
+const flyoutTextClass = computed(() =>
+  isDark.value ? "tw:text-dropdown-item-text!" : "tw:text-black!",
+);
+const flyoutIconClass = flyoutTextClass;
+
 const wrapperRef = ref<HTMLElement | null>(null);
 const flyoutRef = ref<HTMLElement | null>(null);
 
@@ -364,7 +377,8 @@ function onChildClick() {
         @keydown="onFlyoutKeydown"
       >
         <div
-          class="tw:px-3 tw:pt-1.5 tw:pb-1 tw:text-[11px] tw:font-semibold tw:text-dropdown-item-text"
+          class="tw:px-3 tw:pt-1.5 tw:pb-1 tw:text-[11px] tw:font-semibold"
+          :class="flyoutTextClass"
         >
           {{ title }}
         </div>
@@ -380,18 +394,19 @@ function onChildClick() {
             :data-test="`nav-group-item-${row.child.name}`"
             role="menuitem"
             :to="childTo(row.child)"
-            class="nav-group-item tw:flex tw:items-center tw:gap-2.5 tw:px-3 tw:py-1.5 tw:rounded-md tw:text-sm tw:text-dropdown-item-text tw:[text-decoration:none]! tw:cursor-pointer tw:select-none tw:outline-none tw:transition-colors tw:duration-150 tw:focus-visible:ring-2 tw:focus-visible:ring-primary-500"
-            :class="
+            class="nav-group-item tw:flex tw:items-center tw:gap-2.5 tw:px-3 tw:py-1.5 tw:rounded-md tw:text-sm tw:[text-decoration:none]! tw:cursor-pointer tw:select-none tw:outline-none tw:transition-colors tw:duration-150 tw:focus-visible:ring-2 tw:focus-visible:ring-primary-500"
+            :class="[
+              flyoutTextClass,
               isChildActive(row.child)
                 ? 'tw:bg-select-item-selected-bg tw:font-medium'
-                : 'tw:hover:bg-dropdown-item-hover-bg'
-            "
+                : 'tw:hover:bg-dropdown-item-hover-bg',
+            ]"
             :aria-current="isChildActive(row.child) ? 'page' : undefined"
             @click="onChildClick"
           >
-            <!-- Icon color is locked to the text color (black) so it never picks
-                 up a primary tint via currentColor inheritance. -->
-            <OIcon :name="row.child.icon" size="sm" class="tw:shrink-0 tw:text-dropdown-item-text!" />
+            <!-- Icon color is locked to the text color so it never picks up a
+                 primary tint via currentColor inheritance. -->
+            <OIcon :name="row.child.icon" size="sm" class="tw:shrink-0" :class="flyoutIconClass" />
             <span class="tw:leading-none">{{ t(row.child.titleKey) }}</span>
           </router-link>
         </template>
