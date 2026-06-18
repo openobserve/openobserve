@@ -58,12 +58,22 @@ def _values_equal(a: str, b: str, rel_tol: float = 0.05) -> bool:
     except (ValueError, TypeError):
         return False
 def load_all_queries():
-    """Return {category_name: [queries]} from queries/*.json files."""
+    """Return {category_name: [queries]} from queries/*.json files.
+
+    Filters out queries tagged ``skip_without_single_node_opt`` when the
+    server was started with ZO_FEATURE_SINGLE_NODE_OPTIMIZE_ENABLED=false,
+    since the non-optimized DataFusion physical plan path triggers known
+    upstream bugs (e.g. match_all + window, DISTINCT + window).
+    """
+    single_node_opt = _os.environ.get("SINGLE_NODE_OPT_MODE", "true").lower() == "true"
     categories: dict[str, list[dict]] = {}
     for fp in sorted(_QUERIES_DIR.glob("*.json")):
         with open(fp) as f:
             data = json.load(f)
-        categories[fp.stem] = data["queries"]
+        queries = data["queries"]
+        if not single_node_opt:
+            queries = [q for q in queries if not q.get("skip_without_single_node_opt")]
+        categories[fp.stem] = queries
     return categories
 
 

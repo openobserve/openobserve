@@ -158,8 +158,10 @@ jobs:
         config:
           - label: single_node_opt_false
             env: "ZO_FEATURE_SINGLE_NODE_OPTIMIZE_ENABLED=false"
+            mode: "false"
           - label: single_node_opt_true
             env: "ZO_FEATURE_SINGLE_NODE_OPTIMIZE_ENABLED=true"
+            mode: "true"
     permissions:
       contents: read
     steps:
@@ -228,7 +230,7 @@ jobs:
             fi
             sleep 1
           done
-          rye run pytest tests/query_agent/ --ignore=tests/query_agent/test_3_vortex.py -v
+          SINGLE_NODE_OPT_MODE=${{ matrix.config.mode }} rye run pytest tests/query_agent/ --ignore=tests/query_agent/test_3_vortex.py -v
           kill $SERVER_PID || true
         working-directory: tests/api-testing/
 

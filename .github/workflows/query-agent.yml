@@ -227,8 +227,10 @@ jobs:
         config:
           - label: single_node_opt_false
             env: "ZO_FEATURE_SINGLE_NODE_OPTIMIZE_ENABLED=false"
+            mode: "false"
           - label: single_node_opt_true
             env: "ZO_FEATURE_SINGLE_NODE_OPTIMIZE_ENABLED=true"
+            mode: "true"
     permissions:
       contents: read
     steps:
@@ -299,7 +301,7 @@ jobs:
             fi
             sleep 1
           done
-          rye run pytest tests/query_agent/ --ignore=tests/query_agent/test_3_vortex.py -v \
+          SINGLE_NODE_OPT_MODE=${{ matrix.config.mode }} rye run pytest tests/query_agent/ --ignore=tests/query_agent/test_3_vortex.py -v \
             --junitxml=junit-query-agent-${{ matrix.config.label }}.xml 2>&1 | tee pytest-query-agent-${{ matrix.config.label }}.log
           echo "exit_code=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
         working-directory: tests/api-testing/
