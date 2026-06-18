@@ -157,11 +157,23 @@ export default class ChartTypeSelector {
 
     // New data-test format: o-field-list-row-{fieldName}
     const fieldItem = this.page.locator(`[data-test="o-field-list-row-${fieldName}"]`);
-    await fieldItem.first().waitFor({ state: "visible", timeout: 5000 });
+    await fieldItem.first().waitFor({ state: "visible", timeout: 10000 });
 
-    // Add button is hidden until hover — reveal it first
-    await fieldItem.first().scrollIntoViewIfNeeded();
-    await fieldItem.first().hover();
+    // hover() auto-scrolls into view — scrollIntoViewIfNeeded() is not needed.
+    // Retry for DOM stability: Vue re-renders the field list multiple times after
+    // search input changes (debounce / virtual scroll), which detaches the element
+    // between waitFor and the action. Re-waiting after each detachment lets the
+    // list settle before the next attempt.
+    const maxAttempts = 3;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        await fieldItem.first().hover({ timeout: 5000 });
+        break;
+      } catch (e) {
+        if (attempt === maxAttempts) throw e;
+        await fieldItem.first().waitFor({ state: "visible", timeout: 5000 });
+      }
+    }
 
     // Now locate and click the button within the field item.
     // Use .first() — in join panels the same field name can appear multiple times
