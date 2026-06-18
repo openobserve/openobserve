@@ -65,8 +65,16 @@ pub async fn set(trace_id: &str, schema_key: &str, format: &str, files: Vec<File
             version: None,
         });
         if let Some(selection) = file.selection {
+            // Must match the suffix that `get_scan_selection` extracts by splitting
+            // the full object path on `/$$/`. For accounted files that suffix is
+            // `{account}/{ACCOUNT_SEPARATOR}/{file.key}`, not just `file.key`.
+            let selection_key = if file.account.is_empty() {
+                file.key
+            } else {
+                format!("{}/{}/{}", file.account, ACCOUNT_SEPARATOR, file.key)
+            };
             scan_selections.insert(
-                file.key,
+                selection_key,
                 ScanSelection {
                     selection,
                     row_group_size: file.row_group_size,
@@ -107,8 +115,21 @@ pub fn clear(trace_id: &str) {
 pub fn get_scan_selection(file_key: &str) -> Option<ScanSelection> {
     let (trace_id, filename) = file_key.split_once("/$$/")?;
     let r = SCAN_SELECTIONS.read();
-    let data = r.get(trace_id)?;
-    data.get(filename).cloned()
+    let Some(data) = r.get(trace_id) else {
+        log::warn!(
+            "[trace_id {trace_id}] scan_selection lookup: trace_id not in map (filename={filename})"
+        );
+        return None;
+    };
+    let result = data.get(filename).cloned();
+    if result.is_none() {
+        let sample_key = data.keys().next().cloned().unwrap_or_default();
+        log::warn!(
+            "[trace_id {trace_id}] scan_selection miss: lookup_filename={filename}, selections_in_map={}, sample_key_in_map={sample_key}",
+            data.len(),
+        );
+    }
+    result
 }
 
 #[cfg(test)]
@@ -137,5 +158,70 @@ mod tests {
     fn test_get_scan_selection_no_separator_returns_none() {
         let result = get_scan_selection("no-separator-here");
         assert!(result.is_none());
+    }
+
+    // Regression: when `file.account` is non-empty, the path produced by `set()`
+    // splits on `/$$/` into `({key}, "{account}/::/{file.key}")`, so the
+    // SCAN_SELECTIONS inner map must be keyed by `{account}/::/{file.key}` —
+    // not just `file.key`. Previously the lookup silently missed and the
+    // tantivy row-id selection was dropped, causing the parquet reader to
+    // scan whole row groups instead of the indexed rows.
+    #[tokio::test]
+    async fn test_scan_selection_lookup_with_account() {
+        use std::sync::Arc;
+
+        use arrow::buffer::BooleanBuffer;
+
+        let trace_id = "trace_account_lookup_regression";
+        let schema_key = "schemakey";
+        let format = "parquet";
+        let account = "acc1";
+        let file_key = "files/default/traces/default/2026/06/17/16/regress.parquet";
+
+        let mut file = FileKey::default();
+        file.account = account.to_string();
+        file.key = file_key.to_string();
+        file.selection = Some(FileSelection::Rows(Arc::new(BooleanBuffer::new_unset(8))));
+        file.row_group_size = Some(1024);
+
+        set(trace_id, schema_key, format, vec![file]).await;
+
+        // Path shape matches `set()`'s file_name construction with the leading
+        // slash stripped (object_store::path::Path normalises it).
+        let lookup = format!(
+            "{trace_id}/schema={schema_key}/format={format}/{TRACE_ID_SEPARATOR}/{account}/{ACCOUNT_SEPARATOR}/{file_key}"
+        );
+        assert!(
+            get_scan_selection(&lookup).is_some(),
+            "row-id selection must be retrievable for accounted files",
+        );
+
+        clear(trace_id);
+    }
+
+    #[tokio::test]
+    async fn test_scan_selection_lookup_without_account() {
+        use std::sync::Arc;
+
+        use arrow::buffer::BooleanBuffer;
+
+        let trace_id = "trace_no_account_lookup_regression";
+        let schema_key = "schemakey";
+        let format = "parquet";
+        let file_key = "files/default/traces/default/2026/06/17/16/regress2.parquet";
+
+        let mut file = FileKey::default();
+        file.key = file_key.to_string();
+        file.selection = Some(FileSelection::Rows(Arc::new(BooleanBuffer::new_unset(8))));
+        file.row_group_size = Some(1024);
+
+        set(trace_id, schema_key, format, vec![file]).await;
+
+        let lookup = format!(
+            "{trace_id}/schema={schema_key}/format={format}/{TRACE_ID_SEPARATOR}/{file_key}"
+        );
+        assert!(get_scan_selection(&lookup).is_some());
+
+        clear(trace_id);
     }
 }
