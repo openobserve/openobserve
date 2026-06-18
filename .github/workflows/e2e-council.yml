@@ -1134,54 +1134,58 @@ jobs:
         run: |
           RUN_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
           EXTRA=""   # optional appended detail (integrity findings / feature-incomplete evidence)
-          # Root cause = the most-upstream failing stage (build -> boot -> pw-setup -> spec-resolve -> heal -> final -> quality).
+          # OUTCOME = short label; CAUSE = one-line why. Root cause = most-upstream failing stage
+          # (build -> boot -> pw-setup -> spec-resolve -> heal -> final -> quality).
           if [ "$BUILD_OUTCOME" = "failure" ]; then
-            CAUSE="Building OpenObserve from the feature branch failed (compile / frontend build error)."
+            OUTCOME="Build failed"; CAUSE="Building OpenObserve from the feature branch failed (compile / frontend build error)."
           elif [ "$BOOT_OUTCOME" = "failure" ]; then
-            CAUSE="OpenObserve built but failed to boot/serve on :5080 within the timeout."
+            OUTCOME="Boot failed"; CAUSE="OpenObserve built but failed to boot/serve on :5080 within the timeout."
           elif [ "$PWINSTALL_OUTCOME" = "failure" ]; then
-            CAUSE="Setting up the test environment failed (npm ci / Playwright browser install) — a CI/infra problem, not the generated test."
+            OUTCOME="Test-env setup failed (CI/infra)"; CAUSE="npm ci / Playwright browser install failed — a CI/infra problem, not the generated test."
           elif [ "$SPEC_OUTCOME" = "failure" ]; then
-            CAUSE="Could not resolve the generated spec path from run metadata (generation/hand-off problem — run-context.json missing or spec_path invalid)."
+            OUTCOME="Spec resolution failed"; CAUSE="Could not resolve the generated spec path from run metadata (generation / hand-off problem)."
           elif [ "$HEAL_OUTCOME" = "failure" ] || [ "$HEAL_OUTCOME" = "cancelled" ]; then
-            CAUSE="The healer hit its time cap (hung or too-slow heal loop) and was stopped before the tests passed."
+            OUTCOME="Heal timed out"; CAUSE="The healer hit its time cap (hung or too-slow heal loop) before the tests passed."
           elif [ "$FINAL_STATUS" = "failing" ]; then
-            CAUSE="The generated spec still failed after healing — likely a genuinely broken/flaky test or a real product issue."
+            OUTCOME="Tests still failing after heal"; CAUSE="The generated spec still failed after healing — likely a genuinely broken/flaky test or a real product issue."
           elif [ "$SCOPE_STATUS" = "violation" ]; then
-            CAUSE="🚫 The Healer tried to **edit product code** (outside \`tests/ui-testing/\`) to force the tests green — that's blocked. This almost always means the **feature itself is broken/incomplete**: fix the feature, then the generated tests should pass. The Healer's product edits were reverted and **no PR was opened**."
+            OUTCOME="Blocked — Healer edited product code"; CAUSE="The Healer tried to edit product code (outside \`tests/ui-testing/\`) to force a green — reverted + blocked. This usually means the feature itself is broken: fix the feature, then the tests should pass."
           elif [ "$QUALITY_STATUS" = "fail" ]; then
-            # The most valuable outcome: tests went green but DON'T meaningfully test the feature.
             HSTATUS=$(jq -r '.status // ""' docs/test_generator/ci/heal-result.json 2>/dev/null || echo "")
             if [ "$HSTATUS" = "feature-incomplete" ]; then
-              CAUSE="⚠️ The tests can't pass honestly because the **feature appears incomplete in this build** — so they were NOT certified (no green-washing)."
+              OUTCOME="Feature incomplete — every test parked (no green-wash)"; CAUSE="No test could pass honestly because the feature isn't wired in this build — nothing was certified. The assertions are kept as \`fixme\` and will go green once the feature is finished."
               EV=$(jq -r '.evidence // empty' docs/test_generator/ci/heal-result.json 2>/dev/null || echo "")
-              [ -n "$EV" ] && EXTRA=$(printf '\n\n**Healer evidence:** %s' "$EV")
+              [ -n "$EV" ] && EXTRA="- **Evidence:** ${EV}"
             else
-              CAUSE="The spec is green but the **assertion-integrity gate blocked it** — it does not meaningfully test the feature (tautologies, conditional-only assertions, or assertions weakened/inverted during healing)."
+              OUTCOME="Blocked — weak / gamed tests"; CAUSE="The spec is green but the assertion-integrity gate blocked it — it does not meaningfully test the feature (tautologies, conditional-only, or assertions weakened/inverted during healing)."
             fi
             if [ -f docs/test_generator/ci/assert-verdict.json ]; then
-              F=$(jq -r '.findings[]? | "- `\(.rule)`\(if .line then " (line \(.line))" else "" end): \(.detail)"' docs/test_generator/ci/assert-verdict.json 2>/dev/null || echo "")
-              [ -n "$F" ] && EXTRA=$(printf '%s\n\n**Findings:**\n%s' "$EXTRA" "$F")
+              F=$(jq -r '.findings[]? | "  - `\(.rule)`\(if .line then " (line \(.line))" else "" end): \(.detail)"' docs/test_generator/ci/assert-verdict.json 2>/dev/null || echo "")
+              [ -n "$F" ] && EXTRA=$(printf '%s\n- **Findings:**\n%s' "$EXTRA" "$F")
             fi
           else
-            CAUSE="Verify/heal did not complete (see the run)."
+            OUTCOME="Did not complete"; CAUSE="Verify/heal did not complete (see the run)."
           fi
-          MARKER="<!-- e2e-council-testpr -->"
+          # Summary facts (best-effort, from the hand-off).
+          FEATURE=$(jq -r '.feature_title // empty' docs/test_generator/ci/run-context.json 2>/dev/null || echo "")
+          AREA=$(jq -r '.area // empty' docs/test_generator/ci/run-context.json 2>/dev/null || echo "")
+          PASSED=$(jq -r '.passed // empty' docs/test_generator/ci/heal-result.json 2>/dev/null || echo "")
+          SKIPPED=$(jq -r '.skipped // empty' docs/test_generator/ci/heal-result.json 2>/dev/null || echo "")
+          FAILED=$(jq -r '.failed // empty' docs/test_generator/ci/heal-result.json 2>/dev/null || echo "")
+          # Distinct marker from the pr_back PR-link sticky, and we POST a NEW comment EVERY run
+          # (no patch/overwrite) so each attempt's outcome is preserved as its own entry.
           {
-            printf '%s\n' "$MARKER"
-            printf '🤖 **E2E Council** — I generated E2E tests for #%s, but **no test PR was opened** (working code only).\n\n' "$SRC_PR"
-            printf '**Root cause:** %s\n' "$CAUSE"
+            printf '%s\n' "<!-- e2e-council-report -->"
+            printf '### 🤖 E2E Council — no test PR opened\n\n'
+            printf -- '- **Outcome:** %s\n' "$OUTCOME"
+            [ -n "$FEATURE" ] && { printf -- '- **Feature:** %s' "$FEATURE"; [ -n "$AREA" ] && printf ' (area: %s)' "$AREA"; printf '\n'; }
+            [ -n "${PASSED}${SKIPPED}${FAILED}" ] && printf -- '- **Tests:** %s passed · %s parked (fixme) · %s failed\n' "${PASSED:-0}" "${SKIPPED:-0}" "${FAILED:-0}"
+            printf -- '- **Why:** %s\n' "$CAUSE"
             [ -n "$EXTRA" ] && printf '%s\n' "$EXTRA"
-            printf '\n[View run + logs](%s)\n' "$RUN_URL"
+            printf -- '- **Run:** [view logs](%s)\n' "$RUN_URL"
           } > /tmp/healfail.md
-          CID=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${SRC_PR}/comments" \
-            --jq "[.[] | select(.body | startswith(\"${MARKER}\"))][0].id // empty")
-          if [ -n "$CID" ]; then
-            URL=$(gh api -X PATCH "repos/${GITHUB_REPOSITORY}/issues/comments/${CID}" -F body=@/tmp/healfail.md --jq '.html_url')
-          else
-            URL=$(gh api -X POST "repos/${GITHUB_REPOSITORY}/issues/${SRC_PR}/comments" -F body=@/tmp/healfail.md --jq '.html_url')
-          fi
-          echo "::notice::Posted heal-failure comment with root cause: $URL"
+          URL=$(gh api -X POST "repos/${GITHUB_REPOSITORY}/issues/${SRC_PR}/comments" -F body=@/tmp/healfail.md --jq '.html_url')
+          echo "::notice::Posted no-PR report comment: $URL"
 
   # ---------------------------------------------------------------------------
   # JOB 4 — Open the test PR — ONLY if Job 3 healed the tests to passing. The branch +
