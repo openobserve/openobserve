@@ -5464,6 +5464,20 @@
     "footerReopen": "reopen",
     "footerRun": "click row to run",
     "footerMacHint": "⌘ = Cmd on Mac · Ctrl on Windows",
+    "modules": {
+      "global": "Global",
+      "logs": "Logs",
+      "dashboards": "Dashboards",
+      "metrics": "Metrics",
+      "traces": "Traces",
+      "alerts": "Alerts",
+      "streams": "Streams",
+      "pipelines": "Pipelines",
+      "functions": "Functions",
+      "reports": "Reports",
+      "iam": "IAM",
+      "runningQueries": "Running Queries"
+    },
     "pages": {
       "global": "Global",
       "tableRow": "Table Row (hover a row)",

@@ -12,6 +12,65 @@ export interface ShortcutGroup {
   shortcuts: ShortcutEntry[];
 }
 
+export interface ShortcutModule {
+  /** i18n key under shortcuts.modules.* */
+  titleKey: string;
+  /** pageKeys (ShortcutGroup.pageKey) grouped under this module, in display order */
+  pages: string[];
+}
+
+/**
+ * Groups the flat SHORTCUT_REGISTRY into modules for the cheatsheet. Each module
+ * is one chip + one block in the listing; its `pages` render as sub-sections.
+ */
+export const SHORTCUT_MODULES: ShortcutModule[] = [
+  {
+    titleKey: "shortcuts.modules.global",
+    pages: ["shortcuts.pages.global", "shortcuts.pages.tableRow"],
+  },
+  { titleKey: "shortcuts.modules.logs", pages: ["shortcuts.pages.logs"] },
+  {
+    titleKey: "shortcuts.modules.dashboards",
+    pages: [
+      "shortcuts.pages.dashboardsList",
+      "shortcuts.pages.dashboards",
+      "shortcuts.pages.dashboardsPanel",
+      "shortcuts.pages.panelEditor",
+    ],
+  },
+  { titleKey: "shortcuts.modules.metrics", pages: ["shortcuts.pages.metrics"] },
+  {
+    titleKey: "shortcuts.modules.traces",
+    pages: ["shortcuts.pages.traces", "shortcuts.pages.traceDetail"],
+  },
+  {
+    titleKey: "shortcuts.modules.alerts",
+    pages: [
+      "shortcuts.pages.alerts",
+      "shortcuts.pages.alertDestinations",
+      "shortcuts.pages.alertTemplates",
+    ],
+  },
+  { titleKey: "shortcuts.modules.streams", pages: ["shortcuts.pages.streams"] },
+  { titleKey: "shortcuts.modules.pipelines", pages: ["shortcuts.pages.pipelines"] },
+  { titleKey: "shortcuts.modules.functions", pages: ["shortcuts.pages.functions"] },
+  { titleKey: "shortcuts.modules.reports", pages: ["shortcuts.pages.reports"] },
+  {
+    titleKey: "shortcuts.modules.iam",
+    pages: [
+      "shortcuts.pages.iamUsers",
+      "shortcuts.pages.iamRoles",
+      "shortcuts.pages.iamGroups",
+      "shortcuts.pages.iamServiceAccounts",
+      "shortcuts.pages.ingestionTokens",
+    ],
+  },
+  {
+    titleKey: "shortcuts.modules.runningQueries",
+    pages: ["shortcuts.pages.runningQueries"],
+  },
+];
+
 /**
  * Static registry of all keyboard shortcuts shown in the cheatsheet.
  * All labels are i18n keys — the cheatsheet resolves them via useI18n().

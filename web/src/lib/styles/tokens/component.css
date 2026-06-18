@@ -259,6 +259,9 @@
   --color-badge-primary-soft-bg: var(--color-primary-200);
   --color-badge-primary-soft-text: var(--color-primary-700);
 
+  /* Keyboard-shortcut cheatsheet — soft primary highlight (light tint; reversed in dark) */
+  --color-shortcut-highlight-bg: var(--color-primary-100);
+
   /* Badge — success */
   --color-badge-success-solid-bg: var(--color-success-500);
   --color-badge-success-solid-text: var(--color-white);
@@ -1108,6 +1111,9 @@
   --color-badge-primary-ol-text: var(--color-badge-primary-ol-text);
   --color-badge-primary-soft-bg: var(--color-badge-primary-soft-bg);
   --color-badge-primary-soft-text: var(--color-badge-primary-soft-text);
+
+  /* Keyboard-shortcut cheatsheet */
+  --color-shortcut-highlight-bg: var(--color-shortcut-highlight-bg);
 
   /* Badge — success */
   --color-badge-success-solid-bg: var(--color-badge-success-solid-bg);
