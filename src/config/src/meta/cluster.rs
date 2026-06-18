@@ -95,40 +95,51 @@ impl Node {
     }
 
     pub fn is_single_node(&self) -> bool {
-        self.role.len() == 1 && self.role.contains(&Role::All)
+        get_config().common.local_mode && self.role.len() == 1 && self.role.contains(&Role::All)
     }
+
     pub fn is_single_role(&self) -> bool {
         self.role.len() == 1
     }
+
     pub fn is_router(&self) -> bool {
         self.role.contains(&Role::Router)
     }
+
     pub fn is_ingester(&self) -> bool {
         self.role.contains(&Role::Ingester) || self.role.contains(&Role::All)
     }
+
     pub fn is_querier(&self) -> bool {
         self.role.contains(&Role::Querier) || self.role.contains(&Role::All)
     }
+
     pub fn is_interactive_querier(&self) -> bool {
         self.is_querier()
             && (self.role_group == RoleGroup::None || self.role_group == RoleGroup::Interactive)
     }
+
     pub fn is_background_querier(&self) -> bool {
         self.is_querier()
             && (self.role_group == RoleGroup::None || self.role_group == RoleGroup::Background)
     }
+
     pub fn is_compactor(&self) -> bool {
         self.role.contains(&Role::Compactor) || self.role.contains(&Role::All)
     }
+
     pub fn is_flatten_compactor(&self) -> bool {
         self.role.contains(&Role::FlattenCompactor)
     }
+
     pub fn is_alert_manager(&self) -> bool {
         self.role.contains(&Role::AlertManager) || self.role.contains(&Role::All)
     }
+
     pub fn is_action_server(&self) -> bool {
         self.role.contains(&Role::ActionServer) || self.role.contains(&Role::All)
     }
+
     pub fn is_standalone(&self) -> bool {
         // standalone implies there is no external dependency required
         // for this node. All role will always have DB dep.
