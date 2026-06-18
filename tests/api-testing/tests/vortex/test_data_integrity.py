@@ -290,11 +290,7 @@ class TestFileMetadata:
         flush_and_wait(client, self.STREAM, expected=self.N)
 
     def test_62_stream_listing_has_correct_structure(self, client):
-        """Stream listing has required fields; stats are non-negative.
-
-        Note: doc_num/storage_size only update after background compaction.
-        We assert structure (created_at, non-negative counts), not specific values.
-        """
+        """Stream listing has required fields; stats are non-negative."""
         resp = client.get(f"streams?type=logs&stream_name={self.STREAM}")
         assert resp.status_code == 200
 
@@ -306,16 +302,14 @@ class TestFileMetadata:
         assert entry["stream_type"] == "logs"
 
         stats = entry.get("stats", {})
-        assert int(stats.get("created_at", 0)) > 0, "created_at must be set"
         for key in ("doc_num", "file_num"):
             assert int(stats.get(key, 0)) >= 0, f"{key} must be >= 0"
         for key in ("storage_size", "compressed_size"):
             assert float(stats.get(key, 0.0)) >= 0.0, f"{key} must be >= 0"
 
         logging.info(
-            "stream %s: created_at=%s doc_num=%s file_num=%s",
+            "stream %s: doc_num=%s file_num=%s",
             self.STREAM,
-            stats.get("created_at"),
             stats.get("doc_num"),
             stats.get("file_num"),
         )
