@@ -35,6 +35,13 @@ import { resolveAICardLogo } from "../index";
 
 const str = (v: unknown): string | undefined =>
   typeof v === "string" ? v : undefined;
+
+/** Maps md `stream_type` to the detect streamType union (else traces). */
+const STREAM_TYPES: Record<string, "logs" | "metrics" | "traces"> = {
+  logs: "logs",
+  metrics: "metrics",
+  traces: "traces",
+};
 const trimTrailing = (s: string) => s.replace(/\n+$/, "");
 
 function buildStep(raw: any, slug: string, i: number, subs: CardSubstitutions): RichCardStep {
@@ -109,13 +116,15 @@ export function buildFromMarkdown(
         }
       : undefined,
     detect: {
-      streamType:
-        detect.stream_type === "logs"
-          ? "logs"
-          : detect.stream_type === "metrics"
-            ? "metrics"
-            : "traces",
-      match: detect.match === "keyword" ? "keyword" : undefined,
+      // Unknown/absent stream types fall back to traces (the AI default).
+      streamType: STREAM_TYPES[detect.stream_type] ?? "traces",
+      // Only the two valid match modes pass through (else exact via undefined).
+      match:
+        detect.match === "keyword"
+          ? "keyword"
+          : detect.match === "exact"
+            ? "exact"
+            : undefined,
       streamName: str(detect.stream),
       filter: str(detect.filter) ?? "",
       modelLabel: str(detect.model_label),

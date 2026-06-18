@@ -35,7 +35,11 @@ import type { CardSubstitutions } from "./types";
 import { getDataSourceCard } from "./registry";
 
 const props = defineProps<{
-  /** Data-source route slug, e.g. "sqlServer". */
+  /**
+   * Data-source route slug, e.g. "sqlServer". Resolves card content from
+   * setupCard/registry.ts; if the slug isn't registered, the legacy
+   * fallbackContent/fallbackDocUrl is shown instead.
+   */
   slug: string;
   /** Legacy CopyContent body, shown when the slug has no registered card. */
   fallbackContent?: string;
