@@ -23,6 +23,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     ]"
     style="color: var(--o2-log-table-text)"
   >
+    <!-- Top progress bar: keeps rows visible while a new result set streams in
+      (e.g. streaming_aggs replacing values). Same component dashboard panels
+      use; driven by backend streaming progress. The full skeleton below is
+      shown only on first load (no rows yet). -->
+    <LoadingProgress
+      :loading="loading"
+      :loadingProgressPercentage="loadingProgressPercentage"
+    />
     <table
       v-if="table"
       data-test="logs-search-result-logs-table"
@@ -207,9 +215,11 @@ class="tw:mr-1" />
         </tr>
       </thead>
 
-      <!-- Skeleton loading body — replaces the old spinner row -->
+      <!-- Skeleton loading body — shown ONLY on first load (no rows yet).
+        Once rows exist they stay visible while the top progress bar signals an
+        in-progress refresh (e.g. streaming_aggs replacing values). -->
       <tbody
-        v-if="loading"
+        v-if="loading && tableRows.length === 0"
         data-test="logs-table-skeleton-body"
         aria-busy="true"
         aria-label="Loading logs"
@@ -482,6 +492,7 @@ import { useTextHighlighter } from "@/composables/useTextHighlighter";
 import { useLogsHighlighter } from "@/composables/useLogsHighlighter";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import LoadingProgress from "@/components/common/LoadingProgress.vue";
 
 interface StreamField {
   name: string;
@@ -508,6 +519,10 @@ const props = defineProps({
   loading: {
     type: Boolean,
     default: false,
+  },
+  loadingProgressPercentage: {
+    type: Number,
+    default: 0,
   },
   errMsg: {
     type: String,

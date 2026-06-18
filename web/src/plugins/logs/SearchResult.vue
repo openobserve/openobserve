@@ -296,6 +296,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             searchObj.data.histogram.errorCode != -1
           "
         >
+          <!-- Streaming progress bar for the histogram chart: keeps the chart
+            visible while it refreshes/replaces, mirroring the results table. -->
+          <LoadingProgress
+            :loading="searchObj.loadingHistogram"
+            :loadingProgressPercentage="
+              searchObj.loadingHistogramProgressPercentage || 0
+            "
+          />
           <div
             v-if="
               searchObj.meta.showHistogram &&
@@ -375,10 +383,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >.</span
               >
             </h5>
-          </div>
-
-          <div class="tw:pb-2 histogram-loader" v-if="histogramLoader">
-            <OSpinner size="xs" class="search-spinner" />
           </div>
         </div>
         <div
@@ -490,6 +494,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :width="getTableWidth"
             :err-msg="searchObj.data.missingStreamMessage"
             :loading="searchObj.loading"
+            :loadingProgressPercentage="searchObj.loadingProgressPercentage || 0"
             :functionErrorMsg="searchObj?.data?.functionError"
             :expandedRows="expandedLogs"
             :highlight-timestamp="searchObj.data?.searchAround?.indexTimestamp"
@@ -707,6 +712,7 @@ import OPagination from "@/lib/navigation/Pagination/OPagination.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
+import LoadingProgress from "@/components/common/LoadingProgress.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
@@ -719,6 +725,7 @@ export default defineComponent({
     OTooltip,
     OSelect,
     OPagination,
+    LoadingProgress,
     DetailTable: defineAsyncComponent(() => import("./DetailTable.vue")),
     ChartRenderer: defineAsyncComponent(
       () => import("@/components/dashboards/panels/ChartRenderer.vue"),
@@ -1705,10 +1712,6 @@ export default defineComponent({
       }
     });
     //this is used to show the histogram loader when the histogram is loading
-    const histogramLoader = computed(() => {
-      return searchObj.meta.showHistogram && searchObj.loadingHistogram == true;
-    });
-
     // 250 bars × 9px (7px bar + 2px gap) = 2250px — covers any viewport width.
     // Heights cycle through a realistic uneven pattern so it looks like real log data.
     const SKELETON_HEIGHTS = [45,72,58,88,62,42,78,52,73,38,68,83,48,68,44,92,62,38,72,56,32,82,48,64,38,88,68,44,78,52,40,95,55,70,30,85,65,50,75,42];
@@ -1931,7 +1934,6 @@ export default defineComponent({
       getPaginations,
       refreshPagination,
       refreshJobPagination,
-      histogramLoader,
       skeletonBarHeights,
       sendToAiChat,
       closeTable,
