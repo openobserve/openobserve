@@ -293,6 +293,7 @@ export const useSearchBar = () => {
     try {
       searchObj.loadingStream = true;
       searchObj.loading = true;
+      searchObj.loadingProgressPercentage = 0;
 
       await cancelQuery();
 
@@ -414,6 +415,7 @@ export const useSearchBar = () => {
       searchObj.data.tempFunctionName = "";
       searchObj.data.tempFunctionContent = "";
       searchObj.loading = true;
+      searchObj.loadingProgressPercentage = 0;
       await getQueryData();
     } catch (e: any) {
       console.log("Error while loading logs data");
