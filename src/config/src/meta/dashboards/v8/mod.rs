@@ -651,8 +651,10 @@ where
 #[serde(default)]
 #[serde(rename_all = "camelCase")]
 pub struct Value {
-    unit: String,
-    custom_unit: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    unit: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    custom_unit: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
