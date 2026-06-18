@@ -886,6 +886,7 @@ export default defineComponent({
         span_id_field_name: "spanId",
         trace_id_field_name: "traceId",
         toggle_ingestion_logs: false,
+        usage_stream_enabled: false,
         enable_websocket_search: false,
         enable_streaming_search: false,
         streaming_aggregation_enabled: false,
@@ -917,6 +918,9 @@ export default defineComponent({
           toggle_ingestion_logs:
             orgSettings?.data?.data?.toggle_ingestion_logs ??
             defaultSettings.toggle_ingestion_logs,
+          usage_stream_enabled:
+            orgSettings?.data?.data?.usage_stream_enabled ??
+            defaultSettings.usage_stream_enabled,
           enable_websocket_search:
             orgSettings?.data?.data?.enable_websocket_search ??
             defaultSettings.enable_websocket_search,

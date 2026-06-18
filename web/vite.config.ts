@@ -14,8 +14,31 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { fileURLToPath, URL } from "node:url";
+import { spawn } from "node:child_process";
 
 import { defineConfig } from "vite";
+
+// Runs `node <scriptPath>` as a child process and resolves when it finishes.
+// We use spawn (not execFileSync/execFile) for two reasons:
+//   - stdio: "inherit" streams the script's logs straight to the terminal so a
+//     slow/failed fetch is visible instead of looking like a silent hang.
+//   - it's async, so awaiting it doesn't block Vite's event loop synchronously.
+// spawn is event-based, so we wrap it in a Promise: resolve on exit code 0,
+// reject otherwise — the rejection propagates out of the async config hook and
+// FAILS the build (this is what makes DS_CONTENT_STRICT actually abort).
+const runNode = (
+  scriptPath: string,
+  env: NodeJS.ProcessEnv,
+): Promise<void> =>
+  new Promise((resolve, reject) => {
+    const child = spawn("node", [scriptPath], { stdio: "inherit", env });
+    child.on("error", reject); // process could not be started at all
+    child.on("close", (code) =>
+      code === 0
+        ? resolve()
+        : reject(new Error(`fetch-datasource-content exited with ${code}`)),
+    );
+  });
 import vue from "@vitejs/plugin-vue";
 import vueJsx from "@vitejs/plugin-vue-jsx";
 import nodePolyfills from "rollup-plugin-node-polyfills";
@@ -82,6 +105,39 @@ function monacoEditorTestResolver() {
   };
 }
 
+// Fetches AI data-source UI markdown from the content repo before Vite starts,
+// so import.meta.glob can bundle it. Covers `vite dev` and every build mode.
+// Builds (CI/prod) force a fresh pull AND fail if it can't be fetched, so we
+// never ship stale or missing content; the dev server stays lenient (uses the
+// cached generated/ dir). Override with DS_CONTENT_STRICT / DS_CONTENT_FORCE.
+// See scripts/fetch-datasource-content.mjs.
+const datasourceContentPlugin = {
+  name: "datasource-content",
+  enforce: "pre" as const,
+  // async so it doesn't block Vite's event loop; the script itself caps each
+  // fetch with a timeout and only retries under DS_CONTENT_STRICT (builds/CI).
+  async config(_config: any, env: { command: string }) {
+    // env.command is "build" (vite build / CI / prod) or "serve" (dev server).
+    const isBuild = env?.command === "build";
+    await runNode(
+      path.resolve(__dirname, "scripts/fetch-datasource-content.mjs"),
+      {
+        // Inherit the parent env (PATH, etc.) so git/node resolve, and so any
+        // DS_CONTENT_* the dev set (REPO/REF/TIMEOUT) flows through to the script.
+        ...process.env,
+        // Policy flags (the `?? ` lets an explicitly-set env var override):
+        //   STRICT: a failed fetch exits non-zero → build fails. On for builds,
+        //   off for dev (dev falls back to cache / the legacy snippet).
+        DS_CONTENT_STRICT:
+          process.env.DS_CONTENT_STRICT ?? (isBuild ? "1" : ""),
+        //   FORCE: re-fetch the latest instead of reusing the cached generated/
+        //   dir. On for builds (always ship fresh), off for dev (fast restarts).
+        DS_CONTENT_FORCE: process.env.DS_CONTENT_FORCE ?? (isBuild ? "1" : ""),
+      },
+    );
+  },
+};
+
 // let filePath = path.resolve(process.cwd(), "src");
 // if (process.env.VITE_OPENOBSERVE_CLOUD === "true") {
 // const filePath = path.resolve(process.cwd(), "src/enterprise");
@@ -118,6 +174,10 @@ export default defineConfig({
         forceBuildInstrument: true,
       }),
     enterpriseResolverPlugin,
+    // Register the content fetcher for dev + builds, but NOT under vitest
+    // (tests mock the content/manifest and must stay offline/deterministic).
+    // `false` entries are dropped by the `.filter(Boolean)` at the end.
+    !isTesting && datasourceContentPlugin,
     Icons({
       compiler: "vue3",
       autoInstall: false,

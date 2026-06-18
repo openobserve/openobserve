@@ -2,7 +2,7 @@
  * OCode — inline and block monospace code display.
  *
  * Use OCode when you need to display:
- *  - Cron expressions ("0 */5 * * *")
+ *  - Cron expressions ("0 0 * * *")
  *  - Stream IDs, resource identifiers
  *  - SQL / PromQL / VRL snippets
  *  - Config values, API keys (truncated), environment names

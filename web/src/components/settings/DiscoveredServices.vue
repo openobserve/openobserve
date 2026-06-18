@@ -184,11 +184,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             expansion="multi"
             :expand-on-row-click="(row: any) => row.__type === 'group'"
             :get-row-expansion-enabled="(row: any) => row.__type === 'group'"
+            :keep-page-on-data-change="true"
+            :current-page="currentPage"
             class="o2-table o2-row-md o2-table-header-sticky services-table tw:w-full"
             :class="filteredGroupCount > 0 ? 'services-table-full-height tw:h-[calc(100vh-21.25rem)]' : ''"
             data-test="services-list-table"
             @update:expanded-ids="syncExpansion"
             @row-click="handleRowClick"
+            @pagination-change="({ page }: { page: number }) => currentPage = page"
           >
             <template #empty>
               <OEmptyState
@@ -591,9 +594,10 @@ const filterValue = ref<string | null>(null);
 const selectedService = ref<ServiceRecord | null>(null);
 const expandedGroupNames = ref<Set<string>>(new Set());
 const pageSize = ref(20);
+const currentPage = ref(1);
 
 watch([filterKey, filterValue, searchQuery], () => {
-  // Filters changed — OTable handles reset internally via key change or ref
+  currentPage.value = 1;
 });
 
 // Label override for internal field keys shown in the filter dropdown

@@ -20,6 +20,9 @@ const registerAPI = inject<StepperRegisterAPI>(STEPPER_REGISTER_KEY)
 const isActive = computed<boolean>(() => context?.value.modelValue === props.name)
 const isVertical = computed<boolean>(() => context?.value.orientation === 'vertical')
 const animated = computed<boolean>(() => context?.value.animated ?? true)
+/** Checklist mode (from OStepper): render every step's panel, not just the
+ *  active one. */
+const expanded = computed<boolean>(() => context?.value.expanded ?? false)
 
 // ── Height transition hooks (like OCollapsible) ─────────────────────────
 function onBeforeEnter(el: Element) {
@@ -180,8 +183,14 @@ const triggerClasses = computed<string>(() => {
         <component :is="icon as Component" v-else-if="icon" class="tw:size-4" />
         <span v-else aria-hidden="true">{{ name }}</span>
       </button>
-      <!-- Vertical connector line below the indicator (hidden for the last step via CSS) -->
-      <div class="tw:flex-1 tw:w-px tw:mt-1 tw:bg-stepper-connector tw:[.o-step:last-child_&]:hidden" aria-hidden="true" />
+      <!-- Vertical connector line below the indicator (hidden for the last step
+           via CSS). Turns "done" once this step is complete, so a checklist
+           shows progress flowing down the rail. -->
+      <div
+        class="tw:flex-1 tw:w-px tw:mt-1 tw:[.o-step:last-child_&]:hidden"
+        :class="done ? 'tw:bg-stepper-connector-done' : 'tw:bg-stepper-connector'"
+        aria-hidden="true"
+      />
     </div>
 
     <!-- Right column: title button + content panel -->
@@ -195,7 +204,10 @@ const triggerClasses = computed<string>(() => {
         @click="handleClick"
       >
         <span class="tw:flex tw:flex-col tw:items-start tw:min-w-0">
-          <span :class="titleClasses">{{ title }}</span>
+          <span class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap">
+            <span :class="titleClasses">{{ title }}</span>
+            <slot name="title-suffix" />
+          </span>
           <span
             v-if="description"
             class="tw:text-xs tw:text-text-secondary tw:mt-0.5 tw:leading-tight"
@@ -205,23 +217,29 @@ const triggerClasses = computed<string>(() => {
         </span>
       </button>
 
-      <!-- Content panel (visible only when active) -->
+      <!-- Content panel. Expanded (checklist) mode: always rendered, no
+           transition. Wizard mode: only the active step, animated. -->
       <div class="tw:mt-2 tw:min-w-0">
-        <Transition
-          v-if="animated"
-          :css="false"
-          @before-enter="onBeforeEnter"
-          @enter="onEnter"
-          @leave="onLeave"
-          mode="out-in"
-        >
-          <div v-if="isActive" :key="name">
-            <slot />
-          </div>
-        </Transition>
-        <div v-else-if="isActive">
+        <div v-if="expanded">
           <slot />
         </div>
+        <template v-else>
+          <Transition
+            v-if="animated"
+            :css="false"
+            @before-enter="onBeforeEnter"
+            @enter="onEnter"
+            @leave="onLeave"
+            mode="out-in"
+          >
+            <div v-if="isActive" :key="name">
+              <slot />
+            </div>
+          </Transition>
+          <div v-else-if="isActive">
+            <slot />
+          </div>
+        </template>
       </div>
     </div>
   </div>
@@ -231,32 +249,43 @@ const triggerClasses = computed<string>(() => {
     The header indicators are rendered by OStepper from registered metadata.
   -->
   <template v-else>
-    <Transition
-      v-if="animated"
-      :css="false"
-      @before-enter="onBeforeEnter"
-      @enter="onEnter"
-      @leave="onLeave"
-      mode="out-in"
-    >
-      <div
-        v-if="isActive"
-        :key="name"
-        class="o-step-content tw:w-full tw:min-w-0"
-        role="region"
-        :aria-label="`${title}`"
-      >
-        <slot />
-      </div>
-    </Transition>
+    <!-- Expanded (checklist) mode: always rendered, no transition. -->
     <div
-      v-else-if="!animated && isActive"
+      v-if="expanded"
       class="o-step-content tw:w-full tw:min-w-0"
       role="region"
       :aria-label="`${title}`"
     >
       <slot />
     </div>
+    <template v-else>
+      <Transition
+        v-if="animated"
+        :css="false"
+        @before-enter="onBeforeEnter"
+        @enter="onEnter"
+        @leave="onLeave"
+        mode="out-in"
+      >
+        <div
+          v-if="isActive"
+          :key="name"
+          class="o-step-content tw:w-full tw:min-w-0"
+          role="region"
+          :aria-label="`${title}`"
+        >
+          <slot />
+        </div>
+      </Transition>
+      <div
+        v-else-if="!animated && isActive"
+        class="o-step-content tw:w-full tw:min-w-0"
+        role="region"
+        :aria-label="`${title}`"
+      >
+        <slot />
+      </div>
+    </template>
   </template>
 </template>
 

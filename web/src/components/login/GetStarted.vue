@@ -38,6 +38,7 @@
     <OForm ref="formRef" :default-values="{ hearAboutUs: '', whereDoYouWork: '' }" @submit="doSubmit" class="tw:w-full tw:flex tw:flex-col tw:gap-y-2">
     <OFormInput
       name="hearAboutUs"
+      data-test="onboarding-get-started-hear-about-us"
       class="o2-input"
       v-model="hearAboutUs"
       :label="`How did you hear about us? *`"
@@ -47,6 +48,7 @@
     />
     <OFormInput
       name="whereDoYouWork"
+      data-test="onboarding-get-started-where-do-you-work"
       class="tw:-mt-2"
       v-model="whereDoYouWork"
       :label="`Where do you work? *`"
@@ -55,7 +57,7 @@
       :validators="[(val) => !String(val ?? '').trim() ? 'This field is required' : undefined]"
     />
     <div class="tw:w-full tw:flex tw:items-center tw:gap-2">
-      <OCheckbox v-model="isAgree" />
+      <OCheckbox data-test="onboarding-get-started-agree-checkbox" v-model="isAgree" />
       <span class="tw:text-sm">
         I have read and agree with the
         <a href="#" class="tw:text-[#6B76E3] hover:underline">Terms of use</a> and
@@ -64,6 +66,7 @@
     </div>
     <div class="tw:w-full tw:mt-4">
       <OButton
+        data-test="onboarding-get-started-submit-btn"
         variant="primary"
         size="md"
         block

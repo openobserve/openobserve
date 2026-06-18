@@ -77,6 +77,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
+      <!-- Source event + chips (dialog mode) -->
+      <CorrelationEventHeader
+        :source-event="sourceEvent"
+        :context-chips="contextChips"
+        :subject-chips="subjectChips"
+        v-model:active-subject="activeSubject"
+        overflow-mode="responsive"
+        badge-size="md"
+        :get-subject-button-label="getSubjectButtonLabel"
+      />
+
       <!-- Tabs (only in dialog mode, tw:hidden in embedded-tabs mode) -->
       <div class="tw:px-4">
       <OTabs
@@ -550,6 +561,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       unstable-dimension-tooltip="Unstable dimension - changes on pod restart. Default: All values."
       @update:dimension="handleDimensionUpdate"
       @apply="applyDimensionChanges"
+    />
+
+    <!-- Source event + chips (embedded mode) -->
+    <CorrelationEventHeader
+      :source-event="sourceEvent"
+      :context-chips="contextChips"
+      :subject-chips="subjectChips"
+      v-model:active-subject="activeSubject"
+      overflow-mode="responsive"
+      :get-subject-button-label="getSubjectButtonLabel"
     />
 
     <!-- Tab Panels (no tabs in embedded mode, controlled by parent) -->
@@ -1100,6 +1121,8 @@ import {
   defineAsyncComponent,
   provide,
   nextTick,
+  onBeforeMount,
+  onBeforeUnmount,
 } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -1125,10 +1148,31 @@ import {
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import streamService from "@/services/stream";
 import searchService from "@/services/search";
-import { b64EncodeUnicode, getUUID } from "@/utils/zincutils";
+import {
+  b64EncodeUnicode,
+  getUUID,
+  convertTimeFromNsToMs,
+  convertTimeFromMicroToMilli,
+  timestampToTimezoneDate,
+} from "@/utils/zincutils";
+import {
+  buildSubjectButtons,
+  streamMatchesPatterns,
+  SUBJECT_BUTTONS_BY_SET,
+  resolveSetId,
+  type SubjectButton,
+} from "@/composables/useMetricSubjectButtons";
+import {
+  INTENT_DEFINITIONS,
+  filterByIntent,
+  getEssentialStreams,
+  pickDefaultIntent,
+  type IntentId,
+} from "@/utils/metrics/metricIntent";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import LogstashDatasource from "@/components/ingestion/logs/LogstashDatasource.vue";
 import DimensionFiltersBar from "./DimensionFiltersBar.vue";
+import CorrelationEventHeader from "./CorrelationEventHeader.vue";
 import TraceDetails from "@/plugins/traces/TraceDetails.vue";
 import TracesSearchResultList from "@/plugins/traces/components/TracesSearchResultList.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -1141,8 +1185,11 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 const RenderDashboardCharts = defineAsyncComponent(
   () => import("@/views/Dashboards/RenderDashboardCharts.vue"),
@@ -1157,6 +1204,13 @@ export interface TelemetryCorrelationDashboardProps {
   serviceName: string;
   matchedDimensions: Record<string, string>;
   additionalDimensions?: Record<string, string>; // Unstable dimensions (pod-id, etc.) - shown with _o2_all option
+  matchedSetId?: string; // Identity set selected by best-coverage resolution ("k8s", "aws", "gcp", "azure", ...)
+  chipDimensions?: Record<string, string>; // Semantic-id keyed dimensions for the chip row
+  sourceEvent?: {
+    timestamp?: number | string;
+    severity?: string;
+    message?: string;
+  };
   metricStreams: StreamInfo[];
   logStreams?: StreamInfo[];
   traceStreams?: StreamInfo[];
@@ -1284,6 +1338,7 @@ const PANEL_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes cache duration
 let streamChangeDebounceTimeout: any = null; // Debounce timeout for batching multiple hide/unhide operations
 const STREAM_CHANGE_DEBOUNCE_MS = 300; // 300ms debounce delay
 let wasEmptyBeforeChange = false; // Track if we're transitioning from empty state
+let suppressNextStreamReload = false; // Set when a full reload is already scheduled (e.g. chip click)
 
 // Trace correlation state
 const tracesLoading = ref(false);
@@ -1497,19 +1552,299 @@ const uniqueMetricStreams = computed(() => {
   return getUniqueStreams(sortedMetricStreams.value);
 });
 
-// Selected metric streams � prefer curated defaults from group definitions,
-// fall back to first 6 unique streams for non-OTel deployments.
-// Apply SELECT_ALL_VALUE defaults for unstable dimensions.
+// Selected metric streams — declared before chip/intent block because applyActivePill references it.
 const selectedMetricStreams = ref<StreamInfo[]>(
   applyUnstableDimensionDefaults(
     (() => {
       const unique = getUniqueStreams(sortedMetricStreams.value);
-      const defs =
-        props.metricGroupDefinitions ?? DEFAULT_METRIC_GROUP_DEFINITIONS;
+      const defs = props.metricGroupDefinitions ?? DEFAULT_METRIC_GROUP_DEFINITIONS;
       const defaults = getDefaultMetricSelections(defs, unique);
       return defaults.length > 0 ? defaults : unique.slice(0, 6);
     })(),
   ),
+);
+
+// ── Chip row & subject/intent logic ───────────────────────────────────────
+
+const LABEL_ACRONYMS = new Set([
+  "aws", "ecs", "gcp", "iam", "vpc", "rds", "s3", "ec2",
+  "id", "url", "uri", "ip", "dns", "ssl", "tls", "tcp", "udp",
+  "api", "cpu", "gpu", "ram", "ssd", "hdd", "io",
+  "k8s", "faas", "otel", "sql", "http", "https",
+]);
+const titleCaseWord = (w: string): string => {
+  if (!w) return w;
+  if (LABEL_ACRONYMS.has(w.toLowerCase())) return w.toUpperCase();
+  if (/^k8s$/i.test(w)) return "K8s";
+  return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+};
+const titleCase = (s: string) => s.split(/\s+/).map(titleCaseWord).join(" ");
+
+const dimensionDisplayLabelCache = new Map<string, string>();
+const dimensionDisplayLabel = (key: string): string => {
+  const cached = dimensionDisplayLabelCache.get(key);
+  if (cached !== undefined) return cached;
+  const label = titleCase(key.replace(/[-_.]/g, " "));
+  dimensionDisplayLabelCache.set(key, label);
+  return label;
+};
+
+const toChipString = (v: unknown): string | null => {
+  if (v == null) return null;
+  if (typeof v === "string") return v;
+  if (typeof v === "number" || typeof v === "boolean") return String(v);
+  return null;
+};
+const sanitizeChipDimensions = (src: Record<string, unknown> | undefined | null): Record<string, string> => {
+  if (!src) return {};
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(src)) {
+    const s = toChipString(v);
+    if (s !== null && s !== "") out[k] = s;
+  }
+  return out;
+};
+const chipDimensionSource = computed<Record<string, string>>(() => {
+  if (props.chipDimensions && Object.keys(props.chipDimensions).length > 0) {
+    return sanitizeChipDimensions(props.chipDimensions as Record<string, unknown>);
+  }
+  return sanitizeChipDimensions({
+    ...(props.matchedDimensions ?? {}),
+    ...(props.additionalDimensions ?? {}),
+  });
+});
+const chipDimensionKeys = computed<string[]>(() => Object.keys(chipDimensionSource.value));
+
+const fieldKeysForSemanticId = (semanticId: string): string[] => {
+  const group = semanticGroups.value.find((g) => g.id === semanticId);
+  if (!group) return semanticId in pendingDimensions.value ? [semanticId] : [];
+  const pending = group.fields.filter((f) => f in pendingDimensions.value);
+  if (pending.length > 0) return pending;
+  const avail = props.availableDimensions ?? {};
+  const sourceHit = group.fields.find((f) => avail[f] !== undefined && avail[f] !== null && avail[f] !== "");
+  return sourceHit ? [sourceHit] : [];
+};
+
+const activeChipKeysLocal = ref<Set<string>>(new Set());
+watch(chipDimensionKeys, (keys) => {
+  const next = new Set<string>();
+  for (const k of keys) {
+    const fields = fieldKeysForSemanticId(k);
+    if (fields.length === 0) next.add(k);
+  }
+  activeChipKeysLocal.value = next;
+}, { immediate: true });
+
+const originalValueForKey = (key: string): string => {
+  const v = chipDimensionSource.value[key];
+  return v !== undefined && v !== SELECT_ALL_VALUE ? v : "";
+};
+
+type ChipKind = "context" | "subject";
+type DimensionChip = {
+  key: string; label: string; value: string;
+  kind: ChipKind; active: boolean; disabled?: boolean;
+};
+
+const subjectSemanticIds = computed<Set<string>>(() => {
+  if (!props.matchedSetId) return new Set();
+  const canonical = resolveSetId(props.matchedSetId);
+  const specs = canonical ? SUBJECT_BUTTONS_BY_SET[canonical] : undefined;
+  if (!specs?.length) return new Set();
+  return new Set(specs.flatMap((s) => s.semanticIds));
+});
+
+const activeSubject = ref<string | null>(null);
+
+const subjectButtons = computed<SubjectButton[]>(() =>
+  buildSubjectButtons(props.matchedSetId, semanticGroups.value),
+);
+
+const subjectMatchCounts = computed<Record<string, number>>(() => {
+  const out: Record<string, number> = {};
+  const pool = props.metricStreams ?? [];
+  if (pool.length === 0) return out;
+  const cachedSchemas = (store.state.streams?.metrics as Record<string, any> | undefined) ?? {};
+  for (const button of subjectButtons.value) {
+    if (!button.semanticIds || button.poolPatterns.length === 0) continue;
+    const subjectFieldAliases = new Set<string>();
+    for (const sid of button.semanticIds) {
+      const group = semanticGroups.value.find((g) => g.id === sid);
+      if (group) for (const f of group.fields) subjectFieldAliases.add(f);
+    }
+    const seen = new Set<string>();
+    let matchCount = 0;
+    for (const stream of pool) {
+      if (seen.has(stream.stream_name)) continue;
+      seen.add(stream.stream_name);
+      const schema = cachedSchemas[stream.stream_name]?.schema as Array<{ name: string }> | undefined;
+      if (schema && schema.length > 0 && subjectFieldAliases.size > 0) {
+        if (schema.some((c) => subjectFieldAliases.has(c.name))) matchCount++;
+      } else if (streamMatchesPatterns(stream.stream_name, button.poolPatterns)) {
+        matchCount++;
+      }
+    }
+    for (const sid of button.semanticIds) out[sid] = matchCount;
+  }
+  return out;
+});
+
+const unifiedChips = computed<DimensionChip[]>(() =>
+  chipDimensionKeys.value
+    .map((key): DimensionChip => {
+      const isSubject = subjectSemanticIds.value.has(key);
+      const matchCount = isSubject ? subjectMatchCounts.value[key] ?? 0 : 0;
+      // Context chips: active when the field key has a real value in pendingDimensions (not SELECT_ALL_VALUE)
+      const contextActive = !isSubject && (() => {
+        const fields = fieldKeysForSemanticId(key);
+        if (fields.length > 0) return fields.some((f) => pendingDimensions.value[f] !== SELECT_ALL_VALUE);
+        return activeChipKeysLocal.value.has(key);
+      })();
+      return {
+        key,
+        label: dimensionDisplayLabel(key),
+        value: originalValueForKey(key),
+        kind: isSubject ? "subject" : "context",
+        active: isSubject ? activeSubject.value === key : contextActive,
+        disabled: isSubject && matchCount === 0,
+      };
+    })
+    .filter((c) => {
+      if (!c.value || c.value === SELECT_ALL_VALUE) return false;
+      // Subject chips (Pod, Node, Host) are only meaningful on the metrics tab
+      if (c.kind === "subject" && activeTab.value !== "metrics") return false;
+      return true;
+    }),
+);
+
+// Helper function to get shorter label from SUBJECT_BUTTONS_BY_SET
+const getSubjectButtonLabel = (semanticId: string): string => {
+  const canonical = resolveSetId(props.matchedSetId);
+  if (!canonical) return semanticId;
+
+  const specs = SUBJECT_BUTTONS_BY_SET[canonical];
+  if (!specs) return semanticId;
+
+  const spec = specs.find(s => s.semanticIds.includes(semanticId));
+  return spec?.label || semanticId;
+};
+
+const pinSubject = (newSubject: string | null, previousSubject: string | null) => {
+  let next = { ...pendingDimensions.value };
+  let mutated = false;
+  if (previousSubject && next[previousSubject] !== SELECT_ALL_VALUE) {
+    next[previousSubject] = SELECT_ALL_VALUE; mutated = true;
+  }
+  if (newSubject) {
+    const resolved = originalValueForKey(newSubject);
+    if (resolved && next[newSubject] !== resolved) { next[newSubject] = resolved; mutated = true; }
+  }
+  if (mutated) pendingDimensions.value = next;
+  return mutated;
+};
+
+watch(
+  [subjectSemanticIds, () => props.matchedSetId, () => props.chipDimensions, subjectMatchCounts],
+  ([sids, matchedSetId]) => {
+    let mutated = false;
+    if (activeSubject.value && sids.has(activeSubject.value)) {
+      mutated = pinSubject(activeSubject.value, null);
+    } else if (!matchedSetId) {
+      activeSubject.value = null;
+    } else {
+      const canonical = resolveSetId(matchedSetId);
+      const specs = canonical ? SUBJECT_BUTTONS_BY_SET[canonical] : undefined;
+      if (!specs?.length) {
+        activeSubject.value = null;
+      } else {
+        const counts = subjectMatchCounts.value;
+        const ordered = [...specs.filter((s) => s.defaultActive), ...specs.filter((s) => !s.defaultActive)];
+        let picked: string | null = null;
+        for (const spec of ordered) {
+          const sid = spec.semanticIds[0];
+          if (sid && sids.has(sid) && (counts[sid] ?? 0) > 0) { picked = sid; break; }
+        }
+        if (picked) { activeSubject.value = picked; mutated = pinSubject(picked, null); }
+      }
+    }
+    if (!mutated) return;
+    activeDimensions.value = { ...pendingDimensions.value };
+    if (initialLoadCompleted.value) {
+      dashboardData.value = null;
+      nextTick(() => { loadDashboard(); });
+    }
+  },
+  { immediate: true },
+);
+
+// Split chips by type for new UI structure
+const contextChips = computed(() =>
+  unifiedChips.value.filter(chip => chip.kind === "context")
+);
+const subjectChips = computed(() =>
+  unifiedChips.value.filter(chip => chip.kind === "subject")
+);
+
+// ── Intent pill row ────────────────────────────────────────────────────────
+const activeIntent = ref<IntentId>("all");
+
+const activeSubjectButtonId = computed<string | null>(() => {
+  const sid = activeSubject.value;
+  if (!sid) return null;
+  const button = subjectButtons.value.find((b) => Array.isArray(b.semanticIds) && b.semanticIds.includes(sid));
+  return button?.id ?? null;
+});
+
+const applyScopeFilter = (streams: StreamInfo[]): StreamInfo[] => {
+  const sid = activeSubject.value;
+  if (!sid || subjectButtons.value.length === 0) return streams;
+  const button = subjectButtons.value.find((b) => Array.isArray(b.semanticIds) && b.semanticIds.includes(sid));
+  if (!button || button.poolPatterns.length === 0) return streams;
+  return streams.filter((s) => streamMatchesPatterns(s.stream_name, button.poolPatterns));
+};
+
+const streamsForActivePill = computed<StreamInfo[]>(() => {
+  const scoped = applyScopeFilter(uniqueMetricStreams.value);
+  return filterByIntent(scoped, activeIntent.value, props.matchedSetId, activeSubjectButtonId.value);
+});
+
+const pillDescriptors = computed(() => {
+  const scoped = applyScopeFilter(uniqueMetricStreams.value);
+  return INTENT_DEFINITIONS.map((def) => {
+    const matches = filterByIntent(scoped, def.id, props.matchedSetId, activeSubjectButtonId.value);
+    return { ...def, count: matches.length, disabled: def.id === "essentials" && matches.length === 0 };
+  });
+});
+
+const essentialStreamNames = computed<Set<string>>(() => {
+  const ess = getEssentialStreams(uniqueMetricStreams.value, props.matchedSetId, activeSubjectButtonId.value);
+  return new Set(ess.map((s) => s.stream_name));
+});
+
+const applyActivePill = () => {
+  selectedMetricStreams.value = applyUnstableDimensionDefaults(streamsForActivePill.value);
+};
+
+const setActiveIntent = (id: IntentId) => {
+  if (activeIntent.value === id) return;
+  activeIntent.value = id;
+  applyActivePill();
+  dashboardData.value = null;
+  loadDashboard();
+};
+
+let lastIntentInitKey: string | null = null;
+watch(
+  [() => props.matchedSetId, uniqueMetricStreams, subjectButtons],
+  ([matchedSetId, streams]) => {
+    if (streams.length === 0) return;
+    const key = `${matchedSetId ?? ""}|${streams.map((s) => s.stream_name).sort().join(",")}`;
+    if (lastIntentInitKey === key) return;
+    lastIntentInitKey = key;
+    activeIntent.value = pickDefaultIntent(streams, matchedSetId, activeSubjectButtonId.value);
+    applyActivePill();
+  },
+  { immediate: true },
 );
 
 // Filter metric streams based on search text
@@ -1855,6 +2190,7 @@ const loadDashboard = async () => {
       sourceType: props.sourceType,
       availableDimensions: props.availableDimensions,
       metricSchemas: metricSchemas,
+      semanticGroups: semanticGroups.value,
     };
 
     // Generate metrics dashboard JSON (if we have metrics)
@@ -1958,6 +2294,7 @@ const addMetricPanels = async (addedStreams: StreamInfo[]) => {
         sourceType: props.sourceType,
         availableDimensions: props.availableDimensions,
         metricSchemas: newSchemas,
+        semanticGroups: semanticGroups.value,
       };
 
       const newDashboard = generateDashboard(
@@ -2029,6 +2366,7 @@ const addMetricPanels = async (addedStreams: StreamInfo[]) => {
       sourceType: props.sourceType,
       availableDimensions: props.availableDimensions,
       metricSchemas: store.state.streams.metrics || {},
+      semanticGroups: semanticGroups.value,
     };
     regenerateGroupDashboards(groupConfig);
 
@@ -2492,7 +2830,7 @@ const fetchTracesByDimensions = (): Promise<any[]> => {
               start_time: props.timeRange.startTime,
               end_time: props.timeRange.endTime,
               from: 0,
-              size: 50,
+              size: 10,
             },
             type: "traces",
             traceId,
@@ -2746,6 +3084,11 @@ watch(
         currentPanels.length === 0
       ) {
         wasEmptyBeforeChange = false;
+        // Skip if a full reload is already scheduled (e.g. by onChipClick → applyDimensionChanges)
+        if (suppressNextStreamReload) {
+          suppressNextStreamReload = false;
+          return;
+        }
         if (isOpen.value && currentStreams.length > 0) {
           dashboardData.value = null;
           loadDashboard();
@@ -2785,7 +3128,10 @@ watch(
       }
 
       if (isOpen.value && currentStreams.length > 0) {
-        if (panelsToRemove.length > 0) {
+        if (suppressNextStreamReload) {
+          // A full reload is already scheduled (e.g. by onChipClick → applyDimensionChanges)
+          suppressNextStreamReload = false;
+        } else if (panelsToRemove.length > 0) {
           // If panels need to be removed, do full reload
           dashboardData.value = null;
           nextTick(() => {
@@ -2863,6 +3209,24 @@ watch(
   },
 );
 
+// Watch activeSubject changes from OTabs to trigger the same logic as onChipClick
+watch(
+  () => activeSubject.value,
+  (newSubject, oldSubject) => {
+    // Skip if no change or not on metrics tab
+    if (newSubject === oldSubject || activeTab.value !== "metrics") return;
+
+    // Apply the same logic as onChipClick for subject selection
+    if (newSubject) {
+      pinSubject(newSubject, oldSubject);
+      suppressNextStreamReload = true;
+      applyActivePill();
+      dashboardData.value = null;
+      applyDimensionChanges();
+    }
+  },
+);
+
 // Watch all dimension props together to detect any changes
 // This ensures filter dropdowns are always in sync with current row data
 // Triggers when: component mounts, user switches rows, or props update
@@ -2918,4 +3282,5 @@ watch(
 .metric-group-tabs .o-tab__indicator {
   height: 0.125rem;
 }
+
 </style>

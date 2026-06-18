@@ -681,6 +681,9 @@ const processTestResults = async (results: any) => {
   expandState.value.output = true;
   originalOutputEvents.value = JSON.stringify(results?.data?.results);
 
+  // Clear any previous function error shown in the parent
+  emit("function-error", "");
+
   const processedEvents =
     results?.data?.results.map((event: any) => event.event || event.events) ||
     [];

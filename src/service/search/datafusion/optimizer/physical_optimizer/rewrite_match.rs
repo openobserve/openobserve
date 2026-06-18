@@ -99,7 +99,7 @@ impl TreeNodeRewriter for PlanRewriter {
     type Node = Arc<dyn ExecutionPlan>;
 
     fn f_up(&mut self, plan: Self::Node) -> Result<Transformed<Self::Node>> {
-        if let Some(filter) = plan.as_any().downcast_ref::<FilterExec>() {
+        if let Some(filter) = plan.downcast_ref::<FilterExec>() {
             let predicate = filter.predicate();
 
             // 1. Check if the predicate contains any match_all functions
@@ -160,7 +160,7 @@ impl TreeNodeRewriter for ColumnIndexRewriter {
 
     fn f_up(&mut self, expr: Self::Node) -> Result<Transformed<Self::Node>> {
         // Check if this is a Column expression
-        if let Some(column) = expr.as_any().downcast_ref::<Column>() {
+        if let Some(column) = expr.downcast_ref::<Column>() {
             let field_name = column.name();
             // Find the new index in the new schema
             if let Ok(new_index) = self.new_schema.index_of(field_name) {
@@ -210,12 +210,9 @@ fn rewrite_match_all_physical(
     schema: SchemaRef,
     fields: &[(String, DataType)],
 ) -> Result<Arc<dyn PhysicalExpr>> {
-    let scalar_fn = expr
-        .as_any()
-        .downcast_ref::<ScalarFunctionExpr>()
-        .ok_or_else(|| {
-            DataFusionError::Internal("Expected ScalarFunctionExpr for match_all".to_string())
-        })?;
+    let scalar_fn = expr.downcast_ref::<ScalarFunctionExpr>().ok_or_else(|| {
+        DataFusionError::Internal("Expected ScalarFunctionExpr for match_all".to_string())
+    })?;
 
     let name = scalar_fn.name();
     let args = scalar_fn.args();
@@ -398,7 +395,7 @@ fn has_match_all_function(expr: &Arc<dyn PhysicalExpr>) -> bool {
 
 // check if the expr is match_all function
 fn is_match_all_physical(expr: &Arc<dyn PhysicalExpr>) -> bool {
-    if let Some(scalar_fn) = expr.as_any().downcast_ref::<ScalarFunctionExpr>() {
+    if let Some(scalar_fn) = expr.downcast_ref::<ScalarFunctionExpr>() {
         let name = scalar_fn.name();
         name.to_lowercase() == MATCH_ALL_UDF_NAME
             || name == FUZZY_MATCH_ALL_UDF_NAME
@@ -428,7 +425,7 @@ impl TreeNodeRewriter for AddFstFieldsToProjection {
     type Node = Arc<dyn ExecutionPlan>;
 
     fn f_up(&mut self, plan: Self::Node) -> Result<Transformed<Self::Node>> {
-        if let Some(empty_exec) = plan.as_any().downcast_ref::<NewEmptyExec>() {
+        if let Some(empty_exec) = plan.downcast_ref::<NewEmptyExec>() {
             let schema = empty_exec.full_schema();
             // used for read field from parquet file, because match_all function do not include
             // the field in argument, so when we rewrite match_all function, we need to add
@@ -658,13 +655,13 @@ mod tests {
 
         // Verify that all column indices in FilterExec match the input schema
         let _ = physical_plan.apply(&mut |node: &Arc<dyn ExecutionPlan>| -> Result<TreeNodeRecursion> {
-            if let Some(filter) = node.as_any().downcast_ref::<FilterExec>() {
+            if let Some(filter) = node.downcast_ref::<FilterExec>() {
                 let input_schema = filter.input().schema();
                 let predicate = filter.predicate();
 
                 // Traverse the predicate expression tree to find all Column references
                 let _ = predicate.apply(&mut |expr: &Arc<dyn PhysicalExpr>| -> Result<TreeNodeRecursion> {
-                    if let Some(column) = expr.as_any().downcast_ref::<Column>() {
+                    if let Some(column) = expr.downcast_ref::<Column>() {
                         let column_name = column.name();
                         let column_index = column.index();
 

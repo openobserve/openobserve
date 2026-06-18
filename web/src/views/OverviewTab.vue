@@ -258,11 +258,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-if="isLoading" class="tw:flex tw:flex-col tw:gap-2 tw:py-2 tw:px-0">
       <OSkeleton v-for="i in 3" :key="i" class="tw:h-[3.25em]" />
     </div>
+
+    <!-- Alert History Drawer — opened from anomaly Investigate button -->
+    <AlertHistoryDrawer
+      v-model:open="showAlertHistoryDrawer"
+      :alert-details="selectedAlertForHistory"
+      :alert-id="selectedAlertIdForHistory"
+      alert-type="anomaly_detection"
+      data-test="overview-alert-history-drawer"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from "vue";
+import { ref, computed, defineAsyncComponent, onMounted, watch } from "vue";
 
 // Module-level cache for anomaly history — survives re-renders, cleared on org change
 const ANOMALY_CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes
@@ -286,6 +295,9 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ServiceGraphNodeSidePanel from "@/plugins/traces/ServiceGraphNodeSidePanel.vue";
+const AlertHistoryDrawer = defineAsyncComponent(
+  () => import("@/components/alerts/AlertHistoryDrawer.vue"),
+);
 
 const { t } = useI18n();
 const store = useStore();
@@ -361,6 +373,11 @@ const anomalies = ref<any[]>([]);
 const incidents = ref<any[]>([]);
 const services = ref<any[]>([]);
 const recentEvents = ref<any[]>([]);
+
+// Alert history drawer state
+const showAlertHistoryDrawer = ref(false);
+const selectedAlertForHistory = ref<any>(null);
+const selectedAlertIdForHistory = ref("");
 
 // Service graph raw data + panel state
 const graphData = ref<{ nodes: any[]; edges: any[] }>({ nodes: [], edges: [] });
@@ -468,6 +485,8 @@ const loadAnomalies = async () => {
             alertName: cfg?.name ?? cfg?.alert_name ?? h.alert_name,
             streamName: cfg?.stream_name ?? h.stream_name,
             ts: tsMs,
+            alertId: cfg?.id ?? cfg?.anomaly_id ?? h.anomaly_id ?? "",
+            alertConfig: cfg ?? null,
           });
         }
       });
@@ -735,10 +754,9 @@ const serviceCardClass = (svc: any) => {
 
 // ── Navigation ───────────────────────────────────────────────────────────────
 const goToAlert = (item: any) => {
-  router.push({
-    name: "alertHistory",
-    query: { org_identifier: orgId.value },
-  });
+  selectedAlertForHistory.value = item.alertConfig ?? { name: item.alertName };
+  selectedAlertIdForHistory.value = item.alertId ?? "";
+  showAlertHistoryDrawer.value = true;
 };
 
 const goToService = (svc: any) => {

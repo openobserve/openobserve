@@ -33,11 +33,11 @@
       </div>
       <div class="tw:flex tw:justify-start tw:items-center" style="padding-top: 0px">
         <div
-          data-test="add-alert-stream-type-select"
           class="alert-stream-type o2-input tw:mr-2"
           style="padding-top: 0"
         >
           <OSelect
+            data-test="add-alert-stream-type-select"
             v-model="streamRoute.sourceStreamType"
             :options="streamTypes"
             :label="t('alerts.streamType') + ' *'"
@@ -51,11 +51,11 @@
           />
         </div>
         <div
-          data-test="add-alert-stream-select"
           class="o2-input"
           style="padding-top: 0"
         >
           <OSelect
+            data-test="add-alert-stream-select"
             v-model="streamRoute.sourceStreamName"
             :options="filteredStreams"
             :label="t('alerts.stream_name') + ' *'"

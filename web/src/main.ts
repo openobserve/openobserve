@@ -83,6 +83,7 @@ const getConfig = async () => {
         trackResources: true,
         trackLongTasks: true,
         trackUserInteractions: true,
+        actionNameAttribute: "data-test",
         apiVersion: options.apiVersion,
         insecureHTTP: options.insecureHTTP,
         defaultPrivacyLevel: "allow",

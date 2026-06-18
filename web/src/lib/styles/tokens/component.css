@@ -291,6 +291,68 @@
   --color-badge-purple-ol-border: var(--color-purple-600);
   --color-badge-purple-ol-text:   var(--color-purple-700);
 
+  /* Badge — teal */
+  --color-badge-teal-solid-bg: var(--color-teal-600);
+  --color-badge-teal-solid-text: var(--color-white);
+  --color-badge-teal-ol-border: var(--color-teal-500);
+  --color-badge-teal-ol-text: var(--color-teal-700);
+  --color-badge-teal-soft-bg: var(--color-teal-50);
+  --color-badge-teal-soft-text: var(--color-teal-700);
+
+  /* Badge — orange */
+  --color-badge-orange-solid-bg: var(--color-orange-600);
+  --color-badge-orange-solid-text: var(--color-white);
+  --color-badge-orange-ol-border: var(--color-orange-500);
+  --color-badge-orange-ol-text: var(--color-orange-700);
+  --color-badge-orange-soft-bg: var(--color-orange-50);
+  --color-badge-orange-soft-text: var(--color-orange-700);
+
+  /* Badge — lime */
+  --color-badge-lime-solid-bg: var(--color-lime-600);
+  --color-badge-lime-solid-text: var(--color-white);
+  --color-badge-lime-ol-border: var(--color-lime-500);
+  --color-badge-lime-ol-text: var(--color-lime-700);
+  --color-badge-lime-soft-bg: var(--color-lime-50);
+  --color-badge-lime-soft-text: var(--color-lime-700);
+
+  /* Badge — amber */
+  --color-badge-amber-solid-bg: var(--color-amber-600);
+  --color-badge-amber-solid-text: var(--color-white);
+  --color-badge-amber-ol-border: var(--color-amber-500);
+  --color-badge-amber-ol-text: var(--color-amber-700);
+  --color-badge-amber-soft-bg: var(--color-amber-50);
+  --color-badge-amber-soft-text: var(--color-amber-700);
+
+  /* Badge — cyan */
+  --color-badge-cyan-solid-bg: var(--color-cyan-600);
+  --color-badge-cyan-solid-text: var(--color-white);
+  --color-badge-cyan-ol-border: var(--color-cyan-500);
+  --color-badge-cyan-ol-text: var(--color-cyan-700);
+  --color-badge-cyan-soft-bg: var(--color-cyan-50);
+  --color-badge-cyan-soft-text: var(--color-cyan-700);
+
+  /* Badge — blue */
+  --color-badge-blue-solid-bg: var(--color-blue-600);
+  --color-badge-blue-solid-text: var(--color-white);
+  --color-badge-blue-ol-border: var(--color-blue-500);
+  --color-badge-blue-ol-text: var(--color-blue-700);
+  --color-badge-blue-soft-bg: var(--color-blue-50);
+  --color-badge-blue-soft-text: var(--color-blue-700);
+
+  /* Badge — purple (solid/soft variants for correlation) */
+  --color-badge-purple-solid-bg: var(--color-purple-600);
+  --color-badge-purple-solid-text: var(--color-white);
+  --color-badge-purple-soft-bg: var(--color-purple-50);
+  --color-badge-purple-soft-text: var(--color-purple-700);
+
+  /* Badge — indigo */
+  --color-badge-indigo-solid-bg: var(--color-indigo-600);
+  --color-badge-indigo-solid-text: var(--color-white);
+  --color-badge-indigo-ol-border: var(--color-indigo-500);
+  --color-badge-indigo-ol-text: var(--color-indigo-700);
+  --color-badge-indigo-soft-bg: var(--color-indigo-50);
+  --color-badge-indigo-soft-text: var(--color-indigo-700);
+
   /* Badge — shared */
   --color-badge-focus-ring: var(--color-primary-400);
 
@@ -1078,6 +1140,68 @@
   /* Badge — purple */
   --color-badge-purple-ol-border: var(--color-badge-purple-ol-border);
   --color-badge-purple-ol-text:   var(--color-badge-purple-ol-text);
+
+  /* Badge — teal */
+  --color-badge-teal-solid-bg: var(--color-badge-teal-solid-bg);
+  --color-badge-teal-solid-text: var(--color-badge-teal-solid-text);
+  --color-badge-teal-ol-border: var(--color-badge-teal-ol-border);
+  --color-badge-teal-ol-text: var(--color-badge-teal-ol-text);
+  --color-badge-teal-soft-bg: var(--color-badge-teal-soft-bg);
+  --color-badge-teal-soft-text: var(--color-badge-teal-soft-text);
+
+  /* Badge — orange */
+  --color-badge-orange-solid-bg: var(--color-badge-orange-solid-bg);
+  --color-badge-orange-solid-text: var(--color-badge-orange-solid-text);
+  --color-badge-orange-ol-border: var(--color-badge-orange-ol-border);
+  --color-badge-orange-ol-text: var(--color-badge-orange-ol-text);
+  --color-badge-orange-soft-bg: var(--color-badge-orange-soft-bg);
+  --color-badge-orange-soft-text: var(--color-badge-orange-soft-text);
+
+  /* Badge — lime */
+  --color-badge-lime-solid-bg: var(--color-badge-lime-solid-bg);
+  --color-badge-lime-solid-text: var(--color-badge-lime-solid-text);
+  --color-badge-lime-ol-border: var(--color-badge-lime-ol-border);
+  --color-badge-lime-ol-text: var(--color-badge-lime-ol-text);
+  --color-badge-lime-soft-bg: var(--color-badge-lime-soft-bg);
+  --color-badge-lime-soft-text: var(--color-badge-lime-soft-text);
+
+  /* Badge — amber */
+  --color-badge-amber-solid-bg: var(--color-badge-amber-solid-bg);
+  --color-badge-amber-solid-text: var(--color-badge-amber-solid-text);
+  --color-badge-amber-ol-border: var(--color-badge-amber-ol-border);
+  --color-badge-amber-ol-text: var(--color-badge-amber-ol-text);
+  --color-badge-amber-soft-bg: var(--color-badge-amber-soft-bg);
+  --color-badge-amber-soft-text: var(--color-badge-amber-soft-text);
+
+  /* Badge — cyan */
+  --color-badge-cyan-solid-bg: var(--color-badge-cyan-solid-bg);
+  --color-badge-cyan-solid-text: var(--color-badge-cyan-solid-text);
+  --color-badge-cyan-ol-border: var(--color-badge-cyan-ol-border);
+  --color-badge-cyan-ol-text: var(--color-badge-cyan-ol-text);
+  --color-badge-cyan-soft-bg: var(--color-badge-cyan-soft-bg);
+  --color-badge-cyan-soft-text: var(--color-badge-cyan-soft-text);
+
+  /* Badge — blue */
+  --color-badge-blue-solid-bg: var(--color-badge-blue-solid-bg);
+  --color-badge-blue-solid-text: var(--color-badge-blue-solid-text);
+  --color-badge-blue-ol-border: var(--color-badge-blue-ol-border);
+  --color-badge-blue-ol-text: var(--color-badge-blue-ol-text);
+  --color-badge-blue-soft-bg: var(--color-badge-blue-soft-bg);
+  --color-badge-blue-soft-text: var(--color-badge-blue-soft-text);
+
+  /* Badge — purple (solid/soft variants) */
+  --color-badge-purple-solid-bg: var(--color-badge-purple-solid-bg);
+  --color-badge-purple-solid-text: var(--color-badge-purple-solid-text);
+  --color-badge-purple-soft-bg: var(--color-badge-purple-soft-bg);
+  --color-badge-purple-soft-text: var(--color-badge-purple-soft-text);
+
+  /* Badge — indigo */
+  --color-badge-indigo-solid-bg: var(--color-badge-indigo-solid-bg);
+  --color-badge-indigo-solid-text: var(--color-badge-indigo-solid-text);
+  --color-badge-indigo-ol-border: var(--color-badge-indigo-ol-border);
+  --color-badge-indigo-ol-text: var(--color-badge-indigo-ol-text);
+  --color-badge-indigo-soft-bg: var(--color-badge-indigo-soft-bg);
+  --color-badge-indigo-soft-text: var(--color-badge-indigo-soft-text);
 
   /* Badge — shared */
   --color-badge-focus-ring: var(--color-badge-focus-ring);
@@ -2731,6 +2855,7 @@ body.body--dark .rca-report-content {
 
 .histogram-container {
   border-radius: 0.5rem;
+  position: relative;
 
   &--visible {
     height: 6.25rem;
@@ -2759,12 +2884,6 @@ body.body--dark .rca-report-content {
   &__message {
     min-height: 2rem;
   }
-}
-
-.histogram-loader {
-  top: 3.125rem;
-  position: absolute;
-  left: 50%;
 }
 
 .histogram-skeleton {
@@ -3699,6 +3818,10 @@ thead {
 
 th {
   text-align: left;
+
+  .column-actions {
+    background: var(--o2-log-table-header-bg);
+  }
 
   &:hover {
     .column-actions {

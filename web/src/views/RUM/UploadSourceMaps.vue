@@ -48,6 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div>
             <div class="tw:text-sm tw:font-medium text-weight-medium tw:mb-2">Service *</div>
             <OInput
+              data-test="rum-upload-source-maps-service-input"
               v-model="formData.service"
               placeholder="Enter service name"
               :error="!!serviceError"
@@ -60,6 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div>
             <div class="tw:text-sm tw:font-medium text-weight-medium tw:mb-2">Version *</div>
             <OInput
+              data-test="rum-upload-source-maps-version-input"
               v-model="formData.version"
               placeholder="Enter version (e.g., 1.0.0)"
               :error="!!versionError"
@@ -72,6 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div>
             <div class="tw:text-sm tw:font-medium text-weight-medium tw:mb-2">Environment</div>
             <OInput
+              data-test="rum-upload-source-maps-environment-input"
               v-model="formData.environment"
               placeholder="Enter environment (optional)"
             />
@@ -82,6 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="tw:mb-6">
           <div class="tw:text-sm tw:font-medium text-weight-medium tw:mb-2">Source Map ZIP File *</div>
           <div
+            data-test="rum-upload-source-maps-file-dropzone"
             class="tw:border-2 tw:border-dashed tw:border-(--q-border-color) tw:rounded-lg tw:p-8 tw:text-center tw:cursor-pointer tw:transition-all tw:duration-300 tw:bg-(--q-background) tw:hover:border-(--q-primary) tw:dark:border-[rgba(255,255,255,0.1)] tw:dark:hover:bg-[rgba(var(--q-primary-rgb),0.05)]"
             :class="[
               isDragging ? 'tw:border-[var(--q-primary)]! tw:bg-[rgba(var(--q-primary-rgb),0.05)]! tw:border-solid! tw:dark:bg-[rgba(var(--q-primary-rgb),0.1)]!' : '',
@@ -94,6 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <input
               ref="fileInputRef"
+              data-test="rum-upload-source-maps-file-input"
               type="file"
               accept=".zip"
               style="display: none"
@@ -133,12 +138,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="action-bar tw:shrink-0 card-container tw:flex tw:items-center tw:justify-end tw:gap-3 tw:py-3 tw:pr-3 tw:border-t tw:border-(--q-border-color)"
       style="position: sticky; z-index: 2">
       <OButton
+        data-test="rum-upload-source-maps-cancel-btn"
         variant="outline"
         size="sm-action"
         @click="navigateBack"
         :disabled="isUploading"
       >Cancel</OButton>
       <OButton
+        data-test="rum-upload-source-maps-upload-btn"
         variant="primary"
         size="sm-action"
         :loading="isUploading"
@@ -254,19 +261,22 @@ const formatFileSize = (bytes: number): string => {
 
 // Upload source maps
 const uploadSourceMaps = async () => {
+  // Validate every required field top-to-bottom and surface all errors at once:
+  // Service / Version as inline field errors, the ZIP file as a toast.
+  serviceError.value = formData.value.service ? "" : "Service is required";
+  versionError.value = formData.value.version ? "" : "Version is required";
+
+  let hasError = !formData.value.service || !formData.value.version;
+
   if (!formData.value.file) {
     toast({
       variant: "error",
       message: "Please select a ZIP file to upload",
     });
-    return;
+    hasError = true;
   }
 
-  if (!formData.value.service || !formData.value.version) {
-    serviceError.value = formData.value.service ? "" : "Service is required";
-    versionError.value = formData.value.version ? "" : "Version is required";
-    return;
-  }
+  if (hasError) return;
 
   isUploading.value = true;
 

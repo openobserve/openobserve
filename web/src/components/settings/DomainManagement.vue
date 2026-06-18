@@ -171,6 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div class="tw:flex tw:gap-x-2 tw:items-center">
           <OInput
+            data-test="domain-management-new-domain-input"
             v-model="newDomain"
             class="domain-input tw:w-75"
             @keydown.enter="addDomain"
@@ -180,6 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:model-value="domainError = ''"
           />
           <OButton
+            data-test="domain-management-add-domain-btn"
             variant="primary"
             size="sm-action"
             @click="addDomain"
@@ -204,7 +206,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="tw:mb-1 tw:border tw:border-(--o2-border) tw:rounded-lg tw:bg-white tw:dark:border-[#444] tw:dark:bg-[#1e1e1e]"
         >
           <div class="tw:flex tw:items-center tw:justify-between tw:px-3 tw:py-2 tw:bg-[#f5f5f5] tw:border-b tw:border-b-(--o2-border) tw:rounded-t-lg tw:dark:bg-[#2a2a2a] tw:dark:border-b-[#444]">
-          <div class="tw:text-base tw:font-bold">{{ domain.name }}</div>
+          <div class="tw:text-base tw:font-bold" :data-test="`domain-management-domain-name-${domain.name}`">{{ domain.name }}</div>
           <OButton
             icon-left="close"
             variant="ghost-destructive"
@@ -295,6 +297,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="resetForm"
       >{{ t('common.cancel') }}</OButton>
       <OButton
+        data-test="domain-management-save-changes-btn"
         variant="primary"
         size="sm-action"
         @click="saveChanges"

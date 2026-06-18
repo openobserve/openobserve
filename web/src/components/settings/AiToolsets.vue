@@ -134,8 +134,12 @@ import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
 import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import AddAiToolset from "@/components/ai_toolsets/AddAiToolset.vue";
+import aiToolsetsService from "@/services/ai_toolsets";
 // Distinct variants so each kind reads visually different (mcp=blue, cli=green,
 // skill=amber/warning, generic=neutral). Previously skill/mcp both rendered blue.
 const KIND_VARIANTS: Record<string, string> = {

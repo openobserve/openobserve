@@ -14,6 +14,7 @@
       class="trace-id-field-name o2-input tw:mb-2 tw:w-100"
     >
       <OInput
+        data-test="settings-org-trace-id-input"
         v-model.trim="traceIdFieldName"
         :label="t('settings.traceIdFieldName') + ' *'"
         class="tw:py-3 showLabelOnTop"
@@ -29,6 +30,7 @@
       class="span-id-field-name o2-input tw:w-100"
     >
       <OInput
+        data-test="settings-org-span-id-input"
         v-model.trim="spanIdFieldName"
         :label="t('settings.spanIdFieldName') + ' *'"
         class="tw:py-3 showLabelOnTop"

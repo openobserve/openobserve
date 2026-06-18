@@ -358,13 +358,11 @@ export default defineComponent({
     const { fnParsedSQL, fnUnparsedSQL, updatedLocalLogFilterField } =
       logsUtils();
 
-    const {
-      fetchQueryDataWithWebSocket,
-      sendSearchMessageBasedOnRequestId,
-      cancelSearchQueryBasedOnRequestId,
-    } = useSearchWebSocket();
+    const { fetchQueryDataWithWebSocket, sendSearchMessageBasedOnRequestId } =
+      useSearchWebSocket();
 
-    const { fetchQueryDataWithHttpStream } = useHttpStreaming();
+    const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } =
+      useHttpStreaming();
 
     const traceIdMapper = ref<{ [key: string]: string[] }>({});
 
@@ -1864,10 +1862,14 @@ export default defineComponent({
     };
 
     const cancelFilterCreator = (row: any) => {
-      //if it is websocker based then cancel the trace id
-      //else cancel the further value api calls using the openedFilterFields
+      // Abort the in-flight HTTP-stream values request so collapsing actually
+      // cancels a slow fetch, then clear local state.
       expandedFields.value[row.name] = false;
+      cancelTraceId(row.name);
       cancelValueApi(row.name);
+      if (fieldValues.value[row.name]) {
+        fieldValues.value[row.name].isLoading = false;
+      }
       delete lastFieldFetchPayloads.value[row.name];
       delete cachedFieldValues.value[row.name];
       delete cachedStreamFieldValues.value[row.name];
@@ -1877,14 +1879,17 @@ export default defineComponent({
     };
 
     const cancelTraceId = (field: string) => {
+      // Field values stream over fetchQueryDataWithHttpStream, so abort via the
+      // HTTP-stream cancel (cancelStreamQueryBasedOnRequestId), not the WebSocket one.
       const traceIds = traceIdMapper.value[field];
-      if (traceIds) {
-        traceIds.forEach((traceId) => {
-          cancelSearchQueryBasedOnRequestId({
+      if (traceIds?.length) {
+        traceIds.forEach((traceId) =>
+          cancelStreamQueryBasedOnRequestId({
             trace_id: traceId,
             org_id: store?.state?.selectedOrganization?.identifier,
-          });
-        });
+          }),
+        );
+        traceIdMapper.value[field] = [];
       }
     };
 

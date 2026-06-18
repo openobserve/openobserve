@@ -74,6 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </p>
               <OInput
                 v-model="newOrgName"
+                data-test="aws-marketplace-org-name"
                 label="Organization Name"
                 class="tw:mb-3"
                 :error="!!orgNameError"
@@ -81,6 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @update:model-value="orgNameError = ''"
               />
               <OButton
+                data-test="aws-marketplace-create-link-btn"
                 variant="primary"
                 size="sm-action"
                 block

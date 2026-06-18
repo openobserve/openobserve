@@ -287,15 +287,8 @@ impl TreeNodeRewriter for SortByTime {
 fn generate_table_source_with_sorted_by_time(
     table_source: Arc<dyn TableSource>,
 ) -> Arc<dyn TableSource> {
-    let source: &DefaultTableSource = table_source
-        .as_any()
-        .downcast_ref::<DefaultTableSource>()
-        .unwrap();
-    if let Some(table_provider) = source
-        .table_provider
-        .as_any()
-        .downcast_ref::<NewEmptyTable>()
-    {
+    let source: &DefaultTableSource = table_source.downcast_ref::<DefaultTableSource>().unwrap();
+    if let Some(table_provider) = source.table_provider.downcast_ref::<NewEmptyTable>() {
         let mut new_table_provider = (*table_provider).clone();
         new_table_provider.sorted_by_time = true;
         let new_source = DefaultTableSource::new(Arc::new(new_table_provider));
