@@ -300,6 +300,7 @@ export const usePanelSQLExecutor = (ctx: {
               queryType: panelSchema.value.queryType,
               variables: [...(metadata1 || []), ...(metadata2 || [])],
               timeRangeGap: timeRangeGap,
+              panelQueryIndex: panelQueryIndex,
             };
 
             // push metadata and searchRequestObj[which will be passed to search API]
