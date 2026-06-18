@@ -95,7 +95,7 @@ impl Node {
     }
 
     pub fn is_single_node(&self) -> bool {
-        self.role.len() == 1 && self.role.contains(&Role::All)
+        get_config().common.local_mode
     }
     pub fn is_single_role(&self) -> bool {
         self.role.len() == 1
