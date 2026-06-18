@@ -31,11 +31,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ? activeIconClass
           : 'tw:text-tabs-inactive-text tw:group-hover:text-primary-600'"
       >
-        <OIcon v-if="icon" :name="icon" size="md" />
+        <!-- Rail icons are a hair smaller than the md (24px) default. -->
+        <OIcon v-if="icon" :name="icon" size="md" class="tw:size-5.5!" />
         <component
           v-else-if="hasIconComponent"
           :is="iconComponent"
-          class="o-icon tw:size-6"
+          class="o-icon tw:size-5.5"
         />
         <div
           v-if="badge && badge > 0"
@@ -47,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div
-        class="nav-menu-item-label tw:text-[10.5px] tw:tracking-[0.01em] tw:transition-colors tw:duration-250 tw:w-full tw:text-center tw:leading-tight"
+        class="nav-menu-item-label tw:text-[10px] tw:tracking-[0.01em] tw:transition-colors tw:duration-250 tw:w-full tw:text-center tw:leading-tight"
         :class="isActive
           ? activeLabelClass
           : 'tw:font-medium tw:text-tabs-inactive-text tw:group-hover:text-primary-600'"

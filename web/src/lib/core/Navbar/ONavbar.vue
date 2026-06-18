@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     aria-label="Main navigation"
     data-test="navbar-main-nav"
     data-o2-navbar
-    class="left-drawer navbar-links o2-navbar-scroll tw:flex tw:flex-col tw:bg-[var(--color-surface-chrome-deeper)] tw:shrink-0 tw:min-h-0 tw:overflow-y-auto tw:w-[5.25rem] tw:pb-1"
+    class="left-drawer navbar-links o2-navbar-scroll tw:flex tw:flex-col tw:bg-[var(--color-surface-chrome-deeper)] tw:shrink-0 tw:min-h-0 tw:overflow-y-auto tw:w-19 tw:pb-1"
     @keydown="handleKeydown"
   >
     <!-- Three rail-entry shapes (see navGroups.ts):
