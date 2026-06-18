@@ -546,9 +546,10 @@ async function main() {
 
   const hasDeepSeek = Boolean(process.env.DEEPSEEK_API_KEY);
   if (!hasDeepSeek) {
-    console.error("DEEPSEEK_API_KEY not set. Add it as a repository secret.");
-    process.exit(1);
+    console.warn(`[${isoNow()}] DEEPSEEK_API_KEY not set. Skipping AI Code Review.`);
+    process.exit(0);
   }
+
   console.log(`[${isoNow()}] DeepSeek: configured`);
 
   // 1. Get PR diff

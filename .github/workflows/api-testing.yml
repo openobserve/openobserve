@@ -212,7 +212,7 @@ jobs:
 
       - name: Run query agent tests
         run: |
-          ${{ github.workspace }}/target/debug/openobserve > o2_query_agent.log 2>&1 &
+          ZO_MAX_FILE_RETENTION_TIME=1 ${{ github.workspace }}/target/debug/openobserve > o2_query_agent.log 2>&1 &
           SERVER_PID=$!
           for i in $(seq 1 60); do
             if curl -sf http://localhost:5080/healthz > /dev/null 2>&1; then
