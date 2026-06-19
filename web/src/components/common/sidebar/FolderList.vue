@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`dashboard-folder-tab-${tab.folderId}`"
           >
           <div class="folder-item tw:w-full tw:flex tw:items-center tw:justify-between tw:flex-nowrap tw:gap-2 tw:min-h-6 tw:group/row" :data-test="`dashboard-folder-tab-name-${tab.name}`">
-              <span class="folder-name tw:flex-1 tw:min-w-0 tw:text-left" :title="tab.name" :data-test="`dashboard-folder-name-${tab.name}`">{{
+              <span class="folder-name tw:flex-1 tw:min-w-0 tw:text-left tw:truncate" :title="tab.name" :data-test="`dashboard-folder-name-${tab.name}`">{{
               tab.name
               }}</span>
               <div class="tw:hidden tw:group-hover/row:flex tw:has-[[data-state=open]]:flex tw:items-center tw:shrink-0">
