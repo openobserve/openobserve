@@ -922,6 +922,12 @@ const formName = computed<string>(
 const formUrl = computed<string>(
   () => formRef.value?.form?.state.values.url ?? "",
 );
+// Metadata (Splunk/Datadog) is form-owned via the nested `metadata.*` OFormInput
+// fields, so read it from the form too — NOT from `formData.metadata`, which the
+// migrated inputs no longer write to.
+const formMetadata = computed<Record<string, any>>(
+  () => formRef.value?.form?.state.values.metadata ?? {},
+);
 
 // Watch destination_type changes to ensure method is set to "post" for non-custom types
 watch(
@@ -1009,9 +1015,9 @@ const canProceedStep2 = computed(() => {
   // Validate destination-specific metadata
   if (formData.value.destination_type === "splunk") {
     return !!(
-      formData.value.metadata?.source?.trim() &&
-      formData.value.metadata?.sourcetype?.trim() &&
-      formData.value.metadata?.hostname?.trim()
+      formMetadata.value?.source?.trim() &&
+      formMetadata.value?.sourcetype?.trim() &&
+      formMetadata.value?.hostname?.trim()
     );
   }
 
@@ -1025,8 +1031,8 @@ const canProceedStep2 = computed(() => {
 
   if (formData.value.destination_type === "datadog") {
     return !!(
-      formData.value.metadata?.ddsource?.trim() &&
-      formData.value.metadata?.ddtags?.trim()
+      formMetadata.value?.ddsource?.trim() &&
+      formMetadata.value?.ddtags?.trim()
     );
   }
 

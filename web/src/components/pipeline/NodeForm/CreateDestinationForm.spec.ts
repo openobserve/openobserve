@@ -567,6 +567,65 @@ describe("CreateDestinationForm", () => {
       await nextTick();
       expect(wrapper.vm.canProceedStep2).toBe(true);
     });
+
+    // metadata is FORM-OWNED (name="metadata.*"), so canProceedStep2 must read it
+    // from the form store, not from formData.metadata (which the inputs no longer
+    // write to). Set metadata via the real form.
+    it("is true for splunk when all metadata fields are provided", async () => {
+      wrapper.vm.formData.destination_type = "splunk";
+      setFormField(wrapper, "name", "test");
+      setFormField(wrapper, "url", "https://splunk.example.com");
+      wrapper.vm.formData.url_endpoint = "/services/collector";
+      wrapper.vm.formData.method = "post";
+      wrapper.vm.formData.output_format = "nestedevent";
+      setFormField(wrapper, "metadata", {
+        source: "my_source",
+        sourcetype: "_json",
+        hostname: "server01",
+      });
+      await nextTick();
+      expect(wrapper.vm.canProceedStep2).toBe(true);
+    });
+
+    it("is false for splunk when metadata is incomplete", async () => {
+      wrapper.vm.formData.destination_type = "splunk";
+      setFormField(wrapper, "name", "test");
+      setFormField(wrapper, "url", "https://splunk.example.com");
+      wrapper.vm.formData.url_endpoint = "/services/collector";
+      wrapper.vm.formData.method = "post";
+      wrapper.vm.formData.output_format = "nestedevent";
+      // Only source provided — sourcetype + hostname missing.
+      setFormField(wrapper, "metadata", { source: "my_source" });
+      await nextTick();
+      expect(wrapper.vm.canProceedStep2).toBe(false);
+    });
+
+    it("is true for datadog when ddsource + ddtags are provided", async () => {
+      wrapper.vm.formData.destination_type = "datadog";
+      setFormField(wrapper, "name", "test");
+      setFormField(wrapper, "url", "https://http-intake.logs.datadoghq.com");
+      wrapper.vm.formData.url_endpoint = "/v1/input";
+      wrapper.vm.formData.method = "post";
+      wrapper.vm.formData.output_format = "json";
+      setFormField(wrapper, "metadata", {
+        ddsource: "nginx",
+        ddtags: "env:prod",
+      });
+      await nextTick();
+      expect(wrapper.vm.canProceedStep2).toBe(true);
+    });
+
+    it("is false for datadog when dd fields are missing", async () => {
+      wrapper.vm.formData.destination_type = "datadog";
+      setFormField(wrapper, "name", "test");
+      setFormField(wrapper, "url", "https://http-intake.logs.datadoghq.com");
+      wrapper.vm.formData.url_endpoint = "/v1/input";
+      wrapper.vm.formData.method = "post";
+      wrapper.vm.formData.output_format = "json";
+      setFormField(wrapper, "metadata", {});
+      await nextTick();
+      expect(wrapper.vm.canProceedStep2).toBe(false);
+    });
   });
 
   // ─────────────────────────────────────────────────────────────────────────────
