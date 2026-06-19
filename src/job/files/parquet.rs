@@ -522,8 +522,11 @@ async fn move_files(
             Ok(v) => v,
             Err(e) => {
                 log::error!("[INGESTER:JOB] merge files failed: {e}");
-                tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-                continue;
+                // need release all the files
+                for file in files_with_size.iter() {
+                    PROCESSING_FILES.write().await.remove(&file.key);
+                }
+                return Ok(());
             }
         };
         if new_file_name.is_empty() {
