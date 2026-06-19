@@ -122,12 +122,17 @@ export const useSearchStream = () => {
       });
     }
 
-    // Update loading states
+    // Update loading states. Reset streaming progress to 0 on completion so the
+    // next search never starts from a stale percentage — the leftover value can
+    // be anything the previous search ended at (e.g. 80, 90, 100), so gating on
+    // a single magic number isn't enough.
     if (payload.type === "search") {
       searchObj.loading = false;
+      searchObj.loadingProgressPercentage = 0;
     }
     if (payload.type === "histogram" || payload.type === "pageCount") {
       searchObj.loadingHistogram = false;
+      searchObj.loadingHistogramProgressPercentage = 0;
     }
 
     //we need ot make if false
