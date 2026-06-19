@@ -181,7 +181,7 @@ const hasInsideLabel = computed(
         disabled && 'o-input-label--disabled',
       ]"
     >
-      <slot name="label">{{ label }}</slot>
+      <slot name="label">{{ label }}</slot><span v-if="required" aria-hidden="true" class="tw:select-none">*</span>
       <OIcon
         v-if="$slots.tooltip"
         name="info-outline"
@@ -205,7 +205,7 @@ const hasInsideLabel = computed(
           v-if="hasInsideLabel"
           class="tw:absolute tw:top-1 tw:start-3 tw:text-[10px] tw:leading-none tw:text-input-placeholder tw:select-none tw:pointer-events-none tw:z-10"
         >
-          <slot name="label">{{ label }}</slot>
+          <slot name="label">{{ label }}</slot><span v-if="required" aria-hidden="true">&nbsp;*</span>
         </span>
         <ComboboxInput
           :id="inputId"

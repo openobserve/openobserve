@@ -4,6 +4,7 @@
 import { inject } from "vue";
 import ODate from "./ODate.vue";
 import { FORM_CONTEXT_KEY } from "../Form/OForm.types";
+import { firstFieldError } from "../Form/fieldError";
 import type { FormDateProps } from "./OFormDate.types";
 
 defineOptions({ inheritAttrs: false });
@@ -20,24 +21,7 @@ if (import.meta.env.DEV && !form) {
 </script>
 
 <template>
-  <component
-    v-if="form"
-    :is="form.Field"
-    :name="props.name"
-    :validators="
-      props.validators
-        ? {
-            onChange: (ctx: { value: unknown }) => {
-              for (const v of props.validators ?? []) {
-                const r = v(ctx.value as string);
-                if (r !== undefined) return r;
-              }
-              return undefined;
-            },
-          }
-        : undefined
-    "
-  >
+  <component v-if="form" :is="form.Field" :name="props.name">
     <template #default="{ field }">
       <ODate
         v-bind="$attrs"
@@ -49,16 +33,17 @@ if (import.meta.env.DEV && !form) {
         :clearable="props.clearable"
         :readonly="props.readonly"
         :disabled="props.disabled"
+        :required="props.required"
         :size="props.size"
         :id="props.id"
         :name="props.name"
         :model-value="field.state.value"
         :error="
-          field.state.meta.isTouched && field.state.meta.errors.length > 0
+          field.state.meta.errors.length > 0
         "
         :error-message="
-          field.state.meta.isTouched && field.state.meta.errors.length > 0
-            ? String(field.state.meta.errors[0])
+          field.state.meta.errors.length > 0
+            ? firstFieldError(field.state.meta.errors)
             : undefined
         "
         @update:model-value="field.handleChange"

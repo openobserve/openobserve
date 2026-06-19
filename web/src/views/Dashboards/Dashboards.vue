@@ -340,7 +340,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :secondary-button-label="t('dashboard.cancel')"
             :primary-button-label="t('dashboard.save')"
             form-id="add-dashboard-form"
-            :primary-button-loading="addDashboardRef?.onSubmit?.isLoading?.value"
             @click:secondary="showAddDashboardDialog = false"
           >
             <AddDashboard

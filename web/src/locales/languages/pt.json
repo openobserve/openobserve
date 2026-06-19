@@ -3448,7 +3448,9 @@
     "import_this_pattern": "Importar este padrão",
     "patterns_loaded": "Padrão (s) {count} carregado (s)",
     "failed_to_load": "Falha ao carregar padrões",
-    "no_patterns_selected": "Selecione pelo menos um padrão"
+    "no_patterns_selected": "Selecione pelo menos um padrão",
+    "name_required": "* O nome é obrigatório",
+    "pattern_required": "* O padrão é obrigatório"
   },
   "search_history": {
     "title": "Histórico de pesquisa",
