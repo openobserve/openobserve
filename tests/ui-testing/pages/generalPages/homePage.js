@@ -1,5 +1,6 @@
 // homePage.js - Landing Page Object for OpenObserve
 import { expect } from '@playwright/test';
+import { openNavFlyoutChild } from '../commonActions.js';
 
 export class HomePage {
     constructor(page) {
@@ -14,9 +15,7 @@ export class HomePage {
         this.dashboardsMenu = page.locator('[data-test="menu-link-\\/dashboards-item"]');
         this.streamsMenu = page.locator('[data-test="menu-link-\\/streams-item"]');
         this.alertsMenu = page.locator('[data-test="menu-link-\\/alerts-item"]');
-        this.ingestionMenu = page.locator('[data-test="menu-link-\\/ingestion-item"]');
         this.iamMenu = page.locator('[data-test="menu-link-\\/iam-item"]');
-        this.reportsMenu = page.locator('[data-test="menu-link-\\/reports-item"]');
 
         // ===== HEADER SELECTORS (VERIFIED) =====
         this.orgSelector = page.locator('[data-test="navbar-organizations-select"]');
@@ -119,8 +118,7 @@ export class HomePage {
     }
 
     async navigateToIngestion() {
-        await this.ingestionMenu.waitFor({ state: 'visible', timeout: 10000 });
-        await this.ingestionMenu.click();
+        await openNavFlyoutChild(this.page, 'ingestion');
         await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
     }
 
@@ -137,8 +135,7 @@ export class HomePage {
     }
 
     async navigateToReports() {
-        await this.reportsMenu.waitFor({ state: 'visible', timeout: 10000 });
-        await this.reportsMenu.click();
+        await openNavFlyoutChild(this.page, 'reports');
         await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
     }
 
@@ -162,7 +159,6 @@ export class HomePage {
         await expect(this.dashboardsMenu).toBeVisible();
         await expect(this.streamsMenu).toBeVisible();
         await expect(this.alertsMenu).toBeVisible();
-        await expect(this.ingestionMenu).toBeVisible();
     }
 
     async validateHeaderElementsVisible() {

@@ -771,7 +771,7 @@
     "docs": "Docs",
     "billings": "Billing",
     "rum": "RUM",
-    "settings": "Management",
+    "settings": "Settings",
     "iam": "IAM",
     "report": "Reports",
     "pipeline": "Pipelines",
@@ -3356,7 +3356,7 @@
     "addToDashboard": "Add to Dashboard"
   },
   "settings": {
-    "header": "Management",
+    "header": "Settings",
     "alertCorrelation": "Alert Deduplication",
     "correlationSettings": "Correlation Settings",
     "userKeyLabel": "User Key",

@@ -3,6 +3,7 @@ const { waitUtils } = require('../../playwright-tests/utils/wait-helpers.js');
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 const { getAuthHeaders, getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
 const MonacoEditorHelper = require('../../playwright-tests/utils/MonacoEditorHelper.js');
+import { openNavFlyoutChild } from '../commonActions.js';
 
 export class SanityPage {
     constructor(page) {
@@ -72,7 +73,6 @@ export class SanityPage {
         // ============================================================
         // Menu Navigation locators
         // ============================================================
-        this.pipelineMenuItem = page.locator('[data-test="menu-link-\\/pipeline-item"]');
         this.realtimeTab = page.locator('[data-test="tab-realtime"]');
         this.streamPipelinesTab = page.locator('[data-test="pipeline-section-tab-streamPipelines"]');
         this.functionStreamTab = page.locator('[data-test="pipeline-section-tab-functions"]');
@@ -426,7 +426,7 @@ export class SanityPage {
         await this.savedViewDialogSave.click();
         await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
-        await this.pipelineMenuItem.click();
+        await openNavFlyoutChild(this.page, 'pipeline');
         await this.realtimeTab.click();
         await this.functionStreamTab.click();
 
@@ -454,7 +454,7 @@ export class SanityPage {
 
         const uniqueFunctionName = `sanitytest_${generateSuffix()}`;
 
-        await this.pipelineMenuItem.click();
+        await openNavFlyoutChild(this.page, 'pipeline');
         await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
         await this.streamPipelinesTab.click();
         await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});

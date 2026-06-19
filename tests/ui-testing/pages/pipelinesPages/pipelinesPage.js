@@ -3,18 +3,14 @@ const { expect } = require('@playwright/test')
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 const fetch = require('node-fetch');
 const { getAuthHeaders } = require('../../playwright-tests/utils/cloud-auth.js');
+import { openNavFlyoutChild } from '../commonActions.js';
 
 const randomNodeName = `remote-node-${Math.floor(Math.random() * 1000)}`;
 
 export class PipelinesPage {
     constructor(page) {
         this.page = page;
-        this.pipelinesPageMenu = page.locator('[data-test="menu-link-\\/pipeline-item"]');
-        
         // Locators from PipelinePage
-        this.pipelineMenuLink = page.locator(
-          '[data-test="menu-link-\\/pipeline-item"]'
-        );
         this.pipelineTab = page.locator('[data-test="pipeline-section-tab-streamPipelines"]');
         this.addPipelineButton = page.locator(
           '[data-test="pipeline-list-add-pipeline-btn"]'
@@ -165,7 +161,6 @@ export class PipelinesPage {
         this.functionNameInput = page.locator('[data-test="add-function-name-input"]');
         this.functionNameInputField = page.locator('[data-test="add-function-name-input-field"]');
         this.addConditionSaveButton = page.locator('[data-test="add-condition-drawer"] [data-test="o-drawer-primary-btn"]');
-        this.pipelineMenu = '[data-test="menu-link-\\/pipeline-item"]';
         this.enrichmentTableTab = '[data-test="pipeline-section-tab-enrichmentTables"]';
         // Added data-test "enrichment-tables-add-btn" on the New Enrichment
         // Table OButton — prefer the data-test locator; fall back to the
@@ -301,7 +296,7 @@ export class PipelinesPage {
 
     // Methods from original PipelinesPage
     async gotoPipelinesPage() {
-        await this.pipelinesPageMenu.click();
+        await openNavFlyoutChild(this.page, 'pipeline');
     }
 
     async pipelinesPageDefaultOrg() {
@@ -325,7 +320,7 @@ export class PipelinesPage {
 
     // Methods from PipelinePage
     async openPipelineMenu() {
-        await this.pipelineMenuLink.click();
+        await openNavFlyoutChild(this.page, 'pipeline');
         await this.page.waitForTimeout(1000);
         await this.pipelineTab.click();
         await this.page.waitForTimeout(2000);
@@ -911,7 +906,7 @@ export class PipelinesPage {
     }
 
     async navigateToAddEnrichmentTable() {
-        await this.pipelineMenuLink.click();
+        await openNavFlyoutChild(this.page, 'pipeline');
         // The enrichment-table tab uses a Reka-based OToggleGroup — `force` avoids
         // visibility races when the tab list animates in.
         await this.enrichmentTableTabLocator.click({ force: true });
@@ -991,7 +986,7 @@ export class PipelinesPage {
     }
 
     async navigateToEnrichmentTableTab() {
-        await this.pipelineMenuLink.click();
+        await openNavFlyoutChild(this.page, 'pipeline');
         await this.page.locator(this.enrichmentTableTab).click();
     }
 
@@ -1088,7 +1083,7 @@ export class PipelinesPage {
     }
 
     async navigateToPipeline() {
-        await this.pipelineMenuLink.click();
+        await openNavFlyoutChild(this.page, 'pipeline');
     }
 
     async setupContainerNameCondition() {
@@ -1854,7 +1849,7 @@ export class PipelinesPage {
         await this.timestampColumnMenu.click();
 
         // Navigate to the pipeline menu
-        await this.pipelineMenuLink.click();
+        await openNavFlyoutChild(this.page, 'pipeline');
     }
 
     /**
