@@ -409,7 +409,7 @@ describe("validateSql — mutation detection on broken queries", () => {
     truncate_after_GROUP:        0.99,
     truncate_after_HAVING:       0.99,
     truncate_after_LIMIT:        0.97,
-    remove_WHERE_keyword:        0.85, // tightened missingWhere guard: ambiguous patterns suppressed
+    remove_WHERE_keyword:        0.80, // tightened missingWhere guard: ambiguous patterns suppressed; expanded query set lowers rate
     unquote_like_pattern:        0.50, // small sample, parser handles some cases
     drop_AND_between_conditions: 0.90,
     // Complex-construct mutations

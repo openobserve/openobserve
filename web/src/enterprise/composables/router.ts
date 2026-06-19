@@ -29,6 +29,10 @@ const AILLMInsightsPage = () =>
   import("@/enterprise/views/AIObservability/LLMInsightsPage.vue");
 const AISessionsPage = () =>
   import("@/enterprise/views/AIObservability/SessionsPage.vue");
+// Reused for the AI/LLM session drill-down so it lives under /ai (keeps the
+// AI menu item active) instead of the Traces session-details route.
+const SessionDetails = () =>
+  import("@/plugins/traces/SessionDetails.vue");
 
 const useEnvRoutes = () => {
   // Note: AWS Marketplace registration is handled by backend at POST /api/aws-marketplace/register
@@ -97,6 +101,17 @@ const useEnvRoutes = () => {
           meta: { title: "Evaluations", keepAlive: false },
         },
       ],
+    },
+    {
+      // AI/LLM session drill-down — under /ai so the AI menu stays active
+      // (reuses the Traces SessionDetails view).
+      path: "ai/session-details",
+      name: "aiSessionDetails",
+      component: SessionDetails,
+      meta: { title: "Session Details", keepAlive: false },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
     },
     {
       // Legacy URL — keep saved/bookmarked links working

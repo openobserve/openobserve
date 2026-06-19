@@ -76,7 +76,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :name="integration.routeName"
                       :label="integration.name"
                       :data-test="`ai-integrations-item-${integration.slug}`"
-                    />
+                    >
+                      <template #icon>
+                        <img
+                          v-if="(integration.logo || integration.logoDark) && !failedLogos.has(integration.slug)"
+                          :src="(store.state.theme === 'dark' && integration.logoDark) || integration.logo"
+                          :alt="`${integration.name} logo`"
+                          class="ai-menu-logo"
+                          loading="lazy"
+                          referrerpolicy="no-referrer"
+                          @error="onLogoError(integration.slug)"
+                        />
+                        <span v-else class="ai-menu-mono" aria-hidden="true">{{
+                          integration.name.charAt(0)
+                        }}</span>
+                      </template>
+                    </OTab>
                   </OTabs>
                 </div>
               </div>
@@ -86,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <template v-slot:after>
           <div class="tw:w-full tw:h-full">
-            <div class="card-container tw:h-full">
+            <div class="card-container tw:h-full" data-test="ai-integrations-detail-pane">
               <div class="tw:overflow-auto tw:h-full tw:pt-0.5">
                 <router-view />
               </div>
@@ -121,6 +136,12 @@ export default defineComponent({
     const selectedCategory = ref(aiCategories[0].slug);
     const selectedIntegration = ref(aiCategories[0].integrations[0].routeName);
     const integrationFilter = ref("");
+
+    // Slugs whose remote logo failed to load → fall back to the monogram tile.
+    const failedLogos = ref<Set<string>>(new Set());
+    const onLogoError = (slug: string) => {
+      failedLogos.value = new Set(failedLogos.value).add(slug);
+    };
 
     const currentIntegrations = computed(() => {
       const cat = aiCategories.find((c) => c.slug === selectedCategory.value);
@@ -209,9 +230,33 @@ export default defineComponent({
       navigateToIntegration,
       categorySplitterModel: ref(200),
       integrationSplitterModel: ref(250),
+      failedLogos,
+      onLogoError,
     };
   },
 });
 </script>
 
-
+<style scoped lang="scss">
+/* Sidebar provider logo / monogram — every item gets a marker (logo URL from the
+   manifest, else a lettered tile in the app theme color, matching the card hero). */
+.ai-menu-logo,
+.ai-menu-mono {
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  flex: none;
+}
+.ai-menu-logo {
+  object-fit: contain;
+}
+.ai-menu-mono {
+  display: grid;
+  place-items: center;
+  background: var(--q-primary, #3f7994);
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 1;
+}
+</style>

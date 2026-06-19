@@ -95,7 +95,7 @@ impl Node {
     }
 
     pub fn is_single_node(&self) -> bool {
-        self.role.len() == 1 && self.role.contains(&Role::All)
+        get_config().common.local_mode
     }
     pub fn is_single_role(&self) -> bool {
         self.role.len() == 1
@@ -382,21 +382,10 @@ mod tests {
 
     #[test]
     fn test_node_is_single_node() {
-        let mut node = Node::default();
-
-        node.role = vec![Role::All];
-        assert!(node.is_single_node());
-
-        // multiple roles — not single node
-        node.role = vec![Role::All, Role::Ingester];
-        assert!(!node.is_single_node());
-
-        // single role but not All
-        node.role = vec![Role::Ingester];
-        assert!(!node.is_single_node());
-
-        node.role = vec![];
-        assert!(!node.is_single_node());
+        let node = Node::default();
+        // is_single_node is driven by config.common.local_mode, not by the node role.
+        let expected = get_config().common.local_mode;
+        assert_eq!(node.is_single_node(), expected);
     }
 
     #[test]

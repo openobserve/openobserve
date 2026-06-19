@@ -162,13 +162,18 @@ class="tw:mr-1" />
       </div> -->
     </div>
 
-    <!-- Main Content Area -->
-    <div class="tw:flex-1 tw:overflow-hidden tw:relative">
-      <!-- Wrap Content Button -->
-      <div class="tw:flex tw:items-center tw:w-full tw:pb-1.5 tw:justify-end tw:px-2">
+    <!-- Source event + chips -->
+    <CorrelationEventHeader
+      :source-event="props.sourceEvent"
+      :context-chips="unifiedChips"
+      overflow-mode="responsive"
+      :overflow-threshold="4"
+    >
+      <template v-if="unifiedChips.length > 0 || props.hideDimensionFilters" #chip-actions>
         <OButton
           variant="ghost"
           size="icon"
+          class="tw:h-5!"
           :class="{ 'tw:text-white! tw:bg-[var(--o2-theme-color)]! tw:hover:opacity-80': wrapTableCells }"
           data-test="correlated-logs-table-wrap-content-btn"
           @click="wrapTableCells = !wrapTableCells"
@@ -176,13 +181,18 @@ class="tw:mr-1" />
           <OIcon name="wrap-text" size="sm" />
           <OTooltip :content="t('search.messageWrapContent')" />
         </OButton>
-      </div>
+      </template>
+    </CorrelationEventHeader>
+
+    <!-- Main Content Area -->
+    <div class="tw:flex-1 tw:overflow-hidden tw:relative">
       <!-- Logs Table or Skeleton -->
       <div class="tw:h-full tw:w-full tw:overflow-auto logs-table-container">
         <!-- Actual Table (when data is loaded) -->
         <TenstackTable
           v-if="hasResults"
-          :rows="searchResults"
+          :key="`page-${currentPage}`"
+          :rows="pagedResults"
           :columns="tableColumns"
           :wrap="wrapTableCells"
           :loading="isLoading"
@@ -255,16 +265,42 @@ class="tw:mr-1" />
           </p>
         </div>
       </div>
+
+      <!-- Pagination bar -->
+      <div
+        v-if="hasResults && totalPages > 1"
+        class="tw:flex tw:items-center tw:justify-between tw:px-4 tw:py-2 tw:border-t tw:border-solid tw:border-[var(--o2-border-color)] tw:bg-[var(--o2-card-bg)] tw:text-xs tw:shrink-0"
+        data-test="correlated-logs-pagination"
+      >
+        <span class="tw:opacity-60">
+          {{ (currentPage - 1) * displayPageSize + 1 }}–{{ Math.min(currentPage * displayPageSize, searchResults.length) }} of {{ searchResults.length }}
+        </span>
+        <OPagination
+          :model-value="currentPage"
+          :max="totalPages"
+          :max-pages="5"
+          data-test="correlated-logs-pagination-control"
+          @update:model-value="goToPage"
+        />
+      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, watch } from "vue";
+import {
+  buildSubjectButtons,
+  streamMatchesPatterns,
+  SUBJECT_BUTTONS_BY_SET,
+  resolveSetId,
+  type SubjectButton,
+} from "@/composables/useMetricSubjectButtons";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OPagination from "@/lib/navigation/Pagination/OPagination.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
@@ -274,6 +310,7 @@ import type { CorrelatedLogsProps } from "@/composables/useCorrelatedLogs";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import TenstackTable from "@/plugins/logs/TenstackTable.vue";
 import DimensionFiltersBar from "./DimensionFiltersBar.vue";
+import CorrelationEventHeader from "./CorrelationEventHeader.vue";
 import { formatDate } from "@/utils/date";
 import { copyToClipboard } from "@/utils/clipboard";
 import type { ColumnDef } from "@tanstack/vue-table";
@@ -303,23 +340,28 @@ const { t } = useI18n();
 const store = useStore();
 const router = useRouter();
 const { searchObj } = searchState();
-const { loadKeyFields } = useServiceCorrelation();
+const { loadKeyFields, semanticGroups } = useServiceCorrelation();
 
 // Use correlated logs composable
 const {
   loading,
   error,
   searchResults,
+  pagedResults,
   totalHits,
   took,
   currentFilters,
   currentTimeRange,
+  currentPage,
+  totalPages,
+  displayPageSize,
   logStreamsCount,
   hasResults,
   isLoading,
   hasError,
   isEmpty,
   fetchCorrelatedLogs,
+  goToPage,
   updateFilter,
   updateFilters,
   resetFilters,
@@ -1188,6 +1230,65 @@ watch(
   { deep: true },
 );
 
+// ── Chip row ───────────────────────────────────────────────────────────────
+
+const LABEL_ACRONYMS = new Set([
+  "aws", "ecs", "gcp", "iam", "vpc", "rds", "s3", "ec2",
+  "id", "url", "uri", "ip", "dns", "ssl", "tls", "tcp", "udp",
+  "api", "cpu", "gpu", "ram", "ssd", "hdd", "io",
+  "k8s", "faas", "otel", "sql", "http", "https",
+]);
+const titleCaseWord = (w: string) => {
+  if (!w) return w;
+  if (LABEL_ACRONYMS.has(w.toLowerCase())) return w.toUpperCase();
+  if (/^k8s$/i.test(w)) return "K8s";
+  return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+};
+const titleCase = (s: string) => s.split(/\s+/).map(titleCaseWord).join(" ");
+
+const dimensionDisplayLabel = (key: string): string =>
+  titleCase(key.replace(/[-_.]/g, " "));
+
+const toChipString = (v: unknown): string | null => {
+  if (v == null) return null;
+  if (typeof v === "string") return v;
+  if (typeof v === "number" || typeof v === "boolean") return String(v);
+  return null;
+};
+
+const chipDimensionSource = computed<Record<string, string>>(() => {
+  const src = props.chipDimensions && Object.keys(props.chipDimensions).length > 0
+    ? props.chipDimensions
+    : { ...(props.matchedDimensions ?? {}), ...(props.additionalDimensions ?? {}) };
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(src)) {
+    const s = toChipString(v);
+    if (s !== null && s !== "" && s !== SELECT_ALL_VALUE) out[k] = s;
+  }
+  return out;
+});
+
+type ChipKind = "context" | "subject";
+type DimensionChip = { key: string; label: string; value: string; kind: ChipKind; };
+
+const subjectSemanticIds = computed<Set<string>>(() => {
+  if (!props.matchedSetId) return new Set();
+  const canonical = resolveSetId(props.matchedSetId);
+  const specs = canonical ? SUBJECT_BUTTONS_BY_SET[canonical] : undefined;
+  return specs?.length ? new Set(specs.flatMap((s: SubjectButton) => s.semanticIds)) : new Set();
+});
+
+const unifiedChips = computed<DimensionChip[]>(() =>
+  Object.keys(chipDimensionSource.value)
+    .filter((key) => !subjectSemanticIds.value.has(key))
+    .map((key): DimensionChip => ({
+      key,
+      label: dimensionDisplayLabel(key),
+      value: chipDimensionSource.value[key],
+      kind: "context",
+    })),
+);
+
 </script>
 
 <style lang="scss" scoped>
@@ -1298,6 +1399,7 @@ watch(
     }
   }
 }
+
 </style>
 
 <style lang="scss">

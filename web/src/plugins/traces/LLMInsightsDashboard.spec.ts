@@ -93,6 +93,13 @@ vi.mock("@/composables/useStreams", () => ({
   }),
 }));
 
+vi.mock("vue-i18n", () => ({
+  useI18n: vi.fn(() => ({
+    t: (key: string, params?: Record<string, any>) =>
+      params ? key + JSON.stringify(params) : key,
+  })),
+}));
+
 vi.mock("vue-router", () => ({
   useRouter: () => ({ push: mockRouterPush }),
 }));

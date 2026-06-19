@@ -132,7 +132,6 @@ export default {
   background-color: var(--o2-code-bg, #f1f5f9);
   padding: 0.0625rem 0.25rem;
   border-radius: 0.25rem;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.85em;
 }
 </style>

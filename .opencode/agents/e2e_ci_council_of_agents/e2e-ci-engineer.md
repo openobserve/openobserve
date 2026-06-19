@@ -16,6 +16,7 @@ tests that follow the framework conventions exactly, then **register the new spe
 
 ```bash
 cat docs/test_generator/ci/run-context.json
+cat docs/test_generator/ci/coverage-decision.json          # the Architect's extend/append/new decision
 cat docs/test_generator/test-plans/<feature_slug>-test-plan.md
 cat docs/test_generator/features/<feature_slug>-feature.md   # for verified selectors
 ```
@@ -27,7 +28,40 @@ source: `grep -oE 'data-test="[^"]*"' web/src/path/to/Component.vue | sort -u`.
 
 ---
 
+## COVERAGE ACTION — write a new spec, or edit an existing one
+
+Read `coverage-decision.json` and honour its `action`:
+
+- **`none`** — the existing tests already cover this. **Write nothing, change nothing, register
+  nothing** — just print a one-line "already covered, no changes" summary and stop. (The workflow
+  detects the empty result and skips the rest, reporting "already covered.")
+- **`new`** — create a brand-new spec at `target_spec` (= run-context `spec_path`) using the
+  required structure below. This is the only case that needs registration (see below).
+- **`append`** — **open the existing `target_spec` and ADD a new `test()` inside its existing
+  `describe`**, reusing its imports, `describe.configure`, and `beforeEach`. Do NOT rewrite the
+  file, re-order, or touch unrelated tests — make a minimal, surgical addition. Match the file's
+  existing style/tags. **No registration** (the file is already in playwright.yml).
+- **`extend`** — **open the existing `target_spec` and modify the specific test** named in the
+  decision: add the missing steps/assertions for the new behavior. Keep all other tests byte-for-
+  byte unchanged. **No registration.**
+
+For `append`/`extend`: any new locators/methods still go in the **page object** (never raw
+selectors in the spec), exactly as for new specs. Preserve `mode: 'parallel'` — never switch a
+file to serial. If the existing file is somehow `serial`, leave its mode as-is but keep your
+added test independent.
+
+> **Minimal-diff rule for append/extend:** the goal is the smallest possible change to the
+> existing file — a reviewer should see only the added/changed test, nothing else.
+
+---
+
 ## MANDATORY framework rules
+
+### Fully-parallel by default (non-negotiable)
+- Every `test.describe` MUST use `test.describe.configure({ mode: 'parallel' })`. NEVER emit `mode: 'serial'`.
+- Because tests run in parallel, **each test MUST be fully independent**: it sets up its own state in `beforeEach` (login/navigation/data), shares NO mutable state with sibling tests, and assumes NO execution order. Two tests must never depend on data the other created or on running first/second.
+- Do not rely on a single shared record/name across tests — give each test its own uniquely-named fixtures (e.g. suffix with a per-test unique id) so parallel runs can't collide.
+- The runner uses `--workers=4`; parallel mode is what lets those workers actually spread the tests. Design for it.
 
 ### Required imports
 ```javascript
@@ -40,7 +74,7 @@ const logData = require("../../fixtures/log.json");
 ### Required structure
 ```javascript
 test.describe("<feature_title> testcases", () => {
-  test.describe.configure({ mode: 'serial' });
+  test.describe.configure({ mode: 'parallel' });
   let pm;
 
   test.beforeEach(async ({ page }, testInfo) => {
@@ -93,7 +127,12 @@ xpath / nth-child / framework classes.
 
 ## REGISTER THE SPEC IN `playwright.yml` (emit structured data — do NOT edit the file)
 
-A generated spec only runs in CI if it's listed in `.github/workflows/playwright.yml`. For
+> **ONLY for `action: new`.** For `append`/`extend` the target spec is already in playwright.yml,
+> so **skip this section entirely and do NOT write `playwright-registration.json`** (a deterministic
+> step treats a missing file as "nothing to register"). Registering an already-listed file would
+> create a no-op or duplicate.
+
+A brand-new spec only runs in CI if it's listed in `.github/workflows/playwright.yml`. For
 security, **you do not edit that workflow file directly** — an LLM editing a CI workflow file is
 a code-execution risk. Instead you **describe** the change as structured JSON, and a
 deterministic (non-LLM) workflow step applies the one-line `run_files` append.
@@ -129,6 +168,37 @@ deterministic (non-LLM) workflow step applies the one-line `run_files` append.
 
 ---
 
+## MANDATORY: Sentinel-compliance self-audit (do this BEFORE you finish)
+
+The Sentinel will audit your output and **reject** it on any of the issues below — which then
+forces a fix-and-re-audit loop. **Write the code right the first time, then re-read your spec and
+page objects against this exact checklist and fix every violation before you return.** Match the
+Sentinel's bar so the audit passes on attempt 1.
+
+**CRITICAL — Sentinel will FAIL the build on any of these:**
+1. **No raw selectors in the SPEC file** — none of `page.locator(`, `page.getByRole(`,
+   `page.getByText(`, `page.getByTestId(`, `page.$(`, **including inside `expect(...)`** (e.g.
+   `expect(page.locator(...))` is a violation). Every selector lives in a page object; the spec
+   calls `pm.<area>Page.<method>()` / `pm.<area>Page.expectXVisible()`. (Page-object FILES are
+   *expected* to contain selectors — that's fine; this rule is about the spec.)
+2. **Every test has ≥1 real, meaningful assertion.** Never `expect(true).toBe(true)`,
+   `expect(1).toBe(1)`, or `if (visible) {…} else { expect(true).toBe(true) }`. Assert on actual
+   feature state via a page-object expect method.
+3. **No `console.log`** — use `testLogger.info(...)`.
+4. **Every async call is `await`ed.**
+5. **No hardcoded credentials** — only `process.env.*`.
+
+**WARNINGS — avoid these too (Sentinel reports them):**
+- Locators must be declared at the **top** of each page-object file (as properties), not inline.
+- No brittle selectors (xpath, `nth-child`, framework-generated classes).
+- ≤3 `waitForTimeout` per test — prefer `waitForLoadState`/`toBeVisible`.
+- Use `PageManager` (`pm.…`) for all interactions; reuse existing page objects.
+- If a test creates data, add cleanup in `tests/ui-testing/playwright-tests/cleanup.spec.js`.
+
+Treat this as a gate on *yourself*: a spec that trips any CRITICAL above is not done.
+
+---
+
 ## OUTPUT
 
 1. The spec file at `spec_path`.
@@ -139,6 +209,20 @@ deterministic (non-LLM) workflow step applies the one-line `run_files` append.
    (`mkdir -p` first) listing: spec path, page objects touched (new methods/locators), the
    `playwright.yml` group + filename to register, and any open risks (e.g. `NEEDS SELECTOR`
    items the Analyst flagged and how you handled them).
+5. A machine-readable **test summary** → `docs/test_generator/ci/test-summary.json`: one entry per
+   test case you **added or changed this run** (skip unchanged sibling tests), so the PR-back job
+   can render a reviewer-facing table. Shape:
+   ```json
+   [
+     { "title": "should open the demo page", "action": "new", "verifies": "demo page loads and the header is visible" },
+     { "title": "should filter rows", "action": "append", "verifies": "the filter control updates the results table" }
+   ]
+   ```
+   `action` = this case's coverage action (`new` for a new spec's tests, `append`/`extend` for ones
+   added/modified on an existing spec). `verifies` = one concise human sentence. For `action: none`
+   write `[]`. Keep `title` byte-identical to the `test("…")` name in the spec.
+   > It must be valid JSON. `pr_back` renders it as a table but **skips it gracefully** (no table) if
+   > the file is missing, empty `[]`, or unparseable — so never block generation on it.
 
 > **Where outputs go:** you run in an ephemeral CI runner with no commit access. Your files are
 > uploaded as a build artifact and the **PR-back job (Job 4) commits them** to a `test/<slug>`

@@ -410,7 +410,6 @@ async function performDelete() {
 }
 
 .llmp-mono {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 12px;
 }
 

@@ -61,9 +61,13 @@ class TestNewFieldAddition:
         ingest(client, s, batch2)
         flush_and_wait(client, s, expected=10)
 
-        for field in ("field_a", "field_b"):
-            n = count_records(client, s, where=f"{field} IS NOT NULL AND {field} != ''")
-            assert n == 10, f"{field} should appear in all 10 rows, got {n}"
+        # field_a is a string — IS NOT NULL AND != '' is a valid emptiness check.
+        n = count_records(client, s, where="field_a IS NOT NULL AND field_a != ''")
+        assert n == 10, f"field_a should appear in all 10 rows, got {n}"
+        # field_b is int — comparing to '' is a numeric/string type mismatch; use
+        # the actual value (1 in every row) instead.
+        n = count_records(client, s, where="field_b = 1")
+        assert n == 10, f"field_b should appear in all 10 rows, got {n}"
 
         # Use value-specific checks: IS NOT NULL AND != '' is unreliable for
         # numeric/boolean fields (e.g. field_d=0, field_e=false may look empty).

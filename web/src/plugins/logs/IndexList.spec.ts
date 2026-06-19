@@ -28,6 +28,7 @@ const mockExtractFields = vi.fn();
 const mockGetValuesPartition = vi.fn();
 const mockGetFilterExpressionByFieldType = vi.fn(() => "field = 'value'");
 const mockFetchQueryDataWithHttpStream = vi.fn();
+const mockCancelStreamQueryBasedOnRequestId = vi.fn();
 
 vi.mock("@/services/search", () => ({
   default: {
@@ -248,6 +249,7 @@ vi.mock("@/composables/useLocalInterestingFields", () => ({
 vi.mock("@/composables/useStreamingSearch", () => ({
   default: () => ({
     fetchQueryDataWithHttpStream: mockFetchQueryDataWithHttpStream,
+    cancelStreamQueryBasedOnRequestId: mockCancelStreamQueryBasedOnRequestId,
   }),
 }));
 
@@ -1181,25 +1183,49 @@ describe("Index List", async () => {
       expect(wrapper.vm.openedFilterFields.value).toEqual(["field1", "field3"]);
     });
 
-    it.skip("should cancel trace ID by calling cancelSearchQueryBasedOnRequestId", async () => {
+    it("should abort in-flight streams and clear the mapper in cancelTraceId", async () => {
+      mockCancelStreamQueryBasedOnRequestId.mockClear();
       const field = "testField";
-      const traceIds = ["trace1", "trace2"];
-      wrapper.vm.traceIdMapper[field] = traceIds;
-
-      const mockCancelSearchQuery = vi.fn();
-      wrapper.vm.cancelSearchQueryBasedOnRequestId = mockCancelSearchQuery;
+      wrapper.vm.traceIdMapper[field] = ["trace1", "trace2"];
 
       wrapper.vm.cancelTraceId(field);
 
-      expect(mockCancelSearchQuery).toHaveBeenCalledTimes(2);
-      expect(mockCancelSearchQuery).toHaveBeenCalledWith({
+      expect(mockCancelStreamQueryBasedOnRequestId).toHaveBeenCalledTimes(2);
+      expect(mockCancelStreamQueryBasedOnRequestId).toHaveBeenCalledWith({
         trace_id: "trace1",
         org_id: wrapper.vm.store.state.selectedOrganization.identifier,
       });
-      expect(mockCancelSearchQuery).toHaveBeenCalledWith({
+      expect(mockCancelStreamQueryBasedOnRequestId).toHaveBeenCalledWith({
         trace_id: "trace2",
         org_id: wrapper.vm.store.state.selectedOrganization.identifier,
       });
+      // Trace IDs are cleared so a re-expand starts a clean stream.
+      expect(wrapper.vm.traceIdMapper[field]).toEqual([]);
+    });
+
+    it("should cancel the in-flight request when collapsing a loading field", async () => {
+      mockCancelStreamQueryBasedOnRequestId.mockClear();
+      const field = "level";
+      // Simulate an expanded field with a request in-flight.
+      wrapper.vm.traceIdMapper[field] = ["trace-abc"];
+      wrapper.vm.fieldValues[field] = {
+        isLoading: true,
+        values: [],
+        errMsg: "",
+      };
+
+      wrapper.vm.cancelFilterCreator({ name: field });
+
+      // The HTTP stream is aborted via the trace ID...
+      expect(mockCancelStreamQueryBasedOnRequestId).toHaveBeenCalledWith({
+        trace_id: "trace-abc",
+        org_id: wrapper.vm.store.state.selectedOrganization.identifier,
+      });
+      // ...the mapper is emptied, the loading flag is cleared, and the field
+      // is marked collapsed so the row is interactive again.
+      expect(wrapper.vm.traceIdMapper[field]).toEqual([]);
+      expect(wrapper.vm.fieldValues[field].isLoading).toBe(false);
+      expect(wrapper.vm.expandedFields[field]).toBe(false);
     });
   });
 
@@ -2271,25 +2297,49 @@ describe("Index List", async () => {
       expect(wrapper.vm.openedFilterFields.value).toEqual(["field1", "field3"]);
     });
 
-    it.skip("should cancel trace ID by calling cancelSearchQueryBasedOnRequestId", async () => {
+    it("should abort in-flight streams and clear the mapper in cancelTraceId", async () => {
+      mockCancelStreamQueryBasedOnRequestId.mockClear();
       const field = "testField";
-      const traceIds = ["trace1", "trace2"];
-      wrapper.vm.traceIdMapper[field] = traceIds;
-
-      const mockCancelSearchQuery = vi.fn();
-      wrapper.vm.cancelSearchQueryBasedOnRequestId = mockCancelSearchQuery;
+      wrapper.vm.traceIdMapper[field] = ["trace1", "trace2"];
 
       wrapper.vm.cancelTraceId(field);
 
-      expect(mockCancelSearchQuery).toHaveBeenCalledTimes(2);
-      expect(mockCancelSearchQuery).toHaveBeenCalledWith({
+      expect(mockCancelStreamQueryBasedOnRequestId).toHaveBeenCalledTimes(2);
+      expect(mockCancelStreamQueryBasedOnRequestId).toHaveBeenCalledWith({
         trace_id: "trace1",
         org_id: wrapper.vm.store.state.selectedOrganization.identifier,
       });
-      expect(mockCancelSearchQuery).toHaveBeenCalledWith({
+      expect(mockCancelStreamQueryBasedOnRequestId).toHaveBeenCalledWith({
         trace_id: "trace2",
         org_id: wrapper.vm.store.state.selectedOrganization.identifier,
       });
+      // Trace IDs are cleared so a re-expand starts a clean stream.
+      expect(wrapper.vm.traceIdMapper[field]).toEqual([]);
+    });
+
+    it("should cancel the in-flight request when collapsing a loading field", async () => {
+      mockCancelStreamQueryBasedOnRequestId.mockClear();
+      const field = "level";
+      // Simulate an expanded field with a request in-flight.
+      wrapper.vm.traceIdMapper[field] = ["trace-abc"];
+      wrapper.vm.fieldValues[field] = {
+        isLoading: true,
+        values: [],
+        errMsg: "",
+      };
+
+      wrapper.vm.cancelFilterCreator({ name: field });
+
+      // The HTTP stream is aborted via the trace ID...
+      expect(mockCancelStreamQueryBasedOnRequestId).toHaveBeenCalledWith({
+        trace_id: "trace-abc",
+        org_id: wrapper.vm.store.state.selectedOrganization.identifier,
+      });
+      // ...the mapper is emptied, the loading flag is cleared, and the field
+      // is marked collapsed so the row is interactive again.
+      expect(wrapper.vm.traceIdMapper[field]).toEqual([]);
+      expect(wrapper.vm.fieldValues[field].isLoading).toBe(false);
+      expect(wrapper.vm.expandedFields[field]).toBe(false);
     });
   });
 

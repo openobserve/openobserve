@@ -225,6 +225,18 @@ export const emptyStatePresets = {
     titleKey: "emptyState.noTraces.title",
     descriptionKey: "emptyState.noTraces.description",
   },
+  "no-service-graph": {
+    illustration: "service-graph",
+    variant: "no-results",
+    titleKey: "emptyState.noServiceGraph.title",
+    descriptionKey: "emptyState.noServiceGraph.description",
+  },
+  "no-services-catalog": {
+    illustration: "services-catalog",
+    variant: "no-results",
+    titleKey: "emptyState.noServicesCatalog.title",
+    descriptionKey: "emptyState.noServicesCatalog.description",
+  },
   "no-search-history": {
     illustration: "history",
     variant: "neutral",

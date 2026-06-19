@@ -179,7 +179,6 @@ const logoSrc = computed(() =>
 }
 
 .welcome-hero__code {
-  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
   font-size: 12px;
   font-weight: 600;
   padding: 1px 6px;
