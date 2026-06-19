@@ -110,15 +110,43 @@ describe("groupNavLinks", () => {
     ]);
   });
 
-  it("keeps Alerts and Reports as separate top-level links", () => {
+  it("keeps Alerts separate; Reports stays a link when Dashboards is absent", () => {
     const entries = groupNavLinks([
       link("home"),
       link("alertList"),
       link("reports"),
     ]);
     expect(keysOf(entries)).toContain("link:alertList");
+    // Dashboards absent → the Dashboards group has only Reports (1 child) so it
+    // doesn't collapse; Reports stays a plain link.
     expect(keysOf(entries)).toContain("link:reports");
     expect(entries.some((e) => e.type === "linkGroup")).toBe(false);
+  });
+
+  it("moves Reports under the Dashboards group", () => {
+    const entries = groupNavLinks([
+      link("home"),
+      link("dashboards"),
+      link("reports"),
+      link("alertList"),
+    ]);
+    // Reports is absorbed; the Dashboards tile takes the dashboards slot.
+    expect(keysOf(entries)).toEqual([
+      "link:home",
+      "linkGroup:dashboards",
+      "link:alertList",
+    ]);
+    const dash = entries.find(
+      (e): e is Extract<RailEntry, { type: "linkGroup" }> =>
+        e.type === "linkGroup" && e.item.name === "dashboards",
+    );
+    expect(dash?.item.link).toBe("/dashboards");
+    expect(dash?.children.map((c) => c.name)).toEqual(["dashboards", "reports"]);
+  });
+
+  it("keeps Dashboards a plain link when Reports is absent", () => {
+    const entries = groupNavLinks([link("home"), link("dashboards")]);
+    expect(keysOf(entries)).toEqual(["link:home", "link:dashboards"]);
   });
 
   it("only includes Data children whose required top-level item is present", () => {

@@ -114,6 +114,17 @@ export const NAV_GROUPS: NavGroupDef[] = [
       { titleKey: "menu.ingestion", icon: "data-plus-line", name: "ingestion", requires: "ingestion" },
     ],
   },
+  {
+    key: "dashboards",
+    title: "Dashboards",
+    icon: "dashboard",
+    parentLink: "/dashboards",
+    absorbs: ["dashboards", "reports"],
+    children: [
+      { titleKey: "menu.dashboard", icon: "dashboard", name: "dashboards", requires: "dashboards" },
+      { titleKey: "menu.report", icon: "description", name: "reports", requires: "reports" },
+    ],
+  },
 ];
 
 /**
@@ -146,7 +157,9 @@ export function groupNavLinks(links: NavItem[]): RailEntry[] {
       (c) => !c.requires || presentNames.has(c.requires),
     );
     const hasAbsorbed = def.absorbs.some((n) => presentNames.has(n));
-    if (children.length === 0 || !hasAbsorbed) continue;
+    // A single-child "group" is pointless (the flyout would duplicate the tile),
+    // so only collapse into a group when ≥2 children remain after filtering.
+    if (children.length < 2 || !hasAbsorbed) continue;
     groupChildren.set(def.key, children);
     for (const n of def.absorbs) absorbedToGroup.set(n, def);
   }
