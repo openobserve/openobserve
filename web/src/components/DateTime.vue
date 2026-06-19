@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ref="datetimeBtn"
           data-cy="date-time-button"
           :variant="variant"
-          class="date-time-button tw:h-7.5 tw:min-h-7.5 tw:rounded-md tw:py-0 tw:px-1.25 tw:text-xs tw:min-w-fit tw:justify-start! tw:hover:bg-[var(--o2-hover-accent)]!"
+          size="sm-toolbar"
           :class="{
             [selectedType + 'type']: !disableRelative,
             hideRelative: disableRelative,
