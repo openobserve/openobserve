@@ -115,9 +115,11 @@ vi.mock("@/composables/dashboard/useDashboardPanel", () => ({
   default: vi.fn(() => mockReturn),
 }));
 
+const mockGetStreams = vi.fn();
+
 vi.mock("@/composables/useStreams", () => ({
   default: () => ({
-    getStreams: vi.fn().mockResolvedValue({ list: mockStreamResults }),
+    getStreams: mockGetStreams,
     getStream: vi.fn().mockResolvedValue({}),
   }),
 }));
@@ -142,6 +144,7 @@ describe("FieldList", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockGetStreams.mockResolvedValue({ list: mockStreamResults });
     mockReturn = defaultMockReturn();
     store.state.selectedOrganization = { identifier: "test-org" };
     store.state.theme = "light";
@@ -235,6 +238,101 @@ describe("FieldList", () => {
         '[data-test="index-dropdown-stream_type"]',
       );
       expect(dropdown.exists()).toBe(true);
+    });
+
+    it("clears the selected stream when the stream type changes", async () => {
+      wrapper = mountComponent({ pageKey: "dashboard" });
+      const fields = mockReturn.dashboardPanelData.data.queries[0].fields;
+      fields.stream = "app_logs"; // a logs-type stream is currently selected
+
+      // Switching type must drop the old stream so its schema isn't fetched under
+      // the new type (the stale request that fired the metrics call twice).
+      await wrapper
+        .findComponent('[data-test="index-dropdown-stream_type"]')
+        .vm.$emit("update:model-value", "metrics");
+
+      expect(fields.stream).toBe("");
+      expect(fields.stream_type).toBe("metrics");
+    });
+  });
+
+  // ── Stream List Loading ─────────────────────────────────────────────
+
+  describe("Stream List Loading", () => {
+    const currentFields = () =>
+      mockReturn.dashboardPanelData.data.queries[0].fields;
+
+    it("loads the stream list for the current stream type on mount", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+
+      expect(mockGetStreams).toHaveBeenCalledTimes(1);
+      expect(mockGetStreams).toHaveBeenCalledWith("logs", false);
+      expect(mockReturn.dashboardPanelData.meta.stream.streamResultsType).toBe(
+        "logs",
+      );
+    });
+
+    it("reloads the stream list when the stream type changes", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      mockGetStreams.mockClear();
+
+      currentFields().stream_type = "metrics";
+      await flushPromises();
+
+      expect(mockGetStreams).toHaveBeenCalledWith("metrics", false);
+      expect(mockReturn.dashboardPanelData.meta.stream.streamResultsType).toBe(
+        "metrics",
+      );
+    });
+
+    it("does not refetch the stream list when only the selected stream changes", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      mockGetStreams.mockClear();
+
+      // Selecting a different stream of the same type must not reload the list.
+      currentFields().stream = "error_logs";
+      await flushPromises();
+
+      expect(mockGetStreams).not.toHaveBeenCalled();
+    });
+
+    it("ignores a stale response when the stream type changed mid-flight", async () => {
+      // First (logs) request stays pending; the second (metrics) resolves first.
+      let resolveLogs: (v: any) => void = () => {};
+      mockGetStreams
+        .mockImplementationOnce(
+          () => new Promise((resolve) => (resolveLogs = resolve)),
+        )
+        .mockImplementationOnce(() =>
+          Promise.resolve({
+            list: [{ name: "system_metrics", stream_type: "metrics" }],
+          }),
+        );
+
+      wrapper = mountComponent(); // fires the pending logs request
+      currentFields().stream_type = "metrics"; // fires the metrics request
+      await flushPromises();
+
+      // metrics already won
+      expect(mockReturn.dashboardPanelData.meta.stream.streamResultsType).toBe(
+        "metrics",
+      );
+
+      // the late logs response must not overwrite it (stream type is now metrics)
+      resolveLogs({ list: [{ name: "app_logs", stream_type: "logs" }] });
+      await flushPromises();
+
+      expect(mockReturn.dashboardPanelData.meta.stream.streamResultsType).toBe(
+        "metrics",
+      );
+      expect(
+        mockReturn.dashboardPanelData.meta.stream.streamResults.map(
+          (s: any) => s.name,
+        ),
+      ).toEqual(["system_metrics"]);
     });
   });
 

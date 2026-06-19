@@ -5,6 +5,7 @@ import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { h } from "vue";
 import OFormTime from "./OFormTime.vue";
 import OForm from "../Form/OForm.vue";
+import { z } from "zod";
 
 describe("OFormTime", () => {
   let wrapper: VueWrapper;
@@ -26,30 +27,23 @@ describe("OFormTime", () => {
     expect(wrapper.find('[role="group"]').exists()).toBe(true);
   });
 
-  it("shows validator error after change", async () => {
+  it("shows schema error after submit when empty", async () => {
     wrapper = mount(OForm, {
-      props: { defaultValues: { meet: "" } },
+      props: {
+        defaultValues: { meet: "" },
+        schema: z.object({ meet: z.string().min(1, "Required") }),
+      },
       slots: {
-        default: () =>
-          h(OFormTime, {
-            name: "meet",
-            validators: [(v: string) => (!v ? "Required" : undefined)],
-          }),
+        default: () => h(OFormTime, { name: "meet" }),
       },
       global: { components: { OFormTime } },
     });
 
-    // OTime uses a custom clock popup (no native <input>).
-    // Use OForm's publicly exposed TanStack form API to exercise validation.
-    const formRef = wrapper.vm as unknown as { form: { setFieldValue: (n: string, v: string) => void; validateField: (n: string, c: string) => Promise<unknown>; getFieldMeta: (n: string) => Record<string, unknown>; setFieldMeta: (n: string, u: Record<string, unknown>) => void } };
-
-    // Trigger onChange validation with an empty value
-    formRef.form.setFieldValue("meet", "");
-    await formRef.form.validateField("meet", "change");
-
-    // Mark field as touched so the error message is displayed
-    const meta = formRef.form.getFieldMeta("meet") as Record<string, unknown>;
-    formRef.form.setFieldMeta("meet", { ...meta, isTouched: true });
+    // OTime uses a custom clock popup (no native <input>). Drive the schema
+    // through OForm's exposed TanStack form (submit-then-change reveals errors).
+    await (
+      wrapper.vm as unknown as { form: { handleSubmit: () => Promise<unknown> } }
+    ).form.handleSubmit();
     await flushPromises();
 
     expect(wrapper.text()).toContain("Required");

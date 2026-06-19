@@ -169,12 +169,16 @@ const computedLabel = (label: QueryBuilderLabelFilter): string => {
   return `${label.label} ${label.op} ${label.value}`;
 };
 
-// Watch for metric changes to fetch available labels
+// Watch for metric OR selected time range changes to (re)fetch available labels.
 watch(
-  () => props.metric,
-  async (newMetric) => {
-    if (newMetric) {
-      await fetchPromQLLabels(newMetric);
+  () => [
+    props.metric,
+    props.dashboardPanelData?.meta?.dateTime?.start_time,
+    props.dashboardPanelData?.meta?.dateTime?.end_time,
+  ],
+  async () => {
+    if (props.metric) {
+      await fetchPromQLLabels(props.metric);
     }
     // When metric is cleared, the computed properties will handle empty state
     // No need to mutate props.dashboardData

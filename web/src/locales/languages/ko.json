@@ -3461,7 +3461,9 @@
     "import_this_pattern": "이 패턴 가져오기",
     "patterns_loaded": "로드된 {개수} 개의 패턴",
     "failed_to_load": "패턴을 로드하지 못했습니다.",
-    "no_patterns_selected": "패턴을 하나 이상 선택하십시오."
+    "no_patterns_selected": "패턴을 하나 이상 선택하십시오.",
+    "name_required": "* 이름 필수",
+    "pattern_required": "* 패턴 필수"
   },
   "search_history": {
     "title": "검색 기록",

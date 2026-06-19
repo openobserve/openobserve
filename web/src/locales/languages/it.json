@@ -3459,7 +3459,9 @@
     "import_this_pattern": "Importa questo modello",
     "patterns_loaded": "Schema (i) {count} caricato (i)",
     "failed_to_load": "Caricamento dei pattern non riuscito",
-    "no_patterns_selected": "Seleziona almeno un motivo"
+    "no_patterns_selected": "Seleziona almeno un motivo",
+    "name_required": "* Il nome è obbligatorio",
+    "pattern_required": "* Il modello è obbligatorio"
   },
   "search_history": {
     "title": "Cronologia delle ricerche",

@@ -13,12 +13,34 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+// AddFolder is single-source-of-truth: the OForm holds name/description (seeded
+// via `:default-values`), and `folderId` comes from the prop. There is no local
+// `folderData` mirror and no manual reset on save. Tests drive submit via the
+// @submit handler (`vm.onSubmit(value)`); the validated value is the source of
+// truth.
+
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import AddFolder from "./AddFolder.vue";
 import i18n from "@/locales";
 import { createStore } from "vuex";
 
+// OForm stub: renders the form + slot and captures `defaultValues` so prefill
+// can be asserted without mounting the real TanStack-powered OForm.
+const OFormStub = {
+  name: "OForm",
+  template: '<form class="o-form-stub" @submit.prevent><slot /></form>',
+  props: ["defaultValues", "schema", "greedy"],
+  emits: ["submit", "reset"],
+};
+
+// OFormInput stub: a basic input so the parent renders without the real wrapper.
+const OFormInputStub = {
+  name: "OFormInput",
+  template:
+    '<input class="o-form-input-stub" :data-test="$attrs[\'data-test\']" />',
+  props: ["name", "label", "required"],
+};
 
 // Mock the utils functions
 vi.mock("@/utils/commons", () => ({
@@ -54,6 +76,7 @@ describe("AddFolder", () => {
       props,
       global: {
         plugins: [i18n, store],
+        stubs: { OForm: OFormStub, OFormInput: OFormInputStub },
       },
     });
 
@@ -98,82 +121,48 @@ describe("AddFolder", () => {
     expect(descInput.exists()).toBe(true);
   });
 
-  it("should expose submit method", () => {
+  it("should expose onSubmit as a plain async handler", () => {
     const wrapper = createWrapper();
 
-    expect(typeof wrapper.vm.submit).toBe("function");
+    expect(typeof wrapper.vm.onSubmit).toBe("function");
   });
 
-  it("should expose onSubmit loading state", () => {
+  it("exposes t, schema and onSubmit (no local folderData mirror)", () => {
     const wrapper = createWrapper();
-
-    expect(wrapper.vm.onSubmit).toBeDefined();
-    expect(wrapper.vm.onSubmit.isLoading).toBeDefined();
+    const vm = wrapper.vm as any;
+    expect(vm.t).toBeInstanceOf(Function);
+    expect(vm.addFolderSchema).toBeDefined();
+    expect(typeof vm.onSubmit).toBe("function");
+    // The old local model + form ref were removed (single source of truth).
+    expect(vm.folderData).toBeUndefined();
+    expect(vm.addFolderForm).toBeUndefined();
   });
 
-  it("should initialize with empty folder data in create mode", () => {
+  it("seeds blank default-values in create mode", () => {
     const wrapper = createWrapper({ editMode: false });
 
-    expect(wrapper.vm.folderData.name).toBe("");
-    expect(wrapper.vm.folderData.description).toBe("");
-    expect(wrapper.vm.folderData.folderId).toBe("");
+    const defaults = wrapper.findComponent(OFormStub).props("defaultValues");
+    expect(defaults).toEqual({ name: "", description: "" });
   });
 
-  it("should initialize with existing folder data in edit mode", () => {
+  it("seeds the folder's values as default-values in edit mode", () => {
     const wrapper = createWrapper({ editMode: true, folderId: "folder1" });
 
-    expect(wrapper.vm.folderData.name).toBe("Test Folder");
-    expect(wrapper.vm.folderData.description).toBe("Test description");
+    const defaults = wrapper.findComponent(OFormStub).props("defaultValues");
+    expect(defaults).toEqual({ name: "Test Folder", description: "Test description" });
   });
 
-  // Helper: stub the addFolderForm ref so submit can pass through validation
-  // and supplies the form values that onSubmit reads.
-  const stubFormWith = (
-    wrapper: any,
-    name: string,
-    description = "",
-    { valid = true }: { valid?: boolean } = {},
-  ) => {
-    wrapper.vm.addFolderForm = {
-      validate: vi.fn().mockResolvedValue(valid),
-      resetValidation: vi.fn(),
-      form: {
-        state: {
-          values: { name, description },
-        },
-      },
-    };
-  };
+  it("falls back to blank default-values when the folder can't be found", () => {
+    const wrapper = createWrapper({ editMode: true, folderId: "missing" });
 
-  it("should update folder name via OForm field setter", async () => {
-    const wrapper = createWrapper();
-
-    const formRef = wrapper.vm.addFolderForm;
-    expect(formRef).toBeTruthy();
-    formRef.form.setFieldValue("name", "My New Folder");
-    await wrapper.vm.$nextTick();
-
-    expect(formRef.form.state.values.name).toBe("My New Folder");
-  });
-
-  it("should update folder description via OForm field setter", async () => {
-    const wrapper = createWrapper();
-
-    const formRef = wrapper.vm.addFolderForm;
-    expect(formRef).toBeTruthy();
-    formRef.form.setFieldValue("description", "My folder description");
-    await wrapper.vm.$nextTick();
-
-    expect(formRef.form.state.values.description).toBe(
-      "My folder description",
-    );
+    const defaults = wrapper.findComponent(OFormStub).props("defaultValues");
+    expect(defaults).toEqual({ name: "", description: "" });
   });
 
   it("should emit update:modelValue on successful folder creation", async () => {
     const wrapper = createWrapper({ editMode: false });
-    stubFormWith(wrapper, "Test Folder");
 
-    await wrapper.vm.submit();
+    await wrapper.vm.onSubmit({ name: "Test Folder", description: "" });
     await flushPromises();
 
     expect(wrapper.emitted("update:modelValue")).toBeTruthy();
@@ -181,39 +170,52 @@ describe("AddFolder", () => {
 
   it("should emit update:modelValue on successful folder update in edit mode", async () => {
     const wrapper = createWrapper({ editMode: true, folderId: "folder1" });
-    stubFormWith(wrapper, "Test Folder", "Test description");
 
-    await wrapper.vm.submit();
+    await wrapper.vm.onSubmit({ name: "Test Folder", description: "Test description" });
     await flushPromises();
 
     expect(wrapper.emitted("update:modelValue")).toBeTruthy();
   });
 
-  it("should not emit update:modelValue when name is empty (validation fails)", async () => {
-    const wrapper = createWrapper();
-    stubFormWith(wrapper, "", "", { valid: false });
+  it("creates the folder with a trimmed name", async () => {
+    const { createFolder } = await import("@/utils/commons");
+    const wrapper = createWrapper({ editMode: false });
 
-    await wrapper.vm.submit();
+    await wrapper.vm.onSubmit({ name: "  Valid Name  ", description: "" });
     await flushPromises();
 
-    expect(wrapper.emitted("update:modelValue")).toBeFalsy();
+    expect(createFolder).toHaveBeenCalled();
+    expect((createFolder as any).mock.calls[0][1].name).toBe("Valid Name");
   });
 
-  it("should not emit update:modelValue when name is whitespace-only", async () => {
-    const wrapper = createWrapper();
-    stubFormWith(wrapper, "   ", "", { valid: false });
+  it("updates with the prop folderId and emits", async () => {
+    const { updateFolder } = await import("@/utils/commons");
+    const wrapper = createWrapper({ editMode: true, folderId: "folder1" });
 
-    await wrapper.vm.submit();
+    await wrapper.vm.onSubmit({ name: "Test Folder", description: "Test description" });
     await flushPromises();
 
-    expect(wrapper.emitted("update:modelValue")).toBeFalsy();
+    expect(updateFolder).toHaveBeenCalled();
+    expect((updateFolder as any).mock.calls[0][1]).toBe("folder1"); // folderId arg
+    const modelEvents = wrapper.emitted("update:modelValue");
+    expect(modelEvents![0][0]).toMatchObject({
+      folderId: "folder1",
+      name: "Test Folder",
+    });
   });
 
-  it("should accept whitespace-trimmed name", () => {
-    const wrapper = createWrapper();
+  it("valid input submits through the form (@submit → onSubmit) and emits", async () => {
+    const wrapper = createWrapper({ editMode: false });
 
-    wrapper.vm.folderData.name = "  Valid Name  ";
-    expect(wrapper.vm.folderData.name.trim()).toBe("Valid Name");
+    // Drive the real @submit path: the OForm stub emits `submit` with the
+    // validated value, which the parent routes to onSubmit.
+    await wrapper.findComponent(OFormStub).vm.$emit("submit", {
+      name: "Programmatic Folder",
+      description: "",
+    });
+    await flushPromises();
+
+    expect(wrapper.emitted("update:modelValue")).toBeTruthy();
   });
 
   it("should handle folder creation error gracefully", async () => {
@@ -223,9 +225,8 @@ describe("AddFolder", () => {
     );
 
     const wrapper = createWrapper({ editMode: false });
-    stubFormWith(wrapper, "Valid Folder");
 
-    await wrapper.vm.submit();
+    await wrapper.vm.onSubmit({ name: "Valid Folder", description: "" });
     await flushPromises();
 
     // No update:modelValue should be emitted on failure
@@ -239,33 +240,10 @@ describe("AddFolder", () => {
     );
 
     const wrapper = createWrapper({ editMode: true, folderId: "folder1" });
-    stubFormWith(wrapper, "Test Folder", "Test description");
 
-    await wrapper.vm.submit();
+    await wrapper.vm.onSubmit({ name: "Test Folder", description: "Test description" });
     await flushPromises();
 
     expect(wrapper.emitted("update:modelValue")).toBeFalsy();
-  });
-
-  it("submit() should trigger onSubmit.execute", async () => {
-    const wrapper = createWrapper({ editMode: false });
-    stubFormWith(wrapper, "Programmatic Folder");
-
-    await wrapper.vm.submit();
-    await flushPromises();
-
-    expect(wrapper.emitted("update:modelValue")).toBeTruthy();
-  });
-
-  it("should reset folder data after successful creation", async () => {
-    const wrapper = createWrapper({ editMode: false });
-    stubFormWith(wrapper, "Folder To Reset", "desc");
-
-    await wrapper.vm.submit();
-    await flushPromises();
-
-    expect(wrapper.vm.folderData.name).toBe("");
-    expect(wrapper.vm.folderData.description).toBe("");
-    expect(wrapper.vm.folderData.folderId).toBe("");
   });
 });
