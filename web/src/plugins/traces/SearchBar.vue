@@ -165,7 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="ghost"
               data-test="traces-search-bar-cancel-btn"
               :title="t('search.cancel')"
-              class="tw:p-0 tw:h-[1.875rem]! tw:[transition:box-shadow_0.3s_ease,_opacity_0.2s_ease] o2-color-cancel tw:text-(--text-xs) tw:font-(--font-medium)! tw:leading-4! tw:px-1! tw:py-0! tw:w-[5.875rem]! tw:whitespace-normal tw:break-words tw:text-center tw:bg-(--o2-cancel-query-bg) tw:text-(--o2-primary-btn-text) element-box-shadow tw:![border-radius:0.375rem_0_0_0.375rem]"
+              class="tw:p-0 tw:h-[1.875rem]! tw:[transition:box-shadow_0.3s_ease,_opacity_0.2s_ease] tw:text-(--text-xs)! tw:font-(--font-medium)! tw:leading-4! tw:px-1! tw:py-0! tw:w-[5.875rem]! tw:whitespace-normal tw:break-words tw:text-center tw:bg-(--o2-cancel-query-bg)! tw:text-(--o2-primary-btn-text)! element-box-shadow tw:![border-radius:0.375rem_0_0_0.375rem]"
               @click="cancelQueryData"
               >{{ t("search.cancel") }}</OButton
             >
@@ -175,7 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="logs-search-bar-refresh-btn"
               data-cy="search-bar-refresh-button"
               :title="t('search.runQuery')"
-              class="tw:p-0 tw:h-[1.875rem]! element-box-shadow tw:[transition:box-shadow_0.3s_ease,_opacity_0.2s_ease] tw:hover:opacity-90 tw:hover:shadow-[0_0_0.5rem_color-mix(in_srgb,var(--o2-primary-btn-bg),transparent_30%)] tw:text-(--text-xs) tw:font-(--font-medium)! tw:leading-4! tw:px-1! tw:py-0! tw:w-[5.875rem]! tw:whitespace-normal tw:break-words tw:text-center tw:bg-(--o2-primary-btn-bg) tw:text-(--o2-primary-btn-text)"
+              class="tw:p-0 tw:h-[1.875rem]! element-box-shadow tw:[transition:box-shadow_0.3s_ease,_opacity_0.2s_ease] tw:hover:opacity-90 tw:hover:shadow-[0_0_0.5rem_color-mix(in_srgb,var(--o2-primary-btn-bg),transparent_30%)] tw:text-(--text-xs)! tw:font-(--font-medium)! tw:leading-4! tw:px-1! tw:py-0! tw:w-[5.875rem]! tw:whitespace-normal tw:break-words tw:text-center tw:bg-(--o2-primary-btn-bg)! tw:text-(--o2-primary-btn-text)!"
               :class="
                 store.state.zoConfig.auto_query_enabled
                   ? 'tw:![border-radius:0.375rem_0_0_0.375rem]'
@@ -216,8 +216,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :disabled="isLoading"
                   :class="[
                     config.isEnterprise == 'true' && isLoading
-                      ? 'o2-color-cancel'
-                      : 'tw:hover:opacity-90 tw:hover:shadow-[0_0_0.5rem_color-mix(in_srgb,var(--o2-primary-btn-bg),transparent_30%)]',
+                      ? 'tw:bg-(--o2-cancel-query-bg)! tw:text-(--o2-primary-btn-text)!'
+                      : 'tw:bg-(--o2-primary-btn-bg)! tw:text-(--o2-primary-btn-text)! tw:hover:opacity-90 tw:hover:shadow-[0_0_0.5rem_color-mix(in_srgb,var(--o2-primary-btn-bg),transparent_30%)]',
                     'tw:![border-radius:0_0.375rem_0.375rem_0]',
                   ]"
                 >
