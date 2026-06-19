@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <ul
-            class="dashboard-list tw:my-2 tw:flex tw:flex-col tw:rounded tw:list-none tw:p-0 tw:m-0 tw:max-h-[calc(100dvh-200px)] tw:overflow-y-auto"
+            class="dashboard-list tw:flex tw:flex-col tw:rounded tw:list-none tw:p-0 tw:m-0 tw:max-h-[calc(100dvh-200px)] tw:overflow-y-auto"
             :class="filteredDashboards.length > 0 ? 'tw:border tw:border-border' : ''"
           >
             <li
