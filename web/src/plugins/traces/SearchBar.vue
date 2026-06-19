@@ -384,12 +384,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           editor-id="traces-query-editor"
           v-model:query="searchObj.data.editorValue"
           :keywords="effectiveKeywords"
-          :class="
-            searchObj.data.editorValue == '' &&
-            searchObj.meta.queryEditorPlaceholderFlag
-              ? 'empty-query'
-              : ''
-          "
           language="sql"
           @update:query="updateQueryValue"
           @run-query="searchData"
@@ -401,9 +395,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             searchObj.data.editorValue == '' &&
             searchObj.meta.queryEditorPlaceholderFlag
           "
-          class="tw:absolute tw:top-0 tw:left-0 tw:right-0 tw:bottom-0 tw:flex tw:items-start tw:pt-[0.1875rem] tw:pr-2 tw:pb-0 tw:pl-[2.15rem] tw:pointer-events-none tw:z-[1] tw:select-none"
+          class="query-editor-placeholder-overlay tw:absolute tw:top-0 tw:left-0 tw:right-0 tw:bottom-0 tw:flex tw:items-start tw:[padding:0.1875rem_0.5rem_0_2.15rem] tw:pointer-events-none tw:z-[1] tw:select-none"
         >
-          <span class="tw:font-mono tw:text-[var(--text-base)] tw:[line-height:1.3125rem] tw:text-[#a0aec0] tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis tw:dark:text-[#718096]">{{ traceEditorPlaceholder }}</span>
+          <span class="query-editor-placeholder-typewriter">{{ traceEditorPlaceholder }}</span>
         </div>
       </div>
     </div>
