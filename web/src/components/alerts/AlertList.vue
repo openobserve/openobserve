@@ -1226,6 +1226,10 @@ export default defineComponent({
           // we are not fetching the alerts again, we are just assigning the alerts to the filteredResults
           allAlerts.value =
             store.state.organizationData.allAlertsListByFolderId[folderId];
+          // Data is served synchronously from cache — clear the loading flag
+          // (it starts true to avoid the empty-state flash) so the table renders
+          // the cached rows instead of staying stuck on the skeleton.
+          loading.value = false;
         }
       } catch (error) {
         throw error;
@@ -1494,6 +1498,9 @@ export default defineComponent({
         allSelectedAlerts.value = false;
 
         if (newVal == router.currentRoute.value.query.folder) {
+          // Not refetching here — clear the initial loading flag so the table
+          // doesn't stay stuck on the skeleton.
+          loading.value = false;
           return;
         }
         if (searchAcrossFolders.value) {
