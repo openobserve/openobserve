@@ -5,6 +5,61 @@ import { expect } from '@playwright/test';
 import { getAuthHeaders, getOrgIdentifier } from '../playwright-tests/utils/cloud-auth.js';
 import testLogger from '../playwright-tests/utils/test-logger.js';
 
+// Left-nav group flyouts.
+// Several former top-level menu items (pipeline, functions, enrichment tables,
+// ingestion, reports) were moved into hover flyout groups ("Data" and
+// "Dashboards"). The group tile itself is still a navigating link
+// (menu-link-/streams-item, menu-link-/dashboards-item); its absorbed children
+// only appear in a flyout (teleported to <body>) after hovering the tile and
+// carry a new `nav-group-item-<routeName>` data-test.
+//
+// `openNavFlyoutChild` hovers the owning group tile and clicks the child,
+// landing on exactly the same page the old direct menu click used to.
+export const NAV_GROUP_TILE = {
+    data: '[data-test="menu-link-\\/streams-item"]',
+    dashboards: '[data-test="menu-link-\\/dashboards-item"]',
+};
+
+// route `name` of each child within its group (matches navGroups.ts).
+export const NAV_FLYOUT_CHILD = {
+    pipeline: { group: 'data', name: 'pipelines' },
+    functions: { group: 'data', name: 'functionList' },
+    enrichment: { group: 'data', name: 'enrichmentTables' },
+    ingestion: { group: 'data', name: 'ingestion' },
+    streams: { group: 'data', name: 'logstreams' },
+    reports: { group: 'dashboards', name: 'reports' },
+};
+
+/**
+ * Hover a left-nav group tile and click one of its flyout children.
+ * @param {import('@playwright/test').Page} page
+ * @param {keyof typeof NAV_FLYOUT_CHILD} child - logical child key (e.g. 'pipeline')
+ */
+export async function openNavFlyoutChild(page, child) {
+    const entry = NAV_FLYOUT_CHILD[child];
+    if (!entry) throw new Error(`Unknown nav flyout child: ${child}`);
+    const tile = page.locator(NAV_GROUP_TILE[entry.group]);
+    await tile.waitFor({ state: 'visible', timeout: 30000 });
+    const item = page.locator(`[data-test="nav-group-item-${entry.name}"]`);
+    // Opening is hover-driven with a short open delay, and the flyout self-closes
+    // on scroll/resize — so while the page is still settling a single hover can
+    // open it only for it to be closed again before we click. Retry the
+    // open-and-reveal as a unit until the child is actually visible. Move the
+    // pointer away first each attempt so `hover()` always dispatches a fresh
+    // `mouseenter` (a no-op move when already over the tile never re-opens it).
+    await expect(async () => {
+        await page.mouse.move(0, 0);
+        await tile.hover();
+        await expect(item).toBeVisible({ timeout: 2000 });
+    }).toPass({ timeout: 30000 });
+    // The pointer is still over the tile (last hover above), so the flyout stays
+    // open. Force-click the child: a normal click's stability wait gives the
+    // mouseleave close-timer / slide-in animation a window to detach the element
+    // mid-click; force skips that wait and clicks the (already-visible) item
+    // immediately on arrival, before the close timer can fire.
+    await item.click({ force: true });
+}
+
 // Common Locator exports
 export var dateTimeButtonLocator='[data-test="date-time-btn"]';
 export var relative30SecondsButtonLocator='[data-test="date-time-relative-30-s-btn"]';

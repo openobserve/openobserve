@@ -1,16 +1,16 @@
 // dataPage.js
 import { expect } from '@playwright/test';
+import { openNavFlyoutChild } from '../commonActions.js';
 
 
 export class DataPage {
     constructor(page) {
         this.page = page;
-        this.dataPageMenu = page.locator('[data-test="menu-link-\\/ingestion-item"]');
 
     }
 
     async gotoDataPage() {
-        await this.dataPageMenu.click();
+        await openNavFlyoutChild(this.page, 'ingestion');
         await expect(this.page.getByRole('main')).toContainText('Data sources');
     }
 
