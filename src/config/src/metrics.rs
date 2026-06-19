@@ -1318,7 +1318,12 @@ pub static PIPELINE_EXEC_TIME_MS: Lazy<HistogramVec> = Lazy::new(|| {
             5000.0, 10000.0, 30000.0,
         ])
         .const_labels(create_const_labels()),
-        &["organization", "pipeline_id", "pipeline_name", "stream_type"],
+        &[
+            "organization",
+            "pipeline_id",
+            "pipeline_name",
+            "stream_type",
+        ],
     )
     .expect("Metric created")
 });
@@ -1335,7 +1340,12 @@ pub static PIPELINE_EXEC_BATCH_SIZE: Lazy<HistogramVec> = Lazy::new(|| {
             1.0, 10.0, 50.0, 100.0, 500.0, 1000.0, 5000.0, 10000.0, 50000.0, 100000.0,
         ])
         .const_labels(create_const_labels()),
-        &["organization", "pipeline_id", "pipeline_name", "stream_type"],
+        &[
+            "organization",
+            "pipeline_id",
+            "pipeline_name",
+            "stream_type",
+        ],
     )
     .expect("Metric created")
 });

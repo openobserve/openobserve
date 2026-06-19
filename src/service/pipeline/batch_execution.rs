@@ -41,9 +41,9 @@ use futures::future::try_join_all;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::pipeline::pipeline_wal_writer::get_pipeline_wal_writer;
 use proto::cluster_rpc;
-use tokio::sync::mpsc::{Receiver, Sender, channel};
 #[cfg(feature = "enterprise")]
 use tokio::sync::Mutex;
+use tokio::sync::mpsc::{Receiver, Sender, channel};
 
 use crate::{
     common::{infra::config::QUERY_FUNCTIONS, utils::js::JSRuntimeConfig},
