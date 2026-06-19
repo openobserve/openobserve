@@ -897,7 +897,9 @@ export default defineComponent({
       });
     };
     const dashboardList = ref([]);
-    const loading = ref(false);
+    // Start in the loading state so the table shows the skeleton on first
+    // render instead of briefly flashing the empty state before the fetch.
+    const loading = ref(true);
     const getDashboards = async () => {
       const dismiss = toast({
         variant: "loading",
