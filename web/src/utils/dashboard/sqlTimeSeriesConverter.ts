@@ -148,12 +148,14 @@ export const applyAutoSQLTimeSeries = (
       options.xAxis[0].data = [];
 
       // Pin x-axis range to the user's full query range so anchors are unnecessary.
+      // queryStartMs is the query start in ms (past start for comparison queries).
+      // timeGap is already in ms — adding it shifts the past range to the current period.
       const queryStartMs = parseInt(metadata?.queries[0]?.startTime?.toString() ?? "0") / 1000;
       const queryEndMs = parseInt(metadata?.queries[0]?.endTime?.toString() ?? "0") / 1000;
       const timeGap = metadata?.queries[0]?.timeRangeGap?.seconds ?? 0;
       if (queryStartMs > 0 && queryEndMs > 0) {
-        options.xAxis[0].min = toZonedTime(queryStartMs + timeGap * 1000, store.state.timezone);
-        options.xAxis[0].max = toZonedTime(queryEndMs + timeGap * 1000, store.state.timezone);
+        options.xAxis[0].min = toZonedTime(queryStartMs + timeGap, store.state.timezone);
+        options.xAxis[0].max = toZonedTime(queryEndMs + timeGap, store.state.timezone);
       }
 
       options.tooltip.formatter = function (name: any) {
@@ -385,12 +387,14 @@ export const applyCustomSQLTimeSeries = (
       options.xAxis[0].data = [];
 
       // Pin x-axis range to the user's full query range so anchors are unnecessary.
+      // queryStartMs is the query start in ms (past start for comparison queries).
+      // timeGap is already in ms — adding it shifts the past range to the current period.
       const queryStartMs = parseInt(metadata?.queries[0]?.startTime?.toString() ?? "0") / 1000;
       const queryEndMs = parseInt(metadata?.queries[0]?.endTime?.toString() ?? "0") / 1000;
       const timeGap = metadata?.queries[0]?.timeRangeGap?.seconds ?? 0;
       if (queryStartMs > 0 && queryEndMs > 0) {
-        options.xAxis[0].min = toZonedTime(queryStartMs + timeGap * 1000, store.state.timezone);
-        options.xAxis[0].max = toZonedTime(queryEndMs + timeGap * 1000, store.state.timezone);
+        options.xAxis[0].min = toZonedTime(queryStartMs + timeGap, store.state.timezone);
+        options.xAxis[0].max = toZonedTime(queryEndMs + timeGap, store.state.timezone);
       }
 
       options.tooltip.formatter = function (name: any) {

@@ -312,3 +312,111 @@ describe("applyCustomSQLTimeSeries", () => {
     expect(result).toBe(false);
   });
 });
+
+// ────────────────────────────────────────────────────────────
+// xAxis min/max with comparison timeGap
+// ────────────────────────────────────────────────────────────
+
+describe("xAxis min/max with comparison timeGap", () => {
+  // June 1 2025 00:00:00 UTC in microseconds
+  const startTimeUs = 1_748_736_000_000_000;
+  // June 1 2025 01:00:00 UTC in microseconds (1 hour later)
+  const endTimeUs = 1_748_739_600_000_000;
+  // 1 day in milliseconds — this is what convertOffsetToSeconds() returns for "1d"
+  const oneDay_ms = 86_400_000;
+
+  // queryStartMs and queryEndMs computed as the code does:
+  const queryStartMs = startTimeUs / 1000; // = 1_748_736_000_000
+  const queryEndMs = endTimeUs / 1000; // = 1_748_739_600_000
+
+  function makeComparisonMetadata(timeGapMs: number): any {
+    return {
+      queries: [
+        {
+          startTime: startTimeUs,
+          endTime: endTimeUs,
+          timeRangeGap: { seconds: timeGapMs },
+        },
+      ],
+    };
+  }
+
+  describe("applyAutoSQLTimeSeries", () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+    });
+
+    it("sets xAxis.min and xAxis.max by adding timeGap (in ms) once — not multiplied by 1000", () => {
+      const options = makeOptions(["2025-06-01 00:00:00", "2025-06-01 01:00:00"]);
+      const panelSchema = makePanelSchema("line", false, [makeHistogramField()]);
+      const metadata = makeComparisonMetadata(oneDay_ms);
+
+      applyAutoSQLTimeSeries(options, panelSchema, makeStore(), metadata, { value: null });
+
+      // Correct: queryStartMs + timeGap_ms (not * 1000)
+      expect(options.xAxis[0].min).toBe(queryStartMs + oneDay_ms);
+      expect(options.xAxis[0].max).toBe(queryEndMs + oneDay_ms);
+
+      // Regression guard: the old bug produced queryStartMs + timeGap * 1000
+      expect(options.xAxis[0].min).not.toBe(queryStartMs + oneDay_ms * 1000);
+      expect(options.xAxis[0].max).not.toBe(queryEndMs + oneDay_ms * 1000);
+    });
+
+    it("does not set xAxis.min/max when startTime is 0", () => {
+      const options = makeOptions(["2025-06-01 00:00:00"]);
+      const panelSchema = makePanelSchema("line", false, [makeHistogramField()]);
+      const metadata = { queries: [{ startTime: 0, endTime: 0, timeRangeGap: { seconds: oneDay_ms } }] };
+
+      applyAutoSQLTimeSeries(options, panelSchema, makeStore(), metadata, { value: null });
+
+      expect(options.xAxis[0].min).toBeUndefined();
+      expect(options.xAxis[0].max).toBeUndefined();
+    });
+
+    it("does not set xAxis.min/max when timeRangeGap.seconds is 0 (current period query)", () => {
+      const options = makeOptions(["2025-06-01 00:00:00"]);
+      const panelSchema = makePanelSchema("line", false, [makeHistogramField()]);
+      const metadata = makeComparisonMetadata(0);
+
+      applyAutoSQLTimeSeries(options, panelSchema, makeStore(), metadata, { value: null });
+
+      // timeGap=0 → min/max = queryStartMs and queryEndMs (still pinned)
+      // Only test that min is queryStartMs + 0, not a huge year-2027 value
+      expect(options.xAxis[0].min).toBe(queryStartMs + 0);
+      expect(options.xAxis[0].max).toBe(queryEndMs + 0);
+    });
+  });
+
+  describe("applyCustomSQLTimeSeries", () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+      vi.mocked(dateTimeUtils.isTimeSeries).mockReturnValue(true as any);
+    });
+
+    it("sets xAxis.min and xAxis.max by adding timeGap (in ms) once — not multiplied by 1000", () => {
+      const options = makeOptions(["2025-06-01 00:00:00", "2025-06-01 01:00:00"]);
+      const panelSchema = makePanelSchema("line", true);
+      const metadata = makeComparisonMetadata(oneDay_ms);
+
+      applyCustomSQLTimeSeries(options, panelSchema, makeStore(), metadata, { value: null });
+
+      expect(options.xAxis[0].min).toBe(queryStartMs + oneDay_ms);
+      expect(options.xAxis[0].max).toBe(queryEndMs + oneDay_ms);
+
+      // Regression guard
+      expect(options.xAxis[0].min).not.toBe(queryStartMs + oneDay_ms * 1000);
+      expect(options.xAxis[0].max).not.toBe(queryEndMs + oneDay_ms * 1000);
+    });
+
+    it("does not set xAxis.min/max when startTime is 0", () => {
+      const options = makeOptions(["2025-06-01 00:00:00"]);
+      const panelSchema = makePanelSchema("line", true);
+      const metadata = { queries: [{ startTime: 0, endTime: 0, timeRangeGap: { seconds: oneDay_ms } }] };
+
+      applyCustomSQLTimeSeries(options, panelSchema, makeStore(), metadata, { value: null });
+
+      expect(options.xAxis[0].min).toBeUndefined();
+      expect(options.xAxis[0].max).toBeUndefined();
+    });
+  });
+});
