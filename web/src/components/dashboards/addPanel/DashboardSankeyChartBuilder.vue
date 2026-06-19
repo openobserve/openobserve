@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
             </template>
             <div
-              class="field-function-menu-popup dashboard-sankey-chart-builder-dropdown tw:w-[771px]! tw:h-[323px] tw:rounded tw:border tw:border-(--o2-border-input) tw:bg-white tw:shadow-[0px_4px_4px_0px_rgba(0,0,0,0.05)] tw:p-4 tw:shadow-[0px_3px_15px_rgba(0,0,0,0.1)] tw:translate-y-2 tw:rounded-none"
+              class="field-function-menu-popup dashboard-sankey-chart-builder-dropdown tw:w-[771px]! tw:h-[323px] tw:shadow-[0px_4px_4px_0px_rgba(0,0,0,0.05)] tw:p-4 tw:shadow-[0px_3px_15px_rgba(0,0,0,0.1)] tw:translate-y-2 tw:rounded-none"
               :data-test="`dashboard-source-item-${sourceLabel}-menu`"
             >
               <div
@@ -207,7 +207,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
             </template>
             <div
-              class="field-function-menu-popup dashboard-sankey-chart-builder-dropdown tw:w-[771px]! tw:h-[323px] tw:rounded tw:border tw:border-(--o2-border-input) tw:bg-white tw:shadow-[0px_4px_4px_0px_rgba(0,0,0,0.05)] tw:p-4 tw:shadow-[0px_3px_15px_rgba(0,0,0,0.1)] tw:translate-y-2 tw:rounded-none"
+              class="field-function-menu-popup dashboard-sankey-chart-builder-dropdown tw:w-[771px]! tw:h-[323px] tw:shadow-[0px_4px_4px_0px_rgba(0,0,0,0.05)] tw:p-4 tw:shadow-[0px_3px_15px_rgba(0,0,0,0.1)] tw:translate-y-2 tw:rounded-none"
               :data-test="`dashboard-target-item-${targetLabel}-menu`"
             >
               <div
@@ -332,7 +332,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
             </template>
             <div
-              class="field-function-menu-popup dashboard-sankey-chart-builder-dropdown tw:w-[771px]! tw:h-[323px] tw:rounded tw:border tw:border-(--o2-border-input) tw:bg-white tw:shadow-[0px_4px_4px_0px_rgba(0,0,0,0.05)] tw:p-4 tw:shadow-[0px_3px_15px_rgba(0,0,0,0.1)] tw:translate-y-2 tw:rounded-none"
+              class="field-function-menu-popup dashboard-sankey-chart-builder-dropdown tw:w-[771px]! tw:h-[323px] tw:shadow-[0px_4px_4px_0px_rgba(0,0,0,0.05)] tw:p-4 tw:shadow-[0px_3px_15px_rgba(0,0,0,0.1)] tw:translate-y-2 tw:rounded-none"
               :data-test="`dashboard-value-item-${valueLabel}-menu`"
             >
               <div
