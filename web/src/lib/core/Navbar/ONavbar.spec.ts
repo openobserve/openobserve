@@ -125,7 +125,7 @@ describe("ONavbar", () => {
       );
     });
 
-    it("merges Alerts and Reports under the Monitoring group", () => {
+    it("keeps Alerts and Reports as separate top-level links", () => {
       wrapper = mountNavbar({
         linksList: [
           { title: "Home", icon: "home", link: "/home", name: "home" },
@@ -134,14 +134,9 @@ describe("ONavbar", () => {
         ],
       });
 
-      // Alerts and Reports are absorbed — not standalone links.
-      expect(wrapper.find('[data-test="menu-link-alertList-item"]').exists()).toBe(false);
-      expect(wrapper.find('[data-test="menu-link-reports-item"]').exists()).toBe(false);
-
-      const mon = wrapper.find('[data-test="nav-group-monitoring"]');
-      expect(mon.exists()).toBe(true);
-      expect(mon.attributes("data-mode")).toBe("link");
-      expect(mon.attributes("data-children")).toBe("alertList,reports");
+      expect(wrapper.find('[data-test="menu-link-alertList-item"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="menu-link-reports-item"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="nav-group-monitoring"]').exists()).toBe(false);
     });
 
     it("renders IAM / Management / AI as plain links (no submenu)", () => {

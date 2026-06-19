@@ -47,6 +47,9 @@ export const GATE_PREDICATES: Record<
   serviceAccount: (c) => c.serviceAccount,
   rbac: (c) => (c.isEnterprise || c.isCloud) && c.rbac,
   rbacMeta: (c) => (c.isEnterprise || c.isCloud) && c.rbac && c.isMeta,
+  // Pipelines: the Stream Pipelines tab hides when custom_hide_menus lists
+  // "pipelines" — mirrors PipelineSectionTabs.vue exactly.
+  streamPipelines: (c) => !c.hiddenMenus.has("pipelines"),
 };
 
 /**
@@ -86,6 +89,11 @@ export interface NavGroupDef {
   children: SubnavChild[];
   /** Top-level `name`s this group replaces (removed from the rail). */
   absorbs: string[];
+  /**
+   * Emit the group's tile immediately AFTER this top-level item (when present).
+   * Defaults to the position of the group's first absorbed item.
+   */
+  placeAfter?: string;
   pinBottom?: boolean;
 }
 
@@ -96,24 +104,14 @@ export const NAV_GROUPS: NavGroupDef[] = [
     icon: "database",
     parentLink: "/streams",
     absorbs: ["streams", "pipeline", "ingestion"],
+    placeAfter: "incidentList",
     children: [
       { titleKey: "menu.index", icon: "window", name: "logstreams", requires: "streams" },
-      // Pipeline expands into its own tabbed sub-pages.
-      { titleKey: "function.streamPipeline", icon: "lan", name: "pipelines", requires: "pipeline" },
+      // Pipeline expands into its own tabbed sub-pages (same visibility rules).
+      { titleKey: "function.streamPipeline", icon: "lan", name: "pipelines", requires: "pipeline", gate: "streamPipelines" },
       { titleKey: "function.header", icon: "function", name: "functionList", requires: "pipeline" },
       { titleKey: "function.enrichmentTables", icon: "dataset", name: "enrichmentTables", requires: "pipeline" },
       { titleKey: "menu.ingestion", icon: "data-plus-line", name: "ingestion", requires: "ingestion" },
-    ],
-  },
-  {
-    key: "monitoring",
-    title: "Monitoring",
-    icon: "monitor-heart",
-    parentLink: "/alerts",
-    absorbs: ["alertList", "reports"],
-    children: [
-      { titleKey: "menu.alerts", icon: "shield-alert-outline", name: "alertList", requires: "alertList" },
-      { titleKey: "menu.report", icon: "description", name: "reports", requires: "reports" },
     ],
   },
 ];
@@ -130,46 +128,56 @@ export const NAV_GROUPS: NavGroupDef[] = [
 export const NAV_SUBNAV: Record<string, SubnavChild[]> = {};
 
 /**
- * Desired top-level rail order. `@<groupKey>` tokens mark where a pure group is
- * inserted. Names absent here (but present in the flat list) are appended at the
- * end so nothing silently disappears; names absorbed by a group are skipped.
+ * Transform the flat `linksList` into rail entries, PRESERVING the input order
+ * (which is the main-branch menu order — MainLayout builds it). A group's tile
+ * is emitted at the position of its FIRST present absorbed item; the group's
+ * other absorbed items are removed. Everything else stays exactly where it was.
  */
-const RAIL_ORDER: string[] = [
-  "home",
-  "logs",
-  "metrics",
-  "traces",
-  "rum",
-  "aiObservability",
-  "dashboards",
-  "@data",
-  "@monitoring",
-  "incidentList",
-  "actionScripts",
-  "billings",
-  "iam",
-  "settings",
-];
-
-/** Transform the flat `linksList` into ordered rail entries. */
 export function groupNavLinks(links: NavItem[]): RailEntry[] {
-  const byName = new Map(links.map((l) => [l.name, l]));
   const presentNames = new Set(links.map((l) => l.name));
 
-  const absorbed = new Set<string>();
-  NAV_GROUPS.forEach((g) => g.absorbs.forEach((n) => absorbed.add(n)));
-
-  // Pre-build group entries, dropping children whose `requires` top-level item
-  // isn't present. (`router.hasRoute` gating happens later, in the component.)
-  const groupByToken = new Map<string, RailEntry>();
+  // Activate a group only when it has ≥1 present absorbed item AND ≥1 child
+  // (after `requires` filtering). `router.hasRoute`/`gate` filtering of children
+  // happens later, in the component.
+  const groupChildren = new Map<string, SubnavChild[]>();
+  const absorbedToGroup = new Map<string, NavGroupDef>();
   for (const def of NAV_GROUPS) {
     const children = def.children.filter(
       (c) => !c.requires || presentNames.has(c.requires),
     );
-    if (children.length === 0) continue;
-    // A group renders like a link+subnav: the tile navigates to `parentLink`
-    // (its first item) and hovering reveals the children.
-    groupByToken.set(`@${def.key}`, {
+    const hasAbsorbed = def.absorbs.some((n) => presentNames.has(n));
+    if (children.length === 0 || !hasAbsorbed) continue;
+    groupChildren.set(def.key, children);
+    for (const n of def.absorbs) absorbedToGroup.set(n, def);
+  }
+
+  const entryFor = (item: NavItem): RailEntry => {
+    const subnav = NAV_SUBNAV[item.name];
+    if (subnav && subnav.length > 0) {
+      return { type: "linkGroup", item, children: subnav };
+    }
+    return { type: "link", item };
+  };
+
+  // A group is emitted either AFTER a named item (`placeAfter`, when that item is
+  // present) or in place of its first absorbed item (default). Map the anchor
+  // item name → group keys to emit right after it.
+  const emitAfter = new Map<string, string[]>();
+  for (const def of absorbedToGroup.values()) {
+    if (!groupChildren.has(def.key)) continue;
+    if (def.placeAfter && presentNames.has(def.placeAfter)) {
+      const list = emitAfter.get(def.placeAfter) ?? [];
+      if (!list.includes(def.key)) list.push(def.key);
+      emitAfter.set(def.placeAfter, list);
+    }
+  }
+
+  const result: RailEntry[] = [];
+  const emittedGroups = new Set<string>();
+  const emitGroup = (def: NavGroupDef) => {
+    if (emittedGroups.has(def.key)) return;
+    emittedGroups.add(def.key);
+    result.push({
       type: "linkGroup",
       item: {
         title: def.title,
@@ -177,53 +185,32 @@ export function groupNavLinks(links: NavItem[]): RailEntry[] {
         link: def.parentLink,
         name: def.key,
       },
-      children,
+      children: groupChildren.get(def.key)!,
     });
-  }
-
-  const entryFor = (name: string): RailEntry | null => {
-    const item = byName.get(name);
-    if (!item) return null;
-    const subnav = NAV_SUBNAV[name];
-    if (subnav && subnav.length > 0) {
-      return { type: "linkGroup", item, children: subnav };
-    }
-    return { type: "link", item };
   };
 
-  const result: RailEntry[] = [];
-  const pinned: RailEntry[] = [];
-  const placedNames = new Set<string>();
-
-  for (const token of RAIL_ORDER) {
-    if (token.startsWith("@")) {
-      const group = groupByToken.get(token);
-      if (group) {
-        (group.type === "group" && group.pinBottom ? pinned : result).push(group);
-        groupByToken.delete(token);
-      }
+  for (const item of links) {
+    const group = absorbedToGroup.get(item.name);
+    if (group) {
+      // Absorbed item — drop it. Emit the group here only when it has no
+      // (present) `placeAfter` anchor (default first-absorbed placement).
+      const usesPlaceAfter =
+        group.placeAfter && presentNames.has(group.placeAfter);
+      if (!usesPlaceAfter) emitGroup(group);
       continue;
     }
-    if (absorbed.has(token) || !presentNames.has(token)) continue;
-    const entry = entryFor(token);
-    if (entry) {
-      result.push(entry);
-      placedNames.add(token);
+    result.push(entryFor(item));
+    // Emit any groups anchored after this item.
+    for (const key of emitAfter.get(item.name) ?? []) {
+      const def = NAV_GROUPS.find((d) => d.key === key)!;
+      emitGroup(def);
     }
   }
 
-  // Safety net: append any present, non-absorbed item not covered by RAIL_ORDER,
-  // so a newly added menu still shows up (top-level, at the end).
-  for (const item of links) {
-    if (absorbed.has(item.name) || placedNames.has(item.name)) continue;
-    if (RAIL_ORDER.includes(item.name)) continue;
-    const entry = entryFor(item.name);
-    if (entry) result.push(entry);
+  // Safety net: append any active group not yet placed.
+  for (const def of NAV_GROUPS) {
+    if (groupChildren.has(def.key)) emitGroup(def);
   }
 
-  for (const group of groupByToken.values()) {
-    (group.type === "group" && group.pinBottom ? pinned : result).push(group);
-  }
-
-  return [...result, ...pinned];
+  return result;
 }

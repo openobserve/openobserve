@@ -64,6 +64,8 @@ export interface NavGateContext {
   modelPricing: boolean;
   serviceStreams: boolean;
   onlineEvals: boolean;
+  /** Raw `custom_hide_menus` entries (split on ",") — matches how pages test it. */
+  hiddenMenus: Set<string>;
 }
 
 /**

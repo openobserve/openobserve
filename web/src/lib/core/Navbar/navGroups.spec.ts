@@ -32,22 +32,54 @@ const dataGroup = (entries: RailEntry[]) =>
   );
 
 describe("groupNavLinks", () => {
-  it("keeps daily items top-level in RAIL_ORDER order", () => {
-    const entries = groupNavLinks([
-      link("rum"),
+  it("preserves the input (main-branch) order", () => {
+    const input = [
       link("home"),
-      link("traces"),
       link("logs"),
       link("metrics"),
+      link("traces"),
+      link("rum"),
       link("dashboards"),
+      link("alertList"),
+      link("iam"),
+      link("settings"),
+    ];
+    // Output mirrors the input order exactly (no reordering).
+    expect(keysOf(groupNavLinks(input))).toEqual(
+      input.map((i) => `link:${i.name}`),
+    );
+  });
+
+  it("places the Data group right after Incidents when present", () => {
+    const entries = groupNavLinks([
+      link("home"),
+      link("streams"),
+      link("alertList"),
+      link("incidentList"),
+      link("pipeline"),
     ]);
-    // Output is reordered to the canonical rail order regardless of input order.
+    // streams/pipeline are absorbed; Data is emitted after incidentList.
     expect(keysOf(entries)).toEqual([
       "link:home",
-      "link:logs",
-      "link:metrics",
-      "link:traces",
-      "link:rum",
+      "link:alertList",
+      "link:incidentList",
+      "linkGroup:data",
+    ]);
+  });
+
+  it("emits the Data group in place of its first absorbed item (no Incidents)", () => {
+    const entries = groupNavLinks([
+      link("home"),
+      link("pipeline"),
+      link("dashboards"),
+      link("streams"),
+      link("ingestion"),
+    ]);
+    // Data replaces `pipeline` (first absorbed); streams/ingestion are removed;
+    // `dashboards` keeps its place after it.
+    expect(keysOf(entries)).toEqual([
+      "link:home",
+      "linkGroup:data",
       "link:dashboards",
     ]);
   });
@@ -78,27 +110,15 @@ describe("groupNavLinks", () => {
     ]);
   });
 
-  it("merges Alerts and Reports under the Monitoring group", () => {
+  it("keeps Alerts and Reports as separate top-level links", () => {
     const entries = groupNavLinks([
       link("home"),
       link("alertList"),
       link("reports"),
     ]);
-    // Alerts and Reports are absorbed — no longer standalone links.
-    expect(keysOf(entries)).not.toContain("link:alertList");
-    expect(keysOf(entries)).not.toContain("link:reports");
-
-    const monitoring = entries.find(
-      (e): e is Extract<RailEntry, { type: "linkGroup" }> =>
-        e.type === "linkGroup" && e.item.name === "monitoring",
-    );
-    expect(monitoring).toBeTruthy();
-    // Clicking the Monitoring tile navigates to its first item, Alerts.
-    expect(monitoring?.item.link).toBe("/alerts");
-    expect(monitoring?.children.map((c) => c.name)).toEqual([
-      "alertList",
-      "reports",
-    ]);
+    expect(keysOf(entries)).toContain("link:alertList");
+    expect(keysOf(entries)).toContain("link:reports");
+    expect(entries.some((e) => e.type === "linkGroup")).toBe(false);
   });
 
   it("only includes Data children whose required top-level item is present", () => {
@@ -136,7 +156,7 @@ describe("groupNavLinks", () => {
     expect(NAV_SUBNAV).toEqual({});
   });
 
-  it("appends present items not in RAIL_ORDER at the end as links", () => {
+  it("keeps unknown/new items as plain links in place", () => {
     const entries = groupNavLinks([link("home"), link("somethingNew")]);
     expect(keysOf(entries)).toEqual(["link:home", "link:somethingNew"]);
   });
@@ -188,6 +208,7 @@ describe("GATE_PREDICATES", () => {
     modelPricing: false,
     serviceStreams: true,
     onlineEvals: false,
+    hiddenMenus: new Set<string>(),
     ...over,
   });
 
@@ -210,5 +231,12 @@ describe("GATE_PREDICATES", () => {
     expect(GATE_PREDICATES.storage(ctx({ isEnterprise: true }))).toBe(true); // self-hosted
     expect(GATE_PREDICATES.storage(ctx({ isEnterprise: true, isCloud: true }))).toBe(false);
     expect(GATE_PREDICATES.storage(ctx({ isEnterprise: true, isCloud: true, orgStorage: true }))).toBe(true);
+  });
+
+  it("streamPipelines hides only when custom_hide_menus lists 'pipelines'", () => {
+    expect(GATE_PREDICATES.streamPipelines(ctx())).toBe(true);
+    expect(
+      GATE_PREDICATES.streamPipelines(ctx({ hiddenMenus: new Set(["pipelines"]) })),
+    ).toBe(false);
   });
 });

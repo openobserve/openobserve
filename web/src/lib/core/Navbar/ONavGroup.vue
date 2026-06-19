@@ -102,6 +102,8 @@ const gateContext = computed<NavGateContext>(() => {
     modelPricing: !!z.model_pricing_enabled,
     serviceStreams: z.service_streams_enabled !== false,
     onlineEvals: !!z.online_evals_enabled,
+    // Raw split (no trim) to match how pages test custom_hide_menus.
+    hiddenMenus: new Set((z.custom_hide_menus ?? "").split(",")),
   };
 });
 
@@ -159,11 +161,29 @@ function clearTimers() {
 
 // ── Active state ──────────────────────────────────────────────────────────
 // Active by route name (and tab, for query-param sub-views like AI evals).
+// Resolve a child's route name to its canonical path (for sub-route matching).
+function childPath(name: string): string | null {
+  if (!router.hasRoute(name)) return null;
+  try {
+    return router.resolve({ name }).path || null;
+  } catch {
+    return null;
+  }
+}
+
 function isChildActive(child: SubnavChild): boolean {
   const route = router.currentRoute.value;
-  if (route.name !== child.name) return false;
-  if (child.tab && route.query.tab !== child.tab) return false;
-  return true;
+  // Exact route-name match — precise for query-tab routes (AI evals).
+  if (route.name === child.name) {
+    return !child.tab || route.query.tab === child.tab;
+  }
+  // Otherwise the section is still "active" when the current route is nested
+  // under it — drill-down editors, the ingestion ("Data sources") tab routes
+  // (e.g. ingestLogs under /ingestion), pipeline editors, etc.
+  if (child.tab) return false; // query-tab children only match by exact name
+  const base = childPath(child.name);
+  if (!base || base === "/") return false;
+  return route.path === base || route.path.startsWith(`${base}/`);
 }
 const isGroupActive = computed(() => props.children.some(isChildActive));
 
@@ -187,9 +207,9 @@ async function positionFlyout() {
   const wrapper = wrapperRef.value;
   if (!wrapper) return;
   const rect = wrapper.getBoundingClientRect();
-  // Flush against the rail's right edge — no gap. The -1px overlap hides any
-  // sub-pixel seam so the rail and submenu read as one connected surface.
-  const left = rect.right - 1;
+  // Small breathing gap between the rail and the flyout so they don't touch.
+  const GAP = 4;
+  const left = rect.right + GAP;
   flyoutStyle.value = {
     position: "fixed",
     left: `${left}px`,
