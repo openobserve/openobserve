@@ -159,7 +159,7 @@ export default defineComponent({
       window.open(url, "_blank");
     };
 
-    // Phase 5: Accessibility - compute active state.
+    // Compute the tile's active state.
     // In trigger mode the parent owns the active flag; otherwise we derive it
     // from the route. Home (link === '/') needs special handling because every
     // path starts with '/' — match by route name "home". Others prefix-match.

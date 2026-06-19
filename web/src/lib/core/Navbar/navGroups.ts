@@ -58,15 +58,15 @@ export const GATE_PREDICATES: Record<
  * their own sub-pages on hover.
  *
  * Three shapes (see `RailEntry`):
- *   • plain link    — most items (Home, Logs, Metrics, Traces, RUM, Dashboards,
- *     Streams, Alerts, Incidents, Actions, Billings).
- *   • link + subnav — a top-level link that also surfaces its in-page section
- *     nav on hover (NAV_SUBNAV). Clicking goes to the main page; the flyout
- *     deep-links into a section. Used for AI / IAM / Management.
- *   • pure group    — a flyout with no page of its own (NAV_GROUPS). "Data"
- *     gathers the pipeline/ingestion/reporting items.
+ *   • plain link    — most items (Home, Logs, Metrics, Traces, RUM, Alerts,
+ *     Incidents, Actions, Billings, AI, IAM, Management).
+ *   • link + subnav — a tile that navigates to a main page on click AND surfaces
+ *     a section nav on hover. Produced by NAV_GROUPS (Data → /streams,
+ *     Dashboards → /dashboards) and by any NAV_SUBNAV entry.
+ *   • pure group    — a flyout with no page of its own (click toggles it).
+ *     Supported by the renderer but not emitted by any current entry.
  *
- * The subnav entries below mirror each page's OWN section nav (label / icon /
+ * The child entries below mirror each page's OWN section nav (label / icon /
  * category) so the flyout and the page's SectionRail stay identical. Children
  * navigate by route `name` and are filtered through `router.hasRoute(name)` so
  * feature-gated (enterprise / cloud / RBAC) sections never render dead links.
@@ -75,10 +75,9 @@ export const GATE_PREDICATES: Record<
  */
 
 /**
- * A rail group: a tile that gathers several destinations under one label. It
- * behaves like the link+subnav items (AI/IAM/Management) — clicking the tile
- * navigates to `parentLink` (its first/primary destination) and hovering reveals
- * the full submenu.
+ * A rail group: a tile that gathers several destinations under one label.
+ * Clicking the tile navigates to `parentLink` (its first/primary destination)
+ * and hovering reveals the full submenu — i.e. it renders as a link+subnav tile.
  */
 export interface NavGroupDef {
   key: string;

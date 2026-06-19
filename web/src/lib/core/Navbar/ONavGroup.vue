@@ -27,12 +27,12 @@ const openGroupKey = moduleRef<string | null>(null);
  * A rail tile with a hover flyout. Two modes:
  *
  *  • Link + subnav (`parentItem` provided) — the tile IS a navigating MenuLink
- *    (e.g. IAM → /iam). Hovering reveals its sub-pages; clicking lands on the
- *    main page. No pinning (the click navigates away).
+ *    (e.g. Data → /streams). Hovering reveals its sub-pages; clicking lands on
+ *    the main page. No pinning (the click navigates away).
  *
  *  • Pure group (no `parentItem`) — the tile is a non-navigating MenuLink
- *    trigger (e.g. Data). Hover opens; clicking pins the flyout open until an
- *    outside click / Escape / re-click.
+ *    trigger. Hover opens; clicking pins the flyout open until an outside
+ *    click / Escape / re-click. (Currently unused — every rail group navigates.)
  *
  * The flyout mirrors the target page's own section nav: same labels, icons and
  * category grouping. Children navigate by route `name` and are gated by

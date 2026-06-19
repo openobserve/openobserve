@@ -73,10 +73,10 @@ export interface NavGateContext {
  *  - `link`      — a plain standalone rail link.
  *  - `linkGroup` — a standalone link that ALSO reveals its own sub-pages on
  *                  hover (clicking the tile navigates to the main page). Used
- *                  for items that have their own in-page section nav (AI, IAM,
- *                  Management).
+ *                  for NAV_GROUPS (Data, Dashboards) and any NAV_SUBNAV entry.
  *  - `group`     — a pure flyout group with no page of its own; clicking the
- *                  tile toggles the submenu (e.g. Data).
+ *                  tile toggles the submenu. Supported but not currently emitted
+ *                  by groupNavLinks.
  * See `navGroups.ts`.
  */
 export type RailEntry =

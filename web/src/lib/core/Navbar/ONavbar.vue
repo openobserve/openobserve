@@ -27,8 +27,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- Three rail-entry shapes (see navGroups.ts):
          - link:      plain navigating MenuLink.
-         - linkGroup: a link that also reveals its sub-pages on hover (AI/IAM/…).
-         - group:     a pure flyout group with no page of its own (Data).
+         - linkGroup: a tile that navigates to its main page AND reveals its
+                      sub-pages on hover (Data, Dashboards).
+         - group:     a pure flyout group with no page of its own (click toggles);
+                      supported here but not currently emitted by groupNavLinks.
          `pinBottom` groups float to the foot of the rail via the flex spacer. -->
     <div class="tw:flex tw:flex-col tw:flex-1 tw:min-h-0">
       <template
@@ -63,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </template>
 
-      <!-- Spacer floats pinned-bottom groups (e.g. Admin) to the foot of the rail -->
+      <!-- Spacer floats any pinned-bottom groups to the foot of the rail -->
       <div v-if="bottomEntries.length" class="nav-rail-spacer tw:flex-1 tw:min-h-2" aria-hidden="true" />
 
       <ONavGroup
