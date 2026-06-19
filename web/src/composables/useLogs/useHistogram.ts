@@ -32,6 +32,7 @@ const SEVERITY_ORDER: Record<string, number> = {
 };
 
 import { formatSizeFromMB, histogramDateTimezone } from "@/utils/zincutils";
+import { formatLargeNumber } from "@/utils/formatters";
 
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 
@@ -123,7 +124,7 @@ export const useHistogram = () => {
         " to " +
         endCount +
         " out of " +
-        totalCount.toLocaleString() +
+        formatLargeNumber(totalCount) +
         plusSign +
         " events in " +
         searchObj.data.queryResults.took +

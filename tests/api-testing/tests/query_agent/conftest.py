@@ -58,12 +58,25 @@ def _values_equal(a: str, b: str, rel_tol: float = 0.05) -> bool:
     except (ValueError, TypeError):
         return False
 def load_all_queries():
-    """Return {category_name: [queries]} from queries/*.json files."""
+    """Return {category_name: [queries]} from queries/*.json files.
+
+    Filters out queries whose ``expected`` block contains the optional
+    boolean field ``skip_without_single_node_opt: true`` when the env var
+    ``SINGLE_NODE_OPT_MODE`` is ``"false"`` (defaults to ``"true"``).
+
+    This flag isolates queries that trigger known upstream DataFusion bugs
+    in the non-optimized RemoteScanRewriter path — it should only be set
+    for verified upstream issues, not as a workaround for test flakiness.
+    """
+    single_node_opt = _os.environ.get("SINGLE_NODE_OPT_MODE", "true").lower() == "true"
     categories: dict[str, list[dict]] = {}
     for fp in sorted(_QUERIES_DIR.glob("*.json")):
         with open(fp) as f:
             data = json.load(f)
-        categories[fp.stem] = data["queries"]
+        queries = data["queries"]
+        if not single_node_opt:
+            queries = [q for q in queries if not q.get("expected", {}).get("skip_without_single_node_opt")]
+        categories[fp.stem] = queries
     return categories
 
 

@@ -72,6 +72,7 @@
         :config="selectedConfig"
         :data-type="detailDataType"
         :kpis="detailKpis"
+        :has-scores="detailHasScores"
         :is-loading="isDetailLoading"
         :numeric-trend="numericTrend"
         :numeric-distribution="numericDistribution"
@@ -161,6 +162,7 @@ const {
   isLoading: isDetailLoading,
   dataType: detailDataType,
   kpis: detailKpis,
+  hasScores: detailHasScores,
   booleanAgg,
   categoricalRows,
   refresh: refreshDetail,
@@ -330,8 +332,8 @@ function onDrill(kpiId: string) {
     quick_mode: "false",
     show_histogram: "true",
     refresh: "0",
-    from: String(dateWindow.value.startUs),
-    to: String(dateWindow.value.endUs),
+    from: String(props.dateWindow.startUs),
+    to: String(props.dateWindow.endUs),
     query: encoded,
     type: "ai_chat_query",
   };

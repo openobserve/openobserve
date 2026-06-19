@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <form class="tw:flex tw:flex-col tw:flex-1 tw:min-h-0 tw:bg-card-bg tw:border tw:border-dialog-header-border tw:rounded-md" @submit.prevent="save">
     <div class="tw:flex tw:items-center tw:gap-2.5 tw:min-h-12 tw:px-3.5 tw:py-2 tw:border-b tw:border-dialog-header-border tw:shrink-0">
       <OButton

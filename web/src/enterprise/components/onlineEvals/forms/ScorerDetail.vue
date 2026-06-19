@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="tw:fixed tw:inset-0 tw:bg-[rgba(0,0,0,0.32)] tw:z-[1010] tw:flex tw:justify-end tw:[animation:sd-fade_0.18s_ease-out]" role="dialog" aria-modal="true" @click.self="$emit('close')">
     <aside class="tw:w-[1100px] tw:max-w-[96vw] tw:h-full tw:bg-[var(--color-card-bg)] tw:border-l tw:border-[var(--color-dialog-header-border,var(--o2-border))] tw:flex tw:flex-col tw:[animation:sd-slide_0.22s_ease-out]" @click.stop data-test="scorer-detail">
       <!-- ── Header ── -->

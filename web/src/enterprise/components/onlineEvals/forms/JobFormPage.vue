@@ -1,41 +1,31 @@
 ﻿<template>
-  <form class="tw:flex tw:flex-col tw:flex-1 tw:min-h-0 tw:gap-2.5" @submit.prevent="save(false)">
-    <div class="tw:flex tw:items-center tw:gap-2.5 tw:min-h-12 tw:px-3.5 tw:py-2 tw:bg-(--o2-card-bg) tw:rounded-md tw:shadow-[0_0_0.313rem_0.063rem_var(--o2-hover-shadow)] tw:shrink-0">
-      <OButton
-        variant="outline"
-        size="icon-sm"
-        icon-left="arrow-back-ios-new"
-        data-test="job-form-back-btn"
-        :title="t('onlineEvals.job.backTo')"
-        @click="$emit('cancel')"
-      />
-      <div class="tw:m-0 tw:text-[17px] tw:font-semibold tw:text-text-primary tw:tracking-[0.005em] tw:whitespace-nowrap">
-        {{ mode === "create" ? t("onlineEvals.job.createTitle") : t("onlineEvals.job.editTitle") }}
-      </div>
-      <div class="tw:flex-1 tw:min-w-2" />
-      <button
-        type="button"
-        class="job-form__close tw:inline-flex tw:items-center tw:justify-center tw:w-7 tw:h-7 tw:p-0 tw:text-(--color-text-secondary,var(--o2-text-secondary)) tw:bg-transparent tw:border-0 tw:rounded-md tw:cursor-pointer tw:transition-[background,color] tw:duration-150"
-        :aria-label="t('onlineEvals.buttons.cancel')"
-        data-test="job-form-close-btn"
-        @click="$emit('cancel')"
-      >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        >
-          <line x1="18" y1="6" x2="6" y2="18" />
-          <line x1="6" y1="6" x2="18" y2="18" />
-        </svg>
-      </button>
-    </div>
+  <form class="job-form" @submit.prevent="save(false)">
+    <AppPageHeader
+      :back="{
+        label: t('onlineEvals.job.backTo'),
+        onClick: () => $emit('cancel'),
+        dataTest: 'job-form-back-btn',
+      }"
+      class="card-container tw:px-3 tw:border-b tw:border-border-default"
+      style="flex-shrink: 0"
+    >
+      <template #title>
+        <span data-test="job-form-title">
+          {{ mode === "create" ? t("onlineEvals.job.createTitle") : t("onlineEvals.job.editTitle") }}
+        </span>
+      </template>
+      <template #actions>
+        <OButton
+          variant="ghost"
+          size="icon-sm"
+          icon-left="close"
+          :aria-label="t('onlineEvals.buttons.cancel')"
+          :title="t('onlineEvals.buttons.cancel')"
+          data-test="job-form-close-btn"
+          @click="$emit('cancel')"
+        />
+      </template>
+    </AppPageHeader>
 
     <div class="tw:flex-1 tw:min-h-0 tw:overflow-hidden tw:grid tw:grid-cols-[minmax(0,1.6fr)_minmax(320px,0.9fr)] tw:max-[1100px]:grid-cols-1 tw:gap-2.5">
       <div class="job-form__main tw:min-w-0 tw:overflow-auto tw:pt-[18px] tw:px-6 tw:pb-6 tw:bg-(--o2-card-bg) tw:rounded-md tw:shadow-[0_0_0.313rem_0.063rem_var(--o2-hover-shadow)]">
@@ -240,6 +230,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import useStreams from "@/composables/useStreams";
 import onlineEvalsService, {
@@ -471,11 +462,6 @@ async function save(activateAfter = false) {
 </script>
 
 <style>
-.job-form__close:hover {
-  background: color-mix(in srgb, var(--color-text-primary) 6%, transparent);
-  color: var(--color-primary-600, #3F7994);
-}
-
 .job-form__main textarea {
   max-height: 200px;
   overflow-y: auto;

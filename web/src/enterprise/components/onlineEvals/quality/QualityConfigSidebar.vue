@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <aside class="tw:flex tw:flex-col tw:gap-2.5 tw:p-3 tw:pb-4 tw:bg-(--o2-card-bg) tw:border tw:border-dialog-header-border tw:rounded-md tw:min-h-0 tw:max-h-[calc(100vh-var(--navbar-height)-200px)] tw:overflow-hidden" data-test="quality-config-sidebar">
     <header class="tw:flex tw:items-baseline tw:gap-2">
       <span class="tw:text-[11px] tw:font-semibold tw:text-text-secondary">{{ t("onlineEvals.quality.overview.title") }}</span>

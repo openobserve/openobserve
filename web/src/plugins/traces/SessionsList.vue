@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -16,109 +16,88 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="sessions-list tw:h-full! tw:flex tw:flex-col tw:bg-[var(--o2-card-bg-solid)] card-container tw:px-[0.625rem]"
+    class="sessions-list tw:h-full! tw:flex tw:flex-col tw:bg-[var(--o2-card-bg-solid)] card-container"
   >
-    <!-- Toolbar: stream selector + count pill + pagination.
-         Padding mirrors LLMInsightsDashboard so the upper band height is
-         consistent across the AI Observability sections. -->
-    <div class="tw:flex tw:items-center tw:gap-[0.5rem] tw:py-[0.5rem]">
-      <!-- Stream selector — hidden when there are no LLM streams (empty state is shown below) -->
-      <div
-        v-if="availableStreams.length > 0"
-        data-test="sessions-list-stream-selector"
-        class="tw:w-[14rem] tw:flex-shrink-0"
-      >
-        <OSelect
-          v-model="activeStream"
-          :options="availableStreams.map((s) => ({ label: s, value: s }))"
-          class="tw:w-[auto] tw:flex-shrink-0 tw:rounded"
-          @update:model-value="onStreamChange"
-        />
-      </div>
+    <!-- No LLM streams exist in the org at all — nothing to select, so show
+         the rich first-run empty state on its own (no table chrome). -->
+    <div
+      v-if="streamsLoaded && availableStreams.length === 0"
+      class="tw:flex-1 tw:min-h-0 tw:flex tw:items-center tw:justify-center"
+      data-test="sessions-empty-no-streams"
+    >
+      <OEmptyState size="hero" preset="no-llm-sessions" @action="onEmptyAction" />
+    </div>
 
-      <!-- Count pill -->
-      <template v-if="!loading && sessions.length > 0">
-        <div
-          class="tw:flex tw:items-center tw:gap-[0.375rem] tw:px-[0.625rem] tw:py-[0.25rem] tw:rounded tw:text-[0.75rem] tw:text-[var(--o2-text-4)] tw:bg-[var(--o2-tag-grey-1)]"
-          data-test="sessions-list-count-pill"
-        >
-          {{ t('traces.sessionsList.countPill', { count: sessions.length, total, unit: total === 1 ? t('traces.sessionsList.session') : t('traces.sessionsList.sessions') }) }}
+    <!-- Streams exist: OTable owns the whole surface — toolbar (stream filter +
+         column chooser), server-side pagination footer, column resize, and the
+         empty/error body. Rendering it unconditionally keeps the stream
+         selector reachable even when a window returns no sessions. -->
+    <OTable
+      v-else
+      :data="sessions"
+      :columns="tableColumns"
+      :loading="loading"
+      row-key="sessionId"
+      show-index
+      pagination="server"
+      :current-page="currentPage"
+      :total-count="total"
+      :page-size="rowsPerPage"
+      :page-size-options="rowsPerPageOptions"
+      :footer-title="t('traces.sessionsList.sessions')"
+      :enable-column-resize="true"
+      :persist-columns="true"
+      table-id="ai-sessions-list"
+      :default-columns="false"
+      :show-global-filter="false"
+      :frame="false"
+      width="100%"
+      class="tw:w-full tw:h-full"
+      data-test="sessions-list-table"
+      @row-click="(row: any) => handleRowClick(row)"
+      @pagination-change="onPaginationChange"
+    >
+      <!-- Toolbar: stream filter pushed to the right; OTable auto-injects the
+           column chooser immediately after it. -->
+      <template #toolbar>
+        <div class="tw:flex tw:items-center tw:justify-end tw:gap-2 tw:flex-1 tw:min-w-0">
+          <div
+            data-test="sessions-list-stream-selector"
+            class="tw:w-[14rem] tw:flex-shrink-0"
+          >
+            <OSelect
+              v-model="activeStream"
+              :label="t('traces.sessionsList.streamLabel')"
+              label-position="inside"
+              :options="availableStreams.map((s) => ({ label: s, value: s }))"
+              class="tw:w-[auto] tw:flex-shrink-0 tw:rounded"
+              @update:model-value="onStreamChange"
+            />
+          </div>
         </div>
       </template>
 
-      <!-- Pagination controls -->
-      <div
-        v-if="total > 0"
-        class="tw:flex tw:items-center tw:justify-end tw:px-[0.5rem] tw:py-[0.25rem] tw:ml-auto"
-        data-test="sessions-list-pagination-bar"
-      >
-        <OSelect
-          v-model="rowsPerPage"
-          :options="rowsPerPageOptions"
-          class="select-pagination tw:mr-[0.25rem] tw:mt-0!"
-          size="sm"
-          data-test="sessions-list-records-per-page"
-          @update:model-value="changeRowsPerPage"
+      <!-- Empty / error body — rendered inside the frame so the toolbar (and
+           thus the stream selector) stays visible. -->
+      <template #empty>
+        <EvalEmptyState
+          v-if="error && hasLoadedOnce"
+          data-test="sessions-empty-error"
+          icon="error-outline"
+          :title="t('traces.sessionsList.failedToLoad')"
+          :description="error || ''"
+          :cta-label="t('traces.sessionsList.retry')"
+          cta-data-test="sessions-empty-retry-btn"
+          @create="loadSessions()"
         />
-        <OPagination
-          v-model="currentPage"
-          :max="totalPages"
-          :max-pages="5"
-          class="float-right paginator-section tw:mt-0!"
-          data-test="sessions-list-pagination"
-          @update:model-value="changePage"
-        />
-      </div>
-    </div>
-
-    <!-- Error stays separate — a failed request is a different signal from
-         "no sessions yet". Both empty shapes (no LLM streams in the org;
-         streams loaded but the window returned nothing) collapse into the
-         single OEmptyState branch below, mirroring LLM Insights. -->
-    <EvalEmptyState
-      v-if="error && hasLoadedOnce"
-      data-test="sessions-empty-error"
-      icon="error-outline"
-      :title="t('traces.sessionsList.failedToLoad')"
-      :description="error || ''"
-      :cta-label="t('traces.sessionsList.retry')"
-      cta-data-test="sessions-empty-retry-btn"
-      @create="loadSessions()"
-    />
-
-    <div
-      v-else-if="isEmpty"
-      class="tw:flex-1 tw:min-h-0 tw:flex tw:items-center tw:justify-center"
-      data-test="sessions-empty"
-    >
-      <OEmptyState
-        size="hero"
-        preset="no-llm-sessions"
-        @action="onEmptyAction"
-      />
-    </div>
-
-    <!-- Table — OTable with built-in loading skeleton + own pagination
-         disabled (the toolbar above already drives `currentPage` /
-         `rowsPerPage`). Empty/error cases are handled by the
-         EvalEmptyState branches above, so we never render this block
-         with zero rows. -->
-    <div
-      v-else
-      class="tw:w-full tw:relative tw:flex-1 tw:min-h-0 tw:flex"
-    >
-      <OTable
-        :data="sessions"
-        :columns="tableColumns"
-        :loading="loading"
-        row-key="sessionId"
-        :show-global-filter="false"
-        pagination="none"
-        :frame="false"
-        class="tw:w-full tw:h-full"
-        data-test="sessions-list-table"
-        @row-click="(row: any) => handleRowClick(row)"
-      >
+        <div
+          v-else
+          class="tw:flex tw:items-center tw:justify-center tw:py-12"
+          data-test="sessions-empty"
+        >
+          <OEmptyState size="hero" preset="no-llm-sessions" @action="onEmptyAction" />
+        </div>
+      </template>
         <!-- Timestamp -->
         <template #cell-firstSeenNanos="{ row }">
           <span class="tw:font-mono tw:text-[0.75rem]">
@@ -200,7 +179,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
         </template>
       </OTable>
-    </div>
   </div>
 </template>
 
@@ -217,7 +195,6 @@ import EvalEmptyState from "@/components/EvalEmptyState.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OPagination from "@/lib/navigation/Pagination/OPagination.vue";
 import {
   splitNumberWithUnit,
   splitDuration,
@@ -227,6 +204,9 @@ interface Props {
   streamName: string;
   startTime: number; // microseconds
   endTime: number; // microseconds
+  // Route to open on row click. Defaults to the Traces session-details route;
+  // the AI/LLM Sessions page passes its own route so it stays in the AI menu.
+  detailRouteName?: string;
 }
 
 const props = defineProps<Props>();
@@ -256,27 +236,12 @@ const activeStream = ref<string>(
   localStorage.getItem(STREAM_LS_KEY) || props.streamName || "",
 );
 
-// Server-side pagination state (1-indexed for q-pagination).
+// Server-side pagination state (1-indexed). OTable owns the footer controls
+// in `pagination="server"` mode and emits `pagination-change`; these refs are
+// the source of truth it reads back via `:current-page` / `:page-size`.
 const currentPage = ref(1);
 const rowsPerPage = ref(25);
 const rowsPerPageOptions = [10, 25, 50, 100];
-
-const totalPages = computed(() =>
-  total.value && rowsPerPage.value
-    ? Math.max(1, Math.ceil(total.value / rowsPerPage.value))
-    : 1,
-);
-
-// Drives the consolidated OEmptyState branch. True for both "no LLM streams
-// in the org" and "streams exist but the window returned no sessions" — the
-// page has no filter widget to clear, so the same first-run preset (with
-// the "Instrument with OpenTelemetry" action) covers both shapes.
-const isEmpty = computed<boolean>(
-  () =>
-    streamsLoaded.value &&
-    (availableStreams.value.length === 0 ||
-      (hasLoadedOnce.value && !loading.value && sessions.value.length === 0)),
-);
 
 // `instrument` is the only action id the preset emits. Send the user to
 // the in-app AI integrations page (the closest "set this up" surface) so
@@ -291,12 +256,17 @@ function onEmptyAction(id?: string) {
   });
 }
 
-watch(totalPages, (n) => {
-  // Clamp the page when the total shrinks (e.g. after a re-fetch with
-  // fewer matches than before).
-  if (currentPage.value > n) currentPage.value = n;
+// Clamp the page when the total shrinks (e.g. a re-fetch returns fewer
+// matches than the current page offset).
+watch(total, () => {
+  const pages = Math.max(1, Math.ceil((total.value || 0) / rowsPerPage.value));
+  if (currentPage.value > pages) currentPage.value = pages;
 });
 
+// `hideable` exposes a column in OTable's auto-injected column chooser;
+// `sessionId` stays mandatory (it's the row identity). `firstUserMessage` is
+// the flex column — it fills leftover width on load and freezes on first
+// resize. All widths are user-resizable + persisted via `table-id`.
 const tableColumns = computed(() => [
   {
     id: "firstSeenNanos",
@@ -304,6 +274,7 @@ const tableColumns = computed(() => [
     accessorKey: "firstSeenNanos",
     size: 170,
     sortable: false,
+    hideable: true,
     meta: { align: "left" },
   },
   {
@@ -320,6 +291,7 @@ const tableColumns = computed(() => [
     accessorKey: "userId",
     size: 180,
     sortable: false,
+    hideable: true,
     meta: { align: "left" },
   },
   {
@@ -328,7 +300,8 @@ const tableColumns = computed(() => [
     accessorKey: "firstUserMessage",
     size: 200,
     sortable: false,
-    meta: { align: "left" },
+    hideable: true,
+    meta: { align: "left", flex: true },
   },
   {
     id: "turns",
@@ -336,6 +309,7 @@ const tableColumns = computed(() => [
     accessorKey: "turns",
     size: 90,
     sortable: false,
+    hideable: true,
     meta: { align: "center" },
   },
   {
@@ -344,6 +318,7 @@ const tableColumns = computed(() => [
     accessorKey: "durationNanos",
     size: 120,
     sortable: false,
+    hideable: true,
     meta: { align: "center" },
   },
   {
@@ -352,6 +327,7 @@ const tableColumns = computed(() => [
     accessorKey: "tokens",
     size: 250,
     sortable: false,
+    hideable: true,
     meta: { align: "center" },
   },
   {
@@ -360,6 +336,7 @@ const tableColumns = computed(() => [
     accessorKey: "cost",
     size: 100,
     sortable: false,
+    hideable: true,
     meta: { align: "center" },
   },
   {
@@ -368,9 +345,15 @@ const tableColumns = computed(() => [
     accessorKey: "status",
     size: 100,
     sortable: false,
+    hideable: true,
     meta: { align: "center", disableCellAction: true },
   },
-]);
+].map((c: any) => ({
+  ...c,
+  // Offer every column except the session id (row identity) in OTable's
+  // "Manage columns" chooser.
+  hideable: c.id !== "sessionId",
+})));
 
 function formatTimestamp(nanos: number): string {
   if (!nanos) return "—";
@@ -455,21 +438,23 @@ function onStreamChange() {
   loadSessions();
 }
 
-function changePage(page: number) {
-  currentPage.value = page;
-  loadSessions();
-}
-
-function changeRowsPerPage(val: number) {
-  rowsPerPage.value = val;
-  currentPage.value = 1;
+// Single handler for OTable's server pagination footer. A page-size change
+// resets to the first page (the old offset may be out of range under the new
+// size); a page click just moves to that page. Either way we re-fetch.
+function onPaginationChange({ page, size }: { page: number; size: number }) {
+  if (size !== rowsPerPage.value) {
+    rowsPerPage.value = size;
+    currentPage.value = 1;
+  } else {
+    currentPage.value = page;
+  }
   loadSessions();
 }
 
 function handleRowClick(row: SessionRow) {
   emit("sessionSelected", row);
   router.push({
-    name: "sessionDetails",
+    name: props.detailRouteName || "sessionDetails",
     query: {
       stream: activeStream.value,
       session_id: row.sessionId,
@@ -501,16 +486,3 @@ onUnmounted(() => {
   cancelAll();
 });
 </script>
-
-<style>
-/* Match ServicesCatalog: card surface, paginator + selector
-   styles so we inherit the global table theme from TenstackTable. */
-.sessions-list .paginator-section .q-btn {
-  min-width: 1.5rem;
-  min-height: 1.5rem;
-}
-
-.sessions-list .select-pagination .q-field__control {
-  min-height: 1.75rem;
-}
-</style>

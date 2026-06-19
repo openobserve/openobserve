@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div data-test="llm-providers-settings" class="tw:flex tw:flex-col tw:h-full tw:min-h-0">
     <ProviderFormPage
       v-if="formPage"

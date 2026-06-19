@@ -785,6 +785,17 @@ async function load() {
 }
 
 function goBack() {
+  // When opened from the AI/LLM Sessions page, return there (stays in the AI
+  // menu) instead of dropping into the Traces sessions tab.
+  if (route.name === "aiSessionDetails") {
+    router.push({
+      name: "aiSessions",
+      query: {
+        org_identifier: store.state.selectedOrganization?.identifier,
+      },
+    });
+    return;
+  }
   router.push({
     name: "traces",
     query: {

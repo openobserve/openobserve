@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div
     class="tw:fixed tw:inset-0 tw:bg-black/[0.32] tw:z-[1010] tw:flex tw:justify-end tw:[animation:jd-fade_0.18s_ease-out] jd-scrim"
     role="dialog"
@@ -934,6 +934,178 @@ function relativeTime(timestampMs: number): string {
 }
 
 /* Tab active state — self-styles applied here for specificity alongside border-bottom-color */
+/* — Header — */
+.jd__header {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 16px 20px 14px;
+  border-bottom: 1px solid var(--color-dialog-header-border, var(--o2-border));
+  background: var(--color-card-bg);
+  flex-shrink: 0;
+}
+
+.jd__header-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.jd__eyebrow {
+  font: 600 11px/1.4 var(--o2-font);
+  letter-spacing: 0.02em;
+  color: var(--color-text-secondary, var(--o2-text-secondary));
+}
+
+.jd__title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.jd__title {
+  font-weight: 700;
+  font-size: 18px;
+  letter-spacing: -0.005em;
+  color: var(--color-text-primary, currentColor);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.jd__title-version {
+  font-size: 11px;
+  color: var(--color-text-secondary, var(--o2-text-secondary));
+  font-variant-numeric: tabular-nums;
+}
+
+.jd__status-pill {
+  display: inline-flex;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font: 600 11px var(--o2-font);
+  background: color-mix(in srgb, var(--color-text-secondary) 14%, transparent);
+  color: var(--color-text-secondary, var(--o2-text-secondary));
+  text-transform: capitalize;
+}
+
+.jd__status-pill--active {
+  background: color-mix(in srgb, var(--o2-status-success-text, #2e7d32) 14%, transparent);
+  color: var(--o2-status-success-text, #2e7d32);
+}
+
+.jd__status-pill--paused {
+  background: color-mix(in srgb, #f59e0b 14%, transparent);
+  color: #b45309;
+}
+
+.jd__status-pill--degraded {
+  background: color-mix(in srgb, var(--o2-status-error-text, #c62828) 14%, transparent);
+  color: var(--o2-status-error-text, #c62828);
+}
+
+.jd__status-pill--archived {
+  background: color-mix(in srgb, var(--color-text-secondary) 14%, transparent);
+  color: var(--color-text-secondary, var(--o2-text-secondary));
+  opacity: 0.7;
+}
+
+.jd__sub-line {
+  font-size: 12px;
+  color: var(--color-text-secondary, var(--o2-text-secondary));
+}
+
+.jd__close {
+  flex-shrink: 0;
+  background: transparent;
+  border: 0;
+  padding: 4px;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--color-text-secondary, var(--o2-text-secondary));
+}
+
+.jd__close:hover {
+  background: color-mix(in srgb, var(--color-text-primary) 8%, transparent);
+  color: var(--color-text-primary, currentColor);
+}
+
+/* — KPI strip — */
+.jd__kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  padding: 16px 20px;
+  background: color-mix(in srgb, var(--color-text-secondary) 4%, var(--color-card-bg));
+  border-bottom: 1px solid var(--color-dialog-header-border, var(--o2-border));
+  flex-shrink: 0;
+}
+
+.jd-kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  background: var(--color-card-bg);
+  border: 1px solid var(--color-dialog-header-border, var(--o2-border));
+  border-radius: 6px;
+}
+
+.jd-kpi--good { background: color-mix(in srgb, var(--o2-status-success-text, #2e7d32) 4%, var(--color-card-bg)); }
+.jd-kpi--warn { background: color-mix(in srgb, #f59e0b 5%, var(--color-card-bg)); }
+.jd-kpi--bad  { background: color-mix(in srgb, var(--o2-status-error-text, #c62828) 4%, var(--color-card-bg)); }
+
+.jd-kpi__title {
+  font: 600 11px/1.4 var(--o2-font);
+  letter-spacing: 0.01em;
+  color: var(--color-text-secondary, var(--o2-text-secondary));
+}
+
+.jd-kpi__value {
+  font: 700 22px/1.1 var(--o2-font);
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-primary, currentColor);
+}
+
+.jd-kpi--good .jd-kpi__value { color: var(--o2-status-success-text, #2e7d32); }
+.jd-kpi--warn .jd-kpi__value { color: #b45309; }
+.jd-kpi--bad  .jd-kpi__value { color: var(--o2-status-error-text, #c62828); }
+
+.jd-kpi__sub {
+  font-size: 11px;
+  color: var(--color-text-secondary, var(--o2-text-secondary));
+}
+
+/* — Tab strip — */
+.jd__tabs {
+  display: flex;
+  gap: 18px;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--color-dialog-header-border, var(--o2-border));
+  background: var(--color-card-bg);
+  flex-shrink: 0;
+}
+
+.jd__tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 0;
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  color: var(--color-text-secondary, var(--o2-text-secondary));
+  font: 600 13px var(--o2-font);
+  margin-bottom: -1px;
+}
+
+.jd__tab:hover { color: var(--color-text-primary, currentColor); }
+
 .jd__tab--active {
   color: var(--color-primary-600, #3F7994);
   border-bottom-color: var(--color-primary-600, #3F7994);
@@ -954,6 +1126,144 @@ function relativeTime(timestampMs: number): string {
 .jd-kpi--good .jd-kpi__value { color: var(--o2-status-success-text, #2e7d32); }
 .jd-kpi--warn .jd-kpi__value { color: #b45309; }
 .jd-kpi--bad  .jd-kpi__value { color: var(--o2-status-error-text, #c62828); }
+/* — Configuration sections — */
+.jd-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.jd-section__title {
+  margin: 0;
+  font: 600 13px/1.5 var(--o2-font);
+  color: var(--color-text-primary, currentColor);
+  padding-bottom: 6px;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-text-secondary) 12%, transparent);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.jd-section__chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 5px;
+  border-radius: 3px;
+  font: 600 10px var(--o2-font);
+  background: color-mix(in srgb, var(--color-text-secondary) 12%, transparent);
+  color: var(--color-text-secondary, var(--o2-text-secondary));
+}
+
+.jd-kv {
+  display: grid;
+  grid-template-columns: 130px 1fr;
+  gap: 6px 14px;
+  margin: 0;
+}
+
+.jd-kv dt {
+  font-size: 11px;
+  color: var(--color-text-secondary, var(--o2-text-secondary));
+}
+
+.jd-kv dd {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-text-primary, currentColor);
+  word-break: break-word;
+}
+
+.jd-mono {
+  font-variant-numeric: tabular-nums;
+}
+
+.jd-muted {
+  color: var(--color-text-secondary, var(--o2-text-secondary));
+  font-style: italic;
+}
+
+.jd-empty {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  background: color-mix(in srgb, var(--color-text-secondary) 6%, transparent);
+  border-radius: 5px;
+  font-size: 12px;
+  color: var(--color-text-secondary, var(--o2-text-secondary));
+}
+
+.jd-filter {
+  margin: 0;
+  padding: 12px 14px;
+  background: color-mix(in srgb, #6b76e3 6%, var(--color-card-bg));
+  border: 1px solid color-mix(in srgb, #6b76e3 22%, transparent);
+  border-radius: 6px;
+  font-size: 13px;
+  line-height: 1.85;
+  color: var(--color-text-primary, currentColor);
+  max-height: 240px;
+  overflow: auto;
+  white-space: pre;
+}
+
+.jd-filter__row {
+  display: block;
+  white-space: pre;
+}
+
+.jd-filter__kw {
+  display: inline-block;
+  width: 38px;
+  margin-right: 8px;
+  color: #7c3aed;
+  font-weight: 700;
+}
+
+.jd-filter__col {
+  color: #1d4ed8;
+  margin-right: 6px;
+}
+
+.jd-filter__op {
+  color: var(--color-text-secondary, var(--o2-text-secondary));
+  margin-right: 6px;
+}
+
+.jd-filter__val {
+  color: var(--color-text-primary, currentColor);
+}
+
+.jd-filter__val--str {
+  color: #b25400;
+}
+
+.jd-scorers {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.jd-scorers__card {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  background: var(--color-card-bg);
+  border: 1px solid color-mix(in srgb, var(--color-text-secondary) 16%, transparent);
+  border-radius: 8px;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    background 0.15s,
+    box-shadow 0.15s,
+    transform 0.15s;
+}
 
 /* Scorer card hover with :not(:disabled) — complex selector, must keep */
 .jd-scorers__card:hover:not(:disabled) {

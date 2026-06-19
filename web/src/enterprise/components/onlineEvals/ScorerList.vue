@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <EvalListShell
     data-test="scorer"
     :show-empty="showNoProvidersState"
@@ -36,6 +36,9 @@
         :page-size="20"
         :page-size-options="[20, 50, 100, 250, 500]"
         :default-columns="false"
+        :enable-column-resize="true"
+        :persist-columns="true"
+        table-id="scorer-list"
         width="100%"
         class="tw:w-full tw:h-full"
         @row-click="(row: any) => $emit('view', row)"
@@ -90,16 +93,9 @@
         </template>
 
         <template #cell-type="{ row }">
-          <span
-            class="tw:inline-flex tw:items-center tw:gap-1 tw:py-[1px] tw:px-[7px] tw:rounded-[3px] tw:font-semibold tw:text-[11px] tw:leading-[1.5]"
-            :class="{
-              'tw:bg-[color-mix(in_srgb,var(--o2-status-info-text)_14%,transparent)] tw:text-(--o2-status-info-text)': scorerTypeOf(row) === 'llm_judge',
-              'tw:bg-[color-mix(in_srgb,var(--o2-status-success-text)_14%,transparent)] tw:text-(--o2-status-success-text)': scorerTypeOf(row) === 'remote',
-              'tw:bg-[color-mix(in_srgb,var(--o2-status-warning-text)_14%,transparent)] tw:text-(--o2-status-warning-text)': scorerTypeOf(row) === 'code',
-            }"
-          >
+          <OBadge :variant="scorerTypeBadgeVariant(scorerTypeOf(row))" size="sm">
             {{ scorerTypeLabel(scorerTypeOf(row)) }}
-          </span>
+          </OBadge>
         </template>
 
         <template #cell-produces="{ row }">
@@ -169,6 +165,7 @@ import type {
 } from "@/services/online-evals.service";
 import { entityId, scorerTypeOf, valueOf } from "./utils/evalEntity";
 import EvalListShell from "./EvalListShell.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import { useNumberedRows } from "./composables/useNumberedRows";
 
 const props = defineProps<{
@@ -226,7 +223,9 @@ const columns = computed(() => [
     accessorKey: "name",
     sortable: true,
     size: COL.name,
-    meta: { align: "left", autoWidth: true },
+    // `flex` (not `autoWidth`): fills leftover width on load AND stays
+    // resizable — matches Dashboards/AlertList; `autoWidth` has no resize grip.
+    meta: { align: "left", flex: true },
   },
   {
     id: "type",
@@ -275,7 +274,12 @@ const columns = computed(() => [
     size: 140,
     meta: { align: "center", cellClass: "actions-column", actionCount: 3 },
   },
-]);
+].map((c: any) => ({
+  ...c,
+  // Every column except the row index, the name (row identity) and the
+  // actions column is offered in OTable's "Manage columns" chooser.
+  hideable: c.id !== "#" && c.id !== "name" && !c.isAction,
+})));
 
 const filteredRows = computed(() =>
   typeFilter.value
@@ -318,6 +322,15 @@ function onEmptyAction(id?: string) {
 function scorerTypeLabel(type: ScorerType) {
   if (type === "remote") return t("onlineEvals.scorer.badgeRemote");
   return t("onlineEvals.scorer.badgeLlm");
+}
+
+// Map a scorer type to a neutral design-system OBadge soft variant
+// (llm_judge → blue, remote → teal, code → purple). Types are just labels,
+// so use neutral palette colors rather than semantic success/warning variants.
+function scorerTypeBadgeVariant(type: ScorerType | string) {
+  if (type === "remote") return "teal-soft" as const;
+  if (type === "code") return "purple-soft" as const;
+  return "blue-soft" as const; // llm_judge
 }
 
 function producesLabel(row: Scorer) {

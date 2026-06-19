@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <EvalListShell
     data-test="score-config"
     :show-empty="false"
@@ -18,6 +18,9 @@
         :page-size="20"
         :page-size-options="[20, 50, 100, 250, 500]"
         :default-columns="false"
+        :enable-column-resize="true"
+        :persist-columns="true"
+        table-id="score-config-list"
         width="100%"
         class="tw:w-full tw:h-full"
         @row-click="(row: any) => $emit('view', row)"
@@ -55,12 +58,9 @@
         </template>
 
         <template #cell-type="{ row }">
-          <span
-            class="tw:inline-flex tw:items-center tw:gap-1 tw:py-px tw:px-1.75 tw:rounded-[3px] tw:font-semibold tw:text-[11px] tw:leading-normal tw:font-[inherit]"
-            :class="dtypeChipClass(dataTypeOf(row))"
-          >
+          <OBadge :variant="dataTypeBadgeVariant(dataTypeOf(row))" size="sm">
             {{ dataTypeOf(row) }}
-          </span>
+          </OBadge>
         </template>
 
         <template #cell-rangeValues="{ row }">
@@ -140,6 +140,7 @@
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
@@ -186,6 +187,16 @@ function handleBulkExport() {
   emit("export-bulk", ids);
 }
 
+// Map a score-config data type to a neutral design-system OBadge soft variant
+// (numeric → blue, categorical → purple, boolean → teal). Data types are just
+// labels, so use neutral palette colors rather than semantic success/warning
+// variants that would imply a good/bad meaning.
+function dataTypeBadgeVariant(type: DataType | string) {
+  if (type === "categorical") return "purple-soft" as const;
+  if (type === "boolean") return "teal-soft" as const;
+  return "blue-soft" as const; // numeric
+}
+
 const typeOptions = computed(() => [
   { label: t("onlineEvals.scoreConfig.allTypes"), value: null },
   { label: t("onlineEvals.scoreConfig.dataTypes.numeric"), value: "numeric" },
@@ -208,7 +219,9 @@ const columns = computed(() => [
     accessorKey: "name",
     sortable: true,
     size: COL.name,
-    meta: { align: "left", autoWidth: true },
+    // `flex` (not `autoWidth`): fills leftover width on load AND stays
+    // resizable — matches Dashboards/AlertList; `autoWidth` has no resize grip.
+    meta: { align: "left", flex: true },
   },
   {
     id: "type",
@@ -266,7 +279,12 @@ const columns = computed(() => [
     size: 140,
     meta: { align: "center", cellClass: "actions-column", actionCount: 3 },
   },
-]);
+].map((c: any) => ({
+  ...c,
+  // Every column except the row index, the name (row identity) and the
+  // actions column is offered in OTable's "Manage columns" chooser.
+  hideable: c.id !== "#" && c.id !== "name" && !c.isAction,
+})));
 
 const filteredRows = computed(() =>
   typeFilter.value

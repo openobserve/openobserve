@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <section class="tw:flex tw:flex-col tw:gap-[10px] tw:min-h-0 tw:flex-1" data-test="quality-score-configs-overview">
     <header class="tw:flex tw:items-center tw:justify-between tw:gap-3">
       <div class="tw:flex tw:items-baseline tw:gap-[10px] tw:min-w-0">
@@ -52,16 +52,34 @@
         :columns="columns"
         row-key="configId"
         :loading="isLoading"
-        :row-class="rowClassOf"
         :footer-title="t('onlineEvals.quality.overview.title')"
         :show-global-filter="false"
         :page-size="20"
         :page-size-options="[20, 50, 100]"
         :default-columns="false"
+        :enable-column-resize="true"
+        :persist-columns="true"
+        table-id="quality-score-configs"
         width="100%"
         class="tw:w-full tw:h-full"
         @row-click="(row: any) => $emit('select', row)"
       >
+        <!-- Filter moved into the table toolbar so OTable's column chooser
+             ("Manage columns") renders next to it, matching the eval lists. -->
+        <template #toolbar>
+          <OInput
+            v-model="filter"
+            :placeholder="t('onlineEvals.quality.overview.searchPlaceholder')"
+            size="sm"
+            class="tw:flex-1 tw:min-w-0"
+            data-test="quality-overview-filter-input"
+          >
+            <template #icon-left>
+              <OIcon name="search" size="xs" />
+            </template>
+          </OInput>
+        </template>
+
         <template #cell-status="{ row }">
           <span class="tw:inline-flex tw:text-base tw:leading-none" :class="statusClass(row.status)" :aria-label="row.status">●</span>
         </template>
@@ -123,6 +141,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
 import { useRoute, useRouter } from "vue-router";
 import type { ScoreConfigRow } from "../composables/useQualityScoreConfigs";
@@ -201,6 +220,8 @@ const columns = computed(() => [
     accessorKey: "status",
     sortable: false,
     size: 40,
+    // Fixed-width status dot — no resize grip (OTable reads `resizable`).
+    resizable: false,
     meta: { align: "center" },
   },
   {
@@ -209,7 +230,8 @@ const columns = computed(() => [
     accessorKey: "name",
     sortable: true,
     size: COL.name,
-    meta: { align: "left", autoWidth: true },
+    // `flex` (not `autoWidth`): fills leftover width AND stays resizable.
+    meta: { align: "left", flex: true },
   },
   {
     id: "type",
@@ -250,13 +272,27 @@ const columns = computed(() => [
     size: COL.date,
     meta: { align: "left" },
   },
-]);
+].map((c: any) => ({
+  ...c,
+  // Offer every column except the name and the leading status dot in the
+  // "Manage columns" chooser.
+  hideable: c.id !== "name" && c.id !== "status",
+})));
 
 function shortType(type: ScoreConfigRow["dataType"]): string {
   if (type === "numeric") return "Num";
   if (type === "categorical") return "Cat";
   if (type === "boolean") return "Bool";
   return "—";
+}
+
+// Map a score-config data type to a neutral design-system OBadge soft variant
+// (numeric → blue, categorical → purple, boolean → teal). Data types are just
+// labels, so use neutral palette colors rather than semantic variants.
+function dataTypeBadgeVariant(type: ScoreConfigRow["dataType"]) {
+  if (type === "categorical") return "purple-soft" as const;
+  if (type === "boolean") return "teal-soft" as const;
+  return "blue-soft" as const; // numeric
 }
 
 function formatCount(n: number | null): string {

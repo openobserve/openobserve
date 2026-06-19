@@ -1,17 +1,25 @@
-<template>
+﻿<template>
   <section class="tw:flex tw:flex-col tw:gap-3 tw:px-5 tw:pt-4 tw:pb-6 tw:min-h-0 tw:overflow-auto" data-test="quality-detail-panel">
     <!-- Title row + type badge + version + description moved up into the
          ODrawer header (QualityPage) so the panel content starts straight
          from the KPI tiles without a duplicated identification block. -->
 
-    <div v-if="kpis.length === 0 && isLoading" class="tw:flex tw:flex-col tw:items-center tw:gap-2 tw:py-[28px] tw:px-3 tw:border tw:border-dashed tw:border-(--color-dialog-header-border,var(--o2-border)) tw:rounded-md tw:text-center tw:text-(--color-text-secondary,var(--o2-text-secondary)) tw:text-xs">
+    <div v-if="isLoading && !hasScores" class="qdp__loading">
       <OSpinner size="sm" />
       <span>{{ t("onlineEvals.quality.detail.loading") }}</span>
     </div>
 
-    <div v-else-if="kpis.length === 0" class="tw:flex tw:flex-col tw:items-center tw:gap-2 tw:py-[28px] tw:px-3 tw:border tw:border-dashed tw:border-(--color-dialog-header-border,var(--o2-border)) tw:rounded-md tw:text-center tw:text-(--color-text-secondary,var(--o2-text-secondary)) tw:text-xs">
-      <OIcon name="info" size="lg" />
-      <p>{{ t("onlineEvals.quality.detail.noData") }}</p>
+    <!-- No scores landed for this config in the window: show one focused
+         empty state (same OEmptyState used across list pages) instead of a
+         grid of dashed KPI cards + a chart placeholder. -->
+    <div v-else-if="!hasScores" class="qdp__empty">
+      <OEmptyState
+        size="block"
+        illustration="hourglass"
+        :title="t('onlineEvals.quality.detail.empty.title')"
+        :description="t('onlineEvals.quality.detail.empty.description')"
+        data-test="quality-detail-empty"
+      />
     </div>
 
     <template v-else>
@@ -154,8 +162,8 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import type { ScoreConfig } from "@/services/online-evals.service";
 import type {
   BooleanAggRow,
@@ -178,6 +186,7 @@ const props = defineProps<{
   config: ScoreConfig;
   dataType: "numeric" | "boolean" | "categorical" | "unknown";
   kpis: DetailKpi[];
+  hasScores: boolean;
   isLoading: boolean;
   numericTrend: TrendPoint[];
   numericDistribution: DistributionBucket[];
@@ -248,6 +257,38 @@ function formatKpi(kpi: DetailKpi): string {
 
 <style>
 /* ::before pseudo-element for KPI accent bar — cannot inline */
+
+.qdp__loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 28px 12px;
+  border: 1px dashed var(--color-dialog-header-border, var(--o2-border));
+  border-radius: 6px;
+  text-align: center;
+  color: var(--color-text-secondary, var(--o2-text-secondary));
+  font-size: 12px;
+}
+
+.qdp__empty {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.qdp-kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 14px;
+  background: var(--o2-card-bg);
+  border: 1px solid var(--color-dialog-header-border, var(--o2-border));
+  border-radius: 6px;
+  position: relative;
+}
 .qdp-kpi::before {
   content: "";
   position: absolute;
@@ -272,6 +313,20 @@ function formatKpi(kpi: DetailKpi): string {
 }
 
 /* Descendant selector — unhealthy KPI colors the big value */
+.qdp-kpi__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.qdp-kpi__big {
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+}
+
 .qdp-kpi--unhealthy .qdp-kpi__big { color: var(--o2-status-warning-text, #b25400); }
 
 /* Descendant selector — split label input margin reset */

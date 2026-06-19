@@ -495,6 +495,48 @@ describe("usePanelSQLExecutor", () => {
 
       expect(state.metadata.queries[0].tabName).toBeUndefined();
     });
+
+    it("sets panelQueryIndex on all time-shift metadata entries including the current-period entry", async () => {
+      const panelSchema = makePanelSchema([
+        {
+          query: "SELECT * FROM logs",
+          vrlFunctionQuery: "",
+          fields: { stream: "logs", stream_type: "logs", x: [{ alias: "ts" }] },
+          config: { time_shift: [{ offSet: "1d" }] },
+        },
+      ]);
+
+      const { ctx, state } = makeCtx({ panelSchema });
+      const { executeSQL } = usePanelSQLExecutor(ctx);
+      await executeSQL(0, 300_000_000, null);
+
+      // 2 entries: current period (index 0) + 1 comparison (index 1)
+      expect(state.metadata.queries).toHaveLength(2);
+      // Both must carry panelQueryIndex: 0 (first query in panelSchema.queries)
+      expect(state.metadata.queries[0].panelQueryIndex).toBe(0);
+      expect(state.metadata.queries[1].panelQueryIndex).toBe(0);
+    });
+
+    it("sets correct panelQueryIndex for each time-shift entry when there are multiple time shifts", async () => {
+      const panelSchema = makePanelSchema([
+        {
+          query: "SELECT * FROM logs",
+          vrlFunctionQuery: "",
+          fields: { stream: "logs", stream_type: "logs", x: [{ alias: "ts" }] },
+          config: { time_shift: [{ offSet: "1d" }, { offSet: "7d" }] },
+        },
+      ]);
+
+      const { ctx, state } = makeCtx({ panelSchema });
+      const { executeSQL } = usePanelSQLExecutor(ctx);
+      await executeSQL(0, 300_000_000, null);
+
+      // 3 entries: current + 2 comparisons
+      expect(state.metadata.queries).toHaveLength(3);
+      expect(state.metadata.queries[0].panelQueryIndex).toBe(0);
+      expect(state.metadata.queries[1].panelQueryIndex).toBe(0);
+      expect(state.metadata.queries[2].panelQueryIndex).toBe(0);
+    });
   });
 
   describe("getRegionClusterParams integration", () => {

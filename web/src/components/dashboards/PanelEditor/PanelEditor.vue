@@ -92,7 +92,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Main content area (after slot) -->
           <template #after>
             <div :class="mainContentAreaClass" :style="afterSlotStyle">
-              <div :class="afterSlotInnerClass" :style="afterSlotInnerStyle">
+              <div
+                :class="afterSlotInnerClass"
+                :style="afterSlotInnerStyle"
+                @scroll.passive="onBuilderScroll"
+              >
                 <div
                   class="layout-panel-container tw:flex tw:flex-col tw:w-full tw:h-full"
                   :style="layoutPanelContainerStyle"
@@ -725,6 +729,15 @@ const {
 
 // Provide page key for child components
 provide("dashboardPanelDataPageKey", pageKey.value);
+
+// Close any open OSelect/ODropdown in the builder/joins area when the main
+// content scrolls, so portaled menus never float detached from their trigger.
+// Mirrors the config panel's mechanism in PanelSidebar.vue.
+const builderScrollTick = ref(0);
+provide("sidebarScrollTick", builderScrollTick);
+const onBuilderScroll = () => {
+  builderScrollTick.value++;
+};
 
 // ============================================================================
 // usePanelEditor Composable

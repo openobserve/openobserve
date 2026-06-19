@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -58,11 +58,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="test-class tw:min-h-[1.5rem]"
           :data-test="`dashboard-folder-tab-${tab.folderId}`"
           >
-          <div class="tw:w-full tw:flex tw:justify-between tw:items-center tw:flex-nowrap tw:group/row tw:relative tw:rounded tw:[transition:background-color_0.3s] tw:[--color-button-ghost-hover-bg:transparent]" :data-test="`dashboard-folder-tab-name-${tab.name}`">
-              <span class="tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis tw:normal-case" :title="tab.name" :data-test="`dashboard-folder-name-${tab.name}`">{{
+          <div class="folder-item tw:w-full tw:flex tw:items-center tw:justify-between tw:flex-nowrap tw:gap-2 tw:min-h-6 tw:group/row" :data-test="`dashboard-folder-tab-name-${tab.name}`">
+              <span class="folder-name tw:flex-1 tw:min-w-0 tw:text-left" :title="tab.name" :data-test="`dashboard-folder-name-${tab.name}`">{{
               tab.name
               }}</span>
-              <div class="tw:invisible tw:group-hover/row:visible tw:has-[[data-state=open]]:visible tw:flex tw:items-center tw:absolute tw:right-0 tw:top-1/2 tw:-translate-y-1/2">
+              <div class="tw:hidden tw:group-hover/row:flex tw:has-[[data-state=open]]:flex tw:items-center tw:shrink-0">
               <ODropdown
                 v-if="index || (searchQuery?.length > 0 && index ==  0 && tab.folderId.toLowerCase() != 'default') "
                 side="bottom"
