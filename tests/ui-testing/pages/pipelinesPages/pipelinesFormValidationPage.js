@@ -1,6 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
+import { openNavFlyoutChild } from '../commonActions.js';
 
 export class PipelinesFormValidationPage {
     /**
@@ -8,9 +9,6 @@ export class PipelinesFormValidationPage {
      */
     constructor(page) {
         this.page = page;
-
-        // ── Navigation ────────────────────────────────────────────────────────
-        this.pipelineMenuLink = '[data-test="menu-link-\\/pipeline-item"]';
 
         // ── Import Pipeline page ──────────────────────────────────────────────
         // BaseImport renders with test-prefix="pipeline" so:
@@ -108,7 +106,7 @@ export class PipelinesFormValidationPage {
 
     async navigateToPipelines() {
         testLogger.info('Navigating to Pipelines page');
-        await this.page.locator(this.pipelineMenuLink).click();
+        await openNavFlyoutChild(this.page, 'pipeline');
         await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
     }
 
