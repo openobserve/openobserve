@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="showAiIcon && !disableAi"
       variant="sidebar-toggle"
       size="icon-toolbar"
-      class="tw:absolute tw:top-2 tw:right-2 tw:z-10 tw:bg-(--o2-bg-primary) tw:border tw:border-(--o2-border-color) tw:transition-all tw:duration-200 tw:hover:bg-[var(--o2-hover-accent)] tw:hover:border-[var(--o2-color-primary)]"
+      class="tw:absolute! tw:top-2 tw:right-2 tw:z-10 tw:bg-(--o2-bg-primary) tw:border tw:border-(--o2-border-color) tw:transition-all tw:duration-200 tw:hover:bg-[var(--o2-hover-accent)] tw:hover:border-[var(--o2-color-primary)]"
       :class="nlpMode ? 'tw:bg-[var(--o2-color-primary-light)] tw:border-[var(--o2-color-primary)]' : ''"
       @click="toggleNlpMode"
       data-test="query-editor-ai-icon-btn"

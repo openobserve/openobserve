@@ -99,7 +99,7 @@
         size="icon-toolbar"
         :disabled="props.disableAi"
         @click="nlpMode = true"
-        class="tw:group tw:absolute tw:top-0.75 tw:z-100 tw:bg-[linear-gradient(135deg,rgba(139,92,246,0.15)_0%,rgba(236,72,153,0.15)_100%)]! tw:text-white! tw:[transition:background_0.3s_ease,box-shadow_0.3s_ease]! tw:w-7.5! tw:h-7.5! tw:min-w-7.5! tw:min-h-7.5! tw:rounded-md tw:hover:bg-[linear-gradient(135deg,#8B5CF6_0%,#EC4899_100%)]! tw:hover:shadow-[0_0.25rem_0.75rem_0_rgba(139,92,246,0.35)]!"
+        class="tw:group tw:absolute! tw:top-0.75 tw:z-100 tw:bg-[linear-gradient(135deg,rgba(139,92,246,0.15)_0%,rgba(236,72,153,0.15)_100%)]! tw:text-white! tw:[transition:background_0.3s_ease,box-shadow_0.3s_ease]! tw:w-7.5! tw:h-7.5! tw:min-w-7.5! tw:min-h-7.5! tw:rounded-md tw:hover:bg-[linear-gradient(135deg,#8B5CF6_0%,#EC4899_100%)]! tw:hover:shadow-[0_0.25rem_0.75rem_0_rgba(139,92,246,0.35)]!"
         :style="props.hasExpandButton ? { right: '2.375rem' } : { right: '0.25rem' }"
       >
         <img :src="nlpIcon" alt="AI Mode" class="tw:w-[18px] tw:h-[18px] tw:transition-transform tw:duration-[600ms] tw:ease-[ease] tw:group-hover:rotate-180 tw:group-hover:brightness-0 tw:group-hover:invert" />
