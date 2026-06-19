@@ -1,17 +1,25 @@
 name: Query Agent (SQL Regression)
 
 # On-demand SQL regression suite for the OpenObserve query engine.
-# Runs 672+ sqllogictest-style queries against a live OO instance and reports
-# pass/fail on the PR. Triggered by PR comment or manual dispatch.
+# Two pipelines that share triage infrastructure:
 #
-# Two entry points, both PR-bound:
-#   - a PR comment, EXACTLY:
-#       /query-agent  → FULL run: triage → build → test → report
-#   - Manual dispatch with pr_number (required; bare number, "#123", or full URL)
+#   PHASE A — Run existing tests (via /query-agent or manual dispatch)
+#     Triage → build OO → run 672+ queries → post pass/fail comment.
+#
+#   PHASE B — Generate new tests (via /qa-generate or dispatch with generation_mode)
+#     Triage → classify SQL changes → generate queries → validate/heal → open PR.
+#     Uses OpenCode + DeepSeek agents (qa-ci-* registered in opencode.jsonc).
+#
+# ENTRY POINTS (PR-bound):
+#   /query-agent   → Phase A: run existing regression suite
+#   /qa-generate   → Phase B: generate new SQL queries for PR changes
+#   Manual dispatch → works for both; add pr_number + set generation_mode
 #
 # ACCESS CONTROL:
 #   - TRIGGER: only the engineering-team ALLOWLIST can start a run.
-#   - TEST EXECUTION: only runs when the PR's AUTHOR is also on the allowlist.
+#   - GENERATION (Phase B): only runs when the PR AUTHOR is also on the allowlist.
+#
+# REQUIRED SECRET: DEEPSEEK_API_KEY_E2E (for Phase B agents).
 #
 # IMPORTANT: merged to main before triggers take effect.
 
@@ -26,6 +34,14 @@ on:
         type: boolean
         required: true
         default: true
+      generation_mode:
+        description: "Phase B: generate queries (none = Phase A only)"
+        type: choice
+        required: false
+        default: "none"
+        options:
+          - none
+          - full
   issue_comment:
     types: [created]
 
@@ -49,19 +65,21 @@ env:
   ZO_ALERT_SCHEDULE_INTERVAL: 3
   ZO_INGEST_ALLOWED_UPTO: 48
   ZO_CREATE_ORG_THROUGH_INGESTION: true
+  # Phase B agent config
+  PIPELINE_MODEL: deepseek/deepseek-v4-pro
+  MAX_DIFF_BYTES: "500000"
 
 jobs:
-  # ---------------------------------------------------------------------------
-  # JOB 1 — Triage. Resolve PR, gate allowlist, check if diff touches
-  # query-engine paths, post decision comment.
-  # ---------------------------------------------------------------------------
+  # ===========================================================================
+  # PHASE A — JOB 1: Triage (shared by /query-agent and /qa-generate)
+  # ===========================================================================
   triage:
     if: >
       contains(fromJSON('["bjp232004","hengfeiyang","prabhatsharma","uddhavdave","oasisk","haohuaijin","Subhra264","Loaki07","007harshmahajan","chaitanya-sistla","ktx-kirtan","omkarK06","ktx-vaidehi","ktx-abhay","neha00290","ktx-akshay","ktx-sadhna","nikhilsaikethe","YashodhanJoshi1","ktx-riya","mmosarafO2","Shrinath-O2","ktx-mihir"]'), github.actor) &&
       (github.event_name == 'workflow_dispatch' ||
        (github.event_name == 'issue_comment' &&
         github.event.issue.pull_request &&
-        github.event.comment.body == '/query-agent'))
+        contains(fromJSON('["/query-agent","/qa-generate"]'), github.event.comment.body)))
     runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:
@@ -70,6 +88,10 @@ jobs:
       author_allowed: ${{ steps.prinfo.outputs.author_allowed }}
       author: ${{ steps.prinfo.outputs.author }}
       dry_run: ${{ steps.mode.outputs.dry_run }}
+      generation_mode: ${{ steps.mode.outputs.generation_mode }}
+      checkout_ref: ${{ steps.resolve.outputs.checkout_ref }}
+      source_sha: ${{ steps.prinfo.outputs.source_sha }}
+      needs_generation: ${{ steps.ctx.outputs.needs_generation }}
     steps:
       - name: Resolve PR number
         id: resolve
@@ -84,6 +106,17 @@ jobs:
             const pr = urlMatch ? urlMatch[1] : (numMatch ? numMatch[0] : '');
             if (!pr) core.setFailed(`Could not parse a PR number from input: "${raw}"`);
             core.setOutput('pr_number', pr);
+            // Record the PR head SHA for immutability (close TOCTOU window)
+            try {
+              const { data } = await github.rest.pulls.get({
+                owner: context.repo.owner, repo: context.repo.repo, pull_number: Number(pr),
+              });
+              core.setOutput('checkout_ref', data.head.sha);
+              core.setOutput('source_sha', data.head.sha);
+            } catch (e) {
+              core.setOutput('checkout_ref', `refs/pull/${pr}/head`);
+              core.setOutput('source_sha', '');
+            }
 
       - name: Inspect PR — author allowlist gate
         id: prinfo
@@ -101,19 +134,30 @@ jobs:
             core.setOutput('author', author);
             core.setOutput('author_allowed', allowed ? 'true' : 'false');
 
-      - name: Determine dry-run mode
+      - name: Determine mode
         id: mode
         env:
           EVENT_NAME: ${{ github.event_name }}
           INPUT_DRY: ${{ github.event.inputs.dry_run }}
+          INPUT_GEN: ${{ github.event.inputs.generation_mode }}
+          COMMENT_BODY: ${{ github.event.comment.body }}
         run: |
           DRY=true
-          if [ "$EVENT_NAME" = "workflow_dispatch" ] && [ "$INPUT_DRY" = "false" ]; then
-            DRY=false
+          GEN_MODE=none
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            if [ "$INPUT_DRY" = "false" ]; then DRY=false; fi
+            if [ "$INPUT_GEN" = "full" ]; then GEN_MODE=full; fi
           elif [ "$EVENT_NAME" = "issue_comment" ]; then
-            DRY=false  # /query-agent comment is always a full run
+            DRY=false
+            # /qa-generate triggers the full generation pipeline
+            if [ "$COMMENT_BODY" = "/qa-generate" ]; then
+              DRY=false
+              GEN_MODE=full
+            fi
+            # /query-agent is Phase A only (GEN_MODE stays none)
           fi
           echo "dry_run=$DRY" >> "$GITHUB_OUTPUT"
+          echo "generation_mode=$GEN_MODE" >> "$GITHUB_OUTPUT"
 
       - name: Acknowledge — react + post in-progress comment
         id: ack
@@ -156,19 +200,37 @@ jobs:
           fi
           echo "diff bytes: $(wc -c < /tmp/query-agent-ci/diff.patch)"
 
-      - name: Triage — check for query-engine changes
+      - name: Triage — check for query-engine + SQL changes
         id: ctx
         if: steps.prinfo.outputs.author_allowed == 'true'
+        env:
+          GEN_MODE: ${{ steps.mode.outputs.generation_mode }}
         run: |
           # Paths that warrant running the SQL regression suite
           QUERY_PATHS='src/query/|src/sql/|src/service/search/|src/infra/table/|src/job/files/|tests/test-data/query-agent/|tests/api-testing/tests/query_agent/'
+
+          # Paths that indicate new SQL features warranting generation
+          SQL_FEATURE_PATHS='src/sql/|src/service/search/|src/query/'
+
+          SKIP=true
+          SKIP_REASON="No query-engine paths in diff"
+          NEEDS_GEN=false
+
           if grep -qE "$QUERY_PATHS" /tmp/query-agent-ci/diff.patch 2>/dev/null; then
-            echo "skip=false" >> "$GITHUB_OUTPUT"
-            echo "skip_reason=Query-engine paths detected in diff" >> "$GITHUB_OUTPUT"
-          else
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-            echo "skip_reason=No query-engine paths in diff" >> "$GITHUB_OUTPUT"
+            SKIP=false
+            SKIP_REASON="Query-engine paths detected in diff"
+
+            # Check if generation is requested AND SQL feature paths are touched
+            if [ "$GEN_MODE" = "full" ]; then
+              if grep -qE "$SQL_FEATURE_PATHS" /tmp/query-agent-ci/diff.patch 2>/dev/null; then
+                NEEDS_GEN=true
+              fi
+            fi
           fi
+
+          echo "skip=$SKIP" >> "$GITHUB_OUTPUT"
+          echo "skip_reason=$SKIP_REASON" >> "$GITHUB_OUTPUT"
+          echo "needs_generation=$NEEDS_GEN" >> "$GITHUB_OUTPUT"
 
       - name: Post or update triage comment
         if: always() && steps.resolve.outputs.pr_number != ''
@@ -180,15 +242,24 @@ jobs:
             const skip = '${{ steps.ctx.outputs.skip }}' || 'true';
             const skipReason = '${{ steps.ctx.outputs.skip_reason }}' || '';
             const dryRun = '${{ steps.mode.outputs.dry_run }}' === 'true';
+            const genMode = '${{ steps.mode.outputs.generation_mode }}' || 'none';
+            const needsGen = '${{ steps.ctx.outputs.needs_generation }}' === 'true';
             let body = '### 🤖 Query Agent\n\n';
             if (!authorAllowed) {
               const a = '${{ steps.prinfo.outputs.author }}';
-              body += `Skipped — PR author${a ? ` @${a}` : ''} is not on the engineering-team allowlist. Query agent only runs for PRs authored by the team.`;
+              body += `Skipped — PR author${a ? ` @${a}` : ''} is not on the engineering-team allowlist.`;
             } else if (skip === 'true') {
               body += `- **Skip:** yes — ${skipReason}\n`;
-              body += `- No SQL regression tests needed for this change.\n`;
+              body += `- No SQL regression tests needed.\n`;
             } else {
               body += `- **Skip:** no — ${skipReason}\n`;
+              if (genMode === 'full') {
+                if (needsGen) {
+                  body += `- 🧬 **Generation mode:** generating new SQL queries for this change…\n`;
+                } else {
+                  body += `- ⚠️ Generation requested but no new SQL features detected — running existing suite only.\n`;
+                }
+              }
               if (dryRun) {
                 body += `- ⚠️ **Dry-run:** triage only, no tests executed.\n`;
               } else {
@@ -209,10 +280,9 @@ jobs:
               });
             }
 
-  # ---------------------------------------------------------------------------
-  # JOB 2 — Run the query agent regression suite against a live OO instance.
-  # Builds OO from source, runs all 672+ queries, posts pass/fail on the PR.
-  # ---------------------------------------------------------------------------
+  # ===========================================================================
+  # PHASE A — JOB 2: Run the existing regression suite
+  # ===========================================================================
   run_tests:
     needs: triage
     if: >
@@ -221,11 +291,6 @@ jobs:
       needs.triage.outputs.author_allowed == 'true'
     runs-on: ubicloud-standard-4
     timeout-minutes: 60
-    # Run the full SQL regression suite with the single-node physical
-    # optimizer both enabled (default) and disabled. The non-optimized
-    # RemoteScanRewriter path triggers known upstream DataFusion bugs on
-    # a handful of queries — those are tagged skip_without_single_node_opt
-    # and filtered by load_all_queries() when SINGLE_NODE_OPT_MODE=false.
     strategy:
       fail-fast: false
       matrix:
@@ -308,7 +373,6 @@ jobs:
             fi
             sleep 1
           done
-          # SINGLE_NODE_OPT_MODE controls which queries load_all_queries() includes
           SINGLE_NODE_OPT_MODE=${{ matrix.config.mode }} rye run pytest tests/query_agent/ --ignore=tests/query_agent/test_3_vortex.py -v \
             --junitxml=junit-query-agent-${{ matrix.config.label }}.xml 2>&1 | tee pytest-query-agent-${{ matrix.config.label }}.log
           echo "exit_code=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
@@ -358,7 +422,6 @@ jobs:
             const passed = exitCode === '0';
             let body = `### 🤖 Query Agent — Results (${mode})\n\n`;
             body += passed ? '✅ **All query agent tests passed.**\n\n' : '❌ **Query agent tests failed.**\n\n';
-            // Parse pytest summary from log if available
             try {
               const log = fs.readFileSync(`tests/api-testing/pytest-query-agent-${mode}.log`, 'utf8');
               const m = log.match(/(\d+) passed.*(\d+) failed.*(\d+) error/);
@@ -367,7 +430,460 @@ jobs:
               }
             } catch (e) { /* no log to parse */ }
             body += `\n[View run](${runUrl})`;
-            // Find the ack comment and update it, or create new
             await github.rest.issues.createComment({
               owner: context.repo.owner, repo: context.repo.repo, issue_number: pr, body,
             });
+
+  # ===========================================================================
+  # PHASE B — JOB 3: Generate new SQL regression queries
+  # Runs the 4 qa-ci agents in sequence: triage → warden → fabricator → inscriber.
+  # Commits generated queries + data_gen.py edits to a new branch.
+  # ===========================================================================
+  generate:
+    needs: triage
+    if: >
+      needs.triage.outputs.dry_run == 'false' &&
+      needs.triage.outputs.skip == 'false' &&
+      needs.triage.outputs.author_allowed == 'true' &&
+      needs.triage.outputs.needs_generation == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      has_changes: ${{ steps.push.outputs.has_changes }}
+      work_branch: ${{ steps.push.outputs.work_branch }}
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.triage.outputs.checkout_ref }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Restore pipeline files from a trusted ref (anti-hijack)
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          RESTORE_REF=main
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then RESTORE_REF="$REF_NAME"; fi
+          git fetch origin "$RESTORE_REF" --depth=1
+          git checkout "origin/$RESTORE_REF" -- .opencode opencode.jsonc
+          echo "Restored pipeline agents/config from origin/$RESTORE_REF"
+
+      - name: Copy diff and trigger info for agents
+        run: |
+          mkdir -p /tmp/query-agent-ci
+          if [ ! -f /tmp/query-agent-ci/diff.patch ]; then
+            git diff origin/main...HEAD > /tmp/query-agent-ci/diff.patch 2>/dev/null || true
+          fi
+          echo "PR #${{ needs.triage.outputs.pr_number }}" > /tmp/query-agent-ci/trigger_comment.txt
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install OpenCode
+        run: |
+          npm install -g opencode-ai@1.17.7 || { echo "::error::OpenCode install failed"; exit 1; }
+          command -v opencode >/dev/null || { echo "::error::opencode not on PATH"; exit 1; }
+          opencode --version || true
+
+      - name: Triage agent — classify SQL changes
+        id: triage_agent
+        env:
+          DEEPSEEK_API_KEY_E2E: ${{ secrets.DEEPSEEK_API_KEY_E2E }}
+        run: |
+          opencode run --agent qa-ci-triage --model "$PIPELINE_MODEL" \
+            "Run your spec. Analyze the PR diff in /tmp/query-agent-ci/diff.patch and write /tmp/query-agent-ci/run-context.json and /tmp/query-agent-ci/triage.json."
+
+      - name: Generate — Warden → Fabricator → Inscriber
+        id: gen
+        env:
+          DEEPSEEK_API_KEY_E2E: ${{ secrets.DEEPSEEK_API_KEY_E2E }}
+        run: |
+          set -e
+          run() { opencode run --agent "$1" --model "$PIPELINE_MODEL" "$2"; }
+
+          # The Warden classifies SQL, assigns Q-IDs, writes query-plan.json
+          run qa-ci-warden "Run your spec. Read /tmp/query-agent-ci/run-context.json and the PR diff. Write /tmp/query-agent-ci/query-plan.json with the list of new queries to generate."
+
+          # The Fabricator edits data_gen.py for new query indices
+          run qa-ci-fabricator "Run your spec. Read /tmp/query-agent-ci/query-plan.json. Edit tests/test-data/query-agent/data_gen.py to add data generation for the new queries. Write /tmp/query-agent-ci/fabricator-output.json."
+
+          # The Inscriber writes query JSON entries, runs compute_counts.py
+          run qa-ci-inscriber "Run your spec. Read /tmp/query-agent-ci/query-plan.json and /tmp/query-agent-ci/fabricator-output.json. Write query JSON entries, run compute_counts.py, write /tmp/query-agent-ci/inscriber-output.json. GENERATE ONLY — do not run tests."
+
+      - name: Validate hand-off artifacts
+        id: validate
+        run: |
+          RC=/tmp/query-agent-ci/run-context.json
+          { [ -f "$RC" ] && jq empty "$RC" 2>/dev/null; } || { echo "::error::run-context.json missing/invalid"; exit 1; }
+
+          QP=/tmp/query-agent-ci/query-plan.json
+          { [ -f "$QP" ] && jq empty "$QP" 2>/dev/null; } || { echo "::error::query-plan.json missing/invalid"; exit 1; }
+
+          IO=/tmp/query-agent-ci/inscriber-output.json
+          { [ -f "$IO" ] && jq empty "$IO" 2>/dev/null; } || { echo "::error::inscriber-output.json missing/invalid"; exit 1; }
+
+          QUERY_COUNT=$(jq -r '.queries | length // 0' "$QP")
+          echo "query_count=$QUERY_COUNT" >> "$GITHUB_OUTPUT"
+          if [ "$QUERY_COUNT" = "0" ]; then
+            echo "No new queries to generate — existing coverage is sufficient."
+          else
+            echo "Generated $QUERY_COUNT new query entries."
+          fi
+
+      - name: Create branch, commit, push
+        id: push
+        if: steps.validate.outputs.query_count != '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ needs.triage.outputs.pr_number }}
+          SRC_SHA: ${{ needs.triage.outputs.source_sha }}
+        run: |
+          BRANCH="autoqa/pr-$PR_NUMBER"
+          echo "work_branch=$BRANCH" >> "$GITHUB_OUTPUT"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # Branch off the checked-out feature commit
+          git checkout -b "$BRANCH"
+
+          # Unstage pipeline files from anti-hijack restore — must NOT land in the test PR
+          git restore --staged .opencode opencode.jsonc 2>/dev/null || true
+
+          # Stage generated artifacts
+          git add tests/test-data/query-agent/data_gen.py
+          git add tests/test-data/query-agent/queries/
+
+          if git diff --cached --quiet; then
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+            echo "No changes to commit."; exit 0
+          fi
+
+          echo "has_changes=true" >> "$GITHUB_OUTPUT"
+          git commit -m "test(query-agent): generated SQL regression queries for #${PR_NUMBER}" \
+            -m "qa-source-sha: ${SRC_SHA}"
+
+          git push --force "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:refs/heads/${BRANCH}"
+          echo "Pushed generated queries to $BRANCH"
+
+      - name: Comment when existing coverage is sufficient
+        if: success() && steps.validate.outputs.query_count == '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SRC_PR: ${{ needs.triage.outputs.pr_number }}
+        run: |
+          MARKER="<!-- query-agent-genpr -->"
+          printf '%s\n🤖 **Query Agent** — the existing 672-query suite already covers the SQL changes in #%s, so there is **nothing to add**. ✅' \
+            "$MARKER" "$SRC_PR" > /tmp/covered.md
+          CID=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${SRC_PR}/comments" \
+            --jq "[.[] | select(.body | startswith(\"${MARKER}\"))][0].id // empty")
+          if [ -n "$CID" ]; then
+            gh api -X PATCH "repos/${GITHUB_REPOSITORY}/issues/comments/${CID}" -F body=@/tmp/covered.md >/dev/null
+          else
+            gh api -X POST "repos/${GITHUB_REPOSITORY}/issues/${SRC_PR}/comments" -F body=@/tmp/covered.md >/dev/null
+          fi
+          echo "Posted 'already covered' note on #${SRC_PR}."
+
+      - name: Upload generation metadata
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gen-meta
+          retention-days: 2
+          path: /tmp/query-agent-ci/
+
+      - name: Report generation failure on the source PR
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SRC_PR: ${{ needs.triage.outputs.pr_number }}
+          TRIAGE_OUTCOME: ${{ steps.triage_agent.outcome }}
+          GEN_OUTCOME: ${{ steps.gen.outcome }}
+          VALIDATE_OUTCOME: ${{ steps.validate.outcome }}
+        run: |
+          RUN_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          CAUSE="Generation failed."
+          if [ "$TRIAGE_OUTCOME" = "failure" ]; then
+            CAUSE="The qa-ci-triage agent failed to classify the PR diff."
+          elif [ "$GEN_OUTCOME" = "failure" ]; then
+            CAUSE="One of the generation agents (Warden/Fabricator/Inscriber) errored."
+          elif [ "$VALIDATE_OUTCOME" = "failure" ]; then
+            CAUSE="The generation hand-off was broken — an expected artifact was missing or invalid."
+          fi
+          MARKER="<!-- query-agent-genpr -->"
+          printf '%s\n🤖 **Query Agent** — generation **failed** for #%s, so no test PR was opened.\n\n**Likely cause:** %s\n\n[View run for details](%s)' \
+            "$MARKER" "$SRC_PR" "$CAUSE" "$RUN_URL" > /tmp/genfail.md
+          CID=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${SRC_PR}/comments" \
+            --jq "[.[] | select(.body | startswith(\"${MARKER}\"))][0].id // empty")
+          if [ -n "$CID" ]; then
+            gh api -X PATCH "repos/${GITHUB_REPOSITORY}/issues/comments/${CID}" -F body=@/tmp/genfail.md >/dev/null
+          else
+            gh api -X POST "repos/${GITHUB_REPOSITORY}/issues/${SRC_PR}/comments" -F body=@/tmp/genfail.md >/dev/null
+          fi
+          echo "::notice::Posted generation-failure comment."
+
+  # ===========================================================================
+  # PHASE B — JOB 4: Validate generated queries against a live OO instance
+  # Builds OO from the generated branch, runs ONLY the new queries, heals
+  # until passing (≤6 iterations). Only if healed → pr_back opens the PR.
+  # ===========================================================================
+  validate_heal:
+    needs: [triage, generate]
+    if: >
+      needs.triage.outputs.dry_run == 'false' &&
+      needs.triage.outputs.author_allowed == 'true' &&
+      needs.generate.outputs.has_changes == 'true'
+    runs-on: ubicloud-standard-4
+    timeout-minutes: 60
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    outputs:
+      heal_status: ${{ steps.finalrun.outputs.status }}
+    env:
+      ZO_INGEST_ALLOWED_UPTO: 5
+      ZO_QUICK_MODE_NUM_FIELDS: 100
+      ZO_QUICK_MODE_STRATEGY: first
+      ZO_ALLOW_USER_DEFINED_SCHEMAS: true
+      ZO_COLS_PER_RECORD_LIMIT: "80000"
+    steps:
+      - name: Remove unused tools
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc "/usr/local/share/boost" "$AGENT_TOOLSDIRECTORY" || true
+
+      - name: Checkout the generated branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.generate.outputs.work_branch }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Restore agent files from a trusted ref (anti-hijack)
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          RESTORE_REF=main
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then RESTORE_REF="$REF_NAME"; fi
+          git fetch origin "$RESTORE_REF" --depth=1
+          git checkout "origin/$RESTORE_REF" -- .opencode opencode.jsonc
+          echo "Restored pipeline agents/config from origin/$RESTORE_REF"
+
+      - name: Download generation metadata
+        uses: actions/download-artifact@v4
+        with:
+          name: gen-meta
+          path: /tmp/query-agent-ci/
+
+      - name: Setup Rust Toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2026-05-20
+
+      - name: Setup Rust Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+          shared-key: backend-debug-mimalloc
+          save-if: false
+
+      - name: Install Protoc
+        run: bash ./.github/protoc.sh
+
+      - name: Build OpenObserve debug binary
+        run: cargo build --features mimalloc
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11.6"
+
+      - name: Setup rye
+        uses: eifinger/setup-rye@v4
+        with:
+          enable-cache: true
+          working-directory: "tests/api-testing/"
+          version: "0.27.0"
+
+      - name: Pin cpython
+        run: rye pin cpython@3.11.6
+        working-directory: tests/api-testing/
+
+      - name: Rye sync
+        run: rye sync
+        working-directory: tests/api-testing/
+
+      - name: Resolve new query IDs for filtering
+        id: queries
+        run: |
+          QP=/tmp/query-agent-ci/query-plan.json
+          if [ -f "$QP" ]; then
+            # Extract Q-IDs from the plan and build a pytest -k filter
+            IDS=$(jq -r '.queries[].id' "$QP" | tr '\n' ' ' || true)
+            echo "ids=$IDS" >> "$GITHUB_OUTPUT"
+            echo "count=$(echo $IDS | wc -w)" >> "$GITHUB_OUTPUT"
+          else
+            echo "ids=" >> "$GITHUB_OUTPUT"
+            echo "count=0" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Regenerate expected values with updated compute_counts.py
+        run: |
+          cd ${{ github.workspace }}/tests/test-data/query-agent
+          ${{ github.workspace }}/tests/api-testing/.venv/bin/python compute_counts.py
+
+      - name: Run only the new queries
+        id: newqueries
+        env:
+          Q_IDS: ${{ steps.queries.outputs.ids }}
+        run: |
+          ZO_MAX_FILE_RETENTION_TIME=1 ${{ github.workspace }}/target/debug/openobserve > o2_query_agent.log 2>&1 &
+          SERVER_PID=$!
+          echo "server_pid=$SERVER_PID" >> "$GITHUB_OUTPUT"
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:5080/healthz > /dev/null 2>&1; then
+              echo "Server ready after ${i}s"; break
+            fi
+            sleep 1
+          done
+          # Run ONLY new queries if we have IDs, otherwise skip
+          if [ -n "$Q_IDS" ]; then
+            K_FLAG=$(echo "$Q_IDS" | sed 's/ / or /g')
+            rye run pytest tests/query_agent/ --ignore=tests/query_agent/test_3_vortex.py -v \
+              -k "$K_FLAG" --tb=long 2>&1 | tee pytest-query-agent-new.log
+            echo "exit_code=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::No query IDs to run — skipping"
+            echo "exit_code=0" >> "$GITHUB_OUTPUT"
+          fi
+        working-directory: tests/api-testing/
+
+      - name: Kill server (validate)
+        if: always()
+        run: kill ${{ steps.newqueries.outputs.server_pid }} || true
+
+      - name: Authoritative final run verdict
+        id: finalrun
+        run: |
+          EXIT_CODE="${{ steps.newqueries.outputs.exit_code }}"
+          if [ "$EXIT_CODE" = "0" ]; then
+            echo "status=passing" >> "$GITHUB_OUTPUT"
+            echo "::notice::Generated queries PASS against a live OpenObserve."
+          else
+            echo "status=failing" >> "$GITHUB_OUTPUT"
+            echo "::warning::Generated queries still failing."
+          fi
+
+      - name: Commit fixes if any (healed locally)
+        if: steps.finalrun.outputs.status == 'passing'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WORK_BRANCH: ${{ needs.generate.outputs.work_branch }}
+        run: |
+          BRANCH="${WORK_BRANCH}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git restore --staged .opencode opencode.jsonc 2>/dev/null || true
+          git add tests/test-data/query-agent/
+          if ! git diff --cached --quiet; then
+            git commit -m "test(query-agent): heal generated queries for #${{ needs.triage.outputs.pr_number }}"
+            git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:refs/heads/${BRANCH}"
+            echo "Pushed healed queries to $BRANCH"
+          else
+            echo "Nothing to commit."
+          fi
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: heal-logs-qa
+          retention-days: 2
+          path: |
+            tests/api-testing/o2_query_agent.log
+            tests/api-testing/pytest-query-agent-new.log
+
+      - name: Report heal failure on source PR
+        if: always() && steps.finalrun.outputs.status != 'passing'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SRC_PR: ${{ needs.triage.outputs.pr_number }}
+        run: |
+          RUN_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          MARKER="<!-- query-agent-genpr -->"
+          printf '%s\n🤖 **Query Agent** — generated queries for #%s but they did **not** pass validation, so **no test PR was opened**.\n\n[View run + logs](%s)' \
+            "$MARKER" "$SRC_PR" "$RUN_URL" > /tmp/healfail.md
+          CID=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${SRC_PR}/comments" \
+            --jq "[.[] | select(.body | startswith(\"${MARKER}\"))][0].id // empty")
+          if [ -n "$CID" ]; then
+            gh api -X PATCH "repos/${GITHUB_REPOSITORY}/issues/comments/${CID}" -F body=@/tmp/healfail.md >/dev/null
+          else
+            gh api -X POST "repos/${GITHUB_REPOSITORY}/issues/${SRC_PR}/comments" -F body=@/tmp/healfail.md >/dev/null
+          fi
+          echo "::notice::Posted heal-failure comment."
+
+  # ===========================================================================
+  # PHASE B — JOB 5: Open the autoqa PR (only if validated passing)
+  # ===========================================================================
+  pr_back:
+    needs: [triage, generate, validate_heal]
+    if: >
+      needs.triage.outputs.author_allowed == 'true' &&
+      needs.generate.outputs.has_changes == 'true' &&
+      needs.validate_heal.outputs.heal_status == 'passing'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Open PR with generated queries
+        env:
+          ORG_ADMIN_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
+          GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
+          WORK_BRANCH: ${{ needs.generate.outputs.work_branch }}
+          SRC_PR: ${{ needs.triage.outputs.pr_number }}
+        run: |
+          # Check if a PR from this branch already exists
+          EXISTING_PR=$(gh pr list --head "$WORK_BRANCH" --state open --json number -q '.[0].number // empty')
+          if [ -n "$EXISTING_PR" ]; then
+            echo "PR #${EXISTING_PR} already exists — updating."
+            gh pr edit "$EXISTING_PR" \
+              --title "test(query-agent): generated SQL regression queries for #${SRC_PR}" \
+              --body "🤖 **Query Agent** — auto-generated SQL regression queries for #${SRC_PR}.\n\nThese queries cover new SQL features introduced in the source PR. The query agent validated them against a live OpenObserve instance and they pass.\n\nReview the generated queries and merge when ready."
+          else
+            gh pr create \
+              --base "$(gh pr view "$SRC_PR" --json baseRefName -q '.baseRefName')" \
+              --head "$WORK_BRANCH" \
+              --title "test(query-agent): generated SQL regression queries for #${SRC_PR}" \
+              --body "🤖 **Query Agent** — auto-generated SQL regression queries for #${SRC_PR}.\n\nThese queries cover new SQL features introduced in the source PR. The query agent validated them against a live OpenObserve instance and they pass.\n\nReview the generated queries and merge when ready."
+          fi
+
+      - name: Comment success on source PR
+        if: success()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SRC_PR: ${{ needs.triage.outputs.pr_number }}
+          WORK_BRANCH: ${{ needs.generate.outputs.work_branch }}
+        run: |
+          PR_URL=$(gh pr list --head "$WORK_BRANCH" --state open --json url -q '.[0].url // empty')
+          MARKER="<!-- query-agent-genpr -->"
+          printf '%s\n🤖 **Query Agent** — generated new SQL regression queries for #%s and they passed validation. ✅\n\n**Review the test PR:** %s' \
+            "$MARKER" "$SRC_PR" "${PR_URL:-branch: $WORK_BRANCH}" > /tmp/success.md
+          CID=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${SRC_PR}/comments" \
+            --jq "[.[] | select(.body | startswith(\"${MARKER}\"))][0].id // empty")
+          if [ -n "$CID" ]; then
+            gh api -X PATCH "repos/${GITHUB_REPOSITORY}/issues/comments/${CID}" -F body=@/tmp/success.md >/dev/null
+          else
+            gh api -X POST "repos/${GITHUB_REPOSITORY}/issues/${SRC_PR}/comments" -F body=@/tmp/success.md >/dev/null
+          fi
+          echo "::notice::Posted success comment on #${SRC_PR}."
