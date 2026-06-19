@@ -158,6 +158,10 @@ fn create_cli_app() -> Command {
             Command::new("bloom-inspect").about("dump fields + file names of a `.bf` file").args([
                 arg!("file", 'f', "file", "path to a `.bf` file (e.g. data/.../bloom/.../{ver}.bf)", true),
             ]),
+            Command::new("ttv-inspect").about("dump properties + contents of a `.ttv` (tantivy index) file").args([
+                arg!("file", 'f', "file", "path to a `.ttv` file (e.g. data/.../index/.../{id}.ttv)", true),
+                arg!("raw", 'r', "raw", "also print the raw tantivy meta.json", false).action(ArgAction::SetTrue),
+            ]),
         ])
 }
 
@@ -202,6 +206,16 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
             eprintln!("warning: infra init failed ({e}); file names will not be resolved");
         }
         super::bloom::inspect(file).await?;
+        return Ok(true);
+    }
+    if name == "ttv-inspect" {
+        // Pure local-file inspection: parses the puffin footer + embedded
+        // tantivy meta.json. No object-store or DB needed.
+        let file = command
+            .get_one::<String>("file")
+            .ok_or_else(|| anyhow::anyhow!("please set --file"))?;
+        let raw = command.get_flag("raw");
+        super::ttv::inspect(file, raw)?;
         return Ok(true);
     }
 

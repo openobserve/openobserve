@@ -24,6 +24,18 @@ export function useTablePagination<TData>(
     props.pageSizeOptions ?? [20, 50, 100, 250, 500],
   );
 
+  // In client mode, allow the parent to force a specific page by passing currentPage.
+  // This lets callers reset to page 1 on filter/search changes without relying on
+  // TanStack's autoResetPageIndex (which can't distinguish filter vs expansion changes).
+  watch(
+    () => props.currentPage,
+    (page) => {
+      if (isClientMode.value && page != null) {
+        table.setPageIndex(page - 1);
+      }
+    },
+  );
+
   // Client-side: current page from TanStack state
   const currentPage = computed(() => {
     if (isServerMode.value) return props.currentPage ?? 1;

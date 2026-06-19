@@ -15,7 +15,11 @@
 
         <!-- Other conditions: show operator + toggle button -->
         <template v-else>
-          <span class="tw:text-sm tw:font-medium tw:min-w-[30px] tw:lowercase">
+          <span
+            class="tw:text-sm tw:font-medium tw:min-w-[30px] tw:lowercase"
+            data-test="alert-conditions-operator-label"
+            :data-test-label="computedLabel"
+          >
             {{ computedLabel }}
           </span>
           <!-- Toggle AND/OR button -->

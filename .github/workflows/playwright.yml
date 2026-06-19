@@ -179,6 +179,15 @@ jobs:
                 "languageTranslation.spec.js",
                 "model-pricing.spec.js",
                 "edition-features.spec.js",
+                "logsqueries.sql-comments.spec.js",
+                "iam-form-validation.spec.js",
+                "regex-patterns-form-validation.spec.js",
+                "cipher-keys-form-validation.spec.js",
+                "settings-form-validation.spec.js",
+                "ai-toolsets-form-validation.spec.js",
+                "shared-components-form-validation.spec.js",
+                "onboarding-form-validation.spec.js",
+                "rum-form-validation.spec.js",
               ]
           - testfolder: "Logs-Builder-Basic"
             browser: "chrome"
@@ -235,6 +244,8 @@ jobs:
                 "alerts-metrics-notification.spec.js",
                 "alerts-destinations-prebuilt.spec.js",
                 "alerts-vrl-encoding.spec.js",
+                "alerts-form-validation.spec.js",
+                "anomaly-detection-form-validation.spec.js",
               ]
           - testfolder: "Dashboards-Core"
             browser: "chrome"
@@ -253,6 +264,7 @@ jobs:
                 "crossLinking.spec.js",
                 "dashboard-multi-sql.spec.js",
                 "crossLinkMultiStream.spec.js",
+                "dashboards-form-validation.spec.js",
               ]
           - testfolder: "Dashboards-Settings"
             browser: "chrome"
@@ -303,6 +315,7 @@ jobs:
                 "pipeline-history.spec.js",
                 "scheduled-pipeline-query-builder.spec.js",
                 # "remotepipeline.spec.js"
+                "pipelines-form-validation.spec.js",
               ]
           - testfolder: "Functions"
             browser: "chrome"
@@ -311,6 +324,8 @@ jobs:
                 "js-transform-type.spec.js",
                 "row-expansion.spec.js",
                 "enrichment-table-url.spec.js",
+                "functions-form-validation.spec.js",
+                "action-scripts-form-validation.spec.js",
               ]
           - testfolder: "Reports"
             browser: "chrome"
@@ -319,6 +334,7 @@ jobs:
                 "reportsScheduleNow.spec.js",
                 "reportsScheduleLater.spec.js",
                 "reportFolders.spec.js",
+                "reports-form-validation.spec.js",
               ]
           - testfolder: "Streams"
             browser: "chrome"
@@ -328,6 +344,7 @@ jobs:
                 "streamname.spec.js",
                 "streaming.spec.js",
                 "stream-settings.spec.js",
+                "streams-form-validation.spec.js",
               ]
           - testfolder: "Traces"
             browser: "chrome"
@@ -357,6 +374,7 @@ jobs:
                 "metrics-table-column-order.spec.js",
                 "metrics-promql-builder.spec.js",
                 "promqlAutocomplete.spec.js",
+                "metrics-share-deep-link.spec.js",
               ]
           - testfolder: "Dashboards-Variables"
             browser: "chrome"

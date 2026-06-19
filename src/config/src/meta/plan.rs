@@ -15,12 +15,12 @@
 
 use datafusion::physical_plan::{ExecutionPlan, displayable};
 
-use crate::cluster::LOCAL_NODE;
+use crate::{cluster::LOCAL_NODE, get_config};
 
 pub fn generate_plan_string(trace_id: &str, plan: &dyn ExecutionPlan) -> String {
     let plan = displayable(plan).indent(false).to_string();
     let mut plan = format!("[trace_id {trace_id}] \n{plan}");
-    if !LOCAL_NODE.is_single_node() {
+    if !LOCAL_NODE.is_single_node() || get_config().common.print_plan_single_line {
         plan = plan.replace("\n", "\\n");
     }
     plan

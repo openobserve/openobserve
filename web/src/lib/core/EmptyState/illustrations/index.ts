@@ -50,6 +50,8 @@ import EmptyReport from "./EmptyReport.vue";
 import EmptyQuery from "./EmptyQuery.vue";
 import EmptyAlert from "./EmptyAlert.vue";
 import EmptyExplorer from "./EmptyExplorer.vue";
+import EmptyServiceGraph from "./EmptyServiceGraph.vue";
+import EmptyServicesCatalog from "./EmptyServicesCatalog.vue";
 
 export const illustrations = {
   // ---- object / metaphor illustrations (the DEFAULT — no character) --------
@@ -61,6 +63,8 @@ export const illustrations = {
   check: EmptyCheck,
   logs: EmptyLogs,
   trace: EmptyTrace,
+  "service-graph": EmptyServiceGraph,
+  "services-catalog": EmptyServicesCatalog,
   pipeline: EmptyPipeline,
   function: EmptyFunction,
   history: EmptyHistory,

@@ -210,6 +210,23 @@ impl Collector for MultiHistogramCollector {
     }
 }
 
+// OSS stub for the enterprise histogram RANK fast path: always falls back to
+// SimpleHistogramCollector. Signature must match the enterprise version.
+#[allow(clippy::too_many_arguments)]
+pub fn simple_histogram_rank(
+    _searcher: &tantivy::Searcher,
+    _ts_field: &str,
+    _term_field: Option<(&str, &str)>,
+    _min_value: i64,
+    _bucket_width: u64,
+    _num_buckets: usize,
+    _ts_offset: i64,
+    _file_min_ts: i64,
+    _file_max_ts: i64,
+) -> tantivy::Result<Option<Vec<u64>>> {
+    Ok(None)
+}
+
 #[cfg(test)]
 mod tests {
     use tantivy::{

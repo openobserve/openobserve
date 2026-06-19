@@ -14,9 +14,16 @@ export class IngestionConfigPage {
         this.recommendedTabsContainerSelector = '[data-test="data-sources-recommended-tabs"]';
         this.recommendedTabsContainer = page.locator(this.recommendedTabsContainerSelector);
 
-        // Configuration content selectors
-        this.copyButton = page.locator('[data-test="rum-copy-btn"]').first();
-        this.contentText = page.locator('[data-test="rum-content-text"]').first();
+        // Configuration content selectors. Legacy integrations render CopyContent
+        // (rum-* selectors); migrated data sources (e.g. Postgres, SQL Server)
+        // render the rich DataSourceSetupCard with OCodeBlock copy buttons. A page
+        // only ever renders one of the two, so the combined selectors are safe.
+        this.copyButton = page
+          .locator('[data-test="rum-copy-btn"], [data-test="ai-code-copy-btn"]')
+          .first();
+        this.contentText = page
+          .locator('[data-test="rum-content-text"], [data-test="data-source-setup-card"]')
+          .first();
 
         // Notification selector — OToast variant=success carries the data-test we target.
         // 'o-toast-success' fires for both the Fluentd and Prometheus copy paths.

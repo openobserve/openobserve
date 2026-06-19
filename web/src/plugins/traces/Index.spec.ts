@@ -162,7 +162,6 @@ const mockSearchObj = {
     liveMode: false,
     serviceColors: {},
     metricsRangeFilters: new Map(),
-    showErrorOnly: false,
   }),
   data: {
     query: "",
@@ -1046,7 +1045,7 @@ describe("Index.vue (Main Traces Page)", () => {
     beforeEach(() => {
       mockApplyFilters.mockReset();
       mockRemoveFilterByField.mockReset();
-      mockSearchObj.meta.showErrorOnly = false;
+      mockSearchObj.data.editorValue = "";
       mockSearchObj.meta.metricsRangeFilters.clear();
       // Reset auto_query_enabled to undefined for each test
       delete store.state.zoConfig.auto_query_enabled;
@@ -1068,8 +1067,8 @@ describe("Index.vue (Main Traces Page)", () => {
       ]); // applyFilters owns the single trigger; no skipSearch arg
     });
 
-    it("should append error filter to applyFilters call when showErrorOnly is enabled", async () => {
-      mockSearchObj.meta.showErrorOnly = true;
+    it("should append error filter to applyFilters call when span_status = 'ERROR' is in the query", async () => {
+      mockSearchObj.data.editorValue = "span_status = 'ERROR'";
       wrapper = mountWithSearchBarStub();
       await flushPromises();
 
@@ -1083,7 +1082,7 @@ describe("Index.vue (Main Traces Page)", () => {
     });
 
     it("should not duplicate error filter when it is already present in incoming filters", async () => {
-      mockSearchObj.meta.showErrorOnly = true;
+      mockSearchObj.data.editorValue = "span_status = 'ERROR'";
       wrapper = mountWithSearchBarStub();
       await flushPromises();
 
@@ -3203,6 +3202,75 @@ describe("Index.vue (Main Traces Page)", () => {
 
       expect(wrapper.vm.streamChangeDialog.show).toBe(true);
       expect(wrapper.vm.streamChangeDialog.pendingStream).toBe("catalog-stream");
+    });
+
+    it("should call onWidenTracesRange and update relativeTimePeriod when service-graph emits widen-range", async () => {
+      mockSearchObj.meta.searchMode = "service-graph";
+      mockSearchObj.data.datetime.relativeTimePeriod = "15m";
+
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": {
+              name: "service-graph",
+              template: "<div />",
+              emits: ["widen-range", "request:stream-change"],
+            },
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+      await flushPromises();
+
+      const serviceGraphEl = wrapper.findComponent({ name: "service-graph" });
+      expect(serviceGraphEl.exists()).toBe(true);
+
+      await serviceGraphEl.vm.$emit("widen-range", "7d");
+      await flushPromises();
+
+      expect(mockSearchObj.data.datetime.relativeTimePeriod).toBe("7d");
+      expect(mockSearchObj.data.datetime.type).toBe("relative");
+    });
+
+    it("should call onWidenTracesRange and update relativeTimePeriod when services-catalog emits widen-range", async () => {
+      mockSearchObj.meta.searchMode = "services-catalog";
+      mockSearchObj.data.datetime.relativeTimePeriod = "15m";
+
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            "services-catalog": {
+              name: "services-catalog",
+              template: "<div />",
+              emits: ["widen-range", "request:stream-change"],
+            },
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+      await flushPromises();
+
+      const servicesCatalogEl = wrapper.findComponent({ name: "services-catalog" });
+      expect(servicesCatalogEl.exists()).toBe(true);
+
+      await servicesCatalogEl.vm.$emit("widen-range", "30d");
+      await flushPromises();
+
+      expect(mockSearchObj.data.datetime.relativeTimePeriod).toBe("30d");
+      expect(mockSearchObj.data.datetime.type).toBe("relative");
     });
   });
 });
