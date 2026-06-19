@@ -5,6 +5,7 @@ import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { h } from "vue";
 import OFormOptionGroup from "./OFormOptionGroup.vue";
 import OForm from "../Form/OForm.vue";
+import { z } from "zod";
 
 const fruits = [
   { value: "apple", label: "Apple" },
@@ -52,26 +53,27 @@ describe("OFormOptionGroup", () => {
     expect(wrapper.findAll("[role='checkbox']").length).toBe(2);
   });
 
-  it("shows validator error after selection", async () => {
+  it("shows schema error after submit when nothing selected", async () => {
     wrapper = mount(OForm, {
-      props: { defaultValues: { fruits: [] as string[] } },
+      props: {
+        defaultValues: { fruits: [] as string[] },
+        schema: z.object({
+          fruits: z.array(z.string()).min(1, "Pick one"),
+        }),
+      },
       slots: {
         default: () =>
           h(OFormOptionGroup, {
             name: "fruits",
             type: "checkbox",
             options: fruits,
-            validators: [
-              (v: string | number | (string | number)[] | undefined) =>
-                !Array.isArray(v) || v.length === 0 ? "Pick one" : undefined,
-            ],
           }),
       },
       global: { components: { OFormOptionGroup } },
     });
-    const boxes = wrapper.findAll("[role='checkbox']");
-    await boxes[0].trigger("click");
-    await boxes[0].trigger("click");
+    await (
+      wrapper.vm as unknown as { form: { handleSubmit: () => Promise<unknown> } }
+    ).form.handleSubmit();
     await flushPromises();
     expect(wrapper.text()).toContain("Pick one");
   });

@@ -27,6 +27,8 @@ export interface DateProps {
   readonly?: boolean;
   /** Prevents interaction */
   disabled?: boolean;
+  /** Marks the field required — renders a `*` after the label (no manual ` *`). */
+  required?: boolean;
   /** Control size */
   size?: DateSize;
   /** HTML id */

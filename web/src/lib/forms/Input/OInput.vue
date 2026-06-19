@@ -219,14 +219,14 @@ const wrapperClasses = computed(() => [
   "tw:flex tw:items-stretch tw:w-full tw:rounded-md tw:border tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150",
   "tw:bg-input-bg",
   !isTextarea.value ? heightClasses[props.size ?? "md"] : "",
+  /* Focus affordance = soft glow: a 4px translucent halo hugging the border
+     plus the focus border color. When the field has an ERROR, keep the red
+     error border on focus (don't let the focus color override it) and tint the
+     glow red — otherwise the focus border (blue) would hide the error state
+     while the field is focused. */
   hasError.value
-    ? "tw:border-input-border-error"
-    : "tw:border-input-border tw:hover:border-input-border-hover",
-  /* Focus affordance = soft glow: a 4px translucent primary halo hugging the
-     border (no offset gap), plus the focus border color. Reads as a glow while
-     staying a clearly visible focus indicator. */
-  "tw:focus-within:border-input-border-focus",
-  "tw:focus-within:ring-[0.125rem] tw:focus-within:ring-primary-500/25",
+    ? "tw:border-input-border-error tw:focus-within:ring-[0.125rem] tw:focus-within:ring-input-border-error/30"
+    : "tw:border-input-border tw:hover:border-input-border-hover tw:focus-within:border-input-border-focus tw:focus-within:ring-[0.125rem] tw:focus-within:ring-primary-500/25",
   /* Disabled inputs were almost indistinguishable from enabled ones — same
      near-white bg, same border. Added opacity-60 + dashed border so they
      read as obviously inactive at a glance. */
@@ -249,7 +249,7 @@ const wrapperClasses = computed(() => [
         props.disabled && 'o-input-label--disabled',
       ]"
     >
-      {{ label }}
+      {{ label }}<span v-if="required" aria-hidden="true" class="tw:select-none">*</span>
       <OIcon
         v-if="$slots.tooltip"
         name="info-outline"
@@ -265,7 +265,7 @@ const wrapperClasses = computed(() => [
       <span
         v-if="label && labelPosition === 'inside' && !isTextarea"
         class="tw:absolute tw:top-1 tw:start-3 tw:end-7 tw:text-[0.6875rem] tw:font-medium tw:leading-none tw:text-text-secondary tw:select-none tw:pointer-events-none tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis"
-      >{{ label }}</span>
+      >{{ label }}<span v-if="required" aria-hidden="true">&nbsp;*</span></span>
 
       <!-- Icon-left slot (inside border, left — matches OButton #icon-left pattern) -->
       <span

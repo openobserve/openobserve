@@ -42,6 +42,8 @@ export interface CheckboxProps {
   color?: CheckboxColor;
   /** Prevents interaction */
   disabled?: boolean;
+  /** Marks the field required — renders a `*` after the label (no manual ` *`). */
+  required?: boolean;
   /** HTML id — forwarded to the native input for external label association */
   id?: string;
   /** HTML name attribute */

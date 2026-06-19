@@ -3,6 +3,7 @@ import { LogsQueryPage } from './logsQueryPage.js';
 import { LoginPage } from '../generalPages/loginPage.js';
 import { IngestionPage } from '../generalPages/ingestionPage.js';
 import { ManagementPage } from '../generalPages/managementPage.js';
+import { openNavFlyoutChild } from '../commonActions.js';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -450,13 +451,15 @@ export class LogsPage {
     }
 
     async clickMenuLinkByType(linkType) {
+        // pipeline and functions moved into the Data group hover flyout
+        if (linkType === 'pipeline' || linkType === 'functions') {
+            return await openNavFlyoutChild(this.page, linkType);
+        }
         const linkMap = {
             'logs': this.logsMenuItem,
             'traces': '[data-test="menu-link-/traces-item"]',
             'streams': this.streamsMenuItem,
-            'metrics': '[data-test="menu-link-\\/metrics-item"]',
-            'pipeline': '[data-test="menu-link-\\/pipeline-item"]',
-            'functions': '[data-test="menu-link-\\/functions-item"]'
+            'metrics': '[data-test="menu-link-\\/metrics-item"]'
         };
         return await this.page.locator(linkMap[linkType]).click({ force: true });
     }

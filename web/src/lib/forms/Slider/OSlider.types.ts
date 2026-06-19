@@ -25,6 +25,8 @@ export interface SliderProps {
   error?: boolean;
   /** Prevents interaction */
   disabled?: boolean;
+  /** Marks the field required — renders a `*` after the label (no manual ` *`). */
+  required?: boolean;
   /** Control size */
   size?: SliderSize;
   /** HTML id */

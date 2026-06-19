@@ -3461,7 +3461,9 @@
     "import_this_pattern": "Bu Deseni İçe Aktar",
     "patterns_loaded": "Yüklenen {count} desen (ler)",
     "failed_to_load": "Desenler yüklenemedi",
-    "no_patterns_selected": "Lütfen en az bir desen seçin"
+    "no_patterns_selected": "Lütfen en az bir desen seçin",
+    "name_required": "* İsim zorunludur",
+    "pattern_required": "* Desen gereklidir"
   },
   "search_history": {
     "title": "Arama Geçmişi",

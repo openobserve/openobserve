@@ -30,6 +30,8 @@ export interface RangeProps {
   error?: boolean;
   /** Prevents interaction */
   disabled?: boolean;
+  /** Marks the field required — renders a `*` after the label (no manual ` *`). */
+  required?: boolean;
   /** Control size */
   size?: RangeSize;
   /** HTML id used as a prefix for both inputs */

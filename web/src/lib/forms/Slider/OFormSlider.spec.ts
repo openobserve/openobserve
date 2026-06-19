@@ -5,6 +5,7 @@ import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { h } from "vue";
 import OFormSlider from "./OFormSlider.vue";
 import OForm from "../Form/OForm.vue";
+import { z } from "zod";
 
 describe("OFormSlider", () => {
   let wrapper: VueWrapper;
@@ -39,22 +40,28 @@ describe("OFormSlider", () => {
     expect(Number(input.value)).toBe(35);
   });
 
-  it("shows validator error after change (handleBlur fires isTouched)", async () => {
+  it("shows schema error after submit when value exceeds the max", async () => {
     wrapper = mount(OForm, {
-      props: { defaultValues: { volume: 50 } },
+      props: {
+        defaultValues: { volume: 50 },
+        schema: z.object({ volume: z.number().max(80, "Too loud") }),
+      },
       slots: {
         default: () =>
-          h(OFormSlider, {
-            name: "volume",
-            min: 0,
-            max: 100,
-            validators: [(v: number) => (v > 80 ? "Too loud" : undefined)],
-          }),
+          h(OFormSlider, { name: "volume", min: 0, max: 100 }),
       },
       global: { components: { OFormSlider } },
     });
-    const input = wrapper.find("input");
-    await input.setValue("95");
+    const form = (
+      wrapper.vm as unknown as {
+        form: {
+          handleSubmit: () => Promise<unknown>;
+          setFieldValue: (n: string, v: unknown) => void;
+        };
+      }
+    ).form;
+    form.setFieldValue("volume", 95);
+    await form.handleSubmit();
     await flushPromises();
     expect(wrapper.text()).toContain("Too loud");
   });

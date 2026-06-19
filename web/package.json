@@ -81,7 +81,8 @@
     "vue-draggable-next": "^2.3.0",
     "vue-i18n": "^11.2.8",
     "vue-router": "^4.6.4",
-    "vuex": "^4.1.0"
+    "vuex": "^4.1.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@cypress/vue": "^6.0.2",
