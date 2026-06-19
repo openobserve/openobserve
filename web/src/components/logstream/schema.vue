@@ -1232,7 +1232,7 @@ export default defineComponent({
       },
       {
         value: "allFields",
-        label: `${computedSchemaFieldsName.value} (${indexData.value.schema.length})`,
+        label: `${computedSchemaFieldsName} (${indexData.value.schema.length})`,
         disabled: false,
         hide: false,
       },
