@@ -91,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
 
           <div
-            class="toolbar-toggle-container tw:py-1 tw:px-[0.375rem] tw:flex tw:items-center tw:justify-center tw:border tw:border-(--color-button-outline-border) tw:rounded-md tw:transition-all tw:duration-200 tw:cursor-pointer tw:hover:bg-(--o2-hover-accent)"
+            class="tw:py-1 tw:px-[0.375rem] tw:flex tw:items-center tw:justify-center tw:border tw:border-(--color-button-outline-border) tw:rounded-md tw:transition-all tw:duration-200 tw:cursor-pointer tw:hover:bg-(--o2-hover-accent)"
           >
             <OSwitch
               data-test="traces-search-bar-show-metrics-toggle-btn"

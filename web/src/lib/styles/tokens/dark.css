@@ -528,6 +528,7 @@
   --o2-menu-color: #FFFFFF;
   --o2-table-header-bg: color-mix(in srgb, var(--o2-theme-color) 80%, white);
   --o2-sticky-col-header-bg: #565656;
+  --o2-pivot-header-border: rgba(255, 255, 255, 0.12);
   --o2-table-actions-bg: #1f2223;
   --o2-log-table-row-bg: #21242c;
   --o2-log-table-row-alt-bg: #252934;

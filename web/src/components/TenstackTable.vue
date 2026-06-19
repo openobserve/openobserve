@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="col in pivotRowColumns"
               :key="'rh_' + col.name"
               :rowspan="pivotHeaderLevels.length"
-              class="tw:cursor-pointer tw:px-2 tw:text-left tw:text-center tw:font-semibold tw:align-middle tw:whitespace-nowrap tw:py-[5px] tw:[border-right:1px_solid_rgba(0,0,0,0.15)] tw:[border-bottom:1px_solid_rgba(0,0,0,0.15)] tw:bg-(--o2-border) tw:dark:bg-[#565656] tw:dark:[border-right-color:rgba(255,255,255,0.12)] tw:dark:[border-bottom-color:rgba(255,255,255,0.12)]"
+              class="tw:cursor-pointer tw:px-2 tw:text-center tw:font-semibold tw:align-middle tw:whitespace-nowrap tw:py-[5px] tw:[border-right:1px_solid_var(--o2-pivot-header-border)] tw:[border-bottom:1px_solid_var(--o2-pivot-header-border)] tw:bg-(--o2-sticky-col-header-bg)"
               :style="getStickyColumnStyle(col) as any"
               @click="handlePivotSort(col.name)"
             >
@@ -86,9 +86,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   pivotSortState.descending ? 'arrow-downward' : 'arrow-upward'
                 "
                 size="xs"
-                class="tw:ml-1 tw:align-middle tw:opacity-0 tw:transition-opacity tw:duration-200"
+                class="tw:ml-1 pivot-sort-icon"
                 :class="{
-                  'tw:opacity-100! tw:text-[var(--o2-primary-color)]': pivotSortState.sortBy === col.name,
+                  'pivot-sort-active tw:text-[var(--o2-primary-color)]': pivotSortState.sortBy === col.name,
                 }"
               />
             </th>
@@ -102,10 +102,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="tw:px-2"
               :class="[
                 level.isLeaf
-                  ? 'tw:text-center tw:font-medium tw:text-[0.85em] tw:align-middle tw:py-[5px] tw:[border-right:1px_solid_rgba(0,0,0,0.15)] tw:[border-bottom:1px_solid_rgba(0,0,0,0.15)] tw:bg-(--o2-border) tw:dark:bg-[#565656] tw:dark:[border-right-color:rgba(255,255,255,0.12)] tw:dark:[border-bottom-color:rgba(255,255,255,0.12)]'
-                  : 'tw:text-center tw:font-semibold tw:align-middle tw:whitespace-nowrap tw:py-[5px] tw:[border-right:1px_solid_rgba(0,0,0,0.15)] tw:[border-bottom:1px_solid_rgba(0,0,0,0.15)] tw:bg-(--o2-border) tw:dark:bg-[#565656] tw:dark:[border-right-color:rgba(255,255,255,0.12)] tw:dark:[border-bottom-color:rgba(255,255,255,0.12)]',
+                  ? 'tw:text-center tw:font-medium tw:text-[0.85em] tw:align-middle tw:py-[5px] tw:[border-right:1px_solid_var(--o2-pivot-header-border)] tw:[border-bottom:1px_solid_var(--o2-pivot-header-border)] tw:bg-(--o2-sticky-col-header-bg)'
+                  : 'tw:text-center tw:font-semibold tw:align-middle tw:whitespace-nowrap tw:py-[5px] tw:[border-right:1px_solid_var(--o2-pivot-header-border)] tw:[border-bottom:1px_solid_var(--o2-pivot-header-border)] tw:bg-(--o2-sticky-col-header-bg)',
                 {
-                  'pivot-section-border tw:[border-left:2px_solid_rgba(0,0,0,0.2)]!':
+                  'pivot-section-border':
                     cell.hasBorder && !(stickyColTotals && cell._isTotalHeader),
                 },
                 { 'pivot-total-col tw:font-semibold': stickyColTotals && cell._isTotalHeader },
@@ -125,9 +125,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   pivotSortState.descending ? 'arrow-downward' : 'arrow-upward'
                 "
                 size="xs"
-                class="tw:ml-1 tw:align-middle tw:opacity-0 tw:transition-opacity tw:duration-200"
+                class="tw:ml-1 pivot-sort-icon"
                 :class="{
-                  'tw:opacity-100! tw:text-[var(--o2-primary-color)]':
+                  'pivot-sort-active tw:text-[var(--o2-primary-color)]':
                     pivotSortState.sortBy === cell._sortColumn,
                 }"
               />
@@ -1006,7 +1006,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.1);
           "
         >
-          <tr class="pivot-total-row tw:font-bold tw:sticky tw:bottom-0 tw:z-[9] tw:shadow-[0_-2px_4px_rgba(0,0,0,0.1)]">
+          <tr class="pivot-total-row pivot-sticky-total-row">
             <td
               v-for="col in (columns as any[]) || []"
               :key="'ft_' + col.name"
