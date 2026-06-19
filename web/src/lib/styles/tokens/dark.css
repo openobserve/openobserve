@@ -225,6 +225,53 @@
     --color-badge-purple-ol-border: var(--color-purple-400);
     --color-badge-purple-ol-text:   var(--color-purple-400);
 
+    /* teal: brighten solid bg and outline for dark mode */
+    --color-badge-teal-solid-bg: var(--color-teal-400);
+    --color-badge-teal-ol-text: var(--color-teal-300);
+    --color-badge-teal-soft-bg: color-mix(in srgb, var(--color-teal-400) 15%, transparent);
+    --color-badge-teal-soft-text: var(--color-teal-400);
+
+    /* orange: brighten solid bg and outline for dark mode */
+    --color-badge-orange-solid-bg: var(--color-orange-400);
+    --color-badge-orange-ol-text: var(--color-orange-300);
+    --color-badge-orange-soft-bg: color-mix(in srgb, var(--color-orange-400) 15%, transparent);
+    --color-badge-orange-soft-text: var(--color-orange-400);
+
+    /* lime: brighten solid bg and outline for dark mode */
+    --color-badge-lime-solid-bg: var(--color-lime-400);
+    --color-badge-lime-ol-text: var(--color-lime-300);
+    --color-badge-lime-soft-bg: color-mix(in srgb, var(--color-lime-400) 15%, transparent);
+    --color-badge-lime-soft-text: var(--color-lime-400);
+
+    /* amber: brighten solid bg and outline for dark mode */
+    --color-badge-amber-solid-bg: var(--color-amber-400);
+    --color-badge-amber-ol-text: var(--color-amber-300);
+    --color-badge-amber-soft-bg: color-mix(in srgb, var(--color-amber-400) 15%, transparent);
+    --color-badge-amber-soft-text: var(--color-amber-400);
+
+    /* cyan: brighten solid bg and outline for dark mode */
+    --color-badge-cyan-solid-bg: var(--color-cyan-400);
+    --color-badge-cyan-ol-text: var(--color-cyan-300);
+    --color-badge-cyan-soft-bg: color-mix(in srgb, var(--color-cyan-400) 15%, transparent);
+    --color-badge-cyan-soft-text: var(--color-cyan-400);
+
+    /* blue: brighten solid bg and outline for dark mode */
+    --color-badge-blue-solid-bg: var(--color-blue-400);
+    --color-badge-blue-ol-text: var(--color-blue-300);
+    --color-badge-blue-soft-bg: color-mix(in srgb, var(--color-blue-400) 15%, transparent);
+    --color-badge-blue-soft-text: var(--color-blue-400);
+
+    /* purple (solid/soft variants): brighten for dark mode */
+    --color-badge-purple-solid-bg: var(--color-purple-400);
+    --color-badge-purple-soft-bg: color-mix(in srgb, var(--color-purple-400) 15%, transparent);
+    --color-badge-purple-soft-text: var(--color-purple-400);
+
+    /* indigo: brighten solid bg and outline for dark mode */
+    --color-badge-indigo-solid-bg: var(--color-indigo-400);
+    --color-badge-indigo-ol-text: var(--color-indigo-300);
+    --color-badge-indigo-soft-bg: color-mix(in srgb, var(--color-indigo-400) 15%, transparent);
+    --color-badge-indigo-soft-text: var(--color-indigo-400);
+
     /* Button — ghost-warning / outline-warning (bright yellow for readability on dark bg) */
     --color-button-ghost-warning-text: var(--color-warning-400);
     --color-button-outline-warning-text: var(--color-warning-400);

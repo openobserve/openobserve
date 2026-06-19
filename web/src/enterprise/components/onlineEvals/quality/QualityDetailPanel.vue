@@ -4,14 +4,22 @@
          ODrawer header (QualityPage) so the panel content starts straight
          from the KPI tiles without a duplicated identification block. -->
 
-    <div v-if="kpis.length === 0 && isLoading" class="qdp__loading">
+    <div v-if="isLoading && !hasScores" class="qdp__loading">
       <OSpinner size="sm" />
       <span>{{ t("onlineEvals.quality.detail.loading") }}</span>
     </div>
 
-    <div v-else-if="kpis.length === 0" class="qdp__empty">
-      <OIcon name="info" size="lg" />
-      <p>{{ t("onlineEvals.quality.detail.noData") }}</p>
+    <!-- No scores landed for this config in the window: show one focused
+         empty state (same OEmptyState used across list pages) instead of a
+         grid of dashed KPI cards + a chart placeholder. -->
+    <div v-else-if="!hasScores" class="qdp__empty">
+      <OEmptyState
+        size="block"
+        illustration="hourglass"
+        :title="t('onlineEvals.quality.detail.empty.title')"
+        :description="t('onlineEvals.quality.detail.empty.description')"
+        data-test="quality-detail-empty"
+      />
     </div>
 
     <template v-else>
@@ -154,8 +162,8 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import type { ScoreConfig } from "@/services/online-evals.service";
 import type {
   BooleanAggRow,
@@ -178,6 +186,7 @@ const props = defineProps<{
   config: ScoreConfig;
   dataType: "numeric" | "boolean" | "categorical" | "unknown";
   kpis: DetailKpi[];
+  hasScores: boolean;
   isLoading: boolean;
   numericTrend: TrendPoint[];
   numericDistribution: DistributionBucket[];
@@ -256,12 +265,14 @@ function formatKpi(kpi: DetailKpi): string {
   // edges. Add comfortable horizontal + vertical padding so titles,
   // KPI cards, and charts breathe inside the panel.
   padding: 16px 20px 24px;
-  min-height: 0;
+  // Fill the drawer body's full height (it's a flex-1 block, not a flex
+  // container) so the empty state's `flex: 1` has room to expand and center
+  // vertically. Populated panels just scroll past it as before.
+  min-height: 100%;
   overflow: auto;
 }
 
-.qdp__loading,
-.qdp__empty {
+.qdp__loading {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -272,6 +283,14 @@ function formatKpi(kpi: DetailKpi): string {
   text-align: center;
   color: var(--color-text-secondary, var(--o2-text-secondary));
   font-size: 12px;
+}
+
+.qdp__empty {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .qdp__kpis {
@@ -348,7 +367,6 @@ function formatKpi(kpi: DetailKpi): string {
   font-weight: 700;
   letter-spacing: -0.01em;
   font-variant-numeric: tabular-nums;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 .qdp-kpi--unhealthy .qdp-kpi__big { color: var(--o2-status-warning-text, #b25400); }

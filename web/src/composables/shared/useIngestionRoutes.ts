@@ -110,6 +110,9 @@ import AIIntegrationDetail from "@/components/ingestion/ai/AIIntegrationDetail.v
 import { aiCategories } from "@/components/ingestion/ai/data";
 
 const useIngestionRoutes = () => {
+  // One route per AI integration across all tabs. `aiCategories` is already
+  // deduped in data.ts (manifest cards reuse an existing route and the original
+  // is removed), so every routeName here is unique — no duplicate-name routes.
   const aiIntegrationRoutes = aiCategories.flatMap((category) =>
     category.integrations.map((integration) => ({
       path: `${category.slug}/${integration.slug}`,

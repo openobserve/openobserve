@@ -41,13 +41,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <OButton
           variant="outline"
-          size="sm-toolbar"
+          size="icon-sm"
+          icon-left="refresh"
           :loading="isRefreshing"
+          title="Refresh"
           data-test="ai-llm-insights-refresh-btn"
           @click="refresh"
-        >
-          Refresh
-        </OButton>
+        />
       </template>
     </AppPageHeader>
 

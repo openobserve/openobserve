@@ -82,10 +82,6 @@ impl Default for SummaryPercentile {
 }
 
 impl AggregateUDFImpl for SummaryPercentile {
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
-
     fn name(&self) -> &str {
         SUMMARY_PERCENTILE
     }

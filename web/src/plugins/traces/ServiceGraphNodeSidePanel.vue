@@ -601,6 +601,7 @@ import {
   type MetricGroupDefinition,
   K8S_METRIC_GROUP_DEFINITIONS,
 } from "@/utils/metrics/metricGrouping";
+import { buildChipDimensionsFromFilters } from "@/services/service_streams";
 import { buildWorkloadChipDimensions } from "@/composables/useMetricSubjectButtons";
 import { normalizeSeverity } from "@/utils/sourceEventSeverity";
 import DeployedCode from "@/components/icons/DeployedCode.vue";
@@ -1107,6 +1108,19 @@ export default defineComponent({
       ),
     );
 
+    // Semantic groups — fetched once for chip deduplication
+    const orgSemanticGroups = ref<FieldAlias[]>([]);
+    const loadOrgSemanticGroups = async () => {
+      if (orgSemanticGroups.value.length > 0) return;
+      try {
+        const org = store.state.selectedOrganization.identifier;
+        const resp = await getSemanticGroups(org);
+        orgSemanticGroups.value = resp.data || [];
+      } catch {
+        // non-fatal: chips won't be deduplicated but will still show
+      }
+    };
+
     // Metrics Correlation State
     const showTelemetryDialog = ref(false);
     const correlationLoading = ref(false);
@@ -1156,6 +1170,7 @@ export default defineComponent({
 
       try {
         const org = store.state.selectedOrganization.identifier;
+        await loadOrgSemanticGroups();
         const serviceName =
           props.selectedNode.name ||
           props.selectedNode.label ||
@@ -1180,10 +1195,8 @@ export default defineComponent({
           matchedDimensions: data.matched_dimensions || {},
           additionalDimensions: data.additional_dimensions || {},
           matchedSetId: data.matched_set_id,
-          chipDimensions: {
-            ...(data.matched_dimensions || {}),
-            ...(data.additional_dimensions || {}),
-          },
+          chipDimensions: buildChipDimensionsFromFilters(data, orgSemanticGroups.value),
+          // No source row available here — subject chips will be added by metricsCorrelationData path
           logStreams: data.related_streams?.logs || [],
           metricStreams: data.related_streams?.metrics || [],
           traceStreams: data.related_streams?.traces || [],
@@ -1295,16 +1308,6 @@ export default defineComponent({
           service: serviceName,
         };
 
-        // Resolve org semantic groups so we can layer Pod/Node/… subject chips
-        // into chipDimensions consistently with the logs/trace-detail sidebars.
-        let orgSemanticGroups: FieldAlias[] = [];
-        try {
-          const sgResp = await getSemanticGroups(org);
-          orgSemanticGroups = sgResp.data || [];
-        } catch {
-          orgSemanticGroups = [];
-        }
-
         const correlateResponse = await correlateStreams(org, {
           source_stream: props.streamFilter || "default",
           source_type: "traces",
@@ -1334,13 +1337,8 @@ export default defineComponent({
           additionalDimensions: data.additional_dimensions || {},
           matchedSetId: data.matched_set_id,
           chipDimensions: {
-            ...(data.matched_dimensions || {}),
-            ...(data.additional_dimensions || {}),
-            ...buildWorkloadChipDimensions(
-              data.matched_set_id,
-              orgSemanticGroups,
-              latestSpan ?? undefined,
-            ),
+            ...buildChipDimensionsFromFilters(data, orgSemanticGroups.value),
+            ...buildWorkloadChipDimensions(data.matched_set_id, orgSemanticGroups.value, latestSpan ?? undefined),
           },
           sourceEvent: latestSpan
             ? {

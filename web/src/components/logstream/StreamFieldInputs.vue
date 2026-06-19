@@ -24,6 +24,7 @@
       >
         <div data-test="add-stream-field-name-input" class="tw:flex-1 tw:min-w-[160px]">
           <OInput
+            :data-test="`add-stream-field-name-input-${index}`"
             v-model="field.name"
             :placeholder="t('logStream.fieldName') + ' *'"
             :error="!!fieldNameErrors[index]"
@@ -49,10 +50,10 @@
         </div>
         <div
           v-if="visibleInputs.data_type"
-          data-test="add-stream-field-data-type-select"
           class="tw:min-w-[100px]"
         >
           <OSelect
+            data-test="add-stream-field-data-type-select"
             v-model="field.type"
             :options="dataTypes"
             label-key="label"

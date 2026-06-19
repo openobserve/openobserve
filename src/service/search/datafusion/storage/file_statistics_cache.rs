@@ -25,10 +25,10 @@ use std::{
 use config::metrics;
 use dashmap::DashMap;
 use datafusion::{
-    common::Statistics,
+    common::{Statistics, TableReference},
     execution::cache::{
-        CacheAccessor,
-        cache_manager::{CachedFileMetadata, FileStatisticsCacheEntry},
+        CacheAccessor, TableScopedPath,
+        cache_manager::{self, CachedFileMetadata, FileStatisticsCacheEntry},
     },
 };
 use object_store::{ObjectMeta, path::Path};
@@ -145,10 +145,10 @@ impl Default for FileStatisticsCache {
     }
 }
 
-impl CacheAccessor<Path, CachedFileMetadata> for FileStatisticsCache {
+impl CacheAccessor<TableScopedPath, CachedFileMetadata> for FileStatisticsCache {
     /// Get cached metadata for file location.
-    fn get(&self, k: &Path) -> Option<CachedFileMetadata> {
-        let k = self.format_key(k);
+    fn get(&self, k: &TableScopedPath) -> Option<CachedFileMetadata> {
+        let k = self.format_key(&k.path);
         match self.statistics.get(&k) {
             Some(s) => {
                 metrics::QUERY_PARQUET_METADATA_CACHE_HITS_TOTAL
@@ -171,8 +171,8 @@ impl CacheAccessor<Path, CachedFileMetadata> for FileStatisticsCache {
     }
 
     /// Save collected file statistics
-    fn put(&self, k: &Path, value: CachedFileMetadata) -> Option<CachedFileMetadata> {
-        let k = self.format_key(k);
+    fn put(&self, k: &TableScopedPath, value: CachedFileMetadata) -> Option<CachedFileMetadata> {
+        let k = self.format_key(&k.path);
         let entry_size = Self::estimate_entry_size(&k, &value.meta, &value.statistics);
 
         let old = self.statistics.insert(
@@ -201,8 +201,8 @@ impl CacheAccessor<Path, CachedFileMetadata> for FileStatisticsCache {
         old.map(|(meta, stats, _)| CachedFileMetadata::new(meta, stats, None))
     }
 
-    fn remove(&self, k: &Path) -> Option<CachedFileMetadata> {
-        let k = self.format_key(k);
+    fn remove(&self, k: &TableScopedPath) -> Option<CachedFileMetadata> {
+        let k = self.format_key(&k.path);
         self.statistics.remove(&k).map(|(_, (meta, stats, size))| {
             self.current_memory
                 .fetch_sub(size as i64, Ordering::Relaxed);
@@ -210,8 +210,8 @@ impl CacheAccessor<Path, CachedFileMetadata> for FileStatisticsCache {
         })
     }
 
-    fn contains_key(&self, k: &Path) -> bool {
-        let k = self.format_key(k);
+    fn contains_key(&self, k: &TableScopedPath) -> bool {
+        let k = self.format_key(&k.path);
         self.statistics.contains_key(&k)
     }
 
@@ -224,17 +224,34 @@ impl CacheAccessor<Path, CachedFileMetadata> for FileStatisticsCache {
         self.cacher.lock().clear();
         self.current_memory.store(0, Ordering::Relaxed);
     }
+
     fn name(&self) -> String {
         "FileStatisticsCache".to_string()
     }
 }
 
-impl datafusion::execution::cache::cache_manager::FileStatisticsCache for FileStatisticsCache {
-    fn list_entries(&self) -> HashMap<Path, FileStatisticsCacheEntry> {
-        let mut entries = HashMap::<Path, FileStatisticsCacheEntry>::new();
+impl cache_manager::FileStatisticsCache for FileStatisticsCache {
+    fn cache_limit(&self) -> usize {
+        config::get_config()
+            .limit
+            .datafusion_file_stat_cache_max_size
+    }
+
+    fn update_cache_limit(&self, _limit: usize) {
+        // No-op: this is a process-wide, long-lived global cache whose eviction
+        // budget is owned solely by `put()` via `datafusion_file_stat_cache_max_size`.
+        // DataFusion calls this once per `CacheManager::try_new` (i.e. per session /
+        // per query) with its own per-session limit;
+    }
+
+    fn list_entries(&self) -> HashMap<TableScopedPath, FileStatisticsCacheEntry> {
+        let mut entries = HashMap::<TableScopedPath, FileStatisticsCacheEntry>::new();
 
         for entry in &self.statistics {
-            let path = Path::from(entry.key().as_str());
+            let path = TableScopedPath {
+                table: None,
+                path: Path::from(entry.key().as_str()),
+            };
             let (object_meta, stats, _) = entry.value();
             entries.insert(
                 path,
@@ -251,86 +268,102 @@ impl datafusion::execution::cache::cache_manager::FileStatisticsCache for FileSt
 
         entries
     }
+
+    fn drop_table_entries(
+        &self,
+        _table_ref: &Option<TableReference>,
+    ) -> datafusion::error::Result<()> {
+        Ok(())
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use chrono::DateTime;
+    use chrono::{DateTime, Utc};
     use datafusion::arrow::datatypes::{DataType, Field, Schema, TimeUnit};
 
     use super::*;
 
-    #[test]
-    fn test_file_statistics_cache() {
-        let meta = ObjectMeta {
-            location: Path::from("test"),
-            last_modified: DateTime::parse_from_rfc3339("2022-09-27T22:36:00+02:00")
-                .unwrap()
-                .into(),
-            size: 1024,
+    /// Wrap a [`Path`] into the table-scoped key the cache API expects.
+    fn key(location: &Path) -> TableScopedPath {
+        TableScopedPath {
+            table: None,
+            path: location.clone(),
+        }
+    }
+
+    /// Parse an RFC3339 timestamp, panicking on malformed input (test-only).
+    fn ts(s: &str) -> DateTime<Utc> {
+        DateTime::parse_from_rfc3339(s).unwrap().into()
+    }
+
+    /// Minimal [`ObjectMeta`] for a location, fixed `last_modified`, no etag/version.
+    fn object_meta(location: &str, size: u64) -> ObjectMeta {
+        ObjectMeta {
+            location: Path::from(location),
+            last_modified: ts("2024-01-15T00:00:00+00:00"),
+            size,
             e_tag: None,
             version: None,
-        };
-        let cache = FileStatisticsCache::default();
-        assert!(cache.get(&meta.location).is_none());
+        }
+    }
 
-        let stats: Arc<Statistics> = Statistics::new_unknown(&Schema::new(vec![Field::new(
+    /// Unknown statistics for the given fields, ready to cache.
+    fn unknown_stats(fields: Vec<Field>) -> Arc<Statistics> {
+        Statistics::new_unknown(&Schema::new(fields)).into()
+    }
+
+    /// Insert an entry into the cache under its own location.
+    fn put(cache: &FileStatisticsCache, meta: ObjectMeta, stats: Arc<Statistics>) {
+        cache.put(
+            &key(&meta.location),
+            CachedFileMetadata::new(meta, stats, None),
+        );
+    }
+
+    #[test]
+    fn test_file_statistics_cache() {
+        let meta = object_meta("test", 1024);
+        let cache = FileStatisticsCache::default();
+        assert!(cache.get(&key(&meta.location)).is_none());
+
+        let stats = unknown_stats(vec![Field::new(
             "test_column",
             DataType::Timestamp(TimeUnit::Second, None),
             false,
-        )]))
-        .into();
-        cache.put(
-            &meta.location,
-            CachedFileMetadata::new(meta.clone(), stats, None),
-        );
-        let cached = cache.get(&meta.location);
-        assert!(cached.is_some());
-        assert!(cached.unwrap().is_valid_for(&meta));
+        )]);
+        put(&cache, meta.clone(), stats);
 
-        // file size changed
-        let mut meta2 = meta.clone();
-        meta2.size = 2048;
-        let cached = cache.get(&meta2.location);
-        assert!(cached.is_some());
-        assert!(!cached.unwrap().is_valid_for(&meta2));
+        // exact match is valid
+        let cached = cache.get(&key(&meta.location)).expect("entry present");
+        assert!(cached.is_valid_for(&meta));
 
-        // file last_modified changed
-        let mut meta2 = meta.clone();
-        meta2.last_modified = DateTime::parse_from_rfc3339("2022-09-27T22:40:00+02:00")
-            .unwrap()
-            .into();
-        let cached = cache.get(&meta2.location);
-        assert!(cached.is_some());
-        assert!(!cached.unwrap().is_valid_for(&meta2));
+        // same location but file size changed -> cached but stale
+        let mut changed = meta.clone();
+        changed.size = 2048;
+        let cached = cache.get(&key(&changed.location)).expect("entry present");
+        assert!(!cached.is_valid_for(&changed));
 
-        // different file
-        let mut meta2 = meta;
-        meta2.location = Path::from("test2");
-        assert!(cache.get(&meta2.location).is_none());
+        // same location but last_modified changed -> cached but stale
+        let mut changed = meta.clone();
+        changed.last_modified = ts("2024-01-15T01:00:00+00:00");
+        let cached = cache.get(&key(&changed.location)).expect("entry present");
+        assert!(!cached.is_valid_for(&changed));
+
+        // different location -> miss
+        assert!(cache.get(&key(&Path::from("test2"))).is_none());
     }
 
     #[test]
     fn test_memory_size_calculation() {
         let cache = FileStatisticsCache::new();
+        assert_eq!(cache.memory_size(), 0, "empty cache tracks zero memory");
 
-        // Empty cache tracks zero memory
-        let empty_size = cache.memory_size();
-        assert_eq!(empty_size, 0);
-
-        // Add some entries
-        for i in 0..10 {
-            let meta = ObjectMeta {
-                location: Path::from(format!("test_file_{i}")),
-                last_modified: DateTime::parse_from_rfc3339("2022-09-27T22:36:00+02:00")
-                    .unwrap()
-                    .into(),
-                size: 1024 * (i + 1),
-                e_tag: Some(format!("etag_{i}")),
-                version: Some(format!("v{i}")),
-            };
-
-            let schema = Schema::new(vec![
+        for i in 0..10u64 {
+            let mut meta = object_meta(&format!("test_file_{i}"), 1024 * (i + 1));
+            meta.e_tag = Some(format!("etag_{i}"));
+            meta.version = Some(format!("v{i}"));
+            let stats = unknown_stats(vec![
                 Field::new("column1", DataType::Utf8, false),
                 Field::new("column2", DataType::Int64, true),
                 Field::new(
@@ -339,84 +372,55 @@ mod tests {
                     false,
                 ),
             ]);
-
-            cache.put(
-                &meta.location,
-                CachedFileMetadata::new(
-                    meta.clone(),
-                    Statistics::new_unknown(&schema).into(),
-                    None,
-                ),
-            );
+            put(&cache, meta, stats);
         }
 
-        // Size should increase after adding entries
-        let filled_size = cache.memory_size();
-        assert!(filled_size > empty_size);
-
-        println!(
-            "Cache with {} entries uses {} bytes",
-            cache.len(),
-            filled_size,
+        assert!(
+            cache.memory_size() > 0,
+            "memory tracked after inserting entries"
         );
+        assert_eq!(cache.len(), 10);
 
-        // After clearing, tracked memory must return to zero
         cache.clear();
-        assert_eq!(cache.memory_size(), 0);
+        assert_eq!(cache.memory_size(), 0, "cleared cache returns to zero");
     }
 
     #[test]
     fn test_cache_name() {
-        let cache = FileStatisticsCache::new();
-        assert_eq!(cache.name(), "FileStatisticsCache");
+        assert_eq!(FileStatisticsCache::new().name(), "FileStatisticsCache");
     }
 
     #[test]
     fn test_cache_contains_key_and_remove() {
         let cache = FileStatisticsCache::new();
-        let path = Path::from("test_file");
-        let meta = ObjectMeta {
-            location: path.clone(),
-            last_modified: DateTime::parse_from_rfc3339("2024-01-15T00:00:00+00:00")
-                .unwrap()
-                .into(),
-            size: 512,
-            e_tag: None,
-            version: None,
-        };
-        let schema = Schema::new(vec![Field::new("col", DataType::Utf8, false)]);
-        let stats: Arc<Statistics> = Statistics::new_unknown(&schema).into();
+        let meta = object_meta("test_file", 512);
+        let k = key(&meta.location);
 
-        assert!(!cache.contains_key(&path));
+        assert!(!cache.contains_key(&k));
 
-        cache.put(&path, CachedFileMetadata::new(meta.clone(), stats, None));
-        assert!(cache.contains_key(&path));
+        put(
+            &cache,
+            meta,
+            unknown_stats(vec![Field::new("col", DataType::Utf8, false)]),
+        );
+        assert!(cache.contains_key(&k));
         assert_eq!(cache.len(), 1);
 
-        let removed = cache.remove(&path);
-        assert!(removed.is_some());
-        assert!(!cache.contains_key(&path));
+        assert!(cache.remove(&k).is_some());
+        assert!(!cache.contains_key(&k));
         assert_eq!(cache.len(), 0);
     }
 
     #[test]
     fn test_cache_clear() {
         let cache = FileStatisticsCache::new();
-        let schema = Schema::new(vec![Field::new("col", DataType::Int64, false)]);
-
-        for i in 0..3 {
-            let path = Path::from(format!("file_{i}"));
-            let meta = ObjectMeta {
-                location: path.clone(),
-                last_modified: DateTime::parse_from_rfc3339("2024-01-15T00:00:00+00:00")
-                    .unwrap()
-                    .into(),
-                size: 100 * (i + 1),
-                e_tag: None,
-                version: None,
-            };
-            let stats: Arc<Statistics> = Statistics::new_unknown(&schema).into();
-            cache.put(&path, CachedFileMetadata::new(meta, stats, None));
+        for i in 0..3u64 {
+            let meta = object_meta(&format!("file_{i}"), 100 * (i + 1));
+            put(
+                &cache,
+                meta,
+                unknown_stats(vec![Field::new("col", DataType::Int64, false)]),
+            );
         }
 
         assert_eq!(cache.len(), 3);
@@ -428,34 +432,25 @@ mod tests {
     fn test_list_entries() {
         use datafusion::execution::cache::cache_manager::FileStatisticsCache as FscTrait;
 
-        let cache = super::FileStatisticsCache::new();
-        let path = Path::from("list_test");
-        let meta = ObjectMeta {
-            location: path.clone(),
-            last_modified: DateTime::parse_from_rfc3339("2024-01-15T00:00:00+00:00")
-                .unwrap()
-                .into(),
-            size: 256,
-            e_tag: None,
-            version: None,
-        };
-        let schema = Schema::new(vec![Field::new("col", DataType::Utf8, false)]);
-        let stats: Arc<Statistics> = Statistics::new_unknown(&schema).into();
+        let cache = FileStatisticsCache::new();
+        let meta = object_meta("list_test", 256);
+        let k = key(&meta.location);
 
-        let entries_before = FscTrait::list_entries(&cache);
-        assert!(entries_before.is_empty());
+        assert!(FscTrait::list_entries(&cache).is_empty());
 
-        cache.put(&path, CachedFileMetadata::new(meta, stats, None));
+        put(
+            &cache,
+            meta,
+            unknown_stats(vec![Field::new("col", DataType::Utf8, false)]),
+        );
         let entries = FscTrait::list_entries(&cache);
         assert_eq!(entries.len(), 1);
-        assert!(entries.contains_key(&path));
+        assert!(entries.contains_key(&k));
     }
 
     #[test]
     fn test_cache_remove_nonexistent_returns_none() {
         let cache = FileStatisticsCache::new();
-        let path = Path::from("does_not_exist");
-        let removed = cache.remove(&path);
-        assert!(removed.is_none());
+        assert!(cache.remove(&key(&Path::from("does_not_exist"))).is_none());
     }
 }
