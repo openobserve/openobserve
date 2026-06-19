@@ -40,10 +40,24 @@ export async function openNavFlyoutChild(page, child) {
     if (!entry) throw new Error(`Unknown nav flyout child: ${child}`);
     const tile = page.locator(NAV_GROUP_TILE[entry.group]);
     await tile.waitFor({ state: 'visible', timeout: 30000 });
-    await tile.hover();
     const item = page.locator(`[data-test="nav-group-item-${entry.name}"]`);
-    await item.waitFor({ state: 'visible', timeout: 30000 });
-    await item.click();
+    // Opening is hover-driven with a short open delay, and the flyout self-closes
+    // on scroll/resize — so while the page is still settling a single hover can
+    // open it only for it to be closed again before we click. Retry the
+    // open-and-reveal as a unit until the child is actually visible. Move the
+    // pointer away first each attempt so `hover()` always dispatches a fresh
+    // `mouseenter` (a no-op move when already over the tile never re-opens it).
+    await expect(async () => {
+        await page.mouse.move(0, 0);
+        await tile.hover();
+        await expect(item).toBeVisible({ timeout: 2000 });
+    }).toPass({ timeout: 30000 });
+    // The pointer is still over the tile (last hover above), so the flyout stays
+    // open. Force-click the child: a normal click's stability wait gives the
+    // mouseleave close-timer / slide-in animation a window to detach the element
+    // mid-click; force skips that wait and clicks the (already-visible) item
+    // immediately on arrival, before the close timer can fire.
+    await item.click({ force: true });
 }
 
 // Common Locator exports
