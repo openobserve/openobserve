@@ -29,6 +29,7 @@ use config::{
         self_reporting::error::{ErrorData, ErrorSource, PipelineError},
         stream::{StreamParams, StreamType},
     },
+    metrics,
     stats::MemorySize,
     utils::{
         flatten,
@@ -302,7 +303,8 @@ impl ExecutablePipeline {
             return Ok(HashMap::default());
         }
 
-        // Report pipeline ingestion
+        // Source size of the batch (MB). Computed before records are consumed by the
+        // pipeline. Usage is reported at the end with the real pipeline response time.
         let source_stream_params = self.get_source_stream_params();
         let source_size: f64 = records
             .iter()
@@ -320,28 +322,6 @@ impl ExecutablePipeline {
                 self.num_of_func(),
             );
         }
-
-        let usage_report_start = Instant::now();
-        if source_size > 0.0 {
-            let req_stats = config::meta::self_reporting::usage::RequestStats {
-                size: source_size,
-                records: batch_size as i64,
-                response_time: 0.0,
-                ..config::meta::self_reporting::usage::RequestStats::default()
-            };
-
-            crate::service::self_reporting::report_request_usage_stats(
-                req_stats,
-                org_id,
-                &self.id,
-                source_stream_params.stream_type,
-                config::meta::self_reporting::usage::UsageType::Pipeline,
-                0, // No functions for source stream ingestion
-                chrono::Utc::now().timestamp_micros(),
-            )
-            .await;
-        }
-        let usage_report_ms = usage_report_start.elapsed().as_millis();
 
         // result_channel
         let (result_sender, mut result_receiver) =
@@ -538,6 +518,17 @@ impl ExecutablePipeline {
             results.len()
         );
 
+        // Histogram metrics (always on): realtime pipeline batch execution time (ms)
+        // and batch size, labeled by pipeline so latency can be attributed per pipeline.
+        let stream_type_label = source_stream_params.stream_type.as_str();
+        let elapsed_secs = batch_start.elapsed().as_secs_f64();
+        metrics::PIPELINE_EXEC_TIME_MS
+            .with_label_values(&[org_id, &self.id, &pipeline_name, stream_type_label])
+            .observe(elapsed_secs * 1000.0);
+        metrics::PIPELINE_EXEC_BATCH_SIZE
+            .with_label_values(&[org_id, &self.id, &pipeline_name, stream_type_label])
+            .observe(batch_size as f64);
+
         if print_event {
             let total_ms = batch_start.elapsed().as_millis();
             let out_records: usize = results.values().map(|v| v.len()).sum();
@@ -548,10 +539,32 @@ impl ExecutablePipeline {
                 (0.0, 0.0)
             };
             log::info!(
-                "[Pipeline:Timing] [inv={inv_id}] done id={} name={} batch_size={batch_size} source_size_mb={source_size:.4} out_records={out_records} total_ms={total_ms} node_tasks_ms={node_tasks_ms} result_collect_ms={result_collect_ms} error_collect_ms={error_collect_ms} usage_report_ms={usage_report_ms} records_per_sec={records_per_sec:.1} mb_per_sec={mb_per_sec:.4}",
+                "[Pipeline:Timing] [inv={inv_id}] done id={} name={} batch_size={batch_size} source_size_mb={source_size:.4} out_records={out_records} total_ms={total_ms} node_tasks_ms={node_tasks_ms} result_collect_ms={result_collect_ms} error_collect_ms={error_collect_ms} records_per_sec={records_per_sec:.1} mb_per_sec={mb_per_sec:.4}",
                 self.id,
                 pipeline_name,
             );
+        }
+
+        // Report pipeline ingestion usage LAST, with response_time set to the time
+        // spent by the pipeline processing this batch (seconds, f64).
+        if source_size > 0.0 {
+            let req_stats = config::meta::self_reporting::usage::RequestStats {
+                size: source_size,
+                records: batch_size as i64,
+                response_time: elapsed_secs,
+                ..config::meta::self_reporting::usage::RequestStats::default()
+            };
+
+            crate::service::self_reporting::report_request_usage_stats(
+                req_stats,
+                org_id,
+                &self.id,
+                source_stream_params.stream_type,
+                config::meta::self_reporting::usage::UsageType::Pipeline,
+                0, // No functions for source stream ingestion
+                chrono::Utc::now().timestamp_micros(),
+            )
+            .await;
         }
 
         // Cross-type leaf nodes ingest directly via ingestion_service inside process_node,
