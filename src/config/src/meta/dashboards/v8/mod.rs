@@ -602,7 +602,6 @@ pub struct ConditionalRule {
     pub bg_color: Option<String>,
 }
 
-
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
 #[serde(default)]
 #[serde(rename_all = "camelCase")]
@@ -1322,5 +1321,273 @@ mod tests {
         assert!(json.contains("match"));
         assert!(json.contains("color"));
         assert!(json.contains("text"));
+    }
+
+    #[test]
+    fn test_config_unit_tag_and_value() {
+        let cfg: Config = serde_json::from_value(serde_json::json!({
+            "type": "unit",
+            "value": {"unit": "bytes", "customUnit": "rps"}
+        }))
+        .unwrap();
+        match &cfg {
+            Config::Unit { value } => {
+                let v = value.as_ref().unwrap();
+                assert_eq!(v.unit, Some("bytes".to_string()));
+                assert_eq!(v.custom_unit, Some("rps".to_string()));
+            }
+            _ => panic!("expected Unit variant"),
+        }
+        let json = serde_json::to_value(&cfg).unwrap();
+        assert_eq!(json["type"], "unit");
+    }
+
+    #[test]
+    fn test_config_unit_value_none_skipped() {
+        let cfg = Config::Unit { value: None };
+        let json = serde_json::to_value(&cfg).unwrap();
+        assert_eq!(json["type"], "unit");
+        assert!(!json.as_object().unwrap().contains_key("value"));
+    }
+
+    #[test]
+    fn test_config_unique_value_color_camel_case() {
+        let cfg: Config = serde_json::from_value(serde_json::json!({
+            "type": "unique_value_color",
+            "autoColor": true
+        }))
+        .unwrap();
+        assert!(matches!(cfg, Config::UniqueValueColor { auto_color: true }));
+        let json = serde_json::to_value(&cfg).unwrap();
+        assert_eq!(json["type"], "unique_value_color");
+        assert_eq!(json["autoColor"], true);
+    }
+
+    #[test]
+    fn test_config_unique_value_color_auto_color_defaults_false() {
+        let cfg: Config = serde_json::from_value(serde_json::json!({
+            "type": "unique_value_color"
+        }))
+        .unwrap();
+        assert!(matches!(
+            cfg,
+            Config::UniqueValueColor { auto_color: false }
+        ));
+    }
+
+    #[test]
+    fn test_config_simple_string_value_variants() {
+        let cases = [
+            ("alignment", "left"),
+            ("text_color", "#fff"),
+            ("background_color", "#000"),
+            ("field_type", "number"),
+        ];
+        for (typ, val) in cases {
+            let cfg: Config = serde_json::from_value(serde_json::json!({
+                "type": typ,
+                "value": val
+            }))
+            .unwrap();
+            let json = serde_json::to_value(&cfg).unwrap();
+            assert_eq!(json["type"], typ);
+            assert_eq!(json["value"], val);
+            let back: Config = serde_json::from_value(json).unwrap();
+            assert_eq!(back, cfg);
+        }
+    }
+
+    #[test]
+    fn test_config_string_value_none_skipped() {
+        let cfg = Config::Alignment { value: None };
+        let json = serde_json::to_value(&cfg).unwrap();
+        assert_eq!(json["type"], "alignment");
+        assert!(!json.as_object().unwrap().contains_key("value"));
+    }
+
+    #[test]
+    fn test_config_conditional_styles_roundtrip() {
+        let cfg: Config = serde_json::from_value(serde_json::json!({
+            "type": "conditional_styles",
+            "rules": [
+                {"operator": ">", "threshold": 10.0, "textColor": "#fff", "bgColor": "#f00"}
+            ]
+        }))
+        .unwrap();
+        match &cfg {
+            Config::ConditionalStyles { rules } => {
+                let rules = rules.as_ref().unwrap();
+                assert_eq!(rules.len(), 1);
+                assert_eq!(rules[0].operator, ">");
+                assert_eq!(rules[0].text_color, Some("#fff".to_string()));
+                assert_eq!(rules[0].bg_color, Some("#f00".to_string()));
+            }
+            _ => panic!("expected ConditionalStyles variant"),
+        }
+        let json = serde_json::to_value(&cfg).unwrap();
+        assert_eq!(json["type"], "conditional_styles");
+        let back: Config = serde_json::from_value(json).unwrap();
+        assert_eq!(back, cfg);
+    }
+
+    #[test]
+    fn test_config_conditional_styles_rules_none_skipped() {
+        let cfg = Config::ConditionalStyles { rules: None };
+        let json = serde_json::to_value(&cfg).unwrap();
+        assert_eq!(json["type"], "conditional_styles");
+        assert!(!json.as_object().unwrap().contains_key("rules"));
+    }
+
+    #[test]
+    fn test_conditional_rule_optional_colors_absent_when_none() {
+        let rule = ConditionalRule {
+            operator: ">=".to_string(),
+            threshold: OrdF64::from(5.0),
+            text_color: None,
+            bg_color: None,
+        };
+        let json = serde_json::to_string(&rule).unwrap();
+        assert!(!json.contains("textColor"));
+        assert!(!json.contains("bgColor"));
+        assert!(json.contains("operator"));
+        assert!(json.contains("threshold"));
+    }
+
+    #[test]
+    fn test_conditional_rule_threshold_values() {
+        // Thresholds may be negative, positive, zero, decimal, or large.
+        let cases = [
+            -100.0_f64,
+            -3.5,
+            -0.001,
+            0.0,
+            0.25,
+            10.0,
+            42.42,
+            1_000_000.5,
+        ];
+        for &val in &cases {
+            let rule = ConditionalRule {
+                operator: ">".to_string(),
+                threshold: OrdF64::from(val),
+                text_color: None,
+                bg_color: None,
+            };
+            let json = serde_json::to_value(&rule).unwrap();
+            assert_eq!(json["threshold"], serde_json::json!(val), "value {val}");
+
+            let back: ConditionalRule = serde_json::from_value(json).unwrap();
+            assert_eq!(back.threshold, OrdF64::from(val), "roundtrip {val}");
+            assert_eq!(back, rule, "full roundtrip {val}");
+        }
+    }
+
+    #[test]
+    fn test_conditional_rule_negative_threshold_deserialize() {
+        let rule: ConditionalRule = serde_json::from_value(serde_json::json!({
+            "operator": "<",
+            "threshold": -12.75,
+            "textColor": "#000"
+        }))
+        .unwrap();
+        assert_eq!(rule.operator, "<");
+        assert_eq!(rule.threshold, OrdF64::from(-12.75));
+        assert_eq!(rule.text_color, Some("#000".to_string()));
+        assert_eq!(rule.bg_color, None);
+    }
+
+    #[test]
+    fn test_conditional_rule_threshold_default_is_zero() {
+        let rule = ConditionalRule::default();
+        assert_eq!(rule.threshold, OrdF64::from(0.0));
+        let json = serde_json::to_value(&rule).unwrap();
+        assert_eq!(json["threshold"], serde_json::json!(0.0));
+    }
+
+    #[test]
+    fn test_conditional_styles_multiple_rules_threshold_ordering() {
+        // A conditional_styles config with mixed-sign decimal thresholds should
+        // round-trip preserving each rule's threshold and order.
+        let cfg: Config = serde_json::from_value(serde_json::json!({
+            "type": "conditional_styles",
+            "rules": [
+                {"operator": "<", "threshold": -5.5, "bgColor": "#00f"},
+                {"operator": "=", "threshold": 0.0, "bgColor": "#0f0"},
+                {"operator": ">", "threshold": 99.99, "bgColor": "#f00"}
+            ]
+        }))
+        .unwrap();
+        match &cfg {
+            Config::ConditionalStyles { rules } => {
+                let rules = rules.as_ref().unwrap();
+                assert_eq!(rules.len(), 3);
+                assert_eq!(rules[0].threshold, OrdF64::from(-5.5));
+                assert_eq!(rules[1].threshold, OrdF64::from(0.0));
+                assert_eq!(rules[2].threshold, OrdF64::from(99.99));
+            }
+            _ => panic!("expected ConditionalStyles variant"),
+        }
+        let back: Config = serde_json::from_value(serde_json::to_value(&cfg).unwrap()).unwrap();
+        assert_eq!(back, cfg);
+    }
+
+    #[test]
+    fn test_value_default_all_none_absent() {
+        let v = Value::default();
+        let json = serde_json::to_string(&v).unwrap();
+        assert!(!json.contains("unit"));
+        assert!(!json.contains("customUnit"));
+    }
+
+    #[test]
+    fn test_panel_config_table_pivot_and_pagination_fields() {
+        let cfg: PanelConfig = serde_json::from_value(serde_json::json!({
+            "show_legends": true,
+            "legends_position": null,
+            "base_map": null,
+            "map_view": null,
+            "table_pagination": true,
+            "table_pagination_rows_per_page": 25,
+            "table_filtering": false,
+            "table_pivot_show_row_totals": true,
+            "table_pivot_show_col_totals": false,
+            "table_pivot_sticky_row_totals": true,
+            "table_pivot_sticky_col_totals": false,
+            "panel_time_enabled": true,
+            "panel_time_range": {"type": "relative", "relativeTimePeriod": "15m"}
+        }))
+        .unwrap();
+        assert_eq!(cfg.table_pagination, Some(true));
+        assert_eq!(cfg.table_pagination_rows_per_page, Some(25));
+        assert_eq!(cfg.table_filtering, Some(false));
+        assert_eq!(cfg.table_pivot_show_row_totals, Some(true));
+        assert_eq!(cfg.table_pivot_show_col_totals, Some(false));
+        assert_eq!(cfg.table_pivot_sticky_row_totals, Some(true));
+        assert_eq!(cfg.table_pivot_sticky_col_totals, Some(false));
+        assert_eq!(cfg.panel_time_enabled, Some(true));
+        let pr = cfg.panel_time_range.as_ref().unwrap();
+        assert_eq!(pr.typee, "relative");
+        assert_eq!(pr.relative_time_period, Some("15m".to_string()));
+    }
+
+    #[test]
+    fn test_panel_config_table_optional_fields_absent_when_none() {
+        let cfg: PanelConfig = serde_json::from_value(serde_json::json!({
+            "show_legends": false,
+            "legends_position": null,
+            "base_map": null,
+            "map_view": null
+        }))
+        .unwrap();
+        let json = serde_json::to_string(&cfg).unwrap();
+        assert!(!json.contains("table_pagination"));
+        assert!(!json.contains("table_pagination_rows_per_page"));
+        assert!(!json.contains("table_filtering"));
+        assert!(!json.contains("table_pivot_show_row_totals"));
+        assert!(!json.contains("table_pivot_show_col_totals"));
+        assert!(!json.contains("table_pivot_sticky_row_totals"));
+        assert!(!json.contains("table_pivot_sticky_col_totals"));
+        assert!(!json.contains("panel_time_enabled"));
+        assert!(!json.contains("panel_time_range"));
     }
 }
