@@ -3200,25 +3200,35 @@ body.body--dark .rca-report-content {
 }
 
 /* --- json-preview.scss --- */
+/* NOTE: the .monaco-editor rules from json-preview.scss were originally
+   scoped to JsonPreview.vue (<style scoped>). They are now applied inline on
+   that component's editor instead of here, so they don't leak onto every
+   .monaco-editor app-wide (which made a stray #515151 outline appear around
+   unrelated editors such as the dashboard query editor). */
 
-.monaco-editor {
-  --vscode-focusBorder: #515151 !important;
+/* The query-editor wrappers used to carry a stray `monaco-editor` class (left
+   over from the old SCSS that sized the editor via `.monaco-editor { ... }`).
+   With the class present, monaco's base stylesheet applied to the wrapper —
+   including `--vscode-focusBorder` (#0090f1) and its outline — so a stray focus
+   border was painted around the non-editor wrapper, doubling up with the real
+   inner editor's border. The fix is to remove that leftover class from every
+   query-editor usage (see the *.vue templates). This rule is the safety net for
+   the real inner monaco editor: `.logs-query-editor` is present on every
+   CodeQueryEditor mount, so it covers the editor on every page. Neutralise the
+   outline / focus-border on the mount, the real inner editor, the overflow
+   guard, and the hidden focus textarea so no stray border can show. */
+.logs-query-editor,
+.logs-query-editor .monaco-editor,
+.logs-query-editor .overflow-guard,
+.logs-query-editor .inputarea {
+  outline: none !important;
+  --vscode-focusBorder: transparent !important;
 }
 
 .log_json_content {
   white-space: pre-wrap;
   font-family: monospace;
   font-size: 12px;
-}
-
-.monaco-editor {
-  width: calc(100% - 16px) !important;
-  height: calc(100vh - 250px) !important;
-
-  &.expanded {
-    height: 300px !important;
-    max-width: 1024px !important;
-  }
 }
 
 .log-json-field-dropdown-btn {

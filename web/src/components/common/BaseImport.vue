@@ -102,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :data-test="`${testPrefix}-import-sql-editor`"
                     ref="queryEditorRef"
                     :editor-id="`${testPrefix}-import-query-editor`"
-                    class="monaco-editor tw:mx-2"
+                    class="tw:mx-2"
                     :debounceTime="300"
                     v-model:query="jsonStr"
                     language="json"
@@ -154,7 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :data-test="`${testPrefix}-import-sql-editor`"
                     ref="queryEditorRef"
                     :editor-id="`${testPrefix}-import-query-editor`"
-                    class="monaco-editor tw:mx-2"
+                    class="tw:mx-2"
                     :debounceTime="300"
                     v-model:query="jsonStr"
                     language="json"
@@ -580,15 +580,6 @@ export default defineComponent({
   border: 1px solid var(--o2-border-color);
   border-radius: 0.375rem;
   padding-top: 12px;
-}
-
-.monaco-editor {
-  height: v-bind('editorHeights.fileEditor') !important;
-  overflow: auto;
-  resize: none;
-  border: 1px solid var(--o2-border-color);
-  border-radius: 0.375rem;
-  width: calc(100% - 14px) !important;
 }
 
 .error-report-container {

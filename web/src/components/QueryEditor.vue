@@ -88,7 +88,7 @@
         @generation-start="handleGenerationStart"
         @generation-end="handleGenerationEnd"
         @generation-success="handleGenerationSuccess"
-        class="monaco-editor tw:w-full tw:h-full"
+        class="tw:w-full tw:h-full"
       />
 
       <!-- Floating AI Icon (top-right corner of editor) - hidden when AI bar is open -->

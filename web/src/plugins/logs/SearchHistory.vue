@@ -168,7 +168,6 @@
                 style="height: 200px"
                 :ref="`QueryEditorRef${row.trace_id + row.sql}`"
                 :editor-id="`search-query-editor${row.trace_id + row.sql}`"
-                class="monaco-editor"
                 :debounceTime="600"
                 v-model:query="moreDetailsToDisplay"
                 language="json"

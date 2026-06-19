@@ -196,7 +196,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <query-editor
                     data-test="logs-vrl-function-editor"
                     editor-id="add-function-editor"
-                    class="monaco-editor tw:mt-2"
+                    class="tw:mt-2"
                     language="json"
                     ref="permissionJsonEditorRef"
                     v-model:query="permissionsJsonValue"

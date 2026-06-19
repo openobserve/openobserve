@@ -804,7 +804,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
                 data-test="logs-search-bar-refresh-btn"
                 data-cy="search-bar-refresh-button"
-                variant="ghost"
+                variant="primary"
                 :title="t('search.cancel')"
                 class="tw:p-0 tw:h-[1.875rem]! tw:text-[var(--text-xs)] tw:[font-weight:var(--font-medium)]! tw:leading-4! tw:px-1! tw:w-[5.875rem]! tw:whitespace-normal tw:break-words tw:text-center tw:[transition:box-shadow_0.3s_ease,opacity_0.2s_ease] tw:bg-[var(--o2-cancel-query-bg)] tw:text-[var(--o2-primary-btn-text)] element-box-shadow"
                 :class="
@@ -820,7 +820,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-else
                 data-test="logs-search-bar-refresh-btn"
                 data-cy="search-bar-refresh-button"
-                variant="ghost"
+                variant="primary"
                 :title="
                   isNaturalLanguageDetected && !searchObj.meta.nlpMode
                     ? t('search.generateQueryTooltip')
@@ -1115,7 +1115,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :ai-tooltip="t('search.enterFunctionPrompt')"
                       :read-only="isVrlEditorDisabled"
                       editor-height="100%"
-                      class="monaco-editor"
                       @update:query="
                         searchObj.data.tempFunctionContent = $event
                       "
@@ -1155,7 +1154,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="logs-vrl-function-editor"
                   ref="fnEditorRef"
                   editor-id="fnEditor"
-                  class="monaco-editor"
                   :query="actionEditorQuery"
                   read-only
                   language="markdown"

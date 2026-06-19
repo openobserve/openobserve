@@ -176,7 +176,6 @@
                     :key="row.trace_id"
                     :ref="`QueryEditorRef${row.trace_id}`"
                     :editor-id="`alerts-query-editor${row.trace_id}`"
-                    class="monaco-editor"
                     :debounceTime="300"
                     v-model:query="query"
                     language="json"

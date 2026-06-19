@@ -9,7 +9,7 @@
           data-test="common-json-editor"
           ref="queryEditorRef"
           editor-id="common-json-editor"
-          class="monaco-editor tw:flex-1 tw:min-h-0 tw:h-full"
+          class="tw:flex-1 tw:min-h-0 tw:h-full"
           :debounceTime="300"
           v-model:query="jsonContent"
           language="json"

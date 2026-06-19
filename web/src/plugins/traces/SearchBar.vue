@@ -382,7 +382,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <code-query-editor
           ref="queryEditorRef"
           editor-id="traces-query-editor"
-          class="monaco-editor"
           v-model:query="searchObj.data.editorValue"
           :keywords="effectiveKeywords"
           :class="

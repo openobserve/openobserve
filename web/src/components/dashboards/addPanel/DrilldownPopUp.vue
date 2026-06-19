@@ -91,7 +91,6 @@
           data-test="scheduled-alert-sql-editor"
           ref="queryEditorRef"
           editor-id="alerts-query-editor"
-          class="monaco-editor"
           style="height: 80px"
           :debounceTime="300"
           v-model:query="drilldownData.data.logsQuery"
