@@ -80,9 +80,12 @@ impl JsonEncoder {
                         // f64
                     }
                     MetricType::HISTOGRAM => {
-                        // initial type row
-                        ret.push(json!(mf_map.clone()));
-
+                        // NOTE: no "type header" row is emitted here. The metrics
+                        // ingest path (`service::metrics::json::ingest`) requires a
+                        // `value` on every record and aborts the whole batch on a
+                        // value-less record. A header row carries no value, so emitting
+                        // it would drop every metric in the scrape (incl. counters).
+                        // `__type__` is already set on each real row below.
                         let h = m.get_histogram();
                         let mut upper_bounds: Vec<Value> = vec![];
                         let mut cumulative_counts: Vec<Value> = vec![];
@@ -136,9 +139,7 @@ impl JsonEncoder {
                     }
 
                     MetricType::SUMMARY => {
-                        // initial type row
-                        ret.push(json!(mf_map.clone()));
-
+                        // No value-less type header row (see HISTOGRAM note above).
                         let s = m.get_summary();
                         let mut quantiles = vec![];
                         let mut values = vec![];
@@ -180,7 +181,12 @@ impl JsonEncoder {
                     }
                 }
             }
-            ret.push(json!(mf_map));
+            // Only counter/gauge accumulate a `value` into `mf_map`; histogram/summary
+            // emit their own rows above and `continue`, leaving `mf_map` as a value-less
+            // header that must not be ingested.
+            if matches!(metric_type, MetricType::COUNTER | MetricType::GAUGE) {
+                ret.push(json!(mf_map));
+            }
         }
         ret
     }
@@ -305,6 +311,15 @@ mod tests {
 
         let metrics = json.as_array().unwrap();
         assert!(metrics.len() > 1); // Should have multiple entries for buckets, sum, and count
+
+        // Every record must carry a `value` — the metrics ingest path rejects
+        // value-less records and aborts the whole batch. No type-header rows.
+        for m in metrics {
+            assert!(
+                m.get("value").is_some(),
+                "histogram record missing `value`: {m:?}"
+            );
+        }
 
         // Find the sum metric
         let sum_metric = metrics
