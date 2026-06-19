@@ -1,0 +1,1916 @@
+{
+  "queries": [
+    {
+      "id": "Q103",
+      "sql": "SELECT _timestamp, pallet_id, facility_zone, throughput_rate FROM \"{stream}\" ORDER BY throughput_rate DESC, _timestamp ASC LIMIT 8 OFFSET 4",
+      "category": "pagination",
+      "expected": {
+        "columns": [
+          "pallet_id",
+          "facility_zone",
+          "throughput_rate"
+        ],
+        "results": [
+          [
+            "PL-001",
+            "ZONE-3",
+            "610.0"
+          ],
+          [
+            "PL-005",
+            "ZONE-3",
+            "555.0"
+          ],
+          [
+            "PL-007",
+            "ZONE-1",
+            "555.0"
+          ],
+          [
+            "PL-006",
+            "ZONE-4",
+            "480.0"
+          ],
+          [
+            "PL-003",
+            "ZONE-1",
+            "320.0"
+          ],
+          [
+            "PL-005",
+            "ZONE-3",
+            "320.0"
+          ],
+          [
+            "PL-004",
+            "ZONE-2",
+            "290.0"
+          ],
+          [
+            "PL-006",
+            "ZONE-4",
+            "290.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 6119000000,
+        "end_offset": 6283000000
+      }
+    },
+    {
+      "id": "Q104",
+      "sql": "SELECT sorter_model, operation_mode, COUNT(*) AS cnt FROM \"{stream}\" GROUP BY sorter_model, operation_mode ORDER BY cnt DESC LIMIT 6 OFFSET 2",
+      "category": "pagination",
+      "expected": {
+        "columns": [
+          "sorter_model",
+          "operation_mode",
+          "cnt"
+        ],
+        "results": [
+          [
+            "SORT-Q5",
+            "auto",
+            "2"
+          ],
+          [
+            "SORT-X1",
+            "manual",
+            "2"
+          ],
+          [
+            "SORT-Z9",
+            "manual",
+            "2"
+          ],
+          [
+            "SORT-X1",
+            "hybrid",
+            "2"
+          ],
+          [
+            "SORT-A7",
+            "hybrid",
+            "1"
+          ],
+          [
+            "SORT-M3",
+            "auto",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
+      },
+      "time_offset": {
+        "start_offset": 6179000000,
+        "end_offset": 6343000000
+      }
+    },
+    {
+      "id": "Q105",
+      "sql": "WITH numbered AS (SELECT _timestamp, sorter_model, throughput_rate, ROW_NUMBER() OVER (ORDER BY throughput_rate DESC, _timestamp ASC) AS row_num FROM \"{stream}\" WHERE throughput_rate IS NOT NULL) SELECT _timestamp, sorter_model, throughput_rate, row_num FROM numbered WHERE row_num BETWEEN 5 AND 10 ORDER BY row_num",
+      "category": "pagination",
+      "expected": {
+        "columns": [
+          "sorter_model",
+          "throughput_rate",
+          "row_num"
+        ],
+        "results": [
+          [
+            "SORT-X1",
+            "610.0",
+            "5"
+          ],
+          [
+            "SORT-X1",
+            "555.0",
+            "6"
+          ],
+          [
+            "SORT-M3",
+            "555.0",
+            "7"
+          ],
+          [
+            "SORT-A7",
+            "480.0",
+            "8"
+          ],
+          [
+            "SORT-Z9",
+            "480.0",
+            "9"
+          ],
+          [
+            "SORT-X1",
+            "320.0",
+            "10"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 6239000000,
+        "end_offset": 6403000000
+      }
+    },
+    {
+      "id": "Q106",
+      "sql": "WITH reference AS (SELECT _timestamp FROM \"{stream}\" ORDER BY _timestamp ASC LIMIT 1 OFFSET 5) SELECT _timestamp, pallet_id, facility_zone, sorter_model, throughput_rate FROM \"{stream}\" WHERE _timestamp > (SELECT _timestamp FROM reference) ORDER BY _timestamp ASC LIMIT 8",
+      "category": "pagination",
+      "expected": {
+        "columns": [
+          "pallet_id",
+          "facility_zone",
+          "sorter_model",
+          "throughput_rate"
+        ],
+        "results": [
+          [
+            "PL-007",
+            "ZONE-1",
+            "SORT-M3",
+            "610.0"
+          ],
+          [
+            "PL-001",
+            "ZONE-3",
+            "SORT-X1",
+            "610.0"
+          ],
+          [
+            "PL-002",
+            "ZONE-4",
+            "SORT-A7",
+            "725.0"
+          ],
+          [
+            "PL-003",
+            "ZONE-1",
+            "SORT-M3",
+            "840.0"
+          ],
+          [
+            "PL-005",
+            "ZONE-3",
+            "SORT-X1",
+            "840.0"
+          ],
+          [
+            "PL-004",
+            "ZONE-2",
+            "SORT-Q5",
+            "290.0"
+          ],
+          [
+            "PL-006",
+            "ZONE-4",
+            "SORT-A7",
+            "290.0"
+          ],
+          [
+            "PL-007",
+            "ZONE-1",
+            "SORT-M3",
+            "555.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 6299000000,
+        "end_offset": 6463000000
+      }
+    },
+    {
+      "id": "Q107",
+      "sql": "WITH page AS (SELECT _timestamp, pallet_id, control_center, load_factor, throughput_rate, ROW_NUMBER() OVER (ORDER BY throughput_rate DESC, _timestamp ASC) AS row_idx FROM \"{stream}\" WHERE throughput_rate IS NOT NULL) SELECT * FROM page WHERE row_idx > 6 AND row_idx <= 14 ORDER BY row_idx ASC",
+      "category": "pagination",
+      "expected": {
+        "columns": [
+          "pallet_id",
+          "control_center",
+          "load_factor",
+          "throughput_rate",
+          "row_idx"
+        ],
+        "results": [
+          [
+            "PL-001",
+            "CC-BETA",
+            "99.0",
+            "610.0",
+            "7"
+          ],
+          [
+            "PL-007",
+            "CC-DELTA",
+            "72.8",
+            "555.0",
+            "8"
+          ],
+          [
+            "PL-008",
+            "CC-ALPHA",
+            "21.4",
+            "480.0",
+            "9"
+          ],
+          [
+            "PL-004",
+            "CC-ALPHA",
+            "55.2",
+            "290.0",
+            "10"
+          ],
+          [
+            "PL-006",
+            "CC-GAMMA",
+            "55.2",
+            "290.0",
+            "11"
+          ],
+          [
+            "PL-008",
+            "CC-ALPHA",
+            "88.1",
+            "190.0",
+            "12"
+          ],
+          [
+            "PL-002",
+            "CC-GAMMA",
+            "88.1",
+            "190.0",
+            "13"
+          ],
+          [
+            "PL-004",
+            "CC-ALPHA",
+            "45.3",
+            "150.0",
+            "14"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 6359000000,
+        "end_offset": 6523000000
+      }
+    },
+    {
+      "id": "Q108",
+      "sql": "SELECT facility_zone, operation_mode, COUNT(*) AS cnt, ROUND(AVG(throughput_rate), 2) AS avg_tput FROM \"{stream}\" GROUP BY facility_zone, operation_mode ORDER BY cnt DESC, avg_tput DESC LIMIT 6 OFFSET 3",
+      "category": "pagination",
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "operation_mode",
+          "cnt",
+          "avg_tput"
+        ],
+        "results": [
+          [
+            "ZONE-4",
+            "hybrid",
+            "2",
+            "385.0"
+          ],
+          [
+            "ZONE-2",
+            "manual",
+            "2",
+            "335.0"
+          ],
+          [
+            "ZONE-2",
+            "auto",
+            "2",
+            "220.0"
+          ],
+          [
+            "ZONE-1",
+            "manual",
+            "1",
+            "900.0"
+          ],
+          [
+            "ZONE-4",
+            "auto",
+            "1",
+            "190.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 6419000000,
+        "end_offset": 6583000000
+      }
+    },
+    {
+      "id": "Q109",
+      "sql": "WITH zoned AS (SELECT _timestamp, pallet_id, facility_zone, throughput_rate, ROW_NUMBER() OVER (PARTITION BY facility_zone ORDER BY throughput_rate DESC) AS rn FROM \"{stream}\" WHERE throughput_rate IS NOT NULL) SELECT * FROM zoned WHERE rn BETWEEN 2 AND 4 ORDER BY facility_zone ASC, rn ASC",
+      "category": "pagination",
+      "expected": {
+        "columns": [
+          "pallet_id",
+          "facility_zone",
+          "throughput_rate",
+          "rn"
+        ],
+        "results": [
+          [
+            "PL-003",
+            "ZONE-1",
+            "840.0",
+            "2"
+          ],
+          [
+            "PL-007",
+            "ZONE-1",
+            "320.0",
+            "3"
+          ],
+          [
+            "PL-008",
+            "ZONE-2",
+            "480.0",
+            "2"
+          ],
+          [
+            "PL-004",
+            "ZONE-2",
+            "150.0",
+            "3"
+          ],
+          [
+            "PL-005",
+            "ZONE-3",
+            "840.0",
+            "2"
+          ],
+          [
+            "PL-001",
+            "ZONE-3",
+            "610.0",
+            "3"
+          ],
+          [
+            "PL-005",
+            "ZONE-3",
+            "320.0",
+            "4"
+          ],
+          [
+            "PL-006",
+            "ZONE-4",
+            "480.0",
+            "2"
+          ],
+          [
+            "PL-006",
+            "ZONE-4",
+            "290.0",
+            "3"
+          ],
+          [
+            "PL-002",
+            "ZONE-4",
+            "190.0",
+            "4"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 6479000000,
+        "end_offset": 6643000000
+      }
+    },
+    {
+      "id": "Q110",
+      "sql": "SELECT _timestamp, pallet_id, conveyor_lane, load_factor, charge_remaining FROM \"{stream}\" WHERE load_factor IS NOT NULL ORDER BY load_factor DESC, charge_remaining ASC LIMIT 7 OFFSET 7",
+      "category": "pagination",
+      "expected": {
+        "columns": [
+          "pallet_id",
+          "conveyor_lane",
+          "load_factor",
+          "charge_remaining"
+        ],
+        "results": [
+          [
+            "PL-006",
+            "LANE-A",
+            "55.2",
+            "66.6"
+          ],
+          [
+            "PL-003",
+            "LANE-B",
+            "33.0",
+            "33.3"
+          ],
+          [
+            "PL-005",
+            "LANE-D",
+            "33.0",
+            "33.3"
+          ],
+          [
+            "PL-006",
+            "LANE-A",
+            "21.4",
+            "88.7"
+          ],
+          [
+            "PL-008",
+            "LANE-C",
+            "21.4",
+            "88.7"
+          ],
+          [
+            "PL-002",
+            "LANE-A",
+            "12.5",
+            "5.0"
+          ],
+          [
+            "PL-004",
+            "LANE-C",
+            "12.5",
+            "5.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 6539000000,
+        "end_offset": 6703000000
+      }
+    },
+    {
+      "id": "Q111",
+      "sql": "WITH inner_page AS (SELECT _timestamp, pallet_id, facility_zone, cell_temp, RANK() OVER (ORDER BY cell_temp DESC) AS temp_rank FROM \"{stream}\" WHERE cell_temp IS NOT NULL) SELECT * FROM inner_page WHERE temp_rank <= 8 UNION ALL SELECT _timestamp, pallet_id, facility_zone, cell_temp, RANK() OVER (ORDER BY cell_temp ASC) AS temp_rank FROM \"{stream}\" WHERE cell_temp IS NOT NULL ORDER BY temp_rank ASC LIMIT 16",
+      "category": "pagination",
+      "expected": {
+        "columns": [
+          "pallet_id",
+          "facility_zone",
+          "cell_temp",
+          "temp_rank"
+        ],
+        "results": [
+          [
+            "PL-005",
+            "ZONE-3",
+            "40.0",
+            "1"
+          ],
+          [
+            "PL-006",
+            "ZONE-4",
+            "18.5",
+            "1"
+          ],
+          [
+            "PL-003",
+            "ZONE-1",
+            "40.0",
+            "1"
+          ],
+          [
+            "PL-005",
+            "ZONE-3",
+            "19.2",
+            "2"
+          ],
+          [
+            "PL-007",
+            "ZONE-1",
+            "19.2",
+            "2"
+          ],
+          [
+            "PL-006",
+            "ZONE-4",
+            "35.7",
+            "3"
+          ],
+          [
+            "PL-004",
+            "ZONE-2",
+            "35.7",
+            "3"
+          ],
+          [
+            "PL-001",
+            "ZONE-3",
+            "22.0",
+            "4"
+          ],
+          [
+            "PL-007",
+            "ZONE-1",
+            "22.0",
+            "4"
+          ],
+          [
+            "PL-004",
+            "ZONE-2",
+            "32.5",
+            "5"
+          ],
+          [
+            "PL-008",
+            "ZONE-2",
+            "24.8",
+            "6"
+          ],
+          [
+            "PL-003",
+            "ZONE-1",
+            "30.1",
+            "6"
+          ],
+          [
+            "PL-008",
+            "ZONE-2",
+            "26.3",
+            "7"
+          ],
+          [
+            "PL-008",
+            "ZONE-2",
+            "26.3",
+            "7"
+          ],
+          [
+            "PL-002",
+            "ZONE-4",
+            "26.3",
+            "7"
+          ],
+          [
+            "PL-002",
+            "ZONE-4",
+            "26.3",
+            "7"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
+      },
+      "time_offset": {
+        "start_offset": 6599000000,
+        "end_offset": 6763000000
+      }
+    },
+    {
+      "id": "Q112",
+      "sql": "WITH dense_ranked AS (SELECT *, DENSE_RANK() OVER (ORDER BY throughput_rate DESC) AS dr FROM \"{stream}\" WHERE throughput_rate IS NOT NULL), distinct_page AS (SELECT MIN(_timestamp) AS _timestamp, throughput_rate, dr FROM dense_ranked GROUP BY throughput_rate, dr) SELECT * FROM distinct_page WHERE dr > 3 AND dr <= 8 ORDER BY dr ASC",
+      "category": "pagination",
+      "expected": {
+        "columns": [
+          "throughput_rate",
+          "dr"
+        ],
+        "results": [
+          [
+            "610.0",
+            "4"
+          ],
+          [
+            "555.0",
+            "5"
+          ],
+          [
+            "480.0",
+            "6"
+          ],
+          [
+            "320.0",
+            "7"
+          ],
+          [
+            "190.0",
+            "8"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 6659000000,
+        "end_offset": 6823000000
+      }
+    },
+    {
+      "id": "Q359",
+      "sql": "SELECT * FROM \"{stream}\" WHERE action_category = 'navigation' AND action_subcategory = 'vitalsLcp' AND page_slug = 'itemPage' AND component_name LIKE '%scan%' LIMIT 20",
+      "category": "pagination",
+      "time_offset": {
+        "start_offset": 21479000000,
+        "end_offset": 21553000000
+      },
+      "expected": {
+        "columns": [
+          "log",
+          "stream",
+          "pallet_id",
+          "load_factor",
+          "charge_remaining",
+          "throughput_rate",
+          "sorter_model",
+          "conveyor_lane",
+          "facility_zone",
+          "control_center",
+          "item_count",
+          "defect_limit",
+          "runtime_hours",
+          "operation_mode",
+          "package_size",
+          "scan_attempts",
+          "conveyor_segment",
+          "cell_temp",
+          "build_signature",
+          "event_detail",
+          "ack_detail",
+          "log_message",
+          "error_code",
+          "service_owner",
+          "upstream_error_code",
+          "exception_message",
+          "request_payload",
+          "phase_data",
+          "db_info",
+          "api_name",
+          "node_ip",
+          "source_ip",
+          "tag_a",
+          "tag_b",
+          "query_source",
+          "region_code",
+          "client_agent",
+          "operation_name",
+          "site_name",
+          "endpoint_path",
+          "http_method",
+          "response_code",
+          "scan_category",
+          "auth_result",
+          "task_id",
+          "entity_id",
+          "alert_tags",
+          "issue_type",
+          "filter_result",
+          "guard_mode",
+          "record_type",
+          "resource_path",
+          "latency_ms",
+          "org_name",
+          "threat_flag",
+          "build_version",
+          "bin_code",
+          "payload_size",
+          "component_name",
+          "route_key",
+          "auth_token",
+          "app_label",
+          "variant_tag",
+          "cookie_id",
+          "status_code",
+          "lcp_micros",
+          "inp_micros",
+          "cls_score",
+          "device_type",
+          "page_slug",
+          "action_category",
+          "action_subcategory",
+          "page_url",
+          "render_scope",
+          "os_platform",
+          "attack_name",
+          "http_request",
+          "user_agent_str",
+          "uri_path",
+          "geo_org",
+          "geo_country",
+          "geo_user_type",
+          "risk_rules_list",
+          "visitor_session_id",
+          "bot_flag",
+          "passthrough_flag",
+          "order_ref",
+          "info_tag",
+          "graphql_operation",
+          "datacenter"
+        ],
+        "results": [
+          [
+            "Q359 warehouse event record 4",
+            "stderr",
+            "PL-008",
+            "21.4",
+            "88.7",
+            "480.0",
+            "SORT-Z9",
+            "LANE-C",
+            "ZONE-2",
+            "CC-ALPHA",
+            "275",
+            "2.5",
+            "72",
+            "manual",
+            "200",
+            "3",
+            "5",
+            "24.8",
+            "BS-2025-D4",
+            "batch ABC123 processed successfully",
+            "ACK batch batchIdList:BT-008-2026 archived",
+            "ERROR: pallet PL-003 mismatch, retry url=https://warehouse.local/retry",
+            "E002",
+            "@warehouse-Android-track-v1",
+            "None",
+            "DataIntegrityException: pallet_id PL-002 checksum mismatch",
+            "{\"message\":{\"endpoint\":\"syncZone\",\"status\":\"syncing\"}}",
+            "[\"{\\\"name\\\":\\\"load\\\",\\\"startTime\\\":\\\"0\\\"}\", \"{\\\"name\\\":\\\"unload\\\",\\\"startTime\\\":\\\"250\\\"}\"]",
+            "[\"cid-jkl012\",\"status-ok\"]",
+            "SearchItems",
+            "10.12.1.203",
+            "192.168.1.14",
+            "staging",
+            "critical",
+            "cli",
+            "EU-WEST",
+            "node-fetch/3.3.2 (tracking-service)",
+            "CheckThreshold",
+            "site-syd-04",
+            "None",
+            "DELETE",
+            "404",
+            "outbound",
+            "fail",
+            "task-p6q7r8",
+            "ent-003-wh",
+            "capacity",
+            "mismatch",
+            "allow",
+            "active",
+            "track",
+            "None",
+            "45",
+            "warehouse-south",
+            "None",
+            "v2.0.0",
+            "BIN-J0",
+            "256",
+            "scan-hub",
+            "rk-warehouse-001",
+            "tok-wh-qrs345tuv678",
+            "warehouse-sync",
+            "None",
+            "sess_def456",
+            "200",
+            "1800000",
+            "160000",
+            "0.1",
+            "Mobile",
+            "itemPage",
+            "navigation",
+            "vitalsLcp",
+            "None",
+            "SSR",
+            "Android 14",
+            "Path Traversal",
+            "POST /api/login {\"user\":\"admin\"}",
+            "axios/1.6.0",
+            "/admin/login",
+            "Acme Corp",
+            "US",
+            "hosting",
+            "[\"torbot_ua_mismatch\",\"cookie_reuse\"]",
+            "sess_005",
+            "None",
+            "false",
+            "ORD-008",
+            "None",
+            "updateCart",
+            "dc-east"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q360",
+      "sql": "SELECT _timestamp, visitor_session_id, action_category, exception_message FROM \"{stream}\" WHERE org_name = 'warehouse-east' AND action_category = 'performanceMetric' AND exception_message LIKE '%Exception%' ORDER BY _timestamp DESC LIMIT 15",
+      "category": "pagination",
+      "time_offset": {
+        "start_offset": 21539000000,
+        "end_offset": 21613000000
+      },
+      "expected": {
+        "columns": [
+          "visitor_session_id",
+          "action_category",
+          "exception_message"
+        ],
+        "results": [
+          [
+            "sess_001",
+            "performanceMetric",
+            "SecurityException: unauthorized access to control_center CC-ALPHA"
+          ],
+          [
+            "sess_001",
+            "performanceMetric",
+            "SecurityException: unauthorized access to control_center CC-ALPHA"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q361",
+      "sql": "SELECT * FROM \"{stream}\" WHERE action_category = 'navigation' AND action_subcategory = 'vitalsLcp' AND page_slug IN ('itemPage', 'homePage') AND component_name LIKE '%charge%' AND device_type IN ('Mobile', 'Computer') LIMIT 10",
+      "category": "pagination",
+      "time_offset": {
+        "start_offset": 21599000000,
+        "end_offset": 21673000000
+      },
+      "expected": {
+        "columns": [
+          "log",
+          "stream",
+          "pallet_id",
+          "load_factor",
+          "charge_remaining",
+          "throughput_rate",
+          "sorter_model",
+          "conveyor_lane",
+          "facility_zone",
+          "control_center",
+          "item_count",
+          "defect_limit",
+          "runtime_hours",
+          "operation_mode",
+          "package_size",
+          "scan_attempts",
+          "conveyor_segment",
+          "cell_temp",
+          "build_signature",
+          "event_detail",
+          "ack_detail",
+          "log_message",
+          "error_code",
+          "service_owner",
+          "upstream_error_code",
+          "exception_message",
+          "request_payload",
+          "phase_data",
+          "db_info",
+          "api_name",
+          "node_ip",
+          "source_ip",
+          "tag_a",
+          "tag_b",
+          "query_source",
+          "region_code",
+          "client_agent",
+          "operation_name",
+          "site_name",
+          "endpoint_path",
+          "http_method",
+          "response_code",
+          "scan_category",
+          "auth_result",
+          "task_id",
+          "entity_id",
+          "alert_tags",
+          "issue_type",
+          "filter_result",
+          "guard_mode",
+          "record_type",
+          "resource_path",
+          "latency_ms",
+          "org_name",
+          "threat_flag",
+          "build_version",
+          "bin_code",
+          "payload_size",
+          "component_name",
+          "route_key",
+          "auth_token",
+          "app_label",
+          "variant_tag",
+          "cookie_id",
+          "status_code",
+          "lcp_micros",
+          "inp_micros",
+          "cls_score",
+          "device_type",
+          "page_slug",
+          "action_category",
+          "action_subcategory",
+          "page_url",
+          "render_scope",
+          "os_platform",
+          "attack_name",
+          "http_request",
+          "user_agent_str",
+          "uri_path",
+          "geo_org",
+          "geo_country",
+          "geo_user_type",
+          "risk_rules_list",
+          "visitor_session_id",
+          "bot_flag",
+          "passthrough_flag",
+          "order_ref",
+          "info_tag",
+          "graphql_operation",
+          "datacenter"
+        ],
+        "results": [
+          [
+            "Q361 warehouse event record 4",
+            "stdout",
+            "PL-002",
+            "88.1",
+            "25.0",
+            "190.0",
+            "SORT-A7",
+            "LANE-A",
+            "ZONE-4",
+            "CC-GAMMA",
+            "340",
+            "0.5",
+            "500",
+            "auto",
+            "250",
+            "2",
+            "1",
+            "26.3",
+            "BS-2026-B2",
+            "batch MNO456 merged into pallet PL-005",
+            "ACK batch batchIdList:BT-004-2026 validated",
+            "GET /api/v1/warehouse/status 200 OK",
+            "E008",
+            "@warehouse-Android-scan-v2",
+            "UP-E002",
+            "StateTransitionException: operation_mode hybrid invalid state",
+            "{\"message\":{\"endpoint\":\"mergeBatch\",\"status\":\"ok\"}}",
+            "[\"{\\\"name\\\":\\\"boot\\\",\\\"startTime\\\":\\\"0\\\"}\", \"{\\\"name\\\":\\\"calibrate\\\",\\\"startTime\\\":\\\"100\\\"}\"]",
+            "[\"cid-bcd890\",\"status-ok\"]",
+            "CheckThreshold",
+            "10.12.0.104",
+            "192.168.1.10",
+            "staging",
+            "critical",
+            "cli",
+            "EU-CENTRAL",
+            "PostmanRuntime/7.35.0",
+            "DeleteRecord",
+            "site-tor-10",
+            "/api/v1/health/check",
+            "DELETE",
+            "200",
+            "outbound",
+            "pass",
+            "task-d4e5f6",
+            "ent-009-wh",
+            "error",
+            "mismatch",
+            "block",
+            "passive",
+            "track",
+            "/logs/warehouse/app.log",
+            "78",
+            "warehouse-central",
+            "true",
+            "v2.0.8",
+            "BIN-F6",
+            "2048",
+            "charge-checker",
+            "rk-warehouse-007",
+            "tok-wh-stu901vwx234",
+            "warehouse-sort",
+            "variant_c",
+            "var2_mno345",
+            "200",
+            "3400000",
+            "120000",
+            "0.08",
+            "Computer",
+            "homePage",
+            "navigation",
+            "vitalsLcp",
+            "https://shop.example.com/item/1005",
+            "CSR",
+            "iOS 17.4",
+            "Desync Attack",
+            "GET /api/products",
+            "python-requests/2.31",
+            "/ip/10.0.0.1",
+            "NetGuard AS",
+            "US",
+            "business",
+            "[\"cookie_reuse\",\"session_hijack\"]",
+            "sess_002",
+            "None",
+            "false",
+            "ORD-005",
+            "Allowlisted",
+            "verifyPayment",
+            "dc-central"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q362",
+      "sql": "SELECT * FROM \"{stream}\" WHERE action_category = 'navigation' AND action_subcategory = 'vitalsLcp' AND page_slug IN ('itemPage', 'homePage') AND device_type IN ('Mobile', 'Computer', 'Tablet') AND error_code NOT IN ('E001', 'E002') LIMIT 15",
+      "category": "pagination",
+      "time_offset": {
+        "start_offset": 21659000000,
+        "end_offset": 21733000000
+      },
+      "expected": {
+        "columns": [
+          "log",
+          "stream",
+          "pallet_id",
+          "load_factor",
+          "charge_remaining",
+          "throughput_rate",
+          "sorter_model",
+          "conveyor_lane",
+          "facility_zone",
+          "control_center",
+          "item_count",
+          "defect_limit",
+          "runtime_hours",
+          "operation_mode",
+          "package_size",
+          "scan_attempts",
+          "conveyor_segment",
+          "cell_temp",
+          "build_signature",
+          "event_detail",
+          "ack_detail",
+          "log_message",
+          "error_code",
+          "service_owner",
+          "upstream_error_code",
+          "exception_message",
+          "request_payload",
+          "phase_data",
+          "db_info",
+          "api_name",
+          "node_ip",
+          "source_ip",
+          "tag_a",
+          "tag_b",
+          "query_source",
+          "region_code",
+          "client_agent",
+          "operation_name",
+          "site_name",
+          "endpoint_path",
+          "http_method",
+          "response_code",
+          "scan_category",
+          "auth_result",
+          "task_id",
+          "entity_id",
+          "alert_tags",
+          "issue_type",
+          "filter_result",
+          "guard_mode",
+          "record_type",
+          "resource_path",
+          "latency_ms",
+          "org_name",
+          "threat_flag",
+          "build_version",
+          "bin_code",
+          "payload_size",
+          "component_name",
+          "route_key",
+          "auth_token",
+          "app_label",
+          "variant_tag",
+          "cookie_id",
+          "status_code",
+          "lcp_micros",
+          "inp_micros",
+          "cls_score",
+          "device_type",
+          "page_slug",
+          "action_category",
+          "action_subcategory",
+          "page_url",
+          "render_scope",
+          "os_platform",
+          "attack_name",
+          "http_request",
+          "user_agent_str",
+          "uri_path",
+          "geo_org",
+          "geo_country",
+          "geo_user_type",
+          "risk_rules_list",
+          "visitor_session_id",
+          "bot_flag",
+          "passthrough_flag",
+          "order_ref",
+          "info_tag",
+          "graphql_operation",
+          "datacenter"
+        ],
+        "results": [
+          [
+            "Q361 warehouse event record 4",
+            "stdout",
+            "PL-002",
+            "88.1",
+            "25.0",
+            "190.0",
+            "SORT-A7",
+            "LANE-A",
+            "ZONE-4",
+            "CC-GAMMA",
+            "340",
+            "0.5",
+            "500",
+            "auto",
+            "250",
+            "2",
+            "1",
+            "26.3",
+            "BS-2026-B2",
+            "batch MNO456 merged into pallet PL-005",
+            "ACK batch batchIdList:BT-004-2026 validated",
+            "GET /api/v1/warehouse/status 200 OK",
+            "E008",
+            "@warehouse-Android-scan-v2",
+            "UP-E002",
+            "StateTransitionException: operation_mode hybrid invalid state",
+            "{\"message\":{\"endpoint\":\"mergeBatch\",\"status\":\"ok\"}}",
+            "[\"{\\\"name\\\":\\\"boot\\\",\\\"startTime\\\":\\\"0\\\"}\", \"{\\\"name\\\":\\\"calibrate\\\",\\\"startTime\\\":\\\"100\\\"}\"]",
+            "[\"cid-bcd890\",\"status-ok\"]",
+            "CheckThreshold",
+            "10.12.0.104",
+            "192.168.1.10",
+            "staging",
+            "critical",
+            "cli",
+            "EU-CENTRAL",
+            "PostmanRuntime/7.35.0",
+            "DeleteRecord",
+            "site-tor-10",
+            "/api/v1/health/check",
+            "DELETE",
+            "200",
+            "outbound",
+            "pass",
+            "task-d4e5f6",
+            "ent-009-wh",
+            "error",
+            "mismatch",
+            "block",
+            "passive",
+            "track",
+            "/logs/warehouse/app.log",
+            "78",
+            "warehouse-central",
+            "true",
+            "v2.0.8",
+            "BIN-F6",
+            "2048",
+            "charge-checker",
+            "rk-warehouse-007",
+            "tok-wh-stu901vwx234",
+            "warehouse-sort",
+            "variant_c",
+            "var2_mno345",
+            "200",
+            "3400000",
+            "120000",
+            "0.08",
+            "Computer",
+            "homePage",
+            "navigation",
+            "vitalsLcp",
+            "https://shop.example.com/item/1005",
+            "CSR",
+            "iOS 17.4",
+            "Desync Attack",
+            "GET /api/products",
+            "python-requests/2.31",
+            "/ip/10.0.0.1",
+            "NetGuard AS",
+            "US",
+            "business",
+            "[\"cookie_reuse\",\"session_hijack\"]",
+            "sess_002",
+            "None",
+            "false",
+            "ORD-005",
+            "Allowlisted",
+            "verifyPayment",
+            "dc-central"
+          ],
+          [
+            "Q362 warehouse event record 1",
+            "stderr",
+            "PL-004",
+            "88.1",
+            "25.0",
+            "190.0",
+            "SORT-Q5",
+            "LANE-C",
+            "ZONE-2",
+            "CC-ALPHA",
+            "340",
+            "0.5",
+            "500",
+            "auto",
+            "250",
+            "2",
+            "1",
+            "26.3",
+            "BS-2026-B2",
+            "batch MNO456 merged into pallet PL-005",
+            "ACK batch batchIdList:BT-004-2026 validated",
+            "GET /api/v1/warehouse/status 200 OK",
+            "E008",
+            "@warehouse-Android-scan-v2",
+            "None",
+            "StateTransitionException: operation_mode hybrid invalid state",
+            "{\"message\":{\"endpoint\":\"mergeBatch\",\"status\":\"ok\"}}",
+            "[\"{\\\"name\\\":\\\"boot\\\",\\\"startTime\\\":\\\"0\\\"}\", \"{\\\"name\\\":\\\"calibrate\\\",\\\"startTime\\\":\\\"100\\\"}\"]",
+            "[\"cid-bcd890\",\"status-ok\"]",
+            "CheckThreshold",
+            "10.12.0.104",
+            "192.168.1.10",
+            "staging",
+            "critical",
+            "cli",
+            "EU-CENTRAL",
+            "PostmanRuntime/7.35.0",
+            "DeleteRecord",
+            "site-tor-10",
+            "None",
+            "DELETE",
+            "200",
+            "outbound",
+            "pass",
+            "task-d4e5f6",
+            "ent-009-wh",
+            "error",
+            "mismatch",
+            "block",
+            "passive",
+            "track",
+            "None",
+            "78",
+            "warehouse-central",
+            "None",
+            "v2.0.8",
+            "BIN-F6",
+            "2048",
+            "charge-checker",
+            "rk-warehouse-007",
+            "tok-wh-stu901vwx234",
+            "warehouse-sort",
+            "None",
+            "var2_mno345",
+            "200",
+            "3400000",
+            "120000",
+            "0.08",
+            "Computer",
+            "homePage",
+            "navigation",
+            "vitalsLcp",
+            "None",
+            "CSR",
+            "iOS 17.4",
+            "Desync Attack",
+            "GET /api/products",
+            "python-requests/2.31",
+            "/ip/10.0.0.1",
+            "NetGuard AS",
+            "US",
+            "business",
+            "[\"cookie_reuse\",\"session_hijack\"]",
+            "sess_002",
+            "None",
+            "false",
+            "ORD-005",
+            "None",
+            "verifyPayment",
+            "dc-central"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q363",
+      "sql": "SELECT _timestamp, action_category, page_slug, latency_ms FROM \"{stream}\" WHERE action_category = 'performanceMetric' AND latency_ms > 0 ORDER BY latency_ms DESC LIMIT 10 OFFSET 0",
+      "category": "pagination",
+      "time_offset": {
+        "start_offset": 21719000000,
+        "end_offset": 21793000000
+      },
+      "expected": {
+        "columns": [
+          "action_category",
+          "page_slug",
+          "latency_ms"
+        ],
+        "results": [
+          [
+            "performanceMetric",
+            "cartPage",
+            "1450"
+          ],
+          [
+            "performanceMetric",
+            "searchPage",
+            "230"
+          ],
+          [
+            "performanceMetric",
+            "searchPage",
+            "230"
+          ],
+          [
+            "performanceMetric",
+            "itemPage",
+            "12"
+          ],
+          [
+            "performanceMetric",
+            "itemPage",
+            "12"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q364",
+      "sql": "SELECT * FROM \"{stream}\" WHERE action_category = 'performanceMetric' AND action_subcategory = 'vitalsLcp' AND page_slug IN ('itemPage', 'checkoutPage') AND (component_name LIKE '%lane%' OR component_name LIKE '%batch%') AND os_platform IN ('Mac OS X (iPhone)', 'Android 12', 'Android 14') LIMIT 10",
+      "category": "pagination",
+      "time_offset": {
+        "start_offset": 21779000000,
+        "end_offset": 21853000000
+      },
+      "expected": {
+        "columns": [
+          "log",
+          "stream",
+          "pallet_id",
+          "load_factor",
+          "charge_remaining",
+          "throughput_rate",
+          "sorter_model",
+          "conveyor_lane",
+          "facility_zone",
+          "control_center",
+          "item_count",
+          "defect_limit",
+          "runtime_hours",
+          "operation_mode",
+          "package_size",
+          "scan_attempts",
+          "conveyor_segment",
+          "cell_temp",
+          "build_signature",
+          "event_detail",
+          "ack_detail",
+          "log_message",
+          "error_code",
+          "service_owner",
+          "upstream_error_code",
+          "exception_message",
+          "request_payload",
+          "phase_data",
+          "db_info",
+          "api_name",
+          "node_ip",
+          "source_ip",
+          "tag_a",
+          "tag_b",
+          "query_source",
+          "region_code",
+          "client_agent",
+          "operation_name",
+          "site_name",
+          "endpoint_path",
+          "http_method",
+          "response_code",
+          "scan_category",
+          "auth_result",
+          "task_id",
+          "entity_id",
+          "alert_tags",
+          "issue_type",
+          "filter_result",
+          "guard_mode",
+          "record_type",
+          "resource_path",
+          "latency_ms",
+          "org_name",
+          "threat_flag",
+          "build_version",
+          "bin_code",
+          "payload_size",
+          "component_name",
+          "route_key",
+          "auth_token",
+          "app_label",
+          "variant_tag",
+          "cookie_id",
+          "status_code",
+          "lcp_micros",
+          "inp_micros",
+          "cls_score",
+          "device_type",
+          "page_slug",
+          "action_category",
+          "action_subcategory",
+          "page_url",
+          "render_scope",
+          "os_platform",
+          "attack_name",
+          "http_request",
+          "user_agent_str",
+          "uri_path",
+          "geo_org",
+          "geo_country",
+          "geo_user_type",
+          "risk_rules_list",
+          "visitor_session_id",
+          "bot_flag",
+          "passthrough_flag",
+          "order_ref",
+          "info_tag",
+          "graphql_operation",
+          "datacenter"
+        ],
+        "results": [
+          [
+            "Q364 warehouse event record 3 ACK batch batchIdList:Q364-3",
+            "stderr",
+            "PL-008",
+            "55.2",
+            "66.6",
+            "290.0",
+            "SORT-Z9",
+            "LANE-C",
+            "ZONE-2",
+            "CC-ALPHA",
+            "120",
+            "2.8",
+            "48",
+            "manual",
+            "1200",
+            "1",
+            "4",
+            "18.5",
+            "BS-2025-D4",
+            "segment 17 weight threshold exceeded",
+            "ACK batch batchIdList:BT-002-2026 acknowledged",
+            "ERROR: scan_attempts exhausted for pallet_id=PL-007",
+            "E006",
+            "@warehouse-Linux-sort-v3",
+            "UP-E010",
+            "NetworkException: connection to batch sync failed",
+            "{\"message\":{\"endpoint\":\"scanPallet\",\"status\":\"ok\"}}",
+            "[\"{\\\"name\\\":\\\"init\\\",\\\"startTime\\\":\\\"0\\\"}\", \"{\\\"name\\\":\\\"process\\\",\\\"startTime\\\":\\\"150\\\"}\"]",
+            "[\"cid-vwx234\",\"status-ok\"]",
+            "RerouteTrack",
+            "10.12.0.102",
+            "192.168.2.23",
+            "dev",
+            "medium",
+            "cli",
+            "SA-EAST",
+            "Java/17.0.8 (OpenJDK; sorter-agent)",
+            "SearchItems",
+            "site-sin-08",
+            "/api/v2/sorter/reroute",
+            "POST",
+            "403",
+            "internal",
+            "denied",
+            "task-b8c9d0",
+            "ent-007-wh",
+            "latency",
+            "timeout",
+            "allow",
+            "passive",
+            "sort",
+            "/config/zone/ZONE-3.yaml",
+            "567",
+            "warehouse-north",
+            "true",
+            "v3.1.0",
+            "BIN-D4",
+            "512",
+            "lane-monitor",
+            "rk-warehouse-005",
+            "tok-wh-ghi789jkl012",
+            "warehouse-merge",
+            "variant_a",
+            "ctl_xyz789",
+            "200",
+            "2800000",
+            "95000",
+            "0.05",
+            "Computer",
+            "checkoutPage",
+            "performanceMetric",
+            "vitalsLcp",
+            "https://shop.example.com/item/1004",
+            "SSR",
+            "Android 14",
+            "XSS Stored (Body)",
+            "GET /favicon.ico",
+            "Mozilla/5.0 Chrome/120",
+            "/api/v1/users",
+            "CloudServe GmbH",
+            "DE",
+            "hosting",
+            "[\"rate_limit_exceeded\"]",
+            "sess_002",
+            "None",
+            "false",
+            "ORD-003",
+            "None",
+            "placeOrder",
+            "dc-west"
+          ],
+          [
+            "Q365 warehouse event record 0 ACK batch batchIdList:Q365-0",
+            "stdout",
+            "PL-002",
+            "55.2",
+            "66.6",
+            "290.0",
+            "SORT-A7",
+            "LANE-A",
+            "ZONE-4",
+            "CC-GAMMA",
+            "120",
+            "2.8",
+            "48",
+            "auto",
+            "1200",
+            "1",
+            "4",
+            "18.5",
+            "BS-2025-D4",
+            "segment 17 weight threshold exceeded",
+            "ACK batch batchIdList:BT-002-2026 acknowledged",
+            "ERROR: scan_attempts exhausted for pallet_id=PL-007",
+            "E006",
+            "@warehouse-Linux-sort-v3",
+            "UP-E010",
+            "NetworkException: connection to batch sync failed",
+            "{\"message\":{\"endpoint\":\"scanPallet\",\"status\":\"ok\"}}",
+            "[\"{\\\"name\\\":\\\"init\\\",\\\"startTime\\\":\\\"0\\\"}\", \"{\\\"name\\\":\\\"process\\\",\\\"startTime\\\":\\\"150\\\"}\"]",
+            "[\"cid-vwx234\",\"status-ok\"]",
+            "RerouteTrack",
+            "10.12.0.102",
+            "192.168.2.23",
+            "dev",
+            "medium",
+            "cli",
+            "SA-EAST",
+            "Java/17.0.8 (OpenJDK; sorter-agent)",
+            "SearchItems",
+            "site-sin-08",
+            "/api/v2/sorter/reroute",
+            "POST",
+            "403",
+            "internal",
+            "denied",
+            "task-b8c9d0",
+            "ent-007-wh",
+            "latency",
+            "timeout",
+            "allow",
+            "passive",
+            "sort",
+            "/config/zone/ZONE-3.yaml",
+            "567",
+            "warehouse-north",
+            "true",
+            "v3.1.0",
+            "BIN-D4",
+            "512",
+            "lane-monitor",
+            "rk-warehouse-005",
+            "tok-wh-ghi789jkl012",
+            "warehouse-merge",
+            "variant_a",
+            "ctl_xyz789",
+            "200",
+            "2800000",
+            "95000",
+            "0.05",
+            "Computer",
+            "checkoutPage",
+            "performanceMetric",
+            "vitalsLcp",
+            "https://shop.example.com/item/1004",
+            "SSR",
+            "Android 14",
+            "XSS Stored (Body)",
+            "GET /favicon.ico",
+            "Mozilla/5.0 Chrome/120",
+            "/api/v1/users",
+            "CloudServe GmbH",
+            "DE",
+            "hosting",
+            "[\"rate_limit_exceeded\"]",
+            "sess_002",
+            "None",
+            "false",
+            "ORD-003",
+            "None",
+            "placeOrder",
+            "dc-west"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q365",
+      "sql": "SELECT _timestamp, action_category, page_slug, error_code, exception_message FROM \"{stream}\" WHERE org_name = 'warehouse-east' AND action_category IN ('performanceMetric', 'navigation') ORDER BY (CASE WHEN error_code IS NOT NULL THEN 0 ELSE 1 END), _timestamp DESC LIMIT 20",
+      "category": "pagination",
+      "time_offset": {
+        "start_offset": 21839000000,
+        "end_offset": 21913000000
+      },
+      "expected": {
+        "columns": [
+          "action_category",
+          "page_slug",
+          "error_code",
+          "exception_message"
+        ],
+        "results": [
+          [
+            "performanceMetric",
+            "itemPage",
+            "E009",
+            "OverflowException: throughput_rate 999.0 exceeds max capacity"
+          ],
+          [
+            "performanceMetric",
+            "itemPage",
+            "E009",
+            "OverflowException: throughput_rate 999.0 exceeds max capacity"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q485",
+      "sql": "SELECT _timestamp, action_category, page_slug, latency_ms FROM \"{stream}\" WHERE action_category = 'performanceMetric' AND latency_ms > 0 ORDER BY latency_ms ASC, _timestamp ASC, page_slug ASC LIMIT 5 OFFSET 0",
+      "category": "pagination",
+      "time_offset": {
+        "start_offset": 29039000000,
+        "end_offset": 29113000000
+      },
+      "expected": {
+        "columns": [
+          "action_category",
+          "page_slug",
+          "latency_ms"
+        ],
+        "results": [
+          [
+            "performanceMetric",
+            "checkoutPage",
+            "567"
+          ],
+          [
+            "performanceMetric",
+            "itemPage",
+            "1900"
+          ],
+          [
+            "performanceMetric",
+            "itemPage",
+            "1900"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q486",
+      "sql": "SELECT _timestamp, visitor_session_id, pallet_id, throughput_rate FROM \"{stream}\" ORDER BY throughput_rate DESC, pallet_id ASC, _timestamp ASC LIMIT 8 OFFSET 0",
+      "category": "pagination",
+      "time_offset": {
+        "start_offset": 29099000000,
+        "end_offset": 29173000000
+      },
+      "expected": {
+        "columns": [
+          "visitor_session_id",
+          "pallet_id",
+          "throughput_rate"
+        ],
+        "results": [
+          [
+            "sess_001",
+            "PL-007",
+            "900.0"
+          ],
+          [
+            "sess_001",
+            "PL-003",
+            "610.0"
+          ],
+          [
+            "sess_005",
+            "PL-002",
+            "480.0"
+          ],
+          [
+            "sess_005",
+            "PL-004",
+            "480.0"
+          ],
+          [
+            "sess_003",
+            "PL-001",
+            "320.0"
+          ],
+          [
+            "sess_004",
+            "PL-006",
+            "150.0"
+          ],
+          [
+            "sess_004",
+            "PL-008",
+            "150.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q487",
+      "sql": "SELECT _timestamp, visitor_session_id, pallet_id, throughput_rate FROM \"{stream}\" ORDER BY throughput_rate DESC, pallet_id ASC, _timestamp ASC LIMIT 5 OFFSET 3",
+      "category": "pagination",
+      "time_offset": {
+        "start_offset": 29159000000,
+        "end_offset": 29233000000
+      },
+      "expected": {
+        "columns": [
+          "visitor_session_id",
+          "pallet_id",
+          "throughput_rate"
+        ],
+        "results": [
+          [
+            "sess_001",
+            "PL-003",
+            "610.0"
+          ],
+          [
+            "sess_001",
+            "PL-005",
+            "610.0"
+          ],
+          [
+            "sess_005",
+            "PL-004",
+            "480.0"
+          ],
+          [
+            "sess_002",
+            "PL-008",
+            "290.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q488",
+      "sql": "SELECT _timestamp, action_category, page_slug, latency_ms FROM \"{stream}\" WHERE org_name = 'warehouse-east' ORDER BY (CASE WHEN action_category = 'performanceMetric' THEN 0 ELSE 1 END) ASC, latency_ms DESC NULLS LAST, _timestamp ASC LIMIT 5 OFFSET 0",
+      "category": "pagination",
+      "time_offset": {
+        "start_offset": 29219000000,
+        "end_offset": 29293000000
+      },
+      "expected": {
+        "columns": [
+          "action_category",
+          "page_slug",
+          "latency_ms"
+        ],
+        "results": [
+          [
+            "performanceMetric",
+            "itemPage",
+            "1900"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q489",
+      "sql": "SELECT _timestamp, page_slug, COUNT(*) OVER () AS total_rows, ROW_NUMBER() OVER (ORDER BY _timestamp) AS row_num FROM \"{stream}\" WHERE action_category = 'navigation' ORDER BY _timestamp ASC LIMIT 5 OFFSET 0",
+      "category": "pagination",
+      "time_offset": {
+        "start_offset": 29279000000,
+        "end_offset": 29353000000
+      },
+      "expected": {
+        "columns": [
+          "page_slug",
+          "total_rows",
+          "row_num"
+        ],
+        "results": [
+          [
+            "homePage",
+            "2",
+            "1"
+          ],
+          [
+            "itemPage",
+            "2",
+            "2"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    }
+  ],
+  "last_query_id": 112
+}

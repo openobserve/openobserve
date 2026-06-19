@@ -1,0 +1,1463 @@
+{
+  "queries": [
+    {
+      "id": "Q094",
+      "sql": "SELECT ROUND(CAST(COUNT(CASE WHEN load_factor > 70.0 THEN 1 END) AS FLOAT) / NULLIF(COUNT(CASE WHEN load_factor <= 70.0 THEN 1 END), 0) * 100.0, 2) AS high_load_pct FROM \"{stream}\"",
+      "category": "math_functions",
+      "expected": {
+        "columns": [
+          "high_load_pct"
+        ],
+        "results": [
+          [
+            "75.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 5579000000,
+        "end_offset": 5743000000
+      }
+    },
+    {
+      "id": "Q095",
+      "sql": "SELECT _timestamp, pallet_id, throughput_rate, load_factor, ROUND(SQRT(throughput_rate * load_factor), 2) AS geo_mean_index, ROUND(POWER(throughput_rate / 100.0, 2), 3) AS squared_normalized, ROUND(ABS(load_factor - 50.0), 2) AS load_midpoint_dist FROM \"{stream}\" WHERE throughput_rate > 0 AND load_factor > 0 ORDER BY geo_mean_index DESC LIMIT 12",
+      "category": "math_functions",
+      "expected": {
+        "columns": [
+          "pallet_id",
+          "throughput_rate",
+          "load_factor",
+          "geo_mean_index",
+          "squared_normalized",
+          "load_midpoint_dist"
+        ],
+        "results": [
+          [
+            "PL-007",
+            "900.0",
+            "94.6",
+            "291.79",
+            "81.0",
+            "44.6"
+          ],
+          [
+            "PL-001",
+            "900.0",
+            "94.6",
+            "291.79",
+            "81.0",
+            "44.6"
+          ],
+          [
+            "PL-005",
+            "610.0",
+            "99.0",
+            "245.74",
+            "37.21",
+            "49.0"
+          ],
+          [
+            "PL-007",
+            "610.0",
+            "99.0",
+            "245.74",
+            "37.21",
+            "49.0"
+          ],
+          [
+            "PL-003",
+            "555.0",
+            "72.8",
+            "201.01",
+            "30.803",
+            "22.8"
+          ],
+          [
+            "PL-005",
+            "555.0",
+            "72.8",
+            "201.01",
+            "30.803",
+            "22.8"
+          ],
+          [
+            "PL-003",
+            "320.0",
+            "67.9",
+            "147.4",
+            "10.24",
+            "17.9"
+          ],
+          [
+            "PL-006",
+            "190.0",
+            "88.1",
+            "129.38",
+            "3.61",
+            "38.1"
+          ],
+          [
+            "PL-004",
+            "290.0",
+            "55.2",
+            "126.52",
+            "8.41",
+            "5.2"
+          ],
+          [
+            "PL-004",
+            "480.0",
+            "21.4",
+            "101.35",
+            "23.04",
+            "28.6"
+          ],
+          [
+            "PL-006",
+            "480.0",
+            "21.4",
+            "101.35",
+            "23.04",
+            "28.6"
+          ],
+          [
+            "PL-008",
+            "725.0",
+            "12.5",
+            "95.2",
+            "52.563",
+            "37.5"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 5639000000,
+        "end_offset": 5803000000
+      }
+    },
+    {
+      "id": "Q096",
+      "sql": "SELECT _timestamp, item_count, package_size, ROUND(CAST(item_count AS FLOAT) / NULLIF(CAST(package_size AS FLOAT), 0), 4) AS item_pkg_ratio, ROUND(CAST(item_count AS FLOAT) - CAST(package_size AS FLOAT) * FLOOR(CAST(item_count AS FLOAT) / CAST(package_size AS FLOAT)), 0) AS remainder, ROUND(GREATEST(CAST(item_count AS FLOAT), CAST(package_size AS FLOAT), CAST(scan_attempts AS FLOAT) * 100.0), 1) AS max_dimension FROM \"{stream}\" WHERE item_count > 0 AND package_size > 0 ORDER BY item_pkg_ratio DESC",
+      "category": "math_functions",
+      "expected": {
+        "columns": [
+          "item_count",
+          "package_size",
+          "item_pkg_ratio",
+          "remainder",
+          "max_dimension"
+        ],
+        "results": [
+          [
+            "200",
+            "100",
+            "2.0",
+            "0.0",
+            "300.0"
+          ],
+          [
+            "275",
+            "200",
+            "1.375",
+            "75.0",
+            "300.0"
+          ],
+          [
+            "275",
+            "200",
+            "1.375",
+            "75.0",
+            "300.0"
+          ],
+          [
+            "500",
+            "600",
+            "0.833299994468689",
+            "500.0",
+            "600.0"
+          ],
+          [
+            "410",
+            "1000",
+            "0.4099999964237213",
+            "410.0",
+            "1000.0"
+          ],
+          [
+            "155",
+            "750",
+            "0.20669999718666077",
+            "155.0",
+            "750.0"
+          ],
+          [
+            "155",
+            "750",
+            "0.20669999718666077",
+            "155.0",
+            "750.0"
+          ],
+          [
+            "88",
+            "500",
+            "0.17599999904632568",
+            "88.0",
+            "500.0"
+          ],
+          [
+            "60",
+            "350",
+            "0.17139999568462372",
+            "60.0",
+            "350.0"
+          ],
+          [
+            "60",
+            "350",
+            "0.17139999568462372",
+            "60.0",
+            "350.0"
+          ],
+          [
+            "120",
+            "1200",
+            "0.10000000149011612",
+            "120.0",
+            "1200.0"
+          ],
+          [
+            "120",
+            "1200",
+            "0.10000000149011612",
+            "120.0",
+            "1200.0"
+          ],
+          [
+            "50",
+            "850",
+            "0.058800000697374344",
+            "50.0",
+            "850.0"
+          ],
+          [
+            "50",
+            "850",
+            "0.058800000697374344",
+            "50.0",
+            "850.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 5699000000,
+        "end_offset": 5863000000
+      }
+    },
+    {
+      "id": "Q097",
+      "sql": "SELECT _timestamp, cell_temp, ROUND(cell_temp, 1) AS rounded_temp, FLOOR(cell_temp) AS temp_floor, CEIL(cell_temp) AS temp_ceil, ROUND((cell_temp - FLOOR(cell_temp)) * 100.0, 1) AS fractional_pct, CASE WHEN cell_temp - FLOOR(cell_temp) >= 0.5 THEN 'rounds_up' ELSE 'rounds_down' END AS rounding_behavior FROM \"{stream}\" WHERE cell_temp IS NOT NULL ORDER BY fractional_pct DESC",
+      "category": "math_functions",
+      "expected": {
+        "columns": [
+          "cell_temp",
+          "rounded_temp",
+          "temp_floor",
+          "temp_ceil",
+          "fractional_pct",
+          "rounding_behavior"
+        ],
+        "results": [
+          [
+            "28.9",
+            "28.9",
+            "28.0",
+            "29.0",
+            "90.0",
+            "rounds_up"
+          ],
+          [
+            "28.9",
+            "28.9",
+            "28.0",
+            "29.0",
+            "90.0",
+            "rounds_up"
+          ],
+          [
+            "24.8",
+            "24.8",
+            "24.0",
+            "25.0",
+            "80.0",
+            "rounds_up"
+          ],
+          [
+            "35.7",
+            "35.7",
+            "35.0",
+            "36.0",
+            "70.0",
+            "rounds_up"
+          ],
+          [
+            "32.5",
+            "32.5",
+            "32.0",
+            "33.0",
+            "50.0",
+            "rounds_up"
+          ],
+          [
+            "18.5",
+            "18.5",
+            "18.0",
+            "19.0",
+            "50.0",
+            "rounds_up"
+          ],
+          [
+            "18.5",
+            "18.5",
+            "18.0",
+            "19.0",
+            "50.0",
+            "rounds_up"
+          ],
+          [
+            "26.3",
+            "26.3",
+            "26.0",
+            "27.0",
+            "30.0",
+            "rounds_down"
+          ],
+          [
+            "26.3",
+            "26.3",
+            "26.0",
+            "27.0",
+            "30.0",
+            "rounds_down"
+          ],
+          [
+            "30.1",
+            "30.1",
+            "30.0",
+            "31.0",
+            "10.0",
+            "rounds_down"
+          ],
+          [
+            "30.1",
+            "30.1",
+            "30.0",
+            "31.0",
+            "10.0",
+            "rounds_down"
+          ],
+          [
+            "40.0",
+            "40.0",
+            "40.0",
+            "40.0",
+            "0.0",
+            "rounds_down"
+          ],
+          [
+            "40.0",
+            "40.0",
+            "40.0",
+            "40.0",
+            "0.0",
+            "rounds_down"
+          ],
+          [
+            "22.0",
+            "22.0",
+            "22.0",
+            "22.0",
+            "0.0",
+            "rounds_down"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 5759000000,
+        "end_offset": 5923000000
+      }
+    },
+    {
+      "id": "Q098",
+      "sql": "SELECT facility_zone, COUNT(*) AS n, ROUND(AVG(throughput_rate), 2) AS avg_tput, ROUND(STDDEV(throughput_rate), 2) AS std_tput, ROUND((AVG(throughput_rate * throughput_rate) - POWER(AVG(throughput_rate), 2)), 3) AS variance_manual, ROUND(STDDEV(throughput_rate) / NULLIF(AVG(throughput_rate), 0), 4) AS cv FROM \"{stream}\" WHERE throughput_rate IS NOT NULL GROUP BY facility_zone HAVING COUNT(*) >= 3 ORDER BY cv ASC",
+      "category": "math_functions",
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "n",
+          "avg_tput",
+          "std_tput",
+          "variance_manual",
+          "cv"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "4",
+            "667.5",
+            "263.23",
+            "51968.75",
+            "0.3944"
+          ],
+          [
+            "ZONE-2",
+            "3",
+            "320.0",
+            "147.31",
+            "14466.667",
+            "0.4603"
+          ],
+          [
+            "ZONE-3",
+            "3",
+            "591.67",
+            "291.73",
+            "56738.889",
+            "0.4931"
+          ],
+          [
+            "ZONE-4",
+            "4",
+            "277.5",
+            "147.28",
+            "16268.75",
+            "0.5307"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 5819000000,
+        "end_offset": 5983000000
+      }
+    },
+    {
+      "id": "Q099",
+      "sql": "SELECT _timestamp, load_factor, charge_remaining, ROUND((load_factor * charge_remaining) / NULLIF(load_factor + charge_remaining, 0), 2) AS harmonic_component, ROUND((POWER(load_factor, 2) + POWER(charge_remaining, 2)) / 2.0, 2) AS quadratic_mean, ROUND(SQRT(POWER(load_factor - charge_remaining, 2)), 2) AS euclidean_dist FROM \"{stream}\" WHERE load_factor > 0 AND charge_remaining > 0 ORDER BY harmonic_component DESC",
+      "category": "math_functions",
+      "expected": {
+        "columns": [
+          "load_factor",
+          "charge_remaining",
+          "harmonic_component",
+          "quadratic_mean",
+          "euclidean_dist"
+        ],
+        "results": [
+          [
+            "99.0",
+            "95.0",
+            "48.48",
+            "9413.0",
+            "4.0"
+          ],
+          [
+            "67.9",
+            "75.3",
+            "35.7",
+            "5140.25",
+            "7.4"
+          ],
+          [
+            "67.9",
+            "75.3",
+            "35.7",
+            "5140.25",
+            "7.4"
+          ],
+          [
+            "55.2",
+            "66.6",
+            "30.18",
+            "3741.3",
+            "11.4"
+          ],
+          [
+            "94.6",
+            "42.5",
+            "29.33",
+            "5377.7",
+            "52.1"
+          ],
+          [
+            "94.6",
+            "42.5",
+            "29.33",
+            "5377.7",
+            "52.1"
+          ],
+          [
+            "45.3",
+            "58.0",
+            "25.43",
+            "2708.05",
+            "12.7"
+          ],
+          [
+            "88.1",
+            "25.0",
+            "19.47",
+            "4193.3",
+            "63.1"
+          ],
+          [
+            "21.4",
+            "88.7",
+            "17.24",
+            "4162.83",
+            "67.3"
+          ],
+          [
+            "21.4",
+            "88.7",
+            "17.24",
+            "4162.83",
+            "67.3"
+          ],
+          [
+            "33.0",
+            "33.3",
+            "16.57",
+            "1098.95",
+            "0.3"
+          ],
+          [
+            "33.0",
+            "33.3",
+            "16.57",
+            "1098.95",
+            "0.3"
+          ],
+          [
+            "12.5",
+            "5.0",
+            "3.57",
+            "90.63",
+            "7.5"
+          ],
+          [
+            "12.5",
+            "5.0",
+            "3.57",
+            "90.63",
+            "7.5"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 5879000000,
+        "end_offset": 6043000000
+      }
+    },
+    {
+      "id": "Q100",
+      "sql": "WITH global_stats AS (SELECT AVG(throughput_rate) AS avg_tput, AVG(throughput_rate * throughput_rate) - AVG(throughput_rate) * AVG(throughput_rate) AS var_tput, AVG(load_factor) AS avg_load, AVG(load_factor * load_factor) - AVG(load_factor) * AVG(load_factor) AS var_load FROM \"{stream}\"), scored AS (SELECT t._timestamp, t.throughput_rate, t.load_factor, t.charge_remaining, gs.avg_tput, gs.avg_load, ROUND((t.throughput_rate - gs.avg_tput) / NULLIF(SQRT(gs.var_tput), 0), 4) AS zscore_tput, ROUND((t.load_factor - gs.avg_load) / NULLIF(SQRT(gs.var_load), 0), 4) AS zscore_load, ABS((t.throughput_rate - gs.avg_tput) / NULLIF(SQRT(gs.var_tput), 0)) AS abs_zscore_tput FROM \"{stream}\" t CROSS JOIN global_stats gs WHERE t.throughput_rate IS NOT NULL AND t.load_factor IS NOT NULL) SELECT _timestamp, throughput_rate, load_factor, charge_remaining, avg_tput, avg_load, zscore_tput, zscore_load FROM scored ORDER BY abs_zscore_tput DESC LIMIT 12",
+      "category": "math_functions",
+      "expected": {
+        "columns": [
+          "throughput_rate",
+          "load_factor",
+          "charge_remaining",
+          "avg_tput",
+          "avg_load",
+          "zscore_tput",
+          "zscore_load"
+        ],
+        "results": [
+          [
+            "190.0",
+            "88.1",
+            "25.0",
+            "550.0",
+            "55.16428571428572",
+            "-1.5605",
+            "1.0672"
+          ],
+          [
+            "190.0",
+            "88.1",
+            "25.0",
+            "550.0",
+            "55.16428571428572",
+            "-1.5605",
+            "1.0672"
+          ],
+          [
+            "900.0",
+            "94.6",
+            "42.5",
+            "550.0",
+            "55.16428571428572",
+            "1.5171",
+            "1.2779"
+          ],
+          [
+            "840.0",
+            "33.0",
+            "33.3",
+            "550.0",
+            "55.16428571428572",
+            "1.2571",
+            "-0.7182"
+          ],
+          [
+            "840.0",
+            "33.0",
+            "33.3",
+            "550.0",
+            "55.16428571428572",
+            "1.2571",
+            "-0.7182"
+          ],
+          [
+            "290.0",
+            "55.2",
+            "66.6",
+            "550.0",
+            "55.16428571428572",
+            "-1.127",
+            "0.0012"
+          ],
+          [
+            "320.0",
+            "67.9",
+            "75.3",
+            "550.0",
+            "55.16428571428572",
+            "-0.997",
+            "0.4127"
+          ],
+          [
+            "725.0",
+            "12.5",
+            "5.0",
+            "550.0",
+            "55.16428571428572",
+            "0.7586",
+            "-1.3825"
+          ],
+          [
+            "725.0",
+            "12.5",
+            "5.0",
+            "550.0",
+            "55.16428571428572",
+            "0.7586",
+            "-1.3825"
+          ],
+          [
+            "480.0",
+            "21.4",
+            "88.7",
+            "550.0",
+            "55.16428571428572",
+            "-0.3034",
+            "-1.0941"
+          ],
+          [
+            "480.0",
+            "21.4",
+            "88.7",
+            "550.0",
+            "55.16428571428572",
+            "-0.3034",
+            "-1.0941"
+          ],
+          [
+            "610.0",
+            "99.0",
+            "95.0",
+            "550.0",
+            "55.16428571428572",
+            "0.2601",
+            "1.4204"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 5939000000,
+        "end_offset": 6103000000
+      }
+    },
+    {
+      "id": "Q101",
+      "sql": "SELECT _timestamp, pallet_id, cell_temp, charge_remaining, ROUND(CAST(PERCENT_RANK() OVER (ORDER BY cell_temp) AS FLOAT), 4) AS temp_percentile, ROUND(cell_temp - AVG(cell_temp) OVER (), 2) AS temp_mean_diff, ROUND((cell_temp - AVG(cell_temp) OVER ()) / NULLIF(STDDEV(cell_temp) OVER (), 0), 4) AS temp_zscore_window FROM \"{stream}\" WHERE cell_temp IS NOT NULL ORDER BY temp_percentile DESC",
+      "category": "math_functions",
+      "expected": {
+        "columns": [
+          "pallet_id",
+          "cell_temp",
+          "charge_remaining",
+          "temp_percentile",
+          "temp_mean_diff",
+          "temp_zscore_window"
+        ],
+        "results": [
+          [
+            "PL-001",
+            "40.0",
+            "33.3",
+            "0.9230999946594238",
+            "11.98",
+            "1.5621"
+          ],
+          [
+            "PL-003",
+            "40.0",
+            "33.3",
+            "0.9230999946594238",
+            "11.98",
+            "1.5621"
+          ],
+          [
+            "PL-002",
+            "35.7",
+            "58.0",
+            "0.7692000269889832",
+            "7.68",
+            "1.0014"
+          ],
+          [
+            "PL-004",
+            "35.7",
+            "58.0",
+            "0.7692000269889832",
+            "7.68",
+            "1.0014"
+          ],
+          [
+            "PL-002",
+            "32.5",
+            "5.0",
+            "0.692300021648407",
+            "4.48",
+            "0.5841"
+          ],
+          [
+            "PL-001",
+            "30.1",
+            "42.5",
+            "0.6154000163078308",
+            "2.08",
+            "0.2711"
+          ],
+          [
+            "PL-006",
+            "26.3",
+            "25.0",
+            "0.46149998903274536",
+            "-1.72",
+            "-0.2245"
+          ],
+          [
+            "PL-008",
+            "26.3",
+            "25.0",
+            "0.46149998903274536",
+            "-1.72",
+            "-0.2245"
+          ],
+          [
+            "PL-006",
+            "24.8",
+            "88.7",
+            "0.3846000134944916",
+            "-3.22",
+            "-0.4201"
+          ],
+          [
+            "PL-005",
+            "22.0",
+            "10.0",
+            "0.23080000281333923",
+            "-6.02",
+            "-0.7853"
+          ],
+          [
+            "PL-007",
+            "22.0",
+            "10.0",
+            "0.23080000281333923",
+            "-6.02",
+            "-0.7853"
+          ],
+          [
+            "PL-003",
+            "19.2",
+            "75.3",
+            "0.07689999788999557",
+            "-8.82",
+            "-1.1504"
+          ],
+          [
+            "PL-005",
+            "19.2",
+            "75.3",
+            "0.07689999788999557",
+            "-8.82",
+            "-1.1504"
+          ],
+          [
+            "PL-004",
+            "18.5",
+            "66.6",
+            "0.0",
+            "-9.52",
+            "-1.2417"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 5999000000,
+        "end_offset": 6163000000
+      }
+    },
+    {
+      "id": "Q102",
+      "sql": "SELECT _timestamp, ROUND(defect_limit, 2) AS defect, ROUND(load_factor, 2) AS load, ROUND(CAST(LN(NULLIF(throughput_rate, 0)) AS FLOAT), 4) AS log_tput, ROUND(CAST(LOG10(NULLIF(item_count, 0)) AS FLOAT), 4) AS log10_items, ROUND(CAST(EXP(ROUND(defect_limit, 2)) AS FLOAT), 4) AS exp_defect FROM \"{stream}\" WHERE throughput_rate > 0 AND item_count > 0 AND defect_limit <= 2.0 ORDER BY log_tput DESC LIMIT 12",
+      "category": "math_functions",
+      "expected": {
+        "columns": [
+          "defect",
+          "load",
+          "log_tput",
+          "log10_items",
+          "exp_defect"
+        ],
+        "results": [
+          [
+            "1.0",
+            "94.6",
+            "6.8024001121521",
+            "1.9444999694824219",
+            "2.7183001041412354"
+          ],
+          [
+            "1.2",
+            "33.0",
+            "6.733399868011475",
+            "1.6990000009536743",
+            "3.3201000690460205"
+          ],
+          [
+            "0.8",
+            "12.5",
+            "6.58620023727417",
+            "2.6989998817443848",
+            "2.2255001068115234"
+          ],
+          [
+            "0.8",
+            "12.5",
+            "6.58620023727417",
+            "2.6989998817443848",
+            "2.2255001068115234"
+          ],
+          [
+            "2.0",
+            "67.9",
+            "5.7683000564575195",
+            "2.612799882888794",
+            "7.389100074768066"
+          ],
+          [
+            "2.0",
+            "67.9",
+            "5.7683000564575195",
+            "2.612799882888794",
+            "7.389100074768066"
+          ],
+          [
+            "0.5",
+            "88.1",
+            "5.247000217437744",
+            "2.5315001010894775",
+            "1.6486999988555908"
+          ],
+          [
+            "0.5",
+            "88.1",
+            "5.247000217437744",
+            "2.5315001010894775",
+            "1.6486999988555908"
+          ],
+          [
+            "1.5",
+            "45.3",
+            "5.0106000900268555",
+            "2.1902999877929688",
+            "4.4816999435424805"
+          ],
+          [
+            "1.5",
+            "45.3",
+            "5.0106000900268555",
+            "2.1902999877929688",
+            "4.4816999435424805"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 6059000000,
+        "end_offset": 6223000000
+      }
+    },
+    {
+      "id": "Q167",
+      "sql": "SELECT duration_range, COUNT(*) AS query_count,   approx_percentile_cont(CAST(resp_time AS FLOAT), 0.95) AS p95 FROM (   SELECT     CASE       WHEN ((MAX(lcp_micros) - MIN(lcp_micros)) / 60000000) < 240 THEN '1. p95_0h_4h'       WHEN ((MAX(lcp_micros) - MIN(lcp_micros)) / 60000000) >= 240 AND ((MAX(lcp_micros) - MIN(lcp_micros)) / 60000000) < 720 THEN '2. p95_4h_12h'       WHEN ((MAX(lcp_micros) - MIN(lcp_micros)) / 60000000) >= 720 AND ((MAX(lcp_micros) - MIN(lcp_micros)) / 60000000) < 1440 THEN '3. p95_12h_1d'       ELSE '4. p95_gt_1d'     END AS duration_range,     COUNT(_timestamp) AS query_count,     action_category,     MAX(cls_score) AS resp_time   FROM \"{stream}\"   WHERE action_category IN ('performanceMetric', 'navigationTiming')   GROUP BY action_category, _timestamp ) GROUP BY duration_range ORDER BY duration_range ASC",
+      "category": "math_functions",
+      "time_offset": {
+        "start_offset": 9959000000,
+        "end_offset": 10123000000
+      },
+      "expected": {
+        "columns": [
+          "duration_range",
+          "query_count",
+          "p95"
+        ],
+        "results": [
+          [
+            "1. p95_0h_4h",
+            "9",
+            "0.30000001192092896"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q192",
+      "sql": "SELECT facility_zone,\n  COUNT(*) AS cnt,\n  AVG(throughput_rate) AS avg_throughput,\n  approx_percentile_cont(CAST(throughput_rate AS FLOAT), 0.50) AS p50,\n  approx_percentile_cont(CAST(throughput_rate AS FLOAT), 0.90) AS p90,\n  approx_percentile_cont(CAST(throughput_rate AS FLOAT), 0.95) AS p95,\n  approx_percentile_cont(CAST(throughput_rate AS FLOAT), 0.99) AS p99,\n  approx_distinct(sorter_model) AS unique_sorters\nFROM \"{stream}\"\nWHERE throughput_rate > 0\nGROUP BY facility_zone\nHAVING COUNT(*) >= 1\nORDER BY avg_throughput DESC",
+      "category": "math_functions",
+      "time_offset": {
+        "start_offset": 11459000000,
+        "end_offset": 11623000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "cnt",
+          "avg_throughput",
+          "p50",
+          "p90",
+          "p95",
+          "p99",
+          "unique_sorters"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "3",
+            "610.0",
+            "610.0",
+            "900.0",
+            "900.0",
+            "900.0",
+            "1"
+          ],
+          [
+            "ZONE-3",
+            "4",
+            "581.25",
+            "582.5",
+            "840.0",
+            "840.0",
+            "840.0",
+            "1"
+          ],
+          [
+            "ZONE-2",
+            "4",
+            "386.25",
+            "335.0",
+            "725.0",
+            "725.0",
+            "725.0",
+            "2"
+          ],
+          [
+            "ZONE-4",
+            "3",
+            "355.0",
+            "190.0",
+            "725.0",
+            "725.0",
+            "725.0",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
+      }
+    },
+    {
+      "id": "Q193",
+      "sql": "SELECT\n  CASE\n    WHEN load_factor >= 70.0 THEN 'HIGH'\n    WHEN load_factor >= 40.0 THEN 'MED'\n    ELSE 'LOW'\n  END AS load_band,\n  COUNT(*) AS cnt,\n  AVG(throughput_rate) AS avg_throughput,\n  STDDEV(throughput_rate) AS stddev_throughput,\n  (MAX(throughput_rate) - MIN(throughput_rate)) AS tput_range,\n  SQRT(AVG(throughput_rate * throughput_rate) - AVG(throughput_rate) * AVG(throughput_rate)) AS computed_stddev\nFROM \"{stream}\"\nWHERE throughput_rate > 0\nGROUP BY\n  CASE\n    WHEN load_factor >= 70.0 THEN 'HIGH'\n    WHEN load_factor >= 40.0 THEN 'MED'\n    ELSE 'LOW'\n  END\nHAVING COUNT(*) >= 1\nORDER BY avg_throughput DESC",
+      "category": "math_functions",
+      "time_offset": {
+        "start_offset": 11519000000,
+        "end_offset": 11683000000
+      },
+      "expected": {
+        "columns": [
+          "load_band",
+          "cnt",
+          "avg_throughput",
+          "stddev_throughput",
+          "tput_range",
+          "computed_stddev"
+        ],
+        "results": [
+          [
+            "LOW",
+            "4",
+            "692.5",
+            "151.6849805792694",
+            "360.0",
+            "131.3630465541965"
+          ],
+          [
+            "HIGH",
+            "5",
+            "504.0",
+            "177.67245143803245",
+            "420.0",
+            "158.91507165778833"
+          ],
+          [
+            "MED",
+            "5",
+            "274.0",
+            "70.92249290598858",
+            "170.0",
+            "63.43500610861482"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q351",
+      "sql": "SELECT (100.0 * COUNT(CASE WHEN response_code >= 400 THEN 1 END) / COUNT(*)) AS error_rate, (100.0 * COUNT(CASE WHEN latency_ms > 500 THEN 1 END) / COUNT(*)) AS slow_rate, COUNT(*) AS total FROM \"{stream}\" WHERE action_category = 'performanceMetric'",
+      "category": "math_functions",
+      "time_offset": {
+        "start_offset": 20999000000,
+        "end_offset": 21073000000
+      },
+      "expected": {
+        "columns": [
+          "error_rate",
+          "slow_rate",
+          "total"
+        ],
+        "results": [
+          [
+            "100.0",
+            "50.0",
+            "4"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q352",
+      "sql": "SELECT page_slug, ROUND(AVG(CAST(latency_ms AS FLOAT)), 2) AS avg_latency, ROUND(MAX(latency_ms), 2) AS max_latency, ROUND(MIN(latency_ms), 2) AS min_latency FROM \"{stream}\" WHERE latency_ms > 0 AND action_category = 'performanceMetric' GROUP BY page_slug",
+      "category": "math_functions",
+      "time_offset": {
+        "start_offset": 21059000000,
+        "end_offset": 21133000000
+      },
+      "expected": {
+        "columns": [
+          "page_slug",
+          "avg_latency",
+          "max_latency",
+          "min_latency"
+        ],
+        "results": [
+          [
+            "itemPage",
+            "956.0",
+            "1900",
+            "12"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q353",
+      "sql": "SELECT ABS(MAX(latency_ms) - MIN(latency_ms)) AS latency_spread, AVG(CAST(latency_ms AS FLOAT)) AS avg_latency, COUNT(*) AS cnt FROM \"{stream}\" WHERE latency_ms > 0 AND action_category = 'performanceMetric'",
+      "category": "math_functions",
+      "time_offset": {
+        "start_offset": 21119000000,
+        "end_offset": 21193000000
+      },
+      "expected": {
+        "columns": [
+          "latency_spread",
+          "avg_latency",
+          "cnt"
+        ],
+        "results": [
+          [
+            "1438",
+            "386.8",
+            "5"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q354",
+      "sql": "SELECT SQRT(AVG(CAST(latency_ms * latency_ms AS FLOAT)) - AVG(CAST(latency_ms AS FLOAT)) * AVG(CAST(latency_ms AS FLOAT))) AS stddev_approx, AVG(CAST(latency_ms AS FLOAT)) AS mean, COUNT(*) AS cnt FROM \"{stream}\" WHERE latency_ms > 0 AND action_category = 'performanceMetric'",
+      "category": "math_functions",
+      "time_offset": {
+        "start_offset": 21179000000,
+        "end_offset": 21253000000
+      },
+      "expected": {
+        "columns": [
+          "stddev_approx",
+          "mean",
+          "cnt"
+        ],
+        "results": [
+          [
+            "540.1693407318363",
+            "725.5",
+            "6"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q355",
+      "sql": "SELECT (CASE WHEN COUNT(CASE WHEN action_category = 'navigation' THEN 1 END) > 0 THEN ROUND(100.0 * COUNT(CASE WHEN action_category = 'performanceMetric' THEN 1 END) / COUNT(CASE WHEN action_category = 'navigation' THEN 1 END), 1) ELSE 0 END) AS metric_to_nav_ratio FROM \"{stream}\" WHERE org_name = 'warehouse-east'",
+      "category": "math_functions",
+      "time_offset": {
+        "start_offset": 21239000000,
+        "end_offset": 21313000000
+      },
+      "expected": {
+        "columns": [
+          "metric_to_nav_ratio"
+        ],
+        "results": [
+          [
+            "0.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q356",
+      "sql": "SELECT FLOOR(AVG(CAST(latency_ms AS FLOAT)) / 100) * 100 AS latency_bucket_floor, CEIL(AVG(CAST(latency_ms AS FLOAT)) / 100) * 100 AS latency_bucket_ceil, COUNT(*) AS cnt FROM \"{stream}\" WHERE latency_ms > 0 GROUP BY page_slug",
+      "category": "math_functions",
+      "time_offset": {
+        "start_offset": 21299000000,
+        "end_offset": 21373000000
+      },
+      "expected": {
+        "columns": [
+          "latency_bucket_floor",
+          "latency_bucket_ceil",
+          "cnt"
+        ],
+        "results": [
+          [
+            "0.0",
+            "100.0",
+            "3"
+          ],
+          [
+            "500.0",
+            "600.0",
+            "4"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q357",
+      "sql": "SELECT component_name, ROUND(100.0 * COUNT(CASE WHEN response_code >= 400 THEN 1 END) / NULLIF(COUNT(*), 0), 2) AS error_pct, COUNT(*) AS total FROM \"{stream}\" WHERE action_category = 'performanceMetric' GROUP BY component_name",
+      "category": "math_functions",
+      "time_offset": {
+        "start_offset": 21359000000,
+        "end_offset": 21433000000
+      },
+      "expected": {
+        "columns": [
+          "component_name",
+          "error_pct",
+          "total"
+        ],
+        "results": [
+          [
+            "pallet-mapper",
+            "100.0",
+            "2"
+          ],
+          [
+            "lane-monitor",
+            "100.0",
+            "1"
+          ],
+          [
+            "batch-sync",
+            "100.0",
+            "1"
+          ],
+          [
+            "track-router",
+            "100.0",
+            "2"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q358",
+      "sql": "SELECT COUNT(*) AS n, SUM(CAST(latency_ms AS FLOAT)) AS sum_x, SUM(CAST(latency_ms * latency_ms AS FLOAT)) AS sum_x2, AVG(CAST(latency_ms AS FLOAT)) AS mean, (SUM(CAST(latency_ms * latency_ms AS FLOAT)) / COUNT(*) - AVG(CAST(latency_ms AS FLOAT)) * AVG(CAST(latency_ms AS FLOAT))) AS variance_approx FROM \"{stream}\" WHERE latency_ms > 0 AND action_category = 'performanceMetric'",
+      "category": "math_functions",
+      "time_offset": {
+        "start_offset": 21419000000,
+        "end_offset": 21493000000
+      },
+      "expected": {
+        "columns": [
+          "n",
+          "sum_x",
+          "sum_x2",
+          "mean",
+          "variance_approx"
+        ],
+        "results": [
+          [
+            "4",
+            "3123.0",
+            "4260899.0",
+            "780.75",
+            "455654.1875"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q479",
+      "sql": "SELECT ROUND(SQRT(AVG(CAST(latency_ms * latency_ms AS FLOAT))), 2) AS rms_latency, ROUND(AVG(CAST(latency_ms AS FLOAT)), 2) AS avg_latency, COUNT(*) AS cnt FROM \"{stream}\" WHERE latency_ms > 0 AND action_category = 'performanceMetric'",
+      "category": "math_functions",
+      "time_offset": {
+        "start_offset": 28679000000,
+        "end_offset": 28753000000
+      },
+      "expected": {
+        "columns": [
+          "rms_latency",
+          "avg_latency",
+          "cnt"
+        ],
+        "results": [
+          [
+            "1343.53",
+            "956.0",
+            "4"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q480",
+      "sql": "SELECT ROUND(AVG(CAST(latency_ms AS FLOAT)), 1) AS mean, ROUND(STDDEV(CAST(latency_ms AS FLOAT)), 2) AS stddev, ROUND(STDDEV(CAST(latency_ms AS FLOAT)) / NULLIF(AVG(CAST(latency_ms AS FLOAT)), 0) * 100, 2) AS cv_pct FROM \"{stream}\" WHERE latency_ms > 0 AND action_category = 'performanceMetric'",
+      "category": "math_functions",
+      "time_offset": {
+        "start_offset": 28739000000,
+        "end_offset": 28813000000
+      },
+      "expected": {
+        "columns": [
+          "mean",
+          "stddev",
+          "cv_pct"
+        ],
+        "results": [
+          [
+            "646.2",
+            "737.92",
+            "114.19"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q481",
+      "sql": "SELECT component_name, ROUND(ABS(AVG(CAST(latency_ms AS FLOAT)) - MAX(oa.avg_latency)), 2) AS abs_deviation, COUNT(*) AS cnt FROM \"{stream}\" CROSS JOIN (SELECT AVG(CAST(latency_ms AS FLOAT)) AS avg_latency FROM \"{stream}\" WHERE latency_ms > 0) oa WHERE latency_ms > 0 AND component_name IS NOT NULL GROUP BY component_name ORDER BY abs_deviation DESC, component_name ASC LIMIT 5",
+      "category": "math_functions",
+      "time_offset": {
+        "start_offset": 28799000000,
+        "end_offset": 28873000000
+      },
+      "expected": {
+        "columns": [
+          "component_name",
+          "abs_deviation",
+          "cnt"
+        ],
+        "results": [
+          [
+            "temp-regulator",
+            "1961.0",
+            "2"
+          ],
+          [
+            "charge-checker",
+            "1161.0",
+            "1"
+          ],
+          [
+            "pallet-mapper",
+            "1150.0",
+            "2"
+          ],
+          [
+            "lane-monitor",
+            "672.0",
+            "1"
+          ],
+          [
+            "batch-sync",
+            "211.0",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q482",
+      "sql": "SELECT FLOOR(CAST(latency_ms AS FLOAT) / 10) * 10 AS latency_floor, CEIL(CAST(latency_ms AS FLOAT) / 10) * 10 AS latency_ceil, COUNT(*) AS cnt FROM \"{stream}\" WHERE latency_ms > 0 AND latency_ms <= 5000 GROUP BY latency_floor, latency_ceil ORDER BY latency_floor ASC",
+      "category": "math_functions",
+      "time_offset": {
+        "start_offset": 28859000000,
+        "end_offset": 28933000000
+      },
+      "expected": {
+        "columns": [
+          "latency_floor",
+          "latency_ceil",
+          "cnt"
+        ],
+        "results": [
+          [
+            "10.0",
+            "20.0",
+            "3"
+          ],
+          [
+            "70.0",
+            "80.0",
+            "2"
+          ],
+          [
+            "1900.0",
+            "1900.0",
+            "1"
+          ],
+          [
+            "3200.0",
+            "3200.0",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q483",
+      "sql": "SELECT ROUND(POWER(2.0, FLOOR(LOG2(CAST(NULLIF(latency_ms, 0) AS FLOAT)))), 0) AS latency_power2_bucket, COUNT(*) AS cnt FROM \"{stream}\" WHERE latency_ms > 0 GROUP BY latency_power2_bucket ORDER BY latency_power2_bucket ASC",
+      "category": "math_functions",
+      "time_offset": {
+        "start_offset": 28919000000,
+        "end_offset": 28993000000
+      },
+      "expected": {
+        "columns": [
+          "latency_power2_bucket",
+          "cnt"
+        ],
+        "results": [
+          [
+            "8.0",
+            "3"
+          ],
+          [
+            "32.0",
+            "1"
+          ],
+          [
+            "128.0",
+            "2"
+          ],
+          [
+            "1024.0",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q484",
+      "sql": "SELECT ROUND(100.0 * COUNT(CASE WHEN error_code IS NOT NULL THEN 1 END) / NULLIF(COUNT(*), 0), 2) AS error_pct, ROUND(100.0 * COUNT(CASE WHEN threat_flag = 'true' THEN 1 END) / NULLIF(COUNT(*), 0), 2) AS threat_pct, ROUND(100.0 * COUNT(CASE WHEN guard_mode = 'active' THEN 1 END) / NULLIF(COUNT(*), 0), 2) AS active_guard_pct FROM \"{stream}\" WHERE action_category = 'performanceMetric'",
+      "category": "math_functions",
+      "time_offset": {
+        "start_offset": 28979000000,
+        "end_offset": 29053000000
+      },
+      "expected": {
+        "columns": [
+          "error_pct",
+          "threat_pct",
+          "active_guard_pct"
+        ],
+        "results": [
+          [
+            "100.0",
+            "50.0",
+            "16.67"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    }
+  ],
+  "last_query_id": 102
+}
