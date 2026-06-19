@@ -637,7 +637,7 @@ describe("Schema Component Tests", () => {
       
       // With user defined schema
       wrapper.vm.indexData.defined_schema_fields = ["field1"];
-      expect(wrapper.vm.computedSchemaFieldsName).toBe("Other Fields");
+      expect(wrapper.vm.computedSchemaFieldsName).toBe("All Fields");
     });
 
     // Test 36: tabs computed property
@@ -649,7 +649,7 @@ describe("Schema Component Tests", () => {
       expect(tabs[0].value).toBe("schemaFields");
       expect(tabs[1].value).toBe("allFields");
       expect(tabs[0].label).toContain("User Defined Schema (1)");
-      expect(tabs[1].label).toContain("Other Fields (2)");
+      expect(tabs[1].label).toContain("All Fields (2)");
     });
 
     // Test 37: mainTabs computed property

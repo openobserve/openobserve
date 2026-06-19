@@ -213,7 +213,7 @@ pub async fn update_pipeline(mut pipeline: Pipeline) -> Result<(), PipelineError
             if matches!(node.data, NodeData::LlmEvaluation(_)) {
                 let buffer_key = format!("{}:{}", pipeline_id, node.id);
                 o2_enterprise::enterprise::pipeline::llm_evaluation_node::LlmEvaluationNode::remove_buffer(&buffer_key).await;
-                log::info!(
+                log::debug!(
                     "[Pipeline] Evicted LLM evaluation buffer for key={} after pipeline update",
                     buffer_key
                 );
