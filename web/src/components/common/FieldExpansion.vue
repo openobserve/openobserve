@@ -254,11 +254,11 @@ defineExpose({ reset: () => fieldValuesPanelRef.value?.reset() });
 }
 
 .field-expansion-item button[data-state="open"] {
-  background-color: var(--o2-hover-accent);
+  background-color: var(--color-interactive-hover-bg);
 }
 
 .field-expansion-item .o-collapsible-content {
-  background-color: var(--o2-hover-accent);
+  background-color: var(--color-surface-accent);
   width: 100%;
 }
 

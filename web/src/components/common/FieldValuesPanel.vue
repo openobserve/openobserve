@@ -187,7 +187,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="tw:w-full tw:flex tw:justify-center tw:border-t tw:border-(--o2-border-color) tw:pt-1 tw:px-1"
     >
       <button
-        class="tw:inline-flex tw:items-center tw:gap-1 tw:bg-transparent tw:border-0 tw:text-(--o2-primary-color) tw:text-[0.6875rem] tw:font-[inherit] tw:py-0.5 tw:px-1 tw:cursor-pointer tw:rounded-[0.1875rem] tw:transition-opacity tw:duration-150 tw:hover:opacity-80 tw:hover:bg-(--o2-hover-accent) tw:disabled:opacity-50 tw:disabled:cursor-default"
+        class="tw:inline-flex tw:items-center tw:gap-1 tw:bg-transparent tw:border-0 tw:text-(--o2-primary-color) tw:text-[0.6875rem] tw:font-[inherit] tw:py-0.5 tw:px-1 tw:cursor-pointer tw:rounded-[0.1875rem] tw:transition-opacity tw:duration-150 tw:hover:opacity-80 tw:hover:bg-(--color-interactive-hover-bg) tw:disabled:opacity-50 tw:disabled:cursor-default"
         :disabled="isLoadingMore"
         @click="handleLoadMoreClick"
         :data-test="`log-search-subfield-load-more-${fieldName}`"

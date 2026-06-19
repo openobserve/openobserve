@@ -705,7 +705,7 @@ class="tw:h-5! tw:text-[0.75rem]!">
               data-test="trace-details-sidebar-links-table"
             >
               <thead
-                class="thead-sticky tw:text-left tw:bg-[var(--o2-hover-accent)]"
+                class="thead-sticky tw:text-left tw:bg-(--color-surface-accent)"
               >
                 <tr>
                   <th

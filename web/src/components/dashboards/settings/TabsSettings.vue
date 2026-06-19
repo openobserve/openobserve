@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-for="(tab, index) in currentDashboardData.data.tabs"
           :key="index"
-          class="tw:grid tw:items-center tw:border-b tw:border-b-(--o2-border-color) tw:min-h-10 tw:hover:bg-(--o2-hover-accent)"
+          class="tw:grid tw:items-center tw:border-b tw:border-b-(--o2-border-color) tw:min-h-10 tw:hover:bg-(--color-interactive-hover-bg)"
           style="grid-template-columns: 40px minmax(0, 1fr)"
           data-test="dashboard-tab-settings-draggable-row"
           :data-test-tab-name="tab.name"

@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <li
             v-for="(pattern, index) in filteredPatterns"
             :key="`${pattern.name}-${pattern.pattern.substring(0, 20)}`"
-            class="tw:flex tw:items-center tw:gap-3 tw:px-4 tw:py-3 tw:transition-colors tw:duration-150 tw:hover:bg-(--o2-hover-accent)"
+            class="tw:flex tw:items-center tw:gap-3 tw:px-4 tw:py-3 tw:transition-colors tw:duration-150 tw:hover:bg-(--color-interactive-hover-bg)"
             :data-test="`pattern-item-${index}`"
           >
             <div class="tw:flex tw:items-center tw:shrink-0">

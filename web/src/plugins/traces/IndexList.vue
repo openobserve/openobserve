@@ -690,7 +690,7 @@ export default defineComponent({
 }
 
 .index-menu .field_list.selected .field_overlay {
-  background-color: var(--o2-hover-accent);
+  background-color: var(--color-interactive-hover-bg);
 }
 
 .index-menu .field_list.selected .field_overlay .field_icons {
@@ -709,6 +709,6 @@ export default defineComponent({
 }
 
 .index-table table .field_list.selected {
-  background-color: var(--o2-hover-accent);
+  background-color: var(--color-interactive-hover-bg);
 }
 </style>

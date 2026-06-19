@@ -194,7 +194,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div class="tw:flex-1 tw:break-words">
                   <code
-                    class="tw:font-mono tw:text-[10px] tw:px-1 tw:py-0.5 tw:bg-[var(--o2-hover-accent)] tw:rounded"
+                    class="tw:font-mono tw:text-[10px] tw:px-1 tw:py-0.5 tw:bg-(--color-surface-accent) tw:rounded"
                   >
                     {{ formatId(rawEvent.error_id) }}
                   </code>
@@ -251,7 +251,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div class="tw:flex-1 tw:break-words">
                   <code
-                    class="tw:font-mono tw:text-[10px] tw:px-1 tw:py-0.5 tw:bg-[var(--o2-hover-accent)] tw:rounded"
+                    class="tw:font-mono tw:text-[10px] tw:px-1 tw:py-0.5 tw:bg-(--color-surface-accent) tw:rounded"
                   >
                     {{ formatId(rawEvent.view_id) }}
                   </code>
@@ -287,7 +287,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   v-for="item in relatedResources"
                   :key="item[`${item.type}_id`] || item.id"
-                  class="tw:p-1.5 tw:mb-1 tw:bg-[var(--o2-hover-accent)] tw:rounded tw:cursor-pointer tw:hover:bg-[#e0e0e0] tw:transition-colors"
+                  class="tw:p-1.5 tw:mb-1 tw:bg-(--color-surface-accent) tw:rounded tw:cursor-pointer tw:hover:bg-[#e0e0e0] tw:transition-colors"
                   data-test="related-resource-item"
                   @click="viewResourceDetails(item)"
                 >
@@ -407,7 +407,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-for="resource in networkResources"
               :key="resource.resource_id"
-              class="tw:p-2 tw:mb-2 tw:bg-[var(--o2-hover-accent)] tw:rounded"
+              class="tw:p-2 tw:mb-2 tw:bg-(--color-surface-accent) tw:rounded"
               data-test="network-resource-item"
             >
               <div class="tw:flex tw:items-center tw:mb-1">

@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="tw:flex tw:items-center tw:mb-3">
           <div class="tw:w-1/4 tw:text-gray-400">Trace ID:</div>
           <div class="tw:w-3/4 tw:flex tw:items-center tw:flex-nowrap">
-            <code class="tw:font-mono tw:text-sm tw:py-1 tw:px-2 tw:bg-(--o2-hover-accent) tw:rounded tw:text-(--o2-text-color)">{{ formatTraceId(traceId) }}</code>
+            <code class="tw:font-mono tw:text-sm tw:py-1 tw:px-2 tw:bg-(--color-surface-accent) tw:rounded tw:text-(--o2-text-color)">{{ formatTraceId(traceId) }}</code>
             <OButton
               icon-left="content-copy"
               variant="ghost"
@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="tw:flex tw:items-center tw:mb-3" v-if="spanId">
           <div class="tw:w-1/4 tw:text-gray-400">Span ID:</div>
           <div class="tw:w-3/4">
-            <code class="tw:font-mono tw:text-sm tw:py-1 tw:px-2 tw:bg-(--o2-hover-accent) tw:rounded tw:text-(--o2-text-color)">{{ formatSpanId(spanId) }}</code>
+            <code class="tw:font-mono tw:text-sm tw:py-1 tw:px-2 tw:bg-(--color-surface-accent) tw:rounded tw:text-(--o2-text-color)">{{ formatSpanId(spanId) }}</code>
           </div>
         </div>
 
@@ -90,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Performance Breakdown -->
         <div v-if="performanceData" class="tw:mb-3">
           <div class="tw:text-gray-400 tw:mb-1">Performance Breakdown:</div>
-          <div class="tw:p-2 tw:bg-(--o2-hover-accent) tw:rounded tw:text-sm">
+          <div class="tw:p-2 tw:bg-(--color-surface-accent) tw:rounded tw:text-sm">
             <div class="tw:flex tw:items-center tw:mb-1">
               <div class="tw:w-5/12 tw:text-gray-500">Total Duration:</div>
               <div class="tw:w-7/12 tw:font-bold">
@@ -178,7 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Missing trace notice -->
         <div
           v-if="!hasBackendTrace && traceId"
-          class="tw:mt-3 tw:p-2 tw:bg-(--o2-hover-accent) tw:rounded"
+          class="tw:mt-3 tw:p-2 tw:bg-(--color-surface-accent) tw:rounded"
         >
           <div class="tw:flex tw:items-center">
             <OIcon name="info" size="sm" class="tw:mr-2" />

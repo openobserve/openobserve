@@ -712,6 +712,11 @@
   /* Skeleton shimmer + datepicker inner border (were .css-only too) */
   --color-skeleton-shimmer:        rgba(255, 255, 255, 0.8);
   --color-datepicker-inner-border: var(--color-grey-100);
+
+  /* Shared hover + surface accent — wraps --o2-hover-accent so templates use
+     component tokens, not semantic tokens directly */
+  --color-interactive-hover-bg: var(--o2-hover-accent);
+  --color-surface-accent: var(--o2-hover-accent);
 }
 
 
@@ -1325,6 +1330,10 @@
   --color-table-sort-icon-inactive: var(--color-table-sort-icon-inactive);
   --color-table-streaming-bar: var(--color-table-streaming-bar);
   --color-table-row-expanded-bg: var(--color-table-row-expanded-bg);
+
+  /* Shared hover + surface accent */
+  --color-interactive-hover-bg: var(--color-interactive-hover-bg);
+  --color-surface-accent: var(--color-surface-accent);
 }
 
 /* ── Menu animations ── */

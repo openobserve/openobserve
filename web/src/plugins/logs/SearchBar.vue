@@ -142,7 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #trigger>
             <OButton
               data-test="logs-search-bar-utilities-menu-btn"
-              class="tw:p-1! tw:ml-1 tw:[border:0.0625rem_solid_var(--color-button-outline-border)]! tw:rounded-md tw:[transition:all_0.2s_ease] tw:min-h-[1.875rem]! tw:text-xs tw:font-medium tw:hover:bg-[var(--o2-hover-accent)] element-box-shadow"
+              class="tw:p-1! tw:ml-1 tw:[border:0.0625rem_solid_var(--color-button-outline-border)]! tw:rounded-md tw:[transition:all_0.2s_ease] tw:min-h-[1.875rem]! tw:text-xs tw:font-medium tw:hover:bg-(--color-button-outline-hover-bg) element-box-shadow"
               icon-left="more-horiz"
               variant="outline"
               size="xs"
@@ -346,7 +346,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :aria-disabled="isDownloadDisabled || undefined"
               @mouseenter="!isDownloadDisabled && (showDownloadSubmenu = true)"
               @mouseleave="showDownloadSubmenu = false"
-              class="tw:relative tw:flex tw:items-center tw:gap-2 tw:py-[0.375rem] tw:px-3 tw:text-[var(--text-base)] tw:[line-height:1.2] tw:cursor-pointer tw:select-none tw:hover:bg-[var(--o2-hover-accent)] search-download-item"
+              class="tw:relative tw:flex tw:items-center tw:gap-2 tw:py-[0.375rem] tw:px-3 tw:text-[var(--text-base)] tw:[line-height:1.2] tw:cursor-pointer tw:select-none tw:hover:bg-(--color-interactive-hover-bg) search-download-item"
               :class="{ 'tw:cursor-not-allowed! tw:text-(--o2-text-muted) tw:hover:bg-transparent!': isDownloadDisabled }"
             >
               <span class="tw:inline-flex tw:items-center tw:justify-center tw:w-7 tw:h-7 tw:rounded-md tw:bg-(--o2-section-header-bg) tw:text-(--o2-text-secondary) tw:shrink-0">
@@ -363,7 +363,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <button
                   type="button"
                   data-test="search-download-csv-btn"
-                  class="tw:flex tw:items-center tw:gap-[0.625rem] tw:w-full tw:py-[0.375rem] tw:px-3 tw:text-[var(--text-base)] tw:[line-height:1.2] tw:text-left tw:bg-transparent tw:border-0 tw:cursor-pointer tw:text-(--o2-text-body) tw:hover:bg-[var(--o2-hover-accent)]"
+                  class="tw:flex tw:items-center tw:gap-[0.625rem] tw:w-full tw:py-[0.375rem] tw:px-3 tw:text-[var(--text-base)] tw:[line-height:1.2] tw:text-left tw:bg-transparent tw:border-0 tw:cursor-pointer tw:text-(--o2-text-body) tw:hover:bg-(--color-interactive-hover-bg)"
                   @click="downloadLogs(searchObj.data.queryResults.hits, 'csv'); showDownloadSubmenu = false"
                 >
                   <OIcon name="grid-on" size="sm" />
@@ -372,7 +372,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <button
                   type="button"
                   data-test="search-download-json-btn"
-                  class="tw:flex tw:items-center tw:gap-[0.625rem] tw:w-full tw:py-[0.375rem] tw:px-3 tw:text-[var(--text-base)] tw:[line-height:1.2] tw:text-left tw:bg-transparent tw:border-0 tw:cursor-pointer tw:text-(--o2-text-body) tw:hover:bg-[var(--o2-hover-accent)]"
+                  class="tw:flex tw:items-center tw:gap-[0.625rem] tw:w-full tw:py-[0.375rem] tw:px-3 tw:text-[var(--text-base)] tw:[line-height:1.2] tw:text-left tw:bg-transparent tw:border-0 tw:cursor-pointer tw:text-(--o2-text-body) tw:hover:bg-(--color-interactive-hover-bg)"
                   @click="downloadLogs(searchObj.data.queryResults.hits, 'json'); showDownloadSubmenu = false"
                 >
                   <OIcon name="data-object" size="sm" />
