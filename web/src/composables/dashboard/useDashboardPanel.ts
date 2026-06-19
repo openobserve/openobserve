@@ -1576,8 +1576,19 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     dashboardPanelData.meta.promql.loadingLabels = true;
 
     try {
-      const endTime = Math.floor(Date.now() * 1000); // microseconds
-      const startTime = endTime - 24 * 60 * 60 * 1000000; // 24 hours ago in microseconds
+      // Use the panel's selected time range; fall back to the last 24h.
+      const timestamps = dashboardPanelData.meta.dateTime;
+      const hasRange =
+        timestamps?.start_time &&
+        timestamps?.end_time &&
+        timestamps.start_time != "Invalid Date" &&
+        timestamps.end_time != "Invalid Date";
+      const endTime = hasRange
+        ? new Date(timestamps.end_time.toISOString()).getTime() * 1000 // microseconds
+        : Math.floor(Date.now() * 1000); // microseconds
+      const startTime = hasRange
+        ? new Date(timestamps.start_time.toISOString()).getTime() * 1000 // microseconds
+        : endTime - 24 * 60 * 60 * 1000000; // 24 hours ago in microseconds
 
       const response = await metricsService.get_promql_series({
         org_identifier: store.state.selectedOrganization.identifier,
