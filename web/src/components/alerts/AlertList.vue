@@ -787,7 +787,9 @@ export default defineComponent({
     const schemaList = ref([]);
     const streams: any = ref({});
     const isFetchingStreams = ref(false);
-    const loading = ref(false);
+    // Start in the loading state so the table shows the skeleton on first
+    // render instead of briefly flashing the empty state before the fetch.
+    const loading = ref(true);
     const isSubmitting = ref(false);
 
     // Compact toolbar: icon-only buttons when AI sidebar is open at narrow widths
