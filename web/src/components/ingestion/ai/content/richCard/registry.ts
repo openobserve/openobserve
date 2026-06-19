@@ -18,8 +18,10 @@
 // its data-source-ui.md (see buildFromMarkdown.ts). No per-provider code and no
 // list to maintain here — add frontmatter in the content repo and it lights up.
 
-import type { CardSubstitutions } from "../renderMarkdown";
-import type { RichCardContent } from "./types";
+import type {
+  CardSubstitutions,
+  RichCardContent,
+} from "@/components/ingestion/setupCard/types";
 import { getAICardRaw } from "../index";
 import { parseFrontmatter } from "./parseFrontmatter";
 import { buildFromMarkdown } from "./buildFromMarkdown";

@@ -1,6 +1,6 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 <template>
-  <div>
+  <div class="tw:min-w-0">
     <OSelect
       :model-value="selectValue"
       :options="flatOptions"

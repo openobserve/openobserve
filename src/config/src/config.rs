@@ -1173,6 +1173,8 @@ pub struct Common {
     pub print_key_event: bool,
     #[env_config(name = "ZO_PRINT_KEY_SQL", default = true)]
     pub print_key_sql: bool,
+    #[env_config(name = "ZO_PRINT_PLAN_SINGLE_LINE", default = true)]
+    pub print_plan_single_line: bool,
     // usage reporting
     #[env_config(name = "ZO_USAGE_REPORTING_ENABLED", default = false)]
     pub usage_enabled: bool,
