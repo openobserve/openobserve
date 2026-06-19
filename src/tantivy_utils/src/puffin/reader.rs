@@ -246,7 +246,7 @@ impl PuffinFooterBytesReader {
         let payload = slice_payload_from_suffix(&suffix, self.payload_size)
             .ok_or_else(|| anyhow!("Unexpected payload size"))?;
         ensure!(
-            payload.slice(0..MAGIC_SIZE as usize).to_vec() == MAGIC,
+            payload.starts_with(&MAGIC),
             anyhow!("Payload MAGIC mismatch")
         );
         Ok((footer, payload))
