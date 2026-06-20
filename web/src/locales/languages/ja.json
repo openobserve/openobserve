@@ -460,7 +460,8 @@
     "actions": "アクション",
     "incidents": "インシデント",
     "evals": "評価",
-    "aiObservability": "AI オブザーバビリティ"
+    "aiObservability": "AI オブザーバビリティ",
+    "synthetic": "合成繊維"
   },
   "rum": {
     "title": "リアルユーザーモニタリング",

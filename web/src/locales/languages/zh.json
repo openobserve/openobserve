@@ -460,7 +460,8 @@
     "actions": "操作",
     "incidents": "事件",
     "evals": "评测",
-    "aiObservability": "AI"
+    "aiObservability": "AI",
+    "synthetic": "合成的"
   },
   "rum": {
     "title": "用户体验监控",

@@ -460,7 +460,8 @@
     "actions": "Eylemler",
     "incidents": "Olaylar",
     "evals": "Evalar",
-    "aiObservability": "Yapay Zeka Gözlemlenebilirliği"
+    "aiObservability": "Yapay Zeka Gözlemlenebilirliği",
+    "synthetic": "Sentetik"
   },
   "rum": {
     "title": "Gerçek Kullanıcı İzleme",
