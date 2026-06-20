@@ -836,7 +836,8 @@
     "pipeline": "Pipelines",
     "language": "Language",
     "actions": "Actions",
-    "keyboardShortcuts": "Keyboard Shortcuts"
+    "keyboardShortcuts": "Keyboard Shortcuts",
+    "synthetic": "Synthetic"
   },
   "rum": {
     "title": "Real User Monitoring",

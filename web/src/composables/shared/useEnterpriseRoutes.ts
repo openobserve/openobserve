@@ -115,6 +115,16 @@ const useEnterpriseRoutes = () => {
   //the above are the routes that we support for oss including both enterprise and cloud
 
   if (config.isCloud == "true" || config.isEnterprise == "true") {
+    routes.push({
+      path: "synthetic",
+      name: "synthetic",
+      component: () => import("@/views/SyntheticMonitoring.vue"),
+      meta: { title: "Synthetic Monitoring" },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    });
+
     routes.push(
       {
         path: "incidents",

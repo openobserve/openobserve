@@ -614,9 +614,37 @@ export default defineComponent({
     // ever flips at runtime), keep the menu in sync.
     watch(isOnlineEvalsEnabled, () => updateAIObservabilityMenu(), { immediate: false });
 
+    const updateSyntheticMenu = () => {
+      if (config.isCloud !== "true" && config.isEnterprise !== "true") return;
+
+      const exists = linksList.value.some((l: any) => l.name === "synthetic");
+      if (exists) return;
+
+      const incidentIndex = linksList.value.findIndex(
+        (l: any) => l.name === "incidentList",
+      );
+      const alertIndex = linksList.value.findIndex(
+        (l: any) => l.name === "alertList",
+      );
+      const insertAt =
+        incidentIndex !== -1
+          ? incidentIndex + 1
+          : alertIndex !== -1
+            ? alertIndex + 1
+            : linksList.value.length;
+
+      linksList.value.splice(insertAt, 0, {
+        title: t("menu.synthetic"),
+        icon: "radar",
+        link: "/synthetic",
+        name: "synthetic",
+      });
+    };
+
     const filterMenus = () => {
       updateIncidentsMenu();
       updateActionsMenu();
+      updateSyntheticMenu();
       updateAIObservabilityMenu();
 
       const disableMenus = new Set(
@@ -647,6 +675,7 @@ export default defineComponent({
         link: "/reports",
         name: "reports",
       });
+      filterMenus();
     }
 
     //orgIdentifier query param exists then clear the localstorage and store.
