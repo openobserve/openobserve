@@ -835,7 +835,11 @@
     "pipeline": "パイプライン",
     "language": "言語",
     "actions": "アクション",
-    "keyboardShortcuts": "キーボードショートカット"
+    "keyboardShortcuts": "キーボードショートカット",
+    "incidents": "インシデント",
+    "evals": "評価",
+    "aiObservability": "AI オブザーバビリティ",
+    "synthetic": "合成繊維"
   },
   "rum": {
     "title": "リアルユーザーモニタリング",

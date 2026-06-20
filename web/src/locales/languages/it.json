@@ -835,7 +835,11 @@
     "pipeline": "Pipeline",
     "language": "Lingua",
     "actions": "Azioni",
-    "keyboardShortcuts": "Scelte rapide da tastiera"
+    "keyboardShortcuts": "Scelte rapide da tastiera",
+    "incidents": "Incidenti",
+    "evals": "Valuta",
+    "aiObservability": "Osservabilità dell'IA",
+    "synthetic": "Sintetico"
   },
   "rum": {
     "title": "Monitoraggio degli utenti reali",

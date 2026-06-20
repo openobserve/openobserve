@@ -835,7 +835,11 @@
     "pipeline": "Tuberías",
     "language": "Idioma",
     "actions": "Acciones",
-    "keyboardShortcuts": "Métodos abreviados de teclado"
+    "keyboardShortcuts": "Métodos abreviados de teclado",
+    "incidents": "Incidentes",
+    "evals": "Evaluaciones",
+    "aiObservability": "Observabilidad de la IA",
+    "synthetic": "Sintético"
   },
   "rum": {
     "title": "Monitorización de usuarios reales",

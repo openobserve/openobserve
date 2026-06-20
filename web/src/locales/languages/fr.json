@@ -835,7 +835,11 @@
     "pipeline": "Canalisations",
     "language": "Langue",
     "actions": "Actions",
-    "keyboardShortcuts": "Raccourcis clavier"
+    "keyboardShortcuts": "Raccourcis clavier",
+    "incidents": "Incidents",
+    "evals": "Evals",
+    "aiObservability": "Observabilité de l'IA",
+    "synthetic": "Synthétique"
   },
   "rum": {
     "title": "Surveillance réelle des utilisateurs",

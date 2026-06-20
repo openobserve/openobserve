@@ -835,7 +835,11 @@
     "pipeline": "流水线",
     "language": "语言",
     "actions": "操作",
-    "keyboardShortcuts": "键盘快捷键"
+    "keyboardShortcuts": "键盘快捷键",
+    "incidents": "事件",
+    "evals": "评测",
+    "aiObservability": "AI",
+    "synthetic": "合成的"
   },
   "rum": {
     "title": "用户体验监控",

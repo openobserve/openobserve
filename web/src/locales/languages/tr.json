@@ -835,7 +835,11 @@
     "pipeline": "Boru hatları",
     "language": "Dil",
     "actions": "Eylemler",
-    "keyboardShortcuts": "Klavye Kısayolları"
+    "keyboardShortcuts": "Klavye Kısayolları",
+    "incidents": "Olaylar",
+    "evals": "Evalar",
+    "aiObservability": "Yapay Zeka Gözlemlenebilirliği",
+    "synthetic": "Sentetik"
   },
   "rum": {
     "title": "Gerçek Kullanıcı İzleme",

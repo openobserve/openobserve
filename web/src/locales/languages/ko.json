@@ -835,7 +835,11 @@
     "pipeline": "파이프라인",
     "language": "언어",
     "actions": "액션",
-    "keyboardShortcuts": "키보드 단축키"
+    "keyboardShortcuts": "키보드 단축키",
+    "incidents": "인시던트",
+    "evals": "평가",
+    "aiObservability": "AI 옵저버빌리티",
+    "synthetic": "합성"
   },
   "rum": {
     "title": "실제 사용자 모니터링",

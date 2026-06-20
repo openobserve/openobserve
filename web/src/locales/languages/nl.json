@@ -835,7 +835,11 @@
     "pipeline": "Pijpleidingen",
     "language": "taal",
     "actions": "Acties",
-    "keyboardShortcuts": "Sneltoetsen"
+    "keyboardShortcuts": "Sneltoetsen",
+    "incidents": "Incidenten",
+    "evals": "Evalen",
+    "aiObservability": "AI-waarneembaarheid",
+    "synthetic": "Synthetisch"
   },
   "rum": {
     "title": "Monitoring van echte gebruikers",

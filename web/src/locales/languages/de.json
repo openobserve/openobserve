@@ -835,7 +835,11 @@
     "pipeline": "Rohrleitungen",
     "language": "Sprache",
     "actions": "Aktionen",
-    "keyboardShortcuts": "Tastenkürzel"
+    "keyboardShortcuts": "Tastenkürzel",
+    "incidents": "Vorfälle",
+    "evals": "Evalen",
+    "aiObservability": "KI-Beobachtbarkeit",
+    "synthetic": "Synthetisch"
   },
   "rum": {
     "title": "Echte Benutzerüberwachung",

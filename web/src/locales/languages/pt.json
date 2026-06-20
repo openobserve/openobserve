@@ -835,7 +835,11 @@
     "pipeline": "Oleodutos",
     "language": "Idioma",
     "actions": "Ações",
-    "keyboardShortcuts": "Atalhos de teclado"
+    "keyboardShortcuts": "Atalhos de teclado",
+    "incidents": "Incidentes",
+    "evals": "Evals",
+    "aiObservability": "Observabilidade da IA",
+    "synthetic": "Sintético"
   },
   "rum": {
     "title": "Monitoramento de usuários reais",
