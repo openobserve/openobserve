@@ -98,7 +98,7 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="m in pagedMonitors" :key="m.id" class="syn-row">
+            <tr v-for="m in pagedMonitors" :key="m.id" class="syn-row" style="cursor:pointer" @click="openDetail(m)">
               <td class="syn-td td-center"><span class="dot" :class="'dot--' + m.status.toLowerCase()" /></td>
               <td class="syn-td">
                 <div class="mon-name">{{ m.name }}</div>
@@ -460,6 +460,412 @@
       </div>
     </Teleport>
 
+    <!-- Detail Side Panel -->
+    <Teleport to="body">
+      <transition name="dp">
+        <div v-if="detailPanel?.show" class="dp-overlay" @click.self="closeDetail">
+          <aside class="dp-panel">
+            <!-- Header -->
+            <div class="dp-hdr">
+              <div class="dp-hdr-top">
+                <span class="dot" :class="'dot--' + detailPanel.monitor.status.toLowerCase()" style="flex-shrink:0;margin-top:2px"/>
+                <div class="dp-hdr-titles">
+                  <div class="dp-title">{{ detailPanel.monitor.name }}</div>
+                  <div class="dp-url">{{ detailPanel.monitor.url }}</div>
+                </div>
+                <button class="dp-close" @click="closeDetail"><OIcon name="close" size="sm"/></button>
+              </div>
+              <div class="dp-badges">
+                <span class="badge" :class="'badge--'+detailPanel.monitor.type.toLowerCase()">{{ detailPanel.monitor.type }}</span>
+                <span class="dp-meta-chip">{{ detailPanel.monitor.interval }}</span>
+                <span class="dp-meta-chip">{{ detailPanel.monitor.locations.length }} location{{ detailPanel.monitor.locations.length !== 1 ? 's' : '' }}</span>
+                <span class="dp-meta-chip">Last: {{ detailPanel.monitor.lastCheck }}</span>
+              </div>
+            </div>
+            <!-- Tabs -->
+            <div class="dp-tabs">
+              <button class="dp-tab" :class="{ 'dp-tab--active': detailPanel.tab === 'overview' }" @click="detailPanel.tab = 'overview'">Overview</button>
+              <button class="dp-tab" :class="{ 'dp-tab--active': detailPanel.tab === 'logs' }" @click="detailPanel.tab = 'logs'">
+                Logs <span class="dp-tab-ct">{{ detailPanel.logs.length }}</span>
+              </button>
+              <button class="dp-tab" :class="{ 'dp-tab--active': detailPanel.tab === 'metrics' }" @click="detailPanel.tab = 'metrics'">Metrics</button>
+              <button class="dp-tab" :class="{ 'dp-tab--active': detailPanel.tab === 'traces' }" @click="detailPanel.tab = 'traces'">
+                Traces <span class="dp-tab-ct">{{ detailPanel.traces.length }}</span>
+              </button>
+            </div>
+            <!-- Body -->
+            <div class="dp-body">
+
+              <!-- ── OVERVIEW ── -->
+              <template v-if="detailPanel.tab === 'overview'">
+                <div class="dp-ov-grid">
+                  <!-- Left column: KPIs + chart + locations -->
+                  <div class="dp-ov-col">
+                    <div class="dp-kpis">
+                      <div class="dp-kpi">
+                        <div class="dp-kpi-val" :class="detailPanel.monitor.uptime>=99?'c-g':detailPanel.monitor.uptime>=95?'c-a':'c-r'">{{ detailPanel.monitor.uptime }}%</div>
+                        <div class="dp-kpi-lbl">Uptime 7d</div>
+                      </div>
+                      <div class="dp-kpi">
+                        <div class="dp-kpi-val" :class="_rtMs(detailPanel.monitor.responseTime)<600?'c-g':_rtMs(detailPanel.monitor.responseTime)<1200?'c-a':'c-r'">
+                          {{ detailPanel.monitor.responseTime ?? '—' }}
+                        </div>
+                        <div class="dp-kpi-lbl">Avg Response</div>
+                      </div>
+                      <div class="dp-kpi">
+                        <div class="dp-kpi-val">288</div>
+                        <div class="dp-kpi-lbl">Checks/day</div>
+                      </div>
+                      <div class="dp-kpi">
+                        <div class="dp-kpi-val" :class="detailPanel.monitor.status==='Up'?'c-g':detailPanel.monitor.status==='Down'?'c-r':'c-a'">{{ detailPanel.monitor.status }}</div>
+                        <div class="dp-kpi-lbl">Status</div>
+                      </div>
+                      <div class="dp-kpi">
+                        <div class="dp-kpi-val">{{ detailPanel.monitor.status==='Down' ? '~6m' : '0' }}</div>
+                        <div class="dp-kpi-lbl">MTTR</div>
+                      </div>
+                      <div class="dp-kpi">
+                        <div class="dp-kpi-val">{{ detailPanel.incidents.length }}</div>
+                        <div class="dp-kpi-lbl">Incidents 30d</div>
+                      </div>
+                      <div class="dp-kpi">
+                        <div class="dp-kpi-val" :class="detailPanel.monitor.uptime>=99?'c-g':'c-a'">{{ detailPanel.monitor.uptime>=99?'✓':'~' }}</div>
+                        <div class="dp-kpi-lbl">SLA 99.9%</div>
+                      </div>
+                      <div class="dp-kpi">
+                        <div class="dp-kpi-val c-g">87d</div>
+                        <div class="dp-kpi-lbl">SSL Expiry</div>
+                      </div>
+                    </div>
+
+                    <div class="dp-section">
+                      <div class="dp-section-title">Response Time · 24h</div>
+                      <div class="dp-chart24" style="height:80px">
+                        <div v-for="(bar, bi) in detailPanel.metricBars" :key="bi"
+                          class="dp-bar24"
+                          :class="bar.val===null?'dp-bar24--err':bar.val>1000?'dp-bar24--slow':bar.val>600?'dp-bar24--deg':'dp-bar24--ok'"
+                          :style="{ height: bar.val ? Math.max(3, Math.round((bar.val/detailPanel.metricMax)*76)) + 'px' : '76px' }"
+                          :title="bar.val ? bar.hour+': '+bar.val+'ms' : bar.hour+': Timeout'"/>
+                      </div>
+                      <div class="dp-chart24-x"><span>24h ago</span><span>12h ago</span><span>Now</span></div>
+                    </div>
+
+                    <div class="dp-section">
+                      <div class="dp-section-title">{{ detailPanel.geoRow ? 'Geographic Status' : 'Monitored Locations' }}</div>
+                      <div class="dp-geo-list">
+                        <template v-if="detailPanel.geoRow">
+                          <div v-for="(cell, ci) in detailPanel.geoRow.cells" :key="ci"
+                            class="dp-geo-row" :class="{ 'dp-geo-row--none': cell.status === 'none' }">
+                            <span class="dp-geo-flag">{{ geoAllLocations[ci].flag }}</span>
+                            <div class="dp-geo-info">
+                              <span class="dp-geo-loc">{{ geoAllLocations[ci].label }}</span>
+                              <span class="dp-geo-city">{{ geoAllLocations[ci].city }}</span>
+                            </div>
+                            <template v-if="cell.status !== 'none'">
+                              <span class="geo-cell-dot" :class="'geo-cdot--'+cell.status" style="margin-left:auto;flex-shrink:0"/>
+                              <span class="dp-geo-ms" :class="cell.status==='down'?'c-r':cell.status==='deg'?'c-a':'c-g'">{{ cell.ms !== null ? cell.ms+'ms' : 'Timeout' }}</span>
+                            </template>
+                            <span v-else style="margin-left:auto;color:var(--o2-tab-text-color);font-size:12px">—</span>
+                          </div>
+                        </template>
+                        <template v-else>
+                          <div v-for="loc in detailPanel.monitor.locations" :key="loc" class="dp-geo-row">
+                            <span class="dp-geo-flag">📍</span>
+                            <span class="dp-geo-loc">{{ loc }}</span>
+                            <span class="geo-cell-dot geo-cdot--up" style="margin-left:auto;flex-shrink:0"/>
+                            <span class="dp-geo-ms c-g">Active</span>
+                          </div>
+                        </template>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Right column: config + incidents + uptime cal -->
+                  <div class="dp-ov-col">
+                    <div class="dp-section">
+                      <div class="dp-section-title">Monitor Configuration</div>
+                      <div class="dp-cfg-table">
+                        <div class="dp-cfg-row"><span class="dp-cfg-key">URL</span><span class="dp-cfg-val">{{ detailPanel.monitor.url }}</span></div>
+                        <div class="dp-cfg-row"><span class="dp-cfg-key">Check type</span><span class="dp-cfg-val">{{ detailPanel.monitor.type }}</span></div>
+                        <div class="dp-cfg-row"><span class="dp-cfg-key">HTTP method</span><span class="dp-cfg-val">GET</span></div>
+                        <div class="dp-cfg-row"><span class="dp-cfg-key">Interval</span><span class="dp-cfg-val">{{ detailPanel.monitor.interval }}</span></div>
+                        <div class="dp-cfg-row"><span class="dp-cfg-key">Timeout</span><span class="dp-cfg-val">30 seconds</span></div>
+                        <div class="dp-cfg-row"><span class="dp-cfg-key">Expected status</span><span class="dp-cfg-val">200 OK</span></div>
+                        <div class="dp-cfg-row"><span class="dp-cfg-key">Follow redirects</span><span class="dp-cfg-val">Yes (max 5)</span></div>
+                        <div class="dp-cfg-row"><span class="dp-cfg-key">SSL validation</span><span class="dp-cfg-val">Enabled</span></div>
+                        <div class="dp-cfg-row"><span class="dp-cfg-key">Alert threshold</span><span class="dp-cfg-val">2 consecutive failures</span></div>
+                        <div class="dp-cfg-row"><span class="dp-cfg-key">Locations</span><span class="dp-cfg-val">{{ detailPanel.monitor.locations.join(', ') }}</span></div>
+                        <div class="dp-cfg-row"><span class="dp-cfg-key">Last check</span><span class="dp-cfg-val">{{ detailPanel.monitor.lastCheck }}</span></div>
+                        <div class="dp-cfg-row"><span class="dp-cfg-key">Monitor ID</span><span class="dp-cfg-val" style="font-family:ui-monospace,monospace">{{ detailPanel.monitor.id }}</span></div>
+                      </div>
+                    </div>
+
+                    <div class="dp-section">
+                      <div class="dp-section-title">Recent Incidents · 30d</div>
+                      <div class="dp-incidents">
+                        <div v-for="inc in detailPanel.incidents" :key="inc.id"
+                          class="dp-incident-row" :class="'dp-inc--'+inc.type">
+                          <span class="dp-inc-icon" :class="inc.type==='down'?'c-r':'c-a'">{{ inc.type==='down' ? '✗' : '⚠' }}</span>
+                          <div class="dp-inc-body">
+                            <div class="dp-inc-title">{{ inc.title }}</div>
+                            <div class="dp-inc-meta">{{ inc.start }} · {{ inc.locs }}</div>
+                            <div class="dp-inc-id">{{ inc.id }}</div>
+                          </div>
+                          <span class="dp-inc-dur" :class="inc.type==='down'?'c-r':'c-a'">{{ inc.dur }}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="dp-section">
+                      <div class="dp-section-title">Availability · Last 30 days</div>
+                      <div class="dp-uptime-cal">
+                        <div v-for="(day, di) in detailPanel.uptimeCal" :key="di"
+                          class="dp-cal-day" :class="'dp-cal--'+day"
+                          :title="'Day '+(30-di)+': '+day"/>
+                      </div>
+                      <div class="dp-uptime-legend">
+                        <span class="dp-cal-day dp-cal--ok" style="display:inline-block"/><span>Healthy</span>
+                        <span class="dp-cal-day dp-cal--deg" style="display:inline-block"/><span>Degraded</span>
+                        <span class="dp-cal-day dp-cal--down" style="display:inline-block"/><span>Outage</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </template>
+
+              <!-- ── LOGS ── -->
+              <template v-if="detailPanel.tab === 'logs'">
+                <div class="dp-log-filters">
+                  <button v-for="lv in ['ALL','ERROR','WARN','INFO','DEBUG']" :key="lv"
+                    class="dp-logf-btn" :class="{ 'dp-logf-btn--active': dpLogFilter === lv }"
+                    @click="dpLogFilter = lv">
+                    {{ lv }}
+                    <span v-if="lv !== 'ALL' && dpLogCounts[lv]" class="dp-tab-ct">{{ dpLogCounts[lv] }}</span>
+                  </button>
+                  <span style="flex:1"/>
+                  <span class="dp-log-summary">{{ dpFilteredLogs.length }} entries · window: {{ detailPanel.logs[0]?.time ?? '' }} UTC</span>
+                  <span class="dp-mocked-pill">mocked</span>
+                </div>
+                <div class="dp-log-list">
+                  <template v-for="(log, li) in dpFilteredLogs" :key="li">
+                    <div class="dp-log-row" :class="{ 'dp-log-row--has-stack': !!log.stack }">
+                      <span class="dp-log-time">{{ log.time }}</span>
+                      <span class="dp-log-lvl" :class="'dp-lvl--'+log.level.toLowerCase()">{{ log.level }}</span>
+                      <span class="dp-log-src">{{ log.logger }}</span>
+                      <span class="dp-log-msg">{{ log.msg }}</span>
+                    </div>
+                    <div v-if="log.stack" class="dp-log-stack">{{ log.stack }}</div>
+                  </template>
+                </div>
+              </template>
+
+              <!-- ── METRICS ── -->
+              <template v-if="detailPanel.tab === 'metrics'">
+                <div class="dp-tab-info">
+                  Aggregated metrics from synthetic check executions — correlated with incident windows
+                  <span class="dp-mocked-pill">mocked</span>
+                </div>
+                <div class="dp-metrics-grid">
+                  <!-- Left: charts + percentiles -->
+                  <div class="dp-ov-col">
+                    <div class="dp-section">
+                      <div class="dp-section-title">Response Time P90 · 24h</div>
+                      <div class="dp-chart24" style="height:90px">
+                        <div v-for="(bar, bi) in detailPanel.metricBars" :key="bi"
+                          class="dp-bar24"
+                          :class="bar.val===null?'dp-bar24--err':bar.val>1000?'dp-bar24--slow':bar.val>600?'dp-bar24--deg':'dp-bar24--ok'"
+                          :style="{ height: bar.val ? Math.max(3, Math.round((bar.val/detailPanel.metricMax)*86)) + 'px' : '86px' }"
+                          :title="bar.val ? bar.hour+': '+bar.val+'ms' : bar.hour+': Timeout'"/>
+                      </div>
+                      <div class="dp-chart24-x"><span>24h ago</span><span>12h ago</span><span>Now</span></div>
+                    </div>
+
+                    <div class="dp-section">
+                      <div class="dp-section-title">Latency Percentiles · last 1h</div>
+                      <div class="dp-pcts">
+                        <div class="dp-pct-row">
+                          <span class="dp-pct-lbl">P50</span>
+                          <div class="dp-pct-track"><div class="dp-pct-fill dp-pct-fill--ok" style="width:30%"/></div>
+                          <span class="dp-pct-val">{{ Math.round(_rtMs(detailPanel.monitor.responseTime)*0.55) }}ms</span>
+                        </div>
+                        <div class="dp-pct-row">
+                          <span class="dp-pct-lbl">P75</span>
+                          <div class="dp-pct-track"><div class="dp-pct-fill dp-pct-fill--ok" style="width:50%"/></div>
+                          <span class="dp-pct-val">{{ Math.round(_rtMs(detailPanel.monitor.responseTime)*0.82) }}ms</span>
+                        </div>
+                        <div class="dp-pct-row">
+                          <span class="dp-pct-lbl">P90</span>
+                          <div class="dp-pct-track"><div class="dp-pct-fill dp-pct-fill--deg" style="width:65%"/></div>
+                          <span class="dp-pct-val">{{ detailPanel.monitor.responseTime ?? '220ms' }}</span>
+                        </div>
+                        <div class="dp-pct-row">
+                          <span class="dp-pct-lbl">P95</span>
+                          <div class="dp-pct-track"><div class="dp-pct-fill dp-pct-fill--deg" style="width:76%"/></div>
+                          <span class="dp-pct-val">{{ Math.round(_rtMs(detailPanel.monitor.responseTime)*1.4) }}ms</span>
+                        </div>
+                        <div class="dp-pct-row">
+                          <span class="dp-pct-lbl">P99</span>
+                          <div class="dp-pct-track"><div class="dp-pct-fill dp-pct-fill--slow" style="width:88%"/></div>
+                          <span class="dp-pct-val">{{ Math.round(_rtMs(detailPanel.monitor.responseTime)*1.9) }}ms</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="dp-section">
+                      <div class="dp-section-title">Availability · Last 30 days</div>
+                      <div class="dp-uptime-cal">
+                        <div v-for="(day, di) in detailPanel.uptimeCal" :key="di"
+                          class="dp-cal-day" :class="'dp-cal--'+day"
+                          :title="'Day '+(30-di)+': '+day"/>
+                      </div>
+                      <div class="dp-uptime-legend">
+                        <span class="dp-cal-day dp-cal--ok" style="display:inline-block"/><span>Up</span>
+                        <span class="dp-cal-day dp-cal--deg" style="display:inline-block"/><span>Degraded</span>
+                        <span class="dp-cal-day dp-cal--down" style="display:inline-block"/><span>Down</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Right: error rate + per-location table -->
+                  <div class="dp-ov-col">
+                    <div class="dp-section">
+                      <div class="dp-section-title">Error Rate · 24h</div>
+                      <div class="dp-chart24" style="height:90px">
+                        <div v-for="(val, bi) in detailPanel.errorBars" :key="bi"
+                          class="dp-bar24"
+                          :class="val>0?'dp-bar24--err':'dp-bar24--zero'"
+                          :style="{ height: val>0 ? Math.max(3, Math.round(val*86))+'px' : '3px' }"/>
+                      </div>
+                      <div class="dp-chart24-x"><span>24h ago</span><span>12h ago</span><span>Now</span></div>
+                    </div>
+
+                    <div class="dp-section">
+                      <div class="dp-section-title">By Location · last 24h</div>
+                      <table class="dp-loc-table">
+                        <thead>
+                          <tr>
+                            <th>Location</th>
+                            <th style="text-align:right">Checks</th>
+                            <th style="text-align:right">Avg</th>
+                            <th style="text-align:right">P90</th>
+                            <th style="text-align:right">P99</th>
+                            <th style="text-align:right">Err%</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr v-for="row in detailPanel.locBreakdown" :key="row.loc">
+                            <td>{{ row.loc }}</td>
+                            <td style="text-align:right">{{ row.checks }}</td>
+                            <td style="text-align:right" :class="row.avg===null?'c-r':row.avg>600?'c-a':'c-g'">{{ row.avg !== null ? row.avg+'ms' : '—' }}</td>
+                            <td style="text-align:right" :class="row.p90===null?'c-r':row.p90>800?'c-a':'c-g'">{{ row.p90 !== null ? row.p90+'ms' : '—' }}</td>
+                            <td style="text-align:right" :class="row.p99===null?'c-r':row.p99>1500?'c-a':'c-g'">{{ row.p99 !== null ? row.p99+'ms' : '—' }}</td>
+                            <td style="text-align:right" :class="row.errRate==='0.0%'?'c-g':row.errRate==='100%'?'c-r':'c-a'">{{ row.errRate }}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+
+                    <div class="dp-section">
+                      <div class="dp-section-title">SLA Summary</div>
+                      <div class="dp-cfg-table">
+                        <div class="dp-cfg-row"><span class="dp-cfg-key">SLA target</span><span class="dp-cfg-val">99.9% (8.7h downtime/yr)</span></div>
+                        <div class="dp-cfg-row"><span class="dp-cfg-key">Current uptime</span><span class="dp-cfg-val" :class="detailPanel.monitor.uptime>=99.9?'c-g':'c-r'">{{ detailPanel.monitor.uptime }}%</span></div>
+                        <div class="dp-cfg-row"><span class="dp-cfg-key">Downtime this month</span><span class="dp-cfg-val" :class="detailPanel.monitor.status==='Down'?'c-r':'c-g'">{{ detailPanel.monitor.status==='Down' ? '~6 min (ongoing)' : '8 min' }}</span></div>
+                        <div class="dp-cfg-row"><span class="dp-cfg-key">Incidents 30d</span><span class="dp-cfg-val">{{ detailPanel.incidents.length }}</span></div>
+                        <div class="dp-cfg-row"><span class="dp-cfg-key">MTTR (avg)</span><span class="dp-cfg-val">~9 min</span></div>
+                        <div class="dp-cfg-row"><span class="dp-cfg-key">MTTF (avg)</span><span class="dp-cfg-val">~7.2 days</span></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </template>
+
+              <!-- ── TRACES ── -->
+              <template v-if="detailPanel.tab === 'traces'">
+                <!-- Request / response summary bar -->
+                <div class="dp-req-bar">
+                  <span class="dp-req-method">GET</span>
+                  <span class="dp-req-url">{{ detailPanel.monitor.url }}</span>
+                  <span class="dp-req-badge" :class="detailPanel.monitor.status==='Down'?'dp-req-badge--err':'dp-req-badge--ok'">
+                    {{ detailPanel.monitor.status === 'Down' ? '503' : '200' }}
+                  </span>
+                  <span class="dp-req-dur">{{ detailPanel.traces[0]?.dur >= 1000 ? (detailPanel.traces[0].dur/1000).toFixed(1)+'s' : detailPanel.traces[0]?.dur+'ms' }}</span>
+                </div>
+                <div class="dp-trace-meta">
+                  <span>Trace&nbsp;<b style="font-family:ui-monospace,monospace">{{ detailPanel.monitor.id.toString(16).padStart(12,'0') }}af42</b></span>
+                  <span>14:32:01.100 UTC</span>
+                  <span>{{ detailPanel.traces.length }} spans</span>
+                  <span :class="detailPanel.monitor.status==='Down'?'c-r':'c-g'" style="font-weight:600">
+                    {{ detailPanel.monitor.status === 'Down' ? '✗ Failed' : '✓ Success' }}
+                  </span>
+                  <span class="dp-mocked-pill" style="margin-left:auto">mocked</span>
+                </div>
+                <!-- Two-pane: waterfall + span attributes -->
+                <div class="dp-traces-panes">
+                  <div class="dp-waterfall-col">
+                    <div class="dp-wf-hdr">
+                      <span class="dp-wf-hdr-span">Span</span>
+                      <span class="dp-wf-hdr-bar">Timeline / Duration</span>
+                    </div>
+                    <div v-for="(span, si) in detailPanel.traces" :key="si"
+                      class="dp-span-row" :class="{ 'dp-span-row--sel': dpSelectedSpan === span }"
+                      @click="dpSelectedSpan = dpSelectedSpan === span ? null : span">
+                      <div class="dp-span-label" :style="{ paddingLeft: span.depth * 14 + 6 + 'px' }">
+                        <span v-if="span.depth > 0" class="dp-span-tree">└─</span>
+                        <span class="dp-span-name" :title="span.name">{{ span.name }}</span>
+                        <span v-if="span.status !== null" class="dp-span-code" :class="span.status>=400?'c-r':'c-g'">{{ span.status }}</span>
+                      </div>
+                      <div class="dp-span-bar-wrap">
+                        <div class="dp-span-bar" :class="'dp-spanc--'+span.color"
+                          :style="{ width: Math.max(2, Math.round((span.dur/detailPanel.traces[0].dur)*100))+'%', marginLeft: Math.round((span.offset/detailPanel.traces[0].dur)*100)+'%' }"/>
+                        <span class="dp-span-dur">{{ span.dur >= 1000 ? (span.dur/1000).toFixed(1)+'s' : span.dur+'ms' }}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <!-- Span attributes panel -->
+                  <div class="dp-span-attr-col">
+                    <template v-if="dpSelectedSpan">
+                      <div class="dp-sd-name">{{ dpSelectedSpan.name }}</div>
+                      <div class="dp-sd-timing">
+                        <div class="dp-sd-timing-item">
+                          <span class="dp-sd-timing-val" :class="dpSelectedSpan.color==='err'?'c-r':dpSelectedSpan.color==='slow'?'c-a':'c-g'">
+                            {{ dpSelectedSpan.dur >= 1000 ? (dpSelectedSpan.dur/1000).toFixed(1)+'s' : dpSelectedSpan.dur+'ms' }}
+                          </span>
+                          <span class="dp-sd-timing-lbl">Duration</span>
+                        </div>
+                        <div class="dp-sd-timing-item">
+                          <span class="dp-sd-timing-val">+{{ dpSelectedSpan.offset }}ms</span>
+                          <span class="dp-sd-timing-lbl">Start offset</span>
+                        </div>
+                        <div class="dp-sd-timing-item">
+                          <span class="dp-sd-timing-val" :class="dpSelectedSpan.color==='err'?'c-r':dpSelectedSpan.color==='slow'?'c-a':'c-g'">
+                            {{ dpSelectedSpan.color === 'err' ? 'Error' : dpSelectedSpan.color === 'slow' ? 'Slow' : 'OK' }}
+                          </span>
+                          <span class="dp-sd-timing-lbl">State</span>
+                        </div>
+                      </div>
+                      <div class="dp-sd-attrs-title">Attributes</div>
+                      <div class="dp-sd-attrs">
+                        <div v-for="([k,v]) in dpSelectedSpan.attrs" :key="k" class="dp-sd-attr-row">
+                          <span class="dp-sd-attr-k">{{ k }}</span>
+                          <span class="dp-sd-attr-v">{{ v }}</span>
+                        </div>
+                      </div>
+                    </template>
+                    <div v-else class="dp-sd-empty">
+                      <div style="font-size:22px;margin-bottom:6px">↑</div>
+                      Click any span to inspect its attributes, timing, and metadata
+                    </div>
+                  </div>
+                </div>
+              </template>
+
+            </div>
+          </aside>
+        </div>
+      </transition>
+    </Teleport>
+
     <!-- Full Heatmap Modal -->
     <Teleport to="body">
       <transition name="gm">
@@ -475,83 +881,7 @@
               <button class="geo-modal-close" @click="showHeatmapModal = false"><OIcon name="close" size="sm"/></button>
             </div>
             <div class="geo-modal-body">
-              <svg class="geo-modal-svg" viewBox="0 0 960 500" xmlns="http://www.w3.org/2000/svg">
-                <defs>
-                  <radialGradient v-for="stat in geoLocStats" :key="'mg-'+stat.key"
-                    :id="'m'+geoGradId(stat.key)" cx="50%" cy="50%" r="50%">
-                    <stop offset="0%"   :stop-color="stat.health==='up'?'#22c55e':stat.health==='down'?'#ef4444':'#f59e0b'" stop-opacity="0.65"/>
-                    <stop offset="60%"  :stop-color="stat.health==='up'?'#22c55e':stat.health==='down'?'#ef4444':'#f59e0b'" stop-opacity="0.18"/>
-                    <stop offset="100%" :stop-color="stat.health==='up'?'#22c55e':stat.health==='down'?'#ef4444':'#f59e0b'" stop-opacity="0"/>
-                  </radialGradient>
-                </defs>
-                <!-- Ocean -->
-                <rect width="960" height="500" class="geo-ocean"/>
-                <!-- Latitude / longitude grid -->
-                <g class="geo-graticule">
-                  <line x1="0" y1="83" x2="960" y2="83"/>
-                  <line x1="0" y1="167" x2="960" y2="167"/>
-                  <line x1="0" y1="250" x2="960" y2="250"/>
-                  <line x1="0" y1="333" x2="960" y2="333"/>
-                  <line x1="0" y1="417" x2="960" y2="417"/>
-                  <line x1="160" y1="0" x2="160" y2="500"/>
-                  <line x1="320" y1="0" x2="320" y2="500"/>
-                  <line x1="480" y1="0" x2="480" y2="500"/>
-                  <line x1="640" y1="0" x2="640" y2="500"/>
-                  <line x1="800" y1="0" x2="800" y2="500"/>
-                </g>
-                <!-- Continents — equirectangular: x=(lon+180)/360*960, y=(90-lat)/180*500 -->
-                <g class="geo-land">
-                  <!-- North America: clockwise from Bering Strait → Arctic → Atlantic → Gulf → Panama → Pacific → Alaska -->
-                  <path d="M 32,67 L 64,53 L 107,56 L 187,47 L 240,61 L 307,69 L 333,106 L 339,119 L 315,128 L 293,133 L 283,136 L 280,153 L 264,167 L 267,178 L 261,172 L 243,169 L 221,172 L 224,197 L 248,192 L 245,203 L 253,211 L 259,217 L 267,228 L 269,228 L 253,222 L 237,211 L 227,206 L 216,203 L 203,197 L 187,186 L 168,161 L 155,147 L 149,128 L 147,114 L 117,92 L 85,86 L 72,92 L 53,97 L 40,83 Z"/>
-                  <!-- Greenland -->
-                  <path d="M 347,83 L 363,86 L 427,69 L 432,39 L 376,19 L 312,33 L 341,67 Z"/>
-                  <!-- South America: clockwise from Venezuela → NE Brazil bulge → Cape Horn → Pacific coast → back -->
-                  <path d="M 315,219 L 387,264 L 387,272 L 379,286 L 365,314 L 325,344 L 304,378 L 301,403 L 280,383 L 288,350 L 275,283 L 267,256 L 275,239 L 285,219 Z"/>
-                  <!-- Iceland -->
-                  <path d="M 416,72 L 419,67 L 432,67 L 445,69 L 443,75 L 427,75 Z"/>
-                  <!-- UK (Great Britain) -->
-                  <path d="M 467,111 L 469,106 L 472,103 L 467,89 L 475,92 L 480,103 L 483,108 Z"/>
-                  <!-- Ireland -->
-                  <path d="M 453,108 L 453,97 L 464,97 L 464,108 Z"/>
-                  <!-- Europe: Portugal → Gibraltar → Mediterranean coast → Greece → Black Sea → Baltics → Norway → North Sea → back -->
-                  <path d="M 456,144 L 467,150 L 480,143 L 493,131 L 508,125 L 528,136 L 539,150 L 552,139 L 557,136 L 560,122 L 568,122 L 560,83 L 528,53 L 501,92 L 491,103 L 469,117 L 456,131 Z"/>
-                  <!-- Africa: Morocco → N coast → Horn → E coast → Cape → W coast → Gulf of Guinea → back -->
-                  <path d="M 464,150 L 507,147 L 547,161 L 571,167 L 595,217 L 616,219 L 589,253 L 584,269 L 573,297 L 555,342 L 528,347 L 512,331 L 512,264 L 504,253 L 488,239 L 480,236 L 467,236 L 443,228 L 437,219 L 432,208 L 443,192 Z"/>
-                  <!-- Arabian Peninsula -->
-                  <path d="M 573,169 L 600,214 L 616,217 L 637,189 L 629,178 L 608,167 Z"/>
-                  <!-- Asia + SE Asia peninsula: Istanbul → Siberia → Chukotka → Japan coast → Vietnam → Malay tip → Burma → India border → Iran → Turkey -->
-                  <path d="M 557,136 L 589,133 L 613,139 L 627,111 L 653,83 L 667,47 L 747,47 L 853,50 L 931,72 L 915,86 L 909,106 L 832,131 L 821,153 L 805,161 L 784,189 L 771,219 L 757,244 L 747,225 L 739,203 L 723,189 L 661,186 L 645,181 L 632,183 L 608,167 L 576,147 Z"/>
-                  <!-- India subcontinent -->
-                  <path d="M 661,186 L 715,189 L 709,194 L 693,228 L 672,228 L 672,197 Z"/>
-                  <!-- Borneo -->
-                  <path d="M 787,236 L 797,231 L 797,256 L 787,261 L 768,261 Z"/>
-                  <!-- Japan (Kyushu → Honshu → Hokkaido arc) -->
-                  <path d="M 827,158 L 827,164 L 835,158 L 853,150 L 856,136 L 867,128 L 859,144 Z"/>
-                  <!-- Australia: NW coast → Darwin → Gulf of Carpentaria → Queensland → Sydney → Melbourne → Bight → Perth → back -->
-                  <path d="M 784,311 L 787,289 L 829,283 L 843,283 L 840,292 L 851,292 L 861,300 L 877,306 L 888,325 L 883,344 L 867,356 L 829,342 L 787,339 L 781,322 Z"/>
-                  <!-- New Zealand North Island -->
-                  <path d="M 944,350 L 955,356 L 949,364 L 944,364 Z"/>
-                  <!-- New Zealand South Island -->
-                  <path d="M 939,364 L 944,369 L 936,372 L 928,378 L 925,375 L 933,369 Z"/>
-                </g>
-                <!-- Heatmap radial blobs -->
-                <g class="geo-heatmap">
-                  <circle v-for="stat in geoLocStats" :key="'mh-'+stat.key"
-                    :cx="geoMapPos[stat.key].x" :cy="geoMapPos[stat.key].y" r="195"
-                    :fill="'url(#m' + geoGradId(stat.key) + ')'"/>
-                </g>
-                <!-- Location markers -->
-                <g v-for="stat in geoLocStats" :key="'md-'+stat.key">
-                  <circle :cx="geoMapPos[stat.key].x" :cy="geoMapPos[stat.key].y" r="20"
-                    :style="{ fill: stat.health==='up'?'rgba(34,197,94,0.2)':stat.health==='down'?'rgba(239,68,68,0.2)':'rgba(245,158,11,0.2)' }"
-                    :class="stat.health!=='up'?'geo-dot-pulse':''" class="geo-dot-ring"/>
-                  <circle :cx="geoMapPos[stat.key].x" :cy="geoMapPos[stat.key].y" r="9"
-                    :style="{ fill: stat.health==='up'?'#22c55e':stat.health==='down'?'#ef4444':'#f59e0b' }"
-                    stroke="white" stroke-width="2.5"/>
-                  <text :x="geoMapPos[stat.key].x" :y="geoMapPos[stat.key].y + 26" class="geo-dot-label geo-dot-label--lg" text-anchor="middle">{{ stat.flag }} {{ stat.label }}</text>
-                  <text :x="geoMapPos[stat.key].x" :y="geoMapPos[stat.key].y + 40" class="geo-dot-sublabel" text-anchor="middle">{{ stat.uptime }}% uptime</text>
-                </g>
-              </svg>
+              <div ref="heatmapChartEl" class="geo-echarts-map"></div>
             </div>
           </div>
         </div>
@@ -725,7 +1055,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onUnmounted } from "vue";
+import { ref, computed, onUnmounted, watch, nextTick } from "vue";
+import * as echarts from "echarts";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const activeTab      = ref("monitors");
@@ -789,6 +1120,7 @@ onUnmounted(() => {
   if (locHideTimer) clearTimeout(locHideTimer);
   if (sparkHideTimer) clearTimeout(sparkHideTimer);
   if (mapTipTimer) clearTimeout(mapTipTimer);
+  heatmapChart?.dispose();
 });
 
 // ── Geo Checks ────────────────────────────────────────────────────────
@@ -844,16 +1176,110 @@ const geoLocStats = computed(() =>
 );
 
 // ── Geo Map & Panels ───────────────────────────────────────────────────
-const geoMapPos: Record<string, { x: number; y: number }> = {
-  "US East":    { x: 278, y: 140 },
-  "US West":    { x: 155, y: 120 },
-  "EU West":    { x: 462, y: 90  },
-  "EU Central": { x: 505, y: 98  },
-  "AP SE":      { x: 758, y: 230 },
-  "AP NE":      { x: 856, y: 138 },
+const geoMapLonLat: Record<string, [number, number]> = {
+  "US East":    [-77.0, 38.9],
+  "US West":    [-122.4, 45.5],
+  "EU West":    [-6.2, 53.3],
+  "EU Central": [8.7, 50.1],
+  "AP SE":      [103.8, 1.3],
+  "AP NE":      [139.7, 35.7],
 };
-const geoGradId = (key: string) => "hm-" + key.toLowerCase().replace(/\s+/g, "-");
+
 const showHeatmapModal = ref(false);
+const heatmapChartEl = ref<HTMLElement | null>(null);
+let heatmapChart: echarts.ECharts | null = null;
+let worldGeoRegistered = false;
+
+const getHeatmapOption = () => {
+  const isDark = document.body.classList.contains("body--dark");
+  const landColor   = isDark ? "#1d2f3f" : "#cdd5ae";
+  const borderCol   = isDark ? "#2d4560" : "#9faa80";
+  const oceanBg     = isDark ? "#0d1b2a" : "#c2ddf0";
+  const labelColor  = isDark ? "#cbd5e1" : "#334155";
+  return {
+    backgroundColor: oceanBg,
+    geo: {
+      map: "world",
+      roam: false,
+      silent: true,
+      top: 0,
+      bottom: 0,
+      left: 0,
+      right: 0,
+      itemStyle: { areaColor: landColor, borderColor: borderCol, borderWidth: 0.5 },
+      emphasis: { itemStyle: { areaColor: landColor }, label: { show: false } },
+      select: { disabled: true },
+    },
+    tooltip: {
+      trigger: "item",
+      formatter: (params: any) => {
+        if (!params.data) return "";
+        const d = params.data;
+        const col = d.health === "up" ? "#22c55e" : d.health === "down" ? "#ef4444" : "#f59e0b";
+        const label = d.health === "up" ? "Healthy" : d.health === "down" ? "Outage" : "Degraded";
+        return `<div style="font-size:12px;line-height:1.7"><b>${d.flag} ${d.name}</b><br/><span style="color:${col}">${label}</span><br/>Uptime: ${d.uptime}%<br/>Monitors: ${d.total}</div>`;
+      },
+      backgroundColor: isDark ? "#1e2d3d" : "#ffffff",
+      borderColor:     isDark ? "#2d4560" : "#e2e8f0",
+      textStyle: { color: labelColor },
+    },
+    series: [{
+      type: "effectScatter",
+      coordinateSystem: "geo",
+      rippleEffect: { brushType: "stroke", scale: 3.5, period: 2.5 },
+      symbolSize: (val: any, params: any) => Math.max(12, Math.min(26, 10 + (params.data.total ?? 0) * 0.7)),
+      data: geoLocStats.value.map(s => ({
+        name: s.label,
+        value: [geoMapLonLat[s.key][0], geoMapLonLat[s.key][1]],
+        health: s.health,
+        uptime: s.uptime,
+        total: s.total,
+        flag: s.flag,
+      })),
+      itemStyle: {
+        color: (params: any) => params.data.health === "up" ? "#22c55e" : params.data.health === "down" ? "#ef4444" : "#f59e0b",
+        borderColor: "rgba(255,255,255,0.8)",
+        borderWidth: 2,
+        shadowBlur: 12,
+        shadowColor: (params: any) => params.data.health === "up" ? "rgba(34,197,94,0.5)" : params.data.health === "down" ? "rgba(239,68,68,0.5)" : "rgba(245,158,11,0.5)",
+      },
+      label: {
+        show: true,
+        position: "bottom",
+        distance: 8,
+        formatter: (params: any) => `${params.data.flag} ${params.data.name}`,
+        fontSize: 10,
+        fontWeight: 600,
+        color: labelColor,
+        textBorderColor: isDark ? "rgba(0,0,0,0.6)" : "rgba(255,255,255,0.8)",
+        textBorderWidth: 2,
+      },
+    }],
+  };
+};
+
+const initHeatmapChart = async () => {
+  await nextTick();
+  if (!heatmapChartEl.value) return;
+  if (!worldGeoRegistered) {
+    const worldJson = await import("@/assets/dashboard/maps/map.json");
+    echarts.registerMap("world", worldJson.default as any);
+    worldGeoRegistered = true;
+  }
+  heatmapChart = echarts.init(heatmapChartEl.value);
+  heatmapChart.setOption(getHeatmapOption());
+  await nextTick();
+  heatmapChart.resize();
+};
+
+watch(showHeatmapModal, async (open) => {
+  if (open) {
+    await initHeatmapChart();
+  } else {
+    heatmapChart?.dispose();
+    heatmapChart = null;
+  }
+});
 const showIssuesModal  = ref(false);
 const geoIssues = computed(() => {
   const list: { key: string; level: "error" | "warn"; stat: typeof geoLocStats.value[0] }[] = [];
@@ -876,6 +1302,7 @@ const selectedGeoRow = ref<{ monitor: any; cells: any[] } | null>(null);
 const toggleGeoRow = (row: { monitor: any; cells: any[] }) => {
   selectedGeoRow.value = selectedGeoRow.value?.monitor.id === row.monitor.id ? null : row;
   compareLocs.value = [];
+  openDetail(row.monitor, row);
 };
 const geoBarMax = computed(() => {
   if (!selectedGeoRow.value) return 500;
@@ -896,6 +1323,200 @@ const geoAnomalies = computed(() => {
   if (multiDown >= 2) list.push({ key: "multi-region", level: "error", msg: `${multiDown} regions simultaneously affected — possible CDN or upstream incident` });
   return list.filter(a => !dismissedAnomalies.value.includes(a.key));
 });
+
+// ── Detail Side Panel ──────────────────────────────────────────────────
+interface LogEntry { time: string; level: string; logger: string; msg: string; stack?: string }
+interface TraceSpan { name: string; dur: number; offset: number; depth: number; status: number | null; color: string; attrs: [string, string][] }
+interface Incident  { type: 'down' | 'deg'; id: string; title: string; start: string; dur: string; locs: string }
+interface LocRow    { loc: string; checks: number; avg: number | null; p90: number | null; p99: number | null; errRate: string }
+interface DetailPanel {
+  show: boolean;
+  tab: 'overview' | 'logs' | 'metrics' | 'traces';
+  monitor: any;
+  geoRow: { monitor: any; cells: any[] } | null;
+  logs: LogEntry[];
+  metricBars: { hour: string; val: number | null }[];
+  metricMax: number;
+  errorBars: number[];
+  traces: TraceSpan[];
+  incidents: Incident[];
+  uptimeCal: ('ok' | 'deg' | 'down')[];
+  locBreakdown: LocRow[];
+}
+const detailPanel    = ref<DetailPanel | null>(null);
+const dpLogFilter    = ref('ALL');
+const dpSelectedSpan = ref<TraceSpan | null>(null);
+
+const dpFilteredLogs = computed(() => {
+  if (!detailPanel.value) return [] as LogEntry[];
+  if (dpLogFilter.value === 'ALL') return detailPanel.value.logs;
+  return detailPanel.value.logs.filter((l: LogEntry) => l.level === dpLogFilter.value);
+});
+const dpLogCounts = computed(() => {
+  if (!detailPanel.value) return {} as Record<string, number>;
+  return detailPanel.value.logs.reduce((acc: Record<string, number>, l: LogEntry) => {
+    acc[l.level] = (acc[l.level] ?? 0) + 1; return acc;
+  }, {} as Record<string, number>);
+});
+
+const _urlPath = (url: string) => { try { return new URL(url).pathname || '/'; } catch { return '/'; } };
+const _urlHost = (url: string) => { try { return new URL(url).hostname; }  catch { return url; } };
+
+const _rtMs = (rt: any): number => {
+  if (!rt) return 220;
+  const s = String(rt);
+  if (s.endsWith('ms')) return parseFloat(s) || 220;
+  if (s.endsWith('s'))  return Math.round(parseFloat(s) * 1000) || 220;
+  return parseFloat(s) || 220;
+};
+
+const _genLogs = (m: any): LogEntry[] => {
+  const isDown = m.status === 'Down', isDeg = m.status === 'Degraded';
+  const ms   = _rtMs(m.responseTime);
+  const path = _urlPath(m.url), host = _urlHost(m.url);
+  if (isDown) return [
+    { time: '14:32:01.423', level: 'ERROR', logger: 'synthetic.runner', msg: `TCP connection refused: ${m.url}`, stack: `Error: connect ECONNREFUSED 104.21.18.52:443\n  at TCPConnectWrap.afterConnect [as oncomplete] (net.js:1141:16)\n  at SyntheticRunner.executeCheck (runner.js:142:9)\n  at async Runner.run (runner.js:98:5)` },
+    { time: '14:32:01.100', level: 'ERROR', logger: 'http.client',      msg: 'Max retries exceeded (3/3) — alerting: monitor marked DOWN' },
+    { time: '14:32:00.800', level: 'WARN',  logger: 'synthetic.runner', msg: 'Retry 3/3 — back-off 1000ms; previous error: ECONNREFUSED' },
+    { time: '14:31:58.200', level: 'WARN',  logger: 'synthetic.runner', msg: 'Retry 2/3 — back-off 500ms; previous error: ECONNREFUSED' },
+    { time: '14:31:57.100', level: 'WARN',  logger: 'synthetic.runner', msg: 'Retry 1/3 — back-off 200ms; previous error: ECONNREFUSED' },
+    { time: '14:31:56.910', level: 'ERROR', logger: 'http.client',      msg: `HTTP 503 Service Unavailable — url=${m.url} latency=30004ms` },
+    { time: '14:31:56.000', level: 'INFO',  logger: 'synthetic.runner', msg: `Health check initiated: GET ${path} — monitor_id=${m.id} location=US-West` },
+    { time: '14:31:55.800', level: 'DEBUG', logger: 'dns.resolver',     msg: `DNS resolved ${host} → 104.21.18.52 in 4ms (ttl=300s cached=false)` },
+    { time: '14:26:50.122', level: 'INFO',  logger: 'synthetic.runner', msg: `Check passed — 198ms [200 OK] content_match=true ssl_valid=true` },
+    { time: '14:21:45.310', level: 'INFO',  logger: 'synthetic.runner', msg: `Check passed — 214ms [200 OK] content_match=true ssl_valid=true` },
+    { time: '14:16:40.088', level: 'INFO',  logger: 'synthetic.runner', msg: `Check passed — 201ms [200 OK] content_match=true ssl_valid=true` },
+    { time: '14:11:35.500', level: 'DEBUG', logger: 'tls.client',       msg: `TLS 1.3 resumed — cipher=AES_128_GCM_SHA256 session_id=a3f9b2 resumption_time=8ms` },
+    { time: '14:11:35.200', level: 'INFO',  logger: 'synthetic.runner', msg: `Check passed — 188ms [200 OK] content_match=true ssl_valid=true` },
+    { time: '14:06:30.500', level: 'DEBUG', logger: 'tls.client',       msg: `TLS 1.3 handshake — cipher=AES_128_GCM_SHA256 cert_expiry=2026-09-14 san_valid=true` },
+    { time: '14:06:29.900', level: 'INFO',  logger: 'synthetic.runner', msg: `Check passed — 193ms [200 OK] content_match=true ssl_valid=true` },
+  ];
+  if (isDeg) return [
+    { time: '14:32:01.312', level: 'WARN',  logger: 'synthetic.runner', msg: `Slow response: ${ms}ms (SLA threshold 800ms exceeded by ${ms - 800}ms)` },
+    { time: '14:32:00.100', level: 'INFO',  logger: 'http.client',      msg: `Health check passed: 200 OK in ${m.responseTime} — body_match=true` },
+    { time: '14:31:59.950', level: 'DEBUG', logger: 'http.timing',      msg: `dns=12ms tcp=18ms tls=28ms ttfb=${Math.round(ms * 0.72)}ms transfer=${Math.round(ms * 0.28)}ms total=${ms}ms` },
+    { time: '14:31:59.900', level: 'DEBUG', logger: 'tls.client',       msg: `TLS 1.3 resumed — cipher=AES_128_GCM_SHA256 resumption_time=9ms` },
+    { time: '14:27:00.001', level: 'WARN',  logger: 'synthetic.runner', msg: `Response time elevated: 1240ms (threshold: 800ms)` },
+    { time: '14:26:59.500', level: 'INFO',  logger: 'http.client',      msg: `Health check passed: 200 OK in 1240ms` },
+    { time: '14:22:00.210', level: 'INFO',  logger: 'synthetic.runner', msg: `Check passed — 920ms [200 OK] content_match=true` },
+    { time: '14:17:00.085', level: 'INFO',  logger: 'synthetic.runner', msg: `Check passed — 340ms [200 OK] content_match=true` },
+    { time: '14:12:00.500', level: 'DEBUG', logger: 'dns.resolver',     msg: `DNS resolved ${host} → 104.21.18.52 in 5ms (cached=true ttl_remaining=180s)` },
+    { time: '14:12:00.100', level: 'INFO',  logger: 'synthetic.runner', msg: `Check passed — 280ms [200 OK] content_match=true` },
+  ];
+  return [
+    { time: '14:32:01.100', level: 'INFO',  logger: 'synthetic.runner', msg: `Health check passed: 200 OK in ${m.responseTime ?? '198ms'} content_match=true ssl_valid=true` },
+    { time: '14:31:59.900', level: 'DEBUG', logger: 'http.timing',      msg: `dns=${Math.round(ms*0.03)}ms tcp=${Math.round(ms*0.06)}ms tls=${Math.round(ms*0.10)}ms ttfb=${Math.round(ms*0.65)}ms transfer=${Math.round(ms*0.16)}ms` },
+    { time: '14:31:59.800', level: 'DEBUG', logger: 'tls.client',       msg: `TLS 1.3 resumed — cipher=AES_128_GCM_SHA256 cert_expiry=2026-09-14 resumption_time=8ms` },
+    { time: '14:27:00.200', level: 'INFO',  logger: 'synthetic.runner', msg: `Check passed — 198ms [200 OK] content_match=true ssl_valid=true` },
+    { time: '14:22:00.100', level: 'INFO',  logger: 'synthetic.runner', msg: `Check passed — 214ms [200 OK] content_match=true ssl_valid=true` },
+    { time: '14:17:00.050', level: 'INFO',  logger: 'synthetic.runner', msg: `Check passed — 189ms [200 OK] content_match=true ssl_valid=true` },
+    { time: '14:12:00.080', level: 'DEBUG', logger: 'dns.resolver',     msg: `DNS resolved ${host} → 104.21.18.52 in 4ms (cached=true ttl_remaining=218s)` },
+    { time: '14:12:00.050', level: 'INFO',  logger: 'synthetic.runner', msg: `Check passed — 201ms [200 OK] content_match=true ssl_valid=true` },
+    { time: '14:07:00.030', level: 'DEBUG', logger: 'ssl.validator',    msg: `SSL cert valid — issuer="Let's Encrypt" expires=2026-09-14 SANs=[${host}]` },
+    { time: '14:07:00.000', level: 'INFO',  logger: 'synthetic.runner', msg: `Check passed — 195ms [200 OK] content_match=true ssl_valid=true` },
+    { time: '14:02:00.080', level: 'DEBUG', logger: 'http.timing',      msg: `dns=${Math.round(ms*0.03)}ms tcp=${Math.round(ms*0.06)}ms tls=${Math.round(ms*0.10)}ms total=${ms}ms` },
+    { time: '14:02:00.000', level: 'INFO',  logger: 'synthetic.runner', msg: `Check passed — 193ms [200 OK] content_match=true ssl_valid=true` },
+  ];
+};
+
+const _genBars = (m: any) => {
+  const base = _rtMs(m.responseTime);
+  const bars = [];
+  for (let i = 23; i >= 0; i--) {
+    const h = `${String((new Date().getHours() - i + 24) % 24).padStart(2,'0')}:00`;
+    const noise = (((m.id * 7 + i * 13) % 60) - 30) / 100;
+    let val: number | null = Math.round(base * (1 + noise));
+    if (m.status === 'Down' && i <= 1) val = null;
+    else if (m.status === 'Degraded' && i <= 2) val = Math.round(base * 2.8);
+    bars.push({ hour: h, val });
+  }
+  return bars;
+};
+
+const _genTraces = (m: any): TraceSpan[] => {
+  const total = _rtMs(m.responseTime);
+  const path  = _urlPath(m.url), host = _urlHost(m.url);
+  if (m.status === 'Down') {
+    const dns = 6, tcp = 18;
+    return [
+      { name: `GET ${path}`, dur: 30004, offset: 0,        depth: 0, status: 503, color: 'err', attrs: [['http.method','GET'],['http.url',m.url],['http.flavor','1.1'],['net.peer.name',host],['error.type','ECONNREFUSED'],['retry.count','3'],['synthetic.monitor_id',String(m.id)]] },
+      { name: 'dns.resolve',         dur: dns,   offset: 0,      depth: 1, status: null, color: 'ok',  attrs: [['dns.hostname',host],['dns.cached','false'],['dns.resolved_ip','104.21.18.52'],['dns.ttl','300'],['dns.query_type','A']] },
+      { name: 'tcp.connect',         dur: tcp,   offset: dns,    depth: 1, status: null, color: 'ok',  attrs: [['net.peer.ip','104.21.18.52'],['net.peer.port','443'],['net.transport','tcp']] },
+      { name: 'http.request',        dur: 29980, offset: dns+tcp,depth: 1, status: null, color: 'err', attrs: [['http.flavor','1.1'],['http.method','GET'],['http.path',path],['error','socket hang up']] },
+      { name: 'socket.wait_timeout', dur: 29960, offset: dns+tcp+20, depth: 2, status: null, color: 'err', attrs: [['timeout_ms','30000'],['error.type','ETIMEDOUT'],['net.peer.ip','104.21.18.52']] },
+    ];
+  }
+  const dns  = Math.round(total * 0.03);
+  const tcp  = Math.round(total * 0.06);
+  const tls  = Math.round(total * 0.10);
+  const send = Math.round(total * 0.04);
+  const rcv  = Math.round(total * 0.74);
+  const parse = Math.round(total * 0.03);
+  return [
+    { name: `GET ${path}`,  dur: total, offset: 0,                    depth: 0, status: 200,  color: total>800?'slow':'ok', attrs: [['http.method','GET'],['http.url',m.url],['http.status_code','200'],['http.response_content_type','application/json'],['http.response_size','4.2 KB'],['synthetic.monitor_id',String(m.id)],['synthetic.location',m.locations?.[0]??'US East']] },
+    { name: 'dns.resolve',  dur: dns,   offset: 0,                    depth: 1, status: null, color: 'ok',                  attrs: [['dns.hostname',host],['dns.cached','false'],['dns.resolved_ip','104.21.18.52'],['dns.ttl','300'],['dns.query_type','A']] },
+    { name: 'tcp.connect',  dur: tcp,   offset: dns,                  depth: 1, status: null, color: 'ok',                  attrs: [['net.peer.ip','104.21.18.52'],['net.peer.port','443'],['net.transport','tcp'],['net.sock.family','inet']] },
+    { name: 'tls.handshake',dur: tls,   offset: dns+tcp,              depth: 1, status: null, color: 'ok',                  attrs: [['tls.protocol_version','TLSv1.3'],['tls.cipher','AES_128_GCM_SHA256'],['tls.resumed','false'],['tls.cert_valid','true'],['tls.cert_expiry','2026-09-14']] },
+    { name: 'http.send',    dur: send,  offset: dns+tcp+tls,          depth: 1, status: null, color: 'ok',                  attrs: [['http.method','GET'],['http.path',path],['http.host',host],['net.bytes_sent','342']] },
+    { name: 'http.receive', dur: rcv,   offset: dns+tcp+tls+send,     depth: 1, status: null, color: total>800?'slow':'ok', attrs: [['http.status_code','200'],['http.status_text','OK'],['http.content_type','application/json'],['net.bytes_received','4296'],['http.ttfb',String(Math.round(rcv*0.85))+'ms']] },
+    { name: 'content.parse',dur: parse, offset: dns+tcp+tls+send+rcv, depth: 2, status: null, color: 'ok',                  attrs: [['content.type','json'],['content.size_bytes','4296'],['content.assertions_passed','3'],['content.assertions_failed','0']] },
+  ];
+};
+
+const _genIncidents = (m: any): Incident[] => {
+  const isDown = m.status === 'Down', isDeg = m.status === 'Degraded';
+  const id = (n: number) => 'INC-' + String(m.id * 7 + n).padStart(4, '0');
+  const list: Incident[] = [];
+  if (isDown)         list.push({ type: 'down', id: id(1), title: 'Outage — TCP connection refused', start: 'Today 14:31', dur: 'Ongoing', locs: 'US West, AP NE' });
+  if (isDown||isDeg)  list.push({ type: 'deg',  id: id(2), title: 'Elevated response times (>800ms threshold)', start: 'Jun 17 09:14', dur: '23 min', locs: 'EU West' });
+  list.push({ type: 'down', id: id(3), title: 'Scheduled maintenance — planned restart', start: 'Jun 12 02:00', dur: '8 min', locs: 'All locations' });
+  list.push({ type: 'deg',  id: id(4), title: 'High TTFB — upstream database slow queries', start: 'Jun 8 15:42', dur: '11 min', locs: 'US East' });
+  return list.slice(0, 4);
+};
+
+const _genUptimeCal = (m: any): ('ok' | 'deg' | 'down')[] =>
+  Array.from({ length: 30 }, (_, i) => {
+    const seed = (m.id * 11 + i * 7) % 100;
+    if (m.status === 'Down' && i === 29) return 'down';
+    return seed > 97 ? 'down' : seed > 91 ? 'deg' : 'ok';
+  });
+
+const _genLocBreakdown = (m: any): LocRow[] =>
+  (m.locations ?? ['US East']).map((loc: string, i: number) => {
+    const seed = (m.id * 3 + loc.length * 5 + i) % 20;
+    const base = _rtMs(m.responseTime);
+    const adj  = Math.round(base * (0.7 + seed / 50));
+    const isErr    = m.status === 'Down' && (loc.toLowerCase().includes('west') || i === 0);
+    const isDegLoc = !isErr && m.status === 'Degraded' && i % 2 === 0;
+    return { loc, checks: 288, avg: isErr ? null : adj, p90: isErr ? null : Math.round(adj * 1.4), p99: isErr ? null : Math.round(adj * 2.1), errRate: isErr ? '100%' : isDegLoc ? `${seed + 3}%` : '0.0%' };
+  });
+
+const openDetail = (monitor: any, geoRow: { monitor: any; cells: any[] } | null = null) => {
+  const bars   = _genBars(monitor);
+  const maxVal = Math.max(...bars.filter((b: any) => b.val !== null).map((b: any) => b.val!), 100);
+  const errBars = Array.from({ length: 24 }, (_, i) => {
+    if (monitor.status === 'Down'     && i >= 22) return 1.0;
+    if (monitor.status === 'Degraded' && i >= 20) return ((monitor.id * 3 + i * 7) % 30) / 100;
+    return 0;
+  });
+  dpLogFilter.value    = 'ALL';
+  dpSelectedSpan.value = null;
+  detailPanel.value = {
+    show: true, tab: 'overview', monitor, geoRow,
+    logs:         _genLogs(monitor),
+    metricBars:   bars, metricMax: maxVal,
+    errorBars:    errBars,
+    traces:       _genTraces(monitor),
+    incidents:    _genIncidents(monitor),
+    uptimeCal:    _genUptimeCal(monitor),
+    locBreakdown: _genLocBreakdown(monitor),
+  };
+};
+const closeDetail = () => {
+  detailPanel.value    = null;
+  dpLogFilter.value    = 'ALL';
+  dpSelectedSpan.value = null;
+};
 
 const compareLocs = ref<string[]>([]);
 const toggleCompareLoc = (e: MouseEvent, key: string) => {
@@ -1427,20 +2048,8 @@ const saveMonitor = () => { showDrawer.value=false; };
 /* "View Full Heatmap" button overlay — no longer used, kept for safety */
 .geo-fullmap-btn { display:none; }
 
-/* SVG map styles */
-.geo-ocean   { fill:#c2ddf0; }
-.body--dark .geo-ocean { fill:#091e3a; }
-.geo-graticule line { stroke:rgba(128,128,128,0.15); stroke-width:0.5; }
-.geo-land path { fill:#cdd5ae; stroke:#9faa80; stroke-width:0.7; }
-.body--dark .geo-land path { fill:#3b4d2f; stroke:#4e6640; stroke-width:0.7; }
-.geo-heatmap { }
-.geo-dot   { cursor:pointer; }
-.geo-dot-ring { }
-@keyframes geo-pulse { 0%,100%{ opacity:.22;transform:scale(1); } 50%{ opacity:.52;transform:scale(1.4); } }
-.geo-dot-pulse { animation:geo-pulse 2.2s ease-in-out infinite; transform-box:fill-box; transform-origin:center; }
-.geo-dot-label { font-size:9px; fill:var(--o2-tab-text-color); font-family:system-ui,sans-serif; pointer-events:none; }
-.geo-dot-label--lg { font-size:10.5px; font-weight:600; }
-.geo-dot-sublabel { font-size:8.5px; fill:var(--o2-tab-text-color); font-family:system-ui,sans-serif; pointer-events:none; opacity:.7; }
+/* ECharts map container */
+.geo-echarts-map { width:100%; height:100%; }
 
 /* Right panel */
 .geo-right-panel { width:256px; flex-shrink:0; border:1px solid var(--o2-border-color); border-radius:10px; background:var(--o2-card-background); display:flex; flex-direction:column; overflow:hidden; }
@@ -1526,8 +2135,7 @@ const saveMonitor = () => { showDrawer.value=false; };
 .geo-leg-dot { display:inline-block; width:8px; height:8px; border-radius:50%; flex-shrink:0; }
 .geo-modal-close { margin-left:auto; background:none; border:none; cursor:pointer; color:var(--o2-tab-text-color); display:flex; opacity:.7; padding:4px; border-radius:4px; }
 .geo-modal-close:hover { opacity:1; background:rgba(128,128,128,.1); }
-.geo-modal-body { flex:1; overflow:hidden; padding:0; }
-.geo-modal-svg { width:100%; height:100%; display:block; min-height:440px; }
+.geo-modal-body { flex:none; height:clamp(360px,46vw,540px); overflow:hidden; padding:0; }
 
 /* Active Issues modal */
 .issues-modal { background:var(--o2-card-background); border:1px solid var(--o2-border-color); border-radius:14px; width:min(520px,92vw); max-height:80vh; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 24px 60px rgba(0,0,0,.35); }
@@ -1570,4 +2178,195 @@ const saveMonitor = () => { showDrawer.value=false; };
 .type-icon--on   { color:var(--q-primary, #1976d2); }
 .type-icon--off  { color:rgba(128,128,128,.7); }
 .type-check      { color:var(--q-primary, #1976d2); flex-shrink:0; }
+
+/* ── Detail Side Panel ──────────────────────────────────────────────── */
+.dp-overlay { position:fixed; inset:0; z-index:1400; background:rgba(0,0,0,.38); display:flex; justify-content:flex-end; }
+.dp-panel { width:min(1040px,97vw); height:100%; background:var(--o2-card-background); border-left:1px solid var(--o2-border-color); display:flex; flex-direction:column; overflow:hidden; box-shadow:-16px 0 50px rgba(0,0,0,.22); }
+
+/* transitions */
+.dp-enter-active .dp-panel { transition:transform .26s cubic-bezier(.25,.46,.45,.94); }
+.dp-enter-from .dp-panel   { transform:translateX(100%); }
+.dp-leave-active .dp-panel { transition:transform .2s ease-in; }
+.dp-leave-to .dp-panel     { transform:translateX(100%); }
+.dp-enter-active, .dp-leave-active { transition:background .22s; }
+.dp-enter-from, .dp-leave-to       { background:transparent !important; }
+
+/* header */
+.dp-hdr { padding:16px 20px 12px; border-bottom:1px solid var(--o2-border-color); flex-shrink:0; }
+.dp-hdr-top { display:flex; align-items:flex-start; gap:12px; margin-bottom:8px; }
+.dp-hdr-titles { flex:1; min-width:0; }
+.dp-title { font-size:15px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.dp-url   { font-size:12px; color:var(--o2-tab-text-color); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:2px; }
+.dp-close { background:none; border:none; cursor:pointer; color:var(--o2-tab-text-color); display:flex; padding:4px; border-radius:4px; flex-shrink:0; opacity:.7; }
+.dp-close:hover { opacity:1; background:rgba(128,128,128,.1); }
+.dp-badges { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+.dp-meta-chip { font-size:11px; color:var(--o2-tab-text-color); background:rgba(128,128,128,.1); border-radius:4px; padding:2px 8px; }
+
+/* tabs */
+.dp-tabs { display:flex; border-bottom:1px solid var(--o2-border-color); flex-shrink:0; padding:0 20px; gap:2px; }
+.dp-tab  { background:none; border:none; border-bottom:2px solid transparent; cursor:pointer; padding:10px 12px 9px; font-size:13px; color:var(--o2-tab-text-color); display:flex; align-items:center; gap:5px; transition:color .15s, border-color .15s; }
+.dp-tab:hover { color:var(--q-primary); }
+.dp-tab--active { color:var(--q-primary); border-bottom-color:var(--q-primary); font-weight:600; }
+.dp-tab-ct { background:rgba(128,128,128,.15); border-radius:10px; font-size:10px; padding:1px 6px; font-weight:600; }
+
+/* body */
+.dp-body { flex:1; overflow-y:auto; overflow-x:hidden; padding:18px 20px; display:flex; flex-direction:column; gap:18px; }
+
+/* two-column layout for overview & metrics */
+.dp-ov-grid    { display:grid; grid-template-columns:1fr 1fr; gap:22px; align-items:start; }
+.dp-metrics-grid { display:grid; grid-template-columns:1fr 1fr; gap:22px; align-items:start; }
+.dp-ov-col     { display:flex; flex-direction:column; gap:18px; }
+
+/* KPIs — 4 col on wide panel, 4 col on left col */
+.dp-kpis { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
+.dp-kpi  { background:rgba(128,128,128,.06); border:1px solid var(--o2-border-color); border-radius:8px; padding:10px 12px; }
+.dp-kpi-val { font-size:18px; font-weight:700; line-height:1.1; }
+.dp-kpi-lbl { font-size:10px; color:var(--o2-tab-text-color); margin-top:4px; }
+
+/* section */
+.dp-section { display:flex; flex-direction:column; gap:8px; }
+.dp-section-title { font-size:11px; font-weight:600; color:var(--o2-tab-text-color); text-transform:uppercase; letter-spacing:.05em; }
+
+/* 24h bar chart */
+.dp-chart24 { display:flex; align-items:flex-end; gap:2px; height:72px; background:rgba(128,128,128,.05); border-radius:6px; padding:4px 6px 0; }
+.dp-bar24 { flex:1; border-radius:2px 2px 0 0; transition:height .3s; cursor:default; }
+.dp-bar24--ok   { background:#22c55e; }
+.dp-bar24--deg  { background:#f59e0b; }
+.dp-bar24--slow { background:#f97316; }
+.dp-bar24--err  { background:#ef4444; }
+.dp-bar24--zero { background:rgba(128,128,128,.15); }
+.dp-chart24-x { display:flex; justify-content:space-between; font-size:10px; color:var(--o2-tab-text-color); margin-top:2px; }
+
+/* geo breakdown */
+.dp-geo-list { display:flex; flex-direction:column; gap:0; border:1px solid var(--o2-border-color); border-radius:8px; overflow:hidden; }
+.dp-geo-row { display:flex; align-items:center; gap:8px; padding:8px 12px; border-bottom:1px solid var(--o2-border-color); font-size:12px; }
+.dp-geo-row:last-child { border-bottom:none; }
+.dp-geo-row--none { opacity:.45; }
+.dp-geo-flag { font-size:14px; flex-shrink:0; }
+.dp-geo-info { display:flex; flex-direction:column; min-width:0; }
+.dp-geo-loc  { font-weight:600; font-size:12px; }
+.dp-geo-city { font-size:10px; color:var(--o2-tab-text-color); }
+.dp-geo-ms   { font-size:12px; font-weight:600; margin-left:6px; }
+
+/* monitor config table */
+.dp-cfg-table { display:flex; flex-direction:column; border:1px solid var(--o2-border-color); border-radius:8px; overflow:hidden; }
+.dp-cfg-row { display:flex; gap:10px; padding:6px 12px; border-bottom:1px solid var(--o2-border-color); font-size:12px; }
+.dp-cfg-row:last-child { border-bottom:none; }
+.dp-cfg-key { min-width:130px; flex-shrink:0; color:var(--o2-tab-text-color); font-size:11px; }
+.dp-cfg-val { font-weight:500; word-break:break-all; }
+
+/* incident list */
+.dp-incidents { display:flex; flex-direction:column; border:1px solid var(--o2-border-color); border-radius:8px; overflow:hidden; }
+.dp-incident-row { display:flex; align-items:flex-start; gap:10px; padding:10px 12px; border-bottom:1px solid var(--o2-border-color); font-size:12px; }
+.dp-incident-row:last-child { border-bottom:none; }
+.dp-inc--down { border-left:3px solid #ef4444; }
+.dp-inc--deg  { border-left:3px solid #f59e0b; }
+.dp-inc-icon  { font-size:15px; flex-shrink:0; font-weight:700; }
+.dp-inc-body  { flex:1; min-width:0; }
+.dp-inc-title { font-weight:600; margin-bottom:2px; }
+.dp-inc-meta  { font-size:11px; color:var(--o2-tab-text-color); }
+.dp-inc-id    { font-size:10px; color:var(--o2-tab-text-color); font-family:ui-monospace,monospace; margin-top:1px; }
+.dp-inc-dur   { font-weight:700; font-size:12px; flex-shrink:0; white-space:nowrap; }
+
+/* uptime calendar */
+.dp-uptime-cal { display:flex; flex-wrap:wrap; gap:3px; }
+.dp-cal-day { width:16px; height:16px; border-radius:3px; }
+.dp-cal--ok   { background:#22c55e; }
+.dp-cal--deg  { background:#f59e0b; }
+.dp-cal--down { background:#ef4444; }
+.dp-uptime-legend { display:flex; align-items:center; gap:8px; margin-top:4px; font-size:11px; color:var(--o2-tab-text-color); }
+
+/* tab info bar */
+.dp-tab-info { font-size:11px; color:var(--o2-tab-text-color); display:flex; align-items:center; flex-wrap:wrap; gap:8px; padding:7px 12px; background:rgba(128,128,128,.06); border-radius:6px; border:1px solid var(--o2-border-color); }
+.dp-mocked-pill { background:rgba(139,92,246,.15); color:#7c3aed; font-size:10px; font-weight:700; padding:2px 7px; border-radius:10px; border:1px solid rgba(139,92,246,.25); white-space:nowrap; }
+.body--dark .dp-mocked-pill { background:rgba(139,92,246,.2); color:#a78bfa; }
+
+/* log filter bar */
+.dp-log-filters { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+.dp-logf-btn { background:rgba(128,128,128,.08); border:1px solid var(--o2-border-color); border-radius:5px; padding:3px 10px; font-size:11px; cursor:pointer; color:inherit; display:flex; align-items:center; gap:4px; transition:all .15s; }
+.dp-logf-btn:hover { background:rgba(128,128,128,.15); }
+.dp-logf-btn--active { background:var(--q-primary); color:#fff; border-color:var(--q-primary); }
+.dp-logf-btn--active .dp-tab-ct { background:rgba(255,255,255,.25); color:#fff; }
+.dp-log-summary { font-size:11px; color:var(--o2-tab-text-color); }
+
+/* logs */
+.dp-log-list { display:flex; flex-direction:column; gap:0; font-family:ui-monospace,monospace; border:1px solid var(--o2-border-color); border-radius:8px; overflow:hidden; }
+.dp-log-row { display:flex; align-items:baseline; flex-wrap:nowrap; gap:8px; padding:6px 12px; border-bottom:1px solid var(--o2-border-color); font-size:11.5px; line-height:1.5; }
+.dp-log-row:last-child { border-bottom:none; }
+.dp-log-row:hover { background:rgba(128,128,128,.04); }
+.dp-log-time { color:var(--o2-tab-text-color); flex-shrink:0; font-size:10.5px; }
+.dp-log-lvl  { flex-shrink:0; font-weight:700; font-size:10px; min-width:40px; }
+.dp-log-src  { flex-shrink:0; font-size:10px; color:var(--o2-tab-text-color); min-width:110px; max-width:110px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.dp-lvl--error { color:#ef4444; }
+.dp-lvl--warn  { color:#f59e0b; }
+.dp-lvl--info  { color:#3b82f6; }
+.dp-lvl--debug { color:var(--o2-tab-text-color); }
+.dp-log-msg  { color:inherit; word-break:break-word; min-width:0; }
+.dp-log-stack { font-family:ui-monospace,monospace; font-size:10.5px; white-space:pre; padding:6px 12px 8px 32px; background:rgba(239,68,68,.06); color:#ef4444; border-bottom:1px solid var(--o2-border-color); line-height:1.6; overflow-x:auto; }
+
+/* metrics percentiles */
+.dp-pcts { display:flex; flex-direction:column; gap:8px; }
+.dp-pct-row { display:flex; align-items:center; gap:10px; font-size:12px; }
+.dp-pct-lbl { width:30px; font-weight:600; color:var(--o2-tab-text-color); font-size:11px; }
+.dp-pct-track { flex:1; height:7px; background:rgba(128,128,128,.15); border-radius:3px; overflow:hidden; }
+.dp-pct-fill { height:100%; border-radius:3px; }
+.dp-pct-fill--ok   { background:#22c55e; }
+.dp-pct-fill--deg  { background:#f59e0b; }
+.dp-pct-fill--slow { background:#ef4444; }
+.dp-pct-val { font-weight:600; font-size:12px; min-width:58px; text-align:right; }
+
+/* per-location table */
+.dp-loc-table { width:100%; border-collapse:collapse; font-size:12px; border:1px solid var(--o2-border-color); border-radius:8px; overflow:hidden; }
+.dp-loc-table th { text-align:left; padding:6px 10px; font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:.05em; color:var(--o2-tab-text-color); border-bottom:1px solid var(--o2-border-color); background:rgba(128,128,128,.05); }
+.dp-loc-table td { padding:7px 10px; border-bottom:1px solid var(--o2-border-color); }
+.dp-loc-table tr:last-child td { border-bottom:none; }
+.dp-loc-table tr:hover td { background:rgba(128,128,128,.04); }
+
+/* traces */
+.dp-req-bar { display:flex; align-items:center; gap:10px; padding:10px 14px; background:rgba(128,128,128,.06); border:1px solid var(--o2-border-color); border-radius:8px; }
+.dp-req-method { font-family:ui-monospace,monospace; font-size:12px; font-weight:700; color:var(--q-primary); flex-shrink:0; }
+.dp-req-url { font-family:ui-monospace,monospace; font-size:12px; flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--o2-tab-text-color); }
+.dp-req-badge { font-size:11px; font-weight:700; padding:2px 8px; border-radius:4px; flex-shrink:0; }
+.dp-req-badge--ok  { background:rgba(34,197,94,.15); color:#16a34a; }
+.dp-req-badge--err { background:rgba(239,68,68,.15); color:#dc2626; }
+.body--dark .dp-req-badge--ok  { background:rgba(34,197,94,.2);  color:#4ade80; }
+.body--dark .dp-req-badge--err { background:rgba(239,68,68,.2);  color:#f87171; }
+.dp-req-dur { font-size:12px; font-weight:700; flex-shrink:0; }
+.dp-trace-meta { display:flex; gap:16px; flex-wrap:wrap; font-size:11px; color:var(--o2-tab-text-color); padding:6px 12px; background:rgba(128,128,128,.06); border-radius:6px; border:1px solid var(--o2-border-color); align-items:center; }
+
+/* two-pane traces layout */
+.dp-traces-panes { display:grid; grid-template-columns:55fr 45fr; gap:0; border:1px solid var(--o2-border-color); border-radius:8px; overflow:hidden; min-height:300px; }
+.dp-waterfall-col { border-right:1px solid var(--o2-border-color); overflow:auto; }
+.dp-wf-hdr { display:flex; align-items:center; gap:0; padding:6px 0; border-bottom:1px solid var(--o2-border-color); font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:.05em; color:var(--o2-tab-text-color); background:rgba(128,128,128,.05); }
+.dp-wf-hdr-span { width:210px; flex-shrink:0; padding:0 6px; }
+.dp-wf-hdr-bar  { flex:1; padding:0 6px; }
+.dp-span-row { display:flex; align-items:center; cursor:pointer; border-bottom:1px solid var(--o2-border-color); }
+.dp-span-row:last-child { border-bottom:none; }
+.dp-span-row:hover { background:rgba(128,128,128,.06); }
+.dp-span-row--sel { background:rgba(var(--q-primary-rgb, 25,118,210),.08) !important; }
+.dp-span-label { width:210px; flex-shrink:0; display:flex; align-items:center; gap:4px; padding:6px 4px; overflow:hidden; }
+.dp-span-tree { font-size:10px; color:var(--o2-tab-text-color); flex-shrink:0; }
+.dp-span-name { font-size:11px; font-family:ui-monospace,monospace; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.dp-span-code { font-size:10px; font-weight:700; flex-shrink:0; margin-left:2px; }
+.dp-span-bar-wrap { flex:1; display:flex; align-items:center; gap:6px; padding:6px 4px; min-width:0; overflow:hidden; }
+.dp-span-bar { height:11px; border-radius:3px; flex-shrink:0; min-width:2px; }
+.dp-spanc--ok   { background:rgba(34,197,94,.75); }
+.dp-spanc--slow { background:rgba(249,115,22,.8); }
+.dp-spanc--err  { background:rgba(239,68,68,.8); }
+.dp-span-dur { font-size:10px; font-weight:600; color:var(--o2-tab-text-color); white-space:nowrap; }
+
+/* span attribute panel */
+.dp-span-attr-col { padding:14px 14px; overflow-y:auto; background:rgba(128,128,128,.025); }
+.dp-sd-empty { font-size:12px; color:var(--o2-tab-text-color); text-align:center; padding:30px 16px; line-height:1.6; }
+.dp-sd-name { font-size:13px; font-weight:700; font-family:ui-monospace,monospace; margin-bottom:10px; word-break:break-all; }
+.dp-sd-timing { display:flex; gap:18px; margin-bottom:14px; flex-wrap:wrap; }
+.dp-sd-timing-item { display:flex; flex-direction:column; gap:2px; }
+.dp-sd-timing-val { font-size:18px; font-weight:700; line-height:1; }
+.dp-sd-timing-lbl { font-size:10px; color:var(--o2-tab-text-color); margin-top:2px; }
+.dp-sd-attrs-title { font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:.05em; color:var(--o2-tab-text-color); margin-bottom:6px; }
+.dp-sd-attrs { display:flex; flex-direction:column; border:1px solid var(--o2-border-color); border-radius:6px; overflow:hidden; }
+.dp-sd-attr-row { display:flex; align-items:baseline; gap:8px; padding:5px 8px; border-bottom:1px solid var(--o2-border-color); font-size:11px; }
+.dp-sd-attr-row:last-child { border-bottom:none; }
+.dp-sd-attr-k { min-width:130px; flex-shrink:0; color:var(--o2-tab-text-color); font-family:ui-monospace,monospace; font-size:10.5px; }
+.dp-sd-attr-v { font-family:ui-monospace,monospace; word-break:break-all; font-size:11px; font-weight:500; }
 </style>
