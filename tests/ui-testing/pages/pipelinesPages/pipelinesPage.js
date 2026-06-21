@@ -18,27 +18,24 @@ const randomNodeName = `remote-node-${Math.floor(Math.random() * 1000)}`;
  *
  * @param {string} url - Request URL
  * @param {object} options - fetch options
- * @param {number} retries - Number of additional attempts after the first (default: 3)
+ * @param {number} maxRetries - Number of additional attempts after the first (default: 3)
  * @returns {Promise<Response>} The fetch response (only network errors are retried)
  */
-async function fetchWithRetry(url, options, retries = 3) {
-    let lastError;
-    for (let attempt = 0; attempt <= retries; attempt++) {
+async function fetchWithRetry(url, options, maxRetries = 3) {
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
         try {
             return await fetch(url, options);
         } catch (err) {
-            lastError = err;
             const message = String(err && err.message ? err.message : err);
             const isTransient = /premature close|ECONNRESET|socket hang up|network|EPIPE|other side closed/i.test(message);
-            if (!isTransient || attempt === retries) {
+            if (!isTransient || attempt === maxRetries) {
                 throw err;
             }
             const backoffMs = 500 * (attempt + 1);
-            testLogger.warn('Transient fetch error, retrying ingestion', { url, attempt: attempt + 1, retries, error: message, backoffMs });
+            testLogger.warn('Transient fetch error, retrying ingestion', { url, attempt: attempt + 1, maxRetries, error: message, backoffMs });
             await new Promise((resolve) => setTimeout(resolve, backoffMs));
         }
     }
-    throw lastError;
 }
 
 export class PipelinesPage {
