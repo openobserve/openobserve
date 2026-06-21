@@ -45,9 +45,109 @@ env:
   UPLOAD_TO_TESTDINO: ${{ vars.UPLOAD_TO_TESTDINO || 'false' }}
 
 jobs:
+  check_schedule_flag:
+    name: Check Schedule Flag
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    outputs:
+      should_run: ${{ steps.check.outputs.should_run }}
+    steps:
+      - name: Evaluate schedule gate
+        id: check
+        env:
+          FLAG: ${{ vars.E2E_SCHEDULED_RUNS || 'Thrice' }}
+          TRIGGER_SCHEDULE: ${{ github.event.schedule }}
+          EVENT_NAME: ${{ github.event_name }}
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          WORKFLOW_FILE: playwright_regression.yml
+          # Block scheduled runs once this many consecutive scheduled runs have failed.
+          MAX_CONSECUTIVE_FAILURES: '6'
+        run: |
+          set -euo pipefail
+
+          # Manual runs ALWAYS bypass every gate. This is the escape hatch that
+          # un-blocks the suite after the consecutive-failure circuit breaker trips:
+          # fix the regression, trigger a manual run, and a passing run clears the streak.
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::Manual trigger (workflow_dispatch) - bypassing all gates and running."
+            exit 0
+          fi
+
+          # Gate 1: master on/off switch via the E2E_SCHEDULED_RUNS repo variable.
+          FLAG_LOWER=$(echo "$FLAG" | tr '[:upper:]' '[:lower:]')
+          if [ "$FLAG_LOWER" = "no" ]; then
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::E2E_SCHEDULED_RUNS=No - skipping scheduled regression run."
+            exit 0
+          fi
+          echo "::notice::E2E_SCHEDULED_RUNS=$FLAG - flag allows scheduled runs."
+
+          # Gate 2: consecutive-failure circuit breaker.
+          # Count consecutive SCHEDULED runs that concluded 'failure', newest first.
+          # A 'success' from ANY trigger (incl. a manual fix) breaks the streak.
+          # cancelled / timed_out / manual-failure / skipped runs are transparent.
+          echo "::notice::Checking recent run history for consecutive scheduled failures..."
+          RUNS_JSON=$(gh api -X GET \
+            "repos/$REPO/actions/workflows/$WORKFLOW_FILE/runs?status=completed&per_page=50" \
+            2>/dev/null || echo '')
+
+          if [ -z "$RUNS_JSON" ]; then
+            echo "::warning::Could not fetch run history - failing open and running this scheduled run."
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          STREAK=$(echo "$RUNS_JSON" | jq '
+            reduce (.workflow_runs[]) as $r ({count:0, done:false};
+              if .done then .
+              elif $r.conclusion=="success" then {count:.count, done:true}
+              elif ($r.conclusion=="failure" and $r.event=="schedule") then {count:(.count+1), done:false}
+              else .
+              end
+            ) | .count')
+
+          echo "::notice::Consecutive scheduled-run failures: $STREAK (threshold: $MAX_CONSECUTIVE_FAILURES)."
+
+          if [ "$STREAK" -ge "$MAX_CONSECUTIVE_FAILURES" ]; then
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+            echo "::error::################################################################"
+            echo "::error::  REGRESSION SUITE CIRCUIT BREAKER TRIPPED"
+            echo "::error::  The last $STREAK scheduled runs FAILED in a row (>= $MAX_CONSECUTIVE_FAILURES)."
+            echo "::error::  Scheduled runs are now BLOCKED so we stop burning CI on a broken suite."
+            echo "::error::  >>> ACTION REQUIRED: FIX THE REGRESSION SUITE."
+            echo "::error::  >>> Then trigger a manual run (Actions -> Playwright Regression"
+            echo "::error::  >>> Tests -> Run workflow). A passing manual run clears the streak"
+            echo "::error::  >>> and automatically re-enables the schedule."
+            echo "::error::################################################################"
+            # Fail loudly and VISIBLY: exiting non-zero keeps this run RED in history
+            # (so the breaker is noticed and the run is NOT deleted) and skips every
+            # downstream job via the failed dependency. The red scheduled run also
+            # counts toward the streak, keeping the suite blocked until a manual pass.
+            exit 1
+          fi
+
+          echo "should_run=true" >> "$GITHUB_OUTPUT"
+          echo "::notice::Circuit breaker OK - running scheduled regression."
+
+      - name: Delete this workflow run if skipped
+        # Only delete on a clean, quiet skip (E2E_SCHEDULED_RUNS=No -> check step
+        # succeeded with should_run=false). The circuit-breaker path fails the check
+        # step on purpose, so this is skipped and the red run stays visible.
+        if: steps.check.outcome == 'success' && steps.check.outputs.should_run == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "Deleting workflow run ${{ github.run_id }} as it was skipped by schedule flag"
+          gh api -X DELETE repos/${{ github.repository }}/actions/runs/${{ github.run_id }} || true
+
   build_binary:
     timeout-minutes: 45
     name: build_binary
+    needs: [check_schedule_flag]
+    if: needs.check_schedule_flag.outputs.should_run == 'true'
     runs-on:
       labels: ubicloud-standard-16
     permissions:
