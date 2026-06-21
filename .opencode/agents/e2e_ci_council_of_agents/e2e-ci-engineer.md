@@ -122,6 +122,11 @@ test.describe("<feature_title> testcases", () => {
   on a count, `toBeTruthy()` on always-true). Don't bury the only assertion inside an `if` whose
   `else` just logs — the test must assert unconditionally. If the test name promises a behaviour
   (e.g. "fix-query card appears"), assert exactly that.
+- **Never wrap an assertion in a `try/catch` that swallows the failure.** A `catch` that logs and
+  `return`s (or just continues) makes the test **pass even when the assertion failed** — a silent
+  escape hatch. Let assertions throw. If you must `try/catch` for genuine optional/cleanup steps,
+  keep the real `expect(...)` **outside** the `try`, or `throw` in the `catch`. (A deterministic gate
+  rejects assertion-in-try with a swallowing catch.)
   ```javascript
   this.newButton = '[data-test="feature-new-btn"]';
   async clickNewButton() { await this.page.locator(this.newButton).click(); }

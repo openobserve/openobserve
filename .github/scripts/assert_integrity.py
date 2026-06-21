@@ -113,6 +113,59 @@ def conditional_only_tests(lines):
     return flagged
 
 
+# Assertion-ish calls whose failure should surface — if these sit in a try{} whose catch swallows
+# (no throw), the test passes even when the assertion fails.
+ASSERT_TOKEN = re.compile(r'\bexpect\s*\(|\.waitFor\s*\(|\.toBe(Visible|Hidden|Truthy|Falsy)\b|\.toContainText\b|\.toHaveText\b')
+
+
+def _match_brace(text, open_idx):
+    """Index of the '}' matching the '{' at open_idx (-1 if unbalanced)."""
+    depth = 0
+    for i in range(open_idx, len(text)):
+        if text[i] == '{':
+            depth += 1
+        elif text[i] == '}':
+            depth -= 1
+            if depth == 0:
+                return i
+    return -1
+
+
+def swallowed_assertion_tests(lines):
+    """A test where an assertion sits inside a `try {}` whose matching `catch {}` does NOT re-throw —
+    the catch swallows the failure (logs/returns), so the test passes even when the assertion fails.
+    A `catch` that `throw`s, or a try/catch with no assertion inside the try (e.g. cleanup), is fine."""
+    flagged = []
+    for name_i, s, e in find_test_blocks(lines):
+        block = '\n'.join(strip_noise(l) for l in lines[s:e + 1])
+        for m in re.finditer(r'\bcatch\b\s*(\([^)]*\))?\s*\{', block):
+            co = block.index('{', m.start())
+            cc = _match_brace(block, co)
+            if cc < 0:
+                continue
+            if re.search(r'\bthrow\b', block[co + 1:cc]):
+                continue  # catch re-throws → the failure surfaces → fine
+            pre = block[:m.start()]
+            tclose = pre.rstrip().rfind('}')
+            if tclose < 0:
+                continue
+            depth, topen = 0, -1
+            for i in range(tclose, -1, -1):
+                if pre[i] == '}':
+                    depth += 1
+                elif pre[i] == '{':
+                    depth -= 1
+                    if depth == 0:
+                        topen = i
+                        break
+            if topen < 0 or not re.search(r'\btry\s*$', pre[:topen]):
+                continue
+            if ASSERT_TOKEN.search(pre[topen + 1:tclose]):
+                flagged.append(name_i + 1)
+                break
+    return flagged
+
+
 def check(spec_path, baseline=None, allow_weakening=False):
     """Run the static anti-pattern scan (tautologies, conditional-only assertions) and, when a
     baseline is given, the diff-aware heal-weakening guard. Returns a verdict dict; never raises on
@@ -132,6 +185,10 @@ def check(spec_path, baseline=None, allow_weakening=False):
     for line_no, total in conditional_only_tests(lines):
         findings.append({'severity': 'critical', 'rule': 'conditional-only-assertions', 'line': line_no,
                          'detail': f'all {total} expect() in this test are inside if/else — the test can pass asserting nothing'})
+
+    for line_no in swallowed_assertion_tests(lines):
+        findings.append({'severity': 'critical', 'rule': 'swallowed-assertion', 'line': line_no,
+                         'detail': 'an assertion sits in a try{} whose catch swallows the failure (no throw) — the test passes even when the assertion fails'})
 
     # No real coverage: a spec with tests where EVERY one is skip/fixme is a green run that ran
     # nothing (e.g. "fixme everything" to dodge a gap). A genuinely feature-incomplete spec should

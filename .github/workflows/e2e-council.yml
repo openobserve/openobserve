@@ -1114,6 +1114,8 @@ jobs:
           path: |
             o2.log
             docs/test_generator/ci/
+            docs/test_generator/audit-reports/
+            docs/test_generator/execution-reports/
             tests/ui-testing/test-results/
 
       - name: Report heal failure on the source PR (root cause + run link)
@@ -1155,13 +1157,23 @@ jobs:
           elif [ "$SCOPE_STATUS" = "violation" ]; then
             OUTCOME="Blocked — Healer edited product code"; CAUSE="The Healer tried to edit product code (outside \`tests/ui-testing/\`) to force a green — reverted + blocked. This usually means the feature itself is broken: fix the feature, then the tests should pass."
           elif [ "$QUALITY_STATUS" = "fail" ]; then
-            HSTATUS=$(jq -r '.status // ""' docs/test_generator/ci/heal-result.json 2>/dev/null || echo "")
-            if [ "$HSTATUS" = "feature-incomplete" ]; then
+            # Report the ACTUAL blocker (priority: zero-coverage -> integrity gate -> Sentinel), not just
+            # "feature-incomplete" — a feature-incomplete heal can still have passing tests and be blocked
+            # by the Sentinel instead. Read the verdict files written by the gate steps.
+            IVERDICT=$(jq -r '.verdict // "PASS"' docs/test_generator/ci/assert-verdict.json 2>/dev/null || echo PASS)
+            HAS_NORUN=$(jq -e '.findings[]? | select(.rule=="no-runnable-tests")' docs/test_generator/ci/assert-verdict.json >/dev/null 2>&1 && echo yes || echo no)
+            SENTV=$(jq -r '.verdict // "PASS"' docs/test_generator/ci/sentinel-verdict.json 2>/dev/null || echo PASS)
+            SENTC=$(jq -r '.critical_count // 0' docs/test_generator/ci/sentinel-verdict.json 2>/dev/null || echo 0)
+            if [ "$HAS_NORUN" = "yes" ]; then
               OUTCOME="Feature incomplete — every test parked (no green-wash)"; CAUSE="No test could pass honestly because the feature isn't wired in this build — nothing was certified. The assertions are kept as \`fixme\` and will go green once the feature is finished."
               EV=$(jq -r '.evidence // empty' docs/test_generator/ci/heal-result.json 2>/dev/null || echo "")
               [ -n "$EV" ] && EXTRA="- **Evidence:** ${EV}"
+            elif [ "$IVERDICT" = "FAIL" ]; then
+              OUTCOME="Blocked — weak / gamed tests (integrity gate)"; CAUSE="The deterministic assertion-integrity gate found anti-patterns — tautologies, conditional-only or try/catch-swallowed assertions, or assertions weakened/inverted during healing."
+            elif [ "$SENTV" = "FAIL" ] || { [ "$SENTC" -gt 0 ] 2>/dev/null; }; then
+              OUTCOME="Blocked — Sentinel found ${SENTC} critical quality issue(s)"; CAUSE="The Sentinel (LLM quality auditor) flagged ${SENTC} critical issue(s) the deterministic gate doesn't cover — e.g. a skippable / try-catch-swallowed assertion, a test-name vs assertion mismatch, or a raw selector in the spec. See the run's audit in the logs."
             else
-              OUTCOME="Blocked — weak / gamed tests"; CAUSE="The spec is green but the assertion-integrity gate blocked it — it does not meaningfully test the feature (tautologies, conditional-only, or assertions weakened/inverted during healing)."
+              OUTCOME="Blocked — quality gate"; CAUSE="The quality gate did not pass (see the run)."
             fi
             if [ -f docs/test_generator/ci/assert-verdict.json ]; then
               F=$(jq -r '.findings[]? | "  - `\(.rule)`\(if .line then " (line \(.line))" else "" end): \(.detail)"' docs/test_generator/ci/assert-verdict.json 2>/dev/null || echo "")
