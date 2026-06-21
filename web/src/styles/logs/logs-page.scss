@@ -1016,6 +1016,9 @@
 
 .histogram-container {
   border-radius: 0.5rem;
+  // Anchor the absolutely-positioned streaming progress bar (LoadingProgress)
+  // to the top of the histogram area.
+  position: relative;
 
   // Dynamic height controlled by CSS classes
   &--visible {
@@ -1045,12 +1048,6 @@
   &__message {
     min-height: 2rem; // 32px (reduced from 50px)
   }
-}
-
-.histogram-loader {
-  top: 3.125rem; // 50px
-  position: absolute;
-  left: 50%;
 }
 
 .histogram-skeleton {

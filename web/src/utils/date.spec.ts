@@ -480,7 +480,7 @@ describe("Date Utilities", () => {
       // Test with different date formats that might cause issues
       const result1 = convertDateToTimestamp("31-12-2023", "23:59", "UTC");
       const result2 = convertDateToTimestamp("01-01-2024", "00:00", "UTC");
-      
+
       expect(result1.timestamp).toBeGreaterThanOrEqual(0);
       expect(result2.timestamp).toBeGreaterThanOrEqual(0);
       // Only compare if both timestamps are valid (not 0)

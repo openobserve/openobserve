@@ -210,13 +210,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Empty state (shown when not loading and no data) -->
     <div
       v-if="!isLoading && services.length === 0"
-      class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:flex-1 tw:text-[var(--o2-text-secondary)]"
+      class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:flex-1"
       data-test="services-catalog-empty"
     >
-      <OIcon name="layers" class="tw:mb-3 tw:opacity-40" style="width: 3rem; height: 3rem;" />
-      <p class="tw:text-[0.9rem]">
-        {{ t("traces.servicesCatalog.noServicesFound") }}
-      </p>
+      <ServicesCatalogNoDataState @widen-range="$emit('widen-range', $event)" />
     </div>
 
     <!-- Table -->
@@ -381,14 +378,14 @@ import {
   formatLargeNumber,
   formatTimeWithSuffix,
 } from "@/utils/zincutils";
-import { getConsumableRelativeTime } from "@/utils/date";
-import { cloneDeep } from "lodash-es";
+import { getEffectiveTimeRange } from "@/utils/date";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OPagination from "@/lib/navigation/Pagination/OPagination.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import ServicesCatalogNoDataState from "./ServicesCatalogNoDataState.vue";
 
 const { t } = useI18n();
 const store = useStore();
@@ -401,6 +398,7 @@ const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } =
 const emit = defineEmits<{
   "view-traces": [data: string | Record<string, any>];
   "request:stream-change": [stream: string];
+  "widen-range": [period: string];
 }>();
 
 // p99 > 1 second triggers the orange highlight
@@ -700,20 +698,8 @@ function viewTraces(data: string | Record<string, any>) {
 }
 
 function getTimeRange(): { start_time: number; end_time: number } {
-  if (searchObj.data.datetime.type === "relative") {
-    const relTime = getConsumableRelativeTime(
-      searchObj.data.datetime.relativeTimePeriod,
-    );
-    return {
-      start_time: relTime.startTime,
-      end_time: relTime.endTime,
-    };
-  }
-  const dt = cloneDeep(searchObj.data.datetime);
-  return {
-    start_time: dt.startTime,
-    end_time: dt.endTime,
-  };
+  const { startTime, endTime } = getEffectiveTimeRange(searchObj.data.datetime);
+  return { start_time: startTime, end_time: endTime };
 }
 
 // Load trace streams using the same method as the Traces search page

@@ -1,533 +1,58 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mount, VueWrapper } from '@vue/test-utils';
-import { createStore } from 'vuex';
-import { createI18n } from 'vue-i18n';
-import { createRouter, createWebHistory } from 'vue-router';
-import { nextTick } from 'vue';
-import Oracle from './Oracle.vue';
-import CopyContent from '@/components/CopyContent.vue';
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// Mock aws-exports
-vi.mock('../../../aws-exports', () => ({
-  default: {
-    API_ENDPOINT: 'http://localhost:5080',
-    region: 'us-east-1',
-  },
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { mount, VueWrapper } from "@vue/test-utils";
+import { createStore } from "vuex";
+import { createI18n } from "vue-i18n";
+import { ref } from "vue";
+import Oracle from "./Oracle.vue";
+import oracleCard from "@/components/ingestion/setupCard/content/oracle";
+import { getDataSourceCard } from "@/components/ingestion/setupCard/registry";
+
+const mockEndpoint = ref({ url: "https://test.openobserve.ai", host: "h", port: 443, protocol: "https", tls: true });
+vi.mock("@/composables/useIngestion", () => ({ default: vi.fn(() => ({ endpoint: mockEndpoint })) }));
+vi.mock("@/components/ingestion/setupCard/SetupCardRenderer.vue", () => ({
+  default: { name: "SetupCardRenderer", props: ["content", "subs", "logoUrl", "logoUrlDark"], template: '<div data-test="rich-card-stub" />' },
 }));
+const mockStore = createStore({ state: { selectedOrganization: { identifier: "test-org" }, userInfo: { email: "t@e.com" }, organizationData: { organizationPasscode: "pc" }, theme: "light" } });
+const mockI18n = createI18n({ locale: "en", messages: { en: {} } });
+const SUBS = { url: "https://test.openobserve.ai", org: "test-org", token: "dGVzdEB0b2tlbg==" };
 
-// Mock zincutils
-vi.mock('../../../utils/zincutils', () => ({
-  getImageURL: vi.fn((path) => `mock-image-url-${path}`),
-  getEndPoint: vi.fn(() => ({
-    url: 'http://localhost:5080',
-    host: 'localhost',
-    port: '5080',
-    protocol: 'http',
-    tls: false,
-  })),
-  getIngestionURL: vi.fn(() => 'http://localhost:5080'),
-}));
-
-// Mock useIngestion composable
-vi.mock('@/composables/useIngestion', () => ({
-  default: vi.fn(() => ({
-    endpoint: {
-      url: 'http://localhost:5080',
-      host: 'localhost',
-      port: '5080',
-      protocol: 'http',
-      tls: false,
-    },
-    databaseContent: `exporters:
-  otlphttp/openobserve:
-    endpoint: http://localhost:5080/api/test-org/
-    headers:
-      Authorization: Basic [BASIC_PASSCODE]
-      stream-name: [STREAM_NAME]`,
-    databaseDocURLs: {
-      oracle: 'https://openobserve.ai/docs/integration/database/oracle/',
-      postgres: 'https://short.openobserve.ai/database/postgres',
-      sqlServer: 'https://short.openobserve.ai/database/sql-server',
-    },
-  })),
-}));
-
-// Mock CopyContent component
-vi.mock('@/components/CopyContent.vue', () => ({
-  default: {
-    name: 'CopyContent',
-    template: '<div data-test="copy-content">{{ content }}</div>',
-    props: ['content'],
-  },
-}));
-
-const mockStore = createStore({
-  state: {
-    selectedOrganization: {
-      identifier: 'test-org',
-      name: 'Test Organization',
-    },
-    userInfo: {
-      email: 'test@example.com',
-    },
-  },
+describe("oracleCard builder", () => {
+  it("builds metadata + step flow", () => {
+    const card = oracleCard(SUBS);
+    expect(card.provider.name).toBe("Oracle");
+    expect(card.detect).toMatchObject({ streamType: "metrics", match: "keyword", streamName: "oracledb" });
+    expect(card.steps.map((s) => s.id)).toEqual(["prepare", "install", "configure", "run", "verify"]);
+  });
+  it("has the grant SQL and an oracledb receiver config", () => {
+    const card = oracleCard(SUBS);
+    expect(card.steps.find((s) => s.id === "prepare")!.code!.raw).toContain("CREATE USER otel");
+    const config = card.steps.find((s) => s.id === "configure")!.variants!.find((v) => v.id === "linux-amd64")!.code.raw;
+    expect(config).toContain("oracledb:");
+    expect(config).toContain(`endpoint: ${SUBS.url}/api/${SUBS.org}`);
+    expect(config).toContain(`Basic ${SUBS.token}`);
+  });
 });
-
-const mockI18n = createI18n({
-  locale: 'en',
-  messages: {
-    en: {},
-  },
-});
-
-const mockRouter = createRouter({
-  history: createWebHistory(),
-  routes: [
-    { path: '/', component: { template: '<div>Home</div>' } },
-  ],
-});
-
-
-describe('Oracle.vue Comprehensive Coverage', () => {
-  let wrapper: VueWrapper;
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  afterEach(() => {
-    if (wrapper) {
-      wrapper.unmount();
-    }
-    vi.clearAllMocks();
-  });
-
-  const createWrapper = (props = {}) => {
-    const defaultProps = {
-      currOrgIdentifier: 'test-org',
-      currUserEmail: 'test@example.com',
-    };
-
-    return mount(Oracle, {
-      props: { ...defaultProps, ...props },
-      global: {
-        plugins: [mockI18n, mockRouter],
-        provide: {
-          store: mockStore,
-        },
-        components: {
-          CopyContent,
-        },
-      },
-    });
-  };
-
-  describe('Component Rendering Tests', () => {
-    it('should render the component correctly', () => {
-      wrapper = createWrapper();
-      expect(wrapper.exists()).toBe(true);
-      expect(wrapper.find('.tw\\:p-3').exists()).toBe(true);
-    });
-
-    it('should render with correct CSS classes', () => {
-      wrapper = createWrapper();
-      expect(wrapper.find('.tw\\:p-3').exists()).toBe(true);
-      expect(wrapper.find('[data-test="copy-content"]').exists()).toBe(true);
-      expect(wrapper.find('a').exists()).toBe(true);
-    });
-
-    it('should render CopyContent component', () => {
-      wrapper = createWrapper();
-      const copyContent = wrapper.findComponent(CopyContent);
-      expect(copyContent.exists()).toBe(true);
-    });
-
-    it('should render documentation link', () => {
-      wrapper = createWrapper();
-      const docLink = wrapper.find('a');
-      expect(docLink.exists()).toBe(true);
-      expect(docLink.attributes('target')).toBe('_blank');
-    });
-
-    it('should apply correct styling to documentation link', () => {
-      wrapper = createWrapper();
-      const docLink = wrapper.find('a');
-      expect(docLink.classes()).toContain('tw:text-text-link');
-      expect(docLink.classes()).toContain('hover:tw:text-text-link-hover');
-      expect(docLink.classes()).toContain('tw:underline');
-      expect(docLink.classes()).toContain('tw:font-medium');
-    });
-
-    it('should render documentation text correctly', () => {
-      wrapper = createWrapper();
-      expect(wrapper.find('a').exists()).toBe(true);
-      expect(wrapper.text()).toContain('Click');
-      expect(wrapper.text()).toContain('here');
-      expect(wrapper.text()).toContain('to check further documentation.');
-    });
-
-    it('should render with proper component structure', () => {
-      wrapper = createWrapper();
-      expect(wrapper.find('.tw\\:p-3').exists()).toBe(true);
-      expect(wrapper.find('a').exists()).toBe(true);
-    });
-  });
-
-  describe('Component Props Tests', () => {
-    it('should render without props', () => {
-      wrapper = createWrapper();
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it('should render with custom props', () => {
-      wrapper = createWrapper({ currOrgIdentifier: 'custom-org' });
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it('should handle different prop combinations', () => {
-      wrapper = createWrapper({ 
-        currOrgIdentifier: 'test-org', 
-        currUserEmail: 'test@example.com' 
-      });
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it('should handle undefined props gracefully', () => {
-      wrapper = createWrapper({ currOrgIdentifier: undefined });
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it('should handle null props gracefully', () => {
-      wrapper = createWrapper({ currOrgIdentifier: null });
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it('should handle empty string props', () => {
-      wrapper = createWrapper({ currOrgIdentifier: '' });
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it('should render correctly with various prop states', () => {
-      wrapper = createWrapper({ currUserEmail: 'test@example.com' });
-      expect(wrapper.exists()).toBe(true);
-      expect(wrapper.find('.tw\\:p-3').exists()).toBe(true);
-    });
-
-    it('should maintain component structure regardless of props', () => {
-      wrapper = createWrapper({ currUserEmail: null });
-      expect(wrapper.find('[data-test="copy-content"]').exists()).toBe(true);
-    });
-  });
-
-  describe('Setup Function Tests', () => {
-    it('should initialize with correct name variable', () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      
-      // The name should be used to generate content
-      expect(typeof vm.content).toBe('string');
-    });
-
-    it('should process content with stream name replacement', () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      
-      // Content should have [STREAM_NAME] replaced with 'oracle'
-      expect(vm.content).toContain('oracle');
-      expect(vm.content).not.toContain('[STREAM_NAME]');
-    });
-
-    it('should handle name with spaces correctly', () => {
-      // Test that spaces in name are replaced with underscores and lowercased
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      
-      // Since name is 'oracle', it should be processed correctly
-      expect(vm.content).toContain('oracle');
-    });
-
-    it('should return correct docURL', () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      
-      expect(vm.docURL).toBe('https://openobserve.ai/docs/integration/database/oracle/');
-    });
-
-    it('should have setup composition function properties', () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      
-      // Oracle component uses composition API, so we test that the component renders correctly
-      expect(wrapper.exists()).toBe(true);
-      expect(typeof vm).toBe('object');
-    });
-
-    it('should have proper component structure', () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      
-      // Test that component structure is correct
-      expect(wrapper.find('.tw\\:p-3').exists()).toBe(true);
-      expect(typeof vm).toBe('object');
-    });
-
-    it('should expose content string', () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      
-      expect(vm.content).toBeDefined();
-      expect(typeof vm.content).toBe('string');
-    });
-
-    it('should render all required template elements', () => {
-      wrapper = createWrapper();
-
-      // Test that all required template elements are present
-      expect(wrapper.find('.tw\\:p-3').exists()).toBe(true);
-      expect(wrapper.find('a').exists()).toBe(true);
-      expect(wrapper.findComponent(CopyContent).exists()).toBe(true);
-      expect(wrapper.find('a').exists()).toBe(true);
-    });
-  });
-
-  describe('useIngestion Composable Integration Tests', () => {
-    it('should call useIngestion composable', () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      
-      // The composable should be called during setup and provide data
-      expect(vm.content).toBeDefined();
-      expect(vm.docURL).toBeDefined();
-    });
-
-    it('should use endpoint from useIngestion', () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      
-      // The composable should provide endpoint data
-      expect(vm.content).toBeDefined();
-    });
-
-    it('should use databaseContent from useIngestion', () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      
-      expect(vm.content).toContain('oracle');
-    });
-
-    it('should use databaseDocURLs from useIngestion', () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      
-      expect(vm.docURL).toBe('https://openobserve.ai/docs/integration/database/oracle/');
-    });
-  });
-
-  describe('Content Processing Tests', () => {
-    it('should replace [STREAM_NAME] with processed name', () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      
-      expect(vm.content).not.toContain('[STREAM_NAME]');
-      expect(vm.content).toContain('oracle');
-    });
-
-    it('should process name to lowercase', () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      
-      // Name 'oracle' should remain lowercase
-      expect(vm.content).toContain('oracle');
-      expect(vm.content).not.toContain('ORACLE');
-    });
-
-    it('should replace spaces with underscores in name', () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      
-      // Since 'oracle' has no spaces, it should remain unchanged
-      expect(vm.content).toContain('oracle');
-    });
-
-    it('should generate valid YAML-like content', () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      
-      expect(vm.content).toContain('exporters:');
-      expect(vm.content).toContain('otlphttp/openobserve:');
-    });
-  });
-
-  describe('Component Props Passing Tests', () => {
-    it('should pass content prop to CopyContent component', () => {
-      wrapper = createWrapper();
-      const copyContent = wrapper.findComponent(CopyContent);
-      
-      expect(copyContent.props('content')).toBeDefined();
-      expect(typeof copyContent.props('content')).toBe('string');
-    });
-
-    it('should pass processed content to CopyContent', () => {
-      wrapper = createWrapper();
-      const copyContent = wrapper.findComponent(CopyContent);
-      const content = copyContent.props('content');
-      
-      expect(content).toContain('oracle');
-      expect(content).not.toContain('[STREAM_NAME]');
-    });
-
-    it('should pass href to documentation link', () => {
-      wrapper = createWrapper();
-      const docLink = wrapper.find('a');
-      
-      expect(docLink.attributes('href')).toBe('https://openobserve.ai/docs/integration/database/oracle/');
-    });
-  });
-
-  describe('Component Lifecycle Tests', () => {
-    it('should mount without errors', () => {
-      wrapper = createWrapper();
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it('should unmount without errors', () => {
-      wrapper = createWrapper();
-      expect(() => wrapper.unmount()).not.toThrow();
-    });
-
-    it('should handle component updates', async () => {
-      wrapper = createWrapper({ currOrgIdentifier: 'initial-org' });
-      
-      // Test that component remains stable during updates
-      expect(wrapper.exists()).toBe(true);
-      expect(wrapper.find('.tw\\:p-3').exists()).toBe(true);
-    });
-
-    it('should maintain functionality after props update', async () => {
-      wrapper = createWrapper();
-      const initialContent = wrapper.vm.content;
-      
-      await wrapper.setProps({ currUserEmail: 'new@example.com' });
-      
-      expect(wrapper.vm.content).toBe(initialContent);
-    });
-  });
-
-  describe('Edge Cases and Error Handling Tests', () => {
-    it('should handle missing useIngestion data gracefully', () => {
-      const mockUseIngestion = vi.fn().mockReturnValue({
-        endpoint: null,
-        databaseContent: '',
-        databaseDocURLs: {},
-      });
-      
-      vi.doMock('@/composables/useIngestion', () => ({
-        default: mockUseIngestion,
-      }));
-      
-      expect(() => createWrapper()).not.toThrow();
-    });
-
-    it('should handle empty databaseContent', () => {
-      // Since the mocked useIngestion always returns content, let's test content processing
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      
-      // The content should be a string (even if empty would be processed)
-      expect(typeof vm.content).toBe('string');
-      expect(vm.content.length).toBeGreaterThanOrEqual(0);
-    });
-
-    it('should handle missing oracle docURL', () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      
-      // The mocked composable provides oracle URL, so test URL validity
-      expect(vm.docURL).toBeDefined();
-      expect(typeof vm.docURL).toBe('string');
-      expect(vm.docURL).toBe('https://openobserve.ai/docs/integration/database/oracle/');
-    });
-
-    it('should handle special characters in content', () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      
-      // Content should handle YAML special characters properly
-      expect(typeof vm.content).toBe('string');
-    });
-  });
-
-  describe('Template Integration Tests', () => {
-    it('should render all template elements correctly', () => {
-      wrapper = createWrapper();
-
-      expect(wrapper.find('.tw\\:p-3').exists()).toBe(true);
-      expect(wrapper.find('[data-test="copy-content"]').exists()).toBe(true);
-      expect(wrapper.find('a').exists()).toBe(true);
-    });
-
-    it('should pass correct CSS classes', () => {
-      wrapper = createWrapper();
-      const copyContent = wrapper.findComponent(CopyContent);
-
-      expect(copyContent.exists()).toBe(true);
-    });
-
-    it('should render documentation link with correct attributes', () => {
-      wrapper = createWrapper();
-      const link = wrapper.find('a');
-
-      expect(link.attributes('target')).toBe('_blank');
-      expect(link.classes()).toContain('tw:text-text-link');
-      expect(link.classes()).toContain('hover:tw:text-text-link-hover');
-    });
-  });
-
-  describe('Oracle-Specific Tests', () => {
-    it('should have correct Oracle documentation URL', () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      
-      expect(vm.docURL).toBe('https://openobserve.ai/docs/integration/database/oracle/');
-    });
-
-    it('should process Oracle name correctly in content', () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      
-      expect(vm.content).toContain('oracle');
-      expect(vm.content).not.toContain('[STREAM_NAME]');
-    });
-
-    it('should render Oracle-specific documentation link', () => {
-      wrapper = createWrapper();
-      const docLink = wrapper.find('a');
-      
-      expect(docLink.attributes('href')).toBe('https://openobserve.ai/docs/integration/database/oracle/');
-    });
-
-    it('should handle Oracle name processing for stream replacement', () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      
-      // Oracle name should be processed as 'oracle' (lowercase, no spaces)
-      expect(vm.content).toContain('oracle');
-      expect(vm.content).not.toContain('Oracle');
-      expect(vm.content).not.toContain('ORACLE');
-    });
-  });
-
-  describe('Component Name and Identity Tests', () => {
-    it('should be a Vue component', () => {
-      wrapper = createWrapper();
-      expect(wrapper.vm).toBeDefined();
-      expect(typeof wrapper.vm).toBe('object');
-    });
-
-    it('should register CopyContent component', () => {
-      wrapper = createWrapper();
-      const copyContent = wrapper.findComponent(CopyContent);
-      expect(copyContent.exists()).toBe(true);
-    });
+describe("Oracle.vue", () => {
+  let wrapper: VueWrapper<any>;
+  afterEach(() => { if (wrapper) wrapper.unmount(); });
+  it("renders the shared card", () => {
+    expect(getDataSourceCard("oracle", SUBS)?.provider.name).toBe("Oracle");
+    wrapper = mount(Oracle, { global: { plugins: [mockStore, mockI18n] } });
+    expect(wrapper.findComponent({ name: "SetupCardRenderer" }).exists()).toBe(true);
   });
 });

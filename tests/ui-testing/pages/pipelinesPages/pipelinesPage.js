@@ -3,18 +3,45 @@ const { expect } = require('@playwright/test')
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 const fetch = require('node-fetch');
 const { getAuthHeaders } = require('../../playwright-tests/utils/cloud-auth.js');
+import { openNavFlyoutChild } from '../commonActions.js';
 
 const randomNodeName = `remote-node-${Math.floor(Math.random() * 1000)}`;
+
+/**
+ * Perform a fetch, retrying on transient network errors.
+ *
+ * node-fetch occasionally throws "Premature close" / ECONNRESET / "socket hang up"
+ * when the server closes a keep-alive connection before the response body is fully
+ * read. These are not real ingestion failures — a retry almost always succeeds.
+ * Without this, flaky socket errors fail the ingestion in beforeEach and take the
+ * whole serial describe block down (CI: pipeline-regression metrics ingest flake).
+ *
+ * @param {string} url - Request URL
+ * @param {object} options - fetch options
+ * @param {number} maxRetries - Number of additional attempts after the first (default: 3)
+ * @returns {Promise<Response>} The fetch response (only network errors are retried)
+ */
+async function fetchWithRetry(url, options, maxRetries = 3) {
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        try {
+            return await fetch(url, options);
+        } catch (err) {
+            const message = String(err && err.message ? err.message : err);
+            const isTransient = /premature close|ECONNRESET|socket hang up|network|EPIPE|other side closed/i.test(message);
+            if (!isTransient || attempt === maxRetries) {
+                throw err;
+            }
+            const backoffMs = 500 * (attempt + 1);
+            testLogger.warn('Transient fetch error, retrying ingestion', { url, attempt: attempt + 1, maxRetries, error: message, backoffMs });
+            await new Promise((resolve) => setTimeout(resolve, backoffMs));
+        }
+    }
+}
 
 export class PipelinesPage {
     constructor(page) {
         this.page = page;
-        this.pipelinesPageMenu = page.locator('[data-test="menu-link-\\/pipeline-item"]');
-        
         // Locators from PipelinePage
-        this.pipelineMenuLink = page.locator(
-          '[data-test="menu-link-\\/pipeline-item"]'
-        );
         this.pipelineTab = page.locator('[data-test="pipeline-section-tab-streamPipelines"]');
         this.addPipelineButton = page.locator(
           '[data-test="pipeline-list-add-pipeline-btn"]'
@@ -154,11 +181,17 @@ export class PipelinesPage {
         this.confirmButton = page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]');
         this.settingsMenu = page.locator('[data-test="menu-link-\\/settings-item"]');
         this.pipelineDestinationsTab = page.locator('button[data-test="pipeline-destinations-tab"]');
+        // "Add Destination" button in the pipeline destinations list
+        this.destinationListAddBtn = page.locator('[data-test="pipeline-destination-list-add-btn"]');
+        // Destination type selection cards (prefix match — use .first() to avoid strict-mode violations)
+        this.destinationTypeCard = page.locator('[data-test^="destination-type-card-"]');
         this.searchInput = page.locator('[data-test="destination-list-search-input"]');
+        // OToast notifications — data-test-variant is emitted by OToastProvider
+        this.toastError = page.locator('[data-test-variant="error"]');
+        this.toastSuccess = page.locator('[data-test-variant="success"]');
         this.functionNameInput = page.locator('[data-test="add-function-name-input"]');
         this.functionNameInputField = page.locator('[data-test="add-function-name-input-field"]');
         this.addConditionSaveButton = page.locator('[data-test="add-condition-drawer"] [data-test="o-drawer-primary-btn"]');
-        this.pipelineMenu = '[data-test="menu-link-\\/pipeline-item"]';
         this.enrichmentTableTab = '[data-test="pipeline-section-tab-enrichmentTables"]';
         // Added data-test "enrichment-tables-add-btn" on the New Enrichment
         // Table OButton — prefer the data-test locator; fall back to the
@@ -294,7 +327,7 @@ export class PipelinesPage {
 
     // Methods from original PipelinesPage
     async gotoPipelinesPage() {
-        await this.pipelinesPageMenu.click();
+        await openNavFlyoutChild(this.page, 'pipeline');
     }
 
     async pipelinesPageDefaultOrg() {
@@ -318,15 +351,18 @@ export class PipelinesPage {
 
     // Methods from PipelinePage
     async openPipelineMenu() {
-        await this.pipelineMenuLink.click();
+        await openNavFlyoutChild(this.page, 'pipeline');
         await this.page.waitForTimeout(1000);
         await this.pipelineTab.click();
         await this.page.waitForTimeout(2000);
     }
 
     async addPipeline() {
-        // Wait for the add pipeline button to be visible
-        await this.addPipelineButton.waitFor({ state: 'visible', timeout: 30000 });
+        // Wait for the add pipeline button to be visible.
+        // Reduced from 30s to 15s — slowMo:500 in serial mode amplifies
+        // cascading delays when the page doesn't load, and 15s is still
+        // generous enough for CI variance.
+        await this.addPipelineButton.waitFor({ state: 'visible', timeout: 15000 });
         await this.addPipelineButton.click();
     }
 
@@ -901,7 +937,7 @@ export class PipelinesPage {
     }
 
     async navigateToAddEnrichmentTable() {
-        await this.pipelineMenuLink.click();
+        await openNavFlyoutChild(this.page, 'pipeline');
         // The enrichment-table tab uses a Reka-based OToggleGroup — `force` avoids
         // visibility races when the tab list animates in.
         await this.enrichmentTableTabLocator.click({ force: true });
@@ -981,7 +1017,7 @@ export class PipelinesPage {
     }
 
     async navigateToEnrichmentTableTab() {
-        await this.pipelineMenuLink.click();
+        await openNavFlyoutChild(this.page, 'pipeline');
         await this.page.locator(this.enrichmentTableTab).click();
     }
 
@@ -1078,7 +1114,7 @@ export class PipelinesPage {
     }
 
     async navigateToPipeline() {
-        await this.pipelineMenuLink.click();
+        await openNavFlyoutChild(this.page, 'pipeline');
     }
 
     async setupContainerNameCondition() {
@@ -1844,7 +1880,7 @@ export class PipelinesPage {
         await this.timestampColumnMenu.click();
 
         // Navigate to the pipeline menu
-        await this.pipelineMenuLink.click();
+        await openNavFlyoutChild(this.page, 'pipeline');
     }
 
     /**
@@ -1885,7 +1921,7 @@ export class PipelinesPage {
 
         for (const streamName of streamNames) {
             const url = `${baseUrl}/api/${orgId}/${streamName}/_json`;
-            const fetchResponse = await fetch(url, {
+            const fetchResponse = await fetchWithRetry(url, {
                 method: 'POST',
                 headers: headers,
                 body: JSON.stringify(data)
@@ -1928,7 +1964,7 @@ export class PipelinesPage {
 
         const baseUrl = (process.env.INGESTION_URL || '').replace(/\/$/, '');
         const url = `${baseUrl}/api/${orgId}/ingest/metrics/_json`;
-        const fetchResponse = await fetch(url, {
+        const fetchResponse = await fetchWithRetry(url, {
             method: 'POST',
             headers: headers,
             body: JSON.stringify(metricsData)
@@ -2040,7 +2076,7 @@ export class PipelinesPage {
         if (streamName) {
             requestHeaders["stream-name"] = streamName;
         }
-        const fetchResponse = await fetch(`${baseUrl}/api/${orgId}/v1/traces`, {
+        const fetchResponse = await fetchWithRetry(`${baseUrl}/api/${orgId}/v1/traces`, {
             method: 'POST',
             headers: requestHeaders,
             body: JSON.stringify(tracesData)

@@ -16,6 +16,7 @@ tests that follow the framework conventions exactly, then **register the new spe
 
 ```bash
 cat docs/test_generator/ci/run-context.json
+cat docs/test_generator/ci/coverage-decision.json          # the Architect's extend/append/new decision
 cat docs/test_generator/test-plans/<feature_slug>-test-plan.md
 cat docs/test_generator/features/<feature_slug>-feature.md   # for verified selectors
 ```
@@ -24,6 +25,46 @@ If `run-context.json` is missing or `skip: true`, stop. Use `spec_path`, `spec_f
 
 **Never guess selectors.** Use selectors from the feature doc / test plan, or extract from
 source: `grep -oE 'data-test="[^"]*"' web/src/path/to/Component.vue | sort -u`.
+
+---
+
+## COVERAGE ACTION — write a new spec, or edit an existing one
+
+Read `coverage-decision.json` and honour its `action`:
+
+- **`none`** — the existing tests already cover this. **Write nothing, change nothing, register
+  nothing** — just print a one-line "already covered, no changes" summary and stop. (The workflow
+  detects the empty result and skips the rest, reporting "already covered.")
+- **`new`** — create a brand-new spec at `target_spec` (= run-context `spec_path`) using the
+  required structure below. This is the only case that needs registration (see below).
+- **`append`** — **open the existing `target_spec` and ADD a new `test()` inside its existing
+  `describe`**, reusing its imports, `describe.configure`, and `beforeEach`. Do NOT rewrite the
+  file, re-order, or touch unrelated tests — make a minimal, surgical addition. Match the file's
+  existing style/tags. **No registration** (the file is already in playwright.yml).
+- **`extend`** — **open the existing `target_spec` and modify the specific test** named in the
+  decision: add the missing steps/assertions for the new behavior. Keep all other tests byte-for-
+  byte unchanged. **No registration.**
+
+For `append`/`extend`: any new locators/methods still go in the **page object** (never raw
+selectors in the spec), exactly as for new specs. Preserve `mode: 'parallel'` — never switch a
+file to serial. If the existing file is somehow `serial`, leave its mode as-is but keep your
+added test independent.
+
+### Honour each scenario's `Wiring:` marker (from the test plan)
+The Architect tags every scenario WIRED or UNWIRED (from the Analyst's reachability trace):
+- **WIRED** → write a normal, real test that exercises the **named working path** (the one that sets
+  the gating state). It should pass.
+- **UNWIRED (feature-incomplete)** → write the test as **`test.fixme('<name> — not wired: <evidence file:line>')`**
+  with the **real assertion body kept intact** (so it goes green when the feature is finished). Do NOT
+  weaken it, invert it, or turn it into a tautology, and do NOT write a passing test that asserts the
+  feature is absent. A `fixme` with evidence is the honest representation of a gap.
+
+This is the balance: green tests for what works + honest `fixme`s for what doesn't, in ONE spec — so a
+PR opens with real coverage instead of being blocked, and the Healer never has to discover gaps later.
+Only when **every** scenario is UNWIRED is the feature genuinely incomplete (no PR; the plan says so).
+
+> **Minimal-diff rule for append/extend:** the goal is the smallest possible change to the
+> existing file — a reviewer should see only the added/changed test, nothing else.
 
 ---
 
@@ -74,6 +115,18 @@ test.describe("<feature_title> testcases", () => {
 - **Reuse** existing page objects in `tests/ui-testing/pages/`. Only add new methods when none
   fit, and add them to the **existing** page file for that area. Define new locators at the
   **top** of the page file.
+- **No dead scaffolding** — add ONLY page-object methods the spec actually calls. Do not emit
+  speculative `expectXVisible()` helpers "for completeness" if no test uses them; they're noise
+  for human reviewers and rot. Every method you add must be called by at least one test.
+- **Assertions must be real and match the test name.** No tautologies (`toBeGreaterThanOrEqual(0)`
+  on a count, `toBeTruthy()` on always-true). Don't bury the only assertion inside an `if` whose
+  `else` just logs — the test must assert unconditionally. If the test name promises a behaviour
+  (e.g. "fix-query card appears"), assert exactly that.
+- **Never wrap an assertion in a `try/catch` that swallows the failure.** A `catch` that logs and
+  `return`s (or just continues) makes the test **pass even when the assertion failed** — a silent
+  escape hatch. Let assertions throw. If you must `try/catch` for genuine optional/cleanup steps,
+  keep the real `expect(...)` **outside** the `try`, or `throw` in the `catch`. (A deterministic gate
+  rejects assertion-in-try with a swallowing catch.)
   ```javascript
   this.newButton = '[data-test="feature-new-btn"]';
   async clickNewButton() { await this.page.locator(this.newButton).click(); }
@@ -99,7 +152,12 @@ xpath / nth-child / framework classes.
 
 ## REGISTER THE SPEC IN `playwright.yml` (emit structured data — do NOT edit the file)
 
-A generated spec only runs in CI if it's listed in `.github/workflows/playwright.yml`. For
+> **ONLY for `action: new`.** For `append`/`extend` the target spec is already in playwright.yml,
+> so **skip this section entirely and do NOT write `playwright-registration.json`** (a deterministic
+> step treats a missing file as "nothing to register"). Registering an already-listed file would
+> create a no-op or duplicate.
+
+A brand-new spec only runs in CI if it's listed in `.github/workflows/playwright.yml`. For
 security, **you do not edit that workflow file directly** — an LLM editing a CI workflow file is
 a code-execution risk. Instead you **describe** the change as structured JSON, and a
 deterministic (non-LLM) workflow step applies the one-line `run_files` append.
@@ -158,7 +216,9 @@ Sentinel's bar so the audit passes on attempt 1.
 **WARNINGS — avoid these too (Sentinel reports them):**
 - Locators must be declared at the **top** of each page-object file (as properties), not inline.
 - No brittle selectors (xpath, `nth-child`, framework-generated classes).
-- ≤3 `waitForTimeout` per test — prefer `waitForLoadState`/`toBeVisible`.
+- **Do not use `waitForTimeout(<n>)` to synchronize** — it's flaky by construction. Wait on the
+  thing you care about with auto-retrying `await expect(...).toBeVisible()` / `waitForLoadState`.
+  A fixed sleep is acceptable only for a rare deliberate settle, never as the primary wait.
 - Use `PageManager` (`pm.…`) for all interactions; reuse existing page objects.
 - If a test creates data, add cleanup in `tests/ui-testing/playwright-tests/cleanup.spec.js`.
 
@@ -176,6 +236,20 @@ Treat this as a gate on *yourself*: a spec that trips any CRITICAL above is not 
    (`mkdir -p` first) listing: spec path, page objects touched (new methods/locators), the
    `playwright.yml` group + filename to register, and any open risks (e.g. `NEEDS SELECTOR`
    items the Analyst flagged and how you handled them).
+5. A machine-readable **test summary** → `docs/test_generator/ci/test-summary.json`: one entry per
+   test case you **added or changed this run** (skip unchanged sibling tests), so the PR-back job
+   can render a reviewer-facing table. Shape:
+   ```json
+   [
+     { "title": "should open the demo page", "action": "new", "verifies": "demo page loads and the header is visible" },
+     { "title": "should filter rows", "action": "append", "verifies": "the filter control updates the results table" }
+   ]
+   ```
+   `action` = this case's coverage action (`new` for a new spec's tests, `append`/`extend` for ones
+   added/modified on an existing spec). `verifies` = one concise human sentence. For `action: none`
+   write `[]`. Keep `title` byte-identical to the `test("…")` name in the spec.
+   > It must be valid JSON. `pr_back` renders it as a table but **skips it gracefully** (no table) if
+   > the file is missing, empty `[]`, or unparseable — so never block generation on it.
 
 > **Where outputs go:** you run in an ephemeral CI runner with no commit access. Your files are
 > uploaded as a build artifact and the **PR-back job (Job 4) commits them** to a `test/<slug>`

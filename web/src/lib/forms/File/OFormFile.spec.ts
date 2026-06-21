@@ -5,6 +5,7 @@ import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { h } from "vue";
 import OFormFile from "./OFormFile.vue";
 import OForm from "../Form/OForm.vue";
+import { z } from "zod";
 
 describe("OFormFile", () => {
   let wrapper: VueWrapper;
@@ -29,22 +30,19 @@ describe("OFormFile", () => {
     expect(wrapper.find("input[type='file']").exists()).toBe(true);
   });
 
-  it("shows validator error after selection", async () => {
+  it("shows schema error after submit for an oversized file", async () => {
     wrapper = mount(OForm, {
-      props: { defaultValues: { resume: null as File | null } },
+      props: {
+        defaultValues: { resume: null as File | null },
+        schema: z.object({
+          resume: z.any().refine((v) => {
+            const f = Array.isArray(v) ? v[0] : v;
+            return !f || f.size <= 50;
+          }, "Too big"),
+        }),
+      },
       slots: {
-        default: () =>
-          h(OFormFile, {
-            name: "resume",
-            validators: [
-              (v: File | File[] | null) => (v ? undefined : "Required"),
-              (v: File | File[] | null) => {
-                if (!v) return undefined;
-                const f = Array.isArray(v) ? v[0] : v;
-                return f.size > 50 ? "Too big" : undefined;
-              },
-            ],
-          }),
+        default: () => h(OFormFile, { name: "resume" }),
       },
       global: { components: { OFormFile } },
     });
@@ -55,6 +53,11 @@ describe("OFormFile", () => {
       configurable: true,
     });
     await wrapper.find("input[type='file']").trigger("change");
+    await flushPromises();
+    // Submit reveals the schema error (submit-then-change).
+    await (
+      wrapper.vm as unknown as { form: { handleSubmit: () => Promise<unknown> } }
+    ).form.handleSubmit();
     await flushPromises();
     expect(wrapper.text()).toContain("Too big");
   });

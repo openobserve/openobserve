@@ -304,24 +304,6 @@ describe("SearchResult Component", () => {
       expect(width).toBe("");
     });
 
-    it("should compute histogramLoader when loading", () => {
-      wrapper.vm.searchObj.meta.showHistogram = true;
-      wrapper.vm.searchObj.loadingHistogram = true;
-
-      const isLoading = wrapper.vm.histogramLoader;
-
-      expect(isLoading).toBe(true);
-    });
-
-    it("should compute histogramLoader when not loading", () => {
-      wrapper.vm.searchObj.meta.showHistogram = false;
-      wrapper.vm.searchObj.loadingHistogram = false;
-
-      const isLoading = wrapper.vm.histogramLoader;
-
-      expect(isLoading).toBe(false);
-    });
-
     it("should compute getTableWidth correctly", () => {
       Object.defineProperty(window, "innerWidth", {
         writable: true,

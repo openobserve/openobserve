@@ -3448,7 +3448,9 @@
     "import_this_pattern": "このパターンをインポート",
     "patterns_loaded": "{count} 個のパターンをロードしました",
     "failed_to_load": "パターンを読み込めませんでした",
-    "no_patterns_selected": "少なくとも 1 つのパターンを選択してください"
+    "no_patterns_selected": "少なくとも 1 つのパターンを選択してください",
+    "name_required": "* 名前が必要です",
+    "pattern_required": "* パターンは必須です"
   },
   "search_history": {
     "title": "検索履歴",
@@ -4441,6 +4443,14 @@
     "noQueryApplied": {
       "title": "クエリを実行してログを確認する",
       "description": "フィルターを調整し、[クエリを実行] をクリックしてこのストリームのイベントをロードします。"
+    },
+    "noServiceGraph": {
+      "title": "サービスグラフデータなし",
+      "description": "より長い時間範囲をクエリしてみるか、サービスがスパンメトリクスを出力していることを確認してください。"
+    },
+    "noServicesCatalog": {
+      "title": "サービスが見つかりません",
+      "description": "選択した時間範囲でサービスは検出されませんでした。より広い範囲または別のストリームを試してください。"
     }
   },
   "onlineEvals": {

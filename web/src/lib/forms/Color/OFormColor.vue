@@ -4,6 +4,7 @@
 import { inject } from "vue";
 import OColor from "./OColor.vue";
 import { FORM_CONTEXT_KEY } from "../Form/OForm.types";
+import { firstFieldError } from "../Form/fieldError";
 import type { FormColorProps } from "./OFormColor.types";
 
 defineOptions({ inheritAttrs: false });
@@ -24,19 +25,6 @@ if (import.meta.env.DEV && !form) {
     v-if="form"
     :is="form.Field"
     :name="props.name"
-    :validators="
-      props.validators
-        ? {
-            onChange: (ctx: { value: unknown }) => {
-              for (const v of props.validators ?? []) {
-                const r = v(ctx.value as string);
-                if (r !== undefined) return r;
-              }
-              return undefined;
-            },
-          }
-        : undefined
-    "
   >
     <template #default="{ field }">
       <OColor
@@ -47,16 +35,17 @@ if (import.meta.env.DEV && !form) {
         :readonly="props.readonly"
         :clearable="props.clearable"
         :disabled="props.disabled"
+        :required="props.required"
         :size="props.size"
         :id="props.id"
         :name="props.name"
         :model-value="field.state.value"
         :error="
-          field.state.meta.isTouched && field.state.meta.errors.length > 0
+          field.state.meta.errors.length > 0
         "
         :error-message="
-          field.state.meta.isTouched && field.state.meta.errors.length > 0
-            ? String(field.state.meta.errors[0])
+          field.state.meta.errors.length > 0
+            ? firstFieldError(field.state.meta.errors)
             : undefined
         "
         @update:model-value="field.handleChange"

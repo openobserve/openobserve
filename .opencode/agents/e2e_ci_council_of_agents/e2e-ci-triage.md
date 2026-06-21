@@ -70,15 +70,24 @@ If OSS → `edition: "oss"`, continue.
 Set `skip: true` with a clear `skip_reason` if **any** of these hold:
 
 1. **ENT feature** (from Step 1).
-2. **Tests already added for this change** — the diff adds or modifies any file under
-   `tests/ui-testing/playwright-tests/`:
-   ```bash
-   grep -E '^\+\+\+ b/tests/ui-testing/playwright-tests/' docs/test_generator/ci/diff.patch
-   ```
-3. **Explicit marker present** — a label like `tests-added` was passed in context, or the
-   triggering comment asks to skip. (These are passed to you in the prompt.)
-4. **No user-facing change** — the diff is docs-only, CI-only, or comment/test-data-only with
+2. **Explicit opt-out** — a label like `tests-added` was passed in context, or the triggering
+   comment asks to skip. (Passed to you in the prompt.) The dev has *explicitly* said tests are
+   handled — respect that.
+3. **No user-facing change** — the diff is docs-only, CI-only, or comment/test-data-only with
    no `web/src/**` or backend behavior change that a user could exercise.
+
+> **Dev-authored tests are NOT an automatic skip** (this is intentional). If the diff itself
+> adds/modifies files under `tests/ui-testing/playwright-tests/`, do **not** skip — the dev's
+> tests may be partial, improvable, or may not cover the new behavior. Instead set
+> `existing_tests_in_diff: true` (route = *enhance*) and **continue**; the Architect reads those
+> tests and decides whether to extend, append to, or complement them.
+>
+> **Priority when both apply:** an **explicit** opt-out (condition 2 — `tests-added` label or a
+> "skip" comment) always wins → skip, even if the diff also adds tests. The "don't auto-skip" rule
+> only overrides the *automatic* detection of test files, never an explicit human opt-out.
+> ```bash
+> grep -E '^\+\+\+ b/tests/ui-testing/playwright-tests/' docs/test_generator/ci/diff.patch
+> ```
 
 If skipping, still write `run-context.json` and `triage.json` so the workflow can post a clear
 comment, then stop.
@@ -131,13 +140,28 @@ For an OSS change that needs E2E, derive:
   "spec_path": "tests/ui-testing/playwright-tests/Logs/shareLink.spec.js",
   "playwright_group": "Logs-Core",
   "source_files": ["web/src/plugins/logs/SearchBar.vue"],
+  "existing_tests_in_diff": false,
   "skip": false,
   "skip_reason": ""
 }
 ```
 
-`docs/test_generator/ci/triage.json` — the same fields plus a human-readable `rationale`
-string explaining the decision (this is what the workflow posts as the dry-run PR comment).
+`docs/test_generator/ci/triage.json` — the same fields **plus a structured `rationale` OBJECT**
+(the workflow renders it into the PR comment in a FIXED format — you supply only the prose per
+field, never the layout). Emit exactly these keys, each a concise 1–3 sentence explanation:
+```json
+"rationale": {
+  "edition": "why OSS vs ENT — the file PATHS you checked + any enterprise keywords (or their absence)",
+  "skip":    "why skip / why not — is the change user-facing? any skip marker/label/comment?",
+  "e2e":     "why E2E is or isn't warranted — what user-facing behavior needs verifying",
+  "area":    "why this area — where the bulk of the UI changes live + where sibling specs are",
+  "group":   "why this playwright_group (matrix shard)",
+  "existing_tests": "what existing test changes are in the diff and whether they cover the NEW feature (maintenance vs real coverage)"
+}
+```
+Write **every** key (use a short note like "n/a — skipped" if a field doesn't apply). Keep each
+value plain prose — do NOT add your own bold labels or headers; the workflow adds those. The
+`rationale` object only needs to be in `triage.json` (not `run-context.json`).
 
 ## Decision discipline
 

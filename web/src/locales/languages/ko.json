@@ -3461,7 +3461,9 @@
     "import_this_pattern": "이 패턴 가져오기",
     "patterns_loaded": "로드된 {개수} 개의 패턴",
     "failed_to_load": "패턴을 로드하지 못했습니다.",
-    "no_patterns_selected": "패턴을 하나 이상 선택하십시오."
+    "no_patterns_selected": "패턴을 하나 이상 선택하십시오.",
+    "name_required": "* 이름 필수",
+    "pattern_required": "* 패턴 필수"
   },
   "search_history": {
     "title": "검색 기록",
@@ -4454,6 +4456,14 @@
     "noQueryApplied": {
       "title": "쿼리를 실행하여 로그 보기",
       "description": "필터를 조정하고 '쿼리 실행'을 클릭하여 이 스트림에 대한 이벤트를 로드합니다."
+    },
+    "noServiceGraph": {
+      "title": "서비스 그래프 데이터 없음",
+      "description": "더 긴 시간 범위를 쿼리하거나 서비스에서 스팬 메트릭을 내보내고 있는지 확인하세요."
+    },
+    "noServicesCatalog": {
+      "title": "서비스를 찾을 수 없음",
+      "description": "선택한 시간 범위에서 검색된 서비스가 없습니다.더 넓은 범위 또는 다른 스트림을 사용해 보세요."
     }
   },
   "onlineEvals": {

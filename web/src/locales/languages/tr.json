@@ -3461,7 +3461,9 @@
     "import_this_pattern": "Bu Deseni İçe Aktar",
     "patterns_loaded": "Yüklenen {count} desen (ler)",
     "failed_to_load": "Desenler yüklenemedi",
-    "no_patterns_selected": "Lütfen en az bir desen seçin"
+    "no_patterns_selected": "Lütfen en az bir desen seçin",
+    "name_required": "* İsim zorunludur",
+    "pattern_required": "* Desen gereklidir"
   },
   "search_history": {
     "title": "Arama Geçmişi",
@@ -4454,6 +4456,14 @@
     "noQueryApplied": {
       "title": "Günlükleri görmek için bir sorgu çalıştırın",
       "description": "Filtrelerinizi ayarlayın ve bu akış için olayları yüklemek için “Sorgu çalıştır\"ı tıklayın."
+    },
+    "noServiceGraph": {
+      "title": "Servis grafiği verisi yok",
+      "description": "Daha uzun bir zaman aralığı sorgulamayı deneyin veya hizmetlerinizin aralık ölçümleri yaydığından emin olun."
+    },
+    "noServicesCatalog": {
+      "title": "Hizmet bulunamadı",
+      "description": "Seçilen zaman aralığında hiçbir hizmet algılanmadı. Daha geniş bir aralık veya farklı bir akış deneyin."
     }
   },
   "onlineEvals": {

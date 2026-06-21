@@ -3448,7 +3448,9 @@
     "import_this_pattern": "Dieses Muster importieren",
     "patterns_loaded": "{count} Muster (e) geladen",
     "failed_to_load": "Muster konnten nicht geladen werden",
-    "no_patterns_selected": "Bitte wählen Sie mindestens ein Muster aus"
+    "no_patterns_selected": "Bitte wählen Sie mindestens ein Muster aus",
+    "name_required": "* Name ist erforderlich",
+    "pattern_required": "* Muster ist erforderlich"
   },
   "search_history": {
     "title": "Verlauf durchsuchen",
@@ -4441,6 +4443,14 @@
     "noQueryApplied": {
       "title": "Führen Sie eine Abfrage aus, um Protokolle anzuzeigen",
       "description": "Passen Sie Ihre Filter an und klicken Sie auf „Abfrage ausführen“, um Ereignisse für diesen Stream zu laden."
+    },
+    "noServiceGraph": {
+      "title": "Keine Service-Graph-Daten",
+      "description": "Versuchen Sie, einen längeren Zeitraum abzufragen, oder stellen Sie sicher, dass Ihre Dienste Span-Metriken ausgeben."
+    },
+    "noServicesCatalog": {
+      "title": "Keine Dienste gefunden",
+      "description": "Im ausgewählten Zeitraum wurden keine Dienste erkannt. Versuche es mit einer größeren Reichweite oder einem anderen Stream."
     }
   },
   "onlineEvals": {

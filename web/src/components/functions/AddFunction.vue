@@ -466,9 +466,10 @@ export default defineComponent({
 
     const handleFunctionError = (err: string) => {
       vrlFunctionError.value = err;
-      // Auto-expand error section when error occurs
       if (err) {
         expandState.value.functionError = true;
+      } else {
+        expandState.value.functionError = false;
       }
     };
 

@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{any::Any, sync::Arc};
+use std::sync::Arc;
 
 use arrow::{
     array::{ArrayRef, RecordBatch},
@@ -144,10 +144,6 @@ impl EnrichmentMetrics {
 impl ExecutionPlan for EnrichmentExec {
     fn name(&self) -> &'static str {
         "EnrichmentExec"
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
     }
 
     fn properties(&self) -> &Arc<PlanProperties> {

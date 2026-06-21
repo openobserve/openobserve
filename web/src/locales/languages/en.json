@@ -221,6 +221,14 @@
       "title": "No traces found",
       "description": "No traces match the selected service and time range. Try a wider time range or a different service."
     },
+    "noServiceGraph": {
+      "title": "No service graph data",
+      "description": "Try querying a longer time range, or ensure your services are emitting span metrics."
+    },
+    "noServicesCatalog": {
+      "title": "No services found",
+      "description": "No services were detected in the selected time range. Try a wider range or a different stream."
+    },
     "noSearchHistory": {
       "title": "No search history yet",
       "description": "Searches you run will be listed here so you can revisit and re-run them."
@@ -763,7 +771,7 @@
     "docs": "Docs",
     "billings": "Billing",
     "rum": "RUM",
-    "settings": "Management",
+    "settings": "Settings",
     "iam": "IAM",
     "report": "Reports",
     "pipeline": "Pipelines",
@@ -3348,7 +3356,7 @@
     "addToDashboard": "Add to Dashboard"
   },
   "settings": {
-    "header": "Management",
+    "header": "Settings",
     "alertCorrelation": "Alert Deduplication",
     "correlationSettings": "Correlation Settings",
     "userKeyLabel": "User Key",
@@ -3859,6 +3867,7 @@
       "multiStepAgent": "Multi-step Agent"
     },
     "sessionsList": {
+      "streamLabel": "Stream",
       "noStreamsTooltip": "No LLM streams available.",
       "session": "session",
       "sessions": "sessions",
@@ -4153,7 +4162,9 @@
     "import_this_pattern": "Import This Pattern",
     "patterns_loaded": "Loaded {count} pattern(s)",
     "failed_to_load": "Failed to load patterns",
-    "no_patterns_selected": "Please select at least one pattern"
+    "no_patterns_selected": "Please select at least one pattern",
+    "name_required": "* Name is required",
+    "pattern_required": "* Pattern is required"
   },
   "search_history": {
     "title": "Search History",
@@ -4646,6 +4657,10 @@
       "detail": {
         "loading": "Loading per-config breakdown…",
         "noData": "No scores yet for this config in this window.",
+        "empty": {
+          "title": "Waiting for your first scores",
+          "description": "No scores have landed for this config in the selected time range. They'll appear here automatically once a scorer using it runs."
+        },
         "drillTitle": "Drill to traces",
         "splitByScorer": "Split by scorer",
         "splitBySourceType": "Split by source_type",
