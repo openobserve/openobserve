@@ -79,7 +79,11 @@ concurrency:
   # One run at a time per source PR (covers comment, dispatch, and auto-on-merge events) so two
   # triggers can't race on the same autoe2e/pr-<n> branch.
   group: e2e-council-${{ github.event.issue.number || github.event.pull_request.number || github.event.inputs.pr_number || github.ref }}
-  cancel-in-progress: true
+  # cancel-in-progress is FALSE for issue_comment events: the pipeline posts its own comments on the
+  # source PR (pr_back's link, the no-PR report), which fire issue_comment events in this SAME group.
+  # With cancel-in-progress=true those would self-cancel the run mid-pr_back. A comment now QUEUES
+  # behind the running pipeline instead. Dispatch / pull_request still supersede (latest wins).
+  cancel-in-progress: ${{ github.event_name != 'issue_comment' }}
 
 env:
   # Model every agent runs on (provider `deepseek` configured in opencode.jsonc, keyed by the
