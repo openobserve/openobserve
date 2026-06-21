@@ -1,0 +1,42 @@
+[
+  {
+    "title": "should display hero error state with fix-query card on SQL syntax error",
+    "action": "new",
+    "verifies": "Submitting an invalid SQL query triggers the QueryErrorState hero layout with Fix Query action card, error detail panel, and summary text visible"
+  },
+  {
+    "title": "should toggle error detail panel expand and collapse",
+    "action": "new",
+    "verifies": "Clicking the error detail toggle button expands the detail body on first click and collapses it on the second click"
+  },
+  {
+    "title": "should copy error details and show Copied feedback",
+    "action": "new",
+    "verifies": "The Copy Error Details button is visible and clicking it shows 'Copied!' feedback for 2 seconds"
+  },
+  {
+    "title": "should display no-events state with expand range and remove filter cards",
+    "action": "new",
+    "verifies": "A valid SQL query returning 0 results renders the LogsNoEventsState with Expand Time Range and Remove Filter action cards"
+  },
+  {
+    "title": "should focus search bar editor on fix-query card click",
+    "action": "new",
+    "verifies": "Clicking the Fix Query action card emits fix-query and the parent component focuses the Monaco search bar editor"
+  },
+  {
+    "title": "should display filter error state for multi-stream filter mismatch",
+    "action": "new",
+    "verifies": "Multi-stream filter error container appears when a filter field is missing from some selected streams — skipped pending multi-stream schema setup"
+  },
+  {
+    "title": "'Ask AI' button should NOT be visible in OSS edition — not wired: aiEnabled computed from config.isEnterprise at Index.vue:1497-1499",
+    "action": "new",
+    "verifies": "The Ask AI button is never rendered in OSS edition — fixme placeholder until enterprise licensing is available"
+  },
+  {
+    "title": "should display informational message when org has no streams",
+    "action": "new",
+    "verifies": "When an organization has zero log streams, the LogsNoDataState renders a no-streams informational container — skipped pending empty org setup"
+  }
+]

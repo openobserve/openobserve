@@ -1,0 +1,33 @@
+{
+  "feature_slug": "query-error-state",
+  "feature_title": "Unified Query Error State Display",
+  "area": "Logs",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "queryErrorState.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Logs/queryErrorState.spec.js",
+  "playwright_group": "Logs-Builder-Advanced",
+  "source_files": [
+    "web/src/components/common/QueryErrorState.vue",
+    "web/src/components/common/ErrorDetailPanel.vue",
+    "web/src/composables/useQueryError.ts",
+    "web/src/composables/useAiIcon.ts",
+    "web/src/plugins/logs/LogsErrorState.vue",
+    "web/src/plugins/logs/LogsNoEventsState.vue",
+    "web/src/plugins/logs/Index.vue",
+    "web/src/plugins/logs/SearchResult.vue",
+    "web/src/components/alerts/IncidentList.vue"
+  ],
+  "existing_tests_in_diff": true,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "OSS. All changed paths are under web/src/ (components, composables, locales, plugins, stores) and tests/ui-testing/ — none fall under enterprise/, o2_enterprise/, or any enterprise-owned directory. No enterprise keywords (SSO, SAML, RBAC, SDR, cipher, sensitive-data, logo-management) appear in any changed file path.",
+    "skip": "Not skipped. The diff modifies user-facing UI components: adds QueryErrorState.vue and ErrorDetailPanel.vue (hero and block error displays), adds the useQueryError composable, updates LogsErrorState/LogsNoEventsState/LogsNoDataState in web/src/plugins/logs/, updates traces SearchBar/SearchResult/TracesNoDataState, and adds a status filter toggle group to IncidentList.vue. Trigger comment and feature hint are both empty — no explicit opt-out marker or 'tests-added' label.",
+    "e2e": "E2E warranted. QueryErrorState introduces a new user-facing error display component with two layout sizes (hero and block), smart error-code classification with recovery action cards (Fix query, Configure resource, Expand range, Ask AI), collapsible error detail panels with copy-to-clipboard, and embedded TraceID extraction. IncidentList.vue gains a status filter toggle group (all/open/acknowledged/resolved) that is a new user interaction. Test selectors are systematically renamed (logs-search-error-message → logs-search-error-state, logs-search-result-not-found-text → logs-search-no-events-found-text, etc.) — the UI contract has changed and needs new coverage.",
+    "area": "Logs. The test POM changes (logsPage.js, logsQueryPage.js, schemaPage.js) and spec updates (logshistogram.spec.js, logsquickmode.spec.js) are concentrated in the Logs area. The main consumer of QueryErrorState is the logs plugin (LogsErrorState.vue in web/src/plugins/logs/). Sibling E2E specs live in tests/ui-testing/playwright-tests/Logs/.",
+    "group": "Logs-Builder-Advanced. Both existing test files modified by this diff — logshistogram.spec.js and logsquickmode.spec.js — are assigned to the Logs-Builder-Advanced shard in the Playwright CI matrix. A new query error state spec naturally pairs with these query-execution tests since the error state component is triggered by query failures.",
+    "existing_tests": "Two test specs in the diff were updated: logshistogram.spec.js and logsquickmode.spec.js. Both changes are maintenance updates — renaming data-test selectors (logs-search-error-message → logs-search-error-state, logs-search-result-not-found-text → logs-search-no-events-found-text, traces-search-bar-error-only-toggle-btn → traces-error-count-badge) and updating helper methods (clickNoDataFound, clickErrorMessage, waitForSearchResultsToLoad, etc.) to match the new component contracts. They also fix SQL query syntax. These updates maintain compatibility with existing tests but do not add new test cases for the QueryErrorState component, the ErrorDetailPanel, the hero/block layout switching, the per-error-code action cards, or the IncidentList status-filter toggle. Route: enhance — Architect should read these as context and extend with new functional coverage."
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/Logs/queryErrorState.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/Logs/logsqueries.spec.js",
+    "tests/ui-testing/playwright-tests/Logs/logshistogram.spec.js",
+    "tests/ui-testing/playwright-tests/Logs/logsquickmode.spec.js"
+  ],
+  "needs_registration": false,
+  "rationale": "Existing logsqueries.spec.js has one test ('should add invalid query and display error') that asserts the error-state container is visible, but it does NOT test any of the new QueryErrorState features: per-error-code action cards (fix-query, configure-resource, expand-range), error detail panel toggle/copy, block vs hero layout, filter error state, or no-events state. The feature introduces a brand-new component (QueryErrorState.vue) with 17+ data-test selectors and 8+ error-code scenarios — it is clearly its own area. A dedicated spec avoids polluting the general logsqueries.spec.js. The IncidentList.vue status-filter toggle (Alerts area) is noted as secondary/uncovered. No playwright.yml registration needed — Playwright config uses auto-discovery via testDir."
+}

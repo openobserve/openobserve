@@ -1,0 +1,6 @@
+{
+  "group": "Logs-Builder-Advanced",
+  "spec_filename": "queryErrorState.spec.js",
+  "create_group": false,
+  "browser": "chrome"
+}

@@ -198,6 +198,25 @@ export class LogsPage {
         this.resultErrorDetailsBtn = '[data-test="error-detail-toggle-btn"], [data-test="query-error-toggle-detail-btn"]';
         this.searchDetailErrorMessage = '[data-test="error-detail-body"], [data-test="query-error-detail-expanded"]';
 
+        // QueryErrorState component selectors (hero layout — LogsErrorState / QueryErrorState.vue)
+        this.queryErrorState = '[data-test="query-error-state"]';
+        this.queryErrorFixQueryCard = '[data-test="query-error-fix-query-card"]';
+        this.queryErrorCopyBtn = '[data-test="query-error-copy-btn"]';
+        this.queryErrorAskAiBtn = '[data-test="query-error-ask-ai-btn"]';
+        // ErrorDetailPanel selectors (inside QueryErrorState hero layout)
+        this.errorDetailPanel = '[data-test="error-detail-panel"]';
+        this.errorDetailSummary = '[data-test="error-detail-summary"]';
+        this.errorDetailToggleBtn = '[data-test="error-detail-toggle-btn"]';
+        this.errorDetailBody = '[data-test="error-detail-body"]';
+        // LogsNoEventsState selectors
+        this.logsNoEventsFoundText = '[data-test="logs-search-no-events-found-text"]';
+        this.logsNoEventsExpandRangeCard = '[data-test="logs-no-events-expand-range-card"]';
+        this.logsNoEventsRemoveFilterCard = '[data-test="logs-no-events-remove-filter-card"]';
+        // Filter error selector (multi-stream filter mismatch)
+        this.logsSearchFilterErrorMessage = '[data-test="logs-search-filter-error-message"]';
+        // No-streams-in-org selector (LogsNoDataState)
+        this.logsNoStreamsInOrgText = '[data-test="logs-search-no-streams-in-org-text"]';
+
         // Download locators (SearchBar.vue more-options dropdown + custom-download ODialog)
         this.moreOptionsBtn = '[data-test="logs-search-bar-more-options-btn"]';
         // Hover trigger for the nested CSV/JSON submenu (data-test added on the wrapper div).
@@ -6176,6 +6195,101 @@ export class LogsPage {
 
     async expectSearchDetailErrorMessageVisible() {
         return await expect(this.page.locator(this.searchDetailErrorMessage)).toBeVisible();
+    }
+
+    // =========================================================================
+    // QUERY ERROR STATE METHODS (QueryErrorState / LogsErrorState / LogsNoEventsState)
+    // =========================================================================
+
+    async expectQueryErrorStateVisible() {
+        return await expect(this.page.locator(this.queryErrorState)).toBeVisible({ timeout: 30000 });
+    }
+
+    async expectFixQueryCardVisible() {
+        return await expect(this.page.locator(this.queryErrorFixQueryCard)).toBeVisible({ timeout: 15000 });
+    }
+
+    async clickFixQueryCard() {
+        await this.page.locator(this.queryErrorFixQueryCard).waitFor({ state: 'visible', timeout: 15000 });
+        return await this.page.locator(this.queryErrorFixQueryCard).click();
+    }
+
+    async expectCopyErrorButtonVisible() {
+        return await expect(this.page.locator(this.queryErrorCopyBtn)).toBeVisible({ timeout: 10000 });
+    }
+
+    async clickCopyErrorButton() {
+        await this.page.locator(this.queryErrorCopyBtn).waitFor({ state: 'visible', timeout: 10000 });
+        return await this.page.locator(this.queryErrorCopyBtn).click();
+    }
+
+    async expectCopyButtonShowsCopied() {
+        return await expect(this.page.locator(this.queryErrorCopyBtn)).toContainText('Copied', { timeout: 5000 });
+    }
+
+    async expectErrorDetailPanelVisible() {
+        return await expect(this.page.locator(this.errorDetailPanel)).toBeVisible({ timeout: 15000 });
+    }
+
+    async expectErrorDetailSummaryVisible() {
+        return await expect(this.page.locator(this.errorDetailSummary)).toBeVisible({ timeout: 15000 });
+    }
+
+    async expectErrorDetailToggleVisible() {
+        return await expect(this.page.locator(this.errorDetailToggleBtn)).toBeVisible({ timeout: 10000 });
+    }
+
+    async clickErrorDetailToggle() {
+        await this.page.locator(this.errorDetailToggleBtn).waitFor({ state: 'visible', timeout: 10000 });
+        return await this.page.locator(this.errorDetailToggleBtn).click();
+    }
+
+    async expectErrorDetailBodyVisible() {
+        return await expect(this.page.locator(this.errorDetailBody)).toBeVisible({ timeout: 10000 });
+    }
+
+    async expectErrorDetailBodyHidden() {
+        return await expect(this.page.locator(this.errorDetailBody)).toBeHidden({ timeout: 10000 });
+    }
+
+    async expectNoEventsStateVisible() {
+        return await expect(this.page.locator(this.logsNoEventsFoundText)).toBeVisible({ timeout: 30000 });
+    }
+
+    async expectNoEventsExpandCardVisible() {
+        return await expect(this.page.locator(this.logsNoEventsExpandRangeCard)).toBeVisible({ timeout: 15000 });
+    }
+
+    async expectNoEventsRemoveFilterCardVisible() {
+        return await expect(this.page.locator(this.logsNoEventsRemoveFilterCard)).toBeVisible({ timeout: 15000 });
+    }
+
+    async expectFilterErrorMessageVisible() {
+        return await expect(this.page.locator(this.logsSearchFilterErrorMessage)).toBeVisible({ timeout: 30000 });
+    }
+
+    async expectFilterErrorActionCardAbsent() {
+        return await expect(this.page.locator(this.queryErrorFixQueryCard)).toBeHidden({ timeout: 5000 });
+    }
+
+    async expectAskAiButtonNotVisible() {
+        return await expect(this.page.locator(this.queryErrorAskAiBtn)).toBeHidden({ timeout: 5000 });
+    }
+
+    async expectNoStreamsInOrgVisible() {
+        return await expect(this.page.locator(this.logsNoStreamsInOrgText)).toBeVisible({ timeout: 15000 });
+    }
+
+    async expectSearchBarEditorFocused() {
+        // Verify the Monaco editor inside the query-editor container is focused.
+        await expect(async () => {
+            const focused = await this.page.evaluate((selector) => {
+                const host = document.querySelector(selector);
+                if (!host) return false;
+                return host.contains(document.activeElement);
+            }, this.queryEditor);
+            expect(focused).toBe(true);
+        }).toPass({ timeout: 5000 });
     }
 
     async expectStartTimeVisible() {
