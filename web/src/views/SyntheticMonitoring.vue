@@ -12,7 +12,18 @@
           <div class="syn-sub">Proactively monitor uptime, performance, and user journeys from global locations</div>
         </div>
       </div>
-      <button class="syn-new-btn" @click="openCreate"><OIcon name="add" size="sm" />New Monitor</button>
+      <div class="syn-hdr-actions">
+        <button class="geo-hdr-btn" :class="{ 'geo-hdr-btn--alert': geoIssues.length }" @click="showIssuesModal = true">
+          <OIcon :name="geoIssues.length ? 'error' : 'check-circle'" size="xs"/>
+          Active Issues
+          <span v-if="geoIssues.length" class="geo-hdr-badge">{{ geoIssues.length }}</span>
+        </button>
+        <button class="geo-hdr-btn" @click="showHeatmapModal = true">
+          <OIcon name="language" size="xs"/>
+          Geo Map
+        </button>
+        <button class="syn-new-btn" @click="openCreate"><OIcon name="add" size="sm" />New Monitor</button>
+      </div>
     </div>
 
     <!-- FILTER BAR -->
@@ -43,8 +54,7 @@
       <template v-if="activeTab !== 'private'">
         <div class="syn-search-box">
           <OIcon name="search" size="sm" class="syn-search-icon" />
-          <input v-if="activeTab === 'geo'" v-model="geoSearch" class="syn-search-input" placeholder="Filter monitors…" @input="geoPage=1" />
-          <input v-else v-model="search" class="syn-search-input"
+          <input v-model="search" class="syn-search-input"
             :placeholder="activeTab === 'browser' ? 'Search browser tests...' : activeTab === 'api' ? 'Search API tests...' : 'Search monitors...'"
             @input="currentPage = 1" />
         </div>
@@ -64,19 +74,6 @@
 
       <template v-if="activeTab === 'private'">
         <button class="syn-new-btn" @click=""><OIcon name="add" size="sm" />Add Location</button>
-      </template>
-
-      <!-- Geo tab action buttons -->
-      <template v-if="activeTab === 'geo'">
-        <button class="geo-hdr-btn" :class="{ 'geo-hdr-btn--alert': geoIssues.length }" @click="showIssuesModal = true">
-          <OIcon :name="geoIssues.length ? 'error' : 'check-circle'" size="xs"/>
-          Active Issues
-          <span v-if="geoIssues.length" class="geo-hdr-badge">{{ geoIssues.length }}</span>
-        </button>
-        <button class="geo-hdr-btn" @click="showHeatmapModal = true">
-          <OIcon name="language" size="xs"/>
-          Geo Map
-        </button>
       </template>
     </div>
 
@@ -342,67 +339,6 @@
       </div>
     </template>
 
-    <!-- ── GEO CHECKS ── -->
-    <template v-else-if="activeTab === 'geo'">
-
-      <!-- Matrix table -->
-      <div class="syn-table-scroll">
-        <table class="syn-table geo-matrix">
-          <thead>
-            <tr>
-              <th class="syn-th geo-th--monitor">Monitor</th>
-              <th v-for="loc in geoAllLocations" :key="loc.key"
-                class="syn-th geo-th" :class="{ 'geo-th--compare': compareLocs.includes(loc.key) }"
-                @click="toggleCompareLoc($event, loc.key)" style="cursor:pointer;user-select:none">
-                <span class="geo-th-flag">{{ loc.flag }}</span> {{ loc.label }}
-                <span v-if="compareLocs.includes(loc.key)" class="geo-th-badge">{{ compareLocs.indexOf(loc.key) + 1 }}</span>
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="row in geoRows" :key="row.monitor.id"
-              class="geo-row" :class="{ 'geo-row--active': selectedGeoRow?.monitor.id === row.monitor.id }"
-              @click="toggleGeoRow(row)" style="cursor:pointer">
-              <td class="syn-td geo-td--monitor">
-                <div class="geo-mon-name">{{ row.monitor.name }}</div>
-                <div class="geo-mon-url">{{ row.monitor.url }}</div>
-                <span class="badge" :class="'badge--'+row.monitor.type.toLowerCase()" style="margin-top:3px">{{ row.monitor.type }}</span>
-              </td>
-              <td v-for="(c, ci) in row.cells" :key="ci"
-                class="syn-td geo-cell" :class="'geo-cell--'+c.status" style="text-align:center">
-                <template v-if="c.status !== 'none'">
-                  <span class="geo-cell-dot" :class="'geo-cdot--'+c.status" />
-                  <span class="geo-cell-ms">{{ c.ms !== null ? c.ms + 'ms' : 'Timeout' }}</span>
-                </template>
-                <span v-else class="geo-cell-dash">—</span>
-              </td>
-            </tr>
-            <tr v-if="geoRows.length === 0">
-              <td :colspan="geoAllLocations.length + 1" class="syn-td" style="text-align:center;padding:48px;color:var(--o2-tab-text-color);font-size:13px">No monitors match your search</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <!-- Pagination footer -->
-      <div class="syn-footer">
-        <div class="syn-footer-total">{{ geoAllRows.length }} Monitors</div>
-        <div style="flex:1" />
-        <div class="syn-footer-right">
-          <span class="syn-footer-info">Showing {{ geoPageStart + 1 }} - {{ geoPageEnd }} of {{ geoAllRows.length }}</span>
-          <span class="syn-footer-sep" />
-          <span style="font-size:12px;color:var(--o2-tab-text-color);white-space:nowrap">Records per page</span>
-          <select v-model="geoPerPage" class="syn-select" style="width:64px" @change="geoPage=1">
-            <option :value="10">10</option><option :value="20">20</option>
-            <option :value="25">25</option><option :value="50">50</option>
-          </select>
-          <button class="pg-btn" :disabled="geoPage === 1" @click="geoPage=1"><OIcon name="first-page" size="sm" /></button>
-          <button class="pg-btn" :disabled="geoPage === 1" @click="geoPage--"><OIcon name="chevron-left" size="sm" /></button>
-          <button class="pg-btn" :disabled="geoPage === geoTotalPages" @click="geoPage++"><OIcon name="chevron-right" size="sm" /></button>
-          <button class="pg-btn" :disabled="geoPage === geoTotalPages" @click="geoPage=geoTotalPages"><OIcon name="last-page" size="sm" /></button>
-        </div>
-      </div>
-    </template>
 
     <!-- Floating locations tooltip -->
     <Teleport to="body">
@@ -551,33 +487,17 @@
                     </div>
 
                     <div class="dp-section">
-                      <div class="dp-section-title">{{ detailPanel.geoRow ? 'Geographic Status' : 'Monitored Locations' }}</div>
+                      <div class="dp-section-title">Monitored Locations</div>
                       <div class="dp-geo-list">
-                        <template v-if="detailPanel.geoRow">
-                          <div v-for="(cell, ci) in detailPanel.geoRow.cells" :key="ci"
-                            class="dp-geo-row" :class="{ 'dp-geo-row--none': cell.status === 'none' }">
-                            <span class="dp-geo-flag">{{ geoAllLocations[ci].flag }}</span>
-                            <div class="dp-geo-info">
-                              <span class="dp-geo-loc">{{ geoAllLocations[ci].label }}</span>
-                              <span class="dp-geo-city">{{ geoAllLocations[ci].city }}</span>
-                            </div>
-                            <template v-if="cell.status !== 'none'">
-                              <span class="geo-cell-dot" :class="'geo-cdot--'+cell.status" style="margin-left:auto;flex-shrink:0"/>
-                              <span class="dp-geo-ms" :class="cell.status==='down'?'c-r':cell.status==='deg'?'c-a':'c-g'">{{ cell.ms !== null ? cell.ms+'ms' : 'Timeout' }}</span>
-                            </template>
-                            <span v-else style="margin-left:auto;color:var(--o2-tab-text-color);font-size:12px">—</span>
-                          </div>
-                        </template>
-                        <template v-else>
-                          <div v-for="loc in detailPanel.monitor.locations" :key="loc" class="dp-geo-row">
-                            <span class="dp-geo-flag">📍</span>
-                            <span class="dp-geo-loc">{{ loc }}</span>
-                            <span class="geo-cell-dot geo-cdot--up" style="margin-left:auto;flex-shrink:0"/>
-                            <span class="dp-geo-ms c-g">Active</span>
-                          </div>
-                        </template>
+                        <div v-for="loc in detailPanel.monitor.locations" :key="loc" class="dp-geo-row">
+                          <span class="dp-geo-flag">📍</span>
+                          <span class="dp-geo-loc">{{ loc }}</span>
+                          <span class="geo-cell-dot geo-cdot--up" style="margin-left:auto;flex-shrink:0"/>
+                          <span class="dp-geo-ms c-g">Active</span>
+                        </div>
                       </div>
                     </div>
+
                   </div>
 
                   <!-- Right column: config + incidents + uptime cal -->
@@ -1547,7 +1467,6 @@ const tabs = [
   { key:"monitors", label:"All Monitors",     count:30   },
   { key:"browser",  label:"Browser Tests",    count:5    },
   { key:"api",      label:"API Tests",        count:6    },
-  { key:"geo",      label:"Geo Checks",       count:null },
   { key:"private",  label:"Private Locations",count:null },
 ];
 const steps = [
@@ -1731,6 +1650,7 @@ const saveMonitor = () => { showDrawer.value=false; };
 
 /* ── PAGE HEADER ── */
 .syn-page-header     { display:flex; align-items:center; justify-content:space-between; padding:12px 20px; border-bottom:1px solid var(--o2-border-color); flex-shrink:0; background:var(--o2-card-background); }
+.syn-hdr-actions     { display:flex; align-items:center; gap:10px; }
 .syn-page-title-wrap { display:flex; align-items:center; gap:12px; }
 .syn-page-icon       { width:36px; height:36px; border-radius:9px; background:rgba(0,0,0,.07); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
 .body--dark .syn-page-icon { background:rgba(255,255,255,.1); }
