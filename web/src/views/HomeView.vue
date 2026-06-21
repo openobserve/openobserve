@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Body: padded wrapper that holds the active tab panel. Padding lives
            here (not on the root) so the header above stays full-bleed. -->
-      <div class="tw:flex-1 tw:min-h-0 tw:flex tw:flex-col tw:p-2.5">
+      <div class="tw:flex-1 tw:min-h-0 tw:flex tw:flex-col tw:pt-px tw:px-2.5 tw:pb-2.5">
         <!-- O2 AI Assistant tab -->
         <div v-if="activeHomeTab === 'ai'" class="home-tab-panel home-ai-panel">
           <HomeChatHistory @load-chat="onLoadChat" @new-chat="onNewChat" />
@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Usage tab -->
-        <div v-if="activeHomeTab === 'usage'" class="home-tab-panel">
+        <div v-if="activeHomeTab === 'usage'" class="home-tab-panel home-tab-panel--usage">
           <UsageTab />
         </div>
       </div>
@@ -278,6 +278,15 @@ export default defineComponent({
   flex: 1;
   min-height: 0;
   overflow: hidden;
+}
+
+/* Usage tab: cancel the body wrapper's right padding so the scroll container
+   reaches the content-card's right edge and its scrollbar sits flush there
+   (instead of floating ~10px inset). The wrapper is overflow:visible, so this
+   negative margin isn't clipped. The inner gap is restored by UsageTab's
+   `.usage-scroll` padding-right. */
+.home-tab-panel--usage {
+  margin-right: -0.625rem;
 }
 
 /* AI assistant tab — side-by-side layout */

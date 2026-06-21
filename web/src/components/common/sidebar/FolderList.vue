@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="tw:bg-surface-panel tw:h-full tw:flex tw:flex-col tw:pb-[0.3rem] tw:border-r tw:border-border-default">
       <div class="folder-header" :class="store.state.theme === 'dark' ? 'folder-header-dark' : 'folder-header-light'">
-        <div class="tw:font-semibold tw:text-sm tw:text-text-primary tw:px-2 tw:py-2 tw:flex tw:items-center tw:justify-between tw:gap-2">
+        <div class="tw:font-medium tw:text-sm tw:text-text-primary tw:px-2 tw:py-2 tw:flex tw:items-center tw:justify-between tw:gap-2">
           {{ t('dashboard.folders') }}
           <div>
             <OButton
@@ -58,11 +58,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="test-class"
           :data-test="`dashboard-folder-tab-${tab.folderId}`"
           >
-          <div class="folder-item tw:w-full tw:flex tw:justify-between tw:flex-nowrap tw:group/row" :data-test="`dashboard-folder-tab-name-${tab.name}`">
-              <span class="folder-name" :title="tab.name" :data-test="`dashboard-folder-name-${tab.name}`">{{
+          <div class="folder-item tw:w-full tw:flex tw:items-center tw:justify-between tw:flex-nowrap tw:gap-2 tw:min-h-6 tw:group/row" :data-test="`dashboard-folder-tab-name-${tab.name}`">
+              <span class="folder-name tw:flex-1 tw:min-w-0 tw:text-left" :title="tab.name" :data-test="`dashboard-folder-name-${tab.name}`">{{
               tab.name
               }}</span>
-              <div class="tw:invisible tw:group-hover/row:visible tw:has-[[data-state=open]]:visible tw:flex tw:items-center tw:absolute tw:right-0 tw:top-1/2 tw:-translate-y-1/2">
+              <div class="tw:hidden tw:group-hover/row:flex tw:has-[[data-state=open]]:flex tw:items-center tw:shrink-0">
               <ODropdown
                 v-if="index || (searchQuery?.length > 0 && index ==  0 && tab.folderId.toLowerCase() != 'default') "
                 side="bottom"
@@ -373,17 +373,16 @@ export default defineComponent({
         justify-content: flex-start;
         padding: 0 0.625rem;
         border-radius: 0.5rem;
-        /* No forced capitalize — folder names render as authored. Weight 500
-           (record-name weight), not 600, so the list reads calm. Active state is
-           inherited from OTab vertical (tint bg + primary text) so the folder rail
-           matches the IAM/Settings rails exactly. */
-        font-weight: 500;
+        /* Weight 400 — Inter reads heavier than IBM Plex at 500, so drop to
+           normal for calm sidebar list. Active state tint + primary color
+           provides sufficient emphasis without weight. */
+        font-weight: 400;
 
         &__content.tab_content {
           .o-tab {
             &__icon + &__label {
               padding-left: 0.875rem;
-              font-weight: 500;
+              font-weight: 400;
             }
           }
         }

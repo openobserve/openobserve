@@ -23,6 +23,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     ]"
     style="color: var(--o2-log-table-text)"
   >
+    <!-- Top progress bar: keeps rows visible while a new result set streams in
+      (e.g. streaming_aggs replacing values). Same component dashboard panels
+      use; driven by backend streaming progress. The full skeleton below is
+      shown only on first load (no rows yet). -->
+    <LoadingProgress
+      :loading="loading"
+      :loadingProgressPercentage="loadingProgressPercentage"
+    />
     <table
       v-if="table"
       data-test="logs-search-result-logs-table"
@@ -30,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :style="{
         minWidth: '100%',
         ...columnSizeVars,
-        minHeight: totalSize + 'px',
+        minHeight: isFirefox ? undefined : totalSize + 'px',
         width: !defaultColumns
           ? table.getCenterTotalSize() + 'px'
           : wrap
@@ -61,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ? width - 12 + 'px'
                 : defaultColumns
                   ? tableRowSize + 'px'
-                  : table.getTotalSize() + 'px',
+                  : '100%',
             minWidth: '100%',
             background: 'var(--o2-log-table-header-bg)',
           }"
@@ -71,11 +79,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="tw:flex tw:items-center"
         >
           <th
-            v-for="header in headerGroup.headers"
+            v-for="(header, headerIndex) in headerGroup.headers"
             :key="header.id"
             :id="header.id"
             class="tw:px-2 tw:relative table-head tw:text-ellipsis"
-            :style="{ width: `calc(var(--header-${header?.id}-size) * 1px)` }"
+            :style="
+              !defaultColumns && headerIndex === headerGroup.headers.length - 1
+                ? { flex: '1 1 auto', minWidth: `calc(var(--header-${header?.id}-size) * 1px)`, width: 'auto', overflow: 'hidden' }
+                : { width: `calc(var(--header-${header?.id}-size) * 1px)`, minWidth: `calc(var(--header-${header?.id}-size) * 1px)`, flexShrink: '0' }
+            "
             :data-test="`log-search-result-table-th-${header.id}`"
           >
             <div
@@ -112,31 +124,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :render="header.column.columnDef.header"
                 :props="header.getContext()"
               />
+            </div>
 
-              <div
-                :data-test="`log-add-data-from-column-${header.column.columnDef.header}`"
-                class="tw:invisible tw:items-center tw:absolute tw:right-2 tw:top-0 tw:px-2 column-actions"
-                :class="
-                  store.state.theme === 'dark' ? 'field_overlay_dark' : ''
-                "
-                v-if="
+            <div
+              v-if="
+                !header.isPlaceholder &&
+                (
                   (header.column.columnDef.meta as any).closable ||
                   (header.column.columnDef.meta as any).showWrap
+                )
+              "
+              :data-test="`log-add-data-from-column-${header.column.columnDef.header}`"
+              class="tw:invisible tw:flex tw:items-center tw:absolute tw:right-2 tw:top-0 tw:px-2 column-actions"
+            >
+              <OIcon
+                v-if="(header.column.columnDef.meta as any).closable"
+                :data-test="`logs-search-result-table-th-remove-${header.column.columnDef.header}-btn`"
+                name="close"
+                class="tw:m-0 tw:mt-[0.125rem]! close-icon tw:cursor-pointer"
+                :class="
+                  store.state.theme === 'dark' ? 'text-white' : 'tw:text-gray-700'
                 "
-              >
-                <OIcon
-                  v-if="(header.column.columnDef.meta as any).closable"
-                  :data-test="`logs-search-result-table-th-remove-${header.column.columnDef.header}-btn`"
-                  name="close"
-                  class="tw:m-0 close-icon tw:cursor-pointer"
-                  :class="
-                    store.state.theme === 'dark' ? 'text-white' : 'tw:text-gray-400'
-                  "
-                  :title="t('common.close')"
-                  size="sm"
-                  @click="closeColumn(header.column.columnDef)"
-                 />
-              </div>
+                :title="t('common.close')"
+                size="sm"
+                @click.stop="closeColumn(header.column.columnDef)"
+              />
             </div>
           </th>
         </vue-draggable>
@@ -203,9 +215,11 @@ class="tw:mr-1" />
         </tr>
       </thead>
 
-      <!-- Skeleton loading body — replaces the old spinner row -->
+      <!-- Skeleton loading body — shown ONLY on first load (no rows yet).
+        Once rows exist they stay visible while the top progress bar signals an
+        in-progress refresh (e.g. streaming_aggs replacing values). -->
       <tbody
-        v-if="loading"
+        v-if="loading && tableRows.length === 0"
         data-test="logs-table-skeleton-body"
         aria-busy="true"
         aria-label="Loading logs"
@@ -248,6 +262,7 @@ class="tw:mr-1" />
         data-test="logs-search-result-table-body"
         ref="tableBodyRef"
         class="tw:relative"
+        :style="isFirefox ? { minHeight: totalSize + 'px' } : {}"
       >
         <template v-for="virtualRow in virtualRows" :key="virtualRow.id">
           <tr
@@ -257,8 +272,9 @@ class="tw:mr-1" />
               ]
             }`"
             :style="{
-              transform: `translateY(${virtualRow.start + (isFirefox ? baseOffset : 0)}px)`,
+              transform: `translateY(${virtualRow.start}px)`,
               minWidth: '100%',
+              width: (!defaultColumns && !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow) ? '100%' : undefined,
             }"
             :data-index="virtualRow.index"
             :data-expanded="
@@ -351,16 +367,32 @@ class="tw:mr-1" />
                 "
                 class="tw:py-none tw:px-2 tw:flex tw:items-center tw:justify-start tw:relative table-cell"
                 :class="[...tableCellClass, { 'tw:pl-4': cellIndex === 0 }]"
-                :style="{
-                  width:
-                    cell.column.columnDef.id !== 'source' ||
-                    cell.column.columnDef.enableResizing
-                      ? `calc(var(--col-${cell.column.columnDef.id}-size) * 1px)`
-                      : wrap
-                        ? width - 260 - 12 + 'px'
-                        : 'auto',
-                  height: wrap ? '100%' : '20px',
-                }"
+                :style="
+                  !defaultColumns && cellIndex === formattedRows[virtualRow.index].getVisibleCells().length - 1
+                    ? {
+                        flex: '1 1 auto',
+                        minWidth: `calc(var(--col-${cell.column.columnDef.id}-size) * 1px)`,
+                        width: 'auto',
+                        overflow: 'hidden',
+                        height: wrap ? '100%' : '20px',
+                      }
+                    : {
+                        width:
+                          cell.column.columnDef.id !== 'source' ||
+                          cell.column.columnDef.enableResizing
+                            ? `calc(var(--col-${cell.column.columnDef.id}-size) * 1px)`
+                            : wrap
+                              ? width - 260 - 12 + 'px'
+                              : 'auto',
+                        minWidth:
+                          cell.column.columnDef.id !== 'source' ||
+                          cell.column.columnDef.enableResizing
+                            ? `calc(var(--col-${cell.column.columnDef.id}-size) * 1px)`
+                            : undefined,
+                        flexShrink: '0',
+                        height: wrap ? '100%' : '20px',
+                      }
+                "
                 @mouseover="handleCellMouseOver(cell)"
                 @mouseleave="handleCellMouseLeave()"
               >
@@ -415,16 +447,16 @@ class="tw:mr-1" />
                 <span v-else>
                   {{ cell.renderValue() }}
                 </span>
-                <O2AIContextAddBtn
-                  v-if="
-                    cell.column.columnDef.id ===
-                    store.state.zoConfig.timestamp_column
-                  "
-                  class="tw:absolute tw:right-0 tw:top-1/2 tw:transform tw:invisible tw:-translate-y-1/2 tw:-translate-x-1/2 ai-btn"
-                  @send-to-ai-chat="
-                    sendToAiChat(JSON.stringify(cell.row.original), true)
-                  "
-                />
+                <div
+                  v-if="cell.column.columnDef.id === store.state.zoConfig.timestamp_column"
+                  class="tw:absolute tw:right-0 tw:top-1/2 tw:-translate-y-1/2 tw:invisible"
+                >
+                  <O2AIContextAddBtn
+                    class="tw:right-0 ai-btn"
+                    @send-to-ai-chat="sendToAiChat(JSON.stringify(cell.row.original), true)"
+                    :size="'2px'"
+                  />
+                </div>
               </td>
             </template>
           </tr>
@@ -466,6 +498,7 @@ import { useTextHighlighter } from "@/composables/useTextHighlighter";
 import { useLogsHighlighter } from "@/composables/useLogsHighlighter";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import LoadingProgress from "@/components/common/LoadingProgress.vue";
 
 interface StreamField {
   name: string;
@@ -492,6 +525,10 @@ const props = defineProps({
   loading: {
     type: Boolean,
     default: false,
+  },
+  loadingProgressPercentage: {
+    type: Number,
+    default: 0,
   },
   errMsg: {
     type: String,
@@ -823,6 +860,9 @@ const skelTdStyle = (header: any, c: number): Record<string, string> => {
   const isStretchSource = colId === 'source' && !header.column.getCanResize();
   if (isStretchSource) return { flex: '1 1 0', minWidth: '0' };
   const w = `calc(var(--col-${colId}-size) * 1px)`;
+  if (!props.defaultColumns && c === headers.value.length - 1) {
+    return { flex: '1 1 auto', minWidth: w, width: 'auto', overflow: 'hidden' };
+  }
   return { width: w, minWidth: w, flexShrink: '0' };
 };
 
@@ -845,8 +885,6 @@ const isFirefox = computed(() => {
     typeof document !== "undefined" && CSS.supports("-moz-appearance", "none")
   );
 });
-
-const baseOffset = isFirefox.value ? 20 : 0;
 
 // Cache for expanded row heights
 const expandedRowHeights = ref<{ [key: number]: number }>({});

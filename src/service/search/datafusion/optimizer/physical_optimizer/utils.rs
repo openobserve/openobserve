@@ -22,6 +22,7 @@ use datafusion::{
     logical_expr::Operator,
     physical_expr::{
         PhysicalExpr,
+        aggregate::AggregateFunctionExpr,
         expressions::{Column, Literal},
     },
     physical_plan::{
@@ -37,7 +38,7 @@ pub fn is_aggregate_exec(plan: &Arc<dyn ExecutionPlan>) -> bool {
 }
 
 pub fn extract_string_literal(expr: &Arc<dyn PhysicalExpr>) -> Result<String> {
-    if let Some(literal) = expr.as_any().downcast_ref::<Literal>() {
+    if let Some(literal) = expr.downcast_ref::<Literal>() {
         match literal.value() {
             ScalarValue::Utf8(Some(s)) => Ok(s.clone()),
             ScalarValue::Utf8View(Some(s)) => Ok(s.to_string()),
@@ -55,7 +56,7 @@ pub fn extract_string_literal(expr: &Arc<dyn PhysicalExpr>) -> Result<String> {
 }
 
 pub fn extract_column(expr: &Arc<dyn PhysicalExpr>) -> Result<Column> {
-    if let Some(column) = expr.as_any().downcast_ref::<Column>() {
+    if let Some(column) = expr.downcast_ref::<Column>() {
         Ok(column.clone())
     } else {
         Err(DataFusionError::Internal(
@@ -65,7 +66,7 @@ pub fn extract_column(expr: &Arc<dyn PhysicalExpr>) -> Result<Column> {
 }
 
 pub fn extract_int64_literal(expr: &Arc<dyn PhysicalExpr>) -> Result<i64> {
-    if let Some(literal) = expr.as_any().downcast_ref::<Literal>() {
+    if let Some(literal) = expr.downcast_ref::<Literal>() {
         match literal.value() {
             ScalarValue::Int64(Some(s)) => Ok(*s),
             _ => Err(DataFusionError::Internal(format!(
@@ -99,9 +100,9 @@ fn disjunction_opt(
 }
 
 pub fn is_column(expr: &Arc<dyn PhysicalExpr>) -> bool {
-    if expr.as_any().downcast_ref::<Column>().is_some() {
+    if expr.downcast_ref::<Column>().is_some() {
         true
-    } else if let Some(expr) = expr.as_any().downcast_ref::<CastExpr>() {
+    } else if let Some(expr) = expr.downcast_ref::<CastExpr>() {
         is_column(expr.expr())
     } else {
         false
@@ -109,17 +110,30 @@ pub fn is_column(expr: &Arc<dyn PhysicalExpr>) -> bool {
 }
 
 pub fn get_column_name(expr: &Arc<dyn PhysicalExpr>) -> &str {
-    if let Some(expr) = expr.as_any().downcast_ref::<Column>() {
+    if let Some(expr) = expr.downcast_ref::<Column>() {
         expr.name()
-    } else if let Some(expr) = expr.as_any().downcast_ref::<CastExpr>() {
+    } else if let Some(expr) = expr.downcast_ref::<CastExpr>() {
         get_column_name(expr.expr())
     } else {
         UNKNOWN_NAME
     }
 }
 
+pub fn is_count_rows_aggregate(expr: &AggregateFunctionExpr) -> bool {
+    if expr.name() == "count(Int64(1))" {
+        return true;
+    }
+
+    if !expr.fun().name().eq_ignore_ascii_case("count") || expr.is_distinct() {
+        return false;
+    }
+
+    let args = expr.expressions();
+    args.len() == 1 && is_column(&args[0]) && get_column_name(&args[0]) == TIMESTAMP_COL_NAME
+}
+
 pub fn is_value(expr: &Arc<dyn PhysicalExpr>) -> bool {
-    expr.as_any().downcast_ref::<Literal>().is_some()
+    expr.downcast_ref::<Literal>().is_some()
 }
 
 pub fn is_only_timestamp_filter(expr: &[&Arc<dyn PhysicalExpr>]) -> bool {
@@ -127,7 +141,7 @@ pub fn is_only_timestamp_filter(expr: &[&Arc<dyn PhysicalExpr>]) -> bool {
 }
 
 fn is_timestamp_filter(expr: &Arc<dyn PhysicalExpr>) -> bool {
-    if let Some(expr) = expr.as_any().downcast_ref::<BinaryExpr>() {
+    if let Some(expr) = expr.downcast_ref::<BinaryExpr>() {
         match expr.op() {
             Operator::Gt | Operator::GtEq | Operator::Lt | Operator::LtEq => {
                 let column = if is_value(expr.left()) && is_column(expr.right()) {
@@ -272,9 +286,7 @@ mod tests {
     fn test_disjunction_empty_returns_true_literal() {
         let result = disjunction(vec![]);
         // empty → lit(true)
-        let lit = result
-            .as_any()
-            .downcast_ref::<datafusion::physical_plan::expressions::Literal>();
+        let lit = result.downcast_ref::<datafusion::physical_plan::expressions::Literal>();
         assert!(lit.is_some());
     }
 

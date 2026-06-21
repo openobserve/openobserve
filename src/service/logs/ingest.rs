@@ -1191,6 +1191,7 @@ mod tests {
             value: Some(AnyValue {
                 value: Some(Value::StringValue("my_val".to_string())),
             }),
+            ..Default::default()
         };
         let result = get_tuple_from_open_telemetry_key_value(kv);
         assert_eq!(result, Some(("my_key".to_string(), "my_val".to_string())));
@@ -1204,6 +1205,7 @@ mod tests {
             value: Some(AnyValue {
                 value: Some(Value::IntValue(42)),
             }),
+            ..Default::default()
         };
         let result = get_tuple_from_open_telemetry_key_value(kv);
         assert_eq!(result, None);
@@ -1215,6 +1217,7 @@ mod tests {
         let kv = KeyValue {
             key: "my_key".to_string(),
             value: None,
+            ..Default::default()
         };
         let result = get_tuple_from_open_telemetry_key_value(kv);
         assert_eq!(result, None);

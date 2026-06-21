@@ -44,7 +44,7 @@ const NUMERIC_TYPES = new Set(["Int64", "Float64", "UInt64", "Int32", "UInt32"])
  * Priority: interesting (key) fields → FTS fields → other fields.
  * Uses correct OpenObserve query syntax:
  *   - FTS fields  → match_all('term'), match_all('term*'), match_all('*term')
- *   - string cols → str_match(field, 'val'), str_match_ignore_case, fuzzy_match
+ *   - string cols → str_match(field, 'val'), str_match_ignore_case
  *   - numeric     → field=value / WHERE field >= value
  */
 export function useQueryPlaceholder(
@@ -177,24 +177,10 @@ export function useQueryPlaceholder(
     // 6. match_all postfix variant
     result.push(`match_all('*${term}')`);
 
-    // 7. str_match combined with match_all prefix
-    if (sf0) {
-      result.push(`str_match(${sf0.name}, '${strVal(sf0)}') AND match_all('${term}*')`);
-    } else if (kf0) {
-      result.push(`${fieldExpr(kf0)} AND match_all('${term}*')`);
-    }
-
-    // 7a. standalone str_match — no match_all, shown on all pages including traces
+    // 7. standalone str_match — no match_all, shown on all pages including traces
     if (sf0) result.push(`str_match(${sf0.name}, '${strVal(sf0)}')`);
 
-    // 8. fuzzy_match combined with raw filter
-    if (sf0 && kf0 && sf0.name !== kf0.name) {
-      result.push(`${fieldExpr(kf0)} AND fuzzy_match(${sf0.name}, '${strVal(sf0)}', 1)`);
-    } else if (sf0) {
-      result.push(`fuzzy_match(${sf0.name}, '${strVal(sf0)}', 1)`);
-    }
-
-    // 9. Raw filter OR match_all postfix
+    // 8. Raw filter OR match_all postfix
     if (kf0) result.push(`${fieldExpr(kf0)} OR match_all('*${term}')`);
 
     const filtered = options.excludeMatchAll

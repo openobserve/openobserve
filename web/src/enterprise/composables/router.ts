@@ -21,8 +21,6 @@ import BillingGroup from "@/enterprise/components/billings/BillingGroup.vue";
 import AzureMarketplaceSetup from "@/views/AzureMarketplaceSetup.vue";
 import AwsMarketplaceSetup from "@/views/AwsMarketplaceSetup.vue";
 import OnlineEvals from "@/enterprise/components/OnlineEvals.vue";
-import EvalTemplateList from "@/enterprise/components/EvalTemplateList.vue";
-import EvalTemplateEditor from "@/enterprise/components/EvalTemplateEditor.vue";
 import { routeGuard } from "@/utils/zincutils";
 
 const AIObservabilityShell = () =>
@@ -31,6 +29,10 @@ const AILLMInsightsPage = () =>
   import("@/enterprise/views/AIObservability/LLMInsightsPage.vue");
 const AISessionsPage = () =>
   import("@/enterprise/views/AIObservability/SessionsPage.vue");
+// Reused for the AI/LLM session drill-down so it lives under /ai (keeps the
+// AI menu item active) instead of the Traces session-details route.
+const SessionDetails = () =>
+  import("@/plugins/traces/SessionDetails.vue");
 
 const useEnvRoutes = () => {
   // Note: AWS Marketplace registration is handled by backend at POST /api/aws-marketplace/register
@@ -101,6 +103,17 @@ const useEnvRoutes = () => {
       ],
     },
     {
+      // AI/LLM session drill-down — under /ai so the AI menu stays active
+      // (reuses the Traces SessionDetails view).
+      path: "ai/session-details",
+      name: "aiSessionDetails",
+      component: SessionDetails,
+      meta: { title: "Session Details", keepAlive: false },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
       // Legacy URL — keep saved/bookmarked links working
       path: "online-evals",
       redirect: { name: "aiEvaluations" },
@@ -137,42 +150,7 @@ const useEnvRoutes = () => {
     },
   ];
 
-  // Child routes to merge under pipeline/pipelines path
-  const pipelineChildren = [
-    {
-      path: "online-evals",
-      redirect: { name: "aiEvaluations" },
-    },
-    {
-      path: "eval-templates",
-      name: "evalTemplates",
-      component: EvalTemplateList,
-      meta: {
-        title: "Evaluation Templates",
-        keepAlive: false,
-      },
-    },
-    {
-      path: "eval-templates/add",
-      name: "evalTemplatesAdd",
-      component: EvalTemplateEditor,
-      meta: {
-        title: "Create Evaluation Template",
-        keepAlive: false,
-      },
-    },
-    {
-      path: "eval-templates/:id/edit",
-      name: "evalTemplatesEdit",
-      component: EvalTemplateEditor,
-      meta: {
-        title: "Edit Evaluation Template",
-        keepAlive: false,
-      },
-    },
-  ];
-
-  return { parentRoutes, homeChildRoutes, pipelineChildren };
+  return { parentRoutes, homeChildRoutes };
 };
 
 export default useEnvRoutes;

@@ -419,13 +419,138 @@ describe("MainLayout Methods and Functions", () => {
       };
 
       await getOrganizationSettings();
-      expect(mockStore.dispatch).toHaveBeenCalledWith("setOrganizationSettings", 
+      expect(mockStore.dispatch).toHaveBeenCalledWith("setOrganizationSettings",
         expect.objectContaining({
           scrape_interval: 30,
-          span_id_field_name: "custom_span_id", 
+          span_id_field_name: "custom_span_id",
           trace_id_field_name: "custom_trace_id"
         })
       );
+    });
+
+    describe("getOrganizationSettings — usage_stream_enabled", () => {
+      it("defaults usage_stream_enabled to false when field is absent from API response", async () => {
+        // Arrange
+        const getOrganizationSettings = async () => {
+          const apiData = {
+            scrape_interval: 15,
+            span_id_field_name: "spanId",
+            trace_id_field_name: "traceId",
+            // usage_stream_enabled intentionally absent
+          };
+
+          const settings = {
+            scrape_interval: apiData?.scrape_interval ?? 15,
+            span_id_field_name: apiData?.span_id_field_name ?? "spanId",
+            trace_id_field_name: apiData?.trace_id_field_name ?? "traceId",
+            usage_stream_enabled: apiData?.usage_stream_enabled ?? false,
+          };
+
+          mockStore.dispatch("setOrganizationSettings", settings);
+          return settings;
+        };
+
+        // Act
+        const result = await getOrganizationSettings();
+
+        // Assert
+        expect(result.usage_stream_enabled).toBe(false);
+        expect(mockStore.dispatch).toHaveBeenCalledWith(
+          "setOrganizationSettings",
+          expect.objectContaining({ usage_stream_enabled: false }),
+        );
+      });
+
+      it("passes through usage_stream_enabled: true from API response", async () => {
+        // Arrange
+        const getOrganizationSettings = async () => {
+          const apiData = {
+            scrape_interval: 15,
+            span_id_field_name: "spanId",
+            trace_id_field_name: "traceId",
+            usage_stream_enabled: true,
+          };
+
+          const settings = {
+            scrape_interval: apiData?.scrape_interval ?? 15,
+            span_id_field_name: apiData?.span_id_field_name ?? "spanId",
+            trace_id_field_name: apiData?.trace_id_field_name ?? "traceId",
+            usage_stream_enabled: apiData?.usage_stream_enabled ?? false,
+          };
+
+          mockStore.dispatch("setOrganizationSettings", settings);
+          return settings;
+        };
+
+        // Act
+        const result = await getOrganizationSettings();
+
+        // Assert
+        expect(result.usage_stream_enabled).toBe(true);
+        expect(mockStore.dispatch).toHaveBeenCalledWith(
+          "setOrganizationSettings",
+          expect.objectContaining({ usage_stream_enabled: true }),
+        );
+      });
+
+      it("preserves usage_stream_enabled: false from API response without overriding via default", async () => {
+        // Arrange — API explicitly returns false; nullish coalescing must NOT override it
+        const getOrganizationSettings = async () => {
+          const apiData = {
+            scrape_interval: 15,
+            span_id_field_name: "spanId",
+            trace_id_field_name: "traceId",
+            usage_stream_enabled: false,
+          };
+
+          const settings = {
+            scrape_interval: apiData?.scrape_interval ?? 15,
+            span_id_field_name: apiData?.span_id_field_name ?? "spanId",
+            trace_id_field_name: apiData?.trace_id_field_name ?? "traceId",
+            usage_stream_enabled: apiData?.usage_stream_enabled ?? false,
+          };
+
+          mockStore.dispatch("setOrganizationSettings", settings);
+          return settings;
+        };
+
+        // Act
+        const result = await getOrganizationSettings();
+
+        // Assert — explicitly provided false must not be replaced by default true
+        expect(result.usage_stream_enabled).toBe(false);
+        expect(mockStore.dispatch).toHaveBeenCalledWith(
+          "setOrganizationSettings",
+          expect.objectContaining({ usage_stream_enabled: false }),
+        );
+      });
+
+      it("falls back to usage_stream_enabled: false when API response is null/undefined", async () => {
+        // Arrange — simulate absent/null org settings response
+        const getOrganizationSettings = async () => {
+          const apiData: any = null;
+
+          const settings = {
+            scrape_interval: apiData?.scrape_interval ?? 15,
+            span_id_field_name: apiData?.span_id_field_name ?? "spanId",
+            trace_id_field_name: apiData?.trace_id_field_name ?? "traceId",
+            usage_stream_enabled: apiData?.usage_stream_enabled ?? false,
+          };
+
+          mockStore.dispatch("setOrganizationSettings", settings);
+          return settings;
+        };
+
+        // Act
+        const result = await getOrganizationSettings();
+
+        // Assert
+        expect(result.usage_stream_enabled).toBe(false);
+        expect(mockStore.dispatch).toHaveBeenCalledWith(
+          "setOrganizationSettings",
+          expect.objectContaining({ usage_stream_enabled: false }),
+        );
+      });
     });
   });
 

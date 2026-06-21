@@ -422,7 +422,10 @@
     "menuGroupInspect": "Inspectez",
     "validSql": "SQL valide",
     "invalidSql": "Requête non valide",
-    "menuGroupExplain": "Expliquez"
+    "menuGroupExplain": "Expliquez",
+    "fieldValuesEmpty": "Aucune valeur n'a été trouvée.",
+    "fieldValuesEmptyHint": "Essayez une plage de temps plus large pour voir les valeurs.",
+    "selectLogsStreamFirst": "Sélectionnez d'abord Logs stream"
   },
   "menu": {
     "home": "Accueil",
@@ -845,7 +848,10 @@
     "feature_correlation_management": "Gestion des corrélations",
     "feature_log_patterns": "Modèles de journaux",
     "environment_type": "Type d'environnement",
-    "license_allows_unlimited_ingestion": "La licence actuelle permet une ingestion de données illimitée."
+    "license_allows_unlimited_ingestion": "La licence actuelle permet une ingestion de données illimitée.",
+    "refresh_license_limits": "Actualiser les limites de licence",
+    "license_refresh_success": "Actualisation de la limite de licence déclenchée avec succès",
+    "failed_to_refresh_license": "Impossible d'actualiser les limites de licence"
   },
   "login": {
     "userid": "ID utilisateur",
@@ -3442,7 +3448,9 @@
     "import_this_pattern": "Importer ce modèle",
     "patterns_loaded": "Motif (s) {count} chargé (s)",
     "failed_to_load": "Impossible de charger les modèles",
-    "no_patterns_selected": "Veuillez sélectionner au moins un motif"
+    "no_patterns_selected": "Veuillez sélectionner au moins un motif",
+    "name_required": "* Le nom est obligatoire",
+    "pattern_required": "* Le motif est obligatoire"
   },
   "search_history": {
     "title": "Historique des recherches",
@@ -4435,6 +4443,14 @@
     "noQueryApplied": {
       "title": "Exécutez une requête pour voir les journaux",
       "description": "Ajustez vos filtres et cliquez sur « Exécuter la requête » pour charger les événements pour ce flux."
+    },
+    "noServiceGraph": {
+      "title": "Aucune donnée graphique de service",
+      "description": "Essayez d'interroger une plage de temps plus longue ou assurez-vous que vos services émettent des métriques d'intervalle."
+    },
+    "noServicesCatalog": {
+      "title": "Aucun service n'a été trouvé",
+      "description": "Aucun service n'a été détecté au cours de la période sélectionnée. Essayez une gamme plus large ou un flux différent."
     }
   },
   "onlineEvals": {

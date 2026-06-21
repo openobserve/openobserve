@@ -683,6 +683,16 @@ export class CrossLinkPage {
         return this.page.locator(this.crossLinkDeleteBtn(idx));
     }
 
+    // ── Locator getters for assertions in spec files ──────────────────────────
+
+    getCrossLinkDialogLocator() {
+        return this.page.locator(this.crossLinkDialog);
+    }
+
+    getCrossLinkSaveBtnLocator() {
+        return this.page.locator(this.crossLinkSaveBtn);
+    }
+
     /**
      * Click the first non-empty data cell in the rendered dashboard table panel.
      * Uses the `dashboard-data-row-cell` data-test attribute emitted by

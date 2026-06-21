@@ -17,7 +17,7 @@ keywords = [
 license = "AGPL-3.0"
 name = "openobserve"
 repository = "https://github.com/openobserve/openobserve/"
-version = "0.91.0"
+version = "0.92.0"
 publish = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -36,7 +36,6 @@ profiling = [
     "dep:jemalloc_pprof",
     "dep:pprof",
 ]
-pyroscope = ["dep:pyroscope", "dep:pyroscope_pprofrs"]
 tokio-console = ["dep:console-subscriber"]
 
 [profile.release]
@@ -86,7 +85,6 @@ async-recursion.workspace = true
 aws-sdk-sns.workspace = true
 base64.workspace = true
 bitflags = "2.11"
-bitvec.workspace = true
 blake3 = { version = "1.8", features = ["rayon"] }
 bytes.workspace = true
 byteorder.workspace = true
@@ -137,8 +135,6 @@ prost.workspace = true
 prost-wkt-types.workspace = true
 proto.workspace = true
 prettytable-rs = "0.10.0"
-pyroscope = { version = "1.0", optional = true }
-pyroscope_pprofrs = { version = "0.2.8", optional = true }
 rand.workspace = true
 rayon.workspace = true
 regex.workspace = true
@@ -311,7 +307,6 @@ aws-sdk-sns = { version = "1.97", default-features = false, features = [
     "rt-tokio",
 ] }
 base64 = "0.22"
-bitvec = "1.0"
 bytes = "1.11"
 byteorder = "1.5"
 chromiumoxide = { git = "https://github.com/mattsse/chromiumoxide", features = [
@@ -324,10 +319,10 @@ cityhasher = { version = "0.1", default-features = false }
 collapse = "0.1.2"
 cron = "0.15"
 dashmap = { version = "6.1", features = ["serde"] }
-datafusion = "53"
-datafusion-proto = "53"
-datafusion-functions-aggregate-common = "53"
-datafusion-functions-json = "0.53"
+datafusion = "54"
+datafusion-proto = "54"
+datafusion-functions-aggregate-common = "54"
+datafusion-functions-json = "0.54"
 expect-test = "1.4"
 arrow = { version = "58", features = ["ipc_compression", "prettyprint"] }
 arrow-flight = "58"
@@ -335,7 +330,7 @@ arrow-json = "58"
 arrow-schema = { version = "58", features = ["serde"] }
 parquet = { version = "58", features = ["arrow", "async", "object_store"] }
 object_store = { version = "0.13.2", features = ["aws", "azure", "gcp"] }
-sqlparser = { version = "0.61", features = ["serde", "visitor"] }
+sqlparser = { version = "0.62", features = ["serde", "visitor"] }
 dotenv_config = "0.2"
 dotenvy = "0.15"
 env_logger = "0.11"
@@ -362,15 +357,15 @@ md5 = "0.8.0"
 memchr = "2.7"
 murmur3 = "0.5"
 ordered-float = { version = "5.1.0", features = ["serde"] }
-opentelemetry = "0.31"
-opentelemetry_sdk = { version = "0.31", features = [
+opentelemetry = "0.32"
+opentelemetry_sdk = { version = "0.32", features = [
     "experimental_trace_batch_span_processor_with_async_runtime",
     "rt-tokio",
     "trace",
     "metrics",
     "spec_unstable_metrics_views",
 ] }
-opentelemetry-otlp = { version = "0.31", features = [
+opentelemetry-otlp = { version = "0.32", features = [
     "http-proto",
     "serialize",
     "serde",
@@ -378,7 +373,7 @@ opentelemetry-otlp = { version = "0.31", features = [
     "reqwest-client",
     "grpc-tonic",
 ] }
-opentelemetry-proto = { version = "0.31", features = [
+opentelemetry-proto = { version = "0.32", features = [
     "gen-tonic",
     "with-serde",
     "logs",
@@ -394,12 +389,15 @@ rand = "0.10"
 rayon = "1.10"
 regex = "1.11"
 regex-syntax = "0.8"
-reqwest = { version = "0.12", default-features = false, features = [
-    "rustls-tls-native-roots",
+reqwest = { version = "0.13", default-features = false, features = [
+    "rustls",
     "stream",
     "gzip",
     "brotli",
     "deflate",
+    "json",
+    "query",
+    "form",
 ] }
 roaring = "0.11.3"
 rquickjs = { version = "0.11.0", features = ["array-buffer", "classes"] }
@@ -458,7 +456,7 @@ tonic-prost = "0.14"
 tracing = "0.1.44"
 tracing-appender = "0.2.4"
 tracing-log = "0.2"
-tracing-opentelemetry = "0.32"
+tracing-opentelemetry = "0.33"
 tracing-subscriber = { version = "0.3.22", features = [
     "env-filter",
     "json",
@@ -481,5 +479,39 @@ zip = "8.0"
 zstd = "0.13"
 
 [patch.crates-io]
+datafusion = { git = "https://github.com/openobserve/datafusion", branch = "branch-54-modify" }
+datafusion-catalog = { git = "https://github.com/openobserve/datafusion", branch = "branch-54-modify" }
+datafusion-catalog-listing = { git = "https://github.com/openobserve/datafusion", branch = "branch-54-modify" }
+datafusion-common = { git = "https://github.com/openobserve/datafusion", branch = "branch-54-modify" }
+datafusion-common-runtime = { git = "https://github.com/openobserve/datafusion", branch = "branch-54-modify" }
+datafusion-datasource = { git = "https://github.com/openobserve/datafusion", branch = "branch-54-modify" }
+datafusion-datasource-arrow = { git = "https://github.com/openobserve/datafusion", branch = "branch-54-modify" }
+datafusion-datasource-csv = { git = "https://github.com/openobserve/datafusion", branch = "branch-54-modify" }
+datafusion-datasource-json = { git = "https://github.com/openobserve/datafusion", branch = "branch-54-modify" }
+datafusion-datasource-parquet = { git = "https://github.com/openobserve/datafusion", branch = "branch-54-modify" }
+datafusion-doc = { git = "https://github.com/openobserve/datafusion", branch = "branch-54-modify" }
+datafusion-execution = { git = "https://github.com/openobserve/datafusion", branch = "branch-54-modify" }
+datafusion-expr = { git = "https://github.com/openobserve/datafusion", branch = "branch-54-modify" }
+datafusion-expr-common = { git = "https://github.com/openobserve/datafusion", branch = "branch-54-modify" }
+datafusion-functions = { git = "https://github.com/openobserve/datafusion", branch = "branch-54-modify" }
+datafusion-functions-aggregate = { git = "https://github.com/openobserve/datafusion", branch = "branch-54-modify" }
+datafusion-functions-aggregate-common = { git = "https://github.com/openobserve/datafusion", branch = "branch-54-modify" }
+datafusion-functions-nested = { git = "https://github.com/openobserve/datafusion", branch = "branch-54-modify" }
+datafusion-functions-table = { git = "https://github.com/openobserve/datafusion", branch = "branch-54-modify" }
+datafusion-functions-window = { git = "https://github.com/openobserve/datafusion", branch = "branch-54-modify" }
+datafusion-functions-window-common = { git = "https://github.com/openobserve/datafusion", branch = "branch-54-modify" }
+datafusion-macros = { git = "https://github.com/openobserve/datafusion", branch = "branch-54-modify" }
+datafusion-optimizer = { git = "https://github.com/openobserve/datafusion", branch = "branch-54-modify" }
+datafusion-physical-expr = { git = "https://github.com/openobserve/datafusion", branch = "branch-54-modify" }
+datafusion-physical-expr-adapter = { git = "https://github.com/openobserve/datafusion", branch = "branch-54-modify" }
+datafusion-physical-expr-common = { git = "https://github.com/openobserve/datafusion", branch = "branch-54-modify" }
+datafusion-physical-optimizer = { git = "https://github.com/openobserve/datafusion", branch = "branch-54-modify" }
+datafusion-physical-plan = { git = "https://github.com/openobserve/datafusion", branch = "branch-54-modify" }
+datafusion-proto = { git = "https://github.com/openobserve/datafusion", branch = "branch-54-modify" }
+datafusion-proto-common = { git = "https://github.com/openobserve/datafusion", branch = "branch-54-modify" }
+datafusion-pruning = { git = "https://github.com/openobserve/datafusion", branch = "branch-54-modify" }
+datafusion-session = { git = "https://github.com/openobserve/datafusion", branch = "branch-54-modify" }
+datafusion-sql = { git = "https://github.com/openobserve/datafusion", branch = "branch-54-modify" }
 object_store = { git = "https://github.com/openobserve/arrow-rs-object-store", branch = "openobserve-v0.13.2" }
 proc-macro-error2 = { git = "https://github.com/hengfeiyang/proc-macro-error-2", branch = "main" }
+tantivy = { git = "https://github.com/openobserve/tantivy", branch = "perf/openobserve" }

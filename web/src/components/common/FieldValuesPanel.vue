@@ -91,10 +91,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Scrollable values area -->
     <div class="values-scroll-container">
-      <!-- Loading state (only shown when there are no interim cached results) -->
+      <!-- Loading state (only shown when there are no interim cached results).
+           tw:relative is required: OInnerLoading is `absolute inset-0`, so this
+           wrapper must be its positioning context — otherwise the overlay escapes
+           to the nearest positioned ancestor (.o-field-list__row) and covers the
+           field row, blocking the click that collapses/cancels the request. -->
       <div
         v-show="fieldValues?.isLoading && !displayValues.length"
-        class="tw:pl-3 tw:py-1"
+        class="tw:relative tw:pl-3 tw:py-1"
         style="height: 3.75rem"
       >
         <OInnerLoading
@@ -111,7 +115,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="tw:pl-3 tw:py-1 tw:text-sm tw:text-o2-text-secondary"
         data-test="field-values-panel-no-values-msg"
       >
-        {{ fieldValues?.errMsg || "No values found" }}
+        <template v-if="fieldValues?.errMsg">{{ fieldValues.errMsg }}</template>
+        <template v-else>
+          {{ t("search.fieldValuesEmpty") }}
+          <span class="tw:block tw:text-xs tw:text-o2-text-muted tw:mt-0.5">
+            {{ t("search.fieldValuesEmptyHint") }}
+          </span>
+        </template>
       </div>
 
       <!-- Selected values with no count data available (synthetic fallback) -->
@@ -195,6 +205,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import { useDebounceFn, watchDebounced } from "@vueuse/core";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
@@ -222,6 +233,8 @@ interface Props {
   activeIncludeValues?: string[];
   activeExcludeValues?: string[];
 }
+
+const { t } = useI18n();
 
 const props = withDefaults(defineProps<Props>(), {
   showMultiSelect: true,

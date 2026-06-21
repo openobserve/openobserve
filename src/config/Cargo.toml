@@ -26,7 +26,6 @@ aws-sdk-sns.workspace = true
 axum.workspace = true
 axum-client-ip.workspace = true
 base64.workspace = true
-bitvec.workspace = true
 bytes.workspace = true
 byteorder.workspace = true
 chrono.workspace = true
@@ -66,7 +65,6 @@ rand.workspace = true
 sea-orm.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-segment.workspace = true
 sha256.workspace = true
 sqlparser.workspace = true
 sqlx.workspace = true
@@ -89,11 +87,10 @@ urlencoding.workspace = true
 utoipa.workspace = true
 uuid.workspace = true
 vrl.workspace = true
-roaring.workspace = true
 tonic.workspace = true
 tonic-prost.workspace = true
 tracing-opentelemetry.workspace = true
-vortex = { git = "https://github.com/openobserve/vortex", rev = "13423ca204f81dc1b20ca040da2aeb386220a312", features = [
+vortex = { git = "https://github.com/openobserve/vortex", branch = "0.75.0-fix", features = [
     "tokio",
 ], optional = true }
 

@@ -1,11 +1,31 @@
 // Copyright 2026 OpenObserve Inc.
 
+import {
+  manifestIntegrations,
+  manifestCategories,
+  type ManifestEntry,
+} from "./content/manifest";
+import { resolveAICardLogo, getAICardLogos } from "./content";
+
 export interface AIIntegration {
   slug: string;
   name: string;
   routeName: string;
   docURL: string;
   keywords: string[];
+  /**
+   * Folder slug of the rich card content in o2-datasource
+   * (`datasource-ui-content/<contentSlug>/data-source-ui.md`). Set only on
+   * integrations whose catalog `slug` differs from the content folder name
+   * (e.g. `openai-python` → `"openai"`); defaults to `slug` when omitted.
+   * This is the bridge that lets a manifest entry match this catalog entry.
+   */
+  contentSlug?: string;
+  /** Resolved brand logo URL (from the manifest). Shown in the sidebar + card
+   *  hero; omitted → lettered monogram fallback. */
+  logo?: string;
+  /** Optional resolved dark-mode logo URL; used only in dark mode, else `logo`. */
+  logoDark?: string;
 }
 
 export interface AICategory {
@@ -14,7 +34,12 @@ export interface AICategory {
   integrations: AIIntegration[];
 }
 
-export const aiCategories: AICategory[] = [
+// Static catalog of every AI integration (the long tail of basic stubs plus
+// the ones that have rich content). This is the BASE — the exported
+// `aiCategories` at the bottom of the file merges the o2-datasource manifest on
+// top of this (placing/reordering rich cards). Do not import this directly;
+// import `aiCategories`.
+const realCategories: AICategory[] = [
   {
     slug: "frameworks",
     name: "AI Frameworks & Agents",
@@ -305,6 +330,7 @@ export const aiCategories: AICategory[] = [
         docURL:
           "https://openobserve.ai/docs/integration/ai/providers/anthropic/",
         keywords: ["anthropic", "python", "claude", "model provider"],
+        contentSlug: "anthropic",
       },
       {
         slug: "anthropic-jsts",
@@ -382,6 +408,7 @@ export const aiCategories: AICategory[] = [
         docURL:
           "https://openobserve.ai/docs/integration/ai/providers/google-gemini/",
         keywords: ["google", "gemini", "model provider"],
+        contentSlug: "gemini",
       },
       {
         slug: "groq",
@@ -431,6 +458,7 @@ export const aiCategories: AICategory[] = [
         routeName: "ai-openai-python",
         docURL: "https://openobserve.ai/docs/integration/ai/providers/openai/",
         keywords: ["openai", "python", "gpt", "model provider"],
+        contentSlug: "openai",
       },
       {
         slug: "openai-jsts",
@@ -505,6 +533,7 @@ export const aiCategories: AICategory[] = [
         docURL:
           "https://openobserve.ai/docs/integration/ai/gateways/litellm-proxy/",
         keywords: ["litellm", "proxy", "gateway", "llm"],
+        contentSlug: "litellm",
       },
       {
         slug: "openrouter",
@@ -699,3 +728,117 @@ export const aiCategories: AICategory[] = [
     ],
   },
 ];
+
+// Tab placement is driven by the content repo's manifest
+// (datasource-ui-content/manifest.json). For each manifest entry we build a
+// rich card and place it at the TOP of its declared `category` tab. If the
+// entry matches an existing catalog integration (by content slug) we MOVE it —
+// reusing its route and removing the original — so a card is never duplicated.
+// Entries with no existing match (e.g. CLI agents) become new entries; a
+// `category` with no existing tab becomes a new tab (labelled via the
+// manifest's `categories` block). Adding/moving a card is a content-repo change.
+
+const titleCase = (slug: string): string =>
+  slug
+    .split(/[-_]/)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
+
+// Index existing integrations by their content slug so manifest entries can
+// reuse routes and we can drop the originals (dedupe).
+const existingByContentSlug = new Map<string, AIIntegration>();
+for (const category of realCategories) {
+  for (const integration of category.integrations) {
+    existingByContentSlug.set(
+      integration.contentSlug ?? integration.slug,
+      integration,
+    );
+  }
+}
+
+const toCard = (entry: ManifestEntry): AIIntegration => {
+  const existing = existingByContentSlug.get(entry.slug);
+  const fmLogos = getAICardLogos(entry.slug);
+  return {
+    slug: entry.slug,
+    name: entry.name,
+    routeName: existing?.routeName ?? `ai-${entry.slug}`, // reuse route if it exists
+    docURL: entry.docURL ?? existing?.docURL ?? "",
+    keywords: entry.keywords ?? existing?.keywords ?? [],
+    contentSlug: entry.slug,
+    // Logo precedence: manifest entry → the card's frontmatter logo → a
+    // hardcoded fallback. (Manifest filename → bundled asset URL, or absolute
+    // URL as-is.) `logo_dark`/`logoDark` is the optional dark-mode variant.
+    // Falling back to the frontmatter means a single `logo:` in the md shows in
+    // both the sidebar menu and the card hero — one authoring spot.
+    logo:
+      resolveAICardLogo(entry.slug, entry.logo) ||
+      fmLogos.logo ||
+      existing?.logo,
+    logoDark:
+      resolveAICardLogo(entry.slug, entry.logoDark ?? (entry as any).logo_dark) ||
+      fmLogos.logoDark ||
+      existing?.logoDark,
+  };
+};
+
+// Group manifest cards by category (sorted by order) and remember which
+// existing routes they claimed, so we can remove those originals.
+const cardsByCategory = new Map<string, AIIntegration[]>();
+const claimedRouteNames = new Set<string>();
+for (const entry of [...manifestIntegrations].sort(
+  (a, b) => (a.order ?? 0) - (b.order ?? 0),
+)) {
+  const card = toCard(entry);
+  claimedRouteNames.add(card.routeName);
+  const list = cardsByCategory.get(entry.category) ?? [];
+  list.push(card);
+  cardsByCategory.set(entry.category, list);
+}
+
+const categoryLabel = new Map(
+  manifestCategories.map((c) => [c.slug, c.label] as const),
+);
+
+// Build a tab: manifest cards on top, then the remaining (unclaimed) catalog
+// entries. Returns null if the tab would be empty.
+const buildCategory = (slug: string): AICategory | null => {
+  const cards = cardsByCategory.get(slug) ?? [];
+  const real = realCategories.find((c) => c.slug === slug);
+  if (real) {
+    const remaining = real.integrations.filter(
+      (i) => !claimedRouteNames.has(i.routeName),
+    );
+    return { slug: real.slug, name: real.name, integrations: [...cards, ...remaining] };
+  }
+  if (!cards.length) return null;
+  return {
+    slug,
+    name: categoryLabel.get(slug) ?? titleCase(slug),
+    integrations: cards,
+  };
+};
+
+const ordered: AICategory[] = [];
+const seen = new Set<string>();
+const push = (slug: string) => {
+  if (seen.has(slug)) return;
+  const built = buildCategory(slug);
+  if (built) {
+    ordered.push(built);
+    seen.add(slug);
+  }
+};
+
+// 0. "Popular" is always pinned first when it has cards.
+push("popular");
+// 1. Categories the manifest explicitly declares, in their declared order.
+[...manifestCategories]
+  .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+  .forEach((c) => push(c.slug));
+// 2. Remaining real categories, in their natural order.
+realCategories.forEach((c) => push(c.slug));
+// 3. Any manifest categories with cards that weren't declared or pre-existing.
+[...cardsByCategory.keys()].forEach((slug) => push(slug));
+
+export const aiCategories: AICategory[] = ordered;

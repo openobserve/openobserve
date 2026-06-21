@@ -34,7 +34,11 @@ vi.mock("vuex", async (importOriginal) => {
 });
 
 vi.mock("vue-router", () => ({
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({
+    push: vi.fn(),
+    replace: vi.fn(() => Promise.resolve()),
+  }),
+  useRoute: () => ({ query: {}, fullPath: "/metrics" }),
 }));
 
 const mockShowErrorNotification = vi.fn();
@@ -139,6 +143,9 @@ const createWrapper = (props: Record<string, any> = {}) => {
     props,
     global: {
       stubs: {
+        // ShareButton pulls in the vuex store (store.commit) + short_url; the
+        // metrics page tests don't exercise it (it has its own spec).
+        ShareButton: true,
         // Heavy async / complex children
         PanelEditor: {
           template:

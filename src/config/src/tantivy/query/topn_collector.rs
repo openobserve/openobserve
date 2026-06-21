@@ -140,7 +140,7 @@ impl<K: OrdKey> TopNCollector<K> {
 }
 
 /// Above this many cells (4 bytes each = 32MB) the dense counting array gives way to a hash map.
-const DENSE_GROUP_SPACE_LIMIT: usize = 8_000_000;
+pub const DENSE_GROUP_SPACE_LIMIT: usize = 8_000_000;
 
 /// Per-segment group counters: a flat array indexed by the mixed-radix ordinal when the
 /// product of the fields' dictionary sizes is small (one add per doc, no hashing), otherwise
@@ -416,19 +416,15 @@ impl<K: OrdKey> SegmentCollector for TopNSegmentCollector<K> {
 /// Resolve term ordinals to strings in one sorted forward pass over the term dictionary:
 /// `sorted_ords_to_term_cb` opens each dictionary block once, while `ord_to_term` would
 /// re-scan a block per call.
-fn resolve_ords(col: &StrColumn, mut ords: Vec<u64>) -> HashMap<u64, String> {
+pub fn resolve_ords(col: &StrColumn, mut ords: Vec<u64>) -> HashMap<u64, String> {
     ords.sort_unstable();
     ords.dedup();
     let mut strings: Vec<String> = Vec::with_capacity(ords.len());
     // the callback fires once per input ordinal in order, so `strings[i]` pairs with `ords[i]`;
     // on error only the unresolved tail is dropped (zip stops at the shorter side)
-    if let Err(e) = col
-        .dictionary()
-        .sorted_ords_to_term_cb(ords.iter().copied(), |bytes| {
-            strings.push(String::from_utf8_lossy(bytes).into_owned());
-            Ok(())
-        })
-    {
+    if let Err(e) = col.dictionary().sorted_ords_to_term_cb(&ords, |bytes| {
+        strings.push(String::from_utf8_lossy(bytes).into_owned());
+    }) {
         log::warn!(
             "search->tantivy: topn failed to resolve {} of {} term ordinals: {e}",
             ords.len() - strings.len(),
@@ -472,7 +468,7 @@ fn select_top_k_dense(counts: &[u32], k: usize, ascend: bool) -> Vec<(usize, u32
 /// Keep the top-K entries by count, in place: the K smallest when `ascend`, the K largest
 /// otherwise. Count ties break toward the smaller key, which keeps survivors clustered by
 /// ordinal for cheaper resolution (SQL leaves tie order unspecified).
-fn truncate_top_k<K: Ord>(items: &mut Vec<(K, u32)>, k: usize, ascend: bool) {
+pub fn truncate_top_k<K: Ord>(items: &mut Vec<(K, u32)>, k: usize, ascend: bool) {
     if k == 0 {
         items.clear();
         return;

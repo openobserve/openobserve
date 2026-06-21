@@ -422,7 +422,10 @@
     "menuGroupInspect": "Ispezionare",
     "validSql": "SQL valido",
     "invalidSql": "Query non valida",
-    "menuGroupExplain": "Spiegare"
+    "menuGroupExplain": "Spiegare",
+    "fieldValuesEmpty": "Nessun valore trovato.",
+    "fieldValuesEmptyHint": "Prova un intervallo di tempo più ampio per visualizzare i valori.",
+    "selectLogsStreamFirst": "Seleziona prima Logs stream"
   },
   "menu": {
     "home": "Home",
@@ -845,7 +848,10 @@
     "feature_correlation_management": "Gestione delle correlazioni",
     "feature_log_patterns": "Schemi di registro",
     "environment_type": "Tipo di ambiente",
-    "license_allows_unlimited_ingestion": "La licenza attuale consente l'inserimento illimitato dei dati."
+    "license_allows_unlimited_ingestion": "La licenza attuale consente l'inserimento illimitato dei dati.",
+    "refresh_license_limits": "Aggiorna i limiti delle licenze",
+    "license_refresh_success": "L'aggiornamento del limite di licenza è stato attivato correttamente",
+    "failed_to_refresh_license": "Aggiornamento dei limiti di licenza non riuscito"
   },
   "login": {
     "userid": "ID utente",
@@ -3453,7 +3459,9 @@
     "import_this_pattern": "Importa questo modello",
     "patterns_loaded": "Schema (i) {count} caricato (i)",
     "failed_to_load": "Caricamento dei pattern non riuscito",
-    "no_patterns_selected": "Seleziona almeno un motivo"
+    "no_patterns_selected": "Seleziona almeno un motivo",
+    "name_required": "* Il nome è obbligatorio",
+    "pattern_required": "* Il modello è obbligatorio"
   },
   "search_history": {
     "title": "Cronologia delle ricerche",
@@ -4446,6 +4454,14 @@
     "noQueryApplied": {
       "title": "Esegui una query per visualizzare i log",
       "description": "Modifica i filtri e fai clic su «Esegui query» per caricare gli eventi per questo stream."
+    },
+    "noServiceGraph": {
+      "title": "Nessun dato del grafico del servizio",
+      "description": "Prova a interrogare un intervallo di tempo più lungo o assicurati che i tuoi servizi emettano metriche di intervallo."
+    },
+    "noServicesCatalog": {
+      "title": "Nessun servizio trovato",
+      "description": "Nessun servizio è stato rilevato nell'intervallo di tempo selezionato. Prova con un intervallo più ampio o con uno stream diverso."
     }
   },
   "onlineEvals": {

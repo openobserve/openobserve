@@ -13,9 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+#[cfg(feature = "enterprise")]
+use std::hash::{Hash, Hasher};
 use std::{
     collections::{HashMap, HashSet},
-    hash::{Hash, Hasher},
     sync::LazyLock as Lazy,
 };
 
@@ -65,6 +66,7 @@ struct BatchBuffer {
     last_write: Instant,
 }
 
+#[cfg(feature = "enterprise")]
 fn should_sample_eval_record(record: &json::Value, idx: usize, sampling_rate: f64) -> bool {
     if sampling_rate >= 1.0 {
         return true;
@@ -319,7 +321,9 @@ impl ExecutablePipeline {
         let pipeline_name = self.name.clone();
         // Unique invocation ID to correlate logs across concurrent pipeline runs
         let inv_id = &format!("{:08x}", rand::random::<u32>());
-        log::info!("[Pipeline] {pipeline_name} [inv={inv_id}]: process batch of size {batch_size}");
+        log::debug!(
+            "[Pipeline] {pipeline_name} [inv={inv_id}]: process batch of size {batch_size}"
+        );
         if batch_size == 0 {
             return Ok(HashMap::default());
         }
@@ -427,7 +431,7 @@ impl ExecutablePipeline {
         let pl_name_for_results = pipeline_name.clone();
         let inv_id_for_results = inv_id.clone();
         let result_task = tokio::spawn(async move {
-            log::info!(
+            log::debug!(
                 "[Pipeline] {pl_name_for_results} [inv={inv_id_for_results}]: starts result collecting job"
             );
             let mut results = HashMap::new();
@@ -492,7 +496,7 @@ impl ExecutablePipeline {
         log::debug!("[Pipeline]: All records send into pipeline for processing");
 
         // Wait for all node tasks to complete
-        log::info!(
+        log::debug!(
             "[Pipeline] {pipeline_name} [inv={inv_id}]: waiting for all node tasks to complete"
         );
         if let Err(e) = try_join_all(node_tasks).await {
@@ -500,10 +504,10 @@ impl ExecutablePipeline {
                 "[Pipeline] {pipeline_name} [inv={inv_id}]: node processing jobs failed: {e}"
             );
         }
-        log::info!("[Pipeline] {pipeline_name} [inv={inv_id}]: all node tasks completed");
+        log::debug!("[Pipeline] {pipeline_name} [inv={inv_id}]: all node tasks completed");
 
         // Publish errors if received any
-        log::info!("[Pipeline] {pipeline_name} [inv={inv_id}]: awaiting error task");
+        log::debug!("[Pipeline] {pipeline_name} [inv={inv_id}]: awaiting error task");
         if let Some(pipeline_errors) = error_task.await.map_err(|e| {
             log::error!(
                 "[Pipeline] {pipeline_name} [inv={inv_id}]: error collecting job failed: {e}"
@@ -511,7 +515,7 @@ impl ExecutablePipeline {
             anyhow!("[Pipeline] error collecting job failed: {}", e)
         })? {
             let stream_params = self.get_source_stream_params();
-            log::info!(
+            log::error!(
                 "[Pipeline] id: {}, name: {}, node_errors: {:?}",
                 pipeline_errors.pipeline_id,
                 pipeline_errors.pipeline_name,
@@ -526,14 +530,14 @@ impl ExecutablePipeline {
             publish_error(error_data).await;
         }
 
-        log::info!("[Pipeline] {pipeline_name} [inv={inv_id}]: awaiting result collector");
+        log::debug!("[Pipeline] {pipeline_name} [inv={inv_id}]: awaiting result collector");
         let results = result_task.await.map_err(|e| {
             log::error!(
                 "[Pipeline] {pipeline_name} [inv={inv_id}]: result collecting job failed: {e}"
             );
             anyhow!("[Pipeline] result collecting job failed: {}", e)
         })?;
-        log::info!(
+        log::debug!(
             "[Pipeline] {pipeline_name} [inv={inv_id}]: result collector returned {} stream groups",
             results.len()
         );
@@ -663,7 +667,7 @@ async fn process_node(
     match &node.node_data {
         NodeData::Stream(stream_params) => {
             if node.children.is_empty() {
-                log::info!(
+                log::debug!(
                     "[Pipeline] {pipeline_name} : Leaf node {node_idx} starts processing (stream={}:{})",
                     stream_params.stream_type,
                     stream_params.stream_name,
@@ -762,7 +766,7 @@ async fn process_node(
                     let dest_stream_name = stream_params.stream_name.to_string();
                     let org = org_id.to_string();
                     let pl_name = pipeline_name.clone();
-                    log::info!(
+                    log::debug!(
                         "[Pipeline] {pl_name} : LeafNode {node_idx} spawning background ingestion for {record_count} cross-type records to {dest_stream_type}:{dest_stream_name}",
                     );
                     tokio::spawn(async move {
@@ -776,7 +780,7 @@ async fn process_node(
                         };
                         match crate::service::ingestion::ingestion_service::ingest(req).await {
                             Ok(resp) if resp.status_code == 200 => {
-                                log::info!(
+                                log::debug!(
                                     "[Pipeline] {pl_name} : cross-type ingestion successful to {dest_stream_type}:{dest_stream_name}, records: {record_count}",
                                 );
                             }
@@ -796,7 +800,7 @@ async fn process_node(
                     });
                 }
 
-                log::info!(
+                log::debug!(
                     "[Pipeline] {pipeline_name} : LeafNode {node_idx} done processing {count} records (stream={}:{})",
                     stream_params.stream_type,
                     stream_params.stream_name
@@ -814,7 +818,7 @@ async fn process_node(
             }
         }
         NodeData::Condition(condition_params) => {
-            log::info!("[Pipeline]: cond node {node_idx} starts processing");
+            log::debug!("[Pipeline]: cond node {node_idx} starts processing");
             let mut total_received: usize = 0;
             while let Some(pipeline_item) = receiver.recv().await {
                 total_received += 1;
@@ -1341,7 +1345,22 @@ async fn process_node(
                 );
             }
         }
+        #[cfg(feature = "enterprise")]
         NodeData::LlmEvaluation(params) => {
+            if !o2_enterprise::enterprise::common::config::get_config()
+                .common
+                .online_evals_enabled
+            {
+                log::warn!(
+                    "[Pipeline]: LLM evaluation node {node_idx} skipped because online evals are disabled"
+                );
+                while receiver.recv().await.is_some() {
+                    count += 1;
+                }
+                log::info!("[Pipeline]: LLM evaluation node {node_idx} skipped {count} records");
+                return Ok(());
+            }
+
             log::info!("[Pipeline]: LLM evaluation node {node_idx} starts processing");
 
             if let Err(e) =
@@ -1470,10 +1489,23 @@ async fn process_node(
                 "[Pipeline]: LLM evaluation node {node_idx} done processing {count} records"
             );
         }
+        #[cfg(not(feature = "enterprise"))]
+        NodeData::LlmEvaluation(_) => {
+            log::warn!(
+                "[Pipeline]: LLM evaluation node {node_idx} skipped because online evals are enterprise-only"
+            );
+            let mut skipped_count = 0usize;
+            while receiver.recv().await.is_some() {
+                skipped_count += 1;
+            }
+            log::info!(
+                "[Pipeline]: LLM evaluation node {node_idx} skipped {skipped_count} records"
+            );
+        }
     }
 
     // all cloned senders dropped when function goes out of scope -> close the channel
-    log::info!(
+    log::debug!(
         "[Pipeline] {pipeline_name}: node {node_idx} ({:?}) task returning",
         node.node_data
     );

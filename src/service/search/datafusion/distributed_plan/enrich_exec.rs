@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{any::Any, sync::Arc};
+use std::sync::Arc;
 
 use config::utils::record_batch_ext::convert_json_to_record_batch;
 use datafusion::{
@@ -91,11 +91,6 @@ impl DisplayAs for EnrichExec {
 impl ExecutionPlan for EnrichExec {
     fn name(&self) -> &'static str {
         "EnrichExec"
-    }
-
-    /// Return a reference to Any that can be used for downcasting
-    fn as_any(&self) -> &dyn Any {
-        self
     }
 
     fn properties(&self) -> &Arc<PlanProperties> {
@@ -222,12 +217,10 @@ mod tests {
 
     #[test]
     fn test_as_any_downcasts() {
-        use datafusion::physical_plan::ExecutionPlan;
-
         let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int32, false)]));
         let exec = EnrichExec::new("org", "stream", schema);
-        let any = exec.as_any();
-        assert!(any.downcast_ref::<EnrichExec>().is_some());
+        let exec_plan: &dyn ExecutionPlan = &exec;
+        assert!(exec_plan.downcast_ref::<EnrichExec>().is_some());
     }
 
     #[test]

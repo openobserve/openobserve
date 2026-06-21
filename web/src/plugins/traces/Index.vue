@@ -85,6 +85,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ref="serviceGraphRef"
               class="tw:h-full"
               @view-traces="handleServiceGraphViewTraces"
+              @request:stream-change="onChildStreamChangeRequest"
+              @widen-range="onWidenTracesRange"
             />
           </div>
 
@@ -97,6 +99,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ref="servicesCatalogRef"
               class="tw:h-full"
               @view-traces="handleServicesCatalogViewTraces"
+              @request:stream-change="onChildStreamChangeRequest"
+              @widen-range="onWidenTracesRange"
             />
           </div>
 
@@ -254,6 +258,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <search-result
                       ref="searchResultRef"
+                      :show-error-only="showErrorOnly"
                       @update:datetime="setHistogramDate"
                       @update:scroll="getMoreData"
                       @update:sort="runQueryOnSort"
@@ -273,6 +278,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </OSplitter>
     </div>
+
+    <ODialog
+      v-model:open="streamChangeDialog.show"
+      title="Change stream?"
+      size="sm"
+      primary-button-label="Switch stream"
+      secondary-button-label="Cancel"
+      @click:primary="applyStreamChange(streamChangeDialog.pendingStream)"
+      @click:secondary="streamChangeDialog.show = false"
+    >
+      <p>This will also update the stream in the Traces/Spans tab and reset existing query.</p>
+    </ODialog>
   </div>
 </template>
 
@@ -318,7 +335,7 @@ import config from "@/aws-exports";
 import { logsErrorMessage } from "@/utils/common";
 import useNotifications from "@/composables/useNotifications";
 import { getConsumableRelativeTime } from "@/utils/date";
-import { cloneDeep, debounce } from "lodash-es";
+import { cloneDeep } from "lodash-es";
 import { computed } from "vue";
 import useStreams from "@/composables/useStreams";
 import { parseDurationWhereClause } from "@/composables/useDurationPercentiles";
@@ -339,6 +356,7 @@ import { useTracesTableColumns } from "./composables/useTracesTableColumns";
 import type { TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
 import { isLLMTrace } from "@/utils/llmUtils";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -519,18 +537,17 @@ async function getStreamList() {
         }
 
         await extractFields();
-        const queryBeforeRestore = searchObj.data.editorValue;
         correlationFilters.restore();
-        const filterWasRestored =
-          !queryBeforeRestore && !!searchObj.data.editorValue;
 
+        // Restore filter chips from the editor value. The single mount search is
+        // owned by loadPageData() (after getStreamList resolves), so we do NOT
+        // trigger a search here — that previously produced a duplicate on load.
         if (
           searchObj.data.editorValue &&
           searchObj.data.stream.selectedStreamFields.length
         )
           nextTick(() => {
             restoreFilters(searchObj.data.editorValue);
-            if (filterWasRestored) searchData();
           });
       })
       .catch((e) => {
@@ -1001,10 +1018,20 @@ async function getQueryData(
         : "start_time";
     })();
 
+    // Spans are physically stored sorted by the timestamp column, and the
+    // backend has a dedicated optimizer for timestamp-sorted segments. A span's
+    // `start_time` is monotonically equivalent to the timestamp column, so
+    // ordering by the timestamp column yields the same visible order while
+    // avoiding the costly full re-sort that `ORDER BY start_time` forces.
+    const orderByCol =
+      validSortCol === "start_time"
+        ? store.state.zoConfig.timestamp_column
+        : validSortCol;
+
     const spansQueryReq = (() => {
       if (!isSpansMode) return null;
       const whereClause = combinedFilter ? ` WHERE ${combinedFilter}` : "";
-      const spansSql = `SELECT * FROM "${selectedStreamName.value}"${whereClause} ORDER BY ${validSortCol} ${sortOrd}`;
+      const spansSql = `SELECT * FROM "${selectedStreamName.value}"${whereClause} ORDER BY ${orderByCol} ${sortOrd}`;
       return {
         query: {
           sql: b64EncodeUnicode(spansSql),
@@ -1580,8 +1607,8 @@ function restoreUrlQueryParams() {
   const queryParams = router.currentRoute.value.query;
 
   const date = {
-    startTime: queryParams.from,
-    endTime: queryParams.to,
+    startTime: typeof queryParams.from === "string" ? Number(queryParams.from) : queryParams.from,
+    endTime: typeof queryParams.to === "string" ? Number(queryParams.to) : queryParams.to,
     relativeTimePeriod: queryParams.period || null,
     type: queryParams.period ? "relative" : "absolute",
   };
@@ -1674,20 +1701,20 @@ const setHistogramDate = async (date: any) => {
 // User can manually add their own filters before clicking "Run Query"
 const onMetricsFiltersUpdated = (filters: string[]) => {
   const allFilters = [...filters];
-  // Add error filter only if toggle is on and not already present from Error panel brush
+  // Add error filter only if span_status='ERROR' is currently active and not already present
   if (
-    searchObj.meta.showErrorOnly &&
+    showErrorOnly.value &&
     !allFilters.includes("span_status = 'ERROR'")
   ) {
     allFilters.push("span_status = 'ERROR'");
   }
-  // Apply each filter term independently so replace-or-append works per field
-  // Skip search only when live mode is ON (datetime trigger will handle it)
-  // Don't skip when live mode is OFF (datetime trigger won't fire)
-  const skipSearch = !!(searchObj.meta.liveMode && store.state.zoConfig?.auto_query_enabled);
-
+  // Apply each filter term independently so replace-or-append works per field.
+  // applyFilters owns the single trigger: it emits `searchdata` (one search) only
+  // in live mode. The brush also sets a time range programmatically, which the
+  // DateTime picker stamps userChangedValue=false, so it never adds a competing
+  // search — this filter apply is the sole trigger.
   if (searchBarRef.value?.applyFilters) {
-    searchBarRef.value.applyFilters(allFilters, skipSearch);
+    searchBarRef.value.applyFilters(allFilters);
   } else {
     console.warn("SearchBar not ready for filter application");
   }
@@ -1907,6 +1934,10 @@ const activeExcludeFilterValues = computed((): Record<string, string[]> => {
   return result;
 });
 
+const showErrorOnly = computed(
+  () => activeIncludeFilterValues.value["span_status"]?.includes("ERROR") ?? false,
+);
+
 const searchData = () => {
   if (
     !(
@@ -1963,6 +1994,26 @@ const getMoreData = () => {
 const onChangeStream = async () => {
   await extractFields();
   runQueryFn();
+};
+
+const streamChangeDialog = ref({ show: false, pendingStream: "" });
+
+const applyStreamChange = async (newStream: string) => {
+  searchObj.data.stream.selectedStream = {
+    label: newStream,
+    value: newStream,
+  };
+  searchObj.data.editorValue = "";
+  streamChangeDialog.value.show = false;
+  await onChangeStream();
+};
+
+const onChildStreamChangeRequest = (newStream: string) => {
+  if (searchObj.data.editorValue?.trim()) {
+    streamChangeDialog.value = { show: true, pendingStream: newStream };
+  } else {
+    applyStreamChange(newStream);
+  }
 };
 
 const collapseFieldList = () => {
@@ -2059,71 +2110,10 @@ watch(
   { immediate: true },
 );
 
-// Debounced auto-run on query text changes in live mode.
-const debouncedAutoRunOnQuery = debounce(() => {
-  if (
-    searchObj.meta.liveMode &&
-    store.state.zoConfig?.auto_query_enabled &&
-    !searchObj.loading
-  ) {
-    searchData();
-  }
-}, 500);
-
-// Debounced auto-run on datetime changes in live mode.
-// Traces has no existing auto-run on datetime, so no guard needed.
-const debouncedAutoRunOnDatetime = debounce(() => {
-  // Absolute time is handled by SearchBar's triggerAbsoluteQueryDebounced (2500ms).
-  // Only auto-run here for relative time to avoid double-triggering.
-  if (
-    searchObj.data.datetime.type === "relative" &&
-    searchObj.meta.liveMode &&
-    store.state.zoConfig?.auto_query_enabled &&
-    !searchObj.loading
-  ) {
-    searchData();
-  }
-}, 500);
-
-watch(
-  () => searchObj.data.query,
-  () => {
-    debouncedAutoRunOnQuery();
-  },
-);
-
-watch(
-  () => [
-    searchObj.data.datetime.type,
-    searchObj.data.datetime.startTime,
-    searchObj.data.datetime.endTime,
-    searchObj.data.datetime.relativeTimePeriod,
-  ],
-  () => {
-    debouncedAutoRunOnDatetime();
-  },
-  { deep: true },
-);
-
-// watch(
-//   changeStream,
-//   (stream, oldStream) => {
-//     if (stream.value === oldStream.value) return;
-//     if (searchObj.data.stream.selectedStream.hasOwnProperty("value")) {
-//       if (oldStream.value) {
-//         searchObj.data.query = "";
-//         searchObj.data.advanceFiltersQuery = "";
-//       }
-//       setTimeout(() => {
-//         runQueryFn();
-//         extractFields();
-//       }, 500);
-//     }
-//   },
-//   {
-//     immediate: false,
-//   },
-// );
+// NOTE: auto-run in live mode is driven by explicit triggers at each user-intent
+// handler (filter add/remove, manual date change, redirect, metrics brush) — not
+// by watching `searchObj.data.query`. A query watcher duplicated those explicit
+// triggers (every writer of `data.query` also runs a search), so it was removed.
 
 // Handler for service graph view traces event
 const handleServiceGraphViewTraces = (data: any) => {
@@ -2181,7 +2171,6 @@ const handleServiceGraphViewTraces = (data: any) => {
       filterQuery += ` AND duration <= ${data.maxDurationMicros}`;
     }
     searchObj.data.editorValue = filterQuery;
-    searchObj.data.query = filterQuery;
     searchObj.meta.sqlMode = false; // Traces doesn't use SQL mode
   }
 

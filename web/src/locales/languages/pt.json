@@ -422,7 +422,10 @@
     "menuGroupInspect": "Inspecionar",
     "validSql": "SQL válido",
     "invalidSql": "Consulta inválida",
-    "menuGroupExplain": "Explique"
+    "menuGroupExplain": "Explique",
+    "fieldValuesEmpty": "Nenhum valor encontrado.",
+    "fieldValuesEmptyHint": "Experimente um intervalo de tempo mais amplo para ver os valores.",
+    "selectLogsStreamFirst": "Selecione o fluxo de registros primeiro"
   },
   "menu": {
     "home": "Início",
@@ -845,7 +848,10 @@
     "feature_correlation_management": "Gerenciamento de correlações",
     "feature_log_patterns": "Padrões de registro",
     "environment_type": "Tipo de ambiente",
-    "license_allows_unlimited_ingestion": "A licença atual permite a ingestão ilimitada de dados."
+    "license_allows_unlimited_ingestion": "A licença atual permite a ingestão ilimitada de dados.",
+    "refresh_license_limits": "Atualizar limites de licença",
+    "license_refresh_success": "A atualização do limite de licença foi acionada com sucesso",
+    "failed_to_refresh_license": "Falha ao atualizar os limites da licença"
   },
   "login": {
     "userid": "ID do usuário",
@@ -3442,7 +3448,9 @@
     "import_this_pattern": "Importar este padrão",
     "patterns_loaded": "Padrão (s) {count} carregado (s)",
     "failed_to_load": "Falha ao carregar padrões",
-    "no_patterns_selected": "Selecione pelo menos um padrão"
+    "no_patterns_selected": "Selecione pelo menos um padrão",
+    "name_required": "* O nome é obrigatório",
+    "pattern_required": "* O padrão é obrigatório"
   },
   "search_history": {
     "title": "Histórico de pesquisa",
@@ -4435,6 +4443,14 @@
     "noQueryApplied": {
       "title": "Execute uma consulta para ver os registros",
       "description": "Ajuste seus filtros e clique em “Executar consulta” para carregar eventos para esse stream."
+    },
+    "noServiceGraph": {
+      "title": "Sem dados do gráfico de serviço",
+      "description": "Tente consultar um intervalo de tempo maior ou garanta que seus serviços estejam emitindo métricas de abrangência."
+    },
+    "noServicesCatalog": {
+      "title": "Nenhum serviço encontrado",
+      "description": "Nenhum serviço foi detectado no intervalo de tempo selecionado. Experimente um alcance maior ou um stream diferente."
     }
   },
   "onlineEvals": {

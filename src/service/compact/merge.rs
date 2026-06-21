@@ -586,7 +586,7 @@ pub async fn merge_by_stream(
                 for file in delete_file_list {
                     events.push(FileKey {
                         deleted: true,
-                        segment_ids: None,
+                        selection: None,
                         row_group_size: None,
                         ..file.clone()
                     });
@@ -1262,7 +1262,7 @@ mod tests {
                 bloom_ver: 0,
             },
             deleted: false,
-            segment_ids: None,
+            selection: None,
             row_group_size: None,
         }
     }
@@ -1297,7 +1297,7 @@ mod tests {
         assert_eq!(file_key.id, 0);
         assert_eq!(file_key.account, "test_account");
         assert!(!file_key.deleted);
-        assert!(file_key.segment_ids.is_none());
+        assert!(file_key.selection.is_none());
     }
 
     // Boundary tests for sort_by_time_range

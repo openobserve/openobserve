@@ -45,6 +45,8 @@ export function useTableCore<TData>(
     horizontalScroll?: boolean;
     /** Initial column sizes loaded from localStorage (for persistence) */
     initialColumnSizes?: Record<string, number> | null;
+    /** When true, do not auto-reset page index when data changes */
+    keepPageOnDataChange?: boolean;
   },
   emit: any,
 ) {
@@ -282,6 +284,7 @@ export function useTableCore<TData>(
     get columns() {
       return tanstackColumns.value;
     },
+    autoResetPageIndex: !props.keepPageOnDataChange,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: isClientSort.value ? getSortedRowModel() : undefined,
     getFilteredRowModel: isClientFilter.value

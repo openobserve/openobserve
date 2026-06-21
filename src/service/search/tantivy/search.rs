@@ -13,27 +13,27 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashSet, fmt::Display};
+use std::{collections::HashSet, fmt::Display, sync::Arc};
 
+use arrow::buffer::BooleanBuffer;
+#[cfg(not(feature = "enterprise"))]
+use config::tantivy::query::histogram_collector::{
+    MultiHistogramCollector, SimpleHistogramCollector, simple_histogram_rank,
+};
 use config::{
     TIMESTAMP_COL_NAME,
-    meta::{
-        bitvec::BitVec,
-        inverted_index::{IndexOptimizeMode, MAX_SIMPLE_TOPN_FIELDS},
-    },
+    meta::inverted_index::{IndexOptimizeMode, MAX_SIMPLE_TOPN_FIELDS},
     tantivy::query::{
         contains_query::ContainsAutomaton, ids_collector::SingleSegmentDocIdCollector,
         topn_collector::TopNCollector,
     },
 };
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::search::tantivy::histogram_collector::{
+    MultiHistogramCollector, SimpleHistogramCollector, simple_histogram_rank,
+};
 use tantivy::{
     DocId, Score, Searcher,
-    aggregation::{
-        AggregationCollector, Key,
-        agg_req::{Aggregation, AggregationVariants, Aggregations},
-        agg_result::{AggregationResult, BucketEntries, BucketResult},
-        bucket::{HistogramAggregation, HistogramBounds, TermsAggregation},
-    },
     collector::{Count, TopDocs},
     query::Query,
 };
@@ -43,8 +43,14 @@ use crate::service::search::index::IndexCondition;
 #[derive(Debug, Clone)]
 pub enum TantivyResult {
     RowIds(Vec<u32>),
-    /// (row_id_bitvec, matched_row_count, row_group_size_from_index_file)
-    RowIdsBitVec(BitVec, usize, Option<u32>),
+    RowIdsSelection {
+        row_ids: Arc<BooleanBuffer>, // per-row match bitmap, length num_rows
+        row_group_size: Option<u32>,
+    },
+    NoMatch, // the file should be excluded without building a bitmap
+    Skipped {
+        percent: usize, // skipped tantivy search, with the percentage
+    },
     Count(usize),                            // simple count optimization
     Histogram(Vec<u64>),                     // simple histogram optimization
     MultiHistogram(Vec<(i64, String, u64)>), // multi histogram optimization (with breakdown)
@@ -56,7 +62,7 @@ impl TantivyResult {
     // used for skip tantivy search
     pub fn percent(&self) -> usize {
         match self {
-            Self::RowIdsBitVec(_, percent, _) => *percent,
+            Self::Skipped { percent } => *percent,
             _ => 0,
         }
     }
@@ -66,9 +72,11 @@ impl TantivyResult {
             Self::RowIds(row_ids) => {
                 row_ids.capacity() * std::mem::size_of::<u32>() + std::mem::size_of::<Vec<u32>>()
             }
-            Self::RowIdsBitVec(bitvec, ..) => {
-                bitvec.capacity().div_ceil(8) + std::mem::size_of::<BitVec>()
+            Self::RowIdsSelection { row_ids, .. } => {
+                row_ids.inner().len() + std::mem::size_of::<BooleanBuffer>()
             }
+            Self::NoMatch => 0,
+            Self::Skipped { .. } => std::mem::size_of::<usize>(),
             Self::Count(_) => std::mem::size_of::<usize>(),
             Self::Histogram(histogram) => {
                 histogram.capacity() * std::mem::size_of::<u64>() + std::mem::size_of::<Vec<u64>>()
@@ -143,17 +151,56 @@ impl TantivyResult {
     pub fn handle_simple_histogram(
         searcher: &Searcher,
         query: Box<dyn Query>,
-        min_value: i64,
-        bucket_width: u64,
-        num_buckets: usize,
+        condition: &IndexCondition,
+        idx_optimize_rule: IndexOptimizeMode,
+        file_in_range: bool,
+        file_min_ts: i64,
+        file_max_ts: i64,
     ) -> anyhow::Result<Self> {
+        let IndexOptimizeMode::SimpleHistogram(min_value, bucket_width, num_buckets, ts_offset) =
+            idx_optimize_rule
+        else {
+            return Err(anyhow::anyhow!("invalid index optimize rule"));
+        };
+        // RANK fast path only when no extra _timestamp-range was ANDed in
+        // (file fully in range) and the filter is match-all or a single term
+        let (rank_eligible, term_field) = if file_in_range {
+            if condition.is_condition_all() {
+                (true, None)
+            } else if let Some(tv) = condition.single_equal_term() {
+                (true, Some(tv))
+            } else {
+                (false, None)
+            }
+        } else {
+            (false, None)
+        };
+
+        // RANK fast path (enterprise); None falls back to the collector below
+        if rank_eligible
+            && let Some(counts) = simple_histogram_rank(
+                searcher,
+                TIMESTAMP_COL_NAME,
+                term_field.as_ref().map(|(f, v)| (f.as_str(), v.as_str())),
+                min_value,
+                bucket_width,
+                num_buckets,
+                ts_offset,
+                file_min_ts,
+                file_max_ts,
+            )?
+        {
+            return Ok(Self::Histogram(counts));
+        }
+
         let res = searcher.search(
             &query,
-            &tantivy::collector::HistogramCollector::new::<i64>(
+            &SimpleHistogramCollector::new(
                 TIMESTAMP_COL_NAME.to_string(),
                 min_value,
                 bucket_width,
                 num_buckets,
+                ts_offset,
             ),
         )?;
 
@@ -166,80 +213,22 @@ impl TantivyResult {
         min_value: i64,
         max_value: i64,
         bucket_width: u64,
+        ts_offset: i64,
         breakdown_field: &str,
     ) -> anyhow::Result<Self> {
-        let limit = config::get_config().limit.query_default_limit;
-        // this value should be zero
-        let offset = (min_value % bucket_width as i64) as f64;
-        let histogram_agg = Aggregation {
-            agg: AggregationVariants::Histogram(HistogramAggregation {
-                field: TIMESTAMP_COL_NAME.to_string(),
-                interval: bucket_width as f64,
-                offset: Some(offset),
-                min_doc_count: Some(1),
-                hard_bounds: Some(HistogramBounds {
-                    min: min_value as f64,
-                    max: max_value as f64,
-                }),
-                extended_bounds: None,
-                keyed: false,
-                is_normalized_to_ns: false,
-            }),
-            sub_aggregation: Aggregations::from_iter(vec![(
-                "breakdown".to_string(),
-                Aggregation {
-                    agg: AggregationVariants::Terms(TermsAggregation {
-                        field: breakdown_field.to_string(),
-                        size: Some(limit as u32),
-                        order: None,
-                        missing: None,
-                        min_doc_count: Some(1),
-                        show_term_doc_count_error: Some(false),
-                        segment_size: None,
-                        include: None,
-                        exclude: None,
-                    }),
-                    sub_aggregation: Default::default(),
-                },
-            )]),
-        };
-        let aggregations = Aggregations::from_iter(vec![("histogram".to_string(), histogram_agg)]);
-        let collector = AggregationCollector::from_aggs(aggregations, Default::default());
+        let res = searcher.search(
+            &query,
+            &MultiHistogramCollector::new(
+                TIMESTAMP_COL_NAME.to_string(),
+                breakdown_field.to_string(),
+                min_value,
+                max_value,
+                bucket_width,
+                ts_offset,
+            ),
+        )?;
 
-        let mut res = searcher.search(&query, &collector)?;
-
-        let mut results = Vec::new();
-        if let AggregationResult::BucketResult(BucketResult::Histogram { buckets }) =
-            res.0.remove("histogram").unwrap()
-        {
-            let hist_buckets = match buckets {
-                BucketEntries::Vec(vec) => vec,
-                BucketEntries::HashMap(map) => map.into_values().collect(),
-            };
-            for mut bucket_entry in hist_buckets {
-                let timestamp = match bucket_entry.key {
-                    Key::F64(k) => k as i64,
-                    _ => continue,
-                };
-                if let AggregationResult::BucketResult(BucketResult::Terms {
-                    buckets: term_entries,
-                    ..
-                }) = bucket_entry.sub_aggregation.0.remove("breakdown").unwrap()
-                {
-                    for term_bucket in term_entries {
-                        let breakdown_value = match term_bucket.key {
-                            Key::Str(s) => s,
-                            Key::F64(f) => f.to_string(),
-                            Key::I64(i) => i.to_string(),
-                            Key::U64(u) => u.to_string(),
-                        };
-                        results.push((timestamp, breakdown_value, term_bucket.doc_count));
-                    }
-                }
-            }
-        }
-
-        Ok(Self::MultiHistogram(results))
+        Ok(Self::MultiHistogram(res))
     }
 
     pub fn handle_simple_top_n(
@@ -481,13 +470,13 @@ impl TantivyMultiResult {
 mod tests {
     use std::collections::HashSet;
 
-    use config::meta::{bitvec::BitVec, inverted_index::IndexOptimizeMode};
+    use config::meta::inverted_index::IndexOptimizeMode;
 
     use super::*;
 
     #[test]
     fn test_tantivy_result_percent() {
-        let result = TantivyResult::RowIdsBitVec(BitVec::repeat(false, 100), 75, None);
+        let result = TantivyResult::Skipped { percent: 75 };
         assert_eq!(result.percent(), 75);
 
         let result = TantivyResult::RowIds(Vec::new());
@@ -549,7 +538,7 @@ mod tests {
     #[test]
     fn test_tantivy_multi_result_builder_new() {
         // Test with SimpleHistogram
-        let optimize_rule = Some(IndexOptimizeMode::SimpleHistogram(0, 1000, 10));
+        let optimize_rule = Some(IndexOptimizeMode::SimpleHistogram(0, 1000, 10, 0));
         let builder = TantivyMultiResultBuilder::new(&optimize_rule);
         assert!(matches!(builder, TantivyMultiResultBuilder::Histogram(_)));
 
@@ -860,9 +849,12 @@ mod tests {
     #[test]
     fn test_memory_size_edge_cases() {
         // Test with empty collections
-        let result = TantivyResult::RowIdsBitVec(BitVec::repeat(false, 0), 0, None);
+        let result = TantivyResult::RowIdsSelection {
+            row_ids: Arc::new(BooleanBuffer::new_unset(0)),
+            row_group_size: None,
+        };
         let memory_size = result.get_memory_size();
-        assert_eq!(memory_size, std::mem::size_of::<BitVec>());
+        assert_eq!(memory_size, std::mem::size_of::<BooleanBuffer>());
 
         let result = TantivyResult::RowIds(Vec::new());
         let memory_size = result.get_memory_size();

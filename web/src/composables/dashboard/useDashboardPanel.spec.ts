@@ -224,6 +224,44 @@ describe("useDashboardPanel", () => {
     expect(panel.dashboardPanelData.meta.promql.loadingLabels).toBe(false);
   });
 
+  it("queries PromQL labels using the panel's selected time range", async () => {
+    const panel = useDashboardPanelData("dashboard-panel-test-range");
+
+    // Selected range whose data is older than the previous hardcoded 24h window.
+    const start = new Date("2026-01-01T00:00:00.000Z");
+    const end = new Date("2026-01-08T00:00:00.000Z");
+    panel.dashboardPanelData.meta.dateTime = {
+      start_time: start,
+      end_time: end,
+    };
+
+    await panel.fetchPromQLLabels("cpu_usage");
+
+    expect(getPromSeriesMock).toHaveBeenCalledTimes(1);
+    expect(getPromSeriesMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        labels: '{__name__="cpu_usage"}',
+        // Selected range is forwarded as microseconds, not the hardcoded 24h.
+        start_time: start.getTime() * 1000,
+        end_time: end.getTime() * 1000,
+      }),
+    );
+  });
+
+  it("falls back to the last 24h when no valid time range is set", async () => {
+    const panel = useDashboardPanelData("dashboard-panel-test-fallback");
+    panel.dashboardPanelData.meta.dateTime = {
+      start_time: "Invalid Date",
+      end_time: "Invalid Date",
+    };
+
+    await panel.fetchPromQLLabels("cpu_usage");
+
+    const args = getPromSeriesMock.mock.calls[0][0];
+    // 24 hours expressed in microseconds.
+    expect(args.end_time - args.start_time).toBe(24 * 60 * 60 * 1000000);
+  });
+
   it("clears PromQL labels on fetch failure", async () => {
     const panel = useDashboardPanelData("dashboard-panel-test-7");
     getPromSeriesMock.mockRejectedValueOnce(new Error("network"));

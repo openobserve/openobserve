@@ -21,6 +21,7 @@ use datafusion::arrow::datatypes::Schema;
 
 pub mod json;
 pub mod otlp;
+mod otlp_json_compat;
 pub mod prom;
 
 const EXCLUDE_LABELS: [&str; 8] = [

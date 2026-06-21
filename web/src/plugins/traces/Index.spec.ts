@@ -162,7 +162,6 @@ const mockSearchObj = {
     liveMode: false,
     serviceColors: {},
     metricsRangeFilters: new Map(),
-    showErrorOnly: false,
   }),
   data: {
     query: "",
@@ -911,8 +910,8 @@ describe("Index.vue (Main Traces Page)", () => {
 
   describe("DateTime Handling", () => {
     it("should restore datetime from URL params", async () => {
-      const startTime = "1755853746625720";
-      const endTime = "1755853746725720";
+      const startTime = 1755853746625720;
+      const endTime = 1755853746725720;
 
       routerCurrentRouteSpy.mockReturnValue({
         value: {
@@ -1046,7 +1045,7 @@ describe("Index.vue (Main Traces Page)", () => {
     beforeEach(() => {
       mockApplyFilters.mockReset();
       mockRemoveFilterByField.mockReset();
-      mockSearchObj.meta.showErrorOnly = false;
+      mockSearchObj.data.editorValue = "";
       mockSearchObj.meta.metricsRangeFilters.clear();
       // Reset auto_query_enabled to undefined for each test
       delete store.state.zoConfig.auto_query_enabled;
@@ -1065,11 +1064,11 @@ describe("Index.vue (Main Traces Page)", () => {
       expect(mockApplyFilters).toHaveBeenCalledWith([
         "duration >= 100",
         "service_name = 'test'",
-      ], false); // liveMode is undefined, so skipSearch = false
+      ]); // applyFilters owns the single trigger; no skipSearch arg
     });
 
-    it("should append error filter to applyFilters call when showErrorOnly is enabled", async () => {
-      mockSearchObj.meta.showErrorOnly = true;
+    it("should append error filter to applyFilters call when span_status = 'ERROR' is in the query", async () => {
+      mockSearchObj.data.editorValue = "span_status = 'ERROR'";
       wrapper = mountWithSearchBarStub();
       await flushPromises();
 
@@ -1079,11 +1078,11 @@ describe("Index.vue (Main Traces Page)", () => {
       expect(mockApplyFilters).toHaveBeenCalledWith([
         "duration >= 100",
         "span_status = 'ERROR'",
-      ], false); // liveMode is undefined, so skipSearch = false
+      ]); // applyFilters owns the single trigger; no skipSearch arg
     });
 
     it("should not duplicate error filter when it is already present in incoming filters", async () => {
-      mockSearchObj.meta.showErrorOnly = true;
+      mockSearchObj.data.editorValue = "span_status = 'ERROR'";
       wrapper = mountWithSearchBarStub();
       await flushPromises();
 
@@ -1121,7 +1120,10 @@ describe("Index.vue (Main Traces Page)", () => {
       expect(mockRemoveFilterByField).toHaveBeenCalledWith("span_status");
     });
 
-    it("should skip search when live mode is ON", async () => {
+    // Index no longer branches on liveMode / passes a skipSearch flag — it always
+    // calls applyFilters with just the filters; the live-mode search-gating now
+    // lives inside SearchBar.applyFilters (covered in SearchBar.spec).
+    it("should call applyFilters with only the filters when live mode is ON", async () => {
       mockSearchObj.meta.liveMode = true;
       store.state.zoConfig.auto_query_enabled = true;
       wrapper = mountWithSearchBarStub();
@@ -1131,10 +1133,10 @@ describe("Index.vue (Main Traces Page)", () => {
       wrapper.vm.onMetricsFiltersUpdated(testFilters);
       await flushPromises();
 
-      expect(mockApplyFilters).toHaveBeenCalledWith(testFilters, true);
+      expect(mockApplyFilters).toHaveBeenCalledWith(testFilters);
     });
 
-    it("should not skip search when live mode is OFF", async () => {
+    it("should call applyFilters with only the filters when live mode is OFF", async () => {
       mockSearchObj.meta.liveMode = false;
       wrapper = mountWithSearchBarStub();
       await flushPromises();
@@ -1143,10 +1145,10 @@ describe("Index.vue (Main Traces Page)", () => {
       wrapper.vm.onMetricsFiltersUpdated(testFilters);
       await flushPromises();
 
-      expect(mockApplyFilters).toHaveBeenCalledWith(testFilters, false);
+      expect(mockApplyFilters).toHaveBeenCalledWith(testFilters);
     });
 
-    it("should handle undefined liveMode as false", async () => {
+    it("should call applyFilters with only the filters when liveMode is undefined", async () => {
       mockSearchObj.meta.liveMode = undefined;
       wrapper = mountWithSearchBarStub();
       await flushPromises();
@@ -1155,7 +1157,7 @@ describe("Index.vue (Main Traces Page)", () => {
       wrapper.vm.onMetricsFiltersUpdated(testFilters);
       await flushPromises();
 
-      expect(mockApplyFilters).toHaveBeenCalledWith(testFilters, false);
+      expect(mockApplyFilters).toHaveBeenCalledWith(testFilters);
     });
 
     it("should handle searchBarRef not available", async () => {
@@ -1258,6 +1260,40 @@ describe("Index.vue (Main Traces Page)", () => {
 
       // SQL-style escaping uses double quotes: test'service becomes test''service
       expect(mockSearchObj.data.editorValue).toContain("test''service");
+    });
+
+    it("should not write searchObj.data.query on view-traces (no duplicate trigger)", async () => {
+      // The redirect used to set searchObj.data.query, which tripped a query
+      // watcher in addition to its own runQueryFn() → duplicate search. The
+      // watcher and that write are removed; only editorValue is set now.
+      mockSearchObj.data.query = "";
+
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+
+      await flushPromises();
+
+      wrapper.vm.handleServiceGraphViewTraces({
+        stream: "default",
+        serviceName: "checkout",
+        timeRange: { startTime: 1755853746625720, endTime: 1755853746725720 },
+      });
+      await flushPromises();
+
+      expect(mockSearchObj.data.editorValue).toContain("checkout");
+      expect(mockSearchObj.data.query).toBe("");
     });
 
     function mountIndexComponent() {
@@ -2959,6 +2995,282 @@ describe("Index.vue (Main Traces Page)", () => {
         ...store.state.zoConfig,
         auto_query_enabled: false,
       };
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Stream Change Confirmation Dialog
+  // ---------------------------------------------------------------------------
+  describe("Stream Change Confirmation Dialog", () => {
+    function mountIndexStubbed() {
+      return mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": {
+              name: "service-graph",
+              template: "<div />",
+              emits: ["request:stream-change"],
+            },
+            "services-catalog": {
+              name: "services-catalog",
+              template: "<div />",
+              emits: ["request:stream-change"],
+            },
+            ODialog: true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+    }
+
+    beforeEach(() => {
+      mockSearchObj.data.editorValue = "";
+      mockSearchObj.meta.searchMode = "service-graph";
+    });
+
+    it("should apply stream change immediately when editorValue is empty", async () => {
+      mockSearchObj.data.editorValue = "";
+      mockSearchObj.data.stream.selectedStream = {
+        label: "old-stream",
+        value: "old-stream",
+      };
+
+      wrapper = mountIndexStubbed();
+      await flushPromises();
+
+      wrapper.vm.onChildStreamChangeRequest("new-stream");
+      await flushPromises();
+
+      expect(wrapper.vm.streamChangeDialog.show).toBe(false);
+      expect(mockSearchObj.data.stream.selectedStream.value).toBe("new-stream");
+      expect(mockSearchObj.data.stream.selectedStream.label).toBe("new-stream");
+    });
+
+    it("should apply stream change immediately when editorValue is only whitespace", async () => {
+      mockSearchObj.data.editorValue = "   ";
+      mockSearchObj.data.stream.selectedStream = {
+        label: "old-stream",
+        value: "old-stream",
+      };
+
+      wrapper = mountIndexStubbed();
+      await flushPromises();
+
+      wrapper.vm.onChildStreamChangeRequest("new-stream");
+      await flushPromises();
+
+      expect(wrapper.vm.streamChangeDialog.show).toBe(false);
+      expect(mockSearchObj.data.stream.selectedStream.value).toBe("new-stream");
+    });
+
+    it("should show confirmation dialog when editorValue has content", async () => {
+      mockSearchObj.data.editorValue = "service_name = 'test'";
+
+      wrapper = mountIndexStubbed();
+      await flushPromises();
+
+      wrapper.vm.onChildStreamChangeRequest("other-stream");
+      await flushPromises();
+
+      expect(wrapper.vm.streamChangeDialog.show).toBe(true);
+      expect(wrapper.vm.streamChangeDialog.pendingStream).toBe("other-stream");
+    });
+
+    it("should not change selectedStream when dialog is shown instead of applying immediately", async () => {
+      // Use a stream name present in mockStreamList so loadStreamLists does not
+      // clear it during mount — the assertion checks the stream stays unchanged.
+      mockSearchObj.data.editorValue = "duration >= 1000";
+      mockSearchObj.data.stream.selectedStream = {
+        label: "default",
+        value: "default",
+      };
+
+      wrapper = mountIndexStubbed();
+      await flushPromises();
+
+      // Ensure stream is still "default" after mount before triggering request
+      // (it can be re-set by loadStreamLists when it finds a match)
+      await vi.waitFor(
+        () => {
+          expect(mockSearchObj.data.stream.selectedStream.value).toBe("default");
+        },
+        { timeout: 2000 },
+      );
+
+      wrapper.vm.onChildStreamChangeRequest("requested-stream");
+      await flushPromises();
+
+      // Dialog was shown — selectedStream must NOT have been changed
+      expect(wrapper.vm.streamChangeDialog.show).toBe(true);
+      expect(mockSearchObj.data.stream.selectedStream.value).toBe("default");
+    });
+
+    it("should update selectedStream, clear editorValue, and hide dialog when applyStreamChange is called", async () => {
+      mockSearchObj.data.editorValue = "service_name = 'svc'";
+      wrapper = mountIndexStubbed();
+      await flushPromises();
+
+      // Simulate dialog being shown with a pending stream
+      wrapper.vm.streamChangeDialog.show = true;
+      wrapper.vm.streamChangeDialog.pendingStream = "target-stream";
+
+      await wrapper.vm.applyStreamChange("target-stream");
+      await flushPromises();
+
+      expect(mockSearchObj.data.stream.selectedStream.value).toBe(
+        "target-stream",
+      );
+      expect(mockSearchObj.data.stream.selectedStream.label).toBe(
+        "target-stream",
+      );
+      expect(mockSearchObj.data.editorValue).toBe("");
+      expect(wrapper.vm.streamChangeDialog.show).toBe(false);
+    });
+
+    it("should close dialog and leave stream unchanged when secondary button sets show to false", async () => {
+      // Use a stream name present in mockStreamList so loadStreamLists keeps it.
+      mockSearchObj.data.editorValue = "service_name = 'svc'";
+      mockSearchObj.data.stream.selectedStream = {
+        label: "default",
+        value: "default",
+      };
+
+      wrapper = mountIndexStubbed();
+      await flushPromises();
+
+      // Wait until mount resolves and selectedStream remains "default".
+      await vi.waitFor(
+        () => {
+          expect(mockSearchObj.data.stream.selectedStream.value).toBe("default");
+        },
+        { timeout: 2000 },
+      );
+
+      // Open dialog as if primary button was not clicked
+      wrapper.vm.streamChangeDialog.show = true;
+      wrapper.vm.streamChangeDialog.pendingStream = "other-stream";
+
+      // Secondary button handler — just closes the dialog
+      wrapper.vm.streamChangeDialog.show = false;
+      await flushPromises();
+
+      expect(wrapper.vm.streamChangeDialog.show).toBe(false);
+      // Stream must remain unchanged — the cancel did not apply the pending change
+      expect(mockSearchObj.data.stream.selectedStream.value).toBe("default");
+    });
+
+    it("should trigger onChildStreamChangeRequest when service-graph emits request:stream-change", async () => {
+      mockSearchObj.data.editorValue = "duration >= 500";
+
+      wrapper = mountIndexStubbed();
+      await flushPromises();
+
+      const serviceGraphEl = wrapper.findComponent({ name: "service-graph" });
+      expect(serviceGraphEl.exists()).toBe(true);
+
+      await serviceGraphEl.vm.$emit("request:stream-change", "graph-stream");
+      await flushPromises();
+
+      // Non-empty editorValue → dialog must be shown
+      expect(wrapper.vm.streamChangeDialog.show).toBe(true);
+      expect(wrapper.vm.streamChangeDialog.pendingStream).toBe("graph-stream");
+    });
+
+    it("should trigger onChildStreamChangeRequest when services-catalog emits request:stream-change", async () => {
+      mockSearchObj.data.editorValue = "span_status = 'ERROR'";
+      mockSearchObj.meta.searchMode = "services-catalog";
+
+      wrapper = mountIndexStubbed();
+      await flushPromises();
+
+      const servicesCatalogEl = wrapper.findComponent({
+        name: "services-catalog",
+      });
+      expect(servicesCatalogEl.exists()).toBe(true);
+
+      await servicesCatalogEl.vm.$emit(
+        "request:stream-change",
+        "catalog-stream",
+      );
+      await flushPromises();
+
+      expect(wrapper.vm.streamChangeDialog.show).toBe(true);
+      expect(wrapper.vm.streamChangeDialog.pendingStream).toBe("catalog-stream");
+    });
+
+    it("should call onWidenTracesRange and update relativeTimePeriod when service-graph emits widen-range", async () => {
+      mockSearchObj.meta.searchMode = "service-graph";
+      mockSearchObj.data.datetime.relativeTimePeriod = "15m";
+
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": {
+              name: "service-graph",
+              template: "<div />",
+              emits: ["widen-range", "request:stream-change"],
+            },
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+      await flushPromises();
+
+      const serviceGraphEl = wrapper.findComponent({ name: "service-graph" });
+      expect(serviceGraphEl.exists()).toBe(true);
+
+      await serviceGraphEl.vm.$emit("widen-range", "7d");
+      await flushPromises();
+
+      expect(mockSearchObj.data.datetime.relativeTimePeriod).toBe("7d");
+      expect(mockSearchObj.data.datetime.type).toBe("relative");
+    });
+
+    it("should call onWidenTracesRange and update relativeTimePeriod when services-catalog emits widen-range", async () => {
+      mockSearchObj.meta.searchMode = "services-catalog";
+      mockSearchObj.data.datetime.relativeTimePeriod = "15m";
+
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            "services-catalog": {
+              name: "services-catalog",
+              template: "<div />",
+              emits: ["widen-range", "request:stream-change"],
+            },
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+      await flushPromises();
+
+      const servicesCatalogEl = wrapper.findComponent({ name: "services-catalog" });
+      expect(servicesCatalogEl.exists()).toBe(true);
+
+      await servicesCatalogEl.vm.$emit("widen-range", "30d");
+      await flushPromises();
+
+      expect(mockSearchObj.data.datetime.relativeTimePeriod).toBe("30d");
+      expect(mockSearchObj.data.datetime.type).toBe("relative");
     });
   });
 });

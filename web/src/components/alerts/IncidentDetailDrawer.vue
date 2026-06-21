@@ -63,45 +63,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ incidentDetails.title }}
           <OTooltip v-if="incidentDetails && incidentDetails.title.length > 35" :content="incidentDetails.title" />
         </span>
-      </div>
 
-      <!-- Compact Status, Severity, Alerts badges at extreme right -->
-      <div v-if="incidentDetails && !isEditingTitle" class="tw:flex tw:items-center tw:gap-2 tw:ml-auto">
-        <!-- Status Badge -->
-        <OBadge
-          :variant="getStatusVariant(incidentDetails.status)"
-          class="tw:h-9 tw:px-2.5 tw:cursor-default tw:rounded-md! tw:ring-1 tw:ring-inset tw:ring-current"
-        >
-          <div class="tw:flex tw:items-center tw:gap-1.5">
-            <OIcon name="info" size="xs" />
-            <span>{{ getStatusLabel(incidentDetails.status) }}</span>
-          </div>
-          <OTooltip :delay="200" :content="t('alerts.incidents.status') + ': ' + getStatusLabel(incidentDetails.status)" />
-        </OBadge>
+        <!-- Status, Severity, Alerts badges — grouped with title as metadata -->
+        <template v-if="incidentDetails && !isEditingTitle">
+          <OBadge
+            :variant="getStatusVariant(incidentDetails.status)"
+            class="tw:cursor-default tw:h-7 tw:px-2.5 tw:ring-1 tw:ring-inset tw:ring-current tw:ring-opacity-40"
+          >
+            <div class="tw:flex tw:items-center tw:gap-1">
+              <OIcon name="info" size="xs" />
+              <span>{{ getStatusLabel(incidentDetails.status) }}</span>
+            </div>
+            <OTooltip :delay="200" :content="t('alerts.incidents.status') + ': ' + getStatusLabel(incidentDetails.status)" />
+          </OBadge>
 
-        <!-- Severity Badge -->
-        <OBadge
-          :variant="getSeverityVariant(incidentDetails.severity)"
-          class="tw:h-9 tw:px-2.5 tw:cursor-default tw:rounded-md! tw:ring-1 tw:ring-inset tw:ring-current"
-        >
-          <div class="tw:flex tw:items-center tw:gap-1.5">
-            <OIcon name="warning" size="xs" />
-            <span>{{ incidentDetails.severity }}</span>
-          </div>
-          <OTooltip :delay="200" :content="t('alerts.incidents.severity') + ': ' + incidentDetails.severity" />
-        </OBadge>
+          <OBadge
+            :variant="getSeverityVariant(incidentDetails.severity)"
+            class="tw:cursor-default tw:h-7 tw:px-2.5 tw:ring-1 tw:ring-inset tw:ring-current tw:ring-opacity-40"
+          >
+            <div class="tw:flex tw:items-center tw:gap-1">
+              <OIcon name="warning" size="xs" />
+              <span>{{ incidentDetails.severity }}</span>
+            </div>
+            <OTooltip :delay="200" :content="t('alerts.incidents.severity') + ': ' + incidentDetails.severity" />
+          </OBadge>
 
-        <!-- Alert Count Badge -->
-        <OBadge
-          variant="primary-soft"
-          class="tw:h-9 tw:px-2.5 tw:cursor-default tw:rounded-md! tw:ring-1 tw:ring-inset tw:ring-current"
-        >
-          <div class="tw:flex tw:items-center tw:gap-1.5">
-            <OIcon name="notifications-active" size="xs" />
-            <span>{{ triggers.length }} Alerts</span>
-          </div>
-          <OTooltip :delay="200" :content="t('alerts.incidents.alertCount') + ': ' + triggers.length + ' correlated alerts'" />
-        </OBadge>
+          <OBadge
+            variant="primary-soft"
+            class="tw:cursor-default tw:h-7 tw:px-2.5 tw:ring-1 tw:ring-inset tw:ring-current tw:ring-opacity-40"
+          >
+            <div class="tw:flex tw:items-center tw:gap-1">
+              <OIcon name="notifications-active" size="xs" />
+              <span>{{ triggers.length }} Alerts</span>
+            </div>
+            <OTooltip :delay="200" :content="t('alerts.incidents.alertCount') + ': ' + triggers.length + ' correlated alerts'" />
+          </OBadge>
+        </template>
       </div>
 
       <!-- Save/Cancel buttons when editing -->
@@ -128,7 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       ></div>
 
       <!-- Action buttons at extreme right of header -->
-      <div v-if="incidentDetails && !isEditingTitle" class="tw:flex tw:gap-2 tw:items-center">
+      <div v-if="incidentDetails && !isEditingTitle" class="tw:flex tw:gap-2 tw:items-center tw:ml-auto">
         <OButton
           v-if="incidentDetails.status === 'open'"
           variant="outline"
@@ -782,7 +779,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <div
                         :class="'tw:text-text-primary'"
-                        class="tw:text-sm tw:flex tw:gap-2 tw:items-center"
+                        class="tw:text-xs tw:flex tw:gap-2 tw:items-center"
                       >
                         <span
                           :class="'tw:text-text-muted'"
@@ -1085,6 +1082,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :serviceName="correlationData.serviceName"
               :matchedDimensions="correlationData.matchedDimensions"
               :additionalDimensions="correlationData.additionalDimensions"
+              :matched-set-id="correlationMatchedSetId"
+              :chip-dimensions="correlationChipDimensions"
               :logStreams="correlationData.logStreams"
               :metricStreams="correlationData.metricStreams"
               :traceStreams="correlationData.traceStreams"
@@ -1177,7 +1176,9 @@ import incidentsService, {
   IncidentCorrelatedStreams,
 } from "@/services/incidents";
 import streamService from "@/services/stream";
-import serviceStreamsApi from "@/services/service_streams";
+import serviceStreamsApi, {
+  buildChipDimensionsFromFilters,
+} from "@/services/service_streams";
 import { getImageURL } from "@/utils/zincutils";
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
@@ -1326,6 +1327,19 @@ export default defineComponent({
     const getSemanticGroupDisplayName = (id: string): string => {
       return semanticGroupDisplayMap.value.get(id) || id;
     };
+
+    // Identity set + chip dimensions powering the "View by" subject tabs in the
+    // embedded TelemetryCorrelationDashboard (metrics tab). Without matchedSetId
+    // the dashboard cannot build subject chips, so the toggle never renders.
+    // Both derive from the correlate API response; chip dimensions stay reactive
+    // to semanticGroups (used only for dedup) so they refresh if groups load late.
+    const correlationMatchedSetId = computed(
+      () => correlationData.value?.correlationData?.matched_set_id ?? undefined,
+    );
+    const correlationChipDimensions = computed<Record<string, string>>(() => {
+      const resp = correlationData.value?.correlationData;
+      return resp ? buildChipDimensionsFromFilters(resp, semanticGroups.value) : {};
+    });
 
     // True when a background AI analysis run has started but not yet completed.
     // Updated whenever events are fetched (load, tab switch, reopen, etc.) — no polling.
@@ -2870,6 +2884,8 @@ export default defineComponent({
       expandedSections,
       formattedRcaContent,
       correlationData,
+      correlationMatchedSetId,
+      correlationChipDimensions,
       correlationLoading,
       correlationError,
       hasCorrelatedData,

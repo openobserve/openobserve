@@ -85,6 +85,8 @@ export interface SelectProps {
   iconKey?: string;
   /** Floating label rendered above the trigger */
   label?: string;
+  /** Marks the field required — renders a `*` after the label (no manual ` *`). */
+  required?: boolean;
   /** Placeholder text shown when no value is selected */
   placeholder?: string;
   /** Error message — when truthy the field shows error styling */

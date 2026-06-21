@@ -49,11 +49,17 @@ test.describe("Custom Charts Tests", () => {
     await pm.dashboardPage.setCustomChartCode(pictorialJSON);
     await pm.dashboardPage.setDashboardPanelQuery('select * from "e2e_automate"');
     await pm.dashboardPanelActions.applyDashboardBtn();
+
+    // The validation error is displayed inside an OTooltip on the warning
+    // button — it is not in the DOM until the button is hovered.
+    const errorBtn = page.locator('[data-test="panel-error-data"]');
+    await expect(errorBtn).toBeVisible({ timeout: 30000 });
+    await errorBtn.hover();
     await expect(
-      page.getByText(
+      page.locator('[data-test="o-tooltip-content"] div').getByText(
         "Unsafe code detected: Access to 'document' is not allowed"
       )
-    ).toBeVisible({ timeout: 30000 });
+    ).toBeVisible({ timeout: 5000 });
   });
 
   test("Add line JSON in Monaco Editor", async ({ page }) => {
@@ -70,6 +76,14 @@ test.describe("Custom Charts Tests", () => {
     await pm.dashboardPage.setCustomChartCode(lineJSON);
     await pm.dashboardPage.setDashboardPanelQuery('select * from "e2e_automate"');
     await pm.dashboardPanelActions.applyDashboardBtn();
-    await page.waitForTimeout(3000);
+
+    // line.json is SAFE ECharts code (no forbidden identifiers), so Apply must
+    // actually render the chart — NOT surface a validation/empty-query error.
+    // (Previously this test only waited 3s and asserted nothing.)
+    await pm.dashboardPanelActions.expectCustomChartRendered(expect);
+    await expect(page.getByText("Unsafe code detected")).toBeHidden();
+    await expect(
+      page.getByText("Please enter query for custom chart")
+    ).toBeHidden();
   });
 });

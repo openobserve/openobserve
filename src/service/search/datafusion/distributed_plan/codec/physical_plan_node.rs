@@ -88,25 +88,25 @@ impl PhysicalExtensionCodec for PhysicalPlanNodePhysicalExtensionCodec {
 
     fn try_encode(&self, node: Arc<dyn ExecutionPlan>, buf: &mut Vec<u8>) -> Result<()> {
         #[cfg(feature = "enterprise")]
-        if node.as_any().downcast_ref::<NewEmptyExec>().is_some() {
+        if node.downcast_ref::<NewEmptyExec>().is_some() {
             super::empty_exec::try_encode(node, buf)
-        } else if node.as_any().downcast_ref::<DeduplicationExec>().is_some() {
+        } else if node.downcast_ref::<DeduplicationExec>().is_some() {
             super::deduplication_exec::try_encode(node, buf)
-        } else if node.as_any().downcast_ref::<AggregateTopkExec>().is_some() {
+        } else if node.downcast_ref::<AggregateTopkExec>().is_some() {
             super::aggregate_topk_exec::try_encode(node, buf)
-        } else if node.as_any().downcast_ref::<StreamingAggsExec>().is_some() {
+        } else if node.downcast_ref::<StreamingAggsExec>().is_some() {
             super::streaming_aggs_exec::try_encode(node, buf)
-        } else if node.as_any().downcast_ref::<TmpExec>().is_some() {
+        } else if node.downcast_ref::<TmpExec>().is_some() {
             super::tmp_exec::try_encode(node, buf)
-        } else if node.as_any().downcast_ref::<EnrichmentExec>().is_some() {
+        } else if node.downcast_ref::<EnrichmentExec>().is_some() {
             super::enrichment_exec::try_encode(node, buf)
         } else {
             internal_err!("Not supported")
         }
         #[cfg(not(feature = "enterprise"))]
-        if node.as_any().downcast_ref::<NewEmptyExec>().is_some() {
+        if node.downcast_ref::<NewEmptyExec>().is_some() {
             super::empty_exec::try_encode(node, buf)
-        } else if node.as_any().downcast_ref::<DeduplicationExec>().is_some() {
+        } else if node.downcast_ref::<DeduplicationExec>().is_some() {
             super::deduplication_exec::try_encode(node, buf)
         } else {
             internal_err!("Not supported")
@@ -144,8 +144,8 @@ mod tests {
         let ctx = datafusion::prelude::SessionContext::new();
         let plan2 =
             physical_plan_from_bytes_with_extension_codec(&plan_bytes, &ctx.task_ctx(), &proto)?;
-        let plan2 = plan2.as_any().downcast_ref::<NewEmptyExec>().unwrap();
-        let plan = plan.as_any().downcast_ref::<NewEmptyExec>().unwrap();
+        let plan2 = plan2.downcast_ref::<NewEmptyExec>().unwrap();
+        let plan = plan.downcast_ref::<NewEmptyExec>().unwrap();
 
         // check
         assert_eq!(plan.name(), plan2.name());

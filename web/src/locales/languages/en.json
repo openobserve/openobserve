@@ -221,6 +221,14 @@
       "title": "No traces found",
       "description": "No traces match the selected service and time range. Try a wider time range or a different service."
     },
+    "noServiceGraph": {
+      "title": "No service graph data",
+      "description": "Try querying a longer time range, or ensure your services are emitting span metrics."
+    },
+    "noServicesCatalog": {
+      "title": "No services found",
+      "description": "No services were detected in the selected time range. Try a wider range or a different stream."
+    },
     "noSearchHistory": {
       "title": "No search history yet",
       "description": "Searches you run will be listed here so you can revisit and re-run them."
@@ -447,6 +455,7 @@
     "metrics": "Metrics",
     "selectIndex": "Select Stream First",
     "selectStreamFirst": "Select a stream first",
+    "selectLogsStreamFirst": "Select Logs stream first",
     "typeSearch": "Type your search query here.",
     "searchField": "Search for a field",
     "searchDimension": "Search Dimensions",
@@ -457,6 +466,8 @@
     "source": "_source",
     "noResult": "No results found.",
     "noData": "No data available",
+    "fieldValuesEmpty": "No values found.",
+    "fieldValuesEmptyHint": "Try a broader time range to see values.",
     "syntaxGuide": "Syntax guide",
     "recordsPerPage": "Records per page",
     "showing": "Showing",
@@ -760,7 +771,7 @@
     "docs": "Docs",
     "billings": "Billing",
     "rum": "RUM",
-    "settings": "Management",
+    "settings": "Settings",
     "iam": "IAM",
     "report": "Reports",
     "pipeline": "Pipelines",
@@ -952,6 +963,7 @@
     "environment_type": "Environment Type",
     "request_new_license": "Request new License",
     "add_new_license_key": "Add New License Key",
+    "refresh_license_limits": "Refresh License Limits",
     "update_license_key": "Update License Key",
     "paste_new_license_placeholder": "Paste new license key here...",
     "your_complete_license_key": "Your complete license key:",
@@ -966,6 +978,8 @@
     "usage_shows_zero_unlimited": "* Usage shows 0% for unlimited plans",
     "license_updated_success": "License updated successfully",
     "failed_to_update_license": "Failed to update license",
+    "license_refresh_success": "License limit refresh triggered successfully",
+    "failed_to_refresh_license": "Failed to refresh license limits",
     "license_key_copied": "License key copied to clipboard",
     "failed_to_copy_license": "Failed to copy license key",
     "license_already_active_title": "License Already Active",
@@ -3342,7 +3356,7 @@
     "addToDashboard": "Add to Dashboard"
   },
   "settings": {
-    "header": "Management",
+    "header": "Settings",
     "alertCorrelation": "Alert Deduplication",
     "correlationSettings": "Correlation Settings",
     "userKeyLabel": "User Key",
@@ -3853,6 +3867,7 @@
       "multiStepAgent": "Multi-step Agent"
     },
     "sessionsList": {
+      "streamLabel": "Stream",
       "noStreamsTooltip": "No LLM streams available.",
       "session": "session",
       "sessions": "sessions",
@@ -4147,7 +4162,9 @@
     "import_this_pattern": "Import This Pattern",
     "patterns_loaded": "Loaded {count} pattern(s)",
     "failed_to_load": "Failed to load patterns",
-    "no_patterns_selected": "Please select at least one pattern"
+    "no_patterns_selected": "Please select at least one pattern",
+    "name_required": "* Name is required",
+    "pattern_required": "* Pattern is required"
   },
   "search_history": {
     "title": "Search History",
@@ -4640,6 +4657,10 @@
       "detail": {
         "loading": "Loading per-config breakdown…",
         "noData": "No scores yet for this config in this window.",
+        "empty": {
+          "title": "Waiting for your first scores",
+          "description": "No scores have landed for this config in the selected time range. They'll appear here automatically once a scorer using it runs."
+        },
         "drillTitle": "Drill to traces",
         "splitByScorer": "Split by scorer",
         "splitBySourceType": "Split by source_type",
@@ -5361,11 +5382,11 @@
     "noEvents": {
       "title": "No events found",
       "descNoFilters": "No events were found in {range}. Try widening the time range to load results.",
-      "descWithFilters": "Nothing matched <strong>this query</strong> in the selected window. Try widening the time range, easing a filter, or resetting the query.",
+      "descWithFilters": "Nothing matched <strong>this query</strong> in the selected window. The stream has data here — try relaxing a filter in the query bar.",
+      "descOutOfRange": "Your time window doesn't contain any data from this stream. Jump to when data was last seen.",
+      "jumpToData": "Jump to latest data",
       "expandRange": "Expand the time range",
       "expandRangeDescAbsolute": "Switch to a wider relative time range",
-      "removeFilter": "Remove a filter",
-      "removeFilterDescSql": "You have SQL conditions applied to this query",
       "openHistory": "Open search history",
       "askAi": "Ask AI to fix my query",
       "selectedRange": "the selected range"

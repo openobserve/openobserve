@@ -329,11 +329,14 @@ export default defineComponent({
     });
 
     // Backend `/config` flag `online_evals_enabled` — controlled by
-    // `ZO_ONLINE_EVALS_ENABLED`. Reactive so the menu picks it up regardless
+    // enterprise `O2_ONLINE_EVALS_ENABLED`. Reactive so the menu picks it up regardless
     // of whether the config response arrived before or after this component
     // mounted.
     const isOnlineEvalsEnabled = computed(() => {
-      return Boolean(store.state.zoConfig?.online_evals_enabled);
+      return (
+        (config.isEnterprise == "true" || config.isCloud == "true") &&
+        Boolean(store.state.zoConfig?.online_evals_enabled)
+      );
     });
 
     const orgOptions = ref([{ label: Number, value: String }]);
@@ -883,6 +886,7 @@ export default defineComponent({
         span_id_field_name: "spanId",
         trace_id_field_name: "traceId",
         toggle_ingestion_logs: false,
+        usage_stream_enabled: false,
         enable_websocket_search: false,
         enable_streaming_search: false,
         streaming_aggregation_enabled: false,
@@ -914,6 +918,9 @@ export default defineComponent({
           toggle_ingestion_logs:
             orgSettings?.data?.data?.toggle_ingestion_logs ??
             defaultSettings.toggle_ingestion_logs,
+          usage_stream_enabled:
+            orgSettings?.data?.data?.usage_stream_enabled ??
+            defaultSettings.usage_stream_enabled,
           enable_websocket_search:
             orgSettings?.data?.data?.enable_websocket_search ??
             defaultSettings.enable_websocket_search,

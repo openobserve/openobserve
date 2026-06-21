@@ -18,7 +18,7 @@ const slots = defineSlots<ToggleGroupItemSlots>();
 
 const sizeClasses: Record<NonNullable<ToggleGroupItemProps["size"]>, string> = {
   md: "tw:h-9 tw:px-3 tw:text-sm",
-  sm: "tw:h-7 tw:px-2.5 tw:text-sm",
+  sm: "tw:h-7 tw:px-2.5 tw:text-xs",
   xs: "tw:h-5 tw:px-1.5 tw:text-xs",
 };
 

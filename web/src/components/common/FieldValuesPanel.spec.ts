@@ -18,6 +18,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { nextTick } from "vue";
 import FieldValuesPanel from "@/components/common/FieldValuesPanel.vue";
 
+vi.mock("vue-i18n", () => ({
+  useI18n: () => ({ t: (key: string) => key }),
+}));
+
 vi.mock("@vueuse/core", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@vueuse/core")>();
   return {
@@ -122,6 +126,22 @@ describe("FieldValuesPanel.vue", () => {
       expect(loading.exists()).toBe(true);
     });
 
+    it("confines the loading overlay to its own box via a positioned wrapper", () => {
+      // Regression: OInnerLoading is `absolute inset-0`, so its wrapper must be a
+      // positioning context. Without `tw:relative` the overlay escaped to the
+      // nearest positioned ancestor (`.o-field-list__row`) and covered the field
+      // row, blocking the click that collapses/cancels the request.
+      wrapper = createWrapper({
+        fieldValues: { isLoading: true, values: [], errMsg: "" },
+      });
+      const loading = wrapper.find(
+        '[data-test="field-values-panel-loading-indicator"]',
+      );
+      expect(loading.exists()).toBe(true);
+      const wrapperEl = loading.element.parentElement as HTMLElement;
+      expect(wrapperEl.classList.contains("tw:relative")).toBe(true);
+    });
+
     it("hides values list while loading with no interim cache", () => {
       wrapper = createWrapper({
         fieldValues: { isLoading: true, values: [], errMsg: "" },
@@ -141,7 +161,8 @@ describe("FieldValuesPanel.vue", () => {
       wrapper = createWrapper({
         fieldValues: { isLoading: false, values: [], errMsg: "" },
       });
-      expect(wrapper.text()).toContain("No values found");
+      expect(wrapper.text()).toContain("search.fieldValuesEmpty");
+      expect(wrapper.text()).toContain("search.fieldValuesEmptyHint");
     });
 
     it("shows custom errMsg when provided and values list is empty", () => {

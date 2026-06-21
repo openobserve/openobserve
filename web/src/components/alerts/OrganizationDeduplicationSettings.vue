@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:w-full tw:h-[calc(100vh-172px)] tw:px-2 org-dedup-settings tw:flex tw:flex-col">
+  <div class="tw:w-full tw:h-full tw:px-2 org-dedup-settings tw:flex tw:flex-col">
     <!-- Scrollable content area -->
     <div class="tw:flex-1 tw:overflow-y-auto tw:pr-2">
       <div class="tw:mb-6">

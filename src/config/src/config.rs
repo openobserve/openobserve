@@ -18,7 +18,6 @@ use std::{
     collections::BTreeMap,
     path::{Path, PathBuf},
     sync::{Arc, LazyLock as Lazy},
-    time::Duration,
 };
 
 use arc_swap::ArcSwap;
@@ -338,16 +337,6 @@ pub static NATS_KV_WATCH_MODULES: Lazy<HashSet<String>> = Lazy::new(|| {
 pub static CONFIG: Lazy<ArcSwap<Config>> = Lazy::new(|| ArcSwap::from(Arc::new(init())));
 static INSTANCE_ID: Lazy<RwHashMap<String, String>> = Lazy::new(Default::default);
 
-pub static TELEMETRY_CLIENT: Lazy<segment::HttpClient> = Lazy::new(|| {
-    segment::HttpClient::new(
-        reqwest::Client::builder()
-            .connect_timeout(Duration::from_secs(10))
-            .build()
-            .unwrap(),
-        CONFIG.load().common.telemetry_url.clone(),
-    )
-});
-
 pub fn get_config() -> Arc<Config> {
     CONFIG.load().clone()
 }
@@ -595,7 +584,6 @@ pub struct Config {
     pub s3: S3,
     pub sns: Sns,
     pub prom: Prometheus,
-    pub profiling: Profiling,
     pub smtp: Smtp,
     pub rum: RUM,
     pub chrome: Chrome,
@@ -692,28 +680,6 @@ pub struct Smtp {
 }
 
 #[derive(Serialize, EnvConfig, Default)]
-pub struct Profiling {
-    #[env_config(
-        name = "ZO_PROF_PYROSCOPE_ENABLED",
-        default = false,
-        help = "Enable pyroscope profiling with pyroscope-rs"
-    )]
-    pub pyroscope_enabled: bool,
-    #[env_config(
-        name = "ZO_PROF_PYROSCOPE_SERVER_URL",
-        default = "http://localhost:4040",
-        help = "Pyroscope server URL"
-    )]
-    pub pyroscope_server_url: String,
-    #[env_config(
-        name = "ZO_PROF_PYROSCOPE_PROJECT_NAME",
-        default = "openobserve",
-        help = "Pyroscope project name"
-    )]
-    pub pyroscope_project_name: String,
-}
-
-#[derive(Serialize, EnvConfig, Default)]
 pub struct Auth {
     #[env_config(name = "ZO_ROOT_USER_EMAIL")]
     pub root_user_email: String,
@@ -753,6 +719,8 @@ pub struct Http {
     pub addr: String,
     #[env_config(name = "ZO_HTTP_IPV6_ENABLED", default = false)]
     pub ipv6_enabled: bool,
+    #[env_config(name = "ZO_HTTP_TLS_SKIP_VERIFY", default = false)]
+    pub tls_skip_verify: bool,
     #[env_config(name = "ZO_HTTP_TLS_ENABLED", default = false)]
     pub tls_enabled: bool,
     #[env_config(name = "ZO_HTTP_TLS_CERT_PATH", default = "")]
@@ -1207,6 +1175,8 @@ pub struct Common {
     pub print_key_event: bool,
     #[env_config(name = "ZO_PRINT_KEY_SQL", default = true)]
     pub print_key_sql: bool,
+    #[env_config(name = "ZO_PRINT_PLAN_SINGLE_LINE", default = true)]
+    pub print_plan_single_line: bool,
     // usage reporting
     #[env_config(name = "ZO_USAGE_REPORTING_ENABLED", default = false)]
     pub usage_enabled: bool,
@@ -1398,12 +1368,6 @@ pub struct Common {
         help = "Enable user-defined model pricing. When true, uses DB pricing definitions and syncs from GitHub. When false, falls back to hardcoded built-in pricing only."
     )]
     pub model_pricing_enabled: bool,
-    #[env_config(
-        name = "ZO_ONLINE_EVALS_ENABLED",
-        default = true,
-        help = "Show the Online Evaluations UI (top-level Evaluations route) and the LLM Providers Settings page. When false, both are hidden. The backend endpoints remain reachable regardless — this flag only gates the frontend surface."
-    )]
-    pub online_evals_enabled: bool,
     #[env_config(
         name = "ZO_MODEL_PRICING_SOURCE_URL",
         default = "https://raw.githubusercontent.com/openobserve/sdr_patterns/refs/heads/main/llm_pricing.json",

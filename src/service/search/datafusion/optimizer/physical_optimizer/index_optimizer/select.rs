@@ -64,7 +64,7 @@ impl<'n> TreeNodeVisitor<'n> for SimpleSelectVisitor {
     type Node = Arc<dyn ExecutionPlan>;
 
     fn f_down(&mut self, node: &'n Self::Node) -> Result<TreeNodeRecursion> {
-        if let Some(sort_merge) = node.as_any().downcast_ref::<SortPreservingMergeExec>() {
+        if let Some(sort_merge) = node.downcast_ref::<SortPreservingMergeExec>() {
             if let Some(fetch) = sort_merge.fetch()
                 && fetch > 0
                 && sort_merge.expr().len() == 1
