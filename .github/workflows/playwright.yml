@@ -197,6 +197,7 @@ jobs:
                 "logsQueryBuilder-filters-advanced.spec.js",
                 "logsquickmode.spec.js",
                 "logshistogram.spec.js",
+                "queryErrorState.spec.js",
               ]
           - testfolder: "Logs-Core"
             browser: "chrome"
