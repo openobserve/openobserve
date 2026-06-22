@@ -672,8 +672,7 @@ import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 
 import { byString } from "../../utils/json";
-import { getImageURL, useLocalWrapContent } from "../../utils/zincutils";
-import { formatLargeNumber } from "@/utils/formatters";
+import { getImageURL, useLocalWrapContent, formatLargeNumber } from "../../utils/zincutils";
 import useLogs from "../../composables/useLogs";
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
 import usePatterns from "@/composables/useLogs/usePatterns";
