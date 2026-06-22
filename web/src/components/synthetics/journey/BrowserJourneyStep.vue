@@ -2,6 +2,7 @@
 // Copyright 2026 OpenObserve Inc.
 import { computed } from 'vue'
 import type { BrowserStep, StepAction, SelectorType } from '@/types/synthetics'
+import type { IconName } from '@/lib/core/Icon/OIcon.icons'
 import OButton from '@/lib/core/Button/OButton.vue'
 import OInput from '@/lib/forms/Input/OInput.vue'
 import OSelect from '@/lib/forms/Select/OSelect.vue'
@@ -22,18 +23,18 @@ const emit = defineEmits<{
   'insert-below': []
 }>()
 
-// Action icon map
-const ACTION_ICON_MAP: Record<StepAction, string> = {
-  navigate: 'open_in_browser',
-  click: 'ads_click',
+// Action icon map — all values must be valid IconName keys
+const ACTION_ICON_MAP: Record<StepAction, IconName> = {
+  navigate: 'open-in-browser',
+  click: 'ads-click',
   type: 'keyboard',
   select: 'checklist',
-  press: 'keyboard_command_key',
-  hover: 'point_scan',
-  scroll: 'swipe_vertical',
-  wait: 'hourglass_empty',
-  assert: 'fact_check',
-  screenshot: 'photo_camera',
+  press: 'keyboard',
+  hover: 'touch-app',
+  scroll: 'swap-vert',
+  wait: 'hourglass-empty',
+  assert: 'fact-check',
+  screenshot: 'photo-camera',
 }
 
 const ACTION_LABEL_MAP: Record<StepAction, string> = {
@@ -144,7 +145,7 @@ function toggleExpanded() {
 
       <!-- Action icon chip -->
       <span class="tw:bg-[var(--o2-primary-50)] tw:rounded tw:p-1 tw:shrink-0 tw:flex tw:items-center">
-        <span class="material-icons-outlined tw:text-base tw:leading-none tw:text-[var(--o2-primary-color)]" aria-hidden="true">{{ actionIcon }}</span>
+        <OIcon :name="actionIcon" size="sm" class="tw:text-[var(--o2-primary-color)]" aria-hidden="true" />
       </span>
 
       <!-- Action label badge -->
@@ -172,7 +173,7 @@ function toggleExpanded() {
           data-test="synthetics-journey-step-expand-btn"
           @click="toggleExpanded"
         >
-          <span class="material-icons-outlined tw:text-base tw:leading-none" aria-hidden="true">{{ expanded ? 'expand_less' : 'expand_more' }}</span>
+          <OIcon :name="expanded ? 'expand-less' : 'expand-more'" size="sm" aria-hidden="true" />
         </OButton>
 
         <OButton
@@ -182,7 +183,7 @@ function toggleExpanded() {
           data-test="synthetics-journey-step-insert-btn"
           @click="emit('insert-below')"
         >
-          <span class="material-icons-outlined tw:text-base tw:leading-none" aria-hidden="true">add</span>
+          <OIcon name="add" size="sm" aria-hidden="true" />
         </OButton>
 
         <OButton
@@ -192,7 +193,7 @@ function toggleExpanded() {
           data-test="synthetics-journey-step-duplicate-btn"
           @click="emit('duplicate')"
         >
-          <span class="material-icons-outlined tw:text-base tw:leading-none" aria-hidden="true">content_copy</span>
+          <OIcon name="content-copy" size="sm" aria-hidden="true" />
         </OButton>
 
         <OButton
@@ -203,7 +204,7 @@ function toggleExpanded() {
           class="tw:hover:text-[var(--o2-status-error)]"
           @click="emit('delete')"
         >
-          <span class="material-icons-outlined tw:text-base tw:leading-none" aria-hidden="true">delete</span>
+          <OIcon name="delete" size="sm" aria-hidden="true" />
         </OButton>
       </div>
     </div>
