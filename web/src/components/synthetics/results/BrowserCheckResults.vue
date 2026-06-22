@@ -3,7 +3,7 @@
 import { ref } from 'vue'
 import OBadge from '@/lib/core/Badge/OBadge.vue'
 
-const props = defineProps<{ checkId: string }>()
+defineProps<{ checkId: string }>()
 
 interface RunResult {
   id: string
