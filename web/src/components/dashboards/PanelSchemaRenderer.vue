@@ -1681,6 +1681,6 @@ export default defineComponent({
 }
 
 .annotation-popup-bg {
-  background: var(--o2-card-bg);
+  background: var(--color-surface-panel);
 }
 </style>

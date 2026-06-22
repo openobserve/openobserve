@@ -276,18 +276,18 @@ export default defineComponent({
   width: 2rem;
   height: 2rem;
   border-radius: 50%;
-  border: 2px solid var(--o2-border-color);
+  border: 2px solid var(--color-border-default);
   cursor: pointer;
   transition: box-shadow 0.2s ease, border-color 0.2s ease;
   flex-shrink: 0;
 
   &:hover {
-    border-color: var(--o2-primary-color);
-    box-shadow: 0 0 0 0.125rem var(--o2-focus-ring);
+    border-color: var(--color-button-primary);
+    box-shadow: 0 0 0 0.125rem var(--color-button-primary-focus-ring);
   }
 
   &:focus-visible {
-    outline: 2px solid var(--o2-focus-ring);
+    outline: 2px solid var(--color-button-primary-focus-ring);
     outline-offset: 0.125rem;
   }
 }

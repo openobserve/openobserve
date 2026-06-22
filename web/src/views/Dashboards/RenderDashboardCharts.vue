@@ -1715,11 +1715,11 @@ export default defineComponent({
 .gridBackground {
   background: transparent !important;
   border-radius: 0.5rem;
-  border-color: var(--o2-border-color) !important;
+  border-color: var(--color-border-default) !important;
 }
 
 .gridBackground.dark {
-  border-color: var(--o2-border-color) !important;
+  border-color: var(--color-border-default) !important;
 }
 
 /* Optimized GridStack layout styles for better performance and visual feedback */
@@ -1740,17 +1740,17 @@ export default defineComponent({
   transition: box-shadow 0.2s ease;
 
   &.dark {
-    border-color: var(--o2-border-color) !important;
+    border-color: var(--color-border-default) !important;
 
     .grid-stack-item-content {
-      border-color: var(--o2-border-color);
+      border-color: var(--color-border-default);
     }
   }
   .grid-stack-item-content {
-    border: 1px solid var(--o2-border-color);
+    border: 1px solid var(--color-border-default);
     border-radius: 0.375rem;
     overflow: visible;
-    box-shadow: var(--o2-box-shadow);
+    box-shadow: var(--shadow-sm);
   }
 }
 
