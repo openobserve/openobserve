@@ -18,12 +18,36 @@ use std::sync::{Arc, LazyLock as Lazy};
 use config::get_config;
 use tokio::runtime::Runtime;
 
+const THREAD_STACK_SIZE: usize = 16 * 1024 * 1024;
+
+pub fn create_job_runtime() -> std::io::Result<Runtime> {
+    let cfg = get_config();
+    tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(cfg.limit.job_runtime_worker_num)
+        .enable_all()
+        .thread_name("job_runtime")
+        .thread_stack_size(THREAD_STACK_SIZE)
+        .max_blocking_threads(cfg.limit.job_runtime_blocking_worker_num)
+        .build()
+}
+
+pub fn create_grpc_runtime() -> std::io::Result<Runtime> {
+    let cfg = get_config();
+    tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(cfg.limit.grpc_runtime_worker_num)
+        .enable_all()
+        .thread_name("grpc_runtime")
+        .thread_stack_size(THREAD_STACK_SIZE)
+        .max_blocking_threads(cfg.limit.grpc_runtime_blocking_worker_num)
+        .build()
+}
+
 pub static DATAFUSION_RUNTIME: Lazy<Arc<Runtime>> = Lazy::new(|| {
     Arc::new(
         tokio::runtime::Builder::new_multi_thread()
             .thread_name("datafusion_runtime")
             .worker_threads(get_config().limit.cpu_num)
-            .thread_stack_size(16 * 1024 * 1024)
+            .thread_stack_size(THREAD_STACK_SIZE)
             .enable_all()
             .build()
             .unwrap(),
@@ -55,7 +79,7 @@ pub static WAL_RUNTIME: Lazy<Option<Arc<Runtime>>> = Lazy::new(|| {
     tokio::runtime::Builder::new_multi_thread()
         .thread_name("wal-runtime")
         .worker_threads(thread_num)
-        .thread_stack_size(16 * 1024 * 1024)
+        .thread_stack_size(THREAD_STACK_SIZE)
         .enable_all()
         .build()
         .ok()
