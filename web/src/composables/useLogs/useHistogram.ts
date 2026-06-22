@@ -31,8 +31,7 @@ const SEVERITY_ORDER: Record<string, number> = {
   error: 9, critical: 10, fatal: 11,
 };
 
-import { formatSizeFromMB, histogramDateTimezone } from "@/utils/zincutils";
-import { formatLargeNumber } from "@/utils/formatters";
+import { formatSizeFromMB, histogramDateTimezone, formatLargeNumber } from "@/utils/zincutils";
 
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 
