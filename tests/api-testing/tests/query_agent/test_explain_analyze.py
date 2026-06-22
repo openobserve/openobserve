@@ -1,29 +1,31 @@
-"""EXPLAIN / EXPLAIN ANALYZE tests.
+"""EXPLAIN ANALYZE — run EXPLAIN ANALYZE on every query in the suite.
 
-Verifies the query engine returns a valid plan (200) without crashing
-or populating ``partial_error``.  Plan output is non-deterministic
-(optimizer version, node count, timing) so we only assert on structure:
-status 200, ``partial_error`` absent, and plan content present in hits.
+Prefixes each of the ~672 queries with ``EXPLAIN ANALYZE `` and
+asserts the server returns a valid physical plan (200) without
+populating ``partial_error``.  Plan output is non-deterministic
+(optimizer version, node count, per-node timing), so we only assert
+on structure: status 200, ``partial_error`` absent/falsy, and plan
+content present in the first hit.
 
-Also validates that EXPLAIN ANALYZE on invalid cross-schema dot-notation
-queries returns 4xx (not 5xx) — the same graceful rejection as without
+Also validates that EXPLAIN ANALYZE on the cross-schema dot-notation
+query returns 4xx (not 5xx) — the same graceful rejection as without
 EXPLAIN.
 """
 
 import logging
+import time
 
 import pytest
 
 from support.client import OpenObserveClient
 from support.factories import search_payload
-from tests.query_agent.conftest import STREAM, BASE_TS, run_query
+from tests.query_agent.conftest import load_all_queries, STREAM, BASE_TS
 
 
-# ── Fixtures ──────────────────────────────────────────────────────────────
+# ── Fixture: flush so data is stable ─────────────────────────────────────
 @pytest.fixture(scope="module")
 def explain_post_flush(ingest_query_agent_data):
-    """Flush so we have stable parquet to run EXPLAIN ANALYZE against."""
-    import time
+    """Flush after ingestion so EXPLAIN ANALYZE runs against stable Parquet."""
     from datetime import datetime, timedelta, UTC
     from support.wait import wait_until
 
@@ -60,82 +62,84 @@ def explain_post_flush(ingest_query_agent_data):
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────
-def _explain(client, sql, start_time, end_time):
-    """Run EXPLAIN / EXPLAIN ANALYZE and return the response."""
-    payload = search_payload(sql, start_time=start_time, end_time=end_time)
-    return client.post("_search?type=logs", json=payload)
-
-
-def _assert_explain_ok(resp, label):
-    """Assert EXPLAIN returned 200 with a plan and no partial_error."""
+def _assert_explain_ok(resp, qid):
+    """Assert EXPLAIN ANALYZE returned 200 with a plan and no partial_error."""
     assert resp.status_code == 200, (
-        f"{label}: expected 200, got {resp.status_code}: {resp.text[:500]}"
+        f"{qid}: EXPLAIN ANALYZE expected 200, got {resp.status_code}: {resp.text[:500]}"
     )
     body = resp.json()
 
     # partial_error must be absent or falsy
     pe = body.get("partial_error")
-    assert not pe, f"{label}: partial_error is set: {pe!r}"
+    assert not pe, f"{qid}: partial_error is set: {pe!r}"
 
     # Hits must contain plan output
     hits = body.get("hits", [])
-    assert len(hits) > 0, f"{label}: no hits — expected plan output"
+    assert len(hits) > 0, f"{qid}: no hits — expected plan output"
 
     # Plan content should be in the first hit
     hit = hits[0]
     has_plan = "plan" in hit or "Plan" in str(hit)
-    assert has_plan, f"{label}: no plan content in hit: {list(hit.keys())}"
-
-    logging.info("%s: OK — %d plan hits, took=%s", label, len(hits), body.get("took"))
+    assert has_plan, f"{qid}: no plan content in hit keys: {list(hit.keys())}"
 
 
-# ── Tests ─────────────────────────────────────────────────────────────────
-def test_explain_analyze_basic(client, explain_post_flush):
-    """EXPLAIN ANALYZE on a simple aggregation returns a physical plan."""
-    sql = f'EXPLAIN ANALYZE SELECT COUNT(*) FROM "{STREAM}"'
-    t0 = BASE_TS
-    t1 = t0 + 60_000_000 * 120  # 120 minutes after base
-    resp = _explain(client, sql, t0, t1)
-    _assert_explain_ok(resp, "EXPLAIN ANALYZE COUNT(*)")
+def _run_explain(client, query):
+    """Run EXPLAIN ANALYZE on a single query. Returns (qid, ok, error_msg)."""
+    qid = query["id"]
+    offset = query["time_offset"]
+    sql = "EXPLAIN ANALYZE " + query["sql"].replace("{stream}", STREAM).replace("{stream2}", STREAM)
+
+    # Use the same time window as the original query so the plan covers
+    # the same data.
+    payload = search_payload(
+        sql,
+        start_time=BASE_TS + offset["start_offset"],
+        end_time=BASE_TS + offset["end_offset"],
+        size=500,
+    )
+
+    try:
+        resp = client.post("_search?type=logs", json=payload)
+        _assert_explain_ok(resp, qid)
+        return (qid, True, None)
+    except AssertionError as e:
+        return (qid, False, str(e)[:500])
+    except Exception as e:
+        return (qid, False, f"{type(e).__name__}: {str(e)[:500]}")
 
 
-def test_explain_logical(client, explain_post_flush):
-    """EXPLAIN (without ANALYZE) returns a logical plan."""
-    sql = f'EXPLAIN SELECT * FROM "{STREAM}" LIMIT 5'
-    t0 = BASE_TS
-    t1 = t0 + 60_000_000 * 120
-    resp = _explain(client, sql, t0, t1)
-    _assert_explain_ok(resp, "EXPLAIN SELECT")
+# ── Generate one parametrized test per category ───────────────────────────
+def _make_test(cat, queries):
+    @pytest.mark.parametrize("query", queries, ids=[q["id"] for q in queries])
+    def _test(client, explain_post_flush, query):
+        qid, ok, error = _run_explain(client, query)
+        if not ok:
+            pytest.fail(f"{qid}: {error}")
+
+    return _test
 
 
-def test_explain_analyze_group_by(client, explain_post_flush):
-    """EXPLAIN ANALYZE on GROUP BY + aggregation."""
-    sql = f'EXPLAIN ANALYZE SELECT facility_zone, COUNT(*) AS cnt FROM "{STREAM}" GROUP BY facility_zone ORDER BY cnt DESC'
-    t0 = BASE_TS
-    t1 = t0 + 60_000_000 * 120
-    resp = _explain(client, sql, t0, t1)
-    _assert_explain_ok(resp, "EXPLAIN ANALYZE GROUP BY")
+_CATEGORIES = load_all_queries()
+for _cat, _queries in sorted(_CATEGORIES.items()):
+    _fn = _make_test(_cat, _queries)
+    _fn.__name__ = f"test_explain_{_cat}"
+    _fn.__doc__ = f"EXPLAIN ANALYZE: run all {_cat} queries with EXPLAIN ANALYZE prefix"
+    globals()[_fn.__name__] = _fn
 
 
+# ── Cross-schema rejection ────────────────────────────────────────────────
 def test_explain_analyze_cross_schema_rejected(client, explain_post_flush):
-    """EXPLAIN ANALYZE on cross-schema dot-notation returns 4xx, not 5xx.
-
-    This is the reported bug case — EXPLAIN ANALYZE should not crash
-    when the query references schemas via dot notation.  It should
-    return the same 4xx rejection as without EXPLAIN.
-    """
+    """EXPLAIN ANALYZE on cross-schema dot-notation returns 4xx, not 5xx."""
     sql = "EXPLAIN ANALYZE SELECT b.id, b.name FROM default AS a INNER JOIN enrich.rich AS b ON a.id = b.id LIMIT 1"
     t0 = BASE_TS
     t1 = t0 + 60_000_000 * 120
-    resp = _explain(client, sql, t0, t1)
+    payload = search_payload(sql, start_time=t0, end_time=t1)
+    resp = client.post("_search?type=logs", json=payload)
 
     assert 400 <= resp.status_code <= 499, (
         f"EXPLAIN ANALYZE cross-schema: expected 4xx, got {resp.status_code}: {resp.text[:500]}"
     )
 
-    # Verify the rejection is for stream resolution (cross-schema/dot-notation),
-    # not a generic syntax error.  The server should reference the unresolved
-    # stream name in its error.
     body = resp.json()
     msg = body.get("message", "")
     assert "rich" in msg or "enrich" in msg or "stream" in msg.lower(), (
