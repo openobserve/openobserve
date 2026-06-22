@@ -76,7 +76,7 @@ function updateVariable(index: number, field: 'name' | 'value', val: string) {
 function addVariable() {
   emit('update:check', {
     ...props.check,
-    variables: [...variables.value, { name: '', value: '' }],
+    variables: [...variables.value, { id: crypto.randomUUID(), name: '', value: '' }],
   })
 }
 
@@ -101,7 +101,7 @@ function updateSecret(index: number, field: 'name' | 'value', val: string) {
 function addSecret() {
   emit('update:check', {
     ...props.check,
-    secrets: [...secrets.value, { name: '', value: '' }],
+    secrets: [...secrets.value, { id: crypto.randomUUID(), name: '', value: '' }],
   })
 }
 
@@ -126,7 +126,7 @@ function updateHeader(index: number, field: 'key' | 'value', val: string) {
 function addHeader() {
   emit('update:check', {
     ...props.check,
-    headers: [...headers.value, { key: '', value: '' }],
+    headers: [...headers.value, { id: crypto.randomUUID(), key: '', value: '' }],
   })
 }
 
@@ -151,7 +151,7 @@ function updateCookie(index: number, field: 'name' | 'value' | 'domain', val: st
 function addCookie() {
   emit('update:check', {
     ...props.check,
-    cookies: [...cookies.value, { name: '', value: '', domain: '' }],
+    cookies: [...cookies.value, { id: crypto.randomUUID(), name: '', value: '', domain: '' }],
   })
 }
 
@@ -214,7 +214,7 @@ function removeCookie(index: number) {
             <ul class="tw:flex tw:flex-col tw:gap-2">
               <li
                 v-for="(variable, index) in variables"
-                :key="index"
+                :key="variable.id ?? index"
                 class="tw:flex tw:items-center tw:gap-2"
               >
                 <OInput
@@ -259,7 +259,7 @@ function removeCookie(index: number) {
             <ul class="tw:flex tw:flex-col tw:gap-2">
               <li
                 v-for="(secret, index) in secrets"
-                :key="index"
+                :key="secret.id ?? index"
                 class="tw:flex tw:items-center tw:gap-2"
               >
                 <OInput
@@ -314,7 +314,7 @@ function removeCookie(index: number) {
           <ul class="tw:flex tw:flex-col tw:gap-2">
             <li
               v-for="(header, index) in headers"
-              :key="index"
+              :key="header.id ?? index"
               class="tw:flex tw:items-center tw:gap-2"
             >
               <OInput
@@ -362,7 +362,7 @@ function removeCookie(index: number) {
           <ul class="tw:flex tw:flex-col tw:gap-2">
             <li
               v-for="(cookie, index) in cookies"
-              :key="index"
+              :key="cookie.id ?? index"
               class="tw:flex tw:items-center tw:gap-2"
             >
               <OInput

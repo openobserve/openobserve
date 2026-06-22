@@ -64,7 +64,7 @@ function isSelected(dest: string) {
               :class="[
                 'tw:inline-flex tw:items-center tw:gap-1.5 tw:rounded-full tw:px-3 tw:py-1 tw:text-sm tw:border tw:transition-colors tw:cursor-pointer',
                 isSelected(dest)
-                  ? 'tw:bg-[var(--o2-primary-color)] tw:text-white tw:border-[var(--o2-primary-color)]'
+                  ? 'tw:bg-[var(--o2-primary-color)] tw:text-[var(--o2-text-inverse)] tw:border-[var(--o2-primary-color)]'
                   : 'tw:bg-[var(--o2-card-bg)] tw:text-[var(--o2-text-body)] tw:border-[var(--o2-border-color)] tw:hover:border-[var(--o2-primary-color)]',
               ]"
               @click="toggleDestination(dest)"
