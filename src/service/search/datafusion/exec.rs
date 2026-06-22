@@ -107,6 +107,11 @@ pub fn create_session_config(
         .execution
         .skip_physical_aggregate_schema_check = true;
 
+    config
+        .options_mut()
+        .optimizer
+        .enable_join_dynamic_filter_pushdown = false;
+
     Ok(config)
 }
 
