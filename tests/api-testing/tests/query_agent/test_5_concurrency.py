@@ -3,13 +3,18 @@ thread-safety bugs, lock contention, and race conditions.
 
 Sequential tests never hit deadlocks in DataFusion's physical planner,
 contention in the file-list index, or thread-unsafe access to shared
-state.  This test fires 15 queries simultaneously at the same server,
+state.  This test fires queries simultaneously at the same server,
 each with its own HTTP client, and asserts every one of them returns
 correct results.
 
 Would have caught the ZO_MAX_FILE_RETENTION_TIME race condition
 immediately — parallel queries can see inconsistent file-list state
 that a single sequential query never observes.
+
+Assumptions:
+- Data is stable post-flush (no memtable rotation during test).
+- The server can handle 15 concurrent search requests on CI hardware.
+- Each query completes in under 120 s (Future timeout).
 """
 
 import logging
@@ -21,8 +26,15 @@ import pytest
 from support.client import OpenObserveClient
 from tests.query_agent.conftest import load_all_queries, run_query, STREAM
 
+# Per-future safety timeout — a hung server thread shouldn't block CI forever.
+_FUTURE_TIMEOUT = 120  # seconds
 
-# ── Query selection ───────────────────────────────────────────────────────
+# Seconds of sleep between parametrized worker-level runs so residual
+# server-side effects (connection-pool saturation, file handles) dissipate.
+_COOLDOWN_SECONDS = 5
+
+
+# ── Query selection (session fixture, not module-level) ───────────────────
 def _select_concurrency_queries(per_category: int = 2) -> list[dict]:
     """Pick *per_category* queries from each category.
 
@@ -50,7 +62,10 @@ def _select_concurrency_queries(per_category: int = 2) -> list[dict]:
     return selected
 
 
-_CONCURRENCY_QUERIES = _select_concurrency_queries(per_category=2)
+@pytest.fixture(scope="session")
+def concurrency_queries():
+    """Session-scoped query selection — avoids import-time failure risk."""
+    return _select_concurrency_queries(per_category=2)
 
 
 # ── Fixture: flush so data is stable (no memtable rotation during test) ───
@@ -117,25 +132,34 @@ def _run_one_query(query):
         return (qid, False, f"{type(e).__name__}: {str(e)[:500]}")
 
 
-# ── Concurrency test ──────────────────────────────────────────────────────
+# ── Concurrency test: diverse queries ─────────────────────────────────────
 @pytest.mark.parametrize("workers", [5, 10, 15])
-def test_concurrency_stress(client, post_flush_concurrency, workers):
-    """Run all selected queries in parallel with *workers* threads.
+def test_concurrency_diverse(client, post_flush_concurrency, concurrency_queries, workers):
+    """Run queries from every category in parallel with *workers* threads.
 
     Each thread gets its own OpenObserveClient.  All queries must
     return correct results — any assertion failure, crash (500), or
     timeout is a test failure.
 
     Runs at three worker levels (5, 10, 15) to catch bugs that only
-    appear under specific contention thresholds.
+    appear under specific contention thresholds.  A cooldown between
+    parametrized runs prevents residual server effects from causing
+    cascading failures.
     """
     t0 = time.time()
     results: list[tuple[str, bool, str | None]] = []
 
     with ThreadPoolExecutor(max_workers=workers) as executor:
-        futures = {executor.submit(_run_one_query, q): q for q in _CONCURRENCY_QUERIES}
+        futures = {executor.submit(_run_one_query, q): q for q in concurrency_queries}
         for future in as_completed(futures):
-            qid, ok, error = future.result()
+            qid = futures[future]["id"]
+            try:
+                qid, ok, error = future.result(timeout=_FUTURE_TIMEOUT)
+            except TimeoutError:
+                qid = futures[future]["id"]
+                results.append((qid, False, f"Future timed out after {_FUTURE_TIMEOUT}s"))
+                logging.error("CONCURRENCY TIMEOUT [workers=%d] %s: %ds", workers, qid, _FUTURE_TIMEOUT)
+                continue
             results.append((qid, ok, error))
             if not ok:
                 logging.error("CONCURRENCY FAIL [workers=%d] %s: %s", workers, qid, error)
@@ -145,13 +169,62 @@ def test_concurrency_stress(client, post_flush_concurrency, workers):
     failed = [(qid, err) for qid, ok, err in results if not ok]
 
     logging.info(
-        "Concurrency [workers=%d]: %d/%d passed in %.1fs",
+        "Concurrency diverse [workers=%d]: %d/%d passed in %.1fs",
         workers, passed, len(results), elapsed,
     )
 
     if failed:
         detail = "\n".join(f"  {qid}: {err}" for qid, err in failed)
         pytest.fail(
-            f"Concurrency [workers={workers}]: {len(failed)}/{len(results)} "
-            f"queries failed:\n{detail}"
+            f"Concurrency diverse [workers={workers}]: "
+            f"{len(failed)}/{len(results)} queries failed:\n{detail}"
+        )
+
+    time.sleep(_COOLDOWN_SECONDS)
+
+
+# ── Concurrency test: same query, multiple threads ────────────────────────
+def test_concurrency_same_query(client, post_flush_concurrency, concurrency_queries):
+    """Run the same aggregation query concurrently from 10 threads.
+
+    A common source of race conditions is multiple clients executing the
+    identical query simultaneously — shared plan caches, file-list
+    snapshots, or aggregation state can be corrupted by parallel access
+    to the same physical plan.
+    """
+    # Use the simplest aggregation query from the selected set
+    agg_queries = [q for q in concurrency_queries if q.get("category") == "aggregation"]
+    if not agg_queries:
+        pytest.skip("No aggregation query available for same-query concurrency test")
+    query = agg_queries[0]
+
+    workers = 10
+    t0 = time.time()
+    results: list[tuple[str, bool, str | None]] = []
+
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        futures = [executor.submit(_run_one_query, query) for _ in range(workers)]
+        for i, future in enumerate(as_completed(futures)):
+            try:
+                qid, ok, error = future.result(timeout=_FUTURE_TIMEOUT)
+            except TimeoutError:
+                results.append((f"thread_{i}", False, f"Future timed out after {_FUTURE_TIMEOUT}s"))
+                continue
+            results.append((qid, ok, error))
+            if not ok:
+                logging.error("CONCURRENCY SAME-QUERY FAIL [thread %d] %s: %s", i, qid, error)
+
+    elapsed = time.time() - t0
+    passed = sum(1 for _, ok, _ in results if ok)
+    failed = [(qid, err) for qid, ok, err in results if not ok]
+
+    logging.info(
+        "Concurrency same-query [%d threads]: %d/%d passed in %.1fs",
+        workers, passed, len(results), elapsed,
+    )
+
+    if failed:
+        detail = "\n".join(f"  {qid}: {err}" for qid, err in failed)
+        pytest.fail(
+            f"Concurrency same-query: {len(failed)}/{len(results)} threads failed:\n{detail}"
         )

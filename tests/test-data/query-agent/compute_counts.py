@@ -477,7 +477,8 @@ def main():
 
         queries = query_data.get("queries")
         if queries is None:
-            continue  # skip non-query files (e.g. error_paths.json)
+            print(f"  (skipping {fp.name}: no 'queries' key)")
+            continue
         dirty = False
         for q in queries:
             expected = q.get("expected", {})

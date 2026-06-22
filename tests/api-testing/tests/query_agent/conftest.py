@@ -75,7 +75,8 @@ def load_all_queries():
             data = json.load(f)
         queries = data.get("queries")
         if queries is None:
-            continue  # skip non-query files (e.g. error_paths.json)
+            logging.warning("Skipping %s: no 'queries' key (non-query file)", fp.name)
+            continue
         if not single_node_opt:
             queries = [q for q in queries if not q.get("expected", {}).get("skip_without_single_node_opt")]
         categories[fp.stem] = queries

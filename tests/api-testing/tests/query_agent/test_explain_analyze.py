@@ -132,4 +132,15 @@ def test_explain_analyze_cross_schema_rejected(client, explain_post_flush):
     assert 400 <= resp.status_code <= 499, (
         f"EXPLAIN ANALYZE cross-schema: expected 4xx, got {resp.status_code}: {resp.text[:500]}"
     )
-    logging.info("EXPLAIN ANALYZE cross-schema: correctly rejected with %s", resp.status_code)
+
+    # Verify the rejection is for stream resolution (cross-schema/dot-notation),
+    # not a generic syntax error.  The server should reference the unresolved
+    # stream name in its error.
+    body = resp.json()
+    msg = body.get("message", "")
+    assert "rich" in msg or "enrich" in msg or "stream" in msg.lower(), (
+        f"EXPLAIN ANALYZE cross-schema: error message should mention the "
+        f"unresolved stream, got: {msg!r}"
+    )
+
+    logging.info("EXPLAIN ANALYZE cross-schema: correctly rejected with %s — %s", resp.status_code, msg)
