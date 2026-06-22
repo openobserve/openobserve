@@ -425,7 +425,18 @@
     "menuGroupExplain": "Spiegare",
     "fieldValuesEmpty": "Nessun valore trovato.",
     "fieldValuesEmptyHint": "Prova un intervallo di tempo più ampio per visualizzare i valori.",
-    "selectLogsStreamFirst": "Seleziona prima Logs stream"
+    "selectLogsStreamFirst": "Seleziona prima Logs stream",
+    "menuMore": "Altro",
+    "searchInspect": "Cerca Ispeziona",
+    "vrlOnlyForTableWarning": "La funzione VRL è supportata solo per il grafico tabellare.",
+    "customDownloadTitle": "Download personalizzato",
+    "selectFunctionNamePlaceholder": "Seleziona il nome della funzione",
+    "confirmFunctionUpdateTitle": "Conferma aggiornamento",
+    "confirmFunctionUpdateMsg": "Sei sicuro di voler aggiornare la funzione {name}?",
+    "traceIdLabel": "ID di tracciamento:",
+    "enterTraceIdPlaceholder": "Inserisci l'ID di tracciamento",
+    "changeQueryModeTitle": "Cambia la modalità di interrogazione",
+    "changeQueryModeConfirm": "Sei sicuro di voler cambiare la modalità di interrogazione? I dati salvati per gli assi X, Y e i filtri verranno cancellati."
   },
   "menu": {
     "home": "Home",
@@ -3292,7 +3303,16 @@
     },
     "showAll": "Mostra tutto",
     "filterByErrors": "Filtra per errori",
-    "clearErrorFilter": "Cancella filtro errori"
+    "clearErrorFilter": "Cancella filtro errori",
+    "spansTab": "Spaziate",
+    "tracesTab": "Tracce",
+    "serviceGraphTab": "Grafico dei servizi",
+    "treeView": "Vista ad albero",
+    "graphView": "Visualizzazione del grafico",
+    "layoutHorizontal": "orizzontale",
+    "layoutVertical": "Verticale",
+    "layoutForce": "Layout delle forze",
+    "exportTraces": "Esporta tracce"
   },
   "invitation": {
     "pendingInvitations": "Inviti in sospeso",

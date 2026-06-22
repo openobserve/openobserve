@@ -425,7 +425,18 @@
     "menuGroupExplain": "Açıklamak",
     "fieldValuesEmpty": "Değer bulunamadı.",
     "fieldValuesEmptyHint": "Değerleri görmek için daha geniş bir zaman aralığı deneyin.",
-    "selectLogsStreamFirst": "Önce Günlükler akışını seçin"
+    "selectLogsStreamFirst": "Önce Günlükler akışını seçin",
+    "menuMore": "Daha",
+    "searchInspect": "Arayın İnceleyin",
+    "vrlOnlyForTableWarning": "VRL işlevi yalnızca tablo grafiği için desteklenir.",
+    "customDownloadTitle": "Özel İndirme",
+    "selectFunctionNamePlaceholder": "İşlev Adını Seçin",
+    "confirmFunctionUpdateTitle": "Güncellemeyi Onayla",
+    "confirmFunctionUpdateMsg": "{name} işlevini güncellemek istediğinizden emin misiniz?",
+    "traceIdLabel": "İzleme kimliği:",
+    "enterTraceIdPlaceholder": "İzleme kimliğini girin",
+    "changeQueryModeTitle": "Sorgu Modunu Değiştir",
+    "changeQueryModeConfirm": "Sorgu modunu değiştirmek istediğinizden emin misiniz? X Ekseni, Y Ekseni ve Filtreler için kaydedilen veriler silinecektir."
   },
   "menu": {
     "home": "Ana Sayfa",
@@ -3294,7 +3305,16 @@
     },
     "showAll": "Tümünü Göster",
     "filterByErrors": "Hatalara göre filtrele",
-    "clearErrorFilter": "Hata filtresini temizle"
+    "clearErrorFilter": "Hata filtresini temizle",
+    "spansTab": "Açıklıklar",
+    "tracesTab": "İzleri",
+    "serviceGraphTab": "Servis Grafiği",
+    "treeView": "Ağaç Görünümü",
+    "graphView": "Grafik Görünümü",
+    "layoutHorizontal": "Yatay",
+    "layoutVertical": "Dikey",
+    "layoutForce": "Kuvvet Düzeni",
+    "exportTraces": "İzleri Dışa Aktar"
   },
   "invitation": {
     "pendingInvitations": "Bekleyen Davetiyeler",

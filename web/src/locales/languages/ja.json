@@ -425,7 +425,18 @@
     "menuGroupExplain": "説明してください",
     "fieldValuesEmpty": "値が見つかりません。",
     "fieldValuesEmptyHint": "より広い時間範囲を試して値を確認してください。",
-    "selectLogsStreamFirst": "最初に [ログストリーム] を選択します"
+    "selectLogsStreamFirst": "最初に [ログストリーム] を選択します",
+    "menuMore": "もっと",
+    "searchInspect": "検索検査",
+    "vrlOnlyForTableWarning": "VRL機能はテーブルチャートでのみサポートされています。",
+    "customDownloadTitle": "カスタムダウンロード",
+    "selectFunctionNamePlaceholder": "関数名を選択",
+    "confirmFunctionUpdateTitle": "更新を確認",
+    "confirmFunctionUpdateMsg": "関数 {name} を更新してよろしいですか?",
+    "traceIdLabel": "トレース ID:",
+    "enterTraceIdPlaceholder": "トレース ID を入力",
+    "changeQueryModeTitle": "クエリーモードを変更",
+    "changeQueryModeConfirm": "クエリモードを変更してもよろしいですか?X 軸、Y 軸、フィルターに保存されたデータは消去されます。"
   },
   "menu": {
     "home": "ホーム",
@@ -3302,7 +3313,16 @@
     },
     "showAll": "[すべて表示]",
     "filterByErrors": "エラーで絞り込む",
-    "clearErrorFilter": "エラーフィルターをクリア"
+    "clearErrorFilter": "エラーフィルターをクリア",
+    "spansTab": "スパン",
+    "tracesTab": "トレース",
+    "serviceGraphTab": "サービスグラフ",
+    "treeView": "ツリービュー",
+    "graphView": "グラフビュー",
+    "layoutHorizontal": "水平",
+    "layoutVertical": "垂直",
+    "layoutForce": "フォースレイアウト",
+    "exportTraces": "トレースをエクスポート"
   },
   "actions": {
     "testAction": "アクションをテスト",
