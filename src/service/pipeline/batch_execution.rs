@@ -424,6 +424,9 @@ impl ExecutablePipeline {
             ));
             node_tasks.push(task);
         }
+        // Measure node task duration from when they were spawned (they start running
+        // immediately), not from when we await them below.
+        let node_tasks_start = Instant::now();
 
         // task to collect results
         let pl_name_for_results = pipeline_name.clone();
@@ -500,7 +503,6 @@ impl ExecutablePipeline {
         log::debug!(
             "[Pipeline] {pipeline_name} [inv={inv_id}]: waiting for all node tasks to complete"
         );
-        let node_tasks_start = Instant::now();
         if let Err(e) = try_join_all(node_tasks).await {
             log::error!(
                 "[Pipeline] {pipeline_name} [inv={inv_id}]: node processing jobs failed: {e}"
@@ -1636,7 +1638,7 @@ async fn process_node(
         // busy_ms under low CPU points at upstream/downstream stalls, not this node.
         let wait_ms = node_ms.saturating_sub(busy_ms);
         log::info!(
-            "[Pipeline:Timing] [inv={inv_id}] node idx={node_idx} type={node_type} label={node_label} records={count} node_ms={node_ms} busy_ms={busy_ms} wait_ms={wait_ms}"
+            "[Pipeline:Timing] [inv={inv_id}] name={pipeline_name} node idx={node_idx} type={node_type} label={node_label} records={count} node_ms={node_ms} busy_ms={busy_ms} wait_ms={wait_ms}"
         );
     }
 
