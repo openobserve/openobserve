@@ -1081,6 +1081,26 @@
               </div>
             </div>
           </div>
+          <!-- Completed tool calls during streaming - keep progress visible
+               so each step stays on screen instead of flashing away while it
+               sits in pendingToolCalls waiting for the assistant's text. -->
+          <div
+            v-for="(block, pIdx) in pendingToolCalls"
+            v-show="block.type === 'tool_call'"
+            :key="'pending-tc-' + pIdx"
+            class="tool-call-indicator completed"
+            :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'"
+          >
+            <div class="tool-call-content">
+              <OIcon
+                :name="block.success === false ? 'error' : 'check-circle'"
+                size="sm"
+              />
+              <div class="tool-call-info">
+                <span class="tool-call-message">{{ block.message }}</span>
+              </div>
+            </div>
+          </div>
           <!-- Tool call indicator - shows outside message box -->
           <div
             v-if="activeToolCall"
@@ -1997,6 +2017,33 @@ export default defineComponent({
           }
         }
 
+        // Persist any tool calls that completed before the user hit Stop.
+        // During the tool phase (before the assistant streams text) completed
+        // steps sit in pendingToolCalls and aren't attached to a message yet,
+        // so without this they'd vanish on cancel. Runs after the partial-
+        // message cleanup above so the empty-assistant-message pop can't drop
+        // the message we attach them to.
+        if (pendingToolCalls.value.length) {
+          const lastMessage =
+            chatMessages.value[chatMessages.value.length - 1];
+          if (lastMessage && lastMessage.role === "assistant") {
+            if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
+            // Tools ran before any text, so place them ahead of it.
+            lastMessage.contentBlocks.unshift(...pendingToolCalls.value);
+          } else {
+            const stoppedNote = "_[Response stopped by user]_";
+            chatMessages.value.push({
+              role: "assistant",
+              content: stoppedNote,
+              contentBlocks: [
+                ...pendingToolCalls.value,
+                { type: "text", text: stoppedNote },
+              ],
+            });
+          }
+          pendingToolCalls.value = [];
+        }
+
         // Reset streaming state
         currentStreamingMessage.value = "";
         currentTextSegment.value = "";
@@ -2537,6 +2584,30 @@ export default defineComponent({
                         pendingToolCalls.value.push(completedToolBlock);
                       }
                       if (isActive()) activeToolCall.value = null;
+                    }
+                    // Flush any tool calls that completed before the assistant
+                    // produced text. With opencode, action-only turns (dashboard/
+                    // alert creation, navigation) finish without any `message`
+                    // event, so these blocks would otherwise stay stranded in
+                    // pendingToolCalls and never render — the user sees progress
+                    // "flash and disappear".
+                    if (pendingToolCalls.value.length) {
+                      let lastMessage = msgs[msgs.length - 1];
+                      if (lastMessage && lastMessage.role === "assistant") {
+                        if (!lastMessage.contentBlocks)
+                          lastMessage.contentBlocks = [];
+                        lastMessage.contentBlocks.push(
+                          ...pendingToolCalls.value,
+                        );
+                      } else {
+                        msgs.push({
+                          role: "assistant",
+                          content: "",
+                          contentBlocks: [...pendingToolCalls.value],
+                        });
+                      }
+                      pendingToolCalls.value = [];
+                      if (isActive()) await throttledSaveCtx(true);
                     }
                     continue;
                   }
@@ -6660,6 +6731,18 @@ export default defineComponent({
   &.dark-mode {
     background: linear-gradient(135deg, #1e2235 0%, #252a3d 100%);
     border: 1px solid #3a3f55;
+  }
+
+  // Completed step shown live during streaming — more compact and subdued
+  // than the active (spinner) indicator so the in-flight step still stands out.
+  &.completed {
+    padding: 8px 16px;
+    margin: 4px 0;
+
+    .tool-call-message {
+      font-weight: 500;
+      opacity: 0.85;
+    }
   }
 
   .tool-call-content {
