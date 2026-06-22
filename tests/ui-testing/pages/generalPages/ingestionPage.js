@@ -2,6 +2,22 @@
 import logsdata from "../../../test-data/logs_data.json";
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 const { getAuthHeaders, getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
+
+async function fetchWithRetry(url, options, maxRetries = 3) {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fetch(url, options);
+    } catch (err) {
+      const message = String(err && err.message ? err.message : err);
+      const isTransient = /premature close|ECONNRESET|socket hang up|network|EPIPE|other side closed/i.test(message);
+      if (!isTransient || attempt === maxRetries) throw err;
+      const backoffMs = 500 * (attempt + 1);
+      testLogger.warn('Transient fetch error, retrying ingestion', { url, attempt: attempt + 1, maxRetries, error: message, backoffMs });
+      await new Promise((resolve) => setTimeout(resolve, backoffMs));
+    }
+  }
+}
+
 export class IngestionPage {
   constructor(page) {
     this.page = page;
@@ -10,7 +26,7 @@ export class IngestionPage {
     const orgId = getOrgIdentifier();
     const streamName = "e2e_automate";
     const headers = getAuthHeaders();
-    const fetchResponse = await fetch(
+    const fetchResponse = await fetchWithRetry(
       `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`,
       {
         method: "POST",
@@ -70,7 +86,7 @@ export class IngestionPage {
   async ingestionMultiOrg(orgId) {
     const streamName = "e2e_automate";
     const headers = getAuthHeaders();
-    const fetchResponse = await fetch(
+    const fetchResponse = await fetchWithRetry(
       `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`,
       {
         method: "POST",
@@ -96,7 +112,7 @@ export class IngestionPage {
 
   async ingestionMultiOrgStream(orgId, streamName) {
     const headers = getAuthHeaders();
-    const fetchResponse = await fetch(
+    const fetchResponse = await fetchWithRetry(
       `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`,
       {
         method: "POST",
@@ -158,7 +174,7 @@ export class IngestionPage {
       testLogger.debug(`ingestionJoinUnion: Ingesting to stream '${streamName}' at ${url}`);
 
       try {
-        const response = await fetch(url, {
+        const response = await fetchWithRetry(url, {
           method: "POST",
           headers: headers,
           body: JSON.stringify(logsdata),

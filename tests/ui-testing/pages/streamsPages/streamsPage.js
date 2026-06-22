@@ -5,7 +5,16 @@ import { IngestionPage } from '../generalPages/ingestionPage.js';
 import { ManagementPage } from '../generalPages/managementPage.js';
 
 import { getHeaders, getIngestionUrl, sendRequest } from '../../utils/apiUtils.js';
+const http = require('http');
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
+
+// node-fetch v2 keep-alive pooling + gzip decompression is the root cause of
+// "Premature close" / ECONNRESET flakiness in CI.
+const _noKeepAliveAgent = new http.Agent({ keepAlive: false });
+async function _nodeFetchSafe(url, opts = {}) {
+    const fetch = (await import('node-fetch')).default;
+    return fetch(url, { ...opts, compress: false, agent: _noKeepAliveAgent });
+}
 
 export class StreamsPage {
     constructor(page) {
@@ -559,9 +568,8 @@ export class StreamsPage {
             }
 
             // Self-hosted: use node-fetch with Basic Auth
-            const fetch = (await import('node-fetch')).default;
             const headers = getHeaders();
-            const response = await fetch(`${process.env.INGESTION_URL}/api/${orgId}/streams/${streamName}?type=${streamType}`, {
+            const response = await _nodeFetchSafe(`${process.env.INGESTION_URL}/api/${orgId}/streams/${streamName}?type=${streamType}`, {
                 method: 'POST',
                 headers: headers,
                 body: JSON.stringify(payload)
@@ -610,9 +618,8 @@ export class StreamsPage {
             }
 
             // Self-hosted: use node-fetch with Basic Auth
-            const fetch = (await import('node-fetch')).default;
             const headers = getHeaders();
-            const response = await fetch(`${process.env.INGESTION_URL}/api/${orgId}/streams`, {
+            const response = await _nodeFetchSafe(`${process.env.INGESTION_URL}/api/${orgId}/streams`, {
                 method: 'GET',
                 headers: headers
             });
@@ -674,9 +681,8 @@ export class StreamsPage {
                 data = result;
             } else {
                 // Self-hosted: use node-fetch with Basic Auth
-                const fetch = (await import('node-fetch')).default;
                 const headers = getHeaders();
-                const response = await fetch(`${process.env.INGESTION_URL}/api/${orgId}/_search?type=logs`, {
+                const response = await _nodeFetchSafe(`${process.env.INGESTION_URL}/api/${orgId}/_search?type=logs`, {
                     method: 'POST',
                     headers: headers,
                     body: JSON.stringify(query)
@@ -907,9 +913,8 @@ export class StreamsPage {
             }
 
             // Self-hosted: use node-fetch with Basic Auth
-            const fetch = (await import('node-fetch')).default;
             const headers = getHeaders();
-            const response = await fetch(`${process.env.INGESTION_URL}/api/${orgId}/streams/${streamName}?type=${streamType}`, {
+            const response = await _nodeFetchSafe(`${process.env.INGESTION_URL}/api/${orgId}/streams/${streamName}?type=${streamType}`, {
                 method: 'DELETE',
                 headers: headers
             });
