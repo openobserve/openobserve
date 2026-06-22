@@ -324,7 +324,9 @@ impl ExecutablePipeline {
         // never per-record, to stay safe under high ingestion rate.
         let print_event = config::get_config().common.print_key_event;
         let batch_start = Instant::now();
-        log::info!("[Pipeline] {pipeline_name} [inv={inv_id}]: process batch of size {batch_size}");
+        log::debug!(
+            "[Pipeline] {pipeline_name} [inv={inv_id}]: process batch of size {batch_size}"
+        );
         if batch_size == 0 {
             return Ok(HashMap::default());
         }
@@ -427,7 +429,7 @@ impl ExecutablePipeline {
         let pl_name_for_results = pipeline_name.clone();
         let inv_id_for_results = inv_id.clone();
         let result_task = tokio::spawn(async move {
-            log::info!(
+            log::debug!(
                 "[Pipeline] {pl_name_for_results} [inv={inv_id_for_results}]: starts result collecting job"
             );
             let mut results = HashMap::new();
@@ -490,10 +492,12 @@ impl ExecutablePipeline {
         drop(result_sender);
         drop(error_sender);
         drop(node_senders);
-        log::debug!("[Pipeline] {pipeline_name} [inv={inv_id}]: All records send into pipeline for processing");
+        log::debug!(
+            "[Pipeline] {pipeline_name} [inv={inv_id}]: All records send into pipeline for processing"
+        );
 
         // Wait for all node tasks to complete
-        log::info!(
+        log::debug!(
             "[Pipeline] {pipeline_name} [inv={inv_id}]: waiting for all node tasks to complete"
         );
         let node_tasks_start = Instant::now();
@@ -503,10 +507,10 @@ impl ExecutablePipeline {
             );
         }
         let node_tasks_ms = node_tasks_start.elapsed().as_millis();
-        log::info!("[Pipeline] {pipeline_name} [inv={inv_id}]: all node tasks completed");
+        log::debug!("[Pipeline] {pipeline_name} [inv={inv_id}]: all node tasks completed");
 
         // Publish errors if received any
-        log::info!("[Pipeline] {pipeline_name} [inv={inv_id}]: awaiting error task");
+        log::debug!("[Pipeline] {pipeline_name} [inv={inv_id}]: awaiting error task");
         let error_task_start = Instant::now();
         if let Some(pipeline_errors) = error_task.await.map_err(|e| {
             log::error!(
@@ -515,7 +519,7 @@ impl ExecutablePipeline {
             anyhow!("[Pipeline] error collecting job failed: {}", e)
         })? {
             let stream_params = self.get_source_stream_params();
-            log::info!(
+            log::error!(
                 "[Pipeline] [inv={inv_id}] id: {}, name: {}, node_errors: {:?}",
                 pipeline_errors.pipeline_id,
                 pipeline_errors.pipeline_name,
@@ -526,12 +530,14 @@ impl ExecutablePipeline {
                 stream_params,
                 error_source: ErrorSource::Pipeline(pipeline_errors),
             };
-            log::debug!("[Pipeline] {pipeline_name} [inv={inv_id}]: execution errors occurred and published");
+            log::debug!(
+                "[Pipeline] {pipeline_name} [inv={inv_id}]: execution errors occurred and published"
+            );
             publish_error(error_data).await;
         }
         let error_collect_ms = error_task_start.elapsed().as_millis();
 
-        log::info!("[Pipeline] {pipeline_name} [inv={inv_id}]: awaiting result collector");
+        log::debug!("[Pipeline] {pipeline_name} [inv={inv_id}]: awaiting result collector");
         let result_task_start = Instant::now();
         let results = result_task.await.map_err(|e| {
             log::error!(
@@ -540,7 +546,7 @@ impl ExecutablePipeline {
             anyhow!("[Pipeline] result collecting job failed: {}", e)
         })?;
         let result_collect_ms = result_task_start.elapsed().as_millis();
-        log::info!(
+        log::debug!(
             "[Pipeline] {pipeline_name} [inv={inv_id}]: result collector returned {} stream groups",
             results.len()
         );
@@ -744,7 +750,7 @@ async fn process_node(
     match &node.node_data {
         NodeData::Stream(stream_params) => {
             if node.children.is_empty() {
-                log::info!(
+                log::debug!(
                     "[Pipeline] {pipeline_name} [inv={inv_id}]: Leaf node {node_idx} starts processing (stream={}:{})",
                     stream_params.stream_type,
                     stream_params.stream_name,
@@ -845,7 +851,7 @@ async fn process_node(
                     let org = org_id.to_string();
                     let pl_name = pipeline_name.clone();
                     let inv = inv_id.clone();
-                    log::info!(
+                    log::debug!(
                         "[Pipeline] {pl_name} [inv={inv}]: LeafNode {node_idx} spawning background ingestion for {record_count} cross-type records to {dest_stream_type}:{dest_stream_name}",
                     );
                     tokio::spawn(async move {
@@ -859,7 +865,7 @@ async fn process_node(
                         };
                         match crate::service::ingestion::ingestion_service::ingest(req).await {
                             Ok(resp) if resp.status_code == 200 => {
-                                log::info!(
+                                log::debug!(
                                     "[Pipeline] {pl_name} [inv={inv}]: cross-type ingestion successful to {dest_stream_type}:{dest_stream_name}, records: {record_count}",
                                 );
                             }
@@ -879,13 +885,15 @@ async fn process_node(
                     });
                 }
 
-                log::info!(
+                log::debug!(
                     "[Pipeline] {pipeline_name} [inv={inv_id}]: LeafNode {node_idx} done processing {count} records (stream={}:{})",
                     stream_params.stream_type,
                     stream_params.stream_name
                 );
             } else {
-                log::debug!("[Pipeline] {pipeline_name} [inv={inv_id}]: source node {node_idx} starts processing");
+                log::debug!(
+                    "[Pipeline] {pipeline_name} [inv={inv_id}]: source node {node_idx} starts processing"
+                );
                 // source stream node: send received record to all its children
                 while let Some(item) = receiver.recv().await {
                     send_to_children(&mut child_senders, item, "StreamNode").await;
@@ -897,7 +905,9 @@ async fn process_node(
             }
         }
         NodeData::Condition(condition_params) => {
-            log::info!("[Pipeline] {pipeline_name} [inv={inv_id}]: cond node {node_idx} starts processing");
+            log::debug!(
+                "[Pipeline] {pipeline_name} [inv={inv_id}]: cond node {node_idx} starts processing"
+            );
             let mut total_received: usize = 0;
             while let Some(pipeline_item) = receiver.recv().await {
                 total_received += 1;
@@ -965,7 +975,9 @@ async fn process_node(
             );
         }
         NodeData::Function(func_params) => {
-            log::debug!("[Pipeline] {pipeline_name} [inv={inv_id}]: func node {node_idx} starts processing");
+            log::debug!(
+                "[Pipeline] {pipeline_name} [inv={inv_id}]: func node {node_idx} starts processing"
+            );
             let mut vrl_runtime_state = crate::service::ingestion::init_functions_runtime();
             let stream_name = stream_name.unwrap_or("pipeline".to_string());
             let mut result_array_records = Vec::new();
@@ -1234,16 +1246,22 @@ async fn process_node(
                     }
                 }
             }
-            log::debug!("[Pipeline] {pipeline_name} [inv={inv_id}]: func node {node_idx} done processing {count} records");
+            log::debug!(
+                "[Pipeline] {pipeline_name} [inv={inv_id}]: func node {node_idx} done processing {count} records"
+            );
         }
         NodeData::Query(_) => {
             // source node for Scheduled pipeline. Directly send to children nodes
-            log::debug!("[Pipeline] {pipeline_name} [inv={inv_id}]: query node {node_idx} starts processing");
+            log::debug!(
+                "[Pipeline] {pipeline_name} [inv={inv_id}]: query node {node_idx} starts processing"
+            );
             while let Some(item) = receiver.recv().await {
                 send_to_children(&mut child_senders, item, "QueryNode").await;
                 count += 1;
             }
-            log::debug!("[Pipeline] {pipeline_name} [inv={inv_id}]: query node {node_idx} done processing {count} records");
+            log::debug!(
+                "[Pipeline] {pipeline_name} [inv={inv_id}]: query node {node_idx} done processing {count} records"
+            );
         }
         #[cfg(feature = "enterprise")]
         NodeData::RemoteStream(remote_stream) => {
@@ -1425,7 +1443,9 @@ async fn process_node(
                 }
             }
 
-            log::debug!("[Pipeline] {pipeline_name} [inv={inv_id}]: DestinationNode {node_idx} done processing {count} records");
+            log::debug!(
+                "[Pipeline] {pipeline_name} [inv={inv_id}]: DestinationNode {node_idx} done processing {count} records"
+            );
         }
         #[cfg(not(feature = "enterprise"))]
         NodeData::RemoteStream(_) => {
@@ -1452,11 +1472,15 @@ async fn process_node(
                 while receiver.recv().await.is_some() {
                     count += 1;
                 }
-                log::info!("[Pipeline] {pipeline_name} [inv={inv_id}]: LLM evaluation node {node_idx} skipped {count} records");
+                log::info!(
+                    "[Pipeline] {pipeline_name} [inv={inv_id}]: LLM evaluation node {node_idx} skipped {count} records"
+                );
                 return Ok(());
             }
 
-            log::info!("[Pipeline] {pipeline_name} [inv={inv_id}]: LLM evaluation node {node_idx} starts processing");
+            log::info!(
+                "[Pipeline] {pipeline_name} [inv={inv_id}]: LLM evaluation node {node_idx} starts processing"
+            );
 
             if let Err(e) =
                 crate::service::self_reporting::ensure_llm_scores_stream_initialized(&org_id).await
@@ -1600,7 +1624,7 @@ async fn process_node(
     }
 
     // all cloned senders dropped when function goes out of scope -> close the channel
-    log::info!(
+    log::debug!(
         "[Pipeline] {pipeline_name} [inv={inv_id}]: node {node_idx} ({:?}) task returning",
         node.node_data
     );

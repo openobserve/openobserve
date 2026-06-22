@@ -3452,7 +3452,9 @@
     "import_this_pattern": "导入此模式",
     "patterns_loaded": "已加载 {count} 个模式",
     "failed_to_load": "加载模式失败",
-    "no_patterns_selected": "请至少选择一种模式"
+    "no_patterns_selected": "请至少选择一种模式",
+    "name_required": "* 姓名为必填项",
+    "pattern_required": "* 图案为必填项"
   },
   "search_history": {
     "title": "搜索历史",

@@ -25,6 +25,8 @@ export interface TextareaProps {
   readonly?: boolean;
   /** Prevents interaction */
   disabled?: boolean;
+  /** Marks the field required — renders a `*` after the label (no manual ` *`). */
+  required?: boolean;
   /** Focuses the textarea on mount */
   autofocus?: boolean;
   /** Maximum character length — shows a counter when set */

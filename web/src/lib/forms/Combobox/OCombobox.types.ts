@@ -29,6 +29,8 @@ export interface ComboboxProps {
   valueReplaceFn?: (option: ComboboxOption) => string;
   /** Disables the control */
   disabled?: boolean;
+  /** Marks the field required — renders a `*` after the label (no manual ` *`). */
+  required?: boolean;
   /** Input size */
   size?: "sm" | "md";
   /** Whether the input is in an error state */

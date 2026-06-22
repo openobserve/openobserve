@@ -29,6 +29,7 @@ use config::{
     meta::triggers::{Trigger, TriggerModule, TriggerStatus},
     utils::size::bytes_to_human_readable,
 };
+use infra::runtime::{create_grpc_runtime, create_job_runtime};
 use openobserve::{
     cli::basic::cli,
     common::{
@@ -205,15 +206,7 @@ async fn main() -> Result<(), anyhow::Error> {
     let (job_shutudown_tx, job_shutdown_rx) = oneshot::channel();
     let (job_stopped_tx, job_stopped_rx) = oneshot::channel();
     let job_rt_handle = std::thread::spawn(move || {
-        let cfg = get_config();
-        let Ok(rt) = tokio::runtime::Builder::new_multi_thread()
-            .worker_threads(cfg.limit.job_runtime_worker_num)
-            .enable_all()
-            .thread_name("job_runtime")
-            .thread_stack_size(16 * 1024 * 1024)
-            .max_blocking_threads(cfg.limit.job_runtime_blocking_worker_num)
-            .build()
-        else {
+        let Ok(rt) = create_job_runtime() else {
             job_init_tx.send(false).ok();
             panic!("job runtime init failed")
         };
@@ -303,14 +296,10 @@ async fn main() -> Result<(), anyhow::Error> {
     let (grpc_shutudown_tx, grpc_shutdown_rx) = oneshot::channel();
     let (grpc_stopped_tx, grpc_stopped_rx) = oneshot::channel();
     let grpc_rt_handle = std::thread::spawn(move || {
-        let cfg = get_config();
-        let rt = tokio::runtime::Builder::new_multi_thread()
-            .worker_threads(cfg.limit.grpc_runtime_worker_num)
-            .enable_all()
-            .thread_name("grpc_runtime")
-            .max_blocking_threads(cfg.limit.grpc_runtime_blocking_worker_num)
-            .build()
-            .expect("grpc runtime init failed");
+        let Ok(rt) = create_grpc_runtime() else {
+            grpc_init_tx.send(()).ok();
+            panic!("grpc runtime init failed");
+        };
 
         // Register gRPC runtime for metrics collection
         openobserve::service::runtime_metrics::register_runtime(

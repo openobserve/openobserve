@@ -3448,7 +3448,9 @@
     "import_this_pattern": "Dieses Muster importieren",
     "patterns_loaded": "{count} Muster (e) geladen",
     "failed_to_load": "Muster konnten nicht geladen werden",
-    "no_patterns_selected": "Bitte wählen Sie mindestens ein Muster aus"
+    "no_patterns_selected": "Bitte wählen Sie mindestens ein Muster aus",
+    "name_required": "* Name ist erforderlich",
+    "pattern_required": "* Muster ist erforderlich"
   },
   "search_history": {
     "title": "Verlauf durchsuchen",

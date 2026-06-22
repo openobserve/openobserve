@@ -23,10 +23,10 @@ test.describe("AddToDashboard form validation", () => {
         pm = new PageManager(page);
     });
 
-    test("should disable submit button when panel title is empty", {
+    test("should keep submit button enabled when panel title is empty", {
         tag: ['@shared-components-form-validation', '@P0', '@smoke']
     }, async ({ page }) => {
-        testLogger.info('Verifying submit button is disabled when panel title is empty');
+        testLogger.info('Verifying submit button stays enabled when panel title is empty (R3)');
 
         await pm.sharedComponentsFormValidation.navigateToMetrics();
 
@@ -41,19 +41,20 @@ test.describe("AddToDashboard form validation", () => {
 
         testLogger.info('AddToDashboard dialog opened');
 
-        // Panel title is empty on open — primary button must be disabled
-        // (:primary-button-disabled="!panelTitle.trim()")
+        // Under the OForm foundation the Add button is ALWAYS enabled — the Zod
+        // schema gates the save on submit, not a disabled button. So an empty
+        // panel title leaves the button enabled (clicking it reveals the error).
         await expect(
             pm.sharedComponentsFormValidation.getAddToDashboardSubmitBtnLocator()
-        ).toBeDisabled();
+        ).toBeEnabled();
 
-        testLogger.info('Submit button correctly disabled for empty panel title');
+        testLogger.info('Submit button correctly stays enabled for empty panel title');
     });
 
     test("should show validation error when panel title is submitted empty via form", {
         tag: ['@shared-components-form-validation', '@P0', '@smoke']
     }, async ({ page }) => {
-        testLogger.info('Verifying panel title error message when field is left empty');
+        testLogger.info('Verifying panel title error message when submitted empty');
 
         await pm.sharedComponentsFormValidation.navigateToMetrics();
         await pm.metricsPage.enterMetricsQuery('up');
@@ -62,20 +63,20 @@ test.describe("AddToDashboard form validation", () => {
         await pm.metricsPage.openAddToDashboardDialog();
         await pm.sharedComponentsFormValidation.waitForAddToDashboardDialog();
 
-        // Fill something then clear to trigger the validator
-        await pm.sharedComponentsFormValidation.fillPanelTitle('temp');
-        await pm.sharedComponentsFormValidation.clearPanelTitle();
+        // OForm validates on submit — clicking the (always-enabled) Add button
+        // with an empty title runs the schema and reveals the required error.
+        await pm.sharedComponentsFormValidation.clickAddToDashboardSubmit();
 
-        // Validator: (val) => !String(val ?? '').trim() ? 'Panel Title required' : undefined
+        // Schema: panelTitle z.string().trim().min(1, "Panel Title required")
         const errorLocator = pm.sharedComponentsFormValidation.getPanelTitleErrorLocator();
         await errorLocator.waitFor({ state: 'visible' });
         await expect(errorLocator).toBeVisible();
         await expect(errorLocator).toContainText('Panel Title required');
 
-        // Submit button still disabled
+        // The button stays enabled (the schema gates the save, not a disabled button).
         await expect(
             pm.sharedComponentsFormValidation.getAddToDashboardSubmitBtnLocator()
-        ).toBeDisabled();
+        ).toBeEnabled();
 
         testLogger.info('Panel title error message correctly shown');
     });

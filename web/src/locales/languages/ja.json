@@ -3448,7 +3448,9 @@
     "import_this_pattern": "このパターンをインポート",
     "patterns_loaded": "{count} 個のパターンをロードしました",
     "failed_to_load": "パターンを読み込めませんでした",
-    "no_patterns_selected": "少なくとも 1 つのパターンを選択してください"
+    "no_patterns_selected": "少なくとも 1 つのパターンを選択してください",
+    "name_required": "* 名前が必要です",
+    "pattern_required": "* パターンは必須です"
   },
   "search_history": {
     "title": "検索履歴",
