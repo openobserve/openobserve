@@ -21,26 +21,73 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OSelect
         data-test="dashboard-color-palette-select"
         v-model="dashboardPanelData.data.config.color.mode"
-        :options="colorOptions"
         :label="t('dashboard.colorPalette')"
         class="showLabelOnTop tw:flex-1"
         @update:model-value="onColorModeChange"
         :dropdownStyle="{ width: '240px' }"
       >
-        <template #icon-left>
-          <span
-            v-if="selectedOptionPalette.length"
-            class="palette-preview"
-            aria-hidden="true"
-          >
+        <template #trigger>
+          <div class="trigger-preview">
             <span
-              v-for="(color, i) in selectedOptionPalette.slice(0, 5)"
-              :key="i"
-              class="palette-preview-dot"
-              :style="{ background: color }"
-            />
-          </span>
+              v-if="selectedOptionPalette.length"
+              class="palette-preview"
+              aria-hidden="true"
+            >
+              <span
+                v-for="(color, i) in selectedOptionPalette.slice(0, 3)"
+                :key="i"
+                class="palette-preview-dot"
+                :style="{ background: color }"
+              />
+            </span>
+            <span class="trigger-label">{{ selectedOptionLabel }}</span>
+          </div>
         </template>
+
+        <!-- By Series group -->
+        <OSelectGroup :label="t('dashboard.colorBySeries')">
+          <OSelectItem
+            v-for="opt in colorOptionsByGroup.bySeries"
+            :key="opt.value"
+            :value="opt.value"
+            :label="opt.label"
+          >
+            <div class="color-option-row">
+              <span v-if="opt.colorPalette?.length" class="palette-preview" aria-hidden="true">
+                <span
+                  v-for="(c, i) in opt.colorPalette.slice(0, 5)"
+                  :key="i"
+                  class="palette-preview-dot"
+                  :style="{ background: c }"
+                />
+              </span>
+              <span class="color-option-label">{{ opt.label }}</span>
+            </div>
+          </OSelectItem>
+
+          <OSelectItem value="fixed" :label="t('dashboard.colorSingleColor')" />
+          <OSelectItem value="shades" :label="t('dashboard.colorShadesOfSpecificColor')" />
+        </OSelectGroup>
+
+        <!-- By Value group -->
+        <OSelectGroup :label="t('dashboard.colorByValue')">
+          <OSelectItem
+            v-for="opt in colorOptionsByGroup.byValue"
+            :key="opt.value"
+            :value="opt.value"
+            :label="opt.label"
+          >
+            <div class="color-option-row">
+              <span
+                v-if="opt.colorPalette?.length"
+                class="gradient-preview"
+                aria-hidden="true"
+                :style="{ background: `linear-gradient(to right, ${opt.colorPalette.join(', ')})` }"
+              />
+              <span class="color-option-label">{{ opt.label }}</span>
+            </div>
+          </OSelectItem>
+        </OSelectGroup>
       </OSelect>
 
       <!-- color picker for fixed and shades typed color mode -->
@@ -94,10 +141,12 @@ import { useI18n } from "vue-i18n";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OSelectItem from "@/lib/forms/Select/OSelectItem.vue";
+import OSelectGroup from "@/lib/forms/Select/OSelectGroup.vue";
 
 export default defineComponent({
   name: "ColorPaletteDropdown",
-  components: { OToggleGroup, OToggleGroupItem, OSelect },
+  components: { OToggleGroup, OToggleGroupItem, OSelect, OSelectItem, OSelectGroup },
   setup() {
     const { t } = useI18n();
 
@@ -209,6 +258,13 @@ export default defineComponent({
         : t("dashboard.colorPaletteClassicBySeries");
     });
 
+    const colorOptionsByGroup = computed(() => ({
+      bySeries: colorOptions.filter(
+        (o) => !o.header && !o.value?.startsWith("continuous") && o.value !== "fixed" && o.value !== "shades",
+      ),
+      byValue: colorOptions.filter((o) => o.value?.startsWith("continuous")),
+    }));
+
     const selectedOptionPalette = computed<string[]>(() => {
       const mode = dashboardPanelData?.data?.config?.color?.mode ?? "palette-classic-by-series";
       if (["fixed", "shades"].includes(mode)) {
@@ -241,6 +297,7 @@ export default defineComponent({
       dashboardPanelData,
       promqlMode,
       colorOptions,
+      colorOptionsByGroup,
       onColorModeChange,
       selectedOptionLabel,
       selectedOptionPalette,
@@ -316,6 +373,48 @@ export default defineComponent({
   width: 0.5rem;
   height: 0.5rem;
   border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.trigger-preview {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.trigger-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.875rem;
+  color: var(--color-text-primary);
+}
+
+.color-option-row {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  width: 100%;
+  min-width: 0;
+}
+
+.color-option-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gradient-preview {
+  display: block;
+  width: 2.5rem;
+  height: 0.5rem;
+  border-radius: 0.1875rem;
   flex-shrink: 0;
 }
 </style>

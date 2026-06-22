@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div :class="{ 'drag-allow': !viewOnly && !simplifiedPanelView }">
       <div
         class="tw:flex tw:flex-nowrap tw:items-center tw:w-full tw:min-h-7 tw:py-1 tw:px-2 tw:border-b tw:border-border-subtle panel-bar"
-        :class="{ 'dark-mode': store.state.theme === 'dark' }"
+        :class="{ 'dark-mode': store.state.theme === 'dark', 'panel-bar--loading': isPanelLoading }"
         data-test="dashboard-panel-bar"
       >
         <OIcon
@@ -1027,6 +1027,8 @@ export default defineComponent({
   height: 100%;
   display: flex;
   flex-direction: column;
+  border-radius: 0.5rem;
+  overflow: hidden;
 }
 
 .drag-allow {
@@ -1045,6 +1047,10 @@ export default defineComponent({
 .panel-bar {
   border-top-left-radius: 0.5rem;
   border-top-right-radius: 0.5rem;
+}
+
+.panel-bar--loading {
+  border-bottom-color: transparent;
 }
 
 .panelHeader {
