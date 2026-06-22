@@ -65,7 +65,7 @@
                   Copy
                 </OButton>
               </div>
-              <div class="tw:relative tw:group">
+              <div class="tw:relative tw:group tw:mt-1">
                 <div
                   class="tw:p-2 tw:rounded-lg tw:bg-[var(--o2-body-primary-bg)] tw:border tw:border-[var(--o2-border-color)] tw:font-mono tw:text-sm tw:max-h-40 tw:overflow-y-auto tw:whitespace-pre-wrap tw:break-all tw:[scrollbar-width:thin] tw:[scrollbar-color:rgba(128,128,128,0.2)_transparent]"
                   :data-test="`query-inspector-original-query-${index}`"
@@ -95,7 +95,7 @@
                   Copy
                 </OButton>
               </div>
-              <div class="tw:relative tw:group">
+              <div class="tw:relative tw:group tw:mt-1">
                 <div
                   class="tw:p-2 tw:rounded-lg tw:bg-[var(--o2-body-primary-bg)] tw:border tw:border-[var(--o2-border-color)] tw:font-mono tw:text-sm tw:max-h-40 tw:overflow-y-auto tw:whitespace-pre-wrap tw:break-all tw:[scrollbar-width:thin] tw:[scrollbar-color:rgba(128,128,128,0.2)_transparent]"
                   :data-test="`query-inspector-executed-query-${index}`"
@@ -158,7 +158,7 @@
                 <label class="tw:text-xs tw:font-bold tw:tracking-wider"
                   >Variable(s)</label
                 >
-                <div class="tw:flex tw:flex-wrap tw:gap-2">
+                <div class="tw:flex tw:flex-wrap tw:gap-2 tw:mt-1">
                   <template v-if="getVariablesByType(query, 'variable').length">
                     <div
                       v-for="v in getVariablesByType(query, 'variable')"
@@ -187,7 +187,7 @@
                 <label class="tw:text-xs tw:font-bold tw:tracking-wider"
                   >Fixed Variable(s)</label
                 >
-                <div class="tw:flex tw:flex-wrap tw:gap-2">
+                <div class="tw:flex tw:flex-wrap tw:gap-2 tw:mt-1">
                   <template v-if="getVariablesByType(query, 'fixed').length">
                     <div
                       v-for="v in getVariablesByType(query, 'fixed')"
@@ -216,7 +216,7 @@
                 <label class="tw:text-xs tw:font-bold tw:tracking-wider"
                   >Dynamic Variable(s)</label
                 >
-                <div class="tw:flex tw:flex-wrap tw:gap-2">
+                <div class="tw:flex tw:flex-wrap tw:gap-2 tw:mt-1">
                   <template
                     v-if="getVariablesByType(query, 'dynamicVariable').length"
                   >
