@@ -272,6 +272,15 @@ describe("OverrideConfigPopup", () => {
       expect(wrapper.emitted("close")).toBeTruthy();
     });
 
+    it("can save with no fields (clears all overrides)", async () => {
+      wrapper = await createWrapper({ overrideConfig: { overrideConfigs: [] } });
+      expect(wrapper.vm.columnOverrides).toHaveLength(0);
+      wrapper.vm.saveOverrides();
+      const saved = wrapper.emitted("save")?.[0]?.[0];
+      expect(saved).toEqual([]);
+      expect(wrapper.emitted("close")).toBeTruthy();
+    });
+
     it("emits close on cancel", async () => {
       wrapper = await createWrapper();
       wrapper.vm.closePopup();

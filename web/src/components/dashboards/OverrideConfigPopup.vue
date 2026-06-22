@@ -232,7 +232,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
           <OButton
             variant="primary"
-            :disabled="!columnOverrides.length"
             data-test="override-config-popup-save"
             @click="saveOverrides"
           >
