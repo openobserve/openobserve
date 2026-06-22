@@ -59,6 +59,8 @@ export interface DateTimeRangeProps {
   helpText?: string;
   errorMessage?: string;
   disabled?: boolean;
+  /** Marks the field required — renders a `*` after the label (no manual ` *`). */
+  required?: boolean;
   placeholder?: string;
 }
 

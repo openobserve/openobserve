@@ -15,7 +15,7 @@
 
 <!-- eslint-disable vue/no-unused-components -->
 <template>
-  <div data-test="dashboard-join-pop-up" class="tw:w-156">
+  <div data-test="dashboard-join-pop-up" class="tw:w-156 tw:flex tw:flex-col tw:max-h-[54vh] tw:overflow-hidden">
     <div class="tw:flex tw:justify-between tw:items-center tw:mb-3.75" data-test="dashboard-join-pop-up-header">
       <div class="tw:flex-1 tw:gap-2">
         <div class="tw:flex tw:items-center tw:gap-2 tw:text-(--q-primary)">
@@ -108,8 +108,8 @@
       <div class="tw:border-t tw:border-gray-200 tw:flex-1"></div>
     </div>
 
-    <div class="tw:mb-2.5">
-      <div class="tw:mb-2.5">
+    <div class="tw:mb-2.5 tw:flex tw:flex-col tw:min-h-0 tw:flex-1">
+      <div class="tw:mb-2.5 tw:shrink-0">
         <h3 class="tw:text-sm tw:not-italic tw:font-semibold tw:leading-normal tw:m-0">Joining Clause</h3>
         <p class="tw:text-xs tw:not-italic tw:font-normal tw:leading-normal tw:mt-1 tw:mb-0 tw:mx-0">
           Select the fields that need to be correlated within the joining
@@ -117,6 +117,10 @@
         </p>
       </div>
 
+      <div
+        class="tw:flex-1 tw:min-h-0 tw:overflow-y-auto"
+        data-test="dashboard-join-clause-list"
+      >
       <div
         v-for="(arg, argIndex) in modelValue.conditions"
         :key="argIndex + JSON.stringify(arg)"
@@ -175,6 +179,7 @@
             <OTooltip content="Remove clause" />
           </OButton>
         </div>
+      </div>
       </div>
     </div>
   </div>

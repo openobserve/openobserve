@@ -1,10 +1,16 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const PageManager = require('../../pages/page-manager.js');
 const testLogger = require('../utils/test-logger.js');
-const fetch = require('node-fetch');
+const http = require('http');
+const nodeFetch = require('node-fetch');
 const { getAuthHeaders, getOrgIdentifier } = require('../utils/cloud-auth.js');
 const { generateHexId } = require('../utils/trace-ingestion.js');
 const fs = require('fs');
+
+// node-fetch v2 keep-alive pooling + gzip decompression is the root cause of
+// "Premature close" / ECONNRESET flakiness in CI.
+const noKeepAliveAgent = new http.Agent({ keepAlive: false });
+const fetch = (url, opts = {}) => nodeFetch(url, { ...opts, compress: false, agent: noKeepAliveAgent });
 
 test.describe.configure({ mode: 'parallel' });
 

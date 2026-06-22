@@ -24,6 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="traces-search-result-not-found-text"
       @widen-range="(p) => emit('widen-range', p)"
       @remove-filter="emit('remove-filter')"
+      @jump-to-stream-data="(from, to) => emit('jump-to-stream-data', from, to)"
     />
 
     <!-- ════════════════════ Traces List Section ════════════════════ -->
@@ -248,6 +249,7 @@ const emit = defineEmits<{
   "send-to-ai-chat": [value: string];
   "widen-range": [period: string];
   "remove-filter": [];
+  "jump-to-stream-data": [fromUs: number, toUs: number];
 }>();
 
 const copyToClipboard = (field: string, value: any) =>

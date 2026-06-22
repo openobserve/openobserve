@@ -18,17 +18,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="tw:flex tw:flex-col tw:h-full">
     <DashboardHeader :title="t('dashboard.generalSettingsTitle')" />
     <div>
-    <OForm ref="formRef" :default-values="{ name: '' }" @submit="saveDashboardApi.execute()">
+    <OForm ref="formRef" :schema="generalSettingsSchema" :default-values="generalSettingsDefaults()" @submit="onSubmit" v-slot="{ isSubmitting }">
     <div class="tw:flex tw:flex-col tw:gap-3 tw:px-3">
         <OFormInput
           name="name"
-          v-model="dashboardData.title"
-          :label="t('dashboard.name') + ' *'"
+          :label="t('dashboard.name')"
+          required
           data-test="dashboard-general-setting-name"
-          :validators="[(val) => !String(val ?? '').trim() ? t('dashboard.nameRequired') : undefined]"
         />
-        <OInput
-          v-model="dashboardData.description"
+        <OFormInput
+          name="description"
           :label="t('dashboard.typeDesc')"
           data-test="dashboard-general-setting-description"
         />
@@ -48,8 +47,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             menu-align="start"
           />
         </div>
-        <OSwitch
-          v-model="dashboardData.showDynamicFilters"
+        <OFormSwitch
+          name="showDynamicFilters"
           label="Show Dynamic Filters"
           data-test="dashboard-general-setting-dynamic-filter"
           size="lg"
@@ -59,15 +58,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="$emit('close')"
             variant="outline"
             size="sm-action"
+            :disabled="isSubmitting"
             data-test="dashboard-general-setting-cancel-btn"
             >{{ t("dashboard.cancel") }}</OButton
           >
           <OButton
-            :disabled="dashboardData.title.trim() === ''"
             variant="primary"
             size="sm-action"
-            @click="formRef?.submit()"
-            :loading="saveDashboardApi.isLoading.value"
+            type="submit"
+            :loading="isSubmitting"
             data-test="dashboard-general-setting-save-btn"
             >{{ t("dashboard.save") }}</OButton
           >
@@ -79,21 +78,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, onMounted, ref, watch, nextTick, type Ref } from "vue";
+import { defineComponent, onMounted, ref, nextTick, type Ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { reactive } from "vue";
 import { getDashboard, updateDashboard } from "@/utils/commons";
 import { useRoute } from "vue-router";
 import DashboardHeader from "./common/DashboardHeader.vue";
-import { useLoading } from "@/composables/useLoading";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import useNotifications from "@/composables/useNotifications";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
-import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
+import {
+  makeGeneralSettingsSchema,
+  generalSettingsDefaults,
+  type GeneralSettingsForm,
+} from "./GeneralSettings.schema";
 
 export default defineComponent({
   name: "GeneralSettings",
@@ -101,15 +102,15 @@ export default defineComponent({
     DashboardHeader,
     DateTimePickerDashboard,
     OButton,
-    OInput,
-    OSwitch,
     OForm,
     OFormInput,
+    OFormSwitch,
   },
   emits: ["save", "close"],
   setup(props, { emit }) {
     const store: any = useStore();
     const { t } = useI18n();
+    const generalSettingsSchema = makeGeneralSettingsSchema(t);
     const route = useRoute();
     const {
       showPositiveNotification,
@@ -117,23 +118,10 @@ export default defineComponent({
       showConfictErrorNotificationWithRefreshBtn,
     } = useNotifications();
 
-    const addDashboardForm: Ref<any> = ref(null);
-    const formRef = ref(null);
+    const formRef = ref<any>(null);
     const closeBtn: Ref<any> = ref(null);
     // initial timezone, which will come from the route query
     const initialTimezone: any = ref(store.state.timezone ?? null);
-
-    const dashboardData = reactive({
-      title: "",
-      description: "",
-      showDynamicFilters: true,
-      defaultDatetimeDuration: {
-        startTime: null,
-        endTime: null,
-        relativeTimePeriod: "15m",
-        type: "relative",
-      },
-    });
 
     let dateTimeValue: any = ref(null);
     const getDashboardData = async () => {
@@ -143,14 +131,17 @@ export default defineComponent({
         route.query.folder ?? "default",
       );
 
-      dashboardData.title = data.title;
-      dashboardData.description = data.description;
-      dashboardData.showDynamicFilters =
-        data.variables?.showDynamicFilters ?? false;
-
-      // sync loaded title into OForm field state
+      // Data arrives AFTER mount → re-baseline the form (flash-free) with the
+      // loaded values. `reset()` rebuilds default state, unlike a per-field
+      // `setFieldValue` (which marks the field edited → post-submit re-validate).
+      // The form owns `name`, `description`, and `showDynamicFilters`; there is
+      // no local mirror of any of them.
       await nextTick();
-      formRef.value?.form.setFieldValue('name', data.title);
+      formRef.value?.form.reset({
+        name: data.title,
+        description: data.description ?? "",
+        showDynamicFilters: data.variables?.showDynamicFilters ?? false,
+      });
 
       dateTimeValue.value = {
         startTime: data?.defaultDatetimeDuration?.startTime,
@@ -163,7 +154,7 @@ export default defineComponent({
       await getDashboardData();
     });
 
-    const saveDashboardApi = useLoading(async () => {
+    const saveDashboard = async (value: GeneralSettingsForm) => {
       try {
         // get the latest dashboard data and update the title and description
         const data = JSON.parse(
@@ -176,17 +167,18 @@ export default defineComponent({
           ),
         );
 
-        // update the values
-        data.title = dashboardData.title;
-        data.description = dashboardData.description;
+        // update the values — all three come from the validated form submit
+        // payload (the form owns `name`, `description`, `showDynamicFilters`).
+        data.title = value.name;
+        data.description = value.description;
 
         if (!data.variables) {
           data.variables = {
             list: [],
-            showDynamicFilters: dashboardData.showDynamicFilters,
+            showDynamicFilters: value.showDynamicFilters,
           };
         } else {
-          data.variables.showDynamicFilters = dashboardData.showDynamicFilters;
+          data.variables.showDynamicFilters = value.showDynamicFilters;
         }
 
         data.defaultDatetimeDuration = {
@@ -221,29 +213,22 @@ export default defineComponent({
           });
         }
       }
-    });
+    };
 
-    const onSubmit = () => {
-      addDashboardForm.value.validate().then((valid: any) => {
-        if (!valid) {
-          return false;
-        }
-
-        saveDashboardApi.execute().catch((err: any) => {
-          showErrorNotification(
-            JSON.stringify(
-              err.response.data["error"] || "Dashboard creation failed.",
-            ),
-          );
-        });
-      });
+    // OForm @submit handler — receives the validated form values. The form owns
+    // `name`, `description`, and `showDynamicFilters`; we forward the whole
+    // payload into the save (only the datetime duration is non-form state).
+    // OForm awaits this, so the Save button's `isSubmitting` (slot) spans the save.
+    const onSubmit = async (value: GeneralSettingsForm) => {
+      await saveDashboard(value);
     };
 
     return {
       t,
-      dashboardData,
+      generalSettingsSchema,
+      generalSettingsDefaults,
       store,
-      saveDashboardApi,
+      onSubmit,
       closeBtn,
       initialTimezone,
       dateTimeValue,

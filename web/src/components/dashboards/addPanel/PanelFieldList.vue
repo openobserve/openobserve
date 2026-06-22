@@ -51,7 +51,7 @@
             :label="t('dashboard.selectIndex')"
             :options="filteredStreamsWithIcons"
             data-test="index-dropdown-stream"
-            :loading="streamDataLoading.isLoading.value"
+            :loading="streamListLoading"
             label-key="name"
             value-key="name"
             :icon-key="currentStreamType === 'metrics' ? '_icon' : undefined"
@@ -539,9 +539,11 @@ const currentStream = computed(
 );
 
 function onStreamTypeChange(val: string) {
-  dashboardPanelData.data.queries[
-    dashboardPanelData.layout.currentQueryIndex
-  ].fields.stream_type = val;
+  const fields =
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+      .fields;
+  fields.stream = "";
+  fields.stream_type = val;
 }
 
 function onStreamChange(val: string) {
@@ -560,30 +562,47 @@ const streamTypeOptions = computed(() =>
 
 const filteredStreams = ref<any[]>([]);
 
-const streamDataLoading = useLoading(async (stream_type: any) => {
-  await getStreamList(stream_type);
-});
+const streamListLoading = ref(false);
+
+const currentQueryFields = () =>
+  dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+    .fields;
+
+const isEditPanel = props.editMode;
+let initialStreamsLoaded = false;
 
 const loadStreamsListBasedOnType = async () => {
-  streamDataLoading.execute(
-    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
-      .fields.stream_type,
-  );
+  initialStreamsLoaded = true;
+  streamListLoading.value = true;
+  try {
+    await getStreamList(currentQueryFields().stream_type);
+  } finally {
+    streamListLoading.value = false;
+  }
 };
 
 watch(
-  () => [
-    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
-      .fields.stream_type,
-  ],
-  async () => {
+  () => currentQueryFields().stream_type,
+  () => {
+    if (!initialStreamsLoaded) return;
     loadStreamsListBasedOnType();
   },
 );
 
-onMounted(() => {
-  loadStreamsListBasedOnType();
-});
+if (isEditPanel) {
+  const stopEditInitialLoad = watch(
+    () => currentQueryFields().stream,
+    (streamName) => {
+      if (!streamName) return;
+      stopEditInitialLoad();
+      loadStreamsListBasedOnType();
+    },
+  );
+} else {
+  onMounted(() => {
+    loadStreamsListBasedOnType();
+  });
+}
 
 const onStreamSearch = (val: string) => {
   filteredStreams.value = dashboardPanelData.meta.stream.streamResults.filter(
@@ -1038,7 +1057,10 @@ function showSankeyActions(row: FieldItem, _index: number): boolean {
 
 const getStreamList = async (stream_type: any) => {
   await getStreams(stream_type, false).then((res: any) => {
-    dashboardPanelData.meta.stream.streamResults = [];
+    const currentType =
+      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+        .fields.stream_type;
+    if (stream_type !== currentType) return;
     dashboardPanelData.meta.stream.streamResults = res.list;
     dashboardPanelData.meta.stream.streamResultsType = stream_type;
   });

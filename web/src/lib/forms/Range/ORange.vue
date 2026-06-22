@@ -514,7 +514,7 @@ function onHorizCancel() {
           'tw:font-medium tw:text-slider-label tw:leading-none tw:flex tw:items-center tw:gap-1',
         ]"
       >
-        <slot name="label">{{ label }}</slot>
+        <slot name="label">{{ label }}</slot><span v-if="required" aria-hidden="true" class="tw:select-none">*</span>
         <OIcon
           v-if="$slots.tooltip"
           name="info-outline"

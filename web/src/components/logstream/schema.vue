@@ -1231,7 +1231,7 @@ export default defineComponent({
       },
       {
         value: "allFields",
-        label: `${computedSchemaFieldsName.value} (${indexData.value.schema.length})`,
+        label: `${computedSchemaFieldsName} (${indexData.value.schema.length})`,
         disabled: false,
         hide: false,
       },
@@ -1248,15 +1248,8 @@ export default defineComponent({
         disabled: false,
       },
     ]);
-    //here we are making the schema field name dynamic based on the user defined schema
-    //1. if there is UDS the it should be other fields
-    //2. if there is no UDS then it should be all fields
-    const computedSchemaFieldsName = computed(() => {
-      if (!hasUserDefinedSchema.value) {
-        return "All Fields";
-      }
-      return "Other Fields";
-    });
+    // here we are setting the schema field name always be "All Fields"
+    const computedSchemaFieldsName =  "All Fields";
 
     const streamIndexType = [
       { label: "Full text search", value: "fullTextSearchKey" },

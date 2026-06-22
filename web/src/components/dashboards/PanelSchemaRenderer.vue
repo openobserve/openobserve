@@ -114,6 +114,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @domcontextmenu="onChartDomContextMenu"
         />
       </div>
+      <!-- Metric chart: per-value copy icon, revealed on hover of each number -->
+      <div
+        v-if="metricItems.length"
+        style="position: absolute; inset: 0; pointer-events: none; z-index: 8"
+        data-test="dashboard-metric-copy-overlay"
+      >
+        <div
+          v-for="m in metricItems"
+          :key="m.idx"
+          style="position: absolute; pointer-events: auto"
+          :style="metricZoneStyle(m)"
+          @mouseenter="hoveredMetricIdx = m.idx"
+          @mouseleave="hoveredMetricIdx = null"
+        >
+          <OButton
+            v-show="hoveredMetricIdx === m.idx || metricCopiedIdx === m.idx"
+            variant="ghost"
+            size="icon-xs-sq"
+            style="position: absolute"
+            :style="metricIconStyle(m)"
+            @click="copyMetricItem(m)"
+            data-test="dashboard-metric-copy-btn"
+            :data-copied="metricCopiedIdx === m.idx ? 'true' : undefined"
+          >
+            <OIcon
+              :name="metricCopiedIdx === m.idx ? 'check' : 'content-copy'"
+              size="sm"
+            />
+          </OButton>
+        </div>
+      </div>
       <div
         v-if="
           !errorDetail?.message &&
@@ -394,6 +425,8 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import { copyToClipboard } from "@/utils/clipboard";
+import { calculateWidthText } from "@/utils/dashboard/chartDimensionUtils";
 
 export default defineComponent({
   name: "PanelSchemaRenderer",
@@ -597,6 +630,57 @@ export default defineComponent({
     const isCursorOverPanel = ref(false);
     const showPopupsAndOverlays = () => {
       isCursorOverPanel.value = true;
+    };
+
+    // Metric chart: one copy icon per rendered value (multi-SQL renders many).
+    // Values are already unit/decimal/timestamp formatted at the metric level;
+    // _metricLayout gives the canvas pixel position so the icon sits beside it.
+    const metricItems = computed(() => {
+      if (props.panelSchema?.type !== "metric") return [];
+      const series = panelData.value?.options?.series ?? [];
+      return series
+        .map((s: any, idx: number) => ({
+          idx,
+          text: s?._metricText,
+          layout: s?._metricLayout,
+        }))
+        .filter(
+          (m: any) =>
+            m.layout && m.text != null && String(m.text).trim() !== "",
+        );
+    });
+    // Hover zone = each value's grid cell.
+    const metricZoneStyle = (m: any) => ({
+      left: `${m.layout.left}px`,
+      top: `${m.layout.top}px`,
+      width: `${m.layout.width}px`,
+      height: `${m.layout.height}px`,
+    });
+    // Fixed copy-button width (icon-xs-sq), matching the table chart.
+    const COPY_BTN_PX = 28;
+    // Sit just past the number's measured right edge, clamped inside the cell.
+    // Measuring (vs estimating) keeps the icon off the digits for any value.
+    const metricIconStyle = (m: any) => {
+      const fs = m.layout?.fontSize || 24;
+      const textWidth = calculateWidthText(String(m.text), `${fs}px`);
+      const left = m.layout.cx - m.layout.left + textWidth / 2 + 2;
+      const maxLeft = m.layout.width - COPY_BTN_PX - 2;
+      return {
+        left: `${Math.min(left, maxLeft)}px`,
+        top: `${m.layout.cy - m.layout.top}px`,
+        transform: "translateY(-50%)",
+      };
+    };
+    const hoveredMetricIdx = ref<number | null>(null);
+    const metricCopiedIdx = ref<number | null>(null);
+    const copyMetricItem = (m: any) => {
+      if (m.text == null) return;
+      copyToClipboard(String(m.text), { silent: true }).then(() => {
+        metricCopiedIdx.value = m.idx;
+        setTimeout(() => {
+          if (metricCopiedIdx.value === m.idx) metricCopiedIdx.value = null;
+        }, 3000);
+      });
     };
 
     // get refs from props
@@ -1617,6 +1701,12 @@ export default defineComponent({
       panelsList,
       isCursorOverPanel,
       showPopupsAndOverlays,
+      metricItems,
+      metricZoneStyle,
+      metricIconStyle,
+      hoveredMetricIdx,
+      metricCopiedIdx,
+      copyMetricItem,
       downloadDataAsCSV,
       downloadDataAsJSON,
       getPanelCsvData: (title: string) => {

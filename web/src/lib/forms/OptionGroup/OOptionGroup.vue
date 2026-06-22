@@ -67,7 +67,7 @@ function handleCheckbox(val: (string | number)[]) {
         disabled && 'o-input-label--disabled',
       ]"
     >
-      <slot name="label">{{ label }}</slot>
+      <slot name="label">{{ label }}</slot><span v-if="required" aria-hidden="true" class="tw:select-none">*</span>
       <OIcon
         v-if="$slots.tooltip"
         name="info-outline"

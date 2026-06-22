@@ -2225,6 +2225,10 @@ export default defineComponent({
         value: "numbers",
       },
       {
+        label: t("dashboard.localeFormat"),
+        value: "locale",
+      },
+      {
         label: t("dashboard.bytes"),
         value: "bytes",
       },

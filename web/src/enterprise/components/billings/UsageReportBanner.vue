@@ -20,6 +20,10 @@ export default defineComponent({
   setup() {
     const store = useStore();
 
+    // Purely reactive: the banner derives everything from
+    // store.state.zoConfig.last_usage_report_ts. UsageTab refreshes that config
+    // on mount, so the banner updates on every Usage-tab visit without owning an
+    // API call itself.
     const elapsedMs = computed(() => {
       if (!store.state.zoConfig || !('last_usage_report_ts' in store.state.zoConfig)) return 0;
       const ts = store.state.zoConfig.last_usage_report_ts;

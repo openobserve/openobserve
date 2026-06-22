@@ -35,34 +35,35 @@
 <!-- Form Section -->
 <div class="tw:w-full tw:flex tw:justify-center">
   <div class="tw:w-full tw:max-w-[500px] tw:flex tw:flex-col tw:items-center tw:gap-y-2 tw:px-4">
-    <OForm ref="formRef" :default-values="{ hearAboutUs: '', whereDoYouWork: '' }" @submit="doSubmit" class="tw:w-full tw:flex tw:flex-col tw:gap-y-2">
+    <OForm ref="formRef" :schema="getStartedSchema" :default-values="getStartedDefaults()" @submit="doSubmit" v-slot="{ isSubmitting }" class="tw:w-full tw:flex tw:flex-col tw:gap-y-2">
     <OFormInput
       name="hearAboutUs"
       data-test="onboarding-get-started-hear-about-us"
       class="o2-input"
-      v-model="hearAboutUs"
-      :label="`How did you hear about us? *`"
+      label="How did you hear about us?"
+      required
       placeholder="Eg. From a friend"
       style="width: 100%;"
-      :validators="[(val) => !String(val ?? '').trim() ? 'This field is required' : undefined]"
     />
     <OFormInput
       name="whereDoYouWork"
       data-test="onboarding-get-started-where-do-you-work"
       class="tw:-mt-2"
-      v-model="whereDoYouWork"
-      :label="`Where do you work? *`"
+      label="Where do you work?"
+      required
       placeholder="Company Name"
       style="width: 100%;"
-      :validators="[(val) => !String(val ?? '').trim() ? 'This field is required' : undefined]"
     />
-    <div class="tw:w-full tw:flex tw:items-center tw:gap-2">
-      <OCheckbox data-test="onboarding-get-started-agree-checkbox" v-model="isAgree" />
-      <span class="tw:text-sm">
-        I have read and agree with the
-        <a href="#" class="tw:text-[#6B76E3] hover:underline">Terms of use</a> and
-        <a href="#" class="tw:text-[#6B76E3] hover:underline">Privacy policy*</a>
-      </span>
+    <div class="tw:w-full">
+      <OFormCheckbox name="isAgree" data-test="onboarding-get-started-agree-checkbox">
+        <template #label>
+          <span class="tw:text-sm">
+            I have read and agree with the
+            <a href="#" class="tw:text-[#6B76E3] hover:underline">Terms of use</a> and
+            <a href="#" class="tw:text-[#6B76E3] hover:underline">Privacy policy*</a>
+          </span>
+        </template>
+      </OFormCheckbox>
     </div>
     <div class="tw:w-full tw:mt-4">
       <OButton
@@ -70,9 +71,9 @@
         variant="primary"
         size="md"
         block
-        :disabled="!isAgree || isSubmitting"
+        :disabled="isSubmitting"
         :loading="isSubmitting"
-        @click="formRef?.submit()"
+        type="submit"
       >
         Start your 14-day Trial
       </OButton>
@@ -98,26 +99,21 @@
 <script setup>
 import { ref } from 'vue'
 import OButton from '@/lib/core/Button/OButton.vue'
-import OInput from '@/lib/forms/Input/OInput.vue'
-import OCheckbox from '@/lib/forms/Checkbox/OCheckbox.vue'
 import OForm from '@/lib/forms/Form/OForm.vue'
 import OFormInput from '@/lib/forms/Input/OFormInput.vue'
+import OFormCheckbox from '@/lib/forms/Checkbox/OFormCheckbox.vue'
+import { getStartedSchema, getStartedDefaults } from './GetStarted.schema'
 import { useStore } from 'vuex'
   import billings from '@/services/billings'
 import { toast } from "@/lib/feedback/Toast/useToast";
-const hearAboutUs = ref('')
-const whereDoYouWork = ref('')
-const isAgree = ref(false)
 const store = useStore()
 const emit = defineEmits(['removeFirstTimeLogin'])
-const isSubmitting = ref(false);
 const formRef = ref(null);
 
-const doSubmit = async () => {
-  isSubmitting.value = true
+const doSubmit = async (value) => {
   const res = await billings.submit_new_user_info(store.state.selectedOrganization.identifier, {
-    from: hearAboutUs.value,
-    company: whereDoYouWork.value,
+    from: value.hearAboutUs,
+    company: value.whereDoYouWork,
   })
   if(res.status == 200) {
     localStorage.removeItem("isFirstTimeLogin");
@@ -126,13 +122,11 @@ const doSubmit = async () => {
       message: 'Thank you for your feedback',
       variant: 'success',
     })
-    isSubmitting.value = false
   } else {
     toast({
       message: 'Something went wrong',
       variant: 'error',
     })
-    isSubmitting.value = false
   }
 }
 </script>

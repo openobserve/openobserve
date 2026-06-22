@@ -144,9 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       title="Add New Folder"
       primary-button-label="Save"
       secondary-button-label="Cancel"
-      :primary-button-disabled="isAddingFolder"
-      :primary-button-loading="isAddingFolder"
-      @click:primary="handleAddFolder"
+      form-id="add-folder-dashboards-form"
       @click:secondary="showAddFolderDialog = false"
       data-test="add-dashboard-github-add-folder-dialog"
     >

@@ -199,6 +199,11 @@ function handleClick() {
   <td
     :data-test="`o2-table-cell-${cell.column.id}`"
     :class="[
+      // Base text color for the whole cell so custom `#cell-*` slots (which skip
+      // the default text wrapper) still inherit the theme-aware primary color
+      // instead of falling back to a grey inherited value in dark mode. Inner
+      // links/badges override this with their own color.
+      'tw:text-text-primary',
       meta?.spacer ? 'tw:px-0 tw:align-middle' : (meta?.compactPadding ? 'tw:px-1 tw:align-middle' : 'tw:px-2 tw:align-middle'),
       bordered ? 'tw:border-b tw:border-[var(--color-table-row-divider)]' : '',
       alignClass,

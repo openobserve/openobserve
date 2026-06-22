@@ -1,7 +1,7 @@
 import { expect } from '@playwright/test';
 import {
   dateTimeButtonLocator, relative30SecondsButtonLocator, absoluteTabLocator,
-  Past30SecondsValue
+  Past30SecondsValue, openNavFlyoutChild
 } from '../commonActions.js';
 
 export class ReportsPage {
@@ -11,8 +11,6 @@ export class ReportsPage {
     // Navigation locators (data-test only). The MainLayout side-nav builds
     // each entry's data-test as `menu-link-${link}-item`, so the Home link
     // (`link: "/"`) becomes `menu-link-/-item` (escaped CSS: `menu-link-\\/-item`).
-    this.homeMenu = page.locator('[data-test="menu-link-\\/-item"]');
-    this.reportsMenu = page.locator('[data-test="menu-link-\\/reports-item"]');
     this.reportListTitle = page.locator('[data-test="report-list-title"]');
     this.reportListTable = page.locator('[data-test="report-list-table"]');
     this.scheduledTab = page.locator('[data-test="tab-shared"]');
@@ -122,14 +120,13 @@ export class ReportsPage {
   }
 
   async navigateToReports() {
-    await this.homeMenu.hover();
-    await this.reportsMenu.click({ force: true });
+    await openNavFlyoutChild(this.page, 'reports');
     await expect(this.reportListTitle).toContainText('Reports');
     await this.scheduledTab.click({ force: true });
   }
 
   async goToReports() {
-    await this.reportsMenu.click({ force: true });
+    await openNavFlyoutChild(this.page, 'reports');
     await expect(this.reportListTitle).toContainText('Reports');
   }
 

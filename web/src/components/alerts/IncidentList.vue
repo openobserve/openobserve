@@ -202,7 +202,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, computed, onMounted, watch, nextTick } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { useRouter } from "vue-router";
+import { useRouter, useRoute } from "vue-router";
 import { formatToReadable } from "@/utils/date";
 import incidentsService, { Incident } from "@/services/incidents";
 import PageLayout from "@/components/common/PageLayout.vue";
@@ -239,12 +239,18 @@ export default defineComponent({
     const { t } = useI18n();
     const store = useStore();
     const router = useRouter();
+    const route = useRoute();
 
     const qTableRef: any = ref(null);
     const loading = ref(false);
     const allIncidents = ref<Incident[]>([]);
     const searchQuery = ref("");
-    const statusFilter = ref("all");
+    const validStatuses = ["all", "open", "acknowledged", "resolved"];
+    const statusFilter = ref(
+      validStatuses.includes(route.query.status as string)
+        ? (route.query.status as string)
+        : "all"
+    );
     const isRestoringState = ref(false);
     const pageSize = ref(20);
 
