@@ -14,7 +14,7 @@ import type {
   RecorderStopResponse,
 } from '@/types/synthetics'
 
-const RECORDING_PORT_NAME = 'synthetics-recording'
+const RECORDING_PORT_NAME = 'synthetics-recorder'
 
 /**
  * Encapsulates all communication with the OpenObserve Extension (playwright-crx)
