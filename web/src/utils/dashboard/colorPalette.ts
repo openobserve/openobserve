@@ -22,170 +22,36 @@ export enum ColorModeWithoutMinMax {
   FIXED = "fixed",
 }
 
-// Light theme colors
+// Light theme colors — perceptually distinct, blue-first, safe on light backgrounds
 export const classicColorPaletteLightTheme = [
-  // "#FFADAD",
-  // "#FF8F8F",
-  "#FF7070",
-  "#FF5A5A",
-
-  // "#FFA0C4",
-  // "#FF82B1",
-  "#FF6B9E",
-  "#FF5394",
-
-  // "#E69AE6",
-  // "#E382D8",
-  "#DB6BCC",
-  "#D452C0",
-
-  // "#B8A5E6",
-  // "#A58CDB",
-  "#9273D1",
-  "#7E5AC2",
-
-  // "#A3B1E6",
-  // "#8A9ADA",
-  "#6F7FCB",
-  "#5766C0",
-
-  // "#A5D1F9",
-  // "#82C1F9",
-  "#66A5F6",
-  "#5AAAF5",
-
-  // "#82DCF9",
-  // "#66D1FA",
-  "#4ABEF7",
-  "#4ABEF7",
-
-  // "#82E0E8",
-  // "#66D4E0",
-  "#4ACCDA",
-  "#4ACCDA",
-
-  // "#82CABE",
-  // "#66BFB4",
-  "#4DB3A6",
-  "#4DB3A6",
-
-  // "#A5D6A7",
-  // "#8FD091",
-  "#7ACC7A",
-  "#66C266",
-
-  // "#D4E580",
-  // "#C5E36B",
-  "#BEDA66",
-  "#B3D45C",
-
-  // "#F2F480",
-  // "#EEF06B",
-  "#E6DC66",
-  "#E0D75C",
-
-  // "#FFF566",
-  // "#FFF380",
-  // "#FFF166",
-  "#FFEE5A",
-
-  // "#FFDD80",
-  // "#FFD666",
-  "#FFCC4D",
-  "#FFC740",
-
-  // "#FFCC99",
-  // "#FFC080",
-  "#FFB366",
-  "#FFA94D",
-
-  // "#FFBAA6",
-  // "#FFA682",
-  "#FF9673",
-  "#FF8F5A",
+  "#5b8ef0", // blue
+  "#34d399", // green
+  "#fb923c", // orange
+  "#f472b6", // pink
+  "#a78bfa", // purple
+  "#fbbf24", // yellow
+  "#38bdf8", // sky
+  "#f87171", // red
+  "#2dd4bf", // teal
+  "#4ade80", // lime
+  "#e879f9", // fuchsia
+  "#facc15", // amber
 ];
 
-// Dark theme colors
+// Dark theme colors — brighter variants of the same hues for dark canvas legibility
 export const classicColorPaletteDarkTheme = [
-  // "#FFCDD2",
-  "#EF9A9A",
-  "#E57373",
-  // "#EF5350",
-
-  // "#F8BBD0",
-  "#F48FB1",
-  "#F06292",
-  // "#EC407A",
-
-  // "#E1BEE7",
-  "#CE93D8",
-  "#BA68C8",
-  // "#AB47BC",
-
-  // "#D1C4E9",
-  "#B39DDB",
-  "#9575CD",
-  // "#7E57C2",
-
-  // "#C5CAE9",
-  "#9FA8DA",
-  "#7986CB",
-  // "#5C6BC0",
-
-  // "#BBDEFB",
-  "#90CAF9",
-  "#64B5F6",
-  // "#42A5F5",
-
-  // "#B3E5FC",
-  "#81D4FA",
-  "#4FC3F7",
-  // "#29B6F6",
-
-  // "#B2EBF2",
-  "#80DEEA",
-  "#4DD0E1",
-  // "#26C6DA",
-
-  // "#B2DFDB",
-  "#80CBC4",
-  "#4DB6AC",
-  // "#26A69A",
-
-  // "#C8E6C9",
-  "#A5D6A7",
-  "#81C784",
-  // "#66BB6A",
-
-  // "#DCEDC8",
-  "#C5E1A5",
-  "#AED581",
-  // "#9CCC65",
-
-  // "#F0F4C3",
-  "#E6EE9C",
-  "#DCE775",
-  // "#D4E157",
-
-  // "#FFF9C4",
-  // "#FFF59D",
-  "#FFF176",
-  // "#FFEE58",
-
-  // "#FFECB3",
-  "#FFE082",
-  "#FFD54F",
-  // "#FFCA28",
-
-  // "#FFE0B2",
-  "#FFCC80",
-  "#FFB74D",
-  // "#FFA726",
-
-  // "#FFCCBC",
-  "#FFAB91",
-  "#FF8A65",
-  // "#FF7043",
+  "#60a5fa", // blue
+  "#6ee7b7", // green
+  "#fdba74", // orange
+  "#f9a8d4", // pink
+  "#c4b5fd", // purple
+  "#fde68a", // yellow
+  "#7dd3fc", // sky
+  "#fca5a5", // red
+  "#5eead4", // teal
+  "#86efac", // lime
+  "#f5d0fe", // fuchsia
+  "#fef08a", // amber
 ];
 
 // Update the getColorPalette function to handle string theme values

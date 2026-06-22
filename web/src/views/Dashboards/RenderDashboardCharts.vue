@@ -1714,7 +1714,7 @@ export default defineComponent({
 
 .gridBackground {
   background: transparent !important;
-  border-radius: 4px;
+  border-radius: 8px;
   border-color: #c2c2c27a !important;
 }
 
@@ -1741,9 +1741,6 @@ export default defineComponent({
   &.dark {
     border-color: rgba(204, 204, 220, 0.12) !important;
 
-    /* The visible panel outline lives on the content child; in dark mode pull
-       it onto the design token (clean solid edge) instead of the bright
-       #c2c2c27a gray, which reads too light against the dark canvas. */
     .grid-stack-item-content {
       border-color: var(--color-border-default);
     }

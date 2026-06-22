@@ -25,9 +25,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div :class="{ 'drag-allow': !viewOnly && !simplifiedPanelView }">
       <div
-        class="tw:flex tw:flex-nowrap tw:items-center tw:w-full tw:min-h-7 tw:px-1"
+        class="tw:flex tw:flex-nowrap tw:items-center tw:w-full tw:min-h-7 tw:px-1 tw:border-b tw:border-border-subtle"
         :class="{ 'dark-mode': store.state.theme === 'dark' }"
-        style="border-top-left-radius: 3px; border-top-right-radius: 3px"
+        style="border-top-left-radius: 8px; border-top-right-radius: 8px"
         data-test="dashboard-panel-bar"
       >
         <OIcon
@@ -43,6 +43,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ props.data.title }}
         </div>
         <div class="tw:flex-1" />
+
+        <!-- Show Legends button -->
+        <OButton
+          v-if="
+            isCurrentlyHoveredPanel &&
+            props.showLegendsButton &&
+            ![
+              'table', 'html', 'markdown', 'custom_chart',
+              'geomap', 'maps', 'heatmap', 'metric', 'gauge',
+            ].includes(props.data.type)
+          "
+          variant="ghost"
+          size="icon"
+          @click="showLegendsDialog = true"
+          icon-left="format-list-bulleted"
+          data-test="dashboard-show-legends-btn"
+        >
+          <OTooltip content="Show Legends" side="bottom" align="end" />
+        </OButton>
+
+        <!-- Add Annotations button -->
+        <OButton
+          v-if="
+            !viewOnly &&
+            !simplifiedPanelView &&
+            isCurrentlyHoveredPanel &&
+            [
+              'area', 'area-stacked', 'bar', 'h-bar',
+              'line', 'scatter', 'stacked', 'h-stacked',
+            ].includes(props.data.type) &&
+            PanleSchemaRendererRef?.checkIfPanelIsTimeSeries === true
+          "
+          variant="ghost"
+          size="icon"
+          @click="PanleSchemaRendererRef?.toggleAddAnnotationMode()"
+          data-test="panel-schema-renderer-annotation-button"
+        >
+          <OIcon :name="PanleSchemaRendererRef?.isAddAnnotationMode ? 'cancel' : 'edit'" size="sm" />
+          <OTooltip :content="PanleSchemaRendererRef?.isAddAnnotationMode ? 'Exit Annotations Mode' : 'Add Annotations'" side="bottom" align="end" />
+        </OButton>
+
         <OIcon
           v-if="
             !viewOnly &&
@@ -1004,6 +1045,10 @@ export default defineComponent({
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  letter-spacing: 0.01em;
 }
 
 .warning {
