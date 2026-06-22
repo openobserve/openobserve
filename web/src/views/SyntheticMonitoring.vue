@@ -976,8 +976,11 @@
 
 <script setup lang="ts">
 import { ref, computed, onUnmounted, watch, nextTick } from "vue";
+import { useRouter } from "vue-router";
 import * as echarts from "echarts";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+
+const router = useRouter();
 
 const activeTab      = ref("monitors");
 const statusFilter   = ref("all");
@@ -1412,6 +1415,10 @@ const _genLocBreakdown = (m: any): LocRow[] =>
   });
 
 const openDetail = (monitor: any, geoRow: { monitor: any; cells: any[] } | null = null) => {
+  if (monitor.type === 'browser' || monitor.type === 'Browser') {
+    router.push({ name: 'synthetic-detail', params: { id: monitor.id } });
+    return;
+  }
   const bars   = _genBars(monitor);
   const maxVal = Math.max(...bars.filter((b: any) => b.val !== null).map((b: any) => b.val!), 100);
   const errBars = Array.from({ length: 24 }, (_, i) => {
@@ -1476,7 +1483,13 @@ const steps = [
   { key:"alerts",    label:"Assertions & Alerts" },
 ];
 const stepIdx  = computed(() => steps.findIndex(s => s.key === currentStep.value));
-const nextStep = () => { if (stepIdx.value < steps.length-1) currentStep.value = steps[stepIdx.value+1].key; };
+const nextStep = () => {
+  if (currentStep.value === 'type' && form.value.type === 'Browser') {
+    router.push({ name: 'synthetic-new' });
+    return;
+  }
+  if (stepIdx.value < steps.length - 1) currentStep.value = steps[stepIdx.value + 1].key;
+};
 const prevStep = () => { if (stepIdx.value > 0) currentStep.value = steps[stepIdx.value-1].key; };
 
 const defaultForm = () => ({

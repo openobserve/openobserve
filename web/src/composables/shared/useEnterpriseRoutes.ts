@@ -127,6 +127,27 @@ const useEnterpriseRoutes = () => {
 
     routes.push(
       {
+        path: "synthetic/new",
+        name: "synthetic-new",
+        component: () => import("@/views/synthetics/CreateBrowserTest.vue"),
+        meta: { title: "New Browser Check" },
+        beforeEnter(to: any, from: any, next: any) {
+          routeGuard(to, from, next);
+        },
+      },
+      {
+        path: "synthetic/:id",
+        name: "synthetic-detail",
+        component: () => import("@/views/synthetics/BrowserCheckDetail.vue"),
+        meta: { title: "Browser Check" },
+        beforeEnter(to: any, from: any, next: any) {
+          routeGuard(to, from, next);
+        },
+      },
+    );
+
+    routes.push(
+      {
         path: "incidents",
         name: "incidentList",
         component: IncidentList,
