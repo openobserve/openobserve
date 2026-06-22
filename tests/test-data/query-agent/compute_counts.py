@@ -475,8 +475,11 @@ def main():
         with open(fp) as f:
             query_data = json.load(f)
 
+        queries = query_data.get("queries")
+        if queries is None:
+            continue  # skip non-query files (e.g. error_paths.json)
         dirty = False
-        for q in query_data["queries"]:
+        for q in queries:
             expected = q.get("expected", {})
 
             # Histogram queries: skip auto-interval, convert explicit-interval
