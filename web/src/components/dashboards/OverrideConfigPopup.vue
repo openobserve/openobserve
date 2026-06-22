@@ -476,12 +476,7 @@ export default defineComponent({
 
     const addField = (alias: string) => {
       if (!alias) return;
-      columnOverrides.value.push(
-        emptyColumnOverride(alias, {
-          unit: props.panelUnit || null,
-          customUnit: props.panelUnitCustom || null,
-        }),
-      );
+      columnOverrides.value.push(emptyColumnOverride(alias));
       selectedIdx.value = columnOverrides.value.length - 1;
       addOpenLeft.value = false;
       addOpenCenter.value = false;

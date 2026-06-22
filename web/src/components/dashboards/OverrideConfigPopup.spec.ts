@@ -160,21 +160,11 @@ describe("OverrideConfigPopup", () => {
       expect(wrapper.vm.columnOverrides[before].field).toBe("field2");
     });
 
-    it("defaults a new field's value formatting to the panel-level unit", async () => {
-      wrapper = await createWrapper({
-        panelUnit: "bytes",
-        panelUnitCustom: "",
-      });
+    it("defaults a new field's unit to null (Default), not the panel unit", async () => {
+      wrapper = await createWrapper({ panelUnit: "bytes", panelUnitCustom: "" });
       wrapper.vm.addField("field2");
       const added = wrapper.vm.columnOverrides.at(-1);
       expect(added.field).toBe("field2");
-      expect(added.unit).toBe("bytes");
-    });
-
-    it("defaults a new field's unit to null when panel has no unit", async () => {
-      wrapper = await createWrapper();
-      wrapper.vm.addField("field2");
-      const added = wrapper.vm.columnOverrides.at(-1);
       expect(added.unit).toBeNull();
     });
 
