@@ -24,6 +24,78 @@ export interface BrowserStep {
   timeout?: number // ms, default 30000
 }
 
+// ── OpenObserve Extension (playwright-crx) recorder protocol ────────────────
+// Wire contract shared with the extension. Keep in sync with
+// ../playwright-crx/.docs/synthetics-recorder.md → "Web-side integration".
+
+export type RecorderMode = 'recording' | 'inspecting' | 'asserting' | 'playing'
+
+/**
+ * Step shape as emitted by the extension (Playwright-flavoured). Mapped to the
+ * UI-facing {@link BrowserStep} via `@/utils/synthetics/mapRecordedStep`.
+ */
+export interface WireStep {
+  id: string
+  action: string // navigate | click | type | press | select | setInputFiles | waitFor | assert | screenshot
+  selector?: string
+  selector_type?: 'css' | 'xpath' | 'text' | 'role' | 'data-test'
+  name?: string
+  timeout_ms?: number
+  url?: string
+  value?: string
+  key?: string
+  options?: string[]
+  text?: string
+  checked?: boolean
+  files?: string[]
+  button?: 'left' | 'middle' | 'right'
+  code?: string
+  startTime?: number
+  endTime?: number
+  pageAlias?: string
+  framePath?: string[]
+}
+
+/** Commands the web app sends to the extension via `chrome.runtime.sendMessage`. */
+export type RecorderCommand =
+  | { action: 'getStatus' }
+  | { action: 'startRecording'; targetUrl?: string }
+  | { action: 'stopRecording' }
+  | { action: 'setMode'; mode: RecorderMode }
+
+export interface RecorderCommandEnvelope {
+  type: 'synthetics-command'
+  command: RecorderCommand
+}
+
+// Real `getStatus` payload from the extension (see
+// ../playwright-crx/examples/synthetics-recorder/src/background.ts). There is no
+// `installed` field — reachability is inferred from getting any reply back.
+export interface RecorderStatus {
+  isRecording: boolean
+  mode: string
+  tabId: number | null
+  stepCount: number
+}
+
+export interface RecorderStartResponse {
+  success: boolean
+  tabId?: number
+  error?: string
+}
+
+export interface RecorderStopResponse {
+  success: boolean
+  steps: WireStep[]
+}
+
+/** Messages the extension pushes over the long-lived recording port. */
+export type RecorderPortMessage =
+  | { type: 'steps'; steps: WireStep[] }
+  | { type: 'mode'; mode: RecorderMode }
+  | { type: 'url'; url: string }
+  | { type: 'stopped'; steps: WireStep[] }
+
 export interface BrowserCheckSchedule {
   type: 'interval' | 'cron'
   intervalValue?: number
