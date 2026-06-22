@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // Copyright 2026 OpenObserve Inc.
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import type { BrowserCheck, BrowserStep } from '@/types/synthetics'
 import OButton from '@/lib/core/Button/OButton.vue'
@@ -21,16 +21,30 @@ const activeTab = ref<'journey' | 'configure' | 'results'>('journey')
 const showRecorder = ref(false)
 const showSavedBanner = ref(route.query.saved === '1')
 
+let bannerTimer: ReturnType<typeof setTimeout> | null = null
+
+const dismissBanner = () => {
+  showSavedBanner.value = false
+  if (bannerTimer) clearTimeout(bannerTimer)
+}
+
+const scheduleBannerDismiss = () => {
+  if (bannerTimer) clearTimeout(bannerTimer)
+  bannerTimer = setTimeout(() => { showSavedBanner.value = false }, 4000)
+}
+
 onMounted(() => {
   const tabParam = route.query.tab
   if (tabParam === 'journey' || tabParam === 'configure' || tabParam === 'results') {
     activeTab.value = tabParam
   }
   if (showSavedBanner.value) {
-    setTimeout(() => {
-      showSavedBanner.value = false
-    }, 4000)
+    scheduleBannerDismiss()
   }
+})
+
+onUnmounted(() => {
+  if (bannerTimer) clearTimeout(bannerTimer)
 })
 
 // Mock check data (in real app, fetch by route.params.id)
@@ -48,8 +62,13 @@ const check = ref<BrowserCheck>({
   rum: { collect: true, sessionReplay: false },
 })
 
+const enabled = computed({
+  get: () => check.value.enabled,
+  set: (val: boolean) => { check.value = { ...check.value, enabled: val } },
+})
+
 function onRecordDone(capturedSteps: BrowserStep[]) {
-  check.value.journey = capturedSteps
+  check.value = { ...check.value, journey: capturedSteps }
   showRecorder.value = false
   activeTab.value = 'journey'
 }
@@ -57,9 +76,7 @@ function onRecordDone(capturedSteps: BrowserStep[]) {
 function saveCheck() {
   // In real app, call API
   showSavedBanner.value = true
-  setTimeout(() => {
-    showSavedBanner.value = false
-  }, 4000)
+  scheduleBannerDismiss()
 }
 
 </script>
@@ -78,7 +95,7 @@ function saveCheck() {
         type="button"
         class="tw:ml-auto tw:text-[var(--o2-text-secondary)] tw:hover:text-[var(--o2-text-body)] tw:bg-transparent tw:border-0 tw:cursor-pointer tw:text-lg tw:leading-none"
         aria-label="Dismiss"
-        @click="showSavedBanner = false"
+        @click="dismissBanner"
       >
         ×
       </button>
@@ -92,7 +109,7 @@ function saveCheck() {
         </RouterLink>
         <h2 class="tw:text-base tw:font-semibold">{{ check.name }}</h2>
         <OSwitch
-          v-model="check.enabled"
+          v-model="enabled"
           size="sm"
           data-test="synthetics-detail-enabled-switch"
         />

@@ -38,21 +38,19 @@ const check = ref<BrowserCheck>({
 })
 
 function startRecording() {
-  check.value.url = startUrl.value
-  check.value.name = checkName.value
+  check.value = { ...check.value, url: startUrl.value, name: checkName.value }
   phase.value = 'editor'
   showRecorder.value = true
 }
 
 function buildManually() {
-  check.value.url = startUrl.value
-  check.value.name = checkName.value
+  check.value = { ...check.value, url: startUrl.value, name: checkName.value }
   phase.value = 'editor'
   activeTab.value = 'journey'
 }
 
 function onRecordDone(capturedSteps: BrowserStep[]) {
-  check.value.journey = capturedSteps
+  check.value = { ...check.value, journey: capturedSteps }
   showRecorder.value = false
   activeTab.value = 'journey'
 }
