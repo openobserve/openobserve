@@ -4183,7 +4183,13 @@
       "one": "지난 한 시간 동안 발생한 오류를 보여주세요...",
       "two": "nginx 로그에서 JSON을 구문 분석하기 위해 VRL을 작성하세요...",
       "three": "K8s 노드 상태를 위한 대시보드 구축..."
-    }
+    },
+    "autoNavigation": {
+      "label": "자동 내비게이션",
+      "enabledTooltip": "자동 내비게이션 활성화 - O2 Assistant가 확인 없이 자동으로 탐색합니다.",
+      "disabledTooltip": "자동 내비게이션 비활성화 - O2 Assistant가 탐색 전에 묻습니다."
+    },
+    "attachImageTooltip": "이미지 첨부 (PNG, JPEG, 최대 2MB)"
   },
   "emptyState": {
     "noSearchResults": {
@@ -4934,5 +4940,16 @@
     "askAi": "AI에게 쿼리 수정 요청하기",
     "showDetail": "세부 정보 보기",
     "hideDetail": "세부 정보 숨기기"
+  },
+  "refreshButton": {
+    "justNow": "바로 지금",
+    "secondsAgo": "{초} 초 전",
+    "minutesAgo": "{분} m 전",
+    "hoursAgo": "{h} h 전",
+    "notYetRefreshed": "아직 새로고침되지 않음",
+    "dataFresh": "최신 데이터",
+    "dataGettingStale": "데이터가 점점 부실해지고 있습니다",
+    "dataStale": "데이터가 오래됨",
+    "lastRefreshed": "마지막 새로 고침: {time}"
   }
 }

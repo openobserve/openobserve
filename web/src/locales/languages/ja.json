@@ -4170,7 +4170,13 @@
       "one": "過去 1 時間のエラーを表示...",
       "two": "nginx ログから JSON を解析するための VRL を書き込みます...",
       "three": "K8s ノードの状態を示すダッシュボードを作成..."
-    }
+    },
+    "autoNavigation": {
+      "label": "オートナビゲーション",
+      "enabledTooltip": "自動ナビゲーション有効-O2 Assistantは確認なしで自動ナビゲートします",
+      "disabledTooltip": "オートナビゲーション無効-O2 Assistantはナビゲートする前に確認する"
+    },
+    "attachImageTooltip": "画像を添付する (PNG、JPEG、最大 2 MB)"
   },
   "emptyState": {
     "noSearchResults": {
@@ -4921,5 +4927,16 @@
     "askAi": "AI にクエリの修正を依頼する",
     "showDetail": "詳細を表示",
     "hideDetail": "詳細を非表示にする"
+  },
+  "refreshButton": {
+    "justNow": "たった今",
+    "secondsAgo": "{秒} 秒前",
+    "minutesAgo": "{最小} 分前",
+    "hoursAgo": "{h} 時間前",
+    "notYetRefreshed": "まだ更新されていません",
+    "dataFresh": "データは新鮮",
+    "dataGettingStale": "データが古くなっている",
+    "dataStale": "データが古い",
+    "lastRefreshed": "最終更新日:{time}"
   }
 }

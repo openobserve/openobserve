@@ -4174,7 +4174,13 @@
       "one": "让我看看过去一小时的错误...",
       "two": "编写 VRL 来解析 nginx 日志中的 JSON...",
       "three": "为 K8s 节点运行状况构建仪表板..."
-    }
+    },
+    "autoNavigation": {
+      "label": "自动导航",
+      "enabledTooltip": "启用自动导航-O2 Assistant 无需确认即可自动导航",
+      "disabledTooltip": "自动导航已禁用-O2 Assistant 会在导航前询问"
+    },
+    "attachImageTooltip": "附加图片（PNG、JPEG，最大 2MB）"
   },
   "emptyState": {
     "noSearchResults": {
@@ -4925,5 +4931,16 @@
     "askAi": "让 AI 修复我的查询",
     "showDetail": "显示详情",
     "hideDetail": "隐藏细节"
+  },
+  "refreshButton": {
+    "justNow": "刚才",
+    "secondsAgo": "{秒} 秒前",
+    "minutesAgo": "{min} m 之前",
+    "hoursAgo": "{h} 小时前",
+    "notYetRefreshed": "尚未刷新",
+    "dataFresh": "数据很新",
+    "dataGettingStale": "数据变得陈旧了",
+    "dataStale": "数据已过时",
+    "lastRefreshed": "上次刷新时间：{时间}"
   }
 }

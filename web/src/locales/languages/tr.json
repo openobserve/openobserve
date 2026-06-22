@@ -4183,7 +4183,13 @@
       "one": "Bana son saatteki hataları göster...",
       "two": "NGINX günlüklerinden JSON'u ayrıştırmak için VRL yazın...",
       "three": "K8s düğüm sağlığı için bir gösterge tablosu oluşturun..."
-    }
+    },
+    "autoNavigation": {
+      "label": "Otomatik Navigasyon",
+      "enabledTooltip": "Otomatik navigasyon etkin - O2 Asistanı onay olmadan otomatik olarak gezinecek",
+      "disabledTooltip": "Otomatik navigasyon devre dışı - O2 Assistant gezinmeden önce soracak"
+    },
+    "attachImageTooltip": "Görüntüleri ekleyin (PNG, JPEG, maks. 2MB)"
   },
   "emptyState": {
     "noSearchResults": {
@@ -4934,5 +4940,16 @@
     "askAi": "AI'dan sorgumu düzeltmesini isteyin",
     "showDetail": "Ayrıntıları göster",
     "hideDetail": "Ayrıntıları gizle"
+  },
+  "refreshButton": {
+    "justNow": "Hemen şimdi",
+    "secondsAgo": "{sec} s önce",
+    "minutesAgo": "{min} m önce",
+    "hoursAgo": "{h} h önce",
+    "notYetRefreshed": "Henüz yenilenmedi",
+    "dataFresh": "Veriler taze",
+    "dataGettingStale": "Veriler bayatlanıyor",
+    "dataStale": "Veriler bayat",
+    "lastRefreshed": "Son yenilenme: {time}"
   }
 }
