@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="panel-info-icon"
           data-test="dashboard-panel-description-info"
         >
-          <OTooltip side="bottom" align="end" max-width="220px">
+          <OTooltip side="bottom" align="end" max-width="13.75rem">
             <template #content><div class="panel-description-tooltip">{{ props.data.description }}</div></template>
           </OTooltip>
         </OIcon>
@@ -117,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-panel-dependent-adhoc-variable-btn"
           icon-left="warning"
         >
-          <OTooltip side="bottom" align="end" max-width="220px" content="Some dynamic variables are not applied because the field is not present in the query's stream. Open Query Inspector to see all the details of the variables and queries executed to render this panel" />
+          <OTooltip side="bottom" align="end" max-width="13.75rem" content="Some dynamic variables are not applied because the field is not present in the query's stream. Open Query Inspector to see all the details of the variables and queries executed to render this panel" />
         </OButton>
         <!-- show error here -->
         <PanelErrorButtons

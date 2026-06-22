@@ -247,7 +247,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           {}
                         "
                         :initialVariableValues="initialVariableValues"
-                        :style="{ marginBottom: '8px' }"
+                        class="panel-variables-margin"
                         data-test="panel-variables-selector"
                       />
                     </div>
@@ -1760,6 +1760,10 @@ export default defineComponent({
   flex-direction: column;
 }
 
+.panel-variables-margin {
+  margin-bottom: 0.5rem;
+}
+
 /* GridStack theme overrides */
 :deep(.grid-stack) {
   .grid-stack-item {
@@ -1784,11 +1788,11 @@ export default defineComponent({
       &.ui-resizable-se {
         background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'><path d='M8 2 L8 8 L2 8' stroke='%23999999' stroke-width='1.5' fill='none' stroke-linecap='round'/></svg>")
           no-repeat center;
-        background-size: 8px 8px;
-        width: 16px;
-        height: 16px;
-        bottom: 2px;
-        right: 2px;
+        background-size: 0.5rem 0.5rem;
+        width: 1rem;
+        height: 1rem;
+        bottom: 0.125rem;
+        right: 0.125rem;
         cursor: se-resize;
         transform: rotate(0deg) !important;
       }
