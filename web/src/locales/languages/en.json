@@ -794,6 +794,13 @@
     "performance": "Performance",
     "sessions": "Sessions",
     "errorTracking": "Error Tracking",
+    "sourceMaps": "Source Maps",
+    "service": "Service",
+    "environment": "Environment",
+    "applyFilters": "Apply Filters",
+    "uploadSourceMaps": "Upload Source Maps",
+    "files": "Files",
+    "uploadedAt": "Uploaded At",
     "overview": "Overview",
     "webVitals": "Web Vitals",
     "errors": "Errors",
@@ -4013,7 +4020,12 @@
     "layoutHorizontal": "Horizontal",
     "layoutVertical": "Vertical",
     "layoutForce": "Force Layout",
-    "exportTraces": "Export Traces"
+    "exportTraces": "Export Traces",
+    "waterfall": "Waterfall",
+    "flameGraph": "Flame Graph",
+    "traceGraph": "Trace Graph",
+    "dag": "DAG",
+    "thread": "Thread"
   },
   "actions": {
     "testAction": "Test action",

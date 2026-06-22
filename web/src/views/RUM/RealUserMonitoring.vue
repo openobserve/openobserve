@@ -183,7 +183,7 @@ const tabs = [
     value: "error_tracking",
   },
   {
-    label: "Source Maps",
+    label: t("rum.sourceMaps"),
     value: "source_maps",
   },
 ];
