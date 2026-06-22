@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-for="(variable, index) in dashboardVariablesList"
             :key="variable.name"
-            class="draggable-row tw:grid tw:items-center tw:rounded tw:border-b tw:border-b-(--o2-border-color) tw:hover:bg-(--color-interactive-hover-bg)"
+            class="draggable-row tw:grid tw:items-center tw:rounded tw:border-b tw:border-b-(--o2-border-color) tw:hover:bg-[var(--color-interactive-hover-bg)]"
             style="grid-template-columns: 48px minmax(0, 1fr)"
             data-test="dashboard-variable-settings-draggable-row"
           >

@@ -173,7 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       style="background-color: rgba(0, 0, 0, 0.5)"
       @click.self="handleCloseAddVariable"
     >
-      <div class="add-variable-drawer-panel tw:px-6 tw:pt-4 tw:w-225 tw:h-screen tw:bg-white tw:shadow-[-2px_0_8px_rgba(0,0,0,0.15)] tw:overflow-hidden tw:rounded-none!" :class="store.state.theme === 'dark' ? 'tw:bg-[#1a1a1a]' : ''">
+      <div class="add-variable-drawer-panel tw:px-6 tw:pt-4 tw:w-225 tw:h-screen tw:shadow-[-2px_0_8px_rgba(0,0,0,0.15)] tw:overflow-hidden tw:rounded-none!" :class="store.state.theme === 'dark' ? 'tw:bg-[#1a1a1a]' : 'tw:bg-white'">
         <AddSettingVariable
           @save="handleSaveVariable"
           @close="handleCloseAddVariable"

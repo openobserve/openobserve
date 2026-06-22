@@ -497,6 +497,7 @@
   --o2-primary-color: #6069D3;
   --o2-primary-foreground: #1E1F22;
   --o2-hover-accent: color-mix(in srgb, var(--o2-theme-color) 20%, rgb(39, 39, 39));
+  --color-interactive-hover-bg: color-mix(in srgb, var(--o2-theme-color) 20%, rgb(39, 39, 39));
   --o2-destructive-foreground: #1E1F22;
   --o2-focus-ring: #3A4180;
   --o2-hover-shadow: rgba(0, 0, 0, 0.6);

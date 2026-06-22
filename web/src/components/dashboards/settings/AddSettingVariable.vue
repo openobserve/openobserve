@@ -20,7 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <DashboardHeader :title="title" backButton @back="close">
       </DashboardHeader>
 
-      <div class="scrollable-content tw:overflow-y-auto tw:px-[3px] tw:max-h-[calc(100vh-190px)] tw:[scrollbar-width:thin] tw:[scrollbar-color:#d1d5db_transparent]">
+      <div
+        class="tw:overflow-y-auto tw:px-[3px] tw:max-h-[calc(100vh-190px)] tw:[scrollbar-width:thin] tw:[&::-webkit-scrollbar]:w-[6px] tw:[&::-webkit-scrollbar]:bg-transparent tw:[&::-webkit-scrollbar-thumb]:rounded"
+        :class="store.state.theme === 'dark' ? 'tw:[scrollbar-color:#4b5563_transparent] tw:[&::-webkit-scrollbar-thumb]:bg-[#4b5563]' : 'tw:[scrollbar-color:#d1d5db_transparent] tw:[&::-webkit-scrollbar-thumb]:bg-[#d1d5db]'"
+      >
         <OForm
           greedy
           ref="addVariableForm"
@@ -439,7 +442,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- it can be first value or all values -->
           <div v-if="['query_values'].includes(variableData.type)">
             <div class="tw:mt-1.5 tw:mb-1.5">
-              <div class="tw:mt-1.25 tw:mb-1.25 tw:text-sm tw:font-semibold tw:text-[#666666]">By Default Select:</div>
+              <div class="tw:mt-1.25 tw:mb-1.25 tw:text-sm tw:font-semibold" :class="store.state.theme === 'dark' ? 'tw:text-[#999999]' : 'tw:text-[#666666]'">By Default Select:</div>
               <OToggleGroup
                 :model-value="variableData.selectAllValueForMultiSelect"
                 @update:model-value="
@@ -547,7 +550,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </OForm>
       </div>
-      <div class="sticky-footer tw:sticky tw:bottom-0 tw:left-0 tw:w-full tw:pt-3 tw:pb-2 tw:px-0 tw:flex tw:justify-center tw:gap-4 tw:z-10 tw:border-t tw:border-t-[#eee] tw:shadow-[0px_-4px_7px_0px_rgb(240,240,240)]" :class="store.state.theme === 'dark' ? 'tw:border-t-[#333] tw:shadow-[rgb(20,20,20)_0px_-4px_7px_0px]' : ''">
+      <div
+        class="tw:sticky tw:bottom-0 tw:left-0 tw:w-full tw:pt-3 tw:pb-2 tw:px-0 tw:flex tw:justify-center tw:gap-4 tw:z-10 tw:border-t"
+        :class="store.state.theme === 'dark' ? 'tw:border-t-[#333] tw:[box-shadow:rgb(20,20,20)_0px_-4px_7px_0px]' : 'tw:border-t-[#eee] tw:[box-shadow:rgb(240,240,240)_0px_-4px_7px_0px]'"
+      >
         <OButton
           variant="outline"
           size="sm-action"
@@ -1711,23 +1717,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style>
-.scrollable-content::-webkit-scrollbar {
-  width: 6px;
-  background: transparent;
-}
-
-.scrollable-content::-webkit-scrollbar-thumb {
-  background: #d1d5db;
-  border-radius: 4px;
-}
-
-.theme-dark .scrollable-content::-webkit-scrollbar-thumb {
-  background: #4b5563;
-}
-
-.theme-dark .scrollable-content {
-  scrollbar-color: #4b5563 transparent;
-}
-</style>
