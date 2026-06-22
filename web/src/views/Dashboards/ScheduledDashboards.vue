@@ -49,8 +49,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div
       data-test="scheduled-dashboards-container"
-      class="scheduled-dashboards tw:h-fit tw:bg-white tw:dark:bg-(--o2-primary-background)"
-      :class="store.state.theme === 'dark' ? 'dark-mode' : ''"
+      class="scheduled-dashboards tw:h-fit"
+      :class="store.state.theme === 'dark' ? 'dark-mode tw:bg-[var(--o2-primary-background)]' : 'tw:bg-white'"
     >
     <OTable
       data-test="scheduled-dashboard-table"

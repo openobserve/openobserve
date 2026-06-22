@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     data-test="dashboard-settings-main-container"
     class="tw:p-0"
-    :class="store.state.theme == 'dark' ? 'dark-mode tw:bg-[var(--o2-primary-background)]' : 'tw:bg-white'"
+    :class="store.state.theme == 'dark' ? 'dark-mode tw:bg-surface-panel' : 'tw:bg-white'"
     style="min-height: inherit"
   >
 
