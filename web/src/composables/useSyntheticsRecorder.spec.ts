@@ -18,7 +18,7 @@ interface FakePort {
 function makePort(): FakePort {
   let listener: ((msg: unknown) => void) | null = null
   return {
-    name: 'synthetics-recording',
+    name: 'synthetics-recorder',
     postMessage: vi.fn(),
     disconnect: vi.fn(),
     onMessage: {
@@ -93,7 +93,7 @@ describe('useSyntheticsRecorder', () => {
       const r = useSyntheticsRecorder()
       await r.startRecording('https://app.test/login')
 
-      expect(runtime.connect).toHaveBeenCalledWith(expect.any(String), { name: 'synthetics-recording' })
+      expect(runtime.connect).toHaveBeenCalledWith(expect.any(String), { name: 'synthetics-recorder' })
       expect(r.isRecording.value).toBe(true)
       expect(r.currentUrl.value).toBe('https://app.test/login')
 
