@@ -4603,6 +4603,24 @@
       "evalJobs": "Eval Jobs",
       "scorers": "Scorers",
       "scoreConfigs": "Score Configs"
+    },
+    "kpi": {
+      "totalCost": "Total Cost",
+      "totalTokens": "Total Tokens",
+      "totalTraces": "Total Traces",
+      "p95Latency": "P95 Latency",
+      "errorRate": "Error Rate"
+    },
+    "panels": {
+      "costTrend": { "title": "Cost trend", "subtitle": "USD by model" },
+      "tokenTrend": { "title": "Token trend", "subtitle": "tokens by model" },
+      "spanTrend": { "title": "Span trend", "subtitle": "span count by kind" },
+      "latencyPercentiles": { "title": "Latency p50 / p95 / p99", "subtitle": "all LLM calls" },
+      "tracesOverTime": { "title": "Traces over time", "subtitle": "trace count by service" },
+      "errorsOverTime": { "title": "Errors over time", "subtitle": "error count" },
+      "spansByModel": { "title": "Spans by model", "subtitle": "call count per model" },
+      "tokensByModel": { "title": "Tokens by model", "subtitle": "total tokens per model" },
+      "recentErrors": { "title": "Recent errors", "subtitle": "last 10 failed spans" }
     }
   },
   "onlineEvals": {
