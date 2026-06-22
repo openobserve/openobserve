@@ -2506,7 +2506,13 @@
       "one": "Show me errors from the last hour…",
       "two": "Write VRL to parse JSON from nginx logs…",
       "three": "Build a dashboard for K8s node health…"
-    }
+    },
+    "autoNavigation": {
+      "label": "Auto Navigation",
+      "enabledTooltip": "Auto navigation enabled - O2 Assistant will auto navigate without confirmation",
+      "disabledTooltip": "Auto navigation disabled - O2 Assistant will ask before navigating"
+    },
+    "attachImageTooltip": "Attach images (PNG, JPEG, max 2MB)"
   },
   "billing": {
     "header": "Usage & Billing",
@@ -5467,5 +5473,16 @@
     "askAi": "Ask AI to fix my query",
     "showDetail": "Show details",
     "hideDetail": "Hide details"
+  },
+  "refreshButton": {
+    "justNow": "just now",
+    "secondsAgo": "{sec}s ago",
+    "minutesAgo": "{min}m ago",
+    "hoursAgo": "{h}h ago",
+    "notYetRefreshed": "Not yet refreshed",
+    "dataFresh": "Data is fresh",
+    "dataGettingStale": "Data is getting stale",
+    "dataStale": "Data is stale",
+    "lastRefreshed": "Last refreshed: {time}"
   }
 }

@@ -1274,7 +1274,7 @@
                   size="sm"
                   :class="store.state.theme == 'dark' ? 'tw:text-white' : 'tw:text-gray-600'"
                 />
-                <OTooltip content="Attach images (PNG, JPEG, max 2MB)" />
+                <OTooltip :content="t('aiAssistant.attachImageTooltip')" />
               </OButton>
               <div v-else class="tw:w-8"></div>
 
@@ -1301,12 +1301,12 @@
                       : ''
                   ]"
                 />
-                <span class="auto-nav-label tw:ml-1">Auto Navigation</span>
+                <span class="auto-nav-label tw:ml-1">{{ t('aiAssistant.autoNavigation.label') }}</span>
                 <OTooltip
                   :content="
                     isAutoNavigationEnabled
-                      ? 'Auto navigation enabled - O2 Assistant will auto navigate without confirmation'
-                      : 'Auto navigation disabled - O2 Assistant will ask before navigating'
+                      ? t('aiAssistant.autoNavigation.enabledTooltip')
+                      : t('aiAssistant.autoNavigation.disabledTooltip')
                   "
                 />
               </OButton>
@@ -5693,6 +5693,7 @@ export default defineComponent({
       closeImagePreview,
       contextReferences,
       handleReferencesUpdate,
+      t,
     };
   },
 });
