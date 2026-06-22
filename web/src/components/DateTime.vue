@@ -95,8 +95,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       selectedType == 'relative' &&
                       relativePeriod == period.value &&
                       relativeValue == item
-                        ? 'rp-selector-selected tw:h-8 tw:w-8 tw:bg-(--o2-primary-btn-bg) tw:font-bold tw:text-white tw:disabled:opacity-35 tw:disabled:cursor-not-allowed'
-                        : `rp-selector tw:h-8 tw:w-8 tw:bg-black/7 tw:font-bold tw:disabled:opacity-35 tw:disabled:cursor-not-allowed ${relativePeriod}`
+                        ? 'rp-selector-selected'
+                        : `rp-selector ${relativePeriod}`
                     "
                     variant="ghost"
                     size="xs"

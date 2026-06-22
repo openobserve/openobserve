@@ -29,7 +29,7 @@
           <OTabPanel name="relative">
             <div class="date-time-table tw:relative tw:flex tw:flex-col">
               <div
-                class="relative-row tw:px-3 tw:py-2"
+                class="relative-row tw:px-3 tw:py-2 tw:flex tw:items-center tw:border-b tw:border-[var(--o2-border)]"
                 v-for="(period, periodIndex) in relativePeriods"
                 :key="'date_' + periodIndex"
               >
@@ -43,15 +43,15 @@
                     variant="ghost"
                     :class="
                       isSelected(item, period.value)
-                        ? 'tw:h-8 tw:w-8 tw:bg-[rgba(0,0,0,0.07)] tw:text-white tw:bg-(--o2-primary-btn-bg)'
-                        : 'tw:h-8 tw:w-8 tw:bg-[rgba(0,0,0,0.07)]'
+                        ? 'rp-selector-selected'
+                        : 'rp-selector'
                     "
                     @click="setRelativeDate(period, item)"
                     >{{ item }}</OButton
                   >
                 </div>
               </div>
-              <div class="relative-row tw:px-3 tw:py-2">
+              <div class="relative-row tw:px-3 tw:py-2 tw:flex tw:items-center tw:border-b tw:border-[var(--o2-border)]">
                 <div class="tw:text-sm tw:font-semibold tw:min-w-18.75">Custom</div>
                 <div class="tw:flex tw:gap-2">
                   <div class="tw:flex tw:flex-col tw:w-20">

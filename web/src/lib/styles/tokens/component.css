@@ -3331,6 +3331,30 @@ button.date-time-button {
   height: 36px !important;
 }
 
+/*
+ * Relative-period chips ("Past 15m" grid) shared by DateTime.vue, DateTimePicker.vue
+ * and CustomDateTimePicker.vue. They render as ghost OButtons (transparent bg), so these
+ * classes supply the grey fill, size, and the selected primary fill — same rules that
+ * used to live in each component's <style> block on main, just hoisted here as global CSS
+ * after the per-component SCSS was removed.
+ */
+.rp-selector,
+.rp-selector-selected {
+  height: 32px;
+  width: 32px;
+  background: rgba(0, 0, 0, 0.07);
+  font-weight: 700;
+}
+.rp-selector:disabled,
+.rp-selector-selected:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.rp-selector-selected {
+  color: #ffffff;
+  background: var(--o2-primary-btn-bg);
+}
+
 .wrap-content-btn {
   height: 1.5rem !important;
   min-height: 1.5rem !important;

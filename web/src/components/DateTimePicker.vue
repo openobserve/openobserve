@@ -78,8 +78,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data.selectedDate.tab == 'relative' &&
                     data.selectedDate.relative.period.value == period.value &&
                     data.selectedDate.relative.value == item
-                      ? 'tw:h-8 tw:w-8 tw:bg-(--o2-primary-btn-bg) tw:text-white'
-                      : `tw:h-8 tw:w-8 tw:bg-black/7 ${data.selectedDate.relative.period.value}`
+                      ? 'rp-selector-selected'
+                      : `rp-selector ${data.selectedDate.relative.period.value}`
                   "
                   variant="ghost"
                   size="xs"
