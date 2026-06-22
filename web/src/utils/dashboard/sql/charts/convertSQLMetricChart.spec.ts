@@ -14,7 +14,11 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { applyMetricChart } from "@/utils/dashboard/sql/charts/convertSQLMetricChart";
+import {
+  applyMetricChart,
+  METRIC_COPY_BTN_RESERVE_PX,
+} from "@/utils/dashboard/sql/charts/convertSQLMetricChart";
+import { calculateOptimalFontSize } from "@/utils/dashboard/chartDimensionUtils";
 
 vi.mock("@/utils/dashboard/convertDataIntoUnitValue", () => ({
   formatUnitValue: vi.fn((v) => String(v ?? "")),
@@ -92,6 +96,44 @@ function makeMockContext(overrides: Partial<any> = {}): any {
 }
 
 describe("applyMetricChart", () => {
+  describe("copy-button support", () => {
+    it("exposes the formatted value as _metricText for copy", () => {
+      const ctx = makeMockContext();
+      applyMetricChart(ctx);
+      // getUnitValue/formatUnitValue are mocked passthrough → raw value string.
+      expect(ctx.options.series[0]._metricText).toBe("100");
+    });
+
+    it("stores _metricLayout sized to the panel for icon positioning", () => {
+      const ctx = makeMockContext();
+      applyMetricChart(ctx);
+      expect(ctx.options.series[0]._metricLayout).toMatchObject({
+        left: 0,
+        top: 0,
+        width: 800,
+        height: 400,
+        cx: 400,
+        cy: 200,
+      });
+    });
+
+    it("reserves the copy-button width when fitting the font size", () => {
+      const ctx = makeMockContext();
+      applyMetricChart(ctx);
+      // layout font size is computed against width minus the button reserve.
+      expect(calculateOptimalFontSize).toHaveBeenCalledWith(
+        "100",
+        800 - METRIC_COPY_BTN_RESERVE_PX,
+      );
+    });
+
+    it("omits _metricLayout when the panel ref is unavailable", () => {
+      const ctx = makeMockContext({ chartPanelRef: { value: null } });
+      applyMetricChart(ctx);
+      expect(ctx.options.series[0]._metricLayout).toBeUndefined();
+    });
+  });
+
   it("sets xAxis to empty array", () => {
     const ctx = makeMockContext();
     applyMetricChart(ctx);

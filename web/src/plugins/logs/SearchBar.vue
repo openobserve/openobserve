@@ -2733,6 +2733,7 @@ export default defineComponent({
       await nextTick();
 
       if (
+        value.userChangedValue !== false &&
         searchObj.loading == false &&
         store.state.zoConfig.query_on_stream_selection == false &&
         searchObj.meta.logsVisualizeToggle === "logs" &&

@@ -1,4 +1,5 @@
 // pipelinesPage.js
+const http = require('http');
 const { expect } = require('@playwright/test')
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 const fetch = require('node-fetch');
@@ -7,14 +8,16 @@ import { openNavFlyoutChild } from '../commonActions.js';
 
 const randomNodeName = `remote-node-${Math.floor(Math.random() * 1000)}`;
 
+// HTTP agent that never pools connections. node-fetch v2 keep-alive pooling
+// is the primary cause of "Premature close" / ECONNRESET flakiness in CI.
+const noKeepAliveAgent = new http.Agent({ keepAlive: false });
+
 /**
  * Perform a fetch, retrying on transient network errors.
  *
- * node-fetch occasionally throws "Premature close" / ECONNRESET / "socket hang up"
- * when the server closes a keep-alive connection before the response body is fully
- * read. These are not real ingestion failures — a retry almost always succeeds.
- * Without this, flaky socket errors fail the ingestion in beforeEach and take the
- * whole serial describe block down (CI: pipeline-regression metrics ingest flake).
+ * Uses keepAlive: false agent + compress: false to prevent the node-fetch v2
+ * Gunzip "Premature close" / ECONNRESET flakiness that can survive retries
+ * when every connection attempt hits a pooled dead socket.
  *
  * @param {string} url - Request URL
  * @param {object} options - fetch options
@@ -22,9 +25,14 @@ const randomNodeName = `remote-node-${Math.floor(Math.random() * 1000)}`;
  * @returns {Promise<Response>} The fetch response (only network errors are retried)
  */
 async function fetchWithRetry(url, options, maxRetries = 3) {
+    const requestOpts = {
+        ...options,
+        compress: false,
+        agent: noKeepAliveAgent,
+    };
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
         try {
-            return await fetch(url, options);
+            return await fetch(url, requestOpts);
         } catch (err) {
             const message = String(err && err.message ? err.message : err);
             const isTransient = /premature close|ECONNRESET|socket hang up|network|EPIPE|other side closed/i.test(message);
