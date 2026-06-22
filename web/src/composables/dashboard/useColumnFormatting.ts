@@ -136,6 +136,7 @@ export const loadAllFromRaw = (raw: any[] | undefined): ColumnOverrideUI[] => {
 export const serializeColumnOverride = (
   c: ColumnOverrideUI,
 ): any | null => {
+  if (!c.field) return null;
   const config: any[] = [];
 
   if (c.fieldType && c.fieldType !== "auto")
@@ -178,7 +179,6 @@ export const serializeColumnOverride = (
     });
   }
 
-  if (!config.length) return null;
   return { field: { matchBy: "name", value: c.field }, config };
 };
 

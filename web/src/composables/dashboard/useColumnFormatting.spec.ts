@@ -49,14 +49,13 @@ describe("useColumnFormatting", () => {
   });
 
   describe("serializeColumnOverride", () => {
-    it("returns null when the row has no formatting", () => {
-      expect(serializeColumnOverride(emptyColumnOverride("x"))).toBeNull();
+    it("returns null when there is no field selected", () => {
+      expect(serializeColumnOverride(emptyColumnOverride(""))).toBeNull();
     });
 
-    it("treats every-override-set-to-none as a zero-override field", () => {
-      // A column where the user explicitly picked the 'none'/default value for
-      // each control must serialize identically to a brand-new untouched field
-      // (i.e. produce no entry), so it leaves no residue in override_config.
+    it("persists an added field with all-default controls (empty config)", () => {
+      // A column the user explicitly added but left at default values must still
+      // persist (empty config) so it reappears when the dialog is reopened.
       const allNone: ColumnOverrideUI = {
         field: "x",
         fieldType: "auto", // detect
@@ -68,16 +67,20 @@ describe("useColumnFormatting", () => {
         autoColor: false, // toggle off
         conditions: [], // all rules removed
       };
-      expect(serializeColumnOverride(allNone)).toBeNull();
-      expect(serializeColumnOverride(allNone)).toEqual(
-        serializeColumnOverride(emptyColumnOverride("x")),
-      );
-      // …and the whole-array path drops it too (no entry survives).
-      expect(serializeOverrides([allNone])).toEqual([]);
+      const entry = serializeColumnOverride(allNone);
+      expect(entry).toEqual({
+        field: { matchBy: "name", value: "x" },
+        config: [],
+      });
+      // …and the whole-array path keeps it.
+      expect(serializeOverrides([allNone])).toEqual([entry]);
     });
 
     it("serializes a forced field type but omits 'auto'", () => {
-      expect(serializeColumnOverride({ ...emptyColumnOverride("x"), fieldType: "auto" })).toBeNull();
+      // 'auto' adds no config item, but the field still persists (empty config).
+      expect(
+        serializeColumnOverride({ ...emptyColumnOverride("x"), fieldType: "auto" }),
+      ).toEqual({ field: { matchBy: "name", value: "x" }, config: [] });
       const num = serializeColumnOverride({ ...emptyColumnOverride("x"), fieldType: "num" });
       expect(num.config).toEqual([{ type: "field_type", value: "num" }]);
       const text = serializeColumnOverride({ ...emptyColumnOverride("x"), fieldType: "text" });
@@ -172,15 +175,20 @@ describe("useColumnFormatting", () => {
       expect(rows.map((r) => r.field).sort()).toEqual(["a", "b"]);
     });
 
-    it("serializeOverrides drops only blank rows", () => {
+    it("serializeOverrides drops only field-less rows", () => {
       const cols: ColumnOverrideUI[] = [
         { ...emptyColumnOverride("num"), unit: "bytes" },
         { ...emptyColumnOverride("txt"), unit: "bytes" },
-        emptyColumnOverride("blank"), // no formatting → dropped
+        emptyColumnOverride("kept"), // added field, default formatting → kept
+        emptyColumnOverride(""), // no field selected → dropped
       ];
       const out = serializeOverrides(cols);
-      expect(out).toHaveLength(2);
-      expect(out.map((e: any) => e.field.value).sort()).toEqual(["num", "txt"]);
+      expect(out).toHaveLength(3);
+      expect(out.map((e: any) => e.field.value).sort()).toEqual([
+        "kept",
+        "num",
+        "txt",
+      ]);
     });
   });
 });
