@@ -302,7 +302,7 @@ jobs:
       - uses: actions/setup-node@v4
         if: steps.prinfo.outputs.author_allowed == 'true'
         with:
-          node-version: 20
+          node-version: 24
 
       - name: Install OpenCode
         if: steps.prinfo.outputs.author_allowed == 'true'
@@ -502,7 +502,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
 
       - name: Install OpenCode
         run: |
@@ -844,7 +844,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
 
       - name: Install OpenCode
         # REQUIRED: the healer + post-heal Sentinel run via `opencode`. verify_heal is a separate
@@ -1415,7 +1415,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
       - name: Install OpenCode
         run: |
           npm install -g opencode-ai@1.17.7 || { echo "::error::OpenCode install failed"; exit 1; }
