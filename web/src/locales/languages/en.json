@@ -4009,7 +4009,11 @@
     "tracesTab": "Traces",
     "serviceGraphTab": "Service Graph",
     "treeView": "Tree View",
-    "graphView": "Graph View"
+    "graphView": "Graph View",
+    "layoutHorizontal": "Horizontal",
+    "layoutVertical": "Vertical",
+    "layoutForce": "Force Layout",
+    "exportTraces": "Export Traces"
   },
   "actions": {
     "testAction": "Test action",
