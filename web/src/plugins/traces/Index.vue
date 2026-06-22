@@ -267,6 +267,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @run-query="searchData"
                       @widen-range="onWidenTracesRange"
                       @remove-filter="onRemoveTracesFilter"
+                      @jump-to-stream-data="onJumpToTracesStreamData"
                       @error-only-toggled="onErrorOnlyToggled"
                     />
                   </div>
@@ -1270,6 +1271,14 @@ async function extractFields() {
         "traces",
         true,
       );
+      // Mirror the real stats (doc_time_min/max) into streamResults so that
+      // TracesNoEventsState can compute streamDocTimeRange correctly.
+      const streamResultEntry = searchObj.data.streamResults.list?.find(
+        (s: any) => s.name === searchObj.data.stream.selectedStream.value,
+      );
+      if (streamResultEntry && stream?.stats) {
+        streamResultEntry.stats = stream.stats;
+      }
       searchObj.data.datetime.queryRangeRestrictionInHour = -1;
       if (
         (stream.settings.max_query_range > 0 ||
@@ -1778,6 +1787,14 @@ const onWidenTracesRange = (period: string) => {
   searchObj.data.datetime.relativeTimePeriod = period;
   searchObj.data.datetime.type = "relative";
   searchObj.runQuery = true;
+};
+
+const onJumpToTracesStreamData = (fromUs: number, toUs: number) => {
+  searchBarRef.value?.dateTimeRef?.setAbsoluteTime(fromUs, toUs);
+  searchObj.data.datetime.startTime = fromUs;
+  searchObj.data.datetime.endTime = toUs;
+  searchObj.data.datetime.type = "absolute";
+  runQueryFn();
 };
 
 const onSelectTracesStream = () => {
