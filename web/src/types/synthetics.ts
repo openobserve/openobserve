@@ -53,8 +53,8 @@ export interface BrowserCheck {
       passwordSecretRef: string
     }
   }
-  variables?: { name: string; value: string }[]
-  secrets?: { name: string; value: string }[]
-  headers?: { key: string; value: string }[]
-  cookies?: { name: string; value: string; domain: string }[]
+  variables?: { id?: string; name: string; value: string }[]
+  secrets?: { id?: string; name: string; value: string }[]
+  headers?: { id?: string; key: string; value: string }[]
+  cookies?: { id?: string; name: string; value: string; domain: string }[]
 }
