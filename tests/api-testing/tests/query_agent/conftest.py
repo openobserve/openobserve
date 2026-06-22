@@ -73,7 +73,9 @@ def load_all_queries():
     for fp in sorted(_QUERIES_DIR.glob("*.json")):
         with open(fp) as f:
             data = json.load(f)
-        queries = data["queries"]
+        queries = data.get("queries")
+        if queries is None:
+            continue  # skip non-query files (e.g. error_paths.json)
         if not single_node_opt:
             queries = [q for q in queries if not q.get("expected", {}).get("skip_without_single_node_opt")]
         categories[fp.stem] = queries
