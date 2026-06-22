@@ -185,7 +185,7 @@ export default {
 };
 </script>
 
-<style>
+<style scoped>
 /* Override global transparent-by-default scrollbar so it is always visible */
 .user-guide::-webkit-scrollbar {
   width: 6px;
@@ -198,10 +198,10 @@ export default {
   background: rgba(0, 0, 0, 0.05);
 }
 
-ul,
-li,
-p,
-div {
+.user-guide ul,
+.user-guide li,
+.user-guide p,
+.user-guide div {
   margin: 0;
 }
 </style>
