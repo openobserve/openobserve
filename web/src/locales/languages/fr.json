@@ -3498,7 +3498,9 @@
     "import_this_pattern": "Importer ce modèle",
     "patterns_loaded": "Motif (s) {count} chargé (s)",
     "failed_to_load": "Impossible de charger les modèles",
-    "no_patterns_selected": "Veuillez sélectionner au moins un motif"
+    "no_patterns_selected": "Veuillez sélectionner au moins un motif",
+    "name_required": "* Le nom est obligatoire",
+    "pattern_required": "* Le motif est obligatoire"
   },
   "search_history": {
     "title": "Historique des recherches",

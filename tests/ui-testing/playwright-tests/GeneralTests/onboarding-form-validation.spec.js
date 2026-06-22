@@ -40,12 +40,14 @@ test.describe("Onboarding GetStarted form validation", () => {
         testLogger.info('GetStarted form is visible');
     });
 
-    test("should show required error for hear-about-us when field is blurred empty", {
+    test("should show required error for hear-about-us when form is submitted empty", {
         tag: ['@onboarding-form-validation', '@P0', '@smoke']
     }, async ({ page }) => {
         testLogger.info('Testing empty hear-about-us field validation');
 
-        await pm.onboardingFormValidation.triggerEmptyValidationOnHearAboutUs();
+        // OForm validates on submit (revalidateLogic: submit-then-change), so the
+        // required error reveals after clicking Submit — not on blur.
+        await pm.onboardingFormValidation.clickSubmit();
 
         await expect(pm.onboardingFormValidation.getHearAboutUsErrorLocator()).toBeVisible();
         await expect(pm.onboardingFormValidation.getHearAboutUsErrorLocator()).toContainText(
@@ -55,12 +57,13 @@ test.describe("Onboarding GetStarted form validation", () => {
         testLogger.info('Hear-about-us required error shown correctly');
     });
 
-    test("should show required error for where-do-you-work when field is blurred empty", {
+    test("should show required error for where-do-you-work when form is submitted empty", {
         tag: ['@onboarding-form-validation', '@P0', '@smoke']
     }, async ({ page }) => {
         testLogger.info('Testing empty where-do-you-work field validation');
 
-        await pm.onboardingFormValidation.triggerEmptyValidationOnWhereDoYouWork();
+        // Validation reveals on submit, not on blur.
+        await pm.onboardingFormValidation.clickSubmit();
 
         await expect(pm.onboardingFormValidation.getWhereDoYouWorkErrorLocator()).toBeVisible();
         await expect(pm.onboardingFormValidation.getWhereDoYouWorkErrorLocator()).toContainText(
@@ -70,13 +73,13 @@ test.describe("Onboarding GetStarted form validation", () => {
         testLogger.info('Where-do-you-work required error shown correctly');
     });
 
-    test("should show required errors on both fields when both are blurred empty", {
+    test("should show required errors on both fields when the form is submitted empty", {
         tag: ['@onboarding-form-validation', '@P0', '@smoke']
     }, async ({ page }) => {
-        testLogger.info('Testing both fields blurred empty trigger required errors');
+        testLogger.info('Testing both fields empty trigger required errors on submit');
 
-        await pm.onboardingFormValidation.triggerEmptyValidationOnHearAboutUs();
-        await pm.onboardingFormValidation.triggerEmptyValidationOnWhereDoYouWork();
+        // A single submit validates the whole schema, revealing both errors.
+        await pm.onboardingFormValidation.clickSubmit();
 
         await expect(pm.onboardingFormValidation.getHearAboutUsErrorLocator()).toBeVisible();
         await expect(pm.onboardingFormValidation.getHearAboutUsErrorLocator()).toContainText('This field is required');
@@ -91,7 +94,9 @@ test.describe("Onboarding GetStarted form validation", () => {
     }, async ({ page }) => {
         testLogger.info('Testing hear-about-us error clears on input');
 
-        await pm.onboardingFormValidation.triggerEmptyValidationOnHearAboutUs();
+        // Reveal the error via submit, then typing re-validates on change
+        // (revalidateLogic modeAfterSubmission: "change") and clears it.
+        await pm.onboardingFormValidation.clickSubmit();
         await expect(pm.onboardingFormValidation.getHearAboutUsErrorLocator()).toBeVisible();
         await expect(pm.onboardingFormValidation.getHearAboutUsErrorLocator()).toContainText('This field is required');
 
@@ -102,29 +107,33 @@ test.describe("Onboarding GetStarted form validation", () => {
         testLogger.info('Hear-about-us error cleared correctly');
     });
 
-    test("should keep submit button disabled when agree checkbox is unchecked", {
+    test("should keep submit button enabled even when agree checkbox is unchecked", {
         tag: ['@onboarding-form-validation', '@P0', '@smoke']
     }, async ({ page }) => {
-        testLogger.info('Testing submit button disabled when agree not checked');
+        testLogger.info('Testing submit button stays enabled when agree not checked (R3)');
 
         await pm.onboardingFormValidation.fillHearAboutUs('From a friend');
         await pm.onboardingFormValidation.fillWhereDoYouWork('Acme Corp');
 
-        // Checkbox is unchecked by default — button must be disabled
-        await expect(pm.onboardingFormValidation.getSubmitBtnLocator()).toBeDisabled();
+        // Under the OForm foundation the Save button is ALWAYS enabled — the Zod
+        // schema (isAgree must be true) gates the actual submit, not a disabled
+        // button. So with the agree box unchecked the button stays enabled.
+        await expect(pm.onboardingFormValidation.getSubmitBtnLocator()).toBeEnabled();
 
-        testLogger.info('Submit button correctly disabled without agree checkbox');
+        testLogger.info('Submit button correctly stays enabled without agree checkbox');
     });
 
-    test("should enable submit button only when both fields filled and agree checked", {
+    test("should keep submit button enabled when both fields filled and agree checked", {
         tag: ['@onboarding-form-validation', '@P1', '@smoke']
     }, async ({ page }) => {
-        testLogger.info('Testing submit button enabled after all conditions met');
+        testLogger.info('Testing submit button enabled when the form is valid');
 
         await pm.onboardingFormValidation.fillHearAboutUs('From a friend');
         await pm.onboardingFormValidation.fillWhereDoYouWork('Acme Corp');
         await pm.onboardingFormValidation.checkAgreeCheckbox();
 
+        // Always enabled under the OForm foundation; with valid values it stays
+        // enabled and a submit would pass the schema.
         await expect(pm.onboardingFormValidation.getSubmitBtnLocator()).toBeEnabled();
 
         testLogger.info('Submit button correctly enabled when form is valid');

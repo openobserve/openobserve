@@ -5,6 +5,7 @@ import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { h } from "vue";
 import OFormCheckbox from "./OFormCheckbox.vue";
 import OForm from "../Form/OForm.vue";
+import { z } from "zod";
 
 describe("OFormCheckbox", () => {
   let wrapper: VueWrapper;
@@ -26,29 +27,24 @@ describe("OFormCheckbox", () => {
     expect(wrapper.exists()).toBe(true);
   });
 
-  // Validator errors are gated by tanstack-form's `isTouched`, which only
-  // flips on `handleBlur`. OCheckbox never emits blur, so OFormCheckbox must
-  // call handleBlur after handleChange — otherwise errors never render.
-  it("shows validator error after toggling (handleBlur fires isTouched)", async () => {
+  // Schema-only: validation comes from the OForm :schema. Submit-then-change
+  // timing keeps errors hidden until the first submit, then they show.
+  it("shows schema error after submit when unchecked", async () => {
     wrapper = mount(OForm, {
-      props: { defaultValues: { accepted: false } },
+      props: {
+        defaultValues: { accepted: false },
+        schema: z.object({
+          accepted: z.boolean().refine((v) => v === true, "Required"),
+        }),
+      },
       slots: {
-        default: () =>
-          h(OFormCheckbox, {
-            name: "accepted",
-            label: "Accept terms",
-            validators: [
-              (v: unknown) => (v !== true ? "Required" : undefined),
-            ],
-          }),
+        default: () => h(OFormCheckbox, { name: "accepted", label: "Accept terms" }),
       },
       global: { components: { OFormCheckbox } },
     });
-    // First click toggles to true (passes validation, no error)
-    await wrapper.find("button").trigger("click");
-    await flushPromises();
-    // Toggle back to false — validator should now fail and error should show
-    await wrapper.find("button").trigger("click");
+    await (
+      wrapper.vm as unknown as { form: { handleSubmit: () => Promise<unknown> } }
+    ).form.handleSubmit();
     await flushPromises();
     expect(wrapper.text()).toContain("Required");
   });

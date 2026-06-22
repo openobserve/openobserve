@@ -774,7 +774,7 @@
     "docs": "Docs",
     "billings": "Billing",
     "rum": "RUM",
-    "settings": "Management",
+    "settings": "Settings",
     "iam": "IAM",
     "report": "Reports",
     "pipeline": "Pipelines",
@@ -3401,7 +3401,7 @@
     "addToDashboard": "Add to Dashboard"
   },
   "settings": {
-    "header": "Management",
+    "header": "Settings",
     "alertCorrelation": "Alert Deduplication",
     "correlationSettings": "Correlation Settings",
     "userKeyLabel": "User Key",
@@ -4207,7 +4207,9 @@
     "import_this_pattern": "Import This Pattern",
     "patterns_loaded": "Loaded {count} pattern(s)",
     "failed_to_load": "Failed to load patterns",
-    "no_patterns_selected": "Please select at least one pattern"
+    "no_patterns_selected": "Please select at least one pattern",
+    "name_required": "* Name is required",
+    "pattern_required": "* Pattern is required"
   },
   "search_history": {
     "title": "Search History",

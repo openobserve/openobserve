@@ -139,7 +139,7 @@ const wrapperClasses = computed(() => [
       :for="inputId"
       class="tw:text-xs tw:font-medium tw:text-datepicker-label tw:leading-none tw:flex tw:items-center tw:gap-1"
     >
-      <slot name="label">{{ label }}</slot>
+      <slot name="label">{{ label }}</slot><span v-if="required" aria-hidden="true" class="tw:select-none">*</span>
       <OIcon
         v-if="$slots.tooltip"
         name="info-outline"
