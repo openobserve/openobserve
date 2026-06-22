@@ -3843,13 +3843,16 @@ button.date-time-button {
   text-align: left;
 }
 
-table {
+/* Scoped to .logs-table (TenstackTable). In main these bare-element rules lived
+   in a <style scoped> block and only affected this component; keep them scoped
+   here so they don't change fonts on every table in the app. */
+.logs-table {
   border-collapse: separate;
   border-spacing: 0;
   font-size: 12px !important;
 }
 
-thead {
+.logs-table thead {
   font-family: var(--font-sans);
   font-size: 14px !important;
 }
@@ -3858,7 +3861,7 @@ thead {
   border-bottom: 1px solid gray;
 }
 
-th {
+.logs-table th {
   text-align: left;
 
   .column-actions {
@@ -3872,7 +3875,7 @@ th {
   }
 }
 
-td {
+.logs-table td {
   font-family: monospace;
 }
 
