@@ -69,7 +69,10 @@ export const BG_SWATCHES = [
 ];
 
 
-export const emptyColumnOverride = (field = ""): ColumnOverrideUI => ({
+export const emptyColumnOverride = (
+  field = "",
+  overrides: Partial<ColumnOverrideUI> = {},
+): ColumnOverrideUI => ({
   field,
   fieldType: "auto",
   unit: null,
@@ -79,6 +82,7 @@ export const emptyColumnOverride = (field = ""): ColumnOverrideUI => ({
   bgColor: null,
   autoColor: false,
   conditions: [],
+  ...overrides,
 });
 
 /** Apply persisted config items onto a UI override row. */
