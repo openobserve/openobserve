@@ -86,24 +86,9 @@ export const getLocale = () => {
   return "en-gb";
 };
 
-// App language codes are not all valid BCP-47, so map them for Intl.NumberFormat.
-const APP_LOCALE_TO_BCP47: Record<string, string> = {
-  "en-gb": "en-GB",
-  "tr-turk": "tr-TR",
-  "zh-cn": "zh-CN",
-  "zh-tw": "zh-TW",
-  fr: "fr-FR",
-  es: "es-ES",
-  de: "de-DE",
-  it: "it-IT",
-  ja: "ja-JP",
-  ko: "ko-KR",
-  nl: "nl-NL",
-  pt: "pt-PT",
-};
-
-export const getNumberLocale = (): string =>
-  APP_LOCALE_TO_BCP47[getLocale()] ?? "en-GB";
+// Re-exported for consumers that import from "@/locales"; defined in a
+// standalone module so utils don't pull createI18n into their import graph.
+export { getNumberLocale } from "./numberFormat";
 
 const i18n = createI18n({
   locale: getLocale(),

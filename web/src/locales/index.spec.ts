@@ -21,7 +21,7 @@ vi.mock("@/utils/cookies", () => ({
   setLanguage: vi.fn(),
 }));
 
-import { getNumberLocale } from "@/locales";
+import { getNumberLocale } from "@/locales/numberFormat";
 
 describe("getNumberLocale (locale format unit)", () => {
   beforeEach(() => {

@@ -123,8 +123,7 @@ vi.mock("@/utils/dashboard/convertDashboardSchemaVersion", () => ({
 }));
 
 const mockGetNumberLocale = vi.fn(() => "en-GB");
-vi.mock("@/locales", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/locales")>()),
+vi.mock("@/locales/numberFormat", () => ({
   getNumberLocale: () => mockGetNumberLocale(),
 }));
 

@@ -425,6 +425,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import { copyToClipboard } from "@/utils/clipboard";
+import { calculateWidthText } from "@/utils/dashboard/chartDimensionUtils";
 
 export default defineComponent({
   name: "PanelSchemaRenderer",
@@ -656,12 +657,12 @@ export default defineComponent({
     });
     // Fixed copy-button width (icon-xs-sq), matching the table chart.
     const COPY_BTN_PX = 28;
-    // Sit just past the number's right edge (estimated a touch wide so it never
-    // overlaps), clamped inside the cell. The font-size reserve guarantees room.
+    // Sit just past the number's measured right edge, clamped inside the cell.
+    // Measuring (vs estimating) keeps the icon off the digits for any value.
     const metricIconStyle = (m: any) => {
       const fs = m.layout?.fontSize || 24;
-      const halfWidth = (String(m.text).length * fs * 0.55) / 2;
-      const left = m.layout.cx - m.layout.left + halfWidth + 2;
+      const textWidth = calculateWidthText(String(m.text), `${fs}px`);
+      const left = m.layout.cx - m.layout.left + textWidth / 2 + 2;
       const maxLeft = m.layout.width - COPY_BTN_PX - 2;
       return {
         left: `${Math.min(left, maxLeft)}px`,

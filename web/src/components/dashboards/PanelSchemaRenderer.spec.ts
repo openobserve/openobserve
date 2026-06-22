@@ -2361,9 +2361,9 @@ describe("PanelSchemaRenderer", () => {
     it("positions the icon beside the number, clamped inside the cell", async () => {
       wrapper = await mountMetric();
       const style = wrapper.vm.metricIconStyle(wrapper.vm.metricItems[0]);
-      // halfWidth = 6 * 24 * 0.55 / 2 = 39.6; left = (100-0) + 39.6 + 2 = 141.6;
-      // maxLeft = 200 - 28 - 2 = 170 → 141.6 wins.
-      expect(style.left).toBe("141.6px");
+      // jsdom has no layout so calculateWidthText returns 0:
+      // left = (cx 100 - left 0) + 0/2 + 2 = 102; maxLeft = 200 - 28 - 2 = 170.
+      expect(style.left).toBe("102px");
       expect(style.top).toBe("50px");
       expect(style.transform).toBe("translateY(-50%)");
     });

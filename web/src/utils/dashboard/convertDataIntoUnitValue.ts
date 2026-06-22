@@ -1,4 +1,4 @@
-import { getNumberLocale } from "@/locales";
+import { getNumberLocale } from "@/locales/numberFormat";
 
 const units: any = {
   bytes: [
