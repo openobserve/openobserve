@@ -425,7 +425,18 @@
     "menuGroupExplain": "解释一下",
     "fieldValuesEmpty": "未找到任何值。",
     "fieldValuesEmptyHint": "尝试更宽的时间范围来查看数值。",
-    "selectLogsStreamFirst": "先选择日志数据流"
+    "selectLogsStreamFirst": "先选择日志数据流",
+    "menuMore": "更多",
+    "searchInspect": "搜索检查",
+    "vrlOnlyForTableWarning": "VRL 功能仅支持表格图表。",
+    "customDownloadTitle": "自定义下载",
+    "selectFunctionNamePlaceholder": "选择函数名称",
+    "confirmFunctionUpdateTitle": "确认更新",
+    "confirmFunctionUpdateMsg": "你确定要更新函数 {name} 吗？",
+    "traceIdLabel": "追踪编号：",
+    "enterTraceIdPlaceholder": "输入跟踪 ID",
+    "changeQueryModeTitle": "更改查询模式",
+    "changeQueryModeConfirm": "您确定要更改查询模式吗？为 X 轴、Y 轴和过滤器保存的数据将被擦除。"
   },
   "menu": {
     "home": "主页",
@@ -3285,7 +3296,16 @@
     },
     "showAll": "显示全部",
     "filterByErrors": "按错误筛选",
-    "clearErrorFilter": "清除错误过滤器"
+    "clearErrorFilter": "清除错误过滤器",
+    "spansTab": "跨度",
+    "tracesTab": "痕迹",
+    "serviceGraphTab": "服务图",
+    "treeView": "树视图",
+    "graphView": "图表视图",
+    "layoutHorizontal": "水平",
+    "layoutVertical": "垂直",
+    "layoutForce": "原力布局",
+    "exportTraces": "导出跟踪"
   },
   "invitation": {
     "pendingInvitations": "待处理的邀请",

@@ -425,7 +425,18 @@
     "menuGroupExplain": "Erkläre",
     "fieldValuesEmpty": "Keine Werte gefunden.",
     "fieldValuesEmptyHint": "Probieren Sie einen breiteren Zeitraum aus, um die Werte zu sehen.",
-    "selectLogsStreamFirst": "Wählen Sie zuerst Logs-Stream aus"
+    "selectLogsStreamFirst": "Wählen Sie zuerst Logs-Stream aus",
+    "menuMore": "Mehr",
+    "searchInspect": "Suche Inspect",
+    "vrlOnlyForTableWarning": "Die VRL-Funktion wird nur für Tabellendiagramme unterstützt.",
+    "customDownloadTitle": "Benutzerdefinierter Download",
+    "selectFunctionNamePlaceholder": "Wählen Sie den Funktionsnamen",
+    "confirmFunctionUpdateTitle": "Update bestätigen",
+    "confirmFunctionUpdateMsg": "Möchten Sie die Funktion {name} wirklich aktualisieren?",
+    "traceIdLabel": "Trace-ID:",
+    "enterTraceIdPlaceholder": "Trace-ID eingeben",
+    "changeQueryModeTitle": "Abfragemodus ändern",
+    "changeQueryModeConfirm": "Möchten Sie den Abfragemodus wirklich ändern? Die für X-Achse, Y-Achse und Filter gespeicherten Daten werden gelöscht."
   },
   "menu": {
     "home": "Startseite",
@@ -3281,7 +3292,16 @@
     },
     "showAll": "Zeige alles",
     "filterByErrors": "Nach Fehlern filtern",
-    "clearErrorFilter": "Fehlerfilter löschen"
+    "clearErrorFilter": "Fehlerfilter löschen",
+    "spansTab": "Spannweiten",
+    "tracesTab": "Spuren",
+    "serviceGraphTab": "Service-Diagramm",
+    "treeView": "Blick auf den Baum",
+    "graphView": "Diagrammansicht",
+    "layoutHorizontal": "Horizontal",
+    "layoutVertical": "Vertikal",
+    "layoutForce": "Anordnung erzwingen",
+    "exportTraces": "Spuren exportieren"
   },
   "invitation": {
     "pendingInvitations": "Ausstehende Einladungen",

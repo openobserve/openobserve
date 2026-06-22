@@ -425,7 +425,18 @@
     "menuGroupExplain": "Leg uit",
     "fieldValuesEmpty": "Geen waarden gevonden.",
     "fieldValuesEmptyHint": "Probeer een breder tijdsbereik om waarden te zien.",
-    "selectLogsStreamFirst": "Selecteer eerst de stream van de logboeken"
+    "selectLogsStreamFirst": "Selecteer eerst de stream van de logboeken",
+    "menuMore": "Meer",
+    "searchInspect": "Zoek Inspect",
+    "vrlOnlyForTableWarning": "De VRL-functie wordt alleen ondersteund voor tabeldiagrammen.",
+    "customDownloadTitle": "Download op maat",
+    "selectFunctionNamePlaceholder": "Functienaam selecteren",
+    "confirmFunctionUpdateTitle": "Update bevestigen",
+    "confirmFunctionUpdateMsg": "Weet je zeker dat je de functie {name} wilt updaten?",
+    "traceIdLabel": "Traceer-ID:",
+    "enterTraceIdPlaceholder": "Voer de trace-ID in",
+    "changeQueryModeTitle": "Query-modus wijzigen",
+    "changeQueryModeConfirm": "Weet u zeker dat u de querymodus wilt wijzigen? De gegevens die zijn opgeslagen voor de X-as, Y-as en filters worden verwijderd."
   },
   "menu": {
     "home": "Home",
@@ -3294,7 +3305,16 @@
     },
     "showAll": "Alles weergeven",
     "filterByErrors": "Filteren op fouten",
-    "clearErrorFilter": "Foutfilter wissen"
+    "clearErrorFilter": "Foutfilter wissen",
+    "spansTab": "Overspant",
+    "tracesTab": "Sporen",
+    "serviceGraphTab": "Servicegrafiek",
+    "treeView": "Uitzicht op de boom",
+    "graphView": "Grafiekweergave",
+    "layoutHorizontal": "Horizontaal",
+    "layoutVertical": "Verticaal",
+    "layoutForce": "Indeling van de kracht",
+    "exportTraces": "Sporen exporteren"
   },
   "invitation": {
     "pendingInvitations": "Uitnodigingen in behandeling",

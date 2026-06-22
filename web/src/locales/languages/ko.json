@@ -425,7 +425,18 @@
     "menuGroupExplain": "설명하다",
     "fieldValuesEmpty": "값을 찾을 수 없습니다.",
     "fieldValuesEmptyHint": "값을 보려면 더 넓은 시간 범위를 사용해 보십시오.",
-    "selectLogsStreamFirst": "먼저 로그 스트림을 선택합니다."
+    "selectLogsStreamFirst": "먼저 로그 스트림을 선택합니다.",
+    "menuMore": "더 보기",
+    "searchInspect": "검색 검사",
+    "vrlOnlyForTableWarning": "VRL 함수는 테이블 차트에서만 지원됩니다.",
+    "customDownloadTitle": "맞춤 다운로드",
+    "selectFunctionNamePlaceholder": "함수 이름 선택",
+    "confirmFunctionUpdateTitle": "업데이트 확인",
+    "confirmFunctionUpdateMsg": "{name} 함수를 정말로 업데이트하시겠습니까?",
+    "traceIdLabel": "트레이스 ID:",
+    "enterTraceIdPlaceholder": "트레이스 ID 입력",
+    "changeQueryModeTitle": "쿼리 모드 변경",
+    "changeQueryModeConfirm": "정말 쿼리 모드를 변경하시겠습니까?X축, Y축 및 필터에 대해 저장된 데이터는 지워집니다."
   },
   "menu": {
     "home": "홈",
@@ -3294,7 +3305,16 @@
     },
     "showAll": "모두 보기",
     "filterByErrors": "오류별 필터링",
-    "clearErrorFilter": "오류 필터 지우기"
+    "clearErrorFilter": "오류 필터 지우기",
+    "spansTab": "스팬",
+    "tracesTab": "트레이스",
+    "serviceGraphTab": "서비스 그래프",
+    "treeView": "트리 뷰",
+    "graphView": "그래프 보기",
+    "layoutHorizontal": "수평형",
+    "layoutVertical": "수직형",
+    "layoutForce": "포스 레이아웃",
+    "exportTraces": "트레이스 내보내기"
   },
   "invitation": {
     "pendingInvitations": "보류 중인 초대",
