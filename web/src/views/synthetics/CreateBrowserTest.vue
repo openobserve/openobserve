@@ -1,8 +1,10 @@
 <script setup lang="ts">
 // Copyright 2026 OpenObserve Inc.
-import { ref } from 'vue'
-import { RouterLink, useRouter } from 'vue-router'
+import { onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import type { BrowserCheck } from '@/types/synthetics'
+import useSyntheticsRecorder from '@/composables/useSyntheticsRecorder'
+import AppPageHeader from '@/components/common/AppPageHeader.vue'
 import OButton from '@/lib/core/Button/OButton.vue'
 import OIcon from '@/lib/core/Icon/OIcon.vue'
 import OBadge from '@/lib/core/Badge/OBadge.vue'
@@ -26,10 +28,30 @@ const activeTab = ref<'journey' | 'configure' | 'results'>('journey')
 const checkName = ref('')
 const startUrl = ref('')
 
-// Extension setup state — persists across phases in this session
+// Extension setup state — persists across phases in this session.
+// `extensionInstalled` is now driven by a real runtime probe (not a manual click).
+const recorder = useSyntheticsRecorder()
 const extensionInstalled = ref(false)
 const incognitoAllowed = ref(false)
 const extensionReady = ref(false)
+const checkingExtension = ref(false)
+
+async function probeExtension() {
+  checkingExtension.value = true
+  try {
+    extensionInstalled.value = await recorder.detectExtension()
+  } finally {
+    checkingExtension.value = false
+  }
+  return extensionInstalled.value
+}
+
+onMounted(() => {
+  // Warm detection so an already-installed extension lets Record skip setup.
+  probeExtension()
+    .then((installed) => { extensionReady.value = installed })
+    .catch(() => { /* extension messaging unavailable — handled in setup screen */ })
+})
 
 // When true, BrowserJourney starts recording immediately on mount
 const autoRecord = ref(false)
@@ -52,9 +74,11 @@ function commitGate() {
   check.value = { ...check.value, url: startUrl.value, name: checkName.value }
 }
 
-function onRecordClick() {
+async function onRecordClick() {
   commitGate()
-  if (extensionReady.value) {
+  const installed = await probeExtension()
+  extensionReady.value = installed
+  if (installed) {
     autoRecord.value = true
     phase.value = 'editor'
   } else {
@@ -181,15 +205,30 @@ function saveCheck() {
           <div class="tw:flex-1 tw:min-w-0">
             <h4 class="tw:text-sm tw:font-semibold tw:text-[var(--o2-text-heading)] tw:m-0 tw:mb-1">Install the OpenObserve Recorder</h4>
             <p class="tw:text-xs tw:text-[var(--o2-text-secondary)] tw:m-0 tw:mb-3">A lightweight Chrome extension that captures your actions.</p>
-            <OButton
-              variant="outline"
-              size="sm"
-              :disabled="extensionInstalled"
-              data-test="synthetics-setup-add-to-chrome-btn"
-              @click="extensionInstalled = true"
-            >
-              {{ extensionInstalled ? 'Installed ✓' : 'Add to Chrome' }}
-            </OButton>
+            <div class="tw:flex tw:items-center tw:gap-3">
+              <a
+                href="https://openobserve.ai/docs/synthetics/recorder/"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="tw:text-sm tw:text-[var(--o2-text-link)] tw:underline"
+                data-test="synthetics-setup-install-link"
+              >Add to Chrome</a>
+              <OButton
+                v-if="!extensionInstalled"
+                variant="outline"
+                size="sm"
+                :loading="checkingExtension"
+                data-test="synthetics-setup-recheck-btn"
+                @click="probeExtension"
+              >
+                Check again
+              </OButton>
+              <span
+                v-else
+                class="tw:text-sm tw:font-medium tw:text-[var(--o2-status-success)]"
+                data-test="synthetics-setup-installed-label"
+              >Installed ✓</span>
+            </div>
           </div>
         </div>
 
@@ -238,13 +277,14 @@ function saveCheck() {
 
   <!-- ── Editor phase ── -->
   <div v-else class="tw:flex tw:flex-col tw:h-full tw:bg-[var(--o2-body-primary-bg)]">
-    <header class="tw:flex tw:items-center tw:gap-3 tw:px-6 tw:py-3 tw:border-b tw:border-[var(--o2-border-color)]">
-      <RouterLink :to="{ name: 'synthetic' }" class="tw:text-sm tw:text-[var(--o2-text-link)] tw:hover:text-[var(--o2-text-link-hover)] tw:flex tw:items-center tw:gap-1">
-        ← Back to checks
-      </RouterLink>
-      <h2 class="tw:text-base tw:font-semibold">{{ check.name || 'Untitled check' }}</h2>
-      <OBadge variant="warning">Draft — not saved</OBadge>
-    </header>
+    <AppPageHeader
+      :title="check.name || 'Untitled check'"
+      :back="{ label: 'Checks', to: { name: 'synthetic' }, dataTest: 'synthetics-create-back-btn' }"
+    >
+      <template #title-trail>
+        <OBadge variant="warning">Draft — not saved</OBadge>
+      </template>
+    </AppPageHeader>
 
     <OTabs v-model="activeTab" bordered class="tw:px-2 tw:bg-[var(--o2-card-bg)]">
       <OTab name="journey" label="Journey">

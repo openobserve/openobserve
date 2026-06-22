@@ -2,6 +2,7 @@
 // Copyright 2026 OpenObserve Inc.
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import type { BrowserStep } from '@/types/synthetics'
+import useSyntheticsRecorder from '@/composables/useSyntheticsRecorder'
 import OButton from '@/lib/core/Button/OButton.vue'
 import OIcon from '@/lib/core/Icon/OIcon.vue'
 import OInput from '@/lib/forms/Input/OInput.vue'
@@ -27,46 +28,28 @@ const expandedSteps = ref<Set<string>>(new Set())
 const collapsedGroups = ref<Set<number>>(new Set())
 
 // ── Recording state ────────────────────────────────────────────────────────
-const isRecording = ref(false)
-const capturedSteps = ref<BrowserStep[]>([])
-const currentUrl = ref('')
-let stepTimeouts: ReturnType<typeof setTimeout>[] = []
-
-function clearTimer() {
-  stepTimeouts.forEach(clearTimeout)
-  stepTimeouts = []
-}
+// All Chrome-extension messaging lives in the composable; this component only
+// reflects its reactive state and merges the result into the journey on stop.
+const recorder = useSyntheticsRecorder()
+const isRecording = recorder.isRecording
+const capturedSteps = recorder.liveSteps
+const currentUrl = recorder.currentUrl
+const recordingError = recorder.error
 
 function startRecording() {
-  isRecording.value = true
-  capturedSteps.value = []
-  currentUrl.value = props.startUrl ?? ''
-
-  // Simulate captured steps — real Chrome extension integration is future work
-  stepTimeouts.push(
-    setTimeout(() => {
-      capturedSteps.value.push({ id: crypto.randomUUID(), action: 'navigate', name: 'Open start URL', value: props.startUrl, timeout: 30000 })
-    }, 500),
-    setTimeout(() => {
-      capturedSteps.value.push({ id: crypto.randomUUID(), action: 'click', name: 'Click login button', selector: '#login-btn', selectorType: 'CSS', timeout: 30000 })
-    }, 2000),
-    setTimeout(() => {
-      capturedSteps.value.push({ id: crypto.randomUUID(), action: 'type', name: 'Enter username', selector: '#username', selectorType: 'CSS', value: 'user@example.com', timeout: 30000 })
-    }, 4000),
-  )
+  recorder.startRecording(props.startUrl ?? '').catch((err) => {
+    console.log("error ---", err);
+    recorder.error.value = err instanceof Error ? err.message : String(err)
+  })
 }
 
-function stopRecording() {
-  clearTimer()
-  emit('update:modelValue', [...props.modelValue, ...capturedSteps.value])
-  isRecording.value = false
-  capturedSteps.value = []
+async function stopRecording() {
+  const steps = await recorder.stopRecording()
+  if (steps.length > 0) emit('update:modelValue', [...props.modelValue, ...steps])
 }
 
 function cancelRecording() {
-  clearTimer()
-  capturedSteps.value = []
-  isRecording.value = false
+  recorder.cancelRecording()
 }
 
 function onRecordButtonClick() {
@@ -81,7 +64,7 @@ onMounted(() => {
   if (props.autoRecord) startRecording()
 })
 
-onUnmounted(() => clearTimer())
+onUnmounted(() => recorder.cleanup())
 
 // ── Step grouping ──────────────────────────────────────────────────────────
 interface PageGroup {
@@ -197,7 +180,7 @@ function duplicateCapturedStep(index: number, step: BrowserStep) {
       <OButton
         variant="primary"
         size="sm"
-        :disabled="readonly"
+        :disabled="readonly || isRecording"
         data-test="synthetics-journey-record-btn"
         @click="onRecordButtonClick"
       >
@@ -206,14 +189,34 @@ function duplicateCapturedStep(index: number, step: BrowserStep) {
       </OButton>
     </div>
 
+    <!-- Recorder error (extension missing / failed to start) -->
+    <div
+      v-if="recordingError && !isRecording"
+      class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:mb-3 tw:rounded tw:bg-[var(--o2-status-error-subtle)] tw:text-[var(--o2-status-error)] tw:text-sm"
+      role="alert"
+      data-test="synthetics-journey-record-error"
+    >
+      <OIcon name="error" size="sm" aria-hidden="true" />
+      <span>{{ recordingError }}</span>
+    </div>
+
     <!-- Live capture area (shown while recording) -->
-    <template v-if="isRecording && false">
-      <div class="tw:flex tw:items-center tw:gap-2 tw:mb-3">
-        <span class="tw:text-xs tw:font-medium tw:bg-[var(--o2-status-error-subtle)] tw:text-[var(--o2-status-error)] tw:rounded-full tw:px-2 tw:py-0.5 tw:flex tw:items-center tw:gap-1">
-          <span class="tw:w-1.5 tw:h-1.5 tw:rounded-full tw:bg-[var(--o2-status-error)] tw:animate-pulse tw:inline-block" aria-hidden="true" />
-          capturing live
+    <template v-if="isRecording">
+      <!-- Recording banner with current URL + controls -->
+      <div class="tw:flex tw:items-center tw:gap-3 tw:px-3 tw:py-2 tw:mb-3 tw:rounded tw:bg-[var(--o2-status-error-subtle)] tw:border tw:border-[var(--o2-border-color)]">
+        <span class="tw:flex tw:items-center tw:gap-1.5">
+          <span class="tw:w-2 tw:h-2 tw:rounded-full tw:bg-[var(--o2-status-error)] tw:animate-pulse tw:inline-block" aria-hidden="true" />
+          <span class="tw:text-sm tw:font-semibold tw:text-[var(--o2-status-error)]">Recording</span>
         </span>
-        <span class="tw:text-sm tw:text-[var(--o2-text-muted)]">({{ capturedSteps.length }} steps captured)</span>
+        <span class="tw:flex tw:items-center tw:gap-1 tw:text-xs tw:text-[var(--o2-text-secondary)] tw:truncate tw:flex-1 tw:min-w-0">
+          <OIcon name="shield" size="sm" class="tw:shrink-0" aria-hidden="true" />
+          <span class="tw:truncate">{{ currentUrl }}</span>
+        </span>
+        <span class="tw:text-xs tw:text-[var(--o2-text-muted)]">{{ capturedSteps.length }} steps</span>
+        <OButton variant="ghost" size="sm" data-test="synthetics-journey-cancel-btn" @click="cancelRecording">Cancel</OButton>
+        <OButton variant="primary" size="sm" data-test="synthetics-journey-stop-btn" @click="stopRecording">
+          Stop &amp; Review
+        </OButton>
       </div>
 
       <div v-if="capturedSteps.length > 0" class="tw:flex tw:flex-col tw:gap-1">
@@ -241,7 +244,7 @@ function duplicateCapturedStep(index: number, step: BrowserStep) {
     <!-- Normal step list (shown when not recording) -->
       <!-- Empty state -->
     <div
-      v-if="modelValue.length === 0"
+      v-else-if="modelValue.length === 0"
       class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:gap-4 tw:py-16 tw:text-center"
     >
       <OIcon name="open-in-browser" size="xl" class="tw:text-[var(--o2-text-muted)]" aria-hidden="true" />
