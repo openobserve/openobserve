@@ -66,19 +66,11 @@ export class OnboardingFormValidationPage {
         await this.page.locator(this.submitBtn).click();
     }
 
-    /**
-     * Trigger onBlur validation on both OFormInput fields by filling then
-     * blurring without entering content.
-     */
-    async triggerEmptyValidationOnHearAboutUs() {
-        await this.page.locator(this.hearAboutUsInput).click();
-        await this.page.locator(this.hearAboutUsInput).blur();
-    }
-
-    async triggerEmptyValidationOnWhereDoYouWork() {
-        await this.page.locator(this.whereDoYouWorkInput).click();
-        await this.page.locator(this.whereDoYouWorkInput).blur();
-    }
+    // NOTE: validation is revealed by submitting the form (clickSubmit), not by
+    // blurring. The OForm foundation uses revalidateLogic (submit-then-change):
+    // nothing validates until the first submit, after which it re-validates on
+    // change. The Submit button is always enabled (the Zod schema gates the save),
+    // so clicking it always triggers validation.
 
     // ── AWS Marketplace helpers ───────────────────────────────────────────────
 

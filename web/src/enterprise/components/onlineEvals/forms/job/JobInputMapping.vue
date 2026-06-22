@@ -182,7 +182,8 @@ function updateMapping(scorerId: string, variable: string, value: string) {
   border-radius: 4px;
   background: color-mix(in srgb, var(--color-text-secondary) 10%, transparent);
   color: var(--color-text-primary, currentColor);
-  font: 600 11px ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 600;
+  font-size: 11px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -195,7 +196,8 @@ function updateMapping(scorerId: string, variable: string, value: string) {
   border-radius: 4px;
   background: var(--color-input-bg, var(--color-card-bg));
   color: var(--color-input-text, var(--color-text-primary));
-  font: 400 12px ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 400;
+  font-size: 12px;
   outline: none;
   transition: border-color 0.12s;
 }

@@ -246,17 +246,31 @@ pub async fn handle_mcp_get(
         .and_then(|v| v.to_str().ok())
         .map(|s| s.to_string());
 
-    // MCP Streamable HTTP: GET with empty body is for server-initiated
-    // notifications (SSE streaming). O2 doesn't push notifications, so
-    // return an empty SSE stream that immediately ends gracefully.
-    // This prevents 405 errors from breaking MCP clients.
+    // MCP Streamable HTTP: a GET with empty body opens the server->client SSE
+    // channel for server-initiated notifications. O2 never pushes
+    // notifications, but per spec this channel MUST stay open — returning a
+    // stream that ends immediately makes MCP clients (e.g. opencode) treat the
+    // channel as dropped and reconnect in a tight ~1/sec loop. Hold the
+    // connection open and emit a periodic keepalive comment until the client
+    // disconnects (axum drops the stream on disconnect).
     if body.is_empty() {
+        const MCP_SSE_KEEPALIVE_SECS: u64 = 30;
+        // ": ...\n\n" is an SSE comment — ignored by clients, just keeps the
+        // socket warm. An initial comment confirms the stream is live.
+        let initial = futures_util::stream::once(async {
+            Ok::<_, std::io::Error>(Bytes::from(": connected\n\n"))
+        });
+        let keepalive = futures_util::stream::unfold((), |_| async {
+            tokio::time::sleep(std::time::Duration::from_secs(MCP_SSE_KEEPALIVE_SECS)).await;
+            Some((Ok::<_, std::io::Error>(Bytes::from(": keepalive\n\n")), ()))
+        });
+        let body_stream = initial.chain(keepalive);
         return Response::builder()
             .status(StatusCode::OK)
             .header(header::CONTENT_TYPE, "text/event-stream")
             .header(header::CACHE_CONTROL, "no-cache")
             .header("X-Accel-Buffering", "no")
-            .body(Body::from("event: close\ndata: {}\n\n"))
+            .body(Body::from_stream(body_stream))
             .unwrap();
     }
 

@@ -38,14 +38,6 @@ vi.mock("@/composables/useNotifications", () => ({
   }),
 }));
 
-// Mock loading composable — preserve original behaviour (execute = the supplied fn)
-vi.mock("@/composables/useLoading", () => ({
-  useLoading: vi.fn((fn) => ({
-    execute: fn,
-    isLoading: { value: false },
-  })),
-}));
-
 // Mock dashboard schema conversion (identity)
 vi.mock("@/utils/dashboard/convertDashboardSchemaVersion", () => ({
   convertDashboardSchemaVersion: vi.fn((data) => data),
@@ -115,19 +107,12 @@ describe("AddDashboard", () => {
     it("should render the create dashboard form by default", () => {
       wrapper = createWrapper();
 
-      expect(wrapper.vm.beingUpdated).toBe(false);
       expect(
         wrapper.find('[data-test="add-dashboard-name"]').exists(),
       ).toBe(true);
       expect(
         wrapper.find('[data-test="add-dashboard-description"]').exists(),
       ).toBe(true);
-    });
-
-    it("should not render the id input in create mode", () => {
-      wrapper = createWrapper();
-
-      expect(wrapper.find('[data-test="dashboard-id"]').exists()).toBe(false);
     });
 
     it("should show folder selection when showFolderSelection is true", () => {
@@ -146,11 +131,11 @@ describe("AddDashboard", () => {
   });
 
   describe("Setup & Exposed API", () => {
-    it("should expose submit() helper that delegates to onSubmit.execute", () => {
+    it("should expose submit() and onSubmit handlers", () => {
       wrapper = createWrapper();
 
       expect(typeof wrapper.vm.submit).toBe("function");
-      expect(typeof wrapper.vm.onSubmit.execute).toBe("function");
+      expect(typeof wrapper.vm.onSubmit).toBe("function");
     });
 
     it("should initialise selectedFolder from the active folder", () => {
@@ -181,18 +166,27 @@ describe("AddDashboard", () => {
   });
 
   describe("Form Inputs", () => {
-    it("should initialise dashboard data with empty strings", () => {
+    it("should seed the form with blank default values", () => {
       wrapper = createWrapper();
 
-      expect(wrapper.vm.dashboardData.name).toBe("");
-      expect(wrapper.vm.dashboardData.description).toBe("");
+      // The OForm is the single source of truth; it reads `:default-values`
+      // (the typed `addDashboardDefaults` factory) once at mount. The factory
+      // is now imported from the schema (returned from setup), so calling it
+      // yields the schema-shaped defaults — `id` is NOT a form field.
+      expect(typeof wrapper.vm.addDashboardDefaults).toBe("function");
+      expect(wrapper.vm.addDashboardDefaults()).toEqual({ name: "", description: "" });
+
+      const formRef = wrapper.vm.addDashboardForm;
+      expect(formRef).toBeTruthy();
+      expect(formRef.form.state.values.name).toBe("");
+      expect(formRef.form.state.values.description).toBe("");
     });
 
-    it("should update dashboardData when inputs change via OForm", async () => {
+    it("should update the form values when inputs change via OForm", async () => {
       wrapper = createWrapper();
 
-      // The OForm exposes a form via the addDashboardForm ref. Updating
-      // the form's underlying state mirrors what the inputs would do.
+      // The OForm exposes the underlying form via the addDashboardForm ref.
+      // Updating the form's state mirrors what the inputs would do.
       const formRef = wrapper.vm.addDashboardForm;
       expect(formRef).toBeTruthy();
       formRef.form.setFieldValue("name", "New Name");
@@ -223,30 +217,12 @@ describe("AddDashboard", () => {
     });
   });
 
-  // Helper: stub the addDashboardForm ref so submit can pass through validation
-  // and read the supplied values (mirrors what an OForm-driven submission does).
-  const stubFormWith = (
-    name: string,
-    description = "",
-    { valid = true }: { valid?: boolean } = {},
-  ) => {
-    wrapper.vm.addDashboardForm = {
-      validate: vi.fn().mockResolvedValue(valid),
-      resetValidation: vi.fn(),
-      form: {
-        state: {
-          values: { name, description },
-        },
-      },
-    };
-  };
-
   describe("Form Submission", () => {
-    it("should create a new dashboard when submit is called with a valid name", async () => {
+    it("should create a new dashboard when onSubmit runs with a valid name", async () => {
       wrapper = createWrapper();
-      stubFormWith("New Dashboard", "Dashboard description");
 
-      await wrapper.vm.submit();
+      // @submit payload is the source of truth (the schema already gated it).
+      await wrapper.vm.onSubmit({ name: "New Dashboard", description: "Dashboard description" });
       await flushPromises();
 
       expect(dashboardService.create).toHaveBeenCalledWith(
@@ -263,9 +239,8 @@ describe("AddDashboard", () => {
 
     it("should emit 'updated' after a successful submission", async () => {
       wrapper = createWrapper();
-      stubFormWith("New Dashboard");
 
-      await wrapper.vm.submit();
+      await wrapper.vm.onSubmit({ name: "New Dashboard", description: "" });
       await flushPromises();
 
       expect(wrapper.emitted("updated")).toBeTruthy();
@@ -273,25 +248,10 @@ describe("AddDashboard", () => {
       expect(payload).toEqual(["new-dashboard-1", "default"]);
     });
 
-    it("should reset dashboardData after successful submission", async () => {
-      wrapper = createWrapper();
-      stubFormWith("Test Dashboard", "Test Description");
-
-      await wrapper.vm.submit();
-      await flushPromises();
-
-      expect(wrapper.vm.dashboardData).toEqual({
-        id: "",
-        name: "",
-        description: "",
-      });
-    });
-
     it("should show a positive notification on success", async () => {
       wrapper = createWrapper();
-      stubFormWith("Test Dashboard");
 
-      await wrapper.vm.submit();
+      await wrapper.vm.onSubmit({ name: "Test Dashboard", description: "" });
       await flushPromises();
 
       expect(showPositiveNotificationMock).toHaveBeenCalledWith(
@@ -310,8 +270,7 @@ describe("AddDashboard", () => {
         label: "Folder 1",
       });
 
-      stubFormWith("Folder Dashboard");
-      await wrapper.vm.submit();
+      await wrapper.vm.onSubmit({ name: "Folder Dashboard", description: "" });
       await flushPromises();
 
       expect(dashboardService.create).toHaveBeenCalledWith(
@@ -321,13 +280,11 @@ describe("AddDashboard", () => {
       );
     });
 
-    it("should short-circuit when form validation fails", async () => {
+    it("does not create when the name is empty (schema blocks submit)", async () => {
       wrapper = createWrapper();
 
-      // Stub the form ref so validate() resolves false.
-      stubFormWith("Anything", "", { valid: false });
-
-      await wrapper.vm.submit();
+      // Drive the real form: empty name → schema invalid → @submit never fires.
+      await (wrapper.vm.addDashboardForm as any).form.handleSubmit();
       await flushPromises();
 
       expect(dashboardService.create).not.toHaveBeenCalled();
@@ -342,8 +299,7 @@ describe("AddDashboard", () => {
       );
 
       wrapper = createWrapper();
-      stubFormWith("Test Dashboard");
-      await wrapper.vm.submit();
+      await wrapper.vm.onSubmit({ name: "Test Dashboard", description: "" });
       await flushPromises();
 
       expect(showErrorNotificationMock).toHaveBeenCalledWith("Creation failed");
@@ -354,8 +310,7 @@ describe("AddDashboard", () => {
       vi.mocked(dashboardService.create).mockRejectedValueOnce({});
 
       wrapper = createWrapper();
-      stubFormWith("Test Dashboard");
-      await wrapper.vm.submit();
+      await wrapper.vm.onSubmit({ name: "Test Dashboard", description: "" });
       await flushPromises();
 
       expect(showErrorNotificationMock).toHaveBeenCalledWith(

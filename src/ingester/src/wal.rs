@@ -55,7 +55,9 @@ pub(crate) async fn check_uncompleted_parquet_files() -> Result<()> {
     create_dir_all(&wal_dir).context(OpenDirSnafu {
         path: wal_dir.clone(),
     })?;
+    log::info!("Scanning lock files from {wal_dir:?}");
     let lock_files = wal_scan_files(wal_dir, "lock").await.unwrap_or_default();
+    log::info!("Found {} lock files", lock_files.len());
 
     // 2. check if there is a .wal file with same name, delete it and rename the .par to .parquet
     for lock_file in lock_files.iter() {
@@ -101,6 +103,9 @@ pub(crate) async fn check_uncompleted_parquet_files() -> Result<()> {
         log::warn!("delete uncompleted par file: {par_file:?}");
         std::fs::remove_file(par_file).context(DeleteFileSnafu { path: par_file })?;
     }
+
+    log::info!("Check uncompleted parquet files done");
+
     Ok(())
 }
 

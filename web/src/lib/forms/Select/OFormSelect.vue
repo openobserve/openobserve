@@ -4,6 +4,7 @@
 import { inject } from "vue";
 import OSelect from "./OSelect.vue";
 import { FORM_CONTEXT_KEY } from "../Form/OForm.types";
+import { firstFieldError } from "../Form/fieldError";
 import type { FormSelectProps } from "./OFormSelect.types";
 import type { SelectModelValue } from "./OSelect.types";
 
@@ -23,19 +24,6 @@ if (import.meta.env.DEV && !form) {
     v-if="form"
     :is="form.Field"
     :name="props.name"
-    :validators="
-      props.validators
-        ? {
-            onChange: (ctx: { value: unknown }) => {
-              for (const v of props.validators ?? []) {
-                const r = v(ctx.value as SelectModelValue);
-                if (r !== undefined) return r;
-              }
-              return undefined;
-            },
-          }
-        : undefined
-    "
   >
     <template #default="{ field }">
       <OSelect
@@ -53,17 +41,18 @@ if (import.meta.env.DEV && !form) {
         :value-key="props.valueKey"
         :clearable="props.clearable"
         :disabled="props.disabled"
+        :required="props.required"
         :size="props.size"
         :width="props.width"
         :name="props.name"
         :id="props.id"
         :model-value="field.state.value"
         :error="
-          field.state.meta.isTouched && field.state.meta.errors.length > 0
+          field.state.meta.errors.length > 0
         "
         :error-message="
-          field.state.meta.isTouched && field.state.meta.errors.length > 0
-            ? String(field.state.meta.errors[0])
+          field.state.meta.errors.length > 0
+            ? firstFieldError(field.state.meta.errors)
             : undefined
         "
         @update:model-value="field.handleChange"

@@ -960,7 +960,6 @@ function fireConfetti() {
 /* Step context chip is now <OBadge> (lib). Only the terminal "$_" glyph (used
    in the badge's #icon slot) keeps a monospace style. */
 .step-tag-glyph {
-  font-family: "JetBrains Mono", ui-monospace, monospace;
   font-weight: 800;
   font-size: 11px;
 }
@@ -1002,7 +1001,6 @@ function fireConfetti() {
 }
 .step-content-pad :deep(code),
 .step-desc :deep(code) {
-  font-family: "JetBrains Mono", ui-monospace, monospace;
   font-size: 12px;
   background: var(--track);
   color: var(--text-1);
@@ -1128,7 +1126,6 @@ function fireConfetti() {
   line-height: 1.6;
 }
 .acc-body :deep(code) {
-  font-family: "JetBrains Mono", ui-monospace, monospace;
   font-size: 11.5px;
   background: var(--track);
   color: var(--text-1);
