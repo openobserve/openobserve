@@ -1714,12 +1714,12 @@ export default defineComponent({
 
 .gridBackground {
   background: transparent !important;
-  border-radius: 8px;
-  border-color: #c2c2c27a !important;
+  border-radius: 0.5rem;
+  border-color: var(--o2-border-color) !important;
 }
 
 .gridBackground.dark {
-  border-color: rgba(204, 204, 220, 0.12) !important;
+  border-color: var(--o2-border-color) !important;
 }
 
 /* Optimized GridStack layout styles for better performance and visual feedback */
@@ -1737,20 +1737,20 @@ export default defineComponent({
 
 .grid-stack-item {
   background: transparent;
+  transition: box-shadow 0.2s ease;
 
   &.dark {
-    border-color: rgba(204, 204, 220, 0.12) !important;
+    border-color: var(--o2-border-color) !important;
 
     .grid-stack-item-content {
-      border-color: var(--color-border-default);
+      border-color: var(--o2-border-color);
     }
   }
   .grid-stack-item-content {
-    border: 1px solid #c2c2c27a;
-    border-radius: 4px;
+    border: 1px solid var(--o2-border-color);
+    border-radius: 0.375rem;
     overflow: visible;
-    border-radius: inherit;
-    // height: 100%;
+    box-shadow: var(--o2-box-shadow);
   }
 }
 
@@ -1770,7 +1770,8 @@ export default defineComponent({
     &.ui-draggable-dragging {
       opacity: 0.8;
       z-index: 1000;
-      transition: transform 0.15s ease;
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+      box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.15);
     }
 
     &.ui-resizable-resizing {

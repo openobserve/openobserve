@@ -25,9 +25,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div :class="{ 'drag-allow': !viewOnly && !simplifiedPanelView }">
       <div
-        class="tw:flex tw:flex-nowrap tw:items-center tw:w-full tw:min-h-7 tw:px-1 tw:border-b tw:border-border-subtle"
+        class="tw:flex tw:flex-nowrap tw:items-center tw:w-full tw:min-h-7 tw:px-1 tw:border-b tw:border-border-subtle panel-bar"
         :class="{ 'dark-mode': store.state.theme === 'dark' }"
-        style="border-top-left-radius: 8px; border-top-right-radius: 8px"
         data-test="dashboard-panel-bar"
       >
         <OIcon
@@ -93,11 +92,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           name="info-outline"
           size="sm"
-          style="cursor: pointer"
+          class="panel-info-icon"
           data-test="dashboard-panel-description-info"
         >
           <OTooltip side="bottom" align="end" max-width="220px">
-            <template #content><div style="white-space: pre-wrap">{{ props.data.description }}</div></template>
+            <template #content><div class="panel-description-tooltip">{{ props.data.description }}</div></template>
           </OTooltip>
         </OIcon>
         <OButton
@@ -1041,14 +1040,27 @@ export default defineComponent({
   min-height: 0;
 }
 
+.panel-bar {
+  border-top-left-radius: 0.5rem;
+  border-top-right-radius: 0.5rem;
+}
+
 .panelHeader {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 500;
   color: var(--color-text-secondary);
   letter-spacing: 0.01em;
+}
+
+.panel-info-icon {
+  cursor: pointer;
+}
+
+.panel-description-tooltip {
+  white-space: pre-wrap;
 }
 
 .warning {
