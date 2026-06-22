@@ -522,6 +522,7 @@
     "nlpModeLabel": "Natural Language Mode",
     "quickModeLabel": "Quick Mode",
     "disableQuickMode": "Disable Quick Mode",
+    "menuMore": "More",
     "menuGroupSetOnce": "Set Once",
     "menuGroupSavedViews": "Saved Views",
     "menuGroupTools": "Tools",
@@ -741,7 +742,17 @@
     "selectStream": "Select Stream",
     "pattern_summary": "Showing 1 to 50 out of {totalEvents} events & {patternsFound} patterns found in {logsAnalyzed} events in {totalTime} ms.",
     "selectLogStream": "Select logs stream",
-    "loadingStream": "Loading Stream..."
+    "loadingStream": "Loading Stream...",
+    "searchInspect": "Search Inspect",
+    "vrlOnlyForTableWarning": "VRL function is only supported for table chart.",
+    "customDownloadTitle": "Custom Download",
+    "selectFunctionNamePlaceholder": "Select Function Name",
+    "confirmFunctionUpdateTitle": "Confirm Update",
+    "confirmFunctionUpdateMsg": "Are you sure you want to update the function {name}?",
+    "traceIdLabel": "Trace ID:",
+    "enterTraceIdPlaceholder": "Enter trace ID",
+    "changeQueryModeTitle": "Change Query Mode",
+    "changeQueryModeConfirm": "Are you sure you want to change the query mode? The data saved for X-Axis, Y-Axis and Filters will be wiped off."
   },
   "menu": {
     "home": "Home",
