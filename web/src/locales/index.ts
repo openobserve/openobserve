@@ -86,10 +86,6 @@ export const getLocale = () => {
   return "en-gb";
 };
 
-// Re-exported for consumers that import from "@/locales"; defined in a
-// standalone module so utils don't pull createI18n into their import graph.
-export { getNumberLocale } from "./numberFormat";
-
 const i18n = createI18n({
   locale: getLocale(),
   fallbackLocale: "en-gb",
