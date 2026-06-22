@@ -4064,7 +4064,12 @@
     "emptyActionLogs": "Logboeken bekijken",
     "emptyActionLogsDesc": "Zoek en filter je logstreams",
     "emptyActionTraces": "Sporen ontdekken",
-    "emptyActionTracesDesc": "Inspecteer gedistribueerde sporen en servicelatentie"
+    "emptyActionTracesDesc": "Inspecteer gedistribueerde sporen en servicelatentie",
+    "viewAll": "Alles bekijken",
+    "showingOf": "Toont {getoond} van {total}",
+    "colErrorRate": "Foutpercentage",
+    "colLatency": "Latentie",
+    "colReqs": "Req's"
   },
   "chatHistory": {
     "title": "Chats",
