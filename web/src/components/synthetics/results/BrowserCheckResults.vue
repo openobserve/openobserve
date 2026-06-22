@@ -2,6 +2,7 @@
 // Copyright 2026 OpenObserve Inc.
 import { ref } from 'vue'
 import OBadge from '@/lib/core/Badge/OBadge.vue'
+import OIcon from '@/lib/core/Icon/OIcon.vue'
 
 defineProps<{ checkId: string }>()
 
@@ -26,7 +27,7 @@ const runs = ref<RunResult[]>([])
       class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:py-20 tw:gap-4 tw:text-[var(--o2-text-muted)]"
       data-test="synthetics-results-empty-state"
     >
-      <span class="material-icons-outlined tw:text-6xl">bar_chart</span>
+      <OIcon name="bar-chart" size="xl" aria-hidden="true" />
       <h3>No results yet</h3>
       <p>Save and run the check to see results here.</p>
     </div>

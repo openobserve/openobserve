@@ -19,7 +19,7 @@ function handleUpdate(value: BrowserCheck) {
 </script>
 
 <template>
-  <div class="tw:max-w-[53.75rem] tw:mx-auto tw:w-full">
+  <div class="tw:w-full tw:max-w-[53.75rem] tw:px-6 tw:py-4">
     <CheckDetails
       :check="check"
       data-test="synthetics-check-configure-details"
