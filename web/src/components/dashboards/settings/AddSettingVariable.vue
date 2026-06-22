@@ -30,10 +30,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="tw:mt-3">
             <div class="tw:mb-3">
               <OSelect
-                helpText="Variables will be applied to all tabs and panels if global is selected."
+                :helpText="t('dashboard.variableScopeHelp')"
                 v-model="variableData.scope"
                 :options="scopeOptions"
-                label="Select variable scope"
+                :label="t('dashboard.selectVariableScope')"
                 data-test="dashboard-variable-scope-select"
               />
             </div>
