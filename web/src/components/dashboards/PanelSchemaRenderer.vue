@@ -114,18 +114,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @domcontextmenu="onChartDomContextMenu"
         />
       </div>
-      <div
+      <OEmptyState
         v-if="
+          noData &&
           !errorDetail?.message &&
           panelSchema.type != 'geomap' &&
           panelSchema.type != 'maps' &&
           !loading
         "
-        class="noData"
+        size="inline"
+        icon="bar-chart"
+        :title="noData"
+        :backdrop="false"
         data-test="no-data"
-      >
-        {{ noData }}
-      </div>
+        class="noData"
+      />
       <div
         v-if="
           errorDetail?.message &&
@@ -329,6 +332,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 
 export default defineComponent({
   name: "PanelSchemaRenderer",
@@ -348,7 +352,8 @@ export default defineComponent({
     OButton,
     OIcon,
     OTooltip,
-},
+    OEmptyState,
+  },
   props: {
     selectedTimeObj: {
       required: true,
@@ -1670,8 +1675,8 @@ export default defineComponent({
 
 .noData {
   position: absolute;
-  top: 20%;
+  inset: 0;
   width: 100%;
-  text-align: center;
+  height: 100%;
 }
 </style>
