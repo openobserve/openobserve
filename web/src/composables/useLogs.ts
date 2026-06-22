@@ -595,10 +595,11 @@ const useLogs = () => {
         searchObj.meta.sqlMode === true
           ? quoteSqlIdentifierIfNeeded(String(field))
           : field;
+      const escapedValue = String(field_value).replace(/'/g, "''");
       let expression =
         field_value == "null"
           ? `${quotedField} ${operator} ${field_value}`
-          : `${quotedField} ${operator} '${field_value}'`;
+          : `${quotedField} ${operator} '${escapedValue}'`;
 
       const isNumericType = (type: string) =>
         ["int64", "float64"].includes(type.toLowerCase());
@@ -618,7 +619,7 @@ const useLogs = () => {
         searchObj.meta.sqlMode === true
           ? quoteSqlIdentifierIfNeeded(String(field))
           : field;
-      return `${quotedField} ${operator} '${field_value}'`;
+      return `${quotedField} ${operator} '${String(field_value).replace(/'/g, "''")}'`;
     }
   };
 
