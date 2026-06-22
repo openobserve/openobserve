@@ -673,6 +673,7 @@ import { useI18n } from "vue-i18n";
 
 import { byString } from "../../utils/json";
 import { getImageURL, useLocalWrapContent } from "../../utils/zincutils";
+import { formatLargeNumber } from "@/utils/formatters";
 import useLogs from "../../composables/useLogs";
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
 import usePatterns from "@/composables/useLogs/usePatterns";
@@ -969,9 +970,9 @@ export default defineComponent({
       const stats = patternsState.value?.patterns?.statistics;
       if (!stats) return "";
       const patternsFound = stats.total_patterns_found || 0;
-      const logsAnalyzed = (stats.total_logs_analyzed || 0).toLocaleString();
+      const logsAnalyzed = formatLargeNumber(stats.total_logs_analyzed || 0);
       const totalEvents = searchObj.data.queryResults?.total || stats.total_logs_analyzed || 0;
-      const totalEventsStr = totalEvents ? totalEvents.toLocaleString() : logsAnalyzed;
+      const totalEventsStr = totalEvents ? formatLargeNumber(totalEvents) : logsAnalyzed;
       const totalTimeMs = (searchObj.data.queryResults?.took || 0) + (stats.extraction_time_ms || 0);
       return t("search.pattern_summary", {
         totalEvents: totalEventsStr,
@@ -1009,7 +1010,7 @@ export default defineComponent({
 
       const patternsFound = stats.total_patterns_found || 0;
       const totalEvents = searchObj.data.queryResults?.total || stats.total_logs_analyzed || 0;
-      const totalEventsStr = totalEvents ? totalEvents.toLocaleString() : "0";
+      const totalEventsStr = totalEvents ? formatLargeNumber(totalEvents) : "0";
       const totalTimeMs =
         (searchObj.data.queryResults?.took || 0) + (stats.extraction_time_ms || 0);
 
