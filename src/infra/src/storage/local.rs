@@ -14,9 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #[cfg(unix)]
-use std::os::unix::fs::FileExt;
-#[cfg(unix)]
 use std::ops::Range;
+#[cfg(unix)]
+use std::os::unix::fs::FileExt;
 use std::path::PathBuf;
 
 use async_trait::async_trait;

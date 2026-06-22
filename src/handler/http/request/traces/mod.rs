@@ -370,7 +370,10 @@ pub async fn get_latest_traces(
         .unwrap_or(false);
     let has_infer = schema
         .as_ref()
-        .map(|s| s.field_with_name(traces::inferred::INFER_SERVICE_NAME).is_ok())
+        .map(|s| {
+            s.field_with_name(traces::inferred::INFER_SERVICE_NAME)
+                .is_ok()
+        })
         .unwrap_or(false);
     let service_key_expr = if has_infer {
         "COALESCE(infer_service_name, service_name)"
@@ -606,7 +609,10 @@ pub async fn get_latest_traces(
                 start_time: trace_start_time,
                 end_time: trace_end_time,
                 duration: computed_duration,
-                spans: [span_count.try_into().unwrap_or_default(), error_count.try_into().unwrap_or_default()],
+                spans: [
+                    span_count.try_into().unwrap_or_default(),
+                    error_count.try_into().unwrap_or_default(),
+                ],
                 service_name: svc_list,
                 first_event: serde_json::json!({
                     "service_name": event_service_name,
@@ -1151,8 +1157,8 @@ pub async fn get_latest_traces_stream(
 /// Core streaming logic for get_latest_traces_stream.
 ///
 /// For each time partition (newest first):
-///   1. Run Query 1: GROUP BY trace_id to get trace summaries with per-trace
-///      aggregates (span_count, error_count, etc. — formerly Q2a, now merged).
+///   1. Run Query 1: GROUP BY trace_id to get trace summaries with per-trace aggregates
+///      (span_count, error_count, etc. — formerly Q2a, now merged).
 ///   2. Run Query 2b: per-service breakdown only for multi-service traces.
 ///   3. Assemble TraceResponseItem and stream hits via the sender.
 #[allow(clippy::too_many_arguments)]
@@ -1196,14 +1202,18 @@ async fn process_latest_traces_stream(
     // Schema-dependent expressions for Q2a trace aggregates — computed once here
     // and reused in Q1 (merged) and Q2b (service breakdown).
     let stream_schema =
-        infra::schema::get_stream_schema_from_cache(&org_id, &stream_name, StreamType::Traces).await;
+        infra::schema::get_stream_schema_from_cache(&org_id, &stream_name, StreamType::Traces)
+            .await;
     let has_ref_parent_id = stream_schema
         .as_ref()
         .map(|s| s.field_with_name("reference_parent_span_id").is_ok())
         .unwrap_or(false);
     let has_infer = stream_schema
         .as_ref()
-        .map(|s| s.field_with_name(traces::inferred::INFER_SERVICE_NAME).is_ok())
+        .map(|s| {
+            s.field_with_name(traces::inferred::INFER_SERVICE_NAME)
+                .is_ok()
+        })
         .unwrap_or(false);
     let service_key_expr = if has_infer {
         "COALESCE(infer_service_name, service_name)"
@@ -1803,7 +1813,10 @@ async fn run_q2_for_traces(
                 start_time: trace_start_time,
                 end_time: trace_end_time,
                 duration: computed_duration,
-                spans: [span_count.try_into().unwrap_or_default(), error_count.try_into().unwrap_or_default()],
+                spans: [
+                    span_count.try_into().unwrap_or_default(),
+                    error_count.try_into().unwrap_or_default(),
+                ],
                 service_name: svc_list,
                 first_event: serde_json::json!({
                     "service_name": event_service_name,
