@@ -216,7 +216,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           overflow-wrap: break-word;
           z-index: 9999999;
         "
-        :class="store.state.theme === 'dark' ? 'tw:bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'tw:bg-white'"
+        class="annotation-popup-bg"
         ref="annotationPopupRef"
       >
         <div
@@ -1678,5 +1678,9 @@ export default defineComponent({
   inset: 0;
   width: 100%;
   height: 100%;
+}
+
+.annotation-popup-bg {
+  background: var(--o2-card-bg);
 }
 </style>

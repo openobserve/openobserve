@@ -19,13 +19,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="panelcontainer"
     @mouseover="() => (isCurrentlyHoveredPanel = true)"
     @mouseleave="() => (isCurrentlyHoveredPanel = false)"
+    @focusin="() => (isCurrentlyHoveredPanel = true)"
+    @focusout="() => (isCurrentlyHoveredPanel = false)"
     :data-test="`dashboard-panel-container`"
     :data-test-panel-id="props.data.id"
     :data-test-panel-title="props.data.title"
   >
     <div :class="{ 'drag-allow': !viewOnly && !simplifiedPanelView }">
       <div
-        class="tw:flex tw:flex-nowrap tw:items-center tw:w-full tw:min-h-7 tw:px-1 tw:border-b tw:border-border-subtle panel-bar"
+        class="tw:flex tw:flex-nowrap tw:items-center tw:w-full tw:min-h-7 tw:py-1 tw:px-2 tw:border-b tw:border-border-subtle panel-bar"
         :class="{ 'dark-mode': store.state.theme === 'dark' }"
         data-test="dashboard-panel-bar"
       >
@@ -100,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OTooltip>
         </OIcon>
         <OButton
-          v-if="!viewOnly && !simplifiedPanelView && isCurrentlyHoveredPanel"
+          v-if="!viewOnly && isCurrentlyHoveredPanel"
           variant="ghost"
           size="icon"
           @click="onPanelModifyClick('ViewPanel')"
@@ -133,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :viewOnly="viewOnly"
         />
         <OButton
-          v-if="!viewOnly && !simplifiedPanelView"
+          v-if="!viewOnly"
           :variant="variablesDataUpdated ? 'ghost-warning' : 'ghost'"
           size="icon"
           @click="() => onRefreshPanel(false)"
@@ -1049,10 +1051,10 @@ export default defineComponent({
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
   font-weight: 500;
-  color: var(--color-text-secondary);
-  letter-spacing: 0.01em;
+  color: var(--color-text-primary);
+  letter-spacing: 0.02em;
 }
 
 .panel-info-icon {

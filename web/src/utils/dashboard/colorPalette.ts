@@ -307,7 +307,7 @@ export const getSeriesColor = (
   }
 };
 
-export const getColorForTable = [
+const getColorForTableLight = [
   "#FFCDEE",
   "#FFD2D3",
   "#C8FCFA",
@@ -333,3 +333,33 @@ export const getColorForTable = [
   "#FFE6E6",
   "#E8F4FD",
 ];
+
+const getColorForTableDark = [
+  "rgba(255, 100, 180, 0.15)",
+  "rgba(255, 100, 110, 0.15)",
+  "rgba(100, 240, 230, 0.15)",
+  "rgba(90, 170, 240, 0.15)",
+  "rgba(100, 210, 240, 0.15)",
+  "rgba(255, 100, 160, 0.15)",
+  "rgba(100, 220, 230, 0.15)",
+  "rgba(255, 250, 100, 0.15)",
+  "rgba(160, 200, 255, 0.15)",
+  "rgba(230, 130, 130, 0.15)",
+  "rgba(100, 210, 225, 0.15)",
+  "rgba(100, 190, 240, 0.15)",
+  "rgba(200, 100, 240, 0.15)",
+  "rgba(100, 200, 195, 0.15)",
+  "rgba(130, 240, 120, 0.15)",
+  "rgba(240, 130, 170, 0.15)",
+  "rgba(130, 190, 255, 0.15)",
+  "rgba(170, 120, 255, 0.15)",
+  "rgba(150, 210, 170, 0.15)",
+  "rgba(130, 200, 135, 0.15)",
+  "rgba(210, 240, 180, 0.15)",
+  "rgba(255, 230, 130, 0.15)",
+  "rgba(255, 180, 180, 0.15)",
+  "rgba(180, 225, 245, 0.15)",
+];
+
+export const getColorForTable = (theme: string): string[] =>
+  theme === "dark" ? getColorForTableDark : getColorForTableLight;
