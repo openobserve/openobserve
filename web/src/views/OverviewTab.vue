@@ -129,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="goToService(svc)"
         >
           <div class="ov-svc-header">
-            <span class="ov-svc-name">{{ svc.label }}</span>
+            <span class="ov-svc-name" :title="svc.label ?? svc.id">{{ svc.label }}</span>
             <span class="ov-svc-info-wrap">
               <OButton
                 variant="ghost-muted"
@@ -242,7 +242,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t('overview.recentEvents') }}
           <span class="ov-count-badge">{{ recentEvents.length }}</span>
         </div>
-        <button class="ov-view-all" @click="goToAlertHistory">{{ t('overview.viewAll') }} →</button>
+        <button class="ov-view-all" @click="goToAlertList">{{ t('overview.viewAll') }} →</button>
       </div>
       <div class="ov-event-list">
         <div
@@ -947,7 +947,7 @@ watch(isIncidentsEnabled, (enabled) => {
 
 .ov-section-label {
   font-size: 0.875rem;
-  font-weight: 700;
+  font-weight: 500;
   letter-spacing: 0.01em;
   color: var(--o2-text-primary);
 }
@@ -988,7 +988,7 @@ watch(isIncidentsEnabled, (enabled) => {
   padding: 0 0.3rem;
   border-radius: 0.625rem;
   font-size: 0.6875rem;
-  font-weight: 700;
+  font-weight: 600;
   background: var(--o2-status-warning-bg);
   color: var(--o2-status-warning-text);
   border: 0.0625em solid var(--o2-warning);
@@ -1057,7 +1057,7 @@ watch(isIncidentsEnabled, (enabled) => {
 
 .ov-inc-alerts {
   font-size: 0.75rem;
-  font-weight: 600;
+  font-weight: 400;
   color: var(--o2-text-primary);
 }
 
@@ -1303,7 +1303,9 @@ watch(isIncidentsEnabled, (enabled) => {
   border: 0.0625em solid var(--o2-border-color);
   background: var(--o2-card-bg-solid);
   transition: background 0.15s;
-  flex: 0 0 11rem;
+  flex: 0 0 10rem;
+  min-width: 10rem;
+  max-width: 10rem;
 
   &.ov-svc-degraded {
     border-left: 0.1875em solid var(--o2-negative);
@@ -1343,6 +1345,8 @@ watch(isIncidentsEnabled, (enabled) => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  display: block;
+  cursor: default;
 }
 
 .ov-svc-info-wrap {
@@ -1398,7 +1402,7 @@ watch(isIncidentsEnabled, (enabled) => {
 
 .ov-metric-value {
   font-size: 0.875rem;
-  font-weight: 700;
+  font-weight: 500;
   color: var(--o2-text-primary);
 }
 
