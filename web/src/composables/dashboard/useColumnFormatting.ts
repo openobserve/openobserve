@@ -190,6 +190,7 @@ export const getUnitOptions = (
 ): Array<{ label: string; value: string | null }> => [
   { label: t("dashboard.default"), value: null },
   { label: t("dashboard.numbers"), value: "numbers" },
+  { label: t("dashboard.localeFormat"), value: "locale" },
   { label: t("dashboard.bytes"), value: "bytes" },
   { label: t("dashboard.kilobytes"), value: "kilobytes" },
   { label: t("dashboard.megabytes"), value: "megabytes" },

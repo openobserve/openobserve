@@ -1389,6 +1389,7 @@
     "selectDashboardLabel": "대시보드 선택",
     "selectTabLabel": "탭 선택",
     "numbers": "숫자",
+    "localeFormat": "로캘 형식",
     "nanoseconds": "나노세컨드 (ns)",
     "currency": "화폐",
     "p99": "P99",
@@ -4114,7 +4115,12 @@
     "emptyActionLogs": "로그 살펴보기",
     "emptyActionLogsDesc": "로그 스트림 검색 및 필터링",
     "emptyActionTraces": "트레이스 살펴보기",
-    "emptyActionTracesDesc": "분산된 트레이스 및 서비스 지연 시간 검사"
+    "emptyActionTracesDesc": "분산된 트레이스 및 서비스 지연 시간 검사",
+    "viewAll": "모두 보기",
+    "showingOf": "{total} 의 {표시} 보기",
+    "colErrorRate": "오류율",
+    "colLatency": "지연 시간",
+    "colReqs": "요구 사항"
   },
   "chatHistory": {
     "title": "채팅",
