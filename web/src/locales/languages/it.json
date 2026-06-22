@@ -4062,7 +4062,12 @@
     "emptyActionLogs": "Esplora i log",
     "emptyActionLogsDesc": "Cerca e filtra i tuoi flussi di log",
     "emptyActionTraces": "Esplora le tracce",
-    "emptyActionTracesDesc": "Ispeziona le tracce distribuite e la latenza del servizio"
+    "emptyActionTracesDesc": "Ispeziona le tracce distribuite e la latenza del servizio",
+    "viewAll": "Visualizza tutto",
+    "showingOf": "Mostrando {show} di {total}",
+    "colErrorRate": "Tasso di errore",
+    "colLatency": "Latenza",
+    "colReqs": "Requs"
   },
   "chatHistory": {
     "title": "Chat",

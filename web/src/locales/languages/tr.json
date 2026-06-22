@@ -4064,7 +4064,12 @@
     "emptyActionLogs": "Günlükleri keşfedin",
     "emptyActionLogsDesc": "Günlük akışlarınızı arayın ve filtreleyin",
     "emptyActionTraces": "İzleri keşfedin",
-    "emptyActionTracesDesc": "Dağıtılmış izleri ve servis gecikmesini denetleyin"
+    "emptyActionTracesDesc": "Dağıtılmış izleri ve servis gecikmesini denetleyin",
+    "viewAll": "Tümünü görüntüle",
+    "showingOf": "{total} arasından {gösterilen} gösteriliyor",
+    "colErrorRate": "Hata oranı",
+    "colLatency": "Gecikme",
+    "colReqs": "Reqs"
   },
   "chatHistory": {
     "title": "Sohbetler",
