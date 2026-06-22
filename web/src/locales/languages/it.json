@@ -4181,7 +4181,13 @@
       "one": "Mostrami gli errori dell'ultima ora...",
       "two": "Scrivi VRL per analizzare JSON dai log di nginx...",
       "three": "Crea una dashboard per lo stato dei nodi K8s..."
-    }
+    },
+    "autoNavigation": {
+      "label": "Navigazione automatica",
+      "enabledTooltip": "Navigazione automatica abilitata: O2 Assistant navigherà automaticamente senza conferma",
+      "disabledTooltip": "Navigazione automatica disattivata: O2 Assistant chiederà prima di navigare"
+    },
+    "attachImageTooltip": "Allega immagini (PNG, JPEG, max 2 MB)"
   },
   "emptyState": {
     "noSearchResults": {
@@ -4932,5 +4938,16 @@
     "askAi": "Chiedi all'IA di risolvere la mia domanda",
     "showDetail": "Mostra dettagli",
     "hideDetail": "Nascondi dettagli"
+  },
+  "refreshButton": {
+    "justNow": "proprio ora",
+    "secondsAgo": "{sec} s fa",
+    "minutesAgo": "{min} m fa",
+    "hoursAgo": "{h} h fa",
+    "notYetRefreshed": "Non ancora aggiornato",
+    "dataFresh": "I dati sono freschi",
+    "dataGettingStale": "I dati stanno diventando obsoleti",
+    "dataStale": "I dati sono obsoleti",
+    "lastRefreshed": "Ultimo aggiornamento: {time}"
   }
 }

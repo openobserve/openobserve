@@ -4168,7 +4168,13 @@
       "one": "Muéstrame los errores de la última hora...",
       "two": "Escriba VRL para analizar JSON desde los registros de nginx...",
       "three": "Cree un panel de control para el estado de los nodos de K8..."
-    }
+    },
+    "autoNavigation": {
+      "label": "Navegación automática",
+      "enabledTooltip": "Navegación automática habilitada: O2 Assistant navegará automáticamente sin confirmación",
+      "disabledTooltip": "Navegación automática desactivada: O2 Assistant preguntará antes de navegar"
+    },
+    "attachImageTooltip": "Adjuntar imágenes (PNG, JPEG, máximo 2 MB)"
   },
   "emptyState": {
     "noSearchResults": {
@@ -4919,5 +4925,16 @@
     "askAi": "Pedir a la IA que corrija mi consulta",
     "showDetail": "Mostrar detalles",
     "hideDetail": "Ocultar detalles"
+  },
+  "refreshButton": {
+    "justNow": "justo ahora",
+    "secondsAgo": "Hace {segundos}",
+    "minutesAgo": "Hace {min} m",
+    "hoursAgo": "Hace {h} h",
+    "notYetRefreshed": "Aún no se ha actualizado",
+    "dataFresh": "Los datos están actualizados",
+    "dataGettingStale": "Los datos se están volviendo obsoletos",
+    "dataStale": "Los datos están obsoletos",
+    "lastRefreshed": "Última actualización: {time}"
   }
 }

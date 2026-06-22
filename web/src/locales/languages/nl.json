@@ -4183,7 +4183,13 @@
       "one": "Laat me fouten zien van het afgelopen uur...",
       "two": "Schrijf VRL om JSON te parseren uit nginx-logboeken...",
       "three": "Bouw een dashboard voor de gezondheid van K8s nodes..."
-    }
+    },
+    "autoNavigation": {
+      "label": "Autonavigatie",
+      "enabledTooltip": "Automatische navigatie ingeschakeld - O2 Assistant navigeert automatisch zonder bevestiging",
+      "disabledTooltip": "Autonavigatie uitgeschakeld - O2 Assistant zal dit vragen voordat u gaat navigeren"
+    },
+    "attachImageTooltip": "Afbeeldingen bijvoegen (PNG, JPEG, max. 2 MB)"
   },
   "emptyState": {
     "noSearchResults": {
@@ -4934,5 +4940,16 @@
     "askAi": "Vraag AI om mijn vraag op te lossen",
     "showDetail": "Details weergeven",
     "hideDetail": "Details verbergen"
+  },
+  "refreshButton": {
+    "justNow": "net nu",
+    "secondsAgo": "{sec} s geleden",
+    "minutesAgo": "{min} m geleden",
+    "hoursAgo": "{h} h geleden",
+    "notYetRefreshed": "Nog niet vernieuwd",
+    "dataFresh": "Gegevens zijn vers",
+    "dataGettingStale": "Gegevens worden muf",
+    "dataStale": "Gegevens zijn verouderd",
+    "lastRefreshed": "Laatst vernieuwd: {time}"
   }
 }
