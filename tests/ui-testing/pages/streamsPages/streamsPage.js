@@ -6,14 +6,14 @@ import { ManagementPage } from '../generalPages/managementPage.js';
 
 import { getHeaders, getIngestionUrl, sendRequest } from '../../utils/apiUtils.js';
 const http = require('http');
+const nodeFetch = require('node-fetch');
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 
 // node-fetch v2 keep-alive pooling + gzip decompression is the root cause of
 // "Premature close" / ECONNRESET flakiness in CI.
 const _noKeepAliveAgent = new http.Agent({ keepAlive: false });
-async function _nodeFetchSafe(url, opts = {}) {
-    const fetch = (await import('node-fetch')).default;
-    return fetch(url, { ...opts, compress: false, agent: _noKeepAliveAgent });
+function _nodeFetchSafe(url, opts = {}) {
+    return nodeFetch(url, { ...opts, compress: false, agent: _noKeepAliveAgent });
 }
 
 export class StreamsPage {

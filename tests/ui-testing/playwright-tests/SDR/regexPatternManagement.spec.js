@@ -37,9 +37,8 @@ test.describe("Regex Pattern Management Tests", { tag: '@enterprise' }, () => {
     // OForm validates on submit (not field-disabled); clicking save triggers
     // Zod validation which keeps the drawer open on error.
     await pm.sdrPatternsPage.saveButton.click();
-    await page.waitForTimeout(300);
     testLogger.info('Verifying drawer stays open after save with empty name');
-    await expect(pm.sdrPatternsPage.saveButton).toBeVisible({ timeout: 5000 });
+    await expect(pm.sdrPatternsPage.addPatternTitle).toBeVisible({ timeout: 5000 });
 
     await pm.sdrPatternsPage.cancelButton.click();
     await page.waitForTimeout(500);
@@ -51,9 +50,8 @@ test.describe("Regex Pattern Management Tests", { tag: '@enterprise' }, () => {
     await pm.sdrPatternsPage.patternDescriptionInput.fill('Test description');
 
     await pm.sdrPatternsPage.saveButton.click();
-    await page.waitForTimeout(300);
     testLogger.info('Verifying drawer stays open after save with empty pattern');
-    await expect(pm.sdrPatternsPage.saveButton).toBeVisible({ timeout: 5000 });
+    await expect(pm.sdrPatternsPage.addPatternTitle).toBeVisible({ timeout: 5000 });
   });
 
   // ===== ERROR HANDLING TESTS =====
