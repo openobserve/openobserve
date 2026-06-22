@@ -1403,6 +1403,7 @@
     "selectDashboardLabel": "ダッシュボードを選択",
     "selectTabLabel": "タブを選択",
     "numbers": "数字",
+    "localeFormat": "ロケール形式",
     "nanoseconds": "ナノ秒 (ns)",
     "currency": "通貨",
     "p99": "99",

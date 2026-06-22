@@ -1,3 +1,5 @@
+import { getNumberLocale } from "@/locales";
+
 const units: any = {
   bytes: [
     { unit: "B", divisor: 1 },
@@ -173,6 +175,17 @@ export const getUnitValue = (
       return {
         value: `${parseFloat(value)?.toFixed(decimals) ?? 0}`,
         unit: `${customUnit ?? ""}`,
+      };
+    }
+    case "locale": {
+      const num = Number(value);
+      if (Number.isNaN(num)) return { value: value, unit: "" };
+      return {
+        value: new Intl.NumberFormat(getNumberLocale(), {
+          minimumFractionDigits: decimals,
+          maximumFractionDigits: decimals,
+        }).format(num),
+        unit: "",
       };
     }
     case "percent-1": {

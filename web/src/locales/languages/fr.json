@@ -1386,6 +1386,7 @@
     "selectDashboardLabel": "Sélectionnez le tableau de bord",
     "selectTabLabel": "Sélectionnez un onglet",
     "numbers": "Nombres",
+    "localeFormat": "Format régional",
     "nanoseconds": "Nanosecondes (ns)",
     "currency": "Devise",
     "p99": "P99",
