@@ -1386,6 +1386,7 @@
     "selectDashboardLabel": "Seleziona Dashboard",
     "selectTabLabel": "Seleziona scheda",
     "numbers": "Numeri",
+    "localeFormat": "Formato locale",
     "nanoseconds": "Nanosecondi (ns)",
     "currency": "Valuta",
     "p99": "P99",

@@ -1386,6 +1386,7 @@
     "selectDashboardLabel": "Selecteer Dashboard",
     "selectTabLabel": "Tabblad selecteren",
     "numbers": "Getallen",
+    "localeFormat": "Landnotatie",
     "nanoseconds": "Nanoseconden (ns)",
     "currency": "Valuta",
     "p99": "P99",
