@@ -1386,6 +1386,7 @@
     "selectDashboardLabel": "대시보드 선택",
     "selectTabLabel": "탭 선택",
     "numbers": "숫자",
+    "localeFormat": "로캘 형식",
     "nanoseconds": "나노세컨드 (ns)",
     "currency": "화폐",
     "p99": "P99",

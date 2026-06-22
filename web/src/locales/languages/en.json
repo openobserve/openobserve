@@ -2009,6 +2009,7 @@
     "bottom": "Bottom",
     "default": "Default",
     "numbers": "Numbers",
+    "localeFormat": "Locale Format",
     "bytes": "Bytes",
     "kilobytes": "Kilobytes (KB)",
     "megabytes": "Megabytes (MB)",

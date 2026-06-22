@@ -1386,6 +1386,7 @@
     "selectDashboardLabel": "Selecione o painel",
     "selectTabLabel": "Selecione a guia",
     "numbers": "Números",
+    "localeFormat": "Formato Regional",
     "nanoseconds": "Nanossegundos (ns)",
     "currency": "Moeda",
     "p99": "P99",
