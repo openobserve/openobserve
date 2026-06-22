@@ -642,6 +642,7 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import orgService from "@/services/organizations";
+import configService from "@/services/config";
 import config from "@/aws-exports";
 import { formatSizeFromMB, getImageURL } from "@/utils/zincutils";
 import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRenderer.vue";
@@ -1158,8 +1159,22 @@ onMounted(() => {
   ) {
     getSummary(orgId.value);
   }
+  // Refresh config so the UsageReportBanner reflects the latest
+  // last_usage_report_ts each time the Usage tab is opened. UsageTab remounts on
+  // every visit (the home router-view is not kept-alive), and config is otherwise
+  // only fetched at app startup.
+  refreshConfig();
   window.addEventListener("themeColorChanged", onThemeColorChanged);
 });
+
+const refreshConfig = async () => {
+  try {
+    const res: any = await configService.get_config();
+    store.dispatch("setConfig", res.data);
+  } catch (error) {
+    console.log(error);
+  }
+};
 
 onUnmounted(() => {
   window.removeEventListener("themeColorChanged", onThemeColorChanged);
