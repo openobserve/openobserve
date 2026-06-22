@@ -4004,7 +4004,12 @@
       "legend": {
         "title": "Error Rate"
       }
-    }
+    },
+    "spansTab": "Spans",
+    "tracesTab": "Traces",
+    "serviceGraphTab": "Service Graph",
+    "treeView": "Tree View",
+    "graphView": "Graph View"
   },
   "actions": {
     "testAction": "Test action",

@@ -27,35 +27,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="traces-search-mode-spans-btn"
             value="spans"
             size="sm"
-            :tooltip="shouldHideToggleText ? 'Spans' : undefined"
+            :tooltip="shouldHideToggleText ? t('traces.spansTab') : undefined"
           >
             <template #icon-left
               ><OIcon name="layers" size="sm" class="tw:shrink-0"
             /></template>
-            <span v-if="!shouldHideToggleText">Spans</span>
+            <span v-if="!shouldHideToggleText">{{ t('traces.spansTab') }}</span>
           </OToggleGroupItem>
           <OToggleGroupItem
             data-test="traces-search-mode-traces-btn"
             value="traces"
             size="sm"
-            :tooltip="shouldHideToggleText ? 'Traces' : undefined"
+            :tooltip="shouldHideToggleText ? t('traces.tracesTab') : undefined"
           >
             <template #icon-left
               ><OIcon name="account-tree" size="sm" class="tw:shrink-0"
             /></template>
-            <span v-if="!shouldHideToggleText">Traces</span>
+            <span v-if="!shouldHideToggleText">{{ t('traces.tracesTab') }}</span>
           </OToggleGroupItem>
           <OToggleGroupItem
             v-if="config.isEnterprise == 'true'"
             data-test="traces-service-graph-toggle"
             value="service-graph"
             size="sm"
-            :tooltip="shouldHideToggleText ? 'Service Graph' : undefined"
+            :tooltip="shouldHideToggleText ? t('traces.serviceGraphTab') : undefined"
           >
             <template #icon-left
               ><OIcon name="share" size="sm" class="tw:shrink-0"
             /></template>
-            <span v-if="!shouldHideToggleText">Service Graph</span>
+            <span v-if="!shouldHideToggleText">{{ t('traces.serviceGraphTab') }}</span>
           </OToggleGroupItem>
           <OToggleGroupItem
             data-test="traces-search-mode-services-catalog-btn"
@@ -117,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="xs"
               icon-left="more-horiz"
             >
-              More
+              {{ t('search.menuMore') }}
             </OButton>
           </template>
 
@@ -311,7 +311,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #icon-left>
                 <OIcon name="git-branch" size="sm" />
               </template>
-              Tree View
+              {{ t('traces.treeView') }}
             </OToggleGroupItem>
             <OToggleGroupItem
               data-test="service-graph-graph-view-btn"
@@ -320,7 +320,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <template #icon-left
                 ><OIcon name="share" size="sm" class="tw:shrink-0" /></template>
-              Graph View
+              {{ t('traces.graphView') }}
             </OToggleGroupItem>
           </OToggleGroup>
           <OSelect
