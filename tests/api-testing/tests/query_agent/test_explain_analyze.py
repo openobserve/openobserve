@@ -128,23 +128,39 @@ for _cat, _queries in sorted(_CATEGORIES.items()):
 
 
 # ── Cross-schema rejection ────────────────────────────────────────────────
-def test_explain_analyze_cross_schema_rejected(client, explain_post_flush):
-    """EXPLAIN ANALYZE on cross-schema dot-notation returns 4xx, not 5xx."""
-    sql = "EXPLAIN ANALYZE SELECT b.id, b.name FROM default AS a INNER JOIN enrich.rich AS b ON a.id = b.id LIMIT 1"
+@pytest.mark.parametrize("sql,label", [
+    pytest.param(
+        "EXPLAIN ANALYZE SELECT b.id, b.name FROM default AS a INNER JOIN enrich.rich AS b ON a.id = b.id LIMIT 1",
+        "select_columns",
+        id="select_columns",
+    ),
+    pytest.param(
+        "EXPLAIN ANALYZE SELECT count(*) FROM default AS a INNER JOIN enrich.rich AS b ON a.id = b.id LIMIT 1",
+        "select_count",
+        id="select_count",
+    ),
+])
+def test_explain_analyze_cross_schema_rejected(client, explain_post_flush, sql, label):
+    """EXPLAIN ANALYZE on cross-schema dot-notation returns 4xx, not 5xx.
+
+    Both projection (b.id, b.name) and aggregation (count(*)) variants
+    are checked — EXPLAIN ANALYZE actually executes the query, so the
+    aggregation path may hit different planner/execution code.
+    """
     t0 = BASE_TS
     t1 = t0 + 60_000_000 * 120
     payload = search_payload(sql, start_time=t0, end_time=t1)
     resp = client.post("_search?type=logs", json=payload)
 
     assert 400 <= resp.status_code <= 499, (
-        f"EXPLAIN ANALYZE cross-schema: expected 4xx, got {resp.status_code}: {resp.text[:500]}"
+        f"EXPLAIN ANALYZE cross-schema [{label}]: expected 4xx, got {resp.status_code}: {resp.text[:500]}"
     )
 
     body = resp.json()
     msg = body.get("message", "")
     assert "rich" in msg or "enrich" in msg or "stream" in msg.lower(), (
-        f"EXPLAIN ANALYZE cross-schema: error message should mention the "
+        f"EXPLAIN ANALYZE cross-schema [{label}]: error message should mention the "
         f"unresolved stream, got: {msg!r}"
     )
 
-    logging.info("EXPLAIN ANALYZE cross-schema: correctly rejected with %s — %s", resp.status_code, msg)
+    logging.info("EXPLAIN ANALYZE cross-schema [%s]: correctly rejected with %s — %s", label, resp.status_code, msg)
