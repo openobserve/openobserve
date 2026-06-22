@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Copyright 2026 OpenObserve Inc.
 import { onMounted, ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
 import type { BrowserCheck, BrowserStep } from '@/types/synthetics'
 import OButton from '@/lib/core/Button/OButton.vue'
 import OIcon from '@/lib/core/Icon/OIcon.vue'
@@ -16,7 +16,6 @@ import CheckConfigure from '@/components/synthetics/configure/CheckConfigure.vue
 import BrowserCheckResults from '@/components/synthetics/results/BrowserCheckResults.vue'
 
 const route = useRoute()
-const router = useRouter()
 
 const activeTab = ref<'journey' | 'configure' | 'results'>('journey')
 const showRecorder = ref(false)
@@ -63,9 +62,6 @@ function saveCheck() {
   }, 4000)
 }
 
-function goBack() {
-  router.push({ name: 'synthetic' })
-}
 </script>
 
 <template>
@@ -91,13 +87,9 @@ function goBack() {
     <!-- Header row -->
     <header class="tw:flex tw:items-center tw:justify-between tw:px-6 tw:py-3 tw:border-b tw:border-[var(--o2-border-color)]">
       <div class="tw:flex tw:items-center tw:gap-3">
-        <button
-          type="button"
-          class="tw:text-[var(--o2-text-secondary)] tw:hover:text-[var(--o2-text-body)] tw:text-sm tw:flex tw:items-center tw:gap-1 tw:bg-transparent tw:border-0 tw:cursor-pointer"
-          @click="goBack"
-        >
+        <RouterLink :to="{ name: 'synthetic' }" class="tw:text-sm tw:text-[var(--o2-text-link)] tw:hover:text-[var(--o2-text-link-hover)] tw:flex tw:items-center tw:gap-1">
           ← Back to checks
-        </button>
+        </RouterLink>
         <h2 class="tw:text-base tw:font-semibold">{{ check.name }}</h2>
         <OSwitch
           v-model="check.enabled"

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Copyright 2026 OpenObserve Inc.
 import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { RouterLink, useRouter } from 'vue-router'
 import type { BrowserCheck, BrowserStep } from '@/types/synthetics'
 import OButton from '@/lib/core/Button/OButton.vue'
 import OIcon from '@/lib/core/Icon/OIcon.vue'
@@ -60,10 +60,6 @@ function onRecordDone(capturedSteps: BrowserStep[]) {
 function saveCheck() {
   const id = crypto.randomUUID()
   router.push({ name: 'synthetic-detail', params: { id }, query: { tab: 'results', saved: '1' } })
-}
-
-function goBack() {
-  router.push({ name: 'synthetic' })
 }
 </script>
 
@@ -143,13 +139,9 @@ function goBack() {
     <!-- Header row -->
     <header class="tw:flex tw:items-center tw:justify-between tw:px-6 tw:py-3 tw:border-b tw:border-[var(--o2-border-color)]">
       <div class="tw:flex tw:items-center tw:gap-3">
-        <button
-          type="button"
-          class="tw:text-[var(--o2-text-secondary)] tw:hover:text-[var(--o2-text-body)] tw:text-sm tw:flex tw:items-center tw:gap-1 tw:bg-transparent tw:border-0 tw:cursor-pointer"
-          @click="goBack"
-        >
+        <RouterLink :to="{ name: 'synthetic' }" class="tw:text-sm tw:text-[var(--o2-text-link)] tw:hover:text-[var(--o2-text-link-hover)] tw:flex tw:items-center tw:gap-1">
           ← Back to checks
-        </button>
+        </RouterLink>
         <h2 class="tw:text-base tw:font-semibold">{{ check.name || 'Untitled check' }}</h2>
         <OBadge variant="warning">Draft — not saved</OBadge>
       </div>
