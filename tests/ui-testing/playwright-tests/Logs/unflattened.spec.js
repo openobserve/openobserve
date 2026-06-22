@@ -139,7 +139,19 @@ test.describe("Unflattened testcases", () => {
     // instead of sleeping a fixed interval and hoping indexing has caught up.
     // This is what makes the single UI scan below succeed on the first attempt.
     testLogger.info('Waiting for _o2_id to become queryable via search API');
-    await pageManager.unflattenedPage.waitForO2IdQueryable();
+    // Respect the gate's result. On heavily contended CI runners indexing can
+    // lag past the gate window; the gate returning false (ignored previously)
+    // is exactly when the subsequent UI scan was doomed. Give the backend one
+    // more long wait before falling through to the UI scan, so the UI step
+    // isn't asked to find a field the backend hasn't surfaced yet.
+    const o2idReady = await pageManager.unflattenedPage.waitForO2IdQueryable();
+    if (o2idReady) {
+      testLogger.info('_o2_id confirmed queryable via search API');
+    } else {
+      testLogger.warn('_o2_id readiness gate timed out; waiting once more before UI scan');
+      const o2idReadyRetry = await pageManager.unflattenedPage.waitForO2IdQueryable({ timeout: 120000 });
+      testLogger.info('_o2_id readiness gate second wait result', { ready: o2idReadyRetry });
+    }
 
     // Navigate directly with stream in URL — selectStream would deselect it because
     // the Pinia store already has e2e_automate selected from beforeEach
@@ -156,7 +168,7 @@ test.describe("Unflattened testcases", () => {
     // a miss here is only UI/render lag — re-run the query (cheap) rather than
     // re-ingesting (the old loop's re-ingest + 5s sleep is what ballooned wall-time).
     for (let attempt = 1; attempt <= 3; attempt++) {
-      const matchedRow = await pageManager.unflattenedPage.findRowWithO2Id(10);
+      const matchedRow = await pageManager.unflattenedPage.findRowWithO2Id(15);
       if (matchedRow !== -1) {
         testLogger.info(`Found _o2_id in row ${matchedRow} (attempt ${attempt})`);
         await pageManager.unflattenedPage.o2IdText.click();
@@ -257,7 +269,19 @@ test.describe("Unflattened testcases", () => {
     // instead of a fixed 15s sleep + UI re-ingestion retry loop. This was the
     // dominant source of the timeout flake on contended CI runners.
     testLogger.info('Waiting for _o2_id to become queryable via search API');
-    await pageManager.unflattenedPage.waitForO2IdQueryable();
+    // Respect the gate's result. On heavily contended CI runners indexing can
+    // lag past the gate window; the gate returning false (ignored previously)
+    // is exactly when the subsequent UI scan was doomed. Give the backend one
+    // more long wait before falling through to the UI scan, so the UI step
+    // isn't asked to find a field the backend hasn't surfaced yet.
+    const o2idReady = await pageManager.unflattenedPage.waitForO2IdQueryable();
+    if (o2idReady) {
+      testLogger.info('_o2_id confirmed queryable via search API');
+    } else {
+      testLogger.warn('_o2_id readiness gate timed out; waiting once more before UI scan');
+      const o2idReadyRetry = await pageManager.unflattenedPage.waitForO2IdQueryable({ timeout: 120000 });
+      testLogger.info('_o2_id readiness gate second wait result', { ready: o2idReadyRetry });
+    }
 
     // Navigate directly with stream in URL — selectStream would deselect it because
     // the Pinia store already has e2e_automate selected from beforeEach
@@ -308,7 +332,7 @@ test.describe("Unflattened testcases", () => {
     // (the old loop's re-ingest + 5s sleep is what ballooned wall-time on CI).
     let o2idFound = false;
     for (let attempt = 1; attempt <= 3; attempt++) {
-      const matchedRow = await pageManager.unflattenedPage.findRowWithO2Id(10);
+      const matchedRow = await pageManager.unflattenedPage.findRowWithO2Id(15);
       if (matchedRow !== -1) {
         testLogger.info(`Found _o2_id in row ${matchedRow} (attempt ${attempt})`);
         await pageManager.unflattenedPage.o2IdText.click();
