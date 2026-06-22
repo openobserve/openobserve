@@ -3775,6 +3775,7 @@
       "multiStepAgent": "Multi-step Agent"
     },
     "sessionsList": {
+      "streamLabel": "Stream",
       "noStreamsTooltip": "No LLM streams available.",
       "session": "session",
       "sessions": "sessions",
@@ -4562,6 +4563,10 @@
       "detail": {
         "loading": "Loading per-config breakdown…",
         "noData": "No scores yet for this config in this window.",
+        "empty": {
+          "title": "Waiting for your first scores",
+          "description": "No scores have landed for this config in the selected time range. They'll appear here automatically once a scorer using it runs."
+        },
         "drillTitle": "Drill to traces",
         "splitByScorer": "Split by scorer",
         "splitBySourceType": "Split by source_type",

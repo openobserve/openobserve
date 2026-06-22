@@ -534,7 +534,8 @@ async function save(activateAfter = false) {
   border-radius: 999px;
   background: color-mix(in srgb, var(--color-text-secondary) 12%, transparent);
   color: var(--color-text-secondary, var(--o2-text-secondary));
-  font: 700 11px ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 700;
+  font-size: 11px;
 }
 
 .job-section__title {

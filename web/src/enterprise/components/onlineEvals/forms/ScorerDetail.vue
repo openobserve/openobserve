@@ -643,7 +643,6 @@ function relativeTime(timestampMs: number): string {
 }
 
 .sd__title {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-weight: 700;
   font-size: 18px;
   letter-spacing: -0.005em;
@@ -864,7 +863,6 @@ function relativeTime(timestampMs: number): string {
 }
 
 .sd-mono {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-variant-numeric: tabular-nums;
 }
 
@@ -893,7 +891,6 @@ function relativeTime(timestampMs: number): string {
   margin-left: 6px;
   padding: 1px 6px;
   border-radius: 3px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 11px;
   font-weight: 600;
   background: color-mix(in srgb, var(--color-text-secondary) 10%, transparent);
@@ -938,7 +935,6 @@ function relativeTime(timestampMs: number): string {
   background: color-mix(in srgb, var(--color-text-primary) 5%, transparent);
   border: 1px solid color-mix(in srgb, var(--color-text-secondary) 14%, transparent);
   border-radius: 6px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 12px;
   line-height: 1.55;
   color: var(--color-text-primary, currentColor);
