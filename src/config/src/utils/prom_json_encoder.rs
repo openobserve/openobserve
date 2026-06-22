@@ -181,7 +181,7 @@ impl JsonEncoder {
             // Only counter/gauge accumulate a `value` into `mf_map`; histogram/summary
             // emit their own rows above and `continue`, leaving `mf_map` as a value-less
             // header that must not be ingested.
-            if matches!(metric_type, MetricType::COUNTER | MetricType::GAUGE) {
+            if !matches!(metric_type, MetricType::HISTOGRAM | MetricType::SUMMARY) {
                 ret.push(json!(mf_map));
             }
         }
