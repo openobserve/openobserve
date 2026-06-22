@@ -257,7 +257,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="outline"
           size="icon-toolbar"
           :disabled="!searchObj.data.queryResults?.hits?.length"
-          title="Export Traces"
+          :title="t('traces.exportTraces')"
           @click="downloadLogs"
         >
           <OIcon name="download" size="sm" />
@@ -921,11 +921,11 @@ export default defineComponent({
 
     const serviceGraphLayoutOptions = computed(() => {
       if (searchObj.meta.serviceGraphVisualizationType === "graph") {
-        return [{ label: "Force Layout", value: "force" }];
+        return [{ label: t("traces.layoutForce"), value: "force" }];
       }
       return [
-        { label: "Horizontal", value: "horizontal" },
-        { label: "Vertical", value: "vertical" },
+        { label: t("traces.layoutHorizontal"), value: "horizontal" },
+        { label: t("traces.layoutVertical"), value: "vertical" },
       ];
     });
 
