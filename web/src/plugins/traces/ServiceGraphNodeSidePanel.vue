@@ -3079,6 +3079,17 @@ export default defineComponent({
       padding: 0 0.0625rem !important;
     }
   }
+
+  :deep(.render-dashboard-charts-container) {
+    padding: 0 !important;
+  }
+
+  :deep(.render-dashboard-charts-container > *:first-child) {
+    background: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
 }
 
 :deep(
