@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- RED Charts Section -->
         <div
           v-if="streamFilter !== 'all' && dashboardData"
-          class="red-charts-section tw:flex tw:flex-col tw:mb-0!"
+          class="panel-section red-charts-section tw:flex tw:flex-col tw:mb-0!"
           data-test="service-graph-side-panel-red-charts"
         >
           <!-- DataZoom filter chips + View in Traces button -->
@@ -3073,16 +3073,10 @@ export default defineComponent({
 .red-charts-section {
   :deep(.card-container) {
     box-shadow: none;
-    background: transparent;
-    border: none;
 
     :first-child {
       padding: 0 0.0625rem !important;
     }
-  }
-
-  :deep(.render-dashboard-charts-container) {
-    padding: 0 !important;
   }
 }
 
@@ -3092,8 +3086,4 @@ export default defineComponent({
   height: 100% !important;
 }
 
-:deep([data-o2-drawer]) {
-  border-top-left-radius: 0.75rem;
-  border-bottom-left-radius: 0.75rem;
-}
 </style>
