@@ -42,7 +42,6 @@ pub struct Model {
     #[sea_orm(column_type = "Custom(get_text_type())")]
     pub original_url: String,
     pub created_ts: i64,
-    #[sea_orm(column_type = "String(StringLen::N(256))")]
     pub org_id: String,
 }
 
