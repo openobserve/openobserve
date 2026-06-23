@@ -1,0 +1,72 @@
+{
+  "verdict": "PASS",
+  "critical_count": 0,
+  "warning_count": 6,
+  "auto_fixed": 1,
+  "feature_slug": "prebuilt-template-management",
+  "feature_title": "Prebuilt Template Management",
+  "audit_phase": "pre-exec",
+  "files_audited": [
+    "tests/ui-testing/playwright-tests/Alerts/alerts-template-prebuilt-guard.spec.js",
+    "tests/ui-testing/pages/alertsPages/alertTemplatesPage.js",
+    "tests/ui-testing/pages/page-manager.js"
+  ],
+  "warnings": [
+    {
+      "id": "W1",
+      "severity": "warning",
+      "file": "tests/ui-testing/playwright-tests/Alerts/alerts-template-prebuilt-guard.spec.js",
+      "lines": "58-78",
+      "rule": "test-name-assertion-mismatch",
+      "detail": "P0.2 title promises prebuilt guard checks but when hasPrebuilt=false, specific assertions are skipped; only generic table-visibility runs."
+    },
+    {
+      "id": "W2",
+      "severity": "warning",
+      "file": "tests/ui-testing/playwright-tests/Alerts/alerts-template-prebuilt-guard.spec.js",
+      "lines": "201-233",
+      "rule": "test-name-assertion-mismatch",
+      "detail": "P1.4 title says 'Prebuilt Templates Excluded from Bulk Selection' but only asserts bulk-delete button visibility; no explicit prebuilt-exclusion assertion."
+    },
+    {
+      "id": "W3",
+      "severity": "warning",
+      "file": "tests/ui-testing/pages/alertsPages/alertTemplatesPage.js",
+      "lines": "1-2",
+      "rule": "unused-import",
+      "detail": "Unused imports: 'test' and 'test as base' from @playwright/test."
+    },
+    {
+      "id": "W4",
+      "severity": "warning",
+      "file": "tests/ui-testing/pages/alertsPages/alertTemplatesPage.js",
+      "lines": "multiple",
+      "rule": "excessive-waitForTimeout",
+      "detail": "19+ waitForTimeout calls in page object methods; prefer deterministic wait strategies."
+    },
+    {
+      "id": "W5",
+      "severity": "warning",
+      "file": "tests/ui-testing/pages/alertsPages/alertTemplatesPage.js",
+      "lines": "1220-1223",
+      "rule": "misleading-method-name",
+      "detail": "expectAnyPrebuiltRowsExist returns boolean but 'expect' prefix suggests assertion; rename to hasAnyPrebuiltRows or similar."
+    },
+    {
+      "id": "W6",
+      "severity": "warning",
+      "file": "tests/ui-testing/playwright-tests/Alerts/alerts-template-prebuilt-guard.spec.js",
+      "lines": "4",
+      "rule": "unused-import",
+      "detail": "Unused logData import from fixtures/log.json — AUTO-FIXED (removed)."
+    }
+  ],
+  "auto_fixes": [
+    {
+      "id": "AF1",
+      "file": "tests/ui-testing/playwright-tests/Alerts/alerts-template-prebuilt-guard.spec.js",
+      "line": 4,
+      "action": "Removed unused `const logData = require(\"../../fixtures/log.json\");`"
+    }
+  ]
+}

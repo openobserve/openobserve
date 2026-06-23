@@ -1,0 +1,12 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/Alerts/alerts-template-prebuilt-guard.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/Alerts/alerts-destinations-prebuilt.spec.js",
+    "tests/ui-testing/playwright-tests/Alerts/alerts-ui-operations.spec.js",
+    "tests/ui-testing/playwright-tests/Alerts/alerts-import.spec.js",
+    "tests/ui-testing/playwright-tests/Alerts/alerts-advanced.spec.js"
+  ],
+  "needs_registration": false,
+  "rationale": "alerts-destinations-prebuilt.spec.js thoroughly covers the destination-side prebuilt guards (type selector, CRUD, validation, edit). alerts-ui-operations.spec.js has basic template create/delete but no prebuilt-template guards. The template-side gaps — tab filtering (All/Prebuilt/Custom), prebuilt badge rendering, delete-button disabled state, bulk-delete prebuilt exclusion, clone, and edit — are not covered by any existing spec. This new spec ('alerts-template-prebuilt-guard') fills that gap while avoiding duplication with the destination tests."
+}

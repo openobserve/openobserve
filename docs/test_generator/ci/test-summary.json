@@ -1,0 +1,10 @@
+[
+  { "title": "P0.1: Template List Renders with Tabs and Action Buttons", "action": "new", "verifies": "template list core UI renders with tab toggle group, add/import buttons, and data table" },
+  { "title": "P0.2: Prebuilt Template Guard — Delete Button Disabled & Badge Visible", "action": "new", "verifies": "prebuilt templates show a distinguishing badge and have disabled delete buttons" },
+  { "title": "P1.1: Template Tab Filtering — All / Prebuilt / Custom", "action": "new", "verifies": "clicking tab toggles correctly filters visible rows to match the selected filter" },
+  { "title": "P1.2: Edit (Update) a Custom Template", "action": "new", "verifies": "opening a custom template in edit mode allows updating the body and persisting the change" },
+  { "title": "P1.3: Clone a Custom Template", "action": "new", "verifies": "cloning a template creates a Copy_of_ copy without overwriting the original" },
+  { "title": "P1.4: Prebuilt Templates Excluded from Bulk Selection", "action": "new", "verifies": "select-all checkbox excludes prebuilt rows so only custom rows get selected for bulk delete" },
+  { "title": "P2.1: Empty Template Name Validation", "action": "new", "verifies": "saving with an empty name triggers inline validation error" },
+  { "title": "P2.2: Invalid Resource Name Validation", "action": "new", "verifies": "names with spaces or disallowed characters are rejected with a descriptive error" }
+]

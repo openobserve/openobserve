@@ -1,0 +1,2095 @@
+diff --git a/src/config/src/prebuilt_loader.rs b/src/config/src/prebuilt_loader.rs
+index 6579d0bb4bc..ef96a4439f5 100644
+--- a/src/config/src/prebuilt_loader.rs
++++ b/src/config/src/prebuilt_loader.rs
+@@ -108,6 +108,27 @@ fn load_prebuilt_config() -> PrebuiltDestinationsConfig {
+     load_builtin_config()
+ }
+ 
++/// Prefix that marks system-managed template names. The full reserved set is
++/// `prebuilt_<type>` where `<type>` is one of the registered prebuilt
++/// destination types — see `is_prebuilt_template_name` below.
++pub const PREBUILT_TEMPLATE_PREFIX: &str = "prebuilt_";
++
++/// True only for template names the system actually manages: the name must be
++/// `prebuilt_<type>` where `<type>` is a registered prebuilt destination type
++/// (slack, opsgenie, servicenow, ...).
++///
++/// Lives next to `get_prebuilt_template` so the public API surface
++/// (`handler::http::models`), the service-layer guards
++/// (`service::alerts::templates`), and any future caller all derive the
++/// "is system template" answer from the same source of truth.
++///
++/// User-created templates whose names happen to start with `prebuilt_` but
++/// don't match a registered type stay freely editable and deletable.
++pub fn is_prebuilt_template_name(name: &str) -> bool {
++    name.strip_prefix(PREBUILT_TEMPLATE_PREFIX)
++        .is_some_and(|t| get_prebuilt_template(t).is_some())
++}
++
+ /// Get a specific prebuilt template by type (e.g., "slack", "teams", "email")
+ pub fn get_prebuilt_template(prebuilt_type: &str) -> Option<Template> {
+     let config = load_prebuilt_config();
+diff --git a/src/handler/http/models/destinations.rs b/src/handler/http/models/destinations.rs
+index 8cdaa7f9668..6fdaaf21b00 100644
+--- a/src/handler/http/models/destinations.rs
++++ b/src/handler/http/models/destinations.rs
+@@ -184,10 +184,15 @@ impl From<meta_dest::Template> for Template {
+             meta_dest::TemplateType::Sns => (String::new(), DestinationType::Sns),
+         };
+ 
++        // Shared rule lives in `config::prebuilt_loader` so the HTTP DTO and
++        // the service-layer guards can't drift apart.
++        let is_prebuilt = config::prebuilt_loader::is_prebuilt_template_name(&value.name);
++
+         Self {
+             name: value.name,
+             body: value.body,
+             is_default: value.is_default.then_some(true),
++            is_prebuilt,
+             template_type,
+             title,
+         }
+@@ -341,6 +346,12 @@ pub struct Template {
+     #[serde(rename = "isDefault")]
+     #[serde(default)]
+     pub is_default: Option<bool>,
++    /// True for system-managed prebuilt templates (those whose name starts
++    /// with `prebuilt_`). The public API refuses updates and deletes for
++    /// these, so the UI should render them as read-only.
++    #[serde(rename = "isPrebuilt")]
++    #[serde(default)]
++    pub is_prebuilt: bool,
+     /// Indicates whether the body is
+     /// http or email body
+     #[serde(rename = "type")]
+@@ -456,6 +467,7 @@ mod tests {
+             name: "tmpl".to_string(),
+             body: "body".to_string(),
+             is_default: None,
++            is_prebuilt: false,
+             template_type: DestinationType::Http,
+             title: String::new(),
+         };
+@@ -472,6 +484,7 @@ mod tests {
+             name: "email_tmpl".to_string(),
+             body: "hi".to_string(),
+             is_default: Some(true),
++            is_prebuilt: false,
+             template_type: DestinationType::Email,
+             title: "My Alert".to_string(),
+         };
+@@ -489,6 +502,7 @@ mod tests {
+             name: "s".to_string(),
+             body: "b".to_string(),
+             is_default: None,
++            is_prebuilt: false,
+             template_type: DestinationType::Sns,
+             title: String::new(),
+         };
+diff --git a/src/handler/http/request/alerts/templates.rs b/src/handler/http/request/alerts/templates.rs
+index dff8556a9ab..a45049cf9d9 100644
+--- a/src/handler/http/request/alerts/templates.rs
++++ b/src/handler/http/request/alerts/templates.rs
+@@ -37,6 +37,9 @@ impl From<TemplateError> for Response {
+             TemplateError::DeleteWithDestination(e) => {
+                 MetaHttpResponse::conflict(TemplateError::DeleteWithDestination(e))
+             }
++            TemplateError::PrebuiltReadOnly(name) => {
++                MetaHttpResponse::forbidden(TemplateError::PrebuiltReadOnly(name))
++            }
+             other_err => MetaHttpResponse::bad_request(other_err),
+         }
+     }
+@@ -458,4 +461,22 @@ mod tests {
+             StatusCode::INTERNAL_SERVER_ERROR
+         );
+     }
++
++    #[test]
++    fn test_prebuilt_read_only_is_forbidden() {
++        assert_eq!(
++            status(TemplateError::PrebuiltReadOnly(
++                "prebuilt_slack".to_string()
++            )),
++            StatusCode::FORBIDDEN
++        );
++    }
++
++    #[test]
++    fn test_reserved_name_is_bad_request() {
++        assert_eq!(
++            status(TemplateError::ReservedName("prebuilt_slack".to_string())),
++            StatusCode::BAD_REQUEST
++        );
++    }
+ }
+diff --git a/src/service/alerts/templates.rs b/src/service/alerts/templates.rs
+index f2871fc6c18..18523756a28 100644
+--- a/src/service/alerts/templates.rs
++++ b/src/service/alerts/templates.rs
+@@ -14,6 +14,12 @@
+ // along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ 
+ use config::meta::destinations::{Template, TemplateType};
++// The "is this a system-managed template?" check lives next to
++// `get_prebuilt_template` in `config::prebuilt_loader` so the HTTP model, the
++// service-layer guards below, and any future caller all derive the same
++// answer from one place. Re-exported here as a thin wrapper so existing
++// callers in this module keep working without a long path.
++pub use config::prebuilt_loader::is_prebuilt_template_name;
+ 
+ use crate::{
+     common::{
+@@ -48,6 +54,18 @@ pub async fn save(
+         return Err(TemplateError::EmptyTitle);
+     }
+ 
++    // Canonical `prebuilt_<type>` names are reserved for system-managed
++    // templates: users may not create new templates with one of those names.
++    // Editing existing prebuilt templates IS allowed (lets users tweak the
++    // global default payload); deletion is blocked separately in `delete()`
++    // since destinations may still reference them.
++    // System initializers (`ensure_prebuilt_template`,
++    // `ensure_system_templates`) write through the db layer directly and so
++    // bypass this guard intentionally.
++    if create && is_prebuilt_template_name(&template.name) {
++        return Err(TemplateError::ReservedName(template.name.clone()));
++    }
++
+     match db::alerts::templates::get(&template.org_id, &template.name).await {
+         Ok(existing) => {
+             if create {
+@@ -97,6 +115,11 @@ pub async fn list(
+ }
+ 
+ pub async fn delete(org_id: &str, name: &str) -> Result<(), TemplateError> {
++    // System prebuilt templates are read-only from the public API; deleting
++    // one would break every destination still referencing it.
++    if is_prebuilt_template_name(name) {
++        return Err(TemplateError::PrebuiltReadOnly(name.to_string()));
++    }
+     db::alerts::templates::delete(org_id, name).await?;
+     remove_ownership(org_id, "templates", Authz::new(name)).await;
+     Ok(())
+diff --git a/src/service/db/alerts/templates.rs b/src/service/db/alerts/templates.rs
+index 7afe356530d..36f350b0537 100644
+--- a/src/service/db/alerts/templates.rs
++++ b/src/service/db/alerts/templates.rs
+@@ -52,6 +52,16 @@ pub enum TemplateError {
+     DeleteWithAlert(String),
+     #[error("Template not found")]
+     NotFound,
++    #[error(
++        "Template '{0}' is a system prebuilt template and cannot be modified or deleted. \
++         Create a copy with a different name to customize it."
++    )]
++    PrebuiltReadOnly(String),
++    #[error(
++        "Template name '{0}' is reserved for system prebuilt templates. \
++         Pick a different name."
++    )]
++    ReservedName(String),
+ }
+ 
+ pub async fn get(org_id: &str, name: &str) -> Result<Template, TemplateError> {
+diff --git a/web/src/components/ai-assistant/welcome/CapabilityCards.vue b/web/src/components/ai-assistant/welcome/CapabilityCards.vue
+index 902464997b7..e0bda564416 100644
+--- a/web/src/components/ai-assistant/welcome/CapabilityCards.vue
++++ b/web/src/components/ai-assistant/welcome/CapabilityCards.vue
+@@ -18,9 +18,9 @@ const emit = defineEmits<{ (e: "select", prompt: string): void }>();
+       tabindex="0"
+       class="capability-card"
+       :data-accent="card.id"
+-      @click="emit('select', card.prompt)"
+-      @keydown.enter.prevent="emit('select', card.prompt)"
+-      @keydown.space.prevent="emit('select', card.prompt)"
++      @click="emit('select', t(`aiAssistant.capabilities.${card.id}.prompt`))"
++      @keydown.enter.prevent="emit('select', t(`aiAssistant.capabilities.${card.id}.prompt`))"
++      @keydown.space.prevent="emit('select', t(`aiAssistant.capabilities.${card.id}.prompt`))"
+     >
+       <span class="capability-card__glow" aria-hidden="true"></span>
+       <div class="capability-card__icon" :class="card.iconBgClass">
+diff --git a/web/src/components/ai-assistant/welcome/welcomeContent.ts b/web/src/components/ai-assistant/welcome/welcomeContent.ts
+index cf474a8e3d6..28121626886 100644
+--- a/web/src/components/ai-assistant/welcome/welcomeContent.ts
++++ b/web/src/components/ai-assistant/welcome/welcomeContent.ts
+@@ -4,7 +4,7 @@
+  */
+ 
+ export interface CapabilityCard {
+-  /** i18n key — under aiAssistant.capabilities.<id>.title */
++  /** i18n key — under aiAssistant.capabilities.<id>.{title,description,prompt} */
+   id: "query" | "incident" | "dashboard" | "alert";
+   /** OIcon registry name */
+   icon: string;
+@@ -12,8 +12,6 @@ export interface CapabilityCard {
+   iconColorClass: string;
+   /** Tailwind tinted background class for the icon chip */
+   iconBgClass: string;
+-  /** Pre-filled prompt to send when the card is clicked */
+-  prompt: string;
+ }
+ 
+ export const CAPABILITY_CARDS: CapabilityCard[] = [
+@@ -22,28 +20,24 @@ export const CAPABILITY_CARDS: CapabilityCard[] = [
+     icon: "edit",
+     iconColorClass: "tw:text-[#7B61FF]",
+     iconBgClass: "tw:bg-[#7B61FF]/10",
+-    prompt: "Help me write a query",
+   },
+   {
+     id: "incident",
+     icon: "warning",
+     iconColorClass: "tw:text-[#F59E0B]",
+     iconBgClass: "tw:bg-[#F59E0B]/10",
+-    prompt: "Help me investigate an incident",
+   },
+   {
+     id: "dashboard",
+     icon: "dashboard",
+     iconColorClass: "tw:text-[#10B981]",
+     iconBgClass: "tw:bg-[#10B981]/10",
+-    prompt: "Help me build a dashboard or panel",
+   },
+   {
+     id: "alert",
+     icon: "notifications",
+     iconColorClass: "tw:text-[#EF4444]",
+     iconBgClass: "tw:bg-[#EF4444]/10",
+-    prompt: "Help me create an alert or pipeline",
+   },
+ ];
+ 
+diff --git a/web/src/components/alerts/AddDestination.vue b/web/src/components/alerts/AddDestination.vue
+index 017e271154f..522e3da8659 100644
+--- a/web/src/components/alerts/AddDestination.vue
++++ b/web/src/components/alerts/AddDestination.vue
+@@ -155,6 +155,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+               <div class="tw:mt-2 tw:text-gray-400">Loading destination data...</div>
+             </div>
+ 
++            <!-- Template selector for prebuilt destinations -->
++            <div
++              v-if="
++                formData.destination_type &&
++                formData.destination_type !== 'custom'
++              "
++              class="tw:w-1/2 tw:py-1"
++            >
++              <OSelect
++                data-test="add-destination-prebuilt-template-select"
++                v-model="formData.template"
++                :label="t('alert_destinations.template')"
++                :options="prebuiltTemplateOptions"
++                labelKey="label"
++                valueKey="value"
++                tabindex="0"
++              />
++              <div class="tw:text-xs tw:text-gray-400 tw:mt-1">
++                {{ t('alert_destinations.templateHelp', {
++                  type: getDestinationTypeName(formData.destination_type),
++                  name: defaultPrebuiltTemplateName,
++                }) }}
++              </div>
++            </div>
++
+             <!-- Additional Settings for Prebuilt Destinations -->
+             <div class="tw:w-full tw:mt-3">
+               <div class="tw:font-bold tw:py-1">
+@@ -943,6 +968,14 @@ const setupDestinationData = () => {
+       // Sensitive fields containing "password", "key", or "token" are NOT saved to metadata for security
+ 
+       prebuiltCredentials.value = credentials;
++
++      // If the saved destination is using the standard prebuilt template,
++      // surface that as the "Default" option in the dropdown rather than
++      // the raw `prebuilt_<type>` name, so create and edit look the same.
++      const standardName = `prebuilt_${typeId}`;
++      if (formData.value.template === standardName) {
++        formData.value.template = DEFAULT_TEMPLATE_SENTINEL;
++      }
+     }
+ 
+     if (Object.keys(formData.value?.headers || {}).length) {
+@@ -975,6 +1008,54 @@ const getFormattedTemplates = computed(() =>
+     .map((template: any) => template.name),
+ );
+ 
++// Name of the prebuilt template the backend will auto-link if no override is
++// chosen (e.g. "prebuilt_slack"). Shown as the dropdown's default option.
++const defaultPrebuiltTemplateName = computed(() => {
++  if (
++    !formData.value.destination_type ||
++    formData.value.destination_type === "custom"
++  ) {
++    return "";
++  }
++  return `prebuilt_${formData.value.destination_type}`;
++});
++
++// Sentinel for the "use the backend default" option. OSelect treats the
++// empty string as "no selection" and would show the placeholder instead
++// of the option label, so we need a distinct value and translate it back
++// to `undefined` when calling the create/update composable.
++const DEFAULT_TEMPLATE_SENTINEL = "__default__";
++
++// Template choices for a prebuilt destination: a "Default" option whose
++// value is the sentinel above, plus any user templates of the matching
++// kind (email vs http).
++const prebuiltTemplateOptions = computed(() => {
++  const isEmailType = formData.value.destination_type === "email";
++  // Exclude all prebuilt templates: the DEFAULT sentinel already represents
++  // the canonical prebuilt_<type> for this destination, and showing other
++  // prebuilt templates (e.g. prebuilt_servicenow on a Slack destination)
++  // would allow cross-type mismatches.
++  const matching = props.templates.filter((template: any) => {
++    if (template.isPrebuilt) return false;
++    if (isEmailType) return template.type === "email";
++    return template.type !== "email";
++  });
++
++  const defaultLabel = t('alert_destinations.templateDefaultOption', {
++    name: defaultPrebuiltTemplateName.value,
++  });
++
++  const options: { label: string; value: string }[] = [
++    { label: defaultLabel, value: DEFAULT_TEMPLATE_SENTINEL },
++  ];
++
++  matching.forEach((template: any) => {
++    options.push({ label: template.name, value: template.name });
++  });
++
++  return options;
++});
++
+ const isValidDestination = computed(
+   () =>
+     formData.value.name &&
+@@ -1029,8 +1110,10 @@ const selectDestinationType = (type: string) => {
+     formData.value.url = "";
+     formData.value.template = "";
+   } else {
+-    // Set up prebuilt type
++    // Set up prebuilt type — pre-select the "Default" option so the field
++    // shows something instead of an empty placeholder.
+     formData.value.type = type === "email" ? "email" : "http";
++    formData.value.template = DEFAULT_TEMPLATE_SENTINEL;
+   }
+ };
+ 
+@@ -1088,6 +1171,13 @@ const saveDestination = async () => {
+         }
+       });
+ 
++      // The "Default" option (sentinel value) means "let the backend
++      // auto-link the prebuilt template"; any other value is a user-chosen
++      // custom template name.
++      const selected = formData.value.template?.trim();
++      const templateOverride =
++        selected && selected !== DEFAULT_TEMPLATE_SENTINEL ? selected : undefined;
++
+       if (isUpdatingDestination.value) {
+         // Update existing prebuilt destination
+         await updateDestination(
+@@ -1097,6 +1187,7 @@ const saveDestination = async () => {
+           prebuiltCredentials.value,
+           customHeaders, // custom headers
+           formData.value.skip_tls_verify || false, // skipTlsVerify
++          templateOverride,
+         );
+       } else {
+         // Create new prebuilt destination
+@@ -1106,6 +1197,7 @@ const saveDestination = async () => {
+           prebuiltCredentials.value,
+           customHeaders, // custom headers
+           formData.value.skip_tls_verify || false, // skipTlsVerify
++          templateOverride,
+         );
+       }
+ 
+@@ -1190,7 +1282,7 @@ const saveDestination = async () => {
+         emit("cancel:hideform");
+         toast({
+           variant: "success",
+-          message: `Destination saved successfully.`,
++          message: t('alert_destinations.saved'),
+         });
+       })
+       .catch((err: any) => {
+@@ -1220,7 +1312,7 @@ const saveDestination = async () => {
+         emit("cancel:hideform");
+         toast({
+           variant: "success",
+-          message: `Destination saved successfully.`,
++          message: t('alert_destinations.saved'),
+         });
+       })
+       .catch((err: any) => {
+diff --git a/web/src/components/alerts/AddTemplate.vue b/web/src/components/alerts/AddTemplate.vue
+index 13a530ed9cb..17a41e9c9ca 100644
+--- a/web/src/components/alerts/AddTemplate.vue
++++ b/web/src/components/alerts/AddTemplate.vue
+@@ -36,6 +36,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+           <div v-if="isUpdatingTemplate" class="tw:text-xl tw:font-semibold">
+             {{ t("alert_templates.updateTitle") }}
+           </div>
++          <div v-else-if="isClone" class="tw:text-xl tw:font-semibold">
++            {{ t("alert_templates.cloneTitle") }}
++          </div>
+           <div v-else class="tw:text-xl tw:font-semibold">
+             {{ t("alert_templates.addTitle") }}
+           </div>
+@@ -221,7 +224,18 @@ import { toast } from "@/lib/feedback/Toast/useToast";
+ import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+ import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
+ 
+-const props = defineProps<{ template: TemplateData | null }>();
++const props = withDefaults(
++  defineProps<{
++    template: TemplateData | null;
++    /**
++     * When true, the form is in "clone" mode: it pre-fills body/type/title
++     * from `template` but treats the save as a new template (so a renamed
++     * "Copy of X" is created instead of overwriting X).
++     */
++    isClone?: boolean;
++  }>(),
++  { isClone: false },
++);
+ const emit = defineEmits(["get:templates", "cancel:hideform"]);
+ 
+ const QueryEditor = defineAsyncComponent(
+@@ -291,7 +305,9 @@ const tabs = computed(() => [
+ const setupTemplateData = () => {
+   const params = router.currentRoute.value.query;
+   if (props.template) {
+-    isUpdatingTemplate.value = true;
++    // Clone mode pre-fills the form but stays in create mode so save
++    // produces a new template; edit mode would overwrite the original.
++    isUpdatingTemplate.value = !props.isClone;
+     formData.value.name = props.template.name;
+     formData.value.body = props.template.body;
+     formData.value.type = props.template.type;
+diff --git a/web/src/components/alerts/AlertsDestinationList.vue b/web/src/components/alerts/AlertsDestinationList.vue
+index 295b7462906..edec190e01c 100644
+--- a/web/src/components/alerts/AlertsDestinationList.vue
++++ b/web/src/components/alerts/AlertsDestinationList.vue
+@@ -26,7 +26,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+           <div class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]" data-test="alert-destinations-list-title">
+             {{ t("alert_destinations.header") }}
+           </div>
+-          <div class="tw:flex tw:justify-end tw:gap-2">
++          <div class="tw:flex tw:justify-end tw:gap-2 tw:items-center">
++            <OToggleGroup
++              :model-value="activeTab"
++              @update:model-value="(v) => { activeTab = v; }"
++              data-test="destination-list-tabs"
++              class="tw:mr-2"
++            >
++              <OToggleGroupItem value="all" size="sm" data-test="destination-tab-all">
++                <template #icon-left><OIcon name="format-list-bulleted" size="sm" /></template>
++                {{ t("alert_destinations.filterAll") }}
++              </OToggleGroupItem>
++              <OToggleGroupItem value="prebuilt" size="sm" data-test="destination-tab-prebuilt">
++                <template #icon-left><OIcon name="auto-awesome" size="sm" /></template>
++                {{ t("alert_destinations.filterPrebuilt") }}
++              </OToggleGroupItem>
++              <OToggleGroupItem value="custom" size="sm" data-test="destination-tab-custom">
++                <template #icon-left><OIcon name="settings" size="sm" /></template>
++                {{ t("alert_destinations.filterCustom") }}
++              </OToggleGroupItem>
++            </OToggleGroup>
+             <OSearchInput
+               v-model="filterQuery"
+               data-test="destination-list-search-input"
+@@ -109,6 +128,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+             </template>
+           </template>
+ 
++          <template #cell-template="{ row }">
++            <div
++              v-if="row.template"
++              class="tw:flex tw:items-center tw:gap-2 tw:min-w-0"
++              :data-test="`destination-template-${row.name}`"
++            >
++              <span
++                class="tw:truncate tw:min-w-0"
++                :title="row.template"
++              >{{ row.template }}</span>
++              <OBadge
++                v-if="isDefaultPrebuiltTemplate(row)"
++                :data-test="`destination-template-default-badge-${row.name}`"
++                variant="default"
++                class="tw:text-xs tw:flex-shrink-0"
++              >{{ t('alert_destinations.templateDefaultBadge') }}</OBadge>
++            </div>
++            <span v-else class="tw:text-gray-400">—</span>
++          </template>
++
+           <template #cell-type="{ row }">
+             <div class="tw:flex tw:items-center tw:gap-2">
+               <template v-if="getPrebuiltTypeName(row)">
+@@ -240,6 +279,8 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+ import OCheckbox from '@/lib/forms/Checkbox/OCheckbox.vue';
+ import OBadge from '@/lib/core/Badge/OBadge.vue';
+ import OTable from "@/lib/core/Table/OTable.vue";
++import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
++import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+ import { toast } from "@/lib/feedback/Toast/useToast";
+ 
+@@ -260,6 +301,8 @@ export default defineComponent({
+     OCheckbox,
+     OBadge,
+     OTable,
++    OToggleGroup,
++    OToggleGroupItem,
+   },
+   setup() {
+     const store = useStore();
+@@ -300,6 +343,14 @@ export default defineComponent({
+         size: 200,
+         meta: { align: "left" },
+       },
++      {
++        id: "template",
++        header: t("alert_destinations.template"),
++        accessorKey: "template",
++        sortable: true,
++        size: 280,
++        meta: { align: "left" },
++      },
+       {
+         id: "method",
+         header: t("alert_destinations.method"),
+@@ -576,6 +627,15 @@ export default defineComponent({
+       });
+     };
+ 
++    // True when the row's template name matches the canonical `prebuilt_<type>`
++    // for its detected prebuilt type — i.e. the user kept the default rather
++    // than picking a custom template. Used to show a "Default" badge.
++    const isDefaultPrebuiltTemplate = (destination: any): boolean => {
++      const prebuiltType = detectPrebuiltType(destination);
++      if (!prebuiltType) return false;
++      return destination.template === `prebuilt_${prebuiltType}`;
++    };
++
+     const getPrebuiltTypeName = (destination: DestinationPayload): string | null => {
+       const prebuiltType = detectPrebuiltType(destination);
+       if (!prebuiltType) return null;
+@@ -595,9 +655,23 @@ export default defineComponent({
+       return t("alert_destinations.custom");
+     };
+ 
++    // Top-right tab filter — mirrors the alerts list and templates list.
++    // "prebuilt" matches any destination detectable as a prebuilt type
++    // (Slack/Opsgenie/PagerDuty/ServiceNow/etc., identified via the
++    // `prebuilt_type` metadata or URL/template pattern); "custom" is the
++    // negation, capturing user-defined HTTP/Email/Action destinations.
++    const activeTab = ref<"all" | "prebuilt" | "custom">("all");
++
+     const visibleRows = computed(() => {
+-      if (!filterQuery.value) return destinations.value || [];
+-      return filterData(destinations.value || [], filterQuery.value);
++      const base = destinations.value || [];
++      const byTab =
++        activeTab.value === "prebuilt"
++          ? base.filter((d: any) => !!detectPrebuiltType(d))
++          : activeTab.value === "custom"
++            ? base.filter((d: any) => !detectPrebuiltType(d))
++            : base;
++      if (!filterQuery.value) return byTab;
++      return filterData(byTab, filterQuery.value);
+     });
+ 
+     const openBulkDeleteDialog = () => {
+@@ -711,6 +785,7 @@ export default defineComponent({
+       getDestinationByName,
+       resetEditingDestination,
+       visibleRows,
++      activeTab,
+       selectedDestinationIds,
+       handleSelectedIdsUpdate,
+       openBulkDeleteDialog,
+@@ -719,6 +794,7 @@ export default defineComponent({
+       selectedDestinations,
+       getPrebuiltTypeName,
+       getCustomDestinationLabel,
++      isDefaultPrebuiltTemplate,
+     };
+   },
+ });
+diff --git a/web/src/components/alerts/OrganizationDeduplicationSettings.vue b/web/src/components/alerts/OrganizationDeduplicationSettings.vue
+index 754de51ca06..705968d714a 100644
+--- a/web/src/components/alerts/OrganizationDeduplicationSettings.vue
++++ b/web/src/components/alerts/OrganizationDeduplicationSettings.vue
+@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+       </div>
+ 
+       <!-- Cross-Alert Fingerprint Groups -->
+-      <div class="tw:mb-6" v-if="localConfig.alert_dedup_enabled">
++      <div class="tw:mb-6" v-if="localConfig.enabled && localConfig.alert_dedup_enabled">
+         <div class="tw:font-semibold tw:pb-2 tw:flex tw:items-center">
+           {{ t('alerts.correlation.fingerprintGroups') }} <span class="tw:text-red-500 tw:ml-1">*</span>
+           <OIcon
+@@ -226,7 +226,7 @@ const emitUpdate = () => {
+ 
+ const saveSettings = async () => {
+   // Validate cross-alert dedup requires fingerprint groups
+-  if (localConfig.value.alert_dedup_enabled) {
++  if (localConfig.value.enabled && localConfig.value.alert_dedup_enabled) {
+     if (!localConfig.value.alert_fingerprint_groups ||
+         localConfig.value.alert_fingerprint_groups.length === 0) {
+       toast({
+@@ -239,7 +239,6 @@ const saveSettings = async () => {
+ 
+   saving.value = true;
+   try {
+-    // Sanitize: convert empty string/NaN time_window_minutes to null
+     const rawWindow = localConfig.value.time_window_minutes;
+     const configToSave = {
+       ...localConfig.value,
+diff --git a/web/src/components/alerts/TemplateList.spec.ts b/web/src/components/alerts/TemplateList.spec.ts
+index 4a15e66081e..298b0c6118d 100644
+--- a/web/src/components/alerts/TemplateList.spec.ts
++++ b/web/src/components/alerts/TemplateList.spec.ts
+@@ -94,7 +94,9 @@ describe("Alert List", async () => {
+       .findAll("td");
+     // Index 0 is the checkbox cell; actual data cells start at index 1.
+     expect(tableData[1].text()).toBe("01");
+-    expect(tableData[2].text()).toBe("Template2");
++    // The Name cell now includes a Prebuilt/Custom badge next to the name,
++    // so concat'd text() ends with the badge label (e.g. "Template2Custom").
++    expect(tableData[2].text()).toContain("Template2");
+   });
+ 
+   describe("When user clicks on delete alert", () => {
+diff --git a/web/src/components/alerts/TemplateList.vue b/web/src/components/alerts/TemplateList.vue
+index 3fdc1299927..d7c3d192739 100644
+--- a/web/src/components/alerts/TemplateList.vue
++++ b/web/src/components/alerts/TemplateList.vue
+@@ -23,7 +23,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+         <div class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]" data-test="alert-templates-list-title">
+             {{ t("alert_templates.header") }}
+           </div>
+-          <div class="tw:flex tw:justify-end tw:gap-2">
++          <div class="tw:flex tw:justify-end tw:gap-2 tw:items-center">
++            <OToggleGroup
++              :model-value="activeTab"
++              @update:model-value="(v: any) => { activeTab = v; }"
++              data-test="template-list-tabs"
++              class="tw:mr-2"
++            >
++              <OToggleGroupItem value="all" size="sm" data-test="template-tab-all">
++                <template #icon-left><OIcon name="format-list-bulleted" size="sm" /></template>
++                {{ t("alert_templates.filterAll") }}
++              </OToggleGroupItem>
++              <OToggleGroupItem value="prebuilt" size="sm" data-test="template-tab-prebuilt">
++                <template #icon-left><OIcon name="auto-awesome" size="sm" /></template>
++                {{ t("alert_templates.filterPrebuilt") }}
++              </OToggleGroupItem>
++              <OToggleGroupItem value="custom" size="sm" data-test="template-tab-custom">
++                <template #icon-left><OIcon name="settings" size="sm" /></template>
++                {{ t("alert_templates.filterCustom") }}
++              </OToggleGroupItem>
++            </OToggleGroup>
+             <OSearchInput
+               v-model="filterQuery"
+               class="tw:ml-auto"
+@@ -56,6 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+         :loading="loading"
+         :selected-ids="selectedTemplateIds"
+         selection="multiple"
++        :is-row-selectable="isTemplateRowSelectable"
+         pagination="client"
+         :page-size="20"
+         :page-size-options="[5, 10, 20, 50, 100]"
+@@ -69,6 +89,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+         <template #empty>
+           <NoData />
+         </template>
++        <template #cell-name="{ row }">
++          <div class="tw:flex tw:items-center tw:gap-2">
++            <span>{{ row.name }}</span>
++            <span
++              v-if="row.isPrebuilt"
++              class="dimension-badge badge-blue"
++              :title="t('alert_templates.prebuiltBadgeHint')"
++              data-test="alert-template-prebuilt-badge"
++            >{{ t('alert_templates.prebuiltBadge') }}</span>
++            <span
++              v-else
++              class="dimension-badge"
++              data-test="alert-template-custom-badge"
++            >{{ t('alert_templates.customBadge') }}</span>
++          </div>
++        </template>
+         <template #cell-actions="{ row }">
+           <OButton
+             title="Export Template"
+@@ -90,12 +126,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+           >
+             <OIcon name="edit" size="sm" />
+           </OButton>
++          <OButton
++            :data-test="`alert-template-list-${row.name}-clone-template`"
++            class="tw:ml-1"
++            variant="ghost"
++            size="icon-sm"
++            :title="t('alert_templates.clone')"
++            @click="cloneTemplate(row)"
++          >
++            <OIcon name="content-copy" size="sm" />
++          </OButton>
+           <OButton
+             :data-test="`alert-template-list-${row.name}-delete-template`"
+             class="tw:ml-1"
+             variant="ghost"
+             size="icon-sm"
+-            :title="t('alert_templates.delete')"
++            :title="row.isPrebuilt ? t('alert_templates.systemReadOnly') : t('alert_templates.delete')"
++            :disabled="row.isPrebuilt"
+             @click="conformDeleteDestination(row)"
+           >
+             <OIcon name="delete" size="sm" />
+@@ -124,6 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+     <div v-else-if="!showImportTemplate && showTemplateEditor">
+       <AddTemplate
+         :template="editingTemplate"
++        :is-clone="cloningTemplate"
+         @cancel:hideform="toggleTemplateEditor"
+         @get:templates="getTemplates"
+       />
+@@ -170,6 +218,8 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
+ import OButton from "@/lib/core/Button/OButton.vue";
+ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+ import OTable from "@/lib/core/Table/OTable.vue";
++import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
++import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+ import ImportTemplate from "./ImportTemplate.vue";
+ import { useReo } from "@/services/reodotdev_analytics";
+@@ -204,13 +254,16 @@ const columns: OTableColumnDef[] = [
+     header: t("alert_templates.actions"),
+     isAction: true,
+     pinned: "right",
+-    size: 120,
+-    meta: { align: "center", actionCount: 3 },
++    size: 150,
++    meta: { align: "center", actionCount: 4 },
+   },
+ ];
+ const showTemplateEditor = ref(false);
+ const showImportTemplate = ref(false);
+ const editingTemplate: Ref<TemplateData | null> = ref(null);
++// True when the editor was opened via the clone action — the AddTemplate
++// form should treat the prefilled data as a fresh template (not an update).
++const cloningTemplate = ref(false);
+ const resultTotal = ref<number>(0);
+ 
+ const confirmDelete: Ref<{
+@@ -220,6 +273,9 @@ const confirmDelete: Ref<{
+ const selectedTemplates: Ref<any[]> = ref([]);
+ const confirmBulkDelete = ref(false);
+ const filterQuery = ref("");
++// Top-right tab filter — mirrors the alerts list pattern. "prebuilt" shows
++// system templates (name starts with `prebuilt_`), "custom" shows the rest.
++const activeTab = ref<"all" | "prebuilt" | "custom">("all");
+ 
+ const selectedTemplateIds = computed(() =>
+   selectedTemplates.value.map((item: any) => item.name),
+@@ -227,8 +283,18 @@ const selectedTemplateIds = computed(() =>
+ 
+ const handleSelectedIdsUpdate = (ids: string[]) => {
+   const map = new Map(templates.value.map((r: any) => [r.name, r]));
+-  selectedTemplates.value = ids.map((id: any) => map.get(id)).filter(Boolean);
++  // OTable's "Select All" header ignores `isRowSelectable` and emits every
++  // visible row's id; strip prebuilt rows here so they can never land in the
++  // bulk-delete payload.
++  selectedTemplates.value = ids
++    .map((id: any) => map.get(id))
++    .filter((r: any) => r && !r.isPrebuilt);
+ };
++
++// Disables the individual row checkbox for prebuilt templates. The select-all
++// filtering happens in `handleSelectedIdsUpdate` above, since that's the only
++// signal we get when the header checkbox is used.
++const isTemplateRowSelectable = (row: any) => !row?.isPrebuilt;
+ onActivated(() => {
+   if (!templates.value.length) updateRoute();
+ });
+@@ -302,6 +368,7 @@ const editTemplate = (template: any = null) => {
+     });
+   }
+   resetEditingTemplate();
++  cloningTemplate.value = false;
+   toggleTemplateEditor();
+ 
+   const query: { [key: string]: string } = {
+@@ -334,6 +401,30 @@ const editTemplate = (template: any = null) => {
+ const resetEditingTemplate = () => {
+   editingTemplate.value = null;
+ };
++const cloneTemplate = (template: any) => {
++  track("Button Click", {
++    button: "Clone Template",
++    page: "Alert Templates",
++  });
++  // Pre-fill the editor with a copy of the source template. AddTemplate
++  // treats this as a create (since isClone=true), so the user can rename
++  // and save without overwriting the original.
++  // Underscored prefix because template names reject spaces and the other
++  // reserved characters (':', '#', '?', '&', '%', '/', quotes).
++  editingTemplate.value = {
++    ...template,
++    name: `Copy_of_${template.name}`,
++  };
++  cloningTemplate.value = true;
++  showTemplateEditor.value = true;
++  router.push({
++    name: "alertTemplates",
++    query: {
++      action: "add",
++      org_identifier: store.state.selectedOrganization.identifier,
++    },
++  });
++};
+ const deleteTemplate = () => {
+   if (confirmDelete.value?.data?.name) {
+     templateService
+@@ -419,8 +510,15 @@ const exportTemplate = (row: any) => {
+ };
+ 
+ const visibleRows = computed(() => {
+-  if (!filterQuery.value) return templates.value || [];
+-  return filterData(templates.value || [], filterQuery.value);
++  const base = templates.value || [];
++  const byTab =
++    activeTab.value === "prebuilt"
++      ? base.filter((t: any) => !!t.isPrebuilt)
++      : activeTab.value === "custom"
++        ? base.filter((t: any) => !t.isPrebuilt)
++        : base;
++  if (!filterQuery.value) return byTab;
++  return filterData(byTab, filterQuery.value);
+ });
+ // Watch visibleRows to sync resultTotal with search filter
+ watch(
+@@ -482,4 +580,40 @@ const bulkDeleteTemplates = () => {
+     });
+ };
+ </script>
+-<style lang=""></style>
++<style lang="scss" scoped>
++// Badge style copied from ModelPricingList.vue so the "Prebuilt" / "Default"
++// labels match the LLM-pricing list visually.
++.dimension-badge {
++  display: inline-flex;
++  align-items: center;
++  gap: 2px;
++  padding: 2px 8px;
++  border-radius: 6px;
++  font-size: 11px;
++  font-weight: 500;
++  white-space: nowrap;
++  border: 1px solid #d1d5db;
++  color: inherit;
++}
++
++.badge-blue {
++  border: 1px solid #1d4ed8;
++}
++
++.badge-green {
++  border: 1px solid #065f46;
++}
++
++:global(body.body--dark) .dimension-badge {
++  color: #ffffff;
++  border-color: #4b5563;
++}
++
++:global(body.body--dark) .badge-blue {
++  border-color: #93c5fd;
++}
++
++:global(body.body--dark) .badge-green {
++  border-color: #6ee7b7;
++}
++</style>
+diff --git a/web/src/components/settings/index.vue b/web/src/components/settings/index.vue
+index e11b1bda60d..50944218c8a 100644
+--- a/web/src/components/settings/index.vue
++++ b/web/src/components/settings/index.vue
+@@ -224,7 +224,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+                   :label="t('regex_patterns.title')"
+                 />
+                 <ORouteTab
+-                  v-if="config.isEnterprise == 'true' && store.state.zoConfig.service_streams_enabled !== false"
++                  v-if="config.isEnterprise == 'true'"
+                   data-test="correlation-settings-tab"
+                   name="correlation_settings"
+                   :to="{
+diff --git a/web/src/composables/usePrebuiltDestinations.ts b/web/src/composables/usePrebuiltDestinations.ts
+index 4800a1440f9..65c65e76d5b 100644
+--- a/web/src/composables/usePrebuiltDestinations.ts
++++ b/web/src/composables/usePrebuiltDestinations.ts
+@@ -434,13 +434,18 @@ export function usePrebuiltDestinations() {
+ 
+   /**
+    * Create a prebuilt destination with auto-linked template
++   *
++   * `templateOverride` lets callers attach a user-chosen custom template
++   * instead of the standard `prebuilt_<type>` one — required to let multiple
++   * destinations of the same prebuilt type use different message bodies.
+    */
+   async function createDestination(
+     type: PrebuiltTypeId,
+     name: string,
+     credentials: Record<string, any>,
+     headers: Record<string, string> = {},
+-    skipTlsVerify: boolean = false
++    skipTlsVerify: boolean = false,
++    templateOverride?: string
+   ): Promise<void> {
+     try {
+       isLoading.value = true;
+@@ -462,6 +467,7 @@ export function usePrebuiltDestinations() {
+       // Generate destination data
+       const destinationUrl = generateDestinationUrl(type, credentials);
+       const destinationHeaders = generateDestinationHeaders(type, credentials);
++      const templateName = templateOverride?.trim() || config.templateName;
+ 
+       // Create destination payload
+       // Email destinations use different payload structure than HTTP destinations
+@@ -472,7 +478,7 @@ export function usePrebuiltDestinations() {
+         destinationData = {
+           name,
+           type: 'email',
+-          template: config.templateName, // Include template for email
++          template: templateName,
+           skip_tls_verify: skipTlsVerify,
+           output_format: 'json',
+           destination_type_name: type,
+@@ -496,7 +502,7 @@ export function usePrebuiltDestinations() {
+           type: 'http',
+           url: destinationUrl,
+           method: config.method,
+-          template: config.templateName, // Include template for all destinations
++          template: templateName,
+           skip_tls_verify: skipTlsVerify,
+           headers: { ...destinationHeaders, ...headers },
+           output_format: 'json',
+@@ -533,7 +539,7 @@ export function usePrebuiltDestinations() {
+ 
+       toast({
+         variant: "success",
+-        message: t('alerts.destinations.saved'),
++        message: t('alert_destinations.saved'),
+       });
+ 
+     } catch (error: any) {
+@@ -550,6 +556,11 @@ export function usePrebuiltDestinations() {
+ 
+   /**
+    * Update an existing prebuilt destination
++   *
++   * `templateOverride` mirrors the create path: when non-empty it replaces
++   * the standard `prebuilt_<type>` template so a user can swap a prebuilt
++   * destination over to a custom message body without dropping the prebuilt
++   * destination type.
+    */
+   async function updateDestination(
+     type: PrebuiltTypeId,
+@@ -557,7 +568,8 @@ export function usePrebuiltDestinations() {
+     name: string,
+     credentials: Record<string, any>,
+     headers: Record<string, string> = {},
+-    skipTlsVerify: boolean = false
++    skipTlsVerify: boolean = false,
++    templateOverride?: string
+   ): Promise<void> {
+     try {
+       isLoading.value = true;
+@@ -576,6 +588,7 @@ export function usePrebuiltDestinations() {
+       // Generate destination data
+       const destinationUrl = generateDestinationUrl(type, credentials);
+       const destinationHeaders = generateDestinationHeaders(type, credentials);
++      const templateName = templateOverride?.trim() || config.templateName;
+ 
+       // Build update payload (same structure as create)
+       let destinationData: any;
+@@ -584,7 +597,7 @@ export function usePrebuiltDestinations() {
+         destinationData = {
+           name,
+           type: 'email',
+-          template: config.templateName,
++          template: templateName,
+           skip_tls_verify: skipTlsVerify,
+           output_format: 'json',
+           destination_type_name: type,
+@@ -606,7 +619,7 @@ export function usePrebuiltDestinations() {
+           type: 'http',
+           url: destinationUrl,
+           method: config.method,
+-          template: config.templateName,
++          template: templateName,
+           skip_tls_verify: skipTlsVerify,
+           headers: { ...destinationHeaders, ...headers },
+           output_format: 'json',
+@@ -652,7 +665,7 @@ export function usePrebuiltDestinations() {
+ 
+       toast({
+         variant: "success",
+-        message: t('alerts.destinations.saved'),
++        message: t('alert_destinations.saved'),
+       });
+ 
+     } catch (error: any) {
+diff --git a/web/src/lib/core/Table/OTable.vue b/web/src/lib/core/Table/OTable.vue
+index 366ee2e2d9d..923bb1da544 100644
+--- a/web/src/lib/core/Table/OTable.vue
++++ b/web/src/lib/core/Table/OTable.vue
+@@ -236,6 +236,10 @@ const selection = useTableSelection(table, {
+   selection: props.selection,
+   get selectedIds() { return props.selectedIds; },
+   rowKey: props.rowKey,
++  // Forward the per-row guard so "Select All" only toggles rows the caller
++  // marked selectable. Without this, parents that drop non-selectable rows
++  // from `selectedIds` can never reach a fully-selected state and the header
++  // checkbox stays stuck in "select" mode forever.
+   get isRowSelectable() { return props.isRowSelectable; },
+ }, emit);
+ 
+diff --git a/web/src/lib/core/Table/composables/useTableSelection.ts b/web/src/lib/core/Table/composables/useTableSelection.ts
+index ec6201864b5..6de6cb847f3 100644
+--- a/web/src/lib/core/Table/composables/useTableSelection.ts
++++ b/web/src/lib/core/Table/composables/useTableSelection.ts
+@@ -10,6 +10,16 @@ export function useTableSelection<TData>(
+     selection: OTableSelectionMode;
+     selectedIds?: string[];
+     rowKey?: string;
++    /**
++     * Predicate that decides whether a row participates in selection. When
++     * provided, "Select All" and the indeterminate / all-selected state of
++     * the header checkbox only consider rows that pass this predicate.
++     * Without this, a parent that filters non-selectable rows out of the
++     * controlled `selectedIds` would break the header toggle: `allSelected`
++     * could never become true (because the visible non-selectable rows are
++     * never in the set), so the header could only ever select, never
++     * deselect.
++     */
+     isRowSelectable?: (row: TData) => boolean;
+   },
+   emit: any,
+@@ -56,16 +66,17 @@ export function useTableSelection<TData>(
+     emitSelection(newSet);
+   }
+ 
+-  function getSelectableRows(): TData[] {
+-    const rows = table.getRowModel().rows.map((r) => r.original);
++  function selectableRows(): Row<TData>[] {
++    const rows = table.getRowModel().rows;
+     if (!props.isRowSelectable) return rows;
+-    return rows.filter((row) => props.isRowSelectable!(row));
++    return rows.filter((r) => props.isRowSelectable!(r.original));
+   }
+ 
+   function toggleAllRows() {
+     const newSet = new Set(localSelectedIds.value);
+-    const selectableRows = props.selection === "multiple" ? getSelectableRows() : [];
+-    const allIds = selectableRows.map((row) => getRowId(row));
++    const allIds = props.selection === "multiple"
++      ? selectableRows().map((r) => getRowId(r.original))
++      : [];
+ 
+     if (allIds.length === 0) return;
+ 
+@@ -82,16 +93,16 @@ export function useTableSelection<TData>(
+   }
+ 
+   function isAllSelected(): boolean {
+-    const selectableRows = getSelectableRows();
+-    if (selectableRows.length === 0) return false;
+-    return selectableRows.every((row) => isRowSelected(row));
++    const rows = selectableRows();
++    if (rows.length === 0) return false;
++    return rows.every((r) => isRowSelected(r.original));
+   }
+ 
+   function isIndeterminate(): boolean {
+-    const selectableRows = getSelectableRows();
+-    if (selectableRows.length === 0) return false;
+-    const selectedCount = selectableRows.filter((row) => isRowSelected(row)).length;
+-    return selectedCount > 0 && selectedCount < selectableRows.length;
++    const rows = selectableRows();
++    if (rows.length === 0) return false;
++    const selectedCount = rows.filter((r) => isRowSelected(r.original)).length;
++    return selectedCount > 0 && selectedCount < rows.length;
+   }
+ 
+   function clearSelection() {
+diff --git a/web/src/locales/languages/de.json b/web/src/locales/languages/de.json
+index 80443745dff..8f3efdb0d22 100644
+--- a/web/src/locales/languages/de.json
++++ b/web/src/locales/languages/de.json
+@@ -2351,7 +2351,16 @@
+     "delete": "Löschen",
+     "variable_guide_header": "Leitfaden für Vorlagenvariablen",
+     "variable_usage_examples": "Beispiele für die Verwendung",
+-    "body": "Inhalt"
++    "body": "Inhalt",
++    "clone": "Klonen",
++    "cloneTitle": "Vorlage klonen",
++    "systemReadOnly": "Vorgefertigte Vorlage — Löschen ist deaktiviert. Klonen Sie sie, um eine modifizierbare Kopie zu erstellen.",
++    "prebuiltBadge": "Vorgefertigt",
++    "prebuiltBadgeHint": "Wird vom System verwaltet. Sie können bearbeiten, aber das Löschen ist deaktiviert.",
++    "customBadge": "Benutzerdefiniert",
++    "filterAll": "Alle",
++    "filterPrebuilt": "Vorgefertigt",
++    "filterCustom": "Benutzerdefiniert"
+   },
+   "alert_destinations": {
+     "header": "Ziele",
+@@ -2388,7 +2397,13 @@
+     "custom": "Benutzerdefiniert",
+     "separator": "Trennzeichen",
+     "separator_placeholder": "Geben Sie ein Trennzeichen ein (z. B. |,\\n,\\ t, Leerzeichen)",
+-    "separator_hint": "Trennzeichenfolge, die zwischen Datensätzen verwendet werden soll (Leerzeichen erlaubt)"
++    "separator_hint": "Trennzeichenfolge, die zwischen Datensätzen verwendet werden soll (Leerzeichen erlaubt)",
++    "filterAll": "Alle",
++    "filterPrebuilt": "Vorgefertigt",
++    "filterCustom": "Benutzerdefiniert",
++    "templateDefaultBadge": "Standard",
++    "templateDefaultOption": "Default ({name})",
++    "templateHelp": "Leave as default to use the standard {type} template ({name}), or pick a custom one."
+   },
+   "metrics": {
+     "searchMetric": "Suchen Sie nach einer Metrik",
+@@ -3890,19 +3905,23 @@
+     "capabilities": {
+       "query": {
+         "title": "Schreiben Sie eine Anfrage",
+-        "description": "SQL für Logs, Traces, RUM oder PromQL für Metriken."
++        "description": "SQL für Logs, Traces, RUM oder PromQL für Metriken.",
++        "prompt": "Hilf mir, eine Anfrage zu schreiben"
+       },
+       "incident": {
+         "title": "Vorfälle untersuchen",
+-        "description": "Ursache für Logs, Traces und Alerts — z. B. „Warum hat Gateway-5xx gezündet?“"
++        "description": "Ursache für Logs, Traces und Alerts — z. B. „Warum hat Gateway-5xx gezündet?“",
++        "prompt": "Hilf mir, einen Vorfall zu untersuchen"
+       },
+       "dashboard": {
+         "title": "Erstellen Sie ein Dashboard",
+-        "description": "Aus einem Thema — z. B. „Zustand des K8s-Knotens: CPU, Speicher, Neustarts“. Erstellt auch Panels."
++        "description": "Aus einem Thema — z. B. „Zustand des K8s-Knotens: CPU, Speicher, Neustarts“. Erstellt auch Panels.",
++        "prompt": "Hilf mir, ein Dashboard zu erstellen"
+       },
+       "alert": {
+         "title": "Eine Warnung erstellen",
+-        "description": "Schwellenwerte oder geplante Warnungen und VRL-Pipelines zum Zeitpunkt der Aufnahme."
++        "description": "Schwellenwerte oder geplante Warnungen und VRL-Pipelines zum Zeitpunkt der Aufnahme.",
++        "prompt": "Hilf mir, eine Warnung zu erstellen"
+       }
+     },
+     "suggestions": {
+diff --git a/web/src/locales/languages/en.json b/web/src/locales/languages/en.json
+index 3cc9f54b8b6..9257033d9f3 100644
+--- a/web/src/locales/languages/en.json
++++ b/web/src/locales/languages/en.json
+@@ -252,7 +252,6 @@
+     "legendLabel": "Legend",
+     "logs": "Logs",
+     "traces": "Traces",
+-    "metrics": "Metrics",
+     "enrichmentTables": "Enrichment Tables",
+     "switchToLogs": "click to switch back to Logs",
+     "savedViewsLabel": "Saved View",
+@@ -2070,19 +2069,23 @@
+     "capabilities": {
+       "query": {
+         "title": "Write a Query",
+-        "description": "SQL for logs, traces, RUM, or PromQL for metrics."
++        "description": "SQL for logs, traces, RUM, or PromQL for metrics.",
++        "prompt": "Help me write a query"
+       },
+       "incident": {
+         "title": "Investigate Incidents",
+-        "description": "Root-cause across logs, traces, alerts — e.g. \"Why did gateway-5xx fire?\""
++        "description": "Root-cause across logs, traces, alerts — e.g. \"Why did gateway-5xx fire?\"",
++        "prompt": "Help me investigate an incident"
+       },
+       "dashboard": {
+         "title": "Build a Dashboard",
+-        "description": "From a topic — e.g. \"K8s node health: CPU, memory, restarts\". Also creates panels."
++        "description": "From a topic — e.g. \"K8s node health: CPU, memory, restarts\". Also creates panels.",
++        "prompt": "Help me build a dashboard or panel"
+       },
+       "alert": {
+         "title": "Create an Alert",
+-        "description": "Threshold or scheduled alerts, and ingest-time VRL pipelines."
++        "description": "Threshold or scheduled alerts, and ingest-time VRL pipelines.",
++        "prompt": "Help me create an alert or pipeline"
+       }
+     },
+     "suggestions": {
+@@ -2715,7 +2718,7 @@
+       "selectTemplate": "Select Template"
+     },
+     "editJson": "Edit Alert JSON",
+-    "additional_settings":"Additional Settings",
++    "additional_settings": "Additional Settings",
+     "alertNamePlaceholder": "Alert name",
+     "nameRequired": "Alert name is required.",
+     "nameNoSpecialChars": "Alert name cannot contain ':', '#', '?', '&', '%', quotes or space characters. Use underscores (_) instead.",
+@@ -2783,13 +2786,26 @@
+     "delete": "Delete",
+     "variable_guide_header": "Template Variable Guide",
+     "variable_usage_examples": "Usage Examples",
+-    "body": "Body"
++    "body": "Body",
++    "clone": "Clone",
++    "cloneTitle": "Clone template",
++    "systemReadOnly": "Prebuilt template — delete is disabled. Clone it to make a modifiable copy.",
++    "prebuiltBadge": "Prebuilt",
++    "prebuiltBadgeHint": "Managed by the system. You can edit, but deletion is disabled.",
++    "customBadge": "Custom",
++    "filterAll": "All",
++    "filterPrebuilt": "Prebuilt",
++    "filterCustom": "Custom"
+   },
+   "alert_destinations": {
+     "header": "Notification Destinations",
+     "add": "New destination",
+     "edit": "Edit",
+     "search": "Search destination",
++    "filterAll": "All",
++    "filterPrebuilt": "Prebuilt",
++    "filterCustom": "Custom",
++    "templateDefaultBadge": "Default",
+     "name": "Name",
+     "destination_type": "Destination Type",
+     "template": "Template",
+@@ -2820,7 +2836,9 @@
+     "custom": "Custom",
+     "separator": "Separator",
+     "separator_placeholder": "Enter separator (e.g., |, \\n, \\t, space)",
+-    "separator_hint": "Separator string to use between records (spaces allowed)"
++    "separator_hint": "Separator string to use between records (spaces allowed)",
++    "templateDefaultOption": "Default ({name})",
++    "templateHelp": "Leave as default to use the standard {type} template ({name}), or pick a custom one."
+   },
+   "pipeline_destinations": {
+     "header": "Pipeline Destinations",
+@@ -3332,7 +3350,7 @@
+       "criteriaFromTemplate": "Evaluation Criteria (from template)",
+       "criteriaDifferentTemplate": "Evaluation Criteria (different template — for reference only)",
+       "criteriaTemplateMismatchNote": "These criteria belong to {template}, not the template that ran this evaluation ({evaluated}).",
+-      "criteriaSyntaxNote": "Placeholders like \u007bquery\u007d, \u007bresponse\u007d, \u007bmodel\u007d are substituted at evaluation time and shown here in their raw template form.",
++      "criteriaSyntaxNote": "Placeholders like {query}, {response}, {model} are substituted at evaluation time and shown here in their raw template form.",
+       "recommendedFixes": "Recommended Fixes",
+       "fixSuggestion": "Suggestion:",
+       "weakestDimension": "Weakest Dimension:",
+diff --git a/web/src/locales/languages/es.json b/web/src/locales/languages/es.json
+index a8c1640e479..efb277927a8 100644
+--- a/web/src/locales/languages/es.json
++++ b/web/src/locales/languages/es.json
+@@ -2351,7 +2351,16 @@
+     "delete": "Eliminar",
+     "variable_guide_header": "Guía de variables de plantilla",
+     "variable_usage_examples": "Ejemplos de uso",
+-    "body": "Cuerpo"
++    "body": "Cuerpo",
++    "clone": "Clon",
++    "cloneTitle": "Plantilla de clonación",
++    "systemReadOnly": "Plantilla prediseñada: la eliminación está deshabilitada. Clónala para hacer una copia modificable.",
++    "prebuiltBadge": "Preconstruido",
++    "prebuiltBadgeHint": "Gestionado por el sistema. Puede editar, pero la eliminación está deshabilitada.",
++    "customBadge": "Personalizado",
++    "filterAll": "Todas",
++    "filterPrebuilt": "Preconstruido",
++    "filterCustom": "Personalizado"
+   },
+   "alert_destinations": {
+     "header": "Destinos",
+@@ -2388,7 +2397,13 @@
+     "custom": "Personalizado",
+     "separator": "Separador",
+     "separator_placeholder": "Introduzca un separador (p. ej., |,\\n,\\ t, espacio)",
+-    "separator_hint": "Cadena separadora para usar entre registros (se permiten espacios)"
++    "separator_hint": "Cadena separadora para usar entre registros (se permiten espacios)",
++    "filterAll": "Todas",
++    "filterPrebuilt": "Preconstruido",
++    "filterCustom": "Personalizado",
++    "templateDefaultBadge": "Predeterminado",
++    "templateDefaultOption": "Default ({name})",
++    "templateHelp": "Leave as default to use the standard {type} template ({name}), or pick a custom one."
+   },
+   "metrics": {
+     "searchMetric": "Buscar una métrica",
+@@ -3888,19 +3903,23 @@
+     "capabilities": {
+       "query": {
+         "title": "Escribe una consulta",
+-        "description": "SQL para registros, seguimientos, RUM o PromQL para métricas."
++        "description": "SQL para registros, seguimientos, RUM o PromQL para métricas.",
++        "prompt": "Ayúdame a escribir una consulta"
+       },
+       "incident": {
+         "title": "Investigue los incidentes",
+-        "description": "Causa raíz en registros, rastreos y alertas, por ejemplo, «¿Por qué se activó Gateway-5xx?»"
++        "description": "Causa raíz en registros, rastreos y alertas, por ejemplo, «¿Por qué se activó Gateway-5xx?»",
++        "prompt": "Ayúdame a investigar los incidentes"
+       },
+       "dashboard": {
+         "title": "Cree un tablero",
+-        "description": "De un tema, por ejemplo, «Estado del nodo K8: CPU, memoria, reinicios». También crea paneles."
++        "description": "De un tema, por ejemplo, «Estado del nodo K8: CPU, memoria, reinicios». También crea paneles.",
++        "prompt": "Ayúdame a crear un tablero"
+       },
+       "alert": {
+         "title": "Crear una alerta",
+-        "description": "Alertas de umbral o programadas y canalizaciones de VRL de tiempo de ingesta."
++        "description": "Alertas de umbral o programadas y canalizaciones de VRL de tiempo de ingesta.",
++        "prompt": "Ayúdame a crear una alerta"
+       }
+     },
+     "suggestions": {
+diff --git a/web/src/locales/languages/fr.json b/web/src/locales/languages/fr.json
+index 1cabc67e9df..163baf552d8 100644
+--- a/web/src/locales/languages/fr.json
++++ b/web/src/locales/languages/fr.json
+@@ -2351,7 +2351,16 @@
+     "delete": "Supprimer",
+     "variable_guide_header": "Guide des variables du modèle",
+     "variable_usage_examples": "Exemples d'utilisation",
+-    "body": "Corps"
++    "body": "Corps",
++    "clone": "Cloner",
++    "cloneTitle": "Modèle de clonage",
++    "systemReadOnly": "Modèle prédéfini : la suppression est désactivée. Clonez-le pour en faire une copie modifiable.",
++    "prebuiltBadge": "Préconstruit",
++    "prebuiltBadgeHint": "Géré par le système. Vous pouvez modifier, mais la suppression est désactivée.",
++    "customBadge": "Personnalisé",
++    "filterAll": "Tous",
++    "filterPrebuilt": "Préconstruit",
++    "filterCustom": "Personnalisé"
+   },
+   "alert_destinations": {
+     "header": "Destinations",
+@@ -2388,7 +2397,13 @@
+     "custom": "Personnalisé",
+     "separator": "Séparateur",
+     "separator_placeholder": "Entrez un séparateur (par exemple, |,\\n, \\ t, espace)",
+-    "separator_hint": "Chaîne de séparation à utiliser entre les enregistrements (espaces autorisés)"
++    "separator_hint": "Chaîne de séparation à utiliser entre les enregistrements (espaces autorisés)",
++    "filterAll": "Tous",
++    "filterPrebuilt": "Préconstruit",
++    "filterCustom": "Personnalisé",
++    "templateDefaultBadge": "Par défaut",
++    "templateDefaultOption": "Default ({name})",
++    "templateHelp": "Leave as default to use the standard {type} template ({name}), or pick a custom one."
+   },
+   "metrics": {
+     "searchMetric": "Rechercher une métrique",
+@@ -3890,19 +3905,23 @@
+     "capabilities": {
+       "query": {
+         "title": "Rédiger une requête",
+-        "description": "SQL pour les logs, les traces, RUM ou ProMQL pour les métriques."
++        "description": "SQL pour les logs, les traces, RUM ou ProMQL pour les métriques.",
++        "prompt": "Aide-moi à rédiger une requête"
+       },
+       "incident": {
+         "title": "Étudier les incidents",
+-        "description": "Cause première parmi les journaux, les traces et les alertes, par exemple « Pourquoi la passerelle -5xx s'est-elle déclenchée ? »"
++        "description": "Cause première parmi les journaux, les traces et les alertes, par exemple « Pourquoi la passerelle -5xx s'est-elle déclenchée ? »",
++        "prompt": "Aide-moi à étudier les incidents"
+       },
+       "dashboard": {
+         "title": "Créez un tableau de bord",
+-        "description": "À partir d'un sujet, par exemple « État du nœud K8s : processeur, mémoire, redémarrages ». Crée également des panneaux."
++        "description": "À partir d'un sujet, par exemple « État du nœud K8s : processeur, mémoire, redémarrages ». Crée également des panneaux.",
++        "prompt": "Aide-moi à créer un tableau de bord"
+       },
+       "alert": {
+         "title": "Créer une alerte",
+-        "description": "Alertes à seuil ou planifiées et pipelines VRL à durée d'ingestion."
++        "description": "Alertes à seuil ou planifiées et pipelines VRL à durée d'ingestion.",
++        "prompt": "Aide-moi à créer une alerte"
+       }
+     },
+     "suggestions": {
+diff --git a/web/src/locales/languages/it.json b/web/src/locales/languages/it.json
+index a97a8e0a199..0d55fdaad7a 100644
+--- a/web/src/locales/languages/it.json
++++ b/web/src/locales/languages/it.json
+@@ -2349,7 +2349,16 @@
+     "delete": "Elimina",
+     "variable_guide_header": "Guida alle variabili dei modelli",
+     "variable_usage_examples": "Esempi di utilizzo",
+-    "body": "Corpo"
++    "body": "Corpo",
++    "clone": "Clona",
++    "cloneTitle": "Modello di clonazione",
++    "systemReadOnly": "Modello predefinito: l'eliminazione è disabilitata. Clonalo per creare una copia modificabile.",
++    "prebuiltBadge": "Precostruito",
++    "prebuiltBadgeHint": "Gestito dal sistema. È possibile modificare, ma l'eliminazione è disabilitata.",
++    "customBadge": "Personalizzato",
++    "filterAll": "Tutti",
++    "filterPrebuilt": "Precostruito",
++    "filterCustom": "Personalizzato"
+   },
+   "alert_destinations": {
+     "header": "Destinazioni",
+@@ -2386,7 +2395,13 @@
+     "custom": "Personalizzato",
+     "separator": "Separatore",
+     "separator_placeholder": "Inserisci un separatore (ad esempio, |,\\n,\\ t, spazio)",
+-    "separator_hint": "Stringa separatrice da utilizzare tra i record (spazi consentiti)"
++    "separator_hint": "Stringa separatrice da utilizzare tra i record (spazi consentiti)",
++    "filterAll": "Tutti",
++    "filterPrebuilt": "Precostruito",
++    "filterCustom": "Personalizzato",
++    "templateDefaultBadge": "Predefinito",
++    "templateDefaultOption": "Default ({name})",
++    "templateHelp": "Leave as default to use the standard {type} template ({name}), or pick a custom one."
+   },
+   "metrics": {
+     "searchMetric": "Cerca una metrica",
+@@ -3899,19 +3914,23 @@
+     "capabilities": {
+       "query": {
+         "title": "Scrivere una richiesta",
+-        "description": "SQL per log, trace, RUM o ProMQL per le metriche."
++        "description": "SQL per log, trace, RUM o ProMQL per le metriche.",
++        "prompt": "Aiutami a scrivere una richiesta"
+       },
+       "incident": {
+         "title": "Indagare sugli incidenti",
+-        "description": "Causa principale nei log, nelle tracce e negli avvisi, ad esempio «Perché il gateway-5xx si è attivato?»"
++        "description": "Causa principale nei log, nelle tracce e negli avvisi, ad esempio «Perché il gateway-5xx si è attivato?»",
++        "prompt": "Aiutami a indagare sugli incidenti"
+       },
+       "dashboard": {
+         "title": "Crea una dashboard",
+-        "description": "Da un argomento, ad esempio «Stato del nodo K8s: CPU, memoria, riavvii». Crea anche pannelli."
++        "description": "Da un argomento, ad esempio «Stato del nodo K8s: CPU, memoria, riavvii». Crea anche pannelli.",
++        "prompt": "Aiutami a creare una dashboard o un pannello"
+       },
+       "alert": {
+         "title": "Crea un avviso",
+-        "description": "Avvisi di soglia o pianificati e pipeline VRL in fase di inserimento."
++        "description": "Avvisi di soglia o pianificati e pipeline VRL in fase di inserimento.",
++        "prompt": "Aiutami a creare un avviso o una pipeline"
+       }
+     },
+     "suggestions": {
+diff --git a/web/src/locales/languages/ja.json b/web/src/locales/languages/ja.json
+index fb821588a26..6bd758d5781 100644
+--- a/web/src/locales/languages/ja.json
++++ b/web/src/locales/languages/ja.json
+@@ -2368,7 +2368,16 @@
+     "delete": "削除",
+     "variable_guide_header": "テンプレート変数ガイド",
+     "variable_usage_examples": "使用例",
+-    "body": "ボディ"
++    "body": "ボディ",
++    "clone": "クローン",
++    "cloneTitle": "テンプレートを複製",
++    "systemReadOnly": "ビルド済みテンプレート — 削除は無効になっています。クローンを作成して、変更可能なコピーを作成します。",
++    "prebuiltBadge": "構築済み",
++    "prebuiltBadgeHint": "システムによって管理されます。編集はできますが、削除はできません。",
++    "customBadge": "カスタム",
++    "filterAll": "[すべて]",
++    "filterPrebuilt": "構築済み",
++    "filterCustom": "カスタム"
+   },
+   "alert_destinations": {
+     "header": "アラート送信先",
+@@ -2405,7 +2414,13 @@
+     "custom": "カスタム",
+     "separator": "セパレーター",
+     "separator_placeholder": "セパレータを入力してください (例:|、\\n、\\ t、スペース)",
+-    "separator_hint": "レコード間に使用する区切り文字列 (スペース可)"
++    "separator_hint": "レコード間に使用する区切り文字列 (スペース可)",
++    "filterAll": "[すべて]",
++    "filterPrebuilt": "構築済み",
++    "filterCustom": "カスタム",
++    "templateDefaultBadge": "デフォルト",
++    "templateDefaultOption": "Default ({name})",
++    "templateHelp": "Leave as default to use the standard {type} template ({name}), or pick a custom one."
+   },
+   "pipeline_destinations": {
+     "header": "パイプライン送信先",
+@@ -3890,19 +3905,23 @@
+     "capabilities": {
+       "query": {
+         "title": "クエリーを書く",
+-        "description": "ログ用の SQL、トレース、RUM、またはメトリクス用の PromQL。"
++        "description": "ログ用の SQL、トレース、RUM、またはメトリクス用の PromQL。",
++        "prompt": "クエリーの作成を手伝ってください"
+       },
+       "incident": {
+         "title": "インシデントを調査",
+-        "description": "ログ、トレース、アラートにわたる根本原因 — 例:「なぜgateway-5xxが起動したのか?」"
++        "description": "ログ、トレース、アラートにわたる根本原因 — 例:「なぜgateway-5xxが起動したのか?」",
++        "prompt": "インシデントの調査を手伝ってください"
+       },
+       "dashboard": {
+         "title": "ダッシュボードの作成",
+-        "description": "トピックから — 例:「K8s ノードの状態:CPU、メモリ、再起動」パネルも作成します。"
++        "description": "トピックから — 例:「K8s ノードの状態:CPU、メモリ、再起動」パネルも作成します。",
++        "prompt": "ダッシュボードまたはパネルの作成を手伝ってください"
+       },
+       "alert": {
+         "title": "アラートを作成",
+-        "description": "しきい値またはスケジュールされたアラート、および取り込み時間の VRL パイプライン。"
++        "description": "しきい値またはスケジュールされたアラート、および取り込み時間の VRL パイプライン。",
++        "prompt": "アラートまたはパイプラインの作成を手伝ってください"
+       }
+     },
+     "suggestions": {
+diff --git a/web/src/locales/languages/ko.json b/web/src/locales/languages/ko.json
+index 9b2976dee8b..ee3d9aa5528 100644
+--- a/web/src/locales/languages/ko.json
++++ b/web/src/locales/languages/ko.json
+@@ -2349,7 +2349,16 @@
+     "delete": "삭제",
+     "variable_guide_header": "템플릿 변수 가이드",
+     "variable_usage_examples": "사용 예시",
+-    "body": "바디"
++    "body": "바디",
++    "clone": "클론",
++    "cloneTitle": "클론 템플릿",
++    "systemReadOnly": "사전 빌드된 템플릿 — 삭제가 비활성화되었습니다.복제하여 수정 가능한 사본을 만드세요.",
++    "prebuiltBadge": "사전 구축",
++    "prebuiltBadgeHint": "시스템에 의해 관리됩니다.편집은 가능하지만 삭제는 불가능합니다.",
++    "customBadge": "사용자 지정",
++    "filterAll": "모두",
++    "filterPrebuilt": "사전 구축",
++    "filterCustom": "사용자 지정"
+   },
+   "alert_destinations": {
+     "header": "여행지",
+@@ -2386,7 +2395,13 @@
+     "custom": "사용자 지정",
+     "separator": "분리기",
+     "separator_placeholder": "구분자 입력 (예: |,\\n,\\ t, 공백)",
+-    "separator_hint": "레코드 사이에 사용할 구분자 문자열 (공백 허용)"
++    "separator_hint": "레코드 사이에 사용할 구분자 문자열 (공백 허용)",
++    "filterAll": "모두",
++    "filterPrebuilt": "사전 구축",
++    "filterCustom": "사용자 지정",
++    "templateDefaultBadge": "디폴트",
++    "templateDefaultOption": "Default ({name})",
++    "templateHelp": "Leave as default to use the standard {type} template ({name}), or pick a custom one."
+   },
+   "metrics": {
+     "searchMetric": "지표 검색",
+@@ -3901,19 +3916,23 @@
+     "capabilities": {
+       "query": {
+         "title": "쿼리 작성",
+-        "description": "로그, 트레이스, RUM용 SQL 또는 메트릭용 PromQL"
++        "description": "로그, 트레이스, RUM용 SQL 또는 메트릭용 PromQL",
++        "prompt": "쿼리 작성을 도와주세요"
+       },
+       "incident": {
+         "title": "인시던트 조사",
+-        "description": "로그, 트레이스, 경보의 근본 원인 (예: “게이트웨이 5xx가 왜 작동했나요?”)"
++        "description": "로그, 트레이스, 경보의 근본 원인 (예: “게이트웨이 5xx가 왜 작동했나요?”)",
++        "prompt": "인시던트 조사를 도와주세요"
+       },
+       "dashboard": {
+         "title": "대시보드 구축",
+-        "description": "주제 (예: “K8s 노드 상태: CPU, 메모리, 재시작”)또한 패널을 생성합니다."
++        "description": "주제 (예: “K8s 노드 상태: CPU, 메모리, 재시작”)또한 패널을 생성합니다.",
++        "prompt": "대시보드 또는 패널 구축을 도와주세요"
+       },
+       "alert": {
+         "title": "알림 생성",
+-        "description": "임계값 또는 예약된 알림, 인제스트 타임 VRL 파이프라인."
++        "description": "임계값 또는 예약된 알림, 인제스트 타임 VRL 파이프라인.",
++        "prompt": "알림 또는 파이프라인 생성을 도와주세요"
+       }
+     },
+     "suggestions": {
+diff --git a/web/src/locales/languages/nl.json b/web/src/locales/languages/nl.json
+index d9a409230ac..58688755d1b 100644
+--- a/web/src/locales/languages/nl.json
++++ b/web/src/locales/languages/nl.json
+@@ -2349,7 +2349,16 @@
+     "delete": "Verwijderen",
+     "variable_guide_header": "Handleiding voor sjabloonvariabelen",
+     "variable_usage_examples": "Voorbeelden van gebruik",
+-    "body": "Lichaam"
++    "body": "Lichaam",
++    "clone": "Kloon",
++    "cloneTitle": "Sjabloon klonen",
++    "systemReadOnly": "Vooraf gebouwde sjabloon — verwijderen is uitgeschakeld. Kloon het om een aanpasbare kopie te maken.",
++    "prebuiltBadge": "Voorgebouwd",
++    "prebuiltBadgeHint": "Beheerd door het systeem. Je kunt bewerken, maar verwijderen is uitgeschakeld.",
++    "customBadge": "Op maat",
++    "filterAll": "Alles",
++    "filterPrebuilt": "Voorgebouwd",
++    "filterCustom": "Op maat"
+   },
+   "alert_destinations": {
+     "header": "Bestemmingen",
+@@ -2386,7 +2395,13 @@
+     "custom": "Op maat",
+     "separator": "Separator",
+     "separator_placeholder": "Voer een scheidingsteken in (bijvoorbeeld |,\\n,\\ t, spatie)",
+-    "separator_hint": "Scheidingstekenreeks om tussen records te gebruiken (spaties toegestaan)"
++    "separator_hint": "Scheidingstekenreeks om tussen records te gebruiken (spaties toegestaan)",
++    "filterAll": "Alles",
++    "filterPrebuilt": "Voorgebouwd",
++    "filterCustom": "Op maat",
++    "templateDefaultBadge": "Standaard",
++    "templateDefaultOption": "Default ({name})",
++    "templateHelp": "Leave as default to use the standard {type} template ({name}), or pick a custom one."
+   },
+   "metrics": {
+     "searchMetric": "Zoek naar een statistiek",
+@@ -3901,19 +3916,23 @@
+     "capabilities": {
+       "query": {
+         "title": "Een vraag schrijven",
+-        "description": "SQL voor logboeken, traces, RUM of ProMQL voor statistieken."
++        "description": "SQL voor logboeken, traces, RUM of ProMQL voor statistieken.",
++        "prompt": "Help me een vraag te schrijven"
+       },
+       "incident": {
+         "title": "Incidenten onderzoeken",
+-        "description": "Oorzaak in logboeken, sporen, waarschuwingen — bijvoorbeeld „Waarom is gateway-5xx geactiveerd?”"
++        "description": "Oorzaak in logboeken, sporen, waarschuwingen — bijvoorbeeld „Waarom is gateway-5xx geactiveerd?”",
++        "prompt": "Help me incidenten te onderzoeken"
+       },
+       "dashboard": {
+         "title": "Een dashboard bouwen",
+-        "description": "Uit een onderwerp — bijvoorbeeld „K8s node health: CPU, memory, herstarts”. Creëert ook panelen."
++        "description": "Uit een onderwerp — bijvoorbeeld „K8s node health: CPU, memory, herstarts”. Creëert ook panelen.",
++        "prompt": "Help me een dashboard of paneel te bouwen"
+       },
+       "alert": {
+         "title": "Een waarschuwing aanmaken",
+-        "description": "Drempelwaarden of geplande waarschuwingen en VRL-pijplijnen die tijdens de looptijd worden gebruikt."
++        "description": "Drempelwaarden of geplande waarschuwingen en VRL-pijplijnen die tijdens de looptijd worden gebruikt.",
++        "prompt": "Help me een waarschuwing of pipeline aan te maken"
+       }
+     },
+     "suggestions": {
+diff --git a/web/src/locales/languages/pt.json b/web/src/locales/languages/pt.json
+index a86d6e76a94..769a8af1b48 100644
+--- a/web/src/locales/languages/pt.json
++++ b/web/src/locales/languages/pt.json
+@@ -2351,7 +2351,16 @@
+     "delete": "Excluir",
+     "variable_guide_header": "Guia de variáveis de modelo",
+     "variable_usage_examples": "Exemplos de uso",
+-    "body": "Corpo"
++    "body": "Corpo",
++    "clone": "Clonar",
++    "cloneTitle": "Modelo de clone",
++    "systemReadOnly": "Modelo pré-construído — a exclusão está desativada. Clone para criar uma cópia modificável.",
++    "prebuiltBadge": "Pré-construído",
++    "prebuiltBadgeHint": "Gerenciado pelo sistema. Você pode editar, mas a exclusão está desativada.",
++    "customBadge": "Personalizado",
++    "filterAll": "Todos",
++    "filterPrebuilt": "Pré-construído",
++    "filterCustom": "Personalizado"
+   },
+   "alert_destinations": {
+     "header": "Destinos",
+@@ -2388,7 +2397,13 @@
+     "custom": "Personalizado",
+     "separator": "Separador",
+     "separator_placeholder": "Insira o separador (por exemplo, |,\\n,\\ t, espaço)",
+-    "separator_hint": "Cadeia de caracteres separadora a ser usada entre registros (espaços permitidos)"
++    "separator_hint": "Cadeia de caracteres separadora a ser usada entre registros (espaços permitidos)",
++    "filterAll": "Todos",
++    "filterPrebuilt": "Pré-construído",
++    "filterCustom": "Personalizado",
++    "templateDefaultBadge": "Padrão",
++    "templateDefaultOption": "Default ({name})",
++    "templateHelp": "Leave as default to use the standard {type} template ({name}), or pick a custom one."
+   },
+   "metrics": {
+     "searchMetric": "Pesquisar uma métrica",
+@@ -3890,19 +3905,23 @@
+     "capabilities": {
+       "query": {
+         "title": "Escrever uma consulta",
+-        "description": "SQL para registros, rastreamentos, RUM ou ProMQL para métricas."
++        "description": "SQL para registros, rastreamentos, RUM ou ProMQL para métricas.",
++        "prompt": "Ajude-me a escrever uma consulta"
+       },
+       "incident": {
+         "title": "Investigue incidentes",
+-        "description": "Causa raiz em registros, rastreamentos e alertas — por exemplo, “Por que o gateway-5xx foi acionado?”"
++        "description": "Causa raiz em registros, rastreamentos e alertas — por exemplo, “Por que o gateway-5xx foi acionado?”",
++        "prompt": "Ajude-me a investigar incidentes"
+       },
+       "dashboard": {
+         "title": "Crie um painel",
+-        "description": "De um tópico — por exemplo, “Integridade do nó K8s: CPU, memória, reinicializações”. Também cria painéis."
++        "description": "De um tópico — por exemplo, “Integridade do nó K8s: CPU, memória, reinicializações”. Também cria painéis.",
++        "prompt": "Ajude-me a criar um painel ou dashboard"
+       },
+       "alert": {
+         "title": "Crie um alerta",
+-        "description": "Alertas limitados ou programados e pipelines de VRL com tempo de ingestão."
++        "description": "Alertas limitados ou programados e pipelines de VRL com tempo de ingestão.",
++        "prompt": "Ajude-me a criar um alerta ou pipeline"
+       }
+     },
+     "suggestions": {
+diff --git a/web/src/locales/languages/tr.json b/web/src/locales/languages/tr.json
+index a5a59172812..82a63a09ef9 100644
+--- a/web/src/locales/languages/tr.json
++++ b/web/src/locales/languages/tr.json
+@@ -2349,7 +2349,16 @@
+     "delete": "Sil",
+     "variable_guide_header": "Şablon Değişken Kılavuzu",
+     "variable_usage_examples": "Kullanım Örnekleri",
+-    "body": "Vücut"
++    "body": "Vücut",
++    "clone": "Klon",
++    "cloneTitle": "Klon şablonu",
++    "systemReadOnly": "Önceden oluşturulmuş şablon - silme devre dışı bırakıldı. Değiştirilebilir bir kopya oluşturmak için klonlayın.",
++    "prebuiltBadge": "Önceden oluşturulmuş",
++    "prebuiltBadgeHint": "Sistem tarafından yönetilmektedir. Düzenleyebilirsiniz, ancak silme devre dışı bırakılmıştır.",
++    "customBadge": "Özel",
++    "filterAll": "Hepsi",
++    "filterPrebuilt": "Önceden oluşturulmuş",
++    "filterCustom": "Özel"
+   },
+   "alert_destinations": {
+     "header": "Destinasyonlar",
+@@ -2386,7 +2395,13 @@
+     "custom": "Özel",
+     "separator": "Ayırıcı",
+     "separator_placeholder": "Ayırıcı girin (örn. |,\\ n,\\ t, boşluk)",
+-    "separator_hint": "Kayıtlar arasında kullanılacak ayırıcı dize (boşluklara izin verilir)"
++    "separator_hint": "Kayıtlar arasında kullanılacak ayırıcı dize (boşluklara izin verilir)",
++    "filterAll": "Hepsi",
++    "filterPrebuilt": "Önceden oluşturulmuş",
++    "filterCustom": "Özel",
++    "templateDefaultBadge": "Varsayılan",
++    "templateDefaultOption": "Default ({name})",
++    "templateHelp": "Leave as default to use the standard {type} template ({name}), or pick a custom one."
+   },
+   "metrics": {
+     "searchMetric": "Bir Metrik Ara",
+@@ -3901,19 +3916,23 @@
+     "capabilities": {
+       "query": {
+         "title": "Bir Sorgu Yazın",
+-        "description": "Günlükler için SQL, izler, ölçümler için RUM veya PromQL."
++        "description": "Günlükler için SQL, izler, ölçümler için RUM veya PromQL.",
++        "prompt": "Bir sorgu yazmama yardım et"
+       },
+       "incident": {
+         "title": "Olayları Araştırın",
+-        "description": "Günlükler, izler, uyarılar arasında kök neden — örn. “Gateway-5xx neden ateşlendi?”"
++        "description": "Günlükler, izler, uyarılar arasında kök neden — örn. “Gateway-5xx neden ateşlendi?”",
++        "prompt": "Olayları araştırmama yardım et"
+       },
+       "dashboard": {
+         "title": "Bir Gösterge Tablosu Oluşturun",
+-        "description": "Bir konudan — örn. “K8s düğüm durumu: CPU, bellek, yeniden başlatmalar”. Ayrıca paneller oluşturur."
++        "description": "Bir konudan — örn. “K8s düğüm durumu: CPU, bellek, yeniden başlatmalar”. Ayrıca paneller oluşturur.",
++        "prompt": "Bir gösterge tablosu veya panel oluşturmama yardım et"
+       },
+       "alert": {
+         "title": "Uyarı Oluştur",
+-        "description": "Eşik veya zamanlanmış uyarılar ve alım zamanı VRL boru hatları."
++        "description": "Eşik veya zamanlanmış uyarılar ve alım zamanı VRL boru hatları.",
++        "prompt": "Uyarı veya pipeline oluşturmama yardım et"
+       }
+     },
+     "suggestions": {
+diff --git a/web/src/locales/languages/zh.json b/web/src/locales/languages/zh.json
+index 3d303c23f66..97d8135a970 100644
+--- a/web/src/locales/languages/zh.json
++++ b/web/src/locales/languages/zh.json
+@@ -2351,7 +2351,16 @@
+     "delete": "删除",
+     "variable_guide_header": "模板变量指南",
+     "variable_usage_examples": "用法示例",
+-    "body": "Body"
++    "body": "Body",
++    "clone": "克隆",
++    "cloneTitle": "克隆模板",
++    "systemReadOnly": "预建模板 — 删除已禁用。将其克隆以制作可修改的副本。",
++    "prebuiltBadge": "预建的",
++    "prebuiltBadgeHint": "由系统管理。您可以编辑，但删除功能已禁用。",
++    "customBadge": "自定义",
++    "filterAll": "全部",
++    "filterPrebuilt": "预建的",
++    "filterCustom": "自定义"
+   },
+   "alert_destinations": {
+     "header": "地址",
+@@ -2388,7 +2397,13 @@
+     "custom": "自定义",
+     "separator": "分隔符",
+     "separator_placeholder": "输入分隔符（例如，|、\\n、\\ t、空格）",
+-    "separator_hint": "在记录之间使用的分隔字符串（允许空格）"
++    "separator_hint": "在记录之间使用的分隔字符串（允许空格）",
++    "filterAll": "全部",
++    "filterPrebuilt": "预建的",
++    "filterCustom": "自定义",
++    "templateDefaultBadge": "默认",
++    "templateDefaultOption": "Default ({name})",
++    "templateHelp": "Leave as default to use the standard {type} template ({name}), or pick a custom one."
+   },
+   "metrics": {
+     "searchMetric": "搜索指标",
+@@ -3894,19 +3909,23 @@
+     "capabilities": {
+       "query": {
+         "title": "写一个查询",
+-        "description": "SQL 用于日志、跟踪，RUM，或用于衡量指标的 PromQL。"
++        "description": "SQL 用于日志、跟踪，RUM，或用于衡量指标的 PromQL。",
++        "prompt": "帮我写一个查询"
+       },
+       "incident": {
+         "title": "调查事件",
+-        "description": "日志、跟踪、警报的根本原因，例如 “Gateway-5xx 为什么会触发？”"
++        "description": "日志、跟踪、警报的根本原因，例如 “Gateway-5xx 为什么会触发？”",
++        "prompt": "帮我调查一个事件"
+       },
+       "dashboard": {
+         "title": "构建仪表板",
+-        "description": "来自一个主题，例如 “K8s 节点运行状况：CPU、内存、重启”。还会创建面板。"
++        "description": "来自一个主题，例如 “K8s 节点运行状况：CPU、内存、重启”。还会创建面板。",
++        "prompt": "帮我构建一个仪表板或面板"
+       },
+       "alert": {
+         "title": "创建警报",
+-        "description": "阈值或预设警报，以及采集时间 VRL 管道。"
++        "description": "阈值或预设警报，以及采集时间 VRL 管道。",
++        "prompt": "帮我创建一个警报或管道"
+       }
+     },
+     "suggestions": {
+diff --git a/web/src/plugins/traces/Index.vue b/web/src/plugins/traces/Index.vue
+index b9d3a161518..afb751ea18d 100644
+--- a/web/src/plugins/traces/Index.vue
++++ b/web/src/plugins/traces/Index.vue
+@@ -101,6 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+             class="tw:px-[0.625rem] tw:pb-[0.625rem] tw:h-full tw:overflow-hidden"
+           >
+             <LLMInsightsDashboard
++              :key="'llm-' + store.state.selectedOrganization.identifier"
+               ref="llmInsightsRef"
+               :streamName="selectedStreamName"
+               :startTime="insightsTimeRange.startTime"
+@@ -115,6 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+             class="tw:px-[0.625rem] tw:pb-[0.625rem] tw:h-full tw:overflow-hidden"
+           >
+             <SessionsList
++              :key="'sessions-' + store.state.selectedOrganization.identifier"
+               ref="sessionsListRef"
+               :streamName="selectedStreamName"
+               :startTime="insightsTimeRange.startTime"
+diff --git a/web/src/plugins/traces/LLMInsightsDashboard.vue b/web/src/plugins/traces/LLMInsightsDashboard.vue
+index 1db708b3638..1b79334ae48 100644
+--- a/web/src/plugins/traces/LLMInsightsDashboard.vue
++++ b/web/src/plugins/traces/LLMInsightsDashboard.vue
+@@ -16,14 +16,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ 
+ <template>
+   <div
+-    class="llm-insights-dashboard tw:h-full tw:overflow-y-auto tw:px-[0.625rem] tw:pb-[0.625rem]"
++    class="llm-insights-dashboard tw:h-full tw:flex tw:flex-col tw:bg-[var(--o2-card-bg-solid)] card-container tw:px-[0.625rem]"
+   >
+-    <!-- Toolbar: stream selector. The page-level "Run query" button in the
+-         top toolbar is the single source of refresh — picking a different
+-         stream here auto-applies the change (same convention as the rest of
+-         the Traces tabs), and changing the time range / clicking Run query
+-         re-runs the panels via prop watchers below. -->
+-    <div class="tw:flex tw:items-center tw:gap-[0.5rem] tw:py-[0.5rem]">
++    <!-- Toolbar: stream selector — hidden when no streams are available -->
++    <div
++      v-if="availableStreams.length > 0"
++      class="tw:flex tw:items-center tw:gap-[0.5rem] tw:py-[0.5rem]"
++    >
+       <div
+         data-test="llm-insights-stream-selector"
+         class="tw:w-[14rem] tw:flex-shrink-0"
+@@ -34,17 +33,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+           labelKey="label"
+           valueKey="value"
+           class="tw:w-[auto] tw:flex-shrink-0 tw:rounded"
+-          :disabled="availableStreams.length === 0"
+           @update:model-value="onStreamChange"
+         />
+-        <OTooltip v-if="availableStreams.length === 0" content="No LLM streams available." />
+       </div>
+     </div>
+ 
+     <!-- Streams list loaded but no LLM streams exist for this org. -->
+     <div
+       v-if="streamsLoaded && availableStreams.length === 0"
+-      class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-[320px] tw:text-center"
++      class="tw:flex-1 tw:flex tw:flex-col tw:items-center tw:justify-center tw:text-center"
+     >
+       <OIcon name="auto-awesome" class="tw:mb-3" style="width: 3rem; height: 3rem;" />
+       <div class="tw:text-base tw:text-[var(--o2-text-primary)] tw:mb-2">
+@@ -61,23 +58,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+       </div>
+     </div>
+ 
+-    <!-- Skeleton shown only while a real request is in flight (initial
+-         streams fetch or KPI/sparkline load). Prevents the post-tab-switch
+-         "Failed to load" flash by not painting the error state until data
+-         actually fails for the *current* mount. -->
+-    <LLMInsightsSkeleton v-else-if="!streamsLoaded || loading" />
++    <!-- Skeleton shown only while a real request is in flight -->
++    <LLMInsightsSkeleton v-else-if="!streamsLoaded || loading" class="tw:flex-1" />
+ 
+     <!-- Stream has no LLM (gen_ai_*) fields → friendly empty state -->
+     <div
+       v-else-if="streamHasNoLLMFields"
+-      class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-[300px]"
++      class="tw:flex-1 tw:flex tw:flex-col tw:items-center tw:justify-center tw:text-center"
+     >
+       <OIcon name="auto-awesome" class="tw:mb-3" style="width: 3rem; height: 3rem;" />
+       <div class="tw:text-base tw:text-[var(--o2-text-primary)] tw:mb-2">
+         No LLM data in <b>{{ activeStream }}</b>
+       </div>
+       <div
+-        class="tw:text-sm tw:text-[var(--o2-text-muted)] tw:mb-3 tw:max-w-[28rem] tw:text-center"
++        class="tw:text-sm tw:text-[var(--o2-text-muted)] tw:mb-3 tw:max-w-[28rem]"
+       >
+         This stream doesn't have any LLM (<code>gen_ai_*</code>) fields. Pick a
+         different stream above, or instrument your service with the OpenTelemetry
+@@ -85,11 +79,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+       </div>
+     </div>
+ 
+-    <!-- Generic error state — only after at least one successful mount-load
+-         attempt has resolved. -->
++    <!-- Generic error state -->
+     <div
+       v-else-if="error && hasLoadedOnce"
+-      class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-[200px]"
++      class="tw:flex-1 tw:flex tw:flex-col tw:items-center tw:justify-center tw:text-center"
+     >
+       <OIcon name="error-outline" class="tw:mb-3" style="width: 3rem; height: 3rem;" />
+       <div class="tw:text-base tw:mb-2">Failed to load LLM Insights</div>
+@@ -104,10 +97,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+       </OButton>
+     </div>
+ 
+-    <!-- Empty state -->
++    <!-- Empty state — streams exist but no data in this time window -->
+     <div
+       v-else-if="hasLoadedOnce && !hasData"
+-      class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-[200px]"
++      class="tw:flex-1 tw:flex tw:flex-col tw:items-center tw:justify-center tw:text-center"
+     >
+       <OIcon name="info" class="tw:mb-3" style="width: 3rem; height: 3rem;" />
+       <div class="tw:text-base tw:text-[var(--o2-text-muted)]">
+@@ -115,8 +108,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+       </div>
+     </div>
+ 
+-    <!-- Dashboard content -->
+-    <template v-else>
++    <!-- Dashboard content — scrollable panel area -->
++    <div v-else class="tw:flex-1 tw:overflow-y-auto tw:pb-[0.625rem]">
+       <!-- KPI Cards Row -->
+       <div class="tw:grid tw:grid-cols-5 tw:gap-[0.625rem] tw:mt-[0.625rem] tw:mb-[0.625rem]">
+         <div
+@@ -177,7 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+           />
+         </div>
+       </div>
+-    </template>
++    </div>
+   </div>
+ </template>
+ 
+diff --git a/web/src/plugins/traces/SearchBar.vue b/web/src/plugins/traces/SearchBar.vue
+index b8eb7ebf8dc..9b0dbc76daf 100644
+--- a/web/src/plugins/traces/SearchBar.vue
++++ b/web/src/plugins/traces/SearchBar.vue
+@@ -79,10 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+             active selection isn't orphaned mid-session.
+           -->
+           <OToggleGroupItem
+-            v-if="
+-              config.showLLMUI !== 'false' &&
+-              (hasLLMStreams || searchObj.meta.searchMode === 'sessions')
+-            "
++            v-if="config.showLLMUI !== 'false'"
+             data-test="traces-search-mode-sessions-btn"
+             value="sessions"
+             size="sm"
+@@ -93,10 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+             Sessions
+           </OToggleGroupItem>
+           <OToggleGroupItem
+-            v-if="
+-              config.showLLMUI !== 'false' &&
+-              (hasLLMStreams || searchObj.meta.searchMode === 'llm-insights')
+-            "
++            v-if="config.showLLMUI !== 'false'"
+             data-test="traces-search-mode-llm-insights-btn"
+             value="llm-insights"
+             size="sm"
+diff --git a/web/src/plugins/traces/SessionsList.vue b/web/src/plugins/traces/SessionsList.vue
+index e41604065d0..85ac2c4b259 100644
+--- a/web/src/plugins/traces/SessionsList.vue
++++ b/web/src/plugins/traces/SessionsList.vue
+@@ -20,24 +20,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+   >
+     <!-- Toolbar: stream selector + count pill + pagination -->
+     <div class="tw:flex tw:items-center tw:gap-2 tw:py-[0.625rem]">
+-      <!-- Stream selector -->
++      <!-- Stream selector — hidden when there are no LLM streams (empty state is shown below) -->
+       <div
++        v-if="availableStreams.length > 0"
+         data-test="sessions-list-stream-selector"
+         class="tw:w-[14rem] tw:flex-shrink-0"
+       >
+         <OSelect
+           v-model="activeStream"
+-          :options="
+-            availableStreams.length > 0
+-              ? availableStreams.map((s) => ({ label: s, value: s }))
+-              : []
+-          "
++          :options="availableStreams.map((s) => ({ label: s, value: s }))"
+           size="sm"
+           class="tw:w-[auto] tw:flex-shrink-0 tw:rounded"
+           @update:model-value="onStreamChange"
+-          :disabled="availableStreams.length === 0"
+         />
+-        <OTooltip v-if="availableStreams.length === 0" :content="t('traces.sessionsList.noStreamsTooltip')" />
+       </div>
+ 
+       <!-- Count pill -->
+diff --git a/web/src/ts/interfaces/alert.ts b/web/src/ts/interfaces/alert.ts
+index 3add4ab138b..c2340cb1104 100644
+--- a/web/src/ts/interfaces/alert.ts
++++ b/web/src/ts/interfaces/alert.ts
+@@ -80,6 +80,10 @@ export interface Template {
+   name: string;
+   body: any;
+   isDefault?: boolean;
++  // True for system-managed prebuilt templates (name starts with
++  // "prebuilt_"). Such templates are read-only — the UI must hide edit /
++  // delete actions for them and the backend will refuse mutations.
++  isPrebuilt?: boolean;
+   type: "http" | "email";
+   title?: string;
+ }
