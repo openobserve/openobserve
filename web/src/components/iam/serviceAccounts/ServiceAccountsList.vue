@@ -33,6 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="service-accounts-add-btn"
           variant="primary"
           size="sm"
+          shortcut="n"
           @click="addRoutePush({})"
         >
           {{ t('serviceAccounts.add') }}

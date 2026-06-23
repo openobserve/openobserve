@@ -134,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click.stop
           />
           <OIcon name="bar-chart" size="sm" class="tw:shrink-0" />
-          <OTooltip :content="searchObj.meta.showHistogram ? t('search.hideHistogram') : t('search.showHistogramLabel')" />
+          <OTooltip :content="searchObj.meta.showHistogram ? t('search.hideHistogram') : t('search.showHistogramLabel')" shortcut="h" />
         </OButton>
 
         <!-- this is the button group responsible for showing all the utilities -->
@@ -251,6 +251,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <ODropdownItem
               data-test="logs-search-bar-menu-create-saved-view-btn"
+              shortcut="s"
               @select="fnSavedView"
             >
               <template #icon-left>
@@ -325,6 +326,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <ODropdownGroup :label="t('search.menuGroupHistory')">
             <ODropdownItem
               data-test="search-history-item-btn"
+              shortcut="ctrl+h"
               @select="showSearchHistoryfn"
             >
               <template #icon-left>
@@ -368,6 +370,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <OIcon name="grid-on" size="sm" />
                   <span class="tw:flex-1">{{ t("search.downloadCSV") }}</span>
+                  <OShortcut keys="ctrl+shift+d" class="tw:ms-auto" />
                 </button>
                 <button
                   type="button"
@@ -618,6 +621,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ? handleGenerateSQLQuery()
                       : handleRunQueryFn()
                   "
+                  :shortcut="
+                    isNaturalLanguageDetected && !searchObj.meta.nlpMode
+                      ? undefined
+                      : 'ctrl+enter'
+                  "
                 >
                   {{
                     isNaturalLanguageDetected && !searchObj.meta.nlpMode
@@ -718,6 +726,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     isNaturalLanguageDetected && !searchObj.meta.nlpMode
                       ? handleGenerateSQLQuery()
                       : handleRunQueryFn()
+                  "
+                  :shortcut="
+                    isNaturalLanguageDetected && !searchObj.meta.nlpMode
+                      ? undefined
+                      : 'ctrl+enter'
                   "
                 >
                   {{
@@ -1636,6 +1649,7 @@ import { useStore } from "vuex";
 import DateTime from "@/components/DateTime.vue";
 import ShareButton from "@/components/common/ShareButton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OShortcut from "@/lib/core/Shortcut/OShortcut.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
@@ -1794,6 +1808,7 @@ export default defineComponent({
   components: {
     OSeparator,
     OSplitter,
+    OShortcut,
     OButtonGroup,
     ODialog,
     ODropdown,

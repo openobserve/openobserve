@@ -39,6 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="primary"
                 size="sm"
                 @click="refreshData"
+                shortcut="r"
               >
                 {{ t(`queries.refreshQuery`) }}
               </OButton>

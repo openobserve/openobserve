@@ -38,6 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="primary"
             size="sm"
             data-test="function-list-add-function-btn"
+            shortcut="n"
             @click="showAddUpdateFn({})"
           >
             {{ t(`function.add`) }}
@@ -224,6 +225,8 @@ import PipelineSectionTabs from "@/components/pipeline/PipelineSectionTabs.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useShortcutScope } from "@/lib/vue-shortcut-manager";
+import { isInputFocused, useShortcutsWithMac } from "@/utils/keyboardShortcuts";
 
 export default defineComponent({
   name: "functionList",

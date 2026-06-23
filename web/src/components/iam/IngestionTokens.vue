@@ -45,6 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           variant="primary"
           size="sm-action"
+          shortcut="n"
           data-test="add-ingestion-token"
           @click="showCreateForm = true"
         >

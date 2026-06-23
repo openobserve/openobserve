@@ -75,6 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           icon-left="add"
           data-test="dashboard-new"
           @click="addDashboard"
+          shortcut="n"
         >
           {{ t(`dashboard.add`) }}
         </OButton>
@@ -171,10 +172,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="icon-sm"
                 icon-left="refresh"
                 :loading="loading"
-                title="Reload dashboards"
                 data-test="dashboard-list-refresh"
                 @click="getDashboards"
-              />
+              >
+                <OTooltip side="bottom" content="Reload dashboards" shortcut="r" />
+              </OButton>
             </template>
             <template #cell-name="{ row, value }">
               <span

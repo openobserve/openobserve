@@ -184,6 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="searchData"
               :loading="isLoading"
               :disabled="isLoading"
+              shortcut="ctrl+enter"
             >
               <OTooltip
                 v-if="
@@ -267,6 +268,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :url="tracesShareURL"
           variant="outline"
           size="icon-toolbar"
+          shortcut="ctrl+shift+c"
         />
       </div>
 

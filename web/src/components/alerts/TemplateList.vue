@@ -55,6 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="template-list-add-btn"
             variant="primary"
             size="sm"
+            shortcut="n"
             @click="editTemplate(null)"
             >{{ t(`alert_templates.add`) }}</OButton
           >

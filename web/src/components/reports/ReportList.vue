@@ -30,6 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="report-list-add-report-btn"
               variant="primary"
               size="sm"
+              shortcut="n"
               @click="createNewReport"
             >
               {{ t(`reports.add`) }}
@@ -129,10 +130,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="icon-sm"
                     icon-left="refresh"
                     :loading="isLoadingReports"
-                    title="Reload reports"
                     data-test="report-list-refresh-btn"
                     @click="() => { invalidateFolderCache(activeFolderId); loadReports(activeFolderId); }"
-                  />
+                  >
+                    <OTooltip side="bottom" content="Reload reports" shortcut="r" />
+                  </OButton>
                 </template>
                 <template #empty>
                   <OEmptyState
@@ -315,6 +317,7 @@ import AppTabs from "@/components/common/AppTabs.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import { getFoldersListByType } from "@/utils/commons";
 import OButton from '@/lib/core/Button/OButton.vue';
+import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue';
 import OInput from '@/lib/forms/Input/OInput.vue';
 import OIcon from '@/lib/core/Icon/OIcon.vue';
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -324,6 +327,8 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
+import { useShortcutScope } from "@/lib/vue-shortcut-manager";
+import { isInputFocused, useShortcutsWithMac } from "@/utils/keyboardShortcuts";
 
 const MoveAcrossFolders = defineAsyncComponent(
   () => import("@/components/common/sidebar/MoveAcrossFolders.vue"),

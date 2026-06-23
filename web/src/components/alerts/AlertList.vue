@@ -39,15 +39,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="importAlert"
               data-test="alert-import"
               icon-left="upload-file"
+              shortcut="i"
             >
               <template v-if="!isCompactToolbar">{{ t(`dashboard.import`) }}</template>
-              <OTooltip v-if="isCompactToolbar" :content="t('dashboard.import')" side="bottom" />
+              <OTooltip v-if="isCompactToolbar" :content="t('dashboard.import')" side="bottom" shortcut="i" />
             </OButton>
             <!-- Add button — routes to anomaly creation on anomaly tab, alert creation otherwise -->
             <OButton
               data-test="alert-list-add-alert-btn"
               variant="primary"
               size="sm"
+              shortcut="n"
               :disabled="!destinations.length || !templates.length"
               :title="!destinations.length ? t('alerts.noDestinations') : ''"
               @click="
@@ -175,10 +177,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="icon-sm"
                     icon-left="refresh"
                     :loading="loading"
-                    title="Reload alerts"
                     data-test="alert-list-refresh-btn"
                     @click="refreshAlerts"
-                  />
+                  >
+                    <OTooltip side="bottom" content="Reload alerts" shortcut="r" />
+                  </OButton>
                 </template>
 
 

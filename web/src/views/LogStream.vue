@@ -32,6 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="outline"
               size="sm-action"
               @click="getLogStream(true)"
+              shortcut="r"
             >
               {{ t(`logStream.refreshStats`) }}
             </OButton>
@@ -41,6 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="primary"
               size="sm-action"
               @click="addStream"
+              shortcut="n"
             >
               {{ t(`logStream.add`) }}
             </OButton>

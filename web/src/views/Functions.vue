@@ -81,6 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="outline"
               size="sm"
               icon-left="upload-file"
+              shortcut="i"
               @click="goToImportPipeline"
             >
               {{ t("pipeline.import") }}
@@ -90,6 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="pipeline-list-add-pipeline-btn"
             variant="primary"
             size="sm"
+            shortcut="n"
             @click="goToAddPipeline"
           >
             {{ t("pipeline.addPipeline") }}

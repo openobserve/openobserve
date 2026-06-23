@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="dashboard-panel-add"
               icon-left="add"
             >
-              <OTooltip :content="t('panel.add')" />
+              <OTooltip :content="t('panel.add')" shortcut="n" />
             </OButton>
             <!-- <DateTimePicker 
             class="tw:ml-2"
@@ -129,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="dashboard-refresh-btn"
               icon-left="refresh"
             >
-              <OTooltip :content="isVariablesChanged ? 'Refresh to apply latest variable changes' : 'Refresh'" />
+              <OTooltip :content="isVariablesChanged ? 'Refresh to apply latest variable changes' : 'Refresh'" shortcut="r" />
             </OButton>
 
             <ExportDashboard
@@ -181,7 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     isFullscreen ? 'fullscreen-exit' : 'fullscreen'
                   " size="sm"
               /></template>
-              <OTooltip :content="isFullscreen ? t('dashboard.exitFullscreen') : t('dashboard.fullscreen')" />
+              <OTooltip :content="isFullscreen ? t('dashboard.exitFullscreen') : t('dashboard.fullscreen')" shortcut="f" />
             </OButton>
             <OButton
               v-if="!isFullscreen"
