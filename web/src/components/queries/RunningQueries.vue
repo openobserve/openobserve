@@ -201,6 +201,7 @@ import { getDuration } from "@/utils/zincutils";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcutScope } from "@/lib/vue-shortcut-manager";
 import { isInputFocused, useShortcutsWithMac } from "@/utils/keyboardShortcuts";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 
 export default defineComponent({
   name: "RunningQueries",
