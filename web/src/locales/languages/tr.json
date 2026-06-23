@@ -132,7 +132,8 @@
     "error": "Hata",
     "db": "Veritabanı",
     "discardChanges": "Değişiklikleri iptal et",
-    "unsavedChanges": "Kaydedilmemiş değişiklikler"
+    "unsavedChanges": "Kaydedilmemiş değişiklikler",
+    "export": "İhracat"
   },
   "search": {
     "selectIndex": "Önce Yayınla Seçin",
@@ -550,7 +551,14 @@
       "learnMore": "Daha fazla bilgi edinin:",
       "quickImpl": "Hızlı uygulama kılavuzu",
       "blogPost": "Ön uç izleme temelleri"
-    }
+    },
+    "sourceMaps": "Kaynak Haritalar",
+    "service": "Hizmet",
+    "environment": "Çevre",
+    "applyFilters": "Filtreleri Uygula",
+    "uploadSourceMaps": "Kaynak Haritaları Yükle",
+    "files": "Dosyalar",
+    "uploadedAt": "Yüklenen"
   },
   "about": {
     "name": "Açık Gözlem",
@@ -1704,7 +1712,42 @@
     "multiSqlQueryLabelHint": "Açıklamalarda bu sorgu için özel ad (örn., 'Üretim')",
     "multiQueryWarning": "{chartType} için yalnızca Sorgu 1 oluşturulur",
     "trellisNotSupportedWithMultiQuery": "Kafes düzeni birden çok sorgu ile devre dışı bırakılır. Kafes kullanmak için ekstra sorguları kaldırın.",
-    "xAliasInconsistencyWarning": "X ekseni takma adları sorgular arasında tutarsızdır: bazıları histogram kullanır, bazıları kullanmaz. Öngörülebilir sonuçlar için tüm sorgularda aynı takma ad türünü kullanın."
+    "xAliasInconsistencyWarning": "X ekseni takma adları sorgular arasında tutarsızdır: bazıları histogram kullanır, bazıları kullanmaz. Öngörülebilir sonuçlar için tüm sorgularda aynı takma ad türünü kullanın.",
+    "subtitle": "Klasörler arasında gösterge panoları oluşturun, düzenleyin ve paylaşın",
+    "deleteDashboardConfirmTitle": "Gösterge tablosunu sil",
+    "deleteDashboardConfirmMsg": "Kontrol panelini silmek istediğinizden emin misiniz?",
+    "deleteDashboardsConfirmTitle": "Kontrol Panellerini Sil",
+    "deleteDashboardsConfirmMsg": "{count} gösterge tablosunu silmek istediğinizden emin misiniz?",
+    "importCustom": "Özel",
+    "importCustomDesc": "JSON dosyasından veya URL'den içe aktarma",
+    "importTemplates": "Şablonlar",
+    "importTemplatesDesc": "Galeriye göz atın ve içe aktarın",
+    "searchThisFolder": "Bu klasör",
+    "searchThisFolderTitle": "Yalnızca bu klasörü ara",
+    "searchAllFolders": "Tüm klasörler",
+    "searchAllFoldersTitle": "Tüm klasörlerde ara",
+    "reloadDashboards": "Kontrol panellerini yeniden yükle",
+    "editVariable": "Değişkeni Düzenle",
+    "addOption": "Seçenek Ekle",
+    "addFilter": "Filtre Ekle",
+    "noDataFound": "Veri Bulunamadı",
+    "streamSelectTooltip": "Akışı başka bir değere göre dinamik olarak seçmek için bir akış seçin veya $streamVariable gibi bir değişken kullanın.",
+    "fieldSelectTooltip": "Bir alan seçin veya $fieldVariable gibi bir değişken kullanın. Akış bir değişken kullanıyorsa, alan listesi boş olacaktır - alan adını manuel olarak yazın.",
+    "filterInfoTooltip": "Filtrelerde, geçerli değişkenin değerini filtrelemek için başka bir değişkenin değerini kullanabilirsiniz. Bu, diğer değişkenin adı kullanılarak yapılabilir. Örneğin:",
+    "defaultSelectAll": "Varsayılan - Tümünü Seç",
+    "escapeSingleQuotesTooltip": "Etkinleştirilirse, sorguda tek tırnak işaretlerinden kurtulur. Örneğin, `O'Reilly` gibi bir değer `O\"Reilly` olarak değiştirilecektir.",
+    "byDefaultSelect": "Varsayılan Olarak Seçin:",
+    "firstValue": "İlk değer",
+    "allValues": "Tüm değerler",
+    "customValue": "Özel",
+    "showDependencies": "Bağımlılıkları Göster",
+    "deleteVariable": "Değişkeni Sil",
+    "deleteVariableMsg": "Değişkeni silmek istediğinizden emin misiniz?",
+    "appliedToTabs": "Sekmelere uygulanır:",
+    "appliedToPanels": "Panellere uygulanır:",
+    "selectVariableScope": "Değişken kapsamı seçin",
+    "variableScopeHelp": "Genel seçilmişse değişkenler tüm sekmelere ve panellere uygulanacaktır.",
+    "showDynamicFilters": "Dinamik Filtreleri Göster"
   },
   "panel": {
     "header": "Panel",
@@ -3314,7 +3357,12 @@
     "layoutHorizontal": "Yatay",
     "layoutVertical": "Dikey",
     "layoutForce": "Kuvvet Düzeni",
-    "exportTraces": "İzleri Dışa Aktar"
+    "exportTraces": "İzleri Dışa Aktar",
+    "waterfall": "Şelale",
+    "flameGraph": "Alev Grafiği",
+    "traceGraph": "İz Grafiği",
+    "dag": "DAG",
+    "thread": "Konu"
   },
   "invitation": {
     "pendingInvitations": "Bekleyen Davetiyeler",
@@ -4853,6 +4901,51 @@
       "evalJobs": "Eval İş İlanları",
       "scorers": "Gol Sahipleri",
       "scoreConfigs": "Puan Yapılandırmaları"
+    },
+    "kpi": {
+      "totalCost": "Toplam Maliyet",
+      "totalTokens": "Toplam Jetonlar",
+      "totalTraces": "Toplam İzler",
+      "p95Latency": "P95 Gecikme",
+      "errorRate": "Hata Oranı"
+    },
+    "panels": {
+      "costTrend": {
+        "title": "Maliyet eğilimi",
+        "subtitle": "Modele göre USD"
+      },
+      "tokenTrend": {
+        "title": "Token trendi",
+        "subtitle": "modele göre belirteçler"
+      },
+      "spanTrend": {
+        "title": "Yayılma eğilimi",
+        "subtitle": "türe göre aralık sayısı"
+      },
+      "latencyPercentiles": {
+        "title": "Gecikme p50/p95/p99",
+        "subtitle": "tüm LLM çağrıları"
+      },
+      "tracesOverTime": {
+        "title": "Zaman içindeki izler",
+        "subtitle": "hizmete göre izleme sayısı"
+      },
+      "errorsOverTime": {
+        "title": "Zaman içindeki hatalar",
+        "subtitle": "hata sayısı"
+      },
+      "spansByModel": {
+        "title": "Modele göre aralıklar",
+        "subtitle": "model başına çağrı sayısı"
+      },
+      "tokensByModel": {
+        "title": "Modele göre belirteçler",
+        "subtitle": "model başına toplam jeton"
+      },
+      "recentErrors": {
+        "title": "Son hatalar",
+        "subtitle": "son 10 başarısız yayılım"
+      }
     }
   },
   "logs": {

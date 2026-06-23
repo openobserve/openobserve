@@ -132,7 +132,8 @@
     "error": "Errore",
     "db": "Banca dati",
     "discardChanges": "Ignora le modifiche",
-    "unsavedChanges": "Modifiche non salvate"
+    "unsavedChanges": "Modifiche non salvate",
+    "export": "Esporta"
   },
   "search": {
     "selectIndex": "Seleziona Stream First",
@@ -550,7 +551,14 @@
       "learnMore": "Per saperne di più:",
       "quickImpl": "Guida rapida all'implementazione",
       "blogPost": "Nozioni di base sul monitoraggio frontend"
-    }
+    },
+    "sourceMaps": "Mappe di origine",
+    "service": "Servizio",
+    "environment": "Ambiente",
+    "applyFilters": "Applica filtri",
+    "uploadSourceMaps": "Carica mappe di origine",
+    "files": "File",
+    "uploadedAt": "Caricato su"
   },
   "about": {
     "name": "Apri Observe",
@@ -1704,7 +1712,42 @@
     "multiSqlQueryLabelHint": "Nome personalizzato per questa query nelle legende (ad esempio, 'Produzione')",
     "multiQueryWarning": "Viene renderizzato solo l'interrogazione 1 per {chartType}",
     "trellisNotSupportedWithMultiQuery": "Il layout di Trellis è disabilitato con più query. Rimuovi le query aggiuntive per utilizzare trellis.",
-    "xAliasInconsistencyWarning": "Gli alias dell'asse X non sono coerenti tra le query: alcuni utilizzano l'istogramma e altri no. Utilizza lo stesso tipo di alias in tutte le query per risultati prevedibili."
+    "xAliasInconsistencyWarning": "Gli alias dell'asse X non sono coerenti tra le query: alcuni utilizzano l'istogramma e altri no. Utilizza lo stesso tipo di alias in tutte le query per risultati prevedibili.",
+    "subtitle": "Crea, organizza e condividi dashboard tra cartelle",
+    "deleteDashboardConfirmTitle": "Elimina dashboard",
+    "deleteDashboardConfirmMsg": "Sei sicuro di voler eliminare la dashboard?",
+    "deleteDashboardsConfirmTitle": "Elimina dashboard",
+    "deleteDashboardsConfirmMsg": "Sei sicuro di voler eliminare {count} dashboard?",
+    "importCustom": "Personalizzato",
+    "importCustomDesc": "Importazione da file JSON o URL",
+    "importTemplates": "Modelli",
+    "importTemplatesDesc": "Sfoglia e importa dalla galleria",
+    "searchThisFolder": "Questa cartella",
+    "searchThisFolderTitle": "Cerca solo in questa cartella",
+    "searchAllFolders": "Tutte le cartelle",
+    "searchAllFoldersTitle": "Cerca in tutte le cartelle",
+    "reloadDashboards": "Ricarica le dashboard",
+    "editVariable": "Modifica variabile",
+    "addOption": "Aggiungi opzione",
+    "addFilter": "Aggiungi filtro",
+    "noDataFound": "Nessun dato trovato",
+    "streamSelectTooltip": "Seleziona uno stream o usa una variabile come $streamVariable per scegliere dinamicamente lo stream in base a un altro valore.",
+    "fieldSelectTooltip": "Seleziona un campo o usa una variabile come $fieldVariable. Se stream utilizza una variabile, l'elenco dei campi sarà vuoto: digita il nome del campo manualmente.",
+    "filterInfoTooltip": "Nei filtri, puoi utilizzare il valore di un'altra variabile per filtrare il valore della variabile corrente. Questo può essere fatto usando il nome dell'altra variabile. Ad esempio:",
+    "defaultSelectAll": "Predefinito: seleziona tutto",
+    "escapeSingleQuotesTooltip": "Se abilitato, nella query verranno eliminate le virgolette singole. Ad esempio, un valore come `O'Reilly` verrà sostituito come `O\"Reilly`.",
+    "byDefaultSelect": "Per impostazione predefinita, seleziona:",
+    "firstValue": "Primo valore",
+    "allValues": "Tutti i valori",
+    "customValue": "Personalizzato",
+    "showDependencies": "Mostra dipendenze",
+    "deleteVariable": "Elimina variabile",
+    "deleteVariableMsg": "Sei sicuro di voler eliminare la variabile?",
+    "appliedToTabs": "Applicato alle schede:",
+    "appliedToPanels": "Applicato ai pannelli:",
+    "selectVariableScope": "Seleziona ambito variabile",
+    "variableScopeHelp": "Le variabili verranno applicate a tutte le schede e i pannelli se è selezionato globale.",
+    "showDynamicFilters": "Mostra filtri dinamici"
   },
   "panel": {
     "header": "Pannello",
@@ -3312,7 +3355,12 @@
     "layoutHorizontal": "orizzontale",
     "layoutVertical": "Verticale",
     "layoutForce": "Layout delle forze",
-    "exportTraces": "Esporta tracce"
+    "exportTraces": "Esporta tracce",
+    "waterfall": "Cascata",
+    "flameGraph": "Grafico della fiamma",
+    "traceGraph": "Grafico di traccia",
+    "dag": "GIORNO",
+    "thread": "Discussione"
   },
   "invitation": {
     "pendingInvitations": "Inviti in sospeso",
@@ -4851,6 +4899,51 @@
       "evalJobs": "Offerte di lavoro Eval",
       "scorers": "Marcatori",
       "scoreConfigs": "Configurazioni dei punteggi"
+    },
+    "kpi": {
+      "totalCost": "Costo totale",
+      "totalTokens": "Token totali",
+      "totalTraces": "Tracce totali",
+      "p95Latency": "Latenza P95",
+      "errorRate": "Tasso di errore"
+    },
+    "panels": {
+      "costTrend": {
+        "title": "Andamento dei costi",
+        "subtitle": "USD per modello"
+      },
+      "tokenTrend": {
+        "title": "Tendenza dei token",
+        "subtitle": "gettoni per modello"
+      },
+      "spanTrend": {
+        "title": "Tendenza della Spagna",
+        "subtitle": "conteggio degli intervalli per tipo"
+      },
+      "latencyPercentiles": {
+        "title": "Latenza p50/p95/p99",
+        "subtitle": "tutte le chiamate LLM"
+      },
+      "tracesOverTime": {
+        "title": "Tracce nel tempo",
+        "subtitle": "conteggio tracce per servizio"
+      },
+      "errorsOverTime": {
+        "title": "Errori nel tempo",
+        "subtitle": "conteggio errori"
+      },
+      "spansByModel": {
+        "title": "Spaziato per modello",
+        "subtitle": "numero di chiamate per modello"
+      },
+      "tokensByModel": {
+        "title": "Token per modello",
+        "subtitle": "gettoni totali per modello"
+      },
+      "recentErrors": {
+        "title": "Errori recenti",
+        "subtitle": "ultimi 10 intervalli non riusciti"
+      }
     }
   },
   "logs": {

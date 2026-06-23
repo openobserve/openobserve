@@ -132,7 +132,8 @@
     "error": "Error",
     "db": "Base de datos",
     "discardChanges": "Descartar cambios",
-    "unsavedChanges": "Cambios no guardados"
+    "unsavedChanges": "Cambios no guardados",
+    "export": "Exportación"
   },
   "search": {
     "selectIndex": "Selecciona el índice primero",
@@ -550,7 +551,14 @@
       "learnMore": "Obtenga más información:",
       "quickImpl": "Guía de implementación rápida",
       "blogPost": "Conceptos básicos de monitoreo de frontend"
-    }
+    },
+    "sourceMaps": "Mapas de origen",
+    "service": "Servicio",
+    "environment": "Medio ambiente",
+    "applyFilters": "Aplicar filtros",
+    "uploadSourceMaps": "Cargar mapas de origen",
+    "files": "Expedientes",
+    "uploadedAt": "Subido en"
   },
   "about": {
     "name": "Abrir Observe",
@@ -1704,7 +1712,42 @@
     "multiSqlQueryLabelHint": "Nombre personalizado para esta consulta en las leyendas (p. ej., «Producción»)",
     "multiQueryWarning": "Solo se representa la consulta 1 para {chartType}",
     "trellisNotSupportedWithMultiQuery": "El diseño de Trellis está desactivado con varias consultas. Elimine las consultas adicionales para usar Trellis.",
-    "xAliasInconsistencyWarning": "Los alias del eje X son inconsistentes en todas las consultas: algunos usan el histograma y otros no. Utilice el mismo tipo de alias en todas las consultas para obtener resultados predecibles."
+    "xAliasInconsistencyWarning": "Los alias del eje X son inconsistentes en todas las consultas: algunos usan el histograma y otros no. Utilice el mismo tipo de alias en todas las consultas para obtener resultados predecibles.",
+    "subtitle": "Cree, organice y comparta paneles en distintas carpetas",
+    "deleteDashboardConfirmTitle": "Eliminar panel",
+    "deleteDashboardConfirmMsg": "¿Está seguro de que desea eliminar el panel?",
+    "deleteDashboardsConfirmTitle": "Eliminar paneles",
+    "deleteDashboardsConfirmMsg": "¿Estás seguro de que deseas eliminar los paneles de {count}?",
+    "importCustom": "Personalizado",
+    "importCustomDesc": "Importar desde un archivo JSON o URL",
+    "importTemplates": "Plantillas",
+    "importTemplatesDesc": "Navegar e importar desde la galería",
+    "searchThisFolder": "Esta carpeta",
+    "searchThisFolderTitle": "Buscar solo en esta carpeta",
+    "searchAllFolders": "Todas las carpetas",
+    "searchAllFoldersTitle": "Búsqueda en todas las carpetas",
+    "reloadDashboards": "Recargar paneles",
+    "editVariable": "Editar variable",
+    "addOption": "Añadir opción",
+    "addFilter": "Agregar filtro",
+    "noDataFound": "No se han encontrado datos",
+    "streamSelectTooltip": "Selecciona una transmisión o usa una variable como $streamVariable para elegir dinámicamente la transmisión en función de otro valor.",
+    "fieldSelectTooltip": "Seleccione un campo o utilice una variable como $FieldVariable. Si la secuencia usa una variable, la lista de campos estará vacía; escriba el nombre del campo manualmente.",
+    "filterInfoTooltip": "En los filtros, puede usar el valor de otra variable para filtrar el valor de la variable actual. Esto se puede hacer usando el nombre de la otra variable. Por ejemplo:",
+    "defaultSelectAll": "Predeterminado: seleccionar todo",
+    "escapeSingleQuotesTooltip": "Si se habilita, se omiten las comillas simples en la consulta. Por ejemplo, un valor como `O'Reilly` se reemplazará por `O\"Reilly`.",
+    "byDefaultSelect": "Seleccione de forma predeterminada:",
+    "firstValue": "Primer valor",
+    "allValues": "Todos los valores",
+    "customValue": "Personalizado",
+    "showDependencies": "Mostrar dependencias",
+    "deleteVariable": "Eliminar variable",
+    "deleteVariableMsg": "¿Está seguro de que desea eliminar la variable?",
+    "appliedToTabs": "Aplicado a las pestañas:",
+    "appliedToPanels": "Aplicado a paneles:",
+    "selectVariableScope": "Seleccione el alcance variable",
+    "variableScopeHelp": "Las variables se aplicarán a todas las pestañas y paneles si se selecciona global.",
+    "showDynamicFilters": "Mostrar filtros dinámicos"
   },
   "panel": {
     "header": "Panel",
@@ -3299,7 +3342,12 @@
     "layoutHorizontal": "Horizontal",
     "layoutVertical": "Vertical",
     "layoutForce": "Diseño de fuerza",
-    "exportTraces": "Exportar trazas"
+    "exportTraces": "Exportar trazas",
+    "waterfall": "Cascada",
+    "flameGraph": "Gráfico de llamas",
+    "traceGraph": "Gráfico de rastreo",
+    "dag": "DÍA",
+    "thread": "Hilo"
   },
   "invitation": {
     "pendingInvitations": "Invitaciones pendientes",
@@ -4838,6 +4886,51 @@
       "evalJobs": "Empleos en Eval",
       "scorers": "Goleadores",
       "scoreConfigs": "Configuraciones de puntuación"
+    },
+    "kpi": {
+      "totalCost": "Coste total",
+      "totalTokens": "Tokens totales",
+      "totalTraces": "Total de trazas",
+      "p95Latency": "Latencia P95",
+      "errorRate": "Tasa de error"
+    },
+    "panels": {
+      "costTrend": {
+        "title": "Tendencia de costos",
+        "subtitle": "USD por modelo"
+      },
+      "tokenTrend": {
+        "title": "Tendencia simbólica",
+        "subtitle": "fichas por modelo"
+      },
+      "spanTrend": {
+        "title": "Tendencia en España",
+        "subtitle": "recuento de intervalos por tipo"
+      },
+      "latencyPercentiles": {
+        "title": "Latencia p50/p95/p99",
+        "subtitle": "todas las convocatorias de LLM"
+      },
+      "tracesOverTime": {
+        "title": "Huellas a lo largo del tiempo",
+        "subtitle": "recuento de trazas por servicio"
+      },
+      "errorsOverTime": {
+        "title": "Errores a lo largo del tiempo",
+        "subtitle": "recuento de errores"
+      },
+      "spansByModel": {
+        "title": "Vanos por modelo",
+        "subtitle": "recuento de llamadas por modelo"
+      },
+      "tokensByModel": {
+        "title": "Tokens por modelo",
+        "subtitle": "número total de fichas por modelo"
+      },
+      "recentErrors": {
+        "title": "Errores recientes",
+        "subtitle": "últimos 10 intervalos fallidos"
+      }
     }
   },
   "logs": {

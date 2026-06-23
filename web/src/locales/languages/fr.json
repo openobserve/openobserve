@@ -132,7 +132,8 @@
     "error": "Erreur",
     "db": "Base de données",
     "discardChanges": "Ignorer les modifications",
-    "unsavedChanges": "Modifications non enregistrées"
+    "unsavedChanges": "Modifications non enregistrées",
+    "export": "Exporter"
   },
   "search": {
     "selectIndex": "Sélectionnez Stream First",
@@ -550,7 +551,14 @@
       "learnMore": "Pour en savoir plus :",
       "quickImpl": "Guide de mise en œuvre rapide",
       "blogPost": "Principes de base de la surveillance frontale"
-    }
+    },
+    "sourceMaps": "Cartes des sources",
+    "service": "Service",
+    "environment": "L'environnement",
+    "applyFilters": "Appliquer des filtres",
+    "uploadSourceMaps": "Télécharger des cartes sources",
+    "files": "Dossiers",
+    "uploadedAt": "Téléchargé à"
   },
   "about": {
     "name": "Ouvrez Observe",
@@ -1704,7 +1712,42 @@
     "multiSqlQueryLabelHint": "Nom personnalisé pour cette requête dans les légendes (par exemple, « Production »)",
     "multiQueryWarning": "Seule la requête 1 est affichée pour {chartType}",
     "trellisNotSupportedWithMultiQuery": "La disposition en treillis est désactivée en cas de requêtes multiples. Supprimez les requêtes supplémentaires pour utiliser Trellis.",
-    "xAliasInconsistencyWarning": "Les alias de l'axe X ne sont pas cohérents d'une requête à l'autre : certaines utilisent un histogramme, d'autres non. Utilisez le même type d'alias pour toutes les requêtes pour obtenir des résultats prévisibles."
+    "xAliasInconsistencyWarning": "Les alias de l'axe X ne sont pas cohérents d'une requête à l'autre : certaines utilisent un histogramme, d'autres non. Utilisez le même type d'alias pour toutes les requêtes pour obtenir des résultats prévisibles.",
+    "subtitle": "Créez, organisez et partagez des tableaux de bord dans plusieurs dossiers",
+    "deleteDashboardConfirmTitle": "Supprimer le tableau de bord",
+    "deleteDashboardConfirmMsg": "Êtes-vous sûr de vouloir supprimer le tableau de bord ?",
+    "deleteDashboardsConfirmTitle": "Supprimer des tableaux de bord",
+    "deleteDashboardsConfirmMsg": "Êtes-vous sûr de vouloir supprimer le ou les tableaux de bord {count} ?",
+    "importCustom": "Personnalisé",
+    "importCustomDesc": "Importer depuis un fichier JSON ou une URL",
+    "importTemplates": "Modèles",
+    "importTemplatesDesc": "Parcourir et importer depuis la galerie",
+    "searchThisFolder": "Ce dossier",
+    "searchThisFolderTitle": "Rechercher uniquement dans ce dossier",
+    "searchAllFolders": "Tous les dossiers",
+    "searchAllFoldersTitle": "Rechercher dans tous les dossiers",
+    "reloadDashboards": "Recharger les tableaux de bord",
+    "editVariable": "Modifier la variable",
+    "addOption": "Ajouter une option",
+    "addFilter": "Ajouter un filtre",
+    "noDataFound": "Aucune donnée trouvée",
+    "streamSelectTooltip": "Sélectionnez un flux ou utilisez une variable telle que $StreamVariable pour choisir dynamiquement le flux en fonction d'une autre valeur.",
+    "fieldSelectTooltip": "Sélectionnez un champ ou utilisez une variable telle que $FieldVariable. Si stream utilise une variable, la liste des champs sera vide. Tapez le nom du champ manuellement.",
+    "filterInfoTooltip": "Dans les filtres, vous pouvez utiliser la valeur d'une autre variable pour filtrer la valeur de la variable actuelle. Cela peut être fait en utilisant le nom de l'autre variable. Par exemple :",
+    "defaultSelectAll": "Par défaut - Tout sélectionner",
+    "escapeSingleQuotesTooltip": "Si cette option est activée, les guillemets simples seront ignorés dans la requête. Par exemple, une valeur telle que « O'Reilly » sera remplacée par « O » Reilly.",
+    "byDefaultSelect": "Par défaut, sélectionnez :",
+    "firstValue": "Première valeur",
+    "allValues": "Toutes les valeurs",
+    "customValue": "Personnalisé",
+    "showDependencies": "Afficher les dépendances",
+    "deleteVariable": "Supprimer une variable",
+    "deleteVariableMsg": "Êtes-vous sûr de vouloir supprimer la variable ?",
+    "appliedToTabs": "Appliqué aux onglets :",
+    "appliedToPanels": "Appliqué aux panneaux :",
+    "selectVariableScope": "Sélectionnez une portée variable",
+    "variableScopeHelp": "Les variables seront appliquées à tous les onglets et panneaux si l'option globale est sélectionnée.",
+    "showDynamicFilters": "Afficher les filtres dynamiques"
   },
   "panel": {
     "header": "Panneau",
@@ -3301,7 +3344,12 @@
     "layoutHorizontal": "horizontal",
     "layoutVertical": "Verticale",
     "layoutForce": "Disposition des forces",
-    "exportTraces": "Traces d'exportation"
+    "exportTraces": "Traces d'exportation",
+    "waterfall": "Cascade",
+    "flameGraph": "Graphe de flammes",
+    "traceGraph": "Graphique de traçage",
+    "dag": "JOUR",
+    "thread": "fil"
   },
   "invitation": {
     "pendingInvitations": "Invitations en attente",
@@ -4840,6 +4888,51 @@
       "evalJobs": "Emplois chez Eval",
       "scorers": "Buteurs",
       "scoreConfigs": "Configurations de score"
+    },
+    "kpi": {
+      "totalCost": "Coût total",
+      "totalTokens": "Total de jetons",
+      "totalTraces": "Nombre total de traces",
+      "p95Latency": "Latence P95",
+      "errorRate": "Taux d'erreur"
+    },
+    "panels": {
+      "costTrend": {
+        "title": "Tendance des coûts",
+        "subtitle": "USD par modèle"
+      },
+      "tokenTrend": {
+        "title": "Tendance des jetons",
+        "subtitle": "jetons par modèle"
+      },
+      "spanTrend": {
+        "title": "Tendance de l'Espagne",
+        "subtitle": "nombre de spans par type"
+      },
+      "latencyPercentiles": {
+        "title": "Latence p50/p95/p99",
+        "subtitle": "tous les appels LLM"
+      },
+      "tracesOverTime": {
+        "title": "Des traces au fil du temps",
+        "subtitle": "nombre de traces par service"
+      },
+      "errorsOverTime": {
+        "title": "Erreurs au fil du temps",
+        "subtitle": "nombre d'erreurs"
+      },
+      "spansByModel": {
+        "title": "Échelle par modèle",
+        "subtitle": "nombre d'appels par modèle"
+      },
+      "tokensByModel": {
+        "title": "Jetons par modèle",
+        "subtitle": "nombre total de jetons par modèle"
+      },
+      "recentErrors": {
+        "title": "Erreurs récentes",
+        "subtitle": "les 10 dernières spans échouées"
+      }
     }
   },
   "logs": {

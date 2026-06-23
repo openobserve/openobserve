@@ -132,7 +132,8 @@
     "error": "Fout",
     "db": "Database",
     "discardChanges": "Wijzigingen negeren",
-    "unsavedChanges": "Niet opgeslagen wijzigingen"
+    "unsavedChanges": "Niet opgeslagen wijzigingen",
+    "export": "Exporteren"
   },
   "search": {
     "selectIndex": "Selecteer eerst Stream",
@@ -550,7 +551,14 @@
       "learnMore": "Meer informatie:",
       "quickImpl": "Beknopte implementatiegids",
       "blogPost": "Basisprincipes van frontend-monitoring"
-    }
+    },
+    "sourceMaps": "Kaarten met bronnen",
+    "service": "Service",
+    "environment": "Milieu",
+    "applyFilters": "Filters toepassen",
+    "uploadSourceMaps": "Bronkaarten uploaden",
+    "files": "bestanden",
+    "uploadedAt": "Geüpload op"
   },
   "about": {
     "name": "OpenObserve",
@@ -1704,7 +1712,42 @@
     "multiSqlQueryLabelHint": "Aangepaste naam voor deze zoekopdracht in legenda's (bijvoorbeeld 'Productie')",
     "multiQueryWarning": "Alleen Query 1 wordt weergegeven voor {chartType}",
     "trellisNotSupportedWithMultiQuery": "De Trellis-indeling is uitgeschakeld bij meerdere zoekopdrachten. Verwijder extra zoekopdrachten om trellis te gebruiken.",
-    "xAliasInconsistencyWarning": "De aliassen op de X-as zijn niet consistent in alle zoekopdrachten: sommige gebruiken een histogram en andere niet. Gebruik hetzelfde aliastype voor alle zoekopdrachten voor voorspelbare resultaten."
+    "xAliasInconsistencyWarning": "De aliassen op de X-as zijn niet consistent in alle zoekopdrachten: sommige gebruiken een histogram en andere niet. Gebruik hetzelfde aliastype voor alle zoekopdrachten voor voorspelbare resultaten.",
+    "subtitle": "Dashboards maken, ordenen en delen in verschillende mappen",
+    "deleteDashboardConfirmTitle": "Dashboard verwijderen",
+    "deleteDashboardConfirmMsg": "Weet je zeker dat je het dashboard wilt verwijderen?",
+    "deleteDashboardsConfirmTitle": "Dashboards verwijderen",
+    "deleteDashboardsConfirmMsg": "Weet je zeker dat je {count} dashboard (s) wilt verwijderen?",
+    "importCustom": "Op maat",
+    "importCustomDesc": "Importeren vanuit JSON-bestand of URL",
+    "importTemplates": "Sjablonen",
+    "importTemplatesDesc": "Bekijk en importeer vanuit de galerij",
+    "searchThisFolder": "Deze map",
+    "searchThisFolderTitle": "Alleen in deze map zoeken",
+    "searchAllFolders": "Alle mappen",
+    "searchAllFoldersTitle": "Zoek in alle mappen",
+    "reloadDashboards": "Dashboards opnieuw laden",
+    "editVariable": "Variabele bewerken",
+    "addOption": "Optie toevoegen",
+    "addFilter": "Filter toevoegen",
+    "noDataFound": "Geen gegevens gevonden",
+    "streamSelectTooltip": "Selecteer een stream of gebruik een variabele zoals $StreamVariable om dynamisch de stream te kiezen op basis van een andere waarde.",
+    "fieldSelectTooltip": "Selecteer een veld of gebruik een variabele zoals $FieldVariable. Als de stream een variabele gebruikt, is de veldenlijst leeg. Voer de veldnaam handmatig in.",
+    "filterInfoTooltip": "In filters kun je de waarde van een andere variabele gebruiken om de waarde van de huidige variabele te filteren. Dit kan gedaan worden door de naam van de andere variabele te gebruiken. Bijvoorbeeld:",
+    "defaultSelectAll": "Standaard - Alles selecteren",
+    "escapeSingleQuotesTooltip": "Indien ingeschakeld, worden enkele aanhalingstekens in de query als escapet weergegeven. Een waarde zoals `O'Reilly` wordt bijvoorbeeld vervangen door `O\"Reilly`.",
+    "byDefaultSelect": "Selecteer standaard:",
+    "firstValue": "Eerste waarde",
+    "allValues": "Alle waarden",
+    "customValue": "Op maat",
+    "showDependencies": "Afhankelijkheden weergeven",
+    "deleteVariable": "Variabele verwijderen",
+    "deleteVariableMsg": "Weet je zeker dat je de variabele wilt verwijderen?",
+    "appliedToTabs": "Toegepast op tabbladen:",
+    "appliedToPanels": "Van toepassing op panelen:",
+    "selectVariableScope": "Variabel bereik selecteren",
+    "variableScopeHelp": "Variabelen worden toegepast op alle tabbladen en panelen als globaal is geselecteerd.",
+    "showDynamicFilters": "Dynamische filters weergeven"
   },
   "panel": {
     "header": "Paneel",
@@ -3314,7 +3357,12 @@
     "layoutHorizontal": "Horizontaal",
     "layoutVertical": "Verticaal",
     "layoutForce": "Indeling van de kracht",
-    "exportTraces": "Sporen exporteren"
+    "exportTraces": "Sporen exporteren",
+    "waterfall": "Waterval",
+    "flameGraph": "Vlamgrafiek",
+    "traceGraph": "Spoorgrafiek",
+    "dag": "DAG",
+    "thread": "Draad"
   },
   "invitation": {
     "pendingInvitations": "Uitnodigingen in behandeling",
@@ -4853,6 +4901,51 @@
       "evalJobs": "Vacatures bij Eval",
       "scorers": "Scorers",
       "scoreConfigs": "Score-configuraties"
+    },
+    "kpi": {
+      "totalCost": "Totale kosten",
+      "totalTokens": "Totaal aantal tokens",
+      "totalTraces": "Totaal aantal sporen",
+      "p95Latency": "P95 Latentie",
+      "errorRate": "Foutpercentage"
+    },
+    "panels": {
+      "costTrend": {
+        "title": "Kostenontwikkeling",
+        "subtitle": "USD per model"
+      },
+      "tokenTrend": {
+        "title": "Een symbolische trend",
+        "subtitle": "tokens per model"
+      },
+      "spanTrend": {
+        "title": "Spantrend",
+        "subtitle": "aantal spanwijdten per soort"
+      },
+      "latencyPercentiles": {
+        "title": "Latentie p50/p95/p99",
+        "subtitle": "alle LLM-gesprekken"
+      },
+      "tracesOverTime": {
+        "title": "Sporen na verloop van tijd",
+        "subtitle": "aantal tracering per service"
+      },
+      "errorsOverTime": {
+        "title": "Fouten in de loop van de tijd",
+        "subtitle": "aantal fouten"
+      },
+      "spansByModel": {
+        "title": "Overspanningen per model",
+        "subtitle": "aantal gesprekken per model"
+      },
+      "tokensByModel": {
+        "title": "Tokens per model",
+        "subtitle": "totaal aantal tokens per model"
+      },
+      "recentErrors": {
+        "title": "Recente fouten",
+        "subtitle": "laatste 10 mislukte overspanningen"
+      }
     }
   },
   "logs": {
