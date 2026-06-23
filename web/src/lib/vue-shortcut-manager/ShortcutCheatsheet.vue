@@ -527,6 +527,9 @@ function sym(k: string): string {
   if (k === "ctrl" && isMac.value) return "⌘";
   if (k === "alt" && isMac.value) return "⌥";
   if ((k === "delete" || k === "del") && isMac.value) return "⌫";
+  // ⇧ is a Mac glyph; spell it out on Windows/Linux.
+  if (k === "shift") return isMac.value ? "⇧" : "Shift";
+  if (k === "meta") return isMac.value ? "⌘" : "Win";
   return KEY_SYMBOLS[k] ?? k.toUpperCase();
 }
 </script>

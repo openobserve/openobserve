@@ -14,8 +14,8 @@ const isMac =
 const SYMBOLS: Record<string, string> = {
   ctrl: isMac ? "⌘" : "Ctrl",
   cmd: "⌘",
-  meta: "⌘",
-  shift: "⇧",
+  meta: isMac ? "⌘" : "Win",
+  shift: isMac ? "⇧" : "Shift",
   alt: isMac ? "⌥" : "Alt",
   option: "⌥",
   enter: "↵",
