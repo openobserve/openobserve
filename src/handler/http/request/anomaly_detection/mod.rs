@@ -193,6 +193,18 @@ pub async fn update_config(
     Headers(user_email): Headers<UserEmail>,
     Json(mut req): Json<UpdateAnomalyConfigRequest>,
 ) -> Response {
+    #[cfg(feature = "enterprise")]
+    if o2_enterprise::enterprise::common::config::get_config()
+        .anomaly_detection
+        .disabled
+    {
+        return MetaHttpResponse::error(
+            StatusCode::FORBIDDEN.as_u16(),
+            "Anomaly detection is disabled".to_string(),
+        )
+        .into_response();
+    }
+
     // Sanitize empty owner string: treat "" same as omitted on create — fall back to requester.
     req.owner = req.owner.map(|o| {
         if o.is_empty() {
@@ -240,6 +252,18 @@ pub async fn update_config(
 )]
 #[tracing::instrument(skip_all, fields(org_id = %org_id, anomaly_id = %anomaly_id))]
 pub async fn delete_config(Path((org_id, anomaly_id)): Path<(String, String)>) -> Response {
+    #[cfg(feature = "enterprise")]
+    if o2_enterprise::enterprise::common::config::get_config()
+        .anomaly_detection
+        .disabled
+    {
+        return MetaHttpResponse::error(
+            StatusCode::FORBIDDEN.as_u16(),
+            "Anomaly detection is disabled".to_string(),
+        )
+        .into_response();
+    }
+
     match anomaly_service::delete_config(&org_id, &anomaly_id).await {
         Ok(_) => MetaHttpResponse::message(
             StatusCode::OK.as_u16(),
@@ -279,6 +303,18 @@ pub async fn delete_config(Path((org_id, anomaly_id)): Path<(String, String)>) -
 )]
 #[tracing::instrument(skip_all, fields(org_id = %org_id, anomaly_id = %anomaly_id))]
 pub async fn train_model(Path((org_id, anomaly_id)): Path<(String, String)>) -> Response {
+    #[cfg(feature = "enterprise")]
+    if o2_enterprise::enterprise::common::config::get_config()
+        .anomaly_detection
+        .disabled
+    {
+        return MetaHttpResponse::error(
+            StatusCode::FORBIDDEN.as_u16(),
+            "Anomaly detection is disabled".to_string(),
+        )
+        .into_response();
+    }
+
     match anomaly_service::train_model(&org_id, &anomaly_id).await {
         Ok(result) => MetaHttpResponse::json(result),
         Err(e) if e.to_string().contains("not found") => {
@@ -314,6 +350,18 @@ pub async fn train_model(Path((org_id, anomaly_id)): Path<(String, String)>) -> 
 )]
 #[tracing::instrument(skip_all, fields(org_id = %org_id, anomaly_id = %anomaly_id))]
 pub async fn cancel_training(Path((org_id, anomaly_id)): Path<(String, String)>) -> Response {
+    #[cfg(feature = "enterprise")]
+    if o2_enterprise::enterprise::common::config::get_config()
+        .anomaly_detection
+        .disabled
+    {
+        return MetaHttpResponse::error(
+            StatusCode::FORBIDDEN.as_u16(),
+            "Anomaly detection is disabled".to_string(),
+        )
+        .into_response();
+    }
+
     match anomaly_service::cancel_training(&org_id, &anomaly_id).await {
         Ok(()) => MetaHttpResponse::ok("Training cancelled"),
         Err(e) if e.to_string().contains("not found") => {
