@@ -32,17 +32,20 @@ test.describe("IAM Organization form validation", () => {
         testLogger.info('Navigated to IAM Organizations tab');
     });
 
-    test("should disable submit button when organization name is empty", {
+    test("should keep submit enabled and block empty organization name on submit", {
         tag: ['@iamFormValidation', '@smoke', '@P0']
     }, async ({ page }) => {
-        testLogger.info('Testing submit button disabled state for empty org name');
+        testLogger.info('Testing submit gating for empty org name');
 
         await pm.iamFormValidation.openOrganizationForm();
         await expect(pm.iamFormValidation.getOrgDialogLocator()).toBeVisible();
-        // Submit is disabled: :primaryButtonDisabled="(!organizationData.name || !isValidOrgName)"
-        await expect(pm.iamFormValidation.getOrgSubmitBtnLocator()).toBeDisabled();
+        // R3 (Zod migration): Save stays enabled; the schema gates the submit,
+        // not the button. Submitting an empty name reveals the inline error.
+        await expect(pm.iamFormValidation.getOrgSubmitBtnLocator()).toBeEnabled();
+        await pm.iamFormValidation.getOrgSubmitBtnLocator().click();
+        await expect(pm.iamFormValidation.getOrgNameErrorLocator()).toBeVisible();
 
-        testLogger.info('Submit button correctly disabled for empty name');
+        testLogger.info('Empty org name correctly blocked on submit');
     });
 
     test("should show error when organization name contains invalid characters", {
