@@ -800,7 +800,7 @@ describe("Convert PromQL Data Utils", () => {
 
       expect(result.options).toBeDefined();
       expect(result.options.tooltip.textStyle.color).toBe("#fff");
-      expect(result.options.tooltip.backgroundColor).toBe("rgba(0,0,0,1)");
+      expect(result.options.tooltip.backgroundColor).toBe("rgba(22,23,25,0.97)");
     });
 
     it("should handle non-UTC timezone", async () => {
@@ -1852,7 +1852,7 @@ describe("Convert PromQL Data Utils", () => {
         mockAnnotations,
       );
 
-      expect(result.options.tooltip.backgroundColor).toBe("rgba(0,0,0,1)");
+      expect(result.options.tooltip.backgroundColor).toBe("rgba(22,23,25,0.97)");
       expect(result.options.tooltip.textStyle.color).toBe("#fff");
     });
 
@@ -1887,7 +1887,7 @@ describe("Convert PromQL Data Utils", () => {
         mockAnnotations,
       );
 
-      expect(result.options.tooltip.backgroundColor).toBe("rgba(255,255,255,1)");
+      expect(result.options.tooltip.backgroundColor).toBe("rgba(255,255,255,0.97)");
       expect(result.options.tooltip.textStyle.color).toBe("#000");
     });
 
@@ -2117,7 +2117,7 @@ describe("Convert PromQL Data Utils", () => {
       );
 
       // Test that dark theme sets correct backgroundColor (line 662)
-      expect(resultDark.options.tooltip.backgroundColor).toBe("rgba(0,0,0,1)");
+      expect(resultDark.options.tooltip.backgroundColor).toBe("rgba(22,23,25,0.97)");
 
       // Test light theme
       const mockStoreLight = {
@@ -2138,7 +2138,7 @@ describe("Convert PromQL Data Utils", () => {
       );
 
       // Test that light theme sets correct backgroundColor (line 662)
-      expect(resultLight.options.tooltip.backgroundColor).toBe("rgba(255,255,255,1)");
+      expect(resultLight.options.tooltip.backgroundColor).toBe("rgba(255,255,255,0.97)");
     });
 
     it("should test metric chart renderItem function (lines 704-724)", async () => {
