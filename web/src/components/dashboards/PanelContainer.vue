@@ -875,6 +875,10 @@ export default defineComponent({
     const handlePanelKeydown = (e: KeyboardEvent) => {
       if (!isCurrentlyHoveredPanel.value) return;
       if (isInputFocused()) return;
+      // These are single-letter shortcuts — never fire while a modifier is held.
+      // Otherwise combos like Alt+Left (panel-editor "Discard & go back") leaking
+      // a still-held Alt into the next keystroke would wrongly trigger edit/view.
+      if (e.ctrlKey || e.altKey || e.metaKey) return;
       if (e.key === "v" || e.key === "V") {
         e.preventDefault();
         emit("onViewPanel", props.data.id);

@@ -33,6 +33,9 @@ export function useTableRowShortcuts(options: {
   const handleKeydown = (e: KeyboardEvent) => {
     if (!isHovered.value) return;
     if (isInputFocused()) return;
+    // Single-letter shortcuts must never fire while a modifier is held, so a
+    // still-held Ctrl/Alt/Meta from a prior combo can't leak into edit/delete.
+    if (e.ctrlKey || e.altKey || e.metaKey) return;
 
     if (e.key === "e" || e.key === "E") {
       e.preventDefault();
