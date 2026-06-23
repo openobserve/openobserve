@@ -1385,6 +1385,7 @@
     "selectDashboardLabel": "Seleccione panel",
     "selectTabLabel": "Seleccione pestaña",
     "numbers": "Números",
+    "localeFormat": "Formato regional",
     "nanoseconds": "Nanosegundos (ns)",
     "currency": "Moneda",
     "p99": "P99",
@@ -4049,7 +4050,12 @@
     "emptyActionLogs": "Explore los registros",
     "emptyActionLogsDesc": "Busque y filtre sus flujos de registro",
     "emptyActionTraces": "Explora las huellas",
-    "emptyActionTracesDesc": "Inspeccione los rastros distribuidos y la latencia del servicio"
+    "emptyActionTracesDesc": "Inspeccione los rastros distribuidos y la latencia del servicio",
+    "viewAll": "Ver todos",
+    "showingOf": "Mostrando {mostrado} de {total}",
+    "colErrorRate": "Tasa de error",
+    "colLatency": "Latencia",
+    "colReqs": "Reqes"
   },
   "chatHistory": {
     "title": "Charlas",
