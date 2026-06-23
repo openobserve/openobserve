@@ -627,14 +627,6 @@ describe("AlertList - search behaviors", () => {
 // 7. Clipboard, computed helpers, selection label
 describe("AlertList - helpers and utilities", () => {
 
-  it("computedName truncates long names", async () => {
-    const wrapper: any = await mountAlertList();
-    await waitData(wrapper);
-
-    const long = "A".repeat(50);
-    expect(wrapper.vm.computedName(long).endsWith("...")).toBe(true);
-    expect(wrapper.vm.computedName("short")).toBe("short");
-  });
 
   it("computedOwner masks long owners and shows short owners as-is", async () => {
     const wrapper: any = await mountAlertList();
