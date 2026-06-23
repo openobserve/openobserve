@@ -1073,7 +1073,10 @@
     "fieldRequired": "필드는 필수입니다!",
     "dataType": "데이터 유형",
     "dataTypeRequired": "데이터 유형이 필요합니다!",
-    "udsFieldAlreadyInSchema": "하나 이상의 선택된 필드가 이미 정의된 스키마의 일부입니다."
+    "udsFieldAlreadyInSchema": "하나 이상의 선택된 필드가 이미 정의된 스키마의 일부입니다.",
+    "subtitle": "인덱스 관리 및 스트림 구성",
+    "streamNameHelpText": "영숫자, 밑줄 및 콜론만 사용하십시오.",
+    "deleteAssociatedAlertsPipelines": "스트림과 관련된 모든 파이프라인 및 알림 삭제"
   },
   "function": {
     "header": "함수",
@@ -2581,7 +2584,11 @@
     "alertIfValueIs": "값이 다음과 같은 경우 경고",
     "havingSeries": "위빙 시리즈",
     "clearMultiWindowsTitle": "멀티 윈도우를 지우시겠습니까?",
-    "lastTrainedAt": "마지막 교육 날짜"
+    "lastTrainedAt": "마지막 교육 날짜",
+    "noTemplatesMsg": "아직 템플릿을 만들지 않은 것 같습니다.알림을 생성하려면 최소한 하나의 목적지와 하나의 템플릿이 있어야 합니다.",
+    "createTemplateBtn": "템플릿 생성",
+    "noDestinationsMsg": "아직 목적지를 만들지 않은 것 같습니다.알림을 생성하려면 최소한 하나의 목적지와 하나의 템플릿이 있어야 합니다.",
+    "createDestinationBtn": "목적지 생성"
   },
   "alert_templates": {
     "header": "템플릿",

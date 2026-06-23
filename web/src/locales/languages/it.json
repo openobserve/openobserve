@@ -1073,7 +1073,10 @@
     "fieldRequired": "Il campo è obbligatorio!",
     "dataType": "Tipo di dati",
     "dataTypeRequired": "Il tipo di dati è obbligatorio!",
-    "udsFieldAlreadyInSchema": "Uno o più campi selezionati fanno già parte dello schema definito"
+    "udsFieldAlreadyInSchema": "Uno o più campi selezionati fanno già parte dello schema definito",
+    "subtitle": "Gestione degli indici e configurazione dello stream",
+    "streamNameHelpText": "Usa solo caratteri alfanumerici, trattini bassi e due punti.",
+    "deleteAssociatedAlertsPipelines": "Elimina tutte le pipeline e gli avvisi associati allo stream"
   },
   "function": {
     "header": "Funzioni",
@@ -2581,7 +2584,11 @@
     "alertIfValueIs": "Avvisa se il valore è",
     "havingSeries": "Serie Having",
     "clearMultiWindowsTitle": "Cancella le finestre multiple?",
-    "lastTrainedAt": "Ultima formazione a"
+    "lastTrainedAt": "Ultima formazione a",
+    "noTemplatesMsg": "Sembra che tu non abbia ancora creato alcun modello. Per creare un avviso, devi disporre di almeno una destinazione e un modello",
+    "createTemplateBtn": "Crea modello",
+    "noDestinationsMsg": "Sembra che tu non abbia ancora creato alcuna destinazione. Per creare un avviso, devi disporre di almeno una destinazione e un modello",
+    "createDestinationBtn": "Crea destinazione"
   },
   "alert_templates": {
     "header": "Modelli",

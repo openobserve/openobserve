@@ -1073,7 +1073,10 @@
     "fieldRequired": "¡El campo es obligatorio!",
     "dataType": "Tipo de datos",
     "dataTypeRequired": "¡El tipo de datos es obligatorio!",
-    "udsFieldAlreadyInSchema": "Uno o más campos seleccionados ya forman parte del esquema definido"
+    "udsFieldAlreadyInSchema": "Uno o más campos seleccionados ya forman parte del esquema definido",
+    "subtitle": "Administración de índices y configuración de flujos",
+    "streamNameHelpText": "Utilice únicamente caracteres alfanuméricos, guiones bajos y dos puntos.",
+    "deleteAssociatedAlertsPipelines": "Eliminar todas las canalizaciones y alertas asociadas a la transmisión"
   },
   "function": {
     "header": "Funciones",
@@ -2581,7 +2584,11 @@
     "alertIfValueIs": "Alerta si el valor es",
     "havingSeries": "Tener series",
     "clearMultiWindowsTitle": "¿Borrar ventanas múltiples?",
-    "lastTrainedAt": "Entrenado por última vez en"
+    "lastTrainedAt": "Entrenado por última vez en",
+    "noTemplatesMsg": "Parece que aún no has creado ninguna plantilla. Para crear una alerta, necesitarás tener al menos un destino y una plantilla",
+    "createTemplateBtn": "Crear plantilla",
+    "noDestinationsMsg": "Parece que aún no has creado ningún destino. Para crear una alerta, necesitarás tener al menos un destino y una plantilla",
+    "createDestinationBtn": "Crear destino"
   },
   "alert_templates": {
     "header": "Plantillas",

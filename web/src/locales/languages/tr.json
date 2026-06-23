@@ -1073,7 +1073,10 @@
     "fieldRequired": "Alan zorunludur!",
     "dataType": "Veri Türü",
     "dataTypeRequired": "Veri Türü gereklidir!",
-    "udsFieldAlreadyInSchema": "Seçili bir veya daha fazla alan zaten tanımlanmış şemanın bir parçasıdır"
+    "udsFieldAlreadyInSchema": "Seçili bir veya daha fazla alan zaten tanımlanmış şemanın bir parçasıdır",
+    "subtitle": "Dizin yönetimi ve akış yapılandırması",
+    "streamNameHelpText": "Yalnızca alfanümerik karakterler, alt çizgi ve iki nokta üst üste nokta kullanın.",
+    "deleteAssociatedAlertsPipelines": "Akışla ilişkili tüm Boru Hatlarını ve Uyarıları silme"
   },
   "function": {
     "header": "Fonksiyonlar",
@@ -2581,7 +2584,11 @@
     "alertIfValueIs": "Değer ise uyarı",
     "havingSeries": "Serilere sahip olmak",
     "clearMultiWindowsTitle": "Çoklu Pencereleri Temizle?",
-    "lastTrainedAt": "En son eğitildi"
+    "lastTrainedAt": "En son eğitildi",
+    "noTemplatesMsg": "Henüz herhangi bir Şablon oluşturmadınız gibi görünüyor. Uyarı oluşturmak için en az bir Hedef ve bir Şablon bulundurmanız gerekir",
+    "createTemplateBtn": "Şablon Oluştur",
+    "noDestinationsMsg": "Görünüşe göre henüz herhangi bir Hedef oluşturmadınız. Uyarı oluşturmak için en az bir Hedef ve bir Şablon bulundurmanız gerekir",
+    "createDestinationBtn": "Hedef Oluştur"
   },
   "alert_templates": {
     "header": "Şablonlar",
