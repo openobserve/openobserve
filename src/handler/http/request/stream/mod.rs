@@ -809,13 +809,7 @@ pub async fn get_delete_stream_data_status(
         // Super cluster is enabled, get status from all regions
         match get_super_cluster_delete_status(&data_id).await {
             Ok(res) => {
-                // Verify every returned job belongs to the requested org.
-                let org_prefix = format!("{org_id}/");
-                let belongs_to_org = res
-                    .metadata
-                    .iter()
-                    .all(|entry| entry.job.key.starts_with(&org_prefix));
-                if !belongs_to_org {
+                if !job_belongs_to_org(&res, &org_id) {
                     return (
                         StatusCode::NOT_FOUND,
                         Json(MetaHttpResponse::error(
@@ -840,15 +834,8 @@ pub async fn get_delete_stream_data_status(
             }
         }
     } else {
-        // Super cluster not enabled, get local status
         let res = get_local_delete_status(&data_id).await;
-        // Verify the job belongs to the requested org before returning it.
-        let org_prefix = format!("{org_id}/");
-        if !res
-            .metadata
-            .iter()
-            .all(|entry| entry.job.key.starts_with(&org_prefix))
-        {
+        if !job_belongs_to_org(&res, &org_id) {
             return (
                 StatusCode::NOT_FOUND,
                 Json(MetaHttpResponse::error(
@@ -864,13 +851,7 @@ pub async fn get_delete_stream_data_status(
     #[cfg(not(feature = "enterprise"))]
     let response = {
         let res = get_local_delete_status(&data_id).await;
-        // Verify the job belongs to the requested org before returning it.
-        let org_prefix = format!("{org_id}/");
-        if !res
-            .metadata
-            .iter()
-            .all(|entry| entry.job.key.starts_with(&org_prefix))
-        {
+        if !job_belongs_to_org(&res, &org_id) {
             return (
                 StatusCode::NOT_FOUND,
                 Json(MetaHttpResponse::error(
@@ -884,6 +865,13 @@ pub async fn get_delete_stream_data_status(
     };
 
     (StatusCode::OK, Json(response)).into_response()
+}
+
+fn job_belongs_to_org(res: &CompactorManualJobStatusRes, org_id: &str) -> bool {
+    let org_prefix = format!("{org_id}/");
+    res.metadata
+        .iter()
+        .all(|entry| entry.job.key.starts_with(&org_prefix))
 }
 
 async fn get_local_delete_status(id: &str) -> CompactorManualJobStatusRes {
