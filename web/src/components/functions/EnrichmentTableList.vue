@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <AppPageHeader
         :title="t('function.enrichmentTables')"
         icon="dataset"
-        :subtitle="'Lookup tables that enrich ingested data'"
+        :subtitle="t('function.enrichmentTablesSubtitle')"
         tabs-below
         class="tw:shrink-0 tw:px-4"
       >
