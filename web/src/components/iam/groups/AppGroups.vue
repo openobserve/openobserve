@@ -29,7 +29,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="iam-groups-add-group-btn"
           variant="primary"
           size="sm"
-          shortcut="n"
           @click="addGroup"
         >
           {{ t('iam.addGroup') }}

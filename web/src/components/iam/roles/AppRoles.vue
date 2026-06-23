@@ -29,7 +29,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="alert-list-add-alert-btn"
           variant="primary"
           size="sm"
-          shortcut="n"
           @click="addRole"
         >
           {{ t('iam.addRole') }}

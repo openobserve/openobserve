@@ -58,7 +58,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="alert-destination-list-add-alert-btn"
             variant="primary"
             size="sm"
-            shortcut="n"
             :disabled="!templates.length"
             @click="editDestination(null)"
           >{{ t(`alert_destinations.add`) }}</OButton>

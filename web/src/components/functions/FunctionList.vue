@@ -38,7 +38,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="primary"
             size="sm"
             data-test="function-list-add-function-btn"
-            shortcut="n"
             @click="showAddUpdateFn({})"
           >
             {{ t(`function.add`) }}

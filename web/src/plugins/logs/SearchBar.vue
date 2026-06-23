@@ -370,7 +370,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <OIcon name="grid-on" size="sm" />
                   <span class="tw:flex-1">{{ t("search.downloadCSV") }}</span>
-                  <OShortcut keys="ctrl+shift+d" class="tw:ms-auto" />
                 </button>
                 <button
                   type="button"
@@ -621,11 +620,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ? handleGenerateSQLQuery()
                       : handleRunQueryFn()
                   "
-                  :shortcut="
-                    isNaturalLanguageDetected && !searchObj.meta.nlpMode
-                      ? undefined
-                      : 'ctrl+enter'
-                  "
                 >
                   {{
                     isNaturalLanguageDetected && !searchObj.meta.nlpMode
@@ -726,11 +720,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     isNaturalLanguageDetected && !searchObj.meta.nlpMode
                       ? handleGenerateSQLQuery()
                       : handleRunQueryFn()
-                  "
-                  :shortcut="
-                    isNaturalLanguageDetected && !searchObj.meta.nlpMode
-                      ? undefined
-                      : 'ctrl+enter'
                   "
                 >
                   {{
@@ -1649,7 +1638,6 @@ import { useStore } from "vuex";
 import DateTime from "@/components/DateTime.vue";
 import ShareButton from "@/components/common/ShareButton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OShortcut from "@/lib/core/Shortcut/OShortcut.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
@@ -1808,7 +1796,6 @@ export default defineComponent({
   components: {
     OSeparator,
     OSplitter,
-    OShortcut,
     OButtonGroup,
     ODialog,
     ODropdown,

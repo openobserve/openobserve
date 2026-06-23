@@ -75,7 +75,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           icon-left="add"
           data-test="dashboard-new"
           @click="addDashboard"
-          shortcut="n"
         >
           {{ t(`dashboard.add`) }}
         </OButton>

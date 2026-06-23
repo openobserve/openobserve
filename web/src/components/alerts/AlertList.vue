@@ -39,7 +39,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="importAlert"
               data-test="alert-import"
               icon-left="upload-file"
-              shortcut="i"
             >
               <template v-if="!isCompactToolbar">{{ t(`dashboard.import`) }}</template>
               <OTooltip v-if="isCompactToolbar" :content="t('dashboard.import')" side="bottom" shortcut="i" />
@@ -49,7 +48,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="alert-list-add-alert-btn"
               variant="primary"
               size="sm"
-              shortcut="n"
               :disabled="!destinations.length || !templates.length"
               :title="!destinations.length ? t('alerts.noDestinations') : ''"
               @click="

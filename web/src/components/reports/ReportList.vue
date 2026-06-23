@@ -30,7 +30,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="report-list-add-report-btn"
               variant="primary"
               size="sm"
-              shortcut="n"
               @click="createNewReport"
             >
               {{ t(`reports.add`) }}

@@ -82,7 +82,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="metrics-apply"
             :loading="disable"
             :disabled="disable"
-            shortcut="ctrl+enter"
             @click="runQuery"
           >
             {{ t("metrics.runQuery") }}

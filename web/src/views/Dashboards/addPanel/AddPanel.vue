@@ -71,7 +71,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="sm-action"
               @click="goBackToDashboardList"
               data-test="dashboard-panel-discard"
-              shortcut="alt+left"
               >{{ t("panel.discard") }}</OButton
             >
             <OButton
@@ -80,7 +79,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="dashboard-panel-save"
               @click.stop="savePanelData.execute()"
               :loading="savePanelData.isLoading.value"
-              shortcut="ctrl+s"
               >{{ t("panel.save") }}</OButton
             >
             <template
@@ -94,7 +92,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :loading="searchRequestTraceIds.length > 0"
                 :disabled="searchRequestTraceIds.length > 0"
                 @click="() => runQuery(false)"
-                shortcut="ctrl+enter"
                 >{{ t("panel.apply") }}</OButton
               >
               <OButtonGroup v-if="config.isEnterprise === 'true'" radius="lg">
