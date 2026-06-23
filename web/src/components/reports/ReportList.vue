@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Row 1: standard header — title + actions only. Tabs / search / folder
            scope moved into the table's own toolbar below. -->
       <template #header>
-        <AppPageHeader icon="description" :subtitle="'Scheduled reports and exports'">
+        <AppPageHeader icon="description" :subtitle="t('reports.subtitle')">
           <template #title><span data-test="report-list-title">{{ t('reports.header') }}</span></template>
           <template #actions>
             <OButton
@@ -109,14 +109,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               icon-left="folder-outline"
                               data-test="report-list-search-scope-current"
                               title="Search only this folder"
-                            >This folder</OToggleGroupItem>
+                            >{{ t('reports.searchThisFolder') }}</OToggleGroupItem>
                             <OToggleGroupItem
                               value="all"
                               size="xs"
                               icon-left="search"
                               data-test="report-list-search-across-folders-toggle"
                               title="Search across all folders"
-                            >All folders</OToggleGroupItem>
+                            >{{ t('reports.searchAllFolders') }}</OToggleGroupItem>
                           </OToggleGroup>
                         </template>
                       </OInput>
@@ -129,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="icon-sm"
                     icon-left="refresh"
                     :loading="isLoadingReports"
-                    title="Reload reports"
+                    :title="t('reports.reloadReports')"
                     data-test="report-list-refresh-btn"
                     @click="() => { invalidateFolderCache(activeFolderId); loadReports(activeFolderId); }"
                   />
@@ -209,7 +209,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     icon-left="drive-file-move"
                     variant="ghost"
                     size="icon-sm"
-                    title="Move to Folder"
+                    :title="t('reports.moveToFolder')"
                     @click="openMoveDialog(row)"
                   />
 
@@ -240,7 +240,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         size="sm-action"
                         @click="moveMultipleReports"
                       >
-                        Move
+                        {{ t('common.move') }}
                       </OButton>
                       <OButton
                         v-if="selectedReports.length > 0"
@@ -250,7 +250,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         size="sm-action"
                         @click="openBulkDeleteDialog"
                       >
-                        Delete
+                        {{ t('common.delete') }}
                       </OButton>
                     </div>
                   </div>
@@ -273,8 +273,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Bulk delete confirm -->
     <ConfirmDialog
       v-model="confirmBulkDelete"
-      title="Delete Reports"
-      :message="`Are you sure you want to delete ${selectedReports.length} report(s)?`"
+      :title="t('reports.deleteReportsTitle')"
+      :message="t('reports.deleteReportsMsg', { count: selectedReports.length })"
       @update:ok="bulkDeleteReports"
       @update:cancel="confirmBulkDelete = false"
     />
