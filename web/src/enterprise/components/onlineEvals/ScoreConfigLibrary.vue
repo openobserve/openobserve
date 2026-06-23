@@ -79,7 +79,7 @@ the Free Software Foundation, either version 3 of the License, or
               :class="[
                 isSelected(entry.name)
                   ? 'tw:bg-primary/5 tw:border-primary'
-                  : 'tw:border-transparent tw:hover:bg-gray-50',
+                  : 'tw:border-transparent',
               ]"
               :data-test="`score-config-library-item-${entry.name}`"
               @click="toggle(entry)"
