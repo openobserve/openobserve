@@ -33,6 +33,15 @@ const SELECTOR_TYPE_MAP: Record<string, SelectorType> = {
   'data-test': 'TestID',
 }
 
+// Inverse of SELECTOR_TYPE_MAP, for building wire steps from manual UI steps.
+const WIRE_SELECTOR_TYPE_MAP: Record<SelectorType, WireStep['selector_type']> = {
+  CSS: 'css',
+  XPath: 'xpath',
+  Text: 'text',
+  Role: 'role',
+  TestID: 'data-test',
+}
+
 const DEFAULT_TIMEOUT = 30000
 
 function mapAction(action: string): StepAction {
@@ -70,10 +79,64 @@ export function mapWireStep(wire: WireStep): BrowserStep {
     value: mapValue(wire, action),
     timeout: wire.timeout_ms ?? DEFAULT_TIMEOUT,
     code: wire.code || "",
+    // Keep the original extension step untouched for replay (full fidelity).
+    wire,
   }
 }
 
 /** Convert a list of extension wire steps into UI steps. */
 export function mapWireSteps(wires: WireStep[]): BrowserStep[] {
   return wires.map(mapWireStep)
+}
+
+/**
+ * Reverse of {@link mapWireStep}: reconstruct a replayable {@link WireStep} from a
+ * lean UI step that has no recorded `wire` (i.e. manually added in the editor).
+ * Mirrors the fields the extension's `buildActionFromStep` consumes. Returns
+ * `null` for actions the Playwright player can't replay (hover/scroll/wait/screenshot).
+ */
+export function buildWireFromStep(step: BrowserStep): WireStep | null {
+  const base: WireStep = {
+    id: step.id,
+    action: step.action,
+    name: step.name ?? '',
+    selector: step.selector,
+    selector_type: step.selectorType ? WIRE_SELECTOR_TYPE_MAP[step.selectorType] : undefined,
+    timeout_ms: step.timeout ?? DEFAULT_TIMEOUT,
+    pageAlias: 'page',
+    framePath: [],
+  }
+  switch (step.action) {
+    case 'navigate':
+      return { ...base, url: step.value }
+    case 'click':
+      return base
+    case 'type':
+      return { ...base, value: step.value }
+    case 'press':
+      return { ...base, key: step.value }
+    case 'select':
+      return { ...base, options: step.value ? [step.value] : [] }
+    case 'assert':
+      // Lean steps can't express assert subtype; default to assertText when a
+      // value is present, else assertVisible.
+      return step.value !== undefined && step.value !== ''
+        ? { ...base, text: step.value }
+        : base
+    default:
+      // hover / scroll / wait / screenshot — not supported by the player.
+      return null
+  }
+}
+
+/**
+ * Collect the replayable steps from a journey to send to the extension's replay
+ * command. Recorded steps replay verbatim via their preserved `wire`; manual
+ * steps are reverse-mapped via {@link buildWireFromStep}. Unsupported manual
+ * actions yield `null` and are dropped.
+ */
+export function journeyToWireSteps(steps: BrowserStep[]): WireStep[] {
+  return steps
+    .map((s) => s.wire ?? buildWireFromStep(s))
+    .filter((w): w is WireStep => w != null)
 }

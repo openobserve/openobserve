@@ -23,6 +23,10 @@ export interface BrowserStep {
   value?: string
   timeout?: number // ms, default 30000
   code: string
+  // Original, untouched extension step (see WireStep). Preserved for replay,
+  // which sends the rich step back to the extension verbatim. Absent on
+  // manually-added steps.
+  wire?: WireStep
 }
 
 // ── OpenObserve Extension (playwright-crx) recorder protocol ────────────────
@@ -48,13 +52,17 @@ export interface WireStep {
   options?: string[]
   text?: string
   checked?: boolean
+  snapshot?: string
   files?: string[]
+  modifiers?: number
   button?: 'left' | 'middle' | 'right'
+  position?: { x: number; y: number }
   code?: string
   startTime?: number
   endTime?: number
   pageAlias?: string
   framePath?: string[]
+  description?: string
 }
 
 /** Commands the web app sends to the extension via `chrome.runtime.sendMessage`. */
@@ -63,6 +71,8 @@ export type RecorderCommand =
   | { action: 'startRecording'; mode?: RecorderMode; testIdAttr?: string, targetUrl: string }
   | { action: 'stopRecording' }
   | { action: 'setMode'; mode: RecorderMode }
+  | { action: 'replay'; steps: WireStep[]; targetUrl?: string }
+  | { action: 'stopReplay' }
 
 export interface RecorderCommandEnvelope {
   type: 'synthetics-command'
@@ -87,6 +97,16 @@ export interface RecorderStartResponse {
 
 export interface RecorderStopResponse {
   success: boolean
+  error?: string
+}
+
+// Single overall result of a `replay` command (no per-step data). `passed` is
+// false when a step fails (`error` carries that step's message) or when the run
+// was cancelled via `stopReplay` (`stopped: true`).
+export interface ReplayResponse {
+  success: boolean
+  passed: boolean
+  stopped?: boolean
   error?: string
 }
 

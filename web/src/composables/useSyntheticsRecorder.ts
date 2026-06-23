@@ -12,6 +12,8 @@ import type {
   RecorderStartResponse,
   RecorderStatus,
   RecorderStopResponse,
+  ReplayResponse,
+  WireStep,
 } from '@/types/synthetics'
 
 const RECORDING_PORT_NAME = 'synthetics-recorder'
@@ -32,6 +34,8 @@ const useSyntheticsRecorder = () => {
   const currentUrl = ref('')
   const mode = ref<RecorderMode>('recording')
   const error = ref('')
+  const isReplaying = ref(false)
+  const replayResult = ref<ReplayResponse | null>(null)
 
   let port: ChromePort | null = null
 
@@ -177,6 +181,31 @@ const useSyntheticsRecorder = () => {
     liveSteps.value = []
   }
 
+  /**
+   * Replay a journey in the extension's recording window. One-shot command (no
+   * port needed): the promise resolves only when replay finishes, fails at a
+   * step, or is stopped. Returns the overall {@link ReplayResponse}.
+   */
+  async function replay(steps: WireStep[], targetUrl?: string): Promise<ReplayResponse | null> {
+    if (steps.length === 0) {
+      error.value = 'No replayable steps in this journey.'
+      return null
+    }
+    error.value = ''
+    replayResult.value = null
+    isReplaying.value = true
+    const res = await sendCommand<ReplayResponse>({ action: 'replay', steps, targetUrl })
+    console.log("replay Res ----", res);
+    isReplaying.value = false
+    replayResult.value = res
+    return res
+  }
+
+  /** Cancel an in-flight replay; the pending `replay` promise resolves with `stopped`. */
+  function stopReplay(): Promise<unknown> {
+    return sendCommand({ action: 'stopReplay' })
+  }
+
   function setMode(next: RecorderMode): Promise<unknown> {
     mode.value = next
     return sendCommand({ action: 'setMode', mode: next })
@@ -195,10 +224,14 @@ const useSyntheticsRecorder = () => {
     currentUrl,
     mode,
     error,
+    isReplaying,
+    replayResult,
     detectExtension,
     startRecording,
     stopRecording,
     cancelRecording,
+    replay,
+    stopReplay,
     setMode,
     cleanup,
   }

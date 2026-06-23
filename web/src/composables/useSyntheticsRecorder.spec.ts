@@ -158,4 +158,50 @@ describe('useSyntheticsRecorder', () => {
       expect(port.disconnect).toHaveBeenCalled()
     })
   })
+
+  describe('replay', () => {
+    const steps: WireStep[] = [{ id: 's1', action: 'navigate', url: 'https://x.test' }]
+
+    it('should send a replay command, toggle isReplaying, and store the result', async () => {
+      const runtime = installChrome({ replay: (cb) => cb({ success: true, passed: true }) }, port)
+      const r = useSyntheticsRecorder()
+      const res = await r.replay(steps, 'https://x.test')
+
+      expect(runtime.sendMessage).toHaveBeenCalledWith(
+        expect.any(String),
+        { type: 'synthetics-command', command: { action: 'replay', steps, targetUrl: 'https://x.test' } },
+        expect.any(Function),
+      )
+      expect(res).toEqual({ success: true, passed: true })
+      expect(r.isReplaying.value).toBe(false)
+      expect(r.replayResult.value).toEqual({ success: true, passed: true })
+    })
+
+    it('should store a failed replay result with the step error', async () => {
+      installChrome({ replay: (cb) => cb({ success: true, passed: false, error: 'Timeout on #go' }) }, port)
+      const r = useSyntheticsRecorder()
+      const res = await r.replay(steps)
+      expect(res).toMatchObject({ passed: false, error: 'Timeout on #go' })
+    })
+
+    it('should not send a command when there are no steps', async () => {
+      const runtime = installChrome({}, port)
+      const r = useSyntheticsRecorder()
+      const res = await r.replay([])
+      expect(res).toBeNull()
+      expect(runtime.sendMessage).not.toHaveBeenCalled()
+      expect(r.error.value).toContain('No replayable steps')
+    })
+
+    it('stopReplay should send a stopReplay command', async () => {
+      const runtime = installChrome({ stopReplay: (cb) => cb({ success: true }) }, port)
+      const r = useSyntheticsRecorder()
+      await r.stopReplay()
+      expect(runtime.sendMessage).toHaveBeenCalledWith(
+        expect.any(String),
+        { type: 'synthetics-command', command: { action: 'stopReplay' } },
+        expect.any(Function),
+      )
+    })
+  })
 })

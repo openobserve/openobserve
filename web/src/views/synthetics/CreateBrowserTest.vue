@@ -1,9 +1,10 @@
 <script setup lang="ts">
 // Copyright 2026 OpenObserve Inc.
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import type { BrowserCheck } from '@/types/synthetics'
 import useSyntheticsRecorder from '@/composables/useSyntheticsRecorder'
+import { journeyToWireSteps } from '@/utils/synthetics/mapRecordedStep'
 import AppPageHeader from '@/components/common/AppPageHeader.vue'
 import OButton from '@/lib/core/Button/OButton.vue'
 import OIcon from '@/lib/core/Icon/OIcon.vue'
@@ -113,6 +114,34 @@ function saveCheck() {
   const id = crypto.randomUUID()
   router.push({ name: 'synthetic-detail', params: { id }, query: { tab: 'results', saved: '1' } })
 }
+
+// ── Replay ──────────────────────────────────────────────────────────────────
+const isReplaying = recorder.isReplaying
+const replayResult = recorder.replayResult
+const skippedSteps = ref(0)
+
+function onReplay() {
+  const steps = journeyToWireSteps(check.value.journey)
+  skippedSteps.value = check.value.journey.length - steps.length
+  if (steps.length === 0) return
+  recorder.replay(steps, check.value.url).catch((err) => {
+    recorder.error.value = err instanceof Error ? err.message : String(err)
+  })
+}
+
+function onStopReplay() {
+  recorder.stopReplay()
+}
+
+// Inline footer status reflecting the overall replay outcome.
+const replayStatus = computed<{ text: string; tone: 'muted' | 'success' | 'error' } | null>(() => {
+  if (isReplaying.value) return { text: 'Replaying…', tone: 'muted' }
+  const r = replayResult.value
+  if (!r) return null
+  if (r.stopped) return { text: 'Replay stopped', tone: 'muted' }
+  if (r.passed) return { text: 'Replay passed', tone: 'success' }
+  return { text: `Replay failed: ${r.error ?? 'a step did not pass'}`, tone: 'error' }
+})
 </script>
 
 <template>
@@ -327,11 +356,46 @@ function saveCheck() {
 
     <!-- Sticky footer — tab-aware, always visible -->
     <div class="tw:flex tw:items-center tw:justify-end tw:px-3 tw:py-2.5 tw:gap-2 tw:border-t tw:border-[var(--o2-border-color)] tw:shrink-0 tw:bg-[var(--o2-body-primary-bg)]">
-      <!-- Journey tab: Replay + Continue -->
+      <!-- Journey tab: Replay status + Replay/Stop + Continue -->
       <template v-if="activeTab === 'journey'">
-        <OButton variant="outline" size="sm" data-test="synthetics-create-replay-btn">
+        <span
+          v-if="replayStatus"
+          class="tw:mr-auto tw:text-xs tw:flex tw:items-center tw:gap-2"
+          role="status"
+          data-test="synthetics-create-replay-status"
+        >
+          <span
+            :class="{
+              'tw:text-[var(--o2-text-muted)]': replayStatus.tone === 'muted',
+              'tw:text-[var(--o2-status-success)]': replayStatus.tone === 'success',
+              'tw:text-[var(--o2-status-error)]': replayStatus.tone === 'error',
+            }"
+          >{{ replayStatus.text }}</span>
+          <span v-if="skippedSteps > 0" class="tw:text-[var(--o2-text-muted)]">
+            ({{ skippedSteps }} step{{ skippedSteps === 1 ? '' : 's' }} skipped)
+          </span>
+        </span>
+
+        <OButton
+          v-if="!isReplaying"
+          variant="outline"
+          size="sm"
+          :disabled="check.journey.length === 0"
+          data-test="synthetics-create-replay-btn"
+          @click="onReplay"
+        >
           <template #prefix><OIcon name="replay" size="sm" /></template>
           Replay
+        </OButton>
+        <OButton
+          v-else
+          variant="outline"
+          size="sm"
+          data-test="synthetics-create-stop-replay-btn"
+          @click="onStopReplay"
+        >
+          <template #prefix><OIcon name="stop" size="sm" /></template>
+          Stop Replay
         </OButton>
         <OButton variant="primary" size="sm" data-test="synthetics-create-continue-btn" @click="activeTab = 'configure'">
           Continue
