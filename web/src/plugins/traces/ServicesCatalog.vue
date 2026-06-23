@@ -272,24 +272,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Request / error count columns -->
         <template #cell-total_requests="{ item }">
-          <ServiceCatalogBarCell
-            :value="item.total_requests"
-            :max="columnMaxes.total_requests"
-            :label="formatLargeNumber(item.total_requests)"
-            :tooltip="item.total_requests.toLocaleString()"
-            :data-test="`services-catalog-requests-${item.service_name}`"
-          />
+          <span :data-test="`services-catalog-requests-${item.service_name}`">
+            {{ formatLargeNumber(item.total_requests) }}
+            <OTooltip :content="item.total_requests.toLocaleString()" />
+          </span>
         </template>
 
         <template #cell-error_count="{ item }">
-          <ServiceCatalogBarCell
-            :value="item.error_count"
-            :max="columnMaxes.error_count"
-            :label="formatLargeNumber(item.error_count)"
-            :tooltip="item.error_count.toLocaleString()"
-            :variant="item.error_count > 0 ? 'danger' : 'default'"
-            :data-test="`services-catalog-errors-${item.service_name}`"
-          />
+          <span :data-test="`services-catalog-errors-${item.service_name}`">
+            {{ formatLargeNumber(item.error_count) }}
+            <OTooltip :content="item.error_count.toLocaleString()" />
+          </span>
         </template>
 
         <!-- Latency / duration columns -->
@@ -550,18 +543,18 @@ const tableColumns = computed(() => [
     meta: { slot: true, align: "right", sortable: true },
   },
   {
-    id: "error_rate",
-    header: t("traces.servicesCatalog.columns.errorRate"),
-    accessorKey: "error_rate",
-    size: 110,
-    enableSorting: true,
-    meta: { slot: true, align: "right", sortable: true },
-  },
-  {
     id: "error_count",
     header: t("traces.servicesCatalog.columns.errors"),
     accessorKey: "error_count",
     size: 90,
+    enableSorting: true,
+    meta: { slot: true, align: "right", sortable: true },
+  },
+  {
+    id: "error_rate",
+    header: t("traces.servicesCatalog.columns.errorRate"),
+    accessorKey: "error_rate",
+    size: 110,
     enableSorting: true,
     meta: { slot: true, align: "right", sortable: true },
   },
@@ -619,8 +612,6 @@ function colMax(key: keyof ServiceRow): number {
 }
 
 const columnMaxes = computed(() => ({
-  total_requests: colMax("total_requests"),
-  error_count: colMax("error_count"),
   error_rate: colMax("error_rate"),
   p50_latency_ns: colMax("p50_latency_ns"),
   p95_latency_ns: colMax("p95_latency_ns"),
