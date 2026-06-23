@@ -823,7 +823,7 @@ async fn process_node(
                     metadata.pipeline_name,
                 );
             }
-            count
+            0
         }
         #[cfg(feature = "enterprise")]
         NodeData::LlmEvaluation(params) => {
@@ -832,16 +832,18 @@ async fn process_node(
         #[cfg(not(feature = "enterprise"))]
         NodeData::LlmEvaluation(_) => {
             log::warn!(
-                "[Pipeline] {pipeline_name} [inv={inv_id}]: LLM evaluation node {node_idx} skipped because online evals are enterprise-only"
+                "[Pipeline] {} [inv={inv_id}]: LLM evaluation node {node_idx} skipped because online evals are enterprise-only",
+                metadata.pipeline_name
             );
             let mut skipped_count = 0usize;
             while channels.receiver.recv().await.is_some() {
                 skipped_count += 1;
             }
             log::info!(
-                "[Pipeline] {pipeline_name} [inv={inv_id}]: LLM evaluation node {node_idx} skipped {skipped_count} records"
+                "[Pipeline] {} [inv={inv_id}]: LLM evaluation node {node_idx} skipped {skipped_count} records",
+                metadata.pipeline_name
             );
-            count
+            0
         }
     };
 
