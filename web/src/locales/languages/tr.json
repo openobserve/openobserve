@@ -941,7 +941,12 @@
     "authTypeSSO": "SSO",
     "authTypeLocal": "Yerli",
     "noCustomRolesHint": "Özel rol tanımlanmadı - IAM → Roller'de bir tane oluşturun",
-    "externalUserCustomRoleHint": "Harici kullanıcılar yalnızca kaynak sistem üzerinden değiştirilebilir"
+    "externalUserCustomRoleHint": "Harici kullanıcılar yalnızca kaynak sistem üzerinden değiştirilebilir",
+    "subtitle": "Bu organizasyona erişimi olan kişiler",
+    "revokeInvitationTitle": "Davetiyeyi İptal Et",
+    "revokeInvitationMsg": "{email} davetini iptal etmek istediğinizden emin misiniz?",
+    "deleteUsersTitle": "Kullanıcıları Sil",
+    "deleteUsersMsg": "{count} kullanıcıyı silmek istediğinizden emin misiniz?"
   },
   "ticket": {
     "header": "Destek Talepleri",
@@ -1003,7 +1008,8 @@
     "proceed_subscription": "Aboneliğe Geçin",
     "subscription_plan": "Abonelik Planı",
     "makeBilledMember": "Bu Kuruluşu {org} Faturalandırma Üyesi Yapın",
-    "manage": "Yönetmek"
+    "manage": "Yönetmek",
+    "nameHelpText": "Yalnızca alfanümerik karakterler, boşluk ve alt çizgi kullanın."
   },
   "template": {
     "header": "Şablonlar",
@@ -1136,7 +1142,11 @@
     "vrlFunctionHint": "Geçerli olayı temsil etmek için `.` tuşunu kullanın. Örnek: .new_field = .existing_field + 'işlenmiş'",
     "askAIFunctionPlaceholder": "Yapay zekadan işlevinize yardım etmesini isteyin...",
     "enterFunctionPrompt": "Fonksiyon oluşturmak için bir istem girin",
-    "jsErrorDetails": "JavaScript Hata Ayrıntıları"
+    "jsErrorDetails": "JavaScript Hata Ayrıntıları",
+    "subtitle": "Boru hatlarında uygulanan yeniden kullanılabilir VRL fonksiyonları",
+    "clickTestFunctionHint": "Etkinlikleri görmek için lütfen Test Fonksiyonu'na tıklayın",
+    "pleaseEnterQuery": "Lütfen bir sorgu girin",
+    "enrichmentTablesSubtitle": "Alınan verileri zenginleştiren arama tabloları"
   },
   "confirmDialog": {
     "cancel": "İptal",
@@ -2949,7 +2959,19 @@
     "externalUserWarningTitle": "Harici kullanıcı uyarısı",
     "externalUserWarningMessage": "Harici kullanıcıları doğrudan rollere eklemek izin vermez. Bunun yerine Kullanıcı Gruplarına ekleyin.",
     "invitations": "Davetiyeler",
-    "ingestionTokens": "Yutma Jetonları"
+    "ingestionTokens": "Yutma Jetonları",
+    "sectionAccess": "Erişim",
+    "sectionPermissions": "İzinler",
+    "sectionOrganization": "Organizasyon",
+    "usersDesc": "Bu organizasyona erişimi olan kişiler",
+    "serviceAccountsDesc": "API'ler için programlı erişim belirteçleri",
+    "ingestionTokensDesc": "Bu kuruluşa veri almak için belirteçler",
+    "invitationsDesc": "Bekleyen ve gönderilen üye davetleri",
+    "groupsDesc": "Rol atamak için kullanıcıları gruplandırın",
+    "rolesDesc": "İzinleri ve erişim ilkelerini tanımlayın",
+    "quotaDesc": "Rol başına uygulanan kullanım sınırları",
+    "organizationsDesc": "Erişebileceğiniz kuruluşlar",
+    "nameHelpText": "Yalnızca alfanümerik ve '_' karakterleri boşluk olmadan kullanın."
   },
   "pipeline": {
     "header": "Boru hatları",

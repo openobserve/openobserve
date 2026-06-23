@@ -941,7 +941,12 @@
     "authTypeSSO": "SSO",
     "authTypeLocal": "ネイティブ",
     "noCustomRolesHint": "カスタムロールは定義されていません — IAM → ロールで作成",
-    "externalUserCustomRoleHint": "外部ユーザーはソースシステム経由でのみ変更できます"
+    "externalUserCustomRoleHint": "外部ユーザーはソースシステム経由でのみ変更できます",
+    "subtitle": "この組織へのアクセス権を持つユーザー",
+    "revokeInvitationTitle": "招待を取り消す",
+    "revokeInvitationMsg": "{email} への招待を取り消してもよろしいですか？",
+    "deleteUsersTitle": "ユーザーを削除する",
+    "deleteUsersMsg": "{count} 人のユーザーを削除してよろしいですか?"
   },
   "serviceAccounts": {
     "header": "サービスアカウント",
@@ -1020,7 +1025,8 @@
     "proceed_subscription": "購読に進む",
     "subscription_plan": "サブスクリプションプラン",
     "makeBilledMember": "この組織を {org} の請求メンバーにする",
-    "manage": "管理"
+    "manage": "管理",
+    "nameHelpText": "英数字、スペース、アンダースコアのみを使用してください。"
   },
   "template": {
     "header": "テンプレート",
@@ -1153,7 +1159,11 @@
     "vrlFunctionHint": "現在のイベントを表すには `.` を使用してください。例:.new_field = .既存のフィールド + '処理済み'",
     "askAIFunctionPlaceholder": "AIに機能の支援を依頼してください...",
     "enterFunctionPrompt": "関数を生成するプロンプトを入力してください",
-    "jsErrorDetails": "JavaScript エラーの詳細"
+    "jsErrorDetails": "JavaScript エラーの詳細",
+    "subtitle": "パイプラインに適用される再利用可能な VRL 機能",
+    "clickTestFunctionHint": "イベントを確認するには、「テスト機能」をクリックしてください",
+    "pleaseEnterQuery": "クエリを入力してください",
+    "enrichmentTablesSubtitle": "取り込んだデータを充実させるルックアップテーブル"
   },
   "confirmDialog": {
     "cancel": "キャンセル",
@@ -2957,7 +2967,19 @@
     "externalUserWarningTitle": "外部ユーザー警告",
     "externalUserWarningMessage": "外部ユーザーをロールに直接追加しても権限は付与されません。代わりにユーザーグループに追加してください。",
     "invitations": "招待状",
-    "ingestionTokens": "インジェストトークン"
+    "ingestionTokens": "インジェストトークン",
+    "sectionAccess": "アクセス",
+    "sectionPermissions": "パーミッション",
+    "sectionOrganization": "組織",
+    "usersDesc": "この組織へのアクセス権を持つユーザー",
+    "serviceAccountsDesc": "API のプログラマティックアクセストークン",
+    "ingestionTokensDesc": "この組織にデータを取り込むためのトークン",
+    "invitationsDesc": "保留中および送信済みのメンバーへの招待",
+    "groupsDesc": "ユーザーをグループ化して役割を割り当てる",
+    "rolesDesc": "権限とアクセスポリシーの定義",
+    "quotaDesc": "ロールごとに適用される使用制限",
+    "organizationsDesc": "アクセスできる組織",
+    "nameHelpText": "スペースを入れずに、英数字と '_' 文字のみを使用してください。"
   },
   "pipeline": {
     "header": "パイプライン",

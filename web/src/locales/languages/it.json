@@ -941,7 +941,12 @@
     "authTypeSSO": "SSO",
     "authTypeLocal": "Nativo",
     "noCustomRolesHint": "Nessun ruolo personalizzato definito: creane uno in IAM → Ruoli",
-    "externalUserCustomRoleHint": "Gli utenti esterni possono essere modificati solo tramite il sistema sorgente"
+    "externalUserCustomRoleHint": "Gli utenti esterni possono essere modificati solo tramite il sistema sorgente",
+    "subtitle": "Persone con accesso a questa organizzazione",
+    "revokeInvitationTitle": "Revoca l'invito",
+    "revokeInvitationMsg": "Sei sicuro di voler revocare l'invito per {email}?",
+    "deleteUsersTitle": "Elimina utenti",
+    "deleteUsersMsg": "Sei sicuro di voler eliminare {count} utente/i?"
   },
   "ticket": {
     "header": "Ticket di assistenza",
@@ -1003,7 +1008,8 @@
     "proceed_subscription": "Procedi alla sottoscrizione",
     "subscription_plan": "Piano di abbonamento",
     "makeBilledMember": "Rendi questa organizzazione un membro di fatturazione di {org}",
-    "manage": "Gestisci"
+    "manage": "Gestisci",
+    "nameHelpText": "Usa solo caratteri alfanumerici, spazi e trattini bassi."
   },
   "template": {
     "header": "Modelli",
@@ -1136,7 +1142,11 @@
     "vrlFunctionHint": "Usa il `.` per rappresentare l'evento corrente. Esempio: .new_field = .existing_field + 'processed'",
     "askAIFunctionPlaceholder": "Chiedi all'IA di aiutarti con la tua funzione...",
     "enterFunctionPrompt": "Inserisci un prompt per generare la funzione",
-    "jsErrorDetails": "Dettagli sull'errore JavaScript"
+    "jsErrorDetails": "Dettagli sull'errore JavaScript",
+    "subtitle": "Funzioni VRL riutilizzabili applicate nelle pipeline",
+    "clickTestFunctionHint": "Fai clic su Funzione di test per visualizzare gli eventi",
+    "pleaseEnterQuery": "Inserisci una richiesta",
+    "enrichmentTablesSubtitle": "Tabelle di ricerca che arricchiscono i dati inseriti"
   },
   "confirmDialog": {
     "cancel": "Annulla",
@@ -2947,7 +2957,19 @@
     "externalUserWarningTitle": "Avviso per l'utente esterno",
     "externalUserWarningMessage": "L'aggiunta diretta di utenti esterni ai ruoli non concederà autorizzazioni. Aggiungili invece ai gruppi di utenti.",
     "invitations": "Inviti",
-    "ingestionTokens": "Token di ingestione"
+    "ingestionTokens": "Token di ingestione",
+    "sectionAccess": "Accesso",
+    "sectionPermissions": "Autorizzazioni",
+    "sectionOrganization": "Organizzazione",
+    "usersDesc": "Persone con accesso a questa organizzazione",
+    "serviceAccountsDesc": "Token di accesso programmatico per le API",
+    "ingestionTokensDesc": "Token per l'inserimento di dati in questa organizzazione",
+    "invitationsDesc": "Inviti ai membri in sospeso e inviati",
+    "groupsDesc": "Raggruppa gli utenti per assegnare i ruoli",
+    "rolesDesc": "Definire le autorizzazioni e le politiche di accesso",
+    "quotaDesc": "Limiti di utilizzo applicati per ruolo",
+    "organizationsDesc": "Organizzazioni a cui puoi accedere",
+    "nameHelpText": "Usa solo caratteri alfanumerici e '_', senza spazi."
   },
   "pipeline": {
     "header": "Oleodotti",

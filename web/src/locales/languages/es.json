@@ -941,7 +941,12 @@
     "authTypeSSO": "SSO",
     "authTypeLocal": "Nativo",
     "noCustomRolesHint": "No hay roles personalizados definidos: cree uno en IAM → Roles",
-    "externalUserCustomRoleHint": "Los usuarios externos solo se pueden modificar a través del sistema fuente"
+    "externalUserCustomRoleHint": "Los usuarios externos solo se pueden modificar a través del sistema fuente",
+    "subtitle": "Personas con acceso a esta organización",
+    "revokeInvitationTitle": "Revocar invitación",
+    "revokeInvitationMsg": "¿Estás seguro de que quieres revocar la invitación de {email}?",
+    "deleteUsersTitle": "Eliminar usuarios",
+    "deleteUsersMsg": "¿Estás seguro de que quieres eliminar los usuarios de {count}?"
   },
   "ticket": {
     "header": "Tickets de soporte",
@@ -1003,7 +1008,8 @@
     "proceed_subscription": "Proceder a la suscripción",
     "subscription_plan": "Plan de suscripción",
     "makeBilledMember": "Haga de esta organización un miembro de facturación de {org}",
-    "manage": "Administrar"
+    "manage": "Administrar",
+    "nameHelpText": "Utilice únicamente caracteres alfanuméricos, espacios y guiones bajos."
   },
   "template": {
     "header": "Plantillas",
@@ -1136,7 +1142,11 @@
     "vrlFunctionHint": "Usa el `.` para representar el evento actual. Ejemplo: .new_field = .existing_field + 'procesado'",
     "askAIFunctionPlaceholder": "Pídele a la IA que te ayude con tu función...",
     "enterFunctionPrompt": "Introduzca un mensaje para generar la función",
-    "jsErrorDetails": "Detalles del error de JavaScript"
+    "jsErrorDetails": "Detalles del error de JavaScript",
+    "subtitle": "Funciones VRL reutilizables aplicadas en tuberías",
+    "clickTestFunctionHint": "Haga clic en Probar función para ver los eventos",
+    "pleaseEnterQuery": "Introduzca una consulta",
+    "enrichmentTablesSubtitle": "Tablas de búsqueda que enriquecen los datos ingeridos"
   },
   "confirmDialog": {
     "cancel": "Cancelar",
@@ -2934,7 +2944,19 @@
     "externalUserWarningTitle": "Advertencia de usuario externo",
     "externalUserWarningMessage": "Agregar usuarios externos directamente a los roles no otorgará permisos. En su lugar, agréguelos a los grupos de usuarios.",
     "invitations": "Invitaciones",
-    "ingestionTokens": "Tokens de ingestión"
+    "ingestionTokens": "Tokens de ingestión",
+    "sectionAccess": "Acceso",
+    "sectionPermissions": "Permisos",
+    "sectionOrganization": "Organización",
+    "usersDesc": "Personas con acceso a esta organización",
+    "serviceAccountsDesc": "Tokens de acceso programático para API",
+    "ingestionTokensDesc": "Tokens para ingerir datos en esta organización",
+    "invitationsDesc": "Invitaciones de miembros pendientes y enviadas",
+    "groupsDesc": "Agrupe a los usuarios para asignar funciones",
+    "rolesDesc": "Definir políticas de permisos y acceso",
+    "quotaDesc": "Límites de uso aplicados por rol",
+    "organizationsDesc": "Organizaciones a las que puede acceder",
+    "nameHelpText": "Utilice únicamente caracteres alfanuméricos y «_», sin espacios."
   },
   "pipeline": {
     "header": "Tuberías",

@@ -941,7 +941,12 @@
     "authTypeSSO": "SSO",
     "authTypeLocal": "Einheimisch",
     "noCustomRolesHint": "Keine benutzerdefinierten Rollen definiert — erstellen Sie eine in IAM → Rollen",
-    "externalUserCustomRoleHint": "Externe Benutzer können nur über das Quellsystem geändert werden"
+    "externalUserCustomRoleHint": "Externe Benutzer können nur über das Quellsystem geändert werden",
+    "subtitle": "Personen mit Zugang zu dieser Organisation",
+    "revokeInvitationTitle": "Einladung widerrufen",
+    "revokeInvitationMsg": "Bist du sicher, dass du die Einladung für {email} widerrufen möchtest?",
+    "deleteUsersTitle": "Benutzer löschen",
+    "deleteUsersMsg": "Sind Sie sicher, dass Sie {count} Benutzer löschen möchten?"
   },
   "ticket": {
     "header": "Tickets für den Support",
@@ -1003,7 +1008,8 @@
     "proceed_subscription": "Weiter zum Abonnement",
     "subscription_plan": "Abonnementplan",
     "makeBilledMember": "Diese Organisation zu einem Rechnungsmitglied von {org} machen",
-    "manage": "Managen"
+    "manage": "Managen",
+    "nameHelpText": "Verwenden Sie nur alphanumerische Zeichen, Leerzeichen und Unterstriche."
   },
   "template": {
     "header": "Vorlagen",
@@ -1136,7 +1142,11 @@
     "vrlFunctionHint": "Verwenden Sie das `.`, um das aktuelle Ereignis darzustellen. Beispiel: .new_field = .existing_field + 'verarbeitet'",
     "askAIFunctionPlaceholder": "Bitten Sie KI um Hilfe bei Ihrer Funktion...",
     "enterFunctionPrompt": "Geben Sie eine Aufforderung ein, um eine Funktion zu generieren",
-    "jsErrorDetails": "JavaScript-Fehlerdetails"
+    "jsErrorDetails": "JavaScript-Fehlerdetails",
+    "subtitle": "Wiederverwendbare VRL-Funktionen, die in Pipelines angewendet werden",
+    "clickTestFunctionHint": "Bitte klicken Sie auf Funktion testen, um die Ereignisse zu sehen",
+    "pleaseEnterQuery": "Bitte geben Sie eine Anfrage ein",
+    "enrichmentTablesSubtitle": "Nachschlagetabellen, die aufgenommene Daten anreichern"
   },
   "confirmDialog": {
     "cancel": "Abbrechen",
@@ -2936,7 +2946,19 @@
     "externalUserWarningTitle": "Warnung für externe Benutzer",
     "externalUserWarningMessage": "Wenn Sie externe Benutzer direkt zu Rollen hinzufügen, werden keine Berechtigungen erteilt. Fügen Sie sie stattdessen zu Benutzergruppen hinzu.",
     "invitations": "Einladungen",
-    "ingestionTokens": "Tokens für die Aufnahme"
+    "ingestionTokens": "Tokens für die Aufnahme",
+    "sectionAccess": "Zugriff",
+    "sectionPermissions": "Genehmigungen",
+    "sectionOrganization": "Organisation",
+    "usersDesc": "Personen mit Zugang zu dieser Organisation",
+    "serviceAccountsDesc": "Programmatische Zugriffstoken für APIs",
+    "ingestionTokensDesc": "Tokens für die Aufnahme von Daten in diese Organisation",
+    "invitationsDesc": "Ausstehende und gesendete Mitgliedereinladungen",
+    "groupsDesc": "Gruppieren Sie Benutzer, um Rollen zuzuweisen",
+    "rolesDesc": "Definieren Sie Berechtigungen und Zugriffsrichtlinien",
+    "quotaDesc": "Pro Rolle geltende Nutzungsbeschränkungen",
+    "organizationsDesc": "Organisationen, auf die Sie zugreifen können",
+    "nameHelpText": "Verwenden Sie nur alphanumerische Zeichen und '_'-Zeichen ohne Leerzeichen."
   },
   "pipeline": {
     "header": "Rohrleitungen",
