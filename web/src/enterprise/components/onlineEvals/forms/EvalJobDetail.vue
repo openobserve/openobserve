@@ -96,7 +96,10 @@
       </nav>
 
       <!-- ── Body ── -->
-      <div class="jd__body">
+      <div
+        class="jd__body"
+        :class="{ 'jd__body--form': activeTab === 'configuration' }"
+      >
         <!-- Configuration -->
         <template v-if="activeTab === 'configuration'">
           <!-- Target -->
@@ -323,6 +326,7 @@
             :page-size="20"
             :page-size-options="[20, 50, 100, 200]"
             :empty-message="t('onlineEvals.job.detail.runs.empty')"
+            :footer-title="t('onlineEvals.job.detail.tabs.runs')"
             width="100%"
             class="tw:w-full"
           >
@@ -434,6 +438,7 @@
             :page-size="20"
             :page-size-options="[20, 50, 100, 200]"
             :empty-message="t('onlineEvals.job.detail.failures.recentEmpty')"
+            :footer-title="t('onlineEvals.job.detail.tabs.failures')"
             width="100%"
             class="tw:w-full"
           >
@@ -918,8 +923,11 @@ const runColumns = computed(() => [
     header: t("onlineEvals.job.detail.runs.col.scorer"),
     accessorKey: "scorerId",
     sortable: true,
-    size: "auto",
-    meta: { align: "left" },
+    // Numeric size + `flex`: this column fills the leftover width AND stays
+    // resizable. `size: "auto"` is not a valid size — it broke column-width
+    // computation (header/body misalignment) and the resize grips.
+    size: 220,
+    meta: { align: "left", flex: true },
   },
   {
     id: "target",
@@ -942,7 +950,10 @@ const runColumns = computed(() => [
     accessorKey: "latencyMs",
     sortable: true,
     size: 110,
-    meta: { align: "right" },
+    // Left-aligned to match the rest of the columns. A sortable header can't
+    // right-align (its flex-1 sort wrapper overrides justify-end), so a
+    // right-aligned cell would never line up under the header label.
+    meta: { align: "left" },
   },
   {
     id: "status",
@@ -1152,6 +1163,13 @@ function relativeTime(timestampMs: number): string {
   gap: 18px;
   min-height: 0;
   background: var(--color-card-bg);
+}
+
+// Form-style tabs (Configuration) need breathing room at the bottom. The
+// table tabs (Runs / Failures) intentionally keep the table flush to the
+// bottom edge, so the padding is opt-in per tab.
+.jd__body--form {
+  padding-bottom: 18px;
 }
 
 /* — Configuration sections — */

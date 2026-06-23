@@ -96,7 +96,10 @@
       </nav>
 
       <!-- ── Body ── -->
-      <div class="sd__body">
+      <div
+        class="sd__body"
+        :class="{ 'sd__body--form': activeTab !== 'runs' }"
+      >
         <!-- Configuration -->
         <template v-if="activeTab === 'configuration'">
           <section class="sd-section">
@@ -282,6 +285,7 @@
             :page-size="20"
             :page-size-options="[20, 50, 100, 200]"
             :empty-message="t('onlineEvals.scorer.detail.runs.empty')"
+            :footer-title="t('onlineEvals.scorer.detail.tabs.runs')"
             width="100%"
             class="tw:w-full"
           >
@@ -661,8 +665,10 @@ const runColumns = computed(() => [
     header: t("onlineEvals.scorer.detail.runs.col.job"),
     accessorKey: "jobId",
     sortable: true,
-    size: "auto",
-    meta: { align: "left" },
+    // Numeric size + `flex`: fills the leftover width AND stays resizable.
+    // `size: "auto"` broke column-width computation and the resize grips.
+    size: 220,
+    meta: { align: "left", flex: true },
   },
   {
     id: "target",
@@ -685,7 +691,9 @@ const runColumns = computed(() => [
     accessorKey: "latencyMs",
     sortable: true,
     size: 110,
-    meta: { align: "right" },
+    // Left-aligned to match the rest of the columns (a sortable header can't
+    // right-align, so a right-aligned cell never lines up under the label).
+    meta: { align: "left" },
   },
   {
     id: "status",
@@ -909,6 +917,13 @@ function relativeTime(timestampMs: number): string {
   gap: 18px;
   min-height: 0;
   background: var(--color-card-bg);
+}
+
+// Form-style tabs (Configuration / Versions / Used By) need breathing room at
+// the bottom. The Runs tab keeps its table flush to the bottom edge, so the
+// padding is opt-in per tab.
+.sd__body--form {
+  padding-bottom: 18px;
 }
 
 .sd__tab-intro {
