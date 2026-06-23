@@ -343,10 +343,20 @@ pub async fn ingest(
     // batch process records through pipeline
     if let Some(exec_pl) = &executable_pipeline {
         let records_count = pipeline_inputs.len();
-        match exec_pl
+        let pipeline_start = std::time::Instant::now();
+        let pl_result = exec_pl
             .process_batch(org_id, pipeline_inputs, Some(stream_name.clone()))
-            .await
-        {
+            .await;
+        if cfg.common.print_key_event {
+            // Pipeline wall-time vs total ingest elapsed so far, to see the realtime
+            // pipeline's share of ingestion latency at the ingest layer.
+            log::info!(
+                "[Pipeline:Timing] ingest org={org_id} stream={stream_name} records={records_count} pipeline_ms={} ingest_elapsed_ms={}",
+                pipeline_start.elapsed().as_millis(),
+                start.elapsed().as_millis(),
+            );
+        }
+        match pl_result {
             Err(e) => {
                 log::error!(
                     "[Pipeline] for stream {org_id}/{stream_name}: Batch execution error: {e}.",
