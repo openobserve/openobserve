@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Row 1: standard header — title + actions only (Import/Add). The alert
            type toggle, search and folder scope moved into the table toolbar. -->
       <template #header>
-        <AppPageHeader :title="t('alerts.header')" :subtitle="'Alert rules and notification channels'" icon="shield-alert-outline">
+        <AppPageHeader :title="t('alerts.header')" :subtitle="t('alerts.subtitle')" icon="shield-alert-outline">
           <template #actions>
             <!-- Import button -->
             <OButton
@@ -155,14 +155,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               icon-left="folder-outline"
                               data-test="alert-list-search-scope-current"
                               title="Search only this folder"
-                            >This folder</OToggleGroupItem>
+                            >{{ t('alerts.searchThisFolder') }}</OToggleGroupItem>
                             <OToggleGroupItem
                               value="all"
                               size="xs"
                               icon-left="search"
                               data-test="alert-list-search-across-folders-toggle"
                               title="Search across all folders"
-                            >All folders</OToggleGroupItem>
+                            >{{ t('alerts.searchAllFolders') }}</OToggleGroupItem>
                           </OToggleGroup>
                         </template>
                       </OInput>
@@ -1074,7 +1074,7 @@ export default defineComponent({
               {
                 id: "last_trained_at",
                 accessorKey: "last_trained_at",
-                header: "Last Trained At",
+                header: t("alerts.lastTrainedAt"),
                 cell: " ",
                 sortable: true,
                 resizable: true,
@@ -1085,7 +1085,7 @@ export default defineComponent({
               {
                 id: "status",
                 accessorKey: "status",
-                header: "Status",
+                header: t("alerts.status"),
                 cell: " ",
                 sortable: true,
                 resizable: true,
