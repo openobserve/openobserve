@@ -28,7 +28,8 @@ const openGroupKey = moduleRef<string | null>(null);
  *
  *  • Link + subnav (`parentItem` provided) — the tile IS a navigating MenuLink
  *    (e.g. Data → /streams). Hovering reveals its sub-pages; clicking lands on
- *    the main page. No pinning (the click navigates away).
+ *    the main page while keeping the flyout open, so the sub-pages stay put
+ *    instead of vanishing the moment you click; moving the cursor away closes it.
  *
  *  • Pure group (no `parentItem`) — the tile is a non-navigating MenuLink
  *    trigger. Hover opens; clicking pins the flyout open until an outside
@@ -260,8 +261,12 @@ function onTriggerClick() {
   }
 }
 
+// Link-mode tiles navigate on click. We keep the flyout OPEN on click (instead
+// of letting it close immediately) so the sub-pages stay visible after you land
+// on the main page — but we don't pin it, so moving the cursor away still closes
+// it through the normal hover-out timer.
 function onLinkClick() {
-  close();
+  open();
 }
 
 function onTileKeydown(event: KeyboardEvent) {

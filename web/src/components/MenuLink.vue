@@ -224,7 +224,6 @@ export default defineComponent({
     const rootProps = computed<Record<string, any>>(() => {
       const common: Record<string, any> = {
         "data-test": `menu-link-${props.link}-item`,
-        title: props.title,
         "aria-label": ariaLabel.value,
       };
       if (props.external) {
@@ -311,7 +310,7 @@ export default defineComponent({
    - Clamp to two lines and hide the overflow so a verbose single-word
      translation (e.g. German "Einstellungen") truncates with an ellipsis on
      one tidy line rather than blowing up the row height; the full text is still
-     available via the anchor's title tooltip and aria-label.
+     available via the anchor's aria-label.
    - hyphens:none guarantees we never insert a dash character. */
 .nav-menu-item-label {
   display: -webkit-box;
