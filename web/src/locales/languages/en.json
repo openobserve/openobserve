@@ -5543,6 +5543,8 @@
       "tableRowView": "View hovered row",
       "tableRowExport": "Export hovered row",
       "tableRowDelete": "Delete hovered row (opens confirm dialog)",
+      "dashboardRowEdit": "Edit hovered panel",
+      "dashboardRowExport": "Export Dashboard",
       "panelView": "View panel fullscreen",
       "panelQueryInspector": "Open query inspector",
       "panelEdit": "Edit panel",
