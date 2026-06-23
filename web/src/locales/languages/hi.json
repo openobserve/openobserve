@@ -1205,6 +1205,7 @@
     "selectDashboardLabel": "Select Dashboard",
     "selectTabLabel": "Select Tab",
     "numbers": "Numbers",
+    "localeFormat": "Locale Format",
     "nanoseconds": "Nanoseconds (ns)",
     "currency": "Currency",
     "p99": "P99",

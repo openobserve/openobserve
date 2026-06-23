@@ -1386,6 +1386,7 @@
     "selectDashboardLabel": "Wählen Sie Dashboard",
     "selectTabLabel": "Wählen Sie Tab",
     "numbers": "Zahlen",
+    "localeFormat": "Gebietsschema-Format",
     "nanoseconds": "Nanosekunden (ns)",
     "currency": "Währung",
     "p99": "P99",
@@ -4051,7 +4052,12 @@
     "emptyActionLogs": "Logs erkunden",
     "emptyActionLogsDesc": "Suchen und filtern Sie Ihre Log-Streams",
     "emptyActionTraces": "Spuren erkunden",
-    "emptyActionTracesDesc": "Untersuchen Sie verteilte Traces und die Servicelatenz"
+    "emptyActionTracesDesc": "Untersuchen Sie verteilte Traces und die Servicelatenz",
+    "viewAll": "Alles ansehen",
+    "showingOf": "Es werden {gezeigt} von {total} angezeigt",
+    "colErrorRate": "Fehlerrate",
+    "colLatency": "Latenz",
+    "colReqs": "Requen"
   },
   "chatHistory": {
     "title": "Chats",

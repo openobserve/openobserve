@@ -1386,6 +1386,7 @@
     "selectDashboardLabel": "选择仪表盘",
     "selectTabLabel": "选择选项卡",
     "numbers": "数字",
+    "localeFormat": "区域格式",
     "nanoseconds": "纳秒 (ns)",
     "currency": "货币",
     "p99": "P99",
@@ -4055,7 +4056,12 @@
     "emptyActionLogs": "浏览日志",
     "emptyActionLogsDesc": "搜索和筛选您的日志流",
     "emptyActionTraces": "探索踪迹",
-    "emptyActionTracesDesc": "检查分布式跟踪和服务延迟"
+    "emptyActionTracesDesc": "检查分布式跟踪和服务延迟",
+    "viewAll": "查看全部",
+    "showingOf": "显示 {总计} 中的 {已显示}",
+    "colErrorRate": "错误率",
+    "colLatency": "延迟",
+    "colReqs": "要求"
   },
   "chatHistory": {
     "title": "聊天",

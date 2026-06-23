@@ -411,6 +411,48 @@ describe("Convert PromQL Data Utils", () => {
       expect(result.extras.isTimeSeries).toBe(false);
     });
 
+    it("exposes _metricText and _metricLayout on the metric series for copy", async () => {
+      const panelSchema = {
+        id: "panel1",
+        type: "metric",
+        config: { background: { value: { color: "#FFFFFF" } } },
+        queries: [{ config: { promql_legend: "" } }],
+      };
+      const searchQueryData = [
+        {
+          resultType: "matrix",
+          result: [
+            {
+              metric: { job: "test-job" },
+              values: [[1640435200, "42"], [1640435260, "45"]],
+            },
+          ],
+        },
+      ];
+
+      const result = await convertPromQLData(
+        panelSchema,
+        searchQueryData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockAnnotations,
+      );
+
+      const series = result.options.series[0];
+      // The displayed value is also what gets copied.
+      expect(series._metricText).toBeDefined();
+      // Layout is sized to the panel (mockChartPanelRef: 500x300), centered.
+      expect(series._metricLayout).toMatchObject({
+        left: 0,
+        top: 0,
+        width: 500,
+        height: 300,
+        cx: 250,
+        cy: 150,
+      });
+    });
+
 
     it("should handle bar chart type", async () => {
       const panelSchema = {

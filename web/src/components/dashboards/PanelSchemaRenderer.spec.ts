@@ -60,6 +60,10 @@ vi.mock("@/utils/dashboard/convertPanelData", () => ({
   }),
 }));
 
+vi.mock("@/utils/clipboard", () => ({
+  copyToClipboard: vi.fn(() => Promise.resolve(true)),
+}));
+
 vi.mock("@/utils/commons", () => ({
   getAllDashboardsByFolderId: vi.fn(),
   getDashboard: vi.fn(),
@@ -160,6 +164,7 @@ import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { usePanelDataLoader } from "@/composables/dashboard/usePanelDataLoader";
+import { copyToClipboard } from "@/utils/clipboard";
 
 
 describe("PanelSchemaRenderer", () => {
@@ -2279,6 +2284,96 @@ describe("PanelSchemaRenderer", () => {
       expect(wrapper.vm.metadata).toBeDefined();
       expect(wrapper.vm.panelSchema.queries).toBeDefined();
       expect(wrapper.vm.panelSchema.queries.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe("metric copy button", () => {
+    const metricSeries = () => [
+      {
+        _metricText: "1.50KB",
+        _metricLayout: {
+          left: 0,
+          top: 0,
+          width: 200,
+          height: 100,
+          cx: 100,
+          cy: 50,
+          fontSize: 24,
+        },
+      },
+      {
+        _metricText: "2.00MB",
+        _metricLayout: {
+          left: 200,
+          top: 0,
+          width: 200,
+          height: 100,
+          cx: 300,
+          cy: 50,
+          fontSize: 24,
+        },
+      },
+    ];
+
+    const mountMetric = async (series = metricSeries()) => {
+      const w = createWrapper({
+        panelSchema: { ...defaultProps.panelSchema, type: "metric" },
+      });
+      await flushPromises();
+      w.vm.panelData = { chartType: "metric", options: { series } };
+      await nextTick();
+      return w;
+    };
+
+    it("builds one copy item per metric value", async () => {
+      wrapper = await mountMetric();
+      expect(wrapper.vm.metricItems).toHaveLength(2);
+      expect(wrapper.vm.metricItems[0]).toMatchObject({ idx: 0, text: "1.50KB" });
+      expect(wrapper.vm.metricItems[1]).toMatchObject({ idx: 1, text: "2.00MB" });
+    });
+
+    it("skips series without a value or layout", async () => {
+      wrapper = await mountMetric([
+        { _metricText: "", _metricLayout: { left: 0, width: 100 } },
+        { _metricText: "5", _metricLayout: null },
+      ]);
+      expect(wrapper.vm.metricItems).toHaveLength(0);
+    });
+
+    it("returns no items for non-metric panels", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+      wrapper.vm.panelData = { options: { series: metricSeries() } };
+      await nextTick();
+      expect(wrapper.vm.metricItems).toEqual([]);
+    });
+
+    it("zone style spans the value's grid cell", async () => {
+      wrapper = await mountMetric();
+      expect(wrapper.vm.metricZoneStyle(wrapper.vm.metricItems[1])).toEqual({
+        left: "200px",
+        top: "0px",
+        width: "200px",
+        height: "100px",
+      });
+    });
+
+    it("positions the icon beside the number, clamped inside the cell", async () => {
+      wrapper = await mountMetric();
+      const style = wrapper.vm.metricIconStyle(wrapper.vm.metricItems[0]);
+      // jsdom has no layout so calculateWidthText returns 0:
+      // left = (cx 100 - left 0) + 0/2 + 2 = 102; maxLeft = 200 - 28 - 2 = 170.
+      expect(style.left).toBe("102px");
+      expect(style.top).toBe("50px");
+      expect(style.transform).toBe("translateY(-50%)");
+    });
+
+    it("copies the displayed value and flags the copied state", async () => {
+      wrapper = await mountMetric();
+      wrapper.vm.copyMetricItem(wrapper.vm.metricItems[1]);
+      expect(copyToClipboard).toHaveBeenCalledWith("2.00MB", { silent: true });
+      await flushPromises();
+      expect(wrapper.vm.metricCopiedIdx).toBe(1);
     });
   });
 });
