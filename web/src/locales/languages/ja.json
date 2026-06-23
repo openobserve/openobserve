@@ -132,7 +132,8 @@
     "error": "[エラー]",
     "db": "[データベース]",
     "discardChanges": "変更を破棄",
-    "unsavedChanges": "未保存の変更"
+    "unsavedChanges": "未保存の変更",
+    "export": "[エクスポート]"
   },
   "search": {
     "metrics": "メトリクス",
@@ -550,7 +551,14 @@
       "learnMore": "さらに詳しく:",
       "quickImpl": "クイック実装ガイド",
       "blogPost": "フロントエンド監視の基本"
-    }
+    },
+    "sourceMaps": "ソースマップ",
+    "service": "サービス",
+    "environment": "環境",
+    "applyFilters": "フィルターを適用",
+    "uploadSourceMaps": "ソースマップをアップロード",
+    "files": "[ファイル]",
+    "uploadedAt": "アップロード日"
   },
   "about": {
     "name": "OpenObserve",
@@ -1721,7 +1729,42 @@
     "multiSqlQueryLabelHint": "このクエリの凡例でのカスタム名 (例:'Production')",
     "multiQueryWarning": "{chartType} ではクエリ 1 のみがレンダリングされます",
     "trellisNotSupportedWithMultiQuery": "Trellis レイアウトは複数のクエリで無効になります。トレリスを使用するには余分なクエリを削除してください。",
-    "xAliasInconsistencyWarning": "X 軸のエイリアスはクエリ間で一貫性がありません。ヒストグラムを使用するものと使用しないものがあります。予測可能な結果を得るには、すべてのクエリで同じエイリアスタイプを使用してください。"
+    "xAliasInconsistencyWarning": "X 軸のエイリアスはクエリ間で一貫性がありません。ヒストグラムを使用するものと使用しないものがあります。予測可能な結果を得るには、すべてのクエリで同じエイリアスタイプを使用してください。",
+    "subtitle": "複数のフォルダでダッシュボードを作成、整理、共有",
+    "deleteDashboardConfirmTitle": "ダッシュボードを削除",
+    "deleteDashboardConfirmMsg": "ダッシュボードを削除してよろしいですか?",
+    "deleteDashboardsConfirmTitle": "ダッシュボードを削除する",
+    "deleteDashboardsConfirmMsg": "{count} 個のダッシュボードを削除してよろしいですか?",
+    "importCustom": "カスタム",
+    "importCustomDesc": "JSON ファイルまたは URL からのインポート",
+    "importTemplates": "[テンプレート]",
+    "importTemplatesDesc": "ギャラリーからブラウズしてインポートする",
+    "searchThisFolder": "このフォルダー",
+    "searchThisFolderTitle": "このフォルダのみを検索する",
+    "searchAllFolders": "すべてのフォルダー",
+    "searchAllFoldersTitle": "すべてのフォルダを検索する",
+    "reloadDashboards": "ダッシュボードを再読み込み",
+    "editVariable": "[変数を編集]",
+    "addOption": "オプションを追加",
+    "addFilter": "フィルターを追加",
+    "noDataFound": "データが見つかりません",
+    "streamSelectTooltip": "ストリームを選択するか、$streamVariable などの変数を使用して、別の値に基づいてストリームを動的に選択します。",
+    "fieldSelectTooltip": "フィールドを選択するか、$FieldVariable のような変数を使用してください。ストリームが変数を使用する場合、フィールドリストは空になります。フィールド名を手動で入力してください。",
+    "filterInfoTooltip": "フィルターでは、別の変数の値を使用して現在の変数の値をフィルターできます。これは、他の変数の名前を使用して行うことができます。例えば:",
+    "defaultSelectAll": "デフォルト-すべて選択",
+    "escapeSingleQuotesTooltip": "有効にすると、クエリ内で一重引用符がエスケープされます。たとえば、`O'Reilly` のような値は `O \"Reilly` に置き換えられます。",
+    "byDefaultSelect": "デフォルトでは以下を選択:",
+    "firstValue": "1 番目の値",
+    "allValues": "すべての値",
+    "customValue": "カスタム",
+    "showDependencies": "依存関係を表示",
+    "deleteVariable": "変数を削除",
+    "deleteVariableMsg": "変数を削除してよろしいですか?",
+    "appliedToTabs": "タブに適用:",
+    "appliedToPanels": "パネルに適用:",
+    "selectVariableScope": "変数スコープの選択",
+    "variableScopeHelp": "グローバルが選択されている場合、変数はすべてのタブとパネルに適用されます。",
+    "showDynamicFilters": "ダイナミックフィルターを表示"
   },
   "panel": {
     "header": "パネル",
@@ -3322,7 +3365,12 @@
     "layoutHorizontal": "水平",
     "layoutVertical": "垂直",
     "layoutForce": "フォースレイアウト",
-    "exportTraces": "トレースをエクスポート"
+    "exportTraces": "トレースをエクスポート",
+    "waterfall": "ウォーターフォール",
+    "flameGraph": "フレームグラフ",
+    "traceGraph": "トレースグラフ",
+    "dag": "ダグ",
+    "thread": "スレッド"
   },
   "actions": {
     "testAction": "アクションをテスト",
@@ -4840,6 +4888,51 @@
       "evalJobs": "評価ジョブ",
       "scorers": "スコアラー",
       "scoreConfigs": "スコア構成"
+    },
+    "kpi": {
+      "totalCost": "合計費用",
+      "totalTokens": "合計トークン",
+      "totalTraces": "トレース総数",
+      "p95Latency": "P95 レイテンシー",
+      "errorRate": "エラー率"
+    },
+    "panels": {
+      "costTrend": {
+        "title": "コストトレンド",
+        "subtitle": "モデル別の米ドル"
+      },
+      "tokenTrend": {
+        "title": "トークントレンド",
+        "subtitle": "モデル別トークン"
+      },
+      "spanTrend": {
+        "title": "スパントレンド",
+        "subtitle": "種類別のスパンカウント"
+      },
+      "latencyPercentiles": {
+        "title": "レイテンシー p50/p95/p99",
+        "subtitle": "すべての LLM コール"
+      },
+      "tracesOverTime": {
+        "title": "経時的なトレース",
+        "subtitle": "サービス別のトレースカウント"
+      },
+      "errorsOverTime": {
+        "title": "時間の経過に伴うエラー",
+        "subtitle": "エラー数"
+      },
+      "spansByModel": {
+        "title": "モデル別のスパン",
+        "subtitle": "モデルごとのコール数"
+      },
+      "tokensByModel": {
+        "title": "モデル別トークン",
+        "subtitle": "モデルごとの合計トークン"
+      },
+      "recentErrors": {
+        "title": "最近のエラー",
+        "subtitle": "直近10回失敗したスパン"
+      }
     }
   },
   "logs": {

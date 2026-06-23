@@ -132,7 +132,8 @@
     "error": "오류",
     "db": "데이터베이스",
     "discardChanges": "변경 내용 취소",
-    "unsavedChanges": "저장되지 않은 변경 사항"
+    "unsavedChanges": "저장되지 않은 변경 사항",
+    "export": "익스포트"
   },
   "search": {
     "selectIndex": "스트림 우선 선택",
@@ -550,7 +551,14 @@
       "learnMore": "자세히 알아보기:",
       "quickImpl": "빠른 구현 가이드",
       "blogPost": "프런트엔드 모니터링 기본 사항"
-    }
+    },
+    "sourceMaps": "소스 맵",
+    "service": "서비스",
+    "environment": "환경",
+    "applyFilters": "필터 적용",
+    "uploadSourceMaps": "소스 맵 업로드",
+    "files": "파일들",
+    "uploadedAt": "업로드 시간"
   },
   "about": {
     "name": "오픈 옵저브",
@@ -1704,7 +1712,42 @@
     "multiSqlQueryLabelHint": "범례로 표시된 이 쿼리의 사용자 지정 이름 (예: 'Production')",
     "multiQueryWarning": "{chartType} 에 대해서는 쿼리 1만 렌더링됩니다.",
     "trellisNotSupportedWithMultiQuery": "다중 쿼리에서 격자 레이아웃을 사용할 수 없습니다.격자를 사용하려면 추가 쿼리를 제거하세요.",
-    "xAliasInconsistencyWarning": "X축 별칭은 쿼리 간에 일치하지 않습니다. 히스토그램을 사용하는 쿼리도 있고 그렇지 않은 쿼리도 있습니다.예측 가능한 결과를 얻으려면 모든 쿼리에 동일한 별칭 유형을 사용하십시오."
+    "xAliasInconsistencyWarning": "X축 별칭은 쿼리 간에 일치하지 않습니다. 히스토그램을 사용하는 쿼리도 있고 그렇지 않은 쿼리도 있습니다.예측 가능한 결과를 얻으려면 모든 쿼리에 동일한 별칭 유형을 사용하십시오.",
+    "subtitle": "폴더 간에 대시보드 생성, 구성 및 공유",
+    "deleteDashboardConfirmTitle": "대시보드 삭제",
+    "deleteDashboardConfirmMsg": "정말로 대시보드를 삭제하시겠습니까?",
+    "deleteDashboardsConfirmTitle": "대시보드 삭제",
+    "deleteDashboardsConfirmMsg": "정말로 {count} 개의 대시보드를 삭제하시겠습니까?",
+    "importCustom": "사용자 지정",
+    "importCustomDesc": "JSON 파일 또는 URL에서 가져오기",
+    "importTemplates": "템플릿",
+    "importTemplatesDesc": "갤러리에서 찾아보기 및 가져오기",
+    "searchThisFolder": "이 폴더",
+    "searchThisFolderTitle": "이 폴더만 검색",
+    "searchAllFolders": "모든 폴더",
+    "searchAllFoldersTitle": "모든 폴더에서 검색",
+    "reloadDashboards": "대시보드 다시 로드",
+    "editVariable": "변수 편집",
+    "addOption": "옵션 추가",
+    "addFilter": "필터 추가",
+    "noDataFound": "데이터를 찾을 수 없음",
+    "streamSelectTooltip": "스트림을 선택하거나 $streamVariable과 같은 변수를 사용하여 다른 값을 기반으로 스트림을 동적으로 선택합니다.",
+    "fieldSelectTooltip": "필드를 선택하거나 $FieldVariable과 같은 변수를 사용합니다.스트림에서 변수를 사용하는 경우 필드 목록이 비어 있게 됩니다. 필드 이름을 수동으로 입력하세요.",
+    "filterInfoTooltip": "필터에서는 다른 변수의 값을 사용하여 현재 변수 값을 필터링할 수 있습니다.다른 변수의 이름을 사용하여 이 작업을 수행할 수 있습니다.예를 들면 다음과 같습니다.",
+    "defaultSelectAll": "기본값 - 모두 선택",
+    "escapeSingleQuotesTooltip": "활성화하면 작은 따옴표가 쿼리에서 이스케이프됩니다.예를 들어 `오라일리`와 같은 값은 `O\"Reilly`로 대체됩니다.",
+    "byDefaultSelect": "기본적으로 다음을 선택합니다.",
+    "firstValue": "첫 번째 가치",
+    "allValues": "모든 값",
+    "customValue": "사용자 지정",
+    "showDependencies": "종속성 보기",
+    "deleteVariable": "변수 삭제",
+    "deleteVariableMsg": "정말로 변수를 삭제하시겠습니까?",
+    "appliedToTabs": "탭에 적용:",
+    "appliedToPanels": "패널에 적용:",
+    "selectVariableScope": "변수 범위 선택",
+    "variableScopeHelp": "글로벌을 선택하면 변수가 모든 탭과 패널에 적용됩니다.",
+    "showDynamicFilters": "동적 필터 보기"
   },
   "panel": {
     "header": "패널",
@@ -3314,7 +3357,12 @@
     "layoutHorizontal": "수평형",
     "layoutVertical": "수직형",
     "layoutForce": "포스 레이아웃",
-    "exportTraces": "트레이스 내보내기"
+    "exportTraces": "트레이스 내보내기",
+    "waterfall": "폭포",
+    "flameGraph": "플레임 그래프",
+    "traceGraph": "트레이스 그래프",
+    "dag": "DAG",
+    "thread": "스레드"
   },
   "invitation": {
     "pendingInvitations": "보류 중인 초대",
@@ -4853,6 +4901,51 @@
       "evalJobs": "평가 작업",
       "scorers": "득점자",
       "scoreConfigs": "스코어 구성"
+    },
+    "kpi": {
+      "totalCost": "총 비용",
+      "totalTokens": "총 토큰",
+      "totalTraces": "토탈 트레이스",
+      "p95Latency": "P95 레이턴시",
+      "errorRate": "오류율"
+    },
+    "panels": {
+      "costTrend": {
+        "title": "비용 추세",
+        "subtitle": "모델별 USD"
+      },
+      "tokenTrend": {
+        "title": "토큰 트렌드",
+        "subtitle": "모델별 토큰"
+      },
+      "spanTrend": {
+        "title": "스팬 트렌드",
+        "subtitle": "종류별 스팬 수"
+      },
+      "latencyPercentiles": {
+        "title": "레이턴시 p50/p95/p99",
+        "subtitle": "모든 LLM 통화"
+      },
+      "tracesOverTime": {
+        "title": "시간 경과에 따른 추적",
+        "subtitle": "서비스별 추적 수"
+      },
+      "errorsOverTime": {
+        "title": "시간 경과에 따른 오류",
+        "subtitle": "오류 개수"
+      },
+      "spansByModel": {
+        "title": "모델별 스팬",
+        "subtitle": "모델당 콜 수"
+      },
+      "tokensByModel": {
+        "title": "모델별 토큰",
+        "subtitle": "모델당 총 토큰"
+      },
+      "recentErrors": {
+        "title": "최근 오류",
+        "subtitle": "지난 10개의 실패한 스팬"
+      }
     }
   },
   "logs": {

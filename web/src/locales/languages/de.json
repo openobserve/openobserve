@@ -132,7 +132,8 @@
     "error": "Fehler",
     "db": "Datenbank",
     "discardChanges": "Änderungen verwerfen",
-    "unsavedChanges": "Ungespeicherte Änderungen"
+    "unsavedChanges": "Ungespeicherte Änderungen",
+    "export": "Exportieren"
   },
   "search": {
     "selectIndex": "Wählen Sie Zuerst streamen",
@@ -550,7 +551,14 @@
       "learnMore": "Erfahre mehr:",
       "quickImpl": "Anleitung zur schnellen Implementierung",
       "blogPost": "Grundlagen der Frontend-Überwachung"
-    }
+    },
+    "sourceMaps": "Quellkarten",
+    "service": "Bedienung",
+    "environment": "Umwelt",
+    "applyFilters": "Filter anwenden",
+    "uploadSourceMaps": "Quellkarten hochladen",
+    "files": "Dateien",
+    "uploadedAt": "Hochgeladen am"
   },
   "about": {
     "name": "Observe öffnen",
@@ -1704,7 +1712,42 @@
     "multiSqlQueryLabelHint": "Benutzerdefinierter Name für diese Abfrage in Legenden (z. B. 'Production')",
     "multiQueryWarning": "Nur Abfrage 1 wird für {chartType} gerendert",
     "trellisNotSupportedWithMultiQuery": "Das Trellis-Layout ist bei mehreren Abfragen deaktiviert. Entfernen Sie zusätzliche Abfragen, um Trellis zu verwenden.",
-    "xAliasInconsistencyWarning": "X-Achsen-Aliase sind bei allen Abfragen inkonsistent: Einige verwenden ein Histogramm, andere nicht. Verwenden Sie für alle Abfragen denselben Aliastyp, um vorhersehbare Ergebnisse zu erzielen."
+    "xAliasInconsistencyWarning": "X-Achsen-Aliase sind bei allen Abfragen inkonsistent: Einige verwenden ein Histogramm, andere nicht. Verwenden Sie für alle Abfragen denselben Aliastyp, um vorhersehbare Ergebnisse zu erzielen.",
+    "subtitle": "Dashboards ordnerübergreifend erstellen, organisieren und teilen",
+    "deleteDashboardConfirmTitle": "Dashboard löschen",
+    "deleteDashboardConfirmMsg": "Möchten Sie das Dashboard wirklich löschen?",
+    "deleteDashboardsConfirmTitle": "Dashboards löschen",
+    "deleteDashboardsConfirmMsg": "Möchten Sie {count} Dashboard (s) wirklich löschen?",
+    "importCustom": "Benutzerdefiniert",
+    "importCustomDesc": "Import aus JSON-Datei oder URL",
+    "importTemplates": "Vorlagen",
+    "importTemplatesDesc": "Durchsuchen und aus der Galerie importieren",
+    "searchThisFolder": "Dieser Ordner",
+    "searchThisFolderTitle": "Nur diesen Ordner durchsuchen",
+    "searchAllFolders": "Alle Ordner",
+    "searchAllFoldersTitle": "In allen Ordnern suchen",
+    "reloadDashboards": "Dashboards neu laden",
+    "editVariable": "Variable bearbeiten",
+    "addOption": "Option hinzufügen",
+    "addFilter": "Filter hinzufügen",
+    "noDataFound": "Keine Daten gefunden",
+    "streamSelectTooltip": "Wählen Sie einen Stream aus oder verwenden Sie eine Variable wie $streamVariable, um den Stream dynamisch auf der Grundlage eines anderen Werts auszuwählen.",
+    "fieldSelectTooltip": "Wählen Sie ein Feld aus oder verwenden Sie eine Variable wie $FieldVariable. Wenn der Stream eine Variable verwendet, ist die Feldliste leer. Geben Sie den Feldnamen manuell ein.",
+    "filterInfoTooltip": "In Filtern können Sie den Wert einer anderen Variablen verwenden, um den Wert der aktuellen Variablen zu filtern. Dies kann mithilfe des Namens der anderen Variablen geschehen. Zum Beispiel:",
+    "defaultSelectAll": "Standard — Alles auswählen",
+    "escapeSingleQuotesTooltip": "Wenn diese Option aktiviert ist, werden einfache Anführungszeichen in der Abfrage maskiert. Zum Beispiel wird ein Wert wie `O'Reilly` durch `O\"Reilly` ersetzt.",
+    "byDefaultSelect": "Standardmäßig wählen Sie:",
+    "firstValue": "Erster Wert",
+    "allValues": "Alle Werte",
+    "customValue": "Benutzerdefiniert",
+    "showDependencies": "Abhängigkeiten anzeigen",
+    "deleteVariable": "Variable löschen",
+    "deleteVariableMsg": "Möchten Sie die Variable wirklich löschen?",
+    "appliedToTabs": "Auf Tabs angewendet:",
+    "appliedToPanels": "Auf Paneele angewendet:",
+    "selectVariableScope": "Variablenbereich auswählen",
+    "variableScopeHelp": "Variablen werden auf alle Tabs und Panels angewendet, wenn Global ausgewählt ist.",
+    "showDynamicFilters": "Dynamische Filter anzeigen"
   },
   "panel": {
     "header": "Panel",
@@ -3301,7 +3344,12 @@
     "layoutHorizontal": "Horizontal",
     "layoutVertical": "Vertikal",
     "layoutForce": "Anordnung erzwingen",
-    "exportTraces": "Spuren exportieren"
+    "exportTraces": "Spuren exportieren",
+    "waterfall": "Wasserfall",
+    "flameGraph": "Flammendiagramm",
+    "traceGraph": "Diagramm verfolgen",
+    "dag": "DAG",
+    "thread": "Gewinde"
   },
   "invitation": {
     "pendingInvitations": "Ausstehende Einladungen",
@@ -4840,6 +4888,51 @@
       "evalJobs": "Stellenangebote evaluieren",
       "scorers": "Torschützen",
       "scoreConfigs": "Score-Konfigurationen"
+    },
+    "kpi": {
+      "totalCost": "Gesamtkosten",
+      "totalTokens": "Gesamtzahl der Tokens",
+      "totalTraces": "Spuren insgesamt",
+      "p95Latency": "P95-Latenz",
+      "errorRate": "Fehlerrate"
+    },
+    "panels": {
+      "costTrend": {
+        "title": "Kostentrend",
+        "subtitle": "USD nach Modell"
+      },
+      "tokenTrend": {
+        "title": "Token-Trend",
+        "subtitle": "Tokens nach Modell"
+      },
+      "spanTrend": {
+        "title": "Span-Trend",
+        "subtitle": "Anzahl der Spannweiten nach Art"
+      },
+      "latencyPercentiles": {
+        "title": "Latenz p50/p95/p99",
+        "subtitle": "alle LLM-Anrufe"
+      },
+      "tracesOverTime": {
+        "title": "Spuren im Laufe der Zeit",
+        "subtitle": "Anzahl der Spuren nach Dienst"
+      },
+      "errorsOverTime": {
+        "title": "Fehler im Laufe der Zeit",
+        "subtitle": "Anzahl der Fehler"
+      },
+      "spansByModel": {
+        "title": "Spannweiten nach Modell",
+        "subtitle": "Anzahl der Anrufe pro Modell"
+      },
+      "tokensByModel": {
+        "title": "Tokens nach Modell",
+        "subtitle": "Gesamtzahl der Tokens pro Modell"
+      },
+      "recentErrors": {
+        "title": "Aktuelle Fehler",
+        "subtitle": "Die letzten 10 fehlgeschlagenen Spans"
+      }
     }
   },
   "logs": {

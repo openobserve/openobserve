@@ -132,7 +132,8 @@
     "error": "Erro",
     "db": "Banco de dados",
     "discardChanges": "Descartar alterações",
-    "unsavedChanges": "Alterações não salvas"
+    "unsavedChanges": "Alterações não salvas",
+    "export": "Exportar"
   },
   "search": {
     "selectIndex": "Selecione Stream First",
@@ -550,7 +551,14 @@
       "learnMore": "Saiba mais:",
       "quickImpl": "Guia de implementação rápida",
       "blogPost": "Noções básicas sobre monitoramento de front-end"
-    }
+    },
+    "sourceMaps": "Mapas de origem",
+    "service": "Serviço",
+    "environment": "Meio ambiente",
+    "applyFilters": "Aplicar filtros",
+    "uploadSourceMaps": "Carregar mapas de origem",
+    "files": "Arquivos",
+    "uploadedAt": "Carregado em"
   },
   "about": {
     "name": "Abra o Observe",
@@ -1704,7 +1712,42 @@
     "multiSqlQueryLabelHint": "Nome personalizado para essa consulta em legendas (por exemplo, 'Produção')",
     "multiQueryWarning": "Somente a consulta 1 é renderizada para {chartType}",
     "trellisNotSupportedWithMultiQuery": "O layout do Trellis está desativado com várias consultas. Remova consultas extras para usar a treliça.",
-    "xAliasInconsistencyWarning": "Os aliases do eixo X são inconsistentes nas consultas: alguns usam histograma e outros não. Use o mesmo tipo de alias em todas as consultas para obter resultados previsíveis."
+    "xAliasInconsistencyWarning": "Os aliases do eixo X são inconsistentes nas consultas: alguns usam histograma e outros não. Use o mesmo tipo de alias em todas as consultas para obter resultados previsíveis.",
+    "subtitle": "Crie, organize e compartilhe painéis em todas as pastas",
+    "deleteDashboardConfirmTitle": "Excluir painel",
+    "deleteDashboardConfirmMsg": "Tem certeza de que deseja excluir o painel?",
+    "deleteDashboardsConfirmTitle": "Excluir painéis",
+    "deleteDashboardsConfirmMsg": "Tem certeza de que deseja excluir {count} painel (s)?",
+    "importCustom": "Personalizado",
+    "importCustomDesc": "Importar do arquivo JSON ou URL",
+    "importTemplates": "Modelos",
+    "importTemplatesDesc": "Navegue e importe da galeria",
+    "searchThisFolder": "Esta pasta",
+    "searchThisFolderTitle": "Pesquisar somente nesta pasta",
+    "searchAllFolders": "Todas as pastas",
+    "searchAllFoldersTitle": "Pesquise em todas as pastas",
+    "reloadDashboards": "Recarregar painéis",
+    "editVariable": "Editar variável",
+    "addOption": "Adicionar opção",
+    "addFilter": "Adicionar filtro",
+    "noDataFound": "Nenhum dado encontrado",
+    "streamSelectTooltip": "Selecione um fluxo ou use uma variável como $streamVariable para escolher dinamicamente o fluxo com base em outro valor.",
+    "fieldSelectTooltip": "Selecione um campo ou use uma variável como $fieldVariable. Se o stream usar uma variável, a lista de campos ficará vazia - digite o nome do campo manualmente.",
+    "filterInfoTooltip": "Em filtros, você pode usar o valor de outra variável para filtrar o valor da variável atual. Isso pode ser feito usando o nome da outra variável. Por exemplo:",
+    "defaultSelectAll": "Padrão - Selecionar tudo",
+    "escapeSingleQuotesTooltip": "Se ativada, as aspas simples serão ignoradas na consulta. Por exemplo, um valor como `O'Reilly` será substituído por `O\"Reilly`.",
+    "byDefaultSelect": "Por padrão, selecione:",
+    "firstValue": "Primeiro valor",
+    "allValues": "Todos os valores",
+    "customValue": "Personalizado",
+    "showDependencies": "Mostrar dependências",
+    "deleteVariable": "Excluir variável",
+    "deleteVariableMsg": "Tem certeza de que deseja excluir a variável?",
+    "appliedToTabs": "Aplicado às guias:",
+    "appliedToPanels": "Aplicado aos painéis:",
+    "selectVariableScope": "Selecione o escopo da variável",
+    "variableScopeHelp": "As variáveis serão aplicadas a todas as guias e painéis se a opção global for selecionada.",
+    "showDynamicFilters": "Mostrar filtros dinâmicos"
   },
   "panel": {
     "header": "Painel",
@@ -3301,7 +3344,12 @@
     "layoutHorizontal": "Horizontal",
     "layoutVertical": "Vertical",
     "layoutForce": "Layout de força",
-    "exportTraces": "Exportar traços"
+    "exportTraces": "Exportar traços",
+    "waterfall": "Cachoeira",
+    "flameGraph": "Gráfico de chamas",
+    "traceGraph": "Gráfico de traço",
+    "dag": "DIA",
+    "thread": "Tópico"
   },
   "invitation": {
     "pendingInvitations": "Convites pendentes",
@@ -4840,6 +4888,51 @@
       "evalJobs": "Empregos de avaliação",
       "scorers": "Marcadores",
       "scoreConfigs": "Configurações de pontuação"
+    },
+    "kpi": {
+      "totalCost": "Custo total",
+      "totalTokens": "Total de tokens",
+      "totalTraces": "Total de traços",
+      "p95Latency": "Latência P95",
+      "errorRate": "Taxa de erro"
+    },
+    "panels": {
+      "costTrend": {
+        "title": "Tendência de custo",
+        "subtitle": "USD por modelo"
+      },
+      "tokenTrend": {
+        "title": "Tendência do token",
+        "subtitle": "tokens por modelo"
+      },
+      "spanTrend": {
+        "title": "Tendência da Espanha",
+        "subtitle": "contagem de extensão por tipo"
+      },
+      "latencyPercentiles": {
+        "title": "Latência p50/p95/p99",
+        "subtitle": "todas as chamadas LLM"
+      },
+      "tracesOverTime": {
+        "title": "Traços ao longo do tempo",
+        "subtitle": "contagem de rastreios por serviço"
+      },
+      "errorsOverTime": {
+        "title": "Erros ao longo do tempo",
+        "subtitle": "contagem de erros"
+      },
+      "spansByModel": {
+        "title": "Expansões por modelo",
+        "subtitle": "contagem de chamadas por modelo"
+      },
+      "tokensByModel": {
+        "title": "Tokens por modelo",
+        "subtitle": "total de tokens por modelo"
+      },
+      "recentErrors": {
+        "title": "Erros recentes",
+        "subtitle": "últimos 10 períodos falhados"
+      }
     }
   },
   "logs": {

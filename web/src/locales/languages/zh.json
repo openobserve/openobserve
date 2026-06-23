@@ -132,7 +132,8 @@
     "error": "错误",
     "db": "数据库",
     "discardChanges": "放弃更改",
-    "unsavedChanges": "未保存的更改"
+    "unsavedChanges": "未保存的更改",
+    "export": "出口"
   },
   "search": {
     "selectIndex": "选择数据流",
@@ -550,7 +551,14 @@
       "learnMore": "了解更多：",
       "quickImpl": "快速实施指南",
       "blogPost": "前端监控基础知识"
-    }
+    },
+    "sourceMaps": "源地图",
+    "service": "服务",
+    "environment": "环境",
+    "applyFilters": "应用过滤器",
+    "uploadSourceMaps": "上传源地图",
+    "files": "档案",
+    "uploadedAt": "上传于"
   },
   "about": {
     "name": "OpenObserve",
@@ -1704,7 +1712,42 @@
     "multiSqlQueryLabelHint": "图例中此查询的自定义名称（例如，“生产”）",
     "multiQueryWarning": "仅为 {chartType} 呈现查询 1",
     "trellisNotSupportedWithMultiQuery": "多次查询禁用网格布局。移除额外的查询以使用网格。",
-    "xAliasInconsistencyWarning": "X 轴别名在不同查询之间不一致：有些使用直方图，有些不使用。在所有查询中使用相同的别名类型以获得可预测的结果。"
+    "xAliasInconsistencyWarning": "X 轴别名在不同查询之间不一致：有些使用直方图，有些不使用。在所有查询中使用相同的别名类型以获得可预测的结果。",
+    "subtitle": "跨文件夹创建、组织和共享仪表板",
+    "deleteDashboardConfirmTitle": "删除仪表板",
+    "deleteDashboardConfirmMsg": "您确定要删除仪表板吗？",
+    "deleteDashboardsConfirmTitle": "删除仪表板",
+    "deleteDashboardsConfirmMsg": "您确定要删除 {count} 控制面板吗？",
+    "importCustom": "自定义",
+    "importCustomDesc": "从 JSON 文件或 URL 导入",
+    "importTemplates": "模板",
+    "importTemplatesDesc": "浏览并从图库导入",
+    "searchThisFolder": "这个文件夹",
+    "searchThisFolderTitle": "仅搜索此文件夹",
+    "searchAllFolders": "所有文件夹",
+    "searchAllFoldersTitle": "搜索所有文件夹",
+    "reloadDashboards": "重新加载仪表板",
+    "editVariable": "编辑变量",
+    "addOption": "添加选项",
+    "addFilter": "添加过滤器",
+    "noDataFound": "未找到任何数据",
+    "streamSelectTooltip": "选择一个流或使用像 $streamVariable 这样的变量根据另一个值动态选择流。",
+    "fieldSelectTooltip": "选择一个字段或使用像 $fieldVariable 这样的变量。如果 stream 使用变量，则字段列表将为空——手动键入字段名称。",
+    "filterInfoTooltip": "在过滤器中，您可以使用另一个变量的值来筛选当前变量的值。这可以通过使用另一个变量的名称来完成。例如：",
+    "defaultSelectAll": "默认-全选",
+    "escapeSingleQuotesTooltip": "如果启用，将在查询中对单引号进行转义。例如，像 `O'Reilly` 这样的值将被替换为 `O \"Reilly`。",
+    "byDefaultSelect": "默认情况下选择：",
+    "firstValue": "第一个值",
+    "allValues": "所有值",
+    "customValue": "自定义",
+    "showDependencies": "显示依赖关系",
+    "deleteVariable": "删除变量",
+    "deleteVariableMsg": "您确定要删除该变量吗？",
+    "appliedToTabs": "应用于选项卡：",
+    "appliedToPanels": "应用于面板：",
+    "selectVariableScope": "选择变量范围",
+    "variableScopeHelp": "如果选择了全局变量，则变量将应用于所有选项卡和面板。",
+    "showDynamicFilters": "显示动态过滤器"
   },
   "panel": {
     "header": "面板",
@@ -3305,7 +3348,12 @@
     "layoutHorizontal": "水平",
     "layoutVertical": "垂直",
     "layoutForce": "原力布局",
-    "exportTraces": "导出跟踪"
+    "exportTraces": "导出跟踪",
+    "waterfall": "瀑布",
+    "flameGraph": "火焰图",
+    "traceGraph": "追踪图",
+    "dag": "DAG",
+    "thread": "线程"
   },
   "invitation": {
     "pendingInvitations": "待处理的邀请",
@@ -4502,6 +4550,51 @@
       "evalJobs": "评测任务",
       "scorers": "评分器",
       "scoreConfigs": "评分配置"
+    },
+    "kpi": {
+      "totalCost": "总成本",
+      "totalTokens": "代币总数",
+      "totalTraces": "轨迹总数",
+      "p95Latency": "P95 延迟",
+      "errorRate": "错误率"
+    },
+    "panels": {
+      "costTrend": {
+        "title": "成本趋势",
+        "subtitle": "按型号划分的美元"
+      },
+      "tokenTrend": {
+        "title": "代币趋势",
+        "subtitle": "按型号分类的代币"
+      },
+      "spanTrend": {
+        "title": "跨度趋势",
+        "subtitle": "按种类划分的跨度数"
+      },
+      "latencyPercentiles": {
+        "title": "延迟 p50/p95/p99",
+        "subtitle": "所有 LLM 电话"
+      },
+      "tracesOverTime": {
+        "title": "随着时间的推移留下痕",
+        "subtitle": "按服务划分的跟踪次数"
+      },
+      "errorsOverTime": {
+        "title": "一段时间内的错误",
+        "subtitle": "错误数"
+      },
+      "spansByModel": {
+        "title": "按型号划分的跨度",
+        "subtitle": "每个型号的呼叫次数"
+      },
+      "tokensByModel": {
+        "title": "按型号分类的代币",
+        "subtitle": "每个模型的代币总数"
+      },
+      "recentErrors": {
+        "title": "最近的错误",
+        "subtitle": "最近 10 次失败的跨度"
+      }
     }
   },
   "onlineEvals": {
