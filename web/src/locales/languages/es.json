@@ -2564,7 +2564,24 @@
       "destinationRequired": "¡Se requiere al menos un destino!",
       "disabledNotificationsInfo": "La detección de anomalías seguirá ejecutándose y escribirá los resultados en la secuencia _anomalies. Habilite las notificaciones para recibir alertas cuando se detecten anomalías."
     },
-    "anomalyName": "Nombre de la anomalía"
+    "anomalyName": "Nombre de la anomalía",
+    "subtitle": "Reglas de alertas y canales de notificación",
+    "searchThisFolder": "Esta carpeta",
+    "searchAllFolders": "Todas las carpetas",
+    "streamConfig": "Configuración de transmisión",
+    "alertRules": "Reglas de alerta",
+    "addCondition": "Agregar condición",
+    "conditionOf": "de",
+    "conditionIs": "es",
+    "matchingTypeFound": "se encontró un {type} coincidente",
+    "matchingMetricsFound": "se encontraron métricas coincidentes",
+    "metricsValueFieldTooltip": "Los flujos de métricas almacenan sus mediciones en el campo «valor» de forma predeterminada",
+    "howOftenCheckTooltip": "Con qué frecuencia comprobar esta condición de alerta",
+    "alertIfNoOfEvents": "Alerta de número de eventos",
+    "alertIfValueIs": "Alerta si el valor es",
+    "havingSeries": "Tener series",
+    "clearMultiWindowsTitle": "¿Borrar ventanas múltiples?",
+    "lastTrainedAt": "Entrenado por última vez en"
   },
   "alert_templates": {
     "header": "Plantillas",
@@ -3071,7 +3088,14 @@
     "dimensionWidth": "Anchura (px)",
     "dimensionHeight": "Altura (px)",
     "imagePreview": "Incluir una imagen de vista previa del panel de control en línea",
-    "customDimensions": "Dimensiones personalizadas (avanzadas)"
+    "customDimensions": "Dimensiones personalizadas (avanzadas)",
+    "subtitle": "Informes y exportaciones programados",
+    "searchThisFolder": "Esta carpeta",
+    "searchAllFolders": "Todas las carpetas",
+    "reloadReports": "Recargar informes",
+    "moveToFolder": "Mover a la carpeta",
+    "deleteReportsTitle": "Eliminar informes",
+    "deleteReportsMsg": "¿Estás seguro de que deseas eliminar los informes de {count}?"
   },
   "queries": {
     "runningQueries": "Consultas en ejecución",

@@ -2564,7 +2564,24 @@
       "destinationRequired": "È richiesta almeno una destinazione!",
       "disabledNotificationsInfo": "Il rilevamento delle anomalie verrà comunque eseguito e scriverà i risultati nel flusso _anomalies. Abilita le notifiche per ricevere avvisi quando vengono rilevate anomalie."
     },
-    "anomalyName": "Nome dell'anomalia"
+    "anomalyName": "Nome dell'anomalia",
+    "subtitle": "Regole di avviso e canali di notifica",
+    "searchThisFolder": "Questa cartella",
+    "searchAllFolders": "Tutte le cartelle",
+    "streamConfig": "Configurazione dello streaming",
+    "alertRules": "Regole di avviso",
+    "addCondition": "Aggiungi condizione",
+    "conditionOf": "di",
+    "conditionIs": "è",
+    "matchingTypeFound": "trovato {type} corrispondente",
+    "matchingMetricsFound": "metriche corrispondenti trovate",
+    "metricsValueFieldTooltip": "Per impostazione predefinita, gli stream di metriche memorizzano la loro misurazione nel campo «valore»",
+    "howOftenCheckTooltip": "Con quale frequenza controllare questa condizione di avviso",
+    "alertIfNoOfEvents": "Avviso in caso di numero di eventi",
+    "alertIfValueIs": "Avvisa se il valore è",
+    "havingSeries": "Serie Having",
+    "clearMultiWindowsTitle": "Cancella le finestre multiple?",
+    "lastTrainedAt": "Ultima formazione a"
   },
   "alert_templates": {
     "header": "Modelli",
@@ -3084,7 +3101,14 @@
     "dimensionWidth": "Larghezza (px)",
     "dimensionHeight": "Altezza (px)",
     "imagePreview": "Includi l'immagine di anteprima della dashboard in linea",
-    "customDimensions": "Dimensioni personalizzate (avanzate)"
+    "customDimensions": "Dimensioni personalizzate (avanzate)",
+    "subtitle": "Rapporti ed esportazioni programmati",
+    "searchThisFolder": "Questa cartella",
+    "searchAllFolders": "Tutte le cartelle",
+    "reloadReports": "Ricarica i report",
+    "moveToFolder": "Sposta nella cartella",
+    "deleteReportsTitle": "Eliminare i report",
+    "deleteReportsMsg": "Sei sicuro di voler eliminare {count} report?"
   },
   "queries": {
     "runningQueries": "Interrogazioni in esecuzione",

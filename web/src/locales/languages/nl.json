@@ -2564,7 +2564,24 @@
       "destinationRequired": "Er is minstens één bestemming vereist!",
       "disabledNotificationsInfo": "De detectie van afwijkingen wordt nog steeds uitgevoerd en de resultaten worden naar de _anomalieënstream geschreven. Schakel meldingen in om waarschuwingen te ontvangen wanneer er afwijkingen worden gedetecteerd."
     },
-    "anomalyName": "Naam van de anomalie"
+    "anomalyName": "Naam van de anomalie",
+    "subtitle": "Waarschuwingsregels en meldingskanalen",
+    "searchThisFolder": "Deze map",
+    "searchAllFolders": "Alle mappen",
+    "streamConfig": "Configuratie van de stream",
+    "alertRules": "Regels voor waarschuwingen",
+    "addCondition": "Conditie toevoegen",
+    "conditionOf": "van",
+    "conditionIs": "is",
+    "matchingTypeFound": "overeenkomend met {type} gevonden",
+    "matchingMetricsFound": "overeenkomende statistieken gevonden",
+    "metricsValueFieldTooltip": "Metrische streams slaan hun metingen standaard op in het veld „waarde”",
+    "howOftenCheckTooltip": "Hoe vaak moet deze waarschuwingsconditie worden gecontroleerd",
+    "alertIfNoOfEvents": "Waarschuwing bij aantal gebeurtenissen",
+    "alertIfValueIs": "Waarschuw als de waarde",
+    "havingSeries": "Serie hebben",
+    "clearMultiWindowsTitle": "Meerdere vensters wissen?",
+    "lastTrainedAt": "Laatst opgeleid bij"
   },
   "alert_templates": {
     "header": "Sjablonen",
@@ -3086,7 +3103,14 @@
     "dimensionWidth": "Breedte (px)",
     "dimensionHeight": "Hoogte (px)",
     "imagePreview": "Inline voorbeeldafbeelding van het dashboard toevoegen",
-    "customDimensions": "Aangepaste afmetingen (geavanceerd)"
+    "customDimensions": "Aangepaste afmetingen (geavanceerd)",
+    "subtitle": "Geplande rapporten en exports",
+    "searchThisFolder": "Deze map",
+    "searchAllFolders": "Alle mappen",
+    "reloadReports": "Rapporten opnieuw laden",
+    "moveToFolder": "Verplaats naar map",
+    "deleteReportsTitle": "Rapporten verwijderen",
+    "deleteReportsMsg": "Weet je zeker dat je {count} rapport (en) wilt verwijderen?"
   },
   "queries": {
     "runningQueries": "Zoekopdrachten uitvoeren",

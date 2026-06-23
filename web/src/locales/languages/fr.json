@@ -2564,7 +2564,24 @@
       "destinationRequired": "Au moins une destination est requise !",
       "disabledNotificationsInfo": "La détection des anomalies sera toujours exécutée et les résultats seront enregistrés dans le flux _anomalies. Activez les notifications pour recevoir des alertes lorsque des anomalies sont détectées."
     },
-    "anomalyName": "Nom de l'anomalie"
+    "anomalyName": "Nom de l'anomalie",
+    "subtitle": "Règles d'alerte et canaux de notification",
+    "searchThisFolder": "Ce dossier",
+    "searchAllFolders": "Tous les dossiers",
+    "streamConfig": "Configuration du flux",
+    "alertRules": "Règles d'alerte",
+    "addCondition": "Ajouter une condition",
+    "conditionOf": "de",
+    "conditionIs": "est",
+    "matchingTypeFound": "{type} correspondant trouvé",
+    "matchingMetricsFound": "mesures correspondantes trouvées",
+    "metricsValueFieldTooltip": "Les flux de métriques stockent leur mesure dans le champ « valeur » par défaut",
+    "howOftenCheckTooltip": "À quelle fréquence vérifier cette condition d'alerte",
+    "alertIfNoOfEvents": "Alerte en cas de nombre d'événements",
+    "alertIfValueIs": "Alerte si la valeur est",
+    "havingSeries": "Avoir des séries",
+    "clearMultiWindowsTitle": "Effacer les fenêtres multiples ?",
+    "lastTrainedAt": "Dernière formation à"
   },
   "alert_templates": {
     "header": "Modèles",
@@ -3073,7 +3090,14 @@
     "dimensionWidth": "Largeur (px)",
     "dimensionHeight": "Hauteur (px)",
     "imagePreview": "Inclure une image d'aperçu du tableau de bord en ligne",
-    "customDimensions": "Dimensions personnalisées (avancées)"
+    "customDimensions": "Dimensions personnalisées (avancées)",
+    "subtitle": "Rapports et exportations planifiés",
+    "searchThisFolder": "Ce dossier",
+    "searchAllFolders": "Tous les dossiers",
+    "reloadReports": "Recharger les rapports",
+    "moveToFolder": "Déplacer vers un dossier",
+    "deleteReportsTitle": "Supprimer des rapports",
+    "deleteReportsMsg": "Êtes-vous sûr de vouloir supprimer {count} rapport (s) ?"
   },
   "queries": {
     "runningQueries": "Exécution de requêtes",
