@@ -601,7 +601,7 @@ test.describe("Dashboard GeneralSettings form validation", () => {
 // Uses a saved panel — enters annotation mode then clicks the panel canvas.
 // ─────────────────────────────────────────────────────────────────────────────
 
-test.describe("Dashboard AddAnnotation form validation", () => {
+test.describe("Dashboard AddAnnotation live form validation", () => {
     test.describe.configure({ mode: 'serial' });
 
     const dashName  = 'e2e_fv_annotation_live_001';
