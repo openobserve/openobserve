@@ -136,21 +136,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="t('ingestion.createTokenTitle')"
       :primary-button-label="t('common.create')"
       :secondary-button-label="t('common.cancel')"
-      :primary-button-disabled="!newTokenName.trim() || loading"
-      @click:primary="createToken"
+      form-id="create-token-form"
       @click:secondary="showCreateForm = false"
     >
-      <OInput
-        v-model="newTokenName"
-        :label="t('ingestion.tokenNameLabel') + ' *'"
-        :maxlength="256"
-        autofocus
-      />
-      <OInput
-        v-model="newTokenDescription"
-        :label="t('ingestion.tokenDescriptionLabel')"
-        class="tw:mt-4"
-      />
+      <OForm
+        id="create-token-form"
+        :schema="createTokenSchema"
+        :default-values="createTokenDefaults()"
+        @submit="createToken"
+      >
+        <OFormInput
+          name="name"
+          :label="t('ingestion.tokenNameLabel')"
+          required
+          :maxlength="256"
+          autofocus
+          data-test="ingestion-token-name-input"
+        />
+        <OFormInput
+          name="description"
+          :label="t('ingestion.tokenDescriptionLabel')"
+          class="tw:mt-4"
+          data-test="ingestion-token-description-input"
+        />
+      </OForm>
     </ODialog>
 
     <!-- Revealed token dialog -->
@@ -194,8 +203,14 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import {
+  makeCreateTokenSchema,
+  createTokenDefaults,
+  type CreateTokenForm,
+} from "./IngestionTokens.schema";
 import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
@@ -214,7 +229,7 @@ interface Token {
 
 export default defineComponent({
   name: "IngestionTokens",
-  components: { AppPageHeader, OButton, OEmptyState, OIcon, OSearchInput, OTooltip, ODialog, OInput, OTable },
+  components: { AppPageHeader, OButton, OEmptyState, OIcon, OSearchInput, OTooltip, ODialog, OForm, OFormInput, OTable },
   setup() {
     const store = useStore();
     const { t } = useI18n();
@@ -224,9 +239,12 @@ export default defineComponent({
     const filterQuery = ref("");
     const showCreateForm = ref(false);
     const showRevealedDialog = ref(false);
-    const newTokenName = ref("");
-    const newTokenDescription = ref("");
     const revealedToken = ref<{ name: string; token: string } | null>(null);
+
+    // Options-API: the schema (and the defaults factory) MUST be returned from
+    // setup() — a bare module import is out of the template's scope, so :schema
+    // would resolve to undefined and validation would silently no-op.
+    const createTokenSchema = makeCreateTokenSchema(t);
 
     const columns: OTableColumnDef<Token>[] = [
       {
@@ -287,23 +305,24 @@ export default defineComponent({
       }
     };
 
-    const createToken = async () => {
-      if (!newTokenName.value.trim()) return;
+    // Plain async @submit handler — fires only after the schema passes (name
+    // required + max 256). Awaited by OForm, so the footer Save spinner spans the
+    // request automatically (no disabled gate). The dialog unmounts its body on
+    // close, so there's no model to reset.
+    const createToken = async (value: CreateTokenForm) => {
       loading.value = true;
       try {
         const res = await organizationsService.create_org_ingestion_token(
           store.state.selectedOrganization.identifier,
           {
-            name: newTokenName.value.trim(),
-            description: newTokenDescription.value.trim(),
+            name: value.name.trim(),
+            description: (value.description ?? "").trim(),
           },
         );
         revealedToken.value = {
-          name: newTokenName.value.trim(),
+          name: value.name.trim(),
           token: res.data.data.token,
         };
-        newTokenName.value = "";
-        newTokenDescription.value = "";
         showCreateForm.value = false;
         showRevealedDialog.value = true;
         await fetchTokens();
@@ -368,9 +387,9 @@ export default defineComponent({
       columns,
       showCreateForm,
       showRevealedDialog,
-      newTokenName,
-      newTokenDescription,
       revealedToken,
+      createTokenSchema,
+      createTokenDefaults,
       fetchTokens,
       createToken,
       toggleEnabled,

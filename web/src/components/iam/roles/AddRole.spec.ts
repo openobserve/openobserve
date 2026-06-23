@@ -13,20 +13,20 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
-// AddGroup is migrated to OForm + Zod (AddGroup.schema.ts). These tests mount
-// the REAL <OForm> (only ODialog is stubbed) so the schema actually gates the
-// submit — an unwired :schema would be caught here. They assert behavior
-// (validation + service call + emits), not removed internals (showNameError /
-// isValidGroupName / nameErrorMessage / the disabled gate are all gone).
+// AddRole is migrated to OForm + Zod (AddRole.schema.ts). These tests mount the
+// REAL <OForm> (only ODialog is stubbed) so the schema actually gates the submit.
+// They assert behavior (validation + service call + emits), not removed internals
+// (showNameError / isValidRoleName / nameErrorMessage / the disabled gate).
 
 import { mount, flushPromises } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import AddGroup from "@/components/iam/groups/AddGroup.vue";
+import AddRole from "@/components/iam/roles/AddRole.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
 vi.mock("@/services/iam", () => ({
-  createGroup: vi.fn(),
+  createRole: vi.fn(),
+  updateRole: vi.fn(),
 }));
 
 vi.mock("@/services/reodotdev_analytics", () => ({
@@ -41,10 +41,6 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: mockToast,
 }));
 
-// Lightweight ODialog stub: renders the default (body) slot so the REAL OForm
-// inside mounts, and exposes the footer primary/secondary buttons. The footer
-// Save submits via `form-id` in the real app; tests drive the form's own submit
-// (form.handleSubmit) so the schema runs deterministically.
 const ODialogStub = {
   name: "ODialog",
   props: [
@@ -78,14 +74,14 @@ const ODialogStub = {
 };
 
 function mountComp(props: Record<string, any> = {}) {
-  return mount(AddGroup, {
+  return mount(AddRole, {
     global: {
       plugins: [store, i18n],
       stubs: { ODialog: ODialogStub },
     },
     props: {
       open: true,
-      group: null,
+      role: null,
       org_identifier: "test-org",
       ...props,
     },
@@ -94,16 +90,14 @@ function mountComp(props: Record<string, any> = {}) {
 
 const getForm = (wrapper: any) => wrapper.findComponent({ name: "OForm" });
 const getNameInput = (wrapper: any) =>
-  wrapper.find('[data-test="add-group-groupname-input-btn"] input');
+  wrapper.find('[data-test="add-role-rolename-input-btn"] input');
 
 const submitForm = async (wrapper: any) => {
-  // Drive the form's own submit so the schema runs + the handler is awaited
-  // deterministically (a fire-and-forget native submit wouldn't be).
   await getForm(wrapper).vm.form.handleSubmit();
   await flushPromises();
 };
 
-describe("AddGroup", () => {
+describe("AddRole", () => {
   let wrapper: any;
 
   beforeEach(() => {
@@ -120,9 +114,9 @@ describe("AddGroup", () => {
   });
 
   describe("rendering", () => {
-    it("renders the dialog and group name input", () => {
+    it("renders the dialog and role name input", () => {
       expect(wrapper.exists()).toBe(true);
-      expect(wrapper.find('[data-test="add-group-section"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="add-role-section"]').exists()).toBe(true);
       expect(getNameInput(wrapper).exists()).toBe(true);
     });
 
@@ -130,10 +124,10 @@ describe("AddGroup", () => {
       expect(getForm(wrapper).exists()).toBe(true);
       expect(
         wrapper.find('[data-test-stub="o-dialog"]').attributes("data-form-id"),
-      ).toBe("add-group-form");
+      ).toBe("add-role-form");
     });
 
-    it("passes a Zod schema to OForm (no per-field validators / disabled gate)", () => {
+    it("passes a Zod schema to OForm", () => {
       expect(getForm(wrapper).props("schema")).toBeDefined();
     });
 
@@ -141,9 +135,9 @@ describe("AddGroup", () => {
       expect(getForm(wrapper).props("defaultValues")).toEqual({ name: "" });
     });
 
-    it("seeds the group name when a group prop is provided", () => {
-      const w = mountComp({ group: { name: "existing_group" } });
-      expect(getForm(w).props("defaultValues")).toEqual({ name: "existing_group" });
+    it("seeds the role name when a role prop is provided", () => {
+      const w = mountComp({ role: { name: "existing_role" } });
+      expect(getForm(w).props("defaultValues")).toEqual({ name: "existing_role" });
       w.unmount();
     });
 
@@ -155,108 +149,151 @@ describe("AddGroup", () => {
       const saveBtn = wrapper.find('[data-test="o-dialog-primary-btn"]');
       expect(saveBtn.attributes("disabled")).toBeUndefined();
     });
+
+    it("renders the dialog title", () => {
+      expect(
+        wrapper.find('[data-test-stub="o-dialog"]').attributes("data-title"),
+      ).toBeTruthy();
+    });
+
+    it("reflects the open prop on the dialog and defaults it to false", async () => {
+      expect(
+        wrapper.find('[data-test-stub="o-dialog"]').attributes("data-open"),
+      ).toBe("true");
+      await wrapper.setProps({ open: false });
+      expect(
+        wrapper.find('[data-test-stub="o-dialog"]').attributes("data-open"),
+      ).toBe("false");
+
+      const w = mount(AddRole, {
+        global: { plugins: [store, i18n], stubs: { ODialog: ODialogStub } },
+      });
+      expect(w.props("open")).toBe(false);
+      w.unmount();
+    });
   });
 
   describe("schema validation (real OForm)", () => {
     it("does not validate before the first submit", async () => {
       await getNameInput(wrapper).setValue("invalid name");
       await flushPromises();
-      // R3: nothing validates until the first submit.
       expect(wrapper.find('[role="alert"]').exists()).toBe(false);
     });
 
-    it("blocks submit and does NOT call createGroup when name is empty", async () => {
-      const { createGroup } = await import("@/services/iam");
+    it("blocks submit and does NOT call createRole when name is empty", async () => {
+      const { createRole } = await import("@/services/iam");
       await submitForm(wrapper);
 
       expect(getForm(wrapper).vm.form.state.isValid).toBe(false);
-      expect(createGroup).not.toHaveBeenCalled();
+      expect(createRole).not.toHaveBeenCalled();
       expect(wrapper.text()).toContain("Name is required");
     });
 
     it("blocks submit for a name with invalid characters (restored regex rule)", async () => {
-      const { createGroup } = await import("@/services/iam");
-      await getNameInput(wrapper).setValue("invalid name!");
+      const { createRole } = await import("@/services/iam");
+      await getNameInput(wrapper).setValue("invalid role!");
       await submitForm(wrapper);
 
       expect(getForm(wrapper).vm.form.state.isValid).toBe(false);
-      expect(createGroup).not.toHaveBeenCalled();
+      expect(createRole).not.toHaveBeenCalled();
       expect(wrapper.text()).toContain(
         "Use alphanumeric and '_' characters only, without spaces.",
       );
     });
 
-    it("submits and calls createGroup once when the name is valid", async () => {
-      const { createGroup } = await import("@/services/iam");
-      vi.mocked(createGroup).mockResolvedValue({
-        data: { name: "test_group" },
-      } as any);
+    it("submits and calls createRole once when the name is valid", async () => {
+      const { createRole } = await import("@/services/iam");
+      vi.mocked(createRole).mockResolvedValue({ data: {} } as any);
 
-      await getNameInput(wrapper).setValue("test_group");
+      await getNameInput(wrapper).setValue("test_role");
       await submitForm(wrapper);
 
       expect(getForm(wrapper).vm.form.state.isValid).toBe(true);
-      expect(createGroup).toHaveBeenCalledTimes(1);
-      expect(createGroup).toHaveBeenCalledWith(
-        "test_group",
+      expect(createRole).toHaveBeenCalledTimes(1);
+      expect(createRole).toHaveBeenCalledWith(
+        "test_role",
         store.state.selectedOrganization.identifier,
       );
     });
 
-    it("trims the submitted name via the schema", async () => {
-      const { createGroup } = await import("@/services/iam");
-      vi.mocked(createGroup).mockResolvedValue({ data: {} } as any);
+    it("trims the submitted name", async () => {
+      const { createRole } = await import("@/services/iam");
+      vi.mocked(createRole).mockResolvedValue({ data: {} } as any);
 
-      await getNameInput(wrapper).setValue("  test_group  ");
+      await getNameInput(wrapper).setValue("  test_role  ");
       await submitForm(wrapper);
 
-      expect(createGroup).toHaveBeenCalledWith(
-        "test_group",
+      expect(createRole).toHaveBeenCalledWith(
+        "test_role",
         store.state.selectedOrganization.identifier,
       );
+    });
+
+    it("blocks submit when the name exceeds 100 characters (restored max rule)", async () => {
+      const { createRole } = await import("@/services/iam");
+      // maxlength caps typing, so set the value directly to exercise the schema.
+      getForm(wrapper).vm.form.setFieldValue("name", "a".repeat(101));
+      await submitForm(wrapper);
+
+      expect(getForm(wrapper).vm.form.state.isValid).toBe(false);
+      expect(createRole).not.toHaveBeenCalled();
     });
   });
 
-  describe("group creation behavior", () => {
-    it("emits added:group + update:open(false) and shows success toast on success", async () => {
-      const { createGroup } = await import("@/services/iam");
-      const mockResponse = { data: { name: "test_group" } };
-      vi.mocked(createGroup).mockResolvedValue(mockResponse as any);
+  describe("role creation behavior", () => {
+    it("emits update:open(false) + added:role and shows success toast on success", async () => {
+      const { createRole } = await import("@/services/iam");
+      vi.mocked(createRole).mockResolvedValue({ data: {} } as any);
 
-      await getNameInput(wrapper).setValue("test_group");
+      await getNameInput(wrapper).setValue("test_role");
       await submitForm(wrapper);
 
-      expect(wrapper.emitted("added:group")?.[0]).toEqual([mockResponse.data]);
+      expect(wrapper.emitted("added:role")).toBeTruthy();
       const updateOpen = wrapper.emitted("update:open");
       expect(updateOpen[updateOpen.length - 1]).toEqual([false]);
       expect(mockToast).toHaveBeenCalledWith({
-        message: 'User Group "test_group" Created Successfully!',
+        message: 'Role "test_role" Created Successfully!',
         variant: "success",
       });
     });
 
-    it("shows an error toast on a non-403 failure and does not emit added:group", async () => {
-      const { createGroup } = await import("@/services/iam");
-      vi.mocked(createGroup).mockRejectedValue({ response: { status: 400 } });
+    it("shows an error toast on a non-403 failure and does not emit added:role", async () => {
+      const { createRole } = await import("@/services/iam");
+      vi.mocked(createRole).mockRejectedValue({
+        response: { status: 400, data: { message: "Role exists" } },
+      });
 
-      await getNameInput(wrapper).setValue("test_group");
+      await getNameInput(wrapper).setValue("test_role");
       await submitForm(wrapper);
 
       expect(mockToast).toHaveBeenCalledWith({
-        message: "Error while creating group",
+        message: "Role exists",
         variant: "error",
       });
-      expect(wrapper.emitted("added:group")).toBeFalsy();
+      expect(wrapper.emitted("added:role")).toBeFalsy();
     });
 
     it("does not show an error toast for a 403 failure", async () => {
-      const { createGroup } = await import("@/services/iam");
-      vi.mocked(createGroup).mockRejectedValue({ response: { status: 403 } });
+      const { createRole } = await import("@/services/iam");
+      vi.mocked(createRole).mockRejectedValue({ response: { status: 403 } });
 
-      await getNameInput(wrapper).setValue("test_group");
+      await getNameInput(wrapper).setValue("test_role");
       await submitForm(wrapper);
 
       expect(mockToast).not.toHaveBeenCalled();
+    });
+
+    it("retains the entered name after a failed save (form not reset on error)", async () => {
+      const { createRole } = await import("@/services/iam");
+      vi.mocked(createRole).mockRejectedValue({
+        response: { status: 500, data: { message: "x" } },
+      });
+
+      await getNameInput(wrapper).setValue("keep_me");
+      await submitForm(wrapper);
+
+      expect(getForm(wrapper).vm.form.state.values.name).toBe("keep_me");
+      expect(wrapper.emitted("added:role")).toBeFalsy();
     });
   });
 
@@ -271,10 +308,6 @@ describe("AddGroup", () => {
       await wrapper.findComponent(ODialogStub).vm.$emit("update:open", false);
       const emitted = wrapper.emitted("update:open");
       expect(emitted[emitted.length - 1]).toEqual([false]);
-    });
-
-    it("uses the provided org_identifier prop", () => {
-      expect(wrapper.props("org_identifier")).toBe("test-org");
     });
   });
 });

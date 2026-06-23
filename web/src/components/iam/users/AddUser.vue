@@ -26,7 +26,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:open="$emit('update:open', $event)"
   >
     <div class="tw:w-full">
-        <OForm id="add-user-form" ref="updateUserForm" @submit="onSubmit">
+        <OForm
+          id="add-user-form"
+          ref="updateUserForm"
+          :key="formMode"
+          :schema="addUserSchema"
+          :default-values="addUserDefaults"
+          @submit="onSubmit"
+        >
           <!-- <p class="tw:pt-2 tw:truncate">{{t('user.organization')}} : <strong>{{formData.organization}}</strong></p> -->
           <p class="tw:mt-2 tw:truncate" v-if="!existingUser">
             {{ t("user.email") }} : <strong>{{ formData.email }}</strong>
@@ -43,28 +50,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("user.customRole") }} :
             <strong>{{ formData.custom_role.join(", ") }}</strong>
           </p>
-          <OInput
+          <OFormInput
             v-if="existingUser && !beingUpdated"
             v-model="formData.email"
-            :label="t('user.email') + ' *'"
+            name="email"
+            :label="t('user.email')"
+            required
             class="showLabelOnTop"
             maxlength="100"
             data-test="user-email-field"
-            :error="!!emailError"
-            :error-message="emailError"
-            @update:model-value="emailError = ''"
           />
 
           <div v-if="!beingUpdated && !existingUser" class="tw:mt-2">
-            <OInput
+            <OFormInput
               :type="isPwd ? 'password' : 'text'"
               v-model="formData.password"
-              :label="t('user.password') + ' *'"
+              name="password"
+              :label="t('user.password')"
+              required
               class="showLabelOnTop"
               data-test="user-password-field"
-              :error="!!passwordError"
-              :error-message="passwordError"
-              @update:model-value="passwordError = ''"
             >
               <template #icon-right>
                 <OIcon
@@ -73,40 +78,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click="isPwd = !isPwd"
                 />
               </template>
-            </OInput>
+            </OFormInput>
           </div>
 
-          <OInput
+          <OFormInput
             v-if="!existingUser && !isCloud"
             v-model="formData.first_name"
+            name="first_name"
             :label="t('user.firstName')"
             class="showLabelOnTop tw:mt-2"
             data-test="user-first-name-field"
           />
 
-          <OInput
+          <OFormInput
             v-if="!existingUser && !isCloud"
             v-model="formData.last_name"
+            name="last_name"
             :label="t('user.lastName')"
             class="showLabelOnTop tw:mt-2"
             data-test="user-last-name-field"
           />
-          <OSelect
+          <OFormSelect
             v-if="
               (existingUser || beingUpdated) &&
               userRole !== 'member' &&
               store.state.userInfo.email !== formData.email
             "
             v-model="formData.role"
-            :label="t('user.role') + ' *'"
+            name="role"
+            :label="t('user.role')"
+            required
             :options="roles"
             class="showLabelOnTop tw:mt-2"
             data-test="user-role-field"
-            :error="!!roleError"
-            :error-message="roleError"
-            @update:model-value="roleError = ''"
           />
-          <OSelect
+          <OFormSelect
             v-if="
               (existingUser || beingUpdated) &&
               userRole !== 'member' &&
@@ -114,6 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               (config.isEnterprise == 'true' || config.isCloud == 'true')
             "
             v-model="formData.custom_role"
+            name="custom_role"
             :label="t('user.customRole')"
             :options="filterdOption"
             class="showLabelOnTop tw:mt-2"
@@ -131,14 +138,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
           />
           <div v-if="beingUpdated && !isCloud" class="tw:mt-2">
-            <OSwitch
+            <OFormSwitch
               v-model="formData.change_password"
+              name="change_password"
               :label="t('user.changePassword')"
               size="lg"
               data-test="user-change-password-field"
             />
 
-            <OInput
+            <OFormInput
               v-if="
                 formData.change_password &&
                 (userRole == 'member' ||
@@ -146,7 +154,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
               :type="isOldPwd ? 'password' : 'text'"
               v-model="formData.old_password"
-              :label="t('user.oldPassword') + ' *'"
+              name="old_password"
+              :label="t('user.oldPassword')"
+              required
               class="showLabelOnTop tw:mt-2"
               data-test="user-old-passoword-field"
             >
@@ -157,13 +167,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click="isOldPwd = !isOldPwd"
                 />
               </template>
-            </OInput>
+            </OFormInput>
 
-            <OInput
+            <OFormInput
               v-if="formData.change_password"
               :type="isNewPwd ? 'password' : 'text'"
               v-model="formData.new_password"
-              :label="t('user.newPassword') + ' *'"
+              name="new_password"
+              :label="t('user.newPassword')"
+              required
               class="showLabelOnTop tw:mt-2"
               data-test="user-new-password-field"
             >
@@ -174,15 +186,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click="isNewPwd = !isNewPwd"
                 />
               </template>
-            </OInput>
+            </OFormInput>
           </div>
-          <OInput
+          <OFormInput
             v-if="
               !beingUpdated &&
               userRole != 'member' &&
               formData.organization == 'other'
             "
             v-model="formData.other_organization"
+            name="other_organization"
             :label="t('user.otherOrganization')"
             class="showLabelOnTop tw:mt-2"
             maxlength="100"
@@ -210,7 +223,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onActivated, onBeforeMount, watch } from "vue";
+import { defineComponent, ref, computed, onActivated, onBeforeMount, watch } from "vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
@@ -226,11 +239,12 @@ import config from "@/aws-exports";
 import { useReo } from "@/services/reodotdev_analytics";
 
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
-import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
+import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { makeAddUserSchema, type AddUserForm } from "./AddUser.schema";
 const defaultValue: any = () => {
   return {
     org_member_id: "",
@@ -250,10 +264,10 @@ export default defineComponent({
   name: "ComponentAddUpdateUser",
   components: { ODialog,
     OIcon,
-    OSwitch,
-    OInput,
-    OSelect,
     OForm,
+    OFormInput,
+    OFormSelect,
+    OFormSwitch,
 },
   props: {
     open: {
@@ -299,7 +313,7 @@ export default defineComponent({
     const formData: any = ref(defaultValue());
     const existingUser = ref(true);
     const beingUpdated: any = ref(false);
-    const userForm: any = ref(null);
+    const updateUserForm: any = ref(null);
     const isPwd: any = ref(true);
     const isNewPwd: any = ref(true);
     const isOldPwd: any = ref(true);
@@ -308,24 +322,47 @@ export default defineComponent({
     const logout_confirm = ref(false);
     const loggedInUserEmail = ref(store.state.userInfo.email);
     const filterdOption = ref([...props.customRoles]);
-    const emailError = ref('');
-    const roleError = ref('');
-    const passwordError = ref('');
 
-    // ----------------------------------------------------------------------
-    //  password policy  (mirrors src/config/src/utils/password.rs)
-    //  Length 8-128 AND lower AND upper AND digit AND special.
-    // ----------------------------------------------------------------------
-    const PASSWORD_POLICY_HINT =
-      "Password must be 8-128 characters and contain at least one lowercase letter, one uppercase letter, one digit, and one special character.";
-    const isStrongPassword = (val: string) => {
-      if (!val || val.length < 8 || val.length > 128) return false;
-      const hasLower = /[a-z]/.test(val);
-      const hasUpper = /[A-Z]/.test(val);
-      const hasDigit = /[0-9]/.test(val);
-      const hasSpecial = /[^A-Za-z0-9]/.test(val);
-      return hasLower && hasUpper && hasDigit && hasSpecial;
-    };
+    // Mode key: the form validates a different subset per mode, and the 422
+    // "this email is actually new" flow flips existingUser → false mid-flight.
+    // Re-keying <OForm> on this remounts it so the new schema applies (values are
+    // preserved because :default-values re-seeds from the persistent formData).
+    const formMode = computed(() => {
+      if (beingUpdated.value) return "edit";
+      if (existingUser.value) return "add-existing";
+      return "add-new";
+    });
+
+    // Conditional schema (returned from setup → in template scope). The factory
+    // reads the non-form context; superRefine reads form values (incl.
+    // change_password) at validation time.
+    const addUserSchema = computed(() =>
+      makeAddUserSchema({
+        existingUser: existingUser.value,
+        beingUpdated: beingUpdated.value,
+        userRole: props.userRole,
+        loggedInUserEmail: loggedInUserEmail.value,
+        modelEmail: props.modelValue?.email ?? "",
+        organization: formData.value.organization,
+      }),
+    );
+
+    // The OForm owns every editable field; formData stays the single working
+    // source for the conditionals/handler (the sanctioned entangled-form
+    // exception), kept in sync by the fields' v-model. :default-values re-seeds
+    // from it on (re)mount.
+    const addUserDefaults = computed((): AddUserForm => ({
+      email: formData.value.email ?? "",
+      password: formData.value.password ?? "",
+      first_name: formData.value.first_name ?? "",
+      last_name: formData.value.last_name ?? "",
+      role: formData.value.role ?? "",
+      custom_role: formData.value.custom_role ?? [],
+      change_password: formData.value.change_password ?? false,
+      old_password: formData.value.old_password ?? "",
+      new_password: formData.value.new_password ?? "",
+      other_organization: formData.value.other_organization ?? "",
+    }));
 
     watch(
       () => props.customRoles,
@@ -370,6 +407,13 @@ export default defineComponent({
             .getUserRoles(orgId, newVal.email)
             .then((response: any) => {
               formData.value.custom_role = response.data;
+              // custom_role arrives AFTER mount (async) — bridge it into the form
+              // so the OFormSelect displays it (the form's value, not formData,
+              // is what's rendered). Per the playbook "data arrives after mount".
+              updateUserForm.value?.form?.setFieldValue(
+                "custom_role",
+                response.data,
+              );
             })
             .catch((error: any) => {
               console.error("Error fetching user roles:", error);
@@ -413,13 +457,19 @@ export default defineComponent({
       formData.value.organization = store.state.selectedOrganization.identifier;
     };
 
+    // Options-API: the schema (and the defaults computed) MUST be returned from
+    // setup() — a bare module import is out of the template's scope, so :schema
+    // would resolve to undefined and validation would silently no-op.
     return {
       t,
       store,
       router,
       formData,
       beingUpdated,
-      userForm,
+      updateUserForm,
+      formMode,
+      addUserSchema,
+      addUserDefaults,
       isPwd,
       isNewPwd,
       isOldPwd,
@@ -430,13 +480,8 @@ export default defineComponent({
       logout_confirm,
       loggedInUserEmail,
       filterdOption,
-      emailError,
-      roleError,
-      passwordError,
       invalidateLoginData,
       config,
-      isStrongPassword,
-      PASSWORD_POLICY_HINT,
       filterFn(val: any, update: any) {
         if (val === "") {
           update(() => {
@@ -464,73 +509,12 @@ export default defineComponent({
 
       this.$router.push("/logout");
     },
-    onSubmit() {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-      if (this.existingUser && !this.beingUpdated) {
-        if (!this.formData.email || !emailRegex.test(this.formData.email)) {
-          this.emailError = 'Please enter a valid email address.';
-          return;
-        }
-        if (
-          this.userRole !== 'member' &&
-          this.store.state.userInfo.email !== this.formData.email &&
-          !this.formData.role
-        ) {
-          this.roleError = 'Field is required';
-          return;
-        }
-      }
-
-      if (!this.existingUser && !this.beingUpdated) {
-        if (!this.formData.password) {
-          this.passwordError = 'Password is required.';
-          return;
-        }
-        if (!this.isStrongPassword(this.formData.password)) {
-          this.passwordError = this.PASSWORD_POLICY_HINT;
-          return;
-        }
-      }
-
-      if (this.beingUpdated && this.formData.change_password) {
-        const needsOldPwd =
-          this.userRole === 'member' ||
-          this.store.state.userInfo.email === this.modelValue?.email;
-        if (needsOldPwd) {
-          if (!this.formData.old_password) {
-            toast({ variant: "error", message: 'Current password is required.' });
-            return;
-          }
-          // Old/current password is never re-validated against the new policy:
-          // it was set under whatever rule was active then. Backend rejects on mismatch.
-        }
-        if (!this.formData.new_password) {
-          toast({ variant: "error", message: 'New password is required.' });
-          return;
-        }
-        if (!this.isStrongPassword(this.formData.new_password)) {
-          toast({ variant: "error", message: this.PASSWORD_POLICY_HINT });
-          return;
-        }
-      }
-
-      if (
-        !this.beingUpdated &&
-        this.userRole !== 'member' &&
-        this.formData.organization === 'other' &&
-        !/^[a-zA-Z][a-zA-Z0-9_-]*$/.test(this.formData.other_organization)
-      ) {
-        toast({ variant: "error", message: 'Organization name must start with a letter and be alphanumeric, _ or -.' });
-        return;
-      }
-
-      const dismiss = toast({
-        variant: "loading",
-        message: "Please wait...",
-        timeout: 0,
-      });
-
+    // Plain async @submit handler — fires only after the Zod schema passes
+    // (AddUser.schema.ts now owns the email / role / password / org rules that
+    // used to be manual emailError/roleError/passwordError refs + toast checks).
+    // OForm awaits it, so the footer Save spinner spans the request automatically
+    // (no manual loading toast). `formData` is the working source of truth.
+    async onSubmit() {
       let selectedOrg = this.formData.organization;
       if (selectedOrg == "other") {
         selectedOrg = encodeURIComponent(this.formData.other_organization);
@@ -543,97 +527,88 @@ export default defineComponent({
           delete this.formData.old_password;
           delete this.formData.new_password;
         }
-        userServiece
-          .update(this.formData, selectedOrg, userEmail)
-          .then((res: any) => {
-            if (
-              this.formData.change_password == true &&
-              this.loggedInUserEmail === this.modelValue?.email
-            ) {
-              this.logout_confirm = true;
-            } else {
-              dismiss();
-              this.formData.email = userEmail;
-              this.$emit("updated", res.data, this.formData, "updated");
-              this.$emit("update:open", false);
-            }
-          })
-          .catch((err: any) => {
-            toast({
-              variant: "error",
-              message: err.response.data.message,
-            });
-            dismiss();
+        try {
+          const res: any = await userServiece.update(
+            this.formData,
+            selectedOrg,
+            userEmail,
+          );
+          if (
+            this.formData.change_password == true &&
+            this.loggedInUserEmail === this.modelValue?.email
+          ) {
+            this.logout_confirm = true;
+          } else {
             this.formData.email = userEmail;
+            this.$emit("updated", res.data, this.formData, "updated");
+            this.$emit("update:open", false);
+          }
+        } catch (err: any) {
+          toast({
+            variant: "error",
+            message: err.response.data.message,
           });
-          this.track("Button Click", {
-            button: "Update User",
-            page: "Add User"
-          });
+          this.formData.email = userEmail;
+        }
+        this.track("Button Click", {
+          button: "Update User",
+          page: "Add User",
+        });
       } else {
         if (this.existingUser) {
           const userEmail = this.formData.email;
 
-          userServiece
-            .updateexistinguser(
+          try {
+            const res: any = await userServiece.updateexistinguser(
               {
                 role: this.formData.role,
                 custom_role: this.formData.custom_role,
               },
               selectedOrg,
               userEmail,
-            )
-            .then((res: any) => {
-              dismiss();
-              this.formData.email = userEmail;
-              this.existingUser = true;
-              this.$emit("updated", res.data, this.formData, "created");
-              this.$emit("update:open", false);
-              // }
-            })
-            .catch((err: any) => {
-              if (err.response.data.code === 422) {
-                // toast({
-                //   color: "positive",
-                //   variant: "success",
-                //   message: "User added successfully.",
-                // });
-                dismiss();
-                this.existingUser = false;
-              } else {
+            );
+            this.formData.email = userEmail;
+            this.existingUser = true;
+            this.$emit("updated", res.data, this.formData, "created");
+            this.$emit("update:open", false);
+          } catch (err: any) {
+            if (err.response.data.code === 422) {
+              // The email is actually new → switch to "create new user" mode.
+              // formMode flips to "add-new", which re-keys <OForm> so the schema
+              // now enforces the password policy.
+              this.existingUser = false;
+            } else {
               if (err.response?.status != 403 || err?.status != 403) {
                 toast({
                   variant: "error",
                   message: err.response.data.message,
                 });
-                dismiss();
               }
-                this.formData.email = userEmail;
-              }
-            });
-            this.track("Button Click", {
-              button: "Update User",
-              page: "Add User"
-            });
+              this.formData.email = userEmail;
+            }
+          }
+          this.track("Button Click", {
+            button: "Update User",
+            page: "Add User",
+          });
         } else {
-          userServiece
-            .create(this.formData, selectedOrg)
-            .then((res: any) => {
-              dismiss();
-              this.$emit("updated", res.data, this.formData, "created");
-              this.$emit("update:open", false);
-            })
-            .catch((err: any) => {
-              toast({
-                variant: "error",
-                message: err.response.data.message,
-              });
-              dismiss();
+          try {
+            const res: any = await userServiece.create(
+              this.formData,
+              selectedOrg,
+            );
+            this.$emit("updated", res.data, this.formData, "created");
+            this.$emit("update:open", false);
+          } catch (err: any) {
+            toast({
+              variant: "error",
+              message: err.response.data.message,
             });
-            this.track("Button Click", {
-              button: "Create User",
-              page: "Add User"
-            });
+          }
+          this.track("Button Click", {
+            button: "Create User",
+            page: "Add User",
+          });
         }
       }
     },

@@ -20,36 +20,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="t('iam.addRole')"
     :primaryButtonLabel="t('alerts.save')"
     :secondaryButtonLabel="t('alerts.cancel')"
-    :primaryButtonDisabled="!name || !isValidRoleName"
-    @click:primary="saveRole"
+    form-id="add-role-form"
     @click:secondary="emits('update:open', false)"
     @update:open="emits('update:open', $event)"
   >
     <div data-test="add-role-section">
-      <OInput
-        v-model.trim="name"
-        :label="t('common.name') + ' *'"
-        class="showLabelOnTop tw:mt-2"
-        maxlength="100"
-        data-test="add-role-rolename-input-btn"
-        :error="showNameError"
-        :error-message="nameErrorMessage"
-        :help-text="!showNameError ? `Use alphanumeric and '_' characters only, without spaces.` : undefined"
-        @update:model-value="showNameError = !!name && !isValidRoleName"
-      />
+      <OForm
+        id="add-role-form"
+        :schema="addRoleSchema"
+        :default-values="addRoleDefaults"
+        @submit="saveRole"
+      >
+        <OFormInput
+          name="name"
+          :label="t('common.name')"
+          required
+          class="showLabelOnTop tw:mt-2"
+          maxlength="100"
+          data-test="add-role-rolename-input-btn"
+          help-text="Use alphanumeric and '_' characters only, without spaces."
+        />
+      </OForm>
     </div>
   </ODialog>
 </template>
 
 <script setup lang="ts">
-import { createRole, updateRole } from "@/services/iam";
+import { createRole } from "@/services/iam";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
-import { ref, computed, watch } from "vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { makeAddRoleSchema, type AddRoleForm } from "./AddRole.schema";
 
 const { t } = useI18n();
 const props = defineProps({
@@ -71,56 +77,44 @@ const emits = defineEmits(["update:open", "added:role"]);
 
 const { track } = useReo();
 
-const name = ref(props.role?.name || "");
-
 const store = useStore();
 
+const addRoleSchema = makeAddRoleSchema(t);
 
-const isValidRoleName = computed(() => {
-  const roleNameRegex = /^[a-zA-Z0-9_]+$/;
-  return roleNameRegex.test(name.value);
-});
+// The OForm owns `name`. The ODialog unmounts its body on close + remounts fresh
+// on open, so this typed computed re-seeds `:default-values` each open (the
+// optional `role` prop prefills it, otherwise blank). No local model / watch.
+const addRoleDefaults = computed((): AddRoleForm => ({
+  name: props.role?.name ?? "",
+}));
 
-const showNameError = ref(false);
-
-watch(
-  () => props.open,
-  (isOpen) => {
-    if (isOpen) {
-      name.value = props.role?.name || "";
-      showNameError.value = false;
-    }
-  }
-);
-
-const nameErrorMessage = computed(() =>
-  !name.value ? t('common.nameRequired') : `Use alphanumeric and '_' characters only, without spaces.`
-);
-
-const saveRole = () => {
-  if (!name.value || !isValidRoleName.value) return;
-  createRole(name.value, store.state.selectedOrganization.identifier)
-    .then(() => {
-      emits("update:open", false);
-      emits("added:role");
+// Plain async @submit handler — the validated `value` is the source of truth.
+// The schema validates the trimmed name; trim again here so the saved value
+// matches (mirrors the old `v-model.trim`). `saveRole` always calls createRole
+// (even when prefilled in edit mode) — behavior preserved from the original.
+const saveRole = async (value: AddRoleForm) => {
+  const name = value.name.trim();
+  try {
+    await createRole(name, store.state.selectedOrganization.identifier);
+    emits("update:open", false);
+    emits("added:role");
+    toast({
+      message: `Role "${name}" Created Successfully!`,
+      variant: "success",
+    });
+  } catch (err: any) {
+    if (err.response?.status != 403) {
       toast({
-        message: `Role "${name.value}" Created Successfully!`,
-        variant: "success",
-      });
-    })
-    .catch((err) => {
-      if(err.response.status != 403){
-        toast({
         message: err?.response?.data?.message,
         variant: "error",
       });
-      }
-      console.log(err);
-    });
-    track("Button Click", {
-      button: "Save Role",
-      page: "Add Role"
-    });
+    }
+    console.log(err);
+  }
+
+  track("Button Click", {
+    button: "Save Role",
+    page: "Add Role",
+  });
 };
 </script>
-

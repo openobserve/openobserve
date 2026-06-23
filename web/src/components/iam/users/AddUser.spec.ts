@@ -1,0 +1,523 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+//
+// AddUser is migrated to OForm + Zod (AddUser.schema.ts): every bare control
+// inside <OForm> is now an OForm* field, the conditional superRefine schema (+
+// defaults) is returned from setup() (Options-API), and the BEFORE rules
+// (email validity, role required, password min-8/strong, other_organization
+// regex) are restored. These tests mount the REAL <OForm> and assert behavior:
+// the schema gates the submit (no service call when invalid), and each restored
+// rule blocks an invalid value.
+
+import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import AddUser from "@/components/iam/users/AddUser.vue";
+import i18n from "@/locales";
+import store from "@/test/unit/helpers/store";
+
+vi.mock("@/aws-exports", () => ({
+  default: {
+    isCloud: "false",
+    isEnterprise: "false",
+  },
+}));
+
+vi.mock("@/services/users", () => ({
+  default: {
+    create: vi.fn(),
+    update: vi.fn(),
+    updateexistinguser: vi.fn(),
+    getUserRoles: vi.fn(() => Promise.resolve({ data: [] })),
+  },
+}));
+
+vi.mock("@/services/reodotdev_analytics", () => ({
+  useReo: () => ({ track: vi.fn() }),
+}));
+
+const { mockToast } = vi.hoisted(() => ({
+  mockToast: vi.fn(),
+}));
+
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: mockToast,
+}));
+
+// Keep the real zincutils, but stub the logout side-effects so signout() is testable.
+vi.mock("@/utils/zincutils", async (importOriginal) => {
+  const actual = (await importOriginal()) as Record<string, unknown>;
+  return {
+    ...actual,
+    useLocalCurrentUser: vi.fn(),
+    useLocalUserInfo: vi.fn(),
+    invalidateLoginData: vi.fn(),
+  };
+});
+
+import userServiece from "@/services/users";
+import { invalidateLoginData } from "@/utils/zincutils";
+import config from "@/aws-exports";
+
+// ODialog stub: renders the default slot so the REAL OForm mounts. (The second
+// ODialog — the logout confirm — is also covered by this stub.)
+const ODialogStub = {
+  name: "ODialog",
+  props: [
+    "open",
+    "size",
+    "title",
+    "primaryButtonLabel",
+    "secondaryButtonLabel",
+    "formId",
+    "persistent",
+  ],
+  emits: ["update:open", "click:primary", "click:secondary"],
+  template: `
+    <div data-test-stub="o-dialog" :data-open="open" :data-title="title" :data-form-id="formId">
+      <slot />
+      <button
+        v-if="secondaryButtonLabel"
+        data-test="o-dialog-secondary-btn"
+        @click="$emit('click:secondary')"
+      >{{ secondaryButtonLabel }}</button>
+    </div>
+  `,
+  inheritAttrs: false,
+};
+
+const ADMIN_EMAIL = "admin@example.com";
+
+function mountComp(props: Record<string, any> = {}) {
+  // Ensure the logged-in user is an admin distinct from the user being edited so
+  // the role select is shown in add-existing mode.
+  store.state.userInfo = { ...store.state.userInfo, email: ADMIN_EMAIL };
+  // The component reads store.state.organizations in onBeforeMount; ensure it's
+  // an array in the test store.
+  store.state.organizations = store.state.organizations ?? [];
+  return mount(AddUser, {
+    global: {
+      plugins: [store, i18n],
+      stubs: { ODialog: ODialogStub },
+    },
+    props: {
+      open: true,
+      modelValue: {},
+      isUpdated: false,
+      userRole: "admin",
+      roles: [{ label: "Admin", value: "admin" }],
+      customRoles: [],
+      isCloud: false,
+      ...props,
+    },
+  });
+}
+
+// The add-user OForm is the first OForm in the tree.
+const getForm = (wrapper: VueWrapper<any>) =>
+  wrapper.findComponent({ name: "OForm" });
+const setField = (wrapper: VueWrapper<any>, name: string, value: unknown) =>
+  getForm(wrapper).vm.form.setFieldValue(name, value);
+const submitForm = async (wrapper: VueWrapper<any>) => {
+  await getForm(wrapper).vm.form.handleSubmit();
+  await flushPromises();
+};
+
+describe("AddUser", () => {
+  let wrapper: VueWrapper<any>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    try {
+      wrapper?.unmount();
+    } catch {
+      // teleported components can throw during unmount in jsdom
+    }
+  });
+
+  describe("rendering & wiring", () => {
+    it("renders the OForm wired to the dialog via form-id", () => {
+      wrapper = mountComp();
+      expect(getForm(wrapper).exists()).toBe(true);
+      expect(
+        wrapper.find('[data-test-stub="o-dialog"]').attributes("data-form-id"),
+      ).toBe("add-user-form");
+    });
+
+    it("returns a schema from setup() (Options-API wiring, not undefined)", () => {
+      wrapper = mountComp();
+      expect(getForm(wrapper).props("schema")).toBeDefined();
+    });
+
+    it("shows the email field in add-existing mode", () => {
+      wrapper = mountComp();
+      expect(wrapper.find('[data-test="user-email-field"]').exists()).toBe(true);
+    });
+
+    it("preserves field data-tests for the role select", () => {
+      wrapper = mountComp();
+      expect(wrapper.find('[data-test="user-role-field"]').exists()).toBe(true);
+    });
+
+    it("reflects the open prop on the dialog", async () => {
+      wrapper = mountComp();
+      expect(
+        wrapper.find('[data-test-stub="o-dialog"]').attributes("data-open"),
+      ).toBe("true");
+      await wrapper.setProps({ open: false });
+      expect(
+        wrapper.find('[data-test-stub="o-dialog"]').attributes("data-open"),
+      ).toBe("false");
+    });
+
+    it("shows the add title in add mode and a different edit title in edit mode", async () => {
+      wrapper = mountComp(); // add mode (empty modelValue)
+      const addTitle = wrapper
+        .find('[data-test-stub="o-dialog"]')
+        .attributes("data-title");
+      expect(addTitle).toBeTruthy();
+
+      const w = mountComp({
+        modelValue: { email: "x@y.com", first_name: "X", org_member_id: "1" },
+      });
+      await flushPromises();
+      const editTitle = w
+        .find('[data-test-stub="o-dialog"]')
+        .attributes("data-title");
+      expect(editTitle).toBeTruthy();
+      expect(editTitle).not.toBe(addTitle);
+      w.unmount();
+    });
+
+    it("filterFn filters custom roles by the typed value", () => {
+      wrapper = mountComp({
+        customRoles: ["admin-role", "editor-role", "viewer"],
+      });
+      // update() runs its callback synchronously (the Quasar filter contract).
+      wrapper.vm.filterFn("edit", (fn: () => void) => fn());
+      expect(wrapper.vm.filterdOption).toEqual(["editor-role"]);
+
+      wrapper.vm.filterFn("", (fn: () => void) => fn());
+      expect(wrapper.vm.filterdOption).toEqual([
+        "admin-role",
+        "editor-role",
+        "viewer",
+      ]);
+    });
+  });
+
+  describe("add-existing user — schema gating (restored email + role rules)", () => {
+    it("blocks submit and does NOT call the service when email is empty", async () => {
+      wrapper = mountComp();
+      await submitForm(wrapper);
+
+      expect(getForm(wrapper).vm.form.state.isValid).toBe(false);
+      expect(userServiece.updateexistinguser).not.toHaveBeenCalled();
+      expect(wrapper.text()).toContain("Please enter a valid email address.");
+    });
+
+    it("blocks submit when the email format is invalid (restored email validity)", async () => {
+      wrapper = mountComp();
+      setField(wrapper, "email", "not-an-email");
+      setField(wrapper, "role", "admin");
+      await submitForm(wrapper);
+
+      expect(getForm(wrapper).vm.form.state.isValid).toBe(false);
+      expect(userServiece.updateexistinguser).not.toHaveBeenCalled();
+    });
+
+    it("blocks submit when the role is empty (restored role-required)", async () => {
+      wrapper = mountComp();
+      setField(wrapper, "email", "newuser@example.com");
+      setField(wrapper, "role", "");
+      await submitForm(wrapper);
+
+      expect(getForm(wrapper).vm.form.state.isValid).toBe(false);
+      expect(userServiece.updateexistinguser).not.toHaveBeenCalled();
+      expect(wrapper.text()).toContain("Field is required");
+    });
+
+    it("submits and calls updateexistinguser when email + role are valid", async () => {
+      vi.mocked(userServiece.updateexistinguser).mockResolvedValue({
+        data: {},
+      } as any);
+      wrapper = mountComp();
+      setField(wrapper, "email", "newuser@example.com");
+      setField(wrapper, "role", "admin");
+      await submitForm(wrapper);
+
+      expect(getForm(wrapper).vm.form.state.isValid).toBe(true);
+      expect(userServiece.updateexistinguser).toHaveBeenCalledTimes(1);
+      expect(wrapper.emitted("updated")).toBeTruthy();
+    });
+
+    it("emits update:open(false) after a successful save", async () => {
+      vi.mocked(userServiece.updateexistinguser).mockResolvedValue({
+        data: {},
+      } as any);
+      wrapper = mountComp();
+      setField(wrapper, "email", "newuser@example.com");
+      setField(wrapper, "role", "admin");
+      await submitForm(wrapper);
+
+      const updateOpen = wrapper.emitted("update:open");
+      expect(updateOpen[updateOpen.length - 1]).toEqual([false]);
+    });
+
+    it("switches to create-new mode on a 422 and then enforces the password policy", async () => {
+      vi.mocked(userServiece.updateexistinguser).mockRejectedValue({
+        response: { data: { code: 422 } },
+      });
+      wrapper = mountComp();
+      setField(wrapper, "email", "brandnew@example.com");
+      setField(wrapper, "role", "admin");
+      await submitForm(wrapper);
+
+      // existingUser flipped → create-new mode; password field now shown.
+      expect(wrapper.vm.existingUser).toBe(false);
+      await flushPromises();
+      expect(wrapper.find('[data-test="user-password-field"]').exists()).toBe(true);
+
+      // An empty / weak password is now blocked by the schema (restored policy).
+      await submitForm(wrapper);
+      expect(getForm(wrapper).vm.form.state.isValid).toBe(false);
+      expect(userServiece.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("create-new user — restored password policy", () => {
+    // Force create-new mode directly.
+    const mountAddNew = () => {
+      const w = mountComp();
+      w.vm.existingUser = false;
+      return w;
+    };
+
+    it("blocks submit for a weak password and accepts a strong one", async () => {
+      vi.mocked(userServiece.create).mockResolvedValue({ data: {} } as any);
+      wrapper = mountAddNew();
+      await flushPromises();
+
+      // Weak (too short, no complexity) → blocked.
+      setField(wrapper, "password", "short");
+      await submitForm(wrapper);
+      expect(getForm(wrapper).vm.form.state.isValid).toBe(false);
+      expect(userServiece.create).not.toHaveBeenCalled();
+
+      // Strong (≥8, lower+upper+digit+special) → passes.
+      setField(wrapper, "password", "Str0ng!Pass");
+      await submitForm(wrapper);
+      expect(getForm(wrapper).vm.form.state.isValid).toBe(true);
+      expect(userServiece.create).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("edit user — restored password rules on change_password", () => {
+    const mountEditSelf = () =>
+      mountComp({
+        modelValue: {
+          email: ADMIN_EMAIL,
+          first_name: "Admin",
+          org_member_id: "1",
+        },
+      });
+
+    it("requires old + new passwords (min 8 / strong) when changing own password", async () => {
+      wrapper = mountEditSelf();
+      await flushPromises();
+      expect(wrapper.vm.beingUpdated).toBe(true);
+
+      // Turn on change_password, leave passwords empty → blocked.
+      setField(wrapper, "change_password", true);
+      await submitForm(wrapper);
+      expect(getForm(wrapper).vm.form.state.isValid).toBe(false);
+      expect(userServiece.update).not.toHaveBeenCalled();
+
+      // Short old password (<8) is rejected (restored BEFORE min-8 on old_password).
+      setField(wrapper, "old_password", "short");
+      setField(wrapper, "new_password", "Str0ng!Pass");
+      await submitForm(wrapper);
+      expect(getForm(wrapper).vm.form.state.isValid).toBe(false);
+      expect(userServiece.update).not.toHaveBeenCalled();
+
+      // Valid old (≥8) + strong new → passes.
+      vi.mocked(userServiece.update).mockResolvedValue({ data: {} } as any);
+      setField(wrapper, "old_password", "longenough8");
+      setField(wrapper, "new_password", "Str0ng!Pass");
+      await submitForm(wrapper);
+      expect(getForm(wrapper).vm.form.state.isValid).toBe(true);
+    });
+
+    it("submits a plain role update (no password change) without password rules", async () => {
+      vi.mocked(userServiece.update).mockResolvedValue({ data: {} } as any);
+      wrapper = mountComp({
+        modelValue: {
+          email: "other@example.com",
+          first_name: "Other",
+          role: "admin",
+          org_member_id: "2",
+        },
+      });
+      await flushPromises();
+
+      await submitForm(wrapper);
+      expect(getForm(wrapper).vm.form.state.isValid).toBe(true);
+      expect(userServiece.update).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("dialog interactions", () => {
+    it("emits update:open(false) when cancel is clicked", async () => {
+      wrapper = mountComp();
+      await wrapper.find('[data-test="o-dialog-secondary-btn"]').trigger("click");
+      const emitted = wrapper.emitted("update:open");
+      expect(emitted[emitted.length - 1]).toEqual([false]);
+    });
+  });
+
+  // Changing YOUR OWN password logs you out: the update succeeds, then a logout
+  // confirmation dialog is shown (logout_confirm) instead of the normal close,
+  // and confirming it runs signout().
+  describe("own-password change → logout flow", () => {
+    it("shows the logout confirmation when changing your OWN password", async () => {
+      vi.mocked(userServiece.update).mockResolvedValue({ data: {} } as any);
+      wrapper = mountComp({
+        modelValue: {
+          email: ADMIN_EMAIL, // self
+          first_name: "Admin",
+          org_member_id: "1",
+        },
+      });
+      await flushPromises();
+
+      setField(wrapper, "change_password", true);
+      setField(wrapper, "old_password", "longenough8");
+      setField(wrapper, "new_password", "Str0ng!Pass");
+      // onSubmit branches on this.formData.change_password; the v-model bridge
+      // only syncs formData on real input events, not setFieldValue, so mirror it.
+      wrapper.vm.formData.change_password = true;
+      await submitForm(wrapper);
+
+      expect(userServiece.update).toHaveBeenCalledTimes(1);
+      expect(wrapper.vm.logout_confirm).toBe(true);
+      // The logout dialog takes over — the normal close is NOT emitted.
+      expect(wrapper.emitted("update:open")).toBeFalsy();
+    });
+
+    it("does NOT show logout confirmation when changing ANOTHER user's password", async () => {
+      vi.mocked(userServiece.update).mockResolvedValue({ data: {} } as any);
+      wrapper = mountComp({
+        modelValue: {
+          email: "other@example.com", // not self
+          first_name: "Other",
+          org_member_id: "2",
+        },
+      });
+      await flushPromises();
+
+      setField(wrapper, "change_password", true);
+      // Admin editing another user → old password isn't required; new is strong.
+      setField(wrapper, "new_password", "Str0ng!Pass");
+      await submitForm(wrapper);
+
+      expect(userServiece.update).toHaveBeenCalledTimes(1);
+      expect(wrapper.vm.logout_confirm).toBe(false);
+      const updateOpen = wrapper.emitted("update:open");
+      expect(updateOpen[updateOpen.length - 1]).toEqual([false]);
+    });
+
+    it("signout() clears auth state and redirects to /logout", () => {
+      store.state.userInfo = { ...store.state.userInfo, email: ADMIN_EMAIL };
+      store.state.organizations = [];
+      const dispatchSpy = vi
+        .spyOn(store, "dispatch")
+        .mockReturnValue(undefined as any);
+      const push = vi.fn();
+      const w = mount(AddUser, {
+        global: {
+          plugins: [store, i18n],
+          stubs: { ODialog: ODialogStub },
+          mocks: { $router: { push } },
+        },
+        props: {
+          open: true,
+          modelValue: {},
+          isUpdated: false,
+          userRole: "admin",
+          roles: [{ label: "Admin", value: "admin" }],
+          customRoles: [],
+          isCloud: false,
+        },
+      });
+
+      w.vm.signout();
+
+      expect(invalidateLoginData).toHaveBeenCalled();
+      expect(dispatchSpy).toHaveBeenCalledWith("logout");
+      expect(push).toHaveBeenCalledWith("/logout");
+
+      w.unmount();
+      dispatchSpy.mockRestore();
+    });
+  });
+
+  // The aws-exports mock is a shared singleton, so flip its flag for this block
+  // (and restore it) to exercise the enterprise-only branches: custom-role fetch
+  // + the custom_role select.
+  describe("enterprise mode (config.isEnterprise = 'true')", () => {
+    beforeEach(() => {
+      config.isEnterprise = "true";
+    });
+    afterEach(() => {
+      config.isEnterprise = "false";
+    });
+
+    it("fetches user roles for an existing user in enterprise mode", async () => {
+      vi.mocked(userServiece.getUserRoles).mockResolvedValue({
+        data: ["custom-a"],
+      } as any);
+      wrapper = mountComp({
+        modelValue: {
+          email: "other@example.com",
+          first_name: "Other",
+          org_member_id: "2",
+        },
+      });
+      await flushPromises();
+
+      expect(userServiece.getUserRoles).toHaveBeenCalledWith(
+        store.state.selectedOrganization.identifier,
+        "other@example.com",
+      );
+    });
+
+    it("shows the custom_role field in enterprise mode", async () => {
+      wrapper = mountComp({
+        modelValue: {
+          email: "other@example.com",
+          first_name: "Other",
+          org_member_id: "2",
+        },
+      });
+      await flushPromises();
+
+      expect(
+        wrapper.find('[data-test="user-custom-role-field"]').exists(),
+      ).toBe(true);
+    });
+  });
+});

@@ -402,4 +402,27 @@ describe("User Component", () => {
       expect(addButton.exists()).toBe(false); // Add button should not exist in cloud mode
     });
   });
+
+  // Regression / model: the row must store the canonical role VALUE (e.g.
+  // "admin"), not a camel-cased display string ("Admin") — otherwise the value
+  // doesn't match the role-select options and the edit dropdown comes up blank.
+  // Display is derived from the value in the table cell, not baked into the data.
+  describe("Edit dialog role prefill (row stores the role value)", () => {
+    it("builds rows with the raw role value, not a display string", async () => {
+      await flushPromises();
+      // mockUsers roles are "admin" / "user" — the row keeps them verbatim.
+      expect(wrapper.vm.usersState.users[0].role).toBe("admin");
+      expect(wrapper.vm.usersState.users[1].role).toBe("user");
+    });
+
+    it("seeds AddUser with the row's role value", () => {
+      wrapper.vm.addUser({ row: { email: "u@x.com", role: "viewer" } }, true);
+      expect(wrapper.vm.selectedUser.role).toBe("viewer");
+    });
+
+    it("seeds UpdateRole with the row's role value", () => {
+      wrapper.vm.updateUser({ row: { email: "u@x.com", role: "admin" } });
+      expect(wrapper.vm.selectedUser.role).toBe("admin");
+    });
+  });
 });

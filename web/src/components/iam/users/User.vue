@@ -121,6 +121,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
 
+          <!-- Single role (open-source mode): the row stores the raw value;
+               capitalise it for display here (and flag pending invites). Display
+               is derived from the value — the value itself stays canonical. -->
+          <template #cell-role="{ row }">
+            {{ row.role ? toCamelCase(row.role) : '' }}{{ row.status === 'pending' ? ' (Invited)' : '' }}
+          </template>
+
           <template #cell-actions="{ row }">
             <OButton
               v-if="row.enableDelete && row.status != 'pending'"
@@ -649,7 +656,12 @@ export default defineComponent({
                 rawEmail: data.email,
                 first_name: data.first_name,
                 last_name: data.last_name,
-                role: data?.status == "pending" ? toCamelCase(data.role) + " (Invited)": toCamelCase(data.role),
+                // Store the canonical role VALUE (e.g. "admin"/"viewer"), never a
+                // display string. Display is derived from it where shown: the table
+                // capitalises it in the #cell-role slot, and the edit dialogs /
+                // update_member_role consume the value directly. (Single source of
+                // truth — display is a one-way function of the value, never reversed.)
+                role: data.role,
                 roles: rolesArr,
                 auth_type: data?.auth_type
                   ? data.auth_type
@@ -834,7 +846,9 @@ export default defineComponent({
     };
 
     const updateUser = (props: any) => {
-      selectedUser.value = props.row;
+      // The row already stores the canonical role VALUE, so it seeds the role
+      // select directly (matches an option, shows its label).
+      selectedUser.value = { ...props.row };
       showUpdateUserDialog.value = true;
     };
 
@@ -844,7 +858,9 @@ export default defineComponent({
         store.state.selectedOrganization.identifier;
 
       if (props.row != undefined) {
-        selectedUser.value = props.row;
+        // The row already stores the canonical role VALUE, so AddUser's role
+        // select matches an option directly (see updateUser).
+        selectedUser.value = { ...props.row };
         segment.track("Button Click", {
           button: "Actions",
           user_org: store.state.selectedOrganization.identifier,
