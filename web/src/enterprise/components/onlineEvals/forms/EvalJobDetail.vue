@@ -1,64 +1,32 @@
 <template>
-  <div
-    class="jd-scrim"
-    role="dialog"
-    aria-modal="true"
-    @click.self="$emit('close')"
+  <ODrawer
+    :open="open"
+    side="right"
+    :width="70"
+    :title="t('onlineEvals.job.detail.eyebrow')"
+    data-test="eval-job-detail"
+    @update:open="handleOpenChange"
   >
-    <aside class="jd" @click.stop data-test="eval-job-detail">
-      <!-- ── Header ── -->
-      <header class="jd__header">
-        <div class="jd__header-text">
-          <div class="tw:flex tw:items-center tw:gap-2 tw:flex-nowrap">
-            <span class="jd__eyebrow">{{
-              t("onlineEvals.job.detail.eyebrow")
-            }}</span>
-            <span
-              v-if="row.name"
-              :class="[
-                'tw:font-semibold tw:px-2 tw:py-1 tw:rounded-md tw:inline-block',
-                store.state.theme === 'dark'
-                  ? 'tw:text-blue-400 tw:bg-blue-900/50'
-                  : 'tw:text-blue-600 tw:bg-blue-50',
-              ]"
-            >
-              {{ row.name }}
-              <OTooltip
-                v-if="row.name && row.name.length > 35"
-                :content="row.name"
-                side="top"
-              />
-            </span>
-          </div>
-          <div v-if="row.description" class="jd__sub-line">
-            {{ row.description }}
-          </div>
-        </div>
-        <button
-          type="button"
-          class="jd__close"
-          :aria-label="t('onlineEvals.job.detail.close')"
-          data-test="eval-job-detail-close-btn"
-          @click="$emit('close')"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            aria-hidden="true"
-          >
-            <line x1="18" y1="6" x2="6" y2="18" />
-            <line x1="6" y1="6" x2="18" y2="18" />
-          </svg>
-        </button>
-      </header>
+    <!-- Header: module label as the title + the job name as a blue chip,
+         mirroring the Alert History drawer. -->
+    <template #header-left>
+      <span
+        v-if="row.name"
+        :class="[
+          'tw:font-semibold tw:text-[18px] tw:px-2 tw:py-1 tw:rounded-md tw:ml-2 tw:min-w-0 tw:truncate',
+          store.state.theme === 'dark'
+            ? 'tw:text-blue-400 tw:bg-blue-900/50'
+            : 'tw:text-blue-600 tw:bg-blue-50',
+        ]"
+        data-test="eval-job-detail-name-badge"
+      >
+        {{ row.name }}
+        <OTooltip v-if="row.name" :content="row.name" />
+      </span>
+    </template>
 
+    <!-- Body: the KPI strip + tab bar stay pinned; only the tab content scrolls. -->
+    <div class="jd__body-inner">
       <!-- ── KPI strip ── -->
       <section class="jd__kpis">
         <article class="jd-kpi">
@@ -334,6 +302,9 @@
 
           <OTable
             data-test="eval-job-detail-runs-table"
+            :enable-column-resize="true"
+            :persist-columns="true"
+            table-id="eval-job-runs"
             :data="runs"
             :columns="runColumns"
             row-key="id"
@@ -443,6 +414,9 @@
             <OTable
               v-else
               data-test="eval-job-detail-failures-by-scorer-table"
+              :enable-column-resize="true"
+              :persist-columns="true"
+              table-id="eval-job-failures-by-scorer"
               :data="failureRows"
               :columns="failureByScorerColumns"
               row-key="scorerId"
@@ -487,6 +461,9 @@
             <OTable
               v-else
               data-test="eval-job-detail-failures-table"
+              :enable-column-resize="true"
+              :persist-columns="true"
+              table-id="eval-job-failures"
               :data="failedRuns"
               :columns="runColumns"
               row-key="id"
@@ -551,8 +528,8 @@
           </section>
         </template>
       </div>
-    </aside>
-  </div>
+    </div>
+  </ODrawer>
 </template>
 
 <script setup lang="ts">
@@ -562,6 +539,7 @@ import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
@@ -594,6 +572,16 @@ const emit = defineEmits<{
   (e: "close"): void;
   (e: "view-scorer", row: Scorer): void;
 }>();
+
+// Drawer open state — starts open (the parent mounts this only when a job is
+// selected). Any dismiss path (× button, Escape, overlay click) flows through
+// ODrawer's update:open(false) → we forward `close` to the parent, which
+// unmounts us.
+const open = ref(true);
+function handleOpenChange(value: boolean) {
+  open.value = value;
+  if (!value) emit("close");
+}
 
 const { t } = useI18n();
 const store = useStore();
@@ -843,8 +831,12 @@ function scorerNameFor(refId: string): string {
   return found?.name ?? refId;
 }
 
+// Config-tab scorer cards key off `resolvedScorers[].id`, which is the scorer's
+// stable `entity_id` (see resolvedScorers). Match on `entityId(s)` here too —
+// matching the per-version row `id` instead leaves the card disabled whenever
+// entity_id differs from id (the common case for versioned scorers).
 function findScorerById(refId: string): Scorer | null {
-  return props.scorers.find((s) => String(s.id) === refId) ?? null;
+  return props.scorers.find((s) => entityId(s) === refId) ?? null;
 }
 
 function onScorerClick(refId: string) {
@@ -1132,150 +1124,15 @@ function relativeTime(timestampMs: number): string {
 </script>
 
 <style lang="scss" scoped>
-.jd-scrim {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.32);
-  z-index: 1010;
+// Drawer body wrapper: fills ODrawer's scrollable body and lays the KPI strip
+// and tab bar as fixed (shrink-0) rows, with the tab content scrolling on its
+// own below them — preserves the previous fixed-header / scrolling-content feel
+// that the hand-rolled panel had.
+.jd__body-inner {
   display: flex;
-  justify-content: flex-end;
-  animation: jd-fade 0.18s ease-out;
-}
-
-@keyframes jd-fade {
-  from {
-    background: rgba(0, 0, 0, 0);
-  }
-  to {
-    background: rgba(0, 0, 0, 0.32);
-  }
-}
-
-.jd {
-  width: 1100px;
-  max-width: 96vw;
+  flex-direction: column;
   height: 100%;
-  background: var(--color-card-bg);
-  border-left: 1px solid var(--color-dialog-header-border, var(--o2-border));
-  display: flex;
-  flex-direction: column;
-  animation: jd-slide 0.22s ease-out;
-}
-
-@keyframes jd-slide {
-  from {
-    transform: translateX(100%);
-  }
-  to {
-    transform: translateX(0);
-  }
-}
-
-/* — Header — */
-.jd__header {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 16px 20px 14px;
-  border-bottom: 1px solid var(--color-dialog-header-border, var(--o2-border));
-  background: var(--color-card-bg);
-  flex-shrink: 0;
-}
-
-.jd__header-text {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.jd__eyebrow {
-  font: 600 11px/1.4 var(--o2-font);
-  letter-spacing: 0.02em;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.jd__title-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-
-.jd__title {
-  font-weight: 700;
-  font-size: 18px;
-  letter-spacing: -0.005em;
-  color: var(--color-text-primary, currentColor);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.jd__title-version {
-  font-size: 11px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  font-variant-numeric: tabular-nums;
-}
-
-.jd__status-pill {
-  display: inline-flex;
-  padding: 1px 8px;
-  border-radius: 999px;
-  font: 600 11px var(--o2-font);
-  background: color-mix(in srgb, var(--color-text-secondary) 14%, transparent);
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  text-transform: capitalize;
-}
-
-.jd__status-pill--active {
-  background: color-mix(
-    in srgb,
-    var(--o2-status-success-text, #2e7d32) 14%,
-    transparent
-  );
-  color: var(--o2-status-success-text, #2e7d32);
-}
-
-.jd__status-pill--paused {
-  background: color-mix(in srgb, #f59e0b 14%, transparent);
-  color: #b45309;
-}
-
-.jd__status-pill--degraded {
-  background: color-mix(
-    in srgb,
-    var(--o2-status-error-text, #c62828) 14%,
-    transparent
-  );
-  color: var(--o2-status-error-text, #c62828);
-}
-
-.jd__status-pill--archived {
-  background: color-mix(in srgb, var(--color-text-secondary) 14%, transparent);
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  opacity: 0.7;
-}
-
-.jd__sub-line {
-  font-size: 12px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.jd__close {
-  flex-shrink: 0;
-  background: transparent;
-  border: 0;
-  padding: 4px;
-  border-radius: 4px;
-  cursor: pointer;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.jd__close:hover {
-  background: color-mix(in srgb, var(--color-text-primary) 8%, transparent);
-  color: var(--color-text-primary, currentColor);
+  min-height: 0;
 }
 
 /* — KPI strip — */
@@ -1408,7 +1265,11 @@ function relativeTime(timestampMs: number): string {
 .jd__body {
   flex: 1;
   overflow: auto;
-  padding: 18px 20px;
+  // Horizontal padding lives on the children (sections + toolbar) instead of
+  // the body, so the Runs table — a bare child of the body — sits full-bleed
+  // with edge-to-edge column headers. No bottom padding: the table reaches the
+  // bottom edge with no dead space under its pagination bar.
+  padding: 18px 0 0;
   display: flex;
   flex-direction: column;
   gap: 18px;
@@ -1421,6 +1282,10 @@ function relativeTime(timestampMs: number): string {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  // Re-apply the inset the body no longer provides (Configuration + Failures
+  // sections stay aligned with the page content).
+  padding-left: 20px;
+  padding-right: 20px;
 }
 
 .jd-section__title {
@@ -1717,6 +1582,9 @@ function relativeTime(timestampMs: number): string {
   justify-content: flex-end;
   gap: 8px;
   flex-wrap: wrap;
+  // Re-apply the body's former inset so the toolbar controls stay aligned.
+  padding-left: 20px;
+  padding-right: 20px;
 }
 
 .jd__date-picker {
