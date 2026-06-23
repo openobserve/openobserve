@@ -941,7 +941,12 @@
     "authTypeSSO": "SSO",
     "authTypeLocal": "Inheems",
     "noCustomRolesHint": "Geen aangepaste rollen gedefinieerd — maak er een in IAM → Rollen",
-    "externalUserCustomRoleHint": "Externe gebruikers kunnen alleen via het bronsysteem worden gewijzigd"
+    "externalUserCustomRoleHint": "Externe gebruikers kunnen alleen via het bronsysteem worden gewijzigd",
+    "subtitle": "Mensen met toegang tot deze organisatie",
+    "revokeInvitationTitle": "Uitnodiging intrekken",
+    "revokeInvitationMsg": "Weet je zeker dat je de uitnodiging voor {email} wilt intrekken?",
+    "deleteUsersTitle": "Gebruikers verwijderen",
+    "deleteUsersMsg": "Weet je zeker dat je {count} gebruiker (s) wilt verwijderen?"
   },
   "ticket": {
     "header": "Tickets voor ondersteuning",
@@ -1003,7 +1008,8 @@
     "proceed_subscription": "Ga verder met het abonnement",
     "subscription_plan": "Abonnementsplan",
     "makeBilledMember": "Maak van deze organisatie een factureringslid van {org}",
-    "manage": "Beheren"
+    "manage": "Beheren",
+    "nameHelpText": "Gebruik alleen alfanumerieke tekens, spaties en onderstrepingstekens."
   },
   "template": {
     "header": "Sjablonen",
@@ -1136,7 +1142,11 @@
     "vrlFunctionHint": "Gebruik de `.` om de huidige gebeurtenis weer te geven. Voorbeeld: .new_field = .existing_field + 'verwerkt'",
     "askAIFunctionPlaceholder": "Vraag AI om hulp bij je functie...",
     "enterFunctionPrompt": "Voer een prompt in om een functie te genereren",
-    "jsErrorDetails": "Details van JavaScript-fouten"
+    "jsErrorDetails": "Details van JavaScript-fouten",
+    "subtitle": "Herbruikbare VRL-functies toegepast in pijpleidingen",
+    "clickTestFunctionHint": "Klik op Test Function om de gebeurtenissen te zien",
+    "pleaseEnterQuery": "Voer een vraag in",
+    "enrichmentTablesSubtitle": "Tabellen opzoeken die opgenomen gegevens verrijken"
   },
   "confirmDialog": {
     "cancel": "Annuleer",
@@ -2949,7 +2959,19 @@
     "externalUserWarningTitle": "Waarschuwing voor externe gebruikers",
     "externalUserWarningMessage": "Als u externe gebruikers rechtstreeks aan rollen toevoegt, worden geen machtigingen verleend. Voeg ze in plaats daarvan toe aan gebruikersgroepen.",
     "invitations": "Uitnodigingen",
-    "ingestionTokens": "Tokens voor inname"
+    "ingestionTokens": "Tokens voor inname",
+    "sectionAccess": "Toegang",
+    "sectionPermissions": "Machtigingen",
+    "sectionOrganization": "Organisatie",
+    "usersDesc": "Mensen met toegang tot deze organisatie",
+    "serviceAccountsDesc": "Programmatische toegangstokens voor API's",
+    "ingestionTokensDesc": "Tokens voor het opnemen van gegevens in deze organisatie",
+    "invitationsDesc": "Uitnodigingen voor leden in behandeling en verzonden",
+    "groupsDesc": "Gebruikers groeperen om rollen toe te wijzen",
+    "rolesDesc": "Machtigingen en toegangsbeleid definiëren",
+    "quotaDesc": "Gebruikslimieten die per rol worden toegepast",
+    "organizationsDesc": "Organisaties waar je toegang toe hebt",
+    "nameHelpText": "Gebruik alleen alfanumerieke tekens en '_' tekens, zonder spaties."
   },
   "pipeline": {
     "header": "Pijpleidingen",

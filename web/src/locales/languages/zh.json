@@ -941,7 +941,12 @@
     "authTypeSSO": "SSO",
     "authTypeLocal": "本地人",
     "noCustomRolesHint": "未定义自定义角色——在 IAM → 角色中创建一个",
-    "externalUserCustomRoleHint": "只能通过源系统修改外部用户"
+    "externalUserCustomRoleHint": "只能通过源系统修改外部用户",
+    "subtitle": "有权访问此组织的人员",
+    "revokeInvitationTitle": "撤销邀请",
+    "revokeInvitationMsg": "你确定要撤销 {email} 的邀请吗？",
+    "deleteUsersTitle": "删除用户",
+    "deleteUsersMsg": "您确定要删除 {count} 个用户吗？"
   },
   "ticket": {
     "header": "工单",
@@ -1003,7 +1008,8 @@
     "proceed_subscription": "继续订阅",
     "subscription_plan": "订阅计划",
     "makeBilledMember": "将此组织设为 {org} 的计费会员",
-    "manage": "管理"
+    "manage": "管理",
+    "nameHelpText": "仅使用字母数字字符、空格和下划线。"
   },
   "template": {
     "header": "模板",
@@ -1136,7 +1142,11 @@
     "vrlFunctionHint": "使用 `.` 表示当前事件。示例：.new_field = .existing_field + “已处理”",
     "askAIFunctionPlaceholder": "让 AI 帮你完成任务...",
     "enterFunctionPrompt": "输入提示生成函数",
-    "jsErrorDetails": "脚本错误详情"
+    "jsErrorDetails": "脚本错误详情",
+    "subtitle": "应用于管道的可重复使用的 VRL 函数",
+    "clickTestFunctionHint": "请单击 “测试功能” 查看事件",
+    "pleaseEnterQuery": "请输入查询",
+    "enrichmentTablesSubtitle": "丰富采集数据的查找表"
   },
   "confirmDialog": {
     "cancel": "取消",
@@ -2940,7 +2950,19 @@
     "externalUserWarningTitle": "外部用户警告",
     "externalUserWarningMessage": "将外部用户直接添加到角色不会授予权限。改为将它们添加到用户组。",
     "invitations": "邀请",
-    "ingestionTokens": "写入令牌"
+    "ingestionTokens": "写入令牌",
+    "sectionAccess": "访问",
+    "sectionPermissions": "权限",
+    "sectionOrganization": "组织",
+    "usersDesc": "有权访问此组织的人员",
+    "serviceAccountsDesc": "API 的编程访问令牌",
+    "ingestionTokensDesc": "用于向该组织摄取数据的代币",
+    "invitationsDesc": "待处理和已发送的成员邀请",
+    "groupsDesc": "将用户分组在一起以分配角色",
+    "rolesDesc": "定义权限和访问策略",
+    "quotaDesc": "每个角色适用的使用限制",
+    "organizationsDesc": "您可以访问的组织",
+    "nameHelpText": "仅使用字母数字和 “_” 字符，不含空格。"
   },
   "pipeline": {
     "header": "流水线",

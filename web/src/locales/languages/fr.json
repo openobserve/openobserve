@@ -941,7 +941,12 @@
     "authTypeSSO": "SSO",
     "authTypeLocal": "Autochtone",
     "noCustomRolesHint": "Aucun rôle personnalisé n'est défini. Créez-en un dans IAM → Rôles",
-    "externalUserCustomRoleHint": "Les utilisateurs externes ne peuvent être modifiés que via le système source"
+    "externalUserCustomRoleHint": "Les utilisateurs externes ne peuvent être modifiés que via le système source",
+    "subtitle": "Personnes ayant accès à cette organisation",
+    "revokeInvitationTitle": "Révoquer l'invitation",
+    "revokeInvitationMsg": "Êtes-vous sûr de vouloir révoquer l'invitation pour {email} ?",
+    "deleteUsersTitle": "Supprimer des utilisateurs",
+    "deleteUsersMsg": "Êtes-vous sûr de vouloir supprimer {count} utilisateur (s) ?"
   },
   "ticket": {
     "header": "Tickets d'assistance",
@@ -1003,7 +1008,8 @@
     "proceed_subscription": "Procéder à l'abonnement",
     "subscription_plan": "Plan d'abonnement",
     "makeBilledMember": "Faire de cette organisation un membre facturant de {org}",
-    "manage": "Gérez"
+    "manage": "Gérez",
+    "nameHelpText": "Utilisez uniquement des caractères alphanumériques, des espaces et des traits de soulignement."
   },
   "template": {
     "header": "Modèles",
@@ -1136,7 +1142,11 @@
     "vrlFunctionHint": "Utilisez le «. » pour représenter l'événement en cours. Exemple : .new_field = .existing_field + « traité »",
     "askAIFunctionPlaceholder": "Demandez à l'IA de vous aider dans votre fonction...",
     "enterFunctionPrompt": "Entrez une invite pour générer une fonction",
-    "jsErrorDetails": "Détails de l'erreur JavaScript"
+    "jsErrorDetails": "Détails de l'erreur JavaScript",
+    "subtitle": "Fonctions VRL réutilisables appliquées aux pipelines",
+    "clickTestFunctionHint": "Cliquez sur Tester la fonction pour voir les événements",
+    "pleaseEnterQuery": "Veuillez saisir une requête",
+    "enrichmentTablesSubtitle": "Tables de recherche qui enrichissent les données ingérées"
   },
   "confirmDialog": {
     "cancel": "Annuler",
@@ -2936,7 +2946,19 @@
     "externalUserWarningTitle": "Avertissement destiné aux utilisateurs externes",
     "externalUserWarningMessage": "L'ajout d'utilisateurs externes directement aux rôles n'accordera pas d'autorisations. Ajoutez-les plutôt aux groupes d'utilisateurs.",
     "invitations": "Invitations",
-    "ingestionTokens": "Jetons d'ingestion"
+    "ingestionTokens": "Jetons d'ingestion",
+    "sectionAccess": "Accès",
+    "sectionPermissions": "Autorisations",
+    "sectionOrganization": "Organisation",
+    "usersDesc": "Personnes ayant accès à cette organisation",
+    "serviceAccountsDesc": "Jetons d'accès programmatiques pour les API",
+    "ingestionTokensDesc": "Jetons pour l'ingestion de données dans cette organisation",
+    "invitationsDesc": "Invitations aux membres en attente et envoyées",
+    "groupsDesc": "Regroupez les utilisateurs pour attribuer des rôles",
+    "rolesDesc": "Définissez les autorisations et les politiques d'accès",
+    "quotaDesc": "Limites d'utilisation appliquées par rôle",
+    "organizationsDesc": "Organisations auxquelles vous pouvez accéder",
+    "nameHelpText": "Utilisez uniquement des caractères alphanumériques et des caractères « _ », sans espaces."
   },
   "pipeline": {
     "header": "Canalisations",
