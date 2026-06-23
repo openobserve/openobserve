@@ -1286,7 +1286,7 @@ export default defineComponent({
                 label: t("alerts.period"),
                 align: "center",
                 sortable: true,
-                style: "width: 150px",
+                style: "width: 80px",
               },
             ]
           : []),
@@ -1299,7 +1299,7 @@ export default defineComponent({
                 label: t("alerts.frequency"),
                 align: "left",
                 sortable: true,
-                style: "width: 150px",
+                style: "width: 70px",
               },
             ]
           : []),
@@ -1328,7 +1328,7 @@ export default defineComponent({
                 label: "Last Trained At",
                 align: "left" as const,
                 sortable: true,
-                style: "width: 150px",
+                style: "width: 110px",
               },
               {
                 name: "status",
@@ -1336,7 +1336,7 @@ export default defineComponent({
                 label: "Status",
                 align: "left" as const,
                 sortable: true,
-                style: "width: 120px",
+                style: "width: 80px",
               },
             ]
           : []),
