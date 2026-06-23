@@ -184,8 +184,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <table v-if="!hideRelativeTime" class="tw:px-3 tw:w-[calc(100%-0.8rem)] tw:mx-[0.4rem] tw:mt-2 tw:mb-[0.3rem] startEndTime">
                 <tbody>
                   <tr>
-                    <td class="label tw:px-2 tw:text-xs tw:font-semibold tw:w-1/2">Start time</td>
-                    <td class="label tw:px-2 tw:text-xs tw:font-semibold tw:w-1/2">End time</td>
+                    <td class="label o-input-label tw:pr-1.5 tw:text-xs tw:font-semibold tw:w-1/2">Start time</td>
+                    <td class="label o-input-label tw:pl-1.5 tw:text-xs tw:font-semibold tw:w-1/2">End time</td>
                   </tr>
                   <tr>
                     <td class="tw:pr-1.5 tw:w-1/2">
