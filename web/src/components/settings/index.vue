@@ -338,7 +338,7 @@ export default defineComponent({
           icon: "smart-toy",
           to: { name: "genAiAgentMapping", query: { org_identifier: org } },
           dataTest: "gen-ai-agent-mapping-tab",
-          group: "DATA & AI",
+          group: "Data & AI",
         },
         {
           key: "queryManagement",
