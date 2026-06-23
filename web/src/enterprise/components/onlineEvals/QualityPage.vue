@@ -2,7 +2,7 @@
   <div class="quality-page" data-test="quality-page">
     <!-- Agent filter — right-aligned at the top of the content container so it
          sits with the KPIs + table it scopes (matches LLM Insights). -->
-    <div class="tw:flex tw:items-center tw:justify-end">
+    <div class="tw:flex tw:items-center tw:justify-end tw:px-4">
       <div class="tw:w-[14rem] tw:flex-shrink-0">
         <OSelect
           v-model="agentModel"
@@ -17,8 +17,12 @@
       </div>
     </div>
 
-    <QualityKpiSkeleton v-if="showKpiSkeleton" :count="visibleKpis.length" />
-    <section v-else class="quality-page__kpis" aria-label="Tier 1 KPIs">
+    <QualityKpiSkeleton
+      v-if="showKpiSkeleton"
+      :count="visibleKpis.length"
+      class="tw:px-4"
+    />
+    <section v-else class="quality-page__kpis tw:px-4" aria-label="Tier 1 KPIs">
       <QualityKpiCard
         v-for="kpi in visibleKpis"
         :key="kpi.id"
@@ -438,7 +442,10 @@ function shortType(type: string): string {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  padding: 14px 16px 18px;
+  // Horizontal padding lives on the individual children (agent filter + KPIs)
+  // rather than the container, so the score-configs table can sit full-bleed
+  // against the content edges. Only vertical padding stays here.
+  padding: 14px 0 18px;
   min-height: 0;
   flex: 1;
 }

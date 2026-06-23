@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          a padded box. -->
     <div
       v-if="availableStreams.length > 0"
-      class="tw:flex tw:items-center tw:justify-end tw:gap-[0.5rem] tw:py-[0.5rem]"
+      class="tw:flex tw:items-center tw:justify-end tw:gap-[0.5rem] tw:px-4 tw:py-[0.5rem]"
     >
       <div
         data-test="llm-insights-stream-selector"
@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :options="availableStreams.map((s) => ({ label: s, value: s }))"
           labelKey="label"
           valueKey="value"
-          class="tw:w-[auto] tw:flex-shrink-0 tw:rounded"
+          class="tw:w-full tw:rounded"
           @update:model-value="onStreamChange"
         />
       </div>
@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :options="agentOptions"
           labelKey="label"
           valueKey="value"
-          class="tw:w-[auto] tw:flex-shrink-0 tw:rounded"
+          class="tw:w-full tw:rounded"
           @update:model-value="onAgentChange"
         />
       </div>
