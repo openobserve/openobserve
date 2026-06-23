@@ -275,14 +275,14 @@ mod tests {
 
     #[test]
     fn test_short_url_record_new_sets_fields() {
-        let rec = ShortUrlRecord::new("abc123", "https://example.com/long/path");
+        let rec = ShortUrlRecord::new("abc123", "https://example.com/long/path", "default");
         assert_eq!(rec.short_id, "abc123");
         assert_eq!(rec.original_url, "https://example.com/long/path");
     }
 
     #[test]
     fn test_short_url_record_new_empty_strings() {
-        let rec = ShortUrlRecord::new("", "");
+        let rec = ShortUrlRecord::new("", "", "");
         assert!(rec.short_id.is_empty());
         assert!(rec.original_url.is_empty());
     }
