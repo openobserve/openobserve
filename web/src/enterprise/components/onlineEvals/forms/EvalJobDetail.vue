@@ -110,27 +110,34 @@
 
               <dt>{{ t("onlineEvals.job.detail.streamTypeLabel") }}</dt>
               <dd class="jd-mono">{{ streamType }}</dd>
-
-              <dt>{{ t("onlineEvals.job.detail.filterLabel") }}</dt>
-              <dd>
-                <pre
-                  v-if="filterClauses.length > 0"
-                  class="jd-filter"
-                  data-test="eval-job-detail-filter"
-                ><div
-                    v-for="(clause, idx) in filterClauses"
-                    :key="idx"
-                    class="jd-filter__row"
-                    :style="{ paddingLeft: `${clause.depth * 16}px` }"
-                  ><span class="jd-filter__kw">{{ clause.keyword }}</span><span class="jd-filter__col">{{ clause.column }}</span><span class="jd-filter__op">{{ clause.operator }}</span><span
-                      class="jd-filter__val"
-                      :class="{ 'jd-filter__val--str': clause.valueIsString }"
-                    >{{ clause.valueText }}</span></div></pre>
-                <span v-else class="jd-muted">{{
-                  t("onlineEvals.job.detail.filterEmpty")
-                }}</span>
-              </dd>
             </dl>
+
+            <!-- Filter rendered as a code block with a header bar + copy action,
+                 matching the Alert History condition view. -->
+            <div class="jd-codeblock" data-test="eval-job-detail-filter">
+              <div class="jd-codeblock__header">
+                <span class="jd-codeblock__label">{{
+                  t("onlineEvals.job.detail.filterLabel")
+                }}</span>
+                <OButton
+                  v-if="filterText"
+                  variant="ghost-muted"
+                  size="icon-xs-sq"
+                  data-test="eval-job-detail-filter-copy-btn"
+                  @click="
+                    copyToClipboard(filterText, {
+                      successMessage: t('common.copySuccess'),
+                    })
+                  "
+                >
+                  <OIcon name="content-copy" size="sm" />
+                  <OTooltip :content="t('common.copy')" />
+                </OButton>
+              </div>
+              <pre class="jd-codeblock__content">{{
+                filterText || t("onlineEvals.job.detail.filterEmpty")
+              }}</pre>
+            </div>
           </section>
 
           <!-- Scorers -->
@@ -543,6 +550,7 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
+import { copyToClipboard } from "@/utils/clipboard";
 import genAiAgentMappingService from "@/services/gen-ai-agent-mapping.service";
 import type {
   EvalJob,
@@ -551,6 +559,7 @@ import type {
 } from "@/services/online-evals.service";
 import { entityId } from "../utils/evalEntity";
 import { normalizeJobFilterCondition } from "../utils/jobFilter";
+import { buildConditionsString } from "@/utils/alerts/conditionsFormatter";
 import {
   useEvalJobRuns,
   type JobRunsWindow,
@@ -612,103 +621,21 @@ const normalizedFilter = computed(() => {
 
 const filterCondition = computed(() => normalizedFilter.value);
 
-interface FilterClause {
-  keyword: "if" | "AND" | "OR";
-  column: string;
-  operator: string;
-  valueText: string;
-  valueIsString: boolean;
-  depth: number;
-}
-
-const filterClauses = computed<FilterClause[]>(() => {
+// Render the filter with the SAME formatter the alert UI uses, so a job's
+// filter reads identically to an alert condition: a single inline expression
+// with lowercase operators and nested groups in parentheses (no custom
+// per-level layout). The job's `filter_condition` is the same V2 group
+// structure alerts use, so it feeds straight into `buildConditionsString`.
+const filterText = computed<string>(() => {
   const cond = filterCondition.value;
-  if (!cond) return [];
-  const out = flattenFilter(cond, 0);
-  if (out.length === 0) return [];
-  out[0].keyword = "if";
-  return out;
+  if (!cond) return "";
+  const body = buildConditionsString(cond, {
+    sqlMode: false,
+    addWherePrefix: false,
+    formatValues: false,
+  });
+  return body ? `if ${body}` : "";
 });
-
-function flattenFilter(node: any, depth: number): FilterClause[] {
-  if (!node || typeof node !== "object") return [];
-
-  if (node.filterType === "condition") {
-    const formatted = formatConditionParts(node);
-    if (!formatted) return [];
-    return [{ ...formatted, keyword: "AND" as const, depth }];
-  }
-
-  if (node.filterType === "group" && Array.isArray(node.conditions)) {
-    // V2 semantics: the group's own `logicalOperator` is NOT the connective
-    // between its conditions — each item carries the operator that joins it to
-    // the PREVIOUS sibling (index 0 has none). Reading the group operator here
-    // is what made "A OR B" render as "A AND B". See conditionsFormatter.ts.
-    const out: FilterClause[] = [];
-    for (let i = 0; i < node.conditions.length; i += 1) {
-      const rawChild = node.conditions[i];
-      const child = flattenFilter(
-        rawChild,
-        depth + (out.length > 0 ? 1 : 0),
-      );
-      if (child.length === 0) continue;
-      if (out.length > 0) {
-        child[0].keyword = rawChild?.logicalOperator === "OR" ? "OR" : "AND";
-      }
-      out.push(...child);
-    }
-    return out;
-  }
-
-  return [];
-}
-
-function formatConditionParts(
-  node: any,
-): Pick<
-  FilterClause,
-  "column" | "operator" | "valueText" | "valueIsString"
-> | null {
-  const column = String(node.column ?? "").trim();
-  const operator = String(node.operator ?? "=").trim();
-  if (!column) return null;
-
-  const valuesList: string[] = Array.isArray(node.values)
-    ? node.values.filter(Boolean)
-    : [];
-  const rawValue = node.value;
-  const opUpper = operator.toUpperCase();
-
-  if (opUpper === "IN" || opUpper === "NOT IN") {
-    const items =
-      valuesList.length > 0 ? valuesList : rawValue ? [String(rawValue)] : [];
-    if (items.length === 0) {
-      return { column, operator, valueText: "(…)", valueIsString: false };
-    }
-    return {
-      column,
-      operator,
-      valueText: `(${items.map(formatValue).join(", ")})`,
-      valueIsString: false,
-    };
-  }
-
-  if (rawValue == null || rawValue === "") {
-    return { column, operator, valueText: `""`, valueIsString: true };
-  }
-  const valueText = formatValue(String(rawValue));
-  return {
-    column,
-    operator,
-    valueText,
-    valueIsString: !/^-?\d+(\.\d+)?$/.test(String(rawValue)),
-  };
-}
-
-function formatValue(v: string): string {
-  if (/^-?\d+(\.\d+)?$/.test(v)) return v;
-  return `"${v.replace(/"/g, '\\"')}"`;
-}
 
 const statusLabel = computed(() =>
   t(`onlineEvals.jobStatus.${props.row.status}`, props.row.status),
@@ -1352,49 +1279,50 @@ function relativeTime(timestampMs: number): string {
   color: var(--color-text-secondary, var(--o2-text-secondary));
 }
 
-.jd-filter {
-  margin: 0;
-  padding: 12px 14px;
-  background: color-mix(in srgb, #6b76e3 6%, var(--color-card-bg));
-  border: 1px solid color-mix(in srgb, #6b76e3 22%, transparent);
-  border-radius: 6px;
-  font-size: 13px;
-  line-height: 1.85;
-  color: var(--color-text-primary, currentColor);
-  max-height: 240px;
-  overflow: auto;
-  white-space: pre;
+// Filter code block — mirrors the Alert History condition view (rounded,
+// bordered, neutral surface + header bar) so condition rendering is consistent
+// across drawers.
+.jd-codeblock {
+  border: 1px solid var(--color-dialog-header-border, var(--o2-border));
+  border-radius: 8px;
+  overflow: hidden;
+  background: color-mix(
+    in srgb,
+    var(--color-text-secondary) 4%,
+    var(--color-card-bg)
+  );
 }
 
-.jd-filter__row {
-  display: block;
-  white-space: pre;
+.jd-codeblock__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--color-dialog-header-border, var(--o2-border));
+  background: color-mix(
+    in srgb,
+    var(--color-text-secondary) 6%,
+    var(--color-card-bg)
+  );
 }
 
-.jd-filter__kw {
-  display: inline-block;
-  width: 38px;
-  margin-right: 8px;
-  color: #7c3aed;
-  font-weight: 700;
-}
-
-.jd-filter__col {
-  color: #1d4ed8;
-  margin-right: 6px;
-}
-
-.jd-filter__op {
+.jd-codeblock__label {
+  font-size: 11px;
+  font-weight: 500;
   color: var(--color-text-secondary, var(--o2-text-secondary));
-  margin-right: 6px;
 }
 
-.jd-filter__val {
+.jd-codeblock__content {
+  margin: 0;
+  padding: 10px 14px;
+  font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", monospace;
+  font-size: 13px;
+  line-height: 1.6;
   color: var(--color-text-primary, currentColor);
-}
-
-.jd-filter__val--str {
-  color: #b25400;
+  white-space: pre-wrap;
+  overflow-x: auto;
+  max-height: 240px;
+  overflow-y: auto;
 }
 
 .jd-scorers {
