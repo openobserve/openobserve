@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <AppPageHeader
           :title="t('alerts.incidents.title')"
           icon="notifications-active"
-          :subtitle="'Incident management and tracking'"
+          :subtitle="t('alerts.incidents.subtitle')"
         >
           <template #actions>
             <OButton
@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :loading="loading"
               @click="refreshIncidents"
               data-test="incident-refresh-btn"
-            >Refresh</OButton>
+            >{{ t('common.refresh') }}</OButton>
           </template>
         </AppPageHeader>
       </template>
