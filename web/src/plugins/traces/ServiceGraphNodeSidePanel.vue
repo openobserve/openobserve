@@ -134,6 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <RenderDashboardCharts
                 ref="dashboardChartsRef"
                 :viewOnly="true"
+                :frame="false"
                 :dashboardData="dashboardData || {}"
                 :currentTimeObj="currentTimeObj"
                 :allowAlertCreation="false"
@@ -3082,13 +3083,6 @@ export default defineComponent({
 
   :deep(.render-dashboard-charts-container) {
     padding: 0 !important;
-  }
-
-  :deep(.render-dashboard-charts-container > *:first-child) {
-    background: transparent !important;
-    border: none !important;
-    border-radius: 0 !important;
-    box-shadow: none !important;
   }
 }
 
