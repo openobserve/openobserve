@@ -1878,6 +1878,20 @@ export default defineComponent({
           toggleFullscreen();
         },
       },
+      {
+        key: "x",
+        scope: "dashboard",
+        description: "shortcuts.actions.dashboardExport",
+        handler: () => {
+          if (isInputFocused()) return;
+          // Trigger the whole-dashboard export (ExportDashboard button).
+          (
+            document.querySelector(
+              '[data-test="export-dashboard"]',
+            ) as HTMLElement | null
+          )?.click();
+        },
+      },
     ]);
 
     return {

@@ -5535,6 +5535,7 @@
       "dashboardAddPanel": "Add new panel",
       "dashboardSave": "Save dashboard",
       "dashboardFullscreen": "Toggle fullscreen",
+      "dashboardExport": "Export dashboard",
       "tableRowNavigate": "Move to next / previous row",
       "tableRowEdit": "Edit hovered row",
       "tableRowDuplicate": "Duplicate hovered row",
