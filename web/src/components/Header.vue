@@ -219,6 +219,12 @@ size="xs" class="warning" />{{
           @mouseleave="handleMouseLeave"
         >
           <img :src="getBtnLogo" class="ai-icon tw:w-5 tw:h-5 tw:shrink-0" />
+          <OTooltip
+            side="bottom"
+            align="center"
+            :content="t('menu.aiAssistant')"
+            shortcut="ctrl+b"
+          />
         </OButton>
       </template>
 
@@ -275,6 +281,7 @@ size="xs" class="warning" />{{
           <!-- Keyboard shortcuts -->
           <ODropdownItem
             data-test="menu-link-shortcuts-item"
+            shortcut="?"
             @select="openShortcuts"
           >
             {{ t("menu.keyboardShortcuts") }}
