@@ -23,7 +23,12 @@
       <div class="tiles-grid tw:grid tw:gap-4" style="grid-template-columns: repeat(auto-fit, minmax(240px, 1fr))">
         <div v-for="n in 5" :key="n" class="tw:rounded-[0.325rem] tw:border-[0.0625rem] tw:border-(--o2-border-color)">
           <div
-            class="tile-content tw:h-full tw:p-4 tw:rounded-lg tw:gap-2 tw:rounded tw:text-center tw:flex tw:flex-col tw:justify-between tw:bg-(--tile-bg) tw:border tw:border-(--tile-border) tw:text-(--text-primary) tw:[--tile-bg:#ffffff] tw:[--tile-border:#e7eaee] tw:[--text-primary:#2e3133] tw:dark:[--tile-bg:#2b2c2d] tw:dark:[--tile-border:#444444] tw:dark:[--text-primary:#cccfd1]"
+            class="tile-content tw:h-full tw:p-4 tw:rounded-lg tw:gap-2 tw:rounded tw:text-center tw:flex tw:flex-col tw:justify-between tw:bg-(--tile-bg) tw:border tw:border-(--tile-border) tw:text-(--text-primary)"
+            :class="
+              store.state.theme === 'dark'
+                ? 'tw:[--tile-bg:#2b2c2d] tw:[--tile-border:#444444] tw:[--text-primary:#cccfd1]'
+                : 'tw:[--tile-bg:#ffffff] tw:[--tile-border:#e7eaee] tw:[--text-primary:#2e3133]'
+            "
           >
             <!-- Top Section (60%) -->
             <div class="tw:flex tw:flex-col tw:justify-between">
@@ -50,7 +55,12 @@
         <!-- Functions tile -->
         <div class="tile-wrapper tw:flex-1 tw:flex tw:min-w-0 tw:w-full">
           <div
-            class="feature-card tw:bg-(--tile-bg) tw:border-[0.0625rem] tw:border-(--tile-border) tw:rounded-lg tw:p-4 tw:w-full tw:rounded tw:text-center tw:flex tw:flex-col tw:justify-between tw:text-(--text-primary) tw:[--tile-bg:#ffffff] tw:[--tile-border:#e7eaee] tw:[--text-primary:#2e3133] tw:dark:[--tile-bg:#2b2c2d] tw:dark:[--tile-border:#444444] tw:dark:[--text-primary:#cccfd1]"
+            class="feature-card tw:bg-(--tile-bg) tw:border-[0.0625rem] tw:border-(--tile-border) tw:rounded-lg tw:p-4 tw:w-full tw:rounded tw:text-center tw:flex tw:flex-col tw:justify-between tw:text-(--text-primary)"
+            :class="
+              store.state.theme === 'dark'
+                ? 'tw:[--tile-bg:#2b2c2d] tw:[--tile-border:#444444] tw:[--text-primary:#cccfd1]'
+                : 'tw:[--tile-bg:#ffffff] tw:[--tile-border:#e7eaee] tw:[--text-primary:#2e3133]'
+            "
           >
             <div class="tw:flex tw:flex-col tw:justify-between">
               <div
@@ -70,7 +80,12 @@
         <!-- Dashboards tile -->
         <div class="tile-wrapper tw:flex-1 tw:flex tw:min-w-0 tw:w-full">
           <div
-            class="feature-card tw:bg-(--tile-bg) tw:border-[0.0625rem] tw:border-(--tile-border) tw:rounded-lg tw:p-4 tw:w-full tw:rounded tw:text-center tw:flex tw:flex-col tw:justify-between tw:text-(--text-primary) tw:[--tile-bg:#ffffff] tw:[--tile-border:#e7eaee] tw:[--text-primary:#2e3133] tw:dark:[--tile-bg:#2b2c2d] tw:dark:[--tile-border:#444444] tw:dark:[--text-primary:#cccfd1]"
+            class="feature-card tw:bg-(--tile-bg) tw:border-[0.0625rem] tw:border-(--tile-border) tw:rounded-lg tw:p-4 tw:w-full tw:rounded tw:text-center tw:flex tw:flex-col tw:justify-between tw:text-(--text-primary)"
+            :class="
+              store.state.theme === 'dark'
+                ? 'tw:[--tile-bg:#2b2c2d] tw:[--tile-border:#444444] tw:[--text-primary:#cccfd1]'
+                : 'tw:[--tile-bg:#ffffff] tw:[--tile-border:#e7eaee] tw:[--text-primary:#2e3133]'
+            "
           >
             <div class="tw:flex tw:flex-col tw:justify-between">
               <div
@@ -90,7 +105,12 @@
 
       <!-- Alerts Chart -->
       <div
-        class="feature-card first-chart-container tw:bg-(--tile-bg) tw:border-[0.0625rem] tw:border-(--tile-border) tw:rounded-lg tw:rounded tw:p-4 tw:[--tile-bg:#ffffff] tw:[--tile-border:#e7eaee] tw:dark:[--tile-bg:#2b2c2d] tw:dark:[--tile-border:#444444]"
+        class="feature-card first-chart-container tw:bg-(--tile-bg) tw:border-[0.0625rem] tw:border-(--tile-border) tw:rounded-lg tw:rounded tw:p-4"
+        :class="
+          store.state.theme === 'dark'
+            ? 'tw:[--tile-bg:#2b2c2d] tw:[--tile-border:#444444]'
+            : 'tw:[--tile-bg:#ffffff] tw:[--tile-border:#e7eaee]'
+        "
       >
         <div class="details-container tw:flex tw:flex-col tw:gap-3 tw:mb-4">
           <!-- Header -->
@@ -137,7 +157,12 @@
 
       <!-- Pipelines Chart -->
       <div
-        class="feature-card second-chart-container tw:bg-(--tile-bg) tw:border-[0.0625rem] tw:border-(--tile-border) tw:rounded-lg tw:rounded tw:p-4 tw:[--tile-bg:#ffffff] tw:[--tile-border:#e7eaee] tw:dark:[--tile-bg:#2b2c2d] tw:dark:[--tile-border:#444444]"
+        class="feature-card second-chart-container tw:bg-(--tile-bg) tw:border-[0.0625rem] tw:border-(--tile-border) tw:rounded-lg tw:rounded tw:p-4"
+        :class="
+          store.state.theme === 'dark'
+            ? 'tw:[--tile-bg:#2b2c2d] tw:[--tile-border:#444444]'
+            : 'tw:[--tile-bg:#ffffff] tw:[--tile-border:#e7eaee]'
+        "
       >
         <div class="details-container tw:flex tw:flex-col tw:gap-3 tw:mb-4">
           <!-- Header -->
@@ -186,8 +211,11 @@
 </template>
 
 <script setup lang="ts">
+import { useStore } from "vuex";
 import SkeletonBox from "./SkeletonBox.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+
+const store = useStore();
 </script>
 
 <style>
