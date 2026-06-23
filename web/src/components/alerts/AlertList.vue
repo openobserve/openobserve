@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -253,7 +253,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <q-td v-for="col in columns" :key="col.name"
 :props="props">
                       <template v-if="col.name === 'name'">
-                        <div class="tw:flex tw:items-center tw:gap-1.5">
+                        <div class="tw:flex tw:items-center tw:gap-1.5 tw:min-w-0">
                           <q-icon
                             v-if="props.row.is_real_time === 'anomaly'"
                             name="query_stats"
@@ -272,7 +272,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             size="15px"
                             class="tw:text-grey-7 tw:shrink-0"
                           />
-                          <span>{{ computedName(props.row[col.field]) }}</span>
+                          <span class="tw:truncate tw:min-w-[200px] tw:max-w-[500px]">{{ props.row[col.field] || "--" }}</span>
                         </div>
                         <q-tooltip
                           v-if="props.row[col.field]?.length > 30"
@@ -1286,7 +1286,7 @@ export default defineComponent({
                 label: t("alerts.period"),
                 align: "center",
                 sortable: true,
-                style: "width: 150px",
+                style: "width: 80px",
               },
             ]
           : []),
@@ -1299,7 +1299,7 @@ export default defineComponent({
                 label: t("alerts.frequency"),
                 align: "left",
                 sortable: true,
-                style: "width: 150px",
+                style: "width: 70px",
               },
             ]
           : []),
@@ -1328,7 +1328,7 @@ export default defineComponent({
                 label: "Last Trained At",
                 align: "left" as const,
                 sortable: true,
-                style: "width: 150px",
+                style: "width: 110px",
               },
               {
                 name: "status",
@@ -1336,7 +1336,7 @@ export default defineComponent({
                 label: "Status",
                 align: "left" as const,
                 sortable: true,
-                style: "width: 120px",
+                style: "width: 80px",
               },
             ]
           : []),
@@ -2677,12 +2677,6 @@ export default defineComponent({
         });
       }
     };
-    const computedName = (name: string) => {
-      if (!name) {
-        return "--";
-      }
-      return name.length > 30 ? name.substring(0, 30) + "..." : name;
-    };
     const computedOwner = (owner: string) => {
       if (!owner) {
         return "--";
@@ -3027,7 +3021,6 @@ export default defineComponent({
       outlinedMoreVert,
       getAlertsFn,
       multipleExportAlert,
-      computedName,
       computedOwner,
       tabs,
       alertTabs,
