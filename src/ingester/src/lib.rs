@@ -91,21 +91,33 @@ impl ProcessedBatch {
 }
 
 pub async fn init() -> errors::Result<()> {
-    // check uncompleted parquet files, need delete those files
-    wal::check_uncompleted_parquet_files().await?;
+    if !config::cluster::LOCAL_NODE.is_ingester() {
+        return Ok(());
+    }
+
+    log::info!("Start ingester init");
 
     // replay wal files to create immutable
-    let wal_dir = PathBuf::from(&config::get_config().common.data_wal_dir).join("logs");
+    let cfg = config::get_config();
+    let wal_dir = PathBuf::from(&cfg.common.data_wal_dir).join(WAL_DIR_DEFAULT_PREFIX);
     create_dir_all(&wal_dir).context(OpenDirSnafu {
         path: wal_dir.clone(),
     })?;
-    let wal_files = wal::wal_scan_files(&wal_dir, "wal")
-        .await
-        .unwrap_or_default();
+
+    // check uncompleted parquet files, need delete those files
+    wal::check_uncompleted_parquet_files().await?;
+
+    // replay wal files
     tokio::task::spawn(async move {
+        log::info!("Scanning wal files from {wal_dir:?}");
+        let wal_files = wal::wal_scan_files(&wal_dir, "wal")
+            .await
+            .unwrap_or_default();
+        log::info!("Found {} wal files to replay", wal_files.len());
         if let Err(e) = wal::replay_wal_files(wal_dir, wal_files).await {
             log::error!("replay wal files error: {e}");
         }
+        log::info!("Replay wal files done");
     });
 
     // start a job to flush memtable to immutable
@@ -128,6 +140,9 @@ pub async fn init() -> errors::Result<()> {
             log::error!("immutable persist error: {e}");
         }
     });
+
+    log::info!("Ingesters init done");
+
     Ok(())
 }
 

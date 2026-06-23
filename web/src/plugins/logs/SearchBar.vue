@@ -2449,6 +2449,19 @@ export default defineComponent({
         searchObj.meta.sqlMode = false;
       }
 
+      // Turn off SQL mode when the query is no longer a SQL statement (user
+      // removed the SELECT/WITH prefix). Set sqlModeEditTransition so the
+      // Index.vue watcher preserves the remaining filter expression instead of
+      // clearing the editor.
+      if (
+        value.trim() !== "" &&
+        searchObj.meta.sqlMode === true &&
+        !isSqlQuery(value)
+      ) {
+        searchObj.meta.sqlModeEditTransition = true;
+        searchObj.meta.sqlMode = false;
+      }
+
       if (searchObj.meta.quickMode === true) {
         const parsedSQL = fnParsedSQL();
         if (
@@ -2720,6 +2733,7 @@ export default defineComponent({
       await nextTick();
 
       if (
+        value.userChangedValue !== false &&
         searchObj.loading == false &&
         store.state.zoConfig.query_on_stream_selection == false &&
         searchObj.meta.logsVisualizeToggle === "logs" &&

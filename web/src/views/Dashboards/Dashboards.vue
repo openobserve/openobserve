@@ -340,7 +340,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :secondary-button-label="t('dashboard.cancel')"
             :primary-button-label="t('dashboard.save')"
             form-id="add-dashboard-form"
-            :primary-button-loading="addDashboardRef?.onSubmit?.isLoading?.value"
             @click:secondary="showAddDashboardDialog = false"
           >
             <AddDashboard
@@ -897,7 +896,9 @@ export default defineComponent({
       });
     };
     const dashboardList = ref([]);
-    const loading = ref(false);
+    // Start in the loading state so the table shows the skeleton on first
+    // render instead of briefly flashing the empty state before the fetch.
+    const loading = ref(true);
     const getDashboards = async () => {
       const dismiss = toast({
         variant: "loading",

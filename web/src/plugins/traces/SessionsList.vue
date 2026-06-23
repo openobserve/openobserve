@@ -17,7 +17,64 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     class="sessions-list tw:h-full! tw:flex tw:flex-col tw:bg-[var(--o2-card-bg-solid)] card-container"
+    class="sessions-list tw:h-full! tw:flex tw:flex-col tw:bg-[var(--o2-card-bg-solid)] card-container"
   >
+    <!-- No LLM streams exist in the org at all — nothing to select, so show
+         the rich first-run empty state on its own (no table chrome). -->
+    <div
+      v-if="streamsLoaded && availableStreams.length === 0"
+      class="tw:flex-1 tw:min-h-0 tw:flex tw:items-center tw:justify-center"
+      data-test="sessions-empty-no-streams"
+    >
+      <OEmptyState size="hero" preset="no-llm-sessions" @action="onEmptyAction" />
+    </div>
+
+    <!-- Streams exist: OTable owns the whole surface — toolbar (stream filter +
+         column chooser), server-side pagination footer, column resize, and the
+         empty/error body. Rendering it unconditionally keeps the stream
+         selector reachable even when a window returns no sessions. -->
+    <OTable
+      v-else
+      :data="sessions"
+      :columns="tableColumns"
+      :loading="loading"
+      row-key="sessionId"
+      show-index
+      pagination="server"
+      :current-page="currentPage"
+      :total-count="total"
+      :page-size="rowsPerPage"
+      :page-size-options="rowsPerPageOptions"
+      :footer-title="t('traces.sessionsList.sessions')"
+      :enable-column-resize="true"
+      :persist-columns="true"
+      table-id="ai-sessions-list"
+      :default-columns="false"
+      :show-global-filter="false"
+      :frame="false"
+      width="100%"
+      class="tw:w-full tw:h-full"
+      data-test="sessions-list-table"
+      @row-click="(row: any) => handleRowClick(row)"
+      @pagination-change="onPaginationChange"
+    >
+      <!-- Toolbar: stream filter pushed to the right; OTable auto-injects the
+           column chooser immediately after it. -->
+      <template #toolbar>
+        <div class="tw:flex tw:items-center tw:justify-end tw:gap-2 tw:flex-1 tw:min-w-0">
+          <div
+            data-test="sessions-list-stream-selector"
+            class="tw:w-[14rem] tw:flex-shrink-0"
+          >
+            <OSelect
+              v-model="activeStream"
+              :label="t('traces.sessionsList.streamLabel')"
+              label-position="inside"
+              :options="availableStreams.map((s) => ({ label: s, value: s }))"
+              class="tw:w-[auto] tw:flex-shrink-0 tw:rounded"
+              @update:model-value="onStreamChange"
+            />
+          </div>
     <!-- No LLM streams exist in the org at all — nothing to select, so show
          the rich first-run empty state on its own (no table chrome). -->
     <div
@@ -98,6 +155,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OEmptyState size="hero" preset="no-llm-sessions" @action="onEmptyAction" />
         </div>
       </template>
+<<<<<<< HEAD
+=======
+        <!-- Timestamp -->
+>>>>>>> main
         <template #cell-firstSeenNanos="{ row }">
           <span class="tw:text-[0.75rem] tw:tabular-nums">
             {{ formatTimestamp(row.firstSeenNanos) }}
@@ -203,6 +264,9 @@ interface Props {
   streamName: string;
   startTime: number; // microseconds
   endTime: number; // microseconds
+  // Route to open on row click. Defaults to the Traces session-details route;
+  // the AI/LLM Sessions page passes its own route so it stays in the AI menu.
+  detailRouteName?: string;
 }
 
 const props = defineProps<Props>();
@@ -450,7 +514,7 @@ function onPaginationChange({ page, size }: { page: number; size: number }) {
 function handleRowClick(row: SessionRow) {
   emit("sessionSelected", row);
   router.push({
-    name: "sessionDetails",
+    name: props.detailRouteName || "sessionDetails",
     query: {
       stream: activeStream.value,
       session_id: row.sessionId,

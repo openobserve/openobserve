@@ -22,19 +22,59 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     aria-label="Main navigation"
     data-test="navbar-main-nav"
     data-o2-navbar
-    class="left-drawer navbar-links o2-navbar-scroll tw:flex tw:flex-col tw:bg-[var(--color-surface-chrome-deeper)] tw:shrink-0 tw:min-h-0 tw:overflow-y-auto tw:w-[5.25rem] tw:py-1"
+    class="left-drawer navbar-links o2-navbar-scroll tw:flex tw:flex-col tw:bg-[var(--color-surface-chrome-deeper)] tw:shrink-0 tw:min-h-0 tw:overflow-y-auto tw:w-[5.5rem] tw:pb-1"
     @keydown="handleKeydown"
   >
-    <!-- Each active item carries its own left accent border (see MenuLink), so
-         no separate floating indicator bar is needed. -->
-    <div class="tw:flex tw:flex-col">
-      <menu-link
-        v-for="(nav, index) in linksList"
-        :key="nav.title"
-        :link-name="nav.name"
-        :animation-index="index"
-        v-bind="{ ...nav, mini: miniMode }"
-        @mouseenter="emit('menu-hover', nav.link)"
+    <!-- Three rail-entry shapes (see navGroups.ts):
+         - link:      plain navigating MenuLink.
+         - linkGroup: a tile that navigates to its main page AND reveals its
+                      sub-pages on hover (Data, Dashboards).
+         - group:     a pure flyout group with no page of its own (click toggles);
+                      supported here but not currently emitted by groupNavLinks.
+         `pinBottom` groups float to the foot of the rail via the flex spacer. -->
+    <div class="tw:flex tw:flex-col tw:flex-1 tw:min-h-0">
+      <template
+        v-for="entry in topEntries"
+        :key="
+          entry.type === 'group'
+            ? `g-${entry.key}`
+            : `l-${entry.item.name}`
+        "
+      >
+        <menu-link
+          v-if="entry.type === 'link'"
+          :link-name="entry.item.name"
+          v-bind="{ ...entry.item, mini: miniMode }"
+          @mouseenter="emit('menu-hover', entry.item.link)"
+        />
+        <ONavGroup
+          v-else-if="entry.type === 'linkGroup'"
+          :group-key="entry.item.name"
+          :title="entry.item.title"
+          :icon="entry.item.icon"
+          :children="entry.children"
+          :parent-item="entry.item"
+          @mouseenter="emit('menu-hover', entry.item.link)"
+        />
+        <ONavGroup
+          v-else
+          :group-key="entry.key"
+          :title="entry.title"
+          :icon="entry.icon"
+          :children="entry.children"
+        />
+      </template>
+
+      <!-- Spacer floats any pinned-bottom groups to the foot of the rail -->
+      <div v-if="bottomEntries.length" class="nav-rail-spacer tw:flex-1 tw:min-h-2" aria-hidden="true" />
+
+      <ONavGroup
+        v-for="entry in bottomEntries"
+        :key="`g-${entry.key}`"
+        :group-key="entry.key"
+        :title="entry.title"
+        :icon="entry.icon"
+        :children="entry.children"
       />
     </div>
   </nav>
@@ -45,12 +85,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * Left sidebar navigation bar. Renders a list of MenuLink items with keyboard
  * navigation (ArrowUp/ArrowDown) and Tab trapping.
  */
-import type { NavbarProps, NavbarEmits, NavbarSlots } from "./ONavbar.types";
+import { computed } from "vue";
+import type {
+  NavbarProps,
+  NavbarEmits,
+  NavbarSlots,
+  RailEntry,
+} from "./ONavbar.types";
+import { groupNavLinks } from "./navGroups";
 import MenuLink from "@/components/MenuLink.vue";
+import ONavGroup from "./ONavGroup.vue";
 
 defineOptions({ inheritAttrs: false });
 
-withDefaults(defineProps<NavbarProps>(), {
+const props = withDefaults(defineProps<NavbarProps>(), {
   miniMode: false,
   visible: true,
 });
@@ -58,6 +106,20 @@ withDefaults(defineProps<NavbarProps>(), {
 const emit = defineEmits<NavbarEmits>();
 
 defineSlots<NavbarSlots>();
+
+// Reshape the flat link list into rail entries: daily-use links stay top-level,
+// config / occasional items fold into flyout groups. Split out pinned-bottom
+// groups so the template can float them to the foot of the rail.
+const railEntries = computed<RailEntry[]>(() => groupNavLinks(props.linksList));
+const topEntries = computed(() =>
+  railEntries.value.filter((e) => !(e.type === "group" && e.pinBottom)),
+);
+const bottomEntries = computed(
+  () =>
+    railEntries.value.filter(
+      (e) => e.type === "group" && e.pinBottom,
+    ) as Extract<RailEntry, { type: "group" }>[],
+);
 
 const NAV_KEYS = ["ArrowDown", "ArrowUp", "Tab"] as const;
 

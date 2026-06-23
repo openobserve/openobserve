@@ -91,11 +91,11 @@ const wrapperClasses = computed(() => [
   "tw:flex tw:items-stretch tw:w-full tw:rounded-md tw:border tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150",
   "tw:ring-offset-1 tw:ring-offset-surface-base",
   "tw:bg-input-bg",
+  /* Keep the red error border on focus (don't let the focus color override it);
+     focus border color applies only when there's no error. See OInput.vue. */
   hasError.value
     ? "tw:border-input-border-error"
-    : "tw:border-input-border tw:hover:border-input-border-hover",
-  /* Single-border focus — see OInput.vue for rationale. */
-  "tw:focus-within:border-input-border-focus",
+    : "tw:border-input-border tw:hover:border-input-border-hover tw:focus-within:border-input-border-focus",
   /* Same opacity+dashed treatment as OInput so disabled textareas are
      visually obvious vs enabled ones. */
   props.disabled
@@ -122,7 +122,7 @@ const wrapperClasses = computed(() => [
         props.disabled && 'o-input-label--disabled',
       ]"
     >
-      {{ label }}
+      {{ label }}<span v-if="required" aria-hidden="true" class="tw:select-none">*</span>
       <OIcon
         v-if="$slots.tooltip"
         name="info-outline"
@@ -175,6 +175,7 @@ const wrapperClasses = computed(() => [
     >
       <span
         v-if="effectiveError && effectiveError.trim()"
+        :data-test="parentDataTest ? `${parentDataTest}-error` : undefined"
         class="tw:text-xs tw:text-input-error-text tw:leading-none"
         role="alert"
       >

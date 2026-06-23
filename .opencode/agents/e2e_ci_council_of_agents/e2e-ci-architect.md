@@ -69,7 +69,34 @@ already (partly) covered and choose the **least-duplicative** action.
 - `needs_registration`: **true ONLY for `action: new`** (a brand-new spec must be added to
   playwright.yml). For `append`/`extend` the file is already registered → **false**.
 
+### One spec = one feature area (no Frankenstein specs)
+If the diff spans **multiple test areas** (e.g. a Logs change AND an Alerts/incidents change),
+do **not** cram both into one spec. Pick the **dominant feature** for this run, put its tests in
+the correct area folder with that area's tags (a Logs feature → `Logs/…` + `@logs`; an Alerts
+feature → `Alerts/…` + `@alerts`), and **note the un-covered secondary area** in your test plan so
+a human knows it still needs tests. A spec whose folder/tags don't match its tests (Alerts tests
+inside a `Logs/` spec) is a defect.
+
+### De-duplicate scenarios
+Do not emit several P-cases that perform the **same action and assert the same thing** (e.g. four
+tests that all fire the same error query and check "error visible"). Each scenario must add
+distinct coverage; merge near-duplicates into one.
+
 ---
+
+## Honour the Analyst's wiring map (WIRED vs UNWIRED)
+
+Read the **Behavior Reachability** table in the feature design doc. Plan each behavior by its status —
+this is how we produce green tests AND avoid both green-washing and over-blocking:
+- **WIRED** → plan a normal test that exercises **the exact path the Analyst named** (the one that
+  actually sets the gating state). This test should go green.
+- **UNWIRED (feature-incomplete)** → do **NOT** plan a test that will fail or a weakened/negative one.
+  Plan it as a **`fixme` placeholder** with the Analyst's evidence (file:line of the missing/commented
+  wiring) so the Engineer writes `test.fixme('<behavior> — not wired: <evidence>')`. Mark the scenario
+  `Wiring: UNWIRED`. The pipeline surfaces these as a feature-gap report, not a failed run.
+
+If **every** headline behavior is UNWIRED, the feature is genuinely incomplete — say so plainly in the
+plan; do not pad with tautological/always-green filler just to have "tests."
 
 ## Write the Test Plan
 
@@ -96,6 +123,7 @@ Structure:
 ### P0 — <critical path scenario>
 #### <Test Case Name>
 **Objective:** <what it verifies>
+**Wiring:** WIRED (path: `file:line`) | UNWIRED (fixme — evidence: `file:line`)
 **Pre-conditions:** <setup>
 **Steps:** 1. <action> 2. <action>
 **Expected Results:** - <outcome>

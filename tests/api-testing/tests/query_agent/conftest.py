@@ -58,13 +58,73 @@ def _values_equal(a: str, b: str, rel_tol: float = 0.05) -> bool:
     except (ValueError, TypeError):
         return False
 def load_all_queries():
-    """Return {category_name: [queries]} from queries/*.json files."""
+    """Return {category_name: [queries]} from queries/*.json files.
+
+    Filters out queries whose ``expected`` block contains the optional
+    boolean field ``skip_without_single_node_opt: true`` when the env var
+    ``SINGLE_NODE_OPT_MODE`` is ``"false"`` (defaults to ``"true"``).
+
+    This flag isolates queries that trigger known upstream DataFusion bugs
+    in the non-optimized RemoteScanRewriter path — it should only be set
+    for verified upstream issues, not as a workaround for test flakiness.
+    """
+    single_node_opt = _os.environ.get("SINGLE_NODE_OPT_MODE", "true").lower() == "true"
     categories: dict[str, list[dict]] = {}
     for fp in sorted(_QUERIES_DIR.glob("*.json")):
         with open(fp) as f:
             data = json.load(f)
-        categories[fp.stem] = data["queries"]
+        queries = data["queries"]
+        if not single_node_opt:
+            queries = [q for q in queries if not q.get("expected", {}).get("skip_without_single_node_opt")]
+        categories[fp.stem] = queries
     return categories
+
+
+# ── FTS Content Verification ────────────────────────────────────────────────
+def _verify_fts_content(sql, hits, qid):
+    """Verify match_all results: every returned hit contains the search terms.
+
+    Tantivy full-text search tokenizes and indexes text fields.  When the
+    DataFusion access plan is bypassed (e.g. after an upgrade), match_all
+    can silently return wrong results — rows that don't contain the search
+    terms at all.  This check catches that.
+
+    Precondition: ``hits`` is non-empty (no-op otherwise).
+
+    Only hard-fails when the ``log`` field is in the hit (match_all
+    searches the FTS-indexed ``log`` field by default).  When ``log`` is
+    absent from the SELECT, we can't verify — the match may have been
+    against a non-returned field, and sqllogictest comparison remains the
+    primary correctness backstop.
+    """
+    terms = re.findall(r"match_all\('([^']*)'\)", sql, re.IGNORECASE)
+    if not terms or not hits:
+        return
+
+    has_log = "log" in hits[0]
+
+    # Pre-compute lowercased words once outside the hit loop
+    search_words = [w.lower() for term in terms for w in term.split()]
+
+    for hit in hits:
+        # Search all text fields in the hit
+        text_parts = []
+        for k, v in hit.items():
+            if isinstance(v, str) and v:
+                text_parts.append(v)
+        haystack = " ".join(text_parts).lower()
+
+        for word in search_words:
+            if word not in haystack:
+                if has_log:
+                    raise AssertionError(
+                        f"{qid}: FTS content verification failed — "
+                        f"match_all term word '{word}' not found in any "
+                        f"returned field (log is present). "
+                        f"hit={ {k: v for k, v in hit.items() if k != '_timestamp'} }"
+                    )
+                # log not in SELECT — the match may be in a non-returned
+                # field; sqllogictest comparison catches wrong row counts.
 
 
 # ── Shared query runner ────────────────────────────────────────────────────
@@ -94,51 +154,88 @@ def run_query(client, query, *, skip_fts_count=False):
         end_time=BASE_TS + offset["end_offset"],
         size=size,
     )
-    resp = client.post("_search?type=logs", json=json_data)
-    assert resp.status_code == 200, \
-        f"{qid}: Expected 200, got {resp.status_code}: {resp.text[:500]}"
-
-    response_data = resp.json()
-    assert "hits" in response_data, f"{qid}: Response should contain 'hits'"
-    hits = response_data["hits"]
-
     expected = query.get("expected", {})
     is_fts = query.get("category") == "full_text_search"
 
-    if "results" in expected and not (skip_fts_count and is_fts) and not expected.get("skip_sqllogictest"):
-        # ── sqllogictest mode: result-set comparison with float tolerance ─
-        cols = expected["columns"]
-        actual = sorted(
-            [str(hit.get(col, "")) for col in cols] for hit in hits
-        )
-        want = sorted(expected["results"])
+    sqllogictest_mode = (
+        "results" in expected
+        and not (skip_fts_count and is_fts)
+        and not expected.get("skip_sqllogictest")
+    )
 
-        assert len(actual) == len(want), \
-            f"{qid}: row count mismatch — got {len(actual)}, expected {len(want)}"
+    def _validate(hits):
+        """Run every assertion for this query against *hits*; raise on mismatch."""
+        # Verify match_all results actually contain the search terms.
+        # After a DataFusion upgrade, the Tantivy access plan can be bypassed
+        # silently — this content check catches wrong results that row-count
+        # comparisons alone would miss.
+        # Only run post-flush when Tantivy indexes are expected to exist.
+        if not skip_fts_count:
+            _verify_fts_content(sql, hits, qid)
 
-        for i, (got_row, want_row) in enumerate(zip(actual, want)):
-            assert len(got_row) == len(want_row), \
-                f"{qid}: column count mismatch at row {i}"
-            for j, (gv, wv) in enumerate(zip(got_row, want_row)):
-                if not _values_equal(gv, wv):
-                    assert False, \
-                        f"{qid}: mismatch at row {i}, col {j} ('{cols[j]}'): got {gv!r}, expected {wv!r}"
+        if sqllogictest_mode:
+            # ── sqllogictest mode: result-set comparison with float tolerance ─
+            cols = expected["columns"]
+            actual = sorted(
+                [str(hit.get(col, "")) for col in cols] for hit in hits
+            )
+            want = sorted(expected["results"])
 
-    else:
-        # ── Legacy assertion mode (histogram, broken queries, complex CTEs)
-        if expected.get("row_count") is not None:
-            if not (skip_fts_count and is_fts) and not expected.get("skip_row_count"):
-                assert len(hits) == expected["row_count"], \
-                    f"{qid}: Expected {expected['row_count']} rows, got {len(hits)}"
+            assert len(actual) == len(want), \
+                f"{qid}: row count mismatch — got {len(actual)}, expected {len(want)}"
 
-        assert len(hits) < size, \
-            f"{qid}: Got {len(hits)} rows at size={size} — result may be truncated"
+            for i, (got_row, want_row) in enumerate(zip(actual, want)):
+                assert len(got_row) == len(want_row), \
+                    f"{qid}: column count mismatch at row {i}"
+                for j, (gv, wv) in enumerate(zip(got_row, want_row)):
+                    if not _values_equal(gv, wv):
+                        assert False, \
+                            f"{qid}: mismatch at row {i}, col {j} ('{cols[j]}'): got {gv!r}, expected {wv!r}"
 
-        if len(hits) > 0 and not expected.get("skip_column_check"):
-            for col in expected.get("columns", []):
-                assert col in hits[0], f"{qid}: Expected column '{col}' not in response"
+        else:
+            # ── Legacy assertion mode (histogram, broken queries, complex CTEs)
+            if expected.get("row_count") is not None:
+                if not (skip_fts_count and is_fts) and not expected.get("skip_row_count"):
+                    assert len(hits) == expected["row_count"], \
+                        f"{qid}: Expected {expected['row_count']} rows, got {len(hits)}"
 
-        _run_content_assertions(query, sql, hits)
+            assert len(hits) < size, \
+                f"{qid}: Got {len(hits)} rows at size={size} — result may be truncated"
+
+            if len(hits) > 0 and not expected.get("skip_column_check"):
+                for col in expected.get("columns", []):
+                    assert col in hits[0], f"{qid}: Expected column '{col}' not in response"
+
+            _run_content_assertions(query, sql, hits)
+
+    # Pre-flush (skip_fts_count=True), CI runs with ZO_MAX_FILE_RETENTION_TIME=1
+    # so the memtable continuously rotates to immutable→WAL parquet→file_list
+    # for the whole ~160s run.  A narrow time-window query issued mid-handoff
+    # (an immutable removed before its parquet is registered, or a record
+    # briefly present in neither) can transiently drop rows — changing both row
+    # counts and aggregate values (COUNT(DISTINCT), SUM, …) even though the
+    # data is durably ingested.  Re-run the whole comparison until it settles.
+    # The post-flush phase runs the identical query against stable parquet, so
+    # a genuine wrong-result regression is still caught there — the retry only
+    # absorbs the transient ingestion race.
+    attempts = 12 if skip_fts_count else 1
+    for attempt in range(attempts):
+        resp = client.post("_search?type=logs", json=json_data)
+        assert resp.status_code == 200, \
+            f"{qid}: Expected 200, got {resp.status_code}: {resp.text[:500]}"
+
+        response_data = resp.json()
+        assert "hits" in response_data, f"{qid}: Response should contain 'hits'"
+        hits = response_data["hits"]
+
+        try:
+            _validate(hits)
+        except AssertionError:
+            if attempt < attempts - 1:
+                time.sleep(0.5)
+                continue
+            raise
+        break
 
     logging.info("%s passed: %d rows", qid, len(hits))
 

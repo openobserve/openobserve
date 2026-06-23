@@ -79,10 +79,37 @@ def _replace_re_match(sql: str) -> str:
 
 
 def _replace_match_all(sql: str) -> str:
-    """Replace match_all('term') with log LIKE '%term%'."""
+    """Replace match_all('term') with DuckDB LIKE conditions.
+
+    Tantivy tokenizes the term and matches each token independently
+    across all indexed text fields.  We emulate this with per-word LIKE
+    conditions on the log field (the primary FTS field in test data).
+
+    Single word:  match_all('warehouse') → log LIKE '%warehouse%'
+    Multi-word:   match_all('ACK batch') → (log LIKE '%ACK%' AND log LIKE '%batch%')
+
+    Note: This is an approximation — Tantivy's actual tokenization may
+    differ from whitespace splitting (stemming, stop words, case folding).
+    The per-token content assertion in the test runner provides a
+    correctness backstop that is independent of this oracle.
+    """
+    def _escape_like(s: str) -> str:
+        # Escape LIKE wildcards and single quotes to prevent unintended
+        # matches and SQL syntax breaks.  Not a parameterized query, but
+        # this is test infrastructure against a local in-memory DuckDB.
+        return s.replace("'", "''").replace("%", "\\%").replace("_", "\\_")
+
+    def _build_like(m: re.Match) -> str:
+        term = m.group(1)
+        words = [_escape_like(w) for w in term.split()]
+        if len(words) == 1:
+            return f"log LIKE '%{words[0]}%'"
+        clauses = " AND ".join(f"log LIKE '%{w}%'" for w in words)
+        return f"({clauses})"
+
     return re.sub(
         r"match_all\('([^']*)'\)",
-        r"log LIKE '%\1%'",
+        _build_like,
         sql,
         flags=re.IGNORECASE,
     )
@@ -305,7 +332,7 @@ _HAS_ARRAY_HAS = set()
 # Queries where OO returns fewer columns than DuckDB (e.g. ENT FULL OUTER JOIN
 # column aliasing). Skip the per-column existence check in legacy mode so the
 # test only validates row-count and ORDER BY, not column presence.
-_SKIP_COLUMN_CHECK = {"Q072", "Q308", "Q312", "Q313", "Q318", "Q320", "Q323", "Q395"}
+_SKIP_COLUMN_CHECK = {"Q072", "Q308", "Q312", "Q313", "Q318", "Q320", "Q323", "Q395", "Q548"}
 
 
 def compute_results(con: duckdb.DuckDBPyConnection, q: dict, *, is_histogram: bool = False) -> dict | None:
@@ -478,8 +505,9 @@ def main():
 
             # Merge preserved keys from old expected into new expected
             _PRESERVE_KEYS = ("skip_sqllogictest", "skip_row_count",
-                              "skip_column_check", "note", "assertions",
-                              "row_count")
+                              "skip_column_check",
+                              "skip_without_single_node_opt",
+                              "note", "assertions", "row_count")
             for key in _PRESERVE_KEYS:
                 if key in old_expected:
                     new_expected[key] = old_expected[key]

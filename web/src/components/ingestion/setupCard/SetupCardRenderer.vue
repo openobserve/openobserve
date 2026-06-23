@@ -15,15 +15,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <!--
-  AIRichSetupCard — generic, content-driven rich setup card for AI integrations.
+  SetupCardRenderer — generic, content-driven rich setup card shared by AI
+  integrations and in-repo data sources.
 
   Purely presentational: everything (hero, ordered steps, context chips, code
   chrome, supplementary accordions, footer) is rendered from a RichCardContent
-  object (see ./types.ts, ./registry.ts). Detection ("have my spans arrived?")
-  is delegated to useSpanDetect — a single user-triggered check per "Test" click,
-  no background polling.
+  object (see ./types.ts). Detection ("has my data arrived?") is delegated to
+  useStreamDetect — a single user-triggered check per "Test" click, no
+  background polling.
 
-  Add a provider by authoring a RichCardContent — no edits here.
+  Drive it by building a RichCardContent (AI: markdown frontmatter; data sources:
+  setupCard/content/*) — no edits here.
 -->
 <script setup lang="ts">
 import { computed, ref, watch, nextTick } from "vue";
@@ -38,11 +40,18 @@ import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
 import OStep from "@/lib/navigation/Stepper/OStep.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
-import { safeHttpUrl, type CardSubstitutions } from "../renderMarkdown";
-import type { RichCardContent, RichCardStep, StepChipKind } from "./types";
-import { useSpanDetect, prefersReducedMotion } from "./useSpanDetect";
+import { safeHttpUrl } from "./subs";
+import type {
+  CardSubstitutions,
+  RichCardContent,
+  RichCardStep,
+  StepChipKind,
+} from "./types";
+import { useStreamDetect, prefersReducedMotion } from "./useStreamDetect";
 
 const props = defineProps<{
   /** The integration's rich content (already token-substituted). */
@@ -60,11 +69,36 @@ const router = useRouter();
 const { getStreams } = useStreams();
 const isDark = computed(() => store.state?.theme === "dark");
 
-// "View Logs" / "View Traces" — the destination + label follow the detected
-// stream type (codex etc. are logs, most others are traces).
-const isLogsStream = computed(() => props.content.detect.streamType === "logs");
+// The detected stream type drives the status copy + the "View …" destination.
+// traces / logs land in their explorers; metrics (which fan out into many
+// per-metric streams) link to the Streams page where those streams appear.
+const streamKind = computed(() => props.content.detect.streamType);
+const isLogsStream = computed(() => streamKind.value === "logs");
+const isMetricsStream = computed(() => streamKind.value === "metrics");
+// Plural noun for the "Checking for …" / "No … found" copy.
+const dataNoun = computed(() =>
+  isMetricsStream.value ? "metrics" : isLogsStream.value ? "logs" : "spans",
+);
+// Singular unit for the connected count ("3 metric streams" / "5 spans").
+const countUnit = computed(() =>
+  isMetricsStream.value ? "metric stream" : isLogsStream.value ? "log" : "span",
+);
+const connectedHeadline = computed(() =>
+  isMetricsStream.value
+    ? "Connected — Metrics Are Flowing"
+    : isLogsStream.value
+      ? "Connected — Logs Are Flowing"
+      : "Connected — Traces Are Flowing",
+);
 const viewDataLabel = computed(() =>
-  isLogsStream.value ? "View Logs" : "View Traces",
+  isMetricsStream.value
+    ? "View Streams"
+    : isLogsStream.value
+      ? "View Logs"
+      : "View Traces",
+);
+const viewDataIcon = computed(() =>
+  isMetricsStream.value ? "list" : isLogsStream.value ? "article" : "timeline",
 );
 
 // Open the Logs/Traces view for the detected stream, pre-filtered to this
@@ -81,6 +115,16 @@ const viewData = async () => {
     await getStreams(props.content.detect.streamType, false, false, true);
   } catch {
     // ignore — navigate anyway
+  }
+
+  // Metrics fan out into many per-metric streams with no single SQL filter, so
+  // we send the user to the Streams page (where the new sqlserver_* streams
+  // appear) rather than a pre-filtered explorer.
+  if (isMetricsStream.value) {
+    router
+      .push({ name: "logstreams", query: { org_identifier: props.subs.org } })
+      .catch(() => {});
+    return;
   }
 
   const query: Record<string, string> = {
@@ -137,16 +181,39 @@ const watchedStream = computed(() =>
     ? streamName.value.trim() || props.content.streamInput.default || "default"
     : props.content.detect.streamName || "default",
 );
-// Substitute the live stream value into authored code at display/copy time
-// (kept out of build-time subs because it changes as the user types).
-const subStream = (text?: string): string | undefined =>
-  text == null ? text : text.replaceAll("{stream}", watchedStream.value);
+// ── free-form inputs (optional) ──────────────────────────────────────────────
+// Steps can declare `inputs` (e.g. SQL Server host/port on the configure step).
+// Each field's value substitutes its `{id}` placeholder in any code block
+// reactively, like `{stream}` above. We aggregate every step's inputs so a value
+// can fill code anywhere, and seed from defaults so all keys exist (keeps
+// mutations reactive) and code shows sensible values before the user edits.
+const allInputs = computed(() =>
+  props.content.steps.flatMap((s) => s.inputs ?? []),
+);
+const inputValues = ref<Record<string, string>>(
+  Object.fromEntries(allInputs.value.map((i) => [i.id, i.default])),
+);
 
-const detect = useSpanDetect({
+// Substitute live values (stream + free-form inputs) into authored code at
+// display/copy time (kept out of build-time subs because they change as the user
+// types). Build-time {url}/{org}/{token} are already resolved.
+const subStream = (text?: string): string | undefined => {
+  if (text == null) return text;
+  let out = text.replaceAll("{stream}", watchedStream.value);
+  for (const inp of allInputs.value) {
+    out = out.replaceAll(`{${inp.id}}`, inputValues.value[inp.id] ?? inp.default);
+  }
+  return out;
+};
+
+const detect = useStreamDetect({
   config: () => ({
     orgId: props.subs.org,
     streamType: props.content.detect.streamType,
     streamName: watchedStream.value,
+    // Forward the match mode — without it, keyword detection (metrics, which fan
+    // out into sqlserver_* streams) falls back to exact match and never connects.
+    match: props.content.detect.match,
     filter: props.content.detect.filter,
   }),
   onConnect: () => fireConfetti(),
@@ -171,6 +238,27 @@ const showFixHint = computed(
     !!extras.value.fixSnippet &&
     failedChecks.value >= FIX_HINT_AFTER_FAILURES,
 );
+
+// ── per-step variant selection (e.g. OS/arch for an install command) ─────────
+// Each step with `variants` renders a small toggle; the chosen variant's code is
+// shown/copied. Defaults to the first variant until the user picks another.
+const variantSel = ref<Record<string, string>>({});
+// Selection is keyed by `variantGroup` when set, so grouped steps (e.g. install +
+// configure sharing "os") move together; otherwise by the step's own id.
+const variantKey = (step: RichCardStep): string => step.variantGroup ?? step.id;
+const currentVariantId = (step: RichCardStep): string | undefined =>
+  step.variants?.length
+    ? variantSel.value[variantKey(step)] ?? step.variants[0].id
+    : undefined;
+const activeVariant = (step: RichCardStep) =>
+  step.variants?.find((v) => v.id === currentVariantId(step));
+const selectVariant = (key: string, variantId: unknown) => {
+  variantSel.value = { ...variantSel.value, [key]: String(variantId) };
+};
+const displayCode = (step: RichCardStep) =>
+  step.variants?.length ? activeVariant(step)?.code : step.code;
+const currentVariantNote = (step: RichCardStep) =>
+  step.variants?.length ? activeVariant(step)?.note : undefined;
 
 // ── step completion / active-step model ─────────────────────────────────────
 const copied = ref<Record<string, boolean>>({});
@@ -353,7 +441,15 @@ function fireConfetti() {
             icon="schedule"
             >{{ content.provider.setupTime }} setup</OBadge
           >
-          <OBadge variant="default-outline" icon="attach-money"
+          <template v-if="content.provider.metaBadges">
+            <OBadge
+              v-for="b in content.provider.metaBadges"
+              :key="b"
+              variant="default-outline"
+              >{{ b }}</OBadge
+            >
+          </template>
+          <OBadge v-else variant="default-outline" icon="attach-money"
             >Cost &amp; Tokens Captured</OBadge
           >
         </div>
@@ -407,19 +503,71 @@ function fireConfetti() {
           <div class="step-content-pad" :ref="(el) => setStepRef(el, i)">
             <p class="step-desc" v-html="inlineMd(step.description)"></p>
 
+            <!-- Per-step inputs (e.g. host/port) — fill {id} in this step's code -->
+            <div
+              v-if="step.inputs?.length"
+              class="step-inputs"
+              :data-test="`ai-step-inputs-${step.id}`"
+            >
+              <OInput
+                v-for="inp in step.inputs"
+                :key="inp.id"
+                v-model="inputValues[inp.id]"
+                :label="inp.label"
+                :placeholder="inp.placeholder || inp.default"
+                :help-text="inp.help"
+                size="sm"
+                :width="inp.width || 'md'"
+                :data-test="`ai-input-${inp.id}`"
+              />
+            </div>
+
+            <!-- Variant selector (e.g. OS/arch) — shared OToggleGroup; swaps the
+                 code block below. Hidden on follower steps (variantToggle:false),
+                 which instead follow their group's selection. -->
+            <div
+              v-if="step.variants?.length && step.variantToggle !== false"
+              class="variant-tabs"
+              data-test="ai-variant-tabs"
+            >
+              <OToggleGroup
+                :model-value="currentVariantId(step)"
+                @update:model-value="(v) => selectVariant(variantKey(step), v)"
+              >
+                <OToggleGroupItem
+                  v-for="v in step.variants"
+                  :key="v.id"
+                  :value="v.id"
+                  size="sm"
+                  :data-test="`ai-variant-${v.id}`"
+                >
+                  <template v-if="v.icon" #icon-left>
+                    <img
+                      :src="v.icon"
+                      alt=""
+                      aria-hidden="true"
+                      class="variant-icon"
+                      :class="{ 'variant-icon-invert': v.iconInvertDark }"
+                    />
+                  </template>
+                  {{ v.label }}
+                </OToggleGroupItem>
+              </OToggleGroup>
+            </div>
+
             <OCodeBlock
-              v-if="step.code"
-              :lang="step.code.lang"
+              v-if="displayCode(step)"
+              :lang="displayCode(step)?.lang"
               :chrome="codeChrome(step)"
-              :filename="step.code.filename"
-              :code="subStream(step.code.raw) || ''"
-              :code-masked="subStream(step.code.masked)"
+              :filename="displayCode(step)?.filename"
+              :code="subStream(displayCode(step)?.raw) || ''"
+              :code-masked="subStream(displayCode(step)?.masked)"
               data-test="ai-code"
               reveal-tooltip="Reveal Token"
               hide-tooltip="Hide Token"
               @copy="onStepCopy(step, i)"
             >
-              <template v-if="step.code.downloadEnv" #actions>
+              <template v-if="displayCode(step)?.downloadEnv" #actions>
                 <OButton
                   data-test="ai-code-env-btn"
                   variant="ghost"
@@ -432,6 +580,9 @@ function fireConfetti() {
               </template>
             </OCodeBlock>
 
+            <p v-if="currentVariantNote(step)" class="step-note">
+              <OIcon name="info-outline" size="sm" /> {{ currentVariantNote(step) }}
+            </p>
             <p v-if="step.note" class="step-note">
               <OIcon name="info-outline" size="sm" /> {{ step.note }}
             </p>
@@ -456,25 +607,25 @@ function fireConfetti() {
                 <span class="sb-dot" />
                 <span v-if="detect.idle.value" class="sb-txt"
                   >Not Tested Yet<span class="sb-sub"
-                    >run your app, then test for spans</span
+                    >start ingesting, then test for {{ dataNoun }}</span
                   ></span
                 >
                 <span v-else-if="detect.checking.value" class="sb-txt"
-                  >Checking for spans…<span class="sb-sub"
+                  >Checking for {{ dataNoun }}…<span class="sb-sub"
                     >on {{ watchedStream }}</span
                   ></span
                 >
                 <span v-else-if="detect.connected.value" class="sb-txt"
-                  >Connected — Traces Are Flowing<span class="sb-sub"
-                    >{{ detect.count.value }} span{{
-                      detect.count.value === 1 ? "" : "s"
+                  >{{ connectedHeadline }}<span class="sb-sub"
+                    >{{ detect.count.value }} {{ countUnit
+                    }}{{ detect.count.value === 1 ? "" : "s"
                     }}<template v-if="content.detect.modelLabel">
                       · {{ content.detect.modelLabel }}</template
                     ></span
                   ></span
                 >
                 <span v-else class="sb-txt sb-warn"
-                  >No Spans Found Yet<span class="sb-sub"
+                  >No {{ dataNoun }} Found Yet<span class="sb-sub"
                     >nothing on {{ watchedStream }} — run your app and test
                     again</span
                   ></span
@@ -503,7 +654,7 @@ function fireConfetti() {
                   v-else-if="detect.connected.value"
                   variant="primary"
                   size="sm"
-                  :icon-left="isLogsStream ? 'article' : 'timeline'"
+                  :icon-left="viewDataIcon"
                   data-test="ai-c-traces"
                   @click="viewData()"
                 >
@@ -705,7 +856,9 @@ function fireConfetti() {
 /* ---- layout ---- */
 .dirC {
   max-width: 980px;
-  margin: 0 auto;
+  /* Left-align the reading column (not centered) so it sits against the panel's
+     left edge, consistent across AI integrations and data-source cards. */
+  margin: 0;
   padding: 4px 4px 0;
 }
 
@@ -787,6 +940,18 @@ function fireConfetti() {
   white-space: nowrap;
 }
 
+/* ---- per-step free-form inputs (host/port …) — wrapping row above the code ---- */
+.step-inputs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: flex-start;
+  margin: 4px 0 14px;
+}
+.step-inputs :deep(label) {
+  margin-bottom: 2px;
+}
+
 /* ---- steps (lib OStepper in expanded mode) — only the per-step body content
    is styled here; the rail (indicator/connector/title) comes from OStepper. ---- */
 .steps {
@@ -812,6 +977,23 @@ function fireConfetti() {
   font-size: 12.5px;
   line-height: 1.5;
   margin: 10px 0 0;
+}
+
+/* ---- variant toggle (shared OToggleGroup) — only spacing + icon sizing here;
+   the toggle's own visuals come from the design system. ---- */
+.variant-tabs {
+  margin: 0 0 14px;
+}
+.variant-icon {
+  width: 14px;
+  height: 14px;
+  object-fit: contain;
+  flex: none;
+}
+/* Monochrome black glyphs (e.g. the Apple logo) would vanish on the dark panel —
+   invert them to white in dark mode. */
+.dirC-demo.dark .variant-icon-invert {
+  filter: invert(1);
 }
 .step-note :deep(svg) {
   flex: none;

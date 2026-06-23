@@ -4,6 +4,7 @@
 import { inject } from "vue";
 import OFile from "./OFile.vue";
 import { FORM_CONTEXT_KEY } from "../Form/OForm.types";
+import { firstFieldError } from "../Form/fieldError";
 import type { FormFileProps } from "./OFormFile.types";
 import type { FileValue } from "./OFile.types";
 
@@ -21,24 +22,7 @@ if (import.meta.env.DEV && !form) {
 </script>
 
 <template>
-  <component
-    v-if="form"
-    :is="form.Field"
-    :name="props.name"
-    :validators="
-      props.validators
-        ? {
-            onChange: (ctx: { value: unknown }) => {
-              for (const v of props.validators ?? []) {
-                const r = v(ctx.value as FileValue);
-                if (r !== undefined) return r;
-              }
-              return undefined;
-            },
-          }
-        : undefined
-    "
-  >
+  <component v-if="form" :is="form.Field" :name="props.name">
     <template #default="{ field }">
       <div class="tw:flex tw:flex-col tw:gap-1">
         <OFile
@@ -51,12 +35,13 @@ if (import.meta.env.DEV && !form) {
           :drop-zone="props.dropZone"
           :help-text="props.helpText"
           :disabled="props.disabled"
+          :required="props.required"
           :size="props.size"
           :id="props.id"
           :name="props.name"
           :model-value="field.state.value"
           :error="
-            field.state.meta.isTouched && field.state.meta.errors.length > 0
+            field.state.meta.errors.length > 0
           "
           @update:model-value="
             (v: FileValue) => {
@@ -74,11 +59,11 @@ if (import.meta.env.DEV && !form) {
         </OFile>
         <div
           v-if="
-            field.state.meta.isTouched && field.state.meta.errors.length > 0
+            field.state.meta.errors.length > 0
           "
           class="tw:text-xs tw:text-file-error-text"
         >
-          {{ field.state.meta.errors[0] }}
+          {{ firstFieldError(field.state.meta.errors) }}
         </div>
       </div>
     </template>

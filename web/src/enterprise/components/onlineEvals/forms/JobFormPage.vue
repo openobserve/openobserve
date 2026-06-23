@@ -1,41 +1,31 @@
 <template>
   <form class="job-form" @submit.prevent="save(false)">
-    <div class="job-form__top">
-      <OButton
-        variant="outline"
-        size="icon-sm"
-        icon-left="arrow-back-ios-new"
-        data-test="job-form-back-btn"
-        :title="t('onlineEvals.job.backTo')"
-        @click="$emit('cancel')"
-      />
-      <h1 class="job-form__title">
-        {{ mode === "create" ? t("onlineEvals.job.createTitle") : t("onlineEvals.job.editTitle") }}
-      </h1>
-      <div class="job-form__top-spacer" />
-      <button
-        type="button"
-        class="job-form__close"
-        :aria-label="t('onlineEvals.buttons.cancel')"
-        data-test="job-form-close-btn"
-        @click="$emit('cancel')"
-      >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        >
-          <line x1="18" y1="6" x2="6" y2="18" />
-          <line x1="6" y1="6" x2="18" y2="18" />
-        </svg>
-      </button>
-    </div>
+    <AppPageHeader
+      :back="{
+        label: t('onlineEvals.job.backTo'),
+        onClick: () => $emit('cancel'),
+        dataTest: 'job-form-back-btn',
+      }"
+      class="card-container tw:px-3 tw:border-b tw:border-border-default"
+      style="flex-shrink: 0"
+    >
+      <template #title>
+        <span data-test="job-form-title">
+          {{ mode === "create" ? t("onlineEvals.job.createTitle") : t("onlineEvals.job.editTitle") }}
+        </span>
+      </template>
+      <template #actions>
+        <OButton
+          variant="ghost"
+          size="icon-sm"
+          icon-left="close"
+          :aria-label="t('onlineEvals.buttons.cancel')"
+          :title="t('onlineEvals.buttons.cancel')"
+          data-test="job-form-close-btn"
+          @click="$emit('cancel')"
+        />
+      </template>
+    </AppPageHeader>
 
     <div class="job-form__body">
       <div class="job-form__main">
@@ -240,6 +230,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import useStreams from "@/composables/useStreams";
 import onlineEvalsService, {
@@ -477,61 +468,6 @@ async function save(activateAfter = false) {
   flex: 1;
   min-height: 0;
   gap: 10px;
-}
-
-.job-form__top {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 48px;
-  padding: 8px 14px;
-  background-color: var(--o2-card-bg);
-  border-radius: 0.375rem;
-  box-shadow: 0 0 0.313rem 0.063rem var(--o2-hover-shadow);
-  flex-shrink: 0;
-}
-
-.job-form__title {
-  margin: 0;
-  font-size: 17px;
-  font-weight: 600;
-  color: var(--color-text-primary, currentColor);
-  letter-spacing: 0.005em;
-  white-space: nowrap;
-}
-
-.job-form__subtitle {
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  font-size: 12px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  min-width: 0;
-}
-
-.job-form__top-spacer {
-  flex: 1;
-  min-width: 8px;
-}
-
-.job-form__close {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  background: transparent;
-  border: 0;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s;
-}
-
-.job-form__close:hover {
-  background: color-mix(in srgb, var(--color-text-primary) 6%, transparent);
-  color: var(--color-primary-600, #3F7994);
 }
 
 .job-form__body {

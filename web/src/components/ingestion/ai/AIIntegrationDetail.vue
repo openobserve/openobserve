@@ -26,7 +26,7 @@ import { getAICardRaw } from "./content";
 import { safeHttpUrl, type CardSubstitutions } from "./content/renderMarkdown";
 import { getRichCardContent } from "./content/richCard/registry";
 import AIIntegrationCard from "./content/AIIntegrationCard.vue";
-import AIRichSetupCard from "./content/richCard/AIRichSetupCard.vue";
+import AIRichSetupCard from "@/components/ingestion/setupCard/SetupCardRenderer.vue";
 
 const props = defineProps<{
   categorySlug: string;

@@ -57,6 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :stream-name="streamName"
         :start-time="timeRange.startTime"
         :end-time="timeRange.endTime"
+        detail-route-name="aiSessionDetails"
         class="tw:h-full"
       />
     </div>

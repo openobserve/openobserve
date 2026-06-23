@@ -1,12 +1,12 @@
 
 import { expect } from '@playwright/test';
+import { openNavFlyoutChild } from '../commonActions.js';
 
 
 export class PipelinesEP {
     constructor(page) {
         this.page = page;
 
-        this.pipelinesMenu = page.locator('[data-test="menu-link-\\/pipeline-item"]');
         this.functionStreamTab = '[data-test="pipeline-section-tab-functions"]';
         this.createFunctionToggle = page.locator('[data-test="create-function-toggle"] div').nth(2);
         this.createFunctionButton = this.page.locator('[data-test="function-list-add-function-btn"]');
@@ -45,7 +45,7 @@ export class PipelinesEP {
     }
 
     async gotoPipelinesPageEP() {
-        await this.pipelinesMenu.click();
+        await openNavFlyoutChild(this.page, 'pipeline');
     }
 
     async goToHomePage() {

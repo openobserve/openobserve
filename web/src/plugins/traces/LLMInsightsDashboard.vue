@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          a padded box. -->
     <div
       v-if="availableStreams.length > 0"
-      class="tw:flex tw:items-center tw:justify-end tw:gap-[0.5rem] tw:px-4 tw:pt-3 tw:pb-2"
+      class="tw:flex tw:items-center tw:justify-end tw:gap-[0.5rem] tw:py-[0.5rem]"
     >
       <div
         data-test="llm-insights-stream-selector"
@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <OSelect
           v-model="activeStream"
-          label="Stream"
+          :label="t('traces.sessionsList.streamLabel')"
           label-position="inside"
           :options="availableStreams.map((s) => ({ label: s, value: s }))"
           labelKey="label"
@@ -169,6 +169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, computed, onMounted, onUnmounted } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
+import { useI18n } from "vue-i18n";
 import { useLLMInsights } from "./composables/useLLMInsights";
 import {
   computeTrend,
@@ -194,6 +195,7 @@ import genAiAgentMappingService, {
 } from "@/services/gen-ai-agent-mapping.service";
 
 const { getStreams } = useStreams();
+const { t } = useI18n();
 const router = useRouter();
 const store = useStore();
 

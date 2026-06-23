@@ -1590,6 +1590,7 @@
     "bottom": "底部",
     "default": "預設",
     "numbers": "數字",
+    "localeFormat": "區域格式",
     "bytes": "Bytes",
     "kilobytes": "Kilobytes (KB)",
     "megabytes": "Megabytes (MB)",

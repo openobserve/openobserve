@@ -62,12 +62,9 @@ vi.mock("vue-i18n", () => ({
   })),
 }));
 
-// The component now renders sessions through the design-system OTable in
-// server-pagination mode (props add `currentPage`/`totalCount`/`pageSize`,
-// emits `pagination-change`). It also drives the toolbar (stream filter) and
-// empty/error body through OTable's `#toolbar` / `#empty` slots. The mock
-// mirrors that contract: rows when data is present, the `#empty` slot when
-// it's not, and always the `#toolbar` slot.
+// The component now renders sessions through the design-system OTable
+// (props: `data`/`columns`/`loading`, emits `row-click`, cell slots receive
+// `{ row }`). The mock mirrors just that contract.
 vi.mock("@/lib/core/Table/OTable.vue", () => ({
   default: {
     name: "OTable",
@@ -76,18 +73,17 @@ vi.mock("@/lib/core/Table/OTable.vue", () => ({
       "columns",
       "loading",
       "rowKey",
-      "currentPage",
       "totalCount",
-      "pageSize",
-      "pageSizeOptions",
-      "pagination",
+      "footerTitle",
     ],
-    emits: ["row-click", "pagination-change"],
+    emits: ["row-click"],
+    // Mirrors the OTable contract the component relies on: a loading state, one
+    // row per item, the `#empty` slot when there are no rows, and a footer that
+    // surfaces the server-side total (the old count pill now lives here).
     template: `
       <div class="otable-mock">
-        <div class="otable-toolbar"><slot name="toolbar" /></div>
         <div v-if="loading" data-test="sessions-list-loading" class="otable-loading" />
-        <template v-else-if="data && data.length">
+        <template v-else>
           <div
             v-for="row in data"
             :key="row.sessionId"
@@ -103,8 +99,13 @@ vi.mock("@/lib/core/Table/OTable.vue", () => ({
             <slot name="cell-cost" :row="row">{{ row.cost }}</slot>
             <slot name="cell-status" :row="row">{{ row.status }}</slot>
           </div>
+          <div v-if="!data || data.length === 0" class="otable-empty">
+            <slot name="empty" />
+          </div>
         </template>
-        <div v-else class="otable-empty"><slot name="empty" /></div>
+        <div data-test="sessions-list-footer" class="otable-footer">
+          {{ footerTitle }} {{ totalCount }}
+        </div>
       </div>
     `,
   },
@@ -198,9 +199,8 @@ describe("SessionsList — no LLM streams", () => {
     mockGetStreams.mockResolvedValue({ list: [] });
     const wrapper = await mountComponent();
 
-    // No streams at all → the dedicated empty state renders on its own (the
-    // table — and its toolbar/selector — is not shown when there's nothing
-    // to select).
+    // With no LLM streams at all, the dedicated first-run empty state renders
+    // on its own — the table (and its `#empty` slot) is not mounted.
     expect(
       wrapper.find("[data-test='sessions-empty-no-streams']").exists(),
     ).toBe(true);
@@ -274,23 +274,18 @@ describe("SessionsList — sessions table", () => {
     expect(rows).toHaveLength(2);
   });
 
-  it("drives OTable server pagination from the total count", async () => {
+  it("surfaces the server-side sessions count via the table footer", async () => {
     mockHasLoadedOnce.value = true;
     mockLoading.value = false;
     mockSessions.value = [makeSession()];
     mockTotal.value = 42;
 
     const wrapper = await mountComponent();
-    // The count pill + custom paginator were replaced by OTable's built-in
-    // server-pagination footer: assert the table is wired with the totals
-    // rather than re-implementing pagination in this component.
-    const table = wrapper.findComponent({ name: "OTable" });
-    expect(table.exists()).toBe(true);
-    expect(table.props("pagination")).toBe("server");
-    expect(table.props("totalCount")).toBe(42);
-    expect(wrapper.find("[data-test='sessions-list-count-pill']").exists()).toBe(
-      false,
-    );
+    // The standalone count pill was removed; the total now flows to OTable's
+    // footer via `:total-count`.
+    const footer = wrapper.find("[data-test='sessions-list-footer']");
+    expect(footer.exists()).toBe(true);
+    expect(footer.text()).toContain("42");
   });
 
   it("status badge shows 'ok' status for ok sessions", async () => {

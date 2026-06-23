@@ -21,37 +21,37 @@ test.describe("Regex Pattern Management Tests", { tag: '@enterprise' }, () => {
 
   // ===== VALIDATION TESTS =====
 
-  test("should disable save button when required fields are empty", {
+  test("should reject save when required fields are empty", {
     tag: ['@sdr', '@regexPatterns', '@negative', '@validation', '@P2']
   }, async ({ page }) => {
-    testLogger.info('Testing that save button is disabled when required fields are empty');
+    testLogger.info('Testing that form rejects save when required fields are empty');
 
     await pm.sdrPatternsPage.navigateToRegexPatterns();
 
-    // Test 1: Empty pattern name
+    // Test 1: Empty pattern name — form should not close
     testLogger.info('Testing empty pattern name');
     await pm.sdrPatternsPage.clickAddPattern();
     await pm.sdrPatternsPage.patternDescriptionInput.fill('Test description');
     await pm.sdrPatternsPage.patternInput.fill('^[A-Z]{5}[0-9]{4}[A-Z]$');
 
-    let saveButton = pm.sdrPatternsPage.saveButton;
-    let isDisabled = await saveButton.isDisabled();
-    testLogger.info(`Save button disabled (empty name): ${isDisabled}`);
-    expect(isDisabled).toBeTruthy();
+    // OForm validates on submit (not field-disabled); clicking save triggers
+    // Zod validation which keeps the drawer open on error.
+    await pm.sdrPatternsPage.saveButton.click();
+    testLogger.info('Verifying drawer stays open after save with empty name');
+    await expect(pm.sdrPatternsPage.addPatternTitle).toBeVisible({ timeout: 5000 });
 
     await pm.sdrPatternsPage.cancelButton.click();
     await page.waitForTimeout(500);
 
-    // Test 2: Empty regex pattern
+    // Test 2: Empty regex pattern — form should not close
     testLogger.info('Testing empty regex pattern');
     await pm.sdrPatternsPage.clickAddPattern();
     await pm.sdrPatternsPage.patternNameInput.fill('empty_pattern');
     await pm.sdrPatternsPage.patternDescriptionInput.fill('Test description');
 
-    saveButton = pm.sdrPatternsPage.saveButton;
-    isDisabled = await saveButton.isDisabled();
-    testLogger.info(`Save button disabled (empty pattern): ${isDisabled}`);
-    expect(isDisabled).toBeTruthy();
+    await pm.sdrPatternsPage.saveButton.click();
+    testLogger.info('Verifying drawer stays open after save with empty pattern');
+    await expect(pm.sdrPatternsPage.addPatternTitle).toBeVisible({ timeout: 5000 });
   });
 
   // ===== ERROR HANDLING TESTS =====
