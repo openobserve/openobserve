@@ -68,6 +68,9 @@ pub struct ScanStats {
     /// unit: bytes
     #[prost(int64, tag = "12")]
     pub peak_memory_usage: i64,
+    /// unit: ms
+    #[prost(int64, tag = "13")]
+    pub wait_in_queue: i64,
 }
 #[derive(serde::Serialize)]
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -3369,8 +3372,8 @@ pub mod idx_optimize_mode {
 }
 #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct SimpleTopN {
-    #[prost(string, tag = "1")]
-    pub field: ::prost::alloc::string::String,
+    #[prost(string, repeated, tag = "1")]
+    pub fields: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
     #[prost(uint32, tag = "2")]
     pub limit: u32,
     #[prost(bool, tag = "3")]

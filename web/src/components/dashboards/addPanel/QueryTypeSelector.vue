@@ -92,6 +92,7 @@ import {
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
+import useDefaultPanelFields from "@/composables/dashboard/useDefaultPanelFields";
 import ConfirmDialog from "../../ConfirmDialog.vue";
 import { useStore } from "vuex";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -121,6 +122,12 @@ export default defineComponent({
       removeXYFilters,
       updateXYFieldsForCustomQueryMode,
     } = useDashboardPanelData(dashboardPanelDataPageKey);
+    const { applyDefaultPanelFields } = useDefaultPanelFields(
+      dashboardPanelDataPageKey,
+    );
+    // Pages that re-seed default builder fields on the in-page Builder toggle.
+    // (Entering a builder surface parses on mount, not via this handler.)
+    const SEED_ON_TOGGLE_PAGES = ["dashboard", "metrics", "build", "logs"];
     const confirmQueryModeChangeDialog = ref(false);
     const confirmDialogMessage = ref(
       "Are you sure you want to change the query mode? The data saved for X-Axis, Y-Axis and Filters will be wiped off.",
@@ -183,6 +190,14 @@ export default defineComponent({
           dashboardPanelData.layout.currentQueryIndex
         ].customQuery,
       ],
+      () => {
+        initializeSelectedButtonType();
+      },
+    );
+
+    // re-sync the toggle when switching between query tabs
+    watch(
+      () => dashboardPanelData.layout.currentQueryIndex,
       () => {
         initializeSelectedButtonType();
       },
@@ -259,7 +274,9 @@ export default defineComponent({
               "Are you sure you want to change the query mode? The data saved for X-Axis, Y-Axis and Filters will be wiped off.";
           }
 
-          dashboardPanelData.data.queries[0].query != ""
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].query != ""
             ? (confirmQueryModeChangeDialog.value = true)
             : changeToggle();
         }
@@ -271,9 +288,6 @@ export default defineComponent({
         popupSelectedButtonType.value === "promql" ||
         popupSelectedButtonType.value === "sql";
 
-      const isSwitchingToBuilder =
-        !isQueryTypeChange && popupSelectedButtonType.value === "builder";
-
       if (isQueryTypeChange) {
         selectedButtonQueryType.value = popupSelectedButtonType.value;
       } else {
@@ -284,46 +298,28 @@ export default defineComponent({
       removeXYFilters();
       updateXYFieldsForCustomQueryMode();
 
-      const queryIdx = dashboardPanelData.layout.currentQueryIndex;
-
-      // Clear query when switching query types (SQL <-> PromQL)
+      // Clear queries for all tabs when switching query types (SQL <-> PromQL)
+      // since the syntax is incompatible between modes
       if (
         isQueryTypeChange &&
         dashboardPanelData.data.type !== "custom_chart"
       ) {
-        dashboardPanelData.data.queries[queryIdx].query = "";
+        dashboardPanelData.data.queries.forEach((q: any) => {
+          q.query = "";
+        });
       }
 
 
-      // When switching to SQL mode, multi-query is not supported.
-      // Keep only the current query, remove others, and reset index to 0.
-      if (
-        isQueryTypeChange &&
-        popupSelectedButtonType.value === "sql" &&
-        dashboardPanelData.data.queries.length > 1
-      ) {
-        const currentQuery = dashboardPanelData.data.queries[queryIdx];
-        dashboardPanelData.data.queries = [currentQuery];
-        dashboardPanelData.layout.currentQueryIndex = 0;
-        dashboardPanelData.layout.hiddenQueries = [];
-      }
-
-      // For metrics page: when switching from custom to builder in PromQL, set sample query
-      if (
-        dashboardPanelDataPageKey === "metrics" &&
-        isSwitchingToBuilder &&
-        dashboardPanelData.data.queryType === "promql" &&
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ]?.fields?.stream
-      ) {
-        const streamName =
-          dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].fields.stream;
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].query = `${streamName}{}`;
+      // removeXYFilters() above wiped the builder fields; re-seed defaults when
+      // the resulting mode is a builder.
+      const seedQueryIdx = dashboardPanelData.layout.currentQueryIndex;
+      const seedQuery = dashboardPanelData.data.queries[seedQueryIdx];
+      const resultingBuilderMode = !seedQuery?.customQuery;
+      const shouldSeedDefaults =
+        resultingBuilderMode &&
+        SEED_ON_TOGGLE_PAGES.includes(dashboardPanelDataPageKey);
+      if (shouldSeedDefaults) {
+        await applyDefaultPanelFields();
       }
 
       // empty the errors

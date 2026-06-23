@@ -1,313 +1,230 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mount, VueWrapper } from '@vue/test-utils';
-import SqlServer from './SqlServer.vue';
-import { createStore } from 'vuex';
-import { createI18n } from 'vue-i18n';
-import { nextTick, ref } from 'vue';
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// Mock aws-exports
-vi.mock('../../../aws-exports', () => ({
-  default: {
-    region: 'us-east-1',
-    userPoolId: 'us-east-1_test',
-    userPoolWebClientId: 'test-client-id',
-  },
-}));
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { mount, VueWrapper } from "@vue/test-utils";
+import { createStore } from "vuex";
+import { createI18n } from "vue-i18n";
+import { ref } from "vue";
+import SqlServer from "./SqlServer.vue";
+import sqlServerCard from "@/components/ingestion/setupCard/content/sqlServer";
+import {
+  getDataSourceCard,
+  hasDataSourceCard,
+} from "@/components/ingestion/setupCard/registry";
 
-// Mock zincutils
-vi.mock('../../../utils/zincutils', () => ({
-  getImageURL: vi.fn((path) => `/mocked/path/${path}`),
-  getEndPoint: vi.fn(() => ({
-    url: 'https://test.openobserve.ai',
-    host: 'test.openobserve.ai',
-    port: 443,
-    protocol: 'https',
-    tls: true,
-  })),
-  getIngestionURL: vi.fn(() => 'https://test.openobserve.ai'),
-}));
-
-// Mock useIngestion composable
+// Mock useIngestion so the endpoint is deterministic (no network / URL lookup).
 const mockEndpoint = ref({
-  url: 'https://test.openobserve.ai',
-  host: 'test.openobserve.ai',
+  url: "https://test.openobserve.ai",
+  host: "test.openobserve.ai",
   port: 443,
-  protocol: 'https',
+  protocol: "https",
   tls: true,
 });
 
-const mockDatabaseContent = `exporters:
-  otlphttp/openobserve:
-    endpoint: https://test.openobserve.ai/api/test-org/[STREAM_NAME]
-    headers:
-      Authorization: Basic [BASIC_PASSCODE]
-      stream-name: [STREAM_NAME]`;
-
-const mockDatabaseDocURLs = {
-  sqlServer: "https://short.openobserve.ai/database/sql-server",
-  postgres: "https://short.openobserve.ai/database/postgres",
-  mongoDB: "https://short.openobserve.ai/database/mongodb",
-  redis: "https://short.openobserve.ai/database/redis",
-};
-
-vi.mock('@/composables/useIngestion', () => ({
-  default: vi.fn(() => ({
-    endpoint: mockEndpoint,
-    databaseContent: mockDatabaseContent,
-    databaseDocURLs: mockDatabaseDocURLs,
-  })),
+vi.mock("@/composables/useIngestion", () => ({
+  default: vi.fn(() => ({ endpoint: mockEndpoint })),
 }));
 
-// Mock CopyContent component
-const MockCopyContent = {
-  name: 'CopyContent',
-  props: ['content'],
-  template: '<div data-test="copy-content">{{ content }}</div>',
-};
+// Replace the heavy presentational card with a light stub so we can assert the
+// content/subs the wrapper hands it without mounting OStepper/useStreamDetect/etc.
+vi.mock("@/components/ingestion/setupCard/SetupCardRenderer.vue", () => ({
+  default: {
+    name: "SetupCardRenderer",
+    props: ["content", "subs", "logoUrl", "logoUrlDark"],
+    template: '<div data-test="rich-card-stub" />',
+  },
+}));
 
 const mockStore = createStore({
   state: {
-    selectedOrganization: {
-      identifier: 'test-org',
-      name: 'Test Organization',
-    },
-    userInfo: {
-      email: 'test@example.com',
-    },
-  },
-  getters: {},
-  mutations: {},
-  actions: {},
-});
-
-const mockI18n = createI18n({
-  locale: 'en',
-  messages: {
-    en: {},
+    selectedOrganization: { identifier: "test-org", name: "Test Organization" },
+    userInfo: { email: "test@example.com" },
+    organizationData: { organizationPasscode: "test-passcode" },
+    theme: "light",
   },
 });
 
+const mockI18n = createI18n({ locale: "en", messages: { en: {} } });
 
-describe('SqlServer.vue Component - Comprehensive Coverage', () => {
-  let wrapper: VueWrapper<any>;
-  
-  const createWrapper = (props = {}) => {
-    return mount(SqlServer, {
-      props: {
-        currOrgIdentifier: 'test-org',
-        currUserEmail: 'test@example.com',
-        ...props,
-      },
-      global: {
-        plugins: [mockStore, mockI18n],
-        components: {
-          CopyContent: MockCopyContent,
-        },
-        stubs: {
-          CopyContent: MockCopyContent,
-        },
-      },
-    });
-  };
+const SUBS = {
+  url: "https://test.openobserve.ai",
+  org: "test-org",
+  token: "dGVzdEB0b2tlbg==",
+};
 
-  beforeEach(() => {
-    vi.clearAllMocks();
+describe("sqlServerCard builder", () => {
+  it("builds the SQL Server card metadata", () => {
+    const card = sqlServerCard(SUBS);
+    expect(card.provider.name).toBe("SQL Server");
+    // Non-AI metrics card → replaces the "Cost & Tokens Captured" hero badge.
+    expect(card.provider.metaBadges).toEqual(["Metrics"]);
+    expect(card.docUrl).toBe(
+      "https://openobserve.ai/blog/monitor-sql-server-with-otel/",
+    );
+    // The blog's flow: prepare → install → configure → run → verify.
+    expect(card.steps.map((s) => s.id)).toEqual([
+      "prepare",
+      "install",
+      "configure",
+      "run",
+      "verify",
+    ]);
   });
+
+  it("writes the config via a shell command with the org's exporter filled in", () => {
+    const configure = sqlServerCard(SUBS).steps.find((s) => s.id === "configure")!;
+    const unix = configure.variants!.find((v) => v.id === "linux-amd64")!.code;
+    expect(unix.lang).toBe("bash");
+    // It's a one-shot file-writing command wrapping the full config.
+    expect(unix.raw).toContain("cat > config.yaml <<'EOF'");
+    expect(unix.raw).toContain("receivers:");
+    expect(unix.raw).toContain("otlphttp/openobserve:");
+    expect(unix.raw).toContain(`endpoint: ${SUBS.url}/api/${SUBS.org}`);
+    expect(unix.raw).toContain(`Basic ${SUBS.token}`);
+    // Verified single-receiver config — the blog's duplicate is dropped.
+    expect(unix.raw).not.toContain("sqlserver/1");
+    // Masked variant hides the token but keeps the rest.
+    expect(unix.masked).toBeDefined();
+    expect(unix.masked).not.toContain(SUBS.token);
+    expect(unix.masked).toContain("otlphttp/openobserve:");
+    // Windows variant uses a PowerShell here-string.
+    const win = configure.variants!.find((v) => v.id === "windows-amd64")!.code;
+    expect(win.lang).toBe("powershell");
+    expect(win.raw).toContain("Set-Content -Path config.yaml");
+  });
+
+  it("puts host/port inputs on the configure step, referenced via placeholders", () => {
+    const configure = sqlServerCard(SUBS).steps.find((s) => s.id === "configure")!;
+    expect(configure.inputs?.map((i) => i.id)).toEqual(["server", "port"]);
+    // The config keeps {server}/{port} unsubstituted so the renderer fills them
+    // live from the inputs (build-time subs only touch url/org/token).
+    const unix = configure.variants!.find((v) => v.id === "linux-amd64")!.code;
+    expect(unix.raw).toContain("server: {server}");
+    expect(unix.raw).toContain("port: {port}");
+  });
+
+  it("offers method tabs for applying the grants (sqlcmd / docker / GUI)", () => {
+    const prepare = sqlServerCard(SUBS).steps.find((s) => s.id === "prepare")!;
+    expect(prepare.code).toBeUndefined();
+    expect(prepare.variants?.map((v) => v.id)).toEqual([
+      "sqlcmd",
+      "docker",
+      "sql-client",
+    ]);
+    // sqlcmd/docker are runnable commands that pipe the SQL via -Q.
+    const sqlcmd = prepare.variants!.find((v) => v.id === "sqlcmd")!.code;
+    expect(sqlcmd.raw).toContain("sqlcmd");
+    expect(sqlcmd.raw).toContain('-Q "');
+    expect(sqlcmd.raw).toContain("CREATE LOGIN otel");
+    expect(prepare.variants!.find((v) => v.id === "docker")!.code.raw).toContain(
+      "docker exec",
+    );
+    // The GUI tab is the raw SQL to paste into a client.
+    const gui = prepare.variants!.find((v) => v.id === "sql-client")!.code;
+    expect(gui.lang).toBe("sql");
+    expect(gui.raw).toContain("GRANT VIEW SERVER PERFORMANCE STATE");
+    expect(gui.raw).not.toContain("sqlcmd");
+    // Every tab carries an icon.
+    expect(prepare.variants!.every((v) => !!v.icon)).toBe(true);
+  });
+
+  it("uses the same literal login in Step 1 and the collector config (in lockstep)", () => {
+    const card = sqlServerCard(SUBS);
+    const prepare = card.steps.find((s) => s.id === "prepare")!;
+    // No extra input fields to decide on — credentials are edited inline.
+    expect(prepare.inputs).toBeUndefined();
+    const config = card.steps.find((s) => s.id === "configure")!.variants!.find(
+      (v) => v.id === "linux-amd64",
+    )!.code.raw;
+    expect(config).toContain("username: otel");
+    expect(config).toContain('password: "YourStrong@Passw0rd"');
+  });
+
+  it("offers OS-specific install variants (no single code block)", () => {
+    const install = sqlServerCard(SUBS).steps.find((s) => s.id === "install")!;
+    expect(install.code).toBeUndefined();
+    expect(install.variants?.map((v) => v.id)).toEqual([
+      "linux-amd64",
+      "linux-arm64",
+      "darwin-arm64",
+      "darwin-amd64",
+      "windows-amd64",
+    ]);
+    // Each variant's command targets its own platform asset.
+    const linux = install.variants!.find((v) => v.id === "linux-amd64")!;
+    expect(linux.code.raw).toContain("otelcol-contrib_0.115.1_linux_amd64.tar.gz");
+    const win = install.variants!.find((v) => v.id === "windows-amd64")!;
+    expect(win.code.lang).toBe("powershell");
+    expect(win.code.raw).toContain("windows_amd64");
+  });
+});
+
+describe("data-source card registry", () => {
+  it("resolves the sqlServer slug", () => {
+    expect(hasDataSourceCard("sqlServer")).toBe(true);
+    expect(getDataSourceCard("sqlServer", SUBS)?.provider.name).toBe(
+      "SQL Server",
+    );
+  });
+
+  it("returns undefined for an unregistered slug", () => {
+    expect(hasDataSourceCard("not-a-real-slug")).toBe(false);
+    expect(getDataSourceCard("not-a-real-slug", SUBS)).toBeUndefined();
+    expect(getDataSourceCard(undefined, SUBS)).toBeUndefined();
+  });
+});
+
+describe("SqlServer.vue", () => {
+  let wrapper: VueWrapper<any>;
+
+  const createWrapper = () =>
+    mount(SqlServer, {
+      global: { plugins: [mockStore, mockI18n] },
+    });
 
   afterEach(() => {
-    if (wrapper) {
-      wrapper.unmount();
-    }
+    if (wrapper) wrapper.unmount();
   });
 
-  // Test 1: Component mounts successfully
-  it('should mount component successfully', () => {
+  it("renders the shared setup card for the sqlServer slug", () => {
     wrapper = createWrapper();
-    expect(wrapper.exists()).toBe(true);
+    expect(
+      wrapper.findComponent({ name: "SetupCardRenderer" }).exists(),
+    ).toBe(true);
+    // Wrapper tags the card with its own data-test (falls through onto the root).
+    expect(
+      wrapper.find('[data-test="data-source-setup-card"]').exists(),
+    ).toBe(true);
   });
 
-  // Test 2: Component has correct name
-  it('should have correct component name', () => {
+  it("passes the per-org substitutions and SQL Server content to the card", () => {
     wrapper = createWrapper();
-    expect(wrapper.vm.$options.name).toBe('AWSConfig');
+    const stub = wrapper.findComponent({ name: "SetupCardRenderer" });
+    expect(stub.exists()).toBe(true);
+
+    const subs = stub.props("subs") as Record<string, string>;
+    expect(subs.url).toBe("https://test.openobserve.ai");
+    expect(subs.org).toBe("test-org");
+    // token = base64("email:passcode"), non-empty.
+    expect(subs.token).toBeTruthy();
+
+    const content = stub.props("content") as any;
+    expect(content.provider.name).toBe("SQL Server");
+    const configure = content.steps.find((s: any) => s.id === "configure");
+    const unix = configure.variants.find((v: any) => v.id === "linux-amd64");
+    expect(unix.code.raw).toContain(`Basic ${subs.token}`);
   });
-
-  // Test 3: Component accepts currOrgIdentifier prop
-  it('should accept currOrgIdentifier prop', () => {
-    wrapper = createWrapper({ currOrgIdentifier: 'custom-org' });
-    expect(wrapper.exists()).toBe(true);
-  });
-
-  // Test 4: Component accepts currUserEmail prop
-  it('should accept currUserEmail prop', () => {
-    wrapper = createWrapper({ currUserEmail: 'custom@example.com' });
-    expect(wrapper.exists()).toBe(true);
-  });
-
-  // Test 5: Props have correct types
-  it('should have correct prop types', () => {
-    wrapper = createWrapper();
-    const propTypes = wrapper.vm.$options.props;
-    expect(propTypes.currOrgIdentifier.type).toBe(String);
-    expect(propTypes.currUserEmail.type).toBe(String);
-  });
-
-  // Test 6: Component renders template correctly
-  it('should render template with correct structure', () => {
-    wrapper = createWrapper();
-    expect(wrapper.find('.tw\\:p-2').exists()).toBe(true);
-    expect(wrapper.find('.tw\\:text-\\[16px\\]').exists()).toBe(true);
-  });
-
-  // Test 7: CopyContent component is rendered
-  it('should render CopyContent component', () => {
-    wrapper = createWrapper();
-    expect(wrapper.find('[data-test="copy-content"]').exists()).toBe(true);
-  });
-
-  // Test 8: Documentation link is rendered
-  it('should render documentation link correctly', () => {
-    wrapper = createWrapper();
-    const link = wrapper.find('a[target="_blank"]');
-    expect(link.exists()).toBe(true);
-    expect(link.attributes('href')).toBe('https://short.openobserve.ai/database/sql-server');
-  });
-
-  // Test 9: Documentation link has correct styling
-  it('should have correct styling for documentation link', () => {
-    wrapper = createWrapper();
-    const link = wrapper.find('a[target="_blank"]');
-    expect(link.classes()).toContain('text-blue-500');
-    expect(link.classes()).toContain('hover:text-blue-600');
-    expect(link.attributes('style')).toContain('text-decoration: underline');
-  });
-
-  // Test 10: Name is correctly set to sqlServer
-  it('should set name to sqlServer', () => {
-    wrapper = createWrapper();
-    expect(wrapper.vm.name).toBe('sqlServer');
-  });
-
-  // Test 11: Config is exposed in component data
-  it('should expose config in component data', () => {
-    wrapper = createWrapper();
-    expect(wrapper.vm.config).toBeDefined();
-    expect(wrapper.vm.config.region).toBe('us-east-1');
-  });
-
-  // Test 12: docURL is correctly set
-  it('should set docURL correctly from databaseDocURLs', () => {
-    wrapper = createWrapper();
-    expect(wrapper.vm.docURL).toBe('https://short.openobserve.ai/database/sql-server');
-  });
-
-  // Test 13: getImageURL is exposed
-  it('should expose getImageURL function', () => {
-    wrapper = createWrapper();
-    expect(wrapper.vm.getImageURL).toBeDefined();
-    expect(typeof wrapper.vm.getImageURL).toBe('function');
-  });
-
-
-  // Test 23: Endpoint data is exposed
-  it('should expose endpoint data', () => {
-    wrapper = createWrapper();
-    expect(wrapper.vm.endpoint).toBeDefined();
-    expect(wrapper.vm.endpoint.url).toBe('https://test.openobserve.ai');
-  });
-
-  // Test 24: Database content is exposed
-  it('should expose databaseContent', () => {
-    wrapper = createWrapper();
-    expect(wrapper.vm.databaseContent).toBeDefined();
-    expect(wrapper.vm.databaseContent).toContain('exporters:');
-  });
-
-  // Test 25: Database doc URLs are exposed
-  it('should expose databaseDocURLs', () => {
-    wrapper = createWrapper();
-    expect(wrapper.vm.databaseDocURLs).toBeDefined();
-    expect(wrapper.vm.databaseDocURLs.sqlServer).toBe('https://short.openobserve.ai/database/sql-server');
-  });
-
-  // Test 26: Component with null props
-  it('should handle null props gracefully', () => {
-    wrapper = createWrapper({ currOrgIdentifier: null, currUserEmail: null });
-    expect(wrapper.exists()).toBe(true);
-    expect(wrapper.exists()).toBe(true);
-  });
-
-  // Test 27: Component with undefined props
-  it('should handle undefined props gracefully', () => {
-    wrapper = createWrapper({ currOrgIdentifier: undefined, currUserEmail: undefined });
-    expect(wrapper.exists()).toBe(true);
-    expect(wrapper.exists()).toBe(true);
-  });
-
-  // Test 28: Component with empty string props
-  it('should handle empty string props', () => {
-    wrapper = createWrapper({ currOrgIdentifier: '', currUserEmail: '' });
-    expect(wrapper.exists()).toBe(true);
-    expect(wrapper.exists()).toBe(true);
-  });
-
-  // Test 29: Template renders content from CopyContent
-  it('should pass content to CopyContent component', () => {
-    wrapper = createWrapper();
-    const copyContentEl = wrapper.find('[data-test="copy-content"]');
-    expect(copyContentEl.text()).toContain('exporters:');
-  });
-
-  // Test 30: Component reactivity - content updates when dependencies change
-  it('should maintain content reactivity', async () => {
-    wrapper = createWrapper();
-    const originalContent = wrapper.vm.content;
-    expect(originalContent).toBeDefined();
-    expect(originalContent).toContain('sqlserver');
-  });
-
-
-  // Test 33: Component instance properties
-  it('should have correct instance properties', () => {
-    wrapper = createWrapper();
-    expect(wrapper.vm).toHaveProperty('name');
-    expect(wrapper.vm).toHaveProperty('content');
-    expect(wrapper.vm).toHaveProperty('docURL');
-    expect(wrapper.vm).toHaveProperty('config');
-  });
-
-
-  // Test 35: Template structure validation
-  it('should have correct template structure and classes', () => {
-    wrapper = createWrapper();
-    expect(wrapper.find('.tw\\:p-2').exists()).toBe(true);
-    expect(wrapper.find('.tw\\:text-\\[16px\\]').exists()).toBe(true);
-    expect(wrapper.find('.tw\\:font-bold').exists()).toBe(true);
-    expect(wrapper.find('.tw\\:pt-6').exists()).toBe(true);
-    expect(wrapper.find('.tw\\:pb-2').exists()).toBe(true);
-  });
-
-  // Test 36: Link attributes validation
-  it('should have correct link attributes and behavior', () => {
-    wrapper = createWrapper();
-    const link = wrapper.find('a');
-    expect(link.attributes('target')).toBe('_blank');
-    expect(link.text()).toBe('here');
-  });
-
-  // Test 37: Component composition API usage
-  it('should use composition API correctly', () => {
-    wrapper = createWrapper();
-    expect(wrapper.vm.$options.setup).toBeDefined();
-    expect(typeof wrapper.vm.$options.setup).toBe('function');
-  });
-
-  // Test 38: Props validation
-  it('should validate props correctly', () => {
-    const propValidators = SqlServer.props;
-    expect(propValidators.currOrgIdentifier.type).toBe(String);
-    expect(propValidators.currUserEmail.type).toBe(String);
-  });
-
-
 });

@@ -15,7 +15,7 @@
 
 use config::meta::{
     pipeline::{
-        Pipeline,
+        Pipeline, PipelineKind,
         components::{NodeData, PipelineSource},
     },
     search::SearchEventType,
@@ -71,8 +71,10 @@ pub async fn save_pipeline(mut pipeline: Pipeline) -> Result<(), PipelineError> 
             "Missing pipeline ID".to_string(),
         ));
     }
-    // check if another realtime pipeline with the same source stream already exists
-    if let PipelineSource::Realtime(stream) = &pipeline.source
+    // User pipelines: only one realtime pipeline per stream
+    // Evaluation pipelines: any number allowed, no exclusivity check
+    if pipeline.is_user()
+        && let PipelineSource::Realtime(stream) = &pipeline.source
         && pipeline::list_streams_with_pipeline(&pipeline.org)
             .await
             .is_ok_and(|list| list.iter().any(|existing| existing == stream))
@@ -111,6 +113,18 @@ pub async fn save_pipeline(mut pipeline: Pipeline) -> Result<(), PipelineError> 
     }
     set_ownership(&pipeline.org, "pipelines", Authz::new(&pipeline.id)).await;
     Ok(())
+}
+
+#[tracing::instrument(skip(pipeline))]
+pub async fn save_user_pipeline(mut pipeline: Pipeline) -> Result<(), PipelineError> {
+    if let Ok(existing_pipeline) = pipeline::get_by_id(&pipeline.id).await
+        && (existing_pipeline.org != pipeline.org || !existing_pipeline.is_user())
+    {
+        return Err(PipelineError::NotFound(pipeline.id));
+    }
+
+    pipeline.kind = PipelineKind::User;
+    save_pipeline(pipeline).await
 }
 
 #[tracing::instrument(skip(pipeline))]
@@ -190,7 +204,7 @@ pub async fn update_pipeline(mut pipeline: Pipeline) -> Result<(), PipelineError
     pipeline::update(&pipeline, prev_source_stream).await?;
 
     // Evict any live LLM evaluation buffer tasks for this pipeline so they
-    // are re-created with the updated config (e.g. new eval_template id) on
+    // are re-created with the updated config (e.g. scorer list) on
     // the next ingestion batch.
     #[cfg(feature = "enterprise")]
     {
@@ -199,7 +213,7 @@ pub async fn update_pipeline(mut pipeline: Pipeline) -> Result<(), PipelineError
             if matches!(node.data, NodeData::LlmEvaluation(_)) {
                 let buffer_key = format!("{}:{}", pipeline_id, node.id);
                 o2_enterprise::enterprise::pipeline::llm_evaluation_node::LlmEvaluationNode::remove_buffer(&buffer_key).await;
-                log::info!(
+                log::debug!(
                     "[Pipeline] Evicted LLM evaluation buffer for key={} after pipeline update",
                     buffer_key
                 );
@@ -208,6 +222,16 @@ pub async fn update_pipeline(mut pipeline: Pipeline) -> Result<(), PipelineError
     }
 
     Ok(())
+}
+
+#[tracing::instrument(skip(pipeline))]
+pub async fn update_user_pipeline(
+    org_id: &str,
+    mut pipeline: Pipeline,
+) -> Result<(), PipelineError> {
+    get_user_pipeline(org_id, &pipeline.id).await?;
+    pipeline.kind = PipelineKind::User;
+    update_pipeline(pipeline).await
 }
 
 #[tracing::instrument]
@@ -230,6 +254,45 @@ pub async fn list_pipelines(
                     .contains(&format!("pipeline:_all_{org_id}"))
         })
         .collect())
+}
+
+#[tracing::instrument]
+pub async fn list_user_pipelines(
+    org_id: &str,
+    permitted: Option<Vec<String>>,
+) -> Result<Vec<Pipeline>, PipelineError> {
+    Ok(pipeline::list_by_org(org_id)
+        .await?
+        .into_iter()
+        .filter(|pipeline| is_user_pipeline_visible(pipeline, org_id, permitted.as_ref()))
+        .collect())
+}
+
+fn is_user_pipeline_visible(
+    pipeline: &Pipeline,
+    org_id: &str,
+    permitted: Option<&Vec<String>>,
+) -> bool {
+    if !pipeline.is_user() {
+        return false;
+    }
+
+    match permitted {
+        Some(permitted) => {
+            permitted.contains(&format!("pipeline:{}", pipeline.id))
+                || permitted.contains(&format!("pipeline:_all_{org_id}"))
+        }
+        None => true,
+    }
+}
+
+#[tracing::instrument]
+pub async fn get_user_pipeline(org_id: &str, pipeline_id: &str) -> Result<Pipeline, PipelineError> {
+    let pipeline = pipeline::get_by_id(pipeline_id).await?;
+    if pipeline.org != org_id || !pipeline.is_user() {
+        return Err(PipelineError::NotFound(pipeline_id.to_string()));
+    }
+    Ok(pipeline)
 }
 
 #[tracing::instrument]
@@ -293,6 +356,17 @@ pub async fn enable_pipeline(
 }
 
 #[tracing::instrument]
+pub async fn enable_user_pipeline(
+    org_id: &str,
+    pipeline_id: &str,
+    enable: bool,
+    starts_from_now: bool,
+) -> Result<(), PipelineError> {
+    get_user_pipeline(org_id, pipeline_id).await?;
+    enable_pipeline(org_id, pipeline_id, enable, starts_from_now).await
+}
+
+#[tracing::instrument]
 pub async fn delete_pipeline(pipeline_id: &str) -> Result<(), PipelineError> {
     let Ok(existing_pipeline) = pipeline::get_by_id(pipeline_id).await else {
         return Err(PipelineError::NotFound(pipeline_id.to_string()));
@@ -334,4 +408,80 @@ pub async fn delete_pipeline(pipeline_id: &str) -> Result<(), PipelineError> {
     )
     .await;
     Ok(())
+}
+
+#[tracing::instrument]
+pub async fn delete_user_pipeline(org_id: &str, pipeline_id: &str) -> Result<(), PipelineError> {
+    get_user_pipeline(org_id, pipeline_id).await?;
+    delete_pipeline(pipeline_id).await
+}
+
+#[cfg(test)]
+mod tests {
+    use config::meta::{
+        pipeline::{
+            Pipeline, PipelineKind,
+            components::{DerivedStream, PipelineSource},
+        },
+        stream::StreamParams,
+    };
+
+    use super::is_user_pipeline_visible;
+
+    fn test_pipeline(id: &str, kind: PipelineKind) -> Pipeline {
+        Pipeline {
+            id: id.to_string(),
+            version: 1,
+            enabled: true,
+            org: "test_org".to_string(),
+            name: id.to_string(),
+            description: String::new(),
+            source: PipelineSource::Realtime(StreamParams::default()),
+            nodes: vec![],
+            edges: vec![],
+            kind,
+        }
+    }
+
+    #[test]
+    fn test_is_user_pipeline_visible_excludes_evaluation_pipelines() {
+        let user_pipeline = test_pipeline("user_pipeline", PipelineKind::User);
+        let evaluation_pipeline = test_pipeline("evaluation_pipeline", PipelineKind::Evaluation);
+
+        assert!(is_user_pipeline_visible(&user_pipeline, "test_org", None));
+        assert!(!is_user_pipeline_visible(
+            &evaluation_pipeline,
+            "test_org",
+            None
+        ));
+    }
+
+    #[test]
+    fn test_is_user_pipeline_visible_applies_permissions() {
+        let pipeline = test_pipeline("user_pipeline", PipelineKind::User);
+
+        assert!(is_user_pipeline_visible(
+            &pipeline,
+            "test_org",
+            Some(&vec!["pipeline:user_pipeline".to_string()])
+        ));
+        assert!(is_user_pipeline_visible(
+            &pipeline,
+            "test_org",
+            Some(&vec!["pipeline:_all_test_org".to_string()])
+        ));
+        assert!(!is_user_pipeline_visible(
+            &pipeline,
+            "test_org",
+            Some(&vec!["pipeline:other_pipeline".to_string()])
+        ));
+    }
+
+    #[test]
+    fn test_is_user_pipeline_visible_keeps_scheduled_user_pipelines() {
+        let mut pipeline = test_pipeline("scheduled_pipeline", PipelineKind::User);
+        pipeline.source = PipelineSource::Scheduled(DerivedStream::default());
+
+        assert!(is_user_pipeline_visible(&pipeline, "test_org", None));
+    }
 }

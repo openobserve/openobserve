@@ -1044,7 +1044,6 @@ export default defineComponent({
           );
 
           updateArrayAlias();
-          updateArrayAlias();
         }
       }
       cleanupDraggingFields();
@@ -1477,7 +1476,7 @@ export default defineComponent({
 .drop-entered {
   transition: all;
   transition-duration: 200ms;
-  background-color: #cbcbcb;
+  background-color: var(--color-field-list-row-hover-bg);
 }
 
 .color-input-wrapper {

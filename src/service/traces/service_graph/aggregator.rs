@@ -51,7 +51,7 @@ pub async fn write_sql_aggregated_edges(
             _ => None,
         })
         .map(|mut obj| {
-            config::utils::json::json!({
+            let mut record = config::utils::json::json!({
                 "_timestamp": obj.remove("end").unwrap_or(serde_json::json!(0)),
                 "org_id": org_id,
                 "trace_stream_name": stream_name,
@@ -63,7 +63,16 @@ pub async fn write_sql_aggregated_edges(
                 "p50_latency_ns": obj.remove("p50").unwrap_or(serde_json::json!(0)),
                 "p95_latency_ns": obj.remove("p95").unwrap_or(serde_json::json!(0)),
                 "p99_latency_ns": obj.remove("p99").unwrap_or(serde_json::json!(0)),
-            })
+            });
+            // Inferred-dependency edges carry the inferred entity's type (database/
+            // queue/rpc/external); instrumented edges omit it so the column stays
+            // absent for them. Presence marks the edge/target node as inferred.
+            if let Some(ct) = obj.remove("connection_type")
+                && !ct.is_null()
+            {
+                record["connection_type"] = ct;
+            }
+            record
         })
         .collect();
 

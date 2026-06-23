@@ -1,19 +1,17 @@
 <template>
-  <ODrawer
+  <ODialog
     :open="open"
-    :width="30"
+    size="md"
     :title="t('dashboard.addDashboard')"
     secondary-button-label="Cancel"
     :primary-button-label="t('metrics.add')"
-    :primary-button-loading="onSubmit.isLoading.value"
-    :primary-button-disabled="!panelTitle.trim()"
+    form-id="add-to-dashboard-form"
     data-test="add-to-dashboard-dialog"
     @update:open="$emit('update:open', $event)"
     @click:secondary="$emit('update:open', false)"
-    @click:primary="handlePrimaryClick()"
   >
-    <OForm ref="formRef" :default-values="{ panelTitle: '' }" @submit="onSubmit.execute()">
-    <div class="add-dashboard-form-card-section tw:flex tw:flex-col tw:gap-4 tw:px-3 tw:py-2">
+    <OForm id="add-to-dashboard-form" :schema="addToDashboardSchema" :default-values="addToDashboardDefaults()" @submit="onSubmit">
+    <div class="add-dashboard-form-card-section tw:flex tw:flex-col tw:gap-4">
       <!-- select folder or create new folder and select -->
       <select-folder-dropdown @folder-selected="updateActiveFolderId" />
 
@@ -33,14 +31,13 @@
       />
       <OFormInput
         name="panelTitle"
-        v-model="panelTitle"
-        :label="t('dashboard.panelTitle') + '*'"
+        :label="t('dashboard.panelTitle')"
+        required
         data-test="metrics-new-dashboard-panel-title"
-        :validators="[(val) => !String(val ?? '').trim() ? 'Panel Title required' : undefined]"
       />
     </div>
     </OForm>
-  </ODrawer>
+  </ODialog>
 </template>
 
 <script lang="ts">
@@ -53,14 +50,14 @@ import { addPanel } from "@/utils/commons";
 import SelectFolderDropdown from "@/components/dashboards/SelectFolderDropdown.vue";
 import SelectDashboardDropdown from "@/components/dashboards/SelectDashboardDropdown.vue";
 import SelectTabDropdown from "@/components/dashboards/SelectTabDropdown.vue";
-import ODrawer from '@/lib/overlay/Drawer/ODrawer.vue';
+import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
 import OInput from '@/lib/forms/Input/OInput.vue';
 import OForm from '@/lib/forms/Form/OForm.vue';
 import OFormInput from '@/lib/forms/Input/OFormInput.vue';
 import { useRouter } from "vue-router";
-import { useLoading } from "@/composables/useLoading";
 import useNotifications from "@/composables/useNotifications";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { addToDashboardSchema, addToDashboardDefaults, type AddToDashboardForm } from "./AddToDashboard.schema";
 
 export default defineComponent({
   name: "AddToDashboard",
@@ -68,7 +65,7 @@ export default defineComponent({
     SelectFolderDropdown,
     SelectDashboardDropdown,
     SelectTabDropdown,
-    ODrawer,
+    ODialog,
     OInput,
     OForm,
     OFormInput,
@@ -93,7 +90,6 @@ export default defineComponent({
     const activeFolderId = ref("default");
     const activeTabId: any = ref(null);
     const { t } = useI18n();
-    const panelTitle = ref("");
 
     const {
       showErrorNotification,
@@ -102,14 +98,15 @@ export default defineComponent({
 
     // Fetch folders only when the drawer opens (matches old q-dialog behaviour where the
     // component mounted only on first open). Avoids an eager API call on page load.
-    // Also reset form state on close so stale unsaved data is never shown on reopen.
+    // On close, reset the non-form dropdown state (folder/dashboard/tab). The
+    // form-owned `panelTitle` needs no manual reset — ODialog unmounts the body
+    // on close and re-seeds via `:default-values="addToDashboardDefaults()"` on reopen.
     watch(
       () => props.open,
       async (isOpen) => {
         if (isOpen) {
           await getFoldersList(store);
         } else {
-          panelTitle.value = "";
           activeFolderId.value = "default";
           selectedDashboard.value = null;
           activeTabId.value = null;
@@ -179,7 +176,10 @@ export default defineComponent({
       }
     };
 
-    const onSubmit = useLoading(async () => {
+    // Plain async fn — OForm awaits it (auto Save spinner + double-submit guard).
+    // The validated `value` payload is the source of truth for `panelTitle`;
+    // selectedDashboard / activeTabId come from the (non-form) dropdowns.
+    const onSubmit = async (value: AddToDashboardForm) => {
       // if selected dashoboard is null
       if (selectedDashboard.value == null) {
         toast({
@@ -196,32 +196,29 @@ export default defineComponent({
           selectedDashboard.value,
           activeFolderId.value,
           activeTabId.value,
-          panelTitle.value,
+          value.panelTitle,
         );
       }
-    });
-
-    const formRef = ref(null);
-    const handlePrimaryClick = async () => {
-      formRef.value?.submit();
     };
 
     return {
       t,
       getImageURL,
+      // Options-API setup(): template only sees what's returned here, so the
+      // Zod schema import MUST be exposed or `:schema` resolves to undefined
+      // (which silently disables validation).
+      addToDashboardSchema,
+      addToDashboardDefaults,
       selectedDashboard,
       filteredDashboards,
       onSubmit,
       store,
       SelectFolderDropdown,
       updateActiveFolderId,
-      panelTitle,
       updateActiveTabId,
       activeFolderId,
       activeTabId,
       updateSelectedDashboard,
-      formRef,
-      handlePrimaryClick,
     };
   },
 });

@@ -183,41 +183,6 @@ describe("QueryConfig.vue", () => {
       expect(wrapper.exists()).toBe(true);
     });
 
-    it("should render with correct theme class (light mode)", () => {
-      expect(wrapper.find(".step-query-config.light-mode").exists()).toBe(true);
-    });
-
-    it("should render with correct theme class (dark mode)", async () => {
-      const darkStore = createMockStore({ theme: "dark" });
-      mockStoreInstance = darkStore;
-      const darkWrapper = mount(QueryConfig, {
-        global: {
-          mocks: { $store: darkStore },
-          provide: { store: darkStore },
-          plugins: [i18n],
-        },
-        props: {
-          tab: "custom",
-          multiTimeRange: [],
-          columns: [],
-          streamFieldsMap: {},
-          generatedSqlQuery: "",
-          inputData: mockInputData,
-          streamType: "logs",
-          isRealTime: "false",
-          sqlQuery: "",
-          promqlQuery: "",
-          vrlFunction: "",
-          streamName: "test-stream",
-          sqlQueryErrorMsg: "",
-        },
-      });
-
-      expect(darkWrapper.find(".step-query-config.dark-mode").exists()).toBe(true);
-      darkWrapper.unmount();
-      mockStoreInstance = mockStore;
-    });
-
     it("should initialize with custom tab by default", () => {
       expect(wrapper.vm.localTab).toBe("custom");
     });
@@ -953,43 +918,6 @@ describe("QueryConfig.vue", () => {
 
       const result = await wrapper.vm.validate();
       expect(result).toBe(false);
-    });
-  });
-
-  describe("Theme Switching", () => {
-    it("should apply light mode theme", () => {
-      expect(wrapper.find(".light-mode").exists()).toBe(true);
-    });
-
-    it("should apply dark mode theme", async () => {
-      const darkStore = createMockStore({ theme: "dark" });
-      mockStoreInstance = darkStore;
-      const darkWrapper = mount(QueryConfig, {
-        global: {
-          mocks: { $store: darkStore },
-          provide: { store: darkStore },
-          plugins: [i18n],
-        },
-        props: {
-          tab: "custom",
-          multiTimeRange: [],
-          columns: [],
-          streamFieldsMap: {},
-          generatedSqlQuery: "",
-          inputData: mockInputData,
-          streamType: "logs",
-          isRealTime: "false",
-          sqlQuery: "",
-          promqlQuery: "",
-          vrlFunction: "",
-          streamName: "test-stream",
-          sqlQueryErrorMsg: "",
-        },
-      });
-
-      expect(darkWrapper.find(".dark-mode").exists()).toBe(true);
-      darkWrapper.unmount();
-      mockStoreInstance = mockStore;
     });
   });
 

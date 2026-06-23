@@ -35,12 +35,22 @@ let cleanupFn: (() => void) | null = null;
 
 onMounted(() => {
   if (!hasDefaultSlot.value && childAnchorRef.value) {
-    // Walk up past any display:contents ancestors — they have no layout box
-    // and getBoundingClientRect() returns all-zeros, sending the tooltip to (0,0).
-    // This is needed because OButton wraps slot content in <span class="tw:contents">.
-    let candidate: Element | null = childAnchorRef.value.parentElement;
-    while (candidate && window.getComputedStyle(candidate).display === "contents") {
-      candidate = candidate.parentElement;
+    // Prefer the nearest previous visible sibling — the actual trigger element (e.g. the
+    // ToggleGroupItem button). Walking up instead when the parent is display:contents would
+    // land on the group container, causing all items in the group to share one hover target.
+    let sibling: Element | null = childAnchorRef.value.previousElementSibling;
+    while (sibling && (sibling as HTMLElement).style.display === "none") {
+      sibling = sibling.previousElementSibling;
+    }
+
+    let candidate: Element | null = sibling;
+    if (!candidate) {
+      // Fallback: walk up past display:contents ancestors — they have no layout box
+      // and getBoundingClientRect() returns all-zeros, sending the tooltip to (0,0).
+      candidate = childAnchorRef.value.parentElement;
+      while (candidate && window.getComputedStyle(candidate).display === "contents") {
+        candidate = candidate.parentElement;
+      }
     }
     parentEl.value = candidate;
     if (parentEl.value) {

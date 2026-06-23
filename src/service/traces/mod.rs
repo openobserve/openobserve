@@ -50,6 +50,7 @@ use opentelemetry_proto::tonic::{
 use prost::Message;
 use serde_json::Map;
 
+pub mod inferred;
 pub mod otel;
 pub mod service_graph;
 
@@ -86,7 +87,24 @@ const SERVICE: &str = "service";
 const PARENT_SPAN_ID: &str = "reference.parent_span_id";
 const PARENT_TRACE_ID: &str = "reference.parent_trace_id";
 const REF_TYPE: &str = "reference.ref_type";
-const BLOCK_FIELDS: [&str; 4] = ["_timestamp", "duration", "start_time", "end_time"];
+const RESERVED_SPAN_FIELDS: [&str; 16] = [
+    "trace_id",
+    "span_id",
+    "flags",
+    "span_status",
+    "span_kind",
+    "operation_name",
+    "start_time",
+    "end_time",
+    "duration",
+    "service_name",
+    inferred::INFER_SERVICE_NAME,
+    inferred::INFER_SERVICE_TYPE,
+    inferred::INFER_SERVICE_SYSTEM,
+    "events",
+    "links",
+    TIMESTAMP_COL_NAME,
+];
 // ref https://opentelemetry.io/docs/specs/otel/trace/api/#retrieving-the-traceid-and-spanid
 const SPAN_ID_BYTES_COUNT: usize = 8;
 const TRACE_ID_BYTES_COUNT: usize = 16;
@@ -127,6 +145,37 @@ fn normalize_llm_field_types(record_val: &mut Map<String, json::Value>) {
                     .unwrap_or_else(|| json::Number::from_f64(0.0).unwrap()),
             );
         }
+    }
+}
+
+fn normalized_trace_key(key: &str) -> String {
+    let mut key = key.to_string();
+    flatten::format_key(&mut key);
+    key
+}
+
+fn span_attribute_key(raw_key: String, service_att_map: &HashMap<String, json::Value>) -> String {
+    let normalized_key = normalized_trace_key(&raw_key);
+    let collides_with_reserved = RESERVED_SPAN_FIELDS.contains(&normalized_key.as_str());
+    let collides_with_resource = service_att_map
+        .keys()
+        .any(|service_key| normalized_trace_key(service_key) == normalized_key);
+
+    if collides_with_reserved || collides_with_resource {
+        format!("attr_{raw_key}")
+    } else {
+        raw_key
+    }
+}
+
+fn resource_attribute_key(raw_key: String) -> String {
+    let service_key = format!("{SERVICE}_{raw_key}");
+    let normalized_key = normalized_trace_key(&service_key);
+
+    if RESERVED_SPAN_FIELDS.contains(&normalized_key.as_str()) {
+        format!("{SERVICE}_attr_{raw_key}")
+    } else {
+        service_key
     }
 }
 
@@ -267,8 +316,8 @@ pub async fn handle_otlp_request(
 
     // Start retrieving associated pipeline and construct pipeline params
     let stream_param = StreamParams::new(org_id, &traces_stream_name, StreamType::Traces);
-    let executable_pipeline =
-        crate::service::ingestion::get_stream_executable_pipeline(&stream_param).await;
+    let executable_pipelines =
+        crate::service::ingestion::get_stream_executable_pipelines(&stream_param).await;
     let mut stream_pipeline_inputs = Vec::new();
     // End pipeline params construction
 
@@ -320,10 +369,8 @@ pub async fn handle_otlp_request(
                         }
                     }
                 } else {
-                    service_att_map.insert(
-                        format!("{}_{}", SERVICE, res_attr.key),
-                        get_val(&res_attr.value.as_ref()),
-                    );
+                    let key = resource_attribute_key(res_attr.key);
+                    service_att_map.insert(key, get_val(&res_attr.value.as_ref()));
                 }
             }
         }
@@ -362,10 +409,7 @@ pub async fn handle_otlp_request(
                 let end_time: u64 = span.end_time_unix_nano;
                 let mut span_att_map: HashMap<String, json::Value> = HashMap::new();
                 for span_att in span.attributes {
-                    let mut key = span_att.key;
-                    if BLOCK_FIELDS.contains(&key.as_str()) {
-                        key = format!("attr_{key}");
-                    }
+                    let key = span_attribute_key(span_att.key, &service_att_map);
                     span_att_map.insert(key, get_val(&span_att.value.as_ref()));
                 }
 
@@ -474,6 +518,30 @@ pub async fn handle_otlp_request(
                     partial_success.rejected_spans += 1;
                     continue;
                 }
+                // Derive inferred service identity (uninstrumented dependencies
+                // like databases, queues, external APIs) from peer attributes of
+                // client/producer spans. Powers dotted "inferred service" nodes
+                // in trace views and the service graph.
+                if let Some(inferred_svc) = inferred::derive_inferred_service(span.kind, |key| {
+                    span_att_map
+                        .get(key)
+                        .and_then(|v| v.as_str())
+                        .map(String::from)
+                }) {
+                    span_att_map.insert(
+                        inferred::INFER_SERVICE_NAME.to_string(),
+                        inferred_svc.name.into(),
+                    );
+                    span_att_map.insert(
+                        inferred::INFER_SERVICE_TYPE.to_string(),
+                        inferred_svc.service_type.into(),
+                    );
+                    if let Some(system) = inferred_svc.system {
+                        span_att_map
+                            .insert(inferred::INFER_SERVICE_SYSTEM.to_string(), system.into());
+                    }
+                }
+
                 let local_val = Span {
                     trace_id: trace_id.clone(),
                     span_id: span_id.clone(),
@@ -502,125 +570,139 @@ pub async fn handle_otlp_request(
                     json::Value::Number(timestamp.into()),
                 );
 
-                if executable_pipeline.is_some() {
+                if !executable_pipelines.is_empty() {
                     stream_pipeline_inputs.push(value);
-                } else {
-                    // JSON Flattening
-                    value = flatten::flatten(value).map_err(|e| {
-                        std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string())
-                    })?;
-
-                    // get json object
-                    let mut record_val = match value.take() {
-                        json::Value::Object(v) => v,
-                        _ => {
-                            log::error!(
-                                "[TRACES:OTLP] stream did not receive a valid json object, trace_id: {trace_id}"
-                            );
-                            return Ok((
-                                http::StatusCode::INTERNAL_SERVER_ERROR,
-                                [(ERROR_HEADER, format!("[trace_id: {trace_id}] stream did not receive a valid json object"))],
-                                Json(MetaHttpResponse::error(
-                                    http::StatusCode::INTERNAL_SERVER_ERROR,
-                                    "stream did not receive a valid json object",
-                                )),
-                            ).into_response());
-                        }
-                    };
-                    normalize_llm_field_types(&mut record_val);
-
-                    if let Some(Some(fields)) = user_defined_schema_map.get(&traces_stream_name) {
-                        record_val = crate::service::ingestion::refactor_map(record_val, fields);
-                    }
-
-                    let (ts_data, _) = json_data_by_stream
-                        .entry(traces_stream_name.to_string())
-                        .or_insert((Vec::new(), None));
-                    ts_data.push((timestamp, record_val));
+                } else if !finalize_and_buffer_trace_span(
+                    value,
+                    &user_defined_schema_map,
+                    &traces_stream_name,
+                    &mut partial_success,
+                    &mut json_data_by_stream,
+                ) {
+                    log::error!(
+                        "[TRACES:OTLP] stream did not receive a valid json object, trace_id: {trace_id}"
+                    );
+                    return Ok((
+                        http::StatusCode::INTERNAL_SERVER_ERROR,
+                        [(
+                            ERROR_HEADER,
+                            format!(
+                                "[trace_id: {trace_id}] stream did not receive a valid json object"
+                            ),
+                        )],
+                        Json(MetaHttpResponse::error(
+                            http::StatusCode::INTERNAL_SERVER_ERROR,
+                            "stream did not receive a valid json object",
+                        )),
+                    )
+                        .into_response());
                 }
             }
         }
     }
 
     // batch process records through pipeline
-    if let Some(exec_pl) = &executable_pipeline {
-        let records = stream_pipeline_inputs;
+    if !executable_pipelines.is_empty() {
+        let records = stream_pipeline_inputs.clone();
 
-        let records_count = records.len();
-        match exec_pl
-            .process_batch(org_id, records, in_stream_name.map(String::from))
-            .await
-        {
-            Err(e) => {
-                log::error!(
-                    "[TRACES:OTLP] pipeline({org_id}/{traces_stream_name}) batch execution error: {e}."
-                );
-                partial_success.rejected_spans += records_count as i64;
-                partial_success.error_message = format!("Pipeline batch execution error: {e}");
-            }
-            Ok(pl_results) => {
-                log::debug!(
-                    "[TRACES:OTLP] pipeline returned results map of size: {}",
-                    pl_results.len()
-                );
-                for (stream_params, stream_pl_results) in pl_results {
-                    if stream_params.stream_type != StreamType::Traces {
-                        log::warn!(
-                            "[TRACES:OTLP] stream {stream_params:?} returned by pipeline is not a Trace stream. Records dropped"
-                        );
-                        continue;
-                    }
-
-                    for (_idx, mut res) in stream_pl_results {
-                        // get json object
-                        let mut record_val = match res.take() {
-                            json::Value::Object(v) => v,
-                            _ => {
-                                log::error!(
-                                    "[TRACES:OTLP] stream did not receive a valid json object"
-                                );
-                                return Ok((
-                                    http::StatusCode::INTERNAL_SERVER_ERROR,
-                                    [(ERROR_HEADER, "stream did not receive a valid json object")],
-                                    Json(MetaHttpResponse::error(
-                                        http::StatusCode::INTERNAL_SERVER_ERROR,
-                                        "stream did not receive a valid json object",
-                                    )),
-                                )
-                                    .into_response());
-                            }
-                        };
-                        normalize_llm_field_types(&mut record_val);
-
-                        if let Some(Some(fields)) =
-                            user_defined_schema_map.get(&stream_params.stream_name.to_string())
-                        {
-                            record_val =
-                                crate::service::ingestion::refactor_map(record_val, fields);
+        for exec_pl in &executable_pipelines {
+            let records_count = records.len();
+            match exec_pl
+                .process_batch(org_id, records.clone(), in_stream_name.map(String::from))
+                .await
+            {
+                Err(e) => {
+                    log::error!(
+                        "[TRACES:OTLP] pipeline({org_id}/{traces_stream_name}) batch execution error: {e}."
+                    );
+                    partial_success.rejected_spans += records_count as i64;
+                    partial_success.error_message = format!("Pipeline batch execution error: {e}");
+                }
+                Ok(pl_results) => {
+                    log::debug!(
+                        "[TRACES:OTLP] pipeline returned results map of size: {}",
+                        pl_results.len()
+                    );
+                    for (stream_params, stream_pl_results) in pl_results {
+                        if stream_params.stream_type != StreamType::Traces {
+                            log::warn!(
+                                "[TRACES:OTLP] stream {stream_params:?} returned by pipeline is not a Trace stream. Records dropped"
+                            );
+                            continue;
                         }
 
-                        log::debug!(
-                            "[TRACES:OTLP] pipeline result for stream: {} got {} records",
-                            stream_params.stream_name,
-                            record_val.len()
-                        );
+                        for (_idx, mut res) in stream_pl_results {
+                            // get json object
+                            let mut record_val = match res.take() {
+                                json::Value::Object(v) => v,
+                                _ => {
+                                    log::error!(
+                                        "[TRACES:OTLP] stream did not receive a valid json object"
+                                    );
+                                    return Ok((
+                                        http::StatusCode::INTERNAL_SERVER_ERROR,
+                                        [(
+                                            ERROR_HEADER,
+                                            "stream did not receive a valid json object",
+                                        )],
+                                        Json(MetaHttpResponse::error(
+                                            http::StatusCode::INTERNAL_SERVER_ERROR,
+                                            "stream did not receive a valid json object",
+                                        )),
+                                    )
+                                        .into_response());
+                                }
+                            };
+                            normalize_llm_field_types(&mut record_val);
 
-                        let Some(timestamp) = record_val
-                            .get(TIMESTAMP_COL_NAME)
-                            .and_then(|ts| ts.as_i64())
-                        else {
-                            log::error!(
-                                "[TRACES:OTLP] skipping span due to missing inserted timestamp",
+                            if let Some(Some(fields)) =
+                                user_defined_schema_map.get(&stream_params.stream_name.to_string())
+                            {
+                                record_val =
+                                    crate::service::ingestion::refactor_map(record_val, fields);
+                            }
+
+                            log::debug!(
+                                "[TRACES:OTLP] pipeline result for stream: {} got {} records",
+                                stream_params.stream_name,
+                                record_val.len()
                             );
-                            partial_success.rejected_spans += 1;
-                            continue;
-                        };
-                        let (ts_data, _) = json_data_by_stream
-                            .entry(stream_params.stream_name.to_string())
-                            .or_insert((Vec::new(), None));
-                        ts_data.push((timestamp, record_val));
+
+                            let Some(timestamp) = record_val
+                                .get(TIMESTAMP_COL_NAME)
+                                .and_then(|ts| ts.as_i64())
+                            else {
+                                log::error!(
+                                    "[TRACES:OTLP] skipping span due to missing inserted timestamp",
+                                );
+                                partial_success.rejected_spans += 1;
+                                continue;
+                            };
+                            let (ts_data, _) = json_data_by_stream
+                                .entry(stream_params.stream_name.to_string())
+                                .or_insert((Vec::new(), None));
+                            ts_data.push((timestamp, record_val));
+                        }
                     }
                 }
+            }
+        } // for each pipeline
+
+        // When only evaluation pipelines exist for this stream (no user pipeline
+        // is responsible for writing to the source stream), preserve original
+        // records by writing them back to the source stream.
+        let has_user_pipeline = executable_pipelines
+            .iter()
+            .any(|p| p.kind == config::meta::pipeline::PipelineKind::User);
+        if !has_user_pipeline && !json_data_by_stream.contains_key(&traces_stream_name) {
+            for value in &stream_pipeline_inputs {
+                let _ = finalize_and_buffer_trace_span(
+                    value.clone(),
+                    &user_defined_schema_map,
+                    &traces_stream_name,
+                    &mut partial_success,
+                    &mut json_data_by_stream,
+                );
             }
         }
     }
@@ -683,6 +765,49 @@ pub async fn handle_otlp_request(
         .inc();
 
     format_response(partial_success, req_type)
+}
+
+/// Finalize a trace span (flatten, normalize LLM field types, apply UDS)
+/// and push it into `json_data_by_stream`.
+///
+/// Returns `true` on success, `false` when the span should be skipped.
+fn finalize_and_buffer_trace_span(
+    mut value: json::Value,
+    user_defined_schema_map: &HashMap<String, Option<HashSet<String>>>,
+    traces_stream_name: &str,
+    partial_success: &mut ExportTracePartialSuccess,
+    json_data_by_stream: &mut HashMap<String, O2IngestJsonData>,
+) -> bool {
+    value = match flatten::flatten(value) {
+        Ok(v) => v,
+        Err(_) => {
+            partial_success.rejected_spans += 1;
+            return false;
+        }
+    };
+    let mut record_val = match value.take() {
+        json::Value::Object(v) => v,
+        _ => {
+            partial_success.rejected_spans += 1;
+            return false;
+        }
+    };
+    normalize_llm_field_types(&mut record_val);
+    if let Some(Some(fields)) = user_defined_schema_map.get(traces_stream_name) {
+        record_val = crate::service::ingestion::refactor_map(record_val, fields);
+    }
+    let Some(timestamp) = record_val
+        .get(TIMESTAMP_COL_NAME)
+        .and_then(|ts| ts.as_i64())
+    else {
+        partial_success.rejected_spans += 1;
+        return false;
+    };
+    let (ts_data, _) = json_data_by_stream
+        .entry(traces_stream_name.to_string())
+        .or_insert((Vec::new(), None));
+    ts_data.push((timestamp, record_val));
+    true
 }
 
 /// This ingestion handler is designated to ScheduledPipeline's gPRC ingestion service.
@@ -800,6 +925,34 @@ pub async fn ingest_json(
             }
         };
         normalize_llm_field_types(&mut record_val);
+
+        // Derive inferred service fields when absent (data from sources that
+        // did not run the OTLP-side derivation, e.g. older versions).
+        if !record_val.contains_key(inferred::INFER_SERVICE_NAME) {
+            let span_kind = match record_val.get("span_kind") {
+                Some(json::Value::String(s)) => inferred::span_kind_to_i32(s),
+                Some(v) => v.as_i64().unwrap_or(0) as i32,
+                None => 0,
+            };
+            if let Some(inferred_svc) = inferred::derive_inferred_service(span_kind, |key| {
+                record_val
+                    .get(key)
+                    .and_then(|v| v.as_str())
+                    .map(String::from)
+            }) {
+                record_val.insert(
+                    inferred::INFER_SERVICE_NAME.to_string(),
+                    inferred_svc.name.into(),
+                );
+                record_val.insert(
+                    inferred::INFER_SERVICE_TYPE.to_string(),
+                    inferred_svc.service_type.into(),
+                );
+                if let Some(system) = inferred_svc.system {
+                    record_val.insert(inferred::INFER_SERVICE_SYSTEM.to_string(), system.into());
+                }
+            }
+        }
 
         // check if we have any LLM related attributes
         if !is_llm_stream && detect_llm_stream(|k| record_val.contains_key(k)) {
@@ -1480,13 +1633,21 @@ mod tests {
     // Test constants and validation logic
 
     #[test]
-    fn test_block_fields() {
-        let block_fields = &super::BLOCK_FIELDS;
-        assert_eq!(block_fields.len(), 4);
-        assert!(block_fields.contains(&"_timestamp"));
-        assert!(block_fields.contains(&"duration"));
-        assert!(block_fields.contains(&"start_time"));
-        assert!(block_fields.contains(&"end_time"));
+    fn test_reserved_span_fields() {
+        let reserved_span_fields = &super::RESERVED_SPAN_FIELDS;
+        assert_eq!(reserved_span_fields.len(), 16);
+        assert!(reserved_span_fields.contains(&"_timestamp"));
+        assert!(reserved_span_fields.contains(&"duration"));
+        assert!(reserved_span_fields.contains(&"start_time"));
+        assert!(reserved_span_fields.contains(&"end_time"));
+        assert!(reserved_span_fields.contains(&"service_name"));
+        assert!(reserved_span_fields.contains(&"infer_service_name"));
+        assert!(reserved_span_fields.contains(&"infer_service_type"));
+        assert!(reserved_span_fields.contains(&"infer_service_system"));
+        assert!(reserved_span_fields.contains(&"trace_id"));
+        assert!(reserved_span_fields.contains(&"span_id"));
+        assert!(reserved_span_fields.contains(&"events"));
+        assert!(reserved_span_fields.contains(&"links"));
     }
 
     // Test validation helper functions
@@ -1523,7 +1684,7 @@ mod tests {
     #[test]
     fn test_blocked_field_transformation() {
         let blocked_field = "_timestamp";
-        let transformed = if super::BLOCK_FIELDS.contains(&blocked_field) {
+        let transformed = if super::RESERVED_SPAN_FIELDS.contains(&blocked_field) {
             format!("attr_{blocked_field}")
         } else {
             blocked_field.to_string()
@@ -1534,7 +1695,7 @@ mod tests {
     #[test]
     fn test_non_blocked_field_no_transformation() {
         let normal_field = "http.method";
-        let transformed = if super::BLOCK_FIELDS.contains(&normal_field) {
+        let transformed = if super::RESERVED_SPAN_FIELDS.contains(&normal_field) {
             format!("attr_{normal_field}")
         } else {
             normal_field.to_string()
@@ -1792,7 +1953,7 @@ mod tests {
         ];
 
         for key in test_keys {
-            let processed_key = if super::BLOCK_FIELDS.contains(&key) {
+            let processed_key = if super::RESERVED_SPAN_FIELDS.contains(&key) {
                 format!("attr_{key}")
             } else {
                 key.to_string()
@@ -1849,13 +2010,105 @@ mod tests {
         // Test non-service.name attribute (should get service_ prefix)
         if attr_key != super::SERVICE_NAME {
             service_att_map.insert(
-                format!("{}_{}", super::SERVICE, attr_key),
+                super::resource_attribute_key(attr_key.to_string()),
                 attr_value.clone(),
             );
         }
 
         assert!(service_att_map.contains_key("service_version"));
         assert_eq!(service_att_map.get("service_version").unwrap(), "1.0.0");
+    }
+
+    #[test]
+    fn test_resource_attribute_key_preserves_canonical_service_name() {
+        let key = super::resource_attribute_key("name".to_string());
+
+        assert_eq!(key, "service_attr_name");
+    }
+
+    #[test]
+    fn test_span_attribute_key_preserves_resource_service_name() {
+        use std::collections::HashMap;
+
+        use config::utils::json;
+
+        let mut service_att_map: HashMap<String, json::Value> = HashMap::new();
+        service_att_map.insert(super::SERVICE_NAME.to_string(), json!("serviceA"));
+
+        let key = super::span_attribute_key("service_name".to_string(), &service_att_map);
+
+        assert_eq!(key, "attr_service_name");
+    }
+
+    #[test]
+    fn test_span_attribute_key_preserves_resource_fields_after_normalization() {
+        use std::collections::HashMap;
+
+        use config::utils::json;
+
+        let mut service_att_map: HashMap<String, json::Value> = HashMap::new();
+        service_att_map.insert("service.version".to_string(), json!("1.0.0"));
+
+        let key = super::span_attribute_key("service_version".to_string(), &service_att_map);
+
+        assert_eq!(key, "attr_service_version");
+    }
+
+    #[test]
+    fn test_span_attribute_key_allows_non_colliding_attributes() {
+        let service_att_map = std::collections::HashMap::new();
+
+        let key = super::span_attribute_key("http.method".to_string(), &service_att_map);
+
+        assert_eq!(key, "http.method");
+    }
+
+    #[test]
+    fn test_service_name_collisions_preserve_canonical_service_name() {
+        use std::collections::HashMap;
+
+        use config::utils::{flatten, json};
+
+        use crate::common::meta::traces::Span;
+
+        let mut service_att_map: HashMap<String, json::Value> = HashMap::new();
+        service_att_map.insert(super::SERVICE_NAME.to_string(), json!("my.service1"));
+        service_att_map.insert(
+            super::resource_attribute_key("name".to_string()),
+            json!("my.service2"),
+        );
+
+        let mut span_att_map: HashMap<String, json::Value> = HashMap::new();
+        span_att_map.insert(
+            super::span_attribute_key("service_name".to_string(), &service_att_map),
+            json!("my.service3"),
+        );
+
+        let local_val = Span {
+            trace_id: "5b8efff798038103d269b633813fc60c".to_string(),
+            span_id: "eee19b7ec3c1b174".to_string(),
+            flags: 1,
+            span_status: "Ok".to_string(),
+            span_kind: "2".to_string(),
+            operation_name: "I'm a server span".to_string(),
+            start_time: 1780645897000000001,
+            end_time: 1780645909000000001,
+            duration: 12_000_000,
+            reference: HashMap::new(),
+            service_name: "my.service1".to_string(),
+            attributes: span_att_map,
+            service: service_att_map,
+            events: "[]".to_string(),
+            links: "[]".to_string(),
+        };
+
+        let value = json::to_value(local_val).unwrap();
+        let flattened = flatten::flatten(value).unwrap();
+        let record = flattened.as_object().unwrap();
+
+        assert_eq!(record.get("service_name").unwrap(), "my.service1");
+        assert_eq!(record.get("service_attr_name").unwrap(), "my.service2");
+        assert_eq!(record.get("attr_service_name").unwrap(), "my.service3");
     }
 
     // Test time validation boundary conditions

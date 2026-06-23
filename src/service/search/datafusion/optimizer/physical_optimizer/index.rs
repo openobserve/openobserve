@@ -13,15 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    collections::HashSet,
-    sync::{
-        Arc,
-        atomic::{AtomicBool, Ordering},
-    },
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, Ordering},
 };
 
-use config::utils::tantivy::tokenizer::o2_collect_search_tokens;
+use config::tantivy::tokenizer::o2_collect_search_tokens;
 use datafusion::{
     common::{
         Result,
@@ -41,6 +38,7 @@ use datafusion::{
         projection::ProjectionExec,
     },
 };
+use hashbrown::HashSet;
 use parking_lot::Mutex;
 
 use crate::service::search::{
@@ -179,7 +177,7 @@ impl TreeNodeRewriter for IndexOptimizer {
     type Node = Arc<dyn ExecutionPlan>;
 
     fn f_up(&mut self, node: Self::Node) -> Result<Transformed<Self::Node>> {
-        if let Some(filter) = node.as_any().downcast_ref::<FilterExec>() {
+        if let Some(filter) = node.downcast_ref::<FilterExec>() {
             self.has_filter = true;
             let mut index_conditions = IndexCondition::new();
             let mut other_conditions = Vec::new();
@@ -256,7 +254,7 @@ fn construct_filter_exec(
 
 // Check if the expression is valid for the index.
 fn is_expr_valid_for_index(expr: &Arc<dyn PhysicalExpr>, index_fields: &HashSet<String>) -> bool {
-    if let Some(expr) = expr.as_any().downcast_ref::<BinaryExpr>() {
+    if let Some(expr) = expr.downcast_ref::<BinaryExpr>() {
         match expr.op() {
             Operator::Eq | Operator::NotEq => {
                 let column = if is_value(expr.left()) && is_column(expr.right()) {
@@ -277,7 +275,7 @@ fn is_expr_valid_for_index(expr: &Arc<dyn PhysicalExpr>, index_fields: &HashSet<
             }
             _ => return false,
         }
-    } else if let Some(expr) = expr.as_any().downcast_ref::<InListExpr>() {
+    } else if let Some(expr) = expr.downcast_ref::<InListExpr>() {
         if !is_column(expr.expr()) || !index_fields.contains(get_column_name(expr.expr())) {
             return false;
         }
@@ -287,7 +285,7 @@ fn is_expr_valid_for_index(expr: &Arc<dyn PhysicalExpr>, index_fields: &HashSet<
                 return false;
             }
         }
-    } else if let Some(expr) = expr.as_any().downcast_ref::<ScalarFunctionExpr>() {
+    } else if let Some(expr) = expr.downcast_ref::<ScalarFunctionExpr>() {
         let name = expr.name();
         return match name {
             MATCH_ALL_UDF_NAME => {
@@ -305,7 +303,7 @@ fn is_expr_valid_for_index(expr: &Arc<dyn PhysicalExpr>, index_fields: &HashSet<
             }
             _ => false,
         };
-    } else if let Some(expr) = expr.as_any().downcast_ref::<NotExpr>() {
+    } else if let Some(expr) = expr.downcast_ref::<NotExpr>() {
         return is_expr_valid_for_index(expr.arg(), index_fields);
     } else {
         return false;
@@ -315,7 +313,7 @@ fn is_expr_valid_for_index(expr: &Arc<dyn PhysicalExpr>, index_fields: &HashSet<
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::HashSet, sync::Arc};
+    use std::sync::Arc;
 
     use arrow::array::{Int64Array, RecordBatch, StringArray};
     use arrow_schema::{DataType, Field, FieldRef, Schema};

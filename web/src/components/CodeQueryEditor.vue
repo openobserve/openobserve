@@ -61,8 +61,13 @@ import {
 let monaco: any = null;
 const loadMonaco = async () => {
   if (!monaco) {
-    await import("monaco-editor/esm/vs/editor/editor.all.js");
+    // editor.api must be imported first — it bootstraps StandaloneServices (the
+    // Monaco DI container). Importing editor.all.js before api causes feature
+    // contributions (ICodeLensCache, ISuggestMemories, actionWidgetService, etc.)
+    // to register against an uninitialised container, producing "[createInstance]
+    // X depends on UNKNOWN service" errors that silently degrade intellisense.
     monaco = await import("monaco-editor/esm/vs/editor/editor.api");
+    await import("monaco-editor/esm/vs/editor/editor.all.js");
   }
   return monaco;
 };
@@ -76,6 +81,7 @@ import { useNLQuery } from "@/composables/useNLQuery";
 import { useI18n } from "vue-i18n";
 import useNotifications from "@/composables/useNotifications";
 import { getImageURL } from "@/utils/zincutils";
+import { isAuthError } from "@/utils/authErrors";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -341,17 +347,6 @@ export default defineComponent({
         insertText: (_keyword: string) =>
           `str_match_ignore_case(fieldname, '${_keyword}')`,
       },
-      {
-        label: (_keyword: string) => `fuzzy_match(fieldname, '${_keyword}', 1)`,
-        kind: "Text",
-        insertText: (_keyword: string) =>
-          `fuzzy_match(fieldname, '${_keyword}', 1)`,
-      },
-      {
-        label: (_keyword: string) => `fuzzy_match_all('${_keyword}', 1)`,
-        kind: "Text",
-        insertText: (_keyword: string) => `fuzzy_match_all('${_keyword}', 1)`,
-      },
     ];
 
     watch(
@@ -359,7 +354,7 @@ export default defineComponent({
       () => {
         if (!monaco) return;
         monaco.editor.setTheme(
-          store.state.theme == "dark" ? "vs-dark" : "myCustomTheme",
+          store.state.theme == "dark" ? "myCustomDarkTheme" : "myCustomTheme",
         );
       },
     );
@@ -483,11 +478,17 @@ export default defineComponent({
         });
 
         if (!generatedSQL || generatedSQL.trim() === "") {
-          // Show error notification
+          // Show error notification - use streaming error message if available (e.g. Unauthorized Access)
           console.log(
             "[NL2Q-UI] Showing error notification - query generation failed or empty",
           );
-          showErrorNotification(t("search.nlQueryGenerationFailed"));
+          const errorMsg = isAuthError(streamingResponse.value)
+            ? streamingResponse.value
+            : t("search.nlQueryGenerationFailed");
+          showErrorNotification(errorMsg);
+          if (isAuthError(streamingResponse.value)) {
+            return; // Auth error already handled, don't trigger catch block
+          }
           throw new Error("Query generation failed");
         }
 
@@ -617,6 +618,17 @@ export default defineComponent({
         },
       });
 
+      monaco.editor.defineTheme("myCustomDarkTheme", {
+        base: "vs-dark",
+        inherit: true,
+        rules: [
+          { token: "string", foreground: "CE9178" },
+          { token: "string.sql", foreground: "CE9178" },
+          { token: "string.vrl", foreground: "CE9178" },
+        ],
+        colors: {},
+      });
+
       // Dispose the provider if it already exists before registering a new one
       provider.value?.dispose();
       registerAutoCompleteProvider();
@@ -667,22 +679,30 @@ export default defineComponent({
       editorObj = monaco.editor.create(editorElement as HTMLElement, {
         value: props.query?.trim(),
         language: props.language,
-        theme: store.state.theme == "dark" ? "vs-dark" : "myCustomTheme",
+        theme: store.state.theme == "dark" ? "myCustomDarkTheme" : "myCustomTheme",
         showFoldingControls: enableCodeFolding.value ? "always" : "never",
         folding: enableCodeFolding.value,
         wordWrap: "on",
         automaticLayout: true,
         lineNumbers: props.showLineNumbers ? "on" : "off",
-        lineNumbersMinChars: 0,
+        // Reserve a couple of gutter chars so the right-aligned line numbers get
+        // left breathing room instead of sitting flush against the editor edge
+        // (and so the gutter width doesn't visibly jump as digit count grows).
+        lineNumbersMinChars: 2,
         overviewRulerLanes: 0,
         fixedOverflowWidgets: true,
         overviewRulerBorder: false,
-        lineDecorationsWidth: 3,
+        // Gap between the (right-aligned) line numbers and the code text. 3px was
+        // too tight and made the digit visually collide with the first character.
+        lineDecorationsWidth: 10,
         hideCursorInOverviewRuler: true,
         renderLineHighlight: "none",
         glyphMargin: false,
         scrollBeyondLastColumn: 0,
         scrollBeyondLastLine: false,
+        // Small top/bottom breathing room so line 1 (and the cursor) doesn't
+        // hug the top edge of the editor.
+        padding: { top: 3, bottom: 3 },
         smoothScrolling: true,
         mouseWheelScrollSensitivity: 1,
         fastScrollSensitivity: 1,
@@ -874,7 +894,7 @@ export default defineComponent({
       () => {
         if (!monaco) return;
         monaco.editor.setTheme(
-          store.state.theme == "dark" ? "vs-dark" : "myCustomTheme",
+          store.state.theme == "dark" ? "myCustomDarkTheme" : "myCustomTheme",
         );
       },
     );
@@ -1077,15 +1097,24 @@ export default defineComponent({
 
       // Set markers to the model
       // monaco.editor.setModelMarkers(getModel(), "owner", markers);
-      const markers = ranges.map((range: any) => ({
-        severity: monaco.MarkerSeverity.Error, // Mark as error
-        startLineNumber: range.startLine,
-        startColumn: 1, // Start of the line
-        endLineNumber: range.endLine,
-        endColumn: 1, // End of the line
-        message: range.error, // The error message
-        code: "", // Optional error code
-      }));
+      const model = getModel();
+      const markers = ranges.map((range: any) => {
+        const startLine = range.startLine;
+        const endLine = range.endLine;
+        const startCol = range.column ?? 1;
+        // Highlight to end-of-line so the squiggle is visible
+        const lineContent = model?.getLineContent?.(endLine) ?? "";
+        const endCol = lineContent.length + 1 || startCol + 1;
+        return {
+          severity: monaco.MarkerSeverity.Error,
+          startLineNumber: startLine,
+          startColumn: startCol,
+          endLineNumber: endLine,
+          endColumn: endCol,
+          message: range.error,
+          code: "",
+        };
+      });
 
       monaco.editor.setModelMarkers(getModel(), "owner", []);
       monaco.editor.setModelMarkers(getModel(), "owner", markers);
@@ -1445,6 +1474,7 @@ export default defineComponent({
 .logs-query-editor {
   flex: 1;
   min-height: 0;
+  background-color: var(--o2-card-bg);
   .monaco-editor,
   .monaco-editor .monaco-editor {
     padding: 0px 0px 0px 0px !important;

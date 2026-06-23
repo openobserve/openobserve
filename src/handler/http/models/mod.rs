@@ -24,6 +24,14 @@ pub mod alerts;
 pub mod billings;
 pub mod dashboards;
 pub mod destinations;
+#[cfg(feature = "enterprise")]
+pub mod eval_jobs;
 pub mod folders;
 pub mod pipelines;
+#[cfg(feature = "enterprise")]
+pub mod providers;
 pub mod reports;
+#[cfg(feature = "enterprise")]
+pub mod score_configs;
+#[cfg(feature = "enterprise")]
+pub mod scorers;

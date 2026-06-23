@@ -89,6 +89,8 @@ export const DEFAULT_LOGS_CONFIG = {
   loadingCounter: false,
   loadingStream: false,
   loadingSavedView: false,
+  loadingProgressPercentage: 0,
+  loadingHistogramProgressPercentage: 0,
   shouldIgnoreWatcher: false,
   communicationMethod: "streaming" as const,
   config: {
@@ -161,6 +163,7 @@ export const DEFAULT_LOGS_CONFIG = {
     errorDetail: "",
     errorCode: 0,
     filterErrMsg: "",
+    sqlSyntaxErrorRanges: [] as Array<{ startLine: number; endLine: number; column?: number; error: string }>,
     missingStreamMessage: "",
     additionalErrorMsg: "",
     savedViewFilterFields: "",

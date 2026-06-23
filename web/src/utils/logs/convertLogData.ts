@@ -32,7 +32,7 @@ export const convertLogData = (
       left: "20",
       right: "20",
       top: "5",
-      bottom: "0",
+      bottom: "5",
     },
     tooltip: {
       show: true,
@@ -269,7 +269,7 @@ export const convertStackedLogData = (
         left: "20",
         right: "20",
         top: "5",
-        bottom: "20",
+        bottom: series.length > 1 ? "20" : "5",
       },
       tooltip: {
         show: true,
@@ -310,7 +310,7 @@ export const convertStackedLogData = (
         },
       },
       legend: {
-        show: true,
+        show: series.length > 1,
         bottom: 0,
         type: "scroll",
         textStyle: { fontSize: 11 },

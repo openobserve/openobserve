@@ -59,6 +59,8 @@ export async function startPanelCreation(page, pm, config) {
   await pm.chartTypeSelector.selectStream(stream);
 
   // Add fields for proper chart configuration
+  // remove the auto-seeded default y-axis before adding this panel's measure
+  await pm.chartTypeSelector.removeField("y_axis_1", "y");
   await pm.chartTypeSelector.searchAndAddField("kubernetes_container_name", "y");
   await pm.chartTypeSelector.searchAndAddField("kubernetes_namespace_name", "b");
 
@@ -179,6 +181,8 @@ export async function addPanelWithPanelTime(page, pm, config) {
   await pm.chartTypeSelector.selectStream(stream);
 
   // Add fields to Y and breakdown axes for proper chart configuration
+  // remove the auto-seeded default y-axis before adding this panel's measure
+  await pm.chartTypeSelector.removeField("y_axis_1", "y");
   await pm.chartTypeSelector.searchAndAddField("kubernetes_container_name", "y");
   await pm.chartTypeSelector.searchAndAddField("kubernetes_namespace_name", "b");
 

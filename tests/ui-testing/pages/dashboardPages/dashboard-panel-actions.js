@@ -210,6 +210,34 @@ export default class DashboardactionPage {
   }
 
   /**
+   * Wait for a custom (ECharts) chart panel to actually render. ECharts stamps
+   * the `_echarts_instance_` attribute on its host element only after init()
+   * runs and the chart options are applied, so a visible host carrying that
+   * attribute is proof the custom chart engine mounted and drew the option —
+   * without depending on canvas pixel reads (the custom-chart canvas reports a
+   * 0-width drawing buffer under headless layout, so a pixel scan can't work).
+   * Polls because the custom chart applies its option asynchronously after Apply.
+   * @param {Function} expect - Playwright expect function
+   * @param {number} timeout
+   */
+  async expectCustomChartRendered(expect, timeout = 20000) {
+    await expect(this.chartRendererCanvas.first()).toBeVisible({ timeout });
+    await expect
+      .poll(
+        async () =>
+          await this.page.evaluate(() =>
+            Array.from(
+              document.querySelectorAll('[data-test="chart-renderer"]')
+            ).some(
+              (h) => h.hasAttribute("_echarts_instance_") && h.offsetParent !== null
+            )
+          ),
+        { timeout, intervals: [500, 1000, 1000, 2000, 2000] }
+      )
+      .toBe(true);
+  }
+
+  /**
    * Wait for the dashboard table panel to render AND contain at least one
    * populated data cell. Encapsulates a `page.waitForFunction` scoped to the
    * `data-test="dashboard-panel-table"` host (approved evaluate pattern) so
@@ -290,7 +318,10 @@ export default class DashboardactionPage {
    */
   async waitForDashboardSearchVisible() {
     await this.dashboardSearchInput.waitFor({ state: 'visible', timeout: 30000 });
-    await this.page.waitForTimeout(2000);
+    // Wait for the dashboard data to finish loading before returning so that
+    // any subsequent search/filter operates on already-loaded data.
+    await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+    await this.page.waitForTimeout(1000);
   }
 
   /**
@@ -299,6 +330,6 @@ export default class DashboardactionPage {
    * @returns {Locator} The dashboard row locator
    */
   getDashboardRow(dashboardName) {
-    return this.page.getByRole("row", { name: new RegExp(`.*${dashboardName}`) });
+    return this.page.locator(`[data-test="dashboard-name-cell-${dashboardName}"]`);
   }
 }

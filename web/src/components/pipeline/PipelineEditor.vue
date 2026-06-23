@@ -17,55 +17,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="tw:w-full tw:h-full tw:pr-[0.625rem]">
     <div class="card-container tw:h-[calc(100vh-50px)]">
-      <div class="tw:flex tw:justify-between tw:items-start tw:py-2 tw:px-2">
-        <div class="tw:flex tw:items-center tw:pl-3">
-          <div class="tw:text-xl tw:font-semibold" v-if="pipelineObj.isEditPipeline == true">
-            {{ pipelineObj.currentSelectedPipeline.name }}
-          </div>
-          <div class="tw:text-xl tw:font-semibold" v-if="pipelineObj.isEditPipeline == false">
-            <OInput
-              ref="pipelineNameInputRef"
-              v-model="pipelineObj.currentSelectedPipeline.name"
-              :placeholder="t('pipeline.pipelineName')"
-              hide-bottom-space
-              class="tw:w-[300px]"
-              :error="pipelineNameError"
-              :error-message="pipelineNameErrorMessage"
-              data-test="pipeline-editor-name-input"
-            />
-          </div>
-        </div>
+      <!-- The shell (Functions.vue) renders the "Pipelines › <name>" breadcrumb
+           header; we contribute the editor actions to it via the portal and the
+           pipeline name for NEW pipelines (edit mode shows it in the breadcrumb). -->
+      <Teleport defer to="#o2-page-actions">
+        <OButton
+          variant="outline"
+          size="icon-sm"
+          class="hideOnPrintMode"
+          data-test="pipeline-json-edit-btn"
+          @click="openJsonEditor"
+          icon-left="code"
+        >
+          <OTooltip :content="t('pipeline.editPipelineJson')" side="top" />
+        </OButton>
+        <OButton
+          data-test="add-pipeline-cancel-btn"
+          variant="outline"
+          size="sm-action"
+          @click="openCancelDialog"
+          >{{ t("pipeline.cancel") }}</OButton
+        >
+        <OButton
+          data-test="add-pipeline-save-btn"
+          variant="primary"
+          size="sm-action"
+          :loading="isPipelineSaving"
+          :disabled="isPipelineSaving"
+          @click="savePipeline"
+          >{{ t("common.save") }}</OButton
+        >
+      </Teleport>
 
-        <div class="tw:flex tw:items-center tw:gap-2">
-          <!-- this is normal secondary button but only icon is there without label -->
-          <OButton
-            variant="outline"
-            size="icon-sm"
-            class="hideOnPrintMode"
-            data-test="pipeline-json-edit-btn"
-            @click="openJsonEditor"
-            icon-left="code"
-          >
-            <OTooltip :content="t('pipeline.editPipelineJson')" side="top" />
-          </OButton>
-          <OButton
-            data-test="add-pipeline-cancel-btn"
-            variant="outline"
-            size="sm-action"
-            @click="openCancelDialog"
-          >{{ t('pipeline.cancel') }}</OButton>
-          <OButton
-            data-test="add-pipeline-save-btn"
-            variant="primary"
-            size="sm-action"
-            :loading="isPipelineSaving"
-            :disabled="isPipelineSaving"
-            @click="savePipeline"
-          >{{ t('common.save') }}</OButton>
-        </div>
-      </div>
-
-      <OSeparator class="tw:mb-2 tw:px-2" />
 
       <div class="tw:flex tw:mt-3 tw:px-2">
         <div class="nodes-drag-container tw:pr-3">
@@ -126,11 +109,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   />
   <ExternalDestination
     v-if="pipelineObj.dialog.name === 'remote_stream'"
-    :open="true"
-    @cancel:hideform="resetDialog"
-  />
-  <LlmEvaluation
-    v-if="pipelineObj.dialog.name === 'llm_evaluation'"
     :open="true"
     @cancel:hideform="resetDialog"
   />
@@ -201,16 +179,13 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import jstransform from "@/services/jstransform";
 import NodeSidebar from "@/components/pipeline/NodeSidebar.vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import StreamNode from "@/components/pipeline/NodeForm/Stream.vue";
 import QueryForm from "@/components/pipeline/NodeForm/Query.vue";
 import ConditionForm from "@/components/pipeline/NodeForm/Condition.vue";
-import LlmEvaluation from "@/components/pipeline/NodeForm/LlmEvaluation.vue";
 import { MarkerType, useVueFlow } from "@vue-flow/core";
 import ExternalDestination from "./NodeForm/ExternalDestination.vue";
 import { contextRegistry, createPipelinesContextProvider } from "@/composables/contextProviders";
@@ -225,7 +200,6 @@ const externalOutputImage = getImageURL("images/pipeline/output_remote.png");
 const streamRouteImage = getImageURL("images/pipeline/route.svg");
 const conditionImage = getImageURL("images/pipeline/transform_condition.png");
 const queryImage = getImageURL("images/pipeline/input_query.png");
-const llmEvaluationImage = getImageURL("images/common/ai_icon_primary.svg");
 import useStreams from "@/composables/useStreams";
 import usePipelines from "@/composables/usePipelines";
 
@@ -464,18 +438,13 @@ const validationErrors = ref<string[]>([]);
 
 const { track } = useReo();
 
-// Pipeline name input validation
-const pipelineNameInputRef = ref(null);
-const pipelineNameError = ref(false);
-const pipelineNameErrorMessage = ref("");
-
-// Clear error when user starts typing in pipeline name
+// Clear pipeline name error when user starts typing
 watch(
   () => pipelineObj.currentSelectedPipeline.name,
   (newValue) => {
     if (newValue && newValue.trim() !== "") {
-      pipelineNameError.value = false;
-      pipelineNameErrorMessage.value = "";
+      pipelineObj.pipelineNameError = false;
+      pipelineObj.pipelineNameErrorMessage = "";
     }
   }
 );
@@ -518,22 +487,6 @@ watch(
 );
 
 onBeforeMount(() => {
-  if (config.isEnterprise == "true" && store.state.zoConfig.ai_enabled) {
-    // Insert LLM Evaluation node before the "Destination" section header
-    const destIdx = nodeTypes.findIndex(
-      (n) => n.isSectionHeader && n.label === "Destination",
-    );
-    if (destIdx !== -1) {
-      nodeTypes.splice(destIdx, 0, {
-        label: "LLM Evaluation",
-        subtype: "llm_evaluation",
-        io_type: "default",
-        icon: "img:" + llmEvaluationImage,
-        tooltip: "LLM Evaluation Node",
-        isSectionHeader: false,
-      });
-    }
-  }
   if (config.isEnterprise == "true") {
     nodeTypes.push({
       label: "Remote",
@@ -621,14 +574,19 @@ onBeforeRouteLeave((to, from, next) => {
     (from.path === "/pipeline/pipelines/add" &&
       pipelineObj.currentSelectedPipeline.nodes.length)
   ) {
-    const confirmMessage = t("pipeline.unsavedMessage");
-    if (window.confirm(confirmMessage)) {
-      // User confirmed, allow navigation
-      next();
-    } else {
-      // User canceled, prevent navigation
-      next(false);
-    }
+    // Cancel this navigation; show a Vue dialog instead of window.confirm
+    // (browsers often suppress window.confirm during navigation events).
+    next(false);
+    const destination = to.fullPath;
+    confirmDialogMeta.value.show = true;
+    confirmDialogMeta.value.title = t("common.cancelChanges");
+    confirmDialogMeta.value.message = t("pipeline.cancelChangesConfirm");
+    confirmDialogMeta.value.onConfirm = () => {
+      resetConfirmDialog();
+      resetPipelineData();
+      forceSkipBeforeUnloadListener = true;
+      router.push(destination);
+    };
   } else {
     // No unsaved changes or not leaving the edit route, allow navigation
     next();
@@ -737,13 +695,8 @@ const resetDialog = () => {
 const savePipeline = async () => {
   forceSkipBeforeUnloadListener = true;
   if (pipelineObj.currentSelectedPipeline.name === "") {
-    pipelineNameError.value = true;
-    pipelineNameErrorMessage.value = t("pipeline.pipelineNameRequired");
-
-    // Focus the input field
-    if (pipelineNameInputRef.value) {
-      pipelineNameInputRef.value.focus();
-    }
+    pipelineObj.pipelineNameError = true;
+    pipelineObj.pipelineNameErrorMessage = t("pipeline.pipelineNameRequired");
 
     toast({
       message: t("pipeline.pipelineNameRequired"),
@@ -753,8 +706,8 @@ const savePipeline = async () => {
   }
 
   // Clear error state if name is valid
-  pipelineNameError.value = false;
-  pipelineNameErrorMessage.value = "";
+  pipelineObj.pipelineNameError = false;
+  pipelineObj.pipelineNameErrorMessage = "";
   // Find the input node
   const inputNodeIndex = pipelineObj.currentSelectedPipeline.nodes.findIndex(
     (node: any) =>

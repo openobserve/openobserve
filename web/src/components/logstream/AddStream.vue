@@ -15,20 +15,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODrawer
+  <ODialog
     v-if="!isInPipeline"
     data-test="add-stream-dialog"
     :open="open"
-    size="lg"
+    size="md"
     :title="t('logStream.add')"
     :secondary-button-label="t('logStream.cancel')"
     :primary-button-label="t('common.save')"
+    form-id="add-stream-form"
     @update:open="emits('update:open', $event)"
     @click:secondary="emits('update:open', false)"
-    @click:primary="submitForm"
   >
-    <div class="tw:p-4 tw:w-full">
-      <OForm :default-values="streamInputsDefault" @submit="submitForm">
+    <div class="tw:w-full">
+      <OForm id="add-stream-form" :default-values="streamInputsDefault" @submit="submitForm">
         <div class="tw:mt-2">
           <OInput
             data-test="add-stream-name-input"
@@ -37,7 +37,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="showLabelOnTop"
             :error="!!nameError"
             :error-message="nameError"
-            @update:model-value="nameError = ''"
+            :help-text="!nameError ? streamNameHelpText : undefined"
+            @update:model-value="validateStreamName"
             tabindex="0"
           />
         </div>
@@ -59,6 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div data-test="add-stream-data-retention-input" v-if="showDataRetention" class="tw:mt-2">
           <OInput
+            data-test="add-stream-data-retention"
             v-model="streamInputs.dataRetentionDays"
             :label="t('logStream.dataRetention') + ' *'"
             class="showLabelOnTop"
@@ -70,6 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <StreamFieldInputs
+          ref="fieldInputsRef"
           class="tw:mt-4"
           :fields="fields"
           @add="addField"
@@ -77,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </OForm>
     </div>
-  </ODrawer>
+  </ODialog>
 
   <!-- Inline form for pipeline usage (no drawer wrapper) -->
     <div v-else class="tw:p-4 tw:w-full">
@@ -90,7 +93,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="showLabelOnTop"
             :error="!!nameError"
             :error-message="nameError"
-            @update:model-value="nameError = ''"
+            :help-text="!nameError ? streamNameHelpText : undefined"
+            @update:model-value="validateStreamName"
             tabindex="0"
           />
         </div>
@@ -112,6 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div data-test="add-stream-data-retention-input" v-if="showDataRetention" class="tw:mt-2">
           <OInput
+            data-test="add-stream-data-retention"
             v-model="streamInputs.dataRetentionDays"
             :label="t('logStream.dataRetention') + ' *'"
             class="showLabelOnTop"
@@ -123,6 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <StreamFieldInputs
+          ref="fieldInputsRef"
           class="tw:mt-4"
           :fields="fields"
           @add="addField"
@@ -156,7 +162,7 @@ import streamService from "@/services/stream";
 import { useStore } from "vuex";
 import { computed } from "vue";
 import useStreams from "@/composables/useStreams";
-import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -184,9 +190,23 @@ const { addStream, getStream } = useStreams();
 
 const fields: Ref<any[]> = ref([]);
 const addStreamFormRef = ref<any>(null);
+const fieldInputsRef = ref<any>(null);
 const nameError = ref('');
 const streamTypeError = ref('');
 const dataRetentionError = ref('');
+
+// Allowed characters mirror the backend `format_stream_name` regex
+// (src/config/src/utils/schema.rs): alphanumeric, underscore and colon only.
+const streamNameRegex = /^[a-zA-Z0-9_:]+$/;
+const streamNameHelpText = "Use alphanumeric characters, underscore and colon only.";
+
+const validateStreamName = () => {
+  if (streamInputs.value.name && !streamNameRegex.test(streamInputs.value.name)) {
+    nameError.value = streamNameHelpText;
+  } else {
+    nameError.value = '';
+  }
+};
 
 const submitForm = () => {
   if (!validateStream()) return;
@@ -241,6 +261,9 @@ const validateStream = () => {
   if (!streamInputs.value.name.trim()) {
     nameError.value = 'Field is required!';
     valid = false;
+  } else if (!streamNameRegex.test(streamInputs.value.name)) {
+    nameError.value = streamNameHelpText;
+    valid = false;
   }
   if (!streamInputs.value.stream_type) {
     streamTypeError.value = 'Field is required!';
@@ -248,6 +271,15 @@ const validateStream = () => {
   }
   if (showDataRetention.value && !(streamInputs.value.dataRetentionDays > 0)) {
     dataRetentionError.value = 'Field is required!';
+    valid = false;
+  }
+  // Fields are optional, but any field that has been added must pass the
+  // name/data-type validation in the child before the stream can be saved.
+  if (
+    fieldInputsRef.value &&
+    typeof fieldInputsRef.value.validate === "function" &&
+    !fieldInputsRef.value.validate()
+  ) {
     valid = false;
   }
   return valid;

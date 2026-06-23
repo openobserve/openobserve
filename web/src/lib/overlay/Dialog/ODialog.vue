@@ -10,9 +10,10 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "reka-ui";
-import { ref, watch, watchEffect, useSlots, computed, nextTick, useAttrs } from "vue";
+import { ref, watch, watchEffect, useSlots, computed, nextTick, useAttrs, inject, provide } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { useScrollShadow } from "@/lib/overlay/useScrollShadow";
+import { FORM_SUBMIT_STATE_KEY } from "@/lib/forms/Form/OForm.types";
 
 defineOptions({ inheritAttrs: false });
 const $attrs = useAttrs();
@@ -21,6 +22,19 @@ const $attrs = useAttrs();
 // using the audit pattern: [data-test="<parent>"] [data-test="o-dialog-*-btn"].
 // (DialogRoot is renderless, so default attribute inheritance would lose it.)
 const parentDataTest = computed(() => $attrs["data-test"] as string | undefined);
+
+// Stacking support: each nested ODialog gets a higher z-index layer
+const dialogDepth = inject<number>("o2DialogDepth", 0);
+provide("o2DialogDepth", dialogDepth + 1);
+
+// Auto loading: an OForm nested in the body (linked via `form-id`) mirrors its
+// `isSubmitting` into this ref, so the footer Save button shows its spinner
+// during an awaited @submit handler — no `:primary-button-loading` needed.
+const formSubmitting = ref(false);
+provide(FORM_SUBMIT_STATE_KEY, formSubmitting);
+
+const overlayZIndex = computed(() => 5999 + dialogDepth * 1000);
+const contentZIndex = computed(() => 6000 + dialogDepth * 1000);
 
 const props = withDefaults(defineProps<DialogProps>(), {
   persistent: false,
@@ -114,10 +128,16 @@ const hasFooter = computed(
 );
 const hasTrigger = computed(() => !!slots.trigger);
 
+// The primary button is loading when the consumer says so OR a nested OForm is
+// mid-submit (auto). Kept as a computed so the disabled logic below picks it up.
+const primaryLoading = computed(
+  () => props.primaryButtonLoading || formSubmitting.value,
+);
+
 // Auto-disable all buttons when any one of them is loading
 const anyButtonLoading = computed(
   () =>
-    props.primaryButtonLoading ||
+    primaryLoading.value ||
     props.secondaryButtonLoading ||
     props.neutralButtonLoading,
 );
@@ -285,12 +305,13 @@ watch(internalOpen, (open) => {
       <!-- Overlay / scrim -->
       <DialogOverlay
         data-test="o-dialog-overlay"
+        :style="{ zIndex: overlayZIndex }"
         :class="[
-          'tw:fixed tw:inset-0 tw:z-5999',
+          'tw:fixed tw:inset-0',
           'tw:bg-dialog-overlay',
           'tw:data-[state=open]:animate-in tw:data-[state=open]:fade-in-0',
           'tw:data-[state=closed]:animate-out tw:data-[state=closed]:fade-out-0',
-          'tw:duration-200',
+          'tw:data-[state=open]:duration-110 tw:data-[state=closed]:duration-90',
         ]"
       />
 
@@ -298,12 +319,14 @@ watch(internalOpen, (open) => {
       <DialogContent
         data-o2-dialog
         :data-test="parentDataTest || 'o-dialog-panel'"
-        :style="contentStyle"
+        :style="[contentStyle, { zIndex: contentZIndex }]"
         :class="[
-          // Positioning — centered in viewport
-          'tw:fixed tw:left-1/2 tw:top-1/2 tw:-translate-x-1/2 tw:-translate-y-1/2',
-          // Stacking — above Quasar header (2000) and drawer (3000)
-          'tw:z-6000',
+          // Positioning — centered in viewport.
+          // Centering uses the standalone `translate` CSS property (not the
+          // `transform`-based -translate utilities) so the zoom animation —
+          // which drives `transform` — composes cleanly and the panel scales
+          // from true center instead of sliding diagonally.
+          'tw:fixed tw:left-1/2 tw:top-1/2 tw:[translate:-50%_-50%]',
           // Layout — flex-col so header/footer stick and only body scrolls
           'tw:flex tw:flex-col tw:overflow-hidden',
           // Size
@@ -318,10 +341,13 @@ watch(internalOpen, (open) => {
           'tw:text-dialog-content-text',
           // Focus ring
           'tw:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-dialog-focus-ring',
-          // Animation
-          'tw:data-[state=open]:animate-in tw:data-[state=open]:fade-in-0 tw:data-[state=open]:zoom-in-95',
-          'tw:data-[state=closed]:animate-out tw:data-[state=closed]:fade-out-0 tw:data-[state=closed]:zoom-out-95',
-          'tw:duration-200',
+          // Animation — single-direction rise: slides up from ~24px below while
+          // fading in, soft ease-out-expo settle (150ms); fades + drops back out
+          // (100ms). No scale, so nothing squishes — it just glides into place.
+          'tw:data-[state=open]:animate-in tw:data-[state=open]:fade-in-0 tw:data-[state=open]:slide-in-from-bottom-6',
+          'tw:data-[state=closed]:animate-out tw:data-[state=closed]:fade-out-0 tw:data-[state=closed]:slide-out-to-bottom-2',
+          'tw:data-[state=open]:duration-150 tw:data-[state=open]:ease-[cubic-bezier(0.16,1,0.3,1)]',
+          'tw:data-[state=closed]:duration-100 tw:data-[state=closed]:ease-in',
         ]"
         @escape-key-down="handleEscapeKeyDown"
         @interact-outside="handleInteractOutside"
@@ -363,7 +389,7 @@ watch(internalOpen, (open) => {
             <div v-if="title || subTitle" class="tw:shrink-0 tw:min-w-0">
               <span
                 v-if="title"
-                class="tw:text-lg tw:font-semibold tw:text-dialog-header-text tw:truncate tw:block"
+                class="tw:text-base tw:font-semibold tw:text-dialog-header-text tw:truncate tw:block"
               >
                 {{ title }}
               </span>
@@ -498,9 +524,11 @@ watch(internalOpen, (open) => {
                 data-test="o-dialog-primary-btn"
                 :variant="primaryButtonVariant"
                 size="sm-action"
+                :type="formId ? 'submit' : 'button'"
+                :form="formId || undefined"
                 :disabled="primaryEffectivelyDisabled"
-                :loading="primaryButtonLoading"
-                @click="emit('click:primary')"
+                :loading="primaryLoading"
+                @click="!formId && emit('click:primary')"
               >
                 {{ primaryButtonLabel }}
               </OButton>

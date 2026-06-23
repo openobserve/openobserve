@@ -15,25 +15,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-    <ODrawer
+    <ODialog
       :open="open"
-      :width="20"
+      size="sm"
       :title="editMode ? t('dashboard.updateFolder') : t('common.addFolder')"
       secondary-button-label="Cancel"
       primary-button-label="Save"
-      :primary-button-loading="onSubmit.isLoading.value"
+      form-id="add-folder-sidebar-form"
       data-test="dashboard-folder-dialog"
       @update:open="$emit('update:open', $event)"
       @click:secondary="$emit('update:open', false)"
-      @click:primary="submit()"
     >
-      <div class="tw:p-4">
-        <OForm ref="addFolderForm" :default-values="{ name: folderData.name, description: folderData.description }" @submit="onSubmit.execute">
+      <div>
+        <OForm
+          id="add-folder-sidebar-form"
+          :schema="addFolderSchema"
+          :default-values="addFolderDefaults"
+          @submit="onSubmit"
+        >
           <OFormInput
             name="name"
-            :label="t('dashboard.nameOfVariable') + '*'"
+            :label="t('dashboard.nameOfVariable')"
+            required
             data-test="dashboard-folder-add-name"
-            :validators="[(val: string | number | undefined) => !(val?.toString().trim()) ? t('dashboard.nameRequired') : undefined]"
           />
           <span>&nbsp;</span>
           <OFormInput
@@ -43,33 +47,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </OForm>
       </div>
-    </ODrawer>
+    </ODialog>
   </template>
-  
+
   <script lang="ts">
-  import { defineComponent, ref, watch } from "vue";
-  import ODrawer from '@/lib/overlay/Drawer/ODrawer.vue';
+  import { defineComponent, computed } from "vue";
+  import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
   import OForm from "@/lib/forms/Form/OForm.vue";
   import OFormInput from "@/lib/forms/Input/OFormInput.vue";
-  import { createFolder, createFolderByType, updateFolder, updateFolderByType } from "@/utils/commons";
+  import { createFolderByType, updateFolderByType } from "@/utils/commons";
   import { useI18n } from "vue-i18n";
   import { useStore } from "vuex";
-  import { getImageURL } from "@/utils/zincutils";
-  import { useLoading } from "@/composables/useLoading";
   import useNotifications from "@/composables/useNotifications";
   import { useReo } from "@/services/reodotdev_analytics";
-  
-  const defaultValue = () => {
-    return {
-      folderId: "",
-      name: "",
-      description: "",
-    };
-  };
-  
+  import { makeAddFolderSchema, type AddFolderForm } from "./AddFolder.schema";
+
   export default defineComponent({
     name: "CommonAddFolder",
-    components: { ODrawer, OForm, OFormInput },
+    components: { ODialog, OForm, OFormInput },
     props: {
       open: {
         type: Boolean,
@@ -91,125 +86,82 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     emits: ["update:modelValue", "update:open"],
     setup(props, { emit }) {
       const store: any = useStore();
-      const addFolderForm: any = ref(null);
-      const disableColor: any = ref("");
-      const folderData: any = ref(defaultValue());
-
-      // The drawer mounts its form lazily and OForm reads `defaultValues` only
-      // once, so refresh local state from the store every time the drawer opens
-      // and push the values into the form fields.
-      const loadFolderData = () => {
-        if (props.editMode) {
-          const found = store.state.organizationData.foldersByType[
-            props.type
-          ]?.find((item: any) => item.folderId === props.folderId);
-          folderData.value = found
-            ? JSON.parse(JSON.stringify(found))
-            : defaultValue();
-        } else {
-          folderData.value = defaultValue();
-        }
-      };
-
-      watch(
-        () => props.open,
-        (isOpen) => {
-          if (isOpen) loadFolderData();
-          else folderData.value = defaultValue();
-        },
-        { immediate: true }
-      );
-
-      watch(
-        () => folderData.value.name,
-        (name) => addFolderForm.value?.form.setFieldValue("name", name ?? "")
-      );
-      watch(
-        () => folderData.value.description,
-        (description) =>
-          addFolderForm.value?.form.setFieldValue("description", description ?? "")
-      );
-
-      const isValidIdentifier: any = ref(true);
       const { t } = useI18n();
+      const addFolderSchema = makeAddFolderSchema(t);
       const { showPositiveNotification, showErrorNotification } =
         useNotifications();
       const { track } = useReo();
-  
-      const onSubmit = useLoading(async () => {
-        await addFolderForm.value.validate().then(async (valid: any) => {
-          if (!valid) {
-            return false;
-          }
 
-          // Sync OForm-owned values back to local state
-          const formVals = addFolderForm.value.form.state.values as { name: string; description: string };
-          folderData.value.name = formVals.name ?? folderData.value.name;
-          folderData.value.description = formVals.description ?? folderData.value.description;
+      const findFolder = () =>
+        store.state.organizationData.foldersByType[props.type]?.find(
+          (item: any) => item.folderId === props.folderId,
+        );
 
-          try {
-            //if edit mode
-            if (props.editMode) {
-              await updateFolderByType (
-                store,
-                folderData.value.folderId,
-                folderData.value,
-                props.type
-              );
-              showPositiveNotification("Folder updated successfully", {
-                timeout: 2000,
-              });
-              emit("update:modelValue", folderData.value);
-              emit("update:open", false);
-            }
-            //else new folder
-            else {
-              //trim the folder name here
-              folderData.value.name = folderData.value.name.trim();
-              const newFolder: any = await createFolderByType(store, folderData.value, props.type);
-              emit("update:modelValue", newFolder);
-              emit("update:open", false);
-              showPositiveNotification("Folder added successfully", {
-                timeout: 2000,
-              });
-            }
-            folderData.value = {
-              folderId: "",
-              name: "",
-              description: "",
-            };
-            await addFolderForm.value.resetValidation();
-          } catch (err: any) {
-            showErrorNotification(
-              err?.response?.data?.message ??
-                (props.editMode
-                  ? "Folder updation failed"
-                  : "Folder creation failed"),
-              { timeout: 2000 }
-            );
-          }
-          track("Button Click", {
-            button: "Save New Folder",
-            page: "Folders",
-          });
-        });
+      // The OForm is the single source of truth. OForm reads `defaultValues`
+      // once at mount, and ODialog remounts the body on open — so this computed
+      // seeds the fields each time the dialog opens (edit → the folder's values,
+      // create → blank). No local model / no manual reset needed.
+      const addFolderDefaults = computed((): AddFolderForm => {
+        if (props.editMode) {
+          const found = findFolder();
+          return { name: found?.name ?? "", description: found?.description ?? "" };
+        }
+        return { name: "", description: "" };
       });
-  
-      const submit = () => onSubmit.execute();
+
+      // Plain async @submit handler — the validated `value` is the source of
+      // truth. `folderId` (not a form field) comes from the prop.
+      const onSubmit = async (value: AddFolderForm) => {
+        const name = (value.name ?? "").trim();
+        const description = value.description ?? "";
+        try {
+          if (props.editMode) {
+            const found = findFolder();
+            const payload = {
+              ...(found ? JSON.parse(JSON.stringify(found)) : {}),
+              folderId: props.folderId,
+              name,
+              description,
+            };
+            await updateFolderByType(store, props.folderId, payload, props.type);
+            showPositiveNotification("Folder updated successfully", {
+              timeout: 2000,
+            });
+            emit("update:modelValue", payload);
+            emit("update:open", false);
+          } else {
+            const newFolder: any = await createFolderByType(
+              store,
+              { name, description },
+              props.type,
+            );
+            emit("update:modelValue", newFolder);
+            emit("update:open", false);
+            showPositiveNotification("Folder added successfully", {
+              timeout: 2000,
+            });
+          }
+        } catch (err: any) {
+          showErrorNotification(
+            err?.response?.data?.message ??
+              (props.editMode
+                ? "Folder updation failed"
+                : "Folder creation failed"),
+            { timeout: 2000 },
+          );
+        }
+        track("Button Click", {
+          button: "Save New Folder",
+          page: "Folders",
+        });
+      };
 
       return {
         t,
-        disableColor,
-        isPwd: ref(true),
-        status,
-        folderData,
-        addFolderForm,
+        addFolderSchema,
         store,
-        isValidIdentifier,
-        getImageURL,
+        addFolderDefaults,
         onSubmit,
-        defaultValue,
-        submit,
       };
     },
   });

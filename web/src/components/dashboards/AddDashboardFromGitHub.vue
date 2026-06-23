@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="searchQuery"
             placeholder="Search dashboards..."
             clearable
-            class="tw:mb-4"
+            class="tw:mb-3"
             data-test="add-dashboard-github-search"
           />
 
@@ -138,15 +138,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </ODialog>
 
     <!-- Add Folder Dialog -->
-    <ODrawer
+    <ODialog
       v-model:open="showAddFolderDialog"
-      size="lg"
+      size="sm"
       title="Add New Folder"
       primary-button-label="Save"
       secondary-button-label="Cancel"
-      :primary-button-disabled="isAddingFolder"
-      :primary-button-loading="isAddingFolder"
-      @click:primary="handleAddFolder"
+      form-id="add-folder-dashboards-form"
       @click:secondary="showAddFolderDialog = false"
       data-test="add-dashboard-github-add-folder-dialog"
     >
@@ -156,7 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @close="showAddFolderDialog = false"
         :edit-mode="false"
       />
-    </ODrawer>
+    </ODialog>
   </ODrawer>
 </template>
 

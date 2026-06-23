@@ -531,7 +531,13 @@ SELECT id, account, stream, date, file, records, index_size FROM file_list WHERE
         Ok(ret?.iter().map(|r| r.into()).collect())
     }
 
-    async fn query_by_ids(&self, ids: &[i64]) -> Result<Vec<FileKey>> {
+    async fn query_by_ids(
+        &self,
+        ids: &[i64],
+        _time_range: Option<(i64, i64)>,
+    ) -> Result<Vec<FileKey>> {
+        // SQLite backend is not partitioned, the id lookup is already a single
+        // index probe; the time range filter is only useful for partition pruning.
         if ids.is_empty() {
             return Ok(Vec::default());
         }
@@ -2110,7 +2116,7 @@ mod tests {
             meta: create_test_file_meta(),
             deleted,
             id: 0,
-            segment_ids: None,
+            selection: None,
             row_group_size: None,
         }
     }

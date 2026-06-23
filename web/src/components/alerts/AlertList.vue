@@ -19,131 +19,61 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="alert-list-page"
-    class="tw:flex tw:flex-col"
-    :style="{ height: 'calc(100vh - var(--navbar-height))' }"
+    class="tw:flex tw:flex-col tw:h-full"
   >
-    <div
-      class="tw:shrink-0 tw:px-[0.625rem]"
+    <PageLayout
       v-if="!showAddAlertDialog && !showImportAlertDialog"
+      :main-panel="false"
+      :header-class="'tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default'"
     >
-      <div class="card-container tw:mb-[0.625rem]">
-        <div
-          class="tw:flex tw:justify-between tw:items-center tw:py-3 tw:px-4 tw:h-[68px]"
-        >
-          <div class="tw:flex tw:items-center tw:gap-4">
-            <div
-              class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]"
-              data-test="alert-list-title"
-            >
-              {{ t("alerts.header") }}
-            </div>
-          </div>
-          <div class="tw:flex tw:ml-auto tw:ps-2 tw:items-center">
-            <!-- Alert Tabs -->
-            <OToggleGroup
-              :model-value="activeTab"
-              @update:model-value="(v) => { activeTab = v; filterAlertsByTab(); }"
-              class="tw:mr-2"
-            >
-              <OToggleGroupItem value="all" size="sm" data-test="tab-all">
-                <template #icon-left><OIcon name="format-list-bulleted" size="sm" /></template>
-                {{ t("alerts.all") }}
-              </OToggleGroupItem>
-              <OToggleGroupItem value="scheduled" size="sm" data-test="tab-scheduled">
-                <template #icon-left><OIcon name="schedule" size="sm" /></template>
-                {{ t("alerts.scheduled") }}
-              </OToggleGroupItem>
-              <OToggleGroupItem value="realTime" size="sm" data-test="tab-realTime">
-                <template #icon-left><OIcon name="bolt" size="sm" /></template>
-                {{ t("alerts.realTime") }}
-              </OToggleGroupItem>
-              <OToggleGroupItem v-if="isAnomalyDetectionEnabled" value="anomalyDetection" size="sm" data-test="tab-anomalyDetection">
-                <template #icon-left><OIcon name="query-stats" size="sm" /></template>
-                {{ t("alerts.anomalyDetection") }}
-              </OToggleGroupItem>
-            </OToggleGroup>
-            <!-- Search for Alerts -->
-            <OSearchInput
-              v-model="dynamicQueryModel"
-              :placeholder="searchAcrossFolders ? t('dashboard.searchAcross') : t('alerts.search')"
-              data-test="alert-list-search-input"
-              @clear="clearSearchHistory"
-              class="tw:ml-2 tw:w-[200px]"
-            />
-            <!-- All Folders toggle -->
-            <OSwitch
-              data-test="alert-list-search-across-folders-toggle"
-              v-model="searchAcrossFolders"
-              size="lg"
-              class="tw:ml-2 tw:h-8 tw:px-2 tw:border tw:border-button-outline-border tw:rounded-md tw:flex tw:items-center tw:justify-center tw:whitespace-nowrap tw:transition-all tw:duration-200 tw:cursor-pointer tw:hover:bg-(--o2-hover-accent)"
-            >
-              <template #label><span class="tw:whitespace-nowrap">{{ t('dashboard.allFolders') }}</span></template>
-              <template #tooltip>
-                <OTooltip :content="searchAcrossFolders ? t('dashboard.searchSelf') : t('dashboard.searchAll')" />
-              </template>
-            </OSwitch>
-            <!-- Refresh button -->
+      <!-- Row 1: standard header — title + actions only (Import/Add). The alert
+           type toggle, search and folder scope moved into the table toolbar. -->
+      <template #header>
+        <AppPageHeader :title="t('alerts.header')" :subtitle="'Alert rules and notification channels'" icon="shield-alert-outline">
+          <template #actions>
+            <!-- Import button -->
             <OButton
-              class="tw:ml-2"
+              :class="isCompactToolbar ? 'compact-icon-btn' : ''"
               variant="outline"
               size="sm"
-              :loading="loading"
-              @click="refreshAlerts"
-              data-test="alert-list-refresh-btn"
+              @click="importAlert"
+              data-test="alert-import"
+              icon-left="upload-file"
             >
-              <template #icon-left><OIcon name="refresh" size="sm" /></template>
-              {{ t('common.refresh') }}
+              <template v-if="!isCompactToolbar">{{ t(`dashboard.import`) }}</template>
+              <OTooltip v-if="isCompactToolbar" :content="t('dashboard.import')" side="bottom" />
             </OButton>
-          </div>
-          <!-- Import button -->
-          <OButton
-            :class="[
-              'tw:ml-2',
-              isCompactToolbar
-                ? 'compact-icon-btn'
-                : '',
-            ]"
-            variant="outline"
-            size="sm"
-            @click="importAlert"
-            data-test="alert-import"
-            icon-left="upload-file"
-          >
-            <template v-if="!isCompactToolbar">{{ t(`dashboard.import`) }}</template>
-            <OTooltip v-if="isCompactToolbar" :content="t('dashboard.import')" side="bottom" />
-          </OButton>
-          <!-- Add button — routes to anomaly creation on anomaly tab, alert creation otherwise -->
-          <OButton
-            data-test="alert-list-add-alert-btn"
-            class="tw:ml-2"
-            variant="primary"
-            size="sm"
-            :disabled="!destinations.length || !templates.length"
-            :title="!destinations.length ? t('alerts.noDestinations') : ''"
-            @click="
-              activeTab === 'anomalyDetection'
-                ? router.push({
-                    name: 'addAnomalyDetection',
-                    query: {
-                      org_identifier:
-                        store.state.selectedOrganization.identifier,
-                      folder: activeFolderId,
-                      tab: activeTab,
-                    },
-                  })
-                : showAddUpdateFn({})
-            "
-          >{{ t(`alerts.add`) }}</OButton>
-        </div>
-      </div>
-    </div>
+            <!-- Add button — routes to anomaly creation on anomaly tab, alert creation otherwise -->
+            <OButton
+              data-test="alert-list-add-alert-btn"
+              variant="primary"
+              size="sm"
+              :disabled="!destinations.length || !templates.length"
+              :title="!destinations.length ? t('alerts.noDestinations') : ''"
+              @click="
+                activeTab === 'anomalyDetection'
+                  ? router.push({
+                      name: 'addAnomalyDetection',
+                      query: {
+                        org_identifier:
+                          store.state.selectedOrganization.identifier,
+                        folder: activeFolderId,
+                        tab: activeTab,
+                      },
+                    })
+                  : showAddUpdateFn({})
+              "
+            >{{ t(`alerts.add`) }}</OButton>
+          </template>
+        </AppPageHeader>
+      </template>
+
     <div
-      v-if="!showAddAlertDialog && !showImportAlertDialog"
       data-test="alert-list-splitter"
-      class="tw:flex-1 tw:flex tw:min-h-0 tw:px-[0.625rem] tw:pb-[0.625rem] tw:gap-[0.625rem]"
+      class="tw:flex-1 tw:flex tw:min-h-0"
     >
       <!-- Left: FolderList -->
-      <div class="tw:shrink-0 tw:h-full" :style="{ width: splitterModel + 'px' }">
+      <div class="tw:shrink-0 tw:h-full" :style="{ width: 230 + 'px' }">
         <div class="tw:h-full">
           <FolderList
             type="alerts"
@@ -156,11 +86,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="tw:h-full card-container">
               <!-- Alert List Table (shows all alert types including anomaly detection rows) -->
               <OTable
+                :frame="false"
                 v-model:selected-ids="selectedAlertIds"
                 selection="multiple"
                 data-test="alert-list-table"
                 :data="filteredResults || []"
                 :columns="columns"
+                show-index
                 row-key="alert_id"
                 :loading="loading"
                 pagination="client"
@@ -169,12 +101,89 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 width="100%"
                 :show-global-filter="false"
                 :default-columns="false"
+                :enable-column-resize="true"
+                :persist-columns="true"
+                table-id="alerts-alert-list"
                 @row-click="triggerExpand"
               >
+                <!-- Toolbar: alert-type filter + search (inline folder scope) + refresh. -->
+                <template #toolbar>
+                  <div class="tw:flex tw:items-center tw:gap-2 tw:w-full">
+                    <OToggleGroup
+                      :model-value="activeTab"
+                      @update:model-value="(v) => { activeTab = v; filterAlertsByTab(); }"
+                    >
+                      <OToggleGroupItem value="all" size="sm" data-test="tab-all">
+                        <template #icon-left><OIcon name="format-list-bulleted" size="sm" /></template>
+                        {{ t("alerts.all") }}
+                      </OToggleGroupItem>
+                      <OToggleGroupItem value="scheduled" size="sm" data-test="tab-scheduled">
+                        <template #icon-left><OIcon name="schedule" size="sm" /></template>
+                        {{ t("alerts.scheduled") }}
+                      </OToggleGroupItem>
+                      <OToggleGroupItem value="realTime" size="sm" data-test="tab-realTime">
+                        <template #icon-left><OIcon name="bolt" size="sm" /></template>
+                        {{ t("alerts.realTime") }}
+                      </OToggleGroupItem>
+                      <OToggleGroupItem v-if="isAnomalyDetectionEnabled" value="anomalyDetection" size="sm" data-test="tab-anomalyDetection">
+                        <template #icon-left><OIcon name="query-stats" size="sm" /></template>
+                        {{ t("alerts.anomalyDetection") }}
+                      </OToggleGroupItem>
+                    </OToggleGroup>
+                    <div class="tw:flex-1 tw:min-w-0">
+                      <OInput
+                        v-model="dynamicQueryModel"
+                        :placeholder="searchAcrossFolders ? t('dashboard.searchAcross') : t('alerts.search')"
+                        :clearable="searchAcrossFolders"
+                        @clear="clearSearchHistory"
+                        data-test="alert-list-search-input"
+                        class="tw:w-full"
+                      >
+                        <template #icon-left>
+                          <OIcon name="search" size="sm" />
+                        </template>
+                        <template #icon-right>
+                          <OToggleGroup
+                            :model-value="searchAcrossFolders ? 'all' : 'this'"
+                            type="single"
+                            class="tw:self-center tw:mr-1"
+                            @update:model-value="(v) => (searchAcrossFolders = v === 'all')"
+                          >
+                            <OToggleGroupItem
+                              value="this"
+                              size="xs"
+                              icon-left="folder-outline"
+                              data-test="alert-list-search-scope-current"
+                              title="Search only this folder"
+                            >This folder</OToggleGroupItem>
+                            <OToggleGroupItem
+                              value="all"
+                              size="xs"
+                              icon-left="search"
+                              data-test="alert-list-search-across-folders-toggle"
+                              title="Search across all folders"
+                            >All folders</OToggleGroupItem>
+                          </OToggleGroup>
+                        </template>
+                      </OInput>
+                    </div>
+                  </div>
+                </template>
+                <template #toolbar-trailing>
+                  <OButton
+                    variant="outline"
+                    size="icon-sm"
+                    icon-left="refresh"
+                    :loading="loading"
+                    title="Reload alerts"
+                    data-test="alert-list-refresh-btn"
+                    @click="refreshAlerts"
+                  />
+                </template>
 
 
                 <template #cell-name="{ row }">
-                  <div class="tw:flex tw:items-center tw:gap-1.5">
+                  <div class="tw:flex tw:items-center tw:gap-1.5 tw:min-w-0 tw:overflow-hidden">
                     <OIcon
                       v-if="row.is_real_time === 'anomaly'"
                       name="query-stats"
@@ -193,10 +202,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       size="sm"
                       class="tw:text-gray-400 tw:shrink-0"
                     />
-                    <span>{{ computedName(row.name) }}</span>
+                    <span class="tw:truncate">{{ row.name || "--" }}</span>
                   </div>
                   <OTooltip
-                    v-if="row.name?.length > 30"
+                    v-if="row.name"
                     :content="row.name"
                     content-class="alert-name-tooltip"
                   />
@@ -409,7 +418,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div style="width: 600px" class="tw:mt-6">
                       <template v-if="!templates.length">
                         <div
-                          class="tw:text-base tw:font-medium"
+                          class="tw:text-sm"
                           data-test="alert-list-create-template-text"
                         >
                           It looks like you haven't created any Templates yet.
@@ -426,7 +435,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </template>
                       <template v-if="!destinations.length && templates.length">
                         <div
-                          class="tw:text-base tw:font-medium"
+                          class="tw:text-sm"
                           data-test="alert-list-create-destination-text"
                         >
                           It looks like you haven't created any Destinations
@@ -444,7 +453,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </div>
                   <template v-else>
-                    <NoData />
+                    <OEmptyState
+                      size="hero"
+                      preset="no-alerts"
+                      :filtered="!!(filterQuery || searchQuery)"
+                      @action="
+                        (id) =>
+                          id === 'clear-filters'
+                            ? ((filterQuery = ''), (searchQuery = ''))
+                            : showAddUpdateFn({})
+                      "
+                    />
                   </template>
                 </template>
 
@@ -517,6 +536,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
+    </PageLayout>
     <template v-else-if="showAddAlertDialog && !showImportAlertDialog">
       <AddAlert
         v-model="formData"
@@ -636,13 +656,17 @@ import {
   ref,
   onBeforeMount,
   onActivated,
+  onDeactivated,
   onBeforeUnmount,
+  onUnmounted,
   watch,
   defineAsyncComponent,
   onMounted,
   computed,
   reactive,
 } from "vue";
+import PageLayout from "@/components/common/PageLayout.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import type { Ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -654,7 +678,7 @@ import { debounce } from "lodash-es";
 import alertsService from "@/services/alerts";
 import destinationService from "@/services/alert_destination";
 import templateService from "@/services/alert_templates";
-import NoData from "@/components/shared/grid/NoData.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
@@ -679,8 +703,6 @@ import SelectFolderDropDown from "../common/sidebar/SelectFolderDropDown.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
-import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
-import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import anomalyDetectionService from "@/services/anomaly_detection";
 import AlertHistoryDrawer from "@/components/alerts/AlertHistoryDrawer.vue";
@@ -699,16 +721,19 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { COL } from "@/lib/core/Table/OTable.types";
 // import alertList from "./alerts";
 
 export default defineComponent({
   name: "AlertList",
   components: {
+    PageLayout,
+    AppPageHeader,
     OSeparator,
     AddAlert: defineAsyncComponent(
       () => import("@/components/alerts/AddAlert.vue"),
     ),
-    NoData,
+    OEmptyState,
     ConfirmDialog,
     ImportAlert,
     DedupSummaryCards,
@@ -717,8 +742,6 @@ export default defineComponent({
     OToggleGroup,
     OToggleGroupItem,
     OInput,
-    OSearchInput,
-    OSwitch,
     OTooltip,
     SelectFolderDropDown,
     AlertHistoryDrawer,
@@ -764,7 +787,9 @@ export default defineComponent({
     const schemaList = ref([]);
     const streams: any = ref({});
     const isFetchingStreams = ref(false);
-    const loading = ref(false);
+    // Start in the loading state so the table shows the skeleton on first
+    // render instead of briefly flashing the empty state before the fetch.
+    const loading = ref(true);
     const isSubmitting = ref(false);
 
     // Compact toolbar: icon-only buttons when AI sidebar is open at narrow widths
@@ -968,20 +993,15 @@ export default defineComponent({
     const columns = computed<OTableColumnDef[]>(() => {
       const baseColumns: OTableColumnDef[] = [
         {
-          id: "#",
-          header: "#",
-          accessorKey: "#",
-          size: 67,
-          meta: { align: "left" },
-        },
-        {
           id: "name",
           accessorKey: "name",
           header: t("alerts.name"),
           sortable: true,
-          size: 250,
-          minSize: 200,
-          meta: { align: "left" },
+          hideable: true,
+          size: 280,
+          minSize: 320,
+          // Flex: fills the leftover width on load, freezes on first resize.
+          meta: { align: "left", flex: true },
         },
         {
           id: "owner",
@@ -989,7 +1009,9 @@ export default defineComponent({
           header: t("alerts.owner"),
           cell: " ",
           sortable: true,
-          size: 150,
+          resizable: true,
+          hideable: true,
+          size: 120,
           meta: { align: "left" },
         },
         // "period" (Look back window) — all tabs except realTime
@@ -1001,7 +1023,9 @@ export default defineComponent({
                 header: t("alerts.period"),
                 cell: " ",
                 sortable: true,
-                size: 150,
+                resizable: true,
+                hideable: true,
+                size: COL.frequency,
                 meta: { align: "center" },
               } as OTableColumnDef,
             ]
@@ -1015,7 +1039,9 @@ export default defineComponent({
                 header: t("alerts.frequency"),
                 cell: " ",
                 sortable: true,
-                size: 150,
+                resizable: true,
+                hideable: true,
+                size: COL.frequency,
                 meta: { align: "left" },
               } as OTableColumnDef,
             ]
@@ -1026,7 +1052,9 @@ export default defineComponent({
           header: t("alerts.lastTriggered"),
           cell: " ",
           sortable: true,
-          size: 150,
+          resizable: true,
+          hideable: true,
+          size: 160,
           meta: { align: "left" },
         },
         {
@@ -1035,7 +1063,9 @@ export default defineComponent({
           header: t("alerts.lastSatisfied"),
           cell: " ",
           sortable: true,
-          size: 150,
+          resizable: true,
+          hideable: true,
+          size: 160,
           meta: { align: "left" },
         },
         // Anomaly Detection columns — shown on anomalyDetection and all tabs
@@ -1047,7 +1077,9 @@ export default defineComponent({
                 header: "Last Trained At",
                 cell: " ",
                 sortable: true,
-                size: 150,
+                resizable: true,
+                hideable: true,
+                size: 160,
                 meta: { align: "left" },
               } as OTableColumnDef,
               {
@@ -1056,7 +1088,9 @@ export default defineComponent({
                 header: "Status",
                 cell: " ",
                 sortable: true,
-                size: 120,
+                resizable: true,
+                hideable: true,
+                size: COL.status,
                 meta: { align: "left" },
               } as OTableColumnDef,
             ]
@@ -1071,15 +1105,17 @@ export default defineComponent({
         },
       ];
 
-      // insert folder_name column if applicable
+      // insert folder_name column after the name column if applicable
       if (searchAcrossFolders.value && searchQuery.value !== "") {
-        baseColumns.splice(2, 0, {
+        baseColumns.splice(1, 0, {
           id: "folder_name",
           accessorKey: "folder_name",
           header: "Folder",
           cell: " ",
           sortable: true,
-          size: 150,
+          resizable: true,
+          hideable: true,
+          size: COL.folder,
           meta: { align: "center" },
         } as OTableColumnDef);
       }
@@ -1124,7 +1160,6 @@ export default defineComponent({
       anomaly: any,
       counter: number,
     ): any => ({
-      "#": counter <= 9 ? `0${counter}` : `${counter}`,
       alert_id: anomaly.alert_id || anomaly.anomaly_id || anomaly.id,
       anomaly_id: anomaly.alert_id || anomaly.anomaly_id || anomaly.id,
       name: anomaly.name,
@@ -1191,6 +1226,10 @@ export default defineComponent({
           // we are not fetching the alerts again, we are just assigning the alerts to the filteredResults
           allAlerts.value =
             store.state.organizationData.allAlertsListByFolderId[folderId];
+          // Data is served synchronously from cache — clear the loading flag
+          // (it starts true to avoid the empty-state flash) so the table renders
+          // the cached rows instead of staying stuck on the skeleton.
+          loading.value = false;
         }
       } catch (error) {
         throw error;
@@ -1268,7 +1307,6 @@ export default defineComponent({
           }
 
           return {
-            "#": counter <= 9 ? `0${counter++}` : counter++,
             alert_id: data.alert_id,
             name: data.name,
             alert_type: data.is_real_time ? "Real Time" : "Scheduled",
@@ -1460,6 +1498,9 @@ export default defineComponent({
         allSelectedAlerts.value = false;
 
         if (newVal == router.currentRoute.value.query.folder) {
+          // Not refetching here — clear the initial loading flag so the table
+          // doesn't stay stuck on the skeleton.
+          loading.value = false;
           return;
         }
         if (searchAcrossFolders.value) {
@@ -2354,12 +2395,6 @@ export default defineComponent({
         });
       }
     };
-    const computedName = (name: string) => {
-      if (!name) {
-        return "--";
-      }
-      return name.length > 30 ? name.substring(0, 30) + "..." : name;
-    };
     const computedOwner = (owner: string) => {
       if (!owner) {
         return "--";
@@ -2676,7 +2711,6 @@ export default defineComponent({
       openMenu,
       getAlertsFn,
       multipleExportAlert,
-      computedName,
       computedOwner,
       tabs,
       alertTabs,
@@ -2751,19 +2785,18 @@ export default defineComponent({
 }
 
 .scroll-content {
-  width: 100%; /* Use the full width of the parent */
-  overflow-y: auto; /* Enable vertical scrolling for long content */
-  padding: 10px; /* Optional: padding for aesthetics */
-  border: 1px solid #ddd; /* Optional: border for visibility */
+  width: 100%;
+  overflow-y: auto;
+  padding: 0.625rem;
+  border: 1px solid var(--o2-border-color);
   height: 100%;
   max-height: 200px;
-  /* Use the full height of the parent */
   text-wrap: normal;
-  background-color: #e8e8e8;
-  color: black;
+  background-color: var(--o2-muted-background);
+  color: var(--o2-text-primary);
 }
 .expanded-sql {
-  border-left: #7a54a2 3px solid;
+  border-left: 3px solid var(--o2-primary-color);
 }
 .alert-name-tooltip {
   max-width: 400px;
@@ -2794,12 +2827,12 @@ export default defineComponent({
 
     :deep(.rum-tab) {
       &:hover {
-        background: #464646;
+        background: var(--o2-hover-gray);
       }
 
       &.active {
-        background: #5960b2;
-        color: #ffffff !important;
+        background: var(--o2-primary-color);
+        color: var(--o2-primary-foreground) !important;
       }
     }
   }
@@ -2809,7 +2842,7 @@ export default defineComponent({
   height: fit-content;
 
   :deep(.rum-tabs) {
-    border: 1px solid #eaeaea;
+    border: 1px solid var(--o2-border-color);
     height: fit-content;
     border-radius: 4px;
     overflow: hidden;
@@ -2821,12 +2854,12 @@ export default defineComponent({
     border: none !important;
 
     &:hover {
-      background: #eaeaea;
+      background: var(--o2-hover-gray);
     }
 
     &.active {
-      background: #5960b2;
-      color: #ffffff !important;
+      background: var(--o2-primary-color);
+      color: var(--o2-primary-foreground) !important;
     }
   }
 }

@@ -12,43 +12,43 @@
         :current-page="currentPage"
         :page-size-options="[50]"
         :expanded-ids="expandedIds"
+        :loading="loading"
         @update:current-page="currentPage = $event"
         @update:expanded-ids="onExpandedIdsChange"
         @row-click="onRowClick"
       >
-        <!-- Field row: render field name with expand chevron when expandable -->
+        <!-- Field row: render field name with expand chevron + actions inside OFieldRow -->
         <template #field-row="{ row }">
-          <span class="field-type-container">
-            <OIcon
-              v-if="isExpandable(row)"
-              class="field-expand-icon"
-              :name="expandedRows[row.name] ? 'expand-less' : 'expand-more'"
-              size="sm"
-            />
-          </span>
-          <OFieldLabel :field="row" class="tw:flex-1 tw:min-w-0" />
-        </template>
-
-        <!-- Field actions: always add button, copy for expandable -->
-        <template #field-actions="{ row }">
-          <OButton
-            v-if="!hideAddSearchTerm"
-            variant="ghost"
-            size="icon-xs-circle"
-            :data-test="`log-search-index-list-filter-${row.name}-field-btn`"
-            @click.stop="addSearchTerm(`${row.name}=''`)"
-          >
-            <OIcon name="add" size="sm" />
-          </OButton>
-          <OButton
-            v-if="!hideCopyValue && isExpandable(row)"
-            variant="ghost"
-            size="icon-xs-circle"
-            :data-test="`log-search-index-list-filter-${row.name}-copy-btn`"
-            @click.stop="copyContentValue(row.name)"
-          >
-            <OIcon name="content-copy" size="sm" />
-          </OButton>
+          <OFieldRow :highlight="!!expandedRows[row.name]">
+            <span class="field-type-container">
+              <OIcon
+                class="field-expand-icon"
+                :name="expandedRows[row.name] ? 'expand-more' : 'chevron-right'"
+                size="sm"
+              />
+            </span>
+            <OFieldLabel :field="row" />
+            <template #actions>
+              <OButton
+                v-if="!hideAddSearchTerm"
+                variant="ghost-neutral"
+                size="icon"
+                :data-test="`log-search-index-list-filter-${row.name}-field-btn`"
+                @click.stop="addSearchTerm(`${row.name}=''`)"
+              >
+                <OIcon name="add" size="sm" />
+              </OButton>
+              <OButton
+                v-if="!hideCopyValue && isExpandable(row)"
+                variant="ghost-neutral"
+                size="icon"
+                :data-test="`log-search-index-list-filter-${row.name}-copy-btn`"
+                @click.stop="copyContentValue(row.name)"
+              >
+                <OIcon name="content-copy" size="sm" />
+              </OButton>
+            </template>
+          </OFieldRow>
         </template>
 
         <!-- Expansion: FieldValuesPanel -->
@@ -68,6 +68,65 @@
               @load-more-values="handleLoadMoreValues"
               @search-field-values="handleSearchFieldValues"
             />
+          </div>
+        </template>
+
+        <!-- Loading skeleton -->
+        <template #loading>
+          <div
+            data-test="search-fieldlist-loading-skeleton"
+            class="tw:w-full tw:flex tw:flex-col"
+          >
+            <!-- Group 1 header -->
+            <div class="tw:h-7 tw:flex tw:items-center tw:justify-between tw:px-2">
+              <OSkeleton type="rect" class="tw:h-3 tw:w-24 tw:rounded-sm" />
+              <OSkeleton type="rect" class="tw:h-3 tw:w-3 tw:rounded-sm" />
+            </div>
+            <!-- Group 1 fields -->
+            <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-[0.375rem]">
+              <OSkeleton type="rect" class="tw:w-[0.875rem] tw:h-[0.875rem] tw:rounded-sm tw:shrink-0" />
+              <OSkeleton type="text" class="tw:flex-1" />
+            </div>
+            <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-[0.375rem]">
+              <OSkeleton type="rect" class="tw:w-[0.875rem] tw:h-[0.875rem] tw:rounded-sm tw:shrink-0" />
+              <OSkeleton type="text" class="tw:w-3/4" />
+            </div>
+            <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-[0.375rem]">
+              <OSkeleton type="rect" class="tw:w-[0.875rem] tw:h-[0.875rem] tw:rounded-sm tw:shrink-0" />
+              <OSkeleton type="text" class="tw:flex-1" />
+            </div>
+            <!-- Group 2 header -->
+            <div class="tw:h-7 tw:flex tw:items-center tw:justify-between tw:px-2 tw:mt-2">
+              <OSkeleton type="rect" class="tw:h-3 tw:w-16 tw:rounded-sm" />
+              <OSkeleton type="rect" class="tw:h-3 tw:w-3 tw:rounded-sm" />
+            </div>
+            <!-- Group 2 fields -->
+            <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-[0.375rem]">
+              <OSkeleton type="rect" class="tw:w-[0.875rem] tw:h-[0.875rem] tw:rounded-sm tw:shrink-0" />
+              <OSkeleton type="text" class="tw:w-4/5" />
+            </div>
+            <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-[0.375rem]">
+              <OSkeleton type="rect" class="tw:w-[0.875rem] tw:h-[0.875rem] tw:rounded-sm tw:shrink-0" />
+              <OSkeleton type="text" class="tw:w-2/3" />
+            </div>
+            <!-- Group 3 header -->
+            <div class="tw:h-7 tw:flex tw:items-center tw:justify-between tw:px-2 tw:mt-2">
+              <OSkeleton type="rect" class="tw:h-3 tw:w-32 tw:rounded-sm" />
+              <OSkeleton type="rect" class="tw:h-3 tw:w-3 tw:rounded-sm" />
+            </div>
+            <!-- Group 3 fields -->
+            <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-[0.375rem]">
+              <OSkeleton type="rect" class="tw:w-[0.875rem] tw:h-[0.875rem] tw:rounded-sm tw:shrink-0" />
+              <OSkeleton type="text" class="tw:flex-1" />
+            </div>
+            <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-[0.375rem]">
+              <OSkeleton type="rect" class="tw:w-[0.875rem] tw:h-[0.875rem] tw:rounded-sm tw:shrink-0" />
+              <OSkeleton type="text" class="tw:w-3/4" />
+            </div>
+            <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-[0.375rem]">
+              <OSkeleton type="rect" class="tw:w-[0.875rem] tw:h-[0.875rem] tw:rounded-sm tw:shrink-0" />
+              <OSkeleton type="text" class="tw:flex-1" />
+            </div>
           </div>
         </template>
 
@@ -130,6 +189,8 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OFieldList from "@/lib/lists/FieldList/OFieldList.vue";
 import OFieldLabel from "@/lib/lists/FieldList/OFieldLabel.vue";
+import OFieldRow from "@/lib/lists/FieldList/OFieldRow.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import { copyToClipboard } from "@/utils/clipboard";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
@@ -168,6 +229,10 @@ const props = defineProps({
     default: "",
   },
   showCount: {
+    type: Boolean,
+    default: false,
+  },
+  loading: {
     type: Boolean,
     default: false,
   },
@@ -551,11 +616,20 @@ const copyContentValue = (value: string) => {
   }
 
   .field-type-container {
-    width: 1.25rem;
+    width: 0.55rem;
     flex-shrink: 0;
     display: flex;
     align-items: center;
     justify-content: center;
+  }
+
+  .field-expand-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 1rem;
+    color: var(--o2-text-muted);
   }
 }
 </style>

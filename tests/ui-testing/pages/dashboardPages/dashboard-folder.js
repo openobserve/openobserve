@@ -15,7 +15,7 @@ export default class DashboardFolder {
       '[data-test="dashboard-folder-add-name-field"]'
     );
     this.folderDialogSaveBtn = page.locator(
-      '[data-test="dashboard-folder-dialog"] [data-test="o-drawer-primary-btn"]'
+      '[data-test="dashboard-folder-dialog"] [data-test="o-dialog-primary-btn"]'
     );
     // More-icon and the post-menu actions live on the global page surface
     // (rendered into a Reka portal in the menu case). The folder-card scoped
@@ -87,6 +87,12 @@ export default class DashboardFolder {
 
     await this.folderDialogSaveBtn.waitFor({ state: "visible", timeout: 5000 });
     await this.folderDialogSaveBtn.click();
+    // Wait for the dialog to fully close before any subsequent interactions.
+    // Reka UI sets aria-hidden="true" on the overlay during the close animation
+    // (data-state stays "open"), so waitFor({ state: "hidden" }) resolves too early
+    // while the overlay still intercepts pointer events.
+    // Wait for the overlay to be detached from the DOM instead.
+    await this.page.locator('[data-test="o-dialog-overlay"]').waitFor({ state: "detached", timeout: 10000 }).catch(() => {});
   }
 
   // Delete folder

@@ -486,6 +486,60 @@ pub async fn get_role_permissions(
     }
 }
 
+#[cfg(feature = "enterprise")]
+/// GetRolePermissions
+#[utoipa::path(
+    get,
+    path = "/{org_id}/roles/{role_id}/permissions",
+    context_path = "/api",
+    tag = "Roles",
+    operation_id = "GetRolePermissions",
+    summary = "Get all role permissions",
+    description = "Retrieves all permissions a role has across every resource type in a single request. Replaces issuing one request per resource type. Requires enterprise features to be enabled.",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("role_id" = String, Path, description = "Role Id"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Object>)),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    )
+)]
+pub async fn get_all_role_permissions(Path((org_id, role_id)): Path<(String, String)>) -> Response {
+    match o2_openfga::authorizer::roles::get_all_role_permissions(&org_id, &role_id).await {
+        Ok(res) => Json(res).into_response(),
+        Err(err) => MetaHttpResponse::internal_error(err),
+    }
+}
+
+#[cfg(not(feature = "enterprise"))]
+#[utoipa::path(
+    get,
+    path = "/{org_id}/roles/{role_id}/permissions",
+    context_path = "/api",
+    tag = "Roles",
+    operation_id = "GetRolePermissions",
+    summary = "Get all role permissions",
+    description = "Retrieves all permissions a role has across every resource type in a single request. This endpoint is only available with enterprise features enabled and will return a forbidden error in the community edition.",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("role_id" = String, Path, description = "Role Id"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Object>)),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    )
+)]
+pub async fn get_all_role_permissions(Path(_path): Path<(String, String)>) -> Response {
+    MetaHttpResponse::forbidden("Not Supported")
+}
+
 #[cfg(not(feature = "enterprise"))]
 #[utoipa::path(
     get,
@@ -616,6 +670,58 @@ pub async fn get_roles_for_user(Path((org_id, user_email)): Path<(String, String
     )
 )]
 pub async fn get_roles_for_user(Path(_path): Path<(String, String)>) -> Response {
+    MetaHttpResponse::forbidden("Not Supported")
+}
+
+#[cfg(feature = "enterprise")]
+/// GetAllUsersRoles
+#[utoipa::path(
+    get,
+    path = "/{org_id}/users/roles/all",
+    context_path = "/api",
+    tag = "Users",
+    operation_id = "GetAllUsersRoles",
+    summary = "Get roles for all users",
+    description = "Retrieves the roles assigned to every user in the organization in a single request, returned as a map of user email to role list. Replaces issuing one request per user. Requires enterprise features to be enabled.",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    )
+)]
+pub async fn get_roles_for_all_users(Path(org_id): Path<String>) -> Response {
+    match o2_openfga::authorizer::roles::get_roles_for_all_org_users(&org_id).await {
+        Ok(res) => Json(res).into_response(),
+        Err(err) => MetaHttpResponse::internal_error(err),
+    }
+}
+
+#[cfg(not(feature = "enterprise"))]
+#[utoipa::path(
+    get,
+    path = "/{org_id}/users/roles/all",
+    context_path = "/api",
+    tag = "Users",
+    operation_id = "GetAllUsersRoles",
+    summary = "Get roles for all users",
+    description = "Retrieves the roles assigned to every user in the organization in a single request. This endpoint is only available with enterprise features enabled and will return a forbidden error in the community edition.",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    )
+)]
+pub async fn get_roles_for_all_users(Path(_path): Path<String>) -> Response {
     MetaHttpResponse::forbidden("Not Supported")
 }
 
@@ -1442,6 +1548,28 @@ mod tests {
                 "test@example.com".to_string(),
             )))
             .await;
+            assert_eq!(extract_status_code(&resp), StatusCode::FORBIDDEN);
+        }
+    }
+
+    #[tokio::test]
+    #[cfg_attr(
+        feature = "enterprise",
+        should_panic(expected = "called `Option::unwrap()` on a `None` value")
+    )]
+    async fn test_get_roles_for_all_users_enterprise() {
+        #[cfg(feature = "enterprise")]
+        {
+            init_ofga_test();
+            let resp = get_roles_for_all_users(Path("test_org".to_string())).await;
+            // Will likely fail due to missing OFGA setup, but testing structure
+            let status = extract_status_code(&resp);
+            assert!(status.is_client_error() || status.is_server_error());
+        }
+
+        #[cfg(not(feature = "enterprise"))]
+        {
+            let resp = get_roles_for_all_users(Path("test_org".to_string())).await;
             assert_eq!(extract_status_code(&resp), StatusCode::FORBIDDEN);
         }
     }

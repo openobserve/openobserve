@@ -33,7 +33,16 @@ export type BadgeVariant =
   | "primary-soft"
   | "success-soft"
   | "warning-soft"
-  | "error-soft";
+  | "error-soft"
+  // NEW: Extended color families for correlation dimensions (8 colors × 3 variants = 24 new variants)
+  | "teal" | "teal-outline" | "teal-soft"
+  | "orange" | "orange-outline" | "orange-soft"
+  | "lime" | "lime-outline" | "lime-soft"
+  | "amber" | "amber-outline" | "amber-soft"
+  | "cyan" | "cyan-outline" | "cyan-soft"
+  | "blue" | "blue-outline" | "blue-soft"
+  | "purple" | "purple-outline" | "purple-soft"
+  | "indigo" | "indigo-outline" | "indigo-soft";
 
 /** Size controls padding and font-size only — shape is always pill (rounded-full). */
 export type BadgeSize = "sm" | "md";
@@ -61,6 +70,13 @@ export interface BadgeProps {
    * (q-badge-compatible behavior).
    */
   hideZeroCount?: boolean;
+  /**
+   * Renders a 7px solid status dot before the label (HANDOFF §11). The dot
+   * inherits the badge's foreground colour (`currentColor`), so a `success`
+   * badge gets a green dot, an `error` badge a red dot, etc. Use for live
+   * status pills like "active" / "suspended".
+   */
+  dot?: boolean;
   /**
    * Makes the badge interactive — adds keyboard handling, hover feedback,
    * and a visible focus ring. Emits `click` on activation.

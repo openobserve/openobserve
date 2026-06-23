@@ -6,28 +6,29 @@
 <template>
   <div class="query-editor tw:w-full tw:relative" :style="rootStyle">
     <!-- AI Input Bar (shown in NL Mode) - Positioned at top -->
+    <!-- Height locked to 1.875rem = same as icon-toolbar expand button -->
     <div
       v-if="isAIMode"
-      class="ai-input-bar tw:p-2 tw:flex-shrink-0 tw:z-10"
+      :class="['ai-input-bar tw:h-[2.25rem] tw:flex tw:items-center tw:gap-2 tw:px-2 tw:flex-shrink-0 tw:z-10', props.hasExpandButton && 'tw:pr-10']"
     >
       <!-- Show streaming status with spinner + stop button -->
-      <div v-if="isGenerating" :class="aiBarStreamingClass">
-        <img :src="nlpIcon" alt="AI" class="tw:w-[20px] tw:h-[20px]" />
+      <template v-if="isGenerating">
+        <img :src="nlpIcon" alt="AI" class="tw:w-[20px] tw:h-[20px] tw:shrink-0" />
         <OSpinner variant="dots" size="xs" />
-        <span class="tw:text-sm tw:flex-1">{{ streamingText || aiStatusText || t('search.analyzingQuery') }}</span>
+        <span class="tw:text-sm tw:flex-1 tw:truncate">{{ streamingText || aiStatusText || t('search.analyzingQuery') }}</span>
         <OButton
           variant="ghost-destructive"
           size="icon-circle-sm"
           icon-left="stop"
           :data-test="`${dataTestPrefix}-ai-stop-btn`"
           @click="cancelGeneration"
-          class="ai-stop-button"
+          class="ai-stop-button tw:shrink-0"
         >
           <OTooltip :content="t('common.stopGenerating')" />
         </OButton>
-      </div>
+      </template>
       <!-- Normal input when not generating -->
-      <div v-else class="tw:flex tw:items-center tw:gap-2">
+      <template v-else>
         <OInput
           v-model="aiInputText"
           :placeholder="props.aiPlaceholder || t('search.askAIPlaceholder')"
@@ -63,7 +64,7 @@
         >
           <OTooltip :content="t('common.close')" />
         </OButton>
-      </div>
+      </template>
     </div>
 
     <!-- Code Editor with relative positioning for floating button -->
@@ -81,8 +82,8 @@
         :debounce-time="debounceTime"
         @update:query="handleQueryUpdate"
         @run-query="emit('run-query')"
-        @focus="emit('focus')"
-        @blur="emit('blur')"
+        @focus="handleEditorFocus"
+        @blur="handleEditorBlur"
         @nlpModeDetected="handleNlpModeDetected"
         @generation-start="handleGenerationStart"
         @generation-end="handleGenerationEnd"
@@ -99,6 +100,7 @@
         :disabled="props.disableAi"
         @click="nlpMode = true"
         class="ai-floating-button"
+        :style="props.hasExpandButton ? { right: '2.375rem' } : { right: '0.25rem' }"
       >
         <img :src="nlpIcon" alt="AI Mode" class="tw:w-[18px] tw:h-[18px] ai-icon" />
         <OTooltip :content="props.disableAi && props.disableAiReason ? props.disableAiReason : t('nlMode.toggle')" />
@@ -148,6 +150,7 @@ interface Props {
   disableAiReason?: string;     // Tooltip reason when AI is disabled
   aiPlaceholder?: string;       // Custom placeholder for AI input (default: 'search.askAIPlaceholder')
   aiTooltip?: string;           // Custom tooltip for AI send button (default: 'search.enterPrompt')
+  hasExpandButton?: boolean;    // Reserve right padding so AI bar close btn doesn't overlap the expand btn
 
   // Testing
   dataTestPrefix?: string;
@@ -166,6 +169,7 @@ const props = withDefaults(defineProps<Props>(), {
   hideNlToggle: false,
   disableAi: false,
   disableAiReason: '',
+  hasExpandButton: false,
   dataTestPrefix: 'query-editor',
 });
 
@@ -231,8 +235,8 @@ const nlpIcon = computed(() => {
 // Computed: AI input field class based on theme
 const aiInputFieldClass = computed(() => {
   return store.state.theme === 'dark'
-    ? 'ai-input-field ai-input-field--dark tw:flex-1'
-    : 'ai-input-field tw:flex-1';
+    ? 'ai-input-field ai-input-field--dark tw:flex-1 tw:my-px'
+    : 'ai-input-field tw:flex-1 tw:my-px';
 });
 
 // Computed: AI streaming bar class based on theme
@@ -260,13 +264,20 @@ const rootStyle = computed(() => {
   if (props.editorHeight === '100%') {
     return { height: '100%' };
   }
-  // For fixed/calc heights, apply to the root so it sizes correctly in any parent
   return { height: props.editorHeight };
 });
 
 // Handle query update from editor
 const handleQueryUpdate = (newQuery: string) => {
   emit('update:query', newQuery);
+};
+
+const handleEditorFocus = () => {
+  emit('focus');
+};
+
+const handleEditorBlur = () => {
+  emit('blur');
 };
 
 // Handle auto-detection from editor
@@ -530,11 +541,24 @@ defineExpose({
     }
   },
 
+  // Error diagnostics
+  addErrorDiagnostics: (ranges: any[]) => {
+    if (editorRef.value?.addErrorDiagnostics) {
+      editorRef.value.addErrorDiagnostics(ranges);
+    }
+  },
+  clearErrorDiagnostics: () => {
+    if (editorRef.value?.addErrorDiagnostics) {
+      editorRef.value.addErrorDiagnostics([]);
+    }
+  },
+
   // State (for parent components that need to read generation status)
   isGenerating: computed(() => isGenerating.value),
 
   // Streaming response (for AI status display)
   streamingResponse: computed(() => editorRef.value?.streamingResponse),
+
 });
 </script>
 
@@ -551,11 +575,11 @@ defineExpose({
   overflow: hidden;
 }
 
-/* Floating AI Button (top-right corner) - matches MainLayout ai-hover-btn */
+/* Floating AI Button (top-right corner) - right is set dynamically via :style based on hasExpandButton */
 .ai-floating-button {
   position: absolute;
   top: 0.1875rem;
-  right: 1.375rem;
+  right: 0.25rem;
   z-index: 100;
   background: linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(236, 72, 153, 0.15) 100%) !important;
   color: white !important;
@@ -631,11 +655,20 @@ defineExpose({
   border-bottom: 1px solid var(--o2-border-color);
 }
 
+.ai-input-field {
+  height: 1.75rem !important; /* tw:h-7 = 28px, overrides OInput's default h-8 (32px) */
+}
+
+.ai-input-field :deep(.tw\:h-8) {
+  height: 1.75rem !important; /* h-7 = 28px, overrides OInput's default h-8 (32px) */
+}
+
 .ai-input-field :deep(.q-field__control) {
   background: white;
   border-radius: 6px;
-  padding: 2px 8px;
-  min-height: 32px;
+  padding: 0 8px;
+  min-height: 18px;
+  height: 18px;
 }
 
 /* Remove focus border */

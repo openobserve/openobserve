@@ -530,6 +530,75 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-config-decimals"
         />
 
+        <!-- Multi-SQL: extra query-tabs visible when SQL has 2+ queries
+             (promql query-tabs are rendered separately above). Not for
+             geomap/maps which don't support multi-query. -->
+        <div
+          v-if="
+            !promqlMode &&
+            dashboardPanelData.data.queries.length > 1 &&
+            dashboardPanelData.data.type != 'geomap' &&
+            dashboardPanelData.data.type != 'maps'
+          "
+          class="showLabelOnTop"
+          style="font-weight: 600"
+        >
+          {{ t("dashboard.query") }}
+          <OTabs
+            v-model="dashboardPanelData.layout.currentQueryIndex"
+            dense
+            mobile-arrows
+            data-test="dashboard-config-query-tab"
+          >
+            <OTab
+              v-for="(tab, index) in dashboardPanelData.data.queries"
+              :key="index"
+              :name="index"
+              :label="tab.tabName || (t('dashboard.queryLabel') + ' ' + (index + 1))"
+              :data-test="`dashboard-config-query-tab-${index}`"
+            >
+            </OTab>
+          </OTabs>
+        </div>
+
+        <!-- Multi-SQL: per-query custom legend label, visible only for SQL with 2+ queries -->
+        <div
+          v-if="
+            !promqlMode &&
+            dashboardPanelData.data.queries.length > 1 &&
+            dashboardPanelData.data.type != 'geomap' &&
+            dashboardPanelData.data.type != 'maps'
+          "
+          v-show="isConfigOptionVisible('data', 'query-label')"
+          class="tw:mt-3"
+        >
+          <div class="tw:flex tw:items-center tw:gap-1 tw:mb-2" style="font-weight: 600">
+            {{ t("dashboard.multiSqlQueryLabel") }}
+            <OIcon name="info-outline" size="sm" />
+            <OTooltip
+              side="top"
+              align="center"
+              max-width="250px"
+              :content="t('dashboard.multiSqlQueryLabelHint')"
+            />
+          </div>
+          <OInput
+            v-model="
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].config.query_label
+            "
+            size="sm"
+            placeholder="{field_name}"
+            class="tw:w-full"
+            :data-test="`dashboard-config-legend-${dashboardPanelData.layout.currentQueryIndex}`"
+            @focus="() => {
+              const q = dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex];
+              if (!q.config.query_label) q.config.query_label = '{field_name}';
+            }"
+          />
+        </div>
+
         <OInput
           v-if="
             !promqlMode &&
@@ -2155,6 +2224,10 @@ export default defineComponent({
         value: "numbers",
       },
       {
+        label: t("dashboard.localeFormat"),
+        value: "locale",
+      },
+      {
         label: t("dashboard.bytes"),
         value: "bytes",
       },
@@ -2451,11 +2524,14 @@ export default defineComponent({
       return supportedTypes.includes(dashboardPanelData.data.type);
     });
 
+    // Trellis requires EVERY query to have a breakdown field, so treat the
+    // breakdown as "empty" (disabling the trellis options) when ANY query is
+    // missing one — not just the currently selected query tab.
     const isBreakdownFieldEmpty = computed(() => {
+      const queries = dashboardPanelData.data.queries || [];
       return (
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ]?.fields?.breakdown?.length == 0
+        queries.length === 0 ||
+        queries.some((q: any) => (q?.fields?.breakdown?.length ?? 0) === 0)
       );
     });
 
@@ -2789,7 +2865,7 @@ export default defineComponent({
 .config-search-wrapper {
   padding: 4px 4px;
   top: 0;
-  z-index: 10;
+  z-index: 20;
   background-color: var(--o2-card-bg-solid);
   border-bottom: 1px solid var(--o2-border-color);
 }

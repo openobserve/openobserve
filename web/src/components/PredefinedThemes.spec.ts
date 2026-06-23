@@ -248,6 +248,49 @@ describe("PredefinedThemes", () => {
       expect(vm.predefinedThemes.length).toBeGreaterThan(0);
     });
 
+    it("includes O2 Crimson Ink as a predefined theme with semanticColors", () => {
+      const wrapper = createWrapper();
+      const { vm } = wrapper;
+      const o2Theme = (vm as any).predefinedThemes.find((t: any) => t.name === 'O2 Crimson Ink');
+      expect(o2Theme).toBeDefined();
+      expect(o2Theme.light.themeColor).toBe('#E11D48');
+      expect(o2Theme.light.semanticColors).toBeDefined();
+      expect(o2Theme.light.semanticColors.error).toBe('#F97316');
+      expect(o2Theme.light.semanticColors.success).toBe('#6366F1');
+      expect(o2Theme.dark.semanticColors).toBeDefined();
+    });
+
+    it("passes semanticColors to applyThemeColors when applying O2 Crimson Ink", async () => {
+      const wrapper = createWrapper();
+      const { vm } = wrapper;
+      const { applyThemeColors } = await import('@/utils/theme');
+      const o2Theme = (vm as any).predefinedThemes.find((t: any) => t.name === 'O2 Crimson Ink');
+      (vm as any).applyTheme(o2Theme, 'light');
+      expect(applyThemeColors).toHaveBeenCalledWith(
+        '#E11D48',
+        'light',
+        false,
+        expect.objectContaining({
+          error: '#F97316',
+          success: '#6366F1',
+        }),
+      );
+    });
+
+    it("does not pass semanticColors when applying a non-signature theme", async () => {
+      const wrapper = createWrapper();
+      const { vm } = wrapper;
+      const { applyThemeColors } = await import('@/utils/theme');
+      const oceanTheme = (vm as any).predefinedThemes.find((t: any) => t.name === 'Ocean Breeze');
+      (vm as any).applyTheme(oceanTheme, 'light');
+      expect(applyThemeColors).toHaveBeenCalledWith(
+        oceanTheme.light.themeColor,
+        'light',
+        false,
+        undefined,
+      );
+    });
+
     it("should display custom color option", () => {
       const wrapper = createWrapper();
       expect(wrapper.text()).toContain("Custom Color");

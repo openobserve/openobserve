@@ -1,0 +1,4132 @@
+{
+  "queries": [
+    {
+      "id": "Q074",
+      "sql": "SELECT _timestamp, log, facility_zone FROM \"{stream}\" WHERE match_all('warehouse') ORDER BY _timestamp DESC LIMIT 10",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "log",
+          "facility_zone"
+        ],
+        "results": [
+          [
+            "Q076 warehouse event record 2",
+            "ZONE-1"
+          ],
+          [
+            "Q076 warehouse event record 1",
+            "ZONE-4"
+          ],
+          [
+            "Q075 warehouse event record 4",
+            "ZONE-2"
+          ],
+          [
+            "Q076 warehouse event record 0 ACK batch batchIdList:Q076-0",
+            "ZONE-3"
+          ],
+          [
+            "Q075 warehouse event record 3 ACK batch batchIdList:Q075-3",
+            "ZONE-1"
+          ],
+          [
+            "Q075 warehouse event record 2",
+            "ZONE-4"
+          ],
+          [
+            "Q075 warehouse event record 1",
+            "ZONE-3"
+          ],
+          [
+            "Q074 warehouse event record 4",
+            "ZONE-1"
+          ],
+          [
+            "Q075 warehouse event record 0 ACK batch batchIdList:Q075-0",
+            "ZONE-2"
+          ],
+          [
+            "Q074 warehouse event record 3 ACK batch batchIdList:Q074-3",
+            "ZONE-4"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 4379000000,
+        "end_offset": 4543000000
+      }
+    },
+    {
+      "id": "Q075",
+      "sql": "SELECT _timestamp, log, pallet_id FROM \"{stream}\" WHERE match_all('event') ORDER BY _timestamp ASC",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "log",
+          "pallet_id"
+        ],
+        "results": [
+          [
+            "Q075 warehouse event record 0 ACK batch batchIdList:Q075-0",
+            "PL-008"
+          ],
+          [
+            "Q074 warehouse event record 4",
+            "PL-007"
+          ],
+          [
+            "Q075 warehouse event record 1",
+            "PL-001"
+          ],
+          [
+            "Q075 warehouse event record 2",
+            "PL-002"
+          ],
+          [
+            "Q075 warehouse event record 3 ACK batch batchIdList:Q075-3",
+            "PL-003"
+          ],
+          [
+            "Q076 warehouse event record 0 ACK batch batchIdList:Q076-0",
+            "PL-005"
+          ],
+          [
+            "Q075 warehouse event record 4",
+            "PL-004"
+          ],
+          [
+            "Q076 warehouse event record 1",
+            "PL-006"
+          ],
+          [
+            "Q076 warehouse event record 2",
+            "PL-007"
+          ],
+          [
+            "Q076 warehouse event record 3 ACK batch batchIdList:Q076-3",
+            "PL-008"
+          ],
+          [
+            "Q077 warehouse event record 0 ACK batch batchIdList:Q077-0",
+            "PL-002"
+          ],
+          [
+            "Q076 warehouse event record 4",
+            "PL-001"
+          ],
+          [
+            "Q077 warehouse event record 1",
+            "PL-003"
+          ],
+          [
+            "Q077 warehouse event record 2",
+            "PL-004"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 4439000000,
+        "end_offset": 4603000000
+      }
+    },
+    {
+      "id": "Q076",
+      "sql": "SELECT facility_zone, COUNT(*) AS cnt FROM \"{stream}\" WHERE match_all('record') AND throughput_rate > 200.0 GROUP BY facility_zone ORDER BY cnt DESC",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "cnt"
+        ],
+        "results": [
+          [
+            "ZONE-3",
+            "4"
+          ],
+          [
+            "ZONE-2",
+            "3"
+          ],
+          [
+            "ZONE-1",
+            "3"
+          ],
+          [
+            "ZONE-4",
+            "2"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 4499000000,
+        "end_offset": 4663000000
+      }
+    },
+    {
+      "id": "Q077",
+      "sql": "SELECT histogram(_timestamp) AS _time, COUNT(*) AS match_count FROM \"{stream}\" WHERE match_all('warehouse') GROUP BY _time ORDER BY _time ASC",
+      "category": "full_text_search",
+      "expected": {
+        "row_count": 17,
+        "columns": [
+          "_time",
+          "match_count"
+        ],
+        "note": "match_all with histogram aggregation",
+        "skip_row_count": true,
+        "assertions": [
+          {
+            "type": "value_range",
+            "column": "match_count",
+            "min": 0
+          }
+        ]
+      },
+      "time_offset": {
+        "start_offset": 4559000000,
+        "end_offset": 4723000000
+      }
+    },
+    {
+      "id": "Q078",
+      "sql": "SELECT _timestamp, pallet_id, facility_zone, sorter_model, throughput_rate, load_factor FROM \"{stream}\" WHERE match_all('warehouse') AND throughput_rate > 400.0 AND facility_zone IN ('ZONE-1', 'ZONE-2') ORDER BY throughput_rate DESC LIMIT 10",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "pallet_id",
+          "facility_zone",
+          "sorter_model",
+          "throughput_rate",
+          "load_factor"
+        ],
+        "results": [
+          [
+            "PL-003",
+            "ZONE-1",
+            "SORT-M3",
+            "900.0",
+            "94.6"
+          ],
+          [
+            "PL-007",
+            "ZONE-1",
+            "SORT-M3",
+            "840.0",
+            "33.0"
+          ],
+          [
+            "PL-003",
+            "ZONE-1",
+            "SORT-M3",
+            "610.0",
+            "99.0"
+          ],
+          [
+            "PL-008",
+            "ZONE-2",
+            "SORT-Z9",
+            "480.0",
+            "21.4"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 4619000000,
+        "end_offset": 4783000000
+      }
+    },
+    {
+      "id": "Q079",
+      "sql": "SELECT facility_zone, COUNT(*) AS match_cnt, ROUND(AVG(throughput_rate), 2) AS avg_tput, ROUND(AVG(load_factor), 2) AS avg_load FROM \"{stream}\" WHERE match_all('event') AND operation_mode != 'manual' GROUP BY facility_zone HAVING COUNT(*) >= 1 ORDER BY match_cnt DESC",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "match_cnt",
+          "avg_tput",
+          "avg_load"
+        ],
+        "results": [
+          [
+            "ZONE-4",
+            "3",
+            "451.67",
+            "26.4"
+          ],
+          [
+            "ZONE-1",
+            "2",
+            "580.0",
+            "50.45"
+          ],
+          [
+            "ZONE-2",
+            "2",
+            "457.5",
+            "50.3"
+          ],
+          [
+            "ZONE-3",
+            "1",
+            "320.0",
+            "67.9"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 4679000000,
+        "end_offset": 4843000000
+      }
+    },
+    {
+      "id": "Q080",
+      "sql": "SELECT histogram(_timestamp, '1 minute') AS time_block, COUNT(*) FILTER (WHERE match_all('warehouse')) AS warehouse_hits, COUNT(*) AS total_events, ROUND(CAST(COUNT(*) FILTER (WHERE match_all('warehouse')) AS FLOAT) / NULLIF(COUNT(*), 0) * 100.0, 2) AS hit_rate_pct FROM \"{stream}\" GROUP BY time_block ORDER BY time_block ASC",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "time_block",
+          "warehouse_hits",
+          "total_events",
+          "hit_rate_pct"
+        ],
+        "results": [
+          [
+            "2026-06-06T07:15:00",
+            "5",
+            "5",
+            "100.0"
+          ],
+          [
+            "2026-06-06T07:16:00",
+            "5",
+            "5",
+            "100.0"
+          ],
+          [
+            "2026-06-06T07:17:00",
+            "4",
+            "4",
+            "100.0"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
+      },
+      "time_offset": {
+        "start_offset": 4739000000,
+        "end_offset": 4903000000
+      }
+    },
+    {
+      "id": "Q081",
+      "sql": "SELECT _timestamp, log, pallet_id, facility_zone, sorter_model, ROW_NUMBER() OVER (PARTITION BY facility_zone ORDER BY _timestamp DESC) AS recency_rank FROM \"{stream}\" WHERE match_all('record') ORDER BY facility_zone ASC, recency_rank ASC",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "log",
+          "pallet_id",
+          "facility_zone",
+          "sorter_model",
+          "recency_rank"
+        ],
+        "results": [
+          [
+            "Q082 warehouse event record 4",
+            "PL-007",
+            "ZONE-1",
+            "SORT-M3",
+            "1"
+          ],
+          [
+            "Q082 warehouse event record 0 ACK batch batchIdList:Q082-0",
+            "PL-003",
+            "ZONE-1",
+            "SORT-M3",
+            "2"
+          ],
+          [
+            "Q081 warehouse event record 1",
+            "PL-007",
+            "ZONE-1",
+            "SORT-M3",
+            "3"
+          ],
+          [
+            "Q083 warehouse event record 0 ACK batch batchIdList:Q083-0",
+            "PL-008",
+            "ZONE-2",
+            "SORT-Z9",
+            "1"
+          ],
+          [
+            "Q082 warehouse event record 1",
+            "PL-004",
+            "ZONE-2",
+            "SORT-Q5",
+            "2"
+          ],
+          [
+            "Q081 warehouse event record 2",
+            "PL-008",
+            "ZONE-2",
+            "SORT-Z9",
+            "3"
+          ],
+          [
+            "Q083 warehouse event record 1",
+            "PL-001",
+            "ZONE-3",
+            "SORT-X1",
+            "1"
+          ],
+          [
+            "Q082 warehouse event record 2",
+            "PL-005",
+            "ZONE-3",
+            "SORT-X1",
+            "2"
+          ],
+          [
+            "Q081 warehouse event record 3 ACK batch batchIdList:Q081-3",
+            "PL-001",
+            "ZONE-3",
+            "SORT-X1",
+            "3"
+          ],
+          [
+            "Q080 warehouse event record 4",
+            "PL-005",
+            "ZONE-3",
+            "SORT-X1",
+            "4"
+          ],
+          [
+            "Q083 warehouse event record 2",
+            "PL-002",
+            "ZONE-4",
+            "SORT-A7",
+            "1"
+          ],
+          [
+            "Q082 warehouse event record 3 ACK batch batchIdList:Q082-3",
+            "PL-006",
+            "ZONE-4",
+            "SORT-A7",
+            "2"
+          ],
+          [
+            "Q081 warehouse event record 4",
+            "PL-002",
+            "ZONE-4",
+            "SORT-A7",
+            "3"
+          ],
+          [
+            "Q081 warehouse event record 0 ACK batch batchIdList:Q081-0",
+            "PL-006",
+            "ZONE-4",
+            "SORT-A7",
+            "4"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 4799000000,
+        "end_offset": 4963000000
+      }
+    },
+    {
+      "id": "Q082",
+      "sql": "SELECT 'primary_hits' AS source, _timestamp, pallet_id, facility_zone, throughput_rate FROM \"{stream}\" WHERE match_all('warehouse') AND throughput_rate >= 500.0 UNION ALL SELECT 'secondary_hits' AS source, _timestamp, pallet_id, facility_zone, throughput_rate FROM \"{stream}\" WHERE match_all('event') AND throughput_rate < 500.0 ORDER BY source ASC, throughput_rate DESC LIMIT 15",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "source",
+          "pallet_id",
+          "facility_zone",
+          "throughput_rate"
+        ],
+        "results": [
+          [
+            "primary_hits",
+            "PL-005",
+            "ZONE-3",
+            "900.0"
+          ],
+          [
+            "primary_hits",
+            "PL-007",
+            "ZONE-1",
+            "840.0"
+          ],
+          [
+            "primary_hits",
+            "PL-004",
+            "ZONE-2",
+            "725.0"
+          ],
+          [
+            "primary_hits",
+            "PL-006",
+            "ZONE-4",
+            "725.0"
+          ],
+          [
+            "primary_hits",
+            "PL-005",
+            "ZONE-3",
+            "610.0"
+          ],
+          [
+            "primary_hits",
+            "PL-003",
+            "ZONE-1",
+            "610.0"
+          ],
+          [
+            "primary_hits",
+            "PL-003",
+            "ZONE-1",
+            "555.0"
+          ],
+          [
+            "secondary_hits",
+            "PL-002",
+            "ZONE-4",
+            "480.0"
+          ],
+          [
+            "secondary_hits",
+            "PL-007",
+            "ZONE-1",
+            "320.0"
+          ],
+          [
+            "secondary_hits",
+            "PL-001",
+            "ZONE-3",
+            "320.0"
+          ],
+          [
+            "secondary_hits",
+            "PL-004",
+            "ZONE-2",
+            "190.0"
+          ],
+          [
+            "secondary_hits",
+            "PL-002",
+            "ZONE-4",
+            "190.0"
+          ],
+          [
+            "secondary_hits",
+            "PL-006",
+            "ZONE-4",
+            "150.0"
+          ],
+          [
+            "secondary_hits",
+            "PL-008",
+            "ZONE-2",
+            "150.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 4859000000,
+        "end_offset": 5023000000
+      }
+    },
+    {
+      "id": "Q163",
+      "sql": "SELECT approx_distinct(source_ip) AS ipc, COUNT(*) AS count, attack_name FROM \"{stream}\" WHERE filter_result = 'block'   AND issue_type != 'N/A'   AND attack_name NOT LIKE 'Malicious%'   AND geo_country IN ('US', 'BR', 'DE')   AND NOT regexp_like(http_request, '127\\.0\\.0\\.1|192\\.168\\.|localhost|test|sleep', 'i')   AND NOT regexp_like(user_agent_str, 'nessus|sleep|test|python|script', 'i')   AND re_not_match(uri_path, 'favicon|etc|git|blocked|admin|config|bash|login')   AND re_not_match(user_agent_str, '127.0.0.1|nessus|sleep|test') GROUP BY attack_name HAVING COUNT(*) >= 1 ORDER BY ipc DESC LIMIT 50",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 9719000000,
+        "end_offset": 9883000000
+      },
+      "expected": {
+        "columns": [
+          "ipc",
+          "count",
+          "attack_name"
+        ],
+        "results": [
+          [
+            "1",
+            "1",
+            "SQL Injection (Param)"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q164",
+      "sql": "SELECT page_slug, COUNT(_timestamp) as cnt, order_ref as \"key\", (CASE WHEN auth_result = filter_result THEN 'new' ELSE 'old' END) as \"session\" FROM \"{stream}\" WHERE (match_all('warehouse') AND page_slug = 'cartPage')   AND info_tag IS NOT NULL   AND passthrough_flag = 'false'   AND status_code = '200'   AND graphql_operation = 'verifyPayment'   AND (user_agent_str NOT LIKE '%bot%' AND user_agent_str NOT LIKE '%test%') GROUP BY \"key\", page_slug, \"session\" HAVING (cnt >= 1 AND \"session\" = 'old') ORDER BY cnt DESC",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 9779000000,
+        "end_offset": 9943000000
+      },
+      "expected": {
+        "columns": [
+          "page_slug",
+          "cnt",
+          "key",
+          "session"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q172",
+      "sql": "SELECT page_slug, COUNT(_timestamp) as cnt, order_ref as \"key\",\n  (CASE WHEN auth_result = filter_result THEN 'new' ELSE 'old' END) as \"session\"\nFROM \"{stream}\"\nWHERE (match_all('warehouse') AND page_slug = 'cartPage')\n  AND bot_flag IS NULL\n  AND passthrough_flag = 'false'\n  AND (info_tag IS NULL OR info_tag NOT LIKE '%NonexistentPattern%')\n  AND ((order_ref IS NULL OR order_ref != 'ORD-999'))\n  AND (user_agent_str IS NULL OR user_agent_str != 'curl/7.88.1')\n  AND status_code = '200'\n  AND graphql_operation = 'verifyPayment'\n  AND (user_agent_str NOT LIKE '%bot%' AND user_agent_str NOT LIKE '%test%' AND user_agent_str NOT LIKE '%curl%')\nGROUP BY \"key\", page_slug, \"session\"\nHAVING (cnt >= 1 AND \"session\" = 'old')\nORDER BY cnt DESC",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 10259000000,
+        "end_offset": 10423000000
+      },
+      "expected": {
+        "columns": [
+          "page_slug",
+          "cnt",
+          "key",
+          "session"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q190",
+      "sql": "SELECT _timestamp, log, facility_zone, operation_mode, api_name\nFROM \"{stream}\"\nWHERE match_all('warehouse')\n  AND str_match_ignore_case(log, 'batch')\n  AND facility_zone IN ('ZONE-1', 'ZONE-2')\nORDER BY _timestamp DESC\nLIMIT 15",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 11339000000,
+        "end_offset": 11503000000
+      },
+      "expected": {
+        "columns": [
+          "log",
+          "facility_zone",
+          "operation_mode",
+          "api_name"
+        ],
+        "results": [
+          [
+            "Q191 warehouse event record 3 ACK batch batchIdList:Q191-3",
+            "ZONE-1",
+            "auto",
+            "MergeBatch"
+          ],
+          [
+            "Q191 warehouse event record 0 ACK batch batchIdList:Q191-0",
+            "ZONE-2",
+            "auto",
+            "DeleteRecord"
+          ],
+          [
+            "Q190 warehouse event record 0 ACK batch batchIdList:Q190-0",
+            "ZONE-1",
+            "auto",
+            "SyncZone"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q191",
+      "sql": "SELECT facility_zone,\n  COUNT(*) AS cnt,\n  AVG(throughput_rate) AS avg_throughput,\n  MAX(load_factor) AS max_load\nFROM \"{stream}\"\nWHERE match_all('warehouse')\n  AND str_match_ignore_case(log, 'event')\n  AND throughput_rate >= 100.0\nGROUP BY facility_zone\nHAVING COUNT(*) >= 1\n  AND AVG(throughput_rate) > 100.0\nORDER BY cnt DESC",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 11399000000,
+        "end_offset": 11563000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "cnt",
+          "avg_throughput",
+          "max_load"
+        ],
+        "results": [
+          [
+            "ZONE-2",
+            "4",
+            "386.25",
+            "88.1"
+          ],
+          [
+            "ZONE-1",
+            "4",
+            "653.75",
+            "94.6"
+          ],
+          [
+            "ZONE-3",
+            "3",
+            "571.6666666666666",
+            "72.8"
+          ],
+          [
+            "ZONE-4",
+            "3",
+            "210.0",
+            "88.1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q306",
+      "sql": "SELECT COUNT(*) AS cnt, response_code AS status FROM \"{stream}\" WHERE uri_path LIKE '%/api/%' GROUP BY status ORDER BY status ASC",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 18299000000,
+        "end_offset": 18373000000
+      },
+      "expected": {
+        "columns": [
+          "cnt",
+          "status"
+        ],
+        "results": [
+          [
+            "1",
+            "201"
+          ],
+          [
+            "1",
+            "500"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q307",
+      "sql": "SELECT _timestamp, exception_message, error_code, action_category FROM \"{stream}\" WHERE exception_message LIKE '%Exception%' OR upstream_error_code LIKE '%UP-E00%' OR error_code LIKE '%E00%' OR event_detail LIKE '%fail%' OR log_message LIKE '%ERROR%' ORDER BY _timestamp DESC",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 18359000000,
+        "end_offset": 18433000000
+      },
+      "expected": {
+        "columns": [
+          "exception_message",
+          "error_code",
+          "action_category"
+        ],
+        "results": [
+          [
+            "NetworkException: connection to batch sync failed",
+            "E006",
+            "performanceMetric"
+          ],
+          [
+            "ConfigurationException: missing facility_zone ZONE-3 override",
+            "E005",
+            "performanceMetric"
+          ],
+          [
+            "ConfigurationException: missing facility_zone ZONE-3 override",
+            "E005",
+            "performanceMetric"
+          ],
+          [
+            "SecurityException: unauthorized access to control_center CC-ALPHA",
+            "E004",
+            "performanceMetric"
+          ],
+          [
+            "ResourceExhaustedException: sorter_model SORT-M3 queue full",
+            "E003",
+            "performanceMetric"
+          ],
+          [
+            "ResourceExhaustedException: sorter_model SORT-M3 queue full",
+            "E003",
+            "performanceMetric"
+          ],
+          [
+            "DataIntegrityException: pallet_id PL-002 checksum mismatch",
+            "E002",
+            "navigation"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q308",
+      "sql": "SELECT * FROM \"{stream}\" WHERE exception_message LIKE '%Exception%' AND exception_message NOT LIKE '%Timeout%' AND exception_message NOT LIKE '%NullPointer%'",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 18419000000,
+        "end_offset": 18493000000
+      },
+      "expected": {
+        "columns": [
+          "log",
+          "stream",
+          "pallet_id",
+          "load_factor",
+          "charge_remaining",
+          "throughput_rate",
+          "sorter_model",
+          "conveyor_lane",
+          "facility_zone",
+          "control_center",
+          "item_count",
+          "defect_limit",
+          "runtime_hours",
+          "operation_mode",
+          "package_size",
+          "scan_attempts",
+          "conveyor_segment",
+          "cell_temp",
+          "build_signature",
+          "event_detail",
+          "ack_detail",
+          "log_message",
+          "error_code",
+          "service_owner",
+          "upstream_error_code",
+          "exception_message",
+          "request_payload",
+          "phase_data",
+          "db_info",
+          "api_name",
+          "node_ip",
+          "source_ip",
+          "tag_a",
+          "tag_b",
+          "query_source",
+          "region_code",
+          "client_agent",
+          "operation_name",
+          "site_name",
+          "endpoint_path",
+          "http_method",
+          "response_code",
+          "scan_category",
+          "auth_result",
+          "task_id",
+          "entity_id",
+          "alert_tags",
+          "issue_type",
+          "filter_result",
+          "guard_mode",
+          "record_type",
+          "resource_path",
+          "latency_ms",
+          "org_name",
+          "threat_flag",
+          "build_version",
+          "bin_code",
+          "payload_size",
+          "component_name",
+          "route_key",
+          "auth_token",
+          "app_label",
+          "variant_tag",
+          "cookie_id",
+          "status_code",
+          "lcp_micros",
+          "inp_micros",
+          "cls_score",
+          "device_type",
+          "page_slug",
+          "action_category",
+          "action_subcategory",
+          "page_url",
+          "render_scope",
+          "os_platform",
+          "attack_name",
+          "http_request",
+          "user_agent_str",
+          "uri_path",
+          "geo_org",
+          "geo_country",
+          "geo_user_type",
+          "risk_rules_list",
+          "visitor_session_id",
+          "bot_flag",
+          "passthrough_flag",
+          "order_ref",
+          "info_tag",
+          "graphql_operation",
+          "datacenter"
+        ],
+        "results": [
+          [
+            "Q307 warehouse event record 4",
+            "stderr",
+            "PL-004",
+            "55.2",
+            "66.6",
+            "290.0",
+            "SORT-Q5",
+            "LANE-C",
+            "ZONE-2",
+            "CC-ALPHA",
+            "120",
+            "2.8",
+            "48",
+            "auto",
+            "1200",
+            "1",
+            "4",
+            "18.5",
+            "BS-2025-D4",
+            "segment 17 weight threshold exceeded",
+            "ACK batch batchIdList:BT-002-2026 acknowledged",
+            "ERROR: scan_attempts exhausted for pallet_id=PL-007",
+            "E006",
+            "@warehouse-Linux-sort-v3",
+            "None",
+            "NetworkException: connection to batch sync failed",
+            "{\"message\":{\"endpoint\":\"scanPallet\",\"status\":\"ok\"}}",
+            "[\"{\\\"name\\\":\\\"init\\\",\\\"startTime\\\":\\\"0\\\"}\", \"{\\\"name\\\":\\\"process\\\",\\\"startTime\\\":\\\"150\\\"}\"]",
+            "[\"cid-vwx234\",\"status-ok\"]",
+            "RerouteTrack",
+            "10.12.0.102",
+            "192.168.2.23",
+            "dev",
+            "medium",
+            "cli",
+            "SA-EAST",
+            "Java/17.0.8 (OpenJDK; sorter-agent)",
+            "SearchItems",
+            "site-sin-08",
+            "None",
+            "POST",
+            "403",
+            "internal",
+            "denied",
+            "task-b8c9d0",
+            "ent-007-wh",
+            "latency",
+            "timeout",
+            "allow",
+            "passive",
+            "sort",
+            "None",
+            "567",
+            "warehouse-north",
+            "None",
+            "v3.1.0",
+            "BIN-D4",
+            "512",
+            "lane-monitor",
+            "rk-warehouse-005",
+            "tok-wh-ghi789jkl012",
+            "warehouse-merge",
+            "None",
+            "ctl_xyz789",
+            "200",
+            "2800000",
+            "95000",
+            "0.05",
+            "Computer",
+            "checkoutPage",
+            "performanceMetric",
+            "vitalsLcp",
+            "None",
+            "SSR",
+            "Android 14",
+            "XSS Stored (Body)",
+            "GET /favicon.ico",
+            "Mozilla/5.0 Chrome/120",
+            "/api/v1/users",
+            "CloudServe GmbH",
+            "DE",
+            "hosting",
+            "[\"rate_limit_exceeded\"]",
+            "sess_002",
+            "None",
+            "false",
+            "ORD-003",
+            "None",
+            "placeOrder",
+            "dc-west"
+          ],
+          [
+            "Q308 warehouse event record 0 ACK batch batchIdList:Q308-0",
+            "stdout",
+            "PL-005",
+            "33.0",
+            "33.3",
+            "840.0",
+            "SORT-X1",
+            "LANE-D",
+            "ZONE-3",
+            "CC-BETA",
+            "50",
+            "1.2",
+            "720",
+            "manual",
+            "850",
+            "4",
+            "3",
+            "40.0",
+            "BS-2026-C3",
+            "batch XYZ789 timed out at checkpoint 3",
+            "ACK batch batchIdList:BT-001-2026 received",
+            "WARN: cell_temp=38.2 exceeding limit at sorter_model=SORT-Z9",
+            "E005",
+            "@warehouse-iOS-sort-v2",
+            "None",
+            "ConfigurationException: missing facility_zone ZONE-3 override",
+            "{\"message\":{\"endpoint\":\"deleteRecord\",\"status\":\"failed\"}}",
+            "[\"{\\\"name\\\":\\\"start\\\",\\\"startTime\\\":\\\"0\\\"}\", \"{\\\"name\\\":\\\"pause\\\",\\\"startTime\\\":\\\"160\\\"}\", \"{\\\"name\\\":\\\"resume\\\",\\\"startTime\\\":\\\"320\\\"}\", \"{\\\"name\\\":\\\"stop\\\",\\\"startTime\\\":\\\"480\\\"}\"]",
+            "[\"cid-stu901\",\"status-warning\"]",
+            "ScanPallet",
+            "10.12.0.101",
+            "192.168.2.22",
+            "staging",
+            "high",
+            "dashboard",
+            "AP-EAST",
+            "Python-urllib/3.11 warehouse-client",
+            "SyncZone",
+            "site-dub-07",
+            "None",
+            "GET",
+            "401",
+            "outbound",
+            "fail",
+            "task-y5z6a7",
+            "ent-006-wh",
+            "capacity",
+            "overflow",
+            "block",
+            "active",
+            "scan",
+            "None",
+            "89",
+            "warehouse-west",
+            "None",
+            "v3.0.1",
+            "BIN-C3",
+            "128",
+            "pallet-mapper",
+            "rk-warehouse-004",
+            "tok-wh-abc123def456",
+            "warehouse-track",
+            "None",
+            "sess_def456",
+            "403",
+            "1500000",
+            "200000",
+            "0.06",
+            "Tablet",
+            "itemPage",
+            "performanceMetric",
+            "pageView",
+            "None",
+            "CSR",
+            "Mac OS X (iPhone)",
+            "Command Injection",
+            "GET /search?q=test",
+            "Mozilla/5.0 Edge/120",
+            "/swag/graphql",
+            "FastHost Ltd",
+            "US",
+            "business",
+            "[\"scraping_pattern\",\"high_freq\"]",
+            "sess_001",
+            "None",
+            "false",
+            "ORD-001",
+            "None",
+            "getInventory",
+            "dc-central"
+          ],
+          [
+            "Q308 warehouse event record 1",
+            "stdout",
+            "PL-006",
+            "55.2",
+            "66.6",
+            "290.0",
+            "SORT-A7",
+            "LANE-A",
+            "ZONE-4",
+            "CC-GAMMA",
+            "120",
+            "2.8",
+            "48",
+            "hybrid",
+            "1200",
+            "1",
+            "4",
+            "18.5",
+            "BS-2025-D4",
+            "segment 17 weight threshold exceeded",
+            "ACK batch batchIdList:BT-002-2026 acknowledged",
+            "ERROR: scan_attempts exhausted for pallet_id=PL-007",
+            "E006",
+            "@warehouse-Linux-sort-v3",
+            "UP-E010",
+            "NetworkException: connection to batch sync failed",
+            "{\"message\":{\"endpoint\":\"scanPallet\",\"status\":\"ok\"}}",
+            "[\"{\\\"name\\\":\\\"init\\\",\\\"startTime\\\":\\\"0\\\"}\", \"{\\\"name\\\":\\\"process\\\",\\\"startTime\\\":\\\"150\\\"}\"]",
+            "[\"cid-vwx234\",\"status-ok\"]",
+            "RerouteTrack",
+            "10.12.0.102",
+            "192.168.2.23",
+            "dev",
+            "medium",
+            "cli",
+            "SA-EAST",
+            "Java/17.0.8 (OpenJDK; sorter-agent)",
+            "SearchItems",
+            "site-sin-08",
+            "/api/v2/sorter/reroute",
+            "POST",
+            "403",
+            "internal",
+            "denied",
+            "task-b8c9d0",
+            "ent-007-wh",
+            "latency",
+            "timeout",
+            "allow",
+            "passive",
+            "sort",
+            "/config/zone/ZONE-3.yaml",
+            "567",
+            "warehouse-north",
+            "true",
+            "v3.1.0",
+            "BIN-D4",
+            "512",
+            "lane-monitor",
+            "rk-warehouse-005",
+            "tok-wh-ghi789jkl012",
+            "warehouse-merge",
+            "variant_a",
+            "ctl_xyz789",
+            "200",
+            "2800000",
+            "95000",
+            "0.05",
+            "Computer",
+            "checkoutPage",
+            "performanceMetric",
+            "vitalsLcp",
+            "https://shop.example.com/item/1004",
+            "SSR",
+            "Android 14",
+            "XSS Stored (Body)",
+            "GET /favicon.ico",
+            "Mozilla/5.0 Chrome/120",
+            "/api/v1/users",
+            "CloudServe GmbH",
+            "DE",
+            "hosting",
+            "[\"rate_limit_exceeded\"]",
+            "sess_002",
+            "None",
+            "false",
+            "ORD-003",
+            "None",
+            "placeOrder",
+            "dc-west"
+          ],
+          [
+            "Q308 warehouse event record 2",
+            "stdout",
+            "PL-007",
+            "72.8",
+            "10.0",
+            "555.0",
+            "SORT-M3",
+            "LANE-B",
+            "ZONE-1",
+            "CC-DELTA",
+            "200",
+            "3.5",
+            "120",
+            "auto",
+            "100",
+            "3",
+            "5",
+            "22.0",
+            "BS-2026-A1",
+            "track TRK-ghi-jkl rerouted to ZONE-3",
+            "ACK batch batchIdList:BT-003-2026 confirmed",
+            "INFO: runtime_hours=1000 maintenance due http://warehouse.local/maint",
+            "E007",
+            "@warehouse-Windows-sort-v1",
+            "UP-E001",
+            "ValidationException: item_count exceeds defect_limit bounds",
+            "{\"message\":{\"endpoint\":\"rerouteTrack\",\"status\":\"queued\"}}",
+            "[\"{\\\"name\\\":\\\"init\\\",\\\"startTime\\\":\\\"0\\\"}\", \"{\\\"name\\\":\\\"validate\\\",\\\"startTime\\\":\\\"200\\\"}\", \"{\\\"name\\\":\\\"complete\\\",\\\"startTime\\\":\\\"400\\\"}\"]",
+            "[\"cid-yza567\",\"status-error\"]",
+            "MergeBatch",
+            "10.12.0.103",
+            "192.168.2.24",
+            "prod",
+            "low",
+            "dashboard",
+            "US-CENTRAL",
+            "Go-http-client/2.0 conveyor-monitor",
+            "UpdateBatch",
+            "site-mum-09",
+            "/api/v2/sorter/merge",
+            "PUT",
+            "200",
+            "inbound",
+            "pass",
+            "task-a1b2c3",
+            "ent-008-wh",
+            "security",
+            "overflow",
+            "allow",
+            "active",
+            "merge",
+            "/logs/warehouse/audit.log",
+            "3200",
+            "warehouse-south",
+            "false",
+            "v1.0.5",
+            "BIN-E5",
+            "1024",
+            "temp-regulator",
+            "rk-warehouse-006",
+            "tok-wh-mno345pqr678",
+            "warehouse-sync",
+            "variant_b",
+            "var1_pqr012",
+            "200",
+            "2100000",
+            "300000",
+            "0.12",
+            "Mobile",
+            "itemPage",
+            "interaction",
+            "vitalsInp",
+            "https://shop.example.com/",
+            "SSR",
+            "Android 14",
+            "File Inclusion",
+            "POST /admin/config",
+            "curl/7.88.1",
+            "/health",
+            "Acme Corp",
+            "UK",
+            "business",
+            "[\"torbot_ua_mismatch\"]",
+            "sess_003",
+            "None",
+            "true",
+            "ORD-004",
+            "None",
+            "updateItems",
+            "dc-east"
+          ],
+          [
+            "Q308 warehouse event record 3 ACK batch batchIdList:Q308-3",
+            "stderr",
+            "PL-008",
+            "88.1",
+            "25.0",
+            "190.0",
+            "SORT-Z9",
+            "LANE-C",
+            "ZONE-2",
+            "CC-ALPHA",
+            "340",
+            "0.5",
+            "500",
+            "manual",
+            "250",
+            "2",
+            "1",
+            "26.3",
+            "BS-2026-B2",
+            "batch MNO456 merged into pallet PL-005",
+            "ACK batch batchIdList:BT-004-2026 validated",
+            "GET /api/v1/warehouse/status 200 OK",
+            "E008",
+            "@warehouse-Android-scan-v2",
+            "None",
+            "StateTransitionException: operation_mode hybrid invalid state",
+            "{\"message\":{\"endpoint\":\"mergeBatch\",\"status\":\"ok\"}}",
+            "[\"{\\\"name\\\":\\\"boot\\\",\\\"startTime\\\":\\\"0\\\"}\", \"{\\\"name\\\":\\\"calibrate\\\",\\\"startTime\\\":\\\"100\\\"}\"]",
+            "[\"cid-bcd890\",\"status-ok\"]",
+            "CheckThreshold",
+            "10.12.0.104",
+            "192.168.1.10",
+            "staging",
+            "critical",
+            "cli",
+            "EU-CENTRAL",
+            "PostmanRuntime/7.35.0",
+            "DeleteRecord",
+            "site-tor-10",
+            "None",
+            "DELETE",
+            "200",
+            "outbound",
+            "pass",
+            "task-d4e5f6",
+            "ent-009-wh",
+            "error",
+            "mismatch",
+            "block",
+            "passive",
+            "track",
+            "None",
+            "78",
+            "warehouse-central",
+            "None",
+            "v2.0.8",
+            "BIN-F6",
+            "2048",
+            "charge-checker",
+            "rk-warehouse-007",
+            "tok-wh-stu901vwx234",
+            "warehouse-sort",
+            "None",
+            "var2_mno345",
+            "200",
+            "3400000",
+            "120000",
+            "0.08",
+            "Computer",
+            "homePage",
+            "navigation",
+            "vitalsLcp",
+            "None",
+            "CSR",
+            "iOS 17.4",
+            "Desync Attack",
+            "GET /api/products",
+            "python-requests/2.31",
+            "/ip/10.0.0.1",
+            "NetGuard AS",
+            "US",
+            "business",
+            "[\"cookie_reuse\",\"session_hijack\"]",
+            "sess_002",
+            "None",
+            "false",
+            "ORD-005",
+            "None",
+            "verifyPayment",
+            "dc-central"
+          ],
+          [
+            "Q308 warehouse event record 4",
+            "stdout",
+            "PL-001",
+            "94.6",
+            "42.5",
+            "900.0",
+            "SORT-X1",
+            "LANE-D",
+            "ZONE-3",
+            "CC-BETA",
+            "88",
+            "1.0",
+            "90",
+            "hybrid",
+            "500",
+            "5",
+            "2",
+            "30.1",
+            "BS-2026-A1",
+            "segment 88 speed anomaly detected",
+            "ACK batch batchIdList:BT-005-2026 processed",
+            "POST /api/v2/sorter/scan 201 Created",
+            "E009",
+            "@warehouse-iOS-scan-v1",
+            "UP-E003",
+            "OverflowException: throughput_rate 999.0 exceeds max capacity",
+            "{\"message\":{\"endpoint\":\"checkThreshold\",\"status\":\"warning\"}}",
+            "[\"{\\\"name\\\":\\\"scan\\\",\\\"startTime\\\":\\\"0\\\"}\", \"{\\\"name\\\":\\\"sort\\\",\\\"startTime\\\":\\\"180\\\"}\", \"{\\\"name\\\":\\\"pack\\\",\\\"startTime\\\":\\\"360\\\"}\"]",
+            "[\"cid-abc123\",\"status-ok\"]",
+            "ArchiveLog",
+            "10.12.0.105",
+            "192.168.1.11",
+            "dev",
+            "high",
+            "api",
+            "AP-CENTRAL",
+            "axios/1.6.0 (Node.js; warehouse-ui)",
+            "ScanPallet",
+            "site-nyc-01",
+            "/api/v1/archive/log",
+            "GET",
+            "201",
+            "internal",
+            "fail",
+            "task-g7h8i9",
+            "ent-010-wh",
+            "capacity",
+            "jam",
+            "allow",
+            "disabled",
+            "scan",
+            "/data/sorter/output.dat",
+            "1900",
+            "warehouse-east",
+            "false",
+            "v3.2.0",
+            "BIN-G7",
+            "4096",
+            "sorter-engine",
+            "rk-warehouse-008",
+            "tok-wh-yza567bcd890",
+            "warehouse-scan",
+            "control",
+            "sess_abc123",
+            "200",
+            "1100000",
+            "180000",
+            "0.25",
+            "Mobile",
+            "itemPage",
+            "performanceMetric",
+            "vitalsInp",
+            "https://shop.example.com/item/1006",
+            "SSR",
+            "Android 13",
+            "Evasion Technique",
+            "PUT /api/cart/update",
+            "Mozilla/5.0 Firefox/121",
+            "/api/v1/data",
+            "HostPro Inc",
+            "BR",
+            "hosting",
+            "[\"credential_stuffing\"]",
+            "sess_001",
+            "None",
+            "false",
+            "ORD-003",
+            "None",
+            "updateItems",
+            "dc-west"
+          ],
+          [
+            "Q309 warehouse event record 0 ACK batch batchIdList:Q309-0",
+            "stdout",
+            "PL-002",
+            "88.1",
+            "25.0",
+            "190.0",
+            "SORT-A7",
+            "LANE-A",
+            "ZONE-4",
+            "CC-GAMMA",
+            "340",
+            "0.5",
+            "500",
+            "auto",
+            "250",
+            "2",
+            "1",
+            "26.3",
+            "BS-2026-B2",
+            "batch MNO456 merged into pallet PL-005",
+            "ACK batch batchIdList:BT-004-2026 validated",
+            "GET /api/v1/warehouse/status 200 OK",
+            "E008",
+            "@warehouse-Android-scan-v2",
+            "UP-E002",
+            "StateTransitionException: operation_mode hybrid invalid state",
+            "{\"message\":{\"endpoint\":\"mergeBatch\",\"status\":\"ok\"}}",
+            "[\"{\\\"name\\\":\\\"boot\\\",\\\"startTime\\\":\\\"0\\\"}\", \"{\\\"name\\\":\\\"calibrate\\\",\\\"startTime\\\":\\\"100\\\"}\"]",
+            "[\"cid-bcd890\",\"status-ok\"]",
+            "CheckThreshold",
+            "10.12.0.104",
+            "192.168.1.10",
+            "staging",
+            "critical",
+            "cli",
+            "EU-CENTRAL",
+            "PostmanRuntime/7.35.0",
+            "DeleteRecord",
+            "site-tor-10",
+            "/api/v1/health/check",
+            "DELETE",
+            "200",
+            "outbound",
+            "pass",
+            "task-d4e5f6",
+            "ent-009-wh",
+            "error",
+            "mismatch",
+            "block",
+            "passive",
+            "track",
+            "/logs/warehouse/app.log",
+            "78",
+            "warehouse-central",
+            "true",
+            "v2.0.8",
+            "BIN-F6",
+            "2048",
+            "charge-checker",
+            "rk-warehouse-007",
+            "tok-wh-stu901vwx234",
+            "warehouse-sort",
+            "variant_c",
+            "var2_mno345",
+            "200",
+            "3400000",
+            "120000",
+            "0.08",
+            "Computer",
+            "homePage",
+            "navigation",
+            "vitalsLcp",
+            "https://shop.example.com/item/1005",
+            "CSR",
+            "iOS 17.4",
+            "Desync Attack",
+            "GET /api/products",
+            "python-requests/2.31",
+            "/ip/10.0.0.1",
+            "NetGuard AS",
+            "US",
+            "business",
+            "[\"cookie_reuse\",\"session_hijack\"]",
+            "sess_002",
+            "None",
+            "false",
+            "ORD-005",
+            "Allowlisted",
+            "verifyPayment",
+            "dc-central"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true,
+        "skip_column_check": true
+      }
+    },
+    {
+      "id": "Q309",
+      "sql": "SELECT _timestamp, component_name, action_category, exception_message FROM \"{stream}\" WHERE component_name LIKE '%sorter%' OR component_name LIKE '%conveyor%' OR component_name LIKE '%zone%' ORDER BY _timestamp DESC LIMIT 20",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 18479000000,
+        "end_offset": 18553000000
+      },
+      "expected": {
+        "columns": [
+          "component_name",
+          "action_category",
+          "exception_message"
+        ],
+        "results": [
+          [
+            "zone-controller",
+            "performanceMetric",
+            "TimeoutException: lane LANE-A did not respond within 5000ms"
+          ],
+          [
+            "zone-controller",
+            "performanceMetric",
+            "TimeoutException: lane LANE-A did not respond within 5000ms"
+          ],
+          [
+            "conveyor-driver",
+            "interaction",
+            "NullPointerException at ConveyorController.handle()"
+          ],
+          [
+            "sorter-engine",
+            "performanceMetric",
+            "OverflowException: throughput_rate 999.0 exceeds max capacity"
+          ],
+          [
+            "sorter-engine",
+            "performanceMetric",
+            "OverflowException: throughput_rate 999.0 exceeds max capacity"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q310",
+      "sql": "SELECT _timestamp, os_platform, action_category, exception_message FROM \"{stream}\" WHERE re_match(os_platform, 'Android|iPhone|iOS') AND (exception_message LIKE '%Exception%' OR error_code LIKE '%E00%') AND action_category = 'performanceMetric'",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 18539000000,
+        "end_offset": 18613000000
+      },
+      "expected": {
+        "columns": [
+          "os_platform",
+          "action_category",
+          "exception_message"
+        ],
+        "results": [
+          [
+            "iOS 18.1",
+            "performanceMetric",
+            "ResourceExhaustedException: sorter_model SORT-M3 queue full"
+          ],
+          [
+            "Android 12",
+            "performanceMetric",
+            "SecurityException: unauthorized access to control_center CC-ALPHA"
+          ],
+          [
+            "Mac OS X (iPhone)",
+            "performanceMetric",
+            "ConfigurationException: missing facility_zone ZONE-3 override"
+          ],
+          [
+            "Android 12",
+            "performanceMetric",
+            "SecurityException: unauthorized access to control_center CC-ALPHA"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q311",
+      "sql": "SELECT _timestamp, exception_message, upstream_error_code, error_code, event_detail FROM \"{stream}\" WHERE exception_message LIKE '%Exception%' OR upstream_error_code LIKE '%UP-E00%' OR error_code LIKE '%E00%' OR event_detail LIKE '%fail%' OR log_message LIKE '%ERROR%' OR issue_type LIKE '%timeout%' OR graphql_operation LIKE '%update%' OR api_name LIKE '%Search%' ORDER BY _timestamp DESC LIMIT 15",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 18599000000,
+        "end_offset": 18673000000
+      },
+      "expected": {
+        "columns": [
+          "exception_message",
+          "upstream_error_code",
+          "error_code",
+          "event_detail"
+        ],
+        "results": [
+          [
+            "StateTransitionException: operation_mode hybrid invalid state",
+            "UP-E002",
+            "E008",
+            "batch MNO456 merged into pallet PL-005"
+          ],
+          [
+            "ValidationException: item_count exceeds defect_limit bounds",
+            "UP-E001",
+            "E007",
+            "track TRK-ghi-jkl rerouted to ZONE-3"
+          ],
+          [
+            "ValidationException: item_count exceeds defect_limit bounds",
+            "UP-E001",
+            "E007",
+            "track TRK-ghi-jkl rerouted to ZONE-3"
+          ],
+          [
+            "NetworkException: connection to batch sync failed",
+            "None",
+            "E006",
+            "segment 17 weight threshold exceeded"
+          ],
+          [
+            "ConfigurationException: missing facility_zone ZONE-3 override",
+            "UP-E009",
+            "E005",
+            "batch XYZ789 timed out at checkpoint 3"
+          ],
+          [
+            "ConfigurationException: missing facility_zone ZONE-3 override",
+            "UP-E009",
+            "E005",
+            "batch XYZ789 timed out at checkpoint 3"
+          ],
+          [
+            "SecurityException: unauthorized access to control_center CC-ALPHA",
+            "None",
+            "E004",
+            "track TRK-abc-def diverted to LANE-B"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q312",
+      "sql": "SELECT * FROM \"{stream}\" WHERE exception_message NOT LIKE '%Timeout%' AND exception_message NOT LIKE '%NullPointer%'  AND action_category = 'performanceMetric'",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 18659000000,
+        "end_offset": 18733000000
+      },
+      "expected": {
+        "columns": [
+          "log",
+          "stream",
+          "pallet_id",
+          "load_factor",
+          "charge_remaining",
+          "throughput_rate",
+          "sorter_model",
+          "conveyor_lane",
+          "facility_zone",
+          "control_center",
+          "item_count",
+          "defect_limit",
+          "runtime_hours",
+          "operation_mode",
+          "package_size",
+          "scan_attempts",
+          "conveyor_segment",
+          "cell_temp",
+          "build_signature",
+          "event_detail",
+          "ack_detail",
+          "log_message",
+          "error_code",
+          "service_owner",
+          "upstream_error_code",
+          "exception_message",
+          "request_payload",
+          "phase_data",
+          "db_info",
+          "api_name",
+          "node_ip",
+          "source_ip",
+          "tag_a",
+          "tag_b",
+          "query_source",
+          "region_code",
+          "client_agent",
+          "operation_name",
+          "site_name",
+          "endpoint_path",
+          "http_method",
+          "response_code",
+          "scan_category",
+          "auth_result",
+          "task_id",
+          "entity_id",
+          "alert_tags",
+          "issue_type",
+          "filter_result",
+          "guard_mode",
+          "record_type",
+          "resource_path",
+          "latency_ms",
+          "org_name",
+          "threat_flag",
+          "build_version",
+          "bin_code",
+          "payload_size",
+          "component_name",
+          "route_key",
+          "auth_token",
+          "app_label",
+          "variant_tag",
+          "cookie_id",
+          "status_code",
+          "lcp_micros",
+          "inp_micros",
+          "cls_score",
+          "device_type",
+          "page_slug",
+          "action_category",
+          "action_subcategory",
+          "page_url",
+          "render_scope",
+          "os_platform",
+          "attack_name",
+          "http_request",
+          "user_agent_str",
+          "uri_path",
+          "geo_org",
+          "geo_country",
+          "geo_user_type",
+          "risk_rules_list",
+          "visitor_session_id",
+          "bot_flag",
+          "passthrough_flag",
+          "order_ref",
+          "info_tag",
+          "graphql_operation",
+          "datacenter"
+        ],
+        "results": [
+          [
+            "Q312 warehouse event record 2",
+            "stdout",
+            "PL-003",
+            "94.6",
+            "42.5",
+            "900.0",
+            "SORT-M3",
+            "LANE-B",
+            "ZONE-1",
+            "CC-DELTA",
+            "88",
+            "1.0",
+            "90",
+            "manual",
+            "500",
+            "5",
+            "2",
+            "30.1",
+            "BS-2026-A1",
+            "segment 88 speed anomaly detected",
+            "ACK batch batchIdList:BT-005-2026 processed",
+            "POST /api/v2/sorter/scan 201 Created",
+            "E009",
+            "@warehouse-iOS-scan-v1",
+            "UP-E003",
+            "OverflowException: throughput_rate 999.0 exceeds max capacity",
+            "{\"message\":{\"endpoint\":\"checkThreshold\",\"status\":\"warning\"}}",
+            "[\"{\\\"name\\\":\\\"scan\\\",\\\"startTime\\\":\\\"0\\\"}\", \"{\\\"name\\\":\\\"sort\\\",\\\"startTime\\\":\\\"180\\\"}\", \"{\\\"name\\\":\\\"pack\\\",\\\"startTime\\\":\\\"360\\\"}\"]",
+            "[\"cid-abc123\",\"status-ok\"]",
+            "ArchiveLog",
+            "10.12.0.105",
+            "192.168.1.11",
+            "dev",
+            "high",
+            "api",
+            "AP-CENTRAL",
+            "axios/1.6.0 (Node.js; warehouse-ui)",
+            "ScanPallet",
+            "site-nyc-01",
+            "/api/v1/archive/log",
+            "GET",
+            "201",
+            "internal",
+            "fail",
+            "task-g7h8i9",
+            "ent-010-wh",
+            "capacity",
+            "jam",
+            "allow",
+            "disabled",
+            "scan",
+            "/data/sorter/output.dat",
+            "1900",
+            "warehouse-east",
+            "false",
+            "v3.2.0",
+            "BIN-G7",
+            "4096",
+            "sorter-engine",
+            "rk-warehouse-008",
+            "tok-wh-yza567bcd890",
+            "warehouse-scan",
+            "control",
+            "sess_abc123",
+            "200",
+            "1100000",
+            "180000",
+            "0.25",
+            "Mobile",
+            "itemPage",
+            "performanceMetric",
+            "vitalsInp",
+            "https://shop.example.com/item/1006",
+            "SSR",
+            "Android 13",
+            "Evasion Technique",
+            "PUT /api/cart/update",
+            "Mozilla/5.0 Firefox/121",
+            "/api/v1/data",
+            "HostPro Inc",
+            "BR",
+            "hosting",
+            "[\"credential_stuffing\"]",
+            "sess_001",
+            "None",
+            "false",
+            "ORD-003",
+            "None",
+            "updateItems",
+            "dc-west"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_column_check": true
+      }
+    },
+    {
+      "id": "Q313",
+      "sql": "SELECT * FROM \"{stream}\" WHERE component_name LIKE '%sorter%' AND page_slug IN ('itemPage', 'cartPage', 'checkoutPage') AND action_category = 'performanceMetric' AND org_name = 'warehouse-east'",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 18719000000,
+        "end_offset": 18793000000
+      },
+      "expected": {
+        "columns": [
+          "log",
+          "stream",
+          "pallet_id",
+          "load_factor",
+          "charge_remaining",
+          "throughput_rate",
+          "sorter_model",
+          "conveyor_lane",
+          "facility_zone",
+          "control_center",
+          "item_count",
+          "defect_limit",
+          "runtime_hours",
+          "operation_mode",
+          "package_size",
+          "scan_attempts",
+          "conveyor_segment",
+          "cell_temp",
+          "build_signature",
+          "event_detail",
+          "ack_detail",
+          "log_message",
+          "error_code",
+          "service_owner",
+          "upstream_error_code",
+          "exception_message",
+          "request_payload",
+          "phase_data",
+          "db_info",
+          "api_name",
+          "node_ip",
+          "source_ip",
+          "tag_a",
+          "tag_b",
+          "query_source",
+          "region_code",
+          "client_agent",
+          "operation_name",
+          "site_name",
+          "endpoint_path",
+          "http_method",
+          "response_code",
+          "scan_category",
+          "auth_result",
+          "task_id",
+          "entity_id",
+          "alert_tags",
+          "issue_type",
+          "filter_result",
+          "guard_mode",
+          "record_type",
+          "resource_path",
+          "latency_ms",
+          "org_name",
+          "threat_flag",
+          "build_version",
+          "bin_code",
+          "payload_size",
+          "component_name",
+          "route_key",
+          "auth_token",
+          "app_label",
+          "variant_tag",
+          "cookie_id",
+          "status_code",
+          "lcp_micros",
+          "inp_micros",
+          "cls_score",
+          "device_type",
+          "page_slug",
+          "action_category",
+          "action_subcategory",
+          "page_url",
+          "render_scope",
+          "os_platform",
+          "attack_name",
+          "http_request",
+          "user_agent_str",
+          "uri_path",
+          "geo_org",
+          "geo_country",
+          "geo_user_type",
+          "risk_rules_list",
+          "visitor_session_id",
+          "bot_flag",
+          "passthrough_flag",
+          "order_ref",
+          "info_tag",
+          "graphql_operation",
+          "datacenter"
+        ],
+        "results": [],
+        "results_mode": "rowsort",
+        "skip_column_check": true
+      }
+    },
+    {
+      "id": "Q314",
+      "sql": "SELECT _timestamp, exception_message, error_code, visitor_session_id FROM \"{stream}\" WHERE exception_message LIKE '%Exception%' AND exception_message LIKE '%at%' ORDER BY _timestamp DESC LIMIT 10",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 18779000000,
+        "end_offset": 18853000000
+      },
+      "expected": {
+        "columns": [
+          "exception_message",
+          "error_code",
+          "visitor_session_id"
+        ],
+        "results": [
+          [
+            "ValidationException: item_count exceeds defect_limit bounds",
+            "E007",
+            "sess_003"
+          ],
+          [
+            "NetworkException: connection to batch sync failed",
+            "E006",
+            "sess_002"
+          ],
+          [
+            "NetworkException: connection to batch sync failed",
+            "E006",
+            "sess_002"
+          ],
+          [
+            "ConfigurationException: missing facility_zone ZONE-3 override",
+            "E005",
+            "sess_001"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q315",
+      "sql": "SELECT _timestamp, log, action_category, page_slug FROM \"{stream}\" WHERE log LIKE '%ACK%' OR log LIKE '%ERROR%' ORDER BY _timestamp DESC LIMIT 10",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 18839000000,
+        "end_offset": 18913000000
+      },
+      "expected": {
+        "columns": [
+          "log",
+          "action_category",
+          "page_slug"
+        ],
+        "results": [
+          [
+            "Q316 warehouse event record 0 ACK batch batchIdList:Q316-0",
+            "performanceMetric",
+            "itemPage"
+          ],
+          [
+            "Q315 warehouse event record 3 ACK batch batchIdList:Q315-3",
+            "performanceMetric",
+            "itemPage"
+          ],
+          [
+            "Q315 warehouse event record 0 ACK batch batchIdList:Q315-0",
+            "performanceMetric",
+            "checkoutPage"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q316",
+      "sql": "SELECT _timestamp, os_platform, exception_message, error_code FROM \"{stream}\" WHERE re_match(os_platform, 'Android|iPhone|iOS') AND action_category = 'performanceMetric' AND (exception_message LIKE '%Exception%' OR exception_message LIKE '%Error%') ORDER BY _timestamp DESC",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 18899000000,
+        "end_offset": 18973000000
+      },
+      "expected": {
+        "columns": [
+          "os_platform",
+          "exception_message",
+          "error_code"
+        ],
+        "results": [
+          [
+            "iOS 18.1",
+            "ResourceExhaustedException: sorter_model SORT-M3 queue full",
+            "E003"
+          ],
+          [
+            "Android 13",
+            "OverflowException: throughput_rate 999.0 exceeds max capacity",
+            "E009"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q317",
+      "sql": "SELECT DISTINCT component_name, error_code FROM \"{stream}\" WHERE (exception_message LIKE '%NullPointer%' OR exception_message LIKE '%Timeout%' OR exception_message LIKE '%ResourceExhausted%') AND action_category = 'performanceMetric'",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 18959000000,
+        "end_offset": 19033000000
+      },
+      "expected": {
+        "columns": [
+          "component_name",
+          "error_code"
+        ],
+        "results": [
+          [
+            "track-router",
+            "E003"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q318",
+      "sql": "SELECT * FROM \"{stream}\" WHERE component_name LIKE '%track%' AND error_code NOT IN ('E001', 'E002') AND exception_message NOT LIKE '%Timeout%' AND action_category = 'performanceMetric'",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 19019000000,
+        "end_offset": 19093000000
+      },
+      "expected": {
+        "columns": [
+          "log",
+          "stream",
+          "pallet_id",
+          "load_factor",
+          "charge_remaining",
+          "throughput_rate",
+          "sorter_model",
+          "conveyor_lane",
+          "facility_zone",
+          "control_center",
+          "item_count",
+          "defect_limit",
+          "runtime_hours",
+          "operation_mode",
+          "package_size",
+          "scan_attempts",
+          "conveyor_segment",
+          "cell_temp",
+          "build_signature",
+          "event_detail",
+          "ack_detail",
+          "log_message",
+          "error_code",
+          "service_owner",
+          "upstream_error_code",
+          "exception_message",
+          "request_payload",
+          "phase_data",
+          "db_info",
+          "api_name",
+          "node_ip",
+          "source_ip",
+          "tag_a",
+          "tag_b",
+          "query_source",
+          "region_code",
+          "client_agent",
+          "operation_name",
+          "site_name",
+          "endpoint_path",
+          "http_method",
+          "response_code",
+          "scan_category",
+          "auth_result",
+          "task_id",
+          "entity_id",
+          "alert_tags",
+          "issue_type",
+          "filter_result",
+          "guard_mode",
+          "record_type",
+          "resource_path",
+          "latency_ms",
+          "org_name",
+          "threat_flag",
+          "build_version",
+          "bin_code",
+          "payload_size",
+          "component_name",
+          "route_key",
+          "auth_token",
+          "app_label",
+          "variant_tag",
+          "cookie_id",
+          "status_code",
+          "lcp_micros",
+          "inp_micros",
+          "cls_score",
+          "device_type",
+          "page_slug",
+          "action_category",
+          "action_subcategory",
+          "page_url",
+          "render_scope",
+          "os_platform",
+          "attack_name",
+          "http_request",
+          "user_agent_str",
+          "uri_path",
+          "geo_org",
+          "geo_country",
+          "geo_user_type",
+          "risk_rules_list",
+          "visitor_session_id",
+          "bot_flag",
+          "passthrough_flag",
+          "order_ref",
+          "info_tag",
+          "graphql_operation",
+          "datacenter"
+        ],
+        "results": [],
+        "results_mode": "rowsort",
+        "skip_column_check": true
+      }
+    },
+    {
+      "id": "Q319",
+      "sql": "SELECT _timestamp, log, action_category FROM \"{stream}\" WHERE str_match_ignore_case(log, 'error') OR str_match_ignore_case(log, 'ack') ORDER BY _timestamp DESC LIMIT 10",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 19079000000,
+        "end_offset": 19153000000
+      },
+      "expected": {
+        "columns": [
+          "log",
+          "action_category"
+        ],
+        "results": [
+          [
+            "Q320 warehouse event record 0 ACK batch batchIdList:Q320-0",
+            "performanceMetric"
+          ],
+          [
+            "Q319 warehouse event record 3 ACK batch batchIdList:Q319-3",
+            "performanceMetric"
+          ],
+          [
+            "Q319 warehouse event record 0 ACK batch batchIdList:Q319-0",
+            "navigation"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q320",
+      "sql": "SELECT * FROM \"{stream}\" WHERE re_not_match(error_code, 'E00[24]') AND action_category = 'performanceMetric' AND exception_message IS NOT NULL",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 19139000000,
+        "end_offset": 19213000000
+      },
+      "expected": {
+        "columns": [
+          "log",
+          "stream",
+          "pallet_id",
+          "load_factor",
+          "charge_remaining",
+          "throughput_rate",
+          "sorter_model",
+          "conveyor_lane",
+          "facility_zone",
+          "control_center",
+          "item_count",
+          "defect_limit",
+          "runtime_hours",
+          "operation_mode",
+          "package_size",
+          "scan_attempts",
+          "conveyor_segment",
+          "cell_temp",
+          "build_signature",
+          "event_detail",
+          "ack_detail",
+          "log_message",
+          "error_code",
+          "service_owner",
+          "upstream_error_code",
+          "exception_message",
+          "request_payload",
+          "phase_data",
+          "db_info",
+          "api_name",
+          "node_ip",
+          "source_ip",
+          "tag_a",
+          "tag_b",
+          "query_source",
+          "region_code",
+          "client_agent",
+          "operation_name",
+          "site_name",
+          "endpoint_path",
+          "http_method",
+          "response_code",
+          "scan_category",
+          "auth_result",
+          "task_id",
+          "entity_id",
+          "alert_tags",
+          "issue_type",
+          "filter_result",
+          "guard_mode",
+          "record_type",
+          "resource_path",
+          "latency_ms",
+          "org_name",
+          "threat_flag",
+          "build_version",
+          "bin_code",
+          "payload_size",
+          "component_name",
+          "route_key",
+          "auth_token",
+          "app_label",
+          "variant_tag",
+          "cookie_id",
+          "status_code",
+          "lcp_micros",
+          "inp_micros",
+          "cls_score",
+          "device_type",
+          "page_slug",
+          "action_category",
+          "action_subcategory",
+          "page_url",
+          "render_scope",
+          "os_platform",
+          "attack_name",
+          "http_request",
+          "user_agent_str",
+          "uri_path",
+          "geo_org",
+          "geo_country",
+          "geo_user_type",
+          "risk_rules_list",
+          "visitor_session_id",
+          "bot_flag",
+          "passthrough_flag",
+          "order_ref",
+          "info_tag",
+          "graphql_operation",
+          "datacenter"
+        ],
+        "results": [
+          [
+            "Q320 warehouse event record 0 ACK batch batchIdList:Q320-0",
+            "stdout",
+            "PL-001",
+            "67.9",
+            "75.3",
+            "320.0",
+            "SORT-X1",
+            "LANE-D",
+            "ZONE-3",
+            "CC-BETA",
+            "410",
+            "2.0",
+            "24",
+            "hybrid",
+            "1000",
+            "2",
+            "4",
+            "19.2",
+            "BS-2026-C3",
+            "batch DEF234 registered at loading dock",
+            "ACK batch batchIdList:BT-007-2026 dispatched",
+            "WARN: lane jam detected at conveyor_segment=3",
+            "E001",
+            "@warehouse-Windows-scan-v2",
+            "UP-E005",
+            "TimeoutException: lane LANE-A did not respond within 5000ms",
+            "{\"message\":{\"endpoint\":\"retryScan\",\"status\":\"retrying\"}}",
+            "[\"{\\\"name\\\":\\\"queue\\\",\\\"startTime\\\":\\\"0\\\"}\", \"{\\\"name\\\":\\\"dequeue\\\",\\\"startTime\\\":\\\"70\\\"}\", \"{\\\"name\\\":\\\"dispatch\\\",\\\"startTime\\\":\\\"140\\\"}\"]",
+            "[\"cid-ghi789\",\"status-failed\"]",
+            "SyncZone",
+            "10.12.1.202",
+            "192.168.1.13",
+            "prod",
+            "low",
+            "dashboard",
+            "US-WEST",
+            "Alamofire/5.8.0 (iOS; scan-app)",
+            "MergeBatch",
+            "site-tok-03",
+            "/api/v1/zone/sync",
+            "PUT",
+            "400",
+            "inbound",
+            "pass",
+            "task-m3n4o5",
+            "ent-002-wh",
+            "error",
+            "overflow",
+            "allow",
+            "passive",
+            "merge",
+            "/logs/warehouse/error.log",
+            "12",
+            "warehouse-north",
+            "true",
+            "v1.1.2",
+            "BIN-I9",
+            "16384",
+            "zone-controller",
+            "rk-warehouse-010",
+            "tok-wh-klm789nop012",
+            "warehouse-merge",
+            "control",
+            "ctl_vwx901",
+            "404",
+            "2500000",
+            "70000",
+            "0.15",
+            "Tablet",
+            "itemPage",
+            "performanceMetric",
+            "clickEvent",
+            "https://shop.example.com/item/1001",
+            "SSR",
+            "Windows 11",
+            "XSS Reflected (Header)",
+            "GET /.env",
+            "Mozilla/5.0 Safari/17.2",
+            "/ip/192.168.1.1",
+            "DataCenter EU",
+            "JP",
+            "business",
+            "[\"rate_limit_exceeded\",\"geo_anomaly\"]",
+            "sess_003",
+            "None",
+            "false",
+            "ORD-007",
+            "None",
+            "verifyPayment",
+            "dc-west"
+          ],
+          [
+            "Q320 warehouse event record 2",
+            "stdout",
+            "PL-003",
+            "99.0",
+            "95.0",
+            "610.0",
+            "SORT-M3",
+            "LANE-B",
+            "ZONE-1",
+            "CC-DELTA",
+            "60",
+            "3.0",
+            "168",
+            "manual",
+            "350",
+            "1",
+            "1",
+            "28.9",
+            "BS-2026-A1",
+            "segment 42 scan completed with no defects",
+            "ACK batch batchIdList:BT-009-2026 retried",
+            "DEBUG: charge_remaining below threshold 15.0",
+            "E003",
+            "@warehouse-iOS-track-v3",
+            "UP-E007",
+            "ResourceExhaustedException: sorter_model SORT-M3 queue full",
+            "{\"message\":{\"endpoint\":\"searchItems\",\"status\":\"ok\"}}",
+            "[\"{\\\"name\\\":\\\"acquire\\\",\\\"startTime\\\":\\\"0\\\"}\", \"{\\\"name\\\":\\\"process\\\",\\\"startTime\\\":\\\"90\\\"}\", \"{\\\"name\\\":\\\"release\\\",\\\"startTime\\\":\\\"270\\\"}\"]",
+            "[\"cid-mno345\",\"status-retrying\"]",
+            "UpdateBatch",
+            "10.12.1.204",
+            "192.168.2.20",
+            "dev",
+            "high",
+            "api",
+            "EU-NORTH",
+            "Mozilla/5.0 WarehouseScanner/1.0",
+            "ArchiveLog",
+            "site-sfo-05",
+            "/api/v1/warehouse/update",
+            "GET",
+            "500",
+            "internal",
+            "pass",
+            "task-s9t0u1",
+            "ent-004-wh",
+            "latency",
+            "jam",
+            "block",
+            "passive",
+            "scan",
+            "/config/zone/ZONE-2.yaml",
+            "230",
+            "warehouse-central",
+            "true",
+            "v2.1.3",
+            "BIN-A1",
+            "32768",
+            "track-router",
+            "rk-warehouse-002",
+            "tok-wh-wxy901zab234",
+            "warehouse-sort",
+            "variant_b",
+            "var1_yza234",
+            "502",
+            "3200000",
+            "80000",
+            "0.2",
+            "Computer",
+            "searchPage",
+            "performanceMetric",
+            "vitalsInp",
+            "https://shop.example.com/search?q=test",
+            "CSR",
+            "iOS 18.1",
+            "CSRF Attempt",
+            "GET /api/users?id=1",
+            "Go-http-client/2.0",
+            "/api/v2/search",
+            "GlobalTech Inc",
+            "IN",
+            "business",
+            "[\"credential_stuffing\",\"rapid_login\"]",
+            "sess_001",
+            "verified_bot",
+            "true",
+            "ORD-001",
+            "None",
+            "createAccount",
+            "dc-west"
+          ],
+          [
+            "Q320 warehouse event record 4",
+            "stdout",
+            "PL-005",
+            "33.0",
+            "33.3",
+            "840.0",
+            "SORT-X1",
+            "LANE-D",
+            "ZONE-3",
+            "CC-BETA",
+            "50",
+            "1.2",
+            "720",
+            "manual",
+            "850",
+            "4",
+            "3",
+            "40.0",
+            "BS-2026-C3",
+            "batch XYZ789 timed out at checkpoint 3",
+            "ACK batch batchIdList:BT-001-2026 received",
+            "WARN: cell_temp=38.2 exceeding limit at sorter_model=SORT-Z9",
+            "E005",
+            "@warehouse-iOS-sort-v2",
+            "UP-E009",
+            "ConfigurationException: missing facility_zone ZONE-3 override",
+            "{\"message\":{\"endpoint\":\"deleteRecord\",\"status\":\"failed\"}}",
+            "[\"{\\\"name\\\":\\\"start\\\",\\\"startTime\\\":\\\"0\\\"}\", \"{\\\"name\\\":\\\"pause\\\",\\\"startTime\\\":\\\"160\\\"}\", \"{\\\"name\\\":\\\"resume\\\",\\\"startTime\\\":\\\"320\\\"}\", \"{\\\"name\\\":\\\"stop\\\",\\\"startTime\\\":\\\"480\\\"}\"]",
+            "[\"cid-stu901\",\"status-warning\"]",
+            "ScanPallet",
+            "10.12.0.101",
+            "192.168.2.22",
+            "staging",
+            "high",
+            "dashboard",
+            "AP-EAST",
+            "Python-urllib/3.11 warehouse-client",
+            "SyncZone",
+            "site-dub-07",
+            "/api/v2/sorter/scan",
+            "GET",
+            "401",
+            "outbound",
+            "fail",
+            "task-y5z6a7",
+            "ent-006-wh",
+            "capacity",
+            "overflow",
+            "block",
+            "active",
+            "scan",
+            "/data/sorter/temp.dat",
+            "89",
+            "warehouse-west",
+            "false",
+            "v3.0.1",
+            "BIN-C3",
+            "128",
+            "pallet-mapper",
+            "rk-warehouse-004",
+            "tok-wh-abc123def456",
+            "warehouse-track",
+            "control",
+            "sess_def456",
+            "403",
+            "1500000",
+            "200000",
+            "0.06",
+            "Tablet",
+            "itemPage",
+            "performanceMetric",
+            "pageView",
+            "https://shop.example.com/cart",
+            "CSR",
+            "Mac OS X (iPhone)",
+            "Command Injection",
+            "GET /search?q=test",
+            "Mozilla/5.0 Edge/120",
+            "/swag/graphql",
+            "FastHost Ltd",
+            "US",
+            "business",
+            "[\"scraping_pattern\",\"high_freq\"]",
+            "sess_001",
+            "None",
+            "false",
+            "ORD-001",
+            "None",
+            "getInventory",
+            "dc-central"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true,
+        "skip_column_check": true
+      }
+    },
+    {
+      "id": "Q321",
+      "sql": "SELECT _timestamp, component_name, exception_message FROM \"{stream}\" WHERE regexp_like(component_name, '(sorter|conveyor|zone|batch|lane|pallet|charge)-[a-z]+') AND action_category = 'performanceMetric' ORDER BY _timestamp DESC LIMIT 20",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 19199000000,
+        "end_offset": 19273000000
+      },
+      "expected": {
+        "columns": [
+          "component_name",
+          "exception_message"
+        ],
+        "results": [
+          [
+            "lane-monitor",
+            "NetworkException: connection to batch sync failed"
+          ],
+          [
+            "pallet-mapper",
+            "ConfigurationException: missing facility_zone ZONE-3 override"
+          ],
+          [
+            "pallet-mapper",
+            "ConfigurationException: missing facility_zone ZONE-3 override"
+          ],
+          [
+            "batch-sync",
+            "SecurityException: unauthorized access to control_center CC-ALPHA"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q322",
+      "sql": "SELECT _timestamp, os_platform, action_category, exception_message FROM \"{stream}\" WHERE re_match(os_platform, 'Android|iPhone|iOS') AND re_not_match(error_code, 'E00[89]') AND action_category IN ('performanceMetric', 'interaction')",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 19259000000,
+        "end_offset": 19333000000
+      },
+      "expected": {
+        "columns": [
+          "os_platform",
+          "action_category",
+          "exception_message"
+        ],
+        "results": [
+          [
+            "Android 14",
+            "interaction",
+            "ValidationException: item_count exceeds defect_limit bounds"
+          ],
+          [
+            "Mac OS X (iPhone)",
+            "interaction",
+            "NullPointerException at ConveyorController.handle()"
+          ],
+          [
+            "Mac OS X (iPhone)",
+            "interaction",
+            "NullPointerException at ConveyorController.handle()"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q323",
+      "sql": "SELECT * FROM \"{stream}\" WHERE pallet_id LIKE '%PL-001%' AND scan_category = 'inbound' ORDER BY _timestamp DESC",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 19319000000,
+        "end_offset": 19393000000
+      },
+      "expected": {
+        "columns": [
+          "log",
+          "stream",
+          "pallet_id",
+          "load_factor",
+          "charge_remaining",
+          "throughput_rate",
+          "sorter_model",
+          "conveyor_lane",
+          "facility_zone",
+          "control_center",
+          "item_count",
+          "defect_limit",
+          "runtime_hours",
+          "operation_mode",
+          "package_size",
+          "scan_attempts",
+          "conveyor_segment",
+          "cell_temp",
+          "build_signature",
+          "event_detail",
+          "ack_detail",
+          "log_message",
+          "error_code",
+          "service_owner",
+          "upstream_error_code",
+          "exception_message",
+          "request_payload",
+          "phase_data",
+          "db_info",
+          "api_name",
+          "node_ip",
+          "source_ip",
+          "tag_a",
+          "tag_b",
+          "query_source",
+          "region_code",
+          "client_agent",
+          "operation_name",
+          "site_name",
+          "endpoint_path",
+          "http_method",
+          "response_code",
+          "scan_category",
+          "auth_result",
+          "task_id",
+          "entity_id",
+          "alert_tags",
+          "issue_type",
+          "filter_result",
+          "guard_mode",
+          "record_type",
+          "resource_path",
+          "latency_ms",
+          "org_name",
+          "threat_flag",
+          "build_version",
+          "bin_code",
+          "payload_size",
+          "component_name",
+          "route_key",
+          "auth_token",
+          "app_label",
+          "variant_tag",
+          "cookie_id",
+          "status_code",
+          "lcp_micros",
+          "inp_micros",
+          "cls_score",
+          "device_type",
+          "page_slug",
+          "action_category",
+          "action_subcategory",
+          "page_url",
+          "render_scope",
+          "os_platform",
+          "attack_name",
+          "http_request",
+          "user_agent_str",
+          "uri_path",
+          "geo_org",
+          "geo_country",
+          "geo_user_type",
+          "risk_rules_list",
+          "visitor_session_id",
+          "bot_flag",
+          "passthrough_flag",
+          "order_ref",
+          "info_tag",
+          "graphql_operation",
+          "datacenter"
+        ],
+        "results": [
+          [
+            "Q323 warehouse event record 1",
+            "stdout",
+            "PL-001",
+            "67.9",
+            "75.3",
+            "320.0",
+            "SORT-X1",
+            "LANE-D",
+            "ZONE-3",
+            "CC-BETA",
+            "410",
+            "2.0",
+            "24",
+            "hybrid",
+            "1000",
+            "2",
+            "4",
+            "19.2",
+            "BS-2026-C3",
+            "batch DEF234 registered at loading dock",
+            "ACK batch batchIdList:BT-007-2026 dispatched",
+            "WARN: lane jam detected at conveyor_segment=3",
+            "E001",
+            "@warehouse-Windows-scan-v2",
+            "UP-E005",
+            "TimeoutException: lane LANE-A did not respond within 5000ms",
+            "{\"message\":{\"endpoint\":\"retryScan\",\"status\":\"retrying\"}}",
+            "[\"{\\\"name\\\":\\\"queue\\\",\\\"startTime\\\":\\\"0\\\"}\", \"{\\\"name\\\":\\\"dequeue\\\",\\\"startTime\\\":\\\"70\\\"}\", \"{\\\"name\\\":\\\"dispatch\\\",\\\"startTime\\\":\\\"140\\\"}\"]",
+            "[\"cid-ghi789\",\"status-failed\"]",
+            "SyncZone",
+            "10.12.1.202",
+            "192.168.1.13",
+            "prod",
+            "low",
+            "dashboard",
+            "US-WEST",
+            "Alamofire/5.8.0 (iOS; scan-app)",
+            "MergeBatch",
+            "site-tok-03",
+            "/api/v1/zone/sync",
+            "PUT",
+            "400",
+            "inbound",
+            "pass",
+            "task-m3n4o5",
+            "ent-002-wh",
+            "error",
+            "overflow",
+            "allow",
+            "passive",
+            "merge",
+            "/logs/warehouse/error.log",
+            "12",
+            "warehouse-north",
+            "true",
+            "v1.1.2",
+            "BIN-I9",
+            "16384",
+            "zone-controller",
+            "rk-warehouse-010",
+            "tok-wh-klm789nop012",
+            "warehouse-merge",
+            "control",
+            "ctl_vwx901",
+            "404",
+            "2500000",
+            "70000",
+            "0.15",
+            "Tablet",
+            "itemPage",
+            "performanceMetric",
+            "clickEvent",
+            "https://shop.example.com/item/1001",
+            "SSR",
+            "Windows 11",
+            "XSS Reflected (Header)",
+            "GET /.env",
+            "Mozilla/5.0 Safari/17.2",
+            "/ip/192.168.1.1",
+            "DataCenter EU",
+            "JP",
+            "business",
+            "[\"rate_limit_exceeded\",\"geo_anomaly\"]",
+            "sess_003",
+            "None",
+            "false",
+            "ORD-007",
+            "None",
+            "verifyPayment",
+            "dc-west"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_column_check": true
+      }
+    },
+    {
+      "id": "Q324",
+      "sql": "SELECT _timestamp, visitor_session_id, exception_message, error_code FROM \"{stream}\" WHERE (exception_message LIKE '%Exception%' OR error_code LIKE '%E00%') AND exception_message NOT LIKE '%Timeout%' AND error_code NOT IN ('E002') AND page_slug = 'itemPage'",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 19379000000,
+        "end_offset": 19453000000
+      },
+      "expected": {
+        "columns": [
+          "visitor_session_id",
+          "exception_message",
+          "error_code"
+        ],
+        "results": [
+          [
+            "sess_001",
+            "ConfigurationException: missing facility_zone ZONE-3 override",
+            "E005"
+          ],
+          [
+            "sess_003",
+            "ValidationException: item_count exceeds defect_limit bounds",
+            "E007"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q325",
+      "sql": "SELECT _timestamp, array_extract(regexp_match(db_info, 'cid-([a-z0-9]+)'), 1) AS extracted_cid, action_category FROM \"{stream}\" WHERE action_category = 'performanceMetric' AND db_info IS NOT NULL LIMIT 10",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 19439000000,
+        "end_offset": 19513000000
+      },
+      "expected": {
+        "columns": [
+          "extracted_cid",
+          "action_category"
+        ],
+        "results": [
+          [
+            "vwx234",
+            "performanceMetric"
+          ],
+          [
+            "abc123",
+            "performanceMetric"
+          ],
+          [
+            "abc123",
+            "performanceMetric"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q461",
+      "sql": "SELECT _timestamp, log, action_category FROM \"{stream}\" WHERE match_all('warehouse') AND action_category = 'performanceMetric' ORDER BY _timestamp DESC LIMIT 10",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 27599000000,
+        "end_offset": 27673000000
+      },
+      "expected": {
+        "columns": [
+          "log",
+          "action_category"
+        ],
+        "results": [
+          [
+            "Q461 warehouse event record 2",
+            "performanceMetric"
+          ],
+          [
+            "Q461 warehouse event record 1",
+            "performanceMetric"
+          ],
+          [
+            "Q460 warehouse event record 4",
+            "performanceMetric"
+          ],
+          [
+            "Q461 warehouse event record 0 ACK batch batchIdList:Q461-0",
+            "performanceMetric"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q462",
+      "sql": "SELECT _timestamp, exception_message, component_name FROM \"{stream}\" WHERE str_match_ignore_case(exception_message, 'exception') AND component_name IS NOT NULL ORDER BY _timestamp ASC LIMIT 10",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 27659000000,
+        "end_offset": 27733000000
+      },
+      "expected": {
+        "columns": [
+          "exception_message",
+          "component_name"
+        ],
+        "results": [
+          [
+            "ValidationException: item_count exceeds defect_limit bounds",
+            "temp-regulator"
+          ],
+          [
+            "StateTransitionException: operation_mode hybrid invalid state",
+            "charge-checker"
+          ],
+          [
+            "StateTransitionException: operation_mode hybrid invalid state",
+            "charge-checker"
+          ],
+          [
+            "OverflowException: throughput_rate 999.0 exceeds max capacity",
+            "sorter-engine"
+          ],
+          [
+            "NullPointerException at ConveyorController.handle()",
+            "conveyor-driver"
+          ],
+          [
+            "NullPointerException at ConveyorController.handle()",
+            "conveyor-driver"
+          ],
+          [
+            "TimeoutException: lane LANE-A did not respond within 5000ms",
+            "zone-controller"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q463",
+      "sql": "SELECT _timestamp, log, request_payload FROM \"{stream}\" WHERE match_all('warehouse') AND log LIKE '%event%' ORDER BY _timestamp ASC LIMIT 10",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 27719000000,
+        "end_offset": 27793000000
+      },
+      "expected": {
+        "columns": [
+          "log",
+          "request_payload"
+        ],
+        "results": [
+          [
+            "Q463 warehouse event record 0 ACK batch batchIdList:Q463-0",
+            "{\"message\":{\"endpoint\":\"archiveLog\",\"status\":\"ok\"}}"
+          ],
+          [
+            "Q462 warehouse event record 4",
+            "{\"message\":{\"endpoint\":\"retryScan\",\"status\":\"retrying\"}}"
+          ],
+          [
+            "Q463 warehouse event record 1",
+            "{\"message\":{\"endpoint\":\"retryScan\",\"status\":\"retrying\"}}"
+          ],
+          [
+            "Q463 warehouse event record 2",
+            "{\"message\":{\"endpoint\":\"syncZone\",\"status\":\"syncing\"}}"
+          ],
+          [
+            "Q463 warehouse event record 3 ACK batch batchIdList:Q463-3",
+            "{\"message\":{\"endpoint\":\"searchItems\",\"status\":\"ok\"}}"
+          ],
+          [
+            "Q464 warehouse event record 0 ACK batch batchIdList:Q464-0",
+            "{\"message\":{\"endpoint\":\"searchItems\",\"status\":\"ok\"}}"
+          ],
+          [
+            "Q463 warehouse event record 4",
+            "{\"message\":{\"endpoint\":\"updateBatch\",\"status\":\"pending\"}}"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q464",
+      "sql": "SELECT _timestamp, event_detail, action_category FROM \"{stream}\" WHERE str_match_ignore_case(event_detail, 'batch') AND action_category = 'performanceMetric' ORDER BY _timestamp ASC LIMIT 10",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 27779000000,
+        "end_offset": 27853000000
+      },
+      "expected": {
+        "columns": [
+          "event_detail",
+          "action_category"
+        ],
+        "results": [
+          [
+            "batch XYZ789 timed out at checkpoint 3",
+            "performanceMetric"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q465",
+      "sql": "SELECT _timestamp, db_info, action_category FROM \"{stream}\" WHERE match_all('cid') AND db_info IS NOT NULL ORDER BY _timestamp ASC LIMIT 10",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 27839000000,
+        "end_offset": 27913000000
+      },
+      "expected": {
+        "columns": [
+          "db_info",
+          "action_category"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q466",
+      "sql": "SELECT _timestamp, ack_detail, facility_zone FROM \"{stream}\" WHERE str_match_ignore_case(ack_detail, 'received') AND facility_zone IS NOT NULL ORDER BY _timestamp ASC LIMIT 10",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 27899000000,
+        "end_offset": 27973000000
+      },
+      "expected": {
+        "columns": [
+          "ack_detail",
+          "facility_zone"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q467",
+      "sql": "SELECT _timestamp, exception_message, error_code FROM \"{stream}\" WHERE match_all('Exception') AND error_code IS NOT NULL AND error_code LIKE 'E00%' ORDER BY _timestamp ASC LIMIT 10",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 27959000000,
+        "end_offset": 28033000000
+      },
+      "expected": {
+        "columns": [
+          "exception_message",
+          "error_code"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q468",
+      "sql": "SELECT _timestamp, log, action_subcategory FROM \"{stream}\" WHERE match_all('warehouse') AND action_subcategory IS NOT NULL ORDER BY _timestamp ASC LIMIT 15",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 28019000000,
+        "end_offset": 28093000000
+      },
+      "expected": {
+        "columns": [
+          "log",
+          "action_subcategory"
+        ],
+        "results": [
+          [
+            "Q468 warehouse event record 0 ACK batch batchIdList:Q468-0",
+            "pageView"
+          ],
+          [
+            "Q467 warehouse event record 4",
+            "vitalsLcp"
+          ],
+          [
+            "Q468 warehouse event record 1",
+            "vitalsLcp"
+          ],
+          [
+            "Q468 warehouse event record 2",
+            "vitalsInp"
+          ],
+          [
+            "Q468 warehouse event record 3 ACK batch batchIdList:Q468-3",
+            "vitalsLcp"
+          ],
+          [
+            "Q469 warehouse event record 0 ACK batch batchIdList:Q469-0",
+            "vitalsLcp"
+          ],
+          [
+            "Q468 warehouse event record 4",
+            "vitalsInp"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q469",
+      "sql": "SELECT _timestamp, exception_message, error_code, component_name FROM \"{stream}\" WHERE (match_all('Exception') OR match_all('Timeout')) AND action_category = 'performanceMetric' ORDER BY _timestamp ASC LIMIT 10",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 28079000000,
+        "end_offset": 28153000000
+      },
+      "expected": {
+        "columns": [
+          "exception_message",
+          "error_code",
+          "component_name"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q470",
+      "sql": "SELECT _timestamp, log_message, uri_path FROM \"{stream}\" WHERE str_match_ignore_case(log_message, 'INFO') AND uri_path LIKE '/api/%' ORDER BY _timestamp ASC LIMIT 10",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 28139000000,
+        "end_offset": 28213000000
+      },
+      "expected": {
+        "columns": [
+          "log_message",
+          "uri_path"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q540",
+      "sql": "SELECT _timestamp, exception_message, log_message FROM \"{stream}\" WHERE re_match(exception_message, 'NullPointer|Timeout|Security') AND re_not_match(exception_message, 'Network') ORDER BY _timestamp ASC LIMIT 10",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 32339000000,
+        "end_offset": 32413000000
+      },
+      "expected": {
+        "columns": [
+          "exception_message",
+          "log_message"
+        ],
+        "results": [
+          [
+            "TimeoutException: lane LANE-A did not respond within 5000ms",
+            "WARN: lane jam detected at conveyor_segment=3"
+          ],
+          [
+            "SecurityException: unauthorized access to control_center CC-ALPHA",
+            "INFO: throughput_rate=840.0 spike at facility_zone=ZONE-4"
+          ],
+          [
+            "SecurityException: unauthorized access to control_center CC-ALPHA",
+            "INFO: throughput_rate=840.0 spike at facility_zone=ZONE-4"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q541",
+      "sql": "SELECT _timestamp, request_payload FROM \"{stream}\" WHERE str_match_ignore_case(request_payload, 'endpoint') AND NOT str_match_ignore_case(request_payload, 'failed') ORDER BY _timestamp ASC LIMIT 10",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 32399000000,
+        "end_offset": 32473000000
+      },
+      "expected": {
+        "columns": [
+          "request_payload"
+        ],
+        "results": [
+          [
+            "{\"message\":{\"endpoint\":\"updateBatch\",\"status\":\"pending\"}}"
+          ],
+          [
+            "{\"message\":{\"endpoint\":\"scanPallet\",\"status\":\"ok\"}}"
+          ],
+          [
+            "{\"message\":{\"endpoint\":\"rerouteTrack\",\"status\":\"queued\"}}"
+          ],
+          [
+            "{\"message\":{\"endpoint\":\"rerouteTrack\",\"status\":\"queued\"}}"
+          ],
+          [
+            "{\"message\":{\"endpoint\":\"mergeBatch\",\"status\":\"ok\"}}"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q542",
+      "sql": "SELECT _timestamp, COALESCE(exception_message, log_message) AS msg FROM \"{stream}\" WHERE regexp_like(COALESCE(exception_message, log_message), '.*Exception.*') ORDER BY _timestamp ASC LIMIT 10",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 32459000000,
+        "end_offset": 32533000000
+      },
+      "expected": {
+        "columns": [
+          "_timestamp",
+          "msg"
+        ],
+        "note": "regexp_like with COALESCE argument cannot be translated to DuckDB regexp_matches",
+        "skip_sqllogictest": true,
+        "skip_row_count": true
+      }
+    },
+    {
+      "id": "Q543",
+      "sql": "SELECT _timestamp, log_message FROM \"{stream}\" WHERE match_all('ACK batch') ORDER BY _timestamp ASC LIMIT 10",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 32519000000,
+        "end_offset": 32593000000
+      },
+      "expected": {
+        "columns": [
+          "log_message"
+        ],
+        "results": [
+          [
+            "INFO: batch sync completed, url=http://warehouse.local/sync"
+          ],
+          [
+            "DEBUG: charge_remaining below threshold 15.0"
+          ],
+          [
+            "DEBUG: charge_remaining below threshold 15.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q544",
+      "sql": "SELECT _timestamp, COALESCE(exception_message, log_message, log) AS searchable_text FROM \"{stream}\" WHERE str_match_ignore_case(COALESCE(exception_message, log_message, log), 'error') AND COALESCE(exception_message, log_message, log) IS NOT NULL ORDER BY _timestamp ASC LIMIT 10",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 32579000000,
+        "end_offset": 32653000000
+      },
+      "expected": {
+        "columns": [
+          "_timestamp",
+          "searchable_text"
+        ],
+        "note": "str_match_ignore_case with COALESCE argument cannot be translated to DuckDB lower()+LIKE",
+        "skip_sqllogictest": true,
+        "skip_row_count": true
+      }
+    },
+    {
+      "id": "Q545",
+      "sql": "SELECT _timestamp, log FROM \"{stream}\" WHERE match_all('ACK') ORDER BY _timestamp DESC LIMIT 10",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 4379000000,
+        "end_offset": 4543000000
+      },
+      "expected": {
+        "columns": [
+          "log"
+        ],
+        "results": [
+          [
+            "Q076 warehouse event record 0 ACK batch batchIdList:Q076-0"
+          ],
+          [
+            "Q075 warehouse event record 3 ACK batch batchIdList:Q075-3"
+          ],
+          [
+            "Q075 warehouse event record 0 ACK batch batchIdList:Q075-0"
+          ],
+          [
+            "Q074 warehouse event record 3 ACK batch batchIdList:Q074-3"
+          ],
+          [
+            "Q074 warehouse event record 0 ACK batch batchIdList:Q074-0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q546",
+      "sql": "SELECT _timestamp, log FROM \"{stream}\" WHERE match_all('Q074') ORDER BY _timestamp ASC LIMIT 10",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 4379000000,
+        "end_offset": 4543000000
+      },
+      "expected": {
+        "columns": [
+          "log"
+        ],
+        "results": [
+          [
+            "Q074 warehouse event record 0 ACK batch batchIdList:Q074-0"
+          ],
+          [
+            "Q074 warehouse event record 1"
+          ],
+          [
+            "Q074 warehouse event record 2"
+          ],
+          [
+            "Q074 warehouse event record 3 ACK batch batchIdList:Q074-3"
+          ],
+          [
+            "Q074 warehouse event record 4"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q547",
+      "sql": "SELECT COUNT(*) AS cnt FROM \"{stream}\" WHERE match_all('Q076')",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 4379000000,
+        "end_offset": 4543000000
+      },
+      "expected": {
+        "columns": [
+          "cnt"
+        ],
+        "results": [
+          [
+            "3"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q548",
+      "sql": "SELECT * FROM \"{stream}\" WHERE match_all('ACK') ORDER BY _timestamp DESC LIMIT 3",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 4379000000,
+        "end_offset": 4543000000
+      },
+      "expected": {
+        "columns": [
+          "log",
+          "stream",
+          "pallet_id",
+          "load_factor",
+          "charge_remaining",
+          "throughput_rate",
+          "sorter_model",
+          "conveyor_lane",
+          "facility_zone",
+          "control_center",
+          "item_count",
+          "defect_limit",
+          "runtime_hours",
+          "operation_mode",
+          "package_size",
+          "scan_attempts",
+          "conveyor_segment",
+          "cell_temp",
+          "build_signature",
+          "event_detail",
+          "ack_detail",
+          "log_message",
+          "error_code",
+          "service_owner",
+          "upstream_error_code",
+          "exception_message",
+          "request_payload",
+          "phase_data",
+          "db_info",
+          "api_name",
+          "node_ip",
+          "source_ip",
+          "tag_a",
+          "tag_b",
+          "query_source",
+          "region_code",
+          "client_agent",
+          "operation_name",
+          "site_name",
+          "endpoint_path",
+          "http_method",
+          "response_code",
+          "scan_category",
+          "auth_result",
+          "task_id",
+          "entity_id",
+          "alert_tags",
+          "issue_type",
+          "filter_result",
+          "guard_mode",
+          "record_type",
+          "resource_path",
+          "latency_ms",
+          "org_name",
+          "threat_flag",
+          "build_version",
+          "bin_code",
+          "payload_size",
+          "component_name",
+          "route_key",
+          "auth_token",
+          "app_label",
+          "variant_tag",
+          "cookie_id",
+          "status_code",
+          "lcp_micros",
+          "inp_micros",
+          "cls_score",
+          "device_type",
+          "page_slug",
+          "action_category",
+          "action_subcategory",
+          "page_url",
+          "render_scope",
+          "os_platform",
+          "attack_name",
+          "http_request",
+          "user_agent_str",
+          "uri_path",
+          "geo_org",
+          "geo_country",
+          "geo_user_type",
+          "risk_rules_list",
+          "visitor_session_id",
+          "bot_flag",
+          "passthrough_flag",
+          "order_ref",
+          "info_tag",
+          "graphql_operation",
+          "datacenter"
+        ],
+        "results": [
+          [
+            "Q076 warehouse event record 0 ACK batch batchIdList:Q076-0",
+            "stdout",
+            "PL-005",
+            "94.6",
+            "42.5",
+            "900.0",
+            "SORT-X1",
+            "LANE-D",
+            "ZONE-3",
+            "CC-BETA",
+            "88",
+            "1.0",
+            "90",
+            "manual",
+            "500",
+            "5",
+            "2",
+            "30.1",
+            "BS-2026-A1",
+            "segment 88 speed anomaly detected",
+            "ACK batch batchIdList:BT-005-2026 processed",
+            "POST /api/v2/sorter/scan 201 Created",
+            "E009",
+            "@warehouse-iOS-scan-v1",
+            "None",
+            "OverflowException: throughput_rate 999.0 exceeds max capacity",
+            "{\"message\":{\"endpoint\":\"checkThreshold\",\"status\":\"warning\"}}",
+            "[\"{\\\"name\\\":\\\"scan\\\",\\\"startTime\\\":\\\"0\\\"}\", \"{\\\"name\\\":\\\"sort\\\",\\\"startTime\\\":\\\"180\\\"}\", \"{\\\"name\\\":\\\"pack\\\",\\\"startTime\\\":\\\"360\\\"}\"]",
+            "[\"cid-abc123\",\"status-ok\"]",
+            "ArchiveLog",
+            "10.12.0.105",
+            "192.168.1.11",
+            "dev",
+            "high",
+            "api",
+            "AP-CENTRAL",
+            "axios/1.6.0 (Node.js; warehouse-ui)",
+            "ScanPallet",
+            "site-nyc-01",
+            "None",
+            "GET",
+            "201",
+            "internal",
+            "fail",
+            "task-g7h8i9",
+            "ent-010-wh",
+            "capacity",
+            "jam",
+            "allow",
+            "disabled",
+            "scan",
+            "None",
+            "1900",
+            "warehouse-east",
+            "None",
+            "v3.2.0",
+            "BIN-G7",
+            "4096",
+            "sorter-engine",
+            "rk-warehouse-008",
+            "tok-wh-yza567bcd890",
+            "warehouse-scan",
+            "None",
+            "sess_abc123",
+            "200",
+            "1100000",
+            "180000",
+            "0.25",
+            "Mobile",
+            "itemPage",
+            "performanceMetric",
+            "vitalsInp",
+            "None",
+            "SSR",
+            "Android 13",
+            "Evasion Technique",
+            "PUT /api/cart/update",
+            "Mozilla/5.0 Firefox/121",
+            "/api/v1/data",
+            "HostPro Inc",
+            "BR",
+            "hosting",
+            "[\"credential_stuffing\"]",
+            "sess_001",
+            "None",
+            "false",
+            "ORD-003",
+            "None",
+            "updateItems",
+            "dc-west"
+          ],
+          [
+            "Q075 warehouse event record 3 ACK batch batchIdList:Q075-3",
+            "stdout",
+            "PL-003",
+            "94.6",
+            "42.5",
+            "900.0",
+            "SORT-M3",
+            "LANE-B",
+            "ZONE-1",
+            "CC-DELTA",
+            "88",
+            "1.0",
+            "90",
+            "manual",
+            "500",
+            "5",
+            "2",
+            "30.1",
+            "BS-2026-A1",
+            "segment 88 speed anomaly detected",
+            "ACK batch batchIdList:BT-005-2026 processed",
+            "POST /api/v2/sorter/scan 201 Created",
+            "E009",
+            "@warehouse-iOS-scan-v1",
+            "None",
+            "OverflowException: throughput_rate 999.0 exceeds max capacity",
+            "{\"message\":{\"endpoint\":\"checkThreshold\",\"status\":\"warning\"}}",
+            "[\"{\\\"name\\\":\\\"scan\\\",\\\"startTime\\\":\\\"0\\\"}\", \"{\\\"name\\\":\\\"sort\\\",\\\"startTime\\\":\\\"180\\\"}\", \"{\\\"name\\\":\\\"pack\\\",\\\"startTime\\\":\\\"360\\\"}\"]",
+            "[\"cid-abc123\",\"status-ok\"]",
+            "ArchiveLog",
+            "10.12.0.105",
+            "192.168.1.11",
+            "dev",
+            "high",
+            "api",
+            "AP-CENTRAL",
+            "axios/1.6.0 (Node.js; warehouse-ui)",
+            "ScanPallet",
+            "site-nyc-01",
+            "None",
+            "GET",
+            "201",
+            "internal",
+            "fail",
+            "task-g7h8i9",
+            "ent-010-wh",
+            "capacity",
+            "jam",
+            "allow",
+            "disabled",
+            "scan",
+            "None",
+            "1900",
+            "warehouse-east",
+            "None",
+            "v3.2.0",
+            "BIN-G7",
+            "4096",
+            "sorter-engine",
+            "rk-warehouse-008",
+            "tok-wh-yza567bcd890",
+            "warehouse-scan",
+            "None",
+            "sess_abc123",
+            "200",
+            "1100000",
+            "180000",
+            "0.25",
+            "Mobile",
+            "itemPage",
+            "performanceMetric",
+            "vitalsInp",
+            "None",
+            "SSR",
+            "Android 13",
+            "Evasion Technique",
+            "PUT /api/cart/update",
+            "Mozilla/5.0 Firefox/121",
+            "/api/v1/data",
+            "HostPro Inc",
+            "BR",
+            "hosting",
+            "[\"credential_stuffing\"]",
+            "sess_001",
+            "None",
+            "false",
+            "ORD-003",
+            "None",
+            "updateItems",
+            "dc-west"
+          ],
+          [
+            "Q075 warehouse event record 0 ACK batch batchIdList:Q075-0",
+            "stderr",
+            "PL-008",
+            "55.2",
+            "66.6",
+            "290.0",
+            "SORT-Z9",
+            "LANE-C",
+            "ZONE-2",
+            "CC-ALPHA",
+            "120",
+            "2.8",
+            "48",
+            "manual",
+            "1200",
+            "1",
+            "4",
+            "18.5",
+            "BS-2025-D4",
+            "segment 17 weight threshold exceeded",
+            "ACK batch batchIdList:BT-002-2026 acknowledged",
+            "ERROR: scan_attempts exhausted for pallet_id=PL-007",
+            "E006",
+            "@warehouse-Linux-sort-v3",
+            "UP-E010",
+            "NetworkException: connection to batch sync failed",
+            "{\"message\":{\"endpoint\":\"scanPallet\",\"status\":\"ok\"}}",
+            "[\"{\\\"name\\\":\\\"init\\\",\\\"startTime\\\":\\\"0\\\"}\", \"{\\\"name\\\":\\\"process\\\",\\\"startTime\\\":\\\"150\\\"}\"]",
+            "[\"cid-vwx234\",\"status-ok\"]",
+            "RerouteTrack",
+            "10.12.0.102",
+            "192.168.2.23",
+            "dev",
+            "medium",
+            "cli",
+            "SA-EAST",
+            "Java/17.0.8 (OpenJDK; sorter-agent)",
+            "SearchItems",
+            "site-sin-08",
+            "/api/v2/sorter/reroute",
+            "POST",
+            "403",
+            "internal",
+            "denied",
+            "task-b8c9d0",
+            "ent-007-wh",
+            "latency",
+            "timeout",
+            "allow",
+            "passive",
+            "sort",
+            "/config/zone/ZONE-3.yaml",
+            "567",
+            "warehouse-north",
+            "true",
+            "v3.1.0",
+            "BIN-D4",
+            "512",
+            "lane-monitor",
+            "rk-warehouse-005",
+            "tok-wh-ghi789jkl012",
+            "warehouse-merge",
+            "variant_a",
+            "ctl_xyz789",
+            "200",
+            "2800000",
+            "95000",
+            "0.05",
+            "Computer",
+            "checkoutPage",
+            "performanceMetric",
+            "vitalsLcp",
+            "https://shop.example.com/item/1004",
+            "SSR",
+            "Android 14",
+            "XSS Stored (Body)",
+            "GET /favicon.ico",
+            "Mozilla/5.0 Chrome/120",
+            "/api/v1/users",
+            "CloudServe GmbH",
+            "DE",
+            "hosting",
+            "[\"rate_limit_exceeded\"]",
+            "sess_002",
+            "None",
+            "false",
+            "ORD-003",
+            "None",
+            "placeOrder",
+            "dc-west"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_column_check": true
+      }
+    },
+    {
+      "id": "Q657",
+      "sql": "SELECT histogram(_timestamp, '1 minute') AS _time, COUNT(*) FILTER (WHERE match_all('ACK')) AS ack_count, COUNT(*) FILTER (WHERE match_all('error')) AS error_count FROM \"{stream}\" GROUP BY _time ORDER BY _time",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 39300000000,
+        "end_offset": 39480000000
+      },
+      "expected": {
+        "columns": [
+          "_time",
+          "ack_count",
+          "error_count"
+        ],
+        "results": [
+          [
+            "2026-06-06T16:51:00",
+            "2",
+            "0"
+          ],
+          [
+            "2026-06-06T16:52:00",
+            "2",
+            "0"
+          ],
+          [
+            "2026-06-06T16:53:00",
+            "2",
+            "0"
+          ],
+          [
+            "2026-06-06T16:54:00",
+            "1",
+            "0"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
+      }
+    },
+    {
+      "id": "Q658",
+      "sql": "SELECT _timestamp, log, exception_message FROM \"{stream}\" WHERE match_all('warehouse') AND re_match(exception_message, 'Exception|Error') ORDER BY _timestamp LIMIT 10",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 39360000000,
+        "end_offset": 39540000000
+      },
+      "expected": {
+        "columns": [
+          "log",
+          "exception_message"
+        ],
+        "results": [
+          [
+            "Q657 warehouse event record 0 ACK batch batchIdList:Q657-0",
+            "DataIntegrityException: pallet_id PL-002 checksum mismatch"
+          ],
+          [
+            "Q656 warehouse event record 4",
+            "ResourceExhaustedException: sorter_model SORT-M3 queue full"
+          ],
+          [
+            "Q657 warehouse event record 1",
+            "ResourceExhaustedException: sorter_model SORT-M3 queue full"
+          ],
+          [
+            "Q657 warehouse event record 2",
+            "SecurityException: unauthorized access to control_center CC-ALPHA"
+          ],
+          [
+            "Q657 warehouse event record 3 ACK batch batchIdList:Q657-3",
+            "ConfigurationException: missing facility_zone ZONE-3 override"
+          ],
+          [
+            "Q658 warehouse event record 0 ACK batch batchIdList:Q658-0",
+            "ConfigurationException: missing facility_zone ZONE-3 override"
+          ],
+          [
+            "Q657 warehouse event record 4",
+            "NetworkException: connection to batch sync failed"
+          ],
+          [
+            "Q658 warehouse event record 1",
+            "NetworkException: connection to batch sync failed"
+          ],
+          [
+            "Q658 warehouse event record 2",
+            "ValidationException: item_count exceeds defect_limit bounds"
+          ],
+          [
+            "Q658 warehouse event record 3 ACK batch batchIdList:Q658-3",
+            "StateTransitionException: operation_mode hybrid invalid state"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q659",
+      "sql": "SELECT _timestamp, log, action_category FROM \"{stream}\" WHERE match_all('event') AND str_match_ignore_case(action_category, 'performance') ORDER BY _timestamp LIMIT 10",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 39420000000,
+        "end_offset": 39600000000
+      },
+      "expected": {
+        "columns": [
+          "log",
+          "action_category"
+        ],
+        "results": [
+          [
+            "Q658 warehouse event record 0 ACK batch batchIdList:Q658-0",
+            "performanceMetric"
+          ],
+          [
+            "Q657 warehouse event record 4",
+            "performanceMetric"
+          ],
+          [
+            "Q658 warehouse event record 1",
+            "performanceMetric"
+          ],
+          [
+            "Q658 warehouse event record 4",
+            "performanceMetric"
+          ],
+          [
+            "Q659 warehouse event record 1",
+            "performanceMetric"
+          ],
+          [
+            "Q659 warehouse event record 3 ACK batch batchIdList:Q659-3",
+            "performanceMetric"
+          ],
+          [
+            "Q660 warehouse event record 0 ACK batch batchIdList:Q660-0",
+            "performanceMetric"
+          ],
+          [
+            "Q660 warehouse event record 2",
+            "performanceMetric"
+          ],
+          [
+            "Q660 warehouse event record 3 ACK batch batchIdList:Q660-3",
+            "performanceMetric"
+          ],
+          [
+            "Q661 warehouse event record 0 ACK batch batchIdList:Q661-0",
+            "performanceMetric"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
+      }
+    },
+    {
+      "id": "Q660",
+      "sql": "SELECT facility_zone, COUNT(*) FILTER (WHERE match_all('ACK')) AS ack_logs, COUNT(*) FILTER (WHERE match_all('warehouse')) AS wh_logs, COUNT(*) AS total FROM \"{stream}\" GROUP BY facility_zone ORDER BY facility_zone",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 39480000000,
+        "end_offset": 39660000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "ack_logs",
+          "wh_logs",
+          "total"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "2",
+            "5",
+            "5"
+          ],
+          [
+            "ZONE-2",
+            "2",
+            "4",
+            "4"
+          ],
+          [
+            "ZONE-3",
+            "2",
+            "4",
+            "4"
+          ],
+          [
+            "ZONE-4",
+            "1",
+            "3",
+            "3"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
+      }
+    },
+    {
+      "id": "Q661",
+      "sql": "SELECT _timestamp, log, facility_zone, match_all('ACK') AS has_ack, ROW_NUMBER() OVER (PARTITION BY facility_zone ORDER BY _timestamp) AS rn FROM \"{stream}\" ORDER BY _timestamp LIMIT 15",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 39540000000,
+        "end_offset": 39720000000
+      },
+      "expected": {
+        "columns": [
+          "log",
+          "facility_zone",
+          "has_ack",
+          "rn"
+        ],
+        "results": [
+          [
+            "Q660 warehouse event record 0 ACK batch batchIdList:Q660-0",
+            "ZONE-3",
+            "True",
+            "1"
+          ],
+          [
+            "Q659 warehouse event record 4",
+            "ZONE-2",
+            "False",
+            "1"
+          ],
+          [
+            "Q660 warehouse event record 1",
+            "ZONE-4",
+            "False",
+            "1"
+          ],
+          [
+            "Q660 warehouse event record 2",
+            "ZONE-1",
+            "False",
+            "1"
+          ],
+          [
+            "Q660 warehouse event record 3 ACK batch batchIdList:Q660-3",
+            "ZONE-2",
+            "True",
+            "2"
+          ],
+          [
+            "Q661 warehouse event record 0 ACK batch batchIdList:Q661-0",
+            "ZONE-4",
+            "True",
+            "2"
+          ],
+          [
+            "Q660 warehouse event record 4",
+            "ZONE-3",
+            "False",
+            "2"
+          ],
+          [
+            "Q661 warehouse event record 1",
+            "ZONE-1",
+            "False",
+            "2"
+          ],
+          [
+            "Q661 warehouse event record 2",
+            "ZONE-2",
+            "False",
+            "3"
+          ],
+          [
+            "Q661 warehouse event record 3 ACK batch batchIdList:Q661-3",
+            "ZONE-3",
+            "True",
+            "3"
+          ],
+          [
+            "Q662 warehouse event record 0 ACK batch batchIdList:Q662-0",
+            "ZONE-1",
+            "True",
+            "3"
+          ],
+          [
+            "Q661 warehouse event record 4",
+            "ZONE-4",
+            "False",
+            "3"
+          ],
+          [
+            "Q662 warehouse event record 1",
+            "ZONE-2",
+            "False",
+            "4"
+          ],
+          [
+            "Q662 warehouse event record 2",
+            "ZONE-3",
+            "False",
+            "4"
+          ],
+          [
+            "Q662 warehouse event record 3 ACK batch batchIdList:Q662-3",
+            "ZONE-4",
+            "True",
+            "4"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true,
+        "skip_without_single_node_opt": true
+      }
+    }
+  ],
+  "last_query_id": 82
+}

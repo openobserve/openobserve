@@ -35,6 +35,7 @@ test.describe("Pre-Test Cleanup", () => {
         'e2e_promql_',             // alerts-regression.spec.js (Bug #9967 PromQL tests)
         'e2e_vrl_',                // alerts-vrl-encoding.spec.js (VRL encoding tests)
         'e2e_sched_',              // alerts-scheduled-features.spec.js (scheduled alert tests)
+        'e2e_metrics_',            // alerts-metrics-notification.spec.js (metrics notification tests)
         /^destination\d{1,3}$/     // destination4, destination44, destination444, etc.
       ],
       // Template prefixes to clean up
@@ -56,7 +57,8 @@ test.describe("Pre-Test Cleanup", () => {
         'e2e_incid_',              // alerts-incident-correlation.spec.js (incident correlation tests)
         'e2e_promql_',             // alerts-regression.spec.js (Bug #9967 PromQL tests)
         'e2e_vrl_',                // alerts-vrl-encoding.spec.js (VRL encoding tests)
-        'e2e_sched_'               // alerts-scheduled-features.spec.js (scheduled alert tests)
+        'e2e_sched_',              // alerts-scheduled-features.spec.js (scheduled alert tests)
+        'e2e_metrics_'            // alerts-metrics-notification.spec.js (metrics notification tests)
       ],
       // Folder prefixes to clean up
       ['auto_', 'incident_e2e_folder_', 'E2E Incidents ', 'E2E Scheduled ']
@@ -371,6 +373,13 @@ test.describe("Pre-Test Cleanup", () => {
       ['service-graph-', 'tree-view-', 'graph-view-', 'graph-debug'],
       screenshotDir
     );
+
+    // Clean up model pricing test records (mp_* names and cloned built-in "(Copy)" org models)
+    await pm.apiCleanup.cleanupModelPricingModels([
+      'mp_',                                // all test models created by model-pricing.spec.js
+      'E2E Pricing Verifier ',              // cost-verification models (Journeys 12/13)
+      /^.+\s\(Copy\)$/                      // cloned built-in models (source=org, name ends with " (Copy)")
+    ]);
 
     testLogger.info('Pre-test cleanup completed successfully');
   });

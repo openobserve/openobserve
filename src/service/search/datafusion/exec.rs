@@ -60,7 +60,10 @@ use super::{
     storage::file_list, udf::transform_udf::get_all_transform,
 };
 use crate::service::search::{
-    datafusion::table_provider::{listing_adapter::ListingTableAdapter, uniontable::NewUnionTable},
+    datafusion::{
+        storage::file_statistics_cache,
+        table_provider::{listing_adapter::ListingTableAdapter, uniontable::NewUnionTable},
+    },
     index::IndexCondition,
 };
 
@@ -107,6 +110,29 @@ pub fn create_session_config(
         .execution
         .skip_physical_aggregate_schema_check = true;
 
+    // DataFusion 54 executes uncorrelated scalar subqueries physically via
+    // `ScalarSubqueryExec`/`ScalarSubqueryExpr` instead of rewriting them into joins.
+    // `ScalarSubqueryExpr` can only be (de)serialized inside its surrounding
+    // `ScalarSubqueryExec`, which breaks our distributed plan splitting across the Flight
+    // boundary. Disable the physical path so `ScalarSubqueryToJoin` decorrelates them into
+    // joins again, keeping the serialized follower plans valid.
+    config
+        .options_mut()
+        .optimizer
+        .enable_physical_uncorrelated_scalar_subquery = false;
+
+    // DataFusion 54 builds a runtime `DynamicFilterPhysicalExpr` from a `HashJoinExec`'s
+    // build-side join keys and pushes it into the probe-side scan. That runtime state can't
+    // cross our distributed RemoteScan/Flight boundary, and after our custom join rewrites
+    // (`swap_inputs` + broadcast/enrichment join) the filter ends up referencing build-side
+    // columns by index against the projected probe-side batch, producing
+    // "PhysicalExpr Column references column ... but input schema only has N columns" at
+    // execution time. Disable join dynamic filter pushdown to keep the split plans valid.
+    config
+        .options_mut()
+        .optimizer
+        .enable_join_dynamic_filter_pushdown = false;
+
     Ok(config)
 }
 
@@ -126,9 +152,9 @@ pub async fn create_runtime_env(trace_id: &str, memory_limit: usize) -> Result<R
         RuntimeEnvBuilder::new().with_object_store_registry(Arc::new(object_store_registry));
     if cfg.limit.datafusion_file_stat_cache_max_size > 0 {
         let cache_config = CacheManagerConfig::default();
-        let cache_config = cache_config.with_files_statistics_cache(Some(
-            super::storage::file_statistics_cache::GLOBAL_CACHE.clone(),
-        ));
+        let cache_config = cache_config
+            .with_file_statistics_cache(Some(file_statistics_cache::GLOBAL_CACHE.clone()))
+            .with_file_statistics_cache_limit(cfg.limit.datafusion_file_stat_cache_max_size);
         builder = builder.with_cache_manager(cache_config);
     }
 
@@ -614,6 +640,14 @@ mod tests {
         assert_eq!(config.options().sql_parser.dialect, Dialect::PostgreSQL);
         assert!(!config.options().execution.listing_table_ignore_subdirectory);
         assert!(config.information_schema());
+        // Join dynamic filter pushdown must stay disabled: its runtime filter can't cross our
+        // distributed RemoteScan/Flight boundary and breaks our custom join rewrites.
+        assert!(
+            !config
+                .options()
+                .optimizer
+                .enable_join_dynamic_filter_pushdown
+        );
 
         Ok(())
     }
@@ -808,7 +842,7 @@ mod tests {
                 deleted: false,
                 account: "test_account".to_string(),
                 id: 1,
-                segment_ids: None,
+                selection: None,
                 row_group_size: None,
             }];
 
@@ -848,7 +882,7 @@ mod tests {
                 deleted: false,
                 account: "test_account".to_string(),
                 id: 1,
-                segment_ids: None,
+                selection: None,
                 row_group_size: None,
             }];
 

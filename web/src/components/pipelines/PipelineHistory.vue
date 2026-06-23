@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -17,104 +17,66 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="pipeline-history-page"
-    class="tw:flex tw:flex-col tw:h-full tw:min-h-0 tw:pr-[0.625rem]"
+    class="tw:flex tw:flex-col tw:h-full tw:min-h-0"
   >
-    <div class="tw:shrink-0">
-      <div class="card-container tw:mb-[0.625rem]">
-        <div
-          class="tw:flex tw:justify-between tw:items-center tw:py-3 tw:px-2 tw:h-[68px]"
-        >
-          <div class="tw:flex tw:items-center">
-            <OButton
-              variant="ghost"
-              size="icon-xs-sq"
-              class="hideOnPrintMode"
-              @click="goBack"
-              data-test="alert-history-back-btn"
-              icon-left="chevron-left"
-            />
-            <div
-              class="tw:text-xl tw:tracking-[0.005em] tw:font-[600] tw:ml-2 tw:flex tw:items-center tw:gap-2"
-              data-test="pipeline-history-title"
-            >
-              {{ t(`pipeline.history`) }}
-              <OIcon name="info" size="sm">
-                <OTooltip
-                  content="History is only available for scheduled and manually triggered pipelines. Real-time pipelines do not generate history records."
-                  side="top"
-                />
-              </OIcon>
-            </div>
-          </div>
-          <div class="tw:flex tw:ml-auto tw:ps-2 tw:items-center">
-            <div class="tw:mr-2">
-              <DateTime
-                ref="dateTimeRef"
-                auto-apply
-                :default-type="dateTimeType"
-                :default-absolute-time="{
-                  startTime: absoluteTime.startTime,
-                  endTime: absoluteTime.endTime,
-                }"
-                :default-relative-time="relativeTime"
-                data-test="pipeline-history-date-picker"
-                @on:date-change="updateDateTime"
-              />
-            </div>
-            <OSelect
-              v-model="selectedPipeline"
-              :options="allPipelines"
-              labelKey="label"
-              valueKey="value"
-              searchable
-              @update:model-value="onPipelineSelected"
-              :placeholder="
-                t(`pipeline.searchHistory`) || 'Select or search pipeline...'
-              "
-              data-test="pipeline-history-search-select"
-              class="tw:mr-2 tw:min-w-[250px]"
-              clearable
-            >
-              <template #empty>
-                <span>No pipelines found</span>
-              </template>
-            </OSelect>
-            <OButton
-              variant="ghost"
-              size="icon-xs-sq"
-              class="tw:mr-2"
-              @click="manualSearch"
-              data-test="pipeline-history-manual-search-btn"
-              :disabled="loading"
-              icon-left="search"
-            >
-              <OTooltip :content="t('common.search') || 'Search'" side="top" />
-            </OButton>
-            <OButton
-              variant="ghost"
-              size="icon-xs-sq"
-              @click="refreshData"
-              data-test="pipeline-history-refresh-btn"
-              :loading="loading"
-              icon-left="refresh"
-            >
-              <OTooltip
-                :content="t('common.refresh') || 'Refresh'"
-                side="top"
-              />
-            </OButton>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="tw:flex-1 tw:min-h-0">
+    <!-- Controls live in the shell header (Functions.vue #o2-page-actions),
+         next to the "Pipelines › History" breadcrumb — no bespoke 2nd header.
+         `defer` (Vue 3.5+) waits for the target to be rendered in the same
+         tick — needed because #o2-page-actions is created by the parent shell
+         (Functions.vue) which may not have fully rendered when this component
+         mounts on initial page load. -->
+    <Teleport to="#o2-page-actions" defer>
+      <DateTime
+        ref="dateTimeRef"
+        auto-apply
+        :default-type="dateTimeType"
+        :default-absolute-time="{
+          startTime: absoluteTime.startTime,
+          endTime: absoluteTime.endTime,
+        }"
+        :default-relative-time="relativeTime"
+        data-test="pipeline-history-date-picker"
+        @on:date-change="updateDateTime"
+      />
+      <OSelect
+        v-model="selectedPipeline"
+        :options="allPipelines"
+        labelKey="label"
+        valueKey="value"
+        searchable
+        @update:model-value="onPipelineSelected"
+        :placeholder="
+          t(`pipeline.searchHistory`) || 'Select or search pipeline...'
+        "
+        data-test="pipeline-history-search-select"
+        class="tw:min-w-[250px]"
+        clearable
+      >
+        <template #empty>
+          <span>No pipelines found</span>
+        </template>
+      </OSelect>
+      <OButton
+        variant="ghost"
+        size="icon-xs-sq"
+        @click="refreshData"
+        data-test="pipeline-history-refresh-btn"
+        :loading="loading"
+        icon-left="refresh"
+      >
+        <OTooltip :content="t('common.refresh') || 'Refresh'" side="top" />
+      </OButton>
+    </Teleport>
+    <div class="tw:flex-1 tw:min-h-0 tw:overflow-hidden">
       <div
         data-test="pipeline-history-table"
         class="pipeline-history-table card-container tw:h-full"
       >
         <OTable
+          :frame="false"
           :data="rows"
           :columns="columns"
+          :default-columns="false"
           row-key="id"
           width="100%"
           class="tw:w-full tw:h-full"
@@ -230,7 +192,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #empty>
-            <no-data />
+            <OEmptyState
+              size="hero"
+              preset="no-pipeline-history"
+              :filtered="!!searchQuery"
+              :hide-action="!searchQuery"
+              @action="(id) => id === 'clear-filters' && clearSearch()"
+            />
           </template>
 
           <template #bottom="{ totalRows }">
@@ -491,7 +459,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { ref, onMounted, watch } from "vue";
-import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import * as dateUtils from "@/utils/date";
@@ -506,12 +473,12 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import pipelinesService from "@/services/pipelines";
 import http from "@/services/http";
-import NoData from "@/components/shared/grid/NoData.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
 const { t } = useI18n();
 const store = useStore();
-const router = useRouter();
 
 // Data
 const loading = ref(false);
@@ -561,7 +528,7 @@ const columns = ref([
     id: "row_number",
     header: "#",
     accessorKey: "#",
-    size: 37,
+    size: TABLE_INDEX_COL_SIZE,
     meta: { align: "left" as const },
   },
   {
@@ -569,6 +536,8 @@ const columns = ref([
     header: "Pipeline Name",
     accessorKey: "pipeline_name",
     sortable: true,
+    size: 320,
+    minSize: 320,
     meta: { align: "left" as const },
   },
   {
@@ -576,7 +545,7 @@ const columns = ref([
     header: "Type",
     accessorKey: "is_realtime",
     sortable: true,
-    size: 90,
+    size: 70,
     meta: { align: "center" as const },
   },
   {
@@ -584,7 +553,7 @@ const columns = ref([
     header: "Is Silenced",
     accessorKey: "is_silenced",
     sortable: true,
-    size: 130,
+    size: 100,
     meta: { align: "center" as const },
   },
   {
@@ -616,7 +585,7 @@ const columns = ref([
     header: "Duration",
     accessorFn: (row: any) => row.end_time - row.start_time,
     sortable: true,
-    size: 110,
+    size: 90,
     meta: { align: "right" as const },
   },
   {
@@ -712,12 +681,6 @@ const onPipelineSelected = (val: any) => {
 const clearSearch = () => {
   searchQuery.value = "";
   selectedPipeline.value = undefined;
-  pagination.value.page = 1;
-  fetchPipelineHistory();
-};
-
-const manualSearch = () => {
-  searchQuery.value = (selectedPipeline.value as any) ?? "";
   pagination.value.page = 1;
   fetchPipelineHistory();
 };
@@ -889,15 +852,6 @@ const showErrorDialog = (error: any) => {
 const closeErrorDialog = () => {
   errorDialog.value = false;
   errorMessage.value = null;
-};
-
-const goBack = () => {
-  router.push({
-    name: "pipelines",
-    query: {
-      org_identifier: store.state.selectedOrganization.identifier,
-    },
-  });
 };
 
 // Lifecycle

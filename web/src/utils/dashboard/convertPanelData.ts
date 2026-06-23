@@ -18,12 +18,15 @@ import {
   convertMultiSQLData,
   convertSQLData,
 } from "@/utils/dashboard/convertSQLData";
-import { convertTableData } from "@/utils/dashboard/convertTableData";
+import {
+  convertTableData,
+  convertMultiQueryTableData,
+} from "@/utils/dashboard/convertTableData";
 import { convertPivotTableData } from "@/utils/dashboard/convertPivotTableData";
 import { convertGeoMapData } from "@/utils/dashboard/convertGeoMapData";
 import { convertMapsData } from "@/utils/dashboard/convertMapsData";
 import { convertSankeyData } from "./convertSankeyData";
-import { runJavaScriptCode } from "./convertCustomChartData";
+import { runJavaScriptCode, validateUserCode } from "./convertCustomChartData";
 /**
  * Converts panel data based on the panel schema and data.
  *
@@ -144,11 +147,21 @@ export const convertPanelData = async (
           (pivotQuery?.fields?.y?.length ?? 0) > 0;
 
         if (isPivot) {
+          // Pivot: single query only
           return {
             chartType: panelSchema.type,
-            ...convertPivotTableData(panelSchema, data, store),
+            ...convertPivotTableData(panelSchema, [data[0]], store),
           };
         }
+
+        // Multi-query UNION mode for non-pivot tables
+        if (Array.isArray(data) && data.length > 1) {
+          return {
+            chartType: panelSchema.type,
+            ...convertMultiQueryTableData(panelSchema, data, store),
+          };
+        }
+
         return {
           chartType: panelSchema.type,
           ...convertTableData(panelSchema, data, store),
@@ -212,6 +225,11 @@ export const convertPanelData = async (
       };
     }
     case "custom_chart": {
+      const validationError = validateUserCode(panelSchema.customChartContent ?? "");
+      if (validationError) {
+        throw new Error(`Unsafe code detected: ${validationError}`);
+      }
+
       const hasData =
         panelSchema?.queryType === "promql"
           ? data.length > 0 && data[0].result.length > 0

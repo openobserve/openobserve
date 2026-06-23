@@ -4,6 +4,7 @@
 import { inject } from "vue";
 import OSlider from "./OSlider.vue";
 import { FORM_CONTEXT_KEY } from "../Form/OForm.types";
+import { firstFieldError } from "../Form/fieldError";
 import type { FormSliderProps } from "./OFormSlider.types";
 
 defineOptions({ inheritAttrs: false });
@@ -24,19 +25,6 @@ if (import.meta.env.DEV && !form) {
     v-if="form"
     :is="form.Field"
     :name="props.name"
-    :validators="
-      props.validators
-        ? {
-            onChange: (ctx: { value: unknown }) => {
-              for (const v of props.validators ?? []) {
-                const r = v(ctx.value as number);
-                if (r !== undefined) return r;
-              }
-              return undefined;
-            },
-          }
-        : undefined
-    "
   >
     <template #default="{ field }">
       <div class="tw:flex tw:flex-col tw:gap-1">
@@ -50,12 +38,13 @@ if (import.meta.env.DEV && !form) {
           :format-value="props.formatValue"
           :help-text="props.helpText"
           :disabled="props.disabled"
+          :required="props.required"
           :size="props.size"
           :id="props.id"
           :name="props.name"
           :model-value="field.state.value"
           :error="
-            field.state.meta.isTouched && field.state.meta.errors.length > 0
+            field.state.meta.errors.length > 0
           "
           @update:model-value="
             (v: number) => {
@@ -71,11 +60,11 @@ if (import.meta.env.DEV && !form) {
         </OSlider>
         <div
           v-if="
-            field.state.meta.isTouched && field.state.meta.errors.length > 0
+            field.state.meta.errors.length > 0
           "
           class="tw:text-xs tw:text-slider-error-text"
         >
-          {{ field.state.meta.errors[0] }}
+          {{ firstFieldError(field.state.meta.errors) }}
         </div>
       </div>
     </template>

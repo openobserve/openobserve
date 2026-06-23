@@ -16,19 +16,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="tw:w-full discovered-services"
+    class="tw:flex tw:flex-col tw:w-full tw:h-full discovered-services"
     :class="{ 'ds-dark': store.state.theme === 'dark' }"
   >
     <!-- Loading State -->
-    <div v-if="loading" class="tw:flex tw:justify-center tw:py-8">
+    <div v-if="loading" class="tw:flex tw:flex-1 tw:items-center tw:justify-center">
       <OSpinner size="sm" data-test="discovered-services-loading-indicator" />
     </div>
 
     <!-- Error State -->
-    <div v-else-if="error" class="tw:text-center tw:py-8">
+    <div v-else-if="error" class="tw:flex tw:flex-col tw:flex-1 tw:items-center tw:justify-center tw:gap-3">
       <OIcon
         name="error-outline"
-        class="tw:mb-4" style="width: 3rem; height: 3rem;" />
+        class="tw:text-red-500" style="width: 3rem; height: 3rem;" />
       <div class="tw:text-base tw:text-red-500">{{ error }}</div>
       <OButton
         data-test="retry-discovered-services-btn"
@@ -42,32 +42,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Empty State -->
-    <div v-else-if="services.length === 0" class="tw:text-center tw:py-8">
-      <OIcon name="search-off" class="tw:mb-4" style="width: 3rem; height: 3rem;" />
-      <div class="tw:text-base">
-        {{ t("settings.correlation.noServicesYet") }}
-      </div>
-      <div class="tw:text-sm tw:text-gray-400 tw:mt-2">
-        {{ t("settings.correlation.noServicesDescription") }}
-      </div>
-      <OButton
-        data-test="refresh-discovered-services-btn"
-        variant="outline"
-        size="sm-action"
-        :loading="refreshing"
-        class="tw:mt-3"
-        @click="loadServices(true)"
-        icon-left="refresh"
+    <div v-else-if="services.length === 0" class="tw:flex tw:flex-1 tw:items-center tw:justify-center">
+      <OEmptyState
+        size="hero"
+        preset="no-discovered-services"
+        :title="t('settings.correlation.noServicesYet')"
+        :description="t('settings.correlation.noServicesDescription')"
+        data-test="discovered-services-empty-state"
       >
-        {{ t("common.refresh") }}
-      </OButton>
+        <template #actions>
+          <OButton
+            data-test="refresh-discovered-services-btn"
+            variant="outline"
+            size="sm-action"
+            :loading="refreshing"
+            @click="loadServices(true)"
+            icon-left="refresh"
+          >
+            {{ t("common.refresh") }}
+          </OButton>
+        </template>
+      </OEmptyState>
     </div>
 
     <!-- Services List -->
-    <div v-else>
+    <div v-else class="tw:flex tw:flex-col tw:flex-1 tw:min-h-0 tw:pt-3">
       <!-- Info banner -->
       <div
-        class="info-banner tw:mb-3 tw:rounded-lg tw:flex tw:items-center tw:gap-3"
+        class="info-banner tw:shrink-0 tw:mb-3 tw:mx-4 tw:rounded-lg tw:flex tw:items-center tw:gap-3"
       >
         <OIcon
           name="info"
@@ -86,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Header with title -->
-      <div class="card-container tw:mb-[0.625rem]">
+      <div class="card-container tw:shrink-0 tw:mb-[0.625rem]">
         <div
           class="services-header-bar tw:flex tw:justify-between tw:items-center tw:w-full"
         >
@@ -157,8 +159,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Grouped Services Table -->
-      <div class="tw:w-full tw:h-full">
-        <div class="tw:h-[calc(100vh-21.25rem)]">
+      <div class="tw:flex-1 tw:min-h-0">
+        <div class="tw:h-full">
           <OTable
             :data="refreshing ? [] : filteredGroups"
             :columns="columns"
@@ -170,16 +172,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             sorting="client"
             filter-mode="client"
             :default-columns="false"
+            :enable-column-resize="true"
+            :persist-columns="true"
+            table-id="settings-discovered-services"
             :show-global-filter="false"
             expansion="multi"
             :expand-on-row-click="(row: any) => row.__type === 'group'"
             :get-row-expansion-enabled="(row: any) => row.__type === 'group'"
+            :keep-page-on-data-change="true"
+            :current-page="currentPage"
             class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky services-table"
             :class="filteredGroupCount > 0 ? 'services-table-full-height' : ''"
             data-test="services-list-table"
             @update:expanded-ids="syncExpansion"
             @row-click="handleRowClick"
+            @pagination-change="({ page }: { page: number }) => currentPage = page"
           >
+            <template #empty>
+              <OEmptyState
+                size="hero"
+                preset="no-discovered-services"
+                :filtered="!!searchQuery"
+                :hide-action="!searchQuery"
+                @action="(id) => id === 'clear-filters' && (searchQuery = '')"
+              />
+            </template>
             <template #cell-service_name="{ row }">
               <div v-if="row.__type === 'group'" class="tw:flex tw:items-center tw:gap-2">
                 <span class="tw:font-semibold">{{ row.service_name }}</span>
@@ -504,6 +521,7 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -557,9 +575,10 @@ const filterValue = ref<string | null>(null);
 const selectedService = ref<ServiceRecord | null>(null);
 const expandedGroupNames = ref<Set<string>>(new Set());
 const pageSize = ref(20);
+const currentPage = ref(1);
 
 watch([filterKey, filterValue, searchQuery], () => {
-  // Filters changed — OTable handles reset internally via key change or ref
+  currentPage.value = 1;
 });
 
 // Label override for internal field keys shown in the filter dropdown
@@ -626,12 +645,17 @@ const columns: OTableColumnDef[] = [
     header: t("settings.correlation.serviceName"),
     accessorKey: "service_name",
     sortable: true,
-    meta: { align: "left", autoWidth: true },
+    resizable: true,
+    hideable: true,
+    minSize: 160,
+    meta: { align: "left", flex: true },
   },
   {
     id: "telemetry",
     header: t("settings.correlation.telemetryCoverage"),
     accessorKey: "telemetry",
+    resizable: true,
+    hideable: true,
     size: 260,
     meta: { align: "left" },
   },
@@ -640,6 +664,8 @@ const columns: OTableColumnDef[] = [
     header: t("settings.correlation.lastSeen"),
     accessorKey: "lastSeen",
     sortable: true,
+    resizable: true,
+    hideable: true,
     size: 120,
     meta: { align: "left" },
   },

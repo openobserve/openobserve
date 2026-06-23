@@ -59,7 +59,7 @@ table {
 }
 
 thead {
-  font-family: "Nunito Sans", sans-serif;
+  font-family: var(--font-sans);
   font-size: 14px !important;
 }
 
@@ -69,6 +69,10 @@ thead {
 
 th {
   text-align: left;
+
+  .column-actions {
+    background: var(--o2-log-table-header-bg);
+  }
 
   &:hover {
     .column-actions {

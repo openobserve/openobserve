@@ -40,8 +40,8 @@ use infra::{
     dist_lock, file_list as infra_file_list,
     runtime::DATAFUSION_RUNTIME,
     schema::{
-        SchemaCache, get_partition_time_level, get_stream_setting_fts_fields,
-        get_stream_setting_index_fields, unwrap_stream_created_at,
+        SchemaCache, get_partition_time_level, get_stream_setting_bloom_filter_fields,
+        get_stream_setting_fts_fields, get_stream_setting_index_fields, unwrap_stream_created_at,
     },
     storage,
 };
@@ -586,7 +586,7 @@ pub async fn merge_by_stream(
                 for file in delete_file_list {
                     events.push(FileKey {
                         deleted: true,
-                        segment_ids: None,
+                        selection: None,
                         row_group_size: None,
                         ..file.clone()
                     });
@@ -622,31 +622,37 @@ pub async fn merge_by_stream(
         orphan_blooms.extend(task.await??);
     }
 
-    // Build bloom for the current hour
-    let build_start = std::time::Instant::now();
-    match crate::service::compact::bloom_build::build_for_stream(
-        org_id,
-        stream_type,
-        stream_name,
-        &date_start,
-        is_incremental,
-        orphan_blooms,
-    )
-    .await
+    // Build bloom for the current hour (enterprise-only).
+    #[cfg(feature = "enterprise")]
     {
-        Ok(false) => {}
-        Ok(true) => {
-            let build_time = build_start.elapsed().as_millis();
-            log::info!(
-                "[COMPACTOR] bloom build for {org_id}/{stream_type}/{stream_name}/{date_start} took: {build_time} ms"
-            );
-        }
-        Err(e) => {
-            log::warn!(
-                "[COMPACTOR] bloom build for {org_id}/{stream_type}/{stream_name}/{date_start} failed: {e}"
-            );
+        let build_start = std::time::Instant::now();
+        match o2_enterprise::enterprise::bloom::compact::build_for_stream(
+            org_id,
+            stream_type,
+            stream_name,
+            &date_start,
+            is_incremental,
+            orphan_blooms,
+        )
+        .await
+        {
+            Ok(false) => {}
+            Ok(true) => {
+                let build_time = build_start.elapsed().as_millis();
+                log::info!(
+                    "[COMPACTOR] bloom build for {org_id}/{stream_type}/{stream_name}/{date_start} took: {build_time} ms"
+                );
+            }
+            Err(e) => {
+                log::warn!(
+                    "[COMPACTOR] bloom build for {org_id}/{stream_type}/{stream_name}/{date_start} failed: {e}"
+                );
+            }
         }
     }
+    // `orphan_blooms` is only consumed by the enterprise bloom builder above.
+    #[cfg(not(feature = "enterprise"))]
+    let _ = orphan_blooms;
 
     // update job status
     if let Err(e) = infra_file_list::set_job_done(&[job_id]).await {
@@ -771,6 +777,7 @@ pub async fn merge_files(
     // get latest version of schema
     let latest_schema = infra::schema::get(org_id, stream_name, stream_type).await?;
     let stream_settings = infra::schema::unwrap_stream_settings(&latest_schema);
+    let bloom_filter_fields = get_stream_setting_bloom_filter_fields(&stream_settings);
     let full_text_search_fields = get_stream_setting_fts_fields(&stream_settings);
     let index_fields = get_stream_setting_index_fields(&stream_settings);
     let (defined_schema_fields, need_original, index_original_data, index_all_values, storage_type) =
@@ -866,6 +873,7 @@ pub async fn merge_files(
                     &stream_name,
                     schema,
                     tables,
+                    &bloom_filter_fields,
                     new_file_meta,
                     false,
                 )
@@ -1254,7 +1262,7 @@ mod tests {
                 bloom_ver: 0,
             },
             deleted: false,
-            segment_ids: None,
+            selection: None,
             row_group_size: None,
         }
     }
@@ -1289,7 +1297,7 @@ mod tests {
         assert_eq!(file_key.id, 0);
         assert_eq!(file_key.account, "test_account");
         assert!(!file_key.deleted);
-        assert!(file_key.segment_ids.is_none());
+        assert!(file_key.selection.is_none());
     }
 
     // Boundary tests for sort_by_time_range

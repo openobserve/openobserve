@@ -20,10 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:open="$emit('update:open', $event)"
     :title="isEdit ? t('regex_patterns.edit_regex_pattern') : t('regex_patterns.create_regex_pattern')"
     :width="isFullScreen ? 100 : store.state.isAiChatEnabled ? 70 : 40"
-    :primary-button-label="isSaving ? 'Saving...' : isEdit ? t('regex_patterns.update_close') : t('regex_patterns.create_close')"
+    :primary-button-label="isEdit ? t('regex_patterns.update_close') : t('regex_patterns.create_close')"
     :secondary-button-label="t('regex_patterns.cancel')"
-    :primary-button-disabled="isFormEmpty || isSaving"
-    @click:primary="saveRegexPattern"
+    form-id="add-regex-pattern-form"
     @click:secondary="handleClose"
     data-test="add-regex-pattern-drawer"
   >
@@ -68,9 +67,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
       >
         <OForm
-          ref="formRef"
-          :key="formKey"
-          :default-values="{ name: regexPatternInputs.name, pattern: regexPatternInputs.pattern }"
+          id="add-regex-pattern-form"
+          ref="addRegexPatternForm"
+          :schema="addRegexPatternSchema"
+          :default-values="addRegexPatternDefaults"
           @submit="saveRegexPattern"
           class="tw:flex tw:flex-col tw:gap-4 tw:mt-2"
         >
@@ -79,16 +79,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               name="name"
               :readonly="isEdit"
               :disabled="isEdit"
-              v-model="regexPatternInputs.name"
-              :label="t('regex_patterns.name') + ' *'"
+              :label="t('regex_patterns.name')"
+              required
               data-test="add-regex-pattern-name-input"
               placeholder="Eg. Internal Passwords"
-              :validators="[(val: string | number | undefined) => (!val || val === '') ? '* Name is required' : undefined]"
             />
-            <OInput
+            <OFormInput
+              name="description"
               :readonly="isEdit"
               :disabled="isEdit"
-              v-model="regexPatternInputs.description"
               :label="t('regex_patterns.description')"
               class="tw:pb-3"
               data-test="add-regex-pattern-description-input"
@@ -145,7 +144,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OFormTextarea
                   name="pattern"
                   data-test="add-regex-pattern-input"
-                  v-model="regexPatternInputs.pattern"
                   class="regex-pattern-input"
                   :class="
                     store.state.theme === 'dark'
@@ -156,7 +154,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   style="width: 100%; resize: none"
                   placeholder="Eg. \d....\d "
                   :rows="5"
-                  :validators="[(val: string | undefined) => (!val || val === '') ? '* Pattern is required' : undefined]"
                 />
               </div>
             </div>
@@ -169,7 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OButton
                   variant="primary"
                   size="chip"
-                  :disabled="regexPatternInputs.pattern.length === 0"
+                  :disabled="!patternValue"
                   @click="testStringOutput"
                 >
                   Test Input
@@ -194,9 +191,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="expandState.regexTestString"
                 class="regex-pattern-input"
               >
-                <OTextarea
+                <OFormTextarea
+                  name="testString"
                   data-test="add-regex-test-string-input"
-                  v-model="testString"
                   class="regex-test-string-input"
                   :class="
                     store.state.theme === 'dark'
@@ -224,10 +221,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
               </FullViewContainer>
               <div v-if="expandState.outputString" class="regex-pattern-input">
-                <OTextarea
-                  v-if="outputString.length > 0"
+                <OFormTextarea
+                  v-if="outputStringValue.length > 0"
+                  name="outputString"
+                  :readonly="true"
                   data-test="add-regex-output-string-input"
-                  v-model="outputString"
                   class="regex-test-string-input"
                   :class="
                     store.state.theme === 'dark'
@@ -248,7 +246,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       : 'light-mode-regex-no-output'
                   "
                 >
-                  <div v-if="!testLoading && outputString.length === 0">
+                  <div v-if="!testLoading && outputStringValue.length === 0">
                     <OIcon
                       name="lightbulb"
                       size="md"
@@ -325,15 +323,17 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
 import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
-import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import regexPatternService from "@/services/regex_pattern";
 import O2AIChat from "@/components/O2AIChat.vue";
 import { useRouter } from "vue-router";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import {
+  makeAddRegexPatternSchema,
+  type AddRegexPatternForm,
+} from "./AddRegexPattern.schema";
 
 export default defineComponent({
   name: "AddRegexPattern",
@@ -363,9 +363,7 @@ export default defineComponent({
     OIcon,
     OForm,
     OFormInput,
-    OInput,
     OFormTextarea,
-    OTextarea,
   },
   setup(props, { emit }) {
     const { t } = useI18n();
@@ -379,31 +377,70 @@ export default defineComponent({
 
     const router = useRouter();
 
-    const testString = ref("");
-
-    const isFormEmpty = ref(props.isEdit ? false : true);
-
     const testLoading = ref(false);
 
     const isPatternValid = ref(false);
 
     const queryEditorRef = ref<any>(null);
 
-    const isSaving = ref(false);
-
-    const outputString = ref("");
-
     const inputContext = ref("");
 
-    const formRef = ref<any>(null);
+    // Ref to the <OForm>; used to read its live values (the form owns name/pattern).
+    const addRegexPatternForm = ref<any>(null);
 
-    const formKey = ref(0);
+    // Zod schema for the form-owned fields (name + pattern). Built via the
+    // i18n-driven factory and RETURNED from setup() so `:schema` resolves
+    // (an Options-API template only sees setup's return — a module import is
+    // out of scope, which would silently disable validation).
+    const addRegexPatternSchema = makeAddRegexPatternSchema(t);
 
-    const regexPatternInputs: any = ref({
-      name: "",
-      pattern: "",
-      description: "", //this is optional we dont consider it anyway but it is should go in the payload with atleast empty string if user doesnot provide it
+    // EDIT-prefill defaults as a typed computed. OForm reads `:default-values`
+    // once at mount and the ODrawer (reka-ui `lazy`) unmounts/remounts its body
+    // on close/open — so this re-seeds the form each time the drawer opens
+    // (edit → the loaded pattern, create → blank). No `formKey` remount hack.
+    const addRegexPatternDefaults = computed((): AddRegexPatternForm => {
+      // "from logs" flow prefills the (non-saved) test string from the store.
+      const testString =
+        store.state.organizationData.regexPatternPrompt &&
+        router.currentRoute.value.query.from === "logs"
+          ? store.state.organizationData.regexPatternTestValue ?? ""
+          : "";
+      return props.isEdit
+        ? {
+            name: props.data?.name ?? "",
+            pattern: props.data?.pattern ?? "",
+            description: props.data?.description ?? "",
+            testString,
+            outputString: "",
+          }
+        : { name: "", pattern: "", description: "", testString, outputString: "" };
     });
+
+    // The live `pattern` value, read ONE-WAY from the form store (never a
+    // mirror). Used by the non-form Test feature (Test button enabled state +
+    // highlight). The selector is wired once the OForm mounts and provides its
+    // store; until then it reflects the default ("").
+    const patternValue = ref<string>(addRegexPatternDefaults.value.pattern);
+    // Live test-feature values, read ONE-WAY from the form store (the form owns
+    // testString/outputString). Used by the Test button + highlight + output display.
+    const testStringValue = ref<string>(
+      addRegexPatternDefaults.value.testString ?? "",
+    );
+    const outputStringValue = ref<string>("");
+    watch(
+      () => addRegexPatternForm.value,
+      (formRef) => {
+        const f = formRef?.form;
+        if (!f) return;
+        const livePattern = f.useStore((s: any) => s.values.pattern ?? "");
+        watch(livePattern, (v: string) => { patternValue.value = v; }, { immediate: true });
+        const liveTestString = f.useStore((s: any) => s.values.testString ?? "");
+        watch(liveTestString, (v: string) => { testStringValue.value = v; }, { immediate: true });
+        const liveOutput = f.useStore((s: any) => s.values.outputString ?? "");
+        watch(liveOutput, (v: string) => { outputStringValue.value = v; }, { immediate: true });
+      },
+      { immediate: true },
+    );
 
     const expandState = ref({
       regexPattern: true,
@@ -412,26 +449,14 @@ export default defineComponent({
     });
 
     const seedFromProps = () => {
-      if (props.isEdit) {
-        regexPatternInputs.value.name = props.data.name;
-        regexPatternInputs.value.pattern = props.data.pattern;
-        regexPatternInputs.value.description = props.data.description
-          ? props.data.description
-          : "";
-      } else {
-        regexPatternInputs.value = {
-          name: "",
-          pattern: "",
-          description: "",
-        };
-      }
-      formKey.value++;
+      // name/pattern/description are form-owned — seeded by `:default-values`
+      // (addRegexPatternDefaults) when the drawer body remounts on open. Here we
+      // only handle the "from logs" prefill of the non-form test string.
       if (
         store.state.organizationData.regexPatternPrompt &&
         router.currentRoute.value.query.from == "logs"
       ) {
         inputContext.value = store.state.organizationData.regexPatternPrompt;
-        testString.value = store.state.organizationData.regexPatternTestValue;
       }
     };
 
@@ -443,35 +468,12 @@ export default defineComponent({
       { immediate: true },
     );
 
-    // Form validation watcher
-    watch(
-      [
-        () => regexPatternInputs.value.name,
-        () => regexPatternInputs.value.pattern,
-      ],
-      () => {
-        if (
-          regexPatternInputs.value.name === "" ||
-          regexPatternInputs.value.name === undefined ||
-          regexPatternInputs.value.pattern === "" ||
-          regexPatternInputs.value.pattern === undefined
-        ) {
-          isFormEmpty.value = true;
-        } else {
-          isFormEmpty.value = false;
-        }
-      },
-    );
-
     // Watch for pattern changes to update highlighting
-    watch(
-      () => regexPatternInputs.value.pattern,
-      (newPattern) => {
-        if (testString.value && queryEditorRef.value) {
-          queryEditorRef.value.highlightRegexMatches(newPattern?.trim());
-        }
-      },
-    );
+    watch(patternValue, (newPattern) => {
+      if (testStringValue.value && queryEditorRef.value) {
+        queryEditorRef.value.highlightRegexMatches(newPattern?.trim());
+      }
+    });
 
     const getBtnLogo = computed(() => {
       if (isHovered.value || store.state.isAiChatEnabled) {
@@ -490,16 +492,16 @@ export default defineComponent({
       window.dispatchEvent(new Event("resize"));
     };
 
-    const saveRegexPattern = async () => {
-      const isValid = await formRef.value?.validate();
-      if (!isValid) return;
-      isSaving.value = true;
+    // The validated `value` from @submit is the source of truth for name/pattern
+    // (the schema already gated it). `description` is the non-form local. OForm
+    // awaits this handler → the ODrawer Save spinner is automatic (no isSaving).
+    const saveRegexPattern = async (value: AddRegexPatternForm) => {
       //payload for create and update regex pattern
       // we need to send the name , pattern , description
       const payload = {
-        name: regexPatternInputs.value.name,
-        pattern: regexPatternInputs.value.pattern,
-        description: regexPatternInputs.value.description,
+        name: value.name,
+        pattern: value.pattern,
+        description: value.description ?? "",
       };
       //here we are emitting close and update:list to the parent component
       //this is used to close the dialog and update the regex pattern list
@@ -535,8 +537,6 @@ export default defineComponent({
             variant: "error",
           });
         }
-      } finally {
-        isSaving.value = false;
       }
     };
 
@@ -548,14 +548,17 @@ export default defineComponent({
     const testStringOutput = async () => {
       try {
         expandState.value.outputString = true;
-        outputString.value = "";
+        addRegexPatternForm.value?.form?.setFieldValue("outputString", "");
         testLoading.value = true;
         const response = await regexPatternService.test(
           store.state.selectedOrganization.identifier,
-          regexPatternInputs.value.pattern,
-          [testString.value],
+          patternValue.value,
+          [testStringValue.value],
         );
-        outputString.value = response.data.results[0];
+        addRegexPatternForm.value?.form?.setFieldValue(
+          "outputString",
+          response.data.results[0],
+        );
       } catch (error) {
         toast({
           message: error.response?.data?.message || "Failed to test string",
@@ -583,16 +586,13 @@ export default defineComponent({
       isHovered,
       toggleAIChat,
       isFullScreen,
-      regexPatternInputs,
       expandState,
-      testString,
-      isFormEmpty,
+      testStringValue,
       saveRegexPattern,
-      isSaving,
       isPatternValid,
       queryEditorRef,
       toggleFullScreen,
-      outputString,
+      outputStringValue,
       testStringOutput,
       outlinedLightbulb: "lightbulb",
       testLoading,
@@ -600,8 +600,12 @@ export default defineComponent({
       inputContext,
       closeAddRegexPatternDialog,
       handleClose,
-      formRef,
-      formKey,
+      // Form wiring — MUST be returned so the Options-API template can resolve
+      // them (a module import alone is out of the template's scope).
+      addRegexPatternForm,
+      addRegexPatternSchema,
+      addRegexPatternDefaults,
+      patternValue,
     };
   },
 });

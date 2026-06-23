@@ -13,21 +13,25 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+// AddFolder is single-source-of-truth: the OForm holds name/description (seeded
+// via `:default-values`), and `folderId` comes from the prop. There is no local
+// `folderData` mirror, no per-field sync watches, and no manual reset on save —
+// the dialog unmounts on close and remounts fresh on open. Tests drive submit
+// via the @submit handler (`vm.onSubmit(value)`); the validated value is the
+// source of truth.
+
 import { mount, flushPromises } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import AddFolder from "@/components/common/sidebar/AddFolder.vue";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 
-
 // ---------------------------------------------------------------------------
-// ODrawer stub — mirrors the migrated component's overlay surface.
-// Renders the default slot so children are queryable. Exposes the migrated
-// props/emits so tests can assert wiring without depending on the real
-// ODrawer overlay implementation.
+// ODialog stub — exposes the migrated overlay props/emits so tests can assert
+// wiring without the real overlay. Renders the default slot for queryability.
 // ---------------------------------------------------------------------------
-const ODrawerStub = {
-  name: "ODrawer",
+const ODialogStub = {
+  name: "ODialog",
   template:
     "<div class='o-drawer-stub' :data-test='$attrs[\"data-test\"]' :data-open='open'>" +
     "<slot name='header' />" +
@@ -56,49 +60,25 @@ const ODrawerStub = {
     "primaryButtonLoading",
     "secondaryButtonLoading",
     "neutralButtonLoading",
+    "formId",
   ],
   emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
 };
 
-// OForm stub: exposes the q-form compatibility surface (validate, resetValidation, form.state.values)
-// so tests control form behaviour without mounting the real TanStack-powered OForm.
+// OForm stub: renders the form + slot and captures `defaultValues` so prefill
+// can be asserted without mounting the real TanStack-powered OForm.
 const OFormStub = {
   name: "OForm",
   template: '<form class="o-form-stub" @submit.prevent><slot /></form>',
-  props: ["defaultValues", "greedy"],
+  props: ["defaultValues", "schema", "greedy"],
   emits: ["submit", "reset"],
-  setup(props: any, { expose }: any) {
-    const formState = {
-      state: {
-        values: { ...props.defaultValues },
-        fieldMeta: {},
-        isValid: true,
-      },
-      validateAllFields: vi.fn().mockResolvedValue(undefined),
-      validateField: vi.fn().mockResolvedValue(undefined),
-      getFieldMeta: vi.fn().mockReturnValue({ errors: [] }),
-      setFieldMeta: vi.fn(),
-      setFieldValue: vi.fn(),
-      handleSubmit: vi.fn(),
-      reset: vi.fn(),
-    };
-    expose({
-      validate: vi.fn().mockResolvedValue(true),
-      resetValidation: vi.fn(),
-      submit: vi.fn(),
-      reset: vi.fn(),
-      form: formState,
-    });
-    return {};
-  },
 };
 
-// OFormInput stub: renders a basic input so the parent renders without pulling in
-// the real TanStack-powered OFormInput component.
+// OFormInput stub: a basic input so the parent renders without the real wrapper.
 const OFormInputStub = {
   name: "OFormInput",
-  template: '<input class="o-form-input-stub" />',
-  props: ["name", "label", "validators"],
+  template: '<input class="o-form-input-stub" :data-test="$attrs[\'data-test\']" />',
+  props: ["name", "label", "required"],
 };
 
 // Mock all dependencies
@@ -118,13 +98,6 @@ vi.mock("@/utils/zincutils.ts", () => ({
   }),
 }));
 
-vi.mock("@/composables/useLoading.ts", () => ({
-  useLoading: vi.fn().mockImplementation((fn) => ({
-    execute: fn,
-    isLoading: { value: false },
-  })),
-}));
-
 const showPositiveNotification = vi.fn();
 const showErrorNotification = vi.fn();
 
@@ -141,229 +114,107 @@ describe("AddFolder.vue", () => {
   let wrapper: any;
 
   beforeEach(() => {
-    // Setup store data
     store.state.organizationData.foldersByType = {
       alerts: [
-        {
-          folderId: "folder-1",
-          name: "Test Folder",
-          description: "Test Description",
-        },
-        {
-          folderId: "folder-2",
-          name: "Another Folder",
-          description: "Another Description",
-        },
+        { folderId: "folder-1", name: "Test Folder", description: "Test Description" },
+        { folderId: "folder-2", name: "Another Folder", description: "Another Description" },
       ],
       dashboards: [
-        {
-          folderId: "dash-folder-1",
-          name: "Dashboard Folder",
-          description: "Dashboard Description",
-        },
+        { folderId: "dash-folder-1", name: "Dashboard Folder", description: "Dashboard Description" },
       ],
     };
   });
 
   afterEach(() => {
-    if (wrapper) {
-      wrapper.unmount();
-    }
+    if (wrapper) wrapper.unmount();
     vi.clearAllMocks();
   });
 
-  const createWrapper = (props = {}) => {
-    return mount(AddFolder, {
-      props: {
-        open: true,
-        folderId: "default",
-        editMode: false,
-        type: "alerts",
-        ...props,
-      },
+  const createWrapper = (props = {}) =>
+    mount(AddFolder, {
+      props: { open: true, folderId: "default", editMode: false, type: "alerts", ...props },
       global: {
         plugins: [i18n],
-        mocks: {
-          $store: store,
-        },
-        provide: {
-          store: store,
-        },
-        stubs: {
-          ODrawer: ODrawerStub,
-          OForm: OFormStub,
-          OFormInput: OFormInputStub,
-        },
+        mocks: { $store: store },
+        provide: { store: store },
+        stubs: { ODialog: ODialogStub, OForm: OFormStub, OFormInput: OFormInputStub },
       },
     });
-  };
 
-  describe("Component Tests", () => {
-    it("should render the component correctly", () => {
+  describe("Component", () => {
+    it("renders correctly", () => {
       wrapper = createWrapper();
       expect(wrapper.exists()).toBe(true);
     });
 
-    it("should have correct component name", () => {
+    it("has the correct component name", () => {
       wrapper = createWrapper();
       expect(wrapper.vm.$options.name).toBe("CommonAddFolder");
     });
 
-    it("should initialize with default props", () => {
+    it("initializes with default props", () => {
       wrapper = createWrapper();
       expect(wrapper.props("folderId")).toBe("default");
       expect(wrapper.props("editMode")).toBe(false);
       expect(wrapper.props("type")).toBe("alerts");
     });
 
-    it("should declare update:modelValue event", () => {
+    it("declares update:modelValue and update:open events", () => {
       wrapper = createWrapper();
       expect(wrapper.vm.$options.emits).toContain("update:modelValue");
-    });
-
-    it("should declare update:open event", () => {
-      wrapper = createWrapper();
       expect(wrapper.vm.$options.emits).toContain("update:open");
     });
 
-    it("should initialize folderData with default values in create mode", () => {
-      wrapper = createWrapper({ editMode: false });
-      const vm = wrapper.vm as any;
-      expect(vm.folderData.folderId).toBe("");
-      expect(vm.folderData.name).toBe("");
-      expect(vm.folderData.description).toBe("");
-    });
-
-    it("should initialize folderData with existing data in edit mode", () => {
-      wrapper = createWrapper({
-        editMode: true,
-        folderId: "folder-1",
-        type: "alerts",
-      });
-      const vm = wrapper.vm as any;
-      expect(vm.folderData.folderId).toBe("folder-1");
-      expect(vm.folderData.name).toBe("Test Folder");
-      expect(vm.folderData.description).toBe("Test Description");
-    });
-
-    it("should expose all necessary properties", () => {
+    it("exposes t, schema and onSubmit (no local folderData mirror)", () => {
       wrapper = createWrapper();
       const vm = wrapper.vm as any;
       expect(vm.t).toBeInstanceOf(Function);
-      expect(vm.disableColor).toBeDefined();
-      expect(vm.isPwd).toBeDefined();
-      expect(vm.folderData).toBeDefined();
-      expect(vm.addFolderForm).toBeDefined();
-      expect(vm.store).toBeDefined();
-      expect(vm.isValidIdentifier).toBeDefined();
-      expect(vm.getImageURL).toBeInstanceOf(Function);
-      expect(vm.onSubmit).toBeDefined();
-      expect(vm.defaultValue).toBeInstanceOf(Function);
-      expect(vm.submit).toBeInstanceOf(Function);
+      expect(vm.addFolderSchema).toBeDefined();
+      expect(typeof vm.onSubmit).toBe("function");
+      // The old local model + form ref were removed (single source of truth).
+      expect(vm.folderData).toBeUndefined();
+      expect(vm.addFolderForm).toBeUndefined();
     });
 
-    it("should call defaultValue function correctly", () => {
+    it("has access to store state", () => {
       wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      const defaultVal = vm.defaultValue();
-      expect(defaultVal).toEqual({
-        folderId: "",
-        name: "",
-        description: "",
-      });
+      expect((wrapper.vm as any).store).toBe(store);
     });
 
-    it("should have access to store state", () => {
+    it("renders the dialog surface + form inputs", () => {
       wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      expect(vm.store).toBe(store);
-      expect(vm.store.state.organizationData).toBeDefined();
-    });
-
-    it("should render the ODrawer overlay surface", () => {
-      wrapper = createWrapper();
-      const drawer = wrapper.findComponent(ODrawerStub);
+      const drawer = wrapper.findComponent(ODialogStub);
       expect(drawer.exists()).toBe(true);
       expect(drawer.attributes("data-test")).toBe("dashboard-folder-dialog");
+      expect(wrapper.find('[data-test="dashboard-folder-add-name"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-folder-add-description"]').exists()).toBe(true);
     });
 
-    it("should render the form inputs inside the drawer", () => {
-      wrapper = createWrapper();
-      expect(
-        wrapper.find('[data-test="dashboard-folder-add-name"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="dashboard-folder-add-description"]').exists(),
-      ).toBe(true);
+    it("seeds blank default-values in create mode", () => {
+      wrapper = createWrapper({ editMode: false });
+      const defaults = wrapper.findComponent(OFormStub).props("defaultValues");
+      expect(defaults).toEqual({ name: "", description: "" });
     });
 
-    it("should handle input value changes for name", async () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-
-      vm.folderData.name = "New Name Value";
-      await wrapper.vm.$nextTick();
-
-      expect(vm.folderData.name).toBe("New Name Value");
+    it("seeds the folder's values as default-values in edit mode", () => {
+      wrapper = createWrapper({ editMode: true, folderId: "folder-1", type: "alerts" });
+      const defaults = wrapper.findComponent(OFormStub).props("defaultValues");
+      expect(defaults).toEqual({ name: "Test Folder", description: "Test Description" });
     });
 
-    it("should bind description input correctly", async () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-
-      vm.folderData.description = "New Description Value";
-      await wrapper.vm.$nextTick();
-
-      expect(vm.folderData.description).toBe("New Description Value");
-    });
-
-    it("should maintain data reactivity for folder name", async () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-
-      vm.folderData.name = "Reactive Name";
-      await wrapper.vm.$nextTick();
-
-      expect(vm.folderData.name).toBe("Reactive Name");
-    });
-
-    it("should maintain data reactivity for folder description", async () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-
-      vm.folderData.description = "Reactive Description";
-      await wrapper.vm.$nextTick();
-
-      expect(vm.folderData.description).toBe("Reactive Description");
-    });
-
-    it("should not cause memory leaks on unmount", () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-
-      vm.folderData.name = "Test";
-      vm.folderData.description = "Description";
-
-      expect(() => wrapper.unmount()).not.toThrow();
-    });
-
-    it("should handle folderId prop correctly", () => {
-      wrapper = createWrapper({ folderId: "test-folder-id" });
+    it("handles folderId / type props", () => {
+      wrapper = createWrapper({ folderId: "test-folder-id", type: "custom-type" });
       expect(wrapper.props("folderId")).toBe("test-folder-id");
-    });
-
-    it("should handle type prop correctly", () => {
-      wrapper = createWrapper({ type: "custom-type" });
       expect(wrapper.props("type")).toBe("custom-type");
     });
 
-    it("should use default prop values", () => {
+    it("uses default prop values", () => {
       wrapper = mount(AddFolder, {
         global: {
           plugins: [i18n],
           mocks: { $store: store },
           provide: { store: store },
-          stubs: { ODrawer: ODrawerStub },
+          stubs: { ODialog: ODialogStub, OForm: OFormStub, OFormInput: OFormInputStub },
         },
       });
       expect(wrapper.props("open")).toBe(false);
@@ -372,415 +223,137 @@ describe("AddFolder.vue", () => {
       expect(wrapper.props("type")).toBe("alerts");
     });
 
-    it("should have onSubmit method", () => {
+    it("does not throw on unmount", () => {
       wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      expect(typeof vm.onSubmit).toBe("object");
-      expect(typeof vm.onSubmit.execute).toBe("function");
+      expect(() => wrapper.unmount()).not.toThrow();
     });
 
-    it("should have submit method", () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      expect(typeof vm.submit).toBe("function");
-    });
-
-    it("should have defaultValue method", () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      expect(typeof vm.defaultValue).toBe("function");
-      expect(vm.defaultValue()).toEqual({
-        folderId: "",
+    it("handles empty/missing store foldersByType in edit mode", () => {
+      const original = store.state.organizationData.foldersByType;
+      store.state.organizationData.foldersByType = {};
+      wrapper = createWrapper({ editMode: true, folderId: "x", type: "missing" });
+      expect(wrapper.exists()).toBe(true);
+      // Falls back to blank when the folder can't be found.
+      expect(wrapper.findComponent(OFormStub).props("defaultValues")).toEqual({
         name: "",
         description: "",
       });
-    });
-
-    it("should have getImageURL method", () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      expect(typeof vm.getImageURL).toBe("function");
-    });
-
-    it("should handle rapid state changes", async () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-
-      for (let i = 0; i < 5; i++) {
-        vm.folderData.name = `Test ${i}`;
-        await wrapper.vm.$nextTick();
-      }
-
-      expect(vm.folderData.name).toBe("Test 4");
-    });
-
-    it("should handle proper input bindings", async () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-
-      vm.folderData.name = "New Name";
-      vm.folderData.description = "New Description";
-      await wrapper.vm.$nextTick();
-
-      expect(vm.folderData.name).toBe("New Name");
-      expect(vm.folderData.description).toBe("New Description");
-    });
-
-    it("should handle empty store foldersByType", () => {
-      const originalFolders = store.state.organizationData.foldersByType;
-      store.state.organizationData.foldersByType = {};
-
-      wrapper = createWrapper({ editMode: false, type: "missing" });
-      expect(wrapper.exists()).toBe(true);
-
-      store.state.organizationData.foldersByType = originalFolders;
-    });
-
-    it("should handle missing type gracefully", () => {
-      const originalFolders = store.state.organizationData.foldersByType;
-      store.state.organizationData.foldersByType = {};
-
-      wrapper = createWrapper({
-        editMode: false,
-        type: "non-existent",
-      });
-      expect(wrapper.exists()).toBe(true);
-
-      store.state.organizationData.foldersByType = originalFolders;
-    });
-
-    it("should handle component mount and unmount lifecycle", () => {
-      wrapper = createWrapper();
-      expect(wrapper.exists()).toBe(true);
-
-      const vm = wrapper.vm as any;
-      vm.folderData.name = "Test Name";
-
-      expect(() => {
-        wrapper.unmount();
-      }).not.toThrow();
-    });
-
-    it("should maintain component instance methods", () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-
-      expect(vm.defaultValue).toBeDefined();
-      expect(vm.onSubmit).toBeDefined();
-      expect(vm.getImageURL).toBeDefined();
-      expect(vm.t).toBeDefined();
-      expect(vm.submit).toBeDefined();
-    });
-
-    it("should have proper Vue component structure", () => {
-      wrapper = createWrapper();
-
-      expect(wrapper.vm).toBeDefined();
-      expect(wrapper.vm.$options).toBeDefined();
-      expect(wrapper.vm.$props).toBeDefined();
-      expect(wrapper.vm.$emit).toBeDefined();
-    });
-
-    it("should maintain state consistency", async () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-
-      const initialState = { ...vm.folderData };
-      vm.folderData.name = "Changed Name";
-      await wrapper.vm.$nextTick();
-
-      expect(vm.folderData.name).not.toBe(initialState.name);
-      expect(vm.folderData.description).toBe(initialState.description);
-    });
-
-    it("should handle component re-rendering", async () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-
-      vm.folderData.name = "Initial Name";
-      await wrapper.vm.$nextTick();
-
-      vm.folderData.name = "Updated Name";
-      await wrapper.vm.$nextTick();
-
-      expect(vm.folderData.name).toBe("Updated Name");
+      store.state.organizationData.foldersByType = original;
     });
   });
 
-  describe("ODrawer surface — props, emits, and wiring contract", () => {
-    it("forwards the `open` prop from the parent to ODrawer", async () => {
+  describe("Dialog surface — props, emits, wiring", () => {
+    it("forwards the `open` prop to the dialog", async () => {
       wrapper = createWrapper({ open: true });
-
-      const drawer = wrapper.findComponent(ODrawerStub);
+      const drawer = wrapper.findComponent(ODialogStub);
       expect(drawer.props("open")).toBe(true);
-
       await wrapper.setProps({ open: false });
       expect(drawer.props("open")).toBe(false);
     });
 
-    it("passes the correct width to ODrawer", () => {
+    it("passes size, labels and form-id", () => {
       wrapper = createWrapper();
-
-      const drawer = wrapper.findComponent(ODrawerStub);
-      expect(drawer.props("width")).toBe(20);
-    });
-
-    it("passes the add-folder title to ODrawer when not in edit mode", () => {
-      wrapper = createWrapper({ editMode: false });
-
-      const drawer = wrapper.findComponent(ODrawerStub);
-      // i18n key resolves; assert it's the create-mode title (non-empty string)
-      expect(typeof drawer.props("title")).toBe("string");
-      expect(drawer.props("title")).not.toBe("");
-    });
-
-    it("passes a different title in edit mode", () => {
-      const createMode = createWrapper({ editMode: false });
-      const createTitle = createMode
-        .findComponent(ODrawerStub)
-        .props("title");
-      createMode.unmount();
-
-      wrapper = createWrapper({
-        editMode: true,
-        folderId: "folder-1",
-        type: "alerts",
-      });
-      const editTitle = wrapper.findComponent(ODrawerStub).props("title");
-
-      expect(editTitle).not.toBe(createTitle);
-      expect(typeof editTitle).toBe("string");
-      expect(editTitle).not.toBe("");
-    });
-
-    it("passes the primary and secondary button labels to ODrawer", () => {
-      wrapper = createWrapper();
-
-      const drawer = wrapper.findComponent(ODrawerStub);
+      const drawer = wrapper.findComponent(ODialogStub);
+      expect(drawer.props("size")).toBe("sm");
       expect(drawer.props("primaryButtonLabel")).toBe("Save");
       expect(drawer.props("secondaryButtonLabel")).toBe("Cancel");
+      expect(drawer.props("formId")).toBe("add-folder-sidebar-form");
     });
 
-    it("passes primaryButtonLoading=false when onSubmit is idle", () => {
+    it("uses a different title in edit vs create mode", () => {
+      const createMode = createWrapper({ editMode: false });
+      const createTitle = createMode.findComponent(ODialogStub).props("title");
+      createMode.unmount();
+      wrapper = createWrapper({ editMode: true, folderId: "folder-1", type: "alerts" });
+      const editTitle = wrapper.findComponent(ODialogStub).props("title");
+      expect(typeof createTitle).toBe("string");
+      expect(createTitle).not.toBe("");
+      expect(editTitle).not.toBe(createTitle);
+    });
+
+    it("does not bind primaryButtonLoading (auto Save spinner)", () => {
       wrapper = createWrapper();
-
-      const drawer = wrapper.findComponent(ODrawerStub);
-      expect(drawer.props("primaryButtonLoading")).toBe(false);
+      expect(wrapper.findComponent(ODialogStub).props("primaryButtonLoading")).toBeFalsy();
     });
 
-    it("re-emits update:open=false when ODrawer emits update:open=false", async () => {
+    it("re-emits update:open from the dialog", async () => {
       wrapper = createWrapper({ open: true });
-
-      const drawer = wrapper.findComponent(ODrawerStub);
+      const drawer = wrapper.findComponent(ODialogStub);
       await drawer.vm.$emit("update:open", false);
-      await wrapper.vm.$nextTick();
-
       const events = wrapper.emitted("update:open");
-      expect(events).toBeTruthy();
       expect(events![events!.length - 1]).toEqual([false]);
     });
 
-    it("re-emits update:open=true when ODrawer emits update:open=true", async () => {
-      wrapper = createWrapper({ open: false });
-
-      const drawer = wrapper.findComponent(ODrawerStub);
-      await drawer.vm.$emit("update:open", true);
-      await wrapper.vm.$nextTick();
-
-      const events = wrapper.emitted("update:open");
-      expect(events).toBeTruthy();
-      expect(events![events!.length - 1]).toEqual([true]);
-    });
-
-    it("emits update:open=false when ODrawer emits click:secondary (Cancel)", async () => {
+    it("emits update:open=false on Cancel (click:secondary)", async () => {
       wrapper = createWrapper({ open: true });
-
-      const drawer = wrapper.findComponent(ODrawerStub);
+      const drawer = wrapper.findComponent(ODialogStub);
       await drawer.vm.$emit("click:secondary");
-      await wrapper.vm.$nextTick();
-
       const events = wrapper.emitted("update:open");
-      expect(events).toBeTruthy();
       expect(events![events!.length - 1]).toEqual([false]);
-    });
-
-    it("invokes submit() when ODrawer emits click:primary (Save)", async () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-
-      // Stub the form validate so onSubmit.execute resolves cleanly
-      vm.addFolderForm = { validate: vi.fn().mockResolvedValue(true) };
-      const submitSpy = vi.spyOn(vm, "submit");
-
-      const drawer = wrapper.findComponent(ODrawerStub);
-      await drawer.vm.$emit("click:primary");
-      await flushPromises();
-
-      expect(submitSpy).toHaveBeenCalled();
     });
   });
 
-  describe("submit() — create flow", () => {
-    it("emits update:modelValue and update:open=false on successful create", async () => {
+  describe("onSubmit — create flow", () => {
+    it("emits update:modelValue and update:open=false on success", async () => {
       wrapper = createWrapper({ editMode: false });
-      const vm = wrapper.vm as any;
-
-      vm.folderData.name = "  My Folder  ";
-      vm.folderData.description = "desc";
-      vm.addFolderForm = {
-        validate: vi.fn().mockResolvedValue(true),
-        resetValidation: vi.fn().mockResolvedValue(undefined),
-        form: {
-          state: {
-            values: { name: "  My Folder  ", description: "desc" },
-          },
-        },
-      };
-
-      await vm.submit();
+      await (wrapper.vm as any).onSubmit({ name: "  My Folder  ", description: "desc" });
       await flushPromises();
 
       const modelEvents = wrapper.emitted("update:modelValue");
-      expect(modelEvents).toBeTruthy();
-      expect(modelEvents![0][0]).toEqual({
-        folderId: "new-folder",
-        name: "New Folder",
-      });
-
+      expect(modelEvents![0][0]).toEqual({ folderId: "new-folder", name: "New Folder" });
       const openEvents = wrapper.emitted("update:open");
-      expect(openEvents).toBeTruthy();
       expect(openEvents![openEvents!.length - 1]).toEqual([false]);
     });
 
-    it("does nothing when form validation fails", async () => {
+    it("does not call the API without a submit", async () => {
       wrapper = createWrapper({ editMode: false });
-      const vm = wrapper.vm as any;
-
-      vm.addFolderForm = {
-        validate: vi.fn().mockResolvedValue(false),
-        resetValidation: vi.fn(),
-      };
-
-      await vm.submit();
-      await flushPromises();
-
-      expect(wrapper.emitted("update:modelValue")).toBeFalsy();
-      expect(wrapper.emitted("update:open")).toBeFalsy();
+      const { createFolderByType } = await import("@/utils/commons");
+      expect(createFolderByType).not.toHaveBeenCalled();
     });
 
     it("trims the folder name before creating", async () => {
       const { createFolderByType } = await import("@/utils/commons");
       wrapper = createWrapper({ editMode: false });
-      const vm = wrapper.vm as any;
-
-      // Set the form state values via the exposed OFormStub (the ref holds the
-      // stub's exposed object, so mutating nested properties works).
-      vm.addFolderForm.form.state.values.name = "   Padded Name   ";
-
-      await vm.onSubmit.execute();
+      await (wrapper.vm as any).onSubmit({ name: "   Padded Name   ", description: "" });
       await flushPromises();
-
       expect(createFolderByType).toHaveBeenCalled();
-      const callArgs = (createFolderByType as any).mock.calls[0];
-      expect(JSON.parse(JSON.stringify(callArgs[1])).name).toBe("Padded Name");
+      expect((createFolderByType as any).mock.calls[0][1].name).toBe("Padded Name");
     });
   });
 
-  describe("submit() — edit flow", () => {
-    it("emits update:modelValue and update:open=false on successful update", async () => {
-      wrapper = createWrapper({
-        editMode: true,
-        folderId: "folder-1",
-        type: "alerts",
-      });
-      const vm = wrapper.vm as any;
-
-      vm.addFolderForm = {
-        validate: vi.fn().mockResolvedValue(true),
-        resetValidation: vi.fn().mockResolvedValue(undefined),
-        form: {
-          state: {
-            values: {
-              name: vm.folderData.name,
-              description: vm.folderData.description,
-            },
-          },
-        },
-      };
-
-      await vm.submit();
+  describe("onSubmit — edit flow", () => {
+    it("updates with the prop folderId and emits", async () => {
+      const { updateFolderByType } = await import("@/utils/commons");
+      wrapper = createWrapper({ editMode: true, folderId: "folder-1", type: "alerts" });
+      await (wrapper.vm as any).onSubmit({ name: "Test Folder", description: "Test Description" });
       await flushPromises();
 
+      expect(updateFolderByType).toHaveBeenCalled();
+      expect((updateFolderByType as any).mock.calls[0][1]).toBe("folder-1"); // folderId arg
       const modelEvents = wrapper.emitted("update:modelValue");
-      expect(modelEvents).toBeTruthy();
-      expect(modelEvents![0][0]).toMatchObject({
-        folderId: "folder-1",
-        name: "Test Folder",
-      });
-
+      expect(modelEvents![0][0]).toMatchObject({ folderId: "folder-1", name: "Test Folder" });
       const openEvents = wrapper.emitted("update:open");
-      expect(openEvents).toBeTruthy();
       expect(openEvents![openEvents!.length - 1]).toEqual([false]);
     });
   });
 
-  describe("submit() — error handling", () => {
+  describe("onSubmit — error handling", () => {
     it("does not emit update:open on create failure", async () => {
       const { createFolderByType } = await import("@/utils/commons");
-      (createFolderByType as any).mockRejectedValueOnce(
-        new Error("create failed"),
-      );
-
+      (createFolderByType as any).mockRejectedValueOnce(new Error("create failed"));
       wrapper = createWrapper({ editMode: false });
-      const vm = wrapper.vm as any;
-
-      vm.folderData.name = "Name";
-      vm.addFolderForm = {
-        validate: vi.fn().mockResolvedValue(true),
-        resetValidation: vi.fn().mockResolvedValue(undefined),
-        form: {
-          state: {
-            values: { name: "Name", description: "" },
-          },
-        },
-      };
-
-      await vm.submit();
+      await (wrapper.vm as any).onSubmit({ name: "Name", description: "" });
       await flushPromises();
-
       expect(wrapper.emitted("update:open")).toBeFalsy();
       expect(showErrorNotification).toHaveBeenCalled();
     });
 
     it("does not emit update:open on update failure", async () => {
       const { updateFolderByType } = await import("@/utils/commons");
-      (updateFolderByType as any).mockRejectedValueOnce(
-        new Error("update failed"),
-      );
-
-      wrapper = createWrapper({
-        editMode: true,
-        folderId: "folder-1",
-        type: "alerts",
-      });
-      const vm = wrapper.vm as any;
-
-      vm.addFolderForm = {
-        validate: vi.fn().mockResolvedValue(true),
-        resetValidation: vi.fn().mockResolvedValue(undefined),
-        form: {
-          state: {
-            values: {
-              name: vm.folderData.name,
-              description: vm.folderData.description,
-            },
-          },
-        },
-      };
-
-      await vm.submit();
+      (updateFolderByType as any).mockRejectedValueOnce(new Error("update failed"));
+      wrapper = createWrapper({ editMode: true, folderId: "folder-1", type: "alerts" });
+      await (wrapper.vm as any).onSubmit({ name: "Test Folder", description: "Test Description" });
       await flushPromises();
-
       expect(wrapper.emitted("update:open")).toBeFalsy();
       expect(showErrorNotification).toHaveBeenCalled();
     });
@@ -790,24 +363,9 @@ describe("AddFolder.vue", () => {
       (createFolderByType as any).mockRejectedValueOnce({
         response: { data: { message: "Server says no" } },
       });
-
       wrapper = createWrapper({ editMode: false });
-      const vm = wrapper.vm as any;
-
-      vm.folderData.name = "Name";
-      vm.addFolderForm = {
-        validate: vi.fn().mockResolvedValue(true),
-        resetValidation: vi.fn().mockResolvedValue(undefined),
-        form: {
-          state: {
-            values: { name: "Name", description: "" },
-          },
-        },
-      };
-
-      await vm.submit();
+      await (wrapper.vm as any).onSubmit({ name: "Name", description: "" });
       await flushPromises();
-
       expect(showErrorNotification).toHaveBeenCalledWith(
         "Server says no",
         expect.objectContaining({ timeout: 2000 }),

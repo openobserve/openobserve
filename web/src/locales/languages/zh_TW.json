@@ -246,7 +246,6 @@
     "legendLabel": "圖例",
     "logs": "日誌",
     "traces": "追蹤",
-    "metrics": "指標",
     "enrichmentTables": "擴充表",
     "switchToLogs": "按一下切換回日誌",
     "savedViewsLabel": "已儲存的檢視",
@@ -517,9 +516,9 @@
     "today_usage": "今日使用量",
     "feature_comparison_lbl": "功能比較",
     "feature_comparision_ent_msg": "目前使用的是 OpenObserve 企業版，可存取下列所有進階功能。",
-    "feature_comparision_plan_detail": "目前方案：企業版在每日攝取量不超過 200 GB (約每月 6 TB) 時免費使用。",
+    "feature_comparision_plan_detail": "目前方案：企業版在每日攝取量不超過 50 GB (約每月 1.5 TB) 時免費使用。",
     "feature_comparision_os_msg": "目前使用的是 OpenObserve 開放原始碼版。升級至企業版即可解鎖下方比較表中的進階功能。",
-    "feature_comparision_good_news": "好消息：OpenObserve 企業版在每日攝取量不超過 200 GB (約每月 6 TB) 時完全免費。",
+    "feature_comparision_good_news": "好消息：OpenObserve 企業版在每日攝取量不超過 50 GB (約每月 1.5 TB) 時完全免費。",
     "feature_comparision_subtitle": "比較開放原始碼版、企業版和雲端版的功能",
     "feature_column_name": "功能",
     "edition_opensource": "開放原始碼版 (自架)",
@@ -564,7 +563,7 @@
     "value_support_enterprise": "企業版",
     "value_support_cloud": "雲端版",
     "value_cost_free": "免費",
-    "value_cost_enterprise": "自架時，每日攝取量不超過 200 GB 免費，超過後付費",
+    "value_cost_enterprise": "自架時，每日攝取量不超過 50 GB 免費，超過後付費",
     "value_cost_cloud": "14 天免費試用，之後付費",
     "commit_lbl": "Commit",
     "build_lbl": "建置",
@@ -624,7 +623,7 @@
       "cloud": {
         "hero_title": "企業版功能",
         "offer_text": "自架 OpenObserve 即可完全免費使用所有企業版功能",
-        "badge_text": "每日最多 200GB 免費",
+        "badge_text": "每日最多 50GB 免費",
         "features_title": "OpenObserve 雲端版功能",
         "features_subtitle": "雲端訂閱包含所有功能",
         "primary_button_text": "立即下載"
@@ -636,7 +635,7 @@
         "features_title": "可用的企業版功能",
         "features_subtitle": "取得免費授權以解鎖所有功能",
         "primary_button_text": "取得免費授權",
-        "license_note": "無授權每日 50GB • 有授權每日 200GB"
+        "license_note": "無授權每日 50GB • 有授權每日 50GB"
       },
       "enterprise_with_license": {
         "hero_title": "企業版",
@@ -650,7 +649,7 @@
       "open_source": {
         "hero_title": "取得企業版",
         "offer_text": "下載並免費解鎖所有企業版功能",
-        "badge_text": "每日最多 200GB 免費",
+        "badge_text": "每日最多 50GB 免費",
         "features_title": "解鎖所有企業版功能",
         "features_subtitle": "正式環境可觀測性所需的一切",
         "primary_button_text": "立即下載"
@@ -1591,6 +1590,7 @@
     "bottom": "底部",
     "default": "預設",
     "numbers": "數字",
+    "localeFormat": "區域格式",
     "bytes": "Bytes",
     "kilobytes": "Kilobytes (KB)",
     "megabytes": "Megabytes (MB)",

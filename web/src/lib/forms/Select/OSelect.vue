@@ -670,10 +670,10 @@ function getPaletteGradient(colors: string[]): string {
   return `linear-gradient(to right, ${colors.join(", ")})`;
 }
 
-// md was h-10 (40px); reduced to h-8 (32px) for compact config panel density; raised to h-9 (36px) to match OButton sm.
+// Aligned with OInput and OButton sm: h-[2.125rem] ≈ 30px at Quasar's 14px base.
 const heightClasses: Record<NonNullable<SelectProps["size"]>, string> = {
   sm: "tw:h-6 tw:text-sm",
-  md: "tw:h-8 tw:text-sm",
+  md: "tw:h-[2.125rem] tw:text-sm",
 };
 
 // Open-state tracking. Reka's PopoverTrigger / SelectTrigger expose
@@ -685,6 +685,7 @@ const selectOpen = ref(false);
 const isOpen = computed(() =>
   listboxModeEnabled.value ? popoverOpen.value : selectOpen.value,
 );
+
 
 // When this OSelect is nested inside an ODropdown, signal its
 // open/close so the parent ignores the pointer event that closes us.
@@ -885,7 +886,7 @@ const fieldWidthClass = computed(() => {
         disabled && 'o-input-label--disabled',
       ]"
     >
-      {{ label }}
+      {{ label }}<span v-if="required" aria-hidden="true" class="tw:select-none">*</span>
       <OIcon
         v-if="$slots.tooltip"
         name="info-outline"
@@ -928,9 +929,9 @@ const fieldWidthClass = computed(() => {
               'tw:bg-select-bg',
               hasError
                 ? 'tw:border-select-border-error'
-                : 'tw:border-select-border tw:hover:border-select-border-hover',
-              /* Single-border focus — no outer ring. See OInput.vue. */
-              'tw:focus:outline-none tw:focus:border-select-border-focus',
+                : 'tw:border-select-border tw:hover:border-select-border-hover tw:focus:border-select-border-focus',
+              /* Keep the red error border on focus; focus border color applies only when there's no error. */
+              'tw:focus:outline-none',
               'tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150',
               'tw:disabled:bg-select-disabled-bg tw:disabled:cursor-not-allowed tw:disabled:border-dashed',
               labelPosition === 'inside' && label
@@ -945,7 +946,7 @@ const fieldWidthClass = computed(() => {
             <span
               v-if="label && labelPosition === 'inside'"
               class="tw:text-[0.625rem] tw:leading-none tw:whitespace-nowrap tw:text-start tw:text-select-placeholder tw:select-none tw:pointer-events-none tw:ps-3 tw:pe-7"
-              >{{ label }}</span
+              >{{ label }}<span v-if="required" aria-hidden="true">&nbsp;*</span></span
             >
 
             <!-- Content row: flex-row for inside-label; display:contents (transparent) for normal mode -->
@@ -1223,7 +1224,7 @@ const fieldWidthClass = computed(() => {
                         v-if="filteredOptions[vRow.index].header"
                         :class="[
                           'tw:flex tw:w-full tw:h-full tw:px-3 tw:py-1 tw:text-xs tw:font-bold',
-                          'tw:text-select-item-text tw:bg-select-content-bg tw:uppercase tw:tracking-wide',
+                          'tw:text-select-item-text tw:bg-select-content-bg',
                           'tw:select-none tw:pointer-events-none',
                         ]"
                       >
@@ -1454,9 +1455,9 @@ const fieldWidthClass = computed(() => {
             'tw:bg-select-bg',
             hasError
               ? 'tw:border-select-border-error'
-              : 'tw:border-select-border tw:hover:border-select-border-hover',
-            /* Single-border focus — no outer ring. See OInput.vue. */
-            'tw:focus:outline-none tw:focus:border-select-border-focus',
+              : 'tw:border-select-border tw:hover:border-select-border-hover tw:focus:border-select-border-focus',
+            /* Keep the red error border on focus; focus border color applies only when there's no error. */
+            'tw:focus:outline-none',
             'tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150',
             'tw:data-disabled:bg-select-disabled-bg tw:data-disabled:cursor-not-allowed tw:data-disabled:border-dashed',
             labelPosition === 'inside' && label
@@ -1471,7 +1472,7 @@ const fieldWidthClass = computed(() => {
           <span
             v-if="label && labelPosition === 'inside'"
             class="tw:text-[0.625rem] tw:leading-none tw:whitespace-nowrap tw:text-start tw:text-select-placeholder tw:select-none tw:pointer-events-none tw:ps-3 tw:pe-7"
-            >{{ label }}</span
+            >{{ label }}<span v-if="required" aria-hidden="true">&nbsp;*</span></span
           >
 
           <!-- Content row: flex-row for inside-label; display:contents for normal mode -->
@@ -1567,11 +1568,13 @@ const fieldWidthClass = computed(() => {
             'tw:overflow-hidden',
             'tw:rounded-md tw:border tw:shadow-md',
             'tw:bg-select-content-bg tw:border-select-content-border',
-            'tw:data-[state=open]:animate-in tw:data-[state=closed]:animate-out',
-            'tw:data-[state=closed]:fade-out-0 tw:data-[state=open]:fade-in-0',
-            'tw:data-[state=closed]:zoom-out-95 tw:data-[state=open]:zoom-in-95',
-            'tw:data-[side=bottom]:slide-in-from-top-2',
-            'tw:data-[side=top]:slide-in-from-bottom-2',
+            // Clip-path reveal: unveiled at full size from its trigger edge (no
+            // scale/squish). Wipes down by default; top-placed wipes up. Soft
+            // ease-out-expo in (200ms), quick wipe out (140ms).
+            'tw:data-[state=open]:animate-[o2-reveal-down-in_140ms_cubic-bezier(0.16,1,0.3,1)]',
+            'tw:data-[state=closed]:animate-[o2-reveal-down-out_100ms_cubic-bezier(0.4,0,1,1)]',
+            'tw:data-[side=top]:data-[state=open]:animate-[o2-reveal-up-in_140ms_cubic-bezier(0.16,1,0.3,1)]',
+            'tw:data-[side=top]:data-[state=closed]:animate-[o2-reveal-up-out_100ms_cubic-bezier(0.4,0,1,1)]',
           ]"
           :style="[dropdownStyle, { maxHeight: 'min(15rem, var(--reka-select-content-available-height, 15rem))' }]"
           @click.stop

@@ -17,16 +17,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
   <div>
-    <div class="tw:px-3 tw:py-3">
-      <div class="general-page-title" data-test="settings-general-page-title">
-        {{ t("settings.generalPageTitle") }}
-      </div>
-      <div class="general-page-subtitle">
-        {{ t("settings.pageSubtitle") }}
-      </div>
-    </div>
-    <!-- platform settings section -->
-    <div class="tw:mx-4">
+    <!-- Section header (title + description) is provided full-width by the
+         Settings shell; this component renders only the form content. -->
+    <!-- platform settings section. The page gutter is owned by the Settings
+         shell's ConstrainedPage; this block adds none of its own. -->
+    <div>
       <GroupHeader :title="t('settings.platformSettings')" :showIcon="false" />
       <div class="tw:w-full tw:flex tw:flex-col">
         <OForm @submit.stop="onSubmit.execute">
@@ -168,13 +163,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           store.state.selectedOrganization.identifier
       "
     >
-      <div class="tw:px-3 tw:py-2">
+      <div class="tw:py-2">
         <GroupHeader
           :title="t('settings.enterpriseFeatures')"
           :showIcon="false"
         />
       </div>
-      <div class="tw:mx-3">
+      <div>
         <div class="settings-grid-item no-border-bottom">
           <span class="individual-setting-title">
             {{ t("settings.customLogoText") }}
@@ -237,7 +232,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
         </div>
         <!-- Light Mode Logo -->
-        <div class="settings-grid-item tw:ml-1">
+        <div class="settings-grid-item">
           <div class="tw:pt-2 individual-setting-title tw:w-full tw:mb-5">
             {{ t("settings.customLogoTitle") }} ({{ t("settings.lightMode") }})
           </div>
@@ -307,7 +302,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
         <!-- Dark Mode Logo -->
-        <div class="settings-grid-item tw:ml-1">
+        <div class="settings-grid-item">
           <div class="tw:pt-2 individual-setting-title tw:w-full tw:mb-5">
             {{ t("settings.customLogoTitle") }} ({{ t("settings.darkMode") }})
           </div>
@@ -1083,16 +1078,8 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
-.general-page-title {
-  font-size: 20px;
-  font-weight: 700;
-  line-height: 24px;
-}
-.general-page-subtitle {
-  font-size: 14px;
-  font-weight: 500;
-  line-height: 20px;
-}
+/* .general-page-title / .general-page-subtitle removed — the section title now
+   renders via the standard AppPageHeader (title + subtitle props). */
 .individual-setting-title {
   font-size: 14px;
   font-weight: 500;
@@ -1105,7 +1092,7 @@ export default defineComponent({
 
 .settings-grid-item {
   display: grid;
-  grid-template-columns: 1fr 1fr 2fr;
+  grid-template-columns: 1fr 1fr 1fr;
   gap: 1rem;
   align-items: center;
   padding: 1rem 0;

@@ -15,14 +15,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODrawer data-test="update-role-dialog"
+  <ODialog data-test="update-role-dialog"
     :open="open"
-    :width="30"
+    size="sm"
     :title="t('user.editUser')"
     persistent
     @update:open="$emit('update:open', $event)"
   >
-    <div class="tw:p-4">
+    <div>
       <div>
         <OInput
           v-model="orgMemberData.first_name"
@@ -35,7 +35,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="orgMemberData.role"
           :label="t('user.role')"
           :options="roleOptions"
+          :error="!!roleError"
+          :error-message="roleError"
           class="tw:pt-3 tw:pb-2 showLabelOnTop"
+          data-test="iam-update-role-select"
+          @update:model-value="roleError = ''"
         />
 
         <div class="tw:flex tw:justify-center tw:mt-4 tw:gap-2">
@@ -43,6 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="$emit('update:open', false)"
             variant="outline"
             size="sm-action"
+            data-test="iam-update-role-cancel-btn"
           >
             {{ t('user.cancel') }}
           </OButton>
@@ -50,19 +55,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="primary"
             size="sm-action"
             @click="onSubmit"
+            data-test="iam-update-role-save-btn"
           >
             {{ t('user.save') }}
           </OButton>
         </div>
       </div>
     </div>
-  </ODrawer>
+  </ODialog>
 </template>
 
 <script lang="ts">
 import { defineComponent, ref } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { useI18n } from "vue-i18n";
@@ -84,7 +90,7 @@ let callOrgMember: any;
 
 export default defineComponent({
   name: "ComponentUpdateUser",
-  components: { OButton, ODrawer, OInput, OSelect },
+  components: { OButton, ODialog, OInput, OSelect },
   props: {
     open: {
       type: Boolean,
@@ -101,14 +107,14 @@ export default defineComponent({
     const { t } = useI18n();
     const roleOptions = ["admin"];
     const orgMemberData: any = ref(defaultValue());
-    const updateUserForm: any = ref(null);
+    const roleError: any = ref('');
 
     return {
       t,
       orgMemberData,
       store,
       roleOptions,
-      updateUserForm,
+      roleError,
       getImageURL,
     };
   },
@@ -124,47 +130,44 @@ export default defineComponent({
   },
   methods: {
     onSubmit() {
+      if (!this.orgMemberData.role) {
+        this.roleError = 'Role is required';
+        return;
+      }
+
       const dismiss = toast({
         variant: "loading",
         message: "Please wait...",
-              timeout: 0,
-});
+        timeout: 0,
+      });
 
-      this.updateUserForm.validate().then((valid: any) => {
-        if (!valid) {
-          return false;
+      callOrgMember = organizationsService.update_member_role(
+        {
+          id: parseInt(this.orgMemberData.org_member_id),
+          role: this.orgMemberData.role,
+          organization_id: parseInt(this.store.state.selectedOrganization.id),
+        },
+        this.store.state.selectedOrganization.identifier
+      );
+
+      callOrgMember.then((res: { data: any }) => {
+        if (res?.data?.error_members != null) {
+          toast({
+            variant: "error",
+            message: "Error while updating organization member",
+            timeout: 15000,
+          });
+        } else {
+          toast({
+            variant: "success",
+            message: "Organization member updated successfully.",
+          });
         }
 
-        callOrgMember = organizationsService.update_member_role(
-          {
-            id: parseInt(this.orgMemberData.org_member_id),
-            role: this.orgMemberData.role,
-            organization_id: parseInt(this.store.state.selectedOrganization.id),
-          },
-          this.store.state.selectedOrganization.identifier
-        );
-
-        callOrgMember.then((res: { data: any }) => {
-          if (res?.data?.error_members != null) {
-            const message = `Error while updating organization member`;
-
-            toast({
-              variant: "error",
-              message: message,
-              timeout: 15000,
-            });
-          } else {
-            toast({
-              variant: "success",
-              message: "Organization member updated successfully.",
-            });
-          }
-
-          this.$emit("updated", res?.data);
-          this.$emit("update:open", false);
-          this.updateUserForm.resetValidation();
-          dismiss();
-        });
+        this.$emit("updated", res?.data);
+        this.$emit("update:open", false);
+        this.roleError = '';
+        dismiss();
       });
     },
   },

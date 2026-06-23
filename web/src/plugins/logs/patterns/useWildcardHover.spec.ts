@@ -25,6 +25,11 @@ describe("useWildcardHover", () => {
   });
 
   afterEach(() => {
+    // Cancel any pending show, then fire the hide so module-level hoveredToken
+    // is null for the next test.
+    const { onMouseLeave } = useWildcardHover();
+    onMouseLeave();
+    vi.advanceTimersByTime(200);
     vi.useRealTimers();
   });
 
@@ -34,6 +39,7 @@ describe("useWildcardHover", () => {
       const el = document.createElement("span");
 
       onMouseEnter("<*>", ["value1", "value2"], { currentTarget: el } as any);
+      vi.advanceTimersByTime(350); // wait for SHOW_DELAY_MS
 
       expect(hoveredToken.value).not.toBeNull();
       expect(hoveredToken.value!.token).toBe("<*>");
@@ -51,6 +57,7 @@ describe("useWildcardHover", () => {
       onMouseEnter("<:IP>", [{ value: "10.0.0.1", count: 42 }], {
         currentTarget: el,
       } as any);
+      vi.advanceTimersByTime(350); // wait for SHOW_DELAY_MS
 
       expect(hoveredToken.value!.displayValues).toEqual([
         { value: "10.0.0.1", count: 42 },
@@ -61,9 +68,15 @@ describe("useWildcardHover", () => {
       const { onMouseEnter, onMouseLeave, hoveredToken } = useWildcardHover();
       const el = document.createElement("span");
 
-      onMouseLeave();
-      // Timeout is now pending — onMouseEnter should cancel it
+      // First establish a visible token
       onMouseEnter("<*>", [], { currentTarget: el } as any);
+      vi.advanceTimersByTime(350);
+      expect(hoveredToken.value).not.toBeNull();
+
+      // Leave starts a 200ms hide timer; re-enter should cancel it
+      onMouseLeave();
+      onMouseEnter("<*>", [], { currentTarget: el } as any);
+      vi.advanceTimersByTime(350); // new show fires
 
       expect(hoveredToken.value).not.toBeNull();
     });
@@ -75,6 +88,7 @@ describe("useWildcardHover", () => {
       const el = document.createElement("span");
 
       onMouseEnter("<*>", [], { currentTarget: el } as any);
+      vi.advanceTimersByTime(350); // wait for show
       expect(hoveredToken.value).not.toBeNull();
 
       onMouseLeave();
@@ -92,6 +106,7 @@ describe("useWildcardHover", () => {
       const el = document.createElement("span");
 
       onMouseEnter("<*>", [], { currentTarget: el } as any);
+      vi.advanceTimersByTime(350); // wait for show
       onMouseLeave(); // starts 200ms timer
 
       onPopoverEnter(); // cancels the timer
@@ -107,6 +122,7 @@ describe("useWildcardHover", () => {
       const el = document.createElement("span");
 
       onMouseEnter("<*>", [], { currentTarget: el } as any);
+      vi.advanceTimersByTime(350); // wait for show
       onPopoverLeave();
 
       vi.advanceTimersByTime(200);
@@ -124,6 +140,7 @@ describe("useWildcardHover", () => {
       onMouseEnter("<:IP>", [], { currentTarget: el } as any);
       onMouseLeave();
       onMouseEnter("<:NUM>", [], { currentTarget: el } as any);
+      vi.advanceTimersByTime(350); // wait for last show to fire
 
       expect(hoveredToken.value!.token).toBe("<:NUM>");
     });
@@ -138,7 +155,8 @@ describe("useWildcardHover", () => {
       onMouseEnter("<:IP>", [], { currentTarget: el } as any);
       onMouseLeave();
       onMouseEnter("<:NUM>", [], { currentTarget: el } as any);
-      onMouseLeave();
+      vi.advanceTimersByTime(350); // let last show fire
+      onMouseLeave(); // final leave
 
       vi.advanceTimersByTime(200);
       expect(hoveredToken.value).toBeNull();

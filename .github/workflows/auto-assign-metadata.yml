@@ -17,9 +17,31 @@ jobs:
   auto-assign:
     runs-on: ubuntu-latest
     steps:
+      # ── Classify creator: team | internal | stranger ──
+      - name: Classify creator
+        id: classify
+        env:
+          GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
+          ORG: ${{ github.repository_owner }}
+          CREATOR: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.user.login || github.event.issue.user.login }}
+        run: |
+          ALLOWLIST=" bjp232004 hengfeiyang prabhatsharma uddhavdave oasisk haohuaijin Subhra264 Loaki07 007harshmahajan chaitanya-sistla ktx-kirtan omkarK06 ktx-vaidehi ktx-abhay neha00290 ktx-akshay ktx-sadhna nikhilsaikethe YashodhanJoshi1 ktx-riya mmosarafO2 Shrinath-O2 ktx-mihir "
+          CREATOR_LOWER=$(echo "$CREATOR" | tr '[:upper:]' '[:lower:]')
+          ALLOWLIST_LOWER=$(echo "$ALLOWLIST" | tr '[:upper:]' '[:lower:]')
+          if echo "$ALLOWLIST_LOWER" | grep -q " $CREATOR_LOWER "; then
+            echo "category=team" >> "$GITHUB_OUTPUT"
+            echo "Creator $CREATOR is on the engineering team"
+          elif gh api "orgs/$ORG/members/$CREATOR" --silent 2>/dev/null; then
+            echo "category=internal" >> "$GITHUB_OUTPUT"
+            echo "Creator $CREATOR is an internal member (not engineering team) — skipping"
+          else
+            echo "category=stranger" >> "$GITHUB_OUTPUT"
+            echo "Creator $CREATOR is an external contributor"
+          fi
+
       # ── PR: assign creator ──
       - name: Assign PR creator
-        if: github.event_name == 'pull_request_target'
+        if: github.event_name == 'pull_request_target' && steps.classify.outputs.category == 'team'
         env:
           GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
           GH_REPO: ${{ github.repository }}
@@ -32,7 +54,7 @@ jobs:
 
       # ── PR: add lowest open milestone (skip drafts) ──
       - name: Add milestone to PR
-        if: github.event_name == 'pull_request_target' && github.event.pull_request.draft == false && github.event.pull_request.base.ref == 'main'
+        if: github.event_name == 'pull_request_target' && steps.classify.outputs.category == 'team' && github.event.pull_request.draft == false && github.event.pull_request.base.ref == 'main'
         env:
           GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
           GH_REPO: ${{ github.repository }}
@@ -68,7 +90,7 @@ jobs:
 
       # ── PR: add to project ──
       - name: Add PR to project
-        if: github.event_name == 'pull_request_target'
+        if: github.event_name == 'pull_request_target' && steps.classify.outputs.category == 'team'
         env:
           GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
           NODE_ID: ${{ github.event.pull_request.node_id }}
@@ -90,7 +112,7 @@ jobs:
 
       # ── Issue: assign creator if unassigned ──
       - name: Assign issue creator
-        if: github.event_name == 'issues'
+        if: github.event_name == 'issues' && steps.classify.outputs.category == 'team'
         env:
           GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
           GH_REPO: ${{ github.repository }}
@@ -108,7 +130,7 @@ jobs:
 
       # ── Issue: add lowest open milestone ──
       - name: Add milestone to issue
-        if: github.event_name == 'issues'
+        if: github.event_name == 'issues' && steps.classify.outputs.category == 'team'
         env:
           GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
           GH_REPO: ${{ github.repository }}
@@ -144,7 +166,8 @@ jobs:
 
       # ── Issue: add to project ──
       - name: Add issue to project
-        if: github.event_name == 'issues'
+        id: add_issue_to_project
+        if: github.event_name == 'issues' && steps.classify.outputs.category == 'team'
         env:
           GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
           NODE_ID: ${{ github.event.issue.node_id }}
@@ -157,9 +180,67 @@ jobs:
 
           [ -n "$PROJECT_ID" ] || { echo "::warning::Project not found — check PROJECT_NUMBER and token scope"; exit 0; }
 
-          gh api graphql \
+          ITEM_ID=$(gh api graphql \
             -f query='mutation($project:ID!,$content:ID!){addProjectV2ItemById(input:{projectId:$project,contentId:$content}){item{id}}}' \
             -f project="$PROJECT_ID" \
             -f content="$NODE_ID" \
-            && echo "Added issue to project" \
-            || echo "::warning::Could not add issue to project"
+            --jq '.data.addProjectV2ItemById.item.id')
+
+          if [ -n "$ITEM_ID" ]; then
+            echo "Added issue to project (item: $ITEM_ID)"
+            echo "item_id=$ITEM_ID" >> "$GITHUB_OUTPUT"
+            echo "project_id=$PROJECT_ID" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::Could not add issue to project"
+          fi
+
+      # ── Issue: set start date ──
+      - name: Set start date on issue
+        if: github.event_name == 'issues' && steps.classify.outputs.category == 'team' && steps.add_issue_to_project.outputs.item_id != ''
+        env:
+          GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
+          ORG: ${{ github.repository_owner }}
+          ITEM_ID: ${{ steps.add_issue_to_project.outputs.item_id }}
+          PROJECT_ID: ${{ steps.add_issue_to_project.outputs.project_id }}
+        run: |
+          TODAY=$(date -u +%Y-%m-%d)
+
+          FIELD_ID=$(gh api graphql \
+            -f query='query($project:ID!){node(id:$project){... on ProjectV2{fields(first:30){nodes{... on ProjectV2Field{id name}}}}}}' \
+            -f project="$PROJECT_ID" \
+            --jq '[.data.node.fields.nodes[] | select(.name | ascii_downcase == "start date")] | .[0].id // empty')
+
+          [ -n "$FIELD_ID" ] || { echo "::warning::Start date field not found in project"; exit 0; }
+
+          MUTATION_OUT=$(gh api graphql \
+            -f query='mutation($project:ID!,$item:ID!,$field:ID!,$date:Date!){updateProjectV2ItemFieldValue(input:{projectId:$project,itemId:$item,fieldId:$field,value:{date:$date}}){projectV2Item{id}}}' \
+            -f project="$PROJECT_ID" \
+            -f item="$ITEM_ID" \
+            -f field="$FIELD_ID" \
+            -f date="$TODAY" 2>&1) \
+            && echo "Set start date to $TODAY" \
+            || echo "::warning::Could not set start date: $MUTATION_OUT"
+
+      # ── Stranger: assign issue to Shrinath + Manas ──
+      - name: Assign stranger issue
+        if: github.event_name == 'issues' && steps.classify.outputs.category == 'stranger'
+        env:
+          GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          NUMBER: ${{ github.event.issue.number }}
+        run: |
+          gh issue edit "$NUMBER" --add-assignee "simranquirky" \
+            && echo "Assigned simranquirky to stranger issue #$NUMBER" \
+            || echo "::warning::Could not assign to stranger issue #$NUMBER"
+
+      # ── Stranger: assign PR to oasisk + hengfeiyang ──
+      - name: Assign stranger PR
+        if: github.event_name == 'pull_request_target' && steps.classify.outputs.category == 'stranger'
+        env:
+          GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          gh pr edit "$NUMBER" --add-assignee "oasisk" --add-assignee "hengfeiyang" \
+            && echo "Assigned oasisk and hengfeiyang to stranger PR #$NUMBER" \
+            || echo "::warning::Could not assign to stranger PR #$NUMBER"

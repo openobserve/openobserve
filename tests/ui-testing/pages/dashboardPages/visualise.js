@@ -28,7 +28,7 @@ export default class LogsVisualise {
     // migrated to ODrawer (SelectDashboardDropdown now hosts the form and
     // the footer primary button calls addDashboardRef?.submit()).
     this.dashboardSubmitBtn = page.locator(
-      '[data-test="dashboard-dashboard-add-dialog"] [data-test="o-drawer-primary-btn"]'
+      '[data-test="dashboard-dashboard-add-dialog"] [data-test="o-dialog-primary-btn"]'
     );
     this.panelTitleInput = page.locator(
       '[data-test="metrics-new-dashboard-panel-title-field"]'
@@ -37,7 +37,7 @@ export default class LogsVisualise {
     // `metrics-schema-update-settings-button` was removed when AddToDashboard.vue
     // migrated to ODrawer (parent slug: add-to-dashboard-dialog).
     this.updateSettingsBtn = page.locator(
-      '[data-test="add-to-dashboard-dialog"] [data-test="o-drawer-primary-btn"]'
+      '[data-test="add-to-dashboard-dialog"] [data-test="o-dialog-primary-btn"]'
     );
 
     // Query editor locators
@@ -183,14 +183,9 @@ export default class LogsVisualise {
 
   //enable SQL Mode
   async enableSQLMode() {
-    // SQL mode toggle is inside the utilities menu dropdown
-    const utilitiesBtn = this.page.locator('[data-test="logs-search-bar-utilities-menu-btn"]');
-    await utilitiesBtn.waitFor({ state: "visible", timeout: 10000 });
-    await utilitiesBtn.click();
-    const sqlModeBtn = this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"]');
-    await sqlModeBtn.waitFor({ state: "visible", timeout: 5000 });
-    await sqlModeBtn.click();
-    await this.page.keyboard.press("Escape");
+    // SQL mode toggle was removed from the UI. SQL mode is now auto-detected
+    // from query content — entering a SELECT query enables it automatically.
+    // This method is intentionally a no-op.
   }
 
   //stream index list

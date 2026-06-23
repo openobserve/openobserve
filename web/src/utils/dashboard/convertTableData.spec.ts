@@ -14,7 +14,10 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { convertTableData } from "@/utils/dashboard/convertTableData";
+import {
+  convertTableData,
+  convertMultiQueryTableData,
+} from "@/utils/dashboard/convertTableData";
 import { isTimeSeries, isTimeStamp } from "@/utils/dashboard/dateTimeUtils";
 
 // Mock external dependencies
@@ -736,5 +739,82 @@ describe("convertTableData", () => {
     const statusColumn = result.columns.find((col: any) => col.field === "status");
     expect(statusColumn).toBeDefined();
     expect(statusColumn.colorMode).toBe("auto");
+  });
+});
+
+describe("convertMultiQueryTableData – column ordering", () => {
+  const store = { state: { timezone: "UTC" } };
+
+  it("groups columns by axis across queries: all X first, then all Y", () => {
+    const panelSchema = {
+      type: "table",
+      config: {},
+      queries: [
+        {
+          fields: {
+            x: [{ alias: "q1_x", label: "Q1 X" }],
+            y: [{ alias: "q1_y", label: "Q1 Y" }],
+          },
+        },
+        {
+          fields: {
+            x: [{ alias: "q2_x", label: "Q2 X" }],
+            y: [{ alias: "q2_y", label: "Q2 Y" }],
+          },
+        },
+      ],
+    };
+    const data = [
+      [{ q1_x: "a", q1_y: 1 }],
+      [{ q2_x: "b", q2_y: 2 }],
+    ];
+
+    const result = convertMultiQueryTableData(panelSchema, data, store);
+
+    // Q1.x, Q2.x, then Q1.y, Q2.y — NOT per-query (q1_x, q1_y, q2_x, q2_y).
+    expect(result.columns.map((c: any) => c.name)).toEqual([
+      "q1_x",
+      "q2_x",
+      "q1_y",
+      "q2_y",
+    ]);
+  });
+
+  it("places breakdown fields (all queries) between the X and Y groups", () => {
+    const panelSchema = {
+      type: "table",
+      config: {},
+      queries: [
+        {
+          fields: {
+            x: [{ alias: "q1_x" }],
+            breakdown: [{ alias: "q1_bd" }],
+            y: [{ alias: "q1_y" }],
+          },
+        },
+        {
+          fields: {
+            x: [{ alias: "q2_x" }],
+            breakdown: [{ alias: "q2_bd" }],
+            y: [{ alias: "q2_y" }],
+          },
+        },
+      ],
+    };
+    const data = [
+      [{ q1_x: "a", q1_bd: "g", q1_y: 1 }],
+      [{ q2_x: "b", q2_bd: "h", q2_y: 2 }],
+    ];
+
+    const result = convertMultiQueryTableData(panelSchema, data, store);
+
+    expect(result.columns.map((c: any) => c.name)).toEqual([
+      "q1_x",
+      "q2_x",
+      "q1_bd",
+      "q2_bd",
+      "q1_y",
+      "q2_y",
+    ]);
   });
 });

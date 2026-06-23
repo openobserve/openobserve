@@ -5,6 +5,7 @@ import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { h } from "vue";
 import OFormColor from "./OFormColor.vue";
 import OForm from "../Form/OForm.vue";
+import { z } from "zod";
 
 describe("OFormColor", () => {
   let wrapper: VueWrapper;
@@ -37,24 +38,22 @@ describe("OFormColor", () => {
     expect(text.value).toBe("#abcdef");
   });
 
-  it("shows validator error after typing an invalid hex", async () => {
+  it("shows schema error after submit for an invalid hex", async () => {
     wrapper = mount(OForm, {
-      props: { defaultValues: { brand: "" } },
+      props: {
+        defaultValues: { brand: "zzz" },
+        schema: z.object({
+          brand: z.string().regex(/^#[0-9a-fA-F]{6}$/, "Invalid hex"),
+        }),
+      },
       slots: {
-        default: () =>
-          h(OFormColor, {
-            name: "brand",
-            validators: [
-              (v: string) =>
-                v && !/^#[0-9a-fA-F]{6}$/.test(v) ? "Invalid hex" : undefined,
-            ],
-          }),
+        default: () => h(OFormColor, { name: "brand" }),
       },
       global: { components: { OFormColor } },
     });
-    const text = wrapper.find("input[type='text']");
-    await text.setValue("xyz");
-    await text.trigger("blur");
+    await (
+      wrapper.vm as unknown as { form: { handleSubmit: () => Promise<unknown> } }
+    ).form.handleSubmit();
     await flushPromises();
     expect(wrapper.text()).toContain("Invalid hex");
   });

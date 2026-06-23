@@ -33,6 +33,7 @@ pub async fn save(
     name: &str,
     mut template: Template,
     create: bool,
+    is_root: bool,
 ) -> Result<Template, TemplateError> {
     if template.body.is_empty() {
         return Err(TemplateError::EmptyBody);
@@ -54,16 +55,17 @@ pub async fn save(
         return Err(TemplateError::EmptyTitle);
     }
 
-    // Canonical `prebuilt_<type>` names are reserved for system-managed
-    // templates: users may not create new templates with one of those names.
-    // Editing existing prebuilt templates IS allowed (lets users tweak the
-    // global default payload); deletion is blocked separately in `delete()`
-    // since destinations may still reference them.
-    // System initializers (`ensure_prebuilt_template`,
-    // `ensure_system_templates`) write through the db layer directly and so
-    // bypass this guard intentionally.
-    if create && is_prebuilt_template_name(&template.name) {
-        return Err(TemplateError::ReservedName(template.name.clone()));
+    if is_prebuilt_template_name(&template.name) {
+        if create {
+            // Nobody may create a new template with a reserved name — it would
+            // shadow or conflict with the system-managed record.
+            return Err(TemplateError::ReservedName(template.name.clone()));
+        }
+        // Updates are allowed for root (internal ops / self-hosted admins);
+        // all other callers get a 403.
+        if !is_root {
+            return Err(TemplateError::PrebuiltReadOnly(template.name.clone()));
+        }
     }
 
     match db::alerts::templates::get(&template.org_id, &template.name).await {
@@ -114,10 +116,8 @@ pub async fn list(
         .collect())
 }
 
-pub async fn delete(org_id: &str, name: &str) -> Result<(), TemplateError> {
-    // System prebuilt templates are read-only from the public API; deleting
-    // one would break every destination still referencing it.
-    if is_prebuilt_template_name(name) {
+pub async fn delete(org_id: &str, name: &str, is_root: bool) -> Result<(), TemplateError> {
+    if !is_root && is_prebuilt_template_name(name) {
         return Err(TemplateError::PrebuiltReadOnly(name.to_string()));
     }
     db::alerts::templates::delete(org_id, name).await?;

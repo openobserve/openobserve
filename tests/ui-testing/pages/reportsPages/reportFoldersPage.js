@@ -1,11 +1,9 @@
 import { expect } from '@playwright/test';
+import { openNavFlyoutChild } from '../commonActions.js';
 
 export class ReportFoldersPage {
   constructor(page) {
     this.page = page;
-
-    // Navigation
-    this.reportsMenu = page.locator('[data-test="menu-link-\\/reports-item"]');
 
     // Folder sidebar
     this.addFolderBtn = page.locator('[data-test="dashboard-new-folder-btn"]');
@@ -25,10 +23,10 @@ export class ReportFoldersPage {
     this.folderNameInput = page.locator('[data-test="dashboard-folder-add-name-field"]');
     this.folderDescInput = page.locator('[data-test="dashboard-folder-add-description-field"]');
     this.folderSaveBtn = page.locator(
-      '[data-test="dashboard-folder-dialog"] [data-test="o-drawer-primary-btn"]'
+      '[data-test="dashboard-folder-dialog"] [data-test="o-dialog-primary-btn"]'
     );
     this.folderCancelBtn = page.locator(
-      '[data-test="dashboard-folder-dialog"] [data-test="o-drawer-secondary-btn"]'
+      '[data-test="dashboard-folder-dialog"] [data-test="o-dialog-secondary-btn"]'
     );
     // OFormInput surfaces validator errors via the inner OInput's
     // `<parentDataTest>-error` slot once `field.state.meta.isTouched` flips
@@ -57,10 +55,10 @@ export class ReportFoldersPage {
       '[data-test="reports-index-dropdown-stream_type-popover"]'
     );
     this.moveSubmitBtn = page.locator(
-      '[data-test="report-move-to-another-folder-dialog"] [data-test="o-drawer-primary-btn"]'
+      '[data-test="report-move-to-another-folder-dialog"] [data-test="o-dialog-primary-btn"]'
     );
     this.moveCancelBtn = page.locator(
-      '[data-test="report-move-to-another-folder-dialog"] [data-test="o-drawer-secondary-btn"]'
+      '[data-test="report-move-to-another-folder-dialog"] [data-test="o-dialog-secondary-btn"]'
     );
 
     // Report list

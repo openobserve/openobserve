@@ -24,7 +24,7 @@ import {
   DEFAULT_SEARCH_AGG_DATA,
 } from "@/utils/logs/constants";
 
-interface HistogramData {
+export interface HistogramData {
   xData: any[];
   yData: any[];
   breakdownField: string | null;
@@ -39,7 +39,7 @@ interface HistogramData {
   errorDetail: string;
 }
 
-interface StreamData {
+export interface StreamData {
   streamLists: any[];
   selectedStream: string[];
   selectedStreamFields: any[];
@@ -52,16 +52,16 @@ interface StreamData {
   streamType: string;
 }
 
-interface ResultGrid {
+export interface ResultGrid {
   currentPage: number;
 }
 
-interface SearchAroundData {
+export interface SearchAroundData {
   indexTimestamp: number;
   size: number;
 }
 
-interface SearchObjectData {
+export interface SearchObjectData {
   streamResults: any;
   errorMsg: string;
   errorDetail: string;
@@ -81,15 +81,19 @@ interface SearchObjectData {
   highlightQuery: string;
   crossLinks: { stream_links: any[]; org_links: any[] };
   crossLinkQuery: string;
+  sqlSyntaxErrorRanges: Array<{ startLine: number; endLine: number; column?: number; error: string }>;
 }
 
-interface SearchObject {
+export interface SearchObject {
   organizationIdentifier: string;
   config: any;
   communicationMethod: string;
   meta: any;
   data: SearchObjectData;
   runQuery: boolean;
+  // Streaming progress (0-100) for the results table and histogram bars
+  loadingProgressPercentage: number;
+  loadingHistogramProgressPercentage: number;
 }
 
 // Main search object containing all search state
@@ -330,6 +334,7 @@ export const searchState = () => {
     searchObj.data.errorDetail = "";
     searchObj.data.countErrorMsg = "";
     searchObj.data.errorCode = 0;
+    searchObj.data.sqlSyntaxErrorRanges = [];
   };
 
   /**

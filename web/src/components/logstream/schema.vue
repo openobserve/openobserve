@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span
               v-if="indexData.name"
               :class="[
-                'tw:font-bold tw:mr-4 tw:px-2 tw:py-1 tw:rounded-md tw:ml-2 tw:max-w-xs tw:truncate tw:inline-block',
+                'tw:font-semibold tw:mr-4 tw:px-2 tw:py-1 tw:rounded-md tw:ml-2 tw:inline-block',
                 store.state.theme === 'dark'
                   ? 'tw:text-blue-400 tw:bg-blue-900/50'
                   : 'tw:text-blue-600 tw:bg-blue-50',
@@ -333,22 +333,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         label="Configuration"
                         data-test="schema-configuration-tab"
                       />
-                      <!-- LLM Evaluation Tab (enterprise + ai_enabled + traces only) -->
-                      <OTab
-                        v-if="
-                          config.isEnterprise == 'true' &&
-                          store.state.zoConfig.ai_enabled &&
-                          indexData.stream_type === 'traces'
-                        "
-                        name="llmEvaluation"
-                        icon="psychology"
-                        :label="t('pipeline.llmEvaluation')"
-                        data-test="stream-llm-evaluation-tab"
-                      />
-
                       <!-- Cross-Linking Tab -->
                       <OTab
-                        v-if="store.state.zoConfig?.enable_cross_linking"
+                        v-if="
+                          isCrossLinkingEnabledForStream(
+                            store.state.zoConfig,
+                            indexData.stream_type,
+                          )
+                        "
                         name="crossLinking"
                         icon="link"
                         :label="t('crossLinks.header')"
@@ -507,12 +499,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       row-key="name"
                       selection="multiple"
                       :selected-ids="selectedSchemaIds"
+                      :is-row-selectable="isSchemaRowSelectable"
                       @update:selected-ids="handleSchemaSelectedIdsUpdate"
                       @selection-change="handleSchemaSelectionChange"
                       pagination="client"
                       :page-size="selectedPerPage"
                       :page-size-options="perPageOptionsList"
                       :show-global-filter="false"
+                      :default-columns="false"
                       dense
                       class="o2-schema-table"
                       :style="{ height: '100%', width: '100%' }"
@@ -521,12 +515,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <div class="tw:flex tw:items-center">
                           <span class="field-name-text" :data-test="`schema-field-name-cell-${row.name}`">
                             {{ row.name }}
-                            <OTooltip
-                              v-if="row.name.length > 30"
-                              class="tw:text-[12px]"
-                            >
-                              {{ row.name }}
-                            </OTooltip>
                           </span>
                           <span
                             v-if="isEnvQuickModeField(row.name)"
@@ -759,6 +747,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :page-size="selectedPerPage"
                         :page-size-options="perPageOptionsList"
                         :show-global-filter="false"
+                        :default-columns="false"
                         dense
                         :class="
                           store.state.theme == 'dark'
@@ -770,15 +759,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </div>
                 </div>
-
-                <!-- LLM Evaluation tab -->
-                <LlmEvaluationSettings
-                  v-if="activeMainTab == 'llmEvaluation'"
-                  ref="llmEvalSettingsRef"
-                  :stream-name="indexData.name"
-                  :stream-fields="llmEvalStreamFields"
-                  @dirty="llmEvalFormDirty = true"
-                />
 
                 <!-- cross-linking tab -->
                 <div v-if="activeMainTab == 'crossLinking'">
@@ -808,32 +788,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <!-- floating footer for the table -->
                 <div class="floating-buttons tw:flex-shrink-0 tw:px-2 tw:py-1">
-                  <!-- LLM Evaluation tab footer -->
                   <div
-                    v-if="activeMainTab === 'llmEvaluation'"
-                    class="tw:flex tw:items-center tw:justify-end tw:gap-2"
-                  >
-                    <OButton
-                      data-test="schema-cancel-button"
-                      variant="outline"
-                      size="sm-action"
-                      @click="llmEvalFormDirty = false; $emit('close')"
-                    >
-                      {{ t("logStream.cancel") }}
-                    </OButton>
-                    <OButton
-                      :disabled="!llmEvalFormDirty"
-                      data-test="schema-update-settings-button"
-                      variant="primary"
-                      size="sm-action"
-                      @click="llmEvalSettingsRef?.save()"
-                    >
-                      {{ t("logStream.updateSettings") }}
-                    </OButton>
-                  </div>
-
-                  <div
-                    v-else-if="indexData.schema.length > 0"
+                    v-if="indexData.schema.length > 0"
                     class="tw:flex tw:items-center tw:justify-between"
                   >
                     <div class="tw:flex tw:items-center tw:gap-2">
@@ -1021,6 +977,7 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import { COL } from "@/lib/core/Table/OTable.types";
 import CrossLinkManager from "@/components/cross-linking/CrossLinkManager.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
@@ -1029,7 +986,6 @@ import DateTime from "@/components/DateTime.vue";
 import AssociatedRegexPatterns from "./AssociatedRegexPatterns.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import PerformanceFieldsDialog from "./PerformanceFieldsDialog.vue";
-import LlmEvaluationSettings from "./LlmEvaluationSettings.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
@@ -1041,6 +997,7 @@ import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import { isCrossLinkingEnabledForStream } from "@/utils/crossLinking";
 
 const defaultValue: any = () => {
   return {
@@ -1078,7 +1035,6 @@ export default defineComponent({
     AssociatedRegexPatterns,
     ODrawer,
     PerformanceFieldsDialog,
-    LlmEvaluationSettings,
     CrossLinkManager,
     OButton,
     OIcon,
@@ -1133,14 +1089,6 @@ export default defineComponent({
     let previousSchemaVersion: any = null;
     const approxPartition = ref(false);
 
-    const llmEvalStreamFields = computed(() =>
-      (indexData.value.schema || []).map((f: any) => ({
-        label: f.name,
-        value: f.name,
-      })),
-    );
-    const llmEvalSettingsRef = ref<any>(null);
-    const llmEvalFormDirty = ref(false);
     const streamCrossLinks = ref<any[]>([]);
     const orgCrossLinks = computed(
       () =>
@@ -1220,6 +1168,15 @@ export default defineComponent({
       },
     });
 
+    // The _timestamp and allFields rows are never part of the selection (they
+    // are filtered out below). Tell the table they are non-selectable so the
+    // header "Select All" toggle only considers real rows — otherwise it can
+    // never reach a fully-selected state and stays stuck in select-only mode,
+    // breaking deselect-all.
+    const isSchemaRowSelectable = (row: any) =>
+      row.name !== store.state.zoConfig.timestamp_column &&
+      row.name !== allFieldsName.value;
+
     const handleSchemaSelectedIdsUpdate = (ids: string[]) => {
       selectedSchemaIds.value = ids;
     };
@@ -1275,7 +1232,7 @@ export default defineComponent({
       },
       {
         value: "allFields",
-        label: `${computedSchemaFieldsName.value} (${indexData.value.schema.length})`,
+        label: `${computedSchemaFieldsName} (${indexData.value.schema.length})`,
         disabled: false,
         hide: false,
       },
@@ -1292,15 +1249,8 @@ export default defineComponent({
         disabled: false,
       },
     ]);
-    //here we are making the schema field name dynamic based on the user defined schema
-    //1. if there is UDS the it should be other fields
-    //2. if there is no UDS then it should be all fields
-    const computedSchemaFieldsName = computed(() => {
-      if (!hasUserDefinedSchema.value) {
-        return "All Fields";
-      }
-      return "Other Fields";
-    });
+    // here we are setting the schema field name always be "All Fields"
+    const computedSchemaFieldsName =  "All Fields";
 
     const streamIndexType = [
       { label: "Full text search", value: "fullTextSearchKey" },
@@ -2004,12 +1954,14 @@ export default defineComponent({
         header: t("logStream.propertyName"),
         accessorKey: "name",
         sortable: true,
-        meta: { align: "left" },
+        size: COL.name,
+        meta: { align: "left", autoWidth: true },
       },
       {
         id: "settings",
         accessorFn: (row: any) => (row.isUserDefined ? 0 : 1),
         sortable: true,
+        size: COL.method,
         meta: { align: "left" },
       },
       {
@@ -2017,6 +1969,7 @@ export default defineComponent({
         header: t("logStream.propertyType"),
         accessorKey: "type",
         sortable: true,
+        size: COL.type,
         meta: { align: "left" },
       },
       {
@@ -2024,6 +1977,7 @@ export default defineComponent({
         header: t("logStream.indexType"),
         accessorKey: "index_type",
         sortable: false,
+        size: 220,
         meta: { align: "left" },
       },
       // Only show patterns column for enterprise builds
@@ -2034,6 +1988,7 @@ export default defineComponent({
               header: t("logStream.regexPatterns"),
               accessorKey: "patterns",
               sortable: false,
+              size: COL.template,
               meta: { align: "left" },
             },
           ]
@@ -2046,13 +2001,15 @@ export default defineComponent({
         header: t("logStream.extendedStartDate"),
         accessorKey: "start",
         sortable: true,
-        meta: { align: "left" },
+        size: COL.date,
+        meta: { align: "left", autoWidth: true },
       },
       {
         id: "end",
         header: t("logStream.extendedEndDate"),
         accessorKey: "end",
         sortable: true,
+        size: COL.date,
         meta: { align: "left" },
       },
     ];
@@ -2092,7 +2049,6 @@ export default defineComponent({
 
     const updateActiveMainTab = (tab) => {
       activeMainTab.value = tab;
-      if (tab !== "llmEvaluation") llmEvalFormDirty.value = false;
     };
 
     // Function to get missing FTS and Secondary Index fields
@@ -2646,6 +2602,7 @@ export default defineComponent({
       dateChangeValue,
       isCloud,
       indexData,
+      isCrossLinkingEnabledForStream,
       getSchema,
       onSubmit,
       updateSettingsForm,
@@ -2701,6 +2658,7 @@ export default defineComponent({
       perPageOptionsList,
       filteredSchemaData,
       selectedSchemaIds,
+      isSchemaRowSelectable,
       handleSchemaSelectedIdsUpdate,
       handleSchemaSelectionChange,
       selectedDateIds,
@@ -2748,9 +2706,6 @@ export default defineComponent({
       quickModeIcon,
       getConfigIcon,
       getTimelineIcon,
-      llmEvalStreamFields,
-      llmEvalSettingsRef,
-      llmEvalFormDirty,
     };
   },
   created() {

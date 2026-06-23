@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:m-3" :key="rumToken">
+  <div class="tw:m-3 tw:mt-1" :key="rumToken">
     <div v-if="rumToken">
       <div class="tw:text-xl tw:font-semibold tw:mt-1" data-test="rumweb-title-text">
         {{ t("ingestion.npmStepTitle") }}
@@ -112,7 +112,14 @@ openobserveRum.init({
   trackUserInteractions: true,
   apiVersion: options.apiVersion,
   insecureHTTP: options.insecureHTTP,
-  defaultPrivacyLevel: 'allow' // 'allow' or 'mask-user-input' or 'mask'. Use one of the 3 values.
+  defaultPrivacyLevel: 'allow', // 'allow' or 'mask-user-input' or 'mask'. Use one of the 3 values.
+  // Enables end-to-end trace correlation from RUM to backend services by injecting tracing headers into matched outgoing requests.
+  allowedTracingUrls: [
+    {
+      match: 'https://your-api-domain.com/api', // Match URL pattern — supports string, RegExp (/\/api\/.*/), or function ((url) => url.includes('/api'))
+      propagatorTypes: ['openobserve', 'tracecontext'], // Header formats: 'openobserve' for x-openobserve-* headers, 'tracecontext' for W3C traceparent
+    },
+  ],
   sessionSampleRate: 100, // Track 100% of sessions
   sessionReplaySampleRate: 50, // Record 50% of sessions
 });

@@ -17,9 +17,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="tw:flex tw:flex-col tw:h-full">
     <div
-      class="tw:flex tw:justify-start tw:items-center tw:pl-3 tw:pr-2 tw:h-[2rem] tw:border-b tw:border-solid tw:border-b-[var(--o2-border-color)]"
+      class="tw:flex tw:justify-start tw:items-center tw:pl-3 tw:pr-2 tw:h-[2rem] tw:border-b tw:border-solid tw:border-b-[var(--o2-border-color)] tw:bg-surface-panel"
       data-test="trace-details-sidebar-header"
-      :class="store.state.theme === 'dark' ? 'tw:bg-gray-700' : 'tw:bg-gray-100'"
     >
       <div
         :title="span.operation_name"
@@ -166,18 +165,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- View Logs Button -->
           <span v-if="parentMode === 'standalone'" class="tw:shrink-0">
-            <OButton
-              variant="outline"
-              size="xs"
-              class="tw:h-full tw:text-[0.75rem]!"
-              :title="(config.isEnterprise === 'true' && correlationLoading) ? t('correlation.loadingCorrelation') : t('traces.viewLogs')"
-              :disabled="config.isEnterprise === 'true' && correlationLoading"
-              :loading="config.isEnterprise === 'true' && correlationLoading"
-              @click.stop="viewSpanLogs"
-              data-test="trace-details-sidebar-header-toolbar-view-logs-btn"
+            <!-- Single button with wrapper for tooltip functionality -->
+            <span
+              class="tw:inline-block"
+              tabindex="0"
             >
-              View Logs
-            </OButton>
+              <OButton
+                variant="outline"
+                size="xs"
+                class="tw:h-full tw:text-[0.75rem]!"
+                :disabled="isViewLogsDisabled"
+                :loading="config.isEnterprise === 'true' && correlationLoading"
+                @click.stop="viewSpanLogs"
+                data-test="trace-details-sidebar-header-toolbar-view-logs-btn"
+              >
+                View Logs
+              </OButton>
+              <OTooltip :content="viewLogsTooltipContent" />
+            </span>
           </span>
         </div>
       </div>
@@ -760,6 +765,9 @@ class="tw:h-5! tw:text-[0.75rem]!">
             :service-name="correlationProps.serviceName"
             :matched-dimensions="correlationProps.matchedDimensions"
             :additional-dimensions="correlationProps.additionalDimensions"
+            :matched-set-id="correlationProps.matchedSetId"
+            :chip-dimensions="correlationProps.chipDimensions"
+            :source-event="correlationProps.sourceEvent"
             :log-streams="correlationProps.logStreams"
             :source-stream="correlationProps.sourceStream"
             :source-type="correlationProps.sourceType"
@@ -789,7 +797,7 @@ class="tw:h-5! tw:text-[0.75rem]!">
               />
               <div
                 v-else-if="correlationError"
-                class="tw:text-[0.875rem] tw:font-bold tw:text-red-500"
+                class="tw:text-[0.875rem] tw:font-bold"
               >
                 {{ correlationError }}
               </div>
@@ -847,7 +855,7 @@ class="tw:h-5! tw:text-[0.75rem]!">
               />
               <div
                 v-else-if="correlationError"
-                class="tw:text-[0.875rem] tw:font-bold tw:text-red-500"
+                class="tw:text-[0.875rem] tw:font-bold"
               >
                 {{ correlationError }}
               </div>
@@ -871,12 +879,13 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import { cloneDeep } from "lodash-es";
 import { formatTimestamp, formatTimestampNs } from "@/utils/date";
 import { copyToClipboard } from "@/utils/clipboard";
 import { toggleFullscreen as domToggleFullScreen } from "@/utils/dom";
-import { defineComponent, onBeforeMount, ref, watch, type Ref } from "vue";
+import { defineComponent, onBeforeMount, ref, watch, type Ref, inject } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { computed } from "vue";
@@ -893,6 +902,7 @@ import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 import JsonPreview from "@/components/JsonPreview.vue";
 import CorrelatedLogsTable from "@/plugins/correlation/CorrelatedLogsTable.vue";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
+import { buildChipDimensionsFromFilters } from "@/services/service_streams";
 import { buildWorkloadChipDimensions } from "@/composables/useMetricSubjectButtons";
 import { normalizeSeverity } from "@/utils/sourceEventSeverity";
 import type { TelemetryContext } from "@/utils/telemetryCorrelation";
@@ -929,6 +939,12 @@ import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { resolveSpanIdentity } from "@/utils/traces/spanIdentity";
+import {
+  TRACE_SERVICE_DETECTION_KEY,
+  useSpanServiceDetection,
+} from "@/utils/traces/useSpanServiceDetection";
+import { getOrSetServiceColor } from "@/utils/traces/serviceColorRegistry";
 
 export default defineComponent({
   name: "TraceDetailsSidebar",
@@ -961,6 +977,14 @@ export default defineComponent({
       type: String,
       default: "attributes",
     },
+    selectedLogStreams: {
+      type: Array,
+      default: () => [],
+    },
+    showLogStreamSelector: {
+      type: Boolean,
+      default: false,
+    },
   },
   components: {
     OSeparator,
@@ -972,6 +996,7 @@ export default defineComponent({
     OToggleGroupItem,
     OButton,
     OIcon,
+    OTooltip,
     OCollapsible,
     LogsHighLighting,
     JsonPreview,
@@ -1003,6 +1028,8 @@ export default defineComponent({
     "update:activeTab",
   ],
   setup(props, { emit }) {
+    const serviceDetectionConfig = inject(TRACE_SERVICE_DETECTION_KEY, ref(null));
+    const { resolveSpanIdentity } = useSpanServiceDetection(serviceDetectionConfig);
     const { t } = useI18n();
     // Check if this is an LLM span to set default tab
     const isLLMSpan = computed(() => isLLMTrace(props.span));
@@ -1253,6 +1280,41 @@ export default defineComponent({
 
     // Get current theme from store
     const isDarkMode = computed(() => store.state.theme === "dark");
+
+    // Check if View Logs button should be disabled
+    const isViewLogsDisabled = computed(() => {
+      // Enterprise loading state
+      if (config.isEnterprise === 'true' && correlationLoading.value) {
+        return true;
+      }
+
+      // Non-enterprise mode with visible log stream selector, disable when no streams are selected
+      return (
+        config.isEnterprise !== "true" &&
+        props.showLogStreamSelector &&
+        props.selectedLogStreams.length === 0
+      );
+    });
+
+    // Get tooltip content based on disabled state
+    const viewLogsTooltipContent = computed(() => {
+      // Enterprise loading state
+      if (config.isEnterprise === 'true' && correlationLoading.value) {
+        return t('correlation.loadingCorrelation');
+      }
+
+      // Non-enterprise mode with no log streams selected
+      if (
+        config.isEnterprise !== "true" &&
+        props.showLogStreamSelector &&
+        props.selectedLogStreams.length === 0
+      ) {
+        return t('search.selectLogsStreamFirst');
+      }
+
+      // Default enabled state
+      return t('traces.viewLogs');
+    });
 
     const eventColumns = ref([
       {
@@ -1681,12 +1743,10 @@ export default defineComponent({
       correlationError.value = null;
 
       try {
-        // Ensure org semantic groups are loaded — buildWorkloadChipDimensions
-        // walks them to populate Pod/Node chips.
         try {
           await loadSemanticGroups();
         } catch {
-          // Non-fatal: workload chips degrade to matched/additional only.
+          // Non-fatal: semantic groups are used for metrics tab label resolution.
         }
 
         // Build telemetry context from span
@@ -1765,13 +1825,8 @@ export default defineComponent({
             additionalDimensions: {},
             matchedSetId: correlationData.matched_set_id,
             chipDimensions: {
-              ...(correlationData.matched_dimensions || {}),
-              ...(correlationData.additional_dimensions || {}),
-              ...buildWorkloadChipDimensions(
-                correlationData.matched_set_id,
-                semanticGroups.value,
-                props.span as Record<string, any>,
-              ),
+              ...buildChipDimensionsFromFilters(correlationData, semanticGroups.value),
+              ...buildWorkloadChipDimensions(correlationData.matched_set_id, semanticGroups.value, props.span as Record<string, any>),
             },
             sourceEvent: {
               timestamp: props.span?.start_time,
@@ -1984,7 +2039,9 @@ export default defineComponent({
       getServiceIconDataUrl(
         props.span?.service_name ?? "",
         store.state.theme === "dark",
-        searchObj.meta.serviceColors?.[props.span?.service_name] ?? "#9e9e9e",
+        props.span
+          ? getOrSetServiceColor(resolveSpanIdentity(props.span))
+          : "#9e9e9e",
       ),
     );
 
@@ -2071,6 +2128,8 @@ export default defineComponent({
       isFullscreen,
       toggleFullscreen,
       isDarkMode,
+      isViewLogsDisabled,
+      viewLogsTooltipContent,
       serviceIconUrl,
       getImageURL,
       copyContentToClipboard,

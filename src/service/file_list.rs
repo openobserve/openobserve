@@ -119,7 +119,10 @@ pub async fn query_by_ids(
         (Vec::with_capacity(ids.len()), ids_set)
     } else {
         let start = std::time::Instant::now();
-        let cached_files = match infra_file_list::LOCAL_CACHE.query_by_ids(ids).await {
+        let cached_files = match infra_file_list::LOCAL_CACHE
+            .query_by_ids(ids, time_range)
+            .await
+        {
             Ok(files) => files,
             Err(e) => {
                 log::error!("[trace_id {trace_id}] file_list query cache failed: {e:?}");
@@ -163,7 +166,7 @@ pub async fn query_by_ids(
     // 2. query from remote db
     let start = std::time::Instant::now();
     let ids: Vec<_> = ids_set.iter().cloned().collect();
-    let mut db_files = infra_file_list::query_by_ids(&ids).await?;
+    let mut db_files = infra_file_list::query_by_ids(&ids, time_range).await?;
     log::info!(
         "{}",
         search_inspector_fields(
@@ -353,7 +356,7 @@ mod tests {
                 bloom_ver: 0,
             },
             deleted: false,
-            segment_ids: None,
+            selection: None,
             row_group_size: None,
         }
     }

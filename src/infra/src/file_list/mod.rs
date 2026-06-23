@@ -70,7 +70,7 @@ pub trait FileList: Sync + Send + 'static {
     async fn update_flattened(&self, file: &str, flattened: bool) -> Result<()>;
     async fn update_compressed_size(&self, file: &str, size: i64) -> Result<()>;
     /// Bulk-set `bloom_ver` for the given file_list ids. Used by the
-    /// post-merge bloom builder (see `service::compact::bloom_build`).
+    /// post-merge bloom builder (enterprise `bloom::compact`).
     /// Empty `ids` is a no-op.
     async fn update_bloom_ver(&self, ids: &[i64], bloom_ver: i64) -> Result<()>;
     /// Is `bloom_ver` still referenced by at least one live file_list row in
@@ -118,7 +118,11 @@ pub trait FileList: Sync + Send + 'static {
         stream_name: &str,
         date: &str,
     ) -> Result<Vec<FileKey>>;
-    async fn query_by_ids(&self, ids: &[i64]) -> Result<Vec<FileKey>>;
+    async fn query_by_ids(
+        &self,
+        ids: &[i64],
+        time_range: Option<(i64, i64)>,
+    ) -> Result<Vec<FileKey>>;
     async fn query_ids(
         &self,
         org_id: &str,
@@ -411,11 +415,11 @@ pub async fn query_for_bloom(
 
 #[inline]
 #[tracing::instrument(name = "infra:file_list:query_db_by_ids", skip_all)]
-pub async fn query_by_ids(ids: &[i64]) -> Result<Vec<FileKey>> {
+pub async fn query_by_ids(ids: &[i64], time_range: Option<(i64, i64)>) -> Result<Vec<FileKey>> {
     if ids.is_empty() {
         return Ok(Vec::default());
     }
-    CLIENT.query_by_ids(ids).await
+    CLIENT.query_by_ids(ids, time_range).await
 }
 
 #[inline]
@@ -755,7 +759,7 @@ impl From<&FileRecord> for FileKey {
             key: "files/".to_string() + &r.stream + "/" + &r.date + "/" + &r.file,
             meta: r.into(),
             deleted: r.deleted,
-            segment_ids: None,
+            selection: None,
             row_group_size: None,
         }
     }
@@ -1004,7 +1008,7 @@ mod tests {
             "files/default/logs/nginx/2024-01-15/chunk001.parquet"
         );
         assert!(!key.deleted);
-        assert!(key.segment_ids.is_none());
+        assert!(key.selection.is_none());
         assert_eq!(key.meta.min_ts, 100);
         assert_eq!(key.meta.max_ts, 200);
     }

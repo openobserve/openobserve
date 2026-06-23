@@ -220,10 +220,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   "
                   :class="[
                     'resizer',
-                    'tw:hover:bg-[var(--o2-border-color)]',
+                    'tw:bg-[var(--o2-border-color)]!',
                     header.column.getIsResizing() ? 'isResizing' : '',
                   ]"
-                  class="tw:right-0 tw:bg-transparent"
+                  class="tw:right-0 tw:absolute tw:w-1 tw:h-full tw:cursor-col-resize"
                 />
                 <div
                   v-if="!header.isPlaceholder"
@@ -304,8 +304,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </th>
           </vue-draggable>
 
-          <!-- Loading row: shown when there are no rows yet (initial fetch) -->
-          <tr v-if="loading && tableRows.length === 0" class="tw:w-full">
+          <!-- Loading row: only rendered when the parent supplies a custom
+            #loading slot. With no slot, the shimmer skeleton <tbody> below
+            takes over (initial fetch). -->
+          <tr
+            v-if="loading && tableRows.length === 0 && $slots.loading"
+            class="tw:w-full"
+          >
             <td
               :colspan="columnOrder.length"
               class="tw:font-bold"
@@ -315,18 +320,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 opacity: 0.7,
               }"
             >
-              <slot name="loading">
-                <div
-                  class="tw:text-sm tw:font-medium text-weight-bold tw:flex tw:items-center"
-                >
-                  <OSpinner size="xs" data-test="tenstack-table-loading-indicator" />
-                  {{ t("confirmDialog.loading") }}
-                </div>
-              </slot>
+              <slot name="loading" />
             </td>
           </tr>
           <!-- Loading banner: shown above rows while a new page is fetching -->
-          <tr v-if="loading && tableRows.length > 0" class="tw:w-full">
+          <tr v-if="loading && tableRows.length > 0 && $slots['loading-banner']" class="tw:w-full">
             <td :colspan="columnOrder.length">
               <slot name="loading-banner" />
             </td>
@@ -392,6 +390,58 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </td>
           </tr>
         </thead>
+
+        <!-- Skeleton loading body — shimmer placeholder shown on initial fetch
+          when the parent does not provide a custom #loading slot. Mirrors the
+          logs TenstackTable pattern. -->
+        <tbody
+          v-if="loading && !$slots.loading"
+          data-test="tenstack-table-skeleton-body"
+          aria-busy="true"
+          aria-label="Loading"
+        >
+          <!-- Rows use tw:flex to align with the real virtual/data rows. -->
+          <tr
+            v-for="r in SKEL_ROW_COUNT"
+            :key="`skel-${r}`"
+            class="o2-skel-row tw:flex tw:items-center tw:w-full"
+            :style="{ animationDelay: `${(r - 1) * 40}ms` }"
+          >
+            <!-- No columns yet (first paint) — full-width shimmer bar -->
+            <td
+              v-if="!headers?.length"
+              class="tw:w-full tw:px-4 tw:overflow-hidden"
+            >
+              <span
+                class="o2-skel-pill tw:inline-block tw:h-3 tw:rounded-md"
+                :style="{ width: `${skelCellWidth(r - 1, 0)}%` }"
+                aria-hidden="true"
+              />
+            </td>
+            <!-- Columns available — per-column aligned shimmer pills -->
+            <template v-else>
+              <td
+                v-for="(header, c) in headers"
+                :key="header.id"
+                class="tw:px-2 tw:overflow-hidden"
+                :class="c === 0 ? 'tw:pl-4' : ''"
+                :style="skelTdStyle(header, c)"
+              >
+                <span
+                  class="o2-skel-pill tw:inline-block tw:h-3 tw:rounded-md"
+                  :style="{
+                    width:
+                      c === 0
+                        ? `${SKEL_TIMESTAMP_PX}px`
+                        : `${skelCellWidth(r - 1, c)}%`,
+                  }"
+                  aria-hidden="true"
+                />
+              </td>
+            </template>
+          </tr>
+        </tbody>
+
         <!-- tw:relative is only needed for virtual-scroll absolute rows (logs/traces).
           In dashboard mode (regular DOM rows) it must be absent so that
           position:sticky on <thead> works correctly. -->
@@ -1063,7 +1113,6 @@ import {
   PIVOT_TABLE_ROW_KEY_SEPARATOR,
 } from "@/utils/dashboard/constants";
 import JsonFieldRenderer from "@/components/dashboards/panels/JsonFieldRenderer.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 export interface StreamField {
   name: string;
@@ -1837,6 +1886,29 @@ const headerGroups = computed(() => table?.getHeaderGroups()[0]);
 
 const headers = computed(() => headerGroups.value.headers);
 
+// ── Skeleton loading helpers — mirrors the logs TenstackTable shimmer pattern ──
+const SKEL_ROW_COUNT = 30;
+const SKEL_BASE_WIDTHS = [55, 70, 60, 45, 65, 50, 75, 40, 58, 68, 48, 62];
+const SKEL_JITTER = [0, 6, -4, 3, -2, 5, -3, 2, -5, 4, -1, 6];
+// First column (timestamp): pill sized to "2026-06-02 12:09:00.349"
+// (23 chars × 7.2 px/char in monospace 12 px).
+const SKEL_TIMESTAMP_PX = Math.round("2026-06-02 12:09:00.349".length * 7.2);
+const skelCellWidth = (r: number, c: number): number => {
+  const base = SKEL_BASE_WIDTHS[c % SKEL_BASE_WIDTHS.length] ?? 60;
+  const jit = SKEL_JITTER[(r + c) % SKEL_JITTER.length] ?? 0;
+  return Math.max(25, Math.min(85, base + jit));
+};
+// Mirror the exact width/flex logic of the real cells so skeleton columns align.
+// Source column (width:'auto' in real rows) → flex:1 to fill remaining space.
+// All other columns: fixed width from the CSS variable (same as real rows).
+const skelTdStyle = (header: any, c: number): Record<string, string> => {
+  const colId = header.column.id;
+  const isStretchSource = colId === "source" && !header.column.getCanResize();
+  if (isStretchSource) return { flex: "1 1 0", minWidth: "0" };
+  const w = `calc(var(--col-${sanitizeCssId(colId)}-size) * 1px)`;
+  return { width: w, minWidth: w, flexShrink: "0" };
+};
+
 watch(
   () => headers.value,
   (newVal) => {
@@ -2369,6 +2441,67 @@ defineExpose({
   &.pivot-sort-active {
     opacity: 1 !important;
     color: var(--q-primary);
+  }
+}
+
+// ── Loading skeleton ─────────────────────────────────────────────
+.o2-skel-row {
+  opacity: 0;
+  animation: o2-skel-row-in 320ms ease-out forwards;
+  border-bottom: 1px solid var(--o2-tag-grey-1);
+  height: 1.75rem;
+}
+
+.o2-skel-pill {
+  // Light mode — grey-100 shimmer (matches logs/histogram skeletons)
+  background: linear-gradient(
+    90deg,
+    var(--color-grey-100) 0%,
+    rgba(255, 255, 255, 0.65) 50%,
+    var(--color-grey-100) 100%
+  );
+  background-size: 200% 100%;
+  animation: o2-skel-shimmer 1.5s ease-in-out infinite;
+
+  // Dark mode — grey-600 shimmer
+  .body--dark & {
+    background: linear-gradient(
+      90deg,
+      var(--color-grey-600) 0%,
+      rgba(255, 255, 255, 0.03) 50%,
+      var(--color-grey-600) 100%
+    );
+    background-size: 200% 100%;
+  }
+}
+
+@keyframes o2-skel-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+@keyframes o2-skel-row-in {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .o2-skel-row {
+    opacity: 1;
+    animation: none;
+  }
+  .o2-skel-pill {
+    animation: none;
   }
 }
 

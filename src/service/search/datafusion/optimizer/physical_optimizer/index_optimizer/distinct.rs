@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashSet, sync::Arc};
+use std::sync::Arc;
 
 use config::meta::inverted_index::IndexOptimizeMode;
 use datafusion::{
@@ -27,6 +27,7 @@ use datafusion::{
         projection::ProjectionExec, sorts::sort_preserving_merge::SortPreservingMergeExec,
     },
 };
+use hashbrown::HashSet;
 
 use crate::service::search::datafusion::optimizer::physical_optimizer::{
     index_optimizer::utils::is_complex_plan,
@@ -81,7 +82,7 @@ impl<'n> TreeNodeVisitor<'n> for SimpleDistinctVisitor {
     type Node = Arc<dyn ExecutionPlan>;
 
     fn f_down(&mut self, node: &'n Self::Node) -> Result<TreeNodeRecursion> {
-        if let Some(sort_merge) = node.as_any().downcast_ref::<SortPreservingMergeExec>() {
+        if let Some(sort_merge) = node.downcast_ref::<SortPreservingMergeExec>() {
             if let Some(fetch) = sort_merge.fetch()
                 && fetch > 0
                 && sort_merge.expr().len() == 1
@@ -98,7 +99,7 @@ impl<'n> TreeNodeVisitor<'n> for SimpleDistinctVisitor {
             // if not simple distinct, stop visiting
             self.simple_distinct = None;
             return Ok(TreeNodeRecursion::Stop);
-        } else if let Some(aggregate) = node.as_any().downcast_ref::<AggregateExec>() {
+        } else if let Some(aggregate) = node.downcast_ref::<AggregateExec>() {
             // check if the group by is simple distinct,
             // only one group by field, no aggregate function
             if aggregate.group_expr().expr().len() == 1
@@ -121,7 +122,7 @@ impl<'n> TreeNodeVisitor<'n> for SimpleDistinctVisitor {
             // if not simple distinct, stop visiting
             self.simple_distinct = None;
             return Ok(TreeNodeRecursion::Stop);
-        } else if let Some(projection) = node.as_any().downcast_ref::<ProjectionExec>() {
+        } else if let Some(projection) = node.downcast_ref::<ProjectionExec>() {
             // Check ProjectionExec for the structure: [index_field]
             let exprs = projection.expr();
             if exprs.len() == 1 {
@@ -132,7 +133,7 @@ impl<'n> TreeNodeVisitor<'n> for SimpleDistinctVisitor {
             // If projection doesn't have exactly 2 expressions, stop visiting
             self.simple_distinct = None;
             return Ok(TreeNodeRecursion::Stop);
-        } else if let Some(filter) = node.as_any().downcast_ref::<FilterExec>() {
+        } else if let Some(filter) = node.downcast_ref::<FilterExec>() {
             let predicate = filter.predicate();
             let exprs = split_conjunction(predicate);
             if exprs.len() == 2 && is_only_timestamp_filter(&exprs) {
@@ -158,7 +159,7 @@ impl<'n> TreeNodeVisitor<'n> for SimpleDistinctVisitor {
 }
 
 fn is_simple_str_match(expr: &Arc<dyn PhysicalExpr>) -> Option<String> {
-    if let Some(func) = expr.as_any().downcast_ref::<ScalarFunctionExpr>()
+    if let Some(func) = expr.downcast_ref::<ScalarFunctionExpr>()
         && func.fun().name().to_lowercase() == "str_match"
         && func.args().len() == 2
     {

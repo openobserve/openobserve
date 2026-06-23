@@ -10,7 +10,7 @@ export class AlertTemplatesPage {
         this.alertDestinationsPage = new AlertDestinationsPage(page);
         
         // Navigation locators
-        this.settingsMenuItem = '[data-test="menu-link-settings-item"]';
+        this.settingsMenuItem = '[data-test="menu-link-/settings-item"]';
         this.templatesTab = '[data-test="alert-templates-tab"]';
         
         // Template creation locators
@@ -326,11 +326,11 @@ export class AlertTemplatesPage {
         try {
             await Promise.race([
                 this.page.locator(this.tableLocator).waitFor({ state: 'visible', timeout: 30000 }),
-                this.page.getByText('No data available').waitFor({ state: 'visible', timeout: 30000 })
+                this.page.locator('[data-test="o2-empty-state"]').waitFor({ state: 'visible', timeout: 30000 })
             ]);
         } catch (error) {
-            testLogger.error('Neither table nor no data message found after template search', { templateName, error: error.message });
-            throw new Error(`Failed to search for template "${templateName}": Neither table nor "No data available" message appeared`);
+            testLogger.error('Neither table nor empty state found after template search', { templateName, error: error.message });
+            throw new Error(`Failed to search for template "${templateName}": Neither table nor empty state appeared`);
         }
 
         // Verify template exists before deletion
@@ -357,7 +357,7 @@ export class AlertTemplatesPage {
         await this.page.waitForTimeout(2000); // Wait for search to complete
 
         // Verify no results found
-        await expect(this.page.getByText('No data available')).toBeVisible();
+        await expect(this.page.locator('[data-test="o2-empty-state"]')).toBeVisible();
     }
 
     /**
@@ -909,7 +909,7 @@ export class AlertTemplatesPage {
      */
     async hasTemplates() {
         try {
-            const noData = await this.page.getByText('No data available').isVisible({ timeout: 2000 });
+            const noData = await this.page.locator('[data-test="o2-empty-state"]').isVisible({ timeout: 2000 });
             if (noData) {
                 testLogger.debug('No templates found');
                 return false;

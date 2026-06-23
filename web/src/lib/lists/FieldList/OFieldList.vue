@@ -26,7 +26,7 @@
     <div ref="scrollContainerRef" class="o-field-list__body" @scroll="onScroll">
       <!-- Loading state -->
       <div
-        v-if="loading && paginatedFields.length === 0"
+        v-if="loading"
         class="o-field-list__loading"
       >
         <slot name="loading" />
@@ -34,13 +34,14 @@
 
       <!-- Empty state -->
       <div
-        v-else-if="!loading && paginatedFields.length === 0"
+        v-else-if="paginatedFields.length === 0"
         class="o-field-list__empty"
       >
         <slot name="empty" />
       </div>
 
-      <!-- Field rows -->
+      <!-- Field rows (hidden while loading) -->
+      <template v-if="!loading">
       <template
         v-for="row in paginatedFields"
         :key="rowKey ? row[rowKey] : row.name"
@@ -109,6 +110,7 @@
           <slot name="expansion" :row="row" />
         </div>
       </template>
+      </template><!-- end v-if="!loading" -->
     </div>
 
     <!-- After-list slot (pagination, toggles, etc.) -->
@@ -398,7 +400,10 @@ defineExpose({ scrollToTop });
     min-height: 0;
   }
 
-  &__loading,
+  &__loading {
+    width: 100%;
+  }
+
   &__empty {
     display: flex;
     align-items: center;
@@ -474,7 +479,7 @@ defineExpose({ scrollToTop });
   &__field-content {
     display: flex;
     align-items: center;
-    gap: 0.5rem; // breathing room between drag handle, type icon, and field name
+    gap: 0.25rem; // breathing room between drag handle, type icon, and field name
     min-width: 0;
     flex: 1;
   }
@@ -555,7 +560,6 @@ defineExpose({ scrollToTop });
   &__expansion {
     width: 100%;
     padding: 0.25rem 0 0.375rem;
-    background-color: var(--color-field-list-expansion-bg);
     border: 1px solid var(--color-field-list-expansion-border);
     border-top: none;
     border-radius: 0 0 0.1875rem 0.1875rem;

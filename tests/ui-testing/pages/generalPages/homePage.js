@@ -1,5 +1,6 @@
 // homePage.js - Landing Page Object for OpenObserve
 import { expect } from '@playwright/test';
+import { openNavFlyoutChild } from '../commonActions.js';
 
 export class HomePage {
     constructor(page) {
@@ -14,9 +15,7 @@ export class HomePage {
         this.dashboardsMenu = page.locator('[data-test="menu-link-\\/dashboards-item"]');
         this.streamsMenu = page.locator('[data-test="menu-link-\\/streams-item"]');
         this.alertsMenu = page.locator('[data-test="menu-link-\\/alerts-item"]');
-        this.ingestionMenu = page.locator('[data-test="menu-link-\\/ingestion-item"]');
         this.iamMenu = page.locator('[data-test="menu-link-\\/iam-item"]');
-        this.reportsMenu = page.locator('[data-test="menu-link-\\/reports-item"]');
 
         // ===== HEADER SELECTORS (VERIFIED) =====
         this.orgSelector = page.locator('[data-test="navbar-organizations-select"]');
@@ -35,7 +34,7 @@ export class HomePage {
         this.slackButton = page.locator('[data-test="menu-link-slack-item"]');
         this.helpButton = page.locator('[data-test="menu-link-help-item"]');
         this.aboutLink = page.locator('[data-test="menu-link-about-item"]');
-        this.settingsButton = page.locator('[data-test="menu-link-settings-item"]');
+        this.settingsButton = page.locator('[data-test="menu-link-/settings-item"]');
         this.profileIcon = page.locator('[data-test="header-my-account-profile-icon"]');
         this.languageDropdown = page.locator('[data-test="language-dropdown-item"]');
         this.themeManager = page.locator('[data-test="menu-link-predefined-themes-item"]');
@@ -119,8 +118,7 @@ export class HomePage {
     }
 
     async navigateToIngestion() {
-        await this.ingestionMenu.waitFor({ state: 'visible', timeout: 10000 });
-        await this.ingestionMenu.click();
+        await openNavFlyoutChild(this.page, 'ingestion');
         await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
     }
 
@@ -137,8 +135,7 @@ export class HomePage {
     }
 
     async navigateToReports() {
-        await this.reportsMenu.waitFor({ state: 'visible', timeout: 10000 });
-        await this.reportsMenu.click();
+        await openNavFlyoutChild(this.page, 'reports');
         await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
     }
 
@@ -162,7 +159,6 @@ export class HomePage {
         await expect(this.dashboardsMenu).toBeVisible();
         await expect(this.streamsMenu).toBeVisible();
         await expect(this.alertsMenu).toBeVisible();
-        await expect(this.ingestionMenu).toBeVisible();
     }
 
     async validateHeaderElementsVisible() {
@@ -804,7 +800,7 @@ export class HomePage {
      * Validate Settings - Cipher Keys page UI elements
      */
     async validateSettingsCipherKeysPageElements() {
-        await expect(this.page.locator('[data-test="cipher-keys-list-title"]')).toBeVisible({ timeout: 10000 });
+        await expect(this.page.locator('[data-test="cipher-keys-add-btn"]')).toBeVisible({ timeout: 10000 });
     }
 
     /**
@@ -825,7 +821,7 @@ export class HomePage {
      * Validate Settings - Sensitive Data Redaction page UI elements
      */
     async validateSettingsSensitiveDataRedactionPageElements() {
-        await expect(this.page.locator('[data-test="regex-pattern-list-title"]')).toBeVisible({ timeout: 10000 });
+        await expect(this.page.locator('[data-test="regex-pattern-list-table"]')).toBeVisible({ timeout: 10000 });
         await expect(this.page.locator('[data-test="regex-pattern-list-add-pattern-btn"]')).toBeVisible({ timeout: 5000 });
     }
 

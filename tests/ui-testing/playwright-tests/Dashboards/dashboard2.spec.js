@@ -41,6 +41,7 @@ test.describe("dashboard UI testcases", () => {
 
     // Select stream and fields
     await pm.chartTypeSelector.selectStream("e2e_automate");
+    await pm.chartTypeSelector.removeField("y_axis_1", "y");
     await pm.chartTypeSelector.searchAndAddField(
       "kubernetes_annotations_kubernetes_io_psp",
       "y"
@@ -89,6 +90,7 @@ test.describe("dashboard UI testcases", () => {
 
     // Select stream and fields
     await pm.chartTypeSelector.selectStream("e2e_automate");
+    await pm.chartTypeSelector.removeField("y_axis_1", "y");
     await pm.chartTypeSelector.searchAndAddField(
       "kubernetes_container_image",
       "y"
@@ -141,6 +143,7 @@ test.describe("dashboard UI testcases", () => {
     await pm.chartTypeSelector.selectStream("e2e_automate");
 
     // Add fields to the chart
+    await pm.chartTypeSelector.removeField("y_axis_1", "y");
     await pm.chartTypeSelector.searchAndAddField(
       "kubernetes_annotations_kubernetes_io_psp",
       "y"
@@ -207,6 +210,7 @@ test.describe("dashboard UI testcases", () => {
     await pm.chartTypeSelector.selectStream("e2e_automate");
 
     // Add fields to the chart
+    await pm.chartTypeSelector.removeField("y_axis_1", "y");
     await pm.chartTypeSelector.searchAndAddField(
       "kubernetes_annotations_kubernetes_io_psp",
       "y"
@@ -252,6 +256,7 @@ test.describe("dashboard UI testcases", () => {
     await pm.chartTypeSelector.selectStream("e2e_automate");
 
     // Add fields to the chart
+    await pm.chartTypeSelector.removeField("y_axis_1", "y");
     await pm.chartTypeSelector.searchAndAddField(
       "kubernetes_container_name",
       "y"
@@ -294,6 +299,7 @@ test.describe("dashboard UI testcases", () => {
     await pm.chartTypeSelector.selectStream("e2e_automate");
 
     // Add fields to the chart
+    await pm.chartTypeSelector.removeField("y_axis_1", "y");
     await pm.chartTypeSelector.searchAndAddField(
       "kubernetes_container_hash",
       "y"
@@ -346,6 +352,7 @@ test.describe("dashboard UI testcases", () => {
     await pm.chartTypeSelector.selectStream("e2e_automate");
 
     // Add fields to the chart
+    await pm.chartTypeSelector.removeField("y_axis_1", "y");
     await pm.chartTypeSelector.searchAndAddField(
       "kubernetes_container_image",
       "b"
@@ -380,6 +387,7 @@ test.describe("dashboard UI testcases", () => {
     await pm.chartTypeSelector.selectStream("e2e_automate");
 
     // Add fields to the chart
+    await pm.chartTypeSelector.removeField("y_axis_1", "y");
     await pm.chartTypeSelector.searchAndAddField(
       "kubernetes_container_hash",
       "y"
@@ -423,6 +431,7 @@ test.describe("dashboard UI testcases", () => {
     await pm.chartTypeSelector.selectStream("e2e_automate");
 
     // Add fields to the chart
+    await pm.chartTypeSelector.removeField("y_axis_1", "y");
     await pm.chartTypeSelector.searchAndAddField(
       "kubernetes_annotations_kubectl_kubernetes_io_default_container",
       "y"

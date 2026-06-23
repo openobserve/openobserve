@@ -1,7 +1,7 @@
 import { expect } from '@playwright/test';
 import {
   dateTimeButtonLocator, relative30SecondsButtonLocator, absoluteTabLocator,
-  Past30SecondsValue
+  Past30SecondsValue, openNavFlyoutChild
 } from '../commonActions.js';
 
 export class ReportsPage {
@@ -11,8 +11,6 @@ export class ReportsPage {
     // Navigation locators (data-test only). The MainLayout side-nav builds
     // each entry's data-test as `menu-link-${link}-item`, so the Home link
     // (`link: "/"`) becomes `menu-link-/-item` (escaped CSS: `menu-link-\\/-item`).
-    this.homeMenu = page.locator('[data-test="menu-link-\\/-item"]');
-    this.reportsMenu = page.locator('[data-test="menu-link-\\/reports-item"]');
     this.reportListTitle = page.locator('[data-test="report-list-title"]');
     this.reportListTable = page.locator('[data-test="report-list-table"]');
     this.scheduledTab = page.locator('[data-test="tab-shared"]');
@@ -122,14 +120,13 @@ export class ReportsPage {
   }
 
   async navigateToReports() {
-    await this.homeMenu.hover();
-    await this.reportsMenu.click({ force: true });
+    await openNavFlyoutChild(this.page, 'reports');
     await expect(this.reportListTitle).toContainText('Reports');
     await this.scheduledTab.click({ force: true });
   }
 
   async goToReports() {
-    await this.reportsMenu.click({ force: true });
+    await openNavFlyoutChild(this.page, 'reports');
     await expect(this.reportListTitle).toContainText('Reports');
   }
 
@@ -415,7 +412,7 @@ export class ReportsPage {
           const t = document.querySelector('[data-test="report-list-table"]');
           if (!t) return false;
           const text = t.textContent || '';
-          return /Showing \d+ - \d+/.test(text) || text.includes('No data available');
+          return /Showing \d+ - \d+/.test(text) || !!document.querySelector('[data-test="o2-empty-state"]');
         }, { timeout: 10000 });
         await this.reportSearchInputField.fill(reportName);
         return await btn.waitFor({ state: 'visible', timeout: 3000 }).then(() => true).catch(() => false);
@@ -486,7 +483,7 @@ export class ReportsPage {
   async notAvailableReport(reportName) {
     await this.reportSearchInputField.fill(reportName);
     await this.reportListTable.waitFor({ state: 'visible', timeout: 10000 });
-    await expect(this.reportListTable).toContainText('No data available');
+    await expect(this.page.locator('[data-test="o2-empty-state"]')).toBeVisible();
   }
 
 }

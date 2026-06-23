@@ -54,6 +54,12 @@ export interface DialogProps {
 
   // ── Inbuilt footer buttons ──────────────────────────────────────────────
 
+  /**
+   * When provided, the built-in primary button becomes type="submit" associated
+   * with this form id. Enables Enter-key submission for forms in the dialog body.
+   */
+  formId?: string;
+
   /** Label for the primary action button (right side). Omit to hide. */
   primaryButtonLabel?: string;
   /** Label for the secondary action button (right of neutral, left of primary). Omit to hide. */

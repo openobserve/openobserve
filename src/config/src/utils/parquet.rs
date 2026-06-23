@@ -13,10 +13,19 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{io::Cursor, path::PathBuf, pin::Pin, sync::Arc};
+use std::{
+    cmp::{max, min},
+    io::Cursor,
+    path::PathBuf,
+    pin::Pin,
+    sync::Arc,
+};
 
 #[cfg(feature = "vortex")]
-use arrow::{array::StructArray, datatypes::DataType};
+use arrow::{
+    array::StructArray,
+    datatypes::{DataType, Field},
+};
 use arrow::{error::ArrowError, record_batch::RecordBatch};
 use arrow_schema::Schema;
 #[cfg(feature = "vortex")]
@@ -30,7 +39,7 @@ use parquet::{
 #[cfg(feature = "vortex")]
 use vortex::{
     VortexSessionDefault,
-    array::{ArrayRef, arrow::IntoArrowArray},
+    array::{ArrayRef, VortexSessionExecute, arrow::ArrowSessionExt},
     buffer::Buffer,
     file::OpenOptionsSessionExt,
     io::session::RuntimeSessionExt,
@@ -42,6 +51,7 @@ use crate::{FileFormat, config::*, ider, meta::stream::FileMeta};
 pub fn new_parquet_writer<'a>(
     buf: &'a mut Vec<u8>,
     schema: &'a Arc<Schema>,
+    bloom_filter_fields: &'a [String],
     metadata: &'a FileMeta,
     write_metadata: bool,
     compression: Option<&str>,
@@ -75,6 +85,25 @@ pub fn new_parquet_writer<'a>(
             ),
         ]));
     }
+
+    // Bloom filter stored by row_group, set NDV to reduce the memory usage.
+    // In this link, it says that the optimal number of NDV is 1000, here we use rg_size / NDV_RATIO
+    // refer: https://www.influxdata.com/blog/using-parquets-bloom-filters/
+    let mut bf_ndv = min(metadata.records as u64, PARQUET_MAX_ROW_GROUP_SIZE as u64);
+    if bf_ndv > 1000 {
+        bf_ndv = max(1000, bf_ndv / 100);
+    }
+    if cfg.common.bloom_filter_parquet_enabled {
+        let mut fields = bloom_filter_fields.to_vec();
+        fields.sort();
+        fields.dedup();
+        for field in fields {
+            writer_props = writer_props
+                .set_column_bloom_filter_enabled(field.as_str().into(), true)
+                .set_column_bloom_filter_fpp(field.as_str().into(), DEFAULT_BLOOM_FILTER_FPP)
+                .set_column_bloom_filter_ndv(field.into(), bf_ndv); // take the field ownership
+        }
+    }
     let writer_props = writer_props.build();
     AsyncArrowWriter::try_new(buf, schema.clone(), Some(writer_props)).unwrap()
 }
@@ -82,10 +111,12 @@ pub fn new_parquet_writer<'a>(
 pub async fn write_recordbatch_to_parquet(
     schema: Arc<Schema>,
     record_batches: &[RecordBatch],
+    bloom_filter_fields: &[String],
     metadata: &FileMeta,
 ) -> Result<Vec<u8>, anyhow::Error> {
     let mut buf = Vec::new();
-    let mut writer = new_parquet_writer(&mut buf, &schema, metadata, true, None);
+    let mut writer =
+        new_parquet_writer(&mut buf, &schema, bloom_filter_fields, metadata, true, None);
     for batch in record_batches {
         writer.write(batch).await?;
     }
@@ -116,11 +147,15 @@ pub type RecordBatchStream = Pin<Box<dyn Stream<Item = Result<RecordBatch, Arrow
 /// Convert a single vortex [`ArrayRef`] to an Arrow [`RecordBatch`].
 #[cfg(feature = "vortex")]
 pub fn vortex_array_to_record_batch(
+    session: &VortexSession,
     array: ArrayRef,
     data_type: &DataType,
 ) -> Result<RecordBatch, ArrowError> {
-    let array = array
-        .into_arrow(data_type)
+    let mut ctx = session.create_execution_ctx();
+    let target = Field::new("", data_type.clone(), array.dtype().is_nullable());
+    let array = session
+        .arrow()
+        .execute_arrow(array, Some(&target), &mut ctx)
         .map_err(|e| ArrowError::ExternalError(Box::new(e)))?;
     let struct_array = array
         .as_any()
@@ -155,9 +190,12 @@ pub async fn get_recordbatch_reader_from_bytes(
 
             let stream = vortex_stream.then(move |result| {
                 let arrow_data_type = arrow_data_type.clone();
+                let session = session.clone();
                 async move {
                     match result {
-                        Ok(array) => vortex_array_to_record_batch(array, &arrow_data_type),
+                        Ok(array) => {
+                            vortex_array_to_record_batch(&session, array, &arrow_data_type)
+                        }
                         Err(e) => Err(ArrowError::ExternalError(Box::new(e))),
                     }
                 }
@@ -421,10 +459,14 @@ mod tests {
         };
 
         // Write to parquet
-        let data =
-            write_recordbatch_to_parquet(schema.clone(), std::slice::from_ref(&batch), &metadata)
-                .await
-                .unwrap();
+        let data = write_recordbatch_to_parquet(
+            schema.clone(),
+            std::slice::from_ref(&batch),
+            &["name".to_string()],
+            &metadata,
+        )
+        .await
+        .unwrap();
 
         // Read back
         let (read_schema, read_batches) =
@@ -453,7 +495,7 @@ mod tests {
         };
 
         // Write to parquet
-        let data = write_recordbatch_to_parquet(schema, &[batch], &metadata)
+        let data = write_recordbatch_to_parquet(schema, &[batch], &["name".to_string()], &metadata)
             .await
             .unwrap();
 

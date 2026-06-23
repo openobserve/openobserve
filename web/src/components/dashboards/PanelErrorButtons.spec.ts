@@ -17,6 +17,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { mount } from "@vue/test-utils";
 import PanelErrorButtons from "./PanelErrorButtons.vue";
 import { createStore } from "vuex";
+import i18n from "@/locales";
 
 
 // Create a mock Vuex store with timezone state
@@ -33,6 +34,7 @@ describe("PanelErrorButtons", () => {
   const mountComponent = (options = {}) => {
     return mount(PanelErrorButtons, {
       global: {
+        plugins: [i18n],
         provide: {
           store: mockStore,
         },

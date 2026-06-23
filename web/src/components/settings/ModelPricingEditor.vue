@@ -20,28 +20,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     style="min-height: 0; height: 100%; overflow: hidden"
   >
     <!-- Header -->
-    <div
-      class="tw:flex tw:items-center tw:px-3 tw:h-[68px] tw:border-b-[1px] tw:gap-3 tw:flex-shrink-0"
+    <AppPageHeader
+      :back="{
+        label: t('modelPricing.header'),
+        onClick: goBack,
+        dataTest: 'model-pricing-editor-back-btn',
+      }"
+      :title="headerTitle"
+      class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
     >
-      <div
-        data-test="model-pricing-editor-back-btn"
-        class="el-border tw:w-6 tw:h-6 tw:flex tw:items-center tw:justify-center tw:cursor-pointer el-border-radius"
-        :title="t('modelPricing.goBack')"
-        @click="goBack"
-      >
-        <OIcon name="arrow-back-ios-new" size="xs" />
-      </div>
-      <div class="tw:flex tw:flex-col tw:justify-center">
-        <div
-          class="tw:text-xl tw:tracking-[0.005em] tw:font-[600] tw:leading-tight"
-          data-test="model-pricing-editor-title"
-        >
-          {{
-            isEdit ? t("modelPricing.editTitle") : t("modelPricing.newTitle")
-          }}
-        </div>
-      </div>
-    </div>
+      <template #title>
+        <span data-test="model-pricing-editor-title">{{ headerTitle }}</span>
+      </template>
+    </AppPageHeader>
 
     <!-- Form Body -->
     <div
@@ -70,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="tw:flex-1">
               <div class="tw:flex tw:items-center tw:gap-1 tw:mb-1 field-label">
                 {{ t("modelPricing.modelNameField") }}
-                <OButton variant="ghost" size="icon-xs-sq" class="tw:ml-1">
+                <OButton variant="ghost" size="icon-xs-sq" class="tw:ml-1" data-test="model-pricing-name-info-btn">
                   <OIcon
                     name="info"
                     size="xs"
@@ -101,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="tw:flex tw:items-center tw:gap-1 tw:mb-1 field-label"
                 >
                   {{ t("modelPricing.matchPatternField") }}
-                  <OButton variant="ghost" size="icon-xs-sq" class="tw:ml-1">
+                  <OButton variant="ghost" size="icon-xs-sq" class="tw:ml-1" data-test="model-pricing-pattern-info-btn">
                     <OIcon
                       name="info"
                       size="xs"
@@ -132,6 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="ghost"
                 size="icon-xs-sq"
                 class="pattern-examples-btn"
+                data-test="model-pricing-pattern-examples-btn"
                 @click="showExamples = true"
               >
                 <OIcon name="lightbulb-outline" size="xs" />
@@ -170,6 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="ghost"
                 size="icon-xs-sq"
                 class="examples-copy-btn"
+                :data-test="`model-pricing-example-copy-btn-${ex.name}`"
                 @click="copyPattern(ex.match_pattern)"
               >
                 <OIcon
@@ -226,6 +219,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OInput
                     v-model="tier.name"
                     :placeholder="t('modelPricing.tierNamePlaceholder')"
+                    :data-test="`model-pricing-tier-name-input-${idx}`"
                   />
                 </div>
                 <div class="tw:flex tw:items-center tw:gap-2 tw:flex-shrink-0">
@@ -233,6 +227,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="model.tiers.length > 1"
                     variant="outline-destructive"
                     size="icon"
+                    :data-test="`model-pricing-tier-remove-btn-${idx}`"
                     @click="removeTier(idx as number)"
                   >
                     <OIcon name="delete" size="sm" />
@@ -256,6 +251,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         v-model="tier.condition.usage_key"
                         :label="t('modelPricing.usageKeyCol')"
                         :placeholder="t('modelPricing.usageKeyPlaceholder')"
+                        :data-test="`model-pricing-tier-condition-key-input-${idx}`"
                       />
                     </div>
                     <div class="tw:w-[90px] tw:flex-shrink-0">
@@ -264,6 +260,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :options="operators"
                         labelKey="label"
                         valueKey="value"
+                        :data-test="`model-pricing-tier-condition-operator-select-${idx}`"
                       />
                     </div>
                     <div class="tw:w-[140px] tw:flex-shrink-0">
@@ -271,6 +268,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         v-model.number="tier.condition.value"
                         :label="t('modelPricing.threshold')"
                         type="number"
+                        :data-test="`model-pricing-tier-condition-value-input-${idx}`"
                       />
                     </div>
                   </div>
@@ -287,6 +285,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     variant="pricing-chip"
                     :active="isTemplateActive(tier, tpl.keys)"
                     class="tw:!rounded-[1.25rem] tw:!h-auto tw:!py-[0.3125rem] tw:!px-[0.875rem] tw:!text-xs tw:!font-medium tw:!gap-[0.375rem]"
+                    :data-test="`model-pricing-tier-template-btn-${idx}-${tpl.name.toLowerCase()}`"
                     @click="applyTemplate(tier, tpl.keys)"
                   >
                     <template #icon-left>
@@ -335,6 +334,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OInput
                         :model-value="entry.key"
                         :placeholder="t('modelPricing.usageKeyPlaceholder')"
+                        :data-test="`model-pricing-price-key-input-${idx}-${entryIdx}`"
                         @update:model-value="
                           (val: any) => renamePriceByIndex(tier, entryIdx, val)
                         "
@@ -345,6 +345,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :min="0"
                         step="0.01"
                         :placeholder="t('modelPricing.pricePlaceholder')"
+                        :data-test="`model-pricing-price-value-input-${idx}-${entryIdx}`"
                         @update:model-value="
                           (val: any) =>
                             updatePrice(
@@ -361,6 +362,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OButton
                         variant="outline-destructive"
                         size="icon"
+                        :data-test="`model-pricing-price-delete-btn-${idx}-${entryIdx}`"
                         @click="deletePrice(tier, entry.key)"
                       >
                         <OIcon name="delete" size="sm" />
@@ -391,6 +393,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OInput
                         v-model="addState[idx as number].key"
                         :placeholder="t('modelPricing.addUsageKeyPlaceholder')"
+                        :data-test="`model-pricing-add-price-key-input-${idx}`"
                       />
                       <OInput
                         v-model.number="addState[idx as number].value"
@@ -398,6 +401,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :min="0"
                         step="0.01"
                         :placeholder="t('modelPricing.pricePlaceholder')"
+                        :data-test="`model-pricing-add-price-value-input-${idx}`"
                       >
                         <template #icon-left
                           ><span class="price-dollar">$</span></template
@@ -407,6 +411,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         variant="outline"
                         size="icon"
                         :disabled="!addState[idx as number].key.trim()"
+                        :data-test="`model-pricing-add-price-btn-${idx}`"
                         @click="addPrice(tier, idx)"
                       >
                         <OIcon name="add" size="xs" />
@@ -481,6 +486,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="outline"
               size="sm-action"
               class="tw:self-start"
+              data-test="model-pricing-add-tier-btn"
               @click="addTier"
             >
               {{ t("modelPricing.addTier") }}
@@ -526,6 +532,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import { copyToClipboard } from "@/utils/clipboard";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
@@ -602,6 +609,9 @@ const regexError = computed(() => {
 
 const isEdit = computed(
   () => !!route.query.id && route.query.duplicate !== "true",
+);
+const headerTitle = computed(() =>
+  isEdit.value ? t("modelPricing.editTitle") : t("modelPricing.newTitle"),
 );
 
 const model = ref<any>(createEmptyModel());

@@ -15,12 +15,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="events-container relative-position">
-    <AppTabs :tabs="tabs" v-model:active-tab="activeTab" class="tw:border-b tw:px-2 tw:py-2" />
+  <div class="events-container relative-position tw:h-full tw:flex tw:flex-col">
+    <AppTabs :tabs="tabs" v-model:active-tab="activeTab" class="tw:px-2 tw:py-1 tw:mt-2! tw:mx-2!" />
     <template v-if="activeTab === 'tags'">
       <div
         data-test="event-metadata"
-        class="tw:flex tw:p-2 event-metadata tw:px-[0.375rem]"
+        class="tw:flex tw:p-2 event-metadata tw:px-3"
       >
         <div class="tw:w-full tw:flex tw:flex-col">
           <div class="tw:w-full tw:pb-2 tw:text-xs">
@@ -46,6 +46,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </template>
+    <template v-else-if="activeTab === 'traces'">
+      <PlayerTracesTab
+        :session-id="sessionId"
+        :current-time="currentTime"
+        :start-time="startTime"
+        :end-time="endTime"
+        @event-emitted="(type, payload) => emit('event-emitted', type, payload)"
+      />
+    </template>
     <template v-else>
       <div
         class="tw:flex tw:items-center tw:justify-between tw:w-full tw:pt-2 tw:px-[0.375rem]"
@@ -70,14 +79,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
       </div>
-      <OSeparator class="tw:mt-2" />
-      <div class="events-list">
+      <OSeparator class="tw:my-2" />
+      <div class="tw:flex-1 tw:min-h-0 tw:overflow-y-auto tw:overflow-x-hidden tw:px-2">
         <template
           v-for="(filteredEvent, index) in filteredEvents"
           :key="filteredEvent.id + '-' + index"
         >
           <div
-            class="tw:mt-1 tw:px-2 event-container tw:py-2 tw:cursor-pointer tw:rounded"
+            class="tw:mb-1 tw:px-2 event-container tw:py-2 tw:cursor-pointer tw:rounded"
             @click="handleEventClick(filteredEvent)"
             :data-test="`player-event-row-${filteredEvent.type}`"
           >
@@ -130,6 +139,7 @@ import FrustrationEventBadge from "./FrustrationEventBadge.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import OBadge from "@/lib/core/Badge/OBadge.vue";
+import PlayerTracesTab from "./PlayerTracesTab.vue";
 
 const { t } = useI18n();
 
@@ -141,6 +151,22 @@ const props = defineProps({
   sessionDetails: {
     type: Object,
     required: true,
+  },
+  sessionId: {
+    type: String,
+    default: "",
+  },
+  currentTime: {
+    type: Number,
+    default: 0,
+  },
+  startTime: {
+    type: Number,
+    default: 0,
+  },
+  endTime: {
+    type: Number,
+    default: 0,
   },
 });
 
@@ -160,6 +186,12 @@ const tabs = [
     label: t("rum.tags"),
     value: "tags",
     icon: "tag",
+    style: { width: "fit-content", padding: "0.5rem 0.625rem" },
+  },
+  {
+    label: t("rum.traces"),
+    value: "traces",
+    icon: "timeline",
     style: { width: "fit-content", padding: "0.5rem 0.625rem" },
   },
 ];
@@ -239,15 +271,9 @@ const handleEventClick = (event: any) => {
 
 .events-container {
   width: calc(100% - 1px);
-  height: calc(100vh - 3.5625rem);
   overflow: hidden;
 }
 
-.events-list {
-  height: calc(100vh - 12.9375rem);
-  overflow-x: hidden;
-  overflow-y: auto;
-}
 
 .event-container:hover {
   background-color: #ededed;

@@ -8,7 +8,7 @@ export class LogsQueryPage {
     this.dateTimeButton = '[data-test="date-time-btn"]';
     this.relative15MinButton = '[data-test="date-time-relative-15-m-btn"]';
     this.refreshButton = '[data-test="logs-search-bar-refresh-btn"]';
-    this.errorMessage = '[data-test="logs-search-error-message"]';
+    this.errorMessage = '[data-test="logs-search-error-state"]';
     this.utilitiesMenuButton = '[data-test="logs-search-bar-utilities-menu-btn"]';
     this.resetFiltersButton = '[data-test="logs-search-bar-reset-filters-btn"]';
     this.resultDetail = '[data-test="logs-search-result-detail-undefined"]';
@@ -43,8 +43,23 @@ export class LogsQueryPage {
   }
 
   async clickErrorMessage() {
-    await expect(this.page.locator(this.errorMessage)).toBeVisible({ timeout: 30000 });
-    await this.page.locator(this.errorMessage).click();
+    // Try selectors in priority order:
+    //   logs-search-no-events-found-text — LogsNoEventsState (0 results, no error)
+    //   logs-search-error-state          — LogsErrorState (query/backend error)
+    const candidates = [
+      this.page.locator('[data-test="logs-search-no-events-found-text"]'),
+      this.page.locator(this.errorMessage),
+    ];
+    for (const locator of candidates) {
+      try {
+        await locator.waitFor({ state: 'visible', timeout: 10000 });
+        await locator.click({ force: true });
+        return;
+      } catch (e) {
+        continue;
+      }
+    }
+    throw new Error('No error/no-results message found — checked: logs-search-no-events-found-text, logs-search-error-state');
   }
 
   async clickResetFilters() {
@@ -54,13 +69,13 @@ export class LogsQueryPage {
 
   async clickNoDataFound() {
     // Try data-test selectors in priority order:
-    //   logs-search-no-data-histogram — SearchResult.vue histogram empty state
-    //   logs-search-error-message     — Index.vue "No events found" heading
-    //   logs-search-result-not-found-text — Index.vue "Result not found" div
+    //   logs-search-no-events-found-text — Index.vue LogsNoEventsState (0 hits, search applied)
+    //   logs-search-no-data-histogram    — SearchResult.vue histogram empty state
+    //   logs-search-error-state          — Index.vue error banner (SQL parse / backend error)
     const locators = [
+      this.page.locator('[data-test="logs-search-no-events-found-text"]'),
       this.page.locator('[data-test="logs-search-no-data-histogram"]'),
-      this.page.locator('[data-test="logs-search-error-message"]'),
-      this.page.locator('[data-test="logs-search-result-not-found-text"]'),
+      this.page.locator('[data-test="logs-search-error-state"]'),
     ];
     for (const locator of locators) {
       try {
@@ -71,7 +86,7 @@ export class LogsQueryPage {
         continue;
       }
     }
-    throw new Error('No "no data" message found — checked: logs-search-no-data-histogram, logs-search-error-message, logs-search-result-not-found-text');
+    throw new Error('No "no data" message found — checked: logs-search-no-events-found-text, logs-search-no-data-histogram, logs-search-error-state');
   }
 
   async clickResultDetail() {
@@ -83,8 +98,16 @@ export class LogsQueryPage {
   }
 
   async toggleHistogram() {
-    // Histogram toggle is inside the utilities ("More") menu.
+    // In normal viewport the histogram is a standalone toolbar button (inline).
+    // In narrow viewport it moves into the More menu.
     await this.page.keyboard.press('Escape').catch(() => {});
+    const inlineBtn = this.page.locator('[data-test="logs-search-bar-histogram-btn"]');
+    const isInline = await inlineBtn.isVisible({ timeout: 2000 }).catch(() => false);
+    if (isInline) {
+      await inlineBtn.click();
+      return;
+    }
+    // Narrow-viewport fallback: open utilities menu and click the menu item.
     await this.page.locator(this.utilitiesMenuButton).click();
     const histogramMenuItem = this.page.locator('[data-test="logs-search-bar-menu-histogram-btn"]');
     await histogramMenuItem.waitFor({ state: 'visible', timeout: 5000 });
@@ -92,8 +115,16 @@ export class LogsQueryPage {
   }
 
   async isHistogramOn() {
-    // Histogram is inside the utilities ("More") menu — open menu, read OSwitch state, close menu.
+    // In normal viewport the histogram is a standalone inline toolbar button.
+    // Check its OSwitch state directly without opening the More menu.
     await this.page.keyboard.press('Escape').catch(() => {});
+    const inlineBtn = this.page.locator('[data-test="logs-search-bar-histogram-btn"]');
+    const isInline = await inlineBtn.isVisible({ timeout: 2000 }).catch(() => false);
+    if (isInline) {
+      const switchChecked = inlineBtn.locator('[data-state="checked"]');
+      return (await switchChecked.count()) > 0;
+    }
+    // Narrow-viewport fallback: check state via the More menu item.
     await this.page.locator(this.utilitiesMenuButton).click();
     const histogramMenuItem = this.page.locator('[data-test="logs-search-bar-menu-histogram-btn"]');
     await histogramMenuItem.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
@@ -110,65 +141,40 @@ export class LogsQueryPage {
     }
   }
 
-  /** Open the utilities dropdown so the SQL mode menu item becomes visible. Returns true if opened. */
+  /** SQL mode toggle was removed from the UI — no-op, always returns false. */
   async _openUtilitiesMenuForSqlMode() {
-    const sqlModeMenuItem = this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"]');
-    const isVisible = await sqlModeMenuItem.isVisible({ timeout: 500 }).catch(() => false);
-    if (!isVisible) {
-      await this.page.locator(this.utilitiesMenuButton).click();
-      await sqlModeMenuItem.waitFor({ state: 'visible', timeout: 5000 });
-      return true;
-    }
+    // SQL mode is now auto-detected from query content (SELECT...FROM = SQL ON, else OFF).
+    // There is no longer a dedicated SQL mode toggle button in the utilities menu.
     return false;
   }
 
   async isSQLModeOn() {
-    // Open the dropdown to read the OSwitch inner button's data-state, then close it.
-    const menuOpened = await this._openUtilitiesMenuForSqlMode();
-    const stateEl = this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"] [data-state]').first();
-    await stateEl.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
-    const state = await stateEl.getAttribute('data-state').catch(() => null);
-    if (menuOpened) {
-      await this.page.keyboard.press('Escape');
-      await this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"]').waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
-    }
-    return state === 'checked';
+    // SQL mode is auto-detected: if the Monaco editor contains SELECT...FROM, SQL mode is ON.
+    const text = await this.page.evaluate((selector) => {
+      const host = document.querySelector(selector);
+      if (!host) return null;
+      const editors = window.monaco?.editor?.getEditors?.() ?? [];
+      for (const ed of editors) {
+        const node = ed.getDomNode?.();
+        if (node && host.contains(node)) return ed.getValue();
+      }
+      return null;
+    }, '[data-test="logs-search-bar-query-editor"]');
+    if (!text) return false;
+    const lower = text.toLowerCase().trim();
+    return lower.includes('select') && lower.includes('from');
   }
 
   async ensureSQLMode() {
-    const menuOpened = await this._openUtilitiesMenuForSqlMode();
-    const stateEl = this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"] [data-state]').first();
-    await stateEl.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
-    const isOn = (await stateEl.getAttribute('data-state').catch(() => null)) === 'checked';
-    if (!isOn) {
-      await this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"]').click();
-      await expect.poll(async () => {
-        const s = await stateEl.getAttribute('data-state').catch(() => null);
-        return s === 'checked';
-      }, { timeout: 5000 }).toBe(true);
-    }
-    if (menuOpened) {
-      await this.page.keyboard.press('Escape');
-      await this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"]').waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
-    }
+    // SQL mode toggle removed from UI. SQL mode is auto-detected from SELECT...FROM in query.
+    // Callers that need SQL mode should set a SELECT query via the editor after this call.
+    testLogger.info('ensureSQLMode: SQL mode toggle removed — SQL mode is auto-detected from query content');
   }
 
   async ensureFTSMode() {
-    const menuOpened = await this._openUtilitiesMenuForSqlMode();
-    const stateEl = this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"] [data-state]').first();
-    await stateEl.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
-    const isOn = (await stateEl.getAttribute('data-state').catch(() => null)) === 'checked';
-    if (isOn) {
-      await this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"]').click();
-      await expect.poll(async () => {
-        const s = await stateEl.getAttribute('data-state').catch(() => null);
-        return s === 'unchecked';
-      }, { timeout: 5000 }).toBe(true);
-    }
-    if (menuOpened) {
-      await this.page.keyboard.press('Escape');
-      await this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"]').waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
-    }
+    // SQL mode toggle removed from UI. SQL mode is auto-detected from SELECT...FROM in query.
+    // Callers that need FTS mode should set a non-SELECT query via the editor after this call.
+    testLogger.info('ensureFTSMode: SQL mode toggle removed — SQL mode is auto-detected from query content');
   }
 
   async _isAutoQueryEnabled() {

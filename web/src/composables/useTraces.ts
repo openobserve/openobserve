@@ -23,6 +23,7 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { copyToClipboard } from "@/utils/clipboard";
 import { getSpanColorHex } from "@/utils/traces/traceColors";
+import { getOrSetServiceColor as registryGetOrSetServiceColor } from "@/utils/traces/serviceColorRegistry";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import { buildFieldToGroupIdMap } from "@/utils/telemetryCorrelation";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
@@ -90,7 +91,6 @@ const defaultObject = {
       string,
       { panelTitle: string; start: number; end: number }
     >(),
-    showErrorOnly: false,
     queryEditorPlaceholderFlag: true,
     liveMode: localStorage.getItem("oo_toggle_auto_run") === "true",
     searchMode: "spans" as TraceSearchMode,
@@ -396,7 +396,6 @@ const useTraces = () => {
    * - Spans mode: service_name is a plain string.
    */
   const setServiceColors = (hits: any[]): void => {
-    let colorIndex = Object.keys(searchObj.meta.serviceColors).length;
     hits.forEach((hit: any) => {
       const serviceNames = Array.isArray(hit.service_name)
         ? hit.service_name
@@ -408,19 +407,18 @@ const useTraces = () => {
           typeof service === "string" ? service : service.service_name;
         if (serviceName && !searchObj.meta.serviceColors[serviceName]) {
           searchObj.meta.serviceColors[serviceName] =
-            getSpanColorHex(colorIndex);
-          colorIndex += 1;
+            registryGetOrSetServiceColor(serviceName);
         }
       });
     });
   };
 
   const getOrSetServiceColor = (serviceName: string): string => {
+    const color = registryGetOrSetServiceColor(serviceName);
     if (serviceName && !searchObj.meta.serviceColors[serviceName]) {
-      const colorIndex = Object.keys(searchObj.meta.serviceColors).length;
-      searchObj.meta.serviceColors[serviceName] = getSpanColorHex(colorIndex);
+      searchObj.meta.serviceColors[serviceName] = color;
     }
-    return searchObj.meta.serviceColors[serviceName];
+    return searchObj.meta.serviceColors[serviceName] ?? color;
   };
 
   const formatTracesMetaData = (traces: any[]): any[] => {

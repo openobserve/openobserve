@@ -32,6 +32,7 @@ import useSearchWebSocket from "@/composables/useSearchWebSocket";
 import useSearchStream from "@/composables/useLogs/useSearchStream";
 import useStreamFields from "@/composables/useLogs/useStreamFields";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
+import { isCrossLinkingEnabledForStream } from "@/utils/crossLinking";
 import config from "@/aws-exports";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
@@ -292,6 +293,7 @@ export const useSearchBar = () => {
     try {
       searchObj.loadingStream = true;
       searchObj.loading = true;
+      searchObj.loadingProgressPercentage = 0;
 
       await cancelQuery();
 
@@ -413,6 +415,7 @@ export const useSearchBar = () => {
       searchObj.data.tempFunctionName = "";
       searchObj.data.tempFunctionContent = "";
       searchObj.loading = true;
+      searchObj.loadingProgressPercentage = 0;
       await getQueryData();
     } catch (e: any) {
       console.log("Error while loading logs data");
@@ -459,14 +462,17 @@ export const useSearchBar = () => {
 
       // Fire result_schema with cross_linking=true in parallel (for cross-linking feature)
       // Use buildSearch(true) to get the actual query (works for both sqlMode and non-sqlMode)
-      if (store.state.zoConfig?.enable_cross_linking) {
+      const crossLinkStreamType = searchObj.data.stream.streamType || "logs";
+      if (
+        isCrossLinkingEnabledForStream(store.state.zoConfig, crossLinkStreamType)
+      ) {
         const searchPayload = buildSearch(true);
         const crossLinkQuery = searchPayload?.query?.sql;
         // Store the built query so resolveCrossLinkUrl can use it (searchObj.data.query is empty in non-SQL mode)
         searchObj.data.crossLinkQuery = crossLinkQuery || "";
         if (crossLinkQuery) {
           const orgId = store.state.selectedOrganization.identifier;
-          const pageType = searchObj.data.stream.streamType || "logs";
+          const pageType = crossLinkStreamType;
           const sqlQueries: string[] = Array.isArray(crossLinkQuery)
             ? crossLinkQuery
             : [crossLinkQuery];

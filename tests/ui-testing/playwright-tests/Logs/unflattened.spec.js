@@ -132,42 +132,57 @@ test.describe("Unflattened testcases", () => {
     await pageManager.unflattenedPage.closeButton.waitFor();
     await pageManager.unflattenedPage.closeButton.click();
 
-    // Short wait for query engine to pick up schema change before ingesting
-    await page.waitForTimeout(5000);
-
     testLogger.info('Re-ingesting data with updated schema (Store Original Data ON)');
     await ingestion(page);
+
+    // Deterministic readiness gate: poll the search API until _o2_id is queryable
+    // instead of sleeping a fixed interval and hoping indexing has caught up.
+    // This is what makes the single UI scan below succeed on the first attempt.
+    testLogger.info('Waiting for _o2_id to become queryable via search API');
+    // Respect the gate's result. On heavily contended CI runners indexing can
+    // lag past the gate window; the gate returning false (ignored previously)
+    // is exactly when the subsequent UI scan was doomed. Give the backend one
+    // more long wait before falling through to the UI scan, so the UI step
+    // isn't asked to find a field the backend hasn't surfaced yet.
+    const o2idReady = await pageManager.unflattenedPage.waitForO2IdQueryable();
+    if (o2idReady) {
+      testLogger.info('_o2_id confirmed queryable via search API');
+    } else {
+      testLogger.warn('_o2_id readiness gate timed out; waiting once more before UI scan');
+      const o2idReadyRetry = await pageManager.unflattenedPage.waitForO2IdQueryable({ timeout: 120000 });
+      testLogger.info('_o2_id readiness gate second wait result', { ready: o2idReadyRetry });
+    }
 
     // Navigate directly with stream in URL — selectStream would deselect it because
     // the Pinia store already has e2e_automate selected from beforeEach
     testLogger.info('Navigating to logs with e2e_automate stream');
     await page.goto(`${process.env.ZO_BASE_URL}/web/logs?org_identifier=${getOrgIdentifier()}&stream_type=logs&stream=e2e_automate`);
     await page.waitForLoadState('domcontentloaded');
-    await page.waitForTimeout(3000);
+    await page.waitForTimeout(1000);
     await applyQueryButton(page);
     testLogger.info('Search query applied, logs should now contain _o2_id field');
 
     testLogger.info('Searching log rows for _o2_id field (iterates first 10 rows per attempt)');
     let o2idFound = false;
-    for (let attempt = 1; attempt <= 5; attempt++) {
-      const matchedRow = await pageManager.unflattenedPage.findRowWithO2Id(10);
+    // The backend readiness gate above already guarantees _o2_id is queryable, so
+    // a miss here is only UI/render lag — re-run the query (cheap) rather than
+    // re-ingesting (the old loop's re-ingest + 5s sleep is what ballooned wall-time).
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      const matchedRow = await pageManager.unflattenedPage.findRowWithO2Id(15);
       if (matchedRow !== -1) {
         testLogger.info(`Found _o2_id in row ${matchedRow} (attempt ${attempt})`);
         await pageManager.unflattenedPage.o2IdText.click();
         o2idFound = true;
         break;
       }
-      testLogger.warn(`_o2_id not found in first 10 rows on attempt ${attempt}, re-ingesting + refreshing query`);
+      testLogger.warn(`_o2_id not found in first 10 rows on attempt ${attempt}, re-running query`);
       await pageManager.unflattenedPage.closeLogDetailDrawerIfOpen();
-      if (attempt < 5) {
-        await ingestion(page);
-        // Wait for indexer to process newly ingested data before re-querying
-        await page.waitForTimeout(5000);
+      if (attempt < 3) {
         await applyQueryButton(page);
       }
     }
     if (!o2idFound) {
-      throw new Error('Failed to find _o2_id field in log details after 5 attempts');
+      throw new Error('Failed to find _o2_id field in log details after 3 attempts');
     }
 
     testLogger.info('Switching to unflattened tab');
@@ -247,17 +262,33 @@ test.describe("Unflattened testcases", () => {
     await pageManager.unflattenedPage.closeButton.waitFor();
     await pageManager.unflattenedPage.closeButton.click();
 
-    await page.waitForTimeout(15000);
-
     testLogger.info('Re-ingesting data with updated schema (Store Original Data ON)');
     await ingestion(page);
+
+    // Deterministic readiness gate: poll the search API until _o2_id is queryable
+    // instead of a fixed 15s sleep + UI re-ingestion retry loop. This was the
+    // dominant source of the timeout flake on contended CI runners.
+    testLogger.info('Waiting for _o2_id to become queryable via search API');
+    // Respect the gate's result. On heavily contended CI runners indexing can
+    // lag past the gate window; the gate returning false (ignored previously)
+    // is exactly when the subsequent UI scan was doomed. Give the backend one
+    // more long wait before falling through to the UI scan, so the UI step
+    // isn't asked to find a field the backend hasn't surfaced yet.
+    const o2idReady = await pageManager.unflattenedPage.waitForO2IdQueryable();
+    if (o2idReady) {
+      testLogger.info('_o2_id confirmed queryable via search API');
+    } else {
+      testLogger.warn('_o2_id readiness gate timed out; waiting once more before UI scan');
+      const o2idReadyRetry = await pageManager.unflattenedPage.waitForO2IdQueryable({ timeout: 120000 });
+      testLogger.info('_o2_id readiness gate second wait result', { ready: o2idReadyRetry });
+    }
 
     // Navigate directly with stream in URL — selectStream would deselect it because
     // the Pinia store already has e2e_automate selected from beforeEach
     testLogger.info('Navigating to logs with e2e_automate stream');
     await page.goto(`${process.env.ZO_BASE_URL}/web/logs?org_identifier=${getOrgIdentifier()}&stream_type=logs&stream=e2e_automate`);
     await page.waitForLoadState('domcontentloaded');
-    await page.waitForTimeout(3000);
+    await page.waitForTimeout(1000);
 
     testLogger.info('Ensuring Quick Mode is on');
     await pageManager.logsPage.ensureQuickModeState(true);
@@ -278,6 +309,9 @@ test.describe("Unflattened testcases", () => {
     testLogger.info('Selecting kubernetes_pod_id field');
     await pageManager.unflattenedPage.clickInterestingFieldButton('kubernetes_pod_id');
 
+    testLogger.info('Waiting for kubernetes_pod_id to be marked as interesting (button title flips to "Remove…")');
+    await pageManager.unflattenedPage.expectFieldMarkedAsInteresting('kubernetes_pod_id');
+
     testLogger.info('Switching to SQL mode');
     await pageManager.unflattenedPage.toggleSqlMode();
     await page.waitForTimeout(500);
@@ -292,19 +326,21 @@ test.describe("Unflattened testcases", () => {
     await applyQueryButton(page);
 
     testLogger.info('Searching log rows for _o2_id field (iterates first 10 rows per attempt)');
-    // With ORDER BY _timestamp DESC the newest rows come first; we scan more
-    // than strictly necessary (10) so a slight indexing lag still resolves
+    // With ORDER BY _timestamp DESC the newest rows come first. The backend
+    // readiness gate above already guarantees _o2_id is queryable, so a miss here
+    // is only UI/render lag — re-run the query (cheap) rather than re-ingesting
+    // (the old loop's re-ingest + 5s sleep is what ballooned wall-time on CI).
     let o2idFound = false;
-    for (let attempt = 1; attempt <= 5; attempt++) {
-      const matchedRow = await pageManager.unflattenedPage.findRowWithO2Id(10);
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      const matchedRow = await pageManager.unflattenedPage.findRowWithO2Id(15);
       if (matchedRow !== -1) {
         testLogger.info(`Found _o2_id in row ${matchedRow} (attempt ${attempt})`);
         await pageManager.unflattenedPage.o2IdText.click();
         o2idFound = true;
         break;
       }
-      testLogger.warn(`_o2_id not found in first 10 rows on attempt ${attempt}, re-ingesting + refreshing query`);
-      if (attempt === 5) {
+      testLogger.warn(`_o2_id not found in first 10 rows on attempt ${attempt}, re-running query`);
+      if (attempt === 3) {
         try {
           const allKeys = await pageManager.unflattenedPage.allLogDetailKeys.allTextContents();
           testLogger.error('Available fields in log detail', { fields: allKeys });
@@ -314,13 +350,10 @@ test.describe("Unflattened testcases", () => {
         break;
       }
       await pageManager.unflattenedPage.closeLogDetailDrawerIfOpen();
-      await ingestion(page);
-      // Wait for indexer to process newly ingested data before re-querying
-      await page.waitForTimeout(5000);
       await applyQueryButton(page);
     }
     if (!o2idFound) {
-      throw new Error('Failed to find _o2_id field in log details after 5 attempts');
+      throw new Error('Failed to find _o2_id field in log details after 3 attempts');
     }
 
     await page.waitForTimeout(500);

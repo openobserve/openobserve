@@ -20,6 +20,10 @@ export default defineComponent({
   setup() {
     const store = useStore();
 
+    // Purely reactive: the banner derives everything from
+    // store.state.zoConfig.last_usage_report_ts. UsageTab refreshes that config
+    // on mount, so the banner updates on every Usage-tab visit without owning an
+    // API call itself.
     const elapsedMs = computed(() => {
       if (!store.state.zoConfig || !('last_usage_report_ts' in store.state.zoConfig)) return 0;
       const ts = store.state.zoConfig.last_usage_report_ts;
@@ -33,7 +37,7 @@ export default defineComponent({
     const SEVEN_DAYS = 7 * 24 * ONE_HOUR;
 
     const showBanner = computed(() => {
-      return elapsedMs.value > ONE_HOUR;
+      return elapsedMs.value > 6 * ONE_HOUR;
     });
 
     const isSevere = computed(() => {
@@ -96,15 +100,17 @@ export default defineComponent({
 }
 
 .o2-usage-message {
-  font-size: 18px;
+  font-size: var(--text-lg);
   font-weight: 600;
-  line-height: 32px;
+  line-height: var(--leading-xl);
+  color: var(--color-text-heading);
 }
 
 .o2-usage-subtitle {
-  font-size: 16px;
+  font-size: var(--text-md);
   font-weight: 400;
-  line-height: 22px;
+  line-height: var(--leading-md);
+  color: var(--color-text-body);
 }
 
 .body--dark {

@@ -167,7 +167,9 @@ describe("TraceHeader", () => {
       const resizeBtn = wrapper.find('[data-test="trace-header-resize-btn"]');
       expect(resizeBtn.classes()).toContain("resize-btn");
       expect(resizeBtn.classes()).toContain("tw:bg-[var(--o2-primary)]");
-      expect(resizeBtn.classes()).toContain("tw:text-white");
+      // tw:text-white was removed from the resize button in favour of inheriting
+      // the icon colour — assert the remaining identity classes instead.
+      expect(resizeBtn.classes()).toContain("tw:rounded-full");
     });
   });
 
@@ -242,7 +244,7 @@ describe("TraceHeader", () => {
   describe("Theme support", () => {
     it("should apply light theme by default", () => {
       const headerContainer = wrapper.find('[data-test="trace-header"]');
-      expect(headerContainer.classes()).toContain("tw:bg-gray-100");
+      expect(headerContainer.classes()).toContain("tw:bg-surface-panel");
       expect(headerContainer.classes()).toContain("trace-header-container");
     });
 
@@ -278,7 +280,7 @@ describe("TraceHeader", () => {
       });
 
       const headerContainer = darkWrapper.find('[data-test="trace-header"]');
-      expect(headerContainer.classes()).toContain("tw:bg-gray-700");
+      expect(headerContainer.classes()).toContain("tw:bg-surface-panel");
       expect(headerContainer.classes()).toContain("trace-header-container");
 
       darkWrapper.unmount();
@@ -473,7 +475,8 @@ describe("TraceHeader", () => {
       expect(ticsSection.classes()).toContain("tw:justify-start");
       expect(ticsSection.classes()).toContain("tw:items-center");
       expect(ticsSection.classes()).toContain("tw:flex-nowrap");
-      expect(ticsSection.classes()).toContain("relative-position");
+      // Component was migrated from Quasar's `relative-position` to Tailwind `tw:relative`.
+      expect(ticsSection.classes()).toContain("tw:relative");
     });
 
     it("should have correct tic label classes", () => {

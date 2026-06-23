@@ -1,466 +1,129 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mount, VueWrapper } from '@vue/test-utils';
-import { createStore } from 'vuex';
-import { createI18n } from 'vue-i18n';
-import { createRouter, createWebHistory } from 'vue-router';
-import { nextTick } from 'vue';
-import Postgres from './Postgres.vue';
-import CopyContent from '@/components/CopyContent.vue';
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// Mock aws-exports
-vi.mock('../../../aws-exports', () => ({
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { mount, VueWrapper } from "@vue/test-utils";
+import { createStore } from "vuex";
+import { createI18n } from "vue-i18n";
+import { ref } from "vue";
+import Postgres from "./Postgres.vue";
+import postgresCard from "@/components/ingestion/setupCard/content/postgres";
+import { getDataSourceCard } from "@/components/ingestion/setupCard/registry";
+
+const mockEndpoint = ref({
+  url: "https://test.openobserve.ai",
+  host: "test.openobserve.ai",
+  port: 443,
+  protocol: "https",
+  tls: true,
+});
+
+vi.mock("@/composables/useIngestion", () => ({
+  default: vi.fn(() => ({ endpoint: mockEndpoint })),
+}));
+
+vi.mock("@/components/ingestion/setupCard/SetupCardRenderer.vue", () => ({
   default: {
-    API_ENDPOINT: 'http://localhost:5080',
-    region: 'us-east-1',
-  },
-}));
-
-// Mock zincutils
-vi.mock('../../../utils/zincutils', () => ({
-  getImageURL: vi.fn((path) => `mock-image-url-${path}`),
-  getEndPoint: vi.fn(() => ({
-    url: 'http://localhost:5080',
-    host: 'localhost',
-    port: '5080',
-    protocol: 'http',
-    tls: false,
-  })),
-  getIngestionURL: vi.fn(() => 'http://localhost:5080'),
-}));
-
-// Mock useIngestion composable
-vi.mock('@/composables/useIngestion', () => ({
-  default: vi.fn(() => ({
-    endpoint: {
-      url: 'http://localhost:5080',
-      host: 'localhost',
-      port: '5080',
-      protocol: 'http',
-      tls: false,
-    },
-    databaseContent: `exporters:
-  otlphttp/openobserve:
-    endpoint: http://localhost:5080/api/test-org/
-    headers:
-      Authorization: Basic [BASIC_PASSCODE]
-      stream-name: [STREAM_NAME]`,
-    databaseDocURLs: {
-      postgres: 'https://short.openobserve.ai/database/postgres',
-      sqlServer: 'https://short.openobserve.ai/database/sql-server',
-      mongoDB: 'https://short.openobserve.ai/database/mongodb',
-    },
-  })),
-}));
-
-// Mock CopyContent component
-vi.mock('@/components/CopyContent.vue', () => ({
-  default: {
-    name: 'CopyContent',
-    template: '<div data-test="copy-content">{{ content }}</div>',
-    props: ['content'],
+    name: "SetupCardRenderer",
+    props: ["content", "subs", "logoUrl", "logoUrlDark"],
+    template: '<div data-test="rich-card-stub" />',
   },
 }));
 
 const mockStore = createStore({
   state: {
-    selectedOrganization: {
-      identifier: 'test-org',
-      name: 'Test Organization',
-    },
-    userInfo: {
-      email: 'test@example.com',
-    },
+    selectedOrganization: { identifier: "test-org", name: "Test Organization" },
+    userInfo: { email: "test@example.com" },
+    organizationData: { organizationPasscode: "test-passcode" },
+    theme: "light",
   },
 });
 
-const mockI18n = createI18n({
-  locale: 'en',
-  messages: {
-    en: {},
-  },
-});
+const mockI18n = createI18n({ locale: "en", messages: { en: {} } });
 
-const mockRouter = createRouter({
-  history: createWebHistory(),
-  routes: [
-    { path: '/', component: { template: '<div>Home</div>' } },
-  ],
-});
+const SUBS = {
+  url: "https://test.openobserve.ai",
+  org: "test-org",
+  token: "dGVzdEB0b2tlbg==",
+};
 
-
-describe('Postgres.vue Comprehensive Coverage', () => {
-  let wrapper: VueWrapper;
-
-  beforeEach(() => {
-    vi.clearAllMocks();
+describe("postgresCard builder", () => {
+  it("builds the Postgres card metadata and step flow", () => {
+    const card = postgresCard(SUBS);
+    expect(card.provider.name).toBe("Postgres");
+    expect(card.provider.metaBadges).toEqual(["Metrics"]);
+    expect(card.detect).toMatchObject({
+      streamType: "metrics",
+      match: "keyword",
+      streamName: "postgresql",
+    });
+    expect(card.steps.map((s) => s.id)).toEqual([
+      "prepare",
+      "install",
+      "configure",
+      "run",
+      "verify",
+    ]);
   });
+
+  it("offers psql / docker / GUI tabs to create the monitoring role", () => {
+    const prepare = postgresCard(SUBS).steps.find((s) => s.id === "prepare")!;
+    expect(prepare.variants?.map((v) => v.id)).toEqual([
+      "psql",
+      "docker",
+      "sql-client",
+    ]);
+    const psql = prepare.variants!.find((v) => v.id === "psql")!.code;
+    expect(psql.raw).toContain("psql");
+    expect(psql.raw).toContain("CREATE ROLE myuser");
+    expect(prepare.variants!.find((v) => v.id === "docker")!.code.raw).toContain(
+      "docker exec",
+    );
+    expect(prepare.variants!.find((v) => v.id === "sql-client")!.code.lang).toBe(
+      "sql",
+    );
+    expect(prepare.variants!.every((v) => !!v.icon)).toBe(true);
+  });
+
+  it("writes a postgresql receiver config with the org's exporter", () => {
+    const card = postgresCard(SUBS);
+    const configure = card.steps.find((s) => s.id === "configure")!;
+    expect(configure.inputs?.map((i) => i.id)).toEqual(["host", "port"]);
+    const config = configure.variants!.find((v) => v.id === "linux-amd64")!.code.raw;
+    expect(config).toContain("postgresql:");
+    expect(config).toContain("endpoint: {host}:{port}");
+    expect(config).toContain(`endpoint: ${SUBS.url}/api/${SUBS.org}`);
+    expect(config).toContain(`Basic ${SUBS.token}`);
+    // Reuses the shared install step (Contrib, per-OS).
+    const install = card.steps.find((s) => s.id === "install")!;
+    expect(install.variants?.map((v) => v.id)).toContain("linux-amd64");
+  });
+});
+
+describe("Postgres.vue", () => {
+  let wrapper: VueWrapper<any>;
 
   afterEach(() => {
-    if (wrapper) {
-      wrapper.unmount();
-    }
-    vi.clearAllMocks();
+    if (wrapper) wrapper.unmount();
   });
 
-  const createWrapper = (props = {}) => {
-    const defaultProps = {
-      currOrgIdentifier: 'test-org',
-      currUserEmail: 'test@example.com',
-    };
-
-    return mount(Postgres, {
-      props: { ...defaultProps, ...props },
-      global: {
-        plugins: [mockI18n, mockRouter],
-        provide: {
-          store: mockStore,
-        },
-        components: {
-          CopyContent,
-        },
-      },
-    });
-  };
-
-  describe('Component Rendering Tests', () => {
-
-    it('should render CopyContent component', () => {
-      wrapper = createWrapper();
-      const copyContent = wrapper.findComponent(CopyContent);
-      expect(copyContent.exists()).toBe(true);
-    });
-
-    it('should render documentation link', () => {
-      wrapper = createWrapper();
-      const docLink = wrapper.find('a');
-      expect(docLink.exists()).toBe(true);
-      expect(docLink.attributes('target')).toBe('_blank');
-    });
-
-    it('should apply correct styling to documentation link', () => {
-      wrapper = createWrapper();
-      const docLink = wrapper.find('a');
-      expect(docLink.classes()).toContain('text-blue-500');
-      expect(docLink.classes()).toContain('hover:text-blue-600');
-      expect(docLink.attributes('style')).toContain('text-decoration: underline');
-    });
-
-    it('should render documentation text correctly', () => {
-      wrapper = createWrapper();
-      const docText = wrapper.find('.tw\\:font-bold');
-      expect(docText.text()).toContain('Click');
-      expect(docText.text()).toContain('here');
-      expect(docText.text()).toContain('to check further documentation.');
-    });
-
-  });
-
-  describe('Props Validation Tests', () => {
-    it('should accept currOrgIdentifier string prop', () => {
-      wrapper = createWrapper({ currOrgIdentifier: 'custom-org' });
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it('should accept currUserEmail string prop', () => {
-      wrapper = createWrapper({ currUserEmail: 'custom@example.com' });
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it('should handle undefined currOrgIdentifier', () => {
-      wrapper = createWrapper({ currOrgIdentifier: undefined });
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it('should handle undefined currUserEmail', () => {
-      wrapper = createWrapper({ currUserEmail: undefined });
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it('should handle null currOrgIdentifier', () => {
-      wrapper = createWrapper({ currOrgIdentifier: null });
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it('should handle null currUserEmail', () => {
-      wrapper = createWrapper({ currUserEmail: null });
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it('should handle empty string currOrgIdentifier', () => {
-      wrapper = createWrapper({ currOrgIdentifier: '' });
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it('should handle empty string currUserEmail', () => {
-      wrapper = createWrapper({ currUserEmail: '' });
-      expect(wrapper.exists()).toBe(true);
-    });
-  });
-
-  describe('Setup Function Tests', () => {
-    it('should initialize with correct name variable', () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      
-      // The name should be used to generate content
-      expect(typeof vm.content).toBe('string');
-    });
-
-    it('should process content with stream name replacement', () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      
-      // Content should have [STREAM_NAME] replaced with 'postgres'
-      expect(vm.content).toContain('postgres');
-      expect(vm.content).not.toContain('[STREAM_NAME]');
-    });
-
-    it('should handle name with spaces correctly', () => {
-      // Test that spaces in name are replaced with underscores and lowercased
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      
-      // Since name is 'postgres', it should be processed correctly
-      expect(vm.content).toContain('postgres');
-    });
-
-    it('should return correct docURL', () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      
-      expect(vm.docURL).toBe('https://short.openobserve.ai/database/postgres');
-    });
-
-    it('should expose config object', () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      
-      expect(vm.config).toBeDefined();
-      expect(typeof vm.config).toBe('object');
-    });
-
-    it('should expose getImageURL function', () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      
-      expect(vm.getImageURL).toBeDefined();
-      expect(typeof vm.getImageURL).toBe('function');
-    });
-
-    it('should expose content string', () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      
-      expect(vm.content).toBeDefined();
-      expect(typeof vm.content).toBe('string');
-    });
-
-    it('should expose all required properties', () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      
-      expect(vm.config).toBeDefined();
-      expect(vm.docURL).toBeDefined();
-      expect(vm.getImageURL).toBeDefined();
-      expect(vm.content).toBeDefined();
-    });
-  });
-
-  describe('useIngestion Composable Integration Tests', () => {
-    it('should call useIngestion composable', () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      
-      // The composable should be called during setup and provide data
-      expect(vm.content).toBeDefined();
-      expect(vm.docURL).toBeDefined();
-    });
-
-    it('should use endpoint from useIngestion', () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      
-      // The composable should provide endpoint data
-      expect(vm.content).toBeDefined();
-    });
-
-    it('should use databaseContent from useIngestion', () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      
-      expect(vm.content).toContain('postgres');
-    });
-
-    it('should use databaseDocURLs from useIngestion', () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      
-      expect(vm.docURL).toBe('https://short.openobserve.ai/database/postgres');
-    });
-  });
-
-  describe('Content Processing Tests', () => {
-    it('should replace [STREAM_NAME] with processed name', () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      
-      expect(vm.content).not.toContain('[STREAM_NAME]');
-      expect(vm.content).toContain('postgres');
-    });
-
-    it('should process name to lowercase', () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      
-      // Name 'postgres' should remain lowercase
-      expect(vm.content).toContain('postgres');
-      expect(vm.content).not.toContain('POSTGRES');
-    });
-
-    it('should replace spaces with underscores in name', () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      
-      // Since 'postgres' has no spaces, it should remain unchanged
-      expect(vm.content).toContain('postgres');
-    });
-
-    it('should generate valid YAML-like content', () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      
-      expect(vm.content).toContain('exporters:');
-      expect(vm.content).toContain('otlphttp/openobserve:');
-    });
-  });
-
-  describe('Component Props Passing Tests', () => {
-    it('should pass content prop to CopyContent component', () => {
-      wrapper = createWrapper();
-      const copyContent = wrapper.findComponent(CopyContent);
-      
-      expect(copyContent.props('content')).toBeDefined();
-      expect(typeof copyContent.props('content')).toBe('string');
-    });
-
-    it('should pass processed content to CopyContent', () => {
-      wrapper = createWrapper();
-      const copyContent = wrapper.findComponent(CopyContent);
-      const content = copyContent.props('content');
-      
-      expect(content).toContain('postgres');
-      expect(content).not.toContain('[STREAM_NAME]');
-    });
-
-    it('should pass href to documentation link', () => {
-      wrapper = createWrapper();
-      const docLink = wrapper.find('a');
-      
-      expect(docLink.attributes('href')).toBe('https://short.openobserve.ai/database/postgres');
-    });
-  });
-
-  describe('Component Lifecycle Tests', () => {
-    it('should mount without errors', () => {
-      wrapper = createWrapper();
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it('should unmount without errors', () => {
-      wrapper = createWrapper();
-      expect(() => wrapper.unmount()).not.toThrow();
-    });
-
-    it('should handle props updates', async () => {
-      wrapper = createWrapper({ currOrgIdentifier: 'initial-org' });
-      
-      await wrapper.setProps({ currOrgIdentifier: 'updated-org' });
-      
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it('should maintain functionality after props update', async () => {
-      wrapper = createWrapper();
-      const initialContent = wrapper.vm.content;
-      
-      await wrapper.setProps({ currUserEmail: 'new@example.com' });
-      
-      expect(wrapper.vm.content).toBe(initialContent);
-    });
-  });
-
-  describe('Edge Cases and Error Handling Tests', () => {
-    it('should handle missing useIngestion data gracefully', () => {
-      const mockUseIngestion = vi.fn().mockReturnValue({
-        endpoint: null,
-        databaseContent: '',
-        databaseDocURLs: {},
-      });
-      
-      vi.doMock('@/composables/useIngestion', () => ({
-        default: mockUseIngestion,
-      }));
-      
-      expect(() => createWrapper()).not.toThrow();
-    });
-
-    it('should handle empty databaseContent', () => {
-      // Since the mocked useIngestion always returns content, let's test content processing
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      
-      // The content should be a string (even if empty would be processed)
-      expect(typeof vm.content).toBe('string');
-      expect(vm.content.length).toBeGreaterThanOrEqual(0);
-    });
-
-    it('should handle missing postgres docURL', () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      
-      // The mocked composable provides postgres URL, so test URL validity
-      expect(vm.docURL).toBeDefined();
-      expect(typeof vm.docURL).toBe('string');
-      expect(vm.docURL).toBe('https://short.openobserve.ai/database/postgres');
-    });
-
-    it('should handle special characters in content', () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      
-      // Content should handle YAML special characters properly
-      expect(typeof vm.content).toBe('string');
-    });
-  });
-
-  describe('Template Integration Tests', () => {
-
-    it('should render documentation link with correct attributes', () => {
-      wrapper = createWrapper();
-      const link = wrapper.find('a');
-      
-      expect(link.attributes('target')).toBe('_blank');
-      expect(link.classes()).toContain('text-blue-500');
-      expect(link.classes()).toContain('hover:text-blue-600');
-    });
-  });
-
-  describe('Component Name and Identity Tests', () => {
-    it('should have correct component name', () => {
-      wrapper = createWrapper();
-      expect(wrapper.vm.$options.name).toBe('PostgresPage');
-    });
-
-    it('should register CopyContent component', () => {
-      wrapper = createWrapper();
-      const copyContent = wrapper.findComponent(CopyContent);
-      expect(copyContent.exists()).toBe(true);
-    });
-
-    it('should be a Vue component', () => {
-      wrapper = createWrapper();
-      expect(wrapper.vm).toBeDefined();
-      expect(typeof wrapper.vm).toBe('object');
-    });
+  it("renders the shared setup card for the postgres slug", () => {
+    expect(getDataSourceCard("postgres", SUBS)?.provider.name).toBe("Postgres");
+    wrapper = mount(Postgres, { global: { plugins: [mockStore, mockI18n] } });
+    const stub = wrapper.findComponent({ name: "SetupCardRenderer" });
+    expect(stub.exists()).toBe(true);
+    expect((stub.props("content") as any).provider.name).toBe("Postgres");
   });
 });

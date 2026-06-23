@@ -50,8 +50,8 @@ export class AlertsPage {
             folderNameInputField: '[data-test="dashboard-folder-add-name-field"]',
             folderDescriptionInput: '[data-test="dashboard-folder-add-description"]',
             folderDescriptionInputField: '[data-test="dashboard-folder-add-description-field"]',
-            folderSaveButton: '[data-test="dashboard-folder-dialog"] [data-test="o-drawer-primary-btn"]',
-            folderCancelButton: '[data-test="dashboard-folder-dialog"] [data-test="o-drawer-secondary-btn"]',
+            folderSaveButton: '[data-test="dashboard-folder-dialog"] [data-test="o-dialog-primary-btn"]',
+            folderCancelButton: '[data-test="dashboard-folder-dialog"] [data-test="o-dialog-secondary-btn"]',
             noDataAvailableText: 'No data available',
             folderExistsError: 'Folder with this name already exists in this organization',
             folderMoreOptionsButton: '[data-test="dashboard-more-icon"]',
@@ -108,11 +108,11 @@ export class AlertsPage {
             contextAttributeValueInput: '[data-test="alert-variables-value-input"]',
             rowTemplateTextarea: '[data-test="add-alert-row-input-textarea"]',
             templateOverrideSelect: '.template-select-field',
-            // Advanced tab: template override select uses .alert-v3-select class
-            advancedTemplateOverrideSelect: '.step-advanced .alert-v3-select',
+            // Advanced tab: template override select with explicit data-test
+            advancedTemplateOverrideSelect: '[data-test="advanced-template-override-select"]',
             // Alert destinations select (in AlertSettings.vue, condition tab)
             alertDestinationsSelect: '[data-test="alert-destinations-select"]',
-            advancedTabBtn: 'button:has-text("Advanced")',
+            advancedTabBtn: '[data-test="add-alert-tab-advanced"]',
             // ODropdown content carries data-test="o-dropdown-content"
             visibleDropdownMenu: '[data-test="o-dropdown-content"]:visible',
 
@@ -151,8 +151,8 @@ export class AlertsPage {
             alertDetailsDialog: '[data-test="alert-details-dialog"]',
             alertDetailsTitle: '[data-test="alert-details-title"]',
             alertDetailsEditButton: '[data-test="alert-details-edit-btn"]',
-            alertDetailsRefreshButton: '[data-test="alert-details-refresh-btn"]',
-            alertDetailsCloseButton: '[data-test="alert-details-close-btn"]',
+            alertDetailsRefreshButton: '[data-test="alert-history-refresh-btn"]',
+            alertDetailsCloseButton: '[data-test="o-drawer-close-btn"]',
             alertDetailsCopyConditionsButton: '[data-test="alert-details-copy-conditions-btn"]',
             alertDetailsHistoryTable: '[data-test="alert-details-history-table"]',
 
@@ -188,7 +188,7 @@ export class AlertsPage {
             selectAllCheckboxRowName: '# Name Owner Period Frequency',
             moveAcrossFoldersButton: '[data-test="alert-list-move-across-folders-btn"]',
             folderDropdown: '[data-test="alerts-index-dropdown-stream_type"]',
-            moveButton: '[data-test="dashboard-move-to-another-folder-dialog"] [data-test="o-drawer-primary-btn"]',
+            moveButton: '[data-test="dashboard-move-to-another-folder-dialog"] [data-test="o-dialog-primary-btn"]',
             alertsMovedMessage: 'alerts Moved successfully',
 
             // Alert search and deletion locators
@@ -889,6 +889,14 @@ export class AlertsPage {
     }
 
     async navigateToFolder(folderName) {
+        // Always navigate to the Alerts section first — createFolder (called by ensureFolderExists)
+        // may leave the browser on the Dashboards page since folders are shared across modules.
+        // Clicking a folder item without switching to Alerts first opens a Dashboard folder instead.
+        const isOnAlertsPage = await this.page.locator(this.locators.alertListTable).isVisible({ timeout: 3000 }).catch(() => false);
+        if (!isOnAlertsPage) {
+            await this.navigateToAlertsPage();
+        }
+
         // Use specific folder-item selector to avoid matching unrelated text
         const folderItem = this.page.locator(`div.folder-item:has-text("${folderName}")`).first();
         const folderVisible = await folderItem.isVisible({ timeout: 5000 }).catch(() => false);
@@ -900,17 +908,17 @@ export class AlertsPage {
         }
         try {
             await Promise.race([
-                this.page.locator(this.locators.tableLocator).waitFor({ state: 'visible', timeout: 30000 }),
-                this.page.getByText('No data available').waitFor({ state: 'visible', timeout: 30000 })
+                this.page.locator(this.locators.alertListTable).waitFor({ state: 'visible', timeout: 30000 }),
+                this.page.locator('[data-test="o2-empty-state"]').waitFor({ state: 'visible', timeout: 30000 })
             ]);
         } catch (error) {
-            testLogger.error('Neither table nor no data message found after clicking folder', { folderName, error: error.message });
-            throw new Error(`Failed to load folder content for "${folderName}": Neither table nor "No data available" message appeared`);
+            testLogger.error('Neither table nor empty state found after clicking folder', { folderName, error: error.message });
+            throw new Error(`Failed to load folder content for "${folderName}": Neither table nor empty state appeared`);
         }
     }
 
     async verifyNoDataAvailable() {
-        await expect(this.page.getByText('No data available')).toBeVisible();
+        await expect(this.page.locator('[data-test="o2-empty-state"]')).toBeVisible();
     }
 
     async verifyFolderExistsError() {
@@ -1124,6 +1132,17 @@ export class AlertsPage {
 
         // Close with robust handling for dialog backdrops
         await this._closeAlertWizard();
+
+        // Error toasts (e.g. "Stream type is required.") have a 30-second auto-dismiss
+        // that is paused in headless mode — dismiss all now so they don't intercept
+        // bulk-action buttons (e.g. move drawer) later in the test.
+        const dismissBtnFRV = this.page.locator('button[aria-label="Dismiss notification"]');
+        for (let i = 0; i < 10; i++) {
+            const count = await dismissBtnFRV.count().catch(() => 0);
+            if (count === 0) break;
+            await dismissBtnFRV.first().click({ force: true }).catch(() => {});
+            await this.page.waitForTimeout(150);
+        }
     }
 
     /**
@@ -1176,6 +1195,18 @@ export class AlertsPage {
         ).toBeVisible({ timeout: 5000 });
         testLogger.info('Clone validation working - stream type required');
 
+        // Error toasts (including any lingering ones from earlier validation steps) have
+        // a 30-second auto-dismiss paused in headless mode — dismiss ALL of them now so
+        // they cannot intercept the move-drawer button later in the test.
+        const dismissBtnClone = this.page.locator('button[aria-label="Dismiss notification"]');
+        for (let i = 0; i < 10; i++) {
+            const count = await dismissBtnClone.count().catch(() => 0);
+            if (count === 0) break;
+            await dismissBtnClone.first().click({ force: true }).catch(() => {});
+            await this.page.waitForTimeout(150);
+        }
+        await this.page.waitForTimeout(300);
+
         await this.page.locator(this.locators.cloneCancelButton).click();
         await this.page.waitForTimeout(500);
 
@@ -1187,7 +1218,7 @@ export class AlertsPage {
 
     async verifyTabContents() {
         await this.page.locator('[data-test="tab-scheduled"]').click();
-        await expect(this.page.getByText('No data available')).toBeVisible();
+        await expect(this.page.locator('[data-test="o2-empty-state"]')).toBeVisible();
         await this.page.locator('[data-test="tab-realTime"]').click();
         await expect(this.page.getByText('Showing 1 - 1 of')).toBeVisible();
         await this.page.locator('[data-test="tab-all"]').click();
@@ -2616,6 +2647,30 @@ export class AlertsPage {
         await dialogBackBtn.click();
         await expect(dialog).not.toBeAttached({ timeout: 10000 });
         testLogger.info('Closed editor dialog via scoped back button');
+    }
+
+    // ==================== TEMPLATE LIST HELPERS ====================
+
+    /**
+     * Search for a template by name in the template list search input.
+     * Uses getByPlaceholder because OSearchInput does not expose a data-test attribute.
+     * @param {string} name - The template name to search for
+     */
+    async searchTemplate(name) {
+        const searchInput = this.page.getByPlaceholder('Search Template');
+        await searchInput.click();
+        await searchInput.fill(name);
+        testLogger.info('Searched for template', { name });
+    }
+
+    /**
+     * Click the update (edit) button for a template in the template list.
+     * @param {string} name - The template name
+     */
+    async clickTemplateUpdateButton(name) {
+        const updateBtn = this.page.locator(`[data-test="alert-template-list-${name}-update-template"]`);
+        await updateBtn.click();
+        testLogger.info('Clicked template update button', { name });
     }
 
     // ==================== STEP 2 / QUERY CONFIG HELPERS (scheduled features) ====================

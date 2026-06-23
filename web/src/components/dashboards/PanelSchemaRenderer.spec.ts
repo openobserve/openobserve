@@ -15,7 +15,7 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { nextTick } from "vue";
+import { nextTick, ref } from "vue";
 
 // Quasar was removed entirely — no Quasar plugin mock required.
 // (Dialog.create / exportFile no longer used in the component.)
@@ -46,6 +46,7 @@ vi.mock("@/composables/dashboard/useAnnotationsData", () => ({
     toggleAddAnnotationMode: vi.fn(),
     handleAddAnnotation: vi.fn(),
     closeAddAnnotation: vi.fn(),
+    disableAddAnnotationMode: vi.fn(),
     fetchAllPanels: vi.fn(),
     panelsList: { value: [] },
   })),
@@ -57,6 +58,10 @@ vi.mock("@/utils/dashboard/convertPanelData", () => ({
     options: {},
     extras: { isTimeSeries: true },
   }),
+}));
+
+vi.mock("@/utils/clipboard", () => ({
+  copyToClipboard: vi.fn(() => Promise.resolve(true)),
 }));
 
 vi.mock("@/utils/commons", () => ({
@@ -158,6 +163,8 @@ global.console = {
 import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
+import { usePanelDataLoader } from "@/composables/dashboard/usePanelDataLoader";
+import { copyToClipboard } from "@/utils/clipboard";
 
 
 describe("PanelSchemaRenderer", () => {
@@ -1209,32 +1216,57 @@ describe("PanelSchemaRenderer", () => {
     });
 
     it("should emit updated:vrlFunctionFieldList when data has fields", async () => {
+      // Start with empty data so the (non-immediate) data watcher fires when
+      // the loader resolves and populates the ref after mount.
+      const mockData = ref<any[]>([]);
+
+      vi.mocked(usePanelDataLoader).mockReturnValue({
+        data: mockData,
+        loading: ref(false),
+        errorDetail: ref({ message: "", code: "" }),
+        metadata: ref({}),
+        resultMetaData: ref({}),
+        annotations: ref([]),
+        lastTriggeredAt: ref(null),
+        isCachedDataDifferWithCurrentTimeRange: ref(false),
+        searchRequestTraceIds: ref([]),
+        loadingProgressPercentage: ref(0),
+        isPartialData: ref(false),
+      } as any);
+
       wrapper = createWrapper();
-      
-      const mockDataWithFields = [
+      await flushPromises();
+
+      // Simulate the loader delivering query results after mount.
+      mockData.value = [
         [
-          { 
-            timestamp: "2024-01-01T10:00:00Z", 
-            count: 100, 
-            service: "web",
-            method: "GET",
-            status: "200"
+          {
+            ts: "2024-01-01T10:00:00Z",
+            count: 100,
           },
-          { 
-            timestamp: "2024-01-01T11:00:00Z", 
-            count: 150, 
+          {
+            ts: "2024-01-01T11:00:00Z",
+            count: 150,
             service: "api",
-            method: "POST",
-            status: "201"
-          }
-        ]
+          },
+        ],
+        [
+          {
+            source: "a",
+            target: "b",
+            value: 12,
+          },
+        ],
       ];
-      
-      // Set data with multiple fields
-      wrapper.vm.data = { value: mockDataWithFields };
-      await nextTick();
-      
-      expect(wrapper.vm.data).toBeDefined();
+      await flushPromises();
+
+      const emitted = wrapper.emitted("updated:vrlFunctionFieldList") || [];
+      expect(emitted.length).toBeGreaterThan(0);
+      const latestPayload = emitted[emitted.length - 1][0];
+      expect(latestPayload).toEqual([
+        ["ts", "count", "service"],
+        ["source", "target", "value"],
+      ]);
     });
 
     it("should emit update:initialVariableValues during drilldown navigation", () => {
@@ -2252,6 +2284,96 @@ describe("PanelSchemaRenderer", () => {
       expect(wrapper.vm.metadata).toBeDefined();
       expect(wrapper.vm.panelSchema.queries).toBeDefined();
       expect(wrapper.vm.panelSchema.queries.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe("metric copy button", () => {
+    const metricSeries = () => [
+      {
+        _metricText: "1.50KB",
+        _metricLayout: {
+          left: 0,
+          top: 0,
+          width: 200,
+          height: 100,
+          cx: 100,
+          cy: 50,
+          fontSize: 24,
+        },
+      },
+      {
+        _metricText: "2.00MB",
+        _metricLayout: {
+          left: 200,
+          top: 0,
+          width: 200,
+          height: 100,
+          cx: 300,
+          cy: 50,
+          fontSize: 24,
+        },
+      },
+    ];
+
+    const mountMetric = async (series = metricSeries()) => {
+      const w = createWrapper({
+        panelSchema: { ...defaultProps.panelSchema, type: "metric" },
+      });
+      await flushPromises();
+      w.vm.panelData = { chartType: "metric", options: { series } };
+      await nextTick();
+      return w;
+    };
+
+    it("builds one copy item per metric value", async () => {
+      wrapper = await mountMetric();
+      expect(wrapper.vm.metricItems).toHaveLength(2);
+      expect(wrapper.vm.metricItems[0]).toMatchObject({ idx: 0, text: "1.50KB" });
+      expect(wrapper.vm.metricItems[1]).toMatchObject({ idx: 1, text: "2.00MB" });
+    });
+
+    it("skips series without a value or layout", async () => {
+      wrapper = await mountMetric([
+        { _metricText: "", _metricLayout: { left: 0, width: 100 } },
+        { _metricText: "5", _metricLayout: null },
+      ]);
+      expect(wrapper.vm.metricItems).toHaveLength(0);
+    });
+
+    it("returns no items for non-metric panels", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+      wrapper.vm.panelData = { options: { series: metricSeries() } };
+      await nextTick();
+      expect(wrapper.vm.metricItems).toEqual([]);
+    });
+
+    it("zone style spans the value's grid cell", async () => {
+      wrapper = await mountMetric();
+      expect(wrapper.vm.metricZoneStyle(wrapper.vm.metricItems[1])).toEqual({
+        left: "200px",
+        top: "0px",
+        width: "200px",
+        height: "100px",
+      });
+    });
+
+    it("positions the icon beside the number, clamped inside the cell", async () => {
+      wrapper = await mountMetric();
+      const style = wrapper.vm.metricIconStyle(wrapper.vm.metricItems[0]);
+      // jsdom has no layout so calculateWidthText returns 0:
+      // left = (cx 100 - left 0) + 0/2 + 2 = 102; maxLeft = 200 - 28 - 2 = 170.
+      expect(style.left).toBe("102px");
+      expect(style.top).toBe("50px");
+      expect(style.transform).toBe("translateY(-50%)");
+    });
+
+    it("copies the displayed value and flags the copied state", async () => {
+      wrapper = await mountMetric();
+      wrapper.vm.copyMetricItem(wrapper.vm.metricItems[1]);
+      expect(copyToClipboard).toHaveBeenCalledWith("2.00MB", { silent: true });
+      await flushPromises();
+      expect(wrapper.vm.metricCopiedIdx).toBe(1);
     });
   });
 });

@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,16 +15,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div data-test="incident-list" class="tw:flex tw:pt-1">
-    <div class="tw:w-full tw:h-full tw:px-2.5 tw:pb-2.5 tw:flex tw:flex-col">
-      <!-- Header with title and search -->
-      <div class="card-container tw:mb-2.5">
-        <div class="tw:flex tw:justify-between tw:items-center tw:w-full tw:py-3 tw:px-4 tw:h-[68px]">
-          <div class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]" data-test="incidents-list-title">
-            {{ t("alerts.incidents.title") }}
-          </div>
-
-          <div class="tw:flex tw:items-center tw:gap-2">
+  <div data-test="incident-list" class="tw:h-full">
+    <PageLayout
+      :header-class="'tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default'"
+    >
+      <!-- Row 1: standard header — title + actions only. Search moved into the
+           table's own toolbar below. -->
+      <template #header>
+        <AppPageHeader
+          :title="t('alerts.incidents.title')"
+          icon="notifications-active"
+          :subtitle="'Incident management and tracking'"
+        >
+          <template #actions>
             <OButton
               variant="outline"
               size="sm"
@@ -32,34 +35,63 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="refreshIncidents"
               data-test="incident-refresh-btn"
             >Refresh</OButton>
+          </template>
+        </AppPageHeader>
+      </template>
+      <OTable
+        ref="qTableRef"
+        :data="visibleIncidents"
+        :columns="columns"
+        :frame="false"
+        :loading="loading"
+        row-key="id"
+        pagination="client"
+        :page-size="pageSize"
+        :page-size-options="[20, 50, 100, 250, 500]"
+        sorting="client"
+        filter-mode="client"
+        :default-columns="false"
+        :show-global-filter="false"
+        :enable-column-resize="true"
+        :persist-columns="true"
+        table-id="alerts-incident-list"
+        class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
+        data-test="incident-list-table"
+        @row-click="viewIncident"
+      >
+        <template #toolbar>
+          <div class="tw:flex tw:items-center tw:justify-between tw:gap-2 tw:w-full">
+            <OToggleGroup
+              :model-value="statusFilter"
+              @update:model-value="(v) => filterByStatus(v as string)"
+              data-test="incident-status-filter-group"
+            >
+              <OToggleGroupItem value="all" size="sm" data-test="incident-status-filter-all">
+                <template #icon-left><OIcon name="format-list-bulleted" size="sm" /></template>
+                {{ t("alerts.incidents.allStatuses") }}
+              </OToggleGroupItem>
+              <OToggleGroupItem value="open" size="sm" data-test="incident-status-filter-open">
+                <template #icon-left><OIcon name="radio-button-unchecked" size="sm" /></template>
+                {{ t("alerts.incidents.statusOpen") }}
+              </OToggleGroupItem>
+              <OToggleGroupItem value="acknowledged" size="sm" data-test="incident-status-filter-acknowledged">
+                <template #icon-left><OIcon name="visibility" size="sm" /></template>
+                {{ t("alerts.incidents.statusAcknowledged") }}
+              </OToggleGroupItem>
+              <OToggleGroupItem value="resolved" size="sm" data-test="incident-status-filter-resolved">
+                <template #icon-left><OIcon name="task-alt" size="sm" /></template>
+                {{ t("alerts.incidents.statusResolved") }}
+              </OToggleGroupItem>
+            </OToggleGroup>
             <OSearchInput
               v-model="searchQuery"
+              class="tw:w-64"
               :placeholder="t('alerts.incidents.search')"
               data-test="incident-search-input"
               clearable
             />
           </div>
-        </div>
-      </div>
-      <!-- Incidents table -->
-      <div class="card-container tw:overflow-hidden tw:flex-1 tw:min-h-0">
-        <OTable
-          ref="qTableRef"
-          :data="visibleIncidents"
-          :columns="columns"
-          :loading="loading"
-          row-key="id"
-          pagination="client"
-          :page-size="pageSize"
-          :page-size-options="[20, 50, 100, 250, 500]"
-          sorting="client"
-          filter-mode="client"
-          :default-columns="false"
-          :show-global-filter="false"
-          class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
-          data-test="incident-list-table"
-          @row-click="viewIncident"
-        >
+        </template>
         <template #cell-status="{ row }">
           <span
             class="status-badge"
@@ -78,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template #cell-title="{ row }">
           <div class="tw:flex tw:items-center tw:gap-1">
-            <span class="tw:font-medium">
+            <span>
               {{ row.title || formatDimensions(row.group_values) }}
             </span>
           </div>
@@ -91,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="dimension-badge"
               :class="getDimensionColorClass(key)"
             >
-              <span class="tw:font-medium">{{ key }}</span>=<span>{{ value }}</span>
+              <span>{{ key }}</span>=<span>{{ value }}</span>
               <OTooltip :delay="300" :content="key + '=' + value" />
             </span>
             <span
@@ -106,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-for="[key, value] in getSortedDimensions(row.group_values).slice(2)"
                       :key="key"
                     >
-                      <span class="tw:font-medium">{{ key }}</span>=<span>{{ value }}</span>
+                      <span>{{ key }}</span>=<span>{{ value }}</span>
                     </div>
                   </div>
                 </template>
@@ -143,7 +175,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Empty state -->
         <template #empty>
           <div v-if="!loading" class="tw:flex tw:items-center tw:justify-center tw:w-full tw:h-full">
-            <no-data />
+            <OEmptyState
+              size="hero"
+              preset="no-incidents"
+              :filtered="!!searchQuery || statusFilter !== 'all'"
+              :hide-action="!searchQuery && statusFilter === 'all'"
+              @action="(id) => id === 'clear-filters' ? clearFilters() : null"
+            />
           </div>
         </template>
 
@@ -156,8 +194,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
         </OTable>
-      </div>
-    </div>
+    </PageLayout>
   </div>
 </template>
 
@@ -165,39 +202,55 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, computed, onMounted, watch, nextTick } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { useRouter } from "vue-router";
+import { useRouter, useRoute } from "vue-router";
 import { formatToReadable } from "@/utils/date";
 import incidentsService, { Incident } from "@/services/incidents";
-import NoData from "../shared/grid/NoData.vue";
+import PageLayout from "@/components/common/PageLayout.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
 export default defineComponent({
   name: "IncidentList",
   components: {
-    NoData,
+    PageLayout,
+    AppPageHeader,
+    OEmptyState,
     OButton,
     OSpinner,
     OSearchInput,
     OTooltip,
     OIcon,
     OTable,
+    OToggleGroup,
+    OToggleGroupItem,
 },
   setup() {
     const { t } = useI18n();
     const store = useStore();
     const router = useRouter();
+    const route = useRoute();
 
     const qTableRef: any = ref(null);
     const loading = ref(false);
     const allIncidents = ref<Incident[]>([]);
     const searchQuery = ref("");
+    const validStatuses = ["all", "open", "acknowledged", "resolved"];
+    const statusFilter = ref(
+      validStatuses.includes(route.query.status as string)
+        ? (route.query.status as string)
+        : "all"
+    );
     const isRestoringState = ref(false);
     const pageSize = ref(20);
 
@@ -206,19 +259,25 @@ export default defineComponent({
         id: "#",
         header: "#",
         accessorKey: "#",
-        size: 67,
+        size: TABLE_INDEX_COL_SIZE,
         meta: { align: "center" },
       },
       {
         id: "title",
         header: t("alerts.incidents.title_field"),
         accessorKey: "title",
-        meta: { align: "left" },
+        resizable: true,
+        hideable: true,
+        size: COL.name,
+        minSize: 160,
+        meta: { align: "left", flex: true },
       },
       {
         id: "severity",
         header: t("alerts.incidents.severity"),
         accessorKey: "severity",
+        resizable: true,
+        hideable: true,
         size: 100,
         meta: { align: "left" },
       },
@@ -226,6 +285,8 @@ export default defineComponent({
         id: "status",
         header: t("alerts.incidents.status"),
         accessorKey: "status",
+        resizable: true,
+        hideable: true,
         size: 120,
         meta: { align: "left" },
       },
@@ -233,6 +294,8 @@ export default defineComponent({
         id: "dimensions",
         header: "Dimensions",
         accessorKey: "group_values",
+        resizable: true,
+        hideable: true,
         size: 400,
         meta: { align: "left" },
       },
@@ -240,6 +303,8 @@ export default defineComponent({
         id: "alert_count",
         header: t("alerts.incidents.alertCount"),
         accessorKey: "alert_count",
+        resizable: true,
+        hideable: true,
         size: 80,
         meta: { align: "center" },
       },
@@ -248,6 +313,8 @@ export default defineComponent({
         header: t("alerts.incidents.lastAlertAt"),
         accessorKey: "last_alert_at",
         sortable: true,
+        resizable: true,
+        hideable: true,
         size: 180,
         meta: { align: "left" },
       },
@@ -285,7 +352,11 @@ export default defineComponent({
     };
 
     const visibleIncidents = computed(() => {
-      const filtered = applyFrontendSearch(allIncidents.value, searchQuery.value);
+      let filtered = allIncidents.value;
+      if (statusFilter.value !== "all") {
+        filtered = filtered.filter((incident) => incident.status === statusFilter.value);
+      }
+      filtered = applyFrontendSearch(filtered, searchQuery.value);
       return filtered.map((incident, i) => ({ ...incident, "#": i + 1 }));
     });
 
@@ -321,6 +392,7 @@ export default defineComponent({
     const viewIncident = (incident: Incident) => {
       store.dispatch('incidents/setIncidents', {
         searchQuery: searchQuery.value,
+        statusFilter: statusFilter.value,
         pagination: { page: 1, rowsPerPage: 20 },
         organizationIdentifier: store.state.selectedOrganization.identifier
       });
@@ -330,6 +402,27 @@ export default defineComponent({
         params: { id: incident.id },
         query: { org_identifier: store.state.selectedOrganization.identifier },
       });
+    };
+
+    const savePageState = () => {
+      if (isRestoringState.value) return;
+      store.dispatch('incidents/setIncidents', {
+        searchQuery: searchQuery.value,
+        statusFilter: statusFilter.value,
+        pagination: { page: 1, rowsPerPage: 20 },
+        organizationIdentifier: store.state.selectedOrganization.identifier
+      });
+    };
+
+    const filterByStatus = (value: string) => {
+      statusFilter.value = value;
+      store.dispatch('incidents/setStatusFilter', value);
+      savePageState();
+    };
+
+    const clearFilters = () => {
+      searchQuery.value = "";
+      filterByStatus("all");
     };
 
     const updateStatus = async (incident: Incident, newStatus: "open" | "acknowledged" | "resolved") => {
@@ -467,6 +560,9 @@ export default defineComponent({
         if (savedState.searchQuery !== undefined) {
           searchQuery.value = savedState.searchQuery;
         }
+        if (savedState.statusFilter !== undefined) {
+          statusFilter.value = savedState.statusFilter;
+        }
         return true;
       }
       return false;
@@ -490,6 +586,7 @@ export default defineComponent({
       if (hasRestoredState) {
         store.dispatch('incidents/setIncidents', {
           searchQuery: searchQuery.value,
+          statusFilter: statusFilter.value,
           pagination: { page: 1, rowsPerPage: 20 },
           organizationIdentifier: store.state.selectedOrganization.identifier
         });
@@ -499,14 +596,7 @@ export default defineComponent({
       isRestoringState.value = false;
     });
 
-    watch(() => searchQuery.value, () => {
-      if (isRestoringState.value) return;
-      store.dispatch('incidents/setIncidents', {
-        searchQuery: searchQuery.value,
-        pagination: { page: 1, rowsPerPage: 20 },
-        organizationIdentifier: store.state.selectedOrganization.identifier
-      });
-    });
+    watch(() => searchQuery.value, savePageState);
 
     const refreshIncidents = async () => {
       await loadIncidents();
@@ -523,6 +613,9 @@ export default defineComponent({
       allIncidents,
       visibleIncidents,
       searchQuery,
+      statusFilter,
+      filterByStatus,
+      clearFilters,
       columns,
       pageSize,
       loadIncidents,
@@ -648,14 +741,9 @@ body.body--dark {
 }
 
 .badge-more {
-  background: #e5e7eb;
-  color: #6b7280;
+  background: var(--color-surface-panel);
+  color: var(--o2-text-secondary);
   font-weight: 500;
-}
-
-body.body--dark .badge-more {
-  background: #4b5563;
-  color: #d1d5db;
 }
 
 /* Color scheme matching schema.scss type badges */

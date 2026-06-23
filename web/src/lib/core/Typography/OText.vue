@@ -47,17 +47,16 @@ const variantClasses: Record<NonNullable<TextProps["variant"]>, string> = {
   // Page title: compact, authoritative. Designed for the page header rail.
   // Target: same visual weight as Datadog / Grafana page titles — quiet but clear.
   "page-title": [
-    "tw:text-sm tw:font-semibold",
+    "tw:text-sm tw:font-medium",
     "tw:text-typography-page-title",
     "tw:leading-tight",
   ].join(" "),
 
-  // Section group label: uppercase, wide tracking, secondary color.
-  // Like Datadog's "LOGS", "MONITORS" subsection headers — they recede visually.
+  // Section group label (gray eyebrow). Recedes via color + size, not weight.
   "section": [
-    "tw:text-xs tw:font-semibold",
+    "tw:text-[11.5px] tw:font-medium",
     "tw:text-typography-section",
-    "tw:uppercase tw:tracking-wide tw:leading-none",
+    "tw:leading-none",
   ].join(" "),
 
   // Panel / card title: mixed-case, slightly heavier than body, primary color.
@@ -74,15 +73,15 @@ const variantClasses: Record<NonNullable<TextProps["variant"]>, string> = {
     "tw:text-typography-body",
   ].join(" "),
 
-  // Emphasized body: same size as body but semibold. Names, totals, values.
+  // Emphasized body: same size as body but medium. Names, totals, values.
   "body-strong": [
-    "tw:text-sm tw:font-semibold",
+    "tw:text-sm tw:font-medium",
     "tw:text-typography-body",
   ].join(" "),
 
-  // Compact label: 12px semibold. Filter labels, column sub-labels, pill text.
+  // Compact label: 12px medium. Filter labels, column sub-labels, pill text.
   "label": [
-    "tw:text-xs tw:font-semibold",
+    "tw:text-xs tw:font-medium",
     "tw:text-typography-label",
     "tw:leading-none",
   ].join(" "),
@@ -100,6 +99,8 @@ const variantClasses: Record<NonNullable<TextProps["variant"]>, string> = {
   // For actual executable code / query content, prefer OCode instead.
   "mono": [
     "tw:text-xs tw:[font-family:var(--font-mono)]",
+    // HANDOFF §2.1: tabular figures + tight tracking for IDs/counts/timestamps.
+    "tw:[font-feature-settings:'tnum'] tw:tracking-[-0.2px]",
     "tw:text-typography-mono",
     "tw:leading-none",
   ].join(" "),

@@ -56,7 +56,11 @@ function makeMockContext(overrides: Partial<any> = {}): any {
       queries: [
         {
           customQuery: true,
-          fields: { x: [], y: [{ label: "Value" }] },
+          fields: {
+            x: [],
+            y: [{ label: "Value" }],
+            z: [{ label: "Value", alias: "z" }],
+          },
         },
       ],
     },

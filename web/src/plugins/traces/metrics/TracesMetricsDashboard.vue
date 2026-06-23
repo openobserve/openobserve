@@ -27,6 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="show"
             ref="dashboardChartsRef"
             :viewOnly="true"
+            :frame="false"
             :dashboardData="dashboardData || {}"
             :currentTimeObj="currentTimeObj"
             :allowAlertCreation="false"
@@ -162,13 +163,6 @@ const streamFields = computed(() => {
   return searchObj.data.stream.selectedStreamFields || [];
 });
 
-// Use filters from searchObj
-const showErrorOnly = computed({
-  get: () => searchObj.meta.showErrorOnly,
-  set: (val) => {
-    searchObj.meta.showErrorOnly = val;
-  },
-});
 const rangeFilters = computed(() => searchObj.meta.metricsRangeFilters);
 
 // Check if ANY RED panel has a time-based brush selection
@@ -762,9 +756,13 @@ defineExpose({
 
 // Charts wrapper
 .charts-wrapper {
-  padding: 0.25rem;
   overflow: hidden;
   will-change: transform, opacity;
+
+  :deep(.render-dashboard-charts-container){
+    padding-left: 0.2rem;
+    padding-right: 0.2rem;
+  }
 }
 
 // Dark mode support

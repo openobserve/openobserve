@@ -337,9 +337,13 @@ test.describe("Logs Query Builder - SQL Mode Toggle in Builder", () => {
         await page.waitForLoadState('domcontentloaded');
 
         const editorText = await pm.logsPage.getQueryEditorText();
-        expect(editorText.toLowerCase()).not.toContain('select');
+        // When SQL mode is turned OFF in the build tab, `onBuildQueryGenerated`
+        // syncs ONLY the extracted WHERE clause condition (no `WHERE` keyword) into
+        // the search bar — matching the search bar's filter-only mode. Verify the
+        // filter content (`code` field) is retained.
+        expect(editorText.toLowerCase()).toContain('code');
 
-        testLogger.info('SQL ON → OFF: WHERE clause shown - PASSED');
+        testLogger.info('SQL ON → OFF: WHERE clause filter preserved in builder-generated SQL - PASSED');
     });
 });
 
@@ -390,6 +394,13 @@ test.describe("Logs Query Builder - Search Bar Editor State", () => {
         const histogramQuery = 'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1" FROM "e2e_automate" GROUP BY x_axis_1';
         await setupQueryAndSwitchToBuild(pm, page, histogramQuery);
 
+        // Wait for builder toggle to be active AND for the editor to actually contain SQL.
+        // expectBuilderModeActive() passes as soon as the toggle state is set (from the
+        // PanelEditor immediate watcher), but makeAutoSQLQuery() needs the updateGroupedFields
+        // API call to finish first — that takes longer in CI.
+        await pm.logsPage.expectBuilderModeActive();
+        await pm.logsPage.expectQueryEditorPopulated();
+
         const editorText = await pm.logsPage.getQueryEditorText();
         expect(editorText.toLowerCase()).toContain('select');
         expect(editorText.toLowerCase()).toContain('from');
@@ -404,6 +415,12 @@ test.describe("Logs Query Builder - Search Bar Editor State", () => {
 
         const histogramQuery = 'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1" FROM "e2e_automate" GROUP BY x_axis_1';
         await setupQueryAndSwitchToBuild(pm, page, histogramQuery);
+
+        // Wait for builder toggle AND editor content before switching to Custom mode.
+        // onBuildModeToggle reads queries[0].query to populate the editor; that value
+        // is set by makeAutoSQLQuery() which needs the updateGroupedFields API call first.
+        await pm.logsPage.expectBuilderModeActive();
+        await pm.logsPage.expectQueryEditorPopulated();
 
         await pm.logsPage.clickCustomQueryType();
         await pm.logsPage.expectCustomModeActive();

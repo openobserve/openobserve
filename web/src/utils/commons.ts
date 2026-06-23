@@ -1017,7 +1017,10 @@ export const createFolder = async (store: any, data: any) => {
       store.state.selectedOrganization.identifier,
       data,
     );
-    await getFoldersList(store);
+    await Promise.all([
+      getFoldersList(store),
+      getFoldersListByType(store, "dashboards"),
+    ]);
     return newFolder;
   } catch (error) {
     throw error;
@@ -1045,7 +1048,10 @@ export const updateFolder = async (store: any, folderId: any, data: any) => {
       folderId,
       data,
     );
-    await getFoldersList(store);
+    await Promise.all([
+      getFoldersList(store),
+      getFoldersListByType(store, "dashboards"),
+    ]);
   } catch (error) {
     throw error;
   }

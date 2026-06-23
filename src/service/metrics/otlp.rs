@@ -102,7 +102,15 @@ pub async fn otlp_json(
     body: Bytes,
     user: crate::common::meta::ingestion::IngestUser,
 ) -> Result<HttpResponse, std::io::Error> {
-    let request = match serde_json::from_slice::<ExportMetricsServiceRequest>(body.as_ref()) {
+    let mut body_json = match serde_json::from_slice::<json::Value>(body.as_ref()) {
+        Ok(v) => v,
+        Err(e) => {
+            log::error!("[METRICS:OTLP] Invalid json: {e}");
+            return Ok(MetaHttpResponse::bad_request(format!("Invalid json: {e}")));
+        }
+    };
+    super::otlp_json_compat::normalize(&mut body_json);
+    let request = match serde_json::from_value::<ExportMetricsServiceRequest>(body_json) {
         Ok(req) => req,
         Err(e) => {
             log::error!("[METRICS:OTLP] Invalid json: {e}");
@@ -161,8 +169,7 @@ pub async fn handle_otlp_request(
     // End get user defined schema
 
     // associated pipeline
-    let mut stream_executable_pipelines: HashMap<String, Option<ExecutablePipeline>> =
-        HashMap::new();
+    let mut stream_executable_pipelines: HashMap<String, Vec<ExecutablePipeline>> = HashMap::new();
     let mut stream_pipeline_inputs: HashMap<String, Vec<json::Value>> = HashMap::new();
 
     // realtime alerts
@@ -214,7 +221,7 @@ pub async fn handle_otlp_request(
                 // get stream pipeline
                 if !stream_executable_pipelines.contains_key(&metric_name) {
                     let pipeline_params =
-                        crate::service::ingestion::get_stream_executable_pipeline(&stream_param)
+                        crate::service::ingestion::get_stream_executable_pipelines(&stream_param)
                             .await;
                     stream_executable_pipelines.insert(metric_name.clone(), pipeline_params);
                 }
@@ -270,7 +277,17 @@ pub async fn handle_otlp_request(
                             process_summary(&rec, summary, metadata, &mut prom_meta)
                         }
                     },
-                    None => vec![],
+                    None => {
+                        // a flattened oneof that fails to deserialize turns into
+                        // None instead of an error, so surface it here
+                        log::warn!(
+                            "[METRICS:OTLP] metric {metric_name} has no data points (unsupported or undecodable metric type), skipping"
+                        );
+                        partial_success.rejected_data_points += 1;
+                        partial_success.error_message =
+                            format!("metric {metric_name} has no data points");
+                        vec![]
+                    }
                 };
 
                 // update schema metadata
@@ -343,7 +360,7 @@ pub async fn handle_otlp_request(
                         // get stream pipeline
                         if !stream_executable_pipelines.contains_key(&local_metric_name) {
                             let pipeline_params =
-                                crate::service::ingestion::get_stream_executable_pipeline(
+                                crate::service::ingestion::get_stream_executable_pipelines(
                                     &stream_param,
                                 )
                                 .await;
@@ -363,8 +380,7 @@ pub async fn handle_otlp_request(
                     // ready to be buffered for downstream processing
                     if stream_executable_pipelines
                         .get(&local_metric_name)
-                        .unwrap()
-                        .is_some()
+                        .is_some_and(|v| !v.is_empty())
                     {
                         stream_pipeline_inputs
                             .entry(local_metric_name.clone())
@@ -393,8 +409,11 @@ pub async fn handle_otlp_request(
     }
 
     // process records buffered for pipeline processing
-    for (stream_name, exec_pl_option) in &stream_executable_pipelines {
-        if let Some(exec_pl) = exec_pl_option {
+    for (stream_name, pipelines) in &stream_executable_pipelines {
+        if pipelines.is_empty() {
+            continue;
+        }
+        for exec_pl in pipelines {
             let Some(pipeline_inputs) = stream_pipeline_inputs.remove(stream_name) else {
                 let err_msg = format!(
                     "[Ingestion]: Stream {stream_name} has pipeline, but inputs failed to be buffered. BUG",
@@ -578,14 +597,11 @@ pub async fn handle_otlp_request(
         let fsync = false;
         let mut req_stats = write_file(&writer, org_id, &stream_name, stream_data, fsync).await?;
 
-        let fns_length: usize =
-            stream_executable_pipelines
-                .get(&stream_name)
-                .map_or(0, |exec_pl_option| {
-                    exec_pl_option
-                        .as_ref()
-                        .map_or(0, |exec_pl| exec_pl.num_of_func())
-                });
+        let fns_length: usize = stream_executable_pipelines
+            .get(&stream_name)
+            .map_or(0, |pipelines| {
+                pipelines.iter().map(|exec_pl| exec_pl.num_of_func()).sum()
+            });
         req_stats.response_time = start.elapsed().as_secs_f64();
         let email_str = user.to_email();
         req_stats.user_email = if email_str.is_empty() {
@@ -1008,9 +1024,11 @@ fn format_response(
             partial_success.rejected_data_points,
             partial_success.error_message
         );
-        partial_success.error_message =
-            "Some data points were rejected due to exceeding the allowed retention period"
-                .to_string();
+        if partial_success.error_message.is_empty() {
+            partial_success.error_message =
+                "Some data points were rejected due to exceeding the allowed retention period"
+                    .to_string();
+        }
         ExportMetricsServiceResponse {
             partial_success: Some(partial_success),
         }
@@ -1891,6 +1909,7 @@ mod tests {
                     value: Some(AnyValue {
                         value: Some(any_value::Value::StringValue("test-service".to_string())),
                     }),
+                    ..Default::default()
                 }],
                 time_unix_nano: 1640995200000000000,
                 value: Some(exemplar::Value::AsDouble(42.0)),
@@ -1955,18 +1974,21 @@ mod tests {
                         value: Some(AnyValue {
                             value: Some(any_value::Value::StringValue("web".to_string())),
                         }),
+                        ..Default::default()
                     },
                     KeyValue {
                         key: "version".to_string(),
                         value: Some(AnyValue {
                             value: Some(any_value::Value::StringValue("1.0.0".to_string())),
                         }),
+                        ..Default::default()
                     },
                     KeyValue {
                         key: "count".to_string(),
                         value: Some(AnyValue {
                             value: Some(any_value::Value::IntValue(100)),
                         }),
+                        ..Default::default()
                     },
                 ],
                 time_unix_nano: 1640995200000000000,

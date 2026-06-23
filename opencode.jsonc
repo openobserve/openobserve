@@ -1,0 +1,61 @@
+{
+  // OpenCode configuration for the e2e_ci_council_of_agents pipeline.
+  // Used by .github/workflows/e2e-council.yml to run the CI test-generation agents on DeepSeek.
+  // Docs: https://opencode.ai/docs/  — verify provider shape against current docs at build time.
+  "$schema": "https://opencode.ai/config.json",
+
+  "provider": {
+    "deepseek": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "DeepSeek",
+      "options": {
+        "baseURL": "https://api.deepseek.com",
+        "apiKey": "{env:DEEPSEEK_API_KEY_E2E}"
+      },
+      "models": {
+        "deepseek-v4-pro": {
+          "name": "DeepSeek-V4-Pro",
+          "limit": { "context": 1048576, "output": 262144 }
+        }
+      }
+    }
+  },
+
+  // Default model for runs that don't pass --model explicitly.
+  // The workflow passes --model deepseek/deepseek-v4-pro per agent invocation.
+  "model": "deepseek/deepseek-v4-pro",
+
+  // Register the CI agents explicitly so `--agent e2e-ci-*` resolves deterministically.
+  // OpenCode does NOT auto-discover agents nested in .opencode/agents/<subdir>/ (the first CI
+  // run fell back to the default agent), so we point each name at its prompt file here.
+  "agent": {
+    "e2e-ci-triage": {
+      "mode": "primary",
+      "prompt": "{file:./.opencode/agents/e2e_ci_council_of_agents/e2e-ci-triage.md}"
+    },
+    "e2e-ci-analyst": {
+      "mode": "primary",
+      "prompt": "{file:./.opencode/agents/e2e_ci_council_of_agents/e2e-ci-analyst.md}"
+    },
+    "e2e-ci-architect": {
+      "mode": "primary",
+      "prompt": "{file:./.opencode/agents/e2e_ci_council_of_agents/e2e-ci-architect.md}"
+    },
+    "e2e-ci-engineer": {
+      "mode": "primary",
+      "prompt": "{file:./.opencode/agents/e2e_ci_council_of_agents/e2e-ci-engineer.md}"
+    },
+    "e2e-ci-sentinel": {
+      "mode": "primary",
+      "prompt": "{file:./.opencode/agents/e2e_ci_council_of_agents/e2e-ci-sentinel.md}"
+    },
+    "e2e-ci-healer": {
+      "mode": "primary",
+      "prompt": "{file:./.opencode/agents/e2e_ci_council_of_agents/e2e-ci-healer.md}"
+    },
+    "e2e-ci-responder": {
+      "mode": "primary",
+      "prompt": "{file:./.opencode/agents/e2e_ci_council_of_agents/e2e-ci-responder.md}"
+    }
+  }
+}

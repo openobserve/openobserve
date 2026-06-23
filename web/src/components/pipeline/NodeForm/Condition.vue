@@ -316,6 +316,27 @@ const getDefaultStreamRoute: any = () => {
   };
 };
 
+// Backend returns operators in lowercase (e.g. "contains", "not_contains").
+// Normalize them to the canonical casing expected by FilterCondition's triggerOperators.
+const OPERATOR_NORMALIZE_MAP: Record<string, string> = {
+  contains: "Contains",
+  notcontains: "NotContains",
+  not_contains: "NotContains",
+};
+
+const normalizeConditionOperators = (group: any): any => {
+  if (!group || group.filterType !== "group" || !Array.isArray(group.conditions)) return group;
+  group.conditions = group.conditions.map((item: any) => {
+    if (item.filterType === "group") return normalizeConditionOperators(item);
+    if (item.filterType === "condition" && item.operator) {
+      const normalized = OPERATOR_NORMALIZE_MAP[item.operator.toLowerCase()];
+      if (normalized) item.operator = normalized;
+    }
+    return item;
+  });
+  return group;
+};
+
 // Initialize condition group - V2: Auto-convert V0/V1 to V2 format
 // Supports three versions:
 // - V0: Flat array of conditions with implicit AND between all (no groups)
@@ -337,7 +358,7 @@ const getDefaultConditionGroup = (): ConditionGroup => {
         // V0: Flat array format - convert to V2
         // V0 had implicit AND between all conditions (no groups)
         const converted = convertV0ToV2(conditions);
-        return ensureIds(converted) as any;
+        return normalizeConditionOperators(ensureIds(converted) as any);
       } else if (version === 1) {
         // V1: Convert to V2
         let converted;
@@ -348,10 +369,10 @@ const getDefaultConditionGroup = (): ConditionGroup => {
           // V1 Frontend format
           converted = convertV1ToV2(conditions);
         }
-        return ensureIds(converted) as any;
+        return normalizeConditionOperators(ensureIds(converted) as any);
       } else {
         // V2: Use as-is, but ensure all groupIds and ids exist recursively
-        return ensureIds(conditions) as any;
+        return normalizeConditionOperators(ensureIds(conditions) as any);
       }
     } catch (error) {
       console.error("Error converting condition to group format:", error);

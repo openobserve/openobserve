@@ -15,51 +15,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:p-2">
-    <div class="tw:text-[16px]">
-      <CopyContent :content="content" />
-      <div class="tw:font-bold tw:pt-6 tw:pb-2">
-        Click <a :href="docURL" target="_blank" class="text-blue-500 hover:text-blue-600" style="text-decoration: underline">here</a> to check further documentation.
-      </div>
-    </div>
-  </div>
+  <DataSourceSetupCard slug="sqlServer" />
 </template>
 
-<script lang="ts">
-import { defineComponent, ref, type Ref } from "vue";
-import config from "../../../aws-exports";
-import { useStore } from "vuex";
-import { getImageURL } from "../../../utils/zincutils";
-import CopyContent from "@/components/CopyContent.vue";
-import useIngestion from "@/composables/useIngestion";
+<script setup lang="ts">
+import DataSourceSetupCard from "@/components/ingestion/setupCard/DataSourceSetupCard.vue";
 
-export default defineComponent({
-  name: "AWSConfig",
-  props: {
-    currOrgIdentifier: {
-      type: String,
-    },
-    currUserEmail: {
-      type: String,
-    },
-  },
-  components: { CopyContent },
-  setup(props) {
-    const name = "sqlServer";
-    const { endpoint, databaseContent, databaseDocURLs } = useIngestion();
-    const content = databaseContent.replace("[STREAM_NAME]", name.replace(" ", "_").toLowerCase());
-    const docURL = databaseDocURLs[name];
-    return {
-      config,
-      docURL,
-      getImageURL,
-      content,
-      name,
-      endpoint,
-      databaseContent,
-      databaseDocURLs,
-
-    };
-  },
-});
+defineProps<{
+  currOrgIdentifier?: string;
+  currUserEmail?: string;
+}>();
 </script>

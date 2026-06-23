@@ -100,14 +100,6 @@ pub async fn create(
         data.toggle_ingestion_logs = toggle_ingestion_logs;
     }
 
-    #[cfg(feature = "enterprise")]
-    if let Some(streaming_aggregation_enabled) = settings.streaming_aggregation_enabled
-        && config::get_config().common.feature_query_streaming_aggs
-    {
-        field_found = true;
-        data.streaming_aggregation_enabled = streaming_aggregation_enabled;
-    }
-
     if let Some(enable_streaming_search) = settings.enable_streaming_search {
         field_found = true;
         data.enable_streaming_search = enable_streaming_search;
@@ -169,7 +161,6 @@ pub async fn create(
 
     // this will always be taken from orgs table, never from settings
     data.free_trial_expiry = None;
-    data.org_storage_enabled = false;
     match set_org_setting(&org_id, &data).await {
         Ok(()) => (
             StatusCode::OK,

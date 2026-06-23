@@ -6,8 +6,8 @@ option java_outer_classname = "planProto";
 
 package cluster;
 
-import "datafusion_common/datafusion_common.proto";
-import "datafusion/datafusion.proto";
+import "datafusion/proto-common/proto/datafusion_common.proto";
+import "datafusion/proto/proto/datafusion.proto";
 import "cluster/common.proto";
 import "cluster/search.proto";
 
@@ -124,9 +124,9 @@ message IdxOptimizeMode {
 }
 
 message SimpleTopN {
-  string field = 1;
-  uint32 limit = 2;
-  bool     asc = 3;
+  repeated string fields = 1;
+  uint32          limit  = 2;
+  bool            asc    = 3;
 }
 
 message SimpleDistinct {

@@ -40,9 +40,12 @@ env:
   ZO_CREATE_ORG_THROUGH_INGESTION: true
   ZO_UTF8_VIEW_ENABLED: false
   ZO_ENABLE_CROSS_LINKING: true
+  # Timechart (visualize) tab is hidden by default; enable it so visualize E2E tests can reach it.
+  ZO_TIMECHART_ENABLED: true
   # Allow alert destinations to target localhost so the test validation stream
   # (http://localhost:5080/api/.../..._json) is not blocked by the SSRF guard.
   ZO_SSRF_ALLOW_LOOPBACK: true
+  ZO_MODEL_PRICING_ENABLED: true
   UPLOAD_TO_TESTDINO: ${{ vars.UPLOAD_TO_TESTDINO || 'false' }}
 
 jobs:
@@ -171,8 +174,20 @@ jobs:
                 "org.spec.js",
                 "theme-management.spec.js",
                 "ingestion-config.spec.js",
+                "ingestionTokens.spec.js",
                 "landingPage.spec.js",
                 "languageTranslation.spec.js",
+                "model-pricing.spec.js",
+                "edition-features.spec.js",
+                "logsqueries.sql-comments.spec.js",
+                "iam-form-validation.spec.js",
+                "regex-patterns-form-validation.spec.js",
+                "cipher-keys-form-validation.spec.js",
+                "settings-form-validation.spec.js",
+                "ai-toolsets-form-validation.spec.js",
+                "shared-components-form-validation.spec.js",
+                "onboarding-form-validation.spec.js",
+                "rum-form-validation.spec.js",
               ]
           - testfolder: "Logs-Builder-Basic"
             browser: "chrome"
@@ -226,9 +241,12 @@ jobs:
                 "alerts-import.spec.js",
                 # "alerts-advanced.spec.js",
                 # "alerts-scheduled-features.spec.js",
+                "alerts-metrics-notification.spec.js",
                 "alerts-destinations-prebuilt.spec.js",
                 "alerts-vrl-encoding.spec.js",
                 "alerts-template-prebuilt-guard.spec.js",
+                "alerts-form-validation.spec.js",
+                "anomaly-detection-form-validation.spec.js",
               ]
           - testfolder: "Dashboards-Core"
             browser: "chrome"
@@ -245,7 +263,9 @@ jobs:
                 "dashboard-sql-autocomplete.spec.js",
                 "dashboard-share-link.spec.js",
                 "crossLinking.spec.js",
+                "dashboard-multi-sql.spec.js",
                 "crossLinkMultiStream.spec.js",
+                "dashboards-form-validation.spec.js",
               ]
           - testfolder: "Dashboards-Settings"
             browser: "chrome"
@@ -296,6 +316,7 @@ jobs:
                 "pipeline-history.spec.js",
                 "scheduled-pipeline-query-builder.spec.js",
                 # "remotepipeline.spec.js"
+                "pipelines-form-validation.spec.js",
               ]
           - testfolder: "Functions"
             browser: "chrome"
@@ -304,6 +325,8 @@ jobs:
                 "js-transform-type.spec.js",
                 "row-expansion.spec.js",
                 "enrichment-table-url.spec.js",
+                "functions-form-validation.spec.js",
+                "action-scripts-form-validation.spec.js",
               ]
           - testfolder: "Reports"
             browser: "chrome"
@@ -312,6 +335,7 @@ jobs:
                 "reportsScheduleNow.spec.js",
                 "reportsScheduleLater.spec.js",
                 "reportFolders.spec.js",
+                "reports-form-validation.spec.js",
               ]
           - testfolder: "Streams"
             browser: "chrome"
@@ -321,6 +345,7 @@ jobs:
                 "streamname.spec.js",
                 "streaming.spec.js",
                 "stream-settings.spec.js",
+                "streams-form-validation.spec.js",
               ]
           - testfolder: "Traces"
             browser: "chrome"
@@ -350,6 +375,7 @@ jobs:
                 "metrics-table-column-order.spec.js",
                 "metrics-promql-builder.spec.js",
                 "promqlAutocomplete.spec.js",
+                "metrics-share-deep-link.spec.js",
               ]
           - testfolder: "Dashboards-Variables"
             browser: "chrome"
@@ -451,7 +477,7 @@ jobs:
 
       - name: Cache Playwright browser
         id: playwright-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.cache/ms-playwright
           key: playwright-chromium-${{ runner.os }}-${{ hashFiles('tests/ui-testing/package-lock.json') }}
@@ -475,21 +501,27 @@ jobs:
             CURRENT_ATTEMPT=${{ github.run_attempt }}
 
             # Get all jobs from the run
+            # Fallback to empty jobs array on network/rate-limit errors so the step
+            # never fails due to a transient GitHub API issue.
             ALL_JOBS_RESPONSE=$(curl -s -H "Authorization: token $GH_TOKEN" \
               -H "Accept: application/vnd.github.v3+json" \
-              "https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs?filter=all&per_page=100")
+              "https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs?filter=all&per_page=100" \
+              || echo '{"jobs":[]}')
 
             # Count jobs that are NOT completed (actually running in this attempt)
-            CURRENT_ATTEMPT_JOBS=$(echo "$ALL_JOBS_RESPONSE" | jq -r "[.jobs[] | select(.name | startswith(\"e2e /\")) | select(.run_attempt == $CURRENT_ATTEMPT) | select(.status != \"completed\")] | length")
+            # Fall back to "0" if jq fails (e.g. API returned an error body instead of JSON).
+            CURRENT_ATTEMPT_JOBS=$(echo "$ALL_JOBS_RESPONSE" | jq -r "[.jobs[] | select(.name | startswith(\"e2e /\")) | select(.run_attempt == $CURRENT_ATTEMPT) | select(.status != \"completed\")] | length" 2>/dev/null || echo "0")
 
             # Count total unique matrix job names (from attempt 1)
-            TOTAL_MATRIX_JOBS=$(echo "$ALL_JOBS_RESPONSE" | jq -r "[.jobs[] | select(.name | startswith(\"e2e /\")) | select(.run_attempt == 1) | .name] | unique | length")
+            TOTAL_MATRIX_JOBS=$(echo "$ALL_JOBS_RESPONSE" | jq -r "[.jobs[] | select(.name | startswith(\"e2e /\")) | select(.run_attempt == 1) | .name] | unique | length" 2>/dev/null || echo "0")
 
             echo "::notice::Total unique matrix job names: $TOTAL_MATRIX_JOBS"
             echo "::notice::Jobs running in current attempt $CURRENT_ATTEMPT: $CURRENT_ATTEMPT_JOBS"
 
-            # Store rerun type for potential use
-            if [ "$CURRENT_ATTEMPT_JOBS" -eq "$TOTAL_MATRIX_JOBS" ]; then
+            # Store rerun type for potential use.
+            # Guard against non-numeric jq output (e.g. "null") to prevent bash
+            # "integer expression expected" errors under set -eo pipefail.
+            if [ "${CURRENT_ATTEMPT_JOBS:-0}" -eq "${TOTAL_MATRIX_JOBS:-0}" ] 2>/dev/null; then
               echo "::notice::✅ DETECTED: Re-run ALL jobs (all $TOTAL_MATRIX_JOBS matrix jobs running)"
               echo "rerun_type=all" >> $GITHUB_OUTPUT
             else
@@ -1006,12 +1038,40 @@ jobs:
             mv playwright-results/report.json.tmp playwright-results/report.json
           fi
 
-          # Filter report to only include failed tests for TestDino upload
+          # Filter report to only include failed tests for TestDino upload.
+          # Retries with identical status+error are stripped to the final attempt only,
+          # reducing quota usage. Retries with differing status or error are kept in full.
           node -e "
           const fs = require('fs');
           const report = JSON.parse(fs.readFileSync('playwright-results/report.json', 'utf8'));
+          let strippedRetries = 0; // accumulated once per test via single-visit tree traversal
+          function getErrorFingerprint(r) {
+            // First line of error.message is stable across retries (stack/timing in later lines varies).
+            // Distinguish no-error-object (safe to strip on status alone) from error-without-message
+            // (unknown content — treat as unique so we never falsely deduplicate).
+            if (r.error?.message) return r.error.message.split('\n')[0].trim();
+            return r.status + ':' + (r.error ? 'error-no-msg' : 'no-error');
+          }
           function filterSuite(s) {
-            const specs = (s.specs||[]).filter(sp=>sp.tests&&sp.tests.some(t=>t.status==='unexpected'));
+            const specs = (s.specs||[])
+              .filter(sp=>sp.tests&&sp.tests.some(t=>t.status==='unexpected'))
+              .map(sp=>({
+                ...sp,
+                tests: sp.tests.map(t=>{
+                  const results = t.results||[];
+                  if (!results.length) return {...t};
+                  const first = results[0];
+                  const allIdentical = results.length === 1 || results.every(r=>
+                    r.status === first.status &&
+                    getErrorFingerprint(r) === getErrorFingerprint(first)
+                  );
+                  if (allIdentical && results.length > 1) strippedRetries += results.length - 1;
+                  return {
+                    ...t,
+                    results: allIdentical ? [results[results.length-1]] : results
+                  };
+                })
+              }));
             const suites = (s.suites||[]).map(filterSuite).filter(sub=>(sub.specs&&sub.specs.length)||(sub.suites&&sub.suites.length));
             return {...s,specs,suites};
           }
@@ -1022,7 +1082,7 @@ jobs:
           };
           fs.writeFileSync('playwright-results/report-failures-only.json',JSON.stringify(filtered));
           const total=(report.stats.expected||0)+(report.stats.unexpected||0)+(report.stats.skipped||0)+(report.stats.flaky||0);
-          console.log('Uploading '+(report.stats.unexpected||0)+' failed tests out of '+total+' total to TestDino');
+          console.log('Uploading '+(report.stats.unexpected||0)+' failed tests out of '+total+' total to TestDino (stripped '+strippedRetries+' identical retry results)');
           "
           echo "::notice::Report filtered to failures only"
 
@@ -1043,7 +1103,6 @@ jobs:
         check_changes,
         build_binary,
         ui_integration_tests,
-        merge_and_upload_reports,
       ]
     if: always()
     steps:
@@ -1058,7 +1117,6 @@ jobs:
 
           BUILD_OK=false
           UI_OK=false
-          MERGE_OK=false
 
           if [ "${{ needs.build_binary.result }}" == "success" ] || [ "${{ needs.build_binary.result }}" == "skipped" ]; then
             BUILD_OK=true
@@ -1068,17 +1126,12 @@ jobs:
             UI_OK=true
           fi
 
-          if [ "${{ needs.merge_and_upload_reports.result }}" == "success" ] || [ "${{ needs.merge_and_upload_reports.result }}" == "skipped" ] || [ "${{ needs.merge_and_upload_reports.result }}" == "failure" ]; then
-            MERGE_OK=true
-          fi
-
-          if [ "$BUILD_OK" == "true" ] && [ "$UI_OK" == "true" ] && [ "$MERGE_OK" == "true" ]; then
+          if [ "$BUILD_OK" == "true" ] && [ "$UI_OK" == "true" ]; then
             echo "All Playwright tests completed successfully"
             exit 0
           else
             echo "Playwright tests failed:"
             echo "  build_binary: ${{ needs.build_binary.result }}"
             echo "  ui_integration_tests: ${{ needs.ui_integration_tests.result }}"
-            echo "  merge_and_upload_reports: ${{ needs.merge_and_upload_reports.result }}"
             exit 1
           fi

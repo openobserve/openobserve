@@ -404,7 +404,28 @@
     "selectLogStream": "ログストリームを選択",
     "noData": "データはありません",
     "functionEditorLabel": "関数エディター",
-    "loadingStream": "ストリームをロード中..."
+    "loadingStream": "ストリームをロード中...",
+    "askAIPlaceholderRotation": {
+      "one": "過去 1 時間のエラーを表示...",
+      "two": "5 秒以上かかる遅いクエリを検索...",
+      "three": "サービスごとにグループ化された5xx件の回答をカウント...",
+      "four": "レベル = 'error' のログをフィルタする..."
+    },
+    "hideHistogram": "ヒストグラムを非表示",
+    "disableQuickMode": "クイックモードを無効にする",
+    "menuGroupSetOnce": "1 回設定",
+    "menuGroupSavedViews": "保存済みビュー",
+    "menuGroupTools": "ツール",
+    "menuGroupHistory": "歴史",
+    "menuGroupDownloads": "ダウンロード",
+    "menuGroupSchedule": "スケジュール",
+    "menuGroupInspect": "検査",
+    "validSql": "有効な SQL",
+    "invalidSql": "クエリが無効です",
+    "menuGroupExplain": "説明してください",
+    "fieldValuesEmpty": "値が見つかりません。",
+    "fieldValuesEmptyHint": "より広い時間範囲を試して値を確認してください。",
+    "selectLogsStreamFirst": "最初に [ログストリーム] を選択します"
   },
   "menu": {
     "home": "ホーム",
@@ -437,7 +458,9 @@
     "pipeline": "パイプライン",
     "language": "言語",
     "actions": "アクション",
-    "incidents": "インシデント"
+    "incidents": "インシデント",
+    "evals": "評価",
+    "aiObservability": "AI オブザーバビリティ"
   },
   "rum": {
     "title": "リアルユーザーモニタリング",
@@ -490,7 +513,33 @@
     "getStartedRUM": "リアルユーザーモニタリングを始める",
     "loadingErrorDetails": "ちょっと待ってください。エラーの詳細を取得中です。",
     "eventID": "イベント ID",
-    "loadingApplicationErrors": "ちょっと待ってください。アプリケーションエラーを取得しています。"
+    "loadingApplicationErrors": "ちょっと待ってください。アプリケーションエラーを取得しています。",
+    "traces": "トレース",
+    "noCorrelatedTraces": "このセッションの相関トレースは見つかりませんでした。",
+    "viewTraceDetails": "トレースの詳細を表示",
+    "routeChange": "ルート",
+    "initialView": "初期",
+    "failedToFetchTraces": "トレースデータを取得できませんでした。もう一度試してください。",
+    "traceNotFound": "トレースの詳細が見つかりません。",
+    "failedToFetchTraceDetails": "トレースの詳細を読み込めませんでした。もう一度試してください。",
+    "span": "スパン",
+    "spans": "スパン",
+    "errorTraces": "エラートレース",
+    "seekToMoment": "セッションの今この瞬間を探して",
+    "timeInSession": "セッション時間",
+    "route": "ルート",
+    "duration": "所要時間",
+    "emptyState": {
+      "title": "リアルユーザーモニタリングでユーザーを監視する",
+      "description": "RUM は実際のユーザーインタラクション (ページの読み込み、エラー、API 呼び出し、セッションリプレイ) を追跡するので、ユーザーがアプリケーションをどのように体験しているかを正確に把握できます。",
+      "webApp": "Web アプリをインストゥルメントする",
+      "webAppDesc": "OpenObserve RUM SDK を任意の JavaScript アプリに追加してください",
+      "sessionReplay": "セッションリプレイを有効にする",
+      "sessionReplayDesc": "ユーザーセッションを記録および再生して、UX の問題をデバッグする",
+      "learnMore": "さらに詳しく:",
+      "quickImpl": "クイック実装ガイド",
+      "blogPost": "フロントエンド監視の基本"
+    }
   },
   "about": {
     "name": "OpenObserve",
@@ -517,9 +566,9 @@
     "ingestion_limit": "取り込み制限",
     "today_usage": "今日の使用状況",
     "feature_comparision_ent_msg": "OpenObserveエンタープライズエディションを使用しており、以下にリストされているすべての高度な機能にアクセスできます。",
-    "feature_comparision_plan_detail": "ご利用のプラン:エンタープライズエディションでは、1 日あたり最大 200 GB (最大 6 TB/月) のデータを無料で取り込むことができます。",
+    "feature_comparision_plan_detail": "ご利用のプラン:エンタープライズエディションでは、1 日あたり最大 50 GB (最大 1.5 TB/月) のデータを無料で取り込むことができます。",
     "feature_comparision_os_msg": "現在 OpenObserve オープンソースエディションを使用しています。Enterprise Edition にアップグレードすると、下の比較表に記載されている高度な機能を活用できます。",
-    "feature_comparision_good_news": "朗報です。OpenObserveエンタープライズエディションは完全に無料で、1日あたり最大200 GB（最大6 TB/月）のデータインジェストが可能です。",
+    "feature_comparision_good_news": "朗報です。OpenObserveエンタープライズエディションは完全に無料で、1日あたり最大50 GB（最大1.5 TB/月）のデータインジェストが可能です。",
     "commit_lbl": "コミット",
     "build_lbl": "建設",
     "no_license_installed_lbl": "ライセンスがインストールされていません",
@@ -574,14 +623,14 @@
     "value_support_enterprise": "エンタープライズ",
     "value_support_cloud": "クラウド",
     "value_cost_free": "無料",
-    "value_cost_enterprise": "セルフホストの場合、1日あたり最大200 GBのデータを無料で取り込むことができます。それ以降は支払われます。",
+    "value_cost_enterprise": "セルフホストの場合、1日あたり最大50 GBのデータを無料で取り込むことができます。それ以降は支払われます。",
     "value_cost_cloud": "14日間の無料トライアル。それ以降は支払われます。",
     "feature_comparison_lbl": "機能比較",
     "enterprise_offer": {
       "cloud": {
         "hero_title": "エンタープライズ機能",
         "offer_text": "OpenObserveをセルフホストすると、すべてのエンタープライズ機能を完全に無料で利用できます",
-        "badge_text": "1 日あたり最大 200 GB まで無料",
+        "badge_text": "1 日あたり最大 50 GB まで無料",
         "features_title": "OpenObserve クラウドの機能",
         "features_subtitle": "クラウドサブスクリプションに含まれるすべての機能",
         "primary_button_text": "今すぐダウンロード"
@@ -593,7 +642,7 @@
         "features_title": "利用可能なエンタープライズ機能",
         "features_subtitle": "無償ライセンスを取得して、無限の機能をアンロックしましょう",
         "primary_button_text": "無料ライセンスを取得",
-        "license_note": "100 GB/日 (ライセンスなし) • 200 GB/日 (ライセンス契約の場合)"
+        "license_note": "50 GB/日 (ライセンスなし) • 50 GB/日 (ライセンス契約の場合)"
       },
       "enterprise_with_license": {
         "hero_title": "あなたのエンタープライズエディション",
@@ -607,7 +656,7 @@
       "open_source": {
         "hero_title": "エンタープライズエディションを入手",
         "offer_text": "すべてのエンタープライズ機能を完全無料でダウンロードしてロック解除",
-        "badge_text": "1 日あたり最大 200 GB まで無料",
+        "badge_text": "1 日あたり最大 50 GB まで無料",
         "features_title": "すべてのエンタープライズ機能をロック解除",
         "features_subtitle": "本番環境に対応したオブザーバビリティに必要なものすべて",
         "primary_button_text": "今すぐダウンロード"
@@ -799,7 +848,10 @@
     "feature_correlation_management": "相関管理",
     "feature_log_patterns": "ログパターン",
     "environment_type": "環境タイプ",
-    "license_allows_unlimited_ingestion": "現在のライセンスでは、無制限のデータ取り込みが可能です。"
+    "license_allows_unlimited_ingestion": "現在のライセンスでは、無制限のデータ取り込みが可能です。",
+    "refresh_license_limits": "ライセンス制限を更新",
+    "license_refresh_success": "ライセンス制限の更新が正常にトリガーされました",
+    "failed_to_refresh_license": "ライセンス制限を更新できませんでした"
   },
   "login": {
     "userid": "ユーザーID",
@@ -947,7 +999,9 @@
     "nameRequired": "名前が必要です",
     "subscription_type": "プランタイプ",
     "proceed_subscription": "購読に進む",
-    "subscription_plan": "サブスクリプションプラン"
+    "subscription_plan": "サブスクリプションプラン",
+    "makeBilledMember": "この組織を {org} の請求メンバーにする",
+    "manage": "管理"
   },
   "template": {
     "header": "テンプレート",
@@ -1189,7 +1243,8 @@
     "tokenRotateError": "トークンをローテーションできませんでした。",
     "tokenDeleteError": "トークンを削除できませんでした。",
     "noTokensFound": "取り込みトークンが見つかりません。",
-    "createdBy": "作成者"
+    "createdBy": "作成者",
+    "orgLevelSummary": "インジェストエンドポイント用の組織レベルのトークン。"
   },
   "dashboard": {
     "selectField": "フィールド",
@@ -1348,6 +1403,7 @@
     "selectDashboardLabel": "ダッシュボードを選択",
     "selectTabLabel": "タブを選択",
     "numbers": "数字",
+    "localeFormat": "ロケール形式",
     "nanoseconds": "ナノ秒 (ns)",
     "currency": "通貨",
     "p99": "99",
@@ -1649,7 +1705,12 @@
     "axisLabelTooltipNotePrefix": "注記:",
     "axisLabelTooltipNoteText": " このオプションは、時系列の X 軸フィールドではサポートされていません。",
     "allFolders": "すべてのフォルダー",
-    "selectFile": "[ファイルを選択]"
+    "selectFile": "[ファイルを選択]",
+    "multiSqlQueryLabel": "クエリーラベル",
+    "multiSqlQueryLabelHint": "このクエリの凡例でのカスタム名 (例:'Production')",
+    "multiQueryWarning": "{chartType} ではクエリ 1 のみがレンダリングされます",
+    "trellisNotSupportedWithMultiQuery": "Trellis レイアウトは複数のクエリで無効になります。トレリスを使用するには余分なクエリを削除してください。",
+    "xAliasInconsistencyWarning": "X 軸のエイリアスはクエリ間で一貫性がありません。ヒストグラムを使用するものと使用しないものがあります。予測可能な結果を得るには、すべてのクエリで同じエイリアスタイプを使用してください。"
   },
   "panel": {
     "header": "パネル",
@@ -1764,7 +1825,24 @@
     "noDataAvailable": "データはありません",
     "tabAiAssistant": "O2 人工知能アシスタント",
     "tabOverview": "概要",
-    "tabUsage": "使い方"
+    "tabUsage": "使い方",
+    "subtitle": "一目でわかるオブザーバビリティワークスペース",
+    "noDataState": {
+      "title": "データはまだ取り込まれていません",
+      "description": "この組織はまだデータを受け取っていないため、グラフ化するものはありません。イベントが流れ始めると、<strong>取り込み量、ストレージ、クエリ使用量が自動的にここに表示されます</strong>。",
+      "logs": "ログを送信",
+      "logsDesc": "カール、ファイルビート、フルーエントビット、ベクターなど",
+      "traces": "トレースを送信",
+      "tracesDesc": "OTLP/Jaeger/Zipkin ディストリビューティッド・トレーシング",
+      "metrics": "指標を送信",
+      "metricsDesc": "プロメテウス、ホテルコレクター、テレグラフなど",
+      "or": "または:",
+      "otel": "オープンテレメトリ",
+      "kubernetes": "クベルネテス",
+      "aws": "AWS/CloudWatch",
+      "aiIntegrations": "AI インテグレーション",
+      "shippers": "ログシッパー"
+    }
   },
   "billing": {
     "header": "使用状況と請求",
@@ -1824,7 +1902,105 @@
     "aiModePayAsYouGo": "従量課金制",
     "aiModeExhausted": "疲れ果てた",
     "aiExhaustedMessage": "購読して引き続き AI 機能を使用する",
-    "aiPaygMessage": "無料クレジットを使い切りました — 使用量はサブスクリプションに請求されます"
+    "aiPaygMessage": "無料クレジットを使い切りました — 使用量はサブスクリプションに請求されます",
+    "organizationGroup": {
+      "tabLabel": "組織グループ",
+      "inviteOrgButton": "組織を招待",
+      "viewUsage": "使用状況を表示",
+      "statTotal": "子組織の総数",
+      "statActive": "アクティブ",
+      "statPending": "保留中の招待",
+      "statRejected": "拒否",
+      "statusActive": "アクティブ",
+      "statusPending": "保留中",
+      "statusRejected": "拒否",
+      "filterAll": "[すべて]",
+      "childOrgColumn": "児童団体",
+      "dateColumn": "日付",
+      "cancel": "[キャンセル]",
+      "invitedBy": "招待者",
+      "acceptedBy": "承認者",
+      "addedOnCreation": "作成時に追加",
+      "memberSince": "以降のメンバー",
+      "noMembers": "メンバー組織はまだありません",
+      "inviteTitle": "組織を招待する",
+      "inviteOrgIdLabel": "組織識別子",
+      "inviteOrgIdPlaceholder": "組織識別子の入力",
+      "sendInvite": "招待を送信",
+      "inviteSent": "招待状は正常に送信されました",
+      "inviteSameOrg": "組織は自らを招待できない",
+      "childHeadline": "請求管理者",
+      "childHeroSub": "使用量はこの組織に請求されます。プランの変更と請求書は親組織によって処理されるため、ここで管理することは何もありません。",
+      "receivedInvitesTab": "保留中の招待",
+      "noPendingInvites": "保留中の招待はありません",
+      "noPendingInvitesHint": "別の組織が請求グループへの参加を招待すると、ここに招待が表示されます。",
+      "invitedByOn": "{招待者} さんからの招待",
+      "inviteTabPrompt": "請求グループに別の組織を招待してください。その使用量はこの組織に請求されます。",
+      "emptyTitle": "請求グループを開始",
+      "chipConsolidatedBill": "一括請求",
+      "chipLinkOrgs": "複数の組織をリンク",
+      "accept": "承諾する",
+      "reject": "拒否",
+      "inviteAccepted": "招待は正常に受理されました",
+      "inviteRejected": "招待は正常に拒否されました",
+      "plansManagedTitle": "親組織による請求管理",
+      "plansManagedDescription": "この組織の請求は {payer} によって管理されています。プランの変更は親組織によって処理されます。",
+      "chipPlanManaged": "親が管理するプラン",
+      "chipNoInvoices": "個別の請求書は不要",
+      "viewOrgGroup": "組織グループを表示",
+      "usageMemberLabel": "メンバー組織",
+      "usageAllMembers": "現在の組織",
+      "currentOrgTitle": "現在の組織"
+    },
+    "billingGroup": {
+      "tabLabel": "請求グループ",
+      "inviteOrgButton": "組織を招待",
+      "viewUsage": "使用状況を表示",
+      "statTotal": "子組織の総数",
+      "statActive": "アクティブ",
+      "statPending": "保留中の招待",
+      "statRejected": "拒否",
+      "statusActive": "アクティブ",
+      "statusPending": "保留中",
+      "statusRejected": "拒否",
+      "filterAll": "[すべて]",
+      "childOrgColumn": "児童団体",
+      "orgColumn": "組織",
+      "orgIdColumn": "組織識別子",
+      "actionsColumn": "[アクション]",
+      "dateColumn": "日付",
+      "cancel": "[キャンセル]",
+      "invitedBy": "招待者",
+      "acceptedBy": "承認者",
+      "addedOnCreation": "作成時に追加",
+      "memberSince": "以降のメンバー",
+      "noMembers": "メンバー組織はまだありません",
+      "inviteTitle": "組織を招待する",
+      "inviteOrgIdLabel": "組織識別子",
+      "inviteOrgIdPlaceholder": "組織識別子の入力",
+      "sendInvite": "招待を送信",
+      "inviteSent": "招待状は正常に送信されました",
+      "inviteSameOrg": "組織は自らを招待できない",
+      "childHeadline": "請求管理者",
+      "childHeroSub": "使用量はこの組織に請求されます。プランの変更と請求書は親組織によって処理されるため、ここで管理することは何もありません。",
+      "invitesPanelHint": "これらの組織は、あなたをその請求グループに参加するよう招待しています。同意すると、この組織の使用量が組織に請求されます。",
+      "inviteTabPrompt": "請求グループに別の組織を招待してください。その使用量はこの組織に請求されます。",
+      "emptyTitle": "請求グループを開始",
+      "chipConsolidatedBill": "一括請求",
+      "chipLinkOrgs": "複数の組織をリンク",
+      "accept": "承諾する",
+      "reject": "拒否",
+      "inviteAccepted": "招待は正常に受理されました",
+      "inviteRejected": "招待は正常に拒否されました",
+      "plansManagedTitle": "親組織による請求管理",
+      "plansManagedDescription": "この組織の請求は {payer} によって管理されています。プランの変更は親組織によって処理されます。",
+      "chipPlanManaged": "親が管理するプラン",
+      "chipNoInvoices": "個別の請求書は不要",
+      "viewOrgGroup": "組織グループを表示",
+      "usageMemberLabel": "メンバー組織",
+      "usageAllMembers": "現在の組織",
+      "currentOrgTitle": "現在の組織"
+    }
   },
   "message": {
     "ServerInternalError": "エラー:問題が発生しました。内部サーバーエラー。",
@@ -2829,7 +3005,10 @@
     "evaluationTemplate": "評価テンプレート",
     "evaluationTemplateHelp": "LLMジャッジの基準とディメンションを定義する評価テンプレートを選択してください。",
     "noTemplatesFound": "評価テンプレートが見つかりません。評価テンプレートページで作成してください。",
-    "evalTemplatesRefreshed": "評価テンプレートは正常に更新されました"
+    "evalTemplatesRefreshed": "評価テンプレートは正常に更新されました",
+    "subtitle": "転送中のデータの変換、強化、ルーティング",
+    "selectStream": "ストリームを選択...",
+    "queryEditorPlaceholder": "ストリームを選択するか、ここに SQL クエリを書き込んでください..."
   },
   "reports": {
     "header": "レポート",
@@ -3084,7 +3263,46 @@
         "cost": "費用",
         "spans": "スパン"
       }
-    }
+    },
+    "openInFullView": "フルビューで開く",
+    "serviceMap": "サービスマップ",
+    "patternView": "パターンビュー",
+    "spanView": "スパンビュー",
+    "noData": {
+      "title": "OpenObserveへのトレースの送信を開始する",
+      "description": "この組織にはまだトレースストリームが見つかりません。インストゥルメントされたサービスとトレースがここに自動的に表示されます。",
+      "otlp": "OTLP 経由でトレースを送信",
+      "otlpDesc": "イエーガー、ジプキン、その他オープンテレメトリー対応SDK",
+      "otelCollector": "ホテルコレクター/エージェント",
+      "otelCollectorDesc": "すべてのテレメトリ信号を OTel コレクター経由でルーティング",
+      "or": "または:",
+      "kubernetes": "クベルネテス",
+      "python": "Python",
+      "java": "Java",
+      "nodejs": "Node.js",
+      "askAi": "AIにトレーシングの設定を依頼"
+    },
+    "noStream": {
+      "title": "ストリームを選んで探索を始めましょう",
+      "description": "トレースストリームを選択し、[<strong>クエリの実行</strong>] を押します。結果が読み込まれたら、サービス、期間、スパンステータスなどでフィルタリングできます。",
+      "selectStream": "ストリームを選択する",
+      "selectStreamDesc": "この組織で利用可能なトレースストリームを閲覧する",
+      "queryGuide": "トレースガイドを読む",
+      "queryGuideDesc": "サービスグラフ、スパンフィルタリング、RED メトリクスなど",
+      "recent": "最近:"
+    },
+    "noEvents": {
+      "title": "トレースが見つかりません",
+      "descNoFilters": "{range} にはトレースが見つかりませんでした。結果を読み込むには、時間範囲を広げてみてください。",
+      "descWithFilters": "選択したウィンドウには、<strong>このクエリと一致するものはありません</strong>。時間範囲を広げるか、フィルターを削除してみてください。",
+      "expandRange": "時間範囲を広げる",
+      "expandRangeDescAbsolute": "より広い相対時間範囲に切り替える",
+      "removeFilter": "フィルターを削除する",
+      "selectedRange": "選択した範囲"
+    },
+    "showAll": "[すべて表示]",
+    "filterByErrors": "エラーで絞り込む",
+    "clearErrorFilter": "エラーフィルターをクリア"
   },
   "actions": {
     "testAction": "アクションをテスト",
@@ -3190,7 +3408,8 @@
     "confirmRejectMsg": "{org} への招待を拒否してもよろしいですか？",
     "expired": "期限切れ",
     "expiresToday": "本日期限切れ",
-    "daysLeft": "残り {日} 日"
+    "daysLeft": "残り {日} 日",
+    "search": "招待状を検索"
   },
   "regex_patterns": {
     "title": "機密データの編集",
@@ -3230,7 +3449,9 @@
     "import_this_pattern": "このパターンをインポート",
     "patterns_loaded": "{count} 個のパターンをロードしました",
     "failed_to_load": "パターンを読み込めませんでした",
-    "no_patterns_selected": "少なくとも 1 つのパターンを選択してください"
+    "no_patterns_selected": "少なくとも 1 つのパターンを選択してください",
+    "name_required": "* 名前が必要です",
+    "pattern_required": "* パターンは必須です"
   },
   "search_history": {
     "title": "検索履歴",
@@ -3345,7 +3566,9 @@
     "timeRangeLabel": "時間範囲:",
     "analyzeTooltipTraces": "レート、レイテンシー、エラーパターンのトレースディメンションを分析",
     "insightsButtonLabel": "インサイト",
-    "searchInspectionsLabel": "検索ジョブの実行詳細を検査する"
+    "searchInspectionsLabel": "検索ジョブの実行詳細を検査する",
+    "inspectBtnLabel": "検査",
+    "analyzeBtnLabel": "インサイト"
   },
   "errorInsights": {
     "title": "インサイト",
@@ -3823,7 +4046,18 @@
     "elevatedErrorRate": "エラー率の上昇",
     "reqPerSec": "要求/秒",
     "allClear": "すべてクリア",
-    "allClearDesc": "選択した時間枠には、アクティブな異常、インシデント、または低下したサービスはありません。"
+    "allClearDesc": "選択した時間枠には、アクティブな異常、インシデント、または低下したサービスはありません。",
+    "emptyActionAlerts": "アラートルールを表示する",
+    "emptyActionAlertsDesc": "設定したアラートと閾値を確認",
+    "emptyActionLogs": "ログを見る",
+    "emptyActionLogsDesc": "ログストリームの検索とフィルタリング",
+    "emptyActionTraces": "トレースを調べる",
+    "emptyActionTracesDesc": "分散型トレースとサービスレイテンシーの検査",
+    "viewAll": "すべて表示",
+    "showingOf": "{total} の {表示済み} を表示中",
+    "colErrorRate": "エラー率",
+    "colLatency": "レイテンシー",
+    "colReqs": "必要条件"
   },
   "chatHistory": {
     "title": "チャット",
@@ -3937,5 +4171,755 @@
       "two": "nginx ログから JSON を解析するための VRL を書き込みます...",
       "three": "K8s ノードの状態を示すダッシュボードを作成..."
     }
+  },
+  "emptyState": {
+    "noSearchResults": {
+      "title": "データが見つかりませんでした",
+      "description": "現在のフィルターまたは時間範囲と一致するものはありません。検索範囲を広げたり、時間範囲を広げたり、フィルターをクリアしたりしてみてください。",
+      "action": "フィルターをクリア",
+      "actionDesc": "適用されたすべてのフィルターをリセット"
+    },
+    "noLogs": {
+      "title": "この範囲にはログはありません",
+      "description": "選択したストリームと時間範囲のログが見つかりませんでした。より広い時間範囲または別のストリームを試してください。",
+      "action": "時間範囲を広げる",
+      "actionDesc": "より長い期間にわたる検索"
+    },
+    "noDashboards": {
+      "title": "はじめてのダッシュボードを作成",
+      "description": "ダッシュボードでは、メトリクス、ログ、トレースが 1 つのビューにまとめられます。作成して始めましょう。",
+      "action": "新しいダッシュボード",
+      "actionDesc": "空のキャンバスから始める",
+      "import": "ダッシュボードをインポート",
+      "importDesc": "ダッシュボード JSON ファイルのアップロード",
+      "templates": "テンプレートを閲覧する",
+      "templatesDesc": "コミュニティダッシュボードから始める"
+    },
+    "noPipelines": {
+      "title": "はじめてのパイプラインの作成",
+      "description": "パイプラインは、受信したデータを変換してルーティングします。パイプラインを設定してストリームの作成を始めましょう。",
+      "action": "新しいパイプライン",
+      "actionDesc": "フローをゼロから構築",
+      "import": "インポートパイプライン",
+      "importDesc": "パイプライン定義をアップロードする"
+    },
+    "noFunctions": {
+      "title": "はじめての関数を作成",
+      "description": "関数を使用すると、取り込み時またはクエリ時にデータをエンリッチして再形成できます。1 つ追加して始めましょう。",
+      "action": "新機能",
+      "actionDesc": "新しい VRL 関数を書く"
+    },
+    "noStreams": {
+      "title": "最初のデータを待っています",
+      "description": "データはまだ届いていません。ソースを接続すると、ストリームが自動的にここに表示されます。",
+      "action": "取り込みを設定する",
+      "actionDesc": "データソースを接続する"
+    },
+    "noAlerts": {
+      "title": "最初のアラートを作成する",
+      "description": "アラートは、データがしきい値を超えた瞬間に通知します。アラートを定義して監視を開始します。",
+      "action": "新しいアラート",
+      "actionDesc": "監視する条件を定義"
+    },
+    "noIncidents": {
+      "title": "アクティブなインシデントなし",
+      "description": "みなさん、追いつきました。今、注意が必要なことは何もありません。トリガーされたインシデントはここに表示されます。"
+    },
+    "loadError": {
+      "title": "何かがおかしくなった",
+      "description": "このデータを読み込めませんでした。通常は一時的なものです。しばらくしてからもう一度試してください。",
+      "action": "リトライ",
+      "actionDesc": "データをもう一度読み込んでください"
+    },
+    "noData": {
+      "title": "ここにはまだ何もありません",
+      "description": "現在表示できるデータはありません。"
+    },
+    "noTraces": {
+      "title": "トレースが見つかりません",
+      "description": "選択したサービスと時間範囲に一致するトレースはありません。より広い時間範囲または別のサービスを試してください。"
+    },
+    "noSearchHistory": {
+      "title": "検索履歴はまだありません",
+      "description": "実行した検索がここに一覧表示されるので、再度検索して再実行できます。"
+    },
+    "noUsers": {
+      "title": "まだユーザーはいません",
+      "description": "チームメイトをこの組織で共同作業するよう招待してください。",
+      "action": "ユーザーを追加",
+      "actionDesc": "チームメイトをメールで招待する"
+    },
+    "noReports": {
+      "title": "まだレポートはありません",
+      "description": "レポートをスケジュールして、ダッシュボードが受信トレイに配信されるようにします。",
+      "action": "新しいレポート",
+      "actionDesc": "ダッシュボードの配信をスケジュールする"
+    },
+    "noQueries": {
+      "title": "実行中のクエリなし",
+      "description": "現在、アクティブなクエリはありません。実行時間の長いクエリは、実行中もここに表示されます。"
+    },
+    "noServiceAccounts": {
+      "title": "サービスアカウントはまだありません",
+      "description": "サービスアカウントでは、アプリケーションを API で認証できます。アカウントを作成して始めましょう。",
+      "action": "サービスアカウントを追加",
+      "actionDesc": "API サービスアカウントを作成する"
+    },
+    "noInvitations": {
+      "title": "保留中の招待状はありません",
+      "description": "送信または受信した招待状はここに表示されます。"
+    },
+    "filtered": {
+      "title": "{noun} が見つかりません",
+      "description": "現在のフィルターまたは検索条件に一致する {noun} はありません。調整したりクリアしたりしてみてください。",
+      "action": "フィルターをクリア",
+      "actionDesc": "すべてのフィルターをリセットして検索",
+      "fallbackNoun": "結果"
+    },
+    "nouns": {
+      "logs": "ログ",
+      "dashboards": "ダッシュボード",
+      "pipelines": "パイプライン",
+      "functions": "機能",
+      "streams": "ストリーム",
+      "alerts": "アラート",
+      "incidents": "事件",
+      "traces": "トレース",
+      "searches": "検索",
+      "users": "ユーザー",
+      "reports": "レポート",
+      "queries": "クエリ",
+      "serviceAccounts": "サービスアカウント",
+      "invitations": "招待状"
+    },
+    "noDashboardsInFolder": {
+      "title": "このフォルダにはダッシュボードがありません",
+      "description": "このフォルダは空です。ここにダッシュボードを追加するか、別のフォルダからダッシュボードを移動してください。",
+      "action": "新しいダッシュボード",
+      "actionDesc": "このフォルダにダッシュボードを作成",
+      "import": "ダッシュボードをインポート",
+      "importDesc": "ダッシュボード JSON ファイルのアップロード",
+      "templates": "テンプレートを閲覧する",
+      "templatesDesc": "コミュニティダッシュボードから始める"
+    },
+    "noGroups": {
+      "title": "まだグループはありません",
+      "description": "グループを使用すると、複数のユーザーの権限を一度に管理できます。1 つ作成して始めましょう。",
+      "action": "新しいグループ",
+      "actionDesc": "ユーザーグループの作成"
+    },
+    "noRoles": {
+      "title": "ロールはまだありません",
+      "description": "ロールは、ユーザーが実行できるアクションを定義します。アクセスを制御するカスタムロールを作成します。",
+      "action": "新しい役割",
+      "actionDesc": "カスタムアクセスロールの定義"
+    },
+    "noAnomalyConfigs": {
+      "title": "異常検出は設定されていません",
+      "description": "異常検出を設定して、データ内の異常なパターンを自動的に識別します。",
+      "action": "新しい構成",
+      "actionDesc": "異常検出の設定"
+    },
+    "noApiLimits": {
+      "title": "API 制限は設定されていません",
+      "description": "API 制限は、各組織が時間枠ごとに取り込んでクエリできるデータ量を制御します。"
+    },
+    "noRoleLimits": {
+      "title": "ロール制限は設定されていません",
+      "description": "ロール制限は、組織内の個々のロールに適用されるインジェストクォータとクエリクォータを定義します。"
+    },
+    "noIngestionTokens": {
+      "title": "インジェストトークンはまだありません",
+      "description": "取り込みトークンは、ログ、メトリクス、トレースを送信する際にデータソースを認証します。",
+      "action": "新しいトークン",
+      "actionDesc": "取り込みトークンを生成する"
+    },
+    "noOrganizations": {
+      "title": "まだ組織はありません",
+      "description": "組織はユーザーとデータをグループ化します。作成して始めましょう。"
+    },
+    "noAlertDestinations": {
+      "title": "目的地はまだありません",
+      "description": "送信先は、アラート通知の送信先 (Slack、メール、Webhook など) を定義します。",
+      "action": "新しい目的地",
+      "actionDesc": "通知チャネルを接続する"
+    },
+    "noAlertTemplates": {
+      "title": "テンプレートはまだありません",
+      "description": "テンプレートはアラート通知メッセージの形式を定義します。",
+      "action": "新しいテンプレート",
+      "actionDesc": "通知テンプレートを作成する"
+    },
+    "noEnrichmentTables": {
+      "title": "エンリッチメントテーブルはまだありません",
+      "description": "エンリッチメントテーブルを使用すると、クエリ時にログデータに追加のコンテキストを添付できます。",
+      "action": "新しいテーブル",
+      "actionDesc": "エンリッチメントテーブルを作成する"
+    },
+    "noCipherKeys": {
+      "title": "暗号鍵はまだありません",
+      "description": "暗号鍵は、データストリームの機密フィールドを暗号化するために使用されます。",
+      "action": "新しいキー",
+      "actionDesc": "暗号鍵を生成"
+    },
+    "noAiToolsets": {
+      "title": "AI ツールセットはまだありません",
+      "description": "AI ツールセットは、組織を外部 AI 機能に接続します。",
+      "action": "新しいツールセット",
+      "actionDesc": "AI ツールセットの追加"
+    },
+    "noLlmProviders": {
+      "title": "LLM プロバイダーは設定されていません",
+      "description": "言語モデルプロバイダーに接続して AI を活用した機能を有効にします。",
+      "action": "プロバイダーを追加",
+      "actionDesc": "LLM プロバイダーの設定"
+    },
+    "noDiscoveredServices": {
+      "title": "サービスが見つかりませんでした",
+      "description": "トレースが到着し始めると、サービスが自動的にここに表示されます。"
+    },
+    "noNodes": {
+      "title": "使用可能なノードはありません",
+      "description": "クラスターノードは、登録するとここに表示されます。"
+    },
+    "noSourceMaps": {
+      "title": "ソースマップがアップロードされていません",
+      "description": "ソースマップをアップロードして、RUM エラーレポートで読みやすいスタックトレースを有効にします。",
+      "action": "アップロード",
+      "actionDesc": "ソースマップファイルのアップロード"
+    },
+    "noBackfillJobs": {
+      "title": "バックフィルジョブなし",
+      "description": "バックフィルジョブは、パイプラインを通じて履歴データを再処理します。1 つ実行して始めましょう。"
+    },
+    "noSearchJobs": {
+      "title": "スケジュールされた検索ジョブはありません",
+      "description": "スケジュールした長時間にわたる検索がここに表示され、検索のステータスを追跡したり、終了後に結果を確認したりできます。"
+    },
+    "noPipelineDestinations": {
+      "title": "目的地はまだありません",
+      "description": "パイプライン出力の外部ターゲット — HTTP エンドポイントとリモート書き込みターゲット。",
+      "action": "新しい目的地",
+      "actionDesc": "パイプラインデスティネーションの接続"
+    },
+    "noLLMInsights": {
+      "title": "LLM アクティビティはまだありません",
+      "description": "OpenTelemetry Gen-AI セマンティック規約を使用してサービスをインストルメントし、少なくとも 1 つのトレースを取り込んでこのダッシュボードに入力してください。",
+      "action": "オープンテレメトリー搭載機器",
+      "actionDesc": "トレースの gen_ai_* 属性をキャプチャ"
+    },
+    "noLLMSessions": {
+      "title": "LLM セッションはまだありません",
+      "description": "セッションは gen_ai_conversation_id でグループ化されます。各会話がトレースにタグ付けされるようにサービスをインストルメントすると、セッションがここに表示されます。",
+      "action": "オープンテレメトリー搭載機器",
+      "actionDesc": "gen_ai_conversation_id でスパンにタグを付ける"
+    },
+    "noScorers": {
+      "title": "スコアラーはまだいません",
+      "description": "スコア担当者は、LLM回答をスコア設定に照らして採点します。LLMジャッジから始めるか、ライブラリからLLMジャッジをインポートします。",
+      "action": "スコアラーを作成",
+      "actionDesc": "LLMジャッジまたはリモートスコアラーの定義"
+    },
+    "noEvalJobs": {
+      "title": "評価用の仕事はまだありません",
+      "description": "ジョブは LLM ストリームに対してスコアラーをスケジュールします。スコアを作成すると、定期的に会話の採点を開始できます。",
+      "action": "評価ジョブの作成",
+      "actionDesc": "ストリームを選択 + スコアラー + ケイデンス"
+    },
+    "noScoreConfigs": {
+      "title": "スコア設定はまだありません",
+      "description": "スコア構成は、スコアラーが生成するスキーマ（数値、ブール値、またはカテゴリ）を定義します。1 つ追加してスコアリングを開始します。",
+      "action": "スコア設定を作成",
+      "actionDesc": "スコアシェイプ+ヘルシーレンジを定義"
+    },
+    "noEvalTemplates": {
+      "title": "評価テンプレートはまだありません",
+      "description": "評価テンプレートは、LLM評価のための再利用可能な採点基準を定義します。",
+      "action": "新しいテンプレート",
+      "actionDesc": "評価テンプレートを作成する"
+    },
+    "noPipelineHistory": {
+      "title": "パイプライン履歴はまだありません",
+      "description": "パイプラインが実行されると、パイプライン実行履歴がここに表示されます。"
+    },
+    "noStreamSelected": {
+      "title": "ストリームを選択して始めましょう",
+      "description": "左側のドロップダウンからストリームを選択し、[クエリを実行] を押してログを調べます。また、追加のフィルターを適用したり、日付範囲を調整したりすることもできます。"
+    },
+    "noQueryApplied": {
+      "title": "クエリを実行してログを確認する",
+      "description": "フィルターを調整し、[クエリを実行] をクリックしてこのストリームのイベントをロードします。"
+    },
+    "noServiceGraph": {
+      "title": "サービスグラフデータなし",
+      "description": "より長い時間範囲をクエリしてみるか、サービスがスパンメトリクスを出力していることを確認してください。"
+    },
+    "noServicesCatalog": {
+      "title": "サービスが見つかりません",
+      "description": "選択した時間範囲でサービスは検出されませんでした。より広い範囲または別のストリームを試してください。"
+    }
+  },
+  "onlineEvals": {
+    "title": "評価",
+    "description": "LLM プロバイダー、スコア定義、スコアラー、ライブ評価ジョブを設定します。",
+    "loading": "オンライン評価設定をロード中...",
+    "loadError": "オンライン評価を読み込めませんでした",
+    "deletePrompt": "{name} を削除しますか?",
+    "deleted": "{ラベル} は削除されました",
+    "deleteError": "{label} を削除できませんでした",
+    "saved": "{label} が保存されました",
+    "newButton": "新規 {ラベル}",
+    "search": "検索 {ラベル}",
+    "refresh": "リフレッシュ",
+    "allStatuses": "すべてのステータス",
+    "noRowsFound": "{label} が見つかりません",
+    "getStartedHint": "作成してオンライン評価を開始してください.",
+    "columns": {
+      "name": "[名前]",
+      "status": "ステータス",
+      "updated": "更新済み"
+    },
+    "actions": {
+      "edit": "[編集]",
+      "delete": "[削除]"
+    },
+    "tabs": {
+      "jobs": "評価ジョブ",
+      "scorers": "スコアラー",
+      "scoreConfigs": "スコア構成",
+      "providers": "プロバイダー"
+    },
+    "singular": {
+      "jobs": "評価ジョブ",
+      "scorers": "スコアラー",
+      "scoreConfigs": "スコア設定",
+      "providers": "プロバイダー"
+    },
+    "secondaryColumn": {
+      "jobs": "ストリーム",
+      "scorers": "タイプ",
+      "scoreConfigs": "データタイプ",
+      "providers": "プロバイダー"
+    },
+    "jobStatus": {
+      "draft": "ドラフト",
+      "active": "アクティブ",
+      "paused": "一時停止",
+      "degraded": "劣化しました",
+      "archived": "アーカイブ済み"
+    },
+    "buttons": {
+      "cancel": "[キャンセル]",
+      "create": "作成",
+      "save": "[保存]"
+    },
+    "scorerTypeDialog": {
+      "title": "新しいスコアラーを作成",
+      "intro": "スコアラータイプを選択します。オーサリングしたい方法に合うものを選んで実行してください。",
+      "llmJudgeTitle": "LLMジャッジ",
+      "llmJudgeDescription": "設定されたプロバイダーを使用してセマンティックに評価します。",
+      "remoteTitle": "リモート",
+      "remoteDescription": "独自の HTTP エンドポイントを呼び出してスコアリングを行います。",
+      "codeTitle": "コード",
+      "codeDescription": "近日公開予定。"
+    },
+    "provider": {
+      "backTo": "プロバイダーに戻る",
+      "createTitle": "LLM プロバイダーの作成",
+      "editTitle": "LLM プロバイダーの編集",
+      "subtitle": "LLM ジャッジスコアラーが使用するモデルエンドポイントを設定します。",
+      "sectionTitle": "プロバイダー",
+      "nameLabel": "[名前]",
+      "namePlaceholder": "プロダクションオープンAI",
+      "typeLabel": "プロバイダーの種類",
+      "typePlaceholder": "オープンナイ",
+      "endpointLabel": "終点",
+      "endpointPlaceholder": "オプションのカスタムエンドポイント",
+      "defaultModelLabel": "デフォルトモデル",
+      "defaultModelPlaceholder": "GPT 4O-ミニ",
+      "availableModelsLabel": "ご利用可能なモデル",
+      "availableModelsPlaceholder": "GPT-4O-ミニ、GPT-4.1",
+      "useAsDefault": "デフォルトプロバイダーとして使用",
+      "authConfigLabel": "認証設定 JSON",
+      "saveError": "プロバイダを保存できませんでした"
+    },
+    "scoreConfig": {
+      "createTitle": "新しいスコア設定",
+      "editTitle": "スコア設定を編集",
+      "subtitle": "スコア設定は、スコアの種類、ヘルスしきい値、およびカテゴリを定義します。",
+      "nameLabel": "[名前]",
+      "dataTypeLabel": "データタイプ",
+      "descriptionLabel": "[説明]",
+      "numericRangeLabel": "数値範囲 JSON",
+      "categoriesLabel": "カテゴリー:JSON",
+      "healthyThresholdLabel": "ヘルシー閾値 JSON",
+      "dataTypes": {
+        "numeric": "数値",
+        "categorical": "カテゴリカル",
+        "boolean": "ブール値"
+      },
+      "saveError": "スコア設定を保存できませんでした"
+    },
+    "scorer": {
+      "backTo": "スコアラーに戻る",
+      "badgeRemote": "リモート",
+      "badgeLlm": "LLMジャッジ",
+      "createTitleRemote": "リモートスコアラーを作成",
+      "createTitleLlm": "LLM ジャッジスコアラーを作成",
+      "editTitleRemote": "リモートスコアラーの編集",
+      "editTitleLlm": "LLM ジャッジスコアラーの編集",
+      "subtitleRemote": "ホストしている HTTP エンドポイントを呼び出します。リクエストをレンダリングすると、スコアが返されます。",
+      "subtitleLlm": "言語モデルは、指定したプロンプトを使用して各トレースを判断します。",
+      "identitySection": "アイデンティティ",
+      "judgeSection": "ジャッジ構成",
+      "endpointSection": "終点",
+      "nameLabel": "[名前]",
+      "namePlaceholder": "フェイスフルネス・ジャッジ",
+      "producesScoreConfigLabel": "スコアコンフィグを生成します",
+      "producesScoreConfigNone": "[なし]",
+      "scoreConfigVersionLabel": "スコア設定バージョン",
+      "latestSuffix": " (最新)",
+      "pinVersion": "選択したバージョンをピン留めする",
+      "descriptionLabel": "[説明]",
+      "providerLabel": "プロバイダー",
+      "providerPlaceholder": "プロバイダーを選択",
+      "modelLabel": "モデル",
+      "modelPlaceholder": "gpt-4o",
+      "promptLabel": "ジャッジプロンプト",
+      "outputSchemaLabel": "出力スキーマ JSON",
+      "remoteEndpointLabel": "リモートエンドポイント",
+      "remoteEndpointPlaceholder": "https://eval.internal.corp/check",
+      "requestBodyLabel": "リクエスト本文テンプレート",
+      "saveError": "スコアラーを保存できませんでした",
+      "versionsLoadError": "スコア設定バージョンを読み込めませんでした",
+      "testPanel": {
+        "title": "このスコアラーをテスト",
+        "hint": "保存する前に、サンプルデータでスコアラーを試してください。テストランは永続化されません。",
+        "emptyPrefix": "次のような変数を追加 ",
+        "emptySuffix": " スコアラーテンプレートを使用して、サンプルフィールドでテストします。",
+        "runButton": "テストを実行",
+        "scenarioSuccess": "模擬応答",
+        "scenarioAuth": "認証エラー",
+        "scenarioSchema": "スキーマのミスマッチ",
+        "stateIdle": "ここでテストを実行して結果を確認してください。",
+        "stateRunning": "スコアラーテストを実行中...",
+        "successHeader": "成功",
+        "successScore": "スコア:0.92",
+        "successReasoning": "推論：答えは提供されたコンテキストによってサポートされています。",
+        "authHeader": "認証に失敗しました",
+        "authHint": "保存する前にプロバイダの認証情報を確認してください。",
+        "schemaHeader": "スキーマのミスマッチ",
+        "schemaHint": "応答が設定された出力スキーマと一致しませんでした。",
+        "valuePlaceholder": "{variable} の値"
+      }
+    },
+    "job": {
+      "backTo": "評価ジョブに戻る",
+      "createTitle": "オンライン評価ジョブの作成",
+      "editTitle": "オンライン評価ジョブの編集",
+      "subtitle": "この評価ジョブのストリーム、スコアラー、マッピング、およびサンプリング動作を選択してください。",
+      "stepper": {
+        "target": "ターゲット",
+        "scorers": "スコアラー",
+        "mapping": "マッピング",
+        "sampling": "サンプリング"
+      },
+      "targetSection": "ターゲット",
+      "scorersSection": "スコアラーとマッピング",
+      "nameLabel": "[名前]",
+      "namePlaceholder": "プロダクション・フィフネス・モニター",
+      "streamLabel": "入力ストリーム",
+      "streamPlaceholder": "デフォルト",
+      "streamTypeLabel": "ストリームタイプ",
+      "streamTypePlaceholder": "トレース",
+      "descriptionLabel": "[説明]",
+      "samplingModeLabel": "サンプリングモード",
+      "samplingValueLabel": "サンプリング値 JSON",
+      "samplingModes": {
+        "rate": "レート",
+        "all": "[すべて]",
+        "count": "カウント"
+      },
+      "scorerPicker": {
+        "title": "スコアラー",
+        "hint": "マッチしたすべてのスパンで走るスコアラーを 1 人以上選択します。",
+        "meta": "{タイプ} · v {バージョン}"
+      },
+      "filter": {
+        "title": "フィルター条件",
+        "hint": "この条件に一致するスパンのみがサンプリングとスコアリングに入ります。"
+      },
+      "inputMapping": {
+        "title": "入力マッピング",
+        "hint": "スパンフィールドを各スコアラーテンプレート変数にマップします。",
+        "selectScorers": "スコアラーを選択してマッピングを設定します。",
+        "noVariables": "このスコアラーには、マップするテンプレート変数がありません。",
+        "variableCount": "{カウント} 変数"
+      },
+      "preview": {
+        "title": "プレビュー",
+        "hint": "左側のフィールドを使用して、生産評価目標を定義します。",
+        "summaryTitle": "サマリー",
+        "summaryName": "[名前]",
+        "summaryType": "タイプ",
+        "summaryStatus": "ステータス",
+        "statusEditing": "編集",
+        "statusDraft": "ドラフト",
+        "emptyValue": "—"
+      },
+      "selectAtLeastOne": "スコアラーを少なくとも 1 人選択してください",
+      "saveError": "評価ジョブの保存に失敗しました"
+    },
+    "quality": {
+      "scopeLabel": "このワークスペースのすべての品質ディメンション",
+      "timeRange": {
+        "label": "時間範囲",
+        "last1h": "過去 1 時間",
+        "last24h": "過去 24 時間",
+        "last7d": "過去 7 日間",
+        "last30d": "過去 30 日間"
+      },
+      "sourceStream": {
+        "label": "ソースストリーム",
+        "all": "すべてのストリーム"
+      },
+      "refresh": "リフレッシュ",
+      "kpis": {
+        "evaluated": {
+          "title": "評価済みトレース",
+          "unit": "",
+          "hint": "ウィンドウ内の _llm_score 内の個別のトレース ID"
+        },
+        "qualityIssueRate": {
+          "title": "品質問題率",
+          "unit": "%",
+          "hint": "いずれかのディメンションがしきい値を下回っている評価済みトレース"
+        },
+        "evaluationCost": {
+          "title": "評価コスト",
+          "unit": "$",
+          "hint": "ウィンドウに表示される LLM ジャッジスコアラー費用の合計"
+        },
+        "jobSuccess": {
+          "title": "仕事の成功",
+          "unit": "%",
+          "hint": "オンライン評価ジョブの実行成功率"
+        },
+        "scorerFailures": {
+          "title": "スコアラーの失敗",
+          "unit": "",
+          "hint": "ウィンドウでのスコアラーの呼び出しが失敗しました"
+        },
+        "latencyP95": {
+          "title": "レイテンシー p95",
+          "unit": "s",
+          "hint": "スコアーコール p95 レイテンシー"
+        },
+        "vsPrev": "対前へ",
+        "noData": "—"
+      },
+      "loading": "品質データを読み込んでいます...",
+      "detail": {
+        "loading": "設定ごとの内訳を読み込んでいます...",
+        "noData": "このウィンドウには、この構成のスコアはまだありません。",
+        "drillTitle": "ドリル・トゥ・トレース",
+        "splitByScorer": "得点者による分割",
+        "splitBySourceType": "ソースタイプで分割",
+        "trendTitle": "トレンド",
+        "trendSubtitle": "{設定名}、{バケット}",
+        "distributionTitle": "スコア分布",
+        "compositionTitle": "時間の経過に伴う構成",
+        "categoryDistributionTitle": "カテゴリ分布",
+        "passRateTitle": "経時的な合格率",
+        "trueFalseTitle": "真と偽",
+        "legendAvg": "平均",
+        "legendP95": "95",
+        "legendThreshold": "しきい値 {方向} {値}",
+        "legendHealthy": "健康",
+        "legendUnhealthy": "不健全です",
+        "kpis": {
+          "average": "アベレージ",
+          "p50": "50",
+          "p95": "95",
+          "p50p95": "P50/P95",
+          "unhealthy": "不健康",
+          "healthy": "ヘルシー",
+          "coverage": "カバレッジ"
+        }
+      },
+      "sidebar": {
+        "allConfigs": "すべての構成",
+        "empty": "このフィルターに一致する設定はありません。"
+      },
+      "overview": {
+        "title": "スコア設定の概要",
+        "countSuffix": "{n} コンフィグ",
+        "searchPlaceholder": "フィルター構成...",
+        "loading": "設定ごとのアグリゲートをロード中...",
+        "emptyNoConfigsTitle": "スコア設定はまだありません",
+        "emptyNoConfigsHint": "最初の Score Config を定義して、品質ディメンションのトラッキングを開始しましょう。",
+        "emptyWaitingTitle": "最初のスコアが出るのを待っています",
+        "emptyWaitingHint": "スコア設定は宣言されましたが、このウィンドウの _llm_scoresにはまだスコアが書き込まれていません。",
+        "waitingStepJob": "これらの構成のいずれかのスコアを生成するオンライン評価ジョブをアクティブにする",
+        "waitingStepRange": "時間範囲を広げてください。今日または今週の初めのスコアは、このウィンドウに表示されない場合があります",
+        "waitingStepRefresh": "[更新] をクリックします。アクティブなジョブのスコアは、評価から 1 分以内に表示されます。",
+        "waitingPrimaryCta": "評価ジョブを開く",
+        "waitingRefreshCta": "リフレッシュ",
+        "noThreshold": "敷居なし",
+        "columns": {
+          "scoreConfig": "スコア設定",
+          "type": "タイプ",
+          "totalScores": "合計得点",
+          "coverage": "カバレッジ",
+          "unhealthy": "不健康",
+          "trend": "トレンド",
+          "threshold": "もし健康なら",
+          "updated": "更新済み"
+        }
+      }
+    },
+    "deleteTitle": "{ラベル} を削除",
+    "deleteConfirmMessage": "「{name}」を削除してよろしいですか？このアクションは元に戻せません。"
+  },
+  "llmProviders": {
+    "tabLabel": "LLM プロバイダー",
+    "title": "LLM プロバイダー",
+    "subtitle": "LLM Judgeスコアラーが使用するLLMプロバイダー接続を管理します。",
+    "newButton": "新しいプロバイダー",
+    "searchPlaceholder": "検索プロバイダー",
+    "defaultBadge": "デフォルト",
+    "loadError": "LLM プロバイダーを読み込めませんでした",
+    "columns": {
+      "name": "[名前]",
+      "type": "タイプ",
+      "endpoint": "終点",
+      "defaultModel": "デフォルトモデル",
+      "default": "デフォルト"
+    },
+    "empty": {
+      "title": "LLM プロバイダーはまだありません",
+      "description": "LLMプロバイダーは、LLMジャッジスコアラーが呼び出す言語モデルの接続詳細（エンドポイント+認証情報）を保存します。これを追加すると、ジャッジベースの評価を開始できます。"
+    }
+  },
+  "aiObservability": {
+    "title": "LLM オブザーバビリティ",
+    "sections": {
+      "monitor": "モニター",
+      "evaluate": "評価する"
+    },
+    "nav": {
+      "overview": "概要",
+      "sessions": "セッション",
+      "quality": "クオリティ",
+      "evalJobs": "評価ジョブ",
+      "scorers": "スコアラー",
+      "scoreConfigs": "スコア構成"
+    }
+  },
+  "logs": {
+    "noData": {
+      "title": "オープンオブザーブ (OpenObserve) へのデータ送信",
+      "description": "この組織にはまだデータがないため、調べるべきストリームはありません。最初のログを送信すると、自動的にここに表示されます。開始方法を選択してください。",
+      "curl": "Curl/HTTP API 経由で送信",
+      "curlDesc": "一番手っ取り早い方法 — コマンドを1つ貼り付けるとログが流れ始める",
+      "shippers": "ログシッパーを使う",
+      "shippersDesc": "ファイルビート、フルーエントビット、フルーエント、ベクター、システムログなど",
+      "otel": "オープンテレメトリ",
+      "otelDesc": "ログ、トレース、メトリクスのベンダーに依存しないOTLPインジェスト",
+      "or": "または:",
+      "kubernetes": "クベルネテス",
+      "aws": "AWS/CloudWatch",
+      "linux": "リナックス",
+      "windows": "Windows",
+      "askAi": "AIにインジェストの設定を依頼"
+    },
+    "noStream": {
+      "title": "ストリームを選んで探索を始めましょう",
+      "description": "ストリームを選択し、[<strong>クエリの実行</strong>] を押します。結果が出たら、フィルター、VRL 関数、カスタム時間範囲を使用して絞り込むことができます。",
+      "selectStream": "ストリームを選択する",
+      "selectStreamDesc": "ログ、トレース、メトリクス、RUM ストリームを閲覧",
+      "queryGuide": "クエリガイドを読む",
+      "queryGuideDesc": "フィルター、SQL モード、VRL、保存済みビュー",
+      "recent": "最近:"
+    },
+    "noEvents": {
+      "title": "イベントが見つかりません",
+      "descNoFilters": "{range} にはイベントが見つかりませんでした。結果を読み込むには、時間範囲を広げてみてください。",
+      "descWithFilters": "選択したウィンドウには、<strong>このクエリと一致するものはありません</strong>。時間範囲を広げるか、フィルターを緩めるか、クエリをリセットしてみてください。",
+      "expandRange": "時間範囲を広げる",
+      "expandRangeDescAbsolute": "より広い相対時間範囲に切り替える",
+      "removeFilter": "フィルターを削除する",
+      "removeFilterDescSql": "このクエリには SQL 条件が適用されています",
+      "openHistory": "検索履歴を開く",
+      "askAi": "AI にクエリの修正を依頼する",
+      "selectedRange": "選択した範囲"
+    },
+    "error": {
+      "sqlError": "SQL シンタックスエラー",
+      "sqlErrorDesc": "クエリに構文エラーがあります。エラーが強調表示されていないか、クエリエディターを確認してください。",
+      "streamNotFound": "ストリームが見つかりません",
+      "streamNotFoundDesc": "選択したストリームは存在しないか、削除されました。",
+      "ftsNotConfigured": "全文検索が設定されていません",
+      "ftsNotConfiguredDesc": "このストリームには全文検索フィールドがありません。キーワード検索を有効にするように設定してください。",
+      "fieldNotFound": "フィールドが見つかりません",
+      "fieldNotFoundDesc": "クエリは、このストリームに存在しない 1 つまたは複数のフィールドを参照しています。",
+      "functionNotDefined": "関数が定義されていません",
+      "functionNotDefinedDesc": "クエリが定義されていない VRL 関数を呼び出しています。",
+      "dataUnavailable": "データファイルを使用できません",
+      "dataUnavailableDesc": "この時間範囲の一部のデータファイルにアクセスできません。別の時間枠を試してください。",
+      "dataTypeMismatch": "データ型が一致しません",
+      "dataTypeMismatchDesc": "クエリのフィールドが、互換性のないデータ型で使用されています。",
+      "executionError": "クエリの実行が失敗しました",
+      "executionErrorDesc": "クエリの実行中にエラーが発生しました。",
+      "serverError": "サーバーエラー",
+      "serverErrorDesc": "サーバーで内部エラーが発生しました。",
+      "generic": "検索エラー",
+      "genericDesc": "検索イベントの取得中にエラーが発生しました。",
+      "configureStream": "ストリームを設定",
+      "configureStreamDesc": "ストリーム設定に全文検索フィールドを追加する",
+      "fixQuery": "クエリを修正",
+      "fixQueryDesc": "エディターでクエリを確認して修正してください",
+      "expandRange": "別の時間範囲を試してください",
+      "expandRangeDesc": "アクセス可能なデータは別のタイムウィンドウにある可能性があります",
+      "copyError": "エラーの詳細をコピー",
+      "traceId": "トレース ID:",
+      "askAi": "AI にクエリの修正を依頼する",
+      "showDetail": "詳細を表示",
+      "hideDetail": "詳細を非表示にする"
+    }
+  },
+  "queryError": {
+    "sqlError": "SQL シンタックスエラー",
+    "sqlErrorDesc": "クエリに構文エラーがあります。エディターでエラーが強調表示されていないか確認してください。",
+    "streamNotFound": "ストリームが見つかりません",
+    "streamNotFoundDesc": "選択したストリームは存在しないか、削除されました。",
+    "ftsNotConfigured": "全文検索が設定されていません",
+    "ftsNotConfiguredDesc": "このストリームには全文検索フィールドがありません。キーワード検索を有効にするように設定してください。",
+    "fieldNotFound": "フィールドが見つかりません",
+    "fieldNotFoundDesc": "クエリは、このストリームに存在しない 1 つまたは複数のフィールドを参照しています。",
+    "functionNotDefined": "関数が定義されていません",
+    "functionNotDefinedDesc": "クエリが定義されていない VRL 関数を呼び出しています。",
+    "dataUnavailable": "データファイルを使用できません",
+    "dataUnavailableDesc": "この時間範囲の一部のデータファイルにアクセスできません。別の時間枠を試してください。",
+    "dataTypeMismatch": "データ型が一致しません",
+    "dataTypeMismatchDesc": "クエリのフィールドが、互換性のないデータ型で使用されています。",
+    "executionError": "クエリの実行が失敗しました",
+    "executionErrorDesc": "クエリの実行中にエラーが発生しました。",
+    "serverError": "サーバーエラー",
+    "serverErrorDesc": "サーバーで内部エラーが発生しました。",
+    "generic": "クエリーエラー",
+    "genericDesc": "クエリの処理中にエラーが発生しました。",
+    "configureResource": "ストリームを設定",
+    "configureResourceDesc": "ストリーム設定に全文検索フィールドを追加する",
+    "fixQuery": "クエリを修正",
+    "fixQueryDesc": "エディターでクエリを確認して修正してください",
+    "expandRange": "別の時間範囲を試してください",
+    "expandRangeDesc": "アクセス可能なデータは別のタイムウィンドウにある可能性があります",
+    "copyError": "エラーの詳細をコピー",
+    "copied": "コピーされました！",
+    "traceId": "トレース ID:",
+    "askAi": "AI にクエリの修正を依頼する",
+    "showDetail": "詳細を表示",
+    "hideDetail": "詳細を非表示にする"
   }
 }

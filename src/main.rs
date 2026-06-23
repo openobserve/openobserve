@@ -29,6 +29,7 @@ use config::{
     meta::triggers::{Trigger, TriggerModule, TriggerStatus},
     utils::size::bytes_to_human_readable,
 };
+use infra::runtime::{create_grpc_runtime, create_job_runtime};
 use openobserve::{
     cli::basic::cli,
     common::{
@@ -75,10 +76,6 @@ use proto::cluster_rpc::{
     node_service_server::NodeServiceServer, query_cache_server::QueryCacheServer,
     search_server::SearchServer, streams_server::StreamsServer,
 };
-#[cfg(feature = "pyroscope")]
-use pyroscope::PyroscopeAgent;
-#[cfg(feature = "pyroscope")]
-use pyroscope_pprofrs::{PprofConfig, pprof_backend};
 use tokio::{net::TcpListener, sync::oneshot};
 use tonic::{
     codec::CompressionEncoding,
@@ -138,30 +135,6 @@ async fn main() -> Result<(), anyhow::Error> {
             .parse::<SocketAddr>()?,
         )
         .init();
-
-    // setup pyroscope
-    #[cfg(feature = "pyroscope")]
-    let pyroscope_agent = if get_config().profiling.pyroscope_enabled {
-        let agent = PyroscopeAgent::builder(
-            &get_config().profiling.pyroscope_server_url,
-            &get_config().profiling.pyroscope_project_name,
-        )
-        .tags(
-            [
-                ("role", get_config().common.node_role.as_str()),
-                ("instance", get_config().common.instance_name.as_str()),
-                ("version", config::VERSION),
-            ]
-            .to_vec(),
-        )
-        .backend(pprof_backend(PprofConfig::new().sample_rate(100)))
-        .build()
-        .expect("Failed to setup pyroscope agent");
-        let agent_running = agent.start().expect("Failed to start pyroscope agent");
-        Some(agent_running)
-    } else {
-        None
-    };
 
     let cfg = get_config();
 
@@ -233,15 +206,7 @@ async fn main() -> Result<(), anyhow::Error> {
     let (job_shutudown_tx, job_shutdown_rx) = oneshot::channel();
     let (job_stopped_tx, job_stopped_rx) = oneshot::channel();
     let job_rt_handle = std::thread::spawn(move || {
-        let cfg = get_config();
-        let Ok(rt) = tokio::runtime::Builder::new_multi_thread()
-            .worker_threads(cfg.limit.job_runtime_worker_num)
-            .enable_all()
-            .thread_name("job_runtime")
-            .thread_stack_size(16 * 1024 * 1024)
-            .max_blocking_threads(cfg.limit.job_runtime_blocking_worker_num)
-            .build()
-        else {
+        let Ok(rt) = create_job_runtime() else {
             job_init_tx.send(false).ok();
             panic!("job runtime init failed")
         };
@@ -331,14 +296,10 @@ async fn main() -> Result<(), anyhow::Error> {
     let (grpc_shutudown_tx, grpc_shutdown_rx) = oneshot::channel();
     let (grpc_stopped_tx, grpc_stopped_rx) = oneshot::channel();
     let grpc_rt_handle = std::thread::spawn(move || {
-        let cfg = get_config();
-        let rt = tokio::runtime::Builder::new_multi_thread()
-            .worker_threads(cfg.limit.grpc_runtime_worker_num)
-            .enable_all()
-            .thread_name("grpc_runtime")
-            .max_blocking_threads(cfg.limit.grpc_runtime_blocking_worker_num)
-            .build()
-            .expect("grpc runtime init failed");
+        let Ok(rt) = create_grpc_runtime() else {
+            grpc_init_tx.send(()).ok();
+            panic!("grpc runtime init failed");
+        };
 
         // Register gRPC runtime for metrics collection
         openobserve::service::runtime_metrics::register_runtime(
@@ -500,14 +461,6 @@ async fn main() -> Result<(), anyhow::Error> {
         meta::telemetry::Telemetry::new()
             .send_track_event("OpenObserve - Server stopped", None, true, true)
             .await;
-    }
-
-    // stop pyroscope
-    #[cfg(feature = "pyroscope")]
-    if let Some(agent) = pyroscope_agent
-        && let Ok(agent_ready) = agent.stop()
-    {
-        agent_ready.shutdown();
     }
 
     log::info!("server stopped");
@@ -1561,16 +1514,6 @@ async fn init_enterprise() -> Result<(), anyhow::Error> {
         log::error!("Failed to init AI/MCP/Agent: {e}");
     } else {
         log::info!("Initialized AI, MCP, and Agent components");
-    }
-
-    // Initialize evaluation templates for the REST API
-    #[cfg(feature = "enterprise")]
-    {
-        if let Err(e) = o2_enterprise::enterprise::ai::init_evaluation_templates().await {
-            log::error!("Failed to init evaluation templates: {e}");
-        } else {
-            log::info!("Initialized evaluation templates");
-        }
     }
 
     // check ratelimit config

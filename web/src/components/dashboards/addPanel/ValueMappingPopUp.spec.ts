@@ -535,6 +535,9 @@ describe("ValueMappingPopUp", () => {
       ).toEqual({
         type: "value",
         value: "",
+        pattern: "",
+        from: "",
+        to: "",
         text: "",
         color: null,
       });

@@ -36,14 +36,12 @@
   // Fill the available space in the splitter's "after" slot
   // The Q-splitter handles height distribution automatically
   height: 100%;
-  border-radius: 0.5rem;
 }
 
 .build-container {
   // Fill the available space in the splitter's "after" slot
   // The Q-splitter handles height distribution automatically
   height: 100%;
-  border-radius: 0.5rem;
   overflow: hidden;
 }
 
@@ -99,7 +97,6 @@
   background-color: var(--o2-hover-accent) !important;
 }
 .logs-search-bar-component {
-  padding-bottom: 0.0625rem; // 1px
   height: 100%;
   overflow: visible;
 
@@ -363,7 +360,7 @@
   }
 
   .query-editor-container {
-    height: calc(100% - 3.31rem) !important; // 35px
+    height: calc(100% - 2.9rem) !important; // 35px
   }
 
   .logs-auto-refresh-interval {
@@ -1019,10 +1016,14 @@
 
 .histogram-container {
   border-radius: 0.5rem;
+  // Anchor the absolutely-positioned streaming progress bar (LoadingProgress)
+  // to the top of the histogram area.
+  position: relative;
 
   // Dynamic height controlled by CSS classes
   &--visible {
     height: 6.25rem; // 100px
+    padding-top: 0.25rem; // 4px breathing room below the result-bar separator
     opacity: 1;
     transition: all 0.3s ease-in-out;
   }
@@ -1049,10 +1050,109 @@
   }
 }
 
-.histogram-loader {
-  top: 3.125rem; // 50px
-  position: absolute;
-  left: 50%;
+.histogram-skeleton {
+  // Scoped tokens — override per theme so shimmer always has contrast
+  --hsk-bar:     var(--color-grey-100); // #f5f5f5 light — very light skeleton bars
+  --hsk-shimmer: rgba(255, 255, 255, 0.65);
+
+  .body--dark & {
+    --hsk-bar:     var(--color-grey-700); // #404040 — subtle on dark bg
+    --hsk-shimmer: rgba(255, 255, 255, 0.06);
+  }
+
+  height: 6.25rem;
+  display: flex;
+  flex-direction: column;
+  padding-top: 0.25rem;
+  overflow: hidden;
+
+  &__main {
+    flex: 1;
+    display: flex;
+    min-height: 0;
+  }
+
+  &__y-axis {
+    width: 2.25rem;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: flex-end;
+    padding-right: 0.3125rem;
+    padding-bottom: 2px;
+  }
+
+  &__y-label {
+    height: 0.4375rem;
+    border-radius: 0.125rem;
+    background-color: var(--hsk-bar);
+  }
+
+  &__plot {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    border-left: 1px solid var(--o2-border-color);
+    border-bottom: 1px solid var(--o2-border-color);
+  }
+
+  &__bars {
+    flex: 1;
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+    padding: 0.25rem 0.25rem 0;
+    overflow: hidden;
+    position: relative;
+
+    // Single shimmer beam that sweeps left → right across all bars at once
+    &::after {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(
+        90deg,
+        transparent        0%,
+        transparent       20%,
+        var(--hsk-shimmer) 50%,
+        transparent       80%,
+        transparent       100%
+      );
+      animation: histogram-bar-shimmer 1.6s ease-in-out infinite;
+      pointer-events: none;
+    }
+  }
+
+  &__bar {
+    flex: 0 0 7px;
+    flex-shrink: 0;
+    border-radius: 1px 1px 0 0;
+    background-color: var(--hsk-bar);
+  }
+
+  &__x-axis {
+    display: flex;
+    justify-content: space-between;
+    padding-left: 2.25rem;
+    padding-top: 0.1875rem;
+  }
+
+  &__x-label {
+    width: 2.25rem;
+    height: 0.4375rem;
+    border-radius: 0.125rem;
+    background-color: var(--color-skeleton-base);
+  }
+}
+
+@keyframes histogram-bar-shimmer {
+  from { left: -100%; }
+  to   { left: 100%; }
 }
 
 .histogram-error {

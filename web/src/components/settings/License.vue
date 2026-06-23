@@ -1,7 +1,7 @@
 <template>
-  <div class="tw:p-3">
+  <!-- Page gutter is owned by the Settings shell's ConstrainedPage. -->
+  <div>
     <LicensePeriod @updateLicense="showUpdateFormAndFocus"></LicensePeriod>
-    <div class="tw:text-xl tw:font-semibold tw:mb-3">{{ t("about.license_management") }}</div>
 
     <div v-if="loading" class="tw:p-3 tw:flex tw:flex-col tw:items-center tw:justify-center">
       <OSpinner size="md" />
@@ -46,7 +46,7 @@
                 v-model="licenseKey"
                 :rows="8"
                 :placeholder="t('about.paste_license_placeholder')"
-                style="height: 200px"
+                style="min-height: 200px"
               />
               <div v-if="isLicenseKeyAutoFilled" class="tw:mt-2 tw:mb-3">
                 <div class="modern-info-banner">
@@ -64,6 +64,7 @@
                 data-test="no-license-update-btn"
                 variant="primary"
                 size="sm-action"
+                class="tw:mt-2"
                 :loading="updating"
                 :disabled="!licenseKey.trim()"
                 @click="updateLicense"
@@ -177,6 +178,15 @@
                   @click="showUpdateFormAndFocus"
                 >
                   {{ t("about.add_new_license_key") }}
+                </OButton>
+                <OButton
+                  data-test="refresh-license-limits-btn"
+                  variant="primary"
+                  size="sm-action"
+                  v-if="licenseData.license != null"
+                  @click="triggerLimitRefresh"
+                >
+                  {{ t("about.refresh_license_limits") }}
                 </OButton>
               </div>
             </OCardSection>
@@ -546,6 +556,25 @@ export default defineComponent({
         }
       }, 100);
     };
+
+    const triggerLimitRefresh = async () => {
+      try {
+        await licenseServer.refresh_license_limits();
+        toast({
+          variant: "success",
+          message: t("about.license_refresh_success"),
+        });
+      }catch(error){
+        console.error("Error refreshing license:", error);
+        toast({
+          variant: "error",
+          message:
+            t("about.failed_to_refresh_license") +
+            " : " +
+            (error?.response?.data?.message || "unexpected error"),
+        }); 
+      }
+    }
 
     const maskKey = (key: string) => {
       if (!key) return "";
@@ -933,6 +962,7 @@ export default defineComponent({
       showLicenseExpiryWarning,
       getLicenseExpiryMessage,
       showUpdateFormAndFocus,
+      triggerLimitRefresh,
       maskKey,
       getMaskedLicenseKey,
       copyLicenseKey,

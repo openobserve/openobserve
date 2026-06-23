@@ -1,0 +1,373 @@
+name: Query Agent (SQL Regression)
+
+# On-demand SQL regression suite for the OpenObserve query engine.
+# Runs 672+ sqllogictest-style queries against a live OO instance and reports
+# pass/fail on the PR. Triggered by PR comment or manual dispatch.
+#
+# Two entry points, both PR-bound:
+#   - a PR comment, EXACTLY:
+#       /query-agent  → FULL run: triage → build → test → report
+#   - Manual dispatch with pr_number (required; bare number, "#123", or full URL)
+#
+# ACCESS CONTROL:
+#   - TRIGGER: only the engineering-team ALLOWLIST can start a run.
+#   - TEST EXECUTION: only runs when the PR's AUTHOR is also on the allowlist.
+#
+# IMPORTANT: merged to main before triggers take effect.
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "PR number or URL (required)"
+        required: true
+      dry_run:
+        description: "Dry-run: triage only, don't run tests"
+        type: boolean
+        required: true
+        default: true
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: query-agent-${{ github.event.issue.number || github.event.inputs.pr_number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Server config — matches api-testing.yml
+  ZO_ROOT_USER_EMAIL: root@example.com
+  ZO_ROOT_USER_PASSWORD: Complexpass#123
+  ZO_BASE_URL: http://localhost:5080/
+  ZO_BASE_URL_SC: http://localhost:5080/
+  ZO_USAGE_REPORTING_ENABLED: true
+  ZO_USAGE_PUBLISH_INTERVAL: 5
+  ZO_ALERT_SCHEDULE_INTERVAL: 3
+  ZO_INGEST_ALLOWED_UPTO: 48
+  ZO_CREATE_ORG_THROUGH_INGESTION: true
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # JOB 1 — Triage. Resolve PR, gate allowlist, check if diff touches
+  # query-engine paths, post decision comment.
+  # ---------------------------------------------------------------------------
+  triage:
+    if: >
+      contains(fromJSON('["bjp232004","hengfeiyang","prabhatsharma","uddhavdave","oasisk","haohuaijin","Subhra264","Loaki07","007harshmahajan","chaitanya-sistla","ktx-kirtan","omkarK06","ktx-vaidehi","ktx-abhay","neha00290","ktx-akshay","ktx-sadhna","nikhilsaikethe","YashodhanJoshi1","ktx-riya","mmosarafO2","Shrinath-O2","ktx-mihir"]'), github.actor) &&
+      (github.event_name == 'workflow_dispatch' ||
+       (github.event_name == 'issue_comment' &&
+        github.event.issue.pull_request &&
+        github.event.comment.body == '/query-agent'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      skip: ${{ steps.ctx.outputs.skip }}
+      pr_number: ${{ steps.resolve.outputs.pr_number }}
+      author_allowed: ${{ steps.prinfo.outputs.author_allowed }}
+      author: ${{ steps.prinfo.outputs.author }}
+      dry_run: ${{ steps.mode.outputs.dry_run }}
+    steps:
+      - name: Resolve PR number
+        id: resolve
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const raw = context.eventName === 'issue_comment'
+              ? String(context.payload.issue.number)
+              : String(context.payload.inputs.pr_number || '');
+            const urlMatch = raw.match(/\/pull\/(\d+)/);
+            const numMatch = raw.match(/\d+/);
+            const pr = urlMatch ? urlMatch[1] : (numMatch ? numMatch[0] : '');
+            if (!pr) core.setFailed(`Could not parse a PR number from input: "${raw}"`);
+            core.setOutput('pr_number', pr);
+
+      - name: Inspect PR — author allowlist gate
+        id: prinfo
+        if: steps.resolve.outputs.pr_number != ''
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const ALLOW = ["bjp232004","hengfeiyang","prabhatsharma","uddhavdave","oasisk","haohuaijin","Subhra264","Loaki07","007harshmahajan","chaitanya-sistla","ktx-kirtan","omkarK06","ktx-vaidehi","ktx-abhay","neha00290","ktx-akshay","ktx-sadhna","nikhilsaikethe","YashodhanJoshi1","ktx-riya","mmosarafO2","Shrinath-O2","ktx-mihir"].map(s => s.toLowerCase());
+            const pr = Number('${{ steps.resolve.outputs.pr_number }}');
+            const { data } = await github.rest.pulls.get({
+              owner: context.repo.owner, repo: context.repo.repo, pull_number: pr,
+            });
+            const author = (data.user && data.user.login) ? data.user.login : '';
+            const allowed = ALLOW.includes(author.toLowerCase());
+            core.setOutput('author', author);
+            core.setOutput('author_allowed', allowed ? 'true' : 'false');
+
+      - name: Determine dry-run mode
+        id: mode
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_DRY: ${{ github.event.inputs.dry_run }}
+        run: |
+          DRY=true
+          if [ "$EVENT_NAME" = "workflow_dispatch" ] && [ "$INPUT_DRY" = "false" ]; then
+            DRY=false
+          elif [ "$EVENT_NAME" = "issue_comment" ]; then
+            DRY=false  # /query-agent comment is always a full run
+          fi
+          echo "dry_run=$DRY" >> "$GITHUB_OUTPUT"
+
+      - name: Acknowledge — react + post in-progress comment
+        id: ack
+        if: steps.resolve.outputs.pr_number != '' && steps.prinfo.outputs.author_allowed == 'true'
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const pr = Number('${{ steps.resolve.outputs.pr_number }}');
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            if (context.eventName === 'issue_comment') {
+              try {
+                await github.rest.reactions.createForIssueComment({
+                  owner: context.repo.owner, repo: context.repo.repo,
+                  comment_id: context.payload.comment.id, content: 'eyes',
+                });
+              } catch (e) { core.info(`reaction failed: ${e.message}`); }
+            }
+            const { data } = await github.rest.issues.createComment({
+              owner: context.repo.owner, repo: context.repo.repo, issue_number: pr,
+              body: `### 🤖 Query Agent — triage in progress…\n\nAnalyzing the change; I'll update this comment with the decision shortly.\n\n[View run](${runUrl})`,
+            });
+            core.setOutput('comment_id', data.id);
+
+      - uses: actions/checkout@v4
+        if: steps.prinfo.outputs.author_allowed == 'true'
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Fetch PR diff
+        if: steps.prinfo.outputs.author_allowed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ steps.resolve.outputs.pr_number }}
+        run: |
+          mkdir -p /tmp/query-agent-ci
+          gh pr diff "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" > /tmp/query-agent-ci/diff.patch || true
+          if [ ! -s /tmp/query-agent-ci/diff.patch ]; then
+            echo "::warning::Empty diff — nothing to triage"
+          fi
+          echo "diff bytes: $(wc -c < /tmp/query-agent-ci/diff.patch)"
+
+      - name: Triage — check for query-engine changes
+        id: ctx
+        if: steps.prinfo.outputs.author_allowed == 'true'
+        run: |
+          # Paths that warrant running the SQL regression suite
+          QUERY_PATHS='src/query/|src/sql/|src/service/search/|src/infra/table/|src/job/files/|tests/test-data/query-agent/|tests/api-testing/tests/query_agent/'
+          if grep -qE "$QUERY_PATHS" /tmp/query-agent-ci/diff.patch 2>/dev/null; then
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            echo "skip_reason=Query-engine paths detected in diff" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "skip_reason=No query-engine paths in diff" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Post or update triage comment
+        if: always() && steps.resolve.outputs.pr_number != ''
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const authorAllowed = '${{ steps.prinfo.outputs.author_allowed }}' === 'true';
+            const skip = '${{ steps.ctx.outputs.skip }}' || 'true';
+            const skipReason = '${{ steps.ctx.outputs.skip_reason }}' || '';
+            const dryRun = '${{ steps.mode.outputs.dry_run }}' === 'true';
+            let body = '### 🤖 Query Agent\n\n';
+            if (!authorAllowed) {
+              const a = '${{ steps.prinfo.outputs.author }}';
+              body += `Skipped — PR author${a ? ` @${a}` : ''} is not on the engineering-team allowlist. Query agent only runs for PRs authored by the team.`;
+            } else if (skip === 'true') {
+              body += `- **Skip:** yes — ${skipReason}\n`;
+              body += `- No SQL regression tests needed for this change.\n`;
+            } else {
+              body += `- **Skip:** no — ${skipReason}\n`;
+              if (dryRun) {
+                body += `- ⚠️ **Dry-run:** triage only, no tests executed.\n`;
+              } else {
+                body += `- ▶️ Running the query agent regression suite…\n`;
+              }
+            }
+            body += `\n[View run](${runUrl})`;
+            const commentId = '${{ steps.ack.outputs.comment_id }}';
+            if (commentId) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner, repo: context.repo.repo,
+                comment_id: Number(commentId), body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: Number('${{ steps.resolve.outputs.pr_number }}'), body,
+              });
+            }
+
+  # ---------------------------------------------------------------------------
+  # JOB 2 — Run the query agent regression suite against a live OO instance.
+  # Builds OO from source, runs all 672+ queries, posts pass/fail on the PR.
+  # ---------------------------------------------------------------------------
+  run_tests:
+    needs: triage
+    if: >
+      needs.triage.outputs.dry_run == 'false' &&
+      needs.triage.outputs.skip == 'false' &&
+      needs.triage.outputs.author_allowed == 'true'
+    runs-on: ubicloud-standard-4
+    timeout-minutes: 60
+    # Run the full SQL regression suite with the single-node physical
+    # optimizer both enabled (default) and disabled. The non-optimized
+    # RemoteScanRewriter path triggers known upstream DataFusion bugs on
+    # a handful of queries — those are tagged skip_without_single_node_opt
+    # and filtered by load_all_queries() when SINGLE_NODE_OPT_MODE=false.
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - label: single_node_opt_false
+            env: "ZO_FEATURE_SINGLE_NODE_OPTIMIZE_ENABLED=false"
+            mode: "false"
+          - label: single_node_opt_true
+            env: "ZO_FEATURE_SINGLE_NODE_OPTIMIZE_ENABLED=true"
+            mode: "true"
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Remove unused tools
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+
+      - name: Checkout git repo
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Setup Rust Toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2026-05-20
+
+      - name: Setup Rust Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+          shared-key: backend-debug-mimalloc
+          save-if: false
+
+      - name: Install Protoc
+        run: bash ./.github/protoc.sh
+
+      - name: Build OpenObserve debug binary
+        run: cargo build --features mimalloc
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11.6"
+
+      - name: Setup rye
+        uses: eifinger/setup-rye@v4
+        with:
+          enable-cache: true
+          working-directory: "tests/api-testing/"
+          version: "0.27.0"
+
+      - name: Pin cpython
+        run: rye pin cpython@3.11.6
+        working-directory: tests/api-testing/
+
+      - name: Rye sync
+        run: rye sync
+        working-directory: tests/api-testing/
+
+      - name: Regenerate query-agent expected values
+        run: |
+          cd ${{ github.workspace }}/tests/test-data/query-agent
+          ${{ github.workspace }}/tests/api-testing/.venv/bin/python compute_counts.py
+
+      - name: Run query agent tests
+        id: qa_tests
+        run: |
+          ZO_MAX_FILE_RETENTION_TIME=1 ${{ matrix.config.env }} ${{ github.workspace }}/target/debug/openobserve > o2_query_agent_${{ matrix.config.label }}.log 2>&1 &
+          SERVER_PID=$!
+          echo "server_pid=$SERVER_PID" >> "$GITHUB_OUTPUT"
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:5080/healthz > /dev/null 2>&1; then
+              echo "Server ready after ${i}s"; break
+            fi
+            sleep 1
+          done
+          # SINGLE_NODE_OPT_MODE controls which queries load_all_queries() includes
+          SINGLE_NODE_OPT_MODE=${{ matrix.config.mode }} rye run pytest tests/query_agent/ --ignore=tests/query_agent/test_3_vortex.py -v \
+            --junitxml=junit-query-agent-${{ matrix.config.label }}.xml 2>&1 | tee pytest-query-agent-${{ matrix.config.label }}.log
+          echo "exit_code=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+        working-directory: tests/api-testing/
+
+      - name: Kill server
+        if: always()
+        run: kill ${{ steps.qa_tests.outputs.server_pid }} || true
+
+      - name: Upload server log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: openobserve-query-agent-${{ matrix.config.label }}-log
+          path: tests/api-testing/o2_query_agent_${{ matrix.config.label }}.log
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload pytest log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-query-agent-${{ matrix.config.label }}-log
+          path: tests/api-testing/pytest-query-agent-${{ matrix.config.label }}.log
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload JUnit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: junit-query-agent-${{ matrix.config.label }}
+          path: tests/api-testing/junit-query-agent-${{ matrix.config.label }}.xml
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Post results comment
+        if: always() && needs.triage.outputs.pr_number != ''
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const fs = require('fs');
+            const pr = Number('${{ needs.triage.outputs.pr_number }}');
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const mode = '${{ matrix.config.label }}';
+            const exitCode = '${{ steps.qa_tests.outputs.exit_code }}';
+            const passed = exitCode === '0';
+            let body = `### 🤖 Query Agent — Results (${mode})\n\n`;
+            body += passed ? '✅ **All query agent tests passed.**\n\n' : '❌ **Query agent tests failed.**\n\n';
+            // Parse pytest summary from log if available
+            try {
+              const log = fs.readFileSync(`tests/api-testing/pytest-query-agent-${mode}.log`, 'utf8');
+              const m = log.match(/(\d+) passed.*(\d+) failed.*(\d+) error/);
+              if (m) {
+                body += `\`\`\`\n${m[0]}\n\`\`\`\n`;
+              }
+            } catch (e) { /* no log to parse */ }
+            body += `\n[View run](${runUrl})`;
+            // Find the ack comment and update it, or create new
+            await github.rest.issues.createComment({
+              owner: context.repo.owner, repo: context.repo.repo, issue_number: pr, body,
+            });

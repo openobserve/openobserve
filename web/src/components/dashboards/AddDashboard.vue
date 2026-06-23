@@ -15,21 +15,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:px-3 tw:py-2 add-dashboard-form-card-section">
-      <OForm ref="addDashboardForm" :default-values="{ name: '', description: '' }" @submit="onSubmit.execute">
-        <OInput
-          v-if="beingUpdated"
-          v-model="dashboardData.id"
-          :readonly="beingUpdated"
-          :disabled="beingUpdated"
-          :label="t('dashboard.id')"
-          data-test="dashboard-id"
-        />
+  <div class="add-dashboard-form-card-section">
+      <OForm id="add-dashboard-form" ref="addDashboardForm" :schema="addDashboardSchema" :default-values="addDashboardDefaults()" @submit="onSubmit">
         <OFormInput
           name="name"
-          :label="t('dashboard.name') + ' *'"
+          :label="t('dashboard.name')"
+          required
           data-test="add-dashboard-name"
-          :validators="[(val: string | number | undefined) => !(val?.toString().trim()) ? t('dashboard.nameRequired') : undefined]"
         />
         <span>&nbsp;</span>
         <OFormInput
@@ -55,27 +47,19 @@ import { defineComponent, ref } from "vue";
 import dashboardService from "../../services/dashboards";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { toRaw } from "vue";
 import { getImageURL } from "../../utils/zincutils";
 import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
 import SelectFolderDropdown from "./SelectFolderDropdown.vue";
 import { getAllDashboards } from "@/utils/commons";
-import { useLoading } from "@/composables/useLoading";
 import useNotifications from "@/composables/useNotifications";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-
-const defaultValue = () => {
-  return {
-    id: "",
-    name: "",
-    description: "",
-  };
-};
-
-let callDashboard: Promise<{ data: any }>;
+import {
+  makeAddDashboardSchema,
+  addDashboardDefaults,
+  type AddDashboardForm,
+} from "./AddDashboard.schema";
 
 export default defineComponent({
   name: "ComponentAddDashboard",
@@ -94,12 +78,11 @@ export default defineComponent({
   emits: ["updated", "close"],
   setup(props, { emit }) {
     const store: any = useStore();
-    const beingUpdated: any = ref(false);
     const addDashboardForm: any = ref(null);
     const disableColor: any = ref("");
-    const dashboardData: any = ref(defaultValue());
     const isValidIdentifier: any = ref(true);
     const { t } = useI18n();
+    const addDashboardSchema = makeAddDashboardSchema(t);
     const { showPositiveNotification, showErrorNotification } =
       useNotifications();
 
@@ -116,89 +99,70 @@ export default defineComponent({
       return Math.floor(Math.random() * (9999999999 - 100 + 1)) + 100;
     }
 
-    const onSubmit = useLoading(async () => {
-      const valid = await addDashboardForm.value.validate();
-      if (!valid) return;
+    // Plain async @submit handler — the validated `value` is the source of
+    // truth (the schema already gated it). This is a DIALOG form, so we do NOT
+    // reset on save: the overlay unmounts the body on close and remounts fresh
+    // (seeded by `:default-values`) → a clean form for free.
+    const onSubmit = async (value: AddDashboardForm) => {
+      const baseObj = {
+        title: value.name,
+        // NOTE: the dashboard ID is generated at the server side,
+        // in "Create a dashboard" request handler. The server
+        // doesn't care what value we put here as long as it's
+        // a string.
+        dashboardId: "",
+        description: value.description ?? "",
+        variables: {
+          list: [],
+          showDynamicFilters: true,
+        },
+        defaultDatetimeDuration: {
+          startTime: null,
+          endTime: null,
+          relativeTimePeriod: "15m",
+          type: "relative",
+        },
+        role: "",
+        owner: store.state.userInfo.name,
+        created: new Date().toISOString(),
+        tabs: [
+          {
+            panels: [],
+            name: "Default",
+            tabId: "default",
+          },
+        ],
+        version: 3,
+      };
 
-      // Sync OForm-owned values back to local state
-      const formVals = addDashboardForm.value.form.state.values as { name: string; description: string };
-      dashboardData.value.name = formVals.name ?? dashboardData.value.name;
-      dashboardData.value.description = formVals.description ?? dashboardData.value.description;
+      try {
+        const res = await dashboardService.create(
+          store.state.selectedOrganization.identifier,
+          baseObj,
+          selectedFolder.value.value ?? "default",
+        );
 
-      {
-        const dashboardId = dashboardData.value.id;
-        delete dashboardData.value.id;
+        const data = convertDashboardSchemaVersion(
+          res?.data["v" + res?.data?.version],
+        );
 
-        if (dashboardId == "") {
-          const obj = toRaw(dashboardData.value);
-          const baseObj = {
-            title: obj.name,
-            // NOTE: the dashboard ID is generated at the server side,
-            // in "Create a dashboard" request handler. The server
-            // doesn't care what value we put here as long as it's
-            // a string.
-            dashboardId: "",
-            description: obj.description,
-            variables: {
-              list: [],
-              showDynamicFilters: true,
-            },
-            defaultDatetimeDuration: {
-              startTime: null,
-              endTime: null,
-              relativeTimePeriod: "15m",
-              type: "relative",
-            },
-            role: "",
-            owner: store.state.userInfo.name,
-            created: new Date().toISOString(),
-            tabs: [
-              {
-                panels: [],
-                name: "Default",
-                tabId: "default",
-              },
-            ],
-            version: 3,
-          };
+        //update store
+        await getAllDashboards(store, selectedFolder.value.value);
+        emit("updated", data.dashboardId, selectedFolder.value.value);
 
-          callDashboard = dashboardService.create(
-            store.state.selectedOrganization.identifier,
-            baseObj,
-            selectedFolder.value.value ?? "default",
-          );
-        }
-        try {
-          const res = await callDashboard;
-
-          const data = convertDashboardSchemaVersion(
-            res?.data["v" + res?.data?.version],
-          );
-
-          //update store
-          await getAllDashboards(store, selectedFolder.value.value);
-          emit("updated", data.dashboardId, selectedFolder.value.value);
-          dashboardData.value = {
-            id: "",
-            name: "",
-            description: "",
-          };
-          await addDashboardForm.value?.resetValidation();
-
-          showPositiveNotification("Dashboard added successfully.");
-        } catch (err: any) {
-          showErrorNotification(err?.message ?? "Dashboard creation failed.");
-        }
+        showPositiveNotification("Dashboard added successfully.");
+      } catch (err: any) {
+        showErrorNotification(err?.message ?? "Dashboard creation failed.");
       }
-    });
+    };
 
     return {
       t,
+      addDashboardSchema,
       disableColor,
       isPwd: ref(true),
-      beingUpdated,
       status,
-      dashboardData,
+      addDashboardDefaults,
       addDashboardForm,
       store,
       getRandInteger,
@@ -206,7 +170,9 @@ export default defineComponent({
       getImageURL,
       selectedFolder,
       onSubmit,
-      submit: () => onSubmit.execute(),
+      // Submit through the form so the Zod schema gates it (validate() does not
+      // run a form-level schema). Used by external callers / tests.
+      submit: () => addDashboardForm.value?.submit(),
     };
   },
   methods: {
@@ -217,7 +183,7 @@ export default defineComponent({
       });
     },
   },
-  components: { SelectFolderDropdown, OForm, OFormInput, OInput },
+  components: { SelectFolderDropdown, OForm, OFormInput },
 });
 </script>
 <style lang="scss">

@@ -3,7 +3,6 @@ import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import Languages from "@/components/ingestion/Languages.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
-import { useQuasar } from "quasar";
 
 
 // Mock services
@@ -48,38 +47,34 @@ vi.mock("quasar", async (importOriginal) => {
   };
 });
 
+const mountOptions = {
+  props: {
+    currOrgIdentifier: "test-org"
+  },
+  global: {
+    plugins: [i18n],
+    provide: {
+      store,
+    },
+    stubs: {
+      DataSourceSidebarLayout: true,
+      'router-view': true
+    }
+  },
+};
+
 describe("Languages Component", () => {
   let wrapper: any = null;
 
   beforeEach(() => {
     // Reset mocks
     vi.clearAllMocks();
-    
+
     // Reset router state
     mockRouter.currentRoute.value.name = "languages";
     mockRouter.currentRoute.value.query = {};
 
-    wrapper = mount(Languages, {
-      props: {
-        currOrgIdentifier: "test-org"
-      },
-      global: {
-        plugins: [i18n],
-        provide: {
-          store,
-        },
-        stubs: {
-          'OSplitter': {
-            name: 'OSplitter',
-            template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
-          },
-          'OInput': true,
-          'OTabs': true,
-          'ORouteTab': true,
-          'router-view': true
-        }
-      },
-    });
+    wrapper = mount(Languages, mountOptions);
   });
 
   afterEach(() => {
@@ -102,30 +97,16 @@ describe("Languages Component", () => {
     });
 
     it("should initialize with correct data", () => {
-      expect(wrapper.vm.splitterModel).toBe(270);
       expect(wrapper.vm.currentUserEmail).toBeDefined();
       expect(wrapper.vm.tabs).toBe("");
       expect(wrapper.vm.ingestTabType).toBe("python");
-      expect(wrapper.vm.tabsFilter).toBe("");
     });
 
     it("should have default prop value for currOrgIdentifier", () => {
       const testWrapper = mount(Languages, {
-        global: {
-          plugins: [i18n],
-          provide: { store },
-          stubs: {
-            'OSplitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
-            },
-            'OInput': true,
-            'OTabs': true,
-            'ORouteTab': true,
-            'router-view': true
-          }
-        },
+        global: mountOptions.global,
       });
-      
+
       expect(testWrapper.props('currOrgIdentifier')).toBe("");
       testWrapper.unmount();
     });
@@ -145,24 +126,9 @@ describe("Languages Component", () => {
     it("should not redirect when not on languages route", () => {
       mockRouter.currentRoute.value.name = "python";
       mockRouter.push.mockClear();
-      
-      const testWrapper = mount(Languages, {
-        props: { currOrgIdentifier: "test-org" },
-        global: {
-          plugins: [i18n],
-          provide: { store },
-          stubs: {
-            'OSplitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
-            },
-            'OInput': true,
-            'OTabs': true,
-            'ORouteTab': true,
-            'router-view': true
-          }
-        },
-      });
-      
+
+      const testWrapper = mount(Languages, mountOptions);
+
       expect(mockRouter.push).not.toHaveBeenCalled();
       testWrapper.unmount();
     });
@@ -171,24 +137,9 @@ describe("Languages Component", () => {
       mockRouter.currentRoute.value.name = "languages";
       mockRouter.currentRoute.value.query = { someParam: "value" };
       mockRouter.push.mockClear();
-      
-      const testWrapper = mount(Languages, {
-        props: { currOrgIdentifier: "test-org" },
-        global: {
-          plugins: [i18n],
-          provide: { store },
-          stubs: {
-            'OSplitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
-            },
-            'OInput': true,
-            'OTabs': true,
-            'ORouteTab': true,
-            'router-view': true
-          }
-        },
-      });
-      
+
+      const testWrapper = mount(Languages, mountOptions);
+
       expect(mockRouter.push).toHaveBeenCalledWith({
         name: "python",
         query: {
@@ -203,68 +154,38 @@ describe("Languages Component", () => {
     it("should redirect to python route when updated to languages route", async () => {
       // First mount with different route
       mockRouter.currentRoute.value.name = "python";
-      
-      const testWrapper = mount(Languages, {
-        props: { currOrgIdentifier: "test-org" },
-        global: {
-          plugins: [i18n],
-          provide: { store },
-          stubs: {
-            'OSplitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
-            },
-            'OInput': true,
-            'OTabs': true,
-            'ORouteTab': true,
-            'router-view': true
-          }
-        },
-      });
+
+      const testWrapper = mount(Languages, mountOptions);
 
       // Reset mock call count
       mockRouter.push.mockClear();
-      
+
       // Change route to languages to trigger onUpdated
       mockRouter.currentRoute.value.name = "languages";
-      
+
       // Force update
       testWrapper.vm.$forceUpdate();
       await testWrapper.vm.$nextTick();
-      
+
       testWrapper.unmount();
     });
 
     it("should not redirect when updated to non-languages route", async () => {
       // First mount with languages route
       mockRouter.currentRoute.value.name = "languages";
-      
-      const testWrapper = mount(Languages, {
-        props: { currOrgIdentifier: "test-org" },
-        global: {
-          plugins: [i18n],
-          provide: { store },
-          stubs: {
-            'OSplitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
-            },
-            'OInput': true,
-            'OTabs': true,
-            'ORouteTab': true,
-            'router-view': true
-          }
-        },
-      });
+
+      const testWrapper = mount(Languages, mountOptions);
 
       // Reset mock call count
       mockRouter.push.mockClear();
-      
+
       // Change route to python - should not trigger redirect in onUpdated
       mockRouter.currentRoute.value.name = "python";
-      
+
       // Force update
       testWrapper.vm.$forceUpdate();
       await testWrapper.vm.$nextTick();
-      
+
       testWrapper.unmount();
     });
   });
@@ -355,59 +276,6 @@ describe("Languages Component", () => {
     });
   });
 
-  describe("Filtered List Computed Property", () => {
-    it("should return all tabs when filter is empty", () => {
-      wrapper.vm.tabsFilter = "";
-      expect(wrapper.vm.filteredList).toHaveLength(5);
-    });
-
-    it("should filter tabs by label (case insensitive)", () => {
-      wrapper.vm.tabsFilter = "python";
-      expect(wrapper.vm.filteredList).toHaveLength(1);
-      expect(wrapper.vm.filteredList[0].name).toBe("python");
-    });
-
-    it("should filter tabs by label (uppercase)", () => {
-      wrapper.vm.tabsFilter = "PYTHON";
-      expect(wrapper.vm.filteredList).toHaveLength(1);
-      expect(wrapper.vm.filteredList[0].name).toBe("python");
-    });
-
-    it("should filter tabs by partial label match", () => {
-      wrapper.vm.tabsFilter = ".net";
-      expect(wrapper.vm.filteredList).toHaveLength(2);
-      expect(wrapper.vm.filteredList.some((tab: any) => tab.name === "dotnettracing")).toBe(true);
-      expect(wrapper.vm.filteredList.some((tab: any) => tab.name === "dotnetlogs")).toBe(true);
-    });
-
-    it("should return empty array when no match found", () => {
-      wrapper.vm.tabsFilter = "nonexistent";
-      expect(wrapper.vm.filteredList).toHaveLength(0);
-    });
-
-    it("should filter nodejs correctly", () => {
-      wrapper.vm.tabsFilter = "nodejs";
-      expect(wrapper.vm.filteredList).toHaveLength(1);
-      expect(wrapper.vm.filteredList[0].name).toBe("nodejs");
-    });
-
-    it("should filter go correctly", () => {
-      wrapper.vm.tabsFilter = "go";
-      expect(wrapper.vm.filteredList).toHaveLength(1);
-      expect(wrapper.vm.filteredList[0].name).toBe("go");
-    });
-
-    it("should handle special characters in filter", () => {
-      wrapper.vm.tabsFilter = "!@#";
-      expect(wrapper.vm.filteredList).toHaveLength(0);
-    });
-
-    it("should handle whitespace in filter", () => {
-      wrapper.vm.tabsFilter = " python ";
-      expect(wrapper.vm.filteredList).toHaveLength(0);
-    });
-  });
-
   describe("Component Properties and Data", () => {
     it("should expose all required properties", () => {
       expect(wrapper.vm.t).toBeDefined();
@@ -428,14 +296,6 @@ describe("Languages Component", () => {
     it("should have correct initial state", () => {
       expect(wrapper.vm.tabs).toBe("");
       expect(wrapper.vm.ingestTabType).toBe("python");
-      expect(wrapper.vm.tabsFilter).toBe("");
-      expect(wrapper.vm.splitterModel).toBe(270);
-    });
-
-    it("should have reactive tabsFilter", async () => {
-      wrapper.vm.tabsFilter = "test";
-      await wrapper.vm.$nextTick();
-      expect(wrapper.vm.tabsFilter).toBe("test");
     });
 
     it("should have reactive ingestTabType", async () => {
@@ -507,39 +367,11 @@ describe("Languages Component", () => {
     it("should accept string values for currOrgIdentifier", () => {
       const testWrapper = mount(Languages, {
         props: { currOrgIdentifier: "string-value" },
-        global: {
-          plugins: [i18n],
-          provide: { store },
-          stubs: {
-            'OSplitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
-            },
-            'OInput': true,
-            'OTabs': true,
-            'ORouteTab': true,
-            'router-view': true
-          }
-        },
+        global: mountOptions.global,
       });
-      
+
       expect(testWrapper.props('currOrgIdentifier')).toBe("string-value");
       testWrapper.unmount();
-    });
-  });
-
-  describe("Template Rendering", () => {
-    it("should render OSplitter component", () => {
-      const splitterWrapper = wrapper.findComponent({ name: 'OSplitter' });
-      expect(splitterWrapper.exists()).toBe(true);
-    });
-
-    it("should have correct splitter model value", () => {
-      expect(wrapper.vm.splitterModel).toBe(270);
-    });
-
-    it("should render router-view with correct props", () => {
-      const routerView = wrapper.findComponent({ name: 'router-view' });
-      expect(routerView.exists()).toBe(true);
     });
   });
 
@@ -548,53 +380,23 @@ describe("Languages Component", () => {
       // Test multiple redirects
       mockRouter.currentRoute.value.name = "languages";
       mockRouter.push.mockClear();
-      
+
       // First redirect
-      const testWrapper = mount(Languages, {
-        props: { currOrgIdentifier: "test-org" },
-        global: {
-          plugins: [i18n],
-          provide: { store },
-          stubs: {
-            'OSplitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
-            },
-            'OInput': true,
-            'OTabs': true,
-            'ORouteTab': true,
-            'router-view': true
-          }
-        },
-      });
-      
+      const testWrapper = mount(Languages, mountOptions);
+
       expect(mockRouter.push).toHaveBeenCalledTimes(1);
       testWrapper.unmount();
     });
 
     it("should not interfere with other route names", () => {
       const routeNames = ["python", "dotnettracing", "dotnetlogs", "nodejs", "go"];
-      
+
       routeNames.forEach(routeName => {
         mockRouter.currentRoute.value.name = routeName;
         mockRouter.push.mockClear();
-        
-        const testWrapper = mount(Languages, {
-          props: { currOrgIdentifier: "test-org" },
-          global: {
-            plugins: [i18n],
-            provide: { store },
-            stubs: {
-              'OSplitter': {
-                template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
-              },
-              'OInput': true,
-              'OTabs': true,
-              'ORouteTab': true,
-              'router-view': true
-            }
-          },
-        });
-        
+
+        const testWrapper = mount(Languages, mountOptions);
+
         expect(mockRouter.push).not.toHaveBeenCalled();
         testWrapper.unmount();
       });
@@ -609,110 +411,28 @@ describe("Languages Component", () => {
           userInfo: { email: "" }
         }
       };
-      
+
       const testWrapper = mount(Languages, {
         props: { currOrgIdentifier: "test-org" },
         global: {
           plugins: [i18n],
           provide: { store: emptyStore },
           stubs: {
-            'OSplitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
-            },
-            'OInput': true,
-            'OTabs': true,
-            'ORouteTab': true,
+            DataSourceSidebarLayout: true,
             'router-view': true
           }
         },
       });
-      
+
       expect(testWrapper.vm.currentUserEmail).toBe("");
       expect(testWrapper.vm.currentOrgIdentifier).toBe("");
       testWrapper.unmount();
-    });
-
-    it("should handle null router current route", () => {
-      const nullRouter = {
-        currentRoute: { value: null },
-        push: vi.fn()
-      };
-      
-      vi.doMock("vue-router", () => ({
-        useRouter: () => nullRouter
-      }));
-      
-      // This should not throw an error
-      expect(() => {
-        const testWrapper = mount(Languages, {
-          props: { currOrgIdentifier: "test-org" },
-          global: {
-            plugins: [i18n],
-            provide: { store },
-            stubs: {
-              'OSplitter': {
-                template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
-              },
-              'OInput': true,
-              'OTabs': true,
-              'ORouteTab': true,
-              'router-view': true
-            }
-          },
-        });
-      }).not.toThrow();
     });
 
     it("should handle missing translation keys gracefully", () => {
       // The component should still mount even if translation keys are missing
       expect(wrapper.exists()).toBe(true);
       expect(typeof wrapper.vm.t).toBe("function");
-    });
-
-    it("should handle reactive data updates correctly", async () => {
-      // Test rapid filter changes
-      wrapper.vm.tabsFilter = "p";
-      await wrapper.vm.$nextTick();
-      expect(wrapper.vm.filteredList).toHaveLength(1);
-      
-      wrapper.vm.tabsFilter = "py";
-      await wrapper.vm.$nextTick();
-      expect(wrapper.vm.filteredList).toHaveLength(1);
-      
-      wrapper.vm.tabsFilter = "python";
-      await wrapper.vm.$nextTick();
-      expect(wrapper.vm.filteredList).toHaveLength(1);
-      
-      wrapper.vm.tabsFilter = "";
-      await wrapper.vm.$nextTick();
-      expect(wrapper.vm.filteredList).toHaveLength(5);
-    });
-  });
-
-  describe("Computed Property Reactivity", () => {
-    it("should update filteredList when tabsFilter changes", async () => {
-      expect(wrapper.vm.filteredList).toHaveLength(5);
-      
-      wrapper.vm.tabsFilter = "nodejs";
-      await wrapper.vm.$nextTick();
-      expect(wrapper.vm.filteredList).toHaveLength(1);
-      
-      wrapper.vm.tabsFilter = ".net";
-      await wrapper.vm.$nextTick();
-      expect(wrapper.vm.filteredList).toHaveLength(2);
-    });
-
-    it("should maintain filteredList reactivity with complex filters", async () => {
-      // Test with mixed case
-      wrapper.vm.tabsFilter = "PyThOn";
-      await wrapper.vm.$nextTick();
-      expect(wrapper.vm.filteredList).toHaveLength(1);
-      
-      // Test with partial match
-      wrapper.vm.tabsFilter = "nodejs";
-      await wrapper.vm.$nextTick();
-      expect(wrapper.vm.filteredList).toHaveLength(1);
-      expect(wrapper.vm.filteredList[0].name).toBe("nodejs");
     });
   });
 
@@ -732,7 +452,7 @@ describe("Languages Component", () => {
         "images/ingestion/nodejs.svg",
         "images/ingestion/golang.svg"
       ];
-      
+
       paths.forEach(path => {
         const result = wrapper.vm.getImageURL(path);
         expect(result).toBe(`mock-image-url-${path}`);

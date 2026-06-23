@@ -13,6 +13,7 @@ import {
 import { ref, watch, watchEffect, useSlots, computed, inject, provide, nextTick, useAttrs } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { useScrollShadow } from "@/lib/overlay/useScrollShadow";
+import { FORM_SUBMIT_STATE_KEY } from "@/lib/forms/Form/OForm.types";
 
 defineOptions({ inheritAttrs: false });
 const $attrs = useAttrs();
@@ -103,6 +104,12 @@ function handleInteractOutside(e: Event) {
 const drawerDepth = inject<number>("o2DrawerDepth", 0);
 provide("o2DrawerDepth", drawerDepth + 1);
 
+// Auto loading: an OForm nested in the body (linked via `form-id`) mirrors its
+// `isSubmitting` into this ref, so the footer Save button shows its spinner
+// during an awaited @submit handler — no `:primary-button-loading` needed.
+const formSubmitting = ref(false);
+provide(FORM_SUBMIT_STATE_KEY, formSubmitting);
+
 const overlayZIndex = computed(() => 5999 + drawerDepth * 1000);
 const contentZIndex = computed(() => 6000 + drawerDepth * 1000);
 
@@ -125,10 +132,16 @@ const hasFooter = computed(
 const hasTrigger = computed(() => !!slots.trigger);
 const isRight = computed(() => props.side !== "left");
 
+// The primary button is loading when the consumer says so OR a nested OForm is
+// mid-submit (auto). Kept as a computed so the disabled logic below picks it up.
+const primaryLoading = computed(
+  () => props.primaryButtonLoading || formSubmitting.value,
+);
+
 // Auto-disable all buttons when any one of them is loading
 const anyButtonLoading = computed(
   () =>
-    props.primaryButtonLoading ||
+    primaryLoading.value ||
     props.secondaryButtonLoading ||
     props.neutralButtonLoading,
 );
@@ -316,7 +329,7 @@ watch(internalOpen, (open) => {
             : 'tw:bg-dialog-overlay',
           'tw:data-[state=open]:animate-in tw:data-[state=open]:fade-in-0',
           'tw:data-[state=closed]:animate-out tw:data-[state=closed]:fade-out-0',
-          'tw:duration-200',
+          'tw:data-[state=open]:duration-120 tw:data-[state=closed]:duration-120',
         ]"
         :style="{ zIndex: overlayZIndex }"
       />
@@ -338,12 +351,13 @@ watch(internalOpen, (open) => {
           // Surface — reuse dialog tokens (same visual language)
           'tw:bg-dialog-bg tw:text-dialog-content-text',
           isRight
-            ? 'tw:border-s tw:border-dialog-border'
-            : 'tw:border-e tw:border-dialog-border',
+            ? 'tw:border-s tw:border-t tw:border-dialog-border'
+            : 'tw:border-e tw:border-t tw:border-dialog-border',
           'tw:shadow-xl',
           // Focus ring
           'tw:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-dialog-focus-ring',
-          // Slide-in animation — direction matches side
+          // Slide-in animation — direction matches side.
+          // Strong decel curve so it shoots in (170ms) and settles; exit is quicker (120ms).
           isRight
             ? [
                 'tw:data-[state=open]:animate-in tw:data-[state=open]:slide-in-from-right',
@@ -353,7 +367,8 @@ watch(internalOpen, (open) => {
                 'tw:data-[state=open]:animate-in tw:data-[state=open]:slide-in-from-left',
                 'tw:data-[state=closed]:animate-out tw:data-[state=closed]:slide-out-to-left',
               ],
-          'tw:duration-300',
+          'tw:data-[state=open]:duration-170 tw:data-[state=open]:ease-[cubic-bezier(0.32,0.72,0,1)]',
+          'tw:data-[state=closed]:duration-120 tw:data-[state=closed]:ease-in',
         ]"
         @escape-key-down="handleEscapeKeyDown"
         @interact-outside="handleInteractOutside"
@@ -388,7 +403,7 @@ watch(internalOpen, (open) => {
             <div v-if="title || subTitle" class="tw:shrink-0 tw:min-w-0">
               <span
                 v-if="title"
-                class="tw:text-lg tw:font-semibold tw:text-dialog-header-text tw:truncate tw:block"
+                class="tw:text-base tw:font-semibold tw:text-dialog-header-text tw:truncate tw:block"
               >
                 {{ title }}
               </span>
@@ -452,11 +467,11 @@ watch(internalOpen, (open) => {
         </div>
 
         <!-- ── Content (scrollable body) ───────────────────── -->
-        <!-- min-h-0 keeps the body from overflowing the flex container; footer stays after content -->
+        <!-- flex-1 + min-h-0: body fills remaining height so the footer always sticks to the bottom -->
         <div
           ref="bodyRef"
           :class="[
-            'tw:min-h-0 tw:overflow-y-auto tw:overflow-x-hidden',
+            'tw:flex-1 tw:min-h-0 tw:overflow-y-auto tw:overflow-x-hidden',
             'tw:text-dialog-content-text',
             canScrollUp && 'tw:[box-shadow:inset_0_8px_6px_-6px_rgba(0,0,0,0.1)]',
             canScrollDown && 'tw:[box-shadow:inset_0_-8px_6px_-6px_rgba(0,0,0,0.1)]',
@@ -520,9 +535,11 @@ watch(internalOpen, (open) => {
                 data-test="o-drawer-primary-btn"
                 :variant="primaryButtonVariant"
                 size="sm-action"
+                :type="formId ? 'submit' : 'button'"
+                :form="formId || undefined"
                 :disabled="primaryEffectivelyDisabled"
-                :loading="primaryButtonLoading"
-                @click="emit('click:primary')"
+                :loading="primaryLoading"
+                @click="!formId && emit('click:primary')"
               >
                 {{ primaryButtonLabel }}
               </OButton>

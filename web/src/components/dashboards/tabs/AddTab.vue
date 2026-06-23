@@ -15,53 +15,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODrawer data-test="dashboard-tab-settings-add-tab-dialog"
+  <ODialog data-test="dashboard-tab-settings-add-tab-dialog"
     :open="open"
-    :width="20"
+    size="sm"
     :title="editMode ? 'Edit Tab' : 'Add Tab'"
     secondary-button-label="Cancel"
     primary-button-label="Save"
-    :primary-button-loading="onSubmit.isLoading.value"
+    form-id="add-tab-form"
     @update:open="$emit('update:open', $event)"
     @click:secondary="$emit('update:open', false)"
-    @click:primary="submit()"
   >
-    <div class="tw:p-4">
-      <OForm ref="addTabForm" :default-values="{ name: '' }" @submit="onSubmit.execute">
+    <div>
+      <OForm id="add-tab-form" ref="addTabForm" :schema="addTabSchema" :default-values="addTabDefaults" @submit="onSubmit">
         <OFormInput
           name="name"
-          label="Name*"
-          :validators="[(val: string | number | undefined) => !(val?.toString().trim()) ? t('dashboard.nameRequired') : undefined]"
+          label="Name"
+          required
           data-test="dashboard-add-tab-name"
         />
       </OForm>
     </div>
-  </ODrawer>
+  </ODialog>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, watch } from "vue";
+import { defineComponent, ref, computed, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { useLoading } from "@/composables/useLoading";
 import { addTab, getDashboard } from "@/utils/commons";
 import { useRoute } from "vue-router";
 import { editTab } from "../../../utils/commons";
 import useNotifications from "@/composables/useNotifications";
-import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
-
-const defaultValue = () => {
-  return {
-    name: "",
-    panels: [],
-  };
-};
+import { makeAddTabSchema, type AddTabForm } from "./AddTab.schema";
 
 export default defineComponent({
   name: "AddTab",
-  components: { ODrawer, OForm, OFormInput },
+  components: { ODialog, OForm, OFormInput },
   props: {
     open: {
       type: Boolean,
@@ -96,51 +88,55 @@ export default defineComponent({
     const route = useRoute();
     const store: any = useStore();
     const addTabForm: any = ref(null);
-    let dashboardData: any = ref({});
-    const isValidIdentifier: any = ref(true);
+    const addTabSchema = makeAddTabSchema(t);
     const {
       showPositiveNotification,
       showErrorNotification,
       showConfictErrorNotificationWithRefreshBtn,
     } = useNotifications();
-    const tabData: any = ref(defaultValue());
 
+    // The tab record being edited. This is EXTERNAL data fetched from the
+    // store/API (it carries the non-form fields tabId/panels) — NOT a mirror of
+    // the form's `name` field. The OForm owns `name`; this only seeds it.
+    const editingTab: any = ref(null);
+
+    // OForm reads `defaultValues` once at mount, and ODialog remounts the body on
+    // open — so this computed seeds `name` each time the dialog opens (edit → the
+    // tab's name, create → blank). No local model / no manual reset needed.
+    const addTabDefaults = computed((): AddTabForm => ({
+      name: props.editMode ? editingTab.value?.name ?? "" : "",
+    }));
+
+    // Edit data arrives ASYNC (getDashboard may hit the API) after the dialog has
+    // mounted, so `:default-values` has already been read. Per the playbook
+    // "Data arrives AFTER mount" rule, re-baseline the form via form.reset(values)
+    // once the record loads — watching the EXTERNAL source, not a local mirror.
     const loadDashboardData = async () => {
       if (props.editMode) {
-        dashboardData.value = await getDashboard(
+        const dashboardData: any = await getDashboard(
           store,
           props.dashboardId,
           props.folderId ?? route.query.folder ?? "default",
         );
-        tabData.value = JSON.parse(
+        editingTab.value = JSON.parse(
           JSON.stringify(
-            dashboardData?.value?.tabs?.find(
-              (tab: any) => tab.tabId === props.tabId,
-            ),
+            dashboardData?.tabs?.find((tab: any) => tab.tabId === props.tabId),
           ),
         );
+        addTabForm.value?.form.reset({ name: editingTab.value?.name ?? "" });
       }
     };
     watch(
       () => props.open,
       (v) => {
         if (v) loadDashboardData();
-        else tabData.value = defaultValue();
+        else editingTab.value = null;
       },
     );
 
-    watch(
-      () => tabData.value.name,
-      (name) => {
-        addTabForm.value?.form.setFieldValue("name", name ?? "");
-      },
-    );
-
-    const onSubmit = useLoading(async () => {
-      const valid = await addTabForm.value.validate();
-      if (!valid) return;
-      // Sync form values back to local state
-      tabData.value.name = (addTabForm.value.form.state.values.name as string) ?? tabData.value.name;
+    const onSubmit = async (value: AddTabForm) => {
+      // The @submit payload is the source of truth for `name`; the loaded
+      // `editingTab` carries the rest (panels/tabId) in edit mode.
       try {
           //if edit mode
           if (props.editMode) {
@@ -149,8 +145,8 @@ export default defineComponent({
               store,
               props.dashboardId,
               props.folderId ?? route.query.folder ?? "default",
-              tabData.value.tabId,
-              tabData.value,
+              editingTab.value?.tabId,
+              { ...editingTab.value, name: value.name },
             );
 
             // emit refresh to rerender
@@ -165,7 +161,7 @@ export default defineComponent({
               store,
               props.dashboardId,
               props.folderId ?? route.query.folder ?? "default",
-              tabData.value,
+              { name: value.name, panels: [] },
             );
 
             // emit refresh to rerender
@@ -174,11 +170,6 @@ export default defineComponent({
 
             showPositiveNotification("Tab added successfully");
           }
-          tabData.value = {
-            name: "",
-            panels: [],
-          };
-          await addTabForm.value?.resetValidation();
       } catch (error: any) {
           if (error?.response?.status === 409) {
             showConfictErrorNotificationWithRefreshBtn(
@@ -195,20 +186,17 @@ export default defineComponent({
               },
             );
           }
-        } finally {
         }
-    });
-
-    const submit = () => onSubmit.execute();
+    };
 
     return {
       t,
-      tabData,
+      addTabSchema,
+      addTabDefaults,
+      editingTab,
       addTabForm,
       store,
-      isValidIdentifier,
       onSubmit,
-      submit,
     };
   },
 });

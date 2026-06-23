@@ -40,10 +40,13 @@ function createMockResource(overrides: Record<string, any> = {}) {
     view: {
       url: "http://localhost:5080/dashboard",
     },
+    // The component reads _oo?.trace_id to decide whether to show TraceCorrelationCard
+    // but passes _oo_trace_id (flat) as the :trace-id prop binding.
     _oo: {
       trace_id: "trace-123",
       span_id: "span-456",
     },
+    _oo_trace_id: "trace-123",
     ...overrides,
   };
 }
@@ -76,7 +79,13 @@ function mountComponent(options: { props?: Record<string, any>; stubs?: Record<s
       provide: { store },
       stubs: {
         TraceCorrelationCard: {
-          template: '<div data-test="trace-correlation-card">Trace Correlation</div>',
+          template: `<div
+            data-test="trace-correlation-card"
+            :data-trace-id="traceId"
+            :data-span-id="spanId"
+            :data-session-id="sessionId"
+            :data-resource-duration="resourceDuration"
+          >Trace Correlation</div>`,
           props: ["traceId", "spanId", "sessionId", "resourceDuration"],
         },
         ...options.stubs,
@@ -375,44 +384,47 @@ describe("ResourceDetailDrawer", () => {
       expect(wrapper.find('[data-test="trace-correlation-card"]').exists()).toBe(true);
     });
 
-    it("passes correct traceId prop to TraceCorrelationCard", () => {
-      // Arrange
-      const traceCard = wrapper.findComponent({ name: "TraceCorrelationCard" });
-
-      // Assert
-      if (traceCard.exists()) {
-        expect(traceCard.props("traceId")).toBe("trace-123");
-      }
+    it("passes correct traceId via _oo_trace_id flat property to TraceCorrelationCard", () => {
+      // The component uses resource._oo_trace_id as the :trace-id binding.
+      // The mock supplies _oo_trace_id: "trace-123" alongside _oo.trace_id.
+      const traceCard = wrapper.find('[data-test="trace-correlation-card"]');
+      expect(traceCard.exists()).toBe(true);
+      expect(traceCard.attributes("data-trace-id")).toBe("trace-123");
     });
 
     it("passes correct spanId prop to TraceCorrelationCard", () => {
-      // Arrange
-      const traceCard = wrapper.findComponent({ name: "TraceCorrelationCard" });
-
-      // Assert
-      if (traceCard.exists()) {
-        expect(traceCard.props("spanId")).toBe("span-456");
-      }
+      const traceCard = wrapper.find('[data-test="trace-correlation-card"]');
+      expect(traceCard.exists()).toBe(true);
+      expect(traceCard.attributes("data-span-id")).toBe("span-456");
     });
 
     it("passes correct sessionId prop to TraceCorrelationCard", () => {
-      // Arrange
-      const traceCard = wrapper.findComponent({ name: "TraceCorrelationCard" });
-
-      // Assert
-      if (traceCard.exists()) {
-        expect(traceCard.props("sessionId")).toBe("session-123");
-      }
+      const traceCard = wrapper.find('[data-test="trace-correlation-card"]');
+      expect(traceCard.exists()).toBe(true);
+      expect(traceCard.attributes("data-session-id")).toBe("session-123");
     });
 
     it("passes correct resourceDuration prop to TraceCorrelationCard", () => {
-      // Arrange
-      const traceCard = wrapper.findComponent({ name: "TraceCorrelationCard" });
+      const traceCard = wrapper.find('[data-test="trace-correlation-card"]');
+      expect(traceCard.exists()).toBe(true);
+      expect(traceCard.attributes("data-resource-duration")).toBe("250");
+    });
 
-      // Assert
-      if (traceCard.exists()) {
-        expect(traceCard.props("resourceDuration")).toBe(250);
-      }
+    it("passes updated traceId when resource _oo_trace_id flat property changes", async () => {
+      // The component reads _oo?.trace_id to conditionally render TraceCorrelationCard,
+      // but passes _oo_trace_id (flat) as the :trace-id prop.
+      const newTraceId = "trace-updated-999";
+      await wrapper.setProps({
+        resource: createMockResource({
+          _oo: { trace_id: newTraceId, span_id: "span-new" },
+          _oo_trace_id: newTraceId,
+        }),
+      });
+      await flushPromises();
+
+      const traceCard = wrapper.find('[data-test="trace-correlation-card"]');
+      expect(traceCard.exists()).toBe(true);
+      expect(traceCard.attributes("data-trace-id")).toBe(newTraceId);
     });
 
     it("shows no trace available message when resource has no _oo data", async () => {

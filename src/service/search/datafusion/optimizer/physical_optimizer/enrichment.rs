@@ -88,7 +88,7 @@ impl TreeNodeRewriter for EnrichmentExecRewriter {
     type Node = Arc<dyn ExecutionPlan>;
 
     fn f_up(&mut self, node: Arc<dyn ExecutionPlan>) -> Result<Transformed<Self::Node>> {
-        if let Some(new_empty) = node.as_any().downcast_ref::<NewEmptyExec>() {
+        if let Some(new_empty) = node.downcast_ref::<NewEmptyExec>() {
             let table_name = TableReference::parse_str(new_empty.name());
             if matches!(
                 table_name.schema(),
@@ -140,7 +140,7 @@ pub fn should_use_enrichment_broadcast_join(plan: &Arc<dyn ExecutionPlan>) -> bo
     let mut result = false;
     let _ = plan.apply(|node| {
         Ok(if node.name() == "HashJoinExec" {
-            if let Some(hash_join) = node.as_any().downcast_ref::<HashJoinExec>() {
+            if let Some(hash_join) = node.downcast_ref::<HashJoinExec>() {
                 result = is_enrichment_table(hash_join.left())
                     && is_valid_enrich_broadcast_right(hash_join.right());
             }
@@ -157,7 +157,7 @@ pub fn is_enrichment_table(plan: &Arc<dyn ExecutionPlan>) -> bool {
     let mut found_enrichment = false;
     let _ = plan.apply(|node| {
         Ok(
-            if let Some(new_empty) = node.as_any().downcast_ref::<NewEmptyExec>() {
+            if let Some(new_empty) = node.downcast_ref::<NewEmptyExec>() {
                 let table_name = TableReference::parse_str(new_empty.name());
                 if matches!(
                     table_name.schema(),
@@ -180,7 +180,7 @@ fn is_valid_enrich_broadcast_right(plan: &Arc<dyn ExecutionPlan>) -> bool {
     let mut is_valid = true;
     let _ = plan.apply(|node| {
         Ok(
-            if let Some(new_empty) = node.as_any().downcast_ref::<NewEmptyExec>() {
+            if let Some(new_empty) = node.downcast_ref::<NewEmptyExec>() {
                 let table_name = TableReference::parse_str(new_empty.name());
                 if matches!(
                     table_name.schema(),

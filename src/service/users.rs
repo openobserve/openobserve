@@ -263,6 +263,10 @@ pub async fn update_user(
     mut user: UpdateUser,
 ) -> Result<Response, Error> {
     let mut allow_password_update = false;
+    #[cfg(feature = "cloud")]
+    let is_cloud = true;
+    #[cfg(not(feature = "cloud"))]
+    let is_cloud = false;
     if !is_valid_email(email) {
         return Ok(MetaHttpResponse::bad_request("Invalid email"));
     }
@@ -315,6 +319,7 @@ pub async fn update_user(
         let mut custom_roles_need_change = false;
         match existing_user {
             Some(local_user) => {
+                #[cfg(not(feature = "cloud"))]
                 if local_user.is_external {
                     return Ok(MetaHttpResponse::bad_request(
                         "Updates not allowed with external users, please update with source system",
@@ -401,7 +406,7 @@ pub async fn update_user(
                     is_updated = true;
                 }
                 if let Some(role) = user.role
-                    && !local_user.is_external
+                    && (!local_user.is_external || is_cloud)
                     && (!update_mode.is_self_update()
                         || (local_user.role.eq(&UserRole::Admin)
                             // Editor can update other's roles, but viewer can update only self
@@ -732,8 +737,16 @@ pub async fn get_user(org_id: Option<&str>, name: &str) -> Option<User> {
 
 pub async fn get_user_by_token(org_id: &str, token: &str) -> Option<User> {
     let rum_tokens = USERS_RUM_TOKEN.clone();
-    let key = format!("{DEFAULT_ORG}/{token}");
-    if let Some(user) = rum_tokens.get(&key) {
+
+    // Fast-path only for root users whose tokens are cached under DEFAULT_ORG.
+    // A non-root member of the literal "default" org also lands under this key,
+    // so we must verify they are actually a root user before bypassing the
+    // org-scoped lookup — otherwise any default-org token authenticates against
+    // every other org (cross-tenant write IDOR).
+    let default_key = format!("{DEFAULT_ORG}/{token}");
+    if let Some(user) = rum_tokens.get(&default_key)
+        && is_root_user(&user.email)
+    {
         return get_user(None, &user.email).await;
     }
 

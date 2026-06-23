@@ -18,6 +18,11 @@ import { calculateOptimalFontSize } from "../../chartDimensionUtils";
 import { getContrastColor } from "../../chartColorUtils";
 import { type SQLContext } from "../shared/types";
 
+// Width reserved for the copy button when auto-fitting the value font size,
+// so the hover button has room beside the value without shrinking the text
+// more than necessary.
+export const METRIC_COPY_BTN_RESERVE_PX = 40;
+
 /**
  * Applies chart-specific options for: metric
  *
@@ -31,6 +36,7 @@ export function applyMetricChart(ctx: SQLContext): void {
     yAxisKeys,
     defaultSeriesProps,
     getAxisDataFromKey,
+    chartPanelRef,
   } = ctx;
 
   const key1 = yAxisKeys[0];
@@ -41,6 +47,7 @@ export function applyMetricChart(ctx: SQLContext): void {
     panelSchema.config?.unit_custom,
     panelSchema.config?.decimals,
   );
+  const metricText = formatUnitValue(unitValue);
   options.backgroundColor = panelSchema.config?.background?.value?.color ?? "";
   options.dataset = { source: [[]] };
   options.tooltip = {
@@ -55,9 +62,18 @@ export function applyMetricChart(ctx: SQLContext): void {
   options.polar = {};
   options.xAxis = [];
   options.yAxis = [];
+  const metricFillColor = getContrastColor(
+    panelSchema.config?.background?.value?.color,
+    store.state.theme === "dark",
+  );
+  const metricFieldLabel =
+    panelSchema.queries[0]?.fields?.y?.[0]?.label || key1;
   options.series = [
     {
       ...defaultSeriesProps,
+      _metricText: metricText,
+      _metricFillColor: metricFillColor,
+      _metricLabel: metricFieldLabel,
       renderItem: function (params: any) {
         try {
           const backgroundColor = panelSchema.config?.background?.value?.color;
@@ -66,10 +82,10 @@ export function applyMetricChart(ctx: SQLContext): void {
           return {
             type: "text",
             style: {
-              text: formatUnitValue(unitValue),
+              text: metricText,
               fontSize: calculateOptimalFontSize(
-                formatUnitValue(unitValue),
-                params?.coordSys?.cx * 2,
+                metricText,
+                params?.coordSys?.cx * 2 - METRIC_COPY_BTN_RESERVE_PX,
               ), //coordSys is relative. so that we can use it to calculate the dynamic size
               fontWeight: 500,
               align: "center",
@@ -85,4 +101,23 @@ export function applyMetricChart(ctx: SQLContext): void {
       },
     },
   ];
+
+  // Rect for the per-value copy icon overlay (single metric fills the area).
+  const panelEl = chartPanelRef?.value;
+  if (panelEl) {
+    const w = panelEl.offsetWidth;
+    const h = panelEl.offsetHeight;
+    options.series[0]._metricLayout = {
+      left: 0,
+      top: 0,
+      width: w,
+      height: h,
+      cx: w / 2,
+      cy: h / 2,
+      fontSize: calculateOptimalFontSize(
+        metricText,
+        w - METRIC_COPY_BTN_RESERVE_PX,
+      ),
+    };
+  }
 }

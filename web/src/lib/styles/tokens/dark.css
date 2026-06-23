@@ -16,37 +16,112 @@
      */
     color-scheme: dark;
 
-    /* --- Text --- */
-    --color-text-primary: var(--color-grey-50);
-    --color-text-secondary: var(--color-grey-400);
-    --color-text-disabled: var(--color-grey-600);
-    --color-text-inverse: var(--color-grey-900);
+    /* ═══════════════════════════════════════════════════════════
+       DARK MODE FOUNDATION — tune these ~16 values to taste.
+       Everything below (surfaces, borders, text, and the per-component
+       overrides further down) references ONLY these vars, so the whole
+       dark theme is tuned from here without touching components.
 
-    /* --- Surfaces --- */
-    --color-surface-base: var(--color-grey-950);
-    --color-surface-panel: var(--color-grey-900);
-    --color-surface-overlay: var(--color-grey-800);
-    --color-surface-subtle: var(--color-grey-800);
-    --color-surface-subtle-hover: var(--color-grey-700);
+       Elevation order (deepest → lightest), preserving the light-mode
+       relationship (subtle < panel < base < overlay) so cards LIFT and
+       sub-rails RECEDE — that's what creates visible "sections":
 
-    /* --- Borders --- */
-    --color-border-default: var(--color-grey-700);
-    --color-border-strong: var(--color-grey-500);
+         chrome   top bar / left rail / gutter behind the card  (deepest)
+         well     recessed fills, segmented-control track
+         panel    folder & sub rails, cards, table-header base
+         base     THE content card + table canvas               (main, lifted)
+         overlay  menus, dialogs, inputs, table-header, tooltips (highest)
+
+       Two rules that must survive any tuning:
+        1. BASE (the content card) is clearly LIGHTER than the chrome behind
+           it, so the card visibly floats off the frame.
+        2. Borders read clearly ABOVE the surface they outline — a border
+           close to its background is invisible (the bug this fixes).
+
+       Accents stay on the teal brand palette (--color-primary-*), which is
+       theme-driven at runtime (utils/theme.ts) — no accent is hardcoded here.
+       Surfaces are a neutral slate. Want warmer/cooler? Nudge the hex below.
+       ═══════════════════════════════════════════════════════════ */
+
+    /* Surfaces — VS Code Dark+ exact values.
+       chrome  = title bar + activity bar (icon strip)   #333333
+       panel   = sidebar / folder list                   #252526
+       base    = editor / main content canvas            #1E1E1E
+       well    = recessed / segmented track              #2D2D2D
+       overlay = menus, dropdowns, tooltips              #202020 */
+    --d-chrome:    #0E0F11;  /* title bar + left activity-bar strip             */
+    --d-base:      #0d1117;  /* MAIN: content card + table canvas               */
+    --d-well:      #2D2D2D;  /* recessed wells, segmented-control track         */
+    --d-panel:     #181818;  /* folder sidebar, sub rails, cards, dialogs (DM)  */
+    --d-overlay:   #202020;  /* menus, dropdowns, tooltips, table-header (top tier,
+                                lifts above panel #181818 via border + shadow)   */
+
+    /* Borders & dividers — VS Code widget / panel borders */
+    --d-divider:       #3C3C3C;  /* subtle: row & section separators            */
+    --d-border:        #454545;  /* default: card / input / table / rail edges  */
+    --d-border-strong: #6B6B6B;  /* strong: checkbox / radio / file outlines    */
+
+    /* Text — VS Code editor foreground scale */
+    --d-text:      #D4D4D4;  /* primary text, headings, record names            */
+    --d-text-2:    #AAAAAA;  /* secondary: body, nav, labels                    */
+    --d-text-3:    #858585;  /* metadata, captions, column heads, IDs           */
+
+    /* Row / item states on the content surface */
+    --d-hover:     var(--color-primary-900);  /* row & list-item hover — MATCHES
+                             the dashboard-folder hover (theme-tinted, not grey) */
+    --d-selected:  color-mix(in srgb, var(--color-primary-500) 30%, var(--d-panel));
+                             /* selected row — teal-tinted (brand signal)       */
+    --d-zebra:     #252526;  /* striped-row bg — VS Code list alternating row    */
+
+    /* --- Text (mapped to the foundation) --- */
+    --color-text-heading:     var(--d-text);   /* h1-h6, modal titles */
+    --color-text-primary:     var(--d-text);   /* alias for heading */
+    --color-text-soft:        var(--d-text);   /* feeds --color-select-text (OSelect trigger value). Soft variant: var(--d-text-2) */
+    --color-text-body:        var(--d-text-2); /* paragraphs, default body */
+    --color-text-secondary:   var(--d-text-2); /* supporting text, descriptions */
+    --color-text-caption:     var(--d-text-3); /* captions, footnotes, timestamps */
+    --color-text-label:       var(--d-text-3); /* form labels, metadata */
+    --color-text-muted:       var(--d-text-3); /* disabled, de-emphasized */
+    --color-text-disabled:    var(--d-text-3);
+    --color-text-placeholder: var(--d-text-3); /* input placeholders */
+    --color-text-link:        var(--color-primary-400);  /* clickable links (teal) */
+    --color-text-link-hover:  var(--color-primary-300);  /* link hover state (teal) */
+    --color-text-code:        var(--d-text-2);           /* inline code, monospace */
+    --color-text-inverse:     var(--color-grey-900);     /* text on light/colored bg */
+
+    /* --- Surfaces (mapped — elevation order preserved from light mode) --- */
+    --color-surface-base:         var(--d-base);    /* content card + table canvas (lifted) */
+    --color-surface-panel:        var(--d-panel);   /* folder rails, cards, table-header base */
+    --color-surface-overlay:      var(--d-overlay); /* dropdowns, dialogs, selects, popovers */
+    --color-surface-subtle:       var(--d-well);    /* recessed fills, segmented track */
+    --color-surface-subtle-hover: var(--d-panel);   /* hover on a recessed fill (one step up) */
+    --color-surface-chrome:        var(--d-chrome);  /* top bar + left rail */
+    --color-surface-chrome-deeper: var(--d-chrome);  /* gutter behind card (same frame) */
+
+    /* --- Borders (mapped — solid, clearly visible) --- */
+    --color-border-default: var(--d-border);
+    --color-border-strong:  var(--d-border-strong);
+    /* Soft divider — one step quieter than border-default so row/section
+       splits don't read as hard structural lines (but still visible). */
+    --color-border-subtle:  var(--d-divider);
 
     /* ---- Button overrides ---- */
 
     /* secondary (darkened surface) */
-    --color-button-secondary: var(--color-surface-overlay);
+    --o2-secondary-btn-bg: var(--color-surface-overlay);
+    --o2-secondary-btn-text: var(--color-text-primary);
+    --o2-secondary-btn-border: var(--color-border-subtle, rgba(255,255,255,0.12));
+    --color-button-secondary: var(--o2-secondary-btn-bg);
     --color-button-secondary-hover: var(--color-primary-900);
     --color-button-secondary-active: var(--color-primary-800);
     --color-button-secondary-disabled: var(--color-surface-overlay);
-    --color-button-secondary-foreground: var(--color-text-primary);
+    --color-button-secondary-foreground: var(--o2-secondary-btn-text);
 
     /* outline */
     --color-button-outline-text: var(--color-text-primary);
-    --color-button-outline-border: var(--color-primary-700);
+    --color-button-outline-border: var(--color-border-default);
     --color-button-outline-hover-bg: var(--color-primary-900);
-    --color-button-outline-hover-border: var(--color-primary-600);
+    --color-button-outline-hover-border: var(--color-border-strong);
     --color-button-outline-active-bg: var(--color-primary-800);
 
     /* ghost */
@@ -85,10 +160,10 @@
     --color-dropdown-item-destructive-hover-bg: var(--color-surface-overlay);
 
     /* Tooltip */
-    --color-tooltip-bg: var(--color-grey-800);
-    --color-tooltip-text: var(--color-grey-50);
-    --color-tooltip-border: var(--color-grey-600);
-    --color-tooltip-arrow: var(--color-grey-800);
+    --color-tooltip-bg: var(--d-overlay);
+    --color-tooltip-text: var(--d-text);
+    --color-tooltip-border: var(--d-border);
+    --color-tooltip-arrow: var(--d-overlay);
 
     /* ToggleGroup */
     --color-toggle-item-hover-bg: var(--color-primary-950);
@@ -150,6 +225,53 @@
     --color-badge-purple-ol-border: var(--color-purple-400);
     --color-badge-purple-ol-text:   var(--color-purple-400);
 
+    /* teal: brighten solid bg and outline for dark mode */
+    --color-badge-teal-solid-bg: var(--color-teal-400);
+    --color-badge-teal-ol-text: var(--color-teal-300);
+    --color-badge-teal-soft-bg: color-mix(in srgb, var(--color-teal-400) 15%, transparent);
+    --color-badge-teal-soft-text: var(--color-teal-400);
+
+    /* orange: brighten solid bg and outline for dark mode */
+    --color-badge-orange-solid-bg: var(--color-orange-400);
+    --color-badge-orange-ol-text: var(--color-orange-300);
+    --color-badge-orange-soft-bg: color-mix(in srgb, var(--color-orange-400) 15%, transparent);
+    --color-badge-orange-soft-text: var(--color-orange-400);
+
+    /* lime: brighten solid bg and outline for dark mode */
+    --color-badge-lime-solid-bg: var(--color-lime-400);
+    --color-badge-lime-ol-text: var(--color-lime-300);
+    --color-badge-lime-soft-bg: color-mix(in srgb, var(--color-lime-400) 15%, transparent);
+    --color-badge-lime-soft-text: var(--color-lime-400);
+
+    /* amber: brighten solid bg and outline for dark mode */
+    --color-badge-amber-solid-bg: var(--color-amber-400);
+    --color-badge-amber-ol-text: var(--color-amber-300);
+    --color-badge-amber-soft-bg: color-mix(in srgb, var(--color-amber-400) 15%, transparent);
+    --color-badge-amber-soft-text: var(--color-amber-400);
+
+    /* cyan: brighten solid bg and outline for dark mode */
+    --color-badge-cyan-solid-bg: var(--color-cyan-400);
+    --color-badge-cyan-ol-text: var(--color-cyan-300);
+    --color-badge-cyan-soft-bg: color-mix(in srgb, var(--color-cyan-400) 15%, transparent);
+    --color-badge-cyan-soft-text: var(--color-cyan-400);
+
+    /* blue: brighten solid bg and outline for dark mode */
+    --color-badge-blue-solid-bg: var(--color-blue-400);
+    --color-badge-blue-ol-text: var(--color-blue-300);
+    --color-badge-blue-soft-bg: color-mix(in srgb, var(--color-blue-400) 15%, transparent);
+    --color-badge-blue-soft-text: var(--color-blue-400);
+
+    /* purple (solid/soft variants): brighten for dark mode */
+    --color-badge-purple-solid-bg: var(--color-purple-400);
+    --color-badge-purple-soft-bg: color-mix(in srgb, var(--color-purple-400) 15%, transparent);
+    --color-badge-purple-soft-text: var(--color-purple-400);
+
+    /* indigo: brighten solid bg and outline for dark mode */
+    --color-badge-indigo-solid-bg: var(--color-indigo-400);
+    --color-badge-indigo-ol-text: var(--color-indigo-300);
+    --color-badge-indigo-soft-bg: color-mix(in srgb, var(--color-indigo-400) 15%, transparent);
+    --color-badge-indigo-soft-text: var(--color-indigo-400);
+
     /* Button — ghost-warning / outline-warning (bright yellow for readability on dark bg) */
     --color-button-ghost-warning-text: var(--color-warning-400);
     --color-button-outline-warning-text: var(--color-warning-400);
@@ -159,21 +281,22 @@
     --color-refresh-dot-stale: var(--color-warning-500);
     --color-refresh-dot-critical: var(--color-error-400);
 
-    /* Input (OInput, OTextarea) — disabled-bg uses grey-700 (#404040) which
-       sits noticeably brighter than the enabled `surface-panel` grey-900
-       (#171717) so disabled fields are visually obvious in dark mode. */
-    --color-input-bg: var(--color-surface-panel);
-    --color-input-border: var(--color-border-strong);
-    --color-input-disabled-bg: var(--color-grey-700);
+    /* Input (OInput, OTextarea) — bg matches the surface the field sits on
+       (border-only, like light mode where input-bg = surface-base) rather than
+       a distinct lighter gray; disabled-bg uses --d-well so disabled fields
+       still read as a clearly different, inert surface. */
+    --color-input-bg: var(--color-surface-base);
+    --color-input-border: var(--color-border-default);
+    --color-input-disabled-bg: var(--d-well);
     --color-input-disabled-text: var(--color-text-secondary);
     --color-input-placeholder: var(--color-text-disabled);
     --color-input-error-text: var(--color-error-400);
     --color-input-border-error: var(--color-error-400);
 
-    /* Select (OSelect) — same disabled-bg strategy as input. */
-    --color-select-bg: var(--color-surface-panel);
-    --color-select-border: var(--color-border-strong);
-    --color-select-disabled-bg: var(--color-grey-700);
+    /* Select (OSelect) — same surface-matching bg + disabled strategy as input. */
+    --color-select-bg: var(--color-surface-base);
+    --color-select-border: var(--color-border-default);
+    --color-select-disabled-bg: var(--d-well);
     --color-select-disabled-text: var(--color-text-secondary);
     --color-select-placeholder: var(--color-text-disabled);
     --color-select-error-text: var(--color-error-400);
@@ -237,8 +360,7 @@
 
     /* Date / Time / Color (ODate, OTime, OColor) */
     --color-datepicker-bg: var(--color-surface-panel);
-    --color-datepicker-border: var(--color-border-default);
-    --color-datepicker-inner-border: var(--color-grey-600);
+    --color-datepicker-border: var(--color-border-strong);
     --color-datepicker-disabled-bg: var(--color-surface-subtle);
     --color-datepicker-disabled-border: var(--color-border-default);
     --color-datepicker-error-border: var(--color-error-400);
@@ -267,18 +389,21 @@
     --color-colorpicker-popup-border: var(--color-border-default);
 
     /* Dialog */
-    --color-dialog-overlay: color-mix(in srgb, var(--color-grey-950) 70%, transparent);
-    --color-dialog-bg: var(--color-grey-900);
-    --color-dialog-border: var(--color-grey-700);
-    --color-dialog-header-bg: var(--color-grey-800);
-    --color-dialog-header-text: var(--color-grey-50);
-    --color-dialog-header-border: var(--color-grey-700);
-    --color-dialog-content-text: var(--color-grey-50);
-    --color-dialog-footer-bg: var(--color-grey-800);
-    --color-dialog-footer-border: var(--color-grey-700);
-    --color-dialog-close-text: var(--color-grey-400);
-    --color-dialog-close-hover-bg: var(--color-grey-700);
-    --color-dialog-close-active-bg: var(--color-grey-600);
+    --color-dialog-overlay: color-mix(in srgb, var(--d-chrome) 80%, transparent);
+    /* Body matches the normal content canvas (so inputs sit flush like on a
+       page); header + footer take the folder-rail surface so they read as a
+       slightly lifted frame around the content. Shared by ODialog + ODrawer. */
+    --color-dialog-bg: var(--color-surface-base);
+    --color-dialog-border: var(--d-border);
+    --color-dialog-header-bg: var(--color-surface-panel);
+    --color-dialog-header-text: var(--d-text);
+    --color-dialog-header-border: var(--d-border);
+    --color-dialog-content-text: var(--d-text);
+    --color-dialog-footer-bg: var(--color-surface-panel);
+    --color-dialog-footer-border: var(--d-border);
+    --color-dialog-close-text: var(--d-text-3);
+    --color-dialog-close-hover-bg: var(--d-divider);
+    --color-dialog-close-active-bg: var(--d-border);
 
     /* Pagination */
     --color-pagination-item-active-bg: var(--color-primary-500);
@@ -303,9 +428,12 @@
     --color-inner-loading-overlay: color-mix(in srgb, var(--color-grey-950) 70%, transparent);
     --color-inner-loading-label: var(--color-text-secondary);
 
-    /* Skeleton — dark surface base; shimmer is a subtle white gloss. */
-    --color-skeleton-base: var(--color-grey-800);
+    /* Skeleton */
+    --color-skeleton-base: var(--color-grey-700);
+    --color-skeleton-highlight: var(--color-grey-600);
     --color-skeleton-shimmer: rgba(255, 255, 255, 0.07);
+    /* Datepicker inner border — quieter on dark surfaces */
+    --color-datepicker-inner-border: var(--color-grey-600);
 
     /* ProgressBar */
     --color-progress-bar-default: var(--color-primary-500);
@@ -360,31 +488,23 @@
     --color-toast-warning-border: var(--color-warning-500);
     --color-toast-warning-icon:   var(--color-warning-400);
 
-    --color-toast-info-bg:        color-mix(in srgb, var(--color-primary-600) 30%, var(--color-grey-900));
-    --color-toast-info-border:    var(--color-primary-500);
-    --color-toast-info-icon:      var(--color-primary-300);
+    --color-toast-info-bg:        color-mix(in srgb, var(--color-primary-800) 40%, var(--color-grey-900));
+    --color-toast-info-border:    var(--color-primary-700);
+    --color-toast-info-icon:      var(--color-primary-400);
 
     --color-toast-loading-bg:     var(--color-surface-overlay);
     --color-toast-loading-border: var(--color-border-default);
     --color-toast-action-text:    var(--color-primary-400);
     --color-toast-action-hover:   var(--color-primary-300);
 
-    /* ── OTable (dark) ─────────────────────────────────── */
-    --color-table-header-bg: var(--color-grey-800);
-    --color-table-row-hover-bg: var(--color-primary-900);
-    --color-table-row-selected-bg: color-mix(in srgb, var(--color-primary-800) 50%, var(--color-grey-900));
-    --color-table-row-striped-bg: var(--color-grey-800);
-    --color-table-row-divider: var(--color-grey-700);
+    /* ── OTable (dark) — pulled onto the elevation ladder ─── */
+    --color-table-header-bg: var(--d-overlay);          /* header band lifts off rows */
+    --color-table-row-hover-bg: var(--d-hover);        /* neutral hover (not teal-washed) */
+    --color-table-row-selected-bg: var(--d-selected);  /* teal-tinted selection */
+    --color-table-row-striped-bg: var(--d-zebra);      /* panel +1 step zebra */
+    --color-table-row-divider: var(--d-divider);       /* solid, visible row separators */
     --color-table-highlight-bg: color-mix(in srgb, var(--color-warning-700) 40%, transparent);
     --color-table-sort-icon-active: var(--color-primary-400);
     --color-table-streaming-bar: var(--color-primary-400);
-    --color-table-row-expanded-bg: var(--color-grey-850);
-
-    /* ── Sidebar nav (dark) ────────────────────────────────── */
-    --color-nav-icon: var(--color-grey-400);
-    --color-nav-icon-active: var(--color-primary-400);
-    --color-nav-label-hover: var(--color-primary-300);
-    --color-nav-item-hover-bg: rgba(89, 155, 174, 0.15);
-    --color-nav-item-active-bg: rgba(89, 155, 174, 0.30);
-    --color-nav-item-active-border: rgba(89, 155, 174, 0.45);
+    --color-table-row-expanded-bg: var(--d-overlay);
 }

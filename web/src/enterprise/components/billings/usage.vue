@@ -113,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Bottom Section (40%) -->
             <div class="usage-data-to-display tw:flex tw:items-end ">
-               {{ usageData.ingestion }} {{ usageDataType.toUpperCase() }}
+               {{ usageData.ingestion }} {{ usageDataType.toUpperCase() }} {{ usageCost.ingestion ? '| $ '+ usageCost.ingestion : '' }}
             </div>
             </div>
                 </div>
@@ -132,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <!-- Bottom Section (40%) -->
                 <div class="usage-data-to-display tw:flex tw:items-end ">
-                {{ usageData.search }} {{ usageDataType.toUpperCase() }}
+                {{ usageData.search }} {{ usageDataType.toUpperCase() }} {{ usageCost.search ? '| $ '+ usageCost.search : '' }}
                 </div>
                 </div>
                 </div>
@@ -151,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <!-- Bottom Section (40%) -->
                 <div class="usage-data-to-display tw:flex tw:items-end ">
-                {{ usageData.functions }} {{ usageDataType.toUpperCase() }}
+                {{ usageData.functions }} {{ usageDataType.toUpperCase() }} {{ usageCost.functions ? '| $ '+ usageCost.functions : '' }}
                 </div>
                 </div>
                 </div>
@@ -168,7 +168,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                 </div>
                 <div class="usage-data-to-display tw:flex tw:items-end ">
-                {{ usageData.ai_credits }} Credits
+                {{ usageData.ai_credits }} Credits {{ usageCost.ai_credits ? '| $ '+ usageCost.ai_credits : '' }}
                 </div>
                 </div>
                 </div>
@@ -187,7 +187,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <!-- Bottom Section (40%) -->
                 <div class="usage-data-to-display tw:flex tw:items-end ">
-                {{ usageData.pipeline }} {{ usageDataType.toUpperCase() }}
+                {{ usageData.pipeline }} {{ usageDataType.toUpperCase() }} {{ usageCost.pipeline ? '| $ '+ usageCost.pipeline : '' }}
                 </div>
                 </div>
                 </div>
@@ -206,7 +206,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <!-- Bottom Section (40%) -->
                 <div class="usage-data-to-display tw:flex tw:items-end ">
-                {{ usageData.remotepipeline }} {{ usageDataType.toUpperCase() }}
+                {{ usageData.remotepipeline }} {{ usageDataType.toUpperCase() }} {{ usageCost.remotepipeline ? '| $ '+ usageCost.remotepipeline : '' }}
                 </div>
                 </div>
                 </div>
@@ -225,7 +225,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <!-- Bottom Section (40%) -->
                 <div class="usage-data-to-display tw:flex tw:items-end ">
-                {{ usageData.dataretention }} {{ usageDataType.toUpperCase() }}
+                {{ usageData.dataretention }} {{ usageDataType.toUpperCase() }} {{ usageCost.dataretention ? '| $ '+ usageCost.dataretention : '' }}
                 </div>
                 </div>
                 </div>
@@ -242,7 +242,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
   </template>
   <script lang="ts">
-  import { defineComponent, ref, onMounted, defineAsyncComponent, watch, computed, onUnmounted, onActivated   , onBeforeMount, nextTick } from "vue";
+  import { defineComponent, ref, onMounted, defineAsyncComponent, watch, computed, onUnmounted, onActivated   , onBeforeMount, nextTick, inject } from "vue";
   import { useStore } from "vuex";
   import { useI18n } from "vue-i18n";
   import BillingService from "@/services/billings";
@@ -253,7 +253,7 @@ import { getImageURL } from "@/utils/zincutils";
 import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRenderer.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-  
+
   let currentDate = new Date(); // Get the current date and time
   
   // Subtract 30 days from the current date
@@ -289,7 +289,23 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
         dataretention: "0.00",
         ai_credits: "0.00"
       });
+      const usageCost = ref<any>({
+        ingestion: null,
+        search: null,
+        functions: null,
+        pipeline: null,
+        remotepipeline: null,
+        dataretention: null,
+        ai_credits: null
+      });
       let chartData: any = ref({});
+      // The member-org selector lives in Billing.vue (rendered beside this
+      // component) and shares the current selection via this injected reactive.
+      const usageMember = inject<{ selected: string }>(
+        "usageMember",
+        undefined as any
+      );
+      const selectedMember = computed(() => usageMember?.selected || "");
       onMounted(async () => {
         selectUsageDate();
       });
@@ -303,6 +319,9 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
       watch(usageDataType, (val) => {
         getUsage();
       })
+      watch(selectedMember, () => {
+        getUsage();
+      })
       const getUsage = () => {
         const dismiss = toast({
           variant: "loading",
@@ -312,11 +331,17 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
         dataLoading.value = true;
         BillingService.get_data_usage(
           store.state.selectedOrganization.identifier,
-          usageDate.value,  
-          usageDataType.value
+          usageDate.value,
+          usageDataType.value,
+          selectedMember.value || undefined
         )
           .then((res) => {
             dataLoading.value = false;
+            // reset the data
+            for(const key of Object.keys(usageData.value)){
+                usageData.value[key] = "0.00";
+                usageCost.value[key] = null;
+            }
             res.data.data.forEach((item: any) => {
               const numericValue = parseFloat(item.value);
               // Map API event names to usageData keys
@@ -332,6 +357,11 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
               const key = eventKeyMap[item.event.toLowerCase()];
               if (key) {
                 usageData.value[key] = numericValue.toFixed(2);
+                if(item.cost){
+                    usageCost.value[key] = item.cost.toFixed(2);
+                }else{
+                    usageCost.value[key] = null;
+                }
               }
             });
             startTime.value = res.data.start_time;
@@ -952,12 +982,14 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
         searchIcon,
         functionsIcon,
         usageData,
+        usageCost,
         getUsage,
         router,
         pipelineIcon,
         remotePipelineIcon,
         dataRetentionIcon,
         aiIcon,
+        selectedMember,
       };
     },
   });
@@ -1002,20 +1034,20 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
   }
 
   .usage-tile-title {
-    font-size: 1rem;
-    font-weight: 500;
-    line-height: 1.25rem;
+    font-size: var(--text-sm);
+    font-weight: 600;
+    line-height: var(--leading-base);
     letter-spacing: 0%;
-    color: var(--o2-text-heading);
+    color: var(--color-text-heading);
     text-align: left;
   }
 
   .usage-data-to-display {
-    font-size: 1.5rem;
+    font-size: var(--text-2xl);
     font-weight: 600;
-    line-height: 1.75rem;
+    line-height: var(--leading-xl);
     letter-spacing: 0px;
-    color: var(--o2-text-heading);
+    color: var(--color-text-heading);
     text-align: left;
   }
 
@@ -1028,13 +1060,13 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
   }
 
   .text-title {
-    font-size: 1rem;
-    font-weight: bold;
+    font-size: var(--text-md);
+    font-weight: 600;
   }
 
   .text-sub-title {
-    font-size: 1.25rem;
-    font-weight: bolder;
+    font-size: var(--text-xl);
+    font-weight: 600;
   }
 
   .usage-title > span {
@@ -1042,4 +1074,3 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
     color: var(--o2-text-heading);
   }
   </style>
-  

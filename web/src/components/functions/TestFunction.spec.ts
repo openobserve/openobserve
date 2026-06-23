@@ -40,6 +40,21 @@ vi.mock('@/utils/date', () => ({
   getConsumableRelativeTime: vi.fn(),
 }));
 
+vi.mock('@/composables/useSuggestions', () => ({
+  default: () => ({
+    autoCompleteData: { value: { query: '', cursorIndex: -1, popup: { open: undefined }, org: '', streamType: '', streamName: '' } },
+    effectiveKeywords: [],
+    effectiveSuggestions: [],
+    getSuggestions: vi.fn(),
+    updateFieldKeywords: vi.fn(),
+    updateStreamKeywords: vi.fn(),
+  }),
+}));
+
+vi.mock('@/components/logs/useQueryPlaceholder', () => ({
+  useQueryPlaceholder: () => ({ placeholder: '' }),
+}));
+
 const mockStore = createStore({
   state: {
     theme: 'light',
@@ -480,6 +495,15 @@ describe('TestFunction.vue Branch Coverage', () => {
     });
 
     it('should cover utility function branches', async () => {
+      const queryEditorStub = {
+        template: '<div />',
+        methods: {
+          getCursorIndex: () => -1,
+          triggerAutoComplete: vi.fn(),
+          getModel: () => ({ getLinesContent: () => [] }),
+          addErrorDiagnostics: vi.fn(),
+        },
+      };
       const wrapper = mount(TestFunction, {
         props: defaultProps,
         global: {
@@ -488,7 +512,7 @@ describe('TestFunction.vue Branch Coverage', () => {
             store: mockStore,
           },
           stubs: {
-            'query-editor': true,
+            'query-editor': queryEditorStub,
             'DateTime': true,
             'FullViewContainer': true,
             'O2AIContextAddBtn': true,

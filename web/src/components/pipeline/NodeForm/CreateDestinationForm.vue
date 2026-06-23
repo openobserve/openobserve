@@ -17,11 +17,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="create-destination-form">
     <OForm
+      ref="formRef"
+      :schema="destinationSchema"
       :default-values="formDefaultValues"
       @submit="createDestination"
       class="tw:w-full pipeline-add-remote-destination-form"
+      v-slot="{ isSubmitting }"
     >
-      <!-- Stepper for Create New Destination -->
+      <!-- Stepper for Create New Destination.
+           Capped at 50vw (not fixed) so it reads as a readable column on the
+           full-width page editor, yet shrinks to fill narrower containers like
+           the External Destination drawer without overflowing/clipping. The
+           footer below stays full-width so its top border lines up with the
+           full-width page header (matching the other destination forms). -->
+      <div class="tw:w-full tw:max-w-[50vw]">
       <OStepper
         v-model="step"
         ref="stepper"
@@ -89,24 +98,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="tw:flex tw:flex-col tw:gap-4">
             <OFormInput
               data-test="add-destination-name-input"
-              v-model="formData.name"
               name="name"
-              :label="t('alerts.name') + ' *'"
-              :validators="[
-                (val: string | number | undefined) => !val ? t('common.nameRequired') : !isValidResourceName(String(val)) ? 'Characters like :, ?, /, #, and spaces are not allowed.' : undefined,
-              ]"
+              :label="t('alerts.name')"
+              required
               tabindex="0"
             />
 
             <OFormInput
               data-test="add-destination-url-input"
-              v-model="formData.url"
               name="url"
-              :label="t('alert_destinations.url') + ' *'"
-              :validators="[
-                (val: string | number | undefined) => !String(val ?? '').trim() ? 'Field is required!' : undefined,
-                (val: string | number | undefined) => String(val ?? '').trim().endsWith('/') ? 'URL should not end with a trailing slash' : undefined,
-              ]"
+              :label="t('alert_destinations.url')"
+              required
               help-text="Base URL without trailing slash (e.g., https://your-domain.com)"
               tabindex="0"
             />
@@ -121,11 +123,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="add-destination-openobserve-org-input"
                   v-model="openobserveOrg"
                   name="org"
-                  :label="'Organization *'"
+                  :label="'Organization'"
+                  required
                   :placeholder="'e.g., default'"
-                  :validators="[
-                    (val: string | number | undefined) => !String(val ?? '').trim() ? 'Organization is required for OpenObserve' : undefined,
-                  ]"
                   help-text="OpenObserve organization identifier"
                   tabindex="0"
                 />
@@ -135,11 +135,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="add-destination-openobserve-stream-input"
                   v-model="openobserveStream"
                   name="stream"
-                  :label="'Stream Name *'"
+                  :label="'Stream Name'"
+                  required
                   :placeholder="'e.g., default'"
-                  :validators="[
-                    (val: string | number | undefined) => !String(val ?? '').trim() ? 'Stream name is required for OpenObserve' : undefined,
-                  ]"
                   help-text="OpenObserve stream name"
                   tabindex="0"
                 />
@@ -150,21 +148,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="add-destination-url-endpoint-input"
               v-model="formData.url_endpoint"
               name="url_endpoint"
-              :label="
-                formData.destination_type === 'custom'
-                  ? 'Endpoint Path'
-                  : 'Endpoint Path *'
-              "
+              label="Endpoint Path"
+              :required="formData.destination_type !== 'custom'"
               :disabled="formData.destination_type !== 'custom'"
-              :validators="[
-                ...(formData.destination_type !== 'custom'
-                  ? [(val: string | number | undefined) => !String(val ?? '').trim() ? 'Field is required!' : undefined]
-                  : []),
-                (val: string | number | undefined) =>
-                  String(val ?? '').trim() && !String(val ?? '').trim().startsWith('/')
-                    ? 'Endpoint path must start with /'
-                    : undefined,
-              ]"
               help-text="Path will be appended to base URL (must start with /)"
               tabindex="0"
             />
@@ -174,9 +160,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="add-destination-method-select"
               v-model="formData.method"
               name="method"
-              :label="t('alert_destinations.method') + ' *'"
+              :label="t('alert_destinations.method')"
+              required
               :options="apiMethods"
-              :validators="[(val: any) => !val ? 'Field is required!' : undefined]"
               tabindex="0"
             />
 
@@ -185,11 +171,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="add-destination-output-format-select"
               v-model="formData.output_format"
               name="output_format"
-              :label="t('alert_destinations.output_format') + ' *'"
+              :label="t('alert_destinations.output_format')"
+              required
               :options="outputFormats"
               labelKey="label"
               valueKey="value"
-              :validators="[(val: any) => !val ? 'Field is required!' : undefined]"
               :disabled="formData.destination_type !== 'custom'"
               tabindex="0"
             />
@@ -200,11 +186,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="add-destination-esbulk-index-input"
               v-model="formData.esbulk_index"
               name="esbulk_index"
-              :label="'ESBulk Index Name *'"
+              :label="'ESBulk Index Name'"
+              required
               :placeholder="'Enter index name (e.g., logs, events)'"
-              :validators="[
-                (val: string | number | undefined) => !String(val ?? '').trim() ? 'Index name is required for ESBulk format' : undefined,
-              ]"
               help-text="Index name where data will be written in Elasticsearch"
               tabindex="0"
             />
@@ -215,14 +199,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="add-destination-separator-input"
               v-model="formData.separator"
               name="separator"
-              :label="t('alert_destinations.separator') + ' *'"
+              :label="t('alert_destinations.separator')"
+              required
               :placeholder="t('alert_destinations.separator_placeholder')"
-              :validators="[
-                (val: string | number | undefined) =>
-                  (val === null || val === undefined || val === '')
-                    ? 'Separator is required for StringSeparated format'
-                    : undefined,
-              ]"
               :help-text="t('alert_destinations.separator_hint')"
               tabindex="0"
             />
@@ -236,27 +215,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Splunk Metadata Fields -->
             <template v-if="formData.destination_type === 'splunk'">
-              <OInput
+              <OFormInput
                 data-test="add-destination-metadata-source-input"
-                v-model="formData.metadata!.source"
+                name="metadata.source"
                 :label="'Source'"
                 :placeholder="'Enter source (e.g., http:my_source)'"
                 help-text="Splunk source field for event metadata"
                 tabindex="0"
               />
 
-              <OInput
+              <OFormInput
                 data-test="add-destination-metadata-sourcetype-input"
-                v-model="formData.metadata!.sourcetype"
+                name="metadata.sourcetype"
                 :label="'Source Type'"
                 :placeholder="'Enter source type (e.g., _json)'"
                 help-text="Splunk sourcetype field for event metadata"
                 tabindex="0"
               />
 
-              <OInput
+              <OFormInput
                 data-test="add-destination-metadata-hostname-input"
-                v-model="formData.metadata!.hostname"
+                name="metadata.hostname"
                 :label="'Hostname'"
                 :placeholder="'Enter hostname (e.g., server01)'"
                 help-text="Splunk host field for event metadata"
@@ -268,42 +247,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template v-if="formData.destination_type === 'datadog'">
               <OFormInput
                 data-test="add-destination-metadata-ddsource-input"
-                v-model="formData.metadata!.ddsource"
-                name="ddsource"
-                :label="'DD Source *'"
+                name="metadata.ddsource"
+                :label="'DD Source'"
+                required
                 :placeholder="'Enter source (e.g., nginx, java)'"
-                :validators="[
-                  (val: string | number | undefined) => !String(val ?? '').trim() ? 'DD Source is required for Datadog' : undefined,
-                ]"
                 help-text="Source attribute for Datadog logs"
                 tabindex="0"
               />
 
               <OFormInput
                 data-test="add-destination-metadata-ddtags-input"
-                v-model="formData.metadata!.ddtags"
-                name="ddtags"
-                :label="'DD Tags *'"
+                name="metadata.ddtags"
+                :label="'DD Tags'"
+                required
                 :placeholder="'Enter tags (e.g., env:prod,version:1.0)'"
-                :validators="[
-                  (val: string | number | undefined) => !String(val ?? '').trim() ? 'DD Tags are required for Datadog' : undefined,
-                ]"
                 help-text="Comma-separated tags for Datadog logs"
                 tabindex="0"
               />
 
-              <OInput
+              <OFormInput
                 data-test="add-destination-metadata-service-input"
-                v-model="formData.metadata!.service"
+                name="metadata.service"
                 :label="'Service'"
                 :placeholder="'Enter service name (e.g., api-gateway)'"
                 help-text="Service name for Datadog logs"
                 tabindex="0"
               />
 
-              <OInput
+              <OFormInput
                 data-test="add-destination-metadata-hostname-input"
-                v-model="formData.metadata!.hostname"
+                name="metadata.hostname"
                 :label="'Hostname'"
                 :placeholder="'Enter hostname (e.g., server01)'"
                 help-text="Hostname for Datadog logs"
@@ -320,21 +293,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="tw:flex tw:flex-col tw:gap-2">
             <div
               v-for="(header, index) in apiHeaders"
-              :key="header.uuid"
+              :key="index"
               class="tw:flex tw:gap-1"
             >
               <div class="tw:w-5/12">
-                <OInput
+                <OFormInput
                   :data-test="`add-destination-header-${header['key']}-key-input`"
-                  v-model="header.key"
+                  :name="`headers[${index}].key`"
                   :placeholder="t('alert_destinations.api_header')"
                   tabindex="0"
                 />
               </div>
               <div class="tw:w-5/12">
-                <OInput
+                <OFormInput
                   :data-test="`add-destination-header-${header['key']}-value-input`"
-                  v-model="header.value"
+                  :name="`headers[${index}].value`"
                   :placeholder="t('alert_destinations.api_header_value')"
                   tabindex="0"
                 />
@@ -345,7 +318,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="ghost-destructive"
                   size="icon-xs-sq"
                   :title="t('alert_templates.edit')"
-                  @click="deleteApiHeader(header)"
+                  @click="deleteApiHeader(index)"
                   icon-left="delete"
                 />
                 <OButton
@@ -363,9 +336,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <div class="tw:w-full tw:mt-3 tw:inline-flex">
-            <OSwitch
+            <OFormSwitch
               data-test="add-destination-skip-tls-verify-toggle"
-              v-model="formData.skip_tls_verify"
+              name="skip_tls_verify"
               :label="t('alert_destinations.skip_tls_verify')"
             />
           </div>
@@ -410,9 +383,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OCard>
         </OStep>
       </OStepper>
+      </div>
 
       <!-- Form buttons -->
-      <div class="tw:flex tw:justify-start tw:mb-3">
+      <div class="tw:flex tw:justify-start tw:mb-3 tw:pt-4 tw:border-t tw:border-border-default">
         <div v-if="step === 1" class="tw:flex tw:gap-2">
           <OButton
             data-test="step1-cancel-btn"
@@ -437,6 +411,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="step3-back-btn"
             variant="outline"
             size="sm-action"
+            :disabled="isSubmitting"
             @click="prevStep"
           >
             Back
@@ -445,6 +420,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="add-destination-cancel-btn"
             variant="outline"
             size="sm-action"
+            :disabled="isSubmitting"
             @click="$emit('cancel')"
           >
             {{ t('alerts.cancel') }}
@@ -454,6 +430,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="primary"
             size="sm-action"
             type="submit"
+            :loading="isSubmitting"
           >
             {{ t('alerts.save') }}
           </OButton>
@@ -464,7 +441,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts" setup>
-import { ref, computed, watch } from "vue";
+import { ref, computed, watch, onBeforeUnmount } from "vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import type { Ref } from "vue";
@@ -480,9 +457,12 @@ import OStep from "@/lib/navigation/Stepper/OStep.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
-import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import {
+  makeDestinationSchema,
+  type DestinationForm,
+} from "./CreateDestinationForm.schema";
 
 // Props
 const props = defineProps<{
@@ -492,6 +472,15 @@ const props = defineProps<{
 const emit = defineEmits(["created", "updated", "cancel"]);
 const store = useStore();
 const { t } = useI18n();
+
+// OForm instance ref — used for the destination_type bridge (setFieldValue) and
+// to read the form-owned `name`/`url` values reactively (form.useStore).
+// Typed `any` because OForm is generic (its InstanceType isn't constructable).
+const formRef = ref<any>(null);
+
+// Co-located Zod schema (factory keeps the required message i18n-driven).
+// Named after the form per the playbook house style.
+const destinationSchema = makeDestinationSchema(t);
 
 const isEditMode = computed(() => !!props.destination);
 
@@ -574,95 +563,92 @@ const formData: Ref<DestinationData> = ref({
 const openobserveOrg = ref("default");
 const openobserveStream = ref("default");
 
+// A single Headers row. Matches the schema's `headerRowSchema` ({ key, value }).
+// No `uuid` — the dynamic array-field keys rows by index and add/remove operate
+// on the form's `headers` array by index (playbook §2).
+type HeaderRow = { key: string; value: string };
+
 // Helper function to get default headers for each destination type
-const getDefaultHeaders = (destinationType: string) => {
-  const headers: Array<{ key: string; value: string; uuid: string }> = [];
+const getDefaultHeaders = (destinationType: string): HeaderRow[] => {
+  const headers: HeaderRow[] = [];
 
   switch (destinationType) {
     case "openobserve":
-      headers.push({
-        key: "Authorization",
-        value: "Basic <token>",
-        uuid: getUUID(),
-      });
+      headers.push({ key: "Authorization", value: "Basic <token>" });
       break;
     case "splunk":
-      headers.push({
-        key: "Authorization",
-        value: "Splunk <splunk_token>",
-        uuid: getUUID(),
-      });
+      headers.push({ key: "Authorization", value: "Splunk <splunk_token>" });
       break;
     case "elasticsearch":
-      headers.push({
-        key: "Authorization",
-        value: "ApiKey <token>",
-        uuid: getUUID(),
-      });
-      headers.push({
-        key: "Content-Type",
-        value: "application/json",
-        uuid: getUUID(),
-      });
+      headers.push({ key: "Authorization", value: "ApiKey <token>" });
+      headers.push({ key: "Content-Type", value: "application/json" });
       break;
     case "datadog":
-      headers.push({
-        key: "DD-API-KEY",
-        value: "<token>",
-        uuid: getUUID(),
-      });
-      headers.push({
-        key: "Content-Encoding",
-        value: "gzip",
-        uuid: getUUID(),
-      });
-      headers.push({
-        key: "Content-Type",
-        value: "application/json",
-        uuid: getUUID(),
-      });
+      headers.push({ key: "DD-API-KEY", value: "<token>" });
+      headers.push({ key: "Content-Encoding", value: "gzip" });
+      headers.push({ key: "Content-Type", value: "application/json" });
       break;
     case "dynatrace":
-      headers.push({
-        key: "Authorization",
-        value: "Api-Token <token>",
-        uuid: getUUID(),
-      });
+      headers.push({ key: "Authorization", value: "Api-Token <token>" });
       headers.push({
         key: "Content-Type",
         value: "application/json; charset=utf-8",
-        uuid: getUUID(),
       });
       break;
     case "newrelic":
-      headers.push({
-        key: "Api-Key",
-        value: "<token>",
-        uuid: getUUID(),
-      });
-      headers.push({
-        key: "Content-Type",
-        value: "application/json",
-        uuid: getUUID(),
-      });
+      headers.push({ key: "Api-Key", value: "<token>" });
+      headers.push({ key: "Content-Type", value: "application/json" });
       break;
     case "custom":
     default:
-      headers.push({ key: "", value: "", uuid: getUUID() });
+      headers.push({ key: "", value: "" });
       break;
   }
 
   return headers;
 };
 
-// Initialize apiHeaders with default headers for OpenObserve (the default destination type)
-const apiHeaders: Ref<
-  {
-    key: string;
-    value: string;
-    uuid: string;
-  }[]
-> = ref(getDefaultHeaders("openobserve"));
+// Headers are a FORM-OWNED dynamic array-field (`headers[i].key/.value`). The
+// form is the single source of truth; this local mirror is kept in sync from the
+// form's store (subscribed on mount) so the template v-for + the exposed
+// `apiHeaders` stay reactive across add/remove (a bare `form.state.values`
+// read in a computed would NOT re-render — playbook §2 gotcha).
+//
+// `initialHeaders` SEEDS `:default-values` (computed before the form mounts):
+// default headers for the default type, or the prefilled headers in edit mode.
+const initialHeaders = ref<HeaderRow[]>(getDefaultHeaders("openobserve"));
+const apiHeaders = ref<HeaderRow[]>(initialHeaders.value.slice());
+
+// Write the form's `headers` array. Before the form mounts (setup-time edit
+// prefill / immediate watches) there is no form yet → seed `initialHeaders`
+// instead so the value flows in via `:default-values`. After mount, set it on
+// the form (the single source of truth) and the store subscription mirrors it
+// back into `apiHeaders`.
+const setHeaders = (rows: HeaderRow[]) => {
+  const next = rows.map((h) => ({ key: h.key, value: h.value }));
+  if (formRef.value?.form) {
+    formRef.value.form.setFieldValue("headers", next, { dontUpdateMeta: true });
+  } else {
+    initialHeaders.value = next;
+    apiHeaders.value = next.slice();
+  }
+};
+
+// Metadata (Splunk source/sourcetype/hostname, Datadog
+// service/hostname/ddsource/ddtags) is FORM-OWNED via nested `metadata.*`
+// OFormInput fields. `initialMetadata` SEEDS `:default-values`; `setMetadata`
+// writes the whole object onto the form after mount (edit prefill), or seeds it
+// before mount.
+type MetadataValue = DestinationForm["metadata"];
+const initialMetadata = ref<MetadataValue>({});
+const setMetadata = (meta: MetadataValue) => {
+  const next = { ...(meta ?? {}) };
+  if (formRef.value?.form) {
+    formRef.value.form.setFieldValue("metadata", next, { dontUpdateMeta: true });
+  } else {
+    initialMetadata.value = next;
+  }
+};
 
 // Watch destination_type changes to set method, output_format, headers, and endpoint appropriately
 watch(
@@ -697,8 +683,8 @@ watch(
         formData.value.url_endpoint = defaultUrlEndpoint.value;
       }
 
-      // Set default headers for the destination type
-      apiHeaders.value = getDefaultHeaders(newType);
+      // Set default headers for the destination type (form-owned).
+      setHeaders(getDefaultHeaders(newType ?? "openobserve"));
     }
   },
 );
@@ -789,22 +775,25 @@ const populateFormForEdit = (destination: any) => {
     formData.value.url_endpoint = "";
   }
 
-  // Populate headers
+  // Populate headers (form-owned dynamic array-field).
   if (destination.headers && typeof destination.headers === "object") {
-    apiHeaders.value = Object.entries(destination.headers).map(
-      ([key, value]) => ({
+    setHeaders(
+      Object.entries(destination.headers).map(([key, value]) => ({
         key,
         value: value as string,
-        uuid: getUUID(),
-      }),
+      })),
     );
   }
 
-  // Populate metadata object
+  // Populate metadata object (form-owned). `formData.value.metadata` is kept
+  // so the rest of the component (showMetadataFields etc.) keeps working; the
+  // form's `metadata` is seeded via setMetadata so the OFormInput fields prefill.
   if (destination.metadata && typeof destination.metadata === "object") {
     formData.value.metadata = { ...destination.metadata };
+    setMetadata({ ...destination.metadata });
   } else {
     formData.value.metadata = {};
+    setMetadata({});
   }
 
   // Extract OpenObserve org and stream from endpoint if it's OpenObserve
@@ -840,19 +829,105 @@ watch(
 // Snapshot of all field values for OForm defaultValues.
 // Defined AFTER the immediate watch above so that edit-mode values
 // (set synchronously by populateFormForEdit) are captured correctly.
-const formDefaultValues = {
+//
+// `name`/`url`/`skip_tls_verify`/`headers`/`metadata.*` are form-owned: the form
+// is the single source of truth at submit time, and this snapshot only SEEDS
+// them (blank/defaults for create, prefilled for edit). The remaining keys
+// mirror entangled `formData`/`openobserveOrg` values that stay component-owned
+// (sanctioned exception) — they are seeded here so the schema's superRefine can
+// validate them, and re-synced into the form on change by the bridge watches.
+const formDefaultValues: DestinationForm = {
   name: formData.value.name,
   url: formData.value.url,
-  url_endpoint: formData.value.url_endpoint,
-  method: formData.value.method,
+  skip_tls_verify: formData.value.skip_tls_verify ?? false,
+  headers: initialHeaders.value.map((h) => ({ key: h.key, value: h.value })),
+  metadata: { ...(initialMetadata.value ?? {}) },
+  destination_type: formData.value.destination_type,
+  url_endpoint: formData.value.url_endpoint ?? "",
+  method: formData.value.method ?? "post",
   output_format: formData.value.output_format ?? "json",
   esbulk_index: formData.value.esbulk_index ?? "",
   separator: formData.value.separator ?? "",
   org: openobserveOrg.value,
   stream: openobserveStream.value,
-  ddsource: formData.value.metadata?.ddsource ?? "",
-  ddtags: formData.value.metadata?.ddtags ?? "",
 };
+
+// ── Bridge: keep the form's copy of the component-owned fields in sync ────────
+// `destination_type` is a custom card grid (not an <input>), so it can't be a
+// real OForm field — bridge it in via setFieldValue so superRefine can branch on
+// it. This watch→setFieldValue is the documented sanctioned exception. The
+// remaining entangled fields ARE rendered as OForm* (their name= is in the
+// schema) but stay v-model'd to component state and auto-prefilled, so mirror
+// their values in too, ensuring the schema validates the live values on submit.
+const syncToForm = (key: keyof DestinationForm, value: unknown) => {
+  formRef.value?.form?.setFieldValue(key, value, {
+    dontUpdateMeta: true,
+  });
+};
+
+watch(
+  () => formData.value.destination_type,
+  (dt) => syncToForm("destination_type", dt),
+  { immediate: true },
+);
+watch(
+  () => formData.value.url_endpoint,
+  (v) => syncToForm("url_endpoint", v ?? ""),
+);
+watch(
+  () => formData.value.method,
+  (v) => syncToForm("method", v ?? "post"),
+);
+watch(
+  () => formData.value.output_format,
+  (v) => syncToForm("output_format", v ?? "json"),
+);
+watch(
+  () => formData.value.esbulk_index,
+  (v) => syncToForm("esbulk_index", v ?? ""),
+);
+watch(
+  () => formData.value.separator,
+  (v) => syncToForm("separator", v ?? ""),
+);
+watch(openobserveOrg, (v) => syncToForm("org", v ?? ""));
+watch(openobserveStream, (v) => syncToForm("stream", v ?? ""));
+
+// ── Mirror the form-owned `headers` array into `apiHeaders` ───────────────────
+// Headers live on the form (`headers[i].key/.value`). Subscribe to the form's
+// store once it mounts so the template v-for + the exposed `apiHeaders` re-render
+// on every add/remove/edit (a plain `form.state.values` read in a computed would
+// NOT track array mutations — playbook §2 gotcha). Cleaned up on unmount.
+let unsubscribeHeaders: (() => void) | null = null;
+const syncApiHeadersFromForm = () => {
+  const rows = (formRef.value?.form?.state.values.headers ?? []) as HeaderRow[];
+  apiHeaders.value = rows.map((h) => ({ key: h.key, value: h.value }));
+};
+const stopFormReadyWatch = watch(
+  () => formRef.value?.form,
+  (form) => {
+    if (!form || unsubscribeHeaders) return;
+    syncApiHeadersFromForm();
+    unsubscribeHeaders = form.store.subscribe(syncApiHeadersFromForm).unsubscribe;
+    stopFormReadyWatch();
+  },
+  { immediate: true, flush: "post" },
+);
+onBeforeUnmount(() => unsubscribeHeaders?.());
+
+// Reactive reads of the form-owned `name`/`url` (single source of truth).
+const formName = computed<string>(
+  () => formRef.value?.form?.state.values.name ?? "",
+);
+const formUrl = computed<string>(
+  () => formRef.value?.form?.state.values.url ?? "",
+);
+// Metadata (Splunk/Datadog) is form-owned via the nested `metadata.*` OFormInput
+// fields, so read it from the form too — NOT from `formData.metadata`, which the
+// migrated inputs no longer write to.
+const formMetadata = computed<Record<string, any>>(
+  () => formRef.value?.form?.state.values.metadata ?? {},
+);
 
 // Watch destination_type changes to ensure method is set to "post" for non-custom types
 watch(
@@ -865,7 +940,7 @@ watch(
 );
 
 const isValidDestination = computed(() => {
-  return !!(formData.value.name && formData.value.url && formData.value.method);
+  return !!(formName.value && formUrl.value && formData.value.method);
 });
 
 // Default URL endpoints for different destination types (shown as hint)
@@ -919,10 +994,11 @@ const canProceedStep1 = computed(() => {
 });
 
 const canProceedStep2 = computed(() => {
+  // name/url are form-owned — read them from the form (single source of truth).
   const basicValidation =
-    formData.value.name &&
-    isValidResourceName(formData.value.name) &&
-    formData.value.url &&
+    formName.value &&
+    isValidResourceName(formName.value) &&
+    formUrl.value &&
     formData.value.method &&
     formData.value.output_format;
 
@@ -939,9 +1015,9 @@ const canProceedStep2 = computed(() => {
   // Validate destination-specific metadata
   if (formData.value.destination_type === "splunk") {
     return !!(
-      formData.value.metadata?.source?.trim() &&
-      formData.value.metadata?.sourcetype?.trim() &&
-      formData.value.metadata?.hostname?.trim()
+      formMetadata.value?.source?.trim() &&
+      formMetadata.value?.sourcetype?.trim() &&
+      formMetadata.value?.hostname?.trim()
     );
   }
 
@@ -955,8 +1031,8 @@ const canProceedStep2 = computed(() => {
 
   if (formData.value.destination_type === "datadog") {
     return !!(
-      formData.value.metadata?.ddsource?.trim() &&
-      formData.value.metadata?.ddtags?.trim()
+      formMetadata.value?.ddsource?.trim() &&
+      formMetadata.value?.ddtags?.trim()
     );
   }
 
@@ -1090,8 +1166,25 @@ const connectionNotes = computed(() => {
   }
 });
 
-const createDestination = () => {
-  if (!isValidDestination.value) {
+// @submit handler. OForm only calls this once the whole schema passes (incl. the
+// superRefine conditionals), so the schema — not a manual guard — gates the save.
+// `value` is the validated payload and the source of truth for the form-owned
+// `name`/`url`; the entangled fields still come from `formData`. Returning the
+// service promise lets OForm's awaited isSubmitting drive the Save spinner.
+//
+// `value` is optional so existing tests that invoke createDestination() directly
+// (driving formData) keep working — they fall back to the form-owned values.
+const createDestination = (value?: DestinationForm) => {
+  // The @submit payload is the source of truth for every FORM-OWNED field
+  // (name/url/skip_tls_verify/headers/metadata). For direct test calls that pass
+  // no `value`, fall back to the form's live state, then component state.
+  const formValues = (formRef.value?.form?.state.values ?? {}) as Partial<
+    DestinationForm
+  >;
+  const name = value?.name ?? formName.value ?? formData.value.name ?? "";
+  const url = value?.url ?? formUrl.value ?? formData.value.url ?? "";
+
+  if (!(name && url && formData.value.method)) {
     toast({
       variant: "error",
       message: "Please fill required fields",
@@ -1104,13 +1197,17 @@ const createDestination = () => {
     message: "Please wait...",
       timeout: 0,
 });
+  // Headers from the form (form-owned array-field). Only non-empty rows persist.
+  const headerRows = (value?.headers ??
+    formValues.headers ??
+    apiHeaders.value) as HeaderRow[];
   const headers: Headers = {};
-  apiHeaders.value.forEach((header) => {
+  headerRows.forEach((header) => {
     if (header["key"] && header["value"]) headers[header.key] = header.value;
   });
 
   // Merge URL + URL endpoint
-  const fullUrl = formData.value.url + (formData.value.url_endpoint || "");
+  const fullUrl = url + (formData.value.url_endpoint || "");
 
   // Handle output format - for esbulk, format as JSON object with index
   // For stringseparated, format as JSON object with separator
@@ -1133,39 +1230,55 @@ const createDestination = () => {
     outputFormat = formData.value.output_format;
   }
 
+  // skip_tls_verify is form-owned — read it from the @submit payload (fall back
+  // to the form's live state, then formData, for direct test calls).
+  const skipTlsVerify =
+    value?.skip_tls_verify ??
+    formValues.skip_tls_verify ??
+    formData.value.skip_tls_verify ??
+    false;
+
   const payload: any = {
     url: fullUrl,
     method: formData.value.method,
-    skip_tls_verify: formData.value.skip_tls_verify,
+    skip_tls_verify: skipTlsVerify,
     template: formData.value.template,
     headers: headers,
-    name: formData.value.name,
+    name: name,
     type: "http",
     output_format: outputFormat,
     destination_type_name: formData.value.destination_type,
   };
 
-  // Add metadata as JSON object
-  if (
-    formData.value.metadata &&
-    Object.keys(formData.value.metadata).length > 0
-  ) {
-    payload.metadata = formData.value.metadata;
+  // Add metadata as JSON object (form-owned via nested metadata.* fields). Read
+  // it from the @submit payload, falling back to the form's live state, then
+  // formData. Only include non-empty values so we don't persist blank keys.
+  const metadataSource =
+    value?.metadata ?? formValues.metadata ?? formData.value.metadata ?? {};
+  const metadata: Record<string, string> = {};
+  Object.entries(metadataSource).forEach(([k, v]) => {
+    if (v !== undefined && v !== null && String(v) !== "") {
+      metadata[k] = v as string;
+    }
+  });
+  if (Object.keys(metadata).length > 0) {
+    payload.metadata = metadata;
   }
 
-  // Check if we're in edit mode
+  // Check if we're in edit mode. Return the promise so OForm awaits the save
+  // (its isSubmitting drives the Save button spinner).
   if (isEditMode.value) {
     // Update existing destination
-    destinationService
+    return destinationService
       .update({
         org_identifier: store.state.selectedOrganization.identifier,
-        destination_name: formData.value.name,
+        destination_name: name,
         data: payload,
         module: "pipeline",
       })
       .then(() => {
         dismiss();
-        emit("updated", formData.value.name);
+        emit("updated", name);
       })
       .catch((err: any) => {
         if (err.response?.status == 403) {
@@ -1179,16 +1292,16 @@ const createDestination = () => {
       });
   } else {
     // Create new destination
-    destinationService
+    return destinationService
       .create({
         org_identifier: store.state.selectedOrganization.identifier,
-        destination_name: formData.value.name,
+        destination_name: name,
         data: payload,
         module: "pipeline",
       })
       .then(() => {
         dismiss();
-        emit("created", formData.value.name);
+        emit("created", name);
       })
       .catch((err: any) => {
         if (err.response?.status == 403) {
@@ -1203,17 +1316,27 @@ const createDestination = () => {
   }
 };
 
+// Add/remove operate on the FORM-OWNED `headers` array (the single source of
+// truth) via setHeaders; the store subscription mirrors the result back into
+// `apiHeaders` for the template v-for (playbook §2). The template's delete
+// button passes the row INDEX.
 const addApiHeader = (key: string = "", value: string = "") => {
-  apiHeaders.value.push({ key: key, value: value, uuid: getUUID() });
+  const rows = (formRef.value?.form?.state.values.headers ??
+    apiHeaders.value) as HeaderRow[];
+  setHeaders([
+    ...rows.map((h) => ({ key: h.key, value: h.value })),
+    { key, value },
+  ]);
 };
 
-const deleteApiHeader = (header: any) => {
-  apiHeaders.value = apiHeaders.value.filter(
-    (_header) => _header.uuid !== header.uuid,
-  );
-  if (formData.value?.headers?.[header.key])
-    delete formData.value?.headers?.[header.key];
-  if (!apiHeaders.value.length) addApiHeader();
+const deleteApiHeader = (index: number) => {
+  const rows = (formRef.value?.form?.state.values.headers ??
+    apiHeaders.value) as HeaderRow[];
+  const next = rows
+    .filter((_, i) => i !== index)
+    .map((h) => ({ key: h.key, value: h.value }));
+  // Always keep at least one (blank) row so the add button stays reachable.
+  setHeaders(next.length ? next : [{ key: "", value: "" }]);
 };
 
 // Reset form when needed
@@ -1237,6 +1360,8 @@ const resetForm = () => {
   // Reset OpenObserve specific fields
   openobserveOrg.value = "default";
   openobserveStream.value = "default";
+  // Clear the form-owned fields (name/url) back to their blank defaults.
+  formRef.value?.form?.reset();
   // Set default headers for OpenObserve
   apiHeaders.value = getDefaultHeaders(defaultDestinationType);
   step.value = 1;
@@ -1261,6 +1386,10 @@ defineExpose({
   populateFormForEdit,
   openobserveOrg,
   openobserveStream,
+  // Form-owned (name/url) — exposed so tests can drive/read the real form.
+  formRef,
+  formName,
+  formUrl,
 });
 </script>
 

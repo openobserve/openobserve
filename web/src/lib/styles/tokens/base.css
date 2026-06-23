@@ -1,30 +1,70 @@
 /* ============================================================
-   BASE TOKENS — raw palette, spacing, radius, shadows
+   BASE TOKENS — raw palette, spacing, radius, shadows, fonts
    These are NEVER referenced directly in components.
    Components use semantic or component tokens only.
    ============================================================ */
 
 :root {
-  /* --- Primary palette — brand color #3F7994 (HSL 199°, 40%, 41%) --- */
-  --color-primary-50:  #f5f8f9;
-  --color-primary-100: #e4edf1;
-  --color-primary-200: #bad3de;
-  --color-primary-300: #8eb9cc;
-  --color-primary-400: #629fbc;
-  --color-primary-500: #4b8faf;
-  --color-primary-600: #3f7994;
-  --color-primary-700: #316177;
-  --color-primary-800: #224758;
-  --color-primary-900: #16303c;
+  /* --- Font family tokens --- */
+  --font-sans: 'Geist', -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
+  --font-mono: 'Geist Mono', 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  /* --- Font size scale --- */
+  --text-xs:   0.75rem;   /* 12px */
+  --text-sm:   0.8125rem; /* 13px */
+  --text-base: 0.875rem; /* 16px */
+  --text-md:   1rem;      /* 16px */
+  --text-lg:   1.125rem;  /* 18px */
+  --text-xl:   1.25rem;   /* 20px */
+  --text-2xl:  1.5rem;    /* 24px */
+  --text-3xl:  1.875rem;  /* 30px */
+  --text-4xl:  2.25rem;   /* 36px */
+
+  /* --- Line-height scale --- */
+  --leading-xs:    1rem;      /* 16px */
+  --leading-sm:    1.125rem;  /* 18px */
+  --leading-base:  1.25rem;   /* 20px */
+  --leading-md:    1.375rem;  /* 22px */
+  --leading-lg:    1.5rem;    /* 24px */
+  --leading-xl:    1.75rem;   /* 28px */
+  --leading-2xl:   2rem;      /* 32px */
+  --leading-3xl:   2.25rem;   /* 36px */
+  --leading-4xl:   2.5rem;    /* 40px */
+
+  /* --- Letter-spacing scale --- */
+  --tracking-tighter: -0.05em;
+  --tracking-tight:   -0.025em;
+  --tracking-normal:   0;
+  --tracking-wide:     0.025em;
+
+  /* --- Font weight scale --- */
+  --font-normal: normal;
+  --font-medium: 500;
+  --font-semibold: 600;
+  --font-bold: 700;
+  --font-black: 900;
+  /* --- Primary palette — blue-teal #3F7994 --- */
+  --color-primary-50:  #f5f8fa;
+  --color-primary-100: #e2ebef;
+  --color-primary-200: #c5d7df;
+  --color-primary-300: #9fbcca;
+  --color-primary-400: #79a1b4;
+  --color-primary-500: #5c8da4;
+  --color-primary-600: #3F7994;   /* brand accent — buttons, links, active tabs */
+  --color-primary-700: #326176;   /* hover */
+  --color-primary-800: #264959;
+  --color-primary-900: #19303b;
+  --color-primary-950: #0d181e;   /* darkest — dark-mode hover/drag bgs */
 
   /* --- Grey palette --- */
-  --color-grey-0:   #ffffff;
-  --color-grey-50:  #fafafa;
   /* Tailwind "neutral" palette — true greys with no blue undertone.
      Previously used "gray" (#1f2937, #111827, …) which has a cool/blue tint,
      causing inputs / selects / dropdowns / dialogs to read as dark blue in
      dark mode. Neutral matches user expectation of "dark grey, not blue". */
+  --color-grey-0:   #ffffff;
+  --color-grey-50:  #fafafa;
   --color-grey-100: #f5f5f5;
+  --color-grey-150: #ededed;   /* soft divider step (between 100 and 200) */
   --color-grey-200: #e5e5e5;
   --color-grey-300: #d4d4d4;
   --color-grey-400: #a3a3a3;
@@ -39,6 +79,7 @@
   /* --- Error palette --- */
   --color-error-50:  #fef2f2;
   --color-error-100: #fee2e2;
+  --color-error-300: #fca5a5;   /* referenced by destructive-disabled / focus-ring */
   --color-error-400: #f87171;
   --color-error-500: #ef4444;
   --color-error-600: #dc2626;
@@ -48,6 +89,7 @@
   --color-success-50:  #f0fdf4;
   --color-success-100: #dcfce7;
   --color-success-200: #bbf7d0;
+  --color-success-400: #4ade80;   /* referenced by EmptyState check illustration */
   --color-success-500: #22c55e;
   --color-success-700: #15803d;
   --color-success-900: #14532d;
@@ -62,8 +104,7 @@
   --color-warning-700: #a16207;
   --color-warning-900: #78350f;
 
-  /* --- Info palette (blue, used by OBanner info variant) --- */
-  /* Purple palette (used by OBadge purple-outline for metrics stream type) */
+  /* --- Purple palette (used by OBadge purple-outline for metrics stream type) --- */
   --color-purple-50:  #faf5ff;
   --color-purple-100: #f3e8ff;
   --color-purple-400: #c084fc;
@@ -72,6 +113,7 @@
   --color-purple-700: #7e22ce;
   --color-purple-900: #581c87;
 
+  /* --- Info palette (blue, used by OBanner info variant) --- */
   --color-info-50:  #eff6ff;
   --color-info-100: #dbeafe;
   --color-info-200: #bfdbfe;
@@ -89,6 +131,90 @@
   --color-note-highlight-dark:  #93c5fd;
   --color-note-code-light:      #d63384;
   --color-note-code-dark:       #f9a8d4;
+
+  /* --- Teal palette --- */
+  --color-teal-50:  #f0fdfa;
+  --color-teal-100: #ccfbf1;
+  --color-teal-200: #99f6e4;
+  --color-teal-300: #5eead4;
+  --color-teal-400: #2dd4bf;
+  --color-teal-500: #14b8a6;
+  --color-teal-600: #0d9488;
+  --color-teal-700: #0f766e;
+  --color-teal-800: #115e59;
+  --color-teal-900: #134e4a;
+
+  /* --- Orange palette --- */
+  --color-orange-50:  #fff7ed;
+  --color-orange-100: #ffedd5;
+  --color-orange-200: #fed7aa;
+  --color-orange-300: #fdba74;
+  --color-orange-400: #fb923c;
+  --color-orange-500: #f97316;
+  --color-orange-600: #ea580c;
+  --color-orange-700: #c2410c;
+  --color-orange-800: #9a3412;
+  --color-orange-900: #7c2d12;
+
+  /* --- Lime palette --- */
+  --color-lime-50:  #f7fee7;
+  --color-lime-100: #ecfccb;
+  --color-lime-200: #d9f99d;
+  --color-lime-300: #bef264;
+  --color-lime-400: #a3e635;
+  --color-lime-500: #84cc16;
+  --color-lime-600: #65a30d;
+  --color-lime-700: #4d7c0f;
+  --color-lime-800: #365314;
+  --color-lime-900: #1a2e05;
+
+  /* --- Amber palette --- */
+  --color-amber-50:  #fffbeb;
+  --color-amber-100: #fef3c7;
+  --color-amber-200: #fde68a;
+  --color-amber-300: #fcd34d;
+  --color-amber-400: #fbbf24;
+  --color-amber-500: #f59e0b;
+  --color-amber-600: #d97706;
+  --color-amber-700: #b45309;
+  --color-amber-800: #92400e;
+  --color-amber-900: #78350f;
+
+  /* --- Cyan palette --- */
+  --color-cyan-50:  #ecfeff;
+  --color-cyan-100: #cffafe;
+  --color-cyan-200: #a5f3fc;
+  --color-cyan-300: #67e8f9;
+  --color-cyan-400: #22d3ee;
+  --color-cyan-500: #06b6d4;
+  --color-cyan-600: #0891b2;
+  --color-cyan-700: #0e7490;
+  --color-cyan-800: #155e75;
+  --color-cyan-900: #164e63;
+
+  /* --- Blue palette --- */
+  --color-blue-50:  #eff6ff;
+  --color-blue-100: #dbeafe;
+  --color-blue-200: #bfdbfe;
+  --color-blue-300: #93c5fd;
+  --color-blue-400: #60a5fa;
+  --color-blue-500: #3b82f6;
+  --color-blue-600: #2563eb;
+  --color-blue-700: #1d4ed8;
+  --color-blue-800: #1e40af;
+  --color-blue-900: #1e3a8a;
+
+  /* --- Indigo palette --- */
+  --color-indigo-50:  #eef2ff;
+  --color-indigo-100: #e0e7ff;
+  --color-indigo-200: #c7d2fe;
+  --color-indigo-300: #a5b4fc;
+  --color-indigo-400: #818cf8;
+  --color-indigo-500: #6366f1;
+  --color-indigo-600: #4f46e5;
+  --color-indigo-700: #4338ca;
+  --color-indigo-800: #3730a3;
+  --color-indigo-900: #312e81;
 
   /* --- White / Black --- */
   --color-white: #ffffff;
@@ -110,8 +236,10 @@
   --radius-xl:   0.75rem;   /* 12px */
   --radius-full: 9999px;
 
-  /* --- Shadow scale --- */
-  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  /* --- Shadow scale — hairline-border philosophy ---
+     sm is intentionally none: cards use a 1px border, not a drop shadow.
+     md/lg retained for overlays (dialogs, menus) that need real elevation. */
+  --shadow-sm: none;
+  --shadow-md: 0 4px 12px -2px rgb(0 0 0 / 0.08), 0 2px 6px -2px rgb(0 0 0 / 0.06);
+  --shadow-lg: 0 12px 24px -4px rgb(0 0 0 / 0.10), 0 4px 8px -4px rgb(0 0 0 / 0.06);
 }

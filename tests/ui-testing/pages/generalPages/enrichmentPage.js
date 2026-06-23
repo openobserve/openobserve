@@ -1,6 +1,7 @@
 const { expect } = require('@playwright/test');
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 const { isCloudEnvironment } = require('../cloudPages/cloud-env.js');
+import { openNavFlyoutChild } from '../commonActions.js';
 
 class EnrichmentPage {
     constructor(page) {
@@ -39,8 +40,7 @@ class EnrichmentPage {
         // ────────────────────────────────────────────────────────────────────
         // Use the data-test prefix (no `.o-tab__label` suffix — that Quasar
         // class no longer renders under the Reka tabs implementation).
-        this.pipelineMenuItem = page.locator('[data-test="menu-link-\\/pipeline-item"]');
-        this.enrichmentTableTab = page.locator('button[data-test="function-enrichment-table-tab"]');
+        this.enrichmentTableTab = page.locator('[data-test="pipeline-section-tab-enrichmentTables"]');
 
         // ────────────────────────────────────────────────────────────────────
         // Confirm delete dialog (ConfirmDialog) — shared OOConfirmDialog
@@ -119,7 +119,7 @@ class EnrichmentPage {
         this.nameLabel = 'Name';
         this.warningQueryExecution = 'text=warning Query execution';
         this.startTimeCell = 'Start time';
-        this.showingText = 'Showing 1 to 2 out of 2';
+        this.showingText = '1 to 2 out of 2';
         this.csvRequiredError = 'CSV File is required!';
         this.enrichmentTablesButton = 'Enrichment Tables';
         this.appendDataToggle = 'Append data to existing';
@@ -327,7 +327,7 @@ class EnrichmentPage {
             (resp) => /\/api\/[^/]+\/streams\?type=enrichment_tables/.test(resp.url()) && resp.request().method() === 'GET',
             { timeout: 30000 },
         ).catch(() => null);
-        await this.pipelineMenuItem.click();
+        await openNavFlyoutChild(this.page, 'pipeline');
         await this.enrichmentTableTab.click();
         await listResponse;
         // Wait for the enrichment tables list page to be visible
@@ -841,7 +841,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
 
     async navigateAndAppendData(fileName, filePath) {
         // Navigate back to enrichment tables list
-        await this.pipelineMenuItem.click();
+        await openNavFlyoutChild(this.page, 'pipeline');
         await this.enrichmentTableTab.click();
         await this.listPage.waitFor({ state: 'visible', timeout: 15000 });
 

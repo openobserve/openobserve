@@ -77,6 +77,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model:functions="searchObj.data.stream.functions"
           @update:query="updateQueryValue"
           @run-query="searchData"
+          @focus="onQueryEditorFocus"
+          @blur="onQueryEditorBlur"
         ></query-editor>
       </div>
     </div>
@@ -89,6 +91,7 @@ import {
   defineComponent,
   ref,
   watch,
+  computed,
   onBeforeMount,
   defineAsyncComponent,
   onBeforeUnmount,
@@ -97,6 +100,7 @@ import { useI18n } from "vue-i18n";
 
 import DateTime from "@/components/DateTime.vue";
 import useTraces from "@/composables/useTraces";
+import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
 import {
   applyFilterTerm,
   removeFieldCondition,
@@ -139,6 +143,17 @@ export default defineComponent({
 
     const { searchObj } = useTraces();
     const queryEditorRef = ref(null);
+
+    const { onFocus: _sqlOnFocus, onBlur: _sqlOnBlur, onQueryChange: _sqlOnQueryChange } =
+      useSqlEditorDiagnostics({
+        queryEditorRef,
+        sqlMode: computed(() => searchObj.meta.sqlMode),
+        query: computed(() => searchObj.data.editorValue ?? ""),
+        streamName: computed(() => searchObj.data.stream.selectedStream?.value),
+      });
+
+    const onQueryEditorFocus = () => { _sqlOnFocus(); };
+    const onQueryEditorBlur = async () => { await _sqlOnBlur(); };
 
     let parser: any;
     let streamName = "";
@@ -194,6 +209,7 @@ export default defineComponent({
     };
 
     const updateQueryValue = (value: string) => {
+      _sqlOnQueryChange();
       updateAutoComplete(value);
       if (searchObj.meta.sqlMode == true) {
         searchObj.data.parsedQuery = parser.astify(value);
@@ -304,6 +320,8 @@ export default defineComponent({
       t,
       searchObj,
       queryEditorRef,
+      onQueryEditorFocus,
+      onQueryEditorBlur,
       updateQueryValue,
       updateDateTime,
       updateQuery,

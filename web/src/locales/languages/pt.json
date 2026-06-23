@@ -404,7 +404,28 @@
     "selectLogStream": "Selecione o fluxo de registros",
     "noData": "Não há dados disponíveis",
     "functionEditorLabel": "Editor de funções",
-    "loadingStream": "Carregando Stream..."
+    "loadingStream": "Carregando Stream...",
+    "askAIPlaceholderRotation": {
+      "one": "Mostre-me os erros da última hora...",
+      "two": "Encontre consultas lentas que demoram mais de 5s...",
+      "three": "Conte 5xx respostas agrupadas por serviço...",
+      "four": "Filtrar registros em que nível = 'erro'..."
+    },
+    "hideHistogram": "Ocultar histograma",
+    "disableQuickMode": "Desativar o Modo Rápido",
+    "menuGroupSetOnce": "Definir uma vez",
+    "menuGroupSavedViews": "Visualizações salvas",
+    "menuGroupTools": "Ferramentas",
+    "menuGroupHistory": "História",
+    "menuGroupDownloads": "Downloads",
+    "menuGroupSchedule": "Cronograma",
+    "menuGroupInspect": "Inspecionar",
+    "validSql": "SQL válido",
+    "invalidSql": "Consulta inválida",
+    "menuGroupExplain": "Explique",
+    "fieldValuesEmpty": "Nenhum valor encontrado.",
+    "fieldValuesEmptyHint": "Experimente um intervalo de tempo mais amplo para ver os valores.",
+    "selectLogsStreamFirst": "Selecione o fluxo de registros primeiro"
   },
   "menu": {
     "home": "Início",
@@ -437,7 +458,9 @@
     "pipeline": "Oleodutos",
     "language": "Idioma",
     "actions": "Ações",
-    "incidents": "Incidentes"
+    "incidents": "Incidentes",
+    "evals": "Evals",
+    "aiObservability": "Observabilidade da IA"
   },
   "rum": {
     "title": "Monitoramento de usuários reais",
@@ -490,7 +513,33 @@
     "getStartedRUM": "Comece com o monitoramento real de usuários",
     "loadingErrorDetails": "Espere aí, estamos buscando os detalhes do erro.",
     "eventID": "ID do evento",
-    "loadingApplicationErrors": "Espere aí, estamos detectando erros de aplicativos."
+    "loadingApplicationErrors": "Espere aí, estamos detectando erros de aplicativos.",
+    "traces": "Traços",
+    "noCorrelatedTraces": "Nenhum traço correlacionado foi encontrado para esta sessão.",
+    "viewTraceDetails": "Exibir detalhes do rastreamento",
+    "routeChange": "Rota",
+    "initialView": "Inicial",
+    "failedToFetchTraces": "Falha ao buscar dados de rastreamento. Por favor, tente novamente.",
+    "traceNotFound": "Detalhes do rastreamento não encontrados.",
+    "failedToFetchTraceDetails": "Falha ao carregar detalhes do rastreamento. Por favor, tente novamente.",
+    "span": "extensão",
+    "spans": "vãos",
+    "errorTraces": "traços de erro",
+    "seekToMoment": "Busque esse momento na sessão",
+    "timeInSession": "Hora da sessão",
+    "route": "Rota",
+    "duration": "Duração",
+    "emptyState": {
+      "title": "Monitore seus usuários com o monitoramento real de usuários",
+      "description": "O RUM rastreia interações reais do usuário — carregamentos de páginas, erros, chamadas de API e repetições de sessões — para que você possa ver exatamente como os usuários experimentam seu aplicativo.",
+      "webApp": "Instrumentar um aplicativo web",
+      "webAppDesc": "Adicione o SDK OpenObserve RUM a qualquer aplicativo JavaScript",
+      "sessionReplay": "Ativar repetição de sessão",
+      "sessionReplayDesc": "Grave e reproduza sessões de usuário para depurar problemas de UX",
+      "learnMore": "Saiba mais:",
+      "quickImpl": "Guia de implementação rápida",
+      "blogPost": "Noções básicas sobre monitoramento de front-end"
+    }
   },
   "about": {
     "name": "Abra o Observe",
@@ -517,9 +566,9 @@
     "ingestion_limit": "Limite de ingestão",
     "today_usage": "Uso atual",
     "feature_comparision_ent_msg": "Você está usando o OpenObserve Enterprise Edition com acesso a todos os recursos avançados listados abaixo.",
-    "feature_comparision_plan_detail": "Seu plano: A Enterprise Edition é gratuita para até 200 GB/dia (aproximadamente 6 TB/mês) de ingestão de dados.",
+    "feature_comparision_plan_detail": "Seu plano: A Enterprise Edition é gratuita para até 50 GB/dia (aproximadamente 1.5 TB/mês) de ingestão de dados.",
     "feature_comparision_os_msg": "No momento, você está usando o OpenObserve Open Source Edition. Atualize para a Enterprise Edition para desbloquear os recursos avançados listados na tabela de comparação abaixo.",
-    "feature_comparision_good_news": "Boas notícias: o OpenObserve Enterprise Edition é totalmente gratuito para até 200 GB/dia (~ 6 TB/mês) de ingestão de dados.",
+    "feature_comparision_good_news": "Boas notícias: o OpenObserve Enterprise Edition é totalmente gratuito para até 50 GB/dia (~ 1.5 TB/mês) de ingestão de dados.",
     "commit_lbl": "Comprometa-se",
     "build_lbl": "Construído",
     "no_license_installed_lbl": "Nenhuma licença instalada",
@@ -574,14 +623,14 @@
     "value_support_enterprise": "Empresarial",
     "value_support_cloud": "Nuvem",
     "value_cost_free": "Gratuito",
-    "value_cost_enterprise": "Se for auto-hospedado, é gratuito para até 200 GB/dia de dados ingeridos. Pago depois disso",
+    "value_cost_enterprise": "Se for auto-hospedado, é gratuito para até 50 GB/dia de dados ingeridos. Pago depois disso",
     "value_cost_cloud": "Teste gratuito de 14 dias. Pago depois disso",
     "feature_comparison_lbl": "Comparação de recursos",
     "enterprise_offer": {
       "cloud": {
         "hero_title": "Características corporativas",
         "offer_text": "Obtenha todos os recursos corporativos totalmente gratuitos ao hospedar o OpenObserve por conta própria",
-        "badge_text": "Gratuito até 200 GB por dia",
+        "badge_text": "Gratuito até 50 GB por dia",
         "features_title": "Recursos do OpenObserve Cloud",
         "features_subtitle": "Todos os recursos incluídos em sua assinatura de nuvem",
         "primary_button_text": "Faça o download agora"
@@ -593,7 +642,7 @@
         "features_title": "Recursos corporativos disponíveis",
         "features_subtitle": "Obtenha uma licença gratuita para desbloquear recursos ilimitados",
         "primary_button_text": "Obtenha uma licença gratuita",
-        "license_note": "100 GB/dia sem licença • 200 GB/dia com licença"
+        "license_note": "50 GB/dia sem licença • 50 GB/dia com licença"
       },
       "enterprise_with_license": {
         "hero_title": "Sua edição empresarial",
@@ -607,7 +656,7 @@
       "open_source": {
         "hero_title": "Obtenha a Enterprise Edition",
         "offer_text": "Baixe e desbloqueie todos os recursos corporativos de forma totalmente gratuita",
-        "badge_text": "Gratuito até 200 GB por dia",
+        "badge_text": "Gratuito até 50 GB por dia",
         "features_title": "Desbloqueie todos os recursos corporativos",
         "features_subtitle": "Tudo o que você precisa para uma observabilidade pronta para produção",
         "primary_button_text": "Faça o download agora"
@@ -799,7 +848,10 @@
     "feature_correlation_management": "Gerenciamento de correlações",
     "feature_log_patterns": "Padrões de registro",
     "environment_type": "Tipo de ambiente",
-    "license_allows_unlimited_ingestion": "A licença atual permite a ingestão ilimitada de dados."
+    "license_allows_unlimited_ingestion": "A licença atual permite a ingestão ilimitada de dados.",
+    "refresh_license_limits": "Atualizar limites de licença",
+    "license_refresh_success": "A atualização do limite de licença foi acionada com sucesso",
+    "failed_to_refresh_license": "Falha ao atualizar os limites da licença"
   },
   "login": {
     "userid": "ID do usuário",
@@ -930,7 +982,9 @@
     "nameRequired": "O nome é obrigatório",
     "subscription_type": "Tipo de plano",
     "proceed_subscription": "Prosseguir com a assinatura",
-    "subscription_plan": "Plano de assinatura"
+    "subscription_plan": "Plano de assinatura",
+    "makeBilledMember": "Torne esta organização um membro de cobrança de {org}",
+    "manage": "Gerenciar"
   },
   "template": {
     "header": "Modelos",
@@ -1172,7 +1226,8 @@
     "tokenRotateError": "Falha ao girar o token.",
     "tokenDeleteError": "Falha ao excluir o token.",
     "noTokensFound": "Nenhum token de ingestão foi encontrado.",
-    "createdBy": "Criado por"
+    "createdBy": "Criado por",
+    "orgLevelSummary": "Tokens de nível organizacional para endpoints de ingestão."
   },
   "dashboard": {
     "selectField": "Campo",
@@ -1331,6 +1386,7 @@
     "selectDashboardLabel": "Selecione o painel",
     "selectTabLabel": "Selecione a guia",
     "numbers": "Números",
+    "localeFormat": "Formato Regional",
     "nanoseconds": "Nanossegundos (ns)",
     "currency": "Moeda",
     "p99": "P99",
@@ -1632,7 +1688,12 @@
     "axisLabelTooltipNotePrefix": "Nota:",
     "axisLabelTooltipNoteText": " Essa opção não é suportada para campos do eixo x de séries temporais.",
     "allFolders": "Todas as pastas",
-    "selectFile": "Selecionar arquivo"
+    "selectFile": "Selecionar arquivo",
+    "multiSqlQueryLabel": "Rótulo de consulta",
+    "multiSqlQueryLabelHint": "Nome personalizado para essa consulta em legendas (por exemplo, 'Produção')",
+    "multiQueryWarning": "Somente a consulta 1 é renderizada para {chartType}",
+    "trellisNotSupportedWithMultiQuery": "O layout do Trellis está desativado com várias consultas. Remova consultas extras para usar a treliça.",
+    "xAliasInconsistencyWarning": "Os aliases do eixo X são inconsistentes nas consultas: alguns usam histograma e outros não. Use o mesmo tipo de alias em todas as consultas para obter resultados previsíveis."
   },
   "panel": {
     "header": "Painel",
@@ -1747,7 +1808,24 @@
     "noDataAvailable": "Não há dados disponíveis",
     "tabAiAssistant": "Assistente de IA O2",
     "tabOverview": "Visão geral",
-    "tabUsage": "Uso"
+    "tabUsage": "Uso",
+    "subtitle": "Seu espaço de trabalho de observabilidade em um piscar de olhos",
+    "noDataState": {
+      "title": "Nenhum dado foi ingerido ainda",
+      "description": "Essa organização não recebeu nenhum dado, então não há nada para mapear. Quando os eventos começarem a fluir, o <strong>volume de ingestão, o armazenamento e o uso da consulta</strong> aparecerão aqui automaticamente.",
+      "logs": "Enviar registros",
+      "logsDesc": "Curl, Filebeat, Fluentbit, Vector e muito mais",
+      "traces": "Enviar rastros",
+      "tracesDesc": "Rastreamento distribuído OTLP/Jaeger/Zipkin",
+      "metrics": "Enviar métricas",
+      "metricsDesc": "Prometheus, Otel Collector, Telegraf e muito mais",
+      "or": "Ou:",
+      "otel": "Telemetria aberta",
+      "kubernetes": "Kubernetes",
+      "aws": "AWS/CloudWatch",
+      "aiIntegrations": "Integrações de IA",
+      "shippers": "Expedidores de toras"
+    }
   },
   "billing": {
     "header": "Uso e cobrança",
@@ -1807,7 +1885,105 @@
     "aiModePayAsYouGo": "Pague conforme o uso",
     "aiModeExhausted": "Exausta",
     "aiExhaustedMessage": "Inscreva-se para continuar usando os recursos de IA",
-    "aiPaygMessage": "Créditos gratuitos esgotados — uso cobrado na assinatura"
+    "aiPaygMessage": "Créditos gratuitos esgotados — uso cobrado na assinatura",
+    "organizationGroup": {
+      "tabLabel": "Grupo organizacional",
+      "inviteOrgButton": "Organização de convites",
+      "viewUsage": "Exibir uso",
+      "statTotal": "Total de organizações infantis",
+      "statActive": "Ativo",
+      "statPending": "Convites pendentes",
+      "statRejected": "Rejeitado",
+      "statusActive": "Ativo",
+      "statusPending": "Pendente",
+      "statusRejected": "Rejeitado",
+      "filterAll": "Todos",
+      "childOrgColumn": "Organização infantil",
+      "dateColumn": "Data",
+      "cancel": "Cancelar",
+      "invitedBy": "Convidado por",
+      "acceptedBy": "Aceito por",
+      "addedOnCreation": "Adicionado na criação",
+      "memberSince": "Membro desde",
+      "noMembers": "Ainda não há organizações membros",
+      "inviteTitle": "Convide uma organização",
+      "inviteOrgIdLabel": "Identificador da organização",
+      "inviteOrgIdPlaceholder": "Insira o identificador da organização",
+      "sendInvite": "Enviar convite",
+      "inviteSent": "Convite enviado com sucesso",
+      "inviteSameOrg": "Uma organização não pode se convidar",
+      "childHeadline": "Faturamento gerenciado por",
+      "childHeroSub": "Seu uso é cobrado dessa organização. As mudanças no plano e as faturas são gerenciadas pela organização-mãe — não há nada para gerenciar aqui.",
+      "receivedInvitesTab": "Convites pendentes",
+      "noPendingInvites": "Sem convites pendentes",
+      "noPendingInvitesHint": "Você verá convites aqui quando outra organização convidar você para participar do grupo de cobrança.",
+      "invitedByOn": "Convidado por {inviter}",
+      "inviteTabPrompt": "Convide outra organização para participar do seu grupo de cobrança. Seu uso será cobrado dessa organização.",
+      "emptyTitle": "Iniciar grupo de cobrança",
+      "chipConsolidatedBill": "Um projeto de lei consolidado",
+      "chipLinkOrgs": "Vincular várias organizações",
+      "accept": "Aceitar",
+      "reject": "Rejeitar",
+      "inviteAccepted": "Convite aceito com sucesso",
+      "inviteRejected": "Convite rejeitado com sucesso",
+      "plansManagedTitle": "Faturamento gerenciado pela organização-mãe",
+      "plansManagedDescription": "O faturamento dessa organização é gerenciado por {payer}. As mudanças no plano são tratadas pela organização-mãe.",
+      "chipPlanManaged": "Plano gerenciado pelos pais",
+      "chipNoInvoices": "Sem faturas separadas",
+      "viewOrgGroup": "Exibir grupo organizacional",
+      "usageMemberLabel": "Organização membro",
+      "usageAllMembers": "Organização atual",
+      "currentOrgTitle": "Organização Atual"
+    },
+    "billingGroup": {
+      "tabLabel": "Grupo de cobrança",
+      "inviteOrgButton": "Organização de convites",
+      "viewUsage": "Exibir uso",
+      "statTotal": "Total de organizações infantis",
+      "statActive": "Ativo",
+      "statPending": "Convites pendentes",
+      "statRejected": "Rejeitado",
+      "statusActive": "Ativo",
+      "statusPending": "Pendente",
+      "statusRejected": "Rejeitado",
+      "filterAll": "Todos",
+      "childOrgColumn": "Organização infantil",
+      "orgColumn": "Organização",
+      "orgIdColumn": "Identificador da organização",
+      "actionsColumn": "Ações",
+      "dateColumn": "Data",
+      "cancel": "Cancelar",
+      "invitedBy": "Convidado por",
+      "acceptedBy": "Aceito por",
+      "addedOnCreation": "Adicionado na criação",
+      "memberSince": "Membro desde",
+      "noMembers": "Ainda não há organizações membros",
+      "inviteTitle": "Convide uma organização",
+      "inviteOrgIdLabel": "Identificador da organização",
+      "inviteOrgIdPlaceholder": "Insira o identificador da organização",
+      "sendInvite": "Enviar convite",
+      "inviteSent": "Convite enviado com sucesso",
+      "inviteSameOrg": "Uma organização não pode se convidar",
+      "childHeadline": "Faturamento gerenciado por",
+      "childHeroSub": "Seu uso é cobrado dessa organização. As mudanças no plano e as faturas são gerenciadas pela organização-mãe — não há nada para gerenciar aqui.",
+      "invitesPanelHint": "Essas organizações convidaram você para participar do grupo de cobrança. Se você aceitar, o uso dessa organização será cobrado deles.",
+      "inviteTabPrompt": "Convide outra organização para participar do seu grupo de cobrança. Seu uso será cobrado dessa organização.",
+      "emptyTitle": "Iniciar grupo de cobrança",
+      "chipConsolidatedBill": "Um projeto de lei consolidado",
+      "chipLinkOrgs": "Vincular várias organizações",
+      "accept": "Aceitar",
+      "reject": "Rejeitar",
+      "inviteAccepted": "Convite aceito com sucesso",
+      "inviteRejected": "Convite rejeitado com sucesso",
+      "plansManagedTitle": "Faturamento gerenciado pela organização-mãe",
+      "plansManagedDescription": "O faturamento dessa organização é gerenciado por {payer}. As mudanças no plano são tratadas pela organização-mãe.",
+      "chipPlanManaged": "Plano gerenciado pelos pais",
+      "chipNoInvoices": "Sem faturas separadas",
+      "viewOrgGroup": "Exibir grupo organizacional",
+      "usageMemberLabel": "Organização membro",
+      "usageAllMembers": "Organização atual",
+      "currentOrgTitle": "Organização Atual"
+    }
   },
   "message": {
     "ServerInternalError": "Erro: Algo deu errado. Erro interno do servidor.",
@@ -2808,7 +2984,10 @@
     "evaluationTemplate": "Modelo de avaliação",
     "evaluationTemplateHelp": "Selecione um modelo de avaliação que defina os critérios e as dimensões para o juiz do LLM.",
     "noTemplatesFound": "Nenhum modelo de avaliação encontrado. Crie um na página Modelos de avaliação.",
-    "evalTemplatesRefreshed": "Modelos de avaliação atualizados com sucesso"
+    "evalTemplatesRefreshed": "Modelos de avaliação atualizados com sucesso",
+    "subtitle": "Transforme, enriqueça e direcione dados em voo",
+    "selectStream": "Selecione um stream...",
+    "queryEditorPlaceholder": "Selecione um stream ou escreva uma consulta SQL aqui..."
   },
   "reports": {
     "header": "Relatórios",
@@ -3063,7 +3242,46 @@
         "cost": "Custo",
         "spans": "Vãos"
       }
-    }
+    },
+    "openInFullView": "Abrir à vista completa",
+    "serviceMap": "Mapa de serviços",
+    "patternView": "Visualização de padrões",
+    "spanView": "Vista da Espanha",
+    "noData": {
+      "title": "Comece a enviar rastreamentos para o OpenObserve",
+      "description": "Ainda não foram encontrados fluxos de rastreamento nesta organização. Instrumente seus serviços e os rastros aparecerão aqui automaticamente.",
+      "otlp": "Enviar rastreamentos via OTLP",
+      "otlpDesc": "Jaeger, Zipkin e qualquer SDK compatível com OpenTelemetry",
+      "otelCollector": "Colecionador/Agente de hotéis",
+      "otelCollectorDesc": "Encaminhe todos os sinais de telemetria através do Otel Collector",
+      "or": "Ou:",
+      "kubernetes": "Kubernetes",
+      "python": "Python",
+      "java": "Java",
+      "nodejs": "Node.js",
+      "askAi": "Peça à IA para configurar o rastreamento"
+    },
+    "noStream": {
+      "title": "Escolha um stream para começar a explorar",
+      "description": "Escolha um stream de rastreamento e pressione <strong>Executar consulta</strong>. Você pode filtrar por serviço, duração, status da extensão e muito mais quando os resultados forem carregados.",
+      "selectStream": "Selecione um stream",
+      "selectStreamDesc": "Navegue pelos fluxos de rastreamento disponíveis nesta organização",
+      "queryGuide": "Leia o guia de rastreamentos",
+      "queryGuideDesc": "Gráfico de serviço, filtragem de abrangência, métricas RED e muito mais",
+      "recent": "Recente:"
+    },
+    "noEvents": {
+      "title": "Nenhum vestígio encontrado",
+      "descNoFilters": "Nenhum traço foi encontrado em {range}. Tente ampliar o intervalo de tempo para carregar os resultados.",
+      "descWithFilters": "Nada correspondeu a <strong>essa consulta</strong> na janela selecionada. Tente ampliar o intervalo de tempo ou remover um filtro.",
+      "expandRange": "Expandir o intervalo de tempo",
+      "expandRangeDescAbsolute": "Mudar para um intervalo de tempo relativo mais amplo",
+      "removeFilter": "Remover um filtro",
+      "selectedRange": "o intervalo selecionado"
+    },
+    "showAll": "Mostrar tudo",
+    "filterByErrors": "Filtrar por erros",
+    "clearErrorFilter": "Limpar filtro de erro"
   },
   "invitation": {
     "pendingInvitations": "Convites pendentes",
@@ -3081,7 +3299,8 @@
     "confirmRejectMsg": "Tem certeza de que deseja rejeitar o convite para entrar em {org}?",
     "expired": "Expirado",
     "expiresToday": "Expira hoje",
-    "daysLeft": "{dias} dias restantes"
+    "daysLeft": "{dias} dias restantes",
+    "search": "Pesquisar convites"
   },
   "serviceAccounts": {
     "header": "Contas de serviço",
@@ -3230,7 +3449,9 @@
     "import_this_pattern": "Importar este padrão",
     "patterns_loaded": "Padrão (s) {count} carregado (s)",
     "failed_to_load": "Falha ao carregar padrões",
-    "no_patterns_selected": "Selecione pelo menos um padrão"
+    "no_patterns_selected": "Selecione pelo menos um padrão",
+    "name_required": "* O nome é obrigatório",
+    "pattern_required": "* O padrão é obrigatório"
   },
   "search_history": {
     "title": "Histórico de pesquisa",
@@ -3345,7 +3566,9 @@
     "timeRangeLabel": "Intervalo de tempo:",
     "analyzeTooltipTraces": "Analise as dimensões do rastreamento para padrões de taxa, latência e erro",
     "insightsButtonLabel": "Percepções",
-    "searchInspectionsLabel": "Inspecione os detalhes da execução do trabalho de pesquisa"
+    "searchInspectionsLabel": "Inspecione os detalhes da execução do trabalho de pesquisa",
+    "inspectBtnLabel": "Inspecionar",
+    "analyzeBtnLabel": "Percepções"
   },
   "errorInsights": {
     "title": "Percepções",
@@ -3823,7 +4046,18 @@
     "elevatedErrorRate": "Taxa de erro elevada",
     "reqPerSec": "exigida/s",
     "allClear": "Tudo limpo",
-    "allClearDesc": "Sem anomalias ativas, incidentes ou serviços degradados na janela de tempo selecionada."
+    "allClearDesc": "Sem anomalias ativas, incidentes ou serviços degradados na janela de tempo selecionada.",
+    "emptyActionAlerts": "Exibir regras de alerta",
+    "emptyActionAlertsDesc": "Revise alertas e limites configurados",
+    "emptyActionLogs": "Explorar registros",
+    "emptyActionLogsDesc": "Pesquise e filtre seus fluxos de log",
+    "emptyActionTraces": "Explore os traços",
+    "emptyActionTracesDesc": "Inspecione rastreamentos distribuídos e latência de serviço",
+    "viewAll": "Exibir tudo",
+    "showingOf": "Mostrando {mostrado} de {total}",
+    "colErrorRate": "Taxa de erro",
+    "colLatency": "Latência",
+    "colReqs": "Requestões"
   },
   "chatHistory": {
     "title": "Conversa",
@@ -3937,5 +4171,755 @@
       "two": "Escreva VRL para analisar o JSON dos logs do nginx...",
       "three": "Crie um painel para a integridade do nó K8s..."
     }
+  },
+  "emptyState": {
+    "noSearchResults": {
+      "title": "Não conseguimos encontrar nenhum dado",
+      "description": "Nada corresponde aos seus filtros ou intervalo de tempo atuais. Tente ampliar sua pesquisa, ampliar o intervalo de tempo ou limpar os filtros.",
+      "action": "Filtros claros",
+      "actionDesc": "Redefinir todos os filtros aplicados"
+    },
+    "noLogs": {
+      "title": "Não há registros neste intervalo",
+      "description": "Não encontramos nenhum registro para o stream e o intervalo de tempo selecionados. Experimente um intervalo de tempo maior ou um stream diferente.",
+      "action": "Amplie o intervalo de tempo",
+      "actionDesc": "Pesquise em um período mais longo"
+    },
+    "noDashboards": {
+      "title": "Crie seu primeiro painel",
+      "description": "Os painéis reúnem suas métricas, registros e rastreamentos em uma única visualização. Crie um para começar.",
+      "action": "Novo painel",
+      "actionDesc": "Comece com uma tela vazia",
+      "import": "Painel de importação",
+      "importDesc": "Carregar um arquivo JSON do painel",
+      "templates": "Navegue pelos modelos",
+      "templatesDesc": "Comece a partir de um painel da comunidade"
+    },
+    "noPipelines": {
+      "title": "Crie seu primeiro funil",
+      "description": "Os pipelines transformam e roteiam seus dados à medida que eles chegam. Configure um para começar a moldar seus streams.",
+      "action": "Novo gasoduto",
+      "actionDesc": "Crie um fluxo do zero",
+      "import": "Pipeline de importação",
+      "importDesc": "Faça upload de uma definição de pipeline"
+    },
+    "noFunctions": {
+      "title": "Crie sua primeira função",
+      "description": "As funções enriquecem e remodelam seus dados no momento da ingestão ou da consulta. Adicione um para começar.",
+      "action": "Nova função",
+      "actionDesc": "Escreva uma nova função VRL"
+    },
+    "noStreams": {
+      "title": "Aguardando seus primeiros dados",
+      "description": "Nenhum dado chegou ainda. Conecte uma fonte e seus streams aparecerão aqui automaticamente.",
+      "action": "Configurar a ingestão",
+      "actionDesc": "Conectar uma fonte de dados"
+    },
+    "noAlerts": {
+      "title": "Crie seu primeiro alerta",
+      "description": "Os alertas notificam você no momento em que seus dados ultrapassam um limite. Defina um para iniciar o monitoramento.",
+      "action": "Novo alerta",
+      "actionDesc": "Defina uma condição a ser monitorada"
+    },
+    "noIncidents": {
+      "title": "Sem incidentes ativos",
+      "description": "Você está ocupado — nada precisa de sua atenção no momento. Os incidentes desencadeados aparecerão aqui."
+    },
+    "loadError": {
+      "title": "Algo deu errado",
+      "description": "Não foi possível carregar esses dados. Geralmente é temporário — tente novamente em um momento.",
+      "action": "Tente novamente",
+      "actionDesc": "Tente carregar os dados novamente"
+    },
+    "noData": {
+      "title": "Nada aqui ainda",
+      "description": "Não há dados para mostrar no momento."
+    },
+    "noTraces": {
+      "title": "Nenhum vestígio encontrado",
+      "description": "Nenhum traço corresponde ao serviço e ao intervalo de tempo selecionados. Experimente um intervalo de tempo maior ou um serviço diferente."
+    },
+    "noSearchHistory": {
+      "title": "Ainda não há histórico de pesquisa",
+      "description": "As pesquisas que você executa serão listadas aqui para que você possa revisitá-las e executá-las novamente."
+    },
+    "noUsers": {
+      "title": "Ainda não há usuários",
+      "description": "Convide seus colegas de equipe para colaborar nessa organização.",
+      "action": "Adicionar usuário",
+      "actionDesc": "Convide um colega de equipe por e-mail"
+    },
+    "noReports": {
+      "title": "Ainda não há relatórios",
+      "description": "Agende um relatório para que os painéis sejam entregues em sua caixa de entrada.",
+      "action": "Novo relatório",
+      "actionDesc": "Agende a entrega de um painel"
+    },
+    "noQueries": {
+      "title": "Sem consultas em execução",
+      "description": "Não há consultas ativas no momento. As consultas de longa duração aparecerão aqui enquanto são executadas."
+    },
+    "noServiceAccounts": {
+      "title": "Ainda não há contas de serviço",
+      "description": "As contas de serviço permitem que os aplicativos se autentiquem com a API. Crie um para começar.",
+      "action": "Adicionar conta de serviço",
+      "actionDesc": "Crie uma conta de serviço de API"
+    },
+    "noInvitations": {
+      "title": "Sem convites pendentes",
+      "description": "Os convites que você enviou ou recebeu aparecerão aqui."
+    },
+    "filtered": {
+      "title": "Nenhum {substantivo} encontrado",
+      "description": "Nenhum {substantivo} corresponde aos seus filtros ou pesquisas atuais. Tente ajustá-los ou limpá-los.",
+      "action": "Filtros claros",
+      "actionDesc": "Redefina todos os filtros e pesquise",
+      "fallbackNoun": "resultados"
+    },
+    "nouns": {
+      "logs": "troncos",
+      "dashboards": "painéis",
+      "pipelines": "oleodutos",
+      "functions": "funções",
+      "streams": "córregos",
+      "alerts": "alertas",
+      "incidents": "incidentes",
+      "traces": "rastros",
+      "searches": "pesquisa",
+      "users": "usuários",
+      "reports": "notícias",
+      "queries": "consultas",
+      "serviceAccounts": "contas de serviço",
+      "invitations": "convites"
+    },
+    "noDashboardsInFolder": {
+      "title": "Não há painéis nesta pasta",
+      "description": "Essa pasta está vazia. Adicione um painel aqui ou mova um de outra pasta.",
+      "action": "Novo painel",
+      "actionDesc": "Crie um painel nesta pasta",
+      "import": "Painel de importação",
+      "importDesc": "Carregar um arquivo JSON do painel",
+      "templates": "Navegue pelos modelos",
+      "templatesDesc": "Comece a partir de um painel da comunidade"
+    },
+    "noGroups": {
+      "title": "Ainda não há grupos",
+      "description": "Os grupos permitem gerenciar permissões para vários usuários ao mesmo tempo. Crie um para começar.",
+      "action": "Novo grupo",
+      "actionDesc": "Criar um grupo de usuários"
+    },
+    "noRoles": {
+      "title": "Ainda não há funções",
+      "description": "As funções definem quais ações os usuários podem realizar. Crie uma função personalizada para controlar o acesso.",
+      "action": "Novo papel",
+      "actionDesc": "Definir uma função de acesso personalizada"
+    },
+    "noAnomalyConfigs": {
+      "title": "Nenhuma detecção de anomalia configurada",
+      "description": "Configure a detecção de anomalias para identificar automaticamente padrões incomuns em seus dados.",
+      "action": "Nova configuração",
+      "actionDesc": "Configurar a detecção de anomalias"
+    },
+    "noApiLimits": {
+      "title": "Nenhum limite de API configurado",
+      "description": "Os limites da API controlam a quantidade de dados que cada organização pode ingerir e consultar por janela de tempo."
+    },
+    "noRoleLimits": {
+      "title": "Nenhum limite de função configurado",
+      "description": "Os limites de função definem as cotas de ingestão e consulta aplicadas a funções individuais em uma organização."
+    },
+    "noIngestionTokens": {
+      "title": "Ainda não há tokens de ingestão",
+      "description": "Os tokens de ingestão autenticam as fontes de dados ao enviar registros, métricas e rastreamentos.",
+      "action": "Novo token",
+      "actionDesc": "Gere um token de ingestão"
+    },
+    "noOrganizations": {
+      "title": "Ainda não há organizações",
+      "description": "As organizações agrupam seus usuários e dados. Crie um para começar."
+    },
+    "noAlertDestinations": {
+      "title": "Ainda não há destinos",
+      "description": "Os destinos definem para onde as notificações de alerta são enviadas: Slack, e-mail, webhooks e muito mais.",
+      "action": "Novo destino",
+      "actionDesc": "Conectar um canal de notificação"
+    },
+    "noAlertTemplates": {
+      "title": "Ainda não há modelos",
+      "description": "Os modelos definem o formato das mensagens de notificação de alerta.",
+      "action": "Novo modelo",
+      "actionDesc": "Crie um modelo de notificação"
+    },
+    "noEnrichmentTables": {
+      "title": "Ainda não há tabelas de enriquecimento",
+      "description": "As tabelas de enriquecimento permitem que você anexe contexto adicional aos seus dados de registro no momento da consulta.",
+      "action": "Mesa nova",
+      "actionDesc": "Crie uma tabela de enriquecimento"
+    },
+    "noCipherKeys": {
+      "title": "Ainda não há chaves cifradas",
+      "description": "As chaves cifradas são usadas para criptografar campos confidenciais em seus fluxos de dados.",
+      "action": "Nova chave",
+      "actionDesc": "Gere uma chave cifrada"
+    },
+    "noAiToolsets": {
+      "title": "Ainda não há conjuntos de ferramentas de IA",
+      "description": "Os conjuntos de ferramentas de IA conectam sua organização a recursos externos de IA.",
+      "action": "Novo conjunto de ferramentas",
+      "actionDesc": "Adicionar um conjunto de ferramentas de IA"
+    },
+    "noLlmProviders": {
+      "title": "Nenhum provedor de LLM configurado",
+      "description": "Conecte um provedor de modelos de idiomas para habilitar recursos baseados em IA.",
+      "action": "Adicionar provedor",
+      "actionDesc": "Configurar um provedor LLM"
+    },
+    "noDiscoveredServices": {
+      "title": "Nenhum serviço descoberto",
+      "description": "Os serviços aparecerão aqui automaticamente quando os rastreamentos começarem a chegar."
+    },
+    "noNodes": {
+      "title": "Não há nós disponíveis",
+      "description": "Os nós do cluster aparecerão aqui assim que forem registrados."
+    },
+    "noSourceMaps": {
+      "title": "Nenhum mapa de origem carregado",
+      "description": "Faça upload de mapas de origem para permitir rastreamentos de pilha legíveis em seus relatórios de erros de RUM.",
+      "action": "Carregar",
+      "actionDesc": "Carregar um arquivo de mapa de origem"
+    },
+    "noBackfillJobs": {
+      "title": "Sem trabalhos de preenchimento",
+      "description": "Os trabalhos de preenchimento reprocessam dados históricos por meio de um pipeline. Execute um para começar."
+    },
+    "noSearchJobs": {
+      "title": "Nenhum trabalho de pesquisa agendado",
+      "description": "As pesquisas de longa duração que você agendar aparecerão aqui, onde você poderá acompanhar seu status e explorar os resultados assim que terminarem."
+    },
+    "noPipelineDestinations": {
+      "title": "Ainda não há destinos",
+      "description": "Alvos externos para saída do pipeline — endpoints HTTP e destinos de gravação remota.",
+      "action": "Novo destino",
+      "actionDesc": "Conecte um destino de pipeline"
+    },
+    "noLLMInsights": {
+      "title": "Ainda não há atividade de LLM",
+      "description": "Instrumente seus serviços com as convenções semânticas do OpenTelemetry Gen-AI e ingira pelo menos um rastreamento para preencher esse painel.",
+      "action": "Instrumento com OpenTelemetry",
+      "actionDesc": "Capture os atributos gen_ai_* em seus traços"
+    },
+    "noLLMSessions": {
+      "title": "Ainda não há sessões de LLM",
+      "description": "As sessões são agrupadas por gen_ai_conversation_id. Instrumente seus serviços para que cada conversa marque seus rastros, e as sessões apareçam aqui.",
+      "action": "Instrumento com OpenTelemetry",
+      "actionDesc": "Expansões de tags com gen_ai_conversation_id"
+    },
+    "noScorers": {
+      "title": "Ainda não há marcadores",
+      "description": "Os pontuadores classificam as respostas do LLM de acordo com suas configurações de pontuação — comece com um juiz do LLM ou importe uma da biblioteca.",
+      "action": "Criar marcador",
+      "actionDesc": "Defina um juiz de LLM ou pontuador remoto"
+    },
+    "noEvalJobs": {
+      "title": "Ainda não há trabalhos de avaliação",
+      "description": "Pontuadores do cronograma de trabalhos em relação a um stream do LLM. Crie um para começar a avaliar as conversas em uma cadência.",
+      "action": "Crie um trabalho de avaliação",
+      "actionDesc": "Escolha uma transmissão, marcadores e cadência"
+    },
+    "noScoreConfigs": {
+      "title": "Ainda não há configurações de pontuação",
+      "description": "As configurações de pontuação definem o esquema que os pontuadores produzem — numérico, booleano ou categórico. Adicione um para começar a pontuar.",
+      "action": "Criar configuração de pontuação",
+      "actionDesc": "Defina a forma da pontuação+faixa saudável"
+    },
+    "noEvalTemplates": {
+      "title": "Ainda não há modelos de avaliação",
+      "description": "Os modelos de avaliação definem critérios de pontuação reutilizáveis para avaliações de LLM.",
+      "action": "Novo modelo",
+      "actionDesc": "Crie um modelo de avaliação"
+    },
+    "noPipelineHistory": {
+      "title": "Ainda não há histórico de oleodutos",
+      "description": "O histórico de execução do pipeline aparecerá aqui quando seus pipelines forem executados."
+    },
+    "noStreamSelected": {
+      "title": "Selecione um stream para começar",
+      "description": "Escolha um stream no menu suspenso à esquerda e pressione “Executar consulta” para explorar seus registros. Você também pode aplicar filtros adicionais e ajustar o intervalo de datas."
+    },
+    "noQueryApplied": {
+      "title": "Execute uma consulta para ver os registros",
+      "description": "Ajuste seus filtros e clique em “Executar consulta” para carregar eventos para esse stream."
+    },
+    "noServiceGraph": {
+      "title": "Sem dados do gráfico de serviço",
+      "description": "Tente consultar um intervalo de tempo maior ou garanta que seus serviços estejam emitindo métricas de abrangência."
+    },
+    "noServicesCatalog": {
+      "title": "Nenhum serviço encontrado",
+      "description": "Nenhum serviço foi detectado no intervalo de tempo selecionado. Experimente um alcance maior ou um stream diferente."
+    }
+  },
+  "onlineEvals": {
+    "title": "Avaliações",
+    "description": "Configure provedores de LLM, definições de pontuação, pontuadores e trabalhos de avaliação ao vivo.",
+    "loading": "Carregando a configuração de avaliação online...",
+    "loadError": "Falha ao carregar avaliações on-line",
+    "deletePrompt": "Excluir {name}?",
+    "deleted": "{label} excluído",
+    "deleteError": "Falha ao excluir {label}",
+    "saved": "{label} salvo",
+    "newButton": "Novo {label}",
+    "search": "Pesquisar {label}",
+    "refresh": "Atualizar",
+    "allStatuses": "Todos os status",
+    "noRowsFound": "Nenhum {label} encontrado",
+    "getStartedHint": "Crie um para começar a fazer uma avaliação on-line.",
+    "columns": {
+      "name": "Nome",
+      "status": "Status",
+      "updated": "Atualizado"
+    },
+    "actions": {
+      "edit": "Editar",
+      "delete": "Excluir"
+    },
+    "tabs": {
+      "jobs": "Empregos de avaliação",
+      "scorers": "Marcadores",
+      "scoreConfigs": "Configurações de pontuação",
+      "providers": "Provedores"
+    },
+    "singular": {
+      "jobs": "Trabalho de avaliação",
+      "scorers": "Marcador",
+      "scoreConfigs": "Configuração de pontuação",
+      "providers": "Provedor"
+    },
+    "secondaryColumn": {
+      "jobs": "Transmita",
+      "scorers": "Tipo",
+      "scoreConfigs": "Tipo de dados",
+      "providers": "Provedor"
+    },
+    "jobStatus": {
+      "draft": "Esboço",
+      "active": "Ativo",
+      "paused": "Pausado",
+      "degraded": "Degradado",
+      "archived": "Arquivado"
+    },
+    "buttons": {
+      "cancel": "Cancelar",
+      "create": "Criar",
+      "save": "Salvar"
+    },
+    "scorerTypeDialog": {
+      "title": "Crie um novo marcador",
+      "intro": "Escolha o tipo de marcador. Escolha o que melhor se adequa à sua criação e execute-o.",
+      "llmJudgeTitle": "Juiz LLM",
+      "llmJudgeDescription": "Use um provedor configurado para avaliar semanticamente.",
+      "remoteTitle": "Remoto",
+      "remoteDescription": "Ligue para seu próprio endpoint HTTP para pontuar.",
+      "codeTitle": "Código",
+      "codeDescription": "Em breve."
+    },
+    "provider": {
+      "backTo": "Voltar para Provedores",
+      "createTitle": "Criar provedor LLM",
+      "editTitle": "Editar provedor LLM",
+      "subtitle": "Configure o endpoint do modelo usado pelos avaliadores do LLM.",
+      "sectionTitle": "Provedor",
+      "nameLabel": "Nome",
+      "namePlaceholder": "Produção OpenAI",
+      "typeLabel": "Tipo de provedor",
+      "typePlaceholder": "openai",
+      "endpointLabel": "Ponto final",
+      "endpointPlaceholder": "Endpoint personalizado opcional",
+      "defaultModelLabel": "Modelo padrão",
+      "defaultModelPlaceholder": "gpt-4o-mini",
+      "availableModelsLabel": "Modelos disponíveis",
+      "availableModelsPlaceholder": "gpt-4o-mini, gpt-4.1",
+      "useAsDefault": "Use como provedor padrão",
+      "authConfigLabel": "Configuração de autenticação JSON",
+      "saveError": "Falha ao salvar o provedor"
+    },
+    "scoreConfig": {
+      "createTitle": "Nova configuração de pontuação",
+      "editTitle": "Editar configuração de pontuação",
+      "subtitle": "As configurações de pontuação definem o tipo de pontuação, limites de saúde e categorias.",
+      "nameLabel": "Nome",
+      "dataTypeLabel": "Tipo de dados",
+      "descriptionLabel": "Descrição",
+      "numericRangeLabel": "Intervalo numérico JSON",
+      "categoriesLabel": "Categorias JSON",
+      "healthyThresholdLabel": "Limite saudável: JSON",
+      "dataTypes": {
+        "numeric": "Numérico",
+        "categorical": "Categórico",
+        "boolean": "boleano"
+      },
+      "saveError": "Falha ao salvar a configuração da pontuação"
+    },
+    "scorer": {
+      "backTo": "Voltar para Scorers",
+      "badgeRemote": "Remoto",
+      "badgeLlm": "Juiz LLM",
+      "createTitleRemote": "Criar marcador remoto",
+      "createTitleLlm": "Crie o Juiz Scorer do LLM",
+      "editTitleRemote": "Editar marcador remoto",
+      "editTitleLlm": "Editar LLM Judge Scorer",
+      "subtitleRemote": "Ligue para um endpoint HTTP que você hospeda. Nós renderizamos a solicitação; você retorna uma pontuação.",
+      "subtitleLlm": "Um modelo de linguagem avalia cada rastreamento usando a solicitação que você fornece.",
+      "identitySection": "Identidade",
+      "judgeSection": "Configuração do juiz",
+      "endpointSection": "Ponto final",
+      "nameLabel": "Nome",
+      "namePlaceholder": "juiz de fidelidade",
+      "producesScoreConfigLabel": "Produz configuração de pontuação",
+      "producesScoreConfigNone": "Nenhum",
+      "scoreConfigVersionLabel": "Versão de configuração de pontuação",
+      "latestSuffix": " (mais recente)",
+      "pinVersion": "Fixar versão selecionada",
+      "descriptionLabel": "Descrição",
+      "providerLabel": "Provedor",
+      "providerPlaceholder": "Selecione o provedor",
+      "modelLabel": "modelo",
+      "modelPlaceholder": "gpt-4o",
+      "promptLabel": "Aviso do juiz",
+      "outputSchemaLabel": "Esquema de saída JSON",
+      "remoteEndpointLabel": "Endpoint remoto",
+      "remoteEndpointPlaceholder": "https://eval.internal.corp/check",
+      "requestBodyLabel": "Modelo de corpo da solicitação",
+      "saveError": "Falha ao salvar o marcador",
+      "versionsLoadError": "Falha ao carregar as versões de configuração da pontuação",
+      "testPanel": {
+        "title": "Teste este marcador",
+        "hint": "Teste seu marcador com dados de amostra antes de salvar. As execuções de teste não persistem.",
+        "emptyPrefix": "Adicione variáveis como ",
+        "emptySuffix": " ao modelo de pontuação para testar com campos de amostra.",
+        "runButton": "Execute o teste",
+        "scenarioSuccess": "Resposta simulada",
+        "scenarioAuth": "Erro de autenticação",
+        "scenarioSchema": "Incompatibilidade de esquema",
+        "stateIdle": "Faça um teste para ver o resultado aqui.",
+        "stateRunning": "Executando o teste de pontuação...",
+        "successHeader": "Sucesso",
+        "successScore": "pontuação: 0.92",
+        "successReasoning": "raciocínio: A resposta é apoiada pelo contexto fornecido.",
+        "authHeader": "Falha na autenticação",
+        "authHint": "Verifique as credenciais do provedor antes de salvar.",
+        "schemaHeader": "Incompatibilidade de esquema",
+        "schemaHint": "A resposta não correspondeu ao esquema de saída configurado.",
+        "valuePlaceholder": "Valor para {variable}"
+      }
+    },
+    "job": {
+      "backTo": "Voltar para Eval Jobs",
+      "createTitle": "Crie um trabalho de avaliação online",
+      "editTitle": "Editar trabalho de avaliação online",
+      "subtitle": "Escolha o comportamento do stream, dos marcadores, do mapeamento e da amostragem para esse trabalho de avaliação.",
+      "stepper": {
+        "target": "Alvo",
+        "scorers": "Marcadores",
+        "mapping": "Mapeamento",
+        "sampling": "Amostragem"
+      },
+      "targetSection": "Alvo",
+      "scorersSection": "Marcadores e mapeamento",
+      "nameLabel": "Nome",
+      "namePlaceholder": "Monitor de fidelidade de produção",
+      "streamLabel": "Fluxo de entrada",
+      "streamPlaceholder": "padrão",
+      "streamTypeLabel": "Tipo de stream",
+      "streamTypePlaceholder": "rastros",
+      "descriptionLabel": "Descrição",
+      "samplingModeLabel": "Modo de amostragem",
+      "samplingValueLabel": "Valor de amostragem JSON",
+      "samplingModes": {
+        "rate": "Tarifa",
+        "all": "Todos",
+        "count": "Conde"
+      },
+      "scorerPicker": {
+        "title": "Marcadores",
+        "hint": "Selecione um ou mais marcadores para disputar cada período combinado.",
+        "meta": "{tipo} · v {versão}"
+      },
+      "filter": {
+        "title": "Condição do filtro",
+        "hint": "Somente intervalos que correspondam a essa condição entram na amostragem e na pontuação."
+      },
+      "inputMapping": {
+        "title": "Mapeamento de entrada",
+        "hint": "Mapeie os campos de abrangência em cada variável do modelo de pontuação.",
+        "selectScorers": "Selecione marcadores para configurar seus mapeamentos.",
+        "noVariables": "Esse marcador não tem variáveis de modelo para mapear.",
+        "variableCount": "variáveis {count}"
+      },
+      "preview": {
+        "title": "prévia",
+        "hint": "Use os campos à esquerda para definir a meta de avaliação da produção.",
+        "summaryTitle": "Resumo",
+        "summaryName": "Nome",
+        "summaryType": "Tipo",
+        "summaryStatus": "Status",
+        "statusEditing": "Editando",
+        "statusDraft": "Esboço",
+        "emptyValue": "—"
+      },
+      "selectAtLeastOne": "Selecione pelo menos um marcador",
+      "saveError": "Falha ao salvar o trabalho de avaliação"
+    },
+    "quality": {
+      "scopeLabel": "Todas as dimensões de qualidade neste espaço de trabalho",
+      "timeRange": {
+        "label": "Intervalo de tempo",
+        "last1h": "Última 1 hora",
+        "last24h": "Últimas 24 horas",
+        "last7d": "Últimos 7 dias",
+        "last30d": "Últimos 30 dias"
+      },
+      "sourceStream": {
+        "label": "Fluxo de origem",
+        "all": "Todas as transmissões"
+      },
+      "refresh": "Atualizar",
+      "kpis": {
+        "evaluated": {
+          "title": "Traços avaliados",
+          "unit": "",
+          "hint": "IDs de rastreamento distintos em _llm_scores dentro da janela"
+        },
+        "qualityIssueRate": {
+          "title": "Taxa de emissão de qualidade",
+          "unit": "%",
+          "hint": "Traços avaliados com qualquer dimensão abaixo do limite"
+        },
+        "evaluationCost": {
+          "title": "Custo de avaliação",
+          "unit": "$",
+          "hint": "Soma do custo do marcador do LLM Judge na janela"
+        },
+        "jobSuccess": {
+          "title": "Sucesso no trabalho",
+          "unit": "%",
+          "hint": "Taxa de sucesso na execução do Online Eval Job"
+        },
+        "scorerFailures": {
+          "title": "Falhas no marcador",
+          "unit": "",
+          "hint": "Falha na invocação do marcador na janela"
+        },
+        "latencyP95": {
+          "title": "Latência p95",
+          "unit": "s",
+          "hint": "Latência p95 do Scorer-Call"
+        },
+        "vsPrev": "versus anterior",
+        "noData": "—"
+      },
+      "loading": "Carregando dados de qualidade...",
+      "detail": {
+        "loading": "Carregando detalhamento por configuração...",
+        "noData": "Ainda não há pontuações para essa configuração nesta janela.",
+        "drillTitle": "Perfure até traçar",
+        "splitByScorer": "Dividido por marcador",
+        "splitBySourceType": "Dividir por source_type",
+        "trendTitle": "Tendência",
+        "trendSubtitle": "{configName}, {bucket}",
+        "distributionTitle": "Distribuição de pontuação",
+        "compositionTitle": "Composição ao longo do tempo",
+        "categoryDistributionTitle": "Distribuição de categorias",
+        "passRateTitle": "Taxa de aprovação ao longo do tempo",
+        "trueFalseTitle": "Verdadeiro versus falso",
+        "legendAvg": "Média",
+        "legendP95": "p95",
+        "legendThreshold": "limite {direção} {valor}",
+        "legendHealthy": "saudável",
+        "legendUnhealthy": "insalubre",
+        "kpis": {
+          "average": "Média",
+          "p50": "P50",
+          "p95": "P95",
+          "p50p95": "P50/P95",
+          "unhealthy": "Insalubre",
+          "healthy": "Saudável",
+          "coverage": "Cobertura"
+        }
+      },
+      "sidebar": {
+        "allConfigs": "Todas as configurações",
+        "empty": "Nenhuma configuração corresponde a esse filtro."
+      },
+      "overview": {
+        "title": "Visão geral das configurações de pontuação",
+        "countSuffix": "configurações {n}",
+        "searchPlaceholder": "Configurações de filtro...",
+        "loading": "Carregando agregados por configuração...",
+        "emptyNoConfigsTitle": "Ainda não há configurações de pontuação",
+        "emptyNoConfigsHint": "Defina sua primeira configuração de pontuação para começar a monitorar as dimensões de qualidade.",
+        "emptyWaitingTitle": "Esperando as primeiras pontuações chegarem",
+        "emptyWaitingHint": "Suas configurações de pontuação são declaradas, mas nenhuma pontuação foi gravada em _llm_scores nesta janela ainda.",
+        "waitingStepJob": "Ative um trabalho de avaliação on-line que produz pontuações para uma dessas configurações",
+        "waitingStepRange": "Amplie o intervalo de tempo — as pontuações do início de hoje ou desta semana podem não estar nesta janela",
+        "waitingStepRefresh": "Clique em Atualizar — as pontuações de um trabalho ativo aparecem em aproximadamente 1 minuto após a avaliação",
+        "waitingPrimaryCta": "Vagas de avaliação abertas",
+        "waitingRefreshCta": "Atualizar",
+        "noThreshold": "sem limite",
+        "columns": {
+          "scoreConfig": "Configuração de pontuação",
+          "type": "Tipo",
+          "totalScores": "Pontuações totais",
+          "coverage": "Cobertura",
+          "unhealthy": "Insalubre",
+          "trend": "Tendência",
+          "threshold": "Saudável se",
+          "updated": "Atualizado"
+        }
+      }
+    },
+    "deleteTitle": "Excluir {label}",
+    "deleteConfirmMessage": "Tem certeza de que deseja excluir “{name}”? Essa ação não pode ser desfeita."
+  },
+  "llmProviders": {
+    "tabLabel": "Provedores de LLM",
+    "title": "Provedores de LLM",
+    "subtitle": "Gerencie as conexões do provedor LLM usadas pelos pontuadores do LLM Judge.",
+    "newButton": "Novo provedor",
+    "searchPlaceholder": "Provedores de pesquisa",
+    "defaultBadge": "Padrão",
+    "loadError": "Falha ao carregar provedores de LLM",
+    "columns": {
+      "name": "Nome",
+      "type": "Tipo",
+      "endpoint": "Ponto final",
+      "defaultModel": "Modelo padrão",
+      "default": "Padrão"
+    },
+    "empty": {
+      "title": "Ainda não há fornecedores de LLM",
+      "description": "Os provedores de LLM armazenam os detalhes da conexão (endpoint + credenciais) dos modelos de linguagem que seus avaliadores do LLM Judge chamam. Adicione um para começar a fazer avaliações baseadas em juízes."
+    }
+  },
+  "aiObservability": {
+    "title": "Observabilidade do LLM",
+    "sections": {
+      "monitor": "Monitor",
+      "evaluate": "Avalie"
+    },
+    "nav": {
+      "overview": "Visão geral",
+      "sessions": "Sessões",
+      "quality": "Qualidade",
+      "evalJobs": "Empregos de avaliação",
+      "scorers": "Marcadores",
+      "scoreConfigs": "Configurações de pontuação"
+    }
+  },
+  "logs": {
+    "noData": {
+      "title": "Comece a enviar dados para o OpenObserve",
+      "description": "Ainda não há dados nessa organização, então não há fluxos para explorar. Envie seus primeiros registros e eles aparecerão aqui automaticamente. Escolha como você quer começar.",
+      "curl": "Enviar via API Curl/HTTP",
+      "curlDesc": "A maneira mais rápida: cole um comando e os registros começarão a fluir",
+      "shippers": "Use um remetente de toras",
+      "shippersDesc": "Filebeat, Fluentbit, Fluentd, Vector, SysLogng e muito mais",
+      "otel": "Telemetria aberta",
+      "otelDesc": "Ingestão de OTLP independente do fornecedor para registros, rastreamentos e métricas",
+      "or": "Ou:",
+      "kubernetes": "Kubernetes",
+      "aws": "AWS/CloudWatch",
+      "linux": "Linux",
+      "windows": "Janela",
+      "askAi": "Peça à IA que configure a ingestão"
+    },
+    "noStream": {
+      "title": "Escolha um stream para começar a explorar",
+      "description": "Escolha um stream e pressione <strong>Executar consulta</strong>. Você pode refinar com filtros, uma função VRL e um intervalo de tempo personalizado quando os resultados chegarem.",
+      "selectStream": "Selecione um stream",
+      "selectStreamDesc": "Navegue por registros, rastreamentos, métricas e fluxos de RUM",
+      "queryGuide": "Leia o guia de consulta",
+      "queryGuideDesc": "Filtros, modo SQL, VRL e visualizações salvas",
+      "recent": "Recente:"
+    },
+    "noEvents": {
+      "title": "Nenhum evento encontrado",
+      "descNoFilters": "Nenhum evento foi encontrado em {range}. Tente ampliar o intervalo de tempo para carregar os resultados.",
+      "descWithFilters": "Nada correspondeu a <strong>essa consulta</strong> na janela selecionada. Experimente ampliar o intervalo de tempo, facilitar um filtro ou redefinir a consulta.",
+      "expandRange": "Expandir o intervalo de tempo",
+      "expandRangeDescAbsolute": "Mudar para um intervalo de tempo relativo mais amplo",
+      "removeFilter": "Remover um filtro",
+      "removeFilterDescSql": "Você tem condições SQL aplicadas a essa consulta",
+      "openHistory": "Abrir histórico de pesquisa",
+      "askAi": "Peça à IA que corrija minha consulta",
+      "selectedRange": "o intervalo selecionado"
+    },
+    "error": {
+      "sqlError": "Erro de sintaxe SQL",
+      "sqlErrorDesc": "Sua consulta tem um erro de sintaxe. Consulte o editor de consultas para ver os erros destacados.",
+      "streamNotFound": "Stream não encontrado",
+      "streamNotFoundDesc": "O fluxo selecionado não existe ou foi removido.",
+      "ftsNotConfigured": "Pesquisa de texto completo não configurada",
+      "ftsNotConfiguredDesc": "Esse fluxo não tem um campo de pesquisa de texto completo. Configure um para ativar a pesquisa por palavra-chave.",
+      "fieldNotFound": "Campo não encontrado",
+      "fieldNotFoundDesc": "Sua consulta faz referência a um ou mais campos que não existem nesse fluxo.",
+      "functionNotDefined": "Função não definida",
+      "functionNotDefinedDesc": "Sua consulta chama uma função VRL que não está definida.",
+      "dataUnavailable": "Arquivos de dados indisponíveis",
+      "dataUnavailableDesc": "Alguns arquivos de dados desse intervalo de tempo estão inacessíveis. Experimente uma janela de tempo diferente.",
+      "dataTypeMismatch": "Incompatibilidade de tipos de dados",
+      "dataTypeMismatchDesc": "Um campo na sua consulta é usado com um tipo de dados incompatível.",
+      "executionError": "Falha na execução da consulta",
+      "executionErrorDesc": "Ocorreu um erro ao executar sua consulta.",
+      "serverError": "Erro no servidor",
+      "serverErrorDesc": "Ocorreu um erro interno no servidor.",
+      "generic": "Erro de pesquisa",
+      "genericDesc": "Ocorreu um erro ao recuperar eventos de pesquisa.",
+      "configureStream": "Configurar stream",
+      "configureStreamDesc": "Adicione um campo de pesquisa de texto completo nas configurações do stream",
+      "fixQuery": "Corrija a consulta",
+      "fixQueryDesc": "Revise e corrija a consulta no editor",
+      "expandRange": "Experimente um intervalo de tempo diferente",
+      "expandRangeDesc": "Os dados acessíveis podem estar em uma janela de tempo diferente",
+      "copyError": "Copiar detalhes do erro",
+      "traceId": "ID de rastreamento:",
+      "askAi": "Peça à IA que corrija minha consulta",
+      "showDetail": "Mostrar detalhes",
+      "hideDetail": "Ocultar detalhes"
+    }
+  },
+  "queryError": {
+    "sqlError": "Erro de sintaxe SQL",
+    "sqlErrorDesc": "Sua consulta tem um erro de sintaxe. Examine o editor para ver se há erros destacados.",
+    "streamNotFound": "Stream não encontrado",
+    "streamNotFoundDesc": "O fluxo selecionado não existe ou foi removido.",
+    "ftsNotConfigured": "Pesquisa de texto completo não configurada",
+    "ftsNotConfiguredDesc": "Esse fluxo não tem um campo de pesquisa de texto completo. Configure um para ativar a pesquisa por palavra-chave.",
+    "fieldNotFound": "Campo não encontrado",
+    "fieldNotFoundDesc": "Sua consulta faz referência a um ou mais campos que não existem nesse fluxo.",
+    "functionNotDefined": "Função não definida",
+    "functionNotDefinedDesc": "Sua consulta chama uma função VRL que não está definida.",
+    "dataUnavailable": "Arquivos de dados indisponíveis",
+    "dataUnavailableDesc": "Alguns arquivos de dados desse intervalo de tempo estão inacessíveis. Experimente uma janela de tempo diferente.",
+    "dataTypeMismatch": "Incompatibilidade de tipos de dados",
+    "dataTypeMismatchDesc": "Um campo na sua consulta é usado com um tipo de dados incompatível.",
+    "executionError": "Falha na execução da consulta",
+    "executionErrorDesc": "Ocorreu um erro ao executar sua consulta.",
+    "serverError": "Erro no servidor",
+    "serverErrorDesc": "Ocorreu um erro interno no servidor.",
+    "generic": "Erro de consulta",
+    "genericDesc": "Ocorreu um erro ao processar sua consulta.",
+    "configureResource": "Configurar stream",
+    "configureResourceDesc": "Adicione um campo de pesquisa de texto completo nas configurações do stream",
+    "fixQuery": "Corrija a consulta",
+    "fixQueryDesc": "Revise e corrija a consulta no editor",
+    "expandRange": "Experimente um intervalo de tempo diferente",
+    "expandRangeDesc": "Os dados acessíveis podem estar em uma janela de tempo diferente",
+    "copyError": "Copiar detalhes do erro",
+    "copied": "Copiado!",
+    "traceId": "ID de rastreamento:",
+    "askAi": "Peça à IA que corrija minha consulta",
+    "showDetail": "Mostrar detalhes",
+    "hideDetail": "Ocultar detalhes"
   }
 }

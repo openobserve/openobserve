@@ -341,10 +341,15 @@ export function buildSQLContext(
   const labelMargin = 10;
 
   // Calculate the section height (nameGap) upfront so we can use it for bottom spacing
-  // Skip rotation-based calculations for horizontal charts and time-based axes
+  // Skip rotation-based calculations for horizontal charts and time-based axes.
+  // nameGap is the distance from the axis line to the (middle-anchored) axis name.
+  // The tick labels occupy ~22px below the axis line (labelMargin 10 + fontSize 12),
+  // so a gap of 25 placed the bold axis name on top of the labels (and, with a bottom
+  // legend, on top of the legend). Use 35 so the name sits clearly below the labels —
+  // matching `calculateDynamicNameGap`'s own formula (labelHeight + margin + buffer).
   const dynamicXAxisNameGap =
     hasTimestampField || isHorizontalChart
-      ? 25
+      ? 35
       : calculateDynamicNameGap(
           labelRotation,
           labelWidth,
@@ -375,15 +380,21 @@ export function buildSQLContext(
       top: "15",
       bottom: hasXAxisName
         ? (() => {
+            // Reserve enough vertical space below the plot for the tick labels, the
+            // axis name (`nameGap` 35) and — when a horizontal legend is shown — the
+            // legend row beneath it. Measured ideal is roughly `nameGap + 20` for the
+            // containLabel case (labels are reserved inside the grid box, so only the
+            // name needs to clear the bottom-anchored legend); the earlier values left
+            // the name overlapping the legend, and over-padding leaves a visible gap.
             const baseBottom =
               legendConfig.orient === "horizontal" &&
               panelSchema.config?.show_legends
                 ? panelSchema.config?.axis_width == null
-                  ? 50
-                  : 60
+                  ? 55
+                  : 75
                 : panelSchema.config?.axis_width == null
-                  ? 35
-                  : 40;
+                  ? 30
+                  : 50;
             // When an x-axis name is present, `nameGap` already reserves space
             // between rotated labels and the axis name. Adding `additionalBottomSpace`
             // here causes double-counting and extra blank space beneath the axis
@@ -409,9 +420,13 @@ export function buildSQLContext(
       },
       enterable: true,
       backgroundColor:
-        store.state.theme === "dark" ? "rgba(0,0,0,1)" : "rgba(255,255,255,1)",
+        store.state.theme === "dark" ? "rgba(22,23,25,0.97)" : "rgba(255,255,255,0.97)",
+      borderColor:
+        store.state.theme === "dark" ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.08)",
+      borderWidth: 1,
+      padding: [8, 12],
       extraCssText:
-        "max-height: 200px; overflow: auto; max-width: 400px; user-select: text; scrollbar-width: thin; scrollbar-color: rgba(128,128,128,0.5) transparent;",
+        "max-height: 200px; overflow: auto; max-width: 400px; user-select: text; scrollbar-width: thin; scrollbar-color: rgba(128,128,128,0.5) transparent; border-radius: 8px !important; box-shadow: 0 4px 16px rgba(0,0,0,0.12) !important;",
       axisPointer: {
         type: "cross",
         label: {

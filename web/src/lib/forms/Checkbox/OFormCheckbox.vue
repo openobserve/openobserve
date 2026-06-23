@@ -4,6 +4,7 @@
 import { computed, inject } from "vue";
 import OCheckbox from "./OCheckbox.vue";
 import { FORM_CONTEXT_KEY } from "../Form/OForm.types";
+import { firstFieldError } from "../Form/fieldError";
 import type { FormCheckboxProps } from "./OFormCheckbox.types";
 import type { CheckboxModelValue } from "./OCheckbox.types";
 
@@ -24,6 +25,7 @@ const passthroughProps = computed(() => {
   const out: Record<string, unknown> = {};
   if (props.label !== undefined) out.label = props.label;
   if (props.disabled !== undefined) out.disabled = props.disabled;
+  if (props.required !== undefined) out.required = props.required;
   if (props.size !== undefined) out.size = props.size;
   if (props.value !== undefined) out.value = props.value;
   if (props.val !== undefined) out.val = props.val;
@@ -43,19 +45,6 @@ const passthroughProps = computed(() => {
     v-if="form"
     :is="form.Field"
     :name="props.name"
-    :validators="
-      props.validators
-        ? {
-            onChange: (ctx: { value: unknown }) => {
-              for (const v of props.validators ?? []) {
-                const r = v(ctx.value as CheckboxModelValue);
-                if (r !== undefined) return r;
-              }
-              return undefined;
-            },
-          }
-        : undefined
-    "
   >
     <template #default="{ field }">
       <div class="tw:flex tw:flex-col tw:gap-1">
@@ -75,11 +64,11 @@ const passthroughProps = computed(() => {
         </OCheckbox>
         <div
           v-if="
-            field.state.meta.isTouched && field.state.meta.errors.length > 0
+            field.state.meta.errors.length > 0
           "
           class="tw:text-xs tw:text-input-error-text"
         >
-          {{ field.state.meta.errors[0] }}
+          {{ firstFieldError(field.state.meta.errors) }}
         </div>
       </div>
     </template>

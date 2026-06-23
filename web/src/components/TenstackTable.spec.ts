@@ -325,13 +325,28 @@ describe("TenstackTable", () => {
 
   // ── Loading state ─────────────────────────────────────────────────────────
   describe("loading state", () => {
-    it("should show the default loading indicator when loading=true and no rows", () => {
+    it("should show the skeleton loading body when loading=true and no rows", () => {
       wrapper = mountTable({ rows: [], loading: true });
       expect(
-        wrapper.find('[data-test="tenstack-table-loading-indicator"]').exists(),
+        wrapper.find('[data-test="tenstack-table-skeleton-body"]').exists(),
       ).toBe(true);
-      // i18n key is rendered as-is by the mock
-      expect(wrapper.html()).toContain("confirmDialog.loading");
+    });
+
+    it("should not show the skeleton body when a custom loading slot is provided", () => {
+      wrapper = mountTable(
+        { rows: [], loading: true },
+        { loading: '<div data-test="custom-loading-slot">Loading…</div>' },
+      );
+      expect(
+        wrapper.find('[data-test="tenstack-table-skeleton-body"]').exists(),
+      ).toBe(false);
+    });
+
+    it("should show the skeleton body when loading=true (follows O2 pattern)", () => {
+      wrapper = mountTable({ loading: true });
+      expect(
+        wrapper.find('[data-test="tenstack-table-skeleton-body"]').exists(),
+      ).toBe(true);
     });
 
     it("should render a custom loading slot when loading=true and rows is empty", () => {
@@ -663,6 +678,37 @@ describe("TenstackTable", () => {
       wrapper = mountTable({ rows: [] });
       const table = wrapper.find('[data-test="o2-table"]');
       expect(table.attributes("style")).toContain("min-height: 22px");
+    });
+  });
+
+  // ── column resizer element ────────────────────────────────────────────────
+  describe("column resizer element", () => {
+    it("should render a resizer div inside each resizable column header", () => {
+      wrapper = mountTable();
+      const resizers = wrapper.findAll(".resizer");
+      // Both baseColumns have no explicit enableResizing=false so they get resizers
+      expect(resizers.length).toBeGreaterThan(0);
+    });
+
+    it("should give the resizer an always-visible border-color background", () => {
+      wrapper = mountTable();
+      const resizer = wrapper.find(".resizer");
+      expect(resizer.exists()).toBe(true);
+      expect(resizer.classes()).toContain("tw:bg-[var(--o2-border-color)]!");
+    });
+
+    it("should not carry a transparent background class on the resizer", () => {
+      wrapper = mountTable();
+      const resizer = wrapper.find(".resizer");
+      expect(resizer.exists()).toBe(true);
+      expect(resizer.classes()).not.toContain("tw:bg-transparent");
+    });
+
+    it("should not carry a hover-only background class on the resizer", () => {
+      wrapper = mountTable();
+      const resizer = wrapper.find(".resizer");
+      expect(resizer.exists()).toBe(true);
+      expect(resizer.classes()).not.toContain("tw:hover:bg-[var(--o2-border-color)]");
     });
   });
 

@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:h-full tw:overflow-hidden tw:pt-1 tw:px-2.5 tw:pb-2.5 tw:flex tw:flex-col">
+  <div class="tw:h-full tw:overflow-hidden tw:flex tw:flex-col">
     <template v-if="isLoading.length">
       <div
         class="tw:pb-4 tw:flex tw:items-center tw:justify-center tw:text-center tw:pt-1 tw:h-[calc(100vh-11.875rem)]"
@@ -33,17 +33,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </template>
     <template v-else-if="isRumEnabled || isSessionReplayEnabled">
-      <div v-if="showTabs" class="tw:pb-[0.625rem]">
-        <div class="card-container tw:px-4 tw:pt-2">
-          <OTabs v-model="activeTab" align="left" dense @change="changeTab">
-            <OTab
-              v-for="tab in tabs"
-              :key="tab.value"
-              :name="tab.value"
-              :label="tab.label"
-            />
-          </OTabs>
-        </div>
+      <div v-if="showTabs" class="tw:w-full tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default">
+        <OTabs v-model="activeTab" align="left" @change="changeTab">
+          <OTab
+            v-for="tab in tabs"
+            :key="tab.value"
+            :name="tab.value"
+            :label="tab.label"
+          />
+        </OTabs>
       </div>
       <router-view v-slot="{ Component }">
         <template v-if="$route.meta.keepAlive">
@@ -69,32 +67,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </router-view>
     </template>
     <template v-else>
-      <div class="">
-        <div
-          class="card-container tw:p-4 tw:max-w-full tw:flex-1 tw:min-h-0"
-        >
-          <div class="tw:pb-4">
-            <div class="tw:text-left tw:text-xl tw:font-semibold tw:font-bold tw:pb-3">
-              {{ t("rum.aboutRUMTitle") }}
-            </div>
-            <div class="tw:text-base tw:font-medium">
-              {{ t("rum.aboutRUMMessage") }}
-            </div>
-            <div>
-              <div></div>
-            </div>
-          </div>
-          <OButton
-            variant="primary"
-            size="sm-action"
-            :title="t('rum.getStartedTitle')"
+      <OEmptyState illustration="radar" size="hero" :hide-action="true">
+        <template #title>{{ t("rum.emptyState.title") }}</template>
+        <template #description><span v-html="t('rum.emptyState.description')" /></template>
+
+        <template #actions>
+          <!-- Instrument a web app -->
+          <EmptyStateIngestionCard
+            icon="devices"
+            :label="t('rum.emptyState.webApp')"
+            :sublabel="t('rum.emptyState.webAppDesc')"
+            icon-variant="blue"
+            data-test="rum-empty-web-card"
             @click="getStarted"
-          >
-            {{ t("rum.getStartedLabel") }}
-            <template #icon-right><OIcon name="arrow-forward" size="sm" class="tw:ml-1" /></template>
-          </OButton>
-        </div>
-      </div>
+          />
+
+          <!-- Session Replay -->
+          <EmptyStateIngestionCard
+            icon="play-circle"
+            :label="t('rum.emptyState.sessionReplay')"
+            :sublabel="t('rum.emptyState.sessionReplayDesc')"
+            icon-variant="purple"
+            data-test="rum-empty-session-card"
+            @click="getStarted"
+          />
+        </template>
+
+        <template #extra>
+          <div class="tw:flex tw:items-center tw:justify-center tw:gap-2 tw:flex-wrap">
+            <span class="tw:text-sm tw:font-semibold tw:text-text-secondary tw:mr-1">
+              {{ t("rum.emptyState.learnMore") }}
+            </span>
+            <EmptyStateIngestionChip
+              icon="bolt"
+              href="https://openobserve.ai/frontend-monitoring/#quick-implementation"
+              data-test="rum-empty-quickstart-btn"
+            >{{ t("rum.emptyState.quickImpl") }}</EmptyStateIngestionChip>
+            <EmptyStateIngestionChip
+              icon="menu-book"
+              href="https://openobserve.ai/blog/frontend-monitoring-basics/"
+              data-test="rum-empty-blog-btn"
+            >{{ t("rum.emptyState.blogPost") }}</EmptyStateIngestionChip>
+          </div>
+        </template>
+      </OEmptyState>
     </template>
   </div>
 </template>
@@ -122,8 +138,10 @@ import useStreams from "@/composables/useStreams";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import EmptyStateIngestionCard from "@/lib/core/EmptyState/EmptyStateIngestionCard.vue";
+import EmptyStateIngestionChip from "@/lib/core/EmptyState/EmptyStateIngestionChip.vue";
 
 const route = useRoute();
 const router = useRouter();
@@ -207,7 +225,7 @@ onMounted(async () => {
 
   // This is temporary fix, as we have kept sessionViewer keep-alive as false.
   // So on routing to sessionViewer, this hook is called triggered and it routes to Session page again
-  const ignoreRoutes = ["SessionViewer", "ErrorViewer"];
+  const ignoreRoutes = ["SessionViewer", "ErrorViewer", "UploadSourceMaps"];
 
   if (!ignoreRoutes.includes(routeName.value as string))
     changeTab(activeTab.value);
@@ -236,7 +254,7 @@ onUpdated(async () => {
 
     // This is temporary fix, as we have kept sessionViewer keep-alive as false.
     // So on routing to sessionViewer, this hook is called triggered and it routes to Session page again
-    const ignoreRoutes = ["SessionViewer", "ErrorViewer"];
+    const ignoreRoutes = ["SessionViewer", "ErrorViewer", "UploadSourceMaps"];
 
     if (!ignoreRoutes.includes(routeName.value as string))
       changeTab(activeTab.value);

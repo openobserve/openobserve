@@ -78,7 +78,7 @@ impl ExecutionPlanVisitor for ScanStatsVisitor {
     type Error = datafusion::common::DataFusionError;
 
     fn pre_visit(&mut self, plan: &dyn ExecutionPlan) -> Result<bool, Self::Error> {
-        let mayby_remote_scan_exec = plan.as_any().downcast_ref::<RemoteScanExec>();
+        let mayby_remote_scan_exec = plan.downcast_ref::<RemoteScanExec>();
         if let Some(remote_scan_exec) = mayby_remote_scan_exec {
             {
                 let guard = remote_scan_exec.scan_stats.lock();

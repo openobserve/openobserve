@@ -19,7 +19,7 @@ use anyhow::{Context, Error};
 use bytes::Bytes;
 use config::{
     FileFormat, TIMESTAMP_COL_NAME,
-    utils::tantivy::tokenizer::{CollectType, O2_TOKENIZER, o2_tokenizer_build},
+    tantivy::tokenizer::{CollectType, O2_TOKENIZER, o2_tokenizer_build},
 };
 use futures::future::join_all;
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;

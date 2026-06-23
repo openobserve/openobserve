@@ -13,10 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    collections::{HashMap, HashSet},
-    sync::Arc,
-};
+use std::{collections::HashMap, sync::Arc};
 
 use config::meta::inverted_index::IndexOptimizeMode;
 use datafusion::{
@@ -32,6 +29,7 @@ use datafusion::{
     },
     sql::TableReference,
 };
+use hashbrown::HashSet;
 use parking_lot::Mutex;
 
 mod count;
@@ -134,11 +132,7 @@ impl TreeNodeRewriter for FollowerIndexOptimizer {
             return Ok(Transformed::new(plan, false, TreeNodeRecursion::Stop));
         }
 
-        if plan
-            .as_any()
-            .downcast_ref::<SortPreservingMergeExec>()
-            .is_some()
-        {
+        if plan.downcast_ref::<SortPreservingMergeExec>().is_some() {
             // Check for SimpleSelect
             if let Some(index_optimize_mode) = is_simple_select(Arc::clone(&plan)) {
                 *self.index_optimizer_mode.lock() = Some(index_optimize_mode);
@@ -160,7 +154,7 @@ impl TreeNodeRewriter for FollowerIndexOptimizer {
                 }
             }
             return Ok(Transformed::new(plan, false, TreeNodeRecursion::Continue));
-        } else if plan.as_any().downcast_ref::<AggregateExec>().is_some() {
+        } else if plan.downcast_ref::<AggregateExec>().is_some() {
             // Check for SimpleCount
             if let Some(index_optimize_mode) = is_simple_count(Arc::clone(&plan)) {
                 *self.index_optimizer_mode.lock() = Some(index_optimize_mode);
@@ -244,11 +238,7 @@ impl TreeNodeRewriter for LeaderIndexOptimizer {
             return Ok(Transformed::new(plan, false, TreeNodeRecursion::Stop));
         }
 
-        if plan
-            .as_any()
-            .downcast_ref::<SortPreservingMergeExec>()
-            .is_some()
-        {
+        if plan.downcast_ref::<SortPreservingMergeExec>().is_some() {
             // Get the index fields of the underlying table
             let mut visitor = TableNameVisitor::new();
             plan.visit(&mut visitor)?;
@@ -300,7 +290,7 @@ impl TreeNodeRewriter for IndexOptimizerRewrite {
     type Node = Arc<dyn ExecutionPlan>;
 
     fn f_up(&mut self, node: Arc<dyn ExecutionPlan>) -> Result<Transformed<Self::Node>> {
-        if let Some(remote) = node.as_any().downcast_ref::<RemoteScanExec>() {
+        if let Some(remote) = node.downcast_ref::<RemoteScanExec>() {
             let remote = Arc::new(
                 remote
                     .clone()
@@ -329,7 +319,7 @@ impl<'n> TreeNodeVisitor<'n> for TableNameVisitor {
     fn f_up(&mut self, node: &'n Self::Node) -> Result<TreeNodeRecursion> {
         let name = node.name();
         if name == "NewEmptyExec" {
-            let table = node.as_any().downcast_ref::<NewEmptyExec>().unwrap();
+            let table = node.downcast_ref::<NewEmptyExec>().unwrap();
             self.table_name = Some(TableReference::from(table.name()));
             Ok(TreeNodeRecursion::Stop)
         } else {
@@ -340,10 +330,6 @@ impl<'n> TreeNodeVisitor<'n> for TableNameVisitor {
 
 #[cfg(test)]
 mod tests {
-    use std::{
-        collections::{HashMap, HashSet},
-        sync::Arc,
-    };
 
     use arrow::datatypes::{DataType, Field, Schema};
     use datafusion::{
@@ -403,16 +389,12 @@ mod tests {
         let plan: Arc<dyn ExecutionPlan> = Arc::new(remote);
 
         // Apply rewrite with a concrete mode and assert it reports transformed=true
-        let mode = IndexOptimizeMode::SimpleTopN("field".to_string(), 10, true);
+        let mode = IndexOptimizeMode::SimpleTopN(vec!["field".to_string()], 10, true);
         let mut rewriter = IndexOptimizerRewrite::new(mode.clone());
         let result = plan.rewrite(&mut rewriter).unwrap();
         assert!(result.transformed, "plan should be marked as transformed");
         assert_eq!(result.data.name(), "RemoteScanExec");
-        let remote_scan = result
-            .data
-            .as_any()
-            .downcast_ref::<RemoteScanExec>()
-            .unwrap();
+        let remote_scan = result.data.downcast_ref::<RemoteScanExec>().unwrap();
         assert_eq!(remote_scan.index_optimize_mode(), Some(mode));
     }
 
@@ -515,7 +497,11 @@ mod tests {
         let remote_scan = get_remote_scan(plan);
         assert_eq!(
             remote_scan[0].index_optimize_mode(),
-            Some(IndexOptimizeMode::SimpleTopN("name".to_string(), 10, false))
+            Some(IndexOptimizeMode::SimpleTopN(
+                vec!["name".to_string()],
+                10,
+                false
+            ))
         )
     }
 

@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <OButton
           variant="primary"
-          size="sm-action"
+          size="sm"
           data-test="alert-list-add-alert-btn"
           @click="createScheduledReport"
           >{{ t("dashboard.newReport") }}</OButton
@@ -61,9 +61,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :page-size="selectedPerPage"
       :page-size-options="perPageOptionsList"
       :show-global-filter="false"
+      :default-columns="false"
       :loading="loading"
       style="width: 100%"
-      class="tw:px-3"
     >
       <template #cell-name="{ row }">
         <span class="tw:cursor-pointer" @click="openReport(row)">{{ row.name }}</span>
@@ -90,7 +90,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #empty>
-        <NoData />
+        <NoData
+          :filtered="!!scheduledFilterQuery"
+          @action="scheduledFilterQuery = ''"
+        />
       </template>
     </OTable>
     </div>
@@ -113,6 +116,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
 const props = defineProps({
   open: {
@@ -257,20 +261,22 @@ const columns: OTableColumnDef[] = [
     header: "#",
     accessorKey: "#",
     meta: { align: "left" },
-    size: 50,
+    size: TABLE_INDEX_COL_SIZE,
   },
   {
     id: "name",
     header: t("reports.name"),
     accessorKey: "name",
     sortable: true,
-    meta: { align: "left" },
+    size: COL.name,
+    meta: { align: "left", autoWidth: true },
   },
   {
     id: "tab",
     header: t("reports.tab"),
     accessorKey: "tab",
     sortable: true,
+    size: COL.streamName,
     meta: { align: "left" },
   },
   {
@@ -278,6 +284,7 @@ const columns: OTableColumnDef[] = [
     header: t("reports.timeRange"),
     accessorKey: "time_range",
     sortable: true,
+    size: COL.date,
     meta: { align: "left" },
   },
   {
@@ -285,6 +292,7 @@ const columns: OTableColumnDef[] = [
     header: t("reports.frequency"),
     accessorKey: "frequency",
     sortable: true,
+    size: COL.frequency,
     meta: { align: "left" },
   },
   {
@@ -292,6 +300,7 @@ const columns: OTableColumnDef[] = [
     header: t("reports.lastTriggeredAt"),
     accessorKey: "last_triggered_at",
     sortable: false,
+    size: COL.date,
     meta: { align: "left" },
   },
   {
@@ -299,6 +308,7 @@ const columns: OTableColumnDef[] = [
     header: t("reports.createdAt"),
     accessorKey: "created_at",
     sortable: false,
+    size: COL.createdAt,
     meta: { align: "left" },
   },
 ];

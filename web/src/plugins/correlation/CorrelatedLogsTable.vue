@@ -44,6 +44,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
 
+          <!-- Wrap Content Button -->
+          <OButton
+            variant="ghost"
+            size="icon"
+            :class="{ 'tw:text-white! tw:bg-[var(--o2-theme-color)]!': wrapTableCells }"
+            data-test="correlated-logs-table-wrap-content-btn"
+            @click="wrapTableCells = !wrapTableCells"
+          >
+            <OIcon name="wrap-text" size="sm" />
+            <OTooltip :content="t('search.messageWrapContent')" />
+          </OButton>
+
           <!-- Column Visibility Dropdown -->
           <div class="tw:pr-4">
             <ODropdown
@@ -150,6 +162,28 @@ class="tw:mr-1" />
       </div> -->
     </div>
 
+    <!-- Source event + chips -->
+    <CorrelationEventHeader
+      :source-event="props.sourceEvent"
+      :context-chips="unifiedChips"
+      overflow-mode="responsive"
+      :overflow-threshold="4"
+    >
+      <template v-if="unifiedChips.length > 0 || props.hideDimensionFilters" #chip-actions>
+        <OButton
+          variant="ghost"
+          size="icon"
+          class="tw:h-5!"
+          :class="{ 'tw:text-white! tw:bg-[var(--o2-theme-color)]! tw:hover:opacity-80': wrapTableCells }"
+          data-test="correlated-logs-table-wrap-content-btn"
+          @click="wrapTableCells = !wrapTableCells"
+        >
+          <OIcon name="wrap-text" size="sm" />
+          <OTooltip :content="t('search.messageWrapContent')" />
+        </OButton>
+      </template>
+    </CorrelationEventHeader>
+
     <!-- Main Content Area -->
     <div class="tw:flex-1 tw:overflow-hidden tw:relative">
       <!-- Logs Table or Skeleton -->
@@ -157,7 +191,8 @@ class="tw:mr-1" />
         <!-- Actual Table (when data is loaded) -->
         <TenstackTable
           v-if="hasResults"
-          :rows="searchResults"
+          :key="`page-${currentPage}`"
+          :rows="pagedResults"
           :columns="tableColumns"
           :wrap="wrapTableCells"
           :loading="isLoading"
@@ -230,17 +265,44 @@ class="tw:mr-1" />
           </p>
         </div>
       </div>
+
+      <!-- Pagination bar -->
+      <div
+        v-if="hasResults && totalPages > 1"
+        class="tw:flex tw:items-center tw:justify-between tw:px-4 tw:py-2 tw:border-t tw:border-solid tw:border-[var(--o2-border-color)] tw:bg-[var(--o2-card-bg)] tw:text-xs tw:shrink-0"
+        data-test="correlated-logs-pagination"
+      >
+        <span class="tw:opacity-60">
+          {{ (currentPage - 1) * displayPageSize + 1 }}–{{ Math.min(currentPage * displayPageSize, searchResults.length) }} of {{ searchResults.length }}
+        </span>
+        <OPagination
+          :model-value="currentPage"
+          :max="totalPages"
+          :max-pages="5"
+          data-test="correlated-logs-pagination-control"
+          @update:model-value="goToPage"
+        />
+      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from "vue";
+import { ref, computed, onMounted, onBeforeUnmount, watch } from "vue";
+import {
+  buildSubjectButtons,
+  streamMatchesPatterns,
+  SUBJECT_BUTTONS_BY_SET,
+  resolveSetId,
+  type SubjectButton,
+} from "@/composables/useMetricSubjectButtons";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OPagination from "@/lib/navigation/Pagination/OPagination.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import { useCorrelatedLogs } from "@/composables/useCorrelatedLogs";
@@ -248,6 +310,7 @@ import type { CorrelatedLogsProps } from "@/composables/useCorrelatedLogs";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import TenstackTable from "@/plugins/logs/TenstackTable.vue";
 import DimensionFiltersBar from "./DimensionFiltersBar.vue";
+import CorrelationEventHeader from "./CorrelationEventHeader.vue";
 import { formatDate } from "@/utils/date";
 import { copyToClipboard } from "@/utils/clipboard";
 import type { ColumnDef } from "@tanstack/vue-table";
@@ -277,23 +340,28 @@ const { t } = useI18n();
 const store = useStore();
 const router = useRouter();
 const { searchObj } = searchState();
-const { loadKeyFields } = useServiceCorrelation();
+const { loadKeyFields, semanticGroups } = useServiceCorrelation();
 
 // Use correlated logs composable
 const {
   loading,
   error,
   searchResults,
+  pagedResults,
   totalHits,
   took,
   currentFilters,
   currentTimeRange,
+  currentPage,
+  totalPages,
+  displayPageSize,
   logStreamsCount,
   hasResults,
   isLoading,
   hasError,
   isEmpty,
   fetchCorrelatedLogs,
+  goToPage,
   updateFilter,
   updateFilters,
   resetFilters,
@@ -313,6 +381,8 @@ const jsonPreviewStreamName = computed(() => {
   return '';
 });
 
+const TIMESTAMP_COL_WIDTH = 225;
+
 // Component state
 const wrapTableCells = ref(false);
 const expandedRows = ref<any[]>([]);
@@ -321,8 +391,19 @@ const visibleColumns = ref<Set<string>>(new Set());
 const columnOrder = ref<string[]>([]);
 const defaultLogFields = ref<string[]>([]);
 const draggedIndex = ref<number | null>(null);
+const containerWidth = ref(window.innerWidth);
+
 let isSaving = false; // Prevent recursive saves
 let isUpdatingFromTable = false; // Prevent recursive updates from table
+
+// Simple canvas context for width calculation
+let canvasContext: CanvasRenderingContext2D | null = null;
+
+// ResizeObserver for container-width tracking; isResizeObserverNeeded is set to false in
+// onBeforeUnmount so the async onMounted continuation skips observer setup if the component
+// has already been torn down.
+let resizeObserver: ResizeObserver | null = null;
+let isResizeObserverNeeded = true;
 
 // Storage keys for persisting state
 const STORAGE_KEY_COLUMNS = "correlatedLogs_visibleColumns";
@@ -360,6 +441,7 @@ const saveColumnState = () => {
   }
 };
 
+
 // Load state and key fields config on component mount
 onMounted(async () => {
   loadColumnState();
@@ -369,6 +451,26 @@ onMounted(async () => {
    defaultLogFields.value = _defaultLogFields;
   } catch {
     defaultLogFields.value = [];
+  }
+
+  // Initialize canvas for width calculation
+  try {
+    const canvas = document.createElement("canvas");
+    canvasContext = canvas.getContext("2d");
+  } catch (error) {
+    console.warn("Canvas not available, using default widths");
+  }
+
+  // Guard: component may have unmounted while awaiting loadKeyFields above.
+  if (!isResizeObserverNeeded) return;
+
+  // Track table container width for dynamic column cap
+  const el = document.querySelector(".logs-table-container");
+  if (el) {
+    resizeObserver = new ResizeObserver(([entry]) => {
+      containerWidth.value = entry.contentRect.width;
+    });
+    resizeObserver.observe(el);
   }
 });
 
@@ -646,18 +748,108 @@ watch(defaultLogFields, (keyFields) => {
   initializeVisibleColumns(availableFields.value);
 });
 
-// Generate table columns dynamically from visible fields in custom order
-const tableColumns = computed<ColumnDef<any>[]>(() => {
-  // Filter out tw:hidden columns, respecting custom order
-  const visibleFields = orderedFields.value.filter((field) =>
+// Filter out tw:hidden columns, respecting custom order
+const visibleFields = computed(() => {
+  return orderedFields.value.filter((field) =>
     visibleColumns.value.has(field),
   );
+});
+
+// Compute per-column max cap based on container width and number of visible columns.
+// totalCols includes timestamp (+1). With only 2 columns (timestamp + 1 other) the
+// other column can use all remaining width; with 3+ we reserve 20px for the scrollbar.
+const columnMaxCap = computed(() => {
+  const totalCols = visibleFields.value.length + 1;
+  return totalCols <= 2
+    ? Math.max(0, containerWidth.value - TIMESTAMP_COL_WIDTH)
+    : Math.max(0, containerWidth.value - TIMESTAMP_COL_WIDTH - 30);
+});
+
+const DEFAULT_LONG_TEXT_FIELDS = [];
+
+// Measures a field's content width and returns the capped size plus whether the
+// raw measurement exceeded maxCap (used to build the dynamic long-text list).
+const getColumnWidth = (
+  field: string,
+  maxCap: number,
+): { width: number; exceededCap: boolean } => {
+  if (field === "_timestamp" || field === "source") {
+    return { width: 150, exceededCap: false };
+  }
+
+  if (!canvasContext) {
+    return { width: 150, exceededCap: false };
+  }
+
+  try {
+    // Font of table header
+    canvasContext.font = "bold 14px sans-serif";
+    let max = canvasContext.measureText(field).width + 16;
+
+    // Font of the table content
+    canvasContext.font = "12px monospace";
+
+    const hits = searchResults.value || [];
+    for (let i = 0; i < Math.min(5, hits.length); i++) {
+      const cellValue = hits[i]?.[field];
+      if (cellValue !== undefined && cellValue !== null && cellValue !== "") {
+        const width = canvasContext.measureText(String(cellValue)).width;
+        if (width > max) max = width;
+      }
+    }
+
+    max += 24; // padding
+    const exceededCap = max > maxCap;
+    return { width: exceededCap ? maxCap : Math.max(150, max), exceededCap };
+  } catch {
+    return { width: 150, exceededCap: false };
+  }
+};
+
+// Single computed that measures all visible fields in one canvas pass.
+// Also builds the dynamic long-text list: any field whose raw measured width
+// exceeds maxCap is added to the set (on top of the static defaults).
+const memoizedData = computed(() => {
+  const widthMap: Record<string, number> = {};
+  const longText = new Set<string>(DEFAULT_LONG_TEXT_FIELDS);
+
+  if (!searchResults.value || searchResults.value.length === 0) {
+    return { widthMap, longTextFields: Array.from(longText) };
+  }
+
+  const maxCap = columnMaxCap.value;
+  visibleFields.value.forEach((field) => {
+    const { width, exceededCap } = getColumnWidth(field, maxCap);
+    widthMap[field] = width;
+    if (exceededCap) longText.add(field);
+  });
+
+  return { widthMap, longTextFields: Array.from(longText) };
+});
+
+const memoizedColumnWidths = computed(() => memoizedData.value.widthMap);
+
+// Dynamic long-text fields: static defaults + any field whose content exceeded maxCap
+const longTextFields = computed(() => memoizedData.value.longTextFields);
+
+// Simple helper that uses memoized widths
+const getColumnWidthHelper = (field: string): number => {
+  return (
+    memoizedColumnWidths.value[field] ||
+    (longTextFields.value.includes(field) ? Math.min(400, columnMaxCap.value) : 150)
+  );
+};
+
+// Generate table columns dynamically from visible fields in custom order
+const tableColumns = computed<ColumnDef<any>[]>(() => {
+  // Use the computed visibleFields
+  const fields = visibleFields.value;
 
   // Check if only timestamp is visible - if so, add source column
   const hasOnlyTimestamp =
-    visibleFields.length === 1 && visibleFields[0] === "_timestamp";
+    fields.length === 1 && fields[0] === "_timestamp";
 
-  const columns = visibleFields.map((field) => {
+  const columns = fields.map((field) => {
     // Special handling for timestamp column
     if (field === "_timestamp") {
       return {
@@ -684,7 +876,7 @@ const tableColumns = computed<ColumnDef<any>[]>(() => {
           }
           return value !== null && value !== undefined ? String(value) : "";
         },
-        size: 260,
+        size: TIMESTAMP_COL_WIDTH,
         meta: {
           closable: false,
           showWrap: false,
@@ -706,8 +898,8 @@ const tableColumns = computed<ColumnDef<any>[]>(() => {
         return byString(row, field);
       },
       cell: (info: any) => info.getValue(),
-      size: field === "message" ? 400 : 150,
-      maxSize: window.innerWidth,
+      size: getColumnWidthHelper(field),
+      maxSize: containerWidth.value,
       meta: {
         closable: true,
         showWrap: true,
@@ -734,15 +926,31 @@ const tableColumns = computed<ColumnDef<any>[]>(() => {
     } as any);
   }
 
+  // Last-column fill: if total column widths leave unused horizontal space and the
+  // last column is a long-text field, expand it to fill the remaining width.
+  const totalWidth = columns.reduce((sum, col: any) => sum + (col.size ?? 150), 0);
+  const lastCol = columns[columns.length - 1] as any;
+  if (
+    totalWidth < containerWidth.value &&
+    lastCol &&
+    longTextFields.value.includes(lastCol.name as string)
+  ) {
+    lastCol.size = Math.min(columnMaxCap.value, Math.max(150, (lastCol.size ?? 150) + (containerWidth.value - totalWidth)));
+  }
+
+  // Always leave 12px clearance on the last resizable column so the resize
+  // handle stays visible and grabbable.
+  const lastResizableCol = [...columns].reverse().find((col: any) => col.enableResizing) as any;
+  if (lastResizableCol) {
+    lastResizableCol.size = Math.max(150, (lastResizableCol.size ?? 150) - 12);
+  }
+
   return columns;
 });
 
 // Determine if we're showing default columns (only timestamp + source)
 const showingDefaultColumns = computed(() => {
-  const visibleFields = availableFields.value.filter((field) =>
-    visibleColumns.value.has(field),
-  );
-  return visibleFields.length === 1 && visibleFields[0] === "_timestamp";
+  return visibleFields.value.length === 1 && visibleFields.value[0] === "_timestamp";
 });
 
 /**
@@ -1008,6 +1216,11 @@ onMounted(() => {
   fetchCorrelatedLogs();
 });
 
+onBeforeUnmount(() => {
+  isResizeObserverNeeded = false;
+  resizeObserver?.disconnect();
+});
+
 // Watch for prop changes
 watch(
   () => props.timeRange,
@@ -1016,6 +1229,66 @@ watch(
   },
   { deep: true },
 );
+
+// ── Chip row ───────────────────────────────────────────────────────────────
+
+const LABEL_ACRONYMS = new Set([
+  "aws", "ecs", "gcp", "iam", "vpc", "rds", "s3", "ec2",
+  "id", "url", "uri", "ip", "dns", "ssl", "tls", "tcp", "udp",
+  "api", "cpu", "gpu", "ram", "ssd", "hdd", "io",
+  "k8s", "faas", "otel", "sql", "http", "https",
+]);
+const titleCaseWord = (w: string) => {
+  if (!w) return w;
+  if (LABEL_ACRONYMS.has(w.toLowerCase())) return w.toUpperCase();
+  if (/^k8s$/i.test(w)) return "K8s";
+  return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+};
+const titleCase = (s: string) => s.split(/\s+/).map(titleCaseWord).join(" ");
+
+const dimensionDisplayLabel = (key: string): string =>
+  titleCase(key.replace(/[-_.]/g, " "));
+
+const toChipString = (v: unknown): string | null => {
+  if (v == null) return null;
+  if (typeof v === "string") return v;
+  if (typeof v === "number" || typeof v === "boolean") return String(v);
+  return null;
+};
+
+const chipDimensionSource = computed<Record<string, string>>(() => {
+  const src = props.chipDimensions && Object.keys(props.chipDimensions).length > 0
+    ? props.chipDimensions
+    : { ...(props.matchedDimensions ?? {}), ...(props.additionalDimensions ?? {}) };
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(src)) {
+    const s = toChipString(v);
+    if (s !== null && s !== "" && s !== SELECT_ALL_VALUE) out[k] = s;
+  }
+  return out;
+});
+
+type ChipKind = "context" | "subject";
+type DimensionChip = { key: string; label: string; value: string; kind: ChipKind; };
+
+const subjectSemanticIds = computed<Set<string>>(() => {
+  if (!props.matchedSetId) return new Set();
+  const canonical = resolveSetId(props.matchedSetId);
+  const specs = canonical ? SUBJECT_BUTTONS_BY_SET[canonical] : undefined;
+  return specs?.length ? new Set(specs.flatMap((s: SubjectButton) => s.semanticIds)) : new Set();
+});
+
+const unifiedChips = computed<DimensionChip[]>(() =>
+  Object.keys(chipDimensionSource.value)
+    .filter((key) => !subjectSemanticIds.value.has(key))
+    .map((key): DimensionChip => ({
+      key,
+      label: dimensionDisplayLabel(key),
+      value: chipDimensionSource.value[key],
+      kind: "context",
+    })),
+);
+
 </script>
 
 <style lang="scss" scoped>
@@ -1077,6 +1350,7 @@ watch(
   scroll-behavior: smooth;
 }
 
+
 // Column visibility list styling
 .column-visibility-list {
   max-height: 400px;
@@ -1125,6 +1399,7 @@ watch(
     }
   }
 }
+
 </style>
 
 <style lang="scss">

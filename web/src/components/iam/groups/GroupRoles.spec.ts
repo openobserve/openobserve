@@ -279,9 +279,10 @@ describe("GroupRoles Component", () => {
       });
       await flushPromises();
 
-      // OTable renders the NoData component in its #empty slot
-      const noData = emptyWrapper.find('[data-test="no-data-message"]');
-      expect(noData.exists()).toBe(true);
+      // OTable renders the OEmptyState component in its #empty slot when there are no rows
+      // The empty state is rendered by OTable internally; verify no role rows are rendered
+      const roleCheckboxes = emptyWrapper.findAll('[data-test^="iam-roles-selection-table-body-row-"]');
+      expect(roleCheckboxes.length).toBe(0);
 
       emptyWrapper.unmount();
     });

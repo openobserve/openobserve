@@ -21,13 +21,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:open="$emit('update:modelValue', $event)"
     :width="90"
     :title="t('search.patternDetailsTitle')"
-    :sub-title="selectedPattern ? t('search.patternXofY', { index: selectedPattern.index + 1, total: totalPatterns }) : undefined"
+    :subTitle="selectedPattern ? t('search.patternXofY', { index: selectedPattern.index + 1, total: totalPatterns }) : undefined"
   >
+    <template #header>
+      <div class="tw:flex-1 tw:min-w-0 tw:flex tw:flex-col tw:gap-0.5 tw:overflow-hidden">
+        <!-- Row 1: level badge · title · token & slot OBadges (right of title) -->
+        <div class="tw:flex tw:items-center tw:gap-2 tw:min-w-0">
+          <span
+            v-if="patternLevelInfo"
+            class="tw:shrink-0 tw:inline-flex tw:items-center tw:px-1.5 tw:py-0.5 tw:rounded tw:text-xs tw:font-semibold tw:uppercase tw:tracking-wide tw:text-white"
+            :style="{ backgroundColor: patternLevelInfo.color }"
+          >
+            {{ patternLevelInfo.level }}
+          </span>
+          <h4 class="tw:font-semibold tw:text-[var(--o2-text-heading)] tw:truncate tw:min-w-0 tw:text-base tw:leading-tight tw:m-0">
+            {{ selectedPattern?.pattern?.description || t('search.patternDetailsTitle') }}
+          </h4>
+          <template v-if="selectedPattern">
+            <OBadge variant="default-soft" size="sm" class="tw:shrink-0">
+              {{ selectedTemplateTokens.length }} {{ selectedTemplateTokens.length === 1 ? 'token' : 'tokens' }}
+            </OBadge>
+            <OBadge variant="default-soft" size="sm" class="tw:shrink-0">
+              {{ patternWildcardCount }} {{ patternWildcardCount === 1 ? 'variable slot' : 'variable slots' }}
+            </OBadge>
+          </template>
+        </div>
+        <!-- Row 2: full-width module path, truncates at edge -->
+        <code
+          v-if="selectedPattern && patternPathToken"
+          class="tw:block tw:w-full tw:truncate tw:text-[var(--o2-text-code)] tw:font-mono tw:text-[0.6875rem] tw:text-[var(--o2-text-caption)]"
+        >{{ patternPathToken }}</code>
+      </div>
+    </template>
     <div class="tw:px-5 tw:py-3">
     <template v-if="selectedPattern">
         <!-- Statistics -->
-        <div class="tw-mb-[1rem]">
-          <div class="tw:text-sm tw:font-medium text-weight-medium tw-mb-[0.375rem]">
+        <div class="tw:mb-4">
+          <div class="tw:text-sm tw:font-medium tw:mb-1.5">
             {{ t("search.patternStatistics") }}
           </div>
           <div class="tw:flex tw:gap-3">
@@ -83,10 +113,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="tw:mt-3"
           >
             <div
-              class="tw-rounded tw-border tw-border-solid tw-border-negative tw-px-3 tw-py-2 tw-flex tw-gap-3 tw-items-start"
-              :class="store.state.theme === 'dark' ? 'tw:bg-gray-800' : 'bg-white'"
+              class="tw:rounded tw:border tw:border-solid tw:border-[var(--o2-status-error-border)] tw:px-3 tw:py-2 tw:flex tw:gap-3 tw:items-start"
+              :class="store.state.theme === 'dark' ? 'tw:bg-gray-800' : 'tw:bg-white'"
             >
-              <OIcon name="warning" size="sm" class="tw-mt-[2px] tw-flex-shrink-0" />
+              <OIcon name="warning" size="sm" class="tw:mt-0.5 tw:shrink-0" />
               <div>
                 <div class="text-weight-bold tw:text-red-500">{{ t("search.patternAnomalyDetected") }}</div>
                 <div
@@ -108,12 +138,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Variables Summary -->
-        <div class="tw-mb-[1rem]">
-          <div class="tw:text-sm tw:font-medium text-weight-medium tw-mb-[0.375rem]">
+        <div class="tw:mb-4">
+          <div class="tw:text-sm tw:font-medium tw:mb-1.5">
             {{ t("search.patternVariablesHeader") }}
           </div>
           <div
-            class="tw:px-[0.625rem] tw:py-[0.375rem] tw:rounded tw:border-l-[0.25rem] tw:border-solid tw:border-l-[var(--q-primary)]"
+            class="tw:px-2.5 tw:py-1.5 tw:rounded tw:border-l-4 tw:border-solid tw:border-l-[var(--o2-primary-color)]"
             :class="
               store.state.theme === 'dark' ? 'tw:bg-gray-800' : 'tw:bg-gray-100'
             "
@@ -127,18 +157,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Pattern Template -->
-        <div class="tw-mb-[1rem]">
-          <div class="tw:text-sm tw:font-medium text-weight-medium tw-mb-[0.375rem]">
+        <div class="tw:mb-4">
+          <div class="tw:text-sm tw:font-medium tw:mb-1.5">
             {{ t("search.patternTemplate") }}
           </div>
           <div
-            class="tw-px-[0.625rem] tw-py-[0.375rem] pattern-detail-text tw-text-[0.8125rem] tw-leading-[1.6] tw-rounded tw-border-l-[0.25rem] tw-border-solid tw-border-l-[var(--q-primary)] tw-break-all tw-flex tw-flex-wrap tw-items-baseline tw-gap-x-[2px] tw-gap-y-[2px]"
+            class="tw:px-2.5 tw:py-1.5 pattern-detail-text tw:text-[0.8125rem] tw:leading-[1.6] tw:rounded tw:border-l-4 tw:border-solid tw:border-l-[var(--o2-primary-color)] tw:break-all tw:flex tw:flex-wrap tw:items-baseline tw:gap-x-[2px] tw:gap-y-[2px]"
             :class="
               store.state.theme === 'dark' ? 'tw:bg-gray-800' : 'tw:bg-gray-100'
             "
           >
             <template v-for="(tok, i) in selectedTemplateTokens" :key="i">
-              <span v-if="tok.kind === 'text'" class="tw-whitespace-pre">{{ tok.value }}</span>
+              <span v-if="tok.kind === 'text'" class="tw:whitespace-pre">{{ tok.value }}</span>
               <span
                 v-else
                 class="tw:inline-flex"
@@ -163,9 +193,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             selectedPattern.pattern.variables &&
             selectedPattern.pattern.variables.length > 0
           "
-          class="tw:mb-[1rem]"
+          class="tw:mb-4"
         >
-          <div class="tw:text-sm tw:font-medium text-weight-medium tw-mb-[0.375rem]">
+          <div class="tw:text-sm tw:font-medium tw:mb-1.5">
             {{ t("search.patternVariablesWithCount", { count: selectedPattern.pattern.variables.length }) }}
           </div>
           <OTable
@@ -174,6 +204,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             row-key="index"
             pagination="none"
             :show-global-filter="false"
+            :default-columns="false"
+            :max-height="undefined"
             class="tw:w-full tw:border tw:border-solid tw:border-[var(--o2-border-color)]"
           >
             <template #cell-name="{ row }">
@@ -205,7 +237,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           class="tw:mb-[1rem]"
         >
-          <div class="tw:text-sm tw:font-medium text-weight-medium tw-mb-[0.375rem]">
+          <div class="tw:text-sm tw:font-medium tw:mb-1.5">
             {{ t("search.patternExampleLogsWithCount", { count: selectedPattern.pattern.examples.length }) }}
           </div>
           <div
@@ -290,6 +322,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { COL } from "@/lib/core/Table/OTable.types";
 import {
   tokenizeTemplate,
   wildcardChipColor,
@@ -298,6 +331,7 @@ import {
 } from "@/composables/useLogs/useTemplateTokenizer";
 import WildcardValuePopover from "./WildcardValuePopover.vue";
 import useWildcardHover from "./useWildcardHover";
+import { extractStatusFromTemplate } from "@/utils/logs/statusParser";
 
 const props = defineProps<{
   modelValue: boolean;
@@ -322,6 +356,8 @@ const {
   onPopoverLeave,
 } = useWildcardHover();
 
+const isDark = computed(() => store.state.theme === "dark");
+
 const selectedTemplateTokens = computed(() =>
   tokenizeTemplate(
     props.selectedPattern?.pattern?.template ?? "",
@@ -329,13 +365,30 @@ const selectedTemplateTokens = computed(() =>
   ),
 );
 
+const patternLevelInfo = computed(() => {
+  const template = props.selectedPattern?.pattern?.template ?? "";
+  if (!template) return null;
+  const info = extractStatusFromTemplate(template, isDark.value);
+  return info.level !== "info" || /\b(info|information)\b/i.test(template) ? info : null;
+});
+
+const patternPathToken = computed(() => {
+  const tokens = selectedTemplateTokens.value;
+  const first = tokens.find((t) => t.kind === "text" && t.value.trim());
+  return first?.value?.trim() ?? "";
+});
+
+const patternWildcardCount = computed(() =>
+  selectedTemplateTokens.value.filter((t) => t.kind !== "text").length,
+);
+
 const anomalyExplanationForSelected = computed(() =>
   anomalyExplanation(props.selectedPattern?.pattern ?? {}, t),
 );
 
 const variableColumns = computed<OTableColumnDef[]>(() => [
-  { id: "name", header: t("search.patternVariableNameColumn"), accessorKey: "name", meta: { align: "left" } },
-  { id: "type", header: t("search.patternVariableTypeColumn"), accessorKey: "var_type", meta: { align: "left" } },
+  { id: "name", header: t("search.patternVariableNameColumn"), accessorKey: "name", size: COL.name, meta: { align: "left", autoWidth: true } },
+  { id: "type", header: t("search.patternVariableTypeColumn"), accessorKey: "var_type", size: COL.type, meta: { align: "left" } },
 ]);
 </script>
 

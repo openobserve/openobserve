@@ -15,6 +15,8 @@ export interface RadioGroupProps {
   label?: string;
   /** Disables all radio buttons in the group */
   disabled?: boolean;
+  /** Marks the field required — renders a `*` after the label (no manual ` *`). */
+  required?: boolean;
   /** Layout direction of child radios */
   orientation?: "horizontal" | "vertical";
   /** HTML name attribute forwarded to all radios */

@@ -319,7 +319,8 @@ describe("CipherKeys", () => {
 
     it("should render cipher keys list title", () => {
       const wrapper = createWrapper();
-      const title = wrapper.find('[data-test="cipher-keys-list-title"]');
+      // Title now lives in the standard AppPageHeader (row 1).
+      const title = wrapper.find(".app-page-header h1");
       expect(title.exists()).toBe(true);
     });
 
@@ -628,7 +629,7 @@ describe("CipherKeys", () => {
       // Column 0: #
       expect(wrapper.vm.columns[0].id).toBe("#");
       expect(wrapper.vm.columns[0].accessorKey).toBe("#");
-      expect(wrapper.vm.columns[0].size).toBe(67);
+      expect(wrapper.vm.columns[0].size).toBe(44);
       expect(wrapper.vm.columns[0].meta.align).toBe("left");
 
       // Column 1: name
@@ -641,14 +642,14 @@ describe("CipherKeys", () => {
       expect(wrapper.vm.columns[2].id).toBe("store_type");
       expect(wrapper.vm.columns[2].accessorKey).toBe("store_type");
       expect(wrapper.vm.columns[2].sortable).toBe(true);
-      expect(wrapper.vm.columns[2].size).toBe(150);
+      expect(wrapper.vm.columns[2].size).toBe(180);
       expect(wrapper.vm.columns[2].meta.align).toBe("left");
 
       // Column 3: mechanism_type
       expect(wrapper.vm.columns[3].id).toBe("mechanism_type");
       expect(wrapper.vm.columns[3].accessorKey).toBe("mechanism_type");
       expect(wrapper.vm.columns[3].sortable).toBe(true);
-      expect(wrapper.vm.columns[3].size).toBe(150);
+      expect(wrapper.vm.columns[3].size).toBe(180);
       expect(wrapper.vm.columns[3].meta.align).toBe("left");
 
       // Column 4: actions
@@ -691,7 +692,7 @@ describe("CipherKeys", () => {
     it("should have proper data-test attributes for interactive elements", () => {
       const wrapper = createWrapper();
       
-      expect(wrapper.find('[data-test="cipher-keys-list-title"]').exists()).toBe(true);
+      expect(wrapper.find('.app-page-header h1').exists()).toBe(true);
     });
 
     it("should render action buttons with proper data-test attributes", async () => {

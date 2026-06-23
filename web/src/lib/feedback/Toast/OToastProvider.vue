@@ -39,6 +39,8 @@ function handleOpenChange(id: string, open: boolean): void {
   if (!open) {
     const idx = toastRecords.findIndex((r) => r.id === id)
     if (idx !== -1) {
+      const record = toastRecords[idx]
+      record.onDismiss?.()
       toastRecords.splice(idx, 1)
     }
   }

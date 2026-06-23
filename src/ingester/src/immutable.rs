@@ -22,6 +22,7 @@ use config::{
     RwAHashSet, metrics,
     stats::{CacheStatsAsync, MemorySize},
 };
+use hashbrown::HashSet;
 use snafu::ResultExt;
 use tokio::{fs, sync::mpsc};
 
@@ -58,7 +59,7 @@ pub async fn read_from_immutable(
     stream_name: &str,
     time_range: Option<(i64, i64)>,
     partition_filters: &[(String, Vec<String>)],
-    memtable_ids: &std::collections::HashSet<u64>,
+    memtable_ids: &HashSet<u64>,
 ) -> Result<(Vec<u64>, Vec<ReadRecordBatchEntry>)> {
     let shared_memtable = config::get_config().common.feature_shared_memtable_enabled;
     let r = IMMUTABLES.read().await;

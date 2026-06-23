@@ -33,7 +33,7 @@ pub mod dashboards;
 pub mod domain_management;
 pub mod enrichment_table;
 #[cfg(feature = "enterprise")]
-pub mod eval_templates;
+pub mod eval_jobs;
 #[allow(deprecated)]
 pub mod folders;
 pub mod functions;
@@ -52,10 +52,16 @@ pub mod pipelines;
 #[cfg(feature = "profiling")]
 pub mod profiling;
 pub mod promql;
+#[cfg(feature = "enterprise")]
+pub mod providers;
 pub mod ratelimit;
 #[cfg(feature = "enterprise")]
 pub mod re_pattern;
 pub mod rum;
+#[cfg(feature = "enterprise")]
+pub mod score_configs;
+#[cfg(feature = "enterprise")]
+pub mod scorers;
 pub mod search;
 pub mod service_accounts;
 pub mod service_streams;

@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Main Panel -->
         <main
           data-test="main-content"
-          class="tw:flex tw:flex-col tw:min-h-0"
+          class="tw:flex tw:flex-col tw:min-h-0 tw:bg-[var(--color-surface-chrome-deeper)] tw:pr-2 tw:pb-2"
           :style="{
             width:
               store.state.isAiChatEnabled && !store.state.isAiChatExpanded
@@ -78,14 +78,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 : '100%',
           }"
         >
+          <!-- White content card — rounded, soft shadow (light) / border (dark). All pages render inside this. -->
           <div
-            v-if="isLoading"
-            :key="store.state.selectedOrganization?.identifier"
-            class="o2-content-scroll tw:flex-1 tw:overflow-y-auto"
+            class="tw:flex-1 tw:flex tw:flex-col tw:min-h-0 tw:bg-surface-base tw:rounded-xl tw:overflow-hidden tw:shadow-[0_1px_3px_rgba(16,40,55,0.06),0_6px_20px_rgba(16,40,55,0.08)]"
+            :class="store.state.theme === 'dark' ? 'tw:border tw:border-border-default' : ''"
           >
-            <router-view v-slot="{ Component }">
-              <component :is="Component" class="tw:h-full" @sendToAiChat="sendToAiChat" />
-            </router-view>
+            <div
+              v-if="isLoading"
+              :key="store.state.selectedOrganization?.identifier"
+              class="o2-content-scroll tw:flex-1 tw:overflow-y-auto tw:h-full"
+            >
+              <router-view v-slot="{ Component }">
+                <component :is="Component" class="tw:h-full" @sendToAiChat="sendToAiChat" />
+              </router-view>
+            </div>
           </div>
         </main>
 
@@ -322,6 +328,17 @@ export default defineComponent({
       );
     });
 
+    // Backend `/config` flag `online_evals_enabled` — controlled by
+    // enterprise `O2_ONLINE_EVALS_ENABLED`. Reactive so the menu picks it up regardless
+    // of whether the config response arrived before or after this component
+    // mounted.
+    const isOnlineEvalsEnabled = computed(() => {
+      return (
+        (config.isEnterprise == "true" || config.isCloud == "true") &&
+        Boolean(store.state.zoConfig?.online_evals_enabled)
+      );
+    });
+
     const orgOptions = ref([{ label: Number, value: String }]);
     let slackURL = "https://short.openobserve.ai/community";
     if (
@@ -395,6 +412,12 @@ export default defineComponent({
         link: "/iam",
         display: store.state?.currentuser?.role == "admin" ? true : false,
         name: "iam",
+      },
+      {
+        title: t("menu.settings"),
+        icon: "settings",
+        link: "/settings",
+        name: "settings",
       },
     ]);
 
@@ -552,9 +575,39 @@ export default defineComponent({
     const selectedLanguage: any =
       langList.find((l) => l.code == getLocale()) || langList[0];
 
+    // Insert / remove the AI Observability menu entry based on the live config
+    // flag. Position: directly after Traces. Idempotent — safe to call from
+    // multiple lifecycle hooks.
+    const updateAIObservabilityMenu = () => {
+      const existingIndex = linksList.value.findIndex(
+        (link: any) => link.name === "aiObservability",
+      );
+
+      if (isOnlineEvalsEnabled.value) {
+        if (existingIndex !== -1) return;
+        const tracesIndex = linksList.value.findIndex(
+          (link: any) => link.name === "traces",
+        );
+        const insertAt = tracesIndex === -1 ? linksList.value.length : tracesIndex + 1;
+        linksList.value.splice(insertAt, 0, {
+          title: t("menu.aiObservability"),
+          icon: "auto-awesome",
+          link: "/ai",
+          name: "aiObservability",
+        });
+      } else if (existingIndex !== -1) {
+        linksList.value.splice(existingIndex, 1);
+      }
+    };
+
+    // If `/config` resolves after this component mounted (or if the flag
+    // ever flips at runtime), keep the menu in sync.
+    watch(isOnlineEvalsEnabled, () => updateAIObservabilityMenu(), { immediate: false });
+
     const filterMenus = () => {
       updateIncidentsMenu();
       updateActionsMenu();
+      updateAIObservabilityMenu();
 
       const disableMenus = new Set(
         store.state.zoConfig?.custom_hide_menus
@@ -833,6 +886,7 @@ export default defineComponent({
         span_id_field_name: "spanId",
         trace_id_field_name: "traceId",
         toggle_ingestion_logs: false,
+        usage_stream_enabled: false,
         enable_websocket_search: false,
         enable_streaming_search: false,
         streaming_aggregation_enabled: false,
@@ -864,6 +918,9 @@ export default defineComponent({
           toggle_ingestion_logs:
             orgSettings?.data?.data?.toggle_ingestion_logs ??
             defaultSettings.toggle_ingestion_logs,
+          usage_stream_enabled:
+            orgSettings?.data?.data?.usage_stream_enabled ??
+            defaultSettings.usage_stream_enabled,
           enable_websocket_search:
             orgSettings?.data?.data?.enable_websocket_search ??
             defaultSettings.enable_websocket_search,

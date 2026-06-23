@@ -5,6 +5,7 @@ import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { h } from "vue";
 import OFormSwitch from "./OFormSwitch.vue";
 import OForm from "../Form/OForm.vue";
+import { z } from "zod";
 
 describe("OFormSwitch", () => {
   let wrapper: VueWrapper;
@@ -27,23 +28,30 @@ describe("OFormSwitch", () => {
     expect(wrapper.find("button").exists()).toBe(true);
   });
 
-  // Validator errors are gated by tanstack-form's `isTouched`, which only
-  // flips on `handleBlur`. OSwitch never emits blur, so OFormSwitch must
-  // call handleBlur after handleChange — otherwise errors never render.
-  it("shows validator error after toggling (handleBlur fires isTouched)", async () => {
+  // Schema-only: validation comes from the OForm :schema; submit reveals it.
+  it("shows schema error after submit when enabled is true", async () => {
     wrapper = mount(OForm, {
-      props: { defaultValues: { enabled: false } },
+      props: {
+        defaultValues: { enabled: false },
+        schema: z.object({
+          enabled: z.boolean().refine((v) => v !== true, "Not allowed"),
+        }),
+      },
       slots: {
-        default: () =>
-          h(OFormSwitch, {
-            name: "enabled",
-            label: "Enable",
-            validators: [(v: unknown) => (v === true ? "Not allowed" : undefined)],
-          }),
+        default: () => h(OFormSwitch, { name: "enabled", label: "Enable" }),
       },
       global: { components: { OFormSwitch } },
     });
-    await wrapper.find("button").trigger("click");
+    const form = (
+      wrapper.vm as unknown as {
+        form: {
+          handleSubmit: () => Promise<unknown>;
+          setFieldValue: (n: string, v: unknown) => void;
+        };
+      }
+    ).form;
+    form.setFieldValue("enabled", true);
+    await form.handleSubmit();
     await flushPromises();
     expect(wrapper.text()).toContain("Not allowed");
   });

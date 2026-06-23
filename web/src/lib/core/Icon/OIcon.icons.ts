@@ -36,6 +36,7 @@ import CalendarMonth from "~icons/material-symbols/calendar-month-outline";
 import Campaign from "~icons/material-symbols/campaign-outline";
 import Cancel from "~icons/material-symbols/cancel-outline";
 import Redeem from "~icons/material-symbols/redeem";
+import ReceiptLong from "~icons/material-symbols/receipt-long-outline";
 import Category from "~icons/material-symbols/category-outline";
 import Check from "~icons/material-symbols/check";
 import CheckCircle from "~icons/material-symbols/check-circle-outline";
@@ -59,11 +60,14 @@ import FormatListBulleted from "~icons/material-symbols/format-list-bulleted";
 import Fullscreen from "~icons/material-symbols/fullscreen";
 import GroupWork from "~icons/material-symbols/group-work-outline";
 import Groups from "~icons/material-symbols/groups-outline";
+import GroupAdd from "~icons/material-symbols/group-add-outline";
+import HowToReg from "~icons/material-symbols/how-to-reg-outline";
 import HelpOutline from "~icons/material-symbols/help-outline";
 import History from "~icons/material-symbols/history";
 import InfoFilled from "~icons/material-symbols/info";
 import Info from "~icons/material-symbols/info-outline";
 import InfoOutline from "~icons/material-symbols/info-outline";
+import AccountBalance from "~icons/material-symbols/account-balance-outline";
 import AccountTree from "~icons/material-symbols/account-tree-outline";
 import DarkMode from "~icons/material-symbols/dark-mode-outline";
 import Draft from "~icons/material-symbols/draft-outline";
@@ -87,6 +91,7 @@ import OpenInNew from "~icons/material-symbols/open-in-new";
 import Pause from "~icons/material-symbols/pause-outline";
 import PauseCircleFilled from "~icons/material-symbols/pause-circle-outline";
 import Person from "~icons/material-symbols/person-outline";
+import PersonAdd from "~icons/material-symbols/person-add-outline";
 import PlayArrow from "~icons/material-symbols/play-arrow-outline";
 import Preview from "~icons/material-symbols/preview-outline";
 import QueryStats from "~icons/material-symbols/query-stats";
@@ -109,6 +114,8 @@ import Warning from "~icons/material-symbols/warning-outline";
 import Workspaces from "~icons/material-symbols/workspaces-outline";
 import WorkspacePremium from "~icons/material-symbols/workspace-premium-outline";
 import UnfoldLess from "~icons/material-symbols/unfold-less";
+import LeftPanelClose from "~icons/material-symbols/left-panel-close";
+import LeftPanelOpen from "~icons/material-symbols/left-panel-open";
 import Reorder from "~icons/material-symbols/reorder";
 import FirstPage from "~icons/material-symbols/first-page";
 import LastPage from "~icons/material-symbols/last-page";
@@ -287,6 +294,7 @@ import MonitorHeart from "~icons/material-symbols/monitor-heart-outline";
 import Dataset from "~icons/material-symbols/dataset-outline";
 import FolderOpen from "~icons/material-symbols/folder-open-outline";
 import Folder from "~icons/material-symbols/folder";
+import FolderOutline from "~icons/material-symbols/folder-outline";
 import Widgets from "~icons/material-symbols/widgets-outline";
 import Lan from "~icons/material-symbols/lan-outline";
 import AutoAwesome from "~icons/material-symbols/auto-awesome-outline";
@@ -342,6 +350,7 @@ export const iconRegistry = {
   "campaign": Campaign,
   "cancel": Cancel,
   "redeem": Redeem,
+  "receipt-long": ReceiptLong,
   "category": Category,
   "check": Check,
   "check-circle": CheckCircle,
@@ -364,12 +373,15 @@ export const iconRegistry = {
   "format-list-bulleted": FormatListBulleted,
   "fullscreen": Fullscreen,
   "group-work": GroupWork,
+  "group-add": GroupAdd,
   "groups": Groups,
+  "how-to-reg": HowToReg,
   "help-outline": HelpOutline,
   "history": History,
   "info": Info,
   "info-filled": InfoFilled,
   "info-outline": InfoOutline,
+  "account-balance": AccountBalance,
   "account-tree": AccountTree,
   "dark-mode": DarkMode,
   "draft": Draft,
@@ -394,6 +406,7 @@ export const iconRegistry = {
   "pause": Pause,
   "pause-circle-filled": PauseCircleFilled,
   "person": Person,
+  "person-add": PersonAdd,
   "play-arrow": PlayArrow,
   "preview": Preview,
   "query-stats": QueryStats,
@@ -416,6 +429,8 @@ export const iconRegistry = {
   "workspaces": Workspaces,
   "workspace-premium": WorkspacePremium,
   "unfold-less": UnfoldLess,
+  "left-panel-close": LeftPanelClose,
+  "left-panel-open": LeftPanelOpen,
   "reorder": Reorder,
   "first-page": FirstPage,
   "last-page": LastPage,
@@ -458,6 +473,7 @@ export const iconRegistry = {
   "dataset": Dataset,
   "folder-open": FolderOpen,
   "folder": Folder,
+  "folder-outline": FolderOutline,
   "widgets": Widgets,
   "lan": Lan,
   "trending-up-filled": TrendingUpFilled,

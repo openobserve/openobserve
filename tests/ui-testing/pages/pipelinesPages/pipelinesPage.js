@@ -1,21 +1,56 @@
 // pipelinesPage.js
+const http = require('http');
 const { expect } = require('@playwright/test')
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 const fetch = require('node-fetch');
 const { getAuthHeaders } = require('../../playwright-tests/utils/cloud-auth.js');
+import { openNavFlyoutChild } from '../commonActions.js';
 
 const randomNodeName = `remote-node-${Math.floor(Math.random() * 1000)}`;
+
+// HTTP agent that never pools connections. node-fetch v2 keep-alive pooling
+// is the primary cause of "Premature close" / ECONNRESET flakiness in CI.
+const noKeepAliveAgent = new http.Agent({ keepAlive: false });
+
+/**
+ * Perform a fetch, retrying on transient network errors.
+ *
+ * Uses keepAlive: false agent + compress: false to prevent the node-fetch v2
+ * Gunzip "Premature close" / ECONNRESET flakiness that can survive retries
+ * when every connection attempt hits a pooled dead socket.
+ *
+ * @param {string} url - Request URL
+ * @param {object} options - fetch options
+ * @param {number} maxRetries - Number of additional attempts after the first (default: 3)
+ * @returns {Promise<Response>} The fetch response (only network errors are retried)
+ */
+async function fetchWithRetry(url, options, maxRetries = 3) {
+    const requestOpts = {
+        ...options,
+        compress: false,
+        agent: noKeepAliveAgent,
+    };
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        try {
+            return await fetch(url, requestOpts);
+        } catch (err) {
+            const message = String(err && err.message ? err.message : err);
+            const isTransient = /premature close|ECONNRESET|socket hang up|network|EPIPE|other side closed/i.test(message);
+            if (!isTransient || attempt === maxRetries) {
+                throw err;
+            }
+            const backoffMs = 500 * (attempt + 1);
+            testLogger.warn('Transient fetch error, retrying ingestion', { url, attempt: attempt + 1, maxRetries, error: message, backoffMs });
+            await new Promise((resolve) => setTimeout(resolve, backoffMs));
+        }
+    }
+}
 
 export class PipelinesPage {
     constructor(page) {
         this.page = page;
-        this.pipelinesPageMenu = page.locator('[data-test="menu-link-\\/pipeline-item"]');
-        
         // Locators from PipelinePage
-        this.pipelineMenuLink = page.locator(
-          '[data-test="menu-link-\\/pipeline-item"]'
-        );
-        this.pipelineTab = page.locator('button[data-test="stream-pipelines-tab"]');
+        this.pipelineTab = page.locator('[data-test="pipeline-section-tab-streamPipelines"]');
         this.addPipelineButton = page.locator(
           '[data-test="pipeline-list-add-pipeline-btn"]'
         );
@@ -152,14 +187,20 @@ export class PipelinesPage {
         );
         this.tableRowsLocator = page.locator("tbody tr");
         this.confirmButton = page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]');
-        this.settingsMenu = page.locator('[data-test="menu-link-settings-item"]');
+        this.settingsMenu = page.locator('[data-test="menu-link-\\/settings-item"]');
         this.pipelineDestinationsTab = page.locator('button[data-test="pipeline-destinations-tab"]');
+        // "Add Destination" button in the pipeline destinations list
+        this.destinationListAddBtn = page.locator('[data-test="pipeline-destination-list-add-btn"]');
+        // Destination type selection cards (prefix match — use .first() to avoid strict-mode violations)
+        this.destinationTypeCard = page.locator('[data-test^="destination-type-card-"]');
         this.searchInput = page.locator('[data-test="destination-list-search-input"]');
+        // OToast notifications — data-test-variant is emitted by OToastProvider
+        this.toastError = page.locator('[data-test-variant="error"]');
+        this.toastSuccess = page.locator('[data-test-variant="success"]');
         this.functionNameInput = page.locator('[data-test="add-function-name-input"]');
         this.functionNameInputField = page.locator('[data-test="add-function-name-input-field"]');
         this.addConditionSaveButton = page.locator('[data-test="add-condition-drawer"] [data-test="o-drawer-primary-btn"]');
-        this.pipelineMenu = '[data-test="menu-link-\\/pipeline-item"]';
-        this.enrichmentTableTab = 'button[data-test="function-enrichment-table-tab"]';
+        this.enrichmentTableTab = '[data-test="pipeline-section-tab-enrichmentTables"]';
         // Added data-test "enrichment-tables-add-btn" on the New Enrichment
         // Table OButton — prefer the data-test locator; fall back to the
         // legacy getByRole locator for older specs still using the old PO copy.
@@ -170,7 +211,7 @@ export class PipelinesPage {
         this.addEnrichmentTablePage = page.locator('[data-test="add-enrichment-table-page"]');
         // Enrichment table tab locator (data-test prefix; the tab is rendered by
         // OToggleGroup under the Functions section).
-        this.enrichmentTableTabLocator = page.locator('button[data-test="function-enrichment-table-tab"]');
+        this.enrichmentTableTabLocator = page.locator('[data-test="pipeline-section-tab-enrichmentTables"]');
         this.editButton = page.locator("button").filter({ hasText: "edit" });
         this.remoteDestinationIcon = page.getByRole("img", { name: "Remote Destination" });
         this.nameInput = page.getByLabel("Name *");
@@ -281,8 +322,10 @@ export class PipelinesPage {
         // Scheduled Pipeline Validation locators (Issue #9901 regression tests)
         this.validateAndCloseBtn = page.locator('[data-test="stream-routing-query-save-btn"]');
         this.streamRoutingQueryCancelBtn = page.locator('[data-test="stream-routing-query-cancel-btn"]');
-        this.discardChangesDialog = page.getByText('Discard Changes');
+        this.discardChangesDialog = page.locator('[data-test="confirm-dialog"]');
         this.discardChangesOkBtn = page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]');
+        // Secondary (Cancel/Dismiss) button in the unsaved-changes confirm dialog.
+        this.discardChangesCancelBtn = page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-secondary-btn"]');
         this.scheduledPipelineCancelBtn = page.locator('button').filter({ hasText: 'Cancel' }).first();
 
         // Bug #11498 - Run Query button (in scheduled pipeline dialog)
@@ -292,7 +335,7 @@ export class PipelinesPage {
 
     // Methods from original PipelinesPage
     async gotoPipelinesPage() {
-        await this.pipelinesPageMenu.click();
+        await openNavFlyoutChild(this.page, 'pipeline');
     }
 
     async pipelinesPageDefaultOrg() {
@@ -316,15 +359,18 @@ export class PipelinesPage {
 
     // Methods from PipelinePage
     async openPipelineMenu() {
-        await this.pipelineMenuLink.click();
+        await openNavFlyoutChild(this.page, 'pipeline');
         await this.page.waitForTimeout(1000);
         await this.pipelineTab.click();
         await this.page.waitForTimeout(2000);
     }
 
     async addPipeline() {
-        // Wait for the add pipeline button to be visible
-        await this.addPipelineButton.waitFor({ state: 'visible', timeout: 30000 });
+        // Wait for the add pipeline button to be visible.
+        // Reduced from 30s to 15s — slowMo:500 in serial mode amplifies
+        // cascading delays when the page doesn't load, and 15s is still
+        // generous enough for CI variance.
+        await this.addPipelineButton.waitFor({ state: 'visible', timeout: 15000 });
         await this.addPipelineButton.click();
     }
 
@@ -899,7 +945,7 @@ export class PipelinesPage {
     }
 
     async navigateToAddEnrichmentTable() {
-        await this.pipelineMenuLink.click();
+        await openNavFlyoutChild(this.page, 'pipeline');
         // The enrichment-table tab uses a Reka-based OToggleGroup — `force` avoids
         // visibility races when the tab list animates in.
         await this.enrichmentTableTabLocator.click({ force: true });
@@ -979,7 +1025,7 @@ export class PipelinesPage {
     }
 
     async navigateToEnrichmentTableTab() {
-        await this.pipelineMenuLink.click();
+        await openNavFlyoutChild(this.page, 'pipeline');
         await this.page.locator(this.enrichmentTableTab).click();
     }
 
@@ -1076,7 +1122,7 @@ export class PipelinesPage {
     }
 
     async navigateToPipeline() {
-        await this.pipelineMenuLink.click();
+        await openNavFlyoutChild(this.page, 'pipeline');
     }
 
     async setupContainerNameCondition() {
@@ -1471,7 +1517,7 @@ export class PipelinesPage {
             await expect.poll(async () => {
                 const apiPromise = this.page.waitForResponse(
                     (resp) => /\/api\/[^/]+\/pipelines(\?|$)/.test(resp.url()) && resp.request().method() === 'GET' && resp.status() === 200,
-                    { timeout: 5000 }
+                    { timeout: 15000 }
                 ).catch(() => null);
                 await this.page.reload().catch(() => {});
                 await apiPromise;
@@ -1842,7 +1888,7 @@ export class PipelinesPage {
         await this.timestampColumnMenu.click();
 
         // Navigate to the pipeline menu
-        await this.pipelineMenuLink.click();
+        await openNavFlyoutChild(this.page, 'pipeline');
     }
 
     /**
@@ -1883,7 +1929,7 @@ export class PipelinesPage {
 
         for (const streamName of streamNames) {
             const url = `${baseUrl}/api/${orgId}/${streamName}/_json`;
-            const fetchResponse = await fetch(url, {
+            const fetchResponse = await fetchWithRetry(url, {
                 method: 'POST',
                 headers: headers,
                 body: JSON.stringify(data)
@@ -1926,7 +1972,7 @@ export class PipelinesPage {
 
         const baseUrl = (process.env.INGESTION_URL || '').replace(/\/$/, '');
         const url = `${baseUrl}/api/${orgId}/ingest/metrics/_json`;
-        const fetchResponse = await fetch(url, {
+        const fetchResponse = await fetchWithRetry(url, {
             method: 'POST',
             headers: headers,
             body: JSON.stringify(metricsData)
@@ -2038,7 +2084,7 @@ export class PipelinesPage {
         if (streamName) {
             requestHeaders["stream-name"] = streamName;
         }
-        const fetchResponse = await fetch(`${baseUrl}/api/${orgId}/v1/traces`, {
+        const fetchResponse = await fetchWithRetry(`${baseUrl}/api/${orgId}/v1/traces`, {
             method: 'POST',
             headers: requestHeaders,
             body: JSON.stringify(tracesData)
@@ -3055,6 +3101,14 @@ export class PipelinesPage {
         const backfillUrl = `${process.env.ZO_BASE_URL}/web/pipeline/pipelines/backfill?org_identifier=${orgName}`;
         await this.page.goto(backfillUrl);
         await this.page.waitForLoadState('networkidle').catch(() => {});
+        // Wait for the Teleport target AND the page content to fully mount.
+        // BackfillJobsList renders both the teleported filters (#o2-page-actions)
+        // and the main page wrapper. Waiting for the page wrapper ensures the
+        // component is fully mounted before we check for teleported elements.
+        await this.page.locator('[data-test="pipeline-detail-actions"]').waitFor({ state: 'attached', timeout: 15000 }).catch(() => {});
+        await this.page.locator('[data-test="backfill-jobs-list-page"]').waitFor({ state: 'attached', timeout: 15000 }).catch(() => {});
+        // Give Vue time to complete the Teleport render cycle
+        await this.page.waitForTimeout(500);
         testLogger.info('Navigated to backfill jobs page', { url: backfillUrl });
     }
 
@@ -3081,8 +3135,8 @@ export class PipelinesPage {
      * @returns {Promise<boolean>} True if filter is visible
      */
     async isStatusFilterVisible() {
-        const filterLocator = this.page.locator('[data-test*="status-filter"], [data-test*="filter"]').first();
-        return await filterLocator.isVisible({ timeout: 5000 }).catch(() => false);
+        const filterLocator = this.page.locator('[data-test="status-filter"]').first();
+        return await filterLocator.waitFor({ state: 'visible', timeout: 15000 }).then(() => true).catch(() => false);
     }
 
     /**
@@ -3090,8 +3144,8 @@ export class PipelinesPage {
      * @returns {Promise<boolean>} True if filter is visible
      */
     async isPipelineFilterVisible() {
-        const filterLocator = this.page.locator('[data-test*="pipeline-filter"], select, .q-select').first();
-        return await filterLocator.isVisible({ timeout: 5000 }).catch(() => false);
+        const filterLocator = this.page.locator('[data-test="pipeline-filter"]').first();
+        return await filterLocator.waitFor({ state: 'visible', timeout: 15000 }).then(() => true).catch(() => false);
     }
 
     /**
@@ -3217,6 +3271,12 @@ export class PipelinesPage {
         const historyUrl = `${process.env.ZO_BASE_URL}/web/pipeline/pipelines/history?org_identifier=${orgName}`;
         await this.page.goto(historyUrl);
         await this.page.waitForLoadState('networkidle').catch(() => {});
+        // Wait for the shell header (#o2-page-actions Teleport target) and the
+        // page container to mount, then wait for the first Teleported control
+        // to be visible — that confirms the defer Teleport cycle is complete.
+        await this.page.locator('[data-test="pipeline-detail-actions"]').waitFor({ state: 'attached', timeout: 15000 }).catch(() => {});
+        await this.page.locator('[data-test="pipeline-history-page"]').waitFor({ state: 'attached', timeout: 15000 }).catch(() => {});
+        await this.page.locator('[data-test="pipeline-history-refresh-btn"]').waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
         testLogger.info('Navigated to pipeline history page', { url: historyUrl });
     }
 
@@ -3315,8 +3375,8 @@ export class PipelinesPage {
      * @returns {Promise<boolean>} True if button is visible
      */
     async isClearFiltersBtnVisible() {
-        const clearBtn = this.page.locator('[data-test*="clear-filter"], button:has-text("Clear"), [data-test*="reset"]').first();
-        return await clearBtn.isVisible({ timeout: 5000 }).catch(() => false);
+        const clearBtn = this.page.locator('[data-test="clear-filters-btn"]').first();
+        return await clearBtn.waitFor({ state: 'visible', timeout: 15000 }).then(() => true).catch(() => false);
     }
 
     /**
@@ -3338,8 +3398,8 @@ export class PipelinesPage {
      * @returns {Promise<boolean>} True if button is visible
      */
     async isBackfillRefreshBtnVisible() {
-        const refreshBtn = this.page.locator('[data-test*="refresh"], button:has-text("Refresh"), .refresh-btn').first();
-        return await refreshBtn.isVisible({ timeout: 5000 }).catch(() => false);
+        const refreshBtn = this.page.locator('[data-test="refresh-btn"]').first();
+        return await refreshBtn.waitFor({ state: 'visible', timeout: 15000 }).then(() => true).catch(() => false);
     }
 
     /**
@@ -3519,8 +3579,8 @@ export class PipelinesPage {
      * @returns {Promise<boolean>} True if date picker is visible
      */
     async isHistoryDatePickerVisible() {
-        const datePicker = this.page.locator('[data-test*="date-picker"], [data-test*="date-range"], .date-picker, .q-date').first();
-        return await datePicker.isVisible({ timeout: 5000 }).catch(() => false);
+        const datePicker = this.page.locator('[data-test="pipeline-history-date-picker"]').first();
+        return await datePicker.waitFor({ state: 'visible', timeout: 15000 }).then(() => true).catch(() => false);
     }
 
     /**
@@ -3528,8 +3588,8 @@ export class PipelinesPage {
      * @returns {Promise<boolean>} True if search select is visible
      */
     async isHistorySearchSelectVisible() {
-        const searchSelect = this.page.locator('[data-test*="search-select"], [data-test*="pipeline-select"], .q-select, select').first();
-        return await searchSelect.isVisible({ timeout: 5000 }).catch(() => false);
+        const searchSelect = this.page.locator('[data-test="pipeline-history-search-select"]').first();
+        return await searchSelect.waitFor({ state: 'visible', timeout: 15000 }).then(() => true).catch(() => false);
     }
 
     /**
@@ -3537,8 +3597,11 @@ export class PipelinesPage {
      * @returns {Promise<boolean>} True if button is visible
      */
     async isHistoryManualSearchBtnVisible() {
-        const searchBtn = this.page.locator('[data-test*="search-btn"], button:has-text("Search"), button:has-text("Run")').first();
-        return await searchBtn.isVisible({ timeout: 5000 }).catch(() => false);
+        // The history page has no dedicated "Search/Run" button — the refresh
+        // button (pipeline-history-refresh-btn) is the manual trigger to
+        // re-fetch history after changing filters. Map the concept to that button.
+        const refreshBtn = this.page.locator('[data-test="pipeline-history-refresh-btn"]').first();
+        return await refreshBtn.isVisible({ timeout: 5000 }).catch(() => false);
     }
 
     /**
@@ -3546,8 +3609,8 @@ export class PipelinesPage {
      * @returns {Promise<boolean>} True if button is visible
      */
     async isHistoryRefreshBtnVisible() {
-        const refreshBtn = this.page.locator('[data-test*="refresh"], button:has-text("Refresh"), .refresh-btn').first();
-        return await refreshBtn.isVisible({ timeout: 5000 }).catch(() => false);
+        const refreshBtn = this.page.locator('[data-test="pipeline-history-refresh-btn"]').first();
+        return await refreshBtn.waitFor({ state: 'visible', timeout: 15000 }).then(() => true).catch(() => false);
     }
 
     /**
@@ -3593,10 +3656,12 @@ export class PipelinesPage {
      * Click history search select
      */
     async clickHistorySearchSelect() {
-        const searchSelect = this.page.locator('[data-test*="search-select"], [data-test*="pipeline-select"], .q-select').first();
+        const searchSelect = this.page.locator('[data-test="pipeline-history-search-select"]').first();
         if (await searchSelect.isVisible().catch(() => false)) {
             await searchSelect.click();
-            await this.page.waitForTimeout(500);
+            // Wait for the OSelect popover to open
+            await this.page.locator('[data-test="pipeline-history-search-select-popover"]')
+                .waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
             testLogger.info('Clicked history search select');
         }
     }
@@ -3605,10 +3670,10 @@ export class PipelinesPage {
      * Select first option in dropdown
      */
     async selectFirstOption() {
-        const option = this.page.getByRole('option').first();
-        if (await option.isVisible().catch(() => false)) {
+        // OSelect options are stamped with data-test="${parent}-option" per §4 conventions.
+        const option = this.page.locator('[data-test="pipeline-history-search-select-option"]').first();
+        if (await option.isVisible({ timeout: 3000 }).catch(() => false)) {
             await option.click();
-            await this.page.waitForTimeout(300);
             testLogger.info('Selected first option');
         }
     }
@@ -3617,11 +3682,11 @@ export class PipelinesPage {
      * Click history manual search button
      */
     async clickHistoryManualSearchBtn() {
-        const searchBtn = this.page.locator('[data-test*="search-btn"], button:has-text("Search"), button:has-text("Run")').first();
-        if (await searchBtn.isVisible().catch(() => false)) {
-            await searchBtn.click();
-            await this.page.waitForTimeout(1000);
-            testLogger.info('Clicked history manual search button');
+        // The history page has no dedicated search button — refresh re-fetches history.
+        const refreshBtn = this.page.locator('[data-test="pipeline-history-refresh-btn"]').first();
+        if (await refreshBtn.isVisible().catch(() => false)) {
+            await refreshBtn.click();
+            testLogger.info('Clicked history manual search button (refresh)');
         }
     }
 

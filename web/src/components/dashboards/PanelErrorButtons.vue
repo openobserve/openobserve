@@ -3,7 +3,7 @@
     v-if="
       error ||
       maxQueryRangeWarning ||
-      limitNumberOfSeriesWarningMessage ||
+      limitNumberOfSeriesWarningMessage || xAliasInconsistencyWarning ||
       isCachedDataDifferWithCurrentTimeRange ||
       (isPartialData && !isPanelLoading) ||
       (lastTriggeredAt && !viewOnly && !simplifiedPanelView)
@@ -30,7 +30,7 @@
       data-test="panel-max-duration-warning"
     >
       <OTooltip side="bottom" align="end" max-width="220px">
-        <template #content><div style="white-space: pre-wrap">{{ maxQueryRangeWarning }}</div></template>
+        <template #content><div data-test="panel-max-duration-warning-content" style="white-space: pre-wrap">{{ maxQueryRangeWarning }}</div></template>
       </OTooltip>
     </OButton>
     <OButton
@@ -44,6 +44,19 @@
       /></template>
       <OTooltip side="bottom" align="end">
         <template #content><div style="white-space: pre-wrap">{{ limitNumberOfSeriesWarningMessage }}</div></template>
+      </OTooltip>
+    </OButton>
+    <OButton
+      v-if="xAliasInconsistencyWarning"
+      variant="ghost-warning"
+      size="icon"
+      icon-left="warning"
+      data-test="panel-x-alias-inconsistency-warning"
+    >
+      <OTooltip side="bottom" align="end" max-width="260px">
+        <template #content>
+          <div style="white-space: pre-wrap">{{ t('dashboard.xAliasInconsistencyWarning') }}</div>
+        </template>
       </OTooltip>
     </OButton>
     <OButton
@@ -91,6 +104,7 @@
 
 <script lang="ts">
 import { defineComponent } from "vue";
+import { useI18n } from "vue-i18n";
 import RelativeTime from "@/components/common/RelativeTime.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -135,10 +149,15 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    xAliasInconsistencyWarning: {
+      type: Boolean,
+      default: false,
+    },
   },
   setup() {
+    const { t } = useI18n();
     return {
-      outlinedRunningWithErrors: "running-with-errors",
+      t,
     };
   },
 });

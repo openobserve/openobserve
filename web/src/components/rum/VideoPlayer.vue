@@ -15,10 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="player-container tw:h-full tw:p-2">
+  <div class="player-container tw:h-full tw:p-2 tw:flex tw:flex-col">
     <div
       v-if="isLoading"
-      class="tw:pb-4 tw:flex tw:items-center tw:justify-center tw:text-center tw:w-full tw:h-[calc(100vh-12.5rem)]"
+      class="tw:pb-4 tw:flex tw:items-center tw:justify-center tw:text-center tw:w-full tw:flex-1 tw:min-h-0"
     >
       <div>
         <OSpinner
@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div
       ref="playerContainerRef"
-      class="tw:flex tw:items-center tw:justify-center tw:h-[calc(100vh-12.375rem)]"
+      class="tw:flex tw:items-center tw:justify-center tw:flex-1 tw:min-h-0"
     >
       <div
         ref="playerRef"
@@ -153,6 +153,8 @@ import {
   onBeforeUnmount,
   onMounted,
   onBeforeMount,
+  onActivated,
+  onDeactivated,
 } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
@@ -194,6 +196,10 @@ const playerContainerRef = ref<HTMLElement | null>(null);
 const worker: Ref<Worker | null> = ref(null);
 
 const workerProcessId = ref(0);
+
+const sessionWidth = ref(0);
+const sessionHeight = ref(0);
+const resizeObserver = ref<ResizeObserver | null>(null);
 
 const speedOptions = [
   {
@@ -243,17 +249,27 @@ const playerState = ref({
   actualTime: 0,
 });
 
-watch(
-  () => props.segments,
-  (value) => {
-    if (value.length) setupSession();
-  },
-  { deep: true, immediate: true },
-);
-
 onBeforeMount(async () => {
   await importVideoPlayer();
   initializeWorker();
+});
+
+onMounted(() => {
+  attachResizeObserver();
+});
+
+onActivated(() => {
+  attachResizeObserver();
+  if (player.value) {
+    const { width, height } = calculatePlayerDimensions();
+    if (playerRef.value) playerRef.value.style.width = `${width}px`;
+    player.value.$set({ width, height });
+    updatePlayerState();
+  }
+});
+
+onDeactivated(() => {
+  detachResizeObserver();
 });
 
 const importVideoPlayer = async () => {
@@ -265,11 +281,51 @@ const importVideoPlayer = async () => {
 };
 
 onBeforeUnmount(() => {
+  detachResizeObserver();
   if (worker.value) {
     worker.value.terminate();
   }
   rrwebPlayer = null;
 });
+
+function attachResizeObserver() {
+  if (!playerContainerRef.value) return;
+  resizeObserver.value = new ResizeObserver(() => {
+    if (!player.value) return;
+    const { width, height } = calculatePlayerDimensions();
+    if (playerRef.value) playerRef.value.style.width = `${width}px`;
+    player.value.$set({ width, height });
+    updatePlayerState();
+  });
+  resizeObserver.value.observe(playerContainerRef.value);
+}
+
+function detachResizeObserver() {
+  resizeObserver.value?.disconnect();
+  resizeObserver.value = null;
+}
+
+function calculatePlayerDimensions(): { width: number; height: number } {
+  if (!playerContainerRef.value) return { width: 0, height: 0 };
+
+  let playerWidth = playerContainerRef.value.clientWidth || 0;
+  let playerHeight = sessionHeight.value
+    ? (sessionHeight.value / sessionWidth.value) * playerWidth
+    : playerWidth * 0.5625;
+
+  if (
+    playerContainerRef.value.clientHeight &&
+    playerHeight > playerContainerRef.value.clientHeight - 90
+  ) {
+    playerHeight = playerContainerRef.value.clientHeight - 90 || 0;
+    playerWidth =
+      sessionWidth.value && sessionHeight.value
+        ? (sessionWidth.value / sessionHeight.value) * playerHeight
+        : playerWidth;
+  }
+
+  return { width: playerWidth, height: playerHeight };
+}
 
 const setupSession = async () => {
   session.value = [];
@@ -342,32 +398,16 @@ const setupSession = async () => {
   //   lastEventTime = currentTime;
   // });
 
-  let sessionWidth: number = 0;
-  let sessionHeight: number = 0;
-
   session.value.every((segment: any) => {
     if (segment.data.height && segment.data.width) {
-      sessionWidth = segment.data.width;
-      sessionHeight = segment.data.height;
+      sessionWidth.value = segment.data.width;
+      sessionHeight.value = segment.data.height;
       return false;
     }
     return true;
   });
 
-  let playerWidth = playerContainerRef.value?.clientWidth || 0;
-  let playerHeight = (sessionHeight / sessionWidth) * playerWidth;
-
-  if (!sessionHeight) {
-    playerHeight = playerWidth * 0.5625;
-  }
-
-  if (
-    playerContainerRef.value?.clientHeight &&
-    playerHeight > playerContainerRef.value?.clientHeight - 90
-  ) {
-    playerHeight = playerContainerRef.value?.clientHeight - 90 || 0;
-    playerWidth = (sessionWidth / sessionHeight) * playerHeight;
-  }
+  const { width: playerWidth, height: playerHeight } = calculatePlayerDimensions();
 
   if (playerRef.value) {
     playerRef.value.style.width = `${playerWidth}px`;
@@ -584,6 +624,14 @@ const processCss = (cssString: string, id: string | number) => {
     }
   });
 };
+
+watch(
+  () => props.segments,
+  (value) => {
+    if (value.length) setupSession();
+  },
+  { deep: true, immediate: true },
+);
 
 defineExpose({
   goto,

@@ -1515,13 +1515,18 @@ pub(crate) fn is_analysis_in_flight(
     let stale_cutoff =
         chrono::Utc::now().timestamp_micros() - (stale_threshold_minutes as i64 * 60 * 1_000_000);
 
-    // Walk backwards: find last AIAnalysisComplete, then check if a
-    // non-stale AIAnalysisBegin comes after it.
-    let last_complete_pos = events
-        .iter()
-        .rposition(|e| matches!(e.event_type, IncidentEventType::AIAnalysisComplete));
+    // Walk backwards: find the last terminal event (Complete OR Failed), then
+    // check if a non-stale AIAnalysisBegin comes after it. AIAnalysisFailed is
+    // also terminal — leaving it out would keep the in-flight lock held until
+    // stale_threshold expires after every failed RCA, blocking manual retries.
+    let last_terminal_pos = events.iter().rposition(|e| {
+        matches!(
+            e.event_type,
+            IncidentEventType::AIAnalysisComplete | IncidentEventType::AIAnalysisFailed { .. }
+        )
+    });
 
-    let search_from = last_complete_pos.map(|p| p + 1).unwrap_or(0);
+    let search_from = last_terminal_pos.map(|p| p + 1).unwrap_or(0);
 
     events[search_from..].iter().any(|e| {
         matches!(e.event_type, IncidentEventType::AIAnalysisBegin) && e.timestamp > stale_cutoff

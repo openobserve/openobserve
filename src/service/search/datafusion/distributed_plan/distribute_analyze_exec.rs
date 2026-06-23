@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{any::Any, sync::Arc};
+use std::sync::Arc;
 
 use arrow::{
     array::{Int32Builder, StringBuilder},
@@ -102,11 +102,6 @@ impl DisplayAs for DistributeAnalyzeExec {
 impl ExecutionPlan for DistributeAnalyzeExec {
     fn name(&self) -> &'static str {
         "DistributeAnalyzeExec"
-    }
-
-    /// Return a reference to Any that can be used for downcasting
-    fn as_any(&self) -> &dyn Any {
-        self
     }
 
     fn properties(&self) -> &Arc<PlanProperties> {

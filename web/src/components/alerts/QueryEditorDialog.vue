@@ -138,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
 
                     <!-- Unified Query Editor -->
-                    <div class="tw:flex-1 tw:min-h-0">
+                    <div class="tw:flex-1 tw:min-h-0 tw:relative">
                       <UnifiedQueryEditor
                         ref="queryEditorRef"
                         :languages="availableLanguages"
@@ -146,18 +146,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :query="localTab === 'sql' ? localSqlQuery : localPromqlQuery"
                         :disable-ai="!streamName"
                         :disable-ai-reason="t('search.selectStreamForAI')"
-                        :class="(localTab === 'sql' ? localSqlQuery : localPromqlQuery) === '' && queryEditorPlaceholderFlag ? 'empty-query' : ''"
                         @update:query="handleQueryUpdate"
                         @language-change="handleLanguageChange"
                         @ask-ai="handleAskAI"
                         @run-query="handleRunQuery(localTab)"
-                        @focus="queryEditorPlaceholderFlag = false"
+                        @focus="onQueryEditorFocus"
                         @blur="onBlurQueryEditor"
                         editor-height="100%"
                         data-test-prefix="alert"
                         :keywords="autoCompleteKeywords"
                         :suggestions="autoCompleteSuggestions"
                       />
+                      <div
+                        v-if="(localTab === 'sql' ? !localSqlQuery : !localPromqlQuery) && queryEditorPlaceholderFlag"
+                        class="query-editor-placeholder-overlay"
+                      >
+                        <span class="query-editor-placeholder-typewriter">{{ fullEditorPlaceholder }}</span>
+                      </div>
                     </div>
                   </div>
 
@@ -271,10 +276,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :debounce-time="300"
                       editor-height="100%"
                       class="tw:w-full tw:h-full"
-                      :class="[
-                        vrlFunctionContent == '' && functionEditorPlaceholderFlag ? 'empty-function' : '',
-                        store.state.theme === 'dark' ? 'dark-mode-editor dark-mode' : 'light-mode-editor light-mode'
-                      ]"
+                      :class="store.state.theme === 'dark' ? 'dark-mode-editor dark-mode' : 'light-mode-editor light-mode'"
                       @update:query="updateVrlFunction"
                       @focus="functionEditorPlaceholderFlag = false"
                       @blur="onBlurFunctionEditor"
@@ -283,6 +285,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @generation-end="handleAlertFunctionEditorGenerationEnd"
                       @generation-success="handleAlertFunctionEditorGenerationSuccess"
                     />
+                    <div
+                      v-if="!vrlFunctionContent && functionEditorPlaceholderFlag"
+                      class="query-editor-placeholder-overlay"
+                    >
+                      <span class="query-editor-placeholder-typewriter">{{ vrlPlaceholder }}</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -442,6 +450,9 @@ import useQuery from "@/composables/useQuery";
 import { getParser as getParserUtil, type SqlUtilsContext } from "@/utils/alerts/alertSqlUtils";
 import useParser from "@/composables/useParser";
 import useSqlSuggestions from "@/composables/useSuggestions";
+import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
+import { useVrlPlaceholder } from "@/composables/useVrlPlaceholder";
+import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
 import { applyFilterTerm, removeFieldCondition } from "@/utils/traces/filterUtils";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
@@ -595,6 +606,24 @@ const restoreVrlEditor = () => {
 // Editor state
 const queryEditorPlaceholderFlag = ref(true);
 const functionEditorPlaceholderFlag = ref(true);
+const { placeholder: vrlPlaceholder } = useVrlPlaceholder();
+
+// ─── Typewriter placeholder for the full query editor ────────────────
+const streamFieldsForPlaceholder = computed(() =>
+  (props.columns as any[]).map((c: any) => ({
+    name: typeof c === 'string' ? c : (c.value ?? c.label ?? ''),
+    dataType: typeof c === 'string' ? '' : (c.type ?? ''),
+  }))
+);
+const noStreamForPlaceholder = computed(() => !props.streamName);
+const isSqlModeForPlaceholder = computed(() => localTab.value === 'sql');
+const { placeholder: fullEditorPlaceholder } = useQueryPlaceholder(
+  streamFieldsForPlaceholder,
+  ref({}),
+  isSqlModeForPlaceholder,
+  noStreamForPlaceholder,
+  { noStreamText: t('pipeline.queryEditorPlaceholder') },
+);
 
 // Field selection
 const selectedFunction = ref<any>(null);
@@ -670,10 +699,10 @@ const updateVrlFunction = (value: string) => {
   emit("update:vrlFunction", value);
 };
 
-const onBlurQueryEditor = debounce(() => {
+const onBlurQueryEditor = debounce(async () => {
   queryEditorPlaceholderFlag.value = localTab.value === 'sql' ? localSqlQuery.value === '' : localPromqlQuery.value === '';
-  // Only validate SQL queries on blur, not PromQL
   if (localTab.value === 'sql') {
+    await _sqlOnBlur();
     emit("validate-sql");
   }
 }, 10);
@@ -935,6 +964,19 @@ const runPromqlQuery = async () => {
 // Unified Query Editor ref
 const queryEditorRef = ref<any>(null);
 
+const { onFocus: _sqlOnFocus, onBlur: _sqlOnBlur, onQueryChange: _sqlOnQueryChange } =
+  useSqlEditorDiagnostics({
+    queryEditorRef,
+    sqlMode: computed(() => localTab.value === 'sql'),
+    query: computed(() => localSqlQuery.value ?? ""),
+    streamName: computed(() => props.streamName),
+  });
+
+const onQueryEditorFocus = () => {
+  queryEditorPlaceholderFlag.value = false;
+  _sqlOnFocus();
+};
+
 // ── Autocomplete ──────────────────────────────────────────────────────────
 const {
   autoCompleteData,
@@ -1031,6 +1073,7 @@ const availableLanguages = computed(() => {
 
 // Unified Query Editor handlers
 const handleQueryUpdate = (newQuery: string) => {
+  _sqlOnQueryChange();
   if (localTab.value === 'sql') {
     updateSqlQuery(newQuery);
   } else {
@@ -1094,6 +1137,33 @@ const getBtnLogo = computed(() => {
 </script>
 
 <style scoped lang="scss">
+.query-editor-placeholder-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: flex-start;
+  padding: 0.1875rem 0.5rem 0 2.15rem;
+  pointer-events: none;
+  z-index: 1;
+  user-select: none;
+
+  .query-editor-placeholder-typewriter {
+    font-family: monospace;
+    font-size: var(--text-base);
+    line-height: 1.3125rem;
+    color: #a0aec0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+:global(.body--dark) .query-editor-placeholder-overlay .query-editor-placeholder-typewriter {
+  color: #718096;
+}
+
 // ── Dialog topbar ──────────────────────────────────────────────────────────
 .dialog-topbar {
   display: flex;

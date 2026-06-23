@@ -3,6 +3,7 @@ const { waitUtils } = require('../../playwright-tests/utils/wait-helpers.js');
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 const { getAuthHeaders, getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
 const MonacoEditorHelper = require('../../playwright-tests/utils/MonacoEditorHelper.js');
+import { openNavFlyoutChild } from '../commonActions.js';
 
 export class SanityPage {
     constructor(page) {
@@ -72,10 +73,9 @@ export class SanityPage {
         // ============================================================
         // Menu Navigation locators
         // ============================================================
-        this.pipelineMenuItem = page.locator('[data-test="menu-link-\\/pipeline-item"]');
         this.realtimeTab = page.locator('[data-test="tab-realtime"]');
-        this.streamPipelinesTab = page.locator('button[data-test="stream-pipelines-tab"]');
-        this.functionStreamTab = page.locator('button[data-test="function-stream-tab"]');
+        this.streamPipelinesTab = page.locator('[data-test="pipeline-section-tab-streamPipelines"]');
+        this.functionStreamTab = page.locator('[data-test="pipeline-section-tab-functions"]');
         this.dashboardsMenuItem = page.locator('[data-test="menu-link-\\/dashboards-item"]');
         this.streamsMenuItem = page.locator('[data-test="menu-link-\\/streams-item"]');
         this.homeMenuItem = page.locator('[data-test="menu-link-\\/-item"]');
@@ -89,7 +89,7 @@ export class SanityPage {
         this.folderAddNameField = page.locator('[data-test="dashboard-folder-add-name-field"]');
         // AddFolder.vue now uses ODrawer's primary footer button — there is
         // no standalone "dashboard-folder-add-save" element after migration.
-        this.folderAddSave = page.locator('[data-test="dashboard-folder-dialog"] [data-test="o-drawer-primary-btn"]');
+        this.folderAddSave = page.locator('[data-test="dashboard-folder-dialog"] [data-test="o-dialog-primary-btn"]');
         this.deleteFolderIcon = page.locator('[data-test="dashboard-delete-folder-icon"]');
 
         // ============================================================
@@ -102,7 +102,7 @@ export class SanityPage {
         this.streamTypeLogsOption = page.locator('[data-test="add-stream-type-input-option"][data-test-value="logs"]');
         // AddStream.vue uses ODrawer (isInPipeline=false on the Streams page).
         // The save action is the ODrawer built-in primary footer button.
-        this.saveStreamButton = page.locator('[data-test="add-stream-dialog"] [data-test="o-drawer-primary-btn"]');
+        this.saveStreamButton = page.locator('[data-test="add-stream-dialog"] [data-test="o-dialog-primary-btn"]');
         // Stream search input on Streams page; OInput auto-generates `-field` variant.
         this.searchStreamInputField = page.locator('[data-test="streams-search-stream-input-field"]');
         // Stream delete button per row (data-test added in LogStream.vue this pass).
@@ -122,7 +122,7 @@ export class SanityPage {
         // ============================================================
         // Settings locators
         // ============================================================
-        this.settingsMenuItem = page.locator('[data-test="menu-link-settings-item"]');
+        this.settingsMenuItem = page.locator('[data-test="menu-link-/settings-item"]');
         // general-settings-tab data-test added in settings/index.vue this pass.
         this.generalSettingsTab = page.locator('button[data-test="general-settings-tab"]');
         // OInput auto-generates `-field` for the native input.
@@ -219,7 +219,7 @@ export class SanityPage {
         await this.refreshButton.click();
         await searchPromise;
 
-        await expect(this.searchResultTitle).toContainText(/Showing 1 to/, { timeout: 15000 });
+        await expect(this.searchResultTitle).toContainText(/1 to/, { timeout: 15000 });
 
         try {
             await expect(this.searchResultPagination).toBeVisible({ timeout: 10000 });
@@ -235,8 +235,16 @@ export class SanityPage {
     // Histogram Methods
     // ================================================================
     async clickHistogramToggle() {
-        // Histogram toggle is inside the utilities ODropdown in SearchBar.vue.
-        // Must open the menu first before the OSwitch element exists in the DOM.
+        // Histogram has an inline toolbar button at normal viewport widths
+        // (data-test="logs-search-bar-histogram-btn"). It moves into the
+        // utilities ("More") menu only at narrow viewports (shouldMoveButtonsToMenu).
+        const inlineBtn = this.page.locator('[data-test="logs-search-bar-histogram-btn"]');
+        const isInline = await inlineBtn.isVisible({ timeout: 1000 }).catch(() => false);
+        if (isInline) {
+            await inlineBtn.click();
+            return;
+        }
+        // Narrow-viewport fallback: open utilities menu and click the menu item.
         const menuHistogramBtn = this.page.locator('[data-test="logs-search-bar-menu-histogram-btn"]');
         const isMenuItemVisible = await menuHistogramBtn.isVisible({ timeout: 500 }).catch(() => false);
         if (!isMenuItemVisible) {
@@ -250,9 +258,18 @@ export class SanityPage {
 
     // Returns true when the histogram OSwitch is currently ON.
     // OSwitch surfaces its state via a nested `role="switch"` element carrying
-    // `aria-checked="true|false"` — opens the utilities menu to read the state,
-    // then closes it without triggering a toggle.
+    // `aria-checked="true|false"`. At normal viewport widths the histogram button
+    // is inline; at narrow widths it lives inside the utilities menu.
     async isHistogramOn() {
+        // Check the inline histogram button first (normal viewport).
+        const inlineBtn = this.page.locator('[data-test="logs-search-bar-histogram-btn"]');
+        const isInline = await inlineBtn.isVisible({ timeout: 1000 }).catch(() => false);
+        if (isInline) {
+            const switchControl = inlineBtn.locator('[role="switch"]');
+            const aria = await switchControl.getAttribute('aria-checked');
+            return aria === 'true';
+        }
+        // Narrow-viewport fallback: read state from the menu item OSwitch.
         const menuHistogramBtn = this.page.locator('[data-test="logs-search-bar-menu-histogram-btn"]');
         const isMenuItemVisible = await menuHistogramBtn.isVisible({ timeout: 500 }).catch(() => false);
         if (!isMenuItemVisible) {
@@ -295,20 +312,17 @@ export class SanityPage {
     // ================================================================
 
     /**
-     * Open the utilities ("More") dropdown, click the SQL mode ODropdownItem to toggle it,
-     * then close the dropdown.
-     * Uses [data-test="logs-search-bar-menu-sql-mode-btn"] — NOT the legacy syntax-guide element.
+     * Enable SQL mode. The SQL mode toggle was removed from the UI; the app now
+     * auto-detects SQL mode when the query editor contains both "select" and "from".
+     * This helper types a minimal SELECT query to trigger that auto-detection.
+     * Callers that subsequently call MonacoEditorHelper.setContent() will overwrite
+     * this query — SQL mode stays active because the replacement also contains SELECT.
      */
     async _clickSqlModeToggle() {
-        const sqlModeMenuItem = this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"]');
-        const isVisible = await sqlModeMenuItem.isVisible({ timeout: 500 }).catch(() => false);
-        if (!isVisible) {
-            await this.utilitiesMenuButton.click();
-            await sqlModeMenuItem.waitFor({ state: 'visible', timeout: 5000 });
-        }
-        await sqlModeMenuItem.click();
-        await this.page.keyboard.press('Escape');
-        await this.page.waitForTimeout(100);
+        await expect(this.queryEditor).toBeVisible({ timeout: 10000 });
+        const monacoHelper = new MonacoEditorHelper(this.page);
+        await monacoHelper.setContent(this.queryEditor, 'SELECT * FROM "e2e_automate"');
+        await this.page.waitForTimeout(200);
     }
 
     // ================================================================
@@ -333,7 +347,7 @@ export class SanityPage {
         await this.refreshButton.click({ force: true });
         await limitSearchPromise;
 
-        await expect(this.searchResultTitle).toContainText(/Showing 1 to 5/, { timeout: 15000 });
+        await expect(this.searchResultTitle).toContainText(/1 to 5/, { timeout: 15000 });
 
         // Reset filters button is now directly on the toolbar
         await this.resetFiltersButton.click();
@@ -412,7 +426,7 @@ export class SanityPage {
         await this.savedViewDialogSave.click();
         await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
-        await this.pipelineMenuItem.click();
+        await openNavFlyoutChild(this.page, 'pipeline');
         await this.realtimeTab.click();
         await this.functionStreamTab.click();
 
@@ -440,7 +454,7 @@ export class SanityPage {
 
         const uniqueFunctionName = `sanitytest_${generateSuffix()}`;
 
-        await this.pipelineMenuItem.click();
+        await openNavFlyoutChild(this.page, 'pipeline');
         await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
         await this.streamPipelinesTab.click();
         await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});

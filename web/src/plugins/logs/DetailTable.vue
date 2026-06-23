@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- Single Tab Row -->
     <div class="tw:flex tw:justify-between tw:pt-2 tw:items-center">
-      <div class="tw:flex tw:items-center tw:gap-2">
+      <div class="tw:flex tw:items-center tw:gap-2 tw:-mb-0.75">
         <OTabs v-model="tab" align="left">
           <OTab
             data-test="log-detail-json-tab"
@@ -53,16 +53,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t('correlation.correlatedTraces')"
           />
         </OTabs>
+      </div>
+      <div class="tw:flex tw:items-center tw:gap-2 tw:pr-3 tw:shrink-0">
         <O2AIContextAddBtn
           data-test="logs-detail-ai-context-btn"
           @sendToAiChat="sendToAiChat(JSON.stringify(rowData))"
         />
-      </div>
-      <div
-        v-show="tab === 'table'"
-        class="col-auto tw:flex tw:justify-end align-center tw:pr-3"
-      >
         <OSwitch
+          v-show="tab === 'table'"
           data-test="log-detail-wrap-values-toggle-btn"
           v-model="shouldWrapValues"
           :label="t('common.wrap')"
@@ -78,7 +76,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OTabPanels
       data-test="log-detail-tab-container"
       v-model="tab"
-      animated
       keep-alive
       grow
     >
@@ -162,7 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="log-details-include-field-btn"
                       @select="toggleIncludeSearchTerm(row.field, row.value, 'include')"
                     >
-                      <template #icon-left><EqualIcon class="tw:size-4" /></template>
+                      <template #icon-left><EqualIcon class="tw:size-2.5" /></template>
                       {{ t("common.includeSearchTerm") }}
                     </ODropdownItem>
                     <ODropdownItem
@@ -175,7 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="log-details-exclude-field-btn"
                       @select="toggleExcludeSearchTerm(row.field, row.value, 'exclude')"
                     >
-                      <template #icon-left><NotEqualIcon class="tw:size-4" /></template>
+                      <template #icon-left><NotEqualIcon class="tw:size-2.5" /></template>
                       {{ t("common.excludeSearchTerm") }}
                     </ODropdownItem>
                     <template v-if="row.field !== store.state.zoConfig.timestamp_column">
@@ -232,10 +229,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </ODropdown>
                   <pre
                     :data-test="`log-detail-${row.field}-value`"
-                    class="table-pre tw:flex-1"
+                    class="table-pre tw:flex-1 tw:min-w-0"
                     :class="
                       !shouldWrapValues
-                        ? 'tw:whitespace-nowrap'
+                        ? 'tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis'
                         : 'tw:whitespace-pre-wrap'
                     "
                   ><ChunkedContent
@@ -264,6 +261,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :service-name="correlationProps.serviceName"
           :matched-dimensions="correlationProps.matchedDimensions"
           :additional-dimensions="correlationProps.additionalDimensions"
+          :matched-set-id="correlationProps.matchedSetId"
+          :chip-dimensions="correlationProps.chipDimensions"
+          :source-event="correlationProps.sourceEvent"
           :log-streams="correlationProps.logStreams"
           :source-stream="correlationProps.sourceStream"
           :source-type="correlationProps.sourceType"
@@ -274,6 +274,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :hide-search-term-actions="false"
           :hide-dimension-filters="true"
           :hide-reset-filters-button="true"
+          class="tw:pr-3!"
           @sendToAiChat="sendToAiChat"
           @addSearchTerm="addSearchTerm"
         />

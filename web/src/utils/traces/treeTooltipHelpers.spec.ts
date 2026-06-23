@@ -22,6 +22,8 @@ import {
   generateEdgeTooltipContent,
   findIncomingEdgeForNode,
   calculateRootNodeMetrics,
+  generateTracePatternTooltipContent,
+  generatePatternNodeTooltipContent,
 } from './treeTooltipHelpers';
 
 describe('treeTooltipHelpers', () => {
@@ -266,6 +268,167 @@ describe('treeTooltipHelpers', () => {
       const metrics = calculateRootNodeMetrics('node', edges);
 
       expect(metrics.errorRate).toBe(0);
+    });
+  });
+
+  describe('generatePatternNodeTooltipContent', () => {
+    it('should show the full service name as the tooltip header', () => {
+      const result = generatePatternNodeTooltipContent({
+        serviceName: 'oteldemo.RecommendationService',
+        count: 3,
+        avg: 39.49,
+        traceTimePercent: 27.9,
+        errorCount: 0,
+      });
+
+      expect(result).toContain('oteldemo.RecommendationService');
+      expect(result).toContain('Spans:');
+      expect(result).toContain('Average:');
+    });
+
+    it('should fall back to the path signature when service name is missing', () => {
+      const result = generatePatternNodeTooltipContent({
+        pathSignature: 'frontend→recommendation',
+        count: 1,
+        avg: 1.5,
+        traceTimePercent: 10,
+      });
+
+      expect(result).toContain('frontend→recommendation');
+    });
+
+    it('should escape HTML in the service name', () => {
+      const result = generatePatternNodeTooltipContent({
+        serviceName: '<img src=x onerror=alert(1)>',
+        count: 1,
+        avg: 0,
+        traceTimePercent: 0,
+      });
+
+      expect(result).not.toContain('<img');
+      expect(result).toContain('&lt;img');
+    });
+
+    it('should return empty string when metadata is missing', () => {
+      expect(generatePatternNodeTooltipContent(null)).toBe('');
+      expect(generatePatternNodeTooltipContent(undefined)).toBe('');
+    });
+  });
+
+  describe('generateTracePatternTooltipContent', () => {
+    it('should generate tooltip HTML with all duration metrics', () => {
+      const mockMetadata = {
+        pathSignature: 'frontend → recommendation',
+        count: 3,
+        avg: 45.5,
+        min: 20.1,
+        max: 89.3,
+        p75: 67.2,
+        p95: 85.6,
+        p99: 88.4,
+        errorRate: 12.5,
+      };
+
+      const result = generateTracePatternTooltipContent(mockMetadata);
+
+      // Values are wrapped in <span> tags — check for label + value separately
+      expect(result).toContain('frontend → recommendation');
+      expect(result).toContain('>3</span>');
+      expect(result).toContain('>45.5ms</span>');
+      expect(result).toContain('>20.1ms</span>');
+      expect(result).toContain('>89.3ms</span>');
+      expect(result).toContain('>67.2ms</span>');
+      expect(result).toContain('>85.6ms</span>');
+      expect(result).toContain('>88.4ms</span>');
+      expect(result).toContain('>12.5%</span>');
+    });
+
+    it('should handle missing or invalid metadata gracefully', () => {
+      const result = generateTracePatternTooltipContent({});
+
+      expect(result).toContain('Unknown Pattern');
+      expect(result).toContain('Calls:');
+      expect(result).toContain('>1</span>');
+      expect(result).toContain('Average:');
+      expect(result).toContain('Error Rate:');
+    });
+
+    it('should handle null or undefined metadata', () => {
+      const resultNull = generateTracePatternTooltipContent(null);
+      const resultUndefined = generateTracePatternTooltipContent(undefined);
+
+      expect(resultNull).toContain('Unknown Pattern');
+      expect(resultUndefined).toContain('Unknown Pattern');
+    });
+
+    it('should format percentile values with single decimal place', () => {
+      const mockMetadata = {
+        pathSignature: 'service-a → service-b',
+        count: 100,
+        avg: 123.456,
+        min: 10.123,
+        max: 999.999,
+        p75: 456.789,
+        p95: 789.123,
+        p99: 999.876,
+        errorRate: 5.555,
+      };
+
+      const result = generateTracePatternTooltipContent(mockMetadata);
+
+      // Values are wrapped in <span> tags — check for formatted values
+      expect(result).toContain('>123.5ms</span>');
+      expect(result).toContain('>10.1ms</span>');
+      expect(result).toContain('>1000.0ms</span>');
+      expect(result).toContain('>456.8ms</span>');
+      expect(result).toContain('>789.1ms</span>');
+      expect(result).toContain('>999.9ms</span>');
+      expect(result).toContain('>5.6%</span>');
+    });
+
+    it('should handle zero values for all metrics', () => {
+      const mockMetadata = {
+        pathSignature: 'zero-pattern',
+        count: 0,
+        avg: 0,
+        min: 0,
+        max: 0,
+        p75: 0,
+        p95: 0,
+        p99: 0,
+        errorRate: 0,
+      };
+
+      const result = generateTracePatternTooltipContent(mockMetadata);
+
+      expect(result).toContain('zero-pattern');
+      expect(result).toContain('Calls:');
+      expect(result).toContain('>0</span>');
+      expect(result).toContain('>0.0ms</span>');
+      expect(result).toContain('>0.0%</span>');
+    });
+
+    it('should include HTML structure with inline styles', () => {
+      const mockMetadata = {
+        pathSignature: 'test',
+        count: 1,
+        avg: 10,
+        min: 5,
+        max: 15,
+        p75: 12,
+        p95: 14,
+        p99: 14.5,
+        errorRate: 0,
+      };
+
+      const result = generateTracePatternTooltipContent(mockMetadata);
+
+      // generateTracePatternTooltipContent uses inline styles, not CSS classes
+      expect(result).toContain('font-family: -apple-system');
+      expect(result).toContain('font-weight: 600');
+      expect(result).toContain('border-bottom: 1px solid');
+      expect(result).toContain('Calls:');
+      expect(result).toContain('<span style="font-family: monospace;">1</span>');
     });
   });
 

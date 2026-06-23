@@ -57,10 +57,10 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: mockToast,
 }));
 
-const ODrawerStub = {
-  name: "ODrawer",
+const ODialogStub = {
+  name: "ODialog",
   template:
-    '<div class="o-drawer-stub" :data-open="open"><slot name="header" /><slot /><slot name="footer" /></div>',
+    '<div class="o-dialog-stub" :data-open="open"><slot name="header" /><slot /><slot name="footer" /></div>',
   props: [
     "open",
     "size",
@@ -110,7 +110,7 @@ describe("AddStream", () => {
 
   const globalStubs = {
     StreamFieldInputs: true,
-    ODrawer: ODrawerStub,
+    ODialog: ODialogStub,
     OForm: OFormStub,
   };
 
@@ -139,7 +139,7 @@ describe("AddStream", () => {
     it("should render ODrawer with localized title and button labels", async () => {
       const wrapper = mountComp();
       await flushPromises();
-      const drawer = wrapper.findComponent(ODrawerStub);
+      const drawer = wrapper.findComponent(ODialogStub);
       expect(drawer.exists()).toBe(true);
       expect(drawer.props("title")).toBeTruthy();
       expect(drawer.props("secondaryButtonLabel")).toBeTruthy();
@@ -149,14 +149,14 @@ describe("AddStream", () => {
     it("should pass through the open prop to ODrawer", async () => {
       const wrapper = mountComp(undefined, { open: true });
       await flushPromises();
-      const drawer = wrapper.findComponent(ODrawerStub);
+      const drawer = wrapper.findComponent(ODialogStub);
       expect(drawer.props("open")).toBe(true);
     });
 
     it("should pass open=false to ODrawer when closed", async () => {
       const wrapper = mountComp(undefined, { open: false });
       await flushPromises();
-      const drawer = wrapper.findComponent(ODrawerStub);
+      const drawer = wrapper.findComponent(ODialogStub);
       expect(drawer.props("open")).toBe(false);
     });
 
@@ -184,7 +184,7 @@ describe("AddStream", () => {
       await flushPromises();
 
       // Pipeline mode should not have ODrawer
-      const drawer = wrapper.findComponent(ODrawerStub);
+      const drawer = wrapper.findComponent(ODialogStub);
       expect(drawer.exists()).toBe(false);
 
       // Pipeline mode should have inputs
@@ -209,7 +209,7 @@ describe("AddStream", () => {
     it("should emit update:open=false when Cancel button is clicked", async () => {
       const wrapper = mountComp();
       await flushPromises();
-      const drawer = wrapper.findComponent(ODrawerStub);
+      const drawer = wrapper.findComponent(ODialogStub);
       await drawer.vm.$emit("click:secondary");
       expect(wrapper.emitted("update:open")).toBeTruthy();
       expect(wrapper.emitted("update:open")!.at(-1)).toEqual([false]);
@@ -218,7 +218,7 @@ describe("AddStream", () => {
     it("should propagate ODrawer's update:open event to parent", async () => {
       const wrapper = mountComp();
       await flushPromises();
-      const drawer = wrapper.findComponent(ODrawerStub);
+      const drawer = wrapper.findComponent(ODialogStub);
       await drawer.vm.$emit("update:open", false);
       expect(wrapper.emitted("update:open")).toBeTruthy();
       expect(wrapper.emitted("update:open")!.at(-1)).toEqual([false]);
@@ -229,7 +229,7 @@ describe("AddStream", () => {
       await flushPromises();
 
       // In drawer mode, Save is wired to ODrawer's click:primary event
-      const drawer = wrapper.findComponent(ODrawerStub);
+      const drawer = wrapper.findComponent(ODialogStub);
       await drawer.vm.$emit("click:primary");
       await flushPromises();
 
@@ -407,13 +407,13 @@ describe("AddStream", () => {
       await flushPromises();
 
       const vm = wrapper.vm as any;
-      vm.streamInputs.name = "test-stream";
+      vm.streamInputs.name = "test_stream";
       vm.streamInputs.stream_type = "logs";
 
       await vm.saveStream();
       await flushPromises();
 
-      expect(mockGetStream).toHaveBeenCalledWith("test-stream", "logs", false);
+      expect(mockGetStream).toHaveBeenCalledWith("test_stream", "logs", false);
     });
 
     it("should not call createStream if stream already exists", async () => {
@@ -440,7 +440,7 @@ describe("AddStream", () => {
       await flushPromises();
 
       const vm = wrapper.vm as any;
-      vm.streamInputs.name = "new-stream";
+      vm.streamInputs.name = "new_stream";
       vm.streamInputs.stream_type = "logs";
 
       await vm.saveStream();
@@ -458,7 +458,7 @@ describe("AddStream", () => {
       await flushPromises();
 
       const vm = wrapper.vm as any;
-      vm.streamInputs.name = "new-stream";
+      vm.streamInputs.name = "new_stream";
       vm.streamInputs.stream_type = "logs";
 
       await vm.saveStream();
@@ -525,7 +525,7 @@ describe("AddStream", () => {
       await flushPromises();
 
       const vm = wrapper.vm as any;
-      vm.streamInputs.name = "new-stream";
+      vm.streamInputs.name = "new_stream";
       vm.streamInputs.stream_type = "logs";
 
       await vm.saveStream();
@@ -543,7 +543,7 @@ describe("AddStream", () => {
       await flushPromises();
 
       const vm = wrapper.vm as any;
-      vm.streamInputs.name = "test-stream";
+      vm.streamInputs.name = "test_stream";
       vm.streamInputs.stream_type = "logs";
 
       await vm.submitForm();
@@ -594,12 +594,12 @@ describe("AddStream", () => {
       // Simulate OInput emitting update:modelValue (as it does on user input)
       const oInputs = wrapper.findAllComponents({ name: "OInput" });
       expect(oInputs.length).toBeGreaterThanOrEqual(1);
-      await oInputs[0].vm.$emit("update:modelValue", "updated-name");
+      await oInputs[0].vm.$emit("update:modelValue", "updated_name");
       await flushPromises();
 
       // v-model setter should update streamInputs.name
-      expect(vm.streamInputs.name).toBe("updated-name");
-      // @update:model-value handler should clear the error
+      expect(vm.streamInputs.name).toBe("updated_name");
+      // @update:model-value handler validates and clears the error for a valid name
       expect(vm.nameError).toBe("");
     });
 
@@ -613,10 +613,10 @@ describe("AddStream", () => {
 
       const oInputs = wrapper.findAllComponents({ name: "OInput" });
       expect(oInputs.length).toBeGreaterThanOrEqual(1);
-      await oInputs[0].vm.$emit("update:modelValue", "pipeline-name");
+      await oInputs[0].vm.$emit("update:modelValue", "pipeline_name");
       await flushPromises();
 
-      expect(vm.streamInputs.name).toBe("pipeline-name");
+      expect(vm.streamInputs.name).toBe("pipeline_name");
       expect(vm.nameError).toBe("");
     });
 

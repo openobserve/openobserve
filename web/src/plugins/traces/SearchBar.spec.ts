@@ -116,7 +116,6 @@ const makeSearchObj = () =>
         | "spans"
         | "service-graph"
         | "services-catalog",
-      showErrorOnly: false,
       queryEditorPlaceholderFlag: true,
       metricsRangeFilters: new Map<
         string,
@@ -298,8 +297,8 @@ const sharedStubs = {
   },
   SyntaxGuide: {
     template:
-      '<div data-test="logs-search-bar-sql-mode-toggle-btn" class="syntax-guide-stub" />',
-    props: ["sqlmode"],
+      '<div data-test="traces-search-bar-syntax-guide-btn" class="syntax-guide-stub" />',
+    props: ["sqlmode", "menuItem"],
   },
   ShareButton: {
     template:
@@ -638,7 +637,7 @@ describe("SearchBar", () => {
 
   // -------------------------------------------------------------------------
   describe("error-only toggle", () => {
-    it("should render the error-only toggle", async () => {
+    it("should not render the error-only toggle in SearchBar (moved to SearchResult)", async () => {
       wrapper = mountSearchBar();
       await flushPromises();
 
@@ -646,7 +645,7 @@ describe("SearchBar", () => {
         wrapper
           .find('[data-test="traces-search-bar-error-only-toggle-btn"]')
           .exists(),
-      ).toBe(true);
+      ).toBe(false);
     });
 
     it("should emit error-only-toggled with true when onErrorOnlyToggle(true) is called", async () => {
@@ -887,7 +886,7 @@ describe("SearchBar", () => {
 
       expect(
         wrapper
-          .find('[data-test="logs-search-bar-sql-mode-toggle-btn"]')
+          .find('[data-test="traces-search-bar-syntax-guide-btn"]')
           .exists(),
       ).toBe(true);
     });
@@ -979,6 +978,48 @@ describe("SearchBar", () => {
       });
 
       expect(searchObjInstance.data.datetime.startTime).toBe(originalStart);
+    });
+
+    it("should emit searchdata on a user-driven relative date change in live mode", async () => {
+      store.state.zoConfig = { auto_query_enabled: true };
+      searchObjInstance.meta.liveMode = true;
+
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      // Control `prev` so isDatetimeChanged() is true for the "1h" change.
+      searchObjInstance.data.datetime.relativeTimePeriod = "15m";
+
+      await (wrapper.vm as any).updateDateTime({
+        startTime: 0,
+        endTime: 0,
+        relativeTimePeriod: "1h",
+        valueType: "relative",
+        userChangedValue: true,
+      });
+
+      expect(wrapper.emitted("searchdata")).toBeTruthy();
+      expect(wrapper.emitted("searchdata")).toHaveLength(1);
+    });
+
+    it("should NOT emit searchdata for a programmatic date change (userChangedValue false) in live mode", async () => {
+      store.state.zoConfig = { auto_query_enabled: true };
+      searchObjInstance.meta.liveMode = true;
+
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      searchObjInstance.data.datetime.relativeTimePeriod = "15m";
+
+      await (wrapper.vm as any).updateDateTime({
+        startTime: 0,
+        endTime: 0,
+        relativeTimePeriod: "1h",
+        valueType: "relative",
+        userChangedValue: false,
+      });
+
+      expect(wrapper.emitted("searchdata")).toBeFalsy();
     });
   });
 
@@ -1233,33 +1274,6 @@ describe("SearchBar", () => {
       (wrapper.vm as any).refreshTimeChange({ value: 60, label: "1 min" });
 
       expect((wrapper.vm as any).btnRefreshInterval).toBe(false);
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // [auto-generated] updateQuery
-  // -------------------------------------------------------------------------
-  describe("updateQuery", () => {
-    it("should call queryEditorRef.setValue with searchObj.data.query", async () => {
-      wrapper = mountSearchBar();
-      await flushPromises();
-
-      const mockSetValue = vi.fn();
-      (wrapper.vm as any).queryEditorRef = { setValue: mockSetValue };
-      searchObjInstance.data.query = "SELECT trace_id FROM default";
-
-      (wrapper.vm as any).updateQuery();
-
-      expect(mockSetValue).toHaveBeenCalledWith("SELECT trace_id FROM default");
-    });
-
-    it("should not throw when queryEditorRef is null", async () => {
-      wrapper = mountSearchBar();
-      await flushPromises();
-
-      (wrapper.vm as any).queryEditorRef = null;
-
-      expect(() => (wrapper.vm as any).updateQuery()).not.toThrow();
     });
   });
 

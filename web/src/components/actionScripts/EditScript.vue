@@ -61,11 +61,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="create-report-form"
           >
             <div
-              data-test="add-action-script-name-input"
+              data-test="add-action-script-name-input-wrapper"
               class="report-name-input"
               style="padding-top: 12px"
             >
               <OInput
+                data-test="add-action-script-name-input"
                 v-model.trim="formData.name"
                 :label="t('alerts.name') + ' *'"
                 class="showLabelOnTop"
@@ -285,7 +286,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :readonly="isEditingActionScript"
                         />
                       </div>
-                      <div class="tw:flex">
+                      <div class="tw:flex tw:pt-2.75">
                         <OSelect
                           data-test="add-action-script-timezone-select"
                           v-model="formData.timezone"

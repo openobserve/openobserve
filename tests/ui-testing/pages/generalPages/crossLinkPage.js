@@ -37,7 +37,7 @@ export class CrossLinkPage {
         this.schemaUpdateSettingsBtn = '[data-test="schema-update-settings-button"]';
 
         // Organization Settings page selectors
-        this.settingsMenuItem = '[data-test="menu-link-settings-item"]';
+        this.settingsMenuItem = '[data-test="menu-link-/settings-item"]';
         this.orgSettingsSaveBtn = '[data-test="add-alert-submit-btn"]';
 
         // Logs result-table expand toggle — kept as a Locator class member so
@@ -207,10 +207,10 @@ export class CrossLinkPage {
 
     async fillFieldInput(fieldName) {
         testLogger.debug('Filling field input', { fieldName });
-        // CrossLinkDialog renders the field-name capture as an OCombobox.
-        // OCombobox forwards the consumer data-test onto the inner <input> as
-        // `${parent}-input`, which is the real fillable target.
-        const inputField = this.page.locator('[data-test="cross-link-field-input-input"]');
+        // CrossLinkDialog renders OCombobox (streams, with suggestions) or OInput
+        // (org-level, no suggestions). OCombobox inner input uses the `-input` suffix;
+        // OInput uses `-field`. Match whichever is present.
+        const inputField = this.page.locator('[data-test="cross-link-field-input-input"], [data-test="cross-link-field-input-field"]');
         await inputField.waitFor({ state: 'visible', timeout: 10000 });
         await inputField.click();
         await inputField.fill(fieldName);
@@ -511,7 +511,9 @@ export class CrossLinkPage {
      * the multi-stream spec used to inline.
      */
     async expandFirstLogRow() {
-        await this.firstLogRowExpand.waitFor({ state: 'visible', timeout: 15000 });
+        // The table renders after the search API responds — allow up to 30 s
+        // on CI where UNION ALL queries can be slow to return rows.
+        await this.firstLogRowExpand.waitFor({ state: 'visible', timeout: 30000 });
         await this.firstLogRowExpand.click();
         await this.page.waitForTimeout(2000);
     }
@@ -679,6 +681,16 @@ export class CrossLinkPage {
 
     async crossLinkItemDeleteBtnLocatorByIdx(idx) {
         return this.page.locator(this.crossLinkDeleteBtn(idx));
+    }
+
+    // ── Locator getters for assertions in spec files ──────────────────────────
+
+    getCrossLinkDialogLocator() {
+        return this.page.locator(this.crossLinkDialog);
+    }
+
+    getCrossLinkSaveBtnLocator() {
+        return this.page.locator(this.crossLinkSaveBtn);
     }
 
     /**

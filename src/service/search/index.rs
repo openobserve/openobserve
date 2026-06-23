@@ -21,7 +21,7 @@ use std::{
 use config::{
     INDEX_FIELD_NAME_FOR_ALL, get_config,
     meta::inverted_index::UNKNOWN_NAME,
-    utils::tantivy::{query::contains_query::ContainsQuery, tokenizer::o2_collect_search_tokens},
+    tantivy::{query::contains_query::ContainsQuery, tokenizer::o2_collect_search_tokens},
 };
 use datafusion::{
     arrow::datatypes::{DataType, SchemaRef},
@@ -193,6 +193,17 @@ impl IndexCondition {
     pub fn is_condition_all(&self) -> bool {
         self.conditions.len() == 1 && matches!(self.conditions[0], Condition::All())
     }
+
+    // use for the simple histogram RANK fast path: the single `field = value` term
+    pub fn single_equal_term(&self) -> Option<(String, String)> {
+        if self.conditions.len() == 1
+            && let Condition::Equal(field, value) = &self.conditions[0]
+        {
+            Some((field.clone(), value.clone()))
+        } else {
+            None
+        }
+    }
 }
 
 // single condition
@@ -256,7 +267,7 @@ impl Condition {
     }
 
     pub fn from_physical_expr(expr: &Arc<dyn PhysicalExpr>) -> Self {
-        if let Some(expr) = expr.as_any().downcast_ref::<BinaryExpr>() {
+        if let Some(expr) = expr.downcast_ref::<BinaryExpr>() {
             match expr.op() {
                 Operator::Eq | Operator::NotEq => {
                     let (field, value) = if is_physical_value(expr.left())
@@ -291,11 +302,11 @@ impl Condition {
                 ),
                 _ => unreachable!(),
             }
-        } else if let Some(expr) = expr.as_any().downcast_ref::<InListExpr>() {
+        } else if let Some(expr) = expr.downcast_ref::<InListExpr>() {
             let field = get_physical_column_name(expr.expr()).to_string();
             let values = expr.list().iter().map(get_physical_value).collect();
             Condition::In(field, values, expr.negated())
-        } else if let Some(expr) = expr.as_any().downcast_ref::<ScalarFunctionExpr>() {
+        } else if let Some(expr) = expr.downcast_ref::<ScalarFunctionExpr>() {
             let name = expr.name();
             match name {
                 MATCH_ALL_UDF_NAME => Condition::MatchAll(get_physical_value(&expr.args()[0])),
@@ -316,7 +327,7 @@ impl Condition {
                 }
                 _ => unreachable!(),
             }
-        } else if let Some(expr) = expr.as_any().downcast_ref::<NotExpr>() {
+        } else if let Some(expr) = expr.downcast_ref::<NotExpr>() {
             Condition::Not(Box::new(Condition::from_physical_expr(expr.arg())))
         } else {
             unreachable!()
@@ -694,9 +705,9 @@ impl Condition {
 
 // TODO: duplication with datafusion/optimizer/physical_optimizer/utils.rs
 fn is_physical_column(expr: &Arc<dyn PhysicalExpr>) -> bool {
-    if expr.as_any().downcast_ref::<Column>().is_some() {
+    if expr.downcast_ref::<Column>().is_some() {
         true
-    } else if let Some(expr) = expr.as_any().downcast_ref::<CastExpr>() {
+    } else if let Some(expr) = expr.downcast_ref::<CastExpr>() {
         is_physical_column(expr.expr())
     } else {
         false
@@ -705,9 +716,9 @@ fn is_physical_column(expr: &Arc<dyn PhysicalExpr>) -> bool {
 
 // TODO: duplication with datafusion/optimizer/physical_optimizer/utils.rs
 fn get_physical_column_name(expr: &Arc<dyn PhysicalExpr>) -> &str {
-    if let Some(expr) = expr.as_any().downcast_ref::<Column>() {
+    if let Some(expr) = expr.downcast_ref::<Column>() {
         expr.name()
-    } else if let Some(expr) = expr.as_any().downcast_ref::<CastExpr>() {
+    } else if let Some(expr) = expr.downcast_ref::<CastExpr>() {
         get_physical_column_name(expr.expr())
     } else {
         UNKNOWN_NAME
@@ -715,11 +726,11 @@ fn get_physical_column_name(expr: &Arc<dyn PhysicalExpr>) -> &str {
 }
 
 fn is_physical_value(expr: &Arc<dyn PhysicalExpr>) -> bool {
-    expr.as_any().downcast_ref::<Literal>().is_some()
+    expr.downcast_ref::<Literal>().is_some()
 }
 
 fn get_physical_value(expr: &Arc<dyn PhysicalExpr>) -> String {
-    if let Some(literal) = expr.as_any().downcast_ref::<Literal>() {
+    if let Some(literal) = expr.downcast_ref::<Literal>() {
         match literal.value() {
             ScalarValue::Boolean(Some(b)) => b.to_string(),
             ScalarValue::Int64(Some(i)) => i.to_string(),

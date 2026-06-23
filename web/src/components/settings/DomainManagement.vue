@@ -15,8 +15,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="domain_management tw:flex tw:flex-col tw:h-full">
-  <div class="tw:px-3 tw:py-3 tw:flex-1 tw:overflow-y-auto tw:pb-4">
+  <div class="domain_management">
+  <!-- Section header is provided full-width by the Settings shell. This page is a
+       CONSTRAINED section, so ConstrainedPage owns the scroll + page gutter — the
+       content just flows. (A nested h-full/overflow here can't resolve against
+       ConstrainedPage's auto-height column and only forces a premature scrollbar.) -->
+  <div>
     <!-- Claim Parser Function Selection -->
     <div class="tw:mb-6">
       <div
@@ -167,6 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       
       <div class="tw:flex tw:gap-x-2 tw:items-center">
           <OInput
+            data-test="domain-management-new-domain-input"
             v-model="newDomain"
             class="domain-input"
             @keydown.enter="addDomain"
@@ -176,6 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:model-value="domainError = ''"
           />
           <OButton
+            data-test="domain-management-add-domain-btn"
             variant="primary"
             size="sm-action"
             @click="addDomain"
@@ -200,7 +206,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="domain-card tw:mb-1"
         >
           <div class="domain-header tw:flex tw:items-center tw:justify-between tw:px-3 tw:py-2">
-          <div class="tw:text-base tw:font-bold">{{ domain.name }}</div>
+          <div
+            :data-test="`domain-management-domain-name-${domain.name}`"
+            class="tw:text-base tw:font-bold"
+          >{{ domain.name }}</div>
           <OButton
             icon-left="close"
             variant="ghost-destructive"
@@ -283,14 +292,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
   </div>
-    <!-- Action Buttons -->
-    <div class="tw:flex tw:justify-end tw:gap-2 tw:px-6 tw:py-4 tw:border-t tw:border-(--o2-border-color) tw:shrink-0 tw:bg-(--o2-bg-default)">
+    <!-- Action Buttons — flow inline at the end of the constrained column. -->
+    <div class="tw:flex tw:justify-end tw:gap-2 tw:pt-4 tw:mt-2 tw:border-t tw:border-(--o2-border-color)">
       <OButton
         variant="outline"
         size="sm-action"
         @click="resetForm"
       >{{ t('common.cancel') }}</OButton>
       <OButton
+        data-test="domain-management-save-changes-btn"
         variant="primary"
         size="sm-action"
         @click="saveChanges"

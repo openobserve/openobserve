@@ -16,158 +16,110 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="sessions-list tw:h-full! tw:flex tw:flex-col tw:bg-[var(--o2-card-bg-solid)] card-container tw:px-[0.625rem]"
+    class="sessions-list tw:h-full! tw:flex tw:flex-col tw:bg-[var(--o2-card-bg-solid)] card-container"
   >
-    <!-- Toolbar: stream selector + count pill + pagination -->
-    <div class="tw:flex tw:items-center tw:gap-2 tw:py-[0.625rem]">
-      <!-- Stream selector — hidden when there are no LLM streams (empty state is shown below) -->
-      <div
-        v-if="availableStreams.length > 0"
-        data-test="sessions-list-stream-selector"
-        class="tw:w-[14rem] tw:flex-shrink-0"
-      >
-        <OSelect
-          v-model="activeStream"
-          :options="availableStreams.map((s) => ({ label: s, value: s }))"
-          size="sm"
-          class="tw:w-[auto] tw:flex-shrink-0 tw:rounded"
-          @update:model-value="onStreamChange"
-        />
-      </div>
+    <!-- No LLM streams exist in the org at all — nothing to select, so show
+         the rich first-run empty state on its own (no table chrome). -->
+    <div
+      v-if="streamsLoaded && availableStreams.length === 0"
+      class="tw:flex-1 tw:min-h-0 tw:flex tw:items-center tw:justify-center"
+      data-test="sessions-empty-no-streams"
+    >
+      <OEmptyState size="hero" preset="no-llm-sessions" @action="onEmptyAction" />
+    </div>
 
-      <!-- Count pill -->
-      <template v-if="!loading && sessions.length > 0">
-        <div
-          class="tw:flex tw:items-center tw:gap-[0.375rem] tw:px-[0.625rem] tw:py-[0.25rem] tw:rounded tw:text-[0.75rem] tw:text-[var(--o2-text-4)] tw:bg-[var(--o2-tag-grey-1)]"
-          data-test="sessions-list-count-pill"
-        >
-          {{ t('traces.sessionsList.countPill', { count: sessions.length, total, unit: total === 1 ? t('traces.sessionsList.session') : t('traces.sessionsList.sessions') }) }}
+    <!-- Streams exist: OTable owns the whole surface — toolbar (stream filter +
+         column chooser), server-side pagination footer, column resize, and the
+         empty/error body. Rendering it unconditionally keeps the stream
+         selector reachable even when a window returns no sessions. -->
+    <OTable
+      v-else
+      :data="sessions"
+      :columns="tableColumns"
+      :loading="loading"
+      row-key="sessionId"
+      show-index
+      pagination="server"
+      :current-page="currentPage"
+      :total-count="total"
+      :page-size="rowsPerPage"
+      :page-size-options="rowsPerPageOptions"
+      :footer-title="t('traces.sessionsList.sessions')"
+      :enable-column-resize="true"
+      :persist-columns="true"
+      table-id="ai-sessions-list"
+      :default-columns="false"
+      :show-global-filter="false"
+      :frame="false"
+      width="100%"
+      class="tw:w-full tw:h-full"
+      data-test="sessions-list-table"
+      @row-click="(row: any) => handleRowClick(row)"
+      @pagination-change="onPaginationChange"
+    >
+      <!-- Toolbar: stream filter pushed to the right; OTable auto-injects the
+           column chooser immediately after it. -->
+      <template #toolbar>
+        <div class="tw:flex tw:items-center tw:justify-end tw:gap-2 tw:flex-1 tw:min-w-0">
+          <div
+            data-test="sessions-list-stream-selector"
+            class="tw:w-[14rem] tw:flex-shrink-0"
+          >
+            <OSelect
+              v-model="activeStream"
+              :label="t('traces.sessionsList.streamLabel')"
+              label-position="inside"
+              :options="availableStreams.map((s) => ({ label: s, value: s }))"
+              class="tw:w-[auto] tw:flex-shrink-0 tw:rounded"
+              @update:model-value="onStreamChange"
+            />
+          </div>
         </div>
       </template>
 
-      <!-- Pagination controls -->
-      <div
-        v-if="total > 0"
-        class="tw:flex tw:items-center tw:justify-end tw:px-[0.5rem] tw:py-[0.25rem] tw:ml-auto"
-        data-test="sessions-list-pagination-bar"
-      >
-        <OSelect
-          v-model="rowsPerPage"
-          :options="rowsPerPageOptions"
-          class="select-pagination tw:mr-[0.25rem] tw:mt-0!"
-          size="sm"
-          data-test="sessions-list-records-per-page"
-          @update:model-value="changeRowsPerPage"
+      <!-- Empty / error body — rendered inside the frame so the toolbar (and
+           thus the stream selector) stays visible. -->
+      <template #empty>
+        <EvalEmptyState
+          v-if="error && hasLoadedOnce"
+          data-test="sessions-empty-error"
+          icon="error-outline"
+          :title="t('traces.sessionsList.failedToLoad')"
+          :description="error || ''"
+          :cta-label="t('traces.sessionsList.retry')"
+          cta-data-test="sessions-empty-retry-btn"
+          @create="loadSessions()"
         />
-        <OPagination
-          v-model="currentPage"
-          :max="totalPages"
-          :max-pages="5"
-          class="float-right paginator-section tw:mt-0!"
-          data-test="sessions-list-pagination"
-          @update:model-value="changePage"
-        />
-      </div>
-    </div>
-
-    <!-- No LLM streams in this org -->
-    <div
-      v-if="streamsLoaded && availableStreams.length === 0"
-      class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:flex-1 tw:text-[var(--o2-text-secondary)] tw:text-center"
-    >
-      <OIcon name="forum" size="xl" class="tw:mb-3 tw:opacity-40" />
-      <div class="tw:text-base tw:text-[var(--o2-text-primary)] tw:mb-2">
-        {{ t('traces.sessionsList.noStreamsFound') }}
-      </div>
-      <p class="tw:text-sm tw:max-w-[30rem]">
-        {{ t('traces.sessionsList.noStreamsDescription1') }} <code>gen_ai_conversation_id</code> {{ t('traces.sessionsList.noStreamsDescription2') }}
-      </p>
-    </div>
-
-    <!-- Generic error -->
-    <div
-      v-else-if="error && hasLoadedOnce"
-      class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:flex-1 tw:text-center"
-    >
-      <OIcon
-        name="error-outline"
-        size="xl"
-        class="tw:mb-3 tw:text-[var(--o2-status-error-text)]"
-      />
-      <div class="tw:text-base tw:text-[var(--o2-text-primary)] tw:mb-2">
-        {{ t('traces.sessionsList.failedToLoad') }}
-      </div>
-      <div
-        class="tw:text-sm tw:text-[var(--o2-text-muted)] tw:mb-3 tw:max-w-[30rem]"
-      >
-        {{ error }}
-      </div>
-      <OButton variant="outline" size="sm" @click="loadSessions()">
-        {{ t('traces.sessionsList.retry') }}
-      </OButton>
-    </div>
-
-    <!-- Empty state — query succeeded but no sessions in this window -->
-    <div
-      v-else-if="hasLoadedOnce && !loading && sessions.length === 0"
-      class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:flex-1 tw:text-center"
-    >
-      <OIcon
-        name="forum"
-        size="xl"
-        class="tw:mb-3 tw:opacity-40 tw:text-[var(--o2-text-muted)]"
-      />
-      <div class="tw:text-base tw:text-[var(--o2-text-primary)] tw:mb-2">
-        {{ t('traces.sessionsList.noSessionsFound') }}
-      </div>
-      <p
-        class="tw:text-sm tw:text-[var(--o2-text-muted)] tw:max-w-[30rem]"
-      >
-        {{ t('traces.sessionsList.noSessionsDescription', { stream: activeStream }) }}
-      </p>
-    </div>
-
-    <!-- Table -->
-    <div
-      v-else
-      class="tw:w-full tw:h-auto! tw:overflow-x-auto tw:relative tw:flex-1"
-    >
-      <TenstackTable
-        class="tw:h-auto!"
-        :rows="sessions"
-        :columns="tableColumns"
-        :loading="loading"
-        :row-height="32"
-        :enable-column-reorder="true"
-        :enable-row-expand="false"
-        :enable-text-highlight="false"
-        :enable-status-bar="false"
-        :default-columns="false"
-        data-test="sessions-list-table"
-        @click:dataRow="handleRowClick"
-      >
+        <div
+          v-else
+          class="tw:flex tw:items-center tw:justify-center tw:py-12"
+          data-test="sessions-empty"
+        >
+          <OEmptyState size="hero" preset="no-llm-sessions" @action="onEmptyAction" />
+        </div>
+      </template>
         <!-- Timestamp -->
-        <template #cell-firstSeenNanos="{ item }">
+        <template #cell-firstSeenNanos="{ row }">
           <span class="tw:font-mono tw:text-[0.75rem]">
-            {{ formatTimestamp(item.firstSeenNanos) }}
+            {{ formatTimestamp(row.firstSeenNanos) }}
           </span>
         </template>
 
         <!-- Session ID -->
-        <template #cell-sessionId="{ item }">
+        <template #cell-sessionId="{ row }">
           <span class="tw:font-mono tw:text-[0.75rem]">
-            {{ shortId(item.sessionId) }}
-            <OTooltip :content="item.sessionId" />
+            {{ shortId(row.sessionId) }}
+            <OTooltip :content="row.sessionId" />
           </span>
         </template>
 
         <!-- User -->
-        <template #cell-userId="{ item }">
+        <template #cell-userId="{ row }">
           <span
-            v-if="item.userId"
+            v-if="row.userId"
             class="tw:text-[0.75rem] tw:text-[var(--o2-text-primary)] tw:truncate tw:max-w-[160px] tw:block"
           >
-            {{ item.userId }}
+            {{ row.userId }}
           </span>
           <span v-else class="tw:text-[0.75rem] tw:text-[var(--o2-text-muted)]">
             {{ t('traces.sessionsList.unknownUser') }}
@@ -175,79 +127,58 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <!-- First user message -->
-        <template #cell-firstUserMessage="{ item }">
+        <template #cell-firstUserMessage="{ row }">
           <span
-            v-if="item.firstUserMessage"
+            v-if="row.firstUserMessage"
             class="tw:text-[0.75rem] tw:text-[var(--o2-text-secondary)]"
           >
-            {{ item.firstUserMessage.length > 30 ? item.firstUserMessage.slice(0, 30) + '…' : item.firstUserMessage }}
-            <OTooltip v-if="item.firstUserMessage.length > 30" :content="item.firstUserMessage" />
+            {{ row.firstUserMessage.length > 30 ? row.firstUserMessage.slice(0, 30) + '…' : row.firstUserMessage }}
+            <OTooltip v-if="row.firstUserMessage.length > 30" :content="row.firstUserMessage" />
           </span>
           <span v-else class="tw:text-[0.75rem] tw:text-[var(--o2-text-muted)]">—</span>
         </template>
 
         <!-- Turns -->
-        <template #cell-turns="{ item }">
-          <span class="tw:text-[0.75rem]">{{ item.turns }}</span>
+        <template #cell-turns="{ row }">
+          <span class="tw:text-[0.75rem]">{{ row.turns }}</span>
         </template>
 
         <!-- Duration -->
-        <template #cell-durationNanos="{ item }">
+        <template #cell-durationNanos="{ row }">
           <span class="tw:text-[0.75rem]">
-            {{ formatDuration(item.durationNanos) }}
-            <OTooltip :content="`${item.durationNanos.toLocaleString()} ${t('traces.sessionsList.durationNs')}`" />
+            {{ formatDuration(row.durationNanos) }}
+            <OTooltip :content="`${row.durationNanos.toLocaleString()} ${t('traces.sessionsList.durationNs')}`" />
           </span>
         </template>
 
         <!-- Tokens -->
-        <template #cell-tokens="{ item }">
+        <template #cell-tokens="{ row }">
           <span class="tw:text-[0.75rem] tw:tabular-nums">
-            {{ formatTokens(item.inputTokens) }} → {{ formatTokens(item.outputTokens) }} (Σ {{ formatTokens(item.tokens) }})
-            <OTooltip :content="t('traces.sessionsList.tokenTooltip', { input: item.inputTokens.toLocaleString(), output: item.outputTokens.toLocaleString(), total: item.tokens.toLocaleString() })" />
+            {{ formatTokens(row.inputTokens) }} → {{ formatTokens(row.outputTokens) }} (Σ {{ formatTokens(row.tokens) }})
+            <OTooltip :content="t('traces.sessionsList.tokenTooltip', { input: row.inputTokens.toLocaleString(), output: row.outputTokens.toLocaleString(), total: row.tokens.toLocaleString() })" />
           </span>
         </template>
 
         <!-- Cost -->
-        <template #cell-cost="{ item }">
-          <span class="tw:text-[0.75rem]">${{ item.cost.toFixed(4) }}</span>
+        <template #cell-cost="{ row }">
+          <span class="tw:text-[0.75rem]">${{ row.cost.toFixed(4) }}</span>
         </template>
 
         <!-- Status (derived from error_count) -->
-        <template #cell-status="{ item }">
+        <template #cell-status="{ row }">
           <span
             class="tw:rounded tw:px-[0.5rem] tw:py-[0.125rem] tw:inline-flex tw:items-center tw:gap-[0.25rem] tw:w-fit tw:text-[0.7rem] tw:font-semibold tw:capitalize"
-            :class="statusBadgeClass(item.status)"
-            :data-test="`sessions-list-status-${item.sessionId}`"
+            :class="statusBadgeClass(row.status)"
+            :data-test="`sessions-list-status-${row.sessionId}`"
           >
             <span
               class="tw:w-[6px] tw:h-[6px] tw:rounded-full"
-              :class="statusDotClass(item.status)"
+              :class="statusDotClass(row.status)"
             />
-            {{ item.status }}
+            {{ row.status }}
           </span>
         </template>
-
-        <!-- Initial loading -->
-        <template #loading>
-          <div
-            data-test="sessions-list-loading"
-            class="tw:flex tw:flex-nowrap tw:items-center tw:px-2 tw:min-w-max tw:min-h-[3.25rem] tw:bg-[var(--o2-card-bg)] tw:border-b tw:border-[var(--o2-border-2)]!"
-          >
-            <OSpinner
-              size="sm"
-              class="tw:mr-[0.25rem]"
-            />
-            <span
-              class="tw:tracking-[0.03rem] tw:text-[0.85rem] tw:text-[var(--o2-text-1)] tw:font-bold"
-            >
-              {{ t('traces.sessionsList.loading') }}
-            </span>
-          </div>
-        </template>
-
-        <template #empty />
-      </TenstackTable>
-    </div>
+      </OTable>
   </div>
 </template>
 
@@ -257,15 +188,13 @@ import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { formatDate } from "@/utils/date";
 import { useI18n } from "vue-i18n";
-import TenstackTable from "@/components/TenstackTable.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
 import useStreams from "@/composables/useStreams";
 import { useSessions, type SessionRow } from "./composables/useSessions";
-import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
+import EvalEmptyState from "@/components/EvalEmptyState.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OPagination from "@/lib/navigation/Pagination/OPagination.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import {
   splitNumberWithUnit,
   splitDuration,
@@ -275,6 +204,9 @@ interface Props {
   streamName: string;
   startTime: number; // microseconds
   endTime: number; // microseconds
+  // Route to open on row click. Defaults to the Traces session-details route;
+  // the AI/LLM Sessions page passes its own route so it stays in the AI menu.
+  detailRouteName?: string;
 }
 
 const props = defineProps<Props>();
@@ -304,97 +236,124 @@ const activeStream = ref<string>(
   localStorage.getItem(STREAM_LS_KEY) || props.streamName || "",
 );
 
-// Server-side pagination state (1-indexed for q-pagination).
+// Server-side pagination state (1-indexed). OTable owns the footer controls
+// in `pagination="server"` mode and emits `pagination-change`; these refs are
+// the source of truth it reads back via `:current-page` / `:page-size`.
 const currentPage = ref(1);
 const rowsPerPage = ref(25);
 const rowsPerPageOptions = [10, 25, 50, 100];
 
-const totalPages = computed(() =>
-  total.value && rowsPerPage.value
-    ? Math.max(1, Math.ceil(total.value / rowsPerPage.value))
-    : 1,
-);
+// `instrument` is the only action id the preset emits. Send the user to
+// the in-app AI integrations page (the closest "set this up" surface) so
+// they don't have to leave the product to find the OpenTelemetry guide.
+function onEmptyAction(id?: string) {
+  if (id !== "instrument") return;
+  router.push({
+    name: "ai-integrations",
+    query: {
+      org_identifier: store.state.selectedOrganization?.identifier,
+    },
+  });
+}
 
-watch(totalPages, (n) => {
-  // Clamp the page when the total shrinks (e.g. after a re-fetch with
-  // fewer matches than before).
-  if (currentPage.value > n) currentPage.value = n;
+// Clamp the page when the total shrinks (e.g. a re-fetch returns fewer
+// matches than the current page offset).
+watch(total, () => {
+  const pages = Math.max(1, Math.ceil((total.value || 0) / rowsPerPage.value));
+  if (currentPage.value > pages) currentPage.value = pages;
 });
 
+// `hideable` exposes a column in OTable's auto-injected column chooser;
+// `sessionId` stays mandatory (it's the row identity). `firstUserMessage` is
+// the flex column — it fills leftover width on load and freezes on first
+// resize. All widths are user-resizable + persisted via `table-id`.
 const tableColumns = computed(() => [
   {
     id: "firstSeenNanos",
     header: t('traces.sessionsList.columns.timestamp'),
     accessorKey: "firstSeenNanos",
     size: 170,
-    enableSorting: false,
-    meta: { slot: true, align: "left" },
+    sortable: false,
+    hideable: true,
+    meta: { align: "left" },
   },
   {
     id: "sessionId",
     header: t('traces.sessionsList.columns.sessionId'),
     accessorKey: "sessionId",
     size: 160,
-    enableSorting: false,
-    meta: { slot: true, align: "left" },
+    sortable: false,
+    meta: { align: "left" },
   },
   {
     id: "userId",
     header: t('traces.sessionsList.columns.user'),
     accessorKey: "userId",
     size: 180,
-    enableSorting: false,
-    meta: { slot: true, align: "left" },
+    sortable: false,
+    hideable: true,
+    meta: { align: "left" },
   },
   {
     id: "firstUserMessage",
     header: t('traces.sessionsList.columns.firstMessage'),
     accessorKey: "firstUserMessage",
     size: 200,
-    enableSorting: false,
-    meta: { slot: true, align: "left" },
+    sortable: false,
+    hideable: true,
+    meta: { align: "left", flex: true },
   },
   {
     id: "turns",
     header: t('traces.sessionsList.columns.turns'),
     accessorKey: "turns",
     size: 90,
-    enableSorting: false,
-    meta: { slot: true, align: "center" },
+    sortable: false,
+    hideable: true,
+    meta: { align: "center" },
   },
   {
     id: "durationNanos",
     header: t('traces.sessionsList.columns.duration'),
     accessorKey: "durationNanos",
     size: 120,
-    enableSorting: false,
-    meta: { slot: true, align: "center" },
+    sortable: false,
+    hideable: true,
+    meta: { align: "center" },
   },
   {
     id: "tokens",
     header: t('traces.sessionsList.columns.tokens'),
     accessorKey: "tokens",
     size: 250,
-    enableSorting: false,
-    meta: { slot: true, align: "center" },
+    sortable: false,
+    hideable: true,
+    meta: { align: "center" },
   },
   {
     id: "cost",
     header: t('traces.sessionsList.columns.cost'),
     accessorKey: "cost",
     size: 100,
-    enableSorting: false,
-    meta: { slot: true, align: "center" },
+    sortable: false,
+    hideable: true,
+    meta: { align: "center" },
   },
   {
     id: "status",
     header: t('traces.sessionsList.columns.status'),
     accessorKey: "status",
     size: 100,
-    enableSorting: false,
-    meta: { slot: true, align: "center", disableCellAction: true },
+    sortable: false,
+    hideable: true,
+    meta: { align: "center", disableCellAction: true },
   },
-]);
+].map((c: any) => ({
+  ...c,
+  // Offer every column except the session id (row identity) in OTable's
+  // "Manage columns" chooser.
+  hideable: c.id !== "sessionId",
+})));
 
 function formatTimestamp(nanos: number): string {
   if (!nanos) return "—";
@@ -479,21 +438,23 @@ function onStreamChange() {
   loadSessions();
 }
 
-function changePage(page: number) {
-  currentPage.value = page;
-  loadSessions();
-}
-
-function changeRowsPerPage(val: number) {
-  rowsPerPage.value = val;
-  currentPage.value = 1;
+// Single handler for OTable's server pagination footer. A page-size change
+// resets to the first page (the old offset may be out of range under the new
+// size); a page click just moves to that page. Either way we re-fetch.
+function onPaginationChange({ page, size }: { page: number; size: number }) {
+  if (size !== rowsPerPage.value) {
+    rowsPerPage.value = size;
+    currentPage.value = 1;
+  } else {
+    currentPage.value = page;
+  }
   loadSessions();
 }
 
 function handleRowClick(row: SessionRow) {
   emit("sessionSelected", row);
   router.push({
-    name: "sessionDetails",
+    name: props.detailRouteName || "sessionDetails",
     query: {
       stream: activeStream.value,
       session_id: row.sessionId,
@@ -525,18 +486,3 @@ onUnmounted(() => {
   cancelAll();
 });
 </script>
-
-<style lang="scss" scoped>
-.sessions-list {
-  // Match ServicesCatalog: card surface, scoped paginator + selector
-  // styles so we inherit the global table theme from TenstackTable.
-  :deep(.paginator-section .q-btn) {
-    min-width: 1.5rem;
-    min-height: 1.5rem;
-  }
-
-  :deep(.select-pagination .q-field__control) {
-    min-height: 1.75rem;
-  }
-}
-</style>

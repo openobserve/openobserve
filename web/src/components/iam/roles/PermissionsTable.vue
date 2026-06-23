@@ -121,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #empty>
             <div v-if="level === 0" class="tw:py-16 tw:flex tw:justify-center tw:items-center">
-              <NoData />
+              <NoData :filtered="!!filter" @action="emits('update:filter', '')" />
             </div>
             <div
               v-else
@@ -144,6 +144,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { COL } from "@/lib/core/Table/OTable.types";
 import NoData from "@/components/shared/grid/NoData.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 const props = defineProps({
@@ -181,7 +182,7 @@ const props = defineProps({
   },
 });
 
-const emits = defineEmits(["updated:permission", "updated:permission-batch", "expand:row"]);
+const emits = defineEmits(["updated:permission", "updated:permission-batch", "expand:row", "update:filter"]);
 
 const { t } = useI18n();
 
@@ -211,6 +212,7 @@ const columns = computed<OTableColumnDef[]>(() => [
     header: t("quota.moduleName"),
     accessorKey: "display_name",
     sortable: true,
+    size: COL.name,
     meta: { align: "left", autoWidth: true },
   },
   {

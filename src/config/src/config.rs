@@ -18,7 +18,6 @@ use std::{
     collections::BTreeMap,
     path::{Path, PathBuf},
     sync::{Arc, LazyLock as Lazy},
-    time::Duration,
 };
 
 use arc_swap::ArcSwap;
@@ -50,7 +49,7 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 43;
+pub const DB_SCHEMA_VERSION: u64 = 45;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -338,16 +337,6 @@ pub static NATS_KV_WATCH_MODULES: Lazy<HashSet<String>> = Lazy::new(|| {
 pub static CONFIG: Lazy<ArcSwap<Config>> = Lazy::new(|| ArcSwap::from(Arc::new(init())));
 static INSTANCE_ID: Lazy<RwHashMap<String, String>> = Lazy::new(Default::default);
 
-pub static TELEMETRY_CLIENT: Lazy<segment::HttpClient> = Lazy::new(|| {
-    segment::HttpClient::new(
-        reqwest::Client::builder()
-            .connect_timeout(Duration::from_secs(10))
-            .build()
-            .unwrap(),
-        CONFIG.load().common.telemetry_url.clone(),
-    )
-});
-
 pub fn get_config() -> Arc<Config> {
     CONFIG.load().clone()
 }
@@ -595,7 +584,6 @@ pub struct Config {
     pub s3: S3,
     pub sns: Sns,
     pub prom: Prometheus,
-    pub profiling: Profiling,
     pub smtp: Smtp,
     pub rum: RUM,
     pub chrome: Chrome,
@@ -692,28 +680,6 @@ pub struct Smtp {
 }
 
 #[derive(Serialize, EnvConfig, Default)]
-pub struct Profiling {
-    #[env_config(
-        name = "ZO_PROF_PYROSCOPE_ENABLED",
-        default = false,
-        help = "Enable pyroscope profiling with pyroscope-rs"
-    )]
-    pub pyroscope_enabled: bool,
-    #[env_config(
-        name = "ZO_PROF_PYROSCOPE_SERVER_URL",
-        default = "http://localhost:4040",
-        help = "Pyroscope server URL"
-    )]
-    pub pyroscope_server_url: String,
-    #[env_config(
-        name = "ZO_PROF_PYROSCOPE_PROJECT_NAME",
-        default = "openobserve",
-        help = "Pyroscope project name"
-    )]
-    pub pyroscope_project_name: String,
-}
-
-#[derive(Serialize, EnvConfig, Default)]
 pub struct Auth {
     #[env_config(name = "ZO_ROOT_USER_EMAIL")]
     pub root_user_email: String,
@@ -753,6 +719,8 @@ pub struct Http {
     pub addr: String,
     #[env_config(name = "ZO_HTTP_IPV6_ENABLED", default = false)]
     pub ipv6_enabled: bool,
+    #[env_config(name = "ZO_HTTP_TLS_SKIP_VERIFY", default = false)]
+    pub tls_skip_verify: bool,
     #[env_config(name = "ZO_HTTP_TLS_ENABLED", default = false)]
     pub tls_enabled: bool,
     #[env_config(name = "ZO_HTTP_TLS_CERT_PATH", default = "")]
@@ -805,8 +773,8 @@ pub struct Grpc {
     pub internal_grpc_token: String,
     #[env_config(
         name = "ZO_GRPC_MAX_MESSAGE_SIZE",
-        default = 16,
-        help = "Max grpc message size in MB, default is 16 MB"
+        default = 32,
+        help = "Max grpc message size in MB, default is 32 MB"
     )]
     pub max_message_size: usize,
     #[env_config(name = "ZO_GRPC_CONNECT_TIMEOUT", default = 5)] // in seconds
@@ -888,6 +856,12 @@ pub struct Route {
     pub timeout: u64,
     #[env_config(name = "ZO_ROUTE_MAX_CONNECTIONS", default = 1024)]
     pub max_connections: usize,
+    #[env_config(
+        name = "ZO_ROUTE_MAX_RETRIES",
+        default = 2,
+        help = "Max number of other nodes the router will fail over to when a proxied request can't reach the selected node (e.g. during a restart/redeploy). 0 disables retry."
+    )]
+    pub max_retries: usize,
     #[env_config(name = "ZO_ROUTE_STRATEGY", parse, default = "workload")]
     pub dispatch_strategy: RouteDispatchStrategy,
 }
@@ -912,6 +886,19 @@ pub struct Common {
     pub meta_postgres_dsn: String, // postgres://postgres:12345678@localhost:5432/openobserve
     #[env_config(name = "ZO_META_POSTGRES_RO_DSN", default = "")]
     pub meta_postgres_ro_dsn: String, // postgres://postgres:12345678@readonly:5432/openobserve
+    // Individual connection vars — alternative to ZO_META_POSTGRES_DSN for environments
+    // where host and password must be injected separately (e.g. ECS/K8s secrets managers).
+    // Used to compose meta_postgres_dsn at startup; ignored when ZO_META_POSTGRES_DSN is set.
+    #[env_config(name = "ZO_META_POSTGRES_HOST", default = "")]
+    pub meta_postgres_host: String,
+    #[env_config(name = "ZO_META_POSTGRES_PORT", default = 5432)]
+    pub meta_postgres_port: u16,
+    #[env_config(name = "ZO_META_POSTGRES_USER", default = "")]
+    pub meta_postgres_user: String,
+    #[env_config(name = "ZO_META_POSTGRES_PASSWORD", default = "")]
+    pub meta_postgres_password: String,
+    #[env_config(name = "ZO_META_POSTGRES_DBNAME", default = "")]
+    pub meta_postgres_dbname: String,
     #[env_config(name = "ZO_META_DDL_DSN", default = "")]
     pub meta_ddl_dsn: String, // same db as meta store, but user with ddl perms
     #[env_config(name = "ZO_META_PARTITION_MODE", default = "auto")]
@@ -1039,7 +1026,7 @@ pub struct Common {
     pub feature_enrichment_broadcast_join_enabled: bool,
     #[env_config(
         name = "ZO_FEATURE_PUSHDOWN_FILTER_ENABLED",
-        default = false,
+        default = true,
         help = "Enable pushdown filter"
     )]
     pub feature_pushdown_filter_enabled: bool,
@@ -1061,6 +1048,12 @@ pub struct Common {
         help = "Skip WAL for query"
     )]
     pub feature_query_skip_wal: bool,
+    #[env_config(
+        name = "ZO_FEATURE_PARTIAL_REDUCE_ENABLED",
+        default = true,
+        help = "Enable partial reduce aggregation to reduce data transfer to the leader"
+    )]
+    pub feature_partial_reduce_enabled: bool,
     #[env_config(
         name = "ZO_FEATURE_SHARED_MEMTABLE_ENABLED",
         default = false,
@@ -1087,6 +1080,12 @@ pub struct Common {
     pub metrics_dedup_enabled: bool,
     #[env_config(name = "ZO_BLOOM_FILTER_ENABLED", default = true)]
     pub bloom_filter_enabled: bool,
+    #[env_config(
+        name = "ZO_BLOOM_FILTER_PARQUET_ENABLED",
+        default = false,
+        help = "Enable bloom filter for parquet files"
+    )]
+    pub bloom_filter_parquet_enabled: bool,
     #[env_config(name = "ZO_BLOOM_FILTER_DEFAULT_FIELDS", default = "")]
     pub bloom_filter_default_fields: String,
     #[env_config(
@@ -1176,6 +1175,8 @@ pub struct Common {
     pub print_key_event: bool,
     #[env_config(name = "ZO_PRINT_KEY_SQL", default = true)]
     pub print_key_sql: bool,
+    #[env_config(name = "ZO_PRINT_PLAN_SINGLE_LINE", default = true)]
+    pub print_plan_single_line: bool,
     // usage reporting
     #[env_config(name = "ZO_USAGE_REPORTING_ENABLED", default = false)]
     pub usage_enabled: bool,
@@ -1494,10 +1495,10 @@ pub struct Limit {
     #[env_config(name = "ZO_MAX_FILE_RETENTION_TIME", default = 600)] // seconds
     pub max_file_retention_time: u64,
     // MB, per log file size limit on disk
-    #[env_config(name = "ZO_MAX_FILE_SIZE_ON_DISK", default = 256)]
+    #[env_config(name = "ZO_MAX_FILE_SIZE_ON_DISK", default = 512)]
     pub max_file_size_on_disk: usize,
     // MB, per data file size limit in memory
-    #[env_config(name = "ZO_MAX_FILE_SIZE_IN_MEMORY", default = 256)]
+    #[env_config(name = "ZO_MAX_FILE_SIZE_IN_MEMORY", default = 512)]
     pub max_file_size_in_memory: usize,
     #[deprecated(
         since = "0.14.1",
@@ -1536,7 +1537,7 @@ pub struct Limit {
     pub wal_write_buffer_size: usize,
     #[env_config(name = "ZO_WAL_WRITE_QUEUE_SIZE", default = 10000)] // 10k messages
     pub wal_write_queue_size: usize,
-    #[env_config(name = "ZO_FILE_PUSH_INTERVAL", default = 10)] // seconds
+    #[env_config(name = "ZO_FILE_PUSH_INTERVAL", default = 2)] // seconds
     pub file_push_interval: u64,
     #[env_config(name = "ZO_FILE_PUSH_LIMIT", default = 0)] // files
     pub file_push_limit: usize,
@@ -1820,6 +1821,12 @@ pub struct Limit {
     )]
     pub inverted_index_skip_threshold: usize,
     #[env_config(
+        name = "ZO_INVERTED_INDEX_TOPN_MAX_GROUP_NUM",
+        default = 1000,
+        help = "For top-n group by queries, a file with up to N distinct groups returns all of them, making its contribution to the merged result exact. Files with more groups keep only the limit-derived top-k and the merged top-n becomes approximate; raise to trade speed for accuracy."
+    )]
+    pub inverted_index_topn_max_group_num: usize,
+    #[env_config(
         name = "ZO_INVERTED_INDEX_MIN_TOKEN_LENGTH",
         default = 2,
         help = "Minimum length of a token in the inverted index."
@@ -1867,6 +1874,12 @@ pub struct Limit {
         default = true
     )]
     pub histogram_enabled: bool,
+    #[env_config(
+        name = "ZO_TIMECHART_ENABLED",
+        help = "Show timechart tab on logs page",
+        default = false
+    )]
+    pub timechart_enabled: bool,
     #[env_config(
         name = "ZO_HISTOGRAM_BREAKDOWN_FIELDS",
         help = "Comma-separated ordered list of stream fields used for stacked histogram breakdown. First match wins. Default: severity,log_level,level,status",
@@ -2625,11 +2638,7 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
     // HACK for move_file_thread_num equal to CPU core
     if cfg.limit.file_move_thread_num == 0 {
-        if cfg.common.local_mode {
-            cfg.limit.file_move_thread_num = std::cmp::max(1, cpu_num / 2);
-        } else {
-            cfg.limit.file_move_thread_num = cpu_num;
-        }
+        cfg.limit.file_move_thread_num = cpu_num;
     }
     // HACK for file_merge_thread_num equal to CPU core
     if cfg.limit.file_merge_thread_num == 0 {
@@ -2758,13 +2767,13 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
     // check max_file_size_on_disk to MB
     if cfg.limit.max_file_size_on_disk == 0 {
-        cfg.limit.max_file_size_on_disk = 256 * 1024 * 1024; // 256MB
+        cfg.limit.max_file_size_on_disk = 512 * 1024 * 1024; // 512MB
     } else {
         cfg.limit.max_file_size_on_disk *= 1024 * 1024;
     }
     // check max_file_size_in_memory to MB
     if cfg.limit.max_file_size_in_memory == 0 {
-        cfg.limit.max_file_size_in_memory = 256 * 1024 * 1024; // 256MB
+        cfg.limit.max_file_size_in_memory = 512 * 1024 * 1024; // 512MB
     } else {
         cfg.limit.max_file_size_in_memory *= 1024 * 1024;
     }
@@ -2859,9 +2868,30 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         ));
     }
     if cfg.common.meta_store.starts_with("postgres") && cfg.common.meta_postgres_dsn.is_empty() {
-        return Err(anyhow::anyhow!(
-            "Meta store is PostgreSQL, you must set ZO_META_POSTGRES_DSN"
-        ));
+        let c = &cfg.common;
+        if c.meta_postgres_host.is_empty()
+            || c.meta_postgres_user.is_empty()
+            || c.meta_postgres_password.is_empty()
+            || c.meta_postgres_dbname.is_empty()
+        {
+            return Err(anyhow::anyhow!(
+                "Meta store is PostgreSQL, you must set either ZO_META_POSTGRES_DSN or all of \
+                 ZO_META_POSTGRES_HOST, ZO_META_POSTGRES_USER, ZO_META_POSTGRES_PASSWORD, \
+                 ZO_META_POSTGRES_DBNAME"
+            ));
+        }
+        // Compose the DSN from the individual vars. User, password and dbname are
+        // percent-encoded so credentials with special characters survive the round
+        // trip — sqlx percent-decodes them again when it parses the DSN.
+        let dsn = format!(
+            "postgres://{}:{}@{}:{}/{}",
+            urlencoding::encode(&c.meta_postgres_user),
+            urlencoding::encode(&c.meta_postgres_password),
+            c.meta_postgres_host,
+            c.meta_postgres_port,
+            urlencoding::encode(&c.meta_postgres_dbname),
+        );
+        cfg.common.meta_postgres_dsn = dsn;
     }
 
     if cfg.common.meta_store.starts_with("mysql") {
@@ -3307,16 +3337,17 @@ fn check_compact_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.compact.old_data_min_files < 1 {
         cfg.compact.old_data_min_files = 10;
     }
-
     if cfg.compact.file_list_deleted_batch_size == 0 {
         cfg.compact.file_list_deleted_batch_size = 1000;
     }
-
     if cfg.compact.batch_size < 1 {
         cfg.compact.batch_size = 100;
     }
     if cfg.compact.pending_jobs_metric_interval == 0 {
         cfg.compact.pending_jobs_metric_interval = 300;
+    }
+    if !cfg.compact.fast_mode && cfg.common.local_mode {
+        cfg.compact.fast_mode = true;
     }
 
     Ok(())

@@ -12,8 +12,8 @@ export class UserPage {
         this.iamPageMenu = page.locator('[data-test="menu-link-\\/iam-item"]');
         this.iamUsersTab = page.locator('[data-test="iam-users-tab"]');
         this.iamPage = page.locator('[data-test="iam-page"]');
-        // NoData empty-state cell rendered inside the OTable empty slot.
-        this.noDataMessage = page.locator('[data-test="no-data-message"]');
+        // Empty-state rendered inside the OTable empty slot.
+        this.noDataMessage = page.locator('[data-test="o2-empty-state"]');
 
         // ===========================================================
         // Add / edit user form (drawer rendered by AddUser.vue)
@@ -28,8 +28,10 @@ export class UserPage {
         this.userNewPasswordFieldInput = page.locator('[data-test="user-new-password-field-field"]');
         // OSelect role trigger + popover option (data-test-value keys to the role value)
         this.userRoleField = page.locator('[data-test="user-role-field"]');
-        this.saveUserButton = page.locator('[data-test="save-user-button"]');
-        this.cancelUserButton = page.locator('[data-test="cancel-user-button"]');
+        // Add/Edit user dialog footer uses ODialog's built-in primary/secondary
+        // buttons; scope to the dialog so they don't collide with other dialogs' btns.
+        this.saveUserButton = page.locator('[data-test="add-user-dialog"] [data-test="o-dialog-primary-btn"]');
+        this.cancelUserButton = page.locator('[data-test="add-user-dialog"] [data-test="o-dialog-secondary-btn"]');
         // Change-password toggle in edit mode
         this.userChangePasswordToggle = page.locator('[data-test="user-change-password-field"]');
 
@@ -42,7 +44,7 @@ export class UserPage {
         // ===========================================================
         // List view — search input (OInput wrapper / inner field)
         // ===========================================================
-        this.iamUsersSearchInput = page.locator('[data-test="iam-users-search-input-field"]');
+        this.iamUsersSearchInput = page.locator('[data-test="user-list-search-input-field"]');
 
         // ===========================================================
         // Feedback surfaces — OToast and OInput inline error
@@ -63,7 +65,7 @@ export class UserPage {
         // so a blank org-name keeps Save in a disabled state instead of
         // surfacing an inline error from onSubmit.
         this.addOrgDrawerSaveButton = page.locator(
-            '[data-test="add-update-organization-dialog"] [data-test="o-drawer-primary-btn"]'
+            '[data-test="add-update-organization-dialog"] [data-test="o-dialog-primary-btn"]'
         );
 
         // OTable rows — used by searchUser / verifyUserExists poll loops.
@@ -253,9 +255,7 @@ export class UserPage {
     }
 
     async verifyUserNotExists() {
-
-        await expect(this.iamPage).toContainText('No data available');
-
+        await expect(this.page.locator('[data-test="o2-empty-state"]')).toBeVisible();
     }
 
     async verifyUserExists(email) {

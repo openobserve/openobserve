@@ -25,20 +25,23 @@
   --color-button-primary-focus-ring: var(--color-primary-400);
 
   /* Button — secondary */
-  --color-button-secondary: var(--color-surface-panel);
+  --o2-secondary-btn-bg: var(--color-surface-panel);
+  --o2-secondary-btn-text: var(--color-text-primary);
+  --o2-secondary-btn-border: var(--color-border-subtle, #e5e7eb);
+  --color-button-secondary: var(--o2-secondary-btn-bg);
   --color-button-secondary-hover: var(--color-primary-50);
   --color-button-secondary-active: var(--color-primary-100);
   --color-button-secondary-disabled: var(--color-surface-panel);
-  --color-button-secondary-foreground: var(--color-text-primary);
+  --color-button-secondary-foreground: var(--o2-secondary-btn-text);
   --color-button-secondary-focus-ring: var(--color-primary-400);
 
   /* Button — outline */
   --color-button-outline-text: var(--color-text-primary);
-  --color-button-outline-border: var(--color-primary-300);
+  --color-button-outline-border: var(--color-border-default);
   --color-button-outline-hover-bg: var(--o2-hover-accent);
-  --color-button-outline-hover-border: var(--color-primary-400);
+  --color-button-outline-hover-border: var(--color-primary-300);
   --color-button-outline-active-bg: var(--color-primary-100);
-  --color-button-outline-focus-ring: var(--color-primary-400);
+  --color-button-outline-focus-ring: var(--color-primary-200);
 
   /* Button — ghost */
   --color-button-ghost-text: var(--color-text-primary);
@@ -155,9 +158,9 @@
   --color-tabs-indicator: var(--color-primary-600);
   --color-tabs-active-text: var(--color-primary-600);
   --color-tabs-active-bg: var(--color-primary-100);
-  --color-tabs-inactive-text: var(--color-text-primary);
+  --color-tabs-inactive-text: var(--color-text-heading);
   --color-tabs-hover-text: var(--color-text-primary);
-  --color-tabs-hover-bg: var(--color-primary-50);
+  --color-tabs-hover-bg: color-mix(in srgb, var(--color-primary-100) 50%, var(--color-primary-50));
   --color-tabs-disabled-text: var(--color-text-disabled);
   --color-tabs-bar-border: var(--color-border-default);
   --color-tabs-focus-ring: var(--color-primary-400);
@@ -172,19 +175,19 @@
   --color-collapsible-label: var(--color-text-primary);
   --color-collapsible-caption: var(--color-text-secondary);
   --color-collapsible-icon: var(--color-text-secondary);
-  --color-collapsible-trigger-hover-bg: var(--color-primary-50);
+  --color-collapsible-trigger-hover-bg: var(--color-primary-100);
   --color-collapsible-trigger-active-bg: var(--color-primary-100);
   --color-collapsible-trigger-focus-ring: var(--color-primary-400);
 
   /* OFieldList / OFieldRow / OFieldLabel */
   --color-field-list-row-hover-bg:     var(--color-primary-100);
   --color-field-list-group-text:       var(--color-text-secondary);
-  --color-field-list-label-text:       var(--color-text-primary);
-  --color-field-list-label-icon:       var(--color-text-muted);
-  --color-field-list-drag-icon:        var(--color-text-muted);
-  --color-field-list-expand-icon:      var(--color-text-muted);
+  --color-field-list-label-text:       var(--color-grey-text-primary);
+  --color-field-list-label-icon:       var(--color-text-secondary);
+  --color-field-list-drag-icon:        var(--color-text-secondary);
+  --color-field-list-expand-icon:      var(--color-text-secondary);
   --color-field-list-empty-text:       var(--color-text-muted);
-  --color-field-list-actions-bg:       var(--color-surface-panel);
+  --color-field-list-actions-bg:       var(--color-primary-100);
   --color-field-list-actions-border:   var(--color-border-default);
   --color-field-list-expansion-bg:     var(--color-surface-subtle);
   --color-field-list-expansion-border: var(--color-border-default);
@@ -288,28 +291,90 @@
   --color-badge-purple-ol-border: var(--color-purple-600);
   --color-badge-purple-ol-text:   var(--color-purple-700);
 
+  /* Badge — teal */
+  --color-badge-teal-solid-bg: var(--color-teal-600);
+  --color-badge-teal-solid-text: var(--color-white);
+  --color-badge-teal-ol-border: var(--color-teal-500);
+  --color-badge-teal-ol-text: var(--color-teal-700);
+  --color-badge-teal-soft-bg: var(--color-teal-50);
+  --color-badge-teal-soft-text: var(--color-teal-700);
+
+  /* Badge — orange */
+  --color-badge-orange-solid-bg: var(--color-orange-600);
+  --color-badge-orange-solid-text: var(--color-white);
+  --color-badge-orange-ol-border: var(--color-orange-500);
+  --color-badge-orange-ol-text: var(--color-orange-700);
+  --color-badge-orange-soft-bg: var(--color-orange-50);
+  --color-badge-orange-soft-text: var(--color-orange-700);
+
+  /* Badge — lime */
+  --color-badge-lime-solid-bg: var(--color-lime-600);
+  --color-badge-lime-solid-text: var(--color-white);
+  --color-badge-lime-ol-border: var(--color-lime-500);
+  --color-badge-lime-ol-text: var(--color-lime-700);
+  --color-badge-lime-soft-bg: var(--color-lime-50);
+  --color-badge-lime-soft-text: var(--color-lime-700);
+
+  /* Badge — amber */
+  --color-badge-amber-solid-bg: var(--color-amber-600);
+  --color-badge-amber-solid-text: var(--color-white);
+  --color-badge-amber-ol-border: var(--color-amber-500);
+  --color-badge-amber-ol-text: var(--color-amber-700);
+  --color-badge-amber-soft-bg: var(--color-amber-50);
+  --color-badge-amber-soft-text: var(--color-amber-700);
+
+  /* Badge — cyan */
+  --color-badge-cyan-solid-bg: var(--color-cyan-600);
+  --color-badge-cyan-solid-text: var(--color-white);
+  --color-badge-cyan-ol-border: var(--color-cyan-500);
+  --color-badge-cyan-ol-text: var(--color-cyan-700);
+  --color-badge-cyan-soft-bg: var(--color-cyan-50);
+  --color-badge-cyan-soft-text: var(--color-cyan-700);
+
+  /* Badge — blue */
+  --color-badge-blue-solid-bg: var(--color-blue-600);
+  --color-badge-blue-solid-text: var(--color-white);
+  --color-badge-blue-ol-border: var(--color-blue-500);
+  --color-badge-blue-ol-text: var(--color-blue-700);
+  --color-badge-blue-soft-bg: var(--color-blue-50);
+  --color-badge-blue-soft-text: var(--color-blue-700);
+
+  /* Badge — purple (solid/soft variants for correlation) */
+  --color-badge-purple-solid-bg: var(--color-purple-600);
+  --color-badge-purple-solid-text: var(--color-white);
+  --color-badge-purple-soft-bg: var(--color-purple-50);
+  --color-badge-purple-soft-text: var(--color-purple-700);
+
+  /* Badge — indigo */
+  --color-badge-indigo-solid-bg: var(--color-indigo-600);
+  --color-badge-indigo-solid-text: var(--color-white);
+  --color-badge-indigo-ol-border: var(--color-indigo-500);
+  --color-badge-indigo-ol-text: var(--color-indigo-700);
+  --color-badge-indigo-soft-bg: var(--color-indigo-50);
+  --color-badge-indigo-soft-text: var(--color-indigo-700);
+
   /* Badge — shared */
   --color-badge-focus-ring: var(--color-primary-400);
 
   /* ── Toast ─────────────────────────────────────────────── */
   /* success */
-  --color-toast-success-bg:     var(--color-success-100);
+  --color-toast-success-bg:     var(--color-success-50);
   --color-toast-success-border: var(--color-success-500);
   --color-toast-success-icon:   var(--color-success-700);
 
   /* error */
-  --color-toast-error-bg:       var(--color-error-100);
+  --color-toast-error-bg:       var(--color-error-50);
   --color-toast-error-border:   var(--color-error-400);
   --color-toast-error-icon:     var(--color-error-600);
 
   /* warning */
-  --color-toast-warning-bg:     var(--color-warning-100);
+  --color-toast-warning-bg:     var(--color-warning-50);
   --color-toast-warning-border: var(--color-warning-400);
   --color-toast-warning-icon:   var(--color-warning-600);
 
   /* info */
-  --color-toast-info-bg:        var(--color-primary-100);
-  --color-toast-info-border:    var(--color-primary-400);
+  --color-toast-info-bg:        var(--color-primary-50);
+  --color-toast-info-border:    var(--color-primary-300);
   --color-toast-info-icon:      var(--color-primary-600);
 
   /* loading / default */
@@ -334,10 +399,9 @@
   --color-inner-loading-overlay: color-mix(in srgb, var(--color-surface-base) 70%, transparent);
   --color-inner-loading-label: var(--color-text-secondary);
 
-  /* Skeleton — flat base with a separate translucent shimmer overlay.
-     shimmer uses rgba so it works as a gloss on top of any base colour. */
-  --color-skeleton-base: var(--color-grey-100);
-  --color-skeleton-shimmer: rgba(255, 255, 255, 0.8);
+  /* Skeleton */
+  --color-skeleton-base: var(--color-grey-200);
+  --color-skeleton-highlight: var(--color-grey-100);
 
   /* ProgressBar */
   --color-progress-bar-default: var(--color-primary-600);
@@ -378,14 +442,17 @@
 
   /* Input (OInput, OTextarea) */
   --color-input-bg: var(--color-surface-base);
-  --color-input-border: var(--color-border-strong);
-  --color-input-border-hover: var(--color-primary-400);
-  --color-input-border-focus: var(--color-primary-500);
+  --color-input-border: var(--color-border-default);
+  --color-input-border-hover: var(--color-primary-300);
+  --color-input-border-focus: var(--color-primary-300);
   --color-input-border-error: var(--color-error-500);
-  --color-input-disabled-bg: var(--color-surface-subtle);
+  /* Disabled-bg uses grey-200 (#e5e5e5) — `surface-subtle` (grey-100 #f5f5f5)
+     was almost identical to the enabled white bg in light mode, making
+     disabled fields visually indistinguishable from enabled ones. */
+  --color-input-disabled-bg: var(--color-grey-200);
   --color-input-disabled-border: var(--color-border-default);
   --color-input-disabled-text: var(--color-text-secondary);
-  --color-input-focus-ring: var(--color-primary-400);
+  --color-input-focus-ring: var(--color-primary-200);
   --color-input-text: var(--color-text-primary);
   --color-input-placeholder: var(--color-text-disabled);
   /* Labels were resolving to text-secondary which is the same muted grey
@@ -395,20 +462,22 @@
   --color-input-hint: var(--color-text-secondary);
   --color-input-help-text: var(--color-text-secondary);
   --color-input-error-text: var(--color-error-600);
+  --color-input-addon-bg: var(--color-surface-panel);
   --color-input-addon-text: var(--color-text-secondary);
   --color-input-clear-btn: var(--color-text-secondary);
   --color-input-clear-btn-hover: var(--color-text-primary);
 
   /* Select (OSelect) */
   --color-select-bg: var(--color-surface-base);
-  --color-select-border: var(--color-border-strong);
-  --color-select-border-hover: var(--color-primary-400);
-  --color-select-border-focus: var(--color-primary-500);
+  --color-select-border: var(--color-border-default);
+  --color-select-border-hover: var(--color-primary-300);
+  --color-select-border-focus: var(--color-primary-300);
   --color-select-border-error: var(--color-error-500);
-  --color-select-disabled-bg: var(--color-surface-subtle);
+  /* Same rationale as input-disabled-bg. */
+  --color-select-disabled-bg: var(--color-grey-200);
   --color-select-disabled-text: var(--color-text-secondary);
-  --color-select-focus-ring: var(--color-primary-400);
-  --color-select-text: var(--color-text-primary);
+  --color-select-focus-ring: var(--color-primary-200);
+  --color-select-text: var(--color-text-soft);
   --color-select-placeholder: var(--color-text-disabled);
   /* Select labels were grey (text-secondary) — same fix as input-label. */
   --color-select-label: var(--color-text-primary);
@@ -499,8 +568,7 @@
 
   /* Date / Time / Color (ODate, OTime, OColor) — share input surface */
   --color-datepicker-bg: var(--color-surface-base);
-  --color-datepicker-border: var(--color-border-default);
-  --color-datepicker-inner-border: var(--color-grey-100);
+  --color-datepicker-border: var(--color-border-strong);
   --color-datepicker-hover-border: var(--color-primary-400);
   --color-datepicker-focus-border: var(--color-primary-500);
   --color-datepicker-focus-ring: var(--color-primary-400);
@@ -509,7 +577,7 @@
   --color-datepicker-text: var(--color-text-primary);
   --color-datepicker-placeholder: var(--color-text-disabled);
   --color-datepicker-label: var(--color-text-secondary);
-  --color-datepicker-icon: var(--color-text-primary);
+  --color-datepicker-icon: var(--color-text-secondary);
   --color-datepicker-error-text: var(--color-error-600);
   --color-datepicker-error-border: var(--color-error-500);
   --color-datepicker-segment-focus-bg: var(--color-primary-600);
@@ -556,13 +624,18 @@
   --color-option-group-error-text: var(--color-error-600);
 
   /* OTable */
-  --color-table-header-bg: var(--color-surface-subtle);
+  /* Near-white header (prototype thead bg = --g-50 ≈ #FBFBFD): barely distinct
+     from the white body, not a grey band. */
+  --color-table-header-bg: var(--color-surface-panel);
   --color-table-header-text: var(--color-text-secondary);
   --color-table-header-border: var(--color-border-default);
   --color-table-row-hover-bg: var(--color-primary-50);
   --color-table-row-selected-bg: var(--color-primary-100);
   --color-table-row-striped-bg: var(--color-surface-subtle);
-  --color-table-row-divider: var(--color-border-default);
+  /* Row dividers use the SOFT border (HANDOFF.md §8.1): lighter than the
+     structural table outline / sticky-header underline so rows read as a calm
+     list, not a hard grid. The header underline + outer border stay default. */
+  --color-table-row-divider: var(--color-border-subtle);
   --color-table-border: var(--color-border-default);
   --color-table-cell-bg: var(--color-surface-base);
   --color-table-cell-text: var(--color-text-primary);
@@ -574,9 +647,13 @@
   --color-table-sort-icon-inactive: var(--color-text-disabled);
   --color-table-streaming-bar: var(--color-primary-500);
   --color-table-row-expanded-bg: var(--color-surface-subtle);
-  /* Row height tokens — change these to resize all OTable rows globally */
-  --table-row-height-dense: 2.25rem;   /* 36px */
-  --table-row-height-normal: 3.375rem;  /* 54px */
+  /* Subtle amber wash for warning/flagged rows (was an undefined token relying
+     on an inline rgba fallback; now token-based so it's theme-aware). */
+  --color-warning-surface: color-mix(in srgb, var(--color-warning-400) 10%, transparent);
+  /* Row height tokens — change these to resize all OTable rows globally.
+     Compact = prototype --row-h 38px. */
+  --table-row-height-dense: 2.375rem;  /* 38px (prototype compact) */
+  --table-row-height-normal: 2.75rem;  /* 44px */
 
   /* ── Banner (OBanner) ──────────────────────────────────── */
   /* default */
@@ -584,7 +661,7 @@
   --color-banner-default-text:    var(--color-grey-800);
 
   /* info */
-  --color-banner-info-bg:         var(--color-info-50);
+  --color-banner-info-bg:         var(--color-info-100);
   --color-banner-info-border:     var(--color-info-200);
   --color-banner-info-text:       var(--color-info-900);
 
@@ -610,9 +687,10 @@
   --color-note-emphasis:         var(--color-grey-600);
   --color-note-code:             var(--color-note-code-light);
 
-  /* ── OText typography color tokens ──────────────────────── */
-  /* One color token per variant. Font size and weight are baked into        */
-  /* OText.vue as Tailwind utilities. To retheme a variant, change one line. */
+  /* ── OText typography colours (one per variant) — these were previously only
+     in the parallel .css token set, which the app does NOT load, so OText's
+     per-variant colours (esp. meta/section grey) silently fell back to inherited
+     text. Define them here in the .scss set the app actually loads. ── */
   --color-typography-page-title:  var(--color-text-primary);
   --color-typography-section:     var(--color-text-secondary);
   --color-typography-panel-title: var(--color-text-primary);
@@ -621,18 +699,19 @@
   --color-typography-meta:        var(--color-text-secondary);
   --color-typography-mono:        var(--color-text-primary);
 
-  /* ── OCode (inline + block monospace display) ────────────── */
-  /* Inline chip */
+  /* ── OCode (inline chip + block) — same .css-only gap as above ── */
   --color-code-text:              var(--color-text-primary);
   --color-code-bg:                var(--color-surface-subtle);
   --color-code-border:            var(--color-border-default);
-  /* Block pre/code */
   --color-code-block-text:        var(--color-text-primary);
   --color-code-block-bg:          var(--color-surface-panel);
-  /* Copy button (shared by inline + block) */
   --color-code-copy-icon:         var(--color-text-secondary);
   --color-code-copy-hover-icon:   var(--color-text-primary);
   --color-code-copy-hover-bg:     var(--color-surface-subtle-hover);
+
+  /* Skeleton shimmer + datepicker inner border (were .css-only too) */
+  --color-skeleton-shimmer:        rgba(255, 255, 255, 0.8);
+  --color-datepicker-inner-border: var(--color-grey-100);
 }
 
 
@@ -643,14 +722,6 @@
   --color-toggle-item-hover-bg: var(--color-primary-100);
   --color-toggle-item-active-bg: var(--color-surface-base);
   --color-toggle-item-active-text: var(--color-primary-700);
-
-  /* ── Sidebar nav ───────────────────────────────────────────── */
-  --color-nav-icon: var(--color-grey-600);
-  --color-nav-icon-active: var(--color-primary-600);
-  --color-nav-label-hover: var(--color-primary-700);
-  --color-nav-item-hover-bg: var(--color-primary-100);
-  --color-nav-item-active-bg: var(--color-primary-200);
-  --color-nav-item-active-border: var(--color-primary-300);
 }
 
 /* ── Register ALL tokens for Tailwind utility generation ── */
@@ -824,6 +895,7 @@
   --color-input-hint: var(--color-input-hint);
   --color-input-help-text: var(--color-input-help-text);
   --color-input-error-text: var(--color-input-error-text);
+  --color-input-addon-bg: var(--color-input-addon-bg);
   --color-input-addon-text: var(--color-input-addon-text);
   --color-input-clear-btn: var(--color-input-clear-btn);
   --color-input-clear-btn-hover: var(--color-input-clear-btn-hover);
@@ -922,7 +994,6 @@
   /* Date / Time / Color (ODate, OTime, OColor) */
   --color-datepicker-bg: var(--color-datepicker-bg);
   --color-datepicker-border: var(--color-datepicker-border);
-  --color-datepicker-inner-border: var(--color-datepicker-inner-border);
   --color-datepicker-hover-border: var(--color-datepicker-hover-border);
   --color-datepicker-focus-border: var(--color-datepicker-focus-border);
   --color-datepicker-focus-ring: var(--color-datepicker-focus-ring);
@@ -990,7 +1061,7 @@
   /* OFieldList / OFieldRow / OFieldLabel */
   --color-field-list-row-hover-bg:     var(--color-field-list-row-hover-bg);
   --color-field-list-group-text:       var(--color-field-list-group-text);
-  --color-field-list-label-text:       var(--color-field-list-label-text);
+  --color-field-list-label-text:       var(--color-text-primary);
   --color-field-list-label-icon:       var(--color-field-list-label-icon);
   --color-field-list-drag-icon:        var(--color-field-list-drag-icon);
   --color-field-list-expand-icon:      var(--color-field-list-expand-icon);
@@ -1070,6 +1141,68 @@
   --color-badge-purple-ol-border: var(--color-badge-purple-ol-border);
   --color-badge-purple-ol-text:   var(--color-badge-purple-ol-text);
 
+  /* Badge — teal */
+  --color-badge-teal-solid-bg: var(--color-badge-teal-solid-bg);
+  --color-badge-teal-solid-text: var(--color-badge-teal-solid-text);
+  --color-badge-teal-ol-border: var(--color-badge-teal-ol-border);
+  --color-badge-teal-ol-text: var(--color-badge-teal-ol-text);
+  --color-badge-teal-soft-bg: var(--color-badge-teal-soft-bg);
+  --color-badge-teal-soft-text: var(--color-badge-teal-soft-text);
+
+  /* Badge — orange */
+  --color-badge-orange-solid-bg: var(--color-badge-orange-solid-bg);
+  --color-badge-orange-solid-text: var(--color-badge-orange-solid-text);
+  --color-badge-orange-ol-border: var(--color-badge-orange-ol-border);
+  --color-badge-orange-ol-text: var(--color-badge-orange-ol-text);
+  --color-badge-orange-soft-bg: var(--color-badge-orange-soft-bg);
+  --color-badge-orange-soft-text: var(--color-badge-orange-soft-text);
+
+  /* Badge — lime */
+  --color-badge-lime-solid-bg: var(--color-badge-lime-solid-bg);
+  --color-badge-lime-solid-text: var(--color-badge-lime-solid-text);
+  --color-badge-lime-ol-border: var(--color-badge-lime-ol-border);
+  --color-badge-lime-ol-text: var(--color-badge-lime-ol-text);
+  --color-badge-lime-soft-bg: var(--color-badge-lime-soft-bg);
+  --color-badge-lime-soft-text: var(--color-badge-lime-soft-text);
+
+  /* Badge — amber */
+  --color-badge-amber-solid-bg: var(--color-badge-amber-solid-bg);
+  --color-badge-amber-solid-text: var(--color-badge-amber-solid-text);
+  --color-badge-amber-ol-border: var(--color-badge-amber-ol-border);
+  --color-badge-amber-ol-text: var(--color-badge-amber-ol-text);
+  --color-badge-amber-soft-bg: var(--color-badge-amber-soft-bg);
+  --color-badge-amber-soft-text: var(--color-badge-amber-soft-text);
+
+  /* Badge — cyan */
+  --color-badge-cyan-solid-bg: var(--color-badge-cyan-solid-bg);
+  --color-badge-cyan-solid-text: var(--color-badge-cyan-solid-text);
+  --color-badge-cyan-ol-border: var(--color-badge-cyan-ol-border);
+  --color-badge-cyan-ol-text: var(--color-badge-cyan-ol-text);
+  --color-badge-cyan-soft-bg: var(--color-badge-cyan-soft-bg);
+  --color-badge-cyan-soft-text: var(--color-badge-cyan-soft-text);
+
+  /* Badge — blue */
+  --color-badge-blue-solid-bg: var(--color-badge-blue-solid-bg);
+  --color-badge-blue-solid-text: var(--color-badge-blue-solid-text);
+  --color-badge-blue-ol-border: var(--color-badge-blue-ol-border);
+  --color-badge-blue-ol-text: var(--color-badge-blue-ol-text);
+  --color-badge-blue-soft-bg: var(--color-badge-blue-soft-bg);
+  --color-badge-blue-soft-text: var(--color-badge-blue-soft-text);
+
+  /* Badge — purple (solid/soft variants) */
+  --color-badge-purple-solid-bg: var(--color-badge-purple-solid-bg);
+  --color-badge-purple-solid-text: var(--color-badge-purple-solid-text);
+  --color-badge-purple-soft-bg: var(--color-badge-purple-soft-bg);
+  --color-badge-purple-soft-text: var(--color-badge-purple-soft-text);
+
+  /* Badge — indigo */
+  --color-badge-indigo-solid-bg: var(--color-badge-indigo-solid-bg);
+  --color-badge-indigo-solid-text: var(--color-badge-indigo-solid-text);
+  --color-badge-indigo-ol-border: var(--color-badge-indigo-ol-border);
+  --color-badge-indigo-ol-text: var(--color-badge-indigo-ol-text);
+  --color-badge-indigo-soft-bg: var(--color-badge-indigo-soft-bg);
+  --color-badge-indigo-soft-text: var(--color-badge-indigo-soft-text);
+
   /* Badge — shared */
   --color-badge-focus-ring: var(--color-badge-focus-ring);
 
@@ -1122,7 +1255,30 @@
 
   /* Skeleton */
   --color-skeleton-base: var(--color-skeleton-base);
+  --color-skeleton-highlight: var(--color-skeleton-highlight);
   --color-skeleton-shimmer: var(--color-skeleton-shimmer);
+
+  /* OText typography colours (so tw:text-typography-* utilities generate) */
+  --color-typography-page-title:  var(--color-typography-page-title);
+  --color-typography-section:     var(--color-typography-section);
+  --color-typography-panel-title: var(--color-typography-panel-title);
+  --color-typography-body:        var(--color-typography-body);
+  --color-typography-label:       var(--color-typography-label);
+  --color-typography-meta:        var(--color-typography-meta);
+  --color-typography-mono:        var(--color-typography-mono);
+
+  /* OCode colours */
+  --color-code-text:              var(--color-code-text);
+  --color-code-bg:                var(--color-code-bg);
+  --color-code-border:            var(--color-code-border);
+  --color-code-block-text:        var(--color-code-block-text);
+  --color-code-block-bg:          var(--color-code-block-bg);
+  --color-code-copy-icon:         var(--color-code-copy-icon);
+  --color-code-copy-hover-icon:   var(--color-code-copy-hover-icon);
+  --color-code-copy-hover-bg:     var(--color-code-copy-hover-bg);
+
+  /* Datepicker inner border */
+  --color-datepicker-inner-border: var(--color-datepicker-inner-border);
 
   /* ProgressBar */
   --color-progress-bar-default: var(--color-progress-bar-default);
@@ -1150,25 +1306,6 @@
   --color-pagination-nav-hover-bg: var(--color-pagination-nav-hover-bg);
   --color-pagination-nav-disabled-text: var(--color-pagination-nav-disabled-text);
 
-  /* OText typography */
-  --color-typography-page-title:  var(--color-typography-page-title);
-  --color-typography-section:     var(--color-typography-section);
-  --color-typography-panel-title: var(--color-typography-panel-title);
-  --color-typography-body:        var(--color-typography-body);
-  --color-typography-label:       var(--color-typography-label);
-  --color-typography-meta:        var(--color-typography-meta);
-  --color-typography-mono:        var(--color-typography-mono);
-
-  /* OCode */
-  --color-code-text:              var(--color-code-text);
-  --color-code-bg:                var(--color-code-bg);
-  --color-code-border:            var(--color-code-border);
-  --color-code-block-text:        var(--color-code-block-text);
-  --color-code-block-bg:          var(--color-code-block-bg);
-  --color-code-copy-icon:         var(--color-code-copy-icon);
-  --color-code-copy-hover-icon:   var(--color-code-copy-hover-icon);
-  --color-code-copy-hover-bg:     var(--color-code-copy-hover-bg);
-
   /* OTable */
   --color-table-header-bg: var(--color-table-header-bg);
   --color-table-header-text: var(--color-table-header-text);
@@ -1188,12 +1325,4 @@
   --color-table-sort-icon-inactive: var(--color-table-sort-icon-inactive);
   --color-table-streaming-bar: var(--color-table-streaming-bar);
   --color-table-row-expanded-bg: var(--color-table-row-expanded-bg);
-
-  /* Nav */
-  --color-nav-icon: var(--color-nav-icon);
-  --color-nav-icon-active: var(--color-nav-icon-active);
-  --color-nav-label-hover: var(--color-nav-label-hover);
-  --color-nav-item-hover-bg: var(--color-nav-item-hover-bg);
-  --color-nav-item-active-bg: var(--color-nav-item-active-bg);
-  --color-nav-item-active-border: var(--color-nav-item-active-border);
 }

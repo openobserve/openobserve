@@ -22,10 +22,10 @@ export class CreateOrgPage {
         // ODrawer footer buttons exposed via o-drawer-{primary|secondary}-btn,
         // scoped under the dialog wrapper data-test for uniqueness.
         this.saveOrgButton = page.locator(
-            '[data-test="add-update-organization-dialog"] [data-test="o-drawer-primary-btn"]'
+            '[data-test="add-update-organization-dialog"] [data-test="o-dialog-primary-btn"]'
         );
         this.cancelOrgButton = page.locator(
-            '[data-test="add-update-organization-dialog"] [data-test="o-drawer-secondary-btn"]'
+            '[data-test="add-update-organization-dialog"] [data-test="o-dialog-secondary-btn"]'
         );
 
         // ── Search input ──────────────────────────────────────────────────
@@ -197,7 +197,7 @@ export class CreateOrgPage {
         // race the OTable's client-side filter.
         await Promise.race([
             this.firstTableRow.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {}),
-            expect(this.iamPage).toContainText('No data available', { timeout: 5000 }).catch(() => {}),
+            this.page.locator('[data-test="o2-empty-state"]').waitFor({ state: 'visible', timeout: 5000 }).catch(() => {}),
         ]);
     }
 
@@ -207,7 +207,7 @@ export class CreateOrgPage {
     }
 
     async verifyOrgNotExists() {
-        await expect(this.iamPage).toContainText('No data available');
+        await expect(this.page.locator('[data-test="o2-empty-state"]')).toBeVisible();
     }
 
     async verifyOrgExists(orgName) {

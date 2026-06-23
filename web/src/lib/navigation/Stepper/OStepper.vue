@@ -16,6 +16,7 @@ const props = withDefaults(defineProps<OStepperProps>(), {
   orientation: 'horizontal',
   animated: true,
   navigable: false,
+  expanded: false,
 })
 
 const emit = defineEmits<OStepperEmits>()
@@ -58,6 +59,7 @@ const context = computed<StepperContext>(() => ({
   orientation: props.orientation ?? 'horizontal',
   navigable: props.navigable ?? false,
   animated: props.animated ?? true,
+  expanded: props.expanded ?? false,
   onStepClick,
 }))
 

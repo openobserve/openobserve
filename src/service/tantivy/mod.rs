@@ -13,7 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub mod bloom_builder;
 mod parallel;
 mod reader;
 mod sequential;
@@ -27,8 +26,7 @@ use arrow_schema::{DataType, Schema};
 use bytes::Bytes;
 use config::{
     FileFormat, INDEX_FIELD_NAME_FOR_ALL, PARQUET_MAX_ROW_GROUP_SIZE, TIMESTAMP_COL_NAME,
-    get_config,
-    utils::{inverted_index::to_tantivy_name, tantivy::tokenizer::O2_TOKENIZER},
+    get_config, tantivy::tokenizer::O2_TOKENIZER, utils::inverted_index::to_tantivy_name,
 };
 use hashbrown::HashSet;
 use infra::storage;
@@ -342,6 +340,7 @@ pub(super) mod tests {
         let mut writer = config::utils::parquet::new_parquet_writer(
             &mut buffer,
             &schema,
+            &[],
             &file_meta,
             false,
             None,

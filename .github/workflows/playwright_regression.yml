@@ -39,6 +39,8 @@ env:
   ZO_CREATE_ORG_THROUGH_INGESTION: true
   ZO_UTF8_VIEW_ENABLED: false
   ZO_ENABLE_CROSS_LINKING: true
+  # Timechart (visualize) tab is hidden by default; enable it so visualize E2E tests can reach it.
+  ZO_TIMECHART_ENABLED: true
   ZO_SSRF_ALLOW_LOOPBACK: true
   UPLOAD_TO_TESTDINO: ${{ vars.UPLOAD_TO_TESTDINO || 'false' }}
 
@@ -127,17 +129,16 @@ jobs:
             run_files:
               [
                 "logs-regression.spec.js",
-                "logs-regression-bugs.spec.js",
-                "logs-regression-bugs-2.spec.js",
+                "logs-bugs.spec.js",
                 "logs-9754.spec.js",
-                "logs-regression-9044-7354.spec.js",
+                "logs-9044-7354.spec.js",
               ]
           - testfolder: "Alerts-Regression"
             run_files:
               [
                 "alerts-regression.spec.js",
-                "alerts-stream-switching-regression.spec.js",
-                "alerts-regression-bugs.spec.js",
+                "alerts-stream-switching.spec.js",
+                "alerts-bugs.spec.js",
               ]
           - testfolder: "Dashboard-Regression"
             run_files:
@@ -159,7 +160,7 @@ jobs:
             run_files:
               [
                 "traces-regression.spec.js",
-                "traces-regression-bugs.spec.js",
+                "traces-bugs.spec.js",
               ]
           - testfolder: "Metrics-Regression"
             run_files:
@@ -170,6 +171,17 @@ jobs:
             run_files:
               [
                 "ui-regression.spec.js",
+                "landing-regression.spec.js",
+              ]
+          - testfolder: "DataSources-Regression"
+            run_files:
+              [
+                "datasources-regression.spec.js",
+              ]
+          - testfolder: "Reports-Regression"
+            run_files:
+              [
+                "reports-regression-bugs.spec.js",
               ]
 
     steps:
@@ -221,7 +233,7 @@ jobs:
 
       - name: Cache Playwright browser
         id: playwright-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.cache/ms-playwright
           key: playwright-chromium-${{ runner.os }}-${{ hashFiles('tests/ui-testing/package-lock.json') }}
@@ -339,8 +351,23 @@ jobs:
           echo "DEBUG: matrix.testfolder = ${{ matrix.testfolder }}"
 
           if [ -n "$FILE_LIST" ]; then
-            ACTUAL_FOLDER="RegressionSet"
+            # Derive feature subfolder from testfolder (maps testfolder name → directory under RegressionSet/)
+            case "${{ matrix.testfolder }}" in
+              "Dashboard-Regression")   FEATURE="Dashboards" ;;
+              "Pipelines-Regression")   FEATURE="Pipelines" ;;
+              "Alerts-Regression")      FEATURE="Alerts" ;;
+              "Logs-Regression")        FEATURE="Logs" ;;
+              "Traces-Regression")      FEATURE="Traces" ;;
+              "Metrics-Regression")     FEATURE="Metrics" ;;
+              "Streams-Regression")     FEATURE="Streams" ;;
+              "Reports-Regression")     FEATURE="Reports" ;;
+              "DataSources-Regression") FEATURE="DataSources" ;;
+              "GeneralTests-Regression") FEATURE="General" ;;
+              *)                        FEATURE="RegressionSet" ;;
+            esac
+            ACTUAL_FOLDER="RegressionSet/$FEATURE"
             echo "DEBUG: ACTUAL_FOLDER = $ACTUAL_FOLDER"
+            echo "DEBUG: FEATURE = $FEATURE"
 
             FILE_PATHS=""
             for file in $FILE_LIST; do

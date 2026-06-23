@@ -42,6 +42,25 @@ vi.mock("@/services/service_streams", () => ({
       related_streams: { logs: [], metrics: [], traces: [] },
     },
   }),
+  getSemanticGroups: vi.fn().mockResolvedValue({ data: [] }),
+  getDimensionAnalytics: vi
+    .fn()
+    .mockResolvedValue({ data: { available_groups: [] } }),
+  buildChipDimensionsFromFilters: vi.fn().mockReturnValue({}),
+}));
+
+// resolveStreamSchema calls useStreams().getStream() to fetch and cache the
+// stream schema. Mock it so those calls complete instantly instead of making
+// real HTTP requests that hang in tests.
+const { getStreamMock } = vi.hoisted(() => ({
+  getStreamMock: vi.fn().mockResolvedValue({ schema: [] }),
+}));
+
+vi.mock("@/composables/useStreams", () => ({
+  default: vi.fn(() => ({
+    getStream: getStreamMock,
+    getStreams: vi.fn().mockResolvedValue([]),
+  })),
 }));
 
 vi.mock("@/utils/dashboard/convertDashboardSchemaVersion", () => ({
@@ -84,6 +103,7 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 
 import ServiceGraphNodeSidePanel from "./ServiceGraphNodeSidePanel.vue";
 import searchService from "@/services/search";
+import useStreams from "@/composables/useStreams";
 import { correlate as correlateStreams } from "@/services/service_streams";
 
 
@@ -974,6 +994,268 @@ describe("ServiceGraphNodeSidePanel", () => {
         const rows = wrapper.vm.sortedOperationsTableRows;
         expect(rows).toHaveLength(0);
       });
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // isInferred computed
+  // ---------------------------------------------------------------------------
+
+  describe("isInferred", () => {
+    it("should return false when service_type is undefined", () => {
+      wrapper = mountPanel({ selectedNode: baseNode });
+      expect(wrapper.vm.isInferred).toBe(false);
+    });
+
+    it("should return false when service_type is null", () => {
+      wrapper = mountPanel({
+        selectedNode: { ...baseNode, service_type: null },
+      });
+      expect(wrapper.vm.isInferred).toBe(false);
+    });
+
+    it("should return true when service_type is 'database'", () => {
+      wrapper = mountPanel({
+        selectedNode: { ...baseNode, service_type: "database" },
+      });
+      expect(wrapper.vm.isInferred).toBe(true);
+    });
+
+    it("should return true for all supported inferred service types", () => {
+      for (const st of ["database", "queue", "rpc", "external"]) {
+        wrapper = mountPanel({
+          selectedNode: { ...baseNode, service_type: st },
+        });
+        expect(wrapper.vm.isInferred).toBe(true);
+      }
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // operationsTableColumns — Caller column for inferred services
+  // ---------------------------------------------------------------------------
+
+  describe("operationsTableColumns", () => {
+    it("should NOT include a caller column when service_type is unset", () => {
+      wrapper = mountPanel({ selectedNode: baseNode });
+      const cols = wrapper.vm.operationsTableColumns;
+      const callerCol = cols.find((c: any) => c.id === "caller");
+      expect(callerCol).toBeUndefined();
+    });
+
+    it("should include a caller column as the first column when service_type is 'database'", () => {
+      wrapper = mountPanel({
+        selectedNode: { ...baseNode, service_type: "database" },
+      });
+      const cols = wrapper.vm.operationsTableColumns;
+      expect(cols[0].id).toBe("caller");
+      expect(cols[0].header).toBe("Caller");
+      expect(cols[0].accessorKey).toBe("caller");
+    });
+
+    it("should include a caller column for all inferred service types", () => {
+      for (const st of ["database", "queue", "rpc", "external"]) {
+        wrapper = mountPanel({
+          selectedNode: { ...baseNode, service_type: st },
+        });
+        const cols = wrapper.vm.operationsTableColumns;
+        expect(cols[0].id).toBe("caller");
+      }
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // activeResourceTabConfigs for inferred services
+  // ---------------------------------------------------------------------------
+
+  describe("activeResourceTabConfigs for inferred services", () => {
+    it("should return empty array when schema is not yet resolved", () => {
+      wrapper = mountPanel({
+        selectedNode: { ...baseNode, service_type: "database" },
+      });
+      // Schema hasn't resolved yet, so inferredTabConfigs should be empty
+      // and activeResourceTabConfigs falls back through inferredTabConfigs
+      const configs = wrapper.vm.activeResourceTabConfigs;
+      expect(configs).toEqual([]);
+    });
+
+    it("should return inferred tabs when schema is resolved with matching fields", async () => {
+      // Override schema mock to return database-related fields
+      getStreamMock.mockResolvedValueOnce({
+        schema: [
+          { name: "server_address", type: "keyword" },
+          { name: "net_peer_name", type: "keyword" },
+          { name: "db_name", type: "keyword" },
+          { name: "db_operation", type: "keyword" },
+        ],
+      });
+
+      wrapper = mountPanel({
+        selectedNode: { ...baseNode, service_type: "database" },
+        streamFilter: "default",
+      });
+      await flushPromises();
+      await flushPromises();
+
+      const configs = wrapper.vm.activeResourceTabConfigs;
+      expect(configs.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it("should return empty when schema has none of the fallback fields", async () => {
+      getStreamMock.mockResolvedValueOnce({
+        schema: [{ name: "unrelated_field", type: "keyword" }],
+      });
+
+      wrapper = mountPanel({
+        selectedNode: { ...baseNode, service_type: "database" },
+        streamFilter: "default",
+      });
+      await flushPromises();
+      await flushPromises();
+
+      const configs = wrapper.vm.activeResourceTabConfigs;
+      expect(configs).toEqual([]);
+    });
+
+    it("should return empty array when service_type is not set", () => {
+      wrapper = mountPanel({ selectedNode: baseNode });
+      // Without service_type, inferredTabConfigs returns []
+      // and availableResourceTabConfigs (user-selected) defaults to []
+      // because no workload fields are selected
+      expect(wrapper.vm.isInferred).toBe(false);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // INFERRED_SERVICE_TABS registry (test through component)
+  // ---------------------------------------------------------------------------
+
+  describe("INFERRED_SERVICE_TABS registry", () => {
+    it("should generate hosts tab for database when server_address exists in schema", async () => {
+      getStreamMock.mockResolvedValueOnce({
+        schema: [{ name: "server_address", type: "keyword" }],
+      });
+
+      wrapper = mountPanel({
+        selectedNode: { ...baseNode, service_type: "database" },
+        streamFilter: "default",
+      });
+      await flushPromises();
+      await flushPromises();
+
+      const configs = wrapper.vm.activeResourceTabConfigs;
+      const hostsTab = configs.find((c: any) => c.id === "hosts");
+      expect(hostsTab).toBeDefined();
+      expect(hostsTab.label).toBe("Hosts");
+      expect(hostsTab.colLabel).toBe("Host");
+      expect(hostsTab.groupField).toContain("COALESCE");
+      expect(hostsTab.groupField).toContain("server_address");
+    });
+
+    it("should generate hosts tab with COALESCE when multiple host fields exist", async () => {
+      getStreamMock.mockResolvedValueOnce({
+        schema: [
+          { name: "server_address", type: "keyword" },
+          { name: "net_peer_name", type: "keyword" },
+          { name: "net_peer_ip", type: "keyword" },
+        ],
+      });
+
+      wrapper = mountPanel({
+        selectedNode: { ...baseNode, service_type: "database" },
+        streamFilter: "default",
+      });
+      await flushPromises();
+      await flushPromises();
+
+      const configs = wrapper.vm.activeResourceTabConfigs;
+      const hostsTab = configs.find((c: any) => c.id === "hosts");
+      expect(hostsTab).toBeDefined();
+      // COALESCE should include all three fields
+      expect(hostsTab.groupField).toContain("server_address");
+      expect(hostsTab.groupField).toContain("net_peer_name");
+      expect(hostsTab.groupField).toContain("net_peer_ip");
+      // network_peer_address is not in schema, so it should NOT be in COALESCE
+      expect(hostsTab.groupField).not.toContain("network_peer_address");
+    });
+
+    it("should NOT generate databases tab when db fields are absent from schema", async () => {
+      getStreamMock.mockResolvedValueOnce({
+        schema: [{ name: "server_address", type: "keyword" }],
+      });
+
+      wrapper = mountPanel({
+        selectedNode: { ...baseNode, service_type: "database" },
+        streamFilter: "default",
+      });
+      await flushPromises();
+      await flushPromises();
+
+      const configs = wrapper.vm.activeResourceTabConfigs;
+      const databasesTab = configs.find((c: any) => c.id === "databases");
+      expect(databasesTab).toBeUndefined();
+    });
+
+    it("should generate queries tab when db_operations exists in schema", async () => {
+      getStreamMock.mockResolvedValueOnce({
+        schema: [
+          { name: "server_address", type: "keyword" },
+          { name: "db_operations", type: "keyword" },
+        ],
+      });
+
+      wrapper = mountPanel({
+        selectedNode: { ...baseNode, service_type: "database" },
+        streamFilter: "default",
+      });
+      await flushPromises();
+      await flushPromises();
+
+      const configs = wrapper.vm.activeResourceTabConfigs;
+      const queriesTab = configs.find((c: any) => c.id === "queries");
+      expect(queriesTab).toBeDefined();
+      expect(queriesTab.colLabel).toBe("DB Operation");
+      expect(queriesTab.groupField).toContain("db_operations");
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Template: Metrics tab hidden for inferred services
+  // ---------------------------------------------------------------------------
+
+  describe("metrics tab visibility for inferred services", () => {
+    it("should render metrics tab for regular (non-inferred) services", () => {
+      wrapper = mountPanel({ selectedNode: baseNode });
+      const metricsTab = wrapper.find(
+        '[data-test="service-graph-node-panel-tab-metrics"]',
+      );
+      expect(metricsTab.exists()).toBe(true);
+    });
+
+    it("should NOT render metrics tab for inferred services", () => {
+      wrapper = mountPanel({
+        selectedNode: { ...baseNode, service_type: "database" },
+      });
+      const metricsTab = wrapper.find(
+        '[data-test="service-graph-node-panel-tab-metrics"]',
+      );
+      expect(metricsTab.exists()).toBe(false);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Template: Resource dropdown hidden for inferred services
+  // ---------------------------------------------------------------------------
+
+  describe("resource dropdown visibility for inferred services", () => {
+    it("should NOT render resource dropdown for inferred services", () => {
+      wrapper = mountPanel({
+        selectedNode: { ...baseNode, service_type: "database" },
+      });
+      const dropdownBtn = wrapper.find(
+        '[data-test="service-graph-node-panel-workload-fields-btn"]',
+      );
+      expect(dropdownBtn.exists()).toBe(false);
     });
   });
 });

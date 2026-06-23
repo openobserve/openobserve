@@ -86,7 +86,7 @@ describe("convertLogData.ts", () => {
         left: "20",
         right: "20",
         top: "5",
-        bottom: "0",
+        bottom: "5",
       });
     });
 
@@ -469,15 +469,28 @@ describe("convertLogData.ts", () => {
       expect(options.series[0].data[1][1]).toBe(0);
     });
 
-    it("shows legend at the bottom", () => {
+    it("hides legend when there is only one series", () => {
       const bd = makeBreakdown([["info", [1]]]);
+      const { options } = convertStackedLogData([ts1], bd, baseParams, false);
+      expect(options.legend.show).toBe(false);
+      expect(options.legend.bottom).toBe(0);
+    });
+
+    it("shows legend at the bottom when there are multiple series", () => {
+      const bd = makeBreakdown([["info", [1]], ["error", [2]]]);
       const { options } = convertStackedLogData([ts1], bd, baseParams, false);
       expect(options.legend.show).toBe(true);
       expect(options.legend.bottom).toBe(0);
     });
 
-    it("sets grid bottom to 20 to accommodate legend", () => {
+    it("sets grid bottom to 5 for a single series (no legend)", () => {
       const bd = makeBreakdown([["info", [1]]]);
+      const { options } = convertStackedLogData([ts1], bd, baseParams, false);
+      expect(options.grid.bottom).toBe("5");
+    });
+
+    it("sets grid bottom to 20 to accommodate legend when multiple series", () => {
+      const bd = makeBreakdown([["info", [1]], ["error", [2]]]);
       const { options } = convertStackedLogData([ts1], bd, baseParams, false);
       expect(options.grid.bottom).toBe("20");
     });

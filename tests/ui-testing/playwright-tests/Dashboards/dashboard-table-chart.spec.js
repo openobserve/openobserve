@@ -167,6 +167,7 @@ test.describe("Dashboard Table Chart - Core Features", () => {
       await pm.chartTypeSelector.selectStreamType("logs");
       await pm.chartTypeSelector.selectStream("e2e_automate");
 
+      await pm.chartTypeSelector.removeField("y_axis_1", "y");
       await pm.chartTypeSelector.searchAndAddField("kubernetes_container_hash", "y");
       await pm.chartTypeSelector.searchAndAddField("kubernetes_container_name", "y");
 
@@ -201,7 +202,6 @@ test.describe("Dashboard Table Chart - Core Features", () => {
       await pm.chartTypeSelector.selectStream("e2e_automate");
 
       await pm.chartTypeSelector.searchAndAddField("kubernetes_container_name", "x");
-      await pm.chartTypeSelector.searchAndAddField("_timestamp", "y");
       await pm.chartTypeSelector.configureYAxisFunction("y_axis_1", "count");
 
       const streamPromise = waitForStreamComplete(page);
@@ -293,6 +293,7 @@ test.describe("Dashboard Table Chart - Core Features", () => {
       await pm.chartTypeSelector.selectStreamType("logs");
       await pm.chartTypeSelector.selectStream("e2e_automate");
       await pm.chartTypeSelector.searchAndAddField("kubernetes_container_name", "x");
+      await pm.chartTypeSelector.removeField("y_axis_1", "y");
       await pm.chartTypeSelector.searchAndAddField("kubernetes_pod_name", "y");
 
       // Enable VRL function toggle and add a VRL function that creates a new field
@@ -368,12 +369,28 @@ test.describe("Dashboard Table Chart - Core Features", () => {
       await pm.chartTypeSelector.selectStream("e2e_automate");
 
       await pm.chartTypeSelector.searchAndAddField("_timestamp", "x");
+      await pm.chartTypeSelector.removeField("y_axis_1", "y");
       await pm.chartTypeSelector.searchAndAddField("code", "y");
       await pm.chartTypeSelector.configureYAxisFunction("y_axis_1", "count");
 
-      const streamPromise = waitForStreamComplete(page);
+      // Register the response waiter BEFORE clicking Apply so the request isn't missed.
+      // Uses waitForResponse instead of waitForStreamComplete so the HTTP status
+      // is asserted directly — waitForStreamComplete silently times out on non-200s.
+      // Matches both _search_stream (raw logs) and _histogram_stream (aggregated).
+      const apiResponsePromise = page.waitForResponse(
+        (r) =>
+          r.url().includes("_search_stream") ||
+          r.url().includes("_histogram_stream"),
+        { timeout: 15000 }
+      );
+
       await pm.dashboardPanelActions.applyDashboardBtn();
-      await streamPromise;
+
+      // Assert the backend returned 200 — catches auth/query errors early.
+      const apiResponse = await apiResponsePromise;
+      expect(apiResponse.status()).toBe(200);
+
+      // Wait for table DOM to reflect the streamed data.
       await pm.chartTypeSelector.waitForTableDataLoad();
 
       // Verify headers — should have at least 2 columns (Timestamp + Code)
@@ -410,6 +427,7 @@ test.describe("Dashboard Table Chart - Core Features", () => {
       await pm.chartTypeSelector.selectStream("e2e_automate");
 
       await pm.chartTypeSelector.searchAndAddField("_timestamp", "x");
+      await pm.chartTypeSelector.removeField("y_axis_1", "y");
       await pm.chartTypeSelector.searchAndAddField("code", "y");
       await pm.chartTypeSelector.configureYAxisFunction("y_axis_1", "count");
 
@@ -448,6 +466,7 @@ test.describe("Dashboard Table Chart - Core Features", () => {
       await pm.chartTypeSelector.selectStream("e2e_automate");
 
       await pm.chartTypeSelector.searchAndAddField("_timestamp", "x");
+      await pm.chartTypeSelector.removeField("y_axis_1", "y");
       await pm.chartTypeSelector.searchAndAddField("code", "y");
       await pm.chartTypeSelector.configureYAxisFunction("y_axis_1", "count");
 
@@ -492,6 +511,7 @@ test.describe("Dashboard Table Chart - Core Features", () => {
       await pm.chartTypeSelector.selectStream("e2e_automate");
 
       await pm.chartTypeSelector.searchAndAddField("_timestamp", "x");
+      await pm.chartTypeSelector.removeField("y_axis_1", "y");
       await pm.chartTypeSelector.searchAndAddField("code", "y");
       await pm.chartTypeSelector.configureYAxisFunction("y_axis_1", "count");
 
@@ -530,6 +550,7 @@ test.describe("Dashboard Table Chart - Core Features", () => {
       await pm.chartTypeSelector.selectStreamType("logs");
       await pm.chartTypeSelector.selectStream("e2e_automate");
 
+      await pm.chartTypeSelector.removeField("y_axis_1", "y");
       await pm.chartTypeSelector.searchAndAddField("kubernetes_container_hash", "y");
       await pm.dashboardPanelActions.applyDashboardBtn();
 
@@ -573,6 +594,7 @@ test.describe("Dashboard Table Chart - Core Features", () => {
       await pm.chartTypeSelector.selectStream("e2e_automate");
 
       await pm.chartTypeSelector.searchAndAddField("kubernetes_container_name", "x");
+      await pm.chartTypeSelector.removeField("y_axis_1", "y");
       await pm.chartTypeSelector.searchAndAddField("kubernetes_container_hash", "y");
       await pm.chartTypeSelector.searchAndAddField("kubernetes_container_name", "filter");
 
@@ -646,6 +668,7 @@ test.describe("Dashboard Table Chart - Core Features", () => {
       await pm.chartTypeSelector.selectStream("e2e_automate");
 
       await pm.chartTypeSelector.searchAndAddField("kubernetes_container_name", "x");
+      await pm.chartTypeSelector.removeField("y_axis_1", "y");
       await pm.chartTypeSelector.searchAndAddField("kubernetes_container_hash", "y");
 
       await pm.dashboardPanelActions.applyDashboardBtn();
@@ -741,6 +764,7 @@ test.describe("Dashboard Table Chart - Core Features", () => {
       await pm.chartTypeSelector.selectStream("e2e_automate");
 
       await pm.chartTypeSelector.searchAndAddField("_timestamp", "x");
+      await pm.chartTypeSelector.removeField("y_axis_1", "y");
       await pm.chartTypeSelector.searchAndAddField("code", "y");
       await pm.chartTypeSelector.configureYAxisFunction("y_axis_1", "count");
 
@@ -797,6 +821,7 @@ test.describe("Dashboard Table Chart - Core Features", () => {
       // Add X field — shows in "First Column" area
       await pm.chartTypeSelector.searchAndAddField("_timestamp", "x");
       // Add Y field — shows in "Other Columns" area
+      await pm.chartTypeSelector.removeField("y_axis_1", "y");
       await pm.chartTypeSelector.searchAndAddField("code", "y");
 
       // Verify layout labels
@@ -837,6 +862,7 @@ test.describe("Dashboard Table Chart - Core Features", () => {
       await pm.chartTypeSelector.selectStream("e2e_automate");
 
       await pm.chartTypeSelector.searchAndAddField("kubernetes_container_name", "x");
+      await pm.chartTypeSelector.removeField("y_axis_1", "y");
       await pm.chartTypeSelector.searchAndAddField("code", "y");
 
       // Test with "sum" aggregation

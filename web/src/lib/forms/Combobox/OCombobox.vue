@@ -181,7 +181,7 @@ const hasInsideLabel = computed(
         disabled && 'o-input-label--disabled',
       ]"
     >
-      <slot name="label">{{ label }}</slot>
+      <slot name="label">{{ label }}</slot><span v-if="required" aria-hidden="true" class="tw:select-none">*</span>
       <OIcon
         v-if="$slots.tooltip"
         name="info-outline"
@@ -205,7 +205,7 @@ const hasInsideLabel = computed(
           v-if="hasInsideLabel"
           class="tw:absolute tw:top-1 tw:start-3 tw:text-[10px] tw:leading-none tw:text-input-placeholder tw:select-none tw:pointer-events-none tw:z-10"
         >
-          <slot name="label">{{ label }}</slot>
+          <slot name="label">{{ label }}</slot><span v-if="required" aria-hidden="true">&nbsp;*</span>
         </span>
         <ComboboxInput
           :id="inputId"
@@ -240,11 +240,13 @@ const hasInsideLabel = computed(
             'tw:rounded-md tw:border tw:shadow-lg',
             'tw:bg-select-content-bg tw:border-select-content-border',
             'tw:p-1',
-            'tw:data-[state=open]:animate-in tw:data-[state=closed]:animate-out',
-            'tw:data-[state=closed]:fade-out-0 tw:data-[state=open]:fade-in-0',
-            'tw:data-[state=closed]:zoom-out-95 tw:data-[state=open]:zoom-in-95',
-            'tw:data-[side=bottom]:slide-in-from-top-2',
-            'tw:data-[side=top]:slide-in-from-bottom-2',
+            // Clip-path reveal: unveiled at full size from its trigger edge (no
+            // scale/squish). Wipes down by default; top-placed wipes up. Soft
+            // ease-out-expo in (200ms), quick wipe out (140ms).
+            'tw:data-[state=open]:animate-[o2-reveal-down-in_140ms_cubic-bezier(0.16,1,0.3,1)]',
+            'tw:data-[state=closed]:animate-[o2-reveal-down-out_100ms_cubic-bezier(0.4,0,1,1)]',
+            'tw:data-[side=top]:data-[state=open]:animate-[o2-reveal-up-in_140ms_cubic-bezier(0.16,1,0.3,1)]',
+            'tw:data-[side=top]:data-[state=closed]:animate-[o2-reveal-up-out_100ms_cubic-bezier(0.4,0,1,1)]',
           ]"
         >
           <ComboboxViewport class="tw:max-h-56 tw:overflow-y-auto">
@@ -274,7 +276,7 @@ const hasInsideLabel = computed(
             >
               <span class="tw:flex-1 tw:wrap-break-word tw:whitespace-normal tw:min-w-0">{{ option.label }}</span>
               <ComboboxItemIndicator
-                class="tw:absolute tw:end-2 tw:flex tw:items-center tw:justify-center tw:size-3.5"
+                class="tw:absolute tw:end-2 tw:top-1/2 tw:-translate-y-1/2 tw:flex tw:items-center tw:justify-center tw:size-3.5"
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"

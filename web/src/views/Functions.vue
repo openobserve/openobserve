@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,246 +15,263 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:rounded-md tw:h-full tw:flex tw:flex-col tw:overflow-hidden">
-      <OSplitter
-        v-model="splitterModel"
-        unit="px"
-        :limits="[0, 400]"
-        :horizontal="false"
-        class="tw:overflow-hidden tw:flex-1 tw:min-h-0"
-      >
-        <template v-slot:before>
-          <div class="tw:w-full tw:h-full tw:pl-[0.625rem] tw:pb-[0.625rem] tw:pt-1">
-            <div
-              v-if="showSidebar"
-              class="card-container tw:h-full"
-              :class="{ 'compact-sidebar': isCompactSidebar }"
+  <!-- Pipelines is a frequently-used workspace, so it has NO landing hub (that
+       would add a click every visit). It lands straight on the default section
+       and uses the same breadcrumb section-switcher for fast lateral nav:
+         Stream Pipelines ▾            (› Edit Pipeline on a detail page)
+       Page actions (and the detail-view teleport target) live in the bar. -->
+  <div class="tw:h-full tw:min-h-0 tw:flex tw:flex-col">
+    <!-- This row hosts page actions: the pipelines-list buttons or the detail
+         teleport target. Section pages (functions/enrichment/eval) render
+         nothing here — their content components have their own headers. -->
+    <AppPageHeader
+      v-if="showPipelineActions || isDetailView"
+      :title="showPipelineActions ? t('menu.pipeline') : breadcrumbLabel"
+      :subtitle="showPipelineActions ? t('pipeline.subtitle') : ''"
+      :icon="showPipelineActions ? 'lan' : undefined"
+      :back="detailBack"
+      :tabs-below="showPipelineActions"
+      class="tw:px-4 tw:border-b tw:border-border-default"
+    >
+      <!-- Section switcher tabs (Stream Pipelines / Functions / …) next to the
+           title on the list page; hidden on detail sub-pages (editor/history).
+           Always pass the slot so hasTabs tracks showPipelineActions reactively
+           via the slot function call instead of relying on slot presence tracking. -->
+      <template #tabs>
+        <PipelineSectionTabs v-if="showPipelineActions" />
+      </template>
+      <!-- Pipeline name input rendered inline with the title on the create page -->
+      <template v-if="routeName === 'createPipeline'" #title-trail>
+        <div class="tw:w-64 tw:shrink-0">
+          <OInput
+            ref="pipelineNameInputRef"
+            v-model="pipelineObj.currentSelectedPipeline.name"
+            :placeholder="t('pipeline.pipelineName')"
+            hide-bottom-space
+            :error="pipelineObj.pipelineNameError"
+            :error-message="pipelineObj.pipelineNameErrorMessage"
+            data-test="pipeline-editor-name-input"
+          />
+        </div>
+      </template>
+      <template #actions>
+        <template v-if="showPipelineActions">
+          <template v-if="!shouldCollapseActions">
+            <OButton
+              data-test="pipeline-list-history-btn"
+              variant="outline"
+              size="sm"
+              icon-left="history"
+              @click="goToPipelineHistory"
             >
-              <OTabs
-                v-model="activeTab"
-                orientation="vertical"
-                :class="{ 'compact-tabs': isCompactSidebar }"
-              >
-                <ORouteTab
-                  v-if="
-                    !store.state.zoConfig?.custom_hide_menus
-                      ?.split(',')
-                      .includes('pipelines')
-                  "
-                  data-test="stream-pipelines-tab"
-                  name="streamPipelines"
-                  :to="{
-                    name: 'pipelines',
-                    query: {
-                      org_identifier: store.state.selectedOrganization.identifier,
-                    },
-                  }"
-                  :label="isCompactSidebar ? undefined : t('function.streamPipeline')"
-                  :icon="isCompactSidebar ? 'lan' : undefined"
-                >
-                  <OTooltip
-                    v-if="isCompactSidebar"
-                    side="right"
-                    align="center"
-                    :sideOffset="8"
-                    :content="t('function.streamPipeline')"
-                  />
-                </ORouteTab>
-                <ORouteTab
-                  data-test="function-stream-tab"
-                  name="functions"
-                  :to="{
-                    name: 'functionList',
-                    query: {
-                      org_identifier: store.state.selectedOrganization.identifier,
-                    },
-                  }"
-                  :label="isCompactSidebar ? undefined : t('function.header')"
-                  :icon="isCompactSidebar ? functionIcon : undefined"
-                >
-                  <OTooltip
-                    v-if="isCompactSidebar"
-                    side="right"
-                    align="center"
-                    :sideOffset="8"
-                    :content="t('function.header')"
-                  />
-                </ORouteTab>
-                <ORouteTab
-                  data-test="function-enrichment-table-tab"
-                  name="enrichmentTables"
-                  :to="{
-                    name: 'enrichmentTables',
-                    query: {
-                      org_identifier: store.state.selectedOrganization.identifier,
-                    },
-                  }"
-                  :label="isCompactSidebar ? undefined : t('function.enrichmentTables')"
-                  :icon="isCompactSidebar ? 'dataset' : undefined"
-                >
-                  <OTooltip
-                    v-if="isCompactSidebar"
-                    side="right"
-                    align="center"
-                    :sideOffset="8"
-                    :content="t('function.enrichmentTables')"
-                  />
-                </ORouteTab>
-                <ORouteTab
-                  v-if="config.isEnterprise == 'true'"
-                  data-test="eval-templates-tab"
-                  name="evalTemplates"
-                  :to="{
-                    name: 'evalTemplates',
-                    query: {
-                      org_identifier: store.state.selectedOrganization.identifier,
-                    },
-                  }"
-                  :label="isCompactSidebar ? undefined : t('pipeline.evalTemplates')"
-                  :icon="isCompactSidebar ? 'rule' : undefined"
-                >
-                  <OTooltip
-                    v-if="isCompactSidebar"
-                    side="right"
-                    align="center"
-                    :sideOffset="8"
-                    :content="t('pipeline.evalTemplates')"
-                  />
-                </ORouteTab>
-              </OTabs>
-            </div>
-          </div>
-        </template>
-        <template #separator>
+              {{ t("pipeline.history") }}
+            </OButton>
+            <OButton
+              v-if="config.isEnterprise == 'true'"
+              data-test="pipeline-list-backfill-btn"
+              variant="outline"
+              size="sm"
+              icon-left="refresh"
+              @click="goToBackfillJobs"
+            >
+              {{ t("pipeline.backfill") }}
+            </OButton>
+            <OButton
+              data-test="pipeline-list-import-pipeline-btn"
+              variant="outline"
+              size="sm"
+              icon-left="upload-file"
+              @click="goToImportPipeline"
+            >
+              {{ t("pipeline.import") }}
+            </OButton>
+          </template>
           <OButton
-            data-test="logs-search-field-list-collapse-btn"
-            :title="showSidebar ? 'Collapse Fields' : 'Open Fields'"
-            variant="sidebar-button"
-            size="sidebar-button"
-            :class="showSidebar ? 'splitter-icon-collapse' : 'splitter-icon-expand'"
-            @click="collapseSidebar"
+            data-test="pipeline-list-add-pipeline-btn"
+            variant="primary"
+            size="sm"
+            @click="goToAddPipeline"
           >
-            <OIcon :name="showSidebar ? 'chevron-left' : 'chevron-right'" size="xs" />
+            {{ t("pipeline.addPipeline") }}
           </OButton>
+          <ODropdown v-if="shouldCollapseActions" align="end">
+            <template #trigger>
+              <OButton
+                variant="outline"
+                size="sm"
+                data-test="pipeline-list-overflow-menu-btn"
+                icon-left="menu"
+              />
+            </template>
+            <ODropdownItem
+              data-test="pipeline-list-menu-history-btn"
+              @select="goToPipelineHistory"
+            >
+              {{ t("pipeline.history") }}
+            </ODropdownItem>
+            <ODropdownItem
+              v-if="config.isEnterprise == 'true'"
+              data-test="pipeline-list-menu-backfill-btn"
+              @select="goToBackfillJobs"
+            >
+              {{ t("pipeline.backfill") }}
+            </ODropdownItem>
+            <ODropdownItem
+              data-test="pipeline-list-menu-import-btn"
+              @select="goToImportPipeline"
+            >
+              {{ t("pipeline.import") }}
+            </ODropdownItem>
+          </ODropdown>
         </template>
-        <template v-slot:after>
-          <!-- :templates="templates"
-            :functionAssociatedStreams="functionAssociatedStreams"
-            @get:functionAssociatedStreams="getFunctionAssociatedStreams"
-            @get:templates="getTemplates" -->
-            <div class="tw:h-full tw:pt-1 tw:pb-[0.625rem] tw:flex tw:flex-col tw:min-h-0">
-              <RouterView v-slot="{ Component }">
-                <component :is="Component" @sendToAiChat="sendToAiChat" />
-              </RouterView>
-            </div>
-        </template>
-      </OSplitter>
+        <!-- Detail sub-pages (editor/history/backfill) teleport their actions
+             here, so the bar owns the single header and pages never render a 2nd. -->
+        <div
+          v-else-if="isDetailView"
+          id="o2-page-actions"
+          class="tw:flex tw:items-center tw:gap-2"
+          data-test="pipeline-detail-actions"
+        />
+      </template>
+    </AppPageHeader>
+
+    <div class="tw:flex-1 tw:min-h-0 tw:flex tw:flex-col tw:overflow-hidden">
+      <RouterView v-slot="{ Component }">
+        <component :is="Component" class="tw:h-full" @sendToAiChat="sendToAiChat" />
+      </RouterView>
+    </div>
   </div>
 </template>
 
 <script lang="ts">
-import ORouteTab from '@/lib/navigation/Tabs/ORouteTab.vue'
-import OTab from '@/lib/navigation/Tabs/OTab.vue'
-import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
-import OIcon from '@/lib/core/Icon/OIcon.vue'
-import OButton from '@/lib/core/Button/OButton.vue'
-import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue'
-import OSplitter from '@/lib/core/Splitter/OSplitter.vue'
-import { defineComponent, ref, computed, onBeforeMount, onMounted, onUnmounted, watch } from "vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import PipelineSectionTabs from "@/components/pipeline/PipelineSectionTabs.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import { pipelineObj } from "@/plugins/pipelines/useDnD";
+import {
+  defineComponent,
+  ref,
+  computed,
+  onBeforeMount,
+  onMounted,
+  onUnmounted,
+  onActivated,
+  onDeactivated,
+  watch,
+} from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
-import { getImageURL } from "@/utils/zincutils";
 import config from "@/aws-exports";
 
 export default defineComponent({
   name: "AppFunctions",
-  components: { OTabs, OTab, ORouteTab, OButton, OIcon, OTooltip, OSplitter },
+  components: {
+    AppPageHeader,
+    PipelineSectionTabs,
+    OButton,
+    ODropdown,
+    ODropdownItem,
+    OInput,
+  },
   emits: ["sendToAiChat"],
   setup(props, { emit }) {
     const store = useStore();
     const { t } = useI18n();
     const router = useRouter();
+
+    // Maps each route to the Level-2 section it belongs under. Pipeline
+    // drill-down sub-pages all resolve to the Pipelines section.
     const routeToFunctionsTab: Record<string, string> = {
-      pipelines:        "streamPipelines",
-      pipelineEditor:   "streamPipelines",
-      createPipeline:   "streamPipelines",
-      importPipeline:   "streamPipelines",
-      pipelineHistory:  "streamPipelines",
+      pipelines: "streamPipelines",
+      pipelineEditor: "streamPipelines",
+      createPipeline: "streamPipelines",
+      importPipeline: "streamPipelines",
+      pipelineHistory: "streamPipelines",
       pipelineBackfill: "streamPipelines",
-      functionList:     "functions",
+      functionList: "functions",
       enrichmentTables: "enrichmentTables",
-      evalTemplates:    "evalTemplates",
     };
+
+    const routeName = computed(() => router.currentRoute.value.name as string);
+
     const activeTab: any = ref(
-      routeToFunctionsTab[router.currentRoute.value.name as string] ?? "streamPipelines"
+      routeToFunctionsTab[routeName.value] ?? "streamPipelines",
     );
-    const templates = ref([]);
-    const functionAssociatedStreams = ref([]);
-    // Responsive sidebar: icon-only at narrow widths
+    watch(routeName, (name) => {
+      if (routeToFunctionsTab[name]) activeTab.value = routeToFunctionsTab[name];
+    });
+
+    const orgIdentifier = computed(
+      () => store.state.selectedOrganization.identifier,
+    );
+
+    // ── Level 3 detail crumb ────────────────────────────────────────────────
+    const detailLabels: Record<string, () => string> = {
+      pipelineEditor: () =>
+        (router.currentRoute.value.query.name as string) || "Edit Pipeline",
+      createPipeline: () => t("pipeline.addPipeline"),
+      importPipeline: () => t("pipeline.import"),
+      pipelineHistory: () => t("pipeline.history"),
+      pipelineBackfill: () => t("pipeline.backfill"),
+    };
+    const isDetailView = computed(() => routeName.value in detailLabels);
+    const breadcrumbLabel = computed(
+      () => detailLabels[routeName.value]?.() ?? "",
+    );
+
+    // On a detail sub-page (editor/create/history/backfill) the leading icon
+    // becomes a Back button to the pipelines list, mirroring the CRUD sub-page
+    // pattern used elsewhere. Undefined on the list page (icon stays).
+    const detailBack = computed(() =>
+      isDetailView.value
+        ? {
+            label: t("function.streamPipeline"),
+            to: {
+              name: "pipelines",
+              query: { org_identifier: orgIdentifier.value },
+            },
+          }
+        : undefined,
+    );
+
+    // Header actions live on the Pipelines index page only.
+    const showPipelineActions = computed(() => routeName.value === "pipelines");
+
+    // Responsive: collapse secondary actions into an overflow menu when narrow.
     const windowWidth = ref(window.innerWidth);
     const onWindowResize = () => {
       windowWidth.value = window.innerWidth;
     };
-    const isCompactSidebar = computed(() => windowWidth.value <= 1440);
-
-    const splitterModel = ref(220);
-
-    const lastSplitterPosition = ref(splitterModel.value);
-
-    const showSidebar = ref(true);
-
-    // Function icon from SVG — same as logs page function toggle
-    const functionIcon = computed(() => {
-      return (
-        "img:" +
-        getImageURL(
-          store.state.theme === "dark"
-            ? "images/common/function_dark.svg"
-            : "images/common/function.svg",
-        )
-      );
-    });
-
-    // Adjust splitter width when switching between compact/full mode
-    watch(isCompactSidebar, (compact) => {
-      if (showSidebar.value) {
-        splitterModel.value = compact ? 65 : 220;
-        lastSplitterPosition.value = splitterModel.value;
-      }
-    });
+    const shouldCollapseActions = computed(() => windowWidth.value <= 1440);
 
     onMounted(() => {
       window.addEventListener("resize", onWindowResize);
-      // Apply initial compact width if needed
-      if (isCompactSidebar.value && showSidebar.value) {
-        splitterModel.value = 65;
-        lastSplitterPosition.value = 65;
-      }
     });
-
     onUnmounted(() => {
       window.removeEventListener("resize", onWindowResize);
     });
 
-    watch(
-      () => router.currentRoute.value,
-      (currentRoute: any) => {
-        if (
-          currentRoute.name === "functionList" &&
-          currentRoute.query.action === "add"
-        ) {
-          if (showSidebar.value) collapseSidebar();
-        }
-      },
-    );
+    // ── Navigation handlers ─────────────────────────────────────────────────
+    const orgQuery = () => ({ org_identifier: orgIdentifier.value });
+    const goToAddPipeline = () =>
+      router.push({ name: "createPipeline", query: orgQuery() });
+    const goToImportPipeline = () =>
+      router.push({ name: "importPipeline", query: orgQuery() });
+    const goToPipelineHistory = () =>
+      router.push({ name: "pipelineHistory", query: orgQuery() });
+    const goToBackfillJobs = () =>
+      router.push({ name: "pipelineBackfill", query: orgQuery() });
 
     watch(
       () => router.currentRoute.value.name,
-      (routeName) => {
-        // This is added to redirect to functionList if the user is on functions route
-        // This case happens when user clicks on functions from menu when he is already on functions page
-        if (routeName === "pipeline") router.back();
+      (name) => {
+        // Clicking "Pipeline" in the menu while already on the section lands
+        // on the bare parent route — bounce back to the default section.
+        if (name === "pipeline") redirectRoute();
       },
     );
 
@@ -262,20 +279,9 @@ export default defineComponent({
       redirectRoute();
     });
 
-    const collapseSidebar = () => {
-      if (showSidebar.value) lastSplitterPosition.value = splitterModel.value;
-      showSidebar.value = !showSidebar.value;
-      splitterModel.value = showSidebar.value ? lastSplitterPosition.value : 0;
-    };
-
     const redirectRoute = () => {
       if (router.currentRoute.value.name === "pipeline") {
-        router.replace({
-          name: "pipelines",
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        });
+        router.replace({ name: "pipelines", query: orgQuery() });
       }
     };
 
@@ -283,88 +289,38 @@ export default defineComponent({
       emit("sendToAiChat", value, append);
     };
 
+    const pipelineNameInputRef = ref<any>(null);
+
+    // Auto-focus the pipeline name input when a validation error is triggered
+    watch(
+      () => pipelineObj.pipelineNameError,
+      (hasError) => {
+        if (hasError && pipelineNameInputRef.value) {
+          pipelineNameInputRef.value.focus();
+        }
+      },
+    );
+
     return {
       t,
       store,
-      router,
-      redirectRoute,
-      splitterModel,
-      functionAssociatedStreams,
-      activeTab,
-      templates,
-      collapseSidebar,
-      showSidebar,
-      sendToAiChat,
-      isCompactSidebar,
-      functionIcon,
       config,
+      orgIdentifier,
+      activeTab,
+      isDetailView,
+      breadcrumbLabel,
+      detailBack,
+      showPipelineActions,
+      shouldCollapseActions,
+      goToAddPipeline,
+      goToImportPipeline,
+      goToPipelineHistory,
+      goToBackfillJobs,
+      sendToAiChat,
+      routeName,
+      pipelineObj,
+      pipelineNameInputRef,
     };
   },
 });
 </script>
-
-<style scoped lang="scss">
-:deep(.q-splitter__before) {
-  overflow: visible;
-}
-
-.q-table {
-  &__top {
-    border-bottom: 1px solid $border-color;
-    justify-content: flex-end;
-  }
-}
-
-// Compact sidebar styles for narrow viewports
-.compact-sidebar {
-  display: flex;
-  justify-content: center;
-  padding: 0.5rem 0;
-}
-
-.compact-tabs {
-  width: 100%;
-
-  :deep(.o-tabs__content) {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.25rem;
-    padding: 0.5rem 0;
-  }
-
-  :deep(.o-tab) {
-    min-height: 2.5rem;
-    min-width: 2.5rem;
-    width: 2.5rem;
-    padding: 0;
-    transition: background-color 0.2s ease, color 0.2s ease;
-
-    .o-tab__icon {
-      font-size: 1.25rem;
-
-      img {
-        width: 1.25rem;
-        height: 1.25rem;
-      }
-    }
-
-    &:hover {
-      background-color: var(--o2-hover-accent);
-    }
-
-    &.o-tab--active {
-      background: color-mix(
-        in srgb,
-        var(--o2-primary-btn-bg) 20%,
-        white 10%
-      );
-      color: var(--o2-text-primary);
-
-      .o-tab__icon {
-        color: var(--o2-text-primary);
-      }
-    }
-  }
-}
-</style>

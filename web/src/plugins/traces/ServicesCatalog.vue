@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="tw:w-[11rem] tw:flex-shrink-0"
       >
         <OSelect
-          v-model="streamFilter"
+          :model-value="streamFilter"
           :options="availableStreams.map((s) => ({ label: s, value: s }))"
           labelKey="label"
           valueKey="value"
@@ -210,13 +210,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Empty state (shown when not loading and no data) -->
     <div
       v-if="!isLoading && services.length === 0"
-      class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:flex-1 tw:text-[var(--o2-text-secondary)]"
+      class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:flex-1"
       data-test="services-catalog-empty"
     >
-      <OIcon name="layers" class="tw:mb-3 tw:opacity-40" style="width: 3rem; height: 3rem;" />
-      <p class="tw:text-[0.9rem]">
-        {{ t("traces.servicesCatalog.noServicesFound") }}
-      </p>
+      <ServicesCatalogNoDataState @widen-range="$emit('widen-range', $event)" />
     </div>
 
     <!-- Table -->
@@ -327,35 +324,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
         </template>
 
-        <!-- Loading banner: shown above rows while a next page is fetching -->
-        <template #loading-banner>
-          <div
-            class="tw:flex tw:flex-nowrap tw:items-center tw:px-2 tw:min-w-max tw:min-h-[3.25rem] tw:bg-[var(--o2-card-bg)] tw:border-b tw:border-[var(--o2-border-2)]!"
-          >
-            <OSpinner size="xs" class="tw:mx-[0.25rem]" />
-            <span
-              class="tw:tracking-[0.03rem] tw:text-[0.85rem] tw:text-[var(--o2-text-1)] tw:font-bold"
-            >
-              {{ t("traces.servicesCatalog.loading") }}
-            </span>
-          </div>
-        </template>
-
-        <!-- Loading row: shown when no rows exist yet (first fetch) -->
-        <template #loading>
-          <div
-            data-test="services-catalog-loading"
-            class="tw:flex tw:flex-nowrap tw:items-center tw:px-2 tw:min-w-max tw:min-h-[3.25rem] tw:bg-[var(--o2-card-bg)] tw:border-b tw:border-[var(--o2-border-2)]!"
-          >
-            <OSpinner size="xs" class="tw:mr-[0.25rem]" />
-            <span
-              class="tw:tracking-[0.03rem] tw:text-[0.85rem] tw:text-[var(--o2-text-1)] tw:font-bold"
-            >
-              {{ t("traces.servicesCatalog.loading") }}
-            </span>
-          </div>
-        </template>
-
         <!-- Cell actions overlay -->
         <template #cell-actions="{ row, column, active }">
           <CellActions
@@ -402,6 +370,7 @@ import ServiceGraphNodeSidePanel from "./ServiceGraphNodeSidePanel.vue";
 import useTraces from "@/composables/useTraces";
 import useStreams from "@/composables/useStreams";
 import useHttpStreaming from "@/composables/useStreamingSearch";
+import streamService from "@/services/stream";
 import { formatLatency } from "@/utils/traces/treeTooltipHelpers";
 import {
   b64EncodeUnicode,
@@ -409,14 +378,14 @@ import {
   formatLargeNumber,
   formatTimeWithSuffix,
 } from "@/utils/zincutils";
-import { getConsumableRelativeTime } from "@/utils/date";
-import { cloneDeep } from "lodash-es";
+import { getEffectiveTimeRange } from "@/utils/date";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OPagination from "@/lib/navigation/Pagination/OPagination.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import ServicesCatalogNoDataState from "./ServicesCatalogNoDataState.vue";
 
 const { t } = useI18n();
 const store = useStore();
@@ -427,7 +396,9 @@ const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } =
   useHttpStreaming();
 
 const emit = defineEmits<{
-  "view-traces": [serviceName: string];
+  "view-traces": [data: string | Record<string, any>];
+  "request:stream-change": [stream: string];
+  "widen-range": [period: string];
 }>();
 
 // p99 > 1 second triggers the orange highlight
@@ -450,6 +421,9 @@ interface ServiceRow {
   p50_latency_ns: number;
   p95_latency_ns: number;
   p99_latency_ns: number;
+  infer_service_name?: string;
+  infer_service_system?: string;
+  infer_service_type?: string;
 }
 
 const isLoading = ref(false);
@@ -460,6 +434,17 @@ const rowsPerPage = ref(25);
 const rowsPerPageOptions = [10, 25, 50, 100];
 const sortBy = ref<string>("status");
 const sortOrder = ref<"asc" | "desc">("desc");
+/**
+ * Tri-state cache for whether the current stream's schema contains the `infer_service_name` column.
+ *
+ * - `null`  — not yet checked for the current stream; triggers a schema API call on next load.
+ * - `true`  — column exists; queries will use `infer_service_name` for service grouping.
+ * - `false` — column absent; queries will fall back to `service_name` only.
+ *
+ * The value is reset to `null` whenever the stream filter changes so that the next
+ * `loadServicesCatalog()` call re-validates against the new stream's schema.
+ */
+const hasInferColumns = ref<boolean | null>(null);
 
 const totalPages = computed(() =>
   filteredServices.value.length && rowsPerPage.value
@@ -497,6 +482,7 @@ const selectedServiceNode = computed(() =>
     ? {
         id: selectedServiceRow.value.service_name,
         name: selectedServiceRow.value.service_name,
+        service_type: selectedServiceRow.value.infer_service_type,
       }
     : null,
 );
@@ -708,26 +694,12 @@ function handleCloseSidePanel() {
 }
 
 function viewTraces(data: string | Record<string, any>) {
-  const serviceName =
-    typeof data === "string" ? data : (data?.serviceName ?? "");
-  emit("view-traces", serviceName);
+  emit("view-traces", data);
 }
 
 function getTimeRange(): { start_time: number; end_time: number } {
-  if (searchObj.data.datetime.type === "relative") {
-    const relTime = getConsumableRelativeTime(
-      searchObj.data.datetime.relativeTimePeriod,
-    );
-    return {
-      start_time: relTime.startTime,
-      end_time: relTime.endTime,
-    };
-  }
-  const dt = cloneDeep(searchObj.data.datetime);
-  return {
-    start_time: dt.startTime,
-    end_time: dt.endTime,
-  };
+  const { startTime, endTime } = getEffectiveTimeRange(searchObj.data.datetime);
+  return { start_time: startTime, end_time: endTime };
 }
 
 // Load trace streams using the same method as the Traces search page
@@ -743,9 +715,7 @@ const loadAvailableStreams = async () => {
 };
 
 const onStreamFilterChange = (stream: string) => {
-  streamFilter.value = stream;
-  localStorage.setItem("servicesCatalog_streamFilter", stream);
-  loadServicesCatalog();
+  emit("request:stream-change", stream);
 };
 
 async function loadServicesCatalog() {
@@ -771,7 +741,46 @@ async function loadServicesCatalog() {
 
   const { start_time, end_time } = getTimeRange();
 
-  const sql = `SELECT
+  // Check stream schema for infer_service_name column (cache result per stream)
+  if (hasInferColumns.value === null) {
+    try {
+      const org = searchObj.organizationIdentifier;
+      const schemaResponse = await streamService.schema(
+        org,
+        streamName,
+        "traces",
+      );
+      const schemaFields =
+        schemaResponse.data?.schema || schemaResponse.data?.fields || [];
+      hasInferColumns.value = schemaFields.some(
+        (f: any) => f.name === "infer_service_name",
+      );
+    } catch {
+      // If schema check fails, default to false (use service_name only)
+      hasInferColumns.value = false;
+    }
+  }
+
+  // Build SQL: use infer_service_name when the column exists in the schema
+  const useInfer = hasInferColumns.value;
+  const sql = useInfer
+    ? `SELECT
+  COALESCE(NULLIF(infer_service_name, ''), service_name) AS service_name,
+  MAX(infer_service_name) AS _infer_service_name,
+  MAX(infer_service_system) AS _infer_service_system,
+  MAX(infer_service_type) AS _infer_service_type,
+  COUNT(*) AS total_requests,
+  SUM(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) AS error_count,
+  CAST(SUM(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) AS DOUBLE) / CAST(COUNT(*) AS DOUBLE) * 100 AS error_rate,
+  AVG(duration) AS avg_duration_ns,
+  MAX(duration) AS max_duration_ns,
+  approx_percentile_cont(duration, 0.5) AS p50_latency_ns,
+  approx_percentile_cont(duration, 0.95) AS p95_latency_ns,
+  approx_percentile_cont(duration, 0.99) AS p99_latency_ns
+FROM "${streamName}"
+GROUP BY COALESCE(NULLIF(infer_service_name, ''), service_name)
+ORDER BY total_requests DESC`
+    : `SELECT
   service_name,
   COUNT(*) AS total_requests,
   SUM(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) AS error_count,
@@ -828,6 +837,9 @@ ORDER BY total_requests DESC`;
               p95_latency_ns: hit.p95_latency_ns ?? 0,
               p99_latency_ns: hit.p99_latency_ns ?? 0,
               status: deriveStatus(hit.error_rate ?? 0),
+              infer_service_name: hit._infer_service_name ?? undefined,
+              infer_service_system: hit._infer_service_system ?? undefined,
+              infer_service_type: hit._infer_service_type ?? undefined,
             });
           }
           services.value = Array.from(serviceMap.values());
@@ -849,6 +861,19 @@ ORDER BY total_requests DESC`;
 
 // Expose for parent ref access
 defineExpose({ loadServicesCatalog, streamFilter });
+
+// Keep streamFilter in sync when Traces/Spans tab changes the global stream
+watch(
+  () => searchObj.data.stream.selectedStream.value,
+  (newStream) => {
+    if (newStream && newStream !== streamFilter.value) {
+      streamFilter.value = newStream;
+      localStorage.setItem("servicesCatalog_streamFilter", newStream);
+      hasInferColumns.value = null;
+      loadServicesCatalog();
+    }
+  },
+);
 
 watch(
   () => [

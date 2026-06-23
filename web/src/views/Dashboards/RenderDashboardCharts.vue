@@ -18,8 +18,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <div
-    class="card-container"
-    :class="store.state.printMode ? '' : 'tw:h-full tw:overflow-y-auto'"
+    class="tw:bg-surface-base"
+    :class="[
+      frame ? 'tw:border tw:border-border-default tw:rounded-xl' : '',
+      store.state.printMode ? '' : 'tw:h-full tw:overflow-y-auto',
+    ]"
   >
     <div class="tw:px-[0.625rem] render-dashboard-charts-container">
       <!-- flag to check if dashboardVariablesAndPanelsDataLoaded which is used while print mode-->
@@ -137,7 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             style="height: 100%; width: 100%"
           />
         </div>
-        <div v-else ref="gridStackContainer" class="grid-stack">
+        <div v-else-if="panels.length > 0" ref="gridStackContainer" class="grid-stack">
           <div
             v-for="item in panels"
             :key="item.id + selectedTabId"
@@ -244,7 +247,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           {}
                         "
                         :initialVariableValues="initialVariableValues"
-                        :style="{ marginBottom: '8px' }"
+                        class="panel-variables-margin"
                         data-test="panel-variables-selector"
                       />
                     </div>
@@ -263,16 +266,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :width="98"
         :show-close="false"
       >
-        <ViewPanel
-          :folderId="folderId"
-          :dashboardId="dashboardData.dashboardId"
-          :panelId="viewPanelId"
-          :selectedDateForViewPanel="viewPanelSelectedDate"
-          :initialVariableValues="getMergedVariablesForPanel(viewPanelId)"
-          :searchType="searchType"
-          @close-panel="() => (showViewPanel = false)"
-          @update:initial-variable-values="updateInitialVariableValues"
-        />
+        <!-- Explicit height wrapper: fills the dialog body's available space
+             (90vh − body padding) so ViewPanel can use height:100% and
+             flex:1 works all the way down without causing a body scrollbar. -->
+        <div class="view-panel-height-wrapper">
+          <ViewPanel
+            :folderId="folderId"
+            :dashboardId="dashboardData.dashboardId"
+            :panelId="viewPanelId"
+            :selectedDateForViewPanel="viewPanelSelectedDate"
+            :initialVariableValues="getMergedVariablesForPanel(viewPanelId)"
+            :searchType="searchType"
+            @close-panel="() => (showViewPanel = false)"
+            @update:initial-variable-values="updateInitialVariableValues"
+          />
+        </div>
       </ODialog>
       <div v-if="!panels.length">
         <!-- if data not available show nodata component -->
@@ -392,6 +400,13 @@ export default defineComponent({
     simplifiedPanelView: {
       type: Boolean,
       default: false,
+    },
+    /** Draws the component's own bordered card. Set false when embedded inside
+     *  an already-bordered container (e.g. the dashboard view page card) to
+     *  avoid a double border. */
+    frame: {
+      type: Boolean,
+      default: true,
     },
   },
 
@@ -1010,6 +1025,18 @@ export default defineComponent({
         await refreshGridStack();
       },
       { deep: true }, // Deep watch to catch layout changes within panels
+    );
+
+    watch(
+      () => panels.value.length,
+      async (newLen, oldLen) => {
+        // When panels are added to a previously-empty tab the grid-stack element
+        // is freshly mounted (v-else-if), so GridStack must be re-initialized.
+        if (newLen > 0 && oldLen === 0) {
+          await nextTick();
+          await refreshGridStack();
+        }
+      },
     );
 
     // Initialize GridStack when component is mounted
@@ -1662,6 +1689,16 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
+// Fills the ODialog body's available space (dialog max-h:90vh minus body padding)
+// so ViewPanel can use height:100% and flex:1 chains work without a scrollbar.
+.view-panel-height-wrapper {
+  height: calc(90vh - var(--spacing-dialog-content-py) * 2);
+  margin: calc(-1 * var(--spacing-dialog-content-py)) calc(-1 * var(--spacing-dialog-content-px));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
 .q-table {
   &__top {
     border-bottom: 1px solid $border-color;
@@ -1677,12 +1714,12 @@ export default defineComponent({
 
 .gridBackground {
   background: transparent !important;
-  border-radius: 4px;
-  border-color: #c2c2c27a !important;
+  border-radius: 0.5rem;
+  border-color: var(--color-border-default) !important;
 }
 
 .gridBackground.dark {
-  border-color: rgba(204, 204, 220, 0.12) !important;
+  border-color: var(--color-border-default) !important;
 }
 
 /* Optimized GridStack layout styles for better performance and visual feedback */
@@ -1700,16 +1737,20 @@ export default defineComponent({
 
 .grid-stack-item {
   background: transparent;
+  transition: box-shadow 0.2s ease;
 
   &.dark {
-    border-color: rgba(204, 204, 220, 0.12) !important;
+    border-color: var(--color-border-default) !important;
+
+    .grid-stack-item-content {
+      border-color: var(--color-border-default);
+    }
   }
   .grid-stack-item-content {
-    border: 1px solid #c2c2c27a;
-    border-radius: 4px;
+    border: 1px solid var(--color-border-default);
+    border-radius: 0.375rem;
     overflow: visible;
-    border-radius: inherit;
-    // height: 100%;
+    box-shadow: var(--shadow-sm);
   }
 }
 
@@ -1717,6 +1758,10 @@ export default defineComponent({
   height: 100%;
   display: flex;
   flex-direction: column;
+}
+
+.panel-variables-margin {
+  margin-bottom: 0.5rem;
 }
 
 /* GridStack theme overrides */
@@ -1729,7 +1774,8 @@ export default defineComponent({
     &.ui-draggable-dragging {
       opacity: 0.8;
       z-index: 1000;
-      transition: transform 0.15s ease;
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+      box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.15);
     }
 
     &.ui-resizable-resizing {
@@ -1742,11 +1788,11 @@ export default defineComponent({
       &.ui-resizable-se {
         background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'><path d='M8 2 L8 8 L2 8' stroke='%23999999' stroke-width='1.5' fill='none' stroke-linecap='round'/></svg>")
           no-repeat center;
-        background-size: 8px 8px;
-        width: 16px;
-        height: 16px;
-        bottom: 2px;
-        right: 2px;
+        background-size: 0.5rem 0.5rem;
+        width: 1rem;
+        height: 1rem;
+        bottom: 0.125rem;
+        right: 0.125rem;
         cursor: se-resize;
         transform: rotate(0deg) !important;
       }

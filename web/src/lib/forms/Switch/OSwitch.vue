@@ -133,8 +133,8 @@ const hasLabel = computed(
             ? 'tw:bg-[var(--color-primary-500)] tw:border-switch-border'
             : 'tw:bg-transparent tw:border-switch-border-off',
         props.disabled ? 'tw:cursor-not-allowed' : 'tw:cursor-pointer',
-        'tw:outline-none tw:ring-offset-1 tw:ring-offset-surface-base',
-        'tw:focus-visible:ring-2 tw:focus-visible:ring-switch-focus-ring',
+        'tw:outline-none',
+        'tw:focus-visible:ring-4 tw:focus-visible:ring-primary-500/25',
         'tw:transition-[color,background-color,border-color,box-shadow] tw:duration-200',
       ]"
     >
@@ -161,7 +161,7 @@ const hasLabel = computed(
         disabled && 'o-input-label--disabled',
       ]"
     >
-      <slot name="label">{{ label }}</slot>
+      <slot name="label">{{ label }}</slot><span v-if="required" aria-hidden="true">&nbsp;*</span>
       <OIcon
         v-if="$slots.tooltip"
         name="info-outline"

@@ -114,18 +114,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @domcontextmenu="onChartDomContextMenu"
         />
       </div>
+      <!-- Metric chart: per-value copy icon, revealed on hover of each number -->
       <div
+        v-if="metricItems.length"
+        style="position: absolute; inset: 0; pointer-events: none; z-index: 8"
+        data-test="dashboard-metric-copy-overlay"
+      >
+        <div
+          v-for="m in metricItems"
+          :key="m.idx"
+          style="position: absolute; pointer-events: auto"
+          :style="metricZoneStyle(m)"
+          @mouseenter="hoveredMetricIdx = m.idx"
+          @mouseleave="hoveredMetricIdx = null"
+        >
+          <OButton
+            v-show="hoveredMetricIdx === m.idx || metricCopiedIdx === m.idx"
+            variant="ghost"
+            size="icon-xs-sq"
+            style="position: absolute"
+            :style="metricIconStyle(m)"
+            @click="copyMetricItem(m)"
+            data-test="dashboard-metric-copy-btn"
+            :data-copied="metricCopiedIdx === m.idx ? 'true' : undefined"
+          >
+            <OIcon
+              :name="metricCopiedIdx === m.idx ? 'check' : 'content-copy'"
+              size="sm"
+            />
+          </OButton>
+        </div>
+      </div>
+      <OEmptyState
         v-if="
+          noData &&
           !errorDetail?.message &&
           panelSchema.type != 'geomap' &&
           panelSchema.type != 'maps' &&
           !loading
         "
-        class="noData"
+        size="inline"
+        icon="bar-chart"
+        :title="noData"
+        :backdrop="false"
         data-test="no-data"
-      >
-        {{ noData }}
-      </div>
+        class="noData"
+      />
       <div
         v-if="
           errorDetail?.message &&
@@ -163,70 +197,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :loading="loading"
           :loadingProgressPercentage="loadingProgressPercentage"
         />
-      </div>
-      <div
-        v-if="isCursorOverPanel"
-        class="tw:flex tw:items-center q-gutter-x-xs"
-        style="
-          position: absolute;
-          top: 0px;
-          right: 0px;
-          z-index: 9;
-          padding-right: 2px;
-          padding-top: 2px;
-        "
-        @click.stop
-      >
-        <OButton
-          v-if="
-            showLegendsButton &&
-            noData !== 'No Data' &&
-            ![
-              'table',
-              'html',
-              'markdown',
-              'custom_chart',
-              'geomap',
-              'maps',
-              'heatmap',
-              'metric',
-              'gauge',
-            ].includes(panelSchema.type)
-          "
-          variant="outline"
-          size="icon-circle"
-          @click="$emit('show-legends')"
-          icon-left="format-list-bulleted"
-          data-test="dashboard-show-legends-btn"
-        >
-          <OTooltip content="Show Legends" side="top" align="end" />
-        </OButton>
-        <OButton
-          v-if="
-            [
-              'area',
-              'area-stacked',
-              'bar',
-              'h-bar',
-              'line',
-              'scatter',
-              'stacked',
-              'h-stacked',
-            ].includes(panelSchema.type) &&
-            checkIfPanelIsTimeSeries === true &&
-            allowAnnotationsAdd &&
-            !viewOnly
-          "
-          data-test="panel-schema-renderer-annotation-button"
-          variant="outline"
-          size="icon-circle"
-          @click="toggleAddAnnotationMode"
-        >
-          <template #icon-left
-            ><OIcon :name="isAddAnnotationMode ? 'cancel' : 'edit'" size="sm"
-          /></template>
-          <OTooltip :content="isAddAnnotationMode ? 'Exit Annotations Mode' : 'Add Annotations'" side="top" align="end" />
-        </OButton>
       </div>
       <div
         class="crosslink-drilldown-menu"
@@ -277,7 +247,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           overflow-wrap: break-word;
           z-index: 9999999;
         "
-        :class="store.state.theme === 'dark' ? 'tw:bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'tw:bg-white'"
+        class="annotation-popup-bg"
         ref="annotationPopupRef"
       >
         <div
@@ -393,6 +363,9 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import { copyToClipboard } from "@/utils/clipboard";
+import { calculateWidthText } from "@/utils/dashboard/chartDimensionUtils";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 
 export default defineComponent({
   name: "PanelSchemaRenderer",
@@ -412,7 +385,8 @@ export default defineComponent({
     OButton,
     OIcon,
     OTooltip,
-},
+    OEmptyState,
+  },
   props: {
     selectedTimeObj: {
       required: true,
@@ -598,6 +572,57 @@ export default defineComponent({
       isCursorOverPanel.value = true;
     };
 
+    // Metric chart: one copy icon per rendered value (multi-SQL renders many).
+    // Values are already unit/decimal/timestamp formatted at the metric level;
+    // _metricLayout gives the canvas pixel position so the icon sits beside it.
+    const metricItems = computed(() => {
+      if (props.panelSchema?.type !== "metric") return [];
+      const series = panelData.value?.options?.series ?? [];
+      return series
+        .map((s: any, idx: number) => ({
+          idx,
+          text: s?._metricText,
+          layout: s?._metricLayout,
+        }))
+        .filter(
+          (m: any) =>
+            m.layout && m.text != null && String(m.text).trim() !== "",
+        );
+    });
+    // Hover zone = each value's grid cell.
+    const metricZoneStyle = (m: any) => ({
+      left: `${m.layout.left}px`,
+      top: `${m.layout.top}px`,
+      width: `${m.layout.width}px`,
+      height: `${m.layout.height}px`,
+    });
+    // Fixed copy-button width (icon-xs-sq), matching the table chart.
+    const COPY_BTN_PX = 28;
+    // Sit just past the number's measured right edge, clamped inside the cell.
+    // Measuring (vs estimating) keeps the icon off the digits for any value.
+    const metricIconStyle = (m: any) => {
+      const fs = m.layout?.fontSize || 24;
+      const textWidth = calculateWidthText(String(m.text), `${fs}px`);
+      const left = m.layout.cx - m.layout.left + textWidth / 2 + 2;
+      const maxLeft = m.layout.width - COPY_BTN_PX - 2;
+      return {
+        left: `${Math.min(left, maxLeft)}px`,
+        top: `${m.layout.cy - m.layout.top}px`,
+        transform: "translateY(-50%)",
+      };
+    };
+    const hoveredMetricIdx = ref<number | null>(null);
+    const metricCopiedIdx = ref<number | null>(null);
+    const copyMetricItem = (m: any) => {
+      if (m.text == null) return;
+      copyToClipboard(String(m.text), { silent: true }).then(() => {
+        metricCopiedIdx.value = m.idx;
+        setTimeout(() => {
+          if (metricCopiedIdx.value === m.idx) metricCopiedIdx.value = null;
+        }, 3000);
+      });
+    };
+
     // get refs from props
     const {
       panelSchema,
@@ -680,11 +705,6 @@ export default defineComponent({
         return data.value;
       }
 
-      // Only filter for PromQL queries
-      if (panelSchema.value.queryType !== "promql") {
-        return data.value;
-      }
-
       // If no hidden queries or empty array, return as is
       if (
         !hiddenQueries.value ||
@@ -694,13 +714,31 @@ export default defineComponent({
         return data.value;
       }
 
-      // Filter out hidden queries
+      // Filter out hidden queries by index (works for both SQL and PromQL)
       const filtered = data.value.filter(
         (_: any, index: number) => !hiddenQueries.value.includes(index),
       );
 
-      // Return filtered data
       return filtered;
+    });
+
+    // E2: Also filter panelSchema.queries in sync with filteredData
+    // to keep data[i] aligned with queries[i] in convertMultiSQLData
+    const filteredPanelSchema = computed(() => {
+      if (
+        panelSchema.value.queryType === "promql" ||
+        !hiddenQueries.value?.length ||
+        !Array.isArray(panelSchema.value.queries)
+      ) {
+        return panelSchema.value;
+      }
+
+      return {
+        ...panelSchema.value,
+        queries: panelSchema.value.queries.filter(
+          (_: any, i: number) => !hiddenQueries.value.includes(i),
+        ),
+      };
     });
 
     // The latest metadata chunk's time_offset.start_time (┬╡s) marks the left boundary
@@ -873,13 +911,28 @@ export default defineComponent({
       tableRendererRef.value = null;
     });
     const convertPanelDataCommon = async (applyOverlay = false) => {
+      // Preserve the previously rendered chart during a reload. While loading,
+      // if the new data buffer has no rows yet but a chart is already rendered,
+      // skip conversion so non-streaming callers (the panelSchema deep watcher,
+      // resize observer, etc.) can't replace it with an empty 0-series result
+      // before the first streaming chunk arrives. The streaming overlay path
+      // (applyOverlay=true) and loading=false final renders are unaffected.
+      const hasRows =
+        data.value?.length > 0 &&
+        (data.value[0]?.result?.length > 0 ||
+          (Array.isArray(data.value[0]) && data.value[0].length > 0));
+      const hasOldChart = panelData.value?.options?.series?.length > 0;
+      if (!applyOverlay && loading.value && !hasRows && hasOldChart) {
+        return;
+      }
+
       if (
         !errorDetail?.value?.message &&
         validatePanelData?.value?.length === 0
       ) {
         try {
           const result = await convertPanelData(
-            panelSchema.value,
+            filteredPanelSchema.value,
             filteredData.value,
             store,
             chartPanelRef,
@@ -1089,28 +1142,58 @@ export default defineComponent({
         annotations,
       ],
       async () => {
-        // emit vrl function field list
-        if (data.value?.length && data.value[0] && data.value[0].length) {
-          // Find the index of the record with max attributes
-          const maxAttributesIndex = data.value[0].reduce(
-            (
-              maxIndex: string | number | any,
-              obj: {},
-              currentIndex: any,
-              array: Array<Record<string, unknown>>,
-            ) => {
-              const numAttributes = Object.keys(obj).length;
-              const maxNumAttributes = Object.keys(array[maxIndex]).length;
-              return numAttributes > maxNumAttributes ? currentIndex : maxIndex;
-            },
-            0,
+        // emit vrl function field list per query index
+        if (data.value?.length) {
+          // data.value is in compacted/executor order (empty queries are
+          // skipped, time-shift queries expand into multiple entries), which
+          // does NOT line up with the panel query (tab) index. Re-key the
+          // detected fields by panelQueryIndex so downstream per-query field
+          // storage maps to the correct query tab. Build a DENSE array (one
+          // slot per panel query, default []) so the consumer's
+          // Array.isArray(fieldList[0]) format check and forEach both see every
+          // index even when a query returned no rows.
+          // Size the array to cover BOTH the panel's queries and the actual
+          // data results (data.value can have more entries than panel queries,
+          // e.g. time-shift expansion), so no query's fields are dropped.
+          const totalQueries = Math.max(
+            panelSchema.value?.queries?.length ?? 0,
+            data.value.length,
           );
-
-          const recordwithMaxAttribute = data.value[0][maxAttributesIndex];
-
-          const responseFields = Object.keys(recordwithMaxAttribute);
-
-          emit("updated:vrlFunctionFieldList", responseFields);
+          const perQueryFields: string[][] = Array.from(
+            { length: totalQueries },
+            () => [],
+          );
+          for (let qi = 0; qi < data.value.length; qi++) {
+            const panelIdx =
+              metadata.value?.queries?.[qi]?.panelQueryIndex ?? qi;
+            const queryData = data.value[qi];
+            if (
+              queryData &&
+              queryData.length &&
+              panelIdx >= 0 &&
+              panelIdx < perQueryFields.length
+            ) {
+              const maxAttributesIndex = queryData.reduce(
+                (
+                  maxIndex: string | number | any,
+                  obj: {},
+                  currentIndex: any,
+                  array: Array<Record<string, unknown>>,
+                ) => {
+                  const numAttributes = Object.keys(obj).length;
+                  const maxNumAttributes = Object.keys(array[maxIndex]).length;
+                  return numAttributes > maxNumAttributes
+                    ? currentIndex
+                    : maxIndex;
+                },
+                0,
+              );
+              perQueryFields[panelIdx] = Object.keys(
+                queryData[maxAttributesIndex],
+              );
+            }
+          }
+          emit("updated:vrlFunctionFieldList", perQueryFields);
         }
         if (panelData.value.chartType == "custom_chart")
           errorDetail.value = {
@@ -1326,6 +1409,9 @@ export default defineComponent({
     // Compute the value of the 'noData' variable.
     // Instead of re-scanning raw rows, this checks the conversion output
     // (panelData) which the pipeline already computed — O(1) property access.
+    // Multi-SQL note: panelData is built from filteredData (visible queries only)
+    // by convertSQLData and friends, so the type-specific checks below
+    // already reflect the multi-query aggregate.
     const noData = computed(() => {
       const type = panelSchema.value.type;
 
@@ -1334,8 +1420,15 @@ export default defineComponent({
       }
 
       if (panelSchema.value?.queryType === "promql") {
-        return filteredData.value?.length &&
-          filteredData.value.some((item: any) => item?.result?.length)
+        const hasResults =
+          filteredData.value?.length &&
+          filteredData.value.some((item: any) => item?.result?.length);
+        if (hasResults) return "";
+        // During a reload the executor clears state.data before the new results
+        // stream in. Keep showing the previously rendered chart while loading
+        // (matching the SQL branch below); only show "No Data" once the load
+        // completes with no results.
+        return loading.value && panelData.value?.options?.series?.length > 0
           ? ""
           : "No Data";
       }
@@ -1455,9 +1548,19 @@ export default defineComponent({
       showPositiveNotification,
     });
 
+    // Trellis only applies when EVERY query has a breakdown field (each
+    // breakdown value becomes a subplot). Mirrors the converter's isTrellis.
+    const allQueriesHaveBreakdown = computed(
+      () =>
+        (panelSchema.value?.queries?.length ?? 0) > 0 &&
+        panelSchema.value.queries.every(
+          (q: any) => (q?.fields?.breakdown?.length ?? 0) > 0,
+        ),
+    );
+
     const chartPanelHeight = computed(() => {
       if (
-        panelSchema.value?.queries?.[0]?.fields?.breakdown?.length > 0 &&
+        allQueriesHaveBreakdown.value &&
         panelSchema.value.config?.trellis?.layout &&
         !loading.value
       ) {
@@ -1469,7 +1572,7 @@ export default defineComponent({
 
     const chartPanelClass = computed(() => {
       if (
-        panelSchema.value?.queries?.[0]?.fields?.breakdown?.length > 0 &&
+        allQueriesHaveBreakdown.value &&
         panelSchema.value.config?.trellis?.layout &&
         !loading.value
       ) {
@@ -1538,6 +1641,12 @@ export default defineComponent({
       panelsList,
       isCursorOverPanel,
       showPopupsAndOverlays,
+      metricItems,
+      metricZoneStyle,
+      metricIconStyle,
+      hoveredMetricIdx,
+      metricCopiedIdx,
+      copyMetricItem,
       downloadDataAsCSV,
       downloadDataAsJSON,
       getPanelCsvData: (title: string) => {
@@ -1656,8 +1765,12 @@ export default defineComponent({
 
 .noData {
   position: absolute;
-  top: 20%;
+  inset: 0;
   width: 100%;
-  text-align: center;
+  height: 100%;
+}
+
+.annotation-popup-bg {
+  background: var(--color-surface-panel);
 }
 </style>

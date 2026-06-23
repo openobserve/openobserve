@@ -41,16 +41,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OButton>
   </div>
   <!-- add dashboard -->
-  <ODrawer
+  <ODialog
     v-model:open="showAddDashboardDialog"
-    :width="20"
+    size="sm"
     title="New dashboard"
     :secondary-button-label="t('dashboard.cancel')"
     :primary-button-label="t('dashboard.save')"
+    form-id="add-dashboard-form"
     data-test="dashboard-dashboard-add-dialog"
     @update:open="showAddDashboardDialog = $event"
     @click:secondary="showAddDashboardDialog = false"
-    @click:primary="addDashboardRef?.submit()"
   >
     <AddDashboard
       ref="addDashboardRef"
@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @updated="updateDashboardList"
       :show-folder-selection="false"
     />
-  </ODrawer>
+  </ODialog>
 </template>
 
 <script lang="ts">
@@ -67,7 +67,7 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import AddDashboard from "@/components/dashboards/AddDashboard.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { getAllDashboardsByFolderId } from "@/utils/commons";
 import { onMounted } from "vue";
@@ -75,7 +75,7 @@ import { useLoading } from "@/composables/useLoading";
 
 export default defineComponent({
   name: "SelectDashboardDropdown",
-  components: { AddDashboard, OButton, ODrawer, OSelect },
+  components: { AddDashboard, OButton, ODialog, OSelect },
   emits: ["dashboard-selected", "dashboard-list-updated"],
   props: {
     folderId: {

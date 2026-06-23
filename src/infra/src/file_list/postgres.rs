@@ -655,12 +655,28 @@ SELECT id, account, stream, date, file, records, index_size FROM file_list WHERE
         Ok(ret?.iter().map(|r| r.into()).collect())
     }
 
-    async fn query_by_ids(&self, ids: &[i64]) -> Result<Vec<FileKey>> {
+    async fn query_by_ids(
+        &self,
+        ids: &[i64],
+        time_range: Option<(i64, i64)>,
+    ) -> Result<Vec<FileKey>> {
         if ids.is_empty() {
             return Ok(Vec::default());
         }
         let mut ret = Vec::new();
         let pool = CLIENT_RO.clone();
+
+        // Derive a date filter from the time range to enable partition pruning.
+        // Without it, planning must open and lock every partition and execution
+        // probes every partition's id index. Measured on 2.7B rows / 384 daily
+        // partitions: ~110ms per call without the filter vs 1.2~2.9ms with it.
+        let date_filter = match time_range {
+            Some((time_start, time_end)) if time_start > 0 && time_end >= time_start => {
+                let (date_from, date_to) = derive_date_range(time_start, time_end);
+                format!(" AND date >= '{date_from}' AND date < '{date_to}'")
+            }
+            _ => String::new(),
+        };
 
         for chunk in ids.chunks(get_config().compact.file_list_deleted_batch_size) {
             if chunk.is_empty() {
@@ -672,7 +688,7 @@ SELECT id, account, stream, date, file, records, index_size FROM file_list WHERE
                 .collect::<Vec<String>>()
                 .join(",");
             let query_str = format!(
-                "SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, compressed_size, index_size, bloom_ver FROM file_list WHERE id IN ({ids})"
+                "SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, compressed_size, index_size, bloom_ver FROM file_list WHERE id IN ({ids}){date_filter}"
             );
             DB_QUERY_NUMS
                 .with_label_values(&["query_by_ids", "file_list"])
@@ -1893,7 +1909,7 @@ WHERE org = $1 AND account = $2;"#;
             .with_label_values(&["stats_by_org_account", "file_list"])
             .inc();
         let start = std::time::Instant::now();
-        let ret: Option<(i64, i64)> = sqlx::query_as(sql)
+        let ret: Option<(Option<i64>, Option<i64>)> = sqlx::query_as(sql)
             .bind(org_id)
             .bind(account)
             .fetch_optional(&pool)
@@ -1902,7 +1918,10 @@ WHERE org = $1 AND account = $2;"#;
         DB_QUERY_TIME
             .with_label_values(&["stats_by_org_account", "file_list"])
             .observe(time);
-        Ok(ret.unwrap_or_default())
+        // in case there are no files ingested before settings up storage,
+        // we can get null, so need to handle that with option<>
+        let (storage, index) = ret.unwrap_or_default();
+        Ok((storage.unwrap_or_default(), index.unwrap_or_default()))
     }
 }
 
@@ -3488,7 +3507,7 @@ mod tests {
             meta: create_test_file_meta(),
             deleted,
             id: 0,
-            segment_ids: None,
+            selection: None,
             row_group_size: None,
         }
     }

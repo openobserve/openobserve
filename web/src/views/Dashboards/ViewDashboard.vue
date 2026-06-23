@@ -17,75 +17,49 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div class="tw:rounded-md tw:h-full" :key="store.state.selectedOrganization.identifier">
+  <div :key="store.state.selectedOrganization.identifier" class="tw:h-full">
     <div
       ref="fullscreenDiv"
-      :class="{
-        fullscreen: isFullscreen,
-        'print-mode-container': store.state.printMode,
-      }"
-      :style="
-        !store.state.printMode && !isFullscreen
-          ? { height: 'calc(100vh - var(--navbar-height))' }
-          : {}
-      "
-      class="tw:mx-[0.625rem] tw:flex tw:flex-col tw:overflow-hidden tw:pt-1"
+      :class="[
+        {
+          fullscreen: isFullscreen,
+          'print-mode-container': store.state.printMode,
+        },
+        store.state.printMode === true ? 'tw:pb-6' : '',
+      ]"
+      class="tw:h-full"
     >
-      <div
-        :class="`${
-          store.state.theme === 'light' ? 'tw:bg-white' : 'dark-mode'
-        } stickyHeader ${
+      <PageLayout
+        :main-panel="false"
+        :header-class="
           isFullscreen || store.state.printMode === true
-            ? 'fullscreenHeader'
-            : ''
-        }`"
-        class="tw:mb-[0.625rem]"
+            ? 'stickyHeader fullscreenHeader tw:bg-surface-panel'
+            : 'tw:shrink-0'
+        "
       >
-        <div
-          class="tw:flex tw:justify-between tw:items-center tw:w-full tw:px-[0.626rem] tw:min-w-0 card-container tw:h-[48px]"
-        >
-          <div class="tw:flex tw:flex-1 tw:overflow-hidden">
+        <template #header>
+          <!-- Normal mode: the icon tile is a Back button (→ dashboards list).
+               Fullscreen/print hide the chrome, so there we keep the module icon
+               as the only on-screen branding (no back affordance). -->
+          <AppPageHeader
+            :subtitle="folderNameFromFolderId"
+            :icon="!isFullscreen && store.state.printMode !== true ? undefined : 'dashboard'"
+            :back="
+              !isFullscreen && store.state.printMode !== true
+                ? { label: t('dashboard.header'), onClick: goBackToDashboardList, dataTest: 'dashboard-back-btn' }
+                : undefined
+            "
+            class="tw:px-4 tw:border-b tw:border-border-default"
+          >
+          <template #title>
+            <span data-test="dashboard-name-title">{{ currentDashboardData.data?.title }}</span>
+          </template>
+          <template #actions>
             <OButton
               v-if="!isFullscreen"
               v-show="store.state.printMode !== true"
               variant="outline"
-              size="icon-xs"
-              @click="goBackToDashboardList"
-              data-test="dashboard-back-btn"
-            >
-              <template #icon-left
-                ><OIcon name="arrow-back-ios-new" size="sm"
-              /></template>
-            </OButton>
-            <span
-              class="tw:text-xl tw:tracking-[0.005em] folder-name tw:px-2 tw:cursor-pointer tw:transition-all tw:rounded-sm tw:ml-2"
-              data-test="dashboard-view-folder-breadcrumb"
-              @click="goBackToDashboardList"
-              >{{ folderNameFromFolderId }}
-            </span>
-            <OSpinner
-              v-if="!store.state.organizationData.folders.length"
-              variant="dots"
-              size="sm"
-            />
-            <OIcon
-              class="tw:text-gray-400 tw:mt-1"
-              name="chevron-right" size="sm"
-             />
-            <span
-              class="tw:text-xl tw:tracking-[0.005em] tw:mx-2 tw:truncate tw:flex-1"
-              :title="currentDashboardData.data?.title"
-              data-test="dashboard-name-title"
-            >
-              {{ currentDashboardData.data?.title }}
-            </span>
-          </div>
-          <div class="tw:flex tw:gap-2 tw:items-center">
-            <OButton
-              v-if="!isFullscreen"
-              v-show="store.state.printMode !== true"
-              variant="outline"
-              size="icon-xs"
+              size="icon-toolbar"
               @click="addPanelData"
               data-test="dashboard-panel-add"
               icon-left="add"
@@ -137,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="config.isEnterprise == 'true' && arePanelsLoading"
               v-show="store.state.printMode !== true"
               variant="outline-destructive"
-              size="icon-xs"
+              size="icon-toolbar"
               @click="cancelQuery"
               data-test="dashboard-cancel-btn"
               icon-left="cancel"
@@ -148,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-else
               v-show="store.state.printMode !== true"
               :variant="isVariablesChanged ? 'warning' : 'outline'"
-              size="icon-xs"
+              size="icon-toolbar"
               @click="refreshData"
               :disabled="arePanelsLoading"
               :loading="arePanelsLoading"
@@ -168,14 +142,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-show="store.state.printMode !== true"
               :url="dashboardShareURL"
               variant="outline"
-              size="icon-xs"
+              size="icon-toolbar"
               data-test="dashboard-share-btn"
             />
             <OButton
               v-if="!isFullscreen"
               v-show="store.state.printMode !== true"
               variant="outline"
-              size="icon-xs"
+              size="icon-toolbar"
               data-test="dashboard-setting-btn"
               @click="openSettingsDialog"
               icon-left="settings"
@@ -184,7 +158,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
             <OButton
               variant="outline"
-              size="icon-xs"
+              size="icon-toolbar"
               @click="printDashboard"
               data-test="dashboard-print-btn"
             >
@@ -197,7 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               v-show="store.state.printMode !== true"
               variant="outline"
-              size="icon-xs"
+              size="icon-toolbar"
               @click="toggleFullscreen"
               data-test="dashboard-fullscreen-btn"
             >
@@ -213,7 +187,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="!isFullscreen"
               v-show="store.state.printMode !== true"
               variant="outline"
-              size="icon-xs"
+              size="icon-toolbar"
               @click="openScheduledReports"
               data-test="view-dashboard-scheduled-reports"
             >
@@ -226,20 +200,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="!isFullscreen"
               v-show="store.state.printMode !== true"
               variant="outline"
-              size="icon-xs"
+              size="icon-toolbar"
               data-test="dashboard-json-edit-btn"
               @click="openJsonEditor"
               icon-left="code"
             >
               <OTooltip :content="t('dashboard.editJson')" />
             </OButton>
-          </div>
-        </div>
-        <OSeparator />
-      </div>
+          </template>
+          </AppPageHeader>
+        </template>
 
-      <RenderDashboardCharts
-        :class="store.state.printMode ? '' : 'tw:flex-1 tw:min-h-0'"
+        <RenderDashboardCharts
+        :frame="false"
+        :class="store.state.printMode ? 'tw:px-6' : 'tw:flex-1 tw:min-h-0'"
         :key="
           currentDashboardData.data?.dashboardId + '-' + dashboardRemountKey
         "
@@ -274,7 +248,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :runId="runId"
         @update:runId="updateRunId"
       />
-
       <DashboardSettings
         v-model:open="showDashboardSettingsDialog"
         @refresh="loadDashboard"
@@ -299,11 +272,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :tabs="currentDashboardData?.data?.tabs || []"
       />
 
-      <DashboardJsonEditor
-        v-model:open="showJsonEditorDialog"
-        :dashboard-data="currentDashboardData.data"
-        :save-json-dashboard="saveJsonDashboard"
-      />
+        <DashboardJsonEditor
+          v-model:open="showJsonEditorDialog"
+          :dashboard-data="currentDashboardData.data"
+          :save-json-dashboard="saveJsonDashboard"
+        />
+      </PageLayout>
     </div>
   </div>
 </template>
@@ -315,6 +289,7 @@ import {
   ref,
   watch,
   onActivated,
+  onDeactivated,
   nextTick,
   provide,
   defineAsyncComponent,
@@ -361,6 +336,9 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import PageLayout from "@/components/common/PageLayout.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import type { BreadcrumbItem } from "@/components/common/AppBreadcrumb.vue";
 import { useLoading } from "@/composables/useLoading";
 import shortURLService from "@/services/short_url";
 import { isEqual } from "lodash-es";
@@ -390,6 +368,8 @@ export default defineComponent({
   name: "ViewDashboard",
   emits: ["onDeletePanel"],
   components: {
+    PageLayout,
+    AppPageHeader,
     OSeparator,
     DateTimePickerDashboard,
     ShareButton,
@@ -1249,15 +1229,54 @@ export default defineComponent({
 
     // [END] date picker related variables
 
-    // back button to render dashboard List page
+    // Breadcrumb root crumb → dashboards list (module root; folder defaults).
+    const goToDashboardList = () => {
+      return router.push({
+        path: "/dashboards",
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      });
+    };
+
+    // back button / folder crumb → dashboards list scoped to the current folder.
     const goBackToDashboardList = () => {
       return router.push({
         path: "/dashboards",
         query: {
           folder: route.query.folder ?? "default",
+          org_identifier: store.state.selectedOrganization.identifier,
         },
       });
     };
+
+    // Level-3 ancestor path: Dashboards › <Folder> › <Dashboard> (current).
+    // The two parent crumbs now have distinct targets (root vs current folder)
+    // and the current dashboard is the terminal, non-interactive crumb.
+    const breadcrumbItems = computed<BreadcrumbItem[]>(() => {
+      const items: BreadcrumbItem[] = [
+        {
+          label: t("dashboard.header"),
+          onClick: goToDashboardList,
+          dataTest: "dashboard-back-btn",
+        },
+        {
+          label: folderNameFromFolderId.value,
+          onClick: goBackToDashboardList,
+          title: folderNameFromFolderId.value,
+          dataTest: "dashboard-view-folder-breadcrumb",
+        },
+      ];
+      const title = currentDashboardData.data?.title;
+      if (title) {
+        items.push({
+          label: title,
+          title,
+          dataTest: "dashboard-view-current",
+        });
+      }
+      return items;
+    });
 
     //add panel
     const addPanelData = () => {
@@ -1739,6 +1758,15 @@ export default defineComponent({
     onUnmounted(() => {
       document.removeEventListener("fullscreenchange", onFullscreenChange);
 
+      // Reset print mode on leave. Print mode hides the global chrome
+      // (left nav sidebar). The close button resets it, but navigating away
+      // via the browser back button skips that, leaving the sidebar hidden on
+      // other pages until a manual refresh. Resetting here guarantees the
+      // chrome is restored whenever the dashboard view is destroyed.
+      if (store.state.printMode === true) {
+        setPrint(false);
+      }
+
       // Clean up AI dashboard event listener
       offDashboardEvent(handleAiDashboardEvent);
 
@@ -1873,6 +1901,7 @@ export default defineComponent({
       savePanelLayout,
       renderDashboardChartsRef,
       folderNameFromFolderId,
+      breadcrumbItems,
       showJsonEditorDialog,
       openJsonEditor,
       saveJsonDashboard,
@@ -1906,12 +1935,16 @@ export default defineComponent({
   background-color: $white;
 }
 
-.stickyHeader {
+// The header wrapper is rendered inside PageLayout (a child component), so these
+// rules must use :deep() to cross the scope boundary. Without it the scoped class
+// names passed via `header-class` never match, position:sticky is never applied,
+// and the header scrolls away in print/fullscreen mode.
+:deep(.stickyHeader) {
   position: sticky;
   top: 0;
   z-index: 1001;
 }
-.stickyHeader.fullscreenHeader {
+:deep(.stickyHeader.fullscreenHeader) {
   top: 0px;
   z-index: 5100 !important;
 }
@@ -1929,8 +1962,15 @@ export default defineComponent({
 }
 
 .print-mode-container {
-  height: 100vh !important;
-  overflow-y: auto !important;
+  // Grow to the dashboard's natural content height and let the app's outer
+  // scroll wrapper (MainLayout's .o2-content-scroll) do the scrolling — the same
+  // model the @media print block below relies on. Pinning a viewport height here
+  // (100vh or 100%) capped the subtree, and PageLayout's body (overflow-hidden)
+  // then clipped the trailing panels, so tall dashboards could never be scrolled
+  // to the bottom. `overflow: visible` keeps the sticky header pinned to the
+  // outer scroll wrapper rather than to a dead inner scroll box.
+  height: auto !important;
+  overflow: visible !important;
 }
 
 @media print {
@@ -1957,10 +1997,6 @@ export default defineComponent({
 .dashboard-icons {
   height: 30px;
   transition: all 0.2s ease;
-
-  &:hover {
-    background-color: var(--o2-hover-accent);
-  }
 
   :deep(.q-btn-dropdown) {
     height: 30px;

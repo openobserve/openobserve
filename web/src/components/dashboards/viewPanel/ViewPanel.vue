@@ -15,7 +15,7 @@
 
 <!-- eslint-disable vue/no-unused-components -->
 <template>
-  <div style="height: calc(100vh - 57px); margin: calc(-1 * var(--spacing-3)) calc(-1 * var(--spacing-5))" data-test="view-panel-screen">
+  <div style="height: 100%; display: flex; flex-direction: column; overflow: hidden" data-test="view-panel-screen">
     <div class="tw:flex tw:justify-between tw:items-center tw:p-3">
       <div class="tw:flex tw:items-center tw:text-xl tw:tracking-[0.005em] tw:mr-3">
         <span data-test="dashboard-viewpanel-title">
@@ -86,7 +86,7 @@
       </div>
     </div>
     <OSeparator />
-    <div class="tw:flex" style="height: calc(100vh - 130px); overflow: hidden">
+    <div class="tw:flex" style="flex: 1; overflow: hidden">
       <div class="tw:flex tw:flex-col" style="width: 100%; height: 100%">
         <div class="tw:flex" style="height: 100%; width: 100%">
           <div class="tw:flex tw:flex-col" style="height: 100%; width: 100%">
@@ -389,6 +389,9 @@ export default defineComponent({
     watch(
       () => histogramInterval.value,
       async () => {
+        // Capture the flag BEFORE any await — it may change while we're paused
+        const wasInitialSetup = isInitialHistogramSetup;
+
         // import sql parser if not imported
         if (!parser) {
           await importSqlParser();
@@ -409,7 +412,7 @@ export default defineComponent({
 
         // Mark as changed to signal refresh needed (unless this is initial setup)
         // Note: false means changes need to be applied (flag logic is inverted)
-        if (!isInitialHistogramSetup) {
+        if (!wasInitialSetup) {
           isVariablesChanged.value = false;
         }
       },
@@ -561,7 +564,18 @@ export default defineComponent({
     );
     const refreshData = () => {
       if (!disable.value) {
-        // Apply any pending histogram interval changes
+        // Apply histogram interval to ALL queries before copying to chartData
+        dashboardPanelData.data.queries?.forEach((query: any) => {
+          const originalQuery = query.query;
+          const updatedQuery = replaceHistogramInterval(
+            originalQuery,
+            histogramInterval.value,
+          );
+          if (updatedQuery !== originalQuery) {
+            query.query = updatedQuery;
+          }
+        });
+
         chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
         dateTimePickerRef.value.refresh();
         Object.assign(

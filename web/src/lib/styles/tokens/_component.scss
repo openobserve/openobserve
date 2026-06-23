@@ -34,11 +34,11 @@
 
   /* Button — outline */
   --color-button-outline-text: var(--color-text-primary);
-  --color-button-outline-border: var(--color-primary-300);
+  --color-button-outline-border: var(--color-border-default);
   --color-button-outline-hover-bg: var(--o2-hover-accent);
-  --color-button-outline-hover-border: var(--color-primary-400);
+  --color-button-outline-hover-border: var(--color-primary-300);
   --color-button-outline-active-bg: var(--color-primary-100);
-  --color-button-outline-focus-ring: var(--color-primary-400);
+  --color-button-outline-focus-ring: var(--color-primary-200);
 
   /* Button — ghost */
   --color-button-ghost-text: var(--color-text-primary);
@@ -155,9 +155,9 @@
   --color-tabs-indicator: var(--color-primary-600);
   --color-tabs-active-text: var(--color-primary-600);
   --color-tabs-active-bg: var(--color-primary-100);
-  --color-tabs-inactive-text: var(--color-text-primary);
+  --color-tabs-inactive-text: var(--color-text-heading);
   --color-tabs-hover-text: var(--color-text-primary);
-  --color-tabs-hover-bg: var(--color-primary-50);
+  --color-tabs-hover-bg: color-mix(in srgb, var(--color-primary-100) 50%, var(--color-primary-50));
   --color-tabs-disabled-text: var(--color-text-disabled);
   --color-tabs-bar-border: var(--color-border-default);
   --color-tabs-focus-ring: var(--color-primary-400);
@@ -179,7 +179,7 @@
   /* OFieldList / OFieldRow / OFieldLabel */
   --color-field-list-row-hover-bg:     var(--color-primary-100);
   --color-field-list-group-text:       var(--color-text-secondary);
-  --color-field-list-label-text:       var(--color-text-primary);
+  --color-field-list-label-text:       var(--color-grey-600);
   --color-field-list-label-icon:       var(--color-text-secondary);
   --color-field-list-drag-icon:        var(--color-text-secondary);
   --color-field-list-expand-icon:      var(--color-text-secondary);
@@ -377,9 +377,9 @@
 
   /* Input (OInput, OTextarea) */
   --color-input-bg: var(--color-surface-base);
-  --color-input-border: var(--color-border-strong);
-  --color-input-border-hover: var(--color-primary-400);
-  --color-input-border-focus: var(--color-primary-500);
+  --color-input-border: var(--color-border-default);
+  --color-input-border-hover: var(--color-primary-300);
+  --color-input-border-focus: var(--color-primary-300);
   --color-input-border-error: var(--color-error-500);
   /* Disabled-bg uses grey-200 (#e5e5e5) — `surface-subtle` (grey-100 #f5f5f5)
      was almost identical to the enabled white bg in light mode, making
@@ -387,7 +387,7 @@
   --color-input-disabled-bg: var(--color-grey-200);
   --color-input-disabled-border: var(--color-border-default);
   --color-input-disabled-text: var(--color-text-secondary);
-  --color-input-focus-ring: var(--color-primary-400);
+  --color-input-focus-ring: var(--color-primary-200);
   --color-input-text: var(--color-text-primary);
   --color-input-placeholder: var(--color-text-disabled);
   /* Labels were resolving to text-secondary which is the same muted grey
@@ -403,15 +403,15 @@
 
   /* Select (OSelect) */
   --color-select-bg: var(--color-surface-base);
-  --color-select-border: var(--color-border-strong);
-  --color-select-border-hover: var(--color-primary-400);
-  --color-select-border-focus: var(--color-primary-500);
+  --color-select-border: var(--color-border-default);
+  --color-select-border-hover: var(--color-primary-300);
+  --color-select-border-focus: var(--color-primary-300);
   --color-select-border-error: var(--color-error-500);
   /* Same rationale as input-disabled-bg. */
   --color-select-disabled-bg: var(--color-grey-200);
   --color-select-disabled-text: var(--color-text-secondary);
-  --color-select-focus-ring: var(--color-primary-400);
-  --color-select-text: var(--color-text-primary);
+  --color-select-focus-ring: var(--color-primary-200);
+  --color-select-text: var(--color-text-soft);
   --color-select-placeholder: var(--color-text-disabled);
   /* Select labels were grey (text-secondary) — same fix as input-label. */
   --color-select-label: var(--color-text-primary);
@@ -558,13 +558,18 @@
   --color-option-group-error-text: var(--color-error-600);
 
   /* OTable */
-  --color-table-header-bg: var(--color-surface-subtle);
+  /* Near-white header (prototype thead bg = --g-50 ≈ #FBFBFD): barely distinct
+     from the white body, not a grey band. */
+  --color-table-header-bg: var(--color-surface-panel);
   --color-table-header-text: var(--color-text-secondary);
   --color-table-header-border: var(--color-border-default);
   --color-table-row-hover-bg: var(--color-primary-50);
   --color-table-row-selected-bg: var(--color-primary-100);
   --color-table-row-striped-bg: var(--color-surface-subtle);
-  --color-table-row-divider: var(--color-border-default);
+  /* Row dividers use the SOFT border (HANDOFF.md §8.1): lighter than the
+     structural table outline / sticky-header underline so rows read as a calm
+     list, not a hard grid. The header underline + outer border stay default. */
+  --color-table-row-divider: var(--color-border-subtle);
   --color-table-border: var(--color-border-default);
   --color-table-cell-bg: var(--color-surface-base);
   --color-table-cell-text: var(--color-text-primary);
@@ -576,8 +581,12 @@
   --color-table-sort-icon-inactive: var(--color-text-disabled);
   --color-table-streaming-bar: var(--color-primary-500);
   --color-table-row-expanded-bg: var(--color-surface-subtle);
-  /* Row height tokens — change these to resize all OTable rows globally */
-  --table-row-height-dense: 2.25rem;   /* 36px */
+  /* Subtle amber wash for warning/flagged rows (was an undefined token relying
+     on an inline rgba fallback; now token-based so it's theme-aware). */
+  --color-warning-surface: color-mix(in srgb, var(--color-warning-400) 10%, transparent);
+  /* Row height tokens — change these to resize all OTable rows globally.
+     Compact = prototype --row-h 38px. */
+  --table-row-height-dense: 2.375rem;  /* 38px (prototype compact) */
   --table-row-height-normal: 2.75rem;  /* 44px */
 
   /* ── Banner (OBanner) ──────────────────────────────────── */
@@ -611,6 +620,32 @@
   --color-note-highlight:        var(--color-note-highlight-light);
   --color-note-emphasis:         var(--color-grey-600);
   --color-note-code:             var(--color-note-code-light);
+
+  /* ── OText typography colours (one per variant) — these were previously only
+     in the parallel .css token set, which the app does NOT load, so OText's
+     per-variant colours (esp. meta/section grey) silently fell back to inherited
+     text. Define them here in the .scss set the app actually loads. ── */
+  --color-typography-page-title:  var(--color-text-primary);
+  --color-typography-section:     var(--color-text-secondary);
+  --color-typography-panel-title: var(--color-text-primary);
+  --color-typography-body:        var(--color-text-primary);
+  --color-typography-label:       var(--color-text-primary);
+  --color-typography-meta:        var(--color-text-secondary);
+  --color-typography-mono:        var(--color-text-primary);
+
+  /* ── OCode (inline chip + block) — same .css-only gap as above ── */
+  --color-code-text:              var(--color-text-primary);
+  --color-code-bg:                var(--color-surface-subtle);
+  --color-code-border:            var(--color-border-default);
+  --color-code-block-text:        var(--color-text-primary);
+  --color-code-block-bg:          var(--color-surface-panel);
+  --color-code-copy-icon:         var(--color-text-secondary);
+  --color-code-copy-hover-icon:   var(--color-text-primary);
+  --color-code-copy-hover-bg:     var(--color-surface-subtle-hover);
+
+  /* Skeleton shimmer + datepicker inner border (were .css-only too) */
+  --color-skeleton-shimmer:        rgba(255, 255, 255, 0.8);
+  --color-datepicker-inner-border: var(--color-grey-100);
 }
 
 
@@ -959,7 +994,7 @@
   /* OFieldList / OFieldRow / OFieldLabel */
   --color-field-list-row-hover-bg:     var(--color-field-list-row-hover-bg);
   --color-field-list-group-text:       var(--color-field-list-group-text);
-  --color-field-list-label-text:       var(--color-field-list-label-text);
+  --color-field-list-label-text:       var(--color-text-primary);
   --color-field-list-label-icon:       var(--color-field-list-label-icon);
   --color-field-list-drag-icon:        var(--color-field-list-drag-icon);
   --color-field-list-expand-icon:      var(--color-field-list-expand-icon);
@@ -1092,6 +1127,29 @@
   /* Skeleton */
   --color-skeleton-base: var(--color-skeleton-base);
   --color-skeleton-highlight: var(--color-skeleton-highlight);
+  --color-skeleton-shimmer: var(--color-skeleton-shimmer);
+
+  /* OText typography colours (so tw:text-typography-* utilities generate) */
+  --color-typography-page-title:  var(--color-typography-page-title);
+  --color-typography-section:     var(--color-typography-section);
+  --color-typography-panel-title: var(--color-typography-panel-title);
+  --color-typography-body:        var(--color-typography-body);
+  --color-typography-label:       var(--color-typography-label);
+  --color-typography-meta:        var(--color-typography-meta);
+  --color-typography-mono:        var(--color-typography-mono);
+
+  /* OCode colours */
+  --color-code-text:              var(--color-code-text);
+  --color-code-bg:                var(--color-code-bg);
+  --color-code-border:            var(--color-code-border);
+  --color-code-block-text:        var(--color-code-block-text);
+  --color-code-block-bg:          var(--color-code-block-bg);
+  --color-code-copy-icon:         var(--color-code-copy-icon);
+  --color-code-copy-hover-icon:   var(--color-code-copy-hover-icon);
+  --color-code-copy-hover-bg:     var(--color-code-copy-hover-bg);
+
+  /* Datepicker inner border */
+  --color-datepicker-inner-border: var(--color-datepicker-inner-border);
 
   /* ProgressBar */
   --color-progress-bar-default: var(--color-progress-bar-default);

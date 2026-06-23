@@ -18,7 +18,7 @@ use axum::{
     response::Response,
 };
 use hashbrown::HashMap;
-use o2_enterprise::enterprise::cloud::billings;
+use o2_enterprise::enterprise::cloud::{billing_group, billings};
 
 use super::IntoHttpResponse;
 use crate::{
@@ -58,7 +58,28 @@ pub async fn get_org_usage(
     };
     let unit = query.get("data_type").map(|h| h.as_str()).unwrap_or("mb");
 
-    match org_usage::get_org_usage(&org_id, &usage_range, unit).await {
+    let member_query = query.get("member").map(|h| h.as_str());
+
+    // if member is present in the query, check if it part of the member group, and if so use that
+    // else error out. If member is not present in the query, use the normal org_id
+    let query_org = if let Some(member) = member_query {
+        let members = match billing_group::list_billing_group_members_of(&org_id).await {
+            Ok(v) => v,
+            Err(e) => {
+                log::error!("error listing billing group members of {org_id} : {e}");
+                return MetaHttpResponse::internal_error(format!("error listing members : {e}"));
+            }
+        };
+
+        if members.iter().find(|m| m.member_org_id == member).is_none() {
+            return MetaHttpResponse::bad_request(format!("no member with org id {member} found"));
+        }
+        member
+    } else {
+        &org_id
+    };
+
+    match org_usage::get_org_usage(&org_id, &query_org, &usage_range, unit).await {
         Err(e) => e.into_http_response(),
         Ok(body) => MetaHttpResponse::json(body),
     }

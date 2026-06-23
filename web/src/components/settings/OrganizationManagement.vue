@@ -15,20 +15,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:rounded-md tw:p-0" style="min-height: inherit">
-    <div>
-      <div class="tw:flex tw:items-center tw:justify-between tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]">
-        <div class="tw:text-xl tw:tracking-[0.005em]" data-test="org-management-list-title">
-          {{ t("settings.organizationManagement") }}
-        </div>
-        <OSearchInput
-          data-test="org-management-search-input"
-          v-model="filterQuery"
-          class="tw:ml-auto no-border o2-search-input"
-          :placeholder="t('settings.searchOrgs')"
-        />
-      </div>
+  <div class="tw:rounded-md tw:flex tw:flex-col tw:h-full tw:p-0">
+    <div class="tw:flex tw:flex-col tw:h-full">
+      <!-- Standard section header: title only. Search moved into the table toolbar. -->
+      <AppPageHeader
+        :title="t('settings.organizationManagement')"
+        icon="lan"
+        :subtitle="'Create and manage organizations'"
+        class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+      />
+      <div class="card-container tw:flex-1 tw:min-h-0 tw:mt-2.5 tw:overflow-hidden">
       <OTable
+        :frame="false"
         data-test="org-management-list-table"
         :data="visibleRows"
         :columns="columns"
@@ -39,11 +37,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         sorting="client"
         filter-mode="client"
         :default-columns="false"
+        :enable-column-resize="true"
+        :persist-columns="true"
+        table-id="org-management-list"
         :show-global-filter="false"
         :loading="loading"
       >
+        <template #toolbar>
+          <OSearchInput
+            data-test="org-management-search-input"
+            v-model="filterQuery"
+            class="tw:w-64 no-border o2-search-input"
+            :placeholder="t('settings.searchOrgs')"
+          />
+        </template>
         <template #empty>
-          <NoData />
+          <OEmptyState
+            size="hero"
+            preset="no-organizations"
+            :filtered="!!filterQuery"
+            :hide-action="!filterQuery"
+            @action="(id) => id === 'clear-filters' && (filterQuery = '')"
+          />
         </template>
         <template #cell-actions="{ row }">
           <div class="tw:flex tw:items-center tw:gap-1 tw:justify-center">
@@ -110,6 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
       </OTable>
+      </div>
     </div>
 
     <!-- Extend Trial Dialog -->
@@ -124,9 +140,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:secondary="extendTrialPrompt = false"
       @click:primary="updateTrialPeriod(extendTrialDataRow.identifier, extendedTrial)"
     >
-      <div>
-        <div class="float-left tw:font-bold">Week(s)</div>
-        <div class="float-right tw:gap-1">
+      <div class="tw:flex tw:flex-col tw:gap-3">
+        <div class="tw:font-bold">Week(s)</div>
+        <div class="tw:flex tw:gap-1">
           <span
             v-for="page in 4"
             :key="page"
@@ -134,7 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :class="[
               'tw:cursor-pointer tw:px-2 tw:py-1 page-border',
               extendedTrial === page
-                ? 'tw:bg-[var(--o2-primary)] tw:text-white'
+                ? 'tw:bg-(--o2-primary-btn-bg) tw:text-(--o2-primary-btn-text) tw:border-(--o2-primary-btn-bg)'
                 : 'tw:bg-white tw:text-gray-700 tw:border-gray-300',
             ]"
           >
@@ -183,7 +199,7 @@ import {
   computed,
 } from "vue";
 import { useI18n } from "vue-i18n";
-import NoData from "../shared/grid/NoData.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { timestampToTimezoneDate, getImageURL } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -195,14 +211,17 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { COL } from "@/lib/core/Table/OTable.types";
 import orgStorageService from "@/services/org_storage";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 
 export default defineComponent({
   name: "PageAlerts",
   components: {
-    NoData,
+    AppPageHeader,
+    OEmptyState,
     OButton,
     ODialog,
     OTooltip,
@@ -259,12 +278,19 @@ export default defineComponent({
         header: t("settings.org_name"),
         accessorKey: "name",
         sortable: true,
-        meta: { align: "left" },
+        resizable: true,
+        hideable: true,
+        size: COL.name,
+        minSize: 200,
+        meta: { align: "left", flex: true },
       },
       {
         id: "identifier",
         header: t("settings.org_identifier"),
         accessorKey: "identifier",
+        resizable: true,
+        hideable: true,
+        size: COL.name,
         meta: { align: "left" },
       },
       {
@@ -272,6 +298,9 @@ export default defineComponent({
         header: t("settings.subscription_status"),
         accessorKey: "plan",
         sortable: true,
+        resizable: true,
+        hideable: true,
+        size: COL.status,
         meta: { align: "left" },
       },
       {
@@ -279,6 +308,9 @@ export default defineComponent({
         header: "Provider",
         accessorKey: "billing_provider",
         sortable: true,
+        resizable: true,
+        hideable: true,
+        size: COL.type,
         meta: { align: "left" },
       },
       {
@@ -286,6 +318,9 @@ export default defineComponent({
         header: t("settings.created_on"),
         accessorKey: "created_at",
         sortable: true,
+        resizable: true,
+        hideable: true,
+        size: COL.date,
         meta: { align: "left" },
       },
       {
@@ -293,6 +328,9 @@ export default defineComponent({
         header: t("settings.trial_expiry"),
         accessorKey: "trial_expires_at",
         sortable: true,
+        resizable: true,
+        hideable: true,
+        size: COL.date,
         meta: { align: "left" },
       },
       {
@@ -300,6 +338,9 @@ export default defineComponent({
         header: "Contract End",
         accessorKey: "contract_end_date_display",
         sortable: true,
+        resizable: true,
+        hideable: true,
+        size: COL.date,
         meta: { align: "left" },
       },
       {
