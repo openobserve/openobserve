@@ -19,8 +19,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="panelcontainer"
     @mouseover="() => (isCurrentlyHoveredPanel = true)"
     @mouseleave="() => (isCurrentlyHoveredPanel = false)"
-    @focusin="() => (isCurrentlyHoveredPanel = true)"
-    @focusout="() => (isCurrentlyHoveredPanel = false)"
     :data-test="`dashboard-panel-container`"
     :data-test-panel-id="props.data.id"
     :data-test-panel-title="props.data.title"
@@ -102,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OTooltip>
         </OIcon>
         <OButton
-          v-if="!viewOnly && isCurrentlyHoveredPanel"
+          v-if="!viewOnly && !simplifiedPanelView && isCurrentlyHoveredPanel"
           variant="ghost"
           size="icon"
           @click="onPanelModifyClick('ViewPanel')"
@@ -135,7 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :viewOnly="viewOnly"
         />
         <OButton
-          v-if="!viewOnly"
+          v-if="!viewOnly && !simplifiedPanelView"
           :variant="variablesDataUpdated ? 'ghost-warning' : 'ghost'"
           size="icon"
           @click="() => onRefreshPanel(false)"
