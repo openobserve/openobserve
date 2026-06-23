@@ -40,7 +40,7 @@ the Free Software Foundation, either version 3 of the License, or
       />
 
       <div class="tw:flex tw:items-center tw:justify-between tw:gap-3 tw:mb-2 tw:pl-4.25 tw:pr-3">
-        <label
+        <div
           v-if="filteredEntries.length > 0"
           class="tw:inline-flex tw:items-center tw:gap-2 tw:py-0.5 tw:px-1 tw:text-xs tw:font-medium tw:text-(--o2-text) tw:select-none"
           data-test="score-config-library-select-all"
@@ -49,26 +49,26 @@ the Free Software Foundation, either version 3 of the License, or
             :model-value="allVisibleSelected"
             @update:model-value="toggleSelectAll"
           />
-          <span>{{ allVisibleSelected ? "Clear all" : "Select all" }}</span>
-        </label>
+          <span class="tw:cursor-pointer" @click="toggleSelectAll">{{ allVisibleSelected ? "Clear all" : "Select all" }}</span>
+        </div>
         <span class="tw:text-xs tw:text-gray-500">
           {{ filteredEntries.length }} score config(s)
         </span>
       </div>
 
-      <div class="tw:overflow-y-auto tw:flex-1 tw:min-h-0">
+      <div class="tw:overflow-y-auto tw:flex-1 tw:min-h-0 tw:pb-4">
         <section
           v-for="(group, index) in groupedEntries"
           :key="group.dataType"
           :class="{ 'tw:mt-4': index > 0 }"
           :data-test="`score-config-library-section-${group.dataType}`"
         >
-          <h4
+          <div
             class="tw:flex tw:items-baseline tw:gap-1.5 tw:mt-0 tw:mx-0 tw:mb-1.5 tw:text-xs tw:font-bold tw:uppercase tw:tracking-[0.04em] tw:text-(--o2-text)"
           >
             <span class="tw:text-(--o2-text)">{{ group.label }}</span>
             <span class="tw:font-medium tw:text-(--o2-text-muted)">({{ group.entries.length }})</span>
-          </h4>
+          </div>
           <ul
             class="tw:flex tw:flex-col tw:rounded tw:border tw:border-border"
           >
