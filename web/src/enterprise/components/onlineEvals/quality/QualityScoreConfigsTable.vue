@@ -1,26 +1,5 @@
 ﻿<template>
   <section class="tw:flex tw:flex-col tw:gap-[10px] tw:min-h-0 tw:flex-1" data-test="quality-score-configs-overview">
-    <header class="tw:flex tw:items-center tw:justify-between tw:gap-3">
-      <div class="tw:flex tw:items-baseline tw:gap-[10px] tw:min-w-0">
-        <h3 class="tw:m-0 tw:text-sm tw:font-bold tw:text-[var(--color-text-primary,currentColor)]">{{ t("onlineEvals.quality.overview.title") }}</h3>
-        <span class="tw:text-xs tw:text-[var(--color-text-secondary,var(--o2-text-secondary))]">
-          {{ t("onlineEvals.quality.overview.countSuffix", { n: filteredRows.length }) }}
-        </span>
-      </div>
-
-      <OInput
-        v-model="filter"
-        :placeholder="t('onlineEvals.quality.overview.searchPlaceholder')"
-        size="sm"
-        class="tw:min-w-[220px] tw:max-w-[320px]"
-        data-test="quality-overview-filter-input"
-      >
-        <template #icon-left>
-          <OIcon name="search" size="xs" />
-        </template>
-      </OInput>
-    </header>
-
     <div v-if="isLoading && rows.length === 0" class="tw:flex tw:flex-col tw:items-center tw:gap-2 tw:py-8 tw:px-3 tw:border tw:border-dashed tw:border-[var(--color-dialog-header-border,var(--o2-border))] tw:rounded-md tw:text-center tw:text-[var(--color-text-secondary,var(--o2-text-secondary))]">
       <OSpinner size="sm" />
       <span>{{ t("onlineEvals.quality.overview.loading") }}</span>

@@ -1,15 +1,13 @@
 <template>
   <div
-    class="quality-page"
+    class="quality-page tw:flex tw:flex-col tw:gap-[14px] tw:p-[14px_16px_18px] tw:min-h-0 tw:flex-1"
     data-test="quality-page"
-    tw:flex tw:flex-col tw:gap-[14px] tw:p-[14px_16px_18px] tw:min-h-0 tw:flex-1
   >
     <QualityKpiSkeleton
       v-if="showKpiSkeleton"
       :count="visibleKpis.length"
     />
-    <section v-else class="quality-page__kpis" aria-label="Tier 1 KPIs"
-      tw:grid tw:gap-[10px]
+    <section v-else class="quality-page__kpis tw:grid tw:gap-[10px]" aria-label="Tier 1 KPIs"
       style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr))"
     >
       <QualityKpiCard
@@ -24,8 +22,7 @@
          row opens the detail in a right-side ODrawer (70% width) instead
          of replacing the whole page. The user keeps full context of the
          list behind the drawer. -->
-    <div class="quality-page__tier2"
-      tw:grid tw:gap-3 tw:min-h-0 tw:flex-1
+    <div class="quality-page__tier2 tw:grid tw:gap-3 tw:min-h-0 tw:flex-1"
       style="grid-template-columns: minmax(0, 1fr)"
     >
       <QualityScoreConfigsTable
@@ -48,22 +45,20 @@
            the inner panel no longer renders its own title row. -->
       <template #header-right>
         <span
-          class="qpd-type"
+          class="qpd-type tw:inline-flex tw:py-0 tw:px-1 tw:rounded-[2px] tw:font-bold tw:text-[8px] tw:leading-[1.4] tw:tracking-[0.02em]"
           :class="{
             'tw:bg-[color-mix(in_srgb,#6b76e3_14%,transparent)] tw:text-[#4f5bcf]': detailDataType === 'numeric',
             'tw:bg-[color-mix(in_srgb,#9333ea_14%,transparent)] tw:text-[#7c3aed]': detailDataType === 'categorical',
             'tw:bg-[color-mix(in_srgb,#16a34a_14%,transparent)] tw:text-[#15803d]': detailDataType === 'boolean',
           }"
           data-test="quality-detail-type-badge"
-          tw:inline-flex tw:py-0 tw:px-1 tw:rounded-[2px] tw:font-bold tw:text-[8px] tw:leading-[1.4] tw:tracking-[0.02em]
         >
           {{ shortType(detailDataType) }}
         </span>
         <span
           v-if="selectedConfig?.version"
-          class="qpd-version"
+          class="qpd-version tw:ml-[6px] tw:text-[11px] tw:text-(--color-text-secondary) tw:[font-variant-numeric:tabular-nums]"
           data-test="quality-detail-version-badge"
-          tw:ml-[6px] tw:text-[11px] tw:text-(--color-text-secondary) tw:[font-variant-numeric:tabular-nums]
         >v{{ selectedConfig.version }}</span>
       </template>
 
