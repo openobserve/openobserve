@@ -237,7 +237,7 @@ function toggleExpanded() {
             v-model="selectorTypeComputed"
             label="Selector type"
             :options="selectorTypeOptions"
-            class="tw:w-32 tw:shrink-0"
+            class="tw:w-32! tw:shrink-0"
             data-test="synthetics-journey-step-selector-type-select"
           />
           <OInput

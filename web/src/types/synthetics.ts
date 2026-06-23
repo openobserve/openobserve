@@ -22,6 +22,7 @@ export interface BrowserStep {
   selectorType?: SelectorType
   value?: string
   timeout?: number // ms, default 30000
+  code: string
 }
 
 // ── OpenObserve Extension (playwright-crx) recorder protocol ────────────────
@@ -59,7 +60,7 @@ export interface WireStep {
 /** Commands the web app sends to the extension via `chrome.runtime.sendMessage`. */
 export type RecorderCommand =
   | { action: 'getStatus' }
-  | { action: 'startRecording'; targetUrl?: string }
+  | { action: 'startRecording'; mode?: RecorderMode; testIdAttr?: string, targetUrl: string }
   | { action: 'stopRecording' }
   | { action: 'setMode'; mode: RecorderMode }
 
@@ -86,15 +87,34 @@ export interface RecorderStartResponse {
 
 export interface RecorderStopResponse {
   success: boolean
-  steps: WireStep[]
+  error?: string
 }
 
-/** Messages the extension pushes over the long-lived recording port. */
-export type RecorderPortMessage =
-  | { type: 'steps'; steps: WireStep[] }
-  | { type: 'mode'; mode: RecorderMode }
-  | { type: 'url'; url: string }
-  | { type: 'stopped'; steps: WireStep[] }
+// ── Live data pushed over the port ──────────────────────────────────────────
+// Mirrors the extension's `ExtensionToO2Message` / `ExtensionToO2Payload`
+// (examples/synthetics-recorder/src/messaging.ts). The discriminant for data
+// pushes is `payload.method`, NOT the top-level `type`. We model only the fields
+// the web app consumes; `sources`/`elementInfo` are opaque here.
+export type RecorderPushPayload =
+  | { method: 'setMode'; mode: RecorderMode }
+  | { method: 'setActions'; browserSteps: WireStep[]; sources?: unknown[] }
+  | { method: 'setSources'; sources?: unknown[]; generatedCode?: string; generatedLanguage?: string }
+  | { method: 'elementPicked'; elementInfo: unknown; userGesture?: boolean }
+  | { method: 'recordingStarted'; tabId: number; url: string }
+  | { method: 'recordingStopped'; totalSteps: number }
+  | { method: 'stepReplayResult'; stepId: string; passed: boolean; duration_ms: number; error?: string }
+
+/** Live data push: `{ type:'synthetics-recorder', recordingId, payload }`. */
+export interface RecorderPortMessage {
+  type: 'synthetics-recorder'
+  recordingId: string
+  payload: RecorderPushPayload
+}
+
+/** Anything the extension can post over the port (data push + command acks). */
+export type RecorderPortInbound =
+  | RecorderPortMessage
+  | { type: 'synthetics-response'; response: unknown }
 
 export interface BrowserCheckSchedule {
   type: 'interval' | 'cron'

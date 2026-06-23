@@ -85,9 +85,9 @@ describe('useSyntheticsRecorder', () => {
   })
 
   describe('startRecording', () => {
-    it('should open a port, start recording, and map streamed steps', async () => {
+    it('should open the named port, start recording, and map setActions pushes', async () => {
       const runtime = installChrome(
-        { startRecording: (cb) => cb({ success: true, tabId: 7 }) },
+        { startRecording: (cb) => cb({ success: true }) },
         port,
       )
       const r = useSyntheticsRecorder()
@@ -97,13 +97,21 @@ describe('useSyntheticsRecorder', () => {
       expect(r.isRecording.value).toBe(true)
       expect(r.currentUrl.value).toBe('https://app.test/login')
 
-      const wire: WireStep[] = [{ id: 's1', action: 'click', selector: '#go', selector_type: 'css' }]
-      port.emit({ type: 'steps', steps: wire })
+      const browserSteps: WireStep[] = [{ id: 's1', action: 'click', selector: '#go', selector_type: 'css' }]
+      port.emit({ type: 'synthetics-recorder', recordingId: 'rec_1', payload: { method: 'setActions', browserSteps } })
       expect(r.liveSteps.value).toHaveLength(1)
       expect(r.liveSteps.value[0].selectorType).toBe('CSS')
 
-      port.emit({ type: 'url', url: 'https://app.test/next' })
+      port.emit({ type: 'synthetics-recorder', recordingId: 'rec_1', payload: { method: 'recordingStarted', tabId: 9, url: 'https://app.test/next' } })
       expect(r.currentUrl.value).toBe('https://app.test/next')
+    })
+
+    it('should ignore command-ack messages on the port', async () => {
+      installChrome({ startRecording: (cb) => cb({ success: true }) }, port)
+      const r = useSyntheticsRecorder()
+      await r.startRecording('https://app.test')
+      port.emit({ type: 'synthetics-response', response: { success: true } })
+      expect(r.liveSteps.value).toHaveLength(0)
     })
 
     it('should surface an error and tear down when start fails', async () => {
@@ -117,18 +125,20 @@ describe('useSyntheticsRecorder', () => {
   })
 
   describe('stopRecording', () => {
-    it('should return mapped final steps and tear down the port', async () => {
+    it('should return the live-accumulated steps and tear down the port', async () => {
       installChrome(
         {
           startRecording: (cb) => cb({ success: true }),
-          stopRecording: (cb) => cb({ success: true, steps: [{ id: 's1', action: 'navigate', url: 'https://x.test' }] }),
+          stopRecording: (cb) => cb({ success: true }),
         },
         port,
       )
       const r = useSyntheticsRecorder()
       await r.startRecording('https://x.test')
-      const steps = await r.stopRecording()
+      // Steps arrive live over the port, not in the stop response.
+      port.emit({ type: 'synthetics-recorder', recordingId: 'rec_1', payload: { method: 'setActions', browserSteps: [{ id: 's1', action: 'navigate', url: 'https://x.test' }] } })
 
+      const steps = await r.stopRecording()
       expect(steps).toHaveLength(1)
       expect(steps[0].action).toBe('navigate')
       expect(steps[0].value).toBe('https://x.test')

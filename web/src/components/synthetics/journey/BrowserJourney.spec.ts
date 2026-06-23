@@ -100,7 +100,7 @@ describe('BrowserJourney recording', () => {
     expect((globalThis as any).chrome.runtime.connect).toHaveBeenCalled()
     expect(wrapper.find('[data-test="synthetics-journey-stop-btn"]').exists()).toBe(true)
 
-    port.emit({ type: 'steps', steps: [{ id: 's1', action: 'click', name: 'Click login', selector: '#login' }] })
+    port.emit({ type: 'synthetics-recorder', recordingId: 'rec_1', payload: { method: 'setActions', browserSteps: [{ id: 's1', action: 'click', name: 'Click login', selector: '#login' }] } })
     await flushPromises()
 
     expect(wrapper.findAll('.bjs-stub')).toHaveLength(1)
@@ -111,13 +111,16 @@ describe('BrowserJourney recording', () => {
     installChrome(
       {
         startRecording: (cb) => cb({ success: true }),
-        stopRecording: (cb) => cb({ success: true, steps: [{ id: 's1', action: 'navigate', url: 'https://app.test' }] }),
+        stopRecording: (cb) => cb({ success: true }),
       },
       port,
     )
     wrapper = mountJourney({ modelValue: [], extensionReady: true })
 
     await wrapper.find('[data-test="synthetics-journey-record-btn"]').trigger('click')
+    await flushPromises()
+    // Steps stream in live over the port, then Stop merges them.
+    port.emit({ type: 'synthetics-recorder', recordingId: 'rec_1', payload: { method: 'setActions', browserSteps: [{ id: 's1', action: 'navigate', url: 'https://app.test' }] } })
     await flushPromises()
     await wrapper.find('[data-test="synthetics-journey-stop-btn"]').trigger('click')
     await flushPromises()

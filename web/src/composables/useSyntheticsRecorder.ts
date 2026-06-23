@@ -8,7 +8,7 @@ import type {
   RecorderCommand,
   RecorderCommandEnvelope,
   RecorderMode,
-  RecorderPortMessage,
+  RecorderPortInbound,
   RecorderStartResponse,
   RecorderStatus,
   RecorderStopResponse,
@@ -79,46 +79,73 @@ const useSyntheticsRecorder = () => {
     }
   }
 
+  // The extension pushes `{ type:'synthetics-recorder', recordingId, payload }`
+  // data events (discriminated by `payload.method`) and `synthetics-response`
+  // command acks over the port. We consume the data events; acks are ignored
+  // since commands use the one-shot sendMessage request/response path.
   function handlePortMessage(message: unknown) {
-    const msg = message as RecorderPortMessage
-    switch (msg.type) {
-      case 'steps':
-        liveSteps.value = mapWireSteps(msg.steps)
+    const msg = message as RecorderPortInbound
+    if (msg.type !== 'synthetics-recorder') return
+
+    const { payload } = msg
+    switch (payload.method) {
+      case 'setActions':
+        liveSteps.value = mapWireSteps(payload.browserSteps)
         break
-      case 'url':
-        currentUrl.value = msg.url
+      case 'recordingStarted':
+        currentUrl.value = payload.url
+        isRecording.value = true
         break
-      case 'mode':
-        mode.value = msg.mode
-        break
-      case 'stopped':
-        liveSteps.value = mapWireSteps(msg.steps)
+      case 'recordingStopped':
         isRecording.value = false
         break
+      case 'setMode':
+        mode.value = payload.mode
+        break
+      // setSources / elementPicked / stepReplayResult: not consumed yet
+    }
+  }
+
+  // Open the long-lived port the extension streams events over. Guarded because
+  // a stale extension context (e.g. extension reloaded after the page loaded)
+  // makes `connect`/`onMessage` throw "Extension context invalidated".
+  function connectPort(): boolean {
+    const runtime = getRuntime()
+    if (!runtime) {
+      error.value = 'Chrome extension messaging is not available in this browser.'
+      return false
+    }
+    try {
+      port = runtime.connect(extensionId, { name: RECORDING_PORT_NAME })
+      port.onMessage.addListener(handlePortMessage)
+      port.onDisconnect.addListener(() => {
+        port = null
+        isRecording.value = false
+      })
+      return true
+    } catch (err) {
+      port = null
+      error.value =
+        err instanceof Error && /context invalidated/i.test(err.message)
+          ? 'The recorder extension was reloaded — please refresh this page and try again.'
+          : 'Could not connect to the recorder extension.'
+      return false
     }
   }
 
   /**
-   * Open the live port and ask the extension to start recording.
-   * The extension opens its own top-level tab; steps arrive over the port.
+   * Open the live port and ask the extension to start recording. The extension
+   * opens its own top-level tab; steps stream back over the port via setActions.
+   * `targetUrl` is kept only for the local recording banner — the extension
+   * command itself takes no URL.
    */
   async function startRecording(targetUrl: string): Promise<void> {
-    const runtime = getRuntime()
-    if (!runtime) {
-      error.value = 'Chrome extension messaging is not available in this browser.'
-      return
-    }
     error.value = ''
     liveSteps.value = []
     currentUrl.value = targetUrl
     mode.value = 'recording'
 
-    port = runtime.connect(extensionId, { name: RECORDING_PORT_NAME })
-    port.onMessage.addListener(handlePortMessage)
-    port.onDisconnect.addListener(() => {
-      port = null
-      isRecording.value = false
-    })
+    if (!connectPort()) return
 
     const res = await sendCommand<RecorderStartResponse>({ action: 'startRecording', targetUrl })
     if (!res?.success) {
@@ -126,14 +153,17 @@ const useSyntheticsRecorder = () => {
       teardownPort()
       return
     }
-    console.log("res ----- ", res);
     isRecording.value = true
   }
 
-  /** Stop recording and return the final mapped steps. */
+  /**
+   * Stop recording and return the final mapped steps. The stop response carries
+   * no steps — the journey was already built live from setActions pushes, so we
+   * return the accumulated `liveSteps`.
+   */
   async function stopRecording(): Promise<BrowserStep[]> {
-    const res = await sendCommand<RecorderStopResponse>({ action: 'stopRecording' })
-    const steps = res?.steps ? mapWireSteps(res.steps) : liveSteps.value
+    await sendCommand<RecorderStopResponse>({ action: 'stopRecording' })
+    const steps = [...liveSteps.value]
     teardownPort()
     isRecording.value = false
     liveSteps.value = []
