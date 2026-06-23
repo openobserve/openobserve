@@ -345,7 +345,10 @@ size="xs" class="warning" />{{
             <!-- Submenu — absolutely positioned to the left of parent dropdown -->
             <div
               v-if="showLanguageSubmenu"
-              class="tw:absolute tw:right-full tw:top-0 tw:mr-1 tw:min-w-50 tw:bg-white tw:border tw:border-black/12 tw:rounded-md tw:shadow-[0_8px_24px_rgba(0,0,0,0.15)] tw:py-1 tw:z-9999 tw:dark:bg-[#1f2937] tw:dark:border-[rgba(255,255,255,0.12)] tw:dark:shadow-[0_8px_24px_rgba(0,0,0,0.5)]"
+              class="tw:absolute tw:right-full tw:top-0 tw:mr-1 tw:min-w-50 tw:border tw:rounded-md tw:py-1 tw:z-9999"
+              :class="store.state.theme === 'dark'
+                ? 'tw:bg-[#1f2937] tw:border-[rgba(255,255,255,0.12)] tw:shadow-[0_8px_24px_rgba(0,0,0,0.5)]'
+                : 'tw:bg-white tw:border-black/12 tw:shadow-[0_8px_24px_rgba(0,0,0,0.15)]'"
               data-test="language-dropdown-item"
               @click.stop
             >
@@ -354,10 +357,13 @@ size="xs" class="warning" />{{
                 :key="lang.code"
                 type="button"
                 :data-test="`language-dropdown-item-${lang.code}`"
-                class="tw:flex tw:items-center tw:gap-2.5 tw:w-full tw:py-1.5 tw:px-3 tw:text-sm tw:leading-[1.2] tw:text-left tw:bg-transparent tw:border-0 tw:cursor-pointer tw:text-inherit tw:hover:bg-[rgba(0,0,0,0.05)] tw:dark:hover:bg-[rgba(255,255,255,0.08)]"
-                :class="{
-                  'tw:font-semibold': selectedLanguage.code === lang.code,
-                }"
+                class="tw:flex tw:items-center tw:gap-2.5 tw:w-full tw:py-1.5 tw:px-3 tw:text-sm tw:leading-[1.2] tw:text-left tw:bg-transparent tw:border-0 tw:cursor-pointer tw:text-inherit"
+                :class="[
+                  store.state.theme === 'dark'
+                    ? 'tw:hover:bg-[rgba(255,255,255,0.08)]'
+                    : 'tw:hover:bg-[rgba(0,0,0,0.05)]',
+                  { 'tw:font-semibold': selectedLanguage.code === lang.code },
+                ]"
                 @click="changeLanguage(lang); showLanguageSubmenu = false"
               >
                 <img
