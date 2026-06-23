@@ -790,7 +790,13 @@ useShortcutsWithMac([
     key: "r",
     scope: "reports",
     description: "shortcuts.actions.reportsRefresh",
-    handler: () => { if (!isInputFocused()) loadReports(activeFolderId.value); },
+    handler: () => {
+      if (!isInputFocused()) {
+        // Match the refresh button: drop the cache first so it actually reloads.
+        invalidateFolderCache(activeFolderId.value);
+        loadReports(activeFolderId.value);
+      }
+    },
   },
   {
     key: "/",
