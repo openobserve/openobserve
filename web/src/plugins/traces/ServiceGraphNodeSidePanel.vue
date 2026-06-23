@@ -266,7 +266,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :enable-text-highlight="false"
                     :enable-status-bar="false"
                     :enable-ai-context-button="false"
-                    :row-height="28"
+                    :row-height="38"
                     @sort-change="handleSortChange"
                     @click:data-row="
                       (row: any) =>
@@ -287,34 +287,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >
                     </template>
                     <template #cell-p99="{ item }">
-                      <span
-                        :class="
-                          item.p99 > 0
-                            ? 'tw:text-[var(--o2-latency-p99)]'
-                            : ''
-                        "
-                        >{{ formatOperationLatency(item.p99) }}</span
-                      >
+                      <ServiceCatalogBarCell
+                        :value="item.p99"
+                        :max="rowMaxes(sortedOperationsTableRows, ['p99']).p99"
+                        :label="formatOperationLatency(item.p99)"
+                        variant="warning"
+                      />
                     </template>
                     <template #cell-p95="{ item }">
-                      <span
-                        :class="
-                          item.p95 > 0
-                            ? 'tw:text-[var(--o2-latency-p95)]'
-                            : ''
-                        "
-                        >{{ formatOperationLatency(item.p95) }}</span
-                      >
+                      <ServiceCatalogBarCell
+                        :value="item.p95"
+                        :max="rowMaxes(sortedOperationsTableRows, ['p95']).p95"
+                        :label="formatOperationLatency(item.p95)"
+                      />
                     </template>
                     <template #cell-p75="{ item }">
-                      <span
-                        :class="
-                          item.p75 > 0
-                            ? 'tw:text-[var(--o2-latency-p75)]'
-                            : ''
-                        "
-                        >{{ formatOperationLatency(item.p75) }}</span
-                      >
+                      <ServiceCatalogBarCell
+                        :value="item.p75"
+                        :max="rowMaxes(sortedOperationsTableRows, ['p75']).p75"
+                        :label="formatOperationLatency(item.p75)"
+                      />
                     </template>
                     <template #cell-actions="{ row, column, active }">
                       <OButton
@@ -381,7 +373,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :enable-text-highlight="false"
                   :enable-status-bar="false"
                   :enable-ai-context-button="false"
-                  :row-height="28"
+                  :row-height="38"
                   @sort-change="handleSortChange"
                   @click:data-row="
                     (row: any) =>
@@ -424,34 +416,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                   </template>
                   <template #cell-p99="{ item }">
-                    <span
-                      :class="
-                        item.p99 > 0
-                          ? 'tw:text-[var(--o2-latency-p99)]'
-                          : ''
-                      "
-                      >{{ formatOperationLatency(item.p99) }}</span
-                    >
+                    <ServiceCatalogBarCell
+                      :value="item.p99"
+                      :max="rowMaxes(sortResourceRows(buildResourceTableRows(cfg)), ['p99']).p99"
+                      :label="formatOperationLatency(item.p99)"
+                      variant="warning"
+                    />
                   </template>
                   <template #cell-p95="{ item }">
-                    <span
-                      :class="
-                        item.p95 > 0
-                          ? 'tw:text-[var(--o2-latency-p95)]'
-                          : ''
-                      "
-                      >{{ formatOperationLatency(item.p95) }}</span
-                    >
+                    <ServiceCatalogBarCell
+                      :value="item.p95"
+                      :max="rowMaxes(sortResourceRows(buildResourceTableRows(cfg)), ['p95']).p95"
+                      :label="formatOperationLatency(item.p95)"
+                    />
                   </template>
                   <template #cell-p75="{ item }">
-                    <span
-                      :class="
-                        item.p75 > 0
-                          ? 'tw:text-[var(--o2-latency-p75)]'
-                          : ''
-                      "
-                      >{{ formatOperationLatency(item.p75) }}</span
-                    >
+                    <ServiceCatalogBarCell
+                      :value="item.p75"
+                      :max="rowMaxes(sortResourceRows(buildResourceTableRows(cfg)), ['p75']).p75"
+                      :label="formatOperationLatency(item.p75)"
+                    />
                   </template>
                   <template #empty>
                     <div
@@ -611,6 +595,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import { toast } from "@/lib/feedback/Toast/useToast";
+import ServiceCatalogBarCell from "./components/ServiceCatalogBarCell.vue";
 
 const TelemetryCorrelationDashboard = defineAsyncComponent(
   () => import("@/plugins/correlation/TelemetryCorrelationDashboard.vue"),
@@ -857,6 +842,7 @@ export default defineComponent({
     OTooltip,
     OCheckbox,
     OIcon,
+    ServiceCatalogBarCell,
 },
   props: {
     selectedNode: {
@@ -2342,6 +2328,14 @@ export default defineComponent({
      return ['p99','p95','p75'].includes(column);
     }
 
+    function rowMaxes(rows: any[], fields: string[]): Record<string, number> {
+      const result: Record<string, number> = {};
+      for (const f of fields) {
+        result[f] = rows.reduce((m, r) => Math.max(m, r[f] ?? 0), 0) || 1;
+      }
+      return result;
+    }
+
     return {
       t,
       serviceMetrics,
@@ -2403,7 +2397,8 @@ export default defineComponent({
       handleSortChange,
       sortResourceRows,
       formatOperationLatency,
-      isDurationColumn
+      isDurationColumn,
+      rowMaxes,
     };
   },
 });
@@ -3088,5 +3083,10 @@ export default defineComponent({
   .metrics-correlation-dashboard .q-splitter--vertical > .q-splitter__separator
 ) {
   height: 100% !important;
+}
+
+:deep([data-o2-drawer]) {
+  border-top-left-radius: 0.75rem;
+  border-bottom-left-radius: 0.75rem;
 }
 </style>
