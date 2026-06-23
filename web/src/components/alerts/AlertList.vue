@@ -376,7 +376,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :data-test="`alert-list-${row.name}-more-options`"
                         />
                       </template>
-                      <ODropdownItem @select="moveAlertToAnotherFolder(row)">
+                      <ODropdownItem
+                        :data-test="`alert-list-${row.name}-move-alert`"
+                        @select="moveAlertToAnotherFolder(row)"
+                      >
                         <template #icon-left>
                           <OIcon name="drive-file-move" size="sm" />
                         </template>
@@ -384,6 +387,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </ODropdownItem>
                       <ODropdownSeparator />
                       <ODropdownItem
+                        :data-test="`alert-list-${row.name}-delete-alert`"
                         variant="destructive"
                         shortcut="del"
                         @select="showDeleteDialogFn({ row })"
@@ -394,7 +398,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         {{ t("alerts.delete") }}
                       </ODropdownItem>
                       <ODropdownSeparator />
-                      <ODropdownItem shortcut="x" @select="exportAlert(row)">
+                      <ODropdownItem
+                        :data-test="`alert-list-${row.name}-export-alert`"
+                        shortcut="x"
+                        @select="exportAlert(row)"
+                      >
                         <template #icon-left>
                           <OIcon size="sm" name="download" />
                         </template>
