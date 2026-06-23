@@ -2889,7 +2889,7 @@
     "createdBy": "Created By",
     "createdAt": "Created At",
     "lastRunAt": "Last Run At",
-    "lastSuccessfulAt": "Last Successfull At",
+    "lastSuccessfulAt": "Last Successful At",
     "status": "Status",
     "numOfEvents": "Number of Events",
     "view": "View",
