@@ -3237,7 +3237,11 @@ export default defineComponent({
         scope: "logs",
         description: "shortcuts.actions.focusSearch",
         handler: () => {
-          const el = document.querySelector<HTMLElement>('[data-test="logs-search-bar"] .cm-editor');
+          // The logs query editor is Monaco — focus its inner textarea
+          // (`.monaco-editor textarea`), not a CodeMirror `.cm-editor`.
+          const el = document.querySelector<HTMLElement>(
+            '[data-test="logs-search-bar-query-editor"] textarea, [data-test="logs-search-bar"] .monaco-editor textarea, [data-test="logs-search-bar"] .cm-editor',
+          );
           el?.focus();
         },
       },
@@ -3276,15 +3280,6 @@ export default defineComponent({
         handler: () => {
           if (isInputFocused()) return;
           (searchBarRef.value as any)?.fnSavedView?.();
-        },
-      },
-      {
-        key: "ctrl+shift+c",
-        scope: "logs",
-        description: "shortcuts.actions.logsCopyQuery",
-        handler: () => {
-          const query: string = searchObj.data?.query ?? "";
-          navigator.clipboard.writeText(query);
         },
       },
       {

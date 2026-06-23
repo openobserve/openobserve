@@ -101,7 +101,6 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
       { key: "ctrl+h",       descriptionKey: "shortcuts.actions.logsSearchHistory" },
       { key: "/",            descriptionKey: "shortcuts.actions.focusSearch" },
       { key: "s",            descriptionKey: "shortcuts.actions.logsSaveView" },
-      { key: "ctrl+shift+c", descriptionKey: "shortcuts.actions.logsCopyQuery" },
       { key: "ctrl+shift+d", descriptionKey: "shortcuts.actions.logsExport" },
     ],
   },
