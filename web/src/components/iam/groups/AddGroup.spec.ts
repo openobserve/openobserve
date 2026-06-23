@@ -186,6 +186,16 @@ describe("AddGroup", () => {
       );
     });
 
+    it("blocks submit when the name exceeds 100 characters (max rule)", async () => {
+      const { createGroup } = await import("@/services/iam");
+      // maxlength caps typing, so set the value directly to exercise the schema.
+      getForm(wrapper).vm.form.setFieldValue("name", "a".repeat(101));
+      await submitForm(wrapper);
+
+      expect(getForm(wrapper).vm.form.state.isValid).toBe(false);
+      expect(createGroup).not.toHaveBeenCalled();
+    });
+
     it("submits and calls createGroup once when the name is valid", async () => {
       const { createGroup } = await import("@/services/iam");
       vi.mocked(createGroup).mockResolvedValue({

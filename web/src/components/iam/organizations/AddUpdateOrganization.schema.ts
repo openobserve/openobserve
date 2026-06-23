@@ -23,7 +23,9 @@ export const makeAddUpdateOrganizationSchema = (t: (_key: string) => string) =>
       .regex(
         orgNameRegex,
         "Use alphanumeric characters, space and underscore only.",
-      ),
+      )
+      // Mirrors the input's maxlength=100 (defense-in-depth for non-typed values).
+      .max(100, "Name must be at most 100 characters."),
     makeBilledMember: z.boolean().optional(),
   });
 

@@ -179,6 +179,16 @@ describe("AddUpdateOrganization", () => {
       );
     });
 
+    it("blocks submit when the name exceeds 100 characters (max rule)", async () => {
+      const wrapper = mountComp();
+      // maxlength caps typing, so set the value directly to exercise the schema.
+      getForm(wrapper).vm.form.setFieldValue("name", "a".repeat(101));
+      await submitForm(wrapper);
+
+      expect(getForm(wrapper).vm.form.state.isValid).toBe(false);
+      expect(orgService.create).not.toHaveBeenCalled();
+    });
+
     it("trims name on submit and calls create, emits updated + update:open false", async () => {
       const wrapper = mountComp();
       await getNameInput(wrapper).setValue("  My Org  ");

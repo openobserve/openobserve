@@ -20,7 +20,9 @@ export const makeAddGroupSchema = (t: (_key: string) => string) =>
       .regex(
         groupNameRegex,
         "Use alphanumeric and '_' characters only, without spaces.",
-      ),
+      )
+      // Mirrors the input's maxlength=100 (defense-in-depth for non-typed values).
+      .max(100, "Name must be at most 100 characters."),
   });
 
 export type AddGroupForm = z.infer<ReturnType<typeof makeAddGroupSchema>>;
