@@ -444,8 +444,10 @@ function shortType(type: string): string {
   gap: 14px;
   // Horizontal padding lives on the individual children (agent filter + KPIs)
   // rather than the container, so the score-configs table can sit full-bleed
-  // against the content edges. Only vertical padding stays here.
-  padding: 14px 0 18px;
+  // against the content edges. No bottom padding: the table is the flex:1 child
+  // and must reach the bottom edge, otherwise the bottom padding shows as dead
+  // space under the table's pagination bar.
+  padding: 14px 0 0;
   min-height: 0;
   flex: 1;
 }
