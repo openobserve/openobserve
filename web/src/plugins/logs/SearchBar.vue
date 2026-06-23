@@ -676,7 +676,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div v-else class="tw:flex tw:items-center">
                 <!-- Cancel button when query is running -->
                 <OButton
-                  v-if="visualizeSearchRequestTraceIds.length > 0"
+                  v-if="visualizeSearchRequestTraceIds.length > 0 && config.isEnterprise == 'true'"
                   data-test="logs-search-bar-visualize-cancel-btn"
                   variant="ghost"
                   :title="t('search.cancel')"
