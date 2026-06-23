@@ -344,6 +344,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @click.stop="duplicateAlert(row)"
                       :data-test="`alert-list-${row.name}-clone-alert`"
                     />
+                    <!-- Hidden proxies so the row-hover shortcuts work for
+                         actions that live in the more-menu dropdown (which is
+                         teleported out of the row DOM): x = export, Del = delete. -->
+                    <button
+                      type="button"
+                      data-row-action="export"
+                      class="tw:hidden"
+                      tabindex="-1"
+                      aria-hidden="true"
+                      @click.stop="exportAlert(row)"
+                    />
+                    <button
+                      type="button"
+                      data-row-action="delete"
+                      class="tw:hidden"
+                      tabindex="-1"
+                      aria-hidden="true"
+                      @click.stop="showDeleteDialogFn({ row })"
+                    />
                     <ODropdown>
                       <template #trigger>
                         <OButton
