@@ -1,8 +1,8 @@
 // Copyright 2026 OpenObserve Inc.
 
 import { describe, expect, it, vi } from 'vitest'
-import type { WireStep } from '@/types/synthetics'
-import { mapWireStep, mapWireSteps } from './mapRecordedStep'
+import type { BrowserStep, WireStep } from '@/types/synthetics'
+import { buildWireFromStep, journeyToWireSteps, mapWireStep, mapWireSteps } from './mapRecordedStep'
 
 describe('mapRecordedStep', () => {
   it('should map a navigate wire step using the url as value', () => {
@@ -22,7 +22,75 @@ describe('mapRecordedStep', () => {
       value: 'https://app.example.com/login',
       timeout: 10000,
       code: '',
+      wire, // original preserved verbatim
     })
+  })
+
+  it('should preserve the original extension step verbatim on wire', () => {
+    const wire: WireStep = {
+      id: 's4',
+      action: 'click',
+      selector: '#login-btn',
+      selector_type: 'css',
+      name: 'Click login',
+      timeout_ms: 10000,
+      button: 'left',
+      modifiers: 2,
+      position: { x: 12, y: 34 },
+      pageAlias: 'page',
+      framePath: [],
+      startTime: 1718700003100,
+      code: "await page.locator('#login-btn').click();",
+    }
+    // Same object reference, untouched — replay sends this back as-is.
+    expect(mapWireStep(wire).wire).toBe(wire)
+    expect(mapWireStep(wire).wire).toEqual(wire)
+  })
+
+  describe('buildWireFromStep (reverse mapper for manual steps)', () => {
+    const lean = (over: Partial<BrowserStep>): BrowserStep =>
+      ({ id: 'm1', action: 'click', timeout: 30000, code: '', ...over })
+
+    it('should map a manual navigate step to a wire with url', () => {
+      const w = buildWireFromStep(lean({ action: 'navigate', value: 'https://x.test' }))
+      expect(w).toMatchObject({ action: 'navigate', url: 'https://x.test', timeout_ms: 30000, pageAlias: 'page', framePath: [] })
+    })
+
+    it('should map a manual click step preserving selector + selector_type', () => {
+      const w = buildWireFromStep(lean({ action: 'click', selector: '#go', selectorType: 'CSS' }))
+      expect(w).toMatchObject({ action: 'click', selector: '#go', selector_type: 'css' })
+    })
+
+    it('should map a manual type step value to wire value', () => {
+      expect(buildWireFromStep(lean({ action: 'type', selector: '#email', value: 'a@b.c' }))).toMatchObject({ action: 'type', value: 'a@b.c' })
+    })
+
+    it('should map a manual press step value to key', () => {
+      expect(buildWireFromStep(lean({ action: 'press', selector: '#i', value: 'Enter' }))).toMatchObject({ action: 'press', key: 'Enter' })
+    })
+
+    it('should map a manual select step value to a single-item options array', () => {
+      expect(buildWireFromStep(lean({ action: 'select', selector: '#s', value: 'opt1' }))).toMatchObject({ action: 'select', options: ['opt1'] })
+    })
+
+    it('should map a manual assert step with a value to assert text', () => {
+      expect(buildWireFromStep(lean({ action: 'assert', selector: '.h', value: 'Welcome' }))).toMatchObject({ action: 'assert', text: 'Welcome' })
+    })
+
+    it.each(['hover', 'scroll', 'wait', 'screenshot'] as const)('should return null for unsupported action %s', (action) => {
+      expect(buildWireFromStep(lean({ action }))).toBeNull()
+    })
+  })
+
+  it('should prefer the recorded wire and reverse-map manual steps in journeyToWireSteps', () => {
+    const recorded = mapWireStep({ id: 's1', action: 'navigate', url: 'https://x.test' })
+    const manual: BrowserStep = { id: 'm1', action: 'click', selector: '#go', timeout: 30000, code: '' }
+    const unsupported: BrowserStep = { id: 'm2', action: 'wait', timeout: 30000, code: '' }
+
+    const wires = journeyToWireSteps([recorded, manual, unsupported])
+    expect(wires).toHaveLength(2) // recorded + manual click; wait dropped
+    expect(wires[0]).toBe(recorded.wire) // recorded preserved verbatim
+    expect(wires[1]).toMatchObject({ action: 'click', selector: '#go' })
   })
 
   it('should map a type wire step with css selector_type to CSS', () => {
