@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="o-field-row tw:group tw:h-6 tw:flex tw:items-center tw:gap-1 tw:w-full tw:relative tw:rounded-[0.25rem] tw:hover:bg-field-list-row-hover-bg"
+    class="o-field-row tw:group tw:h-6 tw:flex tw:items-center tw:gap-1 tw:w-full tw:relative tw:pl-1 tw:rounded-[0.25rem] tw:hover:bg-field-list-row-hover-bg"
     :class="[highlight && 'tw:bg-field-list-row-hover-bg!']"
   >
     <slot />

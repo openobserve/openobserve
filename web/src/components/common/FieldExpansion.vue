@@ -249,21 +249,15 @@ defineExpose({ reset: () => fieldValuesPanelRef.value?.reset() });
 </script>
 
 <style>
-.field-expansion-item button[data-state] {
+.field-expansion-item button[data-state]:not([role="checkbox"]) {
   min-height: 24px !important;
 }
 
-.field-expansion-item button[data-state="open"] {
-  background-color: var(--color-interactive-hover-bg);
-}
-
 .field-expansion-item .o-collapsible-content {
-  background-color: var(--color-surface-accent);
   width: 100%;
 }
 
 .field-expansion-item[data-state="open"] {
-  border: 1px solid var(--o2-border-color);
   margin-bottom: 0.375rem;
 }
 
