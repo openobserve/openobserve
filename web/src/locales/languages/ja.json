@@ -461,7 +461,8 @@
     "incidents": "インシデント",
     "evals": "評価",
     "keyboardShortcuts": "キーボードショートカット",
-    "aiObservability": "AI オブザーバビリティ"
+    "aiObservability": "AI オブザーバビリティ",
+    "aiAssistant": "AI アシスタント"
   },
   "rum": {
     "title": "リアルユーザーモニタリング",

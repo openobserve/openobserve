@@ -461,7 +461,8 @@
     "incidents": "Incidenten",
     "evals": "Evalen",
     "keyboardShortcuts": "Sneltoetsen",
-    "aiObservability": "AI-waarneembaarheid"
+    "aiObservability": "AI-waarneembaarheid",
+    "aiAssistant": "AI-assistent"
   },
   "rum": {
     "title": "Monitoring van echte gebruikers",

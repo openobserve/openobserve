@@ -461,7 +461,8 @@
     "incidents": "인시던트",
     "evals": "평가",
     "keyboardShortcuts": "키보드 단축키",
-    "aiObservability": "AI 옵저버빌리티"
+    "aiObservability": "AI 옵저버빌리티",
+    "aiAssistant": "AI 어시스턴트"
   },
   "rum": {
     "title": "실제 사용자 모니터링",

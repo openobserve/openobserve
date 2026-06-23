@@ -461,7 +461,8 @@
     "incidents": "Incidents",
     "evals": "Evals",
     "keyboardShortcuts": "Raccourcis clavier",
-    "aiObservability": "Observabilité de l'IA"
+    "aiObservability": "Observabilité de l'IA",
+    "aiAssistant": "Assistante IA"
   },
   "rum": {
     "title": "Surveillance réelle des utilisateurs",

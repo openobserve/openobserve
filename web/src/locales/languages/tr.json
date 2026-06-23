@@ -461,7 +461,8 @@
     "incidents": "Olaylar",
     "evals": "Evalar",
     "keyboardShortcuts": "Klavye Kısayolları",
-    "aiObservability": "Yapay Zeka Gözlemlenebilirliği"
+    "aiObservability": "Yapay Zeka Gözlemlenebilirliği",
+    "aiAssistant": "Yapay Zeka Asistanı"
   },
   "rum": {
     "title": "Gerçek Kullanıcı İzleme",

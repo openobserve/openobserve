@@ -461,7 +461,8 @@
     "incidents": "事件",
     "evals": "评测",
     "keyboardShortcuts": "键盘快捷键",
-    "aiObservability": "AI"
+    "aiObservability": "AI",
+    "aiAssistant": "人工智能助手"
   },
   "rum": {
     "title": "用户体验监控",

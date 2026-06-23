@@ -461,7 +461,8 @@
     "incidents": "Vorfälle",
     "evals": "Evalen",
     "keyboardShortcuts": "Tastenkürzel",
-    "aiObservability": "KI-Beobachtbarkeit"
+    "aiObservability": "KI-Beobachtbarkeit",
+    "aiAssistant": "KI-Assistent"
   },
   "rum": {
     "title": "Echte Benutzerüberwachung",
