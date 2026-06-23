@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- RED Charts Section -->
         <div
           v-if="streamFilter !== 'all' && dashboardData"
-          class="panel-section red-charts-section tw:flex tw:flex-col tw:mb-0!"
+          class="red-charts-section tw:flex tw:flex-col tw:mb-0!"
           data-test="service-graph-side-panel-red-charts"
         >
           <!-- DataZoom filter chips + View in Traces button -->
@@ -144,7 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <OSeparator class="tw:my-[1rem]!" />
+        <OSeparator v-if="streamFilter !== 'all' && dashboardData" class="tw:my-[1rem]!" />
         <!-- Tabs: Operations / Nodes / Pods -->
         <template v-if="streamFilter !== 'all'">
           <div
