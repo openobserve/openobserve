@@ -1630,7 +1630,7 @@ async fn process_condition_node(
         metadata.pipeline_name,
         metadata.node_idx,
     );
-    return count;
+    count
 }
 
 async fn process_stream_node(
@@ -1818,7 +1818,7 @@ async fn process_stream_node(
             metadata.node_idx
         );
     }
-    return count;
+    count
 }
 
 #[cfg(feature = "enterprise")]
