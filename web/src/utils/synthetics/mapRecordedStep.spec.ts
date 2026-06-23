@@ -14,13 +14,14 @@ describe('mapRecordedStep', () => {
       timeout_ms: 10000,
     }
     expect(mapWireStep(wire)).toEqual({
-      id: 's1',
+      id: expect.any(String), // mapper assigns a fresh UUID per step
       action: 'navigate',
       name: 'Open login',
       selector: undefined,
       selectorType: undefined,
       value: 'https://app.example.com/login',
       timeout: 10000,
+      code: '',
     })
   })
 

@@ -6,6 +6,7 @@ import type {
   StepAction,
   WireStep,
 } from '@/types/synthetics'
+import { getUUIDv7 } from '../uuid'
 
 // Maps the extension's Playwright-flavoured action names onto the UI's StepAction.
 // `setInputFiles` has no dedicated UI action and is surfaced as a `type` step.
@@ -61,13 +62,14 @@ function mapValue(wire: WireStep, action: StepAction): string | undefined {
 export function mapWireStep(wire: WireStep): BrowserStep {
   const action = mapAction(wire.action)
   return {
-    id: wire.id || crypto.randomUUID(),
+    id: getUUIDv7(),
     action,
     name: wire.name,
     selector: wire.selector,
     selectorType: wire.selector_type ? SELECTOR_TYPE_MAP[wire.selector_type] : undefined,
     value: mapValue(wire, action),
     timeout: wire.timeout_ms ?? DEFAULT_TIMEOUT,
+    code: wire.code || "",
   }
 }
 
