@@ -421,9 +421,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="tw:text-sm"
                           data-test="alert-list-create-template-text"
                         >
-                          It looks like you haven't created any Templates yet.
-                          To create an Alert, you'll need to have at least one
-                          Destination and one Template in place
+                          {{ t('alerts.noTemplatesMsg') }}
                         </div>
                         <OButton
                           data-test="alert-list-create-template-btn"
@@ -431,16 +429,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           variant="primary"
                           size="sm"
                           @click="routeTo('alertTemplates')"
-                        >Create Template</OButton>
+                        >{{ t('alerts.createTemplateBtn') }}</OButton>
                       </template>
                       <template v-if="!destinations.length && templates.length">
                         <div
                           class="tw:text-sm"
                           data-test="alert-list-create-destination-text"
                         >
-                          It looks like you haven't created any Destinations
-                          yet. To create an Alert, you'll need to have at least
-                          one Destination and one Template in place
+                          {{ t('alerts.noDestinationsMsg') }}
                         </div>
                         <OButton
                           data-test="alert-list-create-destination-btn"
@@ -448,7 +444,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           variant="primary"
                           size="sm"
                           @click="routeTo('alertDestinations')"
-                        >Create Destination</OButton>
+                        >{{ t('alerts.createDestinationBtn') }}</OButton>
                       </template>
                     </div>
                   </div>
