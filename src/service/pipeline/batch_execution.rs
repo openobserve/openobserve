@@ -1587,6 +1587,13 @@ async fn process_condition_node(
             flattened = true;
         }
 
+        // A null / non-object record means an upstream function filtered it out
+        // (e.g. VRL `. = null`). Skip it: it can't satisfy any condition and
+        // `as_object().unwrap()` below would panic on a null.
+        if !record.is_object() {
+            continue;
+        }
+
         // Evaluate based on condition version
         let eval_timer = Instant::now();
         let passes = match condition_params {
@@ -1677,6 +1684,14 @@ async fn process_stream_node(
                         continue;
                     }
                 };
+            }
+
+            // A null / non-object record means an upstream function filtered it
+            // out (e.g. VRL `. = null`). Drop it instead of forwarding to the
+            // destination, where it would fail at handle_timestamp with
+            // "Value is not an object" and inflate the failed count.
+            if !record.is_object() {
+                continue;
             }
 
             let mut destination_stream = stream_params.clone();
