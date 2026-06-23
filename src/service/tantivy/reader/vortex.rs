@@ -49,9 +49,10 @@ pub(super) async fn scan_vortex_async(
 
     let stream = scan.into_array_stream()?.then(move |result| {
         let data_type = data_type.clone();
+        let session = session.clone();
         async move {
             match result {
-                Ok(array) => vortex_array_to_record_batch(array, &data_type),
+                Ok(array) => vortex_array_to_record_batch(&session, array, &data_type),
                 Err(e) => Err(ArrowError::ExternalError(Box::new(e))),
             }
         }
@@ -78,7 +79,7 @@ pub(super) fn scan_vortex_row_range(
     let iter: Box<dyn Iterator<Item = Result<RecordBatch, ArrowError>> + 'static> = Box::new(
         scan.into_array_iter(&runtime)?
             .map(move |result| match result {
-                Ok(array) => vortex_array_to_record_batch(array, &data_type),
+                Ok(array) => vortex_array_to_record_batch(&session, array, &data_type),
                 Err(e) => Err(ArrowError::ExternalError(Box::new(e))),
             }),
     );

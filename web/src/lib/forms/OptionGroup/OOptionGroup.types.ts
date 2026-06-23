@@ -37,6 +37,8 @@ export interface OptionGroupProps {
   error?: boolean;
   /** Disables the entire group */
   disabled?: boolean;
+  /** Marks the field required — renders a `*` after the label (no manual ` *`). */
+  required?: boolean;
   /** Size for inner radio/checkbox controls */
   size?: OptionGroupSize;
   /** HTML name applied to inner inputs */

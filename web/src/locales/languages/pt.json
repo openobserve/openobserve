@@ -1386,6 +1386,7 @@
     "selectDashboardLabel": "Selecione o painel",
     "selectTabLabel": "Selecione a guia",
     "numbers": "Números",
+    "localeFormat": "Formato Regional",
     "nanoseconds": "Nanossegundos (ns)",
     "currency": "Moeda",
     "p99": "P99",
@@ -3448,7 +3449,9 @@
     "import_this_pattern": "Importar este padrão",
     "patterns_loaded": "Padrão (s) {count} carregado (s)",
     "failed_to_load": "Falha ao carregar padrões",
-    "no_patterns_selected": "Selecione pelo menos um padrão"
+    "no_patterns_selected": "Selecione pelo menos um padrão",
+    "name_required": "* O nome é obrigatório",
+    "pattern_required": "* O padrão é obrigatório"
   },
   "search_history": {
     "title": "Histórico de pesquisa",
@@ -4049,7 +4052,12 @@
     "emptyActionLogs": "Explorar registros",
     "emptyActionLogsDesc": "Pesquise e filtre seus fluxos de log",
     "emptyActionTraces": "Explore os traços",
-    "emptyActionTracesDesc": "Inspecione rastreamentos distribuídos e latência de serviço"
+    "emptyActionTracesDesc": "Inspecione rastreamentos distribuídos e latência de serviço",
+    "viewAll": "Exibir tudo",
+    "showingOf": "Mostrando {mostrado} de {total}",
+    "colErrorRate": "Taxa de erro",
+    "colLatency": "Latência",
+    "colReqs": "Requestões"
   },
   "chatHistory": {
     "title": "Conversa",
@@ -4441,6 +4449,14 @@
     "noQueryApplied": {
       "title": "Execute uma consulta para ver os registros",
       "description": "Ajuste seus filtros e clique em “Executar consulta” para carregar eventos para esse stream."
+    },
+    "noServiceGraph": {
+      "title": "Sem dados do gráfico de serviço",
+      "description": "Tente consultar um intervalo de tempo maior ou garanta que seus serviços estejam emitindo métricas de abrangência."
+    },
+    "noServicesCatalog": {
+      "title": "Nenhum serviço encontrado",
+      "description": "Nenhum serviço foi detectado no intervalo de tempo selecionado. Experimente um alcance maior ou um stream diferente."
     }
   },
   "onlineEvals": {

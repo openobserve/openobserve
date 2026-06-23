@@ -347,17 +347,6 @@ export default defineComponent({
         insertText: (_keyword: string) =>
           `str_match_ignore_case(fieldname, '${_keyword}')`,
       },
-      {
-        label: (_keyword: string) => `fuzzy_match(fieldname, '${_keyword}', 1)`,
-        kind: "Text",
-        insertText: (_keyword: string) =>
-          `fuzzy_match(fieldname, '${_keyword}', 1)`,
-      },
-      {
-        label: (_keyword: string) => `fuzzy_match_all('${_keyword}', 1)`,
-        kind: "Text",
-        insertText: (_keyword: string) => `fuzzy_match_all('${_keyword}', 1)`,
-      },
     ];
 
     watch(
@@ -1485,13 +1474,6 @@ export default defineComponent({
 .logs-query-editor {
   flex: 1;
   min-height: 0;
-  /* Fixed left breathing room for the whole editor. Monaco mounts as a child of
-     this host, so padding here insets the line-number gutter (and code) by a
-     constant amount regardless of the line-number digit count — unlike
-     lineNumbersMinChars, which only pads while digits stay below the reserved
-     width and goes flush again at 2+ digits. automaticLayout measures the
-     content box, so the editor adapts to the reduced width. */
-  padding-left: 0.5rem;
   background-color: var(--o2-card-bg);
   .monaco-editor,
   .monaco-editor .monaco-editor {

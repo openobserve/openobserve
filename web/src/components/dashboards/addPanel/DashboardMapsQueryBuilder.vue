@@ -653,10 +653,6 @@ export default defineComponent({
 }
 
 .dashboard-maps-query-builder-dropdown {
-  box-shadow: 0px 3px 15px rgba(0, 0, 0, 0.1);
-  transform: translateY(0.5rem);
-  border-radius: 0px;
-
   :deep(.q-virtual-scroll__content) {
     padding: 0.5rem;
   }
@@ -827,10 +823,6 @@ export default defineComponent({
 .field-function-menu-popup {
   width: 771px !important;
   height: 323px;
-  border-radius: 4px;
-  border: 1px solid #d5d5d5;
-  background: #fff;
-  box-shadow: 0px 4px 4px 0px rgba(0, 0, 0, 0.05);
   padding: 16px;
 }
 </style>

@@ -13,10 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    any::Any,
-    sync::{Arc, LazyLock as Lazy},
-};
+use std::sync::{Arc, LazyLock as Lazy};
 
 use arrow::array::{Array, ArrayRef, GenericStringBuilder, ListBuilder, OffsetSizeTrait};
 use arrow_schema::Field;
@@ -87,10 +84,6 @@ impl RegexpMatchesFunc {
 }
 
 impl ScalarUDFImpl for RegexpMatchesFunc {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
     fn name(&self) -> &str {
         REGEX_MATCHES_UDF_NAME
     }

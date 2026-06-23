@@ -4,6 +4,7 @@
 import { inject } from "vue";
 import ORadioGroup from "./ORadioGroup.vue";
 import { FORM_CONTEXT_KEY } from "../Form/OForm.types";
+import { firstFieldError } from "../Form/fieldError";
 import type { FormRadioGroupProps } from "./OFormRadioGroup.types";
 import type { RadioValue } from "./ORadio.types";
 
@@ -21,24 +22,7 @@ if (import.meta.env.DEV && !form) {
 </script>
 
 <template>
-  <component
-    v-if="form"
-    :is="form.Field"
-    :name="props.name"
-    :validators="
-      props.validators
-        ? {
-            onChange: (ctx: { value: RadioValue | undefined }) => {
-              for (const v of props.validators ?? []) {
-                const r = v(ctx.value);
-                if (r !== undefined) return r;
-              }
-              return undefined;
-            },
-          }
-        : undefined
-    "
-  >
+  <component v-if="form" :is="form.Field" :name="props.name">
     <template #default="{ field }">
       <div class="tw:flex tw:flex-col tw:gap-1">
         <ORadioGroup
@@ -46,6 +30,7 @@ if (import.meta.env.DEV && !form) {
           :label="props.label"
           :name="props.name"
           :disabled="props.disabled"
+          :required="props.required"
           :orientation="props.orientation"
           :model-value="field.state.value"
           @update:model-value="
@@ -59,11 +44,11 @@ if (import.meta.env.DEV && !form) {
         </ORadioGroup>
         <div
           v-if="
-            field.state.meta.isTouched && field.state.meta.errors.length > 0
+            field.state.meta.errors.length > 0
           "
           class="tw:text-xs tw:text-input-error-text"
         >
-          {{ field.state.meta.errors[0] }}
+          {{ firstFieldError(field.state.meta.errors) }}
         </div>
       </div>
     </template>

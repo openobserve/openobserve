@@ -10,6 +10,7 @@ export class MetricsPage {
 
         // Navigation
         this.metricsPageMenu = page.locator('[data-test="menu-link-\\/metrics-item"]');
+        this.metricsPageIndicator = page.locator('[data-test="metrics-page"]');
 
         // VERIFIED selectors from Phase 1 analysis
         // Main metrics controls
@@ -106,6 +107,14 @@ export class MetricsPage {
         this.configYAxisMinField = page.locator('[data-test="dashboard-config-y_axis_min-field"]').first();
         this.configYAxisMax = page.locator('[data-test="dashboard-config-y_axis_max"]').first();
         this.configYAxisMaxField = page.locator('[data-test="dashboard-config-y_axis_max-field"]').first();
+
+        // ===== Metrics Share & Deep-Link locators =====
+        this.shareButton = '[data-test="metrics-share-btn"]';
+        this.metricsPageContainer = '[data-test="metrics-page"]';
+        // Scoped success toast for the share-link "Link Copied" message as in dashboard-share-export
+        this.shareSuccessToast = page.locator('[data-test-variant="success"][data-test-message*="Link Copied"]');
+        this.shareErrorToast = page.locator('[data-test-variant="error"][data-test-message*="Error shortening link"]');
+        this.toastMessage = page.locator('[data-test="o-toast-message"]');
     }
 
     /**
@@ -1768,7 +1777,18 @@ export class MetricsPage {
     }
 
     async getAddToDashboardButton() {
-        return this.page.locator('button:has-text("Add to Dashboard"), [aria-label*="dashboard"]').first();
+        return this.page.locator('[data-test="panel-editor-add-to-dashboard-btn"]').first();
+    }
+
+    /**
+     * Opens the AddToDashboard dialog by clicking the toolbar button.
+     * The button is inside the PanelEditor component on the Metrics page.
+     */
+    async openAddToDashboardDialog() {
+        const btn = this.page.locator('[data-test="panel-editor-add-to-dashboard-btn"]');
+        await btn.waitFor({ state: 'visible', timeout: 10000 });
+        await btn.click();
+        await this.page.locator('[data-test="add-to-dashboard-dialog"]').waitFor({ state: 'visible', timeout: 10000 });
     }
 
     async getDashboardModal() {
@@ -2352,6 +2372,292 @@ export class MetricsPage {
      */
     async isPromqlTableVisible() {
         return await this.promqlTableChart.isVisible({ timeout: 3000 }).catch(() => false);
+    }
+
+    // ===== METRICS SHARE & DEEP-LINK METHODS =====
+
+    /**
+     * Returns the share button locator.
+     * @returns {import('@playwright/test').Locator}
+     */
+    getShareButton() {
+        return this.page.locator(this.shareButton);
+    }
+
+    /**
+     * Returns true if the share button is in the DOM and visible.
+     */
+    async isShareButtonVisible() {
+        const btn = this.getShareButton();
+        if (await btn.count() === 0) return false;
+        return await btn.isVisible({ timeout: 2000 }).catch(() => false);
+    }
+
+    /**
+     * Returns true if the share button is enabled (not disabled).
+     */
+    async isShareButtonEnabled() {
+        const btn = this.getShareButton();
+        if (await btn.count() === 0) return false;
+        return await btn.isEnabled({ timeout: 2000 }).catch(() => false);
+    }
+
+    /**
+     * Returns true if the share button element is present in DOM regardless of visibility.
+     */
+    async isShareButtonInDom() {
+        return await this.page.locator(this.shareButton).count() > 0;
+    }
+
+    /**
+     * Returns the share button's disabled tooltip locator if visible.
+     */
+    getShareButtonDisabledTooltip() {
+        return this.page.locator('[role="tooltip"], .q-tooltip, [data-test*="tooltip"]').filter({ hasText: /Web URL|web.url|not configured/i });
+    }
+
+    /**
+     * Clicks the share button and waits for loading to start.
+     * Returns false if button is not visible or is disabled.
+     */
+    async clickShareButton() {
+        const btn = this.getShareButton();
+        const cnt = await btn.count();
+        if (cnt === 0) return false;
+        const enabled = await this.isShareButtonEnabled();
+        if (!enabled) return false;
+        await btn.click();
+        return true;
+    }
+
+    /**
+     * Waits for the share success toast ("Link Copied") to appear.
+     * @param {number} [timeout=10000]
+     */
+    async waitForShareSuccessToast(timeout = 10000) {
+        await expect(this.shareSuccessToast).toBeVisible({ timeout });
+    }
+
+    /**
+     * Waits for the share error toast to appear.
+     * @param {number} [timeout=10000]
+     */
+    async waitForShareErrorToast(timeout = 10000) {
+        await expect(this.shareErrorToast).toBeVisible({ timeout });
+    }
+
+    /**
+     * Returns the share success toast locator for external assertions.
+     */
+    getShareSuccessToast() {
+        return this.shareSuccessToast;
+    }
+
+    /**
+     * Polls the clipboard until it contains a short URL matching "/short/".
+     * Reuses the same polling pattern from DashboardShareExportPage.
+     * @param {number} [timeout=15000]
+     * @returns {Promise<string>} The clipboard text (may be empty on timeout)
+     */
+    async getCopiedShortUrl(timeout = 15000) {
+        const start = Date.now();
+        let lastValue = '';
+        while (Date.now() - start < timeout) {
+            lastValue = await this.page.evaluate(() => navigator.clipboard.readText().catch(() => ''));
+            if (lastValue && lastValue.includes('/short/')) {
+                return lastValue;
+            }
+            await this.page.waitForTimeout(250);
+        }
+        return lastValue;
+    }
+
+    /**
+     * Returns the current page URL. Convenience wrapper.
+     * @returns {string}
+     */
+    getCurrentMetricsUrl() {
+        return this.page.url();
+    }
+
+    /**
+     * Navigates to a given metrics URL and waits for page load.
+     * @param {string} url
+     */
+    async navigateToMetricsUrl(url) {
+        await this.page.goto(url);
+        await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+        // Wait for the metrics page container to be visible
+        await this.page.locator(this.metricsPageContainer).waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+    }
+
+    /**
+     * Extracts the `metrics_data` query parameter from the current URL.
+     * @returns {string|null} The base64 blob or null if absent.
+     */
+    getMetricsDataParam() {
+        try {
+            const url = new URL(this.page.url());
+            return url.searchParams.get('metrics_data') || null;
+        } catch (_) {
+            return null;
+        }
+    }
+
+    /**
+     * Verifies that the `metrics_data` blob decodes to a JSON object that
+     * contains the given chart type in its `data.type` field.
+     * @param {string} chartType - e.g. "line", "bar", "area"
+     * @returns {Promise<boolean>}
+     */
+    async verifyChartTypeInUrl(chartType) {
+        const blob = this.getMetricsDataParam();
+        if (!blob) return false;
+        try {
+            const decoded = JSON.parse(Buffer.from(blob, 'base64').toString('utf8'));
+            return decoded && decoded.data && decoded.data.type === chartType;
+        } catch (_) {
+            return false;
+        }
+    }
+
+    /**
+     * Verifies that the `metrics_data` blob contains the given query string
+     * anywhere in any query slot.
+     * @param {string} query - The query text to look for.
+     * @returns {Promise<boolean>}
+     */
+    async verifyQueryInUrl(query) {
+        const blob = this.getMetricsDataParam();
+        if (!blob) return false;
+        try {
+            const decoded = JSON.parse(Buffer.from(blob, 'base64').toString('utf8'));
+            const queries = decoded?.data?.queries || [];
+            return queries.some(q => q.query && q.query.includes(query));
+        } catch (_) {
+            return false;
+        }
+    }
+
+    /**
+     * Decodes the `metrics_data` blob and returns the parsed JSON object.
+     * Returns null if blob is absent or invalid.
+     * @returns {Promise<Object|null>}
+     */
+    async decodeMetricsBlob() {
+        const blob = this.getMetricsDataParam();
+        if (!blob) return null;
+        try {
+            return JSON.parse(Buffer.from(blob, 'base64').toString('utf8'));
+        } catch (_) {
+            return null;
+        }
+    }
+
+    /**
+     * Returns the metrics page container locator.
+     */
+    getMetricsPageContainer() {
+        return this.page.locator(this.metricsPageContainer);
+    }
+
+    /**
+     * Expects the metrics page container to be visible.
+     */
+    async expectMetricsPageVisible() {
+        await expect(this.page.locator(this.metricsPageContainer)).toBeVisible({ timeout: 10000 });
+    }
+
+    /**
+     * Waits for the Apply button to transition out of loading/disabled state.
+     * @param {number} [timeout=15000]
+     */
+    async waitForApplyEnabled(timeout = 15000) {
+        const btn = this.page.locator(this.applyButton);
+        await expect(btn).toBeEnabled({ timeout });
+    }
+
+    /**
+     * Returns true if the URL currently contains a `metrics_data` param.
+     */
+    async hasMetricsDataParam() {
+        const url = this.page.url();
+        return url.includes('metrics_data=');
+    }
+
+    /**
+     * Returns the current page URL's `from` param (unix seconds) or null.
+     */
+    getFromParam() {
+        try {
+            const url = new URL(this.page.url());
+            return url.searchParams.get('from') || null;
+        } catch (_) { return null; }
+    }
+
+    /**
+     * Returns the current page URL's `to` param (unix seconds) or null.
+     */
+    getToParam() {
+        try {
+            const url = new URL(this.page.url());
+            return url.searchParams.get('to') || null;
+        } catch (_) { return null; }
+    }
+
+    /**
+     * Returns the current page URL's `period` param or null.
+     */
+    getPeriodParam() {
+        try {
+            const url = new URL(this.page.url());
+            return url.searchParams.get('period') || null;
+        } catch (_) { return null; }
+    }
+
+    /**
+     * Returns the current page URL's `refresh` param or null.
+     */
+    getRefreshParam() {
+        try {
+            const url = new URL(this.page.url());
+            return url.searchParams.get('refresh') || null;
+        } catch (_) { return null; }
+    }
+
+    /**
+     * Returns the auto-refresh button's currently displayed label text.
+     */
+    async getAutoRefreshLabelText() {
+        const btn = this.page.locator(this.autoRefresh);
+        if (await btn.count() === 0) return null;
+        return (await btn.textContent()) || '';
+    }
+
+    /**
+     * Verifies that the share button has a disabled attribute or disabled class.
+     * @returns {Promise<boolean>}
+     */
+    async isShareButtonDisabled() {
+        const btn = this.getShareButton();
+        if (await btn.count() === 0) return false;
+        const disabled = await btn.getAttribute('disabled').catch(() => null);
+        if (disabled !== null) return true;
+        const ariaDisabled = await btn.getAttribute('aria-disabled').catch(() => null);
+        return ariaDisabled === 'true';
+    }
+
+    /**
+     * Verifies the share button is showing a loading state (spinner).
+     * Checks for OButton's loading indicator.
+     * @returns {Promise<boolean>}
+     */
+    async isShareButtonLoading() {
+        const btn = this.getShareButton();
+        if (await btn.count() === 0) return false;
+        // OButton shows a loading span with data-test or role
+        const loader = btn.locator('[data-test="o-button-loading"], .o-button__loading, [role="progressbar"]');
+        return await loader.isVisible({ timeout: 1000 }).catch(() => false);
     }
 
 }

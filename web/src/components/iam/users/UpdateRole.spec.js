@@ -208,13 +208,13 @@ describe("UpdateRole Component", () => {
     });
 
     it("handles form validation failure", async () => {
-      wrapper.vm.updateUserForm = {
-        validate: vi.fn().mockResolvedValue(false),
-      };
+      wrapper.vm.orgMemberData.role = "";
+      await wrapper.vm.$nextTick();
 
       await wrapper.vm.onSubmit();
 
       expect(organizationsService.update_member_role).not.toHaveBeenCalled();
+      expect(wrapper.vm.roleError).toBe("Role is required");
     });
 
     it("handles API error response", async () => {
@@ -260,12 +260,8 @@ describe("UpdateRole Component", () => {
       );
     });
 
-    it("resets form validation after successful submission", async () => {
-      const resetValidationMock = vi.fn();
-      wrapper.vm.updateUserForm = {
-        validate: vi.fn().mockResolvedValue(true),
-        resetValidation: resetValidationMock,
-      };
+    it("resets role error after successful submission", async () => {
+      wrapper.vm.roleError = "Role is required";
 
       vi.mocked(organizationsService.update_member_role).mockResolvedValue({
         data: { success: true },
@@ -274,7 +270,7 @@ describe("UpdateRole Component", () => {
       await wrapper.vm.onSubmit();
       await flushPromises();
 
-      expect(resetValidationMock).toHaveBeenCalled();
+      expect(wrapper.vm.roleError).toBe("");
     });
 
     it("handles error_members response with negative notification", async () => {
@@ -483,10 +479,8 @@ describe("UpdateRole Component", () => {
 
   describe("UI Interactions", () => {
     it("prevents form submission on validation failure", async () => {
-      wrapper.vm.updateUserForm = {
-        validate: vi.fn().mockResolvedValue(false),
-        resetValidation: vi.fn(),
-      };
+      wrapper.vm.orgMemberData.role = "";
+      await wrapper.vm.$nextTick();
 
       await wrapper.vm.onSubmit();
 
@@ -540,19 +534,14 @@ describe("UpdateRole Component", () => {
   });
 
   describe("Form Input Validation", () => {
-    it("validates required role field via form.validate()", async () => {
+    it("validates required role field and sets roleError", async () => {
       wrapper.vm.orgMemberData.role = "";
       await wrapper.vm.$nextTick();
-
-      wrapper.vm.updateUserForm = {
-        validate: vi.fn().mockResolvedValue(false),
-        resetValidation: vi.fn(),
-      };
 
       await wrapper.vm.onSubmit();
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.vm.updateUserForm.validate).toHaveBeenCalled();
+      expect(wrapper.vm.roleError).toBe("Role is required");
     });
 
     it("prevents submission with empty role", async () => {

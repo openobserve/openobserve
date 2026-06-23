@@ -273,7 +273,7 @@ impl TreeNodeRewriter for RemoteScanRewriter {
                     // For sort, we should add a SortPreservingMergeExec
                     if child.name() == "SortExec" {
                         let table_name = visitor.table_name.clone().unwrap();
-                        let sort = child.as_any().downcast_ref::<SortExec>().unwrap();
+                        let sort = child.downcast_ref::<SortExec>().unwrap();
                         let sort_merge = Arc::new(
                             SortPreservingMergeExec::new(
                                 LexOrdering::new(sort.expr().to_vec()).unwrap(),
@@ -338,7 +338,7 @@ fn wrap_partial_reduce(
     if !partial_reduce_enabled {
         return Ok(input);
     }
-    let Some(agg) = input.as_any().downcast_ref::<AggregateExec>() else {
+    let Some(agg) = input.downcast_ref::<AggregateExec>() else {
         return Ok(input);
     };
     if *agg.mode() != AggregateMode::Partial {
@@ -429,7 +429,7 @@ impl<'n> TreeNodeVisitor<'n> for TableNameVisitor {
             self.has_remote_scan = true;
             Ok(TreeNodeRecursion::Stop)
         } else if name == "NewEmptyExec" {
-            let table = node.as_any().downcast_ref::<NewEmptyExec>().unwrap();
+            let table = node.downcast_ref::<NewEmptyExec>().unwrap();
             self.table_name = Some(TableReference::from(table.name()));
             Ok(TreeNodeRecursion::Continue)
         } else {
@@ -546,7 +546,7 @@ mod tests {
         )?;
         let input: Arc<dyn ExecutionPlan> = Arc::new(agg);
         let result = wrap_partial_reduce(true, input)?;
-        let result_agg = result.as_any().downcast_ref::<AggregateExec>().unwrap();
+        let result_agg = result.downcast_ref::<AggregateExec>().unwrap();
         assert_eq!(*result_agg.mode(), AggregateMode::Single);
         Ok(())
     }
@@ -566,7 +566,7 @@ mod tests {
         )?;
         let input: Arc<dyn ExecutionPlan> = Arc::new(agg);
         let result = wrap_partial_reduce(true, input)?;
-        let result_agg = result.as_any().downcast_ref::<AggregateExec>().unwrap();
+        let result_agg = result.downcast_ref::<AggregateExec>().unwrap();
         assert_eq!(*result_agg.mode(), AggregateMode::PartialReduce);
         assert!(result_agg.group_expr().expr().is_empty());
         Ok(())
@@ -592,13 +592,12 @@ mod tests {
         )?;
         let input: Arc<dyn ExecutionPlan> = Arc::new(agg);
         let result = wrap_partial_reduce(true, input)?;
-        let result_agg = result.as_any().downcast_ref::<AggregateExec>().unwrap();
+        let result_agg = result.downcast_ref::<AggregateExec>().unwrap();
         assert_eq!(*result_agg.mode(), AggregateMode::PartialReduce);
         assert_eq!(result_agg.group_expr().expr().len(), 1);
         let (expr, name) = &result_agg.group_expr().expr()[0];
         assert_eq!(name, "a");
         let col_expr = expr
-            .as_any()
             .downcast_ref::<PhysicalColumn>()
             .expect("group expr should be a Column reference into partial output schema");
         assert_eq!(col_expr.name(), "a");
@@ -638,7 +637,7 @@ mod tests {
         )?;
         let input: Arc<dyn ExecutionPlan> = Arc::new(agg);
         let result = wrap_partial_reduce(true, input)?;
-        let result_agg = result.as_any().downcast_ref::<AggregateExec>().unwrap();
+        let result_agg = result.downcast_ref::<AggregateExec>().unwrap();
         assert_eq!(*result_agg.mode(), AggregateMode::PartialReduce);
         // The critical invariant: input_schema must be the original scan schema so that
         // aggregate expression argument types (e.g. _timestamp:Int64) are reconstructed
@@ -694,7 +693,7 @@ mod tests {
         )?;
         let input: Arc<dyn ExecutionPlan> = Arc::new(agg);
         let result = wrap_partial_reduce(true, input)?;
-        let result_agg = result.as_any().downcast_ref::<AggregateExec>().unwrap();
+        let result_agg = result.downcast_ref::<AggregateExec>().unwrap();
         assert_eq!(*result_agg.mode(), AggregateMode::PartialReduce);
 
         let null_exprs = result_agg.group_expr().null_expr();
@@ -702,7 +701,7 @@ mod tests {
         // Both must still be Literal(NULL), NOT remapped to Column refs.
         for (expr, _) in null_exprs {
             assert!(
-                expr.as_any().is::<Literal>(),
+                expr.is::<Literal>(),
                 "null_expr must remain a Literal, not be replaced with a Column ref"
             );
         }

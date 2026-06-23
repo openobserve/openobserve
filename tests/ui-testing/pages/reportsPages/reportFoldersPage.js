@@ -1,11 +1,9 @@
 import { expect } from '@playwright/test';
+import { openNavFlyoutChild } from '../commonActions.js';
 
 export class ReportFoldersPage {
   constructor(page) {
     this.page = page;
-
-    // Navigation
-    this.reportsMenu = page.locator('[data-test="menu-link-\\/reports-item"]');
 
     // Folder sidebar
     this.addFolderBtn = page.locator('[data-test="dashboard-new-folder-btn"]');

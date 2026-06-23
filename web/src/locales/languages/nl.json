@@ -1386,6 +1386,7 @@
     "selectDashboardLabel": "Selecteer Dashboard",
     "selectTabLabel": "Tabblad selecteren",
     "numbers": "Getallen",
+    "localeFormat": "Landnotatie",
     "nanoseconds": "Nanoseconden (ns)",
     "currency": "Valuta",
     "p99": "P99",
@@ -3461,7 +3462,9 @@
     "import_this_pattern": "Importeer dit patroon",
     "patterns_loaded": "{count} patroon (en) geladen",
     "failed_to_load": "Het laden van patronen is mislukt",
-    "no_patterns_selected": "Selecteer ten minste één patroon"
+    "no_patterns_selected": "Selecteer ten minste één patroon",
+    "name_required": "* Naam is verplicht",
+    "pattern_required": "* Patroon is vereist"
   },
   "search_history": {
     "title": "Zoekgeschiedenis",
@@ -4062,7 +4065,12 @@
     "emptyActionLogs": "Logboeken bekijken",
     "emptyActionLogsDesc": "Zoek en filter je logstreams",
     "emptyActionTraces": "Sporen ontdekken",
-    "emptyActionTracesDesc": "Inspecteer gedistribueerde sporen en servicelatentie"
+    "emptyActionTracesDesc": "Inspecteer gedistribueerde sporen en servicelatentie",
+    "viewAll": "Alles bekijken",
+    "showingOf": "Toont {getoond} van {total}",
+    "colErrorRate": "Foutpercentage",
+    "colLatency": "Latentie",
+    "colReqs": "Req's"
   },
   "chatHistory": {
     "title": "Chats",
@@ -4454,6 +4462,14 @@
     "noQueryApplied": {
       "title": "Voer een query uit om logboeken te bekijken",
       "description": "Pas je filters aan en klik op 'Query uitvoeren' om gebeurtenissen voor deze stream te laden."
+    },
+    "noServiceGraph": {
+      "title": "Geen servicegrafiekgegevens",
+      "description": "Probeer een groter tijdsbereik op te vragen, of zorg ervoor dat uw services span-statistieken uitzenden."
+    },
+    "noServicesCatalog": {
+      "title": "Geen services gevonden",
+      "description": "Er zijn geen services gevonden in het geselecteerde tijdbereik. Probeer een groter bereik of een andere stream."
     }
   },
   "onlineEvals": {

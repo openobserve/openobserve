@@ -47,6 +47,41 @@ disabled.
 
 ---
 
+## PHASE 1.5: Wiring trace — is each behavior actually REACHABLE? (do this EVERY time)
+
+A `v-if`/`v-else-if` only matters if its condition can ever be **true**. The biggest cause of a
+generated test that can't pass is a behavior that's **gated on state nothing ever sets** — the
+component exists but the feature isn't wired. **No feature is isolated** — its pieces span
+components, composables, stores, and sometimes other (already-merged) PRs. So for **every key
+user-facing behavior** (especially the headline one), trace the gating state **backward across the
+whole codebase from `main`**, not just the diff:
+
+1. Find the condition that renders it, e.g. `v-else-if="isQueryError"`.
+2. Find what that resolves to, e.g. `isQueryError = QUERY_ERROR_CODES.has(errorCode)`, and where
+   `errorCode` comes from (a prop? store? `searchObj.data.errorCode`?).
+3. **Grep the WHOLE app for every place that state is assigned** — does ANY active code path set it
+   to a triggering value?
+   ```bash
+   grep -rn "searchObj.data.errorCode\s*=" web/src/   # is it set, or only reset to 0?
+   ```
+   Watch for the traps: the assignment is **commented out**, **hardcoded to a non-triggering value**
+   (`:error-code="0"`), set **only on a different path** (streaming vs classic, histogram vs main),
+   or set **only in a sibling/follow-up PR**. Check the consumer bindings too (what prop value the
+   parent passes).
+
+For each behavior, classify it in the design doc as one of:
+- **WIRED** — at least one real path sets the gating state. **Name that exact path** (file:line) so
+  the Engineer writes the test to exercise *that* path → it goes green.
+- **UNWIRED (feature-incomplete)** — NO active path sets it (commented out / hardcoded / absent
+  everywhere). Record the precise file:line evidence. The Architect will plan this as a parked
+  `test.fixme`, not a test that will fail.
+
+This front-loads the "is it wired" decision into planning — the Engineer then writes green tests for
+WIRED behaviors and honest `fixme`s for UNWIRED ones, so the Healer never has to discover this after
+a wasted iteration.
+
+---
+
 ## PHASE 2: Write the Feature Design Document
 
 Write to: `docs/test_generator/features/<feature_slug>-feature.md`
@@ -81,6 +116,12 @@ Use this structure:
 #### Actions
 | Action | Trigger | Result |
 
+## Behavior Reachability (wiring trace — Phase 1.5)
+| Behavior | Gating condition | State source (file:line) | Status |
+|----------|------------------|--------------------------|--------|
+| Fix-query card on SQL error | `v-else-if="isQueryError"` | `searchObj.data.errorCode` — set at `useX.ts:NNN` | **WIRED** (test this path) |
+| <behavior> | <condition> | <commented out / hardcoded 0 / never set> | **UNWIRED** (feature-incomplete — fixme) |
+
 ## User Workflows
 ### Workflow 1: <primary use case>
 **Steps:** 1. <action> → <response> ...
@@ -112,6 +153,10 @@ DO:
 - Extract **real** `data-test` attributes. If one doesn't exist for a needed element, mark it
   `NEEDS SELECTOR` so the Engineer adds a robust fallback rather than fabricating one.
 - Map flows by following the code; document all visibility conditions and states.
+- **Trace wiring (Phase 1.5) for every key behavior** — grep the whole app for what sets the gating
+  state, and mark each behavior WIRED (name the path) or UNWIRED (feature-incomplete, with evidence).
+  This is the single highest-value thing you do: it's what lets the Engineer write green tests for
+  the paths that work and honest `fixme`s for the ones that don't.
 
 DO NOT:
 - Guess selectors, assume functionality, skip edge cases, or invent test cases.

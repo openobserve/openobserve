@@ -160,19 +160,18 @@ describe("AddAnnotation", () => {
   });
 
   it("renders save/update and cancel buttons", () => {
-    const buttons = wrapper.findAllComponents({ name: "OButton" });
-    expect(buttons.length).toBeGreaterThan(0);
+    const dialog = wrapper.findAllComponents(ODialogStub)[0];
+    expect(dialog.props("primaryButtonLabel")).toBeTruthy();
+    expect(dialog.props("secondaryButtonLabel")).toBe("Cancel");
   });
 
   it("renders a Save button (not Update) when not in edit mode", () => {
-    const oButtons = wrapper.findAllComponents({ name: "OButton" });
-    const labels = oButtons.map((b: any) => b.text());
-    expect(labels).toContain("Save");
-    expect(labels).not.toContain("Update");
-    expect(labels).not.toContain("Delete");
+    const dialog = wrapper.findAllComponents(ODialogStub)[0];
+    expect(dialog.props("primaryButtonLabel")).toBe("Save");
+    expect(dialog.props("neutralButtonLabel")).toBeFalsy();
   });
 
-  it("calls create_timed_annotations when saving a new annotation", async () => {
+  it("calls create_timed_annotations when submitting a valid new annotation", async () => {
     (annotationService.create_timed_annotations as any).mockResolvedValueOnce({});
 
     const inputs = wrapper.findAllComponents({ name: "OInput" });
@@ -180,11 +179,10 @@ describe("AddAnnotation", () => {
     await inputs[0].vm.$emit("update:modelValue", "New Annotation");
     await flushPromises();
 
-    const oButtons = wrapper.findAllComponents({ name: "OButton" });
-    const saveButton = oButtons.find((btn: any) => btn.text().includes("Save"));
-    expect(saveButton).toBeTruthy();
-
-    await saveButton!.trigger("click");
+    // Submit through the form (schema validates → @submit fires when valid).
+    // Drive + AWAIT the form's own handleSubmit (runs the schema, awaits the
+    // handler) — deterministic, unlike a fire-and-forget native submit event.
+    await (wrapper.findComponent({ name: "OForm" }).vm as any).form.handleSubmit();
     await flushPromises();
 
     expect(annotationService.create_timed_annotations).toHaveBeenCalledTimes(1);
@@ -195,31 +193,26 @@ describe("AddAnnotation", () => {
     );
   });
 
-  it("does not call create_timed_annotations when the title is empty", async () => {
-    const oButtons = wrapper.findAllComponents({ name: "OButton" });
-    const saveButton = oButtons.find((btn: any) => btn.text().includes("Save"));
-    expect(saveButton).toBeTruthy();
-
-    await saveButton!.trigger("click");
+  it("does not call create_timed_annotations when the title is empty (schema blocks submit)", async () => {
+    // Drive + AWAIT the form's own handleSubmit (runs the schema, awaits the
+    // handler) — deterministic, unlike a fire-and-forget native submit event.
+    await (wrapper.findComponent({ name: "OForm" }).vm as any).form.handleSubmit();
     await flushPromises();
 
     expect(annotationService.create_timed_annotations).not.toHaveBeenCalled();
   });
 
-  it("calls update_timed_annotations when in edit mode and clicking Update", async () => {
+  it("calls update_timed_annotations when in edit mode and submitting", async () => {
     wrapper.unmount();
     wrapper = buildWrapper({ annotation: { ...mockAnnotation } });
     await flushPromises();
 
     (annotationService.update_timed_annotations as any).mockResolvedValueOnce({});
 
-    const oButtons = wrapper.findAllComponents({ name: "OButton" });
-    const updateButton = oButtons.find((btn: any) =>
-      btn.text().includes("Update"),
-    );
-    expect(updateButton).toBeTruthy();
-
-    await updateButton!.trigger("click");
+    // Title is pre-filled (edit mode) → schema passes → submit updates.
+    // Drive + AWAIT the form's own handleSubmit (runs the schema, awaits the
+    // handler) — deterministic, unlike a fire-and-forget native submit event.
+    await (wrapper.findComponent({ name: "OForm" }).vm as any).form.handleSubmit();
     await flushPromises();
 
     expect(annotationService.update_timed_annotations).toHaveBeenCalledTimes(1);
@@ -234,16 +227,37 @@ describe("AddAnnotation", () => {
     );
   });
 
+  it("carries the form-owned text + panels (edit prefill) through the @submit payload", async () => {
+    // text/panels are now OWNED by the form (OFormTextarea name='text',
+    // OFormSelect name='panels'); edit-prefill seeds them via addAnnotationDefaults
+    // and they must round-trip through the submit payload back into the update call.
+    wrapper.unmount();
+    wrapper = buildWrapper({ annotation: { ...mockAnnotation } });
+    await flushPromises();
+
+    (annotationService.update_timed_annotations as any).mockResolvedValueOnce({});
+
+    await (wrapper.findComponent({ name: "OForm" }).vm as any).form.handleSubmit();
+    await flushPromises();
+
+    expect(annotationService.update_timed_annotations).toHaveBeenCalledWith(
+      "test-org",
+      "dashboard1",
+      "123",
+      expect.objectContaining({
+        text: "Test Description",
+        panels: ["panel1"],
+      }),
+    );
+  });
+
   it("renders a Delete button in edit mode", async () => {
     wrapper.unmount();
     wrapper = buildWrapper({ annotation: mockAnnotation });
     await flushPromises();
 
-    const oButtons = wrapper.findAllComponents({ name: "OButton" });
-    const deleteButton = oButtons.find((btn: any) =>
-      btn.text().includes("Delete"),
-    );
-    expect(deleteButton).toBeTruthy();
+    const dialog = wrapper.findAllComponents(ODialogStub)[0];
+    expect(dialog.props("neutralButtonLabel")).toBe("Delete");
   });
 
   it("opens the nested delete-confirm ODialog when Delete is clicked", async () => {
@@ -261,11 +275,8 @@ describe("AddAnnotation", () => {
     expect(innerDialogBefore.props("primaryButtonVariant")).toBe("destructive");
     expect(innerDialogBefore.props("size")).toBe("xs");
 
-    const oButtons = wrapper.findAllComponents({ name: "OButton" });
-    const deleteButton = oButtons.find((btn: any) =>
-      btn.text().includes("Delete"),
-    );
-    await deleteButton!.trigger("click");
+    // Delete is now the ODialog built-in neutral button → emits click:neutral.
+    await wrapper.findAllComponents(ODialogStub)[0].vm.$emit("click:neutral");
     await flushPromises();
 
     dialogs = wrapper.findAllComponents(ODialogStub);
@@ -278,11 +289,8 @@ describe("AddAnnotation", () => {
     await flushPromises();
 
     // Open the confirm dialog first.
-    const oButtons = wrapper.findAllComponents({ name: "OButton" });
-    const deleteButton = oButtons.find((btn: any) =>
-      btn.text().includes("Delete"),
-    );
-    await deleteButton!.trigger("click");
+    // Delete is now the ODialog built-in neutral button → emits click:neutral.
+    await wrapper.findAllComponents(ODialogStub)[0].vm.$emit("click:neutral");
     await flushPromises();
 
     const innerDialog = wrapper.findAllComponents(ODialogStub)[1];
@@ -303,11 +311,8 @@ describe("AddAnnotation", () => {
     (annotationService.delete_timed_annotations as any).mockResolvedValueOnce({});
 
     // Open the confirm dialog.
-    const oButtons = wrapper.findAllComponents({ name: "OButton" });
-    const deleteButton = oButtons.find((btn: any) =>
-      btn.text().includes("Delete"),
-    );
-    await deleteButton!.trigger("click");
+    // Delete is now the ODialog built-in neutral button → emits click:neutral.
+    await wrapper.findAllComponents(ODialogStub)[0].vm.$emit("click:neutral");
     await flushPromises();
 
     const innerDialog = wrapper.findAllComponents(ODialogStub)[1];
@@ -323,13 +328,8 @@ describe("AddAnnotation", () => {
   });
 
   it("emits close and closes the outer ODialog when Cancel is clicked", async () => {
-    const oButtons = wrapper.findAllComponents({ name: "OButton" });
-    const cancelButton = oButtons.find((btn: any) =>
-      btn.text().includes("Cancel"),
-    );
-    expect(cancelButton).toBeTruthy();
-
-    await cancelButton!.trigger("click");
+    // Cancel is now the ODialog built-in secondary button → emits click:secondary.
+    await wrapper.findAllComponents(ODialogStub)[0].vm.$emit("click:secondary");
     await flushPromises();
 
     expect(wrapper.emitted("close")).toBeTruthy();
@@ -345,21 +345,21 @@ describe("AddAnnotation", () => {
     expect(wrapper.text()).toContain("Timestamp:");
   });
 
-  it("disables the primary save button when the title is empty", () => {
-    const oButtons = wrapper.findAllComponents({ name: "OButton" });
-    const saveButton = oButtons.find((btn: any) => btn.text().includes("Save"));
-    expect(saveButton).toBeTruthy();
-    expect(saveButton!.props("disabled")).toBe(true);
+  // R3: the Save button is ALWAYS enabled — submit is gated by the Zod schema,
+  // not by disabling the button. (Replaces the old `:disabled="!title"` tests.)
+  it("keeps the Save button enabled even when the title is empty", () => {
+    const dialog = wrapper.findAllComponents(ODialogStub)[0];
+    expect(dialog.props("primaryButtonLabel")).toBeTruthy();
+    expect(dialog.props("primaryButtonDisabled")).toBeFalsy();
   });
 
-  it("enables the primary save button once the title is filled in", async () => {
+  it("keeps the Save button enabled after the title is filled in", async () => {
     const inputs = wrapper.findAllComponents({ name: "OInput" });
     await inputs[0].vm.$emit("update:modelValue", "Has a title now");
     await flushPromises();
 
-    const oButtons = wrapper.findAllComponents({ name: "OButton" });
-    const saveButton = oButtons.find((btn: any) => btn.text().includes("Save"));
-    expect(saveButton!.props("disabled")).toBe(false);
+    const dialog = wrapper.findAllComponents(ODialogStub)[0];
+    expect(dialog.props("primaryButtonDisabled")).toBeFalsy();
   });
 
   it("shows an error notification and does not close when update_timed_annotations rejects", async () => {
@@ -371,11 +371,9 @@ describe("AddAnnotation", () => {
       new Error("boom"),
     );
 
-    const oButtons = wrapper.findAllComponents({ name: "OButton" });
-    const updateButton = oButtons.find((btn: any) =>
-      btn.text().includes("Update"),
-    );
-    await updateButton!.trigger("click");
+    // Drive + AWAIT the form's own handleSubmit (runs the schema, awaits the
+    // handler) — deterministic, unlike a fire-and-forget native submit event.
+    await (wrapper.findComponent({ name: "OForm" }).vm as any).form.handleSubmit();
     await flushPromises();
 
     // close event should NOT be emitted because the save short-circuited on error
@@ -393,9 +391,9 @@ describe("AddAnnotation", () => {
     await inputs[0].vm.$emit("update:modelValue", "Title");
     await flushPromises();
 
-    const oButtons = wrapper.findAllComponents({ name: "OButton" });
-    const saveButton = oButtons.find((btn: any) => btn.text().includes("Save"));
-    await saveButton!.trigger("click");
+    // Drive + AWAIT the form's own handleSubmit (runs the schema, awaits the
+    // handler) — deterministic, unlike a fire-and-forget native submit event.
+    await (wrapper.findComponent({ name: "OForm" }).vm as any).form.handleSubmit();
     await flushPromises();
 
     expect(wrapper.emitted("close")).toBeFalsy();

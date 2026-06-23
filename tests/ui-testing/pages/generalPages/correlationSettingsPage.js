@@ -4,7 +4,7 @@ const testLogger = require('../../playwright-tests/utils/test-logger.js');
 
 /**
  * Page Object for Correlation Settings page
- * Route: /web/settings/correlation_settings?org_identifier={orgId}
+ * Route: /web/settings/correlation?org_identifier={orgId}
  *
  * Tabs:
  * - Service Identity (identity)
@@ -25,7 +25,7 @@ export class CorrelationSettingsPage {
         this.servicesTabName = 'Services';
         this.serviceDiscoveryTabName = 'Configuration';
         this.alertCorrelationTabName = 'Alert Correlation';
-        this.fieldAliasesTabName = 'Field Aliases';
+        this.fieldAliasesTabName = 'Field Mappings';
 
         // ==================== Service Identity Tab Selectors ====================
         this.serviceIdentityBackwardBtn = '[data-test="correlation-service-identity-backward-btn"]';
@@ -156,8 +156,8 @@ export class CorrelationSettingsPage {
     // ==================== Navigation ====================
 
     async navigateToCorrelationSettings(orgId) {
-        const baseUrl = process.env.INGESTION_URL || process.env.ZO_BASE_URL;
-        await this.page.goto(`${baseUrl}/web/settings/correlation_settings?org_identifier=${orgId}`);
+        const baseUrl = process.env.ZO_BASE_URL || 'http://localhost:5080';
+        await this.page.goto(`${baseUrl}/web/settings/correlation?org_identifier=${orgId}`);
         await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
     }
 
@@ -228,9 +228,19 @@ export class CorrelationSettingsPage {
     }
 
     async clickFieldAliasesTab() {
-        const tab = this.page.getByRole('tab', { name: this.fieldAliasesTabName });
-        await tab.click();
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        // Correlation Settings (Field Mappings / Field Aliases) is an ENTERPRISE-only
+        // feature — the tab only mounts on the enterprise build. Probe positively for
+        // the tab via its data-test (data-test-only policy) and return a boolean so
+        // callers can gate the suite to a clean SKIP on the OSS binary.
+        try {
+            const tab = this.page.locator('[data-test="correlation-settings-field-aliases-tab"]');
+            await tab.waitFor({ state: 'visible', timeout: 15000 });
+            await tab.click();
+            await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+            return true;
+        } catch {
+            return false;
+        }
     }
 
     async expectFieldAliasesTabActive() {
@@ -934,5 +944,25 @@ export class CorrelationSettingsPage {
      */
     async waitForQuickUpdate(ms = 300) {
         await this.page.waitForTimeout(ms);
+    }
+
+    /**
+     * Opens the TimeRangeEditor dialog from the Correlation Settings page.
+     * Tries the known trigger button selectors for the time range editor.
+     * Returns true if the dialog was opened successfully, false otherwise.
+     */
+    async openTimeRangeEditor() {
+        const trigger = this.page.locator(
+            '[data-test="correlation-time-range-edit-btn"], [data-test="time-range-editor-trigger"]'
+        );
+        const triggerVisible = await trigger.isVisible({ timeout: 5000 }).catch(() => false);
+        if (!triggerVisible) {
+            testLogger.warn('TimeRangeEditor trigger not found — component may not be available in this environment');
+            return false;
+        }
+        await trigger.click();
+        const dialogVisible = await this.page.locator('[data-test="time-range-editor-dialog"]')
+            .isVisible({ timeout: 5000 }).catch(() => false);
+        return dialogVisible;
     }
 }

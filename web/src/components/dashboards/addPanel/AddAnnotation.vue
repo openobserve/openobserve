@@ -1,58 +1,49 @@
+<!-- Copyright 2026 OpenObserve Inc. -->
 <template>
-  <ODialog data-test="add-annotation-dialog" v-model:open="isOpen" persistent size="lg" :title="isEditMode ? 'Edit Annotation' : 'Add Annotation'">
-    <OForm id="add-annotation-form" :default-values="{ title: annotationData.title }" @submit="saveAnnotation.execute()">
+  <ODialog
+    data-test="add-annotation-dialog"
+    v-model:open="isOpen"
+    persistent
+    size="lg"
+    :title="isEditMode ? 'Edit Annotation' : 'Add Annotation'"
+    form-id="add-annotation-form"
+    :primary-button-label="annotationData.annotation_id ? 'Update' : 'Save'"
+    secondary-button-label="Cancel"
+    :neutral-button-label="annotationData.annotation_id ? 'Delete' : undefined"
+    neutral-button-variant="destructive"
+    @click:secondary="handleClose"
+    @click:neutral="handleDeleteWithConfirm"
+  >
+    <OForm id="add-annotation-form" :schema="addAnnotationSchema" :default-values="addAnnotationDefaults" @submit="saveAnnotation">
     <div class="tw:flex tw:flex-col">
         <OFormInput
           name="title"
-          v-model="annotationData.title"
-          label="Title *"
-          :validators="[(val) => !val ? 'Title is required.' : undefined]"
+          label="Title"
+          required
+          data-test="dashboard-add-annotation-title-input"
         />
-        <OTextarea
-          v-model="annotationData.text"
+        <OFormTextarea
+          name="text"
           label="Description"
           :rows="3"
+          data-test="dashboard-add-annotation-text-input"
         />
 
-        <OSelect
+        <OFormSelect
+            name="panels"
             hint="If no panel is selected, annotations will be applied to all the panels of the dashboard."
-            v-model="selectedPanels"
             :options="groupedPanelsOptions"
             multiple
-            @update:model-value="updateSelectedPanels"
             style="min-width: 150px"
             label="Select Panels"
             class="textbox tw:flex tw:flex-col no-case showLabelOnTop"
+            data-test="dashboard-add-annotation-panels-select"
           />
         <div class="tw:text-xs tw:mt-3">
           Timestamp: {{ annotationDateString }}
         </div>
     </div>
     </OForm>
-    <template #footer>
-      <div class="tw:w-full tw:flex tw:gap-2">
-        <OButton
-          v-if="annotationData.annotation_id"
-          variant="destructive"
-          size="sm-action"
-          @click="handleDeleteWithConfirm"
-          >Delete</OButton
-        >
-        <div class="tw:flex-1"></div>
-        <OButton variant="outline" size="sm-action" @click="handleClose"
-          >Cancel</OButton
-        >
-        <OButton
-          variant="primary"
-          size="sm-action"
-          type="submit"
-          form="add-annotation-form"
-          :loading="saveAnnotation.isLoading?.value"
-          :disabled="!annotationData.title"
-          >{{ annotationData.annotation_id ? "Update" : "Save" }}</OButton
-        >
-      </div>
-    </template>
 
     <ODialog data-test="add-annotation-delete-confirm-dialog"
       v-model:open="showDeleteConfirm"
@@ -76,13 +67,13 @@ import { useStore } from "vuex";
 import { useLoading } from "@/composables/useLoading";
 import { annotationService } from "@/services/dashboard_annotations";
 import useNotifications from "@/composables/useNotifications";
-import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
 import OInput from "@/lib/forms/Input/OInput.vue";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
-import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
+import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
+import { addAnnotationSchema } from "./AddAnnotation.schema";
 const props = defineProps({
   dashboardId: { type: String, required: true },
   annotation: { type: Object, default: null, required: false },
@@ -107,8 +98,16 @@ const annotationData = ref(
   },
 );
 
+// Dynamic: in edit mode `annotationData` is seeded from `props.annotation`, so
+// the form's defaults are prefilled from runtime data (not always blank). The
+// form owns title/text/panels — project all three from the prefilled model.
+const addAnnotationDefaults = computed(() => ({
+  title: annotationData.value.title,
+  text: annotationData.value.text ?? "",
+  panels: annotationData.value.panels ?? [],
+}));
+
 const groupedPanels = ref({});
-const selectedPanels = ref([]);
 
 const groupedPanelsOptions = computed(() =>
   Object.entries(groupedPanels.value).flatMap(([tab, panels]) => [
@@ -121,23 +120,6 @@ const groupedPanelsOptions = computed(() =>
   ]),
 );
 
-const displayValue = computed(() => {
-  if (!selectedPanels.value.length) {
-    return "All Panels";
-  }
-  const selectedTitles = selectedPanels.value.map((panelId) => {
-    const panel = props.panelsList.find((p) => p.id === panelId);
-    return panel?.title || "Unknown";
-  });
-
-  if (selectedTitles.length > 2) {
-    return `${selectedTitles.slice(0, 2).join(", ")}... + ${
-      selectedTitles.length - 2
-    } more`;
-  }
-  return selectedTitles.join(", ");
-});
-
 const groupPanels = () => {
   groupedPanels.value = props.panelsList.reduce((acc, panel) => {
     const tabName = panel.tabName || "Unknown Tab";
@@ -147,21 +129,10 @@ const groupPanels = () => {
   }, {});
 };
 
-const updateSelectedPanels = () => {
-  annotationData.value.panels = selectedPanels.value;
-};
-
-const restorePreviousSelections = () => {
-  if (annotationData.value.panels && annotationData.value.panels.length) {
-    selectedPanels.value = annotationData.value.panels;
-  }
-};
-
 watch(
   () => props.panelsList,
   () => {
     groupPanels();
-    if (props.annotation) restorePreviousSelections();
   },
   { immediate: true },
 );
@@ -253,6 +224,16 @@ const confirmDelete = async () => {
   handleClose();
 };
 
-const saveAnnotation = useLoading(handleSave);
+// The @submit payload is the source of truth for the form fields
+// (title/text/panels); annotationData carries the rest (tags/times/id). We seed
+// those three back onto annotationData so handleSave (and the edit-update path)
+// reads consistent values. Plain async — OForm awaits it, and the ODialog
+// built-in primary button (form-id) auto-shows the Save spinner (no useLoading).
+const saveAnnotation = async (value) => {
+  if (value?.title != null) annotationData.value.title = value.title;
+  annotationData.value.text = value?.text ?? "";
+  annotationData.value.panels = value?.panels ?? [];
+  await handleSave();
+};
 const deleteAnnotation = useLoading(confirmDelete);
 </script>

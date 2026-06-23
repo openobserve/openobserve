@@ -176,6 +176,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   valueKey="name"
                   searchable
                   class="tw:flex-1"
+                  :error-message="fieldErrors.field"
+                  :error="!!fieldErrors.field"
+                  @update:model-value="fieldErrors.field = ''"
                   data-test="dashboard-variable-field-select"
                 >
                   <template #tooltip>
@@ -642,6 +645,7 @@ export default defineComponent({
       panels: "",
       streamType: "",
       stream: "",
+      field: "",
       constantValue: "",
     });
     // Per-item errors for filter rows and custom option rows
@@ -1308,6 +1312,10 @@ export default defineComponent({
         variableData.type === "query_values" && !variableData.query_data.stream
           ? "Stream / index is required."
           : "";
+      fieldErrors.field =
+        variableData.type === "query_values" && !variableData.query_data.field
+          ? "Field is required."
+          : "";
       fieldErrors.constantValue =
         variableData.type === "constant" && !variableData.value?.trim()
           ? "Constant value is required."
@@ -1345,6 +1353,7 @@ export default defineComponent({
         fieldErrors.panels ||
         fieldErrors.streamType ||
         fieldErrors.stream ||
+        fieldErrors.field ||
         fieldErrors.constantValue ||
         hasFilterErrors ||
         hasOptionErrors

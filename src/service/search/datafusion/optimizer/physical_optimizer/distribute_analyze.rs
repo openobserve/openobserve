@@ -29,7 +29,7 @@ use crate::service::search::datafusion::distributed_plan::{
 
 // replace the AnalyzeExec to DistributeAnalyzeExec
 pub fn optimize_distribute_analyze(plan: Arc<dyn ExecutionPlan>) -> Result<Arc<dyn ExecutionPlan>> {
-    if let Some(analyze) = plan.as_any().downcast_ref::<AnalyzeExec>() {
+    if let Some(analyze) = plan.downcast_ref::<AnalyzeExec>() {
         let distribute_analyze = Arc::new(DistributeAnalyzeExec::new(
             analyze.verbose(),
             analyze.show_statistics(),
@@ -55,7 +55,7 @@ impl TreeNodeRewriter for AnalyzeRewrite {
     type Node = Arc<dyn ExecutionPlan>;
 
     fn f_up(&mut self, node: Arc<dyn ExecutionPlan>) -> Result<Transformed<Self::Node>> {
-        if let Some(remote) = node.as_any().downcast_ref::<RemoteScanExec>() {
+        if let Some(remote) = node.downcast_ref::<RemoteScanExec>() {
             let remote = Arc::new(remote.clone().set_analyze()) as Arc<dyn ExecutionPlan>;
             return Ok(Transformed::yes(remote));
         }
@@ -84,6 +84,7 @@ mod tests {
             false,
             false,
             vec![],
+            None,
             Arc::new(EmptyExec::new(get_schema())),
             get_schema(),
         ));
@@ -102,7 +103,7 @@ mod tests {
         ) as Arc<dyn ExecutionPlan>;
         let mut rewriter = AnalyzeRewrite::new();
         let plan = plan.rewrite(&mut rewriter).unwrap().data;
-        let remote_scan = plan.as_any().downcast_ref::<RemoteScanExec>().unwrap();
+        let remote_scan = plan.downcast_ref::<RemoteScanExec>().unwrap();
         assert!(remote_scan.analyze());
     }
 }

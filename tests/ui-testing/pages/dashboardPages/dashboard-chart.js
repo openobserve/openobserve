@@ -157,11 +157,23 @@ export default class ChartTypeSelector {
 
     // New data-test format: o-field-list-row-{fieldName}
     const fieldItem = this.page.locator(`[data-test="o-field-list-row-${fieldName}"]`);
-    await fieldItem.first().waitFor({ state: "visible", timeout: 5000 });
+    await fieldItem.first().waitFor({ state: "visible", timeout: 10000 });
 
-    // Add button is hidden until hover — reveal it first
-    await fieldItem.first().scrollIntoViewIfNeeded();
-    await fieldItem.first().hover();
+    // hover() auto-scrolls into view — scrollIntoViewIfNeeded() is not needed.
+    // Retry for DOM stability: Vue re-renders the field list multiple times after
+    // search input changes (debounce / virtual scroll), which detaches the element
+    // between waitFor and the action. Re-waiting after each detachment lets the
+    // list settle before the next attempt.
+    const maxAttempts = 3;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        await fieldItem.first().hover({ timeout: 5000 });
+        break;
+      } catch (e) {
+        if (attempt === maxAttempts) throw e;
+        await fieldItem.first().waitFor({ state: "visible", timeout: 5000 });
+      }
+    }
 
     // Now locate and click the button within the field item.
     // Use .first() — in join panels the same field name can appear multiple times
@@ -416,8 +428,40 @@ export default class ChartTypeSelector {
   async openFieldPropertyPopup(alias, axis = "x") {
     const itemLocator = this.page.locator(`[data-test="dashboard-${axis}-item-${alias}"]`);
     await itemLocator.waitFor({ state: "visible", timeout: 10000 });
-    await itemLocator.click();
-    testLogger.debug('Opened field property popup', { alias, axis });
+
+    // The popup is an ODropdown anchored to the axis item. When opened
+    // immediately after the panel's first render, a late re-render of the
+    // field list can re-mount the trigger and auto-dismiss the popup within
+    // a few hundred ms — so a single click + visibility check races against
+    // the popup vanishing. Open it, then confirm it STAYS open; re-open if it
+    // auto-closed. Click only when the popup isn't already open (the trigger
+    // toggles, so clicking an open popup would close it).
+    const popupRoot = this.page.locator('[data-test="dynamic-function-popup-root"]');
+    const maxAttempts = 5;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      if (!(await popupRoot.isVisible().catch(() => false))) {
+        await itemLocator.click();
+      }
+      const opened = await popupRoot
+        .waitFor({ state: "visible", timeout: 3000 })
+        .then(() => true)
+        .catch(() => false);
+      if (opened) {
+        // Confirm the popup is still open after the window in which the
+        // post-render re-render would have dismissed it.
+        await this.page.waitForTimeout(700);
+        if (await popupRoot.isVisible().catch(() => false)) {
+          testLogger.debug('Opened field property popup', { alias, axis, attempt });
+          return;
+        }
+      }
+      // Auto-closed (or never opened) — wait briefly for the panel to settle,
+      // then retry the open.
+      await this.page.waitForTimeout(500);
+    }
+    throw new Error(
+      `Field property popup for ${axis}-item-${alias} did not stay open after ${maxAttempts} attempts`,
+    );
   }
 
   /**

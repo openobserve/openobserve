@@ -1,18 +1,20 @@
 <template>
   <div>
-    <!-- Section header is provided full-width by the Settings shell. -->
-    <div class="tw:px-3 tw:pt-3 tw:pb-3">
+    <!-- Section header is provided full-width by the Settings shell. The page
+         gutter is owned by ConstrainedPage; this page adds none of its own. -->
+    <div class="tw:pb-3">
       <div class="tw:text-base tw:font-bold">
         {{ t("settings.logDetails") }}
       </div>
     </div>
 
-    <div class="tw:mx-3 tw:mb-3">
+    <div class="tw:mb-3">
     <div
       data-test="add-role-rolename-input-btn"
       class="trace-id-field-name o2-input tw:mb-2"
     >
       <OInput
+        data-test="settings-org-trace-id-input"
         v-model.trim="traceIdFieldName"
         :label="t('settings.traceIdFieldName') + ' *'"
         class="tw:py-3 showLabelOnTop"
@@ -28,6 +30,7 @@
       class="span-id-field-name o2-input"
     >
       <OInput
+        data-test="settings-org-span-id-input"
         v-model.trim="spanIdFieldName"
         :label="t('settings.spanIdFieldName') + ' *'"
         class="tw:py-3 showLabelOnTop"

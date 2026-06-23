@@ -14,9 +14,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div class="overview-tab">
-    <!-- Header: title + last-fetched + refresh + time picker -->
+    <!-- Header: refresh + time picker -->
     <div class="overview-header">
-      <span class="overview-title">{{ t('overview.title') }}</span>
       <div class="overview-header-right">
         <ORefreshButton
           :last-run-at="lastFetched ? lastFetched.getTime() : null"
@@ -38,49 +37,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Sections rendered top-to-bottom; each collapses when empty -->
 
-    <!-- ACTIVE ANOMALIES -->
-    <section v-if="anomalies.length > 0" class="ov-section">
-      <div class="ov-section-label">{{ t('overview.activeAnomalies') }}</div>
-      <div class="ov-rows">
-        <div
-          v-for="item in anomalies"
-          :key="item.id"
-          class="ov-alert-row"
-          :class="severityRowClass(item.severity)"
-        >
-          <span class="ov-row-icon">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-              <path d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </span>
-          <div class="ov-row-body">
-            <div class="ov-row-title">{{ item.title }}</div>
-            <div class="ov-row-desc">{{ item.description }}</div>
-          </div>
-          <span class="ov-investigate-wrap">
-            <OButton
-              variant="ghost-primary"
-              size="sm"
-              @click="goToAlert(item)"
-            >
-              {{ t("overview.investigate") }}
-            </OButton>
-          </span>
-        </div>
-      </div>
-    </section>
-
     <!-- ACTIVE INCIDENTS (enterprise / cloud only) -->
     <section
       v-if="isIncidentsEnabled && incidents.length > 0"
       class="ov-section"
     >
-      <div class="ov-section-label">{{ t('overview.activeIncidents') }}</div>
-      <div class="ov-rows">
+      <div class="ov-section-header">
+        <div class="ov-section-label">
+          {{ t('overview.activeIncidents') }}
+          <span class="ov-count-badge">{{ incidentsTotal }}</span>
+          <span v-if="incidentsTotal > incidents.length" class="ov-showing-hint">{{ t('overview.showingOf', { shown: incidents.length, total: incidentsTotal }) }}</span>
+        </div>
+        <button class="ov-view-all" @click="goToIncidentList">{{ t('overview.viewAll') }} →</button>
+      </div>
+      <div class="ov-table">
         <div
           v-for="inc in incidents"
           :key="inc.id"
-          class="ov-alert-row"
+          class="ov-alert-row ov-table-row"
           :class="incidentRowClass(inc.severity)"
         >
           <span class="ov-row-icon ov-icon-incident">
@@ -105,13 +79,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ><span>{{ shortDimKey(key) }}: {{ val }}</span></span>
               </template>
             </div>
-            <div class="ov-row-desc">
-              {{ inc.alert_count }} alert{{ inc.alert_count !== 1 ? 's' : '' }} ·
-              opened {{ relativeTime_(inc.first_alert_at) }}
-              <span v-if="inc.assigned_to"> · {{ inc.assigned_to }}</span>
-            </div>
           </div>
-          <span class="ov-investigate-wrap">
+          <div class="ov-inc-meta">
+            <span class="ov-inc-time">{{ relativeTime_(inc.first_alert_at) }}</span>
+            <span class="ov-inc-sep">·</span>
+            <span class="ov-inc-alerts">{{ inc.alert_count }} alerts</span>
+          </div>
+          <span class="ov-investigate-wrap ov-investigate-hover">
             <OButton
               variant="ghost-primary"
               size="sm"
@@ -126,17 +100,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- SERVICES (enterprise only — needs service graph data) -->
     <section v-if="isEnterpriseOrCloud && services.length > 0" class="ov-section">
-      <div class="ov-section-label">{{ t('overview.services') }}</div>
-      <div class="ov-service-grid">
+      <div class="ov-section-header">
+        <div class="ov-section-label">
+          {{ t('overview.services') }}
+          <span class="ov-count-badge">{{ services.length }}</span>
+          <span v-if="servicePanelVisible && selectedService" class="ov-panel-context">
+            — viewing <strong>{{ selectedService.label ?? selectedService.id }}</strong>
+          </span>
+        </div>
+        <button class="ov-view-all" @click="goToServiceGraph">{{ t('overview.viewAll') }} →</button>
+      </div>
+      <div class="ov-service-scroll-wrap">
+        <button
+          class="ov-svc-arrow ov-svc-arrow-left"
+          :disabled="!svcScrollCanLeft"
+          @click="scrollServices(-1)"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+            <path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+        <div ref="svcGridRef" class="ov-service-grid" @scroll="onSvcScroll">
         <div
           v-for="svc in services"
           :key="svc.id"
           class="ov-service-card"
-          :class="serviceCardClass(svc)"
+          :class="[serviceCardClass(svc), { 'ov-svc-active': selectedService?.id === svc.id && servicePanelVisible }]"
           @click="goToService(svc)"
         >
           <div class="ov-svc-header">
-            <span class="ov-svc-name">{{ svc.label }}</span>
+            <span class="ov-svc-name" :title="svc.label ?? svc.id">{{ svc.label }}</span>
             <span class="ov-svc-info-wrap">
               <OButton
                 variant="ghost-muted"
@@ -151,19 +144,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
             </span>
           </div>
-          <div class="ov-svc-flags">
-            <span v-if="svc.errorFlag" class="ov-svc-flag ov-flag-error" :title="t('overview.elevatedErrorRate')">
-              Error Rate {{ svc.error_rate.toFixed(1) }}%
-            </span>
-            <span v-if="svc.latencyFlag" class="ov-svc-flag ov-flag-latency" :title="`Latency elevated vs baseline (${svc.latencyMultiplier}x)`">
-              Latency {{ svc.latencyMultiplier }}x
-            </span>
-          </div>
-          <div class="ov-svc-req">
-            <span class="ov-metric-label">{{ t('overview.reqPerSec') }}</span>
-            <span class="ov-metric-value">{{ formatReqRate(svc.requests) }}</span>
+          <div class="ov-svc-metrics">
+            <div class="ov-svc-metric-row">
+              <span class="ov-metric-label">{{ t('overview.colErrorRate') }}</span>
+              <span class="ov-metric-value" :class="svc.errorFlag ? 'ov-metric-error' : ''">
+                {{ svc.error_rate != null ? svc.error_rate.toFixed(1) + '%' : '—' }}
+              </span>
+            </div>
+            <div class="ov-svc-metric-row">
+              <span class="ov-metric-label">{{ t('overview.colLatency') }}</span>
+              <span class="ov-metric-value" :class="svc.latencyFlag ? 'ov-metric-warn' : ''">
+                {{ svc.latencyMultiplier ? svc.latencyMultiplier + 'x' : '—' }}
+              </span>
+            </div>
+            <div class="ov-svc-metric-row">
+              <span class="ov-metric-label">{{ t('overview.colReqs') }}</span>
+              <span class="ov-metric-value">{{ formatReqRate(svc.requests) }}</span>
+            </div>
           </div>
         </div>
+        </div>
+        <button
+          class="ov-svc-arrow ov-svc-arrow-right"
+          :disabled="!svcScrollCanRight"
+          @click="scrollServices(1)"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+            <path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
       </div>
     </section>
 
@@ -185,9 +194,56 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </template>
 
+    <!-- ACTIVE ANOMALIES -->
+    <section v-if="anomalies.length > 0" class="ov-section">
+      <div class="ov-section-header">
+        <div class="ov-section-label">
+          {{ t('overview.activeAnomalies') }}
+          <span class="ov-count-badge">{{ anomalies.length }}</span>
+        </div>
+        <button class="ov-view-all" @click="goToAnomalies">{{ t('overview.viewAll') }} →</button>
+      </div>
+      <div class="ov-rows">
+        <div
+          v-for="item in anomalies"
+          :key="item.id"
+          class="ov-alert-row"
+          :class="severityRowClass(item.severity)"
+        >
+          <span class="ov-row-icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+              <path d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
+          <div class="ov-row-body">
+            <div class="ov-row-title">
+              {{ item.title }}
+              <span class="ov-row-meta-sep">·</span>
+              <span class="ov-row-meta">{{ item.description }}</span>
+            </div>
+          </div>
+          <span class="ov-investigate-wrap ov-investigate-hover">
+            <OButton
+              variant="ghost-primary"
+              size="sm"
+              @click="goToAlert(item)"
+            >
+              {{ t("overview.investigate") }}
+            </OButton>
+          </span>
+        </div>
+      </div>
+    </section>
+
     <!-- RECENT EVENTS (alert firing feed) -->
     <section v-if="recentEvents.length > 0" class="ov-section">
-      <div class="ov-section-label">{{ t('overview.recentEvents') }}</div>
+      <div class="ov-section-header">
+        <div class="ov-section-label">
+          {{ t('overview.recentEvents') }}
+          <span class="ov-count-badge">{{ recentEvents.length }}</span>
+        </div>
+        <button class="ov-view-all" @click="goToAlertList">{{ t('overview.viewAll') }} →</button>
+      </div>
       <div class="ov-event-list">
         <div
           v-for="ev in recentEvents"
@@ -258,11 +314,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-if="isLoading" class="ov-skeleton-wrap">
       <OSkeleton v-for="i in 3" :key="i" class="ov-skeleton-row" />
     </div>
+
+    <!-- Alert History Drawer — opened from anomaly Investigate button -->
+    <AlertHistoryDrawer
+      v-model:open="showAlertHistoryDrawer"
+      :alert-details="selectedAlertForHistory"
+      :alert-id="selectedAlertIdForHistory"
+      alert-type="anomaly_detection"
+      data-test="overview-alert-history-drawer"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from "vue";
+import { ref, computed, defineAsyncComponent, onMounted, watch, nextTick } from "vue";
 
 // Module-level cache for anomaly history — survives re-renders, cleared on org change
 const ANOMALY_CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes
@@ -286,6 +351,9 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ServiceGraphNodeSidePanel from "@/plugins/traces/ServiceGraphNodeSidePanel.vue";
+const AlertHistoryDrawer = defineAsyncComponent(
+  () => import("@/components/alerts/AlertHistoryDrawer.vue"),
+);
 
 const { t } = useI18n();
 const store = useStore();
@@ -359,8 +427,32 @@ const isLoading = ref(false);
 const lastFetched = ref<Date | null>(null);
 const anomalies = ref<any[]>([]);
 const incidents = ref<any[]>([]);
+const incidentsTotal = ref(0);
 const services = ref<any[]>([]);
 const recentEvents = ref<any[]>([]);
+
+// Alert history drawer state
+const showAlertHistoryDrawer = ref(false);
+const selectedAlertForHistory = ref<any>(null);
+const selectedAlertIdForHistory = ref("");
+
+// Service grid scroll
+const svcGridRef = ref<HTMLElement | null>(null);
+const svcScrollCanLeft = ref(false);
+const svcScrollCanRight = ref(false);
+
+const onSvcScroll = () => {
+  const el = svcGridRef.value;
+  if (!el) return;
+  svcScrollCanLeft.value = el.scrollLeft > 0;
+  svcScrollCanRight.value = el.scrollLeft + el.clientWidth < el.scrollWidth - 1;
+};
+
+const scrollServices = (dir: 1 | -1) => {
+  const el = svcGridRef.value;
+  if (!el) return;
+  el.scrollBy({ left: dir * (11 * 16 + 8), behavior: "smooth" });
+};
 
 // Service graph raw data + panel state
 const graphData = ref<{ nodes: any[]; edges: any[] }>({ nodes: [], edges: [] });
@@ -468,6 +560,8 @@ const loadAnomalies = async () => {
             alertName: cfg?.name ?? cfg?.alert_name ?? h.alert_name,
             streamName: cfg?.stream_name ?? h.stream_name,
             ts: tsMs,
+            alertId: cfg?.id ?? cfg?.anomaly_id ?? h.anomaly_id ?? "",
+            alertConfig: cfg ?? null,
           });
         }
       });
@@ -482,7 +576,7 @@ const loadAnomalies = async () => {
     });
     const result = Array.from(deduped.values())
       .sort((a, b) => b.ts - a.ts)
-      .slice(0, 5);
+      .slice(0, 3);
 
     _anomalyCache.set(cacheKey, { ts: Date.now(), startTime, endTime, data: result });
     anomalies.value = result;
@@ -507,7 +601,7 @@ const loadHistoryAndSplit = async () => {
     // Recent events: firing/error shown per-occurrence; failed deduped by alert_name with count
     const firingHits = hits
       .filter((h) => ["firing", "error"].includes(h.status?.toLowerCase()))
-      .slice(0, 10)
+      .slice(0, 5)
       .map((h, idx) => ({
         id: h.id ?? `ev-${idx}`,
         typeLabel: formatStatus(h.status),
@@ -541,7 +635,7 @@ const loadHistoryAndSplit = async () => {
 
     recentEvents.value = [...firingHits, ...Array.from(failedMap.values())]
       .sort((a, b) => (b.rawTs ?? 0) - (a.rawTs ?? 0))
-      .slice(0, 15);
+      .slice(0, 5);
   } catch {
     recentEvents.value = [];
   }
@@ -550,10 +644,12 @@ const loadHistoryAndSplit = async () => {
 const loadIncidents = async () => {
   if (!isIncidentsEnabled.value) return;
   try {
-    const res = await incidentsService.list(orgId.value, "open", 10, 0);
+    const res = await incidentsService.list(orgId.value, "open", 4, 0);
     incidents.value = res.data?.incidents ?? [];
+    incidentsTotal.value = res.data?.total ?? incidents.value.length;
   } catch {
     incidents.value = [];
+    incidentsTotal.value = 0;
   }
 };
 
@@ -608,7 +704,9 @@ const loadServiceGraph = async () => {
         if (errDiff !== 0) return errDiff;
         return a.id.localeCompare(b.id);
       })
-      .slice(0, 9);
+      .slice(0, 12);
+    await nextTick();
+    onSvcScroll();
   } catch {
     services.value = [];
   }
@@ -701,10 +799,9 @@ const serviceCardClass = (svc: any) => {
 
 // ── Navigation ───────────────────────────────────────────────────────────────
 const goToAlert = (item: any) => {
-  router.push({
-    name: "alertHistory",
-    query: { org_identifier: orgId.value },
-  });
+  selectedAlertForHistory.value = item.alertConfig ?? { name: item.alertName };
+  selectedAlertIdForHistory.value = item.alertId ?? "";
+  showAlertHistoryDrawer.value = true;
 };
 
 const goToService = (svc: any) => {
@@ -751,12 +848,38 @@ const goToAlertList = () => {
   router.push({ name: "alertList", query: { org_identifier: orgId.value } });
 };
 
+const goToIncidentList = () => {
+  router.push({ name: "incidentList", query: { org_identifier: orgId.value, status: "open" } });
+};
+
+const goToAnomalies = () => {
+  router.push({ name: "alertList", query: { org_identifier: orgId.value, tab: "anomalyDetection" } });
+};
+
 const goToLogs = () => {
   router.push({ name: "logs", query: { org_identifier: orgId.value } });
 };
 
 const goToTraces = () => {
   router.push({ name: "traces", query: { org_identifier: orgId.value } });
+};
+
+const goToServiceGraph = () => {
+  const query: Record<string, string> = {
+    org_identifier: orgId.value,
+    tab: "service-graph",
+  };
+  if (dateTimeType.value === "relative") {
+    query.period = relativeTime.value;
+  } else {
+    query.from = timeRange.value.startTime.toString();
+    query.to = timeRange.value.endTime.toString();
+  }
+  router.push({ name: "traces", query });
+};
+
+const goToAlertHistory = () => {
+  router.push({ name: "alertHistory", query: { org_identifier: orgId.value } });
 };
 
 // ── Lifecycle ────────────────────────────────────────────────────────────────
@@ -790,7 +913,7 @@ watch(isIncidentsEnabled, (enabled) => {
   display: flex;
   flex-direction: column;
   gap: 0;
-  padding: 0.625rem;
+  padding: 0.625rem 0.875rem 0.625rem 0.625rem;
   height: 100%;
   overflow-y: auto;
   color: var(--o2-text-primary);
@@ -799,16 +922,8 @@ watch(isIncidentsEnabled, (enabled) => {
 /* ── Header ── */
 .overview-header {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   margin-bottom: 1rem;
-}
-
-.overview-title {
-  font-size: 1rem;
-  font-weight: 600;
-  color: var(--o2-text-primary);
-  letter-spacing: 0.01em;
 }
 
 .overview-header-right {
@@ -822,13 +937,160 @@ watch(isIncidentsEnabled, (enabled) => {
   margin-bottom: 1.25rem;
 }
 
-.ov-section-label {
-  font-size: 0.8125rem;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-  color: var(--o2-text-muted);
+.ov-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   margin-bottom: 0.5rem;
   padding-left: 0.25rem;
+}
+
+.ov-section-label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: var(--o2-text-primary);
+}
+
+.ov-panel-context {
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--o2-text-muted);
+  margin-left: 0.25rem;
+
+  strong {
+    font-weight: 600;
+    color: var(--o2-text-primary);
+  }
+}
+
+.ov-view-all {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--o2-primary-color);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity 0.15s;
+  opacity: 0.8;
+  &:hover { opacity: 1; text-decoration: underline; }
+}
+
+/* ── Count badge ── */
+.ov-count-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.25rem;
+  height: 1.25rem;
+  padding: 0 0.3rem;
+  border-radius: 0.625rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  background: var(--o2-status-warning-bg);
+  color: var(--o2-status-warning-text);
+  border: 0.0625em solid var(--o2-warning);
+  margin-left: 0.375rem;
+  vertical-align: middle;
+}
+
+/* ── Showing X of Y hint ── */
+.ov-showing-hint {
+  margin-left: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--o2-text-muted);
+  vertical-align: middle;
+}
+
+/* ── Incidents table layout ── */
+.ov-table {
+  display: flex;
+  flex-direction: column;
+  border: 0.0625em solid var(--o2-border-color);
+  border-radius: 0.375rem;
+  overflow: hidden;
+}
+
+.ov-table-head {
+  display: flex;
+  align-items: center;
+  padding: 0.375rem 0.875rem;
+  background: var(--o2-hover-gray);
+  border-bottom: 0.0625em solid var(--o2-border-color);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--o2-text-muted);
+}
+
+
+.ov-table-row {
+  border-radius: 0 !important;
+  border-left-width: 0.1875em !important;
+  border-top: none !important;
+  border-right: none !important;
+  border-bottom: 0.0625em solid var(--o2-border-color) !important;
+  &:last-child { border-bottom: none !important; }
+}
+
+.ov-inc-meta {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 0.3rem;
+  white-space: nowrap;
+  width: 12rem;
+}
+
+.ov-inc-time {
+  font-size: 0.75rem;
+  color: var(--o2-text-muted);
+  min-width: 4.5rem;
+}
+
+.ov-inc-sep {
+  font-size: 0.75rem;
+  color: var(--o2-text-muted);
+}
+
+.ov-inc-alerts {
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--o2-text-primary);
+}
+
+/* ── Hover-only Investigate button ── */
+.ov-investigate-hover {
+  visibility: hidden;
+}
+
+.ov-alert-row:hover .ov-investigate-hover {
+  visibility: visible;
+}
+
+/* ── Service card metric rows ── */
+.ov-svc-metrics {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-top: 0.5rem;
+}
+
+.ov-svc-metric-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.ov-metric-value.ov-metric-error {
+  color: var(--o2-status-error-text) !important;
+}
+
+.ov-metric-value.ov-metric-warn {
+  color: var(--o2-status-warning-text) !important;
 }
 
 /* ── Alert / Anomaly / Incident rows ── */
@@ -897,6 +1159,19 @@ watch(isIncidentsEnabled, (enabled) => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.ov-row-meta-sep {
+  font-size: 0.75rem;
+  color: var(--o2-text-muted);
+  font-weight: 400;
+  margin: 0 0.1rem;
+}
+
+.ov-row-meta {
+  font-size: 0.75rem;
+  color: var(--o2-text-muted);
+  font-weight: 400;
 }
 
 .ov-investigate-wrap {
@@ -969,11 +1244,57 @@ watch(isIncidentsEnabled, (enabled) => {
   }
 }
 
+/* ── Services scroll wrapper ── */
+.ov-service-scroll-wrap {
+  display: flex;
+  align-items: stretch;
+  gap: 0.5rem;
+}
+
+.ov-svc-arrow {
+  flex-shrink: 0;
+  width: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: 0.0625em solid var(--o2-border-color);
+  border-radius: 0.5rem;
+  background: var(--o2-card-bg-solid);
+  color: var(--o2-text-secondary);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  transition: background 0.15s, color 0.15s, box-shadow 0.15s, transform 0.1s;
+
+  svg { transition: transform 0.15s; }
+
+  &:hover:not(:disabled) {
+    background: var(--o2-hover-gray);
+    color: var(--o2-text-primary);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+    transform: translateY(-1px);
+  }
+
+  &:active:not(:disabled) {
+    transform: translateY(0);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+  }
+
+  &:disabled {
+    opacity: 0.25;
+    cursor: not-allowed;
+    box-shadow: none;
+  }
+}
+
 /* ── Services grid ── */
 .ov-service-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(13.75em, 1fr));
+  display: flex;
+  flex-direction: row;
   gap: 0.5rem;
+  overflow-x: auto;
+  flex: 1;
+  scrollbar-width: none;
+  &::-webkit-scrollbar { display: none; }
 }
 
 .ov-service-card {
@@ -982,6 +1303,9 @@ watch(isIncidentsEnabled, (enabled) => {
   border: 0.0625em solid var(--o2-border-color);
   background: var(--o2-card-bg-solid);
   transition: background 0.15s;
+  flex: 0 0 10rem;
+  min-width: 10rem;
+  max-width: 10rem;
 
   &.ov-svc-degraded {
     border-left: 0.1875em solid var(--o2-negative);
@@ -996,6 +1320,12 @@ watch(isIncidentsEnabled, (enabled) => {
   cursor: pointer;
   &:hover {
     background: var(--o2-hover-gray);
+  }
+
+  &.ov-svc-active {
+    background: var(--o2-hover-gray);
+    outline: 0.125em solid var(--o2-primary-color);
+    outline-offset: -0.0625em;
   }
 }
 
@@ -1015,6 +1345,8 @@ watch(isIncidentsEnabled, (enabled) => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  display: block;
+  cursor: default;
 }
 
 .ov-svc-info-wrap {
@@ -1061,13 +1393,16 @@ watch(isIncidentsEnabled, (enabled) => {
 }
 
 .ov-metric-label {
-  font-size: 0.6875rem;
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   color: var(--o2-text-muted);
 }
 
 .ov-metric-value {
   font-size: 0.875rem;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--o2-text-primary);
 }
 

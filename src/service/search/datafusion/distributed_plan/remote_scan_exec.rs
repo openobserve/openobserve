@@ -13,10 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    any::Any,
-    sync::{Arc, atomic::AtomicUsize},
-};
+use std::sync::{Arc, atomic::AtomicUsize};
 
 use arrow_schema::SchemaRef;
 use config::{
@@ -205,11 +202,6 @@ impl DisplayAs for RemoteScanExec {
 impl ExecutionPlan for RemoteScanExec {
     fn name(&self) -> &'static str {
         "RemoteScanExec"
-    }
-
-    /// Return a reference to Any that can be used for downcasting
-    fn as_any(&self) -> &dyn Any {
-        self
     }
 
     fn schema(&self) -> SchemaRef {
@@ -493,7 +485,8 @@ mod tests {
     #[test]
     fn test_remote_scan_exec_as_any() {
         let exec = make_remote_exec();
-        assert!(exec.as_any().downcast_ref::<RemoteScanExec>().is_some());
+        let exec_plan: &dyn ExecutionPlan = &exec;
+        assert!(exec_plan.downcast_ref::<RemoteScanExec>().is_some());
     }
 
     #[test]

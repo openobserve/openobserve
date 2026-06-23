@@ -29,4 +29,9 @@ export interface OStepProps {
 export interface OStepSlots {
   /** Step content ΓÇö shown only when this step is active */
   default: () => unknown
+  /**
+   * Optional content rendered inline next to the title (e.g. a context badge).
+   * Vertical orientation only (in horizontal mode the header is owned by OStepper).
+   */
+  'title-suffix'?: () => unknown
 }

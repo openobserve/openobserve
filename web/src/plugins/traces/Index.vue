@@ -86,6 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="tw:h-full"
               @view-traces="handleServiceGraphViewTraces"
               @request:stream-change="onChildStreamChangeRequest"
+              @widen-range="onWidenTracesRange"
             />
           </div>
 
@@ -99,6 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="tw:h-full"
               @view-traces="handleServicesCatalogViewTraces"
               @request:stream-change="onChildStreamChangeRequest"
+              @widen-range="onWidenTracesRange"
             />
           </div>
 
@@ -256,6 +258,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <search-result
                       ref="searchResultRef"
+                      :show-error-only="showErrorOnly"
                       @update:datetime="setHistogramDate"
                       @update:scroll="getMoreData"
                       @update:sort="runQueryOnSort"
@@ -264,6 +267,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @run-query="searchData"
                       @widen-range="onWidenTracesRange"
                       @remove-filter="onRemoveTracesFilter"
+                      @jump-to-stream-data="onJumpToTracesStreamData"
                       @error-only-toggled="onErrorOnlyToggled"
                     />
                   </div>
@@ -1015,10 +1019,20 @@ async function getQueryData(
         : "start_time";
     })();
 
+    // Spans are physically stored sorted by the timestamp column, and the
+    // backend has a dedicated optimizer for timestamp-sorted segments. A span's
+    // `start_time` is monotonically equivalent to the timestamp column, so
+    // ordering by the timestamp column yields the same visible order while
+    // avoiding the costly full re-sort that `ORDER BY start_time` forces.
+    const orderByCol =
+      validSortCol === "start_time"
+        ? store.state.zoConfig.timestamp_column
+        : validSortCol;
+
     const spansQueryReq = (() => {
       if (!isSpansMode) return null;
       const whereClause = combinedFilter ? ` WHERE ${combinedFilter}` : "";
-      const spansSql = `SELECT * FROM "${selectedStreamName.value}"${whereClause} ORDER BY ${validSortCol} ${sortOrd}`;
+      const spansSql = `SELECT * FROM "${selectedStreamName.value}"${whereClause} ORDER BY ${orderByCol} ${sortOrd}`;
       return {
         query: {
           sql: b64EncodeUnicode(spansSql),
@@ -1257,6 +1271,14 @@ async function extractFields() {
         "traces",
         true,
       );
+      // Mirror the real stats (doc_time_min/max) into streamResults so that
+      // TracesNoEventsState can compute streamDocTimeRange correctly.
+      const streamResultEntry = searchObj.data.streamResults.list?.find(
+        (s: any) => s.name === searchObj.data.stream.selectedStream.value,
+      );
+      if (streamResultEntry && stream?.stats) {
+        streamResultEntry.stats = stream.stats;
+      }
       searchObj.data.datetime.queryRangeRestrictionInHour = -1;
       if (
         (stream.settings.max_query_range > 0 ||
@@ -1688,9 +1710,9 @@ const setHistogramDate = async (date: any) => {
 // User can manually add their own filters before clicking "Run Query"
 const onMetricsFiltersUpdated = (filters: string[]) => {
   const allFilters = [...filters];
-  // Add error filter only if toggle is on and not already present from Error panel brush
+  // Add error filter only if span_status='ERROR' is currently active and not already present
   if (
-    searchObj.meta.showErrorOnly &&
+    showErrorOnly.value &&
     !allFilters.includes("span_status = 'ERROR'")
   ) {
     allFilters.push("span_status = 'ERROR'");
@@ -1765,6 +1787,14 @@ const onWidenTracesRange = (period: string) => {
   searchObj.data.datetime.relativeTimePeriod = period;
   searchObj.data.datetime.type = "relative";
   searchObj.runQuery = true;
+};
+
+const onJumpToTracesStreamData = (fromUs: number, toUs: number) => {
+  searchBarRef.value?.dateTimeRef?.setAbsoluteTime(fromUs, toUs);
+  searchObj.data.datetime.startTime = fromUs;
+  searchObj.data.datetime.endTime = toUs;
+  searchObj.data.datetime.type = "absolute";
+  runQueryFn();
 };
 
 const onSelectTracesStream = () => {
@@ -1920,6 +1950,10 @@ const activeExcludeFilterValues = computed((): Record<string, string[]> => {
   }
   return result;
 });
+
+const showErrorOnly = computed(
+  () => activeIncludeFilterValues.value["span_status"]?.includes("ERROR") ?? false,
+);
 
 const searchData = () => {
   if (

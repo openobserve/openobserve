@@ -69,6 +69,9 @@ export type SubjectButton = SubjectButtonSpec & {
 /**
  * Per matched_set_id, the ordered list of subject buttons to render.
  * Ordering controls left-to-right display order.
+ *
+ * Keys are canonical slugs. Use `resolveSubjectButtonSpecs` to look up by
+ * any alias (e.g. "k8s" → kubernetes, "Amazon Web Services" → aws).
  */
 export const SUBJECT_BUTTONS_BY_SET: Record<string, SubjectButtonSpec[]> = {
   // matched_set_id is `normalize_category_to_id(group)` on the backend, so for
@@ -101,6 +104,37 @@ export const SUBJECT_BUTTONS_BY_SET: Record<string, SubjectButtonSpec[]> = {
     { id: "function",       semanticIds: ["faas-name"],            label: "Function" },
   ],
 };
+
+// Common aliases → canonical key in SUBJECT_BUTTONS_BY_SET
+const SET_ID_ALIASES: Record<string, string> = {
+  k8s: "kubernetes",
+  kube: "kubernetes",
+  "amazon web services": "aws",
+  "google cloud": "gcp",
+  "google cloud platform": "gcp",
+  "microsoft azure": "azure",
+};
+
+/**
+ * Resolve a matched_set_id (which may be a user-defined slug like "k8s" or
+ * "prod-kubernetes") to the canonical SUBJECT_BUTTONS_BY_SET key.
+ * Tries exact match first, then alias lookup, then prefix/substring match.
+ */
+export function resolveSetId(matchedSetId: string | undefined | null): string | undefined {
+  if (!matchedSetId) return undefined;
+  const lower = matchedSetId.toLowerCase();
+  if (lower in SUBJECT_BUTTONS_BY_SET) return lower;
+  if (lower in SET_ID_ALIASES) return SET_ID_ALIASES[lower];
+  // prefix match: "k8s-prod" → "kubernetes", "aws-east" → "aws"
+  for (const canonical of Object.keys(SUBJECT_BUTTONS_BY_SET)) {
+    if (lower.startsWith(canonical) || lower.includes(canonical)) return canonical;
+  }
+  // alias prefix match
+  for (const [alias, canonical] of Object.entries(SET_ID_ALIASES)) {
+    if (lower.startsWith(alias) || lower.includes(alias)) return canonical;
+  }
+  return undefined;
+}
 
 // Semantic group field names carry OTel/Prometheus envelopes and identifier
 // suffixes that don't appear in metric stream names. Strip them so we can
@@ -169,7 +203,8 @@ export function buildSubjectButtons(
   semanticGroups: FieldAlias[],
 ): SubjectButton[] {
   if (!matchedSetId) return [];
-  const specs = SUBJECT_BUTTONS_BY_SET[matchedSetId];
+  const canonical = resolveSetId(matchedSetId);
+  const specs = canonical ? SUBJECT_BUTTONS_BY_SET[canonical] : undefined;
   if (!specs?.length) return [];
   return specs
     .map((spec) => {
@@ -217,7 +252,8 @@ export function buildWorkloadChipEntries(
   sourceRow: Record<string, any> | undefined | null,
 ): Record<string, WorkloadChipEntry> {
   if (!matchedSetId || !sourceRow) return {};
-  const specs = SUBJECT_BUTTONS_BY_SET[matchedSetId];
+  const canonical = resolveSetId(matchedSetId);
+  const specs = canonical ? SUBJECT_BUTTONS_BY_SET[canonical] : undefined;
   if (!specs?.length) return {};
   const out: Record<string, WorkloadChipEntry> = {};
   for (const spec of specs) {

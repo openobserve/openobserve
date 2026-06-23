@@ -365,7 +365,6 @@ async function save() {
 .provider-form__body :deep(textarea) {
   max-height: 220px;
   overflow-y: auto;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 .provider-section {
@@ -390,7 +389,8 @@ async function save() {
   border-radius: 999px;
   background: color-mix(in srgb, var(--color-text-secondary) 12%, transparent);
   color: var(--color-text-secondary, var(--o2-text-secondary));
-  font: 700 11px ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 700;
+  font-size: 11px;
 }
 
 .provider-section__title {

@@ -15,6 +15,7 @@
 
 import type { StreamInfo } from "@/services/service_streams";
 import { NETWORK_PATTERNS } from "@/utils/metrics/metricGrouping";
+import { resolveSetId } from "@/composables/useMetricSubjectButtons";
 
 /**
  * Intent-based metric organization.
@@ -145,12 +146,13 @@ function curatedFor(
   subjectId?: string | null,
 ): string[] {
   if (!matchedSetId) return [];
+  const canonical = resolveSetId(matchedSetId) ?? matchedSetId;
   if (subjectId) {
-    const subjectKey = `${matchedSetId}:${subjectId}`;
+    const subjectKey = `${canonical}:${subjectId}`;
     if (ESSENTIALS_BY_WORKLOAD_SUBJECT[subjectKey])
       return ESSENTIALS_BY_WORKLOAD_SUBJECT[subjectKey];
   }
-  return ESSENTIALS_BY_WORKLOAD[matchedSetId] ?? [];
+  return ESSENTIALS_BY_WORKLOAD[canonical] ?? [];
 }
 
 // Patterns may or may not carry the /i flag — metricGrouping uses
@@ -180,9 +182,14 @@ export function filterByIntent(
   if (intent === "all") return streams;
   if (intent === "essentials") {
     const curated = curatedFor(matchedSetId, subjectId);
-    if (curated.length === 0) return [];
+    if (curated.length === 0) return streams;
     const allowed = new Set(curated);
-    return streams.filter((s) => allowed.has(s.stream_name));
+    const matched = streams.filter((s) => allowed.has(s.stream_name));
+    if (matched.length === 0) return streams;
+    // Prefer curated streams that have data in the selected time range.
+    // Fall back to the full curated match only when none have overlap.
+    const withData = matched.filter((s) => (s as any).overlap === "yes");
+    return withData.length > 0 ? withData : matched;
   }
   const patterns = INTENT_PATTERNS[intent];
   return streams.filter((s) => matchesAnyPattern(s.stream_name, patterns));

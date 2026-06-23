@@ -58,13 +58,6 @@ impl StreamingAggregationContext {
             return Ok(None);
         }
 
-        let org_settings = crate::service::db::organization::get_org_setting(&request.org_id)
-            .await
-            .unwrap_or_default();
-        if !org_settings.streaming_aggregation_enabled {
-            return Ok(None);
-        }
-
         let streaming_id = request.streaming_id.clone();
         let Some(streaming_id) = streaming_id else {
             return Err(Error::Message(

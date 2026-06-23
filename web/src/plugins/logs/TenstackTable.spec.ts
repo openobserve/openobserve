@@ -16,6 +16,7 @@ import { mount, flushPromises } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { ref } from "vue";
 import TenstackTable from "./TenstackTable.vue";
+import LoadingProgress from "@/components/common/LoadingProgress.vue";
 
 // Mock CSS.supports which is not available in jsdom
 Object.defineProperty(globalThis, "CSS", {
@@ -432,6 +433,54 @@ describe("TenstackTable", () => {
       wrapper.vm.isFunctionErrorOpen = true;
       await wrapper.vm.$nextTick();
       expect(wrapper.vm.isFunctionErrorOpen).toBe(true);
+    });
+  });
+
+  // ── Loading skeleton vs streaming progress bar ────────────────────────────────
+  describe("loading state and progress bar", () => {
+    const SKELETON = '[data-test="logs-table-skeleton-body"]';
+
+    it("shows the full skeleton when loading with no rows yet", () => {
+      const wrapper = mountComponent({ loading: true, rows: [] });
+      expect(wrapper.find(SKELETON).exists()).toBe(true);
+    });
+
+    it("hides the skeleton when loading with rows already present", () => {
+      const wrapper = mountComponent({
+        loading: true,
+        rows: [{ _timestamp: 1000, log: "test" }],
+      });
+      expect(wrapper.find(SKELETON).exists()).toBe(false);
+    });
+
+    it("does not show the skeleton when not loading", () => {
+      const wrapper = mountComponent({
+        loading: false,
+        rows: [{ _timestamp: 1000, log: "test" }],
+      });
+      expect(wrapper.find(SKELETON).exists()).toBe(false);
+    });
+
+    it("renders the LoadingProgress bar with the loading prop", () => {
+      const wrapper = mountComponent({ loading: true, rows: [] });
+      const bar = wrapper.findComponent(LoadingProgress);
+      expect(bar.exists()).toBe(true);
+      expect(bar.props("loading")).toBe(true);
+    });
+
+    it("forwards loadingProgressPercentage to the LoadingProgress bar", () => {
+      const wrapper = mountComponent({
+        loading: true,
+        rows: [{ _timestamp: 1000, log: "test" }],
+        loadingProgressPercentage: 42,
+      });
+      const bar = wrapper.findComponent(LoadingProgress);
+      expect(bar.props("loadingProgressPercentage")).toBe(42);
+    });
+
+    it("defaults loadingProgressPercentage to 0", () => {
+      const wrapper = mountComponent();
+      expect(wrapper.props("loadingProgressPercentage")).toBe(0);
     });
   });
 });
