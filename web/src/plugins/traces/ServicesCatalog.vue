@@ -511,7 +511,7 @@ const tableColumns = computed(() => [
     header: t("traces.servicesCatalog.columns.serviceName"),
     accessorKey: "service_name",
     enableSorting: true,
-    size: 200,
+    size: 260,
     meta: { slot: true, align: "left", sortable: true },
   },
   {
