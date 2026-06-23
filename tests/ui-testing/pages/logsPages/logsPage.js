@@ -3,6 +3,7 @@ import { LogsQueryPage } from './logsQueryPage.js';
 import { LoginPage } from '../generalPages/loginPage.js';
 import { IngestionPage } from '../generalPages/ingestionPage.js';
 import { ManagementPage } from '../generalPages/managementPage.js';
+import { openNavFlyoutChild } from '../commonActions.js';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -450,13 +451,15 @@ export class LogsPage {
     }
 
     async clickMenuLinkByType(linkType) {
+        // pipeline and functions moved into the Data group hover flyout
+        if (linkType === 'pipeline' || linkType === 'functions') {
+            return await openNavFlyoutChild(this.page, linkType);
+        }
         const linkMap = {
             'logs': this.logsMenuItem,
             'traces': '[data-test="menu-link-/traces-item"]',
             'streams': this.streamsMenuItem,
-            'metrics': '[data-test="menu-link-\\/metrics-item"]',
-            'pipeline': '[data-test="menu-link-\\/pipeline-item"]',
-            'functions': '[data-test="menu-link-\\/functions-item"]'
+            'metrics': '[data-test="menu-link-\\/metrics-item"]'
         };
         return await this.page.locator(linkMap[linkType]).click({ force: true });
     }
@@ -6259,10 +6262,25 @@ export class LogsPage {
      */
     async ingestData(streamName, data) {
         const fetch = (await import('node-fetch')).default;
+        const http = require('http');
+        const https = require('https');
         const orgId = getOrgIdentifier();
         const authHeaders = getAuthHeaders();
 
         testLogger.info('Ingesting data', { streamName, recordCount: data.length });
+
+        // node-fetch 2.x reuses keep-alive sockets by default. With records sent
+        // one-by-one (spaced 500ms apart), CI servers close the idle keep-alive
+        // connection between requests, surfacing as a "Premature close" error
+        // while reading the response body — even though the server returns HTTP
+        // 200 and ingests the record. Forcing a fresh connection per request
+        // (keepAlive: false) eliminates that socket-reuse race.
+        const httpAgent = new http.Agent({ keepAlive: false });
+        const httpsAgent = new https.Agent({ keepAlive: false });
+        const agent = (parsedURL) => (parsedURL.protocol === 'https:' ? httpsAgent : httpAgent);
+
+        const ingestUrl = `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`;
+        const maxAttempts = 3;
 
         let successCount = 0;
         let failCount = 0;
@@ -6270,31 +6288,49 @@ export class LogsPage {
         // Send records one by one to ensure each is treated as unique
         for (let i = 0; i < data.length; i++) {
             const record = data[i];
+            let ingested = false;
+            let lastError = null;
 
-            try {
-                const response = await fetch(`${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`, {
-                    method: 'POST',
-                    headers: authHeaders,
-                    body: JSON.stringify([record])  // Send as single-element array
-                });
+            // Retry transient connection failures (e.g. "Premature close") so a
+            // single dropped socket does not fail the whole test.
+            for (let attempt = 1; attempt <= maxAttempts && !ingested; attempt++) {
+                try {
+                    const response = await fetch(ingestUrl, {
+                        method: 'POST',
+                        headers: authHeaders,
+                        body: JSON.stringify([record]),  // Send as single-element array
+                        agent
+                    });
 
-                const responseData = await response.json();
+                    const responseData = await response.json();
 
-                if (response.status === 200 && responseData.code === 200) {
-                    successCount++;
-                    testLogger.debug(`Ingested record ${i+1}/${data.length}`, { name: record.name, test_id: record.test_id || 'no_id', unique_id: record.unique_id });
-                } else {
-                    failCount++;
-                    testLogger.error(`Failed to ingest record ${i+1}/${data.length}`, { response: responseData, test_id: record.test_id || record.name });
+                    if (response.status === 200 && responseData.code === 200) {
+                        ingested = true;
+                        testLogger.debug(`Ingested record ${i+1}/${data.length}`, { name: record.name, test_id: record.test_id || 'no_id', unique_id: record.unique_id });
+                    } else {
+                        lastError = `status=${response.status} code=${responseData.code}`;
+                        testLogger.error(`Failed to ingest record ${i+1}/${data.length} (attempt ${attempt}/${maxAttempts})`, { response: responseData, test_id: record.test_id || record.name });
+                    }
+                } catch (error) {
+                    lastError = error.message;
+                    testLogger.error(`Error ingesting record ${i+1}/${data.length} (attempt ${attempt}/${maxAttempts})`, { error: error.message });
                 }
 
-                // Small delay between records
-                await new Promise(resolve => setTimeout(resolve, 500));
-
-            } catch (error) {
-                failCount++;
-                testLogger.error(`Error ingesting record ${i+1}/${data.length}`, { error: error.message });
+                // Back off briefly before retrying the same record
+                if (!ingested && attempt < maxAttempts) {
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                }
             }
+
+            if (ingested) {
+                successCount++;
+            } else {
+                failCount++;
+                testLogger.error(`Giving up on record ${i+1}/${data.length} after ${maxAttempts} attempts`, { lastError, test_id: record.test_id || record.name });
+            }
+
+            // Small delay between records
+            await new Promise(resolve => setTimeout(resolve, 500));
         }
 
         testLogger.info('Ingestion complete', { streamName, total: data.length, success: successCount, failed: failCount });

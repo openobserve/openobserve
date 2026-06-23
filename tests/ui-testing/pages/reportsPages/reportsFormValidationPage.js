@@ -1,5 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
+import { openNavFlyoutChild } from '../commonActions.js';
+
 export class ReportsFormValidationPage {
     /**
      * @param {import('@playwright/test').Page} page
@@ -8,7 +10,6 @@ export class ReportsFormValidationPage {
         this.page = page;
 
         // ── Navigation ───────────────────────────────────────────────────────
-        this.reportsMenuLink = '[data-test="menu-link-\\/reports-item"]';
         this.reportsListTitle = '[data-test="report-list-title"]';
         this.addReportBtn = '[data-test="report-list-add-report-btn"]';
         this.scheduledTab = '[data-test="tab-shared"]';
@@ -83,7 +84,7 @@ export class ReportsFormValidationPage {
     // ── Navigation ────────────────────────────────────────────────────────────
 
     async navigateToReports() {
-        await this.page.locator(this.reportsMenuLink).click();
+        await openNavFlyoutChild(this.page, 'reports');
         await this.page.locator(this.reportsListTitle).waitFor({ state: 'visible', timeout: 15000 });
         await this.page.locator(this.scheduledTab).click({ force: true });
     }

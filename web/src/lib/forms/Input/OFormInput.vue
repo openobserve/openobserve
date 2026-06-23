@@ -4,6 +4,7 @@
 import { inject } from "vue";
 import OInput from "./OInput.vue";
 import { FORM_CONTEXT_KEY } from "../Form/OForm.types";
+import { firstFieldError } from "../Form/fieldError";
 import type { FormInputProps } from "./OFormInput.types";
 
 defineOptions({ inheritAttrs: false });
@@ -22,19 +23,6 @@ if (import.meta.env.DEV && !form) {
     v-if="form"
     :is="form.Field"
     :name="props.name"
-    :validators="
-      props.validators
-        ? {
-            onBlur: (ctx: { value: unknown }) => {
-              for (const v of props.validators ?? []) {
-                const r = v(ctx.value as string | number | undefined);
-                if (r !== undefined) return r;
-              }
-              return undefined;
-            },
-          }
-        : undefined
-    "
   >
     <template #default="{ field }">
       <OInput
@@ -59,14 +47,14 @@ if (import.meta.env.DEV && !form) {
         :width="props.width"
         :model-value="field.state.value"
         :error="
-          field.state.meta.isTouched && field.state.meta.errors.length > 0
+          field.state.meta.errors.length > 0
         "
         :error-message="
-          field.state.meta.isTouched && field.state.meta.errors.length > 0
-            ? String(field.state.meta.errors[0])
+          field.state.meta.errors.length > 0
+            ? firstFieldError(field.state.meta.errors)
             : undefined
         "
-        @update:model-value="(val: unknown) => { field.handleChange(val); field.handleBlur(); }"
+        @update:model-value="(val: unknown) => field.handleChange(val)"
         @blur="field.handleBlur"
       />
     </template>

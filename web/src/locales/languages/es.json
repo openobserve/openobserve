@@ -1386,6 +1386,7 @@
     "selectDashboardLabel": "Seleccione panel",
     "selectTabLabel": "Seleccione pestaña",
     "numbers": "Números",
+    "localeFormat": "Formato regional",
     "nanoseconds": "Nanosegundos (ns)",
     "currency": "Moneda",
     "p99": "P99",
@@ -3447,7 +3448,9 @@
     "import_this_pattern": "Importar este patrón",
     "patterns_loaded": "Patrones {count} cargados",
     "failed_to_load": "No se pudieron cargar los patrones",
-    "no_patterns_selected": "Selecciona al menos un patrón"
+    "no_patterns_selected": "Selecciona al menos un patrón",
+    "name_required": "* El nombre es obligatorio",
+    "pattern_required": "* El patrón es obligatorio"
   },
   "search_history": {
     "title": "Historial de búsqueda",
@@ -4048,7 +4051,12 @@
     "emptyActionLogs": "Explore los registros",
     "emptyActionLogsDesc": "Busque y filtre sus flujos de registro",
     "emptyActionTraces": "Explora las huellas",
-    "emptyActionTracesDesc": "Inspeccione los rastros distribuidos y la latencia del servicio"
+    "emptyActionTracesDesc": "Inspeccione los rastros distribuidos y la latencia del servicio",
+    "viewAll": "Ver todos",
+    "showingOf": "Mostrando {mostrado} de {total}",
+    "colErrorRate": "Tasa de error",
+    "colLatency": "Latencia",
+    "colReqs": "Reqes"
   },
   "chatHistory": {
     "title": "Charlas",

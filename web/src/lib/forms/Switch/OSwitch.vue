@@ -161,7 +161,7 @@ const hasLabel = computed(
         disabled && 'o-input-label--disabled',
       ]"
     >
-      <slot name="label">{{ label }}</slot>
+      <slot name="label">{{ label }}</slot><span v-if="required" aria-hidden="true">&nbsp;*</span>
       <OIcon
         v-if="$slots.tooltip"
         name="info-outline"

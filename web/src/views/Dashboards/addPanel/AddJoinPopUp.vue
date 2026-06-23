@@ -15,7 +15,10 @@
 
 <!-- eslint-disable vue/no-unused-components -->
 <template>
-  <div data-test="dashboard-join-pop-up" class="join-popup-container">
+  <div
+    data-test="dashboard-join-pop-up"
+    class="join-popup-container tw:flex tw:flex-col tw:max-h-[54vh] tw:overflow-hidden"
+  >
     <div class="join-header" data-test="dashboard-join-pop-up-header">
       <div class="join-section">
         <div class="join-section-header">
@@ -108,8 +111,8 @@
       <div class="tw:border-t tw:border-gray-200 tw:flex-1"></div>
     </div>
 
-    <div class="clause-section">
-      <div class="clause-header">
+    <div class="clause-section tw:flex tw:flex-col tw:min-h-0 tw:flex-1">
+      <div class="clause-header tw:shrink-0">
         <h3 class="clause-title">Joining Clause</h3>
         <p class="clause-description">
           Select the fields that need to be correlated within the joining
@@ -117,6 +120,10 @@
         </p>
       </div>
 
+      <div
+        class="clause-list tw:flex-1 tw:min-h-0 tw:overflow-y-auto"
+        data-test="dashboard-join-clause-list"
+      >
       <div
         v-for="(arg, argIndex) in modelValue.conditions"
         :key="argIndex + JSON.stringify(arg)"
@@ -175,6 +182,7 @@
             <OTooltip content="Remove clause" />
           </OButton>
         </div>
+      </div>
       </div>
     </div>
   </div>
@@ -670,5 +678,9 @@ export default defineComponent({
 
 .field-container {
   flex: 1;
+  // Allow flex children to shrink below their content width so long field
+  // names truncate inside the select instead of overflowing the layout.
+  min-width: 0;
+  overflow: hidden;
 }
 </style>

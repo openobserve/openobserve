@@ -114,6 +114,9 @@ pub fn reqwest_client_tls_config() -> Result<reqwest::Client, anyhow::Error> {
         let tls_config = client_tls_config()?;
         client_builder = client_builder.use_preconfigured_tls(tls_config);
     }
+    if cfg.http.tls_skip_verify {
+        client_builder = client_builder.danger_accept_invalid_certs(true);
+    }
 
     Ok(client_builder.build()?)
 }

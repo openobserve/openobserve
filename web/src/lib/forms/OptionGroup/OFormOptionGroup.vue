@@ -4,6 +4,7 @@
 import { inject } from "vue";
 import OOptionGroup from "./OOptionGroup.vue";
 import { FORM_CONTEXT_KEY } from "../Form/OForm.types";
+import { firstFieldError } from "../Form/fieldError";
 import type { FormOptionGroupProps } from "./OFormOptionGroup.types";
 import type { OptionGroupValue } from "./OOptionGroup.types";
 
@@ -21,24 +22,7 @@ if (import.meta.env.DEV && !form) {
 </script>
 
 <template>
-  <component
-    v-if="form"
-    :is="form.Field"
-    :name="props.name"
-    :validators="
-      props.validators
-        ? {
-            onChange: (ctx: { value: unknown }) => {
-              for (const v of props.validators ?? []) {
-                const r = v(ctx.value as OptionGroupValue);
-                if (r !== undefined) return r;
-              }
-              return undefined;
-            },
-          }
-        : undefined
-    "
-  >
+  <component v-if="form" :is="form.Field" :name="props.name">
     <template #default="{ field }">
       <div class="tw:flex tw:flex-col tw:gap-1">
         <OOptionGroup
@@ -49,11 +33,12 @@ if (import.meta.env.DEV && !form) {
           :label="props.label"
           :help-text="props.helpText"
           :disabled="props.disabled"
+          :required="props.required"
           :size="props.size"
           :name="props.name"
           :model-value="field.state.value"
           :error="
-            field.state.meta.isTouched && field.state.meta.errors.length > 0
+            field.state.meta.errors.length > 0
           "
           @update:model-value="
             (v: OptionGroupValue) => {
@@ -68,11 +53,11 @@ if (import.meta.env.DEV && !form) {
         </OOptionGroup>
         <div
           v-if="
-            field.state.meta.isTouched && field.state.meta.errors.length > 0
+            field.state.meta.errors.length > 0
           "
           class="tw:text-xs tw:text-option-group-error-text"
         >
-          {{ field.state.meta.errors[0] }}
+          {{ firstFieldError(field.state.meta.errors) }}
         </div>
       </div>
     </template>

@@ -54,7 +54,6 @@ class FunctionsFormValidationPage {
     this.enrichmentAddButton = page.locator('[data-test="enrichment-tables-add-btn"]');
 
     // Pipeline / enrichment navigation
-    this.pipelineMenuItem = page.locator('[data-test="menu-link-\\/pipeline-item"]');
     this.enrichmentTableTab = page.locator('[data-test="pipeline-section-tab-enrichmentTables"]');
 
     // Add function button on functions list

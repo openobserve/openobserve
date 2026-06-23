@@ -41,9 +41,20 @@ export type DetectState = "idle" | "checking" | "connected" | "stalled";
 
 export interface SpanDetectConfig {
   orgId: string;
-  streamType: "traces" | "logs";
+  streamType: "traces" | "logs" | "metrics";
   /** Stream to count over. Falls back to "default" until configured. */
   streamName?: string;
+  /**
+   * How `streamName` is matched against existing streams:
+   *  - "exact" (default): the stream must be named exactly `streamName`, then a
+   *    COUNT confirms it carries matching rows.
+   *  - "keyword": `streamName` is a substring; ANY stream whose name contains it
+   *    counts as connected (existence alone). This is how metrics are detected —
+   *    OTLP metrics fan out into one stream per metric (e.g. `sqlserver_*`), so
+   *    there's no single stream to count over, and the stream is only created on
+   *    the first datapoint, making existence proof enough.
+   */
+  match?: "exact" | "keyword";
   /** SQL WHERE fragment, e.g. "gen_ai_system = 'Anthropic'". */
   filter: string;
   /** Count spans from this far back, so a span that arrived during setup still
@@ -51,7 +62,7 @@ export interface SpanDetectConfig {
   lookbackMs?: number;
 }
 
-export interface UseSpanDetectOptions {
+export interface UseStreamDetectOptions {
   /** Reactive config getter (org/stream/filter may resolve asynchronously). */
   config: () => SpanDetectConfig;
   /** Fired once on a successful connect (e.g. confetti). */
@@ -68,7 +79,7 @@ export function prefersReducedMotion(): boolean {
 
 const nowMs = () => new Date().getTime();
 
-export function useSpanDetect(opts: UseSpanDetectOptions) {
+export function useStreamDetect(opts: UseStreamDetectOptions) {
   const state = ref<DetectState>("idle");
   const count = ref(0);
 
@@ -95,7 +106,9 @@ export function useSpanDetect(opts: UseSpanDetectOptions) {
   // Stage 1 — does the target stream exist yet? Uses the streams-list ("stream
   // stats") API, which returns 200 with an empty/filtered list (no 404) until
   // the first span creates the stream.
-  const streamExists = async (cfg: SpanDetectConfig): Promise<boolean> => {
+  const streamExists = async (
+    cfg: SpanDetectConfig,
+  ): Promise<{ exists: boolean; matched: number }> => {
     const stream = cfg.streamName || "default";
     try {
       const res = await streamService.nameList(
@@ -107,10 +120,15 @@ export function useSpanDetect(opts: UseSpanDetectOptions) {
         stream,
       );
       const list: any[] = res?.data?.list ?? [];
-      // keyword is a substring match → require the exact stream name.
-      return list.some((s) => s?.name === stream);
+      // "keyword" mode: nameList already filters by substring, so any returned
+      // stream is a match (e.g. sqlserver_user_connection_count for "sqlserver").
+      if (cfg.match === "keyword") {
+        return { exists: list.length > 0, matched: list.length };
+      }
+      // "exact" mode: nameList's keyword is a substring → require the exact name.
+      return { exists: list.some((s) => s?.name === stream), matched: 1 };
     } catch {
-      return false;
+      return { exists: false, matched: 0 };
     }
   };
 
@@ -122,10 +140,17 @@ export function useSpanDetect(opts: UseSpanDetectOptions) {
     const cfg = opts.config();
 
     // Stage 1 — stream must exist before we touch _search.
-    const exists = await streamExists(cfg);
+    const { exists, matched } = await streamExists(cfg);
     if (state.value !== "checking") return; // reset() raced us
     if (!exists) {
       state.value = "stalled";
+      return;
+    }
+
+    // Keyword mode (metrics): the matching stream existing IS the proof —
+    // there's no single stream to COUNT over. Skip stage 2.
+    if (cfg.match === "keyword") {
+      succeed(matched);
       return;
     }
 

@@ -792,7 +792,9 @@ export default defineComponent({
     const schemaList = ref([]);
     const streams: any = ref({});
     const isFetchingStreams = ref(false);
-    const loading = ref(false);
+    // Start in the loading state so the table shows the skeleton on first
+    // render instead of briefly flashing the empty state before the fetch.
+    const loading = ref(true);
     const isSubmitting = ref(false);
 
     // Compact toolbar: icon-only buttons when AI sidebar is open at narrow widths
@@ -1229,6 +1231,10 @@ export default defineComponent({
           // we are not fetching the alerts again, we are just assigning the alerts to the filteredResults
           allAlerts.value =
             store.state.organizationData.allAlertsListByFolderId[folderId];
+          // Data is served synchronously from cache — clear the loading flag
+          // (it starts true to avoid the empty-state flash) so the table renders
+          // the cached rows instead of staying stuck on the skeleton.
+          loading.value = false;
         }
       } catch (error) {
         throw error;
@@ -1497,6 +1503,9 @@ export default defineComponent({
         allSelectedAlerts.value = false;
 
         if (newVal == router.currentRoute.value.query.folder) {
+          // Not refetching here — clear the initial loading flag so the table
+          // doesn't stay stuck on the skeleton.
+          loading.value = false;
           return;
         }
         if (searchAcrossFolders.value) {

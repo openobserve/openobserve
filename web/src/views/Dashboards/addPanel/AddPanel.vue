@@ -304,7 +304,7 @@ export default defineComponent({
       validatePanel,
       makeAutoSQLQuery,
     } = useDashboardPanelData("dashboard");
-    const editMode = ref(false);
+    const editMode = ref(!!route.query.panelId);
     const selectedDate: any = ref(null);
     const dateTimePickerRef: any = ref(null);
     const errorData: any = reactive({

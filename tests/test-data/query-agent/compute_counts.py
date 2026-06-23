@@ -505,8 +505,9 @@ def main():
 
             # Merge preserved keys from old expected into new expected
             _PRESERVE_KEYS = ("skip_sqllogictest", "skip_row_count",
-                              "skip_column_check", "note", "assertions",
-                              "row_count")
+                              "skip_column_check",
+                              "skip_without_single_node_opt",
+                              "note", "assertions", "row_count")
             for key in _PRESERVE_KEYS:
                 if key in old_expected:
                     new_expected[key] = old_expected[key]

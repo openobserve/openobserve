@@ -1387,6 +1387,7 @@
     "selectDashboardLabel": "Wählen Sie Dashboard",
     "selectTabLabel": "Wählen Sie Tab",
     "numbers": "Zahlen",
+    "localeFormat": "Gebietsschema-Format",
     "nanoseconds": "Nanosekunden (ns)",
     "currency": "Währung",
     "p99": "P99",
@@ -3449,7 +3450,9 @@
     "import_this_pattern": "Dieses Muster importieren",
     "patterns_loaded": "{count} Muster (e) geladen",
     "failed_to_load": "Muster konnten nicht geladen werden",
-    "no_patterns_selected": "Bitte wählen Sie mindestens ein Muster aus"
+    "no_patterns_selected": "Bitte wählen Sie mindestens ein Muster aus",
+    "name_required": "* Name ist erforderlich",
+    "pattern_required": "* Muster ist erforderlich"
   },
   "search_history": {
     "title": "Verlauf durchsuchen",
@@ -4050,7 +4053,12 @@
     "emptyActionLogs": "Logs erkunden",
     "emptyActionLogsDesc": "Suchen und filtern Sie Ihre Log-Streams",
     "emptyActionTraces": "Spuren erkunden",
-    "emptyActionTracesDesc": "Untersuchen Sie verteilte Traces und die Servicelatenz"
+    "emptyActionTracesDesc": "Untersuchen Sie verteilte Traces und die Servicelatenz",
+    "viewAll": "Alles ansehen",
+    "showingOf": "Es werden {gezeigt} von {total} angezeigt",
+    "colErrorRate": "Fehlerrate",
+    "colLatency": "Latenz",
+    "colReqs": "Requen"
   },
   "chatHistory": {
     "title": "Chats",
