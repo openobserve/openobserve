@@ -111,7 +111,10 @@ mod tests {
         let db = Database::connect("sqlite::memory:").await.unwrap();
         create_short_urls_table(&db, true).await;
         let manager = SchemaManager::new(&db);
-        Migration.up(&manager).await.expect("up must not fail when org_id already exists");
+        Migration
+            .up(&manager)
+            .await
+            .expect("up must not fail when org_id already exists");
         assert!(manager.has_column("short_urls", "org_id").await.unwrap());
     }
 
@@ -122,7 +125,10 @@ mod tests {
         create_short_urls_table(&db, false).await;
         let manager = SchemaManager::new(&db);
         assert!(!manager.has_column("short_urls", "org_id").await.unwrap());
-        Migration.up(&manager).await.expect("up must add org_id when missing");
+        Migration
+            .up(&manager)
+            .await
+            .expect("up must add org_id when missing");
         assert!(manager.has_column("short_urls", "org_id").await.unwrap());
     }
 
@@ -135,7 +141,10 @@ mod tests {
         Migration.up(&manager).await.unwrap();
         Migration.down(&manager).await.unwrap();
         assert!(!manager.has_column("short_urls", "org_id").await.unwrap());
-        Migration.down(&manager).await.expect("down must be idempotent");
+        Migration
+            .down(&manager)
+            .await
+            .expect("down must be idempotent");
         Migration.up(&manager).await.unwrap();
         assert!(manager.has_column("short_urls", "org_id").await.unwrap());
     }
