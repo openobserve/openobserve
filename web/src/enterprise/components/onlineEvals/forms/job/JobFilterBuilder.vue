@@ -67,12 +67,18 @@ function handleInputUpdate() {
 </script>
 
 <style>
-.job-filter__group .el-border {
+.job-filter__group  .el-border {
   width: 100%;
   max-width: 100%;
-  margin-top: 0 !important;
   margin-left: 0 !important;
   border-color: var(--color-dialog-header-border, var(--o2-border));
+}
+
+/* Only the root group sits flush under the label. Nested groups keep their
+   top margin so the upward-shifted AND/OR toggle isn't clipped by the
+   parent .group-container (overflow-x-auto also clips vertically). */
+.job-filter__group > .el-border {
+  margin-top: 0 !important;
 }
 
 .job-filter__group .group-container {

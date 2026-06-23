@@ -68,9 +68,14 @@
         </template>
 
         <template #cell-type="{ row }">
-          <span class="tw:inline-flex tw:items-center tw:px-[3px] tw:rounded-[2px] tw:font-bold tw:text-[9px] tw:leading-[14px] tw:tracking-[0.02em]" :class="typeChipClass(row.dataType)">
-            {{ shortType(row.dataType) }}
-          </span>
+          <OBadge
+            v-if="shortType(row.dataType) !== '—'"
+            :variant="dataTypeBadgeVariant(row.dataType)"
+            size="sm"
+          >
+            {{ row.dataType }}
+          </OBadge>
+          <span v-else class="tw:text-[var(--color-text-secondary,var(--o2-text-secondary))]">—</span>
         </template>
 
         <template #cell-totalScores="{ row }">
@@ -172,13 +177,6 @@ function statusClass(status: string): string {
   if (status === 'healthy') return 'tw:text-[var(--o2-status-success-text,#2e7d32)]';
   if (status === 'noData') return 'tw:text-[var(--color-text-secondary,var(--o2-text-secondary))] tw:opacity-[0.55]';
   return 'tw:text-[var(--color-text-secondary,var(--o2-text-secondary))]';
-}
-
-function typeChipClass(dataType: string): string {
-  if (dataType === 'numeric') return 'tw:bg-[color-mix(in_srgb,#6b76e3_14%,transparent)] tw:text-[#4f5bcf]';
-  if (dataType === 'categorical') return 'tw:bg-[color-mix(in_srgb,#9333ea_14%,transparent)] tw:text-[#7c3aed]';
-  if (dataType === 'boolean') return 'tw:bg-[color-mix(in_srgb,#16a34a_14%,transparent)] tw:text-[#15803d]';
-  return 'tw:bg-[color-mix(in_srgb,#6b76e3_14%,transparent)] tw:text-[#4f5bcf]';
 }
 
 function sparkClass(status: string): string {
