@@ -86,12 +86,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="tw:flex tw:items-center actions-container">
             <OButton
               :data-test="`pipeline-list-${row.name}-pause-start-action`"
+              :data-row-action="row.enabled ? 'pause' : 'resume'"
               variant="ghost"
               size="icon-sm"
-              :title="row.enabled ? t('alerts.pause') : t('alerts.start')"
               :icon-left="row.enabled ? 'pause' : 'play-arrow'"
               @click.stop="togglePipeline(row)"
-            />
+            >
+              <OTooltip
+                side="bottom"
+                :content="row.enabled ? t('alerts.pause') : t('alerts.start')"
+                :shortcut="row.enabled ? 'p' : undefined"
+              />
+            </OButton>
             <OButton
               :data-test="`pipeline-list-${row.name}-view-pipeline`"
               variant="ghost"
@@ -107,10 +113,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
             <OButton
               :data-test="`pipeline-list-${row.name}-update-pipeline`"
+              data-row-action="edit"
               variant="ghost"
               size="icon-sm"
               @click.stop="editPipeline(row)"
               icon-left="edit"
+            >
+              <OTooltip side="bottom" :content="t('alerts.edit')" shortcut="e" />
+            </OButton>
+            <!-- Hidden proxies so the row-hover shortcuts reach the more-menu
+                 actions (teleported out of the row): x = export, Del = delete. -->
+            <button
+              type="button"
+              data-row-action="export"
+              class="tw:hidden"
+              tabindex="-1"
+              aria-hidden="true"
+              @click.stop="exportPipeline(row)"
+            />
+            <button
+              type="button"
+              data-row-action="delete"
+              class="tw:hidden"
+              tabindex="-1"
+              aria-hidden="true"
+              @click.stop="openDeleteDialog(row)"
             />
             <ODropdown align="end">
               <template #trigger>
@@ -124,6 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
               <ODropdownItem
                 :data-test="`pipeline-list-${row.name}-export-action`"
+                shortcut="x"
                 @select="exportPipeline(row)"
               >
                 <template #icon-left>
@@ -134,6 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <ODropdownSeparator />
               <ODropdownItem
                 :data-test="`pipeline-list-${row.name}-delete-pipeline`"
+                shortcut="del"
                 @select="openDeleteDialog(row)"
                 variant="destructive"
               >
@@ -1129,13 +1158,13 @@ useShortcutsWithMac([
     key: "n",
     scope: "pipelines",
     description: "shortcuts.actions.pipelinesAdd",
-    handler: () => { if (!isInputFocused()) routeToAddPipeline(); },
+    handler: () => { if (!isInputFocused()) goToCreatePipeline(); },
   },
   {
     key: "i",
     scope: "pipelines",
     description: "shortcuts.actions.pipelinesImport",
-    handler: () => { if (!isInputFocused()) routeToImportPipeline(); },
+    handler: () => { if (!isInputFocused()) goToImportPipeline(); },
   },
   {
     key: "r",
