@@ -5255,15 +5255,8 @@
           }
         },
         "failures": {
-          "byScorerTitle": "Failures by Scorer",
-          "byScorerEmpty": "No failures recorded in the selected window.",
-          "recentTitle": "Recent Failures",
-          "recentEmpty": "No failed runs in the selected window.",
-          "col": {
-            "scorer": "Scorer",
-            "failureRate": "Failure Rate",
-            "count": "Failures / Total"
-          }
+          "allScorers": "All Scorers",
+          "recentEmpty": "No failed runs in the selected window."
         }
       },
       "listTitle": "Eval Jobs",

@@ -24,8 +24,9 @@ export function agentFilterKey(agent: AgentFilterSelection): string {
 }
 
 export function agentFilterLabel(agent: AgentFilterSelection): string {
-  const displayIdentity = agent.id ? `${agent.name} (${agent.id})` : agent.name;
-  return `${displayIdentity} · ${agent.source_stream}`;
+  // Display the agent identity only — the source stream is part of the filter
+  // KEY (see agentFilterKey) for uniqueness, but it's noise in the dropdown.
+  return agent.id ? `${agent.name} (${agent.id})` : agent.name;
 }
 
 function sourceTraceIdSubquery(agent: AgentFilterSelection): string {

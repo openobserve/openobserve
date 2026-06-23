@@ -159,10 +159,12 @@
                 dataTypeOf(producesConfig)
               }}</span>
             </div>
-            <div v-else class="sd-empty">
-              <OIcon name="info" size="xs" />
-              <span>{{ t("onlineEvals.scorer.detail.producesEmpty") }}</span>
-            </div>
+            <OEmptyState
+              v-else
+              size="inline"
+              :title="t('onlineEvals.scorer.detail.producesEmpty')"
+              data-test="scorer-detail-produces-empty"
+            />
           </section>
 
           <section v-if="row.template" class="sd-section">
@@ -279,6 +281,7 @@
             :show-footer="false"
             :page-size="20"
             :page-size-options="[20, 50, 100, 200]"
+            :empty-message="t('onlineEvals.scorer.detail.runs.empty')"
             width="100%"
             class="tw:w-full"
           >
@@ -340,10 +343,12 @@
             <p class="sd__tab-intro">
               {{ t("onlineEvals.scorer.detail.usedByIntro") }}
             </p>
-            <div v-if="usedByJobs.length === 0" class="sd-empty">
-              <OIcon name="info" size="xs" />
-              <span>{{ t("onlineEvals.scorer.detail.usedByEmpty") }}</span>
-            </div>
+            <OEmptyState
+              v-if="usedByJobs.length === 0"
+              size="inline"
+              :title="t('onlineEvals.scorer.detail.usedByEmpty')"
+              data-test="scorer-detail-used-by-empty"
+            />
             <ul v-else class="sd-used-list">
               <li v-for="job in usedByJobs" :key="job.id">
                 <OButton
@@ -378,6 +383,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
@@ -1037,16 +1043,6 @@ function relativeTime(timestampMs: number): string {
   font-size: 11px;
 }
 
-.sd-empty {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 10px;
-  background: color-mix(in srgb, var(--color-text-secondary) 6%, transparent);
-  border-radius: 5px;
-  font-size: 12px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
 
 .sd-code {
   margin: 0;

@@ -64,9 +64,10 @@ describe("agentFilterSql", () => {
     );
   });
 
-  it("labels duplicate agent names with source stream", () => {
-    expect(agentFilterLabel(agentWithId)).toBe(
-      "support-agent (agent-123) · prod_traces",
+  it("labels the agent by identity only (no source stream)", () => {
+    expect(agentFilterLabel(agentWithId)).toBe("support-agent (agent-123)");
+    expect(agentFilterLabel({ ...agentWithId, id: null })).toBe(
+      "support-agent",
     );
   });
 

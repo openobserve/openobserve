@@ -146,10 +146,12 @@
               {{ t("onlineEvals.job.detail.scorersSection") }}
               <span class="jd-section__chip">{{ resolvedScorers.length }}</span>
             </h4>
-            <div v-if="resolvedScorers.length === 0" class="jd-empty">
-              <OIcon name="info" size="xs" />
-              <span>{{ t("onlineEvals.job.detail.scorersEmpty") }}</span>
-            </div>
+            <OEmptyState
+              v-if="resolvedScorers.length === 0"
+              size="inline"
+              :title="t('onlineEvals.job.detail.scorersEmpty')"
+              data-test="eval-job-detail-scorers-empty"
+            />
             <ul v-else class="jd-scorers">
               <li v-for="item in resolvedScorers" :key="item.id">
                 <button
@@ -320,6 +322,7 @@
             :show-footer="false"
             :page-size="20"
             :page-size-options="[20, 50, 100, 200]"
+            :empty-message="t('onlineEvals.job.detail.runs.empty')"
             width="100%"
             class="tw:w-full"
           >
@@ -388,6 +391,16 @@
                 data-test="eval-job-detail-failures-agent-filter"
               />
             </div>
+            <div class="tw:w-[14rem] tw:flex-shrink-0">
+              <OSelect
+                v-model="scorerFilterKey"
+                :options="scorerOptions"
+                labelKey="label"
+                valueKey="value"
+                class="tw:w-full tw:rounded"
+                data-test="eval-job-detail-failures-scorer-filter"
+              />
+            </div>
             <DateTimePickerDashboard
               ref="dateTimePickerRef"
               v-model="selectedDate"
@@ -406,133 +419,74 @@
             />
           </div>
 
-          <!-- Failures-by-scorer rollup -->
-          <section class="jd-section">
-            <h4 class="jd-section__title">
-              {{ t("onlineEvals.job.detail.failures.byScorerTitle") }}
-              <span class="jd-section__chip">{{ failureRows.length }}</span>
-            </h4>
-            <div v-if="failureRows.length === 0" class="jd-empty">
-              <OIcon name="info" size="xs" />
-              <span>{{
-                t("onlineEvals.job.detail.failures.byScorerEmpty")
+          <!-- Single failures table — filterable by agent + scorer. -->
+          <OTable
+            data-test="eval-job-detail-failures-table"
+            :enable-column-resize="true"
+            :persist-columns="true"
+            table-id="eval-job-failures"
+            :data="filteredFailedRuns"
+            :columns="runColumns"
+            row-key="id"
+            :loading="isLoadingRuns"
+            :show-global-filter="false"
+            :show-footer="false"
+            :page-size="20"
+            :page-size-options="[20, 50, 100, 200]"
+            :empty-message="t('onlineEvals.job.detail.failures.recentEmpty')"
+            width="100%"
+            class="tw:w-full"
+          >
+            <template #cell-timestampMs="{ row }">
+              <span class="jd-mono jd-muted-text">{{
+                relativeTime(row.timestampMs)
               }}</span>
-            </div>
-            <OTable
-              v-else
-              data-test="eval-job-detail-failures-by-scorer-table"
-              :enable-column-resize="true"
-              :persist-columns="true"
-              table-id="eval-job-failures-by-scorer"
-              :data="failureRows"
-              :columns="failureByScorerColumns"
-              row-key="scorerId"
-              :show-global-filter="false"
-              :show-footer="false"
-              :show-pagination="false"
-              width="100%"
-              class="tw:w-full"
-            >
-              <template #cell-scorerId="{ row }">
-                <span class="jd-mono">{{ scorerNameFor(row.scorerId) }}</span>
-              </template>
-              <template #cell-failureRate="{ row }">
-                <span class="jd-mono" :class="failTone(row.failureRate)">
-                  {{ formatPercent(row.failureRate) }}
-                </span>
-              </template>
-              <template #cell-failures="{ row }">
-                <span class="jd-mono">
-                  <strong>{{ row.failures }}</strong>
-                  / {{ row.totalRuns }}
-                </span>
-              </template>
-            </OTable>
-          </section>
-
-          <!-- Recent failures -->
-          <section class="jd-section">
-            <h4 class="jd-section__title">
-              {{ t("onlineEvals.job.detail.failures.recentTitle") }}
-              <span class="jd-section__chip">{{ failedRuns.length }}</span>
-            </h4>
-            <div
-              v-if="failedRuns.length === 0 && !isLoadingRuns"
-              class="jd-empty"
-            >
-              <OIcon name="info" size="xs" />
-              <span>{{
-                t("onlineEvals.job.detail.failures.recentEmpty")
-              }}</span>
-            </div>
-            <OTable
-              v-else
-              data-test="eval-job-detail-failures-table"
-              :enable-column-resize="true"
-              :persist-columns="true"
-              table-id="eval-job-failures"
-              :data="failedRuns"
-              :columns="runColumns"
-              row-key="id"
-              :loading="isLoadingRuns"
-              :show-global-filter="false"
-              :show-footer="false"
-              :page-size="20"
-              :page-size-options="[20, 50, 100, 200]"
-              width="100%"
-              class="tw:w-full"
-            >
-              <template #cell-timestampMs="{ row }">
-                <span class="jd-mono jd-muted-text">{{
-                  relativeTime(row.timestampMs)
-                }}</span>
-              </template>
-              <template #cell-scorerId="{ row }">
-                <span class="jd-mono">{{ scorerNameFor(row.scorerId) }}</span>
-              </template>
-              <template #cell-target="{ row }">
-                <div class="jd-target-cell">
-                  <div v-if="row.targetSpanId" class="jd-target-cell__line">
-                    <span class="jd-target-cell__label">{{
-                      t("onlineEvals.job.detail.runs.spanLabel")
-                    }}</span>
-                    <span
-                      class="jd-mono jd-target-cell__id"
-                      :title="row.targetSpanId"
-                      >{{ row.targetSpanId }}</span
-                    >
-                  </div>
-                  <div v-if="row.targetTraceId" class="jd-target-cell__line">
-                    <span class="jd-target-cell__label">{{
-                      t("onlineEvals.job.detail.runs.traceLabel")
-                    }}</span>
-                    <span
-                      class="jd-mono jd-target-cell__id"
-                      :title="row.targetTraceId"
-                      >{{ row.targetTraceId }}</span
-                    >
-                  </div>
+            </template>
+            <template #cell-scorerId="{ row }">
+              <span class="jd-mono">{{ scorerNameFor(row.scorerId) }}</span>
+            </template>
+            <template #cell-target="{ row }">
+              <div class="jd-target-cell">
+                <div v-if="row.targetSpanId" class="jd-target-cell__line">
+                  <span class="jd-target-cell__label">{{
+                    t("onlineEvals.job.detail.runs.spanLabel")
+                  }}</span>
+                  <span
+                    class="jd-mono jd-target-cell__id"
+                    :title="row.targetSpanId"
+                    >{{ row.targetSpanId }}</span
+                  >
                 </div>
-              </template>
-              <template #cell-scoreDisplay="{ row }">
-                <span class="jd-mono">{{ row.scoreDisplay }}</span>
-              </template>
-              <template #cell-latencyMs="{ row }">
-                <span class="jd-mono">{{
-                  row.latencyMs != null ? formatLatency(row.latencyMs) : "—"
-                }}</span>
-              </template>
-              <template #cell-status="{ row }">
-                <span
-                  class="jd-status-cell"
-                  :class="`jd-status-cell--${row.status}`"
-                >
-                  <span class="jd-status-cell__dot" />
-                  {{ row.status }}
-                </span>
-              </template>
-            </OTable>
-          </section>
+                <div v-if="row.targetTraceId" class="jd-target-cell__line">
+                  <span class="jd-target-cell__label">{{
+                    t("onlineEvals.job.detail.runs.traceLabel")
+                  }}</span>
+                  <span
+                    class="jd-mono jd-target-cell__id"
+                    :title="row.targetTraceId"
+                    >{{ row.targetTraceId }}</span
+                  >
+                </div>
+              </div>
+            </template>
+            <template #cell-scoreDisplay="{ row }">
+              <span class="jd-mono">{{ row.scoreDisplay }}</span>
+            </template>
+            <template #cell-latencyMs="{ row }">
+              <span class="jd-mono">{{
+                row.latencyMs != null ? formatLatency(row.latencyMs) : "—"
+              }}</span>
+            </template>
+            <template #cell-status="{ row }">
+              <span
+                class="jd-status-cell"
+                :class="`jd-status-cell--${row.status}`"
+              >
+                <span class="jd-status-cell__dot" />
+                {{ row.status }}
+              </span>
+            </template>
+          </OTable>
         </template>
       </div>
     </div>
@@ -547,6 +501,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
@@ -897,7 +852,6 @@ const jobIdRef = computed(() => String(props.row.id ?? ""));
 const {
   kpis,
   runs,
-  failuresByScorer,
   isLoading: isLoadingRuns,
   refresh: refreshRunsData,
 } = useEvalJobRuns(jobIdRef, dateWindow, tableEnabled, selectedAgent);
@@ -911,9 +865,34 @@ const failedRuns = computed(() =>
   runs.value.filter((r) => r.status === "error" || r.status === "timeout"),
 );
 
-const failureRows = computed(() =>
-  failuresByScorer.value.filter((r) => r.failures > 0),
-);
+// — Scorer filter (Failures tab) — client-side, since runs are already loaded.
+// Options are the job's attached scorers; the value is each scorer's row `id`,
+// which is what a run row carries in `scorerId` (== attributes_scorer_id).
+const ALL_SCORERS_VALUE = "__all_scorers__";
+const scorerFilterKey = ref(ALL_SCORERS_VALUE);
+
+const scorerOptions = computed(() => {
+  const opts = [
+    {
+      label: t("onlineEvals.job.detail.failures.allScorers"),
+      value: ALL_SCORERS_VALUE,
+    },
+  ];
+  if (!Array.isArray(props.row.scorers)) return opts;
+  for (const ref of props.row.scorers) {
+    const refId = typeof ref === "string" ? ref : (ref?.id ?? "");
+    const found = props.scorers.find((s) => entityId(s) === refId);
+    if (found) opts.push({ label: found.name, value: String(found.id) });
+  }
+  return opts;
+});
+
+const filteredFailedRuns = computed(() => {
+  if (scorerFilterKey.value === ALL_SCORERS_VALUE) return failedRuns.value;
+  return failedRuns.value.filter(
+    (r) => String(r.scorerId) === scorerFilterKey.value,
+  );
+});
 
 // — KPI tone —
 const successRateTone = computed(() => {
@@ -923,12 +902,6 @@ const successRateTone = computed(() => {
   if (r >= 80) return "jd-kpi--warn";
   return "jd-kpi--bad";
 });
-
-function failTone(rate: number): string {
-  if (rate >= 20) return "jd-status-cell--bad";
-  if (rate >= 5) return "jd-status-cell--warn";
-  return "";
-}
 
 // — OTable column definitions —
 const runColumns = computed(() => [
@@ -981,32 +954,6 @@ const runColumns = computed(() => [
   },
 ]);
 
-const failureByScorerColumns = computed(() => [
-  {
-    id: "scorerId",
-    header: t("onlineEvals.job.detail.failures.col.scorer"),
-    accessorKey: "scorerId",
-    sortable: true,
-    size: "auto",
-    meta: { align: "left" },
-  },
-  {
-    id: "failureRate",
-    header: t("onlineEvals.job.detail.failures.col.failureRate"),
-    accessorKey: "failureRate",
-    sortable: true,
-    size: 130,
-    meta: { align: "right" },
-  },
-  {
-    id: "failures",
-    header: t("onlineEvals.job.detail.failures.col.count"),
-    accessorKey: "failures",
-    sortable: true,
-    size: 140,
-    meta: { align: "right" },
-  },
-]);
 
 // — Helpers —
 function formatTimestamp(microsOrMs: number): string {
@@ -1266,17 +1213,6 @@ function relativeTime(timestampMs: number): string {
 .jd-muted {
   color: var(--color-text-secondary, var(--o2-text-secondary));
   font-style: italic;
-}
-
-.jd-empty {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 10px;
-  background: color-mix(in srgb, var(--color-text-secondary) 6%, transparent);
-  border-radius: 5px;
-  font-size: 12px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
 }
 
 // Filter code block — mirrors the Alert History condition view (rounded,
