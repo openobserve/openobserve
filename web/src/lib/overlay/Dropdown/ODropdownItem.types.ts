@@ -16,6 +16,12 @@ export interface DropdownItemProps {
   textValue?: string;
   /** Icon placed before the label — renders an OIcon internally */
   iconLeft?: IconName;
+  /**
+   * Renders a keyboard-shortcut hint (OShortcut keycaps) at the trailing edge
+   * of the item. Accepts a pre-symbolised string (`"⌘I"`) or an array of
+   * keycaps (`["⌘", "I"]`). Omit to show no hint.
+   */
+  shortcut?: string | string[];
 }
 
 export interface DropdownItemEmits {

@@ -3,6 +3,7 @@ import type { ButtonProps, ButtonEmits, ButtonSlots } from "./OButton.types";
 import { Primitive } from "reka-ui";
 import { computed } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OShortcut from "@/lib/core/Shortcut/OShortcut.vue";
 
 defineOptions({ inheritAttrs: false });
 
@@ -329,6 +330,11 @@ function handleClick(event: MouseEvent): void {
       <slot name="icon-right">
         <OIcon v-if="iconRight" :name="iconRight" size="sm" />
       </slot>
+      <OShortcut
+        v-if="shortcut"
+        :keys="shortcut"
+        class="tw:ms-1 tw:opacity-90"
+      />
     </span>
   </Primitive>
 </template>

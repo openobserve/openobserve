@@ -98,7 +98,14 @@ export interface ButtonProps extends PrimitiveProps {
    * Renders an OIcon to the right of the label.
    * If the #icon-right slot is also provided, the slot takes precedence.
    */
-  iconRight?: IconName;}
+  iconRight?: IconName;
+  /**
+   * Renders a keyboard-shortcut hint (OShortcut keycaps) after the label.
+   * Accepts a pre-symbolised string (`"⌘K"`) or an array of keycaps
+   * (`["⌘", "K"]`). Omit to show no hint.
+   */
+  shortcut?: string | string[];
+}
 
 export interface ButtonEmits {
   (e: "click", event: MouseEvent): void;
