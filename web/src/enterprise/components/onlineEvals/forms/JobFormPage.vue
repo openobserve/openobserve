@@ -1,5 +1,5 @@
 ﻿<template>
-  <form class="job-form" @submit.prevent="save(false)">
+  <form class="job-form tw:flex tw:flex-col tw:flex-1 tw:min-h-0 tw:gap-2.5" @submit.prevent="save(false)">
     <AppPageHeader
       :back="{
         label: t('onlineEvals.job.backTo'),
@@ -33,15 +33,15 @@
         <section class="job-section tw:mb-6">
           <div class="job-section__head tw:flex tw:items-center tw:gap-[10px] tw:pb-[10px] tw:border-b tw:border-(--color-dialog-header-border,var(--o2-border)) tw:mb-3">
             <span class="job-section__num tw:inline-flex tw:items-center tw:justify-center tw:w-[22px] tw:h-[22px] tw:rounded-full tw:bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] tw:text-(--color-text-secondary,var(--o2-text-secondary)) tw:font-bold tw:text-[11px] tw:font-mono">01</span>
-            <h3 class="job-section__title tw:m-0 tw:text-sm tw:font-semibold tw:text-(--color-text-primary,currentColor)">{{ t("onlineEvals.job.targetSection") }}</h3>
+            <div class="job-section__title tw:m-0 tw:text-sm tw:font-semibold tw:text-(--color-text-primary,currentColor)">{{ t("onlineEvals.job.targetSection") }}</div>
           </div>
 
           <div class="job-field tw:mb-3">
-            <label class="job-field__label tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary,currentColor) tw:mb-1">
+            <div class="job-field__label tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary,currentColor) tw:mb-1">
               {{ t("onlineEvals.job.nameLabel") }}
               <span class="job-field__req tw:text-(--o2-status-error-text) tw:ml-0.5">*</span>
               <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="job-field__lock tw:ml-1.5 tw:text-(--color-text-secondary,var(--o2-text-secondary))" />
-            </label>
+            </div>
             <OInput
               v-model.trim="form.name"
               :placeholder="t('onlineEvals.job.namePlaceholder')"
@@ -52,11 +52,11 @@
           </div>
 
           <div class="job-field tw:mb-3">
-            <label class="job-field__label tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary,currentColor) tw:mb-1">
+            <div class="job-field__label tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary,currentColor) tw:mb-1">
               {{ t("onlineEvals.job.streamLabel") }}
               <span class="job-field__req tw:text-(--o2-status-error-text) tw:ml-0.5">*</span>
               <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="job-field__lock tw:ml-1.5 tw:text-(--color-text-secondary,var(--o2-text-secondary))" />
-            </label>
+            </div>
             <OSelect
               v-model="form.stream"
               :options="streamOptions"
@@ -68,7 +68,7 @@
           </div>
 
           <div class="job-field job-field--desc tw:mb-3">
-            <label class="job-field__label tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary,currentColor) tw:mb-1">{{ t("onlineEvals.job.descriptionLabel") }}</label>
+            <div class="job-field__label tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary,currentColor) tw:mb-1">{{ t("onlineEvals.job.descriptionLabel") }}</div>
             <OInput
               v-model.trim="form.description"
               type="textarea"
@@ -84,7 +84,7 @@
         <section class="job-section tw:mb-6">
           <div class="job-section__head tw:flex tw:items-center tw:gap-[10px] tw:pb-[10px] tw:border-b tw:border-(--color-dialog-header-border,var(--o2-border)) tw:mb-3">
             <span class="job-section__num tw:inline-flex tw:items-center tw:justify-center tw:w-[22px] tw:h-[22px] tw:rounded-full tw:bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] tw:text-(--color-text-secondary,var(--o2-text-secondary)) tw:font-bold tw:text-[11px] tw:font-mono">02</span>
-            <h3 class="job-section__title tw:m-0 tw:text-sm tw:font-semibold tw:text-(--color-text-primary,currentColor)">{{ t("onlineEvals.job.scorersSection") }}</h3>
+            <div class="job-section__title tw:m-0 tw:text-sm tw:font-semibold tw:text-(--color-text-primary,currentColor)">{{ t("onlineEvals.job.scorersSection") }}</div>
           </div>
 
           <JobScorerPicker
@@ -136,12 +136,12 @@
         <section class="job-section tw:mb-6">
           <div class="job-section__head tw:flex tw:items-center tw:gap-[10px] tw:pb-[10px] tw:border-b tw:border-(--color-dialog-header-border,var(--o2-border)) tw:mb-3">
             <span class="job-section__num tw:inline-flex tw:items-center tw:justify-center tw:w-[22px] tw:h-[22px] tw:rounded-full tw:bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] tw:text-(--color-text-secondary,var(--o2-text-secondary)) tw:font-bold tw:text-[11px] tw:font-mono">03</span>
-            <h3 class="job-section__title tw:m-0 tw:text-sm tw:font-semibold tw:text-(--color-text-primary,currentColor)">{{ t("onlineEvals.job.stepper.sampling") }}</h3>
+            <div class="job-section__title tw:m-0 tw:text-sm tw:font-semibold tw:text-(--color-text-primary,currentColor)">{{ t("onlineEvals.job.stepper.sampling") }}</div>
           </div>
 
           <div class="job-field-row tw:grid tw:grid-cols-2 tw:max-[1100px]:grid-cols-1 tw:gap-[14px]">
             <div class="job-field tw:mb-3">
-              <label class="job-field__label tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary,currentColor) tw:mb-1">{{ t("onlineEvals.job.samplingModeLabel") }}</label>
+              <div class="job-field__label tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary,currentColor) tw:mb-1">{{ t("onlineEvals.job.samplingModeLabel") }}</div>
               <OSelect
                 v-model="form.samplingMode"
                 :options="samplingModeOptions"
@@ -152,10 +152,10 @@
             </div>
 
             <div class="job-field tw:mb-3">
-              <label class="job-field__label tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary,currentColor) tw:mb-1">
+              <div class="job-field__label tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary,currentColor) tw:mb-1">
                 {{ t("onlineEvals.job.samplingValueLabel") }}
                 <span v-if="form.samplingMode !== 'all'" class="job-field__req tw:text-(--o2-status-error-text) tw:ml-0.5">*</span>
-              </label>
+              </div>
               <OInput
                 v-model="form.samplingValue"
                 size="sm"
