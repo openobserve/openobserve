@@ -327,6 +327,7 @@
             :page-size-options="[20, 50, 100, 200]"
             :empty-message="t('onlineEvals.job.detail.runs.empty')"
             :footer-title="t('onlineEvals.job.detail.tabs.runs')"
+            show-index
             width="100%"
             class="tw:w-full"
           >
@@ -338,29 +339,23 @@
             <template #cell-scorerId="{ row }">
               <span class="jd-mono">{{ scorerNameFor(row.scorerId) }}</span>
             </template>
-            <template #cell-target="{ row }">
-              <div class="jd-target-cell">
-                <div v-if="row.targetSpanId" class="jd-target-cell__line">
-                  <span class="jd-target-cell__label">{{
-                    t("onlineEvals.job.detail.runs.spanLabel")
-                  }}</span>
-                  <span
-                    class="jd-mono jd-target-cell__id"
-                    :title="row.targetSpanId"
-                    >{{ row.targetSpanId }}</span
-                  >
-                </div>
-                <div v-if="row.targetTraceId" class="jd-target-cell__line">
-                  <span class="jd-target-cell__label">{{
-                    t("onlineEvals.job.detail.runs.traceLabel")
-                  }}</span>
-                  <span
-                    class="jd-mono jd-target-cell__id"
-                    :title="row.targetTraceId"
-                    >{{ row.targetTraceId }}</span
-                  >
-                </div>
-              </div>
+            <template #cell-targetSpanId="{ row }">
+              <span
+                v-if="row.targetSpanId"
+                class="jd-mono jd-target-id"
+                :title="row.targetSpanId"
+                >{{ row.targetSpanId }}</span
+              >
+              <span v-else class="jd-muted-text">—</span>
+            </template>
+            <template #cell-targetTraceId="{ row }">
+              <span
+                v-if="row.targetTraceId"
+                class="jd-mono jd-target-id"
+                :title="row.targetTraceId"
+                >{{ row.targetTraceId }}</span
+              >
+              <span v-else class="jd-muted-text">—</span>
             </template>
             <template #cell-scoreDisplay="{ row }">
               <span class="jd-mono">{{ row.scoreDisplay }}</span>
@@ -439,6 +434,7 @@
             :page-size-options="[20, 50, 100, 200]"
             :empty-message="t('onlineEvals.job.detail.failures.recentEmpty')"
             :footer-title="t('onlineEvals.job.detail.tabs.failures')"
+            show-index
             width="100%"
             class="tw:w-full"
           >
@@ -450,29 +446,23 @@
             <template #cell-scorerId="{ row }">
               <span class="jd-mono">{{ scorerNameFor(row.scorerId) }}</span>
             </template>
-            <template #cell-target="{ row }">
-              <div class="jd-target-cell">
-                <div v-if="row.targetSpanId" class="jd-target-cell__line">
-                  <span class="jd-target-cell__label">{{
-                    t("onlineEvals.job.detail.runs.spanLabel")
-                  }}</span>
-                  <span
-                    class="jd-mono jd-target-cell__id"
-                    :title="row.targetSpanId"
-                    >{{ row.targetSpanId }}</span
-                  >
-                </div>
-                <div v-if="row.targetTraceId" class="jd-target-cell__line">
-                  <span class="jd-target-cell__label">{{
-                    t("onlineEvals.job.detail.runs.traceLabel")
-                  }}</span>
-                  <span
-                    class="jd-mono jd-target-cell__id"
-                    :title="row.targetTraceId"
-                    >{{ row.targetTraceId }}</span
-                  >
-                </div>
-              </div>
+            <template #cell-targetSpanId="{ row }">
+              <span
+                v-if="row.targetSpanId"
+                class="jd-mono jd-target-id"
+                :title="row.targetSpanId"
+                >{{ row.targetSpanId }}</span
+              >
+              <span v-else class="jd-muted-text">—</span>
+            </template>
+            <template #cell-targetTraceId="{ row }">
+              <span
+                v-if="row.targetTraceId"
+                class="jd-mono jd-target-id"
+                :title="row.targetTraceId"
+                >{{ row.targetTraceId }}</span
+              >
+              <span v-else class="jd-muted-text">—</span>
             </template>
             <template #cell-scoreDisplay="{ row }">
               <span class="jd-mono">{{ row.scoreDisplay }}</span>
@@ -930,10 +920,19 @@ const runColumns = computed(() => [
     meta: { align: "left", flex: true },
   },
   {
-    id: "target",
-    header: t("onlineEvals.job.detail.runs.col.target"),
-    sortable: false,
-    size: 360,
+    id: "targetSpanId",
+    header: t("onlineEvals.job.detail.runs.col.spanId"),
+    accessorKey: "targetSpanId",
+    sortable: true,
+    size: 190,
+    meta: { align: "left" },
+  },
+  {
+    id: "targetTraceId",
+    header: t("onlineEvals.job.detail.runs.col.traceId"),
+    accessorKey: "targetTraceId",
+    sortable: true,
+    size: 230,
     meta: { align: "left" },
   },
   {
@@ -1491,35 +1490,13 @@ function relativeTime(timestampMs: number): string {
   color: var(--color-text-secondary, var(--o2-text-secondary));
 }
 
-.jd-target-cell {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.jd-target-cell__line {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-  font-size: 11px;
-  min-width: 0;
-}
-
-.jd-target-cell__label {
-  flex-shrink: 0;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  font-weight: 600;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.jd-target-cell__id {
-  font-size: 11.5px;
-  color: var(--color-text-primary, currentColor);
+// Span / Trace id cell — truncate to the column width with a native tooltip
+// for the full value. No font overrides: inherits the default table-cell font.
+.jd-target-id {
+  display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  min-width: 0;
 }
 
 .jd-status-cell {

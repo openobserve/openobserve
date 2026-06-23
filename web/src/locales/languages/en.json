@@ -5003,13 +5003,12 @@
           "showingOf": "of",
           "showingSuffix": "runs",
           "empty": "No scorer runs in this window.",
-          "spanLabel": "Span",
-          "traceLabel": "Trace",
           "jobUnknown": "—",
           "col": {
             "time": "Time",
             "job": "Job",
-            "target": "Target",
+            "spanId": "Span ID",
+            "traceId": "Trace ID",
             "score": "Score",
             "latency": "Latency",
             "status": "Status"
@@ -5241,13 +5240,12 @@
           "showingOf": "of",
           "showingSuffix": "matched runs",
           "empty": "No runs recorded for this job in the selected window.",
-          "spanLabel": "SPAN",
-          "traceLabel": "TRACE",
           "scorerUnknown": "(unknown scorer)",
           "col": {
             "time": "Time",
             "scorer": "Scorer",
-            "target": "Target",
+            "spanId": "Span ID",
+            "traceId": "Trace ID",
             "score": "Score",
             "latency": "Latency",
             "status": "Status"

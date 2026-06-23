@@ -286,6 +286,7 @@
             :page-size-options="[20, 50, 100, 200]"
             :empty-message="t('onlineEvals.scorer.detail.runs.empty')"
             :footer-title="t('onlineEvals.scorer.detail.tabs.runs')"
+            show-index
             width="100%"
             class="tw:w-full"
           >
@@ -297,29 +298,23 @@
             <template #cell-jobId="{ row }">
               <span class="sd-mono">{{ jobNameFor(row.jobId) }}</span>
             </template>
-            <template #cell-target="{ row }">
-              <div class="sd-target-cell">
-                <div v-if="row.targetSpanId" class="sd-target-cell__line">
-                  <span class="sd-target-cell__label">{{
-                    t("onlineEvals.scorer.detail.runs.spanLabel")
-                  }}</span>
-                  <span
-                    class="sd-mono sd-target-cell__id"
-                    :title="row.targetSpanId"
-                    >{{ row.targetSpanId }}</span
-                  >
-                </div>
-                <div v-if="row.targetTraceId" class="sd-target-cell__line">
-                  <span class="sd-target-cell__label">{{
-                    t("onlineEvals.scorer.detail.runs.traceLabel")
-                  }}</span>
-                  <span
-                    class="sd-mono sd-target-cell__id"
-                    :title="row.targetTraceId"
-                    >{{ row.targetTraceId }}</span
-                  >
-                </div>
-              </div>
+            <template #cell-targetSpanId="{ row }">
+              <span
+                v-if="row.targetSpanId"
+                class="sd-mono sd-target-id"
+                :title="row.targetSpanId"
+                >{{ row.targetSpanId }}</span
+              >
+              <span v-else class="sd-muted-text">—</span>
+            </template>
+            <template #cell-targetTraceId="{ row }">
+              <span
+                v-if="row.targetTraceId"
+                class="sd-mono sd-target-id"
+                :title="row.targetTraceId"
+                >{{ row.targetTraceId }}</span
+              >
+              <span v-else class="sd-muted-text">—</span>
             </template>
             <template #cell-scoreDisplay="{ row }">
               <span class="sd-mono">{{ row.scoreDisplay }}</span>
@@ -671,10 +666,19 @@ const runColumns = computed(() => [
     meta: { align: "left", flex: true },
   },
   {
-    id: "target",
-    header: t("onlineEvals.scorer.detail.runs.col.target"),
-    sortable: false,
-    size: 360,
+    id: "targetSpanId",
+    header: t("onlineEvals.scorer.detail.runs.col.spanId"),
+    accessorKey: "targetSpanId",
+    sortable: true,
+    size: 190,
+    meta: { align: "left" },
+  },
+  {
+    id: "targetTraceId",
+    header: t("onlineEvals.scorer.detail.runs.col.traceId"),
+    accessorKey: "targetTraceId",
+    sortable: true,
+    size: 230,
     meta: { align: "left" },
   },
   {
@@ -1172,35 +1176,13 @@ function relativeTime(timestampMs: number): string {
   color: var(--color-text-secondary, var(--o2-text-secondary));
 }
 
-.sd-target-cell {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.sd-target-cell__line {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-  font-size: 11px;
-  min-width: 0;
-}
-
-.sd-target-cell__label {
-  flex-shrink: 0;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  font-weight: 600;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.sd-target-cell__id {
-  font-size: 11.5px;
-  color: var(--color-text-primary, currentColor);
+// Span / Trace id cell — truncate to the column width with a native tooltip
+// for the full value. No font overrides: inherits the default table-cell font.
+.sd-target-id {
+  display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  min-width: 0;
 }
 
 .sd-status-cell {
