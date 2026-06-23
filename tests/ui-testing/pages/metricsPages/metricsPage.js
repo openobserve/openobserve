@@ -49,6 +49,10 @@ export class MetricsPage {
             '[data-test="no-data"], [data-test="panel-editor-container"] [data-test="o2-empty-state"]'
         );
 
+        // Chart renderer container. Its presence means PanelSchemaRenderer mounted the
+        // chart path without crashing — a valid graceful outcome for invalid queries.
+        this.chartRenderer = page.locator('[data-test="chart-renderer"]');
+
         // ===== metrics-config.spec.js locators =====
         // Date/time picker (shared metrics control)
         this.dateTimePicker = page.locator('[data-test="metrics-date-picker"]');
@@ -1763,6 +1767,15 @@ export class MetricsPage {
     async getNoDataMessage() {
         // Returns the no-data placeholder locator (data-test only; see constructor).
         return this.noDataMessage.first();
+    }
+
+    /**
+     * Get the chart-renderer container locator. Its presence indicates the panel
+     * rendered the chart path without crashing.
+     * @returns {import('@playwright/test').Locator}
+     */
+    getChartRenderer() {
+        return this.chartRenderer;
     }
 
     async getHighlightedElements() {
