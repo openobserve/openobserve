@@ -304,14 +304,16 @@
         <!-- Runs -->
         <template v-else-if="activeTab === 'runs'">
           <div class="jd__runs-toolbar">
-            <OSelect
-              v-model="agentKey"
-              :options="agentOptions"
-              labelKey="label"
-              valueKey="value"
-              class="tw:w-[14rem] tw:flex-shrink-0 tw:rounded"
-              data-test="eval-job-detail-runs-agent-filter"
-            />
+            <div class="tw:w-[14rem] tw:flex-shrink-0">
+              <OSelect
+                v-model="agentKey"
+                :options="agentOptions"
+                labelKey="label"
+                valueKey="value"
+                class="tw:w-full tw:rounded"
+                data-test="eval-job-detail-runs-agent-filter"
+              />
+            </div>
             <DateTimePickerDashboard
               ref="dateTimePickerRef"
               v-model="selectedDate"
@@ -398,14 +400,16 @@
         <!-- Failures -->
         <template v-else-if="activeTab === 'failures'">
           <div class="jd__runs-toolbar">
-            <OSelect
-              v-model="agentKey"
-              :options="agentOptions"
-              labelKey="label"
-              valueKey="value"
-              class="tw:w-[14rem] tw:flex-shrink-0 tw:rounded"
-              data-test="eval-job-detail-failures-agent-filter"
-            />
+            <div class="tw:w-[14rem] tw:flex-shrink-0">
+              <OSelect
+                v-model="agentKey"
+                :options="agentOptions"
+                labelKey="label"
+                valueKey="value"
+                class="tw:w-full tw:rounded"
+                data-test="eval-job-detail-failures-agent-filter"
+              />
+            </div>
             <DateTimePickerDashboard
               ref="dateTimePickerRef"
               v-model="selectedDate"
@@ -648,16 +652,20 @@ function flattenFilter(node: any, depth: number): FilterClause[] {
   }
 
   if (node.filterType === "group" && Array.isArray(node.conditions)) {
-    const op: "AND" | "OR" = node.logicalOperator === "OR" ? "OR" : "AND";
+    // V2 semantics: the group's own `logicalOperator` is NOT the connective
+    // between its conditions — each item carries the operator that joins it to
+    // the PREVIOUS sibling (index 0 has none). Reading the group operator here
+    // is what made "A OR B" render as "A AND B". See conditionsFormatter.ts.
     const out: FilterClause[] = [];
     for (let i = 0; i < node.conditions.length; i += 1) {
+      const rawChild = node.conditions[i];
       const child = flattenFilter(
-        node.conditions[i],
+        rawChild,
         depth + (out.length > 0 ? 1 : 0),
       );
       if (child.length === 0) continue;
-      if (out.length > 0 && child.length > 0) {
-        child[0].keyword = op;
+      if (out.length > 0) {
+        child[0].keyword = rawChild?.logicalOperator === "OR" ? "OR" : "AND";
       }
       out.push(...child);
     }
@@ -1706,6 +1714,7 @@ function relativeTime(timestampMs: number): string {
 .jd__runs-toolbar {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 8px;
   flex-wrap: wrap;
 }

@@ -279,14 +279,16 @@
         <!-- Runs -->
         <template v-else-if="activeTab === 'runs'">
           <div class="sd__runs-toolbar">
-            <OSelect
-              v-model="agentKey"
-              :options="agentOptions"
-              labelKey="label"
-              valueKey="value"
-              class="tw:w-[14rem] tw:flex-shrink-0 tw:rounded"
-              data-test="scorer-detail-runs-agent-filter"
-            />
+            <div class="tw:w-[14rem] tw:flex-shrink-0">
+              <OSelect
+                v-model="agentKey"
+                :options="agentOptions"
+                labelKey="label"
+                valueKey="value"
+                class="tw:w-full tw:rounded"
+                data-test="scorer-detail-runs-agent-filter"
+              />
+            </div>
             <DateTimePickerDashboard
               ref="dateTimePickerRef"
               v-model="selectedDate"
@@ -1261,6 +1263,7 @@ function relativeTime(timestampMs: number): string {
 .sd__runs-toolbar {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 8px;
   flex-wrap: wrap;
 }
