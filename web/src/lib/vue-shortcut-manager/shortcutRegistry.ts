@@ -99,7 +99,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
       { key: "h",            descriptionKey: "shortcuts.actions.logsToggleHistogram" },
       { key: "ctrl+/",       descriptionKey: "shortcuts.actions.logsToggleSidebar" },
       { key: "ctrl+h",       descriptionKey: "shortcuts.actions.logsSearchHistory" },
-      { key: "/",            descriptionKey: "shortcuts.actions.focusSearch" },
+      { key: "/",            descriptionKey: "shortcuts.actions.focusQuery" },
       { key: "s",            descriptionKey: "shortcuts.actions.logsSaveView" },
       { key: "ctrl+shift+d", descriptionKey: "shortcuts.actions.logsExport" },
     ],
@@ -168,7 +168,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
     shortcuts: [
       { key: "ctrl+enter",   descriptionKey: "shortcuts.actions.tracesSearch" },
       { key: "r",            descriptionKey: "shortcuts.actions.tracesRefresh" },
-      { key: "/",            descriptionKey: "shortcuts.actions.focusSearch" },
+      { key: "/",            descriptionKey: "shortcuts.actions.focusQuery" },
       { key: "ctrl+shift+c", descriptionKey: "shortcuts.actions.tracesCopyUrl" },
     ],
   },

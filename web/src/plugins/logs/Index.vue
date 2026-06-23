@@ -3235,7 +3235,7 @@ export default defineComponent({
       {
         key: "/",
         scope: "logs",
-        description: "shortcuts.actions.focusSearch",
+        description: "shortcuts.actions.focusQuery",
         handler: () => {
           // The logs query editor is Monaco — focus its inner textarea
           // (`.monaco-editor textarea`), not a CodeMirror `.cm-editor`.

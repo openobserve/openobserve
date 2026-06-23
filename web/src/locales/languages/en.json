@@ -5524,6 +5524,7 @@
       "openCheatsheet": "Open keyboard shortcuts cheatsheet",
       "closeDialog": "Close any dialog, drawer, or modal",
       "focusSearch": "Focus search bar",
+      "focusQuery": "Focus query editor",
       "logsRunQuery": "Run search query",
       "logsRefresh": "Refresh / re-run search",
       "logsToggleHistogram": "Toggle histogram",

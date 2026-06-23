@@ -2271,9 +2271,12 @@ useShortcutsWithMac([
   {
     key: "/",
     scope: "traces",
-    description: "shortcuts.actions.focusSearch",
+    description: "shortcuts.actions.focusQuery",
     handler: () => {
-      const el = document.querySelector<HTMLElement>('[data-test="logs-search-bar"] .cm-editor');
+      // The traces query editor is Monaco — focus its inner textarea.
+      const el = document.querySelector<HTMLElement>(
+        '[data-test="logs-search-bar"] .monaco-editor textarea, [data-test="logs-search-bar"] textarea, [data-test="logs-search-bar"] .cm-editor',
+      );
       el?.focus();
     },
   },
