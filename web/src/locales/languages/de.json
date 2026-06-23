@@ -1073,7 +1073,10 @@
     "fieldRequired": "Feld ist erforderlich!",
     "dataType": "Datentyp",
     "dataTypeRequired": "Datentyp ist erforderlich!",
-    "udsFieldAlreadyInSchema": "Ein oder mehrere ausgewählte Felder sind bereits Teil des definierten Schemas"
+    "udsFieldAlreadyInSchema": "Ein oder mehrere ausgewählte Felder sind bereits Teil des definierten Schemas",
+    "subtitle": "Indexverwaltung und Stream-Konfiguration",
+    "streamNameHelpText": "Verwenden Sie nur alphanumerische Zeichen, Unterstriche und Doppelpunkte.",
+    "deleteAssociatedAlertsPipelines": "Löschen Sie alle mit dem Stream verknüpften Pipelines und Alerts"
   },
   "function": {
     "header": "Funktionen",
@@ -2581,7 +2584,11 @@
     "alertIfValueIs": "Warnung, wenn der Wert",
     "havingSeries": "Serien haben",
     "clearMultiWindowsTitle": "Multifenster löschen?",
-    "lastTrainedAt": "Zuletzt trainiert am"
+    "lastTrainedAt": "Zuletzt trainiert am",
+    "noTemplatesMsg": "Es sieht so aus, als ob Sie noch keine Vorlagen erstellt haben. Um eine Warnung zu erstellen, benötigen Sie mindestens ein Ziel und eine Vorlage",
+    "createTemplateBtn": "Vorlage erstellen",
+    "noDestinationsMsg": "Es sieht so aus, als ob Sie noch keine Ziele erstellt haben. Um eine Warnung zu erstellen, benötigen Sie mindestens ein Ziel und eine Vorlage",
+    "createDestinationBtn": "Ziel erstellen"
   },
   "alert_templates": {
     "header": "Vorlagen",

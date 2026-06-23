@@ -1073,7 +1073,10 @@
     "fieldRequired": "Veld is verplicht!",
     "dataType": "Gegevenstype",
     "dataTypeRequired": "Gegevenstype is vereist!",
-    "udsFieldAlreadyInSchema": "Een of meer geselecteerde velden maken al deel uit van het gedefinieerde schema"
+    "udsFieldAlreadyInSchema": "Een of meer geselecteerde velden maken al deel uit van het gedefinieerde schema",
+    "subtitle": "Indexbeheer en streamconfiguratie",
+    "streamNameHelpText": "Gebruik alleen alfanumerieke tekens, onderstrepingstekens en dubbele punten.",
+    "deleteAssociatedAlertsPipelines": "Verwijder alle pijplijnen en waarschuwingen die aan de stream zijn gekoppeld"
   },
   "function": {
     "header": "Functies",
@@ -2581,7 +2584,11 @@
     "alertIfValueIs": "Waarschuw als de waarde",
     "havingSeries": "Serie hebben",
     "clearMultiWindowsTitle": "Meerdere vensters wissen?",
-    "lastTrainedAt": "Laatst opgeleid bij"
+    "lastTrainedAt": "Laatst opgeleid bij",
+    "noTemplatesMsg": "Het lijkt erop dat je nog geen sjablonen hebt gemaakt. Als u een waarschuwing wilt maken, moet u ten minste één bestemming en één sjabloon hebben",
+    "createTemplateBtn": "Sjabloon maken",
+    "noDestinationsMsg": "Het lijkt erop dat je nog geen bestemmingen hebt aangemaakt. Als u een waarschuwing wilt maken, moet u ten minste één bestemming en één sjabloon hebben",
+    "createDestinationBtn": "Bestemming aanmaken"
   },
   "alert_templates": {
     "header": "Sjablonen",

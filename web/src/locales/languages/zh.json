@@ -1073,7 +1073,10 @@
     "fieldRequired": "字段为必填字段！",
     "dataType": "数据类型",
     "dataTypeRequired": "数据类型为必填项！",
-    "udsFieldAlreadyInSchema": "一个或多个选定字段已经是定义架构的一部分"
+    "udsFieldAlreadyInSchema": "一个或多个选定字段已经是定义架构的一部分",
+    "subtitle": "索引管理和流配置",
+    "streamNameHelpText": "仅使用字母数字字符、下划线和冒号。",
+    "deleteAssociatedAlertsPipelines": "删除与该直播相关的所有管道和警报"
   },
   "function": {
     "header": "函数",
@@ -2581,7 +2584,11 @@
     "alertIfValueIs": "如果值为，则发出警报",
     "havingSeries": "有系列",
     "clearMultiWindowsTitle": "清除多窗口？",
-    "lastTrainedAt": "上次训练于"
+    "lastTrainedAt": "上次训练于",
+    "noTemplatesMsg": "看来你还没有创建任何模板。要创建提醒，你需要至少有一个目的地和一个模板",
+    "createTemplateBtn": "创建模板",
+    "noDestinationsMsg": "看来你还没有创建任何目的地。要创建提醒，你需要至少有一个目的地和一个模板",
+    "createDestinationBtn": "创建目的地"
   },
   "alert_templates": {
     "header": "模板",

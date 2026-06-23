@@ -1073,7 +1073,10 @@
     "fieldRequired": "O campo é obrigatório!",
     "dataType": "Tipo de dados",
     "dataTypeRequired": "O tipo de dados é obrigatório!",
-    "udsFieldAlreadyInSchema": "Um ou mais campos selecionados já fazem parte do esquema definido"
+    "udsFieldAlreadyInSchema": "Um ou mais campos selecionados já fazem parte do esquema definido",
+    "subtitle": "Gerenciamento de índices e configuração de streams",
+    "streamNameHelpText": "Use somente caracteres alfanuméricos, sublinhado e dois pontos.",
+    "deleteAssociatedAlertsPipelines": "Exclua todos os pipelines e alertas associados ao stream"
   },
   "function": {
     "header": "Funções",
@@ -2581,7 +2584,11 @@
     "alertIfValueIs": "Alerta se o valor for",
     "havingSeries": "Ter séries",
     "clearMultiWindowsTitle": "Limpar várias janelas?",
-    "lastTrainedAt": "Treinado pela última vez em"
+    "lastTrainedAt": "Treinado pela última vez em",
+    "noTemplatesMsg": "Parece que você ainda não criou nenhum modelo. Para criar um alerta, você precisará ter pelo menos um destino e um modelo em vigor",
+    "createTemplateBtn": "Criar modelo",
+    "noDestinationsMsg": "Parece que você ainda não criou nenhum destino. Para criar um alerta, você precisará ter pelo menos um destino e um modelo em vigor",
+    "createDestinationBtn": "Criar destino"
   },
   "alert_templates": {
     "header": "Modelos",
