@@ -1028,7 +1028,7 @@ export default defineComponent({
           sortable: true,
           hideable: true,
           size: 280,
-          minSize: 160,
+          minSize: 320,
           // Flex: fills the leftover width on load, freezes on first resize.
           meta: { align: "left", flex: true },
         },
@@ -1040,7 +1040,7 @@ export default defineComponent({
           sortable: true,
           resizable: true,
           hideable: true,
-          size: COL.owner,
+          size: 120,
           meta: { align: "left" },
         },
         // "period" (Look back window) — all tabs except realTime
@@ -1083,7 +1083,7 @@ export default defineComponent({
           sortable: true,
           resizable: true,
           hideable: true,
-          size: COL.date,
+          size: 160,
           meta: { align: "left" },
         },
         {
@@ -1094,7 +1094,7 @@ export default defineComponent({
           sortable: true,
           resizable: true,
           hideable: true,
-          size: COL.date,
+          size: 160,
           meta: { align: "left" },
         },
         // Anomaly Detection columns — shown on anomalyDetection and all tabs
@@ -1108,7 +1108,7 @@ export default defineComponent({
                 sortable: true,
                 resizable: true,
                 hideable: true,
-                size: COL.date,
+                size: 160,
                 meta: { align: "left" },
               } as OTableColumnDef,
               {

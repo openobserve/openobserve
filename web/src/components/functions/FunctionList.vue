@@ -278,7 +278,7 @@ export default defineComponent({
       {
         id: "name",
         accessorKey: "name",
-        header: t("function.name"),
+        header: t("common.name"),
         sortable: true,
         meta: { align: "left", autoWidth: true },
       },
