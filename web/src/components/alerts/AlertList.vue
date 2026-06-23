@@ -272,7 +272,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             size="15px"
                             class="tw:text-grey-7 tw:shrink-0"
                           />
-                          <span class="tw:truncate tw:min-w-[200px] tw:max-w-[320px]">{{ props.row[col.field] || "--" }}</span>
+                          <span class="tw:truncate tw:min-w-[200px] tw:max-w-[500px]">{{ props.row[col.field] || "--" }}</span>
                         </div>
                         <q-tooltip
                           v-if="props.row[col.field]?.length > 30"
