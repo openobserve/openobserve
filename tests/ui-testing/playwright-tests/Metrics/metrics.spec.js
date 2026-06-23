@@ -472,13 +472,19 @@ test.describe("Metrics testcases", () => {
 
     // Wait for loading to complete and an error/no-data indicator to appear in DOM.
     // For invalid PromQL like "sum(rate(", the query may fail client-side (no API call),
-    // rendering [data-test="no-data"] with empty text (0px height). Playwright's isVisible()
-    // considers zero-height elements invisible, so we also check DOM presence via count().
+    // rendering the no-data placeholder. The no-data placeholder is rendered via the
+    // OEmptyState component, whose root carries its own data-test="o2-empty-state"; in
+    // production builds Vue hoists that static attribute so the fallthrough
+    // data-test="no-data" does not override it. Match the OEmptyState scoped under the
+    // panel-editor container (parent → child) so the selector is build-agnostic, and
+    // keep [data-test="no-data"] as the dev-build fallback.
     await page.waitForFunction(
       () => {
         const dashError = document.querySelector('[data-test="dashboard-error"]');
         const chartError = document.querySelector('[data-test="panel-schema-renderer-error-message"]');
-        const noData = document.querySelector('[data-test="no-data"]');
+        const noData = document.querySelector(
+          '[data-test="no-data"], [data-test="panel-editor-container"] [data-test="o2-empty-state"]'
+        );
         return !!dashError || !!chartError || !!noData;
       },
       null,
