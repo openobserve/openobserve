@@ -47,11 +47,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
       </template>
     </AppPageHeader>
-    <div class="tw:flex">
-      <div class="tw:flex">
+    <div class="tw:flex tw:w-full">
+      <div class="tw:flex tw:w-full tw:min-w-0">
         <OSplitter
           v-model="splitterModel"
-          style="width: calc(100vw - 100px)"
+          class="tw:w-full tw:min-w-0"
         >
           <template #before>
             <div class="tw:w-full tw:h-full">
@@ -101,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="dashboard-import-url-editor"
                     ref="queryEditorFileRef"
                     editor-id="dashboards-query-editor-file"
-                    class="tw:my-4 tw:h-[calc(81vh-14px)]! tw:overflow-hidden tw:resize-none tw:border tw:border-(--o2-border-color) tw:rounded-md"
+                    class="tw:my-4 tw:h-[calc(100vh-285px)]! tw:overflow-hidden tw:resize-none tw:border tw:border-(--o2-border-color) tw:rounded-md"
                     :debounceTime="300"
                     v-model:query="jsonStr"
                     language="json"
@@ -158,7 +158,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="dashboard-import-json-file-editor"
                     ref="queryEditorJsonRef"
                     editor-id="dashboards-query-editor-json"
-                    class="tw:my-4 tw:h-[calc(81vh-14px)]! tw:overflow-hidden tw:resize-none tw:border tw:border-(--o2-border-color) tw:rounded-md"
+                    class="tw:my-4 tw:h-[calc(100vh-282px)]! tw:overflow-hidden tw:resize-none tw:border tw:border-(--o2-border-color) tw:rounded-md"
                     :debounceTime="300"
                     v-model:query="jsonStr"
                     language="json"
