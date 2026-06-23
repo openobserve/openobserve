@@ -3072,6 +3072,8 @@ export default defineComponent({
 .red-charts-section {
   :deep(.card-container) {
     box-shadow: none;
+    background: transparent;
+    border: none;
 
     :first-child {
       padding: 0 0.0625rem !important;
