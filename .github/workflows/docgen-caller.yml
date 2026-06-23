@@ -22,6 +22,9 @@ name: DocGen Caller (openobserve)
 # We use DeepSeek precisely because DEEPSEEK_API_KEY already exists here (e2e-council.yml +
 # ai-code-review.yml) — no Anthropic secret needed. E2E_DEV_CI_TOKEN is only used by the engine
 # for cross-repo diff reads + Phase B docs pushes (comments post as github-actions[bot]).
+#
+# KILL SWITCH: the engine honors a DOCGEN_DISABLED repo/org variable — set it to 'true' to
+# disable all DocGen runs without removing these files.
 
 on:
   issue_comment:
@@ -34,6 +37,10 @@ on:
       dry_run:
         description: "Triage only (no generation)"
         type: boolean
+        # Intentional SAFE default: a manual dispatch previews (triage only) unless you opt
+        # into generation by unchecking this. (Comment path is explicit: /docgen = full run,
+        # /docgen-dryrun = triage.) In Phase A dry_run has no effect yet — everything is
+        # triage-only — so this only matters once Phase B (doc generation) lands.
         default: true
 
 permissions:
