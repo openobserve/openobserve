@@ -363,9 +363,15 @@ jobs:
         if: steps.prinfo.outputs.author_allowed == 'true'
         run: |
           DP=docs/test_generator/ci/diff.patch
-          if grep -qE '^\+\+\+ b/tests/ui-testing/playwright-tests/.+\.spec\.js' "$DP" 2>/dev/null; then ETID=true; else ETID=false; fi
+          # Match Playwright specs by FOLDER (tests/ui-testing/playwright-tests/), allowing .spec.js
+          # OR .spec.ts (Playwright supports TS) — a Vitest web/src/**/*.spec.ts is excluded by folder.
+          if grep -qE '^\+\+\+ b/tests/ui-testing/playwright-tests/.+\.spec\.(j|t)s' "$DP" 2>/dev/null; then ETID=true; else ETID=false; fi
+          # Patch the flag into whichever JSONs the agent produced. We intentionally SKIP a
+          # missing/invalid file rather than fail: a missing run-context.json is already handled
+          # downstream ("Parse run-context" treats it as skip), and generate fail-closes on invalid
+          # JSON — so hard-failing here would only turn a graceful skip into a job failure.
           for f in docs/test_generator/ci/run-context.json docs/test_generator/ci/triage.json; do
-            { [ -f "$f" ] && jq empty "$f" 2>/dev/null; } || continue
+            { [ -f "$f" ] && jq empty "$f" 2>/dev/null; } || { echo "::notice::skip $f (missing/invalid — handled downstream)"; continue; }
             jq --argjson v "$ETID" '.existing_tests_in_diff=$v' "$f" > "$f.tmp" && mv "$f.tmp" "$f"
           done
           echo "::notice::existing_tests_in_diff (deterministic, E2E specs only) = $ETID"

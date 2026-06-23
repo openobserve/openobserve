@@ -85,8 +85,9 @@ Set `skip: true` with a clear `skip_reason` if **any** of these hold:
 > **`existing_tests_in_diff` counts ONLY Playwright E2E specs** under
 > `tests/ui-testing/playwright-tests/**/*.spec.js`. **Vitest unit tests** (`web/src/**/*.spec.ts`,
 > `*.spec.js` under `web/`) and **Rust tests** are NOT E2E coverage — they do **not** set this flag
-> and the Architect never extends them. (A deterministic workflow step recomputes this flag from the
-> diff and overrides your value, so don't guess — but keep your `existing_tests` rationale consistent:
+> and the Architect never extends them. (A deterministic workflow step in `.github/workflows/e2e-council.yml`
+> — "Scope existing_tests_in_diff to E2E specs" — recomputes this flag from the diff and overrides your
+> value, so don't guess — but keep your `existing_tests` rationale consistent:
 > a changed Vitest/unit test is dev test-maintenance, irrelevant to E2E coverage.)
 >
 > **Priority when both apply:** an **explicit** opt-out (condition 2 — `tests-added` label or a
