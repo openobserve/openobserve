@@ -1,6 +1,0 @@
-{
-  "group": "Alerts",
-  "spec_filename": "alerts-template-prebuilt-guard.spec.js",
-  "create_group": false,
-  "browser": "chrome"
-}

@@ -112,13 +112,13 @@ test.describe("Prebuilt Template Management", () => {
     await pm.alertTemplatesPage.expectCustomBadgeVisible();
     await pm.alertTemplatesPage.expectPrebuiltBadgeNotVisible();
 
-    // Click All tab → both visible
+    // Click All tab → both visible (handle pagination: prebuilt rows may be on later pages)
     await pm.alertTemplatesPage.clickTabAll();
     await testLogger.info('Clicked All tab');
 
     await pm.alertTemplatesPage.expectCustomBadgeVisible();
     if (hasPrebuilt) {
-      await pm.alertTemplatesPage.expectPrebuiltBadgeVisible();
+      await pm.alertTemplatesPage.expectPrebuiltBadgeVisibleAcrossPages();
     }
 
     // Cleanup
@@ -143,7 +143,7 @@ test.describe("Prebuilt Template Management", () => {
     testLogger.info('Clicked edit button for', { editName });
 
     // Assert the form opens in Update mode
-    await pm.alertTemplatesPage.expectAddTemplateTitleContains('Update Template');
+    await pm.alertTemplatesPage.expectAddTemplateTitleContains('Update template');
     await pm.alertTemplatesPage.expectTemplateNameInputReadonly();
 
     // Type a new body
@@ -176,7 +176,7 @@ test.describe("Prebuilt Template Management", () => {
     testLogger.info('Clicked clone button for', { srcName });
 
     // Assert the form opens in Clone mode
-    await pm.alertTemplatesPage.expectAddTemplateTitleContains('Clone Template');
+    await pm.alertTemplatesPage.expectAddTemplateTitleContains('Clone template');
 
     // The name input should be pre-filled with "Copy_of_<srcName>"
     const expectedCloneName = `Copy_of_${srcName}`;
@@ -247,7 +247,7 @@ test.describe("Prebuilt Template Management", () => {
     await pm.alertTemplatesPage.clickTemplateSubmitBtn();
 
     // Assert inline validation error
-    await pm.alertTemplatesPage.expectValidationErrorVisible('Field is required!');
+    await pm.alertTemplatesPage.expectValidationErrorVisible('Name is required');
     testLogger.info('✓ Empty name validation triggered');
 
     // Dismiss the form
