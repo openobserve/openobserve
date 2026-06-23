@@ -1151,13 +1151,16 @@ function relativeTime(timestampMs: number): string {
 }
 
 .jd-kpi {
+  // Tile styling mirrors the stream-schema stat tiles (rounded-lg + p-3 +
+  // shadow-sm + border). No icon — the eval KPIs read fine label-only.
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: 10px 12px;
+  gap: 4px;
+  padding: 12px;
   background: var(--color-card-bg);
   border: 1px solid var(--color-dialog-header-border, var(--o2-border));
-  border-radius: 6px;
+  border-radius: 8px;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
 }
 
 .jd-kpi--good {
@@ -1179,7 +1182,7 @@ function relativeTime(timestampMs: number): string {
 }
 
 .jd-kpi__title {
-  font: 600 11px/1.4 var(--o2-font);
+  font: 700 12px/1.4 var(--o2-font);
   letter-spacing: 0.01em;
   color: var(--color-text-secondary, var(--o2-text-secondary));
 }

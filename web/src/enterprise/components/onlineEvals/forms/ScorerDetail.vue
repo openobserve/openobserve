@@ -212,25 +212,27 @@
 
         <!-- Versions -->
         <template v-else-if="activeTab === 'versions'">
-          <p class="sd__tab-intro">
-            {{ t("onlineEvals.scorer.detail.versionsIntro") }}
-          </p>
-          <ul class="sd-versions">
-            <li class="sd-versions__item sd-versions__item--active">
-              <div class="sd-versions__head">
-                <span class="sd-mono sd-versions__label"
-                  >v{{ row.version }}</span
-                >
-                <span class="sd-versions__chip">{{
-                  t("onlineEvals.scorer.detail.activeVersionChip")
-                }}</span>
-              </div>
-              <div v-if="updatedAt" class="sd-versions__meta">
-                {{ t("onlineEvals.scorer.detail.lastUpdated") }}
-                <span class="sd-mono">{{ formatTimestamp(updatedAt) }}</span>
-              </div>
-            </li>
-          </ul>
+          <div class="sd__tab-pad">
+            <p class="sd__tab-intro">
+              {{ t("onlineEvals.scorer.detail.versionsIntro") }}
+            </p>
+            <ul class="sd-versions">
+              <li class="sd-versions__item sd-versions__item--active">
+                <div class="sd-versions__head">
+                  <span class="sd-mono sd-versions__label"
+                    >v{{ row.version }}</span
+                  >
+                  <span class="sd-versions__chip">{{
+                    t("onlineEvals.scorer.detail.activeVersionChip")
+                  }}</span>
+                </div>
+                <div v-if="updatedAt" class="sd-versions__meta">
+                  {{ t("onlineEvals.scorer.detail.lastUpdated") }}
+                  <span class="sd-mono">{{ formatTimestamp(updatedAt) }}</span>
+                </div>
+              </li>
+            </ul>
+          </div>
         </template>
 
         <!-- Runs -->
@@ -334,32 +336,34 @@
 
         <!-- Used by -->
         <template v-else-if="activeTab === 'usedBy'">
-          <p class="sd__tab-intro">
-            {{ t("onlineEvals.scorer.detail.usedByIntro") }}
-          </p>
-          <div v-if="usedByJobs.length === 0" class="sd-empty">
-            <OIcon name="info" size="xs" />
-            <span>{{ t("onlineEvals.scorer.detail.usedByEmpty") }}</span>
+          <div class="sd__tab-pad">
+            <p class="sd__tab-intro">
+              {{ t("onlineEvals.scorer.detail.usedByIntro") }}
+            </p>
+            <div v-if="usedByJobs.length === 0" class="sd-empty">
+              <OIcon name="info" size="xs" />
+              <span>{{ t("onlineEvals.scorer.detail.usedByEmpty") }}</span>
+            </div>
+            <ul v-else class="sd-used-list">
+              <li v-for="job in usedByJobs" :key="job.id">
+                <OButton
+                  variant="ghost"
+                  class="sd-used-list__item"
+                  :data-test="`scorer-detail-used-by-item-${job.name}`"
+                  @click="emit('view-job', job)"
+                >
+                  <OIcon name="play-arrow" size="xs" />
+                  <span class="sd-mono">{{ job.name }}</span>
+                  <span class="sd-used-list__meta">{{ job.status }}</span>
+                  <OIcon
+                    name="chevron-right"
+                    size="xs"
+                    class="sd-used-list__chevron"
+                  />
+                </OButton>
+              </li>
+            </ul>
           </div>
-          <ul v-else class="sd-used-list">
-            <li v-for="job in usedByJobs" :key="job.id">
-              <OButton
-                variant="ghost"
-                class="sd-used-list__item"
-                :data-test="`scorer-detail-used-by-item-${job.name}`"
-                @click="emit('view-job', job)"
-              >
-                <OIcon name="play-arrow" size="xs" />
-                <span class="sd-mono">{{ job.name }}</span>
-                <span class="sd-used-list__meta">{{ job.status }}</span>
-                <OIcon
-                  name="chevron-right"
-                  size="xs"
-                  class="sd-used-list__chevron"
-                />
-              </OButton>
-            </li>
-          </ul>
         </template>
       </div>
     </div>
@@ -772,13 +776,16 @@ function relativeTime(timestampMs: number): string {
 }
 
 .sd-kpi {
+  // Tile styling mirrors the stream-schema stat tiles (rounded-lg + p-3 +
+  // shadow-sm + border). No icon — the scorer KPIs read fine label-only.
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: 10px 12px;
+  gap: 4px;
+  padding: 12px;
   background: var(--color-card-bg);
   border: 1px solid var(--color-dialog-header-border, var(--o2-border));
-  border-radius: 6px;
+  border-radius: 8px;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
 }
 
 .sd-kpi--good {
@@ -800,7 +807,7 @@ function relativeTime(timestampMs: number): string {
 }
 
 .sd-kpi__title {
-  font: 600 12px/1.4 var(--o2-font);
+  font: 700 12px/1.4 var(--o2-font);
   letter-spacing: 0.01em;
   color: var(--color-text-secondary, var(--o2-text-secondary));
 }
@@ -912,6 +919,17 @@ function relativeTime(timestampMs: number): string {
   gap: 8px;
   // Re-apply the inset the body no longer provides (config sections stay
   // aligned with the page content).
+  padding-left: 20px;
+  padding-right: 20px;
+}
+
+// Versions / Used By tab content sits directly in the body (not in a
+// .sd-section), so it needs the same horizontal inset the body no longer
+// carries. The Runs tab keeps its full-bleed table and is not wrapped here.
+.sd__tab-pad {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
   padding-left: 20px;
   padding-right: 20px;
 }
