@@ -347,7 +347,7 @@ export default defineComponent({
       return [
         { id: "user_id", header: t('search_scheduler_job.user_id'), accessorKey: "user_id", sortable: true, size: COL.owner, meta: { align: "left", autoWidth: true } },
         { id: "created_at", header: t('search_scheduler_job.created_at'), accessorKey: "created_at", sortable: true, size: COL.createdAt, meta: { align: "left" } },
-        { id: "start_time", header: t('search_scheduler_job.start_time'), accessorKey: "start_time", sortable: true, size: COL.date, meta: { align: "left" } },
+        { id: "start_time", header: t('search_scheduler_job.start_time'), accessorKey: "start_time", sortable: true, size: COL.createdAt, meta: { align: "left" } },
         { id: "duration", header: t('search_scheduler_job.duration'), accessorKey: "duration", sortable: false, size: COL.duration, meta: { align: "left" } },
         { id: "status", header: t('search_scheduler_job.status'), accessorKey: "status", cell: " ", sortable: false, size: COL.status, meta: { align: "left" } },
         { id: "actions", header: t('search_scheduler_job.actions'), isAction: true, size: 120, meta: { align: "center", cellClass: "actions-column", actionCount: 4 } },
