@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
         ? 'o2-status-pill--error tw:text-(--o2-status-error-text) tw:bg-(--o2-status-error-bg)'
         : isOk
           ? 'o2-status-pill--success tw:text-(--o2-status-success-text) tw:bg-(--o2-status-success-bg)'
-          : 'o2-status-pill--unset tw:text-[var(--o2-status-unset-text,#888888)] tw:bg-[var(--o2-status-unset-bg,#f0f0f0)]'
+          : 'o2-status-pill--unset tw:text-[var(--o2-status-neutral-text)] tw:bg-[var(--o2-status-neutral-bg)]'
     "
   >
     <span
@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
           ? 'tw:bg-[var(--o2-status-error-text)]'
           : isOk
             ? 'tw:bg-[var(--o2-status-success-text)]'
-            : 'tw:bg-[var(--o2-status-unset-text,#888888)]'
+            : 'tw:bg-[var(--o2-status-neutral-text)]'
       "
     />
     <span

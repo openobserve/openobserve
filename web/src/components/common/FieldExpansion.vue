@@ -255,10 +255,15 @@ defineExpose({ reset: () => fieldValuesPanelRef.value?.reset() });
 
 .field-expansion-item .o-collapsible-content {
   width: 100%;
+  /* Themed background for the expanded value panel. Without this the panel is
+     transparent and falls back to a near-white surface in dark mode. Uses the
+     purpose-built token so it stays dark in dark mode / light gray in light mode. */
+  background-color: var(--color-field-list-expansion-bg);
 }
 
 .field-expansion-item[data-state="open"] {
   margin-bottom: 0.375rem;
+  border: 1px solid var(--color-field-list-expansion-border);
 }
 
 </style>
