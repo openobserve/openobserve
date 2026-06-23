@@ -3212,7 +3212,19 @@ export default defineComponent({
         key: "ctrl+enter",
         scope: "logs",
         description: "shortcuts.actions.logsRunQuery",
-        handler: () => handleRunQueryFn(),
+        handler: () => {
+          // In normal logs mode `handleRunQueryFn` only handles
+          // visualize/patterns/build — trigger the logs search the same way the
+          // refresh shortcut and the run button do (via the runQuery watcher).
+          const mode = searchObj.meta.logsVisualizeToggle;
+          if (!mode || mode === "logs") {
+            if (searchObj.loading) return;
+            searchObj.loading = true;
+            searchObj.runQuery = true;
+          } else {
+            handleRunQueryFn();
+          }
+        },
       },
       {
         key: "ctrl+h",
