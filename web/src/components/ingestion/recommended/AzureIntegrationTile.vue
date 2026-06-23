@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OCard class="tw:h-full tw:flex tw:flex-col tw:transition-all tw:duration-200 tw:rounded-lg tw:hover:-translate-y-0.5 tw:hover:shadow-[0_4px_12px_rgba(0,0,0,0.1)] tw:dark:hover:shadow-[0_4px_12px_rgba(255,255,255,0.1)]">
     <OCardSection class="tw:pb-2">
       <div class="tw:flex tw:items-start tw:justify-between tw:mb-2">
-        <div class="tw:font-semibold tw:text-base tw:leading-[1.4] tw:text-[#1a1a1a] tw:dark:text-[var(--o2-border)]">
+        <div class="tw:font-semibold tw:text-base tw:leading-[1.4]" :class="store.state.theme === 'dark' ? 'tw:text-[#e0e0e0]' : 'tw:text-[#1a1a1a]'">
           {{ integration.displayName }}
         </div>
         <OButton
@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTooltip content="View Documentation" />
         </OButton>
       </div>
-      <div class="tw:text-sm tw:text-[#666] tw:dark:text-[#b0b0b0] tw:mb-3 tw:leading-normal tw:min-h-[3em]">
+      <div class="tw:text-sm tw:mb-3 tw:leading-normal tw:min-h-[3em]" :class="store.state.theme === 'dark' ? 'tw:text-[#b0b0b0]' : 'tw:text-[#666]'">
         {{ integration.description }}
       </div>
     </OCardSection>
@@ -226,6 +226,7 @@ export default defineComponent({
     };
 
     return {
+      store,
       handleDeploy,
       handleDashboard,
       handleDocumentation,
