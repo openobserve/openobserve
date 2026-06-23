@@ -225,7 +225,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcutScope } from "@/lib/vue-shortcut-manager";
-import { isInputFocused, useShortcutsWithMac } from "@/utils/keyboardShortcuts";
+import { focusSearchInput, isInputFocused, useShortcutsWithMac } from "@/utils/keyboardShortcuts";
 
 export default defineComponent({
   name: "functionList",
@@ -693,7 +693,7 @@ export default defineComponent({
         scope: "functions",
         description: "shortcuts.actions.focusSearch",
         handler: () => {
-          (document.querySelector('[data-test="functions-list-search-input"] input') as HTMLInputElement)?.focus();
+          focusSearchInput("functions-list-search-input");
         },
       },
     ]);

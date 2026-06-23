@@ -303,7 +303,7 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcutScope } from "@/lib/vue-shortcut-manager";
-import { isInputFocused, useShortcutsWithMac } from "@/utils/keyboardShortcuts";
+import { focusSearchInput, isInputFocused, useShortcutsWithMac } from "@/utils/keyboardShortcuts";
 export default defineComponent({
   name: "PageLogStream",
   components: {
@@ -868,7 +868,7 @@ export default defineComponent({
         scope: "streams",
         description: "shortcuts.actions.focusSearch",
         handler: () => {
-          (document.querySelector('[data-test="streams-search-stream-input"] input') as HTMLInputElement)?.focus();
+          focusSearchInput("streams-search-stream-input");
         },
       },
     ]);

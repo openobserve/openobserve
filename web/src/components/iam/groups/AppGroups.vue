@@ -158,7 +158,7 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcutScope } from "@/lib/vue-shortcut-manager";
-import { isInputFocused, useShortcutsWithMac } from "@/utils/keyboardShortcuts";
+import { focusSearchInput, isInputFocused, useShortcutsWithMac } from "@/utils/keyboardShortcuts";
 import { TABLE_INDEX_COL_SIZE } from "@/lib/core/Table/OTable.types";
 
 const showAddGroup = ref(false);
@@ -381,7 +381,7 @@ useShortcutsWithMac([
     scope: "iam-groups",
     description: "shortcuts.actions.focusSearch",
     handler: () => {
-      (document.querySelector('[data-test="iam-groups-search-input"] input') as HTMLInputElement)?.focus();
+      focusSearchInput("iam-groups-search-input");
     },
   },
 ]);

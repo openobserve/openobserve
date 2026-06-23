@@ -200,7 +200,7 @@ import SummaryList from "./SummaryList.vue";
 import { getDuration } from "@/utils/zincutils";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcutScope } from "@/lib/vue-shortcut-manager";
-import { isInputFocused, useShortcutsWithMac } from "@/utils/keyboardShortcuts";
+import { focusSearchInput, isInputFocused, useShortcutsWithMac } from "@/utils/keyboardShortcuts";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 
 export default defineComponent({
@@ -809,7 +809,7 @@ export default defineComponent({
         scope: "running-queries",
         description: "shortcuts.actions.focusSearch",
         handler: () => {
-          (document.querySelector('[data-test="running-queries-search-input"] input') as HTMLInputElement)?.focus();
+          focusSearchInput("running-queries-search-input");
         },
       },
     ]);

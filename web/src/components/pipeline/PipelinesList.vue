@@ -418,7 +418,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcutScope } from "@/lib/vue-shortcut-manager";
-import { isInputFocused, useShortcutsWithMac } from "@/utils/keyboardShortcuts";
+import { focusSearchInput, isInputFocused, useShortcutsWithMac } from "@/utils/keyboardShortcuts";
 import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
 const { t } = useI18n();
@@ -1148,7 +1148,7 @@ useShortcutsWithMac([
     scope: "pipelines",
     description: "shortcuts.actions.focusSearch",
     handler: () => {
-      (document.querySelector('[data-test="pipeline-list-search-input"] input') as HTMLInputElement)?.focus();
+      focusSearchInput("pipeline-list-search-input");
     },
   },
 ]);

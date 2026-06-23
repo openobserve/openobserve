@@ -84,6 +84,7 @@ const columns: OTableColumnDef[] = [
           :model-value="globalFilter"
           :placeholder="t('iam.searchRole')"
           class="tw:flex-1"
+          data-test="iam-roles-search-input"
           @update:model-value="emit('update:globalFilter', $event)"
         />
       </div>

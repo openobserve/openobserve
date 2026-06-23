@@ -86,6 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="filterQuery"
             class="tw:flex-1"
             :placeholder="t('template.search')"
+            data-test="template-list-search-input"
           />
         </template>
         <template #empty>
@@ -239,7 +240,7 @@ import ImportTemplate from "./ImportTemplate.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcutScope } from "@/lib/vue-shortcut-manager";
-import { isInputFocused, useShortcutsWithMac } from "@/utils/keyboardShortcuts";
+import { focusSearchInput, isInputFocused, useShortcutsWithMac } from "@/utils/keyboardShortcuts";
 import { TABLE_INDEX_COL_SIZE } from "@/lib/core/Table/OTable.types";
 
 const AddTemplate = defineAsyncComponent(
@@ -616,7 +617,7 @@ useShortcutsWithMac([
     scope: "alert-templates",
     description: "shortcuts.actions.focusSearch",
     handler: () => {
-      (document.querySelector('[data-test="template-list-search-input"] input') as HTMLInputElement)?.focus();
+      focusSearchInput("template-list-search-input");
     },
   },
 ]);

@@ -281,7 +281,7 @@ import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcutScope } from "@/lib/vue-shortcut-manager";
-import { isInputFocused, useShortcutsWithMac } from "@/utils/keyboardShortcuts";
+import { focusSearchInput, isInputFocused, useShortcutsWithMac } from "@/utils/keyboardShortcuts";
 import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
 interface ConformDelete {
@@ -790,7 +790,7 @@ export default defineComponent({
         scope: "alert-destinations",
         description: "shortcuts.actions.focusSearch",
         handler: () => {
-          (document.querySelector('[data-test="destination-list-search-input"] input') as HTMLInputElement)?.focus();
+          focusSearchInput("destination-list-search-input");
         },
       },
     ]);

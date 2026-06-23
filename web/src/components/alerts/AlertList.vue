@@ -749,7 +749,7 @@ import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcutScope } from "@/lib/vue-shortcut-manager";
-import { isInputFocused, useShortcutsWithMac } from "@/utils/keyboardShortcuts";
+import { focusSearchInput, isInputFocused, useShortcutsWithMac } from "@/utils/keyboardShortcuts";
 import { COL } from "@/lib/core/Table/OTable.types";
 // import alertList from "./alerts";
 
@@ -2691,7 +2691,7 @@ export default defineComponent({
         scope: "alerts",
         description: "shortcuts.actions.focusSearch",
         handler: () => {
-          (document.querySelector('[data-test="alert-list-search-input"] input') as HTMLInputElement)?.focus();
+          focusSearchInput("alert-list-search-input");
         },
       },
     ]);

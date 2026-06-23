@@ -327,7 +327,7 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 import { useShortcutScope } from "@/lib/vue-shortcut-manager";
-import { isInputFocused, useShortcutsWithMac } from "@/utils/keyboardShortcuts";
+import { focusSearchInput, isInputFocused, useShortcutsWithMac } from "@/utils/keyboardShortcuts";
 
 const MoveAcrossFolders = defineAsyncComponent(
   () => import("@/components/common/sidebar/MoveAcrossFolders.vue"),
@@ -803,7 +803,7 @@ useShortcutsWithMac([
     scope: "reports",
     description: "shortcuts.actions.focusSearch",
     handler: () => {
-      (document.querySelector('[data-test="report-list-search-input"] input') as HTMLInputElement)?.focus();
+      focusSearchInput("report-list-search-input");
     },
   },
 ]);

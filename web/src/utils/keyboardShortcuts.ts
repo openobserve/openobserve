@@ -22,6 +22,29 @@ export function isInputFocused(): boolean {
 }
 
 /**
+ * Focuses a search field identified by its `data-test`, resilient to where the
+ * attribute actually lands in the DOM:
+ *  - O2 inputs (OInput/OSearchInput) put the real <input> at `${dataTest}-field`
+ *  - otherwise the focusable element may be nested under the wrapper, or be the
+ *    `data-test` element itself (raw input / CodeMirror `.cm-editor`).
+ * Tries the most reliable target first so a single `/` handler works everywhere.
+ */
+export function focusSearchInput(dataTest: string): void {
+  const target =
+    document.querySelector<HTMLElement>(`[data-test="${dataTest}-field"]`) ??
+    document.querySelector<HTMLElement>(
+      `[data-test="${dataTest}"] input, [data-test="${dataTest}"] textarea, [data-test="${dataTest}"] .cm-editor`,
+    ) ??
+    (() => {
+      const el = document.querySelector<HTMLElement>(`[data-test="${dataTest}"]`);
+      return el && el.matches("input, textarea, .cm-editor, [contenteditable]")
+        ? el
+        : null;
+    })();
+  target?.focus();
+}
+
+/**
  * Registers shortcuts on both Windows (ctrl) and Mac (meta/⌘).
  * For every shortcut whose key starts with "ctrl+", a hidden "meta+" twin is
  * also registered so the action fires on Mac without duplicating the cheatsheet entry.

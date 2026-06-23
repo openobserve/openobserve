@@ -202,7 +202,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
 import organizationsService from "@/services/organizations";
 import { useShortcutScope } from "@/lib/vue-shortcut-manager";
-import { isInputFocused, useShortcutsWithMac } from "@/utils/keyboardShortcuts";
+import { focusSearchInput, isInputFocused, useShortcutsWithMac } from "@/utils/keyboardShortcuts";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 
 interface Token {
@@ -382,7 +382,7 @@ export default defineComponent({
         scope: "ingestion-tokens",
         description: "shortcuts.actions.focusSearch",
         handler: () => {
-          (document.querySelector('[data-test="ingestion-tokens-search-input"] input') as HTMLInputElement)?.focus();
+          focusSearchInput("ingestion-tokens-search-input");
         },
       },
     ]);

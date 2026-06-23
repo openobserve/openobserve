@@ -69,6 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-model="filterQuery"
                   :placeholder="t('serviceAccounts.search')"
                   class="tw:flex-1"
+                  data-test="iam-service-accounts-search-input"
                 />
               </div>
             </template>
@@ -284,7 +285,7 @@ import service_accounts from "@/services/service_accounts";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcutScope } from "@/lib/vue-shortcut-manager";
-import { isInputFocused, useShortcutsWithMac } from "@/utils/keyboardShortcuts";
+import { focusSearchInput, isInputFocused, useShortcutsWithMac } from "@/utils/keyboardShortcuts";
 export default defineComponent({
   name: "ServiceAccountsList",
   components: { OEmptyState, AddServiceAccount, OButton, ODialog, OIcon, AppPageHeader, OTooltip, OTable, OBadge, OSearchInput },
@@ -699,7 +700,7 @@ export default defineComponent({
         scope: "iam-service-accounts",
         description: "shortcuts.actions.focusSearch",
         handler: () => {
-          (document.querySelector('[data-test="iam-service-accounts-search-input"] input') as HTMLInputElement)?.focus();
+          focusSearchInput("iam-service-accounts-search-input");
         },
       },
     ]);

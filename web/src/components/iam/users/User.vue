@@ -263,7 +263,7 @@ import { computed, nextTick } from "vue";
 import { getRoles as getCustomRolesApi, getRoleUsers } from "@/services/iam";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcutScope } from "@/lib/vue-shortcut-manager";
-import { isInputFocused, useShortcutsWithMac } from "@/utils/keyboardShortcuts";
+import { focusSearchInput, isInputFocused, useShortcutsWithMac } from "@/utils/keyboardShortcuts";
 import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
 export default defineComponent({
@@ -1236,7 +1236,7 @@ export default defineComponent({
         scope: "iam-users",
         description: "shortcuts.actions.focusSearch",
         handler: () => {
-          (document.querySelector('[data-test="iam-users-search-input"] input') as HTMLInputElement)?.focus();
+          focusSearchInput("user-list-search-input");
         },
       },
     ]);
