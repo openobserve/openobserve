@@ -2581,7 +2581,24 @@
       "destinationRequired": "少なくとも 1 つの目的地が必要です!",
       "disabledNotificationsInfo": "異常検出は引き続き実行され、結果が _anomalies ストリームに書き込まれます。異常が検出されたときにアラートを受け取るように通知を有効にします。"
     },
-    "anomalyName": "アノマリー名"
+    "anomalyName": "アノマリー名",
+    "subtitle": "アラートルールと通知チャネル",
+    "searchThisFolder": "このフォルダー",
+    "searchAllFolders": "すべてのフォルダー",
+    "streamConfig": "ストリーム構成",
+    "alertRules": "アラートルール",
+    "addCondition": "条件を追加",
+    "conditionOf": "の",
+    "conditionIs": "です",
+    "matchingTypeFound": "一致する {type} が見つかりました",
+    "matchingMetricsFound": "一致する指標が見つかりました",
+    "metricsValueFieldTooltip": "メトリクスストリームは、デフォルトで「値」フィールドに測定値を格納します。",
+    "howOftenCheckTooltip": "このアラート条件を確認する頻度",
+    "alertIfNoOfEvents": "イベント数のアラート",
+    "alertIfValueIs": "値が次の場合のアラート",
+    "havingSeries": "シリーズを持っている",
+    "clearMultiWindowsTitle": "マルチウィンドウをクリア?",
+    "lastTrainedAt": "最終研修日"
   },
   "alert_templates": {
     "header": "テンプレート",
@@ -3094,7 +3111,14 @@
     "dimensionWidth": "幅 (ピクセル)",
     "dimensionHeight": "高さ (ピクセル)",
     "imagePreview": "インラインダッシュボードのプレビュー画像を含める",
-    "customDimensions": "カスタムディメンション (アドバンス)"
+    "customDimensions": "カスタムディメンション (アドバンス)",
+    "subtitle": "定期レポートとエクスポート",
+    "searchThisFolder": "このフォルダー",
+    "searchAllFolders": "すべてのフォルダー",
+    "reloadReports": "レポートを再読み込み",
+    "moveToFolder": "フォルダに移動",
+    "deleteReportsTitle": "レポートを削除",
+    "deleteReportsMsg": "{count} 件のレポートを削除してよろしいですか?"
   },
   "queries": {
     "runningQueries": "実行中のクエリ",

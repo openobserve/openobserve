@@ -2564,7 +2564,24 @@
       "destinationRequired": "En az bir varış noktası gereklidir!",
       "disabledNotificationsInfo": "Anomali algılama çalışmaya devam edecek ve sonuçları _anomaliler akışına yazacaktır. Anormallikler tespit edildiğinde uyarı almak için bildirimleri etkinleştirin."
     },
-    "anomalyName": "Anomali Adı"
+    "anomalyName": "Anomali Adı",
+    "subtitle": "Uyarı kuralları ve bildirim kanalları",
+    "searchThisFolder": "Bu klasör",
+    "searchAllFolders": "Tüm klasörler",
+    "streamConfig": "Akış Yapılandırması",
+    "alertRules": "Uyarı Kuralları",
+    "addCondition": "Koşul Ekle",
+    "conditionOf": "dan",
+    "conditionIs": "dır",
+    "matchingTypeFound": "eşleşen {type} bulundu",
+    "matchingMetricsFound": "eşleşen metrikler bulundu",
+    "metricsValueFieldTooltip": "Metrik akışları, ölçümlerini varsayılan olarak “değer” alanında depolar",
+    "howOftenCheckTooltip": "Bu uyarı durumu ne sıklıkla kontrol edilir",
+    "alertIfNoOfEvents": "Olay sayısı ise uyarı",
+    "alertIfValueIs": "Değer ise uyarı",
+    "havingSeries": "Serilere sahip olmak",
+    "clearMultiWindowsTitle": "Çoklu Pencereleri Temizle?",
+    "lastTrainedAt": "En son eğitildi"
   },
   "alert_templates": {
     "header": "Şablonlar",
@@ -3086,7 +3103,14 @@
     "dimensionWidth": "Genişlik (piksel)",
     "dimensionHeight": "Yükseklik (piksel)",
     "imagePreview": "Satır içi gösterge paneli önizleme görüntüsünü ekleyin",
-    "customDimensions": "Özel Boyutlar (Gelişmiş)"
+    "customDimensions": "Özel Boyutlar (Gelişmiş)",
+    "subtitle": "Zamanlanmış raporlar ve dışa aktarmalar",
+    "searchThisFolder": "Bu klasör",
+    "searchAllFolders": "Tüm klasörler",
+    "reloadReports": "Raporları yeniden yükle",
+    "moveToFolder": "Klasöre Taşı",
+    "deleteReportsTitle": "Raporları Sil",
+    "deleteReportsMsg": "{count} raporlarını silmek istediğinizden emin misiniz?"
   },
   "queries": {
     "runningQueries": "Çalışan Sorgular",

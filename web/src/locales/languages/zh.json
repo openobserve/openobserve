@@ -2564,7 +2564,24 @@
       "destinationRequired": "至少需要一个目标！",
       "disabledNotificationsInfo": "异常检测仍将运行并将结果写入 _anomalies 流。启用通知以在检测到异常时接收警报。"
     },
-    "anomalyName": "异常名称"
+    "anomalyName": "异常名称",
+    "subtitle": "警报规则和通知渠道",
+    "searchThisFolder": "这个文件夹",
+    "searchAllFolders": "所有文件夹",
+    "streamConfig": "直播配置",
+    "alertRules": "警报规则",
+    "addCondition": "添加条件",
+    "conditionOf": "的",
+    "conditionIs": "是",
+    "matchingTypeFound": "找到匹配的 {type}",
+    "matchingMetricsFound": "已找到匹配指标",
+    "metricsValueFieldTooltip": "默认情况下，指标流将其测量结果存储在 “值” 字段中",
+    "howOftenCheckTooltip": "多久检查一次此警报状态",
+    "alertIfNoOfEvents": "事件数量时发出警报",
+    "alertIfValueIs": "如果值为，则发出警报",
+    "havingSeries": "有系列",
+    "clearMultiWindowsTitle": "清除多窗口？",
+    "lastTrainedAt": "上次训练于"
   },
   "alert_templates": {
     "header": "模板",
@@ -3077,7 +3094,14 @@
     "dimensionWidth": "宽度 (px)",
     "dimensionHeight": "高度 (px)",
     "imagePreview": "包括内联仪表板预览图片",
-    "customDimensions": "自定义尺寸（高级）"
+    "customDimensions": "自定义尺寸（高级）",
+    "subtitle": "预定报告和导出",
+    "searchThisFolder": "这个文件夹",
+    "searchAllFolders": "所有文件夹",
+    "reloadReports": "重新加载报告",
+    "moveToFolder": "移至文件夹",
+    "deleteReportsTitle": "删除报告",
+    "deleteReportsMsg": "您确定要删除 {count} 份报告吗？"
   },
   "queries": {
     "runningQueries": "运行查询",

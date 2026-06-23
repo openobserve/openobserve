@@ -2564,7 +2564,24 @@
       "destinationRequired": "Es ist mindestens ein Ziel erforderlich!",
       "disabledNotificationsInfo": "Die Anomalieerkennung wird weiterhin ausgeführt und die Ergebnisse werden in den _anomalies-Stream geschrieben. Aktivieren Sie Benachrichtigungen, um Benachrichtigungen zu erhalten, wenn Anomalien erkannt werden."
     },
-    "anomalyName": "Name der Anomalie"
+    "anomalyName": "Name der Anomalie",
+    "subtitle": "Alarmregeln und Benachrichtigungskanäle",
+    "searchThisFolder": "Dieser Ordner",
+    "searchAllFolders": "Alle Ordner",
+    "streamConfig": "Stream-Konfiguration",
+    "alertRules": "Regeln für Warnmeldungen",
+    "addCondition": "Bedingung hinzufügen",
+    "conditionOf": "von",
+    "conditionIs": "ist",
+    "matchingTypeFound": "passender {type} gefunden",
+    "matchingMetricsFound": "übereinstimmende Metriken gefunden",
+    "metricsValueFieldTooltip": "Metrik-Streams speichern ihre Messung standardmäßig im Feld „Wert“",
+    "howOftenCheckTooltip": "Wie oft muss diese Warnbedingung überprüft werden?",
+    "alertIfNoOfEvents": "Warnung bei Anzahl der Ereignisse",
+    "alertIfValueIs": "Warnung, wenn der Wert",
+    "havingSeries": "Serien haben",
+    "clearMultiWindowsTitle": "Multifenster löschen?",
+    "lastTrainedAt": "Zuletzt trainiert am"
   },
   "alert_templates": {
     "header": "Vorlagen",
@@ -3073,7 +3090,14 @@
     "dimensionWidth": "Breite (px)",
     "dimensionHeight": "Höhe (px)",
     "imagePreview": "Fügen Sie ein Inline-Dashboard-Vorschaubild hinzu",
-    "customDimensions": "Benutzerdefinierte Abmessungen (für Fortgeschrittene)"
+    "customDimensions": "Benutzerdefinierte Abmessungen (für Fortgeschrittene)",
+    "subtitle": "Geplante Berichte und Exporte",
+    "searchThisFolder": "Dieser Ordner",
+    "searchAllFolders": "Alle Ordner",
+    "reloadReports": "Berichte neu laden",
+    "moveToFolder": "In Ordner verschieben",
+    "deleteReportsTitle": "Berichte löschen",
+    "deleteReportsMsg": "Sind Sie sicher, dass Sie {count} Bericht (e) löschen möchten?"
   },
   "queries": {
     "runningQueries": "Abfragen ausführen",

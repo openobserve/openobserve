@@ -2564,7 +2564,24 @@
       "destinationRequired": "목적지가 하나 이상 필요합니다!",
       "disabledNotificationsInfo": "예외 항목 탐지는 계속 실행되고 결과를 _anomalies 스트림에 기록합니다.이상 징후가 감지되면 알림을 받을 수 있도록 하세요."
     },
-    "anomalyName": "예외 항목 이름"
+    "anomalyName": "예외 항목 이름",
+    "subtitle": "경고 규칙 및 알림 채널",
+    "searchThisFolder": "이 폴더",
+    "searchAllFolders": "모든 폴더",
+    "streamConfig": "스트림 구성",
+    "alertRules": "경고 규칙",
+    "addCondition": "조건 추가",
+    "conditionOf": "의",
+    "conditionIs": "입니다",
+    "matchingTypeFound": "일치하는 {type} 을 (를) 찾았습니다.",
+    "matchingMetricsFound": "일치하는 메트릭을 찾았습니다.",
+    "metricsValueFieldTooltip": "지표 스트림은 기본적으로 '값' 필드에 측정값을 저장합니다.",
+    "howOftenCheckTooltip": "이 알림 상태를 확인하는 빈도",
+    "alertIfNoOfEvents": "이벤트 수가 많으면 알림",
+    "alertIfValueIs": "값이 다음과 같은 경우 경고",
+    "havingSeries": "위빙 시리즈",
+    "clearMultiWindowsTitle": "멀티 윈도우를 지우시겠습니까?",
+    "lastTrainedAt": "마지막 교육 날짜"
   },
   "alert_templates": {
     "header": "템플릿",
@@ -3086,7 +3103,14 @@
     "dimensionWidth": "너비 (픽셀)",
     "dimensionHeight": "높이 (픽셀)",
     "imagePreview": "인라인 대시보드 미리 보기 이미지 포함",
-    "customDimensions": "사용자 지정 치수 (고급)"
+    "customDimensions": "사용자 지정 치수 (고급)",
+    "subtitle": "정기 보고서 및 내보내기",
+    "searchThisFolder": "이 폴더",
+    "searchAllFolders": "모든 폴더",
+    "reloadReports": "보고서 다시 로드",
+    "moveToFolder": "폴더로 이동",
+    "deleteReportsTitle": "보고서 삭제",
+    "deleteReportsMsg": "정말로 {count} 개의 보고서를 삭제하시겠습니까?"
   },
   "queries": {
     "runningQueries": "쿼리 실행",

@@ -2564,7 +2564,24 @@
       "destinationRequired": "É necessário pelo menos um destino!",
       "disabledNotificationsInfo": "A detecção de anomalias ainda será executada e gravará os resultados no fluxo _anomalies. Ative as notificações para receber alertas quando forem detectadas anomalias."
     },
-    "anomalyName": "Nome da anomalia"
+    "anomalyName": "Nome da anomalia",
+    "subtitle": "Regras de alerta e canais de notificação",
+    "searchThisFolder": "Esta pasta",
+    "searchAllFolders": "Todas as pastas",
+    "streamConfig": "Configuração de transmissão",
+    "alertRules": "Regras de alerta",
+    "addCondition": "Adicionar condição",
+    "conditionOf": "do",
+    "conditionIs": "é",
+    "matchingTypeFound": "{type} correspondente encontrado",
+    "matchingMetricsFound": "métricas correspondentes encontradas",
+    "metricsValueFieldTooltip": "Por padrão, os fluxos de métricas armazenam suas medidas no campo “valor”",
+    "howOftenCheckTooltip": "Com que frequência verificar essa condição de alerta",
+    "alertIfNoOfEvents": "Alerta em caso de número de eventos",
+    "alertIfValueIs": "Alerta se o valor for",
+    "havingSeries": "Ter séries",
+    "clearMultiWindowsTitle": "Limpar várias janelas?",
+    "lastTrainedAt": "Treinado pela última vez em"
   },
   "alert_templates": {
     "header": "Modelos",
@@ -3073,7 +3090,14 @@
     "dimensionWidth": "Largura (px)",
     "dimensionHeight": "Altura (px)",
     "imagePreview": "Incluir imagem de visualização do painel em linha",
-    "customDimensions": "Dimensões personalizadas (avançadas)"
+    "customDimensions": "Dimensões personalizadas (avançadas)",
+    "subtitle": "Relatórios e exportações programados",
+    "searchThisFolder": "Esta pasta",
+    "searchAllFolders": "Todas as pastas",
+    "reloadReports": "Recarregar relatórios",
+    "moveToFolder": "Mover para a pasta",
+    "deleteReportsTitle": "Excluir relatórios",
+    "deleteReportsMsg": "Tem certeza de que deseja excluir {count} relatório (s)?"
   },
   "queries": {
     "runningQueries": "Executando consultas",
