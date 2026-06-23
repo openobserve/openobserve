@@ -319,31 +319,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :variant="row.enabled ? 'ghost-destructive' : 'ghost'"
                       size="icon-sm"
                       :icon-left="row.enabled ? 'pause' : 'play-arrow'"
-                      :title="
-                        row.enabled
-                          ? t('alerts.pause')
-                          : t('alerts.start')
-                      "
                       @click.stop="toggleAlertState(row)"
-                    />
+                    >
+                      <OTooltip
+                        side="bottom"
+                        :content="row.enabled ? t('alerts.pause') : t('alerts.start')"
+                        :shortcut="row.enabled ? 'p' : undefined"
+                      />
+                    </OButton>
                     <OButton
                       data-row-action="edit"
                       :data-test="`alert-list-${row.name}-update-alert`"
                       variant="ghost"
                       size="icon-sm"
                       icon-left="edit"
-                      :title="t('alerts.edit')"
                       @click.stop="editAlert(row)"
-                    />
+                    >
+                      <OTooltip side="bottom" :content="t('alerts.edit')" shortcut="e" />
+                    </OButton>
                     <OButton
                       data-row-action="duplicate"
-                      :title="t('alerts.clone')"
                       variant="ghost"
                       size="icon-sm"
                       icon-left="content-copy"
                       @click.stop="duplicateAlert(row)"
                       :data-test="`alert-list-${row.name}-clone-alert`"
-                    />
+                    >
+                      <OTooltip side="bottom" :content="t('alerts.clone')" shortcut="d" />
+                    </OButton>
                     <!-- Hidden proxies so the row-hover shortcuts work for
                          actions that live in the more-menu dropdown (which is
                          teleported out of the row DOM): x = export, Del = delete. -->
@@ -382,6 +385,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <ODropdownSeparator />
                       <ODropdownItem
                         variant="destructive"
+                        shortcut="del"
                         @select="showDeleteDialogFn({ row })"
                       >
                         <template #icon-left>
@@ -390,7 +394,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         {{ t("alerts.delete") }}
                       </ODropdownItem>
                       <ODropdownSeparator />
-                      <ODropdownItem @select="exportAlert(row)">
+                      <ODropdownItem shortcut="x" @select="exportAlert(row)">
                         <template #icon-left>
                           <OIcon size="sm" name="download" />
                         </template>
