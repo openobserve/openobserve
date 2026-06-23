@@ -546,7 +546,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- UsageTab: self-contained home usage dashboard showing streams, functions, dashboards, alerts, and pipelines summary with animated counters and charts. -->
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -588,6 +588,9 @@ const animatedScheduledAlerts = ref(0);
 const animatedRtAlerts = ref(0);
 const animatedScheduledPipelines = ref(0);
 const animatedRtPipelines = ref(0);
+
+// Bumped when theme colors change to force re-computation of theme-dependent chart options
+const themeVersion = ref(0);
 
 // Count-up animation using requestAnimationFrame
 const animateValue = (
@@ -773,6 +776,7 @@ const showUsageReportBanner = computed(() => {
 });
 
 const alertsPanelData = computed(() => {
+  void themeVersion.value; // reactive dependency — re-runs when theme changes
   const healthyAlerts = summary.value.healthy_alerts || 0;
   const failedAlerts = summary.value.failed_alerts || 0;
   const total = healthyAlerts + failedAlerts;
@@ -858,6 +862,7 @@ const alertsPanelData = computed(() => {
 });
 
 const pipelinesPanelData = computed(() => {
+  void themeVersion.value; // reactive dependency — re-runs when theme changes
   const healthyPipelines = summary.value.healthy_pipelines || 0;
   const failedPipelines = summary.value.failed_pipelines || 0;
   const warningPipelines = summary.value.warning_pipelines || 0;
@@ -1043,6 +1048,8 @@ const formattedAnimatedIndexSize = computed(() => {
 const orgId = computed(() => store.state.selectedOrganization?.identifier);
 
 // Initial load
+const onThemeColorChanged = () => { themeVersion.value++; };
+
 onMounted(() => {
   if (
     Object.keys(store.state.selectedOrganization).length > 0 &&
