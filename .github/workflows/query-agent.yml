@@ -52,6 +52,10 @@ permissions:
   pull-requests: write
   issues: write
 
+concurrency:
+  group: query-agent-openobserve-${{ github.event.issue.number || github.event.inputs.pr_number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   call-query-agent:
     # Manual dispatch: always run (restricted to repo write access by GitHub).
