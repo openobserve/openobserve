@@ -310,8 +310,41 @@ pub async fn job_ack(Json(body): Json<serde_json::Value>) -> Response {
                 return MetaHttpResponse::bad_request(e.to_string());
             }
         };
+
+        let status = req.status.clone();
+        let response_time_ms = req.response_time_ms;
+        let error = req.error.clone();
+        let checked_at = config::utils::time::now_micros();
+
         match o2_enterprise::enterprise::synthetics::job_api::ack(req).await {
-            Ok(resp) => MetaHttpResponse::json(resp),
+            Ok(resp) => {
+                if !resp.destinations.is_empty() {
+                    let org_id = resp.org_id.clone();
+                    let monitor_name = resp.monitor_name.clone();
+                    let monitor_id = resp.monitor_id.clone();
+                    let monitor_type = resp.monitor_type.clone();
+                    let target = resp.target.clone();
+                    let destinations = resp.destinations.clone();
+                    let location = resp.location.clone();
+                    tokio::spawn(async move {
+                        crate::service::synthetics::notify_check_result(
+                            &org_id,
+                            &monitor_name,
+                            &monitor_id,
+                            &monitor_type,
+                            &target,
+                            &destinations,
+                            &location,
+                            &status,
+                            response_time_ms,
+                            error.as_deref(),
+                            checked_at,
+                        )
+                        .await;
+                    });
+                }
+                MetaHttpResponse::json(resp)
+            }
             Err(e) => {
                 tracing::error!("[synthetics] job_ack: {e}");
                 MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())

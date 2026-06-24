@@ -34,6 +34,9 @@ pub struct Monitor {
     pub next_run_at: i64,
     pub created_at: i64,
     pub updated_at: i64,
+    /// Alert destination names to notify on every check completion.
+    #[serde(default)]
+    pub destinations: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]

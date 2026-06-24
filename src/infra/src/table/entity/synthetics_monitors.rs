@@ -19,6 +19,7 @@ pub struct Model {
     pub next_run_at: i64,
     pub created_at: i64,
     pub updated_at: i64,
+    pub destinations: Json,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
@@ -46,6 +47,7 @@ mod tests {
             next_run_at: 0,
             created_at: 1750000000000000,
             updated_at: 1750000000000000,
+            destinations: serde_json::json!([]),
         };
         assert_eq!(m.id, "mon-1");
         assert_eq!(m.monitor_type, "browser");

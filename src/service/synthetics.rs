@@ -480,3 +480,122 @@ pub async fn batch_monitor_summary(
 
     Ok(result)
 }
+
+// ── Notifications ─────────────────────────────────────────────────────────────
+
+/// Sends a check result notification to each configured alert destination.
+///
+/// Uses the destination's configured template for body rendering when present,
+/// falling back to a JSON payload. Template variables: `{{monitor_name}}`,
+/// `{{monitor_id}}`, `{{monitor_type}}`, `{{target}}`, `{{location}}`,
+/// `{{status}}`, `{{response_time_ms}}`, `{{error}}`, `{{checked_at}}`.
+#[cfg(feature = "enterprise")]
+pub async fn notify_check_result(
+    org_id: &str,
+    monitor_name: &str,
+    monitor_id: &str,
+    monitor_type: &str,
+    target: &str,
+    destinations: &[String],
+    location: &str,
+    status: &str,
+    response_time_ms: f64,
+    error: Option<&str>,
+    checked_at: i64,
+) {
+    use config::meta::destinations::Module;
+
+    let vars: &[(&str, &str)] = &[
+        ("monitor_name", monitor_name),
+        ("monitor_id", monitor_id),
+        ("monitor_type", monitor_type),
+        ("target", target),
+        ("location", location),
+        ("status", status),
+        ("response_time_ms", &format!("{response_time_ms:.2}")),
+        ("error", error.unwrap_or("")),
+        ("checked_at", &checked_at.to_string()),
+    ];
+
+    for dest_name in destinations {
+        match crate::service::alerts::destinations::get_with_template(org_id, dest_name).await {
+            Ok((dest, tpl)) => {
+                let Module::Alert {
+                    destination_type, ..
+                } = &dest.module
+                else {
+                    continue;
+                };
+
+                let msg = if let Some(t) = tpl {
+                    render_template(&t.body, vars)
+                } else {
+                    default_notification_payload(
+                        monitor_name,
+                        monitor_id,
+                        monitor_type,
+                        target,
+                        location,
+                        status,
+                        response_time_ms,
+                        error,
+                        checked_at,
+                    )
+                };
+
+                let subject = format!("Synthetics: {monitor_name} [{location}] is {status}");
+                if let Err(e) = crate::service::alerts::alert::dispatch_notification(
+                    destination_type,
+                    &subject,
+                    msg,
+                )
+                .await
+                {
+                    log::error!(
+                        "[synthetics] notify dest={dest_name} monitor={monitor_id}: {e}"
+                    );
+                }
+            }
+            Err(e) => {
+                log::error!(
+                    "[synthetics] load dest={dest_name} org={org_id}: {e}"
+                );
+            }
+        }
+    }
+}
+
+#[cfg(feature = "enterprise")]
+fn render_template(body: &str, vars: &[(&str, &str)]) -> String {
+    let mut out = body.to_string();
+    for (k, v) in vars {
+        out = out.replace(&format!("{{{{{k}}}}}"), v);
+    }
+    out
+}
+
+#[cfg(feature = "enterprise")]
+fn default_notification_payload(
+    monitor_name: &str,
+    monitor_id: &str,
+    monitor_type: &str,
+    target: &str,
+    location: &str,
+    status: &str,
+    response_time_ms: f64,
+    error: Option<&str>,
+    checked_at: i64,
+) -> String {
+    serde_json::json!({
+        "monitor_name": monitor_name,
+        "monitor_id": monitor_id,
+        "monitor_type": monitor_type,
+        "target": target,
+        "location": location,
+        "status": status,
+        "response_time_ms": response_time_ms,
+        "error": error,
+        "checked_at": checked_at,
+    })
+    .to_string()
+}

@@ -39,6 +39,9 @@ impl TryFrom<synthetics_monitors::Model> for Monitor {
         let locations: Vec<String> = serde_json::from_value(m.locations)
             .map_err(|e| errors::Error::Message(format!("invalid locations JSON: {e}")))?;
 
+        let destinations: Vec<String> = serde_json::from_value(m.destinations)
+            .map_err(|e| errors::Error::Message(format!("invalid destinations JSON: {e}")))?;
+
         Ok(Monitor {
             id: m.id,
             org_id: m.org_id,
@@ -53,6 +56,7 @@ impl TryFrom<synthetics_monitors::Model> for Monitor {
             next_run_at: m.next_run_at,
             created_at: m.created_at,
             updated_at: m.updated_at,
+            destinations,
         })
     }
 }
@@ -106,7 +110,7 @@ pub async fn create<C: TransactionTrait>(
     let _lock = super::get_lock().await;
     let txn = conn.begin().await?;
     let now = config::utils::time::now_micros();
-    let id = svix_ksuid::Ksuid::new(None, None).to_string();
+    let id = config::ider::uuid();
 
     let mut am = build_active_model(&monitor)?;
     am.id = Set(id);
@@ -314,6 +318,7 @@ async fn list_models<C: ConnectionTrait>(
 /// Does NOT set immutable fields (id, org_id, created_at, monitor_type).
 fn update_mutable_fields(am: &mut ActiveModel, monitor: &Monitor) -> Result<(), errors::Error> {
     let locations = serde_json::to_value(&monitor.locations)?;
+    let destinations = serde_json::to_value(&monitor.destinations)?;
     am.folder_id = Set(monitor.folder_id.clone());
     am.name = Set(monitor.name.clone());
     am.target = Set(monitor.target.clone());
@@ -321,6 +326,7 @@ fn update_mutable_fields(am: &mut ActiveModel, monitor: &Monitor) -> Result<(), 
     am.interval_secs = Set(monitor.interval_secs);
     am.locations = Set(locations);
     am.enabled = Set(monitor.enabled);
+    am.destinations = Set(destinations);
     Ok(())
 }
 
@@ -328,6 +334,7 @@ fn update_mutable_fields(am: &mut ActiveModel, monitor: &Monitor) -> Result<(), 
 /// Caller must still set: id, org_id, folder_id, monitor_type, created_at, updated_at, next_run_at.
 fn build_active_model(monitor: &Monitor) -> Result<ActiveModel, errors::Error> {
     let locations = serde_json::to_value(&monitor.locations)?;
+    let destinations = serde_json::to_value(&monitor.destinations)?;
     Ok(ActiveModel {
         name: Set(monitor.name.clone()),
         target: Set(monitor.target.clone()),
@@ -335,6 +342,7 @@ fn build_active_model(monitor: &Monitor) -> Result<ActiveModel, errors::Error> {
         interval_secs: Set(monitor.interval_secs),
         locations: Set(locations),
         enabled: Set(monitor.enabled),
+        destinations: Set(destinations),
         ..Default::default()
     })
 }
@@ -395,6 +403,7 @@ mod tests {
             next_run_at: 0,
             created_at: 1750000000000000,
             updated_at: 1750000000000000,
+            destinations: serde_json::json!([]),
         }
     }
 
