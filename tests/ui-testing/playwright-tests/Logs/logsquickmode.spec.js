@@ -126,9 +126,11 @@ test.describe("Logs Quickmode testcases", () => {
     testLogger.info('Validated: "kubernetes_pod_id" marked as an interesting field via sidebar button');
     await pm.logsPage.clickSearchBarRefreshButton();
     testLogger.info('Validated: search refresh triggered with interesting field selection active');
-    await pm.logsPage.waitForSearchResults();
+    // Pinning an interesting field promotes it to its own table column, so the
+    // generic "source" column is no longer rendered — wait for any result row.
+    await pm.logsPage.waitForSearchResultsAnyColumn();
     testLogger.info('Validated: search results loaded after refresh');
-    await pm.logsPage.expectInterestingFieldInTable("kubernetes_pod_id");
+    await pm.logsPage.expectLogTableColumnVisible("kubernetes_pod_id");
     testLogger.info('Validated: "kubernetes_pod_id" appears as a column in the results table in histogram mode');
 
     testLogger.info('Interesting fields histogram mode test completed');
@@ -186,13 +188,19 @@ test.describe("Logs Quickmode testcases", () => {
     await pm.logsPage.clickSQLModeToggle();
     await pm.logsPage.waitForQueryEditorTextbox();
     await pm.logsPage.runQueryAfterModeChange();
-    await pm.logsPage.waitForSearchResults();
-    await pm.logsPage.expectLogTableColumnSourceVisible();
+    // Both interesting fields are pinned, so each renders as its own column and
+    // the generic "source" column is not present — wait for any result row, then
+    // assert the pinned field column is shown.
+    await pm.logsPage.waitForSearchResultsAnyColumn();
+    await pm.logsPage.expectLogTableColumnVisible("kubernetes_container_name");
     await pm.logsPage.clickInterestingFieldButton("level");
     await pm.logsPage.expectQueryEditorNotContainsText("level");
     await pm.logsPage.clickSearchBarRefreshButton();
-    await pm.logsPage.waitForSearchResults();
-    await pm.logsPage.expectLogTableColumnSourceNotHaveText("source");
+    await pm.logsPage.waitForSearchResultsAnyColumn();
+    // De-selecting "level" removes it from the result columns while the still-pinned
+    // "kubernetes_container_name" column remains.
+    await pm.logsPage.expectLogTableColumnNotVisible("level");
+    await pm.logsPage.expectLogTableColumnVisible("kubernetes_container_name");
     
     testLogger.info('Interesting fields add/remove test completed');
   });
@@ -226,10 +234,12 @@ test.describe("Logs Quickmode testcases", () => {
     testLogger.info('Validated: switched to SQL mode');
     await pm.logsPage.waitForQueryEditorTextbox();
     await pm.logsPage.runQueryAfterModeChange();
-    await pm.logsPage.waitForSearchResults();
+    // The pinned "kubernetes_pod_id" field is rendered as its own column, so the
+    // generic "source" column is not present — wait for any result row.
+    await pm.logsPage.waitForSearchResultsAnyColumn();
     testLogger.info('Validated: search results loaded');
-    await pm.logsPage.expectExactTextVisible("source");
-    testLogger.info('Validated: "source" column is visible in results — query ran without auto-injecting _timestamp in quick mode');
+    await pm.logsPage.expectLogTableColumnVisible("kubernetes_pod_id");
+    testLogger.info('Validated: "kubernetes_pod_id" column is visible in results — query ran without auto-injecting _timestamp in quick mode');
 
     testLogger.info('Quick mode results test completed');
   });
