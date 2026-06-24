@@ -1319,10 +1319,10 @@ const activeOuterTab = ref<string>(
   groupDefs.value.find((g) => g.children)?.id ?? groupDefs.value[0]?.id ?? "",
 );
 
-// Map outer tab id → actual resource name from additionalDimensions (e.g. pod/node name)
+// Map outer tab id → actual resource name from chipDimensions (e.g. pod/node name)
 const outerTabResourceName = computed<Record<string, string | undefined>>(() => ({
-  pods: props.additionalDimensions?.["k8s-pod-name"],
-  nodes: props.additionalDimensions?.["k8s-node-name"],
+  pods: props.chipDimensions?.["k8s-pod-name"],
+  nodes: props.chipDimensions?.["k8s-node-name"],
 }));
 
 // Map outer tab id → subject semantic id (drives the same filtering as the "View by" chip)
