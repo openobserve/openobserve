@@ -724,23 +724,41 @@ describe("ServiceGraphNodeSidePanel", () => {
       wrapper = mountPanel();
     });
 
-    it("should expose exactly 4 metric group entries", () => {
-      expect(wrapper.vm.metricGroupResources).toHaveLength(4);
+    it("should expose exactly 2 top-level metric group entries (Pods/Nodes)", () => {
+      expect(wrapper.vm.metricGroupResources).toHaveLength(2);
     });
 
-    it("should have IDs in order: pods, nodes, network, others", () => {
+    it("should have top-level IDs in order: pods, nodes", () => {
       const ids = wrapper.vm.metricGroupResources.map(
         (g: { id: string }) => g.id,
       );
-      expect(ids).toEqual(["pods", "nodes", "network", "others"]);
+      expect(ids).toEqual(["pods", "nodes"]);
     });
 
-    it("should have the expected id and label for each group", () => {
+    it("should have the expected id and label for each top-level group", () => {
       const groups = wrapper.vm.metricGroupResources;
       expect(groups[0]).toMatchObject({ id: "pods", label: "Pods" });
       expect(groups[1]).toMatchObject({ id: "nodes", label: "Nodes" });
-      expect(groups[2]).toMatchObject({ id: "network", label: "Network" });
-      expect(groups[3]).toMatchObject({ id: "others", label: "Others" });
+    });
+
+    it("should nest compute/memory/network/storage/others under each top-level group", () => {
+      const groups = wrapper.vm.metricGroupResources;
+      const childIds = (g: { children?: { id: string }[] }) =>
+        (g.children ?? []).map((c) => c.id);
+      expect(childIds(groups[0])).toEqual([
+        "compute",
+        "memory",
+        "network",
+        "storage",
+        "others",
+      ]);
+      expect(childIds(groups[1])).toEqual([
+        "compute",
+        "memory",
+        "network",
+        "storage",
+        "others",
+      ]);
     });
   });
 
