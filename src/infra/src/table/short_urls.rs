@@ -15,7 +15,7 @@
 
 use config::utils::time::now_micros;
 use sea_orm::{
-    ColumnTrait, ConnectionTrait, DatabaseBackend, EntityTrait, FromQueryResult, Order,
+    ColumnTrait, Condition, ConnectionTrait, DatabaseBackend, EntityTrait, FromQueryResult, Order,
     PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, Schema, Set,
     entity::prelude::*,
     sea_query::{Alias, DynIden},
@@ -42,6 +42,7 @@ pub struct Model {
     #[sea_orm(column_type = "Custom(get_text_type())")]
     pub original_url: String,
     pub created_ts: i64,
+    pub org_id: String,
 }
 
 fn get_text_type() -> DynIden {
@@ -64,13 +65,15 @@ impl ActiveModelBehavior for ActiveModel {}
 pub struct ShortUrlRecord {
     pub short_id: String,
     pub original_url: String,
+    pub org_id: String,
 }
 
 impl ShortUrlRecord {
-    pub fn new(short_id: &str, original_url: &str) -> Self {
+    pub fn new(short_id: &str, original_url: &str, org_id: &str) -> Self {
         Self {
             short_id: short_id.to_string(),
             original_url: original_url.to_string(),
+            org_id: org_id.to_string(),
         }
     }
 }
@@ -124,11 +127,12 @@ pub async fn create_table_index() -> Result<(), errors::Error> {
     Ok(())
 }
 
-pub async fn add(short_id: &str, original_url: &str) -> Result<(), errors::Error> {
+pub async fn add(short_id: &str, original_url: &str, org_id: &str) -> Result<(), errors::Error> {
     let record = ActiveModel {
         short_id: Set(short_id.to_string()),
         original_url: Set(original_url.to_string()),
         created_ts: Set(now_micros()),
+        org_id: Set(org_id.to_string()),
         ..Default::default()
     };
 
@@ -154,13 +158,26 @@ pub async fn remove(short_id: &str) -> Result<(), errors::Error> {
     Ok(())
 }
 
-pub async fn get(short_id: &str) -> Result<ShortUrlRecord, errors::Error> {
+pub async fn get(short_id: &str, org_id: &str) -> Result<ShortUrlRecord, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let record = Entity::find()
+    let mut query = Entity::find()
         .select_only()
         .column(Column::ShortId)
         .column(Column::OriginalUrl)
-        .filter(Column::ShortId.eq(short_id))
+        .column(Column::OrgId)
+        .filter(Column::ShortId.eq(short_id));
+
+    // Legacy rows were stored without an org_id (empty string). Accept them from
+    // any org so existing short links don't break after the migration.
+    if !org_id.is_empty() {
+        query = query.filter(
+            Condition::any()
+                .add(Column::OrgId.eq(org_id))
+                .add(Column::OrgId.eq("")),
+        );
+    }
+
+    let record = query
         .into_model::<ShortUrlRecord>()
         .one(client)
         .await?
@@ -175,6 +192,7 @@ pub async fn list(limit: Option<i64>) -> Result<Vec<ShortUrlRecord>, errors::Err
         .select_only()
         .column(Column::ShortId)
         .column(Column::OriginalUrl)
+        .column(Column::OrgId)
         .order_by(Column::CreatedTs, Order::Desc);
     if let Some(limit) = limit {
         res = res.limit(limit as u64);
@@ -257,14 +275,14 @@ mod tests {
 
     #[test]
     fn test_short_url_record_new_sets_fields() {
-        let rec = ShortUrlRecord::new("abc123", "https://example.com/long/path");
+        let rec = ShortUrlRecord::new("abc123", "https://example.com/long/path", "default");
         assert_eq!(rec.short_id, "abc123");
         assert_eq!(rec.original_url, "https://example.com/long/path");
     }
 
     #[test]
     fn test_short_url_record_new_empty_strings() {
-        let rec = ShortUrlRecord::new("", "");
+        let rec = ShortUrlRecord::new("", "", "");
         assert!(rec.short_id.is_empty());
         assert!(rec.original_url.is_empty());
     }
