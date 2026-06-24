@@ -10,9 +10,9 @@ name: DocGen Screenshot Spike
 # touching main) or manual dispatch. Delete this workflow + branch once v2 is built.
 #
 # REQUIRED SECRETS (add to the openobserve repo — values from tests/ui-testing/.env o2latestmain block):
-#   O2LATESTMAIN_URL      = https://o2latestmain.o2aks1.internal.zinclabs.dev
-#   O2LATESTMAIN_EMAIL    = latest@openobserve.ai
-#   O2LATESTMAIN_PASSWORD = <the ZO_ROOT_USER_PASSWORD for o2latestmain>
+#   O2_URL      = https://o2latestmain.o2aks1.internal.zinclabs.dev
+#   O2_EMAIL    = latest@openobserve.ai
+#   O2_PASSWORD = <the ZO_ROOT_USER_PASSWORD for o2latestmain>
 #   (DEEPSEEK_API_KEY already exists.)
 
 on:
@@ -28,9 +28,9 @@ jobs:
     runs-on: repo-openobserve-standard-4   # self-hosted; internal-network access (per release.yml)
     timeout-minutes: 25
     env:
-      O2_URL: ${{ secrets.O2LATESTMAIN_URL }}
-      O2_EMAIL: ${{ secrets.O2LATESTMAIN_EMAIL }}
-      O2_PASSWORD: ${{ secrets.O2LATESTMAIN_PASSWORD }}
+      O2_URL: ${{ secrets.O2_URL }}
+      O2_EMAIL: ${{ secrets.O2_EMAIL }}
+      O2_PASSWORD: ${{ secrets.O2_PASSWORD }}
       DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
     steps:
       - name: Check secrets present
