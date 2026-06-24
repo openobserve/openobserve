@@ -51,11 +51,11 @@
 
         <div class="provider-field-row tw:grid tw:grid-cols-2 tw:gap-[14px]">
           <div class="tw:mb-3">
-            <label class="tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary) tw:mb-1">
+            <div class="tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary) tw:mb-1">
               {{ t("onlineEvals.provider.nameLabel") }}
               <span class="tw:text-(--o2-status-error-text) tw:ml-0.5">*</span>
               <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="tw:ml-1.5 tw:text-text-secondary" />
-            </label>
+            </div>
             <OInput
               v-model.trim="form.name"
               :placeholder="t('onlineEvals.provider.namePlaceholder')"
@@ -69,11 +69,11 @@
           </div>
 
           <div class="tw:mb-3">
-            <label class="tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary) tw:mb-1">
+            <div class="tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary) tw:mb-1">
               {{ t("onlineEvals.provider.typeLabel") }}
               <span class="tw:text-(--o2-status-error-text) tw:ml-0.5">*</span>
               <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="tw:ml-1.5 tw:text-text-secondary" />
-            </label>
+            </div>
             <OSelect
               v-model="form.providerType"
               :options="providerTypeOptions"
@@ -85,7 +85,7 @@
         </div>
 
         <div class="tw:mb-3">
-          <label class="tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary) tw:mb-1">{{ t("onlineEvals.provider.endpointLabel") }}</label>
+          <div class="tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary) tw:mb-1">{{ t("onlineEvals.provider.endpointLabel") }}</div>
           <OInput
             v-model.trim="form.endpoint"
             :placeholder="t('onlineEvals.provider.endpointPlaceholder')"
@@ -96,10 +96,10 @@
 
         <div class="provider-field-row tw:grid tw:grid-cols-2 tw:gap-[14px]">
           <div class="tw:mb-3">
-            <label class="tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary) tw:mb-1">
+            <div class="tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary) tw:mb-1">
               {{ t("onlineEvals.provider.defaultModelLabel") }}
               <span class="tw:text-(--o2-status-error-text) tw:ml-0.5">*</span>
-            </label>
+            </div>
             <OInput
               v-model.trim="form.defaultModel"
               :placeholder="t('onlineEvals.provider.defaultModelPlaceholder')"
@@ -109,7 +109,7 @@
           </div>
 
           <div class="tw:mb-3">
-            <label class="tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary) tw:mb-1">{{ t("onlineEvals.provider.availableModelsLabel") }}</label>
+            <div class="tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary) tw:mb-1">{{ t("onlineEvals.provider.availableModelsLabel") }}</div>
             <OInput
               v-model.trim="form.availableModels"
               :placeholder="t('onlineEvals.provider.availableModelsPlaceholder')"
@@ -134,10 +134,10 @@
         </div>
 
         <div class="tw:mb-3">
-          <label class="tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary) tw:mb-1">
+          <div class="tw:flex tw:items-center tw:text-xs tw:font-semibold tw:text-(--color-text-primary) tw:mb-1">
             {{ t("onlineEvals.provider.apiKeyLabel") }}
             <span v-if="mode === 'create'" class="tw:text-(--o2-status-error-text) tw:ml-0.5">*</span>
-          </label>
+          </div>
           <OInput
             v-model.trim="form.apiKey"
             type="password"

@@ -78,12 +78,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :width="40"
       >
         <div class="tw:p-4 tw:text-sm">
-          <div class="tw:mb-4 tw:p-4 tw:bg-[#f5f5f5] tw:rounded tw:dark:bg-[#2a2a2a]">
+          <div class="tw:mb-4 tw:p-4 tw:rounded" :class="store.state.theme === 'dark' ? 'tw:bg-[#2a2a2a]' : 'tw:bg-[#f5f5f5]'">
             <div class="tw:font-medium tw:mb-2">{{ t("settings.claimParserFunctionInputTitle") }}</div>
             <div>{{ t("settings.claimParserFunctionInputDescription") }}</div>
           </div>
 
-          <div class="tw:mb-4 tw:p-4 tw:bg-[#f5f5f5] tw:rounded tw:dark:bg-[#2a2a2a]">
+          <div class="tw:mb-4 tw:p-4 tw:rounded" :class="store.state.theme === 'dark' ? 'tw:bg-[#2a2a2a]' : 'tw:bg-[#f5f5f5]'">
             <div class="tw:font-medium tw:mb-2">{{ t("settings.claimParserFunctionOutputTitle") }}</div>
             <div class="tw:mb-2">{{ t("settings.claimParserFunctionOutputDescription") }}</div>
             <div class="tw:ml-4">
@@ -93,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Recent Errors Section -->
-          <div v-if="claimParserFunction" class="tw:p-4 tw:bg-[#f5f5f5] tw:rounded tw:border-l-[3px] tw:border-l-[#c10015] tw:dark:bg-[#2a2a2a] tw:dark:border-l-[#ff6b6b]">
+          <div v-if="claimParserFunction" class="tw:p-4 tw:rounded tw:border-l-[3px]" :class="store.state.theme === 'dark' ? 'tw:bg-[#2a2a2a] tw:border-l-[#ff6b6b]' : 'tw:bg-[#f5f5f5] tw:border-l-[#c10015]'">
             <div class="tw:flex tw:items-center tw:mb-2">
               <div class="tw:flex-1 tw:font-medium">{{ t("settings.claimParserRecentErrors") }}</div>
               <div>
@@ -121,7 +121,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-for="(error, index) in recentErrors.slice(0, 3)"
                 :key="index"
-                class="tw:p-2 tw:mb-1 tw:bg-[#fff9f9] tw:rounded tw:border-l-2 tw:border-l-[#ff9e9e] tw:dark:bg-[#2a1f1f] tw:dark:border-l-[#ff6b6b]"
+                class="tw:p-2 tw:mb-1 tw:rounded tw:border-l-2"
+                :class="store.state.theme === 'dark' ? 'tw:bg-[#2a1f1f] tw:border-l-[#ff6b6b]' : 'tw:bg-[#fff9f9] tw:border-l-[#ff9e9e]'"
               >
                 <div class="tw:flex tw:items-start tw:mb-1">
                   <OIcon name="error" size="xs" class="tw:mr-1 tw:mt-1" />
@@ -130,7 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="tw:text-xs" style="color: var(--o2-text-muted)">{{ formatTimestamp(error._timestamp) }}</div>
                   </div>
                 </div>
-                <div class="tw:text-xs tw:text-[#666] tw:wrap-break-word tw:dark:text-[#ccc]">{{ error.error }}</div>
+                <div class="tw:text-xs tw:wrap-break-word" :class="store.state.theme === 'dark' ? 'tw:text-[#ccc]' : 'tw:text-[#666]'">{{ error.error }}</div>
               </div>
 
               <!-- Show More Button -->
@@ -203,9 +204,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template v-for="(domain, index) in domains" :key="domain?.name || `domain-${index}`">
         <div
           v-if="domain && domain.name"
-          class="tw:mb-1 tw:border tw:border-(--o2-border) tw:rounded-lg tw:bg-white tw:dark:border-[#444] tw:dark:bg-[#1e1e1e]"
+          class="tw:mb-1 tw:border tw:border-(--o2-border) tw:rounded-lg"
+          :class="store.state.theme === 'dark' ? 'tw:border-[#444] tw:bg-[#1e1e1e]' : 'tw:bg-white'"
         >
-          <div class="tw:flex tw:items-center tw:justify-between tw:px-3 tw:py-2 tw:bg-[#f5f5f5] tw:border-b tw:border-b-(--o2-border) tw:rounded-t-lg tw:dark:bg-[#2a2a2a] tw:dark:border-b-[#444]">
+          <div class="tw:flex tw:items-center tw:justify-between tw:px-3 tw:py-2 tw:border-b tw:border-b-(--o2-border) tw:rounded-t-lg" :class="store.state.theme === 'dark' ? 'tw:bg-[#2a2a2a] tw:border-b-[#444]' : 'tw:bg-[#f5f5f5]'">
           <div class="tw:text-base tw:font-bold" :data-test="`domain-management-domain-name-${domain.name}`">{{ domain.name }}</div>
           <OButton
             icon-left="close"
@@ -236,7 +238,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Info message for all users -->
           <div
             v-if="domain.allowAllUsers"
-            class="tw:p-2 tw:bg-blue-50 tw:text-blue-700 tw:rounded tw:mb-3"
+            class="tw:p-2 tw:rounded tw:mb-3"
+            :class="store.state.theme === 'dark' ? 'tw:bg-[#1a2535] tw:text-blue-300' : 'tw:bg-blue-50 tw:text-blue-700'"
           >
             {{ t("settings.allUsersAllowedMessage", { domain: '@'+domain.name }) }}
           </div>
@@ -263,7 +266,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-for="(email, emailIndex) in domain.allowedEmails"
                 :key="email"
-                class="tw:flex tw:items-center tw:justify-between tw:p-2 tw:mb-1 tw:bg-[#f9f9f9] tw:rounded tw:border tw:border-(--o2-border) tw:dark:bg-[#2a2a2a] tw:dark:border-[#444]"
+                class="tw:flex tw:items-center tw:justify-between tw:p-2 tw:mb-1 tw:rounded tw:border tw:border-(--o2-border)"
+                :class="store.state.theme === 'dark' ? 'tw:bg-[#2a2a2a] tw:border-[#444]' : 'tw:bg-[#f9f9f9]'"
               >
                 <div class="tw:text-sm">{{ email }}</div>
                 <OButton
@@ -283,7 +287,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       v-else
       data-test="domain-management-no-domain-message"
-      class="tw:text-xl tw:font-semibold tw:text-gray-400 tw:mt-3 tw:mb-4 tw:w-full tw:text-center tw:p-4 tw:border tw:border-(--o2-border) tw:rounded-lg tw:bg-white tw:dark:border-[#444] tw:dark:bg-[#1e1e1e]"
+      class="tw:text-xl tw:font-semibold tw:text-gray-400 tw:mt-3 tw:mb-4 tw:w-full tw:text-center tw:p-4 tw:border tw:border-(--o2-border) tw:rounded-lg"
+      :class="store.state.theme === 'dark' ? 'tw:border-[#444] tw:bg-[#1e1e1e]' : 'tw:bg-white'"
     >
       {{ t("settings.noDomainMessage") }}
     </div>

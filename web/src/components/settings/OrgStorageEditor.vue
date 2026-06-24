@@ -86,10 +86,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-for="provider in availableProviders"
                 :key="provider.value"
                 :data-test="`storage-settings-provider-card-${provider.value}`"
-                class="tw:group/card tw:relative tw:flex tw:flex-col tw:items-center tw:justify-center tw:py-5 tw:px-3 tw:border-2 tw:border-(--o2-border) tw:rounded-xl tw:bg-white tw:cursor-pointer tw:transition-all tw:duration-300 tw:min-h-30 tw:hover:border-(--o2-border-color) tw:hover:shadow-[0_4px_12px_rgba(25,118,210,0.15)] tw:hover:-translate-y-0.5 tw:dark:bg-[#1e1e1e] tw:dark:border-[#424242] tw:dark:hover:border-[#5d9cec] tw:dark:hover:shadow-[0_4px_12px_rgba(93,156,236,0.2)]"
-                :class="{
-                  selected: selectedProvider === provider.value,
-                }"
+                class="tw:group/card tw:relative tw:flex tw:flex-col tw:items-center tw:justify-center tw:py-5 tw:px-3 tw:border-2 tw:rounded-xl tw:cursor-pointer tw:transition-all tw:duration-300 tw:min-h-30 tw:hover:-translate-y-0.5"
+                :class="[
+                  { selected: selectedProvider === provider.value },
+                  store.state.theme === 'dark'
+                    ? 'tw:bg-[#1e1e1e] tw:border-[#424242] tw:hover:border-[#5d9cec] tw:hover:shadow-[0_4px_12px_rgba(93,156,236,0.2)]'
+                    : 'tw:bg-white tw:border-(--o2-border) tw:hover:border-(--o2-border-color) tw:hover:shadow-[0_4px_12px_rgba(25,118,210,0.15)]'
+                ]"
                 :style="selectedProvider === provider.value && store.state.theme !== 'dark'
                   ? 'border-color: var(--o2-border-color); background: linear-gradient(135deg, #e3f2fd 0%, #ffffff 100%); box-shadow: 0 4px 16px rgba(25,118,210,0.2);'
                   : selectedProvider === provider.value && store.state.theme === 'dark'

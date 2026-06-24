@@ -117,10 +117,10 @@ limitations under the License.
           </div>
           <div data-test="email-body" class="email-body tw:p-6">
             <div class="email-alert-header">
-              <h1 class="tw:text-[#d63638] tw:text-center tw:mb-4 tw:text-[1.5rem]">🚨 Alert Notification</h1>
+              <div class="tw:text-[#d63638] tw:text-center tw:mb-4 tw:text-[1.5rem] tw:font-bold">🚨 Alert Notification</div>
             </div>
             <div class="email-alert-info tw:bg-[#f8f9fa] tw:border-l-4 tw:border-[#d63638] tw:p-4 tw:my-4">
-              <h2 class="tw:text-[#d63638] tw:m-0 tw:mb-2 tw:text-[1.125rem]">High CPU Usage</h2>
+              <div class="tw:text-[#d63638] tw:m-0 tw:mb-2 tw:text-[1.125rem] tw:font-bold">High CPU Usage</div>
               <p class="tw:m-0 tw:text-[#6c757d]">An alert has been triggered in your OpenObserve monitoring system.</p>
             </div>
             <div class="email-details tw:my-4">
@@ -160,7 +160,7 @@ limitations under the License.
             <div class="pagerduty-status tw:bg-[#d13212] tw:py-1 tw:px-2 tw:rounded tw:text-xs tw:font-bold">Triggered</div>
           </div>
           <div class="pagerduty-content tw:p-6">
-            <h3 class="tw:m-0 tw:mb-4 tw:text-[#2d3748]">OpenObserve Alert: High CPU Usage</h3>
+            <div class="tw:m-0 tw:mb-4 tw:text-[#2d3748] tw:font-bold tw:text-[1.17rem]">OpenObserve Alert: High CPU Usage</div>
             <div class="pagerduty-details">
               <div class="pagerduty-field tw:mb-2 tw:text-[#4a5568]">
                 <strong>Source:</strong> openobserve
@@ -220,7 +220,7 @@ limitations under the License.
             <div class="opsgenie-priority tw:bg-[#ffab00] tw:text-[#172b4d] tw:py-1 tw:px-2 tw:rounded tw:font-bold">P3</div>
           </div>
           <div class="opsgenie-content tw:p-6">
-            <h3 class="tw:m-0 tw:mb-4 tw:text-[#2d3748]">OpenObserve Alert: High CPU Usage</h3>
+            <div class="tw:m-0 tw:mb-4 tw:text-[#2d3748] tw:font-bold tw:text-[1.17rem]">OpenObserve Alert: High CPU Usage</div>
             <div class="opsgenie-details">
               <div class="opsgenie-field tw:mb-2 tw:text-[#4a5568]">
                 <strong>Source:</strong> OpenObserve

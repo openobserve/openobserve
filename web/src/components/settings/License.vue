@@ -245,10 +245,10 @@
       </div>
 
       <div class="tw:col-span-1 tw:self-start">
-        <OCard class="futuristic-card tw:border tw:border-solid tw:border-[var(--o2-border-color)] tw:dark:bg-[linear-gradient(135deg,rgba(99,102,241,0.08)_0%,rgba(168,85,247,0.08)_100%)] tw:dark:border-[rgba(99,102,241,0.25)]">
+        <OCard class="futuristic-card tw:border tw:border-solid" :class="store.state.theme === 'dark' ? 'tw:bg-[linear-gradient(135deg,rgba(99,102,241,0.08)_0%,rgba(168,85,247,0.08)_100%)] tw:border-[rgba(99,102,241,0.25)]' : 'tw:border-[var(--o2-border-color)]'">
           <OCardSection class="tw:p-3">
             <div>
-              <div class="tw:dark:bg-[radial-gradient(ellipse_at_center,rgba(99,102,241,0.15)_0%,transparent_70%)]"></div>
+              <div :class="store.state.theme === 'dark' ? 'tw:bg-[radial-gradient(ellipse_at_center,rgba(99,102,241,0.15)_0%,transparent_70%)]' : ''"></div>
               <div class="tw:text-xl tw:font-semibold tw:relative tw:z-10">
                 {{ t("about.usage_information") }}
               </div>
@@ -256,7 +256,7 @@
 
             <div class="tw:flex tw:flex-col tw:gap-2 tw:mt-3">
               <!-- Summary Message -->
-              <div class="ingestion-summary-compact tw:border tw:border-solid tw:border-[rgba(99,102,241,0.2)] tw:rounded-lg tw:py-3 tw:px-[14px] tw:[backdrop-filter:blur(10px)] tw:relative tw:overflow-hidden tw:dark:bg-[linear-gradient(135deg,rgba(99,102,241,0.1)_0%,rgba(168,85,247,0.1)_100%)] tw:dark:border-[rgba(99,102,241,0.3)]">
+              <div class="ingestion-summary-compact tw:border tw:border-solid tw:rounded-lg tw:py-3 tw:px-[14px] tw:[backdrop-filter:blur(10px)] tw:relative tw:overflow-hidden" :class="store.state.theme === 'dark' ? 'tw:bg-[linear-gradient(135deg,rgba(99,102,241,0.1)_0%,rgba(168,85,247,0.1)_100%)] tw:border-[rgba(99,102,241,0.3)]' : 'tw:border-[rgba(99,102,241,0.2)]'">
                 <div class="summary-text-compact tw:text-sm tw:leading-[1.6] tw:text-inherit tw:text-[13px]">
                   <!-- Line 1: License Info -->
                   <div class="tw:flex tw:items-center tw:gap-2 tw:mb-2">
@@ -976,6 +976,7 @@ export default defineComponent({
       generateUsageDashboard,
       limitBreachAllowedCount,
       DOMPurify,
+      store,
     };
   },
 });

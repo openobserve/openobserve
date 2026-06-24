@@ -52,10 +52,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="destType in destinationTypes"
               :key="destType.value"
               :data-test="`destination-type-card-${destType.value}`"
-              class="destination-type-card tw:relative tw:flex tw:flex-col tw:items-center tw:justify-center tw:py-[20px] tw:px-3 tw:border-2 tw:border-[var(--o2-border)] tw:dark:border-[#424242] tw:rounded-xl tw:bg-white tw:dark:bg-[#1e1e1e] tw:cursor-pointer tw:[transition:all_0.3s_ease] tw:min-h-[120px] tw:hover:border-[var(--o2-border-color)] tw:hover:shadow-[0_4px_12px_rgba(25,118,210,0.15)] tw:hover:-translate-y-0.5 tw:dark:hover:border-[#5d9cec] tw:dark:hover:shadow-[0_4px_12px_rgba(93,156,236,0.2)]"
-              :class="{
-                selected: formData.destination_type === destType.value,
-              }"
+              class="destination-type-card tw:relative tw:flex tw:flex-col tw:items-center tw:justify-center tw:py-[20px] tw:px-3 tw:border-2 tw:rounded-xl tw:cursor-pointer tw:[transition:all_0.3s_ease] tw:min-h-[120px] tw:hover:-translate-y-0.5"
+              :class="[
+                { selected: formData.destination_type === destType.value },
+                store.state.theme === 'dark'
+                  ? 'tw:border-[#424242] tw:bg-[#1e1e1e] tw:hover:border-[#5d9cec] tw:hover:shadow-[0_4px_12px_rgba(93,156,236,0.2)]'
+                  : 'tw:border-[var(--o2-border)] tw:bg-white tw:hover:border-[var(--o2-border-color)] tw:hover:shadow-[0_4px_12px_rgba(25,118,210,0.15)]'
+              ]"
               @click="formData.destination_type = destType.value"
             >
               <img
@@ -369,7 +372,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </ol>
                 <div
                   v-if="connectionNotes.example"
-                  class="tw:mt-2 tw:p-2 tw:rounded-md tw:text-[13px] tw:bg-white tw:dark:bg-gray-600"
+                  class="tw:mt-2 tw:p-2 tw:rounded-md tw:text-[13px]"
+                  :class="store.state.theme === 'dark' ? 'tw:bg-gray-600' : 'tw:bg-white'"
                 >
                   <strong>Example:</strong>
                   <code class="tw:ml-1 tw:bg-transparent tw:p-0 tw:font-[Monaco,Menlo,'Ubuntu_Mono',monospace] tw:text-[#1976d2]">{{ connectionNotes.example }}</code>

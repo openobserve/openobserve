@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :placeholder="t('queries.search')"
               data-test="running-queries-search-input"
             />
-            <div v-else class="o2-select-input o2-input">
+            <div v-else class="o2-select-input o2-input tw:w-[250px]">
               <OSelect
                 v-model="filterQuery"
                 placeholder="Select option"
