@@ -57,7 +57,23 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Validate workflow_dispatch inputs before forwarding to the engine.
+  # Skipped for issue_comment events (no inputs to validate).
+  validate_inputs:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate pr_number is a positive integer
+        env:
+          PR_NUMBER: ${{ inputs.pr_number }}
+        run: |
+          if ! echo "$PR_NUMBER" | grep -qE '^[0-9]+$'; then
+            echo "::error::pr_number must be a positive integer, got: $PR_NUMBER"
+            exit 1
+          fi
+
   call-query-agent:
+    needs: [validate_inputs]
     # Manual dispatch: always run (restricted to repo write access by GitHub).
     # Comment: only if the commenter is on the allowlist AND the command matches.
     if: >
@@ -65,7 +81,7 @@ jobs:
       (github.event.issue.pull_request &&
        contains(fromJSON('["/query-agent","/qa-generate"]'), github.event.comment.body) &&
        contains(fromJSON('["bjp232004","hengfeiyang","prabhatsharma","uddhavdave","oasisk","haohuaijin","Subhra264","Loaki07","007harshmahajan","chaitanya-sistla","ktx-kirtan","omkarK06","ktx-vaidehi","ktx-abhay","neha00290","ktx-akshay","ktx-sadhna","nikhilsaikethe","YashodhanJoshi1","ktx-riya","mmosarafO2","Shrinath-O2","ktx-mihir"]'), github.actor))
-    uses: openobserve/o2-enterprise/.github/workflows/query-agent.yml@main
+    uses: openobserve/o2-enterprise/.github/workflows/query-agent.yml@cb74bab8b9da410f525f7931a9396ec8cd885665
     with:
       source_repo: openobserve
       # dispatch supplies pr_number directly; comment path uses the commented PR number.
@@ -74,7 +90,7 @@ jobs:
       generation_mode: ${{ github.event_name == 'workflow_dispatch' && (inputs.generation_mode || 'none') || (github.event.comment.body == '/qa-generate' && 'full' || 'none') }}
       # dry_run: dispatch honors the typed boolean; comment path always runs (not dry).
       dry_run: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || false }}
-      actor: ${{ github.event_name == 'workflow_dispatch' && github.actor || github.event.comment.user.login }}
+      actor: ${{ github.actor }}
     secrets:
       DEEPSEEK_API_KEY_E2E: ${{ secrets.DEEPSEEK_API_KEY_E2E }}
       ORG_ADMIN_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
