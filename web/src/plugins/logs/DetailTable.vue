@@ -243,7 +243,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :simple-mode="false"
                     /><LogsHighLighting
                       v-else
-                      :data="row.value"
+                      :data="getDisplayValue(row.field, row.value)"
                       :show-braces="false"
                       :query-string="highlightQuery"
                     /></pre>
@@ -429,6 +429,7 @@ import { getImageURL } from "../../utils/zincutils";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import { copyToClipboard } from "@/utils/clipboard";
+import { formatTimestamp } from "@/utils/date";
 import JsonPreview from "./JsonPreview.vue";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
@@ -848,6 +849,22 @@ export default defineComponent({
       return String(data).length;
     };
 
+    // Display-only: render the timestamp column in a human-readable format
+    // (same representation as the traces detail sidebar). The raw value is kept
+    // intact for include/exclude search terms and all other field actions.
+    const getDisplayValue = (field: string | number, value: any): any => {
+      if (
+        field === store.state.zoConfig.timestamp_column &&
+        value !== null &&
+        value !== undefined &&
+        value !== "" &&
+        !isNaN(Number(value))
+      ) {
+        return formatTimestamp(Number(value), "MMM DD, YYYY HH:mm:ss.SSS Z");
+      }
+      return value;
+    };
+
     return {
       t,
       store,
@@ -879,6 +896,7 @@ export default defineComponent({
       serviceStreamsEnabled,
       config,
       getContentSize,
+      getDisplayValue,
       getBtnLogo,
       regexIcon,
       createRegexPatternFromLogs,

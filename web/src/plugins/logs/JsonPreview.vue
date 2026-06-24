@@ -176,7 +176,7 @@
               :query-string="highlightQuery"
               :simple-mode="false" /><LogsHighLighting
               v-else
-              :data="value[key]"
+              :data="getDisplayValue(key, value[key])"
               :show-braces="false"
               :query-string="highlightQuery" /></span
           ><span v-if="index < Object.keys(value).length - 1">,</span>
@@ -270,6 +270,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { copyToClipboard } from "@/utils/clipboard";
+import { formatTimestamp } from "@/utils/date";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default {
@@ -886,6 +887,22 @@ export default {
       return String(data).length;
     };
 
+    // Display-only: render the timestamp column in a human-readable format
+    // (same representation as the traces detail sidebar). The raw value is kept
+    // intact for include/exclude search terms and all other field actions.
+    const getDisplayValue = (key: string, val: any): any => {
+      if (
+        key === store.state.zoConfig.timestamp_column &&
+        val !== null &&
+        val !== undefined &&
+        val !== "" &&
+        !isNaN(Number(val))
+      ) {
+        return formatTimestamp(Number(val), "MMM DD, YYYY HH:mm:ss.SSS Z");
+      }
+      return val;
+    };
+
     return {
       t,
       copyLogToClipboard,
@@ -933,6 +950,7 @@ export default {
       regexPatternType,
       confirmRegexPatternType,
       getContentSize,
+      getDisplayValue,
       getCrossLinksForField,
       openCrossLink,
     };
