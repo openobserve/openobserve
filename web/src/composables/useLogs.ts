@@ -808,6 +808,7 @@ const FTS_PRIORITY = ['body', 'body_msg', 'message', 'log', 'msg'];
 export const resolveDefaultColumns = (
   streamFields: Array<{ name: string; ftsKey: boolean }>,
   globalFtsKeys: string[],
+  hits?: Record<string, unknown>[],
 ): string[] => {
   const streamFieldNames = new Set(streamFields.map((f) => f.name));
   const streamFtsNames = streamFields
@@ -816,21 +817,33 @@ export const resolveDefaultColumns = (
 
   // Only include global FTS keys that actually exist in this stream's fields
   const globalFtsInStream = globalFtsKeys.filter((k) => streamFieldNames.has(k));
-  const allFtsNames = [...new Set([...streamFtsNames, ...globalFtsInStream])];
+  const candidates = [...new Set([...streamFtsNames, ...globalFtsInStream])];
 
-  if (allFtsNames.length === 0) return [];
+  if (candidates.length === 0) return [];
 
-  // Sort by priority list, then lexicographic for the rest
+  // When hits are available, pick the candidate with the highest fill rate
+  if (hits && hits.length > 0) {
+    let bestField = '';
+    let bestCount = -1;
+    for (const field of candidates) {
+      const count = hits.filter(
+        (h) => h[field] !== undefined && h[field] !== null && h[field] !== '',
+      ).length;
+      if (count > bestCount) {
+        bestCount = count;
+        bestField = field;
+      }
+    }
+    return bestField && bestCount > 0 ? [bestField] : [];
+  }
+
+  // No hits yet — fall back to static priority order
   const priorityIndex = (name: string) => {
     const idx = FTS_PRIORITY.indexOf(name);
     return idx === -1 ? FTS_PRIORITY.length : idx;
   };
 
-  const sorted = allFtsNames.sort(
-    (a, b) => priorityIndex(a) - priorityIndex(b),
-  );
-
-  // Return only the single best match to avoid showing multiple empty columns
+  const sorted = candidates.sort((a, b) => priorityIndex(a) - priorityIndex(b));
   return sorted.slice(0, 1);
 };
 
