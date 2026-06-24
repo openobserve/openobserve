@@ -134,7 +134,8 @@
     "discardChanges": "변경 내용 취소",
     "unsavedChanges": "저장되지 않은 변경 사항",
     "export": "익스포트",
-    "invalidEmail": "유효한 이메일 주소를 입력하십시오."
+    "invalidEmail": "유효한 이메일 주소를 입력하십시오.",
+    "nameMaxLength": "이름은 최대 {max} 자여야 합니다."
   },
   "search": {
     "selectIndex": "스트림 우선 선택",
@@ -958,7 +959,8 @@
     "passwordPolicyHint": "암호는 8~128자여야 하며 소문자 1개, 대문자 1개, 숫자 1개, 특수 문자 1개를 포함해야 합니다.",
     "currentPasswordRequired": "현재 암호가 필요합니다.",
     "newPasswordRequired": "새 암호가 필요합니다.",
-    "otherOrgInvalid": "조직 이름은 문자로 시작하고 영숫자, _ 또는 -여야 합니다."
+    "otherOrgInvalid": "조직 이름은 문자로 시작하고 영숫자, _ 또는 -여야 합니다.",
+    "inviteEmailInvalid": "올바른 이메일 ID를 입력하십시오."
   },
   "ticket": {
     "header": "지원 티켓",

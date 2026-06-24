@@ -134,7 +134,8 @@
     "discardChanges": "Änderungen verwerfen",
     "unsavedChanges": "Ungespeicherte Änderungen",
     "export": "Exportieren",
-    "invalidEmail": "Bitte geben Sie eine gültige E-Mail-Adresse ein."
+    "invalidEmail": "Bitte geben Sie eine gültige E-Mail-Adresse ein.",
+    "nameMaxLength": "Der Name darf aus maximal {max} Zeichen bestehen."
   },
   "search": {
     "selectIndex": "Wählen Sie Zuerst streamen",
@@ -958,7 +959,8 @@
     "passwordPolicyHint": "Das Passwort muss aus 8 bis 128 Zeichen bestehen und mindestens einen Kleinbuchstaben, einen Großbuchstaben, eine Ziffer und ein Sonderzeichen enthalten.",
     "currentPasswordRequired": "Das aktuelle Passwort ist erforderlich.",
     "newPasswordRequired": "Ein neues Passwort ist erforderlich.",
-    "otherOrgInvalid": "Der Name der Organisation muss mit einem Buchstaben beginnen und alphanumerisch, _ oder -, sein."
+    "otherOrgInvalid": "Der Name der Organisation muss mit einem Buchstaben beginnen und alphanumerisch, _ oder -, sein.",
+    "inviteEmailInvalid": "Bitte geben Sie die richtige E-Mail-ID ein."
   },
   "ticket": {
     "header": "Tickets für den Support",

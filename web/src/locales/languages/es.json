@@ -134,7 +134,8 @@
     "discardChanges": "Descartar cambios",
     "unsavedChanges": "Cambios no guardados",
     "export": "Exportación",
-    "invalidEmail": "Introduce una dirección de correo electrónico válida."
+    "invalidEmail": "Introduce una dirección de correo electrónico válida.",
+    "nameMaxLength": "El nombre debe tener como máximo {max} caracteres."
   },
   "search": {
     "selectIndex": "Selecciona el índice primero",
@@ -958,7 +959,8 @@
     "passwordPolicyHint": "La contraseña debe tener entre 8 y 128 caracteres y contener al menos una letra minúscula, una mayúscula, un dígito y un carácter especial.",
     "currentPasswordRequired": "Se requiere la contraseña actual.",
     "newPasswordRequired": "Se requiere una nueva contraseña.",
-    "otherOrgInvalid": "El nombre de la organización debe empezar por una letra y ser alfanumérico, _ o -."
+    "otherOrgInvalid": "El nombre de la organización debe empezar por una letra y ser alfanumérico, _ o -.",
+    "inviteEmailInvalid": "Ingresa la dirección de correo electrónico correcta."
   },
   "ticket": {
     "header": "Tickets de soporte",

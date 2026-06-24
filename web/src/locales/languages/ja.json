@@ -134,7 +134,8 @@
     "discardChanges": "変更を破棄",
     "unsavedChanges": "未保存の変更",
     "export": "[エクスポート]",
-    "invalidEmail": "有効なEメールアドレスを入力してください。"
+    "invalidEmail": "有効なEメールアドレスを入力してください。",
+    "nameMaxLength": "名前は最大 {max} 文字でなければなりません。"
   },
   "search": {
     "metrics": "メトリクス",
@@ -958,7 +959,8 @@
     "passwordPolicyHint": "パスワードは 8 ～ 128 文字で、少なくとも 1 つの小文字、1 つの大文字、1 つの数字、1 つの特殊文字を含む必要があります。",
     "currentPasswordRequired": "現在のパスワードが必要です。",
     "newPasswordRequired": "新しいパスワードが必要です。",
-    "otherOrgInvalid": "組織名は文字で始まり、英数字、_ または-でなければなりません。"
+    "otherOrgInvalid": "組織名は文字で始まり、英数字、_ または-でなければなりません。",
+    "inviteEmailInvalid": "正しい電子メール ID を入力してください。"
   },
   "serviceAccounts": {
     "header": "サービスアカウント",

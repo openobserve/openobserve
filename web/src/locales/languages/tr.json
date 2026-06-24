@@ -134,7 +134,8 @@
     "discardChanges": "Değişiklikleri iptal et",
     "unsavedChanges": "Kaydedilmemiş değişiklikler",
     "export": "İhracat",
-    "invalidEmail": "Lütfen geçerli bir e-posta adresi girin."
+    "invalidEmail": "Lütfen geçerli bir e-posta adresi girin.",
+    "nameMaxLength": "İsim en fazla {max} karakter olmalıdır."
   },
   "search": {
     "selectIndex": "Önce Yayınla Seçin",
@@ -958,7 +959,8 @@
     "passwordPolicyHint": "Şifre 8-128 karakter olmalı ve en az bir küçük harf, bir büyük harf, bir basamak ve bir özel karakter içermelidir.",
     "currentPasswordRequired": "Geçerli şifre gereklidir.",
     "newPasswordRequired": "Yeni şifre gereklidir.",
-    "otherOrgInvalid": "Kuruluş adı bir harfle başlamalı ve alfasayısal, _ veya - olmalıdır."
+    "otherOrgInvalid": "Kuruluş adı bir harfle başlamalı ve alfasayısal, _ veya - olmalıdır.",
+    "inviteEmailInvalid": "Lütfen doğru e-posta kimliğini girin."
   },
   "ticket": {
     "header": "Destek Talepleri",

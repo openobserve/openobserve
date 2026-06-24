@@ -134,7 +134,8 @@
     "discardChanges": "Descartar alterações",
     "unsavedChanges": "Alterações não salvas",
     "export": "Exportar",
-    "invalidEmail": "Por favor, insira um endereço de e-mail válido."
+    "invalidEmail": "Por favor, insira um endereço de e-mail válido.",
+    "nameMaxLength": "O nome deve ter no máximo {max} caracteres."
   },
   "search": {
     "selectIndex": "Selecione Stream First",
@@ -958,7 +959,8 @@
     "passwordPolicyHint": "A senha deve ter de 8 a 128 caracteres e conter pelo menos uma letra minúscula, uma letra maiúscula, um dígito e um caractere especial.",
     "currentPasswordRequired": "A senha atual é obrigatória.",
     "newPasswordRequired": "É necessária uma nova senha.",
-    "otherOrgInvalid": "O nome da organização deve começar com uma letra e ser alfanumérico, _ ou -."
+    "otherOrgInvalid": "O nome da organização deve começar com uma letra e ser alfanumérico, _ ou -.",
+    "inviteEmailInvalid": "Insira o ID de e-mail correto."
   },
   "ticket": {
     "header": "Tickets de suporte",

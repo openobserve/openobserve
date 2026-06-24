@@ -134,7 +134,8 @@
     "discardChanges": "Wijzigingen negeren",
     "unsavedChanges": "Niet opgeslagen wijzigingen",
     "export": "Exporteren",
-    "invalidEmail": "Voer een geldig e-mailadres in."
+    "invalidEmail": "Voer een geldig e-mailadres in.",
+    "nameMaxLength": "De naam moet uit maximaal {max} tekens bestaan."
   },
   "search": {
     "selectIndex": "Selecteer eerst Stream",
@@ -958,7 +959,8 @@
     "passwordPolicyHint": "Het wachtwoord moet 8-128 tekens lang zijn en minstens één kleine letter, één hoofdletter, één cijfer en één speciaal teken bevatten.",
     "currentPasswordRequired": "Het huidige wachtwoord is vereist.",
     "newPasswordRequired": "Een nieuw wachtwoord is vereist.",
-    "otherOrgInvalid": "De naam van de organisatie moet beginnen met een letter en alfanumeriek zijn, _ of -."
+    "otherOrgInvalid": "De naam van de organisatie moet beginnen met een letter en alfanumeriek zijn, _ of -.",
+    "inviteEmailInvalid": "Voer het juiste e-mailadres in."
   },
   "ticket": {
     "header": "Tickets voor ondersteuning",

@@ -134,7 +134,8 @@
     "discardChanges": "放弃更改",
     "unsavedChanges": "未保存的更改",
     "export": "出口",
-    "invalidEmail": "请输入有效的电子邮件地址。"
+    "invalidEmail": "请输入有效的电子邮件地址。",
+    "nameMaxLength": "名称必须最多 {max} 个字符。"
   },
   "search": {
     "selectIndex": "选择数据流",
@@ -958,7 +959,8 @@
     "passwordPolicyHint": "密码必须为 8-128 个字符，并且至少包含一个小写字母、一个大写字母、一个数字和一个特殊字符。",
     "currentPasswordRequired": "当前密码为必填项。",
     "newPasswordRequired": "需要新密码。",
-    "otherOrgInvalid": "组织名称必须以字母开头，并且必须是字母数字、_ 或-。"
+    "otherOrgInvalid": "组织名称必须以字母开头，并且必须是字母数字、_ 或-。",
+    "inviteEmailInvalid": "请输入正确的电子邮件 ID。"
   },
   "ticket": {
     "header": "工单",
