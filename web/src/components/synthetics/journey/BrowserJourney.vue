@@ -25,7 +25,6 @@ const emit = defineEmits<{
 // ── Filter / expand state ──────────────────────────────────────────────────
 const filterQuery = ref('')
 const expandedSteps = ref<Set<string>>(new Set())
-const collapsedGroups = ref<Set<number>>(new Set())
 
 // ── Recording state ────────────────────────────────────────────────────────
 // All Chrome-extension messaging lives in the composable; this component only
@@ -66,44 +65,17 @@ onMounted(() => {
 
 onUnmounted(() => recorder.cleanup())
 
-// ── Step grouping ──────────────────────────────────────────────────────────
-interface PageGroup {
-  pageIndex: number
-  navigateUrl: string
-  steps: { step: BrowserStep; originalIndex: number }[]
-}
-
-const pageGroups = computed<PageGroup[]>(() => {
-  const groups: PageGroup[] = []
-  let currentGroup: PageGroup | null = null
-  let pageIndex = 0
-
-  for (let i = 0; i < props.modelValue.length; i++) {
-    const step = props.modelValue[i]
-    if (step.action === 'navigate' || currentGroup === null) {
-      currentGroup = { pageIndex, navigateUrl: step.action === 'navigate' ? (step.value ?? '') : '', steps: [] }
-      groups.push(currentGroup)
-      pageIndex++
-    }
-    currentGroup.steps.push({ step, originalIndex: i })
-  }
-  return groups
-})
-
-const filteredGroups = computed<PageGroup[]>(() => {
-  if (!filterQuery.value.trim()) return pageGroups.value
-  const q = filterQuery.value.toLowerCase()
-  return pageGroups.value
-    .map((group) => ({
-      ...group,
-      steps: group.steps.filter(({ step }) =>
-        (step.name?.toLowerCase().includes(q)) ||
-        step.action.toLowerCase().includes(q) ||
-        (step.selector?.toLowerCase().includes(q)) ||
-        (step.value?.toLowerCase().includes(q))
-      ),
-    }))
-    .filter((group) => group.steps.length > 0)
+// ── Step list (single flat list — one journey, one start URL) ───────────────
+const filteredSteps = computed<{ step: BrowserStep; originalIndex: number }[]>(() => {
+  const indexed = props.modelValue.map((step, originalIndex) => ({ step, originalIndex }))
+  const q = filterQuery.value.trim().toLowerCase()
+  if (!q) return indexed
+  return indexed.filter(({ step }) =>
+    (step.name?.toLowerCase().includes(q)) ||
+    step.action.toLowerCase().includes(q) ||
+    (step.selector?.toLowerCase().includes(q)) ||
+    (step.value?.toLowerCase().includes(q))
+  )
 })
 
 const allExpanded = computed(() =>
@@ -112,12 +84,6 @@ const allExpanded = computed(() =>
 
 function toggleExpandAll() {
   expandedSteps.value = allExpanded.value ? new Set() : new Set(props.modelValue.map((s) => s.id))
-}
-
-function toggleGroupCollapse(pageIndex: number) {
-  const next = new Set(collapsedGroups.value)
-  next.has(pageIndex) ? next.delete(pageIndex) : next.add(pageIndex)
-  collapsedGroups.value = next
 }
 
 function isStepExpanded(id: string) { return expandedSteps.value.has(id) }
@@ -158,12 +124,12 @@ function duplicateCapturedStep(index: number, step: BrowserStep) {
     <!-- Toolbar — adapts in-place to recording state, no layout shift -->
     <div class="tw:flex tw:items-center tw:gap-2 tw:mb-3">
       <!-- Normal: label + filter + step actions -->
-      <h3 class="tw:text-base tw:font-semibold tw:text-[var(--o2-text-heading)] tw:m-0">Journey</h3>
+      <h3 class="tw:text-base tw:font-semibold tw:text-[var(--o2-text-heading)] tw:mr-0">Steps</h3>
       <OBadge variant="default" size="sm">{{ modelValue.length }}</OBadge>
       <OInput
         v-model="filterQuery"
         placeholder="Filter steps..."
-        class="tw:w-48"
+        class="tw:w-48 tw:ml-6!"
         data-test="synthetics-journey-filter-input"
       />
       <span class="tw:flex-1" aria-hidden="true" />
@@ -254,34 +220,20 @@ function duplicateCapturedStep(index: number, step: BrowserStep) {
         <OButton variant="outline" size="sm" @click="addStep">Add a step manually</OButton>
       </div>
     </div>
-    <!-- Step list grouped by page -->
+    <!-- Step list — single flat list -->
     <div v-else class="tw:flex tw:flex-col tw:gap-1">
-      <template v-for="group in filteredGroups" :key="group.pageIndex">
-        <button
-          type="button"
-          class="tw:flex tw:items-center tw:gap-2 tw:py-1 tw:px-2 tw:bg-[var(--o2-bg-subtle)] tw:rounded tw:text-xs tw:font-medium tw:text-[var(--o2-text-secondary)] tw:mb-1 tw:cursor-pointer tw:w-full tw:text-left tw:border-0"
-          @click="toggleGroupCollapse(group.pageIndex)"
-        >
-          <OIcon :name="collapsedGroups.has(group.pageIndex) ? 'chevron-right' : 'expand-more'" size="sm" aria-hidden="true" />
-          <span>PAGE {{ group.pageIndex + 1 }}</span>
-          <span v-if="group.navigateUrl" class="tw:truncate tw:max-w-[16rem] tw:text-[var(--o2-text-muted)]">{{ group.navigateUrl }}</span>
-          <OBadge variant="default" size="sm">{{ group.steps.length }}</OBadge>
-        </button>
-        <template v-if="!collapsedGroups.has(group.pageIndex)">
-          <BrowserJourneyStep
-            v-for="{ step, originalIndex } in group.steps"
-            :key="step.id"
-            :step="step"
-            :index="originalIndex"
-            :expanded="isStepExpanded(step.id)"
-            @update:step="updateStep(originalIndex, $event)"
-            @update:expanded="setStepExpanded(step.id, $event)"
-            @delete="deleteStep(originalIndex)"
-            @duplicate="duplicateStep(originalIndex)"
-            @insert-below="insertStepBelow(originalIndex)"
-          />
-        </template>
-      </template>
+      <BrowserJourneyStep
+        v-for="{ step, originalIndex } in filteredSteps"
+        :key="step.id"
+        :step="step"
+        :index="originalIndex"
+        :expanded="isStepExpanded(step.id)"
+        @update:step="updateStep(originalIndex, $event)"
+        @update:expanded="setStepExpanded(step.id, $event)"
+        @delete="deleteStep(originalIndex)"
+        @duplicate="duplicateStep(originalIndex)"
+        @insert-below="insertStepBelow(originalIndex)"
+      />
     </div>
   </div>
 </template>
