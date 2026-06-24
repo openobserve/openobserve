@@ -43,6 +43,7 @@ pub mod session;
 pub mod short_url;
 pub mod sql;
 pub mod stream;
+pub mod synthetics;
 pub mod system_settings;
 pub mod timed_annotations;
 pub mod triggers;
