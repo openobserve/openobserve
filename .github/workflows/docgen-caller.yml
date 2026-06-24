@@ -67,5 +67,7 @@ jobs:
       dry_run: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || github.event.comment.body == '/docgen-dryrun' }}
       actor: ${{ github.event_name == 'workflow_dispatch' && github.actor || github.event.comment.user.login }}
     secrets:
-      DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+      # OSS holds the DeepSeek key as DEEPSEEK_API_KEY_E2E; forward it under the engine's
+      # (renamed) DEEPSEEK_API_KEY_E2E input. Both repos now standardize on this name.
+      DEEPSEEK_API_KEY_E2E: ${{ secrets.DEEPSEEK_API_KEY_E2E }}
       CROSS_REPO_TOKEN: ${{ secrets.E2E_DEV_CI_TOKEN }}
