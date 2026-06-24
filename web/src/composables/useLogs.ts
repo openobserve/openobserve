@@ -809,11 +809,14 @@ export const resolveDefaultColumns = (
   streamFields: Array<{ name: string; ftsKey: boolean }>,
   globalFtsKeys: string[],
 ): string[] => {
+  const streamFieldNames = new Set(streamFields.map((f) => f.name));
   const streamFtsNames = streamFields
     .filter((f) => f.ftsKey)
     .map((f) => f.name);
 
-  const allFtsNames = [...new Set([...streamFtsNames, ...globalFtsKeys])];
+  // Only include global FTS keys that actually exist in this stream's fields
+  const globalFtsInStream = globalFtsKeys.filter((k) => streamFieldNames.has(k));
+  const allFtsNames = [...new Set([...streamFtsNames, ...globalFtsInStream])];
 
   if (allFtsNames.length === 0) return [];
 

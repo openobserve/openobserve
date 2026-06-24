@@ -2771,11 +2771,21 @@ describe('resolveDefaultColumns', () => {
     expect(result[0]).toBe('body');
   });
 
-  it('falls back to global fts keys if stream has none', () => {
-    const streamFields = [{ name: 'pod_name', ftsKey: false }];
+  it('includes global fts keys that exist in the stream even if not marked ftsKey', () => {
+    const streamFields = [
+      { name: 'pod_name', ftsKey: false },
+      { name: 'message', ftsKey: false },
+    ];
     const globalFtsKeys = ['message'];
     const result = resolveDefaultColumns(streamFields, globalFtsKeys);
     expect(result).toEqual(['message']);
+  });
+
+  it('excludes global fts keys that do not exist in the stream', () => {
+    const streamFields = [{ name: 'pod_name', ftsKey: false }];
+    const globalFtsKeys = ['message'];
+    const result = resolveDefaultColumns(streamFields, globalFtsKeys);
+    expect(result).toEqual([]);
   });
 
   it('returns empty array when no fts keys found', () => {
