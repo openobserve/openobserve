@@ -105,78 +105,11 @@
     />
 
     <!-- ── PRIVATE LOCATIONS ── -->
-    <template v-else-if="activeTab === 'private'">
-      <div class="pl-root">
-        <div class="pl-grid">
-          <OCard v-for="loc in privateLocations" :key="loc.id" class="pl-card">
-            <div class="pl-card-header">
-              <div style="display:flex;align-items:center;gap:8px">
-                <span class="dot" :class="loc.status==='Online'?'dot--up':'dot--down'" style="width:8px;height:8px;box-shadow:none" />
-                <span class="pl-card-title">{{ loc.name }}</span>
-              </div>
-              <div style="display:flex;align-items:center;gap:2px">
-                <OButton variant="ghost" size="icon" title="Edit"><OIcon name="edit" size="sm" /></OButton>
-                <OButton variant="destructive" size="icon" title="Remove"><OIcon name="delete" size="sm" /></OButton>
-              </div>
-            </div>
-            <div class="pl-card-region"><OIcon name="location-on" size="xs" class="pl-icon-muted" />{{ loc.region }}</div>
-            <div style="display:flex;align-items:center;gap:6px">
-              <span class="pl-status-chip" :class="loc.status==='Online'?'chip-g':'chip-r'">{{ loc.status }}</span>
-              <span class="pl-ver">v{{ loc.version }}</span>
-            </div>
-            <div class="pl-divider" />
-            <div class="pl-stats">
-              <div class="pl-stat"><div class="pl-stat-val">{{ loc.monitors }}</div><div class="pl-stat-label">Monitors</div></div>
-              <div class="pl-stat-sep" />
-              <div class="pl-stat"><div class="pl-stat-val">{{ loc.workers }}</div><div class="pl-stat-label">Workers</div></div>
-              <div class="pl-stat-sep" />
-              <div class="pl-stat"><div class="pl-stat-val">{{ loc.checks }}</div><div class="pl-stat-label">Checks/min</div></div>
-            </div>
-            <div class="pl-last-seen"><OIcon name="schedule" size="xs" class="pl-icon-muted" />Last seen {{ loc.lastSeen }}</div>
-          </OCard>
-
-          <OCard class="pl-card pl-card--add">
-            <OIcon name="add-circle" size="lg" class="pl-icon-muted" />
-            <div style="font-size:13px;font-weight:600;margin-top:10px">Add private location</div>
-            <div style="font-size:11px;color:var(--o2-tab-text-color);margin-top:4px;text-align:center;line-height:1.5">Run checks from your servers, VPC, or on-premise network</div>
-            <OButton variant="primary" size="sm" class="tw:mt-3">Get started</OButton>
-          </OCard>
-        </div>
-
-        <div class="pl-guide">
-          <div class="pl-guide-header"><OIcon name="code" size="sm" class="pl-icon-primary" />Setting up a private location agent</div>
-          <div class="pl-guide-steps">
-            <div class="pl-guide-step">
-              <div class="pl-step-num">1</div>
-              <div class="pl-step-body">
-                <div class="pl-step-title">Deploy the agent</div>
-                <div class="pl-step-desc">Run the container on any machine in your network — Docker, Kubernetes, or native binary.</div>
-                <OCodeBlock
-                  :code="dockerInstallCmd"
-                  lang="bash"
-                  chrome="editor"
-                  filename="Docker"
-                />
-              </div>
-            </div>
-            <div class="pl-guide-step">
-              <div class="pl-step-num">2</div>
-              <div class="pl-step-body">
-                <div class="pl-step-title">Register the location</div>
-                <div class="pl-step-desc">Click <strong>Add Location</strong>, give it a name, and paste the API key printed by the agent on first start.</div>
-              </div>
-            </div>
-            <div class="pl-guide-step">
-              <div class="pl-step-num">3</div>
-              <div class="pl-step-body">
-                <div class="pl-step-title">Assign to monitors</div>
-                <div class="pl-step-desc">Select this location when creating or editing any monitor. Checks will run from your own infrastructure.</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </template>
+    <PrivateLocations
+      v-else-if="activeTab === 'private'"
+      :locations="privateLocations"
+      data-test="synthetic-monitoring-private-locations"
+    />
 
 
     <!-- Map dot tooltip -->
@@ -775,9 +708,8 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
 import OStep from "@/lib/navigation/Stepper/OStep.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
-import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
-import OCard from "@/lib/core/Card/OCard.vue";
 import MonitorTable from "@/components/synthetic-monitoring/MonitorTable.vue";
+import PrivateLocations, { type PrivateLocation } from '@/components/synthetic-monitoring/PrivateLocations.vue'
 
 const router = useRouter();
 
@@ -790,11 +722,6 @@ const monitorTypeBadgeVariant = (type: string): string => {
   };
   return map[type.toUpperCase()] ?? "default-soft";
 };
-
-const dockerInstallCmd = `docker run -d \\
-  -e O2_PRIVATE_LOC_KEY=<your_key> \\
-  -e O2_ENDPOINT=https://your-openobserve-host \\
-  openobserve/syn-agent:latest`;
 
 const activeTab      = ref("monitors");
 const monitorTableMode = computed(() => activeTab.value as 'monitors' | 'browser' | 'api');
@@ -1313,7 +1240,7 @@ const monitors = ref([
 const browserMonitors = computed(() => monitors.value.filter(m=>m.type==="Browser").map(m=>({...m,steps:[3,7,4,5,4][m.id%5]})));
 const apiMonitors     = computed(() => monitors.value.filter(m=>m.type==="API").map(m=>({...m,method:"GET",assertions:3})));
 
-const privateLocations = ref([
+const privateLocations = ref<PrivateLocation[]>([
   { id:1, name:"Corp HQ",        region:"New York, US",  status:"Online",  monitors:12, workers:2, checks:36, version:"1.4.2", lastSeen:"5s ago" },
   { id:2, name:"EU Data Center", region:"Frankfurt, DE", status:"Online",  monitors:8,  workers:3, checks:24, version:"1.4.2", lastSeen:"2s ago" },
   { id:3, name:"APAC Office",    region:"Singapore",     status:"Offline", monitors:4,  workers:1, checks:0,  version:"1.3.9", lastSeen:"2h ago" },
@@ -1379,37 +1306,6 @@ const saveMonitor = () => { showDrawer.value=false; };
 .mono { font-family:monospace; font-size:13px; font-weight:600; }
 .c-g  { color:#16a34a; } .c-a { color:#d97706; } .c-r { color:#dc2626; }
 
-/* ── PRIVATE LOCATIONS ── */
-.pl-root    { flex:1; overflow-y:auto; padding:16px 20px 24px; }
-.pl-grid    { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:14px; margin-bottom:20px; }
-.pl-card    { border:1px solid var(--o2-border-color); border-radius:10px; padding:18px; display:flex; flex-direction:column; gap:8px; }
-.pl-card--add { border-style:dashed; align-items:center; justify-content:center; min-height:160px; cursor:pointer; text-align:center; transition:background .12s; }
-.pl-card--add:hover { background:rgba(128,128,128,.06); }
-.pl-card-header { display:flex; align-items:center; justify-content:space-between; }
-.pl-card-title  { font-size:14px; font-weight:700; }
-.pl-card-region { display:flex; align-items:center; gap:4px; font-size:12px; color:var(--o2-tab-text-color); }
-.pl-status-chip { font-size:11px; font-weight:700; padding:2px 8px; border-radius:5px; }
-.chip-g { background:#dcfce7; color:#15803d; }
-.chip-r { background:#fee2e2; color:#dc2626; }
-.body--dark .chip-g { background:#052e16; color:#4ade80; }
-.body--dark .chip-r { background:#450a0a; color:#f87171; }
-.pl-ver { font-size:11px; padding:2px 7px; background:rgba(128,128,128,.15); border-radius:4px; font-family:monospace; color:var(--o2-tab-text-color); }
-.pl-divider { height:1px; background:var(--o2-border-color); }
-.pl-stats   { display:grid; grid-template-columns:1fr auto 1fr auto 1fr; align-items:center; }
-.pl-stat    { display:flex; flex-direction:column; gap:2px; }
-.pl-stat-val   { font-size:17px; font-weight:800; line-height:1.1; }
-.pl-stat-label { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--o2-tab-text-color); }
-.pl-stat-sep   { width:1px; height:28px; background:var(--o2-border-color); margin:0 10px; }
-.pl-last-seen  { display:flex; align-items:center; gap:5px; font-size:11px; color:var(--o2-tab-text-color); }
-
-.pl-guide        { background:var(--o2-card-background); border:1px solid var(--o2-border-color); border-radius:10px; padding:20px 22px; }
-.pl-guide-header { display:flex; align-items:center; gap:8px; font-size:13px; font-weight:700; margin-bottom:18px; }
-.pl-guide-steps  { display:flex; flex-direction:column; gap:18px; }
-.pl-guide-step   { display:flex; gap:14px; }
-.pl-step-num     { width:24px; height:24px; border-radius:50%; background:var(--o2-primary-color); color:var(--o2-text-inverse); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; flex-shrink:0; margin-top:1px; }
-.pl-step-body    { flex:1; }
-.pl-step-title   { font-size:13px; font-weight:700; margin-bottom:3px; }
-.pl-step-desc    { font-size:12px; color:var(--o2-tab-text-color); line-height:1.5; }
 /* ── DRAWER ── */
 .drw-slabel { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:var(--o2-tab-text-color); margin-bottom:12px; }
 .drw-footer { display:flex; align-items:center; justify-content:space-between; padding:12px 22px; border-top:1px solid var(--o2-border-color); flex-shrink:0; }
@@ -1567,8 +1463,6 @@ const saveMonitor = () => { showDrawer.value=false; };
 
 
 /* ── ICON COLOR HELPERS ── */
-.pl-icon-muted   { color:var(--o2-tab-text-color); flex-shrink:0; }
-.pl-icon-primary { color:var(--o2-primary-color); flex-shrink:0; }
 .type-icon--on   { color:var(--o2-primary-color); }
 .type-icon--off  { color:rgba(128,128,128,.7); }
 .type-check      { color:var(--o2-primary-color); flex-shrink:0; }
