@@ -47,13 +47,13 @@
         ],
         "results": [
           [
-            "ZONE-2",
+            "ZONE-1",
             "4",
             "2",
             "50.0"
           ],
           [
-            "ZONE-1",
+            "ZONE-2",
             "4",
             "2",
             "50.0"
@@ -695,15 +695,15 @@
         ],
         "results": [
           [
-            "LANE-B",
-            "ZONE-1",
+            "LANE-C",
+            "ZONE-2",
             "4",
             "3.5",
             "0.5"
           ],
           [
-            "LANE-C",
-            "ZONE-2",
+            "LANE-B",
+            "ZONE-1",
             "4",
             "3.5",
             "0.5"
@@ -1242,14 +1242,14 @@
             "258.0"
           ],
           [
-            "ZONE-3",
-            "3",
-            "94.0"
-          ],
-          [
             "ZONE-2",
             "3",
             "620.0"
+          ],
+          [
+            "ZONE-3",
+            "3",
+            "94.0"
           ]
         ],
         "results_mode": "rowsort"
@@ -1286,7 +1286,8 @@
           "dependency",
           "statuscode"
         ],
-        "note": "Subquery in FROM with regexp named groups, str_match_ignore_case"
+        "note": "Subquery in FROM with regexp named groups, str_match_ignore_case",
+        "skip_sqllogictest": true
       },
       "time_offset": {
         "start_offset": 9539000000,
@@ -1409,15 +1410,6 @@
             "26.3"
           ],
           [
-            "ZONE-3",
-            "SORT-X1",
-            "manual",
-            "2",
-            "437.5",
-            "72.8",
-            "19.2"
-          ],
-          [
             "ZONE-4",
             "SORT-A7",
             "auto",
@@ -1425,6 +1417,15 @@
             "437.5",
             "45.3",
             "32.5"
+          ],
+          [
+            "ZONE-3",
+            "SORT-X1",
+            "manual",
+            "2",
+            "437.5",
+            "72.8",
+            "19.2"
           ],
           [
             "ZONE-4",
@@ -1763,12 +1764,12 @@
             "1"
           ],
           [
-            "ConfigurationException: missing facility_zone ZONE-3 override",
+            "ResourceExhaustedException: sorter_model SORT-M3 queue full",
             "1",
             "1"
           ],
           [
-            "ResourceExhaustedException: sorter_model SORT-M3 queue full",
+            "ConfigurationException: missing facility_zone ZONE-3 override",
             "1",
             "1"
           ]
@@ -2158,12 +2159,12 @@
           ],
           [
             "performanceMetric",
-            "cartPage",
+            "checkoutPage",
             "1"
           ],
           [
             "performanceMetric",
-            "checkoutPage",
+            "cartPage",
             "1"
           ]
         ],
@@ -2287,16 +2288,16 @@
         ],
         "results": [
           [
-            "checkoutPage",
-            "1",
-            "1",
-            "567.0"
-          ],
-          [
             "itemPage",
             "2",
             "1",
             "89.0"
+          ],
+          [
+            "checkoutPage",
+            "1",
+            "1",
+            "567.0"
           ]
         ],
         "results_mode": "rowsort"
@@ -2944,16 +2945,16 @@
         ],
         "results": [
           [
-            "warehouse-south",
-            "2",
-            "45.0",
-            "2"
-          ],
-          [
             "warehouse-west",
             "2",
             "15.0",
             "0"
+          ],
+          [
+            "warehouse-south",
+            "2",
+            "45.0",
+            "2"
           ],
           [
             "warehouse-east",
@@ -2962,15 +2963,15 @@
             "0"
           ],
           [
-            "warehouse-north",
-            "1",
-            "12.0",
-            "1"
-          ],
-          [
             "warehouse-central",
             "1",
             "230.0",
+            "1"
+          ],
+          [
+            "warehouse-north",
+            "1",
+            "12.0",
             "1"
           ]
         ],
@@ -3769,6 +3770,1562 @@
         ],
         "results_mode": "rowsort",
         "skip_sqllogictest": true
+      }
+    },
+    {
+      "id": "Q757",
+      "sql": "WITH cte1 AS (SELECT _timestamp, facility_zone, operation_mode, throughput_rate, load_factor FROM \"{stream}\" WHERE throughput_rate > 100), cte2 AS (SELECT cte1.*, AVG(cte1.throughput_rate) OVER (PARTITION BY cte1.facility_zone) AS zone_avg FROM cte1), cte3 AS (SELECT *, CASE WHEN throughput_rate > zone_avg THEN 'above_avg' ELSE 'below_avg' END AS perf_tier FROM cte2) SELECT perf_tier, COUNT(*) AS cnt, AVG(throughput_rate) AS avg_rate, AVG(load_factor) AS avg_load FROM cte3 GROUP BY perf_tier ORDER BY cnt DESC",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 45359000000,
+        "end_offset": 45433000000
+      },
+      "expected": {
+        "columns": [
+          "perf_tier",
+          "cnt",
+          "avg_rate",
+          "avg_load"
+        ],
+        "results": [
+          [
+            "below_avg",
+            "4",
+            "558.75",
+            "66.425"
+          ],
+          [
+            "above_avg",
+            "3",
+            "720.0",
+            "29.133333333333336"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q758",
+      "sql": "WITH base AS (SELECT * FROM \"{stream}\" WHERE latency_ms IS NOT NULL), ranked AS (SELECT *, ROW_NUMBER() OVER (PARTITION BY component_name ORDER BY latency_ms DESC) AS rn FROM base), top3 AS (SELECT component_name, latency_ms, rn FROM ranked WHERE rn <= 3) SELECT component_name, AVG(latency_ms) AS avg_top3_lat, COUNT(*) AS top3_cnt FROM top3 GROUP BY component_name ORDER BY avg_top3_lat DESC",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 45419000000,
+        "end_offset": 45493000000
+      },
+      "expected": {
+        "columns": [
+          "component_name",
+          "avg_top3_lat",
+          "top3_cnt"
+        ],
+        "results": [
+          [
+            "temp-regulator",
+            "3200.0",
+            "1"
+          ],
+          [
+            "sorter-engine",
+            "1900.0",
+            "1"
+          ],
+          [
+            "lane-monitor",
+            "567.0",
+            "2"
+          ],
+          [
+            "pallet-mapper",
+            "89.0",
+            "1"
+          ],
+          [
+            "charge-checker",
+            "78.0",
+            "2"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q759",
+      "sql": "WITH cte1 AS (SELECT facility_zone, AVG(throughput_rate) AS avg_rate, AVG(load_factor) AS avg_load FROM \"{stream}\" GROUP BY facility_zone), cte2 AS (SELECT facility_zone, AVG(throughput_rate) AS avg_rate2 FROM \"{stream2}\" GROUP BY facility_zone), cte3 AS (SELECT c1.facility_zone, c1.avg_rate, c1.avg_load, c2.avg_rate2, c1.avg_rate / NULLIF(c2.avg_rate2, 0) AS ratio FROM cte1 c1 LEFT JOIN cte2 c2 ON c1.facility_zone = c2.facility_zone) SELECT * FROM cte3 ORDER BY ratio DESC NULLS LAST",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 45479000000,
+        "end_offset": 45553000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "avg_rate",
+          "avg_load",
+          "avg_rate2",
+          "ratio"
+        ],
+        "results": [
+          [
+            "ZONE-3",
+            "610.0",
+            "81.25",
+            "320.0",
+            "1.90625"
+          ],
+          [
+            "ZONE-2",
+            "335.0",
+            "54.75",
+            "315.0",
+            "1.0634920634920635"
+          ],
+          [
+            "ZONE-1",
+            "610.0",
+            "81.25",
+            "755.0",
+            "0.8079470198675497"
+          ],
+          [
+            "ZONE-4",
+            "150.0",
+            "45.3",
+            "315.0",
+            "0.47619047619047616"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q760",
+      "sql": "SELECT facility_zone, COUNT(*) AS cnt, AVG(throughput_rate) AS avg_rate, (SELECT AVG(throughput_rate) FROM \"{stream}\") AS global_avg_rate FROM \"{stream}\" GROUP BY facility_zone ORDER BY avg_rate DESC",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 45539000000,
+        "end_offset": 45613000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "cnt",
+          "avg_rate",
+          "global_avg_rate"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "1",
+            "610.0",
+            "597.1428571428571"
+          ],
+          [
+            "ZONE-2",
+            "2",
+            "602.5",
+            "597.1428571428571"
+          ],
+          [
+            "ZONE-4",
+            "2",
+            "602.5",
+            "597.1428571428571"
+          ],
+          [
+            "ZONE-3",
+            "2",
+            "580.0",
+            "597.1428571428571"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q761",
+      "sql": "SELECT component_name, COUNT(*) AS cnt, AVG(CAST(latency_ms AS FLOAT)) AS avg_lat, (SELECT AVG(CAST(latency_ms AS FLOAT)) FROM \"{stream}\" WHERE latency_ms IS NOT NULL) AS global_avg_lat FROM \"{stream}\" WHERE latency_ms IS NOT NULL GROUP BY component_name ORDER BY avg_lat DESC LIMIT 10",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 45599000000,
+        "end_offset": 45673000000
+      },
+      "expected": {
+        "columns": [
+          "component_name",
+          "cnt",
+          "avg_lat",
+          "global_avg_lat"
+        ],
+        "results": [
+          [
+            "temp-regulator",
+            "2",
+            "3200.0",
+            "1239.0"
+          ],
+          [
+            "batch-sync",
+            "1",
+            "1450.0",
+            "1239.0"
+          ],
+          [
+            "lane-monitor",
+            "1",
+            "567.0",
+            "1239.0"
+          ],
+          [
+            "pallet-mapper",
+            "2",
+            "89.0",
+            "1239.0"
+          ],
+          [
+            "charge-checker",
+            "1",
+            "78.0",
+            "1239.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q762",
+      "sql": "SELECT a.component_name, a.latency_ms, (SELECT AVG(CAST(b.latency_ms AS FLOAT)) FROM \"{stream2}\" b WHERE b.component_name = a.component_name) AS avg_in_other_stream FROM \"{stream}\" a WHERE a.latency_ms IS NOT NULL ORDER BY a.latency_ms DESC LIMIT 10",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 45659000000,
+        "end_offset": 45733000000
+      },
+      "expected": {
+        "columns": [
+          "component_name",
+          "latency_ms",
+          "avg_in_other_stream"
+        ],
+        "results": [
+          [
+            "temp-regulator",
+            "3200",
+            "None"
+          ],
+          [
+            "sorter-engine",
+            "1900",
+            "1900.0"
+          ],
+          [
+            "charge-checker",
+            "78",
+            "78.0"
+          ],
+          [
+            "charge-checker",
+            "78",
+            "78.0"
+          ],
+          [
+            "conveyor-driver",
+            "15",
+            "15.0"
+          ],
+          [
+            "conveyor-driver",
+            "15",
+            "15.0"
+          ],
+          [
+            "zone-controller",
+            "12",
+            "12.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q763",
+      "sql": "SELECT a._timestamp, a.facility_zone, a.throughput_rate FROM \"{stream}\" a WHERE EXISTS (SELECT 1 FROM \"{stream}\" b WHERE b.facility_zone = a.facility_zone AND b.throughput_rate > a.throughput_rate AND b._timestamp > a._timestamp) ORDER BY a._timestamp ASC LIMIT 10",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 45719000000,
+        "end_offset": 45793000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "throughput_rate"
+        ],
+        "results": [
+          [
+            "ZONE-2",
+            "150.0"
+          ],
+          [
+            "ZONE-1",
+            "320.0"
+          ],
+          [
+            "ZONE-3",
+            "320.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q764",
+      "sql": "SELECT a.component_name, a.region_code, a.latency_ms FROM \"{stream}\" a WHERE a.latency_ms > (SELECT AVG(CAST(b.latency_ms AS FLOAT)) FROM \"{stream}\" b WHERE b.region_code = a.region_code) ORDER BY a.latency_ms DESC LIMIT 10",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 45779000000,
+        "end_offset": 45853000000
+      },
+      "expected": {
+        "columns": [
+          "component_name",
+          "region_code",
+          "latency_ms"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q765",
+      "sql": "SELECT a.pallet_id, a.facility_zone, a.load_factor FROM \"{stream}\" a WHERE a.load_factor = (SELECT MAX(b.load_factor) FROM \"{stream}\" b WHERE b.facility_zone = a.facility_zone) ORDER BY a.facility_zone, a.pallet_id LIMIT 10",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 45839000000,
+        "end_offset": 45913000000
+      },
+      "expected": {
+        "columns": [
+          "pallet_id",
+          "facility_zone",
+          "load_factor"
+        ],
+        "results": [
+          [
+            "PL-007",
+            "ZONE-1",
+            "94.6"
+          ],
+          [
+            "PL-004",
+            "ZONE-2",
+            "88.1"
+          ],
+          [
+            "PL-005",
+            "ZONE-3",
+            "94.6"
+          ],
+          [
+            "PL-002",
+            "ZONE-4",
+            "55.2"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q766",
+      "sql": "SELECT facility_zone, AVG(throughput_rate) AS avg_rate FROM \"{stream}\" GROUP BY facility_zone HAVING AVG(throughput_rate) > (SELECT AVG(throughput_rate) FROM \"{stream}\") ORDER BY avg_rate DESC",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 45899000000,
+        "end_offset": 45973000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "avg_rate"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "755.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q767",
+      "sql": "SELECT component_name, AVG(CAST(latency_ms AS FLOAT)) AS avg_lat FROM \"{stream}\" WHERE latency_ms IS NOT NULL GROUP BY component_name HAVING AVG(CAST(latency_ms AS FLOAT)) > (SELECT PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY latency_ms) FROM \"{stream}\") ORDER BY avg_lat DESC LIMIT 10",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 45959000000,
+        "end_offset": 46033000000
+      },
+      "expected": {
+        "columns": [
+          "component_name",
+          "avg_lat"
+        ],
+        "results": [
+          [
+            "batch-sync",
+            "1450.0"
+          ],
+          [
+            "lane-monitor",
+            "567.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q768",
+      "sql": "WITH paired AS (SELECT a.facility_zone AS zone_a, b.facility_zone AS zone_b, a.throughput_rate AS rate_a, b.throughput_rate AS rate_b FROM \"{stream}\" a JOIN \"{stream2}\" b ON a.facility_zone < b.facility_zone) SELECT zone_a, zone_b, AVG(rate_a) AS avg_a, AVG(rate_b) AS avg_b, AVG(rate_a + rate_b) AS combined_avg FROM paired GROUP BY zone_a, zone_b ORDER BY combined_avg DESC LIMIT 10",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 46019000000,
+        "end_offset": 46093000000
+      },
+      "expected": {
+        "columns": [
+          "zone_a",
+          "zone_b",
+          "avg_a",
+          "avg_b",
+          "combined_avg"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "ZONE-3",
+            "555.0",
+            "727.5",
+            "1282.5"
+          ],
+          [
+            "ZONE-3",
+            "ZONE-4",
+            "870.0",
+            "190.0",
+            "1060.0"
+          ],
+          [
+            "ZONE-2",
+            "ZONE-3",
+            "240.0",
+            "727.5",
+            "967.5"
+          ],
+          [
+            "ZONE-1",
+            "ZONE-2",
+            "555.0",
+            "220.0",
+            "775.0"
+          ],
+          [
+            "ZONE-1",
+            "ZONE-4",
+            "555.0",
+            "190.0",
+            "745.0"
+          ],
+          [
+            "ZONE-2",
+            "ZONE-4",
+            "240.0",
+            "190.0",
+            "430.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q769",
+      "sql": "WITH high_rate AS (SELECT pallet_id, facility_zone, throughput_rate FROM \"{stream}\" WHERE throughput_rate > 500), low_rate AS (SELECT pallet_id, facility_zone, throughput_rate FROM \"{stream}\" WHERE throughput_rate < 200), combined AS (SELECT *, 'high' AS tier FROM high_rate UNION ALL SELECT *, 'low' AS tier FROM low_rate) SELECT tier, COUNT(*) AS cnt, AVG(throughput_rate) AS avg_rate FROM combined GROUP BY tier ORDER BY tier",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 46079000000,
+        "end_offset": 46153000000
+      },
+      "expected": {
+        "columns": [
+          "tier",
+          "cnt",
+          "avg_rate"
+        ],
+        "results": [
+          [
+            "high",
+            "2",
+            "900.0"
+          ],
+          [
+            "low",
+            "2",
+            "170.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q770",
+      "sql": "SELECT facility_zone, sorter_model, throughput_rate FROM \"{stream}\" a WHERE throughput_rate > (SELECT AVG(throughput_rate) FROM \"{stream}\" b WHERE b.facility_zone = a.facility_zone AND b.facility_zone IN (SELECT facility_zone FROM \"{stream2}\" WHERE load_factor > 50)) ORDER BY throughput_rate DESC LIMIT 10",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 46139000000,
+        "end_offset": 46213000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "sorter_model",
+          "throughput_rate"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "SORT-M3",
+            "840.0"
+          ],
+          [
+            "ZONE-4",
+            "SORT-A7",
+            "725.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q771",
+      "sql": "SELECT component_name, AVG(CAST(latency_ms AS FLOAT)) AS avg_lat, COUNT(*) AS cnt, (SELECT MAX(latency_ms) FROM \"{stream}\" b WHERE b.component_name = a.component_name) AS max_lat, (SELECT MIN(latency_ms) FROM \"{stream}\" b WHERE b.component_name = a.component_name) AS min_lat FROM \"{stream}\" a WHERE a.latency_ms IS NOT NULL GROUP BY component_name ORDER BY avg_lat DESC LIMIT 10",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 46199000000,
+        "end_offset": 46273000000
+      },
+      "expected": {
+        "columns": [
+          "component_name",
+          "avg_lat",
+          "cnt",
+          "max_lat",
+          "min_lat"
+        ],
+        "results": [
+          [
+            "temp-regulator",
+            "3200.0",
+            "2",
+            "3200",
+            "3200"
+          ],
+          [
+            "batch-sync",
+            "1450.0",
+            "1",
+            "1450",
+            "1450"
+          ],
+          [
+            "lane-monitor",
+            "567.0",
+            "1",
+            "567",
+            "567"
+          ],
+          [
+            "pallet-mapper",
+            "89.0",
+            "2",
+            "89",
+            "89"
+          ],
+          [
+            "charge-checker",
+            "78.0",
+            "1",
+            "78",
+            "78"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q772",
+      "sql": "WITH zone_baseline AS (SELECT facility_zone, AVG(throughput_rate) AS baseline_rate, STDDEV(throughput_rate) AS std_rate FROM \"{stream}\" GROUP BY facility_zone) SELECT a.facility_zone, a.pallet_id, a.throughput_rate, zb.baseline_rate, zb.std_rate, a.throughput_rate - zb.baseline_rate AS deviation FROM \"{stream}\" a JOIN zone_baseline zb ON a.facility_zone = zb.facility_zone WHERE a.throughput_rate > zb.baseline_rate + zb.std_rate ORDER BY deviation DESC LIMIT 10",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 46259000000,
+        "end_offset": 46333000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "pallet_id",
+          "throughput_rate",
+          "baseline_rate",
+          "std_rate",
+          "deviation"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q773",
+      "sql": "SELECT a.pallet_id, a.facility_zone, a.throughput_rate FROM \"{stream}\" a WHERE NOT EXISTS (SELECT 1 FROM \"{stream}\" b WHERE b.facility_zone = a.facility_zone AND b.throughput_rate > a.throughput_rate AND b._timestamp > a._timestamp) ORDER BY a.facility_zone, a.throughput_rate DESC LIMIT 10",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 46319000000,
+        "end_offset": 46393000000
+      },
+      "expected": {
+        "columns": [
+          "pallet_id",
+          "facility_zone",
+          "throughput_rate"
+        ],
+        "results": [
+          [
+            "PL-007",
+            "ZONE-1",
+            "610.0"
+          ],
+          [
+            "PL-004",
+            "ZONE-2",
+            "480.0"
+          ],
+          [
+            "PL-005",
+            "ZONE-3",
+            "610.0"
+          ],
+          [
+            "PL-006",
+            "ZONE-4",
+            "725.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q774",
+      "sql": "WITH base AS (SELECT _timestamp, facility_zone, component_name, throughput_rate, latency_ms FROM \"{stream}\"), zone_stats AS (SELECT facility_zone, AVG(throughput_rate) AS avg_tput, AVG(CAST(latency_ms AS FLOAT)) AS avg_lat FROM base GROUP BY facility_zone), global_stats AS (SELECT AVG(avg_tput) AS global_avg_tput, AVG(avg_lat) AS global_avg_lat FROM zone_stats) SELECT zs.facility_zone, zs.avg_tput, zs.avg_lat, CASE WHEN zs.avg_tput > gs.global_avg_tput THEN 'above_global' ELSE 'below_global' END AS tput_vs_global, CASE WHEN zs.avg_lat < gs.global_avg_lat THEN 'faster_than_global' ELSE 'slower_than_global' END AS lat_vs_global FROM zone_stats zs CROSS JOIN global_stats gs ORDER BY zs.facility_zone",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 46379000000,
+        "end_offset": 46453000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "avg_tput",
+          "avg_lat",
+          "tput_vs_global",
+          "lat_vs_global"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "582.5",
+            "1715.0",
+            "below_global",
+            "slower_than_global"
+          ],
+          [
+            "ZONE-2",
+            "507.5",
+            "1008.5",
+            "below_global",
+            "slower_than_global"
+          ],
+          [
+            "ZONE-3",
+            "840.0",
+            "89.0",
+            "above_global",
+            "faster_than_global"
+          ],
+          [
+            "ZONE-4",
+            "507.5",
+            "1008.5",
+            "below_global",
+            "slower_than_global"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q775",
+      "sql": "SELECT org_name, region_code, avg_lat, rn FROM (SELECT org_name, region_code, avg_lat, ROW_NUMBER() OVER (PARTITION BY region_code ORDER BY avg_lat ASC) AS rn FROM (SELECT org_name, region_code, AVG(CAST(latency_ms AS FLOAT)) AS avg_lat FROM \"{stream}\" WHERE latency_ms IS NOT NULL AND org_name IS NOT NULL AND region_code IS NOT NULL GROUP BY org_name, region_code) mid) outer_q WHERE rn <= 2 ORDER BY region_code, rn LIMIT 12",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 46439000000,
+        "end_offset": 46513000000
+      },
+      "expected": {
+        "columns": [
+          "org_name",
+          "region_code",
+          "avg_lat",
+          "rn"
+        ],
+        "results": [
+          [
+            "warehouse-east",
+            "AP-CENTRAL",
+            "1900.0",
+            "1"
+          ],
+          [
+            "warehouse-central",
+            "EU-CENTRAL",
+            "78.0",
+            "1"
+          ],
+          [
+            "warehouse-north",
+            "SA-EAST",
+            "567.0",
+            "1"
+          ],
+          [
+            "warehouse-south",
+            "US-CENTRAL",
+            "3200.0",
+            "1"
+          ],
+          [
+            "warehouse-west",
+            "US-EAST",
+            "15.0",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q776",
+      "sql": "SELECT sq.facility_zone, sq.mode, COUNT(*) AS cnt, SUM(sq.total_rate) AS total_rate FROM (SELECT facility_zone, operation_mode AS mode, SUM(throughput_rate) AS total_rate FROM \"{stream}\" GROUP BY facility_zone, operation_mode) sq GROUP BY sq.facility_zone, sq.mode ORDER BY total_rate DESC LIMIT 12",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 46499000000,
+        "end_offset": 46573000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "mode",
+          "cnt",
+          "total_rate"
+        ],
+        "results": [
+          [
+            "ZONE-3",
+            "hybrid",
+            "1",
+            "900.0"
+          ],
+          [
+            "ZONE-3",
+            "manual",
+            "1",
+            "610.0"
+          ],
+          [
+            "ZONE-4",
+            "hybrid",
+            "1",
+            "480.0"
+          ],
+          [
+            "ZONE-2",
+            "auto",
+            "1",
+            "480.0"
+          ],
+          [
+            "ZONE-1",
+            "manual",
+            "1",
+            "320.0"
+          ],
+          [
+            "ZONE-2",
+            "manual",
+            "1",
+            "150.0"
+          ],
+          [
+            "ZONE-4",
+            "auto",
+            "1",
+            "150.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q777",
+      "sql": "WITH tagged AS (SELECT *, CASE WHEN throughput_rate >= 500 THEN 'high' WHEN throughput_rate >= 300 THEN 'medium' ELSE 'low' END AS perf_class FROM \"{stream}\") SELECT facility_zone, perf_class, COUNT(*) AS cnt, AVG(load_factor) AS avg_load, AVG(cell_temp) AS avg_temp FROM tagged GROUP BY facility_zone, perf_class ORDER BY facility_zone, perf_class",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 46559000000,
+        "end_offset": 46633000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "perf_class",
+          "cnt",
+          "avg_load",
+          "avg_temp"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "high",
+            "2",
+            "66.0",
+            "34.45"
+          ],
+          [
+            "ZONE-2",
+            "high",
+            "1",
+            "12.5",
+            "32.5"
+          ],
+          [
+            "ZONE-3",
+            "high",
+            "2",
+            "66.0",
+            "34.45"
+          ],
+          [
+            "ZONE-4",
+            "low",
+            "1",
+            "55.2",
+            "18.5"
+          ],
+          [
+            "ZONE-4",
+            "medium",
+            "1",
+            "21.4",
+            "24.8"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q778",
+      "sql": "WITH self_joined AS (SELECT a.facility_zone, a.pallet_id AS pallet_a, b.pallet_id AS pallet_b, a.throughput_rate AS rate_a, b.throughput_rate AS rate_b FROM \"{stream}\" a JOIN \"{stream}\" b ON a.facility_zone = b.facility_zone AND a._timestamp < b._timestamp) SELECT facility_zone, COUNT(*) AS pair_cnt, AVG(CAST(rate_a AS FLOAT) + CAST(rate_b AS FLOAT)) AS avg_pair_rate FROM self_joined GROUP BY facility_zone ORDER BY pair_cnt DESC",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 46619000000,
+        "end_offset": 46693000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "pair_cnt",
+          "avg_pair_rate"
+        ],
+        "results": [
+          [
+            "ZONE-4",
+            "1",
+            "480.0"
+          ],
+          [
+            "ZONE-2",
+            "1",
+            "480.0"
+          ],
+          [
+            "ZONE-1",
+            "1",
+            "1740.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q779",
+      "sql": "WITH cte1 AS (SELECT component_name, region_code, AVG(CAST(latency_ms AS FLOAT)) AS avg_lat FROM \"{stream}\" WHERE latency_ms IS NOT NULL GROUP BY component_name, region_code), cte2 AS (SELECT *, RANK() OVER (ORDER BY avg_lat DESC) AS global_rank FROM cte1) SELECT * FROM cte2 WHERE global_rank <= 3 ORDER BY global_rank",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 46679000000,
+        "end_offset": 46753000000
+      },
+      "expected": {
+        "columns": [
+          "component_name",
+          "region_code",
+          "avg_lat",
+          "global_rank"
+        ],
+        "results": [
+          [
+            "sorter-engine",
+            "AP-CENTRAL",
+            "1900.0",
+            "1"
+          ],
+          [
+            "charge-checker",
+            "EU-CENTRAL",
+            "78.0",
+            "2"
+          ],
+          [
+            "scan-hub",
+            "EU-WEST",
+            "45.0",
+            "3"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q780",
+      "sql": "SELECT a.facility_zone, a.throughput_rate, (SELECT COUNT(*) FROM \"{stream}\" b WHERE b.facility_zone = a.facility_zone AND b.throughput_rate > a.throughput_rate) AS better_cnt FROM \"{stream}\" a ORDER BY a.facility_zone, better_cnt LIMIT 12",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 46739000000,
+        "end_offset": 46813000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "throughput_rate",
+          "better_cnt"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "610.0",
+            "0"
+          ],
+          [
+            "ZONE-2",
+            "725.0",
+            "0"
+          ],
+          [
+            "ZONE-2",
+            "480.0",
+            "1"
+          ],
+          [
+            "ZONE-3",
+            "840.0",
+            "0"
+          ],
+          [
+            "ZONE-3",
+            "320.0",
+            "1"
+          ],
+          [
+            "ZONE-4",
+            "725.0",
+            "0"
+          ],
+          [
+            "ZONE-4",
+            "480.0",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q781",
+      "sql": "WITH base AS (SELECT _timestamp, component_name, latency_ms, response_code FROM \"{stream}\" WHERE latency_ms IS NOT NULL), error_base AS (SELECT _timestamp, component_name, latency_ms FROM base WHERE response_code >= 400), success_base AS (SELECT _timestamp, component_name, latency_ms FROM base WHERE response_code < 400) SELECT component_name, AVG(CAST(e.latency_ms AS FLOAT)) AS avg_error_lat, AVG(CAST(s.latency_ms AS FLOAT)) AS avg_success_lat, COUNT(e._timestamp) AS error_cnt, COUNT(s._timestamp) AS success_cnt FROM error_base e FULL OUTER JOIN success_base s ON e.component_name = s.component_name GROUP BY COALESCE(e.component_name, s.component_name) ORDER BY error_cnt DESC NULLS LAST LIMIT 10",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 46799000000,
+        "end_offset": 46873000000
+      },
+      "expected": {
+        "skip_sqllogictest": true
+      }
+    },
+    {
+      "id": "Q782",
+      "sql": "WITH ranked AS (SELECT *, ROW_NUMBER() OVER (PARTITION BY facility_zone ORDER BY throughput_rate DESC) AS rn FROM \"{stream}\") SELECT facility_zone, MAX(CASE WHEN rn = 1 THEN pallet_id END) AS top_pallet, MAX(CASE WHEN rn = 1 THEN throughput_rate END) AS top_rate, MAX(CASE WHEN rn = 2 THEN throughput_rate END) AS second_rate, AVG(throughput_rate) AS avg_rate FROM ranked GROUP BY facility_zone ORDER BY top_rate DESC",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 46859000000,
+        "end_offset": 46933000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "top_pallet",
+          "top_rate",
+          "second_rate",
+          "avg_rate"
+        ],
+        "results": [
+          [
+            "ZONE-3",
+            "PL-001",
+            "900.0",
+            "None",
+            "900.0"
+          ],
+          [
+            "ZONE-1",
+            "PL-007",
+            "555.0",
+            "320.0",
+            "437.5"
+          ],
+          [
+            "ZONE-4",
+            "PL-006",
+            "190.0",
+            "150.0",
+            "170.0"
+          ],
+          [
+            "ZONE-2",
+            "PL-008",
+            "190.0",
+            "150.0",
+            "170.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q783",
+      "sql": "SELECT component_name, cnt, avg_lat FROM (SELECT component_name, COUNT(*) AS cnt, AVG(CAST(latency_ms AS FLOAT)) AS avg_lat, RANK() OVER (ORDER BY COUNT(*) DESC) AS cnt_rank FROM \"{stream}\" WHERE latency_ms IS NOT NULL GROUP BY component_name) sub WHERE cnt_rank <= 5 ORDER BY cnt DESC",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 46919000000,
+        "end_offset": 46993000000
+      },
+      "expected": {
+        "columns": [
+          "component_name",
+          "cnt",
+          "avg_lat"
+        ],
+        "results": [
+          [
+            "zone-controller",
+            "2",
+            "12.0"
+          ],
+          [
+            "track-router",
+            "2",
+            "230.0"
+          ],
+          [
+            "batch-sync",
+            "1",
+            "1450.0"
+          ],
+          [
+            "conveyor-driver",
+            "1",
+            "15.0"
+          ],
+          [
+            "scan-hub",
+            "1",
+            "45.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q784",
+      "sql": "SELECT a.pallet_id, a.facility_zone, a.throughput_rate, a.throughput_rate / NULLIF((SELECT AVG(b.throughput_rate) FROM \"{stream}\" b WHERE b.facility_zone = a.facility_zone), 0) AS relative_rate FROM \"{stream}\" a ORDER BY relative_rate DESC LIMIT 10",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 46979000000,
+        "end_offset": 47053000000
+      },
+      "expected": {
+        "columns": [
+          "pallet_id",
+          "facility_zone",
+          "throughput_rate",
+          "relative_rate"
+        ],
+        "results": [
+          [
+            "PL-002",
+            "ZONE-4",
+            "725.0",
+            "1.4285714285714286"
+          ],
+          [
+            "PL-008",
+            "ZONE-2",
+            "725.0",
+            "1.4285714285714286"
+          ],
+          [
+            "PL-001",
+            "ZONE-3",
+            "610.0",
+            "1.0472103004291846"
+          ],
+          [
+            "PL-003",
+            "ZONE-1",
+            "840.0",
+            "1.0"
+          ],
+          [
+            "PL-005",
+            "ZONE-3",
+            "555.0",
+            "0.9527896995708155"
+          ],
+          [
+            "PL-004",
+            "ZONE-2",
+            "290.0",
+            "0.5714285714285714"
+          ],
+          [
+            "PL-006",
+            "ZONE-4",
+            "290.0",
+            "0.5714285714285714"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q785",
+      "sql": "WITH zone_records AS (SELECT facility_zone, COUNT(*) AS record_cnt, SUM(throughput_rate) AS total_rate, SUM(load_factor) AS total_load FROM \"{stream}\" GROUP BY facility_zone), mode_records AS (SELECT facility_zone, operation_mode, COUNT(*) AS mode_cnt FROM \"{stream}\" GROUP BY facility_zone, operation_mode) SELECT zr.facility_zone, zr.record_cnt, zr.total_rate, mr.operation_mode, mr.mode_cnt FROM zone_records zr JOIN mode_records mr ON zr.facility_zone = mr.facility_zone ORDER BY zr.total_rate DESC LIMIT 12",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 47039000000,
+        "end_offset": 47113000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "record_cnt",
+          "total_rate",
+          "operation_mode",
+          "mode_cnt"
+        ],
+        "results": [
+          [
+            "ZONE-3",
+            "2",
+            "1455.0",
+            "hybrid",
+            "1"
+          ],
+          [
+            "ZONE-3",
+            "2",
+            "1455.0",
+            "manual",
+            "1"
+          ],
+          [
+            "ZONE-1",
+            "2",
+            "1455.0",
+            "manual",
+            "1"
+          ],
+          [
+            "ZONE-1",
+            "2",
+            "1455.0",
+            "auto",
+            "1"
+          ],
+          [
+            "ZONE-4",
+            "2",
+            "440.0",
+            "auto",
+            "1"
+          ],
+          [
+            "ZONE-4",
+            "2",
+            "440.0",
+            "hybrid",
+            "1"
+          ],
+          [
+            "ZONE-2",
+            "1",
+            "190.0",
+            "manual",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q786",
+      "sql": "WITH chunked AS (SELECT _timestamp, component_name, latency_ms, NTILE(4) OVER (ORDER BY _timestamp) AS time_chunk FROM \"{stream}\" WHERE latency_ms IS NOT NULL) SELECT time_chunk, component_name, COUNT(*) AS cnt, AVG(CAST(latency_ms AS FLOAT)) AS avg_lat FROM chunked GROUP BY time_chunk, component_name ORDER BY time_chunk, cnt DESC LIMIT 15",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 47099000000,
+        "end_offset": 47173000000
+      },
+      "expected": {
+        "columns": [
+          "time_chunk",
+          "component_name",
+          "cnt",
+          "avg_lat"
+        ],
+        "results": [
+          [
+            "1",
+            "conveyor-driver",
+            "1",
+            "15.0"
+          ],
+          [
+            "1",
+            "sorter-engine",
+            "1",
+            "1900.0"
+          ],
+          [
+            "2",
+            "conveyor-driver",
+            "1",
+            "15.0"
+          ],
+          [
+            "2",
+            "zone-controller",
+            "1",
+            "12.0"
+          ],
+          [
+            "3",
+            "scan-hub",
+            "2",
+            "45.0"
+          ],
+          [
+            "4",
+            "track-router",
+            "1",
+            "230.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q787",
+      "sql": "SELECT facility_zone, operation_mode, SUM(throughput_rate) AS total_rate FROM \"{stream}\" a WHERE a.throughput_rate > (SELECT AVG(b.throughput_rate) * 0.5 FROM \"{stream}\" b WHERE b.facility_zone = a.facility_zone) GROUP BY facility_zone, operation_mode ORDER BY total_rate DESC LIMIT 10",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 47159000000,
+        "end_offset": 47233000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "operation_mode",
+          "total_rate"
+        ],
+        "results": [
+          [
+            "ZONE-3",
+            "manual",
+            "840.0"
+          ],
+          [
+            "ZONE-1",
+            "manual",
+            "840.0"
+          ],
+          [
+            "ZONE-4",
+            "auto",
+            "725.0"
+          ],
+          [
+            "ZONE-3",
+            "hybrid",
+            "610.0"
+          ],
+          [
+            "ZONE-1",
+            "auto",
+            "610.0"
+          ],
+          [
+            "ZONE-2",
+            "manual",
+            "480.0"
+          ],
+          [
+            "ZONE-2",
+            "auto",
+            "290.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q788",
+      "sql": "WITH sub AS (SELECT component_name, region_code, latency_ms, response_code, CASE WHEN response_code >= 400 THEN 1 ELSE 0 END AS is_error FROM \"{stream}\" WHERE latency_ms IS NOT NULL) SELECT component_name, region_code, COUNT(*) AS total, SUM(is_error) AS errors, AVG(CAST(latency_ms AS FLOAT)) AS avg_lat, AVG(CASE WHEN is_error = 1 THEN CAST(latency_ms AS FLOAT) END) AS avg_error_lat FROM sub GROUP BY component_name, region_code ORDER BY errors DESC, total DESC LIMIT 12",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 47219000000,
+        "end_offset": 47293000000
+      },
+      "expected": {
+        "columns": [
+          "component_name",
+          "region_code",
+          "total",
+          "errors",
+          "avg_lat",
+          "avg_error_lat"
+        ],
+        "results": [
+          [
+            "lane-monitor",
+            "SA-EAST",
+            "2",
+            "2",
+            "567.0",
+            "567.0"
+          ],
+          [
+            "pallet-mapper",
+            "AP-EAST",
+            "1",
+            "1",
+            "89.0",
+            "89.0"
+          ],
+          [
+            "charge-checker",
+            "EU-CENTRAL",
+            "2",
+            "0",
+            "78.0",
+            "None"
+          ],
+          [
+            "sorter-engine",
+            "AP-CENTRAL",
+            "1",
+            "0",
+            "1900.0",
+            "None"
+          ],
+          [
+            "temp-regulator",
+            "US-CENTRAL",
+            "1",
+            "0",
+            "3200.0",
+            "None"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q789",
+      "sql": "SELECT a.component_name, AVG(CAST(a.latency_ms AS FLOAT)) AS avg_lat, AVG(CAST(b.latency_ms AS FLOAT)) AS avg_lat_stream2, (SELECT AVG(CAST(latency_ms AS FLOAT)) FROM \"{stream}\") AS global_avg FROM \"{stream}\" a LEFT JOIN \"{stream2}\" b ON a.component_name = b.component_name AND a.region_code = b.region_code WHERE a.latency_ms IS NOT NULL GROUP BY a.component_name ORDER BY avg_lat DESC LIMIT 10",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 47279000000,
+        "end_offset": 47353000000
+      },
+      "expected": {
+        "columns": [
+          "component_name",
+          "avg_lat",
+          "avg_lat_stream2",
+          "global_avg"
+        ],
+        "results": [
+          [
+            "sorter-engine",
+            "1900.0",
+            "1900.0",
+            "566.0"
+          ],
+          [
+            "charge-checker",
+            "78.0",
+            "None",
+            "566.0"
+          ],
+          [
+            "scan-hub",
+            "45.0",
+            "45.0",
+            "566.0"
+          ],
+          [
+            "conveyor-driver",
+            "15.0",
+            "15.0",
+            "566.0"
+          ],
+          [
+            "zone-controller",
+            "12.0",
+            "12.0",
+            "566.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q790",
+      "sql": "WITH agg AS (SELECT facility_zone, AVG(throughput_rate) AS avg_rate FROM \"{stream}\" GROUP BY facility_zone), agg2 AS (SELECT facility_zone, AVG(load_factor) AS avg_load FROM \"{stream2}\" GROUP BY facility_zone) SELECT COALESCE(a.facility_zone, a2.facility_zone) AS zone, a.avg_rate, a2.avg_load FROM agg a FULL OUTER JOIN agg2 a2 ON a.facility_zone = a2.facility_zone ORDER BY zone",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 47339000000,
+        "end_offset": 47413000000
+      },
+      "expected": {
+        "columns": [
+          "zone",
+          "avg_rate",
+          "avg_load"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "580.0",
+            "66.0"
+          ],
+          [
+            "ZONE-2",
+            "602.5",
+            "12.5"
+          ],
+          [
+            "ZONE-3",
+            "610.0",
+            "66.0"
+          ],
+          [
+            "ZONE-4",
+            "602.5",
+            "38.3"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q791",
+      "sql": "WITH base AS (SELECT _timestamp, facility_zone, operation_mode, throughput_rate, load_factor, cell_temp FROM \"{stream}\"), normalized AS (SELECT *, (throughput_rate - MIN(throughput_rate) OVER ()) / NULLIF(MAX(throughput_rate) OVER () - MIN(throughput_rate) OVER (), 0) AS norm_rate FROM base) SELECT facility_zone, operation_mode, AVG(norm_rate) AS avg_norm_rate, AVG(load_factor) AS avg_load, AVG(cell_temp) AS avg_temp FROM normalized GROUP BY facility_zone, operation_mode ORDER BY avg_norm_rate DESC",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 47399000000,
+        "end_offset": 47473000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "operation_mode",
+          "avg_norm_rate",
+          "avg_load",
+          "avg_temp"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "manual",
+            "1.0",
+            "33.0",
+            "40.0"
+          ],
+          [
+            "ZONE-3",
+            "manual",
+            "1.0",
+            "33.0",
+            "40.0"
+          ],
+          [
+            "ZONE-2",
+            "auto",
+            "0.823076923076923",
+            "12.5",
+            "32.5"
+          ],
+          [
+            "ZONE-1",
+            "auto",
+            "0.5615384615384615",
+            "72.8",
+            "22.0"
+          ],
+          [
+            "ZONE-3",
+            "hybrid",
+            "0.5615384615384615",
+            "72.8",
+            "22.0"
+          ],
+          [
+            "ZONE-4",
+            "hybrid",
+            "0.15384615384615385",
+            "55.2",
+            "18.5"
+          ],
+          [
+            "ZONE-2",
+            "manual",
+            "0.0",
+            "88.1",
+            "26.3"
+          ]
+        ],
+        "results_mode": "rowsort"
       }
     }
   ],

@@ -28,17 +28,17 @@
             "25.0"
           ],
           [
-            "ZONE-4",
-            "3",
-            "920.0",
-            "40.63",
-            "0.0"
-          ],
-          [
             "ZONE-1",
             "3",
             "1770.0",
             "66.63",
+            "0.0"
+          ],
+          [
+            "ZONE-4",
+            "3",
+            "920.0",
+            "40.63",
             "0.0"
           ]
         ],
@@ -152,16 +152,16 @@
         ],
         "results": [
           [
-            "ZONE-1",
-            "4",
-            "667.5",
-            "SORT-M3"
-          ],
-          [
             "ZONE-4",
             "4",
             "277.5",
             "SORT-A7"
+          ],
+          [
+            "ZONE-1",
+            "4",
+            "667.5",
+            "SORT-M3"
           ],
           [
             "ZONE-3",
@@ -738,17 +738,17 @@
             "0.0"
           ],
           [
-            "ZONE-1",
-            "SORT-M3",
-            "581.25",
-            "68.18",
-            "0.0"
-          ],
-          [
             "ZONE-4",
             "SORT-A7",
             "498.33",
             "29.7",
+            "0.0"
+          ],
+          [
+            "ZONE-1",
+            "SORT-M3",
+            "581.25",
+            "68.18",
             "0.0"
           ],
           [
@@ -860,23 +860,7 @@
         "results": [
           [
             "2",
-            "syncZone"
-          ],
-          [
-            "2",
             "updateBatch"
-          ],
-          [
-            "2",
-            "retryScan"
-          ],
-          [
-            "1",
-            "mergeBatch"
-          ],
-          [
-            "1",
-            "archiveLog"
           ],
           [
             "2",
@@ -887,8 +871,24 @@
             "deleteRecord"
           ],
           [
+            "2",
+            "syncZone"
+          ],
+          [
+            "1",
+            "mergeBatch"
+          ],
+          [
+            "1",
+            "archiveLog"
+          ],
+          [
             "1",
             "scanPallet"
+          ],
+          [
+            "2",
+            "retryScan"
           ]
         ],
         "results_mode": "rowsort"
@@ -908,7 +908,8 @@
           "count_s",
           "starttime"
         ],
-        "note": "Array flattening with spath, unnest, flatten, cast_to_arr \u2014 OO-specific, skip_sqllogictest"
+        "note": "Array flattening with spath, unnest, flatten, cast_to_arr \u2014 OO-specific, skip_sqllogictest",
+        "skip_sqllogictest": true
       },
       "time_offset": {
         "start_offset": 9599000000,
@@ -1026,28 +1027,10 @@
         ],
         "results": [
           [
-            "MergeBatch",
-            "queued",
-            "2",
-            "3200.0"
-          ],
-          [
             "RetryScan",
             "ok",
             "2",
             "15.0"
-          ],
-          [
-            "ScanPallet",
-            "failed",
-            "2",
-            "89.0"
-          ],
-          [
-            "SyncZone",
-            "retrying",
-            "2",
-            "12.0"
           ],
           [
             "CheckThreshold",
@@ -1056,10 +1039,28 @@
             "78.0"
           ],
           [
-            "RerouteTrack",
-            "ok",
+            "SyncZone",
+            "retrying",
+            "2",
+            "12.0"
+          ],
+          [
+            "MergeBatch",
+            "queued",
+            "2",
+            "3200.0"
+          ],
+          [
+            "ScanPallet",
+            "failed",
+            "2",
+            "89.0"
+          ],
+          [
+            "SearchItems",
+            "syncing",
             "1",
-            "567.0"
+            "45.0"
           ],
           [
             "ArchiveLog",
@@ -1068,16 +1069,16 @@
             "1900.0"
           ],
           [
+            "RerouteTrack",
+            "ok",
+            "1",
+            "567.0"
+          ],
+          [
             "DeleteRecord",
             "pending",
             "1",
             "1450.0"
-          ],
-          [
-            "SearchItems",
-            "syncing",
-            "1",
-            "45.0"
           ]
         ],
         "results_mode": "rowsort"
@@ -1114,16 +1115,6 @@
             "114.0"
           ],
           [
-            "ZONE-4",
-            "HYBRID",
-            "2",
-            "54.75",
-            "26.3",
-            "670.0",
-            "61.5",
-            "84.0"
-          ],
-          [
             "ZONE-3",
             "HYBRID",
             "2",
@@ -1131,6 +1122,16 @@
             "30.1",
             "1510.0",
             "1065.0",
+            "84.0"
+          ],
+          [
+            "ZONE-4",
+            "HYBRID",
+            "2",
+            "54.75",
+            "26.3",
+            "670.0",
+            "61.5",
             "84.0"
           ],
           [
@@ -1176,20 +1177,20 @@
         ],
         "results": [
           [
-            "HIGH_LOAD",
-            "HIGH_TPUT",
-            "4",
-            "25.45",
-            "520",
-            "3.5"
-          ],
-          [
             "MED_LOAD",
             "MED_TPUT",
             "4",
             "18.85",
             "1060",
             "2.8"
+          ],
+          [
+            "HIGH_LOAD",
+            "HIGH_TPUT",
+            "4",
+            "25.45",
+            "520",
+            "3.5"
           ],
           [
             "LOW_LOAD",
@@ -1292,15 +1293,15 @@
         ],
         "results": [
           [
-            "Windows 11",
-            "performanceMetric",
-            "2",
-            "100.0"
-          ],
-          [
             "Android 14",
             "navigation",
             "1",
+            "100.0"
+          ],
+          [
+            "Windows 11",
+            "performanceMetric",
+            "2",
             "100.0"
           ]
         ],
@@ -1480,6 +1481,11 @@
         ],
         "results": [
           [
+            "E005",
+            "1",
+            "1"
+          ],
+          [
             "E009",
             "1",
             "1"
@@ -1487,11 +1493,6 @@
           [
             "E006",
             "2",
-            "1"
-          ],
-          [
-            "E005",
-            "1",
             "1"
           ]
         ],
@@ -1541,16 +1542,16 @@
         ],
         "results": [
           [
-            "Computer",
-            "1",
-            "1",
-            "230.0"
-          ],
-          [
             "Mobile",
             "4",
             "4",
             "747.5"
+          ],
+          [
+            "Computer",
+            "1",
+            "1",
+            "230.0"
           ]
         ],
         "results_mode": "rowsort"
@@ -1587,13 +1588,13 @@
             "1"
           ],
           [
-            "fast",
-            "success",
+            "slow",
+            "error",
             "1"
           ],
           [
-            "slow",
-            "error",
+            "fast",
+            "success",
             "1"
           ]
         ],
@@ -1643,14 +1644,14 @@
         ],
         "results": [
           [
-            "track-router",
-            "E003",
+            "zone-controller",
+            "E001",
             "2",
             "medium"
           ],
           [
-            "zone-controller",
-            "E001",
+            "track-router",
+            "E003",
             "2",
             "medium"
           ],
@@ -1687,12 +1688,6 @@
             "100.0"
           ],
           [
-            "checkoutPage",
-            "2",
-            "2",
-            "100.0"
-          ],
-          [
             "searchPage",
             "1",
             "1",
@@ -1700,6 +1695,12 @@
           ],
           [
             "itemPage",
+            "2",
+            "2",
+            "100.0"
+          ],
+          [
+            "checkoutPage",
             "2",
             "2",
             "100.0"
@@ -2311,12 +2312,12 @@
         ],
         "results": [
           [
-            "app_error",
+            "auth_failure",
             "3",
             "2"
           ],
           [
-            "auth_failure",
+            "app_error",
             "3",
             "2"
           ],
@@ -2475,15 +2476,15 @@
           ],
           [
             "none",
-            "threat",
-            "1",
-            "567.0"
-          ],
-          [
-            "none",
             "passthrough",
             "1",
             "3200.0"
+          ],
+          [
+            "none",
+            "threat",
+            "1",
+            "567.0"
           ],
           [
             "Allowlisted",
@@ -3580,6 +3581,742 @@
           [
             "Q610 warehouse event record 3 ACK batch batchIdList:Q610-3",
             "SecurityException: unauthorized access to control_center CC-ALPHA"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q965",
+      "sql": "WITH base AS (SELECT _timestamp, facility_zone, component_name, throughput_rate, latency_ms, response_code, auth_result FROM \"{stream}\"), ranked AS (SELECT *, RANK() OVER (PARTITION BY facility_zone ORDER BY throughput_rate DESC) AS rate_rank, CASE WHEN response_code >= 400 THEN 1 ELSE 0 END AS is_error FROM base) SELECT facility_zone, COUNT(*) AS total, SUM(is_error) AS errors, AVG(CAST(latency_ms AS FLOAT)) AS avg_lat, MAX(CASE WHEN rate_rank = 1 THEN throughput_rate END) AS peak_rate FROM ranked GROUP BY facility_zone ORDER BY peak_rate DESC",
+      "category": "combined",
+      "time_offset": {
+        "start_offset": 57839000000,
+        "end_offset": 57913000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "total",
+          "errors",
+          "avg_lat",
+          "peak_rate"
+        ],
+        "results": [
+          [
+            "ZONE-3",
+            "2",
+            "0",
+            "2550.0",
+            "900.0"
+          ],
+          [
+            "ZONE-1",
+            "2",
+            "0",
+            "2550.0",
+            "900.0"
+          ],
+          [
+            "ZONE-4",
+            "2",
+            "1",
+            "291.0",
+            "290.0"
+          ],
+          [
+            "ZONE-2",
+            "1",
+            "0",
+            "78.0",
+            "190.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q966",
+      "sql": "WITH perf AS (SELECT facility_zone, operation_mode, AVG(throughput_rate) AS avg_rate, AVG(load_factor) AS avg_load FROM \"{stream}\" GROUP BY facility_zone, operation_mode), perf_ranked AS (SELECT *, RANK() OVER (ORDER BY avg_rate DESC) AS global_rank, RANK() OVER (PARTITION BY operation_mode ORDER BY avg_rate DESC) AS mode_rank FROM perf) SELECT facility_zone, operation_mode, avg_rate, avg_load, global_rank, mode_rank FROM perf_ranked WHERE global_rank <= 5 OR mode_rank <= 3 ORDER BY global_rank LIMIT 12",
+      "category": "combined",
+      "time_offset": {
+        "start_offset": 57899000000,
+        "end_offset": 57973000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "operation_mode",
+          "avg_rate",
+          "avg_load",
+          "global_rank",
+          "mode_rank"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "auto",
+            "900.0",
+            "94.6",
+            "1",
+            "1"
+          ],
+          [
+            "ZONE-1",
+            "manual",
+            "610.0",
+            "99.0",
+            "2",
+            "1"
+          ],
+          [
+            "ZONE-4",
+            "auto",
+            "480.0",
+            "21.4",
+            "3",
+            "2"
+          ],
+          [
+            "ZONE-2",
+            "auto",
+            "480.0",
+            "21.4",
+            "3",
+            "2"
+          ],
+          [
+            "ZONE-3",
+            "hybrid",
+            "320.0",
+            "67.9",
+            "5",
+            "1"
+          ],
+          [
+            "ZONE-2",
+            "manual",
+            "150.0",
+            "45.3",
+            "6",
+            "2"
+          ],
+          [
+            "ZONE-4",
+            "hybrid",
+            "150.0",
+            "45.3",
+            "6",
+            "2"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q967",
+      "sql": "SELECT COALESCE(scan_category, 'unknown') AS scan_type, CASE WHEN CHAR_LENGTH(COALESCE(exception_message, '')) > 40 THEN 'long_error' WHEN CHAR_LENGTH(COALESCE(exception_message, '')) > 0 THEN 'short_error' ELSE 'no_error' END AS error_class, COUNT(*) AS cnt, ROUND(CAST(COUNT(*) AS FLOAT) * 100.0 / SUM(COUNT(*)) OVER (PARTITION BY COALESCE(scan_category, 'unknown')), 1) AS pct FROM \"{stream}\" GROUP BY scan_type, error_class ORDER BY scan_type, cnt DESC",
+      "category": "combined",
+      "time_offset": {
+        "start_offset": 57959000000,
+        "end_offset": 58033000000
+      },
+      "expected": {
+        "columns": [
+          "scan_type",
+          "error_class",
+          "cnt",
+          "pct"
+        ],
+        "results": [
+          [
+            "inbound",
+            "long_error",
+            "1",
+            "100.0"
+          ],
+          [
+            "internal",
+            "long_error",
+            "3",
+            "100.0"
+          ],
+          [
+            "outbound",
+            "long_error",
+            "3",
+            "100.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q968",
+      "sql": "SELECT device_type, page_slug, COUNT(*) AS page_views, AVG(CAST(lcp_micros AS FLOAT)) AS avg_lcp, AVG(CAST(inp_micros AS FLOAT)) AS avg_inp, AVG(CAST(cls_score AS FLOAT)) AS avg_cls FROM \"{stream}\" WHERE device_type IS NOT NULL AND page_slug IS NOT NULL GROUP BY device_type, page_slug ORDER BY page_views DESC LIMIT 10",
+      "category": "combined",
+      "time_offset": {
+        "start_offset": 58019000000,
+        "end_offset": 58093000000
+      },
+      "expected": {
+        "columns": [
+          "device_type",
+          "page_slug",
+          "page_views",
+          "avg_lcp",
+          "avg_inp",
+          "avg_cls"
+        ],
+        "results": [
+          [
+            "Computer",
+            "homePage",
+            "2",
+            "3400000.0",
+            "120000.0",
+            "0.07999999821186066"
+          ],
+          [
+            "Computer",
+            "checkoutPage",
+            "2",
+            "2800000.0",
+            "95000.0",
+            "0.05000000074505806"
+          ],
+          [
+            "Mobile",
+            "itemPage",
+            "2",
+            "1600000.0",
+            "240000.0",
+            "0.1849999986588955"
+          ],
+          [
+            "Tablet",
+            "itemPage",
+            "1",
+            "1500000.0",
+            "200000.0",
+            "0.05999999865889549"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q969",
+      "sql": "SELECT tag_b AS severity, SUM(CASE WHEN re_match(exception_message, 'NullPointer|Timeout|Resource') THEN 1 ELSE 0 END) AS infra_errors, SUM(CASE WHEN re_match(exception_message, 'Security|Validation|Configuration') THEN 1 ELSE 0 END) AS app_errors, COUNT(*) AS total FROM \"{stream}\" GROUP BY severity ORDER BY total DESC",
+      "category": "combined",
+      "time_offset": {
+        "start_offset": 58079000000,
+        "end_offset": 58153000000
+      },
+      "expected": {
+        "columns": [
+          "severity",
+          "infra_errors",
+          "app_errors",
+          "total"
+        ],
+        "results": [
+          [
+            "high",
+            "0",
+            "0",
+            "2"
+          ],
+          [
+            "critical",
+            "0",
+            "0",
+            "2"
+          ],
+          [
+            "low",
+            "2",
+            "0",
+            "2"
+          ],
+          [
+            "medium",
+            "1",
+            "0",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q970",
+      "sql": "SELECT CASE WHEN auth_result = 'pass' AND response_code < 400 THEN 'success' WHEN auth_result = 'pass' AND response_code >= 400 THEN 'app_error' WHEN auth_result IN ('fail', 'denied') THEN 'auth_failure' ELSE 'unknown' END AS outcome, COUNT(*) AS cnt, COUNT(DISTINCT COALESCE(org_name, site_name)) AS distinct_tenants FROM \"{stream}\" GROUP BY outcome ORDER BY cnt DESC",
+      "category": "combined",
+      "time_offset": {
+        "start_offset": 58139000000,
+        "end_offset": 58213000000
+      },
+      "expected": {
+        "columns": [
+          "outcome",
+          "cnt",
+          "distinct_tenants"
+        ],
+        "results": [
+          [
+            "app_error",
+            "4",
+            "3"
+          ],
+          [
+            "auth_failure",
+            "3",
+            "2"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q971",
+      "sql": "SELECT COALESCE(bot_flag, info_tag, 'none') AS flag, CASE WHEN threat_flag = 'true' THEN 'threat' WHEN passthrough_flag = 'true' THEN 'passthrough' ELSE 'normal' END AS traffic_type, COUNT(*) AS cnt, AVG(CAST(latency_ms AS FLOAT)) AS avg_lat FROM \"{stream}\" GROUP BY flag, traffic_type ORDER BY cnt DESC",
+      "category": "combined",
+      "time_offset": {
+        "start_offset": 58199000000,
+        "end_offset": 58273000000
+      },
+      "expected": {
+        "columns": [
+          "flag",
+          "traffic_type",
+          "cnt",
+          "avg_lat"
+        ],
+        "results": [
+          [
+            "none",
+            "normal",
+            "4",
+            "548.75"
+          ],
+          [
+            "none",
+            "passthrough",
+            "2",
+            "3200.0"
+          ],
+          [
+            "Allowlisted",
+            "threat",
+            "1",
+            "78.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q972",
+      "sql": "SELECT region_code, COUNT(*) AS total_events, COUNT(*) FILTER (WHERE auth_result = 'fail') AS failures, ROUND(CAST(COUNT(*) FILTER (WHERE auth_result = 'fail') AS FLOAT) * 100.0 / NULLIF(COUNT(*), 0), 2) AS failure_pct FROM \"{stream}\" WHERE region_code IS NOT NULL GROUP BY region_code HAVING COUNT(*) > 1 ORDER BY failure_pct DESC NULLS LAST LIMIT 10",
+      "category": "combined",
+      "time_offset": {
+        "start_offset": 58259000000,
+        "end_offset": 58333000000
+      },
+      "expected": {
+        "columns": [
+          "region_code",
+          "total_events",
+          "failures",
+          "failure_pct"
+        ],
+        "results": [
+          [
+            "US-EAST",
+            "2",
+            "0",
+            "0.0"
+          ],
+          [
+            "EU-CENTRAL",
+            "2",
+            "0",
+            "0.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q973",
+      "sql": "WITH zone_stats AS (SELECT facility_zone, AVG(throughput_rate) AS avg_rate, AVG(load_factor) AS avg_load, STDDEV(throughput_rate) AS std_rate FROM \"{stream}\" GROUP BY facility_zone), zone_stats2 AS (SELECT facility_zone, AVG(throughput_rate) AS avg_rate2, AVG(load_factor) AS avg_load2 FROM \"{stream2}\" GROUP BY facility_zone) SELECT z.facility_zone, z.avg_rate, z.avg_load, z.std_rate, z2.avg_rate2, z2.avg_load2, CASE WHEN z.avg_rate > z2.avg_rate2 THEN 'primary_faster' ELSE 'secondary_faster' END AS comparison FROM zone_stats z LEFT JOIN zone_stats2 z2 ON z.facility_zone = z2.facility_zone ORDER BY z.facility_zone",
+      "category": "combined",
+      "time_offset": {
+        "start_offset": 58319000000,
+        "end_offset": 58393000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "avg_rate",
+          "avg_load",
+          "std_rate",
+          "avg_rate2",
+          "avg_load2",
+          "comparison"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "465.0",
+            "83.45",
+            "205.0609665440988",
+            "610.0",
+            "99.0",
+            "secondary_faster"
+          ],
+          [
+            "ZONE-2",
+            "480.0",
+            "21.4",
+            "None",
+            "602.5",
+            "16.95",
+            "secondary_faster"
+          ],
+          [
+            "ZONE-3",
+            "465.0",
+            "83.45",
+            "205.0609665440988",
+            "580.0",
+            "50.45",
+            "secondary_faster"
+          ],
+          [
+            "ZONE-4",
+            "437.5",
+            "28.9",
+            "406.5863991822648",
+            "602.5",
+            "16.95",
+            "secondary_faster"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q974",
+      "sql": "SELECT component_name, COUNT(*) AS total, COUNT(*) FILTER (WHERE match_all('error')) AS fts_errors, COUNT(*) FILTER (WHERE match_all('warehouse')) AS fts_hits, AVG(CAST(latency_ms AS FLOAT)) AS avg_lat, RANK() OVER (ORDER BY COUNT(*) DESC) AS freq_rank FROM \"{stream}\" GROUP BY component_name ORDER BY freq_rank LIMIT 10",
+      "category": "combined",
+      "time_offset": {
+        "start_offset": 58379000000,
+        "end_offset": 58453000000
+      },
+      "expected": {
+        "columns": [
+          "component_name",
+          "total",
+          "fts_errors",
+          "fts_hits",
+          "avg_lat",
+          "freq_rank"
+        ],
+        "results": [
+          [
+            "lane-monitor",
+            "2",
+            "0",
+            "2",
+            "567.0",
+            "1"
+          ],
+          [
+            "batch-sync",
+            "2",
+            "0",
+            "2",
+            "1450.0",
+            "1"
+          ],
+          [
+            "pallet-mapper",
+            "1",
+            "0",
+            "1",
+            "89.0",
+            "3"
+          ],
+          [
+            "temp-regulator",
+            "1",
+            "0",
+            "1",
+            "3200.0",
+            "3"
+          ],
+          [
+            "track-router",
+            "1",
+            "0",
+            "1",
+            "230.0",
+            "3"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q975",
+      "sql": "SELECT COALESCE(geo_country, 'unknown') AS country, COALESCE(geo_user_type, 'unknown') AS user_type, COUNT(*) AS cnt, SUM(CASE WHEN re_match(attack_name, 'SQL|XSS|Injection') THEN 1 ELSE 0 END) AS critical_attacks, AVG(CAST(latency_ms AS FLOAT)) AS avg_lat FROM \"{stream}\" WHERE geo_country IS NOT NULL GROUP BY country, user_type ORDER BY cnt DESC LIMIT 12",
+      "category": "combined",
+      "time_offset": {
+        "start_offset": 58439000000,
+        "end_offset": 58513000000
+      },
+      "expected": {
+        "columns": [
+          "country",
+          "user_type",
+          "cnt",
+          "critical_attacks",
+          "avg_lat"
+        ],
+        "results": [
+          [
+            "UK",
+            "business",
+            "2",
+            "0",
+            "3200.0"
+          ],
+          [
+            "US",
+            "business",
+            "2",
+            "1",
+            "46.5"
+          ],
+          [
+            "BR",
+            "hosting",
+            "2",
+            "0",
+            "1900.0"
+          ],
+          [
+            "DE",
+            "hosting",
+            "1",
+            "1",
+            "567.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q976",
+      "sql": "WITH zone_perf AS (SELECT facility_zone, PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY throughput_rate) AS median_rate, PERCENTILE_CONT(0.9) WITHIN GROUP (ORDER BY throughput_rate) AS p90_rate FROM \"{stream}\" GROUP BY facility_zone), zone_lat AS (SELECT facility_zone, AVG(CAST(latency_ms AS FLOAT)) AS avg_lat FROM \"{stream}\" WHERE latency_ms IS NOT NULL GROUP BY facility_zone) SELECT zp.facility_zone, zp.median_rate, zp.p90_rate, zl.avg_lat FROM zone_perf zp LEFT JOIN zone_lat zl ON zp.facility_zone = zl.facility_zone ORDER BY zp.median_rate DESC",
+      "category": "combined",
+      "time_offset": {
+        "start_offset": 58499000000,
+        "end_offset": 58573000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "median_rate",
+          "p90_rate",
+          "avg_lat"
+        ],
+        "results": [
+          [
+            "ZONE-3",
+            "755.0",
+            "871.0",
+            "1065.0"
+          ],
+          [
+            "ZONE-1",
+            "320.0",
+            "320.0",
+            "12.0"
+          ],
+          [
+            "ZONE-2",
+            "315.0",
+            "447.0",
+            "30.0"
+          ],
+          [
+            "ZONE-4",
+            "315.0",
+            "447.0",
+            "30.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q977",
+      "sql": "SELECT a.geo_org, COUNT(*) AS cnt, AVG(CAST(a.latency_ms AS FLOAT)) AS avg_lat_a, AVG(CAST(b.latency_ms AS FLOAT)) AS avg_lat_b, COUNT(DISTINCT a.visitor_session_id) AS distinct_sessions FROM \"{stream}\" a JOIN \"{stream2}\" b ON a.geo_org = b.geo_org WHERE a.geo_org IS NOT NULL GROUP BY a.geo_org ORDER BY cnt DESC LIMIT 10",
+      "category": "combined",
+      "time_offset": {
+        "start_offset": 58559000000,
+        "end_offset": 58633000000
+      },
+      "expected": {
+        "columns": [
+          "geo_org",
+          "cnt",
+          "avg_lat_a",
+          "avg_lat_b",
+          "distinct_sessions"
+        ],
+        "results": [
+          [
+            "DigitalOcean LLC",
+            "2",
+            "1450.0",
+            "1450.0",
+            "1"
+          ],
+          [
+            "FastHost Ltd",
+            "2",
+            "89.0",
+            "89.0",
+            "1"
+          ],
+          [
+            "CloudServe GmbH",
+            "2",
+            "567.0",
+            "567.0",
+            "1"
+          ],
+          [
+            "GlobalTech Inc",
+            "2",
+            "230.0",
+            "230.0",
+            "1"
+          ],
+          [
+            "Acme Corp",
+            "1",
+            "45.0",
+            "3200.0",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q978",
+      "sql": "WITH error_detail AS (SELECT _timestamp, component_name, exception_message, response_code, re_match(exception_message, 'NullPointer|Timeout|Security') AS is_critical FROM \"{stream}\" WHERE exception_message IS NOT NULL) SELECT component_name, COUNT(*) AS error_cnt, SUM(CASE WHEN is_critical THEN 1 ELSE 0 END) AS critical_cnt, AVG(CAST(response_code AS FLOAT)) AS avg_response_code FROM error_detail GROUP BY component_name ORDER BY error_cnt DESC LIMIT 10",
+      "category": "combined",
+      "time_offset": {
+        "start_offset": 58619000000,
+        "end_offset": 58693000000
+      },
+      "expected": {
+        "columns": [
+          "component_name",
+          "error_cnt",
+          "critical_cnt",
+          "avg_response_code"
+        ],
+        "results": [
+          [
+            "charge-checker",
+            "2",
+            "0",
+            "200.0"
+          ],
+          [
+            "lane-monitor",
+            "2",
+            "0",
+            "403.0"
+          ],
+          [
+            "sorter-engine",
+            "1",
+            "0",
+            "201.0"
+          ],
+          [
+            "temp-regulator",
+            "1",
+            "0",
+            "200.0"
+          ],
+          [
+            "pallet-mapper",
+            "1",
+            "0",
+            "401.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q979",
+      "sql": "SELECT facility_zone, COUNT(*) AS total_events, SUM(throughput_rate) AS total_rate, AVG(load_factor) AS avg_load, STDDEV(cell_temp) AS std_temp, SUM(CASE WHEN match_all('warehouse') THEN 1 ELSE 0 END) AS fts_hits FROM \"{stream}\" GROUP BY facility_zone ORDER BY total_rate DESC",
+      "category": "combined",
+      "time_offset": {
+        "start_offset": 58679000000,
+        "end_offset": 58753000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "total_events",
+          "total_rate",
+          "avg_load",
+          "std_temp",
+          "fts_hits"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "2",
+            "1220.0",
+            "81.25",
+            "7.707463914933368",
+            "2"
+          ],
+          [
+            "ZONE-3",
+            "2",
+            "1220.0",
+            "81.25",
+            "7.707463914933368",
+            "2"
+          ],
+          [
+            "ZONE-2",
+            "2",
+            "670.0",
+            "54.75",
+            "1.0606601717798212",
+            "2"
+          ],
+          [
+            "ZONE-4",
+            "1",
+            "150.0",
+            "45.3",
+            "None",
+            "1"
           ]
         ],
         "results_mode": "rowsort"

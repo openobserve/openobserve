@@ -13,54 +13,6 @@
         ],
         "results": [
           [
-            "SORT-X1",
-            "900.0",
-            "1",
-            "1"
-          ],
-          [
-            "SORT-X1",
-            "610.0",
-            "2",
-            "2"
-          ],
-          [
-            "SORT-X1",
-            "555.0",
-            "3",
-            "3"
-          ],
-          [
-            "SORT-A7",
-            "480.0",
-            "1",
-            "1"
-          ],
-          [
-            "SORT-A7",
-            "190.0",
-            "2",
-            "2"
-          ],
-          [
-            "SORT-A7",
-            "150.0",
-            "3",
-            "3"
-          ],
-          [
-            "SORT-Z9",
-            "725.0",
-            "1",
-            "1"
-          ],
-          [
-            "SORT-Z9",
-            "150.0",
-            "2",
-            "2"
-          ],
-          [
             "SORT-M3",
             "900.0",
             "1",
@@ -83,6 +35,54 @@
             "320.0",
             "4",
             "4"
+          ],
+          [
+            "SORT-X1",
+            "900.0",
+            "1",
+            "1"
+          ],
+          [
+            "SORT-X1",
+            "610.0",
+            "2",
+            "2"
+          ],
+          [
+            "SORT-X1",
+            "555.0",
+            "3",
+            "3"
+          ],
+          [
+            "SORT-Z9",
+            "725.0",
+            "1",
+            "1"
+          ],
+          [
+            "SORT-Z9",
+            "150.0",
+            "2",
+            "2"
+          ],
+          [
+            "SORT-A7",
+            "480.0",
+            "1",
+            "1"
+          ],
+          [
+            "SORT-A7",
+            "190.0",
+            "2",
+            "2"
+          ],
+          [
+            "SORT-A7",
+            "150.0",
+            "3",
+            "3"
           ],
           [
             "SORT-Q5",
@@ -1081,7 +1081,7 @@
           ],
           [
             "ZONE-4",
-            "hybrid",
+            "auto",
             "2",
             "4",
             "50.0",
@@ -1089,7 +1089,7 @@
           ],
           [
             "ZONE-4",
-            "auto",
+            "hybrid",
             "2",
             "4",
             "50.0",
@@ -2681,15 +2681,15 @@
             "1"
           ],
           [
-            "cartPage",
-            "Android 12",
-            "2",
-            "1"
-          ],
-          [
             "itemPage",
             "Mac OS X (iPhone)",
             "1",
+            "1"
+          ],
+          [
+            "cartPage",
+            "Android 12",
+            "2",
             "1"
           ]
         ],
@@ -2824,12 +2824,12 @@
         ],
         "results": [
           [
-            "E009",
+            "E001",
             "2",
             "1"
           ],
           [
-            "E001",
+            "E009",
             "2",
             "1"
           ]
@@ -4231,6 +4231,2513 @@
         ],
         "results_mode": "rowsort",
         "skip_sqllogictest": true
+      }
+    },
+    {
+      "id": "Q717",
+      "sql": "SELECT DISTINCT facility_zone, FIRST_VALUE(throughput_rate) OVER (PARTITION BY facility_zone ORDER BY _timestamp) AS first_rate, LAST_VALUE(throughput_rate) OVER (PARTITION BY facility_zone ORDER BY _timestamp ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS last_rate FROM \"{stream}\" ORDER BY facility_zone",
+      "category": "window",
+      "time_offset": {
+        "start_offset": 42959000000,
+        "end_offset": 43033000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "first_rate",
+          "last_rate"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "610.0",
+            "840.0"
+          ],
+          [
+            "ZONE-2",
+            "725.0",
+            "725.0"
+          ],
+          [
+            "ZONE-3",
+            "610.0",
+            "840.0"
+          ],
+          [
+            "ZONE-4",
+            "480.0",
+            "290.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q718",
+      "sql": "SELECT DISTINCT operation_mode, FIRST_VALUE(load_factor) OVER (PARTITION BY operation_mode ORDER BY _timestamp) AS first_load, NTH_VALUE(load_factor, 3) OVER (PARTITION BY operation_mode ORDER BY _timestamp ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS third_load FROM \"{stream}\" ORDER BY operation_mode",
+      "category": "window",
+      "time_offset": {
+        "start_offset": 43019000000,
+        "end_offset": 43093000000
+      },
+      "expected": {
+        "columns": [
+          "operation_mode",
+          "first_load",
+          "third_load"
+        ],
+        "results": [
+          [
+            "auto",
+            "33.0",
+            "88.1"
+          ],
+          [
+            "hybrid",
+            "55.2",
+            "None"
+          ],
+          [
+            "manual",
+            "55.2",
+            "None"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q719",
+      "sql": "SELECT _timestamp, component_name, region_code, latency_ms, AVG(latency_ms) OVER (PARTITION BY component_name ORDER BY _timestamp ROWS BETWEEN 3 PRECEDING AND CURRENT ROW) AS comp_rolling_avg, AVG(latency_ms) OVER (PARTITION BY region_code ORDER BY _timestamp ROWS BETWEEN 3 PRECEDING AND CURRENT ROW) AS region_rolling_avg, MAX(latency_ms) OVER (PARTITION BY component_name) AS comp_max FROM \"{stream}\" WHERE latency_ms IS NOT NULL ORDER BY _timestamp ASC LIMIT 10",
+      "category": "window",
+      "time_offset": {
+        "start_offset": 43079000000,
+        "end_offset": 43153000000
+      },
+      "expected": {
+        "columns": [
+          "component_name",
+          "region_code",
+          "latency_ms",
+          "comp_rolling_avg",
+          "region_rolling_avg",
+          "comp_max"
+        ],
+        "results": [
+          [
+            "charge-checker",
+            "EU-CENTRAL",
+            "78",
+            "78.0",
+            "78.0",
+            "78"
+          ],
+          [
+            "sorter-engine",
+            "AP-CENTRAL",
+            "1900",
+            "1900.0",
+            "1900.0",
+            "1900"
+          ],
+          [
+            "sorter-engine",
+            "AP-CENTRAL",
+            "1900",
+            "1900.0",
+            "1900.0",
+            "1900"
+          ],
+          [
+            "conveyor-driver",
+            "US-EAST",
+            "15",
+            "15.0",
+            "15.0",
+            "15"
+          ],
+          [
+            "zone-controller",
+            "US-WEST",
+            "12",
+            "12.0",
+            "12.0",
+            "12"
+          ],
+          [
+            "zone-controller",
+            "US-WEST",
+            "12",
+            "12.0",
+            "12.0",
+            "12"
+          ],
+          [
+            "scan-hub",
+            "EU-WEST",
+            "45",
+            "45.0",
+            "45.0",
+            "45"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q720",
+      "sql": "SELECT _timestamp, facility_zone, operation_mode, throughput_rate, load_factor, RANK() OVER (PARTITION BY facility_zone ORDER BY throughput_rate DESC) AS zone_rank, DENSE_RANK() OVER (PARTITION BY operation_mode ORDER BY load_factor DESC) AS mode_dense_rank, PERCENT_RANK() OVER (PARTITION BY facility_zone ORDER BY throughput_rate DESC) AS zone_pct_rank FROM \"{stream}\" ORDER BY facility_zone, zone_rank LIMIT 10",
+      "category": "window",
+      "time_offset": {
+        "start_offset": 43139000000,
+        "end_offset": 43213000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "operation_mode",
+          "throughput_rate",
+          "load_factor",
+          "zone_rank",
+          "mode_dense_rank",
+          "zone_pct_rank"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "manual",
+            "610.0",
+            "99.0",
+            "1",
+            "1",
+            "0.0"
+          ],
+          [
+            "ZONE-2",
+            "auto",
+            "725.0",
+            "12.5",
+            "1",
+            "2",
+            "0.0"
+          ],
+          [
+            "ZONE-2",
+            "manual",
+            "480.0",
+            "21.4",
+            "2",
+            "3",
+            "1.0"
+          ],
+          [
+            "ZONE-3",
+            "manual",
+            "840.0",
+            "33.0",
+            "1",
+            "2",
+            "0.0"
+          ],
+          [
+            "ZONE-3",
+            "hybrid",
+            "320.0",
+            "67.9",
+            "2",
+            "1",
+            "1.0"
+          ],
+          [
+            "ZONE-4",
+            "hybrid",
+            "725.0",
+            "12.5",
+            "1",
+            "2",
+            "0.0"
+          ],
+          [
+            "ZONE-4",
+            "auto",
+            "480.0",
+            "21.4",
+            "2",
+            "1",
+            "1.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q721",
+      "sql": "SELECT facility_zone, operation_mode, avg_tput, rn FROM (SELECT facility_zone, operation_mode, AVG(throughput_rate) OVER (PARTITION BY facility_zone, operation_mode) AS avg_tput, ROW_NUMBER() OVER (PARTITION BY facility_zone ORDER BY throughput_rate DESC) AS rn FROM \"{stream}\") sub WHERE rn <= 3 ORDER BY facility_zone, rn",
+      "category": "window",
+      "time_offset": {
+        "start_offset": 43199000000,
+        "end_offset": 43273000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "operation_mode",
+          "avg_tput",
+          "rn"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "auto",
+            "840.0",
+            "1"
+          ],
+          [
+            "ZONE-1",
+            "manual",
+            "555.0",
+            "2"
+          ],
+          [
+            "ZONE-2",
+            "manual",
+            "290.0",
+            "1"
+          ],
+          [
+            "ZONE-3",
+            "manual",
+            "840.0",
+            "1"
+          ],
+          [
+            "ZONE-3",
+            "hybrid",
+            "555.0",
+            "2"
+          ],
+          [
+            "ZONE-4",
+            "hybrid",
+            "725.0",
+            "1"
+          ],
+          [
+            "ZONE-4",
+            "auto",
+            "190.0",
+            "2"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q722",
+      "sql": "SELECT _timestamp, component_name, latency_ms, AVG(latency_ms) OVER w AS rolling_avg, MIN(latency_ms) OVER w AS rolling_min, MAX(latency_ms) OVER w AS rolling_max FROM \"{stream}\" WHERE latency_ms IS NOT NULL WINDOW w AS (PARTITION BY component_name ORDER BY _timestamp ROWS BETWEEN 2 PRECEDING AND 2 FOLLOWING) ORDER BY _timestamp ASC LIMIT 10",
+      "category": "window",
+      "time_offset": {
+        "start_offset": 43259000000,
+        "end_offset": 43333000000
+      },
+      "expected": {
+        "columns": [
+          "component_name",
+          "latency_ms",
+          "rolling_avg",
+          "rolling_min",
+          "rolling_max"
+        ],
+        "results": [
+          [
+            "temp-regulator",
+            "3200",
+            "3200.0",
+            "3200",
+            "3200"
+          ],
+          [
+            "charge-checker",
+            "78",
+            "78.0",
+            "78",
+            "78"
+          ],
+          [
+            "charge-checker",
+            "78",
+            "78.0",
+            "78",
+            "78"
+          ],
+          [
+            "sorter-engine",
+            "1900",
+            "1900.0",
+            "1900",
+            "1900"
+          ],
+          [
+            "conveyor-driver",
+            "15",
+            "15.0",
+            "15",
+            "15"
+          ],
+          [
+            "conveyor-driver",
+            "15",
+            "15.0",
+            "15",
+            "15"
+          ],
+          [
+            "zone-controller",
+            "12",
+            "12.0",
+            "12",
+            "12"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q723",
+      "sql": "SELECT _timestamp, facility_zone, throughput_rate, SUM(throughput_rate) OVER w AS cum_sum, AVG(throughput_rate) OVER w AS cum_avg FROM \"{stream}\" WINDOW w AS (PARTITION BY facility_zone ORDER BY _timestamp ROWS UNBOUNDED PRECEDING) ORDER BY facility_zone, _timestamp ASC LIMIT 10",
+      "category": "window",
+      "time_offset": {
+        "start_offset": 43319000000,
+        "end_offset": 43393000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "throughput_rate",
+          "cum_sum",
+          "cum_avg"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "320.0",
+            "320.0",
+            "320.0"
+          ],
+          [
+            "ZONE-1",
+            "610.0",
+            "930.0",
+            "465.0"
+          ],
+          [
+            "ZONE-2",
+            "150.0",
+            "150.0",
+            "150.0"
+          ],
+          [
+            "ZONE-2",
+            "725.0",
+            "875.0",
+            "437.5"
+          ],
+          [
+            "ZONE-3",
+            "320.0",
+            "320.0",
+            "320.0"
+          ],
+          [
+            "ZONE-3",
+            "610.0",
+            "930.0",
+            "465.0"
+          ],
+          [
+            "ZONE-4",
+            "480.0",
+            "480.0",
+            "480.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q724",
+      "sql": "SELECT _timestamp, component_name, latency_ms, LAG(latency_ms, 1) OVER (PARTITION BY component_name ORDER BY _timestamp) AS prev_lat, LEAD(latency_ms, 1) OVER (PARTITION BY component_name ORDER BY _timestamp) AS next_lat, latency_ms - LAG(latency_ms, 1) OVER (PARTITION BY component_name ORDER BY _timestamp) AS delta FROM \"{stream}\" WHERE latency_ms IS NOT NULL ORDER BY component_name, _timestamp ASC LIMIT 10",
+      "category": "window",
+      "time_offset": {
+        "start_offset": 43379000000,
+        "end_offset": 43453000000
+      },
+      "expected": {
+        "columns": [
+          "component_name",
+          "latency_ms",
+          "prev_lat",
+          "next_lat",
+          "delta"
+        ],
+        "results": [
+          [
+            "batch-sync",
+            "1450",
+            "None",
+            "1450",
+            "None"
+          ],
+          [
+            "batch-sync",
+            "1450",
+            "1450",
+            "None",
+            "0"
+          ],
+          [
+            "lane-monitor",
+            "567",
+            "None",
+            "567",
+            "None"
+          ],
+          [
+            "lane-monitor",
+            "567",
+            "567",
+            "None",
+            "0"
+          ],
+          [
+            "pallet-mapper",
+            "89",
+            "None",
+            "None",
+            "None"
+          ],
+          [
+            "temp-regulator",
+            "3200",
+            "None",
+            "None",
+            "None"
+          ],
+          [
+            "track-router",
+            "230",
+            "None",
+            "None",
+            "None"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q725",
+      "sql": "SELECT _timestamp, facility_zone, throughput_rate, LAG(throughput_rate, 2) OVER (PARTITION BY facility_zone ORDER BY _timestamp) AS two_back, LEAD(throughput_rate, 2) OVER (PARTITION BY facility_zone ORDER BY _timestamp) AS two_forward, throughput_rate - LAG(throughput_rate, 1) OVER (PARTITION BY facility_zone ORDER BY _timestamp) AS step_change FROM \"{stream}\" ORDER BY facility_zone, _timestamp ASC LIMIT 10",
+      "category": "window",
+      "time_offset": {
+        "start_offset": 43439000000,
+        "end_offset": 43513000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "throughput_rate",
+          "two_back",
+          "two_forward",
+          "step_change"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "555.0",
+            "None",
+            "None",
+            "None"
+          ],
+          [
+            "ZONE-1",
+            "900.0",
+            "None",
+            "None",
+            "345.0"
+          ],
+          [
+            "ZONE-2",
+            "190.0",
+            "None",
+            "None",
+            "None"
+          ],
+          [
+            "ZONE-3",
+            "555.0",
+            "None",
+            "None",
+            "None"
+          ],
+          [
+            "ZONE-3",
+            "900.0",
+            "None",
+            "None",
+            "345.0"
+          ],
+          [
+            "ZONE-4",
+            "290.0",
+            "None",
+            "None",
+            "None"
+          ],
+          [
+            "ZONE-4",
+            "150.0",
+            "None",
+            "None",
+            "-140.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q726",
+      "sql": "SELECT _timestamp, sorter_model, facility_zone, throughput_rate, load_factor, SUM(CASE WHEN throughput_rate > 400 THEN 1 ELSE 0 END) OVER (PARTITION BY sorter_model ORDER BY _timestamp ROWS UNBOUNDED PRECEDING) AS high_rate_cnt, AVG(CASE WHEN load_factor > 50 THEN load_factor END) OVER (PARTITION BY sorter_model ORDER BY _timestamp ROWS UNBOUNDED PRECEDING) AS avg_high_load FROM \"{stream}\" ORDER BY sorter_model, _timestamp ASC LIMIT 10",
+      "category": "window",
+      "time_offset": {
+        "start_offset": 43499000000,
+        "end_offset": 43573000000
+      },
+      "expected": {
+        "columns": [
+          "sorter_model",
+          "facility_zone",
+          "throughput_rate",
+          "load_factor",
+          "high_rate_cnt",
+          "avg_high_load"
+        ],
+        "results": [
+          [
+            "SORT-A7",
+            "ZONE-4",
+            "150.0",
+            "45.3",
+            "0",
+            "None"
+          ],
+          [
+            "SORT-A7",
+            "ZONE-4",
+            "480.0",
+            "21.4",
+            "1",
+            "None"
+          ],
+          [
+            "SORT-M3",
+            "ZONE-1",
+            "900.0",
+            "94.6",
+            "1",
+            "94.6"
+          ],
+          [
+            "SORT-M3",
+            "ZONE-1",
+            "610.0",
+            "99.0",
+            "2",
+            "96.8"
+          ],
+          [
+            "SORT-Q5",
+            "ZONE-2",
+            "480.0",
+            "21.4",
+            "1",
+            "None"
+          ],
+          [
+            "SORT-X1",
+            "ZONE-3",
+            "320.0",
+            "67.9",
+            "0",
+            "67.9"
+          ],
+          [
+            "SORT-Z9",
+            "ZONE-2",
+            "150.0",
+            "45.3",
+            "0",
+            "None"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q727",
+      "sql": "SELECT _timestamp, component_name, latency_ms, NTILE(5) OVER (ORDER BY latency_ms) AS latency_quintile, CUME_DIST() OVER (ORDER BY latency_ms) AS latency_cume_dist FROM \"{stream}\" WHERE latency_ms IS NOT NULL ORDER BY latency_ms ASC LIMIT 10",
+      "category": "window",
+      "time_offset": {
+        "start_offset": 43559000000,
+        "end_offset": 43633000000
+      },
+      "expected": {
+        "columns": [
+          "component_name",
+          "latency_ms",
+          "latency_quintile",
+          "latency_cume_dist"
+        ],
+        "results": [
+          [
+            "scan-hub",
+            "45",
+            "1",
+            "0.14285714285714285"
+          ],
+          [
+            "pallet-mapper",
+            "89",
+            "1",
+            "0.42857142857142855"
+          ],
+          [
+            "pallet-mapper",
+            "89",
+            "2",
+            "0.42857142857142855"
+          ],
+          [
+            "track-router",
+            "230",
+            "2",
+            "0.7142857142857143"
+          ],
+          [
+            "track-router",
+            "230",
+            "3",
+            "0.7142857142857143"
+          ],
+          [
+            "lane-monitor",
+            "567",
+            "4",
+            "0.8571428571428571"
+          ],
+          [
+            "batch-sync",
+            "1450",
+            "5",
+            "1.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q728",
+      "sql": "SELECT _timestamp, facility_zone, throughput_rate, NTILE(3) OVER (PARTITION BY facility_zone ORDER BY throughput_rate) AS tput_tertile, CUME_DIST() OVER (PARTITION BY facility_zone ORDER BY throughput_rate) AS tput_cume_dist FROM \"{stream}\" ORDER BY facility_zone, throughput_rate ASC LIMIT 10",
+      "category": "window",
+      "time_offset": {
+        "start_offset": 43619000000,
+        "end_offset": 43693000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "throughput_rate",
+          "tput_tertile",
+          "tput_cume_dist"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "555.0",
+            "1",
+            "1.0"
+          ],
+          [
+            "ZONE-2",
+            "190.0",
+            "1",
+            "0.5"
+          ],
+          [
+            "ZONE-2",
+            "290.0",
+            "2",
+            "1.0"
+          ],
+          [
+            "ZONE-3",
+            "840.0",
+            "1",
+            "0.5"
+          ],
+          [
+            "ZONE-3",
+            "900.0",
+            "2",
+            "1.0"
+          ],
+          [
+            "ZONE-4",
+            "190.0",
+            "1",
+            "0.5"
+          ],
+          [
+            "ZONE-4",
+            "290.0",
+            "2",
+            "1.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q729",
+      "sql": "SELECT facility_zone, component_name, cnt, RANK() OVER (PARTITION BY facility_zone ORDER BY cnt DESC) AS rank_by_cnt, SUM(cnt) OVER (PARTITION BY facility_zone) AS zone_total FROM (SELECT facility_zone, component_name, COUNT(*) AS cnt FROM \"{stream}\" GROUP BY facility_zone, component_name) agg ORDER BY facility_zone, rank_by_cnt LIMIT 12",
+      "category": "window",
+      "time_offset": {
+        "start_offset": 43679000000,
+        "end_offset": 43753000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "component_name",
+          "cnt",
+          "rank_by_cnt",
+          "zone_total"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "zone-controller",
+            "1",
+            "1",
+            "2"
+          ],
+          [
+            "ZONE-1",
+            "sorter-engine",
+            "1",
+            "1",
+            "2"
+          ],
+          [
+            "ZONE-2",
+            "conveyor-driver",
+            "1",
+            "1",
+            "1"
+          ],
+          [
+            "ZONE-3",
+            "zone-controller",
+            "1",
+            "1",
+            "2"
+          ],
+          [
+            "ZONE-3",
+            "sorter-engine",
+            "1",
+            "1",
+            "2"
+          ],
+          [
+            "ZONE-4",
+            "charge-checker",
+            "1",
+            "1",
+            "2"
+          ],
+          [
+            "ZONE-4",
+            "scan-hub",
+            "1",
+            "1",
+            "2"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q730",
+      "sql": "SELECT region_code, component_name, avg_lat, ROW_NUMBER() OVER (PARTITION BY region_code ORDER BY avg_lat DESC) AS lat_rank, AVG(avg_lat) OVER (PARTITION BY region_code) AS region_avg FROM (SELECT region_code, component_name, AVG(CAST(latency_ms AS FLOAT)) AS avg_lat FROM \"{stream}\" GROUP BY region_code, component_name) sub ORDER BY region_code, lat_rank LIMIT 12",
+      "category": "window",
+      "time_offset": {
+        "start_offset": 43739000000,
+        "end_offset": 43813000000
+      },
+      "expected": {
+        "columns": [
+          "region_code",
+          "component_name",
+          "avg_lat",
+          "lat_rank",
+          "region_avg"
+        ],
+        "results": [
+          [
+            "AP-EAST",
+            "pallet-mapper",
+            "89.0",
+            "1",
+            "89.0"
+          ],
+          [
+            "AP-SOUTH",
+            "batch-sync",
+            "1450.0",
+            "1",
+            "1450.0"
+          ],
+          [
+            "EU-NORTH",
+            "track-router",
+            "230.0",
+            "1",
+            "230.0"
+          ],
+          [
+            "EU-WEST",
+            "scan-hub",
+            "45.0",
+            "1",
+            "45.0"
+          ],
+          [
+            "US-WEST",
+            "zone-controller",
+            "12.0",
+            "1",
+            "12.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q731",
+      "sql": "SELECT _timestamp, facility_zone, throughput_rate, AVG(throughput_rate) OVER (PARTITION BY facility_zone ORDER BY _timestamp ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING) AS three_point_avg, MIN(throughput_rate) OVER (PARTITION BY facility_zone ORDER BY _timestamp ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS running_min, MAX(throughput_rate) OVER (PARTITION BY facility_zone ORDER BY _timestamp ROWS BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING) AS future_max FROM \"{stream}\" ORDER BY facility_zone, _timestamp ASC LIMIT 10",
+      "category": "window",
+      "time_offset": {
+        "start_offset": 43799000000,
+        "end_offset": 43873000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "throughput_rate",
+          "three_point_avg",
+          "running_min",
+          "future_max"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "840.0",
+            "697.5",
+            "840.0",
+            "840.0"
+          ],
+          [
+            "ZONE-1",
+            "555.0",
+            "697.5",
+            "555.0",
+            "555.0"
+          ],
+          [
+            "ZONE-2",
+            "725.0",
+            "457.5",
+            "725.0",
+            "725.0"
+          ],
+          [
+            "ZONE-2",
+            "190.0",
+            "457.5",
+            "190.0",
+            "190.0"
+          ],
+          [
+            "ZONE-3",
+            "840.0",
+            "697.5",
+            "840.0",
+            "840.0"
+          ],
+          [
+            "ZONE-3",
+            "555.0",
+            "697.5",
+            "555.0",
+            "555.0"
+          ],
+          [
+            "ZONE-4",
+            "290.0",
+            "290.0",
+            "290.0",
+            "290.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q732",
+      "sql": "SELECT _timestamp, COALESCE(scan_category, 'unknown') AS scan_type, latency_ms, ROW_NUMBER() OVER (PARTITION BY COALESCE(scan_category, 'unknown') ORDER BY latency_ms) AS rn_by_scan, AVG(latency_ms) OVER (PARTITION BY COALESCE(scan_category, 'unknown')) AS avg_by_scan FROM \"{stream}\" WHERE latency_ms IS NOT NULL ORDER BY scan_type, rn_by_scan LIMIT 10",
+      "category": "window",
+      "time_offset": {
+        "start_offset": 43859000000,
+        "end_offset": 43933000000
+      },
+      "expected": {
+        "columns": [
+          "scan_type",
+          "latency_ms",
+          "rn_by_scan",
+          "avg_by_scan"
+        ],
+        "results": [
+          [
+            "inbound",
+            "12",
+            "1",
+            "810.5"
+          ],
+          [
+            "inbound",
+            "15",
+            "2",
+            "810.5"
+          ],
+          [
+            "inbound",
+            "15",
+            "3",
+            "810.5"
+          ],
+          [
+            "inbound",
+            "3200",
+            "4",
+            "810.5"
+          ],
+          [
+            "internal",
+            "1900",
+            "1",
+            "1900.0"
+          ],
+          [
+            "outbound",
+            "78",
+            "1",
+            "78.0"
+          ],
+          [
+            "outbound",
+            "78",
+            "2",
+            "78.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q733",
+      "sql": "SELECT _timestamp, log, component_name, match_all('warehouse') AS has_warehouse, ROW_NUMBER() OVER (PARTITION BY component_name ORDER BY _timestamp) AS rn FROM \"{stream}\" WHERE match_all('warehouse') ORDER BY component_name, rn LIMIT 10",
+      "category": "window",
+      "time_offset": {
+        "start_offset": 43919000000,
+        "end_offset": 43993000000
+      },
+      "expected": {
+        "columns": [
+          "log",
+          "component_name",
+          "has_warehouse",
+          "rn"
+        ],
+        "results": [
+          [
+            "Q733 warehouse event record 4",
+            "batch-sync",
+            "True",
+            "1"
+          ],
+          [
+            "Q733 warehouse event record 0 ACK batch batchIdList:Q733-0",
+            "conveyor-driver",
+            "True",
+            "1"
+          ],
+          [
+            "Q733 warehouse event record 2",
+            "scan-hub",
+            "True",
+            "1"
+          ],
+          [
+            "Q733 warehouse event record 3 ACK batch batchIdList:Q733-3",
+            "track-router",
+            "True",
+            "1"
+          ],
+          [
+            "Q734 warehouse event record 0 ACK batch batchIdList:Q734-0",
+            "track-router",
+            "True",
+            "2"
+          ],
+          [
+            "Q732 warehouse event record 4",
+            "zone-controller",
+            "True",
+            "1"
+          ],
+          [
+            "Q733 warehouse event record 1",
+            "zone-controller",
+            "True",
+            "2"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q734",
+      "sql": "SELECT component_name, SUM(CASE WHEN match_all('error') THEN 1 ELSE 0 END) AS error_hits, COUNT(*) AS total_hits, RANK() OVER (ORDER BY SUM(CASE WHEN match_all('error') THEN 1 ELSE 0 END) DESC) AS error_rank FROM \"{stream}\" GROUP BY component_name ORDER BY error_rank LIMIT 10",
+      "category": "window",
+      "time_offset": {
+        "start_offset": 43979000000,
+        "end_offset": 44053000000
+      },
+      "expected": {
+        "columns": [
+          "component_name",
+          "error_hits",
+          "total_hits",
+          "error_rank"
+        ],
+        "results": [
+          [
+            "pallet-mapper",
+            "0",
+            "1",
+            "1"
+          ],
+          [
+            "temp-regulator",
+            "0",
+            "1",
+            "1"
+          ],
+          [
+            "track-router",
+            "0",
+            "1",
+            "1"
+          ],
+          [
+            "batch-sync",
+            "0",
+            "2",
+            "1"
+          ],
+          [
+            "lane-monitor",
+            "0",
+            "2",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q735",
+      "sql": "SELECT DISTINCT facility_zone, NTH_VALUE(throughput_rate, 2) OVER (PARTITION BY facility_zone ORDER BY throughput_rate DESC ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS second_highest_rate, NTH_VALUE(load_factor, 2) OVER (PARTITION BY facility_zone ORDER BY load_factor DESC ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS second_highest_load FROM \"{stream}\" ORDER BY facility_zone",
+      "category": "window",
+      "time_offset": {
+        "start_offset": 44039000000,
+        "end_offset": 44113000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "second_highest_rate",
+          "second_highest_load"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "555.0",
+            "72.8"
+          ],
+          [
+            "ZONE-2",
+            "150.0",
+            "45.3"
+          ],
+          [
+            "ZONE-3",
+            "555.0",
+            "72.8"
+          ],
+          [
+            "ZONE-4",
+            "None",
+            "None"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q736",
+      "sql": "SELECT facility_zone, operation_mode, SUM(throughput_rate) AS total_rate, SUM(throughput_rate) * 100.0 / NULLIF(SUM(SUM(throughput_rate)) OVER (PARTITION BY facility_zone), 0) AS pct_of_zone FROM \"{stream}\" GROUP BY facility_zone, operation_mode ORDER BY facility_zone, pct_of_zone DESC",
+      "category": "window",
+      "time_offset": {
+        "start_offset": 44099000000,
+        "end_offset": 44173000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "operation_mode",
+          "total_rate",
+          "pct_of_zone"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "manual",
+            "320.0",
+            "100.0"
+          ],
+          [
+            "ZONE-2",
+            "auto",
+            "480.0",
+            "76.19047619047619"
+          ],
+          [
+            "ZONE-2",
+            "manual",
+            "150.0",
+            "23.80952380952381"
+          ],
+          [
+            "ZONE-3",
+            "hybrid",
+            "900.0",
+            "59.602649006622514"
+          ],
+          [
+            "ZONE-3",
+            "manual",
+            "610.0",
+            "40.397350993377486"
+          ],
+          [
+            "ZONE-4",
+            "hybrid",
+            "480.0",
+            "76.19047619047619"
+          ],
+          [
+            "ZONE-4",
+            "auto",
+            "150.0",
+            "23.80952380952381"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q737",
+      "sql": "WITH base AS (SELECT _timestamp, facility_zone, operation_mode, throughput_rate, load_factor FROM \"{stream}\" WHERE throughput_rate > 100) SELECT *, AVG(throughput_rate) OVER (PARTITION BY facility_zone ORDER BY _timestamp ROWS BETWEEN 2 PRECEDING AND CURRENT ROW) AS rolling_avg FROM base ORDER BY facility_zone, _timestamp ASC LIMIT 12",
+      "category": "window",
+      "time_offset": {
+        "start_offset": 44159000000,
+        "end_offset": 44233000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "operation_mode",
+          "throughput_rate",
+          "load_factor",
+          "rolling_avg"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "auto",
+            "610.0",
+            "99.0",
+            "610.0"
+          ],
+          [
+            "ZONE-1",
+            "manual",
+            "840.0",
+            "33.0",
+            "725.0"
+          ],
+          [
+            "ZONE-2",
+            "manual",
+            "725.0",
+            "12.5",
+            "725.0"
+          ],
+          [
+            "ZONE-3",
+            "manual",
+            "610.0",
+            "99.0",
+            "610.0"
+          ],
+          [
+            "ZONE-3",
+            "hybrid",
+            "840.0",
+            "33.0",
+            "725.0"
+          ],
+          [
+            "ZONE-4",
+            "hybrid",
+            "480.0",
+            "21.4",
+            "480.0"
+          ],
+          [
+            "ZONE-4",
+            "auto",
+            "290.0",
+            "55.2",
+            "385.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q738",
+      "sql": "SELECT facility_zone, rn, COUNT(*) AS cnt, AVG(throughput_rate) AS avg_rate FROM (SELECT facility_zone, throughput_rate, ROW_NUMBER() OVER (PARTITION BY facility_zone ORDER BY throughput_rate DESC) AS rn FROM \"{stream}\") ranked WHERE rn <= 3 GROUP BY facility_zone, rn ORDER BY facility_zone, rn",
+      "category": "window",
+      "time_offset": {
+        "start_offset": 44219000000,
+        "end_offset": 44293000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "rn",
+          "cnt",
+          "avg_rate"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "1",
+            "1",
+            "900.0"
+          ],
+          [
+            "ZONE-1",
+            "2",
+            "1",
+            "840.0"
+          ],
+          [
+            "ZONE-2",
+            "1",
+            "1",
+            "290.0"
+          ],
+          [
+            "ZONE-2",
+            "2",
+            "1",
+            "190.0"
+          ],
+          [
+            "ZONE-3",
+            "1",
+            "1",
+            "555.0"
+          ],
+          [
+            "ZONE-4",
+            "1",
+            "1",
+            "290.0"
+          ],
+          [
+            "ZONE-4",
+            "2",
+            "1",
+            "190.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q739",
+      "sql": "SELECT _timestamp, component_name, latency_ms, LAG(latency_ms, 2, 0) OVER (PARTITION BY component_name ORDER BY _timestamp) AS prev2_lat, LEAD(latency_ms, 2, 0) OVER (PARTITION BY component_name ORDER BY _timestamp) AS next2_lat FROM \"{stream}\" WHERE latency_ms IS NOT NULL ORDER BY component_name, _timestamp ASC LIMIT 10",
+      "category": "window",
+      "time_offset": {
+        "start_offset": 44279000000,
+        "end_offset": 44353000000
+      },
+      "expected": {
+        "columns": [
+          "component_name",
+          "latency_ms",
+          "prev2_lat",
+          "next2_lat"
+        ],
+        "results": [
+          [
+            "charge-checker",
+            "78",
+            "0",
+            "0"
+          ],
+          [
+            "conveyor-driver",
+            "15",
+            "0",
+            "0"
+          ],
+          [
+            "scan-hub",
+            "45",
+            "0",
+            "0"
+          ],
+          [
+            "sorter-engine",
+            "1900",
+            "0",
+            "0"
+          ],
+          [
+            "sorter-engine",
+            "1900",
+            "0",
+            "0"
+          ],
+          [
+            "zone-controller",
+            "12",
+            "0",
+            "0"
+          ],
+          [
+            "zone-controller",
+            "12",
+            "0",
+            "0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q740",
+      "sql": "SELECT _timestamp, facility_zone, throughput_rate, load_factor, ROW_NUMBER() OVER (ORDER BY _timestamp) AS global_seq, SUM(throughput_rate) OVER (ORDER BY _timestamp) AS cum_tput, AVG(load_factor) OVER (ORDER BY _timestamp ROWS BETWEEN 4 PRECEDING AND CURRENT ROW) AS trailing_avg FROM \"{stream}\" ORDER BY _timestamp ASC LIMIT 10",
+      "category": "window",
+      "time_offset": {
+        "start_offset": 44339000000,
+        "end_offset": 44413000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "throughput_rate",
+          "load_factor",
+          "global_seq",
+          "cum_tput",
+          "trailing_avg"
+        ],
+        "results": [
+          [
+            "ZONE-3",
+            "320.0",
+            "67.9",
+            "1",
+            "320.0",
+            "67.9"
+          ],
+          [
+            "ZONE-2",
+            "480.0",
+            "21.4",
+            "2",
+            "800.0",
+            "44.650000000000006"
+          ],
+          [
+            "ZONE-4",
+            "480.0",
+            "21.4",
+            "3",
+            "1280.0",
+            "36.900000000000006"
+          ],
+          [
+            "ZONE-1",
+            "610.0",
+            "99.0",
+            "4",
+            "1890.0",
+            "52.425000000000004"
+          ],
+          [
+            "ZONE-2",
+            "725.0",
+            "12.5",
+            "5",
+            "2615.0",
+            "44.440000000000005"
+          ],
+          [
+            "ZONE-4",
+            "725.0",
+            "12.5",
+            "6",
+            "3340.0",
+            "33.36"
+          ],
+          [
+            "ZONE-3",
+            "840.0",
+            "33.0",
+            "7",
+            "4180.0",
+            "35.68"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q741",
+      "sql": "SELECT _timestamp, conveyor_lane, facility_zone, throughput_rate, FIRST_VALUE(throughput_rate) OVER (PARTITION BY conveyor_lane ORDER BY _timestamp ROWS BETWEEN 2 PRECEDING AND 2 FOLLOWING) AS window_first, LAST_VALUE(throughput_rate) OVER (PARTITION BY conveyor_lane ORDER BY _timestamp ROWS BETWEEN 2 PRECEDING AND 2 FOLLOWING) AS window_last FROM \"{stream}\" ORDER BY conveyor_lane, _timestamp ASC LIMIT 10",
+      "category": "window",
+      "time_offset": {
+        "start_offset": 44399000000,
+        "end_offset": 44473000000
+      },
+      "expected": {
+        "columns": [
+          "conveyor_lane",
+          "facility_zone",
+          "throughput_rate",
+          "window_first",
+          "window_last"
+        ],
+        "results": [
+          [
+            "LANE-A",
+            "ZONE-4",
+            "725.0",
+            "725.0",
+            "190.0"
+          ],
+          [
+            "LANE-A",
+            "ZONE-4",
+            "190.0",
+            "725.0",
+            "190.0"
+          ],
+          [
+            "LANE-B",
+            "ZONE-1",
+            "840.0",
+            "840.0",
+            "555.0"
+          ],
+          [
+            "LANE-B",
+            "ZONE-1",
+            "555.0",
+            "840.0",
+            "555.0"
+          ],
+          [
+            "LANE-C",
+            "ZONE-2",
+            "290.0",
+            "290.0",
+            "290.0"
+          ],
+          [
+            "LANE-D",
+            "ZONE-3",
+            "840.0",
+            "840.0",
+            "555.0"
+          ],
+          [
+            "LANE-D",
+            "ZONE-3",
+            "555.0",
+            "840.0",
+            "555.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q742",
+      "sql": "SELECT _timestamp, pallet_id, cell_temp, cell_temp - LAG(cell_temp) OVER (PARTITION BY pallet_id ORDER BY _timestamp) AS temp_delta, AVG(cell_temp) OVER (PARTITION BY pallet_id ORDER BY _timestamp ROWS BETWEEN 2 PRECEDING AND CURRENT ROW) AS rolling_temp FROM \"{stream}\" ORDER BY pallet_id, _timestamp ASC LIMIT 10",
+      "category": "window",
+      "time_offset": {
+        "start_offset": 44459000000,
+        "end_offset": 44533000000
+      },
+      "expected": {
+        "columns": [
+          "pallet_id",
+          "cell_temp",
+          "temp_delta",
+          "rolling_temp"
+        ],
+        "results": [
+          [
+            "PL-001",
+            "30.1",
+            "None",
+            "30.1"
+          ],
+          [
+            "PL-002",
+            "35.7",
+            "None",
+            "35.7"
+          ],
+          [
+            "PL-003",
+            "19.2",
+            "None",
+            "19.2"
+          ],
+          [
+            "PL-004",
+            "35.7",
+            "None",
+            "35.7"
+          ],
+          [
+            "PL-006",
+            "26.3",
+            "None",
+            "26.3"
+          ],
+          [
+            "PL-007",
+            "22.0",
+            "None",
+            "22.0"
+          ],
+          [
+            "PL-008",
+            "26.3",
+            "None",
+            "26.3"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q743",
+      "sql": "SELECT _timestamp, component_name, region_code, latency_ms, SUM(latency_ms) OVER (PARTITION BY component_name ORDER BY _timestamp) AS cum_lat, COUNT(*) OVER (PARTITION BY component_name ORDER BY _timestamp) AS running_cnt, AVG(latency_ms) OVER (PARTITION BY component_name) AS avg_lat FROM \"{stream}\" WHERE latency_ms IS NOT NULL ORDER BY component_name, _timestamp ASC LIMIT 10",
+      "category": "window",
+      "time_offset": {
+        "start_offset": 44519000000,
+        "end_offset": 44593000000
+      },
+      "expected": {
+        "columns": [
+          "component_name",
+          "region_code",
+          "latency_ms",
+          "cum_lat",
+          "running_cnt",
+          "avg_lat"
+        ],
+        "results": [
+          [
+            "batch-sync",
+            "AP-SOUTH",
+            "1450",
+            "1450",
+            "1",
+            "1450.0"
+          ],
+          [
+            "conveyor-driver",
+            "US-EAST",
+            "15",
+            "15",
+            "1",
+            "15.0"
+          ],
+          [
+            "scan-hub",
+            "EU-WEST",
+            "45",
+            "45",
+            "1",
+            "45.0"
+          ],
+          [
+            "track-router",
+            "EU-NORTH",
+            "230",
+            "230",
+            "1",
+            "230.0"
+          ],
+          [
+            "track-router",
+            "EU-NORTH",
+            "230",
+            "460",
+            "2",
+            "230.0"
+          ],
+          [
+            "zone-controller",
+            "US-WEST",
+            "12",
+            "12",
+            "1",
+            "12.0"
+          ],
+          [
+            "zone-controller",
+            "US-WEST",
+            "12",
+            "24",
+            "2",
+            "12.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q744",
+      "sql": "SELECT _timestamp, COALESCE(bot_flag, passthrough_flag) AS flag_status, latency_ms, ROW_NUMBER() OVER (PARTITION BY COALESCE(bot_flag, passthrough_flag) ORDER BY latency_ms DESC) AS rn FROM \"{stream}\" WHERE latency_ms IS NOT NULL ORDER BY flag_status, rn LIMIT 10",
+      "category": "window",
+      "time_offset": {
+        "start_offset": 44579000000,
+        "end_offset": 44653000000
+      },
+      "expected": {
+        "columns": [
+          "flag_status",
+          "latency_ms",
+          "rn"
+        ],
+        "results": [
+          [
+            "false",
+            "1450",
+            "1"
+          ],
+          [
+            "false",
+            "1450",
+            "2"
+          ],
+          [
+            "false",
+            "567",
+            "3"
+          ],
+          [
+            "false",
+            "567",
+            "4"
+          ],
+          [
+            "false",
+            "89",
+            "5"
+          ],
+          [
+            "true",
+            "3200",
+            "1"
+          ],
+          [
+            "verified_bot",
+            "230",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q745",
+      "sql": "SELECT _timestamp, operation_mode, throughput_rate, charge_remaining, RANK() OVER (PARTITION BY operation_mode ORDER BY throughput_rate DESC, charge_remaining DESC) AS combined_rank, DENSE_RANK() OVER (PARTITION BY operation_mode ORDER BY throughput_rate DESC) AS tput_rank FROM \"{stream}\" ORDER BY operation_mode, combined_rank LIMIT 10",
+      "category": "window",
+      "time_offset": {
+        "start_offset": 44639000000,
+        "end_offset": 44713000000
+      },
+      "expected": {
+        "columns": [
+          "operation_mode",
+          "throughput_rate",
+          "charge_remaining",
+          "combined_rank",
+          "tput_rank"
+        ],
+        "results": [
+          [
+            "auto",
+            "555.0",
+            "10.0",
+            "1",
+            "1"
+          ],
+          [
+            "auto",
+            "150.0",
+            "58.0",
+            "2",
+            "2"
+          ],
+          [
+            "hybrid",
+            "900.0",
+            "42.5",
+            "1",
+            "1"
+          ],
+          [
+            "hybrid",
+            "290.0",
+            "66.6",
+            "2",
+            "2"
+          ],
+          [
+            "manual",
+            "900.0",
+            "42.5",
+            "1",
+            "1"
+          ],
+          [
+            "manual",
+            "555.0",
+            "10.0",
+            "2",
+            "2"
+          ],
+          [
+            "manual",
+            "190.0",
+            "25.0",
+            "3",
+            "3"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q746",
+      "sql": "SELECT _timestamp, facility_zone, sorter_model, throughput_rate, ROUND(throughput_rate / NULLIF(FIRST_VALUE(throughput_rate) OVER (PARTITION BY facility_zone, sorter_model ORDER BY _timestamp), 0), 3) AS relative_to_first FROM \"{stream}\" ORDER BY facility_zone, sorter_model, _timestamp ASC LIMIT 10",
+      "category": "window",
+      "time_offset": {
+        "start_offset": 44699000000,
+        "end_offset": 44773000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "sorter_model",
+          "throughput_rate",
+          "relative_to_first"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "SORT-M3",
+            "900.0",
+            "1.0"
+          ],
+          [
+            "ZONE-1",
+            "SORT-M3",
+            "610.0",
+            "0.678"
+          ],
+          [
+            "ZONE-2",
+            "SORT-Q5",
+            "150.0",
+            "1.0"
+          ],
+          [
+            "ZONE-2",
+            "SORT-Z9",
+            "480.0",
+            "1.0"
+          ],
+          [
+            "ZONE-3",
+            "SORT-X1",
+            "320.0",
+            "1.0"
+          ],
+          [
+            "ZONE-4",
+            "SORT-A7",
+            "150.0",
+            "1.0"
+          ],
+          [
+            "ZONE-4",
+            "SORT-A7",
+            "480.0",
+            "3.2"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q747",
+      "sql": "SELECT _timestamp, component_name, latency_ms, LAG(latency_ms, 1) OVER (PARTITION BY component_name ORDER BY _timestamp) AS prev_lat, latency_ms - LAG(latency_ms, 1) OVER (PARTITION BY component_name ORDER BY _timestamp) AS delta, CASE WHEN latency_ms > LAG(latency_ms, 1) OVER (PARTITION BY component_name ORDER BY _timestamp) THEN 'increased' ELSE 'decreased' END AS trend FROM \"{stream}\" WHERE latency_ms IS NOT NULL ORDER BY component_name, _timestamp ASC LIMIT 10",
+      "category": "window",
+      "time_offset": {
+        "start_offset": 44759000000,
+        "end_offset": 44833000000
+      },
+      "expected": {
+        "columns": [
+          "component_name",
+          "latency_ms",
+          "prev_lat",
+          "delta",
+          "trend"
+        ],
+        "results": [
+          [
+            "batch-sync",
+            "1450",
+            "None",
+            "None",
+            "decreased"
+          ],
+          [
+            "lane-monitor",
+            "567",
+            "None",
+            "None",
+            "decreased"
+          ],
+          [
+            "pallet-mapper",
+            "89",
+            "None",
+            "None",
+            "decreased"
+          ],
+          [
+            "pallet-mapper",
+            "89",
+            "89",
+            "0",
+            "decreased"
+          ],
+          [
+            "scan-hub",
+            "45",
+            "None",
+            "None",
+            "decreased"
+          ],
+          [
+            "track-router",
+            "230",
+            "None",
+            "None",
+            "decreased"
+          ],
+          [
+            "track-router",
+            "230",
+            "230",
+            "0",
+            "decreased"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q748",
+      "sql": "SELECT facility_zone, avg_tput, LAG(avg_tput) OVER (ORDER BY avg_tput DESC) AS prev_avg, avg_tput - LAG(avg_tput) OVER (ORDER BY avg_tput DESC) AS drop_from_prev FROM (SELECT facility_zone, AVG(throughput_rate) AS avg_tput FROM \"{stream}\" GROUP BY facility_zone) zone_avgs ORDER BY avg_tput DESC",
+      "category": "window",
+      "time_offset": {
+        "start_offset": 44819000000,
+        "end_offset": 44893000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "avg_tput",
+          "prev_avg",
+          "drop_from_prev"
+        ],
+        "results": [
+          [
+            "ZONE-3",
+            "870.0",
+            "None",
+            "None"
+          ],
+          [
+            "ZONE-1",
+            "555.0",
+            "870.0",
+            "-315.0"
+          ],
+          [
+            "ZONE-2",
+            "240.0",
+            "555.0",
+            "-315.0"
+          ],
+          [
+            "ZONE-4",
+            "240.0",
+            "240.0",
+            "0.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q749",
+      "sql": "SELECT _timestamp, pallet_id, throughput_rate, SUM(throughput_rate) OVER (ORDER BY _timestamp ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS running_total, AVG(throughput_rate) OVER (ORDER BY _timestamp ROWS BETWEEN 4 PRECEDING AND CURRENT ROW) AS trailing_5pt_avg FROM \"{stream}\" ORDER BY _timestamp ASC LIMIT 10",
+      "category": "window",
+      "time_offset": {
+        "start_offset": 44879000000,
+        "end_offset": 44953000000
+      },
+      "expected": {
+        "columns": [
+          "pallet_id",
+          "throughput_rate",
+          "running_total",
+          "trailing_5pt_avg"
+        ],
+        "results": [
+          [
+            "PL-002",
+            "190.0",
+            "190.0",
+            "190.0"
+          ],
+          [
+            "PL-001",
+            "900.0",
+            "1090.0",
+            "545.0"
+          ],
+          [
+            "PL-003",
+            "900.0",
+            "1990.0",
+            "663.3333333333334"
+          ],
+          [
+            "PL-004",
+            "150.0",
+            "2140.0",
+            "535.0"
+          ],
+          [
+            "PL-005",
+            "320.0",
+            "2460.0",
+            "492.0"
+          ],
+          [
+            "PL-007",
+            "320.0",
+            "2780.0",
+            "518.0"
+          ],
+          [
+            "PL-006",
+            "480.0",
+            "3260.0",
+            "434.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q750",
+      "sql": "SELECT _timestamp, component_name, region_code, latency_ms, AVG(latency_ms) OVER w1 AS comp_avg, AVG(latency_ms) OVER w2 AS region_avg FROM \"{stream}\" WHERE latency_ms IS NOT NULL WINDOW w1 AS (PARTITION BY component_name ORDER BY _timestamp ROWS BETWEEN 2 PRECEDING AND 2 FOLLOWING), w2 AS (PARTITION BY region_code ORDER BY _timestamp ROWS BETWEEN 2 PRECEDING AND 2 FOLLOWING) ORDER BY _timestamp ASC LIMIT 10",
+      "category": "window",
+      "time_offset": {
+        "start_offset": 44939000000,
+        "end_offset": 45013000000
+      },
+      "expected": {
+        "columns": [
+          "component_name",
+          "region_code",
+          "latency_ms",
+          "comp_avg",
+          "region_avg"
+        ],
+        "results": [
+          [
+            "zone-controller",
+            "US-WEST",
+            "12",
+            "12.0",
+            "12.0"
+          ],
+          [
+            "scan-hub",
+            "EU-WEST",
+            "45",
+            "45.0",
+            "45.0"
+          ],
+          [
+            "scan-hub",
+            "EU-WEST",
+            "45",
+            "45.0",
+            "45.0"
+          ],
+          [
+            "track-router",
+            "EU-NORTH",
+            "230",
+            "230.0",
+            "230.0"
+          ],
+          [
+            "batch-sync",
+            "AP-SOUTH",
+            "1450",
+            "1450.0",
+            "1450.0"
+          ],
+          [
+            "batch-sync",
+            "AP-SOUTH",
+            "1450",
+            "1450.0",
+            "1450.0"
+          ],
+          [
+            "pallet-mapper",
+            "AP-EAST",
+            "89",
+            "89.0",
+            "89.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q751",
+      "sql": "SELECT DISTINCT control_center, FIRST_VALUE(sorter_model) OVER (PARTITION BY control_center ORDER BY _timestamp) AS first_sorter, LAST_VALUE(sorter_model) OVER (PARTITION BY control_center ORDER BY _timestamp ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS last_sorter FROM \"{stream}\" ORDER BY control_center",
+      "category": "window",
+      "time_offset": {
+        "start_offset": 44999000000,
+        "end_offset": 45073000000
+      },
+      "expected": {
+        "columns": [
+          "control_center",
+          "first_sorter",
+          "last_sorter"
+        ],
+        "results": [
+          [
+            "CC-ALPHA",
+            "SORT-Q5",
+            "SORT-Z9"
+          ],
+          [
+            "CC-BETA",
+            "SORT-X1",
+            "SORT-X1"
+          ],
+          [
+            "CC-DELTA",
+            "SORT-M3",
+            "SORT-M3"
+          ],
+          [
+            "CC-GAMMA",
+            "SORT-A7",
+            "SORT-A7"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q752",
+      "sql": "SELECT DISTINCT component_name, region_code, MAX(latency_ms) OVER (PARTITION BY component_name) AS max_lat, MIN(latency_ms) OVER (PARTITION BY component_name) AS min_lat FROM \"{stream}\" WHERE latency_ms IS NOT NULL ORDER BY component_name, region_code LIMIT 12",
+      "category": "window",
+      "time_offset": {
+        "start_offset": 45059000000,
+        "end_offset": 45133000000
+      },
+      "expected": {
+        "columns": [
+          "component_name",
+          "region_code",
+          "max_lat",
+          "min_lat"
+        ],
+        "results": [
+          [
+            "charge-checker",
+            "EU-CENTRAL",
+            "78",
+            "78"
+          ],
+          [
+            "conveyor-driver",
+            "US-EAST",
+            "15",
+            "15"
+          ],
+          [
+            "sorter-engine",
+            "AP-CENTRAL",
+            "1900",
+            "1900"
+          ],
+          [
+            "temp-regulator",
+            "US-CENTRAL",
+            "3200",
+            "3200"
+          ],
+          [
+            "zone-controller",
+            "US-WEST",
+            "12",
+            "12"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q753",
+      "sql": "SELECT _timestamp, facility_zone, throughput_rate, LAG(throughput_rate) OVER (PARTITION BY facility_zone ORDER BY _timestamp) AS prev_rate, LEAD(throughput_rate) OVER (PARTITION BY facility_zone ORDER BY _timestamp) AS next_rate, AVG(throughput_rate) OVER (PARTITION BY facility_zone ORDER BY _timestamp ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING) AS smooth_rate FROM \"{stream}\" ORDER BY facility_zone, _timestamp ASC LIMIT 10",
+      "category": "window",
+      "time_offset": {
+        "start_offset": 45119000000,
+        "end_offset": 45193000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "throughput_rate",
+          "prev_rate",
+          "next_rate",
+          "smooth_rate"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "320.0",
+            "None",
+            "610.0",
+            "465.0"
+          ],
+          [
+            "ZONE-1",
+            "610.0",
+            "320.0",
+            "None",
+            "465.0"
+          ],
+          [
+            "ZONE-2",
+            "480.0",
+            "None",
+            "None",
+            "480.0"
+          ],
+          [
+            "ZONE-3",
+            "320.0",
+            "None",
+            "610.0",
+            "465.0"
+          ],
+          [
+            "ZONE-3",
+            "610.0",
+            "320.0",
+            "None",
+            "465.0"
+          ],
+          [
+            "ZONE-4",
+            "150.0",
+            "None",
+            "725.0",
+            "437.5"
+          ],
+          [
+            "ZONE-4",
+            "725.0",
+            "150.0",
+            "None",
+            "437.5"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q754",
+      "sql": "SELECT operation_mode, auth_result, avg_lat, RANK() OVER (PARTITION BY operation_mode ORDER BY avg_lat DESC) AS rk FROM (SELECT operation_mode, auth_result, AVG(CAST(latency_ms AS FLOAT)) AS avg_lat FROM \"{stream}\" WHERE latency_ms IS NOT NULL GROUP BY operation_mode, auth_result) sub ORDER BY operation_mode, rk LIMIT 12",
+      "category": "window",
+      "time_offset": {
+        "start_offset": 45179000000,
+        "end_offset": 45253000000
+      },
+      "expected": {
+        "columns": [
+          "operation_mode",
+          "auth_result",
+          "avg_lat",
+          "rk"
+        ],
+        "results": [
+          [
+            "auto",
+            "pass",
+            "2033.3333333333333",
+            "1"
+          ],
+          [
+            "hybrid",
+            "denied",
+            "567.0",
+            "1"
+          ],
+          [
+            "manual",
+            "denied",
+            "567.0",
+            "1"
+          ],
+          [
+            "manual",
+            "pass",
+            "230.0",
+            "2"
+          ],
+          [
+            "manual",
+            "fail",
+            "89.0",
+            "3"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q755",
+      "sql": "SELECT facility_zone, operation_mode, cnt, SUM(cnt) OVER (PARTITION BY facility_zone) AS zone_total, ROUND(CAST(cnt AS FLOAT) * 100.0 / NULLIF(SUM(cnt) OVER (PARTITION BY facility_zone), 0), 2) AS pct FROM (SELECT facility_zone, operation_mode, COUNT(*) AS cnt FROM \"{stream}\" GROUP BY facility_zone, operation_mode) agg ORDER BY facility_zone, pct DESC",
+      "category": "window",
+      "time_offset": {
+        "start_offset": 45239000000,
+        "end_offset": 45313000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "operation_mode",
+          "cnt",
+          "zone_total",
+          "pct"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "manual",
+            "1",
+            "2",
+            "50.0"
+          ],
+          [
+            "ZONE-1",
+            "auto",
+            "1",
+            "2",
+            "50.0"
+          ],
+          [
+            "ZONE-2",
+            "auto",
+            "1",
+            "2",
+            "50.0"
+          ],
+          [
+            "ZONE-2",
+            "manual",
+            "1",
+            "2",
+            "50.0"
+          ],
+          [
+            "ZONE-3",
+            "manual",
+            "1",
+            "2",
+            "50.0"
+          ],
+          [
+            "ZONE-3",
+            "hybrid",
+            "1",
+            "2",
+            "50.0"
+          ],
+          [
+            "ZONE-4",
+            "auto",
+            "1",
+            "1",
+            "100.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q756",
+      "sql": "SELECT _timestamp, pallet_id, throughput_rate, load_factor, STDDEV(throughput_rate) OVER (PARTITION BY pallet_id ORDER BY _timestamp ROWS BETWEEN 3 PRECEDING AND CURRENT ROW) AS rolling_stddev, AVG(load_factor) OVER (PARTITION BY pallet_id ORDER BY _timestamp ROWS BETWEEN 3 PRECEDING AND CURRENT ROW) AS rolling_load FROM \"{stream}\" ORDER BY pallet_id, _timestamp ASC LIMIT 10",
+      "category": "window",
+      "time_offset": {
+        "start_offset": 45299000000,
+        "end_offset": 45373000000
+      },
+      "expected": {
+        "columns": [
+          "pallet_id",
+          "throughput_rate",
+          "load_factor",
+          "rolling_stddev",
+          "rolling_load"
+        ],
+        "results": [
+          [
+            "PL-001",
+            "610.0",
+            "99.0",
+            "None",
+            "99.0"
+          ],
+          [
+            "PL-002",
+            "480.0",
+            "21.4",
+            "None",
+            "21.4"
+          ],
+          [
+            "PL-004",
+            "150.0",
+            "45.3",
+            "None",
+            "45.3"
+          ],
+          [
+            "PL-005",
+            "900.0",
+            "94.6",
+            "None",
+            "94.6"
+          ],
+          [
+            "PL-006",
+            "150.0",
+            "45.3",
+            "None",
+            "45.3"
+          ],
+          [
+            "PL-007",
+            "320.0",
+            "67.9",
+            "None",
+            "67.9"
+          ],
+          [
+            "PL-008",
+            "480.0",
+            "21.4",
+            "None",
+            "21.4"
+          ]
+        ],
+        "results_mode": "rowsort"
       }
     }
   ],
