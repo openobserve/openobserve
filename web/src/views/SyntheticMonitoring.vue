@@ -112,9 +112,13 @@
           <span class="dot" :class="'dot--' + (row as any).status.toLowerCase()" />
         </template>
 
-        <!-- Name + URL -->
+        <!-- Monitor name -->
         <template #cell-name="{ row }">
           <div class="mon-name">{{ (row as any).name }}</div>
+        </template>
+
+        <!-- URL -->
+        <template #cell-url="{ row }">
           <div class="mon-url">{{ (row as any).url }}</div>
         </template>
 
@@ -1062,6 +1066,14 @@ const monitorTableColumns: OTableColumnDef[] = [
     meta: { isName: true, flex: true },
   },
   {
+    id: 'url',
+    header: 'URL',
+    accessorKey: 'url',
+    size: 220,
+    minSize: 140,
+    sortable: false,
+  },
+  {
     id: 'type',
     header: 'Type',
     accessorKey: 'type',
@@ -1715,7 +1727,7 @@ const saveMonitor = () => { showDrawer.value=false; };
 .dot--down     { width:9px; height:9px; background:#ef4444; box-shadow:0 0 0 3px rgba(239,68,68,.15); }
 
 .mon-name { font-size:13px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.mon-url  { font-size:11px; font-family:monospace; color:var(--o2-tab-text-color); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:2px; }
+.mon-url  { font-size:11px; font-family:monospace; color:var(--o2-tab-text-color); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 
 .http-method    { display:inline-block; padding:2px 7px; border-radius:4px; font-size:11px; font-weight:700; font-family:monospace; }
 .method--get    { background:#dbeafe; color:#1d4ed8; }
