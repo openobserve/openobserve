@@ -131,6 +131,11 @@ fn create_synthetics_monitors_table() -> TableCreateStatement {
                 .big_integer()
                 .not_null(),
         )
+        .col(
+            ColumnDef::new(SyntheticsMonitors::Destinations)
+                .json()
+                .not_null(),
+        )
         .to_owned()
 }
 
@@ -179,6 +184,7 @@ enum SyntheticsMonitors {
     NextRunAt,
     CreatedAt,
     UpdatedAt,
+    Destinations,
 }
 
 #[cfg(test)]
@@ -205,7 +211,8 @@ mod tests {
                 "enabled" bool NOT NULL DEFAULT TRUE,
                 "next_run_at" bigint NOT NULL DEFAULT 0,
                 "created_at" bigint NOT NULL,
-                "updated_at" bigint NOT NULL
+                "updated_at" bigint NOT NULL,
+                "destinations" json NOT NULL
             )"#
         );
         assert_eq!(
@@ -240,7 +247,8 @@ mod tests {
                 "enabled" boolean NOT NULL DEFAULT TRUE,
                 "next_run_at" bigint NOT NULL DEFAULT 0,
                 "created_at" bigint NOT NULL,
-                "updated_at" bigint NOT NULL
+                "updated_at" bigint NOT NULL,
+                "destinations" json_text NOT NULL
             )"#
         );
     }

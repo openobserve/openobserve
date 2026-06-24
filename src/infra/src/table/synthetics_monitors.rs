@@ -18,7 +18,6 @@ use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, PaginatorTrait, QueryFilter,
     QueryOrder, Set, TransactionTrait, TryIntoModel,
 };
-use svix_ksuid::KsuidLike;
 
 use super::entity::synthetics_monitors::{self, ActiveModel, Column, Entity};
 use crate::errors;
