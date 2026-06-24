@@ -494,7 +494,7 @@
   --o2-code-bg: #2B2D30;
   --o2-border: #868A91;
   --o2-border-input: #B4B8BF;
-  --o2-primary-color: #6069D3;
+  --o2-primary-color: var(--color-primary-400);
   --o2-primary-foreground: #1E1F22;
   --o2-hover-accent: color-mix(in srgb, var(--o2-theme-color) 20%, rgb(39, 39, 39));
   --color-interactive-hover-bg: color-mix(in srgb, var(--o2-theme-color) 20%, rgb(39, 39, 39));

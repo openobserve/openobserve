@@ -39,27 +39,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTabs
             v-model="activeTab"
             orientation="vertical"
-            class="tw:mt-5 tw:mx-4 tw:mb-0"
           >
             <OTab
               name="generalSettings"
               icon="settings"
               :label="t('dashboard.generalSettings')"
-              class="tw:justify-start tw:py-0 tw:pr-4 tw:pl-5 tw:capitalize"
+              class="tw:justify-start tw:py-0 tw:capitalize"
               data-test="dashboard-settings-general-tab"
             />
             <OTab
               name="variableSettings"
               icon="data-array"
               :label="t('dashboard.variableSettings')"
-              class="tw:justify-start tw:py-0 tw:pr-4 tw:pl-5 tw:capitalize"
+              class="tw:justify-start tw:py-0 tw:capitalize"
               data-test="dashboard-settings-variable-tab"
             />
             <OTab
               name="tabSettings"
               icon="tab"
               :label="t('dashboard.tabSettings')"
-              class="tw:justify-start tw:py-0 tw:pr-4 tw:pl-5 tw:capitalize"
+              class="tw:justify-start tw:py-0 tw:capitalize"
               data-test="dashboard-settings-tab-tab"
             />
           </OTabs>

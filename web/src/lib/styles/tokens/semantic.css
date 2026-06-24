@@ -157,7 +157,7 @@
   --o2-code-bg: #F7F8FA;
   --o2-border: #E8ECF0;
   --o2-border-input: #D3D5DB;
-  --o2-primary-color: #575FC5;
+  --o2-primary-color: var(--color-primary-600);
   --o2-primary-foreground: #FFFFFF;
   --o2-hover-accent: color-mix(in srgb, var(--o2-theme-color) 15%, white);
   --o2-destructive-foreground: #FFFFFF;
