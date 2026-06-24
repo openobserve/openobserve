@@ -647,13 +647,13 @@
             "SORT-M3",
             "manual",
             "ZONE-1",
-            "BS-2026-C3"
+            "BS-2026-A1"
           ],
           [
             "SORT-M3",
             "manual",
             "ZONE-1",
-            "BS-2026-A1"
+            "BS-2026-C3"
           ],
           [
             "SORT-Q5",
@@ -1585,15 +1585,15 @@
             "2"
           ],
           [
+            "[\"scraping_pattern\",\"high_freq\"]",
+            "2"
+          ],
+          [
             "[\"rate_limit_exceeded\",\"geo_anomaly\"]",
             "2"
           ],
           [
             "[\"credential_stuffing\"]",
-            "2"
-          ],
-          [
-            "[\"scraping_pattern\",\"high_freq\"]",
             "2"
           ]
         ],
@@ -7103,6 +7103,930 @@
           [
             "WAREHOUSE-WEST",
             "outbound"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q980",
+      "sql": "SELECT _timestamp, facility_zone, load_factor, throughput_rate, CASE WHEN load_factor >= 80.0 AND cell_temp >= 30.0 THEN 'CRITICAL' WHEN load_factor >= 50.0 AND cell_temp >= 25.0 THEN 'WARNING' WHEN load_factor >= 20.0 THEN 'NORMAL' WHEN charge_remaining < 20.0 THEN 'LOW_CHARGE' ELSE 'UNKNOWN' END AS status, COALESCE(bot_flag, info_tag) AS security_flag FROM \"{stream}\" ORDER BY _timestamp ASC LIMIT 10",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 58739000000,
+        "end_offset": 58813000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "load_factor",
+          "throughput_rate",
+          "status",
+          "security_flag"
+        ],
+        "results": [
+          [
+            "ZONE-3",
+            "67.9",
+            "320.0",
+            "NORMAL",
+            "None"
+          ],
+          [
+            "ZONE-2",
+            "21.4",
+            "480.0",
+            "NORMAL",
+            "None"
+          ],
+          [
+            "ZONE-4",
+            "21.4",
+            "480.0",
+            "NORMAL",
+            "None"
+          ],
+          [
+            "ZONE-1",
+            "99.0",
+            "610.0",
+            "WARNING",
+            "verified_bot"
+          ],
+          [
+            "ZONE-2",
+            "12.5",
+            "725.0",
+            "LOW_CHARGE",
+            "None"
+          ],
+          [
+            "ZONE-4",
+            "12.5",
+            "725.0",
+            "LOW_CHARGE",
+            "None"
+          ],
+          [
+            "ZONE-3",
+            "33.0",
+            "840.0",
+            "NORMAL",
+            "None"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q981",
+      "sql": "SELECT _timestamp, COALESCE(exception_message, log_message, log) AS message, COALESCE(response_code, 0) AS status, latency_ms, COALESCE(scan_category, 'not_scanned') AS scan_type FROM \"{stream}\" WHERE latency_ms IS NOT NULL ORDER BY latency_ms DESC NULLS LAST LIMIT 10",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 58799000000,
+        "end_offset": 58873000000
+      },
+      "expected": {
+        "columns": [
+          "message",
+          "status",
+          "latency_ms",
+          "scan_type"
+        ],
+        "results": [
+          [
+            "ValidationException: item_count exceeds defect_limit bounds",
+            "200",
+            "3200",
+            "inbound"
+          ],
+          [
+            "ValidationException: item_count exceeds defect_limit bounds",
+            "200",
+            "3200",
+            "inbound"
+          ],
+          [
+            "SecurityException: unauthorized access to control_center CC-ALPHA",
+            "503",
+            "1450",
+            "inbound"
+          ],
+          [
+            "NetworkException: connection to batch sync failed",
+            "403",
+            "567",
+            "internal"
+          ],
+          [
+            "ConfigurationException: missing facility_zone ZONE-3 override",
+            "401",
+            "89",
+            "outbound"
+          ],
+          [
+            "ConfigurationException: missing facility_zone ZONE-3 override",
+            "401",
+            "89",
+            "outbound"
+          ],
+          [
+            "StateTransitionException: operation_mode hybrid invalid state",
+            "200",
+            "78",
+            "outbound"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q982",
+      "sql": "SELECT _timestamp, pallet_id, sorter_model, facility_zone, throughput_rate FROM \"{stream}\" WHERE facility_zone IN ('ZONE-1', 'ZONE-2') AND throughput_rate > 200 AND (operation_mode = 'auto' OR charge_remaining > 40.0) ORDER BY throughput_rate DESC LIMIT 10",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 58859000000,
+        "end_offset": 58933000000
+      },
+      "expected": {
+        "columns": [
+          "pallet_id",
+          "sorter_model",
+          "facility_zone",
+          "throughput_rate"
+        ],
+        "results": [
+          [
+            "PL-007",
+            "SORT-M3",
+            "ZONE-1",
+            "555.0"
+          ],
+          [
+            "PL-003",
+            "SORT-M3",
+            "ZONE-1",
+            "320.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q983",
+      "sql": "SELECT _timestamp, component_name, region_code, latency_ms, response_code, CASE WHEN latency_ms < 100 THEN 'fast' WHEN latency_ms < 500 THEN 'normal' WHEN latency_ms < 2000 THEN 'slow' ELSE 'very_slow' END AS latency_tier FROM \"{stream}\" WHERE latency_ms IS NOT NULL ORDER BY latency_ms ASC LIMIT 10",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 58919000000,
+        "end_offset": 58993000000
+      },
+      "expected": {
+        "columns": [
+          "component_name",
+          "region_code",
+          "latency_ms",
+          "response_code",
+          "latency_tier"
+        ],
+        "results": [
+          [
+            "zone-controller",
+            "US-WEST",
+            "12",
+            "400",
+            "fast"
+          ],
+          [
+            "zone-controller",
+            "US-WEST",
+            "12",
+            "400",
+            "fast"
+          ],
+          [
+            "conveyor-driver",
+            "US-EAST",
+            "15",
+            "204",
+            "fast"
+          ],
+          [
+            "scan-hub",
+            "EU-WEST",
+            "45",
+            "404",
+            "fast"
+          ],
+          [
+            "track-router",
+            "EU-NORTH",
+            "230",
+            "500",
+            "normal"
+          ],
+          [
+            "track-router",
+            "EU-NORTH",
+            "230",
+            "500",
+            "normal"
+          ],
+          [
+            "batch-sync",
+            "AP-SOUTH",
+            "1450",
+            "503",
+            "slow"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q984",
+      "sql": "SELECT _timestamp, COALESCE(bot_flag, info_tag, passthrough_flag, 'clean') AS security_tag, CAST(COALESCE(lcp_micros, inp_micros, latency_ms) AS FLOAT) AS perf_value, device_type, page_slug FROM \"{stream}\" WHERE device_type IS NOT NULL ORDER BY perf_value DESC LIMIT 10",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 58979000000,
+        "end_offset": 59053000000
+      },
+      "expected": {
+        "columns": [
+          "security_tag",
+          "perf_value",
+          "device_type",
+          "page_slug"
+        ],
+        "results": [
+          [
+            "verified_bot",
+            "3200000.0",
+            "Computer",
+            "searchPage"
+          ],
+          [
+            "false",
+            "2800000.0",
+            "Computer",
+            "checkoutPage"
+          ],
+          [
+            "false",
+            "2800000.0",
+            "Computer",
+            "checkoutPage"
+          ],
+          [
+            "true",
+            "2100000.0",
+            "Mobile",
+            "itemPage"
+          ],
+          [
+            "false",
+            "1500000.0",
+            "Tablet",
+            "itemPage"
+          ],
+          [
+            "false",
+            "900000.0",
+            "Mobile",
+            "cartPage"
+          ],
+          [
+            "false",
+            "900000.0",
+            "Mobile",
+            "cartPage"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q985",
+      "sql": "SELECT DISTINCT facility_zone, control_center, operation_mode, sorter_model FROM \"{stream}\" WHERE facility_zone IN ('ZONE-1', 'ZONE-3') ORDER BY facility_zone, control_center LIMIT 10",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 59039000000,
+        "end_offset": 59113000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "control_center",
+          "operation_mode",
+          "sorter_model"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "CC-DELTA",
+            "manual",
+            "SORT-M3"
+          ],
+          [
+            "ZONE-1",
+            "CC-DELTA",
+            "auto",
+            "SORT-M3"
+          ],
+          [
+            "ZONE-3",
+            "CC-BETA",
+            "hybrid",
+            "SORT-X1"
+          ],
+          [
+            "ZONE-3",
+            "CC-BETA",
+            "manual",
+            "SORT-X1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q986",
+      "sql": "SELECT _timestamp, pallet_id, throughput_rate, load_factor, cell_temp, throughput_rate / NULLIF(load_factor, 0) AS efficiency_ratio FROM \"{stream}\" WHERE load_factor > 0 ORDER BY efficiency_ratio DESC LIMIT 10",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 59099000000,
+        "end_offset": 59173000000
+      },
+      "expected": {
+        "columns": [
+          "pallet_id",
+          "throughput_rate",
+          "load_factor",
+          "cell_temp",
+          "efficiency_ratio"
+        ],
+        "results": [
+          [
+            "PL-006",
+            "480.0",
+            "21.4",
+            "24.8",
+            "22.429906542056077"
+          ],
+          [
+            "PL-008",
+            "480.0",
+            "21.4",
+            "24.8",
+            "22.429906542056077"
+          ],
+          [
+            "PL-003",
+            "900.0",
+            "94.6",
+            "30.1",
+            "9.513742071881607"
+          ],
+          [
+            "PL-007",
+            "610.0",
+            "99.0",
+            "28.9",
+            "6.161616161616162"
+          ],
+          [
+            "PL-005",
+            "320.0",
+            "67.9",
+            "19.2",
+            "4.71281296023564"
+          ],
+          [
+            "PL-002",
+            "150.0",
+            "45.3",
+            "35.7",
+            "3.3112582781456954"
+          ],
+          [
+            "PL-004",
+            "150.0",
+            "45.3",
+            "35.7",
+            "3.3112582781456954"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q987",
+      "sql": "SELECT _timestamp, component_name, latency_ms, lcp_micros, inp_micros, COALESCE(latency_ms, lcp_micros, inp_micros) AS any_latency FROM \"{stream}\" WHERE latency_ms IS NOT NULL OR lcp_micros IS NOT NULL ORDER BY _timestamp ASC LIMIT 10",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 59159000000,
+        "end_offset": 59233000000
+      },
+      "expected": {
+        "columns": [
+          "component_name",
+          "latency_ms",
+          "lcp_micros",
+          "inp_micros",
+          "any_latency"
+        ],
+        "results": [
+          [
+            "scan-hub",
+            "45",
+            "1800000",
+            "160000",
+            "45"
+          ],
+          [
+            "track-router",
+            "230",
+            "3200000",
+            "80000",
+            "230"
+          ],
+          [
+            "track-router",
+            "230",
+            "3200000",
+            "80000",
+            "230"
+          ],
+          [
+            "batch-sync",
+            "1450",
+            "900000",
+            "150000",
+            "1450"
+          ],
+          [
+            "pallet-mapper",
+            "89",
+            "1500000",
+            "200000",
+            "89"
+          ],
+          [
+            "pallet-mapper",
+            "89",
+            "1500000",
+            "200000",
+            "89"
+          ],
+          [
+            "lane-monitor",
+            "567",
+            "2800000",
+            "95000",
+            "567"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q988",
+      "sql": "SELECT _timestamp, org_name, site_name, COALESCE(org_name, site_name, region_code) AS location, latency_ms FROM \"{stream}\" WHERE org_name IS NOT NULL OR site_name IS NOT NULL ORDER BY _timestamp ASC LIMIT 10",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 59219000000,
+        "end_offset": 59293000000
+      },
+      "expected": {
+        "columns": [
+          "org_name",
+          "site_name",
+          "location",
+          "latency_ms"
+        ],
+        "results": [
+          [
+            "warehouse-west",
+            "site-dub-07",
+            "warehouse-west",
+            "89"
+          ],
+          [
+            "warehouse-north",
+            "site-sin-08",
+            "warehouse-north",
+            "567"
+          ],
+          [
+            "warehouse-north",
+            "site-sin-08",
+            "warehouse-north",
+            "567"
+          ],
+          [
+            "warehouse-south",
+            "site-mum-09",
+            "warehouse-south",
+            "3200"
+          ],
+          [
+            "warehouse-central",
+            "site-tor-10",
+            "warehouse-central",
+            "78"
+          ],
+          [
+            "warehouse-central",
+            "site-tor-10",
+            "warehouse-central",
+            "78"
+          ],
+          [
+            "warehouse-east",
+            "site-nyc-01",
+            "warehouse-east",
+            "1900"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q989",
+      "sql": "SELECT _timestamp, facility_zone, throughput_rate, item_count, defect_limit, item_count * defect_limit AS quality_index FROM \"{stream}\" ORDER BY quality_index DESC LIMIT 10",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 59279000000,
+        "end_offset": 59353000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "throughput_rate",
+          "item_count",
+          "defect_limit",
+          "quality_index"
+        ],
+        "results": [
+          [
+            "ZONE-3",
+            "320.0",
+            "410",
+            "2.0",
+            "820.0"
+          ],
+          [
+            "ZONE-1",
+            "320.0",
+            "410",
+            "2.0",
+            "820.0"
+          ],
+          [
+            "ZONE-4",
+            "480.0",
+            "275",
+            "2.5",
+            "687.5"
+          ],
+          [
+            "ZONE-2",
+            "150.0",
+            "155",
+            "1.5",
+            "232.5"
+          ],
+          [
+            "ZONE-4",
+            "190.0",
+            "340",
+            "0.5",
+            "170.0"
+          ],
+          [
+            "ZONE-3",
+            "900.0",
+            "88",
+            "1.0",
+            "88.0"
+          ],
+          [
+            "ZONE-1",
+            "900.0",
+            "88",
+            "1.0",
+            "88.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q990",
+      "sql": "SELECT _timestamp, conveyor_lane, conveyor_segment, facility_zone, throughput_rate FROM \"{stream}\" WHERE conveyor_lane IN ('LANE-A', 'LANE-B') AND conveyor_segment <= 3 ORDER BY conveyor_lane, conveyor_segment, _timestamp ASC LIMIT 10",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 59339000000,
+        "end_offset": 59413000000
+      },
+      "expected": {
+        "columns": [
+          "conveyor_lane",
+          "conveyor_segment",
+          "facility_zone",
+          "throughput_rate"
+        ],
+        "results": [
+          [
+            "LANE-A",
+            "2",
+            "ZONE-4",
+            "725.0"
+          ],
+          [
+            "LANE-B",
+            "3",
+            "ZONE-1",
+            "840.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q991",
+      "sql": "SELECT _timestamp, pallet_id, runtime_hours, scan_attempts, runtime_hours / NULLIF(scan_attempts, 0) AS hours_per_scan FROM \"{stream}\" WHERE scan_attempts > 0 ORDER BY hours_per_scan DESC LIMIT 10",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 59399000000,
+        "end_offset": 59473000000
+      },
+      "expected": {
+        "columns": [
+          "pallet_id",
+          "runtime_hours",
+          "scan_attempts",
+          "hours_per_scan"
+        ],
+        "results": [
+          [
+            "PL-008",
+            "500",
+            "2",
+            "250.0"
+          ],
+          [
+            "PL-003",
+            "720",
+            "4",
+            "180.0"
+          ],
+          [
+            "PL-004",
+            "360",
+            "2",
+            "180.0"
+          ],
+          [
+            "PL-005",
+            "720",
+            "4",
+            "180.0"
+          ],
+          [
+            "PL-006",
+            "48",
+            "1",
+            "48.0"
+          ],
+          [
+            "PL-007",
+            "120",
+            "3",
+            "40.0"
+          ],
+          [
+            "PL-001",
+            "120",
+            "3",
+            "40.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q992",
+      "sql": "SELECT _timestamp, node_ip, source_ip, app_label, datacenter, latency_ms FROM \"{stream}\" WHERE node_ip IS NOT NULL AND source_ip IS NOT NULL ORDER BY latency_ms ASC NULLS LAST LIMIT 10",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 59459000000,
+        "end_offset": 59533000000
+      },
+      "expected": {
+        "columns": [
+          "node_ip",
+          "source_ip",
+          "app_label",
+          "datacenter",
+          "latency_ms"
+        ],
+        "results": [
+          [
+            "10.12.1.202",
+            "192.168.1.13",
+            "warehouse-merge",
+            "dc-west",
+            "12"
+          ],
+          [
+            "10.12.1.201",
+            "192.168.1.12",
+            "warehouse-track",
+            "dc-east",
+            "15"
+          ],
+          [
+            "10.12.1.201",
+            "192.168.1.12",
+            "warehouse-track",
+            "dc-east",
+            "15"
+          ],
+          [
+            "10.12.0.104",
+            "192.168.1.10",
+            "warehouse-sort",
+            "dc-central",
+            "78"
+          ],
+          [
+            "10.12.0.104",
+            "192.168.1.10",
+            "warehouse-sort",
+            "dc-central",
+            "78"
+          ],
+          [
+            "10.12.0.105",
+            "192.168.1.11",
+            "warehouse-scan",
+            "dc-west",
+            "1900"
+          ],
+          [
+            "10.12.0.103",
+            "192.168.2.24",
+            "warehouse-sync",
+            "dc-east",
+            "3200"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q993",
+      "sql": "SELECT _timestamp, component_name, guard_mode, filter_result, auth_result, CASE WHEN guard_mode = 'active' AND filter_result = 'block' THEN 'blocked' WHEN guard_mode = 'active' AND filter_result = 'allow' THEN 'allowed' WHEN guard_mode = 'passive' THEN 'monitored' ELSE 'bypassed' END AS traffic_action FROM \"{stream}\" ORDER BY _timestamp ASC LIMIT 10",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 59519000000,
+        "end_offset": 59593000000
+      },
+      "expected": {
+        "columns": [
+          "component_name",
+          "guard_mode",
+          "filter_result",
+          "auth_result",
+          "traffic_action"
+        ],
+        "results": [
+          [
+            "conveyor-driver",
+            "active",
+            "block",
+            "denied",
+            "blocked"
+          ],
+          [
+            "zone-controller",
+            "passive",
+            "allow",
+            "pass",
+            "monitored"
+          ],
+          [
+            "zone-controller",
+            "passive",
+            "allow",
+            "pass",
+            "monitored"
+          ],
+          [
+            "scan-hub",
+            "active",
+            "allow",
+            "fail",
+            "allowed"
+          ],
+          [
+            "track-router",
+            "passive",
+            "block",
+            "pass",
+            "monitored"
+          ],
+          [
+            "track-router",
+            "passive",
+            "block",
+            "pass",
+            "monitored"
+          ],
+          [
+            "batch-sync",
+            "disabled",
+            "allow",
+            "pass",
+            "bypassed"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q994",
+      "sql": "SELECT _timestamp, COALESCE(build_signature, build_version) AS build, os_platform, device_type, render_scope, lcp_micros, cls_score FROM \"{stream}\" WHERE device_type IS NOT NULL ORDER BY _timestamp ASC LIMIT 10",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 59579000000,
+        "end_offset": 59653000000
+      },
+      "expected": {
+        "columns": [
+          "build",
+          "os_platform",
+          "device_type",
+          "render_scope",
+          "lcp_micros",
+          "cls_score"
+        ],
+        "results": [
+          [
+            "BS-2026-A1",
+            "iOS 18.1",
+            "Computer",
+            "CSR",
+            "3200000",
+            "0.2"
+          ],
+          [
+            "BS-2026-B2",
+            "Android 12",
+            "Mobile",
+            "SSR",
+            "900000",
+            "0.3"
+          ],
+          [
+            "BS-2026-B2",
+            "Android 12",
+            "Mobile",
+            "SSR",
+            "900000",
+            "0.3"
+          ],
+          [
+            "BS-2026-C3",
+            "Mac OS X (iPhone)",
+            "Tablet",
+            "CSR",
+            "1500000",
+            "0.06"
+          ],
+          [
+            "BS-2025-D4",
+            "Android 14",
+            "Computer",
+            "SSR",
+            "2800000",
+            "0.05"
+          ],
+          [
+            "BS-2025-D4",
+            "Android 14",
+            "Computer",
+            "SSR",
+            "2800000",
+            "0.05"
+          ],
+          [
+            "BS-2026-A1",
+            "Android 14",
+            "Mobile",
+            "SSR",
+            "2100000",
+            "0.12"
           ]
         ],
         "results_mode": "rowsort"

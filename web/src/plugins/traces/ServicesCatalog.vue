@@ -228,7 +228,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :loading="isLoading"
         :sort-by="sortBy"
         :sort-order="sortOrder"
-        :row-height="28"
+        :row-height="38"
         :enable-column-reorder="true"
         :enable-row-expand="false"
         :enable-text-highlight="false"
@@ -259,14 +259,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </template>
 
-        <!-- Error rate with color coding -->
+        <!-- Error rate with progress bar -->
         <template #cell-error_rate="{ item }">
-          <span
-            :class="errorRateClass(item.error_rate)"
+          <ServiceCatalogBarCell
+            :value="item.error_rate"
+            :max="columnMaxes.error_rate"
+            :label="formatPercent(item.error_rate)"
+            :variant="item.error_rate > 10 ? 'danger' : item.error_rate > 5 ? 'warning' : 'default'"
             :data-test="`services-catalog-error-rate-${item.service_name}`"
-          >
-            {{ formatPercent(item.error_rate) }}
-          </span>
+          />
         </template>
 
         <!-- Request / error count columns -->
@@ -286,42 +287,49 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Latency / duration columns -->
         <template #cell-p50_latency_ns="{ item }">
-          <span>
-            {{ formatLat(item.p50_latency_ns) }}
-            <OTooltip :content="item.p50_latency_ns.toLocaleString() + ' ns'" />
-          </span>
+          <ServiceCatalogBarCell
+            :value="item.p50_latency_ns"
+            :max="columnMaxes.p50_latency_ns"
+            :label="formatLat(item.p50_latency_ns)"
+            :tooltip="item.p50_latency_ns.toLocaleString() + ' ns'"
+          />
         </template>
 
         <template #cell-p95_latency_ns="{ item }">
-          <span>
-            {{ formatLat(item.p95_latency_ns) }}
-            <OTooltip :content="item.p95_latency_ns.toLocaleString() + ' ns'" />
-          </span>
+          <ServiceCatalogBarCell
+            :value="item.p95_latency_ns"
+            :max="columnMaxes.p95_latency_ns"
+            :label="formatLat(item.p95_latency_ns)"
+            :tooltip="item.p95_latency_ns.toLocaleString() + ' ns'"
+          />
         </template>
 
         <template #cell-p99_latency_ns="{ item }">
-          <span
-            :class="
-              item.p99_latency_ns > P99_WARN_NS ? 'tw:text-orange-500' : ''
-            "
-          >
-            {{ formatLat(item.p99_latency_ns) }}
-            <OTooltip :content="item.p99_latency_ns.toLocaleString() + ' ns'" />
-          </span>
+          <ServiceCatalogBarCell
+            :value="item.p99_latency_ns"
+            :max="columnMaxes.p99_latency_ns"
+            :label="formatLat(item.p99_latency_ns)"
+            :tooltip="item.p99_latency_ns.toLocaleString() + ' ns'"
+            :variant="item.p99_latency_ns > P99_WARN_NS ? 'warning' : 'default'"
+          />
         </template>
 
         <template #cell-avg_duration_ns="{ item }">
-          <span>
-            {{ formatLat(item.avg_duration_ns) }}
-            <OTooltip :content="item.avg_duration_ns.toLocaleString() + ' ns'" />
-          </span>
+          <ServiceCatalogBarCell
+            :value="item.avg_duration_ns"
+            :max="columnMaxes.avg_duration_ns"
+            :label="formatLat(item.avg_duration_ns)"
+            :tooltip="item.avg_duration_ns.toLocaleString() + ' ns'"
+          />
         </template>
 
         <template #cell-max_duration_ns="{ item }">
-          <span>
-            {{ formatLat(item.max_duration_ns) }}
-            <OTooltip :content="item.max_duration_ns.toLocaleString() + ' ns'" />
-          </span>
+          <ServiceCatalogBarCell
+            :value="item.max_duration_ns"
+            :max="columnMaxes.max_duration_ns"
+            :label="formatLat(item.max_duration_ns)"
+            :tooltip="item.max_duration_ns.toLocaleString() + ' ns'"
+          />
         </template>
 
         <!-- Cell actions overlay -->
@@ -366,6 +374,7 @@ import { copyToClipboard as qCopyToClipboard } from "@/utils/clipboard";
 import TenstackTable from "@/components/TenstackTable.vue";
 import CellActions from "@/plugins/logs/data-table/CellActions.vue";
 import TraceServiceCell from "./components/TraceServiceCell.vue";
+import ServiceCatalogBarCell from "./components/ServiceCatalogBarCell.vue";
 import ServiceGraphNodeSidePanel from "./ServiceGraphNodeSidePanel.vue";
 import useTraces from "@/composables/useTraces";
 import useStreams from "@/composables/useStreams";
@@ -502,7 +511,7 @@ const tableColumns = computed(() => [
     header: t("traces.servicesCatalog.columns.serviceName"),
     accessorKey: "service_name",
     enableSorting: true,
-    size: 200,
+    size: 260,
     meta: { slot: true, align: "left", sortable: true },
   },
   {
@@ -534,18 +543,18 @@ const tableColumns = computed(() => [
     meta: { slot: true, align: "right", sortable: true },
   },
   {
-    id: "error_rate",
-    header: t("traces.servicesCatalog.columns.errorRate"),
-    accessorKey: "error_rate",
-    size: 110,
-    enableSorting: true,
-    meta: { slot: true, align: "right", sortable: true },
-  },
-  {
     id: "error_count",
     header: t("traces.servicesCatalog.columns.errors"),
     accessorKey: "error_count",
     size: 90,
+    enableSorting: true,
+    meta: { slot: true, align: "right", sortable: true },
+  },
+  {
+    id: "error_rate",
+    header: t("traces.servicesCatalog.columns.errorRate"),
+    accessorKey: "error_rate",
+    size: 110,
     enableSorting: true,
     meta: { slot: true, align: "right", sortable: true },
   },
@@ -595,6 +604,20 @@ const statusCounts = computed(() => ({
   critical: services.value.filter((s) => s.status === "critical").length,
   warning: services.value.filter((s) => s.status === "warning").length,
   degraded: services.value.filter((s) => s.status === "degraded").length,
+}));
+
+function colMax(key: keyof ServiceRow): number {
+  const vals = filteredServices.value.map((s) => (s[key] as number) ?? 0);
+  return vals.length ? Math.max(...vals) : 1;
+}
+
+const columnMaxes = computed(() => ({
+  error_rate: colMax("error_rate"),
+  p50_latency_ns: colMax("p50_latency_ns"),
+  p95_latency_ns: colMax("p95_latency_ns"),
+  p99_latency_ns: colMax("p99_latency_ns"),
+  avg_duration_ns: colMax("avg_duration_ns"),
+  max_duration_ns: colMax("max_duration_ns"),
 }));
 
 const filteredServices = computed(() => {

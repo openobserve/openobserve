@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="showLabelOnTop tw:mt-2"
             :error="showNameError"
             :error-message="nameErrorMessage"
-            :help-text="!showNameError ? 'Use alphanumeric characters, space and underscore only.' : undefined"
+            :help-text="!showNameError ? t('organization.nameHelpText') : undefined"
             @update:model-value="showNameError = !!organizationData.name && !isValidOrgName"
             data-test="org-name"
             maxlength="100"
@@ -136,7 +136,7 @@ export default defineComponent({
     const nameErrorMessage = computed(() =>
       !organizationData.value.name
         ? t('organization.nameRequired')
-        : `Use alphanumeric characters, space and underscore only.`
+        : t('organization.nameHelpText')
     );
 
     watch(

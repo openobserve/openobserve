@@ -113,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="card-container tw:shrink-0 stream-config-card">
         <div class="section-header">
           <div class="section-header-accent" />
-          <span class="section-header-title">Stream Config <span class="tw:text-text-primary">*</span></span>
+          <span class="section-header-title">{{ t('alerts.streamConfig') }} <span class="tw:text-text-primary">*</span></span>
         </div>
         <div class="tw:flex tw:items-center tw:gap-4 tw:px-3 tw:py-2">
         <!-- Stream Type -->
@@ -551,7 +551,7 @@ export default defineComponent({
             { key: "anomaly-alerting", label: alertForm.t("alerts.alerting") || "Alerting", required: alertForm.anomalyConfig.value.alert_enabled },
           ]
         : [
-            { key: "condition", label: "Alert Rules", required: true },
+            { key: "condition", label: alertForm.t("alerts.alertRules"), required: true },
             { key: "advanced", label: alertForm.t("alerts.steps.advanced") },
           ];
       return tabs.filter((tab: any) => (tab as any).show !== false);
