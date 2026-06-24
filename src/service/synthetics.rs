@@ -1,0 +1,482 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+//! Service layer for reading from the `synthetics_results` OO stream.
+//! All functions here are OSS — they query the stream via the search service
+//! and require no enterprise dependencies.
+
+use std::collections::HashMap;
+
+use config::{
+    ider,
+    meta::{
+        search::{Query, Request, Response as SearchResponse},
+        stream::StreamType,
+        synthetics::{
+            BucketStatus, CheckResult, CheckStatus, ListResultsParams, ListResultsResponse,
+            MonitorStatus, MonitorSummary, StatusBucket,
+        },
+    },
+};
+
+const STREAM: &str = "synthetics_results";
+const DEFAULT_PAGE_SIZE: u64 = 50;
+const SEVEN_DAYS_US: i64 = 7 * 24 * 3_600 * 1_000_000;
+const ONE_DAY_US: i64 = 24 * 3_600 * 1_000_000;
+const ONE_HOUR_US: i64 = 3_600 * 1_000_000;
+
+fn build_req(sql: String, start_time: i64, end_time: i64, size: i64, from: i64) -> Request {
+    Request {
+        query: Query {
+            sql,
+            start_time,
+            end_time,
+            from,
+            size,
+            track_total_hits: size < 1000, // only pay for total on small result sets
+            ..Default::default()
+        },
+        timeout: 30,
+        ..Default::default()
+    }
+}
+
+async fn run_search(org_id: &str, req: &Request) -> anyhow::Result<SearchResponse> {
+    let trace_id = ider::generate_trace_id();
+    match crate::service::search::search(&trace_id, org_id, StreamType::Logs, None, req).await {
+        Ok(resp) => Ok(resp),
+        Err(e) => {
+            let msg = e.to_string();
+            if msg.contains("not found") || msg.contains("stream not found") {
+                Ok(SearchResponse::default())
+            } else {
+                Err(anyhow::anyhow!("{msg}"))
+            }
+        }
+    }
+}
+
+fn parse_result(h: &serde_json::Value) -> Option<CheckResult> {
+    Some(CheckResult {
+        job_id: h.get("job_id")?.as_i64()?,
+        monitor_id: h.get("monitor_id")?.as_str()?.to_string(),
+        location: h.get("location")?.as_str()?.to_string(),
+        pool: h
+            .get("pool")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string(),
+        status: match h.get("status").and_then(|v| v.as_str()).unwrap_or("error") {
+            "up" => CheckStatus::Up,
+            "degraded" => CheckStatus::Degraded,
+            "down" => CheckStatus::Down,
+            _ => CheckStatus::Error,
+        },
+        response_time_ms: h
+            .get("response_time_ms")
+            .and_then(|v| v.as_f64())
+            .unwrap_or(0.0),
+        error: h
+            .get("error")
+            .and_then(|v| v.as_str())
+            .filter(|s| !s.is_empty())
+            .map(String::from),
+        browser_engine: h
+            .get("browser_engine")
+            .and_then(|v| v.as_str())
+            .filter(|s| !s.is_empty())
+            .map(String::from),
+        device: h
+            .get("device")
+            .and_then(|v| v.as_str())
+            .filter(|s| !s.is_empty())
+            .map(String::from),
+        checked_at: h.get("_timestamp").and_then(|v| v.as_i64()).unwrap_or(0),
+    })
+}
+
+fn safe_ident(s: &str) -> String {
+    s.chars()
+        .filter(|c| c.is_alphanumeric() || *c == '-' || *c == '_')
+        .take(128)
+        .collect()
+}
+
+pub async fn list_results(
+    org_id: &str,
+    monitor_id: &str,
+    params: &ListResultsParams,
+) -> anyhow::Result<ListResultsResponse> {
+    let now = config::utils::time::now_micros();
+    let end_time = params.end_time.unwrap_or(now);
+    let start_time = params.start_time.unwrap_or(end_time - ONE_DAY_US);
+    let page = params.page.unwrap_or(0);
+    let page_size = params.page_size.unwrap_or(DEFAULT_PAGE_SIZE).min(1000);
+
+    let mut where_extra = String::new();
+    if let Some(loc) = &params.location {
+        let loc = safe_ident(loc);
+        where_extra.push_str(&format!(" AND location = '{loc}'"));
+    }
+    if let Some(st) = &params.status {
+        let st = safe_ident(st);
+        where_extra.push_str(&format!(" AND status = '{st}'"));
+    }
+
+    let mid = safe_ident(monitor_id);
+    let sql = format!(
+        "SELECT job_id, monitor_id, location, pool, status, response_time_ms, \
+                error, browser_engine, device, _timestamp \
+         FROM \"{STREAM}\" \
+         WHERE _timestamp >= {start_time} AND _timestamp <= {end_time} \
+           AND monitor_id = '{mid}'{where_extra} \
+         ORDER BY _timestamp DESC"
+    );
+
+    let req = build_req(
+        sql,
+        start_time,
+        end_time,
+        page_size as i64,
+        (page * page_size) as i64,
+    );
+    let resp = run_search(org_id, &req).await?;
+    Ok(ListResultsResponse {
+        total: resp.total as i64,
+        results: resp.hits.iter().filter_map(parse_result).collect(),
+    })
+}
+
+pub async fn get_result(
+    org_id: &str,
+    monitor_id: &str,
+    job_id: i64,
+) -> anyhow::Result<Option<CheckResult>> {
+    let now = config::utils::time::now_micros();
+    let start_time = now - 90 * ONE_DAY_US;
+
+    let mid = safe_ident(monitor_id);
+    let sql = format!(
+        "SELECT job_id, monitor_id, location, pool, status, response_time_ms, \
+                error, browser_engine, device, _timestamp \
+         FROM \"{STREAM}\" \
+         WHERE _timestamp >= {start_time} AND _timestamp <= {now} \
+           AND monitor_id = '{mid}' AND job_id = {job_id}"
+    );
+
+    let req = build_req(sql, start_time, now, 1, 0);
+    let resp = run_search(org_id, &req).await?;
+    Ok(resp.hits.first().and_then(parse_result))
+}
+
+pub async fn get_summary(
+    org_id: &str,
+    monitor_id: &str,
+    start_time: Option<i64>,
+    end_time: Option<i64>,
+) -> anyhow::Result<MonitorSummary> {
+    let now = config::utils::time::now_micros();
+    let end_time = end_time.unwrap_or(now);
+    let start_time = start_time.unwrap_or(end_time - SEVEN_DAYS_US);
+    let bucket_start = end_time - ONE_DAY_US;
+
+    let mid = safe_ident(monitor_id);
+
+    let agg_sql = format!(
+        "SELECT COUNT(*) as total, \
+                SUM(CASE WHEN status = 'up' THEN 1 ELSE 0 END) as up_count, \
+                AVG(response_time_ms) as avg_ms, \
+                MAX(_timestamp) as last_check_at \
+         FROM \"{STREAM}\" \
+         WHERE _timestamp >= {start_time} AND _timestamp <= {end_time} \
+           AND monitor_id = '{mid}'"
+    );
+
+    let bucket_sql = format!(
+        "SELECT (_timestamp / {ONE_HOUR_US}) as hour_bucket, \
+                SUM(CASE WHEN status = 'up' THEN 1 ELSE 0 END) as up_count, \
+                COUNT(*) as total \
+         FROM \"{STREAM}\" \
+         WHERE _timestamp >= {bucket_start} AND _timestamp <= {end_time} \
+           AND monitor_id = '{mid}' \
+         GROUP BY hour_bucket \
+         ORDER BY hour_bucket"
+    );
+
+    let latest_sql = format!(
+        "SELECT status, response_time_ms, _timestamp \
+         FROM \"{STREAM}\" \
+         WHERE _timestamp >= {start_time} AND _timestamp <= {end_time} \
+           AND monitor_id = '{mid}' \
+         ORDER BY _timestamp DESC"
+    );
+
+    let agg_req = build_req(agg_sql, start_time, end_time, 1, 0);
+    let bucket_req = build_req(bucket_sql, bucket_start, end_time, 10000, 0);
+    let latest_req = build_req(latest_sql, start_time, end_time, 1, 0);
+
+    let (agg_res, bucket_res, latest_res) = tokio::join!(
+        run_search(org_id, &agg_req),
+        run_search(org_id, &bucket_req),
+        run_search(org_id, &latest_req),
+    );
+    let agg_resp = agg_res?;
+    let bucket_resp = bucket_res?;
+    let latest_resp = latest_res?;
+
+    let agg = agg_resp.hits.first();
+    let total = agg
+        .and_then(|h| h.get("total"))
+        .and_then(|v| v.as_i64())
+        .unwrap_or(0);
+    let up_count = agg
+        .and_then(|h| h.get("up_count"))
+        .and_then(|v| v.as_i64())
+        .unwrap_or(0);
+    let last_check_at = agg
+        .and_then(|h| h.get("last_check_at"))
+        .and_then(|v| v.as_i64());
+    let uptime_7d_pct = (total > 0).then(|| up_count as f64 / total as f64 * 100.0);
+
+    let latest = latest_resp.hits.first();
+    let status = match latest
+        .and_then(|h| h.get("status"))
+        .and_then(|v| v.as_str())
+    {
+        Some("up") => MonitorStatus::Up,
+        Some("degraded") => MonitorStatus::Degraded,
+        Some("down") => MonitorStatus::Down,
+        _ => MonitorStatus::Unknown,
+    };
+    let last_response_ms = latest
+        .and_then(|h| h.get("response_time_ms"))
+        .and_then(|v| v.as_f64());
+
+    let bucket_map: HashMap<i64, (i64, i64)> = bucket_resp
+        .hits
+        .iter()
+        .filter_map(|h| {
+            let bkt = h.get("hour_bucket")?.as_i64()?;
+            let up = h.get("up_count")?.as_i64().unwrap_or(0);
+            let tot = h.get("total")?.as_i64().unwrap_or(0);
+            Some((bkt, (up, tot)))
+        })
+        .collect();
+
+    let now_bucket = end_time / ONE_HOUR_US;
+    let status_24h = (0..24i64)
+        .map(|i| {
+            let key = now_bucket - 23 + i;
+            let ts = key * ONE_HOUR_US;
+            let bucket_status = match bucket_map.get(&key) {
+                None => BucketStatus::NoData,
+                Some((_, 0)) => BucketStatus::NoData,
+                Some((up, tot)) if up == tot => BucketStatus::Up,
+                Some((0, _)) => BucketStatus::Down,
+                _ => BucketStatus::Degraded,
+            };
+            StatusBucket {
+                ts,
+                status: bucket_status,
+            }
+        })
+        .collect();
+
+    Ok(MonitorSummary {
+        status,
+        last_check_at,
+        last_response_ms,
+        uptime_7d_pct,
+        status_24h,
+    })
+}
+
+pub async fn batch_monitor_summary(
+    org_id: &str,
+    monitor_ids: &[&str],
+) -> anyhow::Result<HashMap<String, MonitorSummary>> {
+    if monitor_ids.is_empty() {
+        return Ok(HashMap::new());
+    }
+
+    let now = config::utils::time::now_micros();
+    let seven_d_ago = now - SEVEN_DAYS_US;
+    let one_d_ago = now - ONE_DAY_US;
+    let one_h_ago = now - ONE_HOUR_US;
+
+    let ids_sql = monitor_ids
+        .iter()
+        .map(|id| format!("'{}'", safe_ident(id)))
+        .collect::<Vec<_>>()
+        .join(", ");
+
+    let agg_sql = format!(
+        "SELECT monitor_id, \
+                COUNT(*) as total, \
+                SUM(CASE WHEN status = 'up' THEN 1 ELSE 0 END) as up_count, \
+                AVG(response_time_ms) as avg_ms, \
+                MAX(_timestamp) as last_check_at \
+         FROM \"{STREAM}\" \
+         WHERE _timestamp >= {seven_d_ago} AND _timestamp <= {now} \
+           AND monitor_id IN ({ids_sql}) \
+         GROUP BY monitor_id"
+    );
+
+    let bucket_sql = format!(
+        "SELECT monitor_id, \
+                (_timestamp / {ONE_HOUR_US}) as hour_bucket, \
+                SUM(CASE WHEN status = 'up' THEN 1 ELSE 0 END) as up_count, \
+                COUNT(*) as total \
+         FROM \"{STREAM}\" \
+         WHERE _timestamp >= {one_d_ago} AND _timestamp <= {now} \
+           AND monitor_id IN ({ids_sql}) \
+         GROUP BY monitor_id, hour_bucket"
+    );
+
+    let latest_sql = format!(
+        "SELECT monitor_id, status, response_time_ms, _timestamp \
+         FROM \"{STREAM}\" \
+         WHERE _timestamp >= {one_h_ago} AND _timestamp <= {now} \
+           AND monitor_id IN ({ids_sql}) \
+         ORDER BY _timestamp DESC"
+    );
+
+    let agg_req = build_req(agg_sql, seven_d_ago, now, 10000, 0);
+    let bucket_req = build_req(bucket_sql, one_d_ago, now, 100000, 0);
+    let latest_req = build_req(latest_sql, one_h_ago, now, 10000, 0);
+
+    let (agg_res, bucket_res, latest_res) = tokio::join!(
+        run_search(org_id, &agg_req),
+        run_search(org_id, &bucket_req),
+        run_search(org_id, &latest_req),
+    );
+    let agg_resp = agg_res?;
+    let bucket_resp = bucket_res?;
+    let latest_resp = latest_res?;
+
+    struct AggRow {
+        total: i64,
+        up_count: i64,
+        avg_ms: Option<f64>,
+        last_check_at: Option<i64>,
+    }
+    let agg_map: HashMap<String, AggRow> = agg_resp
+        .hits
+        .iter()
+        .filter_map(|h| {
+            let mid = h.get("monitor_id")?.as_str()?.to_string();
+            Some((
+                mid,
+                AggRow {
+                    total: h.get("total")?.as_i64().unwrap_or(0),
+                    up_count: h.get("up_count")?.as_i64().unwrap_or(0),
+                    avg_ms: h.get("avg_ms").and_then(|v| v.as_f64()),
+                    last_check_at: h.get("last_check_at").and_then(|v| v.as_i64()),
+                },
+            ))
+        })
+        .collect();
+
+    let mut bucket_map: HashMap<String, HashMap<i64, (i64, i64)>> = HashMap::new();
+    for h in &bucket_resp.hits {
+        if let (Some(mid), Some(bkt)) = (
+            h.get("monitor_id").and_then(|v| v.as_str()),
+            h.get("hour_bucket").and_then(|v| v.as_i64()),
+        ) {
+            let up = h.get("up_count").and_then(|v| v.as_i64()).unwrap_or(0);
+            let tot = h.get("total").and_then(|v| v.as_i64()).unwrap_or(0);
+            bucket_map
+                .entry(mid.to_string())
+                .or_default()
+                .insert(bkt, (up, tot));
+        }
+    }
+
+    // latest_resp: ordered DESC — first occurrence per monitor_id wins
+    let mut latest_map: HashMap<String, (String, f64)> = HashMap::new();
+    for h in &latest_resp.hits {
+        if let Some(mid) = h.get("monitor_id").and_then(|v| v.as_str()) {
+            if !latest_map.contains_key(mid) {
+                let st = h
+                    .get("status")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("unknown")
+                    .to_string();
+                let ms = h
+                    .get("response_time_ms")
+                    .and_then(|v| v.as_f64())
+                    .unwrap_or(0.0);
+                latest_map.insert(mid.to_string(), (st, ms));
+            }
+        }
+    }
+
+    let now_bucket = now / ONE_HOUR_US;
+
+    let result = monitor_ids
+        .iter()
+        .map(|&id| {
+            let agg = agg_map.get(id);
+            let uptime_7d_pct =
+                agg.and_then(|a| (a.total > 0).then(|| a.up_count as f64 / a.total as f64 * 100.0));
+            let last_check_at = agg.and_then(|a| a.last_check_at);
+
+            let (status, last_response_ms) = match latest_map.get(id) {
+                Some((s, ms)) => (
+                    match s.as_str() {
+                        "up" => MonitorStatus::Up,
+                        "degraded" => MonitorStatus::Degraded,
+                        "down" => MonitorStatus::Down,
+                        _ => MonitorStatus::Unknown,
+                    },
+                    Some(*ms),
+                ),
+                None => (MonitorStatus::Unknown, agg.and_then(|a| a.avg_ms)),
+            };
+
+            let my_buckets = bucket_map.get(id);
+            let status_24h = (0..24i64)
+                .map(|i| {
+                    let key = now_bucket - 23 + i;
+                    let ts = key * ONE_HOUR_US;
+                    let bucket_status = match my_buckets.and_then(|m| m.get(&key)) {
+                        None => BucketStatus::NoData,
+                        Some((_, 0)) => BucketStatus::NoData,
+                        Some((up, tot)) if up == tot => BucketStatus::Up,
+                        Some((0, _)) => BucketStatus::Down,
+                        _ => BucketStatus::Degraded,
+                    };
+                    StatusBucket {
+                        ts,
+                        status: bucket_status,
+                    }
+                })
+                .collect();
+
+            (
+                id.to_string(),
+                MonitorSummary {
+                    status,
+                    last_check_at,
+                    last_response_ms,
+                    uptime_7d_pct,
+                    status_24h,
+                },
+            )
+        })
+        .collect();
+
+    Ok(result)
+}

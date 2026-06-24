@@ -116,6 +116,63 @@ pub struct MonitorListResponse {
     pub total: i64,
 }
 
+// ── Results API types (from synthetics_results stream) ────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CheckResult {
+    pub job_id: i64,
+    pub monitor_id: String,
+    pub location: String,
+    pub pool: String,
+    pub status: CheckStatus,
+    pub response_time_ms: f64,
+    pub error: Option<String>,
+    pub browser_engine: Option<String>,
+    pub device: Option<String>,
+    pub checked_at: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum CheckStatus {
+    Up,
+    Degraded,
+    Down,
+    Error,
+}
+
+#[derive(Debug, Clone, Deserialize, Default)]
+pub struct ListResultsParams {
+    pub location: Option<String>,
+    pub status: Option<String>,
+    pub start_time: Option<i64>,
+    pub end_time: Option<i64>,
+    pub page: Option<u64>,
+    pub page_size: Option<u64>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ListResultsResponse {
+    pub results: Vec<CheckResult>,
+    pub total: i64,
+}
+
+#[derive(Debug, Deserialize, Default)]
+pub struct SummaryParams {
+    pub start_time: Option<i64>,
+    pub end_time: Option<i64>,
+}
+
+/// Runtime health summary computed from the synthetics_results stream.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct MonitorSummary {
+    pub status: MonitorStatus,
+    pub last_check_at: Option<i64>,
+    pub last_response_ms: Option<f64>,
+    pub uptime_7d_pct: Option<f64>,
+    pub status_24h: Vec<StatusBucket>,
+}
+
 // ── Type-specific config structs ──────────────────────────────────────────────
 // These are used to validate/parse config at request time.
 // The Monitor.config field stores them as raw serde_json::Value in the DB.
