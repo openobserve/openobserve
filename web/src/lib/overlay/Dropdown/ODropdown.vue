@@ -27,6 +27,8 @@ import { computed, inject, onBeforeUnmount, provide, ref, watch, type Ref } from
 import {
   O_DROPDOWN_NESTED_KEY,
   type DropdownNestedRegistry,
+  setActiveOverlay,
+  clearActiveOverlay,
 } from "./ODropdown.context";
 
 const props = withDefaults(defineProps<DropdownProps>(), {
@@ -106,6 +108,18 @@ onBeforeUnmount(() => {
     closeNestedRegistration = null;
   }
 });
+
+// Single-active-overlay coordination. Only top-level dropdowns participate —
+// a dropdown nested inside another open ODropdown must not close its ancestor.
+// Stable identity so set/clearActiveOverlay match across calls.
+const closeSelf = () => handleOpenChange(false);
+if (!parentDropdownRegistry) {
+  watch(internalOpen, (open) => {
+    if (open) setActiveOverlay(closeSelf);
+    else clearActiveOverlay(closeSelf);
+  });
+  onBeforeUnmount(() => clearActiveOverlay(closeSelf));
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Nested-overlay coordination

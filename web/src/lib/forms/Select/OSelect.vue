@@ -44,7 +44,11 @@ import {
   watch,
   watchEffect,
 } from "vue";
-import { O_DROPDOWN_NESTED_KEY } from "@/lib/overlay/Dropdown/ODropdown.context";
+import {
+  O_DROPDOWN_NESTED_KEY,
+  setActiveOverlay,
+  clearActiveOverlay,
+} from "@/lib/overlay/Dropdown/ODropdown.context";
 
 type NormalizedOption = {
   label: string;
@@ -710,6 +714,23 @@ onBeforeUnmount(() => {
     closeNestedRegistration = null;
   }
 });
+
+// Single-active-overlay coordination. Opening any other top-level O overlay
+// closes this one (and vice-versa), so two unrelated dropdowns are never open
+// at once — even when the new one is opened by focus rather than a click that
+// Reka would treat as a dismiss. Nested selects (inside an open ODropdown) opt
+// out so they don't close their ancestor.
+const closeSelf = () => {
+  popoverOpen.value = false;
+  selectOpen.value = false;
+};
+if (!parentDropdownRegistry) {
+  watch(isOpen, (open) => {
+    if (open) setActiveOverlay(closeSelf);
+    else clearActiveOverlay(closeSelf);
+  });
+  onBeforeUnmount(() => clearActiveOverlay(closeSelf));
+}
 
 // Close when the sidebar scroll container scrolls, preventing the portal
 // from floating disconnected at the top of the screen.
@@ -1469,6 +1490,7 @@ const fieldWidthClass = computed(() => {
     <SelectRoot
       v-else
       :model-value="stringValue"
+      :open="selectOpen"
       :disabled="disabled"
       :name="name"
       @update:model-value="handleUpdate"
