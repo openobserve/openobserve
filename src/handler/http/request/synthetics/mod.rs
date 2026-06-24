@@ -162,7 +162,7 @@ pub async fn run_monitor_now(Path((org_id, id)): Path<(String, String)>) -> Resp
 
 // ── Locations ─────────────────────────────────────────────────────────────────
 
-pub async fn list_locations(Path(org_id): Path<String>) -> Response {
+pub async fn list_locations(Path(_org_id): Path<String>) -> Response {
     #[cfg(feature = "enterprise")]
     {
         let locations = o2_enterprise::enterprise::synthetics::service::list_locations();
