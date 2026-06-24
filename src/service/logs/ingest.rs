@@ -314,7 +314,8 @@ pub async fn ingest(
             // Pipeline wall-time vs total ingest elapsed so far, to see the realtime
             // pipeline's share of ingestion latency at the ingest layer.
             log::info!(
-                "[Pipeline:Timing] ingest org={org_id} stream={stream_name} records={records_count} pipeline_ms={} ingest_elapsed_ms={}",
+                "[Pipeline:Timing] ingest org={org_id} stream={stream_name} pipeline={} records={records_count} pipeline_ms={} ingest_elapsed_ms={}",
+                exec_pl.get_pipeline_name(),
                 pipeline_start.elapsed().as_millis(),
                 start.elapsed().as_millis(),
             );
