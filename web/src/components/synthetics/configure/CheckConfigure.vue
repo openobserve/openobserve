@@ -1,9 +1,12 @@
 <script setup lang="ts">
 // Copyright 2026 OpenObserve Inc.
+import { ref, onMounted } from 'vue'
+import { useStore } from 'vuex'
 import type { BrowserCheck } from '@/types/synthetics'
+import destinationService from '@/services/alert_destination'
 import CheckDetails from './CheckDetails.vue'
-import CheckSchedule from './CheckSchedule.vue'
-import CheckNotifications from './CheckNotifications.vue'
+import CheckScheduleAlert from './CheckScheduleAlert.vue'
+import CheckLocations from './CheckLocations.vue'
 import CheckRUM from './CheckRUM.vue'
 import CheckAuthNetwork from './CheckAuthNetwork.vue'
 
@@ -12,6 +15,28 @@ const props = defineProps<{
   checkType?: 'browser' | 'api'
 }>()
 const emit = defineEmits<{ 'update:check': [value: BrowserCheck] }>()
+
+const store = useStore()
+const destinations = ref<string[]>([])
+
+async function fetchDestinations() {
+  try {
+    const res = await destinationService.list({
+      org_identifier: store.state.selectedOrganization.identifier,
+      page_num: 1,
+      page_size: 1000,
+      sort_by: 'name',
+      desc: false,
+    })
+    destinations.value = (res.data?.list ?? []).map((d: any) => d.name as string)
+  } catch {
+    destinations.value = []
+  }
+}
+
+onMounted(() => {
+  fetchDestinations()
+})
 
 function handleUpdate(value: BrowserCheck) {
   emit('update:check', value)
@@ -25,14 +50,16 @@ function handleUpdate(value: BrowserCheck) {
       data-test="synthetics-check-configure-details"
       @update:check="handleUpdate"
     />
-    <CheckSchedule
+    <CheckScheduleAlert
       :check="check"
-      data-test="synthetics-check-configure-schedule"
+      :destinations="destinations"
+      data-test="synthetics-check-configure-schedule-alert"
       @update:check="handleUpdate"
+      @refresh:destinations="fetchDestinations"
     />
-    <CheckNotifications
+    <CheckLocations
       :check="check"
-      data-test="synthetics-check-configure-notifications"
+      data-test="synthetics-check-configure-locations"
       @update:check="handleUpdate"
     />
     <CheckRUM

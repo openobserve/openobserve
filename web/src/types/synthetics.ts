@@ -142,7 +142,11 @@ export interface BrowserCheckSchedule {
   intervalUnit?: 'minutes' | 'hours'
   cron?: string
   timezone?: string
-  retries?: number // 0–5
+  retries?: number
+  retryDelayMs?: number
+  startType?: 'now' | 'later'
+  startDate?: string
+  startTime?: string
 }
 
 export interface BrowserCheck {
@@ -156,7 +160,11 @@ export interface BrowserCheck {
   journey: BrowserStep[]
   schedule: BrowserCheckSchedule
   locations: string[]
-  notifications: { destinations: string[]; silenceMinutes: number }
+  notifications: {
+    destinations: string[]
+    silenceMinutes: number
+    failureThreshold?: number
+  }
   rum: { collect: boolean; sessionReplay: boolean }
   auth?: {
     basicAuth?: {
