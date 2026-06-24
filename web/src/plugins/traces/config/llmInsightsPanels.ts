@@ -398,7 +398,7 @@ export function renderPanelSql(
     .replace(/\{\{endTime\}\}/g, String(ctx.endTime))
     .replace(/\{\{interval\}\}/g, ctx.interval);
 
-  if (!ctx.agentFilter) return rendered;
+  if (!ctx.agentFilter) return compactSql(rendered);
 
   // Append the agent predicate to the query's WHERE clause (Agent Filtering
   // spec §6.6). Every panel has exactly one flat WHERE, so we splice ` AND
@@ -409,9 +409,35 @@ export function renderPanelSql(
   const clause = ` AND ${ctx.agentFilter} `;
   const tail = rendered.match(/\b(group\s+by|order\s+by|limit)\b/i);
   if (tail && tail.index !== undefined) {
-    return rendered.slice(0, tail.index) + clause + rendered.slice(tail.index);
+    return compactSql(
+      rendered.slice(0, tail.index) + clause + rendered.slice(tail.index),
+    );
   }
-  return `${rendered}${clause}`;
+  return compactSql(`${rendered}${clause}`);
+}
+
+/**
+ * Collapse a multi-line SQL template into a single clean line.
+ *
+ * Our panel/KPI/sparkline SQL is authored as indented template literals for
+ * readability, which means every query carried its source indentation and
+ * blank-line gaps onto the wire (and into the network tab / debug logs). This
+ * flattens all runs of whitespace — newlines, tabs, the leading indentation —
+ * down to a single space and trims the ends. The result is byte-for-byte
+ * equivalent SQL: none of these queries embed intentional multi-space string
+ * literals (`'1 hour'`, `'5 minutes'` etc. keep their single space), so
+ * collapsing whitespace can't alter any value.
+ *
+ * @example
+ *   compactSql(`
+ *     SELECT a
+ *     FROM "default"
+ *     WHERE b IS NOT NULL
+ *   `)
+ *   // => `SELECT a FROM "default" WHERE b IS NOT NULL`
+ */
+export function compactSql(sql: string): string {
+  return sql.replace(/\s+/g, " ").trim();
 }
 
 /**

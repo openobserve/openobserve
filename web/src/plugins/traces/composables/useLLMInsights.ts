@@ -17,6 +17,7 @@ import { ref, type Ref } from "vue";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import type { GenAiAgentListItem } from "@/services/gen-ai-agent-mapping.service";
 import { buildAgentTraceFilter } from "../llmAgentFilter";
+import { compactSql } from "../config/llmInsightsPanels";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import { generateTraceContext } from "@/utils/zincutils";
 import { useStore } from "vuex";
@@ -216,7 +217,7 @@ export function useLLMInsights() {
     // Counting error spans vs LLM-only spans yields values >> 100%.
     // Trace-level counting fixes both: a trace either errored or it didn't.
     const agentFilter = buildAgentTraceFilter(agent, streamName);
-    const sql = `
+    const sql = compactSql(`
       SELECT
         COUNT(*) FILTER (WHERE gen_ai_operation_name IS NOT NULL) as request_count,
         approx_distinct(trace_id) as trace_count,
@@ -227,7 +228,7 @@ export function useLLMInsights() {
         COALESCE(approx_percentile_cont(duration, 0.95), 0) as p95_duration
       FROM "${streamName}"
       ${agentFilter ? `WHERE ${agentFilter}` : ""}
-    `;
+    `);
 
     target.value = { ...EMPTY_KPI };
     await executeQuery(sql, streamName, startTime, endTime, (hits) => {
@@ -355,7 +356,7 @@ export function useLLMInsights() {
     const size = 10_000;
 
     const agentFilter = buildAgentTraceFilter(agent, streamName);
-    const mainSql = `
+    const mainSql = compactSql(`
       SELECT
         histogram(_timestamp, '${interval}') as ts,
         COUNT(*) FILTER (WHERE gen_ai_operation_name IS NOT NULL) as request_count,
@@ -368,7 +369,7 @@ export function useLLMInsights() {
       ${agentFilter ? `WHERE ${agentFilter}` : ""}
       GROUP BY ts
       ORDER BY ts
-    `;
+    `);
 
     const intervalSecs = intervalSeconds(interval);
     const bucketKeys = buildBucketGrid(startTime, endTime, intervalSecs);

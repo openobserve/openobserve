@@ -11,6 +11,7 @@ import { describe, it, expect } from "vitest";
 import {
   LLM_INSIGHTS_PANELS,
   renderPanelSql,
+  compactSql,
   pickInterval,
   type LLMPanelDef,
 } from "./llmInsightsPanels";
@@ -127,6 +128,74 @@ describe("renderPanelSql", () => {
         interval: "1 minute",
       }),
     ).toBe(`FROM ""`);
+  });
+
+  // Multi-line templates (the real shape of every panel) must come back as a
+  // single clean line — no leading indentation, no blank-line gaps — so the
+  // SQL on the wire / in the network tab stays compact.
+  it("collapses an indented multi-line template to one line", () => {
+    const sql = renderPanelSql(
+      `
+        SELECT
+          histogram(_timestamp, '{{interval}}') as ts,
+          COALESCE(SUM(cost), 0) as cost
+        FROM {{stream}}
+        WHERE cost IS NOT NULL
+        GROUP BY ts
+        ORDER BY ts
+      `,
+      { stream: "default", startTime: 1, endTime: 2, interval: "1 hour" },
+    );
+    expect(sql).toBe(
+      `SELECT histogram(_timestamp, '1 hour') as ts, COALESCE(SUM(cost), 0) as cost ` +
+        `FROM "default" WHERE cost IS NOT NULL GROUP BY ts ORDER BY ts`,
+    );
+    expect(sql).not.toContain("\n");
+  });
+
+  // The spliced agent predicate must also land on the compacted single line.
+  it("compacts the output even after the agent predicate is spliced in", () => {
+    const sql = renderPanelSql(
+      `
+        SELECT COUNT(*) as c
+        FROM {{stream}}
+        WHERE gen_ai_operation_name IS NOT NULL
+        GROUP BY ts
+      `,
+      {
+        stream: "default",
+        startTime: 1,
+        endTime: 2,
+        interval: "1 hour",
+        agentFilter:
+          `trace_id IN (SELECT trace_id FROM "default" ` +
+          `WHERE gen_ai_agent_id = 'a1' GROUP BY trace_id)`,
+      },
+    );
+    expect(sql).toBe(
+      `SELECT COUNT(*) as c FROM "default" WHERE gen_ai_operation_name IS NOT NULL ` +
+        `AND trace_id IN (SELECT trace_id FROM "default" WHERE gen_ai_agent_id = 'a1' ` +
+        `GROUP BY trace_id) GROUP BY ts`,
+    );
+    expect(sql).not.toContain("\n");
+  });
+});
+
+describe("compactSql", () => {
+  it("collapses runs of whitespace (newlines, tabs, indentation) to single spaces", () => {
+    expect(compactSql("SELECT\n  a,\n  b\nFROM\tx")).toBe("SELECT a, b FROM x");
+  });
+
+  it("trims leading and trailing whitespace", () => {
+    expect(compactSql("\n   SELECT 1   \n")).toBe("SELECT 1");
+  });
+
+  // Single spaces inside string literals (interval strings) are preserved —
+  // only *runs* of whitespace collapse, and these literals carry exactly one.
+  it("preserves single spaces inside string literals", () => {
+    expect(compactSql("histogram(_timestamp, '5 minutes')")).toBe(
+      "histogram(_timestamp, '5 minutes')",
+    );
   });
 });
 
