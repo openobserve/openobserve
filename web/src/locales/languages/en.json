@@ -1299,6 +1299,7 @@
   },
   "serviceAccounts": {
     "header": "Service Accounts",
+    "emailInvalid": "Please enter a valid email address",
     "search": "Search Service Account",
     "refresh": "Refresh Service Token",
     "showToken": "Show Service Token",

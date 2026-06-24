@@ -8,7 +8,9 @@
 // The mode is supplied by the component (which knows `beingUpdated`) via this
 // factory; the dialog body remounts per open, so OForm always reads the right
 // variant. `first_name` (the description) is always optional. The invalid-email
-// message is i18n-driven (pass useI18n's `t`).
+// message is i18n-driven (pass useI18n's `t`) — its own key (no trailing period)
+// to preserve the exact pre-migration copy, distinct from the user form's
+// `common.invalidEmail` ("…address.").
 
 import { z } from "zod";
 
@@ -23,8 +25,8 @@ export const makeAddServiceAccountSchema = (
       ? z.string().optional()
       : z
           .string()
-          .min(1, t("common.invalidEmail"))
-          .regex(serviceAccountEmailRegex, t("common.invalidEmail")),
+          .min(1, t("serviceAccounts.emailInvalid"))
+          .regex(serviceAccountEmailRegex, t("serviceAccounts.emailInvalid")),
     first_name: z.string().optional(),
   });
 
