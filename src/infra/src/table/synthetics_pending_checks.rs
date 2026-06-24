@@ -73,8 +73,12 @@ pub async fn enqueue<C: ConnectionTrait>(
             Value::from(p.org_id),
             Value::from(p.location),
             Value::from(p.pool),
-            p.browser_engine.map(Value::from).unwrap_or(Value::from(None::<String>)),
-            p.device.map(Value::from).unwrap_or(Value::from(None::<String>)),
+            p.browser_engine
+                .map(Value::from)
+                .unwrap_or(Value::from(None::<String>)),
+            p.device
+                .map(Value::from)
+                .unwrap_or(Value::from(None::<String>)),
             Value::from(p.scheduled_ts),
             Value::from(p.valid_until),
         ],
@@ -170,10 +174,7 @@ pub async fn lease_batch<C: ConnectionTrait>(
 
 /// Deletes a leased row when the probe successfully POSTs its result.
 /// Returns true if the row was found and deleted.
-pub async fn ack_delete<C: ConnectionTrait>(
-    conn: &C,
-    job_id: i64,
-) -> Result<bool, errors::Error> {
+pub async fn ack_delete<C: ConnectionTrait>(conn: &C, job_id: i64) -> Result<bool, errors::Error> {
     let sql = "DELETE FROM synthetics_pending_checks WHERE id = $1";
     let res = conn
         .execute(Statement::from_sql_and_values(
@@ -234,10 +235,7 @@ pub async fn dead_letter_expired<C: ConnectionTrait>(
 }
 
 /// Deletes stale Pending rows whose valid_until has passed (missed entirely).
-pub async fn prune_stale<C: ConnectionTrait>(
-    conn: &C,
-    now_us: i64,
-) -> Result<u64, errors::Error> {
+pub async fn prune_stale<C: ConnectionTrait>(conn: &C, now_us: i64) -> Result<u64, errors::Error> {
     let sql = r#"
         DELETE FROM synthetics_pending_checks
         WHERE status = 0 AND valid_until < $1

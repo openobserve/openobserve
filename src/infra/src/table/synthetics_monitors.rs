@@ -32,7 +32,9 @@ impl TryFrom<synthetics_monitors::Model> for Monitor {
         let monitor_type: MonitorType = serde_json::from_value(serde_json::Value::String(
             m.monitor_type.clone(),
         ))
-        .map_err(|e| errors::Error::Message(format!("invalid monitor_type '{}': {e}", m.monitor_type)))?;
+        .map_err(|e| {
+            errors::Error::Message(format!("invalid monitor_type '{}': {e}", m.monitor_type))
+        })?;
 
         let locations: Vec<String> = serde_json::from_value(m.locations)
             .map_err(|e| errors::Error::Message(format!("invalid locations JSON: {e}")))?;
@@ -89,7 +91,7 @@ pub async fn count<C: ConnectionTrait>(
     params: &ListMonitorsParams,
 ) -> Result<u64, errors::Error> {
     let _lock = super::get_lock().await;
-    let mut q = Entity::find()
+    let q = Entity::find()
         .filter(Column::OrgId.eq(org_id))
         .apply_filters(params);
     Ok(q.count(conn).await?)
@@ -230,14 +232,12 @@ pub async fn fetch_due<C: ConnectionTrait>(
     models
         .into_iter()
         .map(|m| {
-            let monitor_type: MonitorType =
-                serde_json::from_value(serde_json::Value::String(m.monitor_type.clone()))
-                    .map_err(|e| {
-                        errors::Error::Message(format!(
-                            "invalid monitor_type '{}': {e}",
-                            m.monitor_type
-                        ))
-                    })?;
+            let monitor_type: MonitorType = serde_json::from_value(serde_json::Value::String(
+                m.monitor_type.clone(),
+            ))
+            .map_err(|e| {
+                errors::Error::Message(format!("invalid monitor_type '{}': {e}", m.monitor_type))
+            })?;
 
             let locations: Vec<String> = serde_json::from_value(m.locations).map_err(|e| {
                 errors::Error::Message(format!("invalid locations JSON for {}: {e}", m.id))
@@ -312,10 +312,7 @@ async fn list_models<C: ConnectionTrait>(
 
 /// Sets all mutable fields on an `ActiveModel` from a `Monitor`.
 /// Does NOT set immutable fields (id, org_id, created_at, monitor_type).
-fn update_mutable_fields(
-    am: &mut ActiveModel,
-    monitor: &Monitor,
-) -> Result<(), errors::Error> {
+fn update_mutable_fields(am: &mut ActiveModel, monitor: &Monitor) -> Result<(), errors::Error> {
     let locations = serde_json::to_value(&monitor.locations)?;
     am.folder_id = Set(monitor.folder_id.clone());
     am.name = Set(monitor.name.clone());
