@@ -2761,14 +2761,14 @@ describe('resolveDefaultColumns', () => {
     expect(result).toEqual(['body']);
   });
 
-  it('prefers body over body_msg and message', () => {
+  it('prefers body over body_msg and message, returning only the single best match', () => {
     const streamFields = [
       { name: 'message', ftsKey: true },
       { name: 'body', ftsKey: true },
       { name: 'body_msg', ftsKey: true },
     ];
     const result = resolveDefaultColumns(streamFields, []);
-    expect(result[0]).toBe('body');
+    expect(result).toEqual(['body']);
   });
 
   it('includes global fts keys that exist in the stream even if not marked ftsKey', () => {

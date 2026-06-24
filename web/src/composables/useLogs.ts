@@ -826,9 +826,12 @@ export const resolveDefaultColumns = (
     return idx === -1 ? FTS_PRIORITY.length : idx;
   };
 
-  return allFtsNames.sort(
+  const sorted = allFtsNames.sort(
     (a, b) => priorityIndex(a) - priorityIndex(b),
   );
+
+  // Return only the single best match to avoid showing multiple empty columns
+  return sorted.slice(0, 1);
 };
 
 export default useLogs;
