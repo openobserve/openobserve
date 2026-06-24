@@ -124,6 +124,10 @@ vi.mock("vuex", async (importOriginal) => {
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import LLMInsightsDashboard from "./LLMInsightsDashboard.vue";
+// The KPI cache is a module singleton (survives remounts in the app); clear it
+// between tests so a warmed entry from one mount doesn't suppress the fetch in
+// the next.
+import { kpiCache } from "./llmInsightsCache";
 
 const STREAM_LS_KEY = "llmInsights_streamFilter";
 
@@ -166,6 +170,7 @@ function mountDashboard(
 beforeEach(() => {
   // Fresh mock state for every test.
   vi.clearAllMocks();
+  kpiCache.clear();
   mockKpi.value = {
     requestCount: 0,
     traceCount: 0,
@@ -252,12 +257,14 @@ describe("LLMInsightsDashboard — loadInsights guards", () => {
     expect(mockFetchAll).toHaveBeenCalledWith("default", 123, 456, null);
   });
 
-  // Default path — no args means use props.
+  // Default path — no args means use props. `force` bypasses the in-memory KPI
+  // cache that onMounted already warmed for this window (a same-window reload is
+  // otherwise served from the snapshot — see the caching tests).
   it("falls back to props when no args passed", async () => {
     const wrapper = mountDashboard();
     await flushPromises();
     mockFetchAll.mockClear();
-    await (wrapper.vm as any).loadInsights();
+    await (wrapper.vm as any).loadInsights(undefined, undefined, { force: true });
     expect(mockFetchAll).toHaveBeenCalledWith(
       "default",
       1_700_000_000_000_000,
@@ -268,15 +275,34 @@ describe("LLMInsightsDashboard — loadInsights guards", () => {
 
   // Persists the user's stream choice so reopening the dashboard later
   // restores it. The localStorage write happens BEFORE fetchAll —
-  // verify both ordering and content.
+  // verify both ordering and content. (`force` to bypass the warm KPI cache.)
   it("writes the active stream to localStorage before fetching", async () => {
     const wrapper = mountDashboard();
     await flushPromises();
     localStorage.clear();
     mockFetchAll.mockClear();
-    await (wrapper.vm as any).loadInsights();
+    await (wrapper.vm as any).loadInsights(undefined, undefined, { force: true });
     expect(localStorage.getItem(STREAM_LS_KEY)).toBe("default");
     expect(mockFetchAll).toHaveBeenCalled();
+  });
+
+  // The KPI cache: a same-window reload of the same selection is served from the
+  // snapshot (no refetch); `force` and a new window both bypass it.
+  it("restores KPI from cache on a same-window reload (no refetch)", async () => {
+    const wrapper = mountDashboard();
+    await flushPromises();
+    expect(mockFetchAll).toHaveBeenCalledTimes(1); // onMounted
+    mockFetchAll.mockClear();
+    await (wrapper.vm as any).loadInsights();
+    expect(mockFetchAll).not.toHaveBeenCalled();
+  });
+
+  it("refetches KPI after the time window changes", async () => {
+    const wrapper = mountDashboard();
+    await flushPromises();
+    mockFetchAll.mockClear();
+    await (wrapper.vm as any).loadInsights(2_000_000_000_000_000, 2_000_001_000_000_000);
+    expect(mockFetchAll).toHaveBeenCalledTimes(1);
   });
 });
 

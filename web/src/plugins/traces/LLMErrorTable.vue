@@ -120,6 +120,10 @@ import {
 import { useLLMStreamQuery } from "./composables/useLLMStreamQuery";
 import { chipColor } from "./llmTrendPanel.utils";
 import { timestampToTimezoneDate } from "@/utils/timezone";
+// Shared in-memory cache (module singleton) — survives this table's remount on
+// every tab toggle, so returning to a selection restores instantly. See
+// llmInsightsCache.ts for why it lives there and not in component state.
+import { errorRowsCache } from "./llmInsightsCache";
 
 interface Props {
   panel: LLMPanelDef;
@@ -127,8 +131,14 @@ interface Props {
   // epoch microseconds (same units the trend panels receive)
   startTime: number;
   endTime: number;
-  // Bare agent trace-id predicate (no leading AND); "" = All Agents.
+  // Bare agent trace-id predicate (no leading AND); "" = All Agents. Used to
+  // build the SQL — NOT the cache key (that's `cacheKey`).
   agentFilter?: string;
+  // The page's canonical selection id (`stream::agent::window`, built once in
+  // the dashboard from the agent NAME). We key the row cache on this so the
+  // table agrees with the KPI strip + chart panels on one identity, instead of
+  // deriving its own from the SQL filter.
+  cacheKey?: string;
 }
 
 const props = defineProps<Props>();
@@ -197,6 +207,17 @@ async function loadErrors() {
   // Mark the current inputs as loaded so re-entering the viewport (scrolling
   // away and back) doesn't refetch — only an input change sets this true again.
   needsReload.value = false;
+  // Serve this exact selection+window from the in-memory cache if we have it —
+  // a tab toggle back here skips the query entirely. Keyed on the dashboard's
+  // canonical selection id (`cacheKey`); skip caching only if it wasn't passed.
+  const key = props.cacheKey;
+  if (key) {
+    const cached = errorRowsCache.get(key);
+    if (cached) {
+      rows.value = cached;
+      return;
+    }
+  }
   loading.value = true;
   // No histogram here, so the interval is unused; renderPanelSql still
   // substitutes the stream and splices the agent trace-id predicate.
@@ -212,6 +233,8 @@ async function loadErrors() {
     // OTable needs a stable row-key; error spans can repeat a trace_id, so key
     // by position instead.
     rows.value = (hits as any[]).map((h, i) => ({ ...h, id: i }));
+    // Snapshot for this selection+window so a return visit restores instantly.
+    if (key) errorRowsCache.set(key, rows.value);
   } catch (e: any) {
     rows.value = [];
     console.error(`[LLM panel ${props.panel.id}] fetch error`, e);

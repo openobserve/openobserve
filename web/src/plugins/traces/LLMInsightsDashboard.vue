@@ -193,11 +193,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <!-- Trend panels (config-driven) -->
+      <!-- Trend panels (config-driven). The key carries the panel-cache id
+           (stream + agent + window), so changing tab / agent / time range
+           REMOUNTS each panel. That remount is deliberate: PanelSchemaRenderer
+           only consults its IndexedDB cache on mount (runCount === 0), so a
+           remount is what lets it restore an already-fetched result instead of
+           re-querying. Same selection + window → instant cache hit; a new one →
+           a clean miss that fetches. -->
       <div class="tw:grid tw:grid-cols-2 tw:gap-[0.625rem]">
         <div
           v-for="panel in LLM_INSIGHTS_PANELS"
-          :key="panel.id"
+          :key="`${panel.id}::${panelCacheDashboardId}`"
           :class="panel.layout.colSpan === 2 ? 'tw:col-span-2' : ''"
         >
           <!-- Table panels use OTable (interactive, app-navigation) — matches
@@ -210,6 +216,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :startTime="startTime"
             :endTime="endTime"
             :agent-filter="agentFilterClause"
+            :cache-key="panelCacheDashboardId"
             @view-trace="onViewTrace"
           />
           <LLMSchemaPanel
@@ -219,6 +226,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :startTime="startTime"
             :endTime="endTime"
             :agent-filter="agentFilterClause"
+            :dashboard-id="panelCacheDashboardId"
+            :folder-id="PANEL_CACHE_FOLDER"
           />
         </div>
       </div>
@@ -227,7 +236,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts" setup>
-import { ref, computed, onMounted, onUnmounted } from "vue";
+import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
@@ -253,6 +262,7 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { LLM_INSIGHTS_PANELS } from "./config/llmInsightsPanels";
+import { kpiCache, selectionKey } from "./llmInsightsCache";
 import useStreams from "@/composables/useStreams";
 import genAiAgentMappingService, {
   type GenAiAgentListItem,
@@ -367,6 +377,68 @@ const agentFilterClause = computed(() =>
   buildAgentTraceFilter(effectiveAgent.value, effectiveStream.value),
 );
 
+// --- Panel result cache (the dashboards IndexedDB cache) --------------------
+// PanelSchemaRenderer restores a panel's data from IndexedDB on mount and skips
+// the query when the cache key matches — the same mechanism the Dashboards page
+// uses to survive panel remounts. It's keyed `folderId:dashboardId:panelId` and
+// is a no-op unless all three are non-empty (usePanelCache), so we mint a
+// stable, scoped identity for our panels:
+//   folder      → one constant bucket for this whole page.
+//   dashboardId → stream + agent + exact time window, so a different selection
+//                 or a new window is a clean miss (fresh fetch) while the same
+//                 one is a hit. Built from the agent NAME, never the SQL filter,
+//                 so no query text leaks into ids/URLs.
+//   panelId     → the schema's `llm-<panel.id>` (set in buildLLMPanelSchema).
+//
+// This SAME id is the canonical "which selection are we looking at" key for the
+// whole page: it's the panel dashboardId, the KPI cache key, AND the error
+// table's cache key (passed down as a prop) — so all three caches agree on one
+// identity instead of each deriving its own. `agentKey` is the agent's name, or
+// a placeholder when there's no agent (`_stream` on the Stream tab, `_none` on
+// the Agent tab before one resolves) — handled here, in one place.
+const PANEL_CACHE_FOLDER = "ai-llm-insights";
+const panelCacheDashboardId = computed(() => {
+  const agentKey =
+    filterMode.value === "agent"
+      ? (effectiveAgent.value?.name ?? "_none")
+      : "_stream";
+  return selectionKey(
+    effectiveStream.value,
+    agentKey,
+    props.startTime,
+    props.endTime,
+  );
+});
+// PanelSchemaRenderer (via its annotation composable) calls getDashboard() on
+// mount, which hits the network for any dashboardId not already in the Vuex
+// store. Our id is synthetic and never loaded, so without help every panel
+// mount would fire a GET /dashboards/<id>. Seeding a tiny empty-dashboard stub
+// makes getDashboard a store lookup instead — no request, no SQL in the URL.
+// Direct assignment (not the setDashboardData action) on purpose: that action
+// REPLACES the whole map and would evict real dashboards. Empty `tabs` means
+// getDashboard's duplicate-panel-id repair can't fire, so it never saves.
+// A *synchronous* watcher seeds the stub the instant the id changes — before
+// any render — so it wins the race against the panel's onMounted even on the
+// Agent tab, whose id settles through several intermediate values during the
+// async agent lookup (each of which would otherwise remount a panel and fire
+// its own getDashboard).
+function ensurePanelCacheStub(id: string) {
+  const all = store.state.organizationData?.allDashboardData;
+  if (all && id && !all[id]) {
+    all[id] = {
+      title: "",
+      dashboardId: id,
+      tabs: [],
+      variables: { list: [] },
+      version: 5,
+    };
+  }
+}
+watch(panelCacheDashboardId, (id) => ensurePanelCacheStub(id), {
+  immediate: true,
+  flush: "sync",
+});
+
 // Agent tab is open but the agents API returned none for this window — drives a
 // dedicated empty state (vs. the generic "no LLM data" one). Only true once the
 // list has actually loaded, so we don't flash it before the first fetch.
@@ -431,14 +503,33 @@ async function loadTraceStreams() {
   }
 }
 
+// The window the agent list was last loaded for. The agents API is scoped to a
+// time range, so the list only needs refreshing when that window changes — not
+// on every tab toggle. Guarding on this kills a redundant /gen_ai/agents call
+// per toggle.
+let agentsLoadedWindow = "";
 async function loadAgents(startTime?: number, endTime?: number) {
   const orgId = store.state.selectedOrganization?.identifier;
   const start = startTime ?? props.startTime;
   const end = endTime ?? props.endTime;
   if (!orgId || !start || !end) return;
+  const windowKey = `${start}-${end}`;
+  if (agentsLoaded.value && agentsLoadedWindow === windowKey) return;
   try {
     const agentList = await genAiAgentMappingService.listAgents(orgId, start, end);
     agents.value = agentList.agents;
+    agentsLoadedWindow = windowKey;
+    // Proactively seed the panel-cache stub for every selection at this window —
+    // the Stream tab plus each agent. A cold tab/agent switch can mount the
+    // panels before the per-id sync watcher fires, so pre-seeding here (right
+    // after the list resolves, before any switch) closes that race and keeps
+    // getDashboard a store lookup in every case.
+    ensurePanelCacheStub(`${activeStream.value}::_stream::${start}-${end}`);
+    for (const agent of agents.value) {
+      ensurePanelCacheStub(
+        `${agent.source_stream}::${agent.name}::${start}-${end}`,
+      );
+    }
     if (
       activeAgent.value !== ALL_AGENTS_VALUE &&
       !agents.value.some((agent) => agentOptionKey(agent) === activeAgent.value)
@@ -585,10 +676,28 @@ const kpiCards = computed<KpiCard[]>(() => {
   ];
 });
 
+// The KPI strip is dashboard-owned (fetched by useLLMInsights), so it can't ride
+// the chart panels' IndexedDB cache. `kpiCache` (shared module singleton — see
+// llmInsightsCache.ts) is its in-memory equivalent, keyed by the same
+// stream+agent+window scope and restored on a tab toggle / same-window revisit.
+function kpiCacheKey(start: number, end: number): string {
+  const agentKey =
+    filterMode.value === "agent"
+      ? (effectiveAgent.value?.name ?? "_none")
+      : "_stream";
+  return selectionKey(effectiveStream.value, agentKey, start, end);
+}
+
 // Single fetch entry point. Always pulls from the current props (which the
 // parent keeps in sync via `recomputeInsightsTimeRange`). Stream selector
-// changes, refresh button, and onMounted all funnel through here.
-async function loadInsights(startTime?: number, endTime?: number) {
+// changes, refresh button, and onMounted all funnel through here. `force`
+// (manual refresh) bypasses the KPI cache and pulls fresh numbers.
+async function loadInsights(
+  startTime?: number,
+  endTime?: number,
+  opts?: { force?: boolean },
+) {
+  const force = opts?.force ?? false;
   const start = startTime ?? props.startTime;
   const end = endTime ?? props.endTime;
   if (!start || !end) return;
@@ -626,7 +735,33 @@ async function loadInsights(startTime?: number, endTime?: number) {
   // Stream comes from the agent (Agent tab) or the picker (Stream tab).
   const stream = effectiveStream.value;
   if (!stream) return;
+
+  // Per-selection KPI retention: restore the summary numbers for this exact
+  // stream+agent+window instead of refetching on a tab toggle. `force` (manual
+  // refresh) skips the cache.
+  const ck = kpiCacheKey(start, end);
+  if (!force && kpiCache.has(ck)) {
+    const snap = kpiCache.get(ck)!;
+    kpi.value = snap.kpi;
+    kpiPrev.value = snap.kpiPrev;
+    sparklines.value = snap.sparklines;
+    lastRunAt.value = snap.lastRunAt;
+    error.value = null; // restoring a prior success — drop any stale error
+    hasLoadedOnce.value = true; // we have data → no first-load skeleton
+    return;
+  }
+
   await fetchAll(stream, start, end, effectiveAgent.value);
+  // `loading` true→false already stamped lastRunAt via the watcher; snapshot the
+  // fresh result so returning to this selection skips the network.
+  if (!error.value) {
+    kpiCache.set(ck, {
+      kpi: kpi.value,
+      kpiPrev: kpiPrev.value,
+      sparklines: sparklines.value,
+      lastRunAt: lastRunAt.value,
+    });
+  }
 }
 
 function onFilterModeChange(mode?: string | number | null) {
@@ -648,10 +783,19 @@ function onAgentChange() {
 // the freshly computed start/end so we don't have to wait for Vue's
 // next-tick prop propagation.
 async function refresh(startTime?: number, endTime?: number) {
-  await loadInsights(startTime, endTime);
+  await loadInsights(startTime, endTime, { force: true });
 }
 
-defineExpose({ refresh });
+// "Last refreshed" timestamp for the whole-page refresh indicator. Stamped when
+// the KPI fetch settles (loading true→false), mirroring how the Logs page keys
+// its single last-refresh off `searchObj.loading`. Exposed to the page header,
+// which renders it via ORefreshButton.
+const lastRunAt = ref<number | null>(null);
+watch(loading, (isLoading, wasLoading) => {
+  if (wasLoading && !isLoading) lastRunAt.value = Date.now();
+});
+
+defineExpose({ refresh, lastRunAt, loading });
 
 onMounted(async () => {
   if (!streamsLoaded.value) {

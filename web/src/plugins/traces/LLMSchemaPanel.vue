@@ -51,6 +51,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :panelSchema="chartData"
         :selectedTimeObj="selectedTimeObj"
         :variablesData="{}"
+        :dashboardId="dashboardId"
+        :folderId="folderId"
         searchType="dashboards"
         :width="6"
         :height="6"
@@ -76,6 +78,14 @@ interface Props {
   endTime: number;
   // Bare agent trace-id predicate (no leading AND); "" = All Agents.
   agentFilter?: string;
+  // Panel-cache identity, forwarded to PanelSchemaRenderer. The dashboards
+  // engine restores a panel's result from its IndexedDB cache on mount (keyed
+  // `folderId:dashboardId:panelId`) and skips the query when it hits — but the
+  // cache is a no-op unless all three ids are non-empty. We feed a synthetic,
+  // scoped pair (panelId comes from the schema's `llm-<id>`) so LLM Insights
+  // reuses that same mechanism. See LLMInsightsDashboard for how they're built.
+  dashboardId?: string;
+  folderId?: string;
 }
 
 const props = defineProps<Props>();
