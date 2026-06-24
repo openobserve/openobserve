@@ -36,7 +36,7 @@
         <OButton v-for="tab in tabs" :key="tab.key"
           :variant="activeTab === tab.key ? 'primary' : 'ghost'"
           size="sm"
-          @click="activeTab = tab.key; currentPage = 1">
+          @click="activeTab = tab.key">
           {{ tab.label }}
         </OButton>
       </OButtonGroup>
@@ -48,7 +48,7 @@
         <OButton v-for="s in statusTabs" :key="s.filter"
           :variant="statusFilter === s.filter ? 'primary' : 'ghost'"
           size="sm"
-          @click="statusFilter = s.filter; currentPage = 1">
+          @click="statusFilter = s.filter">
           <span v-if="s.filter !== 'all'" class="syn-pill-dot" :class="'sdot-' + s.filter.toLowerCase()" />
           {{ s.label }} <span class="syn-pill-count">{{ s.count }}</span>
         </OButton>
@@ -60,7 +60,6 @@
         <OSearchInput
           v-model="search"
           :placeholder="activeTab === 'browser' ? 'Search browser tests...' : activeTab === 'api' ? 'Search API tests...' : 'Search monitors...'"
-          @update:model-value="currentPage = 1"
         />
       </template>
 
@@ -70,13 +69,11 @@
           v-model="typeFilter"
           :options="typeOpts"
           size="sm"
-          @update:model-value="currentPage = 1"
         />
         <OSelect
           v-model="locationFilter"
           :options="locationOpts"
           size="sm"
-          @update:model-value="currentPage = 1"
         />
       </template>
 
@@ -983,14 +980,12 @@ import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
-import OPagination from "@/lib/navigation/Pagination/OPagination.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
 import OStep from "@/lib/navigation/Stepper/OStep.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -1019,8 +1014,6 @@ const search         = ref("");
 const showDrawer     = ref(false);
 const editTarget     = ref<any>(null);
 const currentStep    = ref(0);
-const currentPage    = ref(1);
-const perPage        = ref(20);
 
 // ── Locations tooltip ──────────────────────────────────────────────────
 const locTip = ref({ show: false, x: 0, y: 0, locs: [] as string[] });
@@ -1132,18 +1125,7 @@ const monitorTableColumns: OTableColumnDef[] = [
   },
 ]
 
-type _Col = { key: string; label: string; width: number; resizable: boolean; align?: string }
-let resizeState: { col: _Col; startX: number; startW: number } | null = null;
-const startResize = (e: MouseEvent, col: _Col) => {
-  e.preventDefault();
-  resizeState = { col, startX: e.clientX, startW: col.width };
-  document.addEventListener("mousemove", onResize);
-  document.addEventListener("mouseup", stopResize);
-};
-const onResize = (e: MouseEvent) => { if (!resizeState) return; resizeState.col.width = Math.max(60, resizeState.startW + (e.clientX - resizeState.startX)); };
-const stopResize = () => { resizeState = null; document.removeEventListener("mousemove", onResize); document.removeEventListener("mouseup", stopResize); };
 onUnmounted(() => {
-  stopResize();
   if (locHideTimer) clearTimeout(locHideTimer);
   if (sparkHideTimer) clearTimeout(sparkHideTimer);
   if (mapTipTimer) clearTimeout(mapTipTimer);
@@ -1676,11 +1658,6 @@ const filteredMonitors = computed(() =>
     (!search.value || m.name.toLowerCase().includes(search.value.toLowerCase()) || m.url.toLowerCase().includes(search.value.toLowerCase()))
   )
 );
-
-const totalPages  = computed(() => Math.max(1, Math.ceil(filteredMonitors.value.length / perPage.value)));
-const pageStart   = computed(() => (currentPage.value - 1) * perPage.value);
-const pageEnd     = computed(() => Math.min(currentPage.value * perPage.value, filteredMonitors.value.length));
-const pagedMonitors = computed(() => filteredMonitors.value.slice(pageStart.value, pageEnd.value));
 
 const rtCls = (rt: string|null) => { if (!rt) return "c-r"; const v=parseFloat(rt); return v<300?"c-g":v<1000?"c-a":"c-r"; };
 const toggleLoc  = (v: string) => { const i=form.value.locations.indexOf(v); if(i===-1)form.value.locations.push(v); else form.value.locations.splice(i,1); };
