@@ -133,7 +133,8 @@
     "db": "데이터베이스",
     "discardChanges": "변경 내용 취소",
     "unsavedChanges": "저장되지 않은 변경 사항",
-    "export": "익스포트"
+    "export": "익스포트",
+    "invalidEmail": "유효한 이메일 주소를 입력하십시오."
   },
   "search": {
     "selectIndex": "스트림 우선 선택",
@@ -950,7 +951,14 @@
     "revokeInvitationTitle": "초대 취소",
     "revokeInvitationMsg": "{email} 에 대한 초대를 정말로 취소하시겠습니까?",
     "deleteUsersTitle": "사용자 삭제",
-    "deleteUsersMsg": "정말로 {count} 명의 사용자를 삭제하시겠습니까?"
+    "deleteUsersMsg": "정말로 {count} 명의 사용자를 삭제하시겠습니까?",
+    "roleRequired": "역할이 필요합니다",
+    "fieldRequired": "필드는 필수입니다",
+    "passwordRequired": "비밀번호가 필요합니다.",
+    "passwordPolicyHint": "암호는 8~128자여야 하며 소문자 1개, 대문자 1개, 숫자 1개, 특수 문자 1개를 포함해야 합니다.",
+    "currentPasswordRequired": "현재 암호가 필요합니다.",
+    "newPasswordRequired": "새 암호가 필요합니다.",
+    "otherOrgInvalid": "조직 이름은 문자로 시작하고 영숫자, _ 또는 -여야 합니다."
   },
   "ticket": {
     "header": "지원 티켓",

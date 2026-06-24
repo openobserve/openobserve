@@ -133,7 +133,8 @@
     "db": "Database",
     "discardChanges": "Wijzigingen negeren",
     "unsavedChanges": "Niet opgeslagen wijzigingen",
-    "export": "Exporteren"
+    "export": "Exporteren",
+    "invalidEmail": "Voer een geldig e-mailadres in."
   },
   "search": {
     "selectIndex": "Selecteer eerst Stream",
@@ -950,7 +951,14 @@
     "revokeInvitationTitle": "Uitnodiging intrekken",
     "revokeInvitationMsg": "Weet je zeker dat je de uitnodiging voor {email} wilt intrekken?",
     "deleteUsersTitle": "Gebruikers verwijderen",
-    "deleteUsersMsg": "Weet je zeker dat je {count} gebruiker (s) wilt verwijderen?"
+    "deleteUsersMsg": "Weet je zeker dat je {count} gebruiker (s) wilt verwijderen?",
+    "roleRequired": "Rol is vereist",
+    "fieldRequired": "Veld is verplicht",
+    "passwordRequired": "Wachtwoord is vereist.",
+    "passwordPolicyHint": "Het wachtwoord moet 8-128 tekens lang zijn en minstens één kleine letter, één hoofdletter, één cijfer en één speciaal teken bevatten.",
+    "currentPasswordRequired": "Het huidige wachtwoord is vereist.",
+    "newPasswordRequired": "Een nieuw wachtwoord is vereist.",
+    "otherOrgInvalid": "De naam van de organisatie moet beginnen met een letter en alfanumeriek zijn, _ of -."
   },
   "ticket": {
     "header": "Tickets voor ondersteuning",

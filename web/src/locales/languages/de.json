@@ -133,7 +133,8 @@
     "db": "Datenbank",
     "discardChanges": "Änderungen verwerfen",
     "unsavedChanges": "Ungespeicherte Änderungen",
-    "export": "Exportieren"
+    "export": "Exportieren",
+    "invalidEmail": "Bitte geben Sie eine gültige E-Mail-Adresse ein."
   },
   "search": {
     "selectIndex": "Wählen Sie Zuerst streamen",
@@ -950,7 +951,14 @@
     "revokeInvitationTitle": "Einladung widerrufen",
     "revokeInvitationMsg": "Bist du sicher, dass du die Einladung für {email} widerrufen möchtest?",
     "deleteUsersTitle": "Benutzer löschen",
-    "deleteUsersMsg": "Sind Sie sicher, dass Sie {count} Benutzer löschen möchten?"
+    "deleteUsersMsg": "Sind Sie sicher, dass Sie {count} Benutzer löschen möchten?",
+    "roleRequired": "Rolle ist erforderlich",
+    "fieldRequired": "Feld ist erforderlich",
+    "passwordRequired": "Passwort ist erforderlich.",
+    "passwordPolicyHint": "Das Passwort muss aus 8 bis 128 Zeichen bestehen und mindestens einen Kleinbuchstaben, einen Großbuchstaben, eine Ziffer und ein Sonderzeichen enthalten.",
+    "currentPasswordRequired": "Das aktuelle Passwort ist erforderlich.",
+    "newPasswordRequired": "Ein neues Passwort ist erforderlich.",
+    "otherOrgInvalid": "Der Name der Organisation muss mit einem Buchstaben beginnen und alphanumerisch, _ oder -, sein."
   },
   "ticket": {
     "header": "Tickets für den Support",

@@ -133,7 +133,8 @@
     "db": "Base de données",
     "discardChanges": "Ignorer les modifications",
     "unsavedChanges": "Modifications non enregistrées",
-    "export": "Exporter"
+    "export": "Exporter",
+    "invalidEmail": "Veuillez saisir une adresse e-mail valide."
   },
   "search": {
     "selectIndex": "Sélectionnez Stream First",
@@ -950,7 +951,14 @@
     "revokeInvitationTitle": "Révoquer l'invitation",
     "revokeInvitationMsg": "Êtes-vous sûr de vouloir révoquer l'invitation pour {email} ?",
     "deleteUsersTitle": "Supprimer des utilisateurs",
-    "deleteUsersMsg": "Êtes-vous sûr de vouloir supprimer {count} utilisateur (s) ?"
+    "deleteUsersMsg": "Êtes-vous sûr de vouloir supprimer {count} utilisateur (s) ?",
+    "roleRequired": "Le rôle est obligatoire",
+    "fieldRequired": "Ce champ est obligatoire",
+    "passwordRequired": "Le mot de passe est obligatoire.",
+    "passwordPolicyHint": "Le mot de passe doit être composé de 8 à 128 caractères et contenir au moins une lettre minuscule, une lettre majuscule, un chiffre et un caractère spécial.",
+    "currentPasswordRequired": "Le mot de passe actuel est requis.",
+    "newPasswordRequired": "Un nouveau mot de passe est requis.",
+    "otherOrgInvalid": "Le nom de l'organisation doit commencer par une lettre et être alphanumérique, _ ou -."
   },
   "ticket": {
     "header": "Tickets d'assistance",

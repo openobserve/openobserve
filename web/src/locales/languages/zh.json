@@ -133,7 +133,8 @@
     "db": "数据库",
     "discardChanges": "放弃更改",
     "unsavedChanges": "未保存的更改",
-    "export": "出口"
+    "export": "出口",
+    "invalidEmail": "请输入有效的电子邮件地址。"
   },
   "search": {
     "selectIndex": "选择数据流",
@@ -950,7 +951,14 @@
     "revokeInvitationTitle": "撤销邀请",
     "revokeInvitationMsg": "你确定要撤销 {email} 的邀请吗？",
     "deleteUsersTitle": "删除用户",
-    "deleteUsersMsg": "您确定要删除 {count} 个用户吗？"
+    "deleteUsersMsg": "您确定要删除 {count} 个用户吗？",
+    "roleRequired": "角色为必填项",
+    "fieldRequired": "字段为必填字段",
+    "passwordRequired": "密码为必填项。",
+    "passwordPolicyHint": "密码必须为 8-128 个字符，并且至少包含一个小写字母、一个大写字母、一个数字和一个特殊字符。",
+    "currentPasswordRequired": "当前密码为必填项。",
+    "newPasswordRequired": "需要新密码。",
+    "otherOrgInvalid": "组织名称必须以字母开头，并且必须是字母数字、_ 或-。"
   },
   "ticket": {
     "header": "工单",

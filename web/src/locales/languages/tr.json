@@ -133,7 +133,8 @@
     "db": "Veritabanı",
     "discardChanges": "Değişiklikleri iptal et",
     "unsavedChanges": "Kaydedilmemiş değişiklikler",
-    "export": "İhracat"
+    "export": "İhracat",
+    "invalidEmail": "Lütfen geçerli bir e-posta adresi girin."
   },
   "search": {
     "selectIndex": "Önce Yayınla Seçin",
@@ -950,7 +951,14 @@
     "revokeInvitationTitle": "Davetiyeyi İptal Et",
     "revokeInvitationMsg": "{email} davetini iptal etmek istediğinizden emin misiniz?",
     "deleteUsersTitle": "Kullanıcıları Sil",
-    "deleteUsersMsg": "{count} kullanıcıyı silmek istediğinizden emin misiniz?"
+    "deleteUsersMsg": "{count} kullanıcıyı silmek istediğinizden emin misiniz?",
+    "roleRequired": "Rol gerekli",
+    "fieldRequired": "Alan zorunludur",
+    "passwordRequired": "Şifre gereklidir.",
+    "passwordPolicyHint": "Şifre 8-128 karakter olmalı ve en az bir küçük harf, bir büyük harf, bir basamak ve bir özel karakter içermelidir.",
+    "currentPasswordRequired": "Geçerli şifre gereklidir.",
+    "newPasswordRequired": "Yeni şifre gereklidir.",
+    "otherOrgInvalid": "Kuruluş adı bir harfle başlamalı ve alfasayısal, _ veya - olmalıdır."
   },
   "ticket": {
     "header": "Destek Talepleri",
