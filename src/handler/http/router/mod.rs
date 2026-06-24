@@ -852,7 +852,10 @@ pub fn service_routes() -> Router {
         // sourcemaps
         .route("/{org_id}/sourcemaps",get(sourcemaps::list).post(sourcemaps::upload_maps).delete(sourcemaps::delete))
         .route("/{org_id}/sourcemaps/values",get(sourcemaps::list_values))
-        .route("/{org_id}/sourcemaps/stacktrace",post(sourcemaps::translate_stacktrace));
+        .route("/{org_id}/sourcemaps/stacktrace",post(sourcemaps::translate_stacktrace))
+
+        .route("/{org_id}/workflows",get(workflows::list_workflows).post(workflows::save_workflow))
+        .route("/{org_id}/workflows/{id}",delete(workflows::delete_workflows).put(workflows::update_workflows));
 
     #[cfg(feature = "enterprise")]
     {

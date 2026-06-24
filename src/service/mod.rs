@@ -69,6 +69,7 @@ pub mod traces;
 #[cfg(feature = "cloud")]
 pub mod trial_quota;
 pub mod users;
+pub mod workflows;
 
 // format stream name
 pub async fn get_formatted_stream_name(params: StreamParams) -> Result<String> {

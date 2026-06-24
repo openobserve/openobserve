@@ -23,7 +23,7 @@ use super::{
 };
 use crate::db::{ORM_CLIENT, connect_to_orm};
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 pub struct Workflow {
     pub id: String,
     pub org_id: String,
@@ -95,7 +95,7 @@ pub async fn list_all() -> Result<Vec<Workflow>, anyhow::Error> {
     Ok(ret)
 }
 
-pub async fn get_by_org(org_id: &str) -> Result<Vec<Workflow>, anyhow::Error> {
+pub async fn list_by_org(org_id: &str) -> Result<Vec<Workflow>, anyhow::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let entities = workflows::Entity::find()
         .filter(workflows::Column::OrgId.eq(org_id))
@@ -108,10 +108,14 @@ pub async fn get_by_org(org_id: &str) -> Result<Vec<Workflow>, anyhow::Error> {
     Ok(ret)
 }
 
-pub async fn get_by_id(id: &str) -> Result<Option<Workflow>, anyhow::Error> {
+pub async fn get_by_org_wid(
+    org_id: &str,
+    workflow_id: &str,
+) -> Result<Option<Workflow>, anyhow::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let res = workflows::Entity::find()
-        .filter(workflows::Column::Id.eq(id))
+        .filter(workflows::Column::Id.eq(workflow_id))
+        .filter(workflows::Column::OrgId.eq(org_id))
         .one(client)
         .await?;
 
@@ -197,5 +201,18 @@ pub async fn save_workflow_errors(errors: WorkflowRunErrors) -> Result<(), anyho
         ..Default::default()
     };
     workflow_errors::Entity::insert(model).exec(client).await?;
+    Ok(())
+}
+
+pub async fn delete_workflow(id: &str) -> Result<(), anyhow::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let _lock = get_lock().await;
+
+    workflows::Entity::delete_many()
+        .filter(workflows::Column::Id.eq(id))
+        .exec(client)
+        .await?;
+    // we do not handler workflow errors here, as background job will take care of them eventually,
+    // and will also handle input data file deletion
     Ok(())
 }

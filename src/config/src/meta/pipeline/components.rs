@@ -227,6 +227,7 @@ pub enum NodeData {
     Function(FunctionParams),
     Condition(ConditionParams),
     LlmEvaluation(LlmEvaluationParams),
+    WorkflowTrigger,
 }
 
 impl MemorySize for NodeData {
@@ -239,7 +240,28 @@ impl MemorySize for NodeData {
                 NodeData::Function(function_params) => function_params.mem_size(),
                 NodeData::Condition(condition_params) => condition_params.mem_size(),
                 NodeData::LlmEvaluation(llm_evaluation_params) => llm_evaluation_params.mem_size(),
+                NodeData::WorkflowTrigger => 0, // no sub-members
             }
+    }
+}
+
+impl NodeData {
+    pub fn is_pipeline_node(&self) -> bool {
+        match self {
+            Self::RemoteStream(_)
+            | Self::Stream(_)
+            | Self::Query(_)
+            | Self::Function(_)
+            | Self::Condition(_)
+            | Self::LlmEvaluation(_) => true,
+            _ => false,
+        }
+    }
+    pub fn is_workflow_node(&self) -> bool {
+        match self {
+            Self::WorkflowTrigger | Self::Query(_) | Self::Function(_) | Self::Condition(_) => true,
+            _ => false,
+        }
     }
 }
 

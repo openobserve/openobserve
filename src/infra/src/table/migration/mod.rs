@@ -245,6 +245,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260615_00001_create_workflow_errors_table::Migration),
         ]
     }
+}
 
 pub fn get_text_type() -> &'static str {
     "text"

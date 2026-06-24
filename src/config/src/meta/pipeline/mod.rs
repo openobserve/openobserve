@@ -157,6 +157,15 @@ impl Pipeline {
             _ => {}
         };
 
+        for node in &self.nodes {
+            if !node.data.is_pipeline_node() {
+                return Err(anyhow!(
+                    "Node {} is not a pipeline compatible node",
+                    node.id
+                ));
+            }
+        }
+
         // ck 3
         match self.nodes.first().unwrap().get_node_data() {
             NodeData::Stream(stream_params) => {
