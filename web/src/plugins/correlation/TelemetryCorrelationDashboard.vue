@@ -313,15 +313,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :name="outerGroup.id"
                     class="tw:flex-none!"
                   >
-                    <div class="tw:flex tw:flex-col tw:items-start tw:px-1 tw:py-0.5">
+                    <div class="tw:flex tw:flex-col tw:items-start tw:px-1 tw:py-0.5 tw:min-w-0">
                       <div class="tw:flex tw:items-center tw:gap-1">
                         <OIcon v-if="typeof outerGroup.icon === 'string'" :name="outerGroup.icon" size="xs" />
                         <component v-else :is="outerGroup.icon" />
-                        <span>{{ outerGroup.label }}</span>
+                        <span class="tw:whitespace-nowrap">{{ outerGroup.label }}</span>
                       </div>
                       <span
                         v-if="outerTabResourceName[outerGroup.id]"
-                        class="tw:text-[11px] tw:leading-tight tw:opacity-80 tw:max-w-[200px] tw:truncate"
+                        class="tw:text-xs tw:leading-tight tw:opacity-75 tw:whitespace-nowrap"
                         :title="outerTabResourceName[outerGroup.id]"
                       >{{ outerTabResourceName[outerGroup.id] }}</span>
                     </div>
@@ -823,7 +823,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                     <span
                       v-if="outerTabResourceName[outerGroup.id]"
-                      class="tw:text-[11px] tw:leading-tight tw:opacity-80 tw:max-w-[200px] tw:truncate"
+                      class="tw:text-xs tw:leading-tight tw:opacity-75 tw:max-w-[300px] tw:truncate"
                       :title="outerTabResourceName[outerGroup.id]"
                     >{{ outerTabResourceName[outerGroup.id] }}</span>
                   </div>
