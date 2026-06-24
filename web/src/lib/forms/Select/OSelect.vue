@@ -721,6 +721,43 @@ if (sidebarScrollTick) {
   });
 }
 
+// Generic close-on-scroll: while the dropdown is open, scrolling any ancestor
+// scroll container (page, query-builder area, joins popup, etc.) would leave
+// the portaled list floating detached from the trigger — close it instead.
+// Scrolls that originate inside the option list are ignored so the list stays
+// scrollable.
+function handleViewportScroll(event: Event) {
+  if (!isOpen.value) return;
+  const target = event.target as Element | null;
+  if (
+    target &&
+    (listboxScrollEl.value?.contains(target) ||
+      target.closest?.('[role="listbox"]'))
+  ) {
+    return;
+  }
+  popoverOpen.value = false;
+  selectOpen.value = false;
+}
+
+watch(isOpen, (open) => {
+  if (typeof window === "undefined") return;
+  if (open) {
+    window.addEventListener("scroll", handleViewportScroll, {
+      capture: true,
+      passive: true,
+    });
+  } else {
+    window.removeEventListener("scroll", handleViewportScroll, true);
+  }
+});
+
+onBeforeUnmount(() => {
+  if (typeof window !== "undefined") {
+    window.removeEventListener("scroll", handleViewportScroll, true);
+  }
+});
+
 // ── Chip overflow (width-aware) ──────────────────────────────────────────
 // In multi-select mode, fit as many chips as the trigger width allows; the
 // rest collapse into a "+N more" indicator. When `maxVisibleChips` is set,

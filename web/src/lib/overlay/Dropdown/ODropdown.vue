@@ -205,6 +205,36 @@ if (sidebarScrollTick) {
     if (internalOpen.value) handleOpenChange(false);
   });
 }
+
+// Generic close-on-scroll: while open, any scroll on an ancestor scroll
+// container (the page, the query-builder area, a joins popup, etc.) would
+// otherwise leave the portaled menu floating detached from its trigger. We
+// close instead. Scrolls that originate *inside* an open menu (a long,
+// scrollable menu list) are ignored so the menu itself stays scrollable.
+function handleViewportScroll(event: Event) {
+  if (!internalOpen.value) return;
+  const target = event.target as Element | null;
+  if (target?.closest?.('[role="menu"]')) return;
+  handleOpenChange(false);
+}
+
+watch(internalOpen, (open) => {
+  if (typeof window === "undefined") return;
+  if (open) {
+    window.addEventListener("scroll", handleViewportScroll, {
+      capture: true,
+      passive: true,
+    });
+  } else {
+    window.removeEventListener("scroll", handleViewportScroll, true);
+  }
+});
+
+onBeforeUnmount(() => {
+  if (typeof window !== "undefined") {
+    window.removeEventListener("scroll", handleViewportScroll, true);
+  }
+});
 </script>
 
 <template>
