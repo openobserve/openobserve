@@ -55,12 +55,11 @@
 
       <!-- Search -->
       <template v-if="activeTab !== 'private'">
-        <div class="syn-search-box">
-          <OIcon name="search" size="sm" class="syn-search-icon" />
-          <input v-model="search" class="syn-search-input"
-            :placeholder="activeTab === 'browser' ? 'Search browser tests...' : activeTab === 'api' ? 'Search API tests...' : 'Search monitors...'"
-            @input="currentPage = 1" />
-        </div>
+        <OSearchInput
+          v-model="search"
+          :placeholder="activeTab === 'browser' ? 'Search browser tests...' : activeTab === 'api' ? 'Search API tests...' : 'Search monitors...'"
+          @update:model-value="currentPage = 1"
+        />
       </template>
 
       <!-- Type + Location dropdowns -->
@@ -1000,6 +999,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 
 const router = useRouter();
 
@@ -1712,8 +1712,6 @@ const saveMonitor = () => { showDrawer.value=false; };
 .sdot-degraded   { background:#f59e0b; }
 .sdot-down       { background:#ef4444; }
 
-.syn-search-box   { display:flex; align-items:center; gap:5px; padding:3px 9px; border:1px solid var(--o2-border-color); border-radius:6px; flex:1; min-width:120px; }
-.syn-search-input { border:none; outline:none; background:transparent; font-size:12px; color:inherit; width:100%; }
 .syn-select { padding:4px 6px; border:1px solid var(--o2-border-color); border-radius:6px; background:var(--o2-card-background); color:inherit; font-size:11.5px; outline:none; cursor:pointer; }
 
 /* ── TABLE AREA — fills space, no hardcoded bg ── */
@@ -2071,7 +2069,6 @@ const saveMonitor = () => { showDrawer.value=false; };
 .gm-leave-to .geo-modal, .gm-leave-to .issues-modal { transform:scale(.96) translateY(8px); opacity:0; }
 
 /* ── ICON COLOR HELPERS ── */
-.syn-search-icon { color:var(--o2-tab-text-color); flex-shrink:0; }
 .syn-empty-icon  { color:var(--o2-tab-text-color); }
 .pl-icon-muted   { color:var(--o2-tab-text-color); flex-shrink:0; }
 .pl-icon-primary { color:var(--q-primary, #1976d2); flex-shrink:0; }
