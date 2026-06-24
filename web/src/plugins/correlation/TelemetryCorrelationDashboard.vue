@@ -321,7 +321,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
                       <span
                         v-if="outerTabResourceName[outerGroup.id]"
-                        class="tw:text-[10px] tw:leading-tight tw:opacity-60 tw:max-w-[160px] tw:truncate tw:font-mono"
+                        class="tw:text-[11px] tw:leading-tight tw:opacity-80 tw:max-w-[200px] tw:truncate"
                         :title="outerTabResourceName[outerGroup.id]"
                       >{{ outerTabResourceName[outerGroup.id] }}</span>
                     </div>
@@ -823,7 +823,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                     <span
                       v-if="outerTabResourceName[outerGroup.id]"
-                      class="tw:text-[10px] tw:leading-tight tw:opacity-60 tw:max-w-[160px] tw:truncate tw:font-mono"
+                      class="tw:text-[11px] tw:leading-tight tw:opacity-80 tw:max-w-[200px] tw:truncate"
                       :title="outerTabResourceName[outerGroup.id]"
                     >{{ outerTabResourceName[outerGroup.id] }}</span>
                   </div>
