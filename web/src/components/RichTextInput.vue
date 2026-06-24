@@ -213,7 +213,7 @@ export default defineComponent({
       chipWrapper.appendChild(removeBtn);
 
       // Add a zero-width space after the chip to allow cursor positioning
-      const spacer = document.createTextNode('​');
+      const spacer = document.createTextNode('\u200B');
       chipWrapper.appendChild(spacer);
 
       return chipWrapper;
@@ -316,7 +316,7 @@ export default defineComponent({
         }
       };
       editableDiv.value.childNodes.forEach(walk);
-      return text.replace(/​/g, ''); // Remove zero-width spaces
+      return text.replace(/\u200B/g, ''); // Remove zero-width spaces
     };
 
     // Get message for backend (unwrap chips with full content)
@@ -341,7 +341,7 @@ export default defineComponent({
         }
       };
       editableDiv.value.childNodes.forEach(walk);
-      return message.replace(/​/g, '').trim();
+      return message.replace(/\u200B/g, '').trim();
     };
 
     // Handle input changes from user
