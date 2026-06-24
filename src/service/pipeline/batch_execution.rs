@@ -732,6 +732,7 @@ impl ExecutablePipeline {
         &self,
         org_id: &str,
         records: Vec<Value>,
+        from_node: Option<String>,
     ) -> Result<HashMap<StreamParams, Vec<(usize, Value)>>> {
         let batch_size = records.len();
         let pipeline_name = self.name.clone();
@@ -868,7 +869,15 @@ impl ExecutablePipeline {
             let source_node = self.node_map.get(&self.source_node_id).unwrap();
             matches!(&source_node.node_data, NodeData::Stream(stream_params) if stream_params.stream_type == StreamType::Metrics)
         };
-        let source_sender = node_senders.remove(&self.source_node_id).unwrap();
+        let source_sender = match from_node {
+            Some(v) => {
+                let Some(node) = node_senders.remove(&v) else {
+                    return Err(anyhow::anyhow!("node with id {v} not fond in workflow"));
+                };
+                node
+            }
+            None => node_senders.remove(&self.source_node_id).unwrap(),
+        };
         for (idx, record) in records.into_iter().enumerate() {
             let pipeline_item = PipelineItem {
                 idx,
