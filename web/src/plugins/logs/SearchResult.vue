@@ -1770,6 +1770,19 @@ export default defineComponent({
       (loading, wasLoading) => {
         if (wasLoading && !loading && searchObj.meta.searchApplied) {
           searchObj.meta.lastRunAt = Date.now();
+          // Refine default column selection using actual result data
+          if (!searchObj.data.stream.selectedFields.length) {
+            const hits = searchObj.data.queryResults?.hits || [];
+            const globalFtsKeys = store?.state?.zoConfig?.default_fts_keys || [];
+            const ftsDefaults = resolveDefaultColumns(
+              searchObj.data.stream.selectedStreamFields,
+              globalFtsKeys,
+              hits,
+            );
+            if (ftsDefaults.length > 0) {
+              searchObj.data.stream.selectedFields = ftsDefaults;
+            }
+          }
         }
       },
     );

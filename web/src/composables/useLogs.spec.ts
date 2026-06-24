@@ -2761,7 +2761,7 @@ describe('resolveDefaultColumns', () => {
     expect(result).toEqual(['body']);
   });
 
-  it('prefers body over body_msg and message, returning only the single best match', () => {
+  it('prefers body over body_msg and message by static priority when no hits', () => {
     const streamFields = [
       { name: 'message', ftsKey: true },
       { name: 'body', ftsKey: true },
@@ -2769,6 +2769,27 @@ describe('resolveDefaultColumns', () => {
     ];
     const result = resolveDefaultColumns(streamFields, []);
     expect(result).toEqual(['body']);
+  });
+
+  it('picks the field with the most non-empty values in hits', () => {
+    const streamFields = [
+      { name: 'body', ftsKey: true },
+      { name: 'message', ftsKey: true },
+    ];
+    const hits = [
+      { body: '', message: 'hello' },
+      { body: '', message: 'world' },
+      { body: 'foo', message: 'bar' },
+    ];
+    const result = resolveDefaultColumns(streamFields, [], hits);
+    expect(result).toEqual(['message']); // message has 3 non-empty, body has 1
+  });
+
+  it('returns empty array when hits are provided but all candidates are empty', () => {
+    const streamFields = [{ name: 'body', ftsKey: true }];
+    const hits = [{ body: '' }, { body: null }, { body: undefined }];
+    const result = resolveDefaultColumns(streamFields, [], hits as any);
+    expect(result).toEqual([]);
   });
 
   it('includes global fts keys that exist in the stream even if not marked ftsKey', () => {
