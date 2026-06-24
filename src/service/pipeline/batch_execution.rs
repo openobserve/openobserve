@@ -40,6 +40,7 @@ use config::{
     },
 };
 use futures::future::try_join_all;
+use infra::table::workflows::Workflow;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::pipeline::pipeline_wal_writer::get_pipeline_wal_writer;
 use proto::cluster_rpc;
@@ -191,6 +192,47 @@ impl PipelineExt for Pipeline {
     }
 }
 
+// TODO YJDOc2: following is almost exact copy of above, and actually
+// only needs nodes and org_id to create the ret. Refactor in a separate PR
+// as a util fn instead of a trait
+#[async_trait]
+impl PipelineExt for Workflow {
+    async fn register_functions(&self) -> Result<HashMap<String, CompiledFunctionRuntime>> {
+        let mut function_map = HashMap::new();
+        for node in &self.nodes {
+            if let NodeData::Function(func_params) = &node.data {
+                let transform = get_transforms(&self.org_id, &func_params.name).await?;
+
+                // Check if function is JS or VRL
+                let compiled_runtime = if transform.is_js() {
+                    // Compile JS function
+                    let js_config = compile_js_function(&transform.function, &self.org_id)?;
+                    CompiledFunctionRuntime::JS(js_config, transform.is_result_array_js())
+                } else {
+                    // Compile VRL function (default)
+                    let vrl_runtime_config =
+                        compile_vrl_function(&transform.function, &self.org_id)?;
+                    let registry = vrl_runtime_config
+                        .config
+                        .get_custom::<vector_enrichment::TableRegistry>()
+                        .unwrap();
+                    registry.finish_load();
+                    CompiledFunctionRuntime::VRL(
+                        Box::new(VRLResultResolver {
+                            program: vrl_runtime_config.program,
+                            fields: vrl_runtime_config.fields,
+                        }),
+                        transform.is_result_array_vrl(),
+                    )
+                };
+
+                function_map.insert(node.get_node_id(), compiled_runtime);
+            }
+        }
+        Ok(function_map)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct ExecutablePipeline {
     pub id: String,
@@ -316,6 +358,80 @@ impl ExecutablePipeline {
             sorted_nodes,
             function_map,
             kind: pipeline.kind.clone(),
+        })
+    }
+
+    pub async fn new_from_workflow(workflow: &Workflow) -> Result<Self> {
+        let node_map = workflow
+            .nodes
+            .iter()
+            .map(|node| {
+                (
+                    node.get_node_id(),
+                    ExecutableNode {
+                        id: node.get_node_id(),
+                        node_data: node.get_node_data(),
+                        children: workflow
+                            .edges
+                            .iter()
+                            .filter(|edge| edge.source == node.id)
+                            .map(|edge| edge.target.clone())
+                            .collect(),
+                    },
+                )
+            })
+            .collect();
+
+        // TODO YJDoc2: check if we should make the error type as workflow error rather than reusing
+        // the pipeline error
+        let function_map = match workflow.register_functions().await {
+            Ok(function_map) => function_map,
+            Err(e) => {
+                let pipeline_error = PipelineError {
+                    pipeline_id: workflow.id.to_string(),
+                    pipeline_name: workflow.name.to_string(),
+                    error: Some(format!("Init error: failed to compile function: {e}")),
+                    node_errors: HashMap::new(),
+                };
+                publish_error(ErrorData {
+                    _timestamp: Utc::now().timestamp_micros(),
+                    stream_params: Default::default(),
+                    error_source: ErrorSource::Pipeline(pipeline_error),
+                })
+                .await;
+                return Err(e);
+            }
+        };
+        let sorted_nodes = match topological_sort(&node_map) {
+            Ok(sorted) => sorted,
+            Err(e) => {
+                let pipeline_error = PipelineError {
+                    pipeline_id: workflow.id.to_string(),
+                    pipeline_name: workflow.name.to_string(),
+                    error: Some(
+                        "Init error: failed to sort pipeline nodes for execution".to_string(),
+                    ),
+                    node_errors: HashMap::new(),
+                };
+                publish_error(ErrorData {
+                    _timestamp: Utc::now().timestamp_micros(),
+                    stream_params: Default::default(),
+                    error_source: ErrorSource::Pipeline(pipeline_error),
+                })
+                .await;
+                return Err(e);
+            }
+        };
+        let source_node_id = sorted_nodes[0].to_owned();
+
+        Ok(Self {
+            id: workflow.id.to_string(),
+            name: workflow.name.to_string(),
+            source_node_id,
+            node_map,
+            sorted_nodes,
+            function_map,
+            kind: PipelineKind::User,
         })
     }
 
@@ -612,6 +728,246 @@ impl ExecutablePipeline {
         Ok(results)
     }
 
+    pub async fn process_workflow(
+        &self,
+        org_id: &str,
+        records: Vec<Value>,
+    ) -> Result<HashMap<StreamParams, Vec<(usize, Value)>>> {
+        let batch_size = records.len();
+        let pipeline_name = self.name.clone();
+        // Unique invocation ID to correlate logs across concurrent pipeline runs
+        let inv_id = &format!("{:08x}", rand::random::<u32>());
+        let batch_start = Instant::now();
+        if batch_size == 0 {
+            return Ok(HashMap::default());
+        }
+
+        // Source size of the batch (MB). Computed before records are consumed by the
+        // pipeline. Usage is reported at the end with the real pipeline response time.
+        let source_size: f64 = records
+            .iter()
+            .map(|record| record.to_string().len() as f64)
+            .sum::<f64>()
+            / config::SIZE_IN_MB;
+
+        // result_channel
+        let (result_sender, mut result_receiver) =
+            channel::<(usize, StreamParams, Value)>(batch_size);
+
+        // error_channel
+        let (error_sender, mut error_receiver) =
+            channel::<(String, String, String, Option<String>)>(batch_size);
+
+        let mut node_senders = HashMap::new();
+        let mut node_receivers = HashMap::new();
+
+        for node_id in &self.sorted_nodes {
+            let (sender, receiver) = channel::<PipelineItem>(batch_size);
+            node_senders.insert(node_id.to_string(), sender);
+            node_receivers.insert(node_id.to_string(), receiver);
+        }
+
+        // Spawn tasks for each node
+        let mut node_tasks = Vec::with_capacity(self.sorted_nodes.len());
+        for (idx, node_id) in self.sorted_nodes.iter().enumerate() {
+            let pl_id_cp = self.id.to_string();
+            let org_id_cp = org_id.to_string();
+            let node = self.node_map.get(node_id).unwrap().clone();
+            let node_receiver = node_receivers.remove(node_id).unwrap();
+            let child_senders: Vec<_> = node
+                .children
+                .iter()
+                .map(|child| node_senders.get(child).unwrap().clone())
+                .collect();
+            let result_sender_cp = node.children.is_empty().then_some(result_sender.clone());
+            let error_sender_cp = error_sender.clone();
+            let function_runtime: Option<CompiledFunctionRuntime> =
+                self.function_map.get(node_id).cloned();
+            let pipeline_name = pipeline_name.clone();
+            let inv_id_cp = inv_id.to_string();
+
+            // For LLM eval nodes, resolve the destination stream params from child leaf node
+            // TODO: check if this is actually used, or no longer needed
+            let _leaf_dest_stream = if matches!(&node.node_data, NodeData::LlmEvaluation(_)) {
+                node.children.iter().find_map(|child_id| {
+                    self.node_map.get(child_id).and_then(|child_node| {
+                        if let NodeData::Stream(sp) = &child_node.node_data {
+                            Some(sp.clone())
+                        } else {
+                            None
+                        }
+                    })
+                })
+            } else {
+                None
+            };
+            let metadata = ProcessMetadata {
+                pipeline_id: pl_id_cp,
+                node_idx: idx,
+                org_id: org_id_cp,
+                pipeline_name,
+                stream_name: None,
+                source_stream_type: StreamType::Logs,
+                inv_id: inv_id_cp,
+                print_event: false, // do not print events for workflows
+                leaf_dest_stream: _leaf_dest_stream,
+            };
+            let channels = ProcessChannels {
+                receiver: node_receiver,
+                child_senders,
+                result_sender: result_sender_cp,
+                error_sender: error_sender_cp,
+            };
+            let task = tokio::spawn(process_node(metadata, node, function_runtime, channels));
+            node_tasks.push(task);
+        }
+
+        // task to collect results
+        let pl_name_for_results = pipeline_name.clone();
+        let inv_id_for_results = inv_id.clone();
+        let result_task = tokio::spawn(async move {
+            log::debug!(
+                "[Workflow] {pl_name_for_results} [inv={inv_id_for_results}]: starts result collecting job"
+            );
+            let mut results = HashMap::new();
+            while let Some((idx, stream_params, record)) = result_receiver.recv().await {
+                log::debug!(
+                    "[Workflow] {pl_name_for_results} [inv={inv_id_for_results}]: result collector got record for {}:{}",
+                    stream_params.stream_type,
+                    stream_params.stream_name,
+                );
+
+                results
+                    .entry(stream_params)
+                    .or_insert(Vec::new())
+                    .push((idx, record));
+            }
+            results
+        });
+
+        // task to collect errors
+        let mut pipeline_error = PipelineError::new(&self.id, &self.name);
+        let inv_id_for_errors = inv_id.clone();
+        let error_task = tokio::spawn(async move {
+            log::debug!("[Workflow] [inv={inv_id_for_errors}]: starts error collecting job");
+            let mut count = 0;
+            while let Some((node_id, node_type, error, fn_name)) = error_receiver.recv().await {
+                pipeline_error.add_node_error(node_id, node_type, error, fn_name);
+                count += 1;
+            }
+            log::debug!("[Workflow] [inv={inv_id_for_errors}]: collected {count} errors");
+            if count > 0 {
+                Some(pipeline_error)
+            } else {
+                None
+            }
+        });
+
+        // Send records to the source node to begin processing
+        let flattened = {
+            let source_node = self.node_map.get(&self.source_node_id).unwrap();
+            matches!(&source_node.node_data, NodeData::Stream(stream_params) if stream_params.stream_type == StreamType::Metrics)
+        };
+        let source_sender = node_senders.remove(&self.source_node_id).unwrap();
+        for (idx, record) in records.into_iter().enumerate() {
+            let pipeline_item = PipelineItem {
+                idx,
+                record,
+                flattened,
+            };
+            if let Err(send_err) = source_sender.send(pipeline_item).await {
+                log::error!(
+                    "[Workflow] {pipeline_name} [inv={inv_id}]: Error sending original records into source Node for {send_err}"
+                );
+                break;
+            }
+        }
+        drop(source_sender);
+        drop(result_sender);
+        drop(error_sender);
+        drop(node_senders);
+        log::debug!(
+            "[Workflow] {pipeline_name} [inv={inv_id}]: All records send into pipeline for processing"
+        );
+
+        // Wait for all node tasks to complete
+        log::debug!(
+            "[Workflow] {pipeline_name} [inv={inv_id}]: waiting for all node tasks to complete"
+        );
+        if let Err(e) = try_join_all(node_tasks).await {
+            log::error!(
+                "[Workflow] {pipeline_name} [inv={inv_id}]: node processing jobs failed: {e}"
+            );
+        }
+        log::debug!("[Workflow] {pipeline_name} [inv={inv_id}]: all node tasks completed");
+
+        // Publish errors if received any
+        log::debug!("[Workflow] {pipeline_name} [inv={inv_id}]: awaiting error task");
+        if let Some(pipeline_errors) = error_task.await.map_err(|e| {
+            log::error!(
+                "[Workflow] {pipeline_name} [inv={inv_id}]: error collecting job failed: {e}"
+            );
+            anyhow!("[Workflow] error collecting job failed: {}", e)
+        })? {
+            // TODO YJDOc2: maybe change error type?
+            log::error!(
+                "[Workflow] [inv={inv_id}] id: {}, name: {}, node_errors: {:?}",
+                pipeline_errors.pipeline_id,
+                pipeline_errors.pipeline_name,
+                pipeline_errors.node_errors
+            );
+            let error_data = ErrorData {
+                _timestamp: Utc::now().timestamp_micros(),
+                stream_params: Default::default(),
+                error_source: ErrorSource::Pipeline(pipeline_errors),
+            };
+            log::debug!(
+                "[Workflow] {pipeline_name} [inv={inv_id}]: execution errors occurred and published"
+            );
+            publish_error(error_data).await;
+        }
+
+        log::debug!("[Workflow] {pipeline_name} [inv={inv_id}]: awaiting result collector");
+        let results = result_task.await.map_err(|e| {
+            log::error!(
+                "[Workflow] {pipeline_name} [inv={inv_id}]: result collecting job failed: {e}"
+            );
+            anyhow!("[Workflow] result collecting job failed: {}", e)
+        })?;
+        log::debug!(
+            "[Workflow] {pipeline_name} [inv={inv_id}]: result collector returned {} stream groups",
+            results.len()
+        );
+
+        // Report pipeline ingestion usage LAST, with response_time set to the time
+        // spent by the pipeline processing this batch (seconds, f64).
+        let elapsed_secs = batch_start.elapsed().as_secs_f64();
+        if source_size > 0.0 {
+            let req_stats = config::meta::self_reporting::usage::RequestStats {
+                size: source_size,
+                records: batch_size as i64,
+                response_time: elapsed_secs,
+                ..config::meta::self_reporting::usage::RequestStats::default()
+            };
+
+            // TODO YJDoc2: change usage type?
+            crate::service::self_reporting::report_request_usage_stats(
+                req_stats,
+                org_id,
+                &self.id,
+                StreamType::Logs,
+                config::meta::self_reporting::usage::UsageType::Pipeline,
+                0, // No functions for source stream ingestion
+                chrono::Utc::now().timestamp_micros(),
+            )
+            .await;
+        }
+
+        // Cross-type leaf nodes ingest directly via ingestion_service inside process_node,
+        // so results here only contain same-type records for the caller to handle.
+        Ok(results)
+    }
+
     pub fn get_all_destination_streams(&self) -> Vec<StreamParams> {
         self.node_map
             .values()
@@ -674,6 +1030,7 @@ impl ExecutableNode {
             NodeData::Condition(_) => "condition".to_string(),
             NodeData::Query(_) => "query".to_string(),
             NodeData::LlmEvaluation(p) => format!("llm_evaluation:{}", p.name),
+            NodeData::WorkflowTrigger => "workflow_trigger".to_string(),
         }
     }
 }
@@ -687,6 +1044,7 @@ impl std::fmt::Display for ExecutableNode {
             NodeData::Condition(_) => write!(f, "condition"),
             NodeData::RemoteStream(_) => write!(f, "remote_stream"),
             NodeData::LlmEvaluation(_) => write!(f, "llm_evaluation"),
+            NodeData::WorkflowTrigger => write!(f, "workflow_trigger"),
         }
     }
 }
@@ -773,6 +1131,14 @@ async fn process_node(
     let mut busy = Duration::ZERO;
 
     let count = match &node.node_data {
+        NodeData::WorkflowTrigger => {
+            let mut count: usize = 0;
+            while let Some(item) = channels.receiver.recv().await {
+                send_to_children(&mut channels.child_senders, item, "WorkflowTrigger").await;
+                count += 1;
+            }
+            count
+        }
         NodeData::Stream(stream_params) => {
             process_stream_node(stream_params, metadata, &node, channels, &mut busy).await
         }

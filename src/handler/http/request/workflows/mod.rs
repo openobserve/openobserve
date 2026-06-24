@@ -7,6 +7,7 @@ use axum::{
 };
 use config::ider;
 use infra::table::workflows::Workflow;
+use serde::Deserialize;
 
 use crate::{
     common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
@@ -16,6 +17,11 @@ use crate::{
     },
     service::workflows,
 };
+
+#[derive(Deserialize)]
+pub struct WorkflowTestInput {
+    inputs: Vec<serde_json::Value>,
+}
 
 /// CreateWorkflow
 
@@ -213,6 +219,45 @@ pub async fn update_workflows(
                 .with_id(id)
                 .with_name(name),
         ),
+        Err(e) => MetaHttpResponse::bad_request(e),
+    }
+}
+
+/// TestWorkflow
+
+#[utoipa::path(
+    post,
+    path = "/{org_id}/workflows/{id}/test",
+    context_path = "/api",
+    tag = "Workflows",
+    operation_id = "testWorkflow",
+    summary = "Test an existing workflow with given input",
+    description = "",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization id"),
+        ("id" = String, Path, description = "Workflow id"),
+    ),
+    request_body(content = inline(Object), description = "Workflow inputs", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "create"})),
+    )
+)]
+pub async fn test_workflow(
+    Path((org_id, workflow_id)): Path<(String, String)>,
+    Json(inputs): Json<WorkflowTestInput>,
+) -> Response {
+    match workflows::test_workflow(&org_id, &workflow_id, inputs.inputs).await {
+        Ok(()) => MetaHttpResponse::json(MetaHttpResponse::message(
+            StatusCode::OK,
+            "Workflow tested successfully",
+        )),
         Err(e) => MetaHttpResponse::bad_request(e),
     }
 }

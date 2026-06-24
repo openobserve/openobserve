@@ -1,5 +1,7 @@
 use infra::table::workflows::{self, Workflow};
 
+use crate::service::pipeline::batch_execution::ExecutablePipeline;
+
 fn validate_workflow(workflow: &Workflow) -> Result<(), anyhow::Error> {
     for node in &workflow.nodes {
         if !node.data.is_workflow_node() {
@@ -56,5 +58,19 @@ fn is_permitted(workflow_id: &str, org_id: &str, permitted: Option<&Vec<String>>
 // TOO YJDoc2: handle cluster sync
 pub async fn delete_workflow(id: &str) -> Result<(), anyhow::Error> {
     workflows::delete_workflow(id).await?;
+    Ok(())
+}
+
+pub async fn test_workflow(
+    org_id: &str,
+    id: &str,
+    inputs: Vec<serde_json::Value>,
+) -> Result<(), anyhow::Error> {
+    let workflow = workflows::get_by_org_wid(org_id, id)
+        .await?
+        .ok_or(anyhow::anyhow!("workflow with given id not found"))?;
+    let executable = ExecutablePipeline::new_from_workflow(&workflow).await?;
+
+    executable.process_workflow(org_id, inputs).await?;
     Ok(())
 }
