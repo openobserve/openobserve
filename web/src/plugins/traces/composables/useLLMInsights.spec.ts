@@ -527,6 +527,40 @@ describe("useLLMInsights — error rate is always [0%, 100%]", () => {
     expect(sql).not.toMatch(/COUNT\(\*\)\s+FILTER\s*\(WHERE\s+span_status\s*=\s*'ERROR'\)/);
     expect(sql).toMatch(/approx_distinct\(trace_id\)\s+FILTER\s*\(WHERE\s+span_status\s*=\s*'ERROR'\)/);
   });
+
+  it("KPI SQL scopes p95/avg latency to LLM calls via per-aggregate FILTER", () => {
+    const { fetchAll } = useLLMInsights();
+    fetchAll("default", 100, 200);
+
+    const kpiCall = mockFetchQueryDataWithHttpStream.mock.calls.find(([p]: any) =>
+      p.queryReq.query.sql.includes("approx_percentile_cont(duration, 0.95)"),
+    );
+    const sql: string = (kpiCall as any)[0].queryReq.query.sql;
+
+    // Latency must be LLM-only — otherwise fast child/tool spans drag the tail
+    // down. Scoped via FILTER (not a top-level WHERE) so the trace-level error
+    // count, which depends on non-LLM child error spans, is untouched.
+    expect(sql).toMatch(
+      /approx_percentile_cont\(duration, 0\.95\)\s+FILTER\s*\(WHERE\s+gen_ai_operation_name\s+IS\s+NOT\s+NULL\)/,
+    );
+    expect(sql).toMatch(
+      /AVG\(duration\)\s+FILTER\s*\(WHERE\s+gen_ai_operation_name\s+IS\s+NOT\s+NULL\)/,
+    );
+  });
+
+  it("sparkline SQL scopes p95 latency to LLM calls via per-aggregate FILTER", () => {
+    const { fetchAll } = useLLMInsights();
+    fetchAll("default", 100, 200);
+
+    const sparkCall = mockFetchQueryDataWithHttpStream.mock.calls.find(([p]: any) =>
+      p.queryReq.query.sql.includes("GROUP BY ts"),
+    );
+    const sql: string = (sparkCall as any)[0].queryReq.query.sql;
+
+    expect(sql).toMatch(
+      /approx_percentile_cont\(duration, 0\.95\)\s+FILTER\s*\(WHERE\s+gen_ai_operation_name\s+IS\s+NOT\s+NULL\)/,
+    );
+  });
 });
 
 // ---------------------------------------------------------------------------

@@ -216,6 +216,14 @@ export function useLLMInsights() {
     // gen_ai_operation_name, so filtering errors to only LLM spans yields 0.
     // Counting error spans vs LLM-only spans yields values >> 100%.
     // Trace-level counting fixes both: a trace either errored or it didn't.
+    //
+    // Latency (avg / p95), by contrast, is scoped to LLM calls via a per-aggregate
+    // FILTER — "P95 Latency" means "how slow are the model calls", so the fast
+    // child/tool spans must be excluded or they drag the tail down. We can't add
+    // a top-level WHERE for this because it would also strip the child error
+    // spans the trace-level error count relies on; the FILTER isolates it to just
+    // these two columns. This matches the dedicated Latency trend panel, which
+    // already filters on gen_ai_operation_name IS NOT NULL.
     const agentFilter = buildAgentTraceFilter(agent, streamName);
     const sql = compactSql(`
       SELECT
@@ -224,8 +232,8 @@ export function useLLMInsights() {
         approx_distinct(trace_id) FILTER (WHERE span_status = 'ERROR') as error_count,
         COALESCE(SUM(gen_ai_usage_total_tokens), 0) as total_tokens,
         COALESCE(SUM(gen_ai_usage_cost), 0) as total_cost,
-        COALESCE(AVG(duration), 0) as avg_duration,
-        COALESCE(approx_percentile_cont(duration, 0.95), 0) as p95_duration
+        COALESCE(AVG(duration) FILTER (WHERE gen_ai_operation_name IS NOT NULL), 0) as avg_duration,
+        COALESCE(approx_percentile_cont(duration, 0.95) FILTER (WHERE gen_ai_operation_name IS NOT NULL), 0) as p95_duration
       FROM "${streamName}"
       ${agentFilter ? `WHERE ${agentFilter}` : ""}
     `);
@@ -364,7 +372,7 @@ export function useLLMInsights() {
         approx_distinct(trace_id) FILTER (WHERE span_status = 'ERROR') as error_count,
         COALESCE(SUM(gen_ai_usage_total_tokens), 0) as total_tokens,
         COALESCE(SUM(gen_ai_usage_cost), 0) as total_cost,
-        COALESCE(approx_percentile_cont(duration, 0.95), 0) as p95_duration
+        COALESCE(approx_percentile_cont(duration, 0.95) FILTER (WHERE gen_ai_operation_name IS NOT NULL), 0) as p95_duration
       FROM "${streamName}"
       ${agentFilter ? `WHERE ${agentFilter}` : ""}
       GROUP BY ts
