@@ -182,7 +182,9 @@ impl SsrfGuard {
             IpAddr::V4(ipv4) => {
                 let octets = ipv4.octets();
 
-                (!allow_loopback && octets[0] == 127)
+                // 0.0.0.0/8 — "this network" (RFC 1122); OS routes to loopback on connect
+                (octets[0] == 0)
+                    || (!allow_loopback && octets[0] == 127)
                     || (octets[0] == 10)
                     || (octets[0] == 172 && octets[1] >= 16 && octets[1] <= 31)
                     || (octets[0] == 192 && octets[1] == 168)
@@ -205,7 +207,9 @@ impl SsrfGuard {
 
                 let segments = ipv6.segments();
 
-                (!allow_loopback && ipv6.is_loopback())
+                // :: (IPv6 unspecified) — not loopback, not v4-mapped, still routes to loopback
+                ipv6.is_unspecified()
+                    || (!allow_loopback && ipv6.is_loopback())
                     || (segments[0] & 0xffc0) == 0xfe80
                     || (segments[0] & 0xfe00) == 0xfc00
                     || (segments[0] == 0x2001 && segments[1] == 0xdb8)
