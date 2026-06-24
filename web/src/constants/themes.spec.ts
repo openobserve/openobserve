@@ -77,7 +77,6 @@ describe("theme registry", () => {
         tempColor: "#ABCDEF",
         appliedThemeName: "Ocean Breeze",
         customColor: "#111111",
-        orgColor: "#222222",
       });
       expect(r.source).toBe("preview");
       expect(r.themeColor).toBe("#ABCDEF");
@@ -108,7 +107,6 @@ describe("theme registry", () => {
       const r = resolveThemeForMode({
         mode: "light",
         appliedThemeName: "Removed In v2",
-        orgColor: null,
       });
       expect(r.source).toBe("default");
       expect(r.themeColor).toBe(getDefaultTheme().light.themeColor);
@@ -124,14 +122,14 @@ describe("theme registry", () => {
       expect(r.themeColor).toBe("#FF0000");
     });
 
-    it("falls back to org color when nothing is selected", () => {
+    it("ignores any org color and uses the named default when nothing is selected", () => {
+      const def = getDefaultTheme();
       const r = resolveThemeForMode({
         mode: "dark",
         appliedThemeName: null,
-        orgColor: "#123456",
       });
-      expect(r.source).toBe("org");
-      expect(r.themeColor).toBe("#123456");
+      expect(r.source).toBe("default");
+      expect(r.themeColor).toBe(def.dark.themeColor);
     });
 
     it("falls back to the default theme (O2 Signature) when nothing else is set", () => {

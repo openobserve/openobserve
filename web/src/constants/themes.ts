@@ -196,12 +196,7 @@ export const getDefaultTheme = (): PredefinedTheme =>
 export const themeNameSlug = (name: string): string =>
   name.toLowerCase().replace(/\s+/g, "-");
 
-export type ThemeSource =
-  | "preview"
-  | "predefined"
-  | "custom"
-  | "org"
-  | "default";
+export type ThemeSource = "preview" | "predefined" | "custom" | "default";
 
 export interface ResolveThemeInput {
   mode: "light" | "dark";
@@ -213,8 +208,6 @@ export interface ResolveThemeInput {
   customColor?: string | null;
   /** Persisted semantic colors for a custom theme, if any. */
   customSemanticColors?: SemanticColors | null;
-  /** Organization-level configured color (backend default). */
-  orgColor?: string | null;
 }
 
 export interface ResolvedTheme {
@@ -233,8 +226,11 @@ export interface ResolvedTheme {
  *   1. Live preview (tempColor)
  *   2. Selected predefined theme — resolved by NAME from the registry
  *   3. Selected custom theme — the persisted hex color
- *   4. Organization-configured color
- *   5. Default theme (O2 Signature) — resolved by NAME from the registry
+ *   4. Default theme (O2 Signature) — resolved by NAME from the registry
+ *
+ * The named default is authoritative: when no theme is explicitly selected it
+ * always wins, so changing the default theme's colors in the registry takes
+ * effect immediately. (Org-level theme colors are not part of this resolution.)
  */
 export const resolveThemeForMode = (input: ResolveThemeInput): ResolvedTheme => {
   const mode = input.mode;
@@ -271,12 +267,7 @@ export const resolveThemeForMode = (input: ResolveThemeInput): ResolvedTheme => 
     };
   }
 
-  // 4. Organization-configured color
-  if (input.orgColor) {
-    return { themeColor: input.orgColor, isDefault: false, source: "org" };
-  }
-
-  // 5. Default theme (O2 Signature), resolved by name
+  // 4. Default theme (O2 Signature), resolved by name
   const def = getDefaultTheme();
   const m = def[mode];
   return {
