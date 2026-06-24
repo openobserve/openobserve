@@ -309,6 +309,17 @@ test.describe("Compare SQL query execution times", () => {
     await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`);
     await pm.logsPage.selectStream(streamName);
 
+    // Pin the fields this test asserts on as explicit columns. The default logs
+    // view now shows only the best-fill FTS "body" field (here: message), so the
+    // non-body "data_age" values (1h_old/3h_old/4h_old) would otherwise live only
+    // inside the raw event and not be visible as table text. Pinning both message
+    // and data_age renders them as their own columns (and signals an explicit user
+    // selection, so the FTS default-column logic leaves them alone).
+    await pm.logsPage.fillIndexFieldSearchInput("message");
+    await pm.logsPage.ensureFieldIsInteresting("message");
+    await pm.logsPage.fillIndexFieldSearchInput("data_age");
+    await pm.logsPage.ensureFieldIsInteresting("data_age");
+
     // STEP 0: First verify ALL data is available in wide range (baseline check to eliminate false positives)
     await pm.logsPage.clickDateTimeButton();
     await pm.logsPage.clickPast6DaysButton();

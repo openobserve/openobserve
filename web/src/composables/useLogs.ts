@@ -821,7 +821,14 @@ export const resolveDefaultColumns = (
 
   if (candidates.length === 0) return [];
 
-  // When hits are available, pick the candidate with the highest fill rate
+  const priorityIndex = (name: string) => {
+    const idx = FTS_PRIORITY.indexOf(name);
+    return idx === -1 ? FTS_PRIORITY.length : idx;
+  };
+
+  // When hits are available, pick the candidate with the highest fill rate.
+  // Break ties using FTS_PRIORITY so the more meaningful body field wins when
+  // multiple candidates are equally populated (e.g. body beats log).
   if (hits && hits.length > 0) {
     let bestField = '';
     let bestCount = -1;
@@ -829,7 +836,10 @@ export const resolveDefaultColumns = (
       const count = hits.filter(
         (h) => h[field] !== undefined && h[field] !== null && h[field] !== '',
       ).length;
-      if (count > bestCount) {
+      if (
+        count > bestCount ||
+        (count === bestCount && priorityIndex(field) < priorityIndex(bestField))
+      ) {
         bestCount = count;
         bestField = field;
       }
@@ -838,11 +848,6 @@ export const resolveDefaultColumns = (
   }
 
   // No hits yet — fall back to static priority order
-  const priorityIndex = (name: string) => {
-    const idx = FTS_PRIORITY.indexOf(name);
-    return idx === -1 ? FTS_PRIORITY.length : idx;
-  };
-
   const sorted = candidates.sort((a, b) => priorityIndex(a) - priorityIndex(b));
   return sorted.slice(0, 1);
 };

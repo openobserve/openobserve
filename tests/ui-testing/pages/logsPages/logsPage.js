@@ -4591,11 +4591,29 @@ export class LogsPage {
         return await this.page.locator(this.logsDetailTableSearchAroundBtn).click();
     }
 
+    /**
+     * Assert that the results table rendered at least one data row.
+     *
+     * Historically the default logs view always showed a single generic "source"
+     * column (full row as JSON). With the FTS default-column feature, a plain
+     * (non-SQL, no-pin) view instead promotes the best-fill full-text "body"
+     * field (e.g. "log"/"message"/"body") to its own column, so "source" is no
+     * longer guaranteed. Custom SQL queries and aggregates still render "source".
+     *
+     * This helper therefore passes when EITHER the "source" column OR any other
+     * first-row column cell is visible — i.e. "results rendered", independent of
+     * which default column the view chose. Use expectLogTableColumnVisible(name)
+     * when a specific column must be asserted.
+     */
     async expectLogTableColumnSourceVisible() {
-        const element = this.page.locator(this.logTableColumnSource);
-        // Wait for the element to be visible with a timeout
-        await element.waitFor({ state: 'visible', timeout: 30000 });
-        return await expect(element).toBeVisible();
+        const sourceCol = this.page.locator(this.logTableColumnSource);
+        const anyFirstRowCol = this.page.locator('[data-test^="log-table-column-0-"]').first();
+        // Whichever appears first satisfies "results rendered".
+        await Promise.race([
+            sourceCol.waitFor({ state: 'visible', timeout: 30000 }).catch(() => {}),
+            anyFirstRowCol.waitFor({ state: 'visible', timeout: 30000 }).catch(() => {}),
+        ]);
+        return await expect(anyFirstRowCol).toBeVisible();
     }
 
     /**

@@ -340,6 +340,8 @@ export const useSearchBar = () => {
       // stream, so we drop it and let the post-search fill-rate check pick a
       // fresh default FTS column for the new stream.
       searchObj.data.stream.selectedFields = [];
+      // The cleared selection is no longer a system pick from the old stream.
+      searchObj.meta.isFtsDefaultColumn = false;
 
       // Update interesting fields list
       searchObj.data.stream.interestingFieldList =

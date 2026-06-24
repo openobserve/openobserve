@@ -350,6 +350,113 @@ describe("SearchResult Component", () => {
       expect(wrapper.vm.searchObj.data.stream.selectedFields).toEqual(["pod_name"]);
     });
 
+    it("loading watcher does not override a user-chosen column (flag cleared, selection non-empty)", async () => {
+      // The user explicitly chose a column, so isFtsDefaultColumn is false and
+      // selectedFields is non-empty. The watcher must leave it alone — even if the
+      // chosen field happens to be an FTS candidate.
+      wrapper.vm.searchObj.data.stream.selectedFields = ["kubernetes_pod_id"];
+      wrapper.vm.searchObj.meta.isFtsDefaultColumn = false;
+      wrapper.vm.searchObj.data.stream.selectedStreamFields = [
+        { name: "message", ftsKey: true },
+        { name: "kubernetes_pod_id", ftsKey: false },
+      ];
+      wrapper.vm.searchObj.data.queryResults = {
+        hits: [{ message: "hello", kubernetes_pod_id: "pod-1" }],
+      };
+      wrapper.vm.searchObj.meta.sqlMode = false;
+      wrapper.vm.searchObj.meta.searchApplied = true;
+
+      wrapper.vm.searchObj.loading = true;
+      await wrapper.vm.$nextTick();
+      wrapper.vm.searchObj.loading = false;
+      await wrapper.vm.$nextTick();
+
+      // User's choice preserved; no FTS default injected.
+      expect(wrapper.vm.searchObj.data.stream.selectedFields).toEqual([
+        "kubernetes_pod_id",
+      ]);
+      expect(wrapper.vm.searchObj.meta.isFtsDefaultColumn).toBe(false);
+    });
+
+    it("loading watcher re-resolves when the current columns are a prior system pick", async () => {
+      // A previous system pick is in place (flag true). A new search may change
+      // fill rates, so the watcher is allowed to re-resolve the default — and the
+      // result stays flagged as a system pick.
+      wrapper.vm.searchObj.data.stream.selectedFields = ["log"];
+      wrapper.vm.searchObj.meta.isFtsDefaultColumn = true;
+      wrapper.vm.searchObj.data.stream.selectedStreamFields = [
+        { name: "message", ftsKey: true },
+        { name: "log", ftsKey: true },
+      ];
+      wrapper.vm.searchObj.data.queryResults = {
+        hits: [{ message: "hello", log: "" }],
+      };
+      wrapper.vm.searchObj.meta.sqlMode = false;
+      wrapper.vm.searchObj.meta.searchApplied = true;
+
+      wrapper.vm.searchObj.loading = true;
+      await wrapper.vm.$nextTick();
+      wrapper.vm.searchObj.loading = false;
+      await wrapper.vm.$nextTick();
+
+      // "message" is filled, "log" is empty → best-fill picks "message".
+      expect(wrapper.vm.searchObj.data.stream.selectedFields).toEqual([
+        "message",
+      ]);
+      expect(wrapper.vm.searchObj.meta.isFtsDefaultColumn).toBe(true);
+    });
+
+    it("loading watcher resolves an FTS default (system pick) when there is no selection", async () => {
+      wrapper.vm.searchObj.data.stream.selectedFields = [];
+      wrapper.vm.searchObj.meta.isFtsDefaultColumn = false;
+      wrapper.vm.searchObj.data.stream.selectedStreamFields = [
+        { name: "message", ftsKey: true },
+        { name: "kubernetes_pod_id", ftsKey: false },
+      ];
+      wrapper.vm.searchObj.data.queryResults = {
+        hits: [{ message: "hello", kubernetes_pod_id: "pod-1" }],
+      };
+      wrapper.vm.searchObj.meta.sqlMode = false;
+      wrapper.vm.searchObj.meta.searchApplied = true;
+
+      wrapper.vm.searchObj.loading = true;
+      await wrapper.vm.$nextTick();
+      wrapper.vm.searchObj.loading = false;
+      await wrapper.vm.$nextTick();
+
+      // No selection → the best-filled FTS field ("message") becomes the default,
+      // and is marked as a system pick so it is never persisted.
+      expect(wrapper.vm.searchObj.data.stream.selectedFields).toEqual([
+        "message",
+      ]);
+      expect(wrapper.vm.searchObj.meta.isFtsDefaultColumn).toBe(true);
+    });
+
+    it("loading watcher leaves columns alone in SQL mode (custom queries are authoritative)", async () => {
+      // A hand-written SQL query (CTE / aggregate) with no pinned fields renders
+      // the generic "source" column. The FTS feature must not override a custom
+      // query's result columns.
+      wrapper.vm.searchObj.data.stream.selectedFields = [];
+      wrapper.vm.searchObj.meta.isFtsDefaultColumn = false;
+      wrapper.vm.searchObj.data.stream.selectedStreamFields = [
+        { name: "message", ftsKey: true },
+      ];
+      wrapper.vm.searchObj.data.queryResults = {
+        hits: [{ message: "hello" }],
+      };
+      wrapper.vm.searchObj.meta.sqlMode = true;
+      wrapper.vm.searchObj.meta.searchApplied = true;
+
+      wrapper.vm.searchObj.loading = true;
+      await wrapper.vm.$nextTick();
+      wrapper.vm.searchObj.loading = false;
+      await wrapper.vm.$nextTick();
+
+      // sqlMode short-circuits the watcher → selectedFields untouched (stays empty
+      // so updateGridColumns renders the "source" column).
+      expect(wrapper.vm.searchObj.data.stream.selectedFields).toEqual([]);
+    });
+
     it("should handle updateTitle changes", async () => {
       const title = "New Title";
       wrapper.vm.searchObj.data.histogram.chartParams.title = title;
