@@ -88,7 +88,8 @@ impl RemoteScanNodes {
                 let t = self.req.time_range.as_ref().map(|x| x.0).unwrap_or(0);
                 if self.req.histogram_interval > 0 {
                     // Snap down to bucket boundary so date_bin()'s first bucket is fully populated.
-                    // histogram_interval is in seconds; convert to microseconds to match _timestamp.
+                    // histogram_interval is in seconds; convert to microseconds to match
+                    // _timestamp.
                     histogram_bucket_start(t, self.req.histogram_interval * 1_000_000)
                 } else {
                     t

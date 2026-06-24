@@ -38,9 +38,9 @@ use futures::future::try_join_all;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::pipeline::pipeline_wal_writer::get_pipeline_wal_writer;
 use once_cell::sync::Lazy;
-use tokio::sync::mpsc::{Receiver, Sender, channel};
 #[cfg(feature = "enterprise")]
 use tokio::sync::Mutex;
+use tokio::sync::mpsc::{Receiver, Sender, channel};
 
 use crate::{
     common::infra::config::QUERY_FUNCTIONS,
@@ -265,15 +265,16 @@ impl ExecutablePipeline {
         // never per-record, to stay safe under high ingestion rate.
         let print_event = config::get_config().common.print_key_event;
         let batch_start = Instant::now();
-        
+
         log::debug!(
             "[Pipeline] {} : process batch of size {}",
             pipeline_name,
             batch_size
         );
-        
+
         // Source size of the batch (MB). Computed before records are consumed by the
-        // pipeline.
+        // pipeline. Usage is reported at the end with the real pipeline response time.
+        let source_stream_params = self.get_source_stream_params();
         let source_size: f64 = records
             .iter()
             .map(|v| v.to_string().into_bytes().len() as f64)
@@ -468,6 +469,27 @@ impl ExecutablePipeline {
             );
         }
 
+        // Report pipeline ingestion usage LAST, with response_time set to the time
+        // spent by the pipeline processing this batch (seconds, f64).
+        if source_size > 0.0 {
+            let req_stats = config::meta::self_reporting::usage::RequestStats {
+                size: source_size,
+                records: batch_size as i64,
+                response_time: elapsed_secs,
+                ..config::meta::self_reporting::usage::RequestStats::default()
+            };
+
+            crate::service::self_reporting::report_request_usage_stats(
+                req_stats,
+                org_id,
+                &self.id,
+                source_stream_params.stream_type,
+                config::meta::self_reporting::usage::UsageType::Pipeline,
+                0, // No functions for source stream ingestion
+                chrono::Utc::now().timestamp_micros(),
+            )
+            .await;
+        }
 
         // Cross-type leaf nodes ingest directly via ingestion_service inside process_node,
         // so results here only contain same-type records for the caller to handle.
