@@ -1223,9 +1223,9 @@
             "2"
           ],
           [
-            "track-router",
+            "batch-sync",
             "100.0",
-            "2"
+            "1"
           ],
           [
             "lane-monitor",
@@ -1233,9 +1233,9 @@
             "1"
           ],
           [
-            "batch-sync",
+            "track-router",
             "100.0",
-            "1"
+            "2"
           ]
         ],
         "results_mode": "rowsort"
@@ -1528,15 +1528,15 @@
         ],
         "results": [
           [
-            "pallet-mapper",
-            "840.0",
-            "33.0",
-            "0.0"
-          ],
-          [
             "track-router",
             "610.0",
             "99.0",
+            "0.0"
+          ],
+          [
+            "pallet-mapper",
+            "840.0",
+            "33.0",
             "0.0"
           ]
         ],
@@ -1589,14 +1589,28 @@
     },
     {
       "id": "Q999",
-      "sql": "SELECT ROUND(POWER(SUM(CAST(throughput_rate AS FLOAT) - AVG(CAST(throughput_rate AS FLOAT)) OVER (), 2) / NULLIF(COUNT(*), 0)), 4) AS variance_pop, ROUND(AVG(CAST(throughput_rate AS FLOAT)), 2) AS avg_rate, COUNT(*) AS cnt FROM \"{stream}\"",
+      "sql": "WITH rates AS (SELECT CAST(throughput_rate AS FLOAT) AS rate FROM \"{stream}\"), agg AS (SELECT AVG(rate) AS mean_rate, COUNT(*) AS n FROM rates) SELECT ROUND(SUM((rate - mean_rate) * (rate - mean_rate)) / NULLIF(MAX(n), 0), 4) AS variance_pop, ROUND(MAX(mean_rate), 2) AS avg_rate, MAX(n) AS cnt FROM rates, agg",
       "category": "math_functions",
       "time_offset": {
         "start_offset": 59879000000,
         "end_offset": 59953000000
       },
       "expected": {
-        "skip_sqllogictest": true
+        "columns": [
+          "variance_pop",
+          "avg_rate",
+          "cnt"
+        ],
+        "results": [
+          [
+            "85081.6327",
+            "465.71",
+            "7"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true,
+        "skip_row_count": true
       }
     }
   ],

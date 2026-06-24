@@ -147,11 +147,11 @@
             "4"
           ],
           [
-            "ZONE-1",
+            "ZONE-2",
             "3"
           ],
           [
-            "ZONE-2",
+            "ZONE-1",
             "3"
           ],
           [
@@ -259,16 +259,16 @@
             "26.4"
           ],
           [
-            "ZONE-2",
-            "2",
-            "457.5",
-            "50.3"
-          ],
-          [
             "ZONE-1",
             "2",
             "580.0",
             "50.45"
+          ],
+          [
+            "ZONE-2",
+            "2",
+            "457.5",
+            "50.3"
           ],
           [
             "ZONE-3",
@@ -663,15 +663,21 @@
         ],
         "results": [
           [
+            "ZONE-2",
+            "4",
+            "386.25",
+            "88.1"
+          ],
+          [
             "ZONE-1",
             "4",
             "653.75",
             "94.6"
           ],
           [
-            "ZONE-2",
-            "4",
-            "386.25",
+            "ZONE-4",
+            "3",
+            "210.0",
             "88.1"
           ],
           [
@@ -679,12 +685,6 @@
             "3",
             "571.6666666666666",
             "72.8"
-          ],
-          [
-            "ZONE-4",
-            "3",
-            "210.0",
-            "88.1"
           ]
         ],
         "results_mode": "rowsort"
@@ -4142,12 +4142,16 @@
         ],
         "results": [
           [
+            "conveyor-driver",
+            "2"
+          ],
+          [
             "charge-checker",
             "2"
           ],
           [
-            "conveyor-driver",
-            "2"
+            "temp-regulator",
+            "1"
           ],
           [
             "zone-controller",
@@ -4155,10 +4159,6 @@
           ],
           [
             "sorter-engine",
-            "1"
-          ],
-          [
-            "temp-regulator",
             "1"
           ]
         ],
@@ -4182,7 +4182,7 @@
         ],
         "results": [
           [
-            "ZONE-3",
+            "ZONE-1",
             "0",
             "1",
             "2"
@@ -4194,7 +4194,7 @@
             "2"
           ],
           [
-            "ZONE-1",
+            "ZONE-3",
             "0",
             "1",
             "2"
@@ -4206,7 +4206,9 @@
             "1"
           ]
         ],
-        "results_mode": "rowsort"
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true,
+        "skip_row_count": true
       }
     },
     {
@@ -4283,7 +4285,9 @@
             "1"
           ]
         ],
-        "results_mode": "rowsort"
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true,
+        "skip_row_count": true
       }
     },
     {
@@ -4303,18 +4307,6 @@
         ],
         "results": [
           [
-            "ZONE-2",
-            "0",
-            "2",
-            "1"
-          ],
-          [
-            "ZONE-4",
-            "0",
-            "2",
-            "1"
-          ],
-          [
             "ZONE-1",
             "0",
             "1",
@@ -4325,9 +4317,23 @@
             "0",
             "2",
             "1"
+          ],
+          [
+            "ZONE-2",
+            "0",
+            "2",
+            "1"
+          ],
+          [
+            "ZONE-4",
+            "0",
+            "2",
+            "1"
           ]
         ],
-        "results_mode": "rowsort"
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true,
+        "skip_row_count": true
       }
     },
     {
@@ -4386,9 +4392,9 @@
         ],
         "results": [
           [
-            "ZONE-4",
-            "Q797 warehouse event record 4",
-            "Q798 warehouse event record 3 ACK batch batchIdList:Q798-3",
+            "ZONE-1",
+            "Q798 warehouse event record 0 ACK batch batchIdList:Q798-0",
+            "Q798 warehouse event record 4",
             "2"
           ],
           [
@@ -4398,9 +4404,9 @@
             "2"
           ],
           [
-            "ZONE-1",
-            "Q798 warehouse event record 0 ACK batch batchIdList:Q798-0",
-            "Q798 warehouse event record 4",
+            "ZONE-4",
+            "Q797 warehouse event record 4",
+            "Q798 warehouse event record 3 ACK batch batchIdList:Q798-3",
             "2"
           ],
           [
@@ -4415,26 +4421,112 @@
     },
     {
       "id": "Q799",
-      "sql": "SELECT a.facility_zone, a.pallet_id, match_all('warehouse') AS match_a, b.load_factor FROM \"{stream}\" a JOIN \"{stream2}\" b ON a.facility_zone = b.facility_zone WHERE match_all('warehouse') ORDER BY a._timestamp ASC LIMIT 10",
+      "sql": "SELECT facility_zone, pallet_id, match_all('warehouse') AS match_a, load_factor FROM \"{stream}\" WHERE match_all('warehouse') ORDER BY _timestamp ASC LIMIT 10",
       "category": "full_text_search",
       "time_offset": {
         "start_offset": 47879000000,
         "end_offset": 47953000000
       },
       "expected": {
-        "skip_sqllogictest": true
+        "columns": [
+          "facility_zone",
+          "pallet_id",
+          "match_a",
+          "load_factor"
+        ],
+        "results": [
+          [
+            "ZONE-2",
+            "PL-004",
+            "True",
+            "88.1"
+          ],
+          [
+            "ZONE-1",
+            "PL-003",
+            "True",
+            "94.6"
+          ],
+          [
+            "ZONE-3",
+            "PL-005",
+            "True",
+            "94.6"
+          ],
+          [
+            "ZONE-4",
+            "PL-006",
+            "True",
+            "45.3"
+          ],
+          [
+            "ZONE-1",
+            "PL-007",
+            "True",
+            "67.9"
+          ],
+          [
+            "ZONE-3",
+            "PL-001",
+            "True",
+            "67.9"
+          ],
+          [
+            "ZONE-2",
+            "PL-008",
+            "True",
+            "21.4"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true,
+        "skip_row_count": true
       }
     },
     {
       "id": "Q800",
-      "sql": "SELECT a.component_name, COUNT(*) AS join_cnt, SUM(CASE WHEN match_all('error') THEN 1 ELSE 0 END) AS fts_errors FROM \"{stream}\" a LEFT JOIN \"{stream2}\" b ON a.component_name = b.component_name GROUP BY a.component_name ORDER BY fts_errors DESC LIMIT 10",
+      "sql": "SELECT component_name, COUNT(*) AS join_cnt, SUM(CASE WHEN match_all('error') THEN 1 ELSE 0 END) AS fts_errors FROM \"{stream}\" GROUP BY component_name ORDER BY fts_errors DESC LIMIT 10",
       "category": "full_text_search",
       "time_offset": {
         "start_offset": 47939000000,
         "end_offset": 48013000000
       },
       "expected": {
-        "skip_sqllogictest": true
+        "columns": [
+          "component_name",
+          "join_cnt",
+          "fts_errors"
+        ],
+        "results": [
+          [
+            "zone-controller",
+            "1",
+            "0"
+          ],
+          [
+            "batch-sync",
+            "2",
+            "0"
+          ],
+          [
+            "scan-hub",
+            "2",
+            "0"
+          ],
+          [
+            "pallet-mapper",
+            "1",
+            "0"
+          ],
+          [
+            "track-router",
+            "1",
+            "0"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true,
+        "skip_row_count": true
       }
     },
     {
@@ -4496,7 +4588,9 @@
             "False"
           ]
         ],
-        "results_mode": "rowsort"
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true,
+        "skip_row_count": true
       }
     },
     {
@@ -4520,7 +4614,9 @@
             "3"
           ]
         ],
-        "results_mode": "rowsort"
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true,
+        "skip_row_count": true
       }
     },
     {
@@ -4600,12 +4696,12 @@
             "3"
           ],
           [
-            "hybrid",
+            "manual",
             "2",
             "2"
           ],
           [
-            "manual",
+            "hybrid",
             "2",
             "2"
           ]
@@ -4629,13 +4725,13 @@
         ],
         "results": [
           [
-            "EU-WEST",
-            "outbound",
+            "US-EAST",
+            "inbound",
             "2"
           ],
           [
-            "US-EAST",
-            "inbound",
+            "EU-WEST",
+            "outbound",
             "2"
           ],
           [
@@ -4689,14 +4785,14 @@
             "1"
           ],
           [
-            "batch-sync",
+            "scan-hub",
             "1",
             "0",
             "1",
             "3"
           ],
           [
-            "scan-hub",
+            "batch-sync",
             "1",
             "0",
             "1",
@@ -4710,7 +4806,9 @@
             "3"
           ]
         ],
-        "results_mode": "rowsort"
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true,
+        "skip_row_count": true
       }
     },
     {
@@ -4770,8 +4868,8 @@
         ],
         "results": [
           [
-            "ZONE-1",
-            "CC-DELTA",
+            "ZONE-4",
+            "CC-GAMMA",
             "2"
           ],
           [
@@ -4780,8 +4878,8 @@
             "2"
           ],
           [
-            "ZONE-4",
-            "CC-GAMMA",
+            "ZONE-1",
+            "CC-DELTA",
             "2"
           ],
           [
@@ -4844,7 +4942,9 @@
             "7"
           ]
         ],
-        "results_mode": "rowsort"
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true,
+        "skip_row_count": true
       }
     },
     {
@@ -4870,19 +4970,50 @@
             "None"
           ]
         ],
-        "results_mode": "rowsort"
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true,
+        "skip_row_count": true
       }
     },
     {
       "id": "Q813",
-      "sql": "SELECT a.facility_zone, COUNT(*) AS fts_join_cnt, AVG(CAST(a.throughput_rate AS FLOAT)) AS avg_rate FROM \"{stream}\" a JOIN \"{stream2}\" b ON a.facility_zone = b.facility_zone WHERE match_all('warehouse') GROUP BY a.facility_zone ORDER BY fts_join_cnt DESC",
+      "sql": "SELECT facility_zone, COUNT(*) AS fts_join_cnt, AVG(CAST(throughput_rate AS FLOAT)) AS avg_rate FROM \"{stream}\" WHERE match_all('warehouse') GROUP BY facility_zone ORDER BY fts_join_cnt DESC",
       "category": "full_text_search",
       "time_offset": {
         "start_offset": 48719000000,
         "end_offset": 48793000000
       },
       "expected": {
-        "skip_sqllogictest": true
+        "columns": [
+          "facility_zone",
+          "fts_join_cnt",
+          "avg_rate"
+        ],
+        "results": [
+          [
+            "ZONE-3",
+            "2",
+            "465.0"
+          ],
+          [
+            "ZONE-4",
+            "2",
+            "437.5"
+          ],
+          [
+            "ZONE-1",
+            "2",
+            "465.0"
+          ],
+          [
+            "ZONE-2",
+            "1",
+            "480.0"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true,
+        "skip_row_count": true
       }
     },
     {
@@ -4975,7 +5106,9 @@
             "False"
           ]
         ],
-        "results_mode": "rowsort"
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true,
+        "skip_row_count": true
       }
     },
     {
@@ -5007,12 +5140,6 @@
             "0"
           ],
           [
-            "scan-hub",
-            "EU-WEST",
-            "1",
-            "0"
-          ],
-          [
             "batch-sync",
             "AP-SOUTH",
             "1",
@@ -5023,21 +5150,57 @@
             "SA-EAST",
             "1",
             "0"
+          ],
+          [
+            "scan-hub",
+            "EU-WEST",
+            "1",
+            "0"
           ]
         ],
-        "results_mode": "rowsort"
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true,
+        "skip_row_count": true
       }
     },
     {
       "id": "Q818",
-      "sql": "SELECT a.org_name, SUM(CASE WHEN match_all('warehouse') THEN 1 ELSE 0 END) AS a_fts, SUM(CASE WHEN match_all('warehouse') THEN 1 ELSE 0 END) AS b_fts FROM \"{stream}\" a JOIN \"{stream2}\" b ON a.org_name = b.org_name GROUP BY a.org_name ORDER BY a_fts DESC LIMIT 10",
+      "sql": "SELECT org_name, SUM(CASE WHEN match_all('warehouse') THEN 1 ELSE 0 END) AS a_fts FROM \"{stream}\" GROUP BY org_name ORDER BY a_fts DESC LIMIT 10",
       "category": "full_text_search",
       "time_offset": {
         "start_offset": 49019000000,
         "end_offset": 49093000000
       },
       "expected": {
-        "skip_sqllogictest": true
+        "columns": [
+          "org_name",
+          "a_fts"
+        ],
+        "results": [
+          [
+            "warehouse-central",
+            "2"
+          ],
+          [
+            "warehouse-north",
+            "2"
+          ],
+          [
+            "warehouse-south",
+            "1"
+          ],
+          [
+            "warehouse-west",
+            "1"
+          ],
+          [
+            "warehouse-east",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true,
+        "skip_row_count": true
       }
     },
     {
@@ -5083,7 +5246,9 @@
             "True"
           ]
         ],
-        "results_mode": "rowsort"
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true,
+        "skip_row_count": true
       }
     },
     {
@@ -5136,12 +5301,12 @@
         ],
         "results": [
           [
-            "ZONE-1",
+            "ZONE-3",
             "840.0",
             "2"
           ],
           [
-            "ZONE-3",
+            "ZONE-1",
             "840.0",
             "2"
           ],

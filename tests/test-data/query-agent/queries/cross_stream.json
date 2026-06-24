@@ -1243,6 +1243,11 @@
         ],
         "results": [
           [
+            "manual",
+            "ZONE-2",
+            "1"
+          ],
+          [
             "hybrid",
             "ZONE-3",
             "1"
@@ -1255,11 +1260,6 @@
           [
             "manual",
             "ZONE-1",
-            "1"
-          ],
-          [
-            "manual",
-            "ZONE-2",
             "1"
           ],
           [
@@ -1393,14 +1393,8 @@
         ],
         "results": [
           [
-            "charge-checker",
-            "EU-CENTRAL",
-            "2",
-            "2"
-          ],
-          [
-            "sorter-engine",
-            "AP-CENTRAL",
+            "zone-controller",
+            "US-WEST",
             "2",
             "2"
           ],
@@ -1411,8 +1405,14 @@
             "2"
           ],
           [
-            "zone-controller",
-            "US-WEST",
+            "charge-checker",
+            "EU-CENTRAL",
+            "2",
+            "2"
+          ],
+          [
+            "sorter-engine",
+            "AP-CENTRAL",
             "2",
             "2"
           ],
@@ -1504,7 +1504,7 @@
     },
     {
       "id": "Q684",
-      "sql": "SELECT a.component_name, b.region_code, COUNT(*) AS pair_cnt FROM \"{stream}\" a CROSS JOIN \"{stream2}\" b WHERE a.latency_ms IS NOT NULL AND b.latency_ms IS NOT NULL AND a.component_name != b.component_name GROUP BY a.component_name, b.region_code ORDER BY pair_cnt DESC LIMIT 12",
+      "sql": "SELECT a.component_name, b.region_code, COUNT(*) AS pair_cnt FROM \"{stream}\" a JOIN \"{stream2}\" b ON a.component_name != b.component_name WHERE a.latency_ms IS NOT NULL AND b.latency_ms IS NOT NULL GROUP BY a.component_name, b.region_code ORDER BY pair_cnt DESC LIMIT 12",
       "category": "cross_stream",
       "time_offset": {
         "start_offset": 40979000000,
@@ -1518,16 +1518,6 @@
         ],
         "results": [
           [
-            "batch-sync",
-            "AP-EAST",
-            "4"
-          ],
-          [
-            "lane-monitor",
-            "AP-EAST",
-            "4"
-          ],
-          [
             "lane-monitor",
             "US-CENTRAL",
             "4"
@@ -1539,27 +1529,17 @@
           ],
           [
             "batch-sync",
-            "SA-EAST",
-            "2"
+            "AP-EAST",
+            "4"
           ],
           [
-            "track-router",
+            "lane-monitor",
             "AP-EAST",
-            "2"
+            "4"
           ],
           [
             "lane-monitor",
             "AP-SOUTH",
-            "2"
-          ],
-          [
-            "lane-monitor",
-            "EU-CENTRAL",
-            "2"
-          ],
-          [
-            "track-router",
-            "US-CENTRAL",
             "2"
           ],
           [
@@ -1573,8 +1553,28 @@
             "2"
           ],
           [
+            "lane-monitor",
+            "EU-CENTRAL",
+            "2"
+          ],
+          [
+            "track-router",
+            "US-CENTRAL",
+            "2"
+          ],
+          [
             "temp-regulator",
             "AP-EAST",
+            "2"
+          ],
+          [
+            "track-router",
+            "AP-EAST",
+            "2"
+          ],
+          [
+            "batch-sync",
+            "SA-EAST",
             "2"
           ]
         ],
@@ -1616,14 +1616,14 @@
             "ZONE-2",
             "PL-004",
             "190.0",
-            "88.1",
+            "45.3",
             "1"
           ],
           [
             "ZONE-2",
             "PL-004",
             "190.0",
-            "45.3",
+            "88.1",
             "1"
           ],
           [
@@ -1644,14 +1644,14 @@
             "ZONE-3",
             "PL-001",
             "555.0",
-            "72.8",
+            "67.9",
             "3"
           ],
           [
             "ZONE-3",
             "PL-001",
             "555.0",
-            "67.9",
+            "72.8",
             "3"
           ],
           [
@@ -1709,12 +1709,6 @@
             "0.0"
           ],
           [
-            "track-router",
-            "230.0",
-            "230.0",
-            "0.0"
-          ],
-          [
             "zone-controller",
             "12.0",
             "12.0",
@@ -1724,6 +1718,12 @@
             "conveyor-driver",
             "15.0",
             "15.0",
+            "0.0"
+          ],
+          [
+            "track-router",
+            "230.0",
+            "230.0",
             "0.0"
           ],
           [
@@ -1976,13 +1976,31 @@
     },
     {
       "id": "Q692",
-      "sql": "SELECT COALESCE(a.info_tag, 'none') AS tag_a, COALESCE(b.info_tag, 'none') AS tag_b, COUNT(*) AS cnt FROM \"{stream}\" a LEFT JOIN \"{stream2}\" b ON a.variant_tag = b.variant_tag GROUP BY tag_a, tag_b ORDER BY cnt DESC LIMIT 15",
+      "sql": "SELECT COALESCE(a.info_tag, 'none') AS tag_a, COALESCE(b.info_tag, 'none') AS tag_b, COUNT(*) AS cnt FROM \"{stream}\" a LEFT JOIN \"{stream2}\" b ON a.variant_tag = b.variant_tag GROUP BY COALESCE(a.info_tag, 'none'), COALESCE(b.info_tag, 'none') ORDER BY cnt DESC LIMIT 15",
       "category": "cross_stream",
       "time_offset": {
         "start_offset": 41459000000,
         "end_offset": 41533000000
       },
       "expected": {
+        "columns": [
+          "tag_a",
+          "tag_b",
+          "cnt"
+        ],
+        "results": [
+          [
+            "none",
+            "none",
+            "9"
+          ],
+          [
+            "Allowlisted",
+            "Allowlisted",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort",
         "skip_sqllogictest": true
       }
     },
@@ -2004,34 +2022,6 @@
         ],
         "results": [
           [
-            "warehouse-north",
-            "warehouse-west",
-            "None",
-            "false",
-            "1"
-          ],
-          [
-            "warehouse-north",
-            "warehouse-north",
-            "None",
-            "true",
-            "1"
-          ],
-          [
-            "warehouse-north",
-            "warehouse-central",
-            "true",
-            "true",
-            "1"
-          ],
-          [
-            "warehouse-central",
-            "warehouse-central",
-            "true",
-            "true",
-            "1"
-          ],
-          [
             "warehouse-central",
             "warehouse-west",
             "None",
@@ -2050,6 +2040,34 @@
             "warehouse-south",
             "false",
             "None",
+            "1"
+          ],
+          [
+            "warehouse-north",
+            "warehouse-north",
+            "None",
+            "true",
+            "1"
+          ],
+          [
+            "warehouse-north",
+            "warehouse-central",
+            "true",
+            "true",
+            "1"
+          ],
+          [
+            "warehouse-central",
+            "warehouse-central",
+            "true",
+            "true",
+            "1"
+          ],
+          [
+            "warehouse-north",
+            "warehouse-west",
+            "None",
+            "false",
             "1"
           ],
           [
@@ -2462,7 +2480,7 @@
     },
     {
       "id": "Q701",
-      "sql": "SELECT a.region_code, COUNT(*) AS stream_a_cnt, SUM(CASE WHEN EXISTS (SELECT 1 FROM \"{stream2}\" b WHERE b.region_code = a.region_code AND b.latency_ms > 500) THEN 1 ELSE 0 END) AS has_high_lat_b FROM \"{stream}\" a GROUP BY a.region_code ORDER BY stream_a_cnt DESC LIMIT 10",
+      "sql": "SELECT a.region_code, COUNT(*) AS stream_a_cnt, COUNT(DISTINCT CASE WHEN b.latency_ms > 500   THEN b._timestamp END) AS has_high_lat_b FROM \"{stream}\" a LEFT JOIN \"{stream2}\" b ON b.region_code = a.region_code GROUP BY a.region_code ORDER BY stream_a_cnt DESC LIMIT 10",
       "category": "cross_stream",
       "time_offset": {
         "start_offset": 41999000000,
@@ -2476,6 +2494,16 @@
         ],
         "results": [
           [
+            "EU-CENTRAL",
+            "2",
+            "0"
+          ],
+          [
+            "SA-EAST",
+            "2",
+            "2"
+          ],
+          [
             "AP-EAST",
             "2",
             "0"
@@ -2483,17 +2511,7 @@
           [
             "US-CENTRAL",
             "2",
-            "2"
-          ],
-          [
-            "SA-EAST",
-            "1",
             "1"
-          ],
-          [
-            "EU-CENTRAL",
-            "1",
-            "0"
           ],
           [
             "AP-SOUTH",
@@ -2660,18 +2678,18 @@
             "12.5"
           ],
           [
-            "ZONE-1",
-            "2",
-            "2",
-            "610.0",
-            "33.0"
-          ],
-          [
             "ZONE-3",
             "2",
             "1",
             "610.0",
             "99.0"
+          ],
+          [
+            "ZONE-1",
+            "2",
+            "2",
+            "610.0",
+            "33.0"
           ],
           [
             "ZONE-4",
@@ -2711,18 +2729,18 @@
             "2"
           ],
           [
-            "SORT-Z9",
-            "LANE-C",
-            "SORT-Z9",
-            "LANE-C",
+            "SORT-A7",
+            "LANE-A",
+            "SORT-A7",
+            "LANE-A",
             "1",
             "1"
           ],
           [
-            "SORT-M3",
-            "LANE-B",
-            "SORT-M3",
-            "LANE-B",
+            "SORT-Z9",
+            "LANE-C",
+            "SORT-Z9",
+            "LANE-C",
             "1",
             "1"
           ],
@@ -2735,10 +2753,10 @@
             "1"
           ],
           [
-            "SORT-A7",
-            "LANE-A",
-            "SORT-A7",
-            "LANE-A",
+            "SORT-M3",
+            "LANE-B",
+            "SORT-M3",
+            "LANE-B",
             "1",
             "1"
           ]
@@ -2996,20 +3014,6 @@
             "15.0"
           ],
           [
-            "medium",
-            "allow",
-            "1",
-            "15.0",
-            "45.0"
-          ],
-          [
-            "medium",
-            "block",
-            "1",
-            "15.0",
-            "15.0"
-          ],
-          [
             "low",
             "block",
             "1",
@@ -3017,11 +3021,25 @@
             "230.0"
           ],
           [
+            "medium",
+            "allow",
+            "1",
+            "15.0",
+            "45.0"
+          ],
+          [
             "high",
             "block",
             "1",
             "1900.0",
             "230.0"
+          ],
+          [
+            "medium",
+            "block",
+            "1",
+            "15.0",
+            "15.0"
           ]
         ],
         "results_mode": "rowsort"
@@ -3261,18 +3279,18 @@
             "1"
           ],
           [
-            "pass",
-            "fail",
-            "2",
-            "1",
-            "2"
-          ],
-          [
             "denied",
             "pass",
             "2",
             "2",
             "1"
+          ],
+          [
+            "pass",
+            "fail",
+            "2",
+            "1",
+            "2"
           ],
           [
             "pass",
@@ -3322,6 +3340,16 @@
         ],
         "results": [
           [
+            "PL-007",
+            "['PL-003']",
+            "1"
+          ],
+          [
+            "PL-003",
+            "['PL-007']",
+            "1"
+          ],
+          [
             "PL-001",
             "['PL-005']",
             "1"
@@ -3334,16 +3362,6 @@
           [
             "PL-002",
             "['PL-006']",
-            "1"
-          ],
-          [
-            "PL-007",
-            "['PL-003']",
-            "1"
-          ],
-          [
-            "PL-003",
-            "['PL-007']",
             "1"
           ],
           [
@@ -3402,13 +3420,31 @@
             "2500000.0"
           ],
           [
-            "Computer",
+            "Mobile",
+            "Mobile",
+            "itemPage",
+            "cartPage",
+            "1",
+            "1800000.0",
+            "900000.0"
+          ],
+          [
             "Tablet",
+            "Computer",
+            "itemPage",
             "searchPage",
+            "1",
+            "2500000.0",
+            "3200000.0"
+          ],
+          [
+            "Mobile",
+            "Mobile",
+            "itemPage",
             "itemPage",
             "1",
-            "3200000.0",
-            "2500000.0"
+            "1800000.0",
+            "1800000.0"
           ],
           [
             "Computer",
@@ -3420,13 +3456,13 @@
             "1800000.0"
           ],
           [
-            "Tablet",
             "Computer",
-            "itemPage",
+            "Tablet",
             "searchPage",
+            "itemPage",
             "1",
-            "2500000.0",
-            "3200000.0"
+            "3200000.0",
+            "2500000.0"
           ],
           [
             "Computer",
@@ -3445,24 +3481,6 @@
             "1",
             "1100000.0",
             "2500000.0"
-          ],
-          [
-            "Mobile",
-            "Mobile",
-            "itemPage",
-            "itemPage",
-            "1",
-            "1800000.0",
-            "1800000.0"
-          ],
-          [
-            "Mobile",
-            "Mobile",
-            "itemPage",
-            "cartPage",
-            "1",
-            "1800000.0",
-            "900000.0"
           ]
         ],
         "results_mode": "rowsort"

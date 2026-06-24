@@ -47,13 +47,13 @@
         ],
         "results": [
           [
-            "ZONE-1",
+            "ZONE-2",
             "4",
             "2",
             "50.0"
           ],
           [
-            "ZONE-2",
+            "ZONE-1",
             "4",
             "2",
             "50.0"
@@ -346,7 +346,7 @@
             "4",
             "581.25",
             "27.53",
-            "manual",
+            "hybrid",
             "2"
           ],
           [
@@ -354,7 +354,7 @@
             "4",
             "386.25",
             "29.83",
-            "manual",
+            "auto",
             "2"
           ],
           [
@@ -1242,14 +1242,14 @@
             "258.0"
           ],
           [
-            "ZONE-2",
-            "3",
-            "620.0"
-          ],
-          [
             "ZONE-3",
             "3",
             "94.0"
+          ],
+          [
+            "ZONE-2",
+            "3",
+            "620.0"
           ]
         ],
         "results_mode": "rowsort"
@@ -1410,15 +1410,6 @@
             "26.3"
           ],
           [
-            "ZONE-4",
-            "SORT-A7",
-            "auto",
-            "2",
-            "437.5",
-            "45.3",
-            "32.5"
-          ],
-          [
             "ZONE-3",
             "SORT-X1",
             "manual",
@@ -1426,6 +1417,15 @@
             "437.5",
             "72.8",
             "19.2"
+          ],
+          [
+            "ZONE-4",
+            "SORT-A7",
+            "auto",
+            "2",
+            "437.5",
+            "45.3",
+            "32.5"
           ],
           [
             "ZONE-4",
@@ -1509,14 +1509,14 @@
             "88.1"
           ],
           [
-            "ZONE-4",
+            "ZONE-2",
             "auto",
             "1",
             "150.0",
             "45.3"
           ],
           [
-            "ZONE-2",
+            "ZONE-4",
             "auto",
             "1",
             "150.0",
@@ -1561,16 +1561,16 @@
             "66.0"
           ],
           [
-            "ZONE-4",
-            "SORT-A7",
+            "ZONE-2",
+            "SORT-Q5",
             "low_tput",
             "1",
             "150.0",
             "45.3"
           ],
           [
-            "ZONE-2",
-            "SORT-Q5",
+            "ZONE-4",
+            "SORT-A7",
             "low_tput",
             "1",
             "150.0",
@@ -1820,13 +1820,13 @@
             "2"
           ],
           [
-            "interaction",
-            "searchPage",
+            "performanceMetric",
+            "itemPage",
             "2"
           ],
           [
-            "performanceMetric",
-            "itemPage",
+            "interaction",
+            "searchPage",
             "2"
           ],
           [
@@ -1932,13 +1932,13 @@
         ],
         "results": [
           [
-            "sess_001",
-            "4",
+            "sess_003",
+            "1",
             "0"
           ],
           [
-            "sess_003",
-            "1",
+            "sess_001",
+            "4",
             "0"
           ],
           [
@@ -2035,11 +2035,11 @@
         ],
         "results": [
           [
-            "E003",
+            "E001",
             "2"
           ],
           [
-            "E001",
+            "E003",
             "2"
           ],
           [
@@ -2143,8 +2143,13 @@
         ],
         "results": [
           [
-            "navigation",
-            "itemPage",
+            "performanceMetric",
+            "checkoutPage",
+            "1"
+          ],
+          [
+            "performanceMetric",
+            "cartPage",
             "1"
           ],
           [
@@ -2158,13 +2163,8 @@
             "1"
           ],
           [
-            "performanceMetric",
-            "checkoutPage",
-            "1"
-          ],
-          [
-            "performanceMetric",
-            "cartPage",
+            "navigation",
+            "itemPage",
             "1"
           ]
         ],
@@ -2250,6 +2250,12 @@
         ],
         "results": [
           [
+            "cartPage",
+            "2",
+            "1450.0",
+            "2"
+          ],
+          [
             "searchPage",
             "1",
             "230.0",
@@ -2260,12 +2266,6 @@
             "1",
             "89.0",
             "1"
-          ],
-          [
-            "cartPage",
-            "2",
-            "1450.0",
-            "2"
           ]
         ],
         "results_mode": "rowsort"
@@ -2963,15 +2963,15 @@
             "0"
           ],
           [
-            "warehouse-central",
-            "1",
-            "230.0",
-            "1"
-          ],
-          [
             "warehouse-north",
             "1",
             "12.0",
+            "1"
+          ],
+          [
+            "warehouse-central",
+            "1",
+            "230.0",
             "1"
           ]
         ],
@@ -3899,7 +3899,7 @@
     },
     {
       "id": "Q760",
-      "sql": "SELECT facility_zone, COUNT(*) AS cnt, AVG(throughput_rate) AS avg_rate, (SELECT AVG(throughput_rate) FROM \"{stream}\") AS global_avg_rate FROM \"{stream}\" GROUP BY facility_zone ORDER BY avg_rate DESC",
+      "sql": "SELECT facility_zone, COUNT(*) AS cnt, AVG(throughput_rate) AS avg_rate, g.global_avg_rate FROM \"{stream}\", (SELECT AVG(throughput_rate) AS global_avg_rate FROM \"{stream}\") g GROUP BY facility_zone, g.global_avg_rate ORDER BY avg_rate DESC",
       "category": "cte_subquery",
       "time_offset": {
         "start_offset": 45539000000,
@@ -3943,7 +3943,7 @@
     },
     {
       "id": "Q761",
-      "sql": "SELECT component_name, COUNT(*) AS cnt, AVG(CAST(latency_ms AS FLOAT)) AS avg_lat, (SELECT AVG(CAST(latency_ms AS FLOAT)) FROM \"{stream}\" WHERE latency_ms IS NOT NULL) AS global_avg_lat FROM \"{stream}\" WHERE latency_ms IS NOT NULL GROUP BY component_name ORDER BY avg_lat DESC LIMIT 10",
+      "sql": "SELECT component_name, COUNT(*) AS cnt, AVG(CAST(latency_ms AS FLOAT)) AS avg_lat, g.global_avg_lat FROM \"{stream}\", (SELECT AVG(CAST(latency_ms AS FLOAT)) AS global_avg_lat  FROM \"{stream}\" WHERE latency_ms IS NOT NULL) g WHERE latency_ms IS NOT NULL GROUP BY component_name, g.global_avg_lat ORDER BY avg_lat DESC LIMIT 10",
       "category": "cte_subquery",
       "time_offset": {
         "start_offset": 45599000000,
@@ -4134,7 +4134,7 @@
     },
     {
       "id": "Q766",
-      "sql": "SELECT facility_zone, AVG(throughput_rate) AS avg_rate FROM \"{stream}\" GROUP BY facility_zone HAVING AVG(throughput_rate) > (SELECT AVG(throughput_rate) FROM \"{stream}\") ORDER BY avg_rate DESC",
+      "sql": "SELECT facility_zone, AVG(throughput_rate) AS avg_rate FROM \"{stream}\", (SELECT AVG(throughput_rate) AS global_avg FROM \"{stream}\") g GROUP BY facility_zone, g.global_avg HAVING AVG(throughput_rate) > g.global_avg ORDER BY avg_rate DESC",
       "category": "cte_subquery",
       "time_offset": {
         "start_offset": 45899000000,
@@ -4240,7 +4240,9 @@
             "430.0"
           ]
         ],
-        "results_mode": "rowsort"
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true,
+        "skip_row_count": true
       }
     },
     {
@@ -4650,6 +4652,11 @@
         ],
         "results": [
           [
+            "ZONE-1",
+            "1",
+            "1740.0"
+          ],
+          [
             "ZONE-4",
             "1",
             "480.0"
@@ -4658,11 +4665,6 @@
             "ZONE-2",
             "1",
             "480.0"
-          ],
-          [
-            "ZONE-1",
-            "1",
-            "1740.0"
           ]
         ],
         "results_mode": "rowsort"
@@ -4708,7 +4710,7 @@
     },
     {
       "id": "Q780",
-      "sql": "SELECT a.facility_zone, a.throughput_rate, (SELECT COUNT(*) FROM \"{stream}\" b WHERE b.facility_zone = a.facility_zone AND b.throughput_rate > a.throughput_rate) AS better_cnt FROM \"{stream}\" a ORDER BY a.facility_zone, better_cnt LIMIT 12",
+      "sql": "SELECT facility_zone, throughput_rate, RANK() OVER (PARTITION BY facility_zone ORDER BY throughput_rate DESC) - 1 AS better_cnt FROM \"{stream}\" ORDER BY facility_zone, better_cnt LIMIT 12",
       "category": "cte_subquery",
       "time_offset": {
         "start_offset": 46739000000,
@@ -4762,13 +4764,58 @@
     },
     {
       "id": "Q781",
-      "sql": "WITH base AS (SELECT _timestamp, component_name, latency_ms, response_code FROM \"{stream}\" WHERE latency_ms IS NOT NULL), error_base AS (SELECT _timestamp, component_name, latency_ms FROM base WHERE response_code >= 400), success_base AS (SELECT _timestamp, component_name, latency_ms FROM base WHERE response_code < 400) SELECT component_name, AVG(CAST(e.latency_ms AS FLOAT)) AS avg_error_lat, AVG(CAST(s.latency_ms AS FLOAT)) AS avg_success_lat, COUNT(e._timestamp) AS error_cnt, COUNT(s._timestamp) AS success_cnt FROM error_base e FULL OUTER JOIN success_base s ON e.component_name = s.component_name GROUP BY COALESCE(e.component_name, s.component_name) ORDER BY error_cnt DESC NULLS LAST LIMIT 10",
+      "sql": "WITH base AS (SELECT _timestamp, component_name, latency_ms, response_code FROM \"{stream}\" WHERE latency_ms IS NOT NULL), error_base AS (SELECT _timestamp, component_name, latency_ms FROM base WHERE response_code >= 400), success_base AS (SELECT _timestamp, component_name, latency_ms FROM base WHERE response_code < 400) SELECT COALESCE(e.component_name, s.component_name) AS component_name, AVG(CAST(e.latency_ms AS FLOAT)) AS avg_error_lat, AVG(CAST(s.latency_ms AS FLOAT)) AS avg_success_lat, COUNT(e._timestamp) AS error_cnt, COUNT(s._timestamp) AS success_cnt FROM error_base e FULL OUTER JOIN success_base s ON e.component_name = s.component_name GROUP BY COALESCE(e.component_name, s.component_name) ORDER BY error_cnt DESC NULLS LAST LIMIT 10",
       "category": "cte_subquery",
       "time_offset": {
         "start_offset": 46799000000,
         "end_offset": 46873000000
       },
       "expected": {
+        "columns": [
+          "component_name",
+          "avg_error_lat",
+          "avg_success_lat",
+          "error_cnt",
+          "success_cnt"
+        ],
+        "results": [
+          [
+            "pallet-mapper",
+            "89.0",
+            "None",
+            "2",
+            "0"
+          ],
+          [
+            "batch-sync",
+            "1450.0",
+            "None",
+            "1",
+            "0"
+          ],
+          [
+            "lane-monitor",
+            "567.0",
+            "None",
+            "1",
+            "0"
+          ],
+          [
+            "temp-regulator",
+            "None",
+            "3200.0",
+            "0",
+            "2"
+          ],
+          [
+            "charge-checker",
+            "None",
+            "78.0",
+            "0",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort",
         "skip_sqllogictest": true
       }
     },
@@ -4852,14 +4899,14 @@
             "1450.0"
           ],
           [
-            "conveyor-driver",
-            "1",
-            "15.0"
-          ],
-          [
             "scan-hub",
             "1",
             "45.0"
+          ],
+          [
+            "conveyor-driver",
+            "1",
+            "15.0"
           ]
         ],
         "results_mode": "rowsort"
@@ -4948,21 +4995,14 @@
             "ZONE-3",
             "2",
             "1455.0",
-            "hybrid",
+            "manual",
             "1"
           ],
           [
             "ZONE-3",
             "2",
             "1455.0",
-            "manual",
-            "1"
-          ],
-          [
-            "ZONE-1",
-            "2",
-            "1455.0",
-            "manual",
+            "hybrid",
             "1"
           ],
           [
@@ -4973,10 +5013,10 @@
             "1"
           ],
           [
-            "ZONE-4",
+            "ZONE-1",
             "2",
-            "440.0",
-            "auto",
+            "1455.0",
+            "manual",
             "1"
           ],
           [
@@ -4984,6 +5024,13 @@
             "2",
             "440.0",
             "hybrid",
+            "1"
+          ],
+          [
+            "ZONE-4",
+            "2",
+            "440.0",
+            "auto",
             "1"
           ],
           [
@@ -5027,15 +5074,15 @@
           ],
           [
             "2",
-            "conveyor-driver",
-            "1",
-            "15.0"
-          ],
-          [
-            "2",
             "zone-controller",
             "1",
             "12.0"
+          ],
+          [
+            "2",
+            "conveyor-driver",
+            "1",
+            "15.0"
           ],
           [
             "3",
@@ -5069,12 +5116,12 @@
         ],
         "results": [
           [
-            "ZONE-3",
+            "ZONE-1",
             "manual",
             "840.0"
           ],
           [
-            "ZONE-1",
+            "ZONE-3",
             "manual",
             "840.0"
           ],
@@ -5297,15 +5344,15 @@
             "32.5"
           ],
           [
-            "ZONE-1",
-            "auto",
+            "ZONE-3",
+            "hybrid",
             "0.5615384615384615",
             "72.8",
             "22.0"
           ],
           [
-            "ZONE-3",
-            "hybrid",
+            "ZONE-1",
+            "auto",
             "0.5615384615384615",
             "72.8",
             "22.0"

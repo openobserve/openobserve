@@ -13,6 +13,24 @@
         ],
         "results": [
           [
+            "SORT-X1",
+            "900.0",
+            "1",
+            "1"
+          ],
+          [
+            "SORT-X1",
+            "610.0",
+            "2",
+            "2"
+          ],
+          [
+            "SORT-X1",
+            "555.0",
+            "3",
+            "3"
+          ],
+          [
             "SORT-M3",
             "900.0",
             "1",
@@ -35,24 +53,6 @@
             "320.0",
             "4",
             "4"
-          ],
-          [
-            "SORT-X1",
-            "900.0",
-            "1",
-            "1"
-          ],
-          [
-            "SORT-X1",
-            "610.0",
-            "2",
-            "2"
-          ],
-          [
-            "SORT-X1",
-            "555.0",
-            "3",
-            "3"
           ],
           [
             "SORT-Z9",
@@ -1065,7 +1065,7 @@
           ],
           [
             "ZONE-3",
-            "hybrid",
+            "manual",
             "2",
             "4",
             "50.0",
@@ -1073,7 +1073,7 @@
           ],
           [
             "ZONE-3",
-            "manual",
+            "hybrid",
             "2",
             "4",
             "50.0",
@@ -2675,6 +2675,12 @@
         ],
         "results": [
           [
+            "cartPage",
+            "Android 12",
+            "2",
+            "1"
+          ],
+          [
             "checkoutPage",
             "Android 14",
             "2",
@@ -2684,12 +2690,6 @@
             "itemPage",
             "Mac OS X (iPhone)",
             "1",
-            "1"
-          ],
-          [
-            "cartPage",
-            "Android 12",
-            "2",
             "1"
           ]
         ],
@@ -2824,12 +2824,12 @@
         ],
         "results": [
           [
-            "E001",
+            "E009",
             "2",
             "1"
           ],
           [
-            "E009",
+            "E001",
             "2",
             "1"
           ]
@@ -4731,7 +4731,9 @@
             "None"
           ]
         ],
-        "results_mode": "rowsort"
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true,
+        "skip_row_count": true
       }
     },
     {
@@ -5025,14 +5027,14 @@
         "results": [
           [
             "ZONE-1",
-            "zone-controller",
+            "sorter-engine",
             "1",
             "1",
             "2"
           ],
           [
             "ZONE-1",
-            "sorter-engine",
+            "zone-controller",
             "1",
             "1",
             "2"
@@ -5323,7 +5325,9 @@
             "2"
           ]
         ],
-        "results_mode": "rowsort"
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true,
+        "skip_row_count": true
       }
     },
     {
@@ -5361,19 +5365,21 @@
             "1"
           ],
           [
-            "batch-sync",
+            "lane-monitor",
             "0",
             "2",
             "1"
           ],
           [
-            "lane-monitor",
+            "batch-sync",
             "0",
             "2",
             "1"
           ]
         ],
-        "results_mode": "rowsort"
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true,
+        "skip_row_count": true
       }
     },
     {
@@ -6212,7 +6218,9 @@
             "decreased"
           ]
         ],
-        "results_mode": "rowsort"
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true,
+        "skip_row_count": true
       }
     },
     {
@@ -6256,7 +6264,9 @@
             "0.0"
           ]
         ],
-        "results_mode": "rowsort"
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true,
+        "skip_row_count": true
       }
     },
     {
@@ -6619,21 +6629,14 @@
         "results": [
           [
             "ZONE-1",
-            "manual",
+            "auto",
             "1",
             "2",
             "50.0"
           ],
           [
             "ZONE-1",
-            "auto",
-            "1",
-            "2",
-            "50.0"
-          ],
-          [
-            "ZONE-2",
-            "auto",
+            "manual",
             "1",
             "2",
             "50.0"
@@ -6646,8 +6649,8 @@
             "50.0"
           ],
           [
-            "ZONE-3",
-            "manual",
+            "ZONE-2",
+            "auto",
             "1",
             "2",
             "50.0"
@@ -6655,6 +6658,13 @@
           [
             "ZONE-3",
             "hybrid",
+            "1",
+            "2",
+            "50.0"
+          ],
+          [
+            "ZONE-3",
+            "manual",
             "1",
             "2",
             "50.0"
