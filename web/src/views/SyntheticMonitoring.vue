@@ -992,6 +992,8 @@ import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 
 const router = useRouter();
 
@@ -1041,22 +1043,97 @@ const hideSparkTip = () => { sparkHideTimer = setTimeout(() => { sparkTip.value.
 const keepSparkTip = () => { if (sparkHideTimer) { clearTimeout(sparkHideTimer); sparkHideTimer = null; } };
 
 // ── Column resize ─────────────────────────────────────────────────────
-interface Col { key: string; label: string; width: number; resizable: boolean; align?: string }
-const columns = ref<Col[]>([
-  { key:"status",   label:"",                  width:36,  resizable:false },
-  { key:"name",     label:"Monitor",           width:200, resizable:true },
-  { key:"type",     label:"Type",              width:88,  resizable:true },
-  { key:"history",  label:"Status · Last 24h", width:180, resizable:true },
-  { key:"response", label:"Response",          width:90,  resizable:true, align:"right" },
-  { key:"uptime",   label:"Uptime 7d",         width:130, resizable:true, align:"right" },
-  { key:"locs",     label:"Locations",         width:120, resizable:true },
-  { key:"interval", label:"Interval",          width:72,  resizable:true },
-  { key:"lastCheck",label:"Last check",        width:90,  resizable:true },
-  { key:"actions",  label:"",                  width:120, resizable:false },
-]);
+const monitorTableColumns: OTableColumnDef[] = [
+  {
+    id: 'status',
+    header: '',
+    accessorKey: 'status',
+    size: 36,
+    minSize: 36,
+    sortable: false,
+    meta: { align: 'center', cellClass: 'tw:px-0' },
+  },
+  {
+    id: 'name',
+    header: 'Monitor',
+    accessorKey: 'name',
+    size: 200,
+    minSize: 120,
+    sortable: true,
+    meta: { isName: true, flex: true },
+  },
+  {
+    id: 'type',
+    header: 'Type',
+    accessorKey: 'type',
+    size: 88,
+    minSize: 72,
+    sortable: true,
+  },
+  {
+    id: 'history',
+    header: 'Status · Last 24h',
+    accessorKey: 'history',
+    size: 180,
+    minSize: 140,
+    sortable: false,
+  },
+  {
+    id: 'responseTime',
+    header: 'Response',
+    accessorKey: 'responseTime',
+    size: 90,
+    minSize: 72,
+    sortable: true,
+    meta: { align: 'right' },
+  },
+  {
+    id: 'uptime',
+    header: 'Uptime 7d',
+    accessorKey: 'uptime',
+    size: 130,
+    minSize: 100,
+    sortable: true,
+    meta: { align: 'right' },
+  },
+  {
+    id: 'locations',
+    header: 'Locations',
+    accessorKey: 'locations',
+    size: 120,
+    minSize: 90,
+    sortable: false,
+  },
+  {
+    id: 'interval',
+    header: 'Interval',
+    accessorKey: 'interval',
+    size: 72,
+    minSize: 60,
+    sortable: false,
+  },
+  {
+    id: 'lastCheck',
+    header: 'Last check',
+    accessorKey: 'lastCheck',
+    size: 90,
+    minSize: 72,
+    sortable: false,
+  },
+  {
+    id: 'actions',
+    header: '',
+    accessorKey: 'id',
+    size: 120,
+    minSize: 120,
+    sortable: false,
+    isAction: true,
+  },
+]
 
-let resizeState: { col: Col; startX: number; startW: number } | null = null;
-const startResize = (e: MouseEvent, col: Col) => {
+type _Col = { key: string; label: string; width: number; resizable: boolean; align?: string }
+let resizeState: { col: _Col; startX: number; startW: number } | null = null;
+const startResize = (e: MouseEvent, col: _Col) => {
   e.preventDefault();
   resizeState = { col, startX: e.clientX, startW: col.width };
   document.addEventListener("mousemove", onResize);
