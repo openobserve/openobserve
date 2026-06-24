@@ -2676,7 +2676,21 @@ export default defineComponent({
         description: "shortcuts.actions.alertsCreate",
         handler: () => {
           if (isInputFocused()) return;
-          addAlert();
+          // Mirror the Add button so the URL updates (action=add / route push),
+          // otherwise "go back"/discard can't return to the list.
+          if (!destinations.value.length || !templates.value.length) return;
+          if (activeTab.value === "anomalyDetection") {
+            router.push({
+              name: "addAnomalyDetection",
+              query: {
+                org_identifier: store.state.selectedOrganization.identifier,
+                folder: activeFolderId.value,
+                tab: activeTab.value,
+              },
+            });
+          } else {
+            showAddUpdateFn({});
+          }
         },
       },
       {
