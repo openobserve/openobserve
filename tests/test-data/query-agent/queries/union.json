@@ -125,12 +125,12 @@
           ],
           [
             "SORT-M3",
-            "auto",
+            "manual",
             "2"
           ],
           [
             "SORT-M3",
-            "manual",
+            "auto",
             "2"
           ],
           [
@@ -839,14 +839,14 @@
           ],
           [
             "US-WEST",
-            "ZONE-1",
+            "ZONE-3",
             "1",
             "320.0",
             "67.9"
           ],
           [
             "US-WEST",
-            "ZONE-3",
+            "ZONE-1",
             "1",
             "320.0",
             "67.9"
@@ -1163,6 +1163,11 @@
           ],
           [
             "component_err",
+            "batch-sync",
+            "2"
+          ],
+          [
+            "component_err",
             "zone-controller",
             "1"
           ],
@@ -1170,11 +1175,6 @@
             "component_err",
             "pallet-mapper",
             "1"
-          ],
-          [
-            "component_err",
-            "batch-sync",
-            "2"
           ],
           [
             "component_err",
@@ -1271,7 +1271,7 @@
           ],
           [
             "error_bucket",
-            "E005",
+            "E001",
             "1"
           ],
           [
@@ -1281,7 +1281,7 @@
           ],
           [
             "error_bucket",
-            "E001",
+            "E005",
             "1"
           ],
           [
@@ -1763,12 +1763,12 @@
           [
             "track-router",
             "230.0",
-            "stream1"
+            "stream2"
           ],
           [
             "track-router",
             "230.0",
-            "stream2"
+            "stream1"
           ],
           [
             "scan-hub",
@@ -1931,11 +1931,11 @@
             "3"
           ],
           [
-            "ZONE-2",
+            "ZONE-4",
             "3"
           ],
           [
-            "ZONE-4",
+            "ZONE-2",
             "3"
           ]
         ],
@@ -2134,11 +2134,11 @@
             "6"
           ],
           [
-            "manual",
+            "hybrid",
             "4"
           ],
           [
-            "hybrid",
+            "manual",
             "4"
           ]
         ],
@@ -2190,7 +2190,7 @@
         ],
         "results": [
           [
-            "ZONE-3",
+            "ZONE-1",
             "2"
           ],
           [
@@ -2198,7 +2198,7 @@
             "2"
           ],
           [
-            "ZONE-1",
+            "ZONE-3",
             "2"
           ],
           [
@@ -2326,11 +2326,11 @@
             "480.0"
           ],
           [
-            "PL-007",
+            "PL-001",
             "320.0"
           ],
           [
-            "PL-001",
+            "PL-007",
             "320.0"
           ],
           [
@@ -2362,15 +2362,15 @@
         ],
         "results": [
           [
-            "ZONE-1",
-            "3",
-            "745.0",
-            "840.0"
-          ],
-          [
             "ZONE-3",
             "4",
             "640.0",
+            "840.0"
+          ],
+          [
+            "ZONE-1",
+            "3",
+            "745.0",
             "840.0"
           ],
           [
@@ -2404,15 +2404,15 @@
         ],
         "results": [
           [
-            "charge-checker",
-            "3"
-          ],
-          [
             "conveyor-driver",
             "3"
           ],
           [
             "temp-regulator",
+            "3"
+          ],
+          [
+            "charge-checker",
             "3"
           ],
           [
