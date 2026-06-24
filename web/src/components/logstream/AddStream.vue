@@ -198,7 +198,7 @@ const dataRetentionError = ref('');
 // Allowed characters mirror the backend `format_stream_name` regex
 // (src/config/src/utils/schema.rs): alphanumeric, underscore and colon only.
 const streamNameRegex = /^[a-zA-Z0-9_:]+$/;
-const streamNameHelpText = "Use alphanumeric characters, underscore and colon only.";
+const streamNameHelpText = t("logStream.streamNameHelpText");
 
 const validateStreamName = () => {
   if (streamInputs.value.name && !streamNameRegex.test(streamInputs.value.name)) {

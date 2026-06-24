@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="showLabelOnTop tw:mt-2"
           maxlength="100"
           data-test="add-group-groupname-input-btn"
-          help-text="Use alphanumeric and '_' characters only, without spaces."
+          :help-text="t('iam.nameHelpText')"
         />
       </OForm>
     </div>

@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('organization.name')"
           required
           class="showLabelOnTop tw:mt-2"
-          help-text="Use alphanumeric characters, space and underscore only."
+          :help-text="t('organization.nameHelpText')"
           data-test="org-name"
           maxlength="100"
         />

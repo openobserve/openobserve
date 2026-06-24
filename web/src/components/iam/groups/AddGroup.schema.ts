@@ -17,10 +17,7 @@ export const makeAddGroupSchema = (t: (_key: string) => string) =>
       .string()
       .trim()
       .min(1, t("common.nameRequired"))
-      .regex(
-        groupNameRegex,
-        "Use alphanumeric and '_' characters only, without spaces.",
-      )
+      .regex(groupNameRegex, t("iam.nameHelpText"))
       // Mirrors the input's maxlength=100 (defense-in-depth for non-typed values).
       .max(100, "Name must be at most 100 characters."),
   });

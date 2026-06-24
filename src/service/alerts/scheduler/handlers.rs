@@ -98,6 +98,19 @@ async fn handle_anomaly_detection_triggers(
         trigger.org
     );
 
+    // Anomaly detection turned off at runtime via O2_ANOMALY_DETECTION_DISABLED — skip detection
+    // but keep the trigger alive so it resumes if the feature is re-enabled on restart.
+    #[cfg(feature = "enterprise")]
+    if o2_enterprise::enterprise::common::config::get_config()
+        .anomaly_detection
+        .disabled
+    {
+        trigger.next_run_at = now_micros() + 60 * 1_000_000;
+        trigger.status = db::scheduler::TriggerStatus::Completed;
+        db::scheduler::update_trigger(trigger, true, "").await?;
+        return Ok(());
+    }
+
     let db = infra::db::ORM_CLIENT
         .get()
         .ok_or_else(|| anyhow::anyhow!("Database not initialized"))?;
@@ -119,7 +132,7 @@ async fn handle_anomaly_detection_triggers(
         );
         trigger.next_run_at = now_micros() + 60 * 1_000_000;
         trigger.status = db::scheduler::TriggerStatus::Waiting;
-        db::scheduler::update_trigger(trigger, false, "").await?;
+        db::scheduler::update_trigger(trigger, true, "").await?;
         return Ok(());
     };
 
@@ -127,7 +140,7 @@ async fn handle_anomaly_detection_triggers(
     if !config.is_trained || !config.enabled {
         trigger.next_run_at = now_micros() + 60 * 1_000_000;
         trigger.status = db::scheduler::TriggerStatus::Waiting;
-        db::scheduler::update_trigger(trigger.clone(), false, "").await?;
+        db::scheduler::update_trigger(trigger.clone(), true, "").await?;
 
         crate::service::self_reporting::publish_triggers_usage(TriggerData {
             _timestamp: now_micros(),
@@ -240,7 +253,7 @@ async fn handle_anomaly_detection_triggers(
     // Reschedule.
     trigger.next_run_at = next_run;
     trigger.status = db::scheduler::TriggerStatus::Waiting;
-    db::scheduler::update_trigger(trigger, false, "").await?;
+    db::scheduler::update_trigger(trigger, true, "").await?;
 
     Ok(())
 }

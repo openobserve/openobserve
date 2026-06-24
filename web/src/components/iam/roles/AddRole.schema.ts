@@ -18,10 +18,7 @@ export const makeAddRoleSchema = (t: (_key: string) => string) =>
       .string()
       .trim()
       .min(1, t("common.nameRequired"))
-      .regex(
-        roleNameRegex,
-        "Use alphanumeric and '_' characters only, without spaces.",
-      )
+      .regex(roleNameRegex, t("iam.nameHelpText"))
       .max(100, "Role name must be at most 100 characters."),
   });
 

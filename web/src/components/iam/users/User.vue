@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          the table's own toolbar (built-in global filter) per the layout system. -->
     <AppPageHeader
       :title="t('iam.basicUsers')"
-      :subtitle="'People with access to this organization'"
+      :subtitle="t('user.subtitle')"
       icon="person"
       class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
     >
@@ -210,25 +210,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ODialog data-test="user-revoke-dialog"
       v-model:open="confirmRevoke"
       size="xs"
-      title="Revoke Invitation"
+      :title="t('user.revokeInvitationTitle')"
       :secondary-button-label="t('user.cancel')"
       :primary-button-label="t('user.ok')"
       @click:secondary="confirmRevoke = false"
       @click:primary="revokeInvite"
     >
-      <p>Are you sure you want to revoke the invitation for {{ revokeInviteEmail }}?</p>
+      <p>{{ t('user.revokeInvitationMsg', { email: revokeInviteEmail }) }}</p>
     </ODialog>
 
     <ODialog data-test="user-bulk-delete-dialog"
       v-model:open="confirmBulkDelete"
       size="sm"
-      title="Delete Users"
-      secondary-button-label="Cancel"
-      primary-button-label="OK"
+      :title="t('user.deleteUsersTitle')"
+      :secondary-button-label="t('user.cancel')"
+      :primary-button-label="t('user.ok')"
       @click:secondary="confirmBulkDelete = false"
       @click:primary="bulkDeleteUsers"
     >
-      <p>Are you sure you want to delete {{ selectedUsers.length }} user(s)?</p>
+      <p>{{ t('user.deleteUsersMsg', { count: selectedUsers.length }) }}</p>
     </ODialog>
   </div>
 </template>
@@ -420,7 +420,7 @@ export default defineComponent({
       if (isEnterpriseOrCloud) {
         cols.push({
           id: "auth",
-          header: "Auth",
+          header: t("user.authType"),
           accessorKey: "auth_type",
           sortable: true,
           resizable: true,
@@ -433,7 +433,7 @@ export default defineComponent({
       // Roles column — array of role chips in enterprise/cloud, single role string otherwise
       cols.push({
         id: isEnterpriseOrCloud ? "roles" : "role",
-        header: isEnterpriseOrCloud ? "Roles" : t("user.role"),
+        header: isEnterpriseOrCloud ? t("user.roles") : t("user.role"),
         accessorKey: isEnterpriseOrCloud ? "roles" : "role",
         sortable: true,
         resizable: true,

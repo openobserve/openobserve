@@ -132,7 +132,8 @@
     "error": "Erreur",
     "db": "Base de données",
     "discardChanges": "Ignorer les modifications",
-    "unsavedChanges": "Modifications non enregistrées"
+    "unsavedChanges": "Modifications non enregistrées",
+    "export": "Exporter"
   },
   "search": {
     "selectIndex": "Sélectionnez Stream First",
@@ -425,7 +426,18 @@
     "menuGroupExplain": "Expliquez",
     "fieldValuesEmpty": "Aucune valeur n'a été trouvée.",
     "fieldValuesEmptyHint": "Essayez une plage de temps plus large pour voir les valeurs.",
-    "selectLogsStreamFirst": "Sélectionnez d'abord Logs stream"
+    "selectLogsStreamFirst": "Sélectionnez d'abord Logs stream",
+    "menuMore": "Plus",
+    "searchInspect": "Rechercher Inspect",
+    "vrlOnlyForTableWarning": "La fonction VRL n'est prise en charge que pour les graphiques tabulaires.",
+    "customDownloadTitle": "Téléchargement personnalisé",
+    "selectFunctionNamePlaceholder": "Sélectionnez le nom de la fonction",
+    "confirmFunctionUpdateTitle": "Confirmer la mise à",
+    "confirmFunctionUpdateMsg": "Êtes-vous sûr de vouloir mettre à jour la fonction {name} ?",
+    "traceIdLabel": "ID de trace :",
+    "enterTraceIdPlaceholder": "Entrez l'ID de trace",
+    "changeQueryModeTitle": "Changer le mode de requête",
+    "changeQueryModeConfirm": "Êtes-vous sûr de vouloir modifier le mode de requête ? Les données enregistrées pour l'axe X, l'axe Y et les filtres seront effacées."
   },
   "menu": {
     "home": "Accueil",
@@ -539,7 +551,14 @@
       "learnMore": "Pour en savoir plus :",
       "quickImpl": "Guide de mise en œuvre rapide",
       "blogPost": "Principes de base de la surveillance frontale"
-    }
+    },
+    "sourceMaps": "Cartes des sources",
+    "service": "Service",
+    "environment": "L'environnement",
+    "applyFilters": "Appliquer des filtres",
+    "uploadSourceMaps": "Télécharger des cartes sources",
+    "files": "Dossiers",
+    "uploadedAt": "Téléchargé à"
   },
   "about": {
     "name": "Ouvrez Observe",
@@ -791,6 +810,10 @@
         "service_maps": {
           "name": "Cartes des services",
           "note": "Visualisez les dépendances entre les services"
+        },
+        "byob": {
+          "name": "Apportez votre propre bucket",
+          "note": "Acheminez les données de l'organisation vers votre propre bucket cloud"
         }
       },
       "buttons": {
@@ -922,7 +945,12 @@
     "authTypeSSO": "SSO",
     "authTypeLocal": "Autochtone",
     "noCustomRolesHint": "Aucun rôle personnalisé n'est défini. Créez-en un dans IAM → Rôles",
-    "externalUserCustomRoleHint": "Les utilisateurs externes ne peuvent être modifiés que via le système source"
+    "externalUserCustomRoleHint": "Les utilisateurs externes ne peuvent être modifiés que via le système source",
+    "subtitle": "Personnes ayant accès à cette organisation",
+    "revokeInvitationTitle": "Révoquer l'invitation",
+    "revokeInvitationMsg": "Êtes-vous sûr de vouloir révoquer l'invitation pour {email} ?",
+    "deleteUsersTitle": "Supprimer des utilisateurs",
+    "deleteUsersMsg": "Êtes-vous sûr de vouloir supprimer {count} utilisateur (s) ?"
   },
   "ticket": {
     "header": "Tickets d'assistance",
@@ -984,7 +1012,8 @@
     "proceed_subscription": "Procéder à l'abonnement",
     "subscription_plan": "Plan d'abonnement",
     "makeBilledMember": "Faire de cette organisation un membre facturant de {org}",
-    "manage": "Gérez"
+    "manage": "Gérez",
+    "nameHelpText": "Utilisez uniquement des caractères alphanumériques, des espaces et des traits de soulignement."
   },
   "template": {
     "header": "Modèles",
@@ -1054,7 +1083,10 @@
     "fieldRequired": "Ce champ est obligatoire !",
     "dataType": "Type de données",
     "dataTypeRequired": "Le type de données est obligatoire !",
-    "udsFieldAlreadyInSchema": "Un ou plusieurs champs sélectionnés font déjà partie du schéma défini"
+    "udsFieldAlreadyInSchema": "Un ou plusieurs champs sélectionnés font déjà partie du schéma défini",
+    "subtitle": "Gestion des index et configuration des flux",
+    "streamNameHelpText": "Utilisez uniquement des caractères alphanumériques, un trait de soulignement et deux points.",
+    "deleteAssociatedAlertsPipelines": "Supprimer tous les pipelines et alertes associés au flux"
   },
   "function": {
     "header": "Fonctions",
@@ -1114,7 +1146,11 @@
     "vrlFunctionHint": "Utilisez le «. » pour représenter l'événement en cours. Exemple : .new_field = .existing_field + « traité »",
     "askAIFunctionPlaceholder": "Demandez à l'IA de vous aider dans votre fonction...",
     "enterFunctionPrompt": "Entrez une invite pour générer une fonction",
-    "jsErrorDetails": "Détails de l'erreur JavaScript"
+    "jsErrorDetails": "Détails de l'erreur JavaScript",
+    "subtitle": "Fonctions VRL réutilisables appliquées aux pipelines",
+    "clickTestFunctionHint": "Cliquez sur Tester la fonction pour voir les événements",
+    "pleaseEnterQuery": "Veuillez saisir une requête",
+    "enrichmentTablesSubtitle": "Tables de recherche qui enrichissent les données ingérées"
   },
   "confirmDialog": {
     "cancel": "Annuler",
@@ -1693,7 +1729,42 @@
     "multiSqlQueryLabelHint": "Nom personnalisé pour cette requête dans les légendes (par exemple, « Production »)",
     "multiQueryWarning": "Seule la requête 1 est affichée pour {chartType}",
     "trellisNotSupportedWithMultiQuery": "La disposition en treillis est désactivée en cas de requêtes multiples. Supprimez les requêtes supplémentaires pour utiliser Trellis.",
-    "xAliasInconsistencyWarning": "Les alias de l'axe X ne sont pas cohérents d'une requête à l'autre : certaines utilisent un histogramme, d'autres non. Utilisez le même type d'alias pour toutes les requêtes pour obtenir des résultats prévisibles."
+    "xAliasInconsistencyWarning": "Les alias de l'axe X ne sont pas cohérents d'une requête à l'autre : certaines utilisent un histogramme, d'autres non. Utilisez le même type d'alias pour toutes les requêtes pour obtenir des résultats prévisibles.",
+    "subtitle": "Créez, organisez et partagez des tableaux de bord dans plusieurs dossiers",
+    "deleteDashboardConfirmTitle": "Supprimer le tableau de bord",
+    "deleteDashboardConfirmMsg": "Êtes-vous sûr de vouloir supprimer le tableau de bord ?",
+    "deleteDashboardsConfirmTitle": "Supprimer des tableaux de bord",
+    "deleteDashboardsConfirmMsg": "Êtes-vous sûr de vouloir supprimer le ou les tableaux de bord {count} ?",
+    "importCustom": "Personnalisé",
+    "importCustomDesc": "Importer depuis un fichier JSON ou une URL",
+    "importTemplates": "Modèles",
+    "importTemplatesDesc": "Parcourir et importer depuis la galerie",
+    "searchThisFolder": "Ce dossier",
+    "searchThisFolderTitle": "Rechercher uniquement dans ce dossier",
+    "searchAllFolders": "Tous les dossiers",
+    "searchAllFoldersTitle": "Rechercher dans tous les dossiers",
+    "reloadDashboards": "Recharger les tableaux de bord",
+    "editVariable": "Modifier la variable",
+    "addOption": "Ajouter une option",
+    "addFilter": "Ajouter un filtre",
+    "noDataFound": "Aucune donnée trouvée",
+    "streamSelectTooltip": "Sélectionnez un flux ou utilisez une variable telle que $StreamVariable pour choisir dynamiquement le flux en fonction d'une autre valeur.",
+    "fieldSelectTooltip": "Sélectionnez un champ ou utilisez une variable telle que $FieldVariable. Si stream utilise une variable, la liste des champs sera vide. Tapez le nom du champ manuellement.",
+    "filterInfoTooltip": "Dans les filtres, vous pouvez utiliser la valeur d'une autre variable pour filtrer la valeur de la variable actuelle. Cela peut être fait en utilisant le nom de l'autre variable. Par exemple :",
+    "defaultSelectAll": "Par défaut - Tout sélectionner",
+    "escapeSingleQuotesTooltip": "Si cette option est activée, les guillemets simples seront ignorés dans la requête. Par exemple, une valeur telle que « O'Reilly » sera remplacée par « O » Reilly.",
+    "byDefaultSelect": "Par défaut, sélectionnez :",
+    "firstValue": "Première valeur",
+    "allValues": "Toutes les valeurs",
+    "customValue": "Personnalisé",
+    "showDependencies": "Afficher les dépendances",
+    "deleteVariable": "Supprimer une variable",
+    "deleteVariableMsg": "Êtes-vous sûr de vouloir supprimer la variable ?",
+    "appliedToTabs": "Appliqué aux onglets :",
+    "appliedToPanels": "Appliqué aux panneaux :",
+    "selectVariableScope": "Sélectionnez une portée variable",
+    "variableScopeHelp": "Les variables seront appliquées à tous les onglets et panneaux si l'option globale est sélectionnée.",
+    "showDynamicFilters": "Afficher les filtres dynamiques"
   },
   "panel": {
     "header": "Panneau",
@@ -1982,7 +2053,14 @@
       "viewOrgGroup": "Afficher le groupe organisationnel",
       "usageMemberLabel": "Organisation membre",
       "usageAllMembers": "Organisation actuelle",
-      "currentOrgTitle": "Organisation Actuelle"
+      "currentOrgTitle": "Organisation Actuelle",
+      "childOrgIdColumn": "Identifiant de l'organisation enfant",
+      "childOrgNameColumn": "Nom de l'organisation enfant",
+      "notEnabledTitle": "Groupe de facturation indisponible",
+      "notEnabledDesc": "Cette organisation n'est pas autorisée à créer un groupe de facturation. Contactez votre administrateur si vous avez besoin de cette fonctionnalité.",
+      "memberOrgsTitle": "Organisations membres",
+      "searchMemberOrg": "Rechercher une organisation",
+      "noMemberMatch": "Aucune organisation correspondante"
     }
   },
   "message": {
@@ -2183,7 +2261,43 @@
       "rcaCompleted": "Analyse des causes profondes terminée",
       "noRcaYet": "Aucune analyse des causes profondes n'est disponible. Cliquez sur « Analyser » pour commencer.",
       "search": "Rechercher des incidents...",
-      "sreChat": "Demander à l'assistant SRE"
+      "sreChat": "Demander à l'assistant SRE",
+      "subtitle": "Gestion et suivi des incidents",
+      "correlationPrimaryMatch": "Correspondance principale",
+      "correlationSecondaryMatch": "Correspondance secondaire",
+      "correlationServiceDiscoveryTooltip": "Corrélé à l'aide de l'identité de service pré-calculée provenant de la découverte de services",
+      "correlationPrimaryMatchTooltip": "Corrélé selon les critères de correspondance principaux",
+      "correlationSecondaryMatchTooltip": "Corrélé selon les critères de correspondance secondaires",
+      "correlationAlertId": "ID de l'alerte",
+      "correlationAlertIdTooltip": "Aucune dimension correspondante trouvée — isolé par ID d'alerte",
+      "correlatedByServiceDiscovery": "Dimensions",
+      "correlatedBySemanticGroups": "Dimensions",
+      "correlatedByAlertId": "ID de l'alerte",
+      "goBack": "Retour",
+      "incident": "Incident",
+      "uniqueAlerts": "Alertes uniques",
+      "relatedAlerts": "Alertes associées",
+      "alertTriggers": "Déclencheurs d'alerte",
+      "incidentTimeline": "Chronologie de l'incident",
+      "incidentDetails": "Détails de l'incident",
+      "incidentId": "ID de l'incident",
+      "incidentName": "Nom de l'incident",
+      "initialTrigger": "Déclencheur initial",
+      "noDimensionsAvailable": "Aucune dimension disponible",
+      "noAlertDetailsAvailable": "Aucun détail d'alerte disponible",
+      "clickOnTriggerToViewDetails": "Cliquez sur un déclencheur dans le tableau pour afficher les détails",
+      "refreshCorrelatedData": "Actualiser les données corrélées",
+      "showingCorrelatedLogs": "Affichage des logs corrélés de la période de l'incident",
+      "showingCorrelatedMetrics": "Affichage des métriques corrélées de la période de l'incident",
+      "showingCorrelatedTraces": "Affichage des traces corrélées de la période de l'incident",
+      "incidentTitleUpdatedSuccess": "Titre de l'incident mis à jour avec succès",
+      "markAsAcknowledgedTooltip": "Marquer l'incident comme pris en compte et en cours de traitement",
+      "markAsResolvedTooltip": "Marquer l'incident comme résolu et le clôturer",
+      "reopenIncidentTooltip": "Rouvrir cet incident résolu",
+      "editIncidentTitleTooltip": "Modifier le titre de l'incident",
+      "firedTimes": "Déclenché {count} fois",
+      "incidentAnalysis": "Analyse de l'incident",
+      "noAlertActivityData": "Aucune donnée d'activité d'alerte"
     },
     "events": "Évènements",
     "multiWindow": "Comparez avec le passé",
@@ -2231,7 +2345,9 @@
       "alertName": "Nom de l'alerte",
       "streamInfo": "Source de données",
       "alertType": "Type d'alerte",
-      "queryCondition": "Condition de requête"
+      "queryCondition": "Condition de requête",
+      "configuringRealTime": "Configuration d'une alerte en temps réel pour",
+      "configuringScheduled": "Configuration d'une alerte planifiée pour"
     },
     "correlation": {
       "title": "Corrélation des alertes",
@@ -2388,7 +2504,8 @@
       "comparingText": "Comparaison du résultat de la requête de la fenêtre en cours avec le résultat de la requête du {offset} précédent.",
       "addComparisonWindow": "Ajouter une fenêtre de comparaison",
       "goToConditions": "Accédez aux conditions",
-      "goToConditionsTooltip": "Cliquez sur « Accéder aux conditions » pour vérifier les événements pour les fenêtres de comparaison sélectionnées"
+      "goToConditionsTooltip": "Cliquez sur « Accéder aux conditions » pour vérifier les événements pour les fenêtres de comparaison sélectionnées",
+      "comparisonDisabledTooltip": "Les fenêtres de comparaison ne sont prises en charge qu'en mode SQL. Basculez en SQL dans l'onglet Règles d'alerte."
     },
     "alertSettings": {
       "cronSchedule": "Calendrier Cron",
@@ -2400,13 +2517,22 @@
       "frequencyTooltipCron": "Format cron UNIX standard avec 5 champs séparés par des espaces : [Minute 0-59] [Heure 0-23] [Jour du mois 1-31] [Mois 1-12 ou JANVIER-DÉCEMBRE] [Jour de la semaine 0-7 ou « 1L-7L », 0 et 7 pour le dimanche].",
       "timezoneWarning": "Avertissement : Le fuseau horaire affiché est approximatif. Vérifiez et sélectionnez manuellement le fuseau horaire correct.",
       "destinationsTooltip": "Sélectionnez une ou plusieurs destinations pour envoyer des notifications d'alerte.",
-      "templateTooltip": "Facultatif : sélectionnez un modèle à utiliser pour toutes les destinations de cette alerte. Les modèles vous permettent de personnaliser le format des messages d'alerte. Si cette option n'est pas sélectionnée, chaque destination utilisera son propre modèle configuré."
+      "templateTooltip": "Facultatif : sélectionnez un modèle à utiliser pour toutes les destinations de cette alerte. Les modèles vous permettent de personnaliser le format des messages d'alerte. Si cette option n'est pas sélectionnée, chaque destination utilisera son propre modèle configuré.",
+      "sectionTitle": "Paramètres",
+      "fieldRequired": "Ce champ est obligatoire !",
+      "noDestinationsAvailable": "Aucune destination disponible",
+      "refreshDestinations": "Actualiser les dernières destinations",
+      "createsIncident": "Crée un incident",
+      "createsIncidentTooltip": "Si une alerte peut créer un incident, elle n'envoie pas de notification dédiée. À la place, une notification pour l'incident est envoyée lorsqu'un nouvel incident est créé ou qu'un nouveau type d'alerte rejoint un incident existant."
     },
     "advanced": {
       "addVariable": "Ajouter une variable",
       "variablesTooltip": "Les variables sont utilisées pour transmettre les données de l'alerte à la destination.",
       "rowTemplateTooltip": "Le modèle de ligne est utilisé pour mettre en forme le message d'alerte.",
-      "templateType": "Type de modèle :"
+      "templateType": "Type de modèle :",
+      "noTemplatesAvailable": "Aucun modèle disponible",
+      "refreshTemplates": "Actualiser les derniers modèles",
+      "selectTemplate": "Sélectionner un modèle"
     },
     "addConditions": "Ajouter des conditions",
     "sqlEditor": "Éditeur SQL",
@@ -2510,7 +2636,28 @@
       "destinationRequired": "Au moins une destination est requise !",
       "disabledNotificationsInfo": "La détection des anomalies sera toujours exécutée et les résultats seront enregistrés dans le flux _anomalies. Activez les notifications pour recevoir des alertes lorsque des anomalies sont détectées."
     },
-    "anomalyName": "Nom de l'anomalie"
+    "anomalyName": "Nom de l'anomalie",
+    "subtitle": "Règles d'alerte et canaux de notification",
+    "searchThisFolder": "Ce dossier",
+    "searchAllFolders": "Tous les dossiers",
+    "streamConfig": "Configuration du flux",
+    "alertRules": "Règles d'alerte",
+    "addCondition": "Ajouter une condition",
+    "conditionOf": "de",
+    "conditionIs": "est",
+    "matchingTypeFound": "{type} correspondant trouvé",
+    "matchingMetricsFound": "mesures correspondantes trouvées",
+    "metricsValueFieldTooltip": "Les flux de métriques stockent leur mesure dans le champ « valeur » par défaut",
+    "howOftenCheckTooltip": "À quelle fréquence vérifier cette condition d'alerte",
+    "alertIfNoOfEvents": "Alerte en cas de nombre d'événements",
+    "alertIfValueIs": "Alerte si la valeur est",
+    "havingSeries": "Avoir des séries",
+    "clearMultiWindowsTitle": "Effacer les fenêtres multiples ?",
+    "lastTrainedAt": "Dernière formation à",
+    "noTemplatesMsg": "Il semble que vous n'ayez pas encore créé de modèles. Pour créer une alerte, vous devez disposer d'au moins une destination et d'un modèle",
+    "createTemplateBtn": "Créer un modèle",
+    "noDestinationsMsg": "Il semblerait que vous n'ayez encore créé aucune destination. Pour créer une alerte, vous devez disposer d'au moins une destination et d'un modèle",
+    "createDestinationBtn": "Créer une destination"
   },
   "alert_templates": {
     "header": "Modèles",
@@ -2782,7 +2929,93 @@
       "noMatchingDimensions": "Aucune dimension correspondante",
       "otherGroup": "Autre",
       "fallbackGroup": "Secours",
-      "fallbackNote": "Les dimensions de secours (comme 'service') s'appliquent dans tous les environnements lorsqu'aucune charge de travail spécifique à l'environnement ne correspond."
+      "fallbackNote": "Les dimensions de secours (comme 'service') s'appliquent dans tous les environnements lorsqu'aucune charge de travail spécifique à l'environnement ne correspond.",
+      "serviceDiscoveryTab": "Règles de détection",
+      "fieldAliasesTab": "Mappages de champs",
+      "fieldAliasesSaved": "Alias de champs enregistrés avec succès",
+      "serviceNameFieldAliasNote": "Les noms de champs réels mappés à ce groupe sont configurés dans",
+      "viewFieldAliases": "Modifier les alias de champs →",
+      "fieldAliasesSaveError": "Échec de l'enregistrement des alias de champs",
+      "fieldAliasesUnsavedConfirm": "Vous avez des modifications de mappage de champs non enregistrées. Les abandonner et quitter ?",
+      "duplicateIdsError": "ID de groupe en double trouvés : {ids}. Veuillez vous assurer que chaque groupe possède un ID unique.",
+      "duplicateNamesInCategoryError": "Nom en double « {name} » trouvé dans la catégorie « {category} ». Chaque groupe au sein d'une catégorie doit avoir un nom unique.",
+      "emptyIdError": " la catégorie comporte des noms de groupes vides. Veuillez vous assurer que tous les groupes ont des noms valides.",
+      "emptyFieldsError": "Au moins un nom de champ est requis",
+      "lastSeen": "Vu pour la dernière fois",
+      "serviceIdentitySetupTitle": "Configuration de l'identité de service",
+      "serviceIdentitySetupDescription": "Configurez la manière dont les services sont identifiés dans vos données de télémétrie",
+      "serviceNameFieldLabel": "Champ du nom de service",
+      "serviceNameFieldHelp": "Quel champ identifie le nom du service dans vos données de télémétrie",
+      "serviceNameFrom": "Nom du service à partir de",
+      "serviceNameDerivedPrefix": "Le nom du service est dérivé à l'aide des champs de nom de service définis dans",
+      "serviceNameFields": "alias de champs",
+      "serviceNameDetectedFrom": "Nom du service détecté à partir de :",
+      "serviceNameNotDetected": "Aucun champ de nom de service détecté dans vos données pour le moment",
+      "serviceNameNotDetectedHelp": "Assurez-vous que votre télémétrie inclut un champ tel que service.name ou similaire",
+      "serviceNameExpandedHelp": "Ces noms de champs dans vos données correspondent tous au nom du service :",
+      "serviceNameConfiguredNotSeen": "configuré mais pas encore vu dans vos données",
+      "customizeFieldMappings": "Personnaliser les mappages de champs",
+      "fieldMappingDialogHelp": "Ajoutez ou supprimez des noms de champs qui doivent être reconnus comme le nom du service dans vos données de télémétrie.",
+      "fieldMappingPlaceholder": "Saisissez un nom de champ et appuyez sur Entrée",
+      "foundInLogs": "Trouvé dans les logs",
+      "foundInTraces": "Trouvé dans les traces",
+      "foundInMetrics": "Trouvé dans les métriques",
+      "distinguishByLabel": "Distinguer les services par",
+      "distinguishByHelp": "Choisissez les champs qui définissent où vos services s'exécutent. Par exemple, cluster + namespace + déploiement créent ensemble une identité unique pour chaque service. Jusqu'à 5 champs.",
+      "serviceOptionalLabel": "Corréler sans attribut de service",
+      "serviceOptionalHelp": "Faire correspondre les flux à l'aide des attributs ci-dessous uniquement, en ignorant les attributs de service",
+      "noFieldsConfiguredYet": "Aucun champ de désambiguïsation configuré pour le moment.",
+      "addField": "Ajouter un champ",
+      "addFieldTooltip": "Ajoutez un autre champ pour aider à identifier les services de manière unique (5 max). Exemples : région, namespace ou environnement.",
+      "addGroup": "Ajouter un groupe",
+      "addGroupTooltip": "Créez un ensemble distinct de champs de désambiguïsation pour un environnement différent (par ex. des champs différents pour Kubernetes vs AWS)",
+      "autoSuggestedBanner": "Ces champs ont été suggérés automatiquement car ils ont peu de valeurs uniques (faible cardinalité) et apparaissent dans la plupart de vos services — idéal pour distinguer les services portant le même nom. Vous pouvez les personnaliser avant l'enregistrement.",
+      "addDisambiguationField": "Ajouter un autre",
+      "removeDisambiguationField": "Supprimer le champ",
+      "nameFieldLockedNote": "Le champ du nom de service ne peut pas être modifié après la première configuration",
+      "noGroupsAvailable": "Aucun groupe de champs disponible",
+      "selectField": "Sélectionner un champ",
+      "detectedLabel": "Nous avons détecté une charge de travail {type} d'après vos données.",
+      "suggestionPrompt": "Devons-nous appliquer la suggestion ?",
+      "applySuggestion": "Appliquer la suggestion",
+      "logStreams": "Flux de logs",
+      "traceStreams": "Flux de traces",
+      "metricStreams": "Flux de métriques",
+      "saveIdentityConfig": "Enregistrer la configuration",
+      "identityConfigSaved": "Configuration de l'identité de service enregistrée avec succès",
+      "identityConfigSaveFailed": "Échec de l'enregistrement de la configuration de l'identité de service",
+      "loadRecommendationsFailed": "Échec du chargement des recommandations",
+      "resetServices": "Réinitialiser les services",
+      "resetServicesTooltip": "Supprimer tous les services découverts. Ils seront redécouverts automatiquement à mesure que de nouvelles données arrivent.",
+      "resetServicesConfirmTitle": "Réinitialiser tous les services découverts ?",
+      "resetServicesConfirmMessage": "Cela supprimera tous les services découverts pour cette organisation. Les services seront automatiquement redécouverts à mesure que de nouvelles données de télémétrie sont ingérées. Cette action est irréversible.",
+      "resetServicesConfirmWarning": "Les services seront automatiquement redécouverts à mesure que de nouvelles données de télémétrie sont ingérées. Cette action est irréversible.",
+      "resetServicesSuccess": "{count} service(s) découvert(s) supprimé(s) avec succès.",
+      "resetServicesFailed": "Échec de la réinitialisation des services",
+      "workload": "Charge de travail",
+      "goToConfiguration": "Accéder à la configuration",
+      "configureServicesHint": "pour configurer la manière dont les services sont identifiés et regroupés.",
+      "filterBy": "Filtrer par :",
+      "selectFieldPlaceholder": "Sélectionner un champ",
+      "selectValuePlaceholder": "Sélectionner une valeur",
+      "selectFieldFirst": "Sélectionnez d'abord un champ",
+      "instanceSingular": "instance",
+      "instancePlural": "instances",
+      "serviceSingular": "Service",
+      "serviceCountSingular": "{count} service",
+      "serviceCountPlural": "{count} services",
+      "instancesCount": "({count} instances)",
+      "noDimensions": "aucune dimension",
+      "defaultSetWarningTitle": "La corrélation peut être peu fiable.",
+      "defaultSetWarningBody": "Cette instance n'a aucune désambiguïsation — elle a été découverte sans aucune correspondance de charge de travail (aucun contexte de cluster, namespace ou environnement). Les logs et les traces peuvent provenir de déploiements différents du même nom de service.",
+      "instanceIdentity": "Identité de l'instance",
+      "noDimensionsCatchAll": "Aucune dimension — instance fourre-tout",
+      "streamSources": "Sources de flux",
+      "openInLogsTooltip": "Ouvrir dans les logs avec un filtre de service",
+      "fieldNameMapping": "Mappage des noms de champs",
+      "logsWithCount": "Logs ({count})",
+      "tracesWithCount": "Traces ({count})",
+      "metricsWithCount": "Métriques ({count})"
     },
     "pageSubtitle": "Ajustez les paramètres de votre application",
     "platformSettings": "Paramètres de la plateforme",
@@ -2825,7 +3058,29 @@
     "usageStreamEnabledLabel": "Activer le flux d'utilisation",
     "aiToolsets": "Ensembles d'outils d'IA",
     "llmModelPricing": "Tarification du modèle LLM",
-    "ingestionTokens": "Jetons d'ingestion"
+    "ingestionTokens": "Jetons d'ingestion",
+    "groupGeneral": "Général",
+    "groupAccessSecurity": "Accès et sécurité",
+    "groupDestinationsTemplates": "Destinations et modèles",
+    "groupDataAI": "Données et IA",
+    "groupOperations": "Opérations",
+    "groupAccount": "Compte",
+    "generalDesc": "Thème, valeurs par défaut des requêtes et préférences principales",
+    "orgDesc": "Paramètres et identifiants de l'organisation",
+    "cipherKeysDesc": "Clés de chiffrement pour les champs sensibles",
+    "regexPatternsDesc": "Modèles regex réutilisables pour le masquage",
+    "domainManagementDesc": "Restreindre la connexion aux domaines SSO autorisés",
+    "alertDestinationsDesc": "Où les alertes déclenchées sont envoyées",
+    "pipelineDestinationsDesc": "Cibles externes pour la sortie du pipeline",
+    "templatesDesc": "Modèles de messages d'alerte réutilisables",
+    "storageSettingsDesc": "Configuration du stockage par organisation",
+    "modelPricingDesc": "Configuration des coûts des modèles LLM",
+    "correlationSettingsDesc": "Configuration de la corrélation de télémétrie",
+    "llmProvidersDesc": "Fournisseurs LLM pour les évaluations en ligne",
+    "queryManagementDesc": "Inspecter et annuler les requêtes en cours d'exécution",
+    "nodesDesc": "Nœuds du cluster et leur état de santé",
+    "licenseDesc": "Détails de la licence Enterprise",
+    "organizationManagementDesc": "Créer et gérer les organisations"
   },
   "iam": {
     "users": "Les utilisateurs",
@@ -2858,7 +3113,19 @@
     "externalUserWarningTitle": "Avertissement destiné aux utilisateurs externes",
     "externalUserWarningMessage": "L'ajout d'utilisateurs externes directement aux rôles n'accordera pas d'autorisations. Ajoutez-les plutôt aux groupes d'utilisateurs.",
     "invitations": "Invitations",
-    "ingestionTokens": "Jetons d'ingestion"
+    "ingestionTokens": "Jetons d'ingestion",
+    "sectionAccess": "Accès",
+    "sectionPermissions": "Autorisations",
+    "sectionOrganization": "Organisation",
+    "usersDesc": "Personnes ayant accès à cette organisation",
+    "serviceAccountsDesc": "Jetons d'accès programmatiques pour les API",
+    "ingestionTokensDesc": "Jetons pour l'ingestion de données dans cette organisation",
+    "invitationsDesc": "Invitations aux membres en attente et envoyées",
+    "groupsDesc": "Regroupez les utilisateurs pour attribuer des rôles",
+    "rolesDesc": "Définissez les autorisations et les politiques d'accès",
+    "quotaDesc": "Limites d'utilisation appliquées par rôle",
+    "organizationsDesc": "Organisations auxquelles vous pouvez accéder",
+    "nameHelpText": "Utilisez uniquement des caractères alphanumériques et des caractères « _ », sans espaces."
   },
   "pipeline": {
     "header": "Canalisations",
@@ -3019,7 +3286,14 @@
     "dimensionWidth": "Largeur (px)",
     "dimensionHeight": "Hauteur (px)",
     "imagePreview": "Inclure une image d'aperçu du tableau de bord en ligne",
-    "customDimensions": "Dimensions personnalisées (avancées)"
+    "customDimensions": "Dimensions personnalisées (avancées)",
+    "subtitle": "Rapports et exportations planifiés",
+    "searchThisFolder": "Ce dossier",
+    "searchAllFolders": "Tous les dossiers",
+    "reloadReports": "Recharger les rapports",
+    "moveToFolder": "Déplacer vers un dossier",
+    "deleteReportsTitle": "Supprimer des rapports",
+    "deleteReportsMsg": "Êtes-vous sûr de vouloir supprimer {count} rapport (s) ?"
   },
   "queries": {
     "runningQueries": "Exécution de requêtes",
@@ -3147,19 +3421,27 @@
         "p99Latency": "P99",
         "avgLatency": "Latence moyenne",
         "lastSeen": "Vu pour la dernière fois",
-        "operations": "Opérations"
+        "operations": "Opérations",
+        "avgDuration": "Durée moy.",
+        "maxDuration": "Durée max."
       },
       "status": {
         "healthy": "En bonne santé",
         "warning": "Avertissement",
-        "degraded": "Dégradé"
+        "degraded": "Dégradé",
+        "critical": "Critique"
       },
       "viewTraces": "Afficher les traces",
       "exportCsv": "Exporter au format CSV",
       "justNow": "Tout à l'heure",
       "minutesAgo": "il y a {n} m",
       "hoursAgo": "il y a {n} h",
-      "daysAgo": "il y a {n} d"
+      "daysAgo": "il y a {n} d",
+      "serviceLabel": "service",
+      "servicesLabel": "services",
+      "legend": {
+        "title": "Taux d'erreur"
+      }
     },
     "noErrorPresent": "Aucune erreur n'est présente pour cette période",
     "httpStatusCode": "Code d'état HTTP",
@@ -3197,8 +3479,12 @@
         "duration": "Durée",
         "tokens": "Jetons",
         "cost": "Coût",
-        "status": "État"
-      }
+        "status": "État",
+        "user": "Utilisateur",
+        "firstMessage": "Premier message"
+      },
+      "streamLabel": "Flux",
+      "unknownUser": "Utilisateur inconnu"
     },
     "sessionDetail": {
       "backToSessions": "Retour aux sessions",
@@ -3240,7 +3526,15 @@
         "output": "sortie",
         "total": "Total",
         "cost": "Coût",
-        "spans": "S'étend"
+        "spans": "S'étend",
+        "llmCalls": "Appels LLM",
+        "toolCalls": "Appels d'outils",
+        "otherCalls": "Autres",
+        "otherCallsTooltip": "Spans gen_ai avec des noms d'opération non reconnus :"
+      },
+      "fullscreen": {
+        "expandTurn": "Afficher le tour en plein écran",
+        "close": "Fermer"
       }
     },
     "openInFullView": "Ouvrir en plein écran",
@@ -3277,11 +3571,28 @@
       "expandRange": "Élargir la plage horaire",
       "expandRangeDescAbsolute": "Passez à une plage de temps relative plus large",
       "removeFilter": "Supprimer un filtre",
-      "selectedRange": "la gamme sélectionnée"
+      "selectedRange": "la gamme sélectionnée",
+      "descOutOfRange": "Votre fenêtre temporelle ne contient aucune donnée de ce flux. Accédez au moment où des données ont été vues pour la dernière fois.",
+      "descDataAtBoundary": "Le flux contient des données dans cette fenêtre, mais aucune trace ne correspond. Essayez d'élargir la plage temporelle.",
+      "jumpToData": "Accéder aux données les plus récentes"
     },
     "showAll": "Afficher tout",
     "filterByErrors": "Filtrer par erreur",
-    "clearErrorFilter": "Effacer le filtre d'erreur"
+    "clearErrorFilter": "Effacer le filtre d'erreur",
+    "spansTab": "S'étend",
+    "tracesTab": "Des traces",
+    "serviceGraphTab": "Graphique des services",
+    "treeView": "Vue sur l'arbre",
+    "graphView": "Affichage graphique",
+    "layoutHorizontal": "horizontal",
+    "layoutVertical": "Verticale",
+    "layoutForce": "Disposition des forces",
+    "exportTraces": "Traces d'exportation",
+    "waterfall": "Cascade",
+    "flameGraph": "Graphe de flammes",
+    "traceGraph": "Graphique de traçage",
+    "dag": "JOUR",
+    "thread": "fil"
   },
   "invitation": {
     "pendingInvitations": "Invitations en attente",
@@ -3451,7 +3762,38 @@
     "failed_to_load": "Impossible de charger les modèles",
     "no_patterns_selected": "Veuillez sélectionner au moins un motif",
     "name_required": "* Le nom est obligatoire",
-    "pattern_required": "* Le motif est obligatoire"
+    "pattern_required": "* Le motif est obligatoire",
+    "associated_breadcrumb": "Détails du flux",
+    "associated_search_placeholder": "Rechercher",
+    "applied_patterns_count": "Modèles appliqués ({count})",
+    "all_patterns_count": "Tous les modèles ({count})",
+    "no_data_available": "Aucune donnée disponible",
+    "no_patterns_applied_title": "Aucun modèle appliqué pour l'instant",
+    "no_patterns_applied_subtitle": "Parcourez la bibliothèque de modèles pour commencer à appliquer des expressions régulières à vos champs.",
+    "pattern_name": "Nom du modèle",
+    "when_value_matches": "Lorsque la valeur correspond",
+    "redact": "Masquer",
+    "redact_hint": "Remplacer par [REDACTED]",
+    "drop": "Supprimer",
+    "drop_hint": "Supprimer entièrement le champ",
+    "hash": "Hacher",
+    "hash_hint": "Remplacer par un hachage interrogeable",
+    "detect_at": "Détecter à",
+    "ingestion": "Ingestion",
+    "query": "Requête",
+    "test_pattern": "Tester le modèle",
+    "test_input": "Tester l'entrée",
+    "regex_pattern_label": "Modèle regex",
+    "input_string": "Chaîne d'entrée",
+    "input_string_placeholder": "Ex. 1234567890",
+    "output": "Sortie",
+    "output_string_placeholder": "Chaîne de sortie",
+    "click_test_input_hint": "Veuillez cliquer sur Tester l'entrée pour voir les résultats",
+    "remove_pattern": "Supprimer le modèle",
+    "add_pattern": "Ajouter un modèle",
+    "remove_pattern_confirm_msg": "Êtes-vous sûr de vouloir supprimer ce modèle du champ ?",
+    "failed_to_test_string": "Échec du test de la chaîne",
+    "select_detect_at_option": "Veuillez sélectionner une option de détection"
   },
   "search_history": {
     "title": "Historique des recherches",
@@ -3679,7 +4021,10 @@
         "duration": "Durée",
         "startBeforeEnd": "L'heure de début doit être antérieure à l'heure de fin",
         "endAfterStart": "L'heure de fin doit être postérieure à l'heure de début"
-      }
+      },
+      "filtersLabel": "Filtres",
+      "errorDetails": "Une erreur s'est produite lors de la récupération des données de log. Veuillez réessayer.",
+      "viewLogs": "Afficher les logs"
     },
     "viewInTraces": "Afficher dans Traces",
     "viewInTracesTooltip": "Ouvrir la page des traces avec le tableau de bord des métriques RED et toutes les traces corrélées",
@@ -4170,7 +4515,13 @@
       "one": "Montrez-moi les erreurs de la dernière heure...",
       "two": "Écrivez VRL pour analyser le JSON à partir des journaux Nginx...",
       "three": "Créez un tableau de bord pour l'état des nœuds K8s..."
-    }
+    },
+    "autoNavigation": {
+      "label": "Navigation automatique",
+      "enabledTooltip": "Navigation automatique activée - O2 Assistant navigue automatiquement sans confirmation",
+      "disabledTooltip": "Navigation automatique désactivée - O2 Assistant vous posera une question avant de naviguer"
+    },
+    "attachImageTooltip": "Joindre des images (PNG, JPEG, 2 Mo maximum)"
   },
   "emptyState": {
     "noSearchResults": {
@@ -4290,7 +4641,29 @@
       "reports": "rapports",
       "queries": "requêtes",
       "serviceAccounts": "comptes de service",
-      "invitations": "invitations"
+      "invitations": "invitations",
+      "searchJobs": "tâches de recherche",
+      "groups": "groupes",
+      "roles": "rôles",
+      "anomalyConfigs": "configurations de détection d'anomalies",
+      "apiLimits": "limites API",
+      "roleLimits": "limites de rôle",
+      "ingestionTokens": "jetons d'ingestion",
+      "organizations": "organisations",
+      "alertDestinations": "destinations",
+      "pipelineDestinations": "destinations",
+      "alertTemplates": "modèles",
+      "evalTemplates": "modèles d'évaluation",
+      "enrichmentTables": "tables d'enrichissement",
+      "cipherKeys": "clés de chiffrement",
+      "aiToolsets": "ensembles d'outils IA",
+      "llmProviders": "fournisseurs LLM",
+      "sourceMaps": "source maps",
+      "backfillJobs": "tâches de remplissage rétroactif",
+      "scorers": "évaluateurs",
+      "evalJobs": "tâches d'évaluation",
+      "scoreConfigs": "configurations de score",
+      "pipelineHistory": "historique du pipeline"
     },
     "noDashboardsInFolder": {
       "title": "Aucun tableau de bord dans ce dossier",
@@ -4481,13 +4854,21 @@
     },
     "actions": {
       "edit": "Modifier",
-      "delete": "Supprimer"
+      "delete": "Supprimer",
+      "export": "Exporter",
+      "activate": "Activer",
+      "pause": "Suspendre",
+      "activated": "Tâche activée",
+      "paused": "Tâche suspendue",
+      "activateError": "Échec de l'activation de la tâche",
+      "pauseError": "Échec de la suspension de la tâche"
     },
     "tabs": {
       "jobs": "Emplois chez Eval",
       "scorers": "Buteurs",
       "scoreConfigs": "Configurations de score",
-      "providers": "Prestataires"
+      "providers": "Prestataires",
+      "quality": "Qualité"
     },
     "singular": {
       "jobs": "Emploi Eval",
@@ -4511,7 +4892,11 @@
     "buttons": {
       "cancel": "Annuler",
       "create": "Créez",
-      "save": "Enregistrer"
+      "save": "Enregistrer",
+      "close": "Fermer",
+      "remove": "Supprimer",
+      "saveAsDraft": "Enregistrer comme brouillon",
+      "createAndActivate": "Créer et activer"
     },
     "scorerTypeDialog": {
       "title": "Créez un nouveau scorer",
@@ -4521,7 +4906,11 @@
       "remoteTitle": "télécommande",
       "remoteDescription": "Appelez votre propre point de terminaison HTTP pour le score.",
       "codeTitle": "Code",
-      "codeDescription": "Prochainement"
+      "codeDescription": "Prochainement",
+      "llmJudgeCta": "Configurer le juge",
+      "remoteCta": "Configurer l'endpoint",
+      "codeCta": "Disponible dans une future version",
+      "comingSoonBadge": "Bientôt disponible"
     },
     "provider": {
       "backTo": "Retour aux fournisseurs",
@@ -4541,7 +4930,15 @@
       "availableModelsPlaceholder": "GPT-4O-Mini, GPT-4.1",
       "useAsDefault": "Utiliser comme fournisseur par défaut",
       "authConfigLabel": "Configuration d'authentification JSON",
-      "saveError": "Impossible d'enregistrer le fournisseur"
+      "saveError": "Impossible d'enregistrer le fournisseur",
+      "authConfigHelp": "Les identifiants sont chiffrés au repos et ne peuvent pas être relus après l'enregistrement.",
+      "apiKeyLabel": "Clé API",
+      "apiKeyPlaceholder": "Saisissez la clé API",
+      "apiKeyHelp": "Stockée chiffrée au repos et jamais relue. Laissez vide lors de la modification pour conserver la clé existante.",
+      "authSection": "Authentification",
+      "authEditNote": "Les identifiants ne peuvent pas être relus. Saisissez à nouveau la clé API uniquement si vous souhaitez la renouveler.",
+      "cannotRename": "Ne peut pas être renommé après la création.",
+      "availableModelsHelp": "Facultatif. Liste de modèles disponibles sur ce fournisseur, séparés par des virgules."
     },
     "scoreConfig": {
       "createTitle": "Nouvelle configuration de score",
@@ -4558,7 +4955,129 @@
         "categorical": "Catégorique",
         "boolean": "Booléen"
       },
-      "saveError": "Impossible d'enregistrer la configuration du score"
+      "saveError": "Impossible d'enregistrer la configuration du score",
+      "booleanValues": "true / false",
+      "detail": {
+        "eyebrow": "Configuration de score",
+        "close": "Fermer",
+        "statusActive": "Actif",
+        "statusInactive": "Inactif",
+        "createdShort": "Créé",
+        "tabs": {
+          "overview": "Vue d'ensemble",
+          "versions": "Versions",
+          "usedBy": "Utilisé par"
+        },
+        "descriptionSection": "Description",
+        "configurationSection": "Configuration",
+        "dataTypeLabel": "Type de données",
+        "rangeLabel": "Plage",
+        "categoriesLabel": "Catégories",
+        "valuesLabel": "Valeurs",
+        "thresholdSection": "Seuil de santé",
+        "thresholdHint": "Considère un score comme sain",
+        "noThreshold": "Non déclaré",
+        "noThresholdHint": "Aucun seuil déclaré — les scores sur cette dimension ne contribueront pas aux signaux d'état de qualité.",
+        "usedByIntro": "Tout évaluateur qui émet une valeur portant ce nom de dimension.",
+        "usedByEmpty": "Aucun évaluateur ne référence encore cette configuration.",
+        "scorerTypeLlmJudge": "Juge LLM",
+        "scorerTypeRemote": "Distant",
+        "versionsIntro": "Chaque modification de la plage, des catégories ou du seuil de santé crée une nouvelle version. Les scores historiques restent rattachés à la version qui les a produits.",
+        "activeVersionChip": "Actif",
+        "lastUpdated": "Dernière mise à jour",
+        "metadataSection": "Métadonnées",
+        "statusLabel": "Statut",
+        "versionLabel": "Version",
+        "createdLabel": "Créé",
+        "updatedLabel": "Mis à jour"
+      },
+      "editTitlePrefix": "Modifier",
+      "eyebrow": "Configurations de score",
+      "sectionTitle": "Configurations de score",
+      "listTitle": "Configurations de score",
+      "listSubtitle": "Dimensions à schéma souple que les évaluateurs produisent.",
+      "searchPlaceholder": "Rechercher des configurations",
+      "allTypes": "Tous les types",
+      "newButton": "Nouvelle configuration de score",
+      "saveButton": "Enregistrer les modifications",
+      "createButton": "Créer",
+      "columns": {
+        "index": "#",
+        "name": "Nom",
+        "type": "Type",
+        "rangeValues": "Plage / valeurs",
+        "healthy": "Sain",
+        "activeVersion": "Version active",
+        "usedBy": "Utilisé par",
+        "created": "Créé",
+        "actions": "Actions"
+      },
+      "active": "actif",
+      "usedByScorers": "{count} évaluateurs",
+      "usedByScorer": "{count} évaluateur",
+      "noHealthy": "—",
+      "createInfoNumeric": "Définissez à partir de quand les scores sur cette dimension sont considérés comme sains. Les scores en dehors de cette plage déclencheront des problèmes de qualité dans les listes de traces, les sessions et d'autres vues.",
+      "editInfoBannerEmphasis": {
+        "numeric": "La modification de la plage ou du seuil de santé crée {nextVersion}.",
+        "categorical": "La modification des catégories ou du seuil de santé crée {nextVersion}.",
+        "boolean": "La modification de la valeur de santé crée {nextVersion}."
+      },
+      "editInfoBannerDetail": "Les scores historiques restent associés à la version qui les a produits. Les modifications portant uniquement sur la description sont appliquées sur place.",
+      "createInfoSubtitle": "Les modifications portant uniquement sur la description mettent à jour {version} sur place.",
+      "namePlaceholder": "ex. « faithfulness »",
+      "nameHelp": "Lettres minuscules, chiffres et tirets bas uniquement. Utilisé comme identifiant stable.",
+      "cannotBeRenamed": "Ne peut pas être renommé",
+      "descriptionPlaceholder": "Que mesure cette dimension ?",
+      "descriptionHelp": "Les modifications portant uniquement sur la description ne créent pas de nouvelle version.",
+      "dataTypeLocked": "Verrouillé",
+      "dataTypeCannotChange": "Ne peut pas être modifié après la création",
+      "dataTypeHelp": {
+        "numeric": "Score sous forme de nombre dans une plage",
+        "categorical": "Score sous forme de l'une des N étiquettes",
+        "boolean": "Score sous forme de true / false"
+      },
+      "minLabel": "Min",
+      "maxLabel": "Max",
+      "addCategoryPlaceholder": "Ajouter une catégorie",
+      "addCategoryButton": "Ajouter",
+      "booleanInfo": "Les configurations booléennes acceptent les valeurs {trueLabel} / {falseLabel}. Aucune configuration supplémentaire n'est nécessaire.",
+      "healthyThresholdTitle": "Seuil de santé",
+      "optional": "Facultatif",
+      "healthyThresholdIntro": "Définissez à partir de quand les scores sur cette dimension sont considérés comme sains. Les scores en dehors de cette plage déclencheront des problèmes de qualité dans les listes de traces, les sessions et d'autres vues.",
+      "healthyWhenValueIs": "Sain lorsque la valeur est :",
+      "healthyCategories": "Catégories saines :",
+      "healthyCategoriesHint": "Cochez toutes les valeurs qui comptent comme saines.",
+      "healthyValue": "Valeur saine :",
+      "gteLabel": "Supérieur ou égal à",
+      "lteLabel": "Inférieur ou égal à",
+      "trueIsHealthy": "true est sain",
+      "trueIsHealthyHint": "Les scores de false déclenchent des problèmes de qualité.",
+      "falseIsHealthy": "false est sain",
+      "falseIsHealthyHint": "Les scores de true déclenchent des problèmes de qualité.",
+      "thresholdEmptyHint": "Laisser ce champ vide signifie que cette dimension ne contribuera pas aux signaux d'état de qualité dans le produit. Les scores seront tout de même enregistrés mais ne déclencheront pas d'indicateurs de problème.",
+      "empty": {
+        "title": "Aucune configuration de score pour l'instant",
+        "description": "Les configurations de score définissent les dimensions que vos évaluateurs produisent — nom, type de données, plage de valeurs et seuil de santé. Créez-en une pour commencer à mettre en place l'évaluation en ligne.",
+        "chipTypes": "Numérique, Catégorielle, Booléenne",
+        "chipThreshold": "Seuil de santé"
+      },
+      "import": {
+        "title": "Importer une configuration de score",
+        "button": "Importer",
+        "customLabel": "Personnalisé",
+        "customSubtitle": "Importer depuis un fichier JSON ou une URL",
+        "libraryLabel": "Bibliothèque",
+        "librarySubtitle": "Parcourir et importer depuis le catalogue organisé",
+        "libraryDrawerTitle": "Bibliothèque de configurations de score",
+        "outputMessages": "Messages de sortie",
+        "creation": "Création de configuration de score",
+        "errors": {
+          "title": "Erreurs de validation"
+        }
+      },
+      "export": {
+        "bulkButton": "Exporter"
+      }
     },
     "scorer": {
       "backTo": "Retour à Scorers",
@@ -4610,7 +5129,203 @@
         "authHint": "Vérifiez les informations d'identification du fournisseur avant d'enregistrer.",
         "schemaHeader": "Incompatibilité de schéma",
         "schemaHint": "La réponse ne correspondait pas au schéma de sortie configuré.",
-        "valuePlaceholder": "Valeur pour {variable}"
+        "valuePlaceholder": "Valeur pour {variable}",
+        "disabledHint": "Renseignez le nom, le fournisseur, le modèle et chaque valeur de variable pour lancer un test.",
+        "errorHeader": "Échec du test",
+        "errorFallback": "Le test de l'évaluateur a échoué. Consultez les logs du serveur pour plus de détails.",
+        "resultScore": "Score",
+        "resultLatency": "Latence",
+        "resultModel": "Modèle",
+        "resultTokens": "Jetons",
+        "resultReasoning": "Raisonnement",
+        "resultRaw": "Réponse brute"
+      },
+      "detail": {
+        "close": "Fermer",
+        "eyebrow": "Évaluateur",
+        "refresh": "Actualiser",
+        "descriptionSection": "Description",
+        "configurationSection": "Configuration",
+        "scorerTypeLabel": "Type d'évaluateur",
+        "providerLabel": "Fournisseur",
+        "providerUnknown": "Inconnu",
+        "modelLabel": "Modèle",
+        "endpointLabel": "Endpoint",
+        "producesSection": "Produit une configuration de score",
+        "producesEmpty": "Cet évaluateur n'écrit dans aucune configuration de score.",
+        "promptSection": "Prompt du juge",
+        "requestTemplateSection": "Modèle de requête",
+        "variablesSuffix": "variables",
+        "outputSchemaSection": "Schéma de sortie",
+        "usedBySection": "Utilisé par",
+        "usedByIntro": "Tâches qui référencent cet évaluateur dans leur pipeline.",
+        "usedByEmpty": "Aucune tâche ne référence encore cet évaluateur.",
+        "versionsIntro": "Les versions sont des instantanés immuables de la configuration de l'évaluateur. La version active est celle que les tâches exécutent actuellement.",
+        "activeVersionChip": "Actif",
+        "lastUpdated": "Dernière mise à jour",
+        "metadataSection": "Métadonnées",
+        "versionLabel": "Version",
+        "createdLabel": "Créé",
+        "updatedLabel": "Mis à jour",
+        "typeLlmJudge": "Juge LLM",
+        "typeRemote": "Distant",
+        "tabs": {
+          "configuration": "Configuration",
+          "versions": "Versions",
+          "runs": "Exécutions",
+          "usedBy": "Utilisé par"
+        },
+        "kpis": {
+          "totalRuns": "Total des exécutions (24 h)",
+          "totalRunsSub": "Sur l'ensemble des tâches référençantes",
+          "successRate": "Taux de réussite",
+          "successRateSub": "Dernières 24 h",
+          "avgLatency": "Latence moy.",
+          "avgLatencySub": "p50 sur les exécutions",
+          "usedBy": "Utilisé par",
+          "usedBySubSingular": "tâche",
+          "usedBySubPlural": "tâches"
+        },
+        "runs": {
+          "showingPrefix": "Affichage de",
+          "showingOf": "sur",
+          "showingSuffix": "exécutions",
+          "empty": "Aucune exécution d'évaluateur dans cette fenêtre.",
+          "spanLabel": "Span",
+          "traceLabel": "Trace",
+          "jobUnknown": "—",
+          "col": {
+            "time": "Heure",
+            "job": "Tâche",
+            "target": "Cible",
+            "score": "Score",
+            "latency": "Latence",
+            "status": "Statut"
+          }
+        }
+      },
+      "listTitle": "Évaluateurs",
+      "listSubtitle": "Les évaluateurs s'exécutent sur vos traces et produisent des scores sur des dimensions définies.",
+      "searchPlaceholder": "Rechercher des évaluateurs",
+      "allTypes": "Tous les types",
+      "newButton": "Nouvel évaluateur",
+      "usedByJobs": "{count} tâches",
+      "usedByJob": "{count} tâche",
+      "columns": {
+        "name": "Nom",
+        "type": "Type",
+        "produces": "Produit",
+        "version": "Version",
+        "usedBy": "Utilisé par",
+        "lastRun": "Dernière exécution",
+        "successRate": "Taux de réussite (24 h)",
+        "actions": "Actions"
+      },
+      "empty": {
+        "title": "Aucun évaluateur pour l'instant",
+        "description": "Les évaluateurs sont les unités d'exécution de l'évaluation. Ils prennent des spans de vos traces de production et produisent des scores selon les dimensions de qualité qui vous intéressent.",
+        "chipLlmJudge": "Juge LLM",
+        "chipRemote": "Distant",
+        "chipCode": "Code"
+      },
+      "noProviders": {
+        "title": "Ajoutez d'abord un fournisseur",
+        "description": "Les évaluateurs ont besoin d'un fournisseur LLM (OpenAI, Anthropic, etc.) pour s'exécuter. Ajoutez un fournisseur dans les Paramètres avant de créer des évaluateurs.",
+        "chipRequired": "Requis pour le juge LLM",
+        "cta": "Ajouter un fournisseur"
+      },
+      "import": {
+        "title": "Importer un évaluateur",
+        "button": "Importer",
+        "customLabel": "Personnalisé",
+        "customSubtitle": "Importer depuis un fichier JSON ou une URL",
+        "libraryLabel": "Bibliothèque",
+        "librarySubtitle": "Parcourir et importer depuis le catalogue organisé",
+        "libraryDrawerTitle": "Bibliothèque d'évaluateurs",
+        "outputMessages": "Messages de sortie",
+        "creation": "Création d'évaluateur",
+        "errors": {
+          "title": "Erreurs de validation"
+        }
+      },
+      "export": {
+        "bulkButton": "Exporter"
+      },
+      "descriptionPlaceholder": "Un bref résumé de ce que mesure cet évaluateur.",
+      "producesScoreHelp": "Quelle dimension cet évaluateur mesure-t-il ?",
+      "providerHelp": "Choisissez le fournisseur LLM que ce juge appelle. Gérez les fournisseurs dans {settingsLink}.",
+      "providerHelpSettingsLink": "Paramètres",
+      "refreshProviders": "Actualiser les fournisseurs",
+      "selectedPrefix": "Sélectionné :",
+      "endpointLabel": "Endpoint :",
+      "defaultModelPreviewLabel": "Modèle par défaut :",
+      "authLabel": "Auth :",
+      "authConfigured": "configuré",
+      "authNotConfigured": "non configuré",
+      "rangeLabel": "Plage :",
+      "healthyLabel": "Sain :",
+      "typeLabel": "Type :",
+      "promptVariablesLabel": "Variables :",
+      "promptHelp": "Concentrez-vous sur la logique d'évaluation. Utilisez {inputVar} et {outputVar} comme espaces réservés.",
+      "includeReasoningLabel": "Inclure le raisonnement",
+      "includeReasoningHint": "Le LLM explique son score. Stocké dans score.metadata.reasoning.",
+      "extraFieldsLabel": "Champs de métadonnées supplémentaires",
+      "extraFieldsOptional": "Facultatif",
+      "extraFieldsHint": "Ajoutez des champs que le LLM doit produire en plus du score. Stockés dans score.metadata pour une analyse ultérieure.",
+      "extraFields": {
+        "colName": "Nom du champ",
+        "colType": "Type",
+        "colDescription": "Description",
+        "namePlaceholder": "field_name",
+        "descriptionPlaceholder": "Que doit mettre le LLM dans ce champ ?",
+        "addButton": "+ Ajouter un champ",
+        "previewSchema": "Afficher le schéma généré",
+        "schemaTitle": "Schéma JSON généré",
+        "schemaLoading": "Dérivation du schéma…",
+        "schemaCopy": "Copier",
+        "schemaCopied": "Copié",
+        "schemaCopyFailed": "Échec de la copie du schéma dans le presse-papiers.",
+        "typeString": "string",
+        "typeNumber": "number",
+        "typeBoolean": "boolean"
+      },
+      "authSection": "Authentification",
+      "headersSection": "En-têtes personnalisés",
+      "requestBodySection": "Corps de la requête",
+      "remoteUrlLabel": "URL",
+      "remoteTimeoutLabel": "Délai d'expiration (ms)",
+      "remoteRetriesLabel": "Nombre max. de tentatives",
+      "remoteBackoffLabel": "Temporisation",
+      "remoteBackoff": {
+        "exponential": "Exponentielle",
+        "linear": "Linéaire",
+        "fixed": "Fixe"
+      },
+      "remoteAuthLabel": "Type d'authentification",
+      "remoteAuth": {
+        "placeholder": "Sélectionner le type d'authentification",
+        "bearer": "Jeton Bearer",
+        "basic": "Authentification de base",
+        "apiKey": "Clé API",
+        "tokenLabel": "Jeton",
+        "usernameLabel": "Nom d'utilisateur",
+        "passwordLabel": "Mot de passe",
+        "headerNameLabel": "Nom de l'en-tête",
+        "bearerTokenPlaceholder": "Collez le jeton Bearer",
+        "basicUsernamePlaceholder": "utilisateur",
+        "basicPasswordPlaceholder": "••••••••",
+        "apiKeyHeaderPlaceholder": "X-API-Key",
+        "apiKeyTokenPlaceholder": "Collez la clé API",
+        "encryptedHint": "Chiffré au repos. Ne peut pas être consulté après l'enregistrement."
+      },
+      "remoteHeaders": {
+        "subtitle": "Envoyés avec chaque requête.",
+        "colName": "Nom",
+        "colValue": "Valeur",
+        "colKey": "Nom",
+        "keyPlaceholder": "X-Custom-Header",
+        "valuePlaceholder": "valeur",
+        "addButton": "+ Ajouter un en-tête"
       }
     },
     "job": {
@@ -4643,7 +5358,10 @@
       "scorerPicker": {
         "title": "Buteurs",
         "hint": "Sélectionnez un ou plusieurs buteurs à courir pour chaque période correspondante.",
-        "meta": "{type} · v {version}"
+        "meta": "{type} · v {version}",
+        "placeholder": "Sélectionner des évaluateurs",
+        "searchPlaceholder": "Rechercher des évaluateurs…",
+        "empty": "Aucun évaluateur disponible. Créez-en un d'abord dans l'onglet Évaluateurs."
       },
       "filter": {
         "title": "État du filtre",
@@ -4668,7 +5386,117 @@
         "emptyValue": "—"
       },
       "selectAtLeastOne": "Sélectionnez au moins un buteur",
-      "saveError": "Impossible d'enregistrer la tâche d'évaluation"
+      "saveError": "Impossible d'enregistrer la tâche d'évaluation",
+      "detail": {
+        "close": "Fermer",
+        "eyebrow": "Tâche d'évaluation",
+        "refresh": "Actualiser",
+        "descriptionSection": "Description",
+        "targetSection": "Cible",
+        "streamLabel": "Flux",
+        "streamTypeLabel": "Type de flux",
+        "filterLabel": "Filtre",
+        "filterEmpty": "Aucun filtre — chaque span est évalué",
+        "scorersSection": "Évaluateurs",
+        "scorersEmpty": "Aucun évaluateur attaché à cette tâche pour l'instant.",
+        "scorerUnknown": "(évaluateur supprimé)",
+        "scorerTypeLlmJudge": "Juge LLM",
+        "scorerTypeRemote": "Distant",
+        "producesPrefix": "Produit",
+        "viewScorerHint": "Afficher",
+        "inputMappingSection": "Mappage des entrées",
+        "samplingSection": "Échantillonnage",
+        "samplingModeLabel": "Mode",
+        "samplingValueLabel": "Valeur",
+        "samplingAll": "Évaluer chaque correspondance",
+        "samplingRate": "Échantillon aléatoire par taux",
+        "samplingCount": "Les N premières correspondances",
+        "metadataSection": "Métadonnées",
+        "versionLabel": "Version",
+        "pipelineLabel": "ID du pipeline",
+        "createdLabel": "Créé",
+        "updatedLabel": "Mis à jour",
+        "tabs": {
+          "configuration": "Configuration",
+          "runs": "Exécutions",
+          "failures": "Échecs"
+        },
+        "kpis": {
+          "totalRuns": "Total des exécutions",
+          "totalRunsSub": "Dans la fenêtre sélectionnée",
+          "successRate": "Taux de réussite",
+          "successRateSub": "Sur l'ensemble des évaluateurs",
+          "avgLatency": "Latence moy.",
+          "avgLatencySub": "Moy. sur les exécutions",
+          "scorers": "Évaluateurs",
+          "scorersSubSingular": "évaluateur attaché",
+          "scorersSubPlural": "évaluateurs attachés"
+        },
+        "runs": {
+          "showingPrefix": "Affichage de",
+          "showingOf": "sur",
+          "showingSuffix": "exécutions correspondantes",
+          "empty": "Aucune exécution enregistrée pour cette tâche dans la fenêtre sélectionnée.",
+          "spanLabel": "SPAN",
+          "traceLabel": "TRACE",
+          "scorerUnknown": "(évaluateur inconnu)",
+          "col": {
+            "time": "Heure",
+            "scorer": "Évaluateur",
+            "target": "Cible",
+            "score": "Score",
+            "latency": "Latence",
+            "status": "Statut"
+          }
+        },
+        "failures": {
+          "byScorerTitle": "Échecs par évaluateur",
+          "byScorerEmpty": "Aucun échec enregistré dans la fenêtre sélectionnée.",
+          "recentTitle": "Échecs récents",
+          "recentEmpty": "Aucune exécution en échec dans la fenêtre sélectionnée.",
+          "col": {
+            "scorer": "Évaluateur",
+            "failureRate": "Taux d'échec",
+            "count": "Échecs / Total"
+          }
+        }
+      },
+      "listTitle": "Tâches d'évaluation",
+      "listSubtitle": "Déployez des évaluateurs sur votre flux de traces de production.",
+      "searchPlaceholder": "Rechercher des tâches",
+      "allStatuses": "Tous les statuts",
+      "newButton": "Nouvelle tâche",
+      "scorersCount": "{count} évaluateurs",
+      "scorerCount": "{count} évaluateur",
+      "columns": {
+        "name": "Nom",
+        "status": "Statut",
+        "stream": "Flux",
+        "scorers": "Évaluateurs",
+        "successRate": "Taux de réussite",
+        "lastRun": "Dernière exécution",
+        "created": "Créé",
+        "actions": "Actions"
+      },
+      "empty": {
+        "title": "Aucune tâche d'évaluation pour l'instant",
+        "description": "Les tâches d'évaluation déploient des évaluateurs sur votre flux de traces de production. Elles échantillonnent les spans correspondants, exécutent les évaluateurs de manière asynchrone et stockent les scores résultants pour analyse.",
+        "chipStreams": "Flux de production",
+        "chipScorers": "Évaluateurs multiples",
+        "chipSampling": "Contrôle de l'échantillonnage"
+      },
+      "descriptionPlaceholder": "Que surveille cette tâche ?",
+      "samplingValueHelp": "JSON : rate est un nombre entre 0 et 1, count est un entier positif.",
+      "samplingValueAllHelp": "Non applicable lorsque le mode est Tout — chaque événement correspondant sera évalué.",
+      "samplingHelp": "Appliqué après le filtre. Contrôle le coût — seuls les spans correspondants comptent dans le taux.",
+      "presets": {
+        "label": "Préréglages rapides",
+        "rootSpans": "Spans racines uniquement",
+        "llmCalls": "Appels LLM",
+        "toolCalls": "Appels d'outils"
+      },
+      "createdAndActivated": "Tâche d'évaluation créée et activée",
+      "createdButActivateFailed": "Tâche d'évaluation créée, mais l'activation a échoué"
     },
     "quality": {
       "scopeLabel": "Toutes les dimensions de qualité dans cet espace de travail",
@@ -4745,6 +5573,10 @@
           "unhealthy": "Malsain",
           "healthy": "En bonne santé",
           "coverage": "Couverture"
+        },
+        "empty": {
+          "title": "En attente de vos premiers scores",
+          "description": "Aucun score n'a été reçu pour cette configuration dans la plage temporelle sélectionnée. Ils apparaîtront ici automatiquement dès qu'un évaluateur l'utilisant s'exécutera."
         }
       },
       "sidebar": {
@@ -4813,7 +5645,53 @@
       "quality": "Qualité",
       "evalJobs": "Emplois chez Eval",
       "scorers": "Buteurs",
-      "scoreConfigs": "Configurations de score"
+      "scoreConfigs": "Configurations de score",
+      "llmInsights": "Analyses LLM"
+    },
+    "kpi": {
+      "totalCost": "Coût total",
+      "totalTokens": "Total de jetons",
+      "totalTraces": "Nombre total de traces",
+      "p95Latency": "Latence P95",
+      "errorRate": "Taux d'erreur"
+    },
+    "panels": {
+      "costTrend": {
+        "title": "Tendance des coûts",
+        "subtitle": "USD par modèle"
+      },
+      "tokenTrend": {
+        "title": "Tendance des jetons",
+        "subtitle": "jetons par modèle"
+      },
+      "spanTrend": {
+        "title": "Tendance de l'Espagne",
+        "subtitle": "nombre de spans par type"
+      },
+      "latencyPercentiles": {
+        "title": "Latence p50/p95/p99",
+        "subtitle": "tous les appels LLM"
+      },
+      "tracesOverTime": {
+        "title": "Des traces au fil du temps",
+        "subtitle": "nombre de traces par service"
+      },
+      "errorsOverTime": {
+        "title": "Erreurs au fil du temps",
+        "subtitle": "nombre d'erreurs"
+      },
+      "spansByModel": {
+        "title": "Échelle par modèle",
+        "subtitle": "nombre d'appels par modèle"
+      },
+      "tokensByModel": {
+        "title": "Jetons par modèle",
+        "subtitle": "nombre total de jetons par modèle"
+      },
+      "recentErrors": {
+        "title": "Erreurs récentes",
+        "subtitle": "les 10 dernières spans échouées"
+      }
     }
   },
   "logs": {
@@ -4852,7 +5730,10 @@
       "removeFilterDescSql": "Des conditions SQL sont appliquées à cette requête",
       "openHistory": "Ouvrir l'historique des recherches",
       "askAi": "Demandez à AI de corriger ma requête",
-      "selectedRange": "la gamme sélectionnée"
+      "selectedRange": "la gamme sélectionnée",
+      "descOutOfRange": "Votre fenêtre temporelle ne contient aucune donnée de ce flux. Accédez au moment où des données ont été vues pour la dernière fois.",
+      "jumpToData": "Accéder aux données les plus récentes",
+      "descDataAtBoundary": "Le flux contient des données dans cette fenêtre, mais aucun événement ne correspond. Essayez de consulter votre historique de recherche ou de demander de l'aide à AI."
     },
     "error": {
       "sqlError": "Erreur de syntaxe SQL",
@@ -4921,5 +5802,16 @@
     "askAi": "Demandez à AI de corriger ma requête",
     "showDetail": "Afficher les détails",
     "hideDetail": "Masquer les détails"
+  },
+  "refreshButton": {
+    "justNow": "tout à l'heure",
+    "secondsAgo": "il y a {secondes}",
+    "minutesAgo": "il y a {min} m",
+    "hoursAgo": "il y a {h} h",
+    "notYetRefreshed": "Pas encore actualisé",
+    "dataFresh": "Les données sont récentes",
+    "dataGettingStale": "Les données deviennent obsolètes",
+    "dataStale": "Les données sont périmées",
+    "lastRefreshed": "Dernière actualisation : {heure}"
   }
 }

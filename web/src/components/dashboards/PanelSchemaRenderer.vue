@@ -145,18 +145,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </div>
       </div>
-      <div
+      <OEmptyState
         v-if="
+          noData &&
           !errorDetail?.message &&
           panelSchema.type != 'geomap' &&
           panelSchema.type != 'maps' &&
           !loading
         "
-        class="noData"
+        size="inline"
+        icon="bar-chart"
+        :title="noData"
+        :backdrop="false"
         data-test="no-data"
-      >
-        {{ noData }}
-      </div>
+        class="noData"
+      />
       <div
         v-if="
           errorDetail?.message &&
@@ -194,70 +197,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :loading="loading"
           :loadingProgressPercentage="loadingProgressPercentage"
         />
-      </div>
-      <div
-        v-if="isCursorOverPanel"
-        class="tw:flex tw:items-center q-gutter-x-xs"
-        style="
-          position: absolute;
-          top: 0px;
-          right: 0px;
-          z-index: 9;
-          padding-right: 2px;
-          padding-top: 2px;
-        "
-        @click.stop
-      >
-        <OButton
-          v-if="
-            showLegendsButton &&
-            noData !== 'No Data' &&
-            ![
-              'table',
-              'html',
-              'markdown',
-              'custom_chart',
-              'geomap',
-              'maps',
-              'heatmap',
-              'metric',
-              'gauge',
-            ].includes(panelSchema.type)
-          "
-          variant="outline"
-          size="icon-circle"
-          @click="$emit('show-legends')"
-          icon-left="format-list-bulleted"
-          data-test="dashboard-show-legends-btn"
-        >
-          <OTooltip content="Show Legends" side="top" align="end" />
-        </OButton>
-        <OButton
-          v-if="
-            [
-              'area',
-              'area-stacked',
-              'bar',
-              'h-bar',
-              'line',
-              'scatter',
-              'stacked',
-              'h-stacked',
-            ].includes(panelSchema.type) &&
-            checkIfPanelIsTimeSeries === true &&
-            allowAnnotationsAdd &&
-            !viewOnly
-          "
-          data-test="panel-schema-renderer-annotation-button"
-          variant="outline"
-          size="icon-circle"
-          @click="toggleAddAnnotationMode"
-        >
-          <template #icon-left
-            ><OIcon :name="isAddAnnotationMode ? 'cancel' : 'edit'" size="sm"
-          /></template>
-          <OTooltip :content="isAddAnnotationMode ? 'Exit Annotations Mode' : 'Add Annotations'" side="top" align="end" />
-        </OButton>
       </div>
       <div
         class="crosslink-drilldown-menu"
@@ -308,7 +247,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           overflow-wrap: break-word;
           z-index: 9999999;
         "
-        :class="store.state.theme === 'dark' ? 'tw:bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'tw:bg-white'"
+        class="annotation-popup-bg"
         ref="annotationPopupRef"
       >
         <div
@@ -426,6 +365,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import { copyToClipboard } from "@/utils/clipboard";
 import { calculateWidthText } from "@/utils/dashboard/chartDimensionUtils";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 
 export default defineComponent({
   name: "PanelSchemaRenderer",
@@ -445,7 +385,8 @@ export default defineComponent({
     OButton,
     OIcon,
     OTooltip,
-},
+    OEmptyState,
+  },
   props: {
     selectedTimeObj: {
       required: true,
@@ -1824,8 +1765,27 @@ export default defineComponent({
 
 .noData {
   position: absolute;
-  top: 20%;
+  inset: 0;
   width: 100%;
-  text-align: center;
+  height: 100%;
+  // Override the inline empty-state's intrinsic min-height/padding so the
+  // content centers within the actual panel box (top/bottom/left/right)
+  // instead of being pushed down by a fixed 160px min-height.
+  min-height: 0 !important;
+  padding: 0.5rem !important;
+  // Establish a size container so we can react to very short panels.
+  container-type: size;
+}
+
+// When the panel is too short to comfortably fit the icon, hide it and
+// show just the centered "No Data" message.
+@container (max-height: 5rem) {
+  .noData :deep(.o2-empty-state__inline-icon) {
+    display: none;
+  }
+}
+
+.annotation-popup-bg {
+  background: var(--color-surface-panel);
 }
 </style>
