@@ -73,7 +73,7 @@
       <div style="flex:1" />
 
       <template v-if="activeTab === 'private'">
-        <button class="syn-new-btn" @click=""><OIcon name="add" size="sm" />Add Location</button>
+        <button class="syn-new-btn" @click.prevent><OIcon name="add" size="sm" />Add Location</button>
       </template>
     </div>
 
@@ -895,25 +895,25 @@
         <template v-if="currentStep === 'configure'">
           <div class="drw-slabel">Basic configuration</div>
           <div class="fstack">
-            <q-input v-model="form.name" label="Monitor name *" outlined dense />
+            <OInput v-model="form.name" label="Monitor name *" />
             <div style="display:flex;gap:8px">
-              <q-select v-if="['HTTP','API'].includes(form.type)" v-model="form.method" :options="['GET','POST','PUT','PATCH','DELETE','HEAD']" outlined dense label="Method" style="width:110px;flex-shrink:0" />
-              <q-input v-model="form.url" label="URL *" outlined dense style="flex:1" placeholder="https://example.com/api/health" />
+              <OSelect v-if="['HTTP','API'].includes(form.type)" v-model="form.method" label="Method" :options="['GET','POST','PUT','PATCH','DELETE','HEAD'].map(m => ({label: m, value: m}))" class="tw:w-[110px] tw:shrink-0" />
+              <OInput v-model="form.url" label="URL *" placeholder="https://example.com/api/health" class="tw:flex-1" />
             </div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-              <q-select v-model="form.interval" :options="intervalOpts" label="Check interval" outlined dense emit-value map-options />
-              <q-input v-model.number="form.timeout" label="Timeout (ms)" type="number" outlined dense />
+              <OSelect v-model="form.interval" label="Check interval" :options="intervalOpts" />
+              <OInput v-model.number="form.timeout" label="Timeout (ms)" type="number" />
             </div>
-            <q-expansion-item dense label="Request Headers" style="border:1px solid var(--o2-border-color);border-radius:8px">
-              <div style="padding:10px;display:flex;flex-direction:column;gap:8px">
+            <OCollapsible title="Request Headers">
+              <div class="tw:p-2.5 tw:flex tw:flex-col tw:gap-2">
                 <div v-for="(h, i) in form.headers" :key="i" style="display:flex;gap:8px;align-items:center">
-                  <q-input v-model="h.key" dense outlined placeholder="Name" style="flex:1" />
-                  <q-input v-model="h.value" dense outlined placeholder="Value" style="flex:1" />
+                  <OInput v-model="h.key" placeholder="Name" class="tw:flex-1" />
+                  <OInput v-model="h.value" placeholder="Value" class="tw:flex-1" />
                   <button class="drw-rm-btn" @click="form.headers.splice(i,1)"><OIcon name="close" size="xs" /></button>
                 </div>
                 <button class="drw-add-btn" @click="form.headers.push({key:'',value:''})"><OIcon name="add" size="xs" />Add header</button>
               </div>
-            </q-expansion-item>
+            </OCollapsible>
           </div>
         </template>
         <template v-if="currentStep === 'locations'">
@@ -943,9 +943,9 @@
           <div class="drw-slabel">Assertions</div>
           <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px">
             <div v-for="(a, i) in form.assertions" :key="i" style="display:flex;align-items:center;gap:8px;padding:8px;border:1px solid var(--o2-border-color);border-radius:8px">
-              <q-select v-model="a.type" :options="assertionTypes" dense outlined emit-value map-options style="flex:1" />
-              <q-select v-model="a.operator" :options="['=','!=','<','>','contains','matches']" dense outlined style="width:100px" />
-              <q-input v-model="a.value" dense outlined style="flex:1" placeholder="200" />
+              <OSelect v-model="a.type" :options="assertionTypes" class="tw:flex-1" />
+              <OSelect v-model="a.operator" :options="['=','!=','<','>','contains','matches'].map(o => ({label: o, value: o}))" class="tw:w-[100px]" />
+              <OInput v-model="a.value" placeholder="200" class="tw:flex-1" />
               <button class="drw-rm-btn" @click="form.assertions.splice(i,1)"><OIcon name="close" size="xs" /></button>
             </div>
             <button class="drw-add-btn" @click="form.assertions.push({type:'statusCode',operator:'=',value:'200'})"><OIcon name="add" size="xs" />Add assertion</button>
@@ -954,11 +954,11 @@
           <div style="display:flex;flex-direction:column;gap:10px">
             <div style="display:flex;align-items:center;gap:8px;font-size:13px;flex-wrap:wrap">
               <span>Alert when failing from</span>
-              <q-input v-model.number="form.alertThreshold" type="number" dense outlined style="width:60px" />
+              <OInput v-model.number="form.alertThreshold" type="number" class="tw:w-15" />
               <span>or more location(s)</span>
             </div>
-            <q-toggle v-model="form.notifyOnRecovery" dense label="Notify on recovery" size="sm" />
-            <q-toggle v-model="form.renotify" dense label="Re-notify every 30 min while failing" size="sm" />
+            <OSwitch v-model="form.notifyOnRecovery" label="Notify on recovery" size="sm" />
+            <OSwitch v-model="form.renotify" label="Re-notify every 30 min while failing" size="sm" />
           </div>
         </template>
       </div>
@@ -979,6 +979,10 @@ import { ref, computed, onUnmounted, watch, nextTick } from "vue";
 import { useRouter } from "vue-router";
 import * as echarts from "echarts";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 
 const router = useRouter();
 
