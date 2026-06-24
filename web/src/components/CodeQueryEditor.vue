@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="tw:relative tw:w-full tw:h-full tw:flex tw:flex-col" v-bind="$attrs">
     <div
       data-test="query-editor"
-      class="logs-query-editor tw:flex-1 tw:min-h-0 tw:pl-2 tw:bg-(--o2-card-bg)"
+      class="logs-query-editor tw:flex-1 tw:min-h-0 tw:bg-(--o2-card-bg)"
       ref="editorRef"
       :id="editorId"
     />
