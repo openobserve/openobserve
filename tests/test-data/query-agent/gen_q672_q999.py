@@ -2655,11 +2655,10 @@ NEW_QUERIES = {
             "id": "Q811",
             "sql": (
                 'SELECT _timestamp, log, '
-                "match_all('warehouse') AS is_match, "
+                'true AS is_match, '
                 'ROW_NUMBER() OVER (ORDER BY _timestamp) AS seq '
                 'FROM "{stream}" '
                 "WHERE match_all('warehouse') "
-                "OR match_all('error') "
                 'ORDER BY _timestamp ASC LIMIT 10'
             ),
             "category": "full_text_search",
