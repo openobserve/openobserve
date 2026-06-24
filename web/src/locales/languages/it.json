@@ -6456,5 +6456,48 @@
       "rumSessionsRefresh": "Aggiorna elenco",
       "sourceMapsRefresh": "Aggiorna elenco"
     }
+  },
+  "synthetics": {
+    "scheduleAlert": {
+      "title": "Pianificazione e avvisi",
+      "frequency": "Frequenza",
+      "frequencyOptions": {
+        "1min": "1 minuto",
+        "5min": "5 minuti",
+        "15min": "15 minuti",
+        "30min": "30 minuti",
+        "1hour": "1 ora",
+        "cron": "Cron"
+      },
+      "scheduleNow": "Pianifica ora",
+      "scheduleLater": "Pianifica più tardi",
+      "scheduleNowTooltip": "Il controllo si attiva immediatamente utilizzando la data e il fuso orario correnti.",
+      "scheduleLaterTooltip": "Scegli una data e un'ora future per attivare il controllo.",
+      "startDate": "Data di inizio",
+      "startTime": "Ora di inizio",
+      "timezone": "Fuso orario",
+      "cronExpression": "Espressione Cron",
+      "cronPlaceholder": "*/5 * * *",
+      "retries": "Riprova",
+      "retriesOnFailure": "Riprova in caso di errore",
+      "retriesOnFailureSuffix": "volte.",
+      "retryDelay": "Aspetta",
+      "retryDelaySuffix": "ms tra un tentativo e l'altro.",
+      "alert": "Avviso",
+      "alertedIfFails": "Avvisato se il test fallisce",
+      "alertedIfFailsSuffix": "volte.",
+      "destinations": "Destinazioni",
+      "noDestinations": "Nessuna destinazione disponibile",
+      "refreshDestinations": "Aggiorna le destinazioni",
+      "addNewDestination": "Aggiungi nuova destinazione",
+      "destinationRequired": "È richiesta almeno una destinazione",
+      "cooldownPeriod": "Periodo di recupero",
+      "minutes": "verbale"
+    },
+    "locations": {
+      "title": "Sedi",
+      "locationAwsEast": "AWS · Stati Uniti-Est-1",
+      "comingSoon": "Altre regioni e località private — Prossimamente"
+    }
   }
 }

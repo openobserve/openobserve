@@ -6456,5 +6456,48 @@
       "rumSessionsRefresh": "刷新清单",
       "sourceMapsRefresh": "刷新清单"
     }
+  },
+  "synthetics": {
+    "scheduleAlert": {
+      "title": "日程安排和提醒",
+      "frequency": "频率",
+      "frequencyOptions": {
+        "1min": "1 分钟",
+        "5min": "5 分钟",
+        "15min": "15 分钟",
+        "30min": "30 分钟",
+        "1hour": "1 小时",
+        "cron": "Cron"
+      },
+      "scheduleNow": "立即安排",
+      "scheduleLater": "稍后安排",
+      "scheduleNowTooltip": "使用当前日期和时区，支票将立即生效。",
+      "scheduleLaterTooltip": "选择未来的日期和时间来激活支票。",
+      "startDate": "开始日期",
+      "startTime": "开始时间",
+      "timezone": "时区",
+      "cronExpression": "Cron 表达式",
+      "cronPlaceholder": "*/5 * * *",
+      "retries": "重试",
+      "retriesOnFailure": "失败时重试",
+      "retriesOnFailureSuffix": "倍。",
+      "retryDelay": "等待",
+      "retryDelaySuffix": "ms 在两次重试之间。",
+      "alert": "警报",
+      "alertedIfFails": "测试失败时发出警报",
+      "alertedIfFailsSuffix": "倍。",
+      "destinations": "目的地",
+      "noDestinations": "没有可用的目的地",
+      "refreshDestinations": "刷新目的地",
+      "addNewDestination": "添加新目的地",
+      "destinationRequired": "至少需要一个目的地",
+      "cooldownPeriod": "冷却时间",
+      "minutes": "分钟"
+    },
+    "locations": {
+      "title": "地点",
+      "locationAwsEast": "AWS · us-east-1",
+      "comingSoon": "更多区域和私人地点 — 即将推出"
+    }
   }
 }

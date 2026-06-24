@@ -6456,5 +6456,48 @@
       "rumSessionsRefresh": "リストを更新",
       "sourceMapsRefresh": "リストを更新"
     }
+  },
+  "synthetics": {
+    "scheduleAlert": {
+      "title": "スケジュールとアラート",
+      "frequency": "周波数",
+      "frequencyOptions": {
+        "1min": "1 分",
+        "5min": "5 分",
+        "15min": "15 分",
+        "30min": "30 分",
+        "1hour": "1 時間",
+        "cron": "クロン"
+      },
+      "scheduleNow": "今すぐスケジュールする",
+      "scheduleLater": "後でスケジュールする",
+      "scheduleNowTooltip": "チェックは、現在の日付とタイムゾーンを使用してすぐに有効になります。",
+      "scheduleLaterTooltip": "チェックを有効にする将来の日付と時刻を選択してください。",
+      "startDate": "開始日",
+      "startTime": "開始時間",
+      "timezone": "タイムゾーン",
+      "cronExpression": "クラウン表現",
+      "cronPlaceholder": "*/5 * * *",
+      "retries": "リトライ",
+      "retriesOnFailure": "失敗時に再試行",
+      "retriesOnFailureSuffix": "回。",
+      "retryDelay": "お待ちください",
+      "retryDelaySuffix": "再試行の間隔はミリ秒です。",
+      "alert": "アラート",
+      "alertedIfFails": "テストが失敗した場合はアラートを通知します",
+      "alertedIfFailsSuffix": "回。",
+      "destinations": "目的地",
+      "noDestinations": "目的地はありません",
+      "refreshDestinations": "デスティネーションを更新",
+      "addNewDestination": "新しい目的地を追加",
+      "destinationRequired": "少なくとも 1 つの目的地が必要です",
+      "cooldownPeriod": "クールダウン期間",
+      "minutes": "分"
+    },
+    "locations": {
+      "title": "ロケーション",
+      "locationAwsEast": "AWS · 米国東部-1",
+      "comingSoon": "その他の地域とプライベートロケーション — 近日公開予定"
+    }
   }
 }

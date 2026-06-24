@@ -6456,5 +6456,48 @@
       "rumSessionsRefresh": "Atualizar lista",
       "sourceMapsRefresh": "Atualizar lista"
     }
+  },
+  "synthetics": {
+    "scheduleAlert": {
+      "title": "Programação e alertas",
+      "frequency": "Frequência",
+      "frequencyOptions": {
+        "1min": "1 min",
+        "5min": "5 min",
+        "15min": "15 minutos",
+        "30min": "30 minutos",
+        "1hour": "1 hora",
+        "cron": "Cron"
+      },
+      "scheduleNow": "Agende agora",
+      "scheduleLater": "Agende mais tarde",
+      "scheduleNowTooltip": "O cheque se torna ativo imediatamente usando a data e o fuso horário atuais.",
+      "scheduleLaterTooltip": "Escolha uma data e hora futuras para ativar o cheque.",
+      "startDate": "Data de início",
+      "startTime": "Hora de início",
+      "timezone": "Fuso horário",
+      "cronExpression": "Expressão Cron",
+      "cronPlaceholder": "*/5 * * * *",
+      "retries": "Tentativas novamente",
+      "retriesOnFailure": "Tenta novamente em caso de falha",
+      "retriesOnFailureSuffix": "vezes.",
+      "retryDelay": "Aguarde",
+      "retryDelaySuffix": "ms entre as novas tentativas.",
+      "alert": "Alerta",
+      "alertedIfFails": "Alertado se o teste falhar",
+      "alertedIfFailsSuffix": "vezes.",
+      "destinations": "Destinos",
+      "noDestinations": "Nenhum destino disponível",
+      "refreshDestinations": "Atualizar destinos",
+      "addNewDestination": "Adicionar novo destino",
+      "destinationRequired": "É necessário pelo menos um destino",
+      "cooldownPeriod": "Período de recarga",
+      "minutes": "ata"
+    },
+    "locations": {
+      "title": "Localizações",
+      "locationAwsEast": "AWS · us-east-1",
+      "comingSoon": "Mais regiões e locais privados — Em breve"
+    }
   }
 }

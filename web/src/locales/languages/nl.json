@@ -6456,5 +6456,48 @@
       "rumSessionsRefresh": "Lijst verversen",
       "sourceMapsRefresh": "Lijst verversen"
     }
+  },
+  "synthetics": {
+    "scheduleAlert": {
+      "title": "Schema en waarschuwingen",
+      "frequency": "Frequentie",
+      "frequencyOptions": {
+        "1min": "1 minuut",
+        "5min": "5 minuten",
+        "15min": "15 minuten",
+        "30min": "30 minuten",
+        "1hour": "1 uur",
+        "cron": "Cron"
+      },
+      "scheduleNow": "Nu plannen",
+      "scheduleLater": "Later plannen",
+      "scheduleNowTooltip": "De controle wordt onmiddellijk actief op basis van de huidige datum en tijdzone.",
+      "scheduleLaterTooltip": "Kies een toekomstige datum en tijd om de cheque te activeren.",
+      "startDate": "Startdatum",
+      "startTime": "Starttijd",
+      "timezone": "Tijdzone",
+      "cronExpression": "Cron-expressie",
+      "cronPlaceholder": "*/5 * * * *",
+      "retries": "Probeert opnieuw",
+      "retriesOnFailure": "Probeert opnieuw bij mislukking",
+      "retriesOnFailureSuffix": "keer.",
+      "retryDelay": "Wacht tot",
+      "retryDelaySuffix": "Ik zit tussen de nieuwe pogingen.",
+      "alert": "Waarschuwing",
+      "alertedIfFails": "Wordt gewaarschuwd als de test mislukt",
+      "alertedIfFailsSuffix": "keer.",
+      "destinations": "Bestemmingen",
+      "noDestinations": "Geen bestemmingen beschikbaar",
+      "refreshDestinations": "Bestemmingen vernieuwen",
+      "addNewDestination": "Nieuwe bestemming toevoegen",
+      "destinationRequired": "Er is minstens één bestemming vereist",
+      "cooldownPeriod": "Afkoelperiode",
+      "minutes": "minuten"
+    },
+    "locations": {
+      "title": "Locaties",
+      "locationAwsEast": "AWS · oost-amerikaan-1",
+      "comingSoon": "Meer regio's en privélocaties — Binnenkort beschikbaar"
+    }
   }
 }

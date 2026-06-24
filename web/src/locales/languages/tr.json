@@ -6456,5 +6456,48 @@
       "rumSessionsRefresh": "Listeyi yenileme",
       "sourceMapsRefresh": "Listeyi yenileme"
     }
+  },
+  "synthetics": {
+    "scheduleAlert": {
+      "title": "Zamanlama ve Uyarı",
+      "frequency": "Frekans",
+      "frequencyOptions": {
+        "1min": "1 dakika",
+        "5min": "5 dakika",
+        "15min": "15 dakika",
+        "30min": "30 dakika",
+        "1hour": "1 saat",
+        "cron": "Cron"
+      },
+      "scheduleNow": "Şimdi planlayın",
+      "scheduleLater": "Daha sonra planlayın",
+      "scheduleNowTooltip": "Kontrol, geçerli tarih ve saat dilimini kullanarak hemen aktif hale gelir.",
+      "scheduleLaterTooltip": "Çeki etkinleştirmek için gelecekteki bir tarih ve saat seçin.",
+      "startDate": "Başlangıç tarihi",
+      "startTime": "Başlangıç saati",
+      "timezone": "Saat dilimi",
+      "cronExpression": "Cron ifadesi",
+      "cronPlaceholder": "*/5* * * *",
+      "retries": "Tekrar denemeler",
+      "retriesOnFailure": "Başarısızlıkta yeniden deneniyor",
+      "retriesOnFailureSuffix": "zaman.",
+      "retryDelay": "Bekle",
+      "retryDelaySuffix": "Tekrar denemeler arasında ms.",
+      "alert": "Alarm",
+      "alertedIfFails": "Test başarısız olursa uyarılır",
+      "alertedIfFailsSuffix": "zaman.",
+      "destinations": "Destinasyonlar",
+      "noDestinations": "Mevcut varış noktası yok",
+      "refreshDestinations": "Hedefleri yenileme",
+      "addNewDestination": "Yeni Hedef Ekle",
+      "destinationRequired": "En az bir varış yeri gereklidir",
+      "cooldownPeriod": "Bekleme Süresi",
+      "minutes": "dakikalar"
+    },
+    "locations": {
+      "title": "Konumlar",
+      "locationAwsEast": "AWS · us-east-1",
+      "comingSoon": "Daha fazla bölge ve özel konum — Çok yakında"
+    }
   }
 }
