@@ -329,6 +329,26 @@ describe("SearchResult Component", () => {
       expect(extractFTSFieldsSpy).toHaveBeenCalled();
     });
 
+    it("populates selectedFields with FTS defaults when stream loads and no fields are selected", async () => {
+      wrapper.vm.searchObj.data.stream.selectedFields = [];
+      wrapper.vm.searchObj.data.stream.selectedStreamFields = [
+        { name: "message", ftsKey: true },
+        { name: "pod_name", ftsKey: false },
+      ];
+      await wrapper.vm.$nextTick();
+      expect(wrapper.vm.searchObj.data.stream.selectedFields).toContain("message");
+    });
+
+    it("does not overwrite selectedFields when user already has columns selected", async () => {
+      wrapper.vm.searchObj.data.stream.selectedFields = ["pod_name"];
+      wrapper.vm.searchObj.data.stream.selectedStreamFields = [
+        { name: "message", ftsKey: true },
+        { name: "pod_name", ftsKey: false },
+      ];
+      await wrapper.vm.$nextTick();
+      expect(wrapper.vm.searchObj.data.stream.selectedFields).toEqual(["pod_name"]);
+    });
+
     it("should handle updateTitle changes", async () => {
       const title = "New Title";
       wrapper.vm.searchObj.data.histogram.chartParams.title = title;
