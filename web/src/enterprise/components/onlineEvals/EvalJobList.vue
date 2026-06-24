@@ -70,10 +70,6 @@
           <span class="ej-mono-cell">{{ scorerCountText(row) }}</span>
         </template>
 
-        <template #cell-lastRun>
-          <span class="ej-muted-cell">—</span>
-        </template>
-
         <template #cell-created="{ row }">
           {{ formatDateShort(rowCreated(row)) }}
         </template>
@@ -225,13 +221,6 @@ const columns = computed(() => [
     meta: { align: "left" },
   },
   {
-    id: "lastRun",
-    header: t("onlineEvals.job.columns.lastRun"),
-    sortable: false,
-    size: COL.date,
-    meta: { align: "left" },
-  },
-  {
     id: "created",
     header: t("onlineEvals.job.columns.created"),
     accessorFn: (row: EvalJob) => rowCreated(row),
@@ -351,8 +340,4 @@ function formatDateShort(value: number) {
   font-size: 12px;
 }
 
-.ej-muted-cell {
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  font-size: 12px;
-}
 </style>

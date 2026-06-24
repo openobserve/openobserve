@@ -5114,14 +5114,14 @@
         "type": "Type",
         "rangeValues": "Range / values",
         "healthy": "Healthy",
-        "activeVersion": "Active version",
+        "activeVersion": "version",
         "usedBy": "Used by",
         "created": "Created",
         "actions": "Actions"
       },
       "active": "active",
       "usedByScorers": "{count} scorers",
-      "usedByScorer": "{count} scorer",
+      "usedByScorer": "{count} scorers",
       "noHealthy": "—",
       "createInfoNumeric": "Define when scores on this dimension are considered healthy. Scores outside this range will trigger quality issues in trace lists, sessions, and other views.",
       "editInfoBannerEmphasis": {
@@ -5268,7 +5268,6 @@
         "produces": "Produces",
         "version": "Version",
         "usedBy": "Used by",
-        "lastRun": "Last run",
         "successRate": "Success rate (24h)",
         "actions": "Actions"
       },
@@ -5504,7 +5503,6 @@
         "stream": "Stream",
         "scorers": "Scorers",
         "successRate": "Success rate",
-        "lastRun": "Last run",
         "created": "Created",
         "actions": "Actions"
       },
