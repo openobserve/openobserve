@@ -975,6 +975,13 @@ pub fn service_routes() -> Router {
             .route("/{org_id}/service_streams/config/identity", get(service_streams::get_identity_config).put(service_streams::save_identity_config))
             .route("/{org_id}/service_streams/_reset", delete(service_streams::reset_services))
             .route("/{org_id}/storage",get(organization::storage::get).post(organization::storage::save).put(organization::storage::update));
+
+        router = router
+            // Synthetics
+            .route("/{org_id}/synthetics/monitors", get(synthetics::list_monitors).post(synthetics::create_monitor))
+            .route("/{org_id}/synthetics/monitors/{id}", get(synthetics::get_monitor).put(synthetics::update_monitor).delete(synthetics::delete_monitor))
+            .route("/{org_id}/synthetics/monitors/{id}/run", post(synthetics::run_monitor_now))
+            .route("/{org_id}/synthetics/locations", get(synthetics::list_locations));
     }
 
     #[cfg(feature = "cloud")]
