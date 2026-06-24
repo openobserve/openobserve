@@ -749,16 +749,25 @@ if (sidebarScrollTick) {
 // scrollable.
 function handleViewportScroll(event: Event) {
   if (!isOpen.value) return;
-  const target = event.target as Element | null;
+  const target = event.target as (Element & Node) | Document | null;
+  if (!target) return;
+  // Ignore scrolls that originate inside the option list so it stays scrollable.
   if (
-    target &&
+    target instanceof Element &&
     (listboxScrollEl.value?.contains(target) ||
       target.closest?.('[role="listbox"]'))
   ) {
     return;
   }
-  popoverOpen.value = false;
-  selectOpen.value = false;
+  // Only close when the scrolled container actually holds this select's
+  // trigger — i.e. the scroll moves the trigger and would leave the portaled
+  // menu detached. Scrolls in unrelated sections (e.g. the field list while a
+  // config-panel dropdown is open) are ignored.
+  const triggerEl = triggerWrapperRef.value ?? selectTriggerWrapperRef.value;
+  if (triggerEl && target.contains(triggerEl)) {
+    popoverOpen.value = false;
+    selectOpen.value = false;
+  }
 }
 
 watch(isOpen, (open) => {
@@ -787,6 +796,9 @@ onBeforeUnmount(() => {
 
 /** The outer wrapper around the trigger. Measured to size the chip row. */
 const triggerWrapperRef = ref<HTMLElement | null>(null);
+// Wrapper around the native-select (non-listbox) trigger, used by the
+// close-on-scroll handler to detect whether a scroll moves this select's trigger.
+const selectTriggerWrapperRef = ref<HTMLElement | null>(null);
 const triggerWidth = ref(0);
 let triggerResizeObserver: ResizeObserver | null = null;
 
@@ -1501,7 +1513,10 @@ const fieldWidthClass = computed(() => {
         }
       "
     >
-      <div class="tw:relative tw:flex tw:items-center">
+      <div
+        ref="selectTriggerWrapperRef"
+        class="tw:relative tw:flex tw:items-center"
+      >
         <SelectTrigger
           :id="inputId"
           :data-test="

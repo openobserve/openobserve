@@ -48,6 +48,11 @@ defineSlots<DropdownSlots>();
 // so reka-ui stays responsive in both uncontrolled and controlled usage.
 const internalOpen = ref(props.open ?? false);
 
+// Ref to the DropdownMenuTrigger; its `$el` is the rendered trigger element.
+// Used by the close-on-scroll handler to tell whether a scroll moves this
+// dropdown's trigger (vs. an unrelated section).
+const triggerRef = ref<{ $el?: Node } | null>(null);
+
 watch(
   () => props.open,
   (v) => {
@@ -227,9 +232,16 @@ if (sidebarScrollTick) {
 // scrollable menu list) are ignored so the menu itself stays scrollable.
 function handleViewportScroll(event: Event) {
   if (!internalOpen.value) return;
-  const target = event.target as Element | null;
-  if (target?.closest?.('[role="menu"]')) return;
-  handleOpenChange(false);
+  const target = event.target as (Element & Node) | Document | null;
+  if (!target) return;
+  // Ignore scrolls inside an open menu so long menu lists stay scrollable.
+  if (target instanceof Element && target.closest?.('[role="menu"]')) return;
+  // Only close when the scrolled container actually holds this dropdown's
+  // trigger — scrolling an unrelated section must not dismiss the menu.
+  const triggerEl = triggerRef.value?.$el as Node | undefined;
+  if (triggerEl && target.contains(triggerEl)) {
+    handleOpenChange(false);
+  }
 }
 
 watch(internalOpen, (open) => {
@@ -257,7 +269,7 @@ onBeforeUnmount(() => {
     :modal="modal"
     @update:open="handleOpenChange"
   >
-    <DropdownMenuTrigger as-child>
+    <DropdownMenuTrigger ref="triggerRef" as-child>
       <slot name="trigger" />
     </DropdownMenuTrigger>
 
