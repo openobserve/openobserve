@@ -287,7 +287,7 @@
     <template v-else-if="activeTab === 'private'">
       <div class="pl-root">
         <div class="pl-grid">
-          <div v-for="loc in privateLocations" :key="loc.id" class="pl-card">
+          <OCard v-for="loc in privateLocations" :key="loc.id" class="pl-card">
             <div class="pl-card-header">
               <div style="display:flex;align-items:center;gap:8px">
                 <span class="dot" :class="loc.status==='Online'?'dot--up':'dot--down'" style="width:8px;height:8px;box-shadow:none" />
@@ -312,14 +312,14 @@
               <div class="pl-stat"><div class="pl-stat-val">{{ loc.checks }}</div><div class="pl-stat-label">Checks/min</div></div>
             </div>
             <div class="pl-last-seen"><OIcon name="schedule" size="xs" class="pl-icon-muted" />Last seen {{ loc.lastSeen }}</div>
-          </div>
+          </OCard>
 
-          <div class="pl-card pl-card--add">
+          <OCard class="pl-card pl-card--add">
             <OIcon name="add-circle" size="lg" class="pl-icon-muted" />
             <div style="font-size:13px;font-weight:600;margin-top:10px">Add private location</div>
             <div style="font-size:11px;color:var(--o2-tab-text-color);margin-top:4px;text-align:center;line-height:1.5">Run checks from your servers, VPC, or on-premise network</div>
             <OButton variant="primary" size="sm" class="tw:mt-3">Get started</OButton>
-          </div>
+          </OCard>
         </div>
 
         <div class="pl-guide">
@@ -991,6 +991,7 @@ import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
+import OCard from "@/lib/core/Card/OCard.vue";
 
 const router = useRouter();
 
@@ -1814,7 +1815,7 @@ const saveMonitor = () => { showDrawer.value=false; };
 /* ── PRIVATE LOCATIONS ── */
 .pl-root    { flex:1; overflow-y:auto; padding:16px 20px 24px; }
 .pl-grid    { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:14px; margin-bottom:20px; }
-.pl-card    { background:var(--o2-card-background); border:1px solid var(--o2-border-color); border-radius:10px; padding:18px; display:flex; flex-direction:column; gap:8px; }
+.pl-card    { border:1px solid var(--o2-border-color); border-radius:10px; padding:18px; display:flex; flex-direction:column; gap:8px; }
 .pl-card--add { border-style:dashed; align-items:center; justify-content:center; min-height:160px; cursor:pointer; text-align:center; transition:background .12s; }
 .pl-card--add:hover { background:rgba(128,128,128,.06); }
 .pl-card-header { display:flex; align-items:center; justify-content:space-between; }

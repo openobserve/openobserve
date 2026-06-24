@@ -6443,5 +6443,48 @@
       "rumSessionsRefresh": "Refresh list",
       "sourceMapsRefresh": "Refresh list"
     }
+  },
+  "synthetics": {
+    "scheduleAlert": {
+      "title": "Schedule & Alerting",
+      "frequency": "Frequency",
+      "frequencyOptions": {
+        "1min": "1 min",
+        "5min": "5 min",
+        "15min": "15 min",
+        "30min": "30 min",
+        "1hour": "1 hour",
+        "cron": "Cron"
+      },
+      "scheduleNow": "Schedule now",
+      "scheduleLater": "Schedule later",
+      "scheduleNowTooltip": "Check becomes active immediately using the current date and timezone.",
+      "scheduleLaterTooltip": "Choose a future date and time to activate the check.",
+      "startDate": "Start date",
+      "startTime": "Start time",
+      "timezone": "Timezone",
+      "cronExpression": "Cron expression",
+      "cronPlaceholder": "*/5 * * * *",
+      "retries": "Retries",
+      "retriesOnFailure": "Retries on failure",
+      "retriesOnFailureSuffix": "times.",
+      "retryDelay": "Wait for",
+      "retryDelaySuffix": "ms in between retries.",
+      "alert": "Alert",
+      "alertedIfFails": "Alerted if test fails",
+      "alertedIfFailsSuffix": "times.",
+      "destinations": "Destinations",
+      "noDestinations": "No destinations available",
+      "refreshDestinations": "Refresh destinations",
+      "addNewDestination": "Add New Destination",
+      "destinationRequired": "At least one destination is required",
+      "cooldownPeriod": "Cooldown Period",
+      "minutes": "minutes"
+    },
+    "locations": {
+      "title": "Locations",
+      "locationAwsEast": "AWS · us-east-1",
+      "comingSoon": "More regions & private locations — Coming soon"
+    }
   }
 }
