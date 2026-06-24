@@ -1904,7 +1904,15 @@ const applyScopeFilter = (streams: StreamInfo[]): StreamInfo[] => {
   if (!sid || subjectButtons.value.length === 0) return streams;
   const button = subjectButtons.value.find((b) => Array.isArray(b.semanticIds) && b.semanticIds.includes(sid));
   if (!button || button.poolPatterns.length === 0) return streams;
-  return streams.filter((s) => streamMatchesPatterns(s.stream_name, button.poolPatterns));
+  const filtered = streams.filter((s) => streamMatchesPatterns(s.stream_name, button.poolPatterns));
+  // In nested mode on the node tab, sort node-native metrics first, pod metrics second
+  if (isNestedGroupMode.value && activeOuterTab.value === "nodes" && button.patterns.length > 0) {
+    return [
+      ...filtered.filter((s) => streamMatchesPatterns(s.stream_name, button.patterns)),
+      ...filtered.filter((s) => !streamMatchesPatterns(s.stream_name, button.patterns)),
+    ];
+  }
+  return filtered;
 };
 
 const streamsForActivePill = computed<StreamInfo[]>(() => {

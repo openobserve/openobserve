@@ -192,8 +192,11 @@ export const STORAGE_PATTERNS: RegExp[] = [
   /^container_fs/,
   /^node_filesystem/,
   /^k8s_.*_storage/,
+  /^k8s_.*_filesystem/,
   /inode/,
   /volume/i,
+  /\bio_/i,
+  /\b_io\b/i,
 ];
 
 /**
@@ -280,6 +283,15 @@ export const K8S_METRIC_GROUP_DEFINITIONS: MetricGroupDefinition[] = [
         ],
       },
       {
+        id: "storage",
+        label: "Storage",
+        icon: "storage",
+        defaultMetrics: [
+          { streamName: "k8s_pod_filesystem_usage" },
+          { streamName: "k8s_pod_filesystem_capacity" },
+        ],
+      },
+      {
         id: "network",
         label: "Network",
         icon: "lan",
@@ -304,6 +316,16 @@ export const K8S_METRIC_GROUP_DEFINITIONS: MetricGroupDefinition[] = [
         label: "Memory",
         icon: "memory",
         defaultMetrics: [{ streamName: "k8s_node_memory_rss" }],
+      },
+      {
+        id: "storage",
+        label: "Storage",
+        icon: "storage",
+        defaultMetrics: [
+          { streamName: "system_disk_io" },
+          { streamName: "system_disk_operations" },
+          { streamName: "system_filesystem_usage" },
+        ],
       },
       {
         id: "network",
