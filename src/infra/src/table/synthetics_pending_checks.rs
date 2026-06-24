@@ -62,7 +62,7 @@ pub async fn enqueue<C: ConnectionTrait>(
             (monitor_id, org_id, location, pool, browser_engine, device,
              scheduled_ts, valid_until, status, attempts)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 0, 0)
-        ON CONFLICT (monitor_id, pool, device, scheduled_ts) DO NOTHING
+        ON CONFLICT (monitor_id, location, pool, device, scheduled_ts) DO NOTHING
     "#;
 
     conn.execute(Statement::from_sql_and_values(

@@ -128,6 +128,7 @@ mod m20260623_000001_create_org_cleanup_tasks;
 mod m20260623_000002_add_status_and_deleted_at_to_organizations;
 mod m20260624_000001_create_synthetics_monitors;
 mod m20260624_000002_create_synthetics_pending_checks;
+mod m20260624_000003_fix_synthetics_pending_checks_dedup;
 mod m20260629_000001_create_gen_ai_agents_table;
 
 pub struct Migrator;
@@ -246,6 +247,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260623_000002_add_status_and_deleted_at_to_organizations::Migration),
             Box::new(m20260624_000001_create_synthetics_monitors::Migration),
             Box::new(m20260624_000002_create_synthetics_pending_checks::Migration),
+            Box::new(m20260624_000003_fix_synthetics_pending_checks_dedup::Migration),
             Box::new(m20260629_000001_create_gen_ai_agents_table::Migration),
         ]
     }
