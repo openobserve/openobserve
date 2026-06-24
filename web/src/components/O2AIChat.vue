@@ -2265,10 +2265,13 @@ export default defineComponent({
         if (!chatId && resultId) {
           if (isActive()) {
             currentChatId.value = resultId;
-            if (pendingAutoNavigation.value) {
-              autoNavigationPreferences.value.set(resultId, true);
-              saveAutoNavigationPreferences();
-            }
+            // Carry the new-chat preference onto the chat id. Persist the actual
+            // value (ON by default) so an explicit user disable is honored.
+            autoNavigationPreferences.value.set(
+              resultId,
+              pendingAutoNavigation.value,
+            );
+            saveAutoNavigationPreferences();
           } else {
             ctxChatId = resultId;
           }
@@ -3433,11 +3436,13 @@ export default defineComponent({
         if (!currentChatId.value && chatId) {
           currentChatId.value = chatId;
 
-          // Apply pending auto navigation preference to the new chat
-          if (pendingAutoNavigation.value) {
-            autoNavigationPreferences.value.set(chatId, true);
-            saveAutoNavigationPreferences();
-          }
+          // Apply pending auto navigation preference to the new chat. Persist the
+          // actual value (ON by default) so an explicit user disable is honored.
+          autoNavigationPreferences.value.set(
+            chatId,
+            pendingAutoNavigation.value,
+          );
+          saveAutoNavigationPreferences();
         }
       } catch (error) {
         console.error("Error saving chat history:", error);
@@ -3571,7 +3576,7 @@ export default defineComponent({
       shouldAutoScroll.value = true; // Reset auto-scroll for new chat
       resetTitleState(); // Clear AI-generated title for new chat
       resetTypewriterState(); // Clear typewriter animation state for new chat
-      pendingAutoNavigation.value = false; // Reset auto navigation for new chat
+      pendingAutoNavigation.value = true; // Auto navigation is ON by default for new chats
       showScrollToBottom.value = false; // Reset scroll-to-bottom button for new chat
       store.dispatch("setCurrentChatTimestamp", null);
       store.dispatch("setChatUpdated", true);
