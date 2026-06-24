@@ -313,10 +313,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :name="outerGroup.id"
                     class="tw:flex-none!"
                   >
-                    <div class="tw:flex tw:items-center tw:gap-1 tw:px-1">
-                      <OIcon v-if="typeof outerGroup.icon === 'string'" :name="outerGroup.icon" size="xs" />
-                      <component v-else :is="outerGroup.icon" />
-                      <span>{{ outerGroup.label }}</span>
+                    <div class="tw:flex tw:flex-col tw:items-start tw:px-1 tw:py-0.5">
+                      <div class="tw:flex tw:items-center tw:gap-1">
+                        <OIcon v-if="typeof outerGroup.icon === 'string'" :name="outerGroup.icon" size="xs" />
+                        <component v-else :is="outerGroup.icon" />
+                        <span>{{ outerGroup.label }}</span>
+                      </div>
+                      <span
+                        v-if="outerTabResourceName[outerGroup.id]"
+                        class="tw:text-[10px] tw:leading-tight tw:opacity-60 tw:max-w-[160px] tw:truncate tw:font-mono"
+                        :title="outerTabResourceName[outerGroup.id]"
+                      >{{ outerTabResourceName[outerGroup.id] }}</span>
                     </div>
                   </OTab>
                 </OTabs>
@@ -1311,6 +1318,12 @@ const isNestedGroupMode = computed(() =>
 const activeOuterTab = ref<string>(
   groupDefs.value.find((g) => g.children)?.id ?? groupDefs.value[0]?.id ?? "",
 );
+
+// Map outer tab id → actual resource name from additionalDimensions (e.g. pod/node name)
+const outerTabResourceName = computed<Record<string, string | undefined>>(() => ({
+  pods: props.additionalDimensions?.["k8s-pod-name"],
+  nodes: props.additionalDimensions?.["k8s-node-name"],
+}));
 
 // Effective sub-groups: children of the active outer tab, or flat groupDefs
 const effectiveGroupDefs = computed(() => {
