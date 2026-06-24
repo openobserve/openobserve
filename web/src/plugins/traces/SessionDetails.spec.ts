@@ -70,6 +70,7 @@ vi.mock("@/lib/core/Button/OButton.vue", () => ({
 vi.mock("./llmInsightsDashboard.utils", () => ({
   splitNumberWithUnit: vi.fn((n: number) => ({ value: n, unit: "" })),
   splitDuration: vi.fn((n: number) => ({ value: n, unit: "ns" })),
+  splitCost: vi.fn((n: number) => ({ value: `$${n}`, unit: "" })),
 }));
 
 // Quasar mock (no longer a dependency)
@@ -384,7 +385,7 @@ describe("SessionDetails — turn rows", () => {
     expect(badgeSpan).toBeTruthy();
   });
 
-  it("token summary shows input → output (Σ total) format", async () => {
+  it("token summary shows input → output = total format", async () => {
     mockFetchSession.mockResolvedValue({
       detail: makeDetail(),
       traces: [makeTrace({ inputTokens: 50, outputTokens: 100, tokens: 150 })],
@@ -394,7 +395,7 @@ describe("SessionDetails — turn rows", () => {
     const header = wrapper.find(".turn-header");
     const text = header.text();
     expect(text).toContain("→");
-    expect(text).toContain("Σ");
+    expect(text).toContain("=");
   });
 });
 

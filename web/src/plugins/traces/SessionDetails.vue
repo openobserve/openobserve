@@ -19,17 +19,59 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="session-details-page tw:h-[calc(100vh-2.6rem)] tw:px-[0.625rem] tw:py-[0.375rem]"
   >
   <div
-    class="session-details card-container tw:h-full tw:flex tw:flex-col tw:px-[1rem] tw:py-[0.625rem] tw:overflow-y-auto"
+    class="session-details card-container tw:h-full tw:flex tw:flex-col tw:overflow-hidden"
   >
-    <!-- Back nav -->
-    <div class="tw:flex tw:items-center tw:gap-[0.5rem] tw:mb-[0.625rem]">
-      <OButton variant="ghost-muted" size="icon" @click="goBack">
-        <OIcon name="arrow-back" size="sm" />
-        <OTooltip :content="t('traces.sessionDetail.backToSessions')" />
-      </OButton>
-      <span class="tw:text-[1rem] tw:font-semibold">{{ t('traces.sessionDetail.pageTitle') }}</span>
+    <!-- Header — fixed top bar (back button + title + session identity +
+         status/turns badges, trace-explorer action pinned right). Sits above the
+         scrolling body as a flex-shrink-0 sibling, mirroring IncidentDetailDrawer.
+         The card owns no horizontal padding, so the border spans edge-to-edge and
+         the header pads its own content. -->
+    <div
+      class="tw:flex tw:items-center tw:flex-nowrap tw:flex-shrink-0 tw:h-[68px] tw:px-[1rem] tw:border-b tw:border-border-default"
+      data-test="session-detail-header"
+    >
+      <div class="tw:flex tw:items-center tw:gap-3 tw:flex-1 tw:min-w-0">
+        <div
+          data-test="session-detail-back-btn"
+          class="tw:flex tw:justify-center tw:items-center tw:cursor-pointer tw:border-[1.5px] tw:border-current tw:rounded-full tw:w-[22px] tw:h-[22px] tw:flex-shrink-0"
+          :title="t('traces.sessionDetail.backToSessions')"
+          @click="goBack"
+        >
+          <OIcon name="arrow-back-ios-new" size="xs" />
+        </div>
+        <div class="tw:text-xl tw:font-semibold tw:text-text-primary tw:flex-shrink-0">
+          {{ t('traces.sessionDetail.pageTitle') }}
+        </div>
+
+        <!-- Session id pill (primary-tinted, copyable) — shows the full id -->
+        <span
+          v-if="detail"
+          class="tw:font-semibold tw:px-2 tw:py-1 tw:rounded-md tw:inline-flex tw:items-center tw:gap-1.5 tw:flex-shrink-0"
+          :class="store.state.theme === 'dark' ? 'tw:text-blue-400 tw:bg-blue-900/50' : 'tw:text-blue-600 tw:bg-blue-50'"
+          data-test="session-detail-title"
+        >
+          <span class="tw:font-mono tw:text-sm">{{ detail.sessionId }}</span>
+          <OIcon
+            name="content-copy"
+            size="xs"
+            class="tw:cursor-pointer tw:opacity-70 hover:tw:opacity-100 tw:flex-shrink-0"
+            @click="copySessionId"
+          />
+        </span>
+      </div>
+
+      <!-- Action pinned right -->
+      <div v-if="detail" class="tw:flex tw:gap-2 tw:items-center tw:ml-auto tw:flex-shrink-0">
+        <OButton variant="outline" size="sm" @click="openInTraceExplorer">
+          {{ t('traces.sessionDetail.openInTraceExplorer') }}
+        </OButton>
+      </div>
     </div>
 
+    <!-- Scrollable body — owns its own scroll so the header above stays fixed.
+         Pads itself horizontally (the card has no px) so focus rings on edge
+         controls aren't clipped by the scroll container's overflow. -->
+    <div class="tw:flex-1 tw:flex tw:flex-col tw:min-h-0 tw:overflow-y-auto tw:px-[1rem] tw:pt-[0.625rem]">
     <!-- Loading -->
     <div
       v-if="loading"
@@ -79,9 +121,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Content -->
     <template v-else>
-      <!-- Toolbar: search + filters + count text -->
+      <!-- Toolbar: search (fills available width) + status/model filters on one row -->
       <div
-        class="tw:flex tw:items-center tw:gap-[0.5rem] tw:mb-[0.625rem] tw:flex-wrap"
+        class="tw:flex tw:items-center tw:gap-[0.5rem] tw:mb-[0.625rem]"
       >
         <OSearchInput
           v-model="searchText"
@@ -89,94 +131,49 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           clearable
           :debounce="200"
           size="xs"
-          class="no-border tw:w-[18rem]! tw:h-[36px]"
+          class="no-border tw:flex-1! tw:h-[36px]"
         />
-        <OSelect
-          v-model="statusFilter"
-          :options="statusOptions"
-          size="sm"
-          class="tw:w-[10rem]"
-        />
-        <OSelect
-          v-model="modelFilter"
-          :options="modelOptions"
-          size="sm"
-          class="tw:w-[14rem]"
-        />
-        <span
-          class="tw:ml-auto tw:text-[0.75rem] tw:text-[var(--o2-text-muted)]"
+        <div class="tw:w-[11rem] tw:flex-shrink-0">
+          <OSelect
+            v-model="statusFilter"
+            :label="t('traces.sessionDetail.filters.status')"
+            label-position="inside"
+            :options="statusOptions"
+          />
+        </div>
+        <div class="tw:w-[14rem] tw:flex-shrink-0">
+          <OSelect
+            v-model="modelFilter"
+            :label="t('traces.sessionDetail.filters.model')"
+            label-position="inside"
+            :options="modelOptions"
+          />
+        </div>
+      </div>
+
+      <!-- KPI strip — identical card layout + text styles to the LLM Insights
+           dashboard so the AI module stays consistent. Card chrome (border/bg/hover)
+           comes from the scoped `.kpi-card` rule, matching that dashboard. -->
+      <div class="kpi-strip tw:grid tw:grid-cols-5 tw:gap-[0.625rem] tw:mb-[0.625rem]">
+        <div
+          v-for="card in kpiCards"
+          :key="card.label"
+          class="kpi-card tw:rounded-lg tw:flex tw:flex-col tw:px-[0.875rem] tw:pt-[0.625rem] tw:pb-[0.625rem] tw:gap-[0.25rem]"
         >
-          {{ t('traces.sessionDetail.turnsShown', { filtered: filteredTraces.length, total: traces.length, unit: traces.length === 1 ? t('traces.sessionDetail.turn') : t('traces.sessionDetail.turns') }) }}
-        </span>
-      </div>
-
-      <!-- User + session id header -->
-      <div
-        class="tw:flex tw:items-center tw:justify-between tw:px-[1rem] tw:py-[0.75rem] tw:rounded tw:border tw:border-[var(--o2-border-color)] tw:bg-[var(--o2-card-bg)] tw:mb-[0.625rem]"
-      >
-        <div class="tw:flex tw:items-center tw:gap-[0.75rem]">
-          <span
-            v-if="detail.userId || routeUserId"
-            class="tw:inline-flex tw:items-center tw:justify-center tw:w-[36px] tw:h-[36px] tw:rounded-full tw:text-[12px] tw:font-semibold tw:text-white"
-            :style="{ background: userAvatarColor(detail.userId || routeUserId) }"
-          >
-            {{ userInitials(detail.userId || routeUserId) }}
-          </span>
-          <div class="tw:flex tw:flex-col">
-            <span
-              class="tw:text-[0.95rem] tw:font-semibold tw:text-[var(--o2-text-primary)] tw:flex tw:items-center tw:gap-[0.5rem]"
-            >
-              {{ detail.userId || routeUserId || t('traces.sessionDetail.unknownUser') }}
-              <span
-                class="tw:text-[0.6rem] tw:font-semibold tw:px-[0.375rem] tw:py-[0.05rem] tw:rounded tw:bg-[var(--o2-tag-grey-1)] tw:text-[var(--o2-text-4)]"
-              >
-                {{ t('traces.sessionDetail.userBadge') }}
-              </span>
+          <div class="kpi-label tw:text-[0.7rem] tw:font-semibold tw:text-[var(--o2-text-muted)]">
+            {{ card.label }}
+          </div>
+          <div class="tw:flex tw:items-baseline tw:gap-[0.2rem]">
+            <span class="tw:text-[1.4rem] tw:font-bold tw:leading-none tw:text-[var(--o2-text-primary)]">
+              {{ card.value }}
             </span>
             <span
-              class="tw:text-[0.75rem] tw:font-mono tw:text-[var(--o2-text-muted)] tw:flex tw:items-center tw:gap-[0.375rem]"
+              v-if="card.unit"
+              class="tw:text-[0.8rem] tw:font-semibold tw:text-[var(--o2-text-secondary)]"
             >
-              {{ t('traces.sessionDetail.sessionPrefix') }} {{ detail.sessionId }}
-              <OTooltip :content="t('traces.sessionDetail.copySessionId')">
-                <OIcon
-                  name="content-copy"
-                  size="xs"
-                  class="tw:cursor-pointer tw:hover:text-[var(--o2-text-primary)]"
-                  @click="copySessionId"
-                />
-              </OTooltip>
+              {{ card.unit }}
             </span>
           </div>
-        </div>
-        <OButton variant="outline" size="sm" @click="openInTraceExplorer">
-          <OIcon name="open-in-new" size="xs" class="tw:mr-[0.25rem]" />
-          {{ t('traces.sessionDetail.openInTraceExplorer') }}
-        </OButton>
-      </div>
-
-      <!-- KPI strip (5 columns) -->
-      <div class="kpi-strip tw:mb-[0.625rem]">
-        <div class="kpi-cell">
-          <div class="kpi-label">{{ t('traces.sessionDetail.kpi.turns') }}</div>
-          <div class="kpi-value">{{ detail.turns }}</div>
-        </div>
-        <div class="kpi-cell">
-          <div class="kpi-label">{{ t('traces.sessionDetail.kpi.duration') }}</div>
-          <div class="kpi-value">
-            {{ formatDuration(detail.durationNanos) }}
-          </div>
-        </div>
-        <div class="kpi-cell">
-          <div class="kpi-label">{{ t('traces.sessionDetail.kpi.inputTokens') }}</div>
-          <div class="kpi-value">{{ formatTokens(detail.inputTokens) }}</div>
-        </div>
-        <div class="kpi-cell">
-          <div class="kpi-label">{{ t('traces.sessionDetail.kpi.outputTokens') }}</div>
-          <div class="kpi-value">{{ formatTokens(detail.outputTokens) }}</div>
-        </div>
-        <div class="kpi-cell">
-          <div class="kpi-label">{{ t('traces.sessionDetail.kpi.cost') }}</div>
-          <div class="kpi-value">${{ detail.cost.toFixed(2) }}</div>
         </div>
       </div>
 
@@ -220,14 +217,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t('traces.sessionDetail.turnLabel') }} {{ originalTurnIndex(trace.traceId) + 1 }}
             </span>
             <span
-              class="tw:text-[0.75rem] tw:font-mono tw:text-[var(--o2-text-muted)]"
+              class="tw:text-[0.75rem] tw:font-mono tw:text-[var(--o2-text-secondary)]"
             >
               {{ formatTimestamp(trace.startTimeMicros) }}
             </span>
-            <span class="tw:text-[0.75rem] tw:text-[var(--o2-text-muted)]">
+            <span class="tw:text-[0.75rem] tw:text-[var(--o2-text-secondary)]">
               · {{ formatDuration(trace.durationNanos) }}
             </span>
-            <span class="tw:text-[0.75rem] tw:text-[var(--o2-text-muted)]">
+            <span class="tw:text-[0.75rem] tw:text-[var(--o2-text-secondary)]">
               · ${{ trace.cost.toFixed(4) }}
             </span>
             <span
@@ -242,13 +239,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
             <span
               v-if="trace.tokens"
-              class="tw:text-[0.7rem] tw:text-[var(--o2-text-muted)] tw:tabular-nums"
+              class="tw:text-[0.7rem] tw:text-[var(--o2-text-secondary)] tw:tabular-nums"
             >
-              {{ formatTokens(trace.inputTokens) }} → {{ formatTokens(trace.outputTokens) }} (Σ {{ formatTokens(trace.tokens) }})
+              {{ formatTokens(trace.inputTokens) }} → {{ formatTokens(trace.outputTokens) }} = {{ formatTokens(trace.tokens) }}
             </span>
             <span class="tw:ml-auto tw:flex tw:items-center tw:gap-[0.25rem]">
               <span
-                class="tw:text-[0.7rem] tw:font-mono tw:text-[var(--o2-text-muted)]"
+                class="tw:text-[0.7rem] tw:font-mono tw:text-[var(--o2-text-secondary)]"
               >
                 {{ trace.traceId }}
               </span>
@@ -470,6 +467,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </template>
+    </div>
   </div>
 
   <!-- Fullscreen turn dialog -->
@@ -507,9 +505,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </span>
         <span
           v-if="fullscreenTrace.tokens"
-          class="tw:text-[0.7rem] tw:text-[var(--o2-text-muted)] tw:tabular-nums"
+          class="tw:text-[0.7rem] tw:text-[var(--o2-text-secondary)] tw:tabular-nums"
         >
-          {{ formatTokens(fullscreenTrace.inputTokens) }} → {{ formatTokens(fullscreenTrace.outputTokens) }} (Σ {{ formatTokens(fullscreenTrace.tokens) }})
+          {{ formatTokens(fullscreenTrace.inputTokens) }} → {{ formatTokens(fullscreenTrace.outputTokens) }} = {{ formatTokens(fullscreenTrace.tokens) }}
         </span>
         <span class="tw:ml-auto tw:flex tw:items-center tw:gap-[0.375rem]">
           <span class="tw:text-[0.7rem] tw:font-mono tw:text-[var(--o2-text-muted)]">
@@ -610,6 +608,7 @@ import useTraces from "@/composables/useTraces";
 import {
   splitNumberWithUnit,
   splitDuration,
+  splitCost,
 } from "./llmInsightsDashboard.utils";
 
 const { t } = useI18n();
@@ -660,14 +659,9 @@ const startTime = computed(() =>
 const endTime = computed(() =>
   typeof route.query.to === "string" ? Number(route.query.to) : 0,
 );
-// Passed from the sessions list so the header renders immediately
-// without waiting for fetchSession to complete.
-const routeUserId = computed(() =>
-  typeof route.query.user_id === "string" ? route.query.user_id : "",
-);
 
 const statusOptions = [
-  { label: "All statuses", value: "all" },
+  { label: "All", value: "all" },
   { label: "OK", value: "ok" },
   { label: "Error", value: "error" },
 ];
@@ -676,10 +670,29 @@ const modelOptions = computed(() => {
   const models = new Set<string>();
   traces.value.forEach((t) => t.models.forEach((m) => models.add(m)));
   return [
-    { label: "All models", value: "all" },
+    { label: "All", value: "all" },
     ...Array.from(models).map((m) => ({ label: m, value: m })),
   ];
 });
+
+// Session-level KPI tiles. Value/unit are split via the same helpers the LLM
+// Insights dashboard uses, so the numbers format and render identically.
+const kpiCards = computed<{ label: string; value: string; unit: string }[]>(
+  () => {
+    const d = detail.value;
+    if (!d) return [];
+    const duration = splitDuration(d.durationNanos / 1000);
+    const input = splitNumberWithUnit(d.inputTokens);
+    const output = splitNumberWithUnit(d.outputTokens);
+    return [
+      { label: t("traces.sessionDetail.kpi.turns"), value: String(d.turns), unit: "" },
+      { label: t("traces.sessionDetail.kpi.duration"), ...duration },
+      { label: t("traces.sessionDetail.kpi.inputTokens"), ...input },
+      { label: t("traces.sessionDetail.kpi.outputTokens"), ...output },
+      { label: t("traces.sessionDetail.kpi.cost"), ...splitCost(d.cost) },
+    ];
+  },
+);
 
 const filteredTraces = computed(() => {
   const q = searchText.value.trim().toLowerCase();
@@ -880,23 +893,6 @@ function formatTokens(n: number): string {
   return `${t.value}${t.unit}`;
 }
 
-function userInitials(userId: string): string {
-  const name = userId.split("@")[0] || userId;
-  const parts = name.split(/[._-]/).filter(Boolean);
-  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
-  return (name[0] + (name[1] || "")).toUpperCase();
-}
-
-function userAvatarColor(userId: string): string {
-  let h = 0;
-  for (let i = 0; i < userId.length; i++) {
-    h = (h << 5) - h + userId.charCodeAt(i);
-    h |= 0;
-  }
-  const hue = Math.abs(h) % 360;
-  return `hsl(${hue}, 55%, 55%)`;
-}
-
 function statusBadgeClass(s: SessionTraceRow["status"]): string {
   switch (s) {
     case "error":
@@ -923,35 +919,16 @@ onMounted(load);
   background: var(--o2-card-bg-solid);
 }
 
-.kpi-strip {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 0.5rem;
-
-  @media (max-width: 900px) {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-.kpi-cell {
+// Mirrors the LLM Insights dashboard KPI tile (border + bg + hover lift) so the
+// AI module's metric cards look identical across pages.
+.kpi-card {
   background: var(--o2-card-bg);
   border: 1px solid var(--o2-border-color);
-  border-radius: 0.375rem;
-  padding: 0.625rem 0.75rem;
-}
+  transition: box-shadow 0.2s ease;
 
-.kpi-label {
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  color: var(--o2-text-muted);
-  margin-bottom: 0.25rem;
-}
-
-.kpi-value {
-  font-size: 1.3rem;
-  font-weight: 600;
-  color: var(--o2-text-primary);
+  &:hover {
+    box-shadow: 0 1px 6px rgba(0, 0, 0, 0.08);
+  }
 }
 
 .turn-card {
@@ -961,22 +938,14 @@ onMounted(load);
   overflow: hidden;
   transition: border-color 0.15s ease;
 
+  // Status is already conveyed by the row's status badge, so rows stay on the
+  // neutral card background — only a thin colored left border flags the state.
   &--error {
     border-left: 3px solid var(--o2-service-health-critical);
-    background: color-mix(
-      in srgb,
-      var(--o2-service-health-critical) 4%,
-      var(--o2-card-bg)
-    );
   }
 
   &--ok {
     border-left: 3px solid var(--o2-service-health-healthy, #16a34a);
-    background: color-mix(
-      in srgb,
-      var(--o2-service-health-healthy, #16a34a) 4%,
-      var(--o2-card-bg)
-    );
   }
 }
 

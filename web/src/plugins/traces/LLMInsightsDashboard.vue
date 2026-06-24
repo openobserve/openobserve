@@ -22,15 +22,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     class="llm-insights-dashboard tw:h-full tw:flex tw:flex-col"
   >
-    <!-- Toolbar: stream selector — hidden when no streams are available.
-         Padding lives on the toolbar + scroll area (not the root) so the
-         scrollbar hugs the content-area edge instead of floating inside
-         a padded box. -->
+    <!-- Toolbar: Stream/Agent mode tab (left) + the matching picker (right) —
+         hidden when no streams are available. Padding lives on the toolbar +
+         scroll area (not the root) so the scrollbar hugs the content-area edge
+         instead of floating inside a padded box. -->
     <div
       v-if="availableStreams.length > 0"
-      class="tw:flex tw:items-center tw:justify-end tw:gap-[0.5rem] tw:px-4 tw:py-[0.5rem]"
+      class="tw:flex tw:items-center tw:justify-between tw:gap-[0.5rem] tw:px-4 tw:py-[0.5rem]"
     >
+      <!-- Filter mode (left): view a whole Stream, or a single Agent. On the
+           Agent tab the stream + trace filter are derived from the agents API
+           (agent.source_stream), so there's no separate agent filter. -->
+      <OToggleGroup
+        :model-value="filterMode"
+        type="single"
+        data-test="llm-insights-filter-mode"
+        @update:model-value="onFilterModeChange"
+      >
+        <OToggleGroupItem value="stream" size="sm">Stream</OToggleGroupItem>
+        <OToggleGroupItem value="agent" size="sm">Agent</OToggleGroupItem>
+      </OToggleGroup>
+
+      <!-- Picker (right): Stream tab → stream picker; Agent tab → agent picker. -->
       <div
+        v-if="filterMode === 'stream'"
         data-test="llm-insights-stream-selector"
         class="tw:w-[14rem] tw:flex-shrink-0"
       >
@@ -46,6 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
       <div
+        v-else
         data-test="llm-insights-agent-selector"
         class="tw:w-[14rem] tw:flex-shrink-0"
       >
@@ -53,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="activeAgent"
           label="Agent"
           label-position="inside"
-          :options="agentOptions"
+          :options="agentSelectOptions"
           labelKey="label"
           valueKey="value"
           class="tw:w-full tw:rounded"
@@ -97,6 +113,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="hero"
         preset="no-llm-insights"
         @action="onEmptyAction"
+      />
+    </div>
+
+    <!-- Agent tab with no agents in the window — its own empty state (reuses
+         the same constellation illustration) rather than bare text, with a way
+         back to the Stream tab. -->
+    <div
+      v-else-if="agentEmpty"
+      class="tw:flex-1 tw:min-h-0 tw:flex tw:items-center tw:justify-center tw:px-4"
+      data-test="llm-insights-agent-empty"
+    >
+      <OEmptyState
+        size="hero"
+        illustration="constellation"
+        title="No Agents In This Range"
+        description="No GenAI agents were detected for the selected time window. Try a wider range, switch to the Stream tab, or configure agent mapping in settings."
+        action-label="View by Stream"
+        @action="onFilterModeChange('stream')"
       />
     </div>
 
@@ -172,7 +206,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <LLMErrorTable
             v-if="panel.type === 'table'"
             :panel="panel"
-            :streamName="activeStream"
+            :streamName="effectiveStream"
             :startTime="startTime"
             :endTime="endTime"
             :agent-filter="agentFilterClause"
@@ -181,7 +215,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <LLMSchemaPanel
             v-else
             :panel="panel"
-            :streamName="activeStream"
+            :streamName="effectiveStream"
             :startTime="startTime"
             :endTime="endTime"
             :agent-filter="agentFilterClause"
@@ -194,7 +228,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts" setup>
 import { ref, computed, onMounted, onUnmounted } from "vue";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useLLMInsights } from "./composables/useLLMInsights";
@@ -215,6 +249,8 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import EvalEmptyState from "@/components/EvalEmptyState.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { LLM_INSIGHTS_PANELS } from "./config/llmInsightsPanels";
 import useStreams from "@/composables/useStreams";
@@ -230,7 +266,15 @@ import {
 const { getStreams } = useStreams();
 const { t } = useI18n();
 const router = useRouter();
+const route = useRoute();
 const store = useStore();
+
+// Initial filter selection precedence: URL query (deep link / shareable) >
+// localStorage (last used) > default. Read once at setup; we write the URL
+// back on every change via syncFilterUrl().
+const urlType = typeof route.query.type === "string" ? route.query.type : "";
+const urlStream = typeof route.query.stream === "string" ? route.query.stream : "";
+const urlAgentName = typeof route.query.agent === "string" ? route.query.agent : "";
 
 interface Props {
   streamName: string;
@@ -260,40 +304,104 @@ const {
 // initial value falls back to localStorage / parent prop. Once the streams
 // list is reconciled, it's clamped to a valid option.
 const activeStream = ref<string>(
-  localStorage.getItem(STREAM_LS_KEY) || props.streamName || "",
+  urlStream || localStorage.getItem(STREAM_LS_KEY) || props.streamName || "",
 );
 const AGENT_LS_KEY = "llmInsights_agentFilter";
 const activeAgent = ref<string>(localStorage.getItem(AGENT_LS_KEY) || ALL_AGENTS_VALUE);
 const agents = ref<GenAiAgentListItem[]>([]);
-const agentOptions = computed(() => [
-  { label: "All Agents", value: ALL_AGENTS_VALUE },
-  // Key by stream-scoped identity (spec §8), not display name, so same-named
-  // agents in different streams don't collide.
-  ...agents.value.map((agent) => ({
+// True once the agents API has resolved at least once — lets us tell "agents
+// not loaded yet" apart from "this window genuinely has no agents".
+const agentsLoaded = ref(false);
+
+// Filter mode: "stream" = view a whole stream; "agent" = view a single agent,
+// whose source stream + trace filter both come from the agents API.
+const MODE_LS_KEY = "llmInsights_filterMode";
+const filterMode = ref<"stream" | "agent">(
+  urlType === "agent"
+    ? "agent"
+    : urlType === "stream"
+      ? "stream"
+      : localStorage.getItem(MODE_LS_KEY) === "agent"
+        ? "agent"
+        : "stream",
+);
+// An agent name from the URL we still need to resolve to a concrete agent once
+// the agents list loads (the URL carries the readable name, not the internal
+// stream-scoped key).
+const pendingAgentName = ref<string | null>(
+  filterMode.value === "agent" && urlAgentName ? urlAgentName : null,
+);
+
+// Agent-tab dropdown: individual agents only (no "All Agents" — whole-stream
+// viewing lives on the Stream tab). Keyed by stream-scoped identity (spec §8),
+// not display name, so same-named agents in different streams don't collide.
+const agentSelectOptions = computed(() =>
+  agents.value.map((agent) => ({
     label: agent.id ? `${agent.name} (${agent.id})` : agent.name,
     value: agentOptionKey(agent),
   })),
-]);
+);
 
-// The full agent object behind the current selection (null for "All Agents"),
-// and the SQL trace-id predicate it produces for the active stream. Both the
-// KPI/sparkline fetch and the trend panels filter on this.
+// The full agent object behind the current selection (null when none).
 const selectedAgent = computed<GenAiAgentListItem | null>(() => {
   if (activeAgent.value === ALL_AGENTS_VALUE) return null;
   return (
     agents.value.find((a) => agentOptionKey(a) === activeAgent.value) ?? null
   );
 });
-const agentFilterClause = computed(() =>
-  buildAgentTraceFilter(selectedAgent.value, activeStream.value),
+
+// The effective stream + agent the whole dashboard queries on:
+//  - Stream tab → the picked stream, no agent.
+//  - Agent tab  → the selected agent's source stream + the agent itself
+//    (→ trace-id filter). Deriving the stream from the agent is the whole
+//    point: we don't ask the user to pick a stream AND an agent separately.
+const effectiveStream = computed(() =>
+  filterMode.value === "agent"
+    ? (selectedAgent.value?.source_stream ?? "")
+    : activeStream.value,
 );
+const effectiveAgent = computed<GenAiAgentListItem | null>(() =>
+  filterMode.value === "agent" ? selectedAgent.value : null,
+);
+const agentFilterClause = computed(() =>
+  buildAgentTraceFilter(effectiveAgent.value, effectiveStream.value),
+);
+
+// Agent tab is open but the agents API returned none for this window — drives a
+// dedicated empty state (vs. the generic "no LLM data" one). Only true once the
+// list has actually loaded, so we don't flash it before the first fetch.
+const agentEmpty = computed(
+  () =>
+    filterMode.value === "agent" &&
+    agentsLoaded.value &&
+    agents.value.length === 0,
+);
+
+// Reflect the current filter in the URL so the view is shareable / survives a
+// reload: `?type=stream&stream=<name>` or `?type=agent&agent=<name>`. We keep
+// the readable name (not the internal agent key) and preserve other params
+// (e.g. the time range owned by the parent).
+function syncFilterUrl() {
+  const query: Record<string, any> = { ...route.query, type: filterMode.value };
+  if (filterMode.value === "agent") {
+    delete query.stream;
+    if (selectedAgent.value?.name) query.agent = selectedAgent.value.name;
+    else delete query.agent;
+  } else {
+    delete query.agent;
+    if (activeStream.value) query.stream = activeStream.value;
+    else delete query.stream;
+  }
+  // replace (not push) — filter tweaks shouldn't pile up in browser history.
+  router.replace({ query }).catch(() => {});
+}
 
 function onViewTrace(traceId: string) {
   if (!traceId) return;
   router.push({
     name: "traceDetails",
     query: {
-      stream: activeStream.value,
+      stream: effectiveStream.value,
       trace_id: traceId,
       from: props.startTime,
       to: props.endTime,
@@ -341,6 +449,8 @@ async function loadAgents(startTime?: number, endTime?: number) {
     console.warn("Failed to load GenAI agents", e);
     agents.value = [];
     activeAgent.value = ALL_AGENTS_VALUE;
+  } finally {
+    agentsLoaded.value = true;
   }
 }
 
@@ -481,17 +591,49 @@ const kpiCards = computed<KpiCard[]>(() => {
 async function loadInsights(startTime?: number, endTime?: number) {
   const start = startTime ?? props.startTime;
   const end = endTime ?? props.endTime;
-  if (!activeStream.value || !start || !end) return;
-  localStorage.setItem(STREAM_LS_KEY, activeStream.value);
-  localStorage.setItem(AGENT_LS_KEY, activeAgent.value);
-  // The agents list only populates the filter dropdown — it must NOT gate the
-  // KPI/chart fetch. Awaiting it here left the skeleton hidden (loading still
-  // false) during the agents API call, so the KPI cards flashed zero values
-  // (EMPTY_KPI) before `fetchAll` set loading=true. Kick it off without
-  // awaiting so the skeleton stays up continuously until the real data
-  // resolves (loadAgents handles its own errors internally).
-  loadAgents(start, end);
-  await fetchAll(activeStream.value, start, end, selectedAgent.value);
+  if (!start || !end) return;
+  localStorage.setItem(MODE_LS_KEY, filterMode.value);
+
+  if (filterMode.value === "agent") {
+    // Agent tab can't fetch until it knows the agent's source stream, so the
+    // agents list must be loaded first — await it here. (In Stream mode it's
+    // kept non-blocking below so it never gates / flashes the KPI cards.)
+    await loadAgents(start, end);
+    // Resolve an agent name carried in the URL to its concrete (stream-scoped)
+    // selection now that the list exists.
+    if (pendingAgentName.value) {
+      const match = agents.value.find((a) => a.name === pendingAgentName.value);
+      if (match) activeAgent.value = agentOptionKey(match);
+      pendingAgentName.value = null;
+    }
+    // Default to the first agent when nothing valid is selected (fresh entry
+    // to the tab, or the previously-picked agent is gone for this window).
+    if (!selectedAgent.value && agents.value.length > 0) {
+      activeAgent.value = agentOptionKey(agents.value[0]);
+    }
+    localStorage.setItem(AGENT_LS_KEY, activeAgent.value);
+  } else {
+    localStorage.setItem(STREAM_LS_KEY, activeStream.value);
+    // Non-blocking: only populates the Agent-tab dropdown for when the user
+    // switches modes. Must NOT gate the KPI/chart fetch (would flash zeros).
+    loadAgents(start, end);
+  }
+
+  // Keep the URL in step with the resolved selection (runs even when there's
+  // nothing to query, e.g. the Agent tab with no agents).
+  syncFilterUrl();
+
+  // Stream comes from the agent (Agent tab) or the picker (Stream tab).
+  const stream = effectiveStream.value;
+  if (!stream) return;
+  await fetchAll(stream, start, end, effectiveAgent.value);
+}
+
+function onFilterModeChange(mode?: string | number | null) {
+  const next = mode === "agent" ? "agent" : "stream";
+  if (next === filterMode.value) return;
+  filterMode.value = next;
+  loadInsights();
 }
 
 function onStreamChange() {
@@ -499,7 +641,6 @@ function onStreamChange() {
 }
 
 function onAgentChange() {
-  localStorage.setItem(AGENT_LS_KEY, activeAgent.value);
   loadInsights();
 }
 
@@ -518,9 +659,10 @@ onMounted(async () => {
   } else if (!availableStreams.value.includes(activeStream.value)) {
     activeStream.value = availableStreams.value[0] || "";
   }
-  if (activeStream.value) {
-    loadInsights();
-  }
+  // Always funnel through loadInsights — it resolves the effective stream for
+  // both tabs (Agent mode derives it from the agents API) and guards itself
+  // when there's nothing to query.
+  loadInsights();
 });
 
 // Cancel any in-flight stream queries when the dashboard goes away

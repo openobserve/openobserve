@@ -101,7 +101,8 @@ vi.mock("vue-i18n", () => ({
 }));
 
 vi.mock("vue-router", () => ({
-  useRouter: () => ({ push: mockRouterPush }),
+  useRouter: () => ({ push: mockRouterPush, replace: vi.fn(() => Promise.resolve()) }),
+  useRoute: () => ({ query: {} }),
 }));
 
 // Partial-mock vuex so `createStore` (used by `src/stores/index.ts`)

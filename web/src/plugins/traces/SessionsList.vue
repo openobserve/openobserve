@@ -154,7 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Tokens -->
         <template #cell-tokens="{ row }">
           <span class="tw:text-[0.75rem] tw:tabular-nums">
-            {{ formatTokens(row.inputTokens) }} → {{ formatTokens(row.outputTokens) }} (Σ {{ formatTokens(row.tokens) }})
+            {{ formatTokens(row.inputTokens) }} → {{ formatTokens(row.outputTokens) }} = {{ formatTokens(row.tokens) }}
             <OTooltip :content="t('traces.sessionsList.tokenTooltip', { input: row.inputTokens.toLocaleString(), output: row.outputTokens.toLocaleString(), total: row.tokens.toLocaleString() })" />
           </span>
         </template>
@@ -330,7 +330,8 @@ const tableColumns = computed(() => [
     id: "tokens",
     header: t('traces.sessionsList.columns.tokens'),
     accessorKey: "tokens",
-    size: 250,
+    size: 200,
+    minSize: 150,
     sortable: false,
     hideable: true,
     meta: { align: "left" },

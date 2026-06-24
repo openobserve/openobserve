@@ -3936,8 +3936,12 @@
       "userBadge": "User",
       "sessionPrefix": "session",
       "copySessionId": "Copy session id",
-      "openInTraceExplorer": "Open in trace explorer",
+      "openInTraceExplorer": "View Trace",
       "unknownUser": "Unknown user",
+      "filters": {
+        "status": "Status",
+        "model": "Model"
+      },
       "kpi": {
         "turns": "Turns",
         "duration": "Duration",
