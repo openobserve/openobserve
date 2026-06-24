@@ -74,63 +74,65 @@ export const THEME_STORAGE_KEYS = {
  * (or who is on the default) will pick up the change on next load.
  */
 export const PREDEFINED_THEMES: PredefinedTheme[] = [
+  // Theme names are intentionally color-agnostic (observability/product terms),
+  // so a theme's accent colors can change in any release without the name going stale.
   {
     id: 10,
     name: "O2 Signature",
     light: {
-      themeColor: "#6B76E3",
+      themeColor: "#575FC5",
       themeColorOpacity: 10,
     },
     dark: {
-      themeColor: "#8B8DF0",
+      themeColor: "#6069D3",
       themeColorOpacity: 10,
     },
   },
   {
     id: 2,
-    name: "Ocean Breeze",
+    name: "O2 Pulse",
     light: {
-      themeColor: "#7678ed",
+      themeColor: "#3F7994",
       themeColorOpacity: 10,
     },
     dark: {
-      themeColor: "#8B8DF0",
+      themeColor: "#3F7994",
       themeColorOpacity: 10,
     },
   },
   {
     id: 4,
-    name: "Purple Dream",
+    name: "O2 Horizon",
     light: {
-      themeColor: "#9C27B0",
+      themeColor: "#077A7F",
       themeColorOpacity: 10,
     },
     dark: {
-      themeColor: "#BA68C8",
+      themeColor: "#588CF3",
       themeColorOpacity: 10,
     },
   },
   {
     id: 5,
-    name: "Indigo Night",
+    name: "O2 Beacon",
     light: {
-      themeColor: "#3F51B5",
+      themeColor: "#3369D6",
       themeColorOpacity: 10,
     },
     dark: {
-      themeColor: "#5C6BC0",
+      themeColor: "#6EA8FE",
       themeColorOpacity: 10,
     },
   },
   {
     id: 8,
-    name: "Sky Blue",
+    name: "O2 Lens",
     light: {
-      themeColor: "#0288D1",
+      themeColor: "#4682FA",
       themeColorOpacity: 10,
     },
     dark: {
-      themeColor: "#29B6F6",
+      themeColor: "#E56D17",
       themeColorOpacity: 10,
     },
   },
@@ -192,7 +194,7 @@ export const getThemeById = (
 export const getDefaultTheme = (): PredefinedTheme =>
   getThemeByName(DEFAULT_THEME_NAME) ?? PREDEFINED_THEMES[0];
 
-/** Slugify a theme name into kebab-case for data-test attributes ("Ocean Breeze" -> "ocean-breeze"). */
+/** Slugify a theme name into kebab-case for data-test attributes ("O2 Pulse" -> "o2-pulse"). */
 export const themeNameSlug = (name: string): string =>
   name.toLowerCase().replace(/\s+/g, "-");
 

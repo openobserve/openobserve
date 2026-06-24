@@ -61,8 +61,8 @@ describe("themeManager", () => {
   });
 
   it("resolves a predefined theme by name and refreshes the color cache", () => {
-    const ocean = getThemeByName("Ocean Breeze")!;
-    localStorage.setItem(THEME_STORAGE_KEYS.light.appliedName, "Ocean Breeze");
+    const ocean = getThemeByName("O2 Pulse")!;
+    localStorage.setItem(THEME_STORAGE_KEYS.light.appliedName, "O2 Pulse");
     // Stale cached color that must be overwritten from the registry.
     localStorage.setItem(THEME_STORAGE_KEYS.light.color, "#000000");
 
@@ -153,9 +153,9 @@ describe("themeManager", () => {
     });
 
     it("uses the saved mode and selected predefined theme", () => {
-      const ocean = getThemeByName("Ocean Breeze")!;
+      const ocean = getThemeByName("O2 Pulse")!;
       localStorage.setItem("theme", "dark");
-      localStorage.setItem(THEME_STORAGE_KEYS.dark.appliedName, "Ocean Breeze");
+      localStorage.setItem(THEME_STORAGE_KEYS.dark.appliedName, "O2 Pulse");
 
       bootstrapTheme();
 
@@ -168,13 +168,13 @@ describe("themeManager", () => {
     });
 
     it("migrates a legacy id selection before applying", () => {
-      localStorage.setItem("appliedLightTheme", "2"); // legacy id for Ocean Breeze
-      const ocean = getThemeByName("Ocean Breeze")!;
+      localStorage.setItem("appliedLightTheme", "2"); // legacy id for O2 Pulse
+      const ocean = getThemeByName("O2 Pulse")!;
 
       bootstrapTheme();
 
       expect(localStorage.getItem(THEME_STORAGE_KEYS.light.appliedName)).toBe(
-        "Ocean Breeze",
+        "O2 Pulse",
       );
       expect(applyThemeColors).toHaveBeenCalledWith(
         ocean.light.themeColor,
