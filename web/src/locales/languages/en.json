@@ -4961,7 +4961,6 @@
         "eyebrow": "Scorer",
         "refresh": "Refresh",
         "descriptionSection": "Description",
-        "configurationSection": "Configuration",
         "scorerTypeLabel": "Scorer Type",
         "providerLabel": "Provider",
         "providerUnknown": "Unknown",
@@ -4993,14 +4992,9 @@
         },
         "kpis": {
           "totalRuns": "Total Runs (24h)",
-          "totalRunsSub": "Across all referencing Jobs",
           "successRate": "Success Rate",
-          "successRateSub": "Trailing 24h",
           "avgLatency": "Avg Latency",
-          "avgLatencySub": "p50 across runs",
-          "usedBy": "Used By",
-          "usedBySubSingular": "job",
-          "usedBySubPlural": "jobs"
+          "usedBy": "Used By"
         },
         "runs": {
           "showingPrefix": "Showing",
@@ -5230,14 +5224,9 @@
         },
         "kpis": {
           "totalRuns": "Total Runs",
-          "totalRunsSub": "Within selected window",
           "successRate": "Success Rate",
-          "successRateSub": "Across all scorers",
           "avgLatency": "Avg Latency",
-          "avgLatencySub": "Avg across runs",
-          "scorers": "Scorers",
-          "scorersSubSingular": "scorer attached",
-          "scorersSubPlural": "scorers attached"
+          "scorers": "Scorers"
         },
         "runs": {
           "showingPrefix": "Showing",

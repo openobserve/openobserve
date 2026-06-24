@@ -28,51 +28,37 @@
     <!-- Body: the KPI strip + tab bar stay pinned; only the tab content scrolls. -->
     <div class="jd__body-inner">
       <!-- ── KPI strip ── -->
-      <section class="jd__kpis">
-        <article class="jd-kpi">
-          <span class="jd-kpi__title">{{
-            t("onlineEvals.job.detail.kpis.totalRuns")
-          }}</span>
-          <span class="jd-kpi__value">{{ formatCount(kpis.totalRuns) }}</span>
-          <span class="jd-kpi__sub">{{
-            t("onlineEvals.job.detail.kpis.totalRunsSub")
-          }}</span>
-        </article>
-        <article class="jd-kpi" :class="successRateTone">
-          <span class="jd-kpi__title">{{
-            t("onlineEvals.job.detail.kpis.successRate")
-          }}</span>
-          <span class="jd-kpi__value">{{
-            formatPercent(kpis.successRate)
-          }}</span>
-          <span class="jd-kpi__sub">{{
-            t("onlineEvals.job.detail.kpis.successRateSub")
-          }}</span>
-        </article>
-        <article class="jd-kpi">
-          <span class="jd-kpi__title">{{
-            t("onlineEvals.job.detail.kpis.avgLatency")
-          }}</span>
-          <span class="jd-kpi__value">{{
-            formatLatency(kpis.avgLatencyMs)
-          }}</span>
-          <span class="jd-kpi__sub">{{
-            t("onlineEvals.job.detail.kpis.avgLatencySub")
-          }}</span>
-        </article>
-        <article class="jd-kpi">
-          <span class="jd-kpi__title">{{
-            t("onlineEvals.job.detail.kpis.scorers")
-          }}</span>
-          <span class="jd-kpi__value">{{ resolvedScorers.length }}</span>
-          <span class="jd-kpi__sub">
-            {{
-              resolvedScorers.length === 1
-                ? t("onlineEvals.job.detail.kpis.scorersSubSingular")
-                : t("onlineEvals.job.detail.kpis.scorersSubPlural")
-            }}
-          </span>
-        </article>
+      <!-- KPI strip — identical card layout + text styles to the LLM
+           Sessions detail page (SessionDetails.vue) so the AI module stays
+           consistent. Card chrome (border/bg/hover) comes from the scoped
+           `.kpi-card` rule below; no sub-caption beneath the value. -->
+      <section
+        class="jd__kpis tw:grid tw:grid-cols-4 tw:gap-[0.625rem]"
+      >
+        <div
+          v-for="card in kpiCards"
+          :key="card.label"
+          class="kpi-card tw:rounded-lg tw:flex tw:flex-col tw:px-[0.875rem] tw:pt-[0.625rem] tw:pb-[0.625rem] tw:gap-[0.25rem]"
+        >
+          <div
+            class="kpi-label tw:text-[0.7rem] tw:font-semibold tw:text-[var(--o2-text-muted)]"
+          >
+            {{ card.label }}
+          </div>
+          <div class="tw:flex tw:items-baseline tw:gap-[0.2rem]">
+            <span
+              class="tw:text-[1.4rem] tw:font-bold tw:leading-none tw:text-[var(--o2-text-primary)]"
+            >
+              {{ card.value }}
+            </span>
+            <span
+              v-if="card.unit"
+              class="tw:text-[0.8rem] tw:font-semibold tw:text-[var(--o2-text-secondary)]"
+            >
+              {{ card.unit }}
+            </span>
+          </div>
+        </div>
       </section>
 
       <!-- ── Tab strip ── -->
@@ -700,11 +686,14 @@ const resolvedScorers = computed<ResolvedScorer[]>(() => {
   });
 });
 
-// `_evaluator.attributes_scorer_id` stores the per-version row `id`, not
-// `entity_id`. Match on `s.id` so the lookup actually resolves.
+// `_evaluator.attributes_scorer_id` stores the scorer's stable `entity_id`
+// (the cross-version identifier), NOT the per-version row `id`. Match on
+// `entityId(s)` so the lookup resolves to the scorer name — matching `s.id`
+// fails whenever entity_id differs from id (the common versioned case), which
+// left the Runs table showing the raw id instead of the scorer name.
 function scorerNameFor(refId: string): string {
   if (!refId) return t("onlineEvals.job.detail.runs.scorerUnknown");
-  const found = props.scorers.find((s) => String(s.id) === refId);
+  const found = props.scorers.find((s) => entityId(s) === refId);
   return found?.name ?? refId;
 }
 
@@ -889,14 +878,35 @@ const filteredFailedRuns = computed(() => {
   );
 });
 
-// — KPI tone —
-const successRateTone = computed(() => {
-  const r = kpis.value.successRate;
-  if (r == null) return "";
-  if (r >= 95) return "jd-kpi--good";
-  if (r >= 80) return "jd-kpi--warn";
-  return "jd-kpi--bad";
-});
+// — KPI strip cards —
+// value/unit split mirrors the SessionDetails KPI cards (big value + small
+// trailing unit) so the AI module's detail pages read identically.
+const kpiCards = computed<{ label: string; value: string; unit: string }[]>(
+  () => {
+    const k = kpis.value;
+    return [
+      {
+        label: t("onlineEvals.job.detail.kpis.totalRuns"),
+        value: formatCount(k.totalRuns),
+        unit: "",
+      },
+      {
+        label: t("onlineEvals.job.detail.kpis.successRate"),
+        value: k.successRate == null ? "—" : k.successRate.toFixed(1),
+        unit: k.successRate == null ? "" : "%",
+      },
+      {
+        label: t("onlineEvals.job.detail.kpis.avgLatency"),
+        ...splitLatency(k.avgLatencyMs),
+      },
+      {
+        label: t("onlineEvals.job.detail.kpis.scorers"),
+        value: String(resolvedScorers.value.length),
+        unit: "",
+      },
+    ];
+  },
+);
 
 // — OTable column definitions —
 const runColumns = computed(() => [
@@ -982,15 +992,18 @@ function formatCount(n: number | null): string {
   return String(Math.round(n));
 }
 
-function formatPercent(n: number | null): string {
-  if (n == null) return "—";
-  return `${n.toFixed(1)}%`;
-}
-
 function formatLatency(ms: number | null): string {
   if (ms == null) return "—";
   if (ms >= 1000) return `${(ms / 1000).toFixed(1)}s`;
   return `${Math.round(ms)}ms`;
+}
+
+/** Split latency into a bare value + trailing unit so the KPI card can render
+ * the unit in the smaller, secondary type (matches SessionDetails). */
+function splitLatency(ms: number | null): { value: string; unit: string } {
+  if (ms == null) return { value: "—", unit: "" };
+  if (ms >= 1000) return { value: (ms / 1000).toFixed(1), unit: "s" };
+  return { value: String(Math.round(ms)), unit: "ms" };
 }
 
 function relativeTime(timestampMs: number): string {
@@ -1020,77 +1033,26 @@ function relativeTime(timestampMs: number): string {
 }
 
 /* — KPI strip — */
+// No background of its own — the drawer's native dialog surface shows through,
+// so the panel keeps its standard color. Padding + bottom divider frame the
+// pinned KPI band; the grid + card layout live in the template's Tailwind
+// classes, matching SessionDetails.vue exactly.
 .jd__kpis {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
   padding: 16px 20px;
-  background: color-mix(
-    in srgb,
-    var(--color-text-secondary) 4%,
-    var(--color-card-bg)
-  );
   border-bottom: 1px solid var(--color-dialog-header-border, var(--o2-border));
   flex-shrink: 0;
 }
 
-.jd-kpi {
-  // Tile styling mirrors the stream-schema stat tiles (rounded-lg + p-3 +
-  // shadow-sm + border). No icon — the eval KPIs read fine label-only.
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 12px;
-  background: var(--color-card-bg);
-  border: 1px solid var(--color-dialog-header-border, var(--o2-border));
-  border-radius: 8px;
-  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-}
+// Card chrome copied verbatim from SessionDetails.vue's `.kpi-card` so the two
+// detail pages render identical cards (border/bg/hover + neutral typography).
+.kpi-card {
+  background: var(--o2-card-bg);
+  border: 1px solid var(--o2-border-color);
+  transition: box-shadow 0.2s ease;
 
-.jd-kpi--good {
-  background: color-mix(
-    in srgb,
-    var(--o2-status-success-text, #2e7d32) 4%,
-    var(--color-card-bg)
-  );
-}
-.jd-kpi--warn {
-  background: color-mix(in srgb, #f59e0b 5%, var(--color-card-bg));
-}
-.jd-kpi--bad {
-  background: color-mix(
-    in srgb,
-    var(--o2-status-error-text, #c62828) 4%,
-    var(--color-card-bg)
-  );
-}
-
-.jd-kpi__title {
-  font: 700 12px/1.4 var(--o2-font);
-  letter-spacing: 0.01em;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.jd-kpi__value {
-  font: 700 22px/1.1 var(--o2-font);
-  letter-spacing: -0.01em;
-  font-variant-numeric: tabular-nums;
-  color: var(--color-text-primary, currentColor);
-}
-
-.jd-kpi--good .jd-kpi__value {
-  color: var(--o2-status-success-text, #2e7d32);
-}
-.jd-kpi--warn .jd-kpi__value {
-  color: #b45309;
-}
-.jd-kpi--bad .jd-kpi__value {
-  color: var(--o2-status-error-text, #c62828);
-}
-
-.jd-kpi__sub {
-  font-size: 11px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
+  &:hover {
+    box-shadow: 0 1px 6px rgba(0, 0, 0, 0.08);
+  }
 }
 
 /* — Tab strip — */
@@ -1099,7 +1061,6 @@ function relativeTime(timestampMs: number): string {
   gap: 18px;
   padding: 0 20px;
   border-bottom: 1px solid var(--color-dialog-header-border, var(--o2-border));
-  background: var(--color-card-bg);
   flex-shrink: 0;
 }
 
@@ -1161,7 +1122,6 @@ function relativeTime(timestampMs: number): string {
   flex-direction: column;
   gap: 18px;
   min-height: 0;
-  background: var(--color-card-bg);
 }
 
 // Form-style tabs (Configuration) need breathing room at the bottom. The
