@@ -80,6 +80,7 @@ import {
   buildValueMappingCache,
   lookupValueMappingFull,
 } from "@/utils/dashboard/tableConfigUtils";
+import { useStore } from "vuex";
 
 export default defineComponent({
   name: "TableRenderer",
@@ -121,6 +122,7 @@ export default defineComponent({
   },
   emits: ["row-click"],
   setup(props) {
+    const store = useStore();
     const tableRef = ref<any>(null);
 
     const tableColumns = computed(
@@ -159,12 +161,13 @@ export default defineComponent({
 
       // 1) Auto color mode — stable palette per distinct string value.
       if (col?.colorMode === "auto") {
+        const palette = getColorForTable(store.state.theme);
         const key = String(value);
         const colKey = col.field ?? col.name;
         if (!autoColorCache.has(colKey)) autoColorCache.set(colKey, new Map<string, string>());
         const map = autoColorCache.get(colKey)!;
         if (!map.has(key))
-          map.set(key, getColorForTable[map.size % getColorForTable.length]);
+          map.set(key, palette[map.size % palette.length]);
         const hex = map.get(key) as string;
         return `background-color: ${hex}; color: ${isColorDark(hex) ? "#ffffff" : "#000000"}`;
       }

@@ -104,7 +104,7 @@ vi.mock("@/utils/dashboard/colorPalette", async (importOriginal) => {
   return {
     ...actual,
     // Prepend a dark color so auto-color mode can assign it and trigger white text logic.
-    getColorForTable: ["#000000", ...actual.getColorForTable],
+    getColorForTable: (theme: string) => ["#000000", ...actual.getColorForTable(theme)],
   };
 });
 
