@@ -327,7 +327,7 @@ FIXES = {
             'true AS is_match, '
             'ROW_NUMBER() OVER (ORDER BY _timestamp) AS seq '
             'FROM "{stream}" '
-            "WHERE match_all('warehouse') OR match_all('error') "
+            "WHERE match_all('warehouse') "
             'ORDER BY _timestamp ASC LIMIT 10'
         ),
         "skip_sqllogictest": True,
