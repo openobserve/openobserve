@@ -3688,7 +3688,8 @@
     "confirmRefreshMsg": "Êtes-vous sûr de vouloir actualiser le jeton de ce compte de service ?",
     "confirmRefreshHead": "Actualiser le jeton de service",
     "downloadToken": "Télécharger Token",
-    "token": "Jeton"
+    "token": "Jeton",
+    "emailInvalid": "Veuillez saisir une adresse e-mail valide"
   },
   "pipeline_destinations": {
     "header": "Destinations des pipelines",

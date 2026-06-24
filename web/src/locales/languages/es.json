@@ -3686,7 +3686,8 @@
     "confirmRefreshMsg": "¿Está seguro de que desea actualizar este token de cuenta de servicio?",
     "confirmRefreshHead": "Actualizar token de servicio",
     "downloadToken": "Descargar Token",
-    "token": "Símbolo"
+    "token": "Símbolo",
+    "emailInvalid": "Introduce una dirección de correo electrónico válida"
   },
   "pipeline_destinations": {
     "header": "Destinos de oleoductos",

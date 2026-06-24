@@ -980,7 +980,8 @@
     "confirmRefreshMsg": "このサービスアカウントのトークンをリフレッシュしてもよろしいですか？",
     "confirmRefreshHead": "サービス用トークンのリフレッシュ",
     "downloadToken": "トークンをダウンロード",
-    "token": "トークン"
+    "token": "トークン",
+    "emailInvalid": "有効なEメールアドレスを入力してください"
   },
   "ticket": {
     "header": "サポートチケット",

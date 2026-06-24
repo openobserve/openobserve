@@ -3702,7 +3702,8 @@
     "confirmRefreshMsg": "Bu hizmet hesabı belirtecini yenilemek istediğinizden emin misiniz?",
     "confirmRefreshHead": "Hizmet Belirtecini Yenile",
     "downloadToken": "Token indir",
-    "token": "Simge"
+    "token": "Simge",
+    "emailInvalid": "Lütfen geçerli bir e-posta adresi girin"
   },
   "pipeline_destinations": {
     "header": "Boru Hattı Destinasyonları",

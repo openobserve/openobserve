@@ -3688,7 +3688,8 @@
     "confirmRefreshMsg": "Möchten Sie dieses Dienstkonto-Token wirklich aktualisieren?",
     "confirmRefreshHead": "Service-Token aktualisieren",
     "downloadToken": "Token herunterladen",
-    "token": "Wertmarke"
+    "token": "Wertmarke",
+    "emailInvalid": "Bitte geben Sie eine gültige E-Mail-Adresse ein"
   },
   "pipeline_destinations": {
     "header": "Pipeline-Ziele",

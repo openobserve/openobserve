@@ -3702,7 +3702,8 @@
     "confirmRefreshMsg": "정말 이 서비스 계정 토큰을 새로 고치시겠습니까?",
     "confirmRefreshHead": "리프레시 서비스 토큰",
     "downloadToken": "토큰 다운로드",
-    "token": "토큰"
+    "token": "토큰",
+    "emailInvalid": "유효한 이메일 주소를 입력하세요"
   },
   "pipeline_destinations": {
     "header": "파이프라인 목적지",

@@ -3688,7 +3688,8 @@
     "confirmRefreshMsg": "您确定要刷新此服务帐号令牌吗？",
     "confirmRefreshHead": "刷新服务令牌",
     "downloadToken": "下载令牌",
-    "token": "令牌"
+    "token": "令牌",
+    "emailInvalid": "请输入有效的电子邮件地址"
   },
   "pipeline_destinations": {
     "header": "流水线目标",

@@ -3700,7 +3700,8 @@
     "confirmRefreshMsg": "Sei sicuro di voler aggiornare questo token dell'account di servizio?",
     "confirmRefreshHead": "Aggiorna token di servizio",
     "downloadToken": "Scarica Token",
-    "token": "Token"
+    "token": "Token",
+    "emailInvalid": "Inserisci un indirizzo email valido"
   },
   "pipeline_destinations": {
     "header": "Destinazioni delle pipeline",
