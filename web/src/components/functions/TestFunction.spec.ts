@@ -4,6 +4,7 @@ import TestFunction from './TestFunction.vue';
 import { createStore } from 'vuex';
 import { createI18n } from 'vue-i18n';
 import { nextTick } from 'vue';
+import enLocale from '@/locales/languages/en.json';
 
 // Mock dependencies
 vi.mock('@/composables/useStreams', () => ({
@@ -64,27 +65,13 @@ const mockStore = createStore({
   },
 });
 
+// Use the real en.json so translation keys resolve exactly as they do in the app.
+// This prevents the spec's i18n dictionary from drifting out of sync with the
+// component's t() keys (the cause of the earlier "function.clickTestFunctionHint" failures).
 const mockI18n = createI18n({
   locale: 'en',
   messages: {
-    en: {
-      common: {
-        query: 'Query',
-        events: 'Events',
-        output: 'Output',
-        duration: 'Duration',
-      },
-      alerts: {
-        streamType: 'Stream Type',
-        stream_name: 'Stream Name',
-      },
-      search: {
-        runQuery: 'Run Query',
-      },
-      confirmDialog: {
-        loading: 'Loading',
-      },
-    },
+    en: enLocale,
   },
 });
 

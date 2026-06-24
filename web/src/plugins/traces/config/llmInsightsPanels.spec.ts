@@ -3,17 +3,19 @@
 // Tests for the LLM Insights panel registry + helpers.
 //
 // Coverage focuses on the two pure helpers (`renderPanelSql` and
-// `pickInterval`) plus invariants on the static `LLM_INSIGHTS_PANELS`
-// array that the renderer depends on (e.g. unique IDs, valid layout
+// `pickInterval`) plus invariants on the `getLLMInsightsPanels`
+// registry that the renderer depends on (e.g. unique IDs, valid layout
 // spans, table panels declaring columns).
 
 import { describe, it, expect } from "vitest";
 import {
-  LLM_INSIGHTS_PANELS,
+  getLLMInsightsPanels,
   renderPanelSql,
   pickInterval,
   type LLMPanelDef,
 } from "./llmInsightsPanels";
+
+const LLM_INSIGHTS_PANELS = getLLMInsightsPanels((key) => key);
 
 describe("renderPanelSql", () => {
   // The placeholders are global — every occurrence must be replaced, not

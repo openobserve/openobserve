@@ -1764,6 +1764,21 @@ export default defineComponent({
   inset: 0;
   width: 100%;
   height: 100%;
+  // Override the inline empty-state's intrinsic min-height/padding so the
+  // content centers within the actual panel box (top/bottom/left/right)
+  // instead of being pushed down by a fixed 160px min-height.
+  min-height: 0 !important;
+  padding: 0.5rem !important;
+  // Establish a size container so we can react to very short panels.
+  container-type: size;
+}
+
+// When the panel is too short to comfortably fit the icon, hide it and
+// show just the centered "No Data" message.
+@container (max-height: 5rem) {
+  .noData :deep(.o2-empty-state__inline-icon) {
+    display: none;
+  }
 }
 
 .annotation-popup-bg {

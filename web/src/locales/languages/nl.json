@@ -135,7 +135,8 @@
     "unsavedChanges": "Niet opgeslagen wijzigingen",
     "clearFilter": "Filter verwijderen",
     "noMatches": "Geen wedstrijden",
-    "remove": "Verwijderen"
+    "remove": "Verwijderen",
+    "export": "Exporteren"
   },
   "search": {
     "selectIndex": "Selecteer eerst Stream",
@@ -428,7 +429,18 @@
     "menuGroupExplain": "Leg uit",
     "fieldValuesEmpty": "Geen waarden gevonden.",
     "fieldValuesEmptyHint": "Probeer een breder tijdsbereik om waarden te zien.",
-    "selectLogsStreamFirst": "Selecteer eerst de stream van de logboeken"
+    "selectLogsStreamFirst": "Selecteer eerst de stream van de logboeken",
+    "menuMore": "Meer",
+    "searchInspect": "Zoek Inspect",
+    "vrlOnlyForTableWarning": "De VRL-functie wordt alleen ondersteund voor tabeldiagrammen.",
+    "customDownloadTitle": "Download op maat",
+    "selectFunctionNamePlaceholder": "Functienaam selecteren",
+    "confirmFunctionUpdateTitle": "Update bevestigen",
+    "confirmFunctionUpdateMsg": "Weet je zeker dat je de functie {name} wilt updaten?",
+    "traceIdLabel": "Traceer-ID:",
+    "enterTraceIdPlaceholder": "Voer de trace-ID in",
+    "changeQueryModeTitle": "Query-modus wijzigen",
+    "changeQueryModeConfirm": "Weet u zeker dat u de querymodus wilt wijzigen? De gegevens die zijn opgeslagen voor de X-as, Y-as en filters worden verwijderd."
   },
   "menu": {
     "home": "Home",
@@ -542,7 +554,14 @@
       "learnMore": "Meer informatie:",
       "quickImpl": "Beknopte implementatiegids",
       "blogPost": "Basisprincipes van frontend-monitoring"
-    }
+    },
+    "sourceMaps": "Kaarten met bronnen",
+    "service": "Service",
+    "environment": "Milieu",
+    "applyFilters": "Filters toepassen",
+    "uploadSourceMaps": "Bronkaarten uploaden",
+    "files": "bestanden",
+    "uploadedAt": "Geüpload op"
   },
   "about": {
     "name": "OpenObserve",
@@ -794,6 +813,10 @@
         "service_maps": {
           "name": "Servicekaarten",
           "note": "Visualiseer serviceafhankelijkheden"
+        },
+        "byob": {
+          "name": "Gebruik je eigen bucket",
+          "note": "Stuur organisatiegegevens naar je eigen cloudbucket"
         }
       },
       "buttons": {
@@ -925,7 +948,12 @@
     "authTypeSSO": "SSO",
     "authTypeLocal": "Inheems",
     "noCustomRolesHint": "Geen aangepaste rollen gedefinieerd — maak er een in IAM → Rollen",
-    "externalUserCustomRoleHint": "Externe gebruikers kunnen alleen via het bronsysteem worden gewijzigd"
+    "externalUserCustomRoleHint": "Externe gebruikers kunnen alleen via het bronsysteem worden gewijzigd",
+    "subtitle": "Mensen met toegang tot deze organisatie",
+    "revokeInvitationTitle": "Uitnodiging intrekken",
+    "revokeInvitationMsg": "Weet je zeker dat je de uitnodiging voor {email} wilt intrekken?",
+    "deleteUsersTitle": "Gebruikers verwijderen",
+    "deleteUsersMsg": "Weet je zeker dat je {count} gebruiker (s) wilt verwijderen?"
   },
   "ticket": {
     "header": "Tickets voor ondersteuning",
@@ -987,7 +1015,8 @@
     "proceed_subscription": "Ga verder met het abonnement",
     "subscription_plan": "Abonnementsplan",
     "makeBilledMember": "Maak van deze organisatie een factureringslid van {org}",
-    "manage": "Beheren"
+    "manage": "Beheren",
+    "nameHelpText": "Gebruik alleen alfanumerieke tekens, spaties en onderstrepingstekens."
   },
   "template": {
     "header": "Sjablonen",
@@ -1057,7 +1086,10 @@
     "fieldRequired": "Veld is verplicht!",
     "dataType": "Gegevenstype",
     "dataTypeRequired": "Gegevenstype is vereist!",
-    "udsFieldAlreadyInSchema": "Een of meer geselecteerde velden maken al deel uit van het gedefinieerde schema"
+    "udsFieldAlreadyInSchema": "Een of meer geselecteerde velden maken al deel uit van het gedefinieerde schema",
+    "subtitle": "Indexbeheer en streamconfiguratie",
+    "streamNameHelpText": "Gebruik alleen alfanumerieke tekens, onderstrepingstekens en dubbele punten.",
+    "deleteAssociatedAlertsPipelines": "Verwijder alle pijplijnen en waarschuwingen die aan de stream zijn gekoppeld"
   },
   "function": {
     "header": "Functies",
@@ -1117,7 +1149,11 @@
     "vrlFunctionHint": "Gebruik de `.` om de huidige gebeurtenis weer te geven. Voorbeeld: .new_field = .existing_field + 'verwerkt'",
     "askAIFunctionPlaceholder": "Vraag AI om hulp bij je functie...",
     "enterFunctionPrompt": "Voer een prompt in om een functie te genereren",
-    "jsErrorDetails": "Details van JavaScript-fouten"
+    "jsErrorDetails": "Details van JavaScript-fouten",
+    "subtitle": "Herbruikbare VRL-functies toegepast in pijpleidingen",
+    "clickTestFunctionHint": "Klik op Test Function om de gebeurtenissen te zien",
+    "pleaseEnterQuery": "Voer een vraag in",
+    "enrichmentTablesSubtitle": "Tabellen opzoeken die opgenomen gegevens verrijken"
   },
   "confirmDialog": {
     "cancel": "Annuleer",
@@ -1743,7 +1779,42 @@
     "columnFormattingEmptyHint": "Kies een veld om eenheden, uitlijning, kleuren en voorwaardelijke regels toe te passen.",
     "columnFormattingNoFieldsToFormat": "Nog geen velden geformatteerd",
     "columnFormattingOneFieldToFormat": "1 veld geformatteerd",
-    "columnFormattingFieldsToFormat": "geformatteerde velden"
+    "columnFormattingFieldsToFormat": "geformatteerde velden",
+    "subtitle": "Dashboards maken, ordenen en delen in verschillende mappen",
+    "deleteDashboardConfirmTitle": "Dashboard verwijderen",
+    "deleteDashboardConfirmMsg": "Weet je zeker dat je het dashboard wilt verwijderen?",
+    "deleteDashboardsConfirmTitle": "Dashboards verwijderen",
+    "deleteDashboardsConfirmMsg": "Weet je zeker dat je {count} dashboard (s) wilt verwijderen?",
+    "importCustom": "Op maat",
+    "importCustomDesc": "Importeren vanuit JSON-bestand of URL",
+    "importTemplates": "Sjablonen",
+    "importTemplatesDesc": "Bekijk en importeer vanuit de galerij",
+    "searchThisFolder": "Deze map",
+    "searchThisFolderTitle": "Alleen in deze map zoeken",
+    "searchAllFolders": "Alle mappen",
+    "searchAllFoldersTitle": "Zoek in alle mappen",
+    "reloadDashboards": "Dashboards opnieuw laden",
+    "editVariable": "Variabele bewerken",
+    "addOption": "Optie toevoegen",
+    "addFilter": "Filter toevoegen",
+    "noDataFound": "Geen gegevens gevonden",
+    "streamSelectTooltip": "Selecteer een stream of gebruik een variabele zoals $StreamVariable om dynamisch de stream te kiezen op basis van een andere waarde.",
+    "fieldSelectTooltip": "Selecteer een veld of gebruik een variabele zoals $FieldVariable. Als de stream een variabele gebruikt, is de veldenlijst leeg. Voer de veldnaam handmatig in.",
+    "filterInfoTooltip": "In filters kun je de waarde van een andere variabele gebruiken om de waarde van de huidige variabele te filteren. Dit kan gedaan worden door de naam van de andere variabele te gebruiken. Bijvoorbeeld:",
+    "defaultSelectAll": "Standaard - Alles selecteren",
+    "escapeSingleQuotesTooltip": "Indien ingeschakeld, worden enkele aanhalingstekens in de query als escapet weergegeven. Een waarde zoals `O'Reilly` wordt bijvoorbeeld vervangen door `O\"Reilly`.",
+    "byDefaultSelect": "Selecteer standaard:",
+    "firstValue": "Eerste waarde",
+    "allValues": "Alle waarden",
+    "customValue": "Op maat",
+    "showDependencies": "Afhankelijkheden weergeven",
+    "deleteVariable": "Variabele verwijderen",
+    "deleteVariableMsg": "Weet je zeker dat je de variabele wilt verwijderen?",
+    "appliedToTabs": "Toegepast op tabbladen:",
+    "appliedToPanels": "Van toepassing op panelen:",
+    "selectVariableScope": "Variabel bereik selecteren",
+    "variableScopeHelp": "Variabelen worden toegepast op alle tabbladen en panelen als globaal is geselecteerd.",
+    "showDynamicFilters": "Dynamische filters weergeven"
   },
   "panel": {
     "header": "Paneel",
@@ -2032,7 +2103,14 @@
       "viewOrgGroup": "Organisatiegroep bekijken",
       "usageMemberLabel": "Organisatie die lid is",
       "usageAllMembers": "Huidige organisatie",
-      "currentOrgTitle": "Huidige Organisatie"
+      "currentOrgTitle": "Huidige Organisatie",
+      "childOrgIdColumn": "Identificatie onderliggende organisatie",
+      "childOrgNameColumn": "Naam onderliggende organisatie",
+      "notEnabledTitle": "Factureringsgroep niet beschikbaar",
+      "notEnabledDesc": "Deze organisatie is niet ingeschakeld om een factureringsgroep te starten. Neem contact op met je beheerder als je deze functie nodig hebt.",
+      "memberOrgsTitle": "Lidorganisaties",
+      "searchMemberOrg": "Organisatie zoeken",
+      "noMemberMatch": "Geen overeenkomende organisaties"
     }
   },
   "message": {
@@ -2233,7 +2311,43 @@
       "rcaCompleted": "Analyse van de hoofdoorzaak voltooid",
       "noRcaYet": "Geen analyse van de hoofdoorzaak beschikbaar. Klik op 'Analyseren' om te beginnen.",
       "search": "Zoek incidenten...",
-      "sreChat": "Vraag de SRE-assistent"
+      "sreChat": "Vraag de SRE-assistent",
+      "subtitle": "Incidentbeheer en -tracking",
+      "correlationPrimaryMatch": "Primaire overeenkomst",
+      "correlationSecondaryMatch": "Secundaire overeenkomst",
+      "correlationServiceDiscoveryTooltip": "Gecorreleerd op basis van vooraf berekende service-identiteit uit service discovery",
+      "correlationPrimaryMatchTooltip": "Gecorreleerd op basis van primaire matchingscriteria",
+      "correlationSecondaryMatchTooltip": "Gecorreleerd op basis van secundaire matchingscriteria",
+      "correlationAlertId": "Waarschuwings-ID",
+      "correlationAlertIdTooltip": "Geen overeenkomende dimensies gevonden — geïsoleerd op waarschuwings-ID",
+      "correlatedByServiceDiscovery": "Dimensies",
+      "correlatedBySemanticGroups": "Dimensies",
+      "correlatedByAlertId": "Waarschuwings-ID",
+      "goBack": "Terug",
+      "incident": "Incident",
+      "uniqueAlerts": "Unieke waarschuwingen",
+      "relatedAlerts": "Gerelateerde waarschuwingen",
+      "alertTriggers": "Waarschuwingstriggers",
+      "incidentTimeline": "Incidenttijdlijn",
+      "incidentDetails": "Incidentdetails",
+      "incidentId": "Incident-ID",
+      "incidentName": "Incidentnaam",
+      "initialTrigger": "Initiële trigger",
+      "noDimensionsAvailable": "Geen dimensies beschikbaar",
+      "noAlertDetailsAvailable": "Geen waarschuwingsdetails beschikbaar",
+      "clickOnTriggerToViewDetails": "Klik op een trigger in de tabel om details te bekijken",
+      "refreshCorrelatedData": "Gecorreleerde gegevens vernieuwen",
+      "showingCorrelatedLogs": "Gecorreleerde logs uit het incidenttijdvak worden weergegeven",
+      "showingCorrelatedMetrics": "Gecorreleerde metrics uit het incidenttijdvak worden weergegeven",
+      "showingCorrelatedTraces": "Gecorreleerde traces uit het incidenttijdvak worden weergegeven",
+      "incidentTitleUpdatedSuccess": "Incidenttitel is bijgewerkt",
+      "markAsAcknowledgedTooltip": "Incident markeren als bevestigd en in behandeling",
+      "markAsResolvedTooltip": "Incident markeren als opgelost en sluiten",
+      "reopenIncidentTooltip": "Dit opgeloste incident heropenen",
+      "editIncidentTitleTooltip": "Incidenttitel bewerken",
+      "firedTimes": "{count} keer geactiveerd",
+      "incidentAnalysis": "Incidentanalyse",
+      "noAlertActivityData": "Geen waarschuwingsactiviteitsgegevens"
     },
     "events": "Evenementen",
     "multiWindow": "Vergelijk met het verleden",
@@ -2281,7 +2395,9 @@
       "alertName": "Waarschuwingsnaam",
       "streamInfo": "Gegevensbron",
       "alertType": "Waarschuwingstype",
-      "queryCondition": "Query-voorwaarde"
+      "queryCondition": "Query-voorwaarde",
+      "configuringRealTime": "Een realtime-waarschuwing configureren voor",
+      "configuringScheduled": "Een geplande waarschuwing configureren voor"
     },
     "correlation": {
       "title": "Correlatie tussen waarschuwingen",
@@ -2438,7 +2554,8 @@
       "comparingText": "Vergelijking van het huidige vensterqueryresultaat met het queryresultaat van de vorige {offset}.",
       "addComparisonWindow": "Vergelijkingsvenster toevoegen",
       "goToConditions": "Ga naar de voorwaarden",
-      "goToConditionsTooltip": "Klik op „Ga naar de voorwaarden” om de gebeurtenissen voor geselecteerde vergelijkingsvensters te verifiëren"
+      "goToConditionsTooltip": "Klik op „Ga naar de voorwaarden” om de gebeurtenissen voor geselecteerde vergelijkingsvensters te verifiëren",
+      "comparisonDisabledTooltip": "Vergelijkingsvensters worden alleen ondersteund in SQL-modus. Schakel over naar SQL op het tabblad Waarschuwingsregels."
     },
     "alertSettings": {
       "cronSchedule": "Cron-schema",
@@ -2450,13 +2567,22 @@
       "frequencyTooltipCron": "Standaard UNIX cron-formaat met 5 velden gescheiden door spaties: [Minuut 0-59] [Uur 0-23] [Dag van maand 1-31] [Maand 1-12 of JAN-DEC] [Dag van week 0-7 of '1L-7L', 0 en 7 voor zondag].",
       "timezoneWarning": "Waarschuwing: De weergegeven tijdzone is bij benadering. Controleer en selecteer handmatig de juiste tijdzone.",
       "destinationsTooltip": "Selecteer een of meer bestemmingen om waarschuwingsmeldingen te verzenden.",
-      "templateTooltip": "Optioneel: Selecteer een sjabloon om te gebruiken voor alle bestemmingen in deze waarschuwing. Met sjablonen kunt u de indeling van waarschuwingsberichten aanpassen. Indien niet geselecteerd, zal elke bestemming zijn eigen geconfigureerde sjabloon gebruiken."
+      "templateTooltip": "Optioneel: Selecteer een sjabloon om te gebruiken voor alle bestemmingen in deze waarschuwing. Met sjablonen kunt u de indeling van waarschuwingsberichten aanpassen. Indien niet geselecteerd, zal elke bestemming zijn eigen geconfigureerde sjabloon gebruiken.",
+      "sectionTitle": "Instellingen",
+      "fieldRequired": "Veld is verplicht!",
+      "noDestinationsAvailable": "Geen bestemmingen beschikbaar",
+      "refreshDestinations": "Nieuwste bestemmingen vernieuwen",
+      "createsIncident": "Maakt incident aan",
+      "createsIncidentTooltip": "Als een waarschuwing een incident kan aanmaken, verstuurt deze geen aparte melding. In plaats daarvan wordt een melding voor het incident verzonden wanneer een nieuw incident wordt aangemaakt of wanneer een nieuw waarschuwingstype zich bij een bestaand incident voegt."
     },
     "advanced": {
       "addVariable": "Variabele toevoegen",
       "variablesTooltip": "Variabelen worden gebruikt om gegevens van de waarschuwing naar de bestemming door te geven.",
       "rowTemplateTooltip": "Rijsjabloon wordt gebruikt om het waarschuwingsbericht op te maken.",
-      "templateType": "Sjabloontype:"
+      "templateType": "Sjabloontype:",
+      "noTemplatesAvailable": "Geen sjablonen beschikbaar",
+      "refreshTemplates": "Nieuwste sjablonen vernieuwen",
+      "selectTemplate": "Sjabloon selecteren"
     },
     "addConditions": "Voorwaarden toevoegen",
     "sqlEditor": "SQL-editor",
@@ -2497,7 +2623,8 @@
       "training": "Opleiding",
       "active": "Actief",
       "failed": "Mislukt",
-      "disabled": "Uitgeschakeld"
+      "disabled": "Uitgeschakeld",
+      "ready": "Gereed"
     },
     "anomalyStepCaptions": {
       "alertSetup": "Geef je detector een naam en selecteer een stream om te monitoren",
@@ -2560,7 +2687,28 @@
       "destinationRequired": "Er is minstens één bestemming vereist!",
       "disabledNotificationsInfo": "De detectie van afwijkingen wordt nog steeds uitgevoerd en de resultaten worden naar de _anomalieënstream geschreven. Schakel meldingen in om waarschuwingen te ontvangen wanneer er afwijkingen worden gedetecteerd."
     },
-    "anomalyName": "Naam van de anomalie"
+    "anomalyName": "Naam van de anomalie",
+    "subtitle": "Waarschuwingsregels en meldingskanalen",
+    "searchThisFolder": "Deze map",
+    "searchAllFolders": "Alle mappen",
+    "streamConfig": "Configuratie van de stream",
+    "alertRules": "Regels voor waarschuwingen",
+    "addCondition": "Conditie toevoegen",
+    "conditionOf": "van",
+    "conditionIs": "is",
+    "matchingTypeFound": "overeenkomend met {type} gevonden",
+    "matchingMetricsFound": "overeenkomende statistieken gevonden",
+    "metricsValueFieldTooltip": "Metrische streams slaan hun metingen standaard op in het veld „waarde”",
+    "howOftenCheckTooltip": "Hoe vaak moet deze waarschuwingsconditie worden gecontroleerd",
+    "alertIfNoOfEvents": "Waarschuwing bij aantal gebeurtenissen",
+    "alertIfValueIs": "Waarschuw als de waarde",
+    "havingSeries": "Serie hebben",
+    "clearMultiWindowsTitle": "Meerdere vensters wissen?",
+    "lastTrainedAt": "Laatst opgeleid bij",
+    "noTemplatesMsg": "Het lijkt erop dat je nog geen sjablonen hebt gemaakt. Als u een waarschuwing wilt maken, moet u ten minste één bestemming en één sjabloon hebben",
+    "createTemplateBtn": "Sjabloon maken",
+    "noDestinationsMsg": "Het lijkt erop dat je nog geen bestemmingen hebt aangemaakt. Als u een waarschuwing wilt maken, moet u ten minste één bestemming en één sjabloon hebben",
+    "createDestinationBtn": "Bestemming aanmaken"
   },
   "alert_templates": {
     "header": "Sjablonen",
@@ -2845,7 +2993,93 @@
       "noMatchingDimensions": "Geen overeenkomende dimensies",
       "otherGroup": "Overig",
       "fallbackGroup": "Terugval",
-      "fallbackNote": "Terugvaldimensies (zoals 'service') zijn van toepassing op alle omgevingen wanneer geen omgevingsspecifieke workload overeenkomt."
+      "fallbackNote": "Terugvaldimensies (zoals 'service') zijn van toepassing op alle omgevingen wanneer geen omgevingsspecifieke workload overeenkomt.",
+      "serviceDiscoveryTab": "Detectieregels",
+      "fieldAliasesTab": "Veldtoewijzingen",
+      "fieldAliasesSaved": "Veldaliassen zijn opgeslagen",
+      "serviceNameFieldAliasNote": "De daadwerkelijke veldnamen die aan deze groep zijn toegewezen, worden geconfigureerd in",
+      "viewFieldAliases": "Veldaliassen bewerken →",
+      "fieldAliasesSaveError": "Opslaan van veldaliassen mislukt",
+      "fieldAliasesUnsavedConfirm": "Je hebt niet-opgeslagen wijzigingen in veldtoewijzingen. Wil je deze verwijderen en vertrekken?",
+      "duplicateIdsError": "Dubbele groeps-ID's gevonden: {ids}. Zorg ervoor dat elke groep een unieke ID heeft.",
+      "duplicateNamesInCategoryError": "Dubbele naam \"{name}\" gevonden in categorie \"{category}\". Elke groep binnen een categorie moet een unieke naam hebben.",
+      "emptyIdError": " categorie heeft lege groepsnamen. Zorg ervoor dat alle groepen geldige namen hebben.",
+      "emptyFieldsError": "Er is ten minste één veldnaam vereist",
+      "lastSeen": "Laatst gezien",
+      "serviceIdentitySetupTitle": "Instellen van service-identiteit",
+      "serviceIdentitySetupDescription": "Configureer hoe services worden geïdentificeerd in je telemetriegegevens",
+      "serviceNameFieldLabel": "Veld servicenaam",
+      "serviceNameFieldHelp": "Welk veld de servicenaam identificeert in je telemetriegegevens",
+      "serviceNameFrom": "Servicenaam uit",
+      "serviceNameDerivedPrefix": "De servicenaam wordt afgeleid met behulp van de servicenaamvelden die zijn gedefinieerd in",
+      "serviceNameFields": "veldaliassen",
+      "serviceNameDetectedFrom": "Servicenaam gedetecteerd uit:",
+      "serviceNameNotDetected": "Nog geen veld voor servicenaam gedetecteerd in je gegevens",
+      "serviceNameNotDetectedHelp": "Zorg ervoor dat je telemetrie een veld bevat zoals service.name of vergelijkbaar",
+      "serviceNameExpandedHelp": "Deze veldnamen in je gegevens worden allemaal toegewezen aan de servicenaam:",
+      "serviceNameConfiguredNotSeen": "geconfigureerd maar nog niet gezien in je gegevens",
+      "customizeFieldMappings": "Veldtoewijzingen aanpassen",
+      "fieldMappingDialogHelp": "Voeg veldnamen toe of verwijder ze die moeten worden herkend als de servicenaam in je telemetriegegevens.",
+      "fieldMappingPlaceholder": "Typ een veldnaam en druk op Enter",
+      "foundInLogs": "Gevonden in Logs",
+      "foundInTraces": "Gevonden in Traces",
+      "foundInMetrics": "Gevonden in Metrics",
+      "distinguishByLabel": "Services onderscheiden op",
+      "distinguishByHelp": "Kies velden die bepalen waar je services draaien. Bijvoorbeeld: cluster + namespace + deployment vormen samen een unieke identiteit voor elke service. Maximaal 5 velden.",
+      "serviceOptionalLabel": "Correleren zonder service-attribuut",
+      "serviceOptionalHelp": "Streams matchen op basis van onderstaande attributen, service-attributen negeren",
+      "noFieldsConfiguredYet": "Nog geen disambiguatievelden geconfigureerd.",
+      "addField": "Veld toevoegen",
+      "addFieldTooltip": "Voeg nog een veld toe om services uniek te helpen identificeren (max. 5). Voorbeelden: regio, namespace of omgeving.",
+      "addGroup": "Groep toevoegen",
+      "addGroupTooltip": "Maak een aparte set disambiguatievelden voor een andere omgeving (bijv. andere velden voor Kubernetes vs AWS)",
+      "autoSuggestedBanner": "Deze velden zijn automatisch voorgesteld omdat ze weinig unieke waarden hebben (lage cardinaliteit) en in de meeste van je services voorkomen — ideaal om services met dezelfde naam van elkaar te onderscheiden. Je kunt ze aanpassen voordat je opslaat.",
+      "addDisambiguationField": "Nog een toevoegen",
+      "removeDisambiguationField": "Veld verwijderen",
+      "nameFieldLockedNote": "Het veld voor servicenaam kan na de eerste configuratie niet worden gewijzigd",
+      "noGroupsAvailable": "Geen veldgroepen beschikbaar",
+      "selectField": "Selecteer een veld",
+      "detectedLabel": "We hebben een {type}-workload gedetecteerd op basis van je gegevens.",
+      "suggestionPrompt": "Moeten we de suggestie toepassen?",
+      "applySuggestion": "Suggestie toepassen",
+      "logStreams": "Logstreams",
+      "traceStreams": "Tracestreams",
+      "metricStreams": "Metricstreams",
+      "saveIdentityConfig": "Configuratie opslaan",
+      "identityConfigSaved": "Configuratie voor service-identiteit is opgeslagen",
+      "identityConfigSaveFailed": "Opslaan van configuratie voor service-identiteit mislukt",
+      "loadRecommendationsFailed": "Laden van aanbevelingen mislukt",
+      "resetServices": "Services resetten",
+      "resetServicesTooltip": "Verwijder alle ontdekte services. Ze worden automatisch opnieuw ontdekt zodra er nieuwe gegevens binnenkomen.",
+      "resetServicesConfirmTitle": "Alle ontdekte services resetten?",
+      "resetServicesConfirmMessage": "Hiermee worden alle ontdekte services voor deze organisatie verwijderd. Services worden automatisch opnieuw ontdekt zodra er nieuwe telemetriegegevens worden ingelezen. Deze actie kan niet ongedaan worden gemaakt.",
+      "resetServicesConfirmWarning": "Services worden automatisch opnieuw ontdekt zodra er nieuwe telemetriegegevens worden ingelezen. Deze actie kan niet ongedaan worden gemaakt.",
+      "resetServicesSuccess": "{count} ontdekte service(s) succesvol verwijderd.",
+      "resetServicesFailed": "Resetten van services mislukt",
+      "workload": "Workload",
+      "goToConfiguration": "Ga naar configuratie",
+      "configureServicesHint": "om te configureren hoe services worden geïdentificeerd en gegroepeerd.",
+      "filterBy": "Filteren op :",
+      "selectFieldPlaceholder": "Veld selecteren",
+      "selectValuePlaceholder": "Waarde selecteren",
+      "selectFieldFirst": "Selecteer eerst een veld",
+      "instanceSingular": "instantie",
+      "instancePlural": "instanties",
+      "serviceSingular": "Service",
+      "serviceCountSingular": "{count} service",
+      "serviceCountPlural": "{count} services",
+      "instancesCount": "({count} instanties)",
+      "noDimensions": "geen dimensies",
+      "defaultSetWarningTitle": "Correlatie is mogelijk onbetrouwbaar.",
+      "defaultSetWarningBody": "Deze instantie heeft geen disambiguatie — deze is ontdekt zonder enige workload-matching (geen cluster-, namespace- of omgevingscontext). Logs en traces kunnen afkomstig zijn van verschillende deployments van dezelfde servicenaam.",
+      "instanceIdentity": "Instantie-identiteit",
+      "noDimensionsCatchAll": "Geen dimensies — catch-all-instantie",
+      "streamSources": "Streambronnen",
+      "openInLogsTooltip": "Openen in Logs met servicefilter",
+      "fieldNameMapping": "Toewijzing veldnamen",
+      "logsWithCount": "Logs ({count})",
+      "tracesWithCount": "Traces ({count})",
+      "metricsWithCount": "Metrics ({count})"
     },
     "pageSubtitle": "Instellingen voor uw toepassing aanpassen",
     "platformSettings": "Platform-instellingen",
@@ -2888,7 +3122,29 @@
     "usageStreamEnabledLabel": "Usage Stream inschakelen",
     "aiToolsets": "AI-toolsets",
     "llmModelPricing": "Prijzen van het LLM-model",
-    "ingestionTokens": "Tokens voor inname"
+    "ingestionTokens": "Tokens voor inname",
+    "groupGeneral": "Algemeen",
+    "groupAccessSecurity": "Toegang en beveiliging",
+    "groupDestinationsTemplates": "Bestemmingen en sjablonen",
+    "groupDataAI": "Data en AI",
+    "groupOperations": "Operaties",
+    "groupAccount": "Account",
+    "generalDesc": "Thema, standaardwaarden voor query's en kernvoorkeuren",
+    "orgDesc": "Organisatieparameters en -identificaties",
+    "cipherKeysDesc": "Versleutelingssleutels voor gevoelige velden",
+    "regexPatternsDesc": "Herbruikbare regex-patronen voor redactie",
+    "domainManagementDesc": "Aanmelden beperken tot toegestane SSO-domeinen",
+    "alertDestinationsDesc": "Waar geactiveerde waarschuwingen worden afgeleverd",
+    "pipelineDestinationsDesc": "Externe doelen voor pipeline-uitvoer",
+    "templatesDesc": "Herbruikbare sjablonen voor waarschuwingsberichten",
+    "storageSettingsDesc": "Opslagconfiguratie per organisatie",
+    "modelPricingDesc": "Kostenconfiguratie voor LLM-model",
+    "correlationSettingsDesc": "Configuratie voor telemetriecorrelatie",
+    "llmProvidersDesc": "LLM-providers voor online evaluaties",
+    "queryManagementDesc": "Lopende query's inspecteren en annuleren",
+    "nodesDesc": "Clusternodes en hun status",
+    "licenseDesc": "Details van enterprise-licentie",
+    "organizationManagementDesc": "Organisaties aanmaken en beheren"
   },
   "iam": {
     "users": "Gebruikers",
@@ -2921,7 +3177,19 @@
     "externalUserWarningTitle": "Waarschuwing voor externe gebruikers",
     "externalUserWarningMessage": "Als u externe gebruikers rechtstreeks aan rollen toevoegt, worden geen machtigingen verleend. Voeg ze in plaats daarvan toe aan gebruikersgroepen.",
     "invitations": "Uitnodigingen",
-    "ingestionTokens": "Tokens voor inname"
+    "ingestionTokens": "Tokens voor inname",
+    "sectionAccess": "Toegang",
+    "sectionPermissions": "Machtigingen",
+    "sectionOrganization": "Organisatie",
+    "usersDesc": "Mensen met toegang tot deze organisatie",
+    "serviceAccountsDesc": "Programmatische toegangstokens voor API's",
+    "ingestionTokensDesc": "Tokens voor het opnemen van gegevens in deze organisatie",
+    "invitationsDesc": "Uitnodigingen voor leden in behandeling en verzonden",
+    "groupsDesc": "Gebruikers groeperen om rollen toe te wijzen",
+    "rolesDesc": "Machtigingen en toegangsbeleid definiëren",
+    "quotaDesc": "Gebruikslimieten die per rol worden toegepast",
+    "organizationsDesc": "Organisaties waar je toegang toe hebt",
+    "nameHelpText": "Gebruik alleen alfanumerieke tekens en '_' tekens, zonder spaties."
   },
   "pipeline": {
     "header": "Pijpleidingen",
@@ -3082,7 +3350,14 @@
     "dimensionWidth": "Breedte (px)",
     "dimensionHeight": "Hoogte (px)",
     "imagePreview": "Inline voorbeeldafbeelding van het dashboard toevoegen",
-    "customDimensions": "Aangepaste afmetingen (geavanceerd)"
+    "customDimensions": "Aangepaste afmetingen (geavanceerd)",
+    "subtitle": "Geplande rapporten en exports",
+    "searchThisFolder": "Deze map",
+    "searchAllFolders": "Alle mappen",
+    "reloadReports": "Rapporten opnieuw laden",
+    "moveToFolder": "Verplaats naar map",
+    "deleteReportsTitle": "Rapporten verwijderen",
+    "deleteReportsMsg": "Weet je zeker dat je {count} rapport (en) wilt verwijderen?"
   },
   "queries": {
     "runningQueries": "Zoekopdrachten uitvoeren",
@@ -3210,19 +3485,27 @@
         "p99Latency": "P99",
         "avgLatency": "Gemiddelde latentie",
         "lastSeen": "Laatst gezien",
-        "operations": "Operaties"
+        "operations": "Operaties",
+        "avgDuration": "Gem. duur",
+        "maxDuration": "Max. duur"
       },
       "status": {
         "healthy": "Gezond",
         "warning": "Waarschuwing",
-        "degraded": "Gedegradeerd"
+        "degraded": "Gedegradeerd",
+        "critical": "Kritiek"
       },
       "viewTraces": "Bekijk de sporen",
       "exportCsv": "CSV exporteren",
       "justNow": "Zojuist",
       "minutesAgo": "{n} m geleden",
       "hoursAgo": "{n} h geleden",
-      "daysAgo": "{n} geleden"
+      "daysAgo": "{n} geleden",
+      "serviceLabel": "service",
+      "servicesLabel": "services",
+      "legend": {
+        "title": "Foutpercentage"
+      }
     },
     "noErrorPresent": "Geen fout aanwezig voor deze reeks",
     "httpStatusCode": "HTTP-statuscode",
@@ -3260,8 +3543,12 @@
         "duration": "Duur",
         "tokens": "Munten",
         "cost": "Kost",
-        "status": "Status"
-      }
+        "status": "Status",
+        "user": "Gebruiker",
+        "firstMessage": "Eerste bericht"
+      },
+      "streamLabel": "Stream",
+      "unknownUser": "Onbekende gebruiker"
     },
     "sessionDetail": {
       "backToSessions": "Terug naar Sessions",
@@ -3303,7 +3590,15 @@
         "output": "Uitgang",
         "total": "Totaal",
         "cost": "Kost",
-        "spans": "Overspant"
+        "spans": "Overspant",
+        "llmCalls": "LLM-aanroepen",
+        "toolCalls": "Toolaanroepen",
+        "otherCalls": "Overig",
+        "otherCallsTooltip": "gen_ai-spans met niet-herkende operatienamen:"
+      },
+      "fullscreen": {
+        "expandTurn": "Beurt op volledig scherm bekijken",
+        "close": "Sluiten"
       }
     },
     "openInFullView": "In volledige weergave openen",
@@ -3340,11 +3635,28 @@
       "expandRange": "Vergroot het tijdbereik",
       "expandRangeDescAbsolute": "Overschakelen naar een breder relatief tijdsbereik",
       "removeFilter": "Een filter verwijderen",
-      "selectedRange": "het geselecteerde bereik"
+      "selectedRange": "het geselecteerde bereik",
+      "descOutOfRange": "Je tijdvenster bevat geen gegevens uit deze stream. Spring naar het moment waarop de gegevens voor het laatst zijn gezien.",
+      "descDataAtBoundary": "De stream bevat gegevens in dit venster, maar er kwamen geen traces overeen. Probeer het tijdsbereik te verbreden.",
+      "jumpToData": "Naar nieuwste gegevens springen"
     },
     "showAll": "Alles weergeven",
     "filterByErrors": "Filteren op fouten",
-    "clearErrorFilter": "Foutfilter wissen"
+    "clearErrorFilter": "Foutfilter wissen",
+    "spansTab": "Overspant",
+    "tracesTab": "Sporen",
+    "serviceGraphTab": "Servicegrafiek",
+    "treeView": "Uitzicht op de boom",
+    "graphView": "Grafiekweergave",
+    "layoutHorizontal": "Horizontaal",
+    "layoutVertical": "Verticaal",
+    "layoutForce": "Indeling van de kracht",
+    "exportTraces": "Sporen exporteren",
+    "waterfall": "Waterval",
+    "flameGraph": "Vlamgrafiek",
+    "traceGraph": "Spoorgrafiek",
+    "dag": "DAG",
+    "thread": "Draad"
   },
   "invitation": {
     "pendingInvitations": "Uitnodigingen in behandeling",
@@ -3514,7 +3826,38 @@
     "failed_to_load": "Het laden van patronen is mislukt",
     "no_patterns_selected": "Selecteer ten minste één patroon",
     "name_required": "* Naam is verplicht",
-    "pattern_required": "* Patroon is vereist"
+    "pattern_required": "* Patroon is vereist",
+    "associated_breadcrumb": "Streamdetails",
+    "associated_search_placeholder": "Zoeken",
+    "applied_patterns_count": "Toegepaste patronen ({count})",
+    "all_patterns_count": "Alle patronen ({count})",
+    "no_data_available": "Geen gegevens beschikbaar",
+    "no_patterns_applied_title": "Nog geen patronen toegepast",
+    "no_patterns_applied_subtitle": "Blader door de patroonbibliotheek om reguliere expressies op je velden toe te passen.",
+    "pattern_name": "Patroonnaam",
+    "when_value_matches": "Wanneer waarde overeenkomt",
+    "redact": "Redigeren",
+    "redact_hint": "Vervangen door [REDACTED]",
+    "drop": "Verwijderen",
+    "drop_hint": "Het veld volledig verwijderen",
+    "hash": "Hashen",
+    "hash_hint": "Vervangen door doorzoekbare hash",
+    "detect_at": "Detecteren bij",
+    "ingestion": "Ingestie",
+    "query": "Query",
+    "test_pattern": "Patroon testen",
+    "test_input": "Testinvoer",
+    "regex_pattern_label": "Regex-patroon",
+    "input_string": "Invoerstring",
+    "input_string_placeholder": "Bijv. 1234567890",
+    "output": "Uitvoer",
+    "output_string_placeholder": "Uitvoerstring",
+    "click_test_input_hint": "Klik op Testinvoer om de resultaten te bekijken",
+    "remove_pattern": "Patroon verwijderen",
+    "add_pattern": "Patroon toevoegen",
+    "remove_pattern_confirm_msg": "Weet je zeker dat je dit patroon uit het veld wilt verwijderen?",
+    "failed_to_test_string": "Testen van string mislukt",
+    "select_detect_at_option": "Selecteer een optie voor detecteren bij"
   },
   "search_history": {
     "title": "Zoekgeschiedenis",
@@ -3742,7 +4085,10 @@
         "duration": "Duur",
         "startBeforeEnd": "De starttijd moet vóór de eindtijd liggen",
         "endAfterStart": "De eindtijd moet na de starttijd liggen"
-      }
+      },
+      "filtersLabel": "Filters",
+      "errorDetails": "Er is een fout opgetreden bij het ophalen van loggegevens. Probeer het opnieuw.",
+      "viewLogs": "Logs bekijken"
     },
     "viewInTraces": "Bekijk in Traces",
     "viewInTracesTooltip": "Open de pagina met sporen met het RED-metriekendashboard en alle gerelateerde sporen",
@@ -4233,7 +4579,13 @@
       "one": "Laat me fouten zien van het afgelopen uur...",
       "two": "Schrijf VRL om JSON te parseren uit nginx-logboeken...",
       "three": "Bouw een dashboard voor de gezondheid van K8s nodes..."
-    }
+    },
+    "autoNavigation": {
+      "label": "Autonavigatie",
+      "enabledTooltip": "Automatische navigatie ingeschakeld - O2 Assistant navigeert automatisch zonder bevestiging",
+      "disabledTooltip": "Autonavigatie uitgeschakeld - O2 Assistant zal dit vragen voordat u gaat navigeren"
+    },
+    "attachImageTooltip": "Afbeeldingen bijvoegen (PNG, JPEG, max. 2 MB)"
   },
   "emptyState": {
     "noSearchResults": {
@@ -4353,7 +4705,29 @@
       "reports": "rapporten",
       "queries": "vragen",
       "serviceAccounts": "serviceaccounts",
-      "invitations": "uitnodigingen"
+      "invitations": "uitnodigingen",
+      "searchJobs": "zoekopdrachten",
+      "groups": "groepen",
+      "roles": "rollen",
+      "anomalyConfigs": "configuraties voor anomaliedetectie",
+      "apiLimits": "API-limieten",
+      "roleLimits": "rollimieten",
+      "ingestionTokens": "ingestietokens",
+      "organizations": "organisaties",
+      "alertDestinations": "bestemmingen",
+      "pipelineDestinations": "bestemmingen",
+      "alertTemplates": "sjablonen",
+      "evalTemplates": "evaluatiesjablonen",
+      "enrichmentTables": "verrijkingstabellen",
+      "cipherKeys": "versleutelingssleutels",
+      "aiToolsets": "AI-toolsets",
+      "llmProviders": "LLM-providers",
+      "sourceMaps": "source maps",
+      "backfillJobs": "backfill-taken",
+      "scorers": "scorers",
+      "evalJobs": "evaluatietaken",
+      "scoreConfigs": "scoreconfiguraties",
+      "pipelineHistory": "pipelinegeschiedenis"
     },
     "noDashboardsInFolder": {
       "title": "Geen dashboards in deze map",
@@ -4544,13 +4918,21 @@
     },
     "actions": {
       "edit": "Bewerken",
-      "delete": "Verwijderen"
+      "delete": "Verwijderen",
+      "export": "Exporteren",
+      "activate": "Activeren",
+      "pause": "Pauzeren",
+      "activated": "Taak geactiveerd",
+      "paused": "Taak gepauzeerd",
+      "activateError": "Activeren van taak mislukt",
+      "pauseError": "Pauzeren van taak mislukt"
     },
     "tabs": {
       "jobs": "Vacatures bij Eval",
       "scorers": "Scorers",
       "scoreConfigs": "Score-configuraties",
-      "providers": "Aanbieders"
+      "providers": "Aanbieders",
+      "quality": "Kwaliteit"
     },
     "singular": {
       "jobs": "Job Eval",
@@ -4574,7 +4956,11 @@
     "buttons": {
       "cancel": "Annuleer",
       "create": "Creëren",
-      "save": "Opslaan"
+      "save": "Opslaan",
+      "close": "Sluiten",
+      "remove": "Verwijderen",
+      "saveAsDraft": "Opslaan als concept",
+      "createAndActivate": "Aanmaken en activeren"
     },
     "scorerTypeDialog": {
       "title": "Maak een nieuwe scorer",
@@ -4584,7 +4970,11 @@
       "remoteTitle": "Op afstand",
       "remoteDescription": "Bel je eigen HTTP-eindpunt om te scoren.",
       "codeTitle": "Code",
-      "codeDescription": "Binnenkort beschikbaar."
+      "codeDescription": "Binnenkort beschikbaar.",
+      "llmJudgeCta": "Judge configureren",
+      "remoteCta": "Endpoint configureren",
+      "codeCta": "Beschikbaar in een toekomstige release",
+      "comingSoonBadge": "Binnenkort beschikbaar"
     },
     "provider": {
       "backTo": "Terug naar Providers",
@@ -4604,7 +4994,15 @@
       "availableModelsPlaceholder": "gpt-4o-mini, gpt-4.1",
       "useAsDefault": "Als standaardprovider gebruiken",
       "authConfigLabel": "Auth-configuratie JSON",
-      "saveError": "Het opslaan van de provider is mislukt"
+      "saveError": "Het opslaan van de provider is mislukt",
+      "authConfigHelp": "Inloggegevens worden versleuteld opgeslagen en kunnen na opslaan niet meer worden teruggelezen.",
+      "apiKeyLabel": "API-sleutel",
+      "apiKeyPlaceholder": "Voer API-sleutel in",
+      "apiKeyHelp": "Wordt versleuteld opgeslagen en nooit teruggelezen. Laat leeg bij het bewerken om de bestaande sleutel te behouden.",
+      "authSection": "Authenticatie",
+      "authEditNote": "Inloggegevens kunnen niet worden teruggelezen. Voer de API-sleutel alleen opnieuw in als je deze wilt roteren.",
+      "cannotRename": "Kan na het aanmaken niet worden hernoemd.",
+      "availableModelsHelp": "Optioneel. Door komma's gescheiden lijst van modellen die beschikbaar zijn op deze provider."
     },
     "scoreConfig": {
       "createTitle": "Nieuwe scoreconfiguratie",
@@ -4621,7 +5019,129 @@
         "categorical": "Categorisch",
         "boolean": "Booleaans"
       },
-      "saveError": "Het opslaan van de scoreconfiguratie is mislukt"
+      "saveError": "Het opslaan van de scoreconfiguratie is mislukt",
+      "booleanValues": "true / false",
+      "detail": {
+        "eyebrow": "Scoreconfiguratie",
+        "close": "Sluiten",
+        "statusActive": "Actief",
+        "statusInactive": "Inactief",
+        "createdShort": "Aangemaakt",
+        "tabs": {
+          "overview": "Overzicht",
+          "versions": "Versies",
+          "usedBy": "Gebruikt door"
+        },
+        "descriptionSection": "Beschrijving",
+        "configurationSection": "Configuratie",
+        "dataTypeLabel": "Gegevenstype",
+        "rangeLabel": "Bereik",
+        "categoriesLabel": "Categorieën",
+        "valuesLabel": "Waarden",
+        "thresholdSection": "Gezonde drempelwaarde",
+        "thresholdHint": "Telt een score als gezond",
+        "noThreshold": "Niet opgegeven",
+        "noThresholdHint": "Geen drempelwaarde opgegeven — scores op deze dimensie dragen niet bij aan kwaliteitsstatussignalen.",
+        "usedByIntro": "Elke scorer die een waarde met deze dimensienaam uitvoert.",
+        "usedByEmpty": "Nog geen scorers verwijzen naar deze configuratie.",
+        "scorerTypeLlmJudge": "LLM Judge",
+        "scorerTypeRemote": "Remote",
+        "versionsIntro": "Elke wijziging aan bereik, categorieën of gezonde drempelwaarde maakt een nieuwe versie aan. Historische scores blijven gekoppeld aan de versie die ze heeft geproduceerd.",
+        "activeVersionChip": "Actief",
+        "lastUpdated": "Laatst bijgewerkt",
+        "metadataSection": "Metadata",
+        "statusLabel": "Status",
+        "versionLabel": "Versie",
+        "createdLabel": "Aangemaakt",
+        "updatedLabel": "Bijgewerkt"
+      },
+      "editTitlePrefix": "Bewerken",
+      "eyebrow": "Scoreconfiguraties",
+      "sectionTitle": "Scoreconfiguraties",
+      "listTitle": "Scoreconfiguraties",
+      "listSubtitle": "Soft-schema-dimensies die scorers produceren.",
+      "searchPlaceholder": "Configuraties zoeken",
+      "allTypes": "Alle typen",
+      "newButton": "Nieuwe scoreconfiguratie",
+      "saveButton": "Wijzigingen opslaan",
+      "createButton": "Aanmaken",
+      "columns": {
+        "index": "#",
+        "name": "Naam",
+        "type": "Type",
+        "rangeValues": "Bereik / waarden",
+        "healthy": "Gezond",
+        "activeVersion": "Actieve versie",
+        "usedBy": "Gebruikt door",
+        "created": "Aangemaakt",
+        "actions": "Acties"
+      },
+      "active": "actief",
+      "usedByScorers": "{count} scorers",
+      "usedByScorer": "{count} scorer",
+      "noHealthy": "—",
+      "createInfoNumeric": "Bepaal wanneer scores op deze dimensie als gezond worden beschouwd. Scores buiten dit bereik veroorzaken kwaliteitsproblemen in tracelijsten, sessies en andere weergaven.",
+      "editInfoBannerEmphasis": {
+        "numeric": "Het wijzigen van het bereik of de gezonde drempelwaarde maakt {nextVersion} aan.",
+        "categorical": "Het wijzigen van de categorieën of de gezonde drempelwaarde maakt {nextVersion} aan.",
+        "boolean": "Het wijzigen van de gezonde waarde maakt {nextVersion} aan."
+      },
+      "editInfoBannerDetail": "Historische scores blijven gekoppeld aan de versie die ze heeft geproduceerd. Wijzigingen aan alleen de beschrijving worden ter plekke bijgewerkt.",
+      "createInfoSubtitle": "Wijzigingen aan alleen de beschrijving werken {version} ter plekke bij.",
+      "namePlaceholder": "bijv. \"faithfulness\"",
+      "nameHelp": "Alleen kleine letters, cijfers en underscores. Wordt gebruikt als stabiele identifier.",
+      "cannotBeRenamed": "Kan niet worden hernoemd",
+      "descriptionPlaceholder": "Wat meet deze dimensie?",
+      "descriptionHelp": "Wijzigingen aan alleen de beschrijving maken geen nieuwe versie aan.",
+      "dataTypeLocked": "Vergrendeld",
+      "dataTypeCannotChange": "Kan na het aanmaken niet worden gewijzigd",
+      "dataTypeHelp": {
+        "numeric": "Score als een getal in een bereik",
+        "categorical": "Score als een van N labels",
+        "boolean": "Score als true / false"
+      },
+      "minLabel": "Min",
+      "maxLabel": "Max",
+      "addCategoryPlaceholder": "Categorie toevoegen",
+      "addCategoryButton": "Toevoegen",
+      "booleanInfo": "Boolean-configuraties accepteren de waarden {trueLabel} / {falseLabel}. Geen aanvullende configuratie nodig.",
+      "healthyThresholdTitle": "Gezonde drempelwaarde",
+      "optional": "Optioneel",
+      "healthyThresholdIntro": "Bepaal wanneer scores op deze dimensie als gezond worden beschouwd. Scores buiten dit bereik veroorzaken kwaliteitsproblemen in tracelijsten, sessies en andere weergaven.",
+      "healthyWhenValueIs": "Gezond wanneer waarde is:",
+      "healthyCategories": "Gezonde categorieën:",
+      "healthyCategoriesHint": "Vink alle waarden aan die als gezond tellen.",
+      "healthyValue": "Gezonde waarde:",
+      "gteLabel": "Groter dan of gelijk aan",
+      "lteLabel": "Kleiner dan of gelijk aan",
+      "trueIsHealthy": "true is gezond",
+      "trueIsHealthyHint": "Scores van false veroorzaken kwaliteitsproblemen.",
+      "falseIsHealthy": "false is gezond",
+      "falseIsHealthyHint": "Scores van true veroorzaken kwaliteitsproblemen.",
+      "thresholdEmptyHint": "Door dit leeg te laten, draagt deze dimensie niet bij aan kwaliteitsstatussignalen in het product. Scores worden nog steeds geregistreerd, maar veroorzaken geen probleemindicatoren.",
+      "empty": {
+        "title": "Nog geen scoreconfiguraties",
+        "description": "Scoreconfiguraties definiëren de dimensies die je scorers produceren — naam, gegevenstype, waardebereik en gezonde drempelwaarde. Maak er een aan om met online evaluatie te beginnen.",
+        "chipTypes": "Numeriek, Categorisch, Boolean",
+        "chipThreshold": "Gezonde drempelwaarde"
+      },
+      "import": {
+        "title": "Scoreconfiguratie importeren",
+        "button": "Importeren",
+        "customLabel": "Aangepast",
+        "customSubtitle": "Importeren vanuit JSON-bestand of URL",
+        "libraryLabel": "Bibliotheek",
+        "librarySubtitle": "Blader door en importeer uit de samengestelde catalogus",
+        "libraryDrawerTitle": "Bibliotheek scoreconfiguraties",
+        "outputMessages": "Uitvoerberichten",
+        "creation": "Aanmaken scoreconfiguratie",
+        "errors": {
+          "title": "Validatiefouten"
+        }
+      },
+      "export": {
+        "bulkButton": "Exporteren"
+      }
     },
     "scorer": {
       "backTo": "Terug naar Scorers",
@@ -4673,7 +5193,203 @@
         "authHint": "Controleer de inloggegevens van de provider voordat u deze opslaat.",
         "schemaHeader": "Schema komt niet overeen",
         "schemaHint": "Het antwoord kwam niet overeen met het geconfigureerde uitvoerschema.",
-        "valuePlaceholder": "Waarde voor {variable}"
+        "valuePlaceholder": "Waarde voor {variable}",
+        "disabledHint": "Vul naam, provider, sjabloon en elke variabelewaarde in om een test uit te voeren.",
+        "errorHeader": "Test mislukt",
+        "errorFallback": "Scorertest mislukt. Controleer de serverlogs voor details.",
+        "resultScore": "Score",
+        "resultLatency": "Latentie",
+        "resultModel": "Model",
+        "resultTokens": "Tokens",
+        "resultReasoning": "Redenering",
+        "resultRaw": "Onbewerkt antwoord"
+      },
+      "detail": {
+        "close": "Sluiten",
+        "eyebrow": "Scorer",
+        "refresh": "Vernieuwen",
+        "descriptionSection": "Beschrijving",
+        "configurationSection": "Configuratie",
+        "scorerTypeLabel": "Scorertype",
+        "providerLabel": "Provider",
+        "providerUnknown": "Onbekend",
+        "modelLabel": "Model",
+        "endpointLabel": "Endpoint",
+        "producesSection": "Produceert scoreconfiguratie",
+        "producesEmpty": "Deze scorer schrijft naar geen enkele scoreconfiguratie.",
+        "promptSection": "Judge-prompt",
+        "requestTemplateSection": "Verzoeksjabloon",
+        "variablesSuffix": "variabelen",
+        "outputSchemaSection": "Uitvoerschema",
+        "usedBySection": "Gebruikt door",
+        "usedByIntro": "Taken die in hun pipeline naar deze scorer verwijzen.",
+        "usedByEmpty": "Nog geen taken verwijzen naar deze scorer.",
+        "versionsIntro": "Versies zijn onveranderlijke momentopnamen van de scorerconfiguratie. De actieve versie is wat taken vandaag uitvoeren.",
+        "activeVersionChip": "Actief",
+        "lastUpdated": "Laatst bijgewerkt",
+        "metadataSection": "Metadata",
+        "versionLabel": "Versie",
+        "createdLabel": "Aangemaakt",
+        "updatedLabel": "Bijgewerkt",
+        "typeLlmJudge": "LLM Judge",
+        "typeRemote": "Remote",
+        "tabs": {
+          "configuration": "Configuratie",
+          "versions": "Versies",
+          "runs": "Uitvoeringen",
+          "usedBy": "Gebruikt door"
+        },
+        "kpis": {
+          "totalRuns": "Totaal aantal uitvoeringen (24u)",
+          "totalRunsSub": "Over alle verwijzende taken",
+          "successRate": "Slagingspercentage",
+          "successRateSub": "Laatste 24u",
+          "avgLatency": "Gem. latentie",
+          "avgLatencySub": "p50 over uitvoeringen",
+          "usedBy": "Gebruikt door",
+          "usedBySubSingular": "taak",
+          "usedBySubPlural": "taken"
+        },
+        "runs": {
+          "showingPrefix": "Wordt weergegeven",
+          "showingOf": "van",
+          "showingSuffix": "uitvoeringen",
+          "empty": "Geen scorer-uitvoeringen in dit venster.",
+          "spanLabel": "Span",
+          "traceLabel": "Trace",
+          "jobUnknown": "—",
+          "col": {
+            "time": "Tijd",
+            "job": "Taak",
+            "target": "Doel",
+            "score": "Score",
+            "latency": "Latentie",
+            "status": "Status"
+          }
+        }
+      },
+      "listTitle": "Scorers",
+      "listSubtitle": "Scorers worden uitgevoerd op je traces en produceren scores op gedefinieerde dimensies.",
+      "searchPlaceholder": "Scorers zoeken",
+      "allTypes": "Alle typen",
+      "newButton": "Nieuwe scorer",
+      "usedByJobs": "{count} taken",
+      "usedByJob": "{count} taak",
+      "columns": {
+        "name": "Naam",
+        "type": "Type",
+        "produces": "Produceert",
+        "version": "Versie",
+        "usedBy": "Gebruikt door",
+        "lastRun": "Laatste uitvoering",
+        "successRate": "Slagingspercentage (24u)",
+        "actions": "Acties"
+      },
+      "empty": {
+        "title": "Nog geen scorers",
+        "description": "Scorers zijn de uitvoeringseenheden van evaluatie. Ze nemen spans uit je productietraces en produceren scores op kwaliteitsdimensies die voor jou belangrijk zijn.",
+        "chipLlmJudge": "LLM Judge",
+        "chipRemote": "Remote",
+        "chipCode": "Code"
+      },
+      "noProviders": {
+        "title": "Voeg eerst een provider toe",
+        "description": "Scorers hebben een LLM-provider (OpenAI, Anthropic, enz.) nodig om te draaien. Voeg een provider toe in Instellingen voordat je scorers aanmaakt.",
+        "chipRequired": "Vereist voor LLM Judge",
+        "cta": "Provider toevoegen"
+      },
+      "import": {
+        "title": "Scorer importeren",
+        "button": "Importeren",
+        "customLabel": "Aangepast",
+        "customSubtitle": "Importeren vanuit JSON-bestand of URL",
+        "libraryLabel": "Bibliotheek",
+        "librarySubtitle": "Blader door en importeer uit de samengestelde catalogus",
+        "libraryDrawerTitle": "Scorerbibliotheek",
+        "outputMessages": "Uitvoerberichten",
+        "creation": "Aanmaken scorer",
+        "errors": {
+          "title": "Validatiefouten"
+        }
+      },
+      "export": {
+        "bulkButton": "Exporteren"
+      },
+      "descriptionPlaceholder": "Een korte samenvatting van wat deze scorer meet.",
+      "producesScoreHelp": "Welke dimensie meet deze scorer?",
+      "providerHelp": "Kies de LLM-provider die deze judge aanroept. Beheer providers in {settingsLink}.",
+      "providerHelpSettingsLink": "Instellingen",
+      "refreshProviders": "Providers vernieuwen",
+      "selectedPrefix": "Geselecteerd:",
+      "endpointLabel": "Endpoint:",
+      "defaultModelPreviewLabel": "Standaardmodel:",
+      "authLabel": "Auth:",
+      "authConfigured": "geconfigureerd",
+      "authNotConfigured": "niet geconfigureerd",
+      "rangeLabel": "Bereik:",
+      "healthyLabel": "Gezond:",
+      "typeLabel": "Type:",
+      "promptVariablesLabel": "Variabelen:",
+      "promptHelp": "Richt je op de evaluatielogica. Gebruik {inputVar} en {outputVar} als placeholders.",
+      "includeReasoningLabel": "Redenering opnemen",
+      "includeReasoningHint": "LLM legt zijn score uit. Opgeslagen in score.metadata.reasoning.",
+      "extraFieldsLabel": "Extra metadatavelden",
+      "extraFieldsOptional": "Optioneel",
+      "extraFieldsHint": "Voeg velden toe die de LLM naast de score moet uitvoeren. Opgeslagen in score.metadata voor latere analyse.",
+      "extraFields": {
+        "colName": "Veldnaam",
+        "colType": "Type",
+        "colDescription": "Beschrijving",
+        "namePlaceholder": "field_name",
+        "descriptionPlaceholder": "Wat moet de LLM in dit veld plaatsen?",
+        "addButton": "+ Veld toevoegen",
+        "previewSchema": "Gegenereerd schema bekijken",
+        "schemaTitle": "Gegenereerd JSON-schema",
+        "schemaLoading": "Schema wordt afgeleid…",
+        "schemaCopy": "Kopiëren",
+        "schemaCopied": "Gekopieerd",
+        "schemaCopyFailed": "Kopiëren van schema naar klembord mislukt.",
+        "typeString": "string",
+        "typeNumber": "number",
+        "typeBoolean": "boolean"
+      },
+      "authSection": "Authenticatie",
+      "headersSection": "Aangepaste headers",
+      "requestBodySection": "Verzoektekst",
+      "remoteUrlLabel": "URL",
+      "remoteTimeoutLabel": "Time-out (ms)",
+      "remoteRetriesLabel": "Max. nieuwe pogingen",
+      "remoteBackoffLabel": "Backoff",
+      "remoteBackoff": {
+        "exponential": "Exponentieel",
+        "linear": "Lineair",
+        "fixed": "Vast"
+      },
+      "remoteAuthLabel": "Auth-type",
+      "remoteAuth": {
+        "placeholder": "Selecteer auth-type",
+        "bearer": "Bearer-token",
+        "basic": "Basic Auth",
+        "apiKey": "API-sleutel",
+        "tokenLabel": "Token",
+        "usernameLabel": "Gebruikersnaam",
+        "passwordLabel": "Wachtwoord",
+        "headerNameLabel": "Headernaam",
+        "bearerTokenPlaceholder": "Plak bearer-token",
+        "basicUsernamePlaceholder": "gebruiker",
+        "basicPasswordPlaceholder": "••••••••",
+        "apiKeyHeaderPlaceholder": "X-API-Key",
+        "apiKeyTokenPlaceholder": "Plak API-sleutel",
+        "encryptedHint": "Versleuteld opgeslagen. Kan na opslaan niet worden bekeken."
+      },
+      "remoteHeaders": {
+        "subtitle": "Verzonden met elk verzoek.",
+        "colName": "Naam",
+        "colValue": "Waarde",
+        "colKey": "Naam",
+        "keyPlaceholder": "X-Custom-Header",
+        "valuePlaceholder": "waarde",
+        "addButton": "+ Header toevoegen"
       }
     },
     "job": {
@@ -4706,7 +5422,10 @@
       "scorerPicker": {
         "title": "Scorers",
         "hint": "Selecteer een of meer scorers om mee te doen voor elke gematchte reeks.",
-        "meta": "{type} · v {versie}"
+        "meta": "{type} · v {versie}",
+        "placeholder": "Scorers selecteren",
+        "searchPlaceholder": "Scorers zoeken…",
+        "empty": "Geen scorers beschikbaar. Maak er eerst een aan op het tabblad Scorers."
       },
       "filter": {
         "title": "Staat van het filter",
@@ -4731,7 +5450,117 @@
         "emptyValue": "—"
       },
       "selectAtLeastOne": "Selecteer minstens één scorer",
-      "saveError": "Kon de evaluatietaak niet opslaan"
+      "saveError": "Kon de evaluatietaak niet opslaan",
+      "detail": {
+        "close": "Sluiten",
+        "eyebrow": "Evaluatietaak",
+        "refresh": "Vernieuwen",
+        "descriptionSection": "Beschrijving",
+        "targetSection": "Doel",
+        "streamLabel": "Stream",
+        "streamTypeLabel": "Streamtype",
+        "filterLabel": "Filter",
+        "filterEmpty": "Geen filter — elke span wordt geëvalueerd",
+        "scorersSection": "Scorers",
+        "scorersEmpty": "Nog geen scorers gekoppeld aan deze taak.",
+        "scorerUnknown": "(verwijderde scorer)",
+        "scorerTypeLlmJudge": "LLM Judge",
+        "scorerTypeRemote": "Remote",
+        "producesPrefix": "Produceert",
+        "viewScorerHint": "Bekijken",
+        "inputMappingSection": "Invoertoewijzing",
+        "samplingSection": "Sampling",
+        "samplingModeLabel": "Modus",
+        "samplingValueLabel": "Waarde",
+        "samplingAll": "Elke match evalueren",
+        "samplingRate": "Willekeurige steekproef op basis van percentage",
+        "samplingCount": "Eerste N matches",
+        "metadataSection": "Metadata",
+        "versionLabel": "Versie",
+        "pipelineLabel": "Pipeline-ID",
+        "createdLabel": "Aangemaakt",
+        "updatedLabel": "Bijgewerkt",
+        "tabs": {
+          "configuration": "Configuratie",
+          "runs": "Uitvoeringen",
+          "failures": "Mislukkingen"
+        },
+        "kpis": {
+          "totalRuns": "Totaal aantal uitvoeringen",
+          "totalRunsSub": "Binnen geselecteerd venster",
+          "successRate": "Slagingspercentage",
+          "successRateSub": "Over alle scorers",
+          "avgLatency": "Gem. latentie",
+          "avgLatencySub": "Gem. over uitvoeringen",
+          "scorers": "Scorers",
+          "scorersSubSingular": "scorer gekoppeld",
+          "scorersSubPlural": "scorers gekoppeld"
+        },
+        "runs": {
+          "showingPrefix": "Wordt weergegeven",
+          "showingOf": "van",
+          "showingSuffix": "overeenkomende uitvoeringen",
+          "empty": "Geen uitvoeringen geregistreerd voor deze taak in het geselecteerde venster.",
+          "spanLabel": "SPAN",
+          "traceLabel": "TRACE",
+          "scorerUnknown": "(onbekende scorer)",
+          "col": {
+            "time": "Tijd",
+            "scorer": "Scorer",
+            "target": "Doel",
+            "score": "Score",
+            "latency": "Latentie",
+            "status": "Status"
+          }
+        },
+        "failures": {
+          "byScorerTitle": "Mislukkingen per scorer",
+          "byScorerEmpty": "Geen mislukkingen geregistreerd in het geselecteerde venster.",
+          "recentTitle": "Recente mislukkingen",
+          "recentEmpty": "Geen mislukte uitvoeringen in het geselecteerde venster.",
+          "col": {
+            "scorer": "Scorer",
+            "failureRate": "Mislukkingspercentage",
+            "count": "Mislukkingen / Totaal"
+          }
+        }
+      },
+      "listTitle": "Evaluatietaken",
+      "listSubtitle": "Implementeer scorers op je productie-tracestream.",
+      "searchPlaceholder": "Taken zoeken",
+      "allStatuses": "Alle statussen",
+      "newButton": "Nieuwe taak",
+      "scorersCount": "{count} scorers",
+      "scorerCount": "{count} scorer",
+      "columns": {
+        "name": "Naam",
+        "status": "Status",
+        "stream": "Stream",
+        "scorers": "Scorers",
+        "successRate": "Slagingspercentage",
+        "lastRun": "Laatste uitvoering",
+        "created": "Aangemaakt",
+        "actions": "Acties"
+      },
+      "empty": {
+        "title": "Nog geen evaluatietaken",
+        "description": "Evaluatietaken implementeren scorers op je productie-tracestream. Ze nemen een steekproef van overeenkomende spans, voeren de scorers asynchroon uit en slaan de resulterende scores op voor analyse.",
+        "chipStreams": "Productiestream",
+        "chipScorers": "Meerdere scorers",
+        "chipSampling": "Samplingbeheer"
+      },
+      "descriptionPlaceholder": "Wat bewaakt deze taak?",
+      "samplingValueHelp": "JSON: rate is een getal van 0-1, count is een positief geheel getal.",
+      "samplingValueAllHelp": "Niet van toepassing wanneer de modus Alles is — elke overeenkomende gebeurtenis wordt geëvalueerd.",
+      "samplingHelp": "Toepassen na Filter. Beheert de kosten — alleen overeenkomende spans tellen mee voor het percentage.",
+      "presets": {
+        "label": "Snelle presets",
+        "rootSpans": "Alleen root-spans",
+        "llmCalls": "LLM-aanroepen",
+        "toolCalls": "Toolaanroepen"
+      },
+      "createdAndActivated": "Evaluatietaak aangemaakt en geactiveerd",
+      "createdButActivateFailed": "Evaluatietaak aangemaakt, maar activeren is mislukt"
     },
     "quality": {
       "scopeLabel": "Alle kwaliteitsdimensies in deze werkruimte",
@@ -4808,6 +5637,10 @@
           "unhealthy": "Ongezond",
           "healthy": "Gezond",
           "coverage": "Dekking"
+        },
+        "empty": {
+          "title": "Wachten op je eerste scores",
+          "description": "Er zijn nog geen scores binnengekomen voor deze configuratie in het geselecteerde tijdsbereik. Ze verschijnen hier automatisch zodra een scorer die deze gebruikt wordt uitgevoerd."
         }
       },
       "sidebar": {
@@ -4876,7 +5709,53 @@
       "quality": "Kwaliteit",
       "evalJobs": "Vacatures bij Eval",
       "scorers": "Scorers",
-      "scoreConfigs": "Score-configuraties"
+      "scoreConfigs": "Score-configuraties",
+      "llmInsights": "LLM-inzichten"
+    },
+    "kpi": {
+      "totalCost": "Totale kosten",
+      "totalTokens": "Totaal aantal tokens",
+      "totalTraces": "Totaal aantal sporen",
+      "p95Latency": "P95 Latentie",
+      "errorRate": "Foutpercentage"
+    },
+    "panels": {
+      "costTrend": {
+        "title": "Kostenontwikkeling",
+        "subtitle": "USD per model"
+      },
+      "tokenTrend": {
+        "title": "Een symbolische trend",
+        "subtitle": "tokens per model"
+      },
+      "spanTrend": {
+        "title": "Spantrend",
+        "subtitle": "aantal spanwijdten per soort"
+      },
+      "latencyPercentiles": {
+        "title": "Latentie p50/p95/p99",
+        "subtitle": "alle LLM-gesprekken"
+      },
+      "tracesOverTime": {
+        "title": "Sporen na verloop van tijd",
+        "subtitle": "aantal tracering per service"
+      },
+      "errorsOverTime": {
+        "title": "Fouten in de loop van de tijd",
+        "subtitle": "aantal fouten"
+      },
+      "spansByModel": {
+        "title": "Overspanningen per model",
+        "subtitle": "aantal gesprekken per model"
+      },
+      "tokensByModel": {
+        "title": "Tokens per model",
+        "subtitle": "totaal aantal tokens per model"
+      },
+      "recentErrors": {
+        "title": "Recente fouten",
+        "subtitle": "laatste 10 mislukte overspanningen"
+      }
     }
   },
   "logs": {
@@ -4915,7 +5794,10 @@
       "removeFilterDescSql": "Er zijn SQL-voorwaarden toegepast op deze query",
       "openHistory": "Zoekgeschiedenis openen",
       "askAi": "Vraag AI om mijn vraag op te lossen",
-      "selectedRange": "het geselecteerde bereik"
+      "selectedRange": "het geselecteerde bereik",
+      "descOutOfRange": "Je tijdvenster bevat geen gegevens uit deze stream. Spring naar het moment waarop de gegevens voor het laatst zijn gezien.",
+      "jumpToData": "Naar nieuwste gegevens springen",
+      "descDataAtBoundary": "De stream bevat gegevens in dit venster, maar er kwamen geen gebeurtenissen overeen. Controleer je zoekgeschiedenis of vraag AI om hulp."
     },
     "error": {
       "sqlError": "SQL-syntaxisfout",
@@ -4984,5 +5866,16 @@
     "askAi": "Vraag AI om mijn vraag op te lossen",
     "showDetail": "Details weergeven",
     "hideDetail": "Details verbergen"
+  },
+  "refreshButton": {
+    "justNow": "net nu",
+    "secondsAgo": "{sec} s geleden",
+    "minutesAgo": "{min} m geleden",
+    "hoursAgo": "{h} h geleden",
+    "notYetRefreshed": "Nog niet vernieuwd",
+    "dataFresh": "Gegevens zijn vers",
+    "dataGettingStale": "Gegevens worden muf",
+    "dataStale": "Gegevens zijn verouderd",
+    "lastRefreshed": "Laatst vernieuwd: {time}"
   }
 }

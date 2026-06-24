@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import OButton from "../Button/OButton.vue";
 import type {
   RefreshButtonProps,
   RefreshButtonEmits,
 } from "./ORefreshButton.types";
+
+const { t } = useI18n();
 
 const props = withDefaults(defineProps<RefreshButtonProps>(), {
   lastRunAt: null,
@@ -24,11 +27,11 @@ const diffSeconds = (): number => {
 
 const getRelativeTime = (ts: number): string => {
   const sec = Math.floor((Date.now() - ts) / 1000);
-  if (sec < 5) return "just now";
-  if (sec < 60) return `${sec}s ago`;
+  if (sec < 5) return t("refreshButton.justNow");
+  if (sec < 60) return t("refreshButton.secondsAgo", { sec });
   const min = Math.floor(sec / 60);
-  if (min < 60) return `${min}m ago`;
-  return `${Math.floor(min / 60)}h ago`;
+  if (min < 60) return t("refreshButton.minutesAgo", { min });
+  return t("refreshButton.hoursAgo", { h: Math.floor(min / 60) });
 };
 
 const updateRelativeTime = () => {
@@ -51,15 +54,17 @@ const dotColor = computed(() => {
 
 const dotTitle = computed(() => {
   const s = diffSeconds();
-  if (s === Infinity) return "Not yet refreshed";
-  if (s < 30) return "Data is fresh";
-  if (s < 300) return "Data is getting stale";
-  return "Data is stale";
+  if (s === Infinity) return t("refreshButton.notYetRefreshed");
+  if (s < 30) return t("refreshButton.dataFresh");
+  if (s < 300) return t("refreshButton.dataGettingStale");
+  return t("refreshButton.dataStale");
 });
 
 const exactTime = computed(() => {
-  if (!props.lastRunAt) return "Not yet refreshed";
-  return `Last refreshed: ${new Date(props.lastRunAt).toLocaleTimeString()}`;
+  if (!props.lastRunAt) return t("refreshButton.notYetRefreshed");
+  return t("refreshButton.lastRefreshed", {
+    time: new Date(props.lastRunAt).toLocaleTimeString(),
+  });
 });
 
 onMounted(() => {
@@ -95,7 +100,7 @@ function handleClick(e: MouseEvent) {
       class="tw:text-xs tw:text-text-secondary tw:tabular-nums tw:whitespace-nowrap tw:select-none"
       :title="exactTime"
     >
-      {{ relativeTime || "just now" }}
+      {{ relativeTime || t("refreshButton.justNow") }}
     </span>
     <!-- refresh icon button -->
     <OButton
