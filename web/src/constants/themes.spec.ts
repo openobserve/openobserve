@@ -44,7 +44,7 @@ const createStorage = (initial: Record<string, string> = {}): Storage => {
 describe("theme registry", () => {
   describe("lookups", () => {
     it("finds a theme by name", () => {
-      expect(getThemeByName("O2 Pulse")?.id).toBe(2);
+      expect(getThemeByName("Ocean Breeze")?.id).toBe(2);
     });
 
     it("returns undefined for an unknown name", () => {
@@ -75,18 +75,19 @@ describe("theme registry", () => {
       const r = resolveThemeForMode({
         mode: "light",
         tempColor: "#ABCDEF",
-        appliedThemeName: "O2 Pulse",
+        appliedThemeName: "Ocean Breeze",
         customColor: "#111111",
+        orgColor: "#222222",
       });
       expect(r.source).toBe("preview");
       expect(r.themeColor).toBe("#ABCDEF");
     });
 
     it("resolves a predefined theme by NAME from the current registry color", () => {
-      const ocean = getThemeByName("O2 Pulse")!;
+      const ocean = getThemeByName("Ocean Breeze")!;
       const r = resolveThemeForMode({
         mode: "light",
-        appliedThemeName: "O2 Pulse",
+        appliedThemeName: "Ocean Breeze",
         // a stale cached color must be ignored in favour of the registry color
         customColor: "#000000",
       });
@@ -107,6 +108,7 @@ describe("theme registry", () => {
       const r = resolveThemeForMode({
         mode: "light",
         appliedThemeName: "Removed In v2",
+        orgColor: null,
       });
       expect(r.source).toBe("default");
       expect(r.themeColor).toBe(getDefaultTheme().light.themeColor);
@@ -122,14 +124,14 @@ describe("theme registry", () => {
       expect(r.themeColor).toBe("#FF0000");
     });
 
-    it("ignores any org color and uses the named default when nothing is selected", () => {
-      const def = getDefaultTheme();
+    it("falls back to org color when nothing is selected", () => {
       const r = resolveThemeForMode({
         mode: "dark",
         appliedThemeName: null,
+        orgColor: "#123456",
       });
-      expect(r.source).toBe("default");
-      expect(r.themeColor).toBe(def.dark.themeColor);
+      expect(r.source).toBe("org");
+      expect(r.themeColor).toBe("#123456");
     });
 
     it("falls back to the default theme (O2 Signature) when nothing else is set", () => {
@@ -156,7 +158,7 @@ describe("theme registry", () => {
       storage.setItem("appliedLightTheme", "2");
       migrateLegacyThemeStorage(storage);
       expect(storage.getItem(THEME_STORAGE_KEYS.light.appliedName)).toBe(
-        "O2 Pulse",
+        "Ocean Breeze",
       );
       expect(storage.getItem("appliedLightTheme")).toBeNull();
     });
@@ -179,10 +181,10 @@ describe("theme registry", () => {
 
     it("does not overwrite an already-migrated name key", () => {
       storage.setItem("appliedLightTheme", "2");
-      storage.setItem(THEME_STORAGE_KEYS.light.appliedName, "O2 Lens");
+      storage.setItem(THEME_STORAGE_KEYS.light.appliedName, "Sky Blue");
       migrateLegacyThemeStorage(storage);
       expect(storage.getItem(THEME_STORAGE_KEYS.light.appliedName)).toBe(
-        "O2 Lens",
+        "Sky Blue",
       );
     });
 

@@ -28,6 +28,7 @@ import { useRouter } from "vue-router";
 import { onMounted, watch } from "vue";
 import config from "@/aws-exports";
 import { applyCurrentTheme } from "@/utils/themeManager";
+import { migrateLegacyThemeStorage } from "@/constants/themes";
 import OToastProvider from "@/lib/feedback/Toast/OToastProvider.vue";
 import ConfirmDialogProvider from "@/components/ConfirmDialogProvider.vue";
 
@@ -48,6 +49,33 @@ export default {
     // in main.ts (which also runs the legacy id→name migration). Re-applying here
     // is a no-op safety net once the store is available.
     onMounted(() => {
+      // One-time migration: clear saved colors that were old defaults so the
+      // current default takes effect automatically.
+      const THEME_MIGRATION_KEY = 'themeMigrationV3';
+      if (!localStorage.getItem(THEME_MIGRATION_KEY)) {
+        const OLD_LIGHT_DEFAULTS = ['#1a8a7a', '#6B76E3', '#5B9FBE'];
+        const OLD_DARK_DEFAULTS  = ['#3ab9aa', '#818CF8', '#5B9FBE'];
+        const savedLight = localStorage.getItem('customLightColor');
+        const savedDark  = localStorage.getItem('customDarkColor');
+        if (savedLight && OLD_LIGHT_DEFAULTS.map(c => c.toLowerCase()).includes(savedLight.toLowerCase())) {
+          localStorage.removeItem('customLightColor');
+          localStorage.removeItem('appliedLightTheme');
+        }
+        if (savedDark && OLD_DARK_DEFAULTS.map(c => c.toLowerCase()).includes(savedDark.toLowerCase())) {
+          localStorage.removeItem('customDarkColor');
+          localStorage.removeItem('appliedDarkTheme');
+        }
+        localStorage.setItem(THEME_MIGRATION_KEY, '1');
+      }
+
+      // One-time migration: convert the legacy id-based theme selection
+      // (appliedLightTheme/appliedDarkTheme) to the name-based model.
+      const THEME_NAME_MIGRATION_KEY = 'themeNameMigrationV4';
+      if (!localStorage.getItem(THEME_NAME_MIGRATION_KEY)) {
+        migrateLegacyThemeStorage();
+        localStorage.setItem(THEME_NAME_MIGRATION_KEY, '1');
+      }
+
       initializeThemeColors();
     });
 
@@ -62,12 +90,14 @@ export default {
     );
 
     /**
-     * Resolve and apply theme colors for the current mode. Priority is handled
-     * centrally by the theme manager / registry:
+     * Initialize and apply theme colors for the current mode.
+     * Resolution priority (highest to lowest) is handled centrally by the theme
+     * manager / registry:
      *   1. Vuex tempThemeColors (live preview from General Settings)
      *   2. Selected predefined theme — resolved by NAME from the registry
      *   3. Selected custom theme — the persisted hex color
-     *   4. Default theme (O2 Signature) — resolved by NAME from the registry
+     *   4. Organization settings (backend default for the org)
+     *   5. Default theme (O2 Signature) — resolved by NAME from the registry
      */
     const initializeThemeColors = () => {
       applyCurrentTheme(store);

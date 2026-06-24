@@ -16,7 +16,6 @@
 import { applyThemeColors, type SemanticColors } from "@/utils/theme";
 import {
   resolveThemeForMode,
-  migrateLegacyThemeStorage,
   THEME_STORAGE_KEYS,
   type ResolvedTheme,
 } from "@/constants/themes";
@@ -25,9 +24,8 @@ import {
  * Theme manager — the single orchestrator that resolves the effective theme
  * (by name for predefined / default, by color for custom) and applies it.
  *
- * Used by main.ts (synchronous bootstrap before first paint), App.vue (on load
- * and theme-mode toggle) and PredefinedThemes.vue, so resolution logic lives in
- * exactly one place.
+ * Used by App.vue (on load and theme-mode toggle) and PredefinedThemes.vue so
+ * resolution logic lives in exactly one place.
  */
 
 type ThemeMode = "light" | "dark";
@@ -37,6 +35,12 @@ interface ThemeStoreLike {
   state: {
     theme?: string;
     tempThemeColors?: { light?: string | null; dark?: string | null };
+    organizationData?: {
+      organizationSettings?: {
+        light_mode_theme_color?: string | null;
+        dark_mode_theme_color?: string | null;
+      };
+    };
   };
 }
 
@@ -52,18 +56,18 @@ const parseSemantic = (raw: string | null): SemanticColors | undefined => {
 /**
  * Resolve and apply the theme for a specific mode, then refresh the localStorage
  * render-cache (`customLightColor`/`customDarkColor` + semantic colors) so chart
- * consumers that read those keys directly always reflect the active theme.
+ * consumers that read those keys directly stay in sync with the selected theme.
  *
- * The cache is rewritten for every persisted source (predefined re-derived by
- * name, custom, and the default theme) — so a color change shipped in a release
- * propagates to direct localStorage readers too. The transient live preview is
- * never persisted.
+ * The render-cache is only rewritten for predefined themes (where colors are
+ * re-derived from the registry by name). For custom themes the cache already IS
+ * the source of truth, and for preview/org/default we leave it untouched.
  */
 export const applyThemeForMode = (
   mode: ThemeMode,
   store: ThemeStoreLike,
 ): ResolvedTheme => {
   const keys = THEME_STORAGE_KEYS[mode];
+  const org = store.state?.organizationData?.organizationSettings;
 
   const resolved = resolveThemeForMode({
     mode,
@@ -71,6 +75,10 @@ export const applyThemeForMode = (
     appliedThemeName: localStorage.getItem(keys.appliedName),
     customColor: localStorage.getItem(keys.color),
     customSemanticColors: parseSemantic(localStorage.getItem(keys.semantic)),
+    orgColor:
+      mode === "light"
+        ? org?.light_mode_theme_color
+        : org?.dark_mode_theme_color,
   });
 
   applyThemeColors(
@@ -80,9 +88,9 @@ export const applyThemeForMode = (
     resolved.semanticColors,
   );
 
-  // Refresh the render-cache for any persisted source so direct localStorage
-  // readers (charts) stay in sync. Never persist the transient live preview.
-  if (resolved.source !== "preview") {
+  // Refresh the render-cache from the registry for predefined themes so a
+  // color change shipped in a release propagates to direct localStorage readers.
+  if (resolved.source === "predefined") {
     localStorage.setItem(keys.color, resolved.themeColor);
     if (resolved.semanticColors) {
       localStorage.setItem(keys.semantic, JSON.stringify(resolved.semanticColors));
@@ -98,22 +106,4 @@ export const applyThemeForMode = (
 export const applyCurrentTheme = (store: ThemeStoreLike): ResolvedTheme => {
   const mode: ThemeMode = store.state.theme === "dark" ? "dark" : "light";
   return applyThemeForMode(mode, store);
-};
-
-/**
- * Synchronous theme bootstrap — call BEFORE the app mounts (in main.ts) so the
- * very first paint already uses the resolved theme instead of the base
- * stylesheet default. Resolution here depends only on localStorage + the theme
- * registry (no Vuex/org/network), so it can run fully synchronously.
- */
-export const bootstrapTheme = (): void => {
-  // Convert any legacy id-based selection to the name-based model first, so the
-  // resolve below reads the correct `appliedXThemeName` keys.
-  migrateLegacyThemeStorage();
-
-  const mode: ThemeMode =
-    localStorage.getItem("theme") === "dark" ? "dark" : "light";
-
-  // No store yet → no live preview at boot.
-  applyThemeForMode(mode, { state: { theme: mode, tempThemeColors: {} } });
 };

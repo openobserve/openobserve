@@ -20,11 +20,7 @@ vi.mock("@/utils/theme", () => ({
   applyThemeColors: vi.fn(),
 }));
 
-import {
-  applyThemeForMode,
-  applyCurrentTheme,
-  bootstrapTheme,
-} from "./themeManager";
+import { applyThemeForMode, applyCurrentTheme } from "./themeManager";
 import { applyThemeColors } from "@/utils/theme";
 import {
   CUSTOM_THEME_NAME,
@@ -37,6 +33,7 @@ const storeWith = (overrides: any = {}) => ({
   state: {
     theme: "light",
     tempThemeColors: { light: null, dark: null },
+    organizationData: { organizationSettings: {} },
     ...overrides,
   },
 });
@@ -61,8 +58,8 @@ describe("themeManager", () => {
   });
 
   it("resolves a predefined theme by name and refreshes the color cache", () => {
-    const ocean = getThemeByName("O2 Pulse")!;
-    localStorage.setItem(THEME_STORAGE_KEYS.light.appliedName, "O2 Pulse");
+    const ocean = getThemeByName("Ocean Breeze")!;
+    localStorage.setItem(THEME_STORAGE_KEYS.light.appliedName, "Ocean Breeze");
     // Stale cached color that must be overwritten from the registry.
     localStorage.setItem(THEME_STORAGE_KEYS.light.color, "#000000");
 
@@ -111,12 +108,8 @@ describe("themeManager", () => {
     expect(localStorage.getItem(THEME_STORAGE_KEYS.light.color)).toBe("#FF0000");
   });
 
-  it("does not persist the transient live preview color", () => {
-    const resolved = applyThemeForMode(
-      "light",
-      storeWith({ tempThemeColors: { light: "#ABCDEF", dark: null } }),
-    );
-    expect(resolved.source).toBe("preview");
+  it("does not write a render-cache for the default theme", () => {
+    applyThemeForMode("light", storeWith());
     expect(localStorage.getItem(THEME_STORAGE_KEYS.light.color)).toBeNull();
   });
 
@@ -129,59 +122,5 @@ describe("themeManager", () => {
       false,
       def.dark.semanticColors,
     );
-  });
-
-  it("refreshes the render-cache for the default theme so charts track it", () => {
-    const def = getDefaultTheme();
-    applyThemeForMode("light", storeWith());
-    // No explicit selection, but the cache now reflects the default color.
-    expect(localStorage.getItem(THEME_STORAGE_KEYS.light.color)).toBe(
-      def.light.themeColor,
-    );
-  });
-
-  describe("bootstrapTheme", () => {
-    it("applies the default theme synchronously when nothing is stored", () => {
-      const def = getDefaultTheme();
-      bootstrapTheme();
-      expect(applyThemeColors).toHaveBeenCalledWith(
-        def.light.themeColor,
-        "light",
-        false,
-        def.light.semanticColors,
-      );
-    });
-
-    it("uses the saved mode and selected predefined theme", () => {
-      const ocean = getThemeByName("O2 Pulse")!;
-      localStorage.setItem("theme", "dark");
-      localStorage.setItem(THEME_STORAGE_KEYS.dark.appliedName, "O2 Pulse");
-
-      bootstrapTheme();
-
-      expect(applyThemeColors).toHaveBeenCalledWith(
-        ocean.dark.themeColor,
-        "dark",
-        false,
-        undefined,
-      );
-    });
-
-    it("migrates a legacy id selection before applying", () => {
-      localStorage.setItem("appliedLightTheme", "2"); // legacy id for O2 Pulse
-      const ocean = getThemeByName("O2 Pulse")!;
-
-      bootstrapTheme();
-
-      expect(localStorage.getItem(THEME_STORAGE_KEYS.light.appliedName)).toBe(
-        "O2 Pulse",
-      );
-      expect(applyThemeColors).toHaveBeenCalledWith(
-        ocean.light.themeColor,
-        "light",
-        false,
-        undefined,
-      );
-    });
   });
 });

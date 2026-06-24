@@ -74,65 +74,63 @@ export const THEME_STORAGE_KEYS = {
  * (or who is on the default) will pick up the change on next load.
  */
 export const PREDEFINED_THEMES: PredefinedTheme[] = [
-  // Theme names are intentionally color-agnostic (observability/product terms),
-  // so a theme's accent colors can change in any release without the name going stale.
   {
     id: 10,
     name: "O2 Signature",
     light: {
-      themeColor: "#575FC5",
+      themeColor: "#6B76E3",
       themeColorOpacity: 10,
     },
     dark: {
-      themeColor: "#6069D3",
+      themeColor: "#8B8DF0",
       themeColorOpacity: 10,
     },
   },
   {
     id: 2,
-    name: "O2 Pulse",
+    name: "Ocean Breeze",
     light: {
-      themeColor: "#3F7994",
+      themeColor: "#7678ed",
       themeColorOpacity: 10,
     },
     dark: {
-      themeColor: "#3F7994",
+      themeColor: "#8B8DF0",
       themeColorOpacity: 10,
     },
   },
   {
     id: 4,
-    name: "O2 Horizon",
+    name: "Purple Dream",
     light: {
-      themeColor: "#077A7F",
+      themeColor: "#9C27B0",
       themeColorOpacity: 10,
     },
     dark: {
-      themeColor: "#588CF3",
+      themeColor: "#BA68C8",
       themeColorOpacity: 10,
     },
   },
   {
     id: 5,
-    name: "O2 Beacon",
+    name: "Indigo Night",
     light: {
-      themeColor: "#3369D6",
+      themeColor: "#3F51B5",
       themeColorOpacity: 10,
     },
     dark: {
-      themeColor: "#6EA8FE",
+      themeColor: "#5C6BC0",
       themeColorOpacity: 10,
     },
   },
   {
     id: 8,
-    name: "O2 Lens",
+    name: "Sky Blue",
     light: {
-      themeColor: "#4682FA",
+      themeColor: "#0288D1",
       themeColorOpacity: 10,
     },
     dark: {
-      themeColor: "#E56D17",
+      themeColor: "#29B6F6",
       themeColorOpacity: 10,
     },
   },
@@ -194,11 +192,16 @@ export const getThemeById = (
 export const getDefaultTheme = (): PredefinedTheme =>
   getThemeByName(DEFAULT_THEME_NAME) ?? PREDEFINED_THEMES[0];
 
-/** Slugify a theme name into kebab-case for data-test attributes ("O2 Pulse" -> "o2-pulse"). */
+/** Slugify a theme name into kebab-case for data-test attributes ("Ocean Breeze" -> "ocean-breeze"). */
 export const themeNameSlug = (name: string): string =>
   name.toLowerCase().replace(/\s+/g, "-");
 
-export type ThemeSource = "preview" | "predefined" | "custom" | "default";
+export type ThemeSource =
+  | "preview"
+  | "predefined"
+  | "custom"
+  | "org"
+  | "default";
 
 export interface ResolveThemeInput {
   mode: "light" | "dark";
@@ -210,6 +213,8 @@ export interface ResolveThemeInput {
   customColor?: string | null;
   /** Persisted semantic colors for a custom theme, if any. */
   customSemanticColors?: SemanticColors | null;
+  /** Organization-level configured color (backend default). */
+  orgColor?: string | null;
 }
 
 export interface ResolvedTheme {
@@ -228,11 +233,8 @@ export interface ResolvedTheme {
  *   1. Live preview (tempColor)
  *   2. Selected predefined theme — resolved by NAME from the registry
  *   3. Selected custom theme — the persisted hex color
- *   4. Default theme (O2 Signature) — resolved by NAME from the registry
- *
- * The named default is authoritative: when no theme is explicitly selected it
- * always wins, so changing the default theme's colors in the registry takes
- * effect immediately. (Org-level theme colors are not part of this resolution.)
+ *   4. Organization-configured color
+ *   5. Default theme (O2 Signature) — resolved by NAME from the registry
  */
 export const resolveThemeForMode = (input: ResolveThemeInput): ResolvedTheme => {
   const mode = input.mode;
@@ -269,7 +271,12 @@ export const resolveThemeForMode = (input: ResolveThemeInput): ResolvedTheme => 
     };
   }
 
-  // 4. Default theme (O2 Signature), resolved by name
+  // 4. Organization-configured color
+  if (input.orgColor) {
+    return { themeColor: input.orgColor, isDefault: false, source: "org" };
+  }
+
+  // 5. Default theme (O2 Signature), resolved by name
   const def = getDefaultTheme();
   const m = def[mode];
   return {
