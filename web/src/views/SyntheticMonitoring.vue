@@ -853,20 +853,24 @@
       </div>
     </ODialog>
 
-    <!-- BACKDROP -->
-    <transition name="bf">
-      <div v-if="showDrawer" class="syn-backdrop" @click="showDrawer = false" />
-    </transition>
-
-    <!-- SLIDE-OVER DRAWER -->
-    <div class="syn-drawer" :class="{ 'syn-drawer--open': showDrawer }">
-      <div class="drw-header">
-        <div>
-          <div class="drw-title">{{ editTarget ? 'Edit Monitor' : 'New Monitor' }}</div>
-          <div class="drw-sub">{{ editTarget ? editTarget.url : 'Configure a new synthetic check' }}</div>
+    <!-- DRAWER -->
+    <ODrawer
+      v-model:open="showDrawer"
+      :title="editTarget ? 'Edit Monitor' : 'New Monitor'"
+      :sub-title="editTarget ? editTarget.url : 'Configure a new synthetic check'"
+      size="lg"
+    >
+      <template #footer>
+        <div class="drw-footer">
+          <OButton variant="ghost" :disabled="stepIdx === 0" @click="prevStep">Back</OButton>
+          <div style="display:flex;gap:8px">
+            <OButton variant="ghost" @click="showDrawer = false">Cancel</OButton>
+            <OButton v-if="stepIdx < steps.length - 1" variant="primary" @click="nextStep">Continue →</OButton>
+            <OButton v-else variant="primary" @click="saveMonitor">{{ editTarget ? 'Save changes' : 'Create monitor' }}</OButton>
+          </div>
         </div>
-        <OButton variant="ghost" size="icon" @click="showDrawer = false"><OIcon name="close" size="sm" /></OButton>
-      </div>
+      </template>
+
       <div class="drw-steps">
         <div v-for="(step, i) in steps" :key="step.key"
           class="drw-step" :class="{ 'drw-step--active': currentStep === step.key, 'drw-step--done': stepIdx > i }"
@@ -964,15 +968,7 @@
           </div>
         </template>
       </div>
-      <div class="drw-footer">
-        <OButton variant="ghost" :disabled="stepIdx === 0" @click="prevStep">Back</OButton>
-        <div style="display:flex;gap:8px">
-          <OButton variant="ghost" @click="showDrawer = false">Cancel</OButton>
-          <OButton v-if="stepIdx < steps.length - 1" variant="primary" @click="nextStep">Continue →</OButton>
-          <OButton v-else variant="primary" @click="saveMonitor">{{ editTarget ? 'Save changes' : 'Create monitor' }}</OButton>
-        </div>
-      </div>
-    </div>
+    </ODrawer>
   </div>
 </template>
 
@@ -994,6 +990,7 @@ import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OPagination from "@/lib/navigation/Pagination/OPagination.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 
 const router = useRouter();
 
@@ -1855,17 +1852,8 @@ const saveMonitor = () => { showDrawer.value=false; };
 .pl-code-label   { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:var(--o2-tab-text-color); margin-bottom:5px; }
 .pl-code         { font-family:monospace; font-size:12px; margin:0; line-height:1.65; white-space:pre-wrap; word-break:break-all; }
 
-/* ── BACKDROP & DRAWER ── */
-.syn-backdrop { position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:2000; }
-.bf-enter-active,.bf-leave-active { transition:opacity .22s; }
-.bf-enter-from,.bf-leave-to { opacity:0; }
-
-.syn-drawer       { position:fixed; top:0; right:0; width:540px; max-width:95vw; height:100vh; background:var(--o2-card-background); box-shadow:-6px 0 30px rgba(0,0,0,.2); z-index:2001; display:flex; flex-direction:column; transform:translateX(100%); transition:transform .25s cubic-bezier(.4,0,.2,1); }
-.syn-drawer--open { transform:translateX(0); }
-.drw-header { display:flex; align-items:flex-start; justify-content:space-between; padding:18px 22px 14px; border-bottom:1px solid var(--o2-border-color); flex-shrink:0; }
-.drw-title  { font-size:15px; font-weight:700; }
-.drw-sub    { font-size:12px; color:var(--o2-tab-text-color); margin-top:2px; }
-.drw-steps  { display:flex; align-items:center; padding:0 22px; border-bottom:1px solid var(--o2-border-color); flex-shrink:0; overflow-x:auto; }
+/* ── DRAWER ── */
+.drw-steps  { display:flex; align-items:center; padding:0 22px; border-bottom:1px solid var(--o2-border-color); overflow-x:auto; position:sticky; top:0; background:var(--o2-card-background); z-index:1; }
 .drw-step   { display:flex; align-items:center; gap:7px; padding:10px 10px; font-size:12px; font-weight:500; color:var(--o2-tab-text-color); cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-1px; white-space:nowrap; user-select:none; transition:color .12s; }
 .drw-step--active { color:var(--q-primary); border-bottom-color:var(--q-primary); font-weight:600; }
 .drw-step--done   { color:#16a34a; }
