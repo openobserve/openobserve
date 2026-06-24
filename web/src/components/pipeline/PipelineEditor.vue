@@ -1167,18 +1167,19 @@ const cleanupPipelinesContextProvider = () => {
   animation: none !important;
 }
 
-/* Ensure dragging nodes have zero lag */
+/* Ensure dragging nodes have zero lag.
+   NOTE: never set `transform: none` here — Vue Flow positions each node via an
+   inline `transform: translate(x, y)`, so zeroing it would snap the node to the
+   canvas origin mid-drag and only restore on release. */
 .vue-flow__node.dragging,
 .vue-flow__node:active {
   transition: none !important;
-  transform: none !important;
   animation: none !important;
 }
 
 .vue-flow__node.dragging *,
 .vue-flow__node:active * {
   transition: none !important;
-  transform: none !important;
   animation: none !important;
 }
 
@@ -1186,7 +1187,7 @@ const cleanupPipelinesContextProvider = () => {
   padding: 8px 16px;
   width: auto;
   min-height: 44px;
-  transition: all 0.3s ease;
+  transition: background 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
   border-radius: 12px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
   cursor: grab;
@@ -1214,7 +1215,7 @@ const cleanupPipelinesContextProvider = () => {
   border-radius: 12px;
   background: rgba(239, 246, 255, 0.8);
   box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1);
-  transition: all 0.3s ease;
+  transition: background 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
   cursor: grab;
   min-height: 36px;
   padding: 8px 16px;
@@ -1240,11 +1241,11 @@ const cleanupPipelinesContextProvider = () => {
   min-height: 36px;
   padding: 8px 16px;
   border: 1px solid rgba(74, 222, 128, 0.4);
-  color: var(--o2-primary-background);
+  color: #1f2937;
   border-radius: 8px;
   background: rgba(240, 253, 244, 0.9);
   box-shadow: 0 2px 8px rgba(34, 197, 94, 0.1);
-  transition: all 0.3s ease;
+  transition: background 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
 }
 
 .o2vf_node .vue-flow__node-output:hover {
@@ -1271,7 +1272,7 @@ const cleanupPipelinesContextProvider = () => {
   border-radius: 12px;
   background: rgba(255, 251, 235, 0.8);
   box-shadow: 0 4px 12px rgba(217, 119, 6, 0.1);
-  transition: all 0.3s ease;
+  transition: background 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
   cursor: grab;
   min-height: 36px;
   padding: 8px 16px;
