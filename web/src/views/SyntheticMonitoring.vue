@@ -13,16 +13,19 @@
         </div>
       </div>
       <div class="syn-hdr-actions">
-        <button class="geo-hdr-btn" :class="{ 'geo-hdr-btn--alert': geoIssues.length }" @click="showIssuesModal = true">
-          <OIcon :name="geoIssues.length ? 'error' : 'check-circle'" size="xs"/>
+        <OButton variant="ghost" size="sm" :class="{ 'geo-hdr-btn--alert': geoIssues.length }" @click="showIssuesModal = true">
+          <template #icon-left><OIcon :name="geoIssues.length ? 'error' : 'check-circle'" size="xs" /></template>
           Active Issues
           <span v-if="geoIssues.length" class="geo-hdr-badge">{{ geoIssues.length }}</span>
-        </button>
-        <button class="geo-hdr-btn" @click="showHeatmapModal = true">
-          <OIcon name="language" size="xs"/>
+        </OButton>
+        <OButton variant="ghost" size="sm" @click="showHeatmapModal = true">
+          <template #icon-left><OIcon name="language" size="xs" /></template>
           Geo Map
-        </button>
-        <button class="syn-new-btn" @click="openCreate"><OIcon name="add" size="sm" />New Monitor</button>
+        </OButton>
+        <OButton variant="primary" @click="openCreate">
+          <template #icon-left><OIcon name="add" size="sm" /></template>
+          New Monitor
+        </OButton>
       </div>
     </div>
 
@@ -73,7 +76,10 @@
       <div style="flex:1" />
 
       <template v-if="activeTab === 'private'">
-        <button class="syn-new-btn"><OIcon name="add" size="sm" />Add Location</button>
+        <OButton variant="primary">
+          <template #icon-left><OIcon name="add" size="sm" /></template>
+          Add Location
+        </OButton>
       </template>
     </div>
 
@@ -128,10 +134,10 @@
               <td class="syn-td td-muted">{{ m.lastCheck }}</td>
               <td class="syn-td td-center" @click.stop>
                 <div class="row-actions">
-                  <button class="act-btn" title="Run now" @click.stop><OIcon name="play-arrow" size="sm" /></button>
-                  <button class="act-btn" title="Edit" @click.stop="openEdit(m)"><OIcon name="edit" size="sm" /></button>
-                  <button class="act-btn" title="Pause" @click.stop><OIcon name="pause" size="sm" /></button>
-                  <button class="act-btn act-btn--del" title="Delete" @click.stop><OIcon name="delete" size="sm" /></button>
+                  <OButton variant="ghost" size="icon" title="Run now" @click.stop><OIcon name="play-arrow" size="sm" /></OButton>
+                  <OButton variant="ghost" size="icon" title="Edit" @click.stop="openEdit(m)"><OIcon name="edit" size="sm" /></OButton>
+                  <OButton variant="ghost" size="icon" title="Pause" @click.stop><OIcon name="pause" size="sm" /></OButton>
+                  <OButton variant="destructive" size="icon" title="Delete" @click.stop><OIcon name="delete" size="sm" /></OButton>
                 </div>
               </td>
             </tr>
@@ -141,7 +147,10 @@
           <OIcon name="radar" size="xl" class="syn-empty-icon" />
           <div style="font-size:15px;font-weight:600">No monitors found</div>
           <div style="font-size:13px;color:var(--o2-tab-text-color)">Adjust filters or create your first monitor.</div>
-          <button class="syn-new-btn" @click="openCreate"><OIcon name="add" size="sm" />Create monitor</button>
+          <OButton variant="primary" @click="openCreate">
+            <template #icon-left><OIcon name="add" size="sm" /></template>
+            Create monitor
+          </OButton>
         </div>
       </div>
 
@@ -196,9 +205,9 @@
               <td class="syn-td td-muted">{{ m.lastCheck }}</td>
               <td class="syn-td td-center" @click.stop>
                 <div class="row-actions">
-                  <button class="act-btn" title="Run" @click.stop><OIcon name="play-arrow" size="sm" /></button>
-                  <button class="act-btn" title="Edit" @click.stop="openEdit(m)"><OIcon name="edit" size="sm" /></button>
-                  <button class="act-btn act-btn--del" title="Delete" @click.stop><OIcon name="delete" size="sm" /></button>
+                  <OButton variant="ghost" size="icon" title="Run" @click.stop><OIcon name="play-arrow" size="sm" /></OButton>
+                  <OButton variant="ghost" size="icon" title="Edit" @click.stop="openEdit(m)"><OIcon name="edit" size="sm" /></OButton>
+                  <OButton variant="destructive" size="icon" title="Delete" @click.stop><OIcon name="delete" size="sm" /></OButton>
                 </div>
               </td>
             </tr>
@@ -245,9 +254,9 @@
               <td class="syn-td td-muted">{{ m.lastCheck }}</td>
               <td class="syn-td td-center" @click.stop>
                 <div class="row-actions">
-                  <button class="act-btn" title="Run" @click.stop><OIcon name="play-arrow" size="sm" /></button>
-                  <button class="act-btn" title="Edit" @click.stop="openEdit(m)"><OIcon name="edit" size="sm" /></button>
-                  <button class="act-btn act-btn--del" title="Delete" @click.stop><OIcon name="delete" size="sm" /></button>
+                  <OButton variant="ghost" size="icon" title="Run" @click.stop><OIcon name="play-arrow" size="sm" /></OButton>
+                  <OButton variant="ghost" size="icon" title="Edit" @click.stop="openEdit(m)"><OIcon name="edit" size="sm" /></OButton>
+                  <OButton variant="destructive" size="icon" title="Delete" @click.stop><OIcon name="delete" size="sm" /></OButton>
                 </div>
               </td>
             </tr>
@@ -274,8 +283,8 @@
                 <span class="pl-card-title">{{ loc.name }}</span>
               </div>
               <div style="display:flex;align-items:center;gap:2px">
-                <button class="act-btn" title="Edit"><OIcon name="edit" size="sm" /></button>
-                <button class="act-btn act-btn--del" title="Remove"><OIcon name="delete" size="sm" /></button>
+                <OButton variant="ghost" size="icon" title="Edit"><OIcon name="edit" size="sm" /></OButton>
+                <OButton variant="destructive" size="icon" title="Remove"><OIcon name="delete" size="sm" /></OButton>
               </div>
             </div>
             <div class="pl-card-region"><OIcon name="location-on" size="xs" class="pl-icon-muted" />{{ loc.region }}</div>
@@ -298,7 +307,7 @@
             <OIcon name="add-circle" size="lg" class="pl-icon-muted" />
             <div style="font-size:13px;font-weight:600;margin-top:10px">Add private location</div>
             <div style="font-size:11px;color:var(--o2-tab-text-color);margin-top:4px;text-align:center;line-height:1.5">Run checks from your servers, VPC, or on-premise network</div>
-            <button class="syn-new-btn" style="margin-top:12px;font-size:11px;padding:4px 10px">Get started</button>
+            <OButton variant="primary" size="sm" class="tw:mt-3">Get started</OButton>
           </div>
         </div>
 
@@ -316,7 +325,7 @@
   -e O2_PRIVATE_LOC_KEY=&lt;your_key&gt; \
   -e O2_ENDPOINT=https://your-openobserve-host \
   openobserve/syn-agent:latest</pre>
-                  <button class="pl-copy-btn" title="Copy"><OIcon name="content-copy" size="xs" /></button>
+                  <OButton variant="ghost" size="icon" title="Copy"><OIcon name="content-copy" size="xs" /></OButton>
                 </div>
               </div>
             </div>
@@ -409,7 +418,7 @@
                   <div class="dp-title">{{ detailPanel.monitor.name }}</div>
                   <div class="dp-url">{{ detailPanel.monitor.url }}</div>
                 </div>
-                <button class="dp-close" @click="closeDetail"><OIcon name="close" size="sm"/></button>
+                <OButton variant="ghost" size="icon" @click="closeDetail"><OIcon name="close" size="sm" /></OButton>
               </div>
               <div class="dp-badges">
                 <span class="badge" :class="'badge--'+detailPanel.monitor.type.toLowerCase()">{{ detailPanel.monitor.type }}</span>
@@ -556,12 +565,13 @@
               <!-- ── LOGS ── -->
               <template v-if="detailPanel.tab === 'logs'">
                 <div class="dp-log-filters">
-                  <button v-for="lv in ['ALL','ERROR','WARN','INFO','DEBUG']" :key="lv"
-                    class="dp-logf-btn" :class="{ 'dp-logf-btn--active': dpLogFilter === lv }"
+                  <OButton v-for="lv in ['ALL','ERROR','WARN','INFO','DEBUG']" :key="lv"
+                    :variant="dpLogFilter === lv ? 'primary' : 'ghost'"
+                    size="sm"
                     @click="dpLogFilter = lv">
                     {{ lv }}
                     <span v-if="lv !== 'ALL' && dpLogCounts[lv]" class="dp-tab-ct">{{ dpLogCounts[lv] }}</span>
-                  </button>
+                  </OButton>
                   <span style="flex:1"/>
                   <span class="dp-log-summary">{{ dpFilteredLogs.length }} entries · window: {{ detailPanel.logs[0]?.time ?? '' }} UTC</span>
                   <span class="dp-mocked-pill">mocked</span>
@@ -798,7 +808,7 @@
                 <span class="geo-leg-item"><span class="geo-leg-dot" style="background:#f59e0b"/><span>Degraded</span></span>
                 <span class="geo-leg-item"><span class="geo-leg-dot" style="background:#ef4444"/><span>Down</span></span>
               </div>
-              <button class="geo-modal-close" @click="showHeatmapModal = false"><OIcon name="close" size="sm"/></button>
+              <OButton variant="ghost" size="icon" @click="showHeatmapModal = false"><OIcon name="close" size="sm" /></OButton>
             </div>
             <div class="geo-modal-body">
               <div ref="heatmapChartEl" class="geo-echarts-map"></div>
@@ -816,7 +826,7 @@
             <div class="geo-modal-hdr">
               <OIcon :name="geoIssues.length ? 'error' : 'check-circle'" size="sm" :class="geoIssues.length ? 'c-r' : 'c-g'"/>
               <span class="geo-modal-title">Active Issues</span>
-              <button class="geo-modal-close" @click="showIssuesModal = false"><OIcon name="close" size="sm"/></button>
+              <OButton variant="ghost" size="icon" @click="showIssuesModal = false"><OIcon name="close" size="sm" /></OButton>
             </div>
             <div class="issues-body">
               <!-- All clear -->
@@ -869,7 +879,7 @@
           <div class="drw-title">{{ editTarget ? 'Edit Monitor' : 'New Monitor' }}</div>
           <div class="drw-sub">{{ editTarget ? editTarget.url : 'Configure a new synthetic check' }}</div>
         </div>
-        <button class="drw-close-btn" @click="showDrawer = false"><OIcon name="close" size="sm" /></button>
+        <OButton variant="ghost" size="icon" @click="showDrawer = false"><OIcon name="close" size="sm" /></OButton>
       </div>
       <div class="drw-steps">
         <div v-for="(step, i) in steps" :key="step.key"
@@ -909,9 +919,12 @@
                 <div v-for="(h, i) in form.headers" :key="i" style="display:flex;gap:8px;align-items:center">
                   <OInput v-model="h.key" placeholder="Name" class="tw:flex-1" />
                   <OInput v-model="h.value" placeholder="Value" class="tw:flex-1" />
-                  <button class="drw-rm-btn" @click="form.headers.splice(i,1)"><OIcon name="close" size="xs" /></button>
+                  <OButton variant="ghost" size="sm" @click="form.headers.splice(i,1)"><OIcon name="close" size="xs" /></OButton>
                 </div>
-                <button class="drw-add-btn" @click="form.headers.push({key:'',value:''})"><OIcon name="add" size="xs" />Add header</button>
+                <OButton variant="outline" size="sm" @click="form.headers.push({key:'',value:''})">
+                  <template #icon-left><OIcon name="add" size="xs" /></template>
+                  Add header
+                </OButton>
               </div>
             </OCollapsible>
           </div>
@@ -946,9 +959,12 @@
               <OSelect v-model="a.type" :options="assertionTypes" class="tw:flex-1" />
               <OSelect v-model="a.operator" :options="['=','!=','<','>','contains','matches'].map(o => ({label: o, value: o}))" class="tw:w-[100px]" />
               <OInput v-model="a.value" placeholder="200" class="tw:flex-1" />
-              <button class="drw-rm-btn" @click="form.assertions.splice(i,1)"><OIcon name="close" size="xs" /></button>
+              <OButton variant="ghost" size="sm" @click="form.assertions.splice(i,1)"><OIcon name="close" size="xs" /></OButton>
             </div>
-            <button class="drw-add-btn" @click="form.assertions.push({type:'statusCode',operator:'=',value:'200'})"><OIcon name="add" size="xs" />Add assertion</button>
+            <OButton variant="outline" size="sm" @click="form.assertions.push({type:'statusCode',operator:'=',value:'200'})">
+              <template #icon-left><OIcon name="add" size="xs" /></template>
+              Add assertion
+            </OButton>
           </div>
           <div class="drw-slabel" style="margin-top:20px">Alert conditions</div>
           <div style="display:flex;flex-direction:column;gap:10px">
@@ -963,11 +979,11 @@
         </template>
       </div>
       <div class="drw-footer">
-        <button class="drw-btn drw-btn--ghost" :disabled="stepIdx === 0" @click="prevStep">Back</button>
+        <OButton variant="ghost" :disabled="stepIdx === 0" @click="prevStep">Back</OButton>
         <div style="display:flex;gap:8px">
-          <button class="drw-btn drw-btn--ghost" @click="showDrawer = false">Cancel</button>
-          <button v-if="stepIdx < steps.length - 1" class="drw-btn drw-btn--primary" @click="nextStep">Continue →</button>
-          <button v-else class="drw-btn drw-btn--primary" @click="saveMonitor">{{ editTarget ? 'Save changes' : 'Create monitor' }}</button>
+          <OButton variant="ghost" @click="showDrawer = false">Cancel</OButton>
+          <OButton v-if="stepIdx < steps.length - 1" variant="primary" @click="nextStep">Continue →</OButton>
+          <OButton v-else variant="primary" @click="saveMonitor">{{ editTarget ? 'Save changes' : 'Create monitor' }}</OButton>
         </div>
       </div>
     </div>
@@ -979,6 +995,7 @@ import { ref, computed, onUnmounted, watch, nextTick } from "vue";
 import { useRouter } from "vue-router";
 import * as echarts from "echarts";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
@@ -1810,10 +1827,6 @@ const saveMonitor = () => { showDrawer.value=false; };
 .syn-page-icon { color: var(--q-primary, #1976d2); }
 
 .row-actions { display:flex; align-items:center; gap:2px; }
-.act-btn { display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; border:none; border-radius:6px; background:transparent; cursor:pointer; padding:0; transition:background .12s; color:rgba(0,0,0,.5); }
-.body--dark .act-btn { color:rgba(255,255,255,.55); }
-.act-btn:hover { background:rgba(128,128,128,.12); color:var(--q-primary, #1976d2); }
-.act-btn--del:hover { background:rgba(239,68,68,.1); color:#dc2626; }
 
 .mono { font-family:monospace; font-size:13px; font-weight:600; }
 .c-g  { color:#16a34a; } .c-a { color:#d97706; } .c-r { color:#dc2626; }
@@ -1861,8 +1874,6 @@ const saveMonitor = () => { showDrawer.value=false; };
 .pl-code-block   { position:relative; margin-top:10px; background:rgba(128,128,128,.08); border:1px solid var(--o2-border-color); border-radius:8px; padding:10px 12px; }
 .pl-code-label   { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:var(--o2-tab-text-color); margin-bottom:5px; }
 .pl-code         { font-family:monospace; font-size:12px; margin:0; line-height:1.65; white-space:pre-wrap; word-break:break-all; }
-.pl-copy-btn     { position:absolute; top:10px; right:10px; display:flex; align-items:center; justify-content:center; width:24px; height:24px; border:1px solid var(--o2-border-color); border-radius:5px; background:var(--o2-card-background); cursor:pointer; color:var(--o2-tab-text-color); padding:0; }
-.pl-copy-btn:hover { background:rgba(128,128,128,.12); }
 
 /* ── BACKDROP & DRAWER ── */
 .syn-backdrop { position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:2000; }
@@ -1902,15 +1913,6 @@ const saveMonitor = () => { showDrawer.value=false; };
 .loc-flag { font-size:18px; line-height:1; }
 
 /* ── SHARED NATIVE BUTTONS ── */
-.syn-new-btn {
-  display:inline-flex; align-items:center; gap:5px;
-  background:var(--q-primary, #1976d2); color:#fff;
-  border:none; border-radius:6px; padding:6px 14px;
-  font-size:13px; font-weight:500; cursor:pointer; white-space:nowrap;
-  transition:opacity .12s;
-}
-.syn-new-btn:hover { opacity:.88; }
-
 .pg-btn {
   display:inline-flex; align-items:center; justify-content:center;
   width:30px; height:30px; border:none; border-radius:6px;
@@ -1920,41 +1922,6 @@ const saveMonitor = () => { showDrawer.value=false; };
 .pg-btn:hover:not(:disabled) { background:rgba(128,128,128,.12); color:var(--q-primary,#1976d2); }
 .pg-btn:disabled { opacity:.35; cursor:default; }
 
-.drw-close-btn {
-  display:inline-flex; align-items:center; justify-content:center;
-  width:30px; height:30px; border:none; border-radius:6px;
-  background:transparent; cursor:pointer; padding:0; flex-shrink:0;
-  color:var(--o2-tab-text-color); transition:background .12s;
-}
-.drw-close-btn:hover { background:rgba(128,128,128,.12); }
-
-.drw-rm-btn {
-  display:inline-flex; align-items:center; justify-content:center;
-  width:26px; height:26px; border:none; border-radius:5px;
-  background:transparent; cursor:pointer; padding:0; flex-shrink:0;
-  color:var(--o2-tab-text-color); transition:background .12s;
-}
-.drw-rm-btn:hover { background:rgba(239,68,68,.1); color:#dc2626; }
-
-.drw-add-btn {
-  display:inline-flex; align-items:center; gap:4px;
-  background:transparent; border:none; cursor:pointer;
-  font-size:12px; font-weight:500; color:var(--q-primary, #1976d2);
-  padding:4px 2px; border-radius:4px;
-}
-.drw-add-btn:hover { opacity:.75; }
-
-.drw-btn {
-  display:inline-flex; align-items:center; justify-content:center;
-  border:none; border-radius:6px; padding:7px 16px;
-  font-size:13px; font-weight:500; cursor:pointer; white-space:nowrap;
-  transition:opacity .12s, background .12s;
-}
-.drw-btn:disabled { opacity:.4; cursor:default; }
-.drw-btn--primary { background:var(--q-primary, #1976d2); color:#fff; }
-.drw-btn--primary:hover:not(:disabled) { opacity:.88; }
-.drw-btn--ghost { background:transparent; color:var(--o2-tab-text-color); }
-.drw-btn--ghost:hover:not(:disabled) { background:rgba(128,128,128,.1); }
 
 /* ── GEO CHECKS ── */
 
@@ -1976,8 +1943,6 @@ const saveMonitor = () => { showDrawer.value=false; };
 .geo-world-map { width:100%; height:100%; display:block; }
 
 /* Filter bar geo buttons */
-.geo-hdr-btn { display:inline-flex; align-items:center; gap:6px; padding:6px 14px; font-size:12px; font-weight:600; border:1px solid var(--o2-border-color); border-radius:7px; background:var(--o2-card-background); color:var(--o2-tab-text-color); cursor:pointer; transition:background .12s, box-shadow .12s; white-space:nowrap; position:relative; }
-.geo-hdr-btn:hover { background:rgba(128,128,128,.06); box-shadow:0 1px 4px rgba(0,0,0,.06); }
 .geo-hdr-btn--alert { border-color:rgba(239,68,68,.4); color:#dc2626; }
 .body--dark .geo-hdr-btn--alert { color:#f87171; border-color:rgba(239,68,68,.35); }
 .geo-hdr-badge { display:inline-flex; align-items:center; justify-content:center; min-width:18px; height:18px; border-radius:9px; background:#ef4444; color:#fff; font-size:10px; font-weight:700; padding:0 4px; margin-left:2px; }
@@ -2070,8 +2035,6 @@ const saveMonitor = () => { showDrawer.value=false; };
 .geo-modal-legend { display:flex; align-items:center; gap:12px; margin-left:8px; flex:1; }
 .geo-leg-item { display:flex; align-items:center; gap:5px; font-size:11px; color:var(--o2-tab-text-color); }
 .geo-leg-dot { display:inline-block; width:8px; height:8px; border-radius:50%; flex-shrink:0; }
-.geo-modal-close { margin-left:auto; background:none; border:none; cursor:pointer; color:var(--o2-tab-text-color); display:flex; opacity:.7; padding:4px; border-radius:4px; }
-.geo-modal-close:hover { opacity:1; background:rgba(128,128,128,.1); }
 .geo-modal-body { flex:none; height:clamp(360px,46vw,540px); overflow:hidden; padding:0; }
 
 /* Active Issues modal */
@@ -2134,8 +2097,6 @@ const saveMonitor = () => { showDrawer.value=false; };
 .dp-hdr-titles { flex:1; min-width:0; }
 .dp-title { font-size:15px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .dp-url   { font-size:12px; color:var(--o2-tab-text-color); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:2px; }
-.dp-close { background:none; border:none; cursor:pointer; color:var(--o2-tab-text-color); display:flex; padding:4px; border-radius:4px; flex-shrink:0; opacity:.7; }
-.dp-close:hover { opacity:1; background:rgba(128,128,128,.1); }
 .dp-badges { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
 .dp-meta-chip { font-size:11px; color:var(--o2-tab-text-color); background:rgba(128,128,128,.1); border-radius:4px; padding:2px 8px; }
 
@@ -2220,10 +2181,6 @@ const saveMonitor = () => { showDrawer.value=false; };
 
 /* log filter bar */
 .dp-log-filters { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
-.dp-logf-btn { background:rgba(128,128,128,.08); border:1px solid var(--o2-border-color); border-radius:5px; padding:3px 10px; font-size:11px; cursor:pointer; color:inherit; display:flex; align-items:center; gap:4px; transition:all .15s; }
-.dp-logf-btn:hover { background:rgba(128,128,128,.15); }
-.dp-logf-btn--active { background:var(--q-primary); color:#fff; border-color:var(--q-primary); }
-.dp-logf-btn--active .dp-tab-ct { background:rgba(255,255,255,.25); color:#fff; }
 .dp-log-summary { font-size:11px; color:var(--o2-tab-text-color); }
 
 /* logs */
