@@ -83,7 +83,7 @@ import { useStore } from "vuex";
 
 import organizationsService from "@/services/organizations";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { updateRoleSchema, type UpdateRoleForm } from "./UpdateRole.schema";
+import { makeUpdateRoleSchema, type UpdateRoleForm } from "./UpdateRole.schema";
 
 const defaultValue: any = () => {
   return {
@@ -112,6 +112,8 @@ export default defineComponent({
     const store: any = useStore();
     const { t } = useI18n();
     const roleOptions = ["admin"];
+
+    const updateRoleSchema = makeUpdateRoleSchema(t);
 
     // EDIT-prefill: the OForm owns role/first_name; this typed computed seeds them
     // from the externally-provided modelValue each time the dialog body mounts.

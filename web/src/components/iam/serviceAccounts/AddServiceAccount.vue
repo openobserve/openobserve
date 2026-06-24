@@ -110,7 +110,7 @@ export default defineComponent({
     // Schema mode follows beingUpdated (email is create-only). The dialog body
     // remounts per open, so OForm always reads the correct variant at mount.
     const addServiceAccountSchema = computed(() =>
-      makeAddServiceAccountSchema(beingUpdated.value),
+      makeAddServiceAccountSchema(beingUpdated.value, t),
     );
 
     // The OForm owns email + first_name. Email is always blank on create; the

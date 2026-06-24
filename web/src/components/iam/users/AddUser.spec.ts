@@ -336,27 +336,29 @@ describe("AddUser", () => {
         },
       });
 
-    it("requires old + new passwords (min 8 / strong) when changing own password", async () => {
+    it("requires old (required-only) + new (strong) passwords when changing own password", async () => {
       wrapper = mountEditSelf();
       await flushPromises();
       expect(wrapper.vm.beingUpdated).toBe(true);
 
-      // Turn on change_password, leave passwords empty → blocked.
+      // Turn on change_password, leave passwords empty → blocked (both required).
       setField(wrapper, "change_password", true);
       await submitForm(wrapper);
       expect(getForm(wrapper).vm.form.state.isValid).toBe(false);
       expect(userServiece.update).not.toHaveBeenCalled();
 
-      // Short old password (<8) is rejected (restored BEFORE min-8 on old_password).
+      // A weak NEW password is rejected (new keeps the strong policy) — the short
+      // old password here is NOT the reason it's blocked.
       setField(wrapper, "old_password", "short");
-      setField(wrapper, "new_password", "Str0ng!Pass");
+      setField(wrapper, "new_password", "weak");
       await submitForm(wrapper);
       expect(getForm(wrapper).vm.form.state.isValid).toBe(false);
       expect(userServiece.update).not.toHaveBeenCalled();
 
-      // Valid old (≥8) + strong new → passes.
+      // A SHORT (<8) old password is accepted — old_password is required-only and
+      // never length/strength-checked (it predates the strong policy). Short old +
+      // strong new → passes.
       vi.mocked(userServiece.update).mockResolvedValue({ data: {} } as any);
-      setField(wrapper, "old_password", "longenough8");
       setField(wrapper, "new_password", "Str0ng!Pass");
       await submitForm(wrapper);
       expect(getForm(wrapper).vm.form.state.isValid).toBe(true);

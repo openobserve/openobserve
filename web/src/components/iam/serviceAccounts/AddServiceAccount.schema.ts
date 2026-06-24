@@ -7,21 +7,24 @@
 // in update mode the field is neither rendered nor submitted, so it is optional.
 // The mode is supplied by the component (which knows `beingUpdated`) via this
 // factory; the dialog body remounts per open, so OForm always reads the right
-// variant. `first_name` (the description) is always optional.
+// variant. `first_name` (the description) is always optional. The invalid-email
+// message is i18n-driven (pass useI18n's `t`).
 
 import { z } from "zod";
 
 export const serviceAccountEmailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const EMAIL_MESSAGE = "Please enter a valid email address";
 
-export const makeAddServiceAccountSchema = (beingUpdated: boolean) =>
+export const makeAddServiceAccountSchema = (
+  beingUpdated: boolean,
+  t: (_key: string) => string,
+) =>
   z.object({
     email: beingUpdated
       ? z.string().optional()
       : z
           .string()
-          .min(1, EMAIL_MESSAGE)
-          .regex(serviceAccountEmailRegex, EMAIL_MESSAGE),
+          .min(1, t("common.invalidEmail"))
+          .regex(serviceAccountEmailRegex, t("common.invalidEmail")),
     first_name: z.string().optional(),
   });
 

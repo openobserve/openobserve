@@ -14,17 +14,19 @@
 //   • role      — required (add-existing, non-self, non-member)
 //   • password  — required + strong policy (create-new). The policy already
 //                 enforces the BEFORE min-length-8 (and more).
-//   • old/new_password — required when changing; old also restores the dropped
-//                 BEFORE min-length-8; new keeps the current strong policy.
+//   • old/new_password — required when changing. old_password is required-only
+//                 (it is an EXISTING credential that predates the strong policy,
+//                 so it is never re-validated for length/strength — matches the
+//                 upstream "enforce strong password policy" baseline); new keeps
+//                 the current strong policy.
 //   • other_organization — must start with a letter (alphanumeric, _ or -).
+//
+// Messages are i18n-driven (the factory takes useI18n's `t`).
 
 import { z } from "zod";
 
 // Password policy (mirrors src/config/src/utils/password.rs): length 8-128 AND
 // lower AND upper AND digit AND special.
-export const PASSWORD_POLICY_HINT =
-  "Password must be 8-128 characters and contain at least one lowercase letter, one uppercase letter, one digit, and one special character.";
-
 export const isStrongPassword = (val: string): boolean => {
   if (!val || val.length < 8 || val.length > 128) return false;
   const hasLower = /[a-z]/.test(val);
@@ -66,7 +68,10 @@ export const addUserBaseSchema = z.object({
 
 export type AddUserForm = z.infer<typeof addUserBaseSchema>;
 
-export const makeAddUserSchema = (ctx: AddUserSchemaContext) =>
+export const makeAddUserSchema = (
+  ctx: AddUserSchemaContext,
+  t: (_key: string) => string,
+) =>
   addUserBaseSchema.superRefine((val, zctx) => {
     // ── Add an existing user (enter an email to invite) ──────────────────────
     if (ctx.existingUser && !ctx.beingUpdated) {
@@ -74,7 +79,7 @@ export const makeAddUserSchema = (ctx: AddUserSchemaContext) =>
         zctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["email"],
-          message: "Please enter a valid email address.",
+          message: t("common.invalidEmail"),
         });
       }
       // Role required when an admin assigns it to someone other than themselves.
@@ -86,7 +91,7 @@ export const makeAddUserSchema = (ctx: AddUserSchemaContext) =>
         zctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["role"],
-          message: "Field is required",
+          message: t("user.fieldRequired"),
         });
       }
     }
@@ -97,13 +102,13 @@ export const makeAddUserSchema = (ctx: AddUserSchemaContext) =>
         zctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["password"],
-          message: "Password is required.",
+          message: t("user.passwordRequired"),
         });
       } else if (!isStrongPassword(val.password)) {
         zctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["password"],
-          message: PASSWORD_POLICY_HINT,
+          message: t("user.passwordPolicyHint"),
         });
       }
     }
@@ -112,34 +117,26 @@ export const makeAddUserSchema = (ctx: AddUserSchemaContext) =>
     if (ctx.beingUpdated && val.change_password) {
       const needsOldPwd =
         ctx.userRole === "member" || ctx.loggedInUserEmail === ctx.modelEmail;
-      if (needsOldPwd) {
-        if (!val.old_password) {
-          zctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            path: ["old_password"],
-            message: "Current password is required.",
-          });
-        } else if (val.old_password.length < 8) {
-          // Restored BEFORE rule: old_password min length 8. The current password
-          // is never held to the NEW strong policy (it predates it).
-          zctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            path: ["old_password"],
-            message: "Password must be at least 8 characters long.",
-          });
-        }
+      // old_password is required-only — never re-validated for length/strength
+      // (it is an existing credential that may predate the strong policy).
+      if (needsOldPwd && !val.old_password) {
+        zctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["old_password"],
+          message: t("user.currentPasswordRequired"),
+        });
       }
       if (!val.new_password) {
         zctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["new_password"],
-          message: "New password is required.",
+          message: t("user.newPasswordRequired"),
         });
       } else if (!isStrongPassword(val.new_password)) {
         zctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["new_password"],
-          message: PASSWORD_POLICY_HINT,
+          message: t("user.passwordPolicyHint"),
         });
       }
     }
@@ -154,8 +151,7 @@ export const makeAddUserSchema = (ctx: AddUserSchemaContext) =>
         zctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["other_organization"],
-          message:
-            "Organization name must start with a letter and be alphanumeric, _ or -.",
+          message: t("user.otherOrgInvalid"),
         });
       }
     }

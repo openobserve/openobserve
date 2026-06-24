@@ -337,14 +337,17 @@ export default defineComponent({
     // reads the non-form context; superRefine reads form values (incl.
     // change_password) at validation time.
     const addUserSchema = computed(() =>
-      makeAddUserSchema({
-        existingUser: existingUser.value,
-        beingUpdated: beingUpdated.value,
-        userRole: props.userRole,
-        loggedInUserEmail: loggedInUserEmail.value,
-        modelEmail: props.modelValue?.email ?? "",
-        organization: formData.value.organization,
-      }),
+      makeAddUserSchema(
+        {
+          existingUser: existingUser.value,
+          beingUpdated: beingUpdated.value,
+          userRole: props.userRole,
+          loggedInUserEmail: loggedInUserEmail.value,
+          modelEmail: props.modelValue?.email ?? "",
+          organization: formData.value.organization,
+        },
+        t,
+      ),
     );
 
     // The OForm owns every editable field; formData stays the single working
