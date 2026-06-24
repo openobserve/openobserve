@@ -41,6 +41,7 @@ export interface MetricGroupDefinition {
   label: string;
   icon: string | {};
   defaultMetrics?: DefaultMetricConfig[];
+  children?: MetricGroupDefinition[];
 }
 
 export interface MetricGroupConfig {
@@ -256,29 +257,63 @@ export const K8S_METRIC_GROUP_DEFINITIONS: MetricGroupDefinition[] = [
   {
     id: "pods",
     label: "Pods",
-    icon: "view-in-ar",
-    defaultMetrics: [
-      { streamName: "k8s_pod_cpu_usage" },
-      { streamName: "k8s_pod_memory_usage" },
-      { streamName: "k8s_pod_cpu_request_utilization" },
-      { streamName: "k8s_pod_memory_request_utilization" },
-      { streamName: "k8s_pod_cpu_limit_utilization" },
-      { streamName: "k8s_pod_memory_limit_utilization" },
-      { streamName: "k8s_pod_network_io" },
+    icon: "widgets",
+    children: [
+      {
+        id: "compute",
+        label: "Compute",
+        icon: "developer_board",
+        defaultMetrics: [
+          { streamName: "k8s_pod_cpu_usage" },
+          { streamName: "k8s_pod_cpu_request_utilization" },
+          { streamName: "k8s_pod_cpu_limit_utilization" },
+        ],
+      },
+      {
+        id: "memory",
+        label: "Memory",
+        icon: "memory",
+        defaultMetrics: [
+          { streamName: "k8s_pod_memory_usage" },
+          { streamName: "k8s_pod_memory_request_utilization" },
+          { streamName: "k8s_pod_memory_limit_utilization" },
+        ],
+      },
+      {
+        id: "network",
+        label: "Network",
+        icon: "lan",
+        defaultMetrics: [{ streamName: "k8s_pod_network_io" }],
+      },
+      { id: "others", label: "Others", icon: "more_horiz" },
     ],
   },
   {
     id: "nodes",
     label: "Nodes",
-    icon: "computer",
-    defaultMetrics: [
-      { streamName: "k8s_node_cpu_usage" },
-      { streamName: "k8s_node_memory_rss" },
-      { streamName: "k8s_node_network_io" },
+    icon: "dns",
+    children: [
+      {
+        id: "compute",
+        label: "Compute",
+        icon: "developer_board",
+        defaultMetrics: [{ streamName: "k8s_node_cpu_usage" }],
+      },
+      {
+        id: "memory",
+        label: "Memory",
+        icon: "memory",
+        defaultMetrics: [{ streamName: "k8s_node_memory_rss" }],
+      },
+      {
+        id: "network",
+        label: "Network",
+        icon: "lan",
+        defaultMetrics: [{ streamName: "k8s_node_network_io" }],
+      },
+      { id: "others", label: "Others", icon: "more_horiz" },
     ],
   },
-  { id: "network", label: "Network", icon: "wifi" },
-  { id: "others", label: "Others", icon: "category" },
 ];
 
 /**
@@ -298,17 +333,20 @@ export function getDefaultMetricSelections(
 ): StreamInfo[] {
   const results: StreamInfo[] = [];
   for (const group of groupDefs) {
-    if (!group.defaultMetrics?.length) continue;
-    for (const def of group.defaultMetrics) {
-      const match = availableStreams.find(
-        (s) =>
-          s.stream_name === def.streamName &&
-          (!def.filters ||
-            Object.entries(def.filters).every(
-              ([k, v]) => s.filters?.[k] === v,
-            )),
-      );
-      if (match) results.push(match);
+    const defsToCheck = group.children?.length ? group.children : [group];
+    for (const def of defsToCheck) {
+      if (!def.defaultMetrics?.length) continue;
+      for (const metric of def.defaultMetrics) {
+        const match = availableStreams.find(
+          (s) =>
+            s.stream_name === metric.streamName &&
+            (!metric.filters ||
+              Object.entries(metric.filters).every(
+                ([k, v]) => s.filters?.[k] === v,
+              )),
+        );
+        if (match) results.push(match);
+      }
     }
   }
   return results;

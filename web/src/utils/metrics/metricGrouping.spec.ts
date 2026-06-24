@@ -615,61 +615,98 @@ describe("groupMetricsByCategory — custom groupDefs", () => {
 // ---------------------------------------------------------------------------
 
 describe("K8S_METRIC_GROUP_DEFINITIONS", () => {
-  it("should contain exactly 4 entries in order: pods, nodes, network, others", () => {
-    expect(K8S_METRIC_GROUP_DEFINITIONS).toHaveLength(4);
+  it("should contain exactly 2 outer entries: pods, nodes", () => {
+    expect(K8S_METRIC_GROUP_DEFINITIONS).toHaveLength(2);
     expect(K8S_METRIC_GROUP_DEFINITIONS.map((d) => d.id)).toEqual([
       "pods",
       "nodes",
-      "network",
-      "others",
     ]);
   });
 
-  it("should have label and icon for every entry", () => {
+  it("should have label and icon for every outer entry", () => {
     for (const def of K8S_METRIC_GROUP_DEFINITIONS) {
       expect(def.label).toBeTruthy();
       expect(def.icon).toBeTruthy();
     }
   });
 
-  it("should have defaultMetrics defined for pods and nodes but not for network", () => {
+  it("should have children on pods and nodes (nested sub-tabs)", () => {
     const pods = K8S_METRIC_GROUP_DEFINITIONS.find((d) => d.id === "pods");
     const nodes = K8S_METRIC_GROUP_DEFINITIONS.find((d) => d.id === "nodes");
-    const network = K8S_METRIC_GROUP_DEFINITIONS.find((d) => d.id === "network");
-    expect(pods?.defaultMetrics?.length).toBeGreaterThan(0);
-    expect(nodes?.defaultMetrics?.length).toBeGreaterThan(0);
-    expect(network?.defaultMetrics ?? []).toHaveLength(0);
+    expect(pods?.children?.length).toBeGreaterThan(0);
+    expect(nodes?.children?.length).toBeGreaterThan(0);
   });
 
-  it("should have no defaultMetrics on the others group", () => {
-    const others = K8S_METRIC_GROUP_DEFINITIONS.find((d) => d.id === "others");
-    expect(others?.defaultMetrics ?? []).toHaveLength(0);
-  });
-
-  it("should list all 6 pod CPU/memory metrics and pod network IO in pods defaults", () => {
+  it("pods children should include compute, memory, network, others", () => {
     const pods = K8S_METRIC_GROUP_DEFINITIONS.find((d) => d.id === "pods");
-    const names = pods!.defaultMetrics!.map((m) => m.streamName);
+    const ids = pods!.children!.map((c) => c.id);
+    expect(ids).toContain("compute");
+    expect(ids).toContain("memory");
+    expect(ids).toContain("network");
+    expect(ids).toContain("others");
+  });
+
+  it("nodes children should include compute, memory, network, others", () => {
+    const nodes = K8S_METRIC_GROUP_DEFINITIONS.find((d) => d.id === "nodes");
+    const ids = nodes!.children!.map((c) => c.id);
+    expect(ids).toContain("compute");
+    expect(ids).toContain("memory");
+    expect(ids).toContain("network");
+    expect(ids).toContain("others");
+  });
+
+  it("should have pod cpu defaultMetrics in pods>compute child", () => {
+    const pods = K8S_METRIC_GROUP_DEFINITIONS.find((d) => d.id === "pods");
+    const compute = pods!.children!.find((c) => c.id === "compute");
+    const names = compute!.defaultMetrics!.map((m) => m.streamName);
     expect(names).toContain("k8s_pod_cpu_usage");
-    expect(names).toContain("k8s_pod_memory_usage");
     expect(names).toContain("k8s_pod_cpu_request_utilization");
-    expect(names).toContain("k8s_pod_memory_request_utilization");
     expect(names).toContain("k8s_pod_cpu_limit_utilization");
+  });
+
+  it("should have pod memory defaultMetrics in pods>memory child", () => {
+    const pods = K8S_METRIC_GROUP_DEFINITIONS.find((d) => d.id === "pods");
+    const memory = pods!.children!.find((c) => c.id === "memory");
+    const names = memory!.defaultMetrics!.map((m) => m.streamName);
+    expect(names).toContain("k8s_pod_memory_usage");
+    expect(names).toContain("k8s_pod_memory_request_utilization");
     expect(names).toContain("k8s_pod_memory_limit_utilization");
+  });
+
+  it("should have k8s_pod_network_io in pods>network child", () => {
+    const pods = K8S_METRIC_GROUP_DEFINITIONS.find((d) => d.id === "pods");
+    const network = pods!.children!.find((c) => c.id === "network");
+    const names = network!.defaultMetrics!.map((m) => m.streamName);
     expect(names).toContain("k8s_pod_network_io");
   });
 
-  it("should list k8s_node_cpu_usage, k8s_node_memory_rss, and k8s_node_network_io in nodes defaults", () => {
+  it("should have k8s_node_cpu_usage in nodes>compute child", () => {
     const nodes = K8S_METRIC_GROUP_DEFINITIONS.find((d) => d.id === "nodes");
-    const names = nodes!.defaultMetrics!.map((m) => m.streamName);
+    const compute = nodes!.children!.find((c) => c.id === "compute");
+    const names = compute!.defaultMetrics!.map((m) => m.streamName);
     expect(names).toContain("k8s_node_cpu_usage");
+  });
+
+  it("should have k8s_node_memory_rss in nodes>memory child", () => {
+    const nodes = K8S_METRIC_GROUP_DEFINITIONS.find((d) => d.id === "nodes");
+    const memory = nodes!.children!.find((c) => c.id === "memory");
+    const names = memory!.defaultMetrics!.map((m) => m.streamName);
     expect(names).toContain("k8s_node_memory_rss");
+  });
+
+  it("should have k8s_node_network_io in nodes>network child", () => {
+    const nodes = K8S_METRIC_GROUP_DEFINITIONS.find((d) => d.id === "nodes");
+    const network = nodes!.children!.find((c) => c.id === "network");
+    const names = network!.defaultMetrics!.map((m) => m.streamName);
     expect(names).toContain("k8s_node_network_io");
   });
 
-  it("should have no direction filters on any default metric config", () => {
+  it("should have no direction filters on any default metric config in children", () => {
     for (const group of K8S_METRIC_GROUP_DEFINITIONS) {
-      for (const m of group.defaultMetrics ?? []) {
-        expect(m.filters?.direction).toBeUndefined();
+      for (const child of group.children ?? []) {
+        for (const m of child.defaultMetrics ?? []) {
+          expect(m.filters?.direction).toBeUndefined();
+        }
       }
     }
   });
