@@ -92,99 +92,100 @@
 
     <!-- ── ALL MONITORS ── -->
     <template v-if="activeTab === 'monitors'">
-      <div class="syn-table-scroll">
-        <table class="syn-table">
-          <colgroup>
-            <col v-for="col in columns" :key="col.key" :style="{ width: col.width + 'px' }" />
-          </colgroup>
-          <thead>
-            <tr>
-              <th v-for="col in columns" :key="col.key" class="syn-th" :class="col.align === 'right' ? 'right' : ''">
-                <div class="th-inner">
-                  <span>{{ col.label }}</span>
-                  <div v-if="col.resizable" class="col-resize-handle" @mousedown="startResize($event, col)" />
-                </div>
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="m in pagedMonitors" :key="m.id" class="syn-row" style="cursor:pointer" @click="openDetail(m)">
-              <td class="syn-td td-center"><span class="dot" :class="'dot--' + m.status.toLowerCase()" /></td>
-              <td class="syn-td">
-                <div class="mon-name">{{ m.name }}</div>
-                <div class="mon-url">{{ m.url }}</div>
-              </td>
-              <td class="syn-td"><OBadge :variant="monitorTypeBadgeVariant(m.type)" size="sm">{{ m.type }}</OBadge></td>
-              <td class="syn-td">
-                <div class="spark">
-                  <span v-for="(tick,i) in m.history" :key="i"
-                    class="spark-bar" :class="'spark--'+tick.status"
-                    @mouseenter="showSparkTip($event, tick)"
-                    @mouseleave="hideSparkTip"
-                  />
-                </div>
-              </td>
-              <td class="syn-td td-right"><span class="mono" :class="rtCls(m.responseTime)">{{ m.responseTime ?? '—' }}</span></td>
-              <td class="syn-td td-right">
-                <div class="uptime-row">
-                  <OProgressBar
-                    :value="m.uptime / 100"
-                    :variant="m.uptime >= 99 ? 'default' : m.uptime >= 95 ? 'warning' : 'danger'"
-                    size="xs"
-                    class="tw:flex-1"
-                  />
-                  <span class="mono" :class="m.uptime>=99?'c-g':m.uptime>=95?'c-a':'c-r'" style="min-width:44px;text-align:right;font-size:12px">{{ m.uptime }}%</span>
-                </div>
-              </td>
-              <td class="syn-td">
-                <div class="locs-cell" @mouseenter="showLoc($event, m.locations)" @mouseleave="hideLoc">
-                  <span class="loc-first">{{ m.locations[0] }}</span>
-                  <span v-if="m.locations.length > 1" class="loc-badge">+{{ m.locations.length - 1 }}</span>
-                </div>
-              </td>
-              <td class="syn-td td-muted">{{ m.interval }}</td>
-              <td class="syn-td td-muted">{{ m.lastCheck }}</td>
-              <td class="syn-td td-center" @click.stop>
-                <div class="row-actions">
-                  <OButton variant="ghost" size="icon" title="Run now" @click.stop><OIcon name="play-arrow" size="sm" /></OButton>
-                  <OButton variant="ghost" size="icon" title="Edit" @click.stop="openEdit(m)"><OIcon name="edit" size="sm" /></OButton>
-                  <OButton variant="ghost" size="icon" title="Pause" @click.stop><OIcon name="pause" size="sm" /></OButton>
-                  <OButton variant="destructive" size="icon" title="Delete" @click.stop><OIcon name="delete" size="sm" /></OButton>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-        <OEmptyState
-          v-if="filteredMonitors.length === 0"
-          size="inline"
-          icon="radar"
-          title="No monitors found"
-          description="Adjust filters or create your first monitor."
-          action-label="Create monitor"
-          action-icon="add"
-          @action="openCreate"
-        />
-      </div>
+      <OTable
+        :columns="monitorTableColumns"
+        :data="filteredMonitors"
+        pagination="client"
+        :page-size="20"
+        :page-size-options="[10, 20, 25, 50]"
+        row-key="id"
+        :show-global-filter="false"
+        :enable-column-resize="true"
+        footer-title="Monitors"
+        empty-message="No monitors found. Adjust filters or create your first monitor."
+        data-test="synthetic-monitoring-all-monitors-table"
+        @row-click="(row) => openDetail(row)"
+      >
+        <!-- Status dot -->
+        <template #cell-status="{ row }">
+          <span class="dot" :class="'dot--' + (row as any).status.toLowerCase()" />
+        </template>
 
-      <!-- PAGINATION FOOTER — matches Incidents page -->
-      <div class="syn-footer">
-        <div class="syn-footer-total">{{ filteredMonitors.length }} Monitors</div>
-        <div style="flex:1" />
-        <div class="syn-footer-right">
-          <span class="syn-footer-info">Showing {{ pageStart + 1 }} - {{ pageEnd }} of {{ filteredMonitors.length }}</span>
-          <span class="syn-footer-sep" />
-          <span style="font-size:12px;color:var(--o2-tab-text-color);white-space:nowrap">Records per page</span>
-          <OSelect
-            v-model="perPage"
-            :options="[{label:'10',value:10},{label:'20',value:20},{label:'25',value:25},{label:'50',value:50}]"
-            size="sm"
-            class="tw:w-16"
-            @update:model-value="currentPage = 1"
-          />
-          <OPagination v-model="currentPage" :max="totalPages" />
-        </div>
-      </div>
+        <!-- Name + URL -->
+        <template #cell-name="{ row }">
+          <div class="mon-name">{{ (row as any).name }}</div>
+          <div class="mon-url">{{ (row as any).url }}</div>
+        </template>
+
+        <!-- Type badge -->
+        <template #cell-type="{ row }">
+          <OBadge :variant="monitorTypeBadgeVariant((row as any).type)" size="sm">{{ (row as any).type }}</OBadge>
+        </template>
+
+        <!-- History sparkbars -->
+        <template #cell-history="{ row }">
+          <div class="spark">
+            <span
+              v-for="(tick, i) in (row as any).history"
+              :key="i"
+              class="spark-bar"
+              :class="'spark--' + tick.status"
+              @mouseenter="showSparkTip($event, tick)"
+              @mouseleave="hideSparkTip"
+            />
+          </div>
+        </template>
+
+        <!-- Response time -->
+        <template #cell-responseTime="{ row }">
+          <span class="mono" :class="rtCls((row as any).responseTime)">{{ (row as any).responseTime ?? '—' }}</span>
+        </template>
+
+        <!-- Uptime progress bar -->
+        <template #cell-uptime="{ row }">
+          <div class="uptime-row">
+            <OProgressBar
+              :value="(row as any).uptime / 100"
+              :variant="(row as any).uptime >= 99 ? 'default' : (row as any).uptime >= 95 ? 'warning' : 'danger'"
+              size="xs"
+              class="tw:flex-1"
+            />
+            <span
+              class="mono"
+              :class="(row as any).uptime >= 99 ? 'c-g' : (row as any).uptime >= 95 ? 'c-a' : 'c-r'"
+              style="min-width:44px;text-align:right;font-size:12px"
+            >{{ (row as any).uptime }}%</span>
+          </div>
+        </template>
+
+        <!-- Locations cell with tooltip -->
+        <template #cell-locations="{ row }">
+          <div class="locs-cell" @mouseenter="showLoc($event, (row as any).locations)" @mouseleave="hideLoc">
+            <span class="loc-first">{{ (row as any).locations[0] }}</span>
+            <span v-if="(row as any).locations.length > 1" class="loc-badge">+{{ (row as any).locations.length - 1 }}</span>
+          </div>
+        </template>
+
+        <!-- Interval -->
+        <template #cell-interval="{ row }">
+          <span class="tw:text-secondary">{{ (row as any).interval }}</span>
+        </template>
+
+        <!-- Last check -->
+        <template #cell-lastCheck="{ row }">
+          <span class="tw:text-secondary">{{ (row as any).lastCheck }}</span>
+        </template>
+
+        <!-- Row actions -->
+        <template #cell-actions="{ row }">
+          <div class="row-actions" @click.stop>
+            <OButton variant="ghost" size="icon" title="Run now" data-test="synthetic-monitoring-run-btn" @click.stop><OIcon name="play-arrow" size="sm" /></OButton>
+            <OButton variant="ghost" size="icon" title="Edit" data-test="synthetic-monitoring-edit-btn" @click.stop="openEdit((row as any))"><OIcon name="edit" size="sm" /></OButton>
+            <OButton variant="ghost" size="icon" title="Pause" data-test="synthetic-monitoring-pause-btn" @click.stop><OIcon name="pause" size="sm" /></OButton>
+            <OButton variant="destructive" size="icon" title="Delete" data-test="synthetic-monitoring-delete-btn" @click.stop><OIcon name="delete" size="sm" /></OButton>
+          </div>
+        </template>
+      </OTable>
     </template>
 
     <!-- ── BROWSER TESTS ── -->
