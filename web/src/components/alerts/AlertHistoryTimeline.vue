@@ -55,12 +55,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Flapping zone segment -->
         <div
           v-if="seg.type === 'flapping'"
-          class="tw:flex tw:items-center tw:justify-center tw:rounded-sm tw:cursor-default tw:relative tw:transition-opacity tw:duration-100 hover:tw:opacity-80 tw:overflow-clip"
+          class="tw:flex tw:items-center tw:justify-center tw:rounded-sm tw:cursor-default tw:relative tw:transition-opacity tw:duration-100 hover:tw:opacity-80"
           :style="{ flex: seg.weight, minWidth: '12px', background: '#7c3aed' }"
           @mouseenter="hoveredIndex = i"
           @mouseleave="hoveredIndex = null"
         >
-          <span class="tw:text-[11px] tw:select-none tw:font-semibold tw:leading-none tw:tracking-wide tw:px-1 tw:truncate" style="color: #fff">⚡ Flapping</span>
+          <span class="tw:text-[11px] tw:select-none tw:font-semibold tw:leading-none tw:tracking-wide tw:px-1 tw:truncate tw:overflow-clip" style="color: #fff">⚡ Flapping</span>
           <div v-if="hoveredIndex === i" class="o2-timeline-tooltip">
             <div class="tw:font-semibold tw:flex tw:items-center tw:gap-1">
               <span>⚡ Flapping Zone</span>
@@ -314,7 +314,7 @@ function formatTimestamp(ts: number): string {
 <style scoped>
 .o2-timeline-tooltip {
   position: absolute;
-  bottom: calc(100% + 6px);
+  top: calc(100% + 6px);
   left: 50%;
   transform: translateX(-50%);
   z-index: 50;
