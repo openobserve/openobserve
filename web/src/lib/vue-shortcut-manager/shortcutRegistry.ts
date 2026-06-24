@@ -329,7 +329,6 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
       { key: "n", descriptionKey: "shortcuts.actions.ingestionTokensAdd" },
       { key: "r", descriptionKey: "shortcuts.actions.ingestionTokensRefresh" },
       { key: "/", descriptionKey: "shortcuts.actions.focusSearch" },
-      { key: "del / ⌫", descriptionKey: "shortcuts.actions.tableRowDelete" },
     ],
   },
 
