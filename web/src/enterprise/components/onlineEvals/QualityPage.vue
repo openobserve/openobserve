@@ -85,10 +85,6 @@
         :boolean-trend="booleanTrend"
         :boolean-trend-series="booleanTrendSeries"
         :categorical-rows="categoricalRows"
-        :split-by-scorer="splitByScorer"
-        :split-by-source-type="splitBySourceType"
-        @update:split-by-scorer="splitByScorer = $event"
-        @update:split-by-source-type="splitBySourceType = $event"
         @back="clearSelection"
       />
     </ODrawer>
@@ -174,8 +170,6 @@ const {
 } = useQualityScoreConfigs(scoreConfigsRef, dateWindowRef, agentFilterRef);
 
 const selectedConfigId = ref<string | null>(routeConfigId());
-const splitByScorer = ref(false);
-const splitBySourceType = ref(false);
 
 const selectedConfig = computed<ScoreConfig | null>(() => {
   const id = selectedConfigId.value;
@@ -200,13 +194,7 @@ const {
   booleanTrend,
   booleanTrendSeries,
   refresh: refreshCharts,
-} = useQualityDetailCharts(
-  selectedConfig,
-  dateWindowRef,
-  splitByScorer,
-  splitBySourceType,
-  agentFilterRef,
-);
+} = useQualityDetailCharts(selectedConfig, dateWindowRef, agentFilterRef);
 
 const numericThreshold = computed(() => {
   const cfg = selectedConfig.value;

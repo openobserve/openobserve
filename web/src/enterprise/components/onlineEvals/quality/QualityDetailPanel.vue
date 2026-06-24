@@ -40,33 +40,8 @@
             <span class="tw:text-[1.4rem] tw:font-bold tw:leading-none tw:text-[var(--o2-text-primary)]">
               {{ formatKpi(kpi) }}
             </span>
-            <span
-              v-if="kpi.context"
-              class="tw:text-[0.8rem] tw:font-semibold tw:text-[var(--o2-text-secondary)]"
-            >
-              {{ kpi.context }}
-            </span>
           </div>
         </div>
-      </div>
-
-      <div class="qdp__splits">
-        <label class="qdp__split">
-          <input
-            v-model="splitByScorer"
-            type="checkbox"
-            data-test="quality-detail-split-scorer"
-          />
-          <span>{{ t("onlineEvals.quality.detail.splitByScorer") }}</span>
-        </label>
-        <label class="qdp__split">
-          <input
-            v-model="splitBySourceType"
-            type="checkbox"
-            data-test="quality-detail-split-source-type"
-          />
-          <span>{{ t("onlineEvals.quality.detail.splitBySourceType") }}</span>
-        </label>
       </div>
 
       <section v-if="dataType === 'numeric'" class="qdp-chart card-container">
@@ -195,26 +170,13 @@ const props = defineProps<{
   booleanTrend: BooleanTrendPoint[];
   booleanTrendSeries: BooleanTrendSeries[];
   categoricalRows: CategoricalAggRow[];
-  splitByScorer: boolean;
-  splitBySourceType: boolean;
 }>();
 
 const emit = defineEmits<{
   (e: "back"): void;
-  (e: "update:splitByScorer", value: boolean): void;
-  (e: "update:splitBySourceType", value: boolean): void;
 }>();
 
 const { t } = useI18n();
-
-const splitByScorer = computed({
-  get: () => props.splitByScorer,
-  set: (v: boolean) => emit("update:splitByScorer", v),
-});
-const splitBySourceType = computed({
-  get: () => props.splitBySourceType,
-  set: (v: boolean) => emit("update:splitBySourceType", v),
-});
 
 function toNumber(v: unknown): number {
   if (v == null) return 0;
@@ -308,27 +270,6 @@ function formatKpi(kpi: DetailKpi): string {
 .kpi-card:hover {
   box-shadow: 0 1px 6px rgba(0, 0, 0, 0.08);
 }
-
-.qdp__splits {
-  display: flex;
-  justify-content: flex-end;
-  gap: 14px;
-  font-size: 12px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.qdp__split {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
-  border: 1px solid var(--color-dialog-header-border, var(--o2-border));
-  border-radius: 4px;
-  cursor: pointer;
-  background: var(--o2-card-bg);
-}
-
-.qdp__split input { margin: 0; }
 
 .qdp-chart {
   padding: 12px 14px 14px;

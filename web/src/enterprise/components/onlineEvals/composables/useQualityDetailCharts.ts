@@ -115,8 +115,6 @@ function healthyThresholdValue(
 export function useQualityDetailCharts(
   selectedConfig: Ref<ScoreConfig | null>,
   dateWindow: Ref<DateWindow>,
-  splitByScorer: Ref<boolean>,
-  splitBySourceType: Ref<boolean>,
   agentFilter?: Ref<AgentFilterSelection | null | undefined>,
 ) {
   const { executeQuery } = useLLMStreamQuery();
@@ -258,24 +256,12 @@ export function useQualityDetailCharts(
         booleanTrend.value = [];
         booleanTrendSeries.value = [];
       } else if (type === "boolean") {
-        // Build series_key from the active split toggles. If neither is on,
-        // emit a constant series_key so the existing single-line code path
-        // works as a one-element series array.
-        let seriesKeyExpr = "'__default__'";
-        const splitParts: string[] = [];
-        if (splitByScorer.value) splitParts.push("CAST(scorer_id AS VARCHAR)");
-        if (splitBySourceType.value)
-          splitParts.push("CAST(source_type AS VARCHAR)");
-        if (splitParts.length === 1) {
-          seriesKeyExpr = `COALESCE(${splitParts[0]}, '(unknown)')`;
-        } else if (splitParts.length === 2) {
-          seriesKeyExpr = `CONCAT(COALESCE(${splitParts[0]}, '(unknown)'), ' · ', COALESCE(${splitParts[1]}, '(unknown)'))`;
-        }
-
+        // Single pass-rate series — a constant series_key keeps the downstream
+        // grouped-series code path working as a one-element array.
         const trendSql = [
           "SELECT",
           `  histogram(_timestamp, '${interval}') AS bucket,`,
-          `  ${seriesKeyExpr} AS series_key,`,
+          "  '__default__' AS series_key,",
           "  COUNT(*) AS total,",
           "  COUNT(CASE WHEN value_boolean = true THEN 1 END) AS trues",
           'FROM "_llm_scores"',
@@ -339,13 +325,7 @@ export function useQualityDetailCharts(
   }
 
   watch(
-    [
-      selectedConfig,
-      dateWindow,
-      splitByScorer,
-      splitBySourceType,
-      agentFilter ?? ref(null),
-    ],
+    [selectedConfig, dateWindow, agentFilter ?? ref(null)],
     () => {
       void refresh();
     },
