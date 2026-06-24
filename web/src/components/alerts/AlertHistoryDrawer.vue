@@ -849,6 +849,8 @@ const formatStatus = (status: string) => {
       return "Ok";
     case "skipped":
       return "Skipped";
+    case "failed":
+      return "Failed";
     case "pending":
       return "Pending";
     default:
@@ -871,6 +873,8 @@ const getStatusChipIcon = (status: string) => {
       return "check-circle-outline";
     case "skipped":
       return "block";
+    case "failed":
+      return "cancel";
     case "pending":
       return "schedule";
     default:
@@ -892,6 +896,8 @@ const getStatusChipVariant = (status: string) => {
       return "success-soft";
     case "skipped":
       return "warning-soft";
+    case "failed":
+      return "error-soft";
     case "pending":
       return "primary-soft";
     default:
