@@ -479,7 +479,7 @@ pub async fn get_latest_sessions(
             Some(s) => s.to_string(),
             None => continue,
         };
-        let first_user_message = extract_first_user_message(item.get("gen_ai_input_messages"), 30);
+        let first_user_message = extract_first_user_message(item.get("gen_ai_input_messages"), 400);
         trace_details.insert(
             tid,
             TraceDetail {
