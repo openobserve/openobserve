@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </DashboardHeader>
 
       <div
-        class="tw:overflow-y-auto tw:px-[3px] tw:max-h-[calc(100vh-190px)] tw:[scrollbar-width:thin] tw:[&::-webkit-scrollbar]:w-[6px] tw:[&::-webkit-scrollbar]:bg-transparent tw:[&::-webkit-scrollbar-thumb]:rounded"
+        class="tw:overflow-y-auto tw:px-[3px] tw:max-h-[calc(100vh-155px)] tw:[scrollbar-width:thin] tw:[&::-webkit-scrollbar]:w-[6px] tw:[&::-webkit-scrollbar]:bg-transparent tw:[&::-webkit-scrollbar-thumb]:rounded"
         :class="store.state.theme === 'dark' ? 'tw:[scrollbar-color:#4b5563_transparent] tw:[&::-webkit-scrollbar-thumb]:bg-[#4b5563]' : 'tw:[scrollbar-color:#d1d5db_transparent] tw:[&::-webkit-scrollbar-thumb]:bg-[#d1d5db]'"
       >
         <OForm
