@@ -7,35 +7,24 @@ Then:
 """
 
 import json
-import re
 from pathlib import Path
 
 QUERIES_DIR = Path(__file__).parent / "queries"
 
-# ── SQL rewrite functions ──────────────────────────────────────────────
-
-def replace_date_trunc(sql: str) -> str:
-    """date_trunc('minute', _timestamp) -> (_timestamp / 60000000) * 60000000
-    date_trunc('hour', _timestamp)   -> (_timestamp / 3600000000) * 3600000000
-    date_trunc('second', _timestamp) -> (_timestamp / 1000000) * 1000000
-    """
-    replacements = {
-        "date_trunc('minute', _timestamp)": "(_timestamp / 60000000) * 60000000",
-        "date_trunc('hour', _timestamp)": "(_timestamp / 3600000000) * 3600000000",
-        "date_trunc('second', _timestamp)": "(_timestamp / 1000000) * 1000000",
-    }
-    for old, new in replacements.items():
-        sql = sql.replace(old, new)
-    return sql
-
-
-def fix_group_by_alias(sql: str) -> str:
-    """Replace GROUP BY aliases with the full expressions."""
-    # Q692: GROUP BY tag_a, tag_b -> GROUP BY COALESCE(a.info_tag, 'none'), COALESCE(b.info_tag, 'none')
-    return sql
-
-
 # ── Per-query fixes ────────────────────────────────────────────────────
+# FIXES dict maps query ID to a dict with one or both of:
+#   "sql": replacement SQL string (for OO-unsupported patterns)
+#   "skip_sqllogictest": true (for OO-specific functions DuckDB can't replicate)
+#   "skip_row_count": true (for queries where OO/DuckDB row counts differ)
+#
+# Common SQL rewrites applied:
+#   - date_trunc -> integer arithmetic on _timestamp bigint
+#   - Scalar correlated subqueries -> CROSS JOIN or window functions
+#   - GROUP BY aliases -> full expressions
+#   - CTE ambiguous columns -> explicit COALESCE
+#   - match_all in cross-stream JOINs -> single-stream rewrite
+#   - Window-inside-aggregate -> CTE decomposition
+#   - CROSS JOIN -> regular JOIN with ON clause
 
 FIXES = {
     # ── GROUP BY alias ────────────────────────────────────────────────

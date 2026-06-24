@@ -7,7 +7,12 @@ and diverse histogram/aggregation patterns.
 Run from the repo root:
     python3 tests/test-data/query-agent/gen_q672_q999.py
 
-WARNING: NOT idempotent. Running multiple times will append duplicates.
+NOTE: Idempotent — re-running skips all existing queries (checks for existing query IDs before appending).
+
+SQL placeholders:
+    {stream}  — replaced at runtime with the primary test stream name
+    {stream2} — replaced at runtime with the secondary cross-stream name
+These are substituted by the test harness / DuckDB oracle before execution.
 """
 
 import json
@@ -17,13 +22,34 @@ QUERIES_DIR = Path(__file__).parent / "queries"
 
 
 def toff(qi):
-    """Standard time_offset — each query owns a 60-second window."""
+    """Standard 60-second window for query *qi*.
+
+    Each query owns a ~60 s slice of the timeline starting at
+    ``(qi - 1) * 60_000_000`` µs.  A 1 s pad before and a 13 s pad
+    after the slice are added so histogram bucket edges and late-arriving
+    records are captured.
+
+    Magic numbers (all in microseconds):
+        60_000_000  — 60 s (one minute)
+         1_000_000  —  1 s padding before
+        73_000_000  — 60 s + 13 s padding after
+    """
     base = (qi - 1) * 60_000_000
     return {"start_offset": base - 1_000_000, "end_offset": base + 73_000_000}
 
 
 def toff_wide(qi):
-    """Wider window for histogram queries."""
+    """Wider window for histogram / multi-partition queries.
+
+    Same base slice as :func:`toff` but with ~103 s of padding after
+    to accommodate wider histogram bucket ranges and multi-aggregate
+    queries that span multiple partitions.
+
+    Magic numbers (all in microseconds):
+        60_000_000  — 60 s (one minute)
+         1_000_000  —  1 s padding before
+       163_000_000  — 60 s + 103 s padding after
+    """
     base = (qi - 1) * 60_000_000
     return {"start_offset": base - 1_000_000, "end_offset": base + 163_000_000}
 
@@ -404,7 +430,7 @@ NEW_QUERIES = {
                 'FROM "{stream}" a '
                 'LEFT JOIN "{stream2}" b '
                 'ON a.variant_tag = b.variant_tag '
-                'GROUP BY tag_a, tag_b '
+                'GROUP BY COALESCE(a.info_tag, \'none\'), COALESCE(b.info_tag, \'none\') '
                 'ORDER BY cnt DESC LIMIT 15'
             ),
             "category": "cross_stream",
@@ -2103,7 +2129,8 @@ NEW_QUERIES = {
                 'SELECT _timestamp, component_name, latency_ms '
                 'FROM base WHERE response_code < 400'
                 ') '
-                'SELECT component_name, '
+                'SELECT '
+                'COALESCE(e.component_name, s.component_name) AS component_name, '
                 'AVG(CAST(e.latency_ms AS FLOAT)) AS avg_error_lat, '
                 'AVG(CAST(s.latency_ms AS FLOAT)) AS avg_success_lat, '
                 'COUNT(e._timestamp) AS error_cnt, '
