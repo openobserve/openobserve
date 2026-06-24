@@ -227,6 +227,8 @@ pub enum UsageType {
     Syslog,
     #[serde(rename = "enrichment_table")]
     EnrichmentTable,
+    #[serde(rename = "pipeline")]
+    Pipeline,
 }
 
 impl UsageType {
@@ -289,6 +291,7 @@ impl std::fmt::Display for UsageType {
             UsageType::Retention => write!(f, "data_retention"),
             UsageType::Syslog => write!(f, "syslog"),
             UsageType::EnrichmentTable => write!(f, "enrichment_table"),
+            UsageType::Pipeline => write!(f, "pipeline"),
         }
     }
 }
