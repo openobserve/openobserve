@@ -934,10 +934,13 @@ export default defineComponent({
     // Show anomaly detection only when the backend is an enterprise or cloud build.
     // The frontend build flag alone is not sufficient — an enterprise UI can be
     // pointed at an OSS backend which does not have the feature.
+    // The backend can also disable it at runtime via O2_ANOMALY_DETECTION_DISABLED,
+    // surfaced as anomaly_detection_enabled in the config API response.
     const isAnomalyDetectionEnabled = computed(
       () =>
         store.state.zoConfig.build_type !== "opensource" &&
-        config.isEnterprise === "true",
+        config.isEnterprise === "true" &&
+        store.state.zoConfig.anomaly_detection_enabled === true,
     );
 
     // Initialize activeTab from URL query parameter, default to "all".
@@ -999,7 +1002,7 @@ export default defineComponent({
           sortable: true,
           hideable: true,
           size: 280,
-          minSize: 160,
+          minSize: 320,
           // Flex: fills the leftover width on load, freezes on first resize.
           meta: { align: "left", flex: true },
         },
@@ -1011,7 +1014,7 @@ export default defineComponent({
           sortable: true,
           resizable: true,
           hideable: true,
-          size: COL.owner,
+          size: 120,
           meta: { align: "left" },
         },
         // "period" (Look back window) — all tabs except realTime
@@ -1054,7 +1057,7 @@ export default defineComponent({
           sortable: true,
           resizable: true,
           hideable: true,
-          size: COL.date,
+          size: 160,
           meta: { align: "left" },
         },
         {
@@ -1065,7 +1068,7 @@ export default defineComponent({
           sortable: true,
           resizable: true,
           hideable: true,
-          size: COL.date,
+          size: 160,
           meta: { align: "left" },
         },
         // Anomaly Detection columns — shown on anomalyDetection and all tabs
@@ -1079,7 +1082,7 @@ export default defineComponent({
                 sortable: true,
                 resizable: true,
                 hideable: true,
-                size: COL.date,
+                size: 160,
                 meta: { align: "left" },
               } as OTableColumnDef,
               {

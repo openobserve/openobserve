@@ -82,6 +82,14 @@ Set `skip: true` with a clear `skip_reason` if **any** of these hold:
 > `existing_tests_in_diff: true` (route = *enhance*) and **continue**; the Architect reads those
 > tests and decides whether to extend, append to, or complement them.
 >
+> **`existing_tests_in_diff` counts ONLY Playwright E2E specs** under
+> `tests/ui-testing/playwright-tests/**/*.spec.js`. **Vitest unit tests** (`web/src/**/*.spec.ts`,
+> `*.spec.js` under `web/`) and **Rust tests** are NOT E2E coverage — they do **not** set this flag
+> and the Architect never extends them. (A deterministic workflow step in `.github/workflows/e2e-council.yml`
+> — "Scope existing_tests_in_diff to E2E specs" — recomputes this flag from the diff and overrides your
+> value, so don't guess — but keep your `existing_tests` rationale consistent:
+> a changed Vitest/unit test is dev test-maintenance, irrelevant to E2E coverage.)
+>
 > **Priority when both apply:** an **explicit** opt-out (condition 2 — `tests-added` label or a
 > "skip" comment) always wins → skip, even if the diff also adds tests. The "don't auto-skip" rule
 > only overrides the *automatic* detection of test files, never an explicit human opt-out.
@@ -156,7 +164,7 @@ field, never the layout). Emit exactly these keys, each a concise 1–3 sentence
   "e2e":     "why E2E is or isn't warranted — what user-facing behavior needs verifying",
   "area":    "why this area — where the bulk of the UI changes live + where sibling specs are",
   "group":   "why this playwright_group (matrix shard)",
-  "existing_tests": "what existing test changes are in the diff and whether they cover the NEW feature (maintenance vs real coverage)"
+  "existing_tests": "ONLY about Playwright E2E specs (tests/ui-testing/playwright-tests/) changed in the diff and whether they cover the NEW feature. A changed Vitest/unit (web/src/**/*.spec.ts) or Rust test is NOT E2E coverage — say 'no E2E specs in the diff' (don't cite unit tests as existing coverage)."
 }
 ```
 Write **every** key (use a short note like "n/a — skipped" if a field doesn't apply). Keep each

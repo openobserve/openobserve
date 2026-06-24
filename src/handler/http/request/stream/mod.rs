@@ -798,7 +798,7 @@ pub async fn delete_stream_data_by_time_range(
     )
 )]
 pub async fn get_delete_stream_data_status(
-    Path((_org_id, _stream_name, data_id)): Path<(String, String, String)>,
+    Path((org_id, _stream_name, data_id)): Path<(String, String, String)>,
 ) -> Response {
     // Check if super cluster is enabled
     #[cfg(feature = "enterprise")]
@@ -808,7 +808,19 @@ pub async fn get_delete_stream_data_status(
     {
         // Super cluster is enabled, get status from all regions
         match get_super_cluster_delete_status(&data_id).await {
-            Ok(res) => res,
+            Ok(res) => {
+                if !job_belongs_to_org(&res, &org_id) {
+                    return (
+                        StatusCode::NOT_FOUND,
+                        Json(MetaHttpResponse::error(
+                            StatusCode::NOT_FOUND,
+                            "job not found".to_string(),
+                        )),
+                    )
+                        .into_response();
+                }
+                res
+            }
             Err(e) => {
                 log::error!("get_super_cluster_delete_status error: {e}");
                 return (
@@ -822,14 +834,44 @@ pub async fn get_delete_stream_data_status(
             }
         }
     } else {
-        // Super cluster not enabled, get local status
-        get_local_delete_status(&data_id).await
+        let res = get_local_delete_status(&data_id).await;
+        if !job_belongs_to_org(&res, &org_id) {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(MetaHttpResponse::error(
+                    StatusCode::NOT_FOUND,
+                    "job not found".to_string(),
+                )),
+            )
+                .into_response();
+        }
+        res
     };
 
     #[cfg(not(feature = "enterprise"))]
-    let response = get_local_delete_status(&data_id).await;
+    let response = {
+        let res = get_local_delete_status(&data_id).await;
+        if !job_belongs_to_org(&res, &org_id) {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(MetaHttpResponse::error(
+                    StatusCode::NOT_FOUND,
+                    "job not found".to_string(),
+                )),
+            )
+                .into_response();
+        }
+        res
+    };
 
     (StatusCode::OK, Json(response)).into_response()
+}
+
+fn job_belongs_to_org(res: &CompactorManualJobStatusRes, org_id: &str) -> bool {
+    let org_prefix = format!("{org_id}/");
+    res.metadata
+        .iter()
+        .all(|entry| entry.job.key.starts_with(&org_prefix))
 }
 
 async fn get_local_delete_status(id: &str) -> CompactorManualJobStatusRes {

@@ -607,11 +607,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="tw:p-0 tw:h-[1.875rem]! element-box-shadow"
                   :class="[
                     isNaturalLanguageDetected && !searchObj.meta.nlpMode
-                      ? 'o2-ai-generate-button'
+                      ? 'o2-ai-generate-button search-button-enterprise-border-radius'
                       : 'o2-run-query-button o2-color-primary',
-                    config.isEnterprise == 'true'
-                      ? 'search-button-enterprise-border-radius'
-                      : 'search-button-normal-border-radius',
+                    'search-button-enterprise-border-radius',
                   ]"
                   @click="
                     isNaturalLanguageDetected && !searchObj.meta.nlpMode
@@ -644,9 +642,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               )
                             ? 'o2-color-primary'
                             : '',
-                        config.isEnterprise == 'true'
-                          ? 'search-button-dropdown-enterprise-border-radius'
-                          : 'search-button-normal-border-radius',
+                        'search-button-dropdown-enterprise-border-radius',
                       ]"
                     >
                       <OIcon name="arrow-drop-down" size="sm" />
@@ -680,7 +676,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div v-else class="tw:flex tw:items-center">
                 <!-- Cancel button when query is running -->
                 <OButton
-                  v-if="visualizeSearchRequestTraceIds.length > 0"
+                  v-if="visualizeSearchRequestTraceIds.length > 0 && config.isEnterprise == 'true'"
                   data-test="logs-search-bar-visualize-cancel-btn"
                   variant="ghost"
                   :title="t('search.cancel')"
@@ -708,11 +704,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="tw:p-0 tw:h-[1.875rem]! element-box-shadow"
                   :class="[
                     isNaturalLanguageDetected && !searchObj.meta.nlpMode
-                      ? 'o2-ai-generate-button'
+                      ? 'o2-ai-generate-button search-button-enterprise-border-radius'
                       : 'o2-run-query-button o2-color-primary',
-                    config.isEnterprise == 'true'
-                      ? 'search-button-enterprise-border-radius'
-                      : 'search-button-normal-border-radius',
+                    'search-button-enterprise-border-radius',
                   ]"
                   @click="
                     isNaturalLanguageDetected && !searchObj.meta.nlpMode
@@ -726,7 +720,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       : t("search.runQuery")
                   }}
                 </OButton>
-                <OSeparator class="tw:h-[1.875rem]! tw:w-[1px]" />
+                <OSeparator class="tw:h-[1.875rem]! tw:w-[1px]" vertical />
                 <ODropdown align="end" side="bottom">
                   <template #trigger>
                     <OButton
@@ -745,9 +739,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               )
                             ? 'o2-color-primary'
                             : '',
-                        config.isEnterprise == 'true'
-                          ? 'search-button-dropdown-enterprise-border-radius'
-                          : 'search-button-normal-border-radius',
+                        'search-button-dropdown-enterprise-border-radius',
                       ]"
                     >
                       <OIcon name="arrow-drop-down" size="sm" />
