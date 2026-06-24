@@ -32,26 +32,28 @@
     <!-- FILTER BAR -->
     <div class="syn-filter-bar">
       <!-- View switcher -->
-      <OButtonGroup>
-        <OButton v-for="tab in tabs" :key="tab.key"
-          :variant="activeTab === tab.key ? 'primary' : 'ghost'"
-          size="sm"
-          @click="activeTab = tab.key">
+      <OToggleGroup
+        :model-value="activeTab"
+        @update:model-value="(v) => { activeTab = v as string; currentPage = 1 }"
+      >
+        <OToggleGroupItem v-for="tab in tabs" :key="tab.key" :value="tab.key" size="sm">
           {{ tab.label }}
-        </OButton>
-      </OButtonGroup>
+        </OToggleGroupItem>
+      </OToggleGroup>
 
       <div class="syn-filter-sep" />
 
       <!-- Status filter — only on All Monitors tab -->
       <template v-if="activeTab === 'monitors'">
-        <OButton v-for="s in statusTabs" :key="s.filter"
-          :variant="statusFilter === s.filter ? 'primary' : 'ghost'"
-          size="sm"
-          @click="statusFilter = s.filter">
-          <span v-if="s.filter !== 'all'" class="syn-pill-dot" :class="'sdot-' + s.filter.toLowerCase()" />
-          {{ s.label }} <span class="syn-pill-count">{{ s.count }}</span>
-        </OButton>
+        <OToggleGroup
+          :model-value="statusFilter"
+          @update:model-value="(v) => { statusFilter = v as string; currentPage = 1 }"
+        >
+          <OToggleGroupItem v-for="s in statusTabs" :key="s.filter" :value="s.filter" size="sm">
+            <span v-if="s.filter !== 'all'" class="syn-pill-dot" :class="'sdot-' + s.filter.toLowerCase()" />
+            {{ s.label }} <span class="syn-pill-count">{{ s.count }}</span>
+          </OToggleGroupItem>
+        </OToggleGroup>
         <div class="syn-filter-sep" />
       </template>
 
@@ -68,12 +70,14 @@
         <OSelect
           v-model="typeFilter"
           :options="typeOpts"
-          size="sm"
+          size="md"
+          @update:model-value="currentPage = 1"
         />
         <OSelect
           v-model="locationFilter"
           :options="locationOpts"
-          size="sm"
+          size="md"
+          @update:model-value="currentPage = 1"
         />
       </template>
 
@@ -975,7 +979,8 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
-import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
