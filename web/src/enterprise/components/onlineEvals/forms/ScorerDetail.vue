@@ -35,8 +35,12 @@
       <section
         class="sd__kpis tw:grid tw:grid-cols-4 tw:gap-[0.625rem]"
       >
+        <!-- While the KPI query is in flight, show skeleton tiles in place of
+             the cards (matches the LLM Insights dashboard pattern). -->
+        <KpiCardsSkeleton v-if="isLoadingKpis" :count="4" />
         <div
           v-for="card in kpiCards"
+          v-else
           :key="card.label"
           class="kpi-card tw:rounded-lg tw:flex tw:flex-col tw:px-[0.875rem] tw:pt-[0.625rem] tw:pb-[0.625rem] tw:gap-[0.25rem]"
         >
@@ -372,6 +376,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
+import KpiCardsSkeleton from "./KpiCardsSkeleton.vue";
 import genAiAgentMappingService from "@/services/gen-ai-agent-mapping.service";
 import type {
   EvalJob,
@@ -624,6 +629,7 @@ const scorerIdRef = computed(() => entityId(props.row));
 const {
   kpis,
   runs,
+  isLoadingKpis,
   isLoadingRuns,
   refresh: refreshRunsData,
 } = useScorerRuns(scorerIdRef, dateWindow, runsEnabled, selectedAgent);
