@@ -875,11 +875,13 @@ export default defineComponent({
         color: DEFAULT_DARK_COLOR,
       });
 
-      // Apply the theme immediately for current mode
+      // Apply the theme immediately for current mode.
+      // isDefault=false so the default theme's (O2 Signature) actual colors are
+      // applied rather than reverting to the base stylesheet palette.
       const currentMode = store.state.theme === "dark" ? "dark" : "light";
       const color =
         currentMode === "light" ? DEFAULT_LIGHT_COLOR : DEFAULT_DARK_COLOR;
-      applyThemeColors(color, currentMode, true);
+      applyThemeColors(color, currentMode, false);
 
       // Show notification
       toast({
@@ -907,13 +909,9 @@ export default defineComponent({
       const color =
         mode === "light" ? customLightColor.value : customDarkColor.value;
 
-      // Check if the color is a default color
-      const isDefault =
-        (mode === "light" && color === DEFAULT_LIGHT_COLOR) ||
-        (mode === "dark" && color === DEFAULT_DARK_COLOR);
-
-      // Apply the theme color for the new mode
-      applyThemeColors(color, mode, isDefault);
+      // Apply the theme color for the new mode. isDefault=false so the resolved
+      // color (including the O2 Signature default) is always applied directly.
+      applyThemeColors(color, mode, false);
     };
 
     const cancelLogoText = () => {
