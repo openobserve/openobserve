@@ -29,6 +29,9 @@ pub struct Model {
     pub created_by: String,
     pub created_at: i64,
     pub updated_at: i64,
+    /// "ingest" for o2oi_ tokens, "synthetics" for o2syn_ tokens.
+    #[sea_orm(default_value = "ingest")]
+    pub token_type: String,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
@@ -53,6 +56,7 @@ mod tests {
             created_by: "admin@test.com".to_string(),
             created_at: 1000,
             updated_at: 2000,
+            token_type: "ingest".to_string(),
         };
         assert_eq!(m.id, "test-id");
         assert_eq!(m.org_id, "org-1");
@@ -74,6 +78,7 @@ mod tests {
             created_by: "admin@test.com".to_string(),
             created_at: 1000,
             updated_at: 2000,
+            token_type: "ingest".to_string(),
         };
         assert!(!m.is_default);
         assert!(!m.enabled);

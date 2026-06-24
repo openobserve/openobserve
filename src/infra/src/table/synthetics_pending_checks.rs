@@ -88,6 +88,44 @@ pub async fn enqueue<C: ConnectionTrait>(
     Ok(())
 }
 
+/// Gets a single pending check by its ID. Used by the job API `resolve` endpoint.
+pub async fn get_by_id<C: ConnectionTrait>(
+    conn: &C,
+    id: i64,
+) -> Result<Option<LeasedRow>, errors::Error> {
+    let sql = r#"
+        SELECT id, monitor_id, org_id, location, pool,
+               browser_engine, device, scheduled_ts, valid_until
+        FROM synthetics_pending_checks
+        WHERE id = $1
+    "#;
+    let rows = conn
+        .query_all(Statement::from_sql_and_values(
+            conn.get_database_backend(),
+            sql,
+            [Value::from(id)],
+        ))
+        .await?;
+
+    rows.into_iter()
+        .next()
+        .map(|row| {
+            Ok(LeasedRow {
+                id: row.try_get("", "id")?,
+                monitor_id: row.try_get("", "monitor_id")?,
+                org_id: row.try_get("", "org_id")?,
+                location: row.try_get("", "location")?,
+                pool: row.try_get("", "pool")?,
+                browser_engine: row.try_get("", "browser_engine")?,
+                device: row.try_get("", "device")?,
+                scheduled_ts: row.try_get("", "scheduled_ts")?,
+                valid_until: row.try_get("", "valid_until")?,
+            })
+        })
+        .transpose()
+        .map_err(errors::Error::from)
+}
+
 /// Deletes all pending checks for a monitor (called on monitor delete).
 pub async fn drain_monitor<C: ConnectionTrait>(
     conn: &C,

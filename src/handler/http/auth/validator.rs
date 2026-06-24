@@ -252,6 +252,38 @@ pub async fn validate_credentials(
         path_columns.pop();
     }
 
+    // Check synthetics agent tokens (o2syn_) — no org_id in path; global token lookup.
+    #[cfg(feature = "enterprise")]
+    if user_password.starts_with(infra::table::org_ingestion_tokens::SYNTHETICS_TOKEN_PREFIX) {
+        match infra::table::org_ingestion_tokens::find_enabled_synthetics_token(user_password).await
+        {
+            Ok(Some(_record)) => {
+                return Ok(TokenValidationResponse {
+                    is_valid: true,
+                    user_email: user_id.to_string(),
+                    is_internal_user: true,
+                    user_role: None,
+                    user_name: "synthetics_probe".to_string(),
+                    family_name: "".to_string(),
+                    given_name: "Synthetics Probe".to_string(),
+                });
+            }
+            Ok(None) => {
+                return Ok(TokenValidationResponse {
+                    is_valid: false,
+                    ..Default::default()
+                });
+            }
+            Err(e) => {
+                log::error!("[synthetics] error validating agent token: {e}");
+                return Ok(TokenValidationResponse {
+                    is_valid: false,
+                    ..Default::default()
+                });
+            }
+        }
+    }
+
     // Check org-level ingestion tokens before user lookup.
     // Org tokens are prefixed with "o2oi_" for fast identification —
     // if the password starts with this prefix, check the dedicated

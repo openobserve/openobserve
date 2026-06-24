@@ -32,6 +32,7 @@ pub async fn create_default_token(org_id: &str, created_by: &str) -> Result<(), 
         created_by: created_by.to_string(),
         created_at: chrono::Utc::now().timestamp_micros(),
         updated_at: chrono::Utc::now().timestamp_micros(),
+        token_type: "ingest".to_string(),
     };
     db::org_ingestion_tokens::add(&record).await?;
     Ok(())
@@ -111,6 +112,7 @@ pub async fn create_token(
         created_by: created_by.to_string(),
         created_at: now,
         updated_at: now,
+        token_type: "ingest".to_string(),
     };
     db::org_ingestion_tokens::add(&record).await?;
 

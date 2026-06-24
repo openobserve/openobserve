@@ -160,6 +160,102 @@ pub async fn run_monitor_now(Path((org_id, id)): Path<(String, String)>) -> Resp
     }
 }
 
+// ── Job API (probe-facing, bypass RBAC, authenticated via o2syn_ token) ──────
+
+pub async fn job_resolve(Json(body): Json<serde_json::Value>) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        let req = match serde_json::from_value::<
+            o2_enterprise::enterprise::synthetics::job_api::ResolveRequest,
+        >(body)
+        {
+            Ok(r) => r,
+            Err(e) => {
+                return MetaHttpResponse::bad_request(e.to_string());
+            }
+        };
+        match o2_enterprise::enterprise::synthetics::job_api::resolve(req).await {
+            Ok(resp) => MetaHttpResponse::json(resp),
+            Err(e) => {
+                let msg = e.to_string();
+                if msg.contains("not found") {
+                    return MetaHttpResponse::not_found(msg);
+                }
+                tracing::error!("[synthetics] job_resolve: {e}");
+                MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), msg)
+                    .into_response()
+            }
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = body;
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+pub async fn job_lease(Json(body): Json<serde_json::Value>) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        let req = match serde_json::from_value::<
+            o2_enterprise::enterprise::synthetics::job_api::LeaseRequest,
+        >(body)
+        {
+            Ok(r) => r,
+            Err(e) => {
+                return MetaHttpResponse::bad_request(e.to_string());
+            }
+        };
+        match o2_enterprise::enterprise::synthetics::job_api::lease(req).await {
+            Ok(resp) => MetaHttpResponse::json(resp),
+            Err(e) => {
+                tracing::error!("[synthetics] job_lease: {e}");
+                MetaHttpResponse::error(
+                    StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
+                    e.to_string(),
+                )
+                .into_response()
+            }
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = body;
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+pub async fn job_ack(Json(body): Json<serde_json::Value>) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        let req = match serde_json::from_value::<
+            o2_enterprise::enterprise::synthetics::job_api::AckRequest,
+        >(body)
+        {
+            Ok(r) => r,
+            Err(e) => {
+                return MetaHttpResponse::bad_request(e.to_string());
+            }
+        };
+        match o2_enterprise::enterprise::synthetics::job_api::ack(req).await {
+            Ok(resp) => MetaHttpResponse::json(resp),
+            Err(e) => {
+                tracing::error!("[synthetics] job_ack: {e}");
+                MetaHttpResponse::error(
+                    StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
+                    e.to_string(),
+                )
+                .into_response()
+            }
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = body;
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
 // ── Locations ─────────────────────────────────────────────────────────────────
 
 pub async fn list_locations(Path(_org_id): Path<String>) -> Response {
