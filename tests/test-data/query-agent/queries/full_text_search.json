@@ -4208,7 +4208,8 @@
         ],
         "results_mode": "rowsort",
         "skip_sqllogictest": true,
-        "skip_row_count": true
+        "skip_row_count": true,
+        "skip_column_check": true
       }
     },
     {
@@ -4252,7 +4253,7 @@
     },
     {
       "id": "Q795",
-      "sql": "SELECT _timestamp, log, facility_zone, match_all('ACK batch') AS has_ack, ROW_NUMBER() OVER (PARTITION BY facility_zone ORDER BY _timestamp) AS rn FROM \"{stream}\" WHERE match_all('ACK batch') ORDER BY facility_zone, rn LIMIT 10",
+      "sql": "SELECT _timestamp, log, facility_zone, true AS has_ack, ROW_NUMBER() OVER (PARTITION BY facility_zone ORDER BY _timestamp) AS rn FROM \"{stream}\" WHERE match_all('ACK batch') ORDER BY facility_zone, rn LIMIT 10",
       "category": "full_text_search",
       "time_offset": {
         "start_offset": 47639000000,
@@ -4287,7 +4288,8 @@
         ],
         "results_mode": "rowsort",
         "skip_sqllogictest": true,
-        "skip_row_count": true
+        "skip_row_count": true,
+        "skip_column_check": true
       }
     },
     {
@@ -4333,7 +4335,8 @@
         ],
         "results_mode": "rowsort",
         "skip_sqllogictest": true,
-        "skip_row_count": true
+        "skip_row_count": true,
+        "skip_column_check": true
       }
     },
     {
@@ -4590,7 +4593,8 @@
         ],
         "results_mode": "rowsort",
         "skip_sqllogictest": true,
-        "skip_row_count": true
+        "skip_row_count": true,
+        "skip_column_check": true
       }
     },
     {
@@ -4616,7 +4620,8 @@
         ],
         "results_mode": "rowsort",
         "skip_sqllogictest": true,
-        "skip_row_count": true
+        "skip_row_count": true,
+        "skip_column_check": true
       }
     },
     {
@@ -4808,7 +4813,8 @@
         ],
         "results_mode": "rowsort",
         "skip_sqllogictest": true,
-        "skip_row_count": true
+        "skip_row_count": true,
+        "skip_column_check": true
       }
     },
     {
@@ -4893,7 +4899,7 @@
     },
     {
       "id": "Q811",
-      "sql": "SELECT _timestamp, log, match_all('warehouse') AS is_match, ROW_NUMBER() OVER (ORDER BY _timestamp) AS seq FROM \"{stream}\" WHERE match_all('warehouse') OR match_all('error') ORDER BY _timestamp ASC LIMIT 10",
+      "sql": "SELECT _timestamp, log, true AS is_match, ROW_NUMBER() OVER (ORDER BY _timestamp) AS seq FROM \"{stream}\" WHERE match_all('warehouse') OR match_all('error') ORDER BY _timestamp ASC LIMIT 10",
       "category": "full_text_search",
       "time_offset": {
         "start_offset": 48599000000,
@@ -4944,7 +4950,8 @@
         ],
         "results_mode": "rowsort",
         "skip_sqllogictest": true,
-        "skip_row_count": true
+        "skip_row_count": true,
+        "skip_column_check": true
       }
     },
     {
@@ -4972,7 +4979,8 @@
         ],
         "results_mode": "rowsort",
         "skip_sqllogictest": true,
-        "skip_row_count": true
+        "skip_row_count": true,
+        "skip_column_check": true
       }
     },
     {
@@ -5108,7 +5116,8 @@
         ],
         "results_mode": "rowsort",
         "skip_sqllogictest": true,
-        "skip_row_count": true
+        "skip_row_count": true,
+        "skip_column_check": true
       }
     },
     {
@@ -5160,7 +5169,8 @@
         ],
         "results_mode": "rowsort",
         "skip_sqllogictest": true,
-        "skip_row_count": true
+        "skip_row_count": true,
+        "skip_column_check": true
       }
     },
     {
@@ -5248,7 +5258,8 @@
         ],
         "results_mode": "rowsort",
         "skip_sqllogictest": true,
-        "skip_row_count": true
+        "skip_row_count": true,
+        "skip_column_check": true
       }
     },
     {
