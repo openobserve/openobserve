@@ -44,7 +44,7 @@ const createStorage = (initial: Record<string, string> = {}): Storage => {
 describe("theme registry", () => {
   describe("lookups", () => {
     it("finds a theme by name", () => {
-      expect(getThemeByName("Ocean Breeze")?.id).toBe(2);
+      expect(getThemeByName("O2 Pulse")?.id).toBe(2);
     });
 
     it("returns undefined for an unknown name", () => {
@@ -75,7 +75,7 @@ describe("theme registry", () => {
       const r = resolveThemeForMode({
         mode: "light",
         tempColor: "#ABCDEF",
-        appliedThemeName: "Ocean Breeze",
+        appliedThemeName: "O2 Pulse",
         customColor: "#111111",
       });
       expect(r.source).toBe("preview");
@@ -83,10 +83,10 @@ describe("theme registry", () => {
     });
 
     it("resolves a predefined theme by NAME from the current registry color", () => {
-      const ocean = getThemeByName("Ocean Breeze")!;
+      const ocean = getThemeByName("O2 Pulse")!;
       const r = resolveThemeForMode({
         mode: "light",
-        appliedThemeName: "Ocean Breeze",
+        appliedThemeName: "O2 Pulse",
         // a stale cached color must be ignored in favour of the registry color
         customColor: "#000000",
       });
@@ -156,7 +156,7 @@ describe("theme registry", () => {
       storage.setItem("appliedLightTheme", "2");
       migrateLegacyThemeStorage(storage);
       expect(storage.getItem(THEME_STORAGE_KEYS.light.appliedName)).toBe(
-        "Ocean Breeze",
+        "O2 Pulse",
       );
       expect(storage.getItem("appliedLightTheme")).toBeNull();
     });
@@ -179,10 +179,10 @@ describe("theme registry", () => {
 
     it("does not overwrite an already-migrated name key", () => {
       storage.setItem("appliedLightTheme", "2");
-      storage.setItem(THEME_STORAGE_KEYS.light.appliedName, "Sky Blue");
+      storage.setItem(THEME_STORAGE_KEYS.light.appliedName, "O2 Lens");
       migrateLegacyThemeStorage(storage);
       expect(storage.getItem(THEME_STORAGE_KEYS.light.appliedName)).toBe(
-        "Sky Blue",
+        "O2 Lens",
       );
     });
 

@@ -285,7 +285,7 @@ describe("PredefinedThemes", () => {
       const wrapper = createWrapper();
       const { vm } = wrapper;
       const { applyThemeColors } = await import('@/utils/theme');
-      const oceanTheme = (vm as any).predefinedThemes.find((t: any) => t.name === 'Ocean Breeze');
+      const oceanTheme = (vm as any).predefinedThemes.find((t: any) => t.name === 'O2 Pulse');
       (vm as any).applyTheme(oceanTheme, 'light');
       expect(applyThemeColors).toHaveBeenCalledWith(
         oceanTheme.light.themeColor,
