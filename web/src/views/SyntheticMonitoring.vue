@@ -1695,9 +1695,6 @@ const saveMonitor = () => { showDrawer.value=false; };
 .syn-table { border-collapse:collapse; border:1px solid var(--o2-border-color); border-radius:10px; overflow:hidden; background:var(--o2-card-background); width:100%; min-width:1000px; }
 .syn-th  { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:var(--o2-tab-text-color); padding:9px 14px; border-bottom:1px solid var(--o2-border-color); text-align:left; position:sticky; top:0; background:var(--o2-card-background); z-index:1; white-space:nowrap; overflow:hidden; }
 .syn-th.right { text-align:right; }
-.th-inner { display:flex; align-items:center; justify-content:space-between; gap:4px; user-select:none; }
-.col-resize-handle { width:4px; height:14px; cursor:col-resize; border-radius:2px; background:var(--o2-border-color); flex-shrink:0; transition:background .12s; }
-.col-resize-handle:hover { background:var(--o2-primary-color); }
 .syn-row { border-bottom:1px solid var(--o2-border-color); transition:background .1s; }
 .syn-row:last-child { border-bottom:none; }
 .syn-row:hover { background:rgba(128,128,128,.06); }
