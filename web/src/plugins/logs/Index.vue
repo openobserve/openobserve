@@ -1541,11 +1541,15 @@ export default defineComponent({
     });
 
     const onJumpToStreamData = (fromUs: number, toUs: number) => {
-      searchBarRef.value?.dateTimeRef?.setAbsoluteTime(fromUs, toUs);
+      // Set datetime state directly and trigger one search. Update the picker UI
+      // after the search starts so its on:date-change emit does not race with runQuery.
       searchObj.data.datetime.startTime = fromUs;
       searchObj.data.datetime.endTime = toUs;
       searchObj.data.datetime.type = "absolute";
       searchObj.runQuery = true;
+      nextTick(() => {
+        searchBarRef.value?.dateTimeRef?.setAbsoluteTime(fromUs, toUs);
+      });
     };
 
     const onRemoveFilter = () => {
