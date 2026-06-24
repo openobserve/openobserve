@@ -780,6 +780,7 @@ const useLogs = () => {
   }
 
   return {
+    resolveDefaultColumns,
     getJobData,
     refreshData,
     loadLogsData,
@@ -799,6 +800,32 @@ const useLogs = () => {
     loadPatternsData,
     getHistogramTitle,
   };
+};
+
+// Priority order for FTS field selection as default columns
+const FTS_PRIORITY = ['body', 'body_msg', 'message', 'log', 'msg'];
+
+export const resolveDefaultColumns = (
+  streamFields: Array<{ name: string; ftsKey: boolean }>,
+  globalFtsKeys: string[],
+): string[] => {
+  const streamFtsNames = streamFields
+    .filter((f) => f.ftsKey)
+    .map((f) => f.name);
+
+  const allFtsNames = [...new Set([...streamFtsNames, ...globalFtsKeys])];
+
+  if (allFtsNames.length === 0) return [];
+
+  // Sort by priority list, then lexicographic for the rest
+  const priorityIndex = (name: string) => {
+    const idx = FTS_PRIORITY.indexOf(name);
+    return idx === -1 ? FTS_PRIORITY.length : idx;
+  };
+
+  return allFtsNames.sort(
+    (a, b) => priorityIndex(a) - priorityIndex(b),
+  );
 };
 
 export default useLogs;
