@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="tw:flex tw:items-center actions-container">
             <OButton
               :data-test="`pipeline-list-${row.name}-pause-start-action`"
-              variant="ghost"
+              :variant="row.enabled ? 'ghost-destructive' : 'ghost'"
               size="icon-sm"
               :title="row.enabled ? t('alerts.pause') : t('alerts.start')"
               :icon-left="row.enabled ? 'pause' : 'play-arrow'"
