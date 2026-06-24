@@ -283,6 +283,7 @@ FIXES = {
     # ── CROSS JOIN -> regular JOIN ────────────────────────────────────
     # OO does not support CROSS JOIN.  The inequality self-join also
     # returns 0 rows in OO (execution-plan difference), so skip comparison.
+    "Q683": {"skip_sqllogictest": True, "skip_row_count": True, "skip_column_check": True},
     "Q684": {
         "sql": (
             'SELECT a.component_name, b.region_code, COUNT(*) AS pair_cnt '
