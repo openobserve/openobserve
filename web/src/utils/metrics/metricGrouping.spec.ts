@@ -39,11 +39,13 @@ function makeStream(stream_name: string): StreamInfo {
 // ---------------------------------------------------------------------------
 
 describe("DEFAULT_METRIC_GROUP_DEFINITIONS", () => {
-  it("should contain exactly 3 entries in order: network, infra, others", () => {
-    expect(DEFAULT_METRIC_GROUP_DEFINITIONS).toHaveLength(3);
+  it("should contain exactly 5 entries in order: compute, memory, storage, network, others", () => {
+    expect(DEFAULT_METRIC_GROUP_DEFINITIONS).toHaveLength(5);
     expect(DEFAULT_METRIC_GROUP_DEFINITIONS.map((d) => d.id)).toEqual([
+      "compute",
+      "memory",
+      "storage",
       "network",
-      "infra",
       "others",
     ]);
   });
@@ -143,7 +145,11 @@ describe("classifyMetric — network group", () => {
 // ---------------------------------------------------------------------------
 
 describe("classifyMetric — network priority over infra", () => {
-  const defs = DEFAULT_METRIC_GROUP_DEFINITIONS;
+  const defs: MetricGroupDefinition[] = [
+    { id: "network", label: "Network", icon: "wifi" },
+    { id: "infra", label: "Infra", icon: "dns" },
+    { id: "others", label: "Others", icon: "category" },
+  ];
 
   it("should classify container_network_receive_bytes_total as network, not infra", () => {
     // matches both INFRA (container_ prefix) and NETWORK (network keyword, receive_bytes)
@@ -168,11 +174,15 @@ describe("classifyMetric — network priority over infra", () => {
 });
 
 // ---------------------------------------------------------------------------
-// classifyMetric — infra patterns
+// classifyMetric — infra patterns (tested via explicit defs that include infra)
 // ---------------------------------------------------------------------------
 
 describe("classifyMetric — infra group", () => {
-  const defs = DEFAULT_METRIC_GROUP_DEFINITIONS;
+  const defs: MetricGroupDefinition[] = [
+    { id: "network", label: "Network", icon: "wifi" },
+    { id: "infra", label: "Infra", icon: "dns" },
+    { id: "others", label: "Others", icon: "category" },
+  ];
 
   it("should classify container_ prefix metrics as infra", () => {
     expect(classifyMetric("container_cpu_usage_seconds_total", defs)).toBe(
@@ -276,7 +286,7 @@ describe("classifyMetric — infra group", () => {
 // ---------------------------------------------------------------------------
 
 describe("classifyMetric — catch-all fallback with DEFAULT_METRIC_GROUP_DEFINITIONS", () => {
-  const defs = DEFAULT_METRIC_GROUP_DEFINITIONS;
+  const defs = DEFAULT_METRIC_GROUP_DEFINITIONS; // compute, memory, storage, network, others
 
   it("should classify http_server_request_duration_seconds as others", () => {
     expect(classifyMetric("http_server_request_duration_seconds", defs)).toBe(
@@ -431,15 +441,17 @@ describe("groupMetricsByCategory — return structure", () => {
   it("should return byGroup with all group ids as keys even when empty", () => {
     const result = groupMetricsByCategory([]);
     expect(Object.keys(result.byGroup).sort()).toEqual(
-      ["infra", "network", "others"].sort(),
+      ["compute", "memory", "network", "others", "storage"].sort(),
     );
   });
 
   it("should return groups array in definition order", () => {
     const result = groupMetricsByCategory([]);
     expect(result.groups.map((g) => g.id)).toEqual([
+      "compute",
+      "memory",
+      "storage",
       "network",
-      "infra",
       "others",
     ]);
   });
@@ -475,17 +487,17 @@ describe("groupMetricsByCategory — classification", () => {
     ];
     const result = groupMetricsByCategory(streams);
     expect(result.byGroup["network"]).toHaveLength(2);
-    expect(result.byGroup["infra"]).toHaveLength(0);
+    expect(result.byGroup["compute"]).toHaveLength(0);
     expect(result.byGroup["others"]).toHaveLength(0);
   });
 
-  it("should place infra metrics into the infra group", () => {
+  it("should place cpu metrics into the compute group", () => {
     const streams = [
       makeStream("container_cpu_usage_seconds_total"),
       makeStream("node_cpu_seconds_total"),
     ];
     const result = groupMetricsByCategory(streams);
-    expect(result.byGroup["infra"]).toHaveLength(2);
+    expect(result.byGroup["compute"]).toHaveLength(2);
     expect(result.byGroup["network"]).toHaveLength(0);
     expect(result.byGroup["others"]).toHaveLength(0);
   });
@@ -498,29 +510,30 @@ describe("groupMetricsByCategory — classification", () => {
     const result = groupMetricsByCategory(streams);
     expect(result.byGroup["others"]).toHaveLength(2);
     expect(result.byGroup["network"]).toHaveLength(0);
-    expect(result.byGroup["infra"]).toHaveLength(0);
+    expect(result.byGroup["compute"]).toHaveLength(0);
   });
 
   it("should split a mixed list across correct groups", () => {
     const streams = [
       makeStream("container_network_receive_bytes_total"), // network wins
-      makeStream("container_cpu_usage_seconds_total"), // infra
+      makeStream("container_cpu_usage_seconds_total"), // compute
       makeStream("http_server_request_duration_seconds"), // others
-      makeStream("kube_pod_status_ready"), // infra (kube_ matches before pod keyword)
+      makeStream("container_memory_usage_bytes"), // memory
     ];
     const result = groupMetricsByCategory(streams);
     expect(result.byGroup["network"]).toHaveLength(1);
     expect(result.byGroup["network"][0].stream_name).toBe(
       "container_network_receive_bytes_total",
     );
-    expect(result.byGroup["infra"]).toHaveLength(2);
+    expect(result.byGroup["compute"]).toHaveLength(1);
+    expect(result.byGroup["memory"]).toHaveLength(1);
     expect(result.byGroup["others"]).toHaveLength(1);
   });
 
   it("should preserve the original StreamInfo objects (same reference)", () => {
     const stream = makeStream("container_cpu_usage_seconds_total");
     const result = groupMetricsByCategory([stream]);
-    expect(result.byGroup["infra"][0]).toBe(stream);
+    expect(result.byGroup["compute"][0]).toBe(stream);
   });
 
   it("should reflect stream counts in the groups array streams field", () => {
@@ -530,9 +543,9 @@ describe("groupMetricsByCategory — classification", () => {
     ];
     const result = groupMetricsByCategory(streams);
     const networkGroup = result.groups.find((g) => g.id === "network");
-    const infraGroup = result.groups.find((g) => g.id === "infra");
+    const computeGroup = result.groups.find((g) => g.id === "compute");
     expect(networkGroup?.streams).toHaveLength(1);
-    expect(infraGroup?.streams).toHaveLength(1);
+    expect(computeGroup?.streams).toHaveLength(1);
   });
 });
 
@@ -791,6 +804,90 @@ describe("getDefaultMetricSelections", () => {
 });
 
 // ---------------------------------------------------------------------------
+// NEW: compute / memory / storage group definitions
+// ---------------------------------------------------------------------------
+
+const COMPUTE_MEMORY_STORAGE_GROUPS: MetricGroupDefinition[] = [
+  { id: "compute", label: "Compute", icon: "developer_board" },
+  { id: "memory", label: "Memory", icon: "memory" },
+  { id: "storage", label: "Storage", icon: "storage" },
+  { id: "network", label: "Network", icon: "lan" },
+  { id: "others", label: "Others", icon: "more_horiz" },
+];
+
+describe("groupMetricsByCategory with compute/memory/storage groups", () => {
+  it("classifies cpu streams as compute", () => {
+    const result = groupMetricsByCategory(
+      [makeStream("container_cpu_usage_seconds_total")],
+      COMPUTE_MEMORY_STORAGE_GROUPS,
+    );
+    expect(result.byGroup["compute"]).toHaveLength(1);
+    expect(result.byGroup["memory"]).toHaveLength(0);
+  });
+
+  it("classifies memory streams as memory", () => {
+    const result = groupMetricsByCategory(
+      [makeStream("container_memory_usage_bytes")],
+      COMPUTE_MEMORY_STORAGE_GROUPS,
+    );
+    expect(result.byGroup["memory"]).toHaveLength(1);
+    expect(result.byGroup["compute"]).toHaveLength(0);
+  });
+
+  it("classifies disk/fs streams as storage", () => {
+    const result = groupMetricsByCategory(
+      [makeStream("node_disk_io_time_seconds_total")],
+      COMPUTE_MEMORY_STORAGE_GROUPS,
+    );
+    expect(result.byGroup["storage"]).toHaveLength(1);
+  });
+
+  it("classifies network streams correctly", () => {
+    const result = groupMetricsByCategory(
+      [makeStream("node_network_transmit_bytes_total")],
+      COMPUTE_MEMORY_STORAGE_GROUPS,
+    );
+    expect(result.byGroup["network"]).toHaveLength(1);
+  });
+
+  it("classifies node_cpu_seconds_total as compute", () => {
+    const result = groupMetricsByCategory(
+      [makeStream("node_cpu_seconds_total")],
+      COMPUTE_MEMORY_STORAGE_GROUPS,
+    );
+    expect(result.byGroup["compute"]).toHaveLength(1);
+  });
+
+  it("classifies k8s_pod_memory_usage as memory", () => {
+    const result = groupMetricsByCategory(
+      [makeStream("k8s_pod_memory_usage")],
+      COMPUTE_MEMORY_STORAGE_GROUPS,
+    );
+    expect(result.byGroup["memory"]).toHaveLength(1);
+  });
+
+  it("classifies node_filesystem_avail_bytes as storage", () => {
+    const result = groupMetricsByCategory(
+      [makeStream("node_filesystem_avail_bytes")],
+      COMPUTE_MEMORY_STORAGE_GROUPS,
+    );
+    expect(result.byGroup["storage"]).toHaveLength(1);
+  });
+
+  it("classifies http_requests_total as others", () => {
+    const result = groupMetricsByCategory(
+      [makeStream("http_requests_total")],
+      COMPUTE_MEMORY_STORAGE_GROUPS,
+    );
+    expect(result.byGroup["others"]).toHaveLength(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// NEW: DEFAULT_METRIC_GROUP_DEFINITIONS has compute/memory/storage (not infra)
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
 // groupMetricsByCategory — edge cases
 // ---------------------------------------------------------------------------
 
@@ -826,7 +923,7 @@ describe("groupMetricsByCategory — edge cases", () => {
     ];
     const first = groupMetricsByCategory(streams);
     const second = groupMetricsByCategory(streams);
-    expect(first.byGroup["infra"].length).toBe(second.byGroup["infra"].length);
+    expect(first.byGroup["compute"].length).toBe(second.byGroup["compute"].length);
     expect(first.byGroup["others"].length).toBe(
       second.byGroup["others"].length,
     );

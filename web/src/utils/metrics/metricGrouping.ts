@@ -147,6 +147,55 @@ const INFRA_PATTERNS: RegExp[] = [
 ];
 
 /**
+ * CPU and processing patterns — classify as "Compute"
+ */
+export const COMPUTE_PATTERNS: RegExp[] = [
+  /\bcpu\b/i,
+  /\bprocessor\b/i,
+  /^node_cpu/,
+  /^container_cpu/,
+  /^system_cpu/,
+  /^k8s_.*_cpu/,
+  /throttl/,
+  /load_average/,
+];
+
+/**
+ * RAM / heap / GC patterns — classify as "Memory"
+ */
+export const MEMORY_PATTERNS: RegExp[] = [
+  /\bmemory\b/i,
+  /\bmem\b/,
+  /\bram\b/i,
+  /\bheap\b/i,
+  /\bgc\b/,
+  /^container_memory/,
+  /^node_memory/,
+  /^system_memory/,
+  /^k8s_.*_memory/,
+  /oom/i,
+  /page_fault/,
+  /swap/i,
+];
+
+/**
+ * Disk, filesystem, object-storage patterns — classify as "Storage"
+ */
+export const STORAGE_PATTERNS: RegExp[] = [
+  /\bdisk\b/i,
+  /\bfilesystem\b/i,
+  /\b_fs\b/,
+  /\bfs_/,
+  /\bstorage\b/i,
+  /^node_disk/,
+  /^container_fs/,
+  /^node_filesystem/,
+  /^k8s_.*_storage/,
+  /inode/,
+  /volume/i,
+];
+
+/**
  * Patterns for Pod metric classification.
  * Covers Kubernetes pod-level metrics from Prometheus and OTel conventions.
  */
@@ -175,6 +224,9 @@ const NODE_PATTERNS: RegExp[] = [
  */
 const METRIC_GROUP_PATTERNS: Record<string, RegExp[]> = {
   network: NETWORK_PATTERNS,
+  compute: COMPUTE_PATTERNS,
+  memory: MEMORY_PATTERNS,
+  storage: STORAGE_PATTERNS,
   infra: INFRA_PATTERNS,
   pods: POD_PATTERNS,
   nodes: NODE_PATTERNS,
@@ -185,9 +237,11 @@ const METRIC_GROUP_PATTERNS: Record<string, RegExp[]> = {
  * Ordering matters — classifyMetric checks groups in this order (first match wins).
  */
 export const DEFAULT_METRIC_GROUP_DEFINITIONS: MetricGroupDefinition[] = [
-  { id: "network", label: "Network", icon: "wifi" },
-  { id: "infra", label: "Infra", icon: "dns" },
-  { id: "others", label: "Others", icon: "category" },
+  { id: "compute", label: "Compute", icon: "developer_board" },
+  { id: "memory", label: "Memory", icon: "memory" },
+  { id: "storage", label: "Storage", icon: "storage" },
+  { id: "network", label: "Network", icon: "lan" },
+  { id: "others", label: "Others", icon: "more_horiz" },
 ];
 
 /**
