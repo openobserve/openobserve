@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- inline size shows a compact icon instead of a full illustration -->
       <span
         v-else-if="inlineIcon"
-        :class="['tw:inline-flex tw:items-center tw:justify-center tw:rounded-full', sizeClass.iconWrap]"
+        :class="['o2-empty-state__inline-icon tw:inline-flex tw:items-center tw:justify-center tw:rounded-full', sizeClass.iconWrap]"
       >
         <OIcon :name="inlineIcon" :size="size === 'inline' ? 'lg' : 'xl'" />
       </span>
