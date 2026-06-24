@@ -114,7 +114,7 @@
                 <div class="mon-name">{{ m.name }}</div>
                 <div class="mon-url">{{ m.url }}</div>
               </td>
-              <td class="syn-td"><span class="badge" :class="'badge--' + m.type.toLowerCase()">{{ m.type }}</span></td>
+              <td class="syn-td"><OBadge :variant="monitorTypeBadgeVariant(m.type)" size="sm">{{ m.type }}</OBadge></td>
               <td class="syn-td">
                 <div class="spark">
                   <span v-for="(tick,i) in m.history" :key="i"
@@ -127,7 +127,12 @@
               <td class="syn-td td-right"><span class="mono" :class="rtCls(m.responseTime)">{{ m.responseTime ?? '—' }}</span></td>
               <td class="syn-td td-right">
                 <div class="uptime-row">
-                  <div class="uptime-track"><div class="uptime-fill" :class="m.uptime>=99?'fill-g':m.uptime>=95?'fill-a':'fill-r'" :style="{ width: m.uptime+'%' }" /></div>
+                  <OProgressBar
+                    :value="m.uptime / 100"
+                    :variant="m.uptime >= 99 ? 'default' : m.uptime >= 95 ? 'warning' : 'danger'"
+                    size="xs"
+                    class="tw:flex-1"
+                  />
                   <span class="mono" :class="m.uptime>=99?'c-g':m.uptime>=95?'c-a':'c-r'" style="min-width:44px;text-align:right;font-size:12px">{{ m.uptime }}%</span>
                 </div>
               </td>
@@ -150,15 +155,16 @@
             </tr>
           </tbody>
         </table>
-        <div v-if="filteredMonitors.length === 0" class="syn-empty">
-          <OIcon name="radar" size="xl" class="syn-empty-icon" />
-          <div style="font-size:15px;font-weight:600">No monitors found</div>
-          <div style="font-size:13px;color:var(--o2-tab-text-color)">Adjust filters or create your first monitor.</div>
-          <OButton variant="primary" @click="openCreate">
-            <template #icon-left><OIcon name="add" size="sm" /></template>
-            Create monitor
-          </OButton>
-        </div>
+        <OEmptyState
+          v-if="filteredMonitors.length === 0"
+          size="inline"
+          icon="radar"
+          title="No monitors found"
+          description="Adjust filters or create your first monitor."
+          action-label="Create monitor"
+          action-icon="add"
+          @action="openCreate"
+        />
       </div>
 
       <!-- PAGINATION FOOTER — matches Incidents page -->
@@ -324,14 +330,12 @@
               <div class="pl-step-body">
                 <div class="pl-step-title">Deploy the agent</div>
                 <div class="pl-step-desc">Run the container on any machine in your network — Docker, Kubernetes, or native binary.</div>
-                <div class="pl-code-block">
-                  <div class="pl-code-label">Docker</div>
-                  <pre class="pl-code">docker run -d \
-  -e O2_PRIVATE_LOC_KEY=&lt;your_key&gt; \
-  -e O2_ENDPOINT=https://your-openobserve-host \
-  openobserve/syn-agent:latest</pre>
-                  <OButton variant="ghost" size="icon" title="Copy"><OIcon name="content-copy" size="xs" /></OButton>
-                </div>
+                <OCodeBlock
+                  :code="dockerInstallCmd"
+                  lang="bash"
+                  chrome="editor"
+                  filename="Docker"
+                />
               </div>
             </div>
             <div class="pl-guide-step">
@@ -426,7 +430,7 @@
                 <OButton variant="ghost" size="icon" @click="closeDetail"><OIcon name="close" size="sm" /></OButton>
               </div>
               <div class="dp-badges">
-                <span class="badge" :class="'badge--'+detailPanel.monitor.type.toLowerCase()">{{ detailPanel.monitor.type }}</span>
+                <OBadge :variant="monitorTypeBadgeVariant(detailPanel.monitor.type)" size="sm">{{ detailPanel.monitor.type }}</OBadge>
                 <span class="dp-meta-chip">{{ detailPanel.monitor.interval }}</span>
                 <span class="dp-meta-chip">{{ detailPanel.monitor.locations.length }} location{{ detailPanel.monitor.locations.length !== 1 ? 's' : '' }}</span>
                 <span class="dp-meta-chip">Last: {{ detailPanel.monitor.lastCheck }}</span>
@@ -991,8 +995,25 @@ import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OPagination from "@/lib/navigation/Pagination/OPagination.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 
 const router = useRouter();
+
+const monitorTypeBadgeVariant = (type: string): string => {
+  const map: Record<string, string> = {
+    HTTP: "blue-soft", BROWSER: "purple-soft", API: "success-soft",
+    TCP: "orange-soft", PING: "default-soft", DNS: "amber-soft",
+  };
+  return map[type.toUpperCase()] ?? "default-soft";
+};
+
+const dockerInstallCmd = `docker run -d \\
+  -e O2_PRIVATE_LOC_KEY=<your_key> \\
+  -e O2_ENDPOINT=https://your-openobserve-host \\
+  openobserve/syn-agent:latest`;
 
 const activeTab      = ref("monitors");
 const statusFilter   = ref("all");
@@ -1718,20 +1739,6 @@ const saveMonitor = () => { showDrawer.value=false; };
 .mon-name { font-size:13px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .mon-url  { font-size:11px; font-family:monospace; color:var(--o2-tab-text-color); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:2px; }
 
-.badge { display:inline-block; padding:2px 7px; border-radius:4px; font-size:11px; font-weight:700; }
-.badge--http    { background:#dbeafe; color:#1d4ed8; }
-.badge--browser { background:#ede9fe; color:#7c3aed; }
-.badge--api     { background:#d1fae5; color:#065f46; }
-.badge--tcp     { background:#ffedd5; color:#c2410c; }
-.badge--ping    { background:#f1f5f9; color:#475569; }
-.badge--dns     { background:#fef9c3; color:#854d0e; }
-.body--dark .badge--http    { background:#172554; color:#93c5fd; }
-.body--dark .badge--browser { background:#2e1065; color:#c4b5fd; }
-.body--dark .badge--api     { background:#052e16; color:#6ee7b7; }
-.body--dark .badge--tcp     { background:#431407; color:#fdba74; }
-.body--dark .badge--ping    { background:#1e293b; color:#94a3b8; }
-.body--dark .badge--dns     { background:#1c1917; color:#fef08a; }
-
 .http-method    { display:inline-block; padding:2px 7px; border-radius:4px; font-size:11px; font-weight:700; font-family:monospace; }
 .method--get    { background:#dbeafe; color:#1d4ed8; }
 .method--post   { background:#d1fae5; color:#065f46; }
@@ -1788,9 +1795,6 @@ const saveMonitor = () => { showDrawer.value=false; };
 }
 
 .uptime-row   { display:flex; align-items:center; justify-content:flex-end; gap:8px; }
-.uptime-track { width:44px; height:4px; border-radius:999px; background:var(--o2-border-color); overflow:hidden; flex-shrink:0; }
-.uptime-fill  { height:100%; border-radius:999px; }
-.fill-g { background:#22c55e; } .fill-a { background:#f59e0b; } .fill-r { background:#ef4444; }
 
 .locs-cell  { display:flex; align-items:center; gap:5px; cursor:default; }
 .loc-first  { font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:70px; }
@@ -1807,8 +1811,6 @@ const saveMonitor = () => { showDrawer.value=false; };
 
 .mono { font-family:monospace; font-size:13px; font-weight:600; }
 .c-g  { color:#16a34a; } .c-a { color:#d97706; } .c-r { color:#dc2626; }
-
-.syn-empty { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; padding:80px 0; }
 
 /* ── PAGINATION FOOTER — matches Incidents ── */
 .syn-footer       { display:flex; align-items:center; padding:9px 16px; border-top:1px solid var(--o2-border-color); flex-shrink:0; background:var(--o2-card-background); gap:12px; min-height:46px; }
@@ -1848,10 +1850,6 @@ const saveMonitor = () => { showDrawer.value=false; };
 .pl-step-body    { flex:1; }
 .pl-step-title   { font-size:13px; font-weight:700; margin-bottom:3px; }
 .pl-step-desc    { font-size:12px; color:var(--o2-tab-text-color); line-height:1.5; }
-.pl-code-block   { position:relative; margin-top:10px; background:rgba(128,128,128,.08); border:1px solid var(--o2-border-color); border-radius:8px; padding:10px 12px; }
-.pl-code-label   { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:var(--o2-tab-text-color); margin-bottom:5px; }
-.pl-code         { font-family:monospace; font-size:12px; margin:0; line-height:1.65; white-space:pre-wrap; word-break:break-all; }
-
 /* ── DRAWER ── */
 .drw-steps  { display:flex; align-items:center; padding:0 22px; border-bottom:1px solid var(--o2-border-color); overflow-x:auto; position:sticky; top:0; background:var(--o2-card-background); z-index:1; }
 .drw-step   { display:flex; align-items:center; gap:7px; padding:10px 10px; font-size:12px; font-weight:500; color:var(--o2-tab-text-color); cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-1px; white-space:nowrap; user-select:none; transition:color .12s; }
@@ -2017,7 +2015,6 @@ const saveMonitor = () => { showDrawer.value=false; };
 
 
 /* ── ICON COLOR HELPERS ── */
-.syn-empty-icon  { color:var(--o2-tab-text-color); }
 .pl-icon-muted   { color:var(--o2-tab-text-color); flex-shrink:0; }
 .pl-icon-primary { color:var(--q-primary, #1976d2); flex-shrink:0; }
 .type-icon--on   { color:var(--q-primary, #1976d2); }
