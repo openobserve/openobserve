@@ -539,8 +539,8 @@ describe("SourceMaps.vue", () => {
       expect(dialog.exists()).toBe(true);
       expect(dialog.props("open")).toBe(false);
       expect(dialog.props("size")).toBe("xs");
-      expect(dialog.props("primaryButtonLabel")).toBe("OK");
-      expect(dialog.props("secondaryButtonLabel")).toBe("Cancel");
+      expect(dialog.props("primaryButtonLabel")).toBe("common.ok");
+      expect(dialog.props("secondaryButtonLabel")).toBe("common.cancel");
     });
 
     it("confirmDeleteSourceMap opens dialog and populates title/message/data", async () => {

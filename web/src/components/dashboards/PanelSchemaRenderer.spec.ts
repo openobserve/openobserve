@@ -2340,6 +2340,20 @@ describe("PanelSchemaRenderer", () => {
       expect(wrapper.vm.metricItems).toHaveLength(0);
     });
 
+    it("hides the copy button for zero-valued metrics", async () => {
+      const layout = { left: 0, top: 0, width: 100, height: 40, cx: 50 };
+      wrapper = await mountMetric([
+        { _metricText: "0", _metricLayout: { ...layout } },
+        { _metricText: "0.00", _metricLayout: { ...layout } },
+        { _metricText: "0 ms", _metricLayout: { ...layout } },
+        { _metricText: "0%", _metricLayout: { ...layout } },
+        { _metricText: "2.00MB", _metricLayout: { ...layout } },
+      ]);
+      // Only the non-zero value survives.
+      expect(wrapper.vm.metricItems).toHaveLength(1);
+      expect(wrapper.vm.metricItems[0]).toMatchObject({ text: "2.00MB" });
+    });
+
     it("returns no items for non-metric panels", async () => {
       wrapper = createWrapper();
       await flushPromises();

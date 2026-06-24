@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="sm"
               @click="showVariablesDependenciesGraphPopUp = true"
               data-test="dashboard-variable-dependencies-btn"
-              >Show Dependencies</OButton
+              >{{ t('dashboard.showDependencies') }}</OButton
             >
             <OButton
               variant="primary"
@@ -129,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="getScopeType(variable) === 'tabs' && variable.tabs?.length"
                   >
                     <template #content>
-                      <div>Applied to tabs:</div>
+                      <div>{{ t('dashboard.appliedToTabs') }}</div>
                       <div v-for="tabId in variable.tabs" :key="tabId">{{ getTabName(tabId) }}</div>
                     </template>
                   </OTooltip>
@@ -138,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="getScopeType(variable) === 'panels' && variable.panels?.length"
                   >
                     <template #content>
-                      <div>Applied to panels:</div>
+                      <div>{{ t('dashboard.appliedToPanels') }}</div>
                       <div v-for="panelId in variable.panels" :key="panelId">{{ getPanelName(panelId) }}</div>
                     </template>
                   </OTooltip>
@@ -173,8 +173,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </draggable>
 
         <ConfirmDialog
-          title="Delete Variable"
-          message="Are you sure you want to delete the variable?"
+          :title="t('dashboard.deleteVariable')"
+          :message="t('dashboard.deleteVariableMsg')"
           @update:ok="deleteVariableFn"
           @update:cancel="confirmDeleteDialog = false"
           v-model="confirmDeleteDialog"

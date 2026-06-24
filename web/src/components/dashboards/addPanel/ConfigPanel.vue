@@ -292,7 +292,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Legend Width + unit selector -->
           <div
             v-if="shouldShowLegendWidth(dashboardPanelData)"
-            class="input-container"
+            class="tw:flex tw:items-end tw:justify-between tw:gap-1.5 tw:w-full tw:min-w-0"
           >
             <OInput
               v-model.number="legendWidthValue"
@@ -300,9 +300,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               type="number"
               :placeholder="t('dashboard.auto')"
               data-test="dashboard-config-legend-width"
+              class="tw:flex-1 tw:min-w-0"
             />
             <div
-              class="unit-container"
+              class="tw:flex tw:items-center tw:gap-1 tw:mt-[0.5625rem] tw:shrink-0"
               v-if="shouldShowLegendWidthUnitContainer(dashboardPanelData)"
             >
               <OButton
@@ -343,7 +344,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Legend Height + unit selector -->
           <div
             v-if="shouldShowLegendHeight(dashboardPanelData)"
-            class="input-container"
+            class="tw:flex tw:items-end tw:justify-between tw:gap-1.5 tw:w-full tw:min-w-0"
           >
             <OInput
               v-model.number="legendHeightValue"
@@ -351,9 +352,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               type="number"
               :placeholder="t('dashboard.auto')"
               data-test="dashboard-config-legend-height"
+              class="tw:flex-1 tw:min-w-0"
             />
             <div
-              class="unit-container"
+              class="tw:flex tw:items-center tw:gap-1 tw:mt-[0.5625rem] tw:shrink-0"
               v-if="shouldShowLegendHeightUnitContainer(dashboardPanelData)"
             >
               <OButton
@@ -2812,20 +2814,6 @@ export default defineComponent({
 // Ensure label icons are always interactive
 :deep(.q-field__label) {
   pointer-events: auto !important;
-}
-
-.input-container {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 6px;
-}
-
-.unit-container {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  margin-top: 9px;
 }
 
 .config-legend-input {
