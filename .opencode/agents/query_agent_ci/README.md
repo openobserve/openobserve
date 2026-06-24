@@ -40,6 +40,18 @@ All agents use `deepseek/deepseek-v4-pro` via the provider configured in `openco
 Agents are registered in `opencode.jsonc` under the `agent` block, alongside the E2E council agents.
 OpenCode does NOT auto-discover nested folders — explicit registration is required.
 
+Example entry in `opencode.jsonc`:
+```jsonc
+{
+  "agent": {
+    "qa-ci-triage": ".opencode/agents/query_agent_ci/qa-ci-triage.md",
+    "qa-ci-warden": ".opencode/agents/query_agent_ci/qa-ci-warden.md",
+    "qa-ci-fabricator": ".opencode/agents/query_agent_ci/qa-ci-fabricator.md",
+    "qa-ci-inscriber": ".opencode/agents/query_agent_ci/qa-ci-inscriber.md"
+  }
+}
+```
+
 ## Related
 
 - E2E Council agents: `.opencode/agents/e2e_ci_council_of_agents/`
