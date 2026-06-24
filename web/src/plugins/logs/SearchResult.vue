@@ -1770,18 +1770,35 @@ export default defineComponent({
       (loading, wasLoading) => {
         if (wasLoading && !loading && searchObj.meta.searchApplied) {
           searchObj.meta.lastRunAt = Date.now();
-          // Refine default column selection using actual result data
-          if (!searchObj.data.stream.selectedFields.length) {
-            const hits = searchObj.data.queryResults?.hits || [];
-            const globalFtsKeys = store?.state?.zoConfig?.default_fts_keys || [];
+          // Pick the best default column using actual result fill rates.
+          // Also re-evaluates when selectedFields contains only FTS candidates
+          // (e.g. restored from localStorage for a stream where that field is empty).
+          const hits = searchObj.data.queryResults?.hits || [];
+          const globalFtsKeys = store?.state?.zoConfig?.default_fts_keys || [];
+          const streamFtsNames = new Set(
+            searchObj.data.stream.selectedStreamFields
+              .filter((f: any) => f.ftsKey)
+              .map((f: any) => f.name)
+              .concat(
+                globalFtsKeys.filter((k: string) =>
+                  searchObj.data.stream.selectedStreamFields.some(
+                    (f: any) => f.name === k,
+                  ),
+                ),
+              ),
+          );
+          const currentFields = searchObj.data.stream.selectedFields;
+          const isOnlyFtsCandidates =
+            currentFields.length > 0 &&
+            currentFields.every((f: string) => streamFtsNames.has(f));
+          if (!currentFields.length || isOnlyFtsCandidates) {
             const ftsDefaults = resolveDefaultColumns(
               searchObj.data.stream.selectedStreamFields,
               globalFtsKeys,
               hits,
             );
-            if (ftsDefaults.length > 0) {
-              searchObj.data.stream.selectedFields = ftsDefaults;
-            }
+            // ftsDefaults is [] when no candidate has filled values → falls through to _source
+            searchObj.data.stream.selectedFields = ftsDefaults;
           }
         }
       },
