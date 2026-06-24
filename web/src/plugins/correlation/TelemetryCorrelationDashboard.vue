@@ -299,6 +299,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- -- Right area: group tabs + dashboard -- -->
             <template #after>
               <div class="tw:flex tw:flex-col tw:h-full tw:overflow-hidden">
+                <!-- Outer Pod/Node tabs — only shown in nested K8s mode -->
+                <OTabs
+                  v-if="isNestedGroupMode"
+                  v-model="activeOuterTab"
+                  dense
+                  align="left"
+                  class="metric-group-tabs tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
+                >
+                  <OTab
+                    v-for="outerGroup in groupDefs"
+                    :key="outerGroup.id"
+                    :name="outerGroup.id"
+                    class="tw:flex-none!"
+                  >
+                    <div class="tw:flex tw:items-center tw:gap-1 tw:px-1">
+                      <OIcon v-if="typeof outerGroup.icon === 'string'" :name="outerGroup.icon" size="xs" />
+                      <component v-else :is="outerGroup.icon" />
+                      <span>{{ outerGroup.label }}</span>
+                    </div>
+                  </OTab>
+                </OTabs>
+
                 <!-- Group tabs -->
                 <OTabs
                   v-if="nonEmptyGroupTabs.length > 0"
@@ -772,6 +794,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- -- Right area: group tabs + dashboard -- -->
           <template #after>
             <div class="tw:flex tw:flex-col tw:h-full tw:overflow-hidden">
+              <!-- Outer Pod/Node tabs — only shown in nested K8s mode -->
+              <OTabs
+                v-if="isNestedGroupMode"
+                v-model="activeOuterTab"
+                dense
+                align="left"
+                class="metric-group-tabs tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
+              >
+                <OTab
+                  v-for="outerGroup in groupDefs"
+                  :key="outerGroup.id"
+                  :name="outerGroup.id"
+                  class="tw:flex-none!"
+                >
+                  <div class="tw:flex tw:items-center tw:gap-1 tw:px-1">
+                    <OIcon v-if="typeof outerGroup.icon === 'string'" :name="outerGroup.icon" size="xs" />
+                    <component v-else :is="outerGroup.icon" />
+                    <span>{{ outerGroup.label }}</span>
+                  </div>
+                </OTab>
+              </OTabs>
+
               <!-- Group tabs -->
               <OTabs
                 v-if="nonEmptyGroupTabs.length > 0"
@@ -1258,7 +1302,24 @@ let currentTracesStreamTraceId: string | null = null;
 const groupDefs = computed(
   () => props.metricGroupDefinitions ?? DEFAULT_METRIC_GROUP_DEFINITIONS,
 );
-const groupIds = computed(() => groupDefs.value.map((g) => g.id));
+
+// Nested mode: when top-level groups have children (e.g. K8s Pod/Node outer tabs)
+const isNestedGroupMode = computed(() =>
+  groupDefs.value.some((g) => g.children && g.children.length > 0),
+);
+
+const activeOuterTab = ref<string>(
+  groupDefs.value.find((g) => g.children)?.id ?? groupDefs.value[0]?.id ?? "",
+);
+
+// Effective sub-groups: children of the active outer tab, or flat groupDefs
+const effectiveGroupDefs = computed(() => {
+  if (!isNestedGroupMode.value) return groupDefs.value;
+  const outer = groupDefs.value.find((g) => g.id === activeOuterTab.value);
+  return outer?.children ?? groupDefs.value;
+});
+
+const groupIds = computed(() => effectiveGroupDefs.value.map((g) => g.id));
 
 // Sort related streams so those with confirmed data overlap in props.timeRange
 // come first; streams without overlap (or missing stats) sink to the bottom.
@@ -1864,23 +1925,29 @@ const filteredMetricStreams = computed(() => {
 
 // Group the filtered metric streams into configured categories
 const groupedFilteredMetricStreams = computed(() =>
-  groupMetricsByCategory(filteredMetricStreams.value, groupDefs.value),
+  groupMetricsByCategory(filteredMetricStreams.value, effectiveGroupDefs.value),
 );
 
 // Group ALL available unique metric streams � drives which tabs are visible
 const groupedUniqueMetricStreams = computed(() =>
-  groupMetricsByCategory(uniqueMetricStreams.value, groupDefs.value),
+  groupMetricsByCategory(uniqueMetricStreams.value, effectiveGroupDefs.value),
 );
 
 // Group the currently *selected* metric streams (used by the selector dialog)
 const groupedSelectedMetricStreams = computed(() =>
-  groupMetricsByCategory(selectedMetricStreams.value, groupDefs.value),
+  groupMetricsByCategory(selectedMetricStreams.value, effectiveGroupDefs.value),
 );
 
 // Active group tab within the metrics section
 const activeMetricGroupTab = ref<string>(
-  props.metricGroupDefinitions?.[0]?.id ?? "infra",
+  effectiveGroupDefs.value[0]?.id ?? "compute",
 );
+
+// When outer tab changes, reset inner tab to first effective child
+watch(activeOuterTab, () => {
+  const first = effectiveGroupDefs.value[0]?.id;
+  if (first) activeMetricGroupTab.value = first;
+});
 
 // Per-group dashboard data and render key
 const groupedDashboardData = ref<Partial<Record<string, any>>>({});
@@ -1907,7 +1974,7 @@ const nonEmptyGroupTabs = computed(() =>
 const regenerateGroupDashboards = (config: MetricsCorrelationConfig) => {
   const grouped = groupMetricsByCategory(
     selectedMetricStreams.value,
-    groupDefs.value,
+    effectiveGroupDefs.value,
   );
   const next: Partial<Record<string, any>> = {};
 
