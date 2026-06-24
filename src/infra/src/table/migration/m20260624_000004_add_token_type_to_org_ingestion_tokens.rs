@@ -46,9 +46,7 @@ impl MigrationTrait for Migration {
         }
         manager
             .get_connection()
-            .execute_unprepared(
-                "ALTER TABLE org_ingestion_tokens DROP COLUMN IF EXISTS token_type",
-            )
+            .execute_unprepared("ALTER TABLE org_ingestion_tokens DROP COLUMN IF EXISTS token_type")
             .await?;
         Ok(())
     }

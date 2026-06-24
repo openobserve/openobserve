@@ -210,11 +210,8 @@ pub async fn job_lease(Json(body): Json<serde_json::Value>) -> Response {
             Ok(resp) => MetaHttpResponse::json(resp),
             Err(e) => {
                 tracing::error!("[synthetics] job_lease: {e}");
-                MetaHttpResponse::error(
-                    StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
-                    e.to_string(),
-                )
-                .into_response()
+                MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
+                    .into_response()
             }
         }
     }
@@ -241,11 +238,8 @@ pub async fn job_ack(Json(body): Json<serde_json::Value>) -> Response {
             Ok(resp) => MetaHttpResponse::json(resp),
             Err(e) => {
                 tracing::error!("[synthetics] job_ack: {e}");
-                MetaHttpResponse::error(
-                    StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
-                    e.to_string(),
-                )
-                .into_response()
+                MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
+                    .into_response()
             }
         }
     }

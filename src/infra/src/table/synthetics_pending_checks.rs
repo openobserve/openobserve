@@ -20,6 +20,7 @@
 //! No `get_lock()` — SKIP LOCKED handles concurrency at the DB level.
 
 use sea_orm::{ConnectionTrait, DbErr, Statement, Value};
+use serde::Serialize;
 
 use crate::errors;
 
@@ -38,6 +39,7 @@ pub struct EnqueueParams<'a> {
     pub valid_until: i64,
 }
 
+#[derive(Debug, Serialize)]
 pub struct LeasedRow {
     pub id: i64,
     pub monitor_id: String,
@@ -109,7 +111,7 @@ pub async fn get_by_id<C: ConnectionTrait>(
 
     rows.into_iter()
         .next()
-        .map(|row| {
+        .map(|row| -> Result<LeasedRow, DbErr> {
             Ok(LeasedRow {
                 id: row.try_get("", "id")?,
                 monitor_id: row.try_get("", "monitor_id")?,
