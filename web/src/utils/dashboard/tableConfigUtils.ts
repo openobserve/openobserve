@@ -26,6 +26,24 @@ import { toZonedTime } from "date-fns-tz";
 import { formatDate, isTimeSeries, isTimeStamp } from "./dateTimeUtils";
 import { getDataValue } from "./aliasUtils";
 
+/** Persisted `override_config` item type discriminants (mirrored in the Rust schema). */
+export const OVERRIDE_CONFIG_TYPES = {
+  UNIT: "unit",
+  UNIQUE_VALUE_COLOR: "unique_value_color",
+  ALIGNMENT: "alignment",
+  TEXT_COLOR: "text_color",
+  BACKGROUND_COLOR: "background_color",
+  CONDITIONAL_STYLES: "conditional_styles",
+  FIELD_TYPE: "field_type",
+} as const;
+
+/** Apply a per-column field-type override ("num"/"text" force; "auto"/absent keep detected). */
+export const resolveIsNumber = (
+  detected: boolean,
+  fieldType: string | undefined,
+): boolean =>
+  fieldType === "num" ? true : fieldType === "text" ? false : detected;
+
 // ---------------------------------------------------------------------------
 // Value-mapping helpers
 // ---------------------------------------------------------------------------
@@ -44,78 +62,91 @@ export const parseRegexPattern = (
   return { pattern: input, flags: "" };
 };
 
-/** Build a fast-lookup cache from the panel's `config.mappings` array. */
+/** Build a fast-lookup cache from `config.mappings`, storing the full mapping object. */
 export const buildValueMappingCache = (
   mappings: any,
-): Map<any, string> | null => {
+): Map<any, any> | null => {
   if (!mappings || !Array.isArray(mappings)) {
     return null;
   }
 
-  const cache = new Map<any, string>();
+  const cache = new Map<any, any>();
 
   mappings.forEach((mapping: any) => {
-    if (mapping && mapping.text != null && mapping.text !== "") {
-      if (mapping.type === "regex") {
-        // Regex mapping – stored with a special prefix; pattern tested during lookup
-        cache.set(`__regex_${mapping.pattern ?? ""}`, mapping.text);
-      } else if (mapping.from !== undefined && mapping.to !== undefined) {
-        // Range mapping – encoded key so direct + range share the same Map
-        cache.set(`__range_${mapping.from}_${mapping.to}`, mapping.text);
-      } else if (mapping.value !== undefined && mapping.value !== null) {
-        cache.set(mapping.value, mapping.text);
-      }
+    if (!mapping) return;
+    const hasText = mapping.text != null && mapping.text !== "";
+    const hasColor = mapping.color != null && mapping.color !== "";
+    if (!hasText && !hasColor) return;
+
+    const hasRange =
+      mapping.from !== undefined &&
+      mapping.from !== "" &&
+      mapping.to !== undefined &&
+      mapping.to !== "";
+
+    const type =
+      mapping.type ?? (mapping.pattern ? "regex" : hasRange ? "range" : "value");
+
+    if (type === "regex") {
+      // Regex mapping – stored with a special prefix; pattern tested during lookup
+      cache.set(`__regex_${mapping.pattern ?? ""}`, mapping);
+    } else if (type === "range") {
+      // Range mapping – encoded key so direct + range share the same Map
+      cache.set(`__range_${mapping.from}_${mapping.to}`, mapping);
+    } else if (mapping.value !== undefined && mapping.value !== null) {
+      cache.set(mapping.value, mapping);
     }
   });
 
   return cache.size > 0 ? cache : null;
 };
 
-/** Look up a value in the pre-built mapping cache (direct then range). */
-export const lookupValueMapping = (
+/**
+ * Look up the first mapping matching `value` (direct, then range, then regex).
+ * `requireField` restricts matches to mappings whose field is non-empty.
+ */
+export const lookupValueMappingFull = (
   value: any,
-  cache: Map<any, string> | null,
-): string | undefined | null => {
+  cache: Map<any, any> | null,
+  requireField?: "text" | "color",
+): any | null => {
   if (!cache) return null;
 
-  // Direct match
-  if (cache.has(value)) {
-    return cache.get(value);
-  }
+  const ok = (m: any) =>
+    !requireField || (m && m[requireField] != null && m[requireField] !== "");
 
-  // Coerce to string once – mapping values are always stored as strings (from the
-  // UI text input) but cell data may be numeric. Reused for range, and regex checks.
+  // Direct match (then string-coerced, e.g. key "3" vs numeric value 3)
+  let m = cache.get(value);
+  if (m !== undefined && ok(m)) return m;
+
   const strValue = String(value);
+  m = cache.get(strValue);
+  if (m !== undefined && ok(m)) return m;
 
-  // String coercion fallback e.g. key "3" vs numeric value 3
-  if (cache.has(strValue)) {
-    return cache.get(strValue);
-  }
-
-  // Range match (numbers only)
-  if (typeof value === "number") {
-    const entries = Array.from(cache.entries());
-    for (let i = 0; i < entries.length; i++) {
-      const [key, text] = entries[i];
+  // Range match — coerce the cell value to a number so numeric strings match too.
+  const numValue =
+    value === "" || value === null || value === undefined ? NaN : Number(value);
+  if (!Number.isNaN(numValue)) {
+    for (const [key, mapping] of cache.entries()) {
       if (typeof key === "string" && key.startsWith("__range_")) {
         const parts = key.split("_");
         const from = parseFloat(parts[3]);
         const to = parseFloat(parts[4]);
-        if (!isNaN(from) && !isNaN(to) && value >= from && value <= to) {
-          return text;
+        if (!isNaN(from) && !isNaN(to) && numValue >= from && numValue <= to && ok(mapping)) {
+          return mapping;
         }
       }
     }
   }
 
   // Regex match
-  for (const [key, text] of cache.entries()) {
+  for (const [key, mapping] of cache.entries()) {
     if (typeof key === "string" && key.startsWith("__regex_")) {
       const rawPattern = key.slice(8); // "__regex_".length === 8
       try {
         const { pattern, flags } = parseRegexPattern(rawPattern);
-        if (new RegExp(pattern, flags).test(strValue)) {
-          return text;
+        if (new RegExp(pattern, flags).test(strValue) && ok(mapping)) {
+          return mapping;
         }
       } catch {
         // invalid regex pattern, skip
@@ -124,6 +155,15 @@ export const lookupValueMapping = (
   }
 
   return null;
+};
+
+/** Look up the mapped display text for a value (null when none has text). */
+export const lookupValueMapping = (
+  value: any,
+  cache: Map<any, any> | null,
+): string | undefined | null => {
+  const mapping = lookupValueMappingFull(value, cache, "text");
+  return mapping ? mapping.text : null;
 };
 
 // ---------------------------------------------------------------------------
@@ -227,40 +267,108 @@ export interface UnitConfig {
   customUnit: string;
 }
 
+export interface ColumnStyleConfig {
+  alignment?: "left" | "center" | "right";
+  textColor?: string;
+  bgColor?: string;
+}
+
+export interface ConditionalRule {
+  operator: "<" | ">" | "<=" | ">=" | "=" | "!=";
+  threshold: number;
+  textColor?: string;
+  bgColor?: string;
+}
+
 export interface OverrideMaps {
   colorConfigMap: Record<string, ColorConfig>;
   unitConfigMap: Record<string, UnitConfig>;
+  styleConfigMap: Record<string, ColumnStyleConfig>;
+  conditionalRulesMap: Record<string, ConditionalRule[]>;
+  fieldTypeMap: Record<string, string>;
 }
 
-/**
- * Parse `config.override_config` into colour and unit lookup maps
- * keyed by lower-cased field alias.
- */
+/** Parse `config.override_config` into lookup maps keyed by lower-cased field alias. */
 export const parseOverrideConfigs = (
   overrideConfigs: any[] | undefined,
 ): OverrideMaps => {
   const colorConfigMap: Record<string, ColorConfig> = {};
   const unitConfigMap: Record<string, UnitConfig> = {};
+  const styleConfigMap: Record<string, ColumnStyleConfig> = {};
+  const conditionalRulesMap: Record<string, ConditionalRule[]> = {};
+  const fieldTypeMap: Record<string, string> = {};
 
-  if (!overrideConfigs) return { colorConfigMap, unitConfigMap };
+  if (!overrideConfigs) return { colorConfigMap, unitConfigMap, styleConfigMap, conditionalRulesMap, fieldTypeMap };
 
   for (const o of overrideConfigs) {
     const alias = o?.field?.value;
-    const cfg = o?.config?.[0];
-    if (alias && cfg) {
-      const aliasLower = alias.toLowerCase();
-      if (cfg.type === "unique_value_color") {
-        colorConfigMap[aliasLower] = { autoColor: cfg.autoColor };
-      } else if (cfg.type === "unit") {
-        unitConfigMap[aliasLower] = {
-          unit: cfg.value?.unit ?? "",
-          customUnit: cfg.value?.customUnit ?? "",
-        };
+    if (!alias) continue;
+    const aliasLower = alias.toLowerCase();
+
+    for (const cfg of o?.config ?? []) {
+      if (!cfg?.type) continue;
+      switch (cfg.type) {
+        case OVERRIDE_CONFIG_TYPES.UNIT:
+          unitConfigMap[aliasLower] = {
+            unit: cfg.value?.unit ?? "",
+            customUnit: cfg.value?.customUnit ?? "",
+          };
+          break;
+        case OVERRIDE_CONFIG_TYPES.UNIQUE_VALUE_COLOR:
+          colorConfigMap[aliasLower] = { autoColor: !!cfg.autoColor };
+          break;
+        case OVERRIDE_CONFIG_TYPES.ALIGNMENT:
+          styleConfigMap[aliasLower] = {
+            ...styleConfigMap[aliasLower],
+            alignment: cfg.value,
+          };
+          break;
+        case OVERRIDE_CONFIG_TYPES.TEXT_COLOR:
+          styleConfigMap[aliasLower] = {
+            ...styleConfigMap[aliasLower],
+            textColor: cfg.value,
+          };
+          break;
+        case OVERRIDE_CONFIG_TYPES.BACKGROUND_COLOR:
+          styleConfigMap[aliasLower] = {
+            ...styleConfigMap[aliasLower],
+            bgColor: cfg.value,
+          };
+          break;
+        case OVERRIDE_CONFIG_TYPES.CONDITIONAL_STYLES:
+          conditionalRulesMap[aliasLower] = (cfg.rules ?? []).map((r: any) => ({
+            operator: r.operator ?? "<",
+            threshold: typeof r.threshold === "number" ? r.threshold : parseFloat(r.threshold) || 0,
+            textColor: r.textColor ?? "",
+            bgColor: r.bgColor ?? "",
+          }));
+          break;
+        case OVERRIDE_CONFIG_TYPES.FIELD_TYPE:
+          if (cfg.value) fieldTypeMap[aliasLower] = cfg.value;
+          break;
       }
     }
   }
 
-  return { colorConfigMap, unitConfigMap };
+  return { colorConfigMap, unitConfigMap, styleConfigMap, conditionalRulesMap, fieldTypeMap };
+};
+
+/** Apply parsed override maps onto a renderer column object, keyed by lower-cased alias. */
+export const applyColumnOverrides = (
+  obj: any,
+  aliasLower: string,
+  maps: OverrideMaps,
+  defaultAlign: string,
+): void => {
+  const colStyle = maps.styleConfigMap?.[aliasLower];
+  obj.align = colStyle?.alignment || defaultAlign;
+
+  if (maps.colorConfigMap?.[aliasLower]?.autoColor) obj.colorMode = "auto";
+  if (colStyle?.textColor) obj.textColor = colStyle.textColor;
+  if (colStyle?.bgColor) obj.bgColor = colStyle.bgColor;
+
+  const condRules = maps.conditionalRulesMap?.[aliasLower];
+  if (condRules?.length) obj.conditionalRules = condRules;
 };
 
 // ---------------------------------------------------------------------------
@@ -274,18 +382,20 @@ export const parseOverrideConfigs = (
  */
 export const formatNumericValue = (
   val: any,
-  valueMappingCache: Map<any, string> | null,
+  valueMappingCache: Map<any, any> | null,
   unit: string | null | undefined,
   customUnit: string | null | undefined,
   decimals: number,
-  missingValue?: string,
+  missingValue = "",
 ): string => {
-  if (val === null || val === undefined) return String(missingValue ?? "");
+  if (val === null || val === undefined || val === "")
+    return String(missingValue);
 
   const mapped = lookupValueMapping(val, valueMappingCache);
   if (mapped != null) return mapped;
 
-  return typeof val === "number" && !Number.isNaN(val)
+  // !Number.isNaN (not typeof number) so numeric strings format too.
+  return !Number.isNaN(val)
     ? `${formatUnitValue(getUnitValue(val, unit, customUnit, decimals)) ?? 0}`
     : val;
 };
