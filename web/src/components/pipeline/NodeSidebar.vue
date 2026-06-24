@@ -34,7 +34,7 @@ export default {
 </script>
 
 <template>
-  <div class="nodes tw:bg-[rgba(226,232,240,0.9)] tw:backdrop-blur-[12px] tw:rounded-[12px] tw:border tw:border-[rgba(226,232,240,0.8)] tw:shadow-[0_4px_16px_rgba(0,0,0,0.08)] tw:py-3 tw:px-2 tw:m-[4px_2px] tw:transition-all tw:duration-300 tw:ease-in-out tw:hover:shadow-[0_6px_20px_rgba(0,0,0,0.12)] tw:dark:bg-[rgba(15,23,42,0.95)]! tw:dark:border! tw:dark:border-[rgba(255,255,255,0.15)]! tw:dark:shadow-[0_6px_24px_rgba(0,0,0,0.4)]! tw:dark:py-3! tw:dark:px-2! tw:dark:hover:shadow-[0_8px_32px_rgba(0,0,0,0.5)]!">
+  <div class="nodes tw:bg-[rgba(226,232,240,0.9)] tw:backdrop-blur-[12px] tw:rounded-[12px] tw:border tw:border-[rgba(226,232,240,0.8)] tw:shadow-[0_4px_16px_rgba(0,0,0,0.08)] tw:py-3 tw:px-2 tw:m-[4px_2px] tw:transition-all tw:duration-300 tw:ease-in-out tw:hover:shadow-[0_6px_20px_rgba(0,0,0,0.12)]">
     <div v-for="node in node_types" :key="node.io_type" class="o2vf_node tw:transition-all tw:rounded-lg tw:mb-3 tw:last:mb-0">
       <OButton
         variant="ghost"
@@ -86,6 +86,16 @@ export default {
 </template>
 
 <style>
+.body--dark .nodes {
+  background: rgba(15, 23, 42, 0.95) !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4) !important;
+}
+
+.body--dark .nodes:hover {
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5) !important;
+}
+
 .drag-handle:hover .dot {
   background: rgba(107, 114, 128, 0.8);
   transform: scale(1.1);

@@ -54,7 +54,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="nodes-drag-container tw:pr-3 tw:w-50">
           <div
             data-test="pipeline-editor-nodes-list-title"
-            class="nodes-header tw:mb-2 tw:mx-2 tw:text-base tw:font-semibold tw:text-[#1f2937] tw:dark:text-[rgba(255,255,255,0.95)] tw:px-1 tw:pb-2 tw:text-center tw:border-b-2 tw:border-[#e5e7eb] tw:dark:border-[rgba(255,255,255,0.2)] tw:tracking-wide tw:relative"
+            class="nodes-header tw:mb-2 tw:mx-2 tw:text-base tw:font-semibold tw:px-1 tw:pb-2 tw:text-center tw:border-b-2 tw:tracking-wide tw:relative"
+            :class="
+              store.state.theme === 'dark'
+                ? 'tw:text-[rgba(255,255,255,0.95)] tw:border-[rgba(255,255,255,0.2)]'
+                : 'tw:text-[#1f2937] tw:border-[#e5e7eb]'
+            "
           >
             {{ t("pipeline.nodes") }}
           </div>
