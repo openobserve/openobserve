@@ -876,7 +876,7 @@
       </template>
 
       <OStepper v-model="currentStep" :navigable="true">
-        <OStep name="type" title="Type" :done="stepIdx > 0">
+        <OStep :name="0" title="Type" :done="stepIdx > 0">
           <div class="drw-slabel">Choose monitor type</div>
           <div class="type-grid">
             <div v-for="t in monitorTypes" :key="t.value" class="type-card" :class="{ 'type-card--on': form.type === t.value }" @click="form.type = t.value">
@@ -886,7 +886,7 @@
             </div>
           </div>
         </OStep>
-        <OStep name="configure" title="Configure" :done="stepIdx > 1">
+        <OStep :name="1" title="Configure" :done="stepIdx > 1">
           <div class="drw-slabel">Basic configuration</div>
           <div class="fstack">
             <OInput v-model="form.name" label="Monitor name *" />
@@ -913,7 +913,7 @@
             </OCollapsible>
           </div>
         </OStep>
-        <OStep name="locations" title="Locations" :done="stepIdx > 2">
+        <OStep :name="2" title="Locations" :done="stepIdx > 2">
           <div class="drw-slabel">Select check locations</div>
           <div style="font-size:12px;color:var(--o2-tab-text-color);margin-bottom:14px">Checks run simultaneously from all selected locations. Select at least one.</div>
           <div class="loc-section-label">Global locations</div>
@@ -936,7 +936,7 @@
             </div>
           </div>
         </OStep>
-        <OStep name="alerts" title="Assertions & Alerts" :done="stepIdx > 3">
+        <OStep :name="3" title="Assertions & Alerts" :done="stepIdx > 3">
           <div class="drw-slabel">Assertions</div>
           <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px">
             <div v-for="(a, i) in form.assertions" :key="i" style="display:flex;align-items:center;gap:8px;padding:8px;border:1px solid var(--o2-border-color);border-radius:8px">
@@ -1015,7 +1015,7 @@ const locationFilter = ref("all");
 const search         = ref("");
 const showDrawer     = ref(false);
 const editTarget     = ref<any>(null);
-const currentStep    = ref("type");
+const currentStep    = ref(0);
 const currentPage    = ref(1);
 const perPage        = ref(20);
 
@@ -1073,9 +1073,6 @@ onUnmounted(() => {
 });
 
 // ── Geo Checks ────────────────────────────────────────────────────────
-const geoSearch   = ref("");
-const geoPage     = ref(1);
-const geoPerPage  = ref(20);
 const geoAllLocations = [
   { key:"US East",    label:"US East",    flag:"🇺🇸", city:"Virginia, USA"      },
   { key:"US West",    label:"US West",    flag:"🇺🇸", city:"Oregon, USA"        },
@@ -1085,9 +1082,7 @@ const geoAllLocations = [
   { key:"AP NE",      label:"AP NE",      flag:"🇯🇵", city:"Tokyo, Japan"       },
 ];
 const geoAllRows = computed(() => {
-  const q = geoSearch.value.trim().toLowerCase();
   return monitors.value
-    .filter(m => !q || m.name.toLowerCase().includes(q) || m.url.toLowerCase().includes(q))
     .map(m => {
       const cells = geoAllLocations.map((loc, li) => {
         const configured = m.locations.includes(loc.key);
@@ -1107,10 +1102,6 @@ const geoAllRows = computed(() => {
       return rank(a) - rank(b);
     });
 });
-const geoTotalPages = computed(() => Math.max(1, Math.ceil(geoAllRows.value.length / geoPerPage.value)));
-const geoPageStart  = computed(() => (geoPage.value - 1) * geoPerPage.value);
-const geoPageEnd    = computed(() => Math.min(geoPageStart.value + geoPerPage.value, geoAllRows.value.length));
-const geoRows       = computed(() => geoAllRows.value.slice(geoPageStart.value, geoPageEnd.value));
 const geoLocStats = computed(() =>
   geoAllLocations.map((loc, li) => {
     const configured = geoAllRows.value.filter(r => r.cells[li].status !== "none");
@@ -1221,13 +1212,15 @@ const initHeatmapChart = async () => {
   heatmapChart.resize();
 };
 
-watch(showHeatmapModal, async (open) => {
-  if (open) {
-    await initHeatmapChart();
-  } else {
+watch(showHeatmapModal, (open) => {
+  if (!open) {
     heatmapChart?.dispose();
     heatmapChart = null;
+    return;
   }
+  initHeatmapChart().catch((err) => {
+    console.error('Failed to initialize heatmap chart:', err);
+  });
 });
 const showIssuesModal  = ref(false);
 const geoIssues = computed(() => {
@@ -1241,37 +1234,8 @@ const geoIssues = computed(() => {
 
 const mapTip = ref({ show: false, x: 0, y: 0, stat: null as any });
 let mapTipTimer: ReturnType<typeof setTimeout> | null = null;
-const showMapTip = (e: MouseEvent, stat: any) => {
-  if (mapTipTimer) { clearTimeout(mapTipTimer); mapTipTimer = null; }
-  mapTip.value = { show: true, x: e.clientX + 14, y: e.clientY - 10, stat };
-};
 const hideMapTip = () => { mapTipTimer = setTimeout(() => { mapTip.value.show = false; }, 100); };
 
-const selectedGeoRow = ref<{ monitor: any; cells: any[] } | null>(null);
-const toggleGeoRow = (row: { monitor: any; cells: any[] }) => {
-  selectedGeoRow.value = selectedGeoRow.value?.monitor.id === row.monitor.id ? null : row;
-  compareLocs.value = [];
-  openDetail(row.monitor, row);
-};
-const geoBarMax = computed(() => {
-  if (!selectedGeoRow.value) return 500;
-  const vals = selectedGeoRow.value.cells.filter((c: any) => c.ms !== null).map((c: any) => c.ms as number);
-  return vals.length ? Math.max(...vals, 100) : 500;
-});
-
-const dismissedAnomalies = ref<string[]>([]);
-const geoAnomalies = computed(() => {
-  const list: { key: string; level: "error" | "warn"; msg: string }[] = [];
-  geoLocStats.value.forEach(s => {
-    if (s.health === "down")
-      list.push({ key: `${s.key}-down`, level: "error", msg: `${s.flag} ${s.label} — ${s.downCt} monitor${s.downCt > 1 ? "s" : ""} down` });
-    else if (s.health === "deg")
-      list.push({ key: `${s.key}-deg`, level: "warn", msg: `${s.flag} ${s.label} — ${s.degCt} monitor${s.degCt > 1 ? "s" : ""} degraded, avg response elevated` });
-  });
-  const multiDown = geoLocStats.value.filter(s => s.health === "down").length;
-  if (multiDown >= 2) list.push({ key: "multi-region", level: "error", msg: `${multiDown} regions simultaneously affected — possible CDN or upstream incident` });
-  return list.filter(a => !dismissedAnomalies.value.includes(a.key));
-});
 
 // ── Detail Side Panel ──────────────────────────────────────────────────
 interface LogEntry { time: string; level: string; logger: string; msg: string; stack?: string }
@@ -1471,30 +1435,6 @@ const closeDetail = () => {
   dpSelectedSpan.value = null;
 };
 
-const compareLocs = ref<string[]>([]);
-const toggleCompareLoc = (e: MouseEvent, key: string) => {
-  e.stopPropagation();
-  const idx = compareLocs.value.indexOf(key);
-  if (idx >= 0) compareLocs.value.splice(idx, 1);
-  else if (compareLocs.value.length < 2) compareLocs.value.push(key);
-  else compareLocs.value = [compareLocs.value[1], key];
-  selectedGeoRow.value = null;
-};
-const clearCompare = () => { compareLocs.value = []; };
-const compareResult = computed(() => {
-  if (compareLocs.value.length < 2) return null;
-  const [kA, kB] = compareLocs.value;
-  const liA = geoAllLocations.findIndex(l => l.key === kA);
-  const liB = geoAllLocations.findIndex(l => l.key === kB);
-  const sA = geoLocStats.value.find(s => s.key === kA)!;
-  const sB = geoLocStats.value.find(s => s.key === kB)!;
-  return {
-    sA, sB,
-    rows: geoAllRows.value
-      .filter(r => r.cells[liA].status !== "none" || r.cells[liB].status !== "none")
-      .map(r => ({ name: r.monitor.name, a: r.cells[liA], b: r.cells[liB] })),
-  };
-});
 
 const tabs = [
   { key:"monitors", label:"All Monitors",     count:30   },
@@ -1503,20 +1443,20 @@ const tabs = [
   { key:"private",  label:"Private Locations",count:null },
 ];
 const steps = [
-  { key:"type",      label:"Type" },
-  { key:"configure", label:"Configure" },
-  { key:"locations", label:"Locations" },
-  { key:"alerts",    label:"Assertions & Alerts" },
+  { key: 0, label: "Type" },
+  { key: 1, label: "Configure" },
+  { key: 2, label: "Locations" },
+  { key: 3, label: "Assertions & Alerts" },
 ];
-const stepIdx  = computed(() => steps.findIndex(s => s.key === currentStep.value));
+const stepIdx  = computed(() => currentStep.value);
 const nextStep = () => {
-  if (currentStep.value === 'type' && form.value.type === 'Browser') {
+  if (currentStep.value === 0 && form.value.type === 'Browser') {
     router.push({ name: 'synthetic-new' });
     return;
   }
-  if (stepIdx.value < steps.length - 1) currentStep.value = steps[stepIdx.value + 1].key;
+  if (currentStep.value < steps.length - 1) currentStep.value++;
 };
-const prevStep = () => { if (stepIdx.value > 0) currentStep.value = steps[stepIdx.value-1].key; };
+const prevStep = () => { if (currentStep.value > 0) currentStep.value--; };
 
 const defaultForm = () => ({
   type:"HTTP", name:"", url:"", method:"GET",
@@ -1664,22 +1604,10 @@ const pageStart   = computed(() => (currentPage.value - 1) * perPage.value);
 const pageEnd     = computed(() => Math.min(currentPage.value * perPage.value, filteredMonitors.value.length));
 const pagedMonitors = computed(() => filteredMonitors.value.slice(pageStart.value, pageEnd.value));
 
-const pageButtons = computed(() => {
-  const total = totalPages.value;
-  const cur   = currentPage.value;
-  if (total <= 7) return Array.from({length: total}, (_,i) => i+1);
-  const pages: (number|string)[] = [1];
-  if (cur > 3) pages.push("…");
-  for (let i = Math.max(2, cur-1); i <= Math.min(total-1, cur+1); i++) pages.push(i);
-  if (cur < total - 2) pages.push("…");
-  pages.push(total);
-  return pages;
-});
-
 const rtCls = (rt: string|null) => { if (!rt) return "c-r"; const v=parseFloat(rt); return v<300?"c-g":v<1000?"c-a":"c-r"; };
 const toggleLoc  = (v: string) => { const i=form.value.locations.indexOf(v); if(i===-1)form.value.locations.push(v); else form.value.locations.splice(i,1); };
-const openCreate  = () => { editTarget.value=null; form.value=defaultForm(); currentStep.value="type"; showDrawer.value=true; };
-const openEdit    = (m: any) => { editTarget.value=m; form.value={...defaultForm(),name:m.name,url:m.url,type:m.type,interval:m.interval}; currentStep.value="configure"; showDrawer.value=true; };
+const openCreate  = () => { editTarget.value=null; form.value=defaultForm(); currentStep.value=0; showDrawer.value=true; };
+const openEdit    = (m: any) => { editTarget.value=m; form.value={...defaultForm(),name:m.name,url:m.url,type:m.type,interval:m.interval}; currentStep.value=1; showDrawer.value=true; };
 const saveMonitor = () => { showDrawer.value=false; };
 </script>
 
@@ -1714,7 +1642,7 @@ const saveMonitor = () => { showDrawer.value=false; };
 .syn-th.right { text-align:right; }
 .th-inner { display:flex; align-items:center; justify-content:space-between; gap:4px; user-select:none; }
 .col-resize-handle { width:4px; height:14px; cursor:col-resize; border-radius:2px; background:var(--o2-border-color); flex-shrink:0; transition:background .12s; }
-.col-resize-handle:hover { background:var(--q-primary); }
+.col-resize-handle:hover { background:var(--o2-primary-color); }
 .syn-row { border-bottom:1px solid var(--o2-border-color); transition:background .1s; }
 .syn-row:last-child { border-bottom:none; }
 .syn-row:hover { background:rgba(128,128,128,.06); }
@@ -1798,7 +1726,7 @@ const saveMonitor = () => { showDrawer.value=false; };
 .loc-float-item:last-child { border-bottom:none; }
 .loc-float-dot  { width:6px; height:6px; border-radius:50%; background:#22c55e; flex-shrink:0; }
 
-.syn-page-icon { color: var(--q-primary, #1976d2); }
+.syn-page-icon { color: var(--o2-primary-color); }
 
 .row-actions { display:flex; align-items:center; gap:2px; }
 
@@ -1839,7 +1767,7 @@ const saveMonitor = () => { showDrawer.value=false; };
 .pl-guide-header { display:flex; align-items:center; gap:8px; font-size:13px; font-weight:700; margin-bottom:18px; }
 .pl-guide-steps  { display:flex; flex-direction:column; gap:18px; }
 .pl-guide-step   { display:flex; gap:14px; }
-.pl-step-num     { width:24px; height:24px; border-radius:50%; background:var(--q-primary); color:#fff; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; flex-shrink:0; margin-top:1px; }
+.pl-step-num     { width:24px; height:24px; border-radius:50%; background:var(--o2-primary-color); color:var(--o2-text-inverse); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; flex-shrink:0; margin-top:1px; }
 .pl-step-body    { flex:1; }
 .pl-step-title   { font-size:13px; font-weight:700; margin-bottom:3px; }
 .pl-step-desc    { font-size:12px; color:var(--o2-tab-text-color); line-height:1.5; }
@@ -1849,8 +1777,8 @@ const saveMonitor = () => { showDrawer.value=false; };
 
 .type-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
 .type-card { border:1.5px solid var(--o2-border-color); border-radius:10px; padding:14px; cursor:pointer; transition:border-color .12s,background .12s; }
-.type-card:hover  { border-color:var(--q-primary); }
-.type-card--on    { border-color:var(--q-primary); background:color-mix(in srgb,var(--q-primary) 8%,transparent); }
+.type-card:hover  { border-color:var(--o2-primary-color); }
+.type-card--on    { border-color:var(--o2-primary-color); background:color-mix(in srgb,var(--o2-primary-color) 8%,transparent); }
 .type-top  { display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; }
 .type-name { font-size:13px; font-weight:700; margin-bottom:3px; }
 .type-desc { font-size:11px; color:var(--o2-tab-text-color); line-height:1.4; }
@@ -1859,8 +1787,8 @@ const saveMonitor = () => { showDrawer.value=false; };
 .loc-section-label { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:var(--o2-tab-text-color); margin-bottom:8px; }
 .loc-list   { display:flex; flex-direction:column; gap:6px; }
 .loc-item   { display:flex; align-items:center; gap:12px; padding:10px 14px; border:1.5px solid var(--o2-border-color); border-radius:8px; cursor:pointer; transition:border-color .12s,background .12s; }
-.loc-item:hover { border-color:var(--q-primary); }
-.loc-item--on   { border-color:var(--q-primary); background:color-mix(in srgb,var(--q-primary) 6%,transparent); }
+.loc-item:hover { border-color:var(--o2-primary-color); }
+.loc-item--on   { border-color:var(--o2-primary-color); background:color-mix(in srgb,var(--o2-primary-color) 6%,transparent); }
 .loc-flag { font-size:18px; line-height:1; }
 
 /* ── GEO CHECKS ── */
@@ -1934,7 +1862,7 @@ const saveMonitor = () => { showDrawer.value=false; };
 .geo-th-flag { font-size:14px; }
 .geo-th--compare { background:rgba(25,118,210,.08) !important; }
 .body--dark .geo-th--compare { background:rgba(99,179,237,.1) !important; }
-.geo-th-badge { display:inline-flex; align-items:center; justify-content:center; width:14px; height:14px; border-radius:50%; background:var(--q-primary,#1976d2); color:#fff; font-size:9px; font-weight:700; margin-left:4px; vertical-align:middle; }
+.geo-th-badge { display:inline-flex; align-items:center; justify-content:center; width:14px; height:14px; border-radius:50%; background:var(--o2-primary-color); color:#fff; font-size:9px; font-weight:700; margin-left:4px; vertical-align:middle; }
 
 .geo-mon-name { font-size:13px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:200px; }
 .geo-mon-url  { font-size:11px; color:var(--o2-tab-text-color); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:200px; margin-top:2px; }
@@ -2001,10 +1929,10 @@ const saveMonitor = () => { showDrawer.value=false; };
 
 /* ── ICON COLOR HELPERS ── */
 .pl-icon-muted   { color:var(--o2-tab-text-color); flex-shrink:0; }
-.pl-icon-primary { color:var(--q-primary, #1976d2); flex-shrink:0; }
-.type-icon--on   { color:var(--q-primary, #1976d2); }
+.pl-icon-primary { color:var(--o2-primary-color); flex-shrink:0; }
+.type-icon--on   { color:var(--o2-primary-color); }
 .type-icon--off  { color:rgba(128,128,128,.7); }
-.type-check      { color:var(--q-primary, #1976d2); flex-shrink:0; }
+.type-check      { color:var(--o2-primary-color); flex-shrink:0; }
 
 /* ── Detail Side Panel ──────────────────────────────────────────────── */
 .dp-overlay { position:fixed; inset:0; z-index:1400; background:rgba(0,0,0,.38); display:flex; justify-content:flex-end; }
@@ -2141,7 +2069,7 @@ const saveMonitor = () => { showDrawer.value=false; };
 
 /* traces */
 .dp-req-bar { display:flex; align-items:center; gap:10px; padding:10px 14px; background:rgba(128,128,128,.06); border:1px solid var(--o2-border-color); border-radius:8px; }
-.dp-req-method { font-family:ui-monospace,monospace; font-size:12px; font-weight:700; color:var(--q-primary); flex-shrink:0; }
+.dp-req-method { font-family:ui-monospace,monospace; font-size:12px; font-weight:700; color:var(--o2-primary-color); flex-shrink:0; }
 .dp-req-url { font-family:ui-monospace,monospace; font-size:12px; flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--o2-tab-text-color); }
 .dp-req-badge { font-size:11px; font-weight:700; padding:2px 8px; border-radius:4px; flex-shrink:0; }
 .dp-req-badge--ok  { background:rgba(34,197,94,.15); color:#16a34a; }
@@ -2160,7 +2088,7 @@ const saveMonitor = () => { showDrawer.value=false; };
 .dp-span-row { display:flex; align-items:center; cursor:pointer; border-bottom:1px solid var(--o2-border-color); }
 .dp-span-row:last-child { border-bottom:none; }
 .dp-span-row:hover { background:rgba(128,128,128,.06); }
-.dp-span-row--sel { background:rgba(var(--q-primary-rgb, 25,118,210),.08) !important; }
+.dp-span-row--sel { background:color-mix(in srgb,var(--o2-primary-color) 8%,transparent) !important; }
 .dp-span-label { width:210px; flex-shrink:0; display:flex; align-items:center; gap:4px; padding:6px 4px; overflow:hidden; }
 .dp-span-tree { font-size:10px; color:var(--o2-tab-text-color); flex-shrink:0; }
 .dp-span-name { font-size:11px; font-family:ui-monospace,monospace; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
