@@ -1304,8 +1304,7 @@ pub static PIPELINE_EXPORTED_BYTES: Lazy<IntCounterVec> = Lazy::new(|| {
 
 // Realtime pipeline batch execution time (milliseconds). Observed by ingesters per
 // `process_batch` call so the realtime pipeline's share of ingestion latency is
-// visible. `pipeline_name` aids dashboards; cardinality is bounded by number of
-// pipelines (pipeline_id is the stable key).
+// visible. Cardinality is bounded by number of pipelines.
 pub static PIPELINE_EXEC_TIME_MS: Lazy<HistogramVec> = Lazy::new(|| {
     HistogramVec::new(
         HistogramOpts::new(
@@ -1318,12 +1317,7 @@ pub static PIPELINE_EXEC_TIME_MS: Lazy<HistogramVec> = Lazy::new(|| {
             5000.0, 10000.0, 30000.0,
         ])
         .const_labels(create_const_labels()),
-        &[
-            "organization",
-            "pipeline_id",
-            "pipeline_name",
-            "stream_type",
-        ],
+        &["organization", "pipeline_id"],
     )
     .expect("Metric created")
 });
@@ -1340,12 +1334,7 @@ pub static PIPELINE_EXEC_BATCH_SIZE: Lazy<HistogramVec> = Lazy::new(|| {
             1.0, 10.0, 50.0, 100.0, 500.0, 1000.0, 5000.0, 10000.0, 50000.0, 100000.0,
         ])
         .const_labels(create_const_labels()),
-        &[
-            "organization",
-            "pipeline_id",
-            "pipeline_name",
-            "stream_type",
-        ],
+        &["organization", "pipeline_id"],
     )
     .expect("Metric created")
 });
