@@ -5592,6 +5592,7 @@
       "descNoFilters": "No events were found in {range}. Try widening the time range to load results.",
       "descWithFilters": "Nothing matched <strong>this query</strong> in the selected window. The stream has data here — try relaxing a filter in the query bar.",
       "descOutOfRange": "Your time window doesn't contain any data from this stream. Jump to when data was last seen.",
+      "descDataAtBoundary": "The stream has data in this window but no events matched. Try checking your search history or asking AI for help.",
       "jumpToData": "Jump to latest data",
       "expandRange": "Expand the time range",
       "expandRangeDescAbsolute": "Switch to a wider relative time range",

@@ -810,6 +810,10 @@
         "service_maps": {
           "name": "サービスマップ",
           "note": "サービスの依存関係を視覚化"
+        },
+        "byob": {
+          "name": "Bring Your Own Bucket",
+          "note": "組織データを独自のクラウドバケットにルーティング"
         }
       },
       "buttons": {
@@ -2066,7 +2070,14 @@
       "viewOrgGroup": "組織グループを表示",
       "usageMemberLabel": "メンバー組織",
       "usageAllMembers": "現在の組織",
-      "currentOrgTitle": "現在の組織"
+      "currentOrgTitle": "現在の組織",
+      "childOrgIdColumn": "子組織識別子",
+      "childOrgNameColumn": "子組織名",
+      "notEnabledTitle": "請求グループは利用できません",
+      "notEnabledDesc": "この組織では請求グループを開始できません。この機能が必要な場合は管理者にお問い合わせください。",
+      "memberOrgsTitle": "メンバー組織",
+      "searchMemberOrg": "組織を検索",
+      "noMemberMatch": "一致する組織がありません"
     }
   },
   "message": {
@@ -2267,7 +2278,43 @@
       "rcaCompleted": "根本原因分析が完了しました",
       "noRcaYet": "根本原因分析はありません。[分析] をクリックして開始します。",
       "search": "インシデントを検索...",
-      "sreChat": "SREアシスタントに聞く"
+      "sreChat": "SREアシスタントに聞く",
+      "subtitle": "インシデント管理と追跡",
+      "correlationPrimaryMatch": "プライマリ一致",
+      "correlationSecondaryMatch": "セカンダリ一致",
+      "correlationServiceDiscoveryTooltip": "サービスディスカバリーで事前計算されたサービスアイデンティティを使用して相関付けされました",
+      "correlationPrimaryMatchTooltip": "プライマリ一致条件によって相関付けされました",
+      "correlationSecondaryMatchTooltip": "セカンダリ一致条件によって相関付けされました",
+      "correlationAlertId": "アラートID",
+      "correlationAlertIdTooltip": "一致するディメンションが見つかりませんでした — アラートIDで分離されました",
+      "correlatedByServiceDiscovery": "ディメンション",
+      "correlatedBySemanticGroups": "ディメンション",
+      "correlatedByAlertId": "アラートID",
+      "goBack": "戻る",
+      "incident": "インシデント",
+      "uniqueAlerts": "一意のアラート",
+      "relatedAlerts": "関連アラート",
+      "alertTriggers": "アラートトリガー",
+      "incidentTimeline": "インシデントタイムライン",
+      "incidentDetails": "インシデント詳細",
+      "incidentId": "インシデントID",
+      "incidentName": "インシデント名",
+      "initialTrigger": "初回トリガー",
+      "noDimensionsAvailable": "利用可能なディメンションがありません",
+      "noAlertDetailsAvailable": "利用可能なアラート詳細がありません",
+      "clickOnTriggerToViewDetails": "詳細を表示するには、テーブル内のトリガーをクリックしてください",
+      "refreshCorrelatedData": "相関データを更新",
+      "showingCorrelatedLogs": "インシデント期間の相関ログを表示中",
+      "showingCorrelatedMetrics": "インシデント期間の相関メトリクスを表示中",
+      "showingCorrelatedTraces": "インシデント期間の相関トレースを表示中",
+      "incidentTitleUpdatedSuccess": "インシデントタイトルが正常に更新されました",
+      "markAsAcknowledgedTooltip": "インシデントを確認済みかつ対応中としてマーク",
+      "markAsResolvedTooltip": "インシデントを解決済みとしてマークしてクローズ",
+      "reopenIncidentTooltip": "解決済みのインシデントを再オープン",
+      "editIncidentTitleTooltip": "インシデントタイトルを編集",
+      "firedTimes": "{count}回発生",
+      "incidentAnalysis": "インシデント分析",
+      "noAlertActivityData": "アラートアクティビティデータがありません"
     },
     "events": "[イベント]",
     "multiWindow": "過去と比較",
@@ -2315,7 +2362,9 @@
       "alertName": "アラート名",
       "streamInfo": "データソース",
       "alertType": "アラートタイプ",
-      "queryCondition": "クエリ条件"
+      "queryCondition": "クエリ条件",
+      "configuringRealTime": "リアルタイムアラートを設定中:",
+      "configuringScheduled": "スケジュールアラートを設定中:"
     },
     "correlation": {
       "title": "アラート相関",
@@ -2472,7 +2521,8 @@
       "comparingText": "現在のウィンドウのクエリ結果と前の {offset} のクエリ結果を比較します。",
       "addComparisonWindow": "比較ウィンドウを追加",
       "goToConditions": "条件に移動",
-      "goToConditionsTooltip": "「条件に移動」をクリックして、選択した比較ウィンドウのイベントを確認してください"
+      "goToConditionsTooltip": "「条件に移動」をクリックして、選択した比較ウィンドウのイベントを確認してください",
+      "comparisonDisabledTooltip": "比較ウィンドウはSQLモードでのみサポートされています。アラートルールタブでSQLに切り替えてください。"
     },
     "alertSettings": {
       "cronSchedule": "クローンスケジュール",
@@ -2484,13 +2534,22 @@
       "frequencyTooltipCron": "5 つのフィールドをスペースで区切った標準 UNIX cron 形式:[分 0 ～ 59 分] [時間 0 ～ 23] [月 1 ～ 31 日] [月 1 ～ 12 月、または 1 月から 12 月] [曜日 0 ～ 7 日、日曜日は 0 と 7 日]。",
       "timezoneWarning": "警告:表示されているタイムゾーンはおおよそのものです。正しいタイムゾーンを手動で確認して選択してください。",
       "destinationsTooltip": "アラート通知を送信する宛先を 1 つ以上選択します。",
-      "templateTooltip": "オプション:このアラートのすべての宛先に使用するテンプレートを選択してください。テンプレートを使用すると、アラートメッセージの形式をカスタマイズできます。選択しない場合、各宛先は独自の構成済みテンプレートを使用します。"
+      "templateTooltip": "オプション:このアラートのすべての宛先に使用するテンプレートを選択してください。テンプレートを使用すると、アラートメッセージの形式をカスタマイズできます。選択しない場合、各宛先は独自の構成済みテンプレートを使用します。",
+      "sectionTitle": "設定",
+      "fieldRequired": "フィールドは必須です！",
+      "noDestinationsAvailable": "利用可能な宛先がありません",
+      "refreshDestinations": "最新の宛先を更新",
+      "createsIncident": "インシデントを作成",
+      "createsIncidentTooltip": "アラートがインシデントを作成できる場合、専用の通知は送信されません。代わりに、新しいインシデントが作成されたとき、または新しいアラートタイプが既存のインシデントに加わったときに、インシデントの通知が送信されます。"
     },
     "advanced": {
       "addVariable": "[変数を追加]",
       "variablesTooltip": "変数は、アラートから宛先にデータを渡すために使用されます。",
       "rowTemplateTooltip": "行テンプレートはアラートメッセージのフォーマットに使用されます。",
-      "templateType": "テンプレートタイプ:"
+      "templateType": "テンプレートタイプ:",
+      "noTemplatesAvailable": "利用可能なテンプレートがありません",
+      "refreshTemplates": "最新のテンプレートを更新",
+      "selectTemplate": "テンプレートを選択"
     },
     "addConditions": "条件を追加",
     "sqlEditor": "SQL エディター",
@@ -2891,7 +2950,93 @@
       "noMatchingDimensions": "一致するディメンションがありません",
       "otherGroup": "その他",
       "fallbackGroup": "フォールバック",
-      "fallbackNote": "フォールバックディメンション（'service' など）は、環境固有のワークロードが一致しない場合にすべての環境に適用されます。"
+      "fallbackNote": "フォールバックディメンション（'service' など）は、環境固有のワークロードが一致しない場合にすべての環境に適用されます。",
+      "serviceDiscoveryTab": "検出ルール",
+      "fieldAliasesTab": "フィールドマッピング",
+      "fieldAliasesSaved": "フィールドエイリアスが正常に保存されました",
+      "serviceNameFieldAliasNote": "このグループにマッピングされる実際のフィールド名は次で設定されます:",
+      "viewFieldAliases": "フィールドエイリアスを編集 →",
+      "fieldAliasesSaveError": "フィールドエイリアスの保存に失敗しました",
+      "fieldAliasesUnsavedConfirm": "保存されていないフィールドマッピングの変更があります。破棄して移動しますか？",
+      "duplicateIdsError": "重複したグループIDが見つかりました: {ids}。各グループに一意のIDが設定されていることを確認してください。",
+      "duplicateNamesInCategoryError": "カテゴリ「{category}」内に重複した名前「{name}」が見つかりました。カテゴリ内の各グループには一意の名前が必要です。",
+      "emptyIdError": " カテゴリにグループ名が空のグループがあります。すべてのグループに有効な名前が設定されていることを確認してください。",
+      "emptyFieldsError": "少なくとも1つのフィールド名が必要です",
+      "lastSeen": "最終確認",
+      "serviceIdentitySetupTitle": "サービスアイデンティティの設定",
+      "serviceIdentitySetupDescription": "テレメトリデータ全体でサービスをどのように識別するかを設定します",
+      "serviceNameFieldLabel": "サービス名フィールド",
+      "serviceNameFieldHelp": "テレメトリデータ内でサービス名を識別するフィールド",
+      "serviceNameFrom": "サービス名の取得元",
+      "serviceNameDerivedPrefix": "サービス名は次で定義されたサービス名フィールドを使用して導出されます",
+      "serviceNameFields": "フィールドエイリアス",
+      "serviceNameDetectedFrom": "サービス名の検出元:",
+      "serviceNameNotDetected": "データ内にサービス名フィールドはまだ検出されていません",
+      "serviceNameNotDetectedHelp": "テレメトリに service.name のようなフィールドが含まれていることを確認してください",
+      "serviceNameExpandedHelp": "データ内のこれらのフィールド名はすべてサービス名にマッピングされます:",
+      "serviceNameConfiguredNotSeen": "設定済みですが、データ内ではまだ確認されていません",
+      "customizeFieldMappings": "フィールドマッピングをカスタマイズ",
+      "fieldMappingDialogHelp": "テレメトリデータ全体でサービス名として認識されるべきフィールド名を追加または削除します。",
+      "fieldMappingPlaceholder": "フィールド名を入力してEnterキーを押してください",
+      "foundInLogs": "ログ内で発見",
+      "foundInTraces": "トレース内で発見",
+      "foundInMetrics": "メトリクス内で発見",
+      "distinguishByLabel": "サービスの区別基準",
+      "distinguishByHelp": "サービスが稼働する場所を定義するフィールドを選択します。たとえば、cluster + namespace + deployment を組み合わせると、各サービスに一意のアイデンティティが作成されます。最大5フィールド。",
+      "serviceOptionalLabel": "サービス属性なしで相関付け",
+      "serviceOptionalHelp": "以下の属性のみを使用してストリームを一致させ、サービス属性は無視します",
+      "noFieldsConfiguredYet": "曖昧性解消フィールドはまだ設定されていません。",
+      "addField": "フィールドを追加",
+      "addFieldTooltip": "サービスを一意に識別するためのフィールドをさらに追加します（最大5）。例: region、namespace、environment。",
+      "addGroup": "グループを追加",
+      "addGroupTooltip": "異なる環境用の曖昧性解消フィールドの個別セットを作成します（例: Kubernetes と AWS で異なるフィールド）",
+      "autoSuggestedBanner": "これらのフィールドは、一意の値が少なく（低カーディナリティ）、ほとんどのサービスに存在するため自動提案されました — 同じ名前のサービスを区別するのに最適です。保存前にカスタマイズできます。",
+      "addDisambiguationField": "さらに追加",
+      "removeDisambiguationField": "フィールドを削除",
+      "nameFieldLockedNote": "サービス名フィールドは初回設定後に変更できません",
+      "noGroupsAvailable": "利用可能なフィールドグループがありません",
+      "selectField": "フィールドを選択",
+      "detectedLabel": "データに基づいて{type}ワークロードを検出しました。",
+      "suggestionPrompt": "提案を適用しますか？",
+      "applySuggestion": "提案を適用",
+      "logStreams": "ログストリーム",
+      "traceStreams": "トレースストリーム",
+      "metricStreams": "メトリクスストリーム",
+      "saveIdentityConfig": "設定を保存",
+      "identityConfigSaved": "サービスアイデンティティ設定が正常に保存されました",
+      "identityConfigSaveFailed": "サービスアイデンティティ設定の保存に失敗しました",
+      "loadRecommendationsFailed": "推奨事項の読み込みに失敗しました",
+      "resetServices": "サービスをリセット",
+      "resetServicesTooltip": "検出されたすべてのサービスを削除します。新しいデータが到着すると自動的に再検出されます。",
+      "resetServicesConfirmTitle": "検出されたすべてのサービスをリセットしますか？",
+      "resetServicesConfirmMessage": "これにより、この組織で検出されたすべてのサービスが削除されます。新しいテレメトリデータが取り込まれると、サービスは自動的に再検出されます。この操作は取り消せません。",
+      "resetServicesConfirmWarning": "新しいテレメトリデータが取り込まれると、サービスは自動的に再検出されます。この操作は取り消せません。",
+      "resetServicesSuccess": "{count}件の検出されたサービスを正常に削除しました。",
+      "resetServicesFailed": "サービスのリセットに失敗しました",
+      "workload": "ワークロード",
+      "goToConfiguration": "設定へ移動",
+      "configureServicesHint": "サービスの識別方法とグループ化方法を設定します。",
+      "filterBy": "フィルター条件 :",
+      "selectFieldPlaceholder": "フィールドを選択",
+      "selectValuePlaceholder": "値を選択",
+      "selectFieldFirst": "最初にフィールドを選択してください",
+      "instanceSingular": "インスタンス",
+      "instancePlural": "インスタンス",
+      "serviceSingular": "サービス",
+      "serviceCountSingular": "{count}サービス",
+      "serviceCountPlural": "{count}サービス",
+      "instancesCount": "（{count}インスタンス）",
+      "noDimensions": "ディメンションなし",
+      "defaultSetWarningTitle": "相関が信頼できない可能性があります。",
+      "defaultSetWarningBody": "このインスタンスには曖昧性解消がありません — ワークロードの一致なし（cluster、namespace、environment のコンテキストなし）で検出されました。ログとトレースは同じサービス名の異なるデプロイメントから来ている可能性があります。",
+      "instanceIdentity": "インスタンスアイデンティティ",
+      "noDimensionsCatchAll": "ディメンションなし — キャッチオールインスタンス",
+      "streamSources": "ストリームソース",
+      "openInLogsTooltip": "サービスフィルター付きでログを開く",
+      "fieldNameMapping": "フィールド名マッピング",
+      "logsWithCount": "ログ（{count}）",
+      "tracesWithCount": "トレース（{count}）",
+      "metricsWithCount": "メトリクス（{count}）"
     },
     "pageSubtitle": "アプリケーションの設定を調整する",
     "platformSettings": "プラットフォーム設定",
@@ -2934,7 +3079,29 @@
     "usageStreamEnabledLabel": "使用ストリームを有効にする",
     "aiToolsets": "AI ツールセット",
     "llmModelPricing": "LLM モデルの価格設定",
-    "ingestionTokens": "インジェストトークン"
+    "ingestionTokens": "インジェストトークン",
+    "groupGeneral": "一般",
+    "groupAccessSecurity": "アクセスとセキュリティ",
+    "groupDestinationsTemplates": "宛先とテンプレート",
+    "groupDataAI": "データとAI",
+    "groupOperations": "運用",
+    "groupAccount": "アカウント",
+    "generalDesc": "テーマ、クエリのデフォルト、基本設定",
+    "orgDesc": "組織のパラメータと識別子",
+    "cipherKeysDesc": "機密フィールドの暗号化キー",
+    "regexPatternsDesc": "墨消し用の再利用可能なregexパターン",
+    "domainManagementDesc": "サインインを許可されたSSOドメインに制限",
+    "alertDestinationsDesc": "トリガーされたアラートの配信先",
+    "pipelineDestinationsDesc": "パイプライン出力の外部ターゲット",
+    "templatesDesc": "再利用可能なアラートメッセージテンプレート",
+    "storageSettingsDesc": "組織ごとのストレージ設定",
+    "modelPricingDesc": "LLMモデルのコスト設定",
+    "correlationSettingsDesc": "テレメトリ相関の設定",
+    "llmProvidersDesc": "オンライン評価用のLLMプロバイダー",
+    "queryManagementDesc": "実行中のクエリの確認とキャンセル",
+    "nodesDesc": "クラスターノードとそのヘルス状態",
+    "licenseDesc": "エンタープライズライセンスの詳細",
+    "organizationManagementDesc": "組織の作成と管理"
   },
   "iam": {
     "users": "ユーザー",
@@ -3275,19 +3442,27 @@
         "p99Latency": "99",
         "avgLatency": "平均レイテンシー",
         "lastSeen": "最後に見たもの",
-        "operations": "オペレーション"
+        "operations": "オペレーション",
+        "avgDuration": "平均所要時間",
+        "maxDuration": "最大所要時間"
       },
       "status": {
         "healthy": "ヘルシー",
         "warning": "警告",
-        "degraded": "劣化しました"
+        "degraded": "劣化しました",
+        "critical": "重大"
       },
       "viewTraces": "トレースを表示",
       "exportCsv": "CSV をエクスポート",
       "justNow": "たった今",
       "minutesAgo": "{n} 分前",
       "hoursAgo": "{n} 時間前",
-      "daysAgo": "{n} 日前"
+      "daysAgo": "{n} 日前",
+      "serviceLabel": "サービス",
+      "servicesLabel": "サービス",
+      "legend": {
+        "title": "エラー率"
+      }
     },
     "noErrorPresent": "このスパンにはエラーはありません",
     "httpStatusCode": "HTTP ステータスコード",
@@ -3325,8 +3500,12 @@
         "duration": "所要時間",
         "tokens": "トークン",
         "cost": "費用",
-        "status": "ステータス"
-      }
+        "status": "ステータス",
+        "user": "ユーザー",
+        "firstMessage": "最初のメッセージ"
+      },
+      "streamLabel": "ストリーム",
+      "unknownUser": "不明なユーザー"
     },
     "sessionDetail": {
       "backToSessions": "セッションに戻る",
@@ -3368,7 +3547,15 @@
         "output": "出力",
         "total": "合計",
         "cost": "費用",
-        "spans": "スパン"
+        "spans": "スパン",
+        "llmCalls": "LLM呼び出し",
+        "toolCalls": "ツール呼び出し",
+        "otherCalls": "その他",
+        "otherCallsTooltip": "認識されない操作名を持つ gen_ai スパン:"
+      },
+      "fullscreen": {
+        "expandTurn": "ターンを全画面で表示",
+        "close": "閉じる"
       }
     },
     "openInFullView": "フルビューで開く",
@@ -3405,7 +3592,10 @@
       "expandRange": "時間範囲を広げる",
       "expandRangeDescAbsolute": "より広い相対時間範囲に切り替える",
       "removeFilter": "フィルターを削除する",
-      "selectedRange": "選択した範囲"
+      "selectedRange": "選択した範囲",
+      "descOutOfRange": "選択した時間ウィンドウには、このストリームのデータが含まれていません。データが最後に確認された時点へジャンプしてください。",
+      "descDataAtBoundary": "このウィンドウ内にストリームのデータはありますが、一致するトレースがありませんでした。時間範囲を広げてみてください。",
+      "jumpToData": "最新のデータへジャンプ"
     },
     "showAll": "[すべて表示]",
     "filterByErrors": "エラーで絞り込む",
@@ -3572,7 +3762,38 @@
     "failed_to_load": "パターンを読み込めませんでした",
     "no_patterns_selected": "少なくとも 1 つのパターンを選択してください",
     "name_required": "* 名前が必要です",
-    "pattern_required": "* パターンは必須です"
+    "pattern_required": "* パターンは必須です",
+    "associated_breadcrumb": "ストリーム詳細",
+    "associated_search_placeholder": "検索",
+    "applied_patterns_count": "適用済みパターン（{count}）",
+    "all_patterns_count": "すべてのパターン（{count}）",
+    "no_data_available": "利用可能なデータがありません",
+    "no_patterns_applied_title": "まだパターンが適用されていません",
+    "no_patterns_applied_subtitle": "パターンライブラリを参照して、フィールドへの正規表現の適用を開始してください。",
+    "pattern_name": "パターン名",
+    "when_value_matches": "値が一致した場合",
+    "redact": "墨消し",
+    "redact_hint": "[REDACTED] で置き換える",
+    "drop": "破棄",
+    "drop_hint": "フィールドを完全に破棄する",
+    "hash": "ハッシュ",
+    "hash_hint": "検索可能なハッシュで置き換える",
+    "detect_at": "検出タイミング",
+    "ingestion": "取り込み",
+    "query": "クエリ",
+    "test_pattern": "パターンをテスト",
+    "test_input": "入力をテスト",
+    "regex_pattern_label": "Regexパターン",
+    "input_string": "入力文字列",
+    "input_string_placeholder": "例: 1234567890",
+    "output": "出力",
+    "output_string_placeholder": "出力文字列",
+    "click_test_input_hint": "結果を表示するには「入力をテスト」をクリックしてください",
+    "remove_pattern": "パターンを削除",
+    "add_pattern": "パターンを追加",
+    "remove_pattern_confirm_msg": "このパターンをフィールドから削除してもよろしいですか？",
+    "failed_to_test_string": "文字列のテストに失敗しました",
+    "select_detect_at_option": "検出タイミングのオプションを選択してください"
   },
   "search_history": {
     "title": "検索履歴",
@@ -3800,7 +4021,10 @@
         "duration": "所要時間",
         "startBeforeEnd": "開始時刻は終了時刻より前でなければなりません",
         "endAfterStart": "終了時刻は開始時刻より後である必要があります"
-      }
+      },
+      "filtersLabel": "フィルター",
+      "errorDetails": "ログデータの取得中にエラーが発生しました。もう一度お試しください。",
+      "viewLogs": "ログを表示"
     },
     "viewInTraces": "トレースで表示",
     "viewInTracesTooltip": "RED メトリクスダッシュボードとすべての相関トレースを含むトレースページを開く",
@@ -4417,7 +4641,29 @@
       "reports": "レポート",
       "queries": "クエリ",
       "serviceAccounts": "サービスアカウント",
-      "invitations": "招待状"
+      "invitations": "招待状",
+      "searchJobs": "検索ジョブ",
+      "groups": "グループ",
+      "roles": "ロール",
+      "anomalyConfigs": "異常検知設定",
+      "apiLimits": "API制限",
+      "roleLimits": "ロール制限",
+      "ingestionTokens": "取り込みトークン",
+      "organizations": "組織",
+      "alertDestinations": "宛先",
+      "pipelineDestinations": "宛先",
+      "alertTemplates": "テンプレート",
+      "evalTemplates": "評価テンプレート",
+      "enrichmentTables": "エンリッチメントテーブル",
+      "cipherKeys": "暗号化キー",
+      "aiToolsets": "AIツールセット",
+      "llmProviders": "LLMプロバイダー",
+      "sourceMaps": "ソースマップ",
+      "backfillJobs": "バックフィルジョブ",
+      "scorers": "スコアラー",
+      "evalJobs": "評価ジョブ",
+      "scoreConfigs": "スコア設定",
+      "pipelineHistory": "パイプライン履歴"
     },
     "noDashboardsInFolder": {
       "title": "このフォルダにはダッシュボードがありません",
@@ -4608,13 +4854,21 @@
     },
     "actions": {
       "edit": "[編集]",
-      "delete": "[削除]"
+      "delete": "[削除]",
+      "export": "エクスポート",
+      "activate": "有効化",
+      "pause": "一時停止",
+      "activated": "ジョブが有効化されました",
+      "paused": "ジョブが一時停止されました",
+      "activateError": "ジョブの有効化に失敗しました",
+      "pauseError": "ジョブの一時停止に失敗しました"
     },
     "tabs": {
       "jobs": "評価ジョブ",
       "scorers": "スコアラー",
       "scoreConfigs": "スコア構成",
-      "providers": "プロバイダー"
+      "providers": "プロバイダー",
+      "quality": "品質"
     },
     "singular": {
       "jobs": "評価ジョブ",
@@ -4638,7 +4892,11 @@
     "buttons": {
       "cancel": "[キャンセル]",
       "create": "作成",
-      "save": "[保存]"
+      "save": "[保存]",
+      "close": "閉じる",
+      "remove": "削除",
+      "saveAsDraft": "下書きとして保存",
+      "createAndActivate": "作成して有効化"
     },
     "scorerTypeDialog": {
       "title": "新しいスコアラーを作成",
@@ -4648,7 +4906,11 @@
       "remoteTitle": "リモート",
       "remoteDescription": "独自の HTTP エンドポイントを呼び出してスコアリングを行います。",
       "codeTitle": "コード",
-      "codeDescription": "近日公開予定。"
+      "codeDescription": "近日公開予定。",
+      "llmJudgeCta": "ジャッジを設定",
+      "remoteCta": "エンドポイントを設定",
+      "codeCta": "今後のリリースで利用可能",
+      "comingSoonBadge": "近日公開"
     },
     "provider": {
       "backTo": "プロバイダーに戻る",
@@ -4668,7 +4930,15 @@
       "availableModelsPlaceholder": "GPT-4O-ミニ、GPT-4.1",
       "useAsDefault": "デフォルトプロバイダーとして使用",
       "authConfigLabel": "認証設定 JSON",
-      "saveError": "プロバイダを保存できませんでした"
+      "saveError": "プロバイダを保存できませんでした",
+      "authConfigHelp": "認証情報は保存時に暗号化され、保存後に読み取ることはできません。",
+      "apiKeyLabel": "APIキー",
+      "apiKeyPlaceholder": "APIキーを入力",
+      "apiKeyHelp": "保存時に暗号化され、読み取ることはできません。編集時に空欄のままにすると既存のキーが保持されます。",
+      "authSection": "認証",
+      "authEditNote": "認証情報は読み取ることができません。ローテーションする場合のみAPIキーを再入力してください。",
+      "cannotRename": "作成後に名前を変更することはできません。",
+      "availableModelsHelp": "任意。このプロバイダーで利用可能なモデルのカンマ区切りリスト。"
     },
     "scoreConfig": {
       "createTitle": "新しいスコア設定",
@@ -4685,7 +4955,129 @@
         "categorical": "カテゴリカル",
         "boolean": "ブール値"
       },
-      "saveError": "スコア設定を保存できませんでした"
+      "saveError": "スコア設定を保存できませんでした",
+      "booleanValues": "true / false",
+      "detail": {
+        "eyebrow": "スコア設定",
+        "close": "閉じる",
+        "statusActive": "有効",
+        "statusInactive": "無効",
+        "createdShort": "作成日",
+        "tabs": {
+          "overview": "概要",
+          "versions": "バージョン",
+          "usedBy": "使用元"
+        },
+        "descriptionSection": "説明",
+        "configurationSection": "設定",
+        "dataTypeLabel": "データ型",
+        "rangeLabel": "範囲",
+        "categoriesLabel": "カテゴリ",
+        "valuesLabel": "値",
+        "thresholdSection": "健全性しきい値",
+        "thresholdHint": "スコアを健全としてカウント",
+        "noThreshold": "未宣言",
+        "noThresholdHint": "しきい値が宣言されていません — このディメンションのスコアは品質ステータスシグナルに寄与しません。",
+        "usedByIntro": "このディメンション名で値を出力するすべてのスコアラー。",
+        "usedByEmpty": "この設定を参照しているスコアラーはまだありません。",
+        "scorerTypeLlmJudge": "LLMジャッジ",
+        "scorerTypeRemote": "リモート",
+        "versionsIntro": "範囲、カテゴリ、または健全性しきい値を変更するたびに、新しいバージョンが作成されます。過去のスコアは、それを生成したバージョンに紐付いたまま保持されます。",
+        "activeVersionChip": "有効",
+        "lastUpdated": "最終更新",
+        "metadataSection": "メタデータ",
+        "statusLabel": "ステータス",
+        "versionLabel": "バージョン",
+        "createdLabel": "作成日",
+        "updatedLabel": "更新日"
+      },
+      "editTitlePrefix": "編集",
+      "eyebrow": "スコア設定",
+      "sectionTitle": "スコア設定",
+      "listTitle": "スコア設定",
+      "listSubtitle": "スコアラーが生成するソフトスキーマのディメンション。",
+      "searchPlaceholder": "設定を検索",
+      "allTypes": "すべての型",
+      "newButton": "新しいスコア設定",
+      "saveButton": "変更を保存",
+      "createButton": "作成",
+      "columns": {
+        "index": "#",
+        "name": "名前",
+        "type": "型",
+        "rangeValues": "範囲 / 値",
+        "healthy": "健全性",
+        "activeVersion": "有効なバージョン",
+        "usedBy": "使用元",
+        "created": "作成日",
+        "actions": "操作"
+      },
+      "active": "有効",
+      "usedByScorers": "{count}個のスコアラー",
+      "usedByScorer": "{count}個のスコアラー",
+      "noHealthy": "—",
+      "createInfoNumeric": "このディメンションのスコアが健全とみなされる条件を定義します。この範囲外のスコアは、トレース一覧、セッション、その他のビューで品質の問題をトリガーします。",
+      "editInfoBannerEmphasis": {
+        "numeric": "範囲または健全性しきい値を変更すると{nextVersion}が作成されます。",
+        "categorical": "カテゴリまたは健全性しきい値を変更すると{nextVersion}が作成されます。",
+        "boolean": "健全な値を変更すると{nextVersion}が作成されます。"
+      },
+      "editInfoBannerDetail": "過去のスコアは、それを生成したバージョンに紐付いたまま保持されます。説明のみの編集はその場で更新されます。",
+      "createInfoSubtitle": "説明のみの編集は{version}をその場で更新します。",
+      "namePlaceholder": "例: \"faithfulness\"",
+      "nameHelp": "小文字、数字、アンダースコアのみ。安定した識別子として使用されます。",
+      "cannotBeRenamed": "名前を変更できません",
+      "descriptionPlaceholder": "このディメンションは何を測定しますか？",
+      "descriptionHelp": "説明のみの編集では新しいバージョンは作成されません。",
+      "dataTypeLocked": "ロック済み",
+      "dataTypeCannotChange": "作成後は変更できません",
+      "dataTypeHelp": {
+        "numeric": "範囲内の数値としてスコア付け",
+        "categorical": "N個のラベルのいずれかとしてスコア付け",
+        "boolean": "true / false としてスコア付け"
+      },
+      "minLabel": "最小",
+      "maxLabel": "最大",
+      "addCategoryPlaceholder": "カテゴリを追加",
+      "addCategoryButton": "追加",
+      "booleanInfo": "ブール型の設定は {trueLabel} / {falseLabel} の値を受け付けます。追加の設定は不要です。",
+      "healthyThresholdTitle": "健全性しきい値",
+      "optional": "任意",
+      "healthyThresholdIntro": "このディメンションのスコアが健全とみなされる条件を定義します。この範囲外のスコアは、トレース一覧、セッション、その他のビューで品質の問題をトリガーします。",
+      "healthyWhenValueIs": "値が次の場合に健全:",
+      "healthyCategories": "健全なカテゴリ:",
+      "healthyCategoriesHint": "健全とみなすすべての値にチェックを入れてください。",
+      "healthyValue": "健全な値:",
+      "gteLabel": "以上",
+      "lteLabel": "以下",
+      "trueIsHealthy": "true が健全",
+      "trueIsHealthyHint": "false のスコアは品質の問題をトリガーします。",
+      "falseIsHealthy": "false が健全",
+      "falseIsHealthyHint": "true のスコアは品質の問題をトリガーします。",
+      "thresholdEmptyHint": "これを空のままにすると、このディメンションは製品全体の品質ステータスシグナルに寄与しません。スコアは引き続き記録されますが、問題インジケーターをトリガーしません。",
+      "empty": {
+        "title": "まだスコア設定がありません",
+        "description": "スコア設定は、スコアラーが生成するディメンション（名前、データ型、値の範囲、健全性しきい値）を定義します。オンライン評価の構成を開始するには、1つ作成してください。",
+        "chipTypes": "数値、カテゴリ、ブール",
+        "chipThreshold": "健全性しきい値"
+      },
+      "import": {
+        "title": "スコア設定をインポート",
+        "button": "インポート",
+        "customLabel": "カスタム",
+        "customSubtitle": "JSONファイルまたはURLからインポート",
+        "libraryLabel": "ライブラリ",
+        "librarySubtitle": "厳選されたカタログから参照してインポート",
+        "libraryDrawerTitle": "スコア設定ライブラリ",
+        "outputMessages": "出力メッセージ",
+        "creation": "スコア設定の作成",
+        "errors": {
+          "title": "検証エラー"
+        }
+      },
+      "export": {
+        "bulkButton": "エクスポート"
+      }
     },
     "scorer": {
       "backTo": "スコアラーに戻る",
@@ -4737,7 +5129,203 @@
         "authHint": "保存する前にプロバイダの認証情報を確認してください。",
         "schemaHeader": "スキーマのミスマッチ",
         "schemaHint": "応答が設定された出力スキーマと一致しませんでした。",
-        "valuePlaceholder": "{variable} の値"
+        "valuePlaceholder": "{variable} の値",
+        "disabledHint": "テストを実行するには、名前、プロバイダー、テンプレート、およびすべての変数値を入力してください。",
+        "errorHeader": "テストに失敗しました",
+        "errorFallback": "スコアラーのテストに失敗しました。詳細はサーバーログを確認してください。",
+        "resultScore": "スコア",
+        "resultLatency": "レイテンシー",
+        "resultModel": "モデル",
+        "resultTokens": "トークン",
+        "resultReasoning": "推論",
+        "resultRaw": "生のレスポンス"
+      },
+      "detail": {
+        "close": "閉じる",
+        "eyebrow": "スコアラー",
+        "refresh": "更新",
+        "descriptionSection": "説明",
+        "configurationSection": "設定",
+        "scorerTypeLabel": "スコアラー型",
+        "providerLabel": "プロバイダー",
+        "providerUnknown": "不明",
+        "modelLabel": "モデル",
+        "endpointLabel": "エンドポイント",
+        "producesSection": "生成するスコア設定",
+        "producesEmpty": "このスコアラーはどのスコア設定にも書き込みません。",
+        "promptSection": "ジャッジプロンプト",
+        "requestTemplateSection": "リクエストテンプレート",
+        "variablesSuffix": "変数",
+        "outputSchemaSection": "出力スキーマ",
+        "usedBySection": "使用元",
+        "usedByIntro": "パイプラインでこのスコアラーを参照しているジョブ。",
+        "usedByEmpty": "このスコアラーを参照しているジョブはまだありません。",
+        "versionsIntro": "バージョンは、スコアラー設定の変更不可能なスナップショットです。有効なバージョンは、現在ジョブが実行しているものです。",
+        "activeVersionChip": "有効",
+        "lastUpdated": "最終更新",
+        "metadataSection": "メタデータ",
+        "versionLabel": "バージョン",
+        "createdLabel": "作成日",
+        "updatedLabel": "更新日",
+        "typeLlmJudge": "LLMジャッジ",
+        "typeRemote": "リモート",
+        "tabs": {
+          "configuration": "設定",
+          "versions": "バージョン",
+          "runs": "実行",
+          "usedBy": "使用元"
+        },
+        "kpis": {
+          "totalRuns": "総実行回数（24時間）",
+          "totalRunsSub": "参照しているすべてのジョブ全体",
+          "successRate": "成功率",
+          "successRateSub": "直近24時間",
+          "avgLatency": "平均レイテンシー",
+          "avgLatencySub": "実行全体の p50",
+          "usedBy": "使用元",
+          "usedBySubSingular": "ジョブ",
+          "usedBySubPlural": "ジョブ"
+        },
+        "runs": {
+          "showingPrefix": "表示中",
+          "showingOf": "/",
+          "showingSuffix": "件の実行",
+          "empty": "このウィンドウ内にスコアラーの実行はありません。",
+          "spanLabel": "スパン",
+          "traceLabel": "トレース",
+          "jobUnknown": "—",
+          "col": {
+            "time": "時刻",
+            "job": "ジョブ",
+            "target": "ターゲット",
+            "score": "スコア",
+            "latency": "レイテンシー",
+            "status": "ステータス"
+          }
+        }
+      },
+      "listTitle": "スコアラー",
+      "listSubtitle": "スコアラーはトレースに対して実行され、定義されたディメンションでスコアを生成します。",
+      "searchPlaceholder": "スコアラーを検索",
+      "allTypes": "すべての型",
+      "newButton": "新しいスコアラー",
+      "usedByJobs": "{count}個のジョブ",
+      "usedByJob": "{count}個のジョブ",
+      "columns": {
+        "name": "名前",
+        "type": "型",
+        "produces": "生成物",
+        "version": "バージョン",
+        "usedBy": "使用元",
+        "lastRun": "最終実行",
+        "successRate": "成功率（24時間）",
+        "actions": "操作"
+      },
+      "empty": {
+        "title": "まだスコアラーがありません",
+        "description": "スコアラーは評価の実行単位です。本番トレースのスパンを取得し、重視する品質ディメンションに沿ってスコアを生成します。",
+        "chipLlmJudge": "LLMジャッジ",
+        "chipRemote": "リモート",
+        "chipCode": "コード"
+      },
+      "noProviders": {
+        "title": "最初にプロバイダーを追加してください",
+        "description": "スコアラーの実行にはLLMプロバイダー（OpenAI、Anthropic など）が必要です。スコアラーを作成する前に、設定でプロバイダーを追加してください。",
+        "chipRequired": "LLMジャッジに必須",
+        "cta": "プロバイダーを追加"
+      },
+      "import": {
+        "title": "スコアラーをインポート",
+        "button": "インポート",
+        "customLabel": "カスタム",
+        "customSubtitle": "JSONファイルまたはURLからインポート",
+        "libraryLabel": "ライブラリ",
+        "librarySubtitle": "厳選されたカタログから参照してインポート",
+        "libraryDrawerTitle": "スコアラーライブラリ",
+        "outputMessages": "出力メッセージ",
+        "creation": "スコアラーの作成",
+        "errors": {
+          "title": "検証エラー"
+        }
+      },
+      "export": {
+        "bulkButton": "エクスポート"
+      },
+      "descriptionPlaceholder": "このスコアラーが測定する内容の簡単な概要。",
+      "producesScoreHelp": "このスコアラーはどのディメンションを測定しますか？",
+      "providerHelp": "このジャッジが呼び出すLLMプロバイダーを選択します。プロバイダーは{settingsLink}で管理します。",
+      "providerHelpSettingsLink": "設定",
+      "refreshProviders": "プロバイダーを更新",
+      "selectedPrefix": "選択中:",
+      "endpointLabel": "エンドポイント:",
+      "defaultModelPreviewLabel": "デフォルトモデル:",
+      "authLabel": "認証:",
+      "authConfigured": "設定済み",
+      "authNotConfigured": "未設定",
+      "rangeLabel": "範囲:",
+      "healthyLabel": "健全性:",
+      "typeLabel": "型:",
+      "promptVariablesLabel": "変数:",
+      "promptHelp": "評価ロジックに集中してください。{inputVar} と {outputVar} をプレースホルダーとして使用します。",
+      "includeReasoningLabel": "推論を含める",
+      "includeReasoningHint": "LLMがスコアの理由を説明します。score.metadata.reasoning に保存されます。",
+      "extraFieldsLabel": "追加メタデータフィールド",
+      "extraFieldsOptional": "任意",
+      "extraFieldsHint": "スコアと併せてLLMが出力すべきフィールドを追加します。後の分析のため score.metadata に保存されます。",
+      "extraFields": {
+        "colName": "フィールド名",
+        "colType": "型",
+        "colDescription": "説明",
+        "namePlaceholder": "field_name",
+        "descriptionPlaceholder": "LLMはこのフィールドに何を入れるべきですか？",
+        "addButton": "+ フィールドを追加",
+        "previewSchema": "生成されたスキーマを表示",
+        "schemaTitle": "生成されたJSONスキーマ",
+        "schemaLoading": "スキーマを導出中…",
+        "schemaCopy": "コピー",
+        "schemaCopied": "コピーしました",
+        "schemaCopyFailed": "スキーマのクリップボードへのコピーに失敗しました。",
+        "typeString": "string",
+        "typeNumber": "number",
+        "typeBoolean": "boolean"
+      },
+      "authSection": "認証",
+      "headersSection": "カスタムヘッダー",
+      "requestBodySection": "リクエストボディ",
+      "remoteUrlLabel": "URL",
+      "remoteTimeoutLabel": "タイムアウト（ms）",
+      "remoteRetriesLabel": "最大再試行回数",
+      "remoteBackoffLabel": "バックオフ",
+      "remoteBackoff": {
+        "exponential": "指数",
+        "linear": "線形",
+        "fixed": "固定"
+      },
+      "remoteAuthLabel": "認証タイプ",
+      "remoteAuth": {
+        "placeholder": "認証タイプを選択",
+        "bearer": "Bearerトークン",
+        "basic": "Basic認証",
+        "apiKey": "APIキー",
+        "tokenLabel": "トークン",
+        "usernameLabel": "ユーザー名",
+        "passwordLabel": "パスワード",
+        "headerNameLabel": "ヘッダー名",
+        "bearerTokenPlaceholder": "Bearerトークンを貼り付け",
+        "basicUsernamePlaceholder": "user",
+        "basicPasswordPlaceholder": "••••••••",
+        "apiKeyHeaderPlaceholder": "X-API-Key",
+        "apiKeyTokenPlaceholder": "APIキーを貼り付け",
+        "encryptedHint": "保存時に暗号化されます。保存後は表示できません。"
+      },
+      "remoteHeaders": {
+        "subtitle": "すべてのリクエストとともに送信されます。",
+        "colName": "名前",
+        "colValue": "値",
+        "colKey": "名前",
+        "keyPlaceholder": "X-Custom-Header",
+        "valuePlaceholder": "値",
+        "addButton": "+ ヘッダーを追加"
       }
     },
     "job": {
@@ -4770,7 +5358,10 @@
       "scorerPicker": {
         "title": "スコアラー",
         "hint": "マッチしたすべてのスパンで走るスコアラーを 1 人以上選択します。",
-        "meta": "{タイプ} · v {バージョン}"
+        "meta": "{タイプ} · v {バージョン}",
+        "placeholder": "スコアラーを選択",
+        "searchPlaceholder": "スコアラーを検索…",
+        "empty": "利用可能なスコアラーがありません。まずスコアラータブで作成してください。"
       },
       "filter": {
         "title": "フィルター条件",
@@ -4795,7 +5386,117 @@
         "emptyValue": "—"
       },
       "selectAtLeastOne": "スコアラーを少なくとも 1 人選択してください",
-      "saveError": "評価ジョブの保存に失敗しました"
+      "saveError": "評価ジョブの保存に失敗しました",
+      "detail": {
+        "close": "閉じる",
+        "eyebrow": "評価ジョブ",
+        "refresh": "更新",
+        "descriptionSection": "説明",
+        "targetSection": "ターゲット",
+        "streamLabel": "ストリーム",
+        "streamTypeLabel": "ストリームタイプ",
+        "filterLabel": "フィルター",
+        "filterEmpty": "フィルターなし — すべてのスパンが評価されます",
+        "scorersSection": "スコアラー",
+        "scorersEmpty": "このジョブにはまだスコアラーが付与されていません。",
+        "scorerUnknown": "（削除されたスコアラー）",
+        "scorerTypeLlmJudge": "LLMジャッジ",
+        "scorerTypeRemote": "リモート",
+        "producesPrefix": "生成物",
+        "viewScorerHint": "表示",
+        "inputMappingSection": "入力マッピング",
+        "samplingSection": "サンプリング",
+        "samplingModeLabel": "モード",
+        "samplingValueLabel": "値",
+        "samplingAll": "一致するものをすべて評価",
+        "samplingRate": "レートによるランダムサンプリング",
+        "samplingCount": "最初のN件の一致",
+        "metadataSection": "メタデータ",
+        "versionLabel": "バージョン",
+        "pipelineLabel": "パイプラインID",
+        "createdLabel": "作成日",
+        "updatedLabel": "更新日",
+        "tabs": {
+          "configuration": "設定",
+          "runs": "実行",
+          "failures": "失敗"
+        },
+        "kpis": {
+          "totalRuns": "総実行回数",
+          "totalRunsSub": "選択したウィンドウ内",
+          "successRate": "成功率",
+          "successRateSub": "すべてのスコアラー全体",
+          "avgLatency": "平均レイテンシー",
+          "avgLatencySub": "実行全体の平均",
+          "scorers": "スコアラー",
+          "scorersSubSingular": "個のスコアラーが付与済み",
+          "scorersSubPlural": "個のスコアラーが付与済み"
+        },
+        "runs": {
+          "showingPrefix": "表示中",
+          "showingOf": "/",
+          "showingSuffix": "件の一致した実行",
+          "empty": "選択したウィンドウ内にこのジョブの実行記録はありません。",
+          "spanLabel": "スパン",
+          "traceLabel": "トレース",
+          "scorerUnknown": "（不明なスコアラー）",
+          "col": {
+            "time": "時刻",
+            "scorer": "スコアラー",
+            "target": "ターゲット",
+            "score": "スコア",
+            "latency": "レイテンシー",
+            "status": "ステータス"
+          }
+        },
+        "failures": {
+          "byScorerTitle": "スコアラー別の失敗",
+          "byScorerEmpty": "選択したウィンドウ内に失敗の記録はありません。",
+          "recentTitle": "最近の失敗",
+          "recentEmpty": "選択したウィンドウ内に失敗した実行はありません。",
+          "col": {
+            "scorer": "スコアラー",
+            "failureRate": "失敗率",
+            "count": "失敗 / 合計"
+          }
+        }
+      },
+      "listTitle": "評価ジョブ",
+      "listSubtitle": "本番トレースストリームにスコアラーをデプロイします。",
+      "searchPlaceholder": "ジョブを検索",
+      "allStatuses": "すべてのステータス",
+      "newButton": "新しいジョブ",
+      "scorersCount": "{count}個のスコアラー",
+      "scorerCount": "{count}個のスコアラー",
+      "columns": {
+        "name": "名前",
+        "status": "ステータス",
+        "stream": "ストリーム",
+        "scorers": "スコアラー",
+        "successRate": "成功率",
+        "lastRun": "最終実行",
+        "created": "作成日",
+        "actions": "操作"
+      },
+      "empty": {
+        "title": "まだ評価ジョブがありません",
+        "description": "評価ジョブは、本番トレースストリームに対してスコアラーをデプロイします。一致するスパンをサンプリングし、スコアラーを非同期で実行し、分析のために結果のスコアを保存します。",
+        "chipStreams": "本番ストリーム",
+        "chipScorers": "複数のスコアラー",
+        "chipSampling": "サンプリング制御"
+      },
+      "descriptionPlaceholder": "このジョブは何を監視しますか？",
+      "samplingValueHelp": "JSON: rate は0～1の数値、count は正の整数です。",
+      "samplingValueAllHelp": "モードが All の場合は適用されません — 一致したすべてのイベントが評価されます。",
+      "samplingHelp": "フィルターの後に適用されます。コストを制御します — 一致したスパンのみがレートにカウントされます。",
+      "presets": {
+        "label": "クイックプリセット",
+        "rootSpans": "ルートスパンのみ",
+        "llmCalls": "LLM呼び出し",
+        "toolCalls": "ツール呼び出し"
+      },
+      "createdAndActivated": "評価ジョブが作成され、有効化されました",
+      "createdButActivateFailed": "評価ジョブは作成されましたが、有効化に失敗しました"
     },
     "quality": {
       "scopeLabel": "このワークスペースのすべての品質ディメンション",
@@ -4872,6 +5573,10 @@
           "unhealthy": "不健康",
           "healthy": "ヘルシー",
           "coverage": "カバレッジ"
+        },
+        "empty": {
+          "title": "最初のスコアを待っています",
+          "description": "選択した時間範囲では、この設定のスコアはまだ取得されていません。この設定を使用するスコアラーが実行されると、ここに自動的に表示されます。"
         }
       },
       "sidebar": {
@@ -4940,7 +5645,8 @@
       "quality": "クオリティ",
       "evalJobs": "評価ジョブ",
       "scorers": "スコアラー",
-      "scoreConfigs": "スコア構成"
+      "scoreConfigs": "スコア構成",
+      "llmInsights": "LLMインサイト"
     },
     "kpi": {
       "totalCost": "合計費用",
@@ -5024,7 +5730,9 @@
       "removeFilterDescSql": "このクエリには SQL 条件が適用されています",
       "openHistory": "検索履歴を開く",
       "askAi": "AI にクエリの修正を依頼する",
-      "selectedRange": "選択した範囲"
+      "selectedRange": "選択した範囲",
+      "descOutOfRange": "選択した時間ウィンドウには、このストリームのデータが含まれていません。データが最後に確認された時点へジャンプしてください。",
+      "jumpToData": "最新のデータへジャンプ"
     },
     "error": {
       "sqlError": "SQL シンタックスエラー",

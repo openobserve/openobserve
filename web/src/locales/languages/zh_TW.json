@@ -127,7 +127,13 @@
     "retry": "重試",
     "resources": "資源",
     "error": "錯誤",
-    "db": "資料庫"
+    "db": "資料庫",
+    "export": "匯出",
+    "enable": "啟用",
+    "disable": "停用",
+    "download": "下載",
+    "enabled": "已啟用",
+    "disabled": "已停用"
   },
   "validation": {
     "required": "此欄位為必填",
@@ -402,7 +408,42 @@
     "addToDashboard": "新增至儀表板",
     "selectStream": "選擇串流",
     "pattern_summary": "顯示 1 到 50 筆 (共 {totalEvents} 筆事件)，在 {logsAnalyzed} 筆事件中找到 {patternsFound} 個模式，耗時 {totalTime} 毫秒。",
-    "selectLogStream": "選擇日誌串流"
+    "selectLogStream": "選擇日誌串流",
+    "selectLogsStreamFirst": "請先選擇日誌串流",
+    "noData": "無可用資料",
+    "fieldValuesEmpty": "找不到值。",
+    "fieldValuesEmptyHint": "請嘗試更廣的時間範圍以查看值。",
+    "hideHistogram": "隱藏直方圖",
+    "disableQuickMode": "停用快速模式",
+    "menuMore": "更多",
+    "menuGroupSetOnce": "一次性設定",
+    "menuGroupSavedViews": "已儲存的檢視",
+    "menuGroupTools": "工具",
+    "menuGroupHistory": "歷史記錄",
+    "menuGroupDownloads": "下載",
+    "menuGroupSchedule": "排程",
+    "menuGroupInspect": "檢查",
+    "menuGroupExplain": "說明",
+    "validSql": "有效的 SQL",
+    "invalidSql": "無效的查詢",
+    "askAIPlaceholderRotation": {
+      "one": "顯示過去一小時的錯誤…",
+      "two": "找出耗時超過 5 秒的慢速查詢…",
+      "three": "依服務分組統計 5xx 回應數…",
+      "four": "篩選 level = 'error' 的日誌…"
+    },
+    "functionEditorLabel": "函式編輯器",
+    "loadingStream": "正在載入串流…",
+    "searchInspect": "搜尋檢查",
+    "vrlOnlyForTableWarning": "VRL 函式僅支援表格圖表。",
+    "customDownloadTitle": "自訂下載",
+    "selectFunctionNamePlaceholder": "選擇函式名稱",
+    "confirmFunctionUpdateTitle": "確認更新",
+    "confirmFunctionUpdateMsg": "您確定要更新函式 {name} 嗎？",
+    "traceIdLabel": "Trace ID：",
+    "enterTraceIdPlaceholder": "輸入 trace ID",
+    "changeQueryModeTitle": "變更查詢模式",
+    "changeQueryModeConfirm": "您確定要變更查詢模式嗎？為 X 軸、Y 軸與篩選條件儲存的資料將被清除。"
   },
   "menu": {
     "home": "首頁",
@@ -435,7 +476,9 @@
     "report": "報表",
     "pipeline": "管線",
     "language": "語言",
-    "actions": "動作"
+    "actions": "動作",
+    "evals": "評估",
+    "aiObservability": "AI"
   },
   "rum": {
     "title": "真實使用者監控",
@@ -488,7 +531,40 @@
     "getStartedRUM": "開始使用真實使用者監控",
     "loadingErrorDetails": "正在擷取錯誤詳細資訊，請稍候。",
     "eventID": "事件 ID",
-    "loadingApplicationErrors": "正在擷取應用程式錯誤，請稍候。"
+    "loadingApplicationErrors": "正在擷取應用程式錯誤，請稍候。",
+    "sourceMaps": "原始碼對應檔",
+    "service": "服務",
+    "environment": "環境",
+    "applyFilters": "套用篩選條件",
+    "uploadSourceMaps": "上傳原始碼對應檔",
+    "files": "檔案",
+    "uploadedAt": "上傳時間",
+    "emptyState": {
+      "title": "使用真實使用者監控（RUM）監控您的使用者",
+      "description": "RUM 追蹤真實使用者的互動 — 頁面載入、錯誤、API 呼叫與工作階段重播 — 讓您精確掌握使用者體驗您應用程式的方式。",
+      "webApp": "檢測網頁應用程式",
+      "webAppDesc": "將 OpenObserve RUM SDK 加入任何 JavaScript 應用程式",
+      "sessionReplay": "啟用工作階段重播",
+      "sessionReplayDesc": "錄製並重播使用者工作階段以偵錯 UX 問題",
+      "learnMore": "深入了解：",
+      "quickImpl": "快速實作指南",
+      "blogPost": "前端監控基礎"
+    },
+    "traces": "追蹤",
+    "noCorrelatedTraces": "找不到此工作階段的相關追蹤。",
+    "viewTraceDetails": "檢視追蹤詳細資料",
+    "routeChange": "路由",
+    "initialView": "初始",
+    "span": "span",
+    "spans": "span",
+    "errorTraces": "錯誤追蹤",
+    "failedToFetchTraces": "擷取追蹤資料失敗。請再試一次。",
+    "traceNotFound": "找不到追蹤詳細資料。",
+    "failedToFetchTraceDetails": "載入追蹤詳細資料失敗。請再試一次。",
+    "seekToMoment": "跳至工作階段中的此刻",
+    "timeInSession": "工作階段時間",
+    "route": "路由",
+    "duration": "持續時間"
   },
   "about": {
     "name": "OpenObserve",
@@ -780,6 +856,10 @@
         "service_maps": {
           "name": "服務圖",
           "note": "視覺化服務相依關係"
+        },
+        "byob": {
+          "name": "自帶儲存桶",
+          "note": "將組織資料路由至您自己的雲端儲存桶"
         }
       },
       "buttons": {
@@ -792,7 +872,11 @@
       "error_messages": {
         "not_authorized_manage_license": "沒有管理授權的權限。"
       }
-    }
+    },
+    "feature_action_scripts": "動作指令碼",
+    "refresh_license_limits": "重新整理授權限制",
+    "license_refresh_success": "已成功觸發授權限制重新整理",
+    "failed_to_refresh_license": "重新整理授權限制失敗"
   },
   "login": {
     "userid": "使用者 ID",
@@ -863,7 +947,12 @@
     "noCustomRolesHint": "尚未定義自訂角色 — 請在 IAM → 角色 中建立",
     "externalUserCustomRoleHint": "外部使用者只能透過來源系統進行修改",
     "description": "說明",
-    "revoke_invite": "撤銷邀請"
+    "revoke_invite": "撤銷邀請",
+    "subtitle": "可存取此組織的人員",
+    "revokeInvitationTitle": "撤銷邀請",
+    "revokeInvitationMsg": "您確定要撤銷對 {email} 的邀請嗎？",
+    "deleteUsersTitle": "刪除使用者",
+    "deleteUsersMsg": "您確定要刪除 {count} 位使用者嗎？"
   },
   "invitation": {
     "pendingInvitations": "待處理的邀請",
@@ -881,7 +970,8 @@
     "confirmRejectMsg": "確定要拒絕加入 {org} 的邀請嗎？",
     "expired": "已過期",
     "expiresToday": "今日到期",
-    "daysLeft": "剩餘 {days} 天"
+    "daysLeft": "剩餘 {days} 天",
+    "search": "搜尋邀請"
   },
   "serviceAccounts": {
     "header": "服務帳戶",
@@ -929,7 +1019,21 @@
     "invitations": "邀請",
     "quota": "配額",
     "externalUserWarningTitle": "外部使用者警告",
-    "externalUserWarningMessage": "直接將外部使用者新增至角色不會授予權限。請改為將外部使用者新增至使用者群組。"
+    "externalUserWarningMessage": "直接將外部使用者新增至角色不會授予權限。請改為將外部使用者新增至使用者群組。",
+    "sectionAccess": "存取",
+    "sectionPermissions": "權限",
+    "sectionOrganization": "組織",
+    "usersDesc": "可存取此組織的人員",
+    "serviceAccountsDesc": "供 API 使用的程式化存取權杖",
+    "ingestionTokensDesc": "用於將資料擷取至此組織的權杖",
+    "invitationsDesc": "待處理與已寄送的成員邀請",
+    "groupsDesc": "將使用者分組以指派角色",
+    "rolesDesc": "定義權限與存取政策",
+    "quotaDesc": "依角色套用的使用量限制",
+    "organizationsDesc": "您可存取的組織",
+    "nameHelpText": "僅可使用英數字元與「_」字元，不可包含空格。",
+    "ingestionTokens": "擷取權杖",
+    "organizationMembers": "組織成員"
   },
   "ticket": {
     "header": "支援工單",
@@ -989,7 +1093,10 @@
     "nameRequired": "名稱為必填",
     "subscription_type": "方案類型",
     "proceed_subscription": "前往訂閱",
-    "subscription_plan": "訂閱方案"
+    "subscription_plan": "訂閱方案",
+    "makeBilledMember": "將此組織新增為目前組織的計費成員。",
+    "nameHelpText": "僅可使用英數字元、空格與底線。",
+    "manage": "管理"
   },
   "template": {
     "header": "範本",
@@ -1059,7 +1166,10 @@
     "fieldName": "欄位名稱",
     "fieldRequired": "欄位為必填！",
     "dataType": "資料類型",
-    "dataTypeRequired": "資料類型為必填！"
+    "dataTypeRequired": "資料類型為必填！",
+    "subtitle": "索引管理與串流設定",
+    "streamNameHelpText": "僅可使用英數字元、底線與冒號。",
+    "deleteAssociatedAlertsPipelines": "刪除與該串流相關聯的所有管線與警報"
   },
   "pipeline": {
     "header": "管線",
@@ -1180,7 +1290,10 @@
     "thresholdShouldNotBeEmpty": "閾值不可為空",
     "errorGettingResults": "取得結果時發生錯誤",
     "save": "儲存",
-    "evalTemplates": "評估範本"
+    "evalTemplates": "評估範本",
+    "subtitle": "在傳輸過程中轉換、擴充與路由資料",
+    "selectStream": "選擇串流…",
+    "queryEditorPlaceholder": "在此選擇串流或撰寫 SQL 查詢…"
   },
   "evalTemplate": {
     "header": "評估範本",
@@ -1283,7 +1396,11 @@
     "dataSource": "資料來源",
     "uploadFile": "上傳檔案",
     "fromUrl": "從 URL",
-    "addFunction": "新增函式"
+    "addFunction": "新增函式",
+    "subtitle": "套用於管線中的可重複使用 VRL 函式",
+    "clickTestFunctionHint": "請點擊「測試函式」以查看事件",
+    "pleaseEnterQuery": "請輸入查詢",
+    "enrichmentTablesSubtitle": "用於擴充已擷取資料的查找資料表"
   },
   "latencyInsights": {
     "title": "洞察",
@@ -1323,7 +1440,9 @@
     "insightsButtonLabel": "洞察",
     "rateLabel": "速率：",
     "timeRangeLabel": "時間範圍：",
-    "searchInspectionsLabel": "檢查搜尋工作執行詳細資訊"
+    "searchInspectionsLabel": "檢查搜尋工作執行詳細資訊",
+    "inspectBtnLabel": "檢查",
+    "analyzeBtnLabel": "洞察"
   },
   "errorInsights": {
     "title": "洞察",
@@ -1415,7 +1534,34 @@
     "apache": "Apache",
     "iis": "IIS",
     "pubsub": "Pub/Sub 日誌",
-    "aiLabel": "AI 整合"
+    "aiLabel": "AI 整合",
+    "manageTokensBtnLabel": "管理權杖",
+    "orgLevelExplanation": "這些是組織層級的擷取權杖。它們不與個別使用者綁定，即使建立它們的使用者離開組織後仍可繼續運作。權杖僅可用於擷取端點。",
+    "orgLevelSummary": "用於擷取端點的組織層級權杖。",
+    "resetDefaultTokenLabel": "重設權杖",
+    "tokenManagementTitle": "管理擷取權杖",
+    "defaultTokenBadge": "預設",
+    "createTokenBtn": "建立新權杖",
+    "createTokenTitle": "建立權杖",
+    "tokenNameLabel": "名稱",
+    "tokenDescriptionLabel": "描述",
+    "rotateTokenBtn": "輪替",
+    "deleteTokenBtn": "刪除",
+    "copyTokenBtn": "複製",
+    "copyTokenWarning": "請立即複製此權杖。它將不會再次顯示。",
+    "newTokenRevealed": "已產生新權杖",
+    "deleteTokenConfirm": "要刪除權杖「{name}」嗎？使用此權杖的管線將停止運作。",
+    "rotateTokenConfirm": "要輪替權杖「{name}」嗎？所有使用此權杖的管線都必須以新值更新。",
+    "tokenCreatedSuccess": "權杖已成功建立。",
+    "tokenRotatedSuccess": "權杖已成功輪替。",
+    "tokenDeletedSuccess": "權杖已成功刪除。",
+    "resetDefaultConfirm": "要重設預設擷取權杖嗎？所有使用此權杖的管線都必須更新。",
+    "tokenFetchError": "載入權杖失敗。",
+    "tokenCreateError": "建立權杖失敗。",
+    "tokenRotateError": "輪替權杖失敗。",
+    "tokenDeleteError": "刪除權杖失敗。",
+    "noTokensFound": "找不到擷取權杖。",
+    "createdBy": "建立者"
   },
   "dashboard": {
     "selectField": "欄位",
@@ -1863,7 +2009,49 @@
     "configSectionDrilldown": "鑽取",
     "configSectionComparison": "比較",
     "configSectionMarkLines": "標記線",
-    "configSectionBackground": "背景"
+    "configSectionBackground": "背景",
+    "multiSqlQueryLabel": "查詢標籤",
+    "multiSqlQueryLabelHint": "此查詢在圖例中的自訂名稱（例如「Production」）",
+    "multiQueryWarning": "{chartType} 僅會呈現查詢 1",
+    "xAliasInconsistencyWarning": "各查詢的 X 軸別名不一致：部分使用直方圖，部分則否。請在所有查詢中使用相同的別名類型，以取得可預期的結果。",
+    "trellisNotSupportedWithMultiQuery": "多查詢時將停用格狀（Trellis）版面配置。請移除多餘的查詢以使用格狀版面配置。",
+    "subtitle": "跨資料夾建立、整理與共用儀表板",
+    "deleteDashboardConfirmTitle": "刪除儀表板",
+    "deleteDashboardConfirmMsg": "您確定要刪除此儀表板嗎？",
+    "deleteDashboardsConfirmTitle": "刪除儀表板",
+    "deleteDashboardsConfirmMsg": "您確定要刪除 {count} 個儀表板嗎？",
+    "importCustom": "自訂",
+    "importCustomDesc": "從 JSON 檔案或 URL 匯入",
+    "importTemplates": "範本",
+    "importTemplatesDesc": "從圖庫瀏覽並匯入",
+    "searchThisFolder": "此資料夾",
+    "searchThisFolderTitle": "僅搜尋此資料夾",
+    "searchAllFolders": "所有資料夾",
+    "searchAllFoldersTitle": "搜尋所有資料夾",
+    "reloadDashboards": "重新載入儀表板",
+    "editVariable": "編輯變數",
+    "addOption": "新增選項",
+    "addFilter": "新增篩選條件",
+    "noDataFound": "找不到資料",
+    "streamSelectTooltip": "選擇一個串流，或使用如 $streamVariable 的變數，以根據另一個值動態選擇串流。",
+    "fieldSelectTooltip": "選擇一個欄位，或使用如 $fieldVariable 的變數。若串流使用變數，欄位清單將為空 — 請手動輸入欄位名稱。",
+    "filterInfoTooltip": "在篩選條件中，您可以使用另一個變數的值來篩選目前變數的值。可透過使用另一個變數的名稱來達成。例如：",
+    "defaultSelectAll": "預設 - 全選",
+    "escapeSingleQuotesTooltip": "若啟用，查詢中的單引號將被跳脫。例如，`O'Reilly` 這樣的值將被替換為 `O''Reilly`。",
+    "byDefaultSelect": "預設選擇：",
+    "firstValue": "第一個值",
+    "allValues": "所有值",
+    "customValue": "自訂",
+    "showDependencies": "顯示相依性",
+    "deleteVariable": "刪除變數",
+    "deleteVariableMsg": "您確定要刪除此變數嗎？",
+    "appliedToTabs": "套用至分頁：",
+    "appliedToPanels": "套用至面板：",
+    "selectVariableScope": "選擇變數範圍",
+    "variableScopeHelp": "若選擇全域，變數將套用至所有分頁與面板。",
+    "selectFile": "選擇檔案",
+    "allFolders": "所有資料夾",
+    "showDynamicFilters": "顯示動態篩選條件"
   },
   "panel": {
     "header": "面板",
@@ -1978,7 +2166,24 @@
     "totalDashboard": "儀表板",
     "tabAiAssistant": "O2 助理",
     "tabOverview": "概觀",
-    "tabUsage": "使用量"
+    "tabUsage": "使用量",
+    "noDataState": {
+      "title": "尚未擷取任何資料",
+      "description": "此組織尚未接收任何資料，因此沒有可繪製的圖表。一旦事件開始流入，您的<strong>擷取量、儲存空間與查詢使用量</strong>將自動顯示於此處。",
+      "logs": "傳送日誌",
+      "logsDesc": "Curl、Filebeat、Fluentbit、Vector 等",
+      "traces": "傳送追蹤",
+      "tracesDesc": "OTLP / Jaeger / Zipkin 分散式追蹤",
+      "metrics": "傳送指標",
+      "metricsDesc": "Prometheus、OTel Collector、Telegraf 等",
+      "or": "或：",
+      "otel": "OpenTelemetry",
+      "kubernetes": "Kubernetes",
+      "aws": "AWS / CloudWatch",
+      "aiIntegrations": "AI 整合",
+      "shippers": "日誌傳送工具"
+    },
+    "subtitle": "一覽您的可觀測性工作區"
   },
   "overview": {
     "title": "系統概觀",
@@ -1992,7 +2197,18 @@
     "elevatedErrorRate": "錯誤率偏高",
     "reqPerSec": "req/s",
     "allClear": "一切正常",
-    "allClearDesc": "在選取的時間區段中沒有作用中的異常、事件或降級服務。"
+    "allClearDesc": "在選取的時間區段中沒有作用中的異常、事件或降級服務。",
+    "viewAll": "檢視全部",
+    "showingOf": "顯示 {total} 中的 {shown}",
+    "colErrorRate": "錯誤率",
+    "colLatency": "延遲",
+    "colReqs": "請求數",
+    "emptyActionAlerts": "檢視警報規則",
+    "emptyActionAlertsDesc": "檢閱已設定的警報與閾值",
+    "emptyActionLogs": "探索日誌",
+    "emptyActionLogsDesc": "搜尋並篩選您的日誌串流",
+    "emptyActionTraces": "探索追蹤",
+    "emptyActionTracesDesc": "檢查分散式追蹤與服務延遲"
   },
   "chatHistory": {
     "title": "對話",
@@ -2063,7 +2279,60 @@
     "aiModePayAsYouGo": "用多少付多少",
     "aiModeExhausted": "已用完",
     "aiExhaustedMessage": "訂閱以繼續使用 AI 功能",
-    "aiPaygMessage": "免費額度已用完 — 使用量計入訂閱費用"
+    "aiPaygMessage": "免費額度已用完 — 使用量計入訂閱費用",
+    "billingGroup": {
+      "tabLabel": "計費群組",
+      "inviteOrgButton": "邀請組織",
+      "viewUsage": "檢視使用量",
+      "statTotal": "子組織總數",
+      "statActive": "使用中",
+      "statPending": "待處理邀請",
+      "statusActive": "使用中",
+      "statusPending": "待處理",
+      "filterAll": "全部",
+      "childOrgIdColumn": "子組織識別碼",
+      "childOrgNameColumn": "子組織名稱",
+      "orgColumn": "組織",
+      "orgIdColumn": "組織識別碼",
+      "actionsColumn": "動作",
+      "dateColumn": "日期",
+      "cancel": "取消",
+      "invitedBy": "邀請者",
+      "acceptedBy": "接受者",
+      "addedOnCreation": "建立時新增",
+      "memberSince": "成為成員的時間",
+      "noMembers": "尚無成員組織",
+      "inviteTitle": "邀請組織",
+      "inviteOrgIdLabel": "組織識別碼",
+      "inviteOrgIdPlaceholder": "輸入組織識別碼",
+      "sendInvite": "傳送邀請",
+      "inviteSent": "已成功傳送邀請",
+      "inviteSameOrg": "組織無法邀請自己",
+      "childHeadline": "計費管理者",
+      "childHeroSub": "您的使用量將計費至此組織。方案變更與發票由上層組織處理 — 此處無需管理任何項目。",
+      "invitesPanelHint": "這些組織已邀請您加入其計費群組。若您接受，此組織的使用量將計費至它們。",
+      "inviteTabPrompt": "邀請另一個組織加入您的計費群組。它們的使用量將計費至此組織。",
+      "emptyTitle": "建立計費群組",
+      "notEnabledTitle": "計費群組無法使用",
+      "notEnabledDesc": "此組織未啟用建立計費群組的功能。若您需要此功能，請聯絡您的管理員。",
+      "chipConsolidatedBill": "單一合併帳單",
+      "chipLinkOrgs": "連結多個組織",
+      "accept": "接受",
+      "reject": "拒絕",
+      "inviteAccepted": "已成功接受邀請",
+      "inviteRejected": "已成功拒絕邀請",
+      "plansManagedTitle": "計費由上層組織管理",
+      "plansManagedDescription": "此組織的計費由 {name}（{id}）管理。方案變更由上層組織處理。",
+      "chipPlanManaged": "方案由上層管理",
+      "chipNoInvoices": "無個別發票",
+      "viewOrgGroup": "檢視組織群組",
+      "usageMemberLabel": "成員組織",
+      "usageAllMembers": "所有成員",
+      "currentOrgTitle": "目前組織",
+      "memberOrgsTitle": "成員組織",
+      "searchMemberOrg": "搜尋組織",
+      "noMemberMatch": "無相符的組織"
+    }
   },
   "awsMarketplace": {
     "title": "AWS Marketplace 註冊",
@@ -2538,7 +2807,8 @@
       "editIncidentTitleTooltip": "編輯事件標題",
       "firedTimes": "觸發 {count} 次",
       "incidentAnalysis": "事件分析",
-      "noAlertActivityData": "無警示活動資料"
+      "noAlertActivityData": "無警示活動資料",
+      "subtitle": "事件管理與追蹤"
     },
     "alertDetails": {
       "alertName": "警示名稱",
@@ -2617,7 +2887,8 @@
       "rowTemplateTooltip": "列範本用於格式化警示訊息。",
       "templateType": "範本類型：",
       "noTemplatesAvailable": "無可用範本",
-      "refreshTemplates": "重新整理最新的範本"
+      "refreshTemplates": "重新整理最新的範本",
+      "selectTemplate": "選擇範本"
     },
     "editJson": "編輯警示 JSON",
     "additional_settings": "額外設定",
@@ -2671,7 +2942,28 @@
       "addNewDestination": "新增目的地",
       "destinationRequired": "至少需要一個目的地！",
       "disabledNotificationsInfo": "異常偵測仍會執行並將結果寫入 _anomalies 串流。啟用通知以在偵測到異常時收到警示。"
-    }
+    },
+    "subtitle": "警報規則與通知管道",
+    "searchThisFolder": "此資料夾",
+    "searchAllFolders": "所有資料夾",
+    "streamConfig": "串流設定",
+    "alertRules": "警報規則",
+    "noTemplatesMsg": "看來您尚未建立任何範本。若要建立警報，您至少需要有一個目的地與一個範本",
+    "createTemplateBtn": "建立範本",
+    "noDestinationsMsg": "看來您尚未建立任何目的地。若要建立警報，您至少需要有一個目的地與一個範本",
+    "createDestinationBtn": "建立目的地",
+    "addCondition": "新增條件",
+    "conditionOf": "的",
+    "conditionIs": "為",
+    "matchingTypeFound": "找到相符的 {type}",
+    "matchingMetricsFound": "找到相符的指標",
+    "metricsValueFieldTooltip": "指標串流預設將其量測值儲存於「value」欄位中",
+    "howOftenCheckTooltip": "檢查此警報條件的頻率",
+    "alertIfNoOfEvents": "若事件數量達到下列條件則警報",
+    "alertIfValueIs": "若值符合下列條件則警報",
+    "havingSeries": "具有序列",
+    "clearMultiWindowsTitle": "清除多重視窗？",
+    "lastTrainedAt": "上次訓練時間"
   },
   "alert_templates": {
     "header": "範本",
@@ -2688,7 +2980,16 @@
     "delete": "刪除",
     "variable_guide_header": "範本變數指南",
     "variable_usage_examples": "使用範例",
-    "body": "主體"
+    "body": "主體",
+    "clone": "複製",
+    "cloneTitle": "複製範本",
+    "systemReadOnly": "預先建置的範本 — 已停用刪除功能。請複製它以建立可修改的副本。",
+    "prebuiltBadge": "預先建置",
+    "prebuiltBadgeHint": "由系統管理。您可以編輯，但已停用刪除功能。",
+    "customBadge": "自訂",
+    "filterAll": "全部",
+    "filterPrebuilt": "預先建置",
+    "filterCustom": "自訂"
   },
   "alert_destinations": {
     "header": "通知目的地",
@@ -2725,7 +3026,13 @@
     "custom": "自訂",
     "separator": "分隔符號",
     "separator_placeholder": "輸入分隔符號 (例如 |，\\n, \\t, 空格)",
-    "separator_hint": "記錄之間使用的分隔字串 (允許空格)"
+    "separator_hint": "記錄之間使用的分隔字串 (允許空格)",
+    "filterAll": "全部",
+    "filterPrebuilt": "預先建置",
+    "filterCustom": "自訂",
+    "templateDefaultBadge": "預設",
+    "templateDefaultOption": "預設（{name}）",
+    "templateHelp": "保留為預設以使用標準的 {type} 範本（{name}），或選擇自訂範本。"
   },
   "pipeline_destinations": {
     "header": "管線目的地",
@@ -3105,7 +3412,30 @@
       "logsWithCount": "日誌 ({count})",
       "tracesWithCount": "追蹤 ({count})",
       "metricsWithCount": "指標 ({count})"
-    }
+    },
+    "groupGeneral": "一般",
+    "groupAccessSecurity": "存取與安全性",
+    "groupDestinationsTemplates": "目的地與範本",
+    "groupDataAI": "資料與 AI",
+    "groupOperations": "營運",
+    "groupAccount": "帳戶",
+    "generalDesc": "主題、查詢預設值與核心偏好設定",
+    "orgDesc": "組織參數與識別碼",
+    "cipherKeysDesc": "用於敏感欄位的加密金鑰",
+    "regexPatternsDesc": "用於遮蔽的可重複使用 regex 模式",
+    "domainManagementDesc": "限制僅允許的 SSO 網域登入",
+    "alertDestinationsDesc": "已觸發警報的傳送位置",
+    "pipelineDestinationsDesc": "管線輸出的外部目標",
+    "templatesDesc": "可重複使用的警報訊息範本",
+    "storageSettingsDesc": "各組織的儲存設定",
+    "modelPricingDesc": "LLM 模型成本設定",
+    "correlationSettingsDesc": "遙測關聯設定",
+    "llmProvidersDesc": "用於線上評估的 LLM 供應商",
+    "queryManagementDesc": "檢查並取消執行中的查詢",
+    "nodesDesc": "叢集節點及其健康狀態",
+    "licenseDesc": "企業版授權詳細資料",
+    "organizationManagementDesc": "建立與管理組織",
+    "ingestionTokens": "擷取權杖"
   },
   "reports": {
     "header": "報表",
@@ -3137,7 +3467,14 @@
     "dimensionWidth": "寬度 (px)",
     "dimensionHeight": "高度 (px)",
     "imagePreview": "包含內嵌儀表板預覽圖片",
-    "customDimensions": "自訂尺寸 (進階)"
+    "customDimensions": "自訂尺寸 (進階)",
+    "subtitle": "已排程的報表與匯出",
+    "searchThisFolder": "此資料夾",
+    "searchAllFolders": "所有資料夾",
+    "reloadReports": "重新載入報表",
+    "moveToFolder": "移動至資料夾",
+    "deleteReportsTitle": "刪除報表",
+    "deleteReportsMsg": "您確定要刪除 {count} 個報表嗎？"
   },
   "queries": {
     "runningQueries": "執行中的查詢",
@@ -3286,7 +3623,8 @@
         "tokens": "權杖",
         "cost": "費用",
         "status": "狀態"
-      }
+      },
+      "streamLabel": "串流"
     },
     "sessionDetail": {
       "backToSessions": "返回工作階段",
@@ -3371,7 +3709,63 @@
       "legend": {
         "title": "錯誤率"
       }
-    }
+    },
+    "openInFullView": "在完整檢視中開啟",
+    "noData": {
+      "title": "開始將追蹤傳送至 OpenObserve",
+      "description": "此組織中尚未找到任何追蹤串流。對您的服務進行檢測後，追蹤將自動顯示於此處。",
+      "otlp": "透過 OTLP 傳送追蹤",
+      "otlpDesc": "Jaeger、Zipkin 及任何相容於 OpenTelemetry 的 SDK",
+      "otelCollector": "OTel Collector / Agent",
+      "otelCollectorDesc": "透過 OTel Collector 路由所有遙測訊號",
+      "or": "或：",
+      "kubernetes": "Kubernetes",
+      "python": "Python",
+      "java": "Java",
+      "nodejs": "Node.js",
+      "askAi": "詢問 AI 以設定追蹤"
+    },
+    "noStream": {
+      "title": "選擇一個串流以開始探索",
+      "description": "選擇一個追蹤串流，然後按下<strong>執行查詢</strong>。結果載入後，您可依服務、持續時間、span 狀態等進行篩選。",
+      "selectStream": "選擇串流",
+      "selectStreamDesc": "瀏覽此組織中可用的追蹤串流",
+      "queryGuide": "閱讀追蹤指南",
+      "queryGuideDesc": "服務圖、span 篩選、RED 指標等",
+      "recent": "最近："
+    },
+    "noEvents": {
+      "title": "找不到追蹤",
+      "descNoFilters": "在 {range} 內找不到任何追蹤。請嘗試放寬時間範圍以載入結果。",
+      "descWithFilters": "在選定的時段內，沒有任何項目符合<strong>此查詢</strong>。請嘗試放寬時間範圍或移除篩選條件。",
+      "descOutOfRange": "您的時段不包含此串流的任何資料。請跳至上次出現資料的時間。",
+      "descDataAtBoundary": "此串流在此時段內有資料，但沒有相符的追蹤。請嘗試放寬時間範圍。",
+      "jumpToData": "跳至最新資料",
+      "expandRange": "擴大時間範圍",
+      "expandRangeDescAbsolute": "切換至更廣的相對時間範圍",
+      "removeFilter": "移除篩選條件",
+      "selectedRange": "選定的範圍"
+    },
+    "showAll": "顯示全部",
+    "filterByErrors": "依錯誤篩選",
+    "clearErrorFilter": "清除錯誤篩選",
+    "serviceMap": "服務地圖",
+    "patternView": "模式檢視",
+    "spanView": "Span 檢視",
+    "spansTab": "Span",
+    "tracesTab": "追蹤",
+    "serviceGraphTab": "服務圖",
+    "treeView": "樹狀檢視",
+    "graphView": "圖形檢視",
+    "layoutHorizontal": "水平",
+    "layoutVertical": "垂直",
+    "layoutForce": "力導向版面配置",
+    "exportTraces": "匯出追蹤",
+    "waterfall": "瀑布圖",
+    "flameGraph": "火焰圖",
+    "traceGraph": "追蹤圖",
+    "dag": "DAG",
+    "thread": "執行緒"
   },
   "actions": {
     "testAction": "測試動作",
@@ -3472,7 +3866,10 @@
     "algorithm": "演算法",
     "storeType": "儲存類型",
     "mechanismType": "機制類型",
-    "actions": "操作"
+    "actions": "操作",
+    "providerTypeRequired": "供應商類型為必填",
+    "algorithmRequired": "演算法為必填",
+    "secretRequired": "密鑰為必填"
   },
   "quota": {
     "header": "配額",
@@ -3552,7 +3949,40 @@
     "import_this_pattern": "匯入此模式",
     "patterns_loaded": "已載入 {count} 個模式",
     "failed_to_load": "載入模式失敗",
-    "no_patterns_selected": "請至少選擇一個模式"
+    "no_patterns_selected": "請至少選擇一個模式",
+    "name_required": "* 名稱為必填",
+    "pattern_required": "* 模式為必填",
+    "associated_breadcrumb": "串流詳細資料",
+    "associated_search_placeholder": "搜尋",
+    "applied_patterns_count": "已套用的模式（{count}）",
+    "all_patterns_count": "所有模式（{count}）",
+    "no_data_available": "無可用資料",
+    "no_patterns_applied_title": "尚未套用任何模式",
+    "no_patterns_applied_subtitle": "瀏覽模式庫以開始將正規表示式套用至您的欄位。",
+    "pattern_name": "模式名稱",
+    "when_value_matches": "當值相符時",
+    "redact": "遮蔽",
+    "redact_hint": "以 [REDACTED] 取代",
+    "drop": "捨棄",
+    "drop_hint": "完全捨棄該欄位",
+    "hash": "雜湊",
+    "hash_hint": "以可搜尋的雜湊值取代",
+    "detect_at": "偵測於",
+    "ingestion": "擷取",
+    "query": "查詢",
+    "test_pattern": "測試模式",
+    "test_input": "測試輸入",
+    "regex_pattern_label": "Regex 模式",
+    "input_string": "輸入字串",
+    "input_string_placeholder": "例如：1234567890",
+    "output": "輸出",
+    "output_string_placeholder": "輸出字串",
+    "click_test_input_hint": "請點擊「測試輸入」以查看結果",
+    "remove_pattern": "移除模式",
+    "add_pattern": "新增模式",
+    "remove_pattern_confirm_msg": "您確定要從該欄位移除此模式嗎？",
+    "failed_to_test_string": "測試字串失敗",
+    "select_detect_at_option": "請選擇偵測於選項"
   },
   "search_history": {
     "title": "搜尋歷史紀錄",
@@ -3677,7 +4107,8 @@
     "deduplicateFieldTooltip": "選擇用於去重複指紋辨識的欄位對應",
     "alertDeduplicationMessage": "具有相同欄位值的警示將被去重複 (相同指紋 = 相同欄位值)",
     "atLeastOneDeduplicationField": "去重複至少需要一個欄位對應",
-    "noSemanticGroupsInCategory": "類別 {category} 中無語意群組"
+    "noSemanticGroupsInCategory": "類別 {category} 中無語意群組",
+    "loadingCorrelation": "正在載入關聯資料…"
   },
   "search_scheduler_job": {
     "title": "搜尋工作排程器",
@@ -3939,6 +4370,1337 @@
     "errSave": "儲存失敗",
     "errLoadModel": "載入模型失敗",
     "tierDefaultName": "預設",
-    "tierConditionalName": "條件式層級"
+    "tierConditionalName": "條件式層級",
+    "shadowedWarningBanner": "下列規則被「{name}」遮蔽 — 被優先順序較高的規則覆寫，且不會用於成本計算。"
+  },
+  "emptyState": {
+    "noSearchResults": {
+      "title": "找不到任何資料",
+      "description": "沒有任何項目符合您目前的篩選條件或時間範圍。請嘗試擴大搜尋範圍、放寬時間範圍，或清除篩選條件。",
+      "action": "清除篩選條件",
+      "actionDesc": "重設所有已套用的篩選條件"
+    },
+    "noLogs": {
+      "title": "此範圍內沒有日誌",
+      "description": "在選定的串流與時間範圍內找不到任何日誌。請嘗試放寬時間範圍或選擇其他串流。",
+      "action": "放寬時間範圍",
+      "actionDesc": "在更長的期間內進行搜尋"
+    },
+    "noStreamSelected": {
+      "title": "請選擇一個串流以開始",
+      "description": "從左側下拉選單中選擇一個串流，然後按下「執行查詢」即可開始探索。您也可以套用額外的篩選條件並調整日期範圍。"
+    },
+    "noQueryApplied": {
+      "title": "執行查詢以查看結果",
+      "description": "調整您的篩選條件並點擊「執行查詢」以載入此串流的事件。"
+    },
+    "noDashboards": {
+      "title": "建立您的第一個儀表板",
+      "description": "儀表板將您的指標、日誌與追蹤整合於單一檢視中。建立一個以開始使用。",
+      "action": "新增儀表板",
+      "actionDesc": "從空白畫布開始",
+      "import": "匯入儀表板",
+      "importDesc": "上傳儀表板 JSON 檔案",
+      "templates": "瀏覽範本",
+      "templatesDesc": "從社群儀表板開始"
+    },
+    "noDashboardsInFolder": {
+      "title": "此資料夾中沒有儀表板",
+      "description": "此資料夾為空。請在此新增儀表板，或從其他資料夾移動一個過來。",
+      "action": "新增儀表板",
+      "actionDesc": "在此資料夾中建立儀表板",
+      "import": "匯入儀表板",
+      "importDesc": "上傳儀表板 JSON 檔案",
+      "templates": "瀏覽範本",
+      "templatesDesc": "從社群儀表板開始"
+    },
+    "noGroups": {
+      "title": "尚無群組",
+      "description": "群組讓您可以一次管理多位使用者的權限。建立一個以開始使用。",
+      "action": "新增群組",
+      "actionDesc": "建立使用者群組"
+    },
+    "noRoles": {
+      "title": "尚無角色",
+      "description": "角色定義使用者可執行的操作。建立自訂角色以控制存取權限。",
+      "action": "新增角色",
+      "actionDesc": "定義自訂存取角色"
+    },
+    "noAnomalyConfigs": {
+      "title": "尚未設定異常偵測",
+      "description": "設定異常偵測以自動識別資料中的異常模式。",
+      "action": "新增設定",
+      "actionDesc": "設定異常偵測"
+    },
+    "noApiLimits": {
+      "title": "尚未設定 API 限制",
+      "description": "API 限制控制每個組織在每個時間範圍內可擷取與查詢的資料量。"
+    },
+    "noRoleLimits": {
+      "title": "尚未設定角色限制",
+      "description": "角色限制定義套用至組織內各個角色的擷取與查詢配額。"
+    },
+    "noIngestionTokens": {
+      "title": "尚無擷取權杖",
+      "description": "擷取權杖在傳送日誌、指標與追蹤時用於驗證資料來源。",
+      "action": "新增權杖",
+      "actionDesc": "產生擷取權杖"
+    },
+    "noOrganizations": {
+      "title": "尚無組織",
+      "description": "組織將您的使用者與資料整合在一起。建立一個以開始使用。"
+    },
+    "noAlertDestinations": {
+      "title": "尚無目的地",
+      "description": "目的地定義警報通知的傳送位置 — Slack、電子郵件、webhook 等。",
+      "action": "新增目的地",
+      "actionDesc": "連接通知管道"
+    },
+    "noPipelineDestinations": {
+      "title": "尚無目的地",
+      "description": "管線輸出的外部目標 — HTTP 端點與遠端寫入目標。",
+      "action": "新增目的地",
+      "actionDesc": "連接管線目的地"
+    },
+    "noAlertTemplates": {
+      "title": "尚無範本",
+      "description": "範本定義警報通知訊息的格式。",
+      "action": "新增範本",
+      "actionDesc": "建立通知範本"
+    },
+    "noEvalTemplates": {
+      "title": "尚無評估範本",
+      "description": "評估範本為 LLM 評估定義可重複使用的評分標準。",
+      "action": "新增範本",
+      "actionDesc": "建立評估範本"
+    },
+    "noEnrichmentTables": {
+      "title": "尚無擴充資料表",
+      "description": "擴充資料表讓您能在查詢時為日誌資料附加額外的上下文。",
+      "action": "新增資料表",
+      "actionDesc": "建立擴充資料表"
+    },
+    "noCipherKeys": {
+      "title": "尚無加密金鑰",
+      "description": "加密金鑰用於加密資料串流中的敏感欄位。",
+      "action": "新增金鑰",
+      "actionDesc": "產生加密金鑰"
+    },
+    "noAiToolsets": {
+      "title": "尚無 AI 工具集",
+      "description": "AI 工具集將您的組織連接至外部 AI 功能。",
+      "action": "新增工具集",
+      "actionDesc": "新增 AI 工具集"
+    },
+    "noLlmProviders": {
+      "title": "尚未設定 LLM 供應商",
+      "description": "連接語言模型供應商以啟用 AI 驅動的功能。",
+      "action": "新增供應商",
+      "actionDesc": "設定 LLM 供應商"
+    },
+    "noDiscoveredServices": {
+      "title": "尚未發現服務",
+      "description": "一旦追蹤資料開始抵達，服務將自動顯示於此處。"
+    },
+    "noNodes": {
+      "title": "無可用節點",
+      "description": "叢集節點註冊後將顯示於此處。"
+    },
+    "noSourceMaps": {
+      "title": "尚未上傳原始碼對應檔",
+      "description": "上傳原始碼對應檔，以在 RUM 錯誤報告中啟用可讀的堆疊追蹤。",
+      "action": "上傳",
+      "actionDesc": "上傳原始碼對應檔"
+    },
+    "noBackfillJobs": {
+      "title": "無回填作業",
+      "description": "回填作業透過管線重新處理歷史資料。執行一個以開始使用。"
+    },
+    "noPipelineHistory": {
+      "title": "尚無管線歷史記錄",
+      "description": "管線執行後，其執行歷史記錄將顯示於此處。"
+    },
+    "noPipelines": {
+      "title": "建立您的第一個管線",
+      "description": "管線在資料抵達時對其進行轉換與路由。設定一個以開始塑造您的串流。",
+      "action": "新增管線",
+      "actionDesc": "從頭建立流程",
+      "import": "匯入管線",
+      "importDesc": "上傳管線定義"
+    },
+    "noFunctions": {
+      "title": "建立您的第一個函式",
+      "description": "函式在擷取或查詢時擴充並重塑您的資料。新增一個以開始使用。",
+      "action": "新增函式",
+      "actionDesc": "撰寫新的 VRL 函式"
+    },
+    "noStreams": {
+      "title": "正在等待您的第一筆資料",
+      "description": "尚無資料抵達。連接一個來源後，您的串流將自動顯示於此處。",
+      "action": "設定擷取",
+      "actionDesc": "連接資料來源"
+    },
+    "noAlerts": {
+      "title": "建立您的第一個警報",
+      "description": "當您的資料越過閾值時，警報會立即通知您。定義一個以開始監控。",
+      "action": "新增警報",
+      "actionDesc": "定義要監控的條件"
+    },
+    "noIncidents": {
+      "title": "無進行中的事件",
+      "description": "您已全部處理完畢 — 目前沒有需要您注意的事項。已觸發的事件將顯示於此處。"
+    },
+    "noLLMInsights": {
+      "title": "尚無 LLM 活動",
+      "description": "使用 OpenTelemetry Gen-AI 語意慣例對您的服務進行檢測，並擷取至少一筆追蹤以填入此儀表板。",
+      "action": "使用 OpenTelemetry 檢測",
+      "actionDesc": "在您的追蹤上擷取 gen_ai_* 屬性"
+    },
+    "noLLMSessions": {
+      "title": "尚無 LLM 工作階段",
+      "description": "工作階段依 gen_ai_conversation_id 分組。請對您的服務進行檢測，讓每段對話為其追蹤加上標籤，工作階段便會顯示於此處。",
+      "action": "使用 OpenTelemetry 檢測",
+      "actionDesc": "以 gen_ai_conversation_id 為 span 加上標籤"
+    },
+    "noScorers": {
+      "title": "尚無評分器",
+      "description": "評分器依您的評分設定為 LLM 回應評分 — 從 LLM 評審開始，或從程式庫匯入一個。",
+      "action": "建立評分器",
+      "actionDesc": "定義 LLM 評審或遠端評分器"
+    },
+    "noEvalJobs": {
+      "title": "尚無評估作業",
+      "description": "作業會依排程針對 LLM 串流執行評分器。建立一個以開始定期為對話評分。",
+      "action": "建立評估作業",
+      "actionDesc": "選擇串流 + 評分器 + 頻率"
+    },
+    "noScoreConfigs": {
+      "title": "尚無評分設定",
+      "description": "評分設定定義評分器產生的結構 — 數值、布林值或類別。新增一個以開始評分。",
+      "action": "建立評分設定",
+      "actionDesc": "定義評分形式 + 健康範圍"
+    },
+    "loadError": {
+      "title": "發生錯誤",
+      "description": "我們無法載入此資料。這通常是暫時性的 — 請稍後再試一次。",
+      "action": "重試",
+      "actionDesc": "再次嘗試載入資料"
+    },
+    "noData": {
+      "title": "此處尚無內容",
+      "description": "目前沒有可顯示的資料。"
+    },
+    "noTraces": {
+      "title": "找不到追蹤",
+      "description": "沒有追蹤符合選定的服務與時間範圍。請嘗試放寬時間範圍或選擇其他服務。"
+    },
+    "noServiceGraph": {
+      "title": "無服務圖資料",
+      "description": "請嘗試查詢更長的時間範圍，或確認您的服務正在發出 span 指標。"
+    },
+    "noServicesCatalog": {
+      "title": "找不到服務",
+      "description": "在選定的時間範圍內未偵測到任何服務。請嘗試放寬範圍或選擇其他串流。"
+    },
+    "noSearchHistory": {
+      "title": "尚無搜尋歷史記錄",
+      "description": "您執行的搜尋將列於此處，方便您重新檢視並再次執行。"
+    },
+    "noSearchJobs": {
+      "title": "無已排程的搜尋作業",
+      "description": "您排程的長時間執行搜尋將顯示於此處，您可在此追蹤其狀態，並在完成後探索結果。"
+    },
+    "noUsers": {
+      "title": "尚無使用者",
+      "description": "邀請您的隊友在此組織中協作。",
+      "action": "新增使用者",
+      "actionDesc": "透過電子郵件邀請隊友"
+    },
+    "noReports": {
+      "title": "尚無報表",
+      "description": "排程報表，以將儀表板傳送至您的收件匣。",
+      "action": "新增報表",
+      "actionDesc": "排程儀表板傳送"
+    },
+    "noQueries": {
+      "title": "無執行中的查詢",
+      "description": "目前沒有進行中的查詢。長時間執行的查詢會在執行期間顯示於此處。"
+    },
+    "noServiceAccounts": {
+      "title": "尚無服務帳戶",
+      "description": "服務帳戶讓應用程式能與 API 進行驗證。建立一個以開始使用。",
+      "action": "新增服務帳戶",
+      "actionDesc": "建立 API 服務帳戶"
+    },
+    "noInvitations": {
+      "title": "無待處理的邀請",
+      "description": "您寄送或收到的邀請將顯示於此處。"
+    },
+    "filtered": {
+      "title": "找不到{noun}",
+      "description": "沒有{noun}符合您目前的篩選條件或搜尋。請嘗試調整或清除它們。",
+      "action": "清除篩選條件",
+      "actionDesc": "重設所有篩選條件與搜尋",
+      "fallbackNoun": "結果"
+    },
+    "nouns": {
+      "logs": "日誌",
+      "dashboards": "儀表板",
+      "pipelines": "管線",
+      "functions": "函式",
+      "streams": "串流",
+      "alerts": "警報",
+      "incidents": "事件",
+      "traces": "追蹤",
+      "searches": "搜尋",
+      "searchJobs": "搜尋作業",
+      "users": "使用者",
+      "reports": "報表",
+      "queries": "查詢",
+      "serviceAccounts": "服務帳戶",
+      "invitations": "邀請",
+      "groups": "群組",
+      "roles": "角色",
+      "anomalyConfigs": "異常偵測設定",
+      "apiLimits": "API 限制",
+      "roleLimits": "角色限制",
+      "ingestionTokens": "擷取權杖",
+      "organizations": "組織",
+      "alertDestinations": "目的地",
+      "pipelineDestinations": "目的地",
+      "alertTemplates": "範本",
+      "evalTemplates": "評估範本",
+      "enrichmentTables": "擴充資料表",
+      "cipherKeys": "加密金鑰",
+      "aiToolsets": "AI 工具集",
+      "llmProviders": "LLM 供應商",
+      "sourceMaps": "原始碼對應檔",
+      "backfillJobs": "回填作業",
+      "scorers": "評分器",
+      "evalJobs": "評估作業",
+      "scoreConfigs": "評分設定",
+      "pipelineHistory": "管線歷史記錄"
+    }
+  },
+  "aiAssistant": {
+    "greeting": {
+      "morning": "早安",
+      "afternoon": "午安",
+      "evening": "晚安",
+      "night": "辛苦了"
+    },
+    "welcome": {
+      "taglineLead": "我是",
+      "taglineHighlight": "O2 助理",
+      "taglineTail": "。我可以為您撰寫",
+      "taglineSql": "SQL",
+      "taglineVrl": "VRL",
+      "taglinePromql": "PromQL",
+      "taglineAnd": "並引導您瀏覽您的日誌、追蹤、指標與事件。",
+      "signedInAs": "登入身分",
+      "role": "角色",
+      "tryOneOfThese": "或試試以下其中一項"
+    },
+    "capabilities": {
+      "query": {
+        "title": "撰寫查詢",
+        "description": "用於日誌、追蹤、RUM 的 SQL，或用於指標的 PromQL。",
+        "prompt": "協助我撰寫查詢"
+      },
+      "incident": {
+        "title": "調查事件",
+        "description": "跨日誌、追蹤、警報進行根本原因分析 — 例如「為何 gateway-5xx 被觸發？」",
+        "prompt": "協助我調查事件"
+      },
+      "dashboard": {
+        "title": "建立儀表板",
+        "description": "從一個主題開始 — 例如「K8s 節點健康狀態：CPU、記憶體、重新啟動次數」。也會建立面板。",
+        "prompt": "協助我建立儀表板或面板"
+      },
+      "alert": {
+        "title": "建立警報",
+        "description": "閾值或排程警報，以及擷取時的 VRL 管線。",
+        "prompt": "協助我建立警報或管線"
+      }
+    },
+    "suggestions": {
+      "vrlParseJson": "撰寫 VRL 以解析我的 nginx 日誌中的 JSON",
+      "regexRedact": "產生用於遮蔽電子郵件的 regex 模式",
+      "mapStreamSchema": "對應我的「default」串流結構描述",
+      "promqlCpu": "為 CPU 使用率 > 80% 的 Pod 撰寫 PromQL",
+      "datadogToO2": "將此 Datadog 查詢轉換為 OpenObserve SQL",
+      "lastAlertFired": "為何我上一個警報被觸發？"
+    },
+    "placeholderRotation": {
+      "one": "顯示過去一小時的錯誤…",
+      "two": "撰寫 VRL 以解析 nginx 日誌中的 JSON…",
+      "three": "為 K8s 節點健康狀態建立儀表板…"
+    },
+    "autoNavigation": {
+      "label": "自動導覽",
+      "enabledTooltip": "已啟用自動導覽 - O2 助理將在不確認的情況下自動導覽",
+      "disabledTooltip": "已停用自動導覽 - O2 助理將在導覽前先詢問"
+    },
+    "attachImageTooltip": "附加圖片（PNG、JPEG，最大 2MB）"
+  },
+  "aiObservability": {
+    "title": "AI 可觀測性",
+    "sections": {
+      "monitor": "監控",
+      "evaluate": "評估"
+    },
+    "nav": {
+      "llmInsights": "LLM 洞察",
+      "sessions": "LLM 工作階段",
+      "quality": "品質",
+      "evalJobs": "評估作業",
+      "scorers": "評分器",
+      "scoreConfigs": "評分設定"
+    },
+    "kpi": {
+      "totalCost": "總成本",
+      "totalTokens": "總 token 數",
+      "totalTraces": "總追蹤數",
+      "p95Latency": "P95 延遲",
+      "errorRate": "錯誤率"
+    },
+    "panels": {
+      "costTrend": {
+        "title": "成本趨勢",
+        "subtitle": "依模型計的美元金額"
+      },
+      "tokenTrend": {
+        "title": "Token 趨勢",
+        "subtitle": "依模型計的 token 數"
+      },
+      "spanTrend": {
+        "title": "Span 趨勢",
+        "subtitle": "依類型計的 span 數"
+      },
+      "latencyPercentiles": {
+        "title": "延遲 p50 / p95 / p99",
+        "subtitle": "所有 LLM 呼叫"
+      },
+      "tracesOverTime": {
+        "title": "追蹤隨時間變化",
+        "subtitle": "依服務計的追蹤數"
+      },
+      "errorsOverTime": {
+        "title": "錯誤隨時間變化",
+        "subtitle": "錯誤數"
+      },
+      "spansByModel": {
+        "title": "依模型計的 span",
+        "subtitle": "每個模型的呼叫次數"
+      },
+      "tokensByModel": {
+        "title": "依模型計的 token",
+        "subtitle": "每個模型的總 token 數"
+      },
+      "recentErrors": {
+        "title": "近期錯誤",
+        "subtitle": "最近 10 個失敗的 span"
+      }
+    }
+  },
+  "onlineEvals": {
+    "title": "評估",
+    "description": "設定 LLM 供應商、評分定義、評分器與即時評估作業。",
+    "loading": "正在載入線上評估設定…",
+    "loadError": "載入線上評估失敗",
+    "deletePrompt": "要刪除 {name} 嗎？",
+    "deleteTitle": "刪除 {label}",
+    "deleteConfirmMessage": "您確定要刪除「{name}」嗎？此操作無法復原。",
+    "deleted": "已刪除 {label}",
+    "deleteError": "刪除 {label} 失敗",
+    "saved": "已儲存 {label}",
+    "newButton": "新增 {label}",
+    "search": "搜尋 {label}",
+    "refresh": "重新整理",
+    "allStatuses": "所有狀態",
+    "noRowsFound": "找不到 {label}",
+    "getStartedHint": "建立一個以開始設定線上評估。",
+    "columns": {
+      "name": "名稱",
+      "status": "狀態",
+      "updated": "更新時間"
+    },
+    "actions": {
+      "edit": "編輯",
+      "delete": "刪除",
+      "export": "匯出",
+      "activate": "啟用",
+      "pause": "暫停",
+      "activated": "作業已啟用",
+      "paused": "作業已暫停",
+      "activateError": "啟用作業失敗",
+      "pauseError": "暫停作業失敗"
+    },
+    "tabs": {
+      "quality": "品質",
+      "jobs": "評估作業",
+      "scorers": "評分器",
+      "scoreConfigs": "評分設定",
+      "providers": "供應商"
+    },
+    "quality": {
+      "scopeLabel": "此工作區中的所有品質維度",
+      "timeRange": {
+        "label": "時間範圍",
+        "last1h": "過去 1 小時",
+        "last24h": "過去 24 小時",
+        "last7d": "過去 7 天",
+        "last30d": "過去 30 天"
+      },
+      "sourceStream": {
+        "label": "來源串流",
+        "all": "所有串流"
+      },
+      "refresh": "重新整理",
+      "kpis": {
+        "evaluated": {
+          "title": "已評估的 Span",
+          "unit": "",
+          "hint": "時段內 _llm_scores 中的相異 span ID"
+        },
+        "evaluationCost": {
+          "title": "評估成本",
+          "unit": "$",
+          "hint": "時段內 LLM 評審評分器成本的總和"
+        },
+        "jobSuccess": {
+          "title": "作業成功率",
+          "unit": "%",
+          "hint": "線上評估作業執行成功率"
+        },
+        "scorerFailures": {
+          "title": "評分器失敗數",
+          "unit": "",
+          "hint": "時段內失敗的評分器呼叫次數"
+        },
+        "latencyP95": {
+          "title": "延遲 p95",
+          "unit": "s",
+          "hint": "評分器呼叫 p95 延遲"
+        },
+        "vsPrev": "對比前期",
+        "noData": "—"
+      },
+      "loading": "正在載入品質資料…",
+      "detail": {
+        "loading": "正在載入各設定的分解資料…",
+        "noData": "此時段內此設定尚無評分。",
+        "empty": {
+          "title": "正在等待您的第一筆評分",
+          "description": "在選定的時間範圍內，此設定尚無評分到達。一旦使用它的評分器執行後，評分將自動顯示於此處。"
+        },
+        "drillTitle": "鑽研至追蹤",
+        "splitByScorer": "依評分器分割",
+        "splitBySourceType": "依 source_type 分割",
+        "trendTitle": "趨勢",
+        "trendSubtitle": "{configName}，{bucket}",
+        "distributionTitle": "評分分佈",
+        "compositionTitle": "隨時間的組成變化",
+        "categoryDistributionTitle": "類別分佈",
+        "passRateTitle": "通過率隨時間變化",
+        "trueFalseTitle": "True 對 False",
+        "legendAvg": "平均值",
+        "legendP95": "p95",
+        "legendThreshold": "閾值 {direction} {value}",
+        "legendHealthy": "健康",
+        "legendUnhealthy": "不健康",
+        "kpis": {
+          "average": "平均值",
+          "p50": "P50",
+          "p95": "P95",
+          "p50p95": "P50 / P95",
+          "unhealthy": "不健康",
+          "healthy": "健康",
+          "coverage": "涵蓋率"
+        }
+      },
+      "sidebar": {
+        "allConfigs": "所有設定",
+        "empty": "沒有設定符合此篩選條件。"
+      },
+      "overview": {
+        "title": "評分設定總覽",
+        "countSuffix": "{n} 個設定",
+        "searchPlaceholder": "篩選設定…",
+        "loading": "正在載入各設定的彙總資料…",
+        "emptyNoConfigsTitle": "尚無評分設定",
+        "emptyNoConfigsHint": "定義您的第一個評分設定，以開始追蹤品質維度。",
+        "emptyWaitingTitle": "正在等待第一筆評分到達",
+        "emptyWaitingHint": "您的評分設定已宣告，但此時段內尚無評分寫入 _llm_scores。",
+        "waitingStepJob": "啟用一個會為其中某個設定產生評分的線上評估作業",
+        "waitingStepRange": "放寬時間範圍 — 今天稍早或本週的評分可能不在此時段內",
+        "waitingStepRefresh": "點擊「重新整理」— 來自進行中作業的評分會在評估後約 1 分鐘內出現",
+        "waitingPrimaryCta": "開啟評估作業",
+        "waitingRefreshCta": "重新整理",
+        "noThreshold": "無閾值",
+        "columns": {
+          "scoreConfig": "評分設定",
+          "type": "類型",
+          "totalScores": "總評分數",
+          "coverage": "涵蓋率",
+          "unhealthy": "不健康",
+          "trend": "趨勢",
+          "threshold": "健康條件",
+          "updated": "更新時間"
+        }
+      }
+    },
+    "singular": {
+      "jobs": "評估作業",
+      "scorers": "評分器",
+      "scoreConfigs": "評分設定",
+      "providers": "供應商"
+    },
+    "secondaryColumn": {
+      "jobs": "串流",
+      "scorers": "類型",
+      "scoreConfigs": "資料類型",
+      "providers": "供應商"
+    },
+    "jobStatus": {
+      "draft": "草稿",
+      "active": "使用中",
+      "paused": "已暫停",
+      "degraded": "已降級",
+      "archived": "已封存"
+    },
+    "buttons": {
+      "cancel": "取消",
+      "close": "關閉",
+      "create": "建立",
+      "remove": "移除",
+      "save": "儲存",
+      "saveAsDraft": "儲存為草稿",
+      "createAndActivate": "建立並啟用"
+    },
+    "scorerTypeDialog": {
+      "title": "建立新的評分器",
+      "intro": "選擇評分器類型。三種皆為一等選項 — 請選擇最符合您撰寫與執行方式的類型。",
+      "llmJudgeTitle": "LLM 評審",
+      "llmJudgeDescription": "透過您已設定的供應商使用語言模型進行語意評估。",
+      "llmJudgeCta": "設定評審",
+      "remoteTitle": "遠端",
+      "remoteDescription": "呼叫您自己的 HTTP 端點 — 將評估邏輯保留在您的環境內。",
+      "remoteCta": "設定端點",
+      "codeTitle": "程式碼",
+      "codeDescription": "撰寫 Python 或 JavaScript 評分函式，並從您的本機環境推送。",
+      "codeCta": "未來版本將提供",
+      "comingSoonBadge": "即將推出"
+    },
+    "provider": {
+      "backTo": "返回供應商",
+      "createTitle": "建立 LLM 供應商",
+      "editTitle": "編輯 LLM 供應商",
+      "subtitle": "設定 LLM 評審評分器使用的模型端點。",
+      "sectionTitle": "供應商",
+      "nameLabel": "名稱",
+      "namePlaceholder": "Production OpenAI",
+      "typeLabel": "供應商類型",
+      "typePlaceholder": "openai",
+      "endpointLabel": "端點",
+      "endpointPlaceholder": "選用的自訂端點",
+      "defaultModelLabel": "預設模型",
+      "defaultModelPlaceholder": "gpt-4o-mini",
+      "availableModelsLabel": "可用模型",
+      "availableModelsPlaceholder": "gpt-4o-mini, gpt-4.1",
+      "useAsDefault": "用作預設供應商",
+      "authConfigLabel": "驗證設定 JSON",
+      "authConfigHelp": "憑證會以加密方式靜態儲存，儲存後無法再次讀取。",
+      "apiKeyLabel": "API 金鑰",
+      "apiKeyPlaceholder": "輸入 API 金鑰",
+      "apiKeyHelp": "以加密方式靜態儲存，且永不再次讀取。編輯時保留空白以維持現有金鑰。",
+      "authSection": "驗證",
+      "authEditNote": "憑證無法再次讀取。僅在您想輪替時才重新輸入 API 金鑰。",
+      "cannotRename": "建立後無法重新命名。",
+      "availableModelsHelp": "選用。此供應商上可用模型的逗號分隔清單。",
+      "saveError": "儲存供應商失敗"
+    },
+    "scoreConfig": {
+      "booleanValues": "true / false",
+      "detail": {
+        "eyebrow": "評分設定",
+        "close": "關閉",
+        "statusActive": "使用中",
+        "statusInactive": "未使用",
+        "createdShort": "建立時間",
+        "tabs": {
+          "overview": "總覽",
+          "versions": "版本",
+          "usedBy": "使用對象"
+        },
+        "descriptionSection": "描述",
+        "configurationSection": "設定",
+        "dataTypeLabel": "資料類型",
+        "rangeLabel": "範圍",
+        "categoriesLabel": "類別",
+        "valuesLabel": "值",
+        "thresholdSection": "健康閾值",
+        "thresholdHint": "將評分計為健康",
+        "noThreshold": "未宣告",
+        "noThresholdHint": "未宣告閾值 — 此維度的評分將不會貢獻於品質狀態訊號。",
+        "usedByIntro": "任何以此維度名稱發出值的評分器。",
+        "usedByEmpty": "尚無評分器參照此設定。",
+        "scorerTypeLlmJudge": "LLM 評審",
+        "scorerTypeRemote": "遠端",
+        "versionsIntro": "每次變更範圍、類別或健康閾值都會建立新版本。歷史評分仍會附屬於產生它們的版本。",
+        "activeVersionChip": "使用中",
+        "lastUpdated": "上次更新",
+        "metadataSection": "中繼資料",
+        "statusLabel": "狀態",
+        "versionLabel": "版本",
+        "createdLabel": "建立時間",
+        "updatedLabel": "更新時間"
+      },
+      "createTitle": "建立評分設定",
+      "editTitlePrefix": "編輯",
+      "subtitle": "評分器產生的軟性結構描述維度。",
+      "eyebrow": "評分設定",
+      "sectionTitle": "評分設定",
+      "listTitle": "評分設定",
+      "listSubtitle": "評分器產生的軟性結構描述維度。",
+      "searchPlaceholder": "搜尋設定",
+      "allTypes": "所有類型",
+      "newButton": "新增評分設定",
+      "saveButton": "儲存變更",
+      "createButton": "建立",
+      "columns": {
+        "index": "#",
+        "name": "名稱",
+        "type": "類型",
+        "rangeValues": "範圍 / 值",
+        "healthy": "健康",
+        "activeVersion": "使用中版本",
+        "usedBy": "使用對象",
+        "created": "建立時間",
+        "actions": "動作"
+      },
+      "active": "使用中",
+      "usedByScorers": "{count} 個評分器",
+      "usedByScorer": "{count} 個評分器",
+      "noHealthy": "—",
+      "createInfoNumeric": "定義此維度的評分在何時被視為健康。超出此範圍的評分將在追蹤清單、工作階段及其他檢視中觸發品質問題。",
+      "editInfoBannerEmphasis": {
+        "numeric": "修改範圍或健康閾值會建立 {nextVersion}。",
+        "categorical": "修改類別或健康閾值會建立 {nextVersion}。",
+        "boolean": "修改健康值會建立 {nextVersion}。"
+      },
+      "editInfoBannerDetail": "歷史評分仍會與產生它們的版本相關聯。僅修改描述的編輯會就地更新。",
+      "createInfoSubtitle": "僅修改描述的編輯會就地更新 {version}。",
+      "nameLabel": "名稱",
+      "namePlaceholder": "例如「faithfulness」",
+      "nameHelp": "僅可使用小寫字母、數字與底線。用作穩定的識別碼。",
+      "cannotBeRenamed": "無法重新命名",
+      "descriptionLabel": "描述",
+      "descriptionPlaceholder": "此維度量測什麼？",
+      "descriptionHelp": "僅修改描述的編輯不會建立新版本。",
+      "dataTypeLabel": "資料類型",
+      "dataTypeLocked": "已鎖定",
+      "dataTypeCannotChange": "建立後無法變更",
+      "dataTypes": {
+        "numeric": "數值",
+        "categorical": "類別",
+        "boolean": "布林值"
+      },
+      "dataTypeHelp": {
+        "numeric": "評分為某範圍內的數字",
+        "categorical": "評分為 N 個標籤之一",
+        "boolean": "評分為 true / false"
+      },
+      "numericRangeLabel": "數值範圍",
+      "minLabel": "最小值",
+      "maxLabel": "最大值",
+      "categoriesLabel": "類別",
+      "addCategoryPlaceholder": "新增類別",
+      "addCategoryButton": "新增",
+      "booleanInfo": "布林值設定接受 {trueLabel} / {falseLabel} 值。無需額外設定。",
+      "healthyThresholdTitle": "健康閾值",
+      "optional": "選用",
+      "healthyThresholdIntro": "定義此維度的評分在何時被視為健康。超出此範圍的評分將在追蹤清單、工作階段及其他檢視中觸發品質問題。",
+      "healthyWhenValueIs": "當值符合下列條件時為健康：",
+      "healthyCategories": "健康類別：",
+      "healthyCategoriesHint": "勾選所有計為健康的值。",
+      "healthyValue": "健康值：",
+      "gteLabel": "大於或等於",
+      "lteLabel": "小於或等於",
+      "trueIsHealthy": "true 為健康",
+      "trueIsHealthyHint": "評分為 false 會觸發品質問題。",
+      "falseIsHealthy": "false 為健康",
+      "falseIsHealthyHint": "評分為 true 會觸發品質問題。",
+      "thresholdEmptyHint": "保留此欄位為空表示此維度不會貢獻於產品中的品質狀態訊號。評分仍會被記錄，但不會觸發問題指示。",
+      "saveError": "儲存評分設定失敗",
+      "empty": {
+        "title": "尚無評分設定",
+        "description": "評分設定定義您的評分器產生的維度 — 名稱、資料類型、值範圍與健康閾值。建立一個以開始設定線上評估。",
+        "chipTypes": "數值、類別、布林值",
+        "chipThreshold": "健康閾值"
+      },
+      "import": {
+        "title": "匯入評分設定",
+        "button": "匯入",
+        "customLabel": "自訂",
+        "customSubtitle": "從 JSON 檔案或 URL 匯入",
+        "libraryLabel": "程式庫",
+        "librarySubtitle": "從精選目錄瀏覽並匯入",
+        "libraryDrawerTitle": "評分設定庫",
+        "outputMessages": "輸出訊息",
+        "creation": "建立評分設定",
+        "errors": {
+          "title": "驗證錯誤"
+        }
+      },
+      "export": {
+        "bulkButton": "匯出"
+      }
+    },
+    "scorer": {
+      "detail": {
+        "close": "關閉",
+        "eyebrow": "評分器",
+        "refresh": "重新整理",
+        "descriptionSection": "描述",
+        "configurationSection": "設定",
+        "scorerTypeLabel": "評分器類型",
+        "providerLabel": "供應商",
+        "providerUnknown": "未知",
+        "modelLabel": "模型",
+        "endpointLabel": "端點",
+        "producesSection": "產生評分設定",
+        "producesEmpty": "此評分器未寫入任何評分設定。",
+        "promptSection": "評審提示",
+        "requestTemplateSection": "請求範本",
+        "variablesSuffix": "個變數",
+        "outputSchemaSection": "輸出結構描述",
+        "usedBySection": "使用對象",
+        "usedByIntro": "在其管線中參照此評分器的作業。",
+        "usedByEmpty": "尚無作業參照此評分器。",
+        "versionsIntro": "版本是評分器設定的不可變更快照。使用中版本即為作業今日執行的版本。",
+        "activeVersionChip": "使用中",
+        "lastUpdated": "上次更新",
+        "metadataSection": "中繼資料",
+        "versionLabel": "版本",
+        "createdLabel": "建立時間",
+        "updatedLabel": "更新時間",
+        "typeLlmJudge": "LLM 評審",
+        "typeRemote": "遠端",
+        "tabs": {
+          "configuration": "設定",
+          "versions": "版本",
+          "runs": "執行記錄",
+          "usedBy": "使用對象"
+        },
+        "kpis": {
+          "totalRuns": "總執行次數（24 小時）",
+          "totalRunsSub": "跨所有參照的作業",
+          "successRate": "成功率",
+          "successRateSub": "過去 24 小時",
+          "avgLatency": "平均延遲",
+          "avgLatencySub": "各執行記錄的 p50",
+          "usedBy": "使用對象",
+          "usedBySubSingular": "個作業",
+          "usedBySubPlural": "個作業"
+        },
+        "runs": {
+          "showingPrefix": "顯示",
+          "showingOf": "／共",
+          "showingSuffix": "次執行",
+          "empty": "此時段內無評分器執行記錄。",
+          "spanLabel": "Span",
+          "traceLabel": "追蹤",
+          "jobUnknown": "—",
+          "col": {
+            "time": "時間",
+            "job": "作業",
+            "target": "目標",
+            "score": "評分",
+            "latency": "延遲",
+            "status": "狀態"
+          }
+        }
+      },
+      "listTitle": "評分器",
+      "listSubtitle": "評分器針對您的追蹤執行，並在定義的維度上產生評分。",
+      "searchPlaceholder": "搜尋評分器",
+      "allTypes": "所有類型",
+      "newButton": "新增評分器",
+      "usedByJobs": "{count} 個作業",
+      "usedByJob": "{count} 個作業",
+      "columns": {
+        "name": "名稱",
+        "type": "類型",
+        "produces": "產生",
+        "version": "版本",
+        "usedBy": "使用對象",
+        "lastRun": "上次執行",
+        "successRate": "成功率（24 小時）",
+        "actions": "動作"
+      },
+      "empty": {
+        "title": "尚無評分器",
+        "description": "評分器是評估的執行單元。它們從您的正式追蹤中擷取 span，並在您關注的品質維度上產生評分。",
+        "chipLlmJudge": "LLM 評審",
+        "chipRemote": "遠端",
+        "chipCode": "程式碼"
+      },
+      "noProviders": {
+        "title": "請先新增供應商",
+        "description": "評分器需要 LLM 供應商（OpenAI、Anthropic 等）才能執行。請在建立評分器前先於「設定」中新增供應商。",
+        "chipRequired": "LLM 評審所需",
+        "cta": "新增供應商"
+      },
+      "import": {
+        "title": "匯入評分器",
+        "button": "匯入",
+        "customLabel": "自訂",
+        "customSubtitle": "從 JSON 檔案或 URL 匯入",
+        "libraryLabel": "程式庫",
+        "librarySubtitle": "從精選目錄瀏覽並匯入",
+        "libraryDrawerTitle": "評分器庫",
+        "outputMessages": "輸出訊息",
+        "creation": "建立評分器",
+        "errors": {
+          "title": "驗證錯誤"
+        }
+      },
+      "export": {
+        "bulkButton": "匯出"
+      },
+      "backTo": "返回評分器",
+      "badgeRemote": "遠端",
+      "badgeLlm": "LLM 評審",
+      "createTitleRemote": "建立遠端評分器",
+      "createTitleLlm": "建立 LLM 評審評分器",
+      "editTitleRemote": "編輯遠端評分器",
+      "editTitleLlm": "編輯 LLM 評審評分器",
+      "subtitleRemote": "呼叫您託管的 HTTP 端點。我們呈現請求，您回傳評分。",
+      "subtitleLlm": "語言模型使用您提供的提示評判每筆追蹤。",
+      "descriptionPlaceholder": "此評分器量測內容的簡短摘要。",
+      "producesScoreHelp": "此評分器量測哪個維度？",
+      "providerHelp": "選擇此評審呼叫的 LLM 供應商。在 {settingsLink} 中管理供應商。",
+      "providerHelpSettingsLink": "設定",
+      "refreshProviders": "重新整理供應商",
+      "selectedPrefix": "已選取：",
+      "endpointLabel": "端點：",
+      "defaultModelPreviewLabel": "預設模型：",
+      "authLabel": "驗證：",
+      "authConfigured": "已設定",
+      "authNotConfigured": "未設定",
+      "rangeLabel": "範圍：",
+      "healthyLabel": "健康：",
+      "typeLabel": "類型：",
+      "promptVariablesLabel": "變數：",
+      "promptHelp": "專注於評估邏輯。使用 {inputVar} 與 {outputVar} 作為預留位置。",
+      "identitySection": "識別",
+      "judgeSection": "評審設定",
+      "endpointSection": "端點",
+      "nameLabel": "名稱",
+      "namePlaceholder": "faithfulness_judge",
+      "producesScoreConfigLabel": "評分設定",
+      "producesScoreConfigNone": "選擇評分設定",
+      "scoreConfigVersionLabel": "評分設定版本",
+      "latestSuffix": " （最新）",
+      "pinVersion": "釘選選定版本",
+      "descriptionLabel": "描述",
+      "providerLabel": "供應商",
+      "providerPlaceholder": "選擇供應商",
+      "modelLabel": "模型",
+      "modelPlaceholder": "gpt-4o",
+      "promptLabel": "評審提示",
+      "includeReasoningLabel": "包含推理",
+      "includeReasoningHint": "LLM 會說明其評分。儲存於 score.metadata.reasoning 中。",
+      "extraFieldsLabel": "額外中繼資料欄位",
+      "extraFieldsOptional": "選用",
+      "extraFieldsHint": "新增 LLM 應與評分一同輸出的欄位。儲存於 score.metadata 中以供後續分析。",
+      "extraFields": {
+        "colName": "欄位名稱",
+        "colType": "類型",
+        "colDescription": "描述",
+        "namePlaceholder": "field_name",
+        "descriptionPlaceholder": "LLM 應在此欄位放入什麼內容？",
+        "addButton": "+ 新增欄位",
+        "previewSchema": "檢視產生的結構描述",
+        "schemaTitle": "產生的 JSON 結構描述",
+        "schemaLoading": "正在推導結構描述…",
+        "schemaCopy": "複製",
+        "schemaCopied": "已複製",
+        "schemaCopyFailed": "將結構描述複製至剪貼簿失敗。",
+        "typeString": "string",
+        "typeNumber": "number",
+        "typeBoolean": "boolean"
+      },
+      "authSection": "驗證",
+      "headersSection": "自訂標頭",
+      "requestBodySection": "請求主體",
+      "remoteEndpointLabel": "遠端端點",
+      "remoteUrlLabel": "URL",
+      "remoteEndpointPlaceholder": "https://eval.internal.corp/check",
+      "remoteTimeoutLabel": "逾時（毫秒）",
+      "remoteRetriesLabel": "最大重試次數",
+      "remoteBackoffLabel": "退避",
+      "remoteBackoff": {
+        "exponential": "指數",
+        "linear": "線性",
+        "fixed": "固定"
+      },
+      "remoteAuthLabel": "驗證類型",
+      "remoteAuth": {
+        "placeholder": "選擇驗證類型",
+        "bearer": "Bearer Token",
+        "basic": "Basic Auth",
+        "apiKey": "API 金鑰",
+        "tokenLabel": "權杖",
+        "usernameLabel": "使用者名稱",
+        "passwordLabel": "密碼",
+        "headerNameLabel": "標頭名稱",
+        "bearerTokenPlaceholder": "貼上 bearer token",
+        "basicUsernamePlaceholder": "user",
+        "basicPasswordPlaceholder": "••••••••",
+        "apiKeyHeaderPlaceholder": "X-API-Key",
+        "apiKeyTokenPlaceholder": "貼上 API 金鑰",
+        "encryptedHint": "以加密方式靜態儲存。儲存後無法檢視。"
+      },
+      "remoteHeaders": {
+        "subtitle": "隨每個請求一同傳送。",
+        "colName": "名稱",
+        "colValue": "值",
+        "colKey": "名稱",
+        "keyPlaceholder": "X-Custom-Header",
+        "valuePlaceholder": "value",
+        "addButton": "+ 新增標頭"
+      },
+      "requestBodyLabel": "請求主體範本",
+      "saveError": "儲存評分器失敗",
+      "versionsLoadError": "載入評分設定版本失敗",
+      "testPanel": {
+        "title": "測試此評分器",
+        "hint": "在儲存前以範例資料試用您的評分器。測試執行不會被保留。",
+        "emptyPrefix": "在評分器範本中新增如 ",
+        "emptySuffix": " 的變數，以使用範例欄位進行測試。",
+        "runButton": "執行測試",
+        "disabledHint": "填寫名稱、供應商、範本與每個變數值以執行測試。",
+        "stateIdle": "執行測試以在此處查看結果。",
+        "stateRunning": "正在執行評分器測試…",
+        "successHeader": "成功",
+        "errorHeader": "測試失敗",
+        "errorFallback": "評分器測試失敗。請查看伺服器日誌以了解詳細資料。",
+        "resultScore": "評分",
+        "resultLatency": "延遲",
+        "resultModel": "模型",
+        "resultTokens": "Token",
+        "resultReasoning": "推理",
+        "resultRaw": "原始回應",
+        "valuePlaceholder": "{variable} 的值"
+      }
+    },
+    "job": {
+      "detail": {
+        "close": "關閉",
+        "eyebrow": "評估作業",
+        "refresh": "重新整理",
+        "descriptionSection": "描述",
+        "targetSection": "目標",
+        "streamLabel": "串流",
+        "streamTypeLabel": "串流類型",
+        "filterLabel": "篩選條件",
+        "filterEmpty": "無篩選條件 — 每個 span 都會被評估",
+        "scorersSection": "評分器",
+        "scorersEmpty": "尚無評分器附加至此作業。",
+        "scorerUnknown": "（已移除的評分器）",
+        "scorerTypeLlmJudge": "LLM 評審",
+        "scorerTypeRemote": "遠端",
+        "producesPrefix": "產生",
+        "viewScorerHint": "檢視",
+        "inputMappingSection": "輸入對應",
+        "samplingSection": "取樣",
+        "samplingModeLabel": "模式",
+        "samplingValueLabel": "值",
+        "samplingAll": "評估每個相符項目",
+        "samplingRate": "依比率隨機取樣",
+        "samplingCount": "前 N 個相符項目",
+        "metadataSection": "中繼資料",
+        "versionLabel": "版本",
+        "pipelineLabel": "管線 ID",
+        "createdLabel": "建立時間",
+        "updatedLabel": "更新時間",
+        "tabs": {
+          "configuration": "設定",
+          "runs": "執行記錄",
+          "failures": "失敗記錄"
+        },
+        "kpis": {
+          "totalRuns": "總執行次數",
+          "totalRunsSub": "在選定時段內",
+          "successRate": "成功率",
+          "successRateSub": "跨所有評分器",
+          "avgLatency": "平均延遲",
+          "avgLatencySub": "各執行記錄的平均值",
+          "scorers": "評分器",
+          "scorersSubSingular": "個已附加的評分器",
+          "scorersSubPlural": "個已附加的評分器"
+        },
+        "runs": {
+          "showingPrefix": "顯示",
+          "showingOf": "／共",
+          "showingSuffix": "次相符執行",
+          "empty": "選定時段內此作業無執行記錄。",
+          "spanLabel": "SPAN",
+          "traceLabel": "TRACE",
+          "scorerUnknown": "（未知的評分器）",
+          "col": {
+            "time": "時間",
+            "scorer": "評分器",
+            "target": "目標",
+            "score": "評分",
+            "latency": "延遲",
+            "status": "狀態"
+          }
+        },
+        "failures": {
+          "byScorerTitle": "依評分器計的失敗數",
+          "byScorerEmpty": "選定時段內無失敗記錄。",
+          "recentTitle": "近期失敗記錄",
+          "recentEmpty": "選定時段內無失敗的執行記錄。",
+          "col": {
+            "scorer": "評分器",
+            "failureRate": "失敗率",
+            "count": "失敗數 / 總數"
+          }
+        }
+      },
+      "listTitle": "評估作業",
+      "listSubtitle": "在您的正式追蹤串流上部署評分器。",
+      "searchPlaceholder": "搜尋作業",
+      "allStatuses": "所有狀態",
+      "newButton": "新增作業",
+      "scorersCount": "{count} 個評分器",
+      "scorerCount": "{count} 個評分器",
+      "columns": {
+        "name": "名稱",
+        "status": "狀態",
+        "stream": "串流",
+        "scorers": "評分器",
+        "successRate": "成功率",
+        "lastRun": "上次執行",
+        "created": "建立時間",
+        "actions": "動作"
+      },
+      "empty": {
+        "title": "尚無評估作業",
+        "description": "評估作業會在您的正式追蹤串流上部署評分器。它們會對相符的 span 進行取樣、非同步執行評分器，並儲存產生的評分以供分析。",
+        "chipStreams": "正式串流",
+        "chipScorers": "多個評分器",
+        "chipSampling": "取樣控制"
+      },
+      "descriptionPlaceholder": "此作業監控什麼？",
+      "samplingValueHelp": "JSON：rate 為 0-1 之間的數字，count 為正整數。",
+      "samplingValueAllHelp": "當模式為「全部」時不適用 — 每個相符事件都會被評估。",
+      "samplingHelp": "在篩選後套用。控制成本 — 只有相符的 span 才會計入比率。",
+      "presets": {
+        "label": "快速預設",
+        "rootSpans": "僅根 span",
+        "llmCalls": "LLM 呼叫",
+        "toolCalls": "工具呼叫"
+      },
+      "backTo": "返回評估作業",
+      "createTitle": "建立線上評估作業",
+      "editTitle": "編輯線上評估作業",
+      "stepper": {
+        "target": "目標",
+        "scorers": "評分器",
+        "mapping": "對應",
+        "sampling": "取樣"
+      },
+      "targetSection": "目標",
+      "scorersSection": "評分器與對應",
+      "nameLabel": "名稱",
+      "namePlaceholder": "Production Faithfulness Monitor",
+      "streamLabel": "輸入串流",
+      "streamPlaceholder": "選擇串流名稱",
+      "streamTypeLabel": "串流類型",
+      "streamTypePlaceholder": "traces",
+      "descriptionLabel": "描述",
+      "samplingModeLabel": "取樣模式",
+      "samplingValueLabel": "取樣值 JSON",
+      "samplingModes": {
+        "rate": "比率",
+        "all": "全部",
+        "count": "數量"
+      },
+      "scorerPicker": {
+        "title": "評分器",
+        "hint": "選擇一個或多個評分器，以對每個相符的 span 執行。",
+        "meta": "{type} · v{version}",
+        "placeholder": "選擇評分器",
+        "searchPlaceholder": "搜尋評分器…",
+        "empty": "無可用評分器。請先在「評分器」分頁中建立一個。"
+      },
+      "filter": {
+        "title": "篩選條件",
+        "hint": "只有符合此條件的 span 才會進入取樣與評分。"
+      },
+      "inputMapping": {
+        "title": "輸入對應",
+        "hint": "將 span 欄位對應至每個評分器範本變數。",
+        "selectScorers": "選擇評分器以設定其對應。",
+        "noVariables": "此評分器沒有可對應的範本變數。",
+        "variableCount": "{count} 個變數"
+      },
+      "preview": {
+        "title": "相符的 Span",
+        "hint": "選擇串流與篩選條件後，此面板將顯示您的作業會相符多少個 span。",
+        "summaryTitle": "摘要",
+        "summaryName": "名稱",
+        "summaryType": "類型",
+        "summaryStatus": "狀態",
+        "statusEditing": "編輯中",
+        "statusDraft": "草稿",
+        "emptyValue": "—"
+      },
+      "selectAtLeastOne": "請至少選擇一個評分器",
+      "saveError": "儲存評估作業失敗",
+      "createdAndActivated": "評估作業已建立並啟用",
+      "createdButActivateFailed": "評估作業已建立，但啟用失敗"
+    }
+  },
+  "llmProviders": {
+    "tabLabel": "LLM 供應商",
+    "title": "LLM 供應商",
+    "subtitle": "管理 LLM 評審評分器使用的 LLM 供應商連線。",
+    "newButton": "新增供應商",
+    "searchPlaceholder": "搜尋供應商",
+    "defaultBadge": "預設",
+    "loadError": "載入 LLM 供應商失敗",
+    "columns": {
+      "name": "名稱",
+      "type": "類型",
+      "endpoint": "端點",
+      "defaultModel": "預設模型",
+      "default": "預設"
+    },
+    "empty": {
+      "title": "尚無 LLM 供應商",
+      "description": "LLM 供應商儲存您的 LLM 評審評分器所呼叫語言模型的連線詳細資料（端點 + 憑證）。新增一個以開始執行基於評審的評估。"
+    }
+  },
+  "logs": {
+    "noData": {
+      "title": "開始將資料傳送至 OpenObserve",
+      "description": "此組織中尚無資料，因此沒有可探索的串流。傳送您的第一筆日誌後，它們將自動顯示於此處 — 請選擇您想要的開始方式。",
+      "curl": "透過 Curl / HTTP API 傳送",
+      "curlDesc": "最快的方式 — 貼上一個指令，日誌即開始流入",
+      "shippers": "使用日誌傳送工具",
+      "shippersDesc": "Filebeat、Fluentbit、Fluentd、Vector、SyslogNg 等",
+      "otel": "OpenTelemetry",
+      "otelDesc": "供應商中立的 OTLP 擷取，適用於日誌、追蹤與指標",
+      "or": "或：",
+      "kubernetes": "Kubernetes",
+      "aws": "AWS / CloudWatch",
+      "linux": "Linux",
+      "windows": "Windows",
+      "askAi": "詢問 AI 以設定擷取"
+    },
+    "noStream": {
+      "title": "選擇一個串流以開始探索",
+      "description": "選擇一個串流，然後按下<strong>執行查詢</strong>。結果出現後，您可使用篩選條件、VRL 函式與自訂時間範圍進行精煉。",
+      "selectStream": "選擇串流",
+      "selectStreamDesc": "瀏覽日誌、追蹤、指標與 RUM 串流",
+      "queryGuide": "閱讀查詢指南",
+      "queryGuideDesc": "篩選條件、SQL 模式、VRL 與已儲存的檢視",
+      "recent": "最近："
+    },
+    "noEvents": {
+      "title": "找不到事件",
+      "descNoFilters": "在 {range} 內找不到任何事件。請嘗試放寬時間範圍以載入結果。",
+      "descWithFilters": "在選定的時段內，沒有任何項目符合<strong>此查詢</strong>。此串流在此處有資料 — 請嘗試放寬查詢列中的篩選條件。",
+      "descOutOfRange": "您的時段不包含此串流的任何資料。請跳至上次出現資料的時間。",
+      "jumpToData": "跳至最新資料",
+      "expandRange": "擴大時間範圍",
+      "expandRangeDescAbsolute": "切換至更廣的相對時間範圍",
+      "openHistory": "開啟搜尋歷史記錄",
+      "askAi": "詢問 AI 以修正我的查詢",
+      "selectedRange": "選定的範圍"
+    },
+    "error": {
+      "sqlError": "SQL 語法錯誤",
+      "sqlErrorDesc": "您的查詢有語法錯誤。請檢閱查詢編輯器中標示的錯誤。",
+      "streamNotFound": "找不到串流",
+      "streamNotFoundDesc": "選定的串流不存在或已被移除。",
+      "ftsNotConfigured": "未設定全文搜尋",
+      "ftsNotConfiguredDesc": "此串流沒有全文搜尋欄位。請設定一個以啟用關鍵字搜尋。",
+      "fieldNotFound": "找不到欄位",
+      "fieldNotFoundDesc": "您的查詢參照了一個或多個此串流中不存在的欄位。",
+      "functionNotDefined": "函式未定義",
+      "functionNotDefinedDesc": "您的查詢呼叫了未定義的 VRL 函式。",
+      "dataUnavailable": "資料檔案無法使用",
+      "dataUnavailableDesc": "此時間範圍的部分資料檔案無法存取。請嘗試其他時段。",
+      "dataTypeMismatch": "資料類型不符",
+      "dataTypeMismatchDesc": "您查詢中的某個欄位使用了不相容的資料類型。",
+      "executionError": "查詢執行失敗",
+      "executionErrorDesc": "執行您的查詢時發生錯誤。",
+      "serverError": "伺服器錯誤",
+      "serverErrorDesc": "伺服器發生內部錯誤。",
+      "generic": "搜尋錯誤",
+      "genericDesc": "擷取搜尋事件時發生錯誤。",
+      "configureStream": "設定串流",
+      "configureStreamDesc": "在串流設定中新增全文搜尋欄位",
+      "fixQuery": "修正查詢",
+      "fixQueryDesc": "在編輯器中檢閱並修正查詢",
+      "expandRange": "嘗試其他時間範圍",
+      "expandRangeDesc": "可存取的資料可能在其他時段",
+      "copyError": "複製錯誤詳細資料",
+      "traceId": "Trace ID：",
+      "askAi": "詢問 AI 以修正我的查詢",
+      "showDetail": "顯示詳細資料",
+      "hideDetail": "隱藏詳細資料"
+    }
+  },
+  "queryError": {
+    "sqlError": "SQL 語法錯誤",
+    "sqlErrorDesc": "您的查詢有語法錯誤。請檢閱編輯器中標示的錯誤。",
+    "streamNotFound": "找不到串流",
+    "streamNotFoundDesc": "選定的串流不存在或已被移除。",
+    "ftsNotConfigured": "未設定全文搜尋",
+    "ftsNotConfiguredDesc": "此串流沒有全文搜尋欄位。請設定一個以啟用關鍵字搜尋。",
+    "fieldNotFound": "找不到欄位",
+    "fieldNotFoundDesc": "您的查詢參照了一個或多個此串流中不存在的欄位。",
+    "functionNotDefined": "函式未定義",
+    "functionNotDefinedDesc": "您的查詢呼叫了未定義的 VRL 函式。",
+    "dataUnavailable": "資料檔案無法使用",
+    "dataUnavailableDesc": "此時間範圍的部分資料檔案無法存取。請嘗試其他時段。",
+    "dataTypeMismatch": "資料類型不符",
+    "dataTypeMismatchDesc": "您查詢中的某個欄位使用了不相容的資料類型。",
+    "executionError": "查詢執行失敗",
+    "executionErrorDesc": "執行您的查詢時發生錯誤。",
+    "serverError": "伺服器錯誤",
+    "serverErrorDesc": "伺服器發生內部錯誤。",
+    "generic": "查詢錯誤",
+    "genericDesc": "處理您的查詢時發生錯誤。",
+    "configureResource": "設定串流",
+    "configureResourceDesc": "在串流設定中新增全文搜尋欄位",
+    "fixQuery": "修正查詢",
+    "fixQueryDesc": "在編輯器中檢閱並修正查詢",
+    "expandRange": "嘗試其他時間範圍",
+    "expandRangeDesc": "可存取的資料可能在其他時段",
+    "copyError": "複製錯誤詳細資料",
+    "copied": "已複製！",
+    "traceId": "Trace ID：",
+    "askAi": "詢問 AI 以修正我的查詢",
+    "showDetail": "顯示詳細資料",
+    "hideDetail": "隱藏詳細資料"
+  },
+  "refreshButton": {
+    "justNow": "剛剛",
+    "secondsAgo": "{sec} 秒前",
+    "minutesAgo": "{min} 分鐘前",
+    "hoursAgo": "{h} 小時前",
+    "notYetRefreshed": "尚未重新整理",
+    "dataFresh": "資料為最新",
+    "dataGettingStale": "資料逐漸過時",
+    "dataStale": "資料已過時",
+    "lastRefreshed": "上次重新整理：{time}"
   }
 }
