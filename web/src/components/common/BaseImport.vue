@@ -106,13 +106,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :debounceTime="300"
                     v-model:query="jsonStr"
                     language="json"
-                    :class="
-                      jsonStr === '' && queryEditorPlaceholderFlag
-                        ? 'empty-query'
-                        : ''
-                    "
-                    @focus="queryEditorPlaceholderFlag = false"
-                    @blur="queryEditorPlaceholderFlag = true"
                   />
                 </div>
               </div>
@@ -158,13 +151,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :debounceTime="300"
                     v-model:query="jsonStr"
                     language="json"
-                    :class="
-                      jsonStr === '' && queryEditorPlaceholderFlag
-                        ? 'empty-query'
-                        : ''
-                    "
-                    @focus="queryEditorPlaceholderFlag = false"
-                    @blur="queryEditorPlaceholderFlag = true"
                   />
                 </div>
               </div>
@@ -351,7 +337,6 @@ export default defineComponent({
     const jsonArrayOfObj = ref<any[]>([]);
     const activeTab = ref(props.defaultActiveTab);
     const splitterModel = ref(60);
-    const queryEditorPlaceholderFlag = ref(true);
     const editorKey = ref(0); // Force editor to re-render when changes
     const isImporting = ref(false); // Track if import is in progress
 
@@ -538,7 +523,6 @@ export default defineComponent({
       jsonArrayOfObj,
       activeTab,
       splitterModel,
-      queryEditorPlaceholderFlag,
       editorKey,
       isImporting,
       handleBack,
@@ -558,12 +542,6 @@ export default defineComponent({
 </script>
 
 <style>
-.empty-query .monaco-editor-background {
-  background-image: url("../../assets/images/common/query-editor.png");
-  background-repeat: no-repeat;
-  background-size: 115px;
-}
-
 .editor-container-url .monaco-editor {
   height: v-bind('editorHeights.urlEditor') !important;
   overflow: auto;
