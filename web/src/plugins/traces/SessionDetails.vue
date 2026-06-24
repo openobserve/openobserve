@@ -441,8 +441,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div v-if="turnDetail(trace.traceId)?.otherCalls" class="stat-row">
                       <span class="tw:flex tw:items-center tw:gap-[0.25rem]">
                         {{ t('traces.sessionDetail.stats.otherCalls') }}
+                        <OIcon name="info" size="xs" class="tw:text-[var(--o2-text-secondary)] tw:cursor-default" />
                         <OTooltip max-width="220px">
-                          <OIcon name="info" size="xs" class="tw:text-[var(--o2-text-muted)] tw:cursor-default" />
                           <template #content>
                             {{ t('traces.sessionDetail.stats.otherCallsTooltip') }}<br />
                             <span class="tw:font-mono tw:text-[0.7rem]">{{ turnDetail(trace.traceId)!.otherOps.join(', ') }}</span>
@@ -1075,7 +1075,7 @@ onMounted(load);
   font-size: 0.7rem;
   font-weight: 600;
   letter-spacing: 0.02em;
-  color: var(--o2-text-muted);
+  color: var(--o2-text-secondary);
   margin-bottom: 0.25rem;
 }
 
@@ -1098,7 +1098,7 @@ onMounted(load);
   align-items: center;
   justify-content: space-between;
   font-size: 0.75rem;
-  color: var(--o2-text-muted);
+  color: var(--o2-text-secondary);
 
   &--total {
     color: var(--o2-text-primary);
