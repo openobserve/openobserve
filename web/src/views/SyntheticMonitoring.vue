@@ -875,18 +875,8 @@
         </div>
       </template>
 
-      <div class="drw-steps">
-        <div v-for="(step, i) in steps" :key="step.key"
-          class="drw-step" :class="{ 'drw-step--active': currentStep === step.key, 'drw-step--done': stepIdx > i }"
-          @click="currentStep = step.key">
-          <span class="step-num">
-            <OIcon v-if="stepIdx > i" name="check" size="xs" /><template v-else>{{ i + 1 }}</template>
-          </span>
-          {{ step.label }}
-        </div>
-      </div>
-      <div class="drw-body">
-        <template v-if="currentStep === 'type'">
+      <OStepper v-model="currentStep" :navigable="true">
+        <OStep name="type" title="Type" :done="stepIdx > 0">
           <div class="drw-slabel">Choose monitor type</div>
           <div class="type-grid">
             <div v-for="t in monitorTypes" :key="t.value" class="type-card" :class="{ 'type-card--on': form.type === t.value }" @click="form.type = t.value">
@@ -895,8 +885,8 @@
               <div class="type-desc">{{ t.desc }}</div>
             </div>
           </div>
-        </template>
-        <template v-if="currentStep === 'configure'">
+        </OStep>
+        <OStep name="configure" title="Configure" :done="stepIdx > 1">
           <div class="drw-slabel">Basic configuration</div>
           <div class="fstack">
             <OInput v-model="form.name" label="Monitor name *" />
@@ -922,8 +912,8 @@
               </div>
             </OCollapsible>
           </div>
-        </template>
-        <template v-if="currentStep === 'locations'">
+        </OStep>
+        <OStep name="locations" title="Locations" :done="stepIdx > 2">
           <div class="drw-slabel">Select check locations</div>
           <div style="font-size:12px;color:var(--o2-tab-text-color);margin-bottom:14px">Checks run simultaneously from all selected locations. Select at least one.</div>
           <div class="loc-section-label">Global locations</div>
@@ -945,8 +935,8 @@
               </div>
             </div>
           </div>
-        </template>
-        <template v-if="currentStep === 'alerts'">
+        </OStep>
+        <OStep name="alerts" title="Assertions & Alerts" :done="stepIdx > 3">
           <div class="drw-slabel">Assertions</div>
           <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px">
             <div v-for="(a, i) in form.assertions" :key="i" style="display:flex;align-items:center;gap:8px;padding:8px;border:1px solid var(--o2-border-color);border-radius:8px">
@@ -970,8 +960,8 @@
             <OSwitch v-model="form.notifyOnRecovery" label="Notify on recovery" size="sm" />
             <OSwitch v-model="form.renotify" label="Re-notify every 30 min while failing" size="sm" />
           </div>
-        </template>
-      </div>
+        </OStep>
+      </OStepper>
     </ODrawer>
   </div>
 </template>
@@ -995,6 +985,8 @@ import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OPagination from "@/lib/navigation/Pagination/OPagination.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
+import OStep from "@/lib/navigation/Stepper/OStep.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -1851,14 +1843,6 @@ const saveMonitor = () => { showDrawer.value=false; };
 .pl-step-title   { font-size:13px; font-weight:700; margin-bottom:3px; }
 .pl-step-desc    { font-size:12px; color:var(--o2-tab-text-color); line-height:1.5; }
 /* ── DRAWER ── */
-.drw-steps  { display:flex; align-items:center; padding:0 22px; border-bottom:1px solid var(--o2-border-color); overflow-x:auto; position:sticky; top:0; background:var(--o2-card-background); z-index:1; }
-.drw-step   { display:flex; align-items:center; gap:7px; padding:10px 10px; font-size:12px; font-weight:500; color:var(--o2-tab-text-color); cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-1px; white-space:nowrap; user-select:none; transition:color .12s; }
-.drw-step--active { color:var(--q-primary); border-bottom-color:var(--q-primary); font-weight:600; }
-.drw-step--done   { color:#16a34a; }
-.step-num   { width:20px; height:20px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; background:rgba(128,128,128,.18); color:var(--o2-tab-text-color); flex-shrink:0; }
-.drw-step--active .step-num { background:var(--q-primary); color:#fff; }
-.drw-step--done   .step-num { background:#16a34a; color:#fff; }
-.drw-body   { flex:1; overflow-y:auto; padding:18px 22px; }
 .drw-slabel { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:var(--o2-tab-text-color); margin-bottom:12px; }
 .drw-footer { display:flex; align-items:center; justify-content:space-between; padding:12px 22px; border-top:1px solid var(--o2-border-color); flex-shrink:0; }
 
