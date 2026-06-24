@@ -184,7 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           dashboardPanelData.data.type == 'stacked'
         "
       >
-        <div style="display: flex; flex-direction: row" class="tw:pl-3">
+        <div style="display: flex; flex-direction: row" class="tw:pl-3 tw:h-full">
           <!-- Separator between X and Breakdown/Pivot -->
           <OSeparator vertical class="tw:mr-4" />
           <div class="layout-name tw:whitespace-nowrap tw:min-w-32.5 tw:flex tw:items-center" style="min-width: 0 !important">
