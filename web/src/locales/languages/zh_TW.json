@@ -5622,7 +5622,8 @@
       "expandRangeDescAbsolute": "切換至更廣的相對時間範圍",
       "openHistory": "開啟搜尋歷史記錄",
       "askAi": "詢問 AI 以修正我的查詢",
-      "selectedRange": "選定的範圍"
+      "selectedRange": "選定的範圍",
+      "descDataAtBoundary": "資料流在此視窗中有資料，但沒有符合的事件。請嘗試查看搜尋記錄或向 AI 尋求協助。"
     },
     "error": {
       "sqlError": "SQL 語法錯誤",

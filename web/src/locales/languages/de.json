@@ -5732,7 +5732,8 @@
       "askAi": "Bitten Sie AI, meine Anfrage zu korrigieren",
       "selectedRange": "der gewählte Bereich",
       "descOutOfRange": "Ihr Zeitfenster enthält keine Daten aus diesem Stream. Springen Sie zu dem Zeitpunkt, an dem zuletzt Daten gesehen wurden.",
-      "jumpToData": "Zu den neuesten Daten springen"
+      "jumpToData": "Zu den neuesten Daten springen",
+      "descDataAtBoundary": "Der Stream enthält Daten in diesem Zeitfenster, aber keine Ereignisse stimmten überein. Überprüfen Sie Ihren Suchverlauf oder bitten Sie AI um Hilfe."
     },
     "error": {
       "sqlError": "SQL-Syntaxfehler",

@@ -5732,7 +5732,8 @@
       "askAi": "Demandez à AI de corriger ma requête",
       "selectedRange": "la gamme sélectionnée",
       "descOutOfRange": "Votre fenêtre temporelle ne contient aucune donnée de ce flux. Accédez au moment où des données ont été vues pour la dernière fois.",
-      "jumpToData": "Accéder aux données les plus récentes"
+      "jumpToData": "Accéder aux données les plus récentes",
+      "descDataAtBoundary": "Le flux contient des données dans cette fenêtre, mais aucun événement ne correspond. Essayez de consulter votre historique de recherche ou de demander de l'aide à AI."
     },
     "error": {
       "sqlError": "Erreur de syntaxe SQL",

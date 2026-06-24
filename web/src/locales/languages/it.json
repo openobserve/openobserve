@@ -5744,7 +5744,8 @@
       "askAi": "Chiedi all'IA di risolvere la mia domanda",
       "selectedRange": "la gamma selezionata",
       "descOutOfRange": "La tua finestra temporale non contiene dati da questo stream. Vai al momento in cui i dati sono stati visti l'ultima volta.",
-      "jumpToData": "Vai ai dati più recenti"
+      "jumpToData": "Vai ai dati più recenti",
+      "descDataAtBoundary": "Lo stream contiene dati in questa finestra, ma nessun evento corrisponde. Prova a controllare la cronologia delle ricerche o a chiedere aiuto a AI."
     },
     "error": {
       "sqlError": "Errore di sintassi SQL",

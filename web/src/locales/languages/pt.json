@@ -5732,7 +5732,8 @@
       "askAi": "Peça à IA que corrija minha consulta",
       "selectedRange": "o intervalo selecionado",
       "descOutOfRange": "Sua janela de tempo não contém nenhum dado deste stream. Vá para quando os dados foram vistos pela última vez.",
-      "jumpToData": "Ir para os dados mais recentes"
+      "jumpToData": "Ir para os dados mais recentes",
+      "descDataAtBoundary": "O stream tem dados nesta janela, mas nenhum evento correspondeu. Tente verificar seu histórico de pesquisa ou pedir ajuda a AI."
     },
     "error": {
       "sqlError": "Erro de sintaxe SQL",

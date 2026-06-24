@@ -5746,7 +5746,8 @@
       "askAi": "AI'dan sorgumu düzeltmesini isteyin",
       "selectedRange": "Seçilen aralık",
       "descOutOfRange": "Zaman pencereniz bu akıştan herhangi bir veri içermiyor. Verinin en son görüldüğü zamana geçin.",
-      "jumpToData": "En son verilere geç"
+      "jumpToData": "En son verilere geç",
+      "descDataAtBoundary": "Akışta bu pencerede veri var ancak hiçbir olay eşleşmedi. Arama geçmişinizi kontrol etmeyi veya AI'dan yardım istemeyi deneyin."
     },
     "error": {
       "sqlError": "SQL sözdizimi hatası",

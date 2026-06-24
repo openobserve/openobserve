@@ -5746,7 +5746,8 @@
       "askAi": "Vraag AI om mijn vraag op te lossen",
       "selectedRange": "het geselecteerde bereik",
       "descOutOfRange": "Je tijdvenster bevat geen gegevens uit deze stream. Spring naar het moment waarop de gegevens voor het laatst zijn gezien.",
-      "jumpToData": "Naar nieuwste gegevens springen"
+      "jumpToData": "Naar nieuwste gegevens springen",
+      "descDataAtBoundary": "De stream bevat gegevens in dit venster, maar er kwamen geen gebeurtenissen overeen. Controleer je zoekgeschiedenis of vraag AI om hulp."
     },
     "error": {
       "sqlError": "SQL-syntaxisfout",

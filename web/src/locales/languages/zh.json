@@ -5731,7 +5731,8 @@
       "askAi": "让 AI 修复我的查询",
       "selectedRange": "所选范围",
       "descOutOfRange": "您的时间窗口不包含来自此流的任何数据。跳转到最后出现数据的时间。",
-      "jumpToData": "跳转到最新数据"
+      "jumpToData": "跳转到最新数据",
+      "descDataAtBoundary": "数据流在此窗口中有数据，但没有匹配的事件。请尝试查看搜索历史或向 AI 寻求帮助。"
     },
     "error": {
       "sqlError": "SQL 语法错误",
