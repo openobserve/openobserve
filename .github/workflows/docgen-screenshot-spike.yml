@@ -1,0 +1,117 @@
+name: DocGen Screenshot Spike
+
+# THROWAWAY de-risking spike for DocGen v2 (real screenshots from the deployed env).
+# Goal: prove the unknowns before building the full screenshots job —
+#   1. the self-hosted repo-openobserve runner can run a headless browser,
+#   2. it can reach the internal o2latestmain env,
+#   3. OpenCode + Playwright MCP works headless in CI (THE open question), and
+#   4. it can log in to o2latestmain and capture a screenshot.
+# Triggered by PUSH to this branch (so it runs from the branch on the self-hosted runner without
+# touching main) or manual dispatch. Delete this workflow + branch once v2 is built.
+#
+# REQUIRED SECRETS (add to the openobserve repo — values from tests/ui-testing/.env o2latestmain block):
+#   O2LATESTMAIN_URL      = https://o2latestmain.o2aks1.internal.zinclabs.dev
+#   O2LATESTMAIN_EMAIL    = latest@openobserve.ai
+#   O2LATESTMAIN_PASSWORD = <the ZO_ROOT_USER_PASSWORD for o2latestmain>
+#   (DEEPSEEK_API_KEY already exists.)
+
+on:
+  push:
+    branches: [ci/docgen-screenshot-spike]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  spike:
+    runs-on: repo-openobserve-standard-4   # self-hosted; internal-network access (per release.yml)
+    timeout-minutes: 25
+    env:
+      O2_URL: ${{ secrets.O2LATESTMAIN_URL }}
+      O2_EMAIL: ${{ secrets.O2LATESTMAIN_EMAIL }}
+      O2_PASSWORD: ${{ secrets.O2LATESTMAIN_PASSWORD }}
+      DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+    steps:
+      - name: Check secrets present
+        run: |
+          for v in O2_URL O2_EMAIL O2_PASSWORD DEEPSEEK_API_KEY; do
+            [ -n "${!v}" ] || { echo "::error::missing secret $v"; exit 1; }
+          done
+          echo "secrets present; env=$O2_URL"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # ---- UNKNOWN #1/#2/#4: can the runner reach the env + run a headless browser + log in? ----
+      - name: Layer A — plain Playwright login + capture (foundation)
+        id: layerA
+        run: |
+          npm i -g playwright@1.50.1 >/dev/null 2>&1 || npm i -g playwright
+          npx playwright install chromium   # browser deps assumed present (e2e runs here)
+          cat > spikeA.mjs <<'JS'
+          import { chromium } from 'playwright';
+          const url = process.env.O2_URL, email = process.env.O2_EMAIL, pass = process.env.O2_PASSWORD;
+          const b = await chromium.launch({ headless: true });
+          const p = await (await b.newContext({ ignoreHTTPSErrors: true })).newPage();
+          await p.goto(url + '/web/login', { waitUntil: 'domcontentloaded', timeout: 60000 }).catch(()=>p.goto(url, {waitUntil:'domcontentloaded'}));
+          // Fill login (OpenObserve login form) — try data-test then generic input types.
+          const eSel = '[data-test="login-user-id"], input[type="email"], input#email';
+          const pSel = '[data-test="login-password"], input[type="password"], input#password';
+          await p.fill(eSel, email); await p.fill(pSel, pass);
+          await p.click('[data-test="login-sign-in"], button[type="submit"], button:has-text("Login")');
+          await p.waitForTimeout(8000);
+          await p.screenshot({ path: 'shotA.png', fullPage: true });
+          console.log('Layer A captured. URL now:', p.url());
+          await b.close();
+          JS
+          node spikeA.mjs && echo "layerA=ok" >> "$GITHUB_OUTPUT" || { echo "::warning::Layer A failed"; echo "layerA=fail" >> "$GITHUB_OUTPUT"; }
+
+      # ---- UNKNOWN #3: does OpenCode + Playwright MCP work headless in CI? (the real v2 path) ----
+      - name: Layer B — OpenCode + Playwright MCP login + capture
+        id: layerB
+        run: |
+          npm install -g opencode-ai@1.17.7 >/dev/null 2>&1 || { echo "::warning::opencode install failed"; echo "layerB=install-fail" >> "$GITHUB_OUTPUT"; exit 0; }
+          # opencode config: DeepSeek provider + Playwright MCP as a local server (headless).
+          cat > opencode.jsonc <<'JSON'
+          {
+            "$schema": "https://opencode.ai/config.json",
+            "provider": {
+              "deepseek": {
+                "npm": "@ai-sdk/openai-compatible",
+                "name": "DeepSeek",
+                "options": { "baseURL": "https://api.deepseek.com", "apiKey": "{env:DEEPSEEK_API_KEY}" },
+                "models": { "deepseek-v4-pro": { "name": "DeepSeek-V4-Pro", "limit": { "context": 1048576, "output": 262144 } } }
+              }
+            },
+            "model": "deepseek/deepseek-v4-pro",
+            "mcp": {
+              "playwright": {
+                "type": "local",
+                "command": ["npx", "-y", "@playwright/mcp@latest", "--headless", "--isolated"],
+                "enabled": true
+              }
+            }
+          }
+          JSON
+          # Ask the agent to drive the browser via the Playwright MCP tools and save a screenshot.
+          timeout 600 opencode run --model deepseek/deepseek-v4-pro \
+            "Use the Playwright MCP browser tools (navigate, type/fill, click, take_screenshot) to: open ${O2_URL}/web/login , log in with email '${O2_EMAIL}' and the password in env O2_PASSWORD, wait for the app to load, then save a full-page screenshot to ./shotB.png . Report the final URL. Use ONLY the browser tools; do not write code files." \
+            && echo "layerB=ran" >> "$GITHUB_OUTPUT" || { echo "::warning::Layer B (opencode+MCP) failed"; echo "layerB=fail" >> "$GITHUB_OUTPUT"; }
+          ls -la shotB.png 2>/dev/null && echo "  Layer B produced shotB.png" || echo "::warning::no shotB.png"
+
+      - name: Results + upload
+        if: always()
+        run: |
+          echo "Layer A (plain Playwright): ${{ steps.layerA.outputs.layerA }}"
+          echo "Layer B (opencode+MCP):    ${{ steps.layerB.outputs.layerB }}"
+          ls -la shot*.png 2>/dev/null || echo "no screenshots"
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: docgen-spike-shots
+          path: shot*.png
+          if-no-files-found: warn
