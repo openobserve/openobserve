@@ -579,4 +579,109 @@ describe("OverrideConfig", () => {
       expect(wrapper.vm.columns.length).toBe(initialColumnsLength + 1);
     });
   });
+
+  describe("Multi-query column aggregation", () => {
+    afterEach(() => {
+      // Restore the single-query fixture so other suites are unaffected.
+      mockDashboardPanelData.data.queries = [
+        {
+          fields: {
+            x: [
+              { alias: "timestamp", label: "Timestamp" },
+              { alias: "user_id", label: "User ID" },
+            ],
+            y: [
+              { alias: "count", label: "Count" },
+              { alias: "duration", label: "Duration" },
+            ],
+          },
+        },
+      ];
+    });
+
+    it("should include fields from the 2nd query, not just queries[0]", () => {
+      mockDashboardPanelData.data.queries = [
+        { fields: { x: [{ alias: "svc", label: "Service" }], y: [{ alias: "cnt", label: "Count" }] } },
+        { fields: { x: [{ alias: "region", label: "Region" }], y: [{ alias: "errs", label: "Errors" }] } },
+      ];
+
+      wrapper = createWrapper();
+
+      const aliases = wrapper.vm.columns.map((c: any) => c.alias);
+      expect(aliases).toContain("region");
+      expect(aliases).toContain("errs");
+      expect(wrapper.vm.columns.length).toBe(4);
+    });
+
+    it("should order columns as all-X then all-breakdown then all-Y across queries", () => {
+      mockDashboardPanelData.data.queries = [
+        {
+          fields: {
+            x: [{ alias: "a", label: "A" }],
+            breakdown: [{ alias: "bd1", label: "BD1" }],
+            y: [{ alias: "b", label: "B" }],
+          },
+        },
+        {
+          fields: {
+            x: [{ alias: "c", label: "C" }],
+            breakdown: [{ alias: "bd2", label: "BD2" }],
+            y: [{ alias: "d", label: "D" }],
+          },
+        },
+      ];
+
+      wrapper = createWrapper();
+
+      const aliases = wrapper.vm.columns.map((c: any) => c.alias);
+      // x(all) -> breakdown(all) -> y(all)
+      expect(aliases).toEqual(["a", "c", "bd1", "bd2", "b", "d"]);
+    });
+
+    it("should de-duplicate columns sharing the same alias across queries", () => {
+      mockDashboardPanelData.data.queries = [
+        { fields: { x: [{ alias: "svc", label: "Service" }], y: [{ alias: "cnt", label: "Count" }] } },
+        { fields: { x: [{ alias: "svc", label: "Service (q2)" }], y: [{ alias: "other", label: "Other" }] } },
+      ];
+
+      wrapper = createWrapper();
+
+      const aliases = wrapper.vm.columns.map((c: any) => c.alias);
+      expect(aliases).toEqual(["svc", "cnt", "other"]);
+      // First occurrence wins (query 1's label is kept).
+      expect(wrapper.vm.columns[0].label).toBe("Service");
+    });
+
+    it("should mark X and breakdown fields non-numeric and Y fields numeric", () => {
+      mockDashboardPanelData.data.queries = [
+        {
+          fields: {
+            x: [{ alias: "x1", label: "X1" }],
+            breakdown: [{ alias: "bd", label: "BD" }],
+            y: [{ alias: "y1", label: "Y1" }],
+          },
+        },
+      ];
+
+      wrapper = createWrapper();
+
+      const byAlias = Object.fromEntries(
+        wrapper.vm.columns.map((c: any) => [c.alias, c.isNumeric]),
+      );
+      expect(byAlias.x1).toBe(false);
+      expect(byAlias.bd).toBe(false);
+      expect(byAlias.y1).toBe(true);
+    });
+
+    it("should ignore a query with missing fields object", () => {
+      mockDashboardPanelData.data.queries = [
+        { fields: { x: [{ alias: "svc", label: "Service" }], y: [{ alias: "cnt", label: "Count" }] } },
+        {}, // malformed / empty query
+      ];
+
+      wrapper = createWrapper();
+
+      expect(wrapper.vm.columns.map((c: any) => c.alias)).toEqual(["svc", "cnt"]);
+    });
+  });
 });

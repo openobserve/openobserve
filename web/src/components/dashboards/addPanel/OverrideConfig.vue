@@ -144,12 +144,25 @@ export default defineComponent({
             columnName === "value" || columnName.startsWith("value_"),
         }));
       } else {
-        const x = dashboardPanelData.data.queries[0].fields.x || [];
-        const y = dashboardPanelData.data.queries[0].fields.y || [];
-        columns.value = [
-          ...x.map((col: any) => ({ ...col, isNumeric: false })),
-          ...y.map((col: any) => ({ ...col, isNumeric: true })),
-        ];
+        const seen = new Set<string>();
+        const collected: any[] = [];
+        const addField = (col: any, isNumeric: boolean) => {
+          const key = String(col?.alias ?? "").toLowerCase();
+          if (!key || seen.has(key)) return;
+          seen.add(key);
+          collected.push({ ...col, isNumeric });
+        };
+        const queries = dashboardPanelData.data.queries || [];
+        queries.forEach((q: any) =>
+          (q?.fields?.x || []).forEach((c: any) => addField(c, false)),
+        );
+        queries.forEach((q: any) =>
+          (q?.fields?.breakdown || []).forEach((c: any) => addField(c, false)),
+        );
+        queries.forEach((q: any) =>
+          (q?.fields?.y || []).forEach((c: any) => addField(c, true)),
+        );
+        columns.value = collected;
       }
     };
 
