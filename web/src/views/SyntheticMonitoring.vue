@@ -33,21 +33,22 @@
     <div class="syn-filter-bar">
       <!-- View switcher -->
       <OToggleGroup
+        v-if="areMultiTypeTestEnabled"
         :model-value="activeTab"
-        @update:model-value="(v) => { activeTab = v as string; currentPage = 1 }"
+        @update:model-value="(v) => { activeTab = v as string }"
       >
         <OToggleGroupItem v-for="tab in tabs" :key="tab.key" :value="tab.key" size="sm">
           {{ tab.label }}
         </OToggleGroupItem>
       </OToggleGroup>
 
-      <div class="syn-filter-sep" />
+      <div v-if="areMultiTypeTestEnabled" class="syn-filter-sep" />
 
       <!-- Status filter — only on All Monitors tab -->
       <template v-if="activeTab === 'monitors'">
         <OToggleGroup
           :model-value="statusFilter"
-          @update:model-value="(v) => { statusFilter = v as string; currentPage = 1 }"
+          @update:model-value="(v) => { statusFilter = v as string }"
         >
           <OToggleGroupItem v-for="s in statusTabs" :key="s.filter" :value="s.filter" size="sm">
             <span v-if="s.filter !== 'all'" class="syn-pill-dot" :class="'sdot-' + s.filter.toLowerCase()" />
@@ -68,16 +69,16 @@
       <!-- Type + Location dropdowns -->
       <template v-if="activeTab === 'monitors'">
         <OSelect
+          v-if="areMultiTypeTestEnabled"
           v-model="typeFilter"
           :options="typeOpts"
           size="md"
-          @update:model-value="currentPage = 1"
-        />
+          />
         <OSelect
+          v-if="areMultiTypeTestEnabled"
           v-model="locationFilter"
           :options="locationOpts"
           size="md"
-          @update:model-value="currentPage = 1"
         />
       </template>
 
@@ -91,203 +92,17 @@
       </template>
     </div>
 
-    <!-- ── ALL MONITORS ── -->
-    <template v-if="activeTab === 'monitors'">
-      <OTable
-        :columns="monitorTableColumns"
-        :data="filteredMonitors"
-        pagination="client"
-        :page-size="20"
-        :page-size-options="[10, 20, 25, 50]"
-        row-key="id"
-        :show-global-filter="false"
-        :enable-column-resize="true"
-        footer-title="Monitors"
-        empty-message="No monitors found. Adjust filters or create your first monitor."
-        data-test="synthetic-monitoring-all-monitors-table"
-        @row-click="(row) => openDetail(row)"
-      >
-        <!-- Status dot -->
-        <template #cell-status="{ row }">
-          <span class="dot" :class="'dot--' + (row as any).status.toLowerCase()" />
-        </template>
-
-        <!-- Monitor name -->
-        <template #cell-name="{ row }">
-          <div class="mon-name">{{ (row as any).name }}</div>
-        </template>
-
-        <!-- URL -->
-        <template #cell-url="{ row }">
-          <div class="mon-url">{{ (row as any).url }}</div>
-        </template>
-
-        <!-- Type badge -->
-        <template #cell-type="{ row }">
-          <OBadge :variant="monitorTypeBadgeVariant((row as any).type)" size="sm">{{ (row as any).type }}</OBadge>
-        </template>
-
-        <!-- History sparkbars -->
-        <template #cell-history="{ row }">
-          <div class="spark">
-            <span
-              v-for="(tick, i) in (row as any).history"
-              :key="i"
-              class="spark-bar"
-              :class="'spark--' + tick.status"
-              @mouseenter="showSparkTip($event, tick)"
-              @mouseleave="hideSparkTip"
-            />
-          </div>
-        </template>
-
-        <!-- Response time -->
-        <template #cell-responseTime="{ row }">
-          <span class="mono" :class="rtCls((row as any).responseTime)">{{ (row as any).responseTime ?? '—' }}</span>
-        </template>
-
-        <!-- Uptime progress bar -->
-        <template #cell-uptime="{ row }">
-          <div class="uptime-row">
-            <OProgressBar
-              :value="(row as any).uptime / 100"
-              :variant="(row as any).uptime >= 99 ? 'default' : (row as any).uptime >= 95 ? 'warning' : 'danger'"
-              size="xs"
-              class="tw:flex-1"
-            />
-            <span
-              class="mono"
-              :class="(row as any).uptime >= 99 ? 'c-g' : (row as any).uptime >= 95 ? 'c-a' : 'c-r'"
-              style="min-width:44px;text-align:right;font-size:12px"
-            >{{ (row as any).uptime }}%</span>
-          </div>
-        </template>
-
-        <!-- Locations cell with tooltip -->
-        <template #cell-locations="{ row }">
-          <div class="locs-cell" @mouseenter="showLoc($event, (row as any).locations)" @mouseleave="hideLoc">
-            <span class="loc-first">{{ (row as any).locations[0] }}</span>
-            <span v-if="(row as any).locations.length > 1" class="loc-badge">+{{ (row as any).locations.length - 1 }}</span>
-          </div>
-        </template>
-
-        <!-- Interval -->
-        <template #cell-interval="{ row }">
-          <span class="tw:text-secondary">{{ (row as any).interval }}</span>
-        </template>
-
-        <!-- Last check -->
-        <template #cell-lastCheck="{ row }">
-          <span class="tw:text-secondary">{{ (row as any).lastCheck }}</span>
-        </template>
-
-        <!-- Row actions -->
-        <template #cell-actions="{ row }">
-          <div class="row-actions" @click.stop>
-            <OButton variant="ghost" size="icon" title="Run now" data-test="synthetic-monitoring-run-btn" @click.stop><OIcon name="play-arrow" size="sm" /></OButton>
-            <OButton variant="ghost" size="icon" title="Edit" data-test="synthetic-monitoring-edit-btn" @click.stop="openEdit((row as any))"><OIcon name="edit" size="sm" /></OButton>
-            <OButton variant="ghost" size="icon" title="Pause" data-test="synthetic-monitoring-pause-btn" @click.stop><OIcon name="pause" size="sm" /></OButton>
-            <OButton variant="destructive" size="icon" title="Delete" data-test="synthetic-monitoring-delete-btn" @click.stop><OIcon name="delete" size="sm" /></OButton>
-          </div>
-        </template>
-      </OTable>
-    </template>
-
-    <!-- ── BROWSER TESTS ── -->
-    <template v-else-if="activeTab === 'browser'">
-      <div class="syn-table-scroll">
-        <table class="syn-table">
-          <thead>
-            <tr>
-              <th class="syn-th" style="width:36px"></th>
-              <th class="syn-th">Test name</th>
-              <th class="syn-th" style="width:220px">URL</th>
-              <th class="syn-th" style="width:72px">Steps</th>
-              <th class="syn-th" style="width:190px">Status · Last 24h</th>
-              <th class="syn-th right" style="width:110px">Page load</th>
-              <th class="syn-th right" style="width:90px">Uptime 7d</th>
-              <th class="syn-th" style="width:100px">Last run</th>
-              <th class="syn-th" style="width:110px"></th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="m in browserMonitors" :key="m.id" class="syn-row">
-              <td class="syn-td td-center"><span class="dot" :class="'dot--'+m.status.toLowerCase()" /></td>
-              <td class="syn-td"><div class="mon-name">{{ m.name }}</div></td>
-              <td class="syn-td"><div class="mon-url">{{ m.url }}</div></td>
-              <td class="syn-td td-muted">{{ m.steps }} steps</td>
-              <td class="syn-td"><div class="spark"><span v-for="(t,i) in m.history" :key="i" class="spark-bar" :class="'spark--'+t.status" @mouseenter="showSparkTip($event, t)" @mouseleave="hideSparkTip" /></div></td>
-              <td class="syn-td td-right"><span class="mono" :class="rtCls(m.responseTime)">{{ m.responseTime }}</span></td>
-              <td class="syn-td td-right"><span class="mono" :class="m.uptime>=99?'c-g':m.uptime>=95?'c-a':'c-r'">{{ m.uptime }}%</span></td>
-              <td class="syn-td td-muted">{{ m.lastCheck }}</td>
-              <td class="syn-td td-center" @click.stop>
-                <div class="row-actions">
-                  <OButton variant="ghost" size="icon" title="Run" @click.stop><OIcon name="play-arrow" size="sm" /></OButton>
-                  <OButton variant="ghost" size="icon" title="Edit" @click.stop="openEdit(m)"><OIcon name="edit" size="sm" /></OButton>
-                  <OButton variant="destructive" size="icon" title="Delete" @click.stop><OIcon name="delete" size="sm" /></OButton>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <div class="syn-footer">
-        <div class="syn-footer-total">{{ browserMonitors.length }} Browser Tests</div>
-        <div style="flex:1" />
-        <div class="syn-footer-right">
-          <span class="syn-footer-info">Showing 1 - {{ browserMonitors.length }} of {{ browserMonitors.length }}</span>
-        </div>
-      </div>
-    </template>
-
-    <!-- ── API TESTS ── -->
-    <template v-else-if="activeTab === 'api'">
-      <div class="syn-table-scroll">
-        <table class="syn-table">
-          <thead>
-            <tr>
-              <th class="syn-th" style="width:36px"></th>
-              <th class="syn-th">Test name</th>
-              <th class="syn-th" style="width:64px">Method</th>
-              <th class="syn-th" style="width:240px">Endpoint</th>
-              <th class="syn-th" style="width:90px">Assertions</th>
-              <th class="syn-th" style="width:190px">Status · Last 24h</th>
-              <th class="syn-th right" style="width:80px">P50</th>
-              <th class="syn-th right" style="width:90px">Uptime 7d</th>
-              <th class="syn-th" style="width:100px">Last run</th>
-              <th class="syn-th" style="width:110px"></th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="m in apiMonitors" :key="m.id" class="syn-row">
-              <td class="syn-td td-center"><span class="dot" :class="'dot--'+m.status.toLowerCase()" /></td>
-              <td class="syn-td"><div class="mon-name">{{ m.name }}</div></td>
-              <td class="syn-td"><span class="http-method" :class="'method--'+m.method.toLowerCase()">{{ m.method }}</span></td>
-              <td class="syn-td"><div class="mon-url">{{ m.url }}</div></td>
-              <td class="syn-td td-muted">{{ m.assertions }} checks</td>
-              <td class="syn-td"><div class="spark"><span v-for="(t,i) in m.history" :key="i" class="spark-bar" :class="'spark--'+t.status" @mouseenter="showSparkTip($event, t)" @mouseleave="hideSparkTip" /></div></td>
-              <td class="syn-td td-right"><span class="mono" :class="rtCls(m.responseTime)">{{ m.responseTime ?? '—' }}</span></td>
-              <td class="syn-td td-right"><span class="mono" :class="m.uptime>=99?'c-g':m.uptime>=95?'c-a':'c-r'">{{ m.uptime }}%</span></td>
-              <td class="syn-td td-muted">{{ m.lastCheck }}</td>
-              <td class="syn-td td-center" @click.stop>
-                <div class="row-actions">
-                  <OButton variant="ghost" size="icon" title="Run" @click.stop><OIcon name="play-arrow" size="sm" /></OButton>
-                  <OButton variant="ghost" size="icon" title="Edit" @click.stop="openEdit(m)"><OIcon name="edit" size="sm" /></OButton>
-                  <OButton variant="destructive" size="icon" title="Delete" @click.stop><OIcon name="delete" size="sm" /></OButton>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <div class="syn-footer">
-        <div class="syn-footer-total">{{ apiMonitors.length }} API Tests</div>
-        <div style="flex:1" />
-        <div class="syn-footer-right">
-          <span class="syn-footer-info">Showing 1 - {{ apiMonitors.length }} of {{ apiMonitors.length }}</span>
-        </div>
-      </div>
-    </template>
+    <!-- ── MONITORS TABLE (All Monitors / Browser Tests / API Tests) ── -->
+    <MonitorTable
+      v-if="activeTab === 'monitors' || activeTab === 'browser' || activeTab === 'api'"
+      :mode="monitorTableMode"
+      :data="activeTab === 'browser' ? browserMonitors : activeTab === 'api' ? apiMonitors : filteredMonitors"
+      :footer-title="activeTab === 'browser' ? 'Browser Tests' : activeTab === 'api' ? 'API Tests' : 'Monitors'"
+      :empty-message="activeTab === 'browser' ? 'No browser tests found.' : activeTab === 'api' ? 'No API tests found.' : 'No monitors found. Adjust filters or create your first monitor.'"
+      data-test="synthetic-monitoring-monitors-table"
+      @row-click="(row) => activeTab === 'monitors' && openDetail(row)"
+      @edit="openEdit"
+    />
 
     <!-- ── PRIVATE LOCATIONS ── -->
     <template v-else-if="activeTab === 'private'">
@@ -364,46 +179,12 @@
     </template>
 
 
-    <!-- Floating locations tooltip -->
-    <Teleport to="body">
-      <div v-if="locTip.show" class="loc-float-tip" :style="{ left: locTip.x + 'px', top: locTip.y + 'px' }">
-        <div v-for="l in locTip.locs" :key="l" class="loc-float-item"><span class="loc-float-dot" />{{ l }}</div>
-      </div>
-    </Teleport>
-
-    <!-- Spark bar detail tooltip -->
-    <Teleport to="body">
-      <div v-if="sparkTip.show && sparkTip.tick"
-        class="spark-tooltip"
-        :style="{ left: sparkTip.x + 'px', top: sparkTip.y + 'px' }"
-        @mouseenter="keepSparkTip"
-        @mouseleave="hideSparkTip"
-      >
-        <div class="stt-header">
-          <span class="stt-time">{{ sparkTip.tick.hour }} – {{ sparkTip.tick.nextHour }}</span>
-          <span class="stt-badge" :class="'stt-badge--' + sparkTip.tick.status">
-            {{ sparkTip.tick.status === 'up' ? '✓ Up' : sparkTip.tick.status === 'down' ? '✗ Down' : '⚠ Degraded' }}
-          </span>
-        </div>
-        <div class="stt-divider" />
-        <div class="stt-checks">
-          <div v-for="c in sparkTip.tick.checks" :key="c.loc" class="stt-check">
-            <span class="stt-dot" :class="c.ok ? 'stt-dot--up' : 'stt-dot--down'" />
-            <span class="stt-loc">{{ c.loc }}</span>
-            <span class="stt-ms">{{ c.ms !== null ? c.ms + 'ms' : 'Timeout' }}</span>
-          </div>
-        </div>
-        <div v-if="sparkTip.tick.avgMs !== null" class="stt-avg">Avg · {{ sparkTip.tick.avgMs }}ms</div>
-        <div class="stt-arrow" />
-      </div>
-    </Teleport>
-
     <!-- Map dot tooltip -->
     <Teleport to="body">
       <div v-if="mapTip.show && mapTip.stat"
         class="map-dot-tip"
         :style="{ left: mapTip.x + 'px', top: mapTip.y + 'px' }"
-        @mouseenter="() => { if (mapTipTimer) { clearTimeout(mapTipTimer); mapTipTimer = null; } }"
+        @mouseenter="keepMapTip"
         @mouseleave="hideMapTip">
         <div class="stt-header">
           <span class="stt-time">{{ mapTip.stat.flag }} {{ mapTip.stat.label }}</span>
@@ -995,12 +776,12 @@ import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
 import OStep from "@/lib/navigation/Stepper/OStep.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
-import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
-import OTable from "@/lib/core/Table/OTable.vue";
-import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import MonitorTable from "@/components/synthetic-monitoring/MonitorTable.vue";
 
 const router = useRouter();
+
+const areMultiTypeTestEnabled = false;
 
 const monitorTypeBadgeVariant = (type: string): string => {
   const map: Record<string, string> = {
@@ -1016,6 +797,7 @@ const dockerInstallCmd = `docker run -d \\
   openobserve/syn-agent:latest`;
 
 const activeTab      = ref("monitors");
+const monitorTableMode = computed(() => activeTab.value as 'monitors' | 'browser' | 'api');
 const statusFilter   = ref("all");
 const typeFilter     = ref("all");
 const locationFilter = ref("all");
@@ -1024,127 +806,7 @@ const showDrawer     = ref(false);
 const editTarget     = ref<any>(null);
 const currentStep    = ref(0);
 
-// ── Locations tooltip ──────────────────────────────────────────────────
-const locTip = ref({ show: false, x: 0, y: 0, locs: [] as string[] });
-let locHideTimer: ReturnType<typeof setTimeout> | null = null;
-const showLoc = (e: MouseEvent, locs: string[]) => {
-  if (locHideTimer) { clearTimeout(locHideTimer); locHideTimer = null; }
-  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-  locTip.value = { show: true, x: rect.left, y: rect.bottom + 6, locs };
-};
-const hideLoc = () => { locHideTimer = setTimeout(() => { locTip.value.show = false; }, 120); };
-
-// ── Spark bar tooltip ──────────────────────────────────────────────────────
-const sparkTip = ref({ show: false, x: 0, y: 0, tick: null as HistoryTick | null });
-let sparkHideTimer: ReturnType<typeof setTimeout> | null = null;
-const showSparkTip = (e: MouseEvent, tick: HistoryTick) => {
-  if (sparkHideTimer) { clearTimeout(sparkHideTimer); sparkHideTimer = null; }
-  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-  sparkTip.value = { show: true, x: rect.left + rect.width / 2, y: rect.top - 10, tick };
-};
-const hideSparkTip = () => { sparkHideTimer = setTimeout(() => { sparkTip.value.show = false; }, 80); };
-const keepSparkTip = () => { if (sparkHideTimer) { clearTimeout(sparkHideTimer); sparkHideTimer = null; } };
-
-// ── Column resize ─────────────────────────────────────────────────────
-const monitorTableColumns: OTableColumnDef[] = [
-  {
-    id: 'status',
-    header: '',
-    accessorKey: 'status',
-    size: 36,
-    minSize: 36,
-    sortable: false,
-    meta: { align: 'center', cellClass: 'tw:px-0' },
-  },
-  {
-    id: 'name',
-    header: 'Monitor',
-    accessorKey: 'name',
-    size: 200,
-    minSize: 120,
-    sortable: true,
-    meta: { isName: true, flex: true },
-  },
-  {
-    id: 'url',
-    header: 'URL',
-    accessorKey: 'url',
-    size: 220,
-    minSize: 140,
-    sortable: false,
-  },
-  {
-    id: 'type',
-    header: 'Type',
-    accessorKey: 'type',
-    size: 88,
-    minSize: 72,
-    sortable: true,
-  },
-  {
-    id: 'history',
-    header: 'Status · Last 24h',
-    accessorKey: 'history',
-    size: 180,
-    minSize: 140,
-    sortable: false,
-  },
-  {
-    id: 'responseTime',
-    header: 'Response',
-    accessorKey: 'responseTime',
-    size: 90,
-    minSize: 72,
-    sortable: true,
-    meta: { align: 'right' },
-  },
-  {
-    id: 'uptime',
-    header: 'Uptime 7d',
-    accessorKey: 'uptime',
-    size: 130,
-    minSize: 100,
-    sortable: true,
-    meta: { align: 'right' },
-  },
-  {
-    id: 'locations',
-    header: 'Locations',
-    accessorKey: 'locations',
-    size: 120,
-    minSize: 90,
-    sortable: false,
-  },
-  {
-    id: 'interval',
-    header: 'Interval',
-    accessorKey: 'interval',
-    size: 72,
-    minSize: 60,
-    sortable: false,
-  },
-  {
-    id: 'lastCheck',
-    header: 'Last check',
-    accessorKey: 'lastCheck',
-    size: 90,
-    minSize: 72,
-    sortable: false,
-  },
-  {
-    id: 'actions',
-    header: '',
-    accessorKey: 'id',
-    size: 120,
-    minSize: 120,
-    sortable: false,
-    isAction: true,
-  },
-]
-
 onUnmounted(() => {
-  if (locHideTimer) clearTimeout(locHideTimer);
-  if (sparkHideTimer) clearTimeout(sparkHideTimer);
   if (mapTipTimer) clearTimeout(mapTipTimer);
   heatmapChart?.dispose();
 });
@@ -1311,6 +973,7 @@ const geoIssues = computed(() => {
 
 const mapTip = ref({ show: false, x: 0, y: 0, stat: null as any });
 let mapTipTimer: ReturnType<typeof setTimeout> | null = null;
+const keepMapTip = () => { if (mapTipTimer) { clearTimeout(mapTipTimer); mapTipTimer = null; } };
 const hideMapTip = () => { mapTipTimer = setTimeout(() => { mapTip.value.show = false; }, 100); };
 
 
@@ -1676,7 +1339,6 @@ const filteredMonitors = computed(() =>
   )
 );
 
-const rtCls = (rt: string|null) => { if (!rt) return "c-r"; const v=parseFloat(rt); return v<300?"c-g":v<1000?"c-a":"c-r"; };
 const toggleLoc  = (v: string) => { const i=form.value.locations.indexOf(v); if(i===-1)form.value.locations.push(v); else form.value.locations.splice(i,1); };
 const openCreate  = () => { editTarget.value=null; form.value=defaultForm(); currentStep.value=0; showDrawer.value=true; };
 const openEdit    = (m: any) => { editTarget.value=m; form.value={...defaultForm(),name:m.name,url:m.url,type:m.type,interval:m.interval}; currentStep.value=1; showDrawer.value=true; };
@@ -1707,107 +1369,15 @@ const saveMonitor = () => { showDrawer.value=false; };
 .sdot-degraded   { background:#f59e0b; }
 .sdot-down       { background:#ef4444; }
 
-/* ── TABLE AREA — fills space, no hardcoded bg ── */
-.syn-table-scroll { flex:1; overflow:auto; padding:12px 16px 0; }
-.syn-table { border-collapse:collapse; border:1px solid var(--o2-border-color); border-radius:10px; overflow:hidden; background:var(--o2-card-background); width:100%; min-width:1000px; }
-.syn-th  { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:var(--o2-tab-text-color); padding:9px 14px; border-bottom:1px solid var(--o2-border-color); text-align:left; position:sticky; top:0; background:var(--o2-card-background); z-index:1; white-space:nowrap; overflow:hidden; }
-.syn-th.right { text-align:right; }
-.syn-row { border-bottom:1px solid var(--o2-border-color); transition:background .1s; }
-.syn-row:last-child { border-bottom:none; }
-.syn-row:hover { background:rgba(128,128,128,.06); }
-.syn-row:hover .row-actions { opacity:1 !important; }
-.syn-td    { padding:10px 14px; vertical-align:middle; overflow:hidden; }
-.td-center { text-align:center; }
-.td-right  { text-align:right; }
-.td-muted  { font-size:12px; color:var(--o2-tab-text-color); white-space:nowrap; }
-
 .dot         { display:inline-block; border-radius:50%; flex-shrink:0; }
 .dot--up       { width:9px; height:9px; background:#22c55e; box-shadow:0 0 0 3px rgba(34,197,94,.15); }
 .dot--degraded { width:9px; height:9px; background:#f59e0b; box-shadow:0 0 0 3px rgba(245,158,11,.15); }
 .dot--down     { width:9px; height:9px; background:#ef4444; box-shadow:0 0 0 3px rgba(239,68,68,.15); }
 
-.mon-name { font-size:13px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.mon-url  { font-size:11px; font-family:monospace; color:var(--o2-tab-text-color); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-
-.http-method    { display:inline-block; padding:2px 7px; border-radius:4px; font-size:11px; font-weight:700; font-family:monospace; }
-.method--get    { background:#dbeafe; color:#1d4ed8; }
-.method--post   { background:#d1fae5; color:#065f46; }
-.method--put    { background:#ffedd5; color:#c2410c; }
-.method--delete { background:#fee2e2; color:#991b1b; }
-.body--dark .method--get    { background:#172554; color:#93c5fd; }
-.body--dark .method--post   { background:#052e16; color:#6ee7b7; }
-.body--dark .method--put    { background:#431407; color:#fdba74; }
-.body--dark .method--delete { background:#450a0a; color:#fca5a5; }
-
-.spark { display:flex; align-items:flex-end; gap:2px; height:20px; }
-.spark-bar {
-  width:7px; height:18px; border-radius:2px; flex-shrink:0; cursor:pointer;
-  transition:height .1s, opacity .1s, filter .1s;
-}
-.spark-bar:hover { height:20px; filter:brightness(1.25); }
-.spark:has(.spark-bar:hover) .spark-bar:not(:hover) { opacity:.45; }
-.spark--up   { background:#22c55e; }
-.spark--down { background:#ef4444; }
-.spark--deg  { background:#f59e0b; }
-
-/* ── Spark detail tooltip ── */
-.spark-tooltip {
-  position:fixed; z-index:10000;
-  background:#1e293b; color:#f1f5f9;
-  border-radius:9px; padding:10px 13px;
-  box-shadow:0 10px 32px rgba(0,0,0,.4);
-  min-width:210px; max-width:280px;
-  pointer-events:auto;
-  transform:translateX(-50%) translateY(-100%);
-  font-size:12px;
-}
-.stt-header { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:7px; }
-.stt-time   { font-size:11px; opacity:.65; white-space:nowrap; }
-.stt-badge  { font-size:11px; font-weight:700; padding:2px 8px; border-radius:4px; white-space:nowrap; }
-.stt-badge--up   { background:rgba(34,197,94,.2);  color:#4ade80; }
-.stt-badge--down { background:rgba(239,68,68,.2);  color:#f87171; }
-.stt-badge--deg  { background:rgba(245,158,11,.2); color:#fbbf24; }
-.stt-divider { height:1px; background:rgba(255,255,255,.08); margin-bottom:8px; }
-.stt-checks  { display:flex; flex-direction:column; gap:5px; margin-bottom:8px; }
-.stt-check   { display:flex; align-items:center; gap:7px; }
-.stt-dot     { width:6px; height:6px; border-radius:50%; flex-shrink:0; }
-.stt-dot--up   { background:#22c55e; box-shadow:0 0 5px rgba(34,197,94,.5); }
-.stt-dot--down { background:#ef4444; box-shadow:0 0 5px rgba(239,68,68,.5); }
-.stt-loc     { flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.stt-ms      { font-size:11px; color:rgba(241,245,249,.55); white-space:nowrap; font-family:monospace; }
-.stt-avg     { font-size:11px; color:rgba(241,245,249,.5); border-top:1px solid rgba(255,255,255,.08); padding-top:6px; font-family:monospace; }
-.stt-arrow   {
-  position:absolute; bottom:-7px; left:50%; transform:translateX(-50%);
-  width:0; height:0;
-  border-left:7px solid transparent;
-  border-right:7px solid transparent;
-  border-top:7px solid #1e293b;
-}
-
-.uptime-row   { display:flex; align-items:center; justify-content:flex-end; gap:8px; }
-
-.locs-cell  { display:flex; align-items:center; gap:5px; cursor:default; }
-.loc-first  { font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:70px; }
-.loc-badge  { font-size:11px; font-weight:700; padding:1px 5px; background:rgba(128,128,128,.18); border-radius:4px; white-space:nowrap; flex-shrink:0; }
-
-.loc-float-tip  { position:fixed; z-index:9999; background:#1e293b; color:#f1f5f9; border-radius:8px; padding:9px 13px; box-shadow:0 8px 24px rgba(0,0,0,.28); min-width:150px; pointer-events:none; }
-.loc-float-item { display:flex; align-items:center; gap:7px; font-size:12px; padding:3px 0; border-bottom:1px solid rgba(255,255,255,.07); }
-.loc-float-item:last-child { border-bottom:none; }
-.loc-float-dot  { width:6px; height:6px; border-radius:50%; background:#22c55e; flex-shrink:0; }
-
 .syn-page-icon { color: var(--o2-primary-color); }
-
-.row-actions { display:flex; align-items:center; gap:2px; }
 
 .mono { font-family:monospace; font-size:13px; font-weight:600; }
 .c-g  { color:#16a34a; } .c-a { color:#d97706; } .c-r { color:#dc2626; }
-
-/* ── PAGINATION FOOTER — matches Incidents ── */
-.syn-footer       { display:flex; align-items:center; padding:9px 16px; border-top:1px solid var(--o2-border-color); flex-shrink:0; background:var(--o2-card-background); gap:12px; min-height:46px; }
-.syn-footer-total { font-size:13px; font-weight:700; white-space:nowrap; }
-.syn-footer-right { display:flex; align-items:center; gap:8px; }
-.syn-footer-info  { font-size:12px; color:var(--o2-tab-text-color); white-space:nowrap; }
-.syn-footer-sep   { width:1px; height:16px; background:var(--o2-border-color); flex-shrink:0; }
 
 /* ── PRIVATE LOCATIONS ── */
 .pl-root    { flex:1; overflow-y:auto; padding:16px 20px 24px; }
