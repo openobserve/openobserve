@@ -2041,19 +2041,6 @@ export default defineComponent({
     },
     findFTSFields() {
       this.extractFTSFields();
-      // Populate FTS fields as default columns when no selection is saved
-      if (!this.searchObj.data.stream.selectedFields.length) {
-        const globalFtsKeys =
-          this.store?.state?.zoConfig?.default_fts_keys || [];
-        const ftsDefaults = this.resolveDefaultColumns(
-          this.searchObj.data.stream.selectedStreamFields,
-          globalFtsKeys,
-        );
-        if (ftsDefaults.length > 0) {
-          this.searchObj.data.stream.selectedFields = ftsDefaults;
-        }
-        // else falls through to existing _timestamp + _source behavior
-      }
     },
     reDrawChartData: {
       deep: true,

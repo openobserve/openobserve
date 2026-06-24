@@ -329,14 +329,15 @@ describe("SearchResult Component", () => {
       expect(extractFTSFieldsSpy).toHaveBeenCalled();
     });
 
-    it("populates selectedFields with FTS defaults when stream loads and no fields are selected", async () => {
+    it("does not set selectedFields from findFTSFields watcher (selection deferred to post-search)", async () => {
       wrapper.vm.searchObj.data.stream.selectedFields = [];
       wrapper.vm.searchObj.data.stream.selectedStreamFields = [
         { name: "message", ftsKey: true },
         { name: "pod_name", ftsKey: false },
       ];
       await wrapper.vm.$nextTick();
-      expect(wrapper.vm.searchObj.data.stream.selectedFields).toContain("message");
+      // Selection is now data-driven (fill-rate from hits), not optimistic
+      expect(wrapper.vm.searchObj.data.stream.selectedFields).toEqual([]);
     });
 
     it("does not overwrite selectedFields when user already has columns selected", async () => {
