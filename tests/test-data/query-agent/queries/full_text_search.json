@@ -675,16 +675,16 @@
             "94.6"
           ],
           [
-            "ZONE-3",
-            "3",
-            "571.6666666666666",
-            "72.8"
-          ],
-          [
             "ZONE-4",
             "3",
             "210.0",
             "88.1"
+          ],
+          [
+            "ZONE-3",
+            "3",
+            "571.6666666666666",
+            "72.8"
           ]
         ],
         "results_mode": "rowsort"
@@ -3347,7 +3347,7 @@
       }
     },
     {
-      "id": "Q545",
+      "id": "Q025",
       "sql": "SELECT _timestamp, log FROM \"{stream}\" WHERE match_all('ACK') ORDER BY _timestamp DESC LIMIT 10",
       "category": "full_text_search",
       "time_offset": {
@@ -3379,7 +3379,7 @@
       }
     },
     {
-      "id": "Q546",
+      "id": "Q611",
       "sql": "SELECT _timestamp, log FROM \"{stream}\" WHERE match_all('Q074') ORDER BY _timestamp ASC LIMIT 10",
       "category": "full_text_search",
       "time_offset": {
@@ -3411,7 +3411,7 @@
       }
     },
     {
-      "id": "Q547",
+      "id": "Q631",
       "sql": "SELECT COUNT(*) AS cnt FROM \"{stream}\" WHERE match_all('Q076')",
       "category": "full_text_search",
       "time_offset": {
@@ -3431,7 +3431,7 @@
       }
     },
     {
-      "id": "Q548",
+      "id": "Q1000",
       "sql": "SELECT * FROM \"{stream}\" WHERE match_all('ACK') ORDER BY _timestamp DESC LIMIT 3",
       "category": "full_text_search",
       "time_offset": {
@@ -4123,7 +4123,1216 @@
           ]
         ],
         "results_mode": "rowsort",
+        "skip_sqllogictest": true,
+        "skip_without_single_node_opt": true
+      }
+    },
+    {
+      "id": "Q792",
+      "sql": "SELECT component_name, COUNT(*) AS cnt FROM \"{stream}\" WHERE match_all('warehouse') GROUP BY component_name HAVING COUNT(*) >= 1 ORDER BY cnt DESC LIMIT 10",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 47459000000,
+        "end_offset": 47533000000
+      },
+      "expected": {
+        "columns": [
+          "component_name",
+          "cnt"
+        ],
+        "results": [
+          [
+            "conveyor-driver",
+            "2"
+          ],
+          [
+            "charge-checker",
+            "2"
+          ],
+          [
+            "temp-regulator",
+            "1"
+          ],
+          [
+            "zone-controller",
+            "1"
+          ],
+          [
+            "sorter-engine",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q793",
+      "sql": "SELECT facility_zone, COUNT(*) FILTER (WHERE match_all('error')) AS error_hits, COUNT(*) FILTER (WHERE match_all('ACK')) AS ack_hits, COUNT(*) AS total FROM \"{stream}\" GROUP BY facility_zone ORDER BY total DESC",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 47519000000,
+        "end_offset": 47593000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "error_hits",
+          "ack_hits",
+          "total"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "0",
+            "1",
+            "2"
+          ],
+          [
+            "ZONE-4",
+            "0",
+            "1",
+            "2"
+          ],
+          [
+            "ZONE-3",
+            "0",
+            "1",
+            "2"
+          ],
+          [
+            "ZONE-2",
+            "0",
+            "0",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true,
+        "skip_row_count": true,
+        "skip_column_check": true
+      }
+    },
+    {
+      "id": "Q794",
+      "sql": "SELECT facility_zone, COUNT(*) AS cnt, AVG(throughput_rate) AS avg_rate FROM \"{stream}\" WHERE match_all('warehouse') GROUP BY facility_zone HAVING AVG(throughput_rate) > 200 ORDER BY avg_rate DESC",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 47579000000,
+        "end_offset": 47653000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "cnt",
+          "avg_rate"
+        ],
+        "results": [
+          [
+            "ZONE-3",
+            "1",
+            "840.0"
+          ],
+          [
+            "ZONE-1",
+            "2",
+            "582.5"
+          ],
+          [
+            "ZONE-4",
+            "2",
+            "507.5"
+          ],
+          [
+            "ZONE-2",
+            "2",
+            "507.5"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q795",
+      "sql": "SELECT _timestamp, log, facility_zone, true AS has_ack, ROW_NUMBER() OVER (PARTITION BY facility_zone ORDER BY _timestamp) AS rn FROM \"{stream}\" WHERE match_all('ACK batch') ORDER BY facility_zone, rn LIMIT 10",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 47639000000,
+        "end_offset": 47713000000
+      },
+      "expected": {
+        "columns": [
+          "log",
+          "facility_zone",
+          "has_ack",
+          "rn"
+        ],
+        "results": [
+          [
+            "Q795 warehouse event record 3 ACK batch batchIdList:Q795-3",
+            "ZONE-1",
+            "True",
+            "1"
+          ],
+          [
+            "Q795 warehouse event record 0 ACK batch batchIdList:Q795-0",
+            "ZONE-2",
+            "True",
+            "1"
+          ],
+          [
+            "Q796 warehouse event record 0 ACK batch batchIdList:Q796-0",
+            "ZONE-3",
+            "True",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true,
+        "skip_row_count": true,
+        "skip_column_check": true
+      }
+    },
+    {
+      "id": "Q796",
+      "sql": "SELECT facility_zone, SUM(CASE WHEN match_all('error') THEN 1 ELSE 0 END) AS error_matches, COUNT(*) AS total, RANK() OVER (ORDER BY SUM(CASE WHEN match_all('error') THEN 1 ELSE 0 END) DESC) AS error_rank FROM \"{stream}\" GROUP BY facility_zone ORDER BY error_rank LIMIT 10",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 47699000000,
+        "end_offset": 47773000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "error_matches",
+          "total",
+          "error_rank"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "0",
+            "1",
+            "1"
+          ],
+          [
+            "ZONE-3",
+            "0",
+            "2",
+            "1"
+          ],
+          [
+            "ZONE-2",
+            "0",
+            "2",
+            "1"
+          ],
+          [
+            "ZONE-4",
+            "0",
+            "2",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true,
+        "skip_row_count": true,
+        "skip_column_check": true
+      }
+    },
+    {
+      "id": "Q797",
+      "sql": "WITH fts_hits AS (SELECT _timestamp, facility_zone, throughput_rate, log FROM \"{stream}\" WHERE match_all('warehouse')) SELECT facility_zone, COUNT(*) AS hit_cnt, AVG(throughput_rate) AS avg_rate FROM fts_hits GROUP BY facility_zone ORDER BY hit_cnt DESC",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 47759000000,
+        "end_offset": 47833000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "hit_cnt",
+          "avg_rate"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "2",
+            "725.0"
+          ],
+          [
+            "ZONE-4",
+            "2",
+            "385.0"
+          ],
+          [
+            "ZONE-3",
+            "2",
+            "725.0"
+          ],
+          [
+            "ZONE-2",
+            "1",
+            "725.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q798",
+      "sql": "WITH fts_base AS (SELECT * FROM \"{stream}\" WHERE match_all('warehouse')), fts_ranked AS (SELECT *, ROW_NUMBER() OVER (PARTITION BY facility_zone ORDER BY _timestamp) AS rn FROM fts_base) SELECT facility_zone, MAX(CASE WHEN rn = 1 THEN log END) AS first_hit, MAX(CASE WHEN rn = 2 THEN log END) AS second_hit, COUNT(*) AS total_hits FROM fts_ranked GROUP BY facility_zone ORDER BY total_hits DESC",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 47819000000,
+        "end_offset": 47893000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "first_hit",
+          "second_hit",
+          "total_hits"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "Q798 warehouse event record 0 ACK batch batchIdList:Q798-0",
+            "Q798 warehouse event record 4",
+            "2"
+          ],
+          [
+            "ZONE-2",
+            "Q798 warehouse event record 1",
+            "Q799 warehouse event record 0 ACK batch batchIdList:Q799-0",
+            "2"
+          ],
+          [
+            "ZONE-4",
+            "Q797 warehouse event record 4",
+            "Q798 warehouse event record 3 ACK batch batchIdList:Q798-3",
+            "2"
+          ],
+          [
+            "ZONE-3",
+            "Q798 warehouse event record 2",
+            "None",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q799",
+      "sql": "SELECT facility_zone, pallet_id, match_all('warehouse') AS match_a, load_factor FROM \"{stream}\" WHERE match_all('warehouse') ORDER BY _timestamp ASC LIMIT 10",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 47879000000,
+        "end_offset": 47953000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "pallet_id",
+          "match_a",
+          "load_factor"
+        ],
+        "results": [
+          [
+            "ZONE-2",
+            "PL-004",
+            "True",
+            "88.1"
+          ],
+          [
+            "ZONE-1",
+            "PL-003",
+            "True",
+            "94.6"
+          ],
+          [
+            "ZONE-3",
+            "PL-005",
+            "True",
+            "94.6"
+          ],
+          [
+            "ZONE-4",
+            "PL-006",
+            "True",
+            "45.3"
+          ],
+          [
+            "ZONE-1",
+            "PL-007",
+            "True",
+            "67.9"
+          ],
+          [
+            "ZONE-3",
+            "PL-001",
+            "True",
+            "67.9"
+          ],
+          [
+            "ZONE-2",
+            "PL-008",
+            "True",
+            "21.4"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true,
+        "skip_row_count": true
+      }
+    },
+    {
+      "id": "Q800",
+      "sql": "SELECT component_name, COUNT(*) AS join_cnt, SUM(CASE WHEN match_all('error') THEN 1 ELSE 0 END) AS fts_errors FROM \"{stream}\" GROUP BY component_name ORDER BY fts_errors DESC LIMIT 10",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 47939000000,
+        "end_offset": 48013000000
+      },
+      "expected": {
+        "columns": [
+          "component_name",
+          "join_cnt",
+          "fts_errors"
+        ],
+        "results": [
+          [
+            "zone-controller",
+            "1",
+            "0"
+          ],
+          [
+            "batch-sync",
+            "2",
+            "0"
+          ],
+          [
+            "scan-hub",
+            "2",
+            "0"
+          ],
+          [
+            "pallet-mapper",
+            "1",
+            "0"
+          ],
+          [
+            "track-router",
+            "1",
+            "0"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true,
+        "skip_row_count": true
+      }
+    },
+    {
+      "id": "Q801",
+      "sql": "SELECT _timestamp, log, match_all('warehouse') AS has_wh, match_all('error') AS has_error, match_all('ACK') AS has_ack FROM \"{stream}\" WHERE match_all('warehouse') OR match_all('error') ORDER BY _timestamp ASC LIMIT 10",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 47999000000,
+        "end_offset": 48073000000
+      },
+      "expected": {
+        "columns": [
+          "log",
+          "has_wh",
+          "has_error",
+          "has_ack"
+        ],
+        "results": [
+          [
+            "Q801 warehouse event record 0 ACK batch batchIdList:Q801-0",
+            "True",
+            "False",
+            "True"
+          ],
+          [
+            "Q800 warehouse event record 4",
+            "True",
+            "False",
+            "False"
+          ],
+          [
+            "Q801 warehouse event record 1",
+            "True",
+            "False",
+            "False"
+          ],
+          [
+            "Q801 warehouse event record 2",
+            "True",
+            "False",
+            "False"
+          ],
+          [
+            "Q801 warehouse event record 3 ACK batch batchIdList:Q801-3",
+            "True",
+            "False",
+            "True"
+          ],
+          [
+            "Q802 warehouse event record 0 ACK batch batchIdList:Q802-0",
+            "True",
+            "False",
+            "True"
+          ],
+          [
+            "Q801 warehouse event record 4",
+            "True",
+            "False",
+            "False"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true,
+        "skip_row_count": true,
+        "skip_column_check": true
+      }
+    },
+    {
+      "id": "Q802",
+      "sql": "SELECT SUM(CASE WHEN match_all('warehouse') THEN 1 ELSE 0 END) AS wh_hits, SUM(CASE WHEN match_all('error') THEN 1 ELSE 0 END) AS error_hits, SUM(CASE WHEN match_all('ACK batch') THEN 1 ELSE 0 END) AS ack_hits FROM \"{stream}\"",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 48059000000,
+        "end_offset": 48133000000
+      },
+      "expected": {
+        "columns": [
+          "wh_hits",
+          "error_hits",
+          "ack_hits"
+        ],
+        "results": [
+          [
+            "7",
+            "0",
+            "3"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true,
+        "skip_row_count": true,
+        "skip_column_check": true
+      }
+    },
+    {
+      "id": "Q803",
+      "sql": "SELECT _timestamp, log, exception_message FROM \"{stream}\" WHERE match_all('warehouse') AND re_match(exception_message, 'NullPointer|Timeout') ORDER BY _timestamp ASC LIMIT 10",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 48119000000,
+        "end_offset": 48193000000
+      },
+      "expected": {
+        "columns": [
+          "log",
+          "exception_message"
+        ],
+        "results": [
+          [
+            "Q803 warehouse event record 0 ACK batch batchIdList:Q803-0",
+            "NullPointerException at ConveyorController.handle()"
+          ],
+          [
+            "Q802 warehouse event record 4",
+            "TimeoutException: lane LANE-A did not respond within 5000ms"
+          ],
+          [
+            "Q803 warehouse event record 1",
+            "TimeoutException: lane LANE-A did not respond within 5000ms"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q804",
+      "sql": "SELECT _timestamp, log_message, component_name FROM \"{stream}\" WHERE match_all('warehouse') AND str_match_ignore_case(log_message, 'error') ORDER BY _timestamp ASC LIMIT 10",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 48179000000,
+        "end_offset": 48253000000
+      },
+      "expected": {
+        "columns": [
+          "log_message",
+          "component_name"
+        ],
+        "results": [
+          [
+            "ERROR: scan_attempts exhausted for pallet_id=PL-007",
+            "lane-monitor"
+          ],
+          [
+            "ERROR: scan_attempts exhausted for pallet_id=PL-007",
+            "lane-monitor"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q805",
+      "sql": "SELECT operation_mode, COUNT(*) AS cnt, APPROX_DISTINCT(component_name) AS distinct_components FROM \"{stream}\" WHERE match_all('warehouse') GROUP BY operation_mode HAVING COUNT(*) > 0 ORDER BY cnt DESC",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 48239000000,
+        "end_offset": 48313000000
+      },
+      "expected": {
+        "columns": [
+          "operation_mode",
+          "cnt",
+          "distinct_components"
+        ],
+        "results": [
+          [
+            "auto",
+            "3",
+            "3"
+          ],
+          [
+            "manual",
+            "2",
+            "2"
+          ],
+          [
+            "hybrid",
+            "2",
+            "2"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q806",
+      "sql": "SELECT region_code, scan_category, COUNT(*) AS fts_hits FROM \"{stream}\" WHERE match_all('warehouse') AND region_code IS NOT NULL GROUP BY region_code, scan_category ORDER BY fts_hits DESC LIMIT 12",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 48299000000,
+        "end_offset": 48373000000
+      },
+      "expected": {
+        "columns": [
+          "region_code",
+          "scan_category",
+          "fts_hits"
+        ],
+        "results": [
+          [
+            "US-EAST",
+            "inbound",
+            "2"
+          ],
+          [
+            "EU-WEST",
+            "outbound",
+            "2"
+          ],
+          [
+            "US-WEST",
+            "inbound",
+            "1"
+          ],
+          [
+            "EU-NORTH",
+            "internal",
+            "1"
+          ],
+          [
+            "AP-CENTRAL",
+            "internal",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q807",
+      "sql": "SELECT component_name, SUM(CASE WHEN match_all('warehouse') THEN 1 ELSE 0 END) AS wh_cnt, SUM(CASE WHEN re_match(exception_message, 'NullPointer|Timeout') THEN 1 ELSE 0 END) AS error_cnt, COUNT(*) AS total, RANK() OVER (ORDER BY COUNT(*) DESC) AS total_rank FROM \"{stream}\" GROUP BY component_name ORDER BY total_rank LIMIT 10",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 48359000000,
+        "end_offset": 48433000000
+      },
+      "expected": {
+        "columns": [
+          "component_name",
+          "wh_cnt",
+          "error_cnt",
+          "total",
+          "total_rank"
+        ],
+        "results": [
+          [
+            "pallet-mapper",
+            "2",
+            "0",
+            "2",
+            "1"
+          ],
+          [
+            "track-router",
+            "2",
+            "0",
+            "2",
+            "1"
+          ],
+          [
+            "scan-hub",
+            "1",
+            "0",
+            "1",
+            "3"
+          ],
+          [
+            "batch-sync",
+            "1",
+            "0",
+            "1",
+            "3"
+          ],
+          [
+            "lane-monitor",
+            "1",
+            "0",
+            "1",
+            "3"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true,
+        "skip_row_count": true,
+        "skip_column_check": true
+      }
+    },
+    {
+      "id": "Q808",
+      "sql": "SELECT _timestamp, COALESCE(exception_message, log_message) AS msg FROM \"{stream}\" WHERE match_all('warehouse') AND regexp_like(COALESCE(exception_message, log_message), '.*Exception.*') ORDER BY _timestamp ASC LIMIT 10",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 48419000000,
+        "end_offset": 48493000000
+      },
+      "expected": {
         "skip_sqllogictest": true
+      }
+    },
+    {
+      "id": "Q809",
+      "sql": "SELECT _timestamp, log, component_name, latency_ms FROM \"{stream}\" WHERE match_all('warehouse') AND latency_ms > 100 ORDER BY latency_ms DESC LIMIT 10",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 48479000000,
+        "end_offset": 48553000000
+      },
+      "expected": {
+        "columns": [
+          "log",
+          "component_name",
+          "latency_ms"
+        ],
+        "results": [
+          [
+            "Q808 warehouse event record 4",
+            "sorter-engine",
+            "1900"
+          ],
+          [
+            "Q809 warehouse event record 1",
+            "sorter-engine",
+            "1900"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q810",
+      "sql": "SELECT facility_zone, control_center, COUNT(*) AS cnt FROM \"{stream}\" WHERE match_all('warehouse') OR str_match_ignore_case(event_detail, 'batch') GROUP BY facility_zone, control_center HAVING COUNT(*) > 0 ORDER BY cnt DESC LIMIT 12",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 48539000000,
+        "end_offset": 48613000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "control_center",
+          "cnt"
+        ],
+        "results": [
+          [
+            "ZONE-4",
+            "CC-GAMMA",
+            "2"
+          ],
+          [
+            "ZONE-2",
+            "CC-ALPHA",
+            "2"
+          ],
+          [
+            "ZONE-1",
+            "CC-DELTA",
+            "2"
+          ],
+          [
+            "ZONE-3",
+            "CC-BETA",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q811",
+      "sql": "SELECT _timestamp, log, true AS is_match, ROW_NUMBER() OVER (ORDER BY _timestamp) AS seq FROM \"{stream}\" WHERE match_all('warehouse') ORDER BY _timestamp ASC LIMIT 10",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 48599000000,
+        "end_offset": 48673000000
+      },
+      "expected": {
+        "columns": [
+          "log",
+          "is_match",
+          "seq"
+        ],
+        "results": [
+          [
+            "Q811 warehouse event record 0 ACK batch batchIdList:Q811-0",
+            "True",
+            "1"
+          ],
+          [
+            "Q810 warehouse event record 4",
+            "True",
+            "2"
+          ],
+          [
+            "Q811 warehouse event record 1",
+            "True",
+            "3"
+          ],
+          [
+            "Q811 warehouse event record 2",
+            "True",
+            "4"
+          ],
+          [
+            "Q811 warehouse event record 3 ACK batch batchIdList:Q811-3",
+            "True",
+            "5"
+          ],
+          [
+            "Q812 warehouse event record 0 ACK batch batchIdList:Q812-0",
+            "True",
+            "6"
+          ],
+          [
+            "Q811 warehouse event record 4",
+            "True",
+            "7"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true,
+        "skip_row_count": true,
+        "skip_column_check": true
+      }
+    },
+    {
+      "id": "Q812",
+      "sql": "WITH fts_set AS (SELECT _timestamp, component_name, latency_ms, log FROM \"{stream}\" WHERE match_all('warehouse')), non_fts_set AS (SELECT _timestamp, component_name, latency_ms, log FROM \"{stream}\" WHERE NOT match_all('warehouse')) SELECT 'fts' AS source, AVG(CAST(latency_ms AS FLOAT)) AS avg_lat FROM fts_set UNION ALL SELECT 'non_fts' AS source, AVG(CAST(latency_ms AS FLOAT)) AS avg_lat FROM non_fts_set",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 48659000000,
+        "end_offset": 48733000000
+      },
+      "expected": {
+        "columns": [
+          "source",
+          "avg_lat"
+        ],
+        "results": [
+          [
+            "fts",
+            "756.8571428571429"
+          ],
+          [
+            "non_fts",
+            "None"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true,
+        "skip_row_count": true,
+        "skip_column_check": true
+      }
+    },
+    {
+      "id": "Q813",
+      "sql": "SELECT facility_zone, COUNT(*) AS fts_join_cnt, AVG(CAST(throughput_rate AS FLOAT)) AS avg_rate FROM \"{stream}\" WHERE match_all('warehouse') GROUP BY facility_zone ORDER BY fts_join_cnt DESC",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 48719000000,
+        "end_offset": 48793000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "fts_join_cnt",
+          "avg_rate"
+        ],
+        "results": [
+          [
+            "ZONE-3",
+            "2",
+            "465.0"
+          ],
+          [
+            "ZONE-4",
+            "2",
+            "437.5"
+          ],
+          [
+            "ZONE-1",
+            "2",
+            "465.0"
+          ],
+          [
+            "ZONE-2",
+            "1",
+            "480.0"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true,
+        "skip_row_count": true
+      }
+    },
+    {
+      "id": "Q814",
+      "sql": "SELECT _timestamp, event_detail, ack_detail FROM \"{stream}\" WHERE match_all('batch') AND str_match_ignore_case(event_detail, 'batch') ORDER BY _timestamp ASC LIMIT 10",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 48779000000,
+        "end_offset": 48853000000
+      },
+      "expected": {
+        "columns": [
+          "event_detail",
+          "ack_detail"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q815",
+      "sql": "SELECT COALESCE(scan_category, 'unknown') AS scan_type, COUNT(*) AS cnt FROM \"{stream}\" WHERE match_all('warehouse') OR LOWER(COALESCE(exception_message, '')) LIKE '%exception%' GROUP BY scan_type ORDER BY cnt DESC LIMIT 10",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 48839000000,
+        "end_offset": 48913000000
+      },
+      "expected": {
+        "columns": [
+          "scan_type",
+          "cnt"
+        ],
+        "results": [
+          [
+            "internal",
+            "3"
+          ],
+          [
+            "inbound",
+            "3"
+          ],
+          [
+            "outbound",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q816",
+      "sql": "SELECT _timestamp, log_message, COALESCE(match_all('error'), FALSE) AS has_error FROM \"{stream}\" ORDER BY _timestamp ASC LIMIT 10",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 48899000000,
+        "end_offset": 48973000000
+      },
+      "expected": {
+        "columns": [
+          "log_message",
+          "has_error"
+        ],
+        "results": [
+          [
+            "POST /api/v2/sorter/scan 201 Created",
+            "False"
+          ],
+          [
+            "INFO: batch sync completed, url=http://warehouse.local/sync",
+            "False"
+          ],
+          [
+            "INFO: batch sync completed, url=http://warehouse.local/sync",
+            "False"
+          ],
+          [
+            "WARN: lane jam detected at conveyor_segment=3",
+            "False"
+          ],
+          [
+            "ERROR: pallet PL-003 mismatch, retry url=https://warehouse.local/retry",
+            "False"
+          ],
+          [
+            "ERROR: pallet PL-003 mismatch, retry url=https://warehouse.local/retry",
+            "False"
+          ],
+          [
+            "DEBUG: charge_remaining below threshold 15.0",
+            "False"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true,
+        "skip_row_count": true,
+        "skip_column_check": true
+      }
+    },
+    {
+      "id": "Q817",
+      "sql": "SELECT component_name, region_code, COUNT(*) FILTER (WHERE match_all('warehouse')) AS wh_hits, COUNT(*) FILTER (WHERE match_all('error')) AS error_hits FROM \"{stream}\" GROUP BY component_name, region_code ORDER BY wh_hits DESC LIMIT 10",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 48959000000,
+        "end_offset": 49033000000
+      },
+      "expected": {
+        "columns": [
+          "component_name",
+          "region_code",
+          "wh_hits",
+          "error_hits"
+        ],
+        "results": [
+          [
+            "track-router",
+            "EU-NORTH",
+            "2",
+            "0"
+          ],
+          [
+            "pallet-mapper",
+            "AP-EAST",
+            "2",
+            "0"
+          ],
+          [
+            "batch-sync",
+            "AP-SOUTH",
+            "1",
+            "0"
+          ],
+          [
+            "lane-monitor",
+            "SA-EAST",
+            "1",
+            "0"
+          ],
+          [
+            "scan-hub",
+            "EU-WEST",
+            "1",
+            "0"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true,
+        "skip_row_count": true,
+        "skip_column_check": true
+      }
+    },
+    {
+      "id": "Q818",
+      "sql": "SELECT org_name, SUM(CASE WHEN match_all('warehouse') THEN 1 ELSE 0 END) AS a_fts FROM \"{stream}\" GROUP BY org_name ORDER BY a_fts DESC LIMIT 10",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 49019000000,
+        "end_offset": 49093000000
+      },
+      "expected": {
+        "columns": [
+          "org_name",
+          "a_fts"
+        ],
+        "results": [
+          [
+            "warehouse-central",
+            "2"
+          ],
+          [
+            "warehouse-north",
+            "2"
+          ],
+          [
+            "warehouse-south",
+            "1"
+          ],
+          [
+            "warehouse-west",
+            "1"
+          ],
+          [
+            "warehouse-east",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true,
+        "skip_row_count": true
+      }
+    },
+    {
+      "id": "Q819",
+      "sql": "SELECT _timestamp, COALESCE(exception_message, log_message, log) AS text_field, match_all('warehouse') AS hits_wh FROM \"{stream}\" WHERE match_all('warehouse') ORDER BY _timestamp ASC LIMIT 10",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 49079000000,
+        "end_offset": 49153000000
+      },
+      "expected": {
+        "columns": [
+          "text_field",
+          "hits_wh"
+        ],
+        "results": [
+          [
+            "StateTransitionException: operation_mode hybrid invalid state",
+            "True"
+          ],
+          [
+            "OverflowException: throughput_rate 999.0 exceeds max capacity",
+            "True"
+          ],
+          [
+            "OverflowException: throughput_rate 999.0 exceeds max capacity",
+            "True"
+          ],
+          [
+            "NullPointerException at ConveyorController.handle()",
+            "True"
+          ],
+          [
+            "TimeoutException: lane LANE-A did not respond within 5000ms",
+            "True"
+          ],
+          [
+            "TimeoutException: lane LANE-A did not respond within 5000ms",
+            "True"
+          ],
+          [
+            "DataIntegrityException: pallet_id PL-002 checksum mismatch",
+            "True"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true,
+        "skip_row_count": true,
+        "skip_column_check": true
+      }
+    },
+    {
+      "id": "Q820",
+      "sql": "SELECT tag_b, COUNT(*) AS cnt, SUM(CASE WHEN re_match(COALESCE(exception_message, ''), 'NullPointer|Timeout|Security') THEN 1 ELSE 0 END) AS matched_errors FROM \"{stream}\" WHERE match_all('warehouse') OR LENGTH(COALESCE(exception_message, '')) > 10 GROUP BY tag_b ORDER BY cnt DESC LIMIT 10",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 49139000000,
+        "end_offset": 49213000000
+      },
+      "expected": {
+        "columns": [
+          "tag_b",
+          "cnt",
+          "matched_errors"
+        ],
+        "results": [
+          [
+            "critical",
+            "4",
+            "2"
+          ],
+          [
+            "high",
+            "2",
+            "0"
+          ],
+          [
+            "low",
+            "1",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q821",
+      "sql": "WITH fts_data AS (SELECT _timestamp, facility_zone, throughput_rate, component_name FROM \"{stream}\" WHERE match_all('warehouse')) SELECT facility_zone, MAX(throughput_rate) AS peak_rate, APPROX_DISTINCT(component_name) AS distinct_comps FROM fts_data GROUP BY facility_zone ORDER BY peak_rate DESC",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 49199000000,
+        "end_offset": 49273000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "peak_rate",
+          "distinct_comps"
+        ],
+        "results": [
+          [
+            "ZONE-3",
+            "840.0",
+            "2"
+          ],
+          [
+            "ZONE-1",
+            "840.0",
+            "2"
+          ],
+          [
+            "ZONE-4",
+            "725.0",
+            "2"
+          ],
+          [
+            "ZONE-2",
+            "290.0",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
       }
     }
   ],
