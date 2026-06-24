@@ -32,24 +32,26 @@
     <!-- FILTER BAR -->
     <div class="syn-filter-bar">
       <!-- View switcher -->
-      <div class="syn-view-tabs">
-        <button v-for="tab in tabs" :key="tab.key"
-          class="syn-view-tab" :class="{ active: activeTab === tab.key }"
+      <OButtonGroup>
+        <OButton v-for="tab in tabs" :key="tab.key"
+          :variant="activeTab === tab.key ? 'primary' : 'ghost'"
+          size="sm"
           @click="activeTab = tab.key; currentPage = 1">
           {{ tab.label }}
-        </button>
-      </div>
+        </OButton>
+      </OButtonGroup>
 
       <div class="syn-filter-sep" />
 
       <!-- Status filter — only on All Monitors tab -->
       <template v-if="activeTab === 'monitors'">
-        <button v-for="s in statusTabs" :key="s.filter"
-          class="syn-pill" :class="{ 'syn-pill--active': statusFilter === s.filter }"
+        <OButton v-for="s in statusTabs" :key="s.filter"
+          :variant="statusFilter === s.filter ? 'primary' : 'ghost'"
+          size="sm"
           @click="statusFilter = s.filter; currentPage = 1">
           <span v-if="s.filter !== 'all'" class="syn-pill-dot" :class="'sdot-' + s.filter.toLowerCase()" />
           {{ s.label }} <span class="syn-pill-count">{{ s.count }}</span>
-        </button>
+        </OButton>
         <div class="syn-filter-sep" />
       </template>
 
@@ -1000,6 +1002,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 
 const router = useRouter();
 
@@ -1695,17 +1698,7 @@ const saveMonitor = () => { showDrawer.value=false; };
 .syn-filter-bar  { display:flex; align-items:center; gap:5px; padding:6px 14px; border-bottom:1px solid var(--o2-border-color); flex-shrink:0; background:var(--o2-card-background); }
 .syn-filter-sep  { width:1px; height:18px; background:var(--o2-border-color); flex-shrink:0; margin:0 2px; }
 
-.syn-view-tabs   { display:flex; align-items:center; border:1px solid var(--o2-border-color); border-radius:7px; overflow:hidden; flex-shrink:0; }
-.syn-view-tab    { display:flex; align-items:center; padding:4px 11px; font-size:11.5px; font-weight:500; border:none; border-right:1px solid var(--o2-border-color); background:transparent; color:var(--o2-tab-text-color); cursor:pointer; white-space:nowrap; transition:background .12s; outline:none; }
-.syn-view-tab:last-child { border-right:none; }
-.syn-view-tab:hover  { background:rgba(128,128,128,.09); }
-.syn-view-tab.active { background:rgba(0,0,0,.06); color:var(--q-primary); font-weight:700; }
-.body--dark .syn-view-tab.active { background:rgba(255,255,255,.08); }
 
-.syn-pill        { display:inline-flex; align-items:center; gap:4px; padding:3px 8px; font-size:11.5px; font-weight:500; border:none; border-radius:5px; background:transparent; color:var(--o2-tab-text-color); cursor:pointer; white-space:nowrap; transition:background .12s; outline:none; }
-.syn-pill:hover      { background:rgba(128,128,128,.1); }
-.syn-pill--active    { background:rgba(0,0,0,.06); color:inherit; font-weight:700; }
-.body--dark .syn-pill--active { background:rgba(255,255,255,.1); }
 .syn-pill-count      { font-size:11px; font-weight:700; }
 .syn-pill-dot    { width:6px; height:6px; border-radius:50%; flex-shrink:0; }
 .sdot-up         { background:#22c55e; }
