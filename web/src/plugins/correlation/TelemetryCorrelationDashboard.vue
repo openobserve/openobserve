@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <CorrelationEventHeader
         :source-event="sourceEvent"
         :context-chips="contextChips"
-        :subject-chips="subjectChips"
+        :subject-chips="isNestedGroupMode ? [] : subjectChips"
         v-model:active-subject="activeSubject"
         overflow-mode="responsive"
         badge-size="md"
@@ -596,7 +596,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <CorrelationEventHeader
       :source-event="sourceEvent"
       :context-chips="contextChips"
-      :subject-chips="subjectChips"
+      :subject-chips="isNestedGroupMode ? [] : subjectChips"
       v-model:active-subject="activeSubject"
       overflow-mode="responsive"
       :get-subject-button-label="getSubjectButtonLabel"
@@ -1325,6 +1325,12 @@ const outerTabResourceName = computed<Record<string, string | undefined>>(() => 
   nodes: props.additionalDimensions?.["k8s-node-name"],
 }));
 
+// Map outer tab id → subject semantic id (drives the same filtering as the "View by" chip)
+const outerTabToSubjectSemanticId: Record<string, string> = {
+  pods: "k8s-pod-name",
+  nodes: "k8s-node-name",
+};
+
 // Effective sub-groups: children of the active outer tab, or flat groupDefs
 const effectiveGroupDefs = computed(() => {
   if (!isNestedGroupMode.value) return groupDefs.value;
@@ -1956,11 +1962,14 @@ const activeMetricGroupTab = ref<string>(
   effectiveGroupDefs.value[0]?.id ?? "compute",
 );
 
-// When outer tab changes, reset inner tab to first effective child
-watch(activeOuterTab, () => {
+// When outer tab changes: reset inner tab + sync activeSubject for filtering
+watch(activeOuterTab, (tabId) => {
   const first = effectiveGroupDefs.value[0]?.id;
   if (first) activeMetricGroupTab.value = first;
-});
+  // Apply the same scope filter that the "View by Pod/Node" chip would apply
+  const semanticId = outerTabToSubjectSemanticId[tabId];
+  if (semanticId) activeSubject.value = semanticId;
+}, { immediate: true });
 
 // Per-group dashboard data and render key
 const groupedDashboardData = ref<Partial<Record<string, any>>>({});
