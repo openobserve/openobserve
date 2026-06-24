@@ -23,15 +23,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OIcon name="compare-arrows" size="md" />
       </div>
       <div>
-        <p class="tw:text-[length:var(--text-xs)] tw:font-semibold tw:uppercase tw:tracking-[0.1em] tw:text-(--o2-primary-color) tw:m-0 tw:mb-[0.125rem]">EDITIONS</p>
-        <h3 class="tw:text-[length:var(--text-xl)] tw:font-semibold tw:text-(--color-text-heading) tw:m-0 tw:tracking-[-0.015em]">{{ t("about.feature_comparison_lbl") }}</h3>
+        <div class="tw:text-[length:var(--text-xs)] tw:font-semibold tw:uppercase tw:tracking-[0.1em] tw:text-(--o2-primary-color) tw:m-0 tw:mb-[0.125rem]">EDITIONS</div>
+        <div class="tw:text-[length:var(--text-xl)] tw:font-semibold tw:text-(--color-text-heading) tw:m-0 tw:tracking-[-0.015em]">{{ t("about.feature_comparison_lbl") }}</div>
       </div>
     </div>
-    <p class="tw:text-[length:var(--text-sm)] tw:leading-[1.65] tw:text-(--o2-text-secondary) tw:mt-2 tw:mb-8">
+    <div class="tw:text-[length:var(--text-sm)] tw:leading-[1.65] tw:text-(--o2-text-secondary) tw:mt-2 tw:mb-8">
       <template v-if="buildType === 'opensource'">{{ t("about.feature_comparision_os_msg") }}</template>
       <template v-else-if="buildType === 'enterprise'">{{ t("about.feature_comparision_ent_msg") }}</template>
       <template v-else>{{ t("about.feature_comparision_subtitle") }}</template>
-    </p>
+    </div>
 
     <!-- ── Edition Cards Grid ──────────────────────────────────────────── -->
     <div class="tw:grid tw:grid-cols-3 tw:gap-5 tw:pt-4">
@@ -49,15 +49,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Edition name + hosting + price ────────────────────────────── -->
         <div class="tw:mb-5">
-          <p class="tw:text-base tw:font-bold tw:text-(--o2-text-heading) tw:m-0 tw:mb-[0.125rem]">{{ ed.shortName }}</p>
-          <p class="tw:text-[0.8125rem] tw:text-(--o2-text-muted) tw:m-0 tw:mb-[0.875rem]">{{ ed.hosting }}</p>
-          <p class="tw:text-[1.75rem] tw:font-bold tw:text-(--o2-primary-color) tw:m-0 tw:mb-1 tw:tracking-[-0.03em] tw:leading-[1.1]">{{ ed.price }}</p>
-          <p class="tw:text-[0.8125rem] tw:text-(--o2-text-muted) tw:m-0 tw:leading-[1.4]">{{ ed.priceSub }}</p>
+          <div class="tw:text-base tw:font-bold tw:text-(--o2-text-heading) tw:m-0 tw:mb-[0.125rem]">{{ ed.shortName }}</div>
+          <div class="tw:text-[0.8125rem] tw:text-(--o2-text-muted) tw:m-0 tw:mb-[0.875rem]">{{ ed.hosting }}</div>
+          <div class="tw:text-[1.75rem] tw:font-bold tw:text-(--o2-primary-color) tw:m-0 tw:mb-1 tw:tracking-[-0.03em] tw:leading-[1.1]">{{ ed.price }}</div>
+          <div class="tw:text-[0.8125rem] tw:text-(--o2-text-muted) tw:m-0 tw:leading-[1.4]">{{ ed.priceSub }}</div>
         </div>
 
         <!-- All Five Pillars chips ────────────────────────────────────── -->
         <div class="tw:bg-[color-mix(in_srgb,var(--o2-primary-color)_5%,var(--o2-card-bg))] tw:border tw:border-[color-mix(in_srgb,var(--o2-primary-color)_15%,transparent)] tw:rounded-lg tw:p-3 tw:mb-4">
-          <p class="tw:text-[0.5625rem] tw:font-bold tw:uppercase tw:tracking-[0.12em] tw:text-(--o2-text-label) tw:m-0 tw:mb-2">ALL FIVE PILLARS</p>
+          <div class="tw:text-[0.5625rem] tw:font-bold tw:uppercase tw:tracking-[0.12em] tw:text-(--o2-text-label) tw:m-0 tw:mb-2">ALL FIVE PILLARS</div>
           <div class="tw:flex tw:flex-wrap tw:gap-1.5 tw:mb-1.5">
             <span v-for="pillarId in PILLAR_IDS" :key="pillarId" class="tw:inline-flex tw:items-center tw:py-[0.1875rem] tw:px-2 tw:rounded tw:text-[0.6875rem] tw:font-medium tw:bg-[color-mix(in_srgb,var(--o2-primary-color)_10%,var(--o2-card-bg))] tw:text-(--o2-primary-color) tw:border tw:border-[color-mix(in_srgb,var(--o2-primary-color)_20%,transparent)] tw:mr-[0.375rem] tw:mb-[0.375rem]">
               {{ t(`about.feature_${pillarId}`) }}
