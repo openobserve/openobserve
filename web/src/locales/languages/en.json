@@ -4364,7 +4364,7 @@
   },
   "alert_list": {
     "alert_details": "Alert Details",
-    "alert_history": "Alert History"
+    "alert_history": "History"
   },
   "sreChat": {
     "emptyMessage": "Ask me anything about your alerts and incidents",
