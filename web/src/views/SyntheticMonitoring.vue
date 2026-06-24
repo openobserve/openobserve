@@ -429,21 +429,17 @@
               </div>
             </div>
             <!-- Tabs -->
-            <div class="dp-tabs">
-              <button class="dp-tab" :class="{ 'dp-tab--active': detailPanel.tab === 'overview' }" @click="detailPanel.tab = 'overview'">Overview</button>
-              <button class="dp-tab" :class="{ 'dp-tab--active': detailPanel.tab === 'logs' }" @click="detailPanel.tab = 'logs'">
-                Logs <span class="dp-tab-ct">{{ detailPanel.logs.length }}</span>
-              </button>
-              <button class="dp-tab" :class="{ 'dp-tab--active': detailPanel.tab === 'metrics' }" @click="detailPanel.tab = 'metrics'">Metrics</button>
-              <button class="dp-tab" :class="{ 'dp-tab--active': detailPanel.tab === 'traces' }" @click="detailPanel.tab = 'traces'">
-                Traces <span class="dp-tab-ct">{{ detailPanel.traces.length }}</span>
-              </button>
-            </div>
+            <OTabs v-model="detailPanel.tab">
+              <OTab name="overview">Overview</OTab>
+              <OTab name="logs">Logs <span class="dp-tab-ct">{{ detailPanel.logs.length }}</span></OTab>
+              <OTab name="metrics">Metrics</OTab>
+              <OTab name="traces">Traces <span class="dp-tab-ct">{{ detailPanel.traces.length }}</span></OTab>
+            </OTabs>
             <!-- Body -->
-            <div class="dp-body">
+            <OTabPanels v-model="detailPanel.tab" scroll="y" class="dp-body">
 
               <!-- ── OVERVIEW ── -->
-              <template v-if="detailPanel.tab === 'overview'">
+              <OTabPanel name="overview">
                 <div class="dp-ov-grid">
                   <!-- Left column: KPIs + chart + locations -->
                   <div class="dp-ov-col">
@@ -561,10 +557,10 @@
                     </div>
                   </div>
                 </div>
-              </template>
+              </OTabPanel>
 
               <!-- ── LOGS ── -->
-              <template v-if="detailPanel.tab === 'logs'">
+              <OTabPanel name="logs">
                 <div class="dp-log-filters">
                   <OButton v-for="lv in ['ALL','ERROR','WARN','INFO','DEBUG']" :key="lv"
                     :variant="dpLogFilter === lv ? 'primary' : 'ghost'"
@@ -588,10 +584,10 @@
                     <div v-if="log.stack" class="dp-log-stack">{{ log.stack }}</div>
                   </template>
                 </div>
-              </template>
+              </OTabPanel>
 
               <!-- ── METRICS ── -->
-              <template v-if="detailPanel.tab === 'metrics'">
+              <OTabPanel name="metrics">
                 <div class="dp-tab-info">
                   Aggregated metrics from synthetic check executions — correlated with incident windows
                   <span class="dp-mocked-pill">mocked</span>
@@ -709,10 +705,10 @@
                     </div>
                   </div>
                 </div>
-              </template>
+              </OTabPanel>
 
               <!-- ── TRACES ── -->
-              <template v-if="detailPanel.tab === 'traces'">
+              <OTabPanel name="traces">
                 <!-- Request / response summary bar -->
                 <div class="dp-req-bar">
                   <span class="dp-req-method">GET</span>
@@ -789,9 +785,9 @@
                     </div>
                   </div>
                 </div>
-              </template>
+              </OTabPanel>
 
-            </div>
+            </OTabPanels>
           </aside>
         </div>
       </transition>
@@ -1003,6 +999,10 @@ import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
+import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
+import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 
 const router = useRouter();
 
@@ -2091,10 +2091,6 @@ const saveMonitor = () => { showDrawer.value=false; };
 .dp-meta-chip { font-size:11px; color:var(--o2-tab-text-color); background:rgba(128,128,128,.1); border-radius:4px; padding:2px 8px; }
 
 /* tabs */
-.dp-tabs { display:flex; border-bottom:1px solid var(--o2-border-color); flex-shrink:0; padding:0 20px; gap:2px; }
-.dp-tab  { background:none; border:none; border-bottom:2px solid transparent; cursor:pointer; padding:10px 12px 9px; font-size:13px; color:var(--o2-tab-text-color); display:flex; align-items:center; gap:5px; transition:color .15s, border-color .15s; }
-.dp-tab:hover { color:var(--q-primary); }
-.dp-tab--active { color:var(--q-primary); border-bottom-color:var(--q-primary); font-weight:600; }
 .dp-tab-ct { background:rgba(128,128,128,.15); border-radius:10px; font-size:10px; padding:1px 6px; font-weight:600; }
 
 /* body */
