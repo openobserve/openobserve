@@ -56,6 +56,24 @@
     "e2e-ci-responder": {
       "mode": "primary",
       "prompt": "{file:./.opencode/agents/e2e_ci_council_of_agents/e2e-ci-responder.md}"
+    },
+
+    // Query Agent Phase B — SQL regression query generation pipeline
+    "qa-ci-triage": {
+      "mode": "primary",
+      "prompt": "{file:./.opencode/agents/query_agent_ci/qa-ci-triage.md}"
+    },
+    "qa-ci-warden": {
+      "mode": "primary",
+      "prompt": "{file:./.opencode/agents/query_agent_ci/qa-ci-warden.md}"
+    },
+    "qa-ci-fabricator": {
+      "mode": "primary",
+      "prompt": "{file:./.opencode/agents/query_agent_ci/qa-ci-fabricator.md}"
+    },
+    "qa-ci-inscriber": {
+      "mode": "primary",
+      "prompt": "{file:./.opencode/agents/query_agent_ci/qa-ci-inscriber.md}"
     }
   }
 }
