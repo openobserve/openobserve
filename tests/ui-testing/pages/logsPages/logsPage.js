@@ -3709,27 +3709,6 @@ export class LogsPage {
         return true;
     }
 
-    /**
-     * Wait for the results table to render at least one data row, regardless of
-     * which column is shown in that row.
-     *
-     * The table renders a single generic "source" column ONLY when no fields are
-     * pinned (selectedFields is empty). Once any field is pinned — either by the
-     * user marking it interesting, or by the FTS default-column selection that
-     * picks the best-filled full-text field after a search — the first column's
-     * id becomes that field name (e.g. "kubernetes_pod_id", "log") and the
-     * "source" column no longer exists. Use this helper instead of
-     * waitForSearchResults() in flows where a field may be pinned, then assert
-     * the specific expected column with expectLogTableColumnVisible().
-     */
-    async waitForSearchResultsAnyColumn(timeout = 30000) {
-        const table = this.page.locator(this.logsTable);
-        await table.waitFor({ state: 'visible', timeout });
-        const firstRowAnyColumn = this.page.locator('[data-test^="log-table-column-0-"]').first();
-        await firstRowAnyColumn.waitFor({ state: 'visible', timeout });
-        return true;
-    }
-
     async expectFieldRequiredVisible() {
         return await expect(this.page.getByText(/Field is required/).first()).toBeVisible();
     }
@@ -4630,18 +4609,6 @@ export class LogsPage {
         const element = this.page.locator(`[data-test="log-table-column-${rowIndex}-${columnName}"]`);
         await element.waitFor({ state: 'visible', timeout: 30000 });
         return await expect(element).toBeVisible();
-    }
-
-    /**
-     * Assert that a named column cell is NOT rendered in the results table.
-     * Use after de-selecting (un-pinning) a field to confirm it was removed from
-     * the result columns.
-     * @param {string} columnName - The column/field name that should be absent
-     * @param {number} rowIndex - Row index (default 0 = first row)
-     */
-    async expectLogTableColumnNotVisible(columnName, rowIndex = 0) {
-        const element = this.page.locator(`[data-test="log-table-column-${rowIndex}-${columnName}"]`);
-        return await expect(element).toHaveCount(0);
     }
 
     async clickLogTableColumn3Source() {

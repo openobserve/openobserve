@@ -309,17 +309,6 @@ test.describe("Compare SQL query execution times", () => {
     await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`);
     await pm.logsPage.selectStream(streamName);
 
-    // Pin the fields this test asserts on as explicit columns. The default logs
-    // view now shows only the best-fill FTS "body" field (here: message), so the
-    // non-body "data_age" values (1h_old/3h_old/4h_old) would otherwise live only
-    // inside the raw event and not be visible as table text. Pinning both message
-    // and data_age renders them as their own columns (and signals an explicit user
-    // selection, so the FTS default-column logic leaves them alone).
-    await pm.logsPage.fillIndexFieldSearchInput("message");
-    await pm.logsPage.ensureFieldIsInteresting("message");
-    await pm.logsPage.fillIndexFieldSearchInput("data_age");
-    await pm.logsPage.ensureFieldIsInteresting("data_age");
-
     // STEP 0: First verify ALL data is available in wide range (baseline check to eliminate false positives)
     await pm.logsPage.clickDateTimeButton();
     await pm.logsPage.clickPast6DaysButton();
@@ -347,10 +336,12 @@ test.describe("Compare SQL query execution times", () => {
     await pm.logsPage.selectRelative6Hours(); // Using 6h since 2h might not exist
     await applyQueryButton(pm);
 
-    // Verify all 3 logs are visible (all within 6 hours)
+    // Verify all 3 logs are visible (all within 6 hours). Assert on the log
+    // message (the FTS "body" field shown in the default view) which uniquely
+    // identifies the row; the non-body "data_age" field is not in the default
+    // columns and is covered by the message text already.
     await pm.logsPage.expectLogsTableRowCount(3);
     await pm.logsPage.waitForSearchResultAndCheckText("Recent log entry - 1 hour ago");
-    await pm.logsPage.waitForSearchResultAndCheckText("1h_old");
     testLogger.info('6-hour range test passed: All 3 logs visible (all within 6 hours)');
 
     // Test 3: Return to 6 days - should show all 3 logs again (final verification)
@@ -358,15 +349,15 @@ test.describe("Compare SQL query execution times", () => {
     await pm.logsPage.clickPast6DaysButton();
     await applyQueryButton(pm);
 
-    // Verify all 3 logs are visible again (confirms filtering is reversible)
+    // Verify all 3 logs are visible again (confirms filtering is reversible).
+    // Assert on the log messages (the FTS "body" field shown by default), which
+    // uniquely identify each row; the non-body "data_age" values are redundant
+    // with these and are not in the default columns.
     await pm.logsPage.expectLogsTableRowCount(3);
     await pm.logsPage.waitForSearchResultAndCheckText("Recent log entry - 1 hour ago");
     await pm.logsPage.waitForSearchResultAndCheckText("Three hour old log entry - 3 hours ago");
     await pm.logsPage.waitForSearchResultAndCheckText("Four hour old log entry - 4 hours ago");
-    await pm.logsPage.waitForSearchResultAndCheckText("1h_old");
-    await pm.logsPage.waitForSearchResultAndCheckText("3h_old");
-    await pm.logsPage.waitForSearchResultAndCheckText("4h_old");
-    
+
     testLogger.info('Final verification passed: All 3 logs visible in 6-day range');
     testLogger.info('Time range filtering validation completed successfully - Progressive filtering works: 0 → 3 → 3 logs as range expands');
 
