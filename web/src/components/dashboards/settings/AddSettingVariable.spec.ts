@@ -23,6 +23,8 @@ vi.mock("vue-i18n", () => ({
   useI18n: () => ({
     t: vi.fn((key: string) => {
       const translations: Record<string, string> = {
+        "dashboard.newVariable": "Add Variable",
+        "dashboard.editVariable": "Edit Variable",
         "dashboard.typeOfVariable": "Type of Variable",
         "dashboard.nameOfVariable": "Name of Variable",
         "dashboard.labelOfVariable": "Label of Variable",

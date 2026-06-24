@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="dateTimeValue"
           data-test="dashboard-general-setting-datetime-picker"
         >
-          <label>Default Duration</label>
+          <label>{{ t('dashboard.defaultDuration') }}</label>
           <DateTimePickerDashboard
             v-show="store.state.printMode === false"
             ref="dateTimePicker"
@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <OFormSwitch
           name="showDynamicFilters"
-          label="Show Dynamic Filters"
+          :label="t('dashboard.showDynamicFilters')"
           data-test="dashboard-general-setting-dynamic-filter"
           size="lg"
         />

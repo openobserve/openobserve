@@ -114,9 +114,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @domcontextmenu="onChartDomContextMenu"
         />
       </div>
-      <!-- Metric chart: per-value copy icon, revealed on hover of each number -->
       <div
-        v-if="metricItems.length"
+        v-if="metricItems.length && !noData && !loading"
         style="position: absolute; inset: 0; pointer-events: none; z-index: 8"
         data-test="dashboard-metric-copy-overlay"
       >
@@ -584,10 +583,14 @@ export default defineComponent({
           text: s?._metricText,
           layout: s?._metricLayout,
         }))
-        .filter(
-          (m: any) =>
-            m.layout && m.text != null && String(m.text).trim() !== "",
-        );
+        .filter((m: any) => {
+          if (!m.layout || m.text == null || String(m.text).trim() === "")
+            return false;
+          const num = parseFloat(
+            String(m.text).replace(/,/g, "").replace(/[^0-9.eE+-]/g, ""),
+          );
+          return Number.isNaN(num) || num !== 0;
+        });
     });
     // Hover zone = each value's grid cell.
     const metricZoneStyle = (m: any) => ({
