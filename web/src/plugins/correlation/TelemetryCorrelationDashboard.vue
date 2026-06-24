@@ -2454,7 +2454,7 @@ const addMetricPanels = async (addedStreams: StreamInfo[]) => {
         x:
           (index % Math.floor(grid / (props.panelWidth ?? 64))) *
           (props.panelWidth ?? 64),
-        y: maxY + Math.floor(index / 3) * (props.panelHeight ?? 16),
+        y: maxY + Math.floor(index / Math.floor(grid / (props.panelWidth ?? 64))) * (props.panelHeight ?? 16),
         i: uniqueId,
       };
       panel.id = `${panel.id}_${timestamp}`;
