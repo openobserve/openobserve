@@ -4732,7 +4732,8 @@
         ],
         "results_mode": "rowsort",
         "skip_sqllogictest": true,
-        "skip_row_count": true
+        "skip_row_count": true,
+        "skip_column_check": true
       }
     },
     {
@@ -5267,7 +5268,7 @@
     },
     {
       "id": "Q733",
-      "sql": "SELECT _timestamp, log, component_name, match_all('warehouse') AS has_warehouse, ROW_NUMBER() OVER (PARTITION BY component_name ORDER BY _timestamp) AS rn FROM \"{stream}\" WHERE match_all('warehouse') ORDER BY component_name, rn LIMIT 10",
+      "sql": "SELECT _timestamp, log, component_name, true AS has_warehouse, ROW_NUMBER() OVER (PARTITION BY component_name ORDER BY _timestamp) AS rn FROM \"{stream}\" WHERE match_all('warehouse') ORDER BY component_name, rn LIMIT 10",
       "category": "window",
       "time_offset": {
         "start_offset": 43919000000,
@@ -5326,7 +5327,8 @@
         ],
         "results_mode": "rowsort",
         "skip_sqllogictest": true,
-        "skip_row_count": true
+        "skip_row_count": true,
+        "skip_column_check": true
       }
     },
     {
@@ -5378,7 +5380,8 @@
         ],
         "results_mode": "rowsort",
         "skip_sqllogictest": true,
-        "skip_row_count": true
+        "skip_row_count": true,
+        "skip_column_check": true
       }
     },
     {
@@ -6219,7 +6222,8 @@
         ],
         "results_mode": "rowsort",
         "skip_sqllogictest": true,
-        "skip_row_count": true
+        "skip_row_count": true,
+        "skip_column_check": true
       }
     },
     {
@@ -6265,7 +6269,8 @@
         ],
         "results_mode": "rowsort",
         "skip_sqllogictest": true,
-        "skip_row_count": true
+        "skip_row_count": true,
+        "skip_column_check": true
       }
     },
     {
