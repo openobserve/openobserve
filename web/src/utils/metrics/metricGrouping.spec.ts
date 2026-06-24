@@ -39,13 +39,13 @@ function makeStream(stream_name: string): StreamInfo {
 // ---------------------------------------------------------------------------
 
 describe("DEFAULT_METRIC_GROUP_DEFINITIONS", () => {
-  it("should contain exactly 5 entries in order: compute, memory, storage, network, others", () => {
+  it("should contain exactly 5 entries in order: compute, memory, network, storage, others", () => {
     expect(DEFAULT_METRIC_GROUP_DEFINITIONS).toHaveLength(5);
     expect(DEFAULT_METRIC_GROUP_DEFINITIONS.map((d) => d.id)).toEqual([
       "compute",
       "memory",
-      "storage",
       "network",
+      "storage",
       "others",
     ]);
   });
@@ -288,9 +288,9 @@ describe("classifyMetric — infra group", () => {
 describe("classifyMetric — catch-all fallback with DEFAULT_METRIC_GROUP_DEFINITIONS", () => {
   const defs = DEFAULT_METRIC_GROUP_DEFINITIONS; // compute, memory, storage, network, others
 
-  it("should classify http_server_request_duration_seconds as others", () => {
+  it("should classify http_server_request_duration_seconds as network (http keyword)", () => {
     expect(classifyMetric("http_server_request_duration_seconds", defs)).toBe(
-      "others",
+      "network",
     );
   });
 
@@ -304,8 +304,8 @@ describe("classifyMetric — catch-all fallback with DEFAULT_METRIC_GROUP_DEFINI
     expect(classifyMetric("", defs)).toBe("others");
   });
 
-  it("should classify go_goroutines as others", () => {
-    expect(classifyMetric("go_goroutines", defs)).toBe("others");
+  it("should classify go_goroutines as compute (goroutine keyword)", () => {
+    expect(classifyMetric("go_goroutines", defs)).toBe("compute");
   });
 
   it("should classify promhttp_metric_handler_requests_total as others", () => {
@@ -423,8 +423,13 @@ describe("classifyMetric — priority ordering with custom groupDefs", () => {
       { id: "network", label: "Network", icon: "wifi" },
       { id: "infra", label: "Infra", icon: "dns" },
     ];
+    // http_server_request_duration_seconds matches network via /\bhttp\b/i now
     expect(
       classifyMetric("http_server_request_duration_seconds", defsNoCatchAll),
+    ).toBe("network");
+    // purely unknown metric falls through to last group (infra)
+    expect(
+      classifyMetric("my_custom_business_metric_total", defsNoCatchAll),
     ).toBe("infra");
   });
 
@@ -450,8 +455,8 @@ describe("groupMetricsByCategory — return structure", () => {
     expect(result.groups.map((g) => g.id)).toEqual([
       "compute",
       "memory",
-      "storage",
       "network",
+      "storage",
       "others",
     ]);
   });
@@ -502,32 +507,34 @@ describe("groupMetricsByCategory — classification", () => {
     expect(result.byGroup["others"]).toHaveLength(0);
   });
 
-  it("should place unmatched metrics into the others group", () => {
+  it("should place http metrics into network and go_goroutines into compute", () => {
     const streams = [
-      makeStream("http_server_request_duration_seconds"),
-      makeStream("go_goroutines"),
+      makeStream("http_server_request_duration_seconds"), // http keyword → network
+      makeStream("go_goroutines"), // goroutine keyword → compute
     ];
     const result = groupMetricsByCategory(streams);
-    expect(result.byGroup["others"]).toHaveLength(2);
-    expect(result.byGroup["network"]).toHaveLength(0);
-    expect(result.byGroup["compute"]).toHaveLength(0);
+    expect(result.byGroup["network"]).toHaveLength(1);
+    expect(result.byGroup["compute"]).toHaveLength(1);
+    expect(result.byGroup["others"]).toHaveLength(0);
   });
 
   it("should split a mixed list across correct groups", () => {
     const streams = [
       makeStream("container_network_receive_bytes_total"), // network wins
       makeStream("container_cpu_usage_seconds_total"), // compute
-      makeStream("http_server_request_duration_seconds"), // others
+      makeStream("http_server_request_duration_seconds"), // network (http keyword)
       makeStream("container_memory_usage_bytes"), // memory
     ];
     const result = groupMetricsByCategory(streams);
-    expect(result.byGroup["network"]).toHaveLength(1);
-    expect(result.byGroup["network"][0].stream_name).toBe(
-      "container_network_receive_bytes_total",
-    );
+    expect(result.byGroup["network"]).toHaveLength(2); // network_receive + http_server
+    expect(
+      result.byGroup["network"].some(
+        (s) => s.stream_name === "container_network_receive_bytes_total",
+      ),
+    ).toBe(true);
     expect(result.byGroup["compute"]).toHaveLength(1);
     expect(result.byGroup["memory"]).toHaveLength(1);
-    expect(result.byGroup["others"]).toHaveLength(1);
+    expect(result.byGroup["others"]).toHaveLength(0);
   });
 
   it("should preserve the original StreamInfo objects (same reference)", () => {
@@ -845,11 +852,11 @@ describe("getDefaultMetricSelections", () => {
 // ---------------------------------------------------------------------------
 
 const COMPUTE_MEMORY_STORAGE_GROUPS: MetricGroupDefinition[] = [
-  { id: "compute", label: "Compute", icon: "developer_board" },
+  { id: "compute", label: "Compute", icon: "insights" },
   { id: "memory", label: "Memory", icon: "memory" },
   { id: "storage", label: "Storage", icon: "storage" },
   { id: "network", label: "Network", icon: "lan" },
-  { id: "others", label: "Others", icon: "more_horiz" },
+  { id: "others", label: "Others", icon: "category" },
 ];
 
 describe("groupMetricsByCategory with compute/memory/storage groups", () => {
@@ -911,12 +918,13 @@ describe("groupMetricsByCategory with compute/memory/storage groups", () => {
     expect(result.byGroup["storage"]).toHaveLength(1);
   });
 
-  it("classifies http_requests_total as others", () => {
+  it("classifies http_requests_total as network (http keyword)", () => {
     const result = groupMetricsByCategory(
       [makeStream("http_requests_total")],
       COMPUTE_MEMORY_STORAGE_GROUPS,
     );
-    expect(result.byGroup["others"]).toHaveLength(1);
+    expect(result.byGroup["network"]).toHaveLength(1);
+    expect(result.byGroup["others"]).toHaveLength(0);
   });
 });
 

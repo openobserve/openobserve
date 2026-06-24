@@ -1198,6 +1198,9 @@ import {
   getDefaultMetricSelections,
   type MetricGroupDefinition,
   DEFAULT_METRIC_GROUP_DEFINITIONS,
+  K8S_METRIC_GROUP_DEFINITIONS,
+  NODE_PATTERNS,
+  POD_PATTERNS,
 } from "@/utils/metrics/metricGrouping";
 import type { StreamInfo } from "@/services/service_streams";
 import {
@@ -1291,7 +1294,6 @@ export interface TelemetryCorrelationDashboardProps {
 const props = withDefaults(defineProps<TelemetryCorrelationDashboardProps>(), {
   mode: "dialog",
   externalActiveTab: "logs",
-  metricGroupDefinitions: () => DEFAULT_METRIC_GROUP_DEFINITIONS,
 });
 
 const emit = defineEmits<{
@@ -1313,9 +1315,13 @@ const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } =
 let currentTracesStreamTraceId: string | null = null;
 
 // Resolved group definitions and their ids (reactive to prop changes)
-const groupDefs = computed(
-  () => props.metricGroupDefinitions ?? DEFAULT_METRIC_GROUP_DEFINITIONS,
-);
+const groupDefs = computed(() => {
+  if (props.metricGroupDefinitions) return props.metricGroupDefinitions;
+  // Auto-select K8s nested definitions when the correlation matched a kubernetes identity set
+  const setId = props.matchedSetId?.toLowerCase() ?? "";
+  if (setId === "kubernetes" || setId.startsWith("k8s")) return K8S_METRIC_GROUP_DEFINITIONS;
+  return DEFAULT_METRIC_GROUP_DEFINITIONS;
+});
 
 // Nested mode: when top-level groups have children (e.g. K8s Pod/Node outer tabs)
 const isNestedGroupMode = computed(() =>
@@ -1325,6 +1331,15 @@ const isNestedGroupMode = computed(() =>
 const activeOuterTab = ref<string>(
   groupDefs.value.find((g) => g.children)?.id ?? groupDefs.value[0]?.id ?? "",
 );
+
+// When matchedSetId arrives (async) groupDefs switches from flat → nested.
+// Re-initialize activeOuterTab to the first outer group so the Pods tab is selected.
+watch(isNestedGroupMode, (nested) => {
+  if (nested) {
+    activeOuterTab.value =
+      groupDefs.value.find((g) => g.children)?.id ?? groupDefs.value[0]?.id ?? "";
+  }
+});
 
 // Resolve a value for a semantic ID by checking chipDimensions directly (semantic-id key)
 // and also by looking up raw field names from semanticGroups (raw-field key).
@@ -1653,7 +1668,25 @@ const applyUnstableDimensionDefaults = (
 };
 
 const uniqueMetricStreams = computed(() => {
-  return getUniqueStreams(sortedMetricStreams.value);
+  const base = getUniqueStreams(sortedMetricStreams.value);
+  if (!isNestedGroupMode.value) return base;
+
+  // In nested mode (K8s), supplement correlation-returned streams with all
+  // node/pod streams from the org catalog. The _correlate API only returns
+  // streams associated with the matched service record (pod-level), so
+  // node-level metrics (k8s_node_*, system_*) are missing from the response.
+  const catalogMetrics = store.state.streams?.metrics as Record<string, any> | undefined;
+  if (!catalogMetrics) return base;
+
+  const existingNames = new Set(base.map((s) => s.stream_name));
+  const extra: StreamInfo[] = Object.keys(catalogMetrics)
+    .filter((name) =>
+      !existingNames.has(name) &&
+      (streamMatchesPatterns(name, NODE_PATTERNS) || streamMatchesPatterns(name, POD_PATTERNS)),
+    )
+    .map((name) => ({ stream_name: name, stream_type: "metrics" }));
+
+  return [...base, ...extra];
 });
 
 // Selected metric streams — declared before chip/intent block because applyActivePill references it.
@@ -1661,7 +1694,7 @@ const selectedMetricStreams = ref<StreamInfo[]>(
   applyUnstableDimensionDefaults(
     (() => {
       const unique = getUniqueStreams(sortedMetricStreams.value);
-      const defs = props.metricGroupDefinitions ?? DEFAULT_METRIC_GROUP_DEFINITIONS;
+      const defs = groupDefs.value;
       const defaults = getDefaultMetricSelections(defs, unique);
       return defaults.length > 0 ? defaults : unique.slice(0, 6);
     })(),
@@ -1900,19 +1933,22 @@ const activeSubjectButtonId = computed<string | null>(() => {
 });
 
 const applyScopeFilter = (streams: StreamInfo[]): StreamInfo[] => {
-  const sid = activeSubject.value;
-  if (!sid || subjectButtons.value.length === 0) return streams;
-  const button = subjectButtons.value.find((b) => Array.isArray(b.semanticIds) && b.semanticIds.includes(sid));
-  if (!button || button.poolPatterns.length === 0) return streams;
-  const filtered = streams.filter((s) => streamMatchesPatterns(s.stream_name, button.poolPatterns));
-  // In nested mode on the node tab, sort node-native metrics first, pod metrics second
-  if (isNestedGroupMode.value && activeOuterTab.value === "nodes" && button.patterns.length > 0) {
-    return [
-      ...filtered.filter((s) => streamMatchesPatterns(s.stream_name, button.patterns)),
-      ...filtered.filter((s) => !streamMatchesPatterns(s.stream_name, button.patterns)),
-    ];
+  if (!isNestedGroupMode.value) {
+    // Non-nested: use the subject button's dimension-derived pool patterns (original behaviour)
+    const sid = activeSubject.value;
+    if (!sid || subjectButtons.value.length === 0) return streams;
+    const button = subjectButtons.value.find((b) => Array.isArray(b.semanticIds) && b.semanticIds.includes(sid));
+    if (!button || button.poolPatterns.length === 0) return streams;
+    return streams.filter((s) => streamMatchesPatterns(s.stream_name, button.poolPatterns));
   }
-  return filtered;
+  // Nested mode: filter by stream-name patterns so node/pod tabs show the right streams
+  if (activeOuterTab.value === "nodes") {
+    return streams.filter((s) => streamMatchesPatterns(s.stream_name, NODE_PATTERNS));
+  }
+  if (activeOuterTab.value === "pods") {
+    return streams.filter((s) => streamMatchesPatterns(s.stream_name, POD_PATTERNS));
+  }
+  return streams;
 };
 
 const streamsForActivePill = computed<StreamInfo[]>(() => {
@@ -1974,13 +2010,21 @@ const filteredMetricStreams = computed(() => {
 });
 
 // Group the filtered metric streams into configured categories
+// In nested mode, also apply scope filter so the sidebar shows only pod/node streams
 const groupedFilteredMetricStreams = computed(() =>
-  groupMetricsByCategory(filteredMetricStreams.value, effectiveGroupDefs.value),
+  groupMetricsByCategory(
+    applyScopeFilter(filteredMetricStreams.value),
+    effectiveGroupDefs.value,
+  ),
 );
 
-// Group ALL available unique metric streams � drives which tabs are visible
+// Group ALL available unique metric streams — drives which tabs are visible
+// In nested mode, scope-filter so counts reflect the active outer tab
 const groupedUniqueMetricStreams = computed(() =>
-  groupMetricsByCategory(uniqueMetricStreams.value, effectiveGroupDefs.value),
+  groupMetricsByCategory(
+    applyScopeFilter(uniqueMetricStreams.value),
+    effectiveGroupDefs.value,
+  ),
 );
 
 // Group the currently *selected* metric streams (used by the selector dialog)
