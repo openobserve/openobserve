@@ -1541,14 +1541,24 @@ export default defineComponent({
     });
 
     const onJumpToStreamData = (fromUs: number, toUs: number) => {
-      // Set datetime state directly and trigger one search. Update the picker UI
-      // after the search starts so its on:date-change emit does not race with runQuery.
+      // We fire the search directly via runQuery below. setAbsoluteTime is only
+      // needed to sync the picker UI, but it also mutates the picker's selectedDate/
+      // selectedTime, which fires DateTime.vue's deep auto-apply watcher → on:date-change
+      // → updateDateTime. In live mode that path schedules a SECOND search via a 2.5s
+      // debounce. The programmatic-change flag that would normally mark that emit as
+      // userChangedValue=false is defeated here because runQuery kicks off an async
+      // search that flushes the flag's nextTick reset before the emit lands.
+      //
+      // Set shouldIgnoreWatcher so updateDateTime's auto-trigger path is skipped, fire
+      // the single search, then release the flag after the picker's emit has flushed.
+      searchObj.shouldIgnoreWatcher = true;
+      searchBarRef.value?.dateTimeRef?.setAbsoluteTime(fromUs, toUs);
       searchObj.data.datetime.startTime = fromUs;
       searchObj.data.datetime.endTime = toUs;
       searchObj.data.datetime.type = "absolute";
       searchObj.runQuery = true;
       nextTick(() => {
-        searchBarRef.value?.dateTimeRef?.setAbsoluteTime(fromUs, toUs);
+        searchObj.shouldIgnoreWatcher = false;
       });
     };
 
