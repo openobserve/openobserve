@@ -141,7 +141,8 @@ function mountDashboard(
       stubs: {
         // Children — all stubbed so we don't try to render echarts /
         // sparkline math during dashboard-level tests.
-        LLMTrendPanel: { template: "<div data-test=\"llm-trend-panel\" />" },
+        LLMSchemaPanel: { template: "<div data-test=\"llm-schema-panel\" />" },
+        LLMErrorTable: { template: "<div data-test=\"llm-error-table\" />" },
         KpiSparkline: { template: "<div data-test=\"kpi-sparkline\" />" },
         LLMInsightsSkeleton: { template: "<div data-test=\"llm-insights-skeleton\" />" },
         OButton: {
@@ -246,7 +247,8 @@ describe("LLMInsightsDashboard — loadInsights guards", () => {
     await flushPromises();
     mockFetchAll.mockClear();
     await (wrapper.vm as any).loadInsights(123, 456);
-    expect(mockFetchAll).toHaveBeenCalledWith("default", 123, 456);
+    // 4th arg is the selected agent (null = All Agents).
+    expect(mockFetchAll).toHaveBeenCalledWith("default", 123, 456, null);
   });
 
   // Default path — no args means use props.
@@ -259,6 +261,7 @@ describe("LLMInsightsDashboard — loadInsights guards", () => {
       "default",
       1_700_000_000_000_000,
       1_700_001_000_000_000,
+      null,
     );
   });
 
@@ -289,7 +292,7 @@ describe("LLMInsightsDashboard — refresh (parent entry point)", () => {
     await flushPromises();
     mockFetchAll.mockClear();
     await (wrapper.vm as any).refresh(999, 1999);
-    expect(mockFetchAll).toHaveBeenCalledWith("default", 999, 1999);
+    expect(mockFetchAll).toHaveBeenCalledWith("default", 999, 1999, null);
   });
 
   // No args → behaves like a normal loadInsights (falls back to props).
@@ -302,6 +305,7 @@ describe("LLMInsightsDashboard — refresh (parent entry point)", () => {
       "default",
       1_700_000_000_000_000,
       1_700_001_000_000_000,
+      null,
     );
   });
 });
@@ -324,6 +328,7 @@ describe("LLMInsightsDashboard — onStreamChange", () => {
       "other",
       1_700_000_000_000_000,
       1_700_001_000_000_000,
+      null,
     );
     expect(localStorage.getItem(STREAM_LS_KEY)).toBe("other");
   });

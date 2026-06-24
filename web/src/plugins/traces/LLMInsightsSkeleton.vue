@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Row 2 & 3: 2-column trend panel grid -->
-    <div class="tw:grid tw:grid-cols-2 tw:gap-[0.625rem]">
+    <div v-if="!kpiOnly" class="tw:grid tw:grid-cols-2 tw:gap-[0.625rem]">
       <div
         v-for="n in 4"
         :key="n"
@@ -81,6 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Row 4: tw:w-full recent errors table -->
     <div
+      v-if="!kpiOnly"
       class="panel-tile"
       :class="
         store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'
@@ -105,6 +106,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { useStore } from "vuex";
 import SkeletonBox from "@/components/shared/SkeletonBox.vue";
+
+// kpiOnly: render just the KPI tiles row. Used when the trend/table panels
+// render live underneath (firing their own queries) while only the KPI strip
+// is still loading — so the panels aren't blocked behind the KPI fetch.
+defineProps<{ kpiOnly?: boolean }>();
 
 const store = useStore();
 </script>

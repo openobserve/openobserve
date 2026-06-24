@@ -30,7 +30,6 @@
 
 export type LLMPanelType =
   | "stacked-area"
-  | "histogram-with-thresholds"
   | "horizontal-bar"
   | "table";
 
@@ -51,7 +50,7 @@ export interface LLMTableColumn {
   align?: "left" | "right";
 }
 
-export type LLMValueFormat = "cost";
+export type LLMValueFormat = "cost" | "latency-ms";
 
 export interface LLMPanelQuery {
   /** SQL with {{stream}}, {{startTime}}, {{endTime}}, {{interval}} placeholders */
@@ -88,23 +87,16 @@ export interface LLMPanelDef {
   /** Optional row cap for horizontal-bar panels (top N). */
   limit?: number;
   /**
-   * For time-series panels (stacked-area): how to handle missing/empty data.
-   * - "zero": synthesise a flat zero line across the time range so empty results
-   *   render as "0 over time" instead of "No data". Useful for absence-is-good
-   *   metrics like errors / timeouts / rate-limits.
+   * For grouped-bar panels: the value columns to render as side-by-side bars
+   * per category (e.g. p50/p90/p95/p99 per model). Each maps a hit field to a
+   * legend label and bar color. When set, these become the chart's Y-axis
+   * series instead of `query.valueField`.
    */
-  gapFill?: "zero";
+  series?: Array<{ field: string; label: string; color: string }>;
   /** Column definitions for "table" panels. */
   columns?: LLMTableColumn[];
   /** Friendly message shown when the panel has no data (overrides "No data"). */
   emptyStateText?: string;
-  /**
-   * For "histogram-with-thresholds": optional second query that returns a
-   * single row containing percentile values to render as guide lines.
-   * Each entry maps a hit field name to a label & color.
-   */
-  thresholds?: Array<{ field: string; label: string; color: string }>;
-  thresholdsQuery?: { sql: string };
 }
 
 // Time-range pruning is handled by the search engine via the start_time /
@@ -196,38 +188,39 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
     },
   },
   {
-    id: "latency-percentiles",
-    title: "Latency p50 / p95 / p99",
-    subtitle: "all LLM calls",
-    type: "histogram-with-thresholds",
+    id: "latency-by-model",
+    title: "Latency by model",
+    subtitle: "p50 / p90 / p95 / p99",
+    type: "horizontal-bar",
     layout: { colSpan: 1 },
+    limit: 8,
     query: {
-      // Pull raw durations and bucket client-side so the bucket width adapts
-      // to the actual data range (sub-millisecond traces and 30s traces both
-      // render correctly). Thresholds below stay exact via approx_percentile.
-      sql: `
-        SELECT duration as duration_us
-        FROM {{stream}}
-        WHERE ${baseFilter}
-        LIMIT 50000
-      `,
-      valueField: "duration_us",
-    },
-    thresholds: [
-      { field: "p50_ms", label: "p50", color: "#64748b" },
-      { field: "p95_ms", label: "p95", color: "#3b82f6" },
-      { field: "p99_ms", label: "p99", color: "#ef4444" },
-    ],
-    thresholdsQuery: {
+      // One row per model with its latency percentiles (ms). Scoped to LLM
+      // calls so fast tool/child spans don't drag the tail down. Ordered by
+      // p95 so the slowest models surface first; the four percentile columns
+      // render as grouped bars per model (see `series`).
       sql: `
         SELECT
-          approx_percentile_cont(duration, 0.5) / 1000.0 as p50_ms,
+          COALESCE(${MODEL_FIELD}, 'unknown') as model,
+          approx_percentile_cont(duration, 0.5)  / 1000.0 as p50_ms,
+          approx_percentile_cont(duration, 0.9)  / 1000.0 as p90_ms,
           approx_percentile_cont(duration, 0.95) / 1000.0 as p95_ms,
           approx_percentile_cont(duration, 0.99) / 1000.0 as p99_ms
         FROM {{stream}}
         WHERE ${baseFilter}
+        GROUP BY COALESCE(${MODEL_FIELD}, 'unknown')
+        ORDER BY p95_ms DESC
       `,
+      seriesField: "model",
+      valueFormat: "latency-ms",
     },
+    // Severity escalation: slate (typical) → red (slow tail).
+    series: [
+      { field: "p50_ms", label: "p50", color: "#64748b" },
+      { field: "p90_ms", label: "p90", color: "#f59e0b" },
+      { field: "p95_ms", label: "p95", color: "#f97316" },
+      { field: "p99_ms", label: "p99", color: "#ef4444" },
+    ],
   },
   {
     id: "traces-over-time",
@@ -258,7 +251,6 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
     type: "stacked-area",
     layout: { colSpan: 1 },
     color: "#ef4444",
-    gapFill: "zero",
     query: {
       // No baseFilter: OTel SDKs typically propagate the failure to a deep
       // child span (e.g. tool.<name>) which doesn't carry

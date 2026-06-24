@@ -107,17 +107,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Session ID -->
         <template #cell-sessionId="{ row }">
-          <span class="tw:text-[0.75rem]">
-            {{ shortId(row.sessionId) }}
+          <div class="tw:text-[0.75rem] tw:truncate tw:w-full">
+            {{ row.sessionId }}
             <OTooltip :content="row.sessionId" />
-          </span>
+          </div>
         </template>
 
         <!-- User -->
         <template #cell-userId="{ row }">
           <span
             v-if="row.userId"
-            class="tw:text-[0.75rem] tw:text-[var(--o2-text-primary)] tw:truncate tw:max-w-[160px] tw:block"
+            class="tw:text-[0.75rem] tw:text-[var(--o2-text-primary)] tw:truncate tw:max-w-[100px] tw:block"
           >
             {{ row.userId }}
           </span>
@@ -128,13 +128,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- First user message -->
         <template #cell-firstUserMessage="{ row }">
-          <span
+          <div
             v-if="row.firstUserMessage"
-            class="tw:text-[0.75rem] tw:text-[var(--o2-text-secondary)]"
+            class="tw:text-[0.75rem] tw:text-[var(--o2-text-secondary)] tw:truncate tw:w-full"
           >
-            {{ row.firstUserMessage.length > 30 ? row.firstUserMessage.slice(0, 30) + '…' : row.firstUserMessage }}
-            <OTooltip v-if="row.firstUserMessage.length > 30" :content="row.firstUserMessage" />
-          </span>
+            {{ row.firstUserMessage }}
+            <OTooltip :content="row.firstUserMessage" />
+          </div>
           <span v-else class="tw:text-[0.75rem] tw:text-[var(--o2-text-muted)]">—</span>
         </template>
 
@@ -289,7 +289,7 @@ const tableColumns = computed(() => [
     id: "userId",
     header: t('traces.sessionsList.columns.user'),
     accessorKey: "userId",
-    size: 180,
+    size: 110,
     sortable: false,
     hideable: true,
     meta: { align: "left" },
@@ -298,7 +298,12 @@ const tableColumns = computed(() => [
     id: "firstUserMessage",
     header: t('traces.sessionsList.columns.firstMessage'),
     accessorKey: "firstUserMessage",
-    size: 200,
+    size: 360,
+    // Flex columns collapse to `minSize` when the table overflows horizontally;
+    // pin a floor so the message stays readable instead of clipping to "Han…".
+    // The user drives how much they want to see via resize, capped by maxSize.
+    minSize: 200,
+    maxSize: 600,
     sortable: false,
     hideable: true,
     meta: { align: "left", flex: true },
@@ -307,19 +312,19 @@ const tableColumns = computed(() => [
     id: "turns",
     header: t('traces.sessionsList.columns.turns'),
     accessorKey: "turns",
-    size: 90,
+    size: 50,
     sortable: false,
     hideable: true,
-    meta: { align: "center" },
+    meta: { align: "left" },
   },
   {
     id: "durationNanos",
     header: t('traces.sessionsList.columns.duration'),
     accessorKey: "durationNanos",
-    size: 120,
+    size: 90,
     sortable: false,
     hideable: true,
-    meta: { align: "center" },
+    meta: { align: "left" },
   },
   {
     id: "tokens",
@@ -328,7 +333,7 @@ const tableColumns = computed(() => [
     size: 250,
     sortable: false,
     hideable: true,
-    meta: { align: "center" },
+    meta: { align: "left" },
   },
   {
     id: "cost",
@@ -337,7 +342,7 @@ const tableColumns = computed(() => [
     size: 100,
     sortable: false,
     hideable: true,
-    meta: { align: "center" },
+    meta: { align: "left" },
   },
   {
     id: "status",
@@ -346,7 +351,7 @@ const tableColumns = computed(() => [
     size: 100,
     sortable: false,
     hideable: true,
-    meta: { align: "center", disableCellAction: true },
+    meta: { align: "left", disableCellAction: true },
   },
 ].map((c: any) => ({
   ...c,
@@ -361,11 +366,6 @@ function formatTimestamp(nanos: number): string {
   return formatDate(Math.floor(nanos / 1_000_000), "YYYY-MM-DD HH:mm:ss");
 }
 
-function shortId(id: string): string {
-  if (!id) return "—";
-  if (id.length <= 16) return id;
-  return `${id.slice(0, 8)}…${id.slice(-5)}`;
-}
 
 function formatDuration(nanos: number): string {
   if (!nanos) return "—";

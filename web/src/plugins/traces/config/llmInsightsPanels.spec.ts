@@ -304,9 +304,10 @@ describe("LLM_INSIGHTS_PANELS — registry invariants", () => {
     }
   });
 
-  // Horizontal-bar panels render top-N — they must declare both
-  // seriesField (categories) and valueField (bar lengths).
-  it("horizontal-bar panels declare seriesField and valueField", () => {
+  // Horizontal-bar panels render top-N — they must declare seriesField
+  // (categories) and a value source: either a single `valueField` (bar
+  // lengths) or a `series[]` of grouped value columns (e.g. p50/p90/p95/p99).
+  it("horizontal-bar panels declare seriesField and a value source", () => {
     const bars = LLM_INSIGHTS_PANELS.filter((p) => p.type === "horizontal-bar");
     expect(bars.length).toBeGreaterThan(0);
     for (const p of bars) {
@@ -314,10 +315,8 @@ describe("LLM_INSIGHTS_PANELS — registry invariants", () => {
         p.query.seriesField,
         `panel ${p.id} missing seriesField`,
       ).toBeTruthy();
-      expect(
-        p.query.valueField,
-        `panel ${p.id} missing valueField`,
-      ).toBeTruthy();
+      const hasValue = !!p.query.valueField || (p.series?.length ?? 0) > 0;
+      expect(hasValue, `panel ${p.id} missing valueField/series`).toBe(true);
     }
   });
 
@@ -332,18 +331,18 @@ describe("LLM_INSIGHTS_PANELS — registry invariants", () => {
     }
   });
 
-  // Latency panel pulls raw durations and bucketizes client-side; it
-  // needs both the main query and a thresholds query (for the percentile
-  // guide lines drawn on the chart).
-  it("histogram-with-thresholds panels declare a thresholdsQuery and thresholds[]", () => {
-    const histos = LLM_INSIGHTS_PANELS.filter(
-      (p) => p.type === "histogram-with-thresholds",
+  // Latency by model renders grouped bars — one Y series per percentile.
+  // Each series must declare a field/label/color so the chart + legend render.
+  it("latency-by-model declares grouped percentile series", () => {
+    const latency = LLM_INSIGHTS_PANELS.find(
+      (p) => p.id === "latency-by-model",
     );
-    expect(histos.length).toBeGreaterThan(0);
-    for (const p of histos) {
-      expect(p.thresholdsQuery?.sql).toBeTruthy();
-      expect(Array.isArray(p.thresholds)).toBe(true);
-      expect((p.thresholds as any[]).length).toBeGreaterThan(0);
+    expect(latency).toBeTruthy();
+    expect(latency!.series?.length ?? 0).toBeGreaterThan(1);
+    for (const s of latency!.series!) {
+      expect(s.field).toBeTruthy();
+      expect(s.label).toBeTruthy();
+      expect(s.color).toBeTruthy();
     }
   });
 
@@ -357,15 +356,5 @@ describe("LLM_INSIGHTS_PANELS — registry invariants", () => {
     const fields = recentErrors!.columns!.map((c) => c.field);
     expect(fields).toContain("operation");
     expect(fields).toContain("trace_id");
-  });
-
-  // Errors-over-time uses gap-fill so an empty result shows "0 over time"
-  // instead of a misleading "No data" — preserve this configuration so a
-  // future reader doesn't strip it as cosmetic.
-  it("errors-over-time panel keeps gapFill='zero'", () => {
-    const errors = LLM_INSIGHTS_PANELS.find(
-      (p: LLMPanelDef) => p.id === "errors-over-time",
-    );
-    expect(errors?.gapFill).toBe("zero");
   });
 });

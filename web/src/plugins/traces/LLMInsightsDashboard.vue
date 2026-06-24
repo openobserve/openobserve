@@ -62,8 +62,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <!-- Skeleton shown only while a real request is in flight -->
-    <LLMInsightsSkeleton v-if="!streamsLoaded || loading" class="tw:flex-1 tw:px-4" />
+    <!-- Full-page skeleton only until the stream list is known. Once we have a
+         stream, we fall through to the content so the trend/table panels mount
+         and fire their queries immediately — in parallel with the KPI fetch,
+         rather than waiting for it (the KPI strip keeps its own skeleton). -->
+    <LLMInsightsSkeleton v-if="!streamsLoaded" class="tw:flex-1 tw:px-4" />
 
     <!-- Generic error state — kept separate because a failed request is a
          different signal from "no data yet". Once we have a result we fall
@@ -101,8 +104,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          here (inside the scroll container) so the scrollbar sits at the
          content-area edge with content padded away from it. -->
     <div v-else class="tw:flex-1 tw:overflow-y-auto tw:px-4 tw:pb-3">
+      <!-- KPI strip: keep a skeleton until the first KPI result lands so the
+           cards never flash zeros. The panels below render regardless, so
+           their queries fire in parallel with the KPI fetch. -->
+      <LLMInsightsSkeleton
+        v-if="loading || !hasLoadedOnce"
+        kpi-only
+        class="tw:mt-[0.625rem] tw:mb-[0.625rem]"
+      />
       <!-- KPI Cards Row -->
-      <div class="tw:grid tw:grid-cols-5 tw:gap-[0.625rem] tw:mt-[0.625rem] tw:mb-[0.625rem]">
+      <div
+        v-else
+        class="tw:grid tw:grid-cols-5 tw:gap-[0.625rem] tw:mt-[0.625rem] tw:mb-[0.625rem]"
+      >
         <div
           v-for="card in kpiCards"
           :key="card.label"
@@ -152,13 +166,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :key="panel.id"
           :class="panel.layout.colSpan === 2 ? 'tw:col-span-2' : ''"
         >
-          <LLMTrendPanel
+          <!-- Table panels use OTable (interactive, app-navigation) — matches
+               the other AI Observability tables; every chart panel renders
+               through the shared dashboards engine (PanelSchemaRenderer). -->
+          <LLMErrorTable
+            v-if="panel.type === 'table'"
             :panel="panel"
             :streamName="activeStream"
             :startTime="startTime"
             :endTime="endTime"
             :agent-filter="agentFilterClause"
             @view-trace="onViewTrace"
+          />
+          <LLMSchemaPanel
+            v-else
+            :panel="panel"
+            :streamName="activeStream"
+            :startTime="startTime"
+            :endTime="endTime"
+            :agent-filter="agentFilterClause"
           />
         </div>
       </div>
@@ -182,7 +208,8 @@ import {
   type KpiTrend,
 } from "./llmInsightsDashboard.utils";
 import KpiSparkline from "./KpiSparkline.vue";
-import LLMTrendPanel from "./LLMTrendPanel.vue";
+import LLMSchemaPanel from "./LLMSchemaPanel.vue";
+import LLMErrorTable from "./LLMErrorTable.vue";
 import LLMInsightsSkeleton from "./LLMInsightsSkeleton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import EvalEmptyState from "@/components/EvalEmptyState.vue";
@@ -341,12 +368,16 @@ const streamHasNoLLMFields = computed(() => {
 // stream has no gen_ai_* fields, or the load completed and the KPI rollup
 // came back empty. The dashboard's KPI tiles + trend panels render only
 // when this is false — so we never show "0" tiles next to empty charts.
+//
+// The "empty KPI" clause is gated on `!loading`: a refresh resets the KPI to
+// EMPTY_KPI before the new result lands, so without this guard the empty state
+// would flash mid-refresh (hasData briefly false while a fetch is in flight).
 const isEmpty = computed<boolean>(
   () =>
     streamsLoaded.value &&
     (availableStreams.value.length === 0 ||
       streamHasNoLLMFields.value ||
-      (hasLoadedOnce.value && !hasData.value)),
+      (hasLoadedOnce.value && !hasData.value && !loading.value)),
 );
 
 // The empty-state action card emits its `id` here. `instrument` routes to
