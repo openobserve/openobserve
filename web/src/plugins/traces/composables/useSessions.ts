@@ -16,8 +16,6 @@
 import { ref } from "vue";
 import { useStore } from "vuex";
 import sessionsService from "@/services/sessions";
-import useHttpStreaming from "@/composables/useStreamingSearch";
-import { generateTraceContext } from "@/utils/zincutils";
 import { useLLMStreamQuery } from "./useLLMStreamQuery";
 
 export interface SessionDetail {
@@ -127,16 +125,9 @@ export function useSessions() {
   const store = useStore();
   // `fetchTurnDetail` still uses the raw SQL streaming search to grab
   // the messages of a single trace when its row is expanded — the
-  // session-list endpoint and the trace `latest_stream` endpoint
+  // session-list and session-detail endpoints
   // don't expose final assistant text or per-span output.
   const { executeQuery, cancelAll } = useLLMStreamQuery();
-  // The trace `latest_stream` endpoint (server-side aggregation per
-  // trace, LLM-aware fields) drives the per-turn list inside a
-  // session. Lifted out of `useLLMStreamQuery` because the URL +
-  // payload shape differs (GET with query params, not a POST SQL).
-  const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } =
-    useHttpStreaming();
-  const activeLatestStreamTraceIds = new Set<string>();
 
   const sessions = ref<SessionRow[]>([]);
   const total = ref(0);
@@ -152,10 +143,8 @@ export function useSessions() {
    *
    * `page` is zero-indexed.
    *
-   * Note: the response does not include user_id / service_name /
-   * span_status, so derived fields like "status pill" or "user
-   * avatar" are not available in the list view. Detail page still
-   * uses `fetchSession` (SQL path) for those.
+   * Note: the response does not include service_name/span_status details for
+   * each turn. The detail page uses `fetchSession` for per-turn rows.
    */
   async function fetchPage(
     streamName: string,
@@ -218,13 +207,9 @@ export function useSessions() {
    * Fetch the per-turn trace list for a single session and derive the
    * session-level rollup client-side.
    *
-   * Single SQL call (GROUP BY trace_id). The session header KPIs —
-   * turns, duration, tokens, cost, error count — are reductions over
-   * the trace list, so issuing a second GROUP BY session_id query
-   * would just duplicate work the server already did. `user_id` and
-   * `service_name` are picked up per-trace and consolidated to the
-   * first non-null value (they're effectively constant within a
-   * session).
+   * The backend returns the same trace-summary hit shape that this mapper
+   * already consumes, but with per-turn status computed from all spans in each
+   * trace.
    */
   async function fetchSession(
     streamName: string,
@@ -235,22 +220,17 @@ export function useSessions() {
     if (!streamName || !sessionId || !startTime || !endTime) {
       return { detail: null, traces: [] };
     }
-    // Escape single quotes so a malformed session id can't break the
-    // server's filter-to-WHERE expansion.
-    const safeId = sessionId.replace(/'/g, "''");
-    const filter = `gen_ai_conversation_id='${safeId}'`;
-
-    // Hit the existing per-stream traces endpoint instead of running
-    // a one-off GROUP BY ourselves. Server-side it's the same shape
-    // OpenObserve already uses for the Traces tab, and on LLM
-    // streams it adds gen_ai_usage_* totals + the first chat span's
-    // input messages — exactly what the session-detail page needs.
-    const accumulated: any[] = await streamLatestTraces(
+    const orgId = store.state.selectedOrganization?.identifier || "default";
+    const res = await sessionsService.details({
+      orgId,
       streamName,
-      filter,
+      sessionId,
       startTime,
       endTime,
-    );
+      from: 0,
+      size: 1000,
+    });
+    const accumulated: any[] = res.data?.hits || [];
 
     if (accumulated.length === 0) {
       return { detail: null, traces: [] };
@@ -352,66 +332,6 @@ export function useSessions() {
     };
 
     return { detail, traces };
-  }
-
-  /**
-   * Drive the `/api/{org}/{stream}/traces/latest_stream` HTTP/2
-   * streaming GET via the shared streaming-search composable. Accumulates
-   * hits across all SSE chunks and resolves once the server signals
-   * `complete`. Tracks the trace_id so `cancelAll` can abort an
-   * in-flight session-detail fetch on tab switch / unmount.
-   */
-  function streamLatestTraces(
-    streamName: string,
-    filter: string,
-    startTime: number,
-    endTime: number,
-  ): Promise<any[]> {
-    return new Promise((resolve, reject) => {
-      const traceId = generateTraceContext().traceId;
-      activeLatestStreamTraceIds.add(traceId);
-      const hits: any[] = [];
-
-      fetchQueryDataWithHttpStream(
-        {
-          queryReq: {
-            stream_name: streamName,
-            filter,
-            start_time: startTime,
-            end_time: endTime,
-            from: 0,
-            size: 1000,
-          },
-          type: "traces",
-          traceId,
-          org_id: store.state.selectedOrganization?.identifier,
-        },
-        {
-          data: (_payload: any, response: any) => {
-            const chunkHits: any[] = response.content?.results?.hits || [];
-            if (chunkHits.length > 0) hits.push(...chunkHits);
-          },
-          error: (response: any) => {
-            activeLatestStreamTraceIds.delete(traceId);
-            const body = response?.content ?? response ?? {};
-            const message =
-              body.message ||
-              body.error ||
-              body.error_detail ||
-              "Failed to fetch session traces";
-            const err: any = new Error(message);
-            err.status = body.status;
-            err.raw = response;
-            reject(err);
-          },
-          complete: () => {
-            activeLatestStreamTraceIds.delete(traceId);
-            resolve(hits);
-          },
-          reset: () => {},
-        },
-      );
-    });
   }
 
   /**
@@ -530,21 +450,12 @@ export function useSessions() {
   }
 
   /**
-   * Cancel every in-flight stream this composable owns: SQL streams
-   * from `useLLMStreamQuery` AND any `latest_stream` GET requests we
-   * started for the session-detail page. Called from the parent on
-   * unmount so server-side work isn't kept around after the tab goes
-   * away.
+   * Cancel in-flight SQL streams from `useLLMStreamQuery`. Called from the
+   * parent on unmount so server-side turn-detail work isn't kept around after
+   * the tab goes away.
    */
   function cancelAllSessionStreams() {
     cancelAll();
-    activeLatestStreamTraceIds.forEach((id) => {
-      cancelStreamQueryBasedOnRequestId({
-        trace_id: id,
-        org_id: store.state.selectedOrganization?.identifier,
-      });
-    });
-    activeLatestStreamTraceIds.clear();
   }
 
   return {

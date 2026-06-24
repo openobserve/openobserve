@@ -44,6 +44,16 @@ export interface SessionApiResponse {
   function_error?: string;
 }
 
+export interface SessionDetailsApiResponse {
+  took: number;
+  total: number;
+  from: number;
+  size: number;
+  hits: any[];
+  trace_id?: string;
+  function_error?: string;
+}
+
 const sessions = {
   /**
    * Fetch the paginated session list from
@@ -95,6 +105,44 @@ const sessions = {
       streamName,
     )}/traces/session?${params.toString()}`;
     return http().get<SessionApiResponse>(url);
+  },
+
+  /**
+   * Fetch per-turn trace summaries for a single session. The backend returns
+   * the same hit shape used by traces/latest_stream, but computes each turn's
+   * status from all spans in the trace.
+   */
+  details: ({
+    orgId,
+    streamName,
+    sessionId,
+    startTime,
+    endTime,
+    from = 0,
+    size = 1000,
+    timeout,
+  }: {
+    orgId: string;
+    streamName: string;
+    sessionId: string;
+    startTime: number;
+    endTime: number;
+    from?: number;
+    size?: number;
+    timeout?: number;
+  }) => {
+    const params = new URLSearchParams({
+      session_id: sessionId,
+      from: String(from),
+      size: String(size),
+      start_time: String(startTime),
+      end_time: String(endTime),
+    });
+    if (timeout) params.set("timeout", String(timeout));
+    const url = `/api/${orgId}/${encodeURIComponent(
+      streamName,
+    )}/traces/session/details?${params.toString()}`;
+    return http().get<SessionDetailsApiResponse>(url);
   },
 };
 

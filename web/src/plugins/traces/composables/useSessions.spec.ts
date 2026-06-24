@@ -7,10 +7,9 @@
 // ---------------------------------------------------------------------------
 
 const mockSessionsList = vi.fn();
+const mockSessionsDetails = vi.fn();
 const mockExecuteQuery = vi.fn();
 const mockCancelAll = vi.fn();
-const mockFetchQueryDataWithHttpStream = vi.fn();
-const mockCancelStreamQueryBasedOnRequestId = vi.fn();
 const mockStoreState = {
   selectedOrganization: { identifier: "test-org" },
   zoConfig: { sql_base64_enabled: false },
@@ -19,6 +18,7 @@ const mockStoreState = {
 vi.mock("@/services/sessions", () => ({
   default: {
     list: (...args: any[]) => mockSessionsList(...args),
+    details: (...args: any[]) => mockSessionsDetails(...args),
   },
 }));
 
@@ -29,19 +29,11 @@ vi.mock("./useLLMStreamQuery", () => ({
   })),
 }));
 
-vi.mock("@/composables/useStreamingSearch", () => ({
-  default: vi.fn(() => ({
-    fetchQueryDataWithHttpStream: mockFetchQueryDataWithHttpStream,
-    cancelStreamQueryBasedOnRequestId: mockCancelStreamQueryBasedOnRequestId,
-  })),
-}));
-
 vi.mock("vuex", () => ({
   useStore: vi.fn(() => ({ state: mockStoreState })),
 }));
 
 vi.mock("@/utils/zincutils", () => ({
-  generateTraceContext: vi.fn(() => ({ traceId: "trace-fixed-id" })),
   b64EncodeUnicode: vi.fn((s: string) => `b64(${s})`),
 }));
 
@@ -240,7 +232,7 @@ describe("useSessions — fetchSession: early return guards", () => {
     const { fetchSession } = useSessions();
     const result = await fetchSession("", "session-id", 1000, 2000);
     expect(result).toEqual({ detail: null, traces: [] });
-    expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
+    expect(mockSessionsDetails).not.toHaveBeenCalled();
   });
 
   it("returns { detail: null, traces: [] } when sessionId is missing", async () => {
@@ -264,16 +256,28 @@ describe("useSessions — fetchSession: early return guards", () => {
 
 describe("useSessions — fetchSession: empty API response", () => {
   it("returns { detail: null, traces: [] } when API returns no hits", async () => {
-    // Simulate streamLatestTraces resolving with empty array
-    mockFetchQueryDataWithHttpStream.mockImplementation(
-      (_payload: any, callbacks: any) => {
-        callbacks.complete();
-      },
-    );
+    mockSessionsDetails.mockResolvedValue({ data: { hits: [], total: 0 } });
 
     const { fetchSession } = useSessions();
     const result = await fetchSession("stream", "sess-1", 1000, 2000);
     expect(result).toEqual({ detail: null, traces: [] });
+  });
+
+  it("calls the session details API with the session id and time range", async () => {
+    mockSessionsDetails.mockResolvedValue({ data: { hits: [], total: 0 } });
+
+    const { fetchSession } = useSessions();
+    await fetchSession("stream", "sess-1", 1000, 2000);
+
+    expect(mockSessionsDetails).toHaveBeenCalledWith({
+      orgId: "test-org",
+      streamName: "stream",
+      sessionId: "sess-1",
+      startTime: 1000,
+      endTime: 2000,
+      from: 0,
+      size: 1000,
+    });
   });
 });
 
@@ -294,63 +298,54 @@ describe("useSessions — fetchSession: trace row mapping", () => {
     ...overrides,
   });
 
-  function setupStreamMock(hits: any[]) {
-    mockFetchQueryDataWithHttpStream.mockImplementation(
-      (_payload: any, callbacks: any) => {
-        if (hits.length > 0) {
-          callbacks.data(null, {
-            content: { results: { hits } },
-          });
-        }
-        callbacks.complete();
-      },
-    );
+  function setupDetailsMock(hits: any[]) {
+    mockSessionsDetails.mockResolvedValue({ data: { hits, total: hits.length } });
   }
 
   it("maps trace_id → traceId", async () => {
-    setupStreamMock([makeStreamHit()]);
+    setupDetailsMock([makeStreamHit()]);
     const { fetchSession } = useSessions();
     const { traces } = await fetchSession("stream", "sess-1", 1000, 2000);
     expect(traces[0].traceId).toBe("trace-abc");
   });
 
   it("maps start_time → startTimeMicros (stored as nanos)", async () => {
-    setupStreamMock([makeStreamHit({ start_time: "5000000000" })]);
+    setupDetailsMock([makeStreamHit({ start_time: "5000000000" })]);
     const { fetchSession } = useSessions();
     const { traces } = await fetchSession("stream", "sess-1", 1000, 2000);
     expect(traces[0].startTimeMicros).toBe(5000000000);
   });
 
   it("maps gen_ai_usage_input_tokens → inputTokens", async () => {
-    setupStreamMock([makeStreamHit({ gen_ai_usage_input_tokens: "75" })]);
+    setupDetailsMock([makeStreamHit({ gen_ai_usage_input_tokens: "75" })]);
     const { fetchSession } = useSessions();
     const { traces } = await fetchSession("stream", "sess-1", 1000, 2000);
     expect(traces[0].inputTokens).toBe(75);
   });
 
   it("maps gen_ai_usage_output_tokens → outputTokens", async () => {
-    setupStreamMock([makeStreamHit({ gen_ai_usage_output_tokens: "125" })]);
+    setupDetailsMock([makeStreamHit({ gen_ai_usage_output_tokens: "125" })]);
     const { fetchSession } = useSessions();
     const { traces } = await fetchSession("stream", "sess-1", 1000, 2000);
     expect(traces[0].outputTokens).toBe(125);
   });
 
   it("maps gen_ai_usage_total_tokens → tokens", async () => {
-    setupStreamMock([makeStreamHit({ gen_ai_usage_total_tokens: "200" })]);
+    setupDetailsMock([makeStreamHit({ gen_ai_usage_total_tokens: "200" })]);
     const { fetchSession } = useSessions();
     const { traces } = await fetchSession("stream", "sess-1", 1000, 2000);
     expect(traces[0].tokens).toBe(200);
   });
 
   it("maps gen_ai_usage_cost → cost", async () => {
-    setupStreamMock([makeStreamHit({ gen_ai_usage_cost: "0.0099" })]);
+    setupDetailsMock([makeStreamHit({ gen_ai_usage_cost: "0.0099" })]);
     const { fetchSession } = useSessions();
     const { traces } = await fetchSession("stream", "sess-1", 1000, 2000);
     expect(traces[0].cost).toBeCloseTo(0.0099);
   });
 
   it("status='error' when spans[1] (error_count) > 0", async () => {
-    setupStreamMock([makeStreamHit({ spans: [5, 2] })]);
+    setupDetailsMock([makeStreamHit({ spans: [5, 2] })]);
     const { fetchSession } = useSessions();
     const { traces } = await fetchSession("stream", "sess-1", 1000, 2000);
     expect(traces[0].status).toBe("error");
@@ -358,7 +353,7 @@ describe("useSessions — fetchSession: trace row mapping", () => {
   });
 
   it("status='ok' when spans[1] is 0", async () => {
-    setupStreamMock([makeStreamHit({ spans: [5, 0] })]);
+    setupDetailsMock([makeStreamHit({ spans: [5, 0] })]);
     const { fetchSession } = useSessions();
     const { traces } = await fetchSession("stream", "sess-1", 1000, 2000);
     expect(traces[0].status).toBe("ok");
@@ -393,12 +388,7 @@ describe("useSessions — fetchSession: sorting", () => {
       },
     ];
 
-    mockFetchQueryDataWithHttpStream.mockImplementation(
-      (_payload: any, callbacks: any) => {
-        callbacks.data(null, { content: { results: { hits } } });
-        callbacks.complete();
-      },
-    );
+    mockSessionsDetails.mockResolvedValue({ data: { hits, total: hits.length } });
 
     const { fetchSession } = useSessions();
     const { traces } = await fetchSession("stream", "sess-1", 1000, 2000);
@@ -409,13 +399,8 @@ describe("useSessions — fetchSession: sorting", () => {
 });
 
 describe("useSessions — fetchSession: SessionDetail derivation", () => {
-  function setupStreamMock(hits: any[]) {
-    mockFetchQueryDataWithHttpStream.mockImplementation(
-      (_payload: any, callbacks: any) => {
-        callbacks.data(null, { content: { results: { hits } } });
-        callbacks.complete();
-      },
-    );
+  function setupDetailsMock(hits: any[]) {
+    mockSessionsDetails.mockResolvedValue({ data: { hits, total: hits.length } });
   }
 
   it("sums inputTokens, outputTokens, tokens, cost across traces", async () => {
@@ -443,7 +428,7 @@ describe("useSessions — fetchSession: SessionDetail derivation", () => {
         gen_ai_usage_cost: 0.002,
       },
     ];
-    setupStreamMock(hits);
+    setupDetailsMock(hits);
 
     const { fetchSession } = useSessions();
     const { detail } = await fetchSession("stream", "sess-1", 1000, 5000);
@@ -480,7 +465,7 @@ describe("useSessions — fetchSession: SessionDetail derivation", () => {
         gen_ai_usage_cost: 0,
       },
     ];
-    setupStreamMock(hits);
+    setupDetailsMock(hits);
 
     const { fetchSession } = useSessions();
     const { detail } = await fetchSession("stream", "sess-1", 1000, 5000);
@@ -503,7 +488,7 @@ describe("useSessions — fetchSession: SessionDetail derivation", () => {
         gen_ai_usage_cost: 0,
       },
     ];
-    setupStreamMock(hits);
+    setupDetailsMock(hits);
 
     const { fetchSession } = useSessions();
     const { detail } = await fetchSession("stream", "sess-1", 1000, 5000);
@@ -536,7 +521,7 @@ describe("useSessions — fetchSession: SessionDetail derivation", () => {
         gen_ai_usage_cost: 0,
       },
     ];
-    setupStreamMock(hits);
+    setupDetailsMock(hits);
 
     const { fetchSession } = useSessions();
     const { detail } = await fetchSession("stream", "sess-1", 1000, 5000);
@@ -554,39 +539,5 @@ describe("useSessions — cancelAll", () => {
     const { cancelAll } = useSessions();
     cancelAll();
     expect(mockCancelAll).toHaveBeenCalledTimes(1);
-  });
-
-  it("cancels active latest-stream fetches by traceId", async () => {
-    // Start a session fetch that never completes so traceId stays active
-    mockFetchQueryDataWithHttpStream.mockImplementation(() => {
-      // Never calls complete or error — stays in flight
-    });
-
-    const { fetchSession, cancelAll } = useSessions();
-    // Fire and forget (don't await)
-    fetchSession("stream", "sess-1", 1000, 2000);
-
-    cancelAll();
-
-    expect(mockCancelStreamQueryBasedOnRequestId).toHaveBeenCalledWith({
-      trace_id: "trace-fixed-id",
-      org_id: "test-org",
-    });
-  });
-
-  it("does not cancel already-completed fetches", async () => {
-    mockFetchQueryDataWithHttpStream.mockImplementation(
-      (_payload: any, callbacks: any) => {
-        callbacks.complete();
-      },
-    );
-
-    const { fetchSession, cancelAll } = useSessions();
-    await fetchSession("stream", "sess-1", 1000, 2000);
-
-    mockCancelStreamQueryBasedOnRequestId.mockClear();
-    cancelAll();
-
-    expect(mockCancelStreamQueryBasedOnRequestId).not.toHaveBeenCalled();
   });
 });
