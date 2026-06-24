@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template v-if="isEventBased">
               <!-- Alert if row -->
               <div class="tw:flex tw:items-center tw:gap-3 tw:py-2 tw:px-3 tw:rounded-md tw:text-[13px]" data-test="alert-if-row-logs">
-                <span class="condition-label tw:font-bold tw:text-[13px] tw:whitespace-nowrap tw:min-w-[90px] tw:shrink-0">Alert if *</span>
+                <span class="condition-label tw:font-bold tw:text-[13px] tw:whitespace-nowrap tw:min-w-[90px] tw:shrink-0">{{ t('alerts.threshold') }}*</span>
                 <div class="tw:flex tw:flex-nowrap tw:items-center tw:gap-2">
                   <div class="tw:min-w-[130px] tw:max-w-[180px]">
                     <OSelect
@@ -90,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   <!-- "of [field]" shown for measure modes -->
                   <template v-if="selectedFunction !== 'total_events'">
-                    <span class="condition-text tw:font-semibold tw:text-[13px] tw:whitespace-nowrap">of</span>
+                    <span class="condition-text tw:font-semibold tw:text-[13px] tw:whitespace-nowrap">{{ t('alerts.conditionOf') }}</span>
                     <OSelect
                       v-model="logMeasureColumn"
                       :options="numericColumns"
@@ -122,12 +122,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :error-message="triggerThresholdError"
                       @update:model-value="triggerThresholdError = ''; onTriggerThresholdChange($event)"
                     />
-                    <span v-if="streamName" class="condition-text tw:font-semibold tw:text-[13px] tw:whitespace-nowrap">matching {{ streamType === 'traces' ? 'traces' : 'logs' }} found</span>
+                    <span v-if="streamName" class="condition-text tw:font-semibold tw:text-[13px] tw:whitespace-nowrap">{{ t('alerts.matchingTypeFound', { type: streamType === 'traces' ? 'traces' : 'logs' }) }}</span>
                   </template>
 
                   <!-- MEASURE mode -->
                   <template v-else>
-                    <span class="condition-text tw:font-semibold tw:text-[13px] tw:whitespace-nowrap">is</span>
+                    <span class="condition-text tw:font-semibold tw:text-[13px] tw:whitespace-nowrap">{{ t('alerts.conditionIs') }}</span>
                     <OSelect
                       v-model="conditionOperator"
                       :options="numericOperators"
@@ -222,7 +222,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template v-else>
               <!-- Alert if row -->
               <div class="tw:flex tw:items-center tw:gap-3 tw:py-2 tw:px-3 tw:rounded-md tw:text-[13px]">
-                <span class="condition-label tw:font-bold tw:text-[13px] tw:whitespace-nowrap tw:min-w-[90px] tw:shrink-0">Alert if *</span>
+                <span class="condition-label tw:font-bold tw:text-[13px] tw:whitespace-nowrap tw:min-w-[90px] tw:shrink-0">{{ t('alerts.threshold') }}*</span>
                 <div class="tw:flex tw:flex-nowrap tw:items-center tw:gap-2">
                   <div class="tw:min-w-[130px] tw:max-w-[180px]">
                     <OSelect
@@ -237,7 +237,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <!-- "of [field]" hidden for count mode -->
                   <template v-if="selectedFunction !== 'total_events'">
-                    <span class="condition-text tw:font-semibold tw:text-[13px] tw:whitespace-nowrap">of</span>
+                    <span class="condition-text tw:font-semibold tw:text-[13px] tw:whitespace-nowrap">{{ t('alerts.conditionOf') }}</span>
                     <div style="position: relative; display: inline-flex;">
                       <OSelect
                         v-model="inputData.aggregation.having.column"
@@ -249,9 +249,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @update:model-value="columnSelectError = false; emitAggregationUpdate()"
                         style="min-width: 140px; max-width: 200px;"
                       />
-                      <OTooltip v-if="inputData.aggregation.having.column === 'value' && columns.some((c: any) => (typeof c === 'string' ? c : c.value) === 'value')" content="Metrics streams store their measurement in the &quot;value&quot; field by default" :delay="300" side="bottom" />
+                      <OTooltip v-if="inputData.aggregation.having.column === 'value' && columns.some((c: any) => (typeof c === 'string' ? c : c.value) === 'value')" :content="t('alerts.metricsValueFieldTooltip')" :delay="300" side="bottom" />
                     </div>
-                    <span class="condition-text tw:font-semibold tw:text-[13px] tw:whitespace-nowrap">is</span>
+                    <span class="condition-text tw:font-semibold tw:text-[13px] tw:whitespace-nowrap">{{ t('alerts.conditionIs') }}</span>
                   </template>
 
                   <!-- Count mode for metrics -->
@@ -271,7 +271,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :error-message="triggerThresholdError"
                       @update:model-value="triggerThresholdError = ''; onTriggerThresholdChange($event)"
                     />
-                    <span class="condition-text tw:font-semibold tw:text-[13px] tw:whitespace-nowrap">matching metrics found</span>
+                    <span class="condition-text tw:font-semibold tw:text-[13px] tw:whitespace-nowrap">{{ t('alerts.matchingMetricsFound') }}</span>
                   </template>
 
                   <!-- Measure mode for metrics -->
@@ -367,7 +367,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="tw:flex tw:items-start tw:gap-3 tw:py-2 tw:px-3 tw:rounded-md tw:text-[13px]">
               <span class="condition-label tw:font-bold tw:text-[13px] tw:whitespace-nowrap tw:min-w-[90px] tw:shrink-0" style="line-height: 28px;">
                 Check every *
-                <OTooltip content="How often to check this alert condition" :delay="300" side="top" />
+                <OTooltip :content="t('alerts.howOftenCheckTooltip')" :delay="300" side="top" />
               </span>
               <div class="tw:flex tw:flex-col tw:gap-1">
                 <div class="tw:flex tw:items-center tw:gap-2">
@@ -582,7 +582,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :class="store.state.theme === 'dark' ? 'tw:bg-white/4 tw:border-b tw:border-[#2d3748]' : 'tw:bg-gray-100 tw:border-b tw:border-[#e5e7eb]'">
                   <div class="tw:flex tw:items-center tw:gap-2">
                     <div class="tw:w-0.75 tw:h-3.5 tw:rounded-sm tw:shrink-0 tw:bg-(--q-primary)" />
-                    <span class="tw:text-xs tw:font-semibold">{{ localTab === 'sql' ? 'SQL Editor' : 'PromQL Editor' }}</span>
+                    <span class="tw:text-xs tw:font-semibold">{{ localTab === 'sql' ? t('alerts.sqlEditor') : t('alerts.promqlEditor') }}</span>
                   </div>
                   <!-- fx toggle shown here only when VRL is not yet enabled -->
                   <OSwitch
@@ -705,7 +705,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="tw:flex tw:items-start tw:gap-3 tw:py-2 tw:px-3 tw:rounded-md tw:text-[13px]">
               <span class="condition-label tw:font-bold tw:text-[13px] tw:whitespace-nowrap tw:min-w-[160px] tw:w-[160px] tw:shrink-0" style="line-height: 28px;">
                 Check every *
-                <OTooltip content="How often to check this alert condition" :delay="300" side="top" />
+                <OTooltip :content="t('alerts.howOftenCheckTooltip')" :delay="300" side="top" />
               </span>
               <div class="tw:flex tw:flex-col tw:gap-1">
                 <div class="tw:flex tw:items-center tw:gap-2">
@@ -769,7 +769,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- SQL: Alert if No. of events -->
             <div v-if="localTab === 'sql'" class="tw:flex tw:items-center tw:gap-3 tw:py-2 tw:px-3 tw:rounded-md tw:text-[13px]">
-              <span class="condition-label tw:font-bold tw:text-[13px] tw:whitespace-nowrap tw:min-w-[160px] tw:w-[160px] tw:shrink-0">Alert if No. of events *</span>
+              <span class="condition-label tw:font-bold tw:text-[13px] tw:whitespace-nowrap tw:min-w-[160px] tw:w-[160px] tw:shrink-0">{{ t('alerts.alertIfNoOfEvents') }} *</span>
               <div class="tw:flex tw:items-center tw:gap-2">
                 <OSelect
                   v-model="triggerOperator"
@@ -795,7 +795,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- PromQL: Alert if the value is + Having series -->
             <template v-if="localTab === 'promql' && promqlCondition">
               <div class="tw:flex tw:items-center tw:gap-3 tw:py-2 tw:px-3 tw:rounded-md tw:text-[13px]">
-                <span class="condition-label tw:font-bold tw:text-[13px] tw:whitespace-nowrap tw:min-w-[160px] tw:w-[160px] tw:shrink-0">Alert if the value is *
+                <span class="condition-label tw:font-bold tw:text-[13px] tw:whitespace-nowrap tw:min-w-[160px] tw:w-[160px] tw:shrink-0">{{ t('alerts.alertIfValueIs') }} *
                   <OTooltip content="Alert when the PromQL expression evaluates to this condition for a time series. Example: &gt;= 100 triggers when the result is 100 or more." :delay="300" side="top" />
                 </span>
                 <div class="tw:flex tw:items-center tw:gap-2">
@@ -822,7 +822,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
               <div class="tw:flex tw:items-center tw:gap-3 tw:py-2 tw:px-3 tw:rounded-md tw:text-[13px]">
-                <span class="condition-label tw:font-bold tw:text-[13px] tw:whitespace-nowrap tw:min-w-[160px] tw:w-[160px] tw:shrink-0">Having series *
+                <span class="condition-label tw:font-bold tw:text-[13px] tw:whitespace-nowrap tw:min-w-[160px] tw:w-[160px] tw:shrink-0">{{ t('alerts.havingSeries') }} *
                   <OTooltip content="Minimum number of time series that must satisfy the condition above to trigger the alert." :delay="300" side="top" />
                 </span>
                 <div class="tw:flex tw:items-center tw:gap-2">
@@ -876,7 +876,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Multi-Window Confirmation Dialog -->
     <CustomConfirmDialog
       v-model="showMultiWindowDialog"
-      title="Clear Multi-Windows?"
+      :title="t('alerts.clearMultiWindowsTitle')"
       :message="`Multi-windows are configured. To enable ${pendingTab === 'custom' ? 'Custom' : 'PromQL'} mode, we need to clear them. Do you want to proceed?`"
       @confirm="handleConfirmClearMultiWindows"
       @cancel="handleCancelClearMultiWindows"

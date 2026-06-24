@@ -245,19 +245,19 @@ size="xs"
                 <template #icon-left
                   ><OIcon name="align-left" size="sm" class="tw:shrink-0"
                 /></template>
-                Waterfall
+                {{ t('traces.waterfall') }}
               </OToggleGroupItem>
               <OToggleGroupItem value="flame-graph" size="sm">
                 <template #icon-left>
                   <OIcon name="flame" size="sm" />
                 </template>
-                Flame Graph
+                {{ t('traces.flameGraph') }}
               </OToggleGroupItem>
               <OToggleGroupItem value="map" size="sm">
                 <template #icon-left
                   ><OIcon name="account-tree" size="sm" class="tw:shrink-0"
                 /></template>
-                Trace Graph
+                {{ t('traces.traceGraph') }}
               </OToggleGroupItem>
               <OToggleGroupItem v-if="hasLLMSpans"
 value="dag"
@@ -265,7 +265,7 @@ size="sm">
                 <template #icon-left>
                   <OIcon name="git-branch" size="sm" />
                 </template>
-                DAG
+                {{ t('traces.dag') }}
               </OToggleGroupItem>
               <!--
                 Thread tab gated on:
@@ -284,7 +284,7 @@ size="sm">
                 <template #icon-left
                   ><OIcon name="chat" size="xs" class="tw:shrink-0"
                 /></template>
-                Thread
+                {{ t('traces.thread') }}
               </OToggleGroupItem>
             </OToggleGroup>
           </div>

@@ -45,7 +45,7 @@
       @click="addNewDrilldown"
       data-test="dashboard-addpanel-config-drilldown-add-btn"
     >
-      + Add
+      + {{ t('common.add') }}
     </OButton>
     <DrilldownPopUp
       :open="showDrilldownPopUp"

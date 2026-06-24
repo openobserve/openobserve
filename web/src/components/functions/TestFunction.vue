@@ -490,7 +490,7 @@ const setEventsEditor = () => {
 
 const outputMessage = computed(() => {
   if (!outputEvents.value) {
-    return "Please click Test Function to see the events";
+    return t("function.clickTestFunctionHint");
   }
 
   return "";
@@ -500,9 +500,9 @@ const areInputValid = () => {
   if (!inputQuery.value) {
     toast({
       variant: "error",
-      message: "Please enter a query",
+      message: t("function.pleaseEnterQuery"),
     });
-    sqlQueryErrorMsg.value = "Please enter a query";
+    sqlQueryErrorMsg.value = t("function.pleaseEnterQuery");
     return false;
   }
 

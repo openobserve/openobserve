@@ -147,7 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="outline"
               size="xs"
             >
-              More
+              {{ t('search.menuMore') }}
             </OButton>
           </template>
 
@@ -463,7 +463,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OIcon name="troubleshoot" size="sm" />
                 </span>
               </template>
-              <span data-test="search-inspect-label">Search Inspect</span>
+              <span data-test="search-inspect-label">{{ t('search.searchInspect') }}</span>
             </ODropdownItem>
           </ODropdownGroup>
 
@@ -1134,7 +1134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OIcon name="warning" size="md" class="tw:mx-2" />
                       <span
                         class="tw:text-red-500 tw:p-2 tw:font-semibold"
-                        >VRL function is only supported for table chart.</span
+                        >{{ t('search.vrlOnlyForTableWarning') }}</span
                       >
                     </div>
                   </div>
@@ -1162,7 +1162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       ref="confirmDialog"
       v-model:open="confirmDialogVisible"
       size="xs"
-      title="Confirm"
+      :title="t('common.confirm')"
       :secondary-button-label="t('confirmDialog.cancel')"
       :primary-button-label="t('confirmDialog.ok')"
       @click:secondary="cancelConfirmDialog"
@@ -1187,7 +1187,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="search-bar-custom-download-dialog"
       v-model:open="customDownloadDialog"
       size="md"
-      title="Custom Download"
+      :title="t('search.customDownloadTitle')"
       :secondary-button-label="t('confirmDialog.cancel')"
       :primary-button-label="t('search.btnDownload')"
       @click:secondary="customDownloadDialog = false"
@@ -1285,8 +1285,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="tw:mb-3"
         @update:model-value="isSavedFunctionAction = $event; savedFunctionName = ''"
       >
-        <OToggleGroupItem value="update" size="sm">Update</OToggleGroupItem>
-        <OToggleGroupItem value="create" size="sm">Create</OToggleGroupItem>
+        <OToggleGroupItem value="update" size="sm">{{ t('common.update') }}</OToggleGroupItem>
+        <OToggleGroupItem value="create" size="sm">{{ t('common.create') }}</OToggleGroupItem>
       </OToggleGroup>
       <div v-if="isSavedFunctionAction == 'create'">
         <OInput
@@ -1306,7 +1306,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           labelKey="name"
           valueKey="name"
           :label="t('search.saveFunctionName')"
-          :placeholder="'Select Function Name'"
+          :placeholder="t('search.selectFunctionNamePlaceholder')"
           class="tw:py-2"
           :error="!!savedFunctionSelectError"
           :error-message="savedFunctionSelectError"
@@ -1318,8 +1318,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Function update confirmation dialog -->
     <ConfirmDialog
       data-test="search-bar-function-update-confirm-dialog"
-      title="Confirm Update"
-      :message="`Are you sure you want to update the function ${savedFunctionSelectedName}?`"
+      :title="t('search.confirmFunctionUpdateTitle')"
+      :message="t('search.confirmFunctionUpdateMsg', { name: savedFunctionSelectedName })"
       v-model="functionUpdateConfirm"
       @update:ok="executeFunctionUpdate"
       @update:cancel="functionUpdateConfirm = false"
@@ -1368,39 +1368,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="search-bar-search-inspect-dialog"
       v-model:open="searchInspectDialog"
       size="sm"
-      title="Search Inspect"
+      :title="t('search.searchInspect')"
       :secondary-button-label="t('confirmDialog.cancel')"
       :primary-button-label="t('confirmDialog.ok')"
       :primary-button-disabled="!searchInspectTraceId.trim()"
       @click:secondary="searchInspectDialog = false"
       @click:primary="navigateToSearchInspect"
     >
-      <div class="tw:text-left tw:mb-1">Trace ID:</div>
+      <div class="tw:text-left tw:mb-1">{{ t('search.traceIdLabel') }}</div>
       <OInput
         v-model="searchInspectTraceId"
-        placeholder="Enter trace ID"
+        :placeholder="t('search.enterTraceIdPlaceholder')"
         autofocus
         data-test="search-inspect-trace-id-input"
       />
     </ODialog>
 
     <ConfirmDialog
-      title="Change Query Mode"
-      message="Are you sure you want to change the query mode? The data saved for X-Axis, Y-Axis and Filters will be wiped off."
+      :title="t('search.changeQueryModeTitle')"
+      :message="t('search.changeQueryModeConfirm')"
       @update:ok="confirmBuildModeChangeOk"
       @update:cancel="confirmBuildModeChange = false"
       v-model="confirmBuildModeChange"
     />
     <ConfirmDialog
-      title="Delete Saved View"
-      message="Are you sure you want to delete saved view?"
+      :title="t('search.deleteSavedView')"
+      :message="t('search.deleteSavedViewConfirm')"
       @update:ok="confirmDeleteSavedViews"
       @update:cancel="confirmDelete = false"
       v-model="confirmDelete"
     />
     <ConfirmDialog
-      title="Update Saved View"
-      message="Are you sure you want to update the saved view? This action will overwrite the existing one."
+      :title="t('search.updateSavedView')"
+      :message="t('search.updateSavedViewConfirm')"
       @update:ok="confirmUpdateSavedViews"
       @update:cancel="confirmUpdate = false"
       v-model="confirmUpdate"

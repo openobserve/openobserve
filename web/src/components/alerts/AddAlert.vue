@@ -113,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="card-container tw:shrink-0 stream-config-card tw:[container-type:inline-size] tw:[container-name:stream-config]">
         <div class="tw:flex tw:items-center tw:gap-0 tw:py-[10px] tw:px-3 tw:border-b tw:border-[#e6e6e6] tw:dark:border-[var(--color-border-default)]">
           <div class="tw:w-[3px] tw:h-4 tw:rounded-sm tw:mr-2 tw:shrink-0 tw:bg-[var(--q-primary)]" />
-          <span class="tw:text-[13px] tw:font-semibold tw:tracking-[0.01em]">Stream Config <span class="tw:text-text-primary">*</span></span>
+          <span class="tw:text-[13px] tw:font-semibold tw:tracking-[0.01em]">{{ t('alerts.streamConfig') }} <span class="tw:text-text-primary">*</span></span>
         </div>
         <div class="tw:flex tw:items-center tw:gap-4 tw:px-3 tw:py-2">
         <!-- Stream Type -->
@@ -551,7 +551,7 @@ export default defineComponent({
             { key: "anomaly-alerting", label: alertForm.t("alerts.alerting") || "Alerting", required: alertForm.anomalyConfig.value.alert_enabled },
           ]
         : [
-            { key: "condition", label: "Alert Rules", required: true },
+            { key: "condition", label: alertForm.t("alerts.alertRules"), required: true },
             { key: "advanced", label: alertForm.t("alerts.steps.advanced") },
           ];
       return tabs.filter((tab: any) => (tab as any).show !== false);

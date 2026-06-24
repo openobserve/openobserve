@@ -33,10 +33,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="tw:mt-3">
             <div class="tw:mb-3">
               <OSelect
-                helpText="Variables will be applied to all tabs and panels if global is selected."
+                :helpText="t('dashboard.variableScopeHelp')"
                 v-model="variableData.scope"
                 :options="scopeOptions"
-                label="Select variable scope"
+                :label="t('dashboard.selectVariableScope')"
                 data-test="dashboard-variable-scope-select"
               />
             </div>
@@ -163,8 +163,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <template #tooltip>
                     <OTooltip max-width="250px">
                       <template #content>
-                        Select a stream or use a variable like $streamVariable
-                        to dynamically choose the stream based on another value.
+                        {{ t('dashboard.streamSelectTooltip') }}
                       </template>
                     </OTooltip>
                   </template>
@@ -187,9 +186,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <template #tooltip>
                     <OTooltip max-width="250px">
                       <template #content>
-                        Select a field or use a variable like $fieldVariable. If
-                        stream uses a variable, field list will be empty - type
-                        field name manually.
+                        {{ t('dashboard.fieldSelectTooltip') }}
                       </template>
                     </OTooltip>
                   </template>
@@ -223,9 +220,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="tw:cursor-help"
                     />
                     <template #content>
-                      In filters, you can use the value of another variable to
-                      filter the current variable's value. This can be done by
-                      using the other variable's name. For example:
+                      {{ t('dashboard.filterInfoTooltip') }}
                       <span class="bg-highlight" :class="store.state.theme === 'dark' ? 'tw:bg-[#747474]' : 'tw:bg-[#e7e6e6]'">$variableName</span>.
                     </template>
                   </OTooltip>
@@ -255,7 +250,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <template #empty>
                         <span class="tw:italic tw:text-gray-400"
-                          >No Data Found</span
+                          >{{ t('dashboard.noDataFound') }}</span
                         >
                       </template>
                     </OSelect>
@@ -321,7 +316,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="dashboard-add-filter-btn"
                     icon-left="add"
                   >
-                    Add Filter
+                    {{ t('dashboard.addFilter') }}
                   </OButton>
                 </div>
 
@@ -353,10 +348,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="tw:flex">
               <div class="tw:w-6"></div>
               <div class="tw:flex-1 tw:font-semibold tw:text-gray-500">
-                Label
+                {{ t('common.label') }}
               </div>
               <div class="tw:flex-1 tw:font-semibold tw:text-gray-500">
-                Value
+                {{ t('common.value') }}
               </div>
               <div class="tw:w-12 tw:flex tw:items-center tw:justify-center">
                 <span v-if="!variableData.multiSelect"> Default </span>
@@ -367,7 +362,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click="onCustomSelectAllClick"
                 >
                   <template #tooltip
-                    ><OTooltip content="Default - Select All"
+                    ><OTooltip :content="t('dashboard.defaultSelectAll')"
                   /></template>
                 </OCheckbox>
               </div>
@@ -422,7 +417,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="dashboard-add-option-btn"
                 icon-left="add"
               >
-                Add Option
+                {{ t('dashboard.addOption') }}
               </OButton>
             </div>
           </div>
@@ -442,7 +437,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- it can be first value or all values -->
           <div v-if="['query_values'].includes(variableData.type)">
             <div class="tw:mt-1.5 tw:mb-1.5">
-              <div class="tw:mt-1.25 tw:mb-1.25 tw:text-sm tw:font-semibold" :class="store.state.theme === 'dark' ? 'tw:text-[#999999]' : 'tw:text-[#666666]'">By Default Select:</div>
+              <div class="tw:mt-1.25 tw:mb-1.25 tw:text-sm tw:font-semibold" :class="store.state.theme === 'dark' ? 'tw:text-[#999999]' : 'tw:text-[#666666]'">{{ t('dashboard.byDefaultSelect') }}</div>
               <OToggleGroup
                 :model-value="variableData.selectAllValueForMultiSelect"
                 @update:model-value="
@@ -453,19 +448,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   value="first"
                   size="sm"
                   data-test="dashboard-multi-select-default-value-toggle-first-value"
-                  >First value</OToggleGroupItem
+                  >{{ t('dashboard.firstValue') }}</OToggleGroupItem
                 >
                 <OToggleGroupItem
                   value="all"
                   size="sm"
                   data-test="dashboard-multi-select-default-value-toggle-all-values"
-                  >All values</OToggleGroupItem
+                  >{{ t('dashboard.allValues') }}</OToggleGroupItem
                 >
                 <OToggleGroupItem
                   value="custom"
                   size="sm"
                   data-test="dashboard-multi-select-default-value-toggle-custom"
-                  >Custom</OToggleGroupItem
+                  >{{ t('dashboard.customValue') }}</OToggleGroupItem
                 >
               </OToggleGroup>
             </div>
@@ -540,9 +535,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #tooltip>
                 <OTooltip max-width="300px">
                   <template #content>
-                    If enabled, single quotes will be escaped in the query. For
-                    example, a value like `O'Reilly` will be replaced as
-                    `O''Reilly`.
+                    {{ t('dashboard.escapeSingleQuotesTooltip') }}
                   </template>
                 </OTooltip>
               </template>
@@ -567,7 +560,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :loading="saveVariableApiCall.isLoading.value"
           @click="addVariableForm?.submit()"
           data-test="dashboard-variable-save-btn"
-          >Save</OButton
+          >{{ t("dashboard.save") }}</OButton
         >
       </div>
     </div>
@@ -736,7 +729,7 @@ export default defineComponent({
       selectedStreamFields: [],
     });
     const route = useRoute();
-    const title = ref("Add Variable");
+    const title = ref(t("dashboard.newVariable"));
     const { getStreams, getStream } = useStreams();
     const {
       showErrorNotification,
@@ -893,7 +886,7 @@ export default defineComponent({
 
         if (props.variableName) {
           editMode.value = true;
-          title.value = "Edit Variable";
+          title.value = t("dashboard.editVariable");
 
           const variablesList = data.variables?.list || [];
           const variable = variablesList.find(

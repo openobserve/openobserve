@@ -179,7 +179,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click.stop="viewSpanLogs"
                 data-test="trace-details-sidebar-header-toolbar-view-logs-btn"
               >
-                View Logs
+                {{ t('traces.viewLogs') }}
               </OButton>
               <OTooltip :content="viewLogsTooltipContent" />
             </span>
