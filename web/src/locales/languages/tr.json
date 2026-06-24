@@ -1386,6 +1386,7 @@
     "selectDashboardLabel": "Kontrol Panelini Seçin",
     "selectTabLabel": "Sekme Seç",
     "numbers": "Sayılar",
+    "localeFormat": "Yerel Biçim",
     "nanoseconds": "Nanosaniye (ns)",
     "currency": "Para Birimi",
     "p99": "P99",
@@ -3461,7 +3462,9 @@
     "import_this_pattern": "Bu Deseni İçe Aktar",
     "patterns_loaded": "Yüklenen {count} desen (ler)",
     "failed_to_load": "Desenler yüklenemedi",
-    "no_patterns_selected": "Lütfen en az bir desen seçin"
+    "no_patterns_selected": "Lütfen en az bir desen seçin",
+    "name_required": "* İsim zorunludur",
+    "pattern_required": "* Desen gereklidir"
   },
   "search_history": {
     "title": "Arama Geçmişi",
@@ -4062,7 +4065,12 @@
     "emptyActionLogs": "Günlükleri keşfedin",
     "emptyActionLogsDesc": "Günlük akışlarınızı arayın ve filtreleyin",
     "emptyActionTraces": "İzleri keşfedin",
-    "emptyActionTracesDesc": "Dağıtılmış izleri ve servis gecikmesini denetleyin"
+    "emptyActionTracesDesc": "Dağıtılmış izleri ve servis gecikmesini denetleyin",
+    "viewAll": "Tümünü görüntüle",
+    "showingOf": "{total} arasından {gösterilen} gösteriliyor",
+    "colErrorRate": "Hata oranı",
+    "colLatency": "Gecikme",
+    "colReqs": "Reqs"
   },
   "chatHistory": {
     "title": "Sohbetler",

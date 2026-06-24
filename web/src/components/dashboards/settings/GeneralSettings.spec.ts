@@ -232,16 +232,16 @@ describe("GeneralSettings", () => {
     it("should populate form fields with loaded data", async () => {
       wrapper = await createWrapper();
 
-      const nameInput = wrapper.find(
-        '[data-test="dashboard-general-setting-name"]',
+      // The form owns `name`, `description`, and `showDynamicFilters`: the async
+      // load re-baselines all of them via form.reset() (no local mirrors).
+      const form = wrapper.findComponent({ name: "OForm" });
+      expect(form.vm.form.state.values.name).toBe(mockDashboardData.title);
+      expect(form.vm.form.state.values.description).toBe(
+        mockDashboardData.description,
       );
-      const descInput = wrapper.find(
-        '[data-test="dashboard-general-setting-description"]',
+      expect(form.vm.form.state.values.showDynamicFilters).toBe(
+        mockDashboardData.variables.showDynamicFilters,
       );
-
-      // Check the Vue component's model value instead of DOM element value
-      expect(wrapper.vm.dashboardData.title).toBe(mockDashboardData.title);
-      expect(wrapper.vm.dashboardData.description).toBe(mockDashboardData.description);
     });
 
     it("should handle loading errors gracefully", async () => {
@@ -260,22 +260,13 @@ describe("GeneralSettings", () => {
   });
 
   describe("Form Validation", () => {
-    it("should require dashboard title", async () => {
+    // R3: the Save button is always enabled — the required-title rule is the Zod
+    // schema (gates submit through the form), not a disabled button.
+    it("keeps the Save button enabled when title is empty (schema gates submit)", async () => {
       wrapper = await createWrapper();
 
-      wrapper.vm.dashboardData.title = "";
-      await wrapper.vm.$nextTick();
-
-      const saveBtn = wrapper.find(
-        '[data-test="dashboard-general-setting-save-btn"]',
-      );
-      expect(saveBtn.element.disabled).toBe(true);
-    });
-
-    it("should enable save button when title is provided", async () => {
-      wrapper = await createWrapper();
-
-      wrapper.vm.dashboardData.title = "Valid Dashboard Name";
+      const form = wrapper.findComponent({ name: "OForm" });
+      form.vm.form.setFieldValue("name", "");
       await wrapper.vm.$nextTick();
 
       const saveBtn = wrapper.find(
@@ -284,29 +275,17 @@ describe("GeneralSettings", () => {
       expect(saveBtn.element.disabled).toBe(false);
     });
 
-    it("should validate title is not just whitespace", async () => {
+    it("keeps the Save button enabled when a title is provided", async () => {
       wrapper = await createWrapper();
 
-      wrapper.vm.dashboardData.title = "   ";
+      const form = wrapper.findComponent({ name: "OForm" });
+      form.vm.form.setFieldValue("name", "Valid Dashboard Name");
       await wrapper.vm.$nextTick();
 
       const saveBtn = wrapper.find(
         '[data-test="dashboard-general-setting-save-btn"]',
       );
-      expect(saveBtn.element.disabled).toBe(true);
-    });
-
-    it("should show validation error for empty title", async () => {
-      wrapper = await createWrapper();
-
-      wrapper.vm.dashboardData.title = "";
-      await wrapper.vm.$nextTick();
-
-      // Save button should be disabled when title is empty
-      const saveBtn = wrapper.find(
-        '[data-test="dashboard-general-setting-save-btn"]',
-      );
-      expect(saveBtn.element.disabled).toBe(true);
+      expect(saveBtn.element.disabled).toBe(false);
     });
   });
 
@@ -319,7 +298,9 @@ describe("GeneralSettings", () => {
       );
       await nameInput.setValue("Updated Dashboard Name");
 
-      expect(wrapper.vm.dashboardData.title).toBe("Updated Dashboard Name");
+      // The form owns `name` now (no local title mirror).
+      const form = wrapper.findComponent({ name: "OForm" });
+      expect(form.vm.form.state.values.name).toBe("Updated Dashboard Name");
     });
 
     it("should update dashboard description when input changes", async () => {
@@ -330,21 +311,20 @@ describe("GeneralSettings", () => {
       );
       await descInput.setValue("Updated description");
 
-      expect(wrapper.vm.dashboardData.description).toBe("Updated description");
+      // The form owns `description` now — assert via the form state.
+      const form = wrapper.findComponent({ name: "OForm" });
+      expect(form.vm.form.state.values.description).toBe("Updated description");
     });
 
     it("should toggle dynamic filters setting", async () => {
       wrapper = await createWrapper();
 
-      // Toggle the dynamic filters setting by directly setting on the component
-      const originalValue = wrapper.vm.dashboardData.showDynamicFilters;
-      wrapper.vm.dashboardData.showDynamicFilters = false;
+      // The form owns `showDynamicFilters` now — toggle via the form field.
+      const form = wrapper.findComponent({ name: "OForm" });
+      form.vm.form.setFieldValue("showDynamicFilters", false);
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.vm.dashboardData.showDynamicFilters).toBe(false);
-      
-      // Reset to original value
-      wrapper.vm.dashboardData.showDynamicFilters = originalValue;
+      expect(form.vm.form.state.values.showDynamicFilters).toBe(false);
     });
 
     it("should handle datetime picker changes", async () => {
@@ -381,11 +361,16 @@ describe("GeneralSettings", () => {
     it("should save dashboard when form is submitted", async () => {
       wrapper = await createWrapper();
 
-      wrapper.vm.dashboardData.title = "Updated Dashboard";
-      await wrapper.vm.$nextTick();
+      // Drive the REAL submit path: type into the form-owned name field, then
+      // run the form's validate→@submit→save chain. The validated `value.name`
+      // is what reaches updateDashboard (no local title mirror).
+      const nameInput = wrapper.find(
+        '[data-test="dashboard-general-setting-name"] input',
+      );
+      await nameInput.setValue("Updated Dashboard");
 
-      // Call saveDashboardApi.execute directly
-      await wrapper.vm.saveDashboardApi.execute();
+      const form = wrapper.findComponent({ name: "OForm" });
+      await form.vm.form.handleSubmit();
       await flushPromises();
 
       expect(updateDashboard).toHaveBeenCalledWith(
@@ -408,15 +393,19 @@ describe("GeneralSettings", () => {
           new Promise((resolve) => setTimeout(() => resolve({} as any), 100)),
       );
 
-      // Trigger the save operation directly
-      const savePromise = wrapper.vm.saveDashboardApi.execute();
-      await wrapper.vm.$nextTick();
+      // Drive the real form submit; OForm owns the loading state (isSubmitting),
+      // which the Save button's spinner is bound to via v-slot.
+      const form = (wrapper.findComponent({ name: "OForm" }).vm as any).form;
+      form.setFieldValue("name", "Test Dashboard");
+      const savePromise = form.handleSubmit();
+      await flushPromises();
 
       // Check loading state
-      expect(wrapper.vm.saveDashboardApi.isLoading.value).toBe(true);
+      expect(form.state.isSubmitting).toBe(true);
 
       // Wait for promise to complete
       await savePromise;
+      expect(form.state.isSubmitting).toBe(false);
     });
 
     it("should handle save errors", async () => {
@@ -427,7 +416,7 @@ describe("GeneralSettings", () => {
       wrapper = await createWrapper();
 
       // Call save directly to trigger error handling
-      await wrapper.vm.saveDashboardApi.execute();
+      await wrapper.vm.onSubmit({ name: "Test Dashboard" });
       await flushPromises();
 
       // The component handles errors via notifications, not console.error
@@ -438,8 +427,8 @@ describe("GeneralSettings", () => {
     it("should emit success event after successful save", async () => {
       wrapper = await createWrapper();
 
-      // Call save method directly
-      await wrapper.vm.saveDashboardApi.execute();
+      // Call save method directly (passes the validated name arg)
+      await wrapper.vm.onSubmit({ name: "Test Dashboard" });
       await flushPromises();
 
       expect(wrapper.emitted()).toHaveProperty("save");
@@ -563,10 +552,11 @@ describe("GeneralSettings", () => {
 
       wrapper = await createWrapper();
 
-      // Should initialize with empty data
-      expect(wrapper.vm.dashboardData.title).toBe("");
-      expect(wrapper.vm.dashboardData.description).toBe("");
-      expect(wrapper.vm.dashboardData.showDynamicFilters).toBe(true);
+      // Should initialize with empty data (all three fields live in the form now)
+      const form = wrapper.findComponent({ name: "OForm" });
+      expect(form.vm.form.state.values.name).toBe("");
+      expect(form.vm.form.state.values.description).toBe("");
+      expect(form.vm.form.state.values.showDynamicFilters).toBe(true);
     });
 
     it("should handle malformed dashboard data", async () => {
@@ -590,10 +580,11 @@ describe("GeneralSettings", () => {
 
       wrapper = await createWrapper();
 
-      // Should handle empty values gracefully
-      expect(wrapper.vm.dashboardData.title).toBe("");
-      expect(wrapper.vm.dashboardData.description).toBe("");
-      expect(wrapper.vm.dashboardData.showDynamicFilters).toBe(true);
+      // Should handle empty values gracefully (all three fields live in the form now)
+      const form = wrapper.findComponent({ name: "OForm" });
+      expect(form.vm.form.state.values.name).toBe("");
+      expect(form.vm.form.state.values.description).toBe("");
+      expect(form.vm.form.state.values.showDynamicFilters).toBe(true);
     });
 
     it("should handle network errors during save", async () => {
@@ -604,12 +595,8 @@ describe("GeneralSettings", () => {
 
       wrapper = await createWrapper();
 
-      // Set up form with valid data
-      wrapper.vm.dashboardData.title = "Test Dashboard";
-      await wrapper.vm.$nextTick();
-
-      // Attempt to submit form by calling save directly
-      await wrapper.vm.saveDashboardApi.execute();
+      // Attempt to submit form by calling save directly (validated name arg)
+      await wrapper.vm.onSubmit({ name: "Test Dashboard" });
       await flushPromises();
 
       // Should handle the error
@@ -632,10 +619,8 @@ describe("GeneralSettings", () => {
       vi.mocked(updateDashboard).mockRejectedValueOnce(conflictError);
 
       wrapper = await createWrapper();
-      wrapper.vm.dashboardData.title = "Test Dashboard";
-      await wrapper.vm.$nextTick();
 
-      await wrapper.vm.saveDashboardApi.execute();
+      await wrapper.vm.onSubmit({ name: "Test Dashboard" });
       await flushPromises();
 
       // Should handle conflict error specially
@@ -652,8 +637,9 @@ describe("GeneralSettings", () => {
       vi.mocked(getDashboard).mockResolvedValue(dataWithoutVariables);
       wrapper = await createWrapper();
 
-      // Should initialize showDynamicFilters to default value
-      expect(wrapper.vm.dashboardData.showDynamicFilters).toBe(false);
+      // Missing variables → form seeds showDynamicFilters to false on load.
+      const form = wrapper.findComponent({ name: "OForm" });
+      expect(form.vm.form.state.values.showDynamicFilters).toBe(false);
     });
   });
 
@@ -692,10 +678,11 @@ describe("GeneralSettings", () => {
 
       const renderSpy = vi.spyOn(wrapper.vm, "$forceUpdate");
 
-      // Multiple prop updates using direct VM assignment
-      wrapper.vm.dashboardData.title = "New Title 1";
+      // Multiple updates to the form-owned name field
+      const form = wrapper.findComponent({ name: "OForm" });
+      form.vm.form.setFieldValue("name", "New Title 1");
       await wrapper.vm.$nextTick();
-      wrapper.vm.dashboardData.title = "New Title 2";
+      form.vm.form.setFieldValue("name", "New Title 2");
       await wrapper.vm.$nextTick();
 
       expect(renderSpy).not.toHaveBeenCalled();
@@ -715,8 +702,9 @@ describe("GeneralSettings", () => {
       await nameInput.setValue("ABC");
       await flushPromises();
 
-      // Should reflect the final value
-      expect(wrapper.vm.dashboardData.title).toBe("ABC");
+      // Should reflect the final value (the form owns `name`)
+      const form = wrapper.findComponent({ name: "OForm" });
+      expect(form.vm.form.state.values.name).toBe("ABC");
     });
   });
 });

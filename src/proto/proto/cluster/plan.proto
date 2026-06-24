@@ -6,8 +6,8 @@ option java_outer_classname = "planProto";
 
 package cluster;
 
-import "datafusion_common/datafusion_common.proto";
-import "datafusion/datafusion.proto";
+import "datafusion/proto-common/proto/datafusion_common.proto";
+import "datafusion/proto/proto/datafusion.proto";
 import "cluster/common.proto";
 import "cluster/search.proto";
 

@@ -66,19 +66,11 @@ vi.mock("@/composables/useNotifications", () => ({
   }),
 }));
 
-const mockUseLoadingExecute = vi.fn();
-const mockUseLoadingIsLoading = { value: false };
-vi.mock("@/composables/useLoading", () => ({
-  useLoading: (fn: any) => ({
-    execute: fn,
-    isLoading: mockUseLoadingIsLoading,
-  }),
-}));
-
 // ---------------------------------------------------------------------------
 // Import the component AFTER all mocks are registered
 // ---------------------------------------------------------------------------
 import AddToDashboard from "./AddToDashboard.vue";
+import OFormReal from "@/lib/forms/Form/OForm.vue";
 
 // ---------------------------------------------------------------------------
 // Shared mock store
@@ -247,12 +239,6 @@ describe("AddToDashboard — component initialization", () => {
     const wrapper = createWrapper();
     await flushPromises();
     expect(wrapper.vm.selectedDashboard).toBeNull();
-  });
-
-  it("initializes panelTitle as empty string", async () => {
-    const wrapper = createWrapper();
-    await flushPromises();
-    expect(wrapper.vm.panelTitle).toBe("");
   });
 
   it("renders the SelectFolderDropdown component", async () => {
@@ -472,7 +458,7 @@ describe("AddToDashboard — onSubmit validation", () => {
     const wrapper = createWrapper();
     await flushPromises();
     // selectedDashboard is null, activeTabId is null
-    await wrapper.vm.onSubmit.execute();
+    await wrapper.vm.onSubmit();
     await flushPromises();
 
     expect(mockToast).toHaveBeenCalledWith(
@@ -486,7 +472,7 @@ describe("AddToDashboard — onSubmit validation", () => {
     wrapper.vm.selectedDashboard = "dash-1";
     wrapper.vm.activeTabId = null;
 
-    await wrapper.vm.onSubmit.execute();
+    await wrapper.vm.onSubmit();
     await flushPromises();
 
     expect(mockToast).toHaveBeenCalledWith(
@@ -500,9 +486,8 @@ describe("AddToDashboard — onSubmit validation", () => {
 
     wrapper.vm.selectedDashboard = "dash-1";
     wrapper.vm.activeTabId = "tab-1";
-    wrapper.vm.panelTitle = "My Panel";
 
-    await wrapper.vm.onSubmit.execute();
+    await wrapper.vm.onSubmit({ panelTitle: "My Panel" });
     await flushPromises();
 
     expect(mockAddPanel).toHaveBeenCalled();
@@ -515,9 +500,8 @@ describe("AddToDashboard — onSubmit validation", () => {
     wrapper.vm.activeFolderId = "my-folder";
     wrapper.vm.selectedDashboard = "dash-1";
     wrapper.vm.activeTabId = "tab-1";
-    wrapper.vm.panelTitle = "My Panel";
 
-    await wrapper.vm.onSubmit.execute();
+    await wrapper.vm.onSubmit({ panelTitle: "My Panel" });
     await flushPromises();
 
     expect(mockAddPanel).toHaveBeenCalledWith(
@@ -535,9 +519,8 @@ describe("AddToDashboard — onSubmit validation", () => {
 
     wrapper.vm.selectedDashboard = "dash-1";
     wrapper.vm.activeTabId = "tab-1";
-    wrapper.vm.panelTitle = "New Panel";
 
-    await wrapper.vm.onSubmit.execute();
+    await wrapper.vm.onSubmit({ panelTitle: "New Panel" });
     await flushPromises();
 
     expect(wrapper.emitted("save")).toBeTruthy();
@@ -549,9 +532,8 @@ describe("AddToDashboard — onSubmit validation", () => {
 
     wrapper.vm.selectedDashboard = "dash-1";
     wrapper.vm.activeTabId = "tab-1";
-    wrapper.vm.panelTitle = "New Panel";
 
-    await wrapper.vm.onSubmit.execute();
+    await wrapper.vm.onSubmit({ panelTitle: "New Panel" });
     await flushPromises();
 
     expect(mockToast).toHaveBeenCalledWith(
@@ -565,10 +547,9 @@ describe("AddToDashboard — onSubmit validation", () => {
 
     wrapper.vm.selectedDashboard = "dash-1";
     wrapper.vm.activeTabId = "tab-1";
-    wrapper.vm.panelTitle = "New Panel";
     wrapper.vm.activeFolderId = "folder-1";
 
-    await wrapper.vm.onSubmit.execute();
+    await wrapper.vm.onSubmit({ panelTitle: "New Panel" });
     await flushPromises();
 
     expect(mockRouterPush).toHaveBeenCalledWith({
@@ -594,9 +575,8 @@ describe("AddToDashboard — error handling in addPanelToDashboard", () => {
 
     wrapper.vm.selectedDashboard = "dash-1";
     wrapper.vm.activeTabId = "tab-1";
-    wrapper.vm.panelTitle = "Panel";
 
-    await wrapper.vm.onSubmit.execute();
+    await wrapper.vm.onSubmit({ panelTitle: "Panel" });
     await flushPromises();
 
     expect(mockShowErrorNotification).toHaveBeenCalled();
@@ -612,9 +592,8 @@ describe("AddToDashboard — error handling in addPanelToDashboard", () => {
 
     wrapper.vm.selectedDashboard = "dash-1";
     wrapper.vm.activeTabId = "tab-1";
-    wrapper.vm.panelTitle = "Panel";
 
-    await wrapper.vm.onSubmit.execute();
+    await wrapper.vm.onSubmit({ panelTitle: "Panel" });
     await flushPromises();
 
     expect(mockShowConfictErrorNotificationWithRefreshBtn).toHaveBeenCalled();
@@ -627,9 +606,8 @@ describe("AddToDashboard — error handling in addPanelToDashboard", () => {
 
     wrapper.vm.selectedDashboard = "dash-1";
     wrapper.vm.activeTabId = "tab-1";
-    wrapper.vm.panelTitle = "Panel";
 
-    await wrapper.vm.onSubmit.execute();
+    await wrapper.vm.onSubmit({ panelTitle: "Panel" });
     await flushPromises();
 
     // The finally block always emits save
@@ -646,16 +624,15 @@ describe("AddToDashboard — error handling in addPanelToDashboard", () => {
 
     wrapper.vm.selectedDashboard = "dash-1";
     wrapper.vm.activeTabId = "tab-1";
-    wrapper.vm.panelTitle = "Panel";
 
-    await wrapper.vm.onSubmit.execute();
+    await wrapper.vm.onSubmit({ panelTitle: "Panel" });
     await flushPromises();
 
     expect(dismissFn).toHaveBeenCalled();
   });
 });
 
-describe("AddToDashboard — panelTitle binding", () => {
+describe("AddToDashboard — panelTitle from @submit payload", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -664,36 +641,23 @@ describe("AddToDashboard — panelTitle binding", () => {
     vi.clearAllMocks();
   });
 
-  it("panelTitle is reactive and can be updated", async () => {
-    const wrapper = createWrapper();
-    await flushPromises();
-
-    wrapper.vm.panelTitle = "New title";
-    await nextTick();
-
-    expect(wrapper.vm.panelTitle).toBe("New title");
-  });
-
-  it("panelTitle is trimmed before being set on the panel data", async () => {
+  it("sets the panel title from the validated @submit payload", async () => {
     mockAddPanel.mockResolvedValue({});
     const wrapper = createWrapper();
     await flushPromises();
 
     wrapper.vm.selectedDashboard = "dash-1";
     wrapper.vm.activeTabId = "tab-1";
-    // Simulate v-model.trim by assigning a string with spaces — the template
-    // uses v-model.trim so the value stored should be the trimmed version.
-    wrapper.vm.panelTitle = "  Trimmed Title  ";
 
-    await wrapper.vm.onSubmit.execute();
+    // panelTitle is no longer a local ref — onSubmit reads it from the
+    // validated form payload (single source of truth).
+    await wrapper.vm.onSubmit({ panelTitle: "My Panel" });
     await flushPromises();
 
-    // addPanel is called with the dashboardPanelData.data.title which was set
-    // to panelTitle.value inside the component
     expect(mockAddPanel).toHaveBeenCalledWith(
       mockStore,
       "dash-1",
-      expect.objectContaining({ title: "  Trimmed Title  " }),
+      expect.objectContaining({ title: "My Panel" }),
       expect.any(String),
       "tab-1",
     );
@@ -724,7 +688,6 @@ describe("AddToDashboard — ODrawer surface", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAddPanel.mockResolvedValue({});
-    mockUseLoadingIsLoading.value = false;
   });
 
   afterEach(() => {
@@ -767,50 +730,31 @@ describe("AddToDashboard — ODrawer surface", () => {
     expect(drawer.props("size")).toBe("md");
   });
 
-  it("disables the primary button when panelTitle is empty", async () => {
-    const wrapper = createWrapper();
-    await flushPromises();
-    // panelTitle starts empty
-    const drawer = wrapper.findComponent(ODialogStub);
-    expect(drawer.props("primaryButtonDisabled")).toBe(true);
-  });
-
-  it("enables the primary button once panelTitle has non-whitespace content", async () => {
-    const wrapper = createWrapper();
-    await flushPromises();
-    wrapper.vm.panelTitle = "My Panel";
-    await nextTick();
-    const drawer = wrapper.findComponent(ODialogStub);
-    expect(drawer.props("primaryButtonDisabled")).toBe(false);
-  });
-
-  it("keeps the primary button disabled when panelTitle is only whitespace", async () => {
-    const wrapper = createWrapper();
-    await flushPromises();
-    wrapper.vm.panelTitle = "   ";
-    await nextTick();
-    const drawer = wrapper.findComponent(ODialogStub);
-    expect(drawer.props("primaryButtonDisabled")).toBe(true);
-  });
-
-  it("reflects useLoading.isLoading on the primary button loading prop", async () => {
-    mockUseLoadingIsLoading.value = true;
+  // R3: Save is always enabled — submit is gated by the Zod schema, not the
+  // button. Loading is automatic (OForm awaits @submit) — no manual props.
+  it("keeps the primary button always enabled (schema gates submit)", async () => {
     const wrapper = createWrapper();
     await flushPromises();
     const drawer = wrapper.findComponent(ODialogStub);
-    expect(drawer.props("primaryButtonLoading")).toBe(true);
+    expect(drawer.props("primaryButtonDisabled")).toBeFalsy();
   });
 
-  it("invokes onSubmit.execute when OForm emits submit", async () => {
+  it("does not bind primaryButtonLoading (Save spinner is automatic)", async () => {
+    const wrapper = createWrapper();
+    await flushPromises();
+    const drawer = wrapper.findComponent(ODialogStub);
+    expect(drawer.props("primaryButtonLoading")).toBeFalsy();
+  });
+
+  it("invokes onSubmit when OForm emits submit", async () => {
     const wrapper = createWrapper();
     await flushPromises();
 
     wrapper.vm.selectedDashboard = "dash-1";
     wrapper.vm.activeTabId = "tab-1";
-    wrapper.vm.panelTitle = "Panel";
 
     const form = wrapper.findComponent({ name: "OForm" });
-    await form.vm.$emit("submit", {});
+    await form.vm.$emit("submit", { panelTitle: "Panel" });
     await flushPromises();
 
     expect(mockAddPanel).toHaveBeenCalled();
@@ -872,9 +816,8 @@ describe("AddToDashboard — getPanelId integration", () => {
 
     wrapper.vm.selectedDashboard = "dash-1";
     wrapper.vm.activeTabId = "tab-1";
-    wrapper.vm.panelTitle = "Test";
 
-    await wrapper.vm.onSubmit.execute();
+    await wrapper.vm.onSubmit({ panelTitle: "Test" });
     await flushPromises();
 
     expect(mockGetPanelId).toHaveBeenCalled();
@@ -892,12 +835,71 @@ describe("AddToDashboard — getPanelId integration", () => {
 
     wrapper.vm.selectedDashboard = "dash-1";
     wrapper.vm.activeTabId = "tab-1";
-    wrapper.vm.panelTitle = "Test";
 
-    await wrapper.vm.onSubmit.execute();
+    await wrapper.vm.onSubmit({ panelTitle: "Test" });
     await flushPromises();
 
     // After execute, the data id was mutated to the generated id
     expect(panelData.data.id).toBe("generated-id-456");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Regression: the Zod schema must actually gate submit. AddToDashboard is an
+// Options-API component, so `:schema="addToDashboardSchema"` only resolves if
+// that import is RETURNED from setup() — otherwise it is undefined and
+// validation is silently disabled (a panel gets added with an empty title).
+// The other suites stub OForm, so they cannot catch this — these mount the REAL
+// OForm and drive form.handleSubmit() so the schema actually runs.
+// ---------------------------------------------------------------------------
+describe("AddToDashboard — schema gates submit (real OForm)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetFoldersList.mockResolvedValue([]);
+  });
+
+  const mountReal = () =>
+    mount(AddToDashboard, {
+      props: { dashboardPanelData: defaultDashboardPanelData, open: true },
+      global: {
+        stubs: {
+          ODialog: { template: "<div><slot /></div>" },
+          SelectFolderDropdown: true,
+          SelectDashboardDropdown: true,
+          SelectTabDropdown: true,
+          // OForm + OFormInput intentionally REAL so the Zod schema runs.
+        },
+      },
+    });
+
+  it("does NOT add the panel when panelTitle is empty", async () => {
+    const wrapper = mountReal();
+    await flushPromises();
+    // Satisfy onSubmit's own dashboard/tab guards so ONLY the schema can block.
+    (wrapper.vm as any).selectedDashboard = "dash-1";
+    (wrapper.vm as any).activeTabId = "tab-1";
+    await flushPromises();
+
+    const form = (wrapper.findComponent(OFormReal).vm as any).form;
+    await form.handleSubmit();
+    await flushPromises();
+
+    expect(form.state.isValid).toBe(false);
+    expect(mockAddPanel).not.toHaveBeenCalled();
+  });
+
+  it("adds the panel when panelTitle is provided", async () => {
+    const wrapper = mountReal();
+    await flushPromises();
+    (wrapper.vm as any).selectedDashboard = "dash-1";
+    (wrapper.vm as any).activeTabId = "tab-1";
+    const form = (wrapper.findComponent(OFormReal).vm as any).form;
+    form.setFieldValue("panelTitle", "My Panel");
+    await flushPromises();
+    await form.handleSubmit();
+    await flushPromises();
+
+    expect(form.state.isValid).toBe(true);
+    expect(mockAddPanel).toHaveBeenCalled();
   });
 });

@@ -3,6 +3,7 @@ import { mount, VueWrapper, flushPromises } from '@vue/test-utils';
 import { createStore } from 'vuex';
 import { createI18n } from 'vue-i18n';
 import GetStarted from './GetStarted.vue';
+import { getStartedSchema } from './GetStarted.schema';
 
 // Mock billings service
 vi.mock('@/services/billings', () => ({
@@ -79,161 +80,83 @@ describe('GetStarted.vue', () => {
     });
   });
 
-  describe('Initial State', () => {
-    it('should initialize hearAboutUs as empty string', () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      expect(vm.hearAboutUs).toBe('');
+  // Validation lives in the Zod schema (GetStarted.schema.ts), not in local refs.
+  // Assert the schema directly so the source of truth is what's tested.
+  describe('schema validation', () => {
+    it('should fail when hearAboutUs is empty', () => {
+      expect(
+        getStartedSchema.safeParse({ hearAboutUs: '', whereDoYouWork: 'Company', isAgree: true }).success,
+      ).toBe(false);
     });
 
-    it('should initialize whereDoYouWork as empty string', () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      expect(vm.whereDoYouWork).toBe('');
+    it('should fail when whereDoYouWork is empty', () => {
+      expect(
+        getStartedSchema.safeParse({ hearAboutUs: 'From a friend', whereDoYouWork: '', isAgree: true }).success,
+      ).toBe(false);
     });
 
-    it('should initialize isAgree as false', () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      expect(vm.isAgree).toBe(false);
+    it('should fail when both fields are empty', () => {
+      expect(
+        getStartedSchema.safeParse({ hearAboutUs: '', whereDoYouWork: '', isAgree: true }).success,
+      ).toBe(false);
     });
 
-    it('should initialize isSubmitting as false', () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      expect(vm.isSubmitting).toBe(false);
-    });
-  });
-
-  // The component validates fields via OFormInput inline validators:
-  // (val) => !String(val ?? '').trim() ? 'This field is required' : undefined
-  // This helper replicates the same logic so we can assert on it directly.
-  const isFormValid = (hearAboutUs: string, whereDoYouWork: string): boolean =>
-    !!String(hearAboutUs ?? '').trim() && !!String(whereDoYouWork ?? '').trim();
-
-  describe('validateForm', () => {
-    it('should return false when hearAboutUs is empty', () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      vm.hearAboutUs = '';
-      vm.whereDoYouWork = 'Company';
-      expect(isFormValid(vm.hearAboutUs, vm.whereDoYouWork)).toBe(false);
+    it('should pass when both fields are filled and terms accepted', () => {
+      expect(
+        getStartedSchema.safeParse({ hearAboutUs: 'From a friend', whereDoYouWork: 'Company Inc', isAgree: true }).success,
+      ).toBe(true);
     });
 
-    it('should return false when whereDoYouWork is empty', () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      vm.hearAboutUs = 'From a friend';
-      vm.whereDoYouWork = '';
-      expect(isFormValid(vm.hearAboutUs, vm.whereDoYouWork)).toBe(false);
+    it('should fail when hearAboutUs is only whitespace', () => {
+      expect(
+        getStartedSchema.safeParse({ hearAboutUs: '   ', whereDoYouWork: 'Company', isAgree: true }).success,
+      ).toBe(false);
     });
 
-    it('should return false when both fields are empty', () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      vm.hearAboutUs = '';
-      vm.whereDoYouWork = '';
-      expect(isFormValid(vm.hearAboutUs, vm.whereDoYouWork)).toBe(false);
-    });
-
-    it('should return true when both fields are filled', () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      vm.hearAboutUs = 'From a friend';
-      vm.whereDoYouWork = 'Company Inc';
-      expect(isFormValid(vm.hearAboutUs, vm.whereDoYouWork)).toBe(true);
-    });
-
-    it('should return false when hearAboutUs is only whitespace', () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      vm.hearAboutUs = '   ';
-      vm.whereDoYouWork = 'Company';
-      expect(isFormValid(vm.hearAboutUs, vm.whereDoYouWork)).toBe(false);
-    });
-
-    it('should return false when whereDoYouWork is only whitespace', () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      vm.hearAboutUs = 'From a friend';
-      vm.whereDoYouWork = '   ';
-      expect(isFormValid(vm.hearAboutUs, vm.whereDoYouWork)).toBe(false);
+    it('should fail when whereDoYouWork is only whitespace', () => {
+      expect(
+        getStartedSchema.safeParse({ hearAboutUs: 'From a friend', whereDoYouWork: '   ', isAgree: true }).success,
+      ).toBe(false);
     });
 
     it('should handle fields with special characters', () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      vm.hearAboutUs = 'LinkedIn & Twitter';
-      vm.whereDoYouWork = 'Acme Corp (2024)';
-      expect(isFormValid(vm.hearAboutUs, vm.whereDoYouWork)).toBe(true);
+      expect(
+        getStartedSchema.safeParse({ hearAboutUs: 'LinkedIn & Twitter', whereDoYouWork: 'Acme Corp (2024)', isAgree: true }).success,
+      ).toBe(true);
+    });
+
+    it('should fail when isAgree is false (terms not accepted)', () => {
+      const result = getStartedSchema.safeParse({
+        hearAboutUs: 'From a friend',
+        whereDoYouWork: 'Company Inc',
+        isAgree: false,
+      });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        const agreeIssue = result.error.issues.find((i) => i.path[0] === 'isAgree');
+        expect(agreeIssue?.message).toBe('You must accept the terms to continue');
+      }
+    });
+
+    it('should fail when isAgree is missing', () => {
+      expect(
+        getStartedSchema.safeParse({ hearAboutUs: 'From a friend', whereDoYouWork: 'Company Inc' }).success,
+      ).toBe(false);
     });
   });
 
-  describe('onSubmit - Invalid Form', () => {
-    it('should set isSubmitting to true when called', async () => {
-      // isSubmitting=true is observable only while the async API call is in-flight;
-      // use a pending promise to observe the in-flight state.
-      const billings = await import('@/services/billings');
-      let resolveSubmit!: (val: any) => void;
-      vi.mocked(billings.default.submit_new_user_info).mockReturnValueOnce(
-        new Promise<any>((resolve) => { resolveSubmit = resolve; }),
-      );
-
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      vm.hearAboutUs = 'From a friend';
-      vm.whereDoYouWork = 'Company Inc';
-
-      const submitPromise = vm.doSubmit();
-      expect(vm.isSubmitting).toBe(true);
-      resolveSubmit({ status: 200 });
-      await submitPromise;
-    });
-
-    it('should call billings service even when fields are empty (no guard in doSubmit)', async () => {
+  describe('onSubmit - submit payload', () => {
+    it('should map the submit payload to the billings service args', async () => {
       const billings = await import('@/services/billings');
       vi.mocked(billings.default.submit_new_user_info).mockResolvedValue({ status: 200 });
 
       wrapper = createWrapper();
       const vm = wrapper.vm as any;
-      vm.hearAboutUs = '';
-      vm.whereDoYouWork = '';
 
-      await vm.doSubmit();
+      await vm.doSubmit({ hearAboutUs: 'Search', company: undefined, whereDoYouWork: 'Company', isAgree: true });
 
       expect(billings.default.submit_new_user_info).toHaveBeenCalledWith('test-org', {
-        from: '',
-        company: '',
-      });
-    });
-
-    it('should set isSubmitting to false after submission completes', async () => {
-      const billings = await import('@/services/billings');
-      vi.mocked(billings.default.submit_new_user_info).mockResolvedValue({ status: 200 });
-
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      vm.hearAboutUs = '';
-      vm.whereDoYouWork = '';
-
-      await vm.doSubmit();
-
-      expect(vm.isSubmitting).toBe(false);
-    });
-
-    it('should call billings service with whatever values are set', async () => {
-      const billings = await import('@/services/billings');
-      vi.mocked(billings.default.submit_new_user_info).mockResolvedValue({ status: 200 });
-
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      vm.hearAboutUs = '';
-      vm.whereDoYouWork = 'Company';
-
-      await vm.doSubmit();
-
-      expect(billings.default.submit_new_user_info).toHaveBeenCalledWith('test-org', {
-        from: '',
+        from: 'Search',
         company: 'Company',
       });
     });
@@ -249,10 +172,8 @@ describe('GetStarted.vue', () => {
       const billings = await import('@/services/billings');
       wrapper = createWrapper();
       const vm = wrapper.vm as any;
-      vm.hearAboutUs = 'From a friend';
-      vm.whereDoYouWork = 'Company Inc';
 
-      await vm.doSubmit();
+      await vm.doSubmit({ hearAboutUs: 'From a friend', whereDoYouWork: 'Company Inc', isAgree: true });
 
       expect(billings.default.submit_new_user_info).toHaveBeenCalledWith('test-org', {
         from: 'From a friend',
@@ -263,10 +184,8 @@ describe('GetStarted.vue', () => {
     it('should emit removeFirstTimeLogin event on success', async () => {
       wrapper = createWrapper();
       const vm = wrapper.vm as any;
-      vm.hearAboutUs = 'From a friend';
-      vm.whereDoYouWork = 'Company Inc';
 
-      await vm.doSubmit();
+      await vm.doSubmit({ hearAboutUs: 'From a friend', whereDoYouWork: 'Company Inc', isAgree: true });
 
       const emittedEvents = wrapper.emitted();
       expect(emittedEvents['removeFirstTimeLogin']).toBeTruthy();
@@ -276,26 +195,13 @@ describe('GetStarted.vue', () => {
     it('should show success notification on success', async () => {
       wrapper = createWrapper();
       const vm = wrapper.vm as any;
-      vm.hearAboutUs = 'From a friend';
-      vm.whereDoYouWork = 'Company Inc';
 
-      await vm.doSubmit();
+      await vm.doSubmit({ hearAboutUs: 'From a friend', whereDoYouWork: 'Company Inc', isAgree: true });
 
       expect(mockToast).toHaveBeenCalledWith({
         message: 'Thank you for your feedback',
         variant: 'success',
       });
-    });
-
-    it('should set isSubmitting to false after successful submission', async () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      vm.hearAboutUs = 'From a friend';
-      vm.whereDoYouWork = 'Company Inc';
-
-      await vm.doSubmit();
-
-      expect(vm.isSubmitting).toBe(false);
     });
 
     it('should remove isFirstTimeLogin from localStorage on success', async () => {
@@ -305,10 +211,8 @@ describe('GetStarted.vue', () => {
 
       wrapper = createWrapper();
       const vm = wrapper.vm as any;
-      vm.hearAboutUs = 'From a friend';
-      vm.whereDoYouWork = 'Company Inc';
 
-      await vm.doSubmit();
+      await vm.doSubmit({ hearAboutUs: 'From a friend', whereDoYouWork: 'Company Inc', isAgree: true });
       await flushPromises();
 
       expect(localStorage.getItem('isFirstTimeLogin')).toBeNull();
@@ -324,10 +228,8 @@ describe('GetStarted.vue', () => {
     it('should show error notification on non-200 response', async () => {
       wrapper = createWrapper();
       const vm = wrapper.vm as any;
-      vm.hearAboutUs = 'From a friend';
-      vm.whereDoYouWork = 'Company Inc';
 
-      await vm.doSubmit();
+      await vm.doSubmit({ hearAboutUs: 'From a friend', whereDoYouWork: 'Company Inc', isAgree: true });
 
       expect(mockToast).toHaveBeenCalledWith({
         message: 'Something went wrong',
@@ -335,24 +237,11 @@ describe('GetStarted.vue', () => {
       });
     });
 
-    it('should set isSubmitting to false after failed submission', async () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      vm.hearAboutUs = 'From a friend';
-      vm.whereDoYouWork = 'Company Inc';
-
-      await vm.doSubmit();
-
-      expect(vm.isSubmitting).toBe(false);
-    });
-
     it('should not emit removeFirstTimeLogin on failure', async () => {
       wrapper = createWrapper();
       const vm = wrapper.vm as any;
-      vm.hearAboutUs = 'From a friend';
-      vm.whereDoYouWork = 'Company Inc';
 
-      await vm.doSubmit();
+      await vm.doSubmit({ hearAboutUs: 'From a friend', whereDoYouWork: 'Company Inc', isAgree: true });
 
       const emittedEvents = wrapper.emitted();
       expect(emittedEvents['removeFirstTimeLogin']).toBeFalsy();
@@ -405,32 +294,6 @@ describe('GetStarted.vue', () => {
     });
   });
 
-  describe('Reactive Updates', () => {
-    it('should update hearAboutUs reactively', async () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      vm.hearAboutUs = 'LinkedIn';
-      await wrapper.vm.$nextTick();
-      expect(vm.hearAboutUs).toBe('LinkedIn');
-    });
-
-    it('should update whereDoYouWork reactively', async () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      vm.whereDoYouWork = 'OpenObserve';
-      await wrapper.vm.$nextTick();
-      expect(vm.whereDoYouWork).toBe('OpenObserve');
-    });
-
-    it('should update isAgree reactively', async () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      vm.isAgree = true;
-      await wrapper.vm.$nextTick();
-      expect(vm.isAgree).toBe(true);
-    });
-  });
-
   describe('Store Integration', () => {
     it('should use organization identifier from store', async () => {
       const billings = await import('@/services/billings');
@@ -446,12 +309,62 @@ describe('GetStarted.vue', () => {
 
       wrapper = createWrapper(customStore);
       const vm = wrapper.vm as any;
-      vm.hearAboutUs = 'Search';
-      vm.whereDoYouWork = 'My Company';
 
-      await vm.doSubmit();
+      await vm.doSubmit({ hearAboutUs: 'Search', whereDoYouWork: 'My Company', isAgree: true });
 
       expect(billings.default.submit_new_user_info).toHaveBeenCalledWith('custom-org', expect.any(Object));
+    });
+  });
+
+  // End-to-end gating through the real OForm/TanStack pipeline: the Save button
+  // is always enabled (R3), so submit is gated by the schema. An unchecked
+  // terms box must block submission; checking it must let it through.
+  // Pattern: set values via each field component's `update:modelValue`, then
+  // AWAIT the form's own handleSubmit (runs schema → @submit) — deterministic.
+  describe('terms gate (real OForm submit)', () => {
+    const fillInputs = async () => {
+      const inputs = wrapper.findAllComponents({ name: 'OInput' });
+      // Two OFormInputs: hearAboutUs, whereDoYouWork (in template order).
+      await inputs[0].vm.$emit('update:modelValue', 'From a friend');
+      await inputs[1].vm.$emit('update:modelValue', 'Company Inc');
+    };
+
+    const submitForm = async () => {
+      await flushPromises();
+      await (wrapper.findComponent({ name: 'OForm' }).vm as any).form.handleSubmit();
+      await flushPromises();
+    };
+
+    it('should NOT call billings when terms checkbox is unchecked', async () => {
+      const billings = await import('@/services/billings');
+      (billings.default.submit_new_user_info as any).mockResolvedValue({ status: 200 });
+
+      wrapper = createWrapper();
+      await fillInputs();
+
+      // Box left unchecked (default false) → schema gate fails on submit.
+      await submitForm();
+
+      expect(billings.default.submit_new_user_info).not.toHaveBeenCalled();
+    });
+
+    it('should call billings when terms checkbox is checked and fields are filled', async () => {
+      const billings = await import('@/services/billings');
+      (billings.default.submit_new_user_info as any).mockResolvedValue({ status: 200 });
+
+      wrapper = createWrapper();
+      await fillInputs();
+
+      // Check the terms box → isAgree=true satisfies the schema gate.
+      const checkbox = wrapper.findComponent({ name: 'OCheckbox' });
+      await checkbox.vm.$emit('update:modelValue', true);
+
+      await submitForm();
+
+      expect(billings.default.submit_new_user_info).toHaveBeenCalledWith('test-org', {
+        from: 'From a friend',
+        company: 'Company Inc',
+      });
     });
   });
 });

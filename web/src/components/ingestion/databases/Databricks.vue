@@ -15,49 +15,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <IngestionContent>
-    <CopyContent :content="content" />
-    <IngestionDocLink :href="docURL" />
-  </IngestionContent>
+  <DataSourceSetupCard slug="databricks" />
 </template>
 
-<script lang="ts">
-import { defineComponent, ref, type Ref } from "vue";
-import config from "../../../aws-exports";
-import { useStore } from "vuex";
-import { getImageURL } from "../../../utils/zincutils";
-import CopyContent from "@/components/CopyContent.vue";
-import IngestionContent from "@/components/ingestion/IngestionContent.vue";
-import IngestionDocLink from "@/components/ingestion/IngestionDocLink.vue";
-import useIngestion from "@/composables/useIngestion";
+<script setup lang="ts">
+import DataSourceSetupCard from "@/components/ingestion/setupCard/DataSourceSetupCard.vue";
 
-export default defineComponent({
-  name: "PostgresPage",
-  props: {
-    currOrgIdentifier: {
-      type: String,
-    },
-    currUserEmail: {
-      type: String,
-    },
-  },
-  components: { CopyContent, IngestionContent, IngestionDocLink },
-  setup(props) {
-    const name = "databricks";
-    const { endpoint, databaseContent, databaseDocURLs } = useIngestion();
-    const content = databaseContent.replace("[STREAM_NAME]", name.replace(" ", "_").toLowerCase());
-    const docURL = databaseDocURLs[name];
-    
-    return {
-      config,
-      docURL,
-      getImageURL,
-      content,
-      name,
-      endpoint,
-      databaseContent,
-      databaseDocURLs,
-    };
-  },
-});
+defineProps<{
+  currOrgIdentifier?: string;
+  currUserEmail?: string;
+}>();
 </script>

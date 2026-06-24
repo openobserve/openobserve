@@ -13,13 +13,28 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::io::{Result, Write};
+use std::{
+    io::{Result, Write},
+    path::{Path, PathBuf},
+};
+
+use cargo_metadata::MetadataCommand;
 
 fn main() -> Result<()> {
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=proto");
 
     let out = std::path::PathBuf::from(std::env::var("OUT_DIR").unwrap());
+
+    // Stage the .proto files shipped by the `datafusion-proto` and
+    // `datafusion-proto-common` crates under a
+    // synthetic include root that mirrors the upstream source-tree layout, so
+    // that `datafusion.proto`'s `import
+    // "datafusion/proto-common/proto/datafusion_common.proto"` resolves.
+    let df_include = out.join("datafusion_proto_include");
+    stage_datafusion_proto_files(&df_include);
+
+    let df_include_str = df_include.to_str().expect("OUT_DIR must be utf-8");
 
     tonic_prost_build::configure()
         .type_attribute("FileList", "#[derive(serde::Serialize)]")
@@ -65,7 +80,7 @@ fn main() -> Result<()> {
                 "proto/cluster/cluster_info.proto",
                 "proto/cluster/stream.proto",
             ],
-            &["proto"],
+            &["proto", df_include_str],
         )
         .unwrap();
 
@@ -145,4 +160,64 @@ fn main() -> Result<()> {
     file.write_all(code.as_str().as_ref()).unwrap();
 
     Ok(())
+}
+
+/// Locate the `.proto` files distributed with `datafusion-proto` and
+/// `datafusion-proto-common` and stage them in
+/// `dest` mirroring the upstream source-tree layout.
+fn stage_datafusion_proto_files(dest: &Path) {
+    let metadata = MetadataCommand::new()
+        .exec()
+        .expect("failed to run `cargo metadata` to locate datafusion proto crates");
+
+    let common_proto = find_proto_file(
+        &metadata,
+        "datafusion-proto-common",
+        "datafusion_common.proto",
+    );
+    let df_proto = find_proto_file(&metadata, "datafusion-proto", "datafusion.proto");
+
+    stage(
+        &common_proto,
+        &dest.join("datafusion/proto-common/proto/datafusion_common.proto"),
+    );
+    stage(
+        &df_proto,
+        &dest.join("datafusion/proto/proto/datafusion.proto"),
+    );
+}
+
+fn find_proto_file(metadata: &cargo_metadata::Metadata, pkg: &str, file_name: &str) -> PathBuf {
+    let pkg_meta = metadata
+        .packages
+        .iter()
+        .find(|p| p.name.as_str() == pkg)
+        .unwrap_or_else(|| panic!("dependency `{pkg}` not found in cargo metadata"));
+    let manifest_dir = pkg_meta
+        .manifest_path
+        .parent()
+        .unwrap_or_else(|| panic!("manifest path for `{pkg}` has no parent"));
+    let proto_path = manifest_dir.join("proto").join(file_name);
+    if !proto_path.exists() {
+        panic!(
+            "expected `{}` to ship `{}`; not found at {}",
+            pkg, file_name, proto_path
+        );
+    }
+    println!("cargo:rerun-if-changed={proto_path}");
+    proto_path.into()
+}
+
+fn stage(src: &Path, dest: &Path) {
+    if let Some(parent) = dest.parent() {
+        std::fs::create_dir_all(parent)
+            .unwrap_or_else(|e| panic!("failed to create {}: {e}", parent.display()));
+    }
+    std::fs::copy(src, dest).unwrap_or_else(|e| {
+        panic!(
+            "failed to stage {} -> {}: {e}",
+            src.display(),
+            dest.display()
+        )
+    });
 }

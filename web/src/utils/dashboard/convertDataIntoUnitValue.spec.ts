@@ -122,6 +122,11 @@ vi.mock("@/utils/dashboard/convertDashboardSchemaVersion", () => ({
   CURRENT_DASHBOARD_SCHEMA_VERSION: "v3"
 }));
 
+const mockGetNumberLocale = vi.fn(() => "en-GB");
+vi.mock("@/locales/numberFormat", () => ({
+  getNumberLocale: () => mockGetNumberLocale(),
+}));
+
 describe("Dashboard Data Conversion Utils", () => {
   // Use actual checkTimestampAlias from logsUtils
   const { checkTimestampAlias } = logsUtils();
@@ -296,6 +301,38 @@ describe("Dashboard Data Conversion Utils", () => {
       const result = getUnitValue(123.45, "currency-rupee", "", 2);
       expect(result.unit).toBe("₹");
       expect(result.value).toContain("123");
+    });
+
+    describe("locale unit", () => {
+      beforeEach(() => {
+        mockGetNumberLocale.mockReturnValue("en-GB");
+      });
+
+      it("should format with en-GB grouping and no unit suffix", () => {
+        mockGetNumberLocale.mockReturnValue("en-GB");
+        const result = getUnitValue(1234567.89, "locale", "", 2);
+        expect(result.value).toBe("1,234,567.89");
+        expect(result.unit).toBe("");
+      });
+
+      it("should format with de-DE grouping", () => {
+        mockGetNumberLocale.mockReturnValue("de-DE");
+        const result = getUnitValue(1234567.89, "locale", "", 2);
+        expect(result.value).toBe("1.234.567,89");
+        expect(result.unit).toBe("");
+      });
+
+      it("should respect the decimals argument", () => {
+        mockGetNumberLocale.mockReturnValue("en-GB");
+        const result = getUnitValue(1234.5, "locale", "", 0);
+        expect(result.value).toBe("1,235");
+      });
+
+      it("should return NaN values untouched with empty unit", () => {
+        const result = getUnitValue(NaN, "locale", "", 2);
+        expect(Number.isNaN(result.value)).toBe(true);
+        expect(result.unit).toBe("");
+      });
     });
 
     it("should handle percent-1 unit", () => {

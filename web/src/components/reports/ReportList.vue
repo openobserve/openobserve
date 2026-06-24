@@ -346,7 +346,9 @@ const reportIdsToMove = ref<string[]>([]);
 // ── Report list state ─────────────────────────────────────────────────────────
 const reportsTableRows: Ref<any[]> = ref([]);
 const staticReportsList: Ref<any[]> = ref([]);
-const isLoadingReports = ref(false);
+// Start in the loading state so the table shows the skeleton on first render
+// instead of briefly flashing the empty state before the fetch completes.
+const isLoadingReports = ref(true);
 const activeTab = ref("shared");
 const filterQuery = ref(""); // client-side filter within current folder
 const searchQuery = ref(""); // API search across all folders
@@ -390,7 +392,7 @@ const columns = computed<OTableColumnDef[]>(() => {
     { id: "name", header: t("alerts.name"), accessorKey: "name", cell: " ", sortable: true, resizable: true, hideable: true, size: COL.name, minSize: 160, meta: { align: "left", flex: true } },
     { id: "owner", header: t("alerts.owner"), accessorKey: "owner", sortable: true, resizable: true, hideable: true, size: COL.owner },
     { id: "description", header: t("alerts.description"), accessorKey: "description", sortable: false, resizable: true, hideable: true, size: COL.description, meta: { align: "center" } },
-    { id: "last_triggered_at", header: t("alerts.lastTriggered"), accessorKey: "last_triggered_at", sortable: true, resizable: true, hideable: true, size: COL.date, meta: { align: "left" } },
+    { id: "last_triggered_at", header: t("alerts.lastTriggered"), accessorKey: "last_triggered_at", sortable: true, resizable: true, hideable: true, size: 200, meta: { align: "left" } },
     { id: "actions", header: t("alerts.actions"), isAction: true, size: 150, meta: { align: "center", cellClass: "actions-column", actionCount: 4 } },
   ];
 
@@ -419,6 +421,9 @@ const loadReports = async (folderId: string, nameQuery?: string) => {
     staticReportsList.value = cached;
     cachedFolderReports.value = cached;
     filterReports();
+    // Data is served synchronously from cache — clear the initial loading flag
+    // so the skeleton doesn't stay stuck on a cached (re)mount.
+    isLoadingReports.value = false;
     return;
   }
 

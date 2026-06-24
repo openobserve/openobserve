@@ -352,6 +352,10 @@ const waitData = async (wrapper: any) => {
   wrapper.vm.allAlerts = transformedAlerts;
   wrapper.vm.filteredResults = [...transformedAlerts]; // shallow copy
   wrapper.vm.activeFolderId = 'default';
+  // `loading` starts true (so the table shows the skeleton instead of flashing
+  // the empty state); this helper simulates the loaded state, so clear it to
+  // let the table render rows.
+  wrapper.vm.loading = false;
   
   // Trigger Vue's reactivity and ensure all watchers are processed
   await wrapper.vm.$nextTick();
@@ -368,8 +372,11 @@ const waitData = async (wrapper: any) => {
   }
   // Note: For "add" action, we let the test manually trigger showAddUpdateFn to test the full flow
   
-  // Give a short wait for any remaining async operations and reactive updates
-  await new Promise(resolve => setTimeout(resolve, 10));
+  // Give a short wait for any remaining async operations and reactive updates.
+  // OTable holds its loading skeleton for MIN_SKELETON_MS (50ms) after loading
+  // starts; `loading` begins true on mount, so we must wait past that hold for
+  // the table to render real rows (and their row-action buttons).
+  await new Promise(resolve => setTimeout(resolve, 80));
   await flushPromises();
 };
 
@@ -536,19 +543,14 @@ describe("AlertList - row actions", () => {
     const first = (wrapper.vm as any).filteredResults[0];
     const initial = first.enabled;
 
-    // Click the pause/start button for this row.
-    // The button is rendered by the OButton wrapper component; firing a DOM
-    // click on the inner <button> does not invoke the OButton's @click emit,
-    // so we emit the click directly on the OButton component instance.
-    const obComponent = wrapper
-      .findAllComponents({ name: "OButton" })
-      .find(
-        (c: any) =>
-          c.attributes("data-test") ===
-          `alert-list-${first.name}-pause-start-alert`,
-      );
-    expect(obComponent).toBeTruthy();
-    await obComponent!.vm.$emit("click", new MouseEvent("click"));
+    // Click the pause/start button for this row. OButton forwards $attrs
+    // (including data-test) to its root element, so a DOM click triggers the
+    // bound @click handler.
+    const btn = wrapper.find(
+      `[data-test="alert-list-${first.name}-pause-start-alert"]`,
+    );
+    expect(btn.exists()).toBe(true);
+    await btn.trigger("click");
     await flushPromises();
 
     const updated = (wrapper.vm as any).filteredResults.find((r: any) => r.uuid === first.uuid);
@@ -955,12 +957,14 @@ describe("AlertList - isAnomalyDetectionEnabled", () => {
     (config as any).isEnterprise = "false";
     (config as any).isCloud = "false";
     delete (store.state as any).zoConfig.build_type;
+    delete (store.state as any).zoConfig.anomaly_detection_enabled;
   });
 
   it("should enable anomalyDetection tab when isEnterprise=true, isCloud=false, and build_type is not opensource", async () => {
     (config as any).isEnterprise = "true";
     (config as any).isCloud = "false";
     (store.state as any).zoConfig.build_type = "enterprise";
+    (store.state as any).zoConfig.anomaly_detection_enabled = true;
 
     const wrapper: any = await mountAlertList();
     const tabValues = wrapper.vm.alertTabs.map((t: any) => t.value);
@@ -981,6 +985,7 @@ describe("AlertList - isAnomalyDetectionEnabled", () => {
     (config as any).isEnterprise = "true";
     (config as any).isCloud = "true";
     (store.state as any).zoConfig.build_type = "enterprise";
+    (store.state as any).zoConfig.anomaly_detection_enabled = true;
 
     const wrapper: any = await mountAlertList();
     const tabValues = wrapper.vm.alertTabs.map((t: any) => t.value);
@@ -1008,6 +1013,7 @@ describe("AlertList - isAnomalyDetectionEnabled", () => {
     (config as any).isEnterprise = "true";
     (config as any).isCloud = "false";
     (store.state as any).zoConfig.build_type = "enterprise";
+    (store.state as any).zoConfig.anomaly_detection_enabled = true;
 
     const wrapper: any = await mountAlertList();
     const tabValues = wrapper.vm.alertTabs.map((t: any) => t.value);

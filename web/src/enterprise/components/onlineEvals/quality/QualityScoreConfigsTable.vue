@@ -1,26 +1,5 @@
 <template>
   <section class="qsc-overview" data-test="quality-score-configs-overview">
-    <header class="qsc-overview__head">
-      <div class="qsc-overview__head-text">
-        <h3 class="qsc-overview__title">{{ t("onlineEvals.quality.overview.title") }}</h3>
-        <span class="qsc-overview__count">
-          {{ t("onlineEvals.quality.overview.countSuffix", { n: filteredRows.length }) }}
-        </span>
-      </div>
-
-      <OInput
-        v-model="filter"
-        :placeholder="t('onlineEvals.quality.overview.searchPlaceholder')"
-        size="sm"
-        class="qsc-overview__filter"
-        data-test="quality-overview-filter-input"
-      >
-        <template #icon-left>
-          <OIcon name="search" size="xs" />
-        </template>
-      </OInput>
-    </header>
-
     <div v-if="isLoading && rows.length === 0" class="qsc-overview__loading">
       <OSpinner size="sm" />
       <span>{{ t("onlineEvals.quality.overview.loading") }}</span>
@@ -52,28 +31,56 @@
         :columns="columns"
         row-key="configId"
         :loading="isLoading"
-        :row-class="rowClassOf"
         :footer-title="t('onlineEvals.quality.overview.title')"
         :show-global-filter="false"
         :page-size="20"
         :page-size-options="[20, 50, 100]"
         :default-columns="false"
+        :enable-column-resize="true"
+        :persist-columns="true"
+        table-id="quality-score-configs"
         width="100%"
         class="tw:w-full tw:h-full"
         @row-click="(row: any) => $emit('select', row)"
       >
+        <!-- Filter moved into the table toolbar so OTable's column chooser
+             ("Manage columns") renders next to it, matching the eval lists. -->
+        <template #toolbar>
+          <OInput
+            v-model="filter"
+            :placeholder="t('onlineEvals.quality.overview.searchPlaceholder')"
+            size="sm"
+            class="tw:flex-1 tw:min-w-0"
+            data-test="quality-overview-filter-input"
+          >
+            <template #icon-left>
+              <OIcon name="search" size="xs" />
+            </template>
+          </OInput>
+        </template>
+
         <template #cell-status="{ row }">
           <span class="qsc-status" :class="`qsc-status--${row.status}`" :aria-label="row.status">●</span>
         </template>
 
         <template #cell-name="{ row }">
-          <div class="qsc-name">{{ row.name }}</div>
+          <div
+            class="qsc-name"
+            :class="{ 'qsc-name--no-data': row.status === 'noData' }"
+          >
+            {{ row.name }}
+          </div>
         </template>
 
         <template #cell-type="{ row }">
-          <span class="qsc-type" :class="`qsc-type--${row.dataType}`">
-            {{ shortType(row.dataType) }}
-          </span>
+          <OBadge
+            v-if="shortType(row.dataType) !== '—'"
+            :variant="dataTypeBadgeVariant(row.dataType)"
+            size="sm"
+          >
+            {{ row.dataType }}
+          </OBadge>
+          <span v-else class="qsc-muted">—</span>
         </template>
 
         <template #cell-totalScores="{ row }">
@@ -123,6 +130,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
 import { useRoute, useRouter } from "vue-router";
 import type { ScoreConfigRow } from "../composables/useQualityScoreConfigs";
@@ -165,13 +173,6 @@ const filteredRows = computed(() => {
   );
 });
 
-// De-emphasize configs that have no scores in the selected window. They
-// stay visible (so users can spot a scorer they defined but never wired
-// up) but visually recede beneath active rows.
-function rowClassOf(row: ScoreConfigRow): string {
-  return row.status === "noData" ? "qsc-row--no-data" : "";
-}
-
 const columns = computed(() => [
   {
     id: "status",
@@ -179,6 +180,8 @@ const columns = computed(() => [
     accessorKey: "status",
     sortable: false,
     size: 40,
+    // Fixed-width status dot — no resize grip (OTable reads `resizable`).
+    resizable: false,
     meta: { align: "center" },
   },
   {
@@ -187,7 +190,8 @@ const columns = computed(() => [
     accessorKey: "name",
     sortable: true,
     size: COL.name,
-    meta: { align: "left", autoWidth: true },
+    // `flex` (not `autoWidth`): fills leftover width AND stays resizable.
+    meta: { align: "left", flex: true },
   },
   {
     id: "type",
@@ -228,13 +232,27 @@ const columns = computed(() => [
     size: COL.date,
     meta: { align: "left" },
   },
-]);
+].map((c: any) => ({
+  ...c,
+  // Offer every column except the name and the leading status dot in the
+  // "Manage columns" chooser.
+  hideable: c.id !== "name" && c.id !== "status",
+})));
 
 function shortType(type: ScoreConfigRow["dataType"]): string {
   if (type === "numeric") return "Num";
   if (type === "categorical") return "Cat";
   if (type === "boolean") return "Bool";
   return "—";
+}
+
+// Map a score-config data type to a neutral design-system OBadge soft variant
+// (numeric → blue, categorical → purple, boolean → teal). Data types are just
+// labels, so use neutral palette colors rather than semantic variants.
+function dataTypeBadgeVariant(type: ScoreConfigRow["dataType"]) {
+  if (type === "categorical") return "purple-soft" as const;
+  if (type === "boolean") return "teal-soft" as const;
+  return "blue-soft" as const; // numeric
 }
 
 function formatCount(n: number | null): string {
@@ -291,37 +309,6 @@ function relativeTime(timestampMs: number): string {
   flex: 1;
 }
 
-.qsc-overview__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.qsc-overview__head-text {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  min-width: 0;
-}
-
-.qsc-overview__title {
-  margin: 0;
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--color-text-primary, currentColor);
-}
-
-.qsc-overview__count {
-  font-size: 12px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.qsc-overview__filter {
-  min-width: 220px;
-  max-width: 320px;
-}
-
 .qsc-overview__loading {
   display: flex;
   flex-direction: column;
@@ -358,33 +345,11 @@ function relativeTime(timestampMs: number): string {
   color: var(--color-text-primary, currentColor);
 }
 
-.qsc-type {
-  display: inline-flex;
-  align-items: center;
-  padding: 0 3px;
-  border-radius: 2px;
-  font-family: inherit;
-  font-weight: 700;
-  font-size: 9px;
-  line-height: 14px;
-  letter-spacing: 0.02em;
-  background: color-mix(in srgb, #6b76e3 14%, transparent);
-  color: #4f5bcf;
-}
-
-.qsc-type--numeric {
-  background: color-mix(in srgb, #6b76e3 14%, transparent);
-  color: #4f5bcf;
-}
-
-.qsc-type--categorical {
-  background: color-mix(in srgb, #9333ea 14%, transparent);
-  color: #7c3aed;
-}
-
-.qsc-type--boolean {
-  background: color-mix(in srgb, #16a34a 14%, transparent);
-  color: #15803d;
+/* De-emphasize the name of configs that have no scores in the selected
+ * window. The row stays at full opacity (so counts/coverage stay readable);
+ * only the name recedes to flag the inactive scorer. */
+.qsc-name--no-data {
+  opacity: 0.55;
 }
 
 .qsc-mono {
@@ -449,13 +414,4 @@ function relativeTime(timestampMs: number): string {
 .qsc-spark--warn { color: var(--o2-status-warning-text, #b25400); }
 .qsc-spark--noThreshold { color: var(--color-text-secondary, var(--o2-text-secondary)); }
 .qsc-spark--noData { color: var(--color-text-secondary, var(--o2-text-secondary)); opacity: 0.55; }
-
-/* Dim no-data rows so active scorers stand out. `:deep` because OTable
- * renders the <tr> outside this component's scope. */
-:deep(tr.qsc-row--no-data) {
-  opacity: 0.6;
-}
-:deep(tr.qsc-row--no-data:hover) {
-  opacity: 0.85;
-}
 </style>

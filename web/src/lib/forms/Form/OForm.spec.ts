@@ -1,10 +1,11 @@
 // Copyright 2026 OpenObserve Inc.
 
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { h } from "vue";
 import OForm from "./OForm.vue";
 import OFormInput from "../Input/OFormInput.vue";
+import { z } from "zod";
 
 describe("OForm", () => {
   let wrapper: VueWrapper;
@@ -37,20 +38,18 @@ describe("OForm", () => {
   });
 
   describe("q-form compatibility ref methods", () => {
-    function mountWithRequiredField(initial = "") {
+    function mountWithRequiredField(
+      initial = "",
+      onSubmit?: (_v: unknown) => unknown,
+    ) {
       return mount(OForm, {
-        props: { defaultValues: { name: initial } },
+        props: {
+          defaultValues: { name: initial },
+          schema: z.object({ name: z.string().trim().min(1, "Required") }),
+          ...(onSubmit ? { onSubmit } : {}),
+        },
         slots: {
-          default: () =>
-            h(OFormInput, {
-              name: "name",
-              validators: [
-                (v: unknown) =>
-                  !v || (typeof v === "string" && !v.trim())
-                    ? "Required"
-                    : undefined,
-              ],
-            }),
+          default: () => h(OFormInput, { name: "name" }),
         },
         global: { components: { OFormInput } },
       });
@@ -70,29 +69,37 @@ describe("OForm", () => {
         .toBe("function");
     });
 
-    it("validate() returns false when a field is invalid", async () => {
+    // Schema-only: the form schema (not per-field validators) gates submit.
+    // `validate()` deliberately does NOT run a form-level schema, so validity is
+    // checked via the real submit path (handleSubmit → form.state.isValid).
+    it("schema marks the form invalid on submit when a required field is empty", async () => {
       wrapper = mountWithRequiredField("");
-      const vm = wrapper.vm as unknown as { validate: () => Promise<boolean> };
-      const result = await vm.validate();
-      expect(result).toBe(false);
+      const vm = wrapper.vm as unknown as {
+        form: { handleSubmit: () => Promise<unknown>; state: { isValid: boolean } };
+      };
+      await vm.form.handleSubmit();
+      await flushPromises();
+      expect(vm.form.state.isValid).toBe(false);
     });
 
-    it("validate() returns true when all fields pass", async () => {
+    it("schema passes on submit when the required field is filled", async () => {
       wrapper = mountWithRequiredField("Alice");
-      const vm = wrapper.vm as unknown as { validate: () => Promise<boolean> };
-      const result = await vm.validate();
-      expect(result).toBe(true);
+      const vm = wrapper.vm as unknown as {
+        form: { handleSubmit: () => Promise<unknown>; state: { isValid: boolean } };
+      };
+      await vm.form.handleSubmit();
+      await flushPromises();
+      expect(vm.form.state.isValid).toBe(true);
     });
 
     it("resetValidation() clears displayed errors", async () => {
       wrapper = mountWithRequiredField("");
       const vm = wrapper.vm as unknown as {
-        validate: () => Promise<boolean>;
+        form: { handleSubmit: () => Promise<unknown> };
         resetValidation: () => void;
       };
-      // Force the field to be touched so the error renders.
-      await wrapper.find("input").trigger("blur");
-      await vm.validate();
+      // First submit reveals the schema error (submit-then-change model).
+      await vm.form.handleSubmit();
       await flushPromises();
       expect(wrapper.text()).toContain("Required");
       vm.resetValidation();
@@ -100,12 +107,18 @@ describe("OForm", () => {
       expect(wrapper.text()).not.toContain("Required");
     });
 
-    it("submit() triggers the @submit event", async () => {
-      wrapper = mountWithRequiredField("Alice");
-      const vm = wrapper.vm as unknown as { submit: () => void };
-      vm.submit();
+    it("submitting calls the awaited onSubmit handler when valid", async () => {
+      const onSubmit = vi.fn();
+      wrapper = mountWithRequiredField("Alice", onSubmit);
+      // Drive the awaited form.handleSubmit() — the exposed submit() is
+      // fire-and-forget, so awaiting the chain here keeps the test deterministic.
+      const vm = wrapper.vm as unknown as {
+        form: { handleSubmit: () => Promise<unknown> };
+      };
+      await vm.form.handleSubmit();
       await flushPromises();
-      expect(wrapper.emitted("submit")).toBeTruthy();
+      expect(onSubmit).toHaveBeenCalledTimes(1);
+      expect(onSubmit).toHaveBeenCalledWith({ name: "Alice" });
     });
 
     it("reset() emits the reset event", async () => {

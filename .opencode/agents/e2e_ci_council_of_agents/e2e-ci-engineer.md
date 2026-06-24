@@ -50,6 +50,19 @@ selectors in the spec), exactly as for new specs. Preserve `mode: 'parallel'` �
 file to serial. If the existing file is somehow `serial`, leave its mode as-is but keep your
 added test independent.
 
+### Honour each scenario's `Wiring:` marker (from the test plan)
+The Architect tags every scenario WIRED or UNWIRED (from the Analyst's reachability trace):
+- **WIRED** → write a normal, real test that exercises the **named working path** (the one that sets
+  the gating state). It should pass.
+- **UNWIRED (feature-incomplete)** → write the test as **`test.fixme('<name> — not wired: <evidence file:line>')`**
+  with the **real assertion body kept intact** (so it goes green when the feature is finished). Do NOT
+  weaken it, invert it, or turn it into a tautology, and do NOT write a passing test that asserts the
+  feature is absent. A `fixme` with evidence is the honest representation of a gap.
+
+This is the balance: green tests for what works + honest `fixme`s for what doesn't, in ONE spec — so a
+PR opens with real coverage instead of being blocked, and the Healer never has to discover gaps later.
+Only when **every** scenario is UNWIRED is the feature genuinely incomplete (no PR; the plan says so).
+
 > **Minimal-diff rule for append/extend:** the goal is the smallest possible change to the
 > existing file — a reviewer should see only the added/changed test, nothing else.
 
@@ -102,6 +115,18 @@ test.describe("<feature_title> testcases", () => {
 - **Reuse** existing page objects in `tests/ui-testing/pages/`. Only add new methods when none
   fit, and add them to the **existing** page file for that area. Define new locators at the
   **top** of the page file.
+- **No dead scaffolding** — add ONLY page-object methods the spec actually calls. Do not emit
+  speculative `expectXVisible()` helpers "for completeness" if no test uses them; they're noise
+  for human reviewers and rot. Every method you add must be called by at least one test.
+- **Assertions must be real and match the test name.** No tautologies (`toBeGreaterThanOrEqual(0)`
+  on a count, `toBeTruthy()` on always-true). Don't bury the only assertion inside an `if` whose
+  `else` just logs — the test must assert unconditionally. If the test name promises a behaviour
+  (e.g. "fix-query card appears"), assert exactly that.
+- **Never wrap an assertion in a `try/catch` that swallows the failure.** A `catch` that logs and
+  `return`s (or just continues) makes the test **pass even when the assertion failed** — a silent
+  escape hatch. Let assertions throw. If you must `try/catch` for genuine optional/cleanup steps,
+  keep the real `expect(...)` **outside** the `try`, or `throw` in the `catch`. (A deterministic gate
+  rejects assertion-in-try with a swallowing catch.)
   ```javascript
   this.newButton = '[data-test="feature-new-btn"]';
   async clickNewButton() { await this.page.locator(this.newButton).click(); }
@@ -191,7 +216,9 @@ Sentinel's bar so the audit passes on attempt 1.
 **WARNINGS — avoid these too (Sentinel reports them):**
 - Locators must be declared at the **top** of each page-object file (as properties), not inline.
 - No brittle selectors (xpath, `nth-child`, framework-generated classes).
-- ≤3 `waitForTimeout` per test — prefer `waitForLoadState`/`toBeVisible`.
+- **Do not use `waitForTimeout(<n>)` to synchronize** — it's flaky by construction. Wait on the
+  thing you care about with auto-retrying `await expect(...).toBeVisible()` / `waitForLoadState`.
+  A fixed sleep is acceptable only for a rare deliberate settle, never as the primary wait.
 - Use `PageManager` (`pm.…`) for all interactions; reuse existing page objects.
 - If a test creates data, add cleanup in `tests/ui-testing/playwright-tests/cleanup.spec.js`.
 

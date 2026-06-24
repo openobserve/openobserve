@@ -686,6 +686,7 @@ const isOpen = computed(() =>
   listboxModeEnabled.value ? popoverOpen.value : selectOpen.value,
 );
 
+
 // When this OSelect is nested inside an ODropdown, signal its
 // open/close so the parent ignores the pointer event that closes us.
 const parentDropdownRegistry = inject<{ open: () => () => void } | null>(
@@ -885,7 +886,7 @@ const fieldWidthClass = computed(() => {
         disabled && 'o-input-label--disabled',
       ]"
     >
-      {{ label }}
+      {{ label }}<span v-if="required" aria-hidden="true" class="tw:select-none">*</span>
       <OIcon
         v-if="$slots.tooltip"
         name="info-outline"
@@ -928,9 +929,9 @@ const fieldWidthClass = computed(() => {
               'tw:bg-select-bg',
               hasError
                 ? 'tw:border-select-border-error'
-                : 'tw:border-select-border tw:hover:border-select-border-hover',
-              /* Single-border focus — no outer ring. See OInput.vue. */
-              'tw:focus:outline-none tw:focus:border-select-border-focus',
+                : 'tw:border-select-border tw:hover:border-select-border-hover tw:focus:border-select-border-focus',
+              /* Keep the red error border on focus; focus border color applies only when there's no error. */
+              'tw:focus:outline-none',
               'tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150',
               'tw:disabled:bg-select-disabled-bg tw:disabled:cursor-not-allowed tw:disabled:border-dashed',
               labelPosition === 'inside' && label
@@ -945,7 +946,7 @@ const fieldWidthClass = computed(() => {
             <span
               v-if="label && labelPosition === 'inside'"
               class="tw:text-[0.625rem] tw:leading-none tw:whitespace-nowrap tw:text-start tw:text-select-placeholder tw:select-none tw:pointer-events-none tw:ps-3 tw:pe-7"
-              >{{ label }}</span
+              >{{ label }}<span v-if="required" aria-hidden="true">&nbsp;*</span></span
             >
 
             <!-- Content row: flex-row for inside-label; display:contents (transparent) for normal mode -->
@@ -1454,9 +1455,9 @@ const fieldWidthClass = computed(() => {
             'tw:bg-select-bg',
             hasError
               ? 'tw:border-select-border-error'
-              : 'tw:border-select-border tw:hover:border-select-border-hover',
-            /* Single-border focus — no outer ring. See OInput.vue. */
-            'tw:focus:outline-none tw:focus:border-select-border-focus',
+              : 'tw:border-select-border tw:hover:border-select-border-hover tw:focus:border-select-border-focus',
+            /* Keep the red error border on focus; focus border color applies only when there's no error. */
+            'tw:focus:outline-none',
             'tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150',
             'tw:data-disabled:bg-select-disabled-bg tw:data-disabled:cursor-not-allowed tw:data-disabled:border-dashed',
             labelPosition === 'inside' && label
@@ -1471,7 +1472,7 @@ const fieldWidthClass = computed(() => {
           <span
             v-if="label && labelPosition === 'inside'"
             class="tw:text-[0.625rem] tw:leading-none tw:whitespace-nowrap tw:text-start tw:text-select-placeholder tw:select-none tw:pointer-events-none tw:ps-3 tw:pe-7"
-            >{{ label }}</span
+            >{{ label }}<span v-if="required" aria-hidden="true">&nbsp;*</span></span
           >
 
           <!-- Content row: flex-row for inside-label; display:contents for normal mode -->

@@ -787,7 +787,9 @@ export default defineComponent({
     const schemaList = ref([]);
     const streams: any = ref({});
     const isFetchingStreams = ref(false);
-    const loading = ref(false);
+    // Start in the loading state so the table shows the skeleton on first
+    // render instead of briefly flashing the empty state before the fetch.
+    const loading = ref(true);
     const isSubmitting = ref(false);
 
     // Compact toolbar: icon-only buttons when AI sidebar is open at narrow widths
@@ -932,10 +934,13 @@ export default defineComponent({
     // Show anomaly detection only when the backend is an enterprise or cloud build.
     // The frontend build flag alone is not sufficient — an enterprise UI can be
     // pointed at an OSS backend which does not have the feature.
+    // The backend can also disable it at runtime via O2_ANOMALY_DETECTION_DISABLED,
+    // surfaced as anomaly_detection_enabled in the config API response.
     const isAnomalyDetectionEnabled = computed(
       () =>
         store.state.zoConfig.build_type !== "opensource" &&
-        config.isEnterprise === "true",
+        config.isEnterprise === "true" &&
+        store.state.zoConfig.anomaly_detection_enabled === true,
     );
 
     // Initialize activeTab from URL query parameter, default to "all".
@@ -997,7 +1002,7 @@ export default defineComponent({
           sortable: true,
           hideable: true,
           size: 280,
-          minSize: 160,
+          minSize: 320,
           // Flex: fills the leftover width on load, freezes on first resize.
           meta: { align: "left", flex: true },
         },
@@ -1009,7 +1014,7 @@ export default defineComponent({
           sortable: true,
           resizable: true,
           hideable: true,
-          size: COL.owner,
+          size: 120,
           meta: { align: "left" },
         },
         // "period" (Look back window) — all tabs except realTime
@@ -1052,7 +1057,7 @@ export default defineComponent({
           sortable: true,
           resizable: true,
           hideable: true,
-          size: COL.date,
+          size: 160,
           meta: { align: "left" },
         },
         {
@@ -1063,7 +1068,7 @@ export default defineComponent({
           sortable: true,
           resizable: true,
           hideable: true,
-          size: COL.date,
+          size: 160,
           meta: { align: "left" },
         },
         // Anomaly Detection columns — shown on anomalyDetection and all tabs
@@ -1077,7 +1082,7 @@ export default defineComponent({
                 sortable: true,
                 resizable: true,
                 hideable: true,
-                size: COL.date,
+                size: 160,
                 meta: { align: "left" },
               } as OTableColumnDef,
               {
@@ -1224,6 +1229,10 @@ export default defineComponent({
           // we are not fetching the alerts again, we are just assigning the alerts to the filteredResults
           allAlerts.value =
             store.state.organizationData.allAlertsListByFolderId[folderId];
+          // Data is served synchronously from cache — clear the loading flag
+          // (it starts true to avoid the empty-state flash) so the table renders
+          // the cached rows instead of staying stuck on the skeleton.
+          loading.value = false;
         }
       } catch (error) {
         throw error;
@@ -1492,6 +1501,9 @@ export default defineComponent({
         allSelectedAlerts.value = false;
 
         if (newVal == router.currentRoute.value.query.folder) {
+          // Not refetching here — clear the initial loading flag so the table
+          // doesn't stay stuck on the skeleton.
+          loading.value = false;
           return;
         }
         if (searchAcrossFolders.value) {

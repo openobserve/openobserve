@@ -771,7 +771,7 @@
     "docs": "Docs",
     "billings": "Billing",
     "rum": "RUM",
-    "settings": "Management",
+    "settings": "Settings",
     "iam": "IAM",
     "report": "Reports",
     "pipeline": "Pipelines",
@@ -2009,6 +2009,7 @@
     "bottom": "Bottom",
     "default": "Default",
     "numbers": "Numbers",
+    "localeFormat": "Locale Format",
     "bytes": "Bytes",
     "kilobytes": "Kilobytes (KB)",
     "megabytes": "Megabytes (MB)",
@@ -2423,6 +2424,11 @@
     "services": "Services",
     "recentEvents": "Recent Events",
     "investigate": "Investigate →",
+    "viewAll": "View all",
+    "showingOf": "Showing {shown} of {total}",
+    "colErrorRate": "Error rate",
+    "colLatency": "Latency",
+    "colReqs": "Reqs",
     "untitledIncident": "Untitled Incident",
     "viewLatencyCharts": "View latency & RED charts",
     "elevatedErrorRate": "Elevated error rate",
@@ -2838,7 +2844,7 @@
     "createdBy": "Created By",
     "createdAt": "Created At",
     "lastRunAt": "Last Run At",
-    "lastSuccessfulAt": "Last Successfull At",
+    "lastSuccessfulAt": "Last Successful At",
     "status": "Status",
     "numOfEvents": "Number of Events",
     "view": "View",
@@ -3356,7 +3362,7 @@
     "addToDashboard": "Add to Dashboard"
   },
   "settings": {
-    "header": "Management",
+    "header": "Settings",
     "alertCorrelation": "Alert Deduplication",
     "correlationSettings": "Correlation Settings",
     "userKeyLabel": "User Key",
@@ -3771,6 +3777,9 @@
       "title": "No traces found",
       "descNoFilters": "No traces were found in {range}. Try widening the time range to load results.",
       "descWithFilters": "Nothing matched <strong>this query</strong> in the selected window. Try widening the time range or removing a filter.",
+      "descOutOfRange": "Your time window doesn't contain any data from this stream. Jump to when data was last seen.",
+      "descDataAtBoundary": "The stream has data in this window but no traces matched. Try widening the time range.",
+      "jumpToData": "Jump to latest data",
       "expandRange": "Expand the time range",
       "expandRangeDescAbsolute": "Switch to a wider relative time range",
       "removeFilter": "Remove a filter",
@@ -3867,6 +3876,7 @@
       "multiStepAgent": "Multi-step Agent"
     },
     "sessionsList": {
+      "streamLabel": "Stream",
       "noStreamsTooltip": "No LLM streams available.",
       "session": "session",
       "sessions": "sessions",
@@ -4161,7 +4171,9 @@
     "import_this_pattern": "Import This Pattern",
     "patterns_loaded": "Loaded {count} pattern(s)",
     "failed_to_load": "Failed to load patterns",
-    "no_patterns_selected": "Please select at least one pattern"
+    "no_patterns_selected": "Please select at least one pattern",
+    "name_required": "* Name is required",
+    "pattern_required": "* Pattern is required"
   },
   "search_history": {
     "title": "Search History",
@@ -4654,6 +4666,10 @@
       "detail": {
         "loading": "Loading per-config breakdown…",
         "noData": "No scores yet for this config in this window.",
+        "empty": {
+          "title": "Waiting for your first scores",
+          "description": "No scores have landed for this config in the selected time range. They'll appear here automatically once a scorer using it runs."
+        },
         "drillTitle": "Drill to traces",
         "splitByScorer": "Split by scorer",
         "splitBySourceType": "Split by source_type",

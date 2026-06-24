@@ -115,8 +115,9 @@ export class DashboardsFormValidationPage {
         this.annotationTitleError   = '[data-test="dashboard-add-annotation-title-input-error"]';
         this.annotationTextField    = '[data-test="dashboard-add-annotation-text-input-field"]';
         this.annotationPanelsPopover = '[data-test="dashboard-add-annotation-panels-select-popover"]';
-        this.annotationCancelBtn    = '[data-test="dashboard-add-annotation-cancel-btn"]';
-        this.annotationSaveBtn      = '[data-test="dashboard-add-annotation-save-btn"]';
+        // Save/Cancel now use ODialog's built-in footer buttons (scoped to this dialog).
+        this.annotationCancelBtn    = '[data-test="add-annotation-dialog"] [data-test="o-dialog-secondary-btn"]';
+        this.annotationSaveBtn      = '[data-test="add-annotation-dialog"] [data-test="o-dialog-primary-btn"]';
 
         // ── GeneralSettings dialog ────────────────────────────────────────────
         this.generalSettingNameField     = '[data-test="dashboard-general-setting-name-field"]';

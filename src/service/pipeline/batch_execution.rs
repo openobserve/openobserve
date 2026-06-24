@@ -18,6 +18,7 @@ use std::hash::{Hash, Hasher};
 use std::{
     collections::{HashMap, HashSet},
     sync::LazyLock as Lazy,
+    time::{Duration, Instant},
 };
 
 use anyhow::{Result, anyhow};
@@ -30,6 +31,7 @@ use config::{
         self_reporting::error::{ErrorData, ErrorSource, PipelineError},
         stream::{StreamParams, StreamType},
     },
+    metrics,
     stats::MemorySize,
     utils::{
         flatten,
@@ -41,12 +43,9 @@ use futures::future::try_join_all;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::pipeline::pipeline_wal_writer::get_pipeline_wal_writer;
 use proto::cluster_rpc;
-use tokio::sync::mpsc::{Receiver, Sender, channel};
 #[cfg(feature = "enterprise")]
-use tokio::{
-    sync::Mutex,
-    time::{Duration, Instant},
-};
+use tokio::sync::Mutex;
+use tokio::sync::mpsc::{Receiver, Sender, channel};
 
 use crate::{
     common::{infra::config::QUERY_FUNCTIONS, utils::js::JSRuntimeConfig},
@@ -321,12 +320,19 @@ impl ExecutablePipeline {
         let pipeline_name = self.name.clone();
         // Unique invocation ID to correlate logs across concurrent pipeline runs
         let inv_id = &format!("{:08x}", rand::random::<u32>());
-        log::info!("[Pipeline] {pipeline_name} [inv={inv_id}]: process batch of size {batch_size}");
+        // Gated detailed timing logs (ZO_PRINT_KEY_EVENT). Per-batch / per-node only,
+        // never per-record, to stay safe under high ingestion rate.
+        let print_event = config::get_config().common.print_key_event;
+        let batch_start = Instant::now();
+        log::debug!(
+            "[Pipeline] {pipeline_name} [inv={inv_id}]: process batch of size {batch_size}"
+        );
         if batch_size == 0 {
             return Ok(HashMap::default());
         }
 
-        // Report pipeline ingestion
+        // Source size of the batch (MB). Computed before records are consumed by the
+        // pipeline. Usage is reported at the end with the real pipeline response time.
         let source_stream_params = self.get_source_stream_params();
         let source_size: f64 = records
             .iter()
@@ -334,24 +340,15 @@ impl ExecutablePipeline {
             .sum::<f64>()
             / config::SIZE_IN_MB;
 
-        if source_size > 0.0 {
-            let req_stats = config::meta::self_reporting::usage::RequestStats {
-                size: source_size,
-                records: batch_size as i64,
-                response_time: 0.0,
-                ..config::meta::self_reporting::usage::RequestStats::default()
-            };
-
-            crate::service::self_reporting::report_request_usage_stats(
-                req_stats,
-                org_id,
-                &self.id,
-                source_stream_params.stream_type,
-                config::meta::self_reporting::usage::UsageType::Pipeline,
-                0, // No functions for source stream ingestion
-                chrono::Utc::now().timestamp_micros(),
-            )
-            .await;
+        if print_event {
+            log::info!(
+                "[Pipeline:Timing] [inv={inv_id}] start id={} name={} org={org_id} stream={:?} batch_size={batch_size} source_size_mb={source_size:.4} num_nodes={} num_funcs={}",
+                self.id,
+                pipeline_name,
+                stream_name,
+                self.sorted_nodes.len(),
+                self.num_of_func(),
+            );
         }
 
         // result_channel
@@ -389,11 +386,13 @@ impl ExecutablePipeline {
                 self.function_map.get(node_id).cloned();
             let pipeline_name = pipeline_name.clone();
             let stream_name = stream_name.clone();
+            let inv_id_cp = inv_id.to_string();
 
             // WARN: Do not change. Processing node can only be done in a task, as the internals of
             // remote wal writer depends on the task id.
             let source_stream_type = source_stream_params.stream_type;
             // For LLM eval nodes, resolve the destination stream params from child leaf node
+            // TODO: check if this is actually used, or no longer needed
             let _leaf_dest_stream = if matches!(&node.node_data, NodeData::LlmEvaluation(_)) {
                 node.children.iter().find_map(|child_id| {
                     self.node_map.get(child_id).and_then(|child_node| {
@@ -407,29 +406,35 @@ impl ExecutablePipeline {
             } else {
                 None
             };
-            let task = tokio::spawn(process_node(
-                pl_id_cp,
-                idx,
-                org_id_cp,
-                node,
-                node_receiver,
-                child_senders,
-                function_runtime,
-                result_sender_cp,
-                error_sender_cp,
+            let metadata = ProcessMetadata {
+                pipeline_id: pl_id_cp,
+                node_idx: idx,
+                org_id: org_id_cp,
                 pipeline_name,
                 stream_name,
                 source_stream_type,
-                _leaf_dest_stream,
-            ));
+                inv_id: inv_id_cp,
+                print_event,
+                leaf_dest_stream: _leaf_dest_stream,
+            };
+            let channels = ProcessChannels {
+                receiver: node_receiver,
+                child_senders,
+                result_sender: result_sender_cp,
+                error_sender: error_sender_cp,
+            };
+            let task = tokio::spawn(process_node(metadata, node, function_runtime, channels));
             node_tasks.push(task);
         }
+        // Measure node task duration from when they were spawned (they start running
+        // immediately), not from when we await them below.
+        let node_tasks_start = Instant::now();
 
         // task to collect results
         let pl_name_for_results = pipeline_name.clone();
         let inv_id_for_results = inv_id.clone();
         let result_task = tokio::spawn(async move {
-            log::info!(
+            log::debug!(
                 "[Pipeline] {pl_name_for_results} [inv={inv_id_for_results}]: starts result collecting job"
             );
             let mut results = HashMap::new();
@@ -453,14 +458,15 @@ impl ExecutablePipeline {
 
         // task to collect errors
         let mut pipeline_error = PipelineError::new(&self.id, &self.name);
+        let inv_id_for_errors = inv_id.clone();
         let error_task = tokio::spawn(async move {
-            log::debug!("[Pipeline]: starts error collecting job");
+            log::debug!("[Pipeline] [inv={inv_id_for_errors}]: starts error collecting job");
             let mut count = 0;
             while let Some((node_id, node_type, error, fn_name)) = error_receiver.recv().await {
                 pipeline_error.add_node_error(node_id, node_type, error, fn_name);
                 count += 1;
             }
-            log::debug!("[Pipeline]: collected {count} errors");
+            log::debug!("[Pipeline] [inv={inv_id_for_errors}]: collected {count} errors");
             if count > 0 {
                 Some(pipeline_error)
             } else {
@@ -482,7 +488,7 @@ impl ExecutablePipeline {
             };
             if let Err(send_err) = source_sender.send(pipeline_item).await {
                 log::error!(
-                    "[Pipeline]: Error sending original records into source Node for {send_err}"
+                    "[Pipeline] {pipeline_name} [inv={inv_id}]: Error sending original records into source Node for {send_err}"
                 );
                 break;
             }
@@ -491,10 +497,12 @@ impl ExecutablePipeline {
         drop(result_sender);
         drop(error_sender);
         drop(node_senders);
-        log::debug!("[Pipeline]: All records send into pipeline for processing");
+        log::debug!(
+            "[Pipeline] {pipeline_name} [inv={inv_id}]: All records send into pipeline for processing"
+        );
 
         // Wait for all node tasks to complete
-        log::info!(
+        log::debug!(
             "[Pipeline] {pipeline_name} [inv={inv_id}]: waiting for all node tasks to complete"
         );
         if let Err(e) = try_join_all(node_tasks).await {
@@ -502,10 +510,12 @@ impl ExecutablePipeline {
                 "[Pipeline] {pipeline_name} [inv={inv_id}]: node processing jobs failed: {e}"
             );
         }
-        log::info!("[Pipeline] {pipeline_name} [inv={inv_id}]: all node tasks completed");
+        let node_tasks_ms = node_tasks_start.elapsed().as_millis();
+        log::debug!("[Pipeline] {pipeline_name} [inv={inv_id}]: all node tasks completed");
 
         // Publish errors if received any
-        log::info!("[Pipeline] {pipeline_name} [inv={inv_id}]: awaiting error task");
+        log::debug!("[Pipeline] {pipeline_name} [inv={inv_id}]: awaiting error task");
+        let error_task_start = Instant::now();
         if let Some(pipeline_errors) = error_task.await.map_err(|e| {
             log::error!(
                 "[Pipeline] {pipeline_name} [inv={inv_id}]: error collecting job failed: {e}"
@@ -513,8 +523,8 @@ impl ExecutablePipeline {
             anyhow!("[Pipeline] error collecting job failed: {}", e)
         })? {
             let stream_params = self.get_source_stream_params();
-            log::info!(
-                "[Pipeline] id: {}, name: {}, node_errors: {:?}",
+            log::error!(
+                "[Pipeline] [inv={inv_id}] id: {}, name: {}, node_errors: {:?}",
                 pipeline_errors.pipeline_id,
                 pipeline_errors.pipeline_name,
                 pipeline_errors.node_errors
@@ -524,21 +534,75 @@ impl ExecutablePipeline {
                 stream_params,
                 error_source: ErrorSource::Pipeline(pipeline_errors),
             };
-            log::debug!("[Pipeline]: execution errors occurred and published");
+            log::debug!(
+                "[Pipeline] {pipeline_name} [inv={inv_id}]: execution errors occurred and published"
+            );
             publish_error(error_data).await;
         }
+        let error_collect_ms = error_task_start.elapsed().as_millis();
 
-        log::info!("[Pipeline] {pipeline_name} [inv={inv_id}]: awaiting result collector");
+        log::debug!("[Pipeline] {pipeline_name} [inv={inv_id}]: awaiting result collector");
+        let result_task_start = Instant::now();
         let results = result_task.await.map_err(|e| {
             log::error!(
                 "[Pipeline] {pipeline_name} [inv={inv_id}]: result collecting job failed: {e}"
             );
             anyhow!("[Pipeline] result collecting job failed: {}", e)
         })?;
-        log::info!(
+        let result_collect_ms = result_task_start.elapsed().as_millis();
+        log::debug!(
             "[Pipeline] {pipeline_name} [inv={inv_id}]: result collector returned {} stream groups",
             results.len()
         );
+
+        // Histogram metrics (always on): realtime pipeline batch execution time (ms)
+        // and batch size, labeled by pipeline so latency can be attributed per pipeline.
+        let stream_type_label = source_stream_params.stream_type.as_str();
+        let elapsed_secs = batch_start.elapsed().as_secs_f64();
+        metrics::PIPELINE_EXEC_TIME_MS
+            .with_label_values(&[org_id, &self.id, &pipeline_name, stream_type_label])
+            .observe(elapsed_secs * 1000.0);
+        metrics::PIPELINE_EXEC_BATCH_SIZE
+            .with_label_values(&[org_id, &self.id, &pipeline_name, stream_type_label])
+            .observe(batch_size as f64);
+
+        if print_event {
+            let total_ms = batch_start.elapsed().as_millis();
+            let out_records: usize = results.values().map(|v| v.len()).sum();
+            let secs = batch_start.elapsed().as_secs_f64();
+            let (records_per_sec, mb_per_sec) = if secs > 0.0 {
+                (batch_size as f64 / secs, source_size / secs)
+            } else {
+                (0.0, 0.0)
+            };
+            log::info!(
+                "[Pipeline:Timing] [inv={inv_id}] done id={} name={} batch_size={batch_size} source_size_mb={source_size:.4} out_records={out_records} total_ms={total_ms} node_tasks_ms={node_tasks_ms} result_collect_ms={result_collect_ms} error_collect_ms={error_collect_ms} records_per_sec={records_per_sec:.1} mb_per_sec={mb_per_sec:.4}",
+                self.id,
+                pipeline_name,
+            );
+        }
+
+        // Report pipeline ingestion usage LAST, with response_time set to the time
+        // spent by the pipeline processing this batch (seconds, f64).
+        if source_size > 0.0 {
+            let req_stats = config::meta::self_reporting::usage::RequestStats {
+                size: source_size,
+                records: batch_size as i64,
+                response_time: elapsed_secs,
+                ..config::meta::self_reporting::usage::RequestStats::default()
+            };
+
+            crate::service::self_reporting::report_request_usage_stats(
+                req_stats,
+                org_id,
+                &self.id,
+                source_stream_params.stream_type,
+                config::meta::self_reporting::usage::UsageType::Pipeline,
+                0, // No functions for source stream ingestion
+                chrono::Utc::now().timestamp_micros(),
+            )
+            .await;
+        }
 
         // Cross-type leaf nodes ingest directly via ingestion_service inside process_node,
         // so results here only contain same-type records for the caller to handle.
@@ -590,6 +654,20 @@ impl ExecutablePipeline {
 impl ExecutableNode {
     pub fn node_type(&self) -> String {
         self.to_string()
+    }
+
+    /// Human-readable label for timing logs, e.g. "function:my_vrl_fn" or
+    /// "stream:logs:default", so node latencies can be told apart in pipelines
+    /// with many nodes.
+    fn timing_label(&self) -> String {
+        match &self.node_data {
+            NodeData::Function(p) => format!("function:{}", p.name),
+            NodeData::Stream(p) => format!("stream:{}:{}", p.stream_type, p.stream_name),
+            NodeData::RemoteStream(p) => format!("remote_stream:{}", p.destination_name),
+            NodeData::Condition(_) => "condition".to_string(),
+            NodeData::Query(_) => "query".to_string(),
+            NodeData::LlmEvaluation(p) => format!("llm_evaluation:{}", p.name),
+        }
     }
 }
 
@@ -644,871 +722,1103 @@ struct PipelineItem {
     flattened: bool,
 }
 
-#[allow(clippy::too_many_arguments)]
-async fn process_node(
+#[derive(Clone)]
+#[allow(unused)]
+struct ProcessMetadata {
     pipeline_id: String,
     node_idx: usize,
     org_id: String,
-    node: ExecutableNode,
-    mut receiver: Receiver<PipelineItem>,
-    mut child_senders: Vec<Sender<PipelineItem>>,
-    function_runtime: Option<CompiledFunctionRuntime>,
-    result_sender: Option<Sender<(usize, StreamParams, Value)>>,
-    error_sender: Sender<(String, String, String, Option<String>)>,
     pipeline_name: String,
     stream_name: Option<String>,
     source_stream_type: StreamType,
-    _leaf_dest_stream: Option<StreamParams>,
+    inv_id: String,
+    print_event: bool,
+    leaf_dest_stream: Option<StreamParams>,
+}
+
+struct ProcessChannels {
+    receiver: Receiver<PipelineItem>,
+    child_senders: Vec<Sender<PipelineItem>>,
+    result_sender: Option<Sender<(usize, StreamParams, Value)>>,
+    error_sender: Sender<(String, String, String, Option<String>)>,
+}
+
+async fn process_node(
+    metadata: ProcessMetadata,
+    node: ExecutableNode,
+    function_runtime: Option<CompiledFunctionRuntime>,
+    mut channels: ProcessChannels,
 ) -> Result<()> {
-    let cfg = config::get_config();
-    let mut count: usize = 0;
-    match &node.node_data {
+    let pl_name = metadata.pipeline_name.clone();
+    let node_idx = metadata.node_idx;
+    let inv_id = metadata.inv_id.clone();
+    let print_event = metadata.print_event;
+
+    // Per-node timing (gated by ZO_PRINT_KEY_EVENT). Aggregated per batch, never
+    // per-record. `node_label` distinguishes nodes (e.g. the VRL fn name) so node
+    // latencies can be told apart in pipelines with many nodes.
+    let node_label = node.timing_label();
+    let node_type = node.node_type();
+    let node_start = Instant::now();
+    // wall time spent doing CPU work inside this node's loop (flatten + fn/eval),
+    // excluding time blocked on `recv().await` from upstream.
+    let mut busy = Duration::ZERO;
+
+    let count = match &node.node_data {
         NodeData::Stream(stream_params) => {
-            if node.children.is_empty() {
-                log::info!(
-                    "[Pipeline] {pipeline_name} : Leaf node {node_idx} starts processing (stream={}:{})",
-                    stream_params.stream_type,
-                    stream_params.stream_name,
-                );
-                // leaf node: `result_sender` guaranteed to be Some()
-                let result_sender = result_sender.unwrap();
-                let is_cross_type = stream_params.stream_type != source_stream_type;
-                // For cross-type destinations, collect records to ingest directly
-                let mut cross_type_records: Vec<Value> = Vec::new();
-
-                while let Some(pipeline_item) = receiver.recv().await {
-                    let PipelineItem {
-                        idx,
-                        mut record,
-                        flattened,
-                    } = pipeline_item;
-                    if !flattened && !record.is_null() && record.is_object() {
-                        record = match flatten::flatten_with_level(
-                            record,
-                            cfg.limit.ingest_flatten_level,
-                        ) {
-                            Ok(flattened) => flattened,
-                            Err(e) => {
-                                let err_msg = format!("LeafNode error with flattening: {e}");
-                                if let Err(send_err) = error_sender
-                                    .send((node.id.to_string(), node.node_type(), err_msg, None))
-                                    .await
-                                {
-                                    log::error!(
-                                        "[Pipeline] {pipeline_name} : LeafNode failed sending errors for collection caused by: {send_err}"
-                                    );
-                                    break;
-                                }
-                                continue;
-                            }
-                        };
-                    }
-
-                    let mut destination_stream = stream_params.clone();
-                    if destination_stream.stream_name.contains("{") {
-                        match resolve_stream_name(&destination_stream.stream_name, &record) {
-                            Ok(stream_name) if !stream_name.is_empty() => {
-                                destination_stream.stream_name =
-                                    if cfg.common.skip_formatting_stream_name {
-                                        stream_name.into()
-                                    } else {
-                                        format_stream_name(stream_name).into()
-                                    }
-                            }
-                            resolve_res => {
-                                let err_msg = if let Err(e) = resolve_res {
-                                    format!(
-                                        "Dynamic stream name detected in destination, but failed to resolve due to {e}. Record dropped"
-                                    )
-                                } else {
-                                    "Dynamic Stream Name resolved to empty. Record dropped"
-                                        .to_string()
-                                };
-                                log::warn!("{err_msg}");
-                                if let Err(send_err) = error_sender
-                                    .send((node.id.to_string(), node.node_type(), err_msg, None))
-                                    .await
-                                {
-                                    log::error!(
-                                        "[Pipeline] {pipeline_name} : LeafNode failed sending errors for collection caused by: {send_err}"
-                                    );
-                                    break;
-                                }
-                                continue;
-                            }
-                        }
-                    }
-
-                    if is_cross_type {
-                        // Cross-type: collect for direct ingestion
-                        cross_type_records.push(record);
-                    } else {
-                        // Same-type: send via result_sender for caller to handle
-                        if let Err(send_err) =
-                            result_sender.send((idx, destination_stream, record)).await
-                        {
-                            log::error!(
-                                "[Pipeline] {pipeline_name} : LeafNode errors sending result for collection caused by: {send_err}"
-                            );
-                            break;
-                        }
-                    }
-                    count += 1;
-                }
-
-                // For cross-type destinations, spawn ingestion as background task
-                // so it doesn't block the primary pipeline path
-                if is_cross_type && !cross_type_records.is_empty() {
-                    let record_count = cross_type_records.len();
-                    let dest_stream_type = stream_params.stream_type.to_string();
-                    let dest_stream_name = stream_params.stream_name.to_string();
-                    let org = org_id.to_string();
-                    let pl_name = pipeline_name.clone();
-                    log::info!(
-                        "[Pipeline] {pl_name} : LeafNode {node_idx} spawning background ingestion for {record_count} cross-type records to {dest_stream_type}:{dest_stream_name}",
-                    );
-                    tokio::spawn(async move {
-                        let req = cluster_rpc::IngestionRequest {
-                            org_id: org,
-                            stream_name: dest_stream_name.clone(),
-                            stream_type: dest_stream_type.clone(),
-                            data: Some(cluster_rpc::IngestionData::from(cross_type_records)),
-                            ingestion_type: Some(cluster_rpc::IngestionType::Json.into()),
-                            metadata: None,
-                        };
-                        match crate::service::ingestion::ingestion_service::ingest(req).await {
-                            Ok(resp) if resp.status_code == 200 => {
-                                log::info!(
-                                    "[Pipeline] {pl_name} : cross-type ingestion successful to {dest_stream_type}:{dest_stream_name}, records: {record_count}",
-                                );
-                            }
-                            Ok(resp) => {
-                                log::error!(
-                                    "[Pipeline] {pl_name} : cross-type ingestion failed (status={}): {}",
-                                    resp.status_code,
-                                    resp.message,
-                                );
-                            }
-                            Err(e) => {
-                                log::error!(
-                                    "[Pipeline] {pl_name} : cross-type ingestion error: {e}"
-                                );
-                            }
-                        }
-                    });
-                }
-
-                log::info!(
-                    "[Pipeline] {pipeline_name} : LeafNode {node_idx} done processing {count} records (stream={}:{})",
-                    stream_params.stream_type,
-                    stream_params.stream_name
-                );
-            } else {
-                log::debug!("[Pipeline]: source node {node_idx} starts processing");
-                // source stream node: send received record to all its children
-                while let Some(item) = receiver.recv().await {
-                    send_to_children(&mut child_senders, item, "StreamNode").await;
-                    count += 1;
-                }
-                log::debug!(
-                    "[Pipeline] {pipeline_name} : source node {node_idx} done processing {count} records"
-                );
-            }
+            process_stream_node(stream_params, metadata, &node, channels, &mut busy).await
         }
         NodeData::Condition(condition_params) => {
-            log::info!("[Pipeline]: cond node {node_idx} starts processing");
-            let mut total_received: usize = 0;
-            while let Some(pipeline_item) = receiver.recv().await {
-                total_received += 1;
-                let PipelineItem {
-                    idx,
-                    mut record,
-                    mut flattened,
-                } = pipeline_item;
-                // value must be flattened before condition params can take effect
-                if !flattened && !record.is_null() && record.is_object() {
-                    record = match flatten::flatten_with_level(
-                        record,
-                        cfg.limit.ingest_flatten_level,
-                    ) {
-                        Ok(flattened) => flattened,
-                        Err(e) => {
-                            let err_msg = format!("ConditionNode error with flattening: {e}");
-                            if let Err(send_err) = error_sender
-                                .send((node.id.to_string(), node.node_type(), err_msg, None))
-                                .await
-                            {
-                                log::error!(
-                                    "[Pipeline] {pipeline_name} : ConditionNode failed sending errors for collection caused by: {send_err}"
-                                );
-                                break;
-                            }
-                            continue;
-                        }
-                    };
-                    flattened = true;
-                }
-
-                // Evaluate based on condition version
-                let passes = match condition_params {
-                    config::meta::pipeline::components::ConditionParams::V1 { conditions } => {
-                        // v1: Use tree-based ConditionList evaluation
-                        conditions.evaluate(record.as_object().unwrap()).await
-                    }
-                    config::meta::pipeline::components::ConditionParams::V2 { conditions } => {
-                        // v2: Use linear ConditionGroup evaluation
-                        conditions.evaluate(record.as_object().unwrap()).await
-                    }
-                };
-
-                // only send to children when passing all condition evaluations
-                if passes {
-                    send_to_children(
-                        &mut child_senders,
-                        PipelineItem {
-                            idx,
-                            record,
-                            flattened,
-                        },
-                        "ConditionNode",
-                    )
-                    .await;
-                    count += 1;
-                }
-            }
-            log::info!(
-                "[Pipeline]: cond node {node_idx} done: received={total_received}, passed={count} records"
-            );
+            process_condition_node(condition_params, metadata, &node, channels, &mut busy).await
         }
         NodeData::Function(func_params) => {
-            log::debug!("[Pipeline]: func node {node_idx} starts processing");
-            let mut vrl_runtime_state = crate::service::ingestion::init_functions_runtime();
-            let stream_name = stream_name.unwrap_or("pipeline".to_string());
-            let mut result_array_records = Vec::new();
-            while let Some(pipeline_item) = receiver.recv().await {
-                let PipelineItem {
-                    idx,
-                    mut record,
-                    mut flattened,
-                } = pipeline_item;
-                if let Some(runtime) = &function_runtime {
-                    // Handle flattening if required
-                    if func_params.after_flatten
-                        && !flattened
-                        && !record.is_null()
-                        && record.is_object()
-                    {
-                        record = match flatten::flatten_with_level(
-                            record,
-                            cfg.limit.ingest_flatten_level,
-                        ) {
-                            Ok(flattened) => flattened,
-                            Err(e) => {
-                                let err_msg = format!("FunctionNode error with flattening: {e}");
-                                let err_msg = err_msg.get(0..500).unwrap_or(&err_msg);
-                                if let Err(send_err) = error_sender
-                                    .send((
-                                        node.id.to_string(),
-                                        node.node_type(),
-                                        err_msg.to_owned(),
-                                        Some(func_params.name.to_owned()),
-                                    ))
-                                    .await
-                                {
-                                    log::error!(
-                                        "[Pipeline] {pipeline_name} : FunctionNode failed sending errors for collection caused by: {send_err}"
-                                    );
-                                    break;
-                                }
-                                continue;
-                            }
-                        };
-                    }
-
-                    // Match on function runtime type (VRL or JS)
-                    match runtime {
-                        CompiledFunctionRuntime::VRL(vrl_resolver, is_result_array) => {
-                            if !is_result_array {
-                                // Single record processing with VRL
-                                record = match apply_vrl_fn(
-                                    &mut vrl_runtime_state,
-                                    vrl_resolver,
-                                    record,
-                                    &org_id,
-                                    std::slice::from_ref(&stream_name),
-                                ) {
-                                    (res, None) => res,
-                                    (res, Some(error)) => {
-                                        let err_msg = format!(
-                                            "FunctionNode VRL error: {}",
-                                            error.get(0..500).unwrap_or(&error)
-                                        );
-                                        if let Err(send_err) = error_sender
-                                            .send((
-                                                node.id.to_string(),
-                                                node.node_type(),
-                                                err_msg.to_owned(),
-                                                Some(func_params.name.to_owned()),
-                                            ))
-                                            .await
-                                        {
-                                            log::error!(
-                                                "[Pipeline] {pipeline_name} : FunctionNode failed sending errors for collection caused by: {send_err}"
-                                            );
-                                            break;
-                                        }
-                                        res
-                                    }
-                                };
-                                flattened = false; // since apply_vrl_fn can produce unflattened data
-                                send_to_children(
-                                    &mut child_senders,
-                                    PipelineItem {
-                                        idx,
-                                        record,
-                                        flattened,
-                                    },
-                                    "FunctionNode",
-                                )
-                                .await;
-                            } else {
-                                // Result array mode - collect records
-                                result_array_records.push(record);
-                            }
-                        }
-                        CompiledFunctionRuntime::JS(js_config, is_result_array) => {
-                            if !is_result_array {
-                                // Single record processing with JS
-                                record = match apply_js_fn(
-                                    js_config,
-                                    record,
-                                    &org_id,
-                                    std::slice::from_ref(&stream_name),
-                                ) {
-                                    (res, None) => res,
-                                    (res, Some(error)) => {
-                                        let err_msg = format!(
-                                            "FunctionNode JS error: {}",
-                                            error.get(0..500).unwrap_or(&error)
-                                        );
-                                        if let Err(send_err) = error_sender
-                                            .send((
-                                                node.id.to_string(),
-                                                node.node_type(),
-                                                err_msg.to_owned(),
-                                                Some(func_params.name.to_owned()),
-                                            ))
-                                            .await
-                                        {
-                                            log::error!(
-                                                "[Pipeline] {pipeline_name} : FunctionNode failed sending errors for collection caused by: {send_err}"
-                                            );
-                                            break;
-                                        }
-                                        res
-                                    }
-                                };
-                                flattened = false; // since JS functions can produce unflattened data
-                                send_to_children(
-                                    &mut child_senders,
-                                    PipelineItem {
-                                        idx,
-                                        record,
-                                        flattened,
-                                    },
-                                    "FunctionNode",
-                                )
-                                .await;
-                            } else {
-                                // Result array mode - collect records
-                                result_array_records.push(record);
-                            }
-                        }
-                    }
-                }
-                count += 1;
-            }
-
-            // Process result array records if any were collected
-            if !result_array_records.is_empty()
-                && let Some(runtime) = &function_runtime
-            {
-                match runtime {
-                    CompiledFunctionRuntime::VRL(vrl_resolver, true) => {
-                        // VRL result array processing
-                        let result = match apply_vrl_fn(
-                            &mut vrl_runtime_state,
-                            vrl_resolver,
-                            json::Value::Array(result_array_records),
-                            &org_id,
-                            std::slice::from_ref(&stream_name),
-                        ) {
-                            (res, None) => res,
-                            (res, Some(error)) => {
-                                let err_msg = format!(
-                                    "FunctionNode VRL result array error: {}",
-                                    error.get(0..500).unwrap_or(&error)
-                                );
-                                if let Err(send_err) = error_sender
-                                    .send((
-                                        node.id.to_string(),
-                                        node.node_type(),
-                                        err_msg.to_owned(),
-                                        Some(func_params.name.to_owned()),
-                                    ))
-                                    .await
-                                {
-                                    log::error!(
-                                        "[Pipeline] {pipeline_name} : FunctionNode failed sending errors for collection caused by: {send_err}"
-                                    );
-                                    return Ok(());
-                                }
-                                res
-                            }
-                        };
-                        // since apply_vrl_fn can produce unflattened data
-                        for record in result.as_array().unwrap().iter() {
-                            // use usize::MAX as a flag to disregard original_value
-                            send_to_children(
-                                &mut child_senders,
-                                PipelineItem {
-                                    idx: usize::MAX,
-                                    record: record.clone(),
-                                    flattened: false,
-                                },
-                                "FunctionNode",
-                            )
-                            .await;
-                        }
-                    }
-                    CompiledFunctionRuntime::JS(js_config, true) => {
-                        // JS result array processing
-                        let result = match apply_js_fn(
-                            js_config,
-                            json::Value::Array(result_array_records),
-                            &org_id,
-                            std::slice::from_ref(&stream_name),
-                        ) {
-                            (res, None) => res,
-                            (res, Some(error)) => {
-                                let err_msg = format!(
-                                    "FunctionNode JS result array error: {}",
-                                    error.get(0..500).unwrap_or(&error)
-                                );
-                                if let Err(send_err) = error_sender
-                                    .send((
-                                        node.id.to_string(),
-                                        node.node_type(),
-                                        err_msg.to_owned(),
-                                        Some(func_params.name.to_owned()),
-                                    ))
-                                    .await
-                                {
-                                    log::error!(
-                                        "[Pipeline] {pipeline_name} : FunctionNode failed sending errors for collection caused by: {send_err}"
-                                    );
-                                    return Ok(());
-                                }
-                                res
-                            }
-                        };
-                        // Process result array
-                        if let Some(result_arr) = result.as_array() {
-                            for record in result_arr.iter() {
-                                // use usize::MAX as a flag to disregard original_value
-                                send_to_children(
-                                    &mut child_senders,
-                                    PipelineItem {
-                                        idx: usize::MAX,
-                                        record: record.clone(),
-                                        flattened: false,
-                                    },
-                                    "FunctionNode",
-                                )
-                                .await;
-                            }
-                        }
-                    }
-                    _ => {
-                        // Shouldn't happen (is_result_array is false)
-                        log::error!(
-                            "[Pipeline] {pipeline_name} : Function node has result_array_records but runtime is not in result array mode"
-                        );
-                    }
-                }
-            }
-            log::debug!("[Pipeline]: func node {node_idx} done processing {count} records");
+            process_function_node(
+                func_params,
+                metadata,
+                &node,
+                function_runtime,
+                channels,
+                &mut busy,
+            )
+            .await
         }
         NodeData::Query(_) => {
             // source node for Scheduled pipeline. Directly send to children nodes
-            log::debug!("[Pipeline]: query node {node_idx} starts processing");
-            while let Some(item) = receiver.recv().await {
-                send_to_children(&mut child_senders, item, "QueryNode").await;
+            log::debug!(
+                "[Pipeline] {} [inv={inv_id}]: query node {} starts processing",
+                metadata.pipeline_name,
+                metadata.node_idx
+            );
+            let mut count: usize = 0;
+            while let Some(item) = channels.receiver.recv().await {
+                send_to_children(&mut channels.child_senders, item, "QueryNode").await;
                 count += 1;
             }
-            log::debug!("[Pipeline]: query node {node_idx} done processing {count} records");
+            log::debug!(
+                "[Pipeline] {} [inv={inv_id}]: query node {} done processing {count} records",
+                metadata.pipeline_name,
+                metadata.node_idx
+            );
+            count
         }
         #[cfg(feature = "enterprise")]
         NodeData::RemoteStream(remote_stream) => {
-            let mut records = vec![];
-            log::debug!(
-                "[Pipeline]: Destination node {node_idx} starts processing, remote_stream : {remote_stream:?}"
-            );
-            let now = config::utils::time::now_micros();
-            let min_ts = now - cfg.limit.ingest_allowed_upto_micro;
-            let max_ts = now + cfg.limit.ingest_allowed_in_future_micro;
-            while let Some(pipeline_item) = receiver.recv().await {
-                let PipelineItem {
-                    mut record,
-                    flattened,
-                    ..
-                } = pipeline_item;
-                // handle timestamp before sending to remote_write service
-                if !flattened && !record.is_null() && record.is_object() {
-                    record = match flatten::flatten_with_level(
-                        record,
-                        cfg.limit.ingest_flatten_level,
-                    ) {
-                        Ok(flattened) => flattened,
-                        Err(e) => {
-                            let err_msg = format!("DestinationNode error with flattening: {e}");
-                            if let Err(send_err) = error_sender
-                                .send((node.id.to_string(), node.node_type(), err_msg, None))
-                                .await
-                            {
-                                log::error!(
-                                    "[Pipeline] {pipeline_name} : DestinationNode failed sending errors for collection caused by: {send_err}"
-                                );
-                                break;
-                            }
-                            continue;
-                        }
-                    };
-                }
-                if !record.is_null() && record.is_object() {
-                    if let Err(e) =
-                        crate::service::logs::ingest::handle_timestamp(&mut record, min_ts, max_ts)
-                    {
-                        let err_msg = format!("DestinationNode error handling timestamp: {e}");
-                        if let Err(send_err) = error_sender
-                            .send((node.id.to_string(), node.node_type(), err_msg, None))
-                            .await
-                        {
-                            log::error!(
-                                "[Pipeline] {} : DestinationNode failed sending errors for collection caused by: {send_err}",
-                                pipeline_name
-                            );
-                            break;
-                        }
-                        continue;
-                    }
-
-                    records.push(record);
-                    count += 1;
-                }
-            }
-
-            log::debug!(
-                "[Pipeline]: RemoteStream node processed {} records",
-                records.len()
-            );
-            if !records.is_empty() {
-                // Group records by batch_key for routing to different remote streams
-                let mut records_by_batch_key: HashMap<String, Vec<json::Value>> = HashMap::new();
-
-                for record in records {
-                    // Extract batch_key from record, fallback to "default" if not present
-                    let batch_key = record
-                        .get("batch_key")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("default")
-                        .to_string();
-
-                    records_by_batch_key
-                        .entry(batch_key)
-                        .or_default()
-                        .push(record);
-                }
-
-                log::debug!(
-                    "[Pipeline]: Grouped records into {} batch keys",
-                    records_by_batch_key.len()
-                );
-
-                // Process each batch_key group separately
-                for (batch_key, batch_records) in records_by_batch_key {
-                    // Create buffer key that includes batch_key for routing
-                    let buffer_key = format!(
-                        "{}:{}:{}:{}:{}",
-                        pipeline_id,
-                        remote_stream.org_id,
-                        remote_stream.destination_name,
-                        batch_key,
-                        "remote"
-                    );
-
-                    // Add records to the accumulating buffer and check if we should flush
-                    let mut buffers = BATCH_BUFFERS.lock().await;
-                    let buffer = buffers
-                        .entry(buffer_key.clone())
-                        .or_insert_with(BatchBuffer::new);
-
-                    let initial_record_count = buffer.records.len();
-                    buffer.add_records(batch_records);
-
-                    log::debug!(
-                        "[Pipeline]: Added {} records to buffer for batch_key '{batch_key}', total: {} records, {} bytes",
-                        buffer.records.len() - initial_record_count,
-                        buffer.records.len(),
-                        buffer.total_bytes
-                    );
-
-                    // Check if buffer should be flushed to WAL
-                    if buffer.should_flush() {
-                        let records_to_write = buffer.take_records();
-                        drop(buffers); // Release the lock before async operations
-
-                        log::debug!(
-                            "[Pipeline]: Flushing buffer for batch_key '{}' - writing {} records to WAL",
-                            batch_key,
-                            records_to_write.len()
-                        );
-
-                        // Create remote stream configuration with batch_key routing
-                        let mut remote_stream_for_batch = remote_stream.clone();
-                        remote_stream_for_batch.org_id = org_id.clone().into();
-
-                        let records_len = records_to_write.len() as i64;
-
-                        let writer =
-                            get_pipeline_wal_writer(&pipeline_id, remote_stream_for_batch).await?;
-                        match writer.write_wal(records_to_write).await {
-                            Err(e) => {
-                                let err_msg = format!(
-                                    "DestinationNode error persisting data for batch_key '{batch_key}' to be ingested externally: {e}"
-                                );
-                                if let Err(send_err) = error_sender
-                                    .send((node.id.to_string(), node.node_type(), err_msg, None))
-                                    .await
-                                {
-                                    log::error!(
-                                        "[Pipeline]: DestinationNode failed sending errors for collection caused by: {send_err}"
-                                    );
-                                }
-                            }
-                            Ok(data_size) => {
-                                let data_size_mb = data_size as f64 / config::SIZE_IN_MB;
-                                // Report remote destination usage after successful WAL write
-                                if data_size_mb > 0.0 {
-                                    let req_stats = config::meta::self_reporting::usage::RequestStats {
-                                        size: data_size_mb,
-                                        records: records_len,
-                                        response_time: 0.0,
-                                        ..config::meta::self_reporting::usage::RequestStats::default()
-                                    };
-
-                                    crate::service::self_reporting::report_request_usage_stats(
-                                        req_stats,
-                                        &org_id,
-                                        &remote_stream.destination_name,
-                                        config::meta::stream::StreamType::Logs, // Default to Logs for remote destinations
-                                        config::meta::self_reporting::usage::UsageType::RemotePipeline,
-                                        0, // No additional functions for remote destination
-                                        chrono::Utc::now().timestamp_micros(),
-                                    )
-                                    .await;
-                                }
-                            }
-                        }
-                    } else {
-                        log::debug!(
-                            "[Pipeline]: Buffer for batch_key '{batch_key}' not ready for flush, continuing to accumulate"
-                        );
-                    }
-                }
-            }
-
-            log::debug!("[Pipeline]: DestinationNode {node_idx} done processing {count} records");
+            process_remote_stream_node(remote_stream, metadata, &node, channels).await?
         }
         #[cfg(not(feature = "enterprise"))]
         NodeData::RemoteStream(_) => {
             let err_msg = "[Pipeline]: remote destination is not supported in open source version. Records dropped".to_string();
-            log::error!("{err_msg}");
-            if let Err(send_err) = error_sender
+            log::error!(
+                "[Pipeline] {} [inv={inv_id}]: {err_msg}",
+                metadata.pipeline_name
+            );
+            if let Err(send_err) = channels
+                .error_sender
                 .send((node.id.to_string(), node.node_type(), err_msg, None))
                 .await
             {
                 log::error!(
-                    "[Pipeline({pipeline_id})]: DestinationNode failed sending errors for collection caused by: {send_err}"
+                    "[Pipeline({})] {} [inv={inv_id}]: DestinationNode failed sending errors for collection caused by: {send_err}",
+                    metadata.pipeline_id,
+                    metadata.pipeline_name,
                 );
             }
+            0
         }
         #[cfg(feature = "enterprise")]
         NodeData::LlmEvaluation(params) => {
-            if !o2_enterprise::enterprise::common::config::get_config()
-                .common
-                .online_evals_enabled
-            {
-                log::warn!(
-                    "[Pipeline]: LLM evaluation node {node_idx} skipped because online evals are disabled"
-                );
-                while receiver.recv().await.is_some() {
-                    count += 1;
-                }
-                log::info!("[Pipeline]: LLM evaluation node {node_idx} skipped {count} records");
-                return Ok(());
-            }
-
-            log::info!("[Pipeline]: LLM evaluation node {node_idx} starts processing");
-
-            if let Err(e) =
-                crate::service::self_reporting::ensure_llm_scores_stream_initialized(&org_id).await
-            {
-                log::warn!(
-                    "[Pipeline]: LLM evaluation node {node_idx} failed to ensure _llm_scores stream initialized for {org_id}: {e}"
-                );
-            }
-            if let Err(e) =
-                crate::service::self_reporting::ensure_evaluator_stream_initialized(&org_id).await
-            {
-                log::warn!(
-                    "[Pipeline]: LLM evaluation node {node_idx} failed to ensure _evaluator stream initialized for {org_id}: {e}"
-                );
-            }
-
-            let scorer_refs = params.scorers.clone();
-
-            let job_id = params.job_id.as_deref();
-            while let Some(item) = receiver.recv().await {
-                if let Some(mut ctx) =
-                    crate::service::llm_evaluations::eval_jobs::executor_runtime::extract_context_from_span(
-                        &org_id,
-                        job_id,
-                        &item.record,
-                    )
-                {
-                    let eval_run_id = config::ider::generate();
-                    ctx.eval_run_id = Some(eval_run_id.clone());
-                    ctx.sampling_rate = Some(params.sampling_rate);
-                    let sampled =
-                        should_sample_eval_record(&item.record, item.idx, params.sampling_rate);
-                    ctx.sampled = Some(sampled);
-
-                    if !sampled {
-                        let skipped_trace =
-                            crate::service::llm_evaluations::evaluator_trace::create_evaluator_trace(
-                                crate::service::llm_evaluations::evaluator_trace::EvaluatorTraceInput {
-                                    org_id: ctx.org_id.clone(),
-                                    evaluator_trace_id: ctx.evaluator_trace_id.clone(),
-                                    target_span_id: ctx.span_id.clone(),
-                                    target_trace_id: ctx.trace_id.clone(),
-                                    target_stream: ctx.source_stream.clone(),
-                                    scorer_id: None,
-                                    scorer_version: None,
-                                    scorer_type: None,
-                                    job_id: ctx.job_id.clone(),
-                                    score_config_id: None,
-                                    score_config_version: None,
-                                    eval_run_id: Some(eval_run_id),
-                                    provider_id: None,
-                                    provider_name: None,
-                                    provider_type: None,
-                                    model: None,
-                                    latency_ms: 0,
-                                    prompt_tokens: None,
-                                    completion_tokens: None,
-                                    total_tokens: None,
-                                    sampling_rate: Some(params.sampling_rate),
-                                    sampled: Some(false),
-                                    status:
-                                        config::meta::self_reporting::evaluator::status::SKIPPED
-                                            .to_string(),
-                                    error_kind: None,
-                                    error_message: None,
-                                    skip_reason: Some("sampling".to_string()),
-                                    prompt: None,
-                                    response: None,
-                                },
-                            );
-                        crate::service::llm_evaluations::evaluator_trace_exporter::EvaluatorTraceExporter::export(
-                            &org_id,
-                            vec![skipped_trace],
-                            node_idx,
-                        )
-                        .await;
-                        count += 1;
-                        continue;
-                    }
-
-                    match crate::service::llm_evaluations::eval_jobs::executor_runtime::execute_scorers(
-                        &ctx,
-                        &scorer_refs,
-                    )
-                    .await
-                    {
-                        Ok(output) => {
-                            for score_record in output.scores {
-                                send_to_children(
-                                    &mut child_senders,
-                                    PipelineItem {
-                                        idx: item.idx,
-                                        record: score_record,
-                                        flattened: true,
-                                    },
-                                    "LlmEvaluationNode",
-                                )
-                                .await;
-                            }
-                            crate::service::llm_evaluations::evaluator_trace_exporter::EvaluatorTraceExporter::export(
-                                &org_id,
-                                output.evaluator_traces,
-                                node_idx,
-                            )
-                            .await;
-                            for err in &output.errors {
-                                log::warn!(
-                                    "[Pipeline]: LLM evaluation node {node_idx} scorer '{}' error: {}",
-                                    err.scorer_id,
-                                    err.error_message
-                                );
-                            }
-                        }
-                        Err(e) => {
-                            log::error!(
-                                "[Pipeline]: LLM evaluation node {node_idx} execution error: {e}"
-                            );
-                        }
-                    }
-                }
-                count += 1;
-            }
-
-            log::info!(
-                "[Pipeline]: LLM evaluation node {node_idx} done processing {count} records"
-            );
+            process_llm_evaluation_node(params, metadata, channels).await
         }
         #[cfg(not(feature = "enterprise"))]
         NodeData::LlmEvaluation(_) => {
             log::warn!(
-                "[Pipeline]: LLM evaluation node {node_idx} skipped because online evals are enterprise-only"
+                "[Pipeline] {} [inv={inv_id}]: LLM evaluation node {node_idx} skipped because online evals are enterprise-only",
+                metadata.pipeline_name
             );
             let mut skipped_count = 0usize;
-            while receiver.recv().await.is_some() {
+            while channels.receiver.recv().await.is_some() {
                 skipped_count += 1;
             }
             log::info!(
-                "[Pipeline]: LLM evaluation node {node_idx} skipped {skipped_count} records"
+                "[Pipeline] {} [inv={inv_id}]: LLM evaluation node {node_idx} skipped {skipped_count} records",
+                metadata.pipeline_name
             );
+            0
         }
-    }
+    };
 
     // all cloned senders dropped when function goes out of scope -> close the channel
     log::info!(
-        "[Pipeline] {pipeline_name}: node {node_idx} ({:?}) task returning",
+        "[Pipeline] {pl_name} [inv={inv_id}]: node {node_idx} ({:?}) task returning",
         node.node_data
     );
 
+    if print_event {
+        let node_ms = node_start.elapsed().as_millis();
+        let busy_ms = busy.as_millis();
+        // wait_ms ~= time blocked on upstream (channel recv). High wait_ms with low
+        // busy_ms under low CPU points at upstream/downstream stalls, not this node.
+        let wait_ms = node_ms.saturating_sub(busy_ms);
+        log::info!(
+            "[Pipeline:Timing] [inv={inv_id}] name={pl_name} node idx={node_idx} type={node_type} label={node_label} records={count} node_ms={node_ms} busy_ms={busy_ms} wait_ms={wait_ms}"
+        );
+    }
+
     Ok(())
+}
+
+#[cfg(feature = "enterprise")]
+async fn process_llm_evaluation_node(
+    params: &config::meta::pipeline::components::LlmEvaluationParams,
+    metadata: ProcessMetadata,
+    mut channels: ProcessChannels,
+) -> usize {
+    let mut count: usize = 0;
+    let inv_id = metadata.inv_id;
+    if !o2_enterprise::enterprise::common::config::get_config()
+        .common
+        .online_evals_enabled
+    {
+        log::warn!(
+            "[Pipeline] {} [inv={inv_id}]: LLM evaluation node {} skipped because online evals are disabled",
+            metadata.pipeline_name,
+            metadata.node_idx
+        );
+        while channels.receiver.recv().await.is_some() {
+            count += 1;
+        }
+        log::info!(
+            "[Pipeline] {} [inv={inv_id}]: LLM evaluation node {} skipped {count} records",
+            metadata.pipeline_name,
+            metadata.node_idx
+        );
+        return count;
+    }
+
+    log::info!(
+        "[Pipeline] {} [inv={inv_id}]: LLM evaluation node {} starts processing",
+        metadata.pipeline_name,
+        metadata.node_idx
+    );
+    if let Err(e) =
+        crate::service::self_reporting::ensure_llm_scores_stream_initialized(&metadata.org_id).await
+    {
+        log::warn!(
+            "[Pipeline] {} [inv={inv_id}]: LLM evaluation node {} failed to ensure _llm_scores stream initialized for {}: {e}",
+            metadata.pipeline_name,
+            metadata.node_idx,
+            metadata.org_id
+        );
+    }
+    if let Err(e) =
+        crate::service::self_reporting::ensure_evaluator_stream_initialized(&metadata.org_id).await
+    {
+        log::warn!(
+            "[Pipeline] {} [inv={inv_id}]: LLM evaluation node {} failed to ensure _evaluator stream initialized for {}: {e}",
+            metadata.pipeline_name,
+            metadata.node_idx,
+            metadata.org_id
+        );
+    }
+
+    let scorer_refs = params.scorers.clone();
+
+    let job_id = params.job_id.as_deref();
+    while let Some(item) = channels.receiver.recv().await {
+        if let Some(mut ctx) =
+            crate::service::llm_evaluations::eval_jobs::executor_runtime::extract_context_from_span(
+                &metadata.org_id,
+                job_id,
+                &item.record,
+            )
+        {
+            let eval_run_id = config::ider::generate();
+            ctx.eval_run_id = Some(eval_run_id.clone());
+            ctx.sampling_rate = Some(params.sampling_rate);
+            let sampled = should_sample_eval_record(&item.record, item.idx, params.sampling_rate);
+            ctx.sampled = Some(sampled);
+
+            if !sampled {
+                let skipped_trace =
+                    crate::service::llm_evaluations::evaluator_trace::create_evaluator_trace(
+                        crate::service::llm_evaluations::evaluator_trace::EvaluatorTraceInput {
+                            org_id: ctx.org_id.clone(),
+                            evaluator_trace_id: ctx.evaluator_trace_id.clone(),
+                            target_span_id: ctx.span_id.clone(),
+                            target_trace_id: ctx.trace_id.clone(),
+                            target_stream: ctx.source_stream.clone(),
+                            scorer_id: None,
+                            scorer_version: None,
+                            scorer_type: None,
+                            job_id: ctx.job_id.clone(),
+                            score_config_id: None,
+                            score_config_version: None,
+                            eval_run_id: Some(eval_run_id),
+                            provider_id: None,
+                            provider_name: None,
+                            provider_type: None,
+                            model: None,
+                            latency_ms: 0,
+                            prompt_tokens: None,
+                            completion_tokens: None,
+                            total_tokens: None,
+                            sampling_rate: Some(params.sampling_rate),
+                            sampled: Some(false),
+                            status: config::meta::self_reporting::evaluator::status::SKIPPED
+                                .to_string(),
+                            error_kind: None,
+                            error_message: None,
+                            skip_reason: Some("sampling".to_string()),
+                            prompt: None,
+                            response: None,
+                        },
+                    );
+                crate::service::llm_evaluations::evaluator_trace_exporter::EvaluatorTraceExporter::export(
+                    &metadata.org_id,
+                    vec![skipped_trace],
+                    metadata.node_idx,
+                )
+                .await;
+                count += 1;
+                continue;
+            }
+
+            match crate::service::llm_evaluations::eval_jobs::executor_runtime::execute_scorers(
+                &ctx,
+                &scorer_refs,
+            )
+            .await
+            {
+                Ok(output) => {
+                    for score_record in output.scores {
+                        send_to_children(
+                            &mut channels.child_senders,
+                            PipelineItem {
+                                idx: item.idx,
+                                record: score_record,
+                                flattened: true,
+                            },
+                            "LlmEvaluationNode",
+                        )
+                        .await;
+                    }
+                    crate::service::llm_evaluations::evaluator_trace_exporter::EvaluatorTraceExporter::export(
+                        &metadata.org_id,
+                        output.evaluator_traces,
+                        metadata.node_idx,
+                    )
+                    .await;
+                    for err in &output.errors {
+                        log::warn!(
+                            "[Pipeline] {} [inv={inv_id}]: LLM evaluation node {} scorer '{}' error: {}",
+                            metadata.pipeline_name,
+                            metadata.node_idx,
+                            err.scorer_id,
+                            err.error_message
+                        );
+                    }
+                }
+                Err(e) => {
+                    log::error!(
+                        "[Pipeline] {} [inv={inv_id}]: LLM evaluation node {} execution error: {e}",
+                        metadata.pipeline_name,
+                        metadata.node_idx
+                    );
+                }
+            }
+        }
+        count += 1;
+    }
+
+    log::info!(
+        "[Pipeline] {} [inv={inv_id}]: LLM evaluation node {} done processing {count} records",
+        metadata.pipeline_name,
+        metadata.node_idx
+    );
+    count
+}
+
+#[cfg(feature = "enterprise")]
+async fn process_remote_stream_node(
+    remote_stream: &config::meta::stream::RemoteStreamParams,
+    metadata: ProcessMetadata,
+    node: &ExecutableNode,
+    mut channels: ProcessChannels,
+) -> Result<usize, anyhow::Error> {
+    let mut count: usize = 0;
+    let cfg = config::get_config();
+    let mut records = vec![];
+    let inv_id = metadata.inv_id;
+    log::debug!(
+        "[Pipeline] {} [inv={inv_id}]: Destination node {} starts processing, remote_stream : {remote_stream:?}",
+        metadata.pipeline_name,
+        metadata.node_idx
+    );
+    let now = config::utils::time::now_micros();
+    let min_ts = now - cfg.limit.ingest_allowed_upto_micro;
+    let max_ts = now + cfg.limit.ingest_allowed_in_future_micro;
+    while let Some(pipeline_item) = channels.receiver.recv().await {
+        let PipelineItem {
+            mut record,
+            flattened,
+            ..
+        } = pipeline_item;
+        // handle timestamp before sending to remote_write service
+        if !flattened && !record.is_null() && record.is_object() {
+            record = match flatten::flatten_with_level(record, cfg.limit.ingest_flatten_level) {
+                Ok(flattened) => flattened,
+                Err(e) => {
+                    let err_msg = format!("DestinationNode error with flattening: {e}");
+                    if let Err(send_err) = channels
+                        .error_sender
+                        .send((node.id.to_string(), node.node_type(), err_msg, None))
+                        .await
+                    {
+                        log::error!(
+                            "[Pipeline] {} [inv={inv_id}]: DestinationNode failed sending errors for collection caused by: {send_err}",
+                            metadata.pipeline_name
+                        );
+                        break;
+                    }
+                    continue;
+                }
+            };
+        }
+        if !record.is_null() && record.is_object() {
+            if let Err(e) =
+                crate::service::logs::ingest::handle_timestamp(&mut record, min_ts, max_ts)
+            {
+                let err_msg = format!("DestinationNode error handling timestamp: {e}");
+                if let Err(send_err) = channels
+                    .error_sender
+                    .send((node.id.to_string(), node.node_type(), err_msg, None))
+                    .await
+                {
+                    log::error!(
+                        "[Pipeline] {} [inv={inv_id}]: DestinationNode failed sending errors for collection caused by: {send_err}",
+                        metadata.pipeline_name
+                    );
+                    break;
+                }
+                continue;
+            }
+
+            records.push(record);
+            count += 1;
+        }
+    }
+    log::debug!(
+        "[Pipeline] {} [inv={inv_id}]: RemoteStream node processed {} records",
+        metadata.pipeline_name,
+        records.len()
+    );
+    if !records.is_empty() {
+        // Group records by batch_key for routing to different remote streams
+        let mut records_by_batch_key: HashMap<String, Vec<json::Value>> = HashMap::new();
+
+        for record in records {
+            // Extract batch_key from record, fallback to "default" if not present
+            let batch_key = record
+                .get("batch_key")
+                .and_then(|v| v.as_str())
+                .unwrap_or("default")
+                .to_string();
+
+            records_by_batch_key
+                .entry(batch_key)
+                .or_default()
+                .push(record);
+        }
+
+        log::debug!(
+            "[Pipeline] {} [inv={inv_id}]: Grouped records into {} batch keys",
+            metadata.pipeline_name,
+            records_by_batch_key.len()
+        );
+
+        // Process each batch_key group separately
+        for (batch_key, batch_records) in records_by_batch_key {
+            // Create buffer key that includes batch_key for routing
+            let buffer_key = format!(
+                "{}:{}:{}:{}:{}",
+                metadata.pipeline_id,
+                remote_stream.org_id,
+                remote_stream.destination_name,
+                batch_key,
+                "remote"
+            );
+
+            // Add records to the accumulating buffer and check if we should flush
+            let mut buffers = BATCH_BUFFERS.lock().await;
+            let buffer = buffers
+                .entry(buffer_key.clone())
+                .or_insert_with(BatchBuffer::new);
+
+            let initial_record_count = buffer.records.len();
+            buffer.add_records(batch_records);
+
+            log::debug!(
+                "[Pipeline] {} [inv={inv_id}]: Added {} records to buffer for batch_key '{batch_key}', total: {} records, {} bytes",
+                metadata.pipeline_name,
+                buffer.records.len() - initial_record_count,
+                buffer.records.len(),
+                buffer.total_bytes
+            );
+
+            // Check if buffer should be flushed to WAL
+            if buffer.should_flush() {
+                let records_to_write = buffer.take_records();
+                drop(buffers); // Release the lock before async operations
+
+                log::debug!(
+                    "[Pipeline] {} [inv={inv_id}]: Flushing buffer for batch_key '{}' - writing {} records to WAL",
+                    metadata.pipeline_name,
+                    batch_key,
+                    records_to_write.len()
+                );
+
+                // Create remote stream configuration with batch_key routing
+                let mut remote_stream_for_batch = remote_stream.clone();
+                remote_stream_for_batch.org_id = metadata.org_id.clone().into();
+
+                let records_len = records_to_write.len() as i64;
+
+                let writer =
+                    get_pipeline_wal_writer(&metadata.pipeline_id, remote_stream_for_batch).await?;
+                match writer.write_wal(records_to_write).await {
+                    Err(e) => {
+                        let err_msg = format!(
+                            "DestinationNode error persisting data for batch_key '{batch_key}' to be ingested externally: {e}"
+                        );
+                        if let Err(send_err) = channels
+                            .error_sender
+                            .send((node.id.to_string(), node.node_type(), err_msg, None))
+                            .await
+                        {
+                            log::error!(
+                                "[Pipeline] {} [inv={inv_id}]: DestinationNode failed sending errors for collection caused by: {send_err}",
+                                metadata.pipeline_name,
+                            );
+                        }
+                    }
+                    Ok(data_size) => {
+                        let data_size_mb = data_size as f64 / config::SIZE_IN_MB;
+                        // Report remote destination usage after successful WAL write
+                        if data_size_mb > 0.0 {
+                            let req_stats = config::meta::self_reporting::usage::RequestStats {
+                                size: data_size_mb,
+                                records: records_len,
+                                response_time: 0.0,
+                                ..config::meta::self_reporting::usage::RequestStats::default()
+                            };
+
+                            crate::service::self_reporting::report_request_usage_stats(
+                                req_stats,
+                                &metadata.org_id,
+                                &remote_stream.destination_name,
+                                config::meta::stream::StreamType::Logs, // Default to Logs for remote destinations
+                                config::meta::self_reporting::usage::UsageType::RemotePipeline,
+                                0, // No additional functions for remote destination
+                                chrono::Utc::now().timestamp_micros(),
+                            )
+                            .await;
+                        }
+                    }
+                }
+            } else {
+                log::debug!(
+                    "[Pipeline] {} [inv={inv_id}]: Buffer for batch_key '{batch_key}' not ready for flush, continuing to accumulate",
+                    metadata.pipeline_name,
+                );
+            }
+        }
+    }
+    log::debug!(
+        "[Pipeline] {} [inv={inv_id}]: DestinationNode {} done processing {count} records",
+        metadata.pipeline_name,
+        metadata.node_idx
+    );
+    Ok(count)
+}
+
+async fn process_function_node(
+    func_params: &config::meta::pipeline::components::FunctionParams,
+    metadata: ProcessMetadata,
+    node: &ExecutableNode,
+    function_runtime: Option<CompiledFunctionRuntime>,
+    mut channels: ProcessChannels,
+    busy: &mut Duration,
+) -> usize {
+    let mut count: usize = 0;
+    let cfg = config::get_config();
+    let inv_id = metadata.inv_id;
+    log::debug!(
+        "[Pipeline] {} [inv={inv_id}]: func node {} starts processing",
+        metadata.pipeline_name,
+        metadata.node_idx
+    );
+    let mut vrl_runtime_state = crate::service::ingestion::init_functions_runtime();
+    let stream_name = metadata.stream_name.unwrap_or("pipeline".to_string());
+    let mut result_array_records = Vec::new();
+    while let Some(pipeline_item) = channels.receiver.recv().await {
+        let PipelineItem {
+            idx,
+            mut record,
+            mut flattened,
+        } = pipeline_item;
+        if let Some(runtime) = &function_runtime {
+            // Handle flattening if required
+            if func_params.after_flatten && !flattened && !record.is_null() && record.is_object() {
+                let flatten_timer = Instant::now();
+                let flatten_res =
+                    flatten::flatten_with_level(record, cfg.limit.ingest_flatten_level);
+                *busy += flatten_timer.elapsed();
+                record = match flatten_res {
+                    Ok(flattened) => flattened,
+                    Err(e) => {
+                        let err_msg = format!("FunctionNode error with flattening: {e}");
+                        let err_msg = err_msg.get(0..500).unwrap_or(&err_msg);
+                        if let Err(send_err) = channels
+                            .error_sender
+                            .send((
+                                node.id.to_string(),
+                                node.node_type(),
+                                err_msg.to_owned(),
+                                Some(func_params.name.to_owned()),
+                            ))
+                            .await
+                        {
+                            log::error!(
+                                "[Pipeline] {} [inv={inv_id}]: FunctionNode failed sending errors for collection caused by: {send_err}",
+                                metadata.pipeline_name
+                            );
+                            break;
+                        }
+                        continue;
+                    }
+                };
+            }
+
+            // Match on function runtime type (VRL or JS)
+            match runtime {
+                CompiledFunctionRuntime::VRL(vrl_resolver, is_result_array) => {
+                    if !is_result_array {
+                        // Single record processing with VRL
+
+                        let vrl_timer = Instant::now();
+                        let vrl_res = apply_vrl_fn(
+                            &mut vrl_runtime_state,
+                            vrl_resolver,
+                            record,
+                            &metadata.org_id,
+                            std::slice::from_ref(&stream_name),
+                        );
+                        *busy += vrl_timer.elapsed();
+                        record = match vrl_res {
+                            (res, None) => res,
+                            (res, Some(error)) => {
+                                let err_msg = format!(
+                                    "FunctionNode VRL error: {}",
+                                    error.get(0..500).unwrap_or(&error)
+                                );
+                                if let Err(send_err) = channels
+                                    .error_sender
+                                    .send((
+                                        node.id.to_string(),
+                                        node.node_type(),
+                                        err_msg.to_owned(),
+                                        Some(func_params.name.to_owned()),
+                                    ))
+                                    .await
+                                {
+                                    log::error!(
+                                        "[Pipeline] {} [inv={inv_id}]: FunctionNode failed sending errors for collection caused by: {send_err}",
+                                        metadata.pipeline_name
+                                    );
+                                    break;
+                                }
+                                res
+                            }
+                        };
+                        flattened = false; // since apply_vrl_fn can produce unflattened data
+                        send_to_children(
+                            &mut channels.child_senders,
+                            PipelineItem {
+                                idx,
+                                record,
+                                flattened,
+                            },
+                            "FunctionNode",
+                        )
+                        .await;
+                    } else {
+                        // Result array mode - collect records
+                        result_array_records.push(record);
+                    }
+                }
+                CompiledFunctionRuntime::JS(js_config, is_result_array) => {
+                    if !is_result_array {
+                        // Single record processing with JS
+                        let js_timer = Instant::now();
+                        let js_res = apply_js_fn(
+                            js_config,
+                            record,
+                            &metadata.org_id,
+                            std::slice::from_ref(&stream_name),
+                        );
+                        *busy += js_timer.elapsed();
+                        record = match js_res {
+                            (res, None) => res,
+                            (res, Some(error)) => {
+                                let err_msg = format!(
+                                    "FunctionNode JS error: {}",
+                                    error.get(0..500).unwrap_or(&error)
+                                );
+                                if let Err(send_err) = channels
+                                    .error_sender
+                                    .send((
+                                        node.id.to_string(),
+                                        node.node_type(),
+                                        err_msg.to_owned(),
+                                        Some(func_params.name.to_owned()),
+                                    ))
+                                    .await
+                                {
+                                    log::error!(
+                                        "[Pipeline] {} [inv={inv_id}]: FunctionNode failed sending errors for collection caused by: {send_err}",
+                                        metadata.pipeline_name
+                                    );
+                                    break;
+                                }
+                                res
+                            }
+                        };
+                        flattened = false; // since JS functions can produce unflattened data
+                        send_to_children(
+                            &mut channels.child_senders,
+                            PipelineItem {
+                                idx,
+                                record,
+                                flattened,
+                            },
+                            "FunctionNode",
+                        )
+                        .await;
+                    } else {
+                        // Result array mode - collect records
+                        result_array_records.push(record);
+                    }
+                }
+            }
+        }
+        count += 1;
+    }
+    if !result_array_records.is_empty()
+        && let Some(runtime) = &function_runtime
+    {
+        match runtime {
+            CompiledFunctionRuntime::VRL(vrl_resolver, true) => {
+                // VRL result array processing
+                let vrl_arr_timer = Instant::now();
+                let vrl_arr_res = apply_vrl_fn(
+                    &mut vrl_runtime_state,
+                    vrl_resolver,
+                    json::Value::Array(result_array_records),
+                    &metadata.org_id,
+                    std::slice::from_ref(&stream_name),
+                );
+                *busy += vrl_arr_timer.elapsed();
+                let result = match vrl_arr_res {
+                    (res, None) => res,
+                    (res, Some(error)) => {
+                        let err_msg = format!(
+                            "FunctionNode VRL result array error: {}",
+                            error.get(0..500).unwrap_or(&error)
+                        );
+                        if let Err(send_err) = channels
+                            .error_sender
+                            .send((
+                                node.id.to_string(),
+                                node.node_type(),
+                                err_msg.to_owned(),
+                                Some(func_params.name.to_owned()),
+                            ))
+                            .await
+                        {
+                            log::error!(
+                                "[Pipeline] {} [inv={inv_id}]: FunctionNode failed sending errors for collection caused by: {send_err}",
+                                metadata.pipeline_name
+                            );
+                            return count;
+                        }
+                        res
+                    }
+                };
+                // since apply_vrl_fn can produce unflattened data
+                for record in result.as_array().unwrap().iter() {
+                    // use usize::MAX as a flag to disregard original_value
+                    send_to_children(
+                        &mut channels.child_senders,
+                        PipelineItem {
+                            idx: usize::MAX,
+                            record: record.clone(),
+                            flattened: false,
+                        },
+                        "FunctionNode",
+                    )
+                    .await;
+                }
+            }
+            CompiledFunctionRuntime::JS(js_config, true) => {
+                // JS result array processing
+                let js_arr_timer = Instant::now();
+                let js_arr_res = apply_js_fn(
+                    js_config,
+                    json::Value::Array(result_array_records),
+                    &metadata.org_id,
+                    std::slice::from_ref(&stream_name),
+                );
+                *busy += js_arr_timer.elapsed();
+                let result = match js_arr_res {
+                    (res, None) => res,
+                    (res, Some(error)) => {
+                        let err_msg = format!(
+                            "FunctionNode JS result array error: {}",
+                            error.get(0..500).unwrap_or(&error)
+                        );
+                        if let Err(send_err) = channels
+                            .error_sender
+                            .send((
+                                node.id.to_string(),
+                                node.node_type(),
+                                err_msg.to_owned(),
+                                Some(func_params.name.to_owned()),
+                            ))
+                            .await
+                        {
+                            log::error!(
+                                "[Pipeline] {} [inv={inv_id}]: FunctionNode failed sending errors for collection caused by: {send_err}",
+                                metadata.pipeline_name
+                            );
+                            return count;
+                        }
+                        res
+                    }
+                };
+                // Process result array
+                if let Some(result_arr) = result.as_array() {
+                    for record in result_arr.iter() {
+                        // use usize::MAX as a flag to disregard original_value
+                        send_to_children(
+                            &mut channels.child_senders,
+                            PipelineItem {
+                                idx: usize::MAX,
+                                record: record.clone(),
+                                flattened: false,
+                            },
+                            "FunctionNode",
+                        )
+                        .await;
+                    }
+                }
+            }
+            _ => {
+                // Shouldn't happen (is_result_array is false)
+                log::error!(
+                    "[Pipeline] {} [inv={inv_id}]: Function node has result_array_records but runtime is not in result array mode",
+                    metadata.pipeline_name,
+                );
+            }
+        }
+    }
+    log::debug!(
+        "[Pipeline] {} [inv={inv_id}]: func node {} done processing {count} records",
+        metadata.pipeline_name,
+        metadata.node_idx
+    );
+
+    count
+}
+
+async fn process_condition_node(
+    condition_params: &config::meta::pipeline::components::ConditionParams,
+    metadata: ProcessMetadata,
+    node: &ExecutableNode,
+    mut channels: ProcessChannels,
+    busy: &mut Duration,
+) -> usize {
+    let mut count: usize = 0;
+    let cfg = config::get_config();
+    let inv_id = metadata.inv_id;
+    log::debug!(
+        "[Pipeline] {} [inv={inv_id}]: cond node {} starts processing",
+        metadata.pipeline_name,
+        metadata.node_idx
+    );
+    let mut total_received: usize = 0;
+    while let Some(pipeline_item) = channels.receiver.recv().await {
+        total_received += 1;
+        let PipelineItem {
+            idx,
+            mut record,
+            mut flattened,
+        } = pipeline_item;
+        // value must be flattened before condition params can take effect
+        if !flattened && !record.is_null() && record.is_object() {
+            let flatten_timer = Instant::now();
+            let flatten_res = flatten::flatten_with_level(record, cfg.limit.ingest_flatten_level);
+            *busy += flatten_timer.elapsed();
+            record = match flatten_res {
+                Ok(flattened) => flattened,
+                Err(e) => {
+                    let err_msg = format!("ConditionNode error with flattening: {e}");
+                    if let Err(send_err) = channels
+                        .error_sender
+                        .send((node.id.to_string(), node.node_type(), err_msg, None))
+                        .await
+                    {
+                        log::error!(
+                            "[Pipeline] {} [inv={inv_id}]: ConditionNode failed sending errors for collection caused by: {send_err}",
+                            metadata.pipeline_name
+                        );
+                        break;
+                    }
+                    continue;
+                }
+            };
+            flattened = true;
+        }
+
+        // A null / non-object record means an upstream function filtered it out
+        // (e.g. VRL `. = null`). Skip it: it can't satisfy any condition and
+        // `as_object().unwrap()` below would panic on a null.
+        if !record.is_object() {
+            continue;
+        }
+
+        // Evaluate based on condition version
+        let eval_timer = Instant::now();
+        let passes = match condition_params {
+            config::meta::pipeline::components::ConditionParams::V1 { conditions } => {
+                // v1: Use tree-based ConditionList evaluation
+                conditions.evaluate(record.as_object().unwrap()).await
+            }
+            config::meta::pipeline::components::ConditionParams::V2 { conditions } => {
+                // v2: Use linear ConditionGroup evaluation
+                conditions.evaluate(record.as_object().unwrap()).await
+            }
+        };
+        *busy += eval_timer.elapsed();
+
+        // only send to children when passing all condition evaluations
+        if passes {
+            send_to_children(
+                &mut channels.child_senders,
+                PipelineItem {
+                    idx,
+                    record,
+                    flattened,
+                },
+                "ConditionNode",
+            )
+            .await;
+            count += 1;
+        }
+    }
+    log::info!(
+        "[Pipeline] {} [inv={inv_id}]: cond node {} done: received={total_received}, passed={count} records",
+        metadata.pipeline_name,
+        metadata.node_idx,
+    );
+    count
+}
+
+async fn process_stream_node(
+    stream_params: &StreamParams,
+    metadata: ProcessMetadata,
+    node: &ExecutableNode,
+    mut channels: ProcessChannels,
+    busy: &mut Duration,
+) -> usize {
+    let cfg = config::get_config();
+    let mut count: usize = 0;
+    let inv_id = metadata.inv_id;
+    if node.children.is_empty() {
+        log::debug!(
+            "[Pipeline] {} [inv={inv_id}]: Leaf node {} starts processing (stream={}:{})",
+            metadata.pipeline_name,
+            metadata.node_idx,
+            stream_params.stream_type,
+            stream_params.stream_name,
+        );
+        // leaf node: `result_sender` guaranteed to be Some()
+        let result_sender = channels.result_sender.unwrap();
+        let is_cross_type = stream_params.stream_type != metadata.source_stream_type;
+        // For cross-type destinations, collect records to ingest directly
+        let mut cross_type_records: Vec<Value> = Vec::new();
+
+        while let Some(pipeline_item) = channels.receiver.recv().await {
+            let PipelineItem {
+                idx,
+                mut record,
+                flattened,
+            } = pipeline_item;
+            if !flattened && !record.is_null() && record.is_object() {
+                let flatten_timer = Instant::now();
+                let flatten_res =
+                    flatten::flatten_with_level(record, cfg.limit.ingest_flatten_level);
+                *busy += flatten_timer.elapsed();
+                record = match flatten_res {
+                    Ok(flattened) => flattened,
+                    Err(e) => {
+                        let err_msg = format!("LeafNode error with flattening: {e}");
+                        if let Err(send_err) = channels
+                            .error_sender
+                            .send((node.id.to_string(), node.node_type(), err_msg, None))
+                            .await
+                        {
+                            log::error!(
+                                "[Pipeline] {} [inv={inv_id}]: LeafNode failed sending errors for collection caused by: {send_err}",
+                                metadata.pipeline_name,
+                            );
+                            break;
+                        }
+                        continue;
+                    }
+                };
+            }
+
+            // A null / non-object record means an upstream function filtered it
+            // out (e.g. VRL `. = null`). Drop it instead of forwarding to the
+            // destination, where it would fail at handle_timestamp with
+            // "Value is not an object" and inflate the failed count.
+            if !record.is_object() {
+                continue;
+            }
+
+            let mut destination_stream = stream_params.clone();
+            if destination_stream.stream_name.contains("{") {
+                match resolve_stream_name(&destination_stream.stream_name, &record) {
+                    Ok(stream_name) if !stream_name.is_empty() => {
+                        destination_stream.stream_name = if cfg.common.skip_formatting_stream_name {
+                            stream_name.into()
+                        } else {
+                            format_stream_name(stream_name).into()
+                        }
+                    }
+                    resolve_res => {
+                        let err_msg = if let Err(e) = resolve_res {
+                            format!(
+                                "Dynamic stream name detected in destination, but failed to resolve due to {e}. Record dropped"
+                            )
+                        } else {
+                            "Dynamic Stream Name resolved to empty. Record dropped".to_string()
+                        };
+                        log::warn!(
+                            "[Pipeline] {} [inv={inv_id}]: {err_msg}",
+                            metadata.pipeline_name
+                        );
+                        if let Err(send_err) = channels
+                            .error_sender
+                            .send((node.id.to_string(), node.node_type(), err_msg, None))
+                            .await
+                        {
+                            log::error!(
+                                "[Pipeline] {} [inv={inv_id}]: LeafNode failed sending errors for collection caused by: {send_err}",
+                                metadata.pipeline_name
+                            );
+                            break;
+                        }
+                        continue;
+                    }
+                }
+            }
+
+            if is_cross_type {
+                // Cross-type: collect for direct ingestion
+                cross_type_records.push(record);
+            } else {
+                // Same-type: send via result_sender for caller to handle
+                if let Err(send_err) = result_sender.send((idx, destination_stream, record)).await {
+                    log::error!(
+                        "[Pipeline] {} [inv={inv_id}]: LeafNode errors sending result for collection caused by: {send_err}",
+                        metadata.pipeline_name
+                    );
+                    break;
+                }
+            }
+            count += 1;
+        }
+
+        // For cross-type destinations, spawn ingestion as background task
+        // so it doesn't block the primary pipeline path
+        if is_cross_type && !cross_type_records.is_empty() {
+            let record_count = cross_type_records.len();
+            let dest_stream_type = stream_params.stream_type.to_string();
+            let dest_stream_name = stream_params.stream_name.to_string();
+            let org = metadata.org_id.to_string();
+            let pl_name = metadata.pipeline_name.clone();
+            let node_idx = metadata.node_idx;
+            let inv = inv_id.clone();
+            log::debug!(
+                "[Pipeline] {pl_name} [inv={inv_id}]: LeafNode {node_idx} spawning background ingestion for {record_count} cross-type records to {dest_stream_type}:{dest_stream_name}",
+            );
+            tokio::spawn(async move {
+                let req = cluster_rpc::IngestionRequest {
+                    org_id: org,
+                    stream_name: dest_stream_name.clone(),
+                    stream_type: dest_stream_type.clone(),
+                    data: Some(cluster_rpc::IngestionData::from(cross_type_records)),
+                    ingestion_type: Some(cluster_rpc::IngestionType::Json.into()),
+                    metadata: None,
+                };
+                match crate::service::ingestion::ingestion_service::ingest(req).await {
+                    Ok(resp) if resp.status_code == 200 => {
+                        log::debug!(
+                            "[Pipeline] {pl_name} [inv={inv}]: cross-type ingestion successful to {dest_stream_type}:{dest_stream_name}, records: {record_count}",
+                        );
+                    }
+                    Ok(resp) => {
+                        log::error!(
+                            "[Pipeline] {pl_name} [inv={inv}]: cross-type ingestion failed (status={}): {}",
+                            resp.status_code,
+                            resp.message,
+                        );
+                    }
+                    Err(e) => {
+                        log::error!(
+                            "[Pipeline] {pl_name} [inv={inv}]: cross-type ingestion error: {e}"
+                        );
+                    }
+                }
+            });
+        }
+
+        log::info!(
+            "[Pipeline] {} [inv={inv_id}] : LeafNode {} done processing {count} records (stream={}:{})",
+            metadata.pipeline_name,
+            metadata.node_idx,
+            stream_params.stream_type,
+            stream_params.stream_name
+        );
+    } else {
+        log::debug!(
+            "[Pipeline] {} [inv={inv_id}]: source node {} starts processing",
+            metadata.pipeline_name,
+            metadata.node_idx
+        );
+        // source stream node: send received record to all its children
+        while let Some(item) = channels.receiver.recv().await {
+            send_to_children(&mut channels.child_senders, item, "StreamNode").await;
+            count += 1;
+        }
+        log::debug!(
+            "[Pipeline] {} [inv={inv_id}] : source node {} done processing {count} records",
+            metadata.pipeline_name,
+            metadata.node_idx
+        );
+    }
+    count
 }
 
 #[cfg(feature = "enterprise")]

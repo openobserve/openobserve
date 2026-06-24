@@ -21,6 +21,24 @@ use bytes::Bytes;
 use super::*;
 use crate::puffin_directory::footer_cache::FOOTER_DATA_CACHE;
 
+/// Suffix pulled from a `.ttv` tail on footer-cache miss. A `.ttv` footer is a
+/// small uncompressed JSON over a fixed ~6-blob single-segment index (~1 KB in
+/// practice, never above ~2 KB and independent of indexed-field count), so 4 KB
+/// covers it in one read instead of two; rare larger footers re-read precisely.
+const PUFFIN_FOOTER_PROBE_BYTES: u64 = 4 * 1024;
+
+/// Slice the payload (`HeadMagic + JSON`) out of a file-tail `suffix`, or `None`
+/// if the suffix doesn't reach the start of the footer region.
+fn slice_payload_from_suffix(suffix: &Bytes, payload_size: u64) -> Option<Bytes> {
+    let need = MAGIC_SIZE + payload_size + FOOTER_SIZE;
+    if need > suffix.len() as u64 {
+        return None;
+    }
+    let start = suffix.len() - need as usize;
+    let end = suffix.len() - FOOTER_SIZE as usize;
+    Some(suffix.slice(start..end))
+}
+
 #[derive(Debug)]
 pub struct PuffinBytesReader {
     account: String,
@@ -188,8 +206,7 @@ impl PuffinFooterBytesReader {
                 payload
             }
             None => {
-                let footer = self.read_footer_metadata().await?;
-                let payload = self.read_payload().await?;
+                let (footer, payload) = self.read_footer_and_payload().await?;
                 let mut combined = Vec::with_capacity(footer.len() + payload.len());
                 combined.extend_from_slice(&footer);
                 combined.extend_from_slice(&payload);
@@ -204,8 +221,10 @@ impl PuffinFooterBytesReader {
         Ok(self.metadata.unwrap())
     }
 
-    /// Read the footer tail and populate flags + payload_size. Returns the raw footer bytes.
-    async fn read_footer_metadata(&mut self) -> Result<Bytes> {
+    /// Read the footer tail and payload, in a single request when the footer
+    /// fits the probe (the common case) and a precise re-read otherwise. Returns
+    /// `(footer_tail, payload)`: the last `FOOTER_SIZE` bytes and `HeadMagic + JSON`.
+    async fn read_footer_and_payload(&mut self) -> Result<(Bytes, Bytes)> {
         if self.source.size < FOOTER_SIZE {
             return Err(anyhow!(
                 "Unexpected footer size: expected size {} vs actual size {}",
@@ -213,15 +232,35 @@ impl PuffinFooterBytesReader {
                 self.source.size
             ));
         }
-        let footer = infra::cache::storage::get_range(
+
+        let mut suffix = self.read_suffix(PUFFIN_FOOTER_PROBE_BYTES).await?;
+        self.parse_footer_metadata(&suffix.slice(suffix.len() - FOOTER_SIZE as usize..))?;
+
+        // Re-read exactly the footer region if the probe fell short.
+        let need = MAGIC_SIZE + self.payload_size + FOOTER_SIZE;
+        if need > suffix.len() as u64 {
+            suffix = self.read_suffix(need).await?;
+        }
+
+        let footer = suffix.slice(suffix.len() - FOOTER_SIZE as usize..);
+        let payload = slice_payload_from_suffix(&suffix, self.payload_size)
+            .ok_or_else(|| anyhow!("Unexpected payload size"))?;
+        ensure!(
+            payload.starts_with(&MAGIC),
+            anyhow!("Payload MAGIC mismatch")
+        );
+        Ok((footer, payload))
+    }
+
+    /// Read the last `n` bytes of the file (clamped to its size) in one request.
+    async fn read_suffix(&self, n: u64) -> Result<Bytes> {
+        let n = n.min(self.source.size);
+        Ok(infra::cache::storage::get_range(
             &self.account,
             &self.source.location,
-            (self.source.size - FOOTER_SIZE)..self.source.size,
+            (self.source.size - n)..self.source.size,
         )
-        .await?;
-
-        self.parse_footer_metadata(&footer)?;
-        Ok(footer)
+        .await?)
     }
 
     /// Parse footer metadata from in-memory bytes. Sets flags and payload_size on self.
@@ -255,27 +294,6 @@ impl PuffinFooterBytesReader {
         }
 
         Ok(())
-    }
-
-    /// Read the payload region from storage. Requires self.payload_size to be set first.
-    async fn read_payload(&self) -> Result<Bytes> {
-        match infra::cache::storage::get_range(
-            &self.account,
-            &self.source.location,
-            (self.source.size - FOOTER_SIZE - self.payload_size - MAGIC_SIZE)
-                ..(self.source.size - FOOTER_SIZE),
-        )
-        .await
-        {
-            Ok(payload) => {
-                ensure!(
-                    payload.slice(0..MAGIC_SIZE as usize).to_vec() == MAGIC,
-                    anyhow!("Footer MAGIC mismatch")
-                );
-                Ok(payload)
-            }
-            Err(e) => Err(anyhow!("Error reading footer payload: {e}")),
-        }
     }
 
     fn parse_payload(&self, bytes: &[u8]) -> Result<PuffinMeta> {
@@ -639,6 +657,67 @@ mod tests {
         // Test invalid flags
         let invalid_flags = PuffinFooterFlags::from_bits(999);
         assert!(invalid_flags.is_none());
+    }
+
+    #[test]
+    fn test_slice_payload_from_suffix_roundtrip() {
+        use crate::puffin::writer::PuffinBytesWriter;
+
+        // Build a real puffin file in memory (write through a &mut Vec so we can
+        // read the buffer back after the writer is dropped).
+        let mut buf: Vec<u8> = Vec::new();
+        {
+            let mut writer = PuffinBytesWriter::new(&mut buf);
+            writer
+                .add_blob(
+                    b"meta-json-bytes",
+                    BlobTypes::O2TtvV1,
+                    "meta.json".to_string(),
+                )
+                .unwrap();
+            writer
+                .add_blob(
+                    &vec![7u8; 4096],
+                    BlobTypes::O2TtvV1,
+                    "abcdef0123456789.term".to_string(),
+                )
+                .unwrap();
+            writer.finish().unwrap();
+        }
+        let file: Bytes = Bytes::from(buf);
+        let total = file.len() as u64;
+
+        // Re-derive payload_size the way parse_footer_metadata does.
+        let footer = file.slice((total - FOOTER_SIZE) as usize..);
+        let payload_size = i32::from_le_bytes(
+            footer[0..FOOTER_PAYLOAD_SIZE_SIZE as usize]
+                .try_into()
+                .unwrap(),
+        ) as u64;
+        let need = MAGIC_SIZE + payload_size + FOOTER_SIZE;
+
+        // The canonical payload (HeadMagic + JSON) as the original 2-IO path reads it.
+        let expected_payload = file.slice(
+            (total - FOOTER_SIZE - payload_size - MAGIC_SIZE) as usize
+                ..(total - FOOTER_SIZE) as usize,
+        );
+
+        // Fast path: a probe covering the whole file, and one covering exactly `need`.
+        for probe in [total, need] {
+            let suffix = file.slice((total - probe) as usize..);
+            let payload = slice_payload_from_suffix(&suffix, payload_size)
+                .expect("probe covers footer region");
+            assert_eq!(payload, expected_payload);
+            // And it must start with the head magic + deserialize to the same meta.
+            assert_eq!(payload.slice(0..MAGIC_SIZE as usize).to_vec(), MAGIC);
+            let meta: PuffinMeta =
+                serde_json::from_slice(&payload.slice(MAGIC_SIZE as usize..)).unwrap();
+            assert_eq!(meta.blobs.len(), 2);
+        }
+
+        // Fallback path: probe one byte short of the footer region -> None.
+        let short = file.slice((total - (need - 1)) as usize..);
+        assert!(slice_payload_from_suffix(&short, payload_size).is_none());
     }
 
     #[test]

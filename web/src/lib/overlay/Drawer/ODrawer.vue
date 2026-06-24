@@ -13,6 +13,7 @@ import {
 import { ref, watch, watchEffect, useSlots, computed, inject, provide, nextTick, useAttrs } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { useScrollShadow } from "@/lib/overlay/useScrollShadow";
+import { FORM_SUBMIT_STATE_KEY } from "@/lib/forms/Form/OForm.types";
 
 defineOptions({ inheritAttrs: false });
 const $attrs = useAttrs();
@@ -103,6 +104,12 @@ function handleInteractOutside(e: Event) {
 const drawerDepth = inject<number>("o2DrawerDepth", 0);
 provide("o2DrawerDepth", drawerDepth + 1);
 
+// Auto loading: an OForm nested in the body (linked via `form-id`) mirrors its
+// `isSubmitting` into this ref, so the footer Save button shows its spinner
+// during an awaited @submit handler — no `:primary-button-loading` needed.
+const formSubmitting = ref(false);
+provide(FORM_SUBMIT_STATE_KEY, formSubmitting);
+
 const overlayZIndex = computed(() => 5999 + drawerDepth * 1000);
 const contentZIndex = computed(() => 6000 + drawerDepth * 1000);
 
@@ -125,10 +132,16 @@ const hasFooter = computed(
 const hasTrigger = computed(() => !!slots.trigger);
 const isRight = computed(() => props.side !== "left");
 
+// The primary button is loading when the consumer says so OR a nested OForm is
+// mid-submit (auto). Kept as a computed so the disabled logic below picks it up.
+const primaryLoading = computed(
+  () => props.primaryButtonLoading || formSubmitting.value,
+);
+
 // Auto-disable all buttons when any one of them is loading
 const anyButtonLoading = computed(
   () =>
-    props.primaryButtonLoading ||
+    primaryLoading.value ||
     props.secondaryButtonLoading ||
     props.neutralButtonLoading,
 );
@@ -525,7 +538,7 @@ watch(internalOpen, (open) => {
                 :type="formId ? 'submit' : 'button'"
                 :form="formId || undefined"
                 :disabled="primaryEffectivelyDisabled"
-                :loading="primaryButtonLoading"
+                :loading="primaryLoading"
                 @click="!formId && emit('click:primary')"
               >
                 {{ primaryButtonLabel }}

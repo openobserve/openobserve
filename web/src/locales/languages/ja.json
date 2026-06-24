@@ -1403,6 +1403,7 @@
     "selectDashboardLabel": "ダッシュボードを選択",
     "selectTabLabel": "タブを選択",
     "numbers": "数字",
+    "localeFormat": "ロケール形式",
     "nanoseconds": "ナノ秒 (ns)",
     "currency": "通貨",
     "p99": "99",
@@ -3448,7 +3449,9 @@
     "import_this_pattern": "このパターンをインポート",
     "patterns_loaded": "{count} 個のパターンをロードしました",
     "failed_to_load": "パターンを読み込めませんでした",
-    "no_patterns_selected": "少なくとも 1 つのパターンを選択してください"
+    "no_patterns_selected": "少なくとも 1 つのパターンを選択してください",
+    "name_required": "* 名前が必要です",
+    "pattern_required": "* パターンは必須です"
   },
   "search_history": {
     "title": "検索履歴",
@@ -4049,7 +4052,12 @@
     "emptyActionLogs": "ログを見る",
     "emptyActionLogsDesc": "ログストリームの検索とフィルタリング",
     "emptyActionTraces": "トレースを調べる",
-    "emptyActionTracesDesc": "分散型トレースとサービスレイテンシーの検査"
+    "emptyActionTracesDesc": "分散型トレースとサービスレイテンシーの検査",
+    "viewAll": "すべて表示",
+    "showingOf": "{total} の {表示済み} を表示中",
+    "colErrorRate": "エラー率",
+    "colLatency": "レイテンシー",
+    "colReqs": "必要条件"
   },
   "chatHistory": {
     "title": "チャット",
