@@ -190,6 +190,58 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div
                     class="tw:flex tw:justify-end tw:mr-2 tw:mt-1 tw:items-center tw:gap-2"
                   >
+                    <!-- Show Legends button -->
+                    <OButton
+                      v-if="
+                        ![
+                          'table', 'heatmap', 'metric', 'gauge',
+                          'geomap', 'maps',
+                        ].includes(dashboardPanelData.data.type)
+                      "
+                      variant="ghost"
+                      size="icon"
+                      @click="showLegendsDialog = true"
+                      icon-left="format-list-bulleted"
+                      data-test="panel-editor-show-legends-btn"
+                    >
+                      <OTooltip content="Show Legends" side="bottom" align="end" />
+                    </OButton>
+
+                    <!-- Add Annotations button -->
+                    <OButton
+                      v-if="
+                        editMode &&
+                        pageType === 'dashboard' &&
+                        [
+                          'area', 'area-stacked', 'bar', 'h-bar',
+                          'line', 'scatter', 'stacked', 'h-stacked',
+                        ].includes(dashboardPanelData.data.type) &&
+                        panelSchemaRendererRef?.checkIfPanelIsTimeSeries === true
+                      "
+                      variant="ghost"
+                      size="icon"
+                      @click="panelSchemaRendererRef?.toggleAddAnnotationMode()"
+                      data-test="panel-editor-annotation-btn"
+                    >
+                      <OIcon
+                        :name="
+                          panelSchemaRendererRef?.isAddAnnotationMode
+                            ? 'cancel'
+                            : 'edit'
+                        "
+                        size="sm"
+                      />
+                      <OTooltip
+                        :content="
+                          panelSchemaRendererRef?.isAddAnnotationMode
+                            ? 'Exit Annotations Mode'
+                            : 'Add Annotations'
+                        "
+                        side="bottom"
+                        align="end"
+                      />
+                    </OButton>
+
                     <PanelErrorButtons
                       :error="errorMessage"
                       :maxQueryRangeWarning="maxQueryRangeWarning"
@@ -233,7 +285,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :width="6"
                         :shouldRefreshWithoutCache="shouldRefreshWithoutCache"
                         :regionClusterParams="props.regionClusterParams"
-                        :showLegendsButton="true"
+                        :showLegendsButton="false"
                         :searchType="searchType"
                         :searchResponse="props.searchResponse"
                         :is_ui_histogram="props.isUiHistogram"
@@ -649,6 +701,7 @@ import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue
 import PanelErrorButtons from "@/components/dashboards/PanelErrorButtons.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";

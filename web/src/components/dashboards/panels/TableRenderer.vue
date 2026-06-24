@@ -75,6 +75,7 @@ import TablePaginationControls from "@/components/dashboards/addPanel/TablePagin
 import { TABLE_ROWS_PER_PAGE_DEFAULT_VALUE } from "@/utils/dashboard/constants";
 import { getColorForTable } from "@/utils/dashboard/colorPalette";
 import { findFirstValidMappedValue } from "@/utils/dashboard/panelValidation";
+import { useStore } from "vuex";
 
 export default defineComponent({
   name: "TableRenderer",
@@ -108,6 +109,7 @@ export default defineComponent({
   },
   emits: ["row-click"],
   setup(props) {
+    const store = useStore();
     const tableRef = ref<any>(null);
 
     /** Returns true when the hex colour is dark (needs white text). */
@@ -134,7 +136,7 @@ export default defineComponent({
 
       // 1) Auto color mode — stable palette per distinct string value.
       if (col?.colorMode === "auto") {
-        const palette = getColorForTable;
+        const palette = getColorForTable(store.state.theme);
         const key = String(value);
         const colKey = col.field ?? col.name;
         if (!autoColorCache.has(colKey)) autoColorCache.set(colKey, new Map<string, string>());

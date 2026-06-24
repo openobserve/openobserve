@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="tw:h-full tw:flex tw:flex-col"
+    class="tw:h-full tw:flex tw:flex-col tw:rounded-lg tw:overflow-hidden"
     @mouseover="() => (isCurrentlyHoveredPanel = true)"
     @mouseleave="() => (isCurrentlyHoveredPanel = false)"
     :data-test="`dashboard-panel-container`"
@@ -25,9 +25,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div :class="{ 'tw:shrink-0': !viewOnly && !simplifiedPanelView }">
       <div
-        class="tw:flex tw:flex-nowrap tw:items-center tw:w-full tw:min-h-7 tw:px-1"
-        :class="{ 'dark-mode': store.state.theme === 'dark' }"
-        style="border-top-left-radius: 3px; border-top-right-radius: 3px"
+        class="tw:flex tw:flex-nowrap tw:items-center tw:w-full tw:min-h-7 tw:py-1 tw:px-2 tw:border-b tw:border-border-subtle tw:rounded-t-lg"
+        :class="{ 'tw:border-b-transparent': isPanelLoading }"
         data-test="dashboard-panel-bar"
       >
         <OIcon
@@ -37,12 +36,53 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <div
           :title="props.data.title"
-          class="tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis"
+          class="tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis tw:text-[0.8125rem] tw:font-medium tw:text-(--color-text-primary) tw:tracking-[0.02em]"
           data-test="dashboard-panel-header"
         >
           {{ props.data.title }}
         </div>
         <div class="tw:flex-1" />
+
+        <!-- Show Legends button -->
+        <OButton
+          v-if="
+            isCurrentlyHoveredPanel &&
+            props.showLegendsButton &&
+            ![
+              'table', 'html', 'markdown', 'custom_chart',
+              'geomap', 'maps', 'heatmap', 'metric', 'gauge',
+            ].includes(props.data.type)
+          "
+          variant="ghost"
+          size="icon"
+          @click="showLegendsDialog = true"
+          icon-left="format-list-bulleted"
+          data-test="dashboard-show-legends-btn"
+        >
+          <OTooltip content="Show Legends" side="bottom" align="end" />
+        </OButton>
+
+        <!-- Add Annotations button -->
+        <OButton
+          v-if="
+            !viewOnly &&
+            !simplifiedPanelView &&
+            isCurrentlyHoveredPanel &&
+            [
+              'area', 'area-stacked', 'bar', 'h-bar',
+              'line', 'scatter', 'stacked', 'h-stacked',
+            ].includes(props.data.type) &&
+            PanleSchemaRendererRef?.checkIfPanelIsTimeSeries === true
+          "
+          variant="ghost"
+          size="icon"
+          @click="PanleSchemaRendererRef?.toggleAddAnnotationMode()"
+          data-test="panel-schema-renderer-annotation-button"
+        >
+          <OIcon :name="PanleSchemaRendererRef?.isAddAnnotationMode ? 'cancel' : 'edit'" size="sm" />
+          <OTooltip :content="PanleSchemaRendererRef?.isAddAnnotationMode ? 'Exit Annotations Mode' : 'Add Annotations'" side="bottom" align="end" />
+        </OButton>
+
         <OIcon
           v-if="
             !viewOnly &&
@@ -52,11 +92,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           name="info-outline"
           size="sm"
-          style="cursor: pointer"
+          class="tw:cursor-pointer"
           data-test="dashboard-panel-description-info"
         >
-          <OTooltip side="bottom" align="end" max-width="220px">
-            <template #content><div style="white-space: pre-wrap">{{ props.data.description }}</div></template>
+          <OTooltip side="bottom" align="end" max-width="13.75rem">
+            <template #content><div class="tw:whitespace-pre-wrap">{{ props.data.description }}</div></template>
           </OTooltip>
         </OIcon>
         <OButton
@@ -77,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-panel-dependent-adhoc-variable-btn"
           icon-left="warning"
         >
-          <OTooltip side="bottom" align="end" max-width="220px" content="Some dynamic variables are not applied because the field is not present in the query's stream. Open Query Inspector to see all the details of the variables and queries executed to render this panel" />
+          <OTooltip side="bottom" align="end" max-width="13.75rem" content="Some dynamic variables are not applied because the field is not present in the query's stream. Open Query Inspector to see all the details of the variables and queries executed to render this panel" />
         </OButton>
         <!-- show error here -->
         <PanelErrorButtons
@@ -979,4 +1019,3 @@ export default defineComponent({
   },
 });
 </script>
-

@@ -145,18 +145,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </div>
       </div>
-      <div
+      <OEmptyState
         v-if="
+          noData &&
           !errorDetail?.message &&
           panelSchema.type != 'geomap' &&
           panelSchema.type != 'maps' &&
           !loading
         "
-        class="tw:absolute tw:top-[20%] tw:w-full tw:text-center"
+        size="inline"
+        icon="bar-chart"
+        :title="noData"
+        :backdrop="false"
         data-test="no-data"
-      >
-        {{ noData }}
-      </div>
+        class="tw:absolute tw:inset-0 tw:w-full tw:h-full"
+      />
       <div
         v-if="
           errorDetail?.message &&
@@ -427,6 +430,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import { copyToClipboard } from "@/utils/clipboard";
 import { calculateWidthText } from "@/utils/dashboard/chartDimensionUtils";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 
 export default defineComponent({
   name: "PanelSchemaRenderer",
@@ -446,7 +450,8 @@ export default defineComponent({
     OButton,
     OIcon,
     OTooltip,
-},
+    OEmptyState,
+  },
   props: {
     selectedTimeObj: {
       required: true,
@@ -1740,4 +1745,3 @@ export default defineComponent({
   },
 });
 </script>
-

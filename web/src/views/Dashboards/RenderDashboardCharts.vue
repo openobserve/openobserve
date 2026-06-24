@@ -140,7 +140,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             style="height: 100%; width: 100%"
           />
         </div>
-        <div v-else-if="panels.length > 0" ref="gridStackContainer" class="grid-stack tw:bg-transparent tw:m-0.5">
+        <div
+          v-else-if="panels.length > 0"
+          ref="gridStackContainer"
+          class="grid-stack tw:bg-transparent tw:m-0.5"
+        >
           <div
             v-for="item in panels"
             :key="item.id + selectedTabId"
@@ -151,12 +155,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :gs-h="getPanelLayout(item, 'h')"
             :gs-min-w="getMinimumWidth(item.type)"
             :gs-min-h="getMinimumHeight(item.type)"
-            class="grid-stack-item tw:bg-transparent! tw:rounded tw:border-[#c2c2c27a]! tw:dark:border-[rgba(204,204,220,0.12)]!"
-            :class="store.state.theme == 'dark' ? 'dark' : ''"
+            class="grid-stack-item gridBackground tw:bg-transparent! tw:rounded-lg tw:border-border-default!"
+            :class="store.state.theme == 'dark' ? 'dark tw:border-border-default!' : ''"
           >
             <div class="grid-stack-item-content">
               <!-- Panel with Panel-Level Variables -->
-              <div class="tw:h-full tw:flex tw:flex-col">
+              <div class="panel-with-variables tw:h-full tw:flex tw:flex-col">
                 <!-- Original Panel Container -->
 
                 <PanelContainer
@@ -247,7 +251,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           {}
                         "
                         :initialVariableValues="initialVariableValues"
-                        :style="{ marginBottom: '8px' }"
+                        class="panel-variables-margin tw:mb-2"
                         data-test="panel-variables-selector"
                       />
                     </div>
@@ -1688,24 +1692,36 @@ export default defineComponent({
 });
 </script>
 
+<!--
+  Plain GLOBAL (unscoped) style block.
+  Only rules that target third-party / dynamically-created DOM that this
+  template does NOT render directly are kept here (GridStack-injected classes,
+  Quasar internals, print/page setup). All component-own element styles are
+  expressed as inline tw: utilities in the template above.
+-->
 <style>
+/* Quasar table top toolbar (dynamic Quasar DOM — cannot be inlined) */
+.q-table__top {
+  border-bottom: 1px solid var(--color-border-default);
+  justify-content: flex-end;
+}
+
 /* When grid is static (disabled), hide resize handles */
 .grid-stack.grid-stack-static .ui-resizable-handle {
   display: none !important;
 }
 
-/* The visible panel outline lives on the content child; in dark mode pull
-   it onto the design token (clean solid edge) instead of the bright
-   #c2c2c27a gray, which reads too light against the dark canvas. */
+/* Dark-mode outline lives on the content child; pull it onto the design
+   token for a clean solid edge against the dark canvas. */
 .grid-stack-item.dark .grid-stack-item-content {
   border-color: var(--color-border-default);
 }
 
 .grid-stack-item .grid-stack-item-content {
-  border: 1px solid #c2c2c27a;
-  border-radius: 4px;
+  border: 1px solid var(--color-border-default);
+  border-radius: 0.375rem;
   overflow: visible;
-  border-radius: inherit;
+  box-shadow: var(--shadow-sm);
 }
 
 /* GridStack theme overrides */
@@ -1716,7 +1732,8 @@ export default defineComponent({
 .grid-stack .grid-stack-item.ui-draggable-dragging {
   opacity: 0.8;
   z-index: 1000;
-  transition: transform 0.15s ease;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.15);
 }
 
 .grid-stack .grid-stack-item.ui-resizable-resizing {
@@ -1730,11 +1747,11 @@ export default defineComponent({
 .grid-stack .grid-stack-item > .ui-resizable-handle.ui-resizable-se {
   background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'><path d='M8 2 L8 8 L2 8' stroke='%23999999' stroke-width='1.5' fill='none' stroke-linecap='round'/></svg>")
     no-repeat center;
-  background-size: 8px 8px;
-  width: 16px;
-  height: 16px;
-  bottom: 2px;
-  right: 2px;
+  background-size: 0.5rem 0.5rem;
+  width: 1rem;
+  height: 1rem;
+  bottom: 0.125rem;
+  right: 0.125rem;
   cursor: se-resize;
   transform: rotate(0deg) !important;
 }
@@ -1775,6 +1792,12 @@ export default defineComponent({
     overflow: visible !important;
   }
 
+  /* Quasar virtual-scroll inserts padding divs above/below the rendered
+   * rows to simulate the full scroll height. In print mode these become
+   * empty white space. Hide them so no blank gaps appear in table panels. */
+  .q-virtual-scroll__padding {
+    display: none !important;
+  }
 }
 
 /* Print page setup — landscape A4 fits the dashboard width better than

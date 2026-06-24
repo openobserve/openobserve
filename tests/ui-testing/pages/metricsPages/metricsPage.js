@@ -40,6 +40,19 @@ export class MetricsPage {
         // Inline error list locator (DashboardErrors component)
         this.inlineError = page.locator('[data-test="dashboard-error"]');
 
+        // No-data placeholder. Rendered via OEmptyState, whose root keeps its own
+        // data-test="o2-empty-state"; in production builds Vue hoists that static
+        // attribute so the fallthrough data-test="no-data" does not override it.
+        // Match either marker, scoping the generic o2-empty-state under the
+        // panel-editor container (parent → child) so it stays build-agnostic.
+        this.noDataMessage = page.locator(
+            '[data-test="no-data"], [data-test="panel-editor-container"] [data-test="o2-empty-state"]'
+        );
+
+        // Chart renderer container. Its presence means PanelSchemaRenderer mounted the
+        // chart path without crashing — a valid graceful outcome for invalid queries.
+        this.chartRenderer = page.locator('[data-test="chart-renderer"]');
+
         // ===== metrics-config.spec.js locators =====
         // Date/time picker (shared metrics control)
         this.dateTimePicker = page.locator('[data-test="metrics-date-picker"]');
@@ -588,8 +601,12 @@ export class MetricsPage {
                 if (canvases.length > 0) return true;
                 const tableHasRows = document.querySelector('[data-test="promql-table-chart"] tbody tr');
                 if (tableHasRows) return true;
-                // A "no-data" state is also valid completion.
-                const noData = document.querySelector('[data-test="no-data"]');
+                // A "no-data" state is also valid completion. The placeholder uses
+                // OEmptyState (own data-test="o2-empty-state"); prod hoists that static
+                // attr over the fallthrough no-data, so match either marker.
+                const noData = document.querySelector(
+                    '[data-test="no-data"], [data-test="panel-editor-container"] [data-test="o2-empty-state"]'
+                );
                 if (noData) return true;
                 return false;
             },
@@ -1748,24 +1765,17 @@ export class MetricsPage {
     }
 
     async getNoDataMessage() {
-        // Check for various no-data/empty state messages
-        const noDataSelectors = [
-            'text=/no data|No results|Empty|no records|0 results/i',
-            '[class*="no-data"]',
-            '[class*="empty-state"]',
-            '.no-results',
-            '.empty-results',
-            '[data-test*="no-data"]',
-            '[data-test*="empty"]'
-        ];
+        // Returns the no-data placeholder locator (data-test only; see constructor).
+        return this.noDataMessage.first();
+    }
 
-        for (const selector of noDataSelectors) {
-            const element = this.page.locator(selector).first();
-            if (await element.count() > 0) {
-                return element;
-            }
-        }
-        return this.page.locator('text=/no data|No results|Empty/i').first();
+    /**
+     * Get the chart-renderer container locator. Its presence indicates the panel
+     * rendered the chart path without crashing.
+     * @returns {import('@playwright/test').Locator}
+     */
+    getChartRenderer() {
+        return this.chartRenderer;
     }
 
     async getHighlightedElements() {

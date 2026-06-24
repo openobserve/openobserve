@@ -607,11 +607,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="tw:p-0 tw:h-[1.875rem]! element-box-shadow"
                   :class="[
                     isNaturalLanguageDetected && !searchObj.meta.nlpMode
-                      ? 'o2-ai-generate-button'
+                      ? 'o2-ai-generate-button tw:[border-radius:0.375rem_0_0_0.375rem]!'
                       : 'tw:text-[var(--text-xs)] tw:[font-weight:var(--font-medium)]! tw:leading-4! tw:px-1! tw:w-[5.875rem]! tw:whitespace-normal tw:break-words tw:text-center tw:[transition:box-shadow_0.3s_ease,opacity_0.2s_ease] tw:bg-[var(--o2-primary-btn-bg)]! tw:text-[var(--o2-primary-btn-text)]! tw:hover:opacity-90 tw:hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--o2-primary-btn-bg),transparent_30%)]',
-                    config.isEnterprise == 'true'
-                      ? 'tw:[border-radius:0.375rem_0_0_0.375rem]!'
-                      : 'tw:rounded-md',
+                    'tw:[border-radius:0.375rem_0_0_0.375rem]!',
                   ]"
                   @click="
                     isNaturalLanguageDetected && !searchObj.meta.nlpMode
@@ -644,9 +642,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               )
                             ? 'tw:bg-[var(--o2-primary-btn-bg)]! tw:text-[var(--o2-primary-btn-text)]! tw:hover:opacity-90 tw:hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--o2-primary-btn-bg),transparent_30%)]'
                             : '',
-                        config.isEnterprise == 'true'
-                          ? 'tw:[border-radius:0_0.375rem_0.375rem_0]!'
-                          : 'tw:rounded-md',
+                        'tw:[border-radius:0_0.375rem_0.375rem_0]!',
                       ]"
                     >
                       <OIcon name="arrow-drop-down" size="sm" />
@@ -680,7 +676,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div v-else class="tw:flex tw:items-center">
                 <!-- Cancel button when query is running -->
                 <OButton
-                  v-if="visualizeSearchRequestTraceIds.length > 0"
+                  v-if="visualizeSearchRequestTraceIds.length > 0 && config.isEnterprise == 'true'"
                   data-test="logs-search-bar-visualize-cancel-btn"
                   variant="ghost"
                   :title="t('search.cancel')"
@@ -708,11 +704,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="tw:p-0 tw:h-[1.875rem]! element-box-shadow"
                   :class="[
                     isNaturalLanguageDetected && !searchObj.meta.nlpMode
-                      ? 'o2-ai-generate-button'
+                      ? 'o2-ai-generate-button tw:[border-radius:0.375rem_0_0_0.375rem]!'
                       : 'tw:text-[var(--text-xs)] tw:[font-weight:var(--font-medium)]! tw:leading-4! tw:px-1! tw:w-[5.875rem]! tw:whitespace-normal tw:break-words tw:text-center tw:[transition:box-shadow_0.3s_ease,opacity_0.2s_ease] tw:bg-[var(--o2-primary-btn-bg)]! tw:text-[var(--o2-primary-btn-text)]! tw:hover:opacity-90 tw:hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--o2-primary-btn-bg),transparent_30%)]',
-                    config.isEnterprise == 'true'
-                      ? 'tw:[border-radius:0.375rem_0_0_0.375rem]!'
-                      : 'tw:rounded-md',
+                    'tw:[border-radius:0.375rem_0_0_0.375rem]!',
                   ]"
                   @click="
                     isNaturalLanguageDetected && !searchObj.meta.nlpMode
@@ -726,7 +720,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       : t("search.runQuery")
                   }}
                 </OButton>
-                <OSeparator class="tw:h-[1.875rem]! tw:w-[1px]" />
+                <OSeparator class="tw:h-[1.875rem]! tw:w-[1px]" vertical />
                 <ODropdown align="end" side="bottom">
                   <template #trigger>
                     <OButton
@@ -745,9 +739,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               )
                             ? 'tw:bg-[var(--o2-primary-btn-bg)]! tw:text-[var(--o2-primary-btn-text)]! tw:hover:opacity-90 tw:hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--o2-primary-btn-bg),transparent_30%)]'
                             : '',
-                        config.isEnterprise == 'true'
-                          ? 'tw:[border-radius:0_0.375rem_0.375rem_0]!'
-                          : 'tw:rounded-md',
+                        'tw:[border-radius:0_0.375rem_0.375rem_0]!',
                       ]"
                     >
                       <OIcon name="arrow-drop-down" size="sm" />

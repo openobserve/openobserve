@@ -421,20 +421,33 @@ test.describe("Sankey chart testcases", () => {
       await pm.dashboardPanelActions.waitForChartToRender();
 
       // Verify no data or error is shown (incomplete Sankey config).
-      // Use expect.poll to handle the async gap between the apply button
-      // re-enabling and Vue committing the no-data text to the DOM.
-      // Checking textContent (not just isVisible) avoids false-positives
-      // from the empty zero-height no-data div that exists when noData === "".
+      // With only a Source field, the Sankey config is incomplete, so applying
+      // surfaces panel validation errors ("Add one field for the target/value")
+      // instead of running the query — the "No Data" empty state never renders.
+      // Accept EITHER the dashboard validation errors OR a "No Data" state.
+      //
+      // IMPORTANT: check the error locator FIRST and use count()/isVisible()
+      // (instant, no auto-wait). locator.textContent() auto-waits for the
+      // element to attach, so calling it on [data-test="no-data"] — which never
+      // renders here — blocks the whole poll for its full timeout and starves
+      // the error check that would otherwise pass on the first iteration.
       const noDataLocator = pm.dashboardPanelActions.getNoDataLocator();
       const dashErrorLocator = pm.dashboardPanelActions.getDashboardErrorLocator();
 
       await expect.poll(async () => {
-        const noDataText = (await noDataLocator.textContent().catch(() => '')).trim();
-        const dashErrorVisible = await dashErrorLocator.isVisible().catch(() => false);
-        return noDataText.length > 0 || dashErrorVisible;
+        // Validation errors are the expected outcome for an incomplete Sankey.
+        if (await dashErrorLocator.isVisible().catch(() => false)) return true;
+        // Only read text once the no-data element exists (count() never waits),
+        // avoiding the textContent auto-wait that blocked the poll previously.
+        if ((await noDataLocator.count()) === 0) return false;
+        const noDataText = (
+          await noDataLocator.first().textContent().catch(() => "")
+        ).trim();
+        return noDataText.length > 0;
       }, {
         timeout: 12000,
-        message: 'Expected "No Data" or dashboard error when only Source field is configured',
+        message:
+          'Expected dashboard validation errors or "No Data" when only Source field is configured',
       }).toBeTruthy();
 
       testLogger.info("Sankey no data state verified");
