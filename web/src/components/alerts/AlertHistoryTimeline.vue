@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ skippedCount }} Skipped
         </span>
         <span v-if="hasFlappingZone" class="tw:flex tw:items-center tw:gap-1 tw:text-[11px] tw:font-semibold" style="color: #7c3aed; filter: brightness(0.9)">
-          <span class="tw:inline-block tw:w-2 tw:h-2 tw:rounded-sm" style="background: #7c3aed" />
+          <span class="tw:inline-block tw:w-2 tw:h-2 tw:rounded-sm o2-flap-swatch" />
           Flapping
         </span>
       </div>
@@ -50,24 +50,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="tw:flex tw:flex-col tw:gap-[3px] tw:w-full tw:px-1">
 
     <!-- Strip -->
-    <div class="tw:flex tw:gap-[2px] tw:w-full tw:h-6 tw:items-stretch">
+    <div class="tw:flex tw:gap-[2px] tw:w-full tw:h-6 tw:items-stretch" style="overflow: visible">
       <template v-for="(seg, i) in segments" :key="i">
-        <!-- Flapping zone segment -->
+        <!-- Flapping zone — alternating hatched red/green cells + callout pill -->
         <div
           v-if="seg.type === 'flapping'"
-          class="tw:flex tw:items-center tw:justify-center tw:rounded-sm tw:cursor-default tw:relative tw:transition-opacity tw:duration-100 hover:tw:opacity-80"
-          :style="{ flex: seg.weight, minWidth: '12px', background: '#7c3aed' }"
+          class="tw:flex tw:gap-[2px] tw:items-stretch tw:relative"
+          :style="{ flex: seg.weight, minWidth: '12px' }"
           @mouseenter="hoveredIndex = i"
           @mouseleave="hoveredIndex = null"
         >
-          <span class="tw:text-[11px] tw:select-none tw:font-semibold tw:leading-none tw:tracking-wide tw:px-1 tw:truncate tw:overflow-clip" style="color: #fff">⚡ Flapping</span>
-          <div v-if="hoveredIndex === i" class="o2-timeline-tooltip">
-            <div class="tw:font-semibold tw:flex tw:items-center tw:gap-1">
-              <span>⚡ Flapping Zone</span>
-            </div>
-            <div class="tw:opacity-70 tw:mt-0.5">{{ seg.startLabel }} – {{ seg.endLabel }}</div>
-            <div class="tw:opacity-60 tw:text-[10px] tw:mt-0.5">{{ seg.count }} transitions</div>
+          <!-- Persistent callout pill above the zone -->
+          <div class="o2-flap-pill">
+            <span class="tw:font-semibold">⚡ Flapping</span>
+            <span class="o2-flap-pill-dot">•</span>{{ seg.flips }} flips
+            <span class="o2-flap-pill-dot">•</span>{{ seg.durationLabel }}
           </div>
+          <div
+            v-for="(cell, c) in seg.cells"
+            :key="c"
+            class="tw:flex-1 tw:rounded-sm tw:min-w-[6px]"
+            :style="flapCellStyle(cell.status)"
+          />
         </div>
 
         <!-- Normal block -->
@@ -93,20 +97,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
     </div><!-- /strip -->
 
-    <!-- Transition tick labels — one label per segment boundary (skip first = oldestLabel) -->
-    <div class="tw:flex tw:w-full tw:relative tw:h-[14px]">
-      <template v-for="(seg, i) in segments" :key="i">
-        <div :style="{ flex: seg.weight, minWidth: 0, position: 'relative' }">
-          <!-- Show label at the left edge of every segment except the first -->
-          <span
-            v-if="i > 0"
-            class="tw:absolute tw:left-0 tw:top-0 tw:text-[10px] tw:tabular-nums tw:whitespace-nowrap tw:translate-x-[-50%]"
-            style="color: var(--color-text-caption)"
-          >
-            {{ seg.startLabel }}
-          </span>
-        </div>
-      </template>
+    <!-- Transition tick labels — placed by cumulative width; labels that would
+         overlap the previously shown one are skipped to keep them readable. -->
+    <div class="tw:w-full tw:relative tw:h-[14px]">
+      <span
+        v-for="(tick, i) in tickLabels"
+        :key="i"
+        class="tw:absolute tw:top-0 tw:text-[10px] tw:tabular-nums tw:whitespace-nowrap tw:translate-x-[-50%]"
+        :style="{ left: tick.leftPct + '%', color: 'var(--color-text-caption)' }"
+      >
+        {{ tick.label }}
+      </span>
     </div><!-- /tick labels -->
 
     </div><!-- /strip + labels wrapper -->
@@ -224,7 +225,16 @@ const hasFlappingZone = computed(() => flappingMask.value.some(Boolean));
 // Weight = number of rows in segment (proportional width).
 
 type Segment =
-  | { type: "flapping"; weight: number; count: number; startLabel: string; endLabel: string }
+  | {
+      type: "flapping";
+      weight: number;
+      count: number;
+      cells: Array<{ status: string }>;
+      flips: number;
+      durationLabel: string;
+      startLabel: string;
+      endLabel: string;
+    }
   | { type: "normal";   weight: number; count: number; status: string; startLabel: string };
 
 const MAX_BLOCKS = 60;
@@ -267,10 +277,26 @@ const segments = computed<Segment[]>(() => {
     if (cur.flapping) {
       let j = i;
       while (j < displayRows.length && displayRows[j].flapping) j++;
+      const cells = displayRows.slice(i, j).map((r) => ({ status: r.status }));
+      // flips = number of firing<->ok state changes within the zone
+      let flips = 0;
+      let prevState = rowState(cells[0].status);
+      for (let k = 1; k < cells.length; k++) {
+        const s = rowState(cells[k].status);
+        if (s !== "other" && prevState !== "other" && s !== prevState) flips++;
+        if (s !== "other") prevState = s;
+      }
+      // duration spans from the zone start to the row just after the zone
+      // (or the last zone row if the flapping zone ends the timeline).
+      const startTs = displayRows[i].timestamp;
+      const endTs = displayRows[j]?.timestamp ?? displayRows[j - 1].timestamp;
       segs.push({
         type: "flapping",
         weight: j - i,
         count: j - i,
+        cells,
+        flips,
+        durationLabel: formatDuration(toMs(endTs) - toMs(startTs)),
         startLabel: formatTimestamp(displayRows[i].timestamp),
         endLabel: formatTimestamp(displayRows[j - 1].timestamp),
       });
@@ -292,6 +318,31 @@ const segments = computed<Segment[]>(() => {
   return segs;
 });
 
+// ── Tick labels ──────────────────────────────────────────────────────────────
+// Position each boundary label by cumulative segment weight (% of total) and
+// drop any that would sit too close to the previously shown label so they
+// never overlap. Endpoints are already shown as oldest/newest in the header.
+const MIN_TICK_GAP_PCT = 7;
+
+const tickLabels = computed<Array<{ leftPct: number; label: string }>>(() => {
+  const segs = segments.value;
+  const total = segs.reduce((sum, s) => sum + s.weight, 0) || 1;
+  const out: Array<{ leftPct: number; label: string }> = [];
+  let cum = 0;
+  let lastShownPct = -Infinity;
+  segs.forEach((seg, i) => {
+    if (i > 0) {
+      const pct = (cum / total) * 100;
+      if (pct - lastShownPct >= MIN_TICK_GAP_PCT && pct <= 100 - MIN_TICK_GAP_PCT) {
+        out.push({ leftPct: pct, label: seg.startLabel });
+        lastShownPct = pct;
+      }
+    }
+    cum += seg.weight;
+  });
+  return out;
+});
+
 // ── Labels ───────────────────────────────────────────────────────────────────
 
 const oldestLabel = computed(() =>
@@ -301,17 +352,87 @@ const newestLabel = computed(() =>
   sorted.value.length ? formatTimestamp(sorted.value[sorted.value.length - 1].timestamp) : "",
 );
 
+function toMs(ts: number): number {
+  // Timestamps may arrive in microseconds; normalize to milliseconds.
+  return ts > 1e12 ? ts / 1000 : ts;
+}
+
 function formatTimestamp(ts: number): string {
   if (!ts) return "";
-  const ms = ts > 1e12 ? ts / 1000 : ts;
-  return new Date(ms).toLocaleString([], {
+  return new Date(toMs(ts)).toLocaleString([], {
     month: "short", day: "numeric",
     hour: "2-digit", minute: "2-digit",
   });
 }
+
+function formatDuration(ms: number): string {
+  const totalMin = Math.max(0, Math.round(ms / 60000));
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  if (h && m) return `${h}h ${m}m`;
+  if (h) return `${h}h`;
+  return `${m}m`;
+}
+
+// Diagonal-hatch fill for a flapping cell, tinted by its real status colour.
+function flapCellStyle(status: string) {
+  return {
+    background:
+      "repeating-linear-gradient(45deg, rgba(255,255,255,0.32) 0, rgba(255,255,255,0.32) 2px, transparent 2px, transparent 6px), " +
+      blockColor(status),
+    boxShadow: "inset 0 0 0 1px rgba(124, 58, 237, 0.55)",
+  };
+}
 </script>
 
 <style scoped>
+/* Hatched purple swatch used in the legend for the flapping key */
+.o2-flap-swatch {
+  background:
+    repeating-linear-gradient(
+      45deg,
+      rgba(255, 255, 255, 0.4) 0,
+      rgba(255, 255, 255, 0.4) 1px,
+      transparent 1px,
+      transparent 3px
+    ),
+    #7c3aed;
+}
+
+/* Persistent purple callout pill above a flapping zone */
+.o2-flap-pill {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 30;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 12px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  background: #7c3aed;
+  box-shadow: var(--shadow-md);
+  pointer-events: none;
+}
+.o2-flap-pill-dot {
+  opacity: 0.6;
+  font-weight: 400;
+}
+.o2-flap-pill::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: #7c3aed;
+}
+
 .o2-timeline-tooltip {
   position: absolute;
   top: calc(100% + 6px);
