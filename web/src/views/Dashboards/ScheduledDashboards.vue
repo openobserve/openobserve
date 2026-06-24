@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       data-test="scheduled-dashboards-container"
       class="scheduled-dashboards tw:h-fit"
-      :class="store.state.theme === 'dark' ? 'dark-mode tw:bg-[var(--o2-primary-background)]' : 'tw:bg-white'"
+      :class="store.state.theme === 'dark' ? 'dark-mode tw:bg-[var(--color-surface-panel)]' : 'tw:bg-white'"
     >
     <OTable
       data-test="scheduled-dashboard-table"
