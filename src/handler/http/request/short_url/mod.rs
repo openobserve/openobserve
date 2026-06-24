@@ -117,7 +117,7 @@ pub async fn retrieve(
         org_id,
         short_id
     );
-    let original_url = short_url::retrieve(&short_id).await;
+    let original_url = short_url::retrieve(&org_id, &short_id).await;
 
     // Check if type=ui for JSON response
     if let Some(ref type_param) = query.type_param

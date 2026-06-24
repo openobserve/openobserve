@@ -1,0 +1,71 @@
+name: DocGen Caller (openobserve)
+
+# Thin caller: watches openobserve (OSS) PRs and forwards to the reusable DocGen engine that
+# lives in o2-enterprise. All real logic lives in the engine; this file only decides WHETHER
+# to run (command detection + org-member gate) and WHICH PR, then forwards.
+#
+# WHY A CALLER (not dispatch the engine directly): a reusable workflow runs in the CALLER's
+# context, so triggering from here makes the run use openobserve's own GITHUB_TOKEN /
+# github-actions[bot] — which can comment on OSS PRs. Dispatching the engine from o2-enterprise
+# would run in ENT's context (ENT bot) and could NOT comment on an OSS PR.
+#
+# TWO WAYS TO TRIGGER:
+#   - issue_comment    → an org member comments `/docgen` or `/docgen-dryrun` on an OSS PR.
+#   - workflow_dispatch → manual "Run workflow" button (Actions UI / gh) against a PR number.
+#                         Dispatch is inherently restricted to users with repo write access.
+#
+# ORG-MEMBER GATE (comment path, no API call): gate on the comment author_association —
+# OWNER / MEMBER (org member) or COLLABORATOR. On this PUBLIC repo this blocks random external
+# commenters from firing paid model runs.
+#
+# SECRETS CONTEXT: a cross-repo reusable runs in THIS (openobserve) repo's secrets context.
+# We use DeepSeek precisely because DEEPSEEK_API_KEY already exists here (e2e-council.yml +
+# ai-code-review.yml) — no Anthropic secret needed. E2E_DEV_CI_TOKEN is only used by the engine
+# for cross-repo diff reads + Phase B docs pushes (comments post as github-actions[bot]).
+#
+# KILL SWITCH: the engine honors a DOCGEN_DISABLED repo/org variable — set it to 'true' to
+# disable all DocGen runs without removing these files.
+
+on:
+  issue_comment:
+    types: [created]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "OSS PR number to run DocGen triage on"
+        required: true
+      dry_run:
+        description: "Triage only (no generation)"
+        type: boolean
+        # Intentional SAFE default: a manual dispatch previews (triage only) unless you opt
+        # into generation by unchecking this. (Comment path is explicit: /docgen = full run,
+        # /docgen-dryrun = triage.) In Phase A dry_run has no effect yet — everything is
+        # triage-only — so this only matters once Phase B (doc generation) lands.
+        default: true
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  call-docgen:
+    # Run on a manual dispatch, OR on an exact `/docgen[-dryrun]` comment from an org member.
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.issue.pull_request &&
+       (github.event.comment.body == '/docgen' || github.event.comment.body == '/docgen-dryrun') &&
+       contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association))
+    uses: openobserve/o2-enterprise/.github/workflows/docgen.yml@main
+    with:
+      source_repo: openobserve
+      # dispatch supplies pr_number directly (inputs.* is the typed dispatch context, empty on
+      # the comment path); comment path uses the commented PR.
+      pr_number: ${{ inputs.pr_number || github.event.issue.number }}
+      # dispatch: honor the (typed boolean) dry_run input; comment path: dry-run only for
+      # /docgen-dryrun. Use inputs.dry_run (typed bool), NOT github.event.inputs (a string).
+      dry_run: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || github.event.comment.body == '/docgen-dryrun' }}
+      actor: ${{ github.event_name == 'workflow_dispatch' && github.actor || github.event.comment.user.login }}
+    secrets:
+      DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+      CROSS_REPO_TOKEN: ${{ secrets.E2E_DEV_CI_TOKEN }}
