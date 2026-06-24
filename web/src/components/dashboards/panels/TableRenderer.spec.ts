@@ -388,6 +388,47 @@ describe("TableRenderer", () => {
       expect(style).toBe("");
     });
 
+    it("applies the LAST matching conditional rule when several match", () => {
+      wrapper = createWrapper();
+      vi.mocked(findFirstValidMappedValue).mockReturnValue(null);
+
+      const col: any = {
+        conditionalRules: [
+          { operator: ">", threshold: 400, textColor: "#a16207", bgColor: "#fefce8" },
+          { operator: ">", threshold: 1000, textColor: "#b91c1c", bgColor: "#fef2f2" },
+        ],
+      };
+      const cell = {
+        column: { columnDef: { meta: { _col: col } } },
+        getValue: () => 2301,
+      };
+      const style = wrapper.vm.cellStyleFn(cell);
+      // 2301 matches both >400 and >1000 → the later rule (>1000) wins.
+      expect(style).toContain("color: #b91c1c");
+      expect(style).toContain("background-color: #fef2f2");
+      expect(style).not.toContain("#a16207");
+    });
+
+    it("applies the only matching conditional rule when just one matches", () => {
+      wrapper = createWrapper();
+      vi.mocked(findFirstValidMappedValue).mockReturnValue(null);
+
+      const col: any = {
+        conditionalRules: [
+          { operator: ">", threshold: 400, textColor: "#a16207", bgColor: "#fefce8" },
+          { operator: ">", threshold: 1000, textColor: "#b91c1c", bgColor: "#fef2f2" },
+        ],
+      };
+      const cell = {
+        column: { columnDef: { meta: { _col: col } } },
+        getValue: () => 500,
+      };
+      const style = wrapper.vm.cellStyleFn(cell);
+      // 500 matches only >400.
+      expect(style).toContain("color: #a16207");
+      expect(style).toContain("background-color: #fefce8");
+    });
+
     it("should apply auto-color mode with a consistent color per distinct value", () => {
       wrapper = createWrapper();
       vi.mocked(findFirstValidMappedValue).mockReturnValue(null);

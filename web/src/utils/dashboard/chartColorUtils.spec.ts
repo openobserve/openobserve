@@ -17,6 +17,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import {
   getContrastColor,
   applySeriesColorMappings,
+  isColorDark,
 } from "@/utils/dashboard/chartColorUtils";
 
 vi.mock("@/utils/dashboard/colorPalette", () => ({
@@ -211,5 +212,33 @@ describe("chartColorUtils", () => {
       // B gets an HSL color since palette is empty
       expect(series[1].color).toMatch(/^hsl\(/);
     });
+  });
+});
+
+describe("isColorDark", () => {
+  it("returns true for dark 6-digit hex", () => {
+    expect(isColorDark("#000000")).toBe(true);
+    expect(isColorDark("#111827")).toBe(true);
+    expect(isColorDark("#b91c1c")).toBe(true);
+  });
+
+  it("returns false for light 6-digit hex", () => {
+    expect(isColorDark("#ffffff")).toBe(false);
+    expect(isColorDark("#fef2f2")).toBe(false);
+  });
+
+  it("accepts an optional leading '#'", () => {
+    expect(isColorDark("000000")).toBe(true);
+  });
+
+  it("handles 3-digit shorthand hex", () => {
+    expect(isColorDark("#003")).toBe(true); // #003 -> #000033 (dark navy)
+    expect(isColorDark("#fff")).toBe(false);
+    expect(isColorDark("000")).toBe(true);
+  });
+
+  it("returns false for empty / invalid input", () => {
+    expect(isColorDark("")).toBe(false);
+    expect(isColorDark("not-a-color")).toBe(false);
   });
 });
