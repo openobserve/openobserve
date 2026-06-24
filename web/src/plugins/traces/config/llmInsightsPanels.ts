@@ -387,13 +387,31 @@ export function renderPanelSql(
     startTime: number;
     endTime: number;
     interval: string;
+    // Bare agent trace-id predicate (no leading AND). Empty = "All Agents".
+    // Auto-spliced into each panel's WHERE (see below).
+    agentFilter?: string;
   },
 ): string {
-  return sql
+  const rendered = sql
     .replace(/\{\{stream\}\}/g, `"${ctx.stream}"`)
     .replace(/\{\{startTime\}\}/g, String(ctx.startTime))
     .replace(/\{\{endTime\}\}/g, String(ctx.endTime))
     .replace(/\{\{interval\}\}/g, ctx.interval);
+
+  if (!ctx.agentFilter) return rendered;
+
+  // Append the agent predicate to the query's WHERE clause (Agent Filtering
+  // spec §6.6). Every panel has exactly one flat WHERE, so we splice ` AND
+  // <agentFilter>` in just before the first GROUP BY / ORDER BY / LIMIT (or at
+  // the end if none). Panel templates carry no subqueries of their own, so the
+  // first such keyword always belongs to the main query, not the agent
+  // sub-select that gets inserted here.
+  const clause = ` AND ${ctx.agentFilter} `;
+  const tail = rendered.match(/\b(group\s+by|order\s+by|limit)\b/i);
+  if (tail && tail.index !== undefined) {
+    return rendered.slice(0, tail.index) + clause + rendered.slice(tail.index);
+  }
+  return `${rendered}${clause}`;
 }
 
 /**

@@ -157,6 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :streamName="activeStream"
             :startTime="startTime"
             :endTime="endTime"
+            :agent-filter="agentFilterClause"
             @view-trace="onViewTrace"
           />
         </div>
@@ -193,6 +194,11 @@ import useStreams from "@/composables/useStreams";
 import genAiAgentMappingService, {
   type GenAiAgentListItem,
 } from "@/services/gen-ai-agent-mapping.service";
+import {
+  ALL_AGENTS_VALUE,
+  agentOptionKey,
+  buildAgentTraceFilter,
+} from "./llmAgentFilter";
 
 const { getStreams } = useStreams();
 const { t } = useI18n();
@@ -230,16 +236,30 @@ const activeStream = ref<string>(
   localStorage.getItem(STREAM_LS_KEY) || props.streamName || "",
 );
 const AGENT_LS_KEY = "llmInsights_agentFilter";
-const ALL_AGENTS_VALUE = "__all__";
 const activeAgent = ref<string>(localStorage.getItem(AGENT_LS_KEY) || ALL_AGENTS_VALUE);
 const agents = ref<GenAiAgentListItem[]>([]);
 const agentOptions = computed(() => [
   { label: "All Agents", value: ALL_AGENTS_VALUE },
+  // Key by stream-scoped identity (spec §8), not display name, so same-named
+  // agents in different streams don't collide.
   ...agents.value.map((agent) => ({
     label: agent.id ? `${agent.name} (${agent.id})` : agent.name,
-    value: agent.name,
+    value: agentOptionKey(agent),
   })),
 ]);
+
+// The full agent object behind the current selection (null for "All Agents"),
+// and the SQL trace-id predicate it produces for the active stream. Both the
+// KPI/sparkline fetch and the trend panels filter on this.
+const selectedAgent = computed<GenAiAgentListItem | null>(() => {
+  if (activeAgent.value === ALL_AGENTS_VALUE) return null;
+  return (
+    agents.value.find((a) => agentOptionKey(a) === activeAgent.value) ?? null
+  );
+});
+const agentFilterClause = computed(() =>
+  buildAgentTraceFilter(selectedAgent.value, activeStream.value),
+);
 
 function onViewTrace(traceId: string) {
   if (!traceId) return;
@@ -286,7 +306,7 @@ async function loadAgents(startTime?: number, endTime?: number) {
     agents.value = agentList.agents;
     if (
       activeAgent.value !== ALL_AGENTS_VALUE &&
-      !agents.value.some((agent) => agent.name === activeAgent.value)
+      !agents.value.some((agent) => agentOptionKey(agent) === activeAgent.value)
     ) {
       activeAgent.value = ALL_AGENTS_VALUE;
     }
@@ -433,8 +453,14 @@ async function loadInsights(startTime?: number, endTime?: number) {
   if (!activeStream.value || !start || !end) return;
   localStorage.setItem(STREAM_LS_KEY, activeStream.value);
   localStorage.setItem(AGENT_LS_KEY, activeAgent.value);
-  await loadAgents(start, end);
-  await fetchAll(activeStream.value, start, end);
+  // The agents list only populates the filter dropdown — it must NOT gate the
+  // KPI/chart fetch. Awaiting it here left the skeleton hidden (loading still
+  // false) during the agents API call, so the KPI cards flashed zero values
+  // (EMPTY_KPI) before `fetchAll` set loading=true. Kick it off without
+  // awaiting so the skeleton stays up continuously until the real data
+  // resolves (loadAgents handles its own errors internally).
+  loadAgents(start, end);
+  await fetchAll(activeStream.value, start, end, selectedAgent.value);
 }
 
 function onStreamChange() {

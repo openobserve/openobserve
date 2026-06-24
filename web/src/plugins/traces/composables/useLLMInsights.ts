@@ -15,6 +15,8 @@
 
 import { ref, type Ref } from "vue";
 import { b64EncodeUnicode } from "@/utils/zincutils";
+import type { GenAiAgentListItem } from "@/services/gen-ai-agent-mapping.service";
+import { buildAgentTraceFilter } from "../llmAgentFilter";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import { generateTraceContext } from "@/utils/zincutils";
 import { useStore } from "vuex";
@@ -201,6 +203,7 @@ export function useLLMInsights() {
     streamName: string,
     startTime: number,
     endTime: number,
+    agent?: GenAiAgentListItem | null,
   ): Promise<void> {
     // Reads only the new OTEL gen_ai_* semantic-convention fields. DataFusion
     // validates column references at parse time, so referencing a legacy
@@ -212,6 +215,7 @@ export function useLLMInsights() {
     // gen_ai_operation_name, so filtering errors to only LLM spans yields 0.
     // Counting error spans vs LLM-only spans yields values >> 100%.
     // Trace-level counting fixes both: a trace either errored or it didn't.
+    const agentFilter = buildAgentTraceFilter(agent, streamName);
     const sql = `
       SELECT
         COUNT(*) FILTER (WHERE gen_ai_operation_name IS NOT NULL) as request_count,
@@ -222,6 +226,7 @@ export function useLLMInsights() {
         COALESCE(AVG(duration), 0) as avg_duration,
         COALESCE(approx_percentile_cont(duration, 0.95), 0) as p95_duration
       FROM "${streamName}"
+      ${agentFilter ? `WHERE ${agentFilter}` : ""}
     `;
 
     target.value = { ...EMPTY_KPI };
@@ -338,6 +343,7 @@ export function useLLMInsights() {
     streamName: string,
     startTime: number,
     endTime: number,
+    agent?: GenAiAgentListItem | null,
   ): Promise<void> {
     const interval = bucketInterval(endTime - startTime);
     // We need every bucket to render the sparkline — there is no
@@ -348,6 +354,7 @@ export function useLLMInsights() {
     // rows). 10_000 leaves a wide safety margin.
     const size = 10_000;
 
+    const agentFilter = buildAgentTraceFilter(agent, streamName);
     const mainSql = `
       SELECT
         histogram(_timestamp, '${interval}') as ts,
@@ -358,6 +365,7 @@ export function useLLMInsights() {
         COALESCE(SUM(gen_ai_usage_cost), 0) as total_cost,
         COALESCE(approx_percentile_cont(duration, 0.95), 0) as p95_duration
       FROM "${streamName}"
+      ${agentFilter ? `WHERE ${agentFilter}` : ""}
       GROUP BY ts
       ORDER BY ts
     `;
@@ -423,6 +431,7 @@ export function useLLMInsights() {
     streamName: string,
     startTime: number,
     endTime: number,
+    agent?: GenAiAgentListItem | null,
   ): Promise<void> {
     if (!streamName || !startTime || !endTime) return;
     loading.value = true;
@@ -434,9 +443,9 @@ export function useLLMInsights() {
 
     try {
       await Promise.all([
-        fetchKPIInto(kpi, streamName, startTime, endTime),
-        fetchKPIInto(kpiPrev, streamName, prevStart, prevEnd),
-        fetchSparklines(streamName, startTime, endTime),
+        fetchKPIInto(kpi, streamName, startTime, endTime, agent),
+        fetchKPIInto(kpiPrev, streamName, prevStart, prevEnd, agent),
+        fetchSparklines(streamName, startTime, endTime, agent),
       ]);
       hasLoadedOnce.value = true;
     } catch (e: any) {

@@ -226,6 +226,8 @@ interface Props {
   streamName: string;
   startTime: number;
   endTime: number;
+  // Bare agent trace-id predicate (no leading AND); "" = All Agents.
+  agentFilter?: string;
 }
 
 const props = defineProps<Props>();
@@ -294,6 +296,7 @@ async function loadPanel() {
     startTime: props.startTime,
     endTime: props.endTime,
     interval,
+    agentFilter: props.agentFilter,
   };
 
   try {
@@ -653,7 +656,13 @@ const chartRendererData = computed(() => ({
 }));
 
 watch(
-  () => [props.streamName, props.startTime, props.endTime, props.panel.id],
+  () => [
+    props.streamName,
+    props.startTime,
+    props.endTime,
+    props.panel.id,
+    props.agentFilter,
+  ],
   () => {
     needsReload.value = true;
     loadPanel();
