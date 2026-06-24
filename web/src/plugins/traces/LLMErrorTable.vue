@@ -69,40 +69,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="llm-recent-errors-table"
       class="tw:w-full"
     >
+      <!-- Time needs timezone formatting, so it keeps a cell template — but no
+           text styling: it inherits OTable's default cell text like every other
+           table. -->
       <template #cell-time="{ value }">
-        <span class="tw:text-[var(--o2-text-secondary)]">{{
-          timestampToTimezoneDate(value, timezone, "yyyy-MM-dd HH:mm:ss")
-        }}</span>
+        {{ timestampToTimezoneDate(value, timezone, "yyyy-MM-dd HH:mm:ss") }}
       </template>
 
-      <template #cell-service="{ value }">
-        <span class="llm-err__chip">
-          <span
-            class="llm-err__chip-dot"
-            :style="{ background: chipColor(value) }"
-          />
-          <span class="tw:truncate">{{ value }}</span>
-        </span>
-      </template>
-
+      <!-- Operation is the one cell we colour — it names the failed span, so it
+           reads in the error colour. -->
       <template #cell-operation="{ value }">
-        <span class="tw:text-[var(--o2-status-error-text)] tw:font-medium">
-          <span class="tw:mr-[0.25rem]">×</span>{{ value }}
-        </span>
+        <span class="tw:text-[var(--o2-status-error-text)]">{{ value }}</span>
       </template>
 
+      <!-- Trace id: only a title for the full value on hover; default text. -->
       <template #cell-trace_id="{ value }">
-        <span class="llm-err__mono tw:truncate" :title="value">{{ value }}</span>
-      </template>
-
-      <template #cell-view="{ row }">
-        <a
-          href="#"
-          class="tw:text-[var(--q-primary)] tw:font-medium tw:no-underline hover:tw:underline"
-          @click.prevent.stop="emit('view-trace', String(row.trace_id || ''))"
-        >
-          View →
-        </a>
+        <span :title="value">{{ value }}</span>
       </template>
     </OTable>
   </div>
@@ -118,7 +100,6 @@ import {
   renderPanelSql,
 } from "./config/llmInsightsPanels";
 import { useLLMStreamQuery } from "./composables/useLLMStreamQuery";
-import { chipColor } from "./llmTrendPanel.utils";
 import { timestampToTimezoneDate } from "@/utils/timezone";
 // Shared in-memory cache (module singleton) — survives this table's remount on
 // every tab toggle, so returning to a selection restores instantly. See
@@ -168,7 +149,8 @@ const columns = [
     header: "Service",
     accessorKey: "service_name",
     sortable: false,
-    size: COL.streamName,
+    // Half the usual stream-name width — service names here are short.
+    size: COL.streamName / 2,
     meta: { align: "left" },
   },
   {
@@ -187,14 +169,6 @@ const columns = [
     sortable: false,
     size: COL.url,
     meta: { align: "left" },
-  },
-  {
-    id: "view",
-    header: "",
-    accessorKey: "trace_id",
-    sortable: false,
-    size: 80,
-    meta: { align: "right" },
   },
 ];
 
@@ -285,31 +259,5 @@ onUnmounted(() => {
 <style lang="scss" scoped>
 .llm-trend-panel {
   border: 1px solid var(--o2-border-color);
-}
-
-.llm-err__mono {
-  font-family: var(--o2-font-mono, monospace);
-  font-size: 0.75rem;
-  display: inline-block;
-  max-width: 100%;
-}
-
-.llm-err__chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0.15rem 0.5rem;
-  border-radius: 999px;
-  background: var(--o2-bg-3);
-  font-size: 0.7rem;
-  max-width: 100%;
-}
-
-.llm-err__chip-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  display: inline-block;
-  flex-shrink: 0;
 }
 </style>
