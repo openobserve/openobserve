@@ -49,6 +49,7 @@ jobs:
        (github.event.comment.body == '/docgen' || github.event.comment.body == '/docgen-dryrun') &&
        contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association))
     runs-on: ubuntu-latest
+    timeout-minutes: 10   # the dispatch is a quick API call; bound it as defense-in-depth
     steps:
       - name: Resolve context (untrusted event data via env, never spliced into commands)
         id: ctx
@@ -86,7 +87,9 @@ jobs:
           echo "Dispatched DocGen engine for openobserve PR #$PR (dry_run=$DRY, by @$ACTOR)."
 
       - name: Acknowledge on the source PR
-        if: github.event_name == 'issue_comment'
+        # success() => only ack if the dispatch actually succeeded (don't mislead the author if
+        # the dispatch 403'd on a missing PAT permission, etc.)
+        if: github.event_name == 'issue_comment' && success()
         env:
           GH_TOKEN: ${{ github.token }}   # OSS context → bot can comment on the OSS PR
           PR: ${{ steps.ctx.outputs.pr }}
