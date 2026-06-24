@@ -73,7 +73,7 @@
       <div style="flex:1" />
 
       <template v-if="activeTab === 'private'">
-        <button class="syn-new-btn" @click.prevent><OIcon name="add" size="sm" />Add Location</button>
+        <button class="syn-new-btn"><OIcon name="add" size="sm" />Add Location</button>
       </template>
     </div>
 
