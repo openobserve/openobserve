@@ -798,75 +798,60 @@
     </Teleport>
 
     <!-- Full Heatmap Modal -->
-    <Teleport to="body">
-      <transition name="gm">
-        <div v-if="showHeatmapModal" class="geo-modal-overlay" @click.self="showHeatmapModal = false">
-          <div class="geo-modal">
-            <div class="geo-modal-hdr">
-              <span class="geo-modal-title">Global Health Heatmap</span>
-              <div class="geo-modal-legend">
-                <span class="geo-leg-item"><span class="geo-leg-dot" style="background:#22c55e"/><span>Healthy</span></span>
-                <span class="geo-leg-item"><span class="geo-leg-dot" style="background:#f59e0b"/><span>Degraded</span></span>
-                <span class="geo-leg-item"><span class="geo-leg-dot" style="background:#ef4444"/><span>Down</span></span>
-              </div>
-              <OButton variant="ghost" size="icon" @click="showHeatmapModal = false"><OIcon name="close" size="sm" /></OButton>
-            </div>
-            <div class="geo-modal-body">
-              <div ref="heatmapChartEl" class="geo-echarts-map"></div>
-            </div>
-          </div>
+    <ODialog v-model:open="showHeatmapModal" title="Global Health Heatmap" :width="94">
+      <template #header-right>
+        <div class="geo-modal-legend">
+          <span class="geo-leg-item"><span class="geo-leg-dot geo-leg-dot--up" /><span>Healthy</span></span>
+          <span class="geo-leg-item"><span class="geo-leg-dot geo-leg-dot--deg" /><span>Degraded</span></span>
+          <span class="geo-leg-item"><span class="geo-leg-dot geo-leg-dot--dn" /><span>Down</span></span>
         </div>
-      </transition>
-    </Teleport>
+      </template>
+      <div class="geo-modal-body">
+        <div ref="heatmapChartEl" class="geo-echarts-map"></div>
+      </div>
+    </ODialog>
 
     <!-- Active Issues Modal -->
-    <Teleport to="body">
-      <transition name="gm">
-        <div v-if="showIssuesModal" class="geo-modal-overlay" @click.self="showIssuesModal = false">
-          <div class="issues-modal">
-            <div class="geo-modal-hdr">
-              <OIcon :name="geoIssues.length ? 'error' : 'check-circle'" size="sm" :class="geoIssues.length ? 'c-r' : 'c-g'"/>
-              <span class="geo-modal-title">Active Issues</span>
-              <OButton variant="ghost" size="icon" @click="showIssuesModal = false"><OIcon name="close" size="sm" /></OButton>
-            </div>
-            <div class="issues-body">
-              <!-- All clear -->
-              <template v-if="!geoIssues.length">
-                <div class="issues-clear">
-                  <OIcon name="check-circle" size="lg" class="c-g"/>
-                  <div style="font-weight:600;margin-top:8px">All regions healthy</div>
-                  <div style="font-size:12px;color:var(--o2-tab-text-color);margin-top:4px">No active issues detected across all monitoring locations.</div>
+    <ODialog v-model:open="showIssuesModal" size="sm">
+      <template #header>
+        <OIcon :name="geoIssues.length ? 'error' : 'check-circle'" size="sm" :class="geoIssues.length ? 'c-r' : 'c-g'"/>
+        <span class="tw:text-base tw:font-semibold">Active Issues</span>
+      </template>
+      <div class="issues-body">
+        <!-- All clear -->
+        <template v-if="!geoIssues.length">
+          <div class="issues-clear">
+            <OIcon name="check-circle" size="lg" class="c-g"/>
+            <div style="font-weight:600;margin-top:8px">All regions healthy</div>
+            <div style="font-size:12px;color:var(--o2-tab-text-color);margin-top:4px">No active issues detected across all monitoring locations.</div>
+          </div>
+        </template>
+        <!-- Issue rows -->
+        <template v-else>
+          <div v-if="geoLocStats.filter(s=>s.health!=='up').length >= 2" class="issues-banner">
+            <OIcon name="warning-amber" size="sm"/> {{ geoLocStats.filter(s=>s.health!=='up').length }} regions simultaneously affected — possible CDN or upstream incident
+          </div>
+          <div class="issues-list">
+            <div v-for="issue in geoIssues" :key="issue.key" class="issues-row" :class="'issues-row--'+issue.level">
+              <div class="issues-row-left">
+                <span class="issues-dot" :class="issue.level==='error'?'issues-dot--down':'issues-dot--deg'"/>
+                <div>
+                  <div class="issues-loc">{{ issue.stat.flag }} {{ issue.stat.label }}</div>
+                  <div class="issues-city">{{ issue.stat.city }}</div>
                 </div>
-              </template>
-              <!-- Issue rows -->
-              <template v-else>
-                <div v-if="geoLocStats.filter(s=>s.health!=='up').length >= 2" class="issues-banner">
-                  <OIcon name="warning-amber" size="sm"/> {{ geoLocStats.filter(s=>s.health!=='up').length }} regions simultaneously affected — possible CDN or upstream incident
-                </div>
-                <div class="issues-list">
-                  <div v-for="issue in geoIssues" :key="issue.key" class="issues-row" :class="'issues-row--'+issue.level">
-                    <div class="issues-row-left">
-                      <span class="issues-dot" :class="issue.level==='error'?'issues-dot--down':'issues-dot--deg'"/>
-                      <div>
-                        <div class="issues-loc">{{ issue.stat.flag }} {{ issue.stat.label }}</div>
-                        <div class="issues-city">{{ issue.stat.city }}</div>
-                      </div>
-                    </div>
-                    <div class="issues-row-right">
-                      <span class="issues-badge" :class="issue.level==='error'?'issues-badge--down':'issues-badge--deg'">
-                        {{ issue.level==='error' ? issue.stat.downCt + ' down' : issue.stat.degCt + ' degraded' }}
-                      </span>
-                      <div class="issues-uptime" :class="issue.level==='error'?'c-r':'c-a'">{{ issue.stat.uptime }}% uptime</div>
-                      <div class="issues-total">{{ issue.stat.total }} monitors</div>
-                    </div>
-                  </div>
-                </div>
-              </template>
+              </div>
+              <div class="issues-row-right">
+                <span class="issues-badge" :class="issue.level==='error'?'issues-badge--down':'issues-badge--deg'">
+                  {{ issue.level==='error' ? issue.stat.downCt + ' down' : issue.stat.degCt + ' degraded' }}
+                </span>
+                <div class="issues-uptime" :class="issue.level==='error'?'c-r':'c-a'">{{ issue.stat.uptime }}% uptime</div>
+                <div class="issues-total">{{ issue.stat.total }} monitors</div>
+              </div>
             </div>
           </div>
-        </div>
-      </transition>
-    </Teleport>
+        </template>
+      </div>
+    </ODialog>
 
     <!-- BACKDROP -->
     <transition name="bf">
@@ -1008,6 +993,7 @@ import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OPagination from "@/lib/navigation/Pagination/OPagination.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 
 const router = useRouter();
 
@@ -2011,17 +1997,13 @@ const saveMonitor = () => { showDrawer.value=false; };
 .map-tip-val { font-weight:600; }
 
 /* ── MODALS ── */
-.geo-modal-overlay { position:fixed; inset:0; z-index:1500; background:rgba(0,0,0,.55); display:flex; align-items:center; justify-content:center; padding:24px; }
-.geo-modal { background:var(--o2-card-background); border:1px solid var(--o2-border-color); border-radius:14px; width:min(1100px,94vw); max-height:90vh; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 24px 60px rgba(0,0,0,.35); }
-.geo-modal-hdr { display:flex; align-items:center; gap:12px; padding:14px 18px 12px; border-bottom:1px solid var(--o2-border-color); flex-shrink:0; }
-.geo-modal-title { font-size:14px; font-weight:700; }
 .geo-modal-legend { display:flex; align-items:center; gap:12px; margin-left:8px; flex:1; }
 .geo-leg-item { display:flex; align-items:center; gap:5px; font-size:11px; color:var(--o2-tab-text-color); }
 .geo-leg-dot { display:inline-block; width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+.geo-leg-dot--up  { background: #22c55e; }
+.geo-leg-dot--deg { background: #f59e0b; }
+.geo-leg-dot--dn  { background: #ef4444; }
 .geo-modal-body { flex:none; height:clamp(360px,46vw,540px); overflow:hidden; padding:0; }
-
-/* Active Issues modal */
-.issues-modal { background:var(--o2-card-background); border:1px solid var(--o2-border-color); border-radius:14px; width:min(520px,92vw); max-height:80vh; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 24px 60px rgba(0,0,0,.35); }
 .issues-body { flex:1; overflow-y:auto; }
 .issues-clear { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:48px 24px; text-align:center; }
 .issues-banner { display:flex; align-items:center; gap:8px; margin:12px 16px 0; padding:8px 12px; background:rgba(245,158,11,.1); border-radius:8px; font-size:12px; color:#d97706; }
@@ -2045,13 +2027,6 @@ const saveMonitor = () => { showDrawer.value=false; };
 .issues-uptime { font-size:12px; font-weight:700; }
 .issues-total  { font-size:10px; color:var(--o2-tab-text-color); }
 
-/* Modal transition */
-.gm-enter-active, .gm-leave-active { transition:opacity .18s ease; }
-.gm-enter-active .geo-modal, .gm-leave-active .geo-modal,
-.gm-enter-active .issues-modal, .gm-leave-active .issues-modal { transition:transform .18s ease, opacity .18s ease; }
-.gm-enter-from, .gm-leave-to { opacity:0; }
-.gm-enter-from .geo-modal, .gm-enter-from .issues-modal { transform:scale(.96) translateY(8px); }
-.gm-leave-to .geo-modal, .gm-leave-to .issues-modal { transform:scale(.96) translateY(8px); opacity:0; }
 
 /* ── ICON COLOR HELPERS ── */
 .syn-empty-icon  { color:var(--o2-tab-text-color); }
