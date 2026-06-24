@@ -66,12 +66,18 @@
 
       <!-- Type + Location dropdowns -->
       <template v-if="activeTab === 'monitors'">
-        <select v-model="typeFilter" class="syn-select" @change="currentPage = 1">
-          <option v-for="o in typeOpts" :key="o.value" :value="o.value">{{ o.label }}</option>
-        </select>
-        <select v-model="locationFilter" class="syn-select" @change="currentPage = 1">
-          <option v-for="o in locationOpts" :key="o.value" :value="o.value">{{ o.label }}</option>
-        </select>
+        <OSelect
+          v-model="typeFilter"
+          :options="typeOpts"
+          size="sm"
+          @update:model-value="currentPage = 1"
+        />
+        <OSelect
+          v-model="locationFilter"
+          :options="locationOpts"
+          size="sm"
+          @update:model-value="currentPage = 1"
+        />
       </template>
 
       <div style="flex:1" />
@@ -163,16 +169,14 @@
           <span class="syn-footer-info">Showing {{ pageStart + 1 }} - {{ pageEnd }} of {{ filteredMonitors.length }}</span>
           <span class="syn-footer-sep" />
           <span style="font-size:12px;color:var(--o2-tab-text-color);white-space:nowrap">Records per page</span>
-          <select v-model="perPage" class="syn-select" style="width:64px" @change="currentPage=1">
-            <option :value="10">10</option>
-            <option :value="20">20</option>
-            <option :value="25">25</option>
-            <option :value="50">50</option>
-          </select>
-          <button class="pg-btn" :disabled="currentPage === 1" @click="currentPage=1"><OIcon name="first-page" size="sm" /></button>
-          <button class="pg-btn" :disabled="currentPage === 1" @click="currentPage--"><OIcon name="chevron-left" size="sm" /></button>
-          <button class="pg-btn" :disabled="currentPage === totalPages" @click="currentPage++"><OIcon name="chevron-right" size="sm" /></button>
-          <button class="pg-btn" :disabled="currentPage === totalPages" @click="currentPage=totalPages"><OIcon name="last-page" size="sm" /></button>
+          <OSelect
+            v-model="perPage"
+            :options="[{label:'10',value:10},{label:'20',value:20},{label:'25',value:25},{label:'50',value:50}]"
+            size="sm"
+            class="tw:w-16"
+            @update:model-value="currentPage = 1"
+          />
+          <OPagination v-model="currentPage" :max="totalPages" />
         </div>
       </div>
     </template>
@@ -1003,6 +1007,7 @@ import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
+import OPagination from "@/lib/navigation/Pagination/OPagination.vue";
 
 const router = useRouter();
 
@@ -1705,8 +1710,6 @@ const saveMonitor = () => { showDrawer.value=false; };
 .sdot-degraded   { background:#f59e0b; }
 .sdot-down       { background:#ef4444; }
 
-.syn-select { padding:4px 6px; border:1px solid var(--o2-border-color); border-radius:6px; background:var(--o2-card-background); color:inherit; font-size:11.5px; outline:none; cursor:pointer; }
-
 /* ── TABLE AREA — fills space, no hardcoded bg ── */
 .syn-table-scroll { flex:1; overflow:auto; padding:12px 16px 0; }
 .syn-table { border-collapse:collapse; border:1px solid var(--o2-border-color); border-radius:10px; overflow:hidden; background:var(--o2-card-background); width:100%; min-width:1000px; }
@@ -1902,17 +1905,6 @@ const saveMonitor = () => { showDrawer.value=false; };
 .loc-item:hover { border-color:var(--q-primary); }
 .loc-item--on   { border-color:var(--q-primary); background:color-mix(in srgb,var(--q-primary) 6%,transparent); }
 .loc-flag { font-size:18px; line-height:1; }
-
-/* ── SHARED NATIVE BUTTONS ── */
-.pg-btn {
-  display:inline-flex; align-items:center; justify-content:center;
-  width:30px; height:30px; border:none; border-radius:6px;
-  background:transparent; cursor:pointer; padding:0;
-  color:var(--o2-tab-text-color); transition:background .12s;
-}
-.pg-btn:hover:not(:disabled) { background:rgba(128,128,128,.12); color:var(--q-primary,#1976d2); }
-.pg-btn:disabled { opacity:.35; cursor:default; }
-
 
 /* ── GEO CHECKS ── */
 
