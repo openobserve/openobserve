@@ -11,7 +11,9 @@ import { z } from "zod";
 
 export const groupNameRegex = /^[a-zA-Z0-9_]+$/;
 
-export const makeAddGroupSchema = (t: (_key: string) => string) =>
+export const makeAddGroupSchema = (
+  t: (_key: string, _params?: Record<string, unknown>) => string,
+) =>
   z.object({
     name: z
       .string()
@@ -19,7 +21,7 @@ export const makeAddGroupSchema = (t: (_key: string) => string) =>
       .min(1, t("common.nameRequired"))
       .regex(groupNameRegex, t("iam.nameHelpText"))
       // Mirrors the input's maxlength=100 (defense-in-depth for non-typed values).
-      .max(100, "Name must be at most 100 characters."),
+      .max(100, t("common.nameMaxLength", { max: 100 })),
   });
 
 export type AddGroupForm = z.infer<ReturnType<typeof makeAddGroupSchema>>;

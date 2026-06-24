@@ -12,14 +12,16 @@ import { z } from "zod";
 
 export const roleNameRegex = /^[a-zA-Z0-9_]+$/;
 
-export const makeAddRoleSchema = (t: (_key: string) => string) =>
+export const makeAddRoleSchema = (
+  t: (_key: string, _params?: Record<string, unknown>) => string,
+) =>
   z.object({
     name: z
       .string()
       .trim()
       .min(1, t("common.nameRequired"))
       .regex(roleNameRegex, t("iam.nameHelpText"))
-      .max(100, "Role name must be at most 100 characters."),
+      .max(100, t("common.nameMaxLength", { max: 100 })),
   });
 
 export type AddRoleForm = z.infer<ReturnType<typeof makeAddRoleSchema>>;

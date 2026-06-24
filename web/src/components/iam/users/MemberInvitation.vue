@@ -72,7 +72,7 @@ import { getRoles } from "@/services/iam";
 import usersService from "@/services/users";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import {
-  memberInvitationSchema,
+  makeMemberInvitationSchema,
   memberInvitationDefaults,
   splitInviteEmails,
   type MemberInvitationForm,
@@ -91,6 +91,8 @@ export default defineComponent({
   setup(props: any, { emit }) {
     const store = useStore();
     const { t } = useI18n();
+
+    const memberInvitationSchema = makeMemberInvitationSchema(t);
 
     const options = ref();
     const currentUserRole = ref(props.currentrole || "");
