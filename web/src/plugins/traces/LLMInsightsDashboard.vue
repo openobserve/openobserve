@@ -28,11 +28,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          instead of floating inside a padded box. -->
     <div
       v-if="availableStreams.length > 0"
-      class="tw:flex tw:items-center tw:justify-between tw:gap-[0.5rem] tw:px-4 tw:py-[0.5rem]"
+      class="tw:flex tw:items-center tw:justify-end tw:gap-[0.5rem] tw:px-4 tw:py-[0.5rem]"
     >
-      <!-- Filter mode (left): view a whole Stream, or a single Agent. On the
-           Agent tab the stream + trace filter are derived from the agents API
-           (agent.source_stream), so there's no separate agent filter. -->
+      <!-- Filter mode: view a whole Stream, or a single Agent. Sits directly
+           beside the picker so switching mode and choosing the value are one
+           motion. On the Agent tab the stream + trace filter are derived from
+           the agents API (agent.source_stream), so there's no separate agent
+           filter. -->
       <OToggleGroup
         :model-value="filterMode"
         type="single"
@@ -43,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OToggleGroupItem value="agent" size="sm">Agent</OToggleGroupItem>
       </OToggleGroup>
 
-      <!-- Picker (right): Stream tab → stream picker; Agent tab → agent picker. -->
+      <!-- Picker: Stream tab → stream picker; Agent tab → agent picker. -->
       <div
         v-if="filterMode === 'stream'"
         data-test="llm-insights-stream-selector"

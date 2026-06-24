@@ -38,7 +38,7 @@
     <div class="quality-page__tier2">
       <QualityScoreConfigsTable
         :rows="configRows"
-        :is-loading="isConfigsLoading"
+        :is-loading="isConfigsLoading || !!configsLoading"
         @select="selectConfig"
         @refresh="refreshAll"
       />
@@ -90,7 +90,6 @@
         @update:split-by-scorer="splitByScorer = $event"
         @update:split-by-source-type="splitBySourceType = $event"
         @back="clearSelection"
-        @drill="onDrill"
       />
     </ODrawer>
   </div>
@@ -100,7 +99,6 @@
 import { computed, onMounted, ref, toRef, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
-import { useStore } from "vuex";
 import type { ScoreConfig } from "@/services/online-evals.service";
 import { useQualityData, type DateWindow } from "./composables/useQualityData";
 import {
@@ -129,6 +127,11 @@ const props = defineProps<{
   // emits the selected key back via v-model.
   agentKey?: string;
   agentOptions?: { label: string; value: string }[];
+  // True while OnlineEvals is still fetching the score-configs list. Until that
+  // resolves `scoreConfigs` is empty, so the table would otherwise flash "No
+  // Data" before its own skeleton kicks in. OR-ing this into the table's
+  // loading flag keeps the skeleton up from the very first paint.
+  configsLoading?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -143,7 +146,6 @@ const agentModel = computed<string>({
 const { t } = useI18n();
 const route = useRoute();
 const router = useRouter();
-const store = useStore();
 
 const dateWindowRef = toRef(props, "dateWindow");
 const agentFilterRef = toRef(props, "agentFilter");
@@ -314,80 +316,6 @@ const detailDrawerOpen = computed<boolean>({
     if (!open) clearSelection();
   },
 });
-
-function escapeSqlString(s: string): string {
-  return s.replace(/'/g, "''");
-}
-
-/** Build the unhealthy SQL fragment that matches the config's `healthy_threshold`. */
-function unhealthySqlFor(config: ScoreConfig): string | null {
-  const ht: any =
-    (config as any).healthyThreshold ?? (config as any).healthy_threshold;
-  const type = (config as any).dataType ?? (config as any).data_type;
-  if (!ht) return null;
-  if (type === "numeric") {
-    if (ht.value == null || !ht.direction) return null;
-    const op = ht.direction === "gte" ? "<" : ">";
-    return `value_numeric ${op} ${Number(ht.value)}`;
-  }
-  if (type === "categorical") {
-    const list: string[] = ht.healthy_categories || ht.healthyCategories || [];
-    if (!Array.isArray(list) || list.length === 0) return null;
-    const inList = list
-      .map((c) => `'${escapeSqlString(String(c))}'`)
-      .join(", ");
-    return `value_categorical NOT IN (${inList})`;
-  }
-  if (type === "boolean") {
-    const healthy = ht.healthy_value ?? ht.healthyValue;
-    if (healthy == null) return null;
-    const expected = healthy === true || healthy === "true";
-    return `value_boolean = ${!expected}`;
-  }
-  return null;
-}
-
-const orgIdForDrill = computed<string>(
-  () => store.state.selectedOrganization?.identifier ?? "default",
-);
-
-function onDrill(kpiId: string) {
-  const cfg = selectedConfig.value;
-  if (!cfg) return;
-
-  const configId = escapeSqlString(String(cfg.id));
-  const baseWhere = `CAST(score_config_id AS VARCHAR) = '${configId}'`;
-  const unhealthyExpr = unhealthySqlFor(cfg);
-
-  let whereClause = baseWhere;
-  if (kpiId === "unhealthy" && unhealthyExpr) {
-    whereClause = `${baseWhere} AND (${unhealthyExpr})`;
-  } else if (kpiId === "healthy" && unhealthyExpr) {
-    whereClause = `${baseWhere} AND NOT (${unhealthyExpr})`;
-  }
-
-  const sql = `SELECT * FROM "_llm_scores" WHERE ${whereClause}`;
-  // Same encoder the rest of the app uses (see O2AIChat.vue).
-  const encoded = btoa(unescape(encodeURIComponent(sql)));
-
-  // Pass the absolute window as `from`/`to` (microseconds) so the Logs page
-  // reproduces exactly the same Quality window the user was looking at.
-  const queryParams: Record<string, string> = {
-    org_identifier: orgIdForDrill.value,
-    stream: "_llm_scores",
-    stream_type: "logs",
-    sql_mode: "true",
-    quick_mode: "false",
-    show_histogram: "true",
-    refresh: "0",
-    from: String(props.dateWindow.startUs),
-    to: String(props.dateWindow.endUs),
-    query: encoded,
-    type: "ai_chat_query",
-  };
-
-  router.push({ name: "logs", query: queryParams }).catch(() => {});
-}
 
 // Used by the drawer header's #header-right slot — same mapping the
 // detail panel used for its in-panel badge so type/version chrome looks

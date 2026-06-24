@@ -186,6 +186,7 @@ the Free Software Foundation, either version 3 of the License, or
             :date-window="qualityDateWindow"
             :agent-filter="selectedQualityAgent"
             :score-configs="scoreConfigs"
+            :configs-loading="isLoading"
           />
           <ScoreConfigList
             v-else-if="activeTab === 'scoreConfigs'"
@@ -399,7 +400,10 @@ import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import type { DateWindow } from "./onlineEvals/composables/useQualityData";
-import { useAiDateRange } from "@/enterprise/composables/useAiDateRange";
+import {
+  useAiDateRange,
+  resolveAiDateWindow,
+} from "@/enterprise/composables/useAiDateRange";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import genAiAgentMappingService from "@/services/gen-ai-agent-mapping.service";
 import { downloadFile } from "@/utils/dom";
@@ -583,10 +587,25 @@ const importI18nKey = computed<"scorer" | "scoreConfig">(() =>
 // lands on the other two (incl. across reloads via localStorage).
 const { state: qualitySelectedDate } = useAiDateRange();
 
-const qualityDateWindow = ref<DateWindow>({
-  startUs: (Date.now() - 15 * 60 * 1000) * 1000,
-  endUs: Date.now() * 1000,
-});
+// Seed the window from the *persisted* AI date range (relative or absolute),
+// resolved synchronously, so QualityPage's initial onMounted refresh queries
+// the correct window from the very first paint. Previously this was a hardcoded
+// 15-minute placeholder, so the first KPI query ran against 15m (e.g. "2
+// evaluated") and then the picker-mount sync re-queried the real range (e.g.
+// "36"), causing a visible flash. Fall back to the 15m default only if the
+// persisted state can't be resolved.
+const initialQualityWindow = resolveAiDateWindow(qualitySelectedDate.value);
+const qualityDateWindow = ref<DateWindow>(
+  initialQualityWindow
+    ? {
+        startUs: initialQualityWindow.startTime,
+        endUs: initialQualityWindow.endTime,
+      }
+    : {
+        startUs: (Date.now() - 15 * 60 * 1000) * 1000,
+        endUs: Date.now() * 1000,
+      },
+);
 const qualityAgents = ref<AgentFilterSelection[]>([]);
 const qualityAgentKey = ref(ALL_AGENTS_VALUE);
 const qualityDatePickerRef = ref<{
