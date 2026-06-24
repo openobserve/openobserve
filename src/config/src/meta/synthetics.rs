@@ -199,7 +199,7 @@ pub struct BrowserDevice {
     pub device: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct BrowserConfig {
     /// Matrix of (browser × device) combinations to run.
     /// Each entry = one pending_check row per interval per location.
