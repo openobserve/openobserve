@@ -165,7 +165,9 @@ pub struct Synthetic {
     #[serde(default)]
     pub last_check_status: SyntheticStatus,
 
+    #[serde(default)]
     pub created_at: i64,
+    #[serde(default)]
     pub updated_at: i64,
 }
 
