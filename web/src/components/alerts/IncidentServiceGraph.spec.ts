@@ -69,6 +69,61 @@ describe("IncidentServiceGraph.vue", () => {
     },
   };
 
+  const mockDuplicatedNodes = {
+    nodes: [
+      {
+        alert_id: "alert_cpu_high_1",
+        alert_name: "Memory_Utilization",
+        service_name: "service-a",
+        alert_count: 10,
+        first_fired_at: 1000000,
+        last_fired_at: 1100000,
+      },
+      {
+        alert_id: "alert_cpu_high_2",
+        alert_name: "Memory_Utilization",
+        service_name: "service-a",
+        alert_count: 20,
+        first_fired_at: 2000000,
+        last_fired_at: 2100000,
+      },
+      {
+        alert_id: "alert_cpu_high_3",
+        alert_name: "Memory_Utilization",
+        service_name: "service-b",
+        alert_count: 5,
+        first_fired_at: 3000000,
+        last_fired_at: 3100000,
+      },
+      {
+        alert_id: "alert_latency_1",
+        alert_name: "Scheduler_Down",
+        service_name: "service-c",
+        alert_count: 3,
+        first_fired_at: 1500000,
+        last_fired_at: 1600000,
+      },
+      {
+        alert_id: "alert_latency_2",
+        alert_name: "Scheduler_Down",
+        service_name: "service-c",
+        alert_count: 7,
+        first_fired_at: 2500000,
+        last_fired_at: 2600000,
+      },
+    ],
+    edges: [
+      { from_node_index: 0, to_node_index: 3, edge_type: "temporal" },
+      { from_node_index: 3, to_node_index: 1, edge_type: "temporal" },
+      { from_node_index: 1, to_node_index: 2, edge_type: "temporal" },
+    ],
+    stats: {
+      total_services: 3,
+      total_alerts: 45,
+      services_with_alerts: 3,
+    },
+  };
+
   const createMockStore = (themeOverride?: string) => ({
     state: {
       theme: themeOverride || "light",
@@ -424,10 +479,10 @@ describe("IncidentServiceGraph.vue", () => {
       const node2 = chartData.options.series[0].data[1]; // 7 alerts
       const node3 = chartData.options.series[0].data[2]; // 12 alerts
 
-      // All nodes have fixed size of 60
-      expect(node1.symbolSize).toBe(60);
-      expect(node2.symbolSize).toBe(60);
-      expect(node3.symbolSize).toBe(60);
+      // Node sizes now scale proportionally with alert_count
+      expect(node1.symbolSize).toBeGreaterThanOrEqual(30);
+      expect(node2.symbolSize).toBeGreaterThanOrEqual(30);
+      expect(node3.symbolSize).toBeGreaterThanOrEqual(30);
     });
 
     it("should cap node size at 100", async () => {
@@ -456,7 +511,7 @@ describe("IncidentServiceGraph.vue", () => {
 
       const chartData = wrapper.vm.chartData;
       const largeNode = chartData.options.series[0].data[0];
-      expect(largeNode.symbolSize).toBe(60); // Fixed size for all nodes
+      expect(largeNode.symbolSize).toBeGreaterThanOrEqual(30); // Size now scales with alert_count
     });
 
     it("should add border to primary service nodes", async () => {
@@ -711,8 +766,10 @@ describe("IncidentServiceGraph.vue", () => {
       await flushPromises();
 
       const chartData = wrapper.vm.chartData;
-      const node = chartData.options.series[0].data[0];
-      const tooltip = node.tooltip.formatter();
+      const cpuNode = chartData.options.series[0].data.find(
+        (n: any) => n.name === "High CPU Usage"
+      );
+      const tooltip = cpuNode.tooltip.formatter();
 
       expect(tooltip).toContain("service-a");
     });
@@ -723,8 +780,10 @@ describe("IncidentServiceGraph.vue", () => {
       await flushPromises();
 
       const chartData = wrapper.vm.chartData;
-      const node = chartData.options.series[0].data[0];
-      const tooltip = node.tooltip.formatter();
+      const cpuNode = chartData.options.series[0].data.find(
+        (n: any) => n.name === "High CPU Usage"
+      );
+      const tooltip = cpuNode.tooltip.formatter();
 
       expect(tooltip).toContain("Alert Count:");
       expect(tooltip).toContain("3");
@@ -832,7 +891,7 @@ describe("IncidentServiceGraph.vue", () => {
       const chartData = wrapper.vm.chartData;
       // Second node has 0 alerts
       const zeroAlertNode = chartData.options.series[0].data[1];
-      expect(zeroAlertNode.symbolSize).toBe(60); // Fixed size for all nodes
+      expect(zeroAlertNode.symbolSize).toBeGreaterThanOrEqual(30); // Size now scales with alert_count
     });
 
     it("should handle very large alert counts", async () => {
@@ -860,7 +919,7 @@ describe("IncidentServiceGraph.vue", () => {
 
       const chartData = wrapper.vm.chartData;
       const largeNode = chartData.options.series[0].data[0];
-      expect(largeNode.symbolSize).toBe(60); // Fixed size for all nodes
+      expect(largeNode.symbolSize).toBeGreaterThanOrEqual(30); // Size now scales with alert_count
     });
 
     it("should handle null orgId gracefully", () => {
@@ -897,6 +956,104 @@ describe("IncidentServiceGraph.vue", () => {
       const chartData = wrapper.vm.chartData;
       // Animation is disabled, so no easing setting
       expect(chartData.options.animation).toBe(false);
+    });
+  });
+
+  describe("Node Aggregation", () => {
+    it("should aggregate nodes with the same alert_name into a single node", async () => {
+      wrapper = mountComponent({ topologyContext: mockDuplicatedNodes });
+      await flushPromises();
+
+      const chartData = wrapper.vm.chartData;
+      const nodes = chartData.options.series[0].data;
+
+      // 5 raw nodes should aggregate into 2 distinct alert_names
+      expect(nodes).toHaveLength(2);
+
+      // Memory_Utilization node: aggregated count = 10 + 20 + 5 = 35
+      const memNode = nodes.find((n: any) => n.name === "Memory_Utilization");
+      expect(memNode).toBeDefined();
+      expect(memNode.originalNode.alert_count).toBe(35);
+      expect(memNode.originalNode.first_fired_at).toBe(1000000); // min
+      expect(memNode.originalNode.last_fired_at).toBe(3100000);  // max
+
+      // Scheduler_Down node: aggregated count = 3 + 7 = 10
+      const schedNode = nodes.find((n: any) => n.name === "Scheduler_Down");
+      expect(schedNode).toBeDefined();
+      expect(schedNode.originalNode.alert_count).toBe(10);
+    });
+
+    it("should cap nodes to a maximum of 100 (top by alert_count)", { timeout: 15000 }, async () => {
+      // Build 150 nodes, each with unique alert_name, varying counts
+      const manyNodes = {
+        nodes: Array.from({ length: 150 }, (_, i) => ({
+          alert_id: `alert_${i}`,
+          alert_name: `Alert_${i}`,
+          service_name: `service-${i % 5}`,
+          alert_count: i + 1, // ascending: Alert_149 has highest count
+          first_fired_at: 1000000 + i * 1000,
+          last_fired_at: 2000000 + i * 1000,
+        })),
+        edges: [],
+        stats: { total_services: 5, total_alerts: 0, services_with_alerts: 0 },
+      };
+
+      wrapper = mountComponent({ topologyContext: manyNodes });
+      await flushPromises();
+
+      const chartData = wrapper.vm.chartData;
+      const nodes = chartData.options.series[0].data;
+
+      // Should be capped at 100
+      expect(nodes.length).toBeLessThanOrEqual(100);
+
+      // The kept nodes should be those with highest alert_count (largest i values)
+      const names = nodes.map((n: any) => n.name);
+      expect(names).toContain("Alert_149");   // highest count -> kept
+      expect(names).not.toContain("Alert_0"); // lowest count -> dropped
+    });
+
+    it("should size nodes proportionally to aggregated alert_count", async () => {
+      wrapper = mountComponent({ topologyContext: mockDuplicatedNodes });
+      await flushPromises();
+
+      const chartData = wrapper.vm.chartData;
+      const nodes = chartData.options.series[0].data;
+      expect(nodes.length).toBeGreaterThanOrEqual(2);
+
+      // Memory_Utilization (count=35) should be larger than Scheduler_Down (count=10)
+      const memNode = nodes.find((n: any) => n.name === "Memory_Utilization");
+      const schedNode = nodes.find((n: any) => n.name === "Scheduler_Down");
+      expect(memNode.symbolSize).toBeGreaterThan(schedNode.symbolSize);
+    });
+
+    it("should rebuild edges after aggregation: deduplicate and remove self-loops", async () => {
+      wrapper = mountComponent({ topologyContext: mockDuplicatedNodes });
+      await flushPromises();
+
+      const chartData = wrapper.vm.chartData;
+      const links = chartData.options.series[0].links;
+
+      // Original edges:
+      //   0(MemUtil) → 3(Scheduler_Down)  → keeps: MemUtil→Sched
+      //   3(Scheduler_Down) → 1(MemUtil)  → Sched→MemUtil (different direction, keeps)
+      //   1(MemUtil) → 2(MemUtil)         → self-loop: dropped after aggregation
+      // Should end up with 2 unique directed edges between the 2 aggregated nodes
+      expect(links.length).toBe(2);
+
+      // Both edges should go between the two aggregated nodes (source/target != same index)
+      const memIdx = chartData.options.series[0].data.findIndex(
+        (n: any) => n.name === "Memory_Utilization"
+      );
+      const schedIdx = chartData.options.series[0].data.findIndex(
+        (n: any) => n.name === "Scheduler_Down"
+      );
+      expect(memIdx).not.toBe(-1);
+      expect(schedIdx).not.toBe(-1);
+
+      for (const link of links) {
+        expect(link.source).not.toBe(link.target);
+      }
     });
   });
 

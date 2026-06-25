@@ -229,8 +229,78 @@ export default defineComponent({
       return "#3b82f6"; // blue-500 - normal
     };
 
-    const getNodeSize = (node: AlertNode): number => {
-      return 60; // Fixed size for all nodes
+    const getNodeSize = (node: AlertNode, nodes: AlertNode[]): number => {
+      // Scale node size based on alert_count relative to the max count in the dataset
+      const minSize = 30;
+      const maxSize = 120;
+      const maxCount = Math.max(...nodes.map(n => n.alert_count || 0), 1);
+      if (maxCount === 0) return minSize;
+      const ratio = (node.alert_count || 0) / maxCount;
+      return Math.round(minSize + ratio * (maxSize - minSize));
+    };
+
+    /**
+     * Aggregate raw alert nodes by alert_name.
+     * Merges duplicate alert_names into a single node with summed count,
+     * min first_fired_at, max last_fired_at, and the most common service_name.
+     */
+    const aggregateNodes = (nodes: any[]): any[] => {
+      const groups = new Map<string, {
+        alert_id: string;
+        alert_name: string;
+        service_name: string;
+        alert_count: number;
+        first_fired_at: number;
+        last_fired_at: number;
+        serviceCounts: Map<string, number>;
+      }>();
+
+      for (const node of nodes) {
+        const name = node.alert_name || "unknown";
+        if (!groups.has(name)) {
+          groups.set(name, {
+            alert_id: node.alert_id,
+            alert_name: name,
+            service_name: node.service_name,
+            alert_count: 0,
+            first_fired_at: node.first_fired_at,
+            last_fired_at: node.last_fired_at,
+            serviceCounts: new Map(),
+          });
+        }
+        const group = groups.get(name)!;
+        group.alert_count += node.alert_count;
+        if (node.first_fired_at < group.first_fired_at) {
+          group.first_fired_at = node.first_fired_at;
+        }
+        if (node.last_fired_at > group.last_fired_at) {
+          group.last_fired_at = node.last_fired_at;
+        }
+        // Track service name frequencies
+        const svc = node.service_name || "";
+        group.serviceCounts.set(svc, (group.serviceCounts.get(svc) || 0) + 1);
+      }
+
+      // Pick the most common service_name and clean up internal bookkeeping
+      return Array.from(groups.values())
+        .map(g => {
+          let bestSvc = g.service_name;
+          let bestCount = 0;
+          g.serviceCounts.forEach((count, svc) => {
+            if (count > bestCount) {
+              bestCount = count;
+              bestSvc = svc;
+            }
+          });
+          return {
+            alert_id: g.alert_id,
+            alert_name: g.alert_name,
+            service_name: bestSvc,
+            alert_count: g.alert_count,
+            first_fired_at: g.first_fired_at,
+            last_fired_at: g.last_fired_at,
+          };
+        });
     };
 
     const chartData = computed(() => {
@@ -238,13 +308,68 @@ export default defineComponent({
         return { options: {}, notMerge: true };
       }
 
-      const { nodes, edges } = graphData.value;
+      const { nodes: rawNodes, edges: rawEdges } = graphData.value;
+
+      // Aggregate nodes by alert_name to prevent thousands of overlapping nodes
+      const MAX_GRAPH_NODES = 100;
+      const aggregated = aggregateNodes(rawNodes);
+      // Sort by alert_count descending so the most-frequent alerts are kept
+      aggregated.sort((a: any, b: any) => (b.alert_count || 0) - (a.alert_count || 0));
+      const nodes = aggregated.slice(0, MAX_GRAPH_NODES);
+
+      /**
+       * Rebuild edges after node aggregation.
+       * Maps original node indices to aggregated node indices, drops self-loops,
+       * and deduplicates edges between the same aggregated-node pairs.
+       */
+      const rebuildEdges = (
+        rawEdges: any[],
+        rawNodes: any[],
+        aggregatedNodes: any[]
+      ): any[] => {
+        // Build mapping from alert_name to aggregated index
+        const nameToAggIdx = new Map<string, number>();
+        aggregatedNodes.forEach((n, idx) => {
+          nameToAggIdx.set(n.alert_name, idx);
+        });
+
+        // Map each raw node index to its aggregated index
+        const rawIdxToAggIdx = new Map<number, number>();
+        rawNodes.forEach((rawNode, idx) => {
+          const aggIdx = nameToAggIdx.get(rawNode.alert_name);
+          if (aggIdx !== undefined) {
+            rawIdxToAggIdx.set(idx, aggIdx);
+          }
+        });
+
+        const seen = new Set<string>();
+        const result: any[] = [];
+
+        for (const edge of rawEdges) {
+          const srcAgg = rawIdxToAggIdx.get(edge.from_node_index);
+          const tgtAgg = rawIdxToAggIdx.get(edge.to_node_index);
+          if (srcAgg === undefined || tgtAgg === undefined) continue; // node was capped out
+          if (srcAgg === tgtAgg) continue; // self-loop after aggregation
+          const key = `${srcAgg}->${tgtAgg}`;
+          if (seen.has(key)) continue; // duplicate
+          seen.add(key);
+          result.push({
+            from_node_index: srcAgg,
+            to_node_index: tgtAgg,
+            edge_type: edge.edge_type,
+          });
+        }
+
+        return result;
+      };
+
+      const edges = rebuildEdges(rawEdges, rawNodes, nodes);
 
       // Prepare nodes for D3-force simulation
       const preparedNodes = nodes.map((node, index) => ({
         name: node.alert_name, // Show only alert name for cleaner labels
         id: index.toString(),
-        symbolSize: getNodeSize(node),
+        symbolSize: getNodeSize(node, nodes),
         originalNode: node,
         originalIndex: index,
       }));
@@ -288,6 +413,7 @@ export default defineComponent({
           y: node.y,
           fixed: true, // Lock position so ECharts doesn't re-layout
           symbolSize: node.symbolSize,
+          originalNode: node.originalNode,
           itemStyle: {
             color: getNodeColor(originalNode, index),
             borderColor: index === 0 ? "#dc2626" : getNodeColor(originalNode, index),
