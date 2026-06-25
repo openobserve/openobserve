@@ -37,17 +37,18 @@ export class AlertHistoryPage {
 
   async selectAlert(alertName) {
     await this.page.locator(this.searchSelect).click();
-    await this.page.waitForTimeout(500);
     const option = this.page.getByRole('option', { name: alertName });
     if (await option.isVisible({ timeout: 3000 }).catch(() => false)) {
       await option.click();
     } else {
-      // Type to filter
-      await this.page.locator(`${this.searchSelect} input`).fill(alertName);
-      await this.page.waitForTimeout(500);
+      const input = this.page.locator(`${this.searchSelect} input`);
+      await input.waitFor({ state: 'visible', timeout: 3000 });
+      await input.fill(alertName);
+      await this.page.getByRole('option', { name: alertName }).waitFor({ state: 'visible', timeout: 5000 });
       await this.page.getByRole('option', { name: alertName }).click();
     }
     await this.page.getByRole('listbox').waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+    await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
   }
 
   async clickManualSearch() {
@@ -82,7 +83,7 @@ export class AlertHistoryPage {
   async clickViewDetails(index = 0) {
     const btns = this.page.locator(this.viewDetailsBtn);
     await btns.nth(index).click();
-    await this.page.waitForTimeout(500);
+    await this.page.locator(this.alertDetailsDialog).waitFor({ state: 'visible', timeout: 8000 }).catch(() => {});
   }
 
   async expectViewDetailsBtnVisible() {

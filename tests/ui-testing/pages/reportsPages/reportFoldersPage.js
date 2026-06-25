@@ -228,6 +228,12 @@ export class ReportFoldersPage {
     ).toBeVisible({ timeout: 10000 });
   }
 
+  async expectReportNotVisibleInTable(reportName) {
+    await expect(
+      this.page.locator(`[data-test="report-list-${reportName}-pause-start-report"]`)
+    ).not.toBeVisible({ timeout: 5000 });
+  }
+
   async getFolderCount() {
     return await this.page.locator(`${this.folderTabsContainer} [role="tab"]`).count();
   }

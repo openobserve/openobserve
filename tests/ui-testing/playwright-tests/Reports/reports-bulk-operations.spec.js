@@ -84,6 +84,10 @@ test.describe("Report Bulk Operations", () => {
     await pm.reportFoldersPage.clickFolderTab(BULK_FOLDER);
     await pm.reportFoldersPage.expectReportVisibleInTable(`${REPORT_1}_move`);
 
+    testLogger.info('Verifying source folder no longer contains the moved reports');
+    await pm.reportFoldersPage.clickFolderTab('default');
+    await pm.reportFoldersPage.expectReportNotVisibleInTable(`${REPORT_1}_move`);
+
     // Cleanup
     await pm.apiCleanup.deleteReport(`${REPORT_1}_move`);
     await pm.apiCleanup.deleteReport(`${REPORT_2}_move`);
@@ -164,6 +168,9 @@ test.describe("Report Bulk Operations", () => {
 
     testLogger.info('Verifying success notification after bulk delete');
     await expect(page.getByText(/deleted successfully/i)).toBeVisible({ timeout: 10000 });
+
+    testLogger.info('Verifying deleted reports are no longer in the table');
+    await pm.reportFoldersPage.expectReportNotVisibleInTable(`${REPORT_2}_del`);
   });
 
   // ===== P2: EDGE CASE TESTS =====

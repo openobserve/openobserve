@@ -29,7 +29,10 @@ async function ensureTemplate(page, templateName) {
     isDefault: false
   });
   testLogger.info('Created alert template', { templateName, status: resp.status });
-  return resp.status === 200 || resp.status === 400 || resp.status === 409;
+  if (resp.status !== 200 && resp.status !== 409) {
+    throw new Error(`ensureTemplate: unexpected status ${resp.status} for "${templateName}" — ${JSON.stringify(resp.data)}`);
+  }
+  return true;
 }
 
 async function ensureDestination(page, destinationName, templateName) {
@@ -43,7 +46,10 @@ async function ensureDestination(page, destinationName, templateName) {
     headers: {}
   });
   testLogger.info('Created alert destination', { destinationName, status: resp.status });
-  return resp.status === 200 || resp.status === 400 || resp.status === 409;
+  if (resp.status !== 200 && resp.status !== 409) {
+    throw new Error(`ensureDestination: unexpected status ${resp.status} for "${destinationName}" — ${JSON.stringify(resp.data)}`);
+  }
+  return true;
 }
 
 async function createHistoryTestAlert(page, alertName, destinationName) {
@@ -217,21 +223,35 @@ test.describe("Alert History Page", () => {
 
   // ===== P2: EDGE CASE TESTS =====
 
-  test("P2: Table shows empty state when no results match search", {
+  test("P2: Table shows empty state when alert has no history", {
     tag: ['@alertHistory', '@edge', '@P2']
   }, async ({ page }) => {
-    testLogger.info('Triggering manual search with default filters (no alert selected)');
+    const ts = Date.now();
+    const alertName = `e2e_hist_empty_${ts}`;
+    const templateName = `e2e_empty_tmpl_${ts}`;
+    const destinationName = `e2e_empty_dest_${ts}`;
+    const org = getOrgIdentifier();
+
+    testLogger.info('Creating alert with no history to guarantee empty results', { alertName });
+    await ensureTemplate(page, templateName);
+    await ensureDestination(page, destinationName, templateName);
+    const createResp = await createHistoryTestAlert(page, alertName, destinationName);
+    if (createResp.status !== 200) {
+      throw new Error(`Setup: failed to create alert: status ${createResp.status} — ${JSON.stringify(createResp.data)}`);
+    }
+
+    testLogger.info('Navigating to alert history and searching for the untriggered alert');
+    await pm.alertHistoryPage.navigate();
+    await pm.alertHistoryPage.selectAlert(alertName);
     await pm.alertHistoryPage.clickManualSearch();
 
-    const rowCount = await pm.alertHistoryPage.getTableRowCount();
-    testLogger.info(`Table row count after search: ${rowCount}`);
+    testLogger.info('Verifying empty state is shown for alert with no history');
+    await pm.alertHistoryPage.expectEmptyStateVisible();
 
-    if (rowCount === 0) {
-      testLogger.info('No rows — verifying empty state is shown');
-      await pm.alertHistoryPage.expectEmptyStateVisible();
-    } else {
-      testLogger.info(`Table has ${rowCount} rows — verifying table is visible`);
-      await pm.alertHistoryPage.expectTableVisible();
-    }
+    // Cleanup
+    await deleteTestAlert(page, alertName);
+    await apiCall(page, 'DELETE', `/api/${org}/alerts/destinations/${destinationName}`);
+    await apiCall(page, 'DELETE', `/api/${org}/alerts/templates/${templateName}`);
+    testLogger.info('Cleaned up alert, destination, and template');
   });
 });
