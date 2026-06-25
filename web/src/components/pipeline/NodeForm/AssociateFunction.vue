@@ -47,6 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div
       v-else
+      data-test="associate-function-routing-container"
       class="tw:rounded-lg tw:w-full tw:pt-3 tw:pb-3 tw:flex tw:flex-col tw:gap-4 tw:flex-1 tw:min-h-0"
     >
       <div class="tw:flex tw:items-center tw:gap-3 tw:px-(--spacing-dialog-header-px)">
@@ -93,6 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             selectedFunction &&
             pipelineObj.functions[selectedFunction]
           "
+          data-test="associate-function-definition-section"
           class="tw:mt-4 tw:mb-4"
         >
           <OCard class="function-definition-card tw:border tw:border-[#e1e5e9] tw:dark:border-[#2d3748] tw:rounded-lg tw:shadow-[0_2px_4px_rgba(0,0,0,0.05)] tw:dark:shadow-[0_4px_12px_rgba(0,0,0,0.4)] tw:overflow-hidden tw:dark:bg-[#1a202c]">
