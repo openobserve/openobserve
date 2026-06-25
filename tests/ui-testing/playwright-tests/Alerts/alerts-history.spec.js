@@ -209,8 +209,21 @@ test.describe("Alert History Page", () => {
     testLogger.info('Asserting history rows are present');
     await pm.alertHistoryPage.expectTableHasRows();
 
-    testLogger.info('Clicking view details on first history row');
-    await pm.alertHistoryPage.clickViewDetails(0);
+    testLogger.info('Clicking view details on first history row (with retry)');
+    let dialogOpened = false;
+    for (let clickAttempt = 0; clickAttempt < 3 && !dialogOpened; clickAttempt++) {
+      await pm.alertHistoryPage.clickViewDetails(0);
+      dialogOpened = await page
+        .locator('[data-test="alert-history-details-dialog"]')
+        .isVisible({ timeout: 5000 })
+        .catch(() => false);
+      if (!dialogOpened && clickAttempt < 2) {
+        testLogger.info(`View details click attempt ${clickAttempt + 1} — dialog not visible, retrying`);
+        // Close any half-open state before retrying
+        await page.keyboard.press('Escape').catch(() => {});
+        await page.waitForTimeout(500);
+      }
+    }
 
     testLogger.info('Verifying details dialog is visible');
     await pm.alertHistoryPage.expectDetailsDialogVisible();

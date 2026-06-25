@@ -115,7 +115,7 @@ test.describe("Report Bulk Operations", () => {
     await pm.reportFoldersPage.confirmBulkDelete();
 
     testLogger.info('Verifying success notification after bulk delete');
-    await expect(page.getByText(/deleted successfully/i)).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('[data-test="o-toast-message"]').filter({ hasText: /deleted successfully/i })).toBeVisible({ timeout: 10000 });
 
     testLogger.info('Verifying deleted reports are no longer in the table');
     await pm.reportFoldersPage.expectReportNotVisibleInTable(`${REPORT_2}_del`);

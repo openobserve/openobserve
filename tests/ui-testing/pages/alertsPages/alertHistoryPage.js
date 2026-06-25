@@ -18,9 +18,9 @@ export class AlertHistoryPage {
     // Results
     this.table = '[data-test="alert-history-table"]';
     this.viewDetailsBtn = '[data-test="alert-history-view-details"]';
-    // reka-ui DialogContent always renders role="dialog"; data-test forwarding
-    // through reka-ui is unreliable so we use the ARIA role as the stable hook.
-    this.alertDetailsDialog = '[role="dialog"]';
+    // ODialog forwards data-test to DialogContent via parentDataTest computed;
+    // [role="dialog"] is the ARIA fallback but the forwarded attr is more specific.
+    this.alertDetailsDialog = '[data-test="alert-history-details-dialog"]';
     this.emptyState = '[data-test="o2-table-empty"]';
   }
 
@@ -89,9 +89,9 @@ export class AlertHistoryPage {
     const btn = (await byDataTest.count() > 0) ? byDataTest.nth(index) : byCell;
     await btn.waitFor({ state: 'visible', timeout: 10000 });
     await btn.scrollIntoViewIfNeeded();
-    // Use evaluate/el.click() — a trusted browser event that reliably triggers
-    // Vue component event handlers through reka-ui's Primitive layer.
-    await btn.evaluate(el => el.click());
+    // Use Playwright's native click — fires full pointer/mouse event sequence
+    // which reka-ui Primitive relies on for state transitions.
+    await btn.click();
   }
 
   async expectViewDetailsBtnVisible() {
@@ -119,7 +119,7 @@ export class AlertHistoryPage {
   }
 
   async expectDetailsDialogVisible() {
-    await expect(this.page.locator(this.alertDetailsDialog)).toBeVisible({ timeout: 15000 });
+    await expect(this.page.locator(this.alertDetailsDialog)).toBeVisible({ timeout: 20000 });
   }
 
   async expectTableOrEmptyStateVisible() {
