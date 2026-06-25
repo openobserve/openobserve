@@ -414,23 +414,26 @@ describe("IncidentServiceGraph.vue", () => {
       expect(mixedNode.itemStyle.color).toBe("#ef4444"); // red-500 for root cause
     });
 
-    it("should calculate node size based on alert count", async () => {
+    it("should calculate node size based on total alert count", async () => {
 
       wrapper = mountComponent();
       await flushPromises();
 
       const chartData = wrapper.vm.chartData;
-      const node1 = chartData.options.series[0].data[0]; // 3 alerts
+      // After aggregation+sorting: DB Pool Exhausted (12), High Latency (7), High CPU Usage (3)
+      const node1 = chartData.options.series[0].data[0]; // 12 alerts (highest count)
       const node2 = chartData.options.series[0].data[1]; // 7 alerts
-      const node3 = chartData.options.series[0].data[2]; // 12 alerts
+      const node3 = chartData.options.series[0].data[2]; // 3 alerts
 
-      // All nodes have fixed size of 60
-      expect(node1.symbolSize).toBe(60);
-      expect(node2.symbolSize).toBe(60);
-      expect(node3.symbolSize).toBe(60);
+      // Sizes now scale with alert_count: 12→~38, 7→~34, 3→~32
+      expect(node1.symbolSize).toBeGreaterThan(30);
+      expect(node2.symbolSize).toBeGreaterThan(30);
+      expect(node3.symbolSize).toBeGreaterThan(30);
+      expect(node1.symbolSize).toBeGreaterThan(node2.symbolSize);
+      expect(node2.symbolSize).toBeGreaterThan(node3.symbolSize);
     });
 
-    it("should cap node size at 100", async () => {
+    it("should cap node size at 100 for very high alert counts", async () => {
       // Create data with very high alert count
       const largeAlertData = {
         nodes: [
@@ -456,7 +459,7 @@ describe("IncidentServiceGraph.vue", () => {
 
       const chartData = wrapper.vm.chartData;
       const largeNode = chartData.options.series[0].data[0];
-      expect(largeNode.symbolSize).toBe(60); // Fixed size for all nodes
+      expect(largeNode.symbolSize).toBe(100); // Max cap at 100
     });
 
     it("should add border to primary service nodes", async () => {
@@ -694,13 +697,13 @@ describe("IncidentServiceGraph.vue", () => {
       await nextTick();
 
       const chartData = wrapper.vm.chartData;
-      // First node is the root cause
+      // First node is the root cause (highest alert count after aggregation)
       const rootCauseNode = chartData.options.series[0].data[0];
 
       // Root cause node should have tooltip formatter that includes root cause text
       expect(rootCauseNode.tooltip.formatter).toBeDefined();
       const tooltipHtml = rootCauseNode.tooltip.formatter();
-      expect(tooltipHtml).toContain("First Alert (Potential Root Cause)");
+      expect(tooltipHtml).toContain("Highest Alert Count (Potential Root Cause)");
     });
   });
 
@@ -711,10 +714,11 @@ describe("IncidentServiceGraph.vue", () => {
       await flushPromises();
 
       const chartData = wrapper.vm.chartData;
+      // After aggregation, nodes sorted by count desc: DB Pool Exhausted (12), High Latency (7), High CPU Usage (3)
       const node = chartData.options.series[0].data[0];
       const tooltip = node.tooltip.formatter();
 
-      expect(tooltip).toContain("service-a");
+      expect(tooltip).toContain("service-c"); // DB Pool Exhausted = service-c
     });
 
     it("should include alert count in tooltip", async () => {
@@ -726,8 +730,8 @@ describe("IncidentServiceGraph.vue", () => {
       const node = chartData.options.series[0].data[0];
       const tooltip = node.tooltip.formatter();
 
-      expect(tooltip).toContain("Alert Count:");
-      expect(tooltip).toContain("3");
+      expect(tooltip).toContain("Total Alert Count:");
+      expect(tooltip).toContain("12"); // DB Pool Exhausted has 12 alerts
     });
 
     it("should show root cause indicator in tooltip", async () => {
@@ -736,11 +740,11 @@ describe("IncidentServiceGraph.vue", () => {
       await flushPromises();
 
       const chartData = wrapper.vm.chartData;
-      // First node is the root cause
+      // First node is the root cause (highest alert count)
       const rootCauseNode = chartData.options.series[0].data[0];
       const tooltip = rootCauseNode.tooltip.formatter();
 
-      expect(tooltip).toContain("First Alert (Potential Root Cause)");
+      expect(tooltip).toContain("Highest Alert Count (Potential Root Cause)");
     });
 
     it("should show primary service indicator in tooltip", async () => {
@@ -749,11 +753,11 @@ describe("IncidentServiceGraph.vue", () => {
       await flushPromises();
 
       const chartData = wrapper.vm.chartData;
-      // First node shows "First Alert (Potential Root Cause)" which is our primary indicator
+      // First node shows highest alert count indicator (root cause)
       const primaryNode = chartData.options.series[0].data[0];
       const tooltip = primaryNode.tooltip.formatter();
 
-      expect(tooltip).toContain("First Alert (Potential Root Cause)");
+      expect(tooltip).toContain("Highest Alert Count (Potential Root Cause)");
     });
 
     it("should not show root cause indicator for non-root-cause nodes", async () => {
@@ -766,7 +770,7 @@ describe("IncidentServiceGraph.vue", () => {
       const normalNode = chartData.options.series[0].data[1];
       const tooltip = normalNode.tooltip.formatter();
 
-      expect(tooltip).not.toContain("First Alert (Potential Root Cause)");
+      expect(tooltip).not.toContain("Highest Alert Count (Potential Root Cause)");
     });
   });
 
@@ -830,9 +834,9 @@ describe("IncidentServiceGraph.vue", () => {
       await flushPromises();
 
       const chartData = wrapper.vm.chartData;
-      // Second node has 0 alerts
+      // Second node has 0 alerts → min size for count <= 1
       const zeroAlertNode = chartData.options.series[0].data[1];
-      expect(zeroAlertNode.symbolSize).toBe(60); // Fixed size for all nodes
+      expect(zeroAlertNode.symbolSize).toBe(30); // Min size for count 0 (clamped to 30 for count<=1)
     });
 
     it("should handle very large alert counts", async () => {
@@ -860,7 +864,7 @@ describe("IncidentServiceGraph.vue", () => {
 
       const chartData = wrapper.vm.chartData;
       const largeNode = chartData.options.series[0].data[0];
-      expect(largeNode.symbolSize).toBe(60); // Fixed size for all nodes
+      expect(largeNode.symbolSize).toBe(100); // Capped at max
     });
 
     it("should handle null orgId gracefully", () => {
@@ -897,6 +901,161 @@ describe("IncidentServiceGraph.vue", () => {
       const chartData = wrapper.vm.chartData;
       // Animation is disabled, so no easing setting
       expect(chartData.options.animation).toBe(false);
+    });
+  });
+
+  describe("Node Aggregation", () => {
+    it("should aggregate nodes with the same alert_name into a single node", async () => {
+      // 3 nodes: two share "Memory_Utilization", one different
+      const dataWithDuplicates = {
+        nodes: [
+          { alert_id: "a1", alert_name: "Memory_Utilization", service_name: "svc-a", alert_count: 10, first_fired_at: 1000, last_fired_at: 2000 },
+          { alert_id: "a2", alert_name: "Memory_Utilization", service_name: "svc-b", alert_count: 5,  first_fired_at: 1500, last_fired_at: 2500 },
+          { alert_id: "a3", alert_name: "Scheduler_Down",      service_name: "svc-c", alert_count: 3,  first_fired_at: 2000, last_fired_at: 3000 },
+        ],
+        edges: [
+          { from_node_index: 0, to_node_index: 2, edge_type: "temporal" },
+          { from_node_index: 1, to_node_index: 2, edge_type: "temporal" },
+        ],
+      };
+
+      wrapper = mountComponent({ topologyContext: dataWithDuplicates });
+      await flushPromises();
+
+      const chartData = wrapper.vm.chartData;
+      const nodes = chartData.options.series[0].data;
+      // Should have 2 nodes (Memory_Utilization aggregated, Scheduler_Down separate)
+      expect(nodes).toHaveLength(2);
+
+      // The aggregated "Memory_Utilization" node should have alert_count 15
+      const memNode = nodes.find((n: any) => n.name === "Memory_Utilization");
+      expect(memNode).toBeDefined();
+      // symbolSize should reflect the total count (15 alerts → scaled above baseline)
+      expect(memNode.symbolSize).toBeGreaterThan(30);
+    });
+
+    it("should cap visible nodes at MAX_VISIBLE_NODES and show truncation notice", async () => {
+      // Generate 60 unique alert_name nodes (exceeds MAX_VISIBLE_NODES=50)
+      const manyNodes = Array.from({ length: 60 }, (_, i) => ({
+        alert_id: `alert_${i}`,
+        alert_name: `Alert_${i}`,
+        service_name: `svc-${i % 5}`,
+        alert_count: 60 - i, // descending counts
+        first_fired_at: 1000 + i * 100,
+        last_fired_at: 2000 + i * 100,
+      }));
+
+      wrapper = mountComponent({
+        topologyContext: { nodes: manyNodes, edges: [] },
+      });
+      await flushPromises();
+
+      const chartData = wrapper.vm.chartData;
+      expect(chartData.options.series[0].data).toHaveLength(50);
+      expect(wrapper.vm.truncatedCount).toBe(10);
+      expect(wrapper.text()).toContain("Showing top 50 of 60 alert groups");
+      expect(wrapper.text()).toContain("10 hidden");
+    });
+
+    it("should not aggregate nodes with different alert names", async () => {
+      const distinctData = {
+        nodes: [
+          { alert_id: "a1", alert_name: "CPU_High",    service_name: "svc-a", alert_count: 5, first_fired_at: 1000, last_fired_at: 2000 },
+          { alert_id: "a2", alert_name: "Memory_High",  service_name: "svc-a", alert_count: 3, first_fired_at: 1500, last_fired_at: 2500 },
+          { alert_id: "a3", alert_name: "Disk_Full",    service_name: "svc-b", alert_count: 2, first_fired_at: 2000, last_fired_at: 3000 },
+        ],
+        edges: [],
+      };
+
+      wrapper = mountComponent({ topologyContext: distinctData });
+      await flushPromises();
+
+      const chartData = wrapper.vm.chartData;
+      expect(chartData.options.series[0].data).toHaveLength(3);
+      const names = chartData.options.series[0].data.map((n: any) => n.name);
+      expect(names).toEqual(expect.arrayContaining(["CPU_High", "Memory_High", "Disk_Full"]));
+    });
+
+    it("should show all service names in aggregated node tooltip", async () => {
+      const data = {
+        nodes: [
+          { alert_id: "a1", alert_name: "OOMKilled", service_name: "pod-a", alert_count: 3, first_fired_at: 1000, last_fired_at: 2000 },
+          { alert_id: "a2", alert_name: "OOMKilled", service_name: "pod-b", alert_count: 7, first_fired_at: 1500, last_fired_at: 3000 },
+          { alert_id: "a3", alert_name: "OOMKilled", service_name: "pod-c", alert_count: 2, first_fired_at: 1200, last_fired_at: 2500 },
+        ],
+        edges: [],
+      };
+
+      wrapper = mountComponent({ topologyContext: data });
+      await flushPromises();
+
+      const chartData = wrapper.vm.chartData;
+      const node = chartData.options.series[0].data[0];
+      const tooltip = node.tooltip.formatter();
+
+      expect(tooltip).toContain("pod-a");
+      expect(tooltip).toContain("pod-b");
+      expect(tooltip).toContain("pod-c");
+      expect(tooltip).toContain("Total Alert Count:");
+      expect(tooltip).toContain("12"); // 3 + 7 + 2
+    });
+
+    it("should not show truncation notice when nodes are below MAX_VISIBLE_NODES", async () => {
+      // mockGraphData has only 3 nodes
+      wrapper = mountComponent();
+      await flushPromises();
+
+      expect(wrapper.vm.truncatedCount).toBe(0);
+      // The truncation banner should not be present
+      const noticeElements = wrapper.findAll("div").filter((el: any) =>
+        el.text().includes("Showing top")
+      );
+      expect(noticeElements.length).toBe(0);
+    });
+
+    it("should scale node size by total alert count after aggregation", async () => {
+      const data = {
+        nodes: [
+          { alert_id: "a1", alert_name: "Rare_Alert",    service_name: "svc-a", alert_count: 1,  first_fired_at: 1000, last_fired_at: 1000 },
+          { alert_id: "a2", alert_name: "Common_Alert",  service_name: "svc-b", alert_count: 100, first_fired_at: 2000, last_fired_at: 3000 },
+        ],
+        edges: [],
+      };
+
+      wrapper = mountComponent({ topologyContext: data });
+      await flushPromises();
+
+      const chartData = wrapper.vm.chartData;
+      const rareNode = chartData.options.series[0].data.find((n: any) => n.name === "Rare_Alert");
+      const commonNode = chartData.options.series[0].data.find((n: any) => n.name === "Common_Alert");
+
+      expect(rareNode.symbolSize).toBe(30);  // min size for count=1
+      expect(commonNode.symbolSize).toBe(100); // max size for count=100
+      expect(commonNode.symbolSize).toBeGreaterThan(rareNode.symbolSize);
+    });
+
+    it("should rebuild edges to connect aggregated node groups", async () => {
+      const data = {
+        nodes: [
+          { alert_id: "a1", alert_name: "Alert_X", service_name: "svc-a", alert_count: 5, first_fired_at: 1000, last_fired_at: 2000 },
+          { alert_id: "a2", alert_name: "Alert_X", service_name: "svc-b", alert_count: 3, first_fired_at: 1500, last_fired_at: 2500 },
+          { alert_id: "a3", alert_name: "Alert_Y", service_name: "svc-c", alert_count: 7, first_fired_at: 2000, last_fired_at: 3000 },
+        ],
+        edges: [
+          { from_node_index: 0, to_node_index: 2, edge_type: "temporal" },
+          { from_node_index: 1, to_node_index: 2, edge_type: "temporal" },
+        ],
+      };
+
+      wrapper = mountComponent({ topologyContext: data });
+      await flushPromises();
+
+      const chartData = wrapper.vm.chartData;
+      const links = chartData.options.series[0].links;
+      // Both edges (0→2 and 1→2) should collapse to one: aggregated Alert_X → Alert_Y
+      expect(links).toHaveLength(1);
+      expect(links[0].source).toBe("0"); // Alert_X is first (highest total count: 5+3=8 vs 7)
+      expect(links[0].target).toBe("1"); // Alert_Y is second
     });
   });
 

@@ -43,6 +43,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="graph-legend__dot" style="color: #a78bfa;">→</span>
           Purple arrows show temporal flow
         </div>
+        <div class="graph-legend__divider" />
+        <div class="graph-legend__row">
+          <span class="graph-legend__dot" style="font-size: 12px;">📊</span>
+          Nodes grouped by alert name; size = total count
+        </div>
       </div>
     </span>
 
@@ -74,13 +79,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Graph Canvas using ECharts -->
     <div
       v-if="!loading && graphData && graphData.nodes && graphData.nodes.length > 0"
-      style="width: 100%; height: 100%;"
+      style="width: 100%; height: 100%; position: relative;"
     >
       <ChartRenderer
         ref="chartRendererRef"
         :data="chartData"
         :key="chartKey"
       />
+      <!-- Truncation notice -->
+      <div
+        v-if="truncatedCount > 0"
+        class="tw:absolute tw:bottom-4 tw:left-4 tw:z-10 tw:px-3 tw:py-1.5 tw:rounded-md tw:text-xs tw:font-medium"
+        :class="isDarkMode ? 'tw:bg-gray-800 tw:text-gray-300 tw:border tw:border-gray-700' : 'tw:bg-white tw:text-gray-600 tw:border tw:border-gray-200 tw:shadow-sm'"
+      >
+        Showing top {{ MAX_VISIBLE_NODES }} of {{ graphData?.nodes?.length || 0 }} alert groups
+        ({{ truncatedCount }} hidden)
+      </div>
     </div>
   </div>
 </template>
@@ -218,19 +232,112 @@ export default defineComponent({
       chartKey.value++;
     };
 
-    const getNodeColor = (node: AlertNode, index: number): string => {
-      // First node (chronologically first alert) is highlighted as potential root cause
+    const getNodeColor = (node: AggregatedNode | AlertNode, index: number): string => {
+      // First node (highest alert count after aggregation) is highlighted as potential root cause
       if (index === 0) {
-        return "#ef4444"; // red-500 - first alert
+        return "#ef4444"; // red-500 - root cause
       }
-      if (node.alert_count > 5) {
+      const count = 'total_alert_count' in node ? (node as AggregatedNode).total_alert_count : (node as AlertNode).alert_count;
+      if (count > 5) {
         return "#f97316"; // orange-500 - high frequency
       }
       return "#3b82f6"; // blue-500 - normal
     };
 
-    const getNodeSize = (node: AlertNode): number => {
-      return 60; // Fixed size for all nodes
+    const getNodeSize = (node: AggregatedNode | AlertNode): number => {
+      const count = 'total_alert_count' in node ? (node as AggregatedNode).total_alert_count : (node as AlertNode).alert_count;
+      if (count <= 1) return 30;
+      if (count >= 100) return 100;
+      // Linear scale: 30 at count=1, 100 at count=100
+      return Math.round(30 + (count - 1) * (70 / 99));
+    };
+
+    // Aggregation: combine nodes with the same alert_name
+    interface AggregatedNode {
+      alert_name: string;
+      total_alert_count: number;
+      service_names: string[];
+      first_fired_at: number;
+      last_fired_at: number;
+      originalIndices: number[];
+    }
+
+    const MAX_VISIBLE_NODES = 50;
+    const truncatedCount = ref(0);
+
+    const aggregateNodes = (rawNodes: AlertNode[]): AggregatedNode[] => {
+      const map = new Map<string, AggregatedNode>();
+
+      rawNodes.forEach((node, idx) => {
+        const key = node.alert_name;
+        const existing = map.get(key);
+        if (existing) {
+          existing.total_alert_count += node.alert_count;
+          if (!existing.service_names.includes(node.service_name)) {
+            existing.service_names.push(node.service_name);
+          }
+          existing.first_fired_at = Math.min(existing.first_fired_at, node.first_fired_at);
+          existing.last_fired_at = Math.max(existing.last_fired_at, node.last_fired_at);
+          existing.originalIndices.push(idx);
+        } else {
+          map.set(key, {
+            alert_name: node.alert_name,
+            total_alert_count: node.alert_count,
+            service_names: [node.service_name],
+            first_fired_at: node.first_fired_at,
+            last_fired_at: node.last_fired_at,
+            originalIndices: [idx],
+          });
+        }
+      });
+
+      // Sort by total_alert_count descending, then cap
+      let result = Array.from(map.values()).sort(
+        (a, b) => b.total_alert_count - a.total_alert_count
+      );
+
+      truncatedCount.value = Math.max(0, result.length - MAX_VISIBLE_NODES);
+      if (result.length > MAX_VISIBLE_NODES) {
+        result = result.slice(0, MAX_VISIBLE_NODES);
+      }
+
+      return result;
+    };
+
+    const rebuildEdges = (
+      rawEdges: any[],
+      rawNodes: AlertNode[],
+      aggregatedNodes: AggregatedNode[]
+    ): any[] => {
+      // Map original node index → aggregated node index
+      const indexMap = new Map<number, number>();
+      aggregatedNodes.forEach((aggNode, aggIdx) => {
+        aggNode.originalIndices.forEach((origIdx) => {
+          indexMap.set(origIdx, aggIdx);
+        });
+      });
+
+      const edgeSet = new Set<string>();
+      const result: any[] = [];
+
+      rawEdges.forEach((edge) => {
+        const fromAgg = indexMap.get(edge.from_node_index);
+        const toAgg = indexMap.get(edge.to_node_index);
+        // Only include edge if both endpoints survive aggregation+cap
+        if (fromAgg !== undefined && toAgg !== undefined && fromAgg !== toAgg) {
+          const key = `${fromAgg}-${toAgg}`;
+          if (!edgeSet.has(key)) {
+            edgeSet.add(key);
+            result.push({
+              from_node_index: fromAgg,
+              to_node_index: toAgg,
+              edge_type: edge.edge_type,
+            });
+          }
+        }
+      });
+
+      return result;
     };
 
     const chartData = computed(() => {
@@ -238,19 +345,25 @@ export default defineComponent({
         return { options: {}, notMerge: true };
       }
 
-      const { nodes, edges } = graphData.value;
+      const rawNodes = graphData.value.nodes;
+      const rawEdges = graphData.value.edges;
 
-      // Prepare nodes for D3-force simulation
-      const preparedNodes = nodes.map((node, index) => ({
-        name: node.alert_name, // Show only alert name for cleaner labels
+      // --- NEW: aggregate and cap ---
+      const aggregated = aggregateNodes(rawNodes);
+      const aggEdges = rebuildEdges(rawEdges, rawNodes, aggregated);
+
+      // Prepare nodes for D3-force simulation (using aggregated)
+      const preparedNodes = aggregated.map((aggNode, index) => ({
+        name: aggNode.alert_name, // Show only alert name for cleaner labels
         id: index.toString(),
-        symbolSize: getNodeSize(node),
-        originalNode: node,
+        symbolSize: getNodeSize(aggNode),
+        originalNode: aggNode,
         originalIndex: index,
+        // originalIndices kept for edge mapping if needed
       }));
 
-      // Prepare edges for D3-force simulation
-      const preparedEdges = edges.map((edge) => ({
+      // Prepare edges (using rebuilt aggregated edges)
+      const preparedEdges = aggEdges.map((edge) => ({
         source: edge.from_node_index.toString(),
         target: edge.to_node_index.toString(),
         originalEdge: edge,
@@ -325,19 +438,22 @@ export default defineComponent({
           },
           tooltip: {
             formatter: () => {
-              const firstTime = new Date(originalNode.first_fired_at / 1000).toLocaleString();
-              const lastTime = originalNode.alert_count > 1 ? new Date(originalNode.last_fired_at / 1000).toLocaleString() : null;
+              const agg = originalNode as AggregatedNode;
+              const firstTime = new Date(agg.first_fired_at / 1000).toLocaleString();
+              const lastTime = agg.total_alert_count > 1
+                ? new Date(agg.last_fired_at / 1000).toLocaleString()
+                : null;
 
               let html = `<div style="padding: 8px; font-size: 12px;">`;
-              html += `<strong style="font-size: 14px;">${originalNode.alert_name}</strong><br/>`;
-              html += `Service: <strong>${originalNode.service_name}</strong><br/><br/>`;
-              html += `Alert Count: <strong>${originalNode.alert_count}</strong><br/>`;
+              html += `<strong style="font-size: 14px;">${agg.alert_name}</strong><br/>`;
+              html += `Services: <strong>${agg.service_names.join(", ")}</strong><br/><br/>`;
+              html += `Total Alert Count: <strong>${agg.total_alert_count}</strong><br/>`;
               html += `First Fired: ${firstTime}<br/>`;
               if (lastTime) {
                 html += `Last Fired: ${lastTime}<br/>`;
               }
               if (index === 0) {
-                html += `<br/><span style="color: #ef4444;">⚠ First Alert (Potential Root Cause)</span>`;
+                html += `<br/><span style="color: #ef4444;">⚠ Highest Alert Count (Potential Root Cause)</span>`;
               }
               html += `</div>`;
               return html;
@@ -346,9 +462,9 @@ export default defineComponent({
         };
       });
 
-      const echartsEdges = edges.map((edge) => {
-        const sourceNode = nodes[edge.from_node_index];
-        const targetNode = nodes[edge.to_node_index];
+      const echartsEdges = aggEdges.map((edge) => {
+        const sourceNode = aggregated[edge.from_node_index];
+        const targetNode = aggregated[edge.to_node_index];
 
         return {
           source: edge.from_node_index.toString(),
@@ -461,6 +577,8 @@ export default defineComponent({
       chartKey,
       isDarkMode,
       loadGraph,
+      truncatedCount,
+      MAX_VISIBLE_NODES,
     };
   },
 });
