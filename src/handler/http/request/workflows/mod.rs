@@ -1,13 +1,14 @@
-use ahash::HashMap;
+use std::collections::HashMap;
+
 use axum::{
     Json,
     extract::{Path, Query},
     http::StatusCode,
     response::Response,
 };
-use config::ider;
+use config::{ider, meta::self_reporting::error::NodeErrors};
 use infra::table::workflows::Workflow;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::{
     common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
@@ -23,6 +24,11 @@ pub struct WorkflowTestInput {
     inputs: Vec<serde_json::Value>,
     #[serde(default)]
     from_node: Option<String>,
+}
+
+#[derive(Serialize)]
+pub struct WorkflowTestResult {
+    errors: HashMap<String, NodeErrors>,
 }
 
 /// CreateWorkflow
@@ -256,10 +262,7 @@ pub async fn test_workflow(
     Json(inputs): Json<WorkflowTestInput>,
 ) -> Response {
     match workflows::test_workflow(&org_id, &workflow_id, inputs.inputs, inputs.from_node).await {
-        Ok(()) => MetaHttpResponse::json(MetaHttpResponse::message(
-            StatusCode::OK,
-            "Workflow tested successfully",
-        )),
+        Ok(v) => MetaHttpResponse::json(WorkflowTestResult { errors: v.errors }),
         Err(e) => MetaHttpResponse::bad_request(e),
     }
 }

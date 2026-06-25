@@ -1,6 +1,6 @@
 use infra::table::workflows::{self, Workflow};
 
-use crate::service::pipeline::batch_execution::ExecutablePipeline;
+use crate::service::pipeline::batch_execution::{ExecutablePipeline, WorkflowResult};
 
 fn validate_workflow(workflow: &Workflow) -> Result<(), anyhow::Error> {
     for node in &workflow.nodes {
@@ -66,14 +66,14 @@ pub async fn test_workflow(
     id: &str,
     inputs: Vec<serde_json::Value>,
     from_node: Option<String>,
-) -> Result<(), anyhow::Error> {
+) -> Result<WorkflowResult, anyhow::Error> {
     let workflow = workflows::get_by_org_wid(org_id, id)
         .await?
         .ok_or(anyhow::anyhow!("workflow with given id not found"))?;
     let executable = ExecutablePipeline::new_from_workflow(&workflow).await?;
 
-    executable
+    let res = executable
         .process_workflow(org_id, inputs, from_node)
         .await?;
-    Ok(())
+    Ok(res)
 }

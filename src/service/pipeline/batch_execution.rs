@@ -28,7 +28,7 @@ use config::{
     meta::{
         function::{Transform, VRLResultResolver},
         pipeline::{Pipeline, PipelineKind, components::NodeData},
-        self_reporting::error::{ErrorData, ErrorSource, PipelineError},
+        self_reporting::error::{ErrorData, ErrorSource, NodeErrors, PipelineError},
         stream::{StreamParams, StreamType},
     },
     metrics,
@@ -64,6 +64,12 @@ struct BatchBuffer {
     records: Vec<json::Value>,
     total_bytes: usize,
     last_write: Instant,
+}
+
+#[derive(Default)]
+pub struct WorkflowResult {
+    pub stream_details: HashMap<StreamParams, Vec<(usize, Value)>>,
+    pub errors: HashMap<String, NodeErrors>,
 }
 
 #[cfg(feature = "enterprise")]
@@ -733,14 +739,14 @@ impl ExecutablePipeline {
         org_id: &str,
         records: Vec<Value>,
         from_node: Option<String>,
-    ) -> Result<HashMap<StreamParams, Vec<(usize, Value)>>> {
+    ) -> Result<WorkflowResult> {
         let batch_size = records.len();
         let pipeline_name = self.name.clone();
         // Unique invocation ID to correlate logs across concurrent pipeline runs
         let inv_id = &format!("{:08x}", rand::random::<u32>());
         let batch_start = Instant::now();
         if batch_size == 0 {
-            return Ok(HashMap::default());
+            return Ok(Default::default());
         }
 
         // Source size of the batch (MB). Computed before records are consumed by the
@@ -912,12 +918,19 @@ impl ExecutablePipeline {
 
         // Publish errors if received any
         log::debug!("[Workflow] {pipeline_name} [inv={inv_id}]: awaiting error task");
-        if let Some(pipeline_errors) = error_task.await.map_err(|e| {
+        let errors = error_task.await.map_err(|e| {
             log::error!(
                 "[Workflow] {pipeline_name} [inv={inv_id}]: error collecting job failed: {e}"
             );
             anyhow!("[Workflow] error collecting job failed: {}", e)
-        })? {
+        })?;
+
+        let node_errors = errors
+            .as_ref()
+            .map(|v| v.node_errors.clone())
+            .unwrap_or_default();
+
+        if let Some(pipeline_errors) = errors {
             // TODO YJDOc2: maybe change error type?
             log::error!(
                 "[Workflow] [inv={inv_id}] id: {}, name: {}, node_errors: {:?}",
@@ -974,7 +987,10 @@ impl ExecutablePipeline {
 
         // Cross-type leaf nodes ingest directly via ingestion_service inside process_node,
         // so results here only contain same-type records for the caller to handle.
-        Ok(results)
+        Ok(WorkflowResult {
+            stream_details: results,
+            errors: node_errors,
+        })
     }
 
     pub fn get_all_destination_streams(&self) -> Vec<StreamParams> {
