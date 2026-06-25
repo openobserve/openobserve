@@ -1393,6 +1393,10 @@ export class AlertsPage {
     /**
      * Verify alert list table is visible
      */
+    async expectAlertListPageVisible() {
+        await expect(this.page.locator(this.locators.alertListPage)).toBeVisible({ timeout: 15000 });
+    }
+
     async expectAlertListTableVisible() {
         await expect(this.page.locator(this.locators.alertListTable)).toBeVisible({ timeout: 10000 });
     }

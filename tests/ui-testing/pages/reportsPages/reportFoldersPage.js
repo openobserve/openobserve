@@ -386,4 +386,50 @@ export class ReportFoldersPage {
     }
     return false;
   }
+
+  // ===== BULK OPERATION METHODS =====
+  // Selectors for bulk report operations (move/delete) in main branch.
+  // Note: bulk pause/resume are not available in main's ReportList.vue.
+  // Bulk delete confirmation uses ConfirmDialog (data-test="confirm-dialog")
+  // with ODialog's standard primary/secondary button pattern.
+
+  async selectAllReports() {
+    const headerCheckbox = this.page.locator('[data-test="report-list-table"] thead .q-checkbox').first();
+    await headerCheckbox.waitFor({ state: 'visible', timeout: 5000 });
+    await headerCheckbox.click();
+    await this.page.waitForTimeout(300);
+  }
+
+  async expectBulkButtonsVisible() {
+    await expect(this.page.locator('[data-test="report-list-move-reports-btn"]')).toBeVisible({ timeout: 5000 });
+    await expect(this.page.locator('[data-test="report-list-delete-reports-btn"]')).toBeVisible({ timeout: 5000 });
+  }
+
+  async expectBulkButtonsHidden() {
+    await expect(this.page.locator('[data-test="report-list-move-reports-btn"]')).not.toBeVisible({ timeout: 3000 });
+  }
+
+  async clickBulkMove() {
+    await this.page.locator('[data-test="report-list-move-reports-btn"]').click();
+    await expect(this.moveDialog).toBeVisible({ timeout: 5000 });
+  }
+
+  async clickBulkDelete() {
+    await this.page.locator('[data-test="report-list-delete-reports-btn"]').click();
+    await expect(this.page.locator('[data-test="confirm-dialog"]')).toBeVisible({ timeout: 5000 });
+  }
+
+  async confirmBulkDelete() {
+    const confirmBtn = this.page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]');
+    await confirmBtn.waitFor({ state: 'visible', timeout: 5000 });
+    await confirmBtn.click({ force: true });
+    await this.page.locator('[data-test="confirm-dialog"]').waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
+    await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+  }
+
+  async cancelBulkDelete() {
+    const cancelBtn = this.page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-secondary-btn"]');
+    await cancelBtn.click();
+    await this.page.locator('[data-test="confirm-dialog"]').waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+  }
 }
