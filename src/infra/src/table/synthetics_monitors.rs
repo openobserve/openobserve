@@ -14,8 +14,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::meta::synthetics::{
-    BrowserConfig, ListMonitorsParams, Monitor, MonitorFrequency, MonitorSettings, MonitorStatus,
-    MonitorType,
+    BrowserConfig, ListSyntheticsParams, MonitorSettings, Synthetic, SyntheticFrequency,
+    SyntheticStatus, SyntheticType,
 };
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, PaginatorTrait, QueryFilter,
@@ -27,11 +27,11 @@ use crate::errors;
 
 // ── TryFrom: ORM model → meta type ───────────────────────────────────────────
 
-impl TryFrom<synthetics_monitors::Model> for Monitor {
+impl TryFrom<synthetics_monitors::Model> for Synthetic {
     type Error = errors::Error;
 
     fn try_from(m: synthetics_monitors::Model) -> Result<Self, Self::Error> {
-        let monitor_type: MonitorType = serde_json::from_value(serde_json::Value::String(
+        let monitor_type: SyntheticType = serde_json::from_value(serde_json::Value::String(
             m.monitor_type.clone(),
         ))
         .map_err(|e| {
@@ -46,15 +46,15 @@ impl TryFrom<synthetics_monitors::Model> for Monitor {
 
         let tags: Vec<String> = serde_json::from_value(m.tags).unwrap_or_default();
 
-        let frequency: MonitorFrequency = serde_json::from_value(m.frequency).unwrap_or_default();
+        let frequency: SyntheticFrequency = serde_json::from_value(m.frequency).unwrap_or_default();
 
         let settings: MonitorSettings = serde_json::from_value(m.settings).unwrap_or_default();
 
-        let last_check_status: MonitorStatus =
+        let last_check_status: SyntheticStatus =
             serde_json::from_value(serde_json::Value::String(m.last_check_status))
                 .unwrap_or_default();
 
-        Ok(Monitor {
+        Ok(Synthetic {
             id: m.id,
             org_id: m.org_id,
             folder_id: m.folder_id,
@@ -92,29 +92,29 @@ pub async fn get<C: ConnectionTrait>(
     conn: &C,
     org_id: &str,
     id: &str,
-) -> Result<Option<Monitor>, errors::Error> {
+) -> Result<Option<Synthetic>, errors::Error> {
     let _lock = super::get_lock().await;
     let maybe = get_model(conn, org_id, id).await?;
-    maybe.map(Monitor::try_from).transpose()
+    maybe.map(Synthetic::try_from).transpose()
 }
 
 pub async fn list<C: ConnectionTrait>(
     conn: &C,
     org_id: &str,
-    params: &ListMonitorsParams,
-) -> Result<Vec<Monitor>, errors::Error> {
+    params: &ListSyntheticsParams,
+) -> Result<Vec<Synthetic>, errors::Error> {
     let _lock = super::get_lock().await;
     list_models(conn, org_id, params)
         .await?
         .into_iter()
-        .map(Monitor::try_from)
+        .map(Synthetic::try_from)
         .collect()
 }
 
 pub async fn count<C: ConnectionTrait>(
     conn: &C,
     org_id: &str,
-    params: &ListMonitorsParams,
+    params: &ListSyntheticsParams,
 ) -> Result<u64, errors::Error> {
     let _lock = super::get_lock().await;
     let q = Entity::find()
@@ -126,8 +126,8 @@ pub async fn count<C: ConnectionTrait>(
 pub async fn create<C: TransactionTrait>(
     conn: &C,
     org_id: &str,
-    monitor: Monitor,
-) -> Result<Monitor, errors::Error> {
+    monitor: Synthetic,
+) -> Result<Synthetic, errors::Error> {
     let _lock = super::get_lock().await;
     let txn = conn.begin().await?;
     let now = config::utils::time::now_micros();
@@ -143,7 +143,7 @@ pub async fn create<C: TransactionTrait>(
     // next_run_at = 0 (DB DEFAULT) → fires on first scheduler tick
 
     let model = am.insert(&txn).await?.try_into_model()?;
-    let result = Monitor::try_from(model)?;
+    let result = Synthetic::try_from(model)?;
     txn.commit().await?;
     Ok(result)
 }
@@ -152,8 +152,8 @@ pub async fn update<C: TransactionTrait>(
     conn: &C,
     org_id: &str,
     id: &str,
-    monitor: Monitor,
-) -> Result<Monitor, errors::Error> {
+    monitor: Synthetic,
+) -> Result<Synthetic, errors::Error> {
     let _lock = super::get_lock().await;
     let txn = conn.begin().await?;
 
@@ -166,7 +166,7 @@ pub async fn update<C: TransactionTrait>(
     am.updated_at = Set(config::utils::time::now_micros());
 
     let model = am.update(&txn).await?.try_into_model()?;
-    let result = Monitor::try_from(model)?;
+    let result = Synthetic::try_from(model)?;
     txn.commit().await?;
     Ok(result)
 }
@@ -174,8 +174,8 @@ pub async fn update<C: TransactionTrait>(
 pub async fn put<C: TransactionTrait>(
     conn: &C,
     org_id: &str,
-    monitor: Monitor,
-) -> Result<Monitor, errors::Error> {
+    monitor: Synthetic,
+) -> Result<Synthetic, errors::Error> {
     let _lock = super::get_lock().await;
     let txn = conn.begin().await?;
     let now = config::utils::time::now_micros();
@@ -186,7 +186,7 @@ pub async fn put<C: TransactionTrait>(
             update_mutable_fields(&mut am, &monitor)?;
             am.updated_at = Set(now);
             let model = am.update(&txn).await?.try_into_model()?;
-            Monitor::try_from(model)?
+            Synthetic::try_from(model)?
         }
         None => {
             let mut am = build_active_model(&monitor)?;
@@ -197,7 +197,7 @@ pub async fn put<C: TransactionTrait>(
             am.created_at = Set(now);
             am.updated_at = Set(now);
             let model = am.insert(&txn).await?.try_into_model()?;
-            Monitor::try_from(model)?
+            Synthetic::try_from(model)?
         }
     };
 
@@ -242,13 +242,13 @@ pub async fn set_enabled<C: ConnectionTrait>(
 
 // ── Scheduler helpers ─────────────────────────────────────────────────────────
 
-/// Scheduler's fan-out data — the subset of Monitor fields the scheduler needs.
+/// Scheduler's fan-out data — the subset of Synthetic fields the scheduler needs.
 pub struct DueMonitor {
     pub id: String,
     pub org_id: String,
-    pub monitor_type: MonitorType,
+    pub monitor_type: SyntheticType,
     pub locations: Vec<String>,
-    pub frequency: MonitorFrequency,
+    pub frequency: SyntheticFrequency,
     /// Minutes from UTC — used for cron scheduling. 0 = UTC.
     pub tz_offset: i32,
     /// Populated only for browser monitors (parsed from config.browser_devices).
@@ -277,7 +277,7 @@ pub async fn fetch_due<C: ConnectionTrait>(
     models
         .into_iter()
         .map(|m| {
-            let monitor_type: MonitorType = serde_json::from_value(serde_json::Value::String(
+            let monitor_type: SyntheticType = serde_json::from_value(serde_json::Value::String(
                 m.monitor_type.clone(),
             ))
             .map_err(|e| {
@@ -291,10 +291,10 @@ pub async fn fetch_due<C: ConnectionTrait>(
                 errors::Error::Message(format!("invalid locations for {}: {e}", m.id))
             })?;
 
-            let frequency: MonitorFrequency =
+            let frequency: SyntheticFrequency =
                 serde_json::from_value(m.frequency).unwrap_or_default();
 
-            let browser_devices = if monitor_type == MonitorType::Browser {
+            let browser_devices = if monitor_type == SyntheticType::Browser {
                 let cfg: BrowserConfig = serde_json::from_value(m.config).unwrap_or_default();
                 cfg.browser_devices
             } else {
@@ -360,7 +360,7 @@ async fn get_model<C: ConnectionTrait>(
 async fn list_models<C: ConnectionTrait>(
     conn: &C,
     org_id: &str,
-    params: &ListMonitorsParams,
+    params: &ListSyntheticsParams,
 ) -> Result<Vec<synthetics_monitors::Model>, sea_orm::DbErr> {
     let q = Entity::find()
         .filter(Column::OrgId.eq(org_id))
@@ -375,7 +375,7 @@ async fn list_models<C: ConnectionTrait>(
     q.all(conn).await
 }
 
-fn pack_settings(monitor: &Monitor) -> Result<serde_json::Value, errors::Error> {
+fn pack_settings(monitor: &Synthetic) -> Result<serde_json::Value, errors::Error> {
     Ok(serde_json::to_value(MonitorSettings {
         retries: monitor.retries,
         cooldown_secs: monitor.cooldown_secs,
@@ -388,7 +388,7 @@ fn pack_settings(monitor: &Monitor) -> Result<serde_json::Value, errors::Error> 
     })?)
 }
 
-fn update_mutable_fields(am: &mut ActiveModel, monitor: &Monitor) -> Result<(), errors::Error> {
+fn update_mutable_fields(am: &mut ActiveModel, monitor: &Synthetic) -> Result<(), errors::Error> {
     let locations = serde_json::to_value(&monitor.locations)?;
     let destinations = serde_json::to_value(&monitor.destinations)?;
     let tags = serde_json::to_value(&monitor.tags)?;
@@ -409,7 +409,7 @@ fn update_mutable_fields(am: &mut ActiveModel, monitor: &Monitor) -> Result<(), 
     Ok(())
 }
 
-fn build_active_model(monitor: &Monitor) -> Result<ActiveModel, errors::Error> {
+fn build_active_model(monitor: &Synthetic) -> Result<ActiveModel, errors::Error> {
     let locations = serde_json::to_value(&monitor.locations)?;
     let destinations = serde_json::to_value(&monitor.destinations)?;
     let tags = serde_json::to_value(&monitor.tags)?;
@@ -430,25 +430,25 @@ fn build_active_model(monitor: &Monitor) -> Result<ActiveModel, errors::Error> {
     })
 }
 
-fn monitor_type_to_str(t: &MonitorType) -> &'static str {
+fn monitor_type_to_str(t: &SyntheticType) -> &'static str {
     match t {
-        MonitorType::Http => "http",
-        MonitorType::Api => "api",
-        MonitorType::Tcp => "tcp",
-        MonitorType::Tls => "tls",
-        MonitorType::Ssh => "ssh",
-        MonitorType::Browser => "browser",
+        SyntheticType::Http => "http",
+        SyntheticType::Api => "api",
+        SyntheticType::Tcp => "tcp",
+        SyntheticType::Tls => "tls",
+        SyntheticType::Ssh => "ssh",
+        SyntheticType::Browser => "browser",
     }
 }
 
 // ── Filter extension ──────────────────────────────────────────────────────────
 
 trait ApplyMonitorFilters {
-    fn apply_filters(self, params: &ListMonitorsParams) -> Self;
+    fn apply_filters(self, params: &ListSyntheticsParams) -> Self;
 }
 
 impl ApplyMonitorFilters for sea_orm::Select<Entity> {
-    fn apply_filters(self, params: &ListMonitorsParams) -> Self {
+    fn apply_filters(self, params: &ListSyntheticsParams) -> Self {
         let mut q = self;
         if let Some(folder_id) = &params.folder_id {
             q = q.filter(Column::FolderId.eq(folder_id.clone()));
@@ -497,15 +497,15 @@ mod tests {
 
     #[test]
     fn test_try_from_model() {
-        let monitor = Monitor::try_from(make_model()).unwrap();
+        let monitor = Synthetic::try_from(make_model()).unwrap();
         assert_eq!(monitor.id, "mon-1");
-        assert_eq!(monitor.monitor_type, MonitorType::Browser);
+        assert_eq!(monitor.monitor_type, SyntheticType::Browser);
         assert_eq!(monitor.locations, vec!["aws-us-east-1"]);
         assert!(monitor.enabled);
         assert_eq!(monitor.frequency.interval, 5);
         assert_eq!(
             monitor.frequency.frequency_type,
-            config::meta::synthetics::MonitorFrequencyType::Minutes
+            config::meta::synthetics::SyntheticFrequencyType::Minutes
         );
     }
 
@@ -513,17 +513,17 @@ mod tests {
     fn test_try_from_invalid_monitor_type() {
         let mut m = make_model();
         m.monitor_type = "invalid".to_string();
-        assert!(Monitor::try_from(m).is_err());
+        assert!(Synthetic::try_from(m).is_err());
     }
 
     #[test]
     fn test_monitor_type_to_str() {
-        assert_eq!(monitor_type_to_str(&MonitorType::Http), "http");
-        assert_eq!(monitor_type_to_str(&MonitorType::Browser), "browser");
-        assert_eq!(monitor_type_to_str(&MonitorType::Api), "api");
-        assert_eq!(monitor_type_to_str(&MonitorType::Tcp), "tcp");
-        assert_eq!(monitor_type_to_str(&MonitorType::Tls), "tls");
-        assert_eq!(monitor_type_to_str(&MonitorType::Ssh), "ssh");
+        assert_eq!(monitor_type_to_str(&SyntheticType::Http), "http");
+        assert_eq!(monitor_type_to_str(&SyntheticType::Browser), "browser");
+        assert_eq!(monitor_type_to_str(&SyntheticType::Api), "api");
+        assert_eq!(monitor_type_to_str(&SyntheticType::Tcp), "tcp");
+        assert_eq!(monitor_type_to_str(&SyntheticType::Tls), "tls");
+        assert_eq!(monitor_type_to_str(&SyntheticType::Ssh), "ssh");
     }
 
     #[test]
@@ -532,9 +532,9 @@ mod tests {
         m.next_run_at = 1750000001000000;
         m.last_triggered_at = 1750000000500000;
         m.last_check_status = "up".to_string();
-        let monitor = Monitor::try_from(m).unwrap();
+        let monitor = Synthetic::try_from(m).unwrap();
         assert_eq!(monitor.next_run_at, 1750000001000000);
         assert_eq!(monitor.last_triggered_at, 1750000000500000);
-        assert_eq!(monitor.last_check_status, MonitorStatus::Up);
+        assert_eq!(monitor.last_check_status, SyntheticStatus::Up);
     }
 }

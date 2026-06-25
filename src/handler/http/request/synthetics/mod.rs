@@ -26,7 +26,7 @@ use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 
 #[utoipa::path(
     get,
-    path = "/{org_id}/synthetics/monitors/{id}/results",
+    path = "/{org_id}/synthetics/{id}/results",
     context_path = "/api",
     tag = "Synthetics",
     operation_id = "ListSyntheticsResults",
@@ -62,7 +62,7 @@ pub async fn list_results(
 
 #[utoipa::path(
     get,
-    path = "/{org_id}/synthetics/monitors/{id}/results/{job_id}",
+    path = "/{org_id}/synthetics/{id}/results/{job_id}",
     context_path = "/api",
     tag = "Synthetics",
     operation_id = "GetSyntheticsResult",
@@ -97,7 +97,7 @@ pub async fn get_result(Path((org_id, id, job_id)): Path<(String, String, String
 
 #[utoipa::path(
     get,
-    path = "/{org_id}/synthetics/monitors/{id}/results/{job_id}/artifact",
+    path = "/{org_id}/synthetics/{id}/results/{job_id}/artifact",
     context_path = "/api",
     tag = "Synthetics",
     operation_id = "GetSyntheticsArtifactUrl",
@@ -125,7 +125,7 @@ pub async fn get_artifact_url(
 
 #[utoipa::path(
     get,
-    path = "/{org_id}/synthetics/monitors/{id}/summary",
+    path = "/{org_id}/synthetics/{id}/summary",
     context_path = "/api",
     tag = "Synthetics",
     operation_id = "GetSyntheticsSummary",
@@ -162,11 +162,11 @@ pub async fn get_summary(
 
 #[utoipa::path(
     get,
-    path = "/{org_id}/synthetics/monitors",
+    path = "/{org_id}/synthetics",
     context_path = "/api",
     tag = "Synthetics",
-    operation_id = "ListSyntheticsMonitors",
-    summary = "List synthetic monitors",
+    operation_id = "ListSynthetics",
+    summary = "List synthetics",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
@@ -179,23 +179,24 @@ pub async fn get_summary(
         ("page_size" = Option<u64>, Query, description = "Results per page"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = config::meta::synthetics::MonitorListResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::synthetics::SyntheticListResponse),
         (status = 500, description = "Error",   content_type = "application/json", body = Object),
     ),
 )]
-pub async fn list_monitors(
+pub async fn list_synthetics(
     Path(org_id): Path<String>,
-    Query(params): Query<config::meta::synthetics::ListMonitorsParams>,
+    Query(params): Query<config::meta::synthetics::ListSyntheticsParams>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        match o2_enterprise::enterprise::synthetics::service::list_monitors(&org_id, &params).await
+        match o2_enterprise::enterprise::synthetics::service::list_synthetics(&org_id, &params)
+            .await
         {
             Ok(mut resp) => {
                 if !resp.monitors.is_empty() {
                     let ids: Vec<&str> = resp.monitors.iter().map(|m| m.id.as_str()).collect();
                     if let Ok(summaries) =
-                        crate::service::synthetics::batch_monitor_summary(&org_id, &ids).await
+                        crate::service::synthetics::batch_synthetic_summary(&org_id, &ids).await
                     {
                         for item in &mut resp.monitors {
                             if let Some(s) = summaries.get(&item.id) {
@@ -209,7 +210,7 @@ pub async fn list_monitors(
                 MetaHttpResponse::json(resp)
             }
             Err(e) => {
-                tracing::error!("[synthetics] list_monitors: {e}");
+                tracing::error!("[synthetics] list_synthetics: {e}");
                 MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
                     .into_response()
             }
@@ -224,31 +225,32 @@ pub async fn list_monitors(
 
 #[utoipa::path(
     post,
-    path = "/{org_id}/synthetics/monitors",
+    path = "/{org_id}/synthetics",
     context_path = "/api",
     tag = "Synthetics",
-    operation_id = "CreateSyntheticsMonitor",
-    summary = "Create a synthetic monitor",
+    operation_id = "CreateSynthetic",
+    summary = "Create a synthetic",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
     ),
-    request_body(content = config::meta::synthetics::Monitor, description = "Monitor definition", content_type = "application/json"),
+    request_body(content = config::meta::synthetics::Synthetic, description = "Synthetic definition", content_type = "application/json"),
     responses(
-        (status = 200, description = "Created", content_type = "application/json", body = config::meta::synthetics::Monitor),
+        (status = 200, description = "Created", content_type = "application/json", body = config::meta::synthetics::Synthetic),
         (status = 500, description = "Error",   content_type = "application/json", body = Object),
     ),
 )]
-pub async fn create_monitor(
+pub async fn create_synthetic(
     Path(org_id): Path<String>,
-    Json(body): Json<config::meta::synthetics::Monitor>,
+    Json(body): Json<config::meta::synthetics::Synthetic>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        match o2_enterprise::enterprise::synthetics::service::create_monitor(&org_id, body).await {
+        match o2_enterprise::enterprise::synthetics::service::create_synthetic(&org_id, body).await
+        {
             Ok(monitor) => MetaHttpResponse::json(monitor),
             Err(e) => {
-                tracing::error!("[synthetics] create_monitor: {e}");
+                tracing::error!("[synthetics] create_synthetic: {e}");
                 MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
                     .into_response()
             }
@@ -263,30 +265,30 @@ pub async fn create_monitor(
 
 #[utoipa::path(
     get,
-    path = "/{org_id}/synthetics/monitors/{id}",
+    path = "/{org_id}/synthetics/{id}",
     context_path = "/api",
     tag = "Synthetics",
-    operation_id = "GetSyntheticsMonitor",
-    summary = "Get a synthetic monitor by ID",
+    operation_id = "GetSynthetic",
+    summary = "Get a synthetic by ID",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("id" = String, Path, description = "Monitor ID"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = config::meta::synthetics::Monitor),
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::synthetics::Synthetic),
         (status = 404, description = "Not found"),
         (status = 500, description = "Error",   content_type = "application/json", body = Object),
     ),
 )]
-pub async fn get_monitor(Path((org_id, id)): Path<(String, String)>) -> Response {
+pub async fn get_synthetic(Path((org_id, id)): Path<(String, String)>) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        match o2_enterprise::enterprise::synthetics::service::get_monitor(&org_id, &id).await {
+        match o2_enterprise::enterprise::synthetics::service::get_synthetic(&org_id, &id).await {
             Ok(Some(monitor)) => MetaHttpResponse::json(monitor),
             Ok(None) => MetaHttpResponse::not_found("monitor not found"),
             Err(e) => {
-                tracing::error!("[synthetics] get_monitor: {e}");
+                tracing::error!("[synthetics] get_synthetic: {e}");
                 MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
                     .into_response()
             }
@@ -301,30 +303,30 @@ pub async fn get_monitor(Path((org_id, id)): Path<(String, String)>) -> Response
 
 #[utoipa::path(
     put,
-    path = "/{org_id}/synthetics/monitors/{id}",
+    path = "/{org_id}/synthetics/{id}",
     context_path = "/api",
     tag = "Synthetics",
-    operation_id = "UpdateSyntheticsMonitor",
-    summary = "Update a synthetic monitor",
+    operation_id = "UpdateSynthetic",
+    summary = "Update a synthetic",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("id" = String, Path, description = "Monitor ID"),
     ),
-    request_body(content = config::meta::synthetics::Monitor, description = "Updated monitor definition", content_type = "application/json"),
+    request_body(content = config::meta::synthetics::Synthetic, description = "Updated synthetic definition", content_type = "application/json"),
     responses(
-        (status = 200, description = "Updated",   content_type = "application/json", body = config::meta::synthetics::Monitor),
+        (status = 200, description = "Updated",   content_type = "application/json", body = config::meta::synthetics::Synthetic),
         (status = 404, description = "Not found"),
         (status = 500, description = "Error",     content_type = "application/json", body = Object),
     ),
 )]
-pub async fn update_monitor(
+pub async fn update_synthetic(
     Path((org_id, id)): Path<(String, String)>,
-    Json(body): Json<config::meta::synthetics::Monitor>,
+    Json(body): Json<config::meta::synthetics::Synthetic>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        match o2_enterprise::enterprise::synthetics::service::update_monitor(&org_id, &id, body)
+        match o2_enterprise::enterprise::synthetics::service::update_synthetic(&org_id, &id, body)
             .await
         {
             Ok(monitor) => MetaHttpResponse::json(monitor),
@@ -333,7 +335,7 @@ pub async fn update_monitor(
                 if msg.contains("not found") {
                     return MetaHttpResponse::not_found(msg);
                 }
-                tracing::error!("[synthetics] update_monitor: {e}");
+                tracing::error!("[synthetics] update_synthetic: {e}");
                 MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), msg)
                     .into_response()
             }
@@ -348,11 +350,11 @@ pub async fn update_monitor(
 
 #[utoipa::path(
     delete,
-    path = "/{org_id}/synthetics/monitors/{id}",
+    path = "/{org_id}/synthetics/{id}",
     context_path = "/api",
     tag = "Synthetics",
-    operation_id = "DeleteSyntheticsMonitor",
-    summary = "Delete a synthetic monitor",
+    operation_id = "DeleteSynthetic",
+    summary = "Delete a synthetic",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
@@ -364,14 +366,14 @@ pub async fn update_monitor(
         (status = 500, description = "Error", content_type = "application/json", body = Object),
     ),
 )]
-pub async fn delete_monitor(Path((org_id, id)): Path<(String, String)>) -> Response {
+pub async fn delete_synthetic(Path((org_id, id)): Path<(String, String)>) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        match o2_enterprise::enterprise::synthetics::service::delete_monitor(&org_id, &id).await {
+        match o2_enterprise::enterprise::synthetics::service::delete_synthetic(&org_id, &id).await {
             Ok(true) => MetaHttpResponse::ok("monitor deleted"),
             Ok(false) => MetaHttpResponse::not_found("monitor not found"),
             Err(e) => {
-                tracing::error!("[synthetics] delete_monitor: {e}");
+                tracing::error!("[synthetics] delete_synthetic: {e}");
                 MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
                     .into_response()
             }
@@ -386,11 +388,11 @@ pub async fn delete_monitor(Path((org_id, id)): Path<(String, String)>) -> Respo
 
 #[utoipa::path(
     put,
-    path = "/{org_id}/synthetics/monitors/{id}/enable",
+    path = "/{org_id}/synthetics/{id}/enable",
     context_path = "/api",
     tag = "Synthetics",
-    operation_id = "SetSyntheticsMonitorEnabled",
-    summary = "Enable or pause a synthetic monitor",
+    operation_id = "SetSyntheticEnabled",
+    summary = "Enable or pause a synthetic",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
@@ -404,7 +406,7 @@ pub async fn delete_monitor(Path((org_id, id)): Path<(String, String)>) -> Respo
         (status = 500, description = "Error", content_type = "application/json", body = Object),
     ),
 )]
-pub async fn set_monitor_enabled(
+pub async fn set_synthetic_enabled(
     Path((org_id, id)): Path<(String, String)>,
     Json(body): Json<serde_json::Value>,
 ) -> Response {
@@ -414,7 +416,7 @@ pub async fn set_monitor_enabled(
             Some(v) => v,
             None => return MetaHttpResponse::bad_request("missing boolean field 'enabled'"),
         };
-        match o2_enterprise::enterprise::synthetics::service::set_monitor_enabled(
+        match o2_enterprise::enterprise::synthetics::service::set_synthetic_enabled(
             &org_id, &id, enabled,
         )
         .await
@@ -426,7 +428,7 @@ pub async fn set_monitor_enabled(
             }),
             Ok(false) => MetaHttpResponse::not_found("monitor not found"),
             Err(e) => {
-                tracing::error!("[synthetics] set_monitor_enabled: {e}");
+                tracing::error!("[synthetics] set_synthetic_enabled: {e}");
                 MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
                     .into_response()
             }
@@ -441,11 +443,11 @@ pub async fn set_monitor_enabled(
 
 #[utoipa::path(
     post,
-    path = "/{org_id}/synthetics/monitors/{id}/run",
+    path = "/{org_id}/synthetics/{id}/run",
     context_path = "/api",
     tag = "Synthetics",
-    operation_id = "RunSyntheticsMonitorNow",
-    summary = "Trigger an immediate run of a monitor",
+    operation_id = "RunSyntheticNow",
+    summary = "Trigger an immediate run of a synthetic",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
@@ -457,17 +459,18 @@ pub async fn set_monitor_enabled(
         (status = 500, description = "Error", content_type = "application/json", body = Object),
     ),
 )]
-pub async fn run_monitor_now(Path((org_id, id)): Path<(String, String)>) -> Response {
+pub async fn run_synthetic_now(Path((org_id, id)): Path<(String, String)>) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        match o2_enterprise::enterprise::synthetics::service::run_monitor_now(&org_id, &id).await {
+        match o2_enterprise::enterprise::synthetics::service::run_synthetic_now(&org_id, &id).await
+        {
             Ok(()) => (StatusCode::ACCEPTED, "").into_response(),
             Err(e) => {
                 let msg = e.to_string();
                 if msg.contains("not found") {
                     return MetaHttpResponse::not_found(msg);
                 }
-                tracing::error!("[synthetics] run_monitor_now: {e}");
+                tracing::error!("[synthetics] run_synthetic_now: {e}");
                 MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), msg)
                     .into_response()
             }
@@ -700,7 +703,7 @@ pub async fn job_ack(Json(body): Json<serde_json::Value>) -> Response {
 
 #[utoipa::path(
     get,
-    path = "/{org_id}/synthetics/monitors/locations",
+    path = "/{org_id}/synthetics/locations",
     context_path = "/api",
     tag = "Synthetics",
     operation_id = "ListSyntheticsLocations",

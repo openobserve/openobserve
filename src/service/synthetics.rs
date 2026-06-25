@@ -26,7 +26,7 @@ use config::{
         stream::StreamType,
         synthetics::{
             BucketStatus, CheckResult, CheckStatus, ListResultsParams, ListResultsResponse,
-            MonitorStatus, MonitorSummary, StatusBucket,
+            SyntheticStatus, SyntheticSummary, StatusBucket,
         },
     },
 };
@@ -194,7 +194,7 @@ pub async fn get_summary(
     monitor_id: &str,
     start_time: Option<i64>,
     end_time: Option<i64>,
-) -> anyhow::Result<MonitorSummary> {
+) -> anyhow::Result<SyntheticSummary> {
     let now = config::utils::time::now_micros();
     let end_time = end_time.unwrap_or(now);
     let start_time = start_time.unwrap_or(end_time - SEVEN_DAYS_US);
@@ -263,10 +263,10 @@ pub async fn get_summary(
         .and_then(|h| h.get("status"))
         .and_then(|v| v.as_str())
     {
-        Some("up") => MonitorStatus::Up,
-        Some("degraded") => MonitorStatus::Degraded,
-        Some("down") => MonitorStatus::Down,
-        _ => MonitorStatus::Unknown,
+        Some("up") => SyntheticStatus::Up,
+        Some("degraded") => SyntheticStatus::Degraded,
+        Some("down") => SyntheticStatus::Down,
+        _ => SyntheticStatus::Unknown,
     };
     let last_response_ms = latest
         .and_then(|h| h.get("response_time_ms"))
@@ -302,7 +302,7 @@ pub async fn get_summary(
         })
         .collect();
 
-    Ok(MonitorSummary {
+    Ok(SyntheticSummary {
         status,
         last_check_at,
         last_response_ms,
@@ -312,10 +312,10 @@ pub async fn get_summary(
     })
 }
 
-pub async fn batch_monitor_summary(
+pub async fn batch_synthetic_summary(
     org_id: &str,
     monitor_ids: &[&str],
-) -> anyhow::Result<HashMap<String, MonitorSummary>> {
+) -> anyhow::Result<HashMap<String, SyntheticSummary>> {
     if monitor_ids.is_empty() {
         return Ok(HashMap::new());
     }
@@ -398,19 +398,19 @@ pub async fn batch_monitor_summary(
             let (status, last_response_ms) = match latest_map.get(id) {
                 Some((s, ms)) => (
                     match s.as_str() {
-                        "up" => MonitorStatus::Up,
-                        "degraded" => MonitorStatus::Degraded,
-                        "down" => MonitorStatus::Down,
-                        _ => MonitorStatus::Unknown,
+                        "up" => SyntheticStatus::Up,
+                        "degraded" => SyntheticStatus::Degraded,
+                        "down" => SyntheticStatus::Down,
+                        _ => SyntheticStatus::Unknown,
                     },
                     Some(*ms),
                 ),
-                None => (MonitorStatus::Unknown, avg_ms),
+                None => (SyntheticStatus::Unknown, avg_ms),
             };
 
             (
                 id.to_string(),
-                MonitorSummary {
+                SyntheticSummary {
                     status,
                     last_check_at,
                     last_response_ms,

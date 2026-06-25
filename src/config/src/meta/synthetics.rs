@@ -21,7 +21,7 @@ use utoipa::ToSchema;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default, ToSchema)]
 #[serde(rename_all = "snake_case")]
-pub enum MonitorFrequencyType {
+pub enum SyntheticFrequencyType {
     Seconds,
     #[default]
     Minutes,
@@ -33,42 +33,42 @@ pub enum MonitorFrequencyType {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-pub struct MonitorFrequency {
+pub struct SyntheticFrequency {
     #[serde(rename = "type", default)]
-    pub frequency_type: MonitorFrequencyType,
+    pub frequency_type: SyntheticFrequencyType,
     #[serde(default)]
     pub interval: i64,
     #[serde(default)]
     pub cron: String,
 }
 
-impl Default for MonitorFrequency {
+impl Default for SyntheticFrequency {
     fn default() -> Self {
         Self {
-            frequency_type: MonitorFrequencyType::Minutes,
+            frequency_type: SyntheticFrequencyType::Minutes,
             interval: 5,
             cron: String::new(),
         }
     }
 }
 
-impl MonitorFrequency {
+impl SyntheticFrequency {
     pub fn interval_secs(&self) -> i64 {
         match self.frequency_type {
-            MonitorFrequencyType::Seconds => self.interval.max(1),
-            MonitorFrequencyType::Minutes => self.interval.max(1) * 60,
-            MonitorFrequencyType::Hours => self.interval.max(1) * 3_600,
-            MonitorFrequencyType::Days => self.interval.max(1) * 86_400,
-            MonitorFrequencyType::Weeks => self.interval.max(1) * 604_800,
-            MonitorFrequencyType::Months => self.interval.max(1) * 2_592_000,
-            MonitorFrequencyType::Cron => 0,
+            SyntheticFrequencyType::Seconds => self.interval.max(1),
+            SyntheticFrequencyType::Minutes => self.interval.max(1) * 60,
+            SyntheticFrequencyType::Hours => self.interval.max(1) * 3_600,
+            SyntheticFrequencyType::Days => self.interval.max(1) * 86_400,
+            SyntheticFrequencyType::Weeks => self.interval.max(1) * 604_800,
+            SyntheticFrequencyType::Months => self.interval.max(1) * 2_592_000,
+            SyntheticFrequencyType::Cron => 0,
         }
     }
 
     pub fn next_run_at(&self, from_us: i64, tz_offset_mins: i32) -> anyhow::Result<i64> {
         use std::str::FromStr;
         match self.frequency_type {
-            MonitorFrequencyType::Cron => {
+            SyntheticFrequencyType::Cron => {
                 if self.cron.is_empty() {
                     return Err(anyhow::anyhow!("cron expression is empty"));
                 }
@@ -96,13 +96,13 @@ impl MonitorFrequency {
     }
 }
 
-// ── Core monitor (stored in Postgres) ────────────────────────────────────────
+// ── Core synthetic (stored in Postgres) ────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, ToSchema)]
-pub struct Monitor {
+pub struct Synthetic {
     pub id: String,
     pub org_id: String,
-    /// KSUID of the folder this monitor belongs to (`folders.id`).
+    /// KSUID of the folder this synthetic belongs to (`folders.id`).
     #[serde(default)]
     pub folder_id: String,
     /// Timezone offset in minutes from UTC (e.g. -300 = EST). Used for cron scheduling.
@@ -115,13 +115,13 @@ pub struct Monitor {
     #[serde(default)]
     pub tags: Vec<String>,
     #[serde(rename = "type")]
-    pub monitor_type: MonitorType,
+    pub monitor_type: SyntheticType,
     /// Target URL (HTTP/Browser) or host:port (TCP/TLS/SSH).
     pub target: String,
     /// Type-specific config, stored as JSONB. Shape depends on monitor_type.
     pub config: serde_json::Value,
     /// Schedule — same modular format as reports frequency.
-    pub frequency: MonitorFrequency,
+    pub frequency: SyntheticFrequency,
     pub locations: Vec<String>,
     pub enabled: bool,
     /// Alert destination names to notify on check failure.
@@ -156,22 +156,22 @@ pub struct Monitor {
     /// Pre-computed next fire time (microseconds). 0 = fire on first tick.
     #[serde(default)]
     pub next_run_at: i64,
-    /// When the scheduler last fanned out this monitor (microseconds). UI: "LAST CHECK".
+    /// When the scheduler last fanned out this synthetic (microseconds). UI: "LAST CHECK".
     #[serde(default)]
     pub last_triggered_at: i64,
     /// Denormalised status from the most recent completed check. Updated by ack handler.
     #[serde(default)]
-    pub last_check_status: MonitorStatus,
+    pub last_check_status: SyntheticStatus,
 
     pub created_at: i64,
     pub updated_at: i64,
 }
 
-// ── MonitorType ───────────────────────────────────────────────────────────────
+// ── SyntheticType ───────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default, ToSchema)]
 #[serde(rename_all = "snake_case")]
-pub enum MonitorType {
+pub enum SyntheticType {
     #[default]
     Http,
     Api,
@@ -181,11 +181,11 @@ pub enum MonitorType {
     Browser,
 }
 
-// ── MonitorStatus ─────────────────────────────────────────────────────────────
+// ── SyntheticStatus ─────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default, ToSchema)]
 #[serde(rename_all = "snake_case")]
-pub enum MonitorStatus {
+pub enum SyntheticStatus {
     Up,
     Degraded,
     Down,
@@ -263,10 +263,10 @@ pub enum TriggerType {
     Manual,
 }
 
-// ── List response (monitor + computed fields) ─────────────────────────────────
+// ── List response (synthetic + computed fields) ─────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-pub struct MonitorListItem {
+pub struct SyntheticListItem {
     pub id: String,
     pub org_id: String,
     pub folder_id: String,
@@ -274,9 +274,9 @@ pub struct MonitorListItem {
     pub description: String,
     pub tags: Vec<String>,
     #[serde(rename = "type")]
-    pub monitor_type: MonitorType,
+    pub monitor_type: SyntheticType,
     pub target: String,
-    pub frequency: MonitorFrequency,
+    pub frequency: SyntheticFrequency,
     pub locations: Vec<String>,
     pub enabled: bool,
     pub created_at: i64,
@@ -284,7 +284,7 @@ pub struct MonitorListItem {
     pub last_triggered_at: i64,
 
     // runtime fields — current status only; uptime/history fetched separately via search
-    pub status: MonitorStatus,
+    pub status: SyntheticStatus,
     pub last_check_at: Option<i64>,
     pub last_response_ms: Option<f64>,
 }
@@ -307,9 +307,9 @@ pub enum BucketStatus {
 // ── Query params / responses ──────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Deserialize, Default)]
-pub struct ListMonitorsParams {
+pub struct ListSyntheticsParams {
     pub folder_id: Option<String>,
-    pub monitor_type: Option<MonitorType>,
+    pub monitor_type: Option<SyntheticType>,
     pub enabled: Option<bool>,
     pub location: Option<String>,
     pub tag: Option<String>,
@@ -318,8 +318,8 @@ pub struct ListMonitorsParams {
 }
 
 #[derive(Debug, Serialize, ToSchema)]
-pub struct MonitorListResponse {
-    pub monitors: Vec<MonitorListItem>,
+pub struct SyntheticListResponse {
+    pub monitors: Vec<SyntheticListItem>,
     pub total: i64,
 }
 
@@ -374,8 +374,8 @@ pub struct SummaryParams {
 
 /// Runtime health summary computed from synthetics_results stream + synthetics_jobs.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct MonitorSummary {
-    pub status: MonitorStatus,
+pub struct SyntheticSummary {
+    pub status: SyntheticStatus,
     pub last_check_at: Option<i64>,
     pub last_response_ms: Option<f64>,
     pub uptime_7d_pct: Option<f64>,
@@ -387,7 +387,7 @@ pub struct MonitorSummary {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LocationSummary {
     pub location: String,
-    pub status: MonitorStatus,
+    pub status: SyntheticStatus,
     pub last_check_at: Option<i64>,
     pub last_response_ms: Option<f64>,
     pub uptime_7d_pct: Option<f64>,
@@ -570,43 +570,43 @@ mod tests {
 
     #[test]
     fn test_monitor_type_default() {
-        assert_eq!(MonitorType::default(), MonitorType::Http);
+        assert_eq!(SyntheticType::default(), SyntheticType::Http);
     }
 
     #[test]
     fn test_monitor_type_serde() {
         let json = serde_json::json!("browser");
-        let mt: MonitorType = serde_json::from_value(json).unwrap();
-        assert_eq!(mt, MonitorType::Browser);
+        let mt: SyntheticType = serde_json::from_value(json).unwrap();
+        assert_eq!(mt, SyntheticType::Browser);
     }
 
     #[test]
     fn test_monitor_status_default() {
-        assert_eq!(MonitorStatus::default(), MonitorStatus::Unknown);
+        assert_eq!(SyntheticStatus::default(), SyntheticStatus::Unknown);
     }
 
     #[test]
     fn test_frequency_interval_secs() {
-        let f = MonitorFrequency {
+        let f = SyntheticFrequency {
             interval: 5,
             cron: String::new(),
-            frequency_type: MonitorFrequencyType::Minutes,
+            frequency_type: SyntheticFrequencyType::Minutes,
             ..Default::default()
         };
         assert_eq!(f.interval_secs(), 300);
 
-        let f = MonitorFrequency {
+        let f = SyntheticFrequency {
             interval: 30,
             cron: String::new(),
-            frequency_type: MonitorFrequencyType::Seconds,
+            frequency_type: SyntheticFrequencyType::Seconds,
             ..Default::default()
         };
         assert_eq!(f.interval_secs(), 30);
 
-        let f = MonitorFrequency {
+        let f = SyntheticFrequency {
             interval: 0,
             cron: "0 */5 * * * *".to_string(),
-            frequency_type: MonitorFrequencyType::Cron,
+            frequency_type: SyntheticFrequencyType::Cron,
             ..Default::default()
         };
         assert_eq!(f.interval_secs(), 0);

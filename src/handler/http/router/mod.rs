@@ -977,15 +977,15 @@ pub fn service_routes() -> Router {
             .route("/{org_id}/storage",get(organization::storage::get).post(organization::storage::save).put(organization::storage::update));
 
         router = router
-            // Synthetics — monitor CRUD + locations
-            .route("/{org_id}/synthetics/monitors", get(synthetics::list_monitors).post(synthetics::create_monitor))
-            .route("/{org_id}/synthetics/monitors/{id}", get(synthetics::get_monitor).put(synthetics::update_monitor).delete(synthetics::delete_monitor))
-            .route("/{org_id}/synthetics/monitors/{id}/run", post(synthetics::run_monitor_now))
-            .route("/{org_id}/synthetics/monitors/{id}/enable", put(synthetics::set_monitor_enabled))
-            .route("/{org_id}/synthetics/monitors/{id}/results", get(synthetics::list_results))
-            .route("/{org_id}/synthetics/monitors/{id}/results/{job_id}", get(synthetics::get_result))
-            .route("/{org_id}/synthetics/monitors/{id}/results/{job_id}/artifact", get(synthetics::get_artifact_url))
-            .route("/{org_id}/synthetics/monitors/{id}/summary", get(synthetics::get_summary))
+            // Synthetics — CRUD + locations
+            .route("/{org_id}/synthetics", get(synthetics::list_synthetics).post(synthetics::create_synthetic))
+            .route("/{org_id}/synthetics/{id}", get(synthetics::get_synthetic).put(synthetics::update_synthetic).delete(synthetics::delete_synthetic))
+            .route("/{org_id}/synthetics/{id}/run", post(synthetics::run_synthetic_now))
+            .route("/{org_id}/synthetics/{id}/enable", put(synthetics::set_synthetic_enabled))
+            .route("/{org_id}/synthetics/{id}/results", get(synthetics::list_results))
+            .route("/{org_id}/synthetics/{id}/results/{job_id}", get(synthetics::get_result))
+            .route("/{org_id}/synthetics/{id}/results/{job_id}/artifact", get(synthetics::get_artifact_url))
+            .route("/{org_id}/synthetics/{id}/summary", get(synthetics::get_summary))
             .route("/{org_id}/synthetics/locations", get(synthetics::list_locations))
             // Synthetics — job API (no org prefix; authenticated via o2syn_ token)
             .route("/synthetics/jobs/resolve", post(synthetics::job_resolve))

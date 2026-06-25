@@ -18,16 +18,14 @@ use sea_orm_migration::prelude::*;
 #[derive(DeriveMigrationName)]
 pub struct Migration;
 
-const SYNTHETICS_MONITORS_ORG_IDX: &str = "synthetics_monitors_org_idx";
-const SYNTHETICS_MONITORS_ORG_FOLDER_IDX: &str = "synthetics_monitors_org_folder_idx";
-const SYNTHETICS_MONITORS_SCHEDULE_IDX: &str = "synthetics_monitors_schedule_idx";
+const SYNTHETICS_MONITORS_ORG_IDX: &str = "synthetics_org_idx";
+const SYNTHETICS_MONITORS_ORG_FOLDER_IDX: &str = "synthetics_org_folder_idx";
+const SYNTHETICS_MONITORS_SCHEDULE_IDX: &str = "synthetics_schedule_idx";
 
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        manager
-            .create_table(create_synthetics_monitors_table())
-            .await?;
+        manager.create_table(create_synthetics_table()).await?;
         manager.create_index(create_org_idx()).await?;
         manager.create_index(create_org_folder_idx()).await?;
         manager.create_index(create_schedule_idx()).await?;
@@ -39,7 +37,7 @@ impl MigrationTrait for Migration {
             .drop_index(
                 Index::drop()
                     .name(SYNTHETICS_MONITORS_SCHEDULE_IDX)
-                    .table(SyntheticsMonitors::Table)
+                    .table(Synthetics::Table)
                     .to_owned(),
             )
             .await?;
@@ -47,7 +45,7 @@ impl MigrationTrait for Migration {
             .drop_index(
                 Index::drop()
                     .name(SYNTHETICS_MONITORS_ORG_FOLDER_IDX)
-                    .table(SyntheticsMonitors::Table)
+                    .table(Synthetics::Table)
                     .to_owned(),
             )
             .await?;
@@ -55,110 +53,110 @@ impl MigrationTrait for Migration {
             .drop_index(
                 Index::drop()
                     .name(SYNTHETICS_MONITORS_ORG_IDX)
-                    .table(SyntheticsMonitors::Table)
+                    .table(Synthetics::Table)
                     .to_owned(),
             )
             .await?;
         manager
-            .drop_table(Table::drop().table(SyntheticsMonitors::Table).to_owned())
+            .drop_table(Table::drop().table(Synthetics::Table).to_owned())
             .await?;
         Ok(())
     }
 }
 
-fn create_synthetics_monitors_table() -> TableCreateStatement {
+fn create_synthetics_table() -> TableCreateStatement {
     Table::create()
-        .table(SyntheticsMonitors::Table)
+        .table(Synthetics::Table)
         .if_not_exists()
         .col(
-            ColumnDef::new(SyntheticsMonitors::Id)
+            ColumnDef::new(Synthetics::Id)
                 .string_len(256)
                 .not_null()
                 .primary_key(),
         )
         .col(
-            ColumnDef::new(SyntheticsMonitors::OrgId)
+            ColumnDef::new(Synthetics::OrgId)
                 .string_len(100)
                 .not_null(),
         )
         .col(
-            ColumnDef::new(SyntheticsMonitors::FolderId)
+            ColumnDef::new(Synthetics::FolderId)
                 .char_len(27)
                 .not_null(),
         )
         .col(
-            ColumnDef::new(SyntheticsMonitors::TzOffset)
+            ColumnDef::new(Synthetics::TzOffset)
                 .integer()
                 .not_null()
                 .default(0i32),
         )
         .foreign_key(
             ForeignKey::create()
-                .name("synthetics_monitors_folder_fk")
-                .from(SyntheticsMonitors::Table, SyntheticsMonitors::FolderId)
+                .name("synthetics_folder_fk")
+                .from(Synthetics::Table, Synthetics::FolderId)
                 .to(Folders::Table, Folders::Id),
         )
         .col(
-            ColumnDef::new(SyntheticsMonitors::Name)
+            ColumnDef::new(Synthetics::Name)
                 .string_len(256)
                 .not_null(),
         )
         .col(
-            ColumnDef::new(SyntheticsMonitors::MonitorType)
+            ColumnDef::new(Synthetics::MonitorType)
                 .string_len(32)
                 .not_null(),
         )
-        .col(ColumnDef::new(SyntheticsMonitors::Target).text().not_null())
-        .col(ColumnDef::new(SyntheticsMonitors::Description).text().not_null().default(""))
+        .col(ColumnDef::new(Synthetics::Target).text().not_null())
+        .col(ColumnDef::new(Synthetics::Description).text().not_null().default(""))
         // Tags: JSON array of strings — supports filter-by-tag queries.
-        .col(ColumnDef::new(SyntheticsMonitors::Tags).json().not_null())
-        .col(ColumnDef::new(SyntheticsMonitors::Config).json().not_null())
+        .col(ColumnDef::new(Synthetics::Tags).json().not_null())
+        .col(ColumnDef::new(Synthetics::Config).json().not_null())
         // Frequency stored as JSON: { type, interval, cron }
-        .col(ColumnDef::new(SyntheticsMonitors::Frequency).json().not_null())
+        .col(ColumnDef::new(Synthetics::Frequency).json().not_null())
         .col(
-            ColumnDef::new(SyntheticsMonitors::Locations)
+            ColumnDef::new(Synthetics::Locations)
                 .json()
                 .not_null(),
         )
         .col(
-            ColumnDef::new(SyntheticsMonitors::Enabled)
+            ColumnDef::new(Synthetics::Enabled)
                 .boolean()
                 .not_null()
                 .default(SimpleExpr::Value(Value::Bool(Some(true)))),
         )
         .col(
-            ColumnDef::new(SyntheticsMonitors::Destinations)
+            ColumnDef::new(Synthetics::Destinations)
                 .json()
                 .not_null(),
         )
         // Extra monitor settings: retries, cooldown, auth, variables, rum toggles, etc.
-        .col(ColumnDef::new(SyntheticsMonitors::Settings).json().not_null())
+        .col(ColumnDef::new(Synthetics::Settings).json().not_null())
         // Scheduler fields — managed by the synthetics scheduler, not by the client.
         .col(
-            ColumnDef::new(SyntheticsMonitors::NextRunAt)
+            ColumnDef::new(Synthetics::NextRunAt)
                 .big_integer()
                 .not_null()
                 .default(0i64),
         )
         .col(
-            ColumnDef::new(SyntheticsMonitors::LastTriggeredAt)
+            ColumnDef::new(Synthetics::LastTriggeredAt)
                 .big_integer()
                 .not_null()
                 .default(0i64),
         )
         .col(
-            ColumnDef::new(SyntheticsMonitors::LastCheckStatus)
+            ColumnDef::new(Synthetics::LastCheckStatus)
                 .string_len(16)
                 .not_null()
                 .default("unknown"),
         )
         .col(
-            ColumnDef::new(SyntheticsMonitors::CreatedAt)
+            ColumnDef::new(Synthetics::CreatedAt)
                 .big_integer()
                 .not_null(),
         )
         .col(
-            ColumnDef::new(SyntheticsMonitors::UpdatedAt)
+            ColumnDef::new(Synthetics::UpdatedAt)
                 .big_integer()
                 .not_null(),
         )
@@ -169,8 +167,8 @@ fn create_org_idx() -> IndexCreateStatement {
     sea_query::Index::create()
         .if_not_exists()
         .name(SYNTHETICS_MONITORS_ORG_IDX)
-        .table(SyntheticsMonitors::Table)
-        .col(SyntheticsMonitors::OrgId)
+        .table(Synthetics::Table)
+        .col(Synthetics::OrgId)
         .to_owned()
 }
 
@@ -178,9 +176,9 @@ fn create_org_folder_idx() -> IndexCreateStatement {
     sea_query::Index::create()
         .if_not_exists()
         .name(SYNTHETICS_MONITORS_ORG_FOLDER_IDX)
-        .table(SyntheticsMonitors::Table)
-        .col(SyntheticsMonitors::OrgId)
-        .col(SyntheticsMonitors::FolderId)
+        .table(Synthetics::Table)
+        .col(Synthetics::OrgId)
+        .col(Synthetics::FolderId)
         .to_owned()
 }
 
@@ -189,9 +187,9 @@ fn create_schedule_idx() -> IndexCreateStatement {
     sea_query::Index::create()
         .if_not_exists()
         .name(SYNTHETICS_MONITORS_SCHEDULE_IDX)
-        .table(SyntheticsMonitors::Table)
-        .col(SyntheticsMonitors::Enabled)
-        .col(SyntheticsMonitors::NextRunAt)
+        .table(Synthetics::Table)
+        .col(Synthetics::Enabled)
+        .col(Synthetics::NextRunAt)
         .to_owned()
 }
 
@@ -202,7 +200,7 @@ enum Folders {
 }
 
 #[derive(DeriveIden)]
-enum SyntheticsMonitors {
+enum Synthetics {
     Table,
     Id,
     OrgId,
@@ -235,9 +233,9 @@ mod tests {
     #[test]
     fn postgres() {
         collapsed_eq!(
-            &create_synthetics_monitors_table().to_string(PostgresQueryBuilder),
+            &create_synthetics_table().to_string(PostgresQueryBuilder),
             r#"
-                CREATE TABLE IF NOT EXISTS "synthetics_monitors" (
+                CREATE TABLE IF NOT EXISTS "synthetics" (
                 "id" varchar(256) NOT NULL PRIMARY KEY,
                 "org_id" varchar(100) NOT NULL,
                 "folder_id" char(27) NOT NULL,
@@ -258,29 +256,29 @@ mod tests {
                 "last_check_status" varchar(16) NOT NULL DEFAULT 'unknown',
                 "created_at" bigint NOT NULL,
                 "updated_at" bigint NOT NULL,
-                CONSTRAINT "synthetics_monitors_folder_fk" FOREIGN KEY ("folder_id") REFERENCES "folders" ("id")
+                CONSTRAINT "synthetics_folder_fk" FOREIGN KEY ("folder_id") REFERENCES "folders" ("id")
             )"#
         );
         assert_eq!(
             &create_org_idx().to_string(PostgresQueryBuilder),
-            r#"CREATE INDEX IF NOT EXISTS "synthetics_monitors_org_idx" ON "synthetics_monitors" ("org_id")"#
+            r#"CREATE INDEX IF NOT EXISTS "synthetics_org_idx" ON "synthetics" ("org_id")"#
         );
         assert_eq!(
             &create_org_folder_idx().to_string(PostgresQueryBuilder),
-            r#"CREATE INDEX IF NOT EXISTS "synthetics_monitors_org_folder_idx" ON "synthetics_monitors" ("org_id", "folder_id")"#
+            r#"CREATE INDEX IF NOT EXISTS "synthetics_org_folder_idx" ON "synthetics" ("org_id", "folder_id")"#
         );
         assert_eq!(
             &create_schedule_idx().to_string(PostgresQueryBuilder),
-            r#"CREATE INDEX IF NOT EXISTS "synthetics_monitors_schedule_idx" ON "synthetics_monitors" ("enabled", "next_run_at")"#
+            r#"CREATE INDEX IF NOT EXISTS "synthetics_schedule_idx" ON "synthetics" ("enabled", "next_run_at")"#
         );
     }
 
     #[test]
     fn sqlite() {
         collapsed_eq!(
-            &create_synthetics_monitors_table().to_string(SqliteQueryBuilder),
+            &create_synthetics_table().to_string(SqliteQueryBuilder),
             r#"
-                CREATE TABLE IF NOT EXISTS "synthetics_monitors" (
+                CREATE TABLE IF NOT EXISTS "synthetics" (
                 "id" varchar(256) NOT NULL PRIMARY KEY,
                 "org_id" varchar(100) NOT NULL,
                 "folder_id" char(27) NOT NULL,
