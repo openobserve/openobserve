@@ -116,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OTabs>
 
       <!-- Dashboard Content with Sidebar -->
-      <div class="analysis-content tw:flex-1 tw:pt-2 tw:overflow-hidden tw:flex tw:min-h-0 tw:bg-[#f5f5f5]!">
+      <div class="analysis-content tw:flex-1 tw:pt-2 tw:overflow-hidden tw:flex tw:min-h-0 tw:bg-[#f5f5f5]">
         <!-- Collapsed dimension sidebar bar (shown when hidden) -->
         <div
           v-if="!showDimensionSelector"
