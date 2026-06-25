@@ -416,7 +416,7 @@ export const getGridLineStyle = (theme: string) => ({
 export const getAreaGradientColor = (color: string, theme?: string) => {
   const isDark = theme === "dark";
   const topAlpha = isDark ? 1 : 0.9;
-  const bottomAlpha = isDark ? 0.5 : 0.3;
+  const bottomAlpha = isDark ? 1 : 0.3;
   return {
     type: "linear",
     x: 0,
