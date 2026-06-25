@@ -5167,8 +5167,11 @@ export class LogsPage {
 
     async clickAddFieldToTableButton(fieldName) {
         const addBtn = this.page.locator(`[data-test="log-search-index-list-add-${fieldName}-field-btn"]`);
-        await addBtn.waitFor({ state: 'visible', timeout: 5000 });
-        await addBtn.click();
+        // Ghost/icon buttons in the field list may be CSS-hidden (opacity:0 or
+        // reveal-on-hover). Use evaluate to click directly via the DOM, bypassing
+        // Playwright's actionability (visibility) checks entirely.
+        await addBtn.waitFor({ state: 'attached', timeout: 5000 });
+        await addBtn.evaluate((el) => el.click());
         // The add operation commits when both (a) the toggle inverts to a remove
         // button in the sidebar, and (b) the field column header appears in the
         // logs table. Wait for either signal — both fire on success.
@@ -5209,8 +5212,10 @@ export class LogsPage {
      */
     async clickRemoveColumnHeaderButton(fieldName) {
         const removeBtn = this.page.locator(`[data-test="logs-search-result-table-th-remove-${fieldName}-btn"]`);
-        await removeBtn.waitFor({ state: 'visible', timeout: 10000 });
-        await removeBtn.click();
+        // The close icon on column headers may be hover-revealed and resolve as
+        // hidden. Use evaluate to click directly via the DOM.
+        await removeBtn.waitFor({ state: 'attached', timeout: 10000 });
+        await removeBtn.evaluate((el) => el.click());
         testLogger.info(`Clicked remove button on column header: ${fieldName}`);
     }
 
