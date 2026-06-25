@@ -531,7 +531,7 @@ const filteredMonitors = computed(() =>
   )
 );
 
-const openCreate = () => { editTarget.value = null; showDrawer.value = true }
+const openCreate = () => router.push({ name: 'synthetic-new' })
 const openEdit   = (m: any) => { editTarget.value = m; showDrawer.value = true }
 </script>
 
