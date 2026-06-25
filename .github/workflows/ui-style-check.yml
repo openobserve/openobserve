@@ -1,0 +1,42 @@
+name: UI Style Check
+
+# Enforces OpenObserve UI house style on the CHANGED .vue files in a PR ONLY:
+#   - no emojis
+#   - no raw user-facing text (strings must use i18n t('key') with the key in en.json)
+#
+# Scoped to changed files so it never trips on the existing backlog (~142 files / ~544 strings) and
+# never blocks unrelated PRs. The main `lint:ci` is unchanged. This is the all-contributors backstop
+# that mirrors the codegen pipeline's own deterministic style gate (kept in sync intentionally).
+
+on:
+  pull_request:
+    paths:
+      - "web/src/**/*.vue"
+
+permissions:
+  contents: read
+
+jobs:
+  ui-style:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # need the base ref to diff against
+
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+
+      - name: Check changed .vue files for emoji + raw text
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          # Only the .vue files changed in this PR (Added/Copied/Modified/Renamed).
+          mapfile -t CHANGED < <(git diff --name-only --diff-filter=ACMR "$BASE_SHA" "$HEAD_SHA" -- 'web/src/**/*.vue')
+          if [ "${#CHANGED[@]}" -eq 0 ]; then
+            echo "No changed .vue files — nothing to check."; exit 0
+          fi
+          printf 'Checking %d changed .vue file(s):\n' "${#CHANGED[@]}"; printf '  %s\n' "${CHANGED[@]}"
+          node web/scripts/check-ui-style.mjs "${CHANGED[@]}"
