@@ -532,15 +532,22 @@ class TestNullHandling:
         null_rows = count_records(client, s, where="fc IS NULL OR fc = ''")
         assert null_rows == 5, f"batch 2 rows (fc absent) should be 5; got {null_rows}"
 
-    def test_30_present_and_absent_counts(self, client):
-        """Scenario 30: fc present in batches 1+3 (10 rows), absent in batch 2 (5 rows)."""
+    def test_30_coalesce_on_absent_field(self, client):
+        """Scenario 30: COALESCE(NULLIF(fc, ''), 'missing') classifies absent-field rows.
+
+        OO stores absent string fields as '' not SQL NULL, so plain COALESCE(fc, 'missing')
+        returns '' for batch 2 rows ('' is not NULL). NULLIF(fc, '') converts '' → NULL first,
+        letting COALESCE substitute the default. Batch 2 (5 rows) must resolve to 'missing'.
+        """
         s = _stream("null_30")
         self._ingest_three_batches(client, s)
-        with_value = count_records(client, s, where="fc IS NOT NULL AND fc != ''")
-        without_value = count_records(client, s, where="fc IS NULL OR fc = ''")
-        assert with_value == 10, f"fc present in batches 1+3 (10 rows); got {with_value}"
-        assert without_value == 5, f"fc absent in batch 2 (5 rows); got {without_value}"
-        assert with_value + without_value == 15
+        start, end = _wide_window()
+        sql = f"""SELECT COUNT(*) AS c FROM "{s}" WHERE COALESCE(NULLIF(fc, ''), 'missing') = 'missing'"""
+        resp = client.post("_search?type=logs", json=search_payload(sql, start_time=start, end_time=end, size=1))
+        assert resp.status_code == 200, resp.text
+        hits = resp.json().get("hits", [])
+        coalesced = int(hits[0].get("c", 0)) if hits else 0
+        assert coalesced == 5, f"COALESCE must classify 5 absent-fc rows as 'missing'; got {coalesced}"
 
     def test_31_not_null_and_null_are_exhaustive(self, client):
         """Scenario 31: IS NOT NULL + IS NULL counts must sum to total — no rows lost."""
@@ -620,14 +627,20 @@ class TestAggregationsOnPartialFields:
         assert mx == 204.0, f"MAX(latency_ms) must be 204; got {mx}"
 
     def test_35_count_distinct_on_partial_field(self, client):
-        """Scenario 35: rows eligible for COUNT(DISTINCT latency_ms) — only the 10 non-null rows.
+        """Scenario 35: COUNT(DISTINCT latency_ms) must be 10 — null rows from batch 2 excluded.
 
-        Verified via WHERE proxy (OO GROUP BY response format is not stable to parse).
+        batch 1: values 100–104 (5 distinct), batch 3: values 200–204 (5 distinct) = 10 total.
+        COUNT(DISTINCT) must not count the 5 null rows from batch 2.
         """
         s = _stream("agg_35")
         self._ingest(client, s)
-        with_latency = count_records(client, s, where="latency_ms IS NOT NULL")
-        assert with_latency == 10, f"non-null latency_ms rows must be 10; got {with_latency}"
+        start, end = _wide_window()
+        sql = f'SELECT COUNT(DISTINCT latency_ms) AS c FROM "{s}"'
+        resp = client.post("_search?type=logs", json=search_payload(sql, start_time=start, end_time=end, size=1))
+        assert resp.status_code == 200, resp.text
+        hits = resp.json().get("hits", [])
+        count = int(hits[0].get("c", 0)) if hits else 0
+        assert count == 10, f"COUNT(DISTINCT latency_ms) must be 10; got {count}"
 
     def test_36_sum_of_always_present_field_covers_all_rows(self, client):
         """Scenario 36: SUM on a field present in all batches must include all 15 rows."""
