@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="tw:bg-[rgba(57,126,246,0.2)] tw:border tw:border-[rgba(57,126,246,0.35)] tw:opacity-80 tw:flex tw:items-center tw:justify-center tw:w-[2.5rem] tw:h-[2.5rem] tw:rounded-lg" aria-hidden="true">
               <OIcon name="window" size="md" />
             </div>
-            <div class="tw:text-[1.25rem] tw:font-semibold tw:[line-height:1.5rem]">{{ t("home.streams") }}</div>
+            <div class="tw:text-(length:--text-lg) tw:font-semibold tw:[line-height:1.4]">{{ t("home.streams") }}</div>
           </div>
           <OButton
             variant="ghost"
@@ -85,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <div class="tw:flex tw:flex-col tw:justify-between">
                 <div class="tw:flex tw:justify-between">
-                  <div class="tw:text-base tw:font-medium tw:[line-height:1.25rem] tw:[letter-spacing:0%]">{{ t("home.streams") }}</div>
+                  <div class="tw:text-(length:--text-base) tw:font-medium tw:[line-height:1.4] tw:[letter-spacing:0%]">{{ t("home.streams") }}</div>
                   <div class="tw:bg-[rgba(57,126,246,0.2)] tw:border tw:border-[rgba(57,126,246,0.35)] tw:opacity-80 tw:flex tw:items-center tw:justify-center tw:w-[2.5rem] tw:h-[2.5rem] tw:rounded-lg" aria-hidden="true">
                     <img :src="streamsIcon" alt="" class="tw:h-6 tw:dark:[filter:brightness(1.5)]" />
                   </div>
@@ -99,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
               <div
-                class="tw:text-[1.5rem] tw:font-semibold tw:[line-height:1.75rem] tw:flex tw:items-end"
+                class="tw:text-(length:--text-xl) tw:font-semibold tw:[line-height:1.3] tw:flex tw:items-end"
                 aria-live="polite"
                 data-test="home-usage-tab-streams-count"
               >
@@ -116,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <div class="tw:flex tw:flex-col tw:justify-between">
                 <div class="tw:flex tw:justify-between">
-                  <div class="tw:text-base tw:font-medium tw:[line-height:1.25rem] tw:[letter-spacing:0%]">{{ t("home.docsCountLbl") }}</div>
+                  <div class="tw:text-(length:--text-base) tw:font-medium tw:[line-height:1.4] tw:[letter-spacing:0%]">{{ t("home.docsCountLbl") }}</div>
                   <div class="tw:bg-[rgba(57,126,246,0.2)] tw:border tw:border-[rgba(57,126,246,0.35)] tw:opacity-80 tw:flex tw:items-center tw:justify-center tw:w-[2.5rem] tw:h-[2.5rem] tw:rounded-lg" aria-hidden="true">
                     <img :src="recordsIcon" alt="" class="tw:h-6 tw:dark:[filter:brightness(1.5)]" />
                   </div>
@@ -130,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
               <div
-                class="tw:text-[1.5rem] tw:font-semibold tw:[line-height:1.75rem] tw:flex tw:items-end"
+                class="tw:text-(length:--text-xl) tw:font-semibold tw:[line-height:1.3] tw:flex tw:items-end"
                 aria-live="polite"
                 data-test="home-usage-tab-events-count"
               >
@@ -147,7 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <div class="tw:flex tw:flex-col tw:justify-between">
                 <div class="tw:flex tw:justify-between">
-                  <div class="tw:text-base tw:font-medium tw:[line-height:1.25rem] tw:[letter-spacing:0%]">
+                  <div class="tw:text-(length:--text-base) tw:font-medium tw:[line-height:1.4] tw:[letter-spacing:0%]">
                     {{ t("home.totalDataIngested") }}
                   </div>
                   <div class="tw:bg-[rgba(57,126,246,0.2)] tw:border tw:border-[rgba(57,126,246,0.35)] tw:opacity-80 tw:flex tw:items-center tw:justify-center tw:w-[2.5rem] tw:h-[2.5rem] tw:rounded-lg" aria-hidden="true">
@@ -163,7 +163,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
               <div
-                class="tw:text-[1.5rem] tw:font-semibold tw:[line-height:1.75rem] tw:flex tw:items-end"
+                class="tw:text-(length:--text-xl) tw:font-semibold tw:[line-height:1.3] tw:flex tw:items-end"
                 aria-live="polite"
                 data-test="home-usage-tab-ingested-size"
               >
@@ -180,7 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <div class="tw:flex tw:flex-col tw:justify-between">
                 <div class="tw:flex tw:justify-between">
-                  <div class="tw:text-base tw:font-medium tw:[line-height:1.25rem] tw:[letter-spacing:0%]">
+                  <div class="tw:text-(length:--text-base) tw:font-medium tw:[line-height:1.4] tw:[letter-spacing:0%]">
                     {{ t("home.totalDataCompressed") }}
                   </div>
                   <div class="tw:bg-[rgba(57,126,246,0.2)] tw:border tw:border-[rgba(57,126,246,0.35)] tw:opacity-80 tw:flex tw:items-center tw:justify-center tw:w-[2.5rem] tw:h-[2.5rem] tw:rounded-lg" aria-hidden="true">
@@ -196,7 +196,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
               <div
-                class="tw:text-[1.5rem] tw:font-semibold tw:[line-height:1.75rem] tw:flex tw:items-end"
+                class="tw:text-(length:--text-xl) tw:font-semibold tw:[line-height:1.3] tw:flex tw:items-end"
                 aria-live="polite"
                 data-test="home-usage-tab-compressed-size"
               >
@@ -213,7 +213,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <div class="tw:flex tw:flex-col tw:justify-between">
                 <div class="tw:flex tw:justify-between">
-                  <div class="tw:text-base tw:font-medium tw:[line-height:1.25rem] tw:[letter-spacing:0%]">{{ t("home.indexSizeLbl") }}</div>
+                  <div class="tw:text-(length:--text-base) tw:font-medium tw:[line-height:1.4] tw:[letter-spacing:0%]">{{ t("home.indexSizeLbl") }}</div>
                   <div class="tw:bg-[rgba(57,126,246,0.2)] tw:border tw:border-[rgba(57,126,246,0.35)] tw:opacity-80 tw:flex tw:items-center tw:justify-center tw:w-[2.5rem] tw:h-[2.5rem] tw:rounded-lg" aria-hidden="true">
                     <img :src="indexSizeIcon" alt="" class="tw:h-6 tw:dark:[filter:brightness(1.5)]" />
                   </div>
@@ -227,7 +227,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
               <div
-                class="tw:text-[1.5rem] tw:font-semibold tw:[line-height:1.75rem] tw:flex tw:items-end"
+                class="tw:text-(length:--text-xl) tw:font-semibold tw:[line-height:1.3] tw:flex tw:items-end"
                 aria-live="polite"
                 data-test="home-usage-tab-index-size"
               >
@@ -259,7 +259,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <img :src="functionsIcon" alt="" class="tw:h-6 tw:dark:[filter:brightness(1.5)]" />
                   </div>
                   <div
-                    class="tw:text-base tw:font-medium tw:[line-height:1.25rem] tw:[letter-spacing:0%] tw:flex-1 tw:text-left tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis"
+                    class="tw:text-(length:--text-base) tw:font-medium tw:[line-height:1.4] tw:[letter-spacing:0%] tw:flex-1 tw:text-left tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis"
                   >
                     {{ t("home.functionTitle") }}
                   </div>
@@ -294,7 +294,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
               <div
-                class="tw:text-[1.5rem] tw:font-semibold tw:[line-height:1.75rem] tw:flex tw:items-end"
+                class="tw:text-(length:--text-xl) tw:font-semibold tw:[line-height:1.3] tw:flex tw:items-end"
                 aria-live="polite"
                 data-test="home-usage-tab-functions-count"
               >
@@ -320,7 +320,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <img :src="dashboardsIcon" alt="" class="tw:h-6 tw:dark:[filter:brightness(1.5)]" />
                   </div>
                   <div
-                    class="tw:text-base tw:font-medium tw:[line-height:1.25rem] tw:[letter-spacing:0%] tw:flex-1 tw:text-left tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis"
+                    class="tw:text-(length:--text-base) tw:font-medium tw:[line-height:1.4] tw:[letter-spacing:0%] tw:flex-1 tw:text-left tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis"
                   >
                     {{ t("home.dashboardTitle") }}
                   </div>
@@ -355,7 +355,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
               <div
-                class="tw:text-[1.5rem] tw:font-semibold tw:[line-height:1.75rem] tw:flex tw:items-end"
+                class="tw:text-(length:--text-xl) tw:font-semibold tw:[line-height:1.3] tw:flex tw:items-end"
                 aria-live="polite"
                 data-test="home-usage-tab-dashboards-count"
               >
@@ -373,7 +373,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <div class="tw:gap-2 tw:mb-3">
             <div class="tw:flex tw:justify-between tw:items-center">
-              <span class="tw:text-[1.125rem] tw:font-medium tw:[line-height:1.25rem] tw:[letter-spacing:0%] tw:flex tw:items-center tw:gap-2">
+              <span class="tw:text-(length:--text-base) tw:font-medium tw:[line-height:1.4] tw:[letter-spacing:0%] tw:flex tw:items-center tw:gap-2">
                 <div class="tw:bg-[rgba(57,126,246,0.2)] tw:border tw:border-[rgba(57,126,246,0.35)] tw:flex tw:items-center tw:justify-center tw:w-[2.5rem] tw:h-[2.5rem] tw:rounded-lg" aria-hidden="true">
                   <img :src="alertsIcon" alt="" class="tw:h-6 tw:dark:[filter:brightness(1.5)]" />
                 </div>
@@ -409,11 +409,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div class="tw:flex tw:pt-2 tw:gap-[1em]">
               <div class="tw:flex tw:flex-col">
-                <span class="tw:text-sm tw:font-normal tw:[line-height:1.25rem] tw:[letter-spacing:0%]">{{
+                <span class="tw:text-(length:--text-sm) tw:font-normal tw:[line-height:1.4] tw:[letter-spacing:0%]">{{
                   t("home.scheduledAlert")
                 }}</span>
                 <span
-                  class="tw:text-[1.25rem] tw:font-semibold tw:[line-height:1.5rem]"
+                  class="tw:text-(length:--text-md) tw:font-semibold tw:[line-height:1.4]"
                   aria-live="polite"
                   data-test="home-usage-tab-scheduled-alerts-count"
                 >{{
@@ -422,9 +422,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <OSeparator :vertical="true" />
               <div class="tw:flex tw:flex-col">
-                <span class="tw:text-sm tw:font-normal tw:[line-height:1.25rem] tw:[letter-spacing:0%]">{{ t("home.rtAlert") }}</span>
+                <span class="tw:text-(length:--text-sm) tw:font-normal tw:[line-height:1.4] tw:[letter-spacing:0%]">{{ t("home.rtAlert") }}</span>
                 <span
-                  class="tw:text-[1.25rem] tw:font-semibold tw:[line-height:1.5rem]"
+                  class="tw:text-(length:--text-md) tw:font-semibold tw:[line-height:1.4]"
                   aria-live="polite"
                   data-test="home-usage-tab-rt-alerts-count"
                 >{{
@@ -452,7 +452,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <div class="tw:gap-2 tw:mb-3">
             <div class="tw:flex tw:justify-between tw:items-center">
-              <span class="tw:text-[1.125rem] tw:font-medium tw:[line-height:1.25rem] tw:[letter-spacing:0%] tw:flex tw:items-center tw:gap-2">
+              <span class="tw:text-(length:--text-base) tw:font-medium tw:[line-height:1.4] tw:[letter-spacing:0%] tw:flex tw:items-center tw:gap-2">
                 <div class="tw:bg-[rgba(57,126,246,0.2)] tw:border tw:border-[rgba(57,126,246,0.35)] tw:opacity-80 tw:flex tw:items-center tw:justify-center tw:w-[2.5rem] tw:h-[2.5rem] tw:rounded-lg" aria-hidden="true">
                   <img :src="pipelinesIcon" alt="" class="tw:h-6 tw:dark:[filter:brightness(1.5)]" />
                 </div>
@@ -488,11 +488,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div class="tw:flex tw:pt-2 tw:gap-[1em]">
               <div class="tw:flex tw:flex-col">
-                <span class="tw:text-sm tw:font-normal tw:[line-height:1.25rem] tw:[letter-spacing:0%]">
+                <span class="tw:text-(length:--text-sm) tw:font-normal tw:[line-height:1.4] tw:[letter-spacing:0%]">
                   {{ t("home.schedulePipelineTitle") }}</span
                 >
                 <span
-                  class="tw:text-[1.25rem] tw:font-semibold tw:[line-height:1.5rem]"
+                  class="tw:text-(length:--text-md) tw:font-semibold tw:[line-height:1.4]"
                   aria-live="polite"
                   data-test="home-usage-tab-scheduled-pipelines-count"
                 >{{
@@ -501,11 +501,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <OSeparator :vertical="true" />
               <div class="tw:flex tw:flex-col">
-                <span class="tw:text-sm tw:font-normal tw:[line-height:1.25rem] tw:[letter-spacing:0%]">{{
+                <span class="tw:text-(length:--text-sm) tw:font-normal tw:[line-height:1.4] tw:[letter-spacing:0%]">{{
                   t("home.rtPipelineTitle")
                 }}</span>
                 <span
-                  class="tw:text-[1.25rem] tw:font-semibold tw:[line-height:1.5rem]"
+                  class="tw:text-(length:--text-md) tw:font-semibold tw:[line-height:1.4]"
                   aria-live="polite"
                   data-test="home-usage-tab-rt-pipelines-count"
                 >{{
