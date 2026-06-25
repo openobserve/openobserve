@@ -100,7 +100,9 @@ impl SyntheticFrequency {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, ToSchema)]
 pub struct Synthetic {
+    #[serde(default)]
     pub id: String,
+    #[serde(default)]
     pub org_id: String,
     /// KSUID of the folder this synthetic belongs to (`folders.id`).
     #[serde(default)]
