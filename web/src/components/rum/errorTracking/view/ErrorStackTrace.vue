@@ -41,6 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template v-for="(stack, index) in error_stack" :key="stack">
               <div
                 v-if="index"
+                data-test="error-stack-trace-line"
                 class="tw:border-b tw:border-l tw:border-r tw:border-solid tw:border-(--o2-border) tw:text-[13px] tw:py-1.5 tw:px-2"
                 :style="{
                   'border-top': Number(index) === 1 ? '1px solid #e0e0e0' : '',

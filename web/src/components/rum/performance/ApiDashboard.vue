@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <div
+    data-test="api-performance-dashboards"
     class="relative-position tw:h-full"
     :key="store.state.selectedOrganization.identifier"
   >

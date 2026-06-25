@@ -47,11 +47,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span class="tw:ml-4">{{ error.timestamp }}</span>
       </div>
       <div class="tw:flex tw:items-center tw:flex-nowrap tw:my-1">
-        <div class="tw:text-[22px] tw:font-bold">{{ error.type }}</div>
+        <div
+          data-test="error-header-error-type"
+          class="tw:text-[22px] tw:font-bold"
+        >{{ error.type }}</div>
       </div>
       <div class="tw:text-base tw:pt-1 tw:flex tw:items-center">
         <div
           v-if="error.error_handling === 'unhandled'"
+          data-test="error-header-unhandled-badge"
           :class="
             error.error_handling === 'unhandled'
               ? 'text-red-6 tw:border tw:border-[rgb(246,68,68)] tw:rounded tw:text-sm tw:px-1 tw:mr-2'

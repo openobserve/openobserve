@@ -23,6 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :class="isLoading.length ? 'tw:invisible' : 'tw:visible'"
     >
       <div
+        data-test="learn-web-vitals-link"
         class="tw:font-bold tw:ml-3 tw:px-2 tw:rounded tw:mt-2 tw:py-1 tw:text-sm tw:w-fit tw:flex tw:items-center"
         :class="store.state.theme === 'dark' ? 'bg-indigo-7' : 'bg-indigo-2'"
       >

@@ -95,7 +95,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="tw:flex tw:py-2 tw:px-3 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]" v-if="resource.session?.id">
               <div class="tw:w-[150px] tw:text-[var(--o2-text-secondary)] tw:font-medium tw:shrink-0">Session ID:</div>
               <div class="tw:flex-1 tw:text-[var(--o2-text-color)] tw:break-words">
-                <code class="tw:font-mono tw:text-sm tw:px-2 tw:py-1 tw:bg-(--color-surface-accent) tw:rounded tw:text-[var(--o2-text-color)]">{{
+                <code
+                  data-test="resource-detail-drawer-session-id-text"
+                  class="tw:font-mono tw:text-sm tw:px-2 tw:py-1 tw:bg-(--color-surface-accent) tw:rounded tw:text-[var(--o2-text-color)]"
+                >{{
                   formatSessionId(resource.session.id)
                 }}</code>
               </div>

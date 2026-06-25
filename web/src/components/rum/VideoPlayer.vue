@@ -45,6 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="tw:w-full tw:p-2 tw:pt-3 controls-container">
       <div
         ref="playbackBarRef"
+        data-test="video-player-playback-bar"
         class="tw:w-full tw:h-[0.3125rem] tw:bg-[#ebebeb] tw:mt-2 tw:mb-3 tw:relative tw:cursor-pointer"
         @click="handlePlaybackBarClick"
       >
@@ -72,6 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-for="event in events as any[]"
           :key="event.id"
+          data-test="video-player-event-marker"
           class="tw:absolute tw:cursor-pointer"
           :class="getEventMarkerClass(event)"
           :style="{

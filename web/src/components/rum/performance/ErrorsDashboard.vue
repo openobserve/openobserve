@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div class="tw:rounded-md relative-position">
+  <div data-test="performance-error-dashboard" class="tw:rounded-md relative-position">
     <div
       class="tw:min-h-0! tw:max-h-[calc(100vh-200px)] tw:overflow-y-auto"
       :class="isLoading.length ? 'tw:invisible' : 'tw:visible'"

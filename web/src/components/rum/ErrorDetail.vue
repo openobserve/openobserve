@@ -16,7 +16,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="error_details tw:w-[40vw]">
-    <div @click="handleErrorTypeClick" class="tw:text-base tw:text-[var(--o2-info)] tw:capitalize tw:cursor-pointer">
+    <div
+      data-test="error-detail-error-type"
+      @click="handleErrorTypeClick"
+      class="tw:text-base tw:text-[var(--o2-info)] tw:capitalize tw:cursor-pointer"
+    >
       {{ column.error_type || "Error" }}
     </div>
     <div

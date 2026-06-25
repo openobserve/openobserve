@@ -38,7 +38,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="tw:flex tw:items-center tw:mb-3">
           <div class="tw:w-1/4 tw:text-gray-400">Trace ID:</div>
           <div class="tw:w-3/4 tw:flex tw:items-center tw:flex-nowrap">
-            <code class="tw:font-mono tw:text-sm tw:py-1 tw:px-2 tw:bg-(--color-surface-accent) tw:rounded tw:text-(--o2-text-color)">{{ formatTraceId(traceId) }}</code>
+            <code
+              data-test="trace-correlation-card-trace-id-text"
+              class="tw:font-mono tw:text-sm tw:py-1 tw:px-2 tw:bg-(--color-surface-accent) tw:rounded tw:text-(--o2-text-color)"
+            >{{ formatTraceId(traceId) }}</code>
             <OButton
               icon-left="content-copy"
               variant="ghost"
@@ -54,7 +57,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="tw:flex tw:items-center tw:mb-3" v-if="spanId">
           <div class="tw:w-1/4 tw:text-gray-400">Span ID:</div>
           <div class="tw:w-3/4">
-            <code class="tw:font-mono tw:text-sm tw:py-1 tw:px-2 tw:bg-(--color-surface-accent) tw:rounded tw:text-(--o2-text-color)">{{ formatSpanId(spanId) }}</code>
+            <code
+              data-test="trace-correlation-card-span-id-text"
+              class="tw:font-mono tw:text-sm tw:py-1 tw:px-2 tw:bg-(--color-surface-accent) tw:rounded tw:text-(--o2-text-color)"
+            >{{ formatSpanId(spanId) }}</code>
           </div>
         </div>
 
