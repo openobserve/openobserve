@@ -16,7 +16,7 @@ const emit = defineEmits<{ (e: "select", prompt: string): void }>();
       :key="card.id"
       role="button"
       tabindex="0"
-      class="capability-card tw:group/card tw:relative tw:py-4 tw:px-4 tw:pb-[1.125rem] tw:border tw:border-(--color-border-default) tw:rounded-xl tw:cursor-pointer tw:bg-(--color-card-bg) tw:transition-[border-color,box-shadow,transform,background] tw:duration-200 tw:isolate tw:overflow-hidden tw:min-h-[132px] tw:[--accent:123,97,255] tw:hover:border-[rgba(var(--accent),0.5)] tw:hover:-translate-y-[3px] tw:hover:shadow-[0_1px_2px_rgba(0,0,0,0.04),0_12px_28px_-10px_rgba(var(--accent),0.35)] tw:focus-visible:outline-none tw:focus-visible:border-[rgba(var(--accent),0.7)] tw:focus-visible:shadow-[0_0_0_2px_rgba(var(--accent),0.45)]"
+      class="capability-card tw:group/card tw:relative tw:py-4 tw:px-4 tw:pb-[1.125rem] tw:border tw:border-(--color-border-default) tw:rounded-xl tw:cursor-pointer tw:bg-(--color-card-bg) tw:transition-[border-color,box-shadow,translate,background] tw:duration-200 tw:ease-[ease] tw:isolate tw:overflow-hidden tw:min-h-[132px] tw:[--accent:123,97,255] tw:hover:border-[rgba(var(--accent),0.5)] tw:hover:-translate-y-[3px] tw:hover:shadow-[0_1px_2px_rgba(0,0,0,0.04),0_12px_28px_-10px_rgba(var(--accent),0.35)] tw:focus-visible:outline-none tw:focus-visible:border-[rgba(var(--accent),0.7)] tw:focus-visible:shadow-[0_0_0_2px_rgba(var(--accent),0.45)]"
       :class="{
         'tw:[--accent:123,97,255]': card.id === 'query',
         'tw:[--accent:245,158,11]': card.id === 'incident',
@@ -44,7 +44,7 @@ const emit = defineEmits<{ (e: "select", prompt: string): void }>();
         {{ t(`aiAssistant.capabilities.${card.id}.description`) }}
       </div>
       <span
-        class="capability-card__chevron tw:z-[1] tw:absolute tw:top-[0.875rem] tw:right-[0.875rem] tw:w-[22px] tw:h-[22px] tw:inline-flex tw:items-center tw:justify-center tw:rounded-full tw:bg-[rgba(var(--accent),0.15)] tw:text-[rgba(var(--accent),1)] tw:opacity-0 tw:translate-x-[-4px] tw:translate-y-[4px] tw:transition-[opacity,transform] tw:duration-200 tw:ease-[ease] tw:group-hover/card:opacity-100 tw:group-hover/card:translate-x-0 tw:group-hover/card:translate-y-0"
+        class="capability-card__chevron tw:z-[1] tw:absolute tw:top-[0.875rem] tw:right-[0.875rem] tw:w-[22px] tw:h-[22px] tw:inline-flex tw:items-center tw:justify-center tw:rounded-full tw:bg-[rgba(var(--accent),0.15)] tw:text-[rgba(var(--accent),1)] tw:opacity-0 tw:translate-x-[-4px] tw:translate-y-[4px] tw:transition-[opacity,translate] tw:duration-200 tw:ease-[ease] tw:group-hover/card:opacity-100 tw:group-hover/card:translate-x-0 tw:group-hover/card:translate-y-0"
         aria-hidden="true"
       >
         <OIcon name="arrow-forward" size="xs" />
