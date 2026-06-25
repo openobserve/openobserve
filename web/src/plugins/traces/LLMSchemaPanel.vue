@@ -54,6 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :dashboardId="dashboardId"
         :folderId="folderId"
         searchType="dashboards"
+        :allowAnnotationsAPI="false"
         :width="6"
         :height="6"
       />
