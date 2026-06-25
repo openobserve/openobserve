@@ -4,8 +4,18 @@ All tests run against a single ZO_FILE_FORMAT=vortex server — no restarts.
 Each test class uses a fresh stream (stream name includes class name) so
 tests are fully isolated and can run in parallel.
 
-Test plan coverage: scenarios 14–25 (schema evolution section),
-scenarios 26–28 (diverge-then-converge stress).
+Test plan coverage:
+  Scenarios 14–25  — baseline schema evolution (new field, drop field, type change,
+                      incompatible type changes)
+  Scenarios 26–28  — diverge-then-converge: three-batch field lifecycle
+  Scenarios 29–31  — NULL handling for absent fields
+  Scenarios 32–36  — aggregations on partial fields (COUNT, SUM, MIN/MAX, DISTINCT)
+  Scenarios 37–40  — GROUP BY / ORDER BY across evolved schemas
+  Scenarios 41–44  — type change on field reappearance
+  Scenarios 45–48  — multiple divergence cycles
+  Scenarios 49–52  — complex queries (JOIN-like, CASE WHEN, subquery, HAVING)
+  Scenarios 53–56  — time-range queries across evolving schemas
+  Scenarios 57–59  — full-text search and high-field-count divergence
 """
 from __future__ import annotations
 
@@ -417,6 +427,9 @@ class TestSchemaDivergenceConvergence:
         fa_count = count_records(client, s, where="fa IS NOT NULL AND fa != ''")
         assert fa_count == 15, f"fa should be in all 15 rows; got {fa_count}"
 
+        fb_count = count_records(client, s, where="fb IS NOT NULL")
+        assert fb_count == 15, f"fb should be in all 15 rows; got {fb_count}"
+
         fc_present = count_records(client, s, where="fc IS NOT NULL AND fc != ''")
         assert fc_present == 10, f"fc should be in batches 1+3 (10 rows); got {fc_present}"
 
@@ -447,7 +460,7 @@ class TestSchemaDivergenceConvergence:
         total = count_records(client, s)
         assert total == 15, f"total record count wrong: {total}"
 
-        with_latency = count_records(client, s, where="latency_ms IS NOT NULL AND latency_ms != ''")
+        with_latency = count_records(client, s, where="latency_ms IS NOT NULL")
         assert with_latency == 10, f"latency_ms should be non-null in 10 rows; got {with_latency}"
 
         # batch 1: values 100–104, batch 3: values 200–204 — all > 99
@@ -473,6 +486,8 @@ class TestSchemaDivergenceConvergence:
         ingest(client, s, b3)
         flush_and_wait(client, s, expected=15)
 
+        # OO stores absent string fields as empty string '' rather than SQL NULL,
+        # so the correct non-null check for string fields is "IS NOT NULL AND != ''".
         both = count_records(client, s, where="fc IS NOT NULL AND fc != '' AND fd IS NOT NULL AND fd != ''")
         assert both == 5, f"only batch 3 should have both fc and fd (5 rows); got {both}"
 
@@ -493,6 +508,12 @@ class TestNullHandling:
     """
 
     def _ingest_three_batches(self, client, s):
+        """Ingest the standard three-batch diverge-then-converge schema into *s*.
+
+        Batch 1 [fa, fb, fc], Batch 2 [fa, fb, fd], Batch 3 [fa, fb, fc, fd, fe].
+        flush_and_wait after each batch forces a separate on-disk file so the query
+        planner must reconcile three distinct schemas.
+        """
         b1 = [{"_timestamp": _ts(i),       "fa": "a", "fb": i, "fc": f"val{i}"} for i in range(5)]
         b2 = [{"_timestamp": _ts(100 + i), "fa": "a", "fb": i, "fd": f"val{i}"} for i in range(5)]
         b3 = [{"_timestamp": _ts(200 + i), "fa": "a", "fb": i, "fc": f"val{i}", "fd": f"val{i}", "fe": f"val{i}"} for i in range(5)]
@@ -544,6 +565,12 @@ class TestAggregationsOnPartialFields:
     """
 
     def _ingest(self, client, s):
+        """Ingest three batches where latency_ms is absent in batch 2.
+
+        Batch 1 [host, latency_ms 100–104], Batch 2 [host only],
+        Batch 3 [host, latency_ms 200–204]. flush_and_wait after each batch
+        ensures each lands in a separate on-disk file with its own schema header.
+        """
         b1 = [{"_timestamp": _ts(i),       "host": "h1", "latency_ms": 100 + i} for i in range(5)]
         b2 = [{"_timestamp": _ts(100 + i), "host": "h1"} for i in range(5)]
         b3 = [{"_timestamp": _ts(200 + i), "host": "h1", "latency_ms": 200 + i} for i in range(5)]
@@ -560,7 +587,7 @@ class TestAggregationsOnPartialFields:
         self._ingest(client, s)
         total = count_records(client, s)
         assert total == 15, f"COUNT(*) must be 15; got {total}"
-        with_latency = count_records(client, s, where="latency_ms IS NOT NULL AND latency_ms != ''")
+        with_latency = count_records(client, s, where="latency_ms IS NOT NULL")
         assert with_latency == 10, f"COUNT(latency_ms) must be 10; got {with_latency}"
 
     def test_33_sum_excludes_null_rows(self, client):
@@ -596,7 +623,7 @@ class TestAggregationsOnPartialFields:
         """Scenario 35: COUNT(DISTINCT latency_ms) must not count null rows from batch 2."""
         s = _stream("agg_35")
         self._ingest(client, s)
-        with_latency = count_records(client, s, where="latency_ms IS NOT NULL AND latency_ms != ''")
+        with_latency = count_records(client, s, where="latency_ms IS NOT NULL")
         assert with_latency == 10, f"non-null latency_ms rows must be 10; got {with_latency}"
 
     def test_36_sum_of_always_present_field_covers_all_rows(self, client):
@@ -626,6 +653,11 @@ class TestGroupByOrderByEvolved:
     """Scenarios 37–40: GROUP BY and ORDER BY on fields absent in some batches."""
 
     def _ingest(self, client, s):
+        """Ingest three batches where fc is absent in batch 2.
+
+        Batch 1 [fa, fc='zone_a'], Batch 2 [fa only], Batch 3 [fa, fc='zone_b'].
+        flush_and_wait after each batch forces separate on-disk files.
+        """
         b1 = [{"_timestamp": _ts(i),       "fa": "a", "fc": "zone_a"} for i in range(5)]
         b2 = [{"_timestamp": _ts(100 + i), "fa": "a"} for i in range(5)]
         b3 = [{"_timestamp": _ts(200 + i), "fa": "a", "fc": "zone_b"} for i in range(5)]
@@ -822,6 +854,11 @@ class TestComplexQueriesEvolved:
     """Scenarios 47–51: subquery, CTE, CASE WHEN, SELECT *, window on evolved schemas."""
 
     def _ingest(self, client, s):
+        """Ingest three batches with the diverge-then-converge pattern plus fd in batch 3.
+
+        Batch 1 [fa, fb, fc], Batch 2 [fa, fb], Batch 3 [fa, fb, fc, fd].
+        flush_and_wait after each batch forces separate on-disk schema files.
+        """
         b1 = [{"_timestamp": _ts(i),       "fa": "a", "fb": i, "fc": f"c{i}"} for i in range(5)]
         b2 = [{"_timestamp": _ts(100 + i), "fa": "a", "fb": i} for i in range(5)]
         b3 = [{"_timestamp": _ts(200 + i), "fa": "a", "fb": i, "fc": f"c{i}", "fd": f"d{i}"} for i in range(5)]
@@ -895,8 +932,13 @@ class TestTimeRangeEvolved:
     """
 
     def _ingest(self, client, s):
-        # Capture base_us BEFORE creating records so time-range assertions are accurate.
-        # Records land at base_us + 0..4ms (b1), base_us + 100..104ms (b2), base_us + 200..204ms (b3).
+        """Ingest three batches with explicit _timestamp offsets; return base_us.
+
+        base_us is captured BEFORE record creation so time-range callers can
+        compute exact per-batch windows. Records land at:
+          b1: base_us + 0..4 ms, b2: base_us + 100..104 ms, b3: base_us + 200..204 ms.
+        fc is in b1 and b3; fd is in b3 only. flush_and_wait forces separate files.
+        """
         base_us = int(time.time() * 1_000_000)
         b1 = [{"_timestamp": base_us + i * 1_000,           "fa": "a", "fc": f"c{i}"} for i in range(5)]
         b2 = [{"_timestamp": base_us + (100 + i) * 1_000,   "fa": "a"} for i in range(5)]
