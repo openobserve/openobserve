@@ -26,7 +26,7 @@ use config::{
         stream::StreamType,
         synthetics::{
             BucketStatus, CheckResult, CheckStatus, ListResultsParams, ListResultsResponse,
-            SyntheticStatus, SyntheticSummary, StatusBucket,
+            StatusBucket, SyntheticStatus, SyntheticSummary,
         },
     },
 };
