@@ -1,9 +1,0 @@
-[
-  { "title": "should auto-pick FTS column on first search with no prior selection", "action": "new", "verifies": "FTS column (message or log) is auto-picked and visible in the results table when no prior field selection exists" },
-  { "title": "should clear FTS default when user toggles a different field", "action": "new", "verifies": "adding a user-chosen field from the sidebar clears the FTS auto-pick and the user field persists across subsequent searches" },
-  { "title": "should re-resolve FTS default on subsequent searches", "action": "new", "verifies": "the FTS default column is re-evaluated (re-resolved) on each new search and remains as a system pick rather than a persisted preference" },
-  { "title": "should reset clear FTS default and re-resolve on new search", "action": "new", "verifies": "clicking Reset drops the auto-picked FTS column, and running a new search re-triggers the auto-pick from scratch" },
-  { "title": "should not apply FTS default in SQL mode", "action": "new", "verifies": "toggling SQL mode ON drops the FTS auto-pick and no FTS column is injected into SQL-authored query results" },
-  { "title": "should re-resolve FTS default after closing column and re-running search", "action": "new", "verifies": "closing the auto-picked column via the X button removes it, and the next search re-resolves the FTS default as a fresh system pick" },
-  { "title": "should not inject FTS default when user already has pinned fields", "action": "new", "verifies": "when user has already pinned fields (isFtsDefaultColumn=false with non-empty selectedFields), the FTS default is not injected on subsequent searches" }
-]
