@@ -35,6 +35,7 @@
 
     <div class="tw:mb-3 tw:mt-4 tw:text-center">
       <a
+        data-test="sso-login-internal-link"
         class="tw:cursor-pointer tw:hover:text-[#595959]"
         style="text-decoration: underline"
         @click="showLoginInput = !showLoginInput"
