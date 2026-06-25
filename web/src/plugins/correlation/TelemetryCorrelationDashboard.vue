@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <CorrelationEventHeader
         :source-event="sourceEvent"
         :context-chips="contextChips"
-        :subject-chips="subjectChips"
+        :subject-chips="isNestedGroupMode ? [] : subjectChips"
         v-model:active-subject="activeSubject"
         overflow-mode="responsive"
         badge-size="md"
@@ -299,6 +299,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- -- Right area: group tabs + dashboard -- -->
             <template #after>
               <div class="tw:flex tw:flex-col tw:h-full tw:overflow-hidden">
+                <!-- Outer Pod/Node tabs — only shown in nested K8s mode -->
+                <OTabs
+                  v-if="isNestedGroupMode"
+                  v-model="activeOuterTab"
+                  dense
+                  align="left"
+                  class="metric-group-tabs tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
+                >
+                  <OTab
+                    v-for="outerGroup in groupDefs"
+                    :key="outerGroup.id"
+                    :name="outerGroup.id"
+                    class="tw:flex-none!"
+                  >
+                    <div class="tw:flex tw:flex-col tw:items-start tw:px-1 tw:py-0.5 tw:min-w-0">
+                      <div class="tw:flex tw:items-center tw:gap-1">
+                        <OIcon v-if="typeof outerGroup.icon === 'string'" :name="outerGroup.icon" size="xs" />
+                        <component v-else :is="outerGroup.icon" />
+                        <span class="tw:whitespace-nowrap">{{ outerGroup.label }}</span>
+                      </div>
+                      <span
+                        v-if="outerTabResourceName[outerGroup.id]"
+                        class="tw:text-xs tw:leading-tight tw:opacity-75 tw:whitespace-nowrap"
+                        :title="outerTabResourceName[outerGroup.id]"
+                      >{{ outerTabResourceName[outerGroup.id] }}</span>
+                    </div>
+                  </OTab>
+                </OTabs>
+
                 <!-- Group tabs -->
                 <OTabs
                   v-if="nonEmptyGroupTabs.length > 0"
@@ -567,7 +596,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <CorrelationEventHeader
       :source-event="sourceEvent"
       :context-chips="contextChips"
-      :subject-chips="subjectChips"
+      :subject-chips="isNestedGroupMode ? [] : subjectChips"
       v-model:active-subject="activeSubject"
       overflow-mode="responsive"
       :get-subject-button-label="getSubjectButtonLabel"
@@ -771,6 +800,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- -- Right area: group tabs + dashboard -- -->
           <template #after>
             <div class="tw:flex tw:flex-col tw:h-full tw:overflow-hidden">
+              <!-- Outer Pod/Node tabs — only shown in nested K8s mode -->
+              <OTabs
+                v-if="isNestedGroupMode"
+                v-model="activeOuterTab"
+                dense
+                align="left"
+                class="metric-group-tabs tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
+              >
+                <OTab
+                  v-for="outerGroup in groupDefs"
+                  :key="outerGroup.id"
+                  :name="outerGroup.id"
+                  class="tw:flex-none!"
+                >
+                  <div class="tw:flex tw:flex-col tw:items-start tw:px-1 tw:py-0.5 tw:min-w-0">
+                    <div class="tw:flex tw:items-center tw:gap-1">
+                      <OIcon v-if="typeof outerGroup.icon === 'string'" :name="outerGroup.icon" size="xs" />
+                      <component v-else :is="outerGroup.icon" />
+                      <span class="tw:whitespace-nowrap">{{ outerGroup.label }}</span>
+                    </div>
+                    <span
+                      v-if="outerTabResourceName[outerGroup.id]"
+                      class="tw:text-xs tw:leading-tight tw:opacity-75 tw:whitespace-nowrap"
+                      :title="outerTabResourceName[outerGroup.id]"
+                    >{{ outerTabResourceName[outerGroup.id] }}</span>
+                  </div>
+                </OTab>
+              </OTabs>
+
               <!-- Group tabs -->
               <OTabs
                 v-if="nonEmptyGroupTabs.length > 0"
@@ -1139,6 +1197,9 @@ import {
   getDefaultMetricSelections,
   type MetricGroupDefinition,
   DEFAULT_METRIC_GROUP_DEFINITIONS,
+  K8S_METRIC_GROUP_DEFINITIONS,
+  NODE_PATTERNS,
+  POD_PATTERNS,
 } from "@/utils/metrics/metricGrouping";
 import type { StreamInfo } from "@/services/service_streams";
 import {
@@ -1232,7 +1293,6 @@ export interface TelemetryCorrelationDashboardProps {
 const props = withDefaults(defineProps<TelemetryCorrelationDashboardProps>(), {
   mode: "dialog",
   externalActiveTab: "logs",
-  metricGroupDefinitions: () => DEFAULT_METRIC_GROUP_DEFINITIONS,
 });
 
 const emit = defineEmits<{
@@ -1254,10 +1314,68 @@ const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } =
 let currentTracesStreamTraceId: string | null = null;
 
 // Resolved group definitions and their ids (reactive to prop changes)
-const groupDefs = computed(
-  () => props.metricGroupDefinitions ?? DEFAULT_METRIC_GROUP_DEFINITIONS,
+const groupDefs = computed(() => {
+  if (props.metricGroupDefinitions) return props.metricGroupDefinitions;
+  // Auto-select K8s nested definitions when the correlation matched a kubernetes identity set
+  const setId = props.matchedSetId?.toLowerCase() ?? "";
+  if (setId === "kubernetes" || setId.startsWith("k8s")) return K8S_METRIC_GROUP_DEFINITIONS;
+  return DEFAULT_METRIC_GROUP_DEFINITIONS;
+});
+
+// Nested mode: when top-level groups have children (e.g. K8s Pod/Node outer tabs)
+const isNestedGroupMode = computed(() =>
+  groupDefs.value.some((g) => g.children && g.children.length > 0),
 );
-const groupIds = computed(() => groupDefs.value.map((g) => g.id));
+
+const activeOuterTab = ref<string>(
+  groupDefs.value.find((g) => g.children)?.id ?? groupDefs.value[0]?.id ?? "",
+);
+
+// When matchedSetId arrives (async) groupDefs switches from flat → nested.
+// Re-initialize activeOuterTab to the first outer group so the Pods tab is selected.
+watch(isNestedGroupMode, (nested) => {
+  if (nested) {
+    activeOuterTab.value =
+      groupDefs.value.find((g) => g.children)?.id ?? groupDefs.value[0]?.id ?? "";
+  }
+});
+
+// Resolve a value for a semantic ID by checking chipDimensions directly (semantic-id key)
+// and also by looking up raw field names from semanticGroups (raw-field key).
+const resolveChipValue = (semanticId: string): string | undefined => {
+  // Try semantic-id key directly (from buildWorkloadChipDimensions)
+  const direct = props.chipDimensions?.[semanticId];
+  if (direct && direct !== SELECT_ALL_VALUE) return direct;
+  // Try raw field names (from buildChipDimensionsFromFilters)
+  const group = semanticGroups.value.find((g) => g.id === semanticId);
+  if (!group) return undefined;
+  for (const field of group.fields) {
+    const v = props.chipDimensions?.[field];
+    if (v && v !== SELECT_ALL_VALUE) return v;
+  }
+  return undefined;
+};
+
+// Map outer tab id → actual resource name (pod/node name)
+const outerTabResourceName = computed<Record<string, string | undefined>>(() => ({
+  pods: resolveChipValue("k8s-pod-name"),
+  nodes: resolveChipValue("k8s-node-name"),
+}));
+
+// Map outer tab id → subject semantic id (drives the same filtering as the "View by" chip)
+const outerTabToSubjectSemanticId: Record<string, string> = {
+  pods: "k8s-pod-name",
+  nodes: "k8s-node-name",
+};
+
+// Effective sub-groups: children of the active outer tab, or flat groupDefs
+const effectiveGroupDefs = computed(() => {
+  if (!isNestedGroupMode.value) return groupDefs.value;
+  const outer = groupDefs.value.find((g) => g.id === activeOuterTab.value);
+  return outer?.children ?? groupDefs.value;
+});
+
+const groupIds = computed(() => effectiveGroupDefs.value.map((g) => g.id));
 
 // Sort related streams so those with confirmed data overlap in props.timeRange
 // come first; streams without overlap (or missing stats) sink to the bottom.
@@ -1549,7 +1667,25 @@ const applyUnstableDimensionDefaults = (
 };
 
 const uniqueMetricStreams = computed(() => {
-  return getUniqueStreams(sortedMetricStreams.value);
+  const base = getUniqueStreams(sortedMetricStreams.value);
+  if (!isNestedGroupMode.value) return base;
+
+  // In nested mode (K8s), supplement correlation-returned streams with all
+  // node/pod streams from the org catalog. The _correlate API only returns
+  // streams associated with the matched service record (pod-level), so
+  // node-level metrics (k8s_node_*, system_*) are missing from the response.
+  const catalogMetrics = store.state.streams?.metrics as Record<string, any> | undefined;
+  if (!catalogMetrics) return base;
+
+  const existingNames = new Set(base.map((s) => s.stream_name));
+  const extra: StreamInfo[] = Object.keys(catalogMetrics)
+    .filter((name) =>
+      !existingNames.has(name) &&
+      (streamMatchesPatterns(name, NODE_PATTERNS) || streamMatchesPatterns(name, POD_PATTERNS)),
+    )
+    .map((name) => ({ stream_name: name, stream_type: "metrics" }));
+
+  return [...base, ...extra];
 });
 
 // Selected metric streams — declared before chip/intent block because applyActivePill references it.
@@ -1557,7 +1693,7 @@ const selectedMetricStreams = ref<StreamInfo[]>(
   applyUnstableDimensionDefaults(
     (() => {
       const unique = getUniqueStreams(sortedMetricStreams.value);
-      const defs = props.metricGroupDefinitions ?? DEFAULT_METRIC_GROUP_DEFINITIONS;
+      const defs = groupDefs.value;
       const defaults = getDefaultMetricSelections(defs, unique);
       return defaults.length > 0 ? defaults : unique.slice(0, 6);
     })(),
@@ -1796,11 +1932,22 @@ const activeSubjectButtonId = computed<string | null>(() => {
 });
 
 const applyScopeFilter = (streams: StreamInfo[]): StreamInfo[] => {
-  const sid = activeSubject.value;
-  if (!sid || subjectButtons.value.length === 0) return streams;
-  const button = subjectButtons.value.find((b) => Array.isArray(b.semanticIds) && b.semanticIds.includes(sid));
-  if (!button || button.poolPatterns.length === 0) return streams;
-  return streams.filter((s) => streamMatchesPatterns(s.stream_name, button.poolPatterns));
+  if (!isNestedGroupMode.value) {
+    // Non-nested: use the subject button's dimension-derived pool patterns (original behaviour)
+    const sid = activeSubject.value;
+    if (!sid || subjectButtons.value.length === 0) return streams;
+    const button = subjectButtons.value.find((b) => Array.isArray(b.semanticIds) && b.semanticIds.includes(sid));
+    if (!button || button.poolPatterns.length === 0) return streams;
+    return streams.filter((s) => streamMatchesPatterns(s.stream_name, button.poolPatterns));
+  }
+  // Nested mode: filter by stream-name patterns so node/pod tabs show the right streams
+  if (activeOuterTab.value === "nodes") {
+    return streams.filter((s) => streamMatchesPatterns(s.stream_name, NODE_PATTERNS));
+  }
+  if (activeOuterTab.value === "pods") {
+    return streams.filter((s) => streamMatchesPatterns(s.stream_name, POD_PATTERNS));
+  }
+  return streams;
 };
 
 const streamsForActivePill = computed<StreamInfo[]>(() => {
@@ -1862,24 +2009,41 @@ const filteredMetricStreams = computed(() => {
 });
 
 // Group the filtered metric streams into configured categories
+// In nested mode, also apply scope filter so the sidebar shows only pod/node streams
 const groupedFilteredMetricStreams = computed(() =>
-  groupMetricsByCategory(filteredMetricStreams.value, groupDefs.value),
+  groupMetricsByCategory(
+    applyScopeFilter(filteredMetricStreams.value),
+    effectiveGroupDefs.value,
+  ),
 );
 
-// Group ALL available unique metric streams � drives which tabs are visible
+// Group ALL available unique metric streams — drives which tabs are visible
+// In nested mode, scope-filter so counts reflect the active outer tab
 const groupedUniqueMetricStreams = computed(() =>
-  groupMetricsByCategory(uniqueMetricStreams.value, groupDefs.value),
+  groupMetricsByCategory(
+    applyScopeFilter(uniqueMetricStreams.value),
+    effectiveGroupDefs.value,
+  ),
 );
 
 // Group the currently *selected* metric streams (used by the selector dialog)
 const groupedSelectedMetricStreams = computed(() =>
-  groupMetricsByCategory(selectedMetricStreams.value, groupDefs.value),
+  groupMetricsByCategory(selectedMetricStreams.value, effectiveGroupDefs.value),
 );
 
 // Active group tab within the metrics section
 const activeMetricGroupTab = ref<string>(
-  props.metricGroupDefinitions?.[0]?.id ?? "infra",
+  effectiveGroupDefs.value[0]?.id ?? "compute",
 );
+
+// When outer tab changes: reset inner tab + sync activeSubject for filtering
+watch(activeOuterTab, (tabId) => {
+  const first = effectiveGroupDefs.value[0]?.id;
+  if (first) activeMetricGroupTab.value = first;
+  // Apply the same scope filter that the "View by Pod/Node" chip would apply
+  const semanticId = outerTabToSubjectSemanticId[tabId];
+  if (semanticId) activeSubject.value = semanticId;
+}, { immediate: true });
 
 // Per-group dashboard data and render key
 const groupedDashboardData = ref<Partial<Record<string, any>>>({});
@@ -1906,7 +2070,7 @@ const nonEmptyGroupTabs = computed(() =>
 const regenerateGroupDashboards = (config: MetricsCorrelationConfig) => {
   const grouped = groupMetricsByCategory(
     selectedMetricStreams.value,
-    groupDefs.value,
+    effectiveGroupDefs.value,
   );
   const next: Partial<Record<string, any>> = {};
 
@@ -2333,7 +2497,7 @@ const addMetricPanels = async (addedStreams: StreamInfo[]) => {
         x:
           (index % Math.floor(grid / (props.panelWidth ?? 64))) *
           (props.panelWidth ?? 64),
-        y: maxY + Math.floor(index / 3) * (props.panelHeight ?? 16),
+        y: maxY + Math.floor(index / Math.floor(grid / (props.panelWidth ?? 64))) * (props.panelHeight ?? 16),
         i: uniqueId,
       };
       panel.id = `${panel.id}_${timestamp}`;
