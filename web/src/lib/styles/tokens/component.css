@@ -3370,16 +3370,16 @@ button.date-time-button {
   &:hover {
     background: rgba(255, 255, 255, 0.15) !important;
   }
+}
 
-  &--active {
-    background: var(--q-primary) !important;
-    color: white;
+.wrap-content-btn--active {
+  background: var(--q-primary) !important;
+  color: white;
+}
 
-    &:hover {
-      background: var(--q-primary) !important;
-      opacity: 0.85;
-    }
-  }
+.wrap-content-btn--active:hover {
+  background: var(--q-primary) !important;
+  opacity: 0.85;
 }
 
 .expanded-sql {
