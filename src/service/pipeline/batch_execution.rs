@@ -522,7 +522,7 @@ impl ExecutablePipeline {
         })? {
             let stream_params = self.get_source_stream_params();
             log::error!(
-                "[Pipeline] id: {}, name: {}, node_errors: {:?}",
+                "[Pipeline] [inv={inv_id}] id: {}, name: {}, node_errors: {:?}",
                 pipeline_errors.pipeline_id,
                 pipeline_errors.pipeline_name,
                 pipeline_errors.node_errors
