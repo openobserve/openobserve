@@ -15,7 +15,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:pb-px tw:h-full tw:overflow-hidden" id="searchBarComponent">
+  <div
+    data-test="logstream-explore-search-bar-container"
+    class="tw:pb-px tw:h-full tw:overflow-hidden"
+    id="searchBarComponent"
+  >
     <div class="tw:flex tw:flex tw:justify-end">
       <div class="tw:my-1">
         <OButton
