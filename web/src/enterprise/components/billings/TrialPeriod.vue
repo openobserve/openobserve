@@ -17,6 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     v-if="showTrialPeriodMsg"
+    data-test="trial-period-container"
     class="tw:flex tw:items-center tw:gap-3 tw:px-4 tw:py-2 tw:rounded-md tw:w-full tw:bg-(--o2-status-warning-bg) tw:border tw:border-(--o2-status-warning-text) tw:text-(--o2-status-warning-text)"
   >
     <!-- Warning icon -->

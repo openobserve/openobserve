@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="tw:flex tw:flex-col tw:justify-between">
                 <!-- Title row -->
                 <div class="tw:flex tw:justify-between tw:items-center">
-                  <div class="tw:text-(--text-sm) tw:font-semibold tw:leading-(--leading-base) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left">RUM Session</div>
+                  <div class="tw:text-(--text-sm) tw:font-semibold tw:leading-(--leading-base) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left" data-test="billings-usage-tile-title">RUM Session</div>
                   <div style="opacity: 0.8;">
                     <img :src="rumSessionIcon" />
                   </div>
@@ -104,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="tw:flex tw:flex-col tw:justify-between">
                 <!-- Title row -->
                 <div class="tw:flex tw:justify-between tw:items-center">
-                  <div class="tw:text-(--text-sm) tw:font-semibold tw:leading-(--leading-base) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left"> Ingestion</div>
+                  <div class="tw:text-(--text-sm) tw:font-semibold tw:leading-(--leading-base) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left" data-test="billings-usage-tile-title"> Ingestion</div>
                   <div style="opacity: 0.8;">
                     <img :src="ingestionIcon" />
                   </div>
@@ -123,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="tw:flex tw:flex-col tw:justify-between">
                     <!-- Title row -->
                     <div class="tw:flex tw:justify-between tw:items-center">
-                    <div class="tw:text-(--text-sm) tw:font-semibold tw:leading-(--leading-base) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left">Search</div>
+                    <div class="tw:text-(--text-sm) tw:font-semibold tw:leading-(--leading-base) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left" data-test="billings-usage-tile-title">Search</div>
                     <div style="opacity: 0.8;">
                         <img :src="searchIcon" />
                     </div>
@@ -142,7 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="tw:flex tw:flex-col tw:justify-between">
                     <!-- Title row -->
                     <div class="tw:flex tw:justify-between tw:items-center">
-                    <div class="tw:text-(--text-sm) tw:font-semibold tw:leading-(--leading-base) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left">Functions</div>
+                    <div class="tw:text-(--text-sm) tw:font-semibold tw:leading-(--leading-base) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left" data-test="billings-usage-tile-title">Functions</div>
                     <div style="opacity: 0.8;">
                         <img :src="functionsIcon" />
                     </div>
