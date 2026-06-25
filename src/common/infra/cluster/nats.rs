@@ -329,4 +329,35 @@ mod tests {
         println!("[CLUSTER::TEST] test_nats_register: {ret:?}");
         assert!(ret.is_ok());
     }
+
+    #[tokio::test]
+    async fn test_nats_update_local_node_updates_cache() {
+        config::cache_instance_id("instance");
+        infra::db_init().await.unwrap();
+        register().await.unwrap();
+
+        let mut node = get_node_by_uuid(&LOCAL_NODE.uuid).await.unwrap();
+        node.scheduled = true;
+        update_local_node(&node).await.unwrap();
+
+        let cached = get_node_by_uuid(&LOCAL_NODE.uuid).await.unwrap();
+        assert!(cached.scheduled);
+    }
+
+    #[tokio::test]
+    async fn test_nats_set_status_preserves_cached_scheduled() {
+        config::cache_instance_id("instance");
+        infra::db_init().await.unwrap();
+        register().await.unwrap();
+
+        let mut node = get_node_by_uuid(&LOCAL_NODE.uuid).await.unwrap();
+        node.scheduled = true;
+        update_local_node(&node).await.unwrap();
+
+        set_status(NodeStatus::Online).await.unwrap();
+
+        let cached = get_node_by_uuid(&LOCAL_NODE.uuid).await.unwrap();
+        assert!(cached.scheduled);
+        assert_eq!(cached.status, NodeStatus::Online);
+    }
 }
