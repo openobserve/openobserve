@@ -4,6 +4,7 @@ import { describe, it, expect } from "vitest";
 import {
   ALL_AGENTS_VALUE,
   agentOptionKey,
+  buildAgentSessionFilter,
   buildAgentTraceFilter,
 } from "./llmAgentFilter";
 import type { GenAiAgentListItem } from "@/services/gen-ai-agent-mapping.service";
@@ -51,6 +52,24 @@ describe("llmAgentFilter", () => {
         "default",
       ),
     ).toContain(`gen_ai_agent_name = 'o''brien'`);
+  });
+
+  it("builds a session-membership filter that keeps full matching sessions", () => {
+    expect(buildAgentSessionFilter(agentWithId, "default")).toBe(
+      `gen_ai_conversation_id IN (SELECT gen_ai_conversation_id FROM "default" WHERE gen_ai_conversation_id IS NOT NULL AND gen_ai_conversation_id != '' AND trace_id IN (SELECT trace_id FROM "default" WHERE gen_ai_agent_id = 'agent-123' GROUP BY trace_id) GROUP BY gen_ai_conversation_id)`,
+    );
+  });
+
+  it("supports a custom session field for session-membership filters", () => {
+    expect(buildAgentSessionFilter(agentWithId, "default", "llm_session_id")).toBe(
+      `llm_session_id IN (SELECT llm_session_id FROM "default" WHERE llm_session_id IS NOT NULL AND llm_session_id != '' AND trace_id IN (SELECT trace_id FROM "default" WHERE gen_ai_agent_id = 'agent-123' GROUP BY trace_id) GROUP BY llm_session_id)`,
+    );
+  });
+
+  it("returns an empty session predicate when no agent / stream / session field is given", () => {
+    expect(buildAgentSessionFilter(null, "default")).toBe("");
+    expect(buildAgentSessionFilter(agentWithId, "")).toBe("");
+    expect(buildAgentSessionFilter(agentWithId, "default", "")).toBe("");
   });
 
   it("exposes the All Agents sentinel", () => {

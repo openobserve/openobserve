@@ -57,9 +57,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @row-click="(row: any) => handleRowClick(row)"
       @pagination-change="onPaginationChange"
     >
-      <!-- Toolbar: filter mode on the left; the matching stream/agent picker on the right. -->
+      <!-- Toolbar: Stream/Agent mode + matching picker aligned with the table actions. -->
       <template #toolbar>
-        <div class="tw:flex tw:items-center tw:justify-between tw:gap-2 tw:flex-1 tw:min-w-0">
+        <div class="tw:flex tw:items-center tw:justify-end tw:gap-2 tw:flex-1 tw:min-w-0">
           <OToggleGroup
             :model-value="filterMode"
             type="single"
@@ -242,7 +242,7 @@ import genAiAgentMappingService, {
 import {
   ALL_AGENTS_VALUE,
   agentOptionKey,
-  buildAgentTraceFilter,
+  buildAgentSessionFilter,
 } from "./llmAgentFilter";
 import {
   splitNumberWithUnit,
@@ -335,7 +335,7 @@ const effectiveAgent = computed<GenAiAgentListItem | null>(() =>
   filterMode.value === "agent" ? selectedAgent.value : null,
 );
 const agentFilterClause = computed(() =>
-  buildAgentTraceFilter(effectiveAgent.value, effectiveStream.value),
+  buildAgentSessionFilter(effectiveAgent.value, effectiveStream.value),
 );
 const agentEmpty = computed(
   () => filterMode.value === "agent" && agentsLoaded.value && agents.value.length === 0,

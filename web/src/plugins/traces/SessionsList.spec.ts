@@ -439,7 +439,7 @@ describe("SessionsList — agent filter", () => {
       2000,
       0,
       25,
-      `trace_id IN (SELECT trace_id FROM "agent-stream" WHERE gen_ai_agent_id = 'agent-1' GROUP BY trace_id)`,
+      `gen_ai_conversation_id IN (SELECT gen_ai_conversation_id FROM "agent-stream" WHERE gen_ai_conversation_id IS NOT NULL AND gen_ai_conversation_id != '' AND trace_id IN (SELECT trace_id FROM "agent-stream" WHERE gen_ai_agent_id = 'agent-1' GROUP BY trace_id) GROUP BY gen_ai_conversation_id)`,
     );
   });
 
