@@ -109,18 +109,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OBadge
                     variant="primary-soft"
                     class="tw:ring-1 tw:ring-inset tw:ring-current"
+                    data-test="dashboard-variable-scope-badge"
                     v-if="getScopeType(variable) === 'global'"
                   >
                     Global
                   </OBadge>
                   <OBadge
                     variant="primary-outline"
+                    data-test="dashboard-variable-scope-badge"
                     v-else-if="getScopeType(variable) === 'tabs'"
                   >
                     {{ variable.tabs?.length || 0 }} Tabs
                   </OBadge>
                   <OBadge
                     variant="primary-outline"
+                    data-test="dashboard-variable-scope-badge"
                     v-else-if="getScopeType(variable) === 'panels'"
                   >
                     {{ variable.panels?.length || 0 }} Panels

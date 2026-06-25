@@ -1075,7 +1075,7 @@ export default class DashboardVariablesScoped {
     await variableRow.waitFor({ state: "visible", timeout: 5000 });
 
     // Hover over the scope chip to see the tooltip showing "Deleted Tab" or "Deleted Panel"
-    const scopeChip = variableRow.locator('[data-test*="chip"], [data-test*="badge"], [class*="scope"]').first();
+    const scopeChip = variableRow.locator('[data-test="dashboard-variable-scope-badge"]').first();
     await scopeChip.hover();
 
     // Wait for tooltip to appear and verify it contains "Deleted Tab" or "Deleted Panel"
