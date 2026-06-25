@@ -29,7 +29,6 @@ use crate::{
 };
 
 pub const ORG_INGESTION_TOKEN_PREFIX: &str = "o2oi_";
-pub const SYNTHETICS_TOKEN_PREFIX: &str = "o2syn_";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OrgIngestionTokenRecord {
@@ -79,9 +78,9 @@ pub fn generate_token() -> String {
     format!("{}{}", ORG_INGESTION_TOKEN_PREFIX, random_part)
 }
 
-/// Find a synthetics agent token by value (global lookup — no org_id needed).
-/// The `o2syn_` prefix is the only distinguisher; no DB type column is required.
-pub async fn find_enabled_synthetics_token(
+/// Find an org ingestion token by value only (global — no org_id filter).
+/// Used for paths that have no org_id in the URL (e.g. synthetics job API).
+pub async fn find_enabled_token_global(
     token: &str,
 ) -> Result<Option<OrgIngestionTokenRecord>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;

@@ -385,7 +385,7 @@ where
             path_columns[0].to_string()
         };
 
-        // Synthetics probe job API — no org_id in path, authenticated via o2syn_ token.
+        // Synthetics probe job API — no org_id in path, authenticated via org ingestion token.
         if method.eq("POST")
             && path_columns.first() == Some(&"synthetics")
             && path_columns.get(1) == Some(&"jobs")
