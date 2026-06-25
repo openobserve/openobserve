@@ -28,7 +28,7 @@ limitations under the License. -->
         <!-- Card Content -->
         <div class="card-content tw:flex tw:flex-col tw:items-center tw:text-center tw:h-full tw:relative">
           <!-- Icon/Image -->
-          <div class="tw:mb-2 tw:text-[var(--o2-icon-color)] tw:group-[.selected]/dest-card:text-[var(--o2-primary-color)]">
+          <div data-test="destination-type-icon" class="tw:mb-2 tw:text-[var(--o2-icon-color)] tw:group-[.selected]/dest-card:text-[var(--o2-primary-color)]">
             <img
               v-if="type.image"
               :src="type.image"
@@ -71,7 +71,7 @@ limitations under the License. -->
         @click="selectType('custom')"
       >
         <div class="card-content tw:flex tw:flex-col tw:items-center tw:text-center tw:h-full tw:relative">
-          <div class="tw:mb-2 tw:text-[var(--o2-icon-color)] tw:group-[.selected]/dest-card:text-[var(--o2-primary-color)]">
+          <div data-test="destination-type-icon" class="tw:mb-2 tw:text-[var(--o2-icon-color)] tw:group-[.selected]/dest-card:text-[var(--o2-primary-color)]">
             <OIcon name="settings" size="md" />
           </div>
           <h3 data-test="destination-type-name" class="card-title tw:text-[0.8125rem] tw:font-medium tw:mt-1 tw:mb-0 tw:text-[var(--q-text-primary)] tw:[line-height:1.3] tw:text-center">

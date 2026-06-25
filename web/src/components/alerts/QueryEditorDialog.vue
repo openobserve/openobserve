@@ -75,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </div>
       </template>
-    <div class="tw:flex tw:h-[calc(100vh-3.5rem)] tw:overflow-hidden tw:bg-(--o2-card-bg)">
+    <div data-test="query-editor-dialog-card" class="tw:flex tw:h-[calc(100vh-3.5rem)] tw:overflow-hidden tw:bg-(--o2-card-bg)">
       <div
         class="tw:h-full tw:flex tw:overflow-hidden tw:flex-1"
       >

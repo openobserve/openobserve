@@ -15,10 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:h-full tw:flex tw:flex-col tw:relative">
-    <div class="tw:text-[0.8125rem] tw:leading-[2.2] tw:flex-1 tw:min-h-0 tw:overflow-y-auto tw:p-4 tw:flex tw:flex-col" ref="summaryContainer" @scroll="checkIfShouldShowScrollButton">
-      <p v-if="summaryText" class="summary-text tw:m-0 tw:whitespace-pre-line tw:tracking-[0.03em]" v-html="DOMPurify.sanitize(summaryText)" @click="handleSummaryClick"></p>
-      <div v-else class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:min-h-[120px] tw:gap-2 tw:p-4">
+  <div data-test="alerts-alert-summary" class="tw:h-full tw:flex tw:flex-col tw:relative">
+    <div data-test="alerts-alert-summary-content" class="tw:text-[0.8125rem] tw:leading-[2.2] tw:flex-1 tw:min-h-0 tw:overflow-y-auto tw:p-4 tw:flex tw:flex-col" ref="summaryContainer" @scroll="checkIfShouldShowScrollButton">
+      <p v-if="summaryText" data-test="alerts-alert-summary-text" class="summary-text tw:m-0 tw:whitespace-pre-line tw:tracking-[0.03em]" v-html="DOMPurify.sanitize(summaryText)" @click="handleSummaryClick"></p>
+      <div v-else data-test="alerts-alert-summary-empty-state" class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:min-h-[120px] tw:gap-2 tw:p-4">
         <OIcon name="article" size="lg" class="tw:opacity-20" />
         <span class="tw:text-[0.8125rem] tw:font-medium tw:text-center tw:opacity-50">{{ t('alerts.summary.configureAlert') || 'Configure your alert to see a summary' }}</span>
       </div>

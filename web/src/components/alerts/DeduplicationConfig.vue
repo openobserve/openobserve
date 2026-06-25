@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:w-full tw:p-0 tw:m-0">
+  <div data-test="alerts-deduplication-config" class="tw:w-full tw:p-0 tw:m-0">
     <div class="tw:w-full">
       <div class="tw:w-full">
         <AlertsContainer
