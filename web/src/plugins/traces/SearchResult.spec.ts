@@ -340,6 +340,8 @@ describe("SearchResult", () => {
         "remove-filter",
         "jump-to-stream-data",
         "error-only-toggled",
+        "ask-ai",
+        "send-to-ai-chat",
       ];
 
       expect(wrapper.vm.$options.emits).toEqual(expectedEmits);

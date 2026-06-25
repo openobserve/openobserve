@@ -49,42 +49,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="traces-no-events-jump-to-data-card"
         @click="emit('jump-to-stream-data', jumpTarget.from, jumpTarget.to)"
       />
-      <!-- No stream stats: expand + optionally remove-filter -->
-      <template v-else-if="!streamDocTimeRange">
-        <EmptyStateActionCard
-          icon="schedule"
-          :label="t('traces.noEvents.expandRange')"
-          :sublabel="expandRangeSublabel"
-          data-test="traces-no-events-expand-range-card"
-          @click="onWidenRange"
-        />
-        <EmptyStateActionCard
-          v-if="hasFilters"
-          icon="filter-list"
-          :label="t('traces.noEvents.removeFilter')"
-          :sublabel="removeFilterSublabel"
-          data-test="traces-no-events-remove-filter-card"
-          @click="onRemoveFilter"
-        />
-      </template>
-      <!-- windowHasStreamData: show expand + optionally remove-filter -->
-      <template v-else>
-        <EmptyStateActionCard
-          icon="schedule"
-          :label="t('traces.noEvents.expandRange')"
-          :sublabel="expandRangeSublabel"
-          data-test="traces-no-events-expand-range-card"
-          @click="onWidenRange"
-        />
-        <EmptyStateActionCard
-          v-if="hasFilters"
-          icon="filter-list"
-          :label="t('traces.noEvents.removeFilter')"
-          :sublabel="removeFilterSublabel"
-          data-test="traces-no-events-remove-filter-card"
-          @click="onRemoveFilter"
-        />
-      </template>
+      <!-- No active filters: the only useful suggestion is to widen the range.
+           When a filter IS applied we intentionally show no action cards — the
+           user is guided to relax the query themselves (and can Ask AI). -->
+      <EmptyStateActionCard
+        v-else-if="!hasFilters"
+        icon="schedule"
+        :label="t('traces.noEvents.expandRange')"
+        :sublabel="expandRangeSublabel"
+        data-test="traces-no-events-expand-range-card"
+        @click="onWidenRange"
+      />
+    </template>
+
+    <template #extra>
+      <div class="tw:flex tw:items-center tw:justify-center tw:gap-2 tw:flex-wrap">
+        <OButton
+          v-if="aiEnabled && windowHasStreamData && !jumpTarget"
+          variant="ghost"
+          size="sm"
+          class="ai-hover-btn"
+          data-test="traces-no-events-ask-ai-btn"
+          @click="emit('ask-ai')"
+        >
+          <template #icon-left>
+            <img :src="aiIconSrc" class="tw:w-4 tw:h-4 tw:shrink-0" alt="" />
+          </template>
+          {{ t("traces.noEvents.askAi") }}
+        </OButton>
+      </div>
     </template>
   </OEmptyState>
 </template>
@@ -96,20 +89,39 @@ import { useStore } from "vuex";
 import { DateTime } from "luxon";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import useTraces from "@/composables/useTraces";
 import useWidenRange from "@/composables/useWidenRange";
+import { useAiIcon } from "@/composables/useAiIcon";
 import { getConsumableRelativeTime } from "@/utils/date";
 
 const FIFTEEN_MINS_US = 15 * 60 * 1_000_000;
 const END_NUDGE_US = 1_000_000;
 
+const props = defineProps<{
+  /** Whether the AI copilot is enabled — gates the "Ask AI" button. */
+  aiEnabled?: boolean;
+  /**
+   * Authoritative stream doc time range (µs), provided by the parent (traces
+   * Index) from the same getStream() the query uses. When present it takes
+   * precedence over the streamResults-derived fallback below.
+   */
+  streamDocTimeRange?: { min: number; max: number };
+  /** Resolved query window (µs), provided by the parent. */
+  queryWindowUs?: { start: number; end: number };
+}>();
+
 const { t } = useI18n();
 const store = useStore();
+const { aiIconSrc } = useAiIcon();
 const emit = defineEmits<{
   "widen-range": [period: string];
-  "remove-filter": [];
   "jump-to-stream-data": [fromUs: number, toUs: number];
+  "ask-ai": [];
 }>();
+
+// `aiEnabled` is consumed via props in the template; alias avoids an unused warning.
+const aiEnabled = computed(() => !!props.aiEnabled);
 
 const { searchObj } = useTraces();
 
@@ -120,16 +132,12 @@ const hasFilters = computed(() => {
   return q.length > 0;
 });
 
-const conditionCount = computed(() => {
-  const q = (searchObj.data?.editorValue || "").trim();
-  if (!q) return 0;
-  const matches = q.match(/\b(AND|OR)\b/gi);
-  return (matches?.length ?? 0) + 1;
-});
-
 // --- stream doc time range (from stream stats) --------------------------------
 
 const streamDocTimeRange = computed(() => {
+  // Parent-provided range (authoritative) wins; fall back to deriving it from
+  // streamResults when used standalone (e.g. in unit tests).
+  if (props.streamDocTimeRange) return props.streamDocTimeRange;
   const selected = searchObj.data?.stream?.selectedStream?.value;
   if (!selected) return undefined;
   const list: any[] = searchObj.data?.streamResults?.list ?? [];
@@ -149,6 +157,7 @@ const streamDocTimeRange = computed(() => {
 // --- query window (resolved microsecond bounds) ------------------------------
 
 const queryWindowUs = computed(() => {
+  if (props.queryWindowUs) return props.queryWindowUs;
   const dt = searchObj.data?.datetime;
   if (!dt) return undefined;
   if (dt.type === "absolute" && dt.startTime && dt.endTime) {
@@ -207,16 +216,7 @@ const {
   },
 );
 
-// --- action card sublabels --------------------------------------------------
-
-const removeFilterSublabel = computed(() => {
-  const n = conditionCount.value;
-  const noun = n === 1 ? "condition" : "conditions";
-  return `You have ${n} active ${noun} on this query`;
-});
-
 // --- actions ----------------------------------------------------------------
 
 const onWidenRange = () => emit("widen-range", suggestedPeriod.value);
-const onRemoveFilter = () => emit("remove-filter");
 </script>
