@@ -420,8 +420,8 @@ export const getAreaGradientColor = (color: string) => ({
   x2: 0,
   y2: 1,
   colorStops: [
-    { offset: 0, color: colorToRgba(color, 0.45) },
-    { offset: 1, color: colorToRgba(color, 0.02) },
+    { offset: 0, color: colorToRgba(color, 0.9) },
+    { offset: 1, color: colorToRgba(color, 0.3) },
   ],
   global: false,
 });
