@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon name="workspace-premium" size="xl" />
             </div>
 
-            <div class="tw:text-[32px] tw:font-bold tw:mb-4 tw:leading-[1.2] tw:text-center tw:text-white">{{ dialogConfig.heroTitle }}</div>
+            <div data-test="enterprise-upgrade-hero-title" class="tw:text-[32px] tw:font-bold tw:mb-4 tw:leading-[1.2] tw:text-center tw:text-white">{{ dialogConfig.heroTitle }}</div>
 
             <div class="tw:mb-6 tw:text-sm tw:leading-[1.6] tw:opacity-[0.95] tw:text-center tw:text-white">
               {{ dialogConfig.offerText }}
@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Loaded State: Show actual data -->
               <template v-else>
-                <div class="tw:inline-flex tw:items-center tw:bg-[linear-gradient(135deg,#22c55e_0%,#4ade80_100%)] tw:py-[10px] tw:px-5 tw:rounded-[24px] tw:font-bold tw:text-[15px] tw:backdrop-blur-[10px] tw:text-white tw:shadow-[0_4px_16px_rgba(34,197,94,0.4)]" :class="{ 'tw:bg-[rgba(255,255,255,0.2)]! tw:shadow-[0_4px_12px_rgba(0,0,0,0.15)]!': dialogConfig.isLicensed }">
+                <div data-test="enterprise-upgrade-offer-badge" class="tw:inline-flex tw:items-center tw:bg-[linear-gradient(135deg,#22c55e_0%,#4ade80_100%)] tw:py-[10px] tw:px-5 tw:rounded-[24px] tw:font-bold tw:text-[15px] tw:backdrop-blur-[10px] tw:text-white tw:shadow-[0_4px_16px_rgba(34,197,94,0.4)]" :class="{ 'tw:bg-[rgba(255,255,255,0.2)]! tw:shadow-[0_4px_12px_rgba(0,0,0,0.15)]!': dialogConfig.isLicensed }">
                   <OIcon v-if="!dialogConfig.showUsageIndicator" :name="dialogConfig.badgeIcon" size="md" class="tw:mr-1" />
                   <span>{{ dialogConfig.badgeText }}</span>
                 </div>
@@ -99,6 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="on-dark-primary"
                 size="lg"
                 @click="handlePrimaryButtonClick"
+                data-test="enterprise-upgrade-download-btn"
                 class="tw:bg-white! tw:text-[var(--q-primary)]! tw:font-bold tw:py-[10px] tw:px-8 tw:text-[15px] tw:rounded-lg! tw:shadow-[0_4px_16px_rgba(0,0,0,0.15)] tw:transition-all tw:duration-300 tw:[transition-timing-function:cubic-bezier(0.4,0,0.2,1)] tw:[letter-spacing:0.3px] tw:hover:[transform:translateY(-3px)_scale(1.02)] tw:hover:shadow-[0_8px_24px_rgba(0,0,0,0.25)] tw:active:[transform:translateY(-1px)_scale(0.98)]"
               >
                 {{ dialogConfig.primaryButtonText }}
@@ -120,6 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="on-dark-ghost"
                 size="lg"
                 @click="openDocsLink"
+                data-test="enterprise-upgrade-learn-more-btn"
                 class="tw:font-semibold tw:py-[10px] tw:px-6 tw:text-[15px] tw:rounded-lg! tw:border-2 tw:border-[rgba(255,255,255,0.3)] tw:transition-all tw:duration-300 tw:bg-transparent tw:[letter-spacing:0.2px] tw:hover:bg-[rgba(255,255,255,0.15)] tw:hover:border-[rgba(255,255,255,0.5)] tw:hover:[transform:translateX(4px)] tw:active:[transform:scale(0.96)]"
               >
                 {{ t('about.enterprise_offer.buttons.learn_more') }}
@@ -131,7 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Right Panel - Features List -->
         <div class="tw:flex-1 tw:flex tw:flex-col tw:overflow-hidden" :class="[isDark ? 'tw:bg-[#1e1e1e]' : 'tw:bg-white', { 'tw:max-w-full': dialogConfig.isCloudLayout }]">
           <div class="tw:pt-4 tw:pb-3 tw:px-8 tw:sticky tw:top-0 tw:z-10 tw:border-b tw:text-center" :class="isDark ? 'tw:bg-[#1e1e1e] tw:border-b-[rgba(255,255,255,0.1)]' : 'tw:bg-white tw:border-b-[rgba(0,0,0,0.08)]'">
-            <div class="tw:text-[18px] tw:font-bold tw:mb-1 tw:[letter-spacing:-0.3px]" :class="isDark ? 'tw:text-[rgba(255,255,255,0.95)]' : 'tw:text-[rgba(0,0,0,0.9)]'">{{ dialogConfig.featuresTitle }}</div>
+            <div data-test="enterprise-upgrade-features-title" class="tw:text-[18px] tw:font-bold tw:mb-1 tw:[letter-spacing:-0.3px]" :class="isDark ? 'tw:text-[rgba(255,255,255,0.95)]' : 'tw:text-[rgba(0,0,0,0.9)]'">{{ dialogConfig.featuresTitle }}</div>
             <div class="tw:text-xs tw:font-medium" :class="isDark ? 'tw:text-[rgba(255,255,255,0.6)]' : 'tw:text-[rgba(0,0,0,0.6)]'">{{ dialogConfig.featuresSubtitle }}</div>
           </div>
 
@@ -224,11 +226,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon :name="feature.icon" size="sm" />
               </div>
               <div class="tw:flex-1 tw:min-w-0">
-                <div class="tw:text-[13px] tw:font-semibold tw:mb-0.5 tw:leading-[1.25] tw:flex tw:items-center tw:gap-1.5" :class="isDark ? 'tw:text-[rgba(255,255,255,0.95)]' : 'tw:text-[rgba(0,0,0,0.87)]'">
+                <div data-test="enterprise-upgrade-feature-name" class="tw:text-[13px] tw:font-semibold tw:mb-0.5 tw:leading-[1.25] tw:flex tw:items-center tw:gap-1.5" :class="isDark ? 'tw:text-[rgba(255,255,255,0.95)]' : 'tw:text-[rgba(0,0,0,0.87)]'">
                   {{ feature.name }}
-                  <OIcon v-if="feature.link" name="open-in-new" size="xs" class="tw:opacity-60 tw:ml-1 tw:align-middle" />
-                  <span v-if="feature.beta" class="tw:inline-flex tw:items-center tw:py-px tw:px-1 tw:text-[var(--q-primary)] tw:border tw:border-[var(--q-primary)] tw:rounded-[10px] tw:text-[8px] tw:font-bold tw:[letter-spacing:0.5px] tw:leading-[1.4] tw:uppercase">BETA</span>
-                  <span v-if="feature.requiresHA" class="tw:inline-flex tw:items-center tw:py-0.5 tw:px-[7px] tw:text-[var(--q-primary)] tw:rounded tw:text-[9px] tw:font-bold tw:[letter-spacing:0.5px] tw:leading-none tw:cursor-pointer tw:ml-1" :class="isDark ? 'tw:bg-[rgba(var(--q-primary-rgb),0.2)]' : 'tw:bg-[rgba(var(--q-primary-rgb),0.15)]'">
+                  <OIcon v-if="feature.link" name="open-in-new" size="xs" data-test="enterprise-upgrade-feature-external-link" class="tw:opacity-60 tw:ml-1 tw:align-middle" />
+                  <span v-if="feature.beta" data-test="enterprise-upgrade-feature-beta-badge" class="tw:inline-flex tw:items-center tw:py-px tw:px-1 tw:text-[var(--q-primary)] tw:border tw:border-[var(--q-primary)] tw:rounded-[10px] tw:text-[8px] tw:font-bold tw:[letter-spacing:0.5px] tw:leading-[1.4] tw:uppercase">BETA</span>
+                  <span v-if="feature.requiresHA" data-test="enterprise-upgrade-feature-ha-badge" class="tw:inline-flex tw:items-center tw:py-0.5 tw:px-[7px] tw:text-[var(--q-primary)] tw:rounded tw:text-[9px] tw:font-bold tw:[letter-spacing:0.5px] tw:leading-none tw:cursor-pointer tw:ml-1" :class="isDark ? 'tw:bg-[rgba(var(--q-primary-rgb),0.2)]' : 'tw:bg-[rgba(var(--q-primary-rgb),0.15)]'">
                     HA
                     <OTooltip side="top" align="center" :sideOffset="8" :content="t('about.enterprise_offer.tooltip.high_availability_mode_only')" />
                   </span>

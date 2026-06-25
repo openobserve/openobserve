@@ -130,7 +130,7 @@ describe("OperationsList", () => {
     it("should render operation items", () => {
       wrapper = createWrapper();
       const operations = wrapper.findAll(
-        '[data-test="promql-operation-item"]',
+        '[data-test="promql-operations-item"]',
       );
       expect(operations.length).toBe(mockOperations.length);
     });

@@ -16,7 +16,7 @@
           class="tw:flex tw:gap-2 tw:flex-wrap tw:items-center"
         >
           <template v-for="(element, index) in props.operations">
-            <div data-test="promql-operation-item">
+            <div data-test="promql-operations-item">
               <OButtonGroup class="axis-field" radius="sm">
                 <OButton
                   variant="outline"
