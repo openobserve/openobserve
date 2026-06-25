@@ -363,3 +363,93 @@ const getColorForTableDark = [
 
 export const getColorForTable = (theme: string): string[] =>
   theme === "dark" ? getColorForTableDark : getColorForTableLight;
+
+/**
+ * Converts a color string (hex, rgb, or rgba) into an rgba string with the
+ * given alpha. Returns the input unchanged if it can't be parsed.
+ */
+export const colorToRgba = (color: string, alpha: number): string => {
+  if (!color) return color;
+  // hex: #rgb or #rrggbb
+  if (color[0] === "#") {
+    let hex = color.slice(1);
+    if (hex.length === 3) {
+      hex = hex
+        .split("")
+        .map((c) => c + c)
+        .join("");
+    }
+    const num = parseInt(hex, 16);
+    if (Number.isNaN(num)) return color;
+    const r = (num >> 16) & 255;
+    const g = (num >> 8) & 255;
+    const b = num & 255;
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  }
+  // rgb()/rgba()
+  const match = color.match(/rgba?\(([^)]+)\)/);
+  if (match) {
+    const parts = match[1].split(",").map((p) => p.trim());
+    const [r, g, b] = parts;
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  }
+  return color;
+};
+
+/**
+ * Dashed split-line style for chart grids — subtle so the lines recede behind
+ * the data. Theme-aware: faint white on dark, faint black on light. Shared by
+ * the PromQL and SQL chart builders so the grid look stays consistent.
+ */
+export const getGridLineStyle = (theme: string) => ({
+  type: "dashed",
+  width: 1,
+  color:
+    theme === "dark" ? "rgba(255, 255, 255, 0.12)" : "rgba(0, 0, 0, 0.08)",
+});
+
+/**
+ * Builds a top-to-bottom vertical gradient for area chart fills that fades
+ * from a translucent series color at the top to fully transparent at the
+ * bottom. `color` should be the resolved concrete series color.
+ */
+export const getAreaGradientColor = (color: string) => ({
+  type: "linear",
+  x: 0,
+  y: 0,
+  x2: 0,
+  y2: 1,
+  colorStops: [
+    { offset: 0, color: colorToRgba(color, 0.45) },
+    { offset: 1, color: colorToRgba(color, 0.02) },
+  ],
+  global: false,
+});
+
+/**
+ * Builds the `{ areaStyle: {...} }` override for area charts — fades the fill
+ * into a bottom-to-top transparent gradient. Returns `{}` for non-area charts
+ * or when there's no base areaStyle. Resolves a concrete color from the palette
+ * when the series color is null (auto-palette mode). Shared by the PromQL and
+ * SQL chart builders so the area fill stays consistent.
+ */
+export const getAreaStyleOverride = (
+  panelType: string,
+  baseAreaStyle: any,
+  resolvedColor: any,
+  seriesName: any,
+  theme: string,
+) => {
+  const isAreaChart =
+    panelType === "area" || panelType === "area-stacked";
+  if (!isAreaChart || !baseAreaStyle) return {};
+  const palette = getColorPalette(theme);
+  const color =
+    resolvedColor ?? palette[getSeriesHash(seriesName?.toString() ?? "", palette)];
+  return {
+    areaStyle: {
+      ...baseAreaStyle,
+      color: getAreaGradientColor(color),
+    },
+  };
+};

@@ -19,7 +19,11 @@ import {
   calculateDynamicNameGap,
   calculateRotatedLabelBottomSpace,
 } from "../../chartDimensionUtils";
-import { ColorModeWithoutMinMax, getSQLMinMaxValue } from "../../colorPalette";
+import {
+  ColorModeWithoutMinMax,
+  getSQLMinMaxValue,
+  getGridLineStyle,
+} from "../../colorPalette";
 import { getDataValue } from "../../aliasUtils";
 import {
   createBaseLegendConfig,
@@ -73,6 +77,8 @@ export function buildSQLContext(
     panelSchema?.config?.show_gridlines !== undefined
       ? panelSchema.config.show_gridlines
       : true;
+  // Subtle dashed grid lines so they recede behind the data
+  const gridLineStyle = getGridLineStyle(store.state.theme);
   const extras: any = {};
 
   // if no data than return it
@@ -629,6 +635,7 @@ export function buildSQLContext(
         },
         splitLine: {
           show: showGridlines,
+          lineStyle: gridLineStyle,
         },
         axisLine: {
           show: searchQueryData?.every((it: any) => it.length == 0)
@@ -694,6 +701,7 @@ export function buildSQLContext(
       },
       splitLine: {
         show: showGridlines,
+        lineStyle: gridLineStyle,
       },
       axisLine: {
         show: searchQueryData?.every((it: any) => it.length == 0)
@@ -728,6 +736,7 @@ export function buildSQLContext(
     (Array.isArray(options.xAxis) ? options.xAxis : [options.xAxis]).forEach(
       (axis) => {
         axis.splitLine.show = showGridlines;
+        axis.splitLine.lineStyle = gridLineStyle;
       },
     );
   }
@@ -736,6 +745,7 @@ export function buildSQLContext(
       (axis) => {
         // if (!axis.splitLine) axis.splitLine = {};
         axis.splitLine.show = showGridlines;
+        axis.splitLine.lineStyle = gridLineStyle;
       },
     );
   }
