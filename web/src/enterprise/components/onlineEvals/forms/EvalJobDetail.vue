@@ -66,24 +66,21 @@
       </section>
 
       <!-- ── Tab strip ── -->
-      <nav class="jd__tabs" role="tablist">
-        <button
+      <OTabs
+        :model-value="activeTab"
+        bordered
+        class="jd__tabs"
+        data-test="eval-job-detail-tabs"
+        @update:model-value="activeTab = $event as TabId"
+      >
+        <OTab
           v-for="tab in tabs"
           :key="tab.id"
-          type="button"
-          class="jd__tab"
-          :class="{ 'jd__tab--active': activeTab === tab.id }"
-          role="tab"
-          :aria-selected="activeTab === tab.id"
+          :name="tab.id"
+          :label="tab.label"
           :data-test="`eval-job-detail-tab-${tab.id}`"
-          @click="activeTab = tab.id"
-        >
-          <span>{{ tab.label }}</span>
-          <span v-if="tab.count != null" class="jd__tab-count">{{
-            tab.count
-          }}</span>
-        </button>
-      </nav>
+        />
+      </OTabs>
 
       <!-- ── Body ── -->
       <div
@@ -489,6 +486,8 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import KpiCardsSkeleton from "./KpiCardsSkeleton.vue";
 import { copyToClipboard } from "@/utils/clipboard";
@@ -735,18 +734,9 @@ const tabs = computed(() => [
   {
     id: "configuration" as TabId,
     label: t("onlineEvals.job.detail.tabs.configuration"),
-    count: null as number | null,
   },
-  {
-    id: "runs" as TabId,
-    label: t("onlineEvals.job.detail.tabs.runs"),
-    count: null as number | null,
-  },
-  {
-    id: "failures" as TabId,
-    label: t("onlineEvals.job.detail.tabs.failures"),
-    count: null as number | null,
-  },
+  { id: "runs" as TabId, label: t("onlineEvals.job.detail.tabs.runs") },
+  { id: "failures" as TabId, label: t("onlineEvals.job.detail.tabs.failures") },
 ]);
 
 // — Runs / Failures window — backed by DateTimePickerDashboard.
@@ -1061,58 +1051,11 @@ function relativeTime(timestampMs: number): string {
   }
 }
 
-/* — Tab strip — */
+/* — Tab strip — OTabs owns the tab chrome; we only pin it and inset it to
+   match the KPI strip / section padding. */
 .jd__tabs {
-  display: flex;
-  gap: 18px;
-  padding: 0 20px;
-  border-bottom: 1px solid var(--color-dialog-header-border, var(--o2-border));
   flex-shrink: 0;
-}
-
-.jd__tab {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 10px 0;
-  background: transparent;
-  border: 0;
-  border-bottom: 2px solid transparent;
-  cursor: pointer;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  font: 600 13px var(--o2-font);
-  margin-bottom: -1px;
-}
-
-.jd__tab:hover {
-  color: var(--color-text-primary, currentColor);
-}
-
-.jd__tab--active {
-  color: var(--color-primary-600, #3f7994);
-  border-bottom-color: var(--color-primary-600, #3f7994);
-}
-
-.jd__tab-count {
-  display: inline-flex;
-  align-items: center;
-  padding: 0 6px;
-  min-width: 18px;
-  height: 16px;
-  border-radius: 999px;
-  font: 600 10px/1 var(--o2-font);
-  background: color-mix(in srgb, var(--color-text-secondary) 14%, transparent);
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  justify-content: center;
-}
-
-.jd__tab--active .jd__tab-count {
-  background: color-mix(
-    in srgb,
-    var(--color-primary-600, #3f7994) 18%,
-    transparent
-  );
-  color: var(--color-primary-600, #3f7994);
+  padding: 0 20px;
 }
 
 /* — Body — */
