@@ -117,6 +117,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #cell-error="{ row }">
               <ErrorDetail :column="row" />
             </template>
+            <!-- Event count as a data bar — surfaces the noisiest errors (audit §2.2). -->
+            <template #cell-events="{ row, value }">
+              <ODataBarCell :value="row.events" :max="eventsMax" :display="value" />
+            </template>
           </OTable>
         </div>
       </template>
@@ -143,6 +147,7 @@ import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import { b64DecodeUnicode, b64EncodeUnicode } from "@/utils/zincutils";
 import { useRouter } from "vue-router";
 import ErrorDetail from "@/components/rum/ErrorDetail.vue";
+import ODataBarCell from "@/lib/core/Table/cells/ODataBarCell.vue";
 import useErrorTracking from "@/composables/useErrorTracking";
 import useQuery from "@/composables/useQuery";
 import { useStore } from "vuex";
@@ -240,6 +245,14 @@ const tableErrors = computed(() => {
     ...e,
   }));
 });
+
+// Per-page max for the events data bar (audit §2.2).
+const eventsMax = computed(() =>
+  tableErrors.value.reduce((m: number, r: any) => {
+    const n = Number(r?.events);
+    return isNaN(n) ? m : Math.max(m, n);
+  }, 0),
+);
 
 // Dynamic editor height based on content lines
 const errorEditorHeight = computed(() => {

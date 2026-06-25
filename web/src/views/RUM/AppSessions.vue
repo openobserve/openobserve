@@ -125,10 +125,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="tw:cursor-pointer session-play-icon tw:text-[var(--o2-icon-color)] hover:tw:text-[var(--o2-primary-btn-bg)]"
                     />
                   </template>
+                  <template #cell-error_count="{ row }">
+                    <span
+                      class="tw:tabular-nums"
+                      :class="(row.error_count || 0) > 0
+                        ? 'tw:text-badge-error-soft-text tw:font-medium'
+                        : 'tw:text-text-primary'"
+                    >{{ row.error_count || 0 }}</span>
+                  </template>
                   <template #cell-frustration_count="{ row }">
                     <FrustrationBadge
                       :count="row.frustration_count || 0"
                     />
+                  </template>
+                  <template #cell-user_email="{ row }">
+                    <OUserCell :value="row.user_email" />
                   </template>
                   <template #cell-location="{ row }">
                     <SessionLocationColumn :column="row" />
@@ -181,6 +192,7 @@ import useSqlSuggestions from "@/composables/useSuggestions";
 import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
 import { useI18n } from "vue-i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";

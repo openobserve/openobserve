@@ -118,16 +118,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :data-test="`${row.name}-type-cell`"
                   class="tw:flex tw:items-center tw:gap-2"
                 >
-                  <span v-if="!row.urlJobs || row.urlJobs.length === 0" :data-test="`${row.name}-type-file`">File</span>
+                  <OTag v-if="!row.urlJobs || row.urlJobs.length === 0" type="enrichmentType" value="file" :data-test="`${row.name}-type-file`" />
                   <template v-else>
                     <span
                       :data-test="`${row.name}-type-url-trigger`"
-                      class="tw:cursor-pointer"
+                      class="tw:cursor-pointer tw:inline-flex tw:items-center tw:gap-1"
                       @click="showUrlJobsDialog(row)"
-                      :class="{'text-primary': row.urlJobs.length > 1}"
                     >
-                      Url
-                      <span v-if="row.urlJobs.length > 1" class="tw:text-gray-400"> ({{ row.urlJobs.length }})</span>
+                      <OTag type="enrichmentType" value="url" />
+                      <span v-if="row.urlJobs.length > 1" class="tw:text-text-primary"> ({{ row.urlJobs.length }})</span>
                     </span>
                     <span v-if="row.aggregateStatus === 'completed'">
                       <OIcon name="check-circle" size="sm" class="tw:text-(--o2-positive)">
@@ -237,6 +236,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     icon-left="delete"
                   />
                 </div>
+              </template>
+
+              <template #cell-doc_num="{ row }">
+                <ONumberCell :value="row.doc_num" format="number" />
               </template>
 
               <template #cell-function="{ row }">
@@ -373,6 +376,8 @@ import PipelineSectionTabs from "@/components/pipeline/PipelineSectionTabs.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import ONumberCell from "@/lib/core/Table/cells/ONumberCell.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
@@ -395,6 +400,8 @@ export default defineComponent({
     OCheckbox,
     OIcon,
     OBadge,
+    OTag,
+    ONumberCell,
     OTable,
 },
   emits: [

@@ -93,20 +93,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
         <template #cell-status="{ row }">
-          <span
-            class="status-badge"
-            :class="getStatusColorClass(row.status)"
-          >
-            {{ getStatusLabel(row.status) }}
-          </span>
+          <OTag
+            type="incidentStatus"
+            :value="row.status"
+            :label="getStatusLabel(row.status)"
+            size="sm"
+            data-test="incident-status-badge"
+          />
         </template>
         <template #cell-severity="{ row }">
-          <span
-            class="severity-badge"
-            :class="getSeverityColorClass(row.severity)"
-          >
-            {{ row.severity }}
-          </span>
+          <OBadge
+            :variant="getSeverityVariant(row.severity)"
+            dot
+            size="sm"
+            data-test="incident-severity-badge"
+          >{{ row.severity }}</OBadge>
         </template>
         <template #cell-title="{ row }">
           <div class="tw:flex tw:items-center tw:gap-1">
@@ -145,6 +146,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OTooltip>
             </span>
           </div>
+        </template>
+        <template #cell-last_alert_at="{ row }">
+          <OTimeCell
+            :value="row.last_alert_at"
+            unit="us"
+            :timezone="store.state.timezone"
+            empty-label="—"
+          />
         </template>
         <template #cell-actions="{ row }">
           <div class="action-buttons">
@@ -214,9 +223,13 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
@@ -232,6 +245,9 @@ export default defineComponent({
     OTooltip,
     OIcon,
     OTable,
+    OTag,
+    OBadge,
+    OTimeCell,
     OToggleGroup,
     OToggleGroupItem,
 },
@@ -474,6 +490,16 @@ export default defineComponent({
       }
     };
 
+    const getSeverityVariant = (severity: string): BadgeVariant => {
+      switch (severity) {
+        case "P1": return "error-soft";
+        case "P2": return "orange-soft";
+        case "P3": return "amber-soft";
+        case "P4": return "blue-soft";
+        default: return "default-soft";
+      }
+    };
+
     const getSeverityColorClass = (severity: string) => {
       switch (severity) {
         case "P1": return "severity-p1";
@@ -626,6 +652,7 @@ export default defineComponent({
       reopenIncident,
       getStatusColorClass,
       getStatusLabel,
+      getSeverityVariant,
       getSeverityColorClass,
       formatTimestamp,
       formatDimensions,

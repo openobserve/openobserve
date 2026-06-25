@@ -31,6 +31,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #empty>
       <NoData />
     </template>
+    <template #cell-start_date="{ row }">
+      <OTimeCell :value="row.start_date" unit="s" mode="date" :timezone="store.state.timezone" />
+    </template>
+    <template #cell-end_date="{ row }">
+      <OTimeCell :value="row.end_date" unit="s" mode="date" :timezone="store.state.timezone" />
+    </template>
+    <template #cell-status="{ row }">
+      <OTag type="invoiceStatus" :value="row.status" />
+    </template>
     <template #cell-actions="{ row }">
       <OButton
         as="a"
@@ -56,6 +65,8 @@ import BillingService from "@/services/billings";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";

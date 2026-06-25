@@ -167,9 +167,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OBadge>
                 </template>
 
+                <!-- Owner column -->
+                <template #cell-owner="{ row }">
+                  <OUserCell :value="row.owner" />
+                </template>
+
                 <!-- Folder column -->
                 <template #cell-folder_name="{ row }">
                   {{ row.folder_name || "default" }}
+                </template>
+
+                <!-- Last triggered timestamp -->
+                <template #cell-last_triggered_at="{ row }">
+                  <OTimeCell
+                    :value="row.last_triggered_at_raw"
+                    unit="us"
+                    :timezone="store.state.timezone"
+                    empty-label="Never"
+                  />
                 </template>
 
                 <!-- Actions column -->
@@ -304,6 +319,8 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import FolderList from "@/components/common/sidebar/FolderList.vue";
 import { formatDate } from "@/utils/date";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
+import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { useI18n } from "vue-i18n";
 import reports from "@/services/reports";
@@ -448,6 +465,7 @@ const loadReports = async (folderId: string, nameQuery?: string) => {
     const mapped = (res.data ?? []).map((report: any, index: number) => ({
       "#": index + 1,
       ...report,
+      last_triggered_at_raw: report.last_triggered_at || null,
       last_triggered_at: report.last_triggered_at
         ? convertUnixToQuasarFormat(report.last_triggered_at)
         : "-",

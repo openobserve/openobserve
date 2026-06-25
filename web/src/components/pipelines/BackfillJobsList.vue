@@ -138,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div
                   v-if="row.chunks_total"
-                  class="tw:text-xs tw:text-gray-400 tw:whitespace-nowrap tw:pr-8"
+                  class="tw:text-xs tw:text-text-primary tw:whitespace-nowrap tw:pr-8"
                 >
                   {{ row.chunks_completed || 0 }}/{{
                     row.chunks_total
@@ -150,16 +150,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Created At Column -->
             <template #cell-created_at="{ row }">
-              <div class="tw:text-xs">
-                {{ formatTimestamp(row.created_at) }}
-              </div>
+              <OTimeCell
+                :value="row.created_at"
+                unit="us"
+                :timezone="store.state.timezone"
+                empty-label="N/A"
+              />
             </template>
 
             <!-- Last Triggered At Column -->
             <template #cell-last_triggered_at="{ row }">
-              <div class="tw:text-xs">
-                {{ formatTimestamp(row.last_triggered_at) }}
-              </div>
+              <OTimeCell
+                :value="row.last_triggered_at"
+                unit="us"
+                :timezone="store.state.timezone"
+                empty-label="N/A"
+              />
             </template>
 
             <!-- Actions Column -->
@@ -305,6 +311,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
 import BackfillJobDetails from "./BackfillJobDetails.vue";

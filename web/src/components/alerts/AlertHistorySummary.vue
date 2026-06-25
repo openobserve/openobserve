@@ -40,14 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #cell-current_state="{ row }">
-        <div class="tw:flex tw:items-center tw:gap-2">
-          <OIcon
-            :name="getStateIcon(row.current_state)"
-            :class="getStateColorClass(row.current_state)"
-            size="sm"
-          />
-          <span>{{ row.current_state }}</span>
-        </div>
+        <OTag :value="row.current_state" size="sm" dot />
       </template>
 
       <template #cell-frequency="{ row }">
@@ -55,13 +48,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #cell-last_evaluation="{ row }">
-        {{ formatTimestamp(row.last_evaluation) }}
+        <OTimeCell
+          :value="row.last_evaluation"
+          unit="us"
+          :timezone="store.state.timezone"
+          empty-label="—"
+        />
       </template>
 
       <template #empty>
         <div class="tw:w-full tw:text-center tw:py-8">
-          <OIcon name="history" size="xl" class="tw:text-gray-400" />
-          <div class="tw:mt-2 tw:text-gray-600 dark:tw:text-gray-400">
+          <OIcon name="history" size="xl" class="tw:text-text-primary" />
+          <div class="tw:mt-2 tw:text-text-primary">
             {{ t("alerts.noHistoryData") }}
           </div>
         </div>
@@ -75,7 +73,9 @@ import { ref, onMounted, watch } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
 import alertsService from "@/services/alerts";

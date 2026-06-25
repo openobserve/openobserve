@@ -97,26 +97,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @sort-change="onSortChange"
         >
           <template #cell-timestamp="{ row }">
-            {{ formatDate(row.timestamp) }}
+            <OTimeCell
+              :value="row.timestamp"
+              unit="us"
+              mode="absolute"
+              :timezone="store.state.timezone"
+            />
           </template>
 
           <template #cell-start_time="{ row }">
-            {{ formatDate(row.start_time) }}
+            <OTimeCell
+              :value="row.start_time"
+              unit="us"
+              mode="absolute"
+              :timezone="store.state.timezone"
+            />
           </template>
 
           <template #cell-end_time="{ row }">
-            {{ formatDate(row.end_time) }}
+            <OTimeCell
+              :value="row.end_time"
+              unit="us"
+              mode="absolute"
+              :timezone="store.state.timezone"
+            />
           </template>
 
           <template #cell-status="{ row }">
-            <OBadge
-              :variant="getStatusVariant(row.status)"
-              size="sm"
+            <span
               data-test="pipeline-history-status-badge"
               :data-test-status="(row.status || '').toLowerCase()"
             >
-              {{ row.status }}
-            </OBadge>
+              <OTag :value="row.status" />
+            </span>
           </template>
 
           <template #cell-is_realtime="{ row }">
@@ -140,7 +153,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #cell-duration="{ row }">
-            {{ formatDuration(row.end_time - row.start_time) }}
+            <ONumberCell
+              :value="row.end_time - row.start_time"
+              format="durationUs"
+            />
           </template>
 
           <template #cell-is_partial="{ row }">
@@ -468,8 +484,11 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
+import ONumberCell from "@/lib/core/Table/cells/ONumberCell.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import pipelinesService from "@/services/pipelines";
 import http from "@/services/http";
@@ -594,7 +613,7 @@ const columns = ref([
     accessorKey: "status",
     sortable: true,
     size: 150,
-    meta: { align: "center" as const },
+    meta: { align: "left" as const },
   },
   {
     id: "retries",

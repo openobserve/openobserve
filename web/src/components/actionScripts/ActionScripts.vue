@@ -66,6 +66,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #empty>
               <NoData />
             </template>
+            <template #cell-created_by="{ row }">
+              <OUserCell :value="row.created_by" />
+            </template>
+            <template #cell-created_at="{ row }">
+              <OTimeCell
+                :value="row.created_at_raw"
+                unit="us"
+                :timezone="store.state.timezone"
+              />
+            </template>
+            <template #cell-execution_details_type="{ row }">
+              <OTag :value="row.execution_details_type" />
+            </template>
+            <template #cell-last_run_at="{ row }">
+              <OTimeCell
+                :value="row.last_run_at_raw"
+                unit="us"
+                :timezone="store.state.timezone"
+                empty-label="Never"
+              />
+            </template>
+            <template #cell-last_successful_at="{ row }">
+              <OTimeCell
+                :value="row.last_successful_at_raw"
+                unit="us"
+                :timezone="store.state.timezone"
+                empty-label="Never"
+              />
+            </template>
+            <template #cell-status="{ row }">
+              <OTag :value="row.status" />
+            </template>
             <template #cell-actions="{ row }">
               <div
                 data-test="action-scripts-loading"
@@ -240,6 +272,9 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
+import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
@@ -277,6 +312,9 @@ export default defineComponent({
     OSelect,
     OForm,
     OTable,
+    OTimeCell,
+    OUserCell,
+    OTag,
   },
   emits: [
     "updated:fields",
@@ -451,12 +489,15 @@ export default defineComponent({
               name: data.name,
               uuid: data.uuid,
               created_by: data.created_by,
+              created_at_raw: data.created_at || null,
               created_at: data.created_at
                 ? convertUnixToQuasarFormat(data.created_at)
                 : "-",
+              last_run_at_raw: data.last_run_at || null,
               last_run_at: data.last_run_at
                 ? convertUnixToQuasarFormat(data.last_run_at)
                 : "-",
+              last_successful_at_raw: data.last_successful_at || null,
               last_successful_at: data.last_successful_at
                 ? convertUnixToQuasarFormat(data.last_successful_at)
                 : "-",

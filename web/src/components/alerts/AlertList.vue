@@ -212,54 +212,49 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
 
                 <template #cell-owner="{ row }">
-                  {{ computedOwner(row.owner) }}
-                  <OTooltip
-                    v-if="row.owner?.length > 15"
-                    :content="row.owner"
-                    content-class="alert-name-tooltip"
-                  />
+                  <OUserCell :value="row.owner" />
                 </template>
 
                 <template #cell-last_triggered_at="{ row }">
-                  <span v-if="row.last_triggered_at">{{ row.last_triggered_at }}</span>
-                  <span v-else class="tw:block">--</span>
+                  <OTimeCell
+                    :value="row.last_triggered_at"
+                    unit="iso"
+                    :timezone="store.state.timezone"
+                    empty-label="Never"
+                  />
                 </template>
 
                 <template #cell-last_satisfied_at="{ row }">
-                  <span v-if="row.last_satisfied_at">{{ row.last_satisfied_at }}</span>
-                  <span v-else class="tw:block">--</span>
+                  <OTimeCell
+                    :value="row.last_satisfied_at"
+                    unit="iso"
+                    :timezone="store.state.timezone"
+                    empty-label="Never"
+                  />
                 </template>
 
                 <template #cell-last_trained_at="{ row }">
-                  <span v-if="row.last_trained_at">{{ row.last_trained_at }}</span>
-                  <span v-else class="tw:block">--</span>
+                  <OTimeCell
+                    :value="row.last_trained_at"
+                    unit="iso"
+                    :timezone="store.state.timezone"
+                    empty-label="—"
+                  />
                 </template>
 
                 <template #cell-status="{ row }">
-                  <template v-if="row.status && row.status !== '--'">
-                    <OBadge
-                      :variant="
-                        row.status === 'failed'
-                          ? 'error'
-                          : row.status === 'active'
-                            ? 'success'
-                            : row.status === 'training'
-                              ? 'warning'
-                              : row.status === 'disabled'
-                                ? 'default'
-                                : 'success'
-                      "
-                      class="tw:capitalize tw:cursor-default"
-                    >
-                      {{ row.status }}
-                      <OTooltip
-                        v-if="row.status === 'failed' && row.last_error"
-                        :max-width="'400px'"
-                        :content="row.last_error"
-                      />
-                    </OBadge>
-                  </template>
-                  <span v-else class="tw:block">--</span>
+                  <span
+                    v-if="row.status && row.status !== '--'"
+                    class="tw:relative tw:inline-flex"
+                  >
+                    <OTag type="alertStatus" :value="row.status" />
+                    <OTooltip
+                      v-if="row.status === 'failed' && row.last_error"
+                      :max-width="'400px'"
+                      :content="row.last_error"
+                    />
+                  </span>
+                  <span v-else class="tw:text-text-primary">—</span>
                 </template>
 
                 <template #cell-period="{ row }">
@@ -714,6 +709,9 @@ import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
+import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -752,6 +750,9 @@ export default defineComponent({
     OBadge,
     OSelect,
     OTable,
+    OTimeCell,
+    OUserCell,
+    OTag,
   },
   emits: [
     "update:changeRecordPerPage",
