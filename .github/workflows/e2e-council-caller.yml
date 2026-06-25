@@ -49,6 +49,12 @@ permissions:
   pull-requests: write   # post the ack comment on the OSS PR (this run is in OSS context)
   issues: write
 
+concurrency:
+  # One caller run per PR so rapid /e2e comments don't fan out into redundant dispatches. The engine
+  # has its OWN concurrency too; this just collapses duplicate dispatches at the door.
+  group: e2e-council-caller-${{ github.event.issue.number || github.event.pull_request.number || inputs.pr_number }}
+  cancel-in-progress: true
+
 jobs:
   dispatch-e2e:
     # Three doors (all PR-bound):
@@ -63,6 +69,7 @@ jobs:
        (github.event.comment.body == '/e2e' || github.event.comment.body == '/e2e-dryrun') &&
        contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)) ||
       (github.event_name == 'pull_request' && github.event.pull_request.merged == true &&
+       github.event.pull_request.base.ref == 'main' &&
        vars.E2E_AUTO_ON_MERGE == 'true')
     runs-on: ubuntu-latest
     timeout-minutes: 10   # the dispatch is a quick API call; bound it as defense-in-depth
@@ -80,9 +87,12 @@ jobs:
           PR_AUTHOR: ${{ github.event.pull_request.user.login }}
           DISPATCH_ACTOR: ${{ github.actor }}
         run: |
-          # Accept a bare number or a PR URL; extract the trailing integer.
-          PR=$(printf '%s' "$IN_PR" | grep -oE '[0-9]+' | tail -1)
-          [[ "$PR" =~ ^[0-9]+$ ]] || { echo "::error::invalid PR number: $IN_PR"; exit 1; }
+          # Accept a bare number, "#123", or a PR URL. Prefer the /pull/<n> or #<n> segment so a URL
+          # with a trailing numeric query (…/pull/12345?foo=678) resolves to the PR, not the query.
+          if   [[ "$IN_PR" =~ /pull/([0-9]+) ]]; then PR="${BASH_REMATCH[1]}"
+          elif [[ "$IN_PR" =~ \#([0-9]+) ]];     then PR="${BASH_REMATCH[1]}"
+          elif [[ "$IN_PR" =~ ^[0-9]+$ ]];       then PR="$IN_PR"
+          else echo "::error::invalid PR number: $IN_PR"; exit 1; fi
           # force_overwrite (clobber) defaults: dispatch honors its box; comment/auto default to REUSE
           # (clobber off) so re-running /e2e refines/extends the existing tests rather than clobbering.
           FORCE="false"; HINT=""
@@ -132,3 +142,18 @@ jobs:
           "### 🤖 E2E Council — started ($MODE)
 
           Running in o2-enterprise CI now (builds the enterprise binary to validate the spec) — I'll post the result back here when ready. ([engine runs](https://github.com/openobserve/o2-enterprise/actions/workflows/e2e-council.yml))"
+
+      - name: Notify dispatch failure on the source PR
+        # If the dispatch itself failed (expired/insufficient PAT, engine workflow missing, network),
+        # the /e2e commenter would otherwise get NO feedback. Tell them + link the caller run.
+        if: github.event_name == 'issue_comment' && failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ steps.ctx.outputs.pr }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          [ -n "$PR" ] || exit 0
+          gh pr comment "$PR" --repo openobserve/openobserve --body \
+          "### ❌ E2E Council — could not start
+
+          Dispatching the E2E Council engine failed (likely an expired/insufficient \`ORG_ADMIN_TOKEN\`, a missing engine workflow on o2-enterprise main, or a transient error). See the [caller run logs]($RUN_URL) and retry \`/e2e\` once resolved." || true
