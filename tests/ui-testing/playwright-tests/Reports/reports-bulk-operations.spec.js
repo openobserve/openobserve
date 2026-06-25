@@ -134,15 +134,9 @@ test.describe("Report Bulk Operations", () => {
 
     testLogger.info('Now resuming the paused report(s)');
     await pm.reportFoldersPage.selectAllReports();
-
-    const resumeVisible = await pm.reportFoldersPage.isBulkResumeBtnVisible();
-    if (!resumeVisible) {
-      testLogger.info('Resume button not visible — reports may already be in enabled state, skipping');
-    } else {
-      await pm.reportFoldersPage.clickBulkResume();
-      await expect(page.getByText(/resumed successfully/i)).toBeVisible({ timeout: 10000 });
-      testLogger.info('Reports resumed successfully');
-    }
+    await pm.reportFoldersPage.clickBulkResume();
+    await expect(page.getByText(/resumed successfully/i)).toBeVisible({ timeout: 10000 });
+    testLogger.info('Reports resumed successfully');
 
     // Cleanup
     await pm.apiCleanup.deleteReport(`${REPORT_1}_resume`);

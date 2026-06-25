@@ -18,6 +18,8 @@ export class AlertHistoryPage {
     // Results
     this.table = '[data-test="alert-history-table"]';
     this.viewDetailsBtn = '[data-test="alert-history-view-details"]';
+    this.alertDetailsDialog = '.alert-details-dialog';
+    this.emptyState = '.q-table__bottom';
   }
 
   async navigate() {
@@ -25,9 +27,7 @@ export class AlertHistoryPage {
       `${process.env["ZO_BASE_URL"]}/web/alerts/history?org_identifier=${process.env["ORGNAME"]}`,
       { waitUntil: 'domcontentloaded' }
     );
-    await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {
-      console.warn('navigateToAlertHistory: networkidle timed out, continuing');
-    });
+    await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
     await expect(this.page.locator(this.pageContainer)).toBeVisible({ timeout: 15000 });
   }
 
@@ -107,5 +107,23 @@ export class AlertHistoryPage {
 
   async expectDatePickerVisible() {
     await expect(this.page.locator(this.datePicker)).toBeVisible({ timeout: 5000 });
+  }
+
+  async expectDetailsDialogVisible() {
+    await expect(this.page.locator(this.alertDetailsDialog)).toBeVisible({ timeout: 8000 });
+  }
+
+  async expectTableOrEmptyStateVisible() {
+    const [tableVisible, emptyVisible] = await Promise.all([
+      this.page.locator(this.table).isVisible({ timeout: 10000 }).catch(() => false),
+      this.page.locator(this.emptyState).isVisible({ timeout: 3000 }).catch(() => false),
+    ]);
+    if (!tableVisible && !emptyVisible) {
+      throw new Error('Expected either the history table or an empty-state to be visible after search');
+    }
+  }
+
+  async expectEmptyStateVisible() {
+    await expect(this.page.locator(this.emptyState)).toBeVisible({ timeout: 5000 });
   }
 }

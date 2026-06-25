@@ -136,7 +136,7 @@ test.describe("Alert History Page", () => {
     testLogger.info('Clicking back button from alert history page');
     await pm.alertHistoryPage.clickBack();
     testLogger.info('Verifying navigation returned to the alerts list page');
-    await expect(page.locator('[data-test="alert-list-page"]')).toBeVisible({ timeout: 15000 });
+    await pm.alertsPage.expectAlertListPageVisible();
     testLogger.info('Successfully returned to alerts list');
   });
 
@@ -148,11 +148,7 @@ test.describe("Alert History Page", () => {
     testLogger.info('Triggering manual search on alert history page');
     await pm.alertHistoryPage.clickManualSearch();
     testLogger.info('Verifying table or empty-state is displayed after search');
-    const tableVisible = await page.locator('[data-test="alert-history-table"]').isVisible({ timeout: 10000 }).catch(() => false);
-    const emptyState = await page.locator('.q-table__bottom').isVisible({ timeout: 3000 }).catch(() => false);
-    if (!tableVisible && !emptyState) {
-      throw new Error('Expected either the history table or an empty-state to be visible after manual search');
-    }
+    await pm.alertHistoryPage.expectTableOrEmptyStateVisible();
     testLogger.info('Table or empty-state rendered correctly after manual search');
   });
 
@@ -207,7 +203,7 @@ test.describe("Alert History Page", () => {
     await pm.alertHistoryPage.clickViewDetails(0);
 
     testLogger.info('Verifying details dialog is visible');
-    await expect(page.locator('.alert-details-dialog')).toBeVisible({ timeout: 8000 });
+    await pm.alertHistoryPage.expectDetailsDialogVisible();
 
     testLogger.info('Alert history populated and view details works');
 
@@ -231,14 +227,11 @@ test.describe("Alert History Page", () => {
     testLogger.info(`Table row count after search: ${rowCount}`);
 
     if (rowCount === 0) {
-      const emptyState =
-        await page.locator('.q-table__bottom').isVisible({ timeout: 5000 }).catch(() => false) ||
-        await page.locator('text=No data').isVisible({ timeout: 3000 }).catch(() => false) ||
-        await page.locator('[data-test="alert-history-table"] .q-td').filter({ hasText: /no data|no results/i }).isVisible({ timeout: 3000 }).catch(() => false);
-      testLogger.info(`Empty state shown: ${emptyState}`);
-      testLogger.info('Empty state verified — no rows present after search with no alert selected');
+      testLogger.info('No rows — verifying empty state is shown');
+      await pm.alertHistoryPage.expectEmptyStateVisible();
     } else {
-      testLogger.info(`Table has ${rowCount} rows — no alert selected but global history returned data`);
+      testLogger.info(`Table has ${rowCount} rows — verifying table is visible`);
+      await pm.alertHistoryPage.expectTableVisible();
     }
   });
 });

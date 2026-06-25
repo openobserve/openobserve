@@ -135,7 +135,9 @@ export class ReportFoldersPage {
   }
 
   async confirmDelete() {
-    await this.page.locator(this.confirmButton).click();
+    const btn = this.page.locator(this.confirmButton);
+    await btn.waitFor({ state: 'visible', timeout: 5000 });
+    await btn.click({ force: true });
     await this.page.locator(this.confirmDeleteDialog).waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
   }
 
