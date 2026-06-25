@@ -18,6 +18,7 @@
     <!-- Group header -->
     <template #group-header="{ row, groupName }">
       <div
+        :data-test="`logs-page-field-list-group-header-${row.group}`"
         class="tw:font-semibold tw:text-xs tw:py-0.5 tw:px-[0.325rem] tw:cursor-pointer tw:text-field-list-group-text tw:bg-surface-subtle tw:h-full tw:w-full tw:flex! tw:justify-between tw:items-center tw:rounded-[0.25rem]"
         @click="$emit('toggle-group', row.group)"
       >
