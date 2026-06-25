@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="incident-service-graph" style="height: calc(100vh - 202px); position: relative;">
+  <div ref="containerRef" class="incident-service-graph" style="height: calc(100vh - 12.625rem); position: relative;">
     <!-- Info Icon → Graph Legend popover (hover to show, like the previous behavior) -->
     <span
       v-if="!loading && graphData && graphData.nodes && graphData.nodes.length > 0"
@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-else-if="!graphData || !graphData.nodes || graphData.nodes.length === 0"
       class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:gap-3 tw:h-full"
     >
-      <OIcon name="hub" :class="isDarkMode ? 'tw:text-gray-600' : 'tw:text-gray-300'" style="width: 48px; height: 48px;" />
+      <OIcon name="hub" :class="isDarkMode ? 'tw:text-gray-600' : 'tw:text-gray-300'" style="width: 3rem; height: 3rem;" />
       <div class="tw:text-center">
         <div class="tw:text-sm tw:font-medium" :class="isDarkMode ? 'tw:text-gray-400' : 'tw:text-gray-600'">
           Service Graph Unavailable
@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, watch } from "vue";
+import { defineComponent, ref, computed, watch, onMounted, onBeforeUnmount } from "vue";
 import { useStore } from "vuex";
 import { forceSimulation, forceManyBody, forceLink, forceCenter, forceCollide, forceX, forceY } from "d3-force";
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
@@ -117,6 +117,11 @@ export default defineComponent({
 
     const loading = ref(false);
     const chartRendererRef = ref<any>(null);
+    const containerRef = ref<HTMLElement | null>(null);
+    // Measured content-box size of the container (excludes padding), kept in sync
+    // by the ResizeObserver below. 0 until the first measurement arrives.
+    const canvasWidth = ref(0);
+    const canvasHeight = ref(0);
     const chartKey = ref(0);
     const nodePositions = ref<Map<string, { x: number; y: number }>>(new Map());
 
@@ -169,6 +174,13 @@ export default defineComponent({
         });
       }
 
+        // Largest node radius drives the boundary margins so big nodes (and the
+      // label rendered below them) never get clipped by the chart container.
+      const maxRadius = Math.max(...nodesCopy.map((n: any) => (n.symbolSize || 60) / 2), 30);
+      const labelAllowance = 28; // room for the label drawn below each node
+      const vMargin = maxRadius + labelAllowance;
+      const hMargin = Math.max(80, maxRadius + 20);
+
       const simulation = forceSimulation(nodesCopy)
         .force('charge', forceManyBody().strength(-400).distanceMax(1200))
         .force('link', forceLink(edgesCopy)
@@ -181,15 +193,12 @@ export default defineComponent({
           // Position nodes left-to-right based on their depth, starting from extreme left
           const depth = nodeDepth.get(d.id) || 0;
           const maxDepth = Math.max(...Array.from(nodeDepth.values()));
-          const leftMargin = 80; // Left margin to prevent nodes from touching the edge
-          const rightMargin = 80; // Right margin
-          const availableWidth = width - leftMargin - rightMargin;
+          const availableWidth = width - hMargin * 2;
           const spacing = maxDepth > 0 ? availableWidth / maxDepth : 0;
-          return leftMargin + spacing * depth;
+          return hMargin + spacing * depth;
         }).strength(1.5)) // Strong horizontal positioning
         .force('y', forceY((d: any) => {
-          // Stronger vertical centering for root nodes (depth 0)
-          const depth = nodeDepth.get(d.id) || 0;
+          // Center vertically within the padded area
           return height / 2;
         }).strength((d: any) => {
           // Stronger centering for root nodes
@@ -209,7 +218,20 @@ export default defineComponent({
         simulation.tick();
       }
 
-      return simulation.nodes().map(n => ({ ...n }));
+      // Clamp every node inside the padded box so no node (or its label) is
+      // clipped by the chart edges. Margin scales with that node's own radius.
+      return simulation.nodes().map((n: any) => {
+        const r = (n.symbolSize || 60) / 2;
+        const minY = r;
+        const maxY = height - r - labelAllowance;
+        const minX = r;
+        const maxX = width - r;
+        return {
+          ...n,
+          x: Math.min(Math.max(n.x, minX), maxX),
+          y: Math.min(Math.max(n.y, minY), maxY),
+        };
+      });
     };
 
     // No longer need to load graph via API - data comes from props
@@ -365,6 +387,22 @@ export default defineComponent({
 
       const edges = rebuildEdges(rawEdges, rawNodes, nodes);
 
+      // ECharts fits the graph to the view using node CENTER coordinates, so the
+      // outer radius of the biggest node (and its label) overflows and clips.
+      // Compute a zoom that reserves margin for that radius + label, scaled to
+      // the largest symbol relative to the available canvas. Clamped so a single
+      // huge node can't shrink the whole graph into a dot.
+      const maxSymbol = Math.max(...nodes.map((n: any) => getNodeSize(n, nodes)), 30);
+      const labelAllowance = 40; // node label is drawn below the symbol
+      const viewMin = Math.min(
+        canvasWidth.value > 0 ? canvasWidth.value : 1200,
+        canvasHeight.value > 0 ? canvasHeight.value : 600,
+      );
+      const fitZoom = Math.max(
+        0.45,
+        Math.min(1, 1 - (maxSymbol + labelAllowance) / viewMin),
+      );
+
       // Prepare nodes for D3-force simulation
       const preparedNodes = nodes.map((node, index) => ({
         name: node.alert_name, // Show only alert name for cleaner labels
@@ -394,8 +432,14 @@ export default defineComponent({
           y: nodePositions.value.get(n.id)!.y,
         }));
       } else {
-        // Compute new positions and cache them with wider canvas for left-to-right layout
-        positionedNodes = computeForceLayout(preparedNodes, preparedEdges, 1200, 400);
+        // Size the layout to the real chart canvas (measured by the ResizeObserver)
+        // so nodes fill the available space and large nodes near the bottom aren't
+        // clipped when ECharts renders the layout into the full-height canvas.
+        // Fall back to sensible dims before the first measurement arrives.
+        const layoutWidth = canvasWidth.value > 0 ? canvasWidth.value : 1200;
+        const layoutHeight = canvasHeight.value > 0 ? canvasHeight.value : 600;
+        // Compute new positions and cache them with the measured canvas size
+        positionedNodes = computeForceLayout(preparedNodes, preparedEdges, layoutWidth, layoutHeight);
         positionedNodes.forEach((node: any) => {
           nodePositions.value.set(node.id, { x: node.x, y: node.y });
         });
@@ -546,6 +590,11 @@ export default defineComponent({
             roam: true,
             draggable: true,
             focusNodeAdjacency: true,
+            // ECharts fits the graph using node CENTER coordinates only, so the
+            // outer half of each node's symbol (and its bottom label) spills past
+            // the view edges and gets clipped. Zooming out reserves margin for the
+            // largest node's radius + label so nothing is cut off (see fitZoom).
+            zoom: fitZoom,
             scaleLimit: {
               min: 0.4,
               max: 3,
@@ -568,6 +617,38 @@ export default defineComponent({
       return { options, notMerge: !hasAllPositions }; // Merge when using cached positions
     });
 
+    // The container's height comes from `calc(100vh - ...)` and is not resolved
+    // on the first tick (clientHeight reports the min-height floor), so a one-shot
+    // read lays nodes out into a too-short box and large nodes clip when ECharts
+    // stretches that box to the real canvas height. A ResizeObserver recomputes
+    // the layout once the real size is known, and again whenever it changes.
+    let resizeObserver: ResizeObserver | null = null;
+    let lastLayoutHeight = 0;
+
+    onMounted(() => {
+      const el = containerRef.value;
+      if (!el || typeof ResizeObserver === "undefined") return;
+      resizeObserver = new ResizeObserver((entries) => {
+        const rect = entries[0]?.contentRect;
+        const h = rect?.height ?? 0;
+        const w = rect?.width ?? 0;
+        // Recompute only on a meaningful height change to avoid feedback loops.
+        if (h > 0 && Math.abs(h - lastLayoutHeight) > 1) {
+          lastLayoutHeight = h;
+          canvasWidth.value = w;
+          canvasHeight.value = h;
+          nodePositions.value.clear();
+          loadGraph();
+        }
+      });
+      resizeObserver.observe(el);
+    });
+
+    onBeforeUnmount(() => {
+      resizeObserver?.disconnect();
+      resizeObserver = null;
+    });
+
     // Watch for topology_context changes
     watch(
       () => props.topologyContext,
@@ -583,6 +664,7 @@ export default defineComponent({
       loading,
       graphData,
       chartRendererRef,
+      containerRef,
       chartData,
       chartKey,
       isDarkMode,
@@ -594,20 +676,20 @@ export default defineComponent({
 
 <style scoped>
 .incident-service-graph {
-  min-height: 400px;
+  min-height: 25rem;
   display: flex;
   flex-direction: column;
-  margin: 12px;
-  padding: 20px;
-  border-radius: 12px;
+  margin: 0.75rem;
+  padding: 1.25rem;
+  border-radius: 0.75rem;
   overflow: hidden;
   transition: all 0.2s ease;
 }
 
 .info-icon-btn {
   position: absolute;
-  top: 16px;
-  right: 16px;
+  top: 1rem;
+  right: 1rem;
   z-index: 10;
 }
 
@@ -617,22 +699,22 @@ export default defineComponent({
    us a white card with invisible (same-color) text. */
 .graph-legend {
   position: absolute;
-  top: calc(100% + 8px);
+  top: calc(100% + 0.5rem);
   right: 0;
-  min-width: 240px;
-  padding: 14px 16px;
-  font-size: 13px;
+  min-width: 15rem;
+  padding: 0.875rem 1rem;
+  font-size: 0.8125rem;
   line-height: 1.5;
   color: #1f2937;
   background-color: #ffffff;
   border: 1px solid var(--o2-border);
-  border-radius: 8px;
+  border-radius: 0.5rem;
   box-shadow:
-    0 10px 20px rgba(0, 0, 0, 0.12),
-    0 3px 6px rgba(0, 0, 0, 0.06);
+    0 0.625rem 1.25rem rgba(0, 0, 0, 0.12),
+    0 0.1875rem 0.375rem rgba(0, 0, 0, 0.06);
   opacity: 0;
   visibility: hidden;
-  transform: translateY(-4px);
+  transform: translateY(-0.25rem);
   transition:
     opacity 0.15s ease,
     transform 0.15s ease,
@@ -650,8 +732,8 @@ body.body--dark .graph-legend {
   background-color: #1f2937;
   border-color: rgba(255, 255, 255, 0.12);
   box-shadow:
-    0 10px 20px rgba(0, 0, 0, 0.6),
-    0 3px 6px rgba(0, 0, 0, 0.4);
+    0 0.625rem 1.25rem rgba(0, 0, 0, 0.6),
+    0 0.1875rem 0.375rem rgba(0, 0, 0, 0.4);
 }
 
 html.dark .graph-legend__divider,
@@ -669,21 +751,21 @@ body.body--dark .graph-legend__divider {
 
 .graph-legend__title {
   font-weight: 600;
-  font-size: 14px;
-  margin-bottom: 10px;
+  font-size: 0.875rem;
+  margin-bottom: 0.625rem;
 }
 
 .graph-legend__row {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 4px 0;
+  gap: 0.5rem;
+  padding: 0.25rem 0;
 }
 
 .graph-legend__dot {
-  font-size: 14px;
+  font-size: 0.875rem;
   line-height: 1;
-  width: 14px;
+  width: 0.875rem;
   text-align: center;
   flex-shrink: 0;
 }
@@ -691,7 +773,7 @@ body.body--dark .graph-legend__divider {
 .graph-legend__divider {
   height: 1px;
   background-color: var(--o2-border);
-  margin: 8px 0;
+  margin: 0.5rem 0;
 }
 
 /* Light mode */
@@ -699,16 +781,16 @@ body.body--dark .graph-legend__divider {
   background: linear-gradient(135deg, #f9fafb 0%, #ffffff 100%);
   border: 1px solid #e5e7eb;
   box-shadow:
-    0 1px 3px 0 rgba(0, 0, 0, 0.08),
-    0 1px 2px 0 rgba(0, 0, 0, 0.04),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.5);
+    0 0.0625rem 0.1875rem 0 rgba(0, 0, 0, 0.08),
+    0 0.0625rem 0.125rem 0 rgba(0, 0, 0, 0.04),
+    inset 0 0 0 0.0625rem rgba(255, 255, 255, 0.5);
 }
 
 .incident-service-graph:hover {
   box-shadow:
-    0 4px 6px -1px rgba(0, 0, 0, 0.1),
-    0 2px 4px -1px rgba(0, 0, 0, 0.06),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.5);
+    0 0.25rem 0.375rem -0.0625rem rgba(0, 0, 0, 0.1),
+    0 0.125rem 0.25rem -0.0625rem rgba(0, 0, 0, 0.06),
+    inset 0 0 0 0.0625rem rgba(255, 255, 255, 0.5);
 }
 
 /* Dark mode */
