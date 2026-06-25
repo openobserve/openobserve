@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="tw:text-[length:var(--text-xl)] tw:font-semibold tw:text-(--color-text-heading) tw:m-0 tw:tracking-[-0.015em]">{{ t("about.feature_comparison_lbl") }}</div>
       </div>
     </div>
-    <div class="tw:text-[length:var(--text-sm)] tw:leading-[1.65] tw:text-(--o2-text-secondary) tw:mt-2 tw:mb-8">
+    <div class="tw:text-[length:var(--text-sm)] tw:leading-[1.65] tw:text-(--o2-text-secondary) tw:mt-2">
       <template v-if="buildType === 'opensource'">{{ t("about.feature_comparision_os_msg") }}</template>
       <template v-else-if="buildType === 'enterprise'">{{ t("about.feature_comparision_ent_msg") }}</template>
       <template v-else>{{ t("about.feature_comparision_subtitle") }}</template>
