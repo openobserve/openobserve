@@ -264,14 +264,14 @@ const silenceMinutes = computed({
           v-model="cron"
           :label="t('synthetics.scheduleAlert.cronExpression')"
           :placeholder="t('synthetics.scheduleAlert.cronPlaceholder')"
-          class="tw:w-64"
+          class="tw:w-83!"
           data-test="synthetics-schedule-alert-cron-input"
         />
         <OSelect
           v-model="timezone"
           :label="t('synthetics.scheduleAlert.timezone')"
           :options="timezoneOptions"
-          class="tw:w-64"
+          class="tw:w-64!"
           data-test="synthetics-schedule-alert-timezone-select"
         />
       </div>
@@ -282,17 +282,19 @@ const silenceMinutes = computed({
           v-model="startDate"
           :label="t('synthetics.scheduleAlert.startDate')"
           data-test="synthetics-schedule-alert-start-date-input"
+          class="tw:w-40!"
         />
         <OTime
           v-model="startTime"
           :label="t('synthetics.scheduleAlert.startTime')"
           data-test="synthetics-schedule-alert-start-time-input"
+          class="tw:w-40!"
         />
         <OSelect
           v-model="timezone"
           :label="t('synthetics.scheduleAlert.timezone')"
           :options="timezoneOptions"
-          class="tw:w-64"
+          class="tw:w-64!"
           data-test="synthetics-schedule-alert-start-timezone-select"
         />
       </div>
@@ -300,22 +302,22 @@ const silenceMinutes = computed({
       <!-- ── Retries ────────────────────────────────────────────────────── -->
       <div class="tw:flex tw:flex-col tw:gap-2">
         <div class="tw:flex tw:items-center tw:gap-2 tw:flex-nowrap">
-          <span class="tw:text-sm tw:text-[var(--o2-text-body)] tw:whitespace-nowrap">{{ t('synthetics.scheduleAlert.retriesOnFailure') }}</span>
+          <span class="tw:text-sm tw:text-[var(--o2-text-body)] tw:whitespace-nowrap tw:w-32">{{ t('synthetics.scheduleAlert.retriesOnFailure') }}</span>
           <OInput
             v-model="retries"
             type="number"
-            class="tw:w-14"
+            class="tw:w-25!"
             placeholder="0"
             data-test="synthetics-schedule-alert-retries-input"
           />
           <span class="tw:text-sm tw:text-[var(--o2-text-body)] tw:whitespace-nowrap">{{ t('synthetics.scheduleAlert.retriesOnFailureSuffix') }}</span>
         </div>
         <div class="tw:flex tw:items-center tw:gap-2 tw:flex-nowrap">
-          <span class="tw:text-sm tw:text-[var(--o2-text-body)] tw:whitespace-nowrap">{{ t('synthetics.scheduleAlert.retryDelay') }}</span>
+          <span class="tw:text-sm tw:text-[var(--o2-text-body)] tw:whitespace-nowrap tw:w-32">{{ t('synthetics.scheduleAlert.retryDelay') }}</span>
           <OInput
             v-model="retryDelayMs"
             type="number"
-            class="tw:w-20"
+            class="tw:w-25!"
             placeholder="0"
             data-test="synthetics-schedule-alert-retry-delay-input"
           />
@@ -324,11 +326,11 @@ const silenceMinutes = computed({
 
         <!-- ── Alert (grouped with retries — same failure-behavior section) ── -->
         <div class="tw:flex tw:items-center tw:gap-2 tw:flex-nowrap">
-          <span class="tw:text-sm tw:text-[var(--o2-text-body)] tw:whitespace-nowrap">{{ t('synthetics.scheduleAlert.alertedIfFails') }}</span>
+          <span class="tw:text-sm tw:text-[var(--o2-text-body)] tw:whitespace-nowrap tw:w-32">{{ t('synthetics.scheduleAlert.alertedIfFails') }}</span>
           <OInput
             v-model="failureThreshold"
             type="number"
-            class="tw:w-14"
+            class="tw:w-25!"
             placeholder="1"
             data-test="synthetics-schedule-alert-failure-threshold-input"
           />
@@ -378,7 +380,7 @@ const silenceMinutes = computed({
 
       <!-- ── Cooldown Period ────────────────────────────────────────────── -->
       <div class="tw:flex tw:items-center tw:gap-0">
-        <div class="tw:w-44 tw:text-sm tw:font-medium tw:text-[var(--o2-text-label)] tw:flex tw:items-center">
+        <div class="tw:w-32 tw:text-sm tw:font-medium tw:text-[var(--o2-text-label)] tw:flex tw:items-center">
           {{ t('synthetics.scheduleAlert.cooldownPeriod') }} *
         </div>
         <div class="tw:flex tw:items-center">
@@ -391,8 +393,7 @@ const silenceMinutes = computed({
             />
           </div>
           <div
-            class="tw:flex tw:justify-center tw:items-center tw:bg-input-addon-bg tw:text-input-addon-text tw:px-3 tw:h-7 tw:text-sm"
-            style="min-width: 90px"
+            class="tw:flex tw:justify-center tw:items-center tw:text-input-addon-text tw:pl-2 tw:h-7 tw:text-sm"
           >
             {{ t('synthetics.scheduleAlert.minutes') }}
           </div>

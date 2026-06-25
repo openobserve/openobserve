@@ -423,7 +423,7 @@ const replayStatus = computed<{ text: string; tone: 'muted' | 'success' | 'error
           :extension-ready="extensionReady"
           :auto-record="autoRecord"
           :is-replaying="isReplaying"
-          class="tw:h-full!"
+          class="tw:h-full! tw:border-t! tw:border-border-default!"
           @need-extension-setup="onNeedExtensionSetup"
           @replay="onReplay"
           @stop-replay="onStopReplay"
@@ -435,7 +435,7 @@ const replayStatus = computed<{ text: string; tone: 'muted' | 'success' | 'error
         icon="tune"
         :done="false"
       >
-        <CheckConfigure v-model:check="check" check-type="browser" />
+        <CheckConfigure v-model:check="check" check-type="browser" class="tw:border-t! tw:border-border-default! tw:w-full!" />
       </OStep>
     </OStepper>
 

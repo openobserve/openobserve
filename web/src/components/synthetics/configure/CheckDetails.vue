@@ -7,6 +7,7 @@ import OSelect from '@/lib/forms/Select/OSelect.vue'
 import OSwitch from '@/lib/forms/Switch/OSwitch.vue'
 import OButton from '@/lib/core/Button/OButton.vue'
 import OIcon from '@/lib/core/Icon/OIcon.vue'
+import CheckAuthNetwork from './CheckAuthNetwork.vue'
 
 const props = defineProps<{ check: BrowserCheck }>()
 const emit = defineEmits<{ 'update:check': [value: BrowserCheck] }>()
@@ -105,8 +106,13 @@ function handleTagKeydown(event: KeyboardEvent) {
         label="Starting URL"
         required
         placeholder="https://example.com"
-        help-text="Supports {{variables}} like {{baseUrl}}"
         data-test="synthetics-check-details-url-input"
+      />
+
+      <CheckAuthNetwork
+        :check="check"
+        data-test="synthetics-check-details-auth-network"
+        @update:check="emit('update:check', $event)"
       />
 
       <OInput
