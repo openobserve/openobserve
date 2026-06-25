@@ -11,13 +11,10 @@ import syntheticsService from '@/services/synthetics'
 import AppPageHeader from '@/components/common/AppPageHeader.vue'
 import OButton from '@/lib/core/Button/OButton.vue'
 import OIcon from '@/lib/core/Icon/OIcon.vue'
-import OBadge from '@/lib/core/Badge/OBadge.vue'
 import OInput from '@/lib/forms/Input/OInput.vue'
 import OSwitch from '@/lib/forms/Switch/OSwitch.vue'
-import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
-import OTab from '@/lib/navigation/Tabs/OTab.vue'
-import OTabPanels from '@/lib/navigation/Tabs/OTabPanels.vue'
-import OTabPanel from '@/lib/navigation/Tabs/OTabPanel.vue'
+import OStepper from '@/lib/navigation/Stepper/OStepper.vue'
+import OStep from '@/lib/navigation/Stepper/OStep.vue'
 import BrowserJourney from '@/components/synthetics/journey/BrowserJourney.vue'
 import CheckConfigure from '@/components/synthetics/configure/CheckConfigure.vue'
 
@@ -29,7 +26,8 @@ const store = useStore()
 //   extension-setup → install extension checklist (only when extension not yet installed)
 //   editor          → tabbed check editor
 const phase = ref<'gate' | 'extension-setup' | 'editor'>('gate')
-const activeTab = ref<'journey' | 'configure' | 'results'>('journey')
+const currentStep = ref(1)
+const journeyStepDone = ref(false)
 const checkName = ref('')
 const startUrl = ref('')
 
@@ -322,54 +320,53 @@ const replayStatus = computed<{ text: string; tone: 'muted' | 'success' | 'error
 
   <!-- ── Editor phase ── -->
   <div v-else class="tw:flex tw:flex-col tw:h-full tw:bg-[var(--o2-body-primary-bg)]">
-    <AppPageHeader
-      :title="check.name || 'Untitled check'"
-      :back="{ label: 'Checks', to: { name: 'synthetic' }, dataTest: 'synthetics-create-back-btn' }"
-    />
+      <AppPageHeader
+        :title="check.name || 'Untitled check'"
+        :back="{ label: 'Checks', to: { name: 'synthetic' }, dataTest: 'synthetics-create-back-btn' }"
+        class="tw:border-b tw:border-border-default"
+      />
 
-    <OTabs v-model="activeTab" bordered class="tw:px-2 tw:bg-[var(--o2-card-bg)]">
-      <OTab name="journey" label="Journey">
-        <template #icon><OIcon name="stacked-line-chart" size="sm" /></template>
-      </OTab>
-      <OTab name="configure" label="Configure">
-        <template #icon><OIcon name="tune" size="sm" /></template>
-      </OTab>
-      <OTab name="results" label="Results" :disable="true">
-        <template #default>
-          <span class="tw:flex tw:items-center tw:gap-1">
-            <OIcon name="bar-chart" size="sm" />
-            Results
-            <OBadge variant="default" size="sm">After save</OBadge>
-          </span>
-        </template>
-      </OTab>
-    </OTabs>
-
-    <OTabPanels :model-value="activeTab" class="tw:flex-1 tw:overflow-y-auto tw:min-h-0">
-      <OTabPanel name="journey" class="tw:h-full">
+    <OStepper
+      v-model="currentStep"
+      :navigable="true"
+      class="tw:flex-1 tw:overflow-y-auto tw:min-h-0 tw:p-2 tw:h-full"
+    >
+      <OStep
+        :name="1"
+        title="Journey"
+        icon="stacked-line-chart"
+        :done="journeyStepDone"
+        class="tw:h-full!"
+      >
         <BrowserJourney
           v-model="check.journey"
           :start-url="check.url"
           :extension-ready="extensionReady"
           :auto-record="autoRecord"
+          :is-replaying="isReplaying"
+          class="tw:h-full!"
           @need-extension-setup="onNeedExtensionSetup"
+          @replay="onReplay"
+          @stop-replay="onStopReplay"
         />
-      </OTabPanel>
-      <OTabPanel name="configure" class="tw:h-full">
+      </OStep>
+      <OStep
+        :name="2"
+        title="Configure"
+        icon="tune"
+        :done="false"
+      >
         <CheckConfigure v-model:check="check" check-type="browser" />
-      </OTabPanel>
-      <OTabPanel name="results" class="tw:h-full">
-        <div class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-64 tw:gap-3 tw:text-[var(--o2-text-muted)]">
-          <OIcon name="lock" size="xl" aria-hidden="true" />
-          <p>Save the check to see results here.</p>
-        </div>
-      </OTabPanel>
-    </OTabPanels>
+      </OStep>
+    </OStepper>
 
     <!-- Sticky footer — tab-aware, always visible -->
     <div class="tw:flex tw:items-center tw:justify-end tw:px-3 tw:py-2.5 tw:gap-2 tw:border-t tw:border-[var(--o2-border-color)] tw:shrink-0 tw:bg-[var(--o2-body-primary-bg)]">
-      <!-- Journey tab: Replay status + Replay/Stop + Continue -->
-      <template v-if="activeTab === 'journey'">
+      <!-- Journey step: Cancel | Replay status + Continue -->
+      <template v-if="currentStep === 1">
+        <OButton variant="ghost" size="sm" data-test="synthetics-create-cancel-btn" @click="router.push({ name: 'synthetic' })">
+          Cancel
+        </OButton>
         <span
           v-if="replayStatus"
           class="tw:mr-auto tw:text-xs tw:flex tw:items-center tw:gap-2"
@@ -388,35 +385,21 @@ const replayStatus = computed<{ text: string; tone: 'muted' | 'success' | 'error
           </span>
         </span>
 
-        <OButton
-          v-if="!isReplaying"
-          variant="outline"
-          size="sm"
-          :disabled="check.journey.length === 0"
-          data-test="synthetics-create-replay-btn"
-          @click="onReplay"
-        >
-          <template #prefix><OIcon name="replay" size="sm" /></template>
-          Replay
-        </OButton>
-        <OButton
-          v-else
-          variant="outline"
-          size="sm"
-          data-test="synthetics-create-stop-replay-btn"
-          @click="onStopReplay"
-        >
-          <template #prefix><OIcon name="stop" size="sm" /></template>
-          Stop Replay
-        </OButton>
-        <OButton variant="primary" size="sm" data-test="synthetics-create-continue-btn" @click="activeTab = 'configure'">
+        <OButton variant="primary" size="sm" data-test="synthetics-create-continue-btn" @click="journeyStepDone = true; currentStep = 2">
           Continue
           <template #suffix><OIcon name="chevron-right" size="sm" /></template>
         </OButton>
       </template>
 
-      <!-- Configure tab: Save check only -->
-      <template v-else-if="activeTab === 'configure'">
+      <!-- Configure step: Cancel | Back + Save -->
+      <template v-else-if="currentStep === 2">
+        <OButton variant="ghost" size="sm" data-test="synthetics-create-cancel-btn" @click="router.push({ name: 'synthetic' })">
+          Cancel
+        </OButton>
+        <OButton variant="outline" size="sm" data-test="synthetics-create-back-to-journey-btn" @click="currentStep = 1">
+          <template #prefix><OIcon name="chevron-left" size="sm" /></template>
+          Back
+        </OButton>
         <OButton variant="primary" size="sm" :loading="isSaving" data-test="synthetics-create-save-btn" @click="saveCheck">
           Save check
           <template #suffix><OIcon name="save" size="sm" /></template>

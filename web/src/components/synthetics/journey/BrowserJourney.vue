@@ -15,11 +15,14 @@ const props = defineProps<{
   startUrl?: string        // URL shown in the recording banner
   extensionReady?: boolean // when false, Record button triggers need-extension-setup
   autoRecord?: boolean     // if true, start recording immediately on mount
+  isReplaying?: boolean
 }>()
 
 const emit = defineEmits<{
   'update:modelValue': [value: BrowserStep[]]
   'need-extension-setup': []
+  'replay': []
+  'stop-replay': []
 }>()
 
 // ── Filter / expand state ──────────────────────────────────────────────────
@@ -119,7 +122,7 @@ function duplicateCapturedStep(index: number, step: BrowserStep) {
 </script>
 
 <template>
-  <div class="tw:flex tw:flex-col tw:min-h-0 tw:p-2">
+  <div class="tw:flex tw:flex-col tw:min-h-0 tw:w-full tw:p-2">
 
     <!-- Toolbar — adapts in-place to recording state, no layout shift -->
     <div class="tw:flex tw:items-center tw:gap-2 tw:mb-3">
@@ -142,6 +145,27 @@ function duplicateCapturedStep(index: number, step: BrowserStep) {
       >
         <OIcon name="add" size="sm" class="tw:mr-1" aria-hidden="true" />
         Add Step
+      </OButton>
+      <OButton
+        v-if="!isReplaying"
+        variant="outline"
+        size="sm"
+        :disabled="readonly || isRecording || modelValue.length === 0"
+        data-test="synthetics-journey-replay-btn"
+        @click="emit('replay')"
+      >
+        <OIcon name="replay" size="sm" class="tw:mr-1" aria-hidden="true" />
+        Replay
+      </OButton>
+      <OButton
+        v-else
+        variant="outline"
+        size="sm"
+        data-test="synthetics-journey-stop-replay-btn"
+        @click="emit('stop-replay')"
+      >
+        <OIcon name="stop" size="sm" class="tw:mr-1" aria-hidden="true" />
+        Stop Replay
       </OButton>
       <OButton
         variant="primary"
