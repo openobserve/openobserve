@@ -3184,7 +3184,18 @@ export class LogsPage {
     }
 
     async clickLogTableColumnSource() {
-        return await this.page.locator(this.logTableColumnSource).click();
+        // Open the first result row's detail/search-around. With the FTS
+        // default-column feature the first cell may be the generic "source"
+        // column OR the FTS "body" column (e.g. log/message/body), so click
+        // whichever first-row cell is rendered rather than "source" only.
+        // The cell can also detach mid-click while the table re-renders, so
+        // Playwright's auto-retrying click is allowed to settle via a short
+        // post-condition wait on the detail dialog by callers.
+        const firstRowCell = this.page
+            .locator('[data-test^="log-table-column-0-"]')
+            .first();
+        await firstRowCell.waitFor({ state: 'visible', timeout: 30000 });
+        return await firstRowCell.click();
     }
 
     async clickIncludeExcludeFieldButton() {
