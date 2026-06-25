@@ -136,6 +136,16 @@ export type RecorderPortInbound =
   | RecorderPortMessage
   | { type: 'synthetics-response'; response: unknown }
 
+export interface BrowserCheckFrequency {
+  type: 'interval' | 'cron'
+  interval?: number      // minutes (interval type only)
+  cron?: string
+  timezone?: string
+  start_time?: number    // unix epoch ms; only when scheduled later
+  retries?: number
+  retry_delay_ms?: number
+}
+
 export interface BrowserCheckSchedule {
   type: 'interval' | 'cron'
   intervalValue?: number

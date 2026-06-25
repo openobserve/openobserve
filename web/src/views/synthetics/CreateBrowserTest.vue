@@ -2,9 +2,12 @@
 // Copyright 2026 OpenObserve Inc.
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { useStore } from 'vuex'
 import type { BrowserCheck } from '@/types/synthetics'
 import useSyntheticsRecorder from '@/composables/useSyntheticsRecorder'
 import { journeyToWireSteps } from '@/utils/synthetics/mapRecordedStep'
+import { buildCreateBrowserTestPayload } from '@/utils/synthetics/buildPayload'
+import syntheticsService from '@/services/synthetics'
 import AppPageHeader from '@/components/common/AppPageHeader.vue'
 import OButton from '@/lib/core/Button/OButton.vue'
 import OIcon from '@/lib/core/Icon/OIcon.vue'
@@ -19,6 +22,7 @@ import BrowserJourney from '@/components/synthetics/journey/BrowserJourney.vue'
 import CheckConfigure from '@/components/synthetics/configure/CheckConfigure.vue'
 
 const router = useRouter()
+const store = useStore()
 
 // Three top-level phases:
 //   gate            → URL + name inputs
@@ -110,9 +114,21 @@ function onNeedExtensionSetup() {
   phase.value = 'extension-setup'
 }
 
-function saveCheck() {
-  const id = crypto.randomUUID()
-  router.push({ name: 'synthetic-detail', params: { id }, query: { tab: 'results', saved: '1' } })
+const isSaving = ref(false)
+const apiPayload = computed(() => buildCreateBrowserTestPayload(check.value))
+
+async function saveCheck() {
+  isSaving.value = true
+  try {
+    const org = store.state.selectedOrganization.identifier
+    const res = await syntheticsService.create(org, apiPayload.value)
+    const id = res.data?.id ?? crypto.randomUUID()
+    router.push({ name: 'synthetic-detail', params: { id }, query: { tab: 'results', saved: '1' } })
+  } catch (err) {
+    console.error('[synthetics] save failed', err)
+  } finally {
+    isSaving.value = false
+  }
 }
 
 // ── Replay ──────────────────────────────────────────────────────────────────
@@ -309,11 +325,7 @@ const replayStatus = computed<{ text: string; tone: 'muted' | 'success' | 'error
     <AppPageHeader
       :title="check.name || 'Untitled check'"
       :back="{ label: 'Checks', to: { name: 'synthetic' }, dataTest: 'synthetics-create-back-btn' }"
-    >
-      <template #title-trail>
-        <OBadge variant="warning">Draft — not saved</OBadge>
-      </template>
-    </AppPageHeader>
+    />
 
     <OTabs v-model="activeTab" bordered class="tw:px-2 tw:bg-[var(--o2-card-bg)]">
       <OTab name="journey" label="Journey">
@@ -405,7 +417,7 @@ const replayStatus = computed<{ text: string; tone: 'muted' | 'success' | 'error
 
       <!-- Configure tab: Save check only -->
       <template v-else-if="activeTab === 'configure'">
-        <OButton variant="primary" size="sm" data-test="synthetics-create-save-btn" @click="saveCheck">
+        <OButton variant="primary" size="sm" :loading="isSaving" data-test="synthetics-create-save-btn" @click="saveCheck">
           Save check
           <template #suffix><OIcon name="save" size="sm" /></template>
         </OButton>

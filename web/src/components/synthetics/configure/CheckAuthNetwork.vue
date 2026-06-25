@@ -170,7 +170,7 @@ function removeCookie(index: number) {
 
       <!-- Authentication -->
       <OCollapsible
-        title="Authentication"
+        label="Authentication"
         data-test="synthetics-check-auth-network-auth-collapsible"
       >
         <div class="tw:flex tw:flex-col tw:gap-3 tw:pt-3">
@@ -204,7 +204,7 @@ function removeCookie(index: number) {
 
       <!-- Variables & Secrets -->
       <OCollapsible
-        title="Variables &amp; Secrets"
+        label="Variables &amp; Secrets"
         data-test="synthetics-check-auth-network-variables-collapsible"
       >
         <div class="tw:flex tw:flex-col tw:gap-4 tw:pt-3">
@@ -307,7 +307,7 @@ function removeCookie(index: number) {
 
       <!-- Custom HTTP Headers -->
       <OCollapsible
-        title="Custom HTTP headers"
+        label="Custom HTTP headers"
         data-test="synthetics-check-auth-network-headers-collapsible"
       >
         <div class="tw:flex tw:flex-col tw:gap-2 tw:pt-3">
@@ -355,7 +355,7 @@ function removeCookie(index: number) {
 
       <!-- Pre-set Cookies -->
       <OCollapsible
-        title="Pre-set cookies"
+        label="Pre-set cookies"
         data-test="synthetics-check-auth-network-cookies-collapsible"
       >
         <div class="tw:flex tw:flex-col tw:gap-2 tw:pt-3">
