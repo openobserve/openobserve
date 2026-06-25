@@ -18,6 +18,10 @@ import { describe, expect, it, beforeEach, vi } from "vitest";
 import PredefinedThemes from "./PredefinedThemes.vue";
 import i18n from "@/locales";
 import { nextTick } from "vue";
+import { CUSTOM_THEME_NAME, getDefaultTheme } from "@/constants/themes";
+
+// The default theme (O2 Signature) provides the fallback colors.
+const DEFAULT_THEME = getDefaultTheme();
 
 // Use vi.hoisted so these variables are available inside vi.mock() factory functions
 // (vi.mock calls are hoisted to the top of the file before variable declarations)
@@ -281,7 +285,7 @@ describe("PredefinedThemes", () => {
       const wrapper = createWrapper();
       const { vm } = wrapper;
       const { applyThemeColors } = await import('@/utils/theme');
-      const oceanTheme = (vm as any).predefinedThemes.find((t: any) => t.name === 'Ocean Breeze');
+      const oceanTheme = (vm as any).predefinedThemes.find((t: any) => t.name === 'O2 Pulse');
       (vm as any).applyTheme(oceanTheme, 'light');
       expect(applyThemeColors).toHaveBeenCalledWith(
         oceanTheme.light.themeColor,
@@ -296,11 +300,11 @@ describe("PredefinedThemes", () => {
       expect(wrapper.text()).toContain("Custom Color");
     });
 
-    it("should show default colors from store", () => {
+    it("should use the default theme (O2 Signature) colors as defaults", () => {
       const wrapper = createWrapper();
       const vm = wrapper.vm as any;
-      expect(vm.DEFAULT_LIGHT_COLOR).toBe("#3F7994");
-      expect(vm.DEFAULT_DARK_COLOR).toBe("#5B9FBE");
+      expect(vm.DEFAULT_LIGHT_COLOR).toBe(DEFAULT_THEME.light.themeColor);
+      expect(vm.DEFAULT_DARK_COLOR).toBe(DEFAULT_THEME.dark.themeColor);
     });
   });
 
@@ -341,10 +345,13 @@ describe("PredefinedThemes", () => {
 
       // Apply a predefined theme
       const theme = vm.predefinedThemes[0];
-      vm.applyTheme(theme);
+      vm.applyTheme(theme, "light");
       await nextTick();
 
-      expect(mockLocalStorage.setItem).toHaveBeenCalled();
+      expect(mockLocalStorage.setItem).toHaveBeenCalledWith(
+        "appliedLightThemeName",
+        theme.name,
+      );
     });
   });
 
@@ -408,8 +415,8 @@ describe("PredefinedThemes", () => {
         '#FF0000'
       );
       expect(mockLocalStorage.setItem).toHaveBeenCalledWith(
-        'appliedLightTheme',
-        '-1'
+        'appliedLightThemeName',
+        CUSTOM_THEME_NAME
       );
     });
   });
@@ -465,13 +472,13 @@ describe("PredefinedThemes", () => {
     it("should show 'Applied' badge when theme is permanently applied", () => {
       mockStore.state.tempThemeColors.light = null;
       mockLocalStorage.getItem.mockImplementation((key: string) => {
-        if (key === 'appliedLightTheme') return '-1';
+        if (key === 'appliedLightThemeName') return CUSTOM_THEME_NAME;
         return null;
       });
 
       const wrapper = createWrapper();
       const vm = wrapper.vm as any;
-      vm.appliedLightTheme = -1;
+      vm.appliedLightThemeName = CUSTOM_THEME_NAME;
 
       const isApplied = vm.isCustomThemeApplied("light");
       expect(isApplied).toBe(true);
