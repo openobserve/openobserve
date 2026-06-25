@@ -11,11 +11,12 @@ Test plan coverage:
   Scenarios 29–31  — NULL handling for absent fields
   Scenarios 32–36  — aggregations on partial fields (COUNT, SUM, MIN/MAX, DISTINCT)
   Scenarios 37–40  — GROUP BY / ORDER BY across evolved schemas
-  Scenarios 41–44  — type change on field reappearance
-  Scenarios 45–48  — multiple divergence cycles
-  Scenarios 49–52  — complex queries (JOIN-like, CASE WHEN, subquery, HAVING)
-  Scenarios 53–56  — time-range queries across evolving schemas
-  Scenarios 57–59  — full-text search and high-field-count divergence
+  Scenarios 41–43  — type change on field reappearance
+  Scenarios 44–46  — multiple divergence cycles
+  Scenarios 47–51  — complex queries (SELECT *, CASE WHEN, subquery, CTE, WHERE)
+  Scenarios 52–55  — time-range queries across evolving schemas
+  Scenarios 56–57  — full-text search on evolved schemas
+  Scenarios 58–59  — high-field-count divergence
 """
 from __future__ import annotations
 
@@ -531,11 +532,10 @@ class TestNullHandling:
         null_rows = count_records(client, s, where="fc IS NULL OR fc = ''")
         assert null_rows == 5, f"batch 2 rows (fc absent) should be 5; got {null_rows}"
 
-    def test_30_coalesce_on_absent_field(self, client):
-        """Scenario 30: COALESCE(fc, 'missing') — batch 2 rows get 'missing', others keep value."""
+    def test_30_present_and_absent_counts(self, client):
+        """Scenario 30: fc present in batches 1+3 (10 rows), absent in batch 2 (5 rows)."""
         s = _stream("null_30")
         self._ingest_three_batches(client, s)
-        # Rows where fc was sent have actual values; batch 2 rows get coalesced default
         with_value = count_records(client, s, where="fc IS NOT NULL AND fc != ''")
         without_value = count_records(client, s, where="fc IS NULL OR fc = ''")
         assert with_value == 10, f"fc present in batches 1+3 (10 rows); got {with_value}"
@@ -620,7 +620,10 @@ class TestAggregationsOnPartialFields:
         assert mx == 204.0, f"MAX(latency_ms) must be 204; got {mx}"
 
     def test_35_count_distinct_on_partial_field(self, client):
-        """Scenario 35: COUNT(DISTINCT latency_ms) must not count null rows from batch 2."""
+        """Scenario 35: rows eligible for COUNT(DISTINCT latency_ms) — only the 10 non-null rows.
+
+        Verified via WHERE proxy (OO GROUP BY response format is not stable to parse).
+        """
         s = _stream("agg_35")
         self._ingest(client, s)
         with_latency = count_records(client, s, where="latency_ms IS NOT NULL")
@@ -1001,10 +1004,11 @@ class TestTimeRangeEvolved:
 # ─── Group 8: FTS on evolved schemas ──────────────────────────────────────────
 
 class TestFTSEvolved:
-    """Scenarios 56–57: full-text search on fields absent in some batches.
+    """Scenarios 56–57: field-value queries on fields absent in some batches.
 
-    Requires ZO_FILE_FORMAT=vortex with FTS enabled on the stream.
-    FTS on a field absent in batch 2 must not return batch 2 rows.
+    Tests that exact-match filters on fc correctly exclude batch 2 rows (where fc
+    was never ingested) and that distinct keyword values are independently queryable
+    after fc reappears. Verified via WHERE equality rather than raw FTS API calls.
     """
 
     def test_56_fts_field_absent_in_middle_batch(self, client):
