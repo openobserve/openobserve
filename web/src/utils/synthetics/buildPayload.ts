@@ -5,21 +5,21 @@ import { journeyToWireSteps, mapWireSteps } from './mapRecordedStep'
 // ── Outbound: BrowserCheck → API payload ─────────────────────────────────────
 
 function buildFrequency(s: BrowserCheckSchedule): BrowserCheckFrequency {
-  const freq: BrowserCheckFrequency = {
-    type: s.type,
-    ...(s.retries !== undefined && { retries: s.retries }),
-    ...(s.retryDelayMs !== undefined && { retry_delay_ms: s.retryDelayMs }),
+  if (s.type === 'cron') {
+    return {
+      type: 'cron',
+      cron: s.cron ?? '',
+      timezone: s.timezone,
+    }
   }
 
-  if (s.type === 'interval') {
-    const mins =
-      s.intervalUnit === 'hours'
-        ? (s.intervalValue ?? 1) * 60
-        : (s.intervalValue ?? 5)
-    freq.interval = mins
-  } else {
-    freq.cron = s.cron
-    freq.timezone = s.timezone
+  const isHours = s.intervalUnit === 'hours'
+  const intervalValue = isHours ? (s.intervalValue ?? 1) : (s.intervalValue ?? 5)
+
+  const freq: BrowserCheckFrequency = {
+    type: isHours ? 'hours' : 'minutes',
+    interval: intervalValue,
+    cron: '',
   }
 
   if (s.startType === 'later' && s.startDate && s.startTime) {
@@ -30,28 +30,39 @@ function buildFrequency(s: BrowserCheckSchedule): BrowserCheckFrequency {
 }
 
 export function buildCreateBrowserTestPayload(check: BrowserCheck): Record<string, unknown> {
-  const { journey, schedule, rum, auth, variables, secrets, headers, cookies, notifications, ...rest } = check
+  const {
+    journey, schedule, rum, auth, variables, secrets, headers, cookies, notifications,
+    url, folder, browserDevices, retries, waitBeforeRetrySecs, cooldownSecs, alertIfFails,
+    tz_offset,
+    ...rest
+  } = check
 
   return {
-    ...rest, // name, description, enabled, folder, tags, url, locations — pass through
+    ...rest,                          // name, description, enabled, tags, locations
+    type: 'browser',
+    target: url,                      // url → target
+    folder_id: folder,                // folder → folder_id
+    tz_offset: tz_offset ?? 0,
 
-    rum: { collect: rum.collect, session_replay: rum.sessionReplay },
+    collect_rum_data: rum.collect,
+    session_replay: rum.sessionReplay,
+
+    retries: retries ?? 0,
+    wait_before_retry_secs: waitBeforeRetrySecs ?? 5,
+    alert_if_fails: alertIfFails ?? 1,
+    cooldown_secs: cooldownSecs ?? 0,
+
+    destinations: notifications.destinations,
+
+    variables: (variables ?? []).map(({ id: _id, ...v }) => v),
 
     frequency: buildFrequency(schedule),
 
-    notifications: {
-      destinations: notifications.destinations,
-      silence_minutes: notifications.silenceMinutes,
-      ...(notifications.failureThreshold !== undefined && {
-        failure_threshold: notifications.failureThreshold,
-      }),
-    },
-
     config: {
       steps: journeyToWireSteps(journey),
-      browser_devices: [{ browser: 'chromium', device: 'laptop_large' }],
+      browser_devices: browserDevices ?? [{ browser: 'chromium', device: 'laptop_large' }],
       timeout_ms: 30000,
-      capture: { screenshot: 'on_fail', trace: 'on_fail' },
+      capture: { screenshot: 'on_fail', trace: 'on_fail', video: 'off' },
       ...(auth?.basicAuth && {
         auth: {
           basic_auth: {
@@ -61,7 +72,6 @@ export function buildCreateBrowserTestPayload(check: BrowserCheck): Record<strin
           },
         },
       }),
-      ...(variables?.length && { variables: variables.map(({ id: _id, ...v }) => v) }),
       ...(secrets?.length && { secrets: secrets.map(({ id: _id, ...s }) => s) }),
       ...(headers?.length && { headers: headers.map(({ id: _id, ...h }) => h) }),
       ...(cookies?.length && { cookies: cookies.map(({ id: _id, ...c }) => c) }),
@@ -79,21 +89,16 @@ function mapFrequencyToSchedule(freq: any): BrowserCheck['schedule'] {
       type: 'cron',
       cron: freq.cron,
       timezone: freq.timezone,
-      retries: freq.retries,
-      retryDelayMs: freq.retry_delay_ms,
     }
   }
 
-  const totalMins = freq.interval ?? 5
-  const intervalUnit = totalMins % 60 === 0 && totalMins >= 60 ? 'hours' : 'minutes'
-  const intervalValue = intervalUnit === 'hours' ? totalMins / 60 : totalMins
+  const isHours = freq.type === 'hours'
+  const intervalValue = freq.interval ?? 5
 
   return {
     type: 'interval',
     intervalValue,
-    intervalUnit,
-    retries: freq.retries,
-    retryDelayMs: freq.retry_delay_ms,
+    intervalUnit: isHours ? 'hours' : 'minutes',
     ...(freq.start_time && {
       startType: 'later' as const,
       startDate: new Date(freq.start_time).toISOString().split('T')[0],
@@ -103,26 +108,42 @@ function mapFrequencyToSchedule(freq: any): BrowserCheck['schedule'] {
 }
 
 export function mapResponseToBrowserCheck(data: Record<string, unknown>): BrowserCheck {
-  const { config, frequency, rum, notifications, ...rest } = data as any
+  const {
+    config, frequency,
+    collect_rum_data, session_replay,
+    destinations,
+    retries, wait_before_retry_secs, alert_if_fails, cooldown_secs,
+    target, folder_id,
+    variables,
+    ...rest
+  } = data as any
 
   return {
     ...rest,
+    url: target,
+    folder: folder_id,
 
     rum: {
-      collect: rum?.collect ?? true,
-      sessionReplay: rum?.session_replay ?? false,
+      collect: collect_rum_data ?? true,
+      sessionReplay: session_replay ?? false,
     },
 
     schedule: mapFrequencyToSchedule(frequency),
 
     notifications: {
-      destinations: notifications?.destinations ?? [],
-      silenceMinutes: notifications?.silence_minutes ?? 60,
-      failureThreshold: notifications?.failure_threshold,
+      destinations: destinations ?? [],
     },
+
+    retries: retries ?? 0,
+    waitBeforeRetrySecs: wait_before_retry_secs ?? 5,
+    alertIfFails: alert_if_fails ?? 1,
+    cooldownSecs: cooldown_secs ?? 0,
+
+    browserDevices: config?.browser_devices,
 
     journey: mapWireSteps(config?.steps ?? []),
 
+    ...(variables?.length && { variables }),
     ...(config?.auth && {
       auth: {
         basicAuth: config.auth.basic_auth
@@ -134,7 +155,6 @@ export function mapResponseToBrowserCheck(data: Record<string, unknown>): Browse
           : undefined,
       },
     }),
-    ...(config?.variables && { variables: config.variables }),
     ...(config?.secrets && { secrets: config.secrets }),
     ...(config?.headers && { headers: config.headers }),
     ...(config?.cookies && { cookies: config.cookies }),

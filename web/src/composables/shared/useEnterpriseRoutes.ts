@@ -136,6 +136,15 @@ const useEnterpriseRoutes = () => {
         },
       },
       {
+        path: "synthetic/:id/results",
+        name: "synthetic-monitor-results",
+        component: () => import("@/views/synthetics/MonitorResults.vue"),
+        meta: { title: "Monitor Results" },
+        beforeEnter(to: any, from: any, next: any) {
+          routeGuard(to, from, next);
+        },
+      },
+      {
         path: "synthetic/:id",
         name: "synthetic-detail",
         component: () => import("@/views/synthetics/BrowserCheckDetail.vue"),

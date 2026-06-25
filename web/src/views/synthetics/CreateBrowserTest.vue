@@ -60,7 +60,6 @@ onMounted(() => {
 const autoRecord = ref(false)
 
 const check = ref<BrowserCheck>({
-  id: '',
   name: '',
   url: '',
   enabled: true,

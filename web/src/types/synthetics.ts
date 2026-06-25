@@ -137,13 +137,11 @@ export type RecorderPortInbound =
   | { type: 'synthetics-response'; response: unknown }
 
 export interface BrowserCheckFrequency {
-  type: 'interval' | 'cron'
-  interval?: number      // minutes (interval type only)
-  cron?: string
+  type: 'minutes' | 'hours' | 'seconds' | 'cron'
+  interval?: number      // value in the unit specified by type
+  cron?: string          // always present; empty string for interval types
   timezone?: string
   start_time?: number    // unix epoch ms; only when scheduled later
-  retries?: number
-  retry_delay_ms?: number
 }
 
 export interface BrowserCheckSchedule {
@@ -160,7 +158,7 @@ export interface BrowserCheckSchedule {
 }
 
 export interface BrowserCheck {
-  id: string
+  id?: string
   name: string
   url: string
   description?: string
@@ -170,10 +168,15 @@ export interface BrowserCheck {
   journey: BrowserStep[]
   schedule: BrowserCheckSchedule
   locations: string[]
+  tz_offset?: number
+  browserDevices?: { browser: string; device: string }[]
+  // Alert / retry settings (top-level in API payload)
+  retries?: number
+  waitBeforeRetrySecs?: number
+  alertIfFails?: number
+  cooldownSecs?: number
   notifications: {
     destinations: string[]
-    silenceMinutes: number
-    failureThreshold?: number
   }
   rum: { collect: boolean; sessionReplay: boolean }
   auth?: {

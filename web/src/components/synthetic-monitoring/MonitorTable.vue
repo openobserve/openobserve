@@ -70,19 +70,22 @@
 
     <!-- Uptime with progress bar -->
     <template #cell-uptime="{ row }">
-      <div class="uptime-row">
-        <OProgressBar
-          :value="(row as any).uptime / 100"
-          :variant="(row as any).uptime >= 99 ? 'default' : (row as any).uptime >= 95 ? 'warning' : 'danger'"
-          size="xs"
-          class="tw:flex-1"
-        />
-        <span
-          class="mono"
-          :class="(row as any).uptime >= 99 ? 'c-g' : (row as any).uptime >= 95 ? 'c-a' : 'c-r'"
-          style="min-width:44px;text-align:right;font-size:12px"
-        >{{ (row as any).uptime }}%</span>
-      </div>
+      <template v-if="(row as any).uptime !== null">
+        <div class="uptime-row">
+          <OProgressBar
+            :value="(row as any).uptime / 100"
+            :variant="(row as any).uptime >= 99 ? 'default' : (row as any).uptime >= 95 ? 'warning' : 'danger'"
+            size="xs"
+            class="tw:flex-1"
+          />
+          <span
+            class="mono"
+            :class="(row as any).uptime >= 99 ? 'c-g' : (row as any).uptime >= 95 ? 'c-a' : 'c-r'"
+            style="min-width:44px;text-align:right;font-size:12px"
+          >{{ (row as any).uptime }}%</span>
+        </div>
+      </template>
+      <span v-else class="tw:text-secondary" style="font-size:13px">—</span>
     </template>
 
     <!-- Locations with tooltip (monitors mode) -->
@@ -346,6 +349,7 @@ onUnmounted(() => {
 .dot--up       { width:9px; height:9px; background:#22c55e; box-shadow:0 0 0 3px rgba(34,197,94,.15); }
 .dot--degraded { width:9px; height:9px; background:#f59e0b; box-shadow:0 0 0 3px rgba(245,158,11,.15); }
 .dot--down     { width:9px; height:9px; background:#ef4444; box-shadow:0 0 0 3px rgba(239,68,68,.15); }
+.dot--unknown  { width:9px; height:9px; background:#94a3b8; box-shadow:0 0 0 3px rgba(148,163,184,.15); }
 
 .mon-name { font-size:13px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .mon-url  { font-size:11px; font-family:monospace; color:var(--o2-tab-text-color); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }

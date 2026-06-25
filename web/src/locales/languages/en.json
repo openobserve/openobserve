@@ -6445,6 +6445,27 @@
     }
   },
   "synthetics": {
+    "results": {
+      "title": "Monitor Results",
+      "monitors": "Monitors",
+      "editMonitor": "Edit Monitor",
+      "uptime": "Uptime",
+      "p95Duration": "P95 Duration",
+      "failedRuns": "Failed Runs",
+      "lastRun": "Last Run",
+      "responseTime": "Response Time",
+      "responseTimeSubtitle": "Total journey duration",
+      "recentRuns": "Recent Runs",
+      "runs": "Runs",
+      "noRuns": "No runs found for the selected time range.",
+      "status": "Status",
+      "started": "Started",
+      "duration": "Duration",
+      "location": "Location",
+      "trigger": "Trigger",
+      "passed": "Passed",
+      "failed": "Failed"
+    },
     "scheduleAlert": {
       "title": "Schedule & Alerting",
       "frequency": "Frequency",

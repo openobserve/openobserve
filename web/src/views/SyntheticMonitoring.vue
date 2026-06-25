@@ -100,7 +100,7 @@
       :footer-title="activeTab === 'browser' ? 'Browser Tests' : activeTab === 'api' ? 'API Tests' : 'Monitors'"
       :empty-message="activeTab === 'browser' ? 'No browser tests found.' : activeTab === 'api' ? 'No API tests found.' : 'No monitors found. Adjust filters or create your first monitor.'"
       data-test="synthetic-monitoring-monitors-table"
-      @row-click="(row) => activeTab === 'monitors' && openDetail(row)"
+      @row-click="openDetail"
       @edit="openEdit"
     />
 
@@ -133,13 +133,6 @@
         <div class="map-tip-row"><span>City</span><span class="map-tip-val">{{ mapTip.stat.city }}</span></div>
       </div>
     </Teleport>
-
-    <!-- Detail Side Panel -->
-    <MonitorDetailPanel
-      :monitor="selectedMonitor"
-      data-test="synthetic-monitoring-detail-panel"
-      @close="closeDetail"
-    />
 
     <!-- Full Heatmap Modal -->
     <ODialog v-model:open="showHeatmapModal" title="Global Health Heatmap" :width="94">
@@ -209,8 +202,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onUnmounted, watch, nextTick } from "vue";
-import { useRouter } from "vue-router";
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from "vue";
+import { useRoute, useRouter } from "vue-router";
+import { useStore } from "vuex";
 import * as echarts from "echarts";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -221,10 +215,115 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import MonitorTable from "@/components/synthetic-monitoring/MonitorTable.vue";
 import PrivateLocations, { type PrivateLocation } from '@/components/synthetic-monitoring/PrivateLocations.vue'
-import MonitorDetailPanel from '@/components/synthetic-monitoring/MonitorDetailPanel.vue'
 import MonitorFormDrawer from '@/components/synthetic-monitoring/MonitorFormDrawer.vue'
+import syntheticsService from '@/services/synthetics'
 
-const router = useRouter();
+const router  = useRouter();
+const route   = useRoute();
+const store   = useStore();
+
+// ── API types ──────────────────────────────────────────────────────────
+interface ApiMonitorFrequency {
+  type: string
+  interval: number
+  cron: string
+}
+
+interface ApiMonitor {
+  id: string
+  org_id: string
+  folder_id: string
+  name: string
+  description: string
+  tags: string[]
+  type: string
+  target: string
+  frequency: ApiMonitorFrequency
+  locations: string[]
+  enabled: boolean
+  status: string
+  created_at: number
+  updated_at: number
+  last_triggered_at: number
+  last_check_at: number | null
+  last_response_ms: number | null
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────
+function formatFrequency(f: ApiMonitorFrequency): string {
+  const n = f.interval
+  switch (f.type) {
+    case 'seconds': return `${n}s`
+    case 'minutes': return `${n}m`
+    case 'hours':   return `${n}h`
+    case 'days':    return `${n}d`
+    default:        return f.cron || `${n}${f.type[0]}`
+  }
+}
+
+function formatTimeAgo(microseconds: number): string {
+  const diffMs = Date.now() - Math.floor(microseconds / 1000)
+  const s = Math.floor(diffMs / 1000)
+  if (s < 60)   return `${s}s ago`
+  const m = Math.floor(s / 60)
+  if (m < 60)   return `${m}m ago`
+  const h = Math.floor(m / 60)
+  if (h < 24)   return `${h}h ago`
+  return `${Math.floor(h / 24)}d ago`
+}
+
+function mapMonitor(m: ApiMonitor) {
+  return {
+    id:           m.id,
+    name:         m.name,
+    description:  m.description,
+    tags:         m.tags,
+    url:          m.target,
+    type:         m.type.toUpperCase(),
+    interval:     formatFrequency(m.frequency),
+    status:       m.status,
+    responseTime: m.last_response_ms !== null ? `${m.last_response_ms}ms` : null,
+    locations:    m.locations,
+    lastCheck:    m.last_check_at !== null ? formatTimeAgo(m.last_check_at) : '—',
+    enabled:      m.enabled,
+    uptime:       null as number | null,
+    history:      [] as unknown[],
+  }
+}
+
+type DisplayMonitor = ReturnType<typeof mapMonitor>
+
+// ── Data loading ───────────────────────────────────────────────────────
+const loading = ref(false)
+
+const orgIdentifier = computed<string>(
+  () => (store.state as any).selectedOrganization?.identifier ?? ''
+)
+
+async function loadMonitors() {
+  if (!orgIdentifier.value) return
+  loading.value = true
+  try {
+    const res = await syntheticsService.list(orgIdentifier.value)
+    monitors.value = ((res.data as any).monitors ?? []).map(mapMonitor)
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(() => {
+  loadMonitors()
+    .then(() => {
+      // Edit round-trip from the Monitor Results page (?edit=<id>): open the
+      // edit drawer for the requested monitor once the list has loaded.
+      const editId = route.query.edit
+      if (typeof editId === 'string' && editId) {
+        const monitor = monitors.value.find((m) => String(m.id) === editId)
+        if (monitor) openEdit(monitor)
+      }
+    })
+    .catch(console.error)
+})
 
 const areMultiTypeTestEnabled = false;
 
@@ -253,14 +352,14 @@ const geoAllLocations = [
 ];
 const geoAllRows = computed(() => {
   return monitors.value
-    .map(m => {
+    .map((m, mi) => {
       const cells = geoAllLocations.map((loc, li) => {
         const configured = m.locations.includes(loc.key);
         if (!configured) return { loc: loc.key, status: "none" as const, ms: null };
-        const seed = (m.id * 11 + li * 17 + loc.key.charCodeAt(0)) % 97;
+        const seed = (mi * 11 + li * 17 + loc.key.charCodeAt(0)) % 97;
         let st: "up"|"down"|"deg";
-        if (m.status === "Down")          st = "down";
-        else if (m.status === "Degraded") st = seed % 4 === 0 ? "deg" : seed % 7 === 0 ? "down" : "up";
+        if (m.status === "down")          st = "down";
+        else if (m.status === "degraded") st = seed % 4 === 0 ? "deg" : seed % 7 === 0 ? "down" : "up";
         else                              st = seed % 11 === 0 ? "deg" : "up";
         const ms = st === "down" ? null : 55 + seed * 4 + (st === "deg" ? 280 + seed * 2 : 0);
         return { loc: loc.key, status: st, ms };
@@ -408,17 +507,14 @@ const keepMapTip = () => { if (mapTipTimer) { clearTimeout(mapTipTimer); mapTipT
 const hideMapTip = () => { mapTipTimer = setTimeout(() => { mapTip.value.show = false; }, 100); };
 
 
-// ── Detail Side Panel ──────────────────────────────────────────────────
-const selectedMonitor = ref<any | null>(null);
-
+// ── Row click → Monitor Results page ───────────────────────────────────
 const openDetail = (monitor: any) => {
-  if (monitor.type === 'browser' || monitor.type === 'Browser') {
-    router.push({ name: 'synthetic-detail', params: { id: monitor.id } });
-    return;
-  }
-  selectedMonitor.value = monitor;
+  router.push({
+    name: 'synthetic-monitor-results',
+    params: { id: String(monitor.id) },
+    query: { name: monitor.name },
+  });
 };
-const closeDetail = () => { selectedMonitor.value = null; };
 
 
 const tabs = [
@@ -438,72 +534,10 @@ const locationOpts = [
   { label:"EU West",      value:"EU West" },{ label:"EU Central", value:"EU Central" },{ label:"AP Southeast", value:"AP SE" },
 ];
 
-// ── 30 mock monitors ──────────────────────────────────────────────────
-interface HistoryTick {
-  status: "up"|"down"|"deg";
-  hour: string;
-  nextHour: string;
-  checks: { loc: string; ms: number|null; ok: boolean }[];
-  avgMs: number|null;
-}
+const monitors = ref<DisplayMonitor[]>([])
 
-const genHistory = (n: number, k: "up"|"down"|"deg", locs: string[]): HistoryTick[] => {
-  const now = new Date();
-  return Array.from({length: n}, (_, i) => {
-    const hoursAgo = n - 1 - i;
-    const d = new Date(now.getTime() - hoursAgo * 3_600_000);
-    const hour     = `${String(d.getHours()).padStart(2,"0")}:00`;
-    const nextHour = `${String((d.getHours() + 1) % 24).padStart(2,"0")}:00`;
-    const st: "up"|"down"|"deg" = k==="up" ? "up"
-      : k==="down" ? (i > n - 5 ? "down" : "up")
-      : (i % 4 === 0 ? "deg" : "up");
-    const checks = locs.map((loc, li) => {
-      const seed = (i * 7 + li * 13 + loc.charCodeAt(0)) % 97;
-      const ok = st !== "down";
-      const ms = ok ? 60 + seed * 3 + (st === "deg" ? 180 + seed : 0) : null;
-      return { loc, ms, ok };
-    });
-    const valid = checks.map(c => c.ms).filter((v): v is number => v !== null);
-    const avgMs = valid.length ? Math.round(valid.reduce((a, b) => a + b, 0) / valid.length) : null;
-    return { status: st, hour, nextHour, checks, avgMs };
-  });
-};
-
-const monitors = ref([
-  { id:1,  name:"Homepage",           url:"https://openobserve.ai",                  type:"HTTP",    interval:"1m",  status:"Up",       responseTime:"142ms", uptime:99.9, locations:["US East","EU West","AP SE"],                        lastCheck:"2s ago"   },
-  { id:2,  name:"API Health",         url:"https://api.openobserve.ai/healthz",      type:"HTTP",    interval:"30s", status:"Up",       responseTime:"89ms",  uptime:100,  locations:["US East","US West","EU West","EU Central","AP SE"],  lastCheck:"1s ago"   },
-  { id:3,  name:"Login Flow",         url:"https://openobserve.ai/login",            type:"Browser", interval:"5m",  status:"Degraded", responseTime:"1.8s",  uptime:98.1, locations:["US East","EU West"],                                lastCheck:"3m ago"   },
-  { id:4,  name:"Checkout API",       url:"https://api.openobserve.ai/v1/checkout",  type:"API",     interval:"1m",  status:"Down",     responseTime:null,    uptime:95.3, locations:["US East","US West","EU West"],                      lastCheck:"1m ago"   },
-  { id:5,  name:"Docs Site",          url:"https://openobserve.ai/docs",             type:"HTTP",    interval:"5m",  status:"Up",       responseTime:"234ms", uptime:99.7, locations:["US East","EU West"],                                lastCheck:"4m ago"   },
-  { id:6,  name:"Ingest Endpoint",    url:"https://ingest.openobserve.ai",           type:"HTTP",    interval:"30s", status:"Up",       responseTime:"67ms",  uptime:100,  locations:["US East","US West","EU West","AP SE"],              lastCheck:"5s ago"   },
-  { id:7,  name:"Auth Service",       url:"https://auth.openobserve.ai/token",       type:"API",     interval:"1m",  status:"Up",       responseTime:"110ms", uptime:99.8, locations:["US East","EU West","AP SE"],                        lastCheck:"45s ago"  },
-  { id:8,  name:"Dashboard Load",     url:"https://openobserve.ai/web/dashboards",   type:"Browser", interval:"10m", status:"Degraded", responseTime:"3.2s",  uptime:97.4, locations:["US East"],                                          lastCheck:"9m ago"   },
-  { id:9,  name:"Metrics API",        url:"https://api.openobserve.ai/v1/metrics",   type:"API",     interval:"1m",  status:"Up",       responseTime:"95ms",  uptime:99.5, locations:["US East","EU West"],                                lastCheck:"30s ago"  },
-  { id:10, name:"DB TCP Probe",       url:"db.openobserve.ai:5432",                  type:"TCP",     interval:"1m",  status:"Up",       responseTime:"12ms",  uptime:100,  locations:["US East"],                                          lastCheck:"15s ago"  },
-  { id:11, name:"CDN Latency",        url:"https://cdn.openobserve.ai",              type:"HTTP",    interval:"5m",  status:"Up",       responseTime:"31ms",  uptime:100,  locations:["US East","US West","EU West"],                      lastCheck:"4m ago"   },
-  { id:12, name:"Search API",         url:"https://api.openobserve.ai/v1/search",    type:"API",     interval:"1m",  status:"Up",       responseTime:"203ms", uptime:99.2, locations:["US East","EU West"],                                lastCheck:"50s ago"  },
-  { id:13, name:"Signup Flow",        url:"https://openobserve.ai/signup",           type:"Browser", interval:"10m", status:"Up",       responseTime:"2.1s",  uptime:99.6, locations:["US East","EU West"],                                lastCheck:"8m ago"   },
-  { id:14, name:"Billing API",        url:"https://api.openobserve.ai/v1/billing",   type:"API",     interval:"2m",  status:"Degraded", responseTime:"820ms", uptime:96.7, locations:["US East"],                                          lastCheck:"1m ago"   },
-  { id:15, name:"Status Page",        url:"https://status.openobserve.ai",           type:"HTTP",    interval:"1m",  status:"Up",       responseTime:"88ms",  uptime:99.9, locations:["US East","US West","EU West","AP SE"],              lastCheck:"30s ago"  },
-  { id:16, name:"Redis Probe",        url:"cache.openobserve.ai:6379",               type:"TCP",     interval:"30s", status:"Up",       responseTime:"5ms",   uptime:100,  locations:["US East"],                                          lastCheck:"10s ago"  },
-  { id:17, name:"Onboarding Flow",    url:"https://openobserve.ai/onboarding",       type:"Browser", interval:"15m", status:"Up",       responseTime:"1.4s",  uptime:99.1, locations:["US East","EU West"],                                lastCheck:"14m ago"  },
-  { id:18, name:"Alert Webhook",      url:"https://alerts.openobserve.ai/webhook",   type:"HTTP",    interval:"5m",  status:"Up",       responseTime:"145ms", uptime:99.4, locations:["US East","EU Central"],                             lastCheck:"3m ago"   },
-  { id:19, name:"DNS openobserve.ai", url:"openobserve.ai",                          type:"DNS",     interval:"5m",  status:"Up",       responseTime:"22ms",  uptime:100,  locations:["US East","EU West"],                                lastCheck:"4m ago"   },
-  { id:20, name:"Alerts API",         url:"https://api.openobserve.ai/v1/alerts",    type:"API",     interval:"1m",  status:"Up",       responseTime:"77ms",  uptime:99.8, locations:["US East","EU West","AP SE"],                        lastCheck:"45s ago"  },
-  { id:21, name:"Export API",         url:"https://api.openobserve.ai/v1/export",    type:"API",     interval:"5m",  status:"Down",     responseTime:null,    uptime:92.1, locations:["US East"],                                          lastCheck:"4m ago"   },
-  { id:22, name:"Pricing Page",       url:"https://openobserve.ai/pricing",          type:"HTTP",    interval:"10m", status:"Up",       responseTime:"178ms", uptime:99.8, locations:["US East","EU West"],                                lastCheck:"8m ago"   },
-  { id:23, name:"MQ Probe",           url:"mq.openobserve.ai:5672",                  type:"TCP",     interval:"1m",  status:"Up",       responseTime:"8ms",   uptime:100,  locations:["US East","EU Central"],                             lastCheck:"20s ago"  },
-  { id:24, name:"Forgot Password",    url:"https://openobserve.ai/forgot-password",  type:"Browser", interval:"30m", status:"Up",       responseTime:"0.9s",  uptime:99.3, locations:["US East"],                                          lastCheck:"28m ago"  },
-  { id:25, name:"DNS api. record",    url:"api.openobserve.ai",                      type:"DNS",     interval:"5m",  status:"Up",       responseTime:"18ms",  uptime:100,  locations:["US East","EU West"],                                lastCheck:"4m ago"   },
-  { id:26, name:"Blog Site",          url:"https://openobserve.ai/blog",             type:"HTTP",    interval:"10m", status:"Up",       responseTime:"310ms", uptime:99.5, locations:["US East","EU West"],                                lastCheck:"9m ago"   },
-  { id:27, name:"User API",           url:"https://api.openobserve.ai/v1/users",     type:"API",     interval:"1m",  status:"Up",       responseTime:"63ms",  uptime:99.9, locations:["US East","EU West","AP SE"],                        lastCheck:"55s ago"  },
-  { id:28, name:"Settings Page",      url:"https://openobserve.ai/settings",         type:"Browser", interval:"30m", status:"Degraded", responseTime:"4.1s",  uptime:94.0, locations:["EU West"],                                          lastCheck:"29m ago"  },
-  { id:29, name:"Ping GW1",           url:"gw1.openobserve.ai",                      type:"Ping",    interval:"1m",  status:"Up",       responseTime:"7ms",   uptime:100,  locations:["US East","EU West"],                                lastCheck:"1m ago"   },
-  { id:30, name:"Ping GW2",           url:"gw2.openobserve.ai",                      type:"Ping",    interval:"1m",  status:"Up",       responseTime:"9ms",   uptime:100,  locations:["US East","AP SE"],                                  lastCheck:"50s ago"  },
-].map(m => ({ ...m, history: genHistory(24, m.status==="Up"?"up":m.status==="Down"?"down":"deg", m.locations) })));
-
-const browserMonitors = computed(() => monitors.value.filter(m=>m.type==="Browser").map(m=>({...m,steps:[3,7,4,5,4][m.id%5]})));
-const apiMonitors     = computed(() => monitors.value.filter(m=>m.type==="API").map(m=>({...m,method:"GET",assertions:3})));
+const browserMonitors = computed(() => monitors.value.filter(m => m.type === 'BROWSER'))
+const apiMonitors     = computed(() => monitors.value.filter(m => m.type === 'API'))
 
 const privateLocations = ref<PrivateLocation[]>([
   { id:1, name:"Corp HQ",        region:"New York, US",  status:"Online",  monitors:12, workers:2, checks:36, version:"1.4.2", lastSeen:"5s ago" },
@@ -513,23 +547,28 @@ const privateLocations = ref<PrivateLocation[]>([
 const onlinePrivateLocations = computed(() => privateLocations.value.filter(l=>l.status==="Online"));
 
 const statusTabs = computed(() => {
-  const ms = monitors.value;
-  return [
-    { filter:"all",      label:"All",      count:ms.length },
-    { filter:"Up",       label:"Up",       count:ms.filter(m=>m.status==="Up").length },
-    { filter:"Degraded", label:"Degraded", count:ms.filter(m=>m.status==="Degraded").length },
-    { filter:"Down",     label:"Down",     count:ms.filter(m=>m.status==="Down").length },
-  ];
-});
+  const ms = monitors.value
+  const tabs = [
+    { filter: 'all',      label: 'All',      count: ms.length },
+    { filter: 'up',       label: 'Up',       count: ms.filter(m => m.status === 'up').length },
+    { filter: 'degraded', label: 'Degraded', count: ms.filter(m => m.status === 'degraded').length },
+    { filter: 'down',     label: 'Down',     count: ms.filter(m => m.status === 'down').length },
+  ]
+  const unknownCount = ms.filter(m => m.status === 'unknown').length
+  if (unknownCount > 0) {
+    tabs.push({ filter: 'unknown', label: 'Unknown', count: unknownCount })
+  }
+  return tabs
+})
 
 const filteredMonitors = computed(() =>
-  monitors.value.filter(m=>
-    (statusFilter.value==="all"   || m.status===statusFilter.value) &&
-    (typeFilter.value==="all"     || m.type===typeFilter.value) &&
-    (locationFilter.value==="all" || m.locations.includes(locationFilter.value)) &&
+  monitors.value.filter(m =>
+    (statusFilter.value === 'all' || m.status === statusFilter.value) &&
+    (typeFilter.value === 'all'   || m.type === typeFilter.value) &&
+    (locationFilter.value === 'all' || m.locations.includes(locationFilter.value)) &&
     (!search.value || m.name.toLowerCase().includes(search.value.toLowerCase()) || m.url.toLowerCase().includes(search.value.toLowerCase()))
   )
-);
+)
 
 const openCreate = () => router.push({ name: 'synthetic-new' })
 const openEdit   = (m: any) => { editTarget.value = m; showDrawer.value = true }
@@ -557,6 +596,7 @@ const openEdit   = (m: any) => { editTarget.value = m; showDrawer.value = true }
 .sdot-up         { background:#22c55e; }
 .sdot-degraded   { background:#f59e0b; }
 .sdot-down       { background:#ef4444; }
+.sdot-unknown    { background:#94a3b8; }
 
 /* ── COLOR HELPERS ── */
 .c-g { color:#15803d; } .body--dark .c-g { color:#4ade80; }
