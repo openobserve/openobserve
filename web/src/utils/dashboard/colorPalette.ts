@@ -413,18 +413,23 @@ export const getGridLineStyle = (theme: string) => ({
  * from a translucent series color at the top to fully transparent at the
  * bottom. `color` should be the resolved concrete series color.
  */
-export const getAreaGradientColor = (color: string) => ({
-  type: "linear",
-  x: 0,
-  y: 0,
-  x2: 0,
-  y2: 1,
-  colorStops: [
-    { offset: 0, color: colorToRgba(color, 0.9) },
-    { offset: 1, color: colorToRgba(color, 0.3) },
-  ],
-  global: false,
-});
+export const getAreaGradientColor = (color: string, theme?: string) => {
+  const isDark = theme === "dark";
+  const topAlpha = isDark ? 1 : 0.9;
+  const bottomAlpha = isDark ? 0.5 : 0.3;
+  return {
+    type: "linear",
+    x: 0,
+    y: 0,
+    x2: 0,
+    y2: 1,
+    colorStops: [
+      { offset: 0, color: colorToRgba(color, topAlpha) },
+      { offset: 1, color: colorToRgba(color, bottomAlpha) },
+    ],
+    global: false,
+  };
+};
 
 /**
  * Builds the `{ areaStyle: {...} }` override for area charts — fades the fill
@@ -449,7 +454,7 @@ export const getAreaStyleOverride = (
   return {
     areaStyle: {
       ...baseAreaStyle,
-      color: getAreaGradientColor(color),
+      color: getAreaGradientColor(color, theme),
     },
   };
 };
