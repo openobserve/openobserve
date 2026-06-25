@@ -3130,7 +3130,8 @@
     "queryManagementDesc": "Laufende Abfragen prüfen und abbrechen",
     "nodesDesc": "Cluster-Knoten und deren Zustand",
     "licenseDesc": "Details zur Enterprise-Lizenz",
-    "organizationManagementDesc": "Organisationen erstellen und verwalten"
+    "organizationManagementDesc": "Organisationen erstellen und verwalten",
+    "scrapeIntervalPositive": "Das Scrape-Intervall muss eine positive Zahl sein"
   },
   "iam": {
     "users": "Nutzer",

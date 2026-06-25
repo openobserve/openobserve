@@ -3130,7 +3130,8 @@
     "queryManagementDesc": "Inspecter et annuler les requêtes en cours d'exécution",
     "nodesDesc": "Nœuds du cluster et leur état de santé",
     "licenseDesc": "Détails de la licence Enterprise",
-    "organizationManagementDesc": "Créer et gérer les organisations"
+    "organizationManagementDesc": "Créer et gérer les organisations",
+    "scrapeIntervalPositive": "L'intervalle de raclage doit être un nombre positif"
   },
   "iam": {
     "users": "Les utilisateurs",

@@ -3144,7 +3144,8 @@
     "queryManagementDesc": "Çalışan sorguları inceleyin ve iptal edin",
     "nodesDesc": "Küme düğümleri ve durumları",
     "licenseDesc": "Kurumsal lisans ayrıntıları",
-    "organizationManagementDesc": "Organizasyon oluşturun ve yönetin"
+    "organizationManagementDesc": "Organizasyon oluşturun ve yönetin",
+    "scrapeIntervalPositive": "Kazıma aralığı pozitif bir sayı olmalıdır"
   },
   "iam": {
     "users": "Kullanıcılar",

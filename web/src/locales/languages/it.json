@@ -3142,7 +3142,8 @@
     "queryManagementDesc": "Ispeziona e annulla le query in esecuzione",
     "nodesDesc": "Nodi del cluster e relativo stato",
     "licenseDesc": "Dettagli della licenza Enterprise",
-    "organizationManagementDesc": "Crea e gestisci le organizzazioni"
+    "organizationManagementDesc": "Crea e gestisci le organizzazioni",
+    "scrapeIntervalPositive": "L'intervallo di raschiatura deve essere un numero positivo"
   },
   "iam": {
     "users": "Utenti",

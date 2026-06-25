@@ -3128,7 +3128,8 @@
     "queryManagementDesc": "Inspecciona y cancela consultas en ejecución",
     "nodesDesc": "Nodos del clúster y su estado",
     "licenseDesc": "Detalles de la licencia Enterprise",
-    "organizationManagementDesc": "Crea y gestiona organizaciones"
+    "organizationManagementDesc": "Crea y gestiona organizaciones",
+    "scrapeIntervalPositive": "El intervalo de raspado debe ser un número positivo"
   },
   "iam": {
     "users": "Usuarios",

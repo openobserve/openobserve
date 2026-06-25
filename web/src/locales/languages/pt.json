@@ -3130,7 +3130,8 @@
     "queryManagementDesc": "Inspecionar e cancelar consultas em execução",
     "nodesDesc": "Nós do cluster e sua integridade",
     "licenseDesc": "Detalhes da licença Enterprise",
-    "organizationManagementDesc": "Criar e gerenciar organizações"
+    "organizationManagementDesc": "Criar e gerenciar organizações",
+    "scrapeIntervalPositive": "O intervalo de raspagem deve ser um número positivo"
   },
   "iam": {
     "users": "Usuários",

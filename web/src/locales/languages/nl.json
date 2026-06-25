@@ -3144,7 +3144,8 @@
     "queryManagementDesc": "Lopende query's inspecteren en annuleren",
     "nodesDesc": "Clusternodes en hun status",
     "licenseDesc": "Details van enterprise-licentie",
-    "organizationManagementDesc": "Organisaties aanmaken en beheren"
+    "organizationManagementDesc": "Organisaties aanmaken en beheren",
+    "scrapeIntervalPositive": "Het schraapinterval moet een positief getal zijn"
   },
   "iam": {
     "users": "Gebruikers",

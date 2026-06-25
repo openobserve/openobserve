@@ -3130,7 +3130,8 @@
     "queryManagementDesc": "检查并取消正在运行的查询",
     "nodesDesc": "集群节点及其健康状况",
     "licenseDesc": "企业版许可证详情",
-    "organizationManagementDesc": "创建和管理组织"
+    "organizationManagementDesc": "创建和管理组织",
+    "scrapeIntervalPositive": "抓取间隔必须为正数"
   },
   "iam": {
     "users": "用户",

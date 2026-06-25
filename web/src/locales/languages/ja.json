@@ -3151,7 +3151,8 @@
     "queryManagementDesc": "実行中のクエリの確認とキャンセル",
     "nodesDesc": "クラスターノードとそのヘルス状態",
     "licenseDesc": "エンタープライズライセンスの詳細",
-    "organizationManagementDesc": "組織の作成と管理"
+    "organizationManagementDesc": "組織の作成と管理",
+    "scrapeIntervalPositive": "スクレイプ間隔は正の数でなければなりません"
   },
   "iam": {
     "users": "ユーザー",

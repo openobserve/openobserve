@@ -3144,7 +3144,8 @@
     "queryManagementDesc": "실행 중인 쿼리 검사 및 취소",
     "nodesDesc": "클러스터 노드 및 상태",
     "licenseDesc": "엔터프라이즈 라이선스 세부 정보",
-    "organizationManagementDesc": "조직 생성 및 관리"
+    "organizationManagementDesc": "조직 생성 및 관리",
+    "scrapeIntervalPositive": "스크래핑 간격은 양수여야 합니다."
   },
   "iam": {
     "users": "유저",
