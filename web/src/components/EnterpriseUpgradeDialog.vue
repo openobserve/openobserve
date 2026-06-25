@@ -100,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="lg"
                 @click="handlePrimaryButtonClick"
                 data-test="enterprise-upgrade-download-btn"
-                class="tw:bg-white! tw:text-[var(--q-primary)]! tw:font-bold tw:py-[10px] tw:px-8 tw:text-[15px] tw:rounded-lg! tw:shadow-[0_4px_16px_rgba(0,0,0,0.15)] tw:transition-all tw:duration-300 tw:[transition-timing-function:cubic-bezier(0.4,0,0.2,1)] tw:[letter-spacing:0.3px] tw:hover:[transform:translateY(-3px)_scale(1.02)] tw:hover:shadow-[0_8px_24px_rgba(0,0,0,0.25)] tw:active:[transform:translateY(-1px)_scale(0.98)]"
+                class="tw:bg-white! tw:text-[var(--q-primary)]! tw:font-bold! tw:py-[10px] tw:px-8 tw:text-[15px] tw:rounded-lg! tw:shadow-[0_4px_16px_rgba(0,0,0,0.15)] tw:transition-all tw:duration-300 tw:[transition-timing-function:cubic-bezier(0.4,0,0.2,1)] tw:[letter-spacing:0.3px] tw:hover:[transform:translateY(-3px)_scale(1.02)] tw:hover:shadow-[0_8px_24px_rgba(0,0,0,0.25)] tw:active:[transform:translateY(-1px)_scale(0.98)]"
               >
                 {{ dialogConfig.primaryButtonText }}
                 <template v-if="dialogConfig.primaryButtonIcon" #icon-right>
@@ -112,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="on-dark-ghost"
                 size="lg"
                 @click="contactSales"
-                class="tw:font-semibold tw:py-[10px] tw:px-6 tw:text-[15px] tw:rounded-lg! tw:border-2 tw:border-[rgba(255,255,255,0.3)] tw:transition-all tw:duration-300 tw:bg-transparent tw:[letter-spacing:0.2px] tw:hover:bg-[rgba(255,255,255,0.15)] tw:hover:border-[rgba(255,255,255,0.5)] tw:hover:[transform:translateX(4px)] tw:active:[transform:scale(0.96)]"
+                class="tw:font-semibold! tw:py-[10px] tw:px-6 tw:text-[15px] tw:rounded-lg! tw:border-2 tw:border-[rgba(255,255,255,0.3)] tw:transition-all tw:duration-300 tw:bg-transparent tw:[letter-spacing:0.2px] tw:hover:bg-[rgba(255,255,255,0.15)] tw:hover:border-[rgba(255,255,255,0.5)] tw:hover:[transform:translateX(4px)] tw:active:[transform:scale(0.96)]"
               >
                 {{ t('about.enterprise_offer.buttons.contact_sales') }}
               </OButton>
@@ -122,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="lg"
                 @click="openDocsLink"
                 data-test="enterprise-upgrade-learn-more-btn"
-                class="tw:font-semibold tw:py-[10px] tw:px-6 tw:text-[15px] tw:rounded-lg! tw:border-2 tw:border-[rgba(255,255,255,0.3)] tw:transition-all tw:duration-300 tw:bg-transparent tw:[letter-spacing:0.2px] tw:hover:bg-[rgba(255,255,255,0.15)] tw:hover:border-[rgba(255,255,255,0.5)] tw:hover:[transform:translateX(4px)] tw:active:[transform:scale(0.96)]"
+                class="tw:font-semibold! tw:py-[10px] tw:px-6 tw:text-[15px] tw:rounded-lg! tw:border-2 tw:border-[rgba(255,255,255,0.3)] tw:transition-all tw:duration-300 tw:bg-transparent tw:[letter-spacing:0.2px] tw:hover:bg-[rgba(255,255,255,0.15)] tw:hover:border-[rgba(255,255,255,0.5)] tw:hover:[transform:translateX(4px)] tw:active:[transform:scale(0.96)]"
               >
                 {{ t('about.enterprise_offer.buttons.learn_more') }}
               </OButton>
