@@ -18,6 +18,7 @@ import OStepper from '@/lib/navigation/Stepper/OStepper.vue'
 import OStep from '@/lib/navigation/Stepper/OStep.vue'
 import BrowserJourney from '@/components/synthetics/journey/BrowserJourney.vue'
 import CheckConfigure from '@/components/synthetics/configure/CheckConfigure.vue'
+import EmptyBrowserCheck from '@/lib/core/EmptyState/illustrations/EmptyBrowserCheck.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -214,9 +215,12 @@ const replayStatus = computed<{ text: string; tone: 'muted' | 'success' | 'error
 
   <!-- ── Gate phase: URL + name ── -->
   <main v-else-if="phase === 'gate'" class="tw:min-h-screen tw:flex tw:flex-col tw:items-center tw:justify-center tw:bg-[var(--o2-body-primary-bg)]">
-    <div class="tw:max-w-lg tw:w-full tw:mx-auto tw:py-16 tw:px-4">
-      <h1 class="tw:mb-3 tw:pb-4">New browser check</h1>
-      <p class="tw:mb-8 tw:pb-4">
+    <div class="tw:max-w-[48rem] tw:w-full tw:mx-auto tw:py-4 tw:px-4">
+      <div class="tw:flex tw:justify-center tw:mb-6">
+        <EmptyBrowserCheck :width="140" />
+      </div>
+      <h1 class="tw:mb-3 tw:pb-4 tw:text-center">New browser check</h1>
+      <p class="tw:mb-8 tw:pb-4 ">
         Tell us where to start — you'll record the journey next. Everything else (schedule, alerts, RUM) gets set up after.
       </p>
 
@@ -282,38 +286,58 @@ const replayStatus = computed<{ text: string; tone: 'muted' | 'success' | 'error
 
   <!-- ── Extension setup phase (only when extension not yet installed) ── -->
   <main v-else-if="phase === 'extension-setup'" class="tw:min-h-screen tw:flex tw:flex-col tw:items-center tw:justify-center tw:bg-[var(--o2-body-primary-bg)]">
-    <div class="tw:max-w-lg tw:w-full tw:mx-auto tw:py-16 tw:px-4">
+    <div class="tw:max-w-[48rem] tw:w-full tw:mx-auto tw:py-4 tw:px-4">
       <div class="tw:flex tw:justify-center tw:mb-6">
         <div class="tw:rounded-2xl tw:border tw:border-[var(--o2-border-color)] tw:bg-[var(--o2-card-bg)] tw:p-6 tw:flex tw:items-center tw:justify-center">
           <OIcon name="open-in-browser" size="xl" class="tw:text-[var(--o2-primary-color)]" aria-hidden="true" />
         </div>
       </div>
 
-      <h1 class="tw:mb-3 tw:text-center">Set up the recorder</h1>
-      <p class="tw:mb-8 tw:text-center">
-        We'll open <strong>{{ check.url }}</strong> in a fresh incognito tab and capture your clicks and inputs — no code.
+      <h1 class="tw:mb-3 tw:text-center tw:pb-4">Set up the recorder</h1>
+      <p class="tw:mb-8 tw:text-left tw:pb-4">
+        We'll open <strong>{{ check.url }}</strong> in a fresh incognito tab and capture your clicks and inputs — <strong>no code</strong>.
       </p>
 
       <div class="tw:rounded-xl tw:border tw:border-[var(--o2-border-color)] tw:divide-y tw:divide-[var(--o2-border-color)] tw:mb-6">
         <!-- Step 1 -->
         <div class="tw:flex tw:items-start tw:gap-4 tw:p-4">
-          <span class="tw:flex-shrink-0 tw:w-7 tw:h-7 tw:rounded-full tw:bg-[var(--o2-primary-color)] tw:text-[var(--o2-text-inverse)] tw:flex tw:items-center tw:justify-center tw:text-sm tw:font-semibold">1</span>
-          <div class="tw:flex-1 tw:min-w-0">
-            <h4 class="tw:text-sm tw:font-semibold tw:text-[var(--o2-text-heading)] tw:m-0 tw:mb-1">Install the OpenObserve Recorder</h4>
-            <p class="tw:text-xs tw:text-[var(--o2-text-secondary)] tw:m-0 tw:mb-3">A lightweight Chrome extension that captures your actions.</p>
-            <div class="tw:flex tw:items-center tw:gap-3">
-              <a
+          <span 
+          class="tw:flex-shrink-0 tw:w-7 tw:h-7 tw:rounded-full tw:bg-[var(--o2-primary-color)] tw:text-[var(--o2-text-inverse)] tw:flex tw:items-center tw:justify-center tw:text-sm tw:font-semibold" 
+          :class="extensionInstalled ? 'tw:bg-[var(--o2-status-success-text)]!': ''"
+          >
+            1
+          </span>
+          <div class="tw:flex-1 tw:min-w-0 tw:flex tw:justify-between">
+            <div class="tw:flex tw:flex-col tw:items-start">
+              <h4 class="tw:text-sm tw:font-semibold tw:text-[var(--o2-text-heading)] tw:m-0 tw:pb-1">Install the OpenObserve Recorder</h4>
+              <p class="tw:text-xs tw:text-[var(--o2-text-secondary)] tw:m-0 tw:mb-3">A lightweight Chrome extension that captures your actions.</p>
+            </div>
+            <div class="tw:flex tw:items-center tw:gap-3 tw:px-3">
+              <!-- <a
                 href="https://openobserve.ai/docs/synthetics/recorder/"
                 target="_blank"
                 rel="noopener noreferrer"
                 class="tw:text-sm tw:text-[var(--o2-text-link)] tw:underline"
                 data-test="synthetics-setup-install-link"
-              >Add to Chrome</a>
+              >              
+                <OButton
+                  v-if="!extensionInstalled"
+                  variant="outline"
+                  size="sm"
+                  :loading="checkingExtension"
+                  iconLeft="download"
+                  data-test="synthetics-setup-recheck-btn"
+                  @click="probeExtension"
+                >
+                  Add to Chrome
+                </OButton>
+              </a> -->
               <OButton
                 v-if="!extensionInstalled"
                 variant="outline"
                 size="sm"
                 :loading="checkingExtension"
+                iconLeft="refresh"
                 data-test="synthetics-setup-recheck-btn"
                 @click="probeExtension"
               >
@@ -321,7 +345,7 @@ const replayStatus = computed<{ text: string; tone: 'muted' | 'success' | 'error
               </OButton>
               <span
                 v-else
-                class="tw:text-sm tw:font-medium tw:text-[var(--o2-status-success)]"
+                class="tw:text-sm tw:font-medium tw:text-[var(--o2-status-success-text)]!"
                 data-test="synthetics-setup-installed-label"
               >Installed ✓</span>
             </div>
@@ -332,11 +356,13 @@ const replayStatus = computed<{ text: string; tone: 'muted' | 'success' | 'error
         <div class="tw:flex tw:items-start tw:gap-4 tw:p-4" :class="{ 'tw:opacity-60': !extensionInstalled }">
           <span
             class="tw:flex-shrink-0 tw:w-7 tw:h-7 tw:rounded-full tw:flex tw:items-center tw:justify-center tw:text-sm tw:font-semibold"
-            :class="extensionInstalled ? 'tw:bg-[var(--o2-primary-color)] tw:text-[var(--o2-text-inverse)]' : 'tw:bg-[var(--o2-bg-subtle)] tw:text-[var(--o2-text-muted)]'"
+            :class="extensionInstalled ? incognitoAllowed ? 'tw:bg-[var(--o2-status-success-text)]! tw:text-[var(--o2-text-inverse)]' : 'tw:bg-[var(--o2-primary-color)] tw:text-[var(--o2-text-inverse)]' : 'tw:bg-[var(--o2-bg-subtle)] tw:text-[var(--o2-text-muted)]'"
           >2</span>
-          <div class="tw:flex-1 tw:min-w-0">
-            <h4 class="tw:text-sm tw:font-semibold tw:text-[var(--o2-text-heading)] tw:m-0 tw:mb-1">Allow it in Incognito</h4>
-            <p class="tw:text-xs tw:text-[var(--o2-text-secondary)] tw:m-0 tw:mb-3">Open <code>chrome://extensions</code> → Details → enable Allow in Incognito.</p>
+          <div class="tw:flex-1 tw:min-w-0 tw:flex tw:justify-between">
+            <div class="tw:flex tw:flex-col tw:items-start">
+              <h4 class="tw:text-sm tw:font-semibold tw:text-[var(--o2-text-heading)] tw:m-0 tw:mb-1">Allow it in Incognito</h4>
+              <p class="tw:text-xs tw:text-[var(--o2-text-secondary)] tw:m-0 tw:mb-3">Open <code>chrome://extensions</code> → Details → enable Allow in Incognito.</p>
+            </div>
             <OSwitch
               v-model="incognitoAllowed"
               label="Done"
