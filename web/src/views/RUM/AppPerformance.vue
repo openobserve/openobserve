@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="tw:pb-2.5">
       <div class="card-container">
         <div class="tw:flex tw:justify-between tw:items-center tw:py-2 tw:px-3">
-          <div class="tw:text-2xl">
+          <div data-test="rum-performance-title" class="tw:text-2xl">
             {{ t("rum.performanceSummaryLabel") }}
           </div>
           <div class="tw:flex tw:items-center tw:gap-2">

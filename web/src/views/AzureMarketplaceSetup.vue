@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="azure-marketplace-setup tw:min-h-screen tw:bg-(--q-background)">
     <div class="tw:flex relative-position tw-px-3 tw-pt-2">
       <img
+        data-test="azure-marketplace-setup-logo"
         class="tw:h-10"
         loading="lazy"
         :src="

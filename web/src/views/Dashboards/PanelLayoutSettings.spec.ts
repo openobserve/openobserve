@@ -425,13 +425,19 @@ describe("PanelLayoutSettings.vue", () => {
 
       const contentDiv = wrapper.find('[data-test="panel-layout-settings-content"]');
       expect(contentDiv.exists()).toBe(true);
-      expect(contentDiv.attributes("class")).toContain("dark-mode");
+      expect(contentDiv.attributes("class")).toContain(
+        "tw:bg-(--o2-primary-background)",
+      );
+      expect(contentDiv.attributes("class")).not.toContain("tw:bg-white");
     });
 
     it("should apply light mode class when theme is light", () => {
       const contentDiv = wrapper.find('[data-test="panel-layout-settings-content"]');
       expect(contentDiv.exists()).toBe(true);
-      expect(contentDiv.attributes("class")).not.toContain("dark-mode");
+      expect(contentDiv.attributes("class")).toContain("tw:bg-white");
+      expect(contentDiv.attributes("class")).not.toContain(
+        "tw:bg-(--o2-primary-background)",
+      );
     });
 
     it("should expose panel layout title via ODrawer prop", () => {

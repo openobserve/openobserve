@@ -1,5 +1,8 @@
 <template>
-  <div class="tw:px-2.5 tw:max-w-350 tw:mx-auto tw:h-[calc(100vh-50px)] tw:overflow-auto">
+  <div
+    data-test="promql-query-builder"
+    class="tw:px-2.5 tw:max-w-350 tw:mx-auto tw:h-[calc(100vh-50px)] tw:overflow-auto"
+  >
     <OCard>
       <OCardSection role="header">
         <div class="tw:text-2xl tw:font-semibold">PromQL Query Builder</div>

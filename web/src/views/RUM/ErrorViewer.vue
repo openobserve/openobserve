@@ -16,6 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
+    data-test="error-viewer-container"
     class="card-container tw:h-full tw:overflow-y-auto"
   >
     <template v-if="isLoading.length">
