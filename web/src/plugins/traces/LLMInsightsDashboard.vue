@@ -484,6 +484,15 @@ function onViewTrace(traceId: string) {
   });
 }
 
+// Load the trace-stream list at most once per mount. Both the initial mount
+// and the (parent-driven) insights load await the SAME promise, so a load can
+// neither race ahead of the stream list nor trigger a second stream fetch.
+let streamsPromise: Promise<void> | null = null;
+function ensureStreamsLoaded(): Promise<void> {
+  if (!streamsPromise) streamsPromise = loadTraceStreams();
+  return streamsPromise;
+}
+
 async function loadTraceStreams() {
   streamsLoaded.value = false;
   try {
@@ -705,10 +714,15 @@ async function loadInsights(
   if (!start || !end) return;
   localStorage.setItem(MODE_LS_KEY, filterMode.value);
 
+  // Stream-mode reads `effectiveStream` from `activeStream`, which is only set
+  // once the stream list loads — so make sure that's done before we fetch,
+  // regardless of whether this call raced ahead of the mount's stream load.
+  await ensureStreamsLoaded();
+
   if (filterMode.value === "agent") {
     // Agent tab can't fetch until it knows the agent's source stream, so the
-    // agents list must be loaded first — await it here. (In Stream mode it's
-    // kept non-blocking below so it never gates / flashes the KPI cards.)
+    // agents list must be loaded first — await it here. (Agents API is only
+    // ever hit on the Agent tab.)
     await loadAgents(start, end);
     // Resolve an agent name carried in the URL to its concrete (stream-scoped)
     // selection now that the list exists.
@@ -724,10 +738,9 @@ async function loadInsights(
     }
     localStorage.setItem(AGENT_LS_KEY, activeAgent.value);
   } else {
+    // Agents API is only relevant on the Agent tab — don't touch it in Stream
+    // mode. The list loads lazily when the user switches to the Agent tab.
     localStorage.setItem(STREAM_LS_KEY, activeStream.value);
-    // Non-blocking: only populates the Agent-tab dropdown for when the user
-    // switches modes. Must NOT gate the KPI/chart fetch (would flash zeros).
-    loadAgents(start, end);
   }
 
   // Keep the URL in step with the resolved selection (runs even when there's
@@ -799,16 +812,11 @@ watch(loading, (isLoading, wasLoading) => {
 
 defineExpose({ refresh, lastRunAt, loading });
 
-onMounted(async () => {
-  if (!streamsLoaded.value) {
-    await loadTraceStreams();
-  } else if (!availableStreams.value.includes(activeStream.value)) {
-    activeStream.value = availableStreams.value[0] || "";
-  }
-  // Always funnel through loadInsights — it resolves the effective stream for
-  // both tabs (Agent mode derives it from the agents API) and guards itself
-  // when there's nothing to query.
-  loadInsights();
+onMounted(() => {
+  // Only kick off the stream-list load here. The insights fetch is driven by the
+  // parent (its DateTime fires an initial `on:date-change` on mount, plus the
+  // refresh button) — a single owner, so we don't double-fetch on load.
+  ensureStreamsLoaded();
 });
 
 // Cancel any in-flight stream queries when the dashboard goes away
