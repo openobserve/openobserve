@@ -260,6 +260,7 @@ pub(crate) async fn set_status(status: NodeStatus) -> Result<()> {
     if let Err(e) = client.put(&key, val.into(), NEED_WATCH, None).await {
         return Err(Error::Message(format!("online node error: {e}")));
     }
+    add_node_to_cache(node).await;
 
     Ok(())
 }
@@ -282,6 +283,7 @@ pub(crate) async fn update_local_node(node: &Node) -> Result<()> {
     if let Err(e) = client.put(&key, val.into(), NEED_WATCH, None).await {
         return Err(Error::Message(format!("update node error: {e}")));
     }
+    add_node_to_cache(node.clone()).await;
     Ok(())
 }
 
