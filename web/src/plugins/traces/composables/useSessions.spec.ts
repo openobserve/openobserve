@@ -159,6 +159,37 @@ describe("useSessions — fetchPage: field mapping", () => {
     await fetchPage("stream", 1000, 2000, 0, 25);
     expect(hasLoadedOnce.value).toBe(true);
   });
+
+  it("passes an empty filter to the list API by default", async () => {
+    mockSessionsList.mockResolvedValue({ data: { hits: [], total: 0 } });
+
+    const { fetchPage } = useSessions();
+    await fetchPage("stream", 1000, 2000, 0, 25);
+
+    expect(mockSessionsList).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orgId: "test-org",
+        streamName: "stream",
+        startTime: 1000,
+        endTime: 2000,
+        page: 0,
+        pageSize: 25,
+        filter: "",
+      }),
+    );
+  });
+
+  it("passes the supplied filter to the list API", async () => {
+    mockSessionsList.mockResolvedValue({ data: { hits: [], total: 0 } });
+    const filter = `trace_id IN (SELECT trace_id FROM "stream" WHERE gen_ai_agent_id = 'agent-1' GROUP BY trace_id)`;
+
+    const { fetchPage } = useSessions();
+    await fetchPage("stream", 1000, 2000, 0, 25, filter);
+
+    expect(mockSessionsList).toHaveBeenCalledWith(
+      expect.objectContaining({ filter }),
+    );
+  });
 });
 
 describe("useSessions — fetchPage: error handling", () => {

@@ -57,22 +57,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @row-click="(row: any) => handleRowClick(row)"
       @pagination-change="onPaginationChange"
     >
-      <!-- Toolbar: stream filter pushed to the right; OTable auto-injects the
-           column chooser immediately after it. -->
+      <!-- Toolbar: filter mode on the left; the matching stream/agent picker on the right. -->
       <template #toolbar>
-        <div class="tw:flex tw:items-center tw:justify-end tw:gap-2 tw:flex-1 tw:min-w-0">
-          <div
-            data-test="sessions-list-stream-selector"
-            class="tw:w-[14rem] tw:flex-shrink-0"
+        <div class="tw:flex tw:items-center tw:justify-between tw:gap-2 tw:flex-1 tw:min-w-0">
+          <OToggleGroup
+            :model-value="filterMode"
+            type="single"
+            data-test="sessions-list-filter-mode"
+            @update:model-value="onFilterModeChange"
           >
-            <OSelect
-              v-model="activeStream"
-              :label="t('traces.sessionsList.streamLabel')"
-              label-position="inside"
-              :options="availableStreams.map((s) => ({ label: s, value: s }))"
-              class="tw:w-[auto] tw:flex-shrink-0 tw:rounded"
-              @update:model-value="onStreamChange"
-            />
+            <OToggleGroupItem value="stream" size="sm">Stream</OToggleGroupItem>
+            <OToggleGroupItem value="agent" size="sm">Agent</OToggleGroupItem>
+          </OToggleGroup>
+
+          <div class="tw:flex tw:items-center tw:justify-end tw:gap-2 tw:min-w-0">
+            <div
+              v-if="filterMode === 'stream'"
+              data-test="sessions-list-stream-selector"
+              class="tw:w-[14rem] tw:flex-shrink-0"
+            >
+              <OSelect
+                v-model="activeStream"
+                :label="t('traces.sessionsList.streamLabel')"
+                label-position="inside"
+                :options="availableStreams.map((s) => ({ label: s, value: s }))"
+                labelKey="label"
+                valueKey="value"
+                class="tw:w-full tw:rounded"
+                @update:model-value="onStreamChange"
+              />
+            </div>
+            <div
+              v-else
+              data-test="sessions-list-agent-selector"
+              class="tw:w-[14rem] tw:flex-shrink-0"
+            >
+              <OSelect
+                v-model="activeAgent"
+                label="Agent"
+                label-position="inside"
+                :options="agentSelectOptions"
+                labelKey="label"
+                valueKey="value"
+                class="tw:w-full tw:rounded"
+                @update:model-value="onAgentChange"
+              />
+            </div>
           </div>
         </div>
       </template>
@@ -89,6 +119,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :cta-label="t('traces.sessionsList.retry')"
           cta-data-test="sessions-empty-retry-btn"
           @create="loadSessions()"
+        />
+        <EvalEmptyState
+          v-else-if="agentEmpty"
+          data-test="sessions-empty-no-agents"
+          icon="groups"
+          title="No Agents In This Range"
+          description="No GenAI agents were detected for the selected time window. Try a wider range or switch back to stream view."
+          cta-label="View by Stream"
+          @create="onFilterModeChange('stream')"
         />
         <div
           v-else
@@ -184,7 +223,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts" setup>
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { formatDate } from "@/utils/date";
 import { useI18n } from "vue-i18n";
@@ -195,6 +234,16 @@ import EvalEmptyState from "@/components/EvalEmptyState.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import genAiAgentMappingService, {
+  type GenAiAgentListItem,
+} from "@/services/gen-ai-agent-mapping.service";
+import {
+  ALL_AGENTS_VALUE,
+  agentOptionKey,
+  buildAgentTraceFilter,
+} from "./llmAgentFilter";
 import {
   splitNumberWithUnit,
   splitDuration,
@@ -218,6 +267,7 @@ const STREAM_LS_KEY = "sessionsList_streamFilter";
 
 const { t } = useI18n();
 const router = useRouter();
+const route = useRoute();
 const store = useStore();
 const { getStreams } = useStreams();
 const {
@@ -230,10 +280,31 @@ const {
   cancelAll,
 } = useSessions();
 
+const urlType = typeof route.query.type === "string" ? route.query.type : "";
+const urlStream = typeof route.query.stream === "string" ? route.query.stream : "";
+const urlAgentName = typeof route.query.agent === "string" ? route.query.agent : "";
+
 const availableStreams = ref<string[]>([]);
 const streamsLoaded = ref(false);
 const activeStream = ref<string>(
-  localStorage.getItem(STREAM_LS_KEY) || props.streamName || "",
+  urlStream || localStorage.getItem(STREAM_LS_KEY) || props.streamName || "",
+);
+const MODE_LS_KEY = "sessionsList_filterMode";
+const AGENT_LS_KEY = "sessionsList_agentFilter";
+const filterMode = ref<"stream" | "agent">(
+  urlType === "agent"
+    ? "agent"
+    : urlType === "stream"
+      ? "stream"
+      : localStorage.getItem(MODE_LS_KEY) === "agent"
+        ? "agent"
+        : "stream",
+);
+const activeAgent = ref<string>(localStorage.getItem(AGENT_LS_KEY) || ALL_AGENTS_VALUE);
+const agents = ref<GenAiAgentListItem[]>([]);
+const agentsLoaded = ref(false);
+const pendingAgentName = ref<string | null>(
+  filterMode.value === "agent" && urlAgentName ? urlAgentName : null,
 );
 
 // Server-side pagination state (1-indexed). OTable owns the footer controls
@@ -242,6 +313,33 @@ const activeStream = ref<string>(
 const currentPage = ref(1);
 const rowsPerPage = ref(25);
 const rowsPerPageOptions = [10, 25, 50, 100];
+
+const agentSelectOptions = computed(() =>
+  agents.value.map((agent) => ({
+    label: agent.id ? `${agent.name} (${agent.id})` : agent.name,
+    value: agentOptionKey(agent),
+  })),
+);
+
+const selectedAgent = computed<GenAiAgentListItem | null>(() => {
+  if (activeAgent.value === ALL_AGENTS_VALUE) return null;
+  return agents.value.find((agent) => agentOptionKey(agent) === activeAgent.value) ?? null;
+});
+
+const effectiveStream = computed(() =>
+  filterMode.value === "agent"
+    ? (selectedAgent.value?.source_stream ?? "")
+    : activeStream.value,
+);
+const effectiveAgent = computed<GenAiAgentListItem | null>(() =>
+  filterMode.value === "agent" ? selectedAgent.value : null,
+);
+const agentFilterClause = computed(() =>
+  buildAgentTraceFilter(effectiveAgent.value, effectiveStream.value),
+);
+const agentEmpty = computed(
+  () => filterMode.value === "agent" && agentsLoaded.value && agents.value.length === 0,
+);
 
 // `instrument` is the only action id the preset emits. Send the user to
 // the in-app AI integrations page (the closest "set this up" surface) so
@@ -420,21 +518,103 @@ async function loadTraceStreams() {
   }
 }
 
+async function loadAgents(startTime?: number, endTime?: number) {
+  const orgId = store.state.selectedOrganization?.identifier;
+  const start = startTime ?? props.startTime;
+  const end = endTime ?? props.endTime;
+  if (!orgId || !start || !end) return;
+  agentsLoaded.value = false;
+  try {
+    const agentList = await genAiAgentMappingService.listAgents(orgId, start, end);
+    agents.value = agentList.agents;
+    if (
+      activeAgent.value !== ALL_AGENTS_VALUE &&
+      !agents.value.some((agent) => agentOptionKey(agent) === activeAgent.value)
+    ) {
+      activeAgent.value = ALL_AGENTS_VALUE;
+    }
+  } catch (e) {
+    console.warn("Failed to load GenAI agents", e);
+    agents.value = [];
+    activeAgent.value = ALL_AGENTS_VALUE;
+  } finally {
+    agentsLoaded.value = true;
+  }
+}
+
+function syncFilterUrl() {
+  const query: Record<string, any> = { ...route.query, type: filterMode.value };
+  if (filterMode.value === "agent") {
+    delete query.stream;
+    if (selectedAgent.value?.name) query.agent = selectedAgent.value.name;
+    else delete query.agent;
+  } else {
+    delete query.agent;
+    if (activeStream.value) query.stream = activeStream.value;
+    else delete query.stream;
+  }
+  router.replace({ query }).catch(() => {});
+}
+
+function clearSessionRows() {
+  sessions.value = [];
+  total.value = 0;
+}
+
 async function loadSessions(startTime?: number, endTime?: number) {
   const start = startTime ?? props.startTime;
   const end = endTime ?? props.endTime;
-  if (!activeStream.value || !start || !end) return;
-  localStorage.setItem(STREAM_LS_KEY, activeStream.value);
+  if (!start || !end) return;
+  localStorage.setItem(MODE_LS_KEY, filterMode.value);
+
+  if (filterMode.value === "agent") {
+    await loadAgents(start, end);
+    if (pendingAgentName.value) {
+      const match = agents.value.find((agent) => agent.name === pendingAgentName.value);
+      if (match) activeAgent.value = agentOptionKey(match);
+      pendingAgentName.value = null;
+    }
+    if (!selectedAgent.value && agents.value.length > 0) {
+      activeAgent.value = agentOptionKey(agents.value[0]);
+    }
+    localStorage.setItem(AGENT_LS_KEY, activeAgent.value);
+  } else {
+    localStorage.setItem(STREAM_LS_KEY, activeStream.value);
+    loadAgents(start, end);
+  }
+
+  syncFilterUrl();
+
+  const stream = effectiveStream.value;
+  if (!stream) {
+    clearSessionRows();
+    return;
+  }
   await fetchPage(
-    activeStream.value,
+    stream,
     start,
     end,
     currentPage.value - 1,
     rowsPerPage.value,
+    agentFilterClause.value,
   );
 }
 
 function onStreamChange() {
+  currentPage.value = 1;
+  loadSessions();
+}
+
+function onFilterModeChange(mode?: string | number | null) {
+  const next = mode === "agent" ? "agent" : "stream";
+  if (next === filterMode.value) return;
+  filterMode.value = next;
+  currentPage.value = 1;
+  clearSessionRows();
+  loadSessions();
+}
+
+function onAgentChange() {
   currentPage.value = 1;
   loadSessions();
 }
@@ -457,7 +637,7 @@ function handleRowClick(row: SessionRow) {
   router.push({
     name: props.detailRouteName || "sessionDetails",
     query: {
-      stream: activeStream.value,
+      stream: effectiveStream.value,
       session_id: row.sessionId,
       from: props.startTime,
       to: props.endTime,
@@ -478,7 +658,7 @@ onMounted(async () => {
   if (!streamsLoaded.value) {
     await loadTraceStreams();
   }
-  if (activeStream.value) {
+  if (activeStream.value || filterMode.value === "agent") {
     loadSessions();
   }
 });

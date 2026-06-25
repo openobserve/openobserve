@@ -152,6 +152,7 @@ export function useSessions() {
     endTime: number,
     page: number,
     pageSize: number,
+    filter = "",
   ): Promise<void> {
     if (!streamName || !startTime || !endTime) return;
     loading.value = true;
@@ -166,6 +167,7 @@ export function useSessions() {
         endTime,
         page,
         pageSize,
+        filter,
       });
       const body = res.data;
       sessions.value = (body.hits || []).map((h) => {

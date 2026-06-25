@@ -32,6 +32,8 @@ export interface SessionApiHit {
   gen_ai_usage_cost: number;
   /** Number of error spans across all traces in this session. */
   error_count: number;
+  user_ids?: string[];
+  first_user_message?: string | null;
 }
 
 export interface SessionApiResponse {
