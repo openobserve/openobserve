@@ -1092,7 +1092,12 @@ jobs:
         #
         # No-op on the happy path: if the re-audit was already clean (verdict PASS / 0 critical), this
         # step reads the verdict, sets ran=false, and exits WITHOUT any DeepSeek call or test re-run.
+        #
+        # continue-on-error: an opencode/network hiccup must never crash the job. If this step dies
+        # mid-run, the quality gate sees ran!='true' and falls back to the PRE-refine state (the Sentinel
+        # FAIL that triggered us) → it BLOCKS. So a crash fails SAFE (no PR), never opens a weak one.
         continue-on-error: true
+        timeout-minutes: 35 # 2 rounds x (refine + full re-run + re-audit); backstop so a hung API can't run to the job cap
         if: steps.finalrun.outputs.status == 'passing'
         env:
           DEEPSEEK_API_KEY_E2E: ${{ secrets.DEEPSEEK_API_KEY_E2E }}
@@ -1101,60 +1106,96 @@ jobs:
           MAX_REFINE: "2"
         run: |
           set +e
-          # Carry the FINAL state out to the quality gate. Defaults = whatever the prior steps produced.
+          # Defaults written to $GITHUB_OUTPUT IMMEDIATELY so even a mid-run crash leaves sane outputs:
+          # ran=false → quality gate uses the pre-refine state (the Sentinel FAIL) → blocks (fail-safe).
+          { echo "ran=false"; echo "integrity=${{ steps.integrity.outputs.status }}"; echo "finalrun=passing"; echo "scope=clean"; } >> "$GITHUB_OUTPUT"
+          # SECURITY: SPEC/REL come from an upstream step but are interpolated into shell + opencode
+          # prompts — validate the shape before use (defence in depth; the spec-resolve step also checks).
+          # A path with shell metacharacters or outside tests/ui-testing/ is rejected, not run.
+          case "$SPEC" in
+            tests/ui-testing/playwright-tests/*.spec.js) : ;;
+            *) echo "::error::Refiner: SPEC '$SPEC' is not a tests/ui-testing/ .spec.js path — refusing to run."; exit 0 ;;
+          esac
+          case "$SPEC$REL" in
+            *[!A-Za-z0-9._/-]*) echo "::error::Refiner: SPEC/REL contains unexpected characters — refusing to run."; exit 0 ;;
+          esac
           FINALRUN=passing
           INTEG="${{ steps.integrity.outputs.status }}"
-          verdict() { jq -r '.verdict // "PASS"' docs/test_generator/ci/sentinel-verdict.json 2>/dev/null || echo PASS; }
-          crit()    { jq -r '.critical_count // 0' docs/test_generator/ci/sentinel-verdict.json 2>/dev/null || echo 0; }
+          RSCOPE=clean
+          verdict() { [ -f docs/test_generator/ci/sentinel-verdict.json ] && jq -r '.verdict // "PASS"' docs/test_generator/ci/sentinel-verdict.json 2>/dev/null || echo PASS; }
+          crit()    { [ -f docs/test_generator/ci/sentinel-verdict.json ] && jq -r '.critical_count // 0' docs/test_generator/ci/sentinel-verdict.json 2>/dev/null || echo 0; }
           SENT=$(verdict); SENT_CRIT=$(crit)
-          # Happy path: Sentinel already clean → nothing to remediate, exit cheap.
+          # Happy path: Sentinel already clean → nothing to remediate, exit cheap (defaults above stand).
           if [ "$SENT" != "FAIL" ] && { [ "$SENT_CRIT" -eq 0 ] 2>/dev/null; }; then
-            echo "Sentinel re-audit was clean — Refiner not needed (no DeepSeek call)."
-            { echo "ran=false"; echo "integrity=$INTEG"; echo "finalrun=$FINALRUN"; } >> "$GITHUB_OUTPUT"
-            exit 0
+            echo "Sentinel re-audit was clean — Refiner not needed (no DeepSeek call)."; exit 0
           fi
           if ! command -v opencode >/dev/null 2>&1; then
-            echo "::warning::opencode unavailable — cannot refine; leaving Sentinel verdict as-is."
-            { echo "ran=false"; echo "integrity=$INTEG"; echo "finalrun=$FINALRUN"; } >> "$GITHUB_OUTPUT"
-            exit 0
+            echo "::warning::opencode unavailable — cannot refine; leaving Sentinel verdict as-is (blocks)."; exit 0
           fi
+          # Snapshot the out-of-scope dirty set BEFORE refining (build seds + heal already accounted for in
+          # pre-heal-dirty.txt) so the post-loop scope check attributes any NEW out-of-scope file to us.
           # Baseline the PRE-refine spec so we can prove the Refiner only ADDED/strengthened assertions.
           if [ -f .github/scripts/assert_integrity.py ]; then
             python3 .github/scripts/assert_integrity.py fingerprint "$SPEC" > docs/test_generator/ci/refine-baseline.json 2>/dev/null || true
           fi
           for i in $(seq 1 "$MAX_REFINE"); do
             echo "::group::Refiner round $i/$MAX_REFINE (Sentinel=$SENT critical=$SENT_CRIT)"
-            opencode run --agent e2e-ci-refiner --model "$PIPELINE_MODEL" \
+            # Reset per-round so a skipped check never reuses a stale verdict from a prior round.
+            FINALRUN=failing; INTEG=unknown
+            timeout 600 opencode run --agent e2e-ci-refiner --model "$PIPELINE_MODEL" \
               "Round ${i}. The post-heal Sentinel re-audit FAILED on a spec whose tests currently PASS. Read docs/test_generator/ci/sentinel-verdict.json and the audit report under docs/test_generator/audit-reports/. For EACH critical finding, make the named test actually verify what its title promises by STRENGTHENING/adding assertions in ${SPEC} (new locators go in page objects, never raw selectors in the spec). HARD RULES: edit ONLY files under tests/ui-testing/; you may ADD or tighten assertions but NEVER delete, invert in place, skip, or weaken one; do NOT rename a test to dodge a missing assertion (rename only when the body already correctly verifies a real behaviour and merely the title is wrong). A live OpenObserve is booted at ${ZO_BASE_URL}; never build/restart the product, never touch /tmp. If strengthening makes a test fail because the FEATURE is not wired in this build, do NOT weaken it — mark that test test.fixme('reason, see #issue') with evidence (file:line) and keep the assertion intact. Keep every other test green. Write docs/test_generator/ci/refine-result.json and the refine report." \
-              || echo "::warning::Refiner agent hiccup (round $i) — continuing to re-verify."
+              || echo "::warning::Refiner agent hiccup/timeout (round $i) — continuing to re-verify."
             # Green must hold: re-run the strengthened spec on the live binary.
             ( cd tests/ui-testing && npx playwright test "$REL" --workers=4 --reporter=line --timeout=360000 )
-            if [ $? -eq 0 ]; then FINALRUN=passing; else FINALRUN=failing; echo "::warning::Spec RED after refine round $i."; fi
-            # Re-check assertion-integrity vs the pre-refine baseline (only additions/strengthening allowed).
-            if [ -f .github/scripts/assert_integrity.py ] && [ "$FINALRUN" = passing ]; then
-              FIXME=$(jq -r '.fixme // 0' docs/test_generator/ci/refine-result.json 2>/dev/null || echo 0)
-              ALLOW=""; [ "$FIXME" -gt 0 ] 2>/dev/null && ALLOW="--allow-weakening"  # honest feature-incomplete fixme
-              BASE=""; [ -f docs/test_generator/ci/refine-baseline.json ] && BASE="--baseline docs/test_generator/ci/refine-baseline.json"
-              if python3 .github/scripts/assert_integrity.py check "$SPEC" $BASE --strengthen $ALLOW > docs/test_generator/ci/assert-verdict.json; then
-                INTEG=pass
+            if [ $? -eq 0 ]; then FINALRUN=passing; else echo "::warning::Spec RED after refine round $i."; fi
+            # Re-check assertion-integrity vs the pre-refine baseline. --strengthen lets the Refiner ADD
+            # negatives / park honest fixme but STILL blocks any dropped assertion or in-place flip — so we
+            # do NOT pass --allow-weakening here (it would disable the removed-assertion guard).
+            if [ "$FINALRUN" = passing ]; then
+              if [ ! -f .github/scripts/assert_integrity.py ]; then
+                INTEG=pass  # analyzer missing → match the pre-refine gate's "treat as pass" behaviour
               else
-                INTEG=fail
-                echo "::error::Refiner produced an integrity violation (assertion dropped/gamed):"
-                jq -r '.findings[]? | "  - [\(.rule)] line \(.line // "-"): \(.detail)"' docs/test_generator/ci/assert-verdict.json 2>/dev/null || true
+                BASE=""; [ -f docs/test_generator/ci/refine-baseline.json ] && BASE="--baseline docs/test_generator/ci/refine-baseline.json"
+                if python3 .github/scripts/assert_integrity.py check "$SPEC" $BASE --strengthen > docs/test_generator/ci/assert-verdict.json; then
+                  INTEG=pass
+                else
+                  INTEG=fail
+                  echo "::error::Refiner produced an integrity violation (assertion dropped/flipped/gamed):"
+                  jq -r '.findings[]? | "  - [\(.rule)] line \(.line // "-"): \(.detail)"' docs/test_generator/ci/assert-verdict.json 2>/dev/null || true
+                fi
               fi
             fi
-            # Re-audit: did the findings clear WITHOUT laundering?
-            opencode run --agent e2e-ci-sentinel --model "$PIPELINE_MODEL" \
-              "Re-audit the refined spec/page objects for ${SPEC} after a remediation pass. Apply ALL critical checks (tautologies, conditional-only, negative-only-on-feature, test-name/assertion mismatch). A pure rename that dodges a missing assertion is STILL a FAIL. Update docs/test_generator/ci/sentinel-verdict.json with an honest verdict." \
-              || echo "::warning::Sentinel re-audit hiccup (round $i)."
-            SENT=$(verdict); SENT_CRIT=$(crit)
+            # Re-audit ONLY when this round is still viable (green + integrity OK) — a doomed round will
+            # block regardless, so don't spend an API call re-auditing it.
+            if [ "$FINALRUN" = passing ] && [ "$INTEG" = pass ]; then
+              timeout 600 opencode run --agent e2e-ci-sentinel --model "$PIPELINE_MODEL" \
+                "Re-audit the refined spec/page objects for ${SPEC} after a remediation pass. Apply ALL critical checks (tautologies, conditional-only, negative-only-on-feature, test-name/assertion mismatch). A pure rename that dodges a missing assertion is STILL a FAIL. Update docs/test_generator/ci/sentinel-verdict.json with an honest verdict." \
+                || echo "::warning::Sentinel re-audit hiccup (round $i)."
+              SENT=$(verdict); SENT_CRIT=$(crit)
+            fi
             echo "::endgroup::"
-            if [ "$SENT" != "FAIL" ] && { [ "$SENT_CRIT" -eq 0 ] 2>/dev/null; } && [ "$INTEG" != fail ] && [ "$FINALRUN" = passing ]; then
-              echo "Refiner cleared the Sentinel findings honestly in round $i ✓"
-              break
+            if [ "$SENT" != "FAIL" ] && { [ "$SENT_CRIT" -eq 0 ] 2>/dev/null; } && [ "$INTEG" = pass ] && [ "$FINALRUN" = passing ]; then
+              echo "Refiner cleared the Sentinel findings honestly in round $i ✓"; break
             fi
           done
-          { echo "ran=true"; echo "integrity=$INTEG"; echo "finalrun=$FINALRUN"; } >> "$GITHUB_OUTPUT"
+          # Deterministic SCOPE LOCK (the prompt rule is not enough): the Refiner may touch ONLY
+          # tests/ui-testing/. Revert + flag anything else (same mechanism as the Healer's scope gate).
+          # pre-heal-dirty.txt already lists build-time dirt; tests/+handoff+pipeline files are exempt.
+          CUR=$(git status --porcelain -- . \
+            ':(exclude)tests/ui-testing/**' ':(exclude)docs/test_generator/**' \
+            ':(exclude).opencode/**' ':(exclude)opencode.jsonc' ':(exclude).github/**' \
+            | sed 's/^...//' | sort)
+          PRE=docs/test_generator/ci/pre-heal-dirty.txt
+          [ -f "$PRE" ] || : > "$PRE"
+          VIOL=$(comm -23 <(printf '%s\n' "$CUR" | sed '/^$/d') <(sort "$PRE"))
+          if [ -n "$VIOL" ]; then
+            RSCOPE=violation
+            echo "::error::Refiner SCOPE VIOLATION — touched files OUTSIDE tests/ui-testing/. Reverting + blocking:"
+            printf '%s\n' "$VIOL"
+            printf '%s\n' "$VIOL" | while IFS= read -r f; do [ -n "$f" ] && git checkout -- "$f" 2>/dev/null || true; done
+            git clean -fd -- $(printf '%s ' $VIOL) 2>/dev/null || true
+          fi
+          { echo "ran=true"; echo "integrity=$INTEG"; echo "finalrun=$FINALRUN"; echo "scope=$RSCOPE"; } >> "$GITHUB_OUTPUT"
 
       - name: Quality gate decision (deterministic integrity + Sentinel verdict)
         id: quality
@@ -1168,12 +1209,13 @@ jobs:
           REFINER_RAN: ${{ steps.refiner.outputs.ran }}
           REFINER_INTEG: ${{ steps.refiner.outputs.integrity }}
           REFINER_FINALRUN: ${{ steps.refiner.outputs.finalrun }}
+          REFINER_SCOPE: ${{ steps.refiner.outputs.scope }}
         run: |
-          # Healer scope violation (edited product code) → never trust the green; block. (A passing
-          # final run here may be against a Healer-patched binary that won't reproduce.)
-          if [ "$SCOPE" = "violation" ]; then
+          # Healer OR Refiner scope violation (edited product code) → never trust the green; block. (A
+          # passing run here could be against a patched binary, or the edit simply doesn't belong.)
+          if [ "$SCOPE" = "violation" ] || [ "$REFINER_SCOPE" = "violation" ]; then
             echo "status=fail" >> "$GITHUB_OUTPUT"
-            echo "::error::Quality gate FAILED — Healer scope violation (edited files outside tests/). No PR."
+            echo "::error::Quality gate FAILED — scope violation (Healer/Refiner edited files outside tests/). No PR."
             exit 0
           fi
           # If the Refiner ran, judge the POST-refine state: it updates sentinel-verdict.json in place
