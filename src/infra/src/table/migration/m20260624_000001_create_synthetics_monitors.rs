@@ -83,7 +83,7 @@ fn create_synthetics_monitors_table() -> TableCreateStatement {
         )
         .col(
             ColumnDef::new(SyntheticsMonitors::FolderId)
-                .big_integer()
+                .char_len(27)
                 .not_null(),
         )
         .col(
@@ -240,7 +240,7 @@ mod tests {
                 CREATE TABLE IF NOT EXISTS "synthetics_monitors" (
                 "id" varchar(256) NOT NULL PRIMARY KEY,
                 "org_id" varchar(100) NOT NULL,
-                "folder_id" bigint NOT NULL,
+                "folder_id" char(27) NOT NULL,
                 "tz_offset" integer NOT NULL DEFAULT 0,
                 "name" varchar(256) NOT NULL,
                 "monitor_type" varchar(32) NOT NULL,
@@ -283,7 +283,7 @@ mod tests {
                 CREATE TABLE IF NOT EXISTS "synthetics_monitors" (
                 "id" varchar(256) NOT NULL PRIMARY KEY,
                 "org_id" varchar(100) NOT NULL,
-                "folder_id" bigint NOT NULL,
+                "folder_id" char(27) NOT NULL,
                 "tz_offset" integer NOT NULL DEFAULT 0,
                 "name" varchar(256) NOT NULL,
                 "monitor_type" varchar(32) NOT NULL,

@@ -8,7 +8,7 @@ pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub id: String,
     pub org_id: String,
-    pub folder_id: i64,
+    pub folder_id: String,
     pub tz_offset: i32,
     pub name: String,
     pub monitor_type: String,
@@ -47,7 +47,7 @@ mod tests {
         let m = Model {
             id: "mon-1".to_string(),
             org_id: "org1".to_string(),
-            folder_id: 1,
+            folder_id: "folder-1".to_string(),
             tz_offset: 0,
             name: "Login Flow".to_string(),
             monitor_type: "browser".to_string(),

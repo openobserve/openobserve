@@ -136,7 +136,7 @@ pub async fn create<C: TransactionTrait>(
     let mut am = build_active_model(&monitor)?;
     am.id = Set(id);
     am.org_id = Set(org_id.to_owned());
-    am.folder_id = Set(monitor.folder_id);
+    am.folder_id = Set(monitor.folder_id.clone());
     am.monitor_type = Set(monitor_type_to_str(&monitor.monitor_type).to_owned());
     am.created_at = Set(now);
     am.updated_at = Set(now);
@@ -192,7 +192,7 @@ pub async fn put<C: TransactionTrait>(
             let mut am = build_active_model(&monitor)?;
             am.id = Set(monitor.id.clone());
             am.org_id = Set(org_id.to_owned());
-            am.folder_id = Set(monitor.folder_id);
+            am.folder_id = Set(monitor.folder_id.clone());
             am.monitor_type = Set(monitor_type_to_str(&monitor.monitor_type).to_owned());
             am.created_at = Set(now);
             am.updated_at = Set(now);
@@ -394,7 +394,7 @@ fn update_mutable_fields(am: &mut ActiveModel, monitor: &Monitor) -> Result<(), 
     let tags = serde_json::to_value(&monitor.tags)?;
     let frequency = serde_json::to_value(&monitor.frequency)?;
     let settings = pack_settings(monitor)?;
-    am.folder_id = Set(monitor.folder_id);
+    am.folder_id = Set(monitor.folder_id.clone());
     am.tz_offset = Set(monitor.tz_offset);
     am.name = Set(monitor.name.clone());
     am.description = Set(monitor.description.clone());
@@ -450,8 +450,8 @@ trait ApplyMonitorFilters {
 impl ApplyMonitorFilters for sea_orm::Select<Entity> {
     fn apply_filters(self, params: &ListMonitorsParams) -> Self {
         let mut q = self;
-        if let Some(folder_id) = params.folder_id {
-            q = q.filter(Column::FolderId.eq(folder_id));
+        if let Some(folder_id) = &params.folder_id {
+            q = q.filter(Column::FolderId.eq(folder_id.clone()));
         }
         if let Some(monitor_type) = &params.monitor_type {
             q = q.filter(Column::MonitorType.eq(monitor_type_to_str(monitor_type)));
@@ -472,7 +472,7 @@ mod tests {
         Model {
             id: "mon-1".to_string(),
             org_id: "org1".to_string(),
-            folder_id: 1,
+            folder_id: "folder-1".to_string(),
             name: "Login Flow".to_string(),
             monitor_type: "browser".to_string(),
             target: "https://app.example.com".to_string(),

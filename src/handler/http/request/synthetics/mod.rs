@@ -170,7 +170,7 @@ pub async fn get_summary(
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("folder_id" = Option<i64>, Query, description = "Filter by folder ID"),
+        ("folder_id" = Option<String>, Query, description = "Filter by folder ID (KSUID)"),
         ("type" = Option<String>, Query, description = "Filter by monitor type (http|browser|tcp|tls|ssh)"),
         ("enabled" = Option<bool>, Query, description = "Filter by enabled status"),
         ("location" = Option<String>, Query, description = "Filter by location"),

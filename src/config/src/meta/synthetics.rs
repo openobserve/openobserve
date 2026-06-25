@@ -102,9 +102,9 @@ impl MonitorFrequency {
 pub struct Monitor {
     pub id: String,
     pub org_id: String,
-    /// Surrogate key of the folder this monitor belongs to (FolderType::Synthetics).
+    /// KSUID of the folder this monitor belongs to (`folders.id`).
     #[serde(default)]
-    pub folder_id: i64,
+    pub folder_id: String,
     /// Timezone offset in minutes from UTC (e.g. -300 = EST). Used for cron scheduling.
     #[serde(default)]
     pub tz_offset: i32,
@@ -269,7 +269,7 @@ pub enum TriggerType {
 pub struct MonitorListItem {
     pub id: String,
     pub org_id: String,
-    pub folder_id: i64,
+    pub folder_id: String,
     pub name: String,
     pub description: String,
     pub tags: Vec<String>,
@@ -311,7 +311,7 @@ pub enum BucketStatus {
 #[derive(Debug, Clone, Deserialize, Default)]
 pub struct ListMonitorsParams {
     pub org_id: String,
-    pub folder_id: Option<i64>,
+    pub folder_id: Option<String>,
     pub monitor_type: Option<MonitorType>,
     pub enabled: Option<bool>,
     pub location: Option<String>,
