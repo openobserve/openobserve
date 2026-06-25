@@ -1461,6 +1461,8 @@ const fieldWidthClass = computed(() => {
                     </div>
                   </div>
                 </div>
+
+                <slot name="after-options" />
               <!-- rowClickSingleSelect hint bar — inside bordered container so the border wraps it -->
               <template v-if="multiple && rowClickSingleSelect">
               <div class="tw:mx-2 tw:mt-1 tw:h-px tw:bg-input-border tw:shrink-0" aria-hidden="true" />
