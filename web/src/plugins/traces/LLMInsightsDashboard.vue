@@ -67,7 +67,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="llm-insights-agent-selector"
         class="tw:w-[14rem] tw:flex-shrink-0"
       >
+        <!-- Hold a picker-shaped skeleton until the agents list lands the first
+             time, so the dropdown doesn't flash an empty "Agent" picker before
+             its options exist. -->
+        <SkeletonBox
+          v-if="!agentsLoaded"
+          width="100%"
+          height="2.125rem"
+          rounded
+        />
         <OSelect
+          v-else
           v-model="activeAgent"
           label="Agent"
           label-position="inside"
@@ -256,6 +266,7 @@ import KpiSparkline from "./KpiSparkline.vue";
 import LLMSchemaPanel from "./LLMSchemaPanel.vue";
 import LLMErrorTable from "./LLMErrorTable.vue";
 import LLMInsightsSkeleton from "./LLMInsightsSkeleton.vue";
+import SkeletonBox from "@/components/shared/SkeletonBox.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import EvalEmptyState from "@/components/EvalEmptyState.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
