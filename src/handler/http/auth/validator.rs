@@ -254,11 +254,10 @@ pub async fn validate_credentials(
 
     // Synthetics probe job API — no org_id in path. Use global token lookup
     // so a regular org ingestion token (o2oi_) can authenticate these routes.
-    let is_synthetics_job_path = path_columns.first() == Some(&"synthetics")
-        && path_columns.get(1) == Some(&"jobs");
+    let is_synthetics_job_path =
+        path_columns.first() == Some(&"synthetics") && path_columns.get(1) == Some(&"jobs");
     if is_synthetics_job_path
-        && user_password
-            .starts_with(infra::table::org_ingestion_tokens::ORG_INGESTION_TOKEN_PREFIX)
+        && user_password.starts_with(infra::table::org_ingestion_tokens::ORG_INGESTION_TOKEN_PREFIX)
     {
         match infra::table::org_ingestion_tokens::find_enabled_token_global(user_password).await {
             Ok(Some(record)) => {
