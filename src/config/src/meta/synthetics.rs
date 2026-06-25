@@ -310,8 +310,6 @@ pub enum BucketStatus {
 
 #[derive(Debug, Clone, Deserialize, Default)]
 pub struct ListMonitorsParams {
-    #[serde(default)]
-    pub org_id: String,
     pub folder_id: Option<String>,
     pub monitor_type: Option<MonitorType>,
     pub enabled: Option<bool>,
