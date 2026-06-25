@@ -115,6 +115,11 @@ export const makeAddDomainSchema = (t: (_key: string) => string) =>
 
 export type AddDomainForm = z.infer<ReturnType<typeof makeAddDomainSchema>>;
 
+// Typed default-values factory (matches the pattern used by every other
+// settings form: licenseDefaults / extendTrialDefaults / generalSettingsDefaults
+// …) instead of an inline `{ newDomain: '' }` literal in the template.
+export const addDomainDefaults = (): AddDomainForm => ({ newDomain: "" });
+
 // ── Add-email row (per-domain): CONDITIONAL — empty passes, format-checked when
 //    present and must belong to the domain. ──────────────────────────────────
 export const makeAddEmailSchema = (
@@ -131,3 +136,8 @@ export const makeAddEmailSchema = (
   });
 
 export type AddEmailForm = z.infer<ReturnType<typeof makeAddEmailSchema>>;
+
+// Typed default-values factory for the per-domain add-email row. The default is
+// the same blank value for every domain, so a plain factory (not keyed by
+// domain) is enough.
+export const addEmailDefaults = (): AddEmailForm => ({ newEmail: "" });

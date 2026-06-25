@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
 import License from './License.vue';
+import { makeLicenseSchema } from './License.schema';
 import licenseServer from '@/services/license_server';
 import { createStore } from 'vuex';
 import i18n from '@/locales';
@@ -1000,5 +1001,24 @@ describe('License.vue', () => {
 
       expect(() => wrapper.unmount()).not.toThrow();
     });
+  });
+});
+
+describe('makeLicenseSchema', () => {
+  const schema = makeLicenseSchema((k: string) => k);
+
+  it('rejects a whitespace-only key (the .trim() rule is load-bearing)', () => {
+    // Without .trim() a single space passes .min(1); this guards that.
+    expect(schema.safeParse({ licenseKey: '   ' }).success).toBe(false);
+  });
+
+  it('rejects an empty key', () => {
+    expect(schema.safeParse({ licenseKey: '' }).success).toBe(false);
+  });
+
+  it('accepts a non-empty key and trims surrounding whitespace', () => {
+    const res = schema.safeParse({ licenseKey: '  abc-123  ' });
+    expect(res.success).toBe(true);
+    if (res.success) expect(res.data.licenseKey).toBe('abc-123');
   });
 });

@@ -26,6 +26,7 @@ import {
 import { mount, flushPromises } from "@vue/test-utils";
 import { createRouter, createWebHistory } from "vue-router";
 import OrganizationManagement from "./OrganizationManagement.vue";
+import { extendTrialSchema } from "./OrganizationManagement.schema";
 import store from "../../test/unit/helpers/store";
 import { createI18n } from "vue-i18n";
 import { nextTick } from "vue";
@@ -1900,5 +1901,31 @@ describe("OrganizationManagement.vue", () => {
       expect(filtered).toHaveLength(1);
       expect(filtered[0].name).toBe("Alpha Corp");
     });
+  });
+});
+
+describe("extendTrialSchema", () => {
+  it("rejects a week count below 1 (the .min(1) rule)", () => {
+    expect(extendTrialSchema.safeParse({ extendedTrial: 0 }).success).toBe(
+      false,
+    );
+  });
+
+  it("coerces a numeric string and still enforces the minimum", () => {
+    // The pill value is bridged in and can arrive as a string.
+    expect(extendTrialSchema.safeParse({ extendedTrial: "0" }).success).toBe(
+      false,
+    );
+    const res = extendTrialSchema.safeParse({ extendedTrial: "2" });
+    expect(res.success).toBe(true);
+    if (res.success) expect(res.data.extendedTrial).toBe(2);
+  });
+
+  it("accepts the in-range pill values 1..4", () => {
+    for (const v of [1, 2, 3, 4]) {
+      expect(extendTrialSchema.safeParse({ extendedTrial: v }).success).toBe(
+        true,
+      );
+    }
   });
 });

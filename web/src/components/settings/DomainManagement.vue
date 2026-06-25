@@ -172,7 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OForm
         ref="addDomainForm"
         :schema="addDomainSchema"
-        :default-values="{ newDomain: '' }"
+        :default-values="addDomainDefaults()"
         @submit="addDomain"
         v-slot="{ isSubmitting }"
         class="tw:flex tw:gap-x-2 tw:items-start"
@@ -252,7 +252,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OForm
                 :ref="(el) => setEmailFormRef(domain.name, el)"
                 :schema="getEmailSchema(domain.name)"
-                :default-values="{ newEmail: '' }"
+                :default-values="addEmailDefaults()"
                 @submit="(v) => addEmail(domain, v.newEmail)"
                 v-slot="{ isSubmitting }"
               >
@@ -378,6 +378,8 @@ import {
   isValidEmail,
   makeAddDomainSchema,
   makeAddEmailSchema,
+  addDomainDefaults,
+  addEmailDefaults,
   type AddDomainForm,
 } from "./DomainManagement.schema";
 

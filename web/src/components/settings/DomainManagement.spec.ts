@@ -16,7 +16,11 @@
 import { DOMWrapper, flushPromises, mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, vi, afterEach, afterAll } from "vitest";
 import DomainManagement from "./DomainManagement.vue";
-import { isValidDomain, isValidEmail } from "./DomainManagement.schema";
+import {
+  isValidDomain,
+  isValidEmail,
+  makeAddEmailSchema,
+} from "./DomainManagement.schema";
 import i18n from "@/locales";
 import { nextTick } from "vue";
 
@@ -867,5 +871,30 @@ describe("DomainManagement Component", () => {
         vm.domains.splice(initialCount, vm.domains.length - initialCount);
       }, 10000);
     });
+  });
+});
+
+describe("makeAddEmailSchema (conditional: empty passes, format-checked when present)", () => {
+  const schema = makeAddEmailSchema("example.com", (k: string) => k);
+
+  it("passes when the email is empty/omitted (optional field)", () => {
+    // The `!v ||` short-circuit makes empty valid even though
+    // isValidEmail("") is false — this is the behaviour the OForm relies on.
+    expect(schema.safeParse({ newEmail: "" }).success).toBe(true);
+    expect(schema.safeParse({ newEmail: undefined }).success).toBe(true);
+    expect(schema.safeParse({}).success).toBe(true);
+  });
+
+  it("passes a valid email that belongs to the domain", () => {
+    expect(schema.safeParse({ newEmail: "user@example.com" }).success).toBe(
+      true,
+    );
+  });
+
+  it("rejects a malformed email or one from another domain", () => {
+    expect(schema.safeParse({ newEmail: "invalid-email" }).success).toBe(false);
+    expect(schema.safeParse({ newEmail: "user@other.com" }).success).toBe(
+      false,
+    );
   });
 });

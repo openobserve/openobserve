@@ -429,7 +429,7 @@ import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OColor from "@/lib/forms/Color/OColor.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import {
-  generalSettingsSchema,
+  makeGeneralSettingsSchema,
   type GeneralSettingsForm,
 } from "./General.schema";
 
@@ -469,6 +469,8 @@ export default defineComponent({
 
     // Schema-driven validation replaces the manual scrapeIntervalError /
     // maxSeriesError refs + the imperative if-checks in onSubmit.
+    // Built once from the component's `t` so the messages are localized.
+    const generalSettingsSchema = makeGeneralSettingsSchema(t);
     // Dynamic defaults (edit-prefill from the store) → a typed computed.
     const generalSettingsDefaults = computed((): GeneralSettingsForm => ({
       scrape_interval:
