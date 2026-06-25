@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Main content when data exists -->
     <div
       v-if="!no_data_ingest && !isLoadingSummary"
-      class="tw:w-full tw:h-full tw:overflow-y-auto tw:[padding-right:0.625rem]"
+      class="tw:w-full tw:h-full tw:flex tw:flex-col tw:overflow-y-auto tw:[padding-right:0.625rem]"
     >
       <!-- Banners -->
       <div class="banners-wrapper tw:shrink-0 tw:flex tw:flex-col tw:gap-2">
@@ -367,7 +367,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Alerts chart -->
         <div
-          class="tw:rounded tw:p-4 tw:bg-[var(--o2-card-bg)] tw:border tw:border-[var(--o2-border-color)]"
+          class="tw:rounded tw:p-4 tw:bg-[var(--o2-card-bg)] tw:border tw:border-[var(--o2-border-color)] tw:flex tw:flex-col tw:min-h-0"
           role="region"
           aria-label="Alerts overview section"
         >
@@ -434,19 +434,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <div
-            class="custom-first-chart tw:my-auto tw:xl:min-h-[200px] tw:h-[calc(100vh-500px)] tw:md:h-[calc(100vh-500px)] tw:lg:h-[calc(100vh-550px)] tw:xl:h-[calc(100vh-645px)] tw:w-full"
+            class="custom-first-chart tw:flex-1 tw:min-h-[200px] tw:w-full"
           >
             <CustomChartRenderer
               :key="alertsPanelDataKey"
               :data="alertsPanelData"
-              class="tw:w-full tw:h-full tw:md:h-[calc(100vh-400px)]"
+              class="tw:w-full tw:h-full"
             />
           </div>
         </div>
 
         <!-- Pipelines chart -->
         <div
-          class="tw:rounded tw:p-4 tw:bg-[var(--o2-card-bg)] tw:border tw:border-[var(--o2-border-color)]"
+          class="tw:rounded tw:p-4 tw:bg-[var(--o2-card-bg)] tw:border tw:border-[var(--o2-border-color)] tw:flex tw:flex-col tw:min-h-0"
           role="region"
           aria-label="Pipelines overview section"
         >
@@ -515,7 +515,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <div
-            class="custom-second-chart tw:my-auto xl:tw:min-h-[200px] tw:h-[calc(100vh-500px)] md:tw:h-[calc(100vh-500px)] lg:tw:h-[calc(100vh-550px)] xl:tw:h-[calc(100vh-645px)]"
+            class="custom-second-chart tw:flex-1 tw:min-h-[200px] tw:w-full"
           >
             <CustomChartRenderer
               :key="pipelinesPanelDataKey"
