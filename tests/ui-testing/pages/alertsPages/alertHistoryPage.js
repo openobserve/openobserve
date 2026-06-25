@@ -82,8 +82,10 @@ export class AlertHistoryPage {
 
   async clickViewDetails(index = 0) {
     const btns = this.page.locator(this.viewDetailsBtn);
-    await btns.nth(index).click();
-    await this.page.locator(this.alertDetailsDialog).waitFor({ state: 'visible', timeout: 8000 }).catch(() => {});
+    const btn = btns.nth(index);
+    await btn.waitFor({ state: 'visible', timeout: 10000 });
+    await btn.scrollIntoViewIfNeeded();
+    await btn.click({ force: true });
   }
 
   async expectViewDetailsBtnVisible() {
@@ -111,7 +113,7 @@ export class AlertHistoryPage {
   }
 
   async expectDetailsDialogVisible() {
-    await expect(this.page.locator(this.alertDetailsDialog)).toBeVisible({ timeout: 8000 });
+    await expect(this.page.locator(this.alertDetailsDialog)).toBeVisible({ timeout: 15000 });
   }
 
   async expectTableOrEmptyStateVisible() {

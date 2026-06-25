@@ -190,19 +190,23 @@ test.describe("Alert History Page", () => {
     testLogger.info('Triggering alert manually via UI', { alertName });
     await pm.alertsPage.triggerAlertManually(alertName);
 
-    testLogger.info('Allowing trigger to propagate');
-    await page.waitForTimeout(2000);
-
     testLogger.info('Navigating to alert history page');
     await pm.alertHistoryPage.navigate();
 
     testLogger.info('Selecting alert in search dropdown', { alertName });
     await pm.alertHistoryPage.selectAlert(alertName);
 
-    testLogger.info('Clicking manual search');
+    testLogger.info('Clicking manual search and polling for history rows');
     await pm.alertHistoryPage.clickManualSearch();
-
-    testLogger.info('Waiting for history rows to appear');
+    let rowCount = await pm.alertHistoryPage.getTableRowCount();
+    for (let attempt = 0; attempt < 4 && rowCount === 0; attempt++) {
+      await page.waitForTimeout(5000);
+      await pm.alertHistoryPage.clickRefresh();
+      await pm.alertHistoryPage.clickManualSearch();
+      rowCount = await pm.alertHistoryPage.getTableRowCount();
+      testLogger.info(`History poll attempt ${attempt + 1}: ${rowCount} rows`);
+    }
+    testLogger.info('Asserting history rows are present');
     await pm.alertHistoryPage.expectTableHasRows();
 
     testLogger.info('Clicking view details on first history row');
