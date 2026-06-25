@@ -39,15 +39,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="tw:h-[2rem]"
           @on:date-change="onDateChange"
         />
-        <OButton
-          variant="outline"
-          size="icon-sm"
-          icon-left="refresh"
-          :loading="isRefreshing"
-          title="Refresh"
-          data-test="ai-sessions-refresh-btn"
-          @click="refresh"
-        />
+        <!-- Last-refresh + refresh control (logs-style), consistent with the
+             LLM Insights page header. -->
+        <div
+          class="tw:inline-flex tw:items-center tw:border tw:border-border-default tw:rounded-md tw:px-1 tw:h-[2rem] tw:overflow-hidden"
+        >
+          <ORefreshButton
+            :last-run-at="sessionsLastRunAt"
+            :loading="isLoading"
+            :disabled="isLoading"
+            data-test="ai-sessions-refresh-btn"
+            @click="refresh"
+          />
+        </div>
       </template>
     </AppPageHeader>
 
@@ -65,13 +69,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, nextTick } from "vue";
+import { ref, computed, onMounted, nextTick } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 import DateTime from "@/components/DateTime.vue";
 import SessionsList from "@/plugins/traces/SessionsList.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
-import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import { getConsumableRelativeTime } from "@/utils/date";
 import {
   useAiDateRange,
@@ -94,6 +98,17 @@ const streamName = ref("");
 const dateTimeRef = ref<any>(null);
 const sessionsRef = ref<any>(null);
 const isRefreshing = ref(false);
+
+// Last-refresh + loading state for the header's ORefreshButton. SessionsList
+// stamps `lastRunAt` when its fetch settles and exposes its own `loading`; OR in
+// the page-level `isRefreshing` so the icon spins from the moment of click
+// (covering the relative-window re-anchor before the list load starts).
+const sessionsLastRunAt = computed<number | null>(
+  () => sessionsRef.value?.lastRunAt ?? null,
+);
+const isLoading = computed(
+  () => isRefreshing.value || sessionsRef.value?.loading || false,
+);
 
 function applyRelative(period: string) {
   const range = getConsumableRelativeTime(period);

@@ -399,7 +399,7 @@ const tableColumns = computed(() => [
     id: "sessionId",
     header: t('traces.sessionsList.columns.sessionId'),
     accessorKey: "sessionId",
-    size: 160,
+    size: 250,
     sortable: false,
     meta: { align: "left" },
   },
@@ -448,7 +448,7 @@ const tableColumns = computed(() => [
     id: "tokens",
     header: t('traces.sessionsList.columns.tokens'),
     accessorKey: "tokens",
-    size: 200,
+    size: 150,
     minSize: 150,
     sortable: false,
     hideable: true,
@@ -672,7 +672,14 @@ async function refresh(startTime?: number, endTime?: number) {
   await loadSessions(startTime, endTime);
 }
 
-defineExpose({ refresh });
+// "Last refresh" timestamp for the page header's ORefreshButton — stamped when
+// a fetch settles (loading true→false), mirroring LLM Insights / the Logs page.
+const lastRunAt = ref<number | null>(null);
+watch(loading, (isLoading, wasLoading) => {
+  if (wasLoading && !isLoading) lastRunAt.value = Date.now();
+});
+
+defineExpose({ refresh, lastRunAt, loading });
 
 onMounted(async () => {
   if (!streamsLoaded.value) {
