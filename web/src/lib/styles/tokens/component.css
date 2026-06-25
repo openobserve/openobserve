@@ -1464,21 +1464,21 @@ h1, h2, h3, h4, h5, h6 {
 
 h1 {
   font-size: var(--text-2xl);
-  font-weight: var(--font-bold);
+  font-weight: var(--font-semibold);
   line-height: var(--leading-2xl);
   letter-spacing: var(--tracking-tight);
 }
 
 h2 {
   font-size: var(--text-xl);
-  font-weight: var(--font-semibold);
+  font-weight: var(--font-medium);
   line-height: var(--leading-xl);
   letter-spacing: var(--tracking-normal);
 }
 
 h3 {
   font-size: var(--text-lg);
-  font-weight: var(--font-semibold);
+  font-weight: var(--font-medium);
   line-height: var(--leading-lg);
   letter-spacing: var(--tracking-normal);
 }
