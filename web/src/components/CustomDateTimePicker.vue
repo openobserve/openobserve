@@ -9,7 +9,7 @@
         data-test="date-time-btn"
         variant="outline"
         class="tw:h-full tw:rounded-[3px] tw:py-0 tw:px-[5px] tw:text-xs tw:min-w-auto tw:bg-[rgba(89,96,178,0.2)]!"
-        :class="changeStyle ? computedClass : ''"
+        :class="changeStyle ? computedClass : 'tw:h-8!'"
         :disabled="isFirstEntry"
       >
         <template v-if="!changeStyle" #icon-left>
