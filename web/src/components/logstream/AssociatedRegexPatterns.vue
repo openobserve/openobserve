@@ -17,7 +17,7 @@
           data-test="associated-regex-patterns-title-text"
         >
           <span class="breadcrumb-text tw:cursor-pointer" @click="closeDialog"
-            >Stream Details &gt; &nbsp;
+            >{{ t('regex_patterns.associated_breadcrumb') }} &gt; &nbsp;
           </span>
           <span class="associated-field-name">
             {{ fieldName }}
@@ -46,7 +46,7 @@
               data-test="associated-regex-patterns-search-input"
               v-model="filterPattern"
               data-cy="schema-index-field-search-input"
-              placeholder="Search"
+              :placeholder="t('regex_patterns.associated_search_placeholder')"
               clearable
             />
           </div>
@@ -54,7 +54,7 @@
             <div class="pattern-list-wrapper">
               <OCollapsible
                 v-model="appliedPatternsExpandedRef"
-                :label="`Applied Patterns (${appliedPatterns.length})`"
+                :label="t('regex_patterns.applied_patterns_count', { count: appliedPatterns.length })"
                 class="tw:mt-2 tw:text-[14px] tw:font-[600]"
                 data-test="associated-regex-patterns-applied-patterns-expansion-item"
               >
@@ -63,7 +63,7 @@
                   class="tw:py-3 tw:px-2 tw:text-[12px] tw:opacity-50"
                   data-test="associated-regex-patterns-applied-patterns-table"
                 >
-                  No data available
+                  {{ t('regex_patterns.no_data_available') }}
                 </div>
                 <ul v-else class="tw:list-none tw:p-0 tw:m-0" data-test="associated-regex-patterns-applied-patterns-table">
                   <li
@@ -84,7 +84,7 @@
             <div class="pattern-list-wrapper">
               <OCollapsible
                 v-model="allPatternsExpandedRef"
-                :label="`All Patterns (${resultTotal})`"
+                :label="t('regex_patterns.all_patterns_count', { count: resultTotal })"
                 class="tw:mt-2 tw:text-[14px] tw:font-[600]"
                 data-test="associated-regex-patterns-all-patterns-expansion-item"
               >
@@ -123,13 +123,12 @@
             <span
               class="no-pattern-applied-title"
               data-test="associated-regex-patterns-no-pattern-applied-title"
-              >No Patterns Applied Yet</span
+              >{{ t('regex_patterns.no_patterns_applied_title') }}</span
             >
             <span
               class="no-pattern-applied-subtitle tw:text-center"
               data-test="associated-regex-patterns-no-pattern-applied-subtitle"
-              >Browse the pattern library to begin applying regular expressions
-              to your fields.</span
+              >{{ t('regex_patterns.no_patterns_applied_subtitle') }}</span
             >
           </div>
           <div
@@ -148,7 +147,7 @@
               <div class="tw:flex tw:flex-col tw:gap-2">
                 <div class="tw:flex tw:flex-col tw:gap-1">
                   <span class="individual-section-title tw:text-[12px] tw:font-[500]">
-                    Pattern Name
+                    {{ t('regex_patterns.pattern_name') }}
                   </span>
                   <span
                     class="individual-section-value tw:text-[15px] tw:font-[700]"
@@ -162,7 +161,7 @@
 
                 <div class="tw:flex tw:flex-col tw:gap-1">
                   <span class="individual-section-title tw:text-[12px] tw:font-[500]">
-                    Description
+                    {{ t('regex_patterns.description') }}
                   </span>
                   <span
                     class="individual-section-value tw:text-[15px] tw:font-[700]"
@@ -171,7 +170,7 @@
                     {{
                       userClickedPattern.description
                         ? userClickedPattern.description
-                        : "No description available"
+                        : t('regex_patterns.no_description')
                     }}
                   </span>
                 </div>
@@ -191,7 +190,7 @@
                 <!-- when value matches -->
                 <div class="tw:flex tw:flex-col tw:gap-1.5 tw:flex-1">
                   <span class="individual-section-title tw:text-[12px] tw:font-[500]">
-                    When value matches
+                    {{ t('regex_patterns.when_value_matches') }}
                   </span>
                   <ORadioGroup v-model="policy">
                     <div class="tw:flex tw:flex-col tw:gap-1">
@@ -201,8 +200,8 @@
                           data-test="associated-regex-patterns-redact-radio"
                           size="sm"
                         />
-                        <span class="tw:font-[600] tw:text-[13px]">Redact</span>
-                        <span class="tw:font-[400] tw:text-[12px] tw:opacity-60">Replace with [REDACTED]</span>
+                        <span class="tw:font-[600] tw:text-[13px]">{{ t('regex_patterns.redact') }}</span>
+                        <span class="tw:font-[400] tw:text-[12px] tw:opacity-60">{{ t('regex_patterns.redact_hint') }}</span>
                       </div>
                       <div class="tw:flex tw:items-center tw:gap-2">
                         <ORadio
@@ -210,8 +209,8 @@
                           data-test="associated-regex-patterns-drop-field-radio"
                           size="sm"
                         />
-                        <span class="tw:font-[600] tw:text-[13px]">Drop</span>
-                        <span class="tw:font-[400] tw:text-[12px] tw:opacity-60">Drop the field completely</span>
+                        <span class="tw:font-[600] tw:text-[13px]">{{ t('regex_patterns.drop') }}</span>
+                        <span class="tw:font-[400] tw:text-[12px] tw:opacity-60">{{ t('regex_patterns.drop_hint') }}</span>
                       </div>
                       <div class="tw:flex tw:items-center tw:gap-2">
                         <ORadio
@@ -219,8 +218,8 @@
                           data-test="associated-regex-patterns-hash-radio"
                           size="sm"
                         />
-                        <span class="tw:font-[600] tw:text-[13px]">Hash</span>
-                        <span class="tw:font-[400] tw:text-[12px] tw:opacity-60">Replace with searchable hash</span>
+                        <span class="tw:font-[600] tw:text-[13px]">{{ t('regex_patterns.hash') }}</span>
+                        <span class="tw:font-[400] tw:text-[12px] tw:opacity-60">{{ t('regex_patterns.hash_hint') }}</span>
                       </div>
                     </div>
                   </ORadioGroup>
@@ -231,21 +230,21 @@
                 <!-- detect at section -->
                 <div class="tw:flex tw:flex-col tw:gap-1.5 tw:min-w-[120px]">
                   <span class="individual-section-title tw:text-[12px] tw:font-[500]">
-                    Detect at
+                    {{ t('regex_patterns.detect_at') }}
                   </span>
                   <div class="tw:flex tw:flex-col tw:gap-1.5">
                     <OCheckbox
                       size="sm"
                       v-model="apply_at"
                       val="AtIngestion"
-                      label="Ingestion"
+                      :label="t('regex_patterns.ingestion')"
                       data-test="associated-regex-patterns-ingestion-checkbox"
                     />
                     <OCheckbox
                       size="sm"
                       v-model="apply_at"
                       val="AtSearch"
-                      label="Query"
+                      :label="t('regex_patterns.query')"
                       data-test="associated-regex-patterns-query-checkbox"
                     />
                   </div>
@@ -269,7 +268,7 @@
                   <span
                     class="individual-section-title-main tw:text-[13px] tw:font-[700]"
                   >
-                    Test Pattern
+                    {{ t('regex_patterns.test_pattern') }}
                   </span>
                   <OButton
                     :disabled="testString.length === 0 || testLoading"
@@ -277,7 +276,7 @@
                     size="sm-action"
                     @click="testStringOutput"
                   >
-                    <span class="tw:text-[12px]">Test Input</span>
+                    <span class="tw:text-[12px]">{{ t('regex_patterns.test_input') }}</span>
                   </OButton>
                 </div>
 
@@ -285,7 +284,7 @@
                   <span
                     class="individual-section-sub-title2 tw:text-[12px] tw:font-[500]"
                   >
-                    Regex Pattern
+                    {{ t('regex_patterns.regex_pattern_label') }}
                   </span>
                   <div
                     class="tw:p-2 tw:rounded tw:font-mono tw:text-[11px] tw:break-all"
@@ -311,7 +310,7 @@
                     <FullViewContainer
                       name="query"
                       v-model:is-expanded="expandState.regexTestString"
-                      label="Input string"
+                      :label="t('regex_patterns.input_string')"
                       class="tw:py-md tw:h-[24px]"
                       :labelClass="
                         store.state.theme === 'dark'
@@ -333,7 +332,7 @@
                             : 'light-mode-regex-test-string-input'
                         "
                         type="textarea"
-                        placeholder="Eg. 1234567890"
+                        :placeholder="t('regex_patterns.input_string_placeholder')"
                         :rows="5"
                         style="width: 100%"
                       />
@@ -344,7 +343,7 @@
                     <FullViewContainer
                       name="output"
                       v-model:is-expanded="expandState.outputString"
-                      label="Output"
+                      :label="t('regex_patterns.output')"
                       class="tw:py-md tw:h-[24px]"
                       :labelClass="
                         store.state.theme === 'dark'
@@ -367,7 +366,7 @@
                             : 'light-mode-regex-test-string-input'
                         "
                         type="textarea"
-                        placeholder="Output String"
+                        :placeholder="t('regex_patterns.output_string_placeholder')"
                         :rows="5"
                         style="width: 100%"
                       />
@@ -398,7 +397,7 @@
                                 : 'tw:text-[#4B5563]'
                             "
                           >
-                            Please click Test Input to see the results
+                            {{ t('regex_patterns.click_test_input_hint') }}
                           </span>
                         </div>
                         <div v-else-if="testLoading">
@@ -430,8 +429,8 @@
               >
                 {{
                   checkIfPatternIsApplied(userClickedPattern.pattern_id)
-                    ? "Remove Pattern"
-                    : "Add Pattern"
+                    ? t('regex_patterns.remove_pattern')
+                    : t('regex_patterns.add_pattern')
                 }}
               </OButton>
             </div>
@@ -442,8 +441,8 @@
     </div>
   </div>
   <ConfirmDialog
-    title="Remove Pattern"
-    message="Are you sure you want to remove this pattern from the field?"
+    :title="t('regex_patterns.remove_pattern')"
+    :message="t('regex_patterns.remove_pattern_confirm_msg')"
     @update:ok="handleAddOrRemovePattern"
     @update:cancel="handleCancelRemovePattern"
     v-model="showWarningDialogToRemovePattern"
@@ -591,7 +590,7 @@ export default defineComponent({
       } catch (error) {
         toast({
           variant: "error",
-          message: error.response?.data?.message || "Failed to test string",
+          message: error.response?.data?.message || t("regex_patterns.failed_to_test_string"),
         });
       } finally {
         testLoading.value = false;
@@ -792,7 +791,7 @@ export default defineComponent({
         if (apply_at.value.length == 0) {
           toast({
             variant: "error",
-            message: "Please select detect at option",
+            message: t("regex_patterns.select_detect_at_option"),
           });
           return;
         }

@@ -584,12 +584,18 @@ describe("AlertHistoryDrawer.vue", () => {
   });
 
   describe("Helper Functions", () => {
-    it("formatStatus should capitalize first letter", async () => {
+    it("formatStatus should normalize status to display labels", async () => {
       await mountComponent();
       const vm = wrapper.vm as any;
       expect(vm.formatStatus("firing")).toBe("Firing");
       expect(vm.formatStatus("ok")).toBe("Ok");
-      expect(vm.formatStatus("error")).toBe("Error");
+      // error/anomaly/completed are all firing states
+      expect(vm.formatStatus("error")).toBe("Firing");
+      expect(vm.formatStatus("anomaly")).toBe("Firing");
+      expect(vm.formatStatus("completed")).toBe("Firing");
+      // condition_not_satisfied is an ok state
+      expect(vm.formatStatus("condition_not_satisfied")).toBe("Ok");
+      expect(vm.formatStatus("skipped")).toBe("Skipped");
     });
 
     it("formatStatus should return Unknown for empty/null input", async () => {

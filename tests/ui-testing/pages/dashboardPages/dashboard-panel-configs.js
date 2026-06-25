@@ -75,6 +75,20 @@ export default class DashboardPanelConfigs {
       '[data-test="dashboard-addpanel-config-override-config-add-btn"]'
     );
 
+    // Column Formatting dialog (override config)
+    this.overrideDialog = page.locator(
+      '[data-test="override-config-popup-dialog"]'
+    );
+    this.overrideAddFieldBtn = page
+      .locator('[data-test="dashboard-addpanel-config-add-column"]')
+      .first();
+    this.overrideSaveBtn = page.locator(
+      '[data-test="override-config-popup-save"]'
+    );
+    this.overrideCancelBtn = page.locator(
+      '[data-test="override-config-popup-cancel"]'
+    );
+
     // Pivot table locators
     this.pivotRowTotals = page.locator(
       '[data-test="dashboard-config-pivot-row-totals"]'
@@ -108,13 +122,6 @@ export default class DashboardPanelConfigs {
     //Map locators
     this.mapType = page.locator('[data-test="dashboard-config-map-type"]');
 
-    // Override config locators
-    this.overrideColumnSelect = page.locator(
-      '[data-test="dashboard-addpanel-config-unit-config-select-column-0"]'
-    );
-    this.overrideTypeSelect = page.locator(
-      '[data-test="dashboard-addpanel-config-type-select-0"]'
-    );
     this.sidebarScrollContainer = page.locator('[data-test="panel-sidebar-content"]');
     this.connectNullValuesToggle = page.locator(
       '[data-test="dashboard-config-connect-null-values"]'
@@ -375,45 +382,68 @@ export default class DashboardPanelConfigs {
   }
 
   /**
-   * Open override config popup, select a column (by name or first available) and a unit,
-   * then save. Popup auto-adds one row on open (onMounted).
+   * Open the Column Formatting dialog, add the first field, force it numeric so the
+   * unit applies, select a unit, then save. Strictly data-test driven.
    * @param {Object} options
-   * @param {string|null} [options.columnName] - Column label to select; null = pick first option
    * @param {string} [options.unitName] - Unit label to select (e.g. "Bytes", "Milliseconds")
    */
-  async configureOverrideWithUnit({ columnName = null, unitName = "Bytes" } = {}) {
-    await this.scrollSidebarToElement(this.overrideConfig);
-    await this.overrideConfig.click();
+  async configureOverrideWithUnit({ unitName = "Bytes" } = {}) {
+    await this.openOverrideConfig();
 
-    const fieldSelect = this.page.locator('[data-test="dashboard-addpanel-config-unit-config-select-column-0"]');
-    await fieldSelect.waitFor({ state: "visible", timeout: 10000 });
-    await fieldSelect.click();
+    // Add the first available field via the "Add field" dropdown
+    await this.overrideAddFieldBtn.waitFor({ state: "visible", timeout: 10000 });
+    await this.overrideAddFieldBtn.click();
+    const firstField = this.page
+      .locator('[data-test^="dashboard-addpanel-config-add-field-"]')
+      .first();
+    await firstField.waitFor({ state: "visible", timeout: 5000 });
+    await firstField.click();
 
-    // OSelect forwards parent data-test to ListboxItem (`*-option`).
-    const columnOptions = this.page.locator('[data-test="dashboard-addpanel-config-unit-config-select-column-0-option"]');
-    if (columnName) {
-      const columnOption = this.page.locator(`[data-test="dashboard-addpanel-config-unit-config-select-column-0-option"][data-test-label="${columnName}"]`);
-      await columnOption.waitFor({ state: "visible", timeout: 5000 });
-      await columnOption.click();
-    } else {
-      // Pick first available column when column name is unknown
-      await columnOptions.first().waitFor({ state: "visible", timeout: 5000 });
-      await columnOptions.first().click();
+    const unitSelect = this.page.locator('[data-test^="o2-format-unit-"]').first();
+    if (!(await unitSelect.isVisible().catch(() => false))) {
+      const numType = this.page
+        .locator('[data-test^="o2-format-field-type-num-"]')
+        .first();
+      await numType.waitFor({ state: "visible", timeout: 5000 });
+      await numType.click();
     }
 
-    const unitSelect = this.page.locator('[data-test="dashboard-addpanel-config-unit-config-select-unit-0"]');
+    // Select the unit (OSelect forwards parent data-test to `*-option`)
     await unitSelect.waitFor({ state: "visible", timeout: 5000 });
     await unitSelect.click();
     const unitOption = this.page
-      .locator(`[data-test="dashboard-addpanel-config-unit-config-select-unit-0-option"][data-test-label="${unitName}"]`)
+      .locator(`[data-test^="o2-format-unit-"][data-test$="-option"][data-test-label="${unitName}"]`)
       .first();
+    await unitOption.waitFor({ state: "visible", timeout: 5000 });
     await unitOption.click();
 
-    // OverrideConfigPopup is now an ODialog — Save is the primary button inside the scoped panel
-    await this.page
-      .locator('[data-test="override-config-popup-dialog"] [data-test="o-dialog-primary-btn"]')
-      .click();
-    await fieldSelect.waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
+    await this.overrideSaveBtn.click();
+    await this.overrideDialog.waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
+  }
+
+  /** Open the Column Formatting dialog and wait for it to be visible. */
+  async openOverrideConfig() {
+    await this.scrollSidebarToElement(this.overrideConfig);
+    await this.overrideConfig.click();
+    await this.overrideDialog.waitFor({ state: "visible", timeout: 10000 });
+  }
+
+  /** Row locator for an added field in the Column Formatting dialog. */
+  getOverrideFieldRow(index = 0) {
+    return this.overrideDialog.locator(
+      `[data-test="override-config-row-${index}"]`,
+    );
+  }
+
+  /** Value-Formatting unit select of the selected field in the dialog. */
+  getOverrideUnitSelect() {
+    return this.overrideDialog.locator('[data-test^="o2-format-unit-"]').first();
+  }
+
+  /** Close the Column Formatting dialog via Cancel. */
+  async closeOverrideConfig() {
+    await this.overrideCancelBtn.click();
+    await this.overrideDialog.waitFor({ state: "hidden", timeout: 5000 });
   }
 
   /**
@@ -472,35 +502,6 @@ export default class DashboardPanelConfigs {
   }
 
   // Add and configure override with dynamic column and type
-  async configureOverride({ columnName, typeName, enableTypeCheckbox = true }) {
-    // Ensure the override button is visible by scrolling the sidebar
-    await this.scrollDownSidebarUntilOverrideVisible();
-    await this.overrideConfig.click();
-
-    // Select column
-    await this.overrideColumnSelect.waitFor({ state: "visible" });
-    await this.overrideColumnSelect.click();
-    const columnOption = this.page.locator(`[data-test="dashboard-addpanel-config-unit-config-select-column-0-option"][data-test-label="${columnName}"]`).first();
-    await columnOption.waitFor({ state: "visible" });
-    await columnOption.click();
-
-    // Select type
-    await this.overrideTypeSelect.waitFor({ state: "visible" });
-    await this.overrideTypeSelect.click();
-    const typeOption = this.page.locator(`[data-test="dashboard-addpanel-config-type-select-0-option"][data-test-label="${typeName}"]`).first();
-    await typeOption.waitFor({ state: "visible" });
-    await typeOption.click();
-
-    // Optionally enable checkbox corresponding to the selected type
-    if (enableTypeCheckbox) {
-      const typeCheckbox = this.page.locator('[data-test="dashboard-addpanel-config-override-unique-value-checkbox-0"]');
-      await typeCheckbox.waitFor({ state: "visible" });
-      await typeCheckbox.click();
-    }
-      const saveBtn = this.page.locator('[data-test="override-config-popup-dialog"] [data-test="o-dialog-primary-btn"]');
-      await saveBtn.waitFor({ state: "visible", timeout: 5000 });
-      await saveBtn.click();
-  } 
   // Click-hold on the sidebar and scroll down until the Override button is visible
   async scrollDownSidebarUntilOverrideVisible() {
     const sidebar = this.sidebarScrollContainer;

@@ -132,7 +132,11 @@
     "error": "错误",
     "db": "数据库",
     "discardChanges": "放弃更改",
-    "unsavedChanges": "未保存的更改"
+    "unsavedChanges": "未保存的更改",
+    "clearFilter": "清除过滤器",
+    "noMatches": "没有匹配项",
+    "remove": "移除",
+    "export": "出口"
   },
   "search": {
     "selectIndex": "选择数据流",
@@ -425,7 +429,18 @@
     "menuGroupExplain": "解释一下",
     "fieldValuesEmpty": "未找到任何值。",
     "fieldValuesEmptyHint": "尝试更宽的时间范围来查看数值。",
-    "selectLogsStreamFirst": "先选择日志数据流"
+    "selectLogsStreamFirst": "先选择日志数据流",
+    "menuMore": "更多",
+    "searchInspect": "搜索检查",
+    "vrlOnlyForTableWarning": "VRL 功能仅支持表格图表。",
+    "customDownloadTitle": "自定义下载",
+    "selectFunctionNamePlaceholder": "选择函数名称",
+    "confirmFunctionUpdateTitle": "确认更新",
+    "confirmFunctionUpdateMsg": "你确定要更新函数 {name} 吗？",
+    "traceIdLabel": "追踪编号：",
+    "enterTraceIdPlaceholder": "输入跟踪 ID",
+    "changeQueryModeTitle": "更改查询模式",
+    "changeQueryModeConfirm": "您确定要更改查询模式吗？为 X 轴、Y 轴和过滤器保存的数据将被擦除。"
   },
   "menu": {
     "home": "主页",
@@ -539,7 +554,14 @@
       "learnMore": "了解更多：",
       "quickImpl": "快速实施指南",
       "blogPost": "前端监控基础知识"
-    }
+    },
+    "sourceMaps": "源地图",
+    "service": "服务",
+    "environment": "环境",
+    "applyFilters": "应用过滤器",
+    "uploadSourceMaps": "上传源地图",
+    "files": "档案",
+    "uploadedAt": "上传于"
   },
   "about": {
     "name": "OpenObserve",
@@ -791,6 +813,10 @@
         "service_maps": {
           "name": "服务地图",
           "note": "可视化服务依赖关系"
+        },
+        "byob": {
+          "name": "自带存储桶",
+          "note": "将组织数据路由到您自己的云存储桶"
         }
       },
       "buttons": {
@@ -922,7 +948,12 @@
     "authTypeSSO": "SSO",
     "authTypeLocal": "本地人",
     "noCustomRolesHint": "未定义自定义角色——在 IAM → 角色中创建一个",
-    "externalUserCustomRoleHint": "只能通过源系统修改外部用户"
+    "externalUserCustomRoleHint": "只能通过源系统修改外部用户",
+    "subtitle": "有权访问此组织的人员",
+    "revokeInvitationTitle": "撤销邀请",
+    "revokeInvitationMsg": "你确定要撤销 {email} 的邀请吗？",
+    "deleteUsersTitle": "删除用户",
+    "deleteUsersMsg": "您确定要删除 {count} 个用户吗？"
   },
   "ticket": {
     "header": "工单",
@@ -984,7 +1015,8 @@
     "proceed_subscription": "继续订阅",
     "subscription_plan": "订阅计划",
     "makeBilledMember": "将此组织设为 {org} 的计费会员",
-    "manage": "管理"
+    "manage": "管理",
+    "nameHelpText": "仅使用字母数字字符、空格和下划线。"
   },
   "template": {
     "header": "模板",
@@ -1054,7 +1086,10 @@
     "fieldRequired": "字段为必填字段！",
     "dataType": "数据类型",
     "dataTypeRequired": "数据类型为必填项！",
-    "udsFieldAlreadyInSchema": "一个或多个选定字段已经是定义架构的一部分"
+    "udsFieldAlreadyInSchema": "一个或多个选定字段已经是定义架构的一部分",
+    "subtitle": "索引管理和流配置",
+    "streamNameHelpText": "仅使用字母数字字符、下划线和冒号。",
+    "deleteAssociatedAlertsPipelines": "删除与该直播相关的所有管道和警报"
   },
   "function": {
     "header": "函数",
@@ -1114,7 +1149,11 @@
     "vrlFunctionHint": "使用 `.` 表示当前事件。示例：.new_field = .existing_field + “已处理”",
     "askAIFunctionPlaceholder": "让 AI 帮你完成任务...",
     "enterFunctionPrompt": "输入提示生成函数",
-    "jsErrorDetails": "脚本错误详情"
+    "jsErrorDetails": "脚本错误详情",
+    "subtitle": "应用于管道的可重复使用的 VRL 函数",
+    "clickTestFunctionHint": "请单击 “测试功能” 查看事件",
+    "pleaseEnterQuery": "请输入查询",
+    "enrichmentTablesSubtitle": "丰富采集数据的查找表"
   },
   "confirmDialog": {
     "cancel": "取消",
@@ -1386,6 +1425,7 @@
     "selectDashboardLabel": "选择仪表盘",
     "selectTabLabel": "选择选项卡",
     "numbers": "数字",
+    "localeFormat": "区域格式",
     "nanoseconds": "纳秒 (ns)",
     "currency": "货币",
     "p99": "P99",
@@ -1692,7 +1732,89 @@
     "multiSqlQueryLabelHint": "图例中此查询的自定义名称（例如，“生产”）",
     "multiQueryWarning": "仅为 {chartType} 呈现查询 1",
     "trellisNotSupportedWithMultiQuery": "多次查询禁用网格布局。移除额外的查询以使用网格。",
-    "xAliasInconsistencyWarning": "X 轴别名在不同查询之间不一致：有些使用直方图，有些不使用。在所有查询中使用相同的别名类型以获得可预测的结果。"
+    "xAliasInconsistencyWarning": "X 轴别名在不同查询之间不一致：有些使用直方图，有些不使用。在所有查询中使用相同的别名类型以获得可预测的结果。",
+    "tableFiltering": "列过滤",
+    "columnFormattingTitle": "列格式",
+    "sectionValueFormatting": "值格式",
+    "configSectionFieldOverridesAliases": [
+      "Field Overrides",
+      "Override Config",
+      "Override",
+      "Column Formatting"
+    ],
+    "sectionAlignment": "对齐",
+    "alignLeft": "Left",
+    "alignCenter": "Center",
+    "alignRight": "Right",
+    "sectionStyling": "造型",
+    "sectionConditionalStyling": "条件样式",
+    "conditionThreshold": "价值",
+    "conditionAddRule": "+ 添加规则",
+    "textColor": "文本",
+    "bgColor": "背景",
+    "colorNone": "无",
+    "conditionNoRules": "还没有规则。",
+    "customColor": "自定义颜色",
+    "inlinePreview": "预览",
+    "columnFormattingSubtitle": "左侧为控制项，右侧为该列的实时示例，便于在上下文中查看。",
+    "columnFormattingPick": "选择列",
+    "columnFormattingSampleNote": "此列的示例行。",
+    "typeNumeric": "数值",
+    "typeText": "文本",
+    "sectionFieldType": "字段类型",
+    "conditionIfValue": "如果值为",
+    "conditionThenText": "然后是文字颜色",
+    "conditionAndBg": "和背景",
+    "opLessThan": "小于",
+    "opGreaterThan": "大于",
+    "opLessThanEqual": "小于或等于",
+    "opGreaterThanEqual": "大于或等于",
+    "opEqual": "等于",
+    "opNotEqual": "不等于",
+    "columnFormattingAddField": "添加字段",
+    "columnFormattingAllAdded": "已添加所有字段",
+    "columnFormattingNoFields": "未添加任何字段",
+    "columnFormattingNoFieldsHint": "使用上面的 “添加字段” 开始格式化列。",
+    "columnFormattingEmptyTitle": "格式化一列",
+    "columnFormattingEmptyHint": "选择一个字段来应用单位、对齐方式、颜色和条件规则。",
+    "columnFormattingNoFieldsToFormat": "尚未格式化任何字段",
+    "columnFormattingOneFieldToFormat": "1 个字段已格式化",
+    "columnFormattingFieldsToFormat": "格式化的字段",
+    "subtitle": "跨文件夹创建、组织和共享仪表板",
+    "deleteDashboardConfirmTitle": "删除仪表板",
+    "deleteDashboardConfirmMsg": "您确定要删除仪表板吗？",
+    "deleteDashboardsConfirmTitle": "删除仪表板",
+    "deleteDashboardsConfirmMsg": "您确定要删除 {count} 控制面板吗？",
+    "importCustom": "自定义",
+    "importCustomDesc": "从 JSON 文件或 URL 导入",
+    "importTemplates": "模板",
+    "importTemplatesDesc": "浏览并从图库导入",
+    "searchThisFolder": "这个文件夹",
+    "searchThisFolderTitle": "仅搜索此文件夹",
+    "searchAllFolders": "所有文件夹",
+    "searchAllFoldersTitle": "搜索所有文件夹",
+    "reloadDashboards": "重新加载仪表板",
+    "editVariable": "编辑变量",
+    "addOption": "添加选项",
+    "addFilter": "添加过滤器",
+    "noDataFound": "未找到任何数据",
+    "streamSelectTooltip": "选择一个流或使用像 $streamVariable 这样的变量根据另一个值动态选择流。",
+    "fieldSelectTooltip": "选择一个字段或使用像 $fieldVariable 这样的变量。如果 stream 使用变量，则字段列表将为空——手动键入字段名称。",
+    "filterInfoTooltip": "在过滤器中，您可以使用另一个变量的值来筛选当前变量的值。这可以通过使用另一个变量的名称来完成。例如：",
+    "defaultSelectAll": "默认-全选",
+    "escapeSingleQuotesTooltip": "如果启用，将在查询中对单引号进行转义。例如，像 `O'Reilly` 这样的值将被替换为 `O \"Reilly`。",
+    "byDefaultSelect": "默认情况下选择：",
+    "firstValue": "第一个值",
+    "allValues": "所有值",
+    "customValue": "自定义",
+    "showDependencies": "显示依赖关系",
+    "deleteVariable": "删除变量",
+    "deleteVariableMsg": "您确定要删除该变量吗？",
+    "appliedToTabs": "应用于选项卡：",
+    "appliedToPanels": "应用于面板：",
+    "selectVariableScope": "选择变量范围",
+    "variableScopeHelp": "如果选择了全局变量，则变量将应用于所有选项卡和面板。",
+    "showDynamicFilters": "显示动态过滤器"
   },
   "panel": {
     "header": "面板",
@@ -1981,7 +2103,14 @@
       "viewOrgGroup": "查看组织群组",
       "usageMemberLabel": "成员组织",
       "usageAllMembers": "当前组织",
-      "currentOrgTitle": "当前组织"
+      "currentOrgTitle": "当前组织",
+      "childOrgIdColumn": "子组织标识符",
+      "childOrgNameColumn": "子组织名称",
+      "notEnabledTitle": "账单组不可用",
+      "notEnabledDesc": "此组织未启用创建账单组的功能。如需此功能，请联系您的管理员。",
+      "memberOrgsTitle": "成员组织",
+      "searchMemberOrg": "搜索组织",
+      "noMemberMatch": "无匹配的组织"
     }
   },
   "message": {
@@ -2182,7 +2311,43 @@
       "rcaCompleted": "根本原因分析已完成",
       "noRcaYet": "没有根本原因分析可用。点击 “分析” 开始。",
       "search": "搜索事件...",
-      "sreChat": "询问SRE助手"
+      "sreChat": "询问SRE助手",
+      "subtitle": "事件管理与跟踪",
+      "correlationPrimaryMatch": "主要匹配",
+      "correlationSecondaryMatch": "次要匹配",
+      "correlationServiceDiscoveryTooltip": "使用来自服务发现的预计算服务标识进行关联",
+      "correlationPrimaryMatchTooltip": "通过主要匹配条件关联",
+      "correlationSecondaryMatchTooltip": "通过次要匹配条件关联",
+      "correlationAlertId": "告警 ID",
+      "correlationAlertIdTooltip": "未找到匹配的维度 — 已按告警 ID 隔离",
+      "correlatedByServiceDiscovery": "维度",
+      "correlatedBySemanticGroups": "维度",
+      "correlatedByAlertId": "告警 ID",
+      "goBack": "返回",
+      "incident": "事件",
+      "uniqueAlerts": "唯一告警",
+      "relatedAlerts": "相关告警",
+      "alertTriggers": "告警触发",
+      "incidentTimeline": "事件时间线",
+      "incidentDetails": "事件详情",
+      "incidentId": "事件 ID",
+      "incidentName": "事件名称",
+      "initialTrigger": "初始触发",
+      "noDimensionsAvailable": "无可用维度",
+      "noAlertDetailsAvailable": "无可用告警详情",
+      "clickOnTriggerToViewDetails": "点击表格中的触发项以查看详情",
+      "refreshCorrelatedData": "刷新关联数据",
+      "showingCorrelatedLogs": "显示事件时间范围内的关联日志",
+      "showingCorrelatedMetrics": "显示事件时间范围内的关联指标",
+      "showingCorrelatedTraces": "显示事件时间范围内的关联追踪",
+      "incidentTitleUpdatedSuccess": "事件标题更新成功",
+      "markAsAcknowledgedTooltip": "将事件标记为已确认并正在处理",
+      "markAsResolvedTooltip": "将事件标记为已解决并关闭",
+      "reopenIncidentTooltip": "重新打开此已解决的事件",
+      "editIncidentTitleTooltip": "编辑事件标题",
+      "firedTimes": "已触发 {count} 次",
+      "incidentAnalysis": "事件分析",
+      "noAlertActivityData": "无告警活动数据"
     },
     "events": "活动",
     "multiWindow": "与过去比较",
@@ -2230,7 +2395,9 @@
       "alertName": "告警名称",
       "streamInfo": "数据源",
       "alertType": "告警类型",
-      "queryCondition": "查询条件"
+      "queryCondition": "查询条件",
+      "configuringRealTime": "正在为以下对象配置实时告警",
+      "configuringScheduled": "正在为以下对象配置计划告警"
     },
     "correlation": {
       "title": "告警关联",
@@ -2387,7 +2554,8 @@
       "comparingText": "将当前窗口查询结果与先前 {offset} 的查询结果进行比较。",
       "addComparisonWindow": "添加比较窗口",
       "goToConditions": "转到条件",
-      "goToConditionsTooltip": "单击 “转到条件” 以验证所选比较窗口的事件"
+      "goToConditionsTooltip": "单击 “转到条件” 以验证所选比较窗口的事件",
+      "comparisonDisabledTooltip": "比较窗口仅在 SQL 模式下受支持。请在“告警规则”选项卡中切换到 SQL。"
     },
     "alertSettings": {
       "cronSchedule": "Cron 时间表",
@@ -2399,13 +2567,22 @@
       "frequencyTooltipCron": "标准 UNIX cron 格式，有 5 个由空格分隔的字段：[0-59 分钟] [小时 0-23] [本月第 1-31 天] [第 1-12 个月或 1 月至 12 月] [周日 0-7 或 '1L-7L'，0 和 7 表示星期日]。",
       "timezoneWarning": "警告：显示的时区是近似值。手动验证并选择正确的时区。",
       "destinationsTooltip": "选择一个或多个目标发送警报通知。",
-      "templateTooltip": "可选：选择一个模板用于此警报中的所有目标。模板允许您自定义警报消息的格式。如果未选中，则每个目标都将使用其自己的配置模板。"
+      "templateTooltip": "可选：选择一个模板用于此警报中的所有目标。模板允许您自定义警报消息的格式。如果未选中，则每个目标都将使用其自己的配置模板。",
+      "sectionTitle": "设置",
+      "fieldRequired": "此字段为必填项！",
+      "noDestinationsAvailable": "无可用目标",
+      "refreshDestinations": "刷新最新目标",
+      "createsIncident": "创建事件",
+      "createsIncidentTooltip": "如果告警可以创建事件，则不会发送专门的通知。相反，当创建新事件或新告警类型加入现有事件时，会发送有关该事件的通知。"
     },
     "advanced": {
       "addVariable": "添加变量",
       "variablesTooltip": "变量用于将数据从警报传递到目标。",
       "rowTemplateTooltip": "行模板用于格式化警报消息。",
-      "templateType": "模板类型："
+      "templateType": "模板类型：",
+      "noTemplatesAvailable": "无可用模板",
+      "refreshTemplates": "刷新最新模板",
+      "selectTemplate": "选择模板"
     },
     "addConditions": "添加条件",
     "sqlEditor": "SQL 编辑器",
@@ -2509,7 +2686,28 @@
       "destinationRequired": "至少需要一个目标！",
       "disabledNotificationsInfo": "异常检测仍将运行并将结果写入 _anomalies 流。启用通知以在检测到异常时接收警报。"
     },
-    "anomalyName": "异常名称"
+    "anomalyName": "异常名称",
+    "subtitle": "警报规则和通知渠道",
+    "searchThisFolder": "这个文件夹",
+    "searchAllFolders": "所有文件夹",
+    "streamConfig": "直播配置",
+    "alertRules": "警报规则",
+    "addCondition": "添加条件",
+    "conditionOf": "的",
+    "conditionIs": "是",
+    "matchingTypeFound": "找到匹配的 {type}",
+    "matchingMetricsFound": "已找到匹配指标",
+    "metricsValueFieldTooltip": "默认情况下，指标流将其测量结果存储在 “值” 字段中",
+    "howOftenCheckTooltip": "多久检查一次此警报状态",
+    "alertIfNoOfEvents": "事件数量时发出警报",
+    "alertIfValueIs": "如果值为，则发出警报",
+    "havingSeries": "有系列",
+    "clearMultiWindowsTitle": "清除多窗口？",
+    "lastTrainedAt": "上次训练于",
+    "noTemplatesMsg": "看来你还没有创建任何模板。要创建提醒，你需要至少有一个目的地和一个模板",
+    "createTemplateBtn": "创建模板",
+    "noDestinationsMsg": "看来你还没有创建任何目的地。要创建提醒，你需要至少有一个目的地和一个模板",
+    "createDestinationBtn": "创建目的地"
   },
   "alert_templates": {
     "header": "模板",
@@ -2785,7 +2983,89 @@
       "noMatchingDimensions": "没有匹配的维度",
       "otherGroup": "其他",
       "fallbackGroup": "回退",
-      "fallbackNote": "当没有特定环境的工作负载匹配时，回退维度（如 'service'）适用于所有环境。"
+      "fallbackNote": "当没有特定环境的工作负载匹配时，回退维度（如 'service'）适用于所有环境。",
+      "serviceDiscoveryTab": "检测规则",
+      "fieldAliasesTab": "字段映射",
+      "fieldAliasesSaved": "字段别名保存成功",
+      "serviceNameFieldAliasNote": "映射到此组的实际字段名称在以下位置配置",
+      "viewFieldAliases": "编辑字段别名 →",
+      "fieldAliasesSaveError": "保存字段别名失败",
+      "fieldAliasesUnsavedConfirm": "您有未保存的字段映射更改。是否放弃并离开？",
+      "lastSeen": "最后出现",
+      "serviceIdentitySetupTitle": "服务标识设置",
+      "serviceIdentitySetupDescription": "配置如何在您的遥测数据中识别服务",
+      "serviceNameFieldLabel": "服务名称字段",
+      "serviceNameFieldHelp": "在您的遥测数据中哪个字段用于标识服务名称",
+      "serviceNameFrom": "服务名称来自",
+      "serviceNameDerivedPrefix": "服务名称是使用以下位置定义的服务名称字段派生的",
+      "serviceNameFields": "字段别名",
+      "serviceNameDetectedFrom": "服务名称检测自：",
+      "serviceNameNotDetected": "尚未在您的数据中检测到服务名称字段",
+      "serviceNameNotDetectedHelp": "请确保您的遥测数据包含 service.name 或类似的字段",
+      "serviceNameExpandedHelp": "您数据中的这些字段名称都映射到服务名称：",
+      "serviceNameConfiguredNotSeen": "已配置但尚未在您的数据中出现",
+      "customizeFieldMappings": "自定义字段映射",
+      "fieldMappingDialogHelp": "添加或移除应在您的遥测数据中被识别为服务名称的字段名称。",
+      "fieldMappingPlaceholder": "输入字段名称并按 Enter",
+      "foundInLogs": "在日志中找到",
+      "foundInTraces": "在追踪中找到",
+      "foundInMetrics": "在指标中找到",
+      "distinguishByLabel": "区分服务依据",
+      "distinguishByHelp": "选择用于定义服务运行位置的字段。例如，cluster + namespace + deployment 共同为每个服务创建唯一标识。最多 5 个字段。",
+      "serviceOptionalLabel": "在没有服务属性的情况下进行关联",
+      "serviceOptionalHelp": "仅使用以下属性匹配流，忽略服务属性",
+      "noFieldsConfiguredYet": "尚未配置消歧字段。",
+      "addField": "添加字段",
+      "addFieldTooltip": "添加另一个字段以帮助唯一标识服务（最多 5 个）。例如：region、namespace 或 environment。",
+      "addGroup": "添加组",
+      "addGroupTooltip": "为不同环境创建一组单独的消歧字段（例如，Kubernetes 与 AWS 使用不同的字段）",
+      "autoSuggestedBanner": "自动建议这些字段是因为它们的唯一值很少（低基数）并且出现在您的大多数服务中 — 非常适合区分具有相同名称的服务。您可以在保存前自定义它们。",
+      "addDisambiguationField": "添加另一个",
+      "removeDisambiguationField": "移除字段",
+      "nameFieldLockedNote": "服务名称字段在首次配置后无法更改",
+      "noGroupsAvailable": "无可用字段组",
+      "selectField": "选择字段",
+      "detectedLabel": "我们根据您的数据检测到 {type} 工作负载。",
+      "suggestionPrompt": "是否应用该建议？",
+      "applySuggestion": "应用建议",
+      "logStreams": "日志流",
+      "traceStreams": "追踪流",
+      "metricStreams": "指标流",
+      "saveIdentityConfig": "保存配置",
+      "identityConfigSaved": "服务标识配置保存成功",
+      "identityConfigSaveFailed": "保存服务标识配置失败",
+      "loadRecommendationsFailed": "加载建议失败",
+      "resetServices": "重置服务",
+      "resetServicesTooltip": "删除所有已发现的服务。随着新数据的到来，它们将自动被重新发现。",
+      "resetServicesConfirmTitle": "重置所有已发现的服务？",
+      "resetServicesConfirmMessage": "这将删除此组织所有已发现的服务。随着新遥测数据的摄取，服务将自动被重新发现。此操作无法撤销。",
+      "resetServicesConfirmWarning": "随着新遥测数据的摄取，服务将自动被重新发现。此操作无法撤销。",
+      "resetServicesSuccess": "已成功删除 {count} 个已发现的服务。",
+      "resetServicesFailed": "重置服务失败",
+      "workload": "工作负载",
+      "goToConfiguration": "前往配置",
+      "configureServicesHint": "以配置如何识别和分组服务。",
+      "filterBy": "筛选依据：",
+      "selectFieldPlaceholder": "选择字段",
+      "selectValuePlaceholder": "选择值",
+      "selectFieldFirst": "请先选择字段",
+      "instanceSingular": "实例",
+      "instancePlural": "实例",
+      "serviceSingular": "服务",
+      "serviceCountSingular": "{count} 个服务",
+      "serviceCountPlural": "{count} 个服务",
+      "instancesCount": "（{count} 个实例）",
+      "noDimensions": "无维度",
+      "defaultSetWarningTitle": "关联可能不可靠。",
+      "defaultSetWarningBody": "此实例没有消歧 — 它是在没有任何工作负载匹配的情况下被发现的（无 cluster、namespace 或 environment 上下文）。日志和追踪可能来自同一服务名称的不同部署。",
+      "instanceIdentity": "实例标识",
+      "noDimensionsCatchAll": "无维度 — 通配实例",
+      "streamSources": "流来源",
+      "openInLogsTooltip": "使用服务筛选器在日志中打开",
+      "fieldNameMapping": "字段名称映射",
+      "logsWithCount": "日志（{count}）",
+      "tracesWithCount": "追踪（{count}）",
+      "metricsWithCount": "指标（{count}）"
     },
     "pageSubtitle": "调整应用程序的设置",
     "platformSettings": "平台设置",
@@ -2828,7 +3108,29 @@
     "usageStreamEnabledLabel": "启用使用流",
     "aiToolsets": "AI 工具集",
     "llmModelPricing": "LLM 模型定价",
-    "ingestionTokens": "写入令牌"
+    "ingestionTokens": "写入令牌",
+    "groupGeneral": "常规",
+    "groupAccessSecurity": "访问与安全",
+    "groupDestinationsTemplates": "目标与模板",
+    "groupDataAI": "数据与 AI",
+    "groupOperations": "运维",
+    "groupAccount": "账户",
+    "generalDesc": "主题、查询默认值和核心首选项",
+    "orgDesc": "组织参数和标识符",
+    "cipherKeysDesc": "用于敏感字段的加密密钥",
+    "regexPatternsDesc": "用于脱敏的可重用 regex 模式",
+    "domainManagementDesc": "限制仅允许的 SSO 域登录",
+    "alertDestinationsDesc": "触发的告警的投递位置",
+    "pipelineDestinationsDesc": "管道输出的外部目标",
+    "templatesDesc": "可重用的告警消息模板",
+    "storageSettingsDesc": "按组织划分的存储配置",
+    "modelPricingDesc": "LLM 模型成本配置",
+    "correlationSettingsDesc": "遥测关联配置",
+    "llmProvidersDesc": "用于在线评估的 LLM 提供商",
+    "queryManagementDesc": "检查并取消正在运行的查询",
+    "nodesDesc": "集群节点及其健康状况",
+    "licenseDesc": "企业版许可证详情",
+    "organizationManagementDesc": "创建和管理组织"
   },
   "iam": {
     "users": "用户",
@@ -2861,7 +3163,19 @@
     "externalUserWarningTitle": "外部用户警告",
     "externalUserWarningMessage": "将外部用户直接添加到角色不会授予权限。改为将它们添加到用户组。",
     "invitations": "邀请",
-    "ingestionTokens": "写入令牌"
+    "ingestionTokens": "写入令牌",
+    "sectionAccess": "访问",
+    "sectionPermissions": "权限",
+    "sectionOrganization": "组织",
+    "usersDesc": "有权访问此组织的人员",
+    "serviceAccountsDesc": "API 的编程访问令牌",
+    "ingestionTokensDesc": "用于向该组织摄取数据的代币",
+    "invitationsDesc": "待处理和已发送的成员邀请",
+    "groupsDesc": "将用户分组在一起以分配角色",
+    "rolesDesc": "定义权限和访问策略",
+    "quotaDesc": "每个角色适用的使用限制",
+    "organizationsDesc": "您可以访问的组织",
+    "nameHelpText": "仅使用字母数字和 “_” 字符，不含空格。"
   },
   "pipeline": {
     "header": "流水线",
@@ -3022,7 +3336,14 @@
     "dimensionWidth": "宽度 (px)",
     "dimensionHeight": "高度 (px)",
     "imagePreview": "包括内联仪表板预览图片",
-    "customDimensions": "自定义尺寸（高级）"
+    "customDimensions": "自定义尺寸（高级）",
+    "subtitle": "预定报告和导出",
+    "searchThisFolder": "这个文件夹",
+    "searchAllFolders": "所有文件夹",
+    "reloadReports": "重新加载报告",
+    "moveToFolder": "移至文件夹",
+    "deleteReportsTitle": "删除报告",
+    "deleteReportsMsg": "您确定要删除 {count} 份报告吗？"
   },
   "queries": {
     "runningQueries": "运行查询",
@@ -3150,19 +3471,27 @@
         "p99Latency": "P99",
         "avgLatency": "平均延迟",
         "lastSeen": "上次看到",
-        "operations": "运营"
+        "operations": "运营",
+        "avgDuration": "平均时长",
+        "maxDuration": "最大时长"
       },
       "status": {
         "healthy": "健康",
         "warning": "警告",
-        "degraded": "已降级"
+        "degraded": "已降级",
+        "critical": "严重"
       },
       "viewTraces": "查看踪迹",
       "exportCsv": "导出 CSV",
       "justNow": "刚才",
       "minutesAgo": "{n} 我之前",
       "hoursAgo": "{n} 小时前",
-      "daysAgo": "{n} d 之前"
+      "daysAgo": "{n} d 之前",
+      "serviceLabel": "服务",
+      "servicesLabel": "服务",
+      "legend": {
+        "title": "错误率"
+      }
     },
     "noErrorPresent": "此跨度没有错误",
     "httpStatusCode": "HTTP 状态码",
@@ -3200,8 +3529,12 @@
         "duration": "持续时间",
         "tokens": "词元",
         "cost": "成本",
-        "status": "状态"
-      }
+        "status": "状态",
+        "user": "用户",
+        "firstMessage": "首条消息"
+      },
+      "streamLabel": "流",
+      "unknownUser": "未知用户"
     },
     "sessionDetail": {
       "backToSessions": "返回会话",
@@ -3243,7 +3576,15 @@
         "output": "输出",
         "total": "总计",
         "cost": "成本",
-        "spans": "跨度"
+        "spans": "跨度",
+        "llmCalls": "LLM 调用",
+        "toolCalls": "工具调用",
+        "otherCalls": "其他",
+        "otherCallsTooltip": "具有无法识别的操作名称的 gen_ai span："
+      },
+      "fullscreen": {
+        "expandTurn": "全屏查看此轮次",
+        "close": "关闭"
       }
     },
     "openInFullView": "以全视图打开",
@@ -3280,11 +3621,28 @@
       "expandRange": "扩大时间范围",
       "expandRangeDescAbsolute": "切换到更宽的相对时间范围",
       "removeFilter": "移除过滤器",
-      "selectedRange": "所选范围"
+      "selectedRange": "所选范围",
+      "descOutOfRange": "您的时间窗口不包含来自此流的任何数据。跳转到最后出现数据的时间。",
+      "descDataAtBoundary": "该流在此窗口内有数据，但没有匹配的追踪。请尝试扩大时间范围。",
+      "jumpToData": "跳转到最新数据"
     },
     "showAll": "显示全部",
     "filterByErrors": "按错误筛选",
-    "clearErrorFilter": "清除错误过滤器"
+    "clearErrorFilter": "清除错误过滤器",
+    "spansTab": "跨度",
+    "tracesTab": "痕迹",
+    "serviceGraphTab": "服务图",
+    "treeView": "树视图",
+    "graphView": "图表视图",
+    "layoutHorizontal": "水平",
+    "layoutVertical": "垂直",
+    "layoutForce": "原力布局",
+    "exportTraces": "导出跟踪",
+    "waterfall": "瀑布",
+    "flameGraph": "火焰图",
+    "traceGraph": "追踪图",
+    "dag": "DAG",
+    "thread": "线程"
   },
   "invitation": {
     "pendingInvitations": "待处理的邀请",
@@ -3454,7 +3812,38 @@
     "failed_to_load": "加载模式失败",
     "no_patterns_selected": "请至少选择一种模式",
     "name_required": "* 姓名为必填项",
-    "pattern_required": "* 图案为必填项"
+    "pattern_required": "* 图案为必填项",
+    "associated_breadcrumb": "流详情",
+    "associated_search_placeholder": "搜索",
+    "applied_patterns_count": "已应用的模式（{count}）",
+    "all_patterns_count": "所有模式（{count}）",
+    "no_data_available": "无可用数据",
+    "no_patterns_applied_title": "尚未应用任何模式",
+    "no_patterns_applied_subtitle": "浏览模式库，开始对您的字段应用正则表达式。",
+    "pattern_name": "模式名称",
+    "when_value_matches": "当值匹配时",
+    "redact": "脱敏",
+    "redact_hint": "替换为 [REDACTED]",
+    "drop": "丢弃",
+    "drop_hint": "完全丢弃该字段",
+    "hash": "哈希",
+    "hash_hint": "替换为可搜索的哈希值",
+    "detect_at": "检测于",
+    "ingestion": "摄取",
+    "query": "查询",
+    "test_pattern": "测试模式",
+    "test_input": "测试输入",
+    "regex_pattern_label": "Regex 模式",
+    "input_string": "输入字符串",
+    "input_string_placeholder": "例如：1234567890",
+    "output": "输出",
+    "output_string_placeholder": "输出字符串",
+    "click_test_input_hint": "请点击“测试输入”以查看结果",
+    "remove_pattern": "移除模式",
+    "add_pattern": "添加模式",
+    "remove_pattern_confirm_msg": "确定要从该字段中移除此模式吗？",
+    "failed_to_test_string": "测试字符串失败",
+    "select_detect_at_option": "请选择检测位置选项"
   },
   "search_history": {
     "title": "搜索历史",
@@ -3682,7 +4071,10 @@
         "duration": "持续时间",
         "startBeforeEnd": "开始时间必须早于结束时间",
         "endAfterStart": "结束时间必须晚于开始时间"
-      }
+      },
+      "filtersLabel": "筛选器",
+      "errorDetails": "获取日志数据时发生错误。请重试。",
+      "viewLogs": "查看日志"
     },
     "viewInTraces": "在轨迹中查看",
     "viewInTracesTooltip": "打开包含 RED 指标仪表板和所有相关追踪记录的跟踪页面",
@@ -4055,7 +4447,12 @@
     "emptyActionLogs": "浏览日志",
     "emptyActionLogsDesc": "搜索和筛选您的日志流",
     "emptyActionTraces": "探索踪迹",
-    "emptyActionTracesDesc": "检查分布式跟踪和服务延迟"
+    "emptyActionTracesDesc": "检查分布式跟踪和服务延迟",
+    "viewAll": "查看全部",
+    "showingOf": "显示 {总计} 中的 {已显示}",
+    "colErrorRate": "错误率",
+    "colLatency": "延迟",
+    "colReqs": "要求"
   },
   "chatHistory": {
     "title": "聊天",
@@ -4168,7 +4565,13 @@
       "one": "让我看看过去一小时的错误...",
       "two": "编写 VRL 来解析 nginx 日志中的 JSON...",
       "three": "为 K8s 节点运行状况构建仪表板..."
-    }
+    },
+    "autoNavigation": {
+      "label": "自动导航",
+      "enabledTooltip": "启用自动导航-O2 Assistant 无需确认即可自动导航",
+      "disabledTooltip": "自动导航已禁用-O2 Assistant 会在导航前询问"
+    },
+    "attachImageTooltip": "附加图片（PNG、JPEG，最大 2MB）"
   },
   "emptyState": {
     "noSearchResults": {
@@ -4288,7 +4691,29 @@
       "reports": "报告",
       "queries": "查询",
       "serviceAccounts": "服务账号",
-      "invitations": "邀请函"
+      "invitations": "邀请函",
+      "searchJobs": "搜索作业",
+      "groups": "组",
+      "roles": "角色",
+      "anomalyConfigs": "异常检测配置",
+      "apiLimits": "API 限制",
+      "roleLimits": "角色限制",
+      "ingestionTokens": "摄取令牌",
+      "organizations": "组织",
+      "alertDestinations": "目标",
+      "pipelineDestinations": "目标",
+      "alertTemplates": "模板",
+      "evalTemplates": "评估模板",
+      "enrichmentTables": "增强表",
+      "cipherKeys": "加密密钥",
+      "aiToolsets": "AI 工具集",
+      "llmProviders": "LLM 提供商",
+      "sourceMaps": "源映射",
+      "backfillJobs": "回填作业",
+      "scorers": "评分器",
+      "evalJobs": "评估作业",
+      "scoreConfigs": "评分配置",
+      "pipelineHistory": "管道历史记录"
     },
     "noDashboardsInFolder": {
       "title": "此文件夹中没有仪表板",
@@ -4470,6 +4895,51 @@
       "evalJobs": "评测任务",
       "scorers": "评分器",
       "scoreConfigs": "评分配置"
+    },
+    "kpi": {
+      "totalCost": "总成本",
+      "totalTokens": "代币总数",
+      "totalTraces": "轨迹总数",
+      "p95Latency": "P95 延迟",
+      "errorRate": "错误率"
+    },
+    "panels": {
+      "costTrend": {
+        "title": "成本趋势",
+        "subtitle": "按型号划分的美元"
+      },
+      "tokenTrend": {
+        "title": "代币趋势",
+        "subtitle": "按型号分类的代币"
+      },
+      "spanTrend": {
+        "title": "跨度趋势",
+        "subtitle": "按种类划分的跨度数"
+      },
+      "latencyPercentiles": {
+        "title": "延迟 p50/p95/p99",
+        "subtitle": "所有 LLM 电话"
+      },
+      "tracesOverTime": {
+        "title": "随着时间的推移留下痕",
+        "subtitle": "按服务划分的跟踪次数"
+      },
+      "errorsOverTime": {
+        "title": "一段时间内的错误",
+        "subtitle": "错误数"
+      },
+      "spansByModel": {
+        "title": "按型号划分的跨度",
+        "subtitle": "每个型号的呼叫次数"
+      },
+      "tokensByModel": {
+        "title": "按型号分类的代币",
+        "subtitle": "每个模型的代币总数"
+      },
+      "recentErrors": {
+        "title": "最近的错误",
+        "subtitle": "最近 10 次失败的跨度"
+      }
     }
   },
   "onlineEvals": {
@@ -4494,13 +4964,21 @@
     },
     "actions": {
       "edit": "编辑",
-      "delete": "删除"
+      "delete": "删除",
+      "export": "导出",
+      "activate": "激活",
+      "pause": "暂停",
+      "activated": "作业已激活",
+      "paused": "作业已暂停",
+      "activateError": "激活作业失败",
+      "pauseError": "暂停作业失败"
     },
     "tabs": {
       "jobs": "评测任务",
       "scorers": "评分器",
       "scoreConfigs": "分数配置",
-      "providers": "模型提供商"
+      "providers": "模型提供商",
+      "quality": "质量"
     },
     "singular": {
       "jobs": "评测任务",
@@ -4524,7 +5002,11 @@
     "buttons": {
       "cancel": "取消",
       "create": "创建",
-      "save": "保存"
+      "save": "保存",
+      "close": "关闭",
+      "remove": "移除",
+      "saveAsDraft": "保存为草稿",
+      "createAndActivate": "创建并激活"
     },
     "scorerTypeDialog": {
       "title": "创建新的评分器",
@@ -4534,7 +5016,11 @@
       "remoteTitle": "远程评分器",
       "remoteDescription": "调用自己的 HTTP 端点进行评分。",
       "codeTitle": "代码评分器",
-      "codeDescription": "即将推出。"
+      "codeDescription": "即将推出。",
+      "llmJudgeCta": "配置评判器",
+      "remoteCta": "配置端点",
+      "codeCta": "将在未来版本中提供",
+      "comingSoonBadge": "即将推出"
     },
     "provider": {
       "backTo": "返回提供商",
@@ -4554,7 +5040,15 @@
       "availableModelsPlaceholder": "gpt-4o-mini，gpt-4.1",
       "useAsDefault": "用作默认提供商",
       "authConfigLabel": "身份验证配置 JSON",
-      "saveError": "无法保存提供商"
+      "saveError": "无法保存提供商",
+      "authConfigHelp": "凭据在静态时加密，保存后无法读取。",
+      "apiKeyLabel": "API 密钥",
+      "apiKeyPlaceholder": "输入 API 密钥",
+      "apiKeyHelp": "在静态时加密存储且永不回读。编辑时留空可保留现有密钥。",
+      "authSection": "身份验证",
+      "authEditNote": "凭据无法回读。仅当您想轮换 API 密钥时才重新输入。",
+      "cannotRename": "创建后无法重命名。",
+      "availableModelsHelp": "可选。此提供商上可用模型的逗号分隔列表。"
     },
     "scoreConfig": {
       "createTitle": "新的分数配置",
@@ -4571,7 +5065,129 @@
         "categorical": "分类的",
         "boolean": "布尔值"
       },
-      "saveError": "无法保存分数配置"
+      "saveError": "无法保存分数配置",
+      "booleanValues": "true / false",
+      "detail": {
+        "eyebrow": "评分配置",
+        "close": "关闭",
+        "statusActive": "已激活",
+        "statusInactive": "未激活",
+        "createdShort": "创建于",
+        "tabs": {
+          "overview": "概览",
+          "versions": "版本",
+          "usedBy": "被使用于"
+        },
+        "descriptionSection": "描述",
+        "configurationSection": "配置",
+        "dataTypeLabel": "数据类型",
+        "rangeLabel": "范围",
+        "categoriesLabel": "类别",
+        "valuesLabel": "值",
+        "thresholdSection": "健康阈值",
+        "thresholdHint": "将评分计为健康",
+        "noThreshold": "未声明",
+        "noThresholdHint": "未声明阈值 — 此维度上的评分将不会影响质量状态信号。",
+        "usedByIntro": "任何使用此维度名称发出值的评分器。",
+        "usedByEmpty": "尚无评分器引用此配置。",
+        "scorerTypeLlmJudge": "LLM 评判器",
+        "scorerTypeRemote": "远程",
+        "versionsIntro": "对范围、类别或健康阈值的每次更改都会创建一个新版本。历史评分仍与产生它们的版本关联。",
+        "activeVersionChip": "已激活",
+        "lastUpdated": "最后更新",
+        "metadataSection": "元数据",
+        "statusLabel": "状态",
+        "versionLabel": "版本",
+        "createdLabel": "创建于",
+        "updatedLabel": "更新于"
+      },
+      "editTitlePrefix": "编辑",
+      "eyebrow": "评分配置",
+      "sectionTitle": "评分配置",
+      "listTitle": "评分配置",
+      "listSubtitle": "评分器产生的软模式维度。",
+      "searchPlaceholder": "搜索配置",
+      "allTypes": "所有类型",
+      "newButton": "新建评分配置",
+      "saveButton": "保存更改",
+      "createButton": "创建",
+      "columns": {
+        "index": "#",
+        "name": "名称",
+        "type": "类型",
+        "rangeValues": "范围 / 值",
+        "healthy": "健康",
+        "activeVersion": "活动版本",
+        "usedBy": "被使用于",
+        "created": "创建于",
+        "actions": "操作"
+      },
+      "active": "活动",
+      "usedByScorers": "{count} 个评分器",
+      "usedByScorer": "{count} 个评分器",
+      "noHealthy": "—",
+      "createInfoNumeric": "定义此维度上的评分何时被视为健康。超出此范围的评分将在追踪列表、会话和其他视图中触发质量问题。",
+      "editInfoBannerEmphasis": {
+        "numeric": "修改范围或健康阈值会创建 {nextVersion}。",
+        "categorical": "修改类别或健康阈值会创建 {nextVersion}。",
+        "boolean": "修改健康值会创建 {nextVersion}。"
+      },
+      "editInfoBannerDetail": "历史评分仍与产生它们的版本关联。仅描述的编辑会就地更新。",
+      "createInfoSubtitle": "仅描述的编辑会就地更新 {version}。",
+      "namePlaceholder": "例如 “faithfulness”",
+      "nameHelp": "仅限小写字母、数字和下划线。用作稳定的标识符。",
+      "cannotBeRenamed": "无法重命名",
+      "descriptionPlaceholder": "此维度衡量什么？",
+      "descriptionHelp": "仅描述的编辑不会创建新版本。",
+      "dataTypeLocked": "已锁定",
+      "dataTypeCannotChange": "创建后无法更改",
+      "dataTypeHelp": {
+        "numeric": "以某个范围内的数字进行评分",
+        "categorical": "以 N 个标签之一进行评分",
+        "boolean": "以 true / false 进行评分"
+      },
+      "minLabel": "最小值",
+      "maxLabel": "最大值",
+      "addCategoryPlaceholder": "添加类别",
+      "addCategoryButton": "添加",
+      "booleanInfo": "布尔配置接受 {trueLabel} / {falseLabel} 值。无需额外配置。",
+      "healthyThresholdTitle": "健康阈值",
+      "optional": "可选",
+      "healthyThresholdIntro": "定义此维度上的评分何时被视为健康。超出此范围的评分将在追踪列表、会话和其他视图中触发质量问题。",
+      "healthyWhenValueIs": "当值满足以下条件时为健康：",
+      "healthyCategories": "健康类别：",
+      "healthyCategoriesHint": "勾选所有计为健康的值。",
+      "healthyValue": "健康值：",
+      "gteLabel": "大于或等于",
+      "lteLabel": "小于或等于",
+      "trueIsHealthy": "true 为健康",
+      "trueIsHealthyHint": "评分为 false 时触发质量问题。",
+      "falseIsHealthy": "false 为健康",
+      "falseIsHealthyHint": "评分为 true 时触发质量问题。",
+      "thresholdEmptyHint": "将此项留空意味着此维度不会影响整个产品的质量状态信号。评分仍会被记录，但不会触发问题指示器。",
+      "empty": {
+        "title": "尚无评分配置",
+        "description": "评分配置定义了您的评分器产生的维度 — 名称、数据类型、值范围和健康阈值。创建一个以开始连接在线评估。",
+        "chipTypes": "数值、类别、布尔",
+        "chipThreshold": "健康阈值"
+      },
+      "import": {
+        "title": "导入评分配置",
+        "button": "导入",
+        "customLabel": "自定义",
+        "customSubtitle": "从 JSON 文件或 URL 导入",
+        "libraryLabel": "库",
+        "librarySubtitle": "浏览并从精选目录导入",
+        "libraryDrawerTitle": "评分配置库",
+        "outputMessages": "输出消息",
+        "creation": "评分配置创建",
+        "errors": {
+          "title": "验证错误"
+        }
+      },
+      "export": {
+        "bulkButton": "导出"
+      }
     },
     "scorer": {
       "backTo": "返回评分器",
@@ -4623,7 +5239,203 @@
         "authHint": "保存之前，请检查提供商凭据。",
         "schemaHeader": "架构不匹配",
         "schemaHint": "响应与配置的输出架构不匹配。",
-        "valuePlaceholder": "{variable} 的值"
+        "valuePlaceholder": "{variable} 的值",
+        "disabledHint": "填写名称、提供商、模板和每个变量值以运行测试。",
+        "errorHeader": "测试失败",
+        "errorFallback": "评分器测试失败。请查看服务器日志了解详情。",
+        "resultScore": "评分",
+        "resultLatency": "延迟",
+        "resultModel": "模型",
+        "resultTokens": "令牌",
+        "resultReasoning": "推理",
+        "resultRaw": "原始响应"
+      },
+      "detail": {
+        "close": "关闭",
+        "eyebrow": "评分器",
+        "refresh": "刷新",
+        "descriptionSection": "描述",
+        "configurationSection": "配置",
+        "scorerTypeLabel": "评分器类型",
+        "providerLabel": "提供商",
+        "providerUnknown": "未知",
+        "modelLabel": "模型",
+        "endpointLabel": "端点",
+        "producesSection": "产生的评分配置",
+        "producesEmpty": "此评分器不写入任何评分配置。",
+        "promptSection": "评判提示词",
+        "requestTemplateSection": "请求模板",
+        "variablesSuffix": "变量",
+        "outputSchemaSection": "输出模式",
+        "usedBySection": "被使用于",
+        "usedByIntro": "在其管道中引用此评分器的作业。",
+        "usedByEmpty": "尚无作业引用此评分器。",
+        "versionsIntro": "版本是评分器配置的不可变快照。活动版本是作业当前运行的版本。",
+        "activeVersionChip": "已激活",
+        "lastUpdated": "最后更新",
+        "metadataSection": "元数据",
+        "versionLabel": "版本",
+        "createdLabel": "创建于",
+        "updatedLabel": "更新于",
+        "typeLlmJudge": "LLM 评判器",
+        "typeRemote": "远程",
+        "tabs": {
+          "configuration": "配置",
+          "versions": "版本",
+          "runs": "运行",
+          "usedBy": "被使用于"
+        },
+        "kpis": {
+          "totalRuns": "总运行次数（24 小时）",
+          "totalRunsSub": "跨所有引用的作业",
+          "successRate": "成功率",
+          "successRateSub": "过去 24 小时",
+          "avgLatency": "平均延迟",
+          "avgLatencySub": "跨运行的 p50",
+          "usedBy": "被使用于",
+          "usedBySubSingular": "个作业",
+          "usedBySubPlural": "个作业"
+        },
+        "runs": {
+          "showingPrefix": "显示",
+          "showingOf": "/",
+          "showingSuffix": "次运行",
+          "empty": "此窗口内无评分器运行。",
+          "spanLabel": "Span",
+          "traceLabel": "Trace",
+          "jobUnknown": "—",
+          "col": {
+            "time": "时间",
+            "job": "作业",
+            "target": "目标",
+            "score": "评分",
+            "latency": "延迟",
+            "status": "状态"
+          }
+        }
+      },
+      "listTitle": "评分器",
+      "listSubtitle": "评分器针对您的追踪运行，并在已定义的维度上产生评分。",
+      "searchPlaceholder": "搜索评分器",
+      "allTypes": "所有类型",
+      "newButton": "新建评分器",
+      "usedByJobs": "{count} 个作业",
+      "usedByJob": "{count} 个作业",
+      "columns": {
+        "name": "名称",
+        "type": "类型",
+        "produces": "产生",
+        "version": "版本",
+        "usedBy": "被使用于",
+        "lastRun": "最后运行",
+        "successRate": "成功率（24 小时）",
+        "actions": "操作"
+      },
+      "empty": {
+        "title": "尚无评分器",
+        "description": "评分器是评估的执行单元。它们从您的生产追踪中获取 span，并沿着您关注的质量维度产生评分。",
+        "chipLlmJudge": "LLM 评判器",
+        "chipRemote": "远程",
+        "chipCode": "代码"
+      },
+      "noProviders": {
+        "title": "请先添加提供商",
+        "description": "评分器需要 LLM 提供商（OpenAI、Anthropic 等）才能运行。请在创建评分器之前在“设置”中添加提供商。",
+        "chipRequired": "LLM 评判器必需",
+        "cta": "添加提供商"
+      },
+      "import": {
+        "title": "导入评分器",
+        "button": "导入",
+        "customLabel": "自定义",
+        "customSubtitle": "从 JSON 文件或 URL 导入",
+        "libraryLabel": "库",
+        "librarySubtitle": "浏览并从精选目录导入",
+        "libraryDrawerTitle": "评分器库",
+        "outputMessages": "输出消息",
+        "creation": "评分器创建",
+        "errors": {
+          "title": "验证错误"
+        }
+      },
+      "export": {
+        "bulkButton": "导出"
+      },
+      "descriptionPlaceholder": "此评分器衡量内容的简短摘要。",
+      "producesScoreHelp": "此评分器衡量哪个维度？",
+      "providerHelp": "选择此评判器调用的 LLM 提供商。在 {settingsLink} 中管理提供商。",
+      "providerHelpSettingsLink": "设置",
+      "refreshProviders": "刷新提供商",
+      "selectedPrefix": "已选择：",
+      "endpointLabel": "端点：",
+      "defaultModelPreviewLabel": "默认模型：",
+      "authLabel": "身份验证：",
+      "authConfigured": "已配置",
+      "authNotConfigured": "未配置",
+      "rangeLabel": "范围：",
+      "healthyLabel": "健康：",
+      "typeLabel": "类型：",
+      "promptVariablesLabel": "变量：",
+      "promptHelp": "专注于评估逻辑。使用 {inputVar} 和 {outputVar} 作为占位符。",
+      "includeReasoningLabel": "包含推理",
+      "includeReasoningHint": "LLM 解释其评分。存储在 score.metadata.reasoning 中。",
+      "extraFieldsLabel": "额外元数据字段",
+      "extraFieldsOptional": "可选",
+      "extraFieldsHint": "添加 LLM 应在评分旁输出的字段。存储在 score.metadata 中以供后续分析。",
+      "extraFields": {
+        "colName": "字段名称",
+        "colType": "类型",
+        "colDescription": "描述",
+        "namePlaceholder": "field_name",
+        "descriptionPlaceholder": "LLM 应在此字段中放入什么？",
+        "addButton": "+ 添加字段",
+        "previewSchema": "查看生成的模式",
+        "schemaTitle": "生成的 JSON 模式",
+        "schemaLoading": "正在派生模式…",
+        "schemaCopy": "复制",
+        "schemaCopied": "已复制",
+        "schemaCopyFailed": "复制模式到剪贴板失败。",
+        "typeString": "string",
+        "typeNumber": "number",
+        "typeBoolean": "boolean"
+      },
+      "authSection": "身份验证",
+      "headersSection": "自定义请求头",
+      "requestBodySection": "请求正文",
+      "remoteUrlLabel": "URL",
+      "remoteTimeoutLabel": "超时（毫秒）",
+      "remoteRetriesLabel": "最大重试次数",
+      "remoteBackoffLabel": "退避",
+      "remoteBackoff": {
+        "exponential": "指数",
+        "linear": "线性",
+        "fixed": "固定"
+      },
+      "remoteAuthLabel": "身份验证类型",
+      "remoteAuth": {
+        "placeholder": "选择身份验证类型",
+        "bearer": "Bearer 令牌",
+        "basic": "Basic 认证",
+        "apiKey": "API 密钥",
+        "tokenLabel": "令牌",
+        "usernameLabel": "用户名",
+        "passwordLabel": "密码",
+        "headerNameLabel": "请求头名称",
+        "bearerTokenPlaceholder": "粘贴 bearer 令牌",
+        "basicUsernamePlaceholder": "user",
+        "basicPasswordPlaceholder": "••••••••",
+        "apiKeyHeaderPlaceholder": "X-API-Key",
+        "apiKeyTokenPlaceholder": "粘贴 API 密钥",
+        "encryptedHint": "在静态时加密。保存后无法查看。"
+      },
+      "remoteHeaders": {
+        "subtitle": "随每个请求发送。",
+        "colName": "名称",
+        "colValue": "值",
+        "colKey": "名称",
+        "keyPlaceholder": "X-Custom-Header",
+        "valuePlaceholder": "value",
+        "addButton": "+ 添加请求头"
       }
     },
     "job": {
@@ -4656,7 +5468,10 @@
       "scorerPicker": {
         "title": "评分器",
         "hint": "选择一个或多个评分器在每个匹配的时间段内运行。",
-        "meta": "{类型} · v {版本}"
+        "meta": "{类型} · v {版本}",
+        "placeholder": "选择评分器",
+        "searchPlaceholder": "搜索评分器…",
+        "empty": "无可用评分器。请先在“评分器”选项卡中创建一个。"
       },
       "filter": {
         "title": "过滤条件",
@@ -4681,7 +5496,117 @@
         "emptyValue": "—"
       },
       "selectAtLeastOne": "至少选择一名评分器",
-      "saveError": "无法保存评测任务"
+      "saveError": "无法保存评测任务",
+      "detail": {
+        "close": "关闭",
+        "eyebrow": "评估作业",
+        "refresh": "刷新",
+        "descriptionSection": "描述",
+        "targetSection": "目标",
+        "streamLabel": "流",
+        "streamTypeLabel": "流类型",
+        "filterLabel": "筛选器",
+        "filterEmpty": "无筛选器 — 评估每个 span",
+        "scorersSection": "评分器",
+        "scorersEmpty": "尚无评分器附加到此作业。",
+        "scorerUnknown": "（已移除的评分器）",
+        "scorerTypeLlmJudge": "LLM 评判器",
+        "scorerTypeRemote": "远程",
+        "producesPrefix": "产生",
+        "viewScorerHint": "查看",
+        "inputMappingSection": "输入映射",
+        "samplingSection": "采样",
+        "samplingModeLabel": "模式",
+        "samplingValueLabel": "值",
+        "samplingAll": "评估每个匹配项",
+        "samplingRate": "按比率随机采样",
+        "samplingCount": "前 N 个匹配项",
+        "metadataSection": "元数据",
+        "versionLabel": "版本",
+        "pipelineLabel": "管道 ID",
+        "createdLabel": "创建于",
+        "updatedLabel": "更新于",
+        "tabs": {
+          "configuration": "配置",
+          "runs": "运行",
+          "failures": "失败"
+        },
+        "kpis": {
+          "totalRuns": "总运行次数",
+          "totalRunsSub": "所选窗口内",
+          "successRate": "成功率",
+          "successRateSub": "跨所有评分器",
+          "avgLatency": "平均延迟",
+          "avgLatencySub": "跨运行的平均值",
+          "scorers": "评分器",
+          "scorersSubSingular": "个评分器已附加",
+          "scorersSubPlural": "个评分器已附加"
+        },
+        "runs": {
+          "showingPrefix": "显示",
+          "showingOf": "/",
+          "showingSuffix": "次匹配的运行",
+          "empty": "在所选窗口内未记录此作业的运行。",
+          "spanLabel": "SPAN",
+          "traceLabel": "TRACE",
+          "scorerUnknown": "（未知评分器）",
+          "col": {
+            "time": "时间",
+            "scorer": "评分器",
+            "target": "目标",
+            "score": "评分",
+            "latency": "延迟",
+            "status": "状态"
+          }
+        },
+        "failures": {
+          "byScorerTitle": "按评分器划分的失败",
+          "byScorerEmpty": "在所选窗口内未记录失败。",
+          "recentTitle": "最近的失败",
+          "recentEmpty": "在所选窗口内无失败的运行。",
+          "col": {
+            "scorer": "评分器",
+            "failureRate": "失败率",
+            "count": "失败 / 总计"
+          }
+        }
+      },
+      "listTitle": "评估作业",
+      "listSubtitle": "在您的生产追踪流上部署评分器。",
+      "searchPlaceholder": "搜索作业",
+      "allStatuses": "所有状态",
+      "newButton": "新建作业",
+      "scorersCount": "{count} 个评分器",
+      "scorerCount": "{count} 个评分器",
+      "columns": {
+        "name": "名称",
+        "status": "状态",
+        "stream": "流",
+        "scorers": "评分器",
+        "successRate": "成功率",
+        "lastRun": "最后运行",
+        "created": "创建于",
+        "actions": "操作"
+      },
+      "empty": {
+        "title": "尚无评估作业",
+        "description": "评估作业将评分器部署到您的生产追踪流上。它们对匹配的 span 进行采样，异步运行评分器，并存储产生的评分以供分析。",
+        "chipStreams": "生产流",
+        "chipScorers": "多个评分器",
+        "chipSampling": "采样控制"
+      },
+      "descriptionPlaceholder": "此作业监控什么？",
+      "samplingValueHelp": "JSON：rate 是 0-1 之间的数字，count 是正整数。",
+      "samplingValueAllHelp": "当模式为“全部”时不适用 — 每个匹配的事件都将被评估。",
+      "samplingHelp": "在筛选器之后应用。控制成本 — 只有匹配的 span 计入比率。",
+      "presets": {
+        "label": "快速预设",
+        "rootSpans": "仅根 span",
+        "llmCalls": "LLM 调用",
+        "toolCalls": "工具调用"
+      },
+      "createdAndActivated": "评估作业已创建并激活",
+      "createdButActivateFailed": "评估作业已创建，但激活失败"
     },
     "quality": {
       "scopeLabel": "此工作空间中的所有质量维度",
@@ -4758,6 +5683,10 @@
           "unhealthy": "不健康",
           "healthy": "健康",
           "coverage": "覆盖范围"
+        },
+        "empty": {
+          "title": "正在等待您的首批评分",
+          "description": "在所选时间范围内，此配置尚无评分。一旦使用它的评分器运行，评分将自动显示在此处。"
         }
       },
       "sidebar": {
@@ -4850,7 +5779,10 @@
       "removeFilterDescSql": "您已将 SQL 条件应用于此查询",
       "openHistory": "打开搜索记录",
       "askAi": "让 AI 修复我的查询",
-      "selectedRange": "所选范围"
+      "selectedRange": "所选范围",
+      "descOutOfRange": "您的时间窗口不包含来自此流的任何数据。跳转到最后出现数据的时间。",
+      "jumpToData": "跳转到最新数据",
+      "descDataAtBoundary": "数据流在此窗口中有数据，但没有匹配的事件。请尝试查看搜索历史或向 AI 寻求帮助。"
     },
     "error": {
       "sqlError": "SQL 语法错误",
@@ -4919,5 +5851,16 @@
     "askAi": "让 AI 修复我的查询",
     "showDetail": "显示详情",
     "hideDetail": "隐藏细节"
+  },
+  "refreshButton": {
+    "justNow": "刚才",
+    "secondsAgo": "{秒} 秒前",
+    "minutesAgo": "{min} m 之前",
+    "hoursAgo": "{h} 小时前",
+    "notYetRefreshed": "尚未刷新",
+    "dataFresh": "数据很新",
+    "dataGettingStale": "数据变得陈旧了",
+    "dataStale": "数据已过时",
+    "lastRefreshed": "上次刷新时间：{时间}"
   }
 }

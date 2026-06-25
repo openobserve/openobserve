@@ -1223,12 +1223,12 @@
             "2"
           ],
           [
-            "lane-monitor",
+            "batch-sync",
             "100.0",
             "1"
           ],
           [
-            "batch-sync",
+            "lane-monitor",
             "100.0",
             "1"
           ],
@@ -1456,6 +1456,161 @@
           ]
         ],
         "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q995",
+      "sql": "SELECT component_name, AVG(CAST(latency_ms AS FLOAT)) AS avg_lat, AVG(CAST(lcp_micros AS FLOAT)) AS avg_lcp FROM \"{stream}\" WHERE latency_ms IS NOT NULL AND lcp_micros IS NOT NULL GROUP BY component_name HAVING COUNT(*) > 1 ORDER BY avg_lat DESC LIMIT 10",
+      "category": "math_functions",
+      "time_offset": {
+        "start_offset": 59639000000,
+        "end_offset": 59713000000
+      },
+      "expected": {
+        "columns": [
+          "component_name",
+          "avg_lat",
+          "avg_lcp"
+        ],
+        "results": [
+          [
+            "temp-regulator",
+            "3200.0",
+            "2100000.0"
+          ],
+          [
+            "sorter-engine",
+            "1900.0",
+            "1100000.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q996",
+      "sql": "SELECT SQRT(AVG(CAST(latency_ms AS FLOAT) * CAST(latency_ms AS FLOAT)) - AVG(CAST(latency_ms AS FLOAT)) * AVG(CAST(latency_ms AS FLOAT))) AS std_lat, AVG(CAST(latency_ms AS FLOAT)) AS avg_lat, COUNT(*) AS cnt FROM \"{stream}\" WHERE latency_ms IS NOT NULL",
+      "category": "math_functions",
+      "time_offset": {
+        "start_offset": 59699000000,
+        "end_offset": 59773000000
+      },
+      "expected": {
+        "columns": [
+          "std_lat",
+          "avg_lat",
+          "cnt"
+        ],
+        "results": [
+          [
+            "647.6986575718744",
+            "323.14285714285717",
+            "7"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q997",
+      "sql": "SELECT component_name, AVG(CAST(throughput_rate AS FLOAT)) AS avg_rate, AVG(CAST(load_factor AS FLOAT)) AS avg_load, AVG(CAST(throughput_rate AS FLOAT) * CAST(load_factor AS FLOAT)) - AVG(CAST(throughput_rate AS FLOAT)) * AVG(CAST(load_factor AS FLOAT)) AS cov_approx FROM \"{stream}\" GROUP BY component_name HAVING COUNT(*) > 1 ORDER BY ABS(cov_approx) DESC LIMIT 10",
+      "category": "math_functions",
+      "time_offset": {
+        "start_offset": 59759000000,
+        "end_offset": 59833000000
+      },
+      "expected": {
+        "columns": [
+          "component_name",
+          "avg_rate",
+          "avg_load",
+          "cov_approx"
+        ],
+        "results": [
+          [
+            "track-router",
+            "610.0",
+            "99.0",
+            "0.0"
+          ],
+          [
+            "pallet-mapper",
+            "840.0",
+            "33.0",
+            "0.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q998",
+      "sql": "SELECT facility_zone, AVG(throughput_rate) AS avg_rate, STDDEV(throughput_rate) AS std_rate, STDDEV(throughput_rate) / NULLIF(AVG(throughput_rate), 0) AS cv FROM \"{stream}\" GROUP BY facility_zone ORDER BY cv DESC",
+      "category": "math_functions",
+      "time_offset": {
+        "start_offset": 59819000000,
+        "end_offset": 59893000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "avg_rate",
+          "std_rate",
+          "cv"
+        ],
+        "results": [
+          [
+            "ZONE-4",
+            "240.0",
+            "70.71067811865476",
+            "0.2946278254943948"
+          ],
+          [
+            "ZONE-2",
+            "240.0",
+            "70.71067811865476",
+            "0.2946278254943948"
+          ],
+          [
+            "ZONE-1",
+            "870.0",
+            "42.42640687119285",
+            "0.048765984909417075"
+          ],
+          [
+            "ZONE-3",
+            "555.0",
+            "None",
+            "None"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q999",
+      "sql": "WITH rates AS (SELECT CAST(throughput_rate AS FLOAT) AS rate FROM \"{stream}\"), agg AS (SELECT AVG(rate) AS mean_rate, COUNT(*) AS n FROM rates) SELECT ROUND(SUM((rate - mean_rate) * (rate - mean_rate)) / NULLIF(MAX(n), 0), 4) AS variance_pop, ROUND(MAX(mean_rate), 2) AS avg_rate, MAX(n) AS cnt FROM rates, agg",
+      "category": "math_functions",
+      "time_offset": {
+        "start_offset": 59879000000,
+        "end_offset": 59953000000
+      },
+      "expected": {
+        "columns": [
+          "variance_pop",
+          "avg_rate",
+          "cnt"
+        ],
+        "results": [
+          [
+            "85081.6327",
+            "465.71",
+            "7"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true,
+        "skip_row_count": true
       }
     }
   ],

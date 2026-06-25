@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Row 1: standard header — title + actions only. The stream-type filter
            and search moved into the table's own toolbar below. -->
       <template #header>
-        <AppPageHeader :subtitle="'Index management and stream configuration'" icon="window">
+        <AppPageHeader :subtitle="t('logStream.subtitle')" icon="window">
           <template #title><span data-test="log-stream-title-text">{{ t('logStream.header') }}</span></template>
           <template #actions>
             <OButton
@@ -222,7 +222,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="deleteAssociatedAlertsPipelines"
           />
           <span class="delete-associated-alerts-pipelines-text">
-            Delete all Pipelines and Alerts associated with the stream
+            {{ t("logStream.deleteAssociatedAlertsPipelines") }}
           </span>
         </div>
       </div>
