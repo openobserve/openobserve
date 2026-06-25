@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <!-- Mode selection (left) + Add To Dashboard (right) row -->
                   <div
-                    class="tw:flex tw:justify-between tw:items-center tw:mx-2"
+                    class="tw:flex tw:justify-between tw:items-center tw:my-2 tw:mx-2"
                   >
                     <QueryTypeSelector
                       v-if="pageType === 'build'"
