@@ -6498,6 +6498,27 @@
       "title": "Sedi",
       "locationAwsEast": "AWS · Stati Uniti-Est-1",
       "comingSoon": "Altre regioni e località private — Prossimamente"
+    },
+    "results": {
+      "title": "Monitora i risultati",
+      "monitors": "Monitor",
+      "editMonitor": "Modifica monitor",
+      "uptime": "Uptime",
+      "p95Duration": "Durata P95",
+      "failedRuns": "Esecuzioni fallite",
+      "lastRun": "Ultima corsa",
+      "responseTime": "Tempo di risposta",
+      "responseTimeSubtitle": "Durata totale del viaggio",
+      "recentRuns": "Esecuzioni recenti",
+      "runs": "Corre",
+      "noRuns": "Nessuna corsa trovata per l'intervallo di tempo selezionato.",
+      "status": "Status",
+      "started": "Iniziato",
+      "duration": "Durata",
+      "location": "Posizione",
+      "trigger": "Trigger",
+      "passed": "Passato",
+      "failed": "Fallito"
     }
   }
 }

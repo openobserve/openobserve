@@ -6498,6 +6498,27 @@
       "title": "ロケーション",
       "locationAwsEast": "AWS · 米国東部-1",
       "comingSoon": "その他の地域とプライベートロケーション — 近日公開予定"
+    },
+    "results": {
+      "title": "モニター結果",
+      "monitors": "モニター",
+      "editMonitor": "モニターを編集",
+      "uptime": "アップタイム",
+      "p95Duration": "P95 所要時間",
+      "failedRuns": "失敗した実行",
+      "lastRun": "ラストラン",
+      "responseTime": "レスポンス・タイム",
+      "responseTimeSubtitle": "合計旅行時間",
+      "recentRuns": "最近実行した記事",
+      "runs": "走る",
+      "noRuns": "選択した時間範囲での実行は見つかりませんでした。",
+      "status": "ステータス",
+      "started": "開始",
+      "duration": "所要時間",
+      "location": "ロケーション",
+      "trigger": "トリガー",
+      "passed": "合格",
+      "failed": "失敗"
     }
   }
 }

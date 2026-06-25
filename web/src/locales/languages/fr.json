@@ -6498,6 +6498,27 @@
       "title": "Localisations",
       "locationAwsEast": "AWS · us-east-1",
       "comingSoon": "Plus de régions et de sites privés — Prochainement"
+    },
+    "results": {
+      "title": "Surveiller les résultats",
+      "monitors": "Moniteurs",
+      "editMonitor": "Modifier le moniteur",
+      "uptime": "Disponibilité",
+      "p95Duration": "Durée P95",
+      "failedRuns": "Exécution échouée",
+      "lastRun": "Dernière course",
+      "responseTime": "Temps de réponse",
+      "responseTimeSubtitle": "Durée totale du trajet",
+      "recentRuns": "Courses récentes",
+      "runs": "Coule",
+      "noRuns": "Aucune course n'a été trouvée pour la période sélectionnée.",
+      "status": "État",
+      "started": "Commencé",
+      "duration": "Durée",
+      "location": "Lieu",
+      "trigger": "Gâchette",
+      "passed": "Passé",
+      "failed": "Échoué"
     }
   }
 }

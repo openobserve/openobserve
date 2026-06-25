@@ -6498,6 +6498,27 @@
       "title": "위치",
       "locationAwsEast": "AWS · 미국-동부-1",
       "comingSoon": "더 많은 지역 및 프라이빗 위치 — 곧 오픈 예정"
+    },
+    "results": {
+      "title": "모니터 결과",
+      "monitors": "모니터",
+      "editMonitor": "모니터 편집",
+      "uptime": "업타임",
+      "p95Duration": "P95 기간",
+      "failedRuns": "실패한 실행",
+      "lastRun": "라스트 런",
+      "responseTime": "응답 시간",
+      "responseTimeSubtitle": "총 여행 시간",
+      "recentRuns": "최근 런",
+      "runs": "뛰다",
+      "noRuns": "선택한 시간 범위에 해당하는 런을 찾을 수 없습니다.",
+      "status": "상태",
+      "started": "시작됨",
+      "duration": "지속",
+      "location": "위치",
+      "trigger": "트리거",
+      "passed": "합격",
+      "failed": "실패"
     }
   }
 }

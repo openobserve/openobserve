@@ -6498,6 +6498,27 @@
       "title": "Locaties",
       "locationAwsEast": "AWS · oost-amerikaan-1",
       "comingSoon": "Meer regio's en privélocaties — Binnenkort beschikbaar"
+    },
+    "results": {
+      "title": "Resultaten monitoren",
+      "monitors": "Monitoren",
+      "editMonitor": "Monitor bewerken",
+      "uptime": "Uptime",
+      "p95Duration": "P95 Duur",
+      "failedRuns": "Mislukte runs",
+      "lastRun": "Laatste run",
+      "responseTime": "Reactietijd",
+      "responseTimeSubtitle": "Totale reisduur",
+      "recentRuns": "Recente hardloopsessies",
+      "runs": "Loopt",
+      "noRuns": "Er zijn geen runs gevonden voor de geselecteerde periode.",
+      "status": "Status",
+      "started": "Gestart",
+      "duration": "Duur",
+      "location": "Locatie",
+      "trigger": "Trigger",
+      "passed": "Geslaagd",
+      "failed": "Mislukt"
     }
   }
 }

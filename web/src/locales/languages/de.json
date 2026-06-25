@@ -6498,6 +6498,27 @@
       "title": "Standorte",
       "locationAwsEast": "AWS · US-East-1",
       "comingSoon": "Mehr Regionen und private Standorte — Demnächst verfügbar"
+    },
+    "results": {
+      "title": "Ergebnisse überwachen",
+      "monitors": "Monitore",
+      "editMonitor": "Monitor bearbeiten",
+      "uptime": "Betriebszeit",
+      "p95Duration": "P95 Dauer",
+      "failedRuns": "Fehlgeschlagene Ausführungen",
+      "lastRun": "Letzter Lauf",
+      "responseTime": "Reaktionszeit",
+      "responseTimeSubtitle": "Gesamtdauer der Reise",
+      "recentRuns": "Letzte Läufe",
+      "runs": "Läuft",
+      "noRuns": "Für den ausgewählten Zeitraum wurden keine Läufe gefunden.",
+      "status": "Status",
+      "started": "Gestartet",
+      "duration": "Dauer",
+      "location": "Standort",
+      "trigger": "Auslösen",
+      "passed": "Bestanden",
+      "failed": "Fehlgeschlagen"
     }
   }
 }

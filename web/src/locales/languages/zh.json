@@ -6498,6 +6498,27 @@
       "title": "地点",
       "locationAwsEast": "AWS · us-east-1",
       "comingSoon": "更多区域和私人地点 — 即将推出"
+    },
+    "results": {
+      "title": "监控结果",
+      "monitors": "显示器",
+      "editMonitor": "编辑监视器",
+      "uptime": "正常运行时间",
+      "p95Duration": "P95 时长",
+      "failedRuns": "运行失败",
+      "lastRun": "最后一次运行",
+      "responseTime": "响应时间",
+      "responseTimeSubtitle": "总行程时长",
+      "recentRuns": "最近的跑步次数",
+      "runs": "跑步",
+      "noRuns": "在所选时间范围内未找到任何运行次数。",
+      "status": "状态",
+      "started": "已开始",
+      "duration": "持续时间",
+      "location": "地点",
+      "trigger": "触发器",
+      "passed": "通过了",
+      "failed": "失败"
     }
   }
 }

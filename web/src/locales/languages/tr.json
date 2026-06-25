@@ -6498,6 +6498,27 @@
       "title": "Konumlar",
       "locationAwsEast": "AWS · us-east-1",
       "comingSoon": "Daha fazla bölge ve özel konum — Çok yakında"
+    },
+    "results": {
+      "title": "Sonuçları İzle",
+      "monitors": "Monitörler",
+      "editMonitor": "Monitörü Düzenle",
+      "uptime": "Çalışma Süresi",
+      "p95Duration": "P95 Süresi",
+      "failedRuns": "Başarısız Çalışmalar",
+      "lastRun": "Son Koşu",
+      "responseTime": "Yanıt Süresi",
+      "responseTimeSubtitle": "Toplam yolculuk süresi",
+      "recentRuns": "Son Koşullar",
+      "runs": "Koşuyor",
+      "noRuns": "Seçilen zaman aralığı için çalışma bulunamadı.",
+      "status": "Durum",
+      "started": "Başladı",
+      "duration": "Süre",
+      "location": "Yer",
+      "trigger": "Tetikleyici",
+      "passed": "Geçti",
+      "failed": "Başarısız"
     }
   }
 }
