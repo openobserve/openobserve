@@ -44,7 +44,11 @@ import {
   watch,
   watchEffect,
 } from "vue";
-import { O_DROPDOWN_NESTED_KEY } from "@/lib/overlay/Dropdown/ODropdown.context";
+import {
+  O_DROPDOWN_NESTED_KEY,
+  setActiveOverlay,
+  clearActiveOverlay,
+} from "@/lib/overlay/Dropdown/ODropdown.context";
 
 type NormalizedOption = {
   label: string;
@@ -711,6 +715,23 @@ onBeforeUnmount(() => {
   }
 });
 
+// Single-active-overlay coordination. Opening any other top-level O overlay
+// closes this one (and vice-versa), so two unrelated dropdowns are never open
+// at once — even when the new one is opened by focus rather than a click that
+// Reka would treat as a dismiss. Nested selects (inside an open ODropdown) opt
+// out so they don't close their ancestor.
+const closeSelf = () => {
+  popoverOpen.value = false;
+  selectOpen.value = false;
+};
+if (!parentDropdownRegistry) {
+  watch(isOpen, (open) => {
+    if (open) setActiveOverlay(closeSelf);
+    else clearActiveOverlay(closeSelf);
+  });
+  onBeforeUnmount(() => clearActiveOverlay(closeSelf));
+}
+
 // Close when the sidebar scroll container scrolls, preventing the portal
 // from floating disconnected at the top of the screen.
 const sidebarScrollTick = inject<Ref<number> | null>('sidebarScrollTick', null);
@@ -721,6 +742,52 @@ if (sidebarScrollTick) {
   });
 }
 
+// Generic close-on-scroll: while the dropdown is open, scrolling any ancestor
+// scroll container (page, query-builder area, joins popup, etc.) would leave
+// the portaled list floating detached from the trigger — close it instead.
+// Scrolls that originate inside the option list are ignored so the list stays
+// scrollable.
+function handleViewportScroll(event: Event) {
+  if (!isOpen.value) return;
+  const target = event.target as (Element & Node) | Document | null;
+  if (!target) return;
+  // Ignore scrolls that originate inside the option list so it stays scrollable.
+  if (
+    target instanceof Element &&
+    (listboxScrollEl.value?.contains(target) ||
+      target.closest?.('[role="listbox"]'))
+  ) {
+    return;
+  }
+  // Only close when the scrolled container actually holds this select's
+  // trigger — i.e. the scroll moves the trigger and would leave the portaled
+  // menu detached. Scrolls in unrelated sections (e.g. the field list while a
+  // config-panel dropdown is open) are ignored.
+  const triggerEl = triggerWrapperRef.value ?? selectTriggerWrapperRef.value;
+  if (triggerEl && target.contains(triggerEl)) {
+    popoverOpen.value = false;
+    selectOpen.value = false;
+  }
+}
+
+watch(isOpen, (open) => {
+  if (typeof window === "undefined") return;
+  if (open) {
+    window.addEventListener("scroll", handleViewportScroll, {
+      capture: true,
+      passive: true,
+    });
+  } else {
+    window.removeEventListener("scroll", handleViewportScroll, true);
+  }
+});
+
+onBeforeUnmount(() => {
+  if (typeof window !== "undefined") {
+    window.removeEventListener("scroll", handleViewportScroll, true);
+  }
+});
+
 // ── Chip overflow (width-aware) ──────────────────────────────────────────
 // In multi-select mode, fit as many chips as the trigger width allows; the
 // rest collapse into a "+N more" indicator. When `maxVisibleChips` is set,
@@ -729,6 +796,9 @@ if (sidebarScrollTick) {
 
 /** The outer wrapper around the trigger. Measured to size the chip row. */
 const triggerWrapperRef = ref<HTMLElement | null>(null);
+// Wrapper around the native-select (non-listbox) trigger, used by the
+// close-on-scroll handler to detect whether a scroll moves this select's trigger.
+const selectTriggerWrapperRef = ref<HTMLElement | null>(null);
 const triggerWidth = ref(0);
 let triggerResizeObserver: ResizeObserver | null = null;
 
@@ -1432,6 +1502,7 @@ const fieldWidthClass = computed(() => {
     <SelectRoot
       v-else
       :model-value="stringValue"
+      :open="selectOpen"
       :disabled="disabled"
       :name="name"
       @update:model-value="handleUpdate"
@@ -1442,7 +1513,10 @@ const fieldWidthClass = computed(() => {
         }
       "
     >
-      <div class="tw:relative tw:flex tw:items-center">
+      <div
+        ref="selectTriggerWrapperRef"
+        class="tw:relative tw:flex tw:items-center"
+      >
         <SelectTrigger
           :id="inputId"
           :data-test="

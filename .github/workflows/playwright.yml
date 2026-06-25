@@ -245,6 +245,7 @@ jobs:
                 "alerts-metrics-notification.spec.js",
                 "alerts-destinations-prebuilt.spec.js",
                 "alerts-vrl-encoding.spec.js",
+                "alerts-template-prebuilt-guard.spec.js",
                 "alerts-form-validation.spec.js",
                 "anomaly-detection-form-validation.spec.js",
               ]

@@ -194,14 +194,16 @@ describe("useMetricsCorrelationDashboard", () => {
       expect(panels[0].layout.w).toBe(customWidth);
       expect(panels[0].layout.h).toBe(customHeight);
 
-      // x is col * customWidth
-      expect(panels[0].layout.x).toBe(0);           // col 0 * 100
-      expect(panels[1].layout.x).toBe(100);         // col 1 * 100
-      expect(panels[2].layout.x).toBe(200);         // col 2 * 100
+      // Columns are derived from how many panels fit in the 192-unit grid:
+      // cols = floor(192 / 100) = 1, so panels stack in a single column.
+      expect(panels[0].layout.x).toBe(0); // col 0
+      expect(panels[1].layout.x).toBe(0); // wraps to next row (only 1 col fits)
+      expect(panels[2].layout.x).toBe(0);
 
-      // y is row * customHeight
-      expect(panels[0].layout.y).toBe(0);           // row 0 * 20
-      expect(panels[3].layout.y).toBe(customHeight); // row 1 * 20
+      // y is row * customHeight; with 1 column each panel is its own row
+      expect(panels[0].layout.y).toBe(0);                // row 0 * 20
+      expect(panels[1].layout.y).toBe(customHeight);     // row 1 * 20
+      expect(panels[3].layout.y).toBe(customHeight * 3); // row 3 * 20
     });
   });
 

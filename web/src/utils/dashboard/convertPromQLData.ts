@@ -40,6 +40,7 @@ import {
   calculateRightLegendWidth,
 } from "./legendConfiguration";
 import { convertPromQLChartData } from "./promql/convertPromQLChartData";
+import { METRIC_COPY_BTN_RESERVE_PX } from "./sql/charts/convertSQLMetricChart";
 import { getPromqlLegendName, getLegendPosition } from "./promql/shared/legendBuilder";
 import { getPropsByChartTypeForSeries } from "./promqlChartSeriesProps";
 
@@ -403,9 +404,13 @@ export const convertPromQLData = async (
       },
       enterable: true,
       backgroundColor:
-        store.state.theme === "dark" ? "rgba(0,0,0,1)" : "rgba(255,255,255,1)",
+        store.state.theme === "dark" ? "rgba(22,23,25,0.97)" : "rgba(255,255,255,0.97)",
+      borderColor:
+        store.state.theme === "dark" ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.08)",
+      borderWidth: 1,
+      padding: [8, 12],
       extraCssText:
-        "max-height: 200px; overflow: auto; max-width: 500px; user-select: text; scrollbar-width: thin; scrollbar-color: rgba(128,128,128,0.5) transparent;",
+        "max-height: 200px; overflow: auto; max-width: 500px; user-select: text; scrollbar-width: thin; scrollbar-color: rgba(128,128,128,0.5) transparent; border-radius: 8px !important; box-shadow: 0 4px 16px rgba(0,0,0,0.12) !important;",
       formatter: function (name: any) {
         // show tooltip for hovered panel only for other we only need axis so just return empty string
         if (
@@ -932,10 +937,16 @@ export const convertPromQLData = async (
           enterable: true,
           backgroundColor:
             store.state.theme === "dark"
-              ? "rgba(0,0,0,1)"
-              : "rgba(255,255,255,1)",
+              ? "rgba(22,23,25,0.97)"
+              : "rgba(255,255,255,0.97)",
+          borderColor:
+            store.state.theme === "dark"
+              ? "rgba(255,255,255,0.1)"
+              : "rgba(0,0,0,0.08)",
+          borderWidth: 1,
+          padding: [8, 12],
           extraCssText:
-            "max-height: 200px; overflow: auto; max-width: 500px; user-select: text; scrollbar-width: thin; scrollbar-color: rgba(128,128,128,0.5) transparent;",
+            "max-height: 200px; overflow: auto; max-width: 500px; user-select: text; scrollbar-width: thin; scrollbar-color: rgba(128,128,128,0.5) transparent; border-radius: 8px !important; box-shadow: 0 4px 16px rgba(0,0,0,0.12) !important;",
         };
 
         // Set coordinate system options
@@ -969,11 +980,13 @@ export const convertPromQLData = async (
             );
             options.backgroundColor =
               panelSchema.config?.background?.value?.color ?? "";
-            const series = [
+            const metricText = formatUnitValue(unitValue);
+            const series: any[] = [
               {
                 type: "custom",
                 silent: true,
                 coordinateSystem: "polar",
+                _metricText: metricText,
                 renderItem: function (params: any) {
                   const backgroundColor =
                     panelSchema.config?.background?.value?.color;
@@ -981,10 +994,10 @@ export const convertPromQLData = async (
                   return {
                     type: "text",
                     style: {
-                      text: formatUnitValue(unitValue),
+                      text: metricText,
                       fontSize: calculateOptimalFontSize(
-                        formatUnitValue(unitValue),
-                        params.coordSys.cx * 2,
+                        metricText,
+                        params.coordSys.cx * 2 - METRIC_COPY_BTN_RESERVE_PX,
                       ), //coordSys is relative. so that we can use it to calculate the dynamic size
                       fontWeight: 500,
                       align: "center",
@@ -997,6 +1010,25 @@ export const convertPromQLData = async (
                 },
               },
             ];
+
+            // Rect for the per-value copy icon overlay (single metric fills the area).
+            const panelEl = chartPanelRef?.value;
+            if (panelEl) {
+              const w = panelEl.offsetWidth;
+              const h = panelEl.offsetHeight;
+              series[0]._metricLayout = {
+                left: 0,
+                top: 0,
+                width: w,
+                height: h,
+                cx: w / 2,
+                cy: h / 2,
+                fontSize: calculateOptimalFontSize(
+                  metricText,
+                  w - METRIC_COPY_BTN_RESERVE_PX,
+                ),
+              };
+            }
 
             options.dataset = { source: [[]] };
             options.tooltip = {

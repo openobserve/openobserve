@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <TenstackTable
       ref="tableRef"
       :rows="sortedRows"
-      :columns="data.columns || []"
+      :columns="tableColumns"
       :sort-by="localSortBy"
       :sort-order="localSortOrder"
       @sort-change="handleSortChange"
@@ -38,6 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :enable-row-expand="false"
       :enable-status-bar="false"
       :enable-ai-context-button="false"
+      :enable-column-filter="enableFiltering"
       data-test="dashboard-panel-table"
       @click:dataRow="(row: any, _idx: number, evt?: MouseEvent) => $emit('row-click', evt ?? null, row, _idx)"
     >
@@ -74,11 +75,19 @@ import TenstackTable from "@/components/TenstackTable.vue";
 import TablePaginationControls from "@/components/dashboards/addPanel/TablePaginationControls.vue";
 import { TABLE_ROWS_PER_PAGE_DEFAULT_VALUE } from "@/utils/dashboard/constants";
 import { getColorForTable } from "@/utils/dashboard/colorPalette";
-import { findFirstValidMappedValue } from "@/utils/dashboard/panelValidation";
+import { isColorDark } from "@/utils/dashboard/chartColorUtils";
+import {
+  buildValueMappingCache,
+  lookupValueMappingFull,
+} from "@/utils/dashboard/tableConfigUtils";
+import { useStore } from "vuex";
 
 export default defineComponent({
   name: "TableRenderer",
-  components: { TenstackTable, TablePaginationControls },
+  components: {
+    TenstackTable,
+    TablePaginationControls,
+  },
   props: {
     data: {
       required: true,
@@ -105,20 +114,20 @@ export default defineComponent({
       type: Number,
       default: TABLE_ROWS_PER_PAGE_DEFAULT_VALUE,
     },
+    enableFiltering: {
+      required: false,
+      type: Boolean,
+      default: false,
+    },
   },
   emits: ["row-click"],
   setup(props) {
+    const store = useStore();
     const tableRef = ref<any>(null);
 
-    /** Returns true when the hex colour is dark (needs white text). */
-    const isDashboardColor = (hex: string): boolean => {
-      const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-      if (!result) return false;
-      const r = parseInt(result[1], 16);
-      const g = parseInt(result[2], 16);
-      const b = parseInt(result[3], 16);
-      return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255 < 0.5;
-    };
+    const tableColumns = computed(
+      () => (props.data?.columns as any[]) || [],
+    );
 
     /**
      * Computes the inline style for a given TanStack cell.
@@ -128,28 +137,76 @@ export default defineComponent({
     // Component-level cache: colKey → (value → hex). Avoids mutating prop-derived col objects.
     const autoColorCache = new Map<string, Map<string, string>>();
 
+    // Value-mapping lookup cache, rebuilt only when the mappings change.
+    const valueMappingCache = computed(() =>
+      buildValueMappingCache(props.valueMapping),
+    );
+
+    const evalCondition = (val: number, op: string, threshold: number): boolean => {
+      switch (op) {
+        case "<":  return val < threshold;
+        case ">":  return val > threshold;
+        case "<=": return val <= threshold;
+        case ">=": return val >= threshold;
+        case "=":
+        case "==": return val === threshold;
+        case "!=": return val !== threshold;
+        default:   return false;
+      }
+    };
+
     const cellStyleFn = computed(() => (cell: any): string => {
       const col = (cell.column.columnDef.meta as any)?._col;
       const value = cell.getValue();
 
       // 1) Auto color mode — stable palette per distinct string value.
       if (col?.colorMode === "auto") {
-        const palette = getColorForTable;
+        const palette = getColorForTable(store.state.theme);
         const key = String(value);
         const colKey = col.field ?? col.name;
         if (!autoColorCache.has(colKey)) autoColorCache.set(colKey, new Map<string, string>());
         const map = autoColorCache.get(colKey)!;
-        if (!map.has(key)) map.set(key, palette[map.size % palette.length]);
+        if (!map.has(key))
+          map.set(key, palette[map.size % palette.length]);
         const hex = map.get(key) as string;
-        return `background-color: ${hex}; color: ${isDashboardColor(hex) ? "#ffffff" : "#000000"}`;
+        return `background-color: ${hex}; color: ${isColorDark(hex) ? "#ffffff" : "#000000"}`;
       }
 
-      // 2) Value-mapping color.
-      const found = findFirstValidMappedValue(value, props.valueMapping, "color");
-      if (found?.color) {
+      // 2) Value-mapping color (valid hex only; else fall through).
+      const found = lookupValueMappingFull(value, valueMappingCache.value, "color");
+      if (
+        found?.color &&
+        /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/i.test(found.color)
+      ) {
         const hex = found.color;
-        if (!/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/i.test(hex)) return "";
-        return `background-color: ${hex}; color: ${isDashboardColor(hex) ? "#ffffff" : "#000000"}`;
+        return `background-color: ${hex}; color: ${isColorDark(hex) ? "#ffffff" : "#000000"}`;
+      }
+
+      // 3) Conditional styling rules — last matching rule wins, so later rules
+      // override earlier ones (e.g. >1000 takes precedence over >400 for 2301).
+      const conditionalRules = col?.conditionalRules as any[] | undefined;
+      if (conditionalRules?.length) {
+        const numVal = parseFloat(String(value));
+        if (!isNaN(numVal)) {
+          let matched: any = null;
+          for (const rule of conditionalRules) {
+            if (evalCondition(numVal, rule.operator, rule.threshold)) matched = rule;
+          }
+          if (matched) {
+            const parts: string[] = [];
+            if (matched.bgColor) parts.push(`background-color: ${matched.bgColor}`);
+            if (matched.textColor) parts.push(`color: ${matched.textColor}`);
+            if (parts.length) return parts.join("; ");
+          }
+        }
+      }
+
+      // 4) Column-level text / background color override.
+      if (col?.bgColor || col?.textColor) {
+        const parts: string[] = [];
+        if (col.bgColor) parts.push(`background-color: ${col.bgColor}`);
+        if (col.textColor) parts.push(`color: ${col.textColor}`);
+        return parts.join("; ");
       }
 
       return "";
@@ -246,6 +303,7 @@ export default defineComponent({
 
     return {
       tableRef,
+      tableColumns,
       cellStyleFn,
       sortedRows,
       localSortBy,

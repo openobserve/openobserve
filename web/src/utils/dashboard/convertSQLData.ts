@@ -24,6 +24,7 @@
 import { convertSQLChartData } from "./sql";
 import { applySeriesColorMappings } from "./chartColorUtils";
 import { calculateOptimalFontSize } from "./chartDimensionUtils";
+import { METRIC_COPY_BTN_RESERVE_PX } from "./sql/charts/convertSQLMetricChart";
 import {
   calculateGridPositions,
   getTrellisGrid,
@@ -351,7 +352,7 @@ export const convertMultiSQLData = async (
     );
     const sharedFontSize = calculateOptimalFontSize(
       longestText,
-      gridData.gridWidth,
+      gridData.gridWidth - METRIC_COPY_BTN_RESERVE_PX,
     );
     const labelFontSize = Math.max(
       11,
@@ -367,6 +368,18 @@ export const convertMultiSQLData = async (
         ((parseFloat(cell.top) + parseFloat(cell.height) / 2) / 100) *
         chartPanelRef.value.offsetHeight;
       const fill = s._metricFillColor ?? (isDark ? "#fff" : "#000");
+      // Grid-cell rect (px) is the hover zone; cx/cy/fontSize place + size the
+      // copy icon beside the number, clamped inside the cell.
+      s._metricLayout = {
+        left: (parseFloat(cell.left) / 100) * chartPanelRef.value.offsetWidth,
+        top: (parseFloat(cell.top) / 100) * chartPanelRef.value.offsetHeight,
+        width: (parseFloat(cell.width) / 100) * chartPanelRef.value.offsetWidth,
+        height:
+          (parseFloat(cell.height) / 100) * chartPanelRef.value.offsetHeight,
+        cx,
+        cy: cy - labelFontSize / 2 - 2,
+        fontSize: sharedFontSize,
+      };
       s.renderItem = () => {
         try {
           return {

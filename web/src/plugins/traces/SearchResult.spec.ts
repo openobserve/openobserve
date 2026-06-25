@@ -338,6 +338,7 @@ describe("SearchResult", () => {
         "run-query",
         "widen-range",
         "remove-filter",
+        "jump-to-stream-data",
         "error-only-toggled",
       ];
 
