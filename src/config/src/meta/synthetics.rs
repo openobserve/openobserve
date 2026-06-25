@@ -283,12 +283,10 @@ pub struct MonitorListItem {
     pub updated_at: i64,
     pub last_triggered_at: i64,
 
-    // runtime fields — from synthetics_jobs (pending) + synthetics_results (completed)
+    // runtime fields — current status only; uptime/history fetched separately via search
     pub status: MonitorStatus,
     pub last_check_at: Option<i64>,
     pub last_response_ms: Option<f64>,
-    pub uptime_7d_pct: Option<f64>,
-    pub status_24h: Vec<StatusBucket>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]

@@ -202,8 +202,6 @@ pub async fn list_monitors(
                                 item.status = s.status.clone();
                                 item.last_check_at = s.last_check_at;
                                 item.last_response_ms = s.last_response_ms;
-                                item.uptime_7d_pct = s.uptime_7d_pct;
-                                item.status_24h = s.status_24h.clone();
                             }
                         }
                     }
