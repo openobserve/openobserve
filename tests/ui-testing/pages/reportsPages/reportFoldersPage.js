@@ -398,8 +398,9 @@ export class ReportFoldersPage {
   // with ODialog's standard primary/secondary button pattern.
 
   async selectAllReports() {
-    // Main branch uses OTable + OCheckbox; header checkbox gets data-test="o2-table-select-header"
-    const headerCheckbox = this.page.locator('[data-test="o2-table-select-header"]');
+    // OTableHeader passes row-id="all" to OTableSelectCheckbox, making the
+    // header checkbox data-test "o2-table-select-all" (not "header").
+    const headerCheckbox = this.page.locator('[data-test="o2-table-select-all"]');
     await headerCheckbox.waitFor({ state: 'visible', timeout: 10000 });
     await headerCheckbox.click();
     await this.page.waitForTimeout(300);

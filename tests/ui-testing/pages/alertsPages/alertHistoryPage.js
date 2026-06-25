@@ -82,11 +82,16 @@ export class AlertHistoryPage {
   }
 
   async clickViewDetails(index = 0) {
-    const btns = this.page.locator(this.viewDetailsBtn);
-    const btn = btns.nth(index);
+    // Prefer data-test selector; fall back to the first button inside the OTable
+    // actions cell when data-test doesn't propagate through reka-ui's Primitive.
+    const byDataTest = this.page.locator(this.viewDetailsBtn);
+    const byCell = this.page.locator('[data-test="o2-table-cell-actions"]').nth(index).locator('button').first();
+    const btn = (await byDataTest.count() > 0) ? byDataTest.nth(index) : byCell;
     await btn.waitFor({ state: 'visible', timeout: 10000 });
     await btn.scrollIntoViewIfNeeded();
-    await btn.click({ force: true });
+    // Use evaluate/el.click() — a trusted browser event that reliably triggers
+    // Vue component event handlers through reka-ui's Primitive layer.
+    await btn.evaluate(el => el.click());
   }
 
   async expectViewDetailsBtnVisible() {
