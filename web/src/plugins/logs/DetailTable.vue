@@ -429,7 +429,7 @@ import { getImageURL } from "../../utils/zincutils";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import { copyToClipboard } from "@/utils/clipboard";
-import { formatTimestamp } from "@/utils/date";
+import { timestampToTimezoneDate } from "@/utils/timezone";
 import JsonPreview from "./JsonPreview.vue";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
@@ -849,9 +849,10 @@ export default defineComponent({
       return String(data).length;
     };
 
-    // Display-only: render the timestamp column in a human-readable format
-    // (same representation as the traces detail sidebar). The raw value is kept
-    // intact for include/exclude search terms and all other field actions.
+    // Display-only: render the timestamp column in a human-readable format in
+    // the user-selected timezone (same representation as the traces detail
+    // sidebar). The raw value is kept intact for include/exclude search terms
+    // and all other field actions.
     const getDisplayValue = (field: string | number, value: any): any => {
       if (
         field === store.state.zoConfig.timestamp_column &&
@@ -860,7 +861,11 @@ export default defineComponent({
         value !== "" &&
         !isNaN(Number(value))
       ) {
-        return formatTimestamp(Number(value), "MMM DD, YYYY HH:mm:ss.SSS Z");
+        return timestampToTimezoneDate(
+          Number(value) / 1000,
+          store.state.timezone,
+          "MMM dd, yyyy HH:mm:ss.SSS ZZZ",
+        );
       }
       return value;
     };

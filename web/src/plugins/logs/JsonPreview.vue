@@ -270,7 +270,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { copyToClipboard } from "@/utils/clipboard";
-import { formatTimestamp } from "@/utils/date";
+import { timestampToTimezoneDate } from "@/utils/timezone";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default {
@@ -887,9 +887,10 @@ export default {
       return String(data).length;
     };
 
-    // Display-only: render the timestamp column in a human-readable format
-    // (same representation as the traces detail sidebar). The raw value is kept
-    // intact for include/exclude search terms and all other field actions.
+    // Display-only: render the timestamp column in a human-readable format in
+    // the user-selected timezone (same representation as the traces detail
+    // sidebar). The raw value is kept intact for include/exclude search terms
+    // and all other field actions.
     const getDisplayValue = (key: string, val: any): any => {
       if (
         key === store.state.zoConfig.timestamp_column &&
@@ -898,7 +899,11 @@ export default {
         val !== "" &&
         !isNaN(Number(val))
       ) {
-        return formatTimestamp(Number(val), "MMM DD, YYYY HH:mm:ss.SSS Z");
+        return timestampToTimezoneDate(
+          Number(val) / 1000,
+          store.state.timezone,
+          "MMM dd, yyyy HH:mm:ss.SSS ZZZ",
+        );
       }
       return val;
     };
