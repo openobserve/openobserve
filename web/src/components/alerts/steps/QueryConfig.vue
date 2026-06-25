@@ -364,7 +364,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <!-- Check every row -->
-            <div class="tw:flex tw:items-start tw:gap-3 tw:py-2 tw:px-3 tw:rounded-md tw:text-[13px]">
+            <div class="tw:flex tw:items-center
+             tw:gap-3 tw:py-2 tw:px-3 tw:rounded-md tw:text-[13px]">
               <span class="condition-label tw:font-bold tw:text-[13px] tw:whitespace-nowrap tw:min-w-[90px] tw:shrink-0" style="line-height: 28px;">
                 Check every *
                 <OTooltip :content="t('alerts.howOftenCheckTooltip')" :delay="300" side="top" />

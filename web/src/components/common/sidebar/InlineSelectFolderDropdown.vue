@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :options="folderOptions"
       labelKey="label"
       valueKey="value"
-      class="alert-v3-select tw:w-[110px] tw:max-[1500px]:w-[90px] tw:max-[1100px]:w-[75px] tw:max-[950px]:w-[65px]"
+      class="alert-v3-select folder-select"
       :disabled="disable"
       @update:model-value="$emit('update:modelValue', $event)"
     />
@@ -104,3 +104,21 @@ export default defineComponent({
   },
 });
 </script>
+
+<style scoped>
+.folder-select {
+  width: 110px;
+}
+
+@media (max-width: 1500px) {
+  .folder-select { width: 90px; }
+}
+
+@media (max-width: 1100px) {
+  .folder-select { width: 75px; }
+}
+
+@media (max-width: 950px) {
+  .folder-select { width: 65px; }
+}
+</style>

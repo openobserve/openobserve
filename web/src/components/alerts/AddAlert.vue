@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- CREATE MODE: Alert Name + Folder -->
           <template v-else>
             <div class="tw:flex tw:items-center tw:gap-1.5 tw:shrink-0">
-              <label class="tw:text-xs tw:font-semibold tw:whitespace-nowrap tw:text-[rgba(0,0,0,0.72)] tw:dark:text-[rgba(255,255,255,0.7)]">{{ isAnomalyMode ? t('alerts.anomalyName') : t('alerts.incidents.alertName') }} <span class="tw:text-text-primary">*</span></label>
+              <div class="tw:text-xs tw:font-semibold tw:whitespace-nowrap" :class="store.state.theme === 'dark' ? 'tw:text-[rgba(255,255,255,0.7)]' : 'tw:text-[rgba(0,0,0,0.72)]'">{{ isAnomalyMode ? t('alerts.anomalyName') : t('alerts.incidents.alertName') }} <span class="tw:text-text-primary">*</span></div>
               <OInput
                 v-if="!isAnomalyMode"
                 ref="step1Ref"
@@ -90,11 +90,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Folder -->
             <div class="tw:flex tw:items-center tw:gap-1.5 tw:shrink-0">
-              <label class="tw:text-xs tw:font-semibold tw:whitespace-nowrap tw:text-[rgba(0,0,0,0.72)] tw:dark:text-[rgba(255,255,255,0.7)]">{{ t('alerts.folder') }}</label>
+              <div class="tw:text-xs tw:font-semibold tw:whitespace-nowrap" :class="store.state.theme === 'dark' ? 'tw:text-[rgba(255,255,255,0.7)]' : 'tw:text-[rgba(0,0,0,0.72)]'">{{ t('alerts.folder') }}</div>
               <InlineSelectFolderDropdown
                 :model-value="activeFolderId"
                 type="alerts"
-                class="tw:min-w-[60px] tw:max-w-[140px]"
+                class="topbar-folder-select"
                 @update:model-value="updateActiveFolderId({ value: $event })"
               />
             </div>
@@ -118,14 +118,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="tw:flex tw:items-center tw:gap-4 tw:px-3 tw:py-2">
         <!-- Stream Type -->
         <div class="tw:flex tw:items-center tw:gap-1.5">
-          <label class="tw:text-xs tw:font-semibold tw:whitespace-nowrap tw:text-[rgba(0,0,0,0.72)] tw:dark:text-[rgba(255,255,255,0.7)]">{{ t("alerts.streamType") }} <span class="tw:text-text-primary">*</span></label>
+          <div class="tw:text-xs tw:font-semibold tw:whitespace-nowrap" :class="store.state.theme === 'dark' ? 'tw:text-[rgba(255,255,255,0.7)]' : 'tw:text-[rgba(0,0,0,0.72)]'">{{ t("alerts.streamType") }} <span class="tw:text-text-primary">*</span></div>
           <OSelect
             ref="streamTypeRef"
             data-test="add-alert-stream-type-select-dropdown"
             v-model="formData.stream_type"
             :options="streamTypes"
             :searchable="false"
-            class="stream-type-select tw:h-[28px]! tw:min-h-[28px]! tw:w-[150px]"
+            class="stream-type-select tw:h-[28px]! tw:min-h-[28px]!"
             :class="streamTypeError ? 'field-error' : ''"
             :disabled="beingUpdated || anomalyEditMode"
             @update:model-value="streamTypeError = false; updateStreams()"
@@ -134,14 +134,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Stream Name -->
         <div class="tw:flex tw:items-center tw:gap-1.5">
-          <label class="tw:text-xs tw:font-semibold tw:whitespace-nowrap tw:text-[rgba(0,0,0,0.72)] tw:dark:text-[rgba(255,255,255,0.7)]">{{ t("alerts.stream_name") }} <span class="tw:text-text-primary">*</span></label>
+          <div class="tw:text-xs tw:font-semibold tw:whitespace-nowrap" :class="store.state.theme === 'dark' ? 'tw:text-[rgba(255,255,255,0.7)]' : 'tw:text-[rgba(0,0,0,0.72)]'">{{ t("alerts.stream_name") }} <span class="tw:text-text-primary">*</span></div>
           <OSelect
             ref="streamNameRef"
             data-test="add-alert-stream-name-select-dropdown"
             v-model="formData.stream_name"
             :options="indexOptions"
             :loading="isFetchingStreams"
-            class="stream-name-select tw:h-[28px]! tw:min-h-[28px]! tw:w-[160px]"
+            class="stream-name-select tw:h-[28px]! tw:min-h-[28px]!"
             :class="streamNameError ? 'field-error' : ''"
             :disabled="beingUpdated || anomalyEditMode || !formData.stream_type"
             @update:model-value="streamNameError = false; updateStreamFields($event)"
@@ -151,13 +151,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Alert Type -->
         <div class="tw:flex tw:items-center tw:gap-1.5">
-          <label class="tw:text-xs tw:font-semibold tw:whitespace-nowrap tw:text-[rgba(0,0,0,0.72)] tw:dark:text-[rgba(255,255,255,0.7)]">{{ t("alerts.alertType") || 'Alert Type' }}</label>
+          <div class="tw:text-xs tw:font-semibold tw:whitespace-nowrap" :class="store.state.theme === 'dark' ? 'tw:text-[rgba(255,255,255,0.7)]' : 'tw:text-[rgba(0,0,0,0.72)]'">{{ t("alerts.alertType") || 'Alert Type' }}</div>
           <OSelect
             data-test="add-alert-type-select-dropdown"
             v-model="formData.is_real_time"
             :options="alertTypeOptions"
             :disabled="beingUpdated || anomalyEditMode"
-            class="alert-type-select tw:h-[28px]! tw:min-h-[28px]! tw:min-w-[110px]"
+            class="alert-type-select tw:h-[28px]! tw:min-h-[28px]!"
             :searchable="false"
           />
         </div>
@@ -600,6 +600,21 @@ export default defineComponent({
 @container topbar (max-width: 680px) {
   .topbar-name-input  { min-width: 70px; }
 }
+
+.topbar-folder-select {
+  min-width: 60px;
+  max-width: 140px;
+}
+.topbar-folder-select .q-field__control { padding: 0; }
+.topbar-folder-select .q-field__native {
+  font-size: 1.25rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.stream-type-select { width: 150px; }
+.stream-name-select { width: 160px; }
+.alert-type-select  { min-width: 110px; }
 
 @container stream-config (max-width: 900px) {
   .stream-type-select { width: 110px; }
