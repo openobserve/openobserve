@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="tw:flex tw:items-center tw:gap-2">
     <img v-if="showIcon" style="width: 24px; height: 24px;" :src="icon" alt="icon" />
-    <span class="tw:text-base tw:font-bold tw:leading-6">
+    <span data-test="common-group-header-title" class="tw:text-base tw:font-bold tw:leading-6">
       {{ title }}
     </span>
     <span class="tw:flex-1">

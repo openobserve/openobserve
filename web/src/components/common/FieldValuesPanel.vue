@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:py-2 tw:text-xs">
+  <div data-test="field-values-panel-container" class="tw:py-2 tw:text-xs">
     <!-- Value search input — only when fetched count hits the limit -->
     <div v-if="showValueSearch" class="value-search-container tw:mb-1">
       <div class="value-search-input-wrap">

@@ -20,6 +20,7 @@
       <!-- Display validation errors -->
       <div
         v-if="validationErrors.length > 0"
+        data-test="common-json-editor-validation-errors"
         class="tw:p-3 tw:text-red-500 tw:shrink-0 tw:max-h-50 tw:overflow-y-auto"
       >
         <div class="tw:font-bold tw:mb-2">Please fix the following issues:</div>

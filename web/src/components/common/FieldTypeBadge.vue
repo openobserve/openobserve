@@ -17,6 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <span
     v-if="info"
+    data-test="common-field-type-badge"
     class="tw:inline-flex tw:items-center tw:justify-center tw:w-4 tw:h-4 tw:rounded-[0.2rem] tw:text-[0.6rem] tw:font-bold tw:mr-[0.3rem] tw:shrink-0 tw:align-middle"
     :style="{ backgroundColor: info.color, color: info.textColor }"
     :title="dataType"
