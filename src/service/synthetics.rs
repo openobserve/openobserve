@@ -351,8 +351,10 @@ pub async fn batch_monitor_summary(
     let agg_req = build_req(agg_sql, seven_d_ago, now, 10000, 0);
     let latest_req = build_req(latest_sql, one_h_ago, now, 10000, 0);
 
-    let (agg_res, latest_res) =
-        tokio::join!(run_search(org_id, &agg_req), run_search(org_id, &latest_req));
+    let (agg_res, latest_res) = tokio::join!(
+        run_search(org_id, &agg_req),
+        run_search(org_id, &latest_req)
+    );
     let agg_resp = agg_res?;
     let latest_resp = latest_res?;
 
@@ -372,8 +374,15 @@ pub async fn batch_monitor_summary(
     for h in &latest_resp.hits {
         if let Some(mid) = h.get("monitor_id").and_then(|v| v.as_str()) {
             if !latest_map.contains_key(mid) {
-                let st = h.get("status").and_then(|v| v.as_str()).unwrap_or("unknown").to_string();
-                let ms = h.get("response_time_ms").and_then(|v| v.as_f64()).unwrap_or(0.0);
+                let st = h
+                    .get("status")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("unknown")
+                    .to_string();
+                let ms = h
+                    .get("response_time_ms")
+                    .and_then(|v| v.as_f64())
+                    .unwrap_or(0.0);
                 latest_map.insert(mid.to_string(), (st, ms));
             }
         }
