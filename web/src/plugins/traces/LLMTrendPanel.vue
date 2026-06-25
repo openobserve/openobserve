@@ -41,6 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div
       v-if="loading || !hasLoadedOnce"
+      data-test="traces-llm-trend-panel-skeleton"
       class="tw:flex tw:flex-col tw:gap-2 tw:mt-2"
       :class="
         store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'

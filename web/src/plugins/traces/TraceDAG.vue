@@ -16,21 +16,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="tw:w-full tw:h-full tw:min-h-125">
-    <div v-if="isLoading" class="tw:flex tw:items-center tw:justify-center tw:flex-col tw:p-6 tw:h-125">
+    <div v-if="isLoading" data-test="traces-trace-dag-loading-container" class="tw:flex tw:items-center tw:justify-center tw:flex-col tw:p-6 tw:h-125">
       <OSpinner size="lg" />
       <div class="tw:mt-3 tw:text-gray-400">Loading trace DAG...</div>
     </div>
 
-    <div v-else-if="error" class="tw:p-3">
+    <div v-else-if="error" data-test="traces-trace-dag-error-message" class="tw:p-3">
       <OBanner variant="error" icon="error" :content="`Failed to load DAG: ${error}`" />
     </div>
 
-    <div v-else-if="!dagData || !dagData.nodes || dagData.nodes.length === 0" class="tw:flex tw:items-center tw:justify-center tw:flex-col tw:p-6 tw:h-125">
+    <div v-else-if="!dagData || !dagData.nodes || dagData.nodes.length === 0" data-test="traces-trace-dag-empty-container" class="tw:flex tw:items-center tw:justify-center tw:flex-col tw:p-6 tw:h-125">
       <OIcon name="info" style="width: 48px; height: 48px;" />
       <div class="tw:mt-3 tw:text-gray-400">No DAG data available</div>
     </div>
 
-    <div v-else class="tw:w-full tw:h-full tw:min-h-150 tw:border tw:border-(--o2-border) tw:rounded tw:relative tw:dark:border-[#444]">
+    <div v-else data-test="traces-trace-dag-wrapper" class="tw:w-full tw:h-full tw:min-h-150 tw:border tw:border-(--o2-border) tw:rounded tw:relative tw:dark:border-[#444]">
       <VueFlow
         :nodes="nodes"
         :edges="edges"

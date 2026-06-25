@@ -418,7 +418,9 @@ describe("TraceTree", () => {
 
       await flushPromises();
 
-      const highlightedSpans = wrapper.findAll(".highlighted");
+      const highlightedSpans = wrapper
+        .findAll('[data-test^="trace-tree-span-service-name-"]')
+        .filter((el) => el.classes().includes("tw:bg-yellow-300"));
       expect(highlightedSpans.length).toBeGreaterThan(0);
     });
 
@@ -429,8 +431,10 @@ describe("TraceTree", () => {
 
       await flushPromises();
 
-      const currentMatch = wrapper.find(".current-match");
-      expect(currentMatch.exists()).toBe(true);
+      const currentMatch = wrapper
+        .findAll('[data-test^="trace-tree-span-service-name-"]')
+        .filter((el) => el.classes().includes("tw:text-red-600"));
+      expect(currentMatch.length).toBeGreaterThan(0);
     });
 
     it("should not highlight when no search query", async () => {
@@ -440,7 +444,9 @@ describe("TraceTree", () => {
 
       await flushPromises();
 
-      const highlightedSpans = wrapper.findAll(".highlighted");
+      const highlightedSpans = wrapper
+        .findAll('[data-test^="trace-tree-span-service-name-"]')
+        .filter((el) => el.classes().includes("tw:bg-yellow-300"));
       expect(highlightedSpans.length).toBe(0);
     });
 

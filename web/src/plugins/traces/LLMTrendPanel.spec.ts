@@ -249,7 +249,9 @@ describe("LLMTrendPanel — render state", () => {
     await new Promise((r) => setTimeout(r, 10));
     observers[0]?.trigger(true);
     await flushPromises();
-    expect(wrapper.find(".llm-panel-skeleton").exists()).toBe(true);
+    expect(
+      wrapper.find('[data-test="traces-llm-trend-panel-skeleton"]').exists(),
+    ).toBe(true);
   });
 
   // After a successful empty fetch (hits = []), the empty state renders

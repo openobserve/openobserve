@@ -147,6 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             variant="ghost-primary"
             size="sm"
+            data-test="traces-llm-content-renderer-expand-btn"
             @click="isExpanded = true"
           >
             ...expand ({{ contentStats.remainingChars }} more characters)
