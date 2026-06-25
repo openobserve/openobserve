@@ -25,8 +25,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         style="width: 125px; margin: 0 auto 1rem"
         alt=""
       />
-      <span class="tw:font-semibold tw:text-base tw:leading-5 tw:text-left tw:tracking-[-0.6%]">{{ t("regex_patterns.no_data") }}</span>
-        <span class="tw:text-sm tw:leading-5 tw:text-left tw:tracking-[-0.6%]">Import patterns from your Library or <span class="tw:text-base tw:leading-6 tw:text-left tw:text-[#5960b2] tw:font-bold tw:cursor-pointer" @click="createNewRegexPattern">Create New</span></span>
+      <span data-test="no-regex-patterns-title" class="tw:font-semibold tw:text-base tw:leading-5 tw:text-left tw:tracking-[-0.6%]">{{ t("regex_patterns.no_data") }}</span>
+        <span data-test="no-regex-patterns-subtitle" class="tw:text-sm tw:leading-5 tw:text-left tw:tracking-[-0.6%]">Import patterns from your Library or <span data-test="no-regex-patterns-create-new" class="tw:text-base tw:leading-6 tw:text-left tw:text-[#5960b2] tw:font-bold tw:cursor-pointer" @click="createNewRegexPattern">Create New</span></span>
         <div style="font-size: 1rem">
             <OButton variant="outline" size="xs" class="tw:mt-2" @click="importRegexPattern">
               {{ t("regex_patterns.import_title") }}

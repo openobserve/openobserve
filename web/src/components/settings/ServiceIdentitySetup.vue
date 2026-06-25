@@ -49,6 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <!-- Collapsed row -->
             <div
+              data-test="service-identity-service-name-header"
               class="tw:flex tw:items-center tw:gap-2.5 tw:px-3 tw:py-2 tw:cursor-pointer tw:hover:opacity-80 tw:transition-opacity"
               @click="serviceNameExpanded = !serviceNameExpanded"
             >
