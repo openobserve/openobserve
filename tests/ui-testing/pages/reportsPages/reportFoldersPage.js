@@ -351,6 +351,10 @@ export class ReportFoldersPage {
     await expect(this.reportPauseStartBtn(reportName)).toBeVisible({ timeout: 10000 });
   }
 
+  async expectReportNotVisibleInTable(reportName) {
+    await expect(this.reportPauseStartBtn(reportName)).not.toBeVisible({ timeout: 5000 });
+  }
+
   async getFolderCount() {
     // Every OTab in the sidebar carries a `data-test="dashboard-folder-tab-<id>"`.
     return await this.page
