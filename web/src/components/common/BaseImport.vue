@@ -102,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :data-test="`${testPrefix}-import-sql-editor`"
                     ref="queryEditorRef"
                     :editor-id="`${testPrefix}-import-query-editor`"
-                    class="tw:mx-2"
+                    class="import-editor-shell import-url-editor tw:mx-2"
                     :debounceTime="300"
                     v-model:query="jsonStr"
                     language="json"
@@ -147,7 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :data-test="`${testPrefix}-import-sql-editor`"
                     ref="queryEditorRef"
                     :editor-id="`${testPrefix}-import-query-editor`"
-                    class="tw:mx-2"
+                    class="import-editor-shell import-file-editor tw:mx-2"
                     :debounceTime="300"
                     v-model:query="jsonStr"
                     language="json"
@@ -542,22 +542,31 @@ export default defineComponent({
 </script>
 
 <style>
-.editor-container-url .monaco-editor {
-  height: v-bind('editorHeights.urlEditor') !important;
-  overflow: auto;
-  resize: none;
+/*
+ * Box styling (border, radius, padding, height) lives on the editor SHELL
+ * wrapper — never on Monaco's internal .monaco-editor element. Monaco sizes
+ * its inner .overflow-guard to the full box it measures; adding border/padding
+ * directly to that element shrinks the content box and forces phantom
+ * horizontal + vertical scrollbars. Styling the wrapper lets Monaco fill a
+ * clean box and removes the scrollbars without any !important overrides.
+ */
+.import-editor-shell {
+  box-sizing: border-box;
+  /* tw:w-full (100%) + tw:mx-2 (1rem total) would overflow by 1rem and add a
+     horizontal scrollbar; subtract the margins so the box stays inside and
+     keeps a right-side gap. */
+  width: calc(100% - 1rem);
   border: 1px solid var(--o2-border-color);
   border-radius: 0.375rem;
-  padding-top: 12px;
+  overflow: hidden;
 }
 
-.editor-container-json .monaco-editor {
-  height: v-bind('editorHeights.fileEditor') !important;
-  overflow: auto;
-  resize: none;
-  border: 1px solid var(--o2-border-color);
-  border-radius: 0.375rem;
-  padding-top: 12px;
+.import-url-editor {
+  height: v-bind('editorHeights.urlEditor');
+}
+
+.import-file-editor {
+  height: v-bind('editorHeights.fileEditor');
 }
 
 .error-report-container {
