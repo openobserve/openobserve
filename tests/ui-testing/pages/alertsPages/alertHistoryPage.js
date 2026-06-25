@@ -18,8 +18,10 @@ export class AlertHistoryPage {
     // Results
     this.table = '[data-test="alert-history-table"]';
     this.viewDetailsBtn = '[data-test="alert-history-view-details"]';
-    this.alertDetailsDialog = '[data-test="alert-history-details-dialog"]';
-    this.emptyState = '.q-table__bottom';
+    // reka-ui DialogContent always renders role="dialog"; data-test forwarding
+    // through reka-ui is unreliable so we use the ARIA role as the stable hook.
+    this.alertDetailsDialog = '[role="dialog"]';
+    this.emptyState = '[data-test="o2-table-empty"]';
   }
 
   async navigate() {
@@ -116,12 +118,13 @@ export class AlertHistoryPage {
   }
 
   async expectTableOrEmptyStateVisible() {
-    const [tableVisible, emptyVisible] = await Promise.all([
-      this.page.locator(this.table).isVisible({ timeout: 10000 }).catch(() => false),
-      this.page.locator(this.emptyState).isVisible({ timeout: 3000 }).catch(() => false),
+    // Check for data rows OR the OTable empty-state panel
+    const [rowsVisible, emptyVisible] = await Promise.all([
+      this.page.locator(`${this.table} tbody tr`).first().isVisible({ timeout: 10000 }).catch(() => false),
+      this.page.locator(this.emptyState).isVisible({ timeout: 5000 }).catch(() => false),
     ]);
-    if (!tableVisible && !emptyVisible) {
-      throw new Error('Expected either the history table or an empty-state to be visible after search');
+    if (!rowsVisible && !emptyVisible) {
+      throw new Error('Expected either history table rows or the empty-state to be visible after search');
     }
   }
 
