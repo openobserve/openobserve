@@ -1,8 +1,0 @@
-[
-  { "title": "should auto-pick an FTS default column on fresh navigation", "action": "new", "verifies": "Fresh navigation to logs auto-picks an FTS text column instead of the generic source column" },
-  { "title": "should render source column in SQL mode (no FTS auto-pick)", "action": "new", "verifies": "SQL mode bypasses FTS auto-pick and renders the generic source column" },
-  { "title": "should clear system-pick flag when user adds a field and user choice persists", "action": "new", "verifies": "User adding a field clears the auto-pick flag and the user's choice persists across subsequent searches" },
-  { "title": "should re-enable auto-pick after resetting selected fields", "action": "new", "verifies": "Resetting selected fields re-enables FTS auto-pick on the next search" },
-  { "title": "should re-evaluate auto-pick after reset filters", "action": "new", "verifies": "Reset filters button clears the auto-pick flag and the next search re-evaluates" },
-  { "title": "should drop auto-pick column when entering SQL mode", "action": "new", "verifies": "Toggling SQL mode with an active system-pick drops the auto-pick column and renders source" }
-]
