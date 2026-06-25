@@ -322,7 +322,6 @@ pub async fn batch_monitor_summary(
 
     let now = config::utils::time::now_micros();
     let seven_d_ago = now - SEVEN_DAYS_US;
-    let one_d_ago = now - ONE_DAY_US;
     let one_h_ago = now - ONE_HOUR_US;
 
     let ids_sql = monitor_ids
@@ -331,31 +330,18 @@ pub async fn batch_monitor_summary(
         .collect::<Vec<_>>()
         .join(", ");
 
+    // last_check_at + avg response time over last 7 days
     let agg_sql = format!(
-        "SELECT monitor_id, \
-                COUNT(*) as total, \
-                SUM(CASE WHEN status = 'up' THEN 1 ELSE 0 END) as up_count, \
-                AVG(response_time_ms) as avg_ms, \
-                MAX(_timestamp) as last_check_at \
+        "SELECT monitor_id, MAX(_timestamp) as last_check_at, AVG(response_time_ms) as avg_ms \
          FROM \"{STREAM}\" \
          WHERE _timestamp >= {seven_d_ago} AND _timestamp <= {now} \
            AND monitor_id IN ({ids_sql}) \
          GROUP BY monitor_id"
     );
 
-    let bucket_sql = format!(
-        "SELECT monitor_id, \
-                (_timestamp / {ONE_HOUR_US}) as hour_bucket, \
-                SUM(CASE WHEN status = 'up' THEN 1 ELSE 0 END) as up_count, \
-                COUNT(*) as total \
-         FROM \"{STREAM}\" \
-         WHERE _timestamp >= {one_d_ago} AND _timestamp <= {now} \
-           AND monitor_id IN ({ids_sql}) \
-         GROUP BY monitor_id, hour_bucket"
-    );
-
+    // most recent status + response time within last hour
     let latest_sql = format!(
-        "SELECT monitor_id, status, response_time_ms, _timestamp \
+        "SELECT monitor_id, status, response_time_ms \
          FROM \"{STREAM}\" \
          WHERE _timestamp >= {one_h_ago} AND _timestamp <= {now} \
            AND monitor_id IN ({ids_sql}) \
@@ -363,84 +349,42 @@ pub async fn batch_monitor_summary(
     );
 
     let agg_req = build_req(agg_sql, seven_d_ago, now, 10000, 0);
-    let bucket_req = build_req(bucket_sql, one_d_ago, now, 100000, 0);
     let latest_req = build_req(latest_sql, one_h_ago, now, 10000, 0);
 
-    let (agg_res, bucket_res, latest_res) = tokio::join!(
-        run_search(org_id, &agg_req),
-        run_search(org_id, &bucket_req),
-        run_search(org_id, &latest_req),
-    );
+    let (agg_res, latest_res) =
+        tokio::join!(run_search(org_id, &agg_req), run_search(org_id, &latest_req));
     let agg_resp = agg_res?;
-    let bucket_resp = bucket_res?;
     let latest_resp = latest_res?;
 
-    struct AggRow {
-        total: i64,
-        up_count: i64,
-        avg_ms: Option<f64>,
-        last_check_at: Option<i64>,
-    }
-    let agg_map: HashMap<String, AggRow> = agg_resp
+    let agg_map: HashMap<String, (Option<i64>, Option<f64>)> = agg_resp
         .hits
         .iter()
         .filter_map(|h| {
             let mid = h.get("monitor_id")?.as_str()?.to_string();
-            Some((
-                mid,
-                AggRow {
-                    total: h.get("total")?.as_i64().unwrap_or(0),
-                    up_count: h.get("up_count")?.as_i64().unwrap_or(0),
-                    avg_ms: h.get("avg_ms").and_then(|v| v.as_f64()),
-                    last_check_at: h.get("last_check_at").and_then(|v| v.as_i64()),
-                },
-            ))
+            let last_check_at = h.get("last_check_at").and_then(|v| v.as_i64());
+            let avg_ms = h.get("avg_ms").and_then(|v| v.as_f64());
+            Some((mid, (last_check_at, avg_ms)))
         })
         .collect();
 
-    let mut bucket_map: HashMap<String, HashMap<i64, (i64, i64)>> = HashMap::new();
-    for h in &bucket_resp.hits {
-        if let (Some(mid), Some(bkt)) = (
-            h.get("monitor_id").and_then(|v| v.as_str()),
-            h.get("hour_bucket").and_then(|v| v.as_i64()),
-        ) {
-            let up = h.get("up_count").and_then(|v| v.as_i64()).unwrap_or(0);
-            let tot = h.get("total").and_then(|v| v.as_i64()).unwrap_or(0);
-            bucket_map
-                .entry(mid.to_string())
-                .or_default()
-                .insert(bkt, (up, tot));
-        }
-    }
-
-    // latest_resp: ordered DESC — first occurrence per monitor_id wins
+    // ordered DESC — first hit per monitor_id is the most recent
     let mut latest_map: HashMap<String, (String, f64)> = HashMap::new();
     for h in &latest_resp.hits {
         if let Some(mid) = h.get("monitor_id").and_then(|v| v.as_str()) {
             if !latest_map.contains_key(mid) {
-                let st = h
-                    .get("status")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("unknown")
-                    .to_string();
-                let ms = h
-                    .get("response_time_ms")
-                    .and_then(|v| v.as_f64())
-                    .unwrap_or(0.0);
+                let st = h.get("status").and_then(|v| v.as_str()).unwrap_or("unknown").to_string();
+                let ms = h.get("response_time_ms").and_then(|v| v.as_f64()).unwrap_or(0.0);
                 latest_map.insert(mid.to_string(), (st, ms));
             }
         }
     }
 
-    let now_bucket = now / ONE_HOUR_US;
-
     let result = monitor_ids
         .iter()
         .map(|&id| {
             let agg = agg_map.get(id);
-            let uptime_7d_pct =
-                agg.and_then(|a| (a.total > 0).then(|| a.up_count as f64 / a.total as f64 * 100.0));
-            let last_check_at = agg.and_then(|a| a.last_check_at);
+            let last_check_at = agg.and_then(|(ts, _)| *ts);
+            let avg_ms = agg.and_then(|(_, ms)| *ms);
 
             let (status, last_response_ms) = match latest_map.get(id) {
                 Some((s, ms)) => (
@@ -452,27 +396,8 @@ pub async fn batch_monitor_summary(
                     },
                     Some(*ms),
                 ),
-                None => (MonitorStatus::Unknown, agg.and_then(|a| a.avg_ms)),
+                None => (MonitorStatus::Unknown, avg_ms),
             };
-
-            let my_buckets = bucket_map.get(id);
-            let status_24h = (0..24i64)
-                .map(|i| {
-                    let key = now_bucket - 23 + i;
-                    let ts = key * ONE_HOUR_US;
-                    let bucket_status = match my_buckets.and_then(|m| m.get(&key)) {
-                        None => BucketStatus::NoData,
-                        Some((_, 0)) => BucketStatus::NoData,
-                        Some((up, tot)) if up == tot => BucketStatus::Up,
-                        Some((0, _)) => BucketStatus::Down,
-                        _ => BucketStatus::Degraded,
-                    };
-                    StatusBucket {
-                        ts,
-                        status: bucket_status,
-                    }
-                })
-                .collect();
 
             (
                 id.to_string(),
@@ -480,8 +405,8 @@ pub async fn batch_monitor_summary(
                     status,
                     last_check_at,
                     last_response_ms,
-                    uptime_7d_pct,
-                    status_24h,
+                    uptime_7d_pct: None,
+                    status_24h: vec![],
                     by_location: vec![],
                 },
             )
