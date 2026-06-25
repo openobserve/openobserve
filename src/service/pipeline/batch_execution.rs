@@ -171,6 +171,7 @@ impl PipelineExt for Pipeline {
 pub struct ExecutablePipeline {
     id: String,
     name: String,
+    is_realtime: bool,
     source_node_id: String,
     sorted_nodes: Vec<String>,
     function_map: HashMap<String, CompiledFunctionRuntime>,
@@ -182,6 +183,7 @@ impl MemorySize for ExecutablePipeline {
         std::mem::size_of::<ExecutablePipeline>()
             + self.id.mem_size()
             + self.name.mem_size()
+            + self.is_realtime.mem_size()
             + self.source_node_id.mem_size()
             + self.sorted_nodes.mem_size()
             + self.function_map.mem_size()
@@ -277,6 +279,7 @@ impl ExecutablePipeline {
         Ok(Self {
             id: pipeline.id.to_string(),
             name: pipeline.name.to_string(),
+            is_realtime: pipeline.source.is_realtime(),
             source_node_id,
             node_map,
             sorted_nodes,
@@ -466,9 +469,6 @@ impl ExecutablePipeline {
         log::debug!("[Pipeline]: All records send into pipeline for processing");
 
         // Wait for all node tasks to complete
-        log::info!(
-            "[Pipeline] {pipeline_name} [inv={inv_id}]: waiting for all node tasks to complete"
-        );
         let node_tasks_start = Instant::now();
         if let Err(e) = try_join_all(node_tasks).await {
             log::error!(
@@ -476,10 +476,8 @@ impl ExecutablePipeline {
             );
         }
         let node_tasks_ms = node_tasks_start.elapsed().as_millis();
-        log::info!("[Pipeline] {pipeline_name} [inv={inv_id}]: all node tasks completed");
 
         // Publish errors if received any
-        log::info!("[Pipeline] {pipeline_name} [inv={inv_id}]: awaiting error task");
         let error_task_start = Instant::now();
         if let Some(pipeline_errors) = error_task.await.map_err(|e| {
             log::error!(
@@ -488,7 +486,7 @@ impl ExecutablePipeline {
             anyhow!("[Pipeline] error collecting job failed: {}", e)
         })? {
             let stream_params = self.get_source_stream_params();
-            log::info!(
+            log::error!(
                 "[Pipeline] id: {}, name: {}, node_errors: {:?}",
                 pipeline_errors.pipeline_id,
                 pipeline_errors.pipeline_name,
@@ -504,7 +502,6 @@ impl ExecutablePipeline {
         }
         let error_collect_ms = error_task_start.elapsed().as_millis();
 
-        log::info!("[Pipeline] {pipeline_name} [inv={inv_id}]: awaiting result collector");
         let result_task_start = Instant::now();
         let results = result_task.await.map_err(|e| {
             log::error!(
@@ -513,21 +510,18 @@ impl ExecutablePipeline {
             anyhow!("[Pipeline] result collecting job failed: {}", e)
         })?;
         let result_collect_ms = result_task_start.elapsed().as_millis();
-        log::info!(
-            "[Pipeline] {pipeline_name} [inv={inv_id}]: result collector returned {} stream groups",
-            results.len()
-        );
 
         // Histogram metrics (always on): realtime pipeline batch execution time (ms)
         // and batch size, labeled by pipeline so latency can be attributed per pipeline.
-        let stream_type_label = source_stream_params.stream_type.as_str();
         let elapsed_secs = batch_start.elapsed().as_secs_f64();
-        metrics::PIPELINE_EXEC_TIME_MS
-            .with_label_values(&[org_id, &self.id, &pipeline_name, stream_type_label])
-            .observe(elapsed_secs * 1000.0);
-        metrics::PIPELINE_EXEC_BATCH_SIZE
-            .with_label_values(&[org_id, &self.id, &pipeline_name, stream_type_label])
-            .observe(batch_size as f64);
+        if self.is_realtime {
+            metrics::PIPELINE_EXEC_TIME_MS
+                .with_label_values(&[org_id, &self.id])
+                .observe(elapsed_secs * 1000.0);
+            metrics::PIPELINE_EXEC_BATCH_SIZE
+                .with_label_values(&[org_id, &self.id])
+                .observe(batch_size as f64);
+        }
 
         if print_event {
             let total_ms = batch_start.elapsed().as_millis();
@@ -539,9 +533,10 @@ impl ExecutablePipeline {
                 (0.0, 0.0)
             };
             log::info!(
-                "[Pipeline:Timing] [inv={inv_id}] done id={} name={} batch_size={batch_size} source_size_mb={source_size:.4} out_records={out_records} total_ms={total_ms} node_tasks_ms={node_tasks_ms} result_collect_ms={result_collect_ms} error_collect_ms={error_collect_ms} records_per_sec={records_per_sec:.1} mb_per_sec={mb_per_sec:.4}",
+                "[Pipeline:Timing] [inv={inv_id}] done id={} name={} stream_groups={} batch_size={batch_size} source_size_mb={source_size:.4} out_records={out_records} total_ms={total_ms} node_tasks_ms={node_tasks_ms} result_collect_ms={result_collect_ms} error_collect_ms={error_collect_ms} records_per_sec={records_per_sec:.1} mb_per_sec={mb_per_sec:.4}",
                 self.id,
                 pipeline_name,
+                results.len()
             );
         }
 
@@ -598,6 +593,10 @@ impl ExecutablePipeline {
 
     pub fn get_pipeline_id(&self) -> &str {
         &self.id
+    }
+
+    pub fn get_pipeline_name(&self) -> &str {
+        &self.name
     }
 
     fn get_source_stream_params(&self) -> StreamParams {
