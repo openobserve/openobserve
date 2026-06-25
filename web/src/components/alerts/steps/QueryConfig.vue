@@ -16,18 +16,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="step-query-config tw:w-full tw:min-w-0 tw:h-full tw:overflow-auto tw:mx-auto" :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
-    <div class="step-content card-container tw:rounded-lg tw:min-h-full tw:w-full tw:min-w-0 tw:overflow-hidden tw:box-border"
-      :class="store.state.theme === 'dark'
-        ? 'tw:bg-[var(--o2-primary-background)] tw:border tw:border-[#343434]'
-        : 'tw:bg-white tw:border tw:border-[#e6e6e6]'">
+    <div class="step-content tw:rounded-lg tw:min-h-full tw:w-full tw:min-w-0 tw:overflow-hidden tw:box-border tw:bg-[var(--color-surface-overlay)] tw:border tw:border-[var(--color-border-default)]">
       <!-- Section header -->
       <div class="section-header tw:flex tw:items-center tw:gap-0 tw:py-2.5 tw:px-3"
         :class="store.state.theme === 'dark'
           ? 'tw:border-b tw:border-[#343434]'
           : 'tw:border-b tw:border-[#eeeeee]'">
         <div class="section-header-accent tw:w-0.75 tw:h-4 tw:rounded-sm tw:mr-2 tw:shrink-0 tw:bg-[var(--q-primary)]" />
-        <span class="section-header-title tw:text-[13px] tw:font-semibold tw:tracking-[0.01em]"
-          :class="store.state.theme === 'dark' ? 'tw:text-[var(--o2-border)]' : 'tw:text-[#374151]'">{{ t('alerts.queryConfig.sectionTitle') }}</span>
+        <span class="section-header-title tw:text-[13px] tw:font-semibold tw:tracking-[0.01em] tw:text-[var(--color-text-primary)]">{{ t('alerts.queryConfig.sectionTitle') }}</span>
       </div>
       <div class="tw:px-3 tw:py-2 tw:min-w-0 tw:w-full tw:box-border">
       <!-- Query Mode Tabs (hidden for real-time alerts) -->
@@ -428,10 +424,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <span class="condition-text tw:font-semibold tw:text-[13px] tw:whitespace-nowrap">on these</span>
                   <div
-                    class="tw:flex tw:items-center tw:gap-1 tw:cursor-pointer tw:select-none filters-inline-toggle tw:px-2 tw:py-0.5 tw:rounded-md tw:transition-colors"
-                    :class="store.state.theme === 'dark'
-                      ? 'tw:bg-gray-700/60 tw:hover:bg-gray-600/70'
-                      : 'tw:bg-gray-100 tw:hover:bg-gray-200'"
+                    class="tw:flex tw:items-center tw:gap-1 tw:cursor-pointer tw:select-none filters-inline-toggle tw:px-2 tw:py-0.5 tw:rounded-md tw:transition-colors tw:bg-surface-panel hover:tw:bg-primary-50"
                     @click="toggleFilters"
                   >
                     <OIcon
@@ -506,10 +499,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-else class="tw:mb-1 tw:px-3">
             <div class="tw:flex tw:items-center tw:gap-2 tw:py-1">
               <div
-                class="tw:flex tw:items-center tw:gap-1 tw:cursor-pointer tw:select-none filters-inline-toggle tw:px-2 tw:py-0.5 tw:rounded-md tw:transition-colors"
-                :class="store.state.theme === 'dark'
-                  ? 'tw:bg-gray-700/60 tw:hover:bg-gray-600/70'
-                  : 'tw:bg-gray-100 tw:hover:bg-gray-200'"
+                class="tw:flex tw:items-center tw:gap-1 tw:cursor-pointer tw:select-none filters-inline-toggle tw:px-2 tw:py-0.5 tw:rounded-md tw:transition-colors tw:bg-surface-panel hover:tw:bg-primary-50"
                 @click="toggleFilters"
               >
                 <OIcon

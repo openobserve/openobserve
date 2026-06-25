@@ -20,8 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'"
   >
     <div
-      class="step-content card-container tw:rounded-lg"
-      :class="store.state.theme === 'dark' ? 'tw:bg-[var(--o2-primary-background)] tw:border tw:border-[#343434]' : 'tw:bg-white tw:border tw:border-[#e6e6e6]'"
+      class="step-content tw:rounded-lg tw:bg-[var(--color-surface-overlay)] tw:border tw:border-[var(--color-border-default)]"
     >
       <!-- Section header -->
       <div
@@ -30,8 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <div class="section-header-accent tw:w-[3px] tw:h-4 tw:rounded-[2px] tw:mr-2 tw:shrink-0 tw:bg-[var(--q-primary)]" />
         <span
-          class="section-header-title tw:text-[13px] tw:font-semibold"
-          :class="store.state.theme === 'dark' ? 'tw:text-[var(--o2-border)]' : 'tw:text-[#374151]'"
+          class="section-header-title tw:text-[13px] tw:font-semibold tw:text-[var(--color-text-primary)]"
         >{{
           t("alerts.additional_settings") || "Additional Settings"
         }}</span>

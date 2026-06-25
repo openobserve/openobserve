@@ -16,10 +16,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div ref="multiWindowContainerRef" class="step-compare-with-past tw:w-full tw:h-full tw:flex tw:flex-col tw:mx-auto" :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
-    <div class="step-content tw:rounded-lg tw:flex-1 tw:min-h-0 tw:overflow-auto" :class="store.state.theme === 'dark' ? ['dark-mode-multi-window', 'tw:bg-[var(--o2-primary-background)]', 'tw:border', 'tw:border-[#343434]'] : ['light-mode-multi-window', 'tw:bg-white', 'tw:border', 'tw:border-[#e6e6e6]']">
+    <div class="step-content tw:rounded-lg tw:flex-1 tw:min-h-0 tw:overflow-auto tw:bg-[var(--color-surface-overlay)] tw:border tw:border-[var(--color-border-default)]" :class="store.state.theme === 'dark' ? 'dark-mode-multi-window' : 'light-mode-multi-window'">
       <div class="section-header tw:flex tw:items-center tw:gap-0 tw:py-2.5 tw:px-3" :class="store.state.theme === 'dark' ? 'tw:border-b tw:border-[#343434]' : 'tw:border-b tw:border-[#eeeeee]'">
         <div class="section-header-accent tw:w-0.75 tw:h-4 tw:rounded-xs tw:mr-2 tw:shrink-0 tw:bg-[var(--q-primary)]" />
-        <span class="section-header-title tw:text-[13px] tw:font-semibold" :class="store.state.theme === 'dark' ? 'tw:text-[var(--o2-border)]' : 'tw:text-[#374151]'">{{ t('alerts.steps.compareWithPast') }}</span>
+        <span class="section-header-title tw:text-[13px] tw:font-semibold tw:text-[var(--color-text-primary)]">{{ t('alerts.steps.compareWithPast') }}</span>
       </div>
       <div class="tw:px-3 tw:pb-2">
       <!-- Alert set for header -->
@@ -29,7 +29,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Current Window -->
-      <div class="tw:flex tw:flex-row tw:justify-between tw:items-start tw:min-h-27.5 tw:px-3 tw:py-2">
+      <div class="tw:flex tw:flex-row tw:justify-between tw:items-start tw:min-h-27.5 tw:px-3 tw:py-2 tw:bg-[var(--o2-card-bg)]"
+        :class="store.state.theme === 'dark' ? 'tw:border tw:border-[#343434]' : 'tw:border tw:border-[#e6e6e6]'">
         <div class="multi-window-text tw:w-auto tw:text-left tw:font-bold tw:text-sm tw:leading-6 tw:align-middle" :class="store.state.theme === 'dark' ? 'tw:text-white' : 'tw:text-[#3d3d3d]'">
           {{ t('alerts.compareWithPast.currentWindow') }}
         </div>
@@ -79,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-for="(picker, index) in localMultiTimeRange"
         :key="picker.uuid"
         class="reference-window-container tw:flex tw:flex-row tw:justify-between tw:items-start tw:min-h-27.5 tw:mt-2 tw:px-3 tw:py-2"
-        :class="store.state.theme === 'dark' ? ['tw:bg-[var(--o2-card-bg,var(--o2-primary-background))]', 'tw:border', 'tw:border-[var(--o2-border-color,#343434)]'] : ['tw:bg-[var(--o2-card-bg,#ffffff)]', 'tw:border', 'tw:border-[var(--o2-border-color,#e6e6e6)]']"
+        :class="store.state.theme === 'dark' ? ['tw:bg-[var(--o2-card-bg)]', 'tw:border', 'tw:border-[#343434]'] : ['tw:bg-[var(--o2-card-bg)]', 'tw:border', 'tw:border-[#e6e6e6]']"
       >
         <div class="multi-window-text tw:w-auto tw:text-left tw:font-bold tw:text-sm tw:leading-6 tw:align-middle" :class="store.state.theme === 'dark' ? 'tw:text-white' : 'tw:text-[#3d3d3d]'">
           {{ t('alerts.compareWithPast.referenceWindow') }} {{ index + 1 }}

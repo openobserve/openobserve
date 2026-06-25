@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <p
         v-if="summaryText"
-        class="tw:m-0 tw:whitespace-pre-line tw:tracking-[0.03em]"
+        class="summary-text tw:m-0 tw:whitespace-pre-line tw:tracking-[0.03em]"
         v-html="summaryText"
       />
       <p v-else class="tw:m-0 tw:italic tw:opacity-60">
@@ -92,3 +92,50 @@ onMounted(async () => {
   checkScrollState();
 });
 </script>
+
+<style>
+/* Styles for bold section labels (v-html content with markdown **text**) */
+.summary-text strong {
+  display: inline;
+  font-weight: 700;
+  font-size: 0.875rem;
+}
+
+/* Styles for clickable spans (v-html content) */
+.summary-text .summary-clickable {
+  cursor: default;
+  color: var(--q-primary);
+  font-weight: 600;
+  padding: 0.125rem 0.375rem;
+  margin: 0 0.125rem;
+  border-radius: 0.25rem;
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--q-primary) 8%, transparent),
+    color-mix(in srgb, var(--q-primary) 12%, transparent)
+  );
+  display: inline;
+  position: relative;
+  box-shadow: 0 0 0 0.0625rem color-mix(in srgb, var(--q-primary) 15%, transparent);
+  line-height: 1.6;
+  vertical-align: baseline;
+  white-space: nowrap;
+}
+
+/* Styles for plain English section */
+.summary-text .plain-english-section {
+  padding: 0.75rem 1rem;
+  border-radius: 0.375rem;
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--q-primary) 5%, transparent),
+    color-mix(in srgb, var(--q-primary) 8%, transparent)
+  );
+  border-left: 0.1875rem solid var(--q-primary);
+  font-size: 0.875rem;
+  line-height: 1.7;
+  font-style: italic;
+  opacity: 0.95;
+  font-weight: 500;
+}
+</style>

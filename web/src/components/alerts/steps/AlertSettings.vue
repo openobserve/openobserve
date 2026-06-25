@@ -16,12 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="step-alert-conditions tw:w-full tw:rounded-lg tw:mx-auto"
-    :class="
-      store.state.theme === 'dark'
-        ? 'dark-mode tw:bg-(--o2-primary-background) tw:border tw:border-[#343434]'
-        : 'light-mode tw:bg-white tw:border tw:border-[#e6e6e6]'
-    "
+    class="step-alert-conditions tw:w-full tw:rounded-lg tw:mx-auto tw:bg-[var(--color-surface-overlay)] tw:border tw:border-[var(--color-border-default)]"
+    :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'"
   >
     <!-- Section header -->
     <div
@@ -30,8 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div class="tw:w-0.75 tw:h-4 tw:rounded-xs tw:mr-2 tw:shrink-0 tw:bg-[var(--q-primary)]" />
       <span
-        class="tw:text-[13px] tw:font-semibold tw:tracking-[0.01em]"
-        :class="store.state.theme === 'dark' ? 'tw:text-[var(--o2-border)]' : 'tw:text-[#374151]'"
+        class="tw:text-[13px] tw:font-semibold tw:tracking-[0.01em] tw:text-[var(--color-text-primary)]"
       >{{
         t("alerts.alertSettings.sectionTitle")
       }}</span>
@@ -79,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :class="
                     store.state.theme === 'dark' ? 'tw:bg-gray-700' : 'tw:bg-gray-100'
                   "
-                  class="tw:flex tw:justify-center tw:items-center"
+                  class="tw:flex tw:justify-center tw:items-center tw:bg-input-addon-bg tw:text-input-addon-text"
                 >
                   {{ t("alerts.minutes") }}
                 </div>
@@ -199,7 +194,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :class="
                     store.state.theme === 'dark' ? 'tw:bg-gray-700' : 'tw:bg-gray-100'
                   "
-                  class="tw:flex tw:justify-center tw:items-center"
+                  class="tw:flex tw:justify-center tw:items-center tw:bg-input-addon-bg tw:text-input-addon-text"
                 >
                   {{ t("alerts.minutes") }}
                 </div>
@@ -253,7 +248,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :class="
                     store.state.theme === 'dark' ? 'tw:bg-gray-700' : 'tw:bg-gray-100'
                   "
-                  class="tw:flex tw:justify-center tw:items-center"
+                  class="tw:flex tw:justify-center tw:items-center tw:bg-input-addon-bg tw:text-input-addon-text"
                 >
                   {{ t("alerts.minutes") }}
                 </div>

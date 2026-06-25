@@ -20,8 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'"
   >
     <div
-      class="step-content tw:px-3 tw:py-4 tw:rounded-lg tw:h-full tw:overflow-y-auto tw:border"
-      :class="store.state.theme === 'dark' ? 'tw:bg-[var(--o2-primary-background)] tw:border-[#343434]' : 'tw:bg-white tw:border-[#e6e6e6]'"
+      class="step-content tw:px-3 tw:py-4 tw:rounded-lg tw:h-full tw:overflow-y-auto tw:border tw:bg-[var(--color-surface-overlay)] tw:border-[var(--color-border-default)]"
     >
       <!-- Enable Notifications toggle -->
       <div class="tw:flex tw:items-start tw:mb-6!  tw:pb-0!">

@@ -135,15 +135,15 @@ onMounted(async () => {
 </script>
 
 <style>
-/* Styles for bold section labels (using :deep for v-html content with markdown **text**) */
-.summary-text :deep(strong) {
+/* Styles for bold section labels (v-html content with markdown **text**) */
+.summary-text strong {
   display: inline;
   font-weight: 700;
   font-size: 0.875rem;
 }
 
-/* Styles for clickable spans (using :deep for v-html content) */
-.summary-text :deep(.summary-clickable) {
+/* Styles for clickable spans (v-html content) */
+.summary-text .summary-clickable {
   cursor: pointer;
   color: var(--q-primary);
   font-weight: 600;
@@ -164,7 +164,7 @@ onMounted(async () => {
   white-space: nowrap;
 }
 
-.summary-text :deep(.summary-clickable):hover {
+.summary-text .summary-clickable:hover {
   background: linear-gradient(
     135deg,
     color-mix(in srgb, var(--q-primary) 15%, transparent),
@@ -176,7 +176,7 @@ onMounted(async () => {
     0 0.125rem 0.5rem color-mix(in srgb, var(--q-primary) 15%, transparent);
 }
 
-.summary-text :deep(.summary-clickable):active {
+.summary-text .summary-clickable:active {
   transform: translateY(0) scale(0.98);
   background: color-mix(in srgb, var(--q-primary) 18%, transparent);
   box-shadow:
@@ -185,7 +185,7 @@ onMounted(async () => {
 }
 
 /* Styles for plain English section */
-.summary-text :deep(.plain-english-section) {
+.summary-text .plain-english-section {
   padding: 0.75rem 1rem;
   border-radius: 0.375rem;
   background: linear-gradient(

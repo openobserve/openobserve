@@ -564,9 +564,11 @@ const sqlStatusState = computed(() => {
 });
 
 const sqlStatusBarClasses = computed(() => {
+  const isDark = store.state.theme === 'dark';
+  const neutralBg = isDark ? 'tw:bg-white/[0.04] tw:text-[#9ca3af]' : 'tw:bg-[#f3f4f6] tw:text-[#6b7280]';
   const map: Record<string, string> = {
-    'sql-status-bar--hint':    'tw:bg-[#f3f4f6] tw:text-[#6b7280]',
-    'sql-status-bar--idle':    'tw:bg-[#f3f4f6] tw:text-[#6b7280]',
+    'sql-status-bar--hint':    neutralBg,
+    'sql-status-bar--idle':    neutralBg,
     'sql-status-bar--loading': 'tw:bg-[rgba(139,92,246,0.06)] tw:text-[#8b5cf6]',
     'sql-status-bar--error':   'tw:bg-[rgba(239,68,68,0.08)] tw:text-[#ef4444] tw:cursor-pointer',
     'sql-status-bar--empty':   'tw:bg-[rgba(245,158,11,0.06)] tw:text-[#f59e0b]',
