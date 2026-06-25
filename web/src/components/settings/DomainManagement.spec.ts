@@ -16,6 +16,7 @@
 import { DOMWrapper, flushPromises, mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, vi, afterEach, afterAll } from "vitest";
 import DomainManagement from "./DomainManagement.vue";
+import { isValidDomain, isValidEmail } from "./DomainManagement.schema";
 import i18n from "@/locales";
 import { nextTick } from "vue";
 
@@ -245,29 +246,29 @@ describe("DomainManagement Component", () => {
       const vm = wrapper.vm;
       
       // Valid domains
-      expect(vm.isValidDomain("example.com")).toBe(true);
-      expect(vm.isValidDomain("sub.example.com")).toBe(true);
-      expect(vm.isValidDomain("my-company.org")).toBe(true);
+      expect(isValidDomain("example.com")).toBe(true);
+      expect(isValidDomain("sub.example.com")).toBe(true);
+      expect(isValidDomain("my-company.org")).toBe(true);
       
       // Invalid domains
-      expect(vm.isValidDomain("")).toBe(true); // Empty is considered valid for optional validation
-      expect(vm.isValidDomain("invalid")).toBe(false);
-      expect(vm.isValidDomain("spaces in domain.com")).toBe(false);
-      expect(vm.isValidDomain(".example.com")).toBe(false);
+      expect(isValidDomain("")).toBe(true); // Empty is considered valid for optional validation
+      expect(isValidDomain("invalid")).toBe(false);
+      expect(isValidDomain("spaces in domain.com")).toBe(false);
+      expect(isValidDomain(".example.com")).toBe(false);
     });
 
     it("should validate email addresses for specific domains", async () => {
       const vm = wrapper.vm;
       
       // Valid emails for domain
-      expect(vm.isValidEmail("user@example.com", "example.com")).toBe(true);
-      expect(vm.isValidEmail("admin@company.org", "company.org")).toBe(true);
+      expect(isValidEmail("user@example.com", "example.com")).toBe(true);
+      expect(isValidEmail("admin@company.org", "company.org")).toBe(true);
       
       // Invalid emails
-      expect(vm.isValidEmail("", "example.com")).toBe(false);
-      expect(vm.isValidEmail("invalid-email", "example.com")).toBe(false);
-      expect(vm.isValidEmail("user@different.com", "example.com")).toBe(false);
-      expect(vm.isValidEmail("user@example.com", "different.org")).toBe(false);
+      expect(isValidEmail("", "example.com")).toBe(false);
+      expect(isValidEmail("invalid-email", "example.com")).toBe(false);
+      expect(isValidEmail("user@different.com", "example.com")).toBe(false);
+      expect(isValidEmail("user@example.com", "different.org")).toBe(false);
     });
   });
 
@@ -280,10 +281,9 @@ describe("DomainManagement Component", () => {
     it("should add a new domain successfully", async () => {
       const vm = wrapper.vm;
       
-      vm.newDomain = "newdomain.com";
-      await vm.addDomain();
+      await vm.addDomain({ newDomain: "newdomain.com" });
       await nextTick();
-      
+
       expect(vm.domains).toContainEqual(
         expect.objectContaining({
           name: "newdomain.com",
@@ -296,9 +296,7 @@ describe("DomainManagement Component", () => {
     it("should not add invalid domain", async () => {
       const vm = wrapper.vm;
       
-      vm.newDomain = "invalid-domain";
-      
-      expect(vm.isValidDomain("invalid-domain")).toBe(false);
+      expect(isValidDomain("invalid-domain")).toBe(false);
     });
 
     it("should not add duplicate domain", async () => {
@@ -309,8 +307,7 @@ describe("DomainManagement Component", () => {
       const initialDomainsCount = vm.domains.length;
       
       // Try to add a domain that already exists
-      vm.newDomain = "example.com"; 
-      await vm.addDomain();
+      await vm.addDomain({ newDomain: "example.com" });
       
       expect(vm.domains.length).toBe(initialDomainsCount);
     });
@@ -318,10 +315,56 @@ describe("DomainManagement Component", () => {
     it("should clear input after adding domain", async () => {
       const vm = wrapper.vm;
       
-      vm.newDomain = "newdomain.com";
-      await vm.addDomain();
-      
-      expect(vm.newDomain).toBe("");
+      vm.addDomainForm.form.setFieldValue("newDomain", "newdomain.com");
+      await vm.addDomain({ newDomain: "newdomain.com" });
+
+      expect(vm.addDomainForm.form.state.values.newDomain).toBe("");
+    });
+  });
+
+  describe("Add-domain schema validation (real OForm)", () => {
+    beforeEach(async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+    });
+
+    it("blocks submit and does NOT add a domain when the input is empty", async () => {
+      const vm = wrapper.vm;
+      const initialCount = vm.domains.length;
+
+      await vm.addDomainForm.form.handleSubmit();
+      await flushPromises();
+
+      expect(vm.addDomainForm.form.state.isValid).toBe(false);
+      expect(vm.domains.length).toBe(initialCount);
+    });
+
+    it("blocks submit when the domain is invalid (restored domain regex rule)", async () => {
+      const vm = wrapper.vm;
+      const initialCount = vm.domains.length;
+
+      vm.addDomainForm.form.setFieldValue("newDomain", "not-a-domain");
+      await nextTick();
+      await vm.addDomainForm.form.handleSubmit();
+      await flushPromises();
+
+      expect(vm.addDomainForm.form.state.isValid).toBe(false);
+      expect(vm.domains.length).toBe(initialCount);
+    });
+
+    it("adds the domain when a valid value is submitted through the form", async () => {
+      const vm = wrapper.vm;
+
+      vm.addDomainForm.form.setFieldValue("newDomain", "valid-domain.com");
+      await nextTick();
+      await vm.addDomainForm.form.handleSubmit();
+      await flushPromises();
+
+      expect(
+        vm.domains.some((d: any) => d.name === "valid-domain.com"),
+      ).toBe(true);
+      // Inline add-row cleared after a successful add.
+      expect(vm.addDomainForm.form.state.values.newDomain).toBe("");
     });
   });
 
@@ -371,12 +414,10 @@ describe("DomainManagement Component", () => {
       if (restrictedDomain) {
         const initialEmailCount = restrictedDomain.allowedEmails.length;
         
-        restrictedDomain.newEmail = `newuser@${restrictedDomain.name}`;
-        await vm.addEmail(restrictedDomain);
-        
+        await vm.addEmail(restrictedDomain, `newuser@${restrictedDomain.name}`);
+
         expect(restrictedDomain.allowedEmails.length).toBe(initialEmailCount + 1);
         expect(restrictedDomain.allowedEmails).toContain(`newuser@${restrictedDomain.name}`);
-        expect(restrictedDomain.newEmail).toBe("");
       }
     });
 
@@ -387,8 +428,7 @@ describe("DomainManagement Component", () => {
       if (restrictedDomain) {
         const initialEmailCount = restrictedDomain.allowedEmails.length;
         
-        restrictedDomain.newEmail = "invalid-email";
-        await vm.addEmail(restrictedDomain);
+        await vm.addEmail(restrictedDomain, "invalid-email");
         
         expect(restrictedDomain.allowedEmails.length).toBe(initialEmailCount);
       }
@@ -402,8 +442,7 @@ describe("DomainManagement Component", () => {
         const initialEmailCount = restrictedDomain.allowedEmails.length;
         const existingEmail = restrictedDomain.allowedEmails[0];
         
-        restrictedDomain.newEmail = existingEmail;
-        await vm.addEmail(restrictedDomain);
+        await vm.addEmail(restrictedDomain, existingEmail);
         
         expect(restrictedDomain.allowedEmails.length).toBe(initialEmailCount);
       }
@@ -450,7 +489,6 @@ describe("DomainManagement Component", () => {
         name: "test.com",
         allowAllUsers: false,
         allowedEmails: [],
-        newEmail: "",
       });
       
       await vm.saveChanges();
@@ -489,14 +527,14 @@ describe("DomainManagement Component", () => {
       const vm = wrapper.vm;
       
       // Modify some data
-      vm.newDomain = "test-input";
-      
+      vm.addDomainForm.form.setFieldValue("newDomain", "test-input");
+
       // Clear the mock call count from beforeEach/mount
       mockDomainManagement.getDomainRestrictions.mockClear();
-      
+
       await vm.resetForm();
-      
-      expect(vm.newDomain).toBe("");
+
+      expect(vm.addDomainForm.form.state.values.newDomain).toBe("");
       expect(mockDomainManagement.getDomainRestrictions).toHaveBeenCalledTimes(1); // Called once by resetForm
     });
   });
@@ -601,8 +639,7 @@ describe("DomainManagement Component", () => {
         ];
 
         for (const xss of xssAttempts) {
-          vm.newDomain = xss;
-          expect(vm.isValidDomain(xss)).toBe(false);
+          expect(isValidDomain(xss)).toBe(false);
         }
       });
 
@@ -618,8 +655,8 @@ describe("DomainManagement Component", () => {
         ];
 
         for (const sql of sqlInjections) {
-          expect(vm.isValidDomain(sql)).toBe(false);
-          expect(vm.isValidEmail(sql + "@test.com", "test.com")).toBe(false);
+          expect(isValidDomain(sql)).toBe(false);
+          expect(isValidEmail(sql + "@test.com", "test.com")).toBe(false);
         }
       });
     });
@@ -629,14 +666,14 @@ describe("DomainManagement Component", () => {
         const vm = wrapper.vm;
         
         // Test null/undefined domain validation
-        expect(vm.isValidDomain(null)).toBe(true); // null treated as empty
-        expect(vm.isValidDomain(undefined)).toBe(true); // undefined treated as empty
+        expect(isValidDomain(null)).toBe(true); // null treated as empty
+        expect(isValidDomain(undefined)).toBe(true); // undefined treated as empty
         
         // Test null/undefined email validation
-        expect(vm.isValidEmail(null, "test.com")).toBe(false);
-        expect(vm.isValidEmail(undefined, "test.com")).toBe(false);
-        expect(vm.isValidEmail("test@test.com", null)).toBe(false);
-        expect(vm.isValidEmail("test@test.com", undefined)).toBe(false);
+        expect(isValidEmail(null, "test.com")).toBe(false);
+        expect(isValidEmail(undefined, "test.com")).toBe(false);
+        expect(isValidEmail("test@test.com", null)).toBe(false);
+        expect(isValidEmail("test@test.com", undefined)).toBe(false);
       });
 
       it("should reject non-string inputs", async () => {
@@ -652,8 +689,8 @@ describe("DomainManagement Component", () => {
         ];
 
         for (const input of nonStringInputs) {
-          expect(vm.isValidDomain(input)).toBe(false);
-          expect(vm.isValidEmail(input, "test.com")).toBe(false);
+          expect(isValidDomain(input)).toBe(false);
+          expect(isValidEmail(input, "test.com")).toBe(false);
         }
       });
 
@@ -663,8 +700,8 @@ describe("DomainManagement Component", () => {
         const hugeDomain = "a".repeat(10000) + ".com";
         const hugeEmail = "a".repeat(10000) + "@test.com";
         
-        expect(vm.isValidDomain(hugeDomain)).toBe(false);
-        expect(vm.isValidEmail(hugeEmail, "test.com")).toBe(false);
+        expect(isValidDomain(hugeDomain)).toBe(false);
+        expect(isValidEmail(hugeEmail, "test.com")).toBe(false);
       });
     });
 
@@ -709,8 +746,7 @@ describe("DomainManagement Component", () => {
         
         // Rapid form submissions
         for (let i = 0; i < 10; i++) {
-          vm.newDomain = `rapid${i}.com`;
-          vm.addDomain(); // Don't await to simulate rapid clicking
+          vm.addDomain({ newDomain: `rapid${i}.com` }); // Don't await to simulate rapid clicking
         }
         
         // Wait for all operations to complete
@@ -721,8 +757,10 @@ describe("DomainManagement Component", () => {
 
       it("should maintain performance with large datasets", async () => {
         const vm = wrapper.vm;
-        
-        // Add many domains (reduced count to prevent timeout)
+
+        // Add many domains (reduced count to prevent timeout). Each restricted
+        // domain now renders its own add-email <OForm>, so this stress scenario
+        // is a little heavier — give it more headroom under parallel CPU load.
         const largeDomainSet = [];
         for (let i = 0; i < 50; i++) {
           largeDomainSet.push({
@@ -735,11 +773,10 @@ describe("DomainManagement Component", () => {
         vm.domains.splice(0, vm.domains.length, ...largeDomainSet);
         
         // Should still function normally
-        vm.newDomain = "newdomain.com";
-        await vm.addDomain();
+        await vm.addDomain({ newDomain: "newdomain.com" });
         
         expect(vm.domains.length).toBe(51);
-      }, 10000);
+      }, 20000);
     });
 
     describe("State Consistency Testing", () => {
@@ -751,7 +788,6 @@ describe("DomainManagement Component", () => {
           name: "test.com", 
           allowAllUsers: false, 
           allowedEmails: ["user1@test.com"],
-          newEmail: ""
         });
         
         const domain = vm.domains[vm.domains.length - 1];
@@ -774,10 +810,10 @@ describe("DomainManagement Component", () => {
         
         // Rapid validation calls
         const validationPromises = [
-          Promise.resolve(vm.isValidDomain("test1.com")),
-          Promise.resolve(vm.isValidDomain("test2.com")),
-          Promise.resolve(vm.isValidEmail("user@test.com", "test.com")),
-          Promise.resolve(vm.isValidEmail("admin@test.com", "test.com"))
+          Promise.resolve(isValidDomain("test1.com")),
+          Promise.resolve(isValidDomain("test2.com")),
+          Promise.resolve(isValidEmail("user@test.com", "test.com")),
+          Promise.resolve(isValidEmail("admin@test.com", "test.com"))
         ];
         
         const results = await Promise.all(validationPromises);
@@ -795,8 +831,7 @@ describe("DomainManagement Component", () => {
         const vm = wrapper.vm;
         
         // Start long-running operations
-        vm.newDomain = "test.com";
-        const addPromise = vm.addDomain();
+        const addPromise = vm.addDomain({ newDomain: "test.com" });
         const savePromise = vm.saveChanges();
         
         // Destroy component immediately
@@ -819,13 +854,11 @@ describe("DomainManagement Component", () => {
             name: `stress-test-${i}.com`,
             allowAllUsers: false,
             allowedEmails: [`user@stress-test-${i}.com`],
-            newEmail: ""
           });
         }
         
         // Component operations should still work under load
-        vm.newDomain = "memory-test.com";
-        await vm.addDomain();
+        await vm.addDomain({ newDomain: "memory-test.com" });
         
         expect(vm.domains.some(d => d.name === "memory-test.com")).toBe(true);
         expect(vm.domains.length).toBe(initialCount + 30 + 1); // Original + stress domains + new domain

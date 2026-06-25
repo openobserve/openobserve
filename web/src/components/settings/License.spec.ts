@@ -260,14 +260,14 @@ describe('License.vue', () => {
       expect(getLicenseBtn).toBeTruthy();
     });
 
-    it('should disable Update License button when license key is empty', () => {
+    it('keeps the Update License button enabled even when empty (R3 — schema-gated)', () => {
       const updateBtn = wrapper.findAll('button').find((btn: any) =>
         btn.text().includes('Update License')
       );
-      expect(updateBtn?.attributes('disabled')).toBeDefined();
+      expect(updateBtn?.attributes('disabled')).toBeUndefined();
     });
 
-    it('should enable Update License button when license key is entered', async () => {
+    it('should keep the Update License button enabled when a key is entered', async () => {
       const textarea = wrapper.find('textarea');
       await textarea.setValue('new-license-key-value');
       await wrapper.vm.$nextTick();
@@ -276,6 +276,36 @@ describe('License.vue', () => {
         btn.text().includes('Update License')
       );
       expect(updateBtn?.attributes('disabled')).toBeUndefined();
+    });
+
+    it('blocks the submit and does NOT call update_license when the key is empty (real OForm)', async () => {
+      vi.mocked(licenseServer.update_license).mockResolvedValue(
+        createAxiosResponse({ success: true }),
+      );
+      const form = wrapper.findComponent({ name: 'OForm' });
+      expect(form.exists()).toBe(true);
+      await (form.vm as any).form.handleSubmit();
+      await flushPromises();
+
+      expect((form.vm as any).form.state.isValid).toBe(false);
+      expect(licenseServer.update_license).not.toHaveBeenCalled();
+    });
+
+    it('submits when a valid key is entered (real OForm)', async () => {
+      vi.mocked(licenseServer.update_license).mockResolvedValue(
+        createAxiosResponse({ success: true }),
+      );
+      const textarea = wrapper.find('textarea');
+      await textarea.setValue('a-valid-license-key');
+      await wrapper.vm.$nextTick();
+
+      const form = wrapper.findComponent({ name: 'OForm' });
+      await (form.vm as any).form.handleSubmit();
+      await flushPromises();
+
+      expect(licenseServer.update_license).toHaveBeenCalledWith(
+        'a-valid-license-key',
+      );
     });
   });
 

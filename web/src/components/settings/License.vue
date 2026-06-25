@@ -41,36 +41,43 @@
               <div class="tw:text-base tw:font-medium tw:mb-3">
                 {{ t("about.enter_license_key") }}
               </div>
-              <OTextarea
-                data-test="no-license-key-input"
-                v-model="licenseKey"
-                :rows="8"
-                :placeholder="t('about.paste_license_placeholder')"
-                style="min-height: 200px"
-              />
-              <div v-if="isLicenseKeyAutoFilled" class="tw:mt-2 tw:mb-3">
-                <div class="modern-info-banner">
-                  <OIcon
-                    name="check-circle"
-                    class="tw:text-green-600 tw:mr-2"
-                    size="md"
-                  />
-                  <span class="tw:text-sm">{{
-                    t("about.license_auto_filled")
-                  }}</span>
-                </div>
-              </div>
-              <OButton
-                data-test="no-license-update-btn"
-                variant="primary"
-                size="sm-action"
-                class="tw:mt-2"
-                :loading="updating"
-                :disabled="!licenseKey.trim()"
-                @click="updateLicense"
+              <OForm
+                ref="noLicenseForm"
+                :schema="licenseSchema"
+                :default-values="licenseDefaults"
+                @submit="updateLicense"
+                v-slot="{ isSubmitting }"
               >
-                {{ t("about.update_license") }}
-              </OButton>
+                <OFormTextarea
+                  data-test="no-license-key-input"
+                  name="licenseKey"
+                  :rows="8"
+                  :placeholder="t('about.paste_license_placeholder')"
+                  style="min-height: 200px"
+                />
+                <div v-if="isLicenseKeyAutoFilled" class="tw:mt-2 tw:mb-3">
+                  <div class="modern-info-banner">
+                    <OIcon
+                      name="check-circle"
+                      class="tw:text-green-600 tw:mr-2"
+                      size="md"
+                    />
+                    <span class="tw:text-sm">{{
+                      t("about.license_auto_filled")
+                    }}</span>
+                  </div>
+                </div>
+                <OButton
+                  data-test="no-license-update-btn"
+                  variant="primary"
+                  size="sm-action"
+                  class="tw:mt-2"
+                  type="submit"
+                  :loading="isSubmitting"
+                >
+                  {{ t("about.update_license") }}
+                </OButton>
+              </OForm>
             </OCardSection>
           </OCard>
         </div>
@@ -197,48 +204,57 @@
               <div class="tw:text-base tw:font-medium tw:mb-2">
                 {{ t("about.update_license_key") }}
               </div>
-              <OTextarea
-                data-test="update-license-key-input"
-                v-model="licenseKey"
-                :rows="6"
-                :placeholder="t('about.paste_new_license_placeholder')"
-                style="min-height: 150px"
-              />
-              <div v-if="isLicenseKeyAutoFilled" class="tw:mt-2 tw:mb-3">
-                <div class="modern-info-banner">
-                  <OIcon
-                    name="check-circle"
-                    class="tw:text-green-600 tw:mr-2"
-                    size="md"
-                  />
-                  <span class="tw:text-sm">{{
-                    t("about.license_auto_filled")
-                  }}</span>
+              <OForm
+                ref="updateLicenseForm"
+                :schema="licenseSchema"
+                :default-values="licenseDefaults"
+                @submit="updateLicense"
+                v-slot="{ isSubmitting }"
+              >
+                <OFormTextarea
+                  data-test="update-license-key-input"
+                  name="licenseKey"
+                  :rows="6"
+                  :placeholder="t('about.paste_new_license_placeholder')"
+                  style="min-height: 150px"
+                />
+                <div v-if="isLicenseKeyAutoFilled" class="tw:mt-2 tw:mb-3">
+                  <div class="modern-info-banner">
+                    <OIcon
+                      name="check-circle"
+                      class="tw:text-green-600 tw:mr-2"
+                      size="md"
+                    />
+                    <span class="tw:text-sm">{{
+                      t("about.license_auto_filled")
+                    }}</span>
+                  </div>
                 </div>
-              </div>
-              <div class="tw:flex tw:gap-2">
-                <OButton
-                  data-test="cancel-update-license-btn"
-                  variant="outline"
-                  size="sm-action"
-                  @click="
-                    showUpdateForm = false;
-                    licenseKey = '';
-                  "
-                >
-                  {{ t("common.cancel") }}
-                </OButton>
-                <OButton
-                  data-test="confirm-update-license-btn"
-                  variant="primary"
-                  size="sm-action"
-                  :loading="updating"
-                  :disabled="!licenseKey.trim()"
-                  @click="updateLicense"
-                >
-                  {{ t("about.update_license") }}
-                </OButton>
-              </div>
+                <div class="tw:flex tw:gap-2">
+                  <OButton
+                    data-test="cancel-update-license-btn"
+                    variant="outline"
+                    size="sm-action"
+                    type="button"
+                    :disabled="isSubmitting"
+                    @click="
+                      showUpdateForm = false;
+                      licenseKey = '';
+                    "
+                  >
+                    {{ t("common.cancel") }}
+                  </OButton>
+                  <OButton
+                    data-test="confirm-update-license-btn"
+                    variant="primary"
+                    size="sm-action"
+                    type="submit"
+                    :loading="isSubmitting"
+                  >
+                    {{ t("about.update_license") }}
+                  </OButton>
+                </div>
+              </OForm>
             </OCardSection>
           </OCard>
         </div>
@@ -444,6 +460,7 @@ import {
   ref,
   onMounted,
   computed,
+  watch,
   defineAsyncComponent,
 } from "vue";
 import { useI18n } from "vue-i18n";
@@ -457,11 +474,14 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import { copyToClipboard } from "@/utils/clipboard";
+import { makeLicenseSchema, type LicenseForm } from "./License.schema";
 
 const RenderDashboardCharts = defineAsyncComponent(
   () => import("@/views/Dashboards/RenderDashboardCharts.vue"),
@@ -478,6 +498,8 @@ export default defineComponent({
     OIcon,
     OBadge,
     OTextarea,
+    OForm,
+    OFormTextarea,
     OCard,
     OCardSection,
 },
@@ -485,7 +507,6 @@ export default defineComponent({
     const { t } = useI18n();
     const { confirm } = useConfirmDialog();
     const loading = ref(false);
-    const updating = ref(false);
     const licenseData = ref<any>({});
     const licenseKey = ref("");
     const showUpdateForm = ref(false);
@@ -494,6 +515,27 @@ export default defineComponent({
     const store = useStore();
     const usageDashboardData = ref<any>(null);
     const dashboardRenderKey = ref(0);
+
+    // Schema-driven validation replaces the `:disabled="!licenseKey.trim()"`
+    // gate. The same licenseKey is entered in two mutually-exclusive cards, each
+    // wrapped in its own <OForm> that OWNS the field (by name). `licenseKey` is
+    // only the shared INCOMING working value (auto-filled from URL, cleared on
+    // save/cancel) — bridged one-way into whichever form is mounted via the
+    // watch below; the typed value is read back from the submit payload, never
+    // from this ref. Options-API: schema/defaults MUST be returned from setup().
+    const licenseSchema = makeLicenseSchema(t);
+    const noLicenseForm = ref<any>(null);
+    const updateLicenseForm = ref<any>(null);
+    const licenseDefaults = computed(
+      (): LicenseForm => ({ licenseKey: licenseKey.value }),
+    );
+
+    // Bridge programmatic licenseKey changes (URL auto-fill, cancel/clear) into
+    // whichever card's form is mounted so the textarea + schema see them.
+    watch(licenseKey, (v) => {
+      noLicenseForm.value?.form?.setFieldValue("licenseKey", v ?? "");
+      updateLicenseForm.value?.form?.setFieldValue("licenseKey", v ?? "");
+    });
 
     const loadLicenseData = async () => {
       try {
@@ -512,10 +554,14 @@ export default defineComponent({
       }
     };
 
-    const updateLicense = async () => {
+    // @submit handler — fires only once the schema passes (licenseKey required +
+    // trim), so the `:disabled` gate is gone (R3). Still callable directly with
+    // no args (reads the shared working ref); OForm awaits it so the inline Save
+    // button's spinner spans the request.
+    const updateLicense = async (value?: LicenseForm) => {
+      const key = (value?.licenseKey ?? licenseKey.value ?? "").trim();
       try {
-        updating.value = true;
-        await licenseServer.update_license(licenseKey.value.trim());
+        await licenseServer.update_license(key);
         toast({
           variant: "success",
           message: t("about.license_updated_success"),
@@ -540,8 +586,6 @@ export default defineComponent({
             " : " +
             (error?.response?.data?.message || "unexpected error"),
         });
-      } finally {
-        updating.value = false;
       }
     };
 
@@ -949,12 +993,17 @@ export default defineComponent({
     return {
       t,
       loading,
-      updating,
       licenseData,
       licenseKey,
       showUpdateForm,
       showLicenseKeyModal,
       updateLicense,
+      // Form wiring (Options-API: schema/defaults MUST be returned so :schema
+      // resolves and validation runs).
+      licenseSchema,
+      licenseDefaults,
+      noLicenseForm,
+      updateLicenseForm,
       formatDate,
       isIngestionUnlimited,
       ingestionUsagePercent,

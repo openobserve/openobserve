@@ -137,27 +137,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       sub-title="Set the new trial extension period."
       :secondary-button-label="t('common.cancel')"
       :primary-button-label="`Extend trial by ${extendedTrial} week(s)`"
+      form-id="org-extend-trial-form"
       @click:secondary="extendTrialPrompt = false"
-      @click:primary="updateTrialPeriod(extendTrialDataRow.identifier, extendedTrial)"
     >
-      <div class="tw:flex tw:flex-col tw:gap-3">
-        <div class="tw:font-bold">Week(s)</div>
-        <div class="tw:flex tw:gap-1">
-          <span
-            v-for="page in 4"
-            :key="page"
-            @click="extendedTrial = page"
-            :class="[
-              'tw:cursor-pointer tw:px-2 tw:py-1 page-border',
-              extendedTrial === page
-                ? 'tw:bg-(--o2-primary-btn-bg) tw:text-(--o2-primary-btn-text) tw:border-(--o2-primary-btn-bg)'
-                : 'tw:bg-white tw:text-gray-700 tw:border-gray-300',
-            ]"
-          >
-            {{ page }}
-          </span>
+      <OForm
+        id="org-extend-trial-form"
+        ref="extendTrialFormRef"
+        :schema="extendTrialSchema"
+        :default-values="extendTrialDefaults"
+        @submit="onExtendTrialSubmit"
+      >
+        <div class="tw:flex tw:flex-col tw:gap-3">
+          <div class="tw:font-bold">Week(s)</div>
+          <div class="tw:flex tw:gap-1">
+            <span
+              v-for="page in 4"
+              :key="page"
+              @click="extendedTrial = page"
+              :class="[
+                'tw:cursor-pointer tw:px-2 tw:py-1 page-border',
+                extendedTrial === page
+                  ? 'tw:bg-(--o2-primary-btn-bg) tw:text-(--o2-primary-btn-text) tw:border-(--o2-primary-btn-bg)'
+                  : 'tw:bg-white tw:text-gray-700 tw:border-gray-300',
+              ]"
+            >
+              {{ page }}
+            </span>
+          </div>
         </div>
-      </div>
+      </OForm>
     </ODialog>
 
     <!-- External Contract Dialog -->
@@ -168,25 +176,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="`${contractMode === 'create' ? 'Create' : 'Extend'} External Contract for ${contractDataRow?.name}`"
       :secondary-button-label="t('common.cancel')"
       :primary-button-label="contractMode === 'create' ? 'Create Contract' : 'Extend Contract'"
+      form-id="org-contract-form"
       @click:secondary="contractPrompt = false"
-      @click:primary="submitContract"
     >
-      <div class="tw:mb-3">
-        <div class="tw:font-bold tw:mb-1">
-          {{ contractMode === 'create' ? 'End Date' : 'New End Date' }}
-        </div>
-        <OInput
-          v-model="contractEndDate"
-          type="date"
-          data-test="contract-end-date-input"
-        />
-      </div>
-      <div
-        v-if="contractMode === 'extend' && contractDataRow?.contract_end_date"
-        class="tw:text-xs tw:text-gray-500"
+      <OForm
+        id="org-contract-form"
+        :schema="contractSchema"
+        :default-values="contractDefaults()"
+        @submit="submitContract"
       >
-        Current end date: {{ formatMicrosToDate(contractDataRow.contract_end_date) }}
-      </div>
+        <div class="tw:mb-3">
+          <OFormInput
+            name="contractEndDate"
+            type="date"
+            data-test="contract-end-date-input"
+            :label="contractMode === 'create' ? 'End Date' : 'New End Date'"
+            required
+          />
+        </div>
+        <div
+          v-if="contractMode === 'extend' && contractDataRow?.contract_end_date"
+          class="tw:text-xs tw:text-gray-500"
+        >
+          Current end date: {{ formatMicrosToDate(contractDataRow.contract_end_date) }}
+        </div>
+      </OForm>
     </ODialog>
   </div>
 </template>
@@ -205,7 +219,8 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import OrganizationServices from "@/services/organizations";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -216,6 +231,13 @@ import orgStorageService from "@/services/org_storage";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import {
+  makeContractSchema,
+  contractDefaults,
+  extendTrialSchema,
+  type ContractForm,
+  type ExtendTrialForm,
+} from "./OrganizationManagement.schema";
 
 export default defineComponent({
   name: "PageAlerts",
@@ -225,7 +247,8 @@ export default defineComponent({
     OButton,
     ODialog,
     OTooltip,
-    OInput,
+    OForm,
+    OFormInput,
     OSearchInput,
     OTable,
   },
@@ -247,7 +270,26 @@ export default defineComponent({
     const contractPrompt = ref(false);
     const contractDataRow = ref<any>({});
     const contractMode = ref<"create" | "extend">("create");
-    const contractEndDate = ref("");
+
+    // ── Form schemas (Options-API: MUST be returned from setup() or :schema
+    //    resolves to undefined and validation silently no-ops). ───────────────
+    // The contract message is mode-aware; the dialog body remounts on open
+    // (reka-ui), so a freshly-mounted <OForm> always reads the current schema.
+    const contractSchema = computed(() => makeContractSchema(contractMode.value));
+
+    // Extend-trial week count is bridged from the pill grid into the form below.
+    // Dynamic defaults (project the current pill value) → a typed computed.
+    const extendTrialFormRef = ref<any>(null);
+    const extendTrialDefaults = computed(
+      (): ExtendTrialForm => ({ extendedTrial: extendedTrial.value }),
+    );
+
+    // Keep the form's copy of the bridged pill value in sync (the pill grid is a
+    // custom control, not an <input>, so it is bridged via setFieldValue — the
+    // documented sanctioned exception, as CreateDestinationForm does).
+    watch(extendedTrial, (v) => {
+      extendTrialFormRef.value?.form?.setFieldValue("extendedTrial", Number(v));
+    });
 
     onMounted(() => {
       if (
@@ -443,21 +485,21 @@ export default defineComponent({
     const toggleContractDialog = (row: any, mode: "create" | "extend") => {
       contractDataRow.value = row;
       contractMode.value = mode;
-      contractEndDate.value = "";
+      // No contractEndDate reset needed: the dialog body remounts on open and
+      // <OForm :default-values> re-seeds the field to blank.
       contractPrompt.value = true;
     };
 
-    const submitContract = () => {
+    // @submit handler — fires only once the schema passes (contractEndDate
+    // required), so the old toast required-guards are gone. Awaited by OForm, so
+    // the footer Save spinner spans the POST automatically.
+    const submitContract = async (value: ContractForm) => {
       const metaOrg = store.state.selectedOrganization.identifier;
 
       if (contractMode.value === "create") {
-        if (!contractEndDate.value) {
-          toast({ variant: "error", message: "End date is required." });
-          return;
-        }
         const payload = {
           org_id: contractDataRow.value.identifier,
-          end_date: dateToMicros(contractEndDate.value),
+          end_date: dateToMicros(value.contractEndDate),
         };
 
         loading.value = true;
@@ -466,7 +508,7 @@ export default defineComponent({
           message: "Creating external contract...",
                   timeout: 0,
 });
-        OrganizationServices.create_external_contract(metaOrg, payload)
+        return OrganizationServices.create_external_contract(metaOrg, payload)
           .then(() => {
             toast({
               variant: "success",
@@ -489,13 +531,9 @@ export default defineComponent({
             });
           });
       } else {
-        if (!contractEndDate.value) {
-          toast({ variant: "error", message: "New end date is required." });
-          return;
-        }
         const payload = {
           org_id: contractDataRow.value.identifier,
-          new_end_date: dateToMicros(contractEndDate.value),
+          new_end_date: dateToMicros(value.contractEndDate),
         };
 
         loading.value = true;
@@ -504,7 +542,7 @@ export default defineComponent({
           message: "Extending external contract...",
                   timeout: 0,
 });
-        OrganizationServices.extend_external_contract(metaOrg, payload)
+        return OrganizationServices.extend_external_contract(metaOrg, payload)
           .then(() => {
             toast({
               variant: "success",
@@ -616,7 +654,7 @@ export default defineComponent({
           "Please wait while processing trial period extension request...",
               timeout: 0,
 });
-      OrganizationServices.extend_trial_period(
+      return OrganizationServices.extend_trial_period(
         store.state.selectedOrganization.identifier,
         payload,
       )
@@ -647,6 +685,16 @@ export default defineComponent({
             });
           }
         });
+    };
+
+    // @submit handler for the extend-trial dialog — awaited by OForm so the
+    // footer Save spinner spans the POST. The week count comes from the
+    // schema-validated form value (bridged from the pill grid).
+    const onExtendTrialSubmit = async (value: ExtendTrialForm) => {
+      return updateTrialPeriod(
+        extendTrialDataRow.value?.identifier,
+        Number(value.extendedTrial),
+      );
     };
 
     const filterData = (rows: string | any[], terms: string) => {
@@ -686,7 +734,6 @@ export default defineComponent({
       contractPrompt,
       contractDataRow,
       contractMode,
-      contractEndDate,
       toggleContractDialog,
       submitContract,
       confirmRevokeContract,
@@ -696,6 +743,14 @@ export default defineComponent({
       filterData,
       visibleRows,
       store,
+      // Form wiring (Options-API: schemas/defaults MUST be returned so :schema
+      // resolves and validation runs).
+      contractSchema,
+      contractDefaults,
+      extendTrialSchema,
+      extendTrialDefaults,
+      extendTrialFormRef,
+      onExtendTrialSubmit,
     };
   },
 });
