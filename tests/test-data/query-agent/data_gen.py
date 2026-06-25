@@ -12,7 +12,10 @@ random.seed(42)
 
 # Number of queries this generator produces data for.
 # build_dataset() default must match this value.
-NUM_QUERIES = 675
+# Must be >= the highest query ID (e.g. Q1000 -> NUM_QUERIES = 1000).
+# Changing this requires re-running compute_counts.py to regenerate
+# expected results for all query JSON files.
+NUM_QUERIES = 1000
 
 # Check for a BASE_TS override saved by compute_counts.py so that the
 # compute oracle and the test harness share the same BASE_TS. Without

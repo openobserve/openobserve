@@ -10,6 +10,7 @@
 
 import { expect } from '@playwright/test';
 import testLogger from '../../playwright-tests/utils/test-logger.js';
+import { openOSelectDropdown } from './oselectHelpers.js';
 
 export class AlertCreationWizard {
     constructor(page, commonActions, locators) {
@@ -153,7 +154,7 @@ export class AlertCreationWizard {
         // Destination selection with fallback
         const destinationDropdown = this.page.locator('[data-test="alert-destinations-select"]');
         await destinationDropdown.waitFor({ state: 'visible', timeout: 10000 });
-        await destinationDropdown.click();
+        await openOSelectDropdown(this.page, destinationDropdown);
         await this.page.waitForTimeout(1000);
 
         // Destination dropdown is OSelect (Reka Listbox) post-migration.
@@ -265,7 +266,7 @@ export class AlertCreationWizard {
         // Destination selection with fallback
         const destinationSection = this.page.locator('[data-test="alert-destinations-select"]');
         await destinationSection.waitFor({ state: 'visible', timeout: 10000 });
-        await destinationSection.click();
+        await openOSelectDropdown(this.page, destinationSection);
         await this.page.waitForTimeout(1000);
 
         const visibleDestMenuDefItems = this.page.locator('[data-test$="-popover"] [data-test$="-option"]');
@@ -449,7 +450,7 @@ export class AlertCreationWizard {
         // Destination selection using v3 data-test locator
         const destinationDropdown = this.page.locator('[data-test="alert-destinations-select"]');
         await destinationDropdown.waitFor({ state: 'visible', timeout: 5000 });
-        await destinationDropdown.click();
+        await openOSelectDropdown(this.page, destinationDropdown);
         await this.page.waitForTimeout(1000);
 
         const visibleDestMenuSqlItems = this.page.locator('[data-test$="-popover"] [data-test$="-option"]');
@@ -619,7 +620,7 @@ export class AlertCreationWizard {
         // Select destination for REAL-TIME alerts
         const destinationDropdown = this.page.locator('[data-test="alert-destinations-select"]');
         await destinationDropdown.waitFor({ state: 'visible', timeout: 10000 });
-        await destinationDropdown.click();
+        await openOSelectDropdown(this.page, destinationDropdown);
         await this.page.waitForTimeout(1000);
 
         // Use popover selector for destination
@@ -804,7 +805,7 @@ export class AlertCreationWizard {
 
         const destinationDropdown = this.page.locator('[data-test="alert-destinations-select"]');
         await destinationDropdown.waitFor({ state: 'visible', timeout: 5000 });
-        await destinationDropdown.click();
+        await openOSelectDropdown(this.page, destinationDropdown);
         await this.page.waitForTimeout(1000);
 
         // Use popover selector for destination
@@ -1294,7 +1295,7 @@ export class AlertCreationWizard {
 
         const destinationDropdown = this.page.locator('[data-test="alert-destinations-select"]');
         await destinationDropdown.waitFor({ state: 'visible', timeout: 10000 });
-        await destinationDropdown.click();
+        await openOSelectDropdown(this.page, destinationDropdown);
         await this.page.waitForTimeout(1000);
 
         // Use popover selector for destination
@@ -1547,7 +1548,7 @@ export class AlertCreationWizard {
         // Destination (v3 uses data-test locator)
         const destinationDropdown = this.page.locator('[data-test="alert-destinations-select"]');
         await destinationDropdown.waitFor({ state: 'visible', timeout: 5000 });
-        await destinationDropdown.click();
+        await openOSelectDropdown(this.page, destinationDropdown);
         await this.page.waitForTimeout(1000);
 
         const visibleDestMenuAggItems = this.page.locator('[data-test$="-popover"] [data-test$="-option"]');
@@ -1747,7 +1748,7 @@ export class AlertCreationWizard {
         // Select destination (v3 uses data-test locator)
         const destinationDropdown = this.page.locator('[data-test="alert-destinations-select"]');
         await destinationDropdown.waitFor({ state: 'visible', timeout: 5000 });
-        await destinationDropdown.click();
+        await openOSelectDropdown(this.page, destinationDropdown);
         await this.page.waitForTimeout(1000);
 
         const visibleDestMenuPromqlItems = this.page.locator('[data-test$="-popover"] [data-test$="-option"]');
