@@ -103,6 +103,14 @@ fn parse_result(h: &serde_json::Value) -> Option<CheckResult> {
             .and_then(|v| v.as_str())
             .filter(|s| !s.is_empty())
             .map(String::from),
+        trigger_type: match h
+            .get("trigger_type")
+            .and_then(|v| v.as_str())
+            .unwrap_or("scheduled")
+        {
+            "manual" => config::meta::synthetics::TriggerType::Manual,
+            _ => config::meta::synthetics::TriggerType::Scheduled,
+        },
         checked_at: h.get("_timestamp").and_then(|v| v.as_i64()).unwrap_or(0),
     })
 }
@@ -300,6 +308,7 @@ pub async fn get_summary(
         last_response_ms,
         uptime_7d_pct,
         status_24h,
+        by_location: vec![],
     })
 }
 
@@ -473,6 +482,7 @@ pub async fn batch_monitor_summary(
                     last_response_ms,
                     uptime_7d_pct,
                     status_24h,
+                    by_location: vec![],
                 },
             )
         })
@@ -551,15 +561,11 @@ pub async fn notify_check_result(
                 )
                 .await
                 {
-                    log::error!(
-                        "[synthetics] notify dest={dest_name} monitor={monitor_id}: {e}"
-                    );
+                    log::error!("[synthetics] notify dest={dest_name} monitor={monitor_id}: {e}");
                 }
             }
             Err(e) => {
-                log::error!(
-                    "[synthetics] load dest={dest_name} org={org_id}: {e}"
-                );
+                log::error!("[synthetics] load dest={dest_name} org={org_id}: {e}");
             }
         }
     }

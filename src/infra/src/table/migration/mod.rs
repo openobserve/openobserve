@@ -127,8 +127,7 @@ mod m20260622_000001_add_org_id_to_short_urls;
 mod m20260623_000001_create_org_cleanup_tasks;
 mod m20260623_000002_add_status_and_deleted_at_to_organizations;
 mod m20260624_000001_create_synthetics_monitors;
-mod m20260624_000002_create_synthetics_pending_checks;
-mod m20260624_000003_fix_synthetics_pending_checks_dedup;
+mod m20260624_000002_create_synthetics_jobs;
 mod m20260624_000004_add_token_type_to_org_ingestion_tokens;
 mod m20260624_000005_add_destinations_to_synthetics_monitors;
 mod m20260629_000001_create_gen_ai_agents_table;
@@ -248,8 +247,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260623_000001_create_org_cleanup_tasks::Migration),
             Box::new(m20260623_000002_add_status_and_deleted_at_to_organizations::Migration),
             Box::new(m20260624_000001_create_synthetics_monitors::Migration),
-            Box::new(m20260624_000002_create_synthetics_pending_checks::Migration),
-            Box::new(m20260624_000003_fix_synthetics_pending_checks_dedup::Migration),
+            Box::new(m20260624_000002_create_synthetics_jobs::Migration),
             Box::new(m20260624_000004_add_token_type_to_org_ingestion_tokens::Migration),
             Box::new(m20260624_000005_add_destinations_to_synthetics_monitors::Migration),
             Box::new(m20260629_000001_create_gen_ai_agents_table::Migration),

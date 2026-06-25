@@ -981,6 +981,7 @@ pub fn service_routes() -> Router {
             .route("/{org_id}/synthetics/monitors", get(synthetics::list_monitors).post(synthetics::create_monitor))
             .route("/{org_id}/synthetics/monitors/{id}", get(synthetics::get_monitor).put(synthetics::update_monitor).delete(synthetics::delete_monitor))
             .route("/{org_id}/synthetics/monitors/{id}/run", post(synthetics::run_monitor_now))
+            .route("/{org_id}/synthetics/monitors/{id}/enable", put(synthetics::set_monitor_enabled))
             .route("/{org_id}/synthetics/monitors/{id}/results", get(synthetics::list_results))
             .route("/{org_id}/synthetics/monitors/{id}/results/{job_id}", get(synthetics::get_result))
             .route("/{org_id}/synthetics/monitors/{id}/results/{job_id}/artifact", get(synthetics::get_artifact_url))

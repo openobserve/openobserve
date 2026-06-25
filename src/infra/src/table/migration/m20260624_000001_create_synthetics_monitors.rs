@@ -83,9 +83,20 @@ fn create_synthetics_monitors_table() -> TableCreateStatement {
         )
         .col(
             ColumnDef::new(SyntheticsMonitors::FolderId)
-                .string_len(256)
+                .big_integer()
+                .not_null(),
+        )
+        .col(
+            ColumnDef::new(SyntheticsMonitors::TzOffset)
+                .integer()
                 .not_null()
-                .default("default"),
+                .default(0i32),
+        )
+        .foreign_key(
+            ForeignKey::create()
+                .name("synthetics_monitors_folder_fk")
+                .from(SyntheticsMonitors::Table, SyntheticsMonitors::FolderId)
+                .to(Folders::Table, Folders::Id),
         )
         .col(
             ColumnDef::new(SyntheticsMonitors::Name)
@@ -98,12 +109,12 @@ fn create_synthetics_monitors_table() -> TableCreateStatement {
                 .not_null(),
         )
         .col(ColumnDef::new(SyntheticsMonitors::Target).text().not_null())
+        .col(ColumnDef::new(SyntheticsMonitors::Description).text().not_null().default(""))
+        // Tags: JSON array of strings — supports filter-by-tag queries.
+        .col(ColumnDef::new(SyntheticsMonitors::Tags).json().not_null())
         .col(ColumnDef::new(SyntheticsMonitors::Config).json().not_null())
-        .col(
-            ColumnDef::new(SyntheticsMonitors::IntervalSecs)
-                .integer()
-                .not_null(),
-        )
+        // Frequency stored as JSON: { type, interval, cron }
+        .col(ColumnDef::new(SyntheticsMonitors::Frequency).json().not_null())
         .col(
             ColumnDef::new(SyntheticsMonitors::Locations)
                 .json()
@@ -116,10 +127,30 @@ fn create_synthetics_monitors_table() -> TableCreateStatement {
                 .default(SimpleExpr::Value(Value::Bool(Some(true)))),
         )
         .col(
+            ColumnDef::new(SyntheticsMonitors::Destinations)
+                .json()
+                .not_null(),
+        )
+        // Extra monitor settings: retries, cooldown, auth, variables, rum toggles, etc.
+        .col(ColumnDef::new(SyntheticsMonitors::Settings).json().not_null())
+        // Scheduler fields — managed by the synthetics scheduler, not by the client.
+        .col(
             ColumnDef::new(SyntheticsMonitors::NextRunAt)
                 .big_integer()
                 .not_null()
-                .default(0_i64),
+                .default(0i64),
+        )
+        .col(
+            ColumnDef::new(SyntheticsMonitors::LastTriggeredAt)
+                .big_integer()
+                .not_null()
+                .default(0i64),
+        )
+        .col(
+            ColumnDef::new(SyntheticsMonitors::LastCheckStatus)
+                .string_len(16)
+                .not_null()
+                .default("unknown"),
         )
         .col(
             ColumnDef::new(SyntheticsMonitors::CreatedAt)
@@ -129,11 +160,6 @@ fn create_synthetics_monitors_table() -> TableCreateStatement {
         .col(
             ColumnDef::new(SyntheticsMonitors::UpdatedAt)
                 .big_integer()
-                .not_null(),
-        )
-        .col(
-            ColumnDef::new(SyntheticsMonitors::Destinations)
-                .json()
                 .not_null(),
         )
         .to_owned()
@@ -158,6 +184,7 @@ fn create_org_folder_idx() -> IndexCreateStatement {
         .to_owned()
 }
 
+/// Composite index for the scheduler's hot path: WHERE enabled = true AND next_run_at <= now
 fn create_schedule_idx() -> IndexCreateStatement {
     sea_query::Index::create()
         .if_not_exists()
@@ -169,22 +196,34 @@ fn create_schedule_idx() -> IndexCreateStatement {
 }
 
 #[derive(DeriveIden)]
+enum Folders {
+    Table,
+    Id,
+}
+
+#[derive(DeriveIden)]
 enum SyntheticsMonitors {
     Table,
     Id,
     OrgId,
     FolderId,
+    TzOffset,
     Name,
     MonitorType,
     Target,
+    Description,
+    Tags,
     Config,
-    IntervalSecs,
+    Frequency,
     Locations,
     Enabled,
+    Destinations,
+    Settings,
     NextRunAt,
+    LastTriggeredAt,
+    LastCheckStatus,
     CreatedAt,
     UpdatedAt,
-    Destinations,
 }
 
 #[cfg(test)]
@@ -201,18 +240,25 @@ mod tests {
                 CREATE TABLE IF NOT EXISTS "synthetics_monitors" (
                 "id" varchar(256) NOT NULL PRIMARY KEY,
                 "org_id" varchar(100) NOT NULL,
-                "folder_id" varchar(256) NOT NULL DEFAULT 'default',
+                "folder_id" bigint NOT NULL,
+                "tz_offset" integer NOT NULL DEFAULT 0,
                 "name" varchar(256) NOT NULL,
                 "monitor_type" varchar(32) NOT NULL,
                 "target" text NOT NULL,
+                "description" text NOT NULL DEFAULT '',
+                "tags" json NOT NULL,
                 "config" json NOT NULL,
-                "interval_secs" integer NOT NULL,
+                "frequency" json NOT NULL,
                 "locations" json NOT NULL,
                 "enabled" bool NOT NULL DEFAULT TRUE,
+                "destinations" json NOT NULL,
+                "settings" json NOT NULL,
                 "next_run_at" bigint NOT NULL DEFAULT 0,
+                "last_triggered_at" bigint NOT NULL DEFAULT 0,
+                "last_check_status" varchar(16) NOT NULL DEFAULT 'unknown',
                 "created_at" bigint NOT NULL,
                 "updated_at" bigint NOT NULL,
-                "destinations" json NOT NULL
+                CONSTRAINT "synthetics_monitors_folder_fk" FOREIGN KEY ("folder_id") REFERENCES "folders" ("id")
             )"#
         );
         assert_eq!(
@@ -237,18 +283,25 @@ mod tests {
                 CREATE TABLE IF NOT EXISTS "synthetics_monitors" (
                 "id" varchar(256) NOT NULL PRIMARY KEY,
                 "org_id" varchar(100) NOT NULL,
-                "folder_id" varchar(256) NOT NULL DEFAULT 'default',
+                "folder_id" bigint NOT NULL,
+                "tz_offset" integer NOT NULL DEFAULT 0,
                 "name" varchar(256) NOT NULL,
                 "monitor_type" varchar(32) NOT NULL,
                 "target" text NOT NULL,
+                "description" text NOT NULL DEFAULT '',
+                "tags" json_text NOT NULL,
                 "config" json_text NOT NULL,
-                "interval_secs" integer NOT NULL,
+                "frequency" json_text NOT NULL,
                 "locations" json_text NOT NULL,
                 "enabled" boolean NOT NULL DEFAULT TRUE,
+                "destinations" json_text NOT NULL,
+                "settings" json_text NOT NULL,
                 "next_run_at" bigint NOT NULL DEFAULT 0,
+                "last_triggered_at" bigint NOT NULL DEFAULT 0,
+                "last_check_status" varchar(16) NOT NULL DEFAULT 'unknown',
                 "created_at" bigint NOT NULL,
                 "updated_at" bigint NOT NULL,
-                "destinations" json_text NOT NULL
+                FOREIGN KEY ("folder_id") REFERENCES "folders" ("id")
             )"#
         );
     }

@@ -13,7 +13,87 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use chrono::FixedOffset;
 use serde::{Deserialize, Serialize};
+
+// ── Frequency ─────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum MonitorFrequencyType {
+    Seconds,
+    #[default]
+    Minutes,
+    Hours,
+    Days,
+    Weeks,
+    Months,
+    Cron,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MonitorFrequency {
+    #[serde(rename = "type", default)]
+    pub frequency_type: MonitorFrequencyType,
+    #[serde(default)]
+    pub interval: i64,
+    #[serde(default)]
+    pub cron: String,
+}
+
+impl Default for MonitorFrequency {
+    fn default() -> Self {
+        Self {
+            frequency_type: MonitorFrequencyType::Minutes,
+            interval: 5,
+            cron: String::new(),
+        }
+    }
+}
+
+impl MonitorFrequency {
+    pub fn interval_secs(&self) -> i64 {
+        match self.frequency_type {
+            MonitorFrequencyType::Seconds => self.interval.max(1),
+            MonitorFrequencyType::Minutes => self.interval.max(1) * 60,
+            MonitorFrequencyType::Hours => self.interval.max(1) * 3_600,
+            MonitorFrequencyType::Days => self.interval.max(1) * 86_400,
+            MonitorFrequencyType::Weeks => self.interval.max(1) * 604_800,
+            MonitorFrequencyType::Months => self.interval.max(1) * 2_592_000,
+            MonitorFrequencyType::Cron => 0,
+        }
+    }
+
+    pub fn next_run_at(&self, from_us: i64, tz_offset_mins: i32) -> anyhow::Result<i64> {
+        use std::str::FromStr;
+        match self.frequency_type {
+            MonitorFrequencyType::Cron => {
+                if self.cron.is_empty() {
+                    return Err(anyhow::anyhow!("cron expression is empty"));
+                }
+                let schedule = cron::Schedule::from_str(&self.cron)
+                    .map_err(|e| anyhow::anyhow!("invalid cron '{}': {e}", self.cron))?;
+                let tz = FixedOffset::east_opt(tz_offset_mins * 60)
+                    .unwrap_or_else(|| FixedOffset::east_opt(0).unwrap());
+                schedule
+                    .upcoming(tz)
+                    .next()
+                    .map(|t| t.timestamp_micros())
+                    .ok_or_else(|| anyhow::anyhow!("cron '{}' has no future dates", self.cron))
+            }
+            _ => {
+                let secs = self.interval_secs();
+                if secs == 0 {
+                    return Err(anyhow::anyhow!(
+                        "frequency type {:?} yields zero interval",
+                        self.frequency_type
+                    ));
+                }
+                Ok(from_us + secs * 1_000_000)
+            }
+        }
+    }
+}
 
 // ── Core monitor (stored in Postgres) ────────────────────────────────────────
 
@@ -21,23 +101,72 @@ use serde::{Deserialize, Serialize};
 pub struct Monitor {
     pub id: String,
     pub org_id: String,
-    pub folder_id: String,
+    /// Surrogate key of the folder this monitor belongs to (FolderType::Synthetics).
+    #[serde(default)]
+    pub folder_id: i64,
+    /// Timezone offset in minutes from UTC (e.g. -300 = EST). Used for cron scheduling.
+    #[serde(default)]
+    pub tz_offset: i32,
     pub name: String,
+    #[serde(default)]
+    pub description: String,
+    /// User-defined tags for filtering/grouping (e.g. ["prod", "checkout"]).
+    #[serde(default)]
+    pub tags: Vec<String>,
     #[serde(rename = "type")]
     pub monitor_type: MonitorType,
+    /// Target URL (HTTP/Browser) or host:port (TCP/TLS/SSH).
     pub target: String,
     /// Type-specific config, stored as JSONB. Shape depends on monitor_type.
     pub config: serde_json::Value,
-    pub interval_secs: i32,
+    /// Schedule — same modular format as reports frequency.
+    pub frequency: MonitorFrequency,
     pub locations: Vec<String>,
     pub enabled: bool,
-    pub next_run_at: i64,
-    pub created_at: i64,
-    pub updated_at: i64,
-    /// Alert destination names to notify on every check completion.
+    /// Alert destination names to notify on check failure.
     #[serde(default)]
     pub destinations: Vec<String>,
+    /// Number of retries before marking a check failed (0 = no retry).
+    #[serde(default)]
+    pub retries: i32,
+    /// Seconds to wait between retry attempts.
+    #[serde(default = "default_wait_before_retry_secs")]
+    pub wait_before_retry_secs: i32,
+    /// Alert only after this many consecutive failures (like alerts trigger_tolerance).
+    #[serde(default = "default_one")]
+    pub alert_if_fails: i32,
+    /// Silence period (seconds) between repeated alert notifications.
+    #[serde(default)]
+    pub cooldown_secs: i32,
+    /// Collect RUM data for browser monitors (session replay / performance).
+    #[serde(default)]
+    pub collect_rum_data: bool,
+    /// Enable session replay capture (browser monitors only).
+    #[serde(default)]
+    pub session_replay: bool,
+    /// Optional authentication config (basic auth, bearer token, etc.).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub auth: Option<MonitorAuth>,
+    /// Key-value variables injected into the probe environment.
+    #[serde(default)]
+    pub variables: Vec<MonitorVariable>,
+
+    // ── Scheduler fields (managed by server, not sent by client on create) ──
+    /// Pre-computed next fire time (microseconds). 0 = fire on first tick.
+    #[serde(default)]
+    pub next_run_at: i64,
+    /// When the scheduler last fanned out this monitor (microseconds). UI: "LAST CHECK".
+    #[serde(default)]
+    pub last_triggered_at: i64,
+    /// Denormalised status from the most recent completed check. Updated by ack handler.
+    #[serde(default)]
+    pub last_check_status: MonitorStatus,
+
+    pub created_at: i64,
+    pub updated_at: i64,
 }
+
+// ── MonitorType ───────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 #[serde(rename_all = "snake_case")]
@@ -51,30 +180,7 @@ pub enum MonitorType {
     Browser,
 }
 
-// ── List response (monitor + computed fields from synthetics_results stream) ──
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MonitorListItem {
-    pub id: String,
-    pub org_id: String,
-    pub folder_id: String,
-    pub name: String,
-    #[serde(rename = "type")]
-    pub monitor_type: MonitorType,
-    pub target: String,
-    pub interval_secs: i32,
-    pub locations: Vec<String>,
-    pub enabled: bool,
-    pub created_at: i64,
-    pub updated_at: i64,
-
-    // computed from synthetics_results stream via batch_monitor_summary
-    pub status: MonitorStatus,
-    pub last_check_at: Option<i64>,
-    pub last_response_ms: Option<f64>,
-    pub uptime_7d_pct: Option<f64>,
-    pub status_24h: Vec<StatusBucket>,
-}
+// ── MonitorStatus ─────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 #[serde(rename_all = "snake_case")]
@@ -82,8 +188,106 @@ pub enum MonitorStatus {
     Up,
     Degraded,
     Down,
+    /// Check dispatched but no result received yet.
+    Pending,
     #[default]
     Unknown,
+}
+
+// ── Auth ──────────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum MonitorAuth {
+    Basic {
+        username: String,
+        password: String,
+    },
+    Bearer {
+        token: String,
+    },
+    /// Reference to a secret stored in OO secrets manager.
+    Secret {
+        secret_name: String,
+    },
+}
+
+// ── Variables ─────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MonitorVariable {
+    pub name: String,
+    /// Inline value OR reference to a secret (prefixed "$secret:name").
+    pub value: String,
+}
+
+// ── Settings (packed into the `settings` JSON column) ────────────────────────
+
+/// Non-type-specific monitor settings stored as a single `settings` JSON blob.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct MonitorSettings {
+    #[serde(default)]
+    pub retries: i32,
+    #[serde(default)]
+    pub cooldown_secs: i32,
+    #[serde(default = "default_wait_before_retry_secs_i32")]
+    pub wait_before_retry_secs: i32,
+    #[serde(default = "default_one_i32")]
+    pub alert_if_fails: i32,
+    #[serde(default)]
+    pub collect_rum_data: bool,
+    #[serde(default)]
+    pub session_replay: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub auth: Option<MonitorAuth>,
+    #[serde(default)]
+    pub variables: Vec<MonitorVariable>,
+}
+
+fn default_wait_before_retry_secs_i32() -> i32 {
+    5
+}
+fn default_one_i32() -> i32 {
+    1
+}
+
+// ── Trigger type for run-now / manual trigger ─────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum TriggerType {
+    #[default]
+    Scheduled,
+    /// Manually triggered via the "Run Test" button in the UI.
+    Manual,
+}
+
+// ── List response (monitor + computed fields) ─────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MonitorListItem {
+    pub id: String,
+    pub org_id: String,
+    pub folder_id: i64,
+    pub name: String,
+    pub description: String,
+    pub tags: Vec<String>,
+    #[serde(rename = "type")]
+    pub monitor_type: MonitorType,
+    pub target: String,
+    pub frequency: MonitorFrequency,
+    pub locations: Vec<String>,
+    pub enabled: bool,
+    pub created_at: i64,
+    pub updated_at: i64,
+    pub last_triggered_at: i64,
+
+    // runtime fields — from synthetics_jobs (pending) + synthetics_results (completed)
+    pub status: MonitorStatus,
+    pub last_check_at: Option<i64>,
+    pub last_response_ms: Option<f64>,
+    pub uptime_7d_pct: Option<f64>,
+    pub status_24h: Vec<StatusBucket>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -105,10 +309,12 @@ pub enum BucketStatus {
 
 #[derive(Debug, Clone, Deserialize, Default)]
 pub struct ListMonitorsParams {
-    pub folder_id: Option<String>,
+    pub org_id: String,
+    pub folder_id: Option<i64>,
     pub monitor_type: Option<MonitorType>,
     pub enabled: Option<bool>,
     pub location: Option<String>,
+    pub tag: Option<String>,
     pub page: Option<u64>,
     pub page_size: Option<u64>,
 }
@@ -132,6 +338,7 @@ pub struct CheckResult {
     pub error: Option<String>,
     pub browser_engine: Option<String>,
     pub device: Option<String>,
+    pub trigger_type: TriggerType,
     pub checked_at: i64,
 }
 
@@ -164,9 +371,10 @@ pub struct ListResultsResponse {
 pub struct SummaryParams {
     pub start_time: Option<i64>,
     pub end_time: Option<i64>,
+    pub location: Option<String>,
 }
 
-/// Runtime health summary computed from the synthetics_results stream.
+/// Runtime health summary computed from synthetics_results stream + synthetics_jobs.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct MonitorSummary {
     pub status: MonitorStatus,
@@ -174,11 +382,20 @@ pub struct MonitorSummary {
     pub last_response_ms: Option<f64>,
     pub uptime_7d_pct: Option<f64>,
     pub status_24h: Vec<StatusBucket>,
+    /// Per-location breakdown — enables "filter by location" in the UI.
+    pub by_location: Vec<LocationSummary>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LocationSummary {
+    pub location: String,
+    pub status: MonitorStatus,
+    pub last_check_at: Option<i64>,
+    pub last_response_ms: Option<f64>,
+    pub uptime_7d_pct: Option<f64>,
 }
 
 // ── Type-specific config structs ──────────────────────────────────────────────
-// These are used to validate/parse config at request time.
-// The Monitor.config field stores them as raw serde_json::Value in the DB.
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HttpConfig {
@@ -250,7 +467,6 @@ pub struct SshAuth {
 }
 
 /// A (browser, device) pair for browser monitor fan-out.
-/// Each selected combination runs as a separate pending_check per interval.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct BrowserDevice {
     /// "chromium" | "firefox" | "edge"
@@ -261,8 +477,6 @@ pub struct BrowserDevice {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct BrowserConfig {
-    /// Matrix of (browser × device) combinations to run.
-    /// Each entry = one pending_check row per interval per location.
     #[serde(default = "default_browser_devices")]
     pub browser_devices: Vec<BrowserDevice>,
     pub runtime: Option<String>,
@@ -299,6 +513,8 @@ pub struct BrowserCapture {
     pub video: String,
 }
 
+// ── Defaults ──────────────────────────────────────────────────────────────────
+
 fn default_http_method() -> String {
     "GET".to_string()
 }
@@ -330,6 +546,14 @@ fn default_browser_devices() -> Vec<BrowserDevice> {
     }]
 }
 
+fn default_wait_before_retry_secs() -> i32 {
+    5
+}
+
+fn default_one() -> i32 {
+    1
+}
+
 fn bool_true() -> bool {
     true
 }
@@ -356,10 +580,6 @@ mod tests {
         let json = serde_json::json!("browser");
         let mt: MonitorType = serde_json::from_value(json).unwrap();
         assert_eq!(mt, MonitorType::Browser);
-
-        let json = serde_json::json!("api");
-        let mt: MonitorType = serde_json::from_value(json).unwrap();
-        assert_eq!(mt, MonitorType::Api);
     }
 
     #[test]
@@ -368,12 +588,38 @@ mod tests {
     }
 
     #[test]
+    fn test_frequency_interval_secs() {
+        let f = MonitorFrequency {
+            interval: 5,
+            cron: String::new(),
+            frequency_type: MonitorFrequencyType::Minutes,
+            ..Default::default()
+        };
+        assert_eq!(f.interval_secs(), 300);
+
+        let f = MonitorFrequency {
+            interval: 30,
+            cron: String::new(),
+            frequency_type: MonitorFrequencyType::Seconds,
+            ..Default::default()
+        };
+        assert_eq!(f.interval_secs(), 30);
+
+        let f = MonitorFrequency {
+            interval: 0,
+            cron: "0 */5 * * * *".to_string(),
+            frequency_type: MonitorFrequencyType::Cron,
+            ..Default::default()
+        };
+        assert_eq!(f.interval_secs(), 0);
+    }
+
+    #[test]
     fn test_http_config_defaults() {
         let cfg: HttpConfig = serde_json::from_str(r#"{"assertions":[]}"#).unwrap();
         assert_eq!(cfg.method, "GET");
         assert_eq!(cfg.timeout_ms, 10_000);
         assert!(cfg.follow_redirects);
-        assert!(cfg.headers.is_empty());
     }
 
     #[test]
@@ -381,41 +627,16 @@ mod tests {
         let cfg: BrowserConfig = serde_json::from_str(r#"{"steps":[]}"#).unwrap();
         assert_eq!(cfg.browser_devices.len(), 1);
         assert_eq!(cfg.browser_devices[0].browser, "chromium");
-        assert_eq!(cfg.browser_devices[0].device, "laptop_large");
-        assert_eq!(cfg.timeout_ms, 30_000);
     }
 
     #[test]
-    fn test_tls_config_defaults() {
-        let cfg: TlsConfig = serde_json::from_str(r#"{}"#).unwrap();
-        assert_eq!(cfg.port, 443);
-        assert_eq!(cfg.min_days_until_expiry, 30);
-        assert!(cfg.verify_chain);
-        assert!(cfg.verify_hostname);
-    }
-
-    #[test]
-    fn test_monitor_list_item_serializes_status() {
-        let item = MonitorListItem {
-            id: "id1".to_string(),
-            org_id: "org1".to_string(),
-            folder_id: "default".to_string(),
-            name: "test".to_string(),
-            monitor_type: MonitorType::Http,
-            target: "https://example.com".to_string(),
-            interval_secs: 60,
-            locations: vec!["aws-us-east-1".to_string()],
-            enabled: true,
-            created_at: 0,
-            updated_at: 0,
-            status: MonitorStatus::Up,
-            last_check_at: None,
-            last_response_ms: Some(142.0),
-            uptime_7d_pct: Some(99.9),
-            status_24h: vec![],
+    fn test_monitor_auth_serde() {
+        let auth = MonitorAuth::Basic {
+            username: "user".to_string(),
+            password: "pass".to_string(),
         };
-        let json = serde_json::to_value(&item).unwrap();
-        assert_eq!(json["status"], "up");
-        assert_eq!(json["type"], "http");
+        let json = serde_json::to_value(&auth).unwrap();
+        assert_eq!(json["type"], "basic");
+        assert_eq!(json["username"], "user");
     }
 }

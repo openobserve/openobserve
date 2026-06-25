@@ -13,10 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::synthetics::{ListMonitorsParams, Monitor, MonitorType};
+use config::meta::synthetics::{
+    BrowserConfig, ListMonitorsParams, Monitor, MonitorFrequency, MonitorSettings, MonitorStatus,
+    MonitorType,
+};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, PaginatorTrait, QueryFilter,
-    QueryOrder, Set, TransactionTrait, TryIntoModel,
+    QueryOrder, QuerySelect, Set, TransactionTrait, TryIntoModel, prelude::Expr,
 };
 
 use super::entity::synthetics_monitors::{self, ActiveModel, Column, Entity};
@@ -41,28 +44,50 @@ impl TryFrom<synthetics_monitors::Model> for Monitor {
         let destinations: Vec<String> = serde_json::from_value(m.destinations)
             .map_err(|e| errors::Error::Message(format!("invalid destinations JSON: {e}")))?;
 
+        let tags: Vec<String> = serde_json::from_value(m.tags).unwrap_or_default();
+
+        let frequency: MonitorFrequency = serde_json::from_value(m.frequency).unwrap_or_default();
+
+        let settings: MonitorSettings = serde_json::from_value(m.settings).unwrap_or_default();
+
+        let last_check_status: MonitorStatus =
+            serde_json::from_value(serde_json::Value::String(m.last_check_status))
+                .unwrap_or_default();
+
         Ok(Monitor {
             id: m.id,
             org_id: m.org_id,
             folder_id: m.folder_id,
+            tz_offset: m.tz_offset,
             name: m.name,
+            description: m.description,
+            tags,
             monitor_type,
             target: m.target,
             config: m.config,
-            interval_secs: m.interval_secs,
+            frequency,
             locations,
             enabled: m.enabled,
+            destinations,
+            retries: settings.retries,
+            cooldown_secs: settings.cooldown_secs,
+            wait_before_retry_secs: settings.wait_before_retry_secs,
+            alert_if_fails: settings.alert_if_fails,
+            collect_rum_data: settings.collect_rum_data,
+            session_replay: settings.session_replay,
+            auth: settings.auth,
+            variables: settings.variables,
             next_run_at: m.next_run_at,
+            last_triggered_at: m.last_triggered_at,
+            last_check_status,
             created_at: m.created_at,
             updated_at: m.updated_at,
-            destinations,
         })
     }
 }
 
-// ── Public API ────────────────────────────────────────────────────────────────
+// ── Public CRUD API ───────────────────────────────────────────────────────────
 
-/// Gets a monitor by ID.
 pub async fn get<C: ConnectionTrait>(
     conn: &C,
     org_id: &str,
@@ -73,7 +98,6 @@ pub async fn get<C: ConnectionTrait>(
     maybe.map(Monitor::try_from).transpose()
 }
 
-/// Lists monitors for an org, with optional filters.
 pub async fn list<C: ConnectionTrait>(
     conn: &C,
     org_id: &str,
@@ -87,7 +111,6 @@ pub async fn list<C: ConnectionTrait>(
         .collect()
 }
 
-/// Counts monitors for an org, with optional filters.
 pub async fn count<C: ConnectionTrait>(
     conn: &C,
     org_id: &str,
@@ -100,7 +123,6 @@ pub async fn count<C: ConnectionTrait>(
     Ok(q.count(conn).await?)
 }
 
-/// Creates a new monitor. Fails if one with the same id already exists.
 pub async fn create<C: TransactionTrait>(
     conn: &C,
     org_id: &str,
@@ -114,11 +136,11 @@ pub async fn create<C: TransactionTrait>(
     let mut am = build_active_model(&monitor)?;
     am.id = Set(id);
     am.org_id = Set(org_id.to_owned());
-    am.folder_id = Set(monitor.folder_id.clone());
+    am.folder_id = Set(monitor.folder_id);
     am.monitor_type = Set(monitor_type_to_str(&monitor.monitor_type).to_owned());
     am.created_at = Set(now);
     am.updated_at = Set(now);
-    am.next_run_at = Set(0);
+    // next_run_at = 0 (DB DEFAULT) → fires on first scheduler tick
 
     let model = am.insert(&txn).await?.try_into_model()?;
     let result = Monitor::try_from(model)?;
@@ -126,7 +148,6 @@ pub async fn create<C: TransactionTrait>(
     Ok(result)
 }
 
-/// Updates an existing monitor. Fails if it does not exist.
 pub async fn update<C: TransactionTrait>(
     conn: &C,
     org_id: &str,
@@ -150,8 +171,6 @@ pub async fn update<C: TransactionTrait>(
     Ok(result)
 }
 
-/// Upserts a monitor (create or update by id).
-/// Used by the super cluster queue handler.
 pub async fn put<C: TransactionTrait>(
     conn: &C,
     org_id: &str,
@@ -173,11 +192,10 @@ pub async fn put<C: TransactionTrait>(
             let mut am = build_active_model(&monitor)?;
             am.id = Set(monitor.id.clone());
             am.org_id = Set(org_id.to_owned());
-            am.folder_id = Set(monitor.folder_id.clone());
+            am.folder_id = Set(monitor.folder_id);
             am.monitor_type = Set(monitor_type_to_str(&monitor.monitor_type).to_owned());
             am.created_at = Set(now);
             am.updated_at = Set(now);
-            am.next_run_at = Set(monitor.next_run_at);
             let model = am.insert(&txn).await?.try_into_model()?;
             Monitor::try_from(model)?
         }
@@ -187,7 +205,6 @@ pub async fn put<C: TransactionTrait>(
     Ok(result)
 }
 
-/// Deletes a monitor by ID. Returns true if a row was deleted.
 pub async fn delete<C: ConnectionTrait>(
     conn: &C,
     org_id: &str,
@@ -202,22 +219,47 @@ pub async fn delete<C: ConnectionTrait>(
     Ok(res.rows_affected > 0)
 }
 
+/// Sets the `enabled` flag — used by the enable/pause API.
+pub async fn set_enabled<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    id: &str,
+    enabled: bool,
+) -> Result<bool, errors::Error> {
+    let _lock = super::get_lock().await;
+    let res = Entity::update_many()
+        .col_expr(Column::Enabled, Expr::value(enabled))
+        .col_expr(
+            Column::UpdatedAt,
+            Expr::value(config::utils::time::now_micros()),
+        )
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::Id.eq(id))
+        .exec(conn)
+        .await?;
+    Ok(res.rows_affected > 0)
+}
+
 // ── Scheduler helpers ─────────────────────────────────────────────────────────
 
-/// Represents a monitor that is due to run, with only the fields the scheduler needs.
+/// Scheduler's fan-out data — the subset of Monitor fields the scheduler needs.
 pub struct DueMonitor {
     pub id: String,
     pub org_id: String,
-    pub folder_id: String,
     pub monitor_type: MonitorType,
     pub locations: Vec<String>,
-    pub interval_secs: i32,
-    /// Parsed from config.browser_devices — empty for non-browser monitors.
+    pub frequency: MonitorFrequency,
+    /// Minutes from UTC — used for cron scheduling. 0 = UTC.
+    pub tz_offset: i32,
+    /// Populated only for browser monitors (parsed from config.browser_devices).
     pub browser_devices: Vec<config::meta::synthetics::BrowserDevice>,
 }
 
-/// Fetches monitors whose `next_run_at <= now_us` and `enabled = true`.
-/// Uses FOR UPDATE SKIP LOCKED so concurrent scheduler instances don't double-schedule.
+/// Returns up to `limit` enabled monitors whose `next_run_at` is at or before `now_us`.
+/// Ordered by next_run_at ASC so the most overdue fire first.
+///
+/// NOTE: Does not use FOR UPDATE SKIP LOCKED — the scheduler is single-node on alert_manager.
+/// If multi-node scheduling is needed, convert to a raw SQL query with SKIP LOCKED.
 pub async fn fetch_due<C: ConnectionTrait>(
     conn: &C,
     now_us: i64,
@@ -228,8 +270,8 @@ pub async fn fetch_due<C: ConnectionTrait>(
         .filter(Column::Enabled.eq(true))
         .filter(Column::NextRunAt.lte(now_us))
         .order_by_asc(Column::NextRunAt)
-        .paginate(conn, limit)
-        .fetch_page(0)
+        .limit(limit)
+        .all(conn)
         .await?;
 
     models
@@ -239,16 +281,21 @@ pub async fn fetch_due<C: ConnectionTrait>(
                 m.monitor_type.clone(),
             ))
             .map_err(|e| {
-                errors::Error::Message(format!("invalid monitor_type '{}': {e}", m.monitor_type))
+                errors::Error::Message(format!(
+                    "invalid monitor_type '{}' for {}: {e}",
+                    m.monitor_type, m.id
+                ))
             })?;
 
             let locations: Vec<String> = serde_json::from_value(m.locations).map_err(|e| {
-                errors::Error::Message(format!("invalid locations JSON for {}: {e}", m.id))
+                errors::Error::Message(format!("invalid locations for {}: {e}", m.id))
             })?;
 
+            let frequency: MonitorFrequency =
+                serde_json::from_value(m.frequency).unwrap_or_default();
+
             let browser_devices = if monitor_type == MonitorType::Browser {
-                let cfg: config::meta::synthetics::BrowserConfig =
-                    serde_json::from_value(m.config).unwrap_or_default();
+                let cfg: BrowserConfig = serde_json::from_value(m.config).unwrap_or_default();
                 cfg.browser_devices
             } else {
                 vec![]
@@ -257,25 +304,40 @@ pub async fn fetch_due<C: ConnectionTrait>(
             Ok(DueMonitor {
                 id: m.id,
                 org_id: m.org_id,
-                folder_id: m.folder_id,
                 monitor_type,
                 locations,
-                interval_secs: m.interval_secs,
+                frequency,
+                tz_offset: m.tz_offset,
                 browser_devices,
             })
         })
         .collect()
 }
 
-/// Advances `next_run_at` for a monitor after it has been scheduled.
-pub async fn advance_next_run_at<C: ConnectionTrait>(
+/// Updates `last_triggered_at` and `next_run_at` after the scheduler fans out a monitor.
+pub async fn advance_schedule<C: ConnectionTrait>(
     conn: &C,
     id: &str,
-    next: i64,
+    last_triggered_at: i64,
+    next_run_at: i64,
 ) -> Result<(), errors::Error> {
-    let _lock = super::get_lock().await;
     Entity::update_many()
-        .col_expr(Column::NextRunAt, sea_orm::prelude::Expr::value(next))
+        .col_expr(Column::LastTriggeredAt, Expr::value(last_triggered_at))
+        .col_expr(Column::NextRunAt, Expr::value(next_run_at))
+        .filter(Column::Id.eq(id))
+        .exec(conn)
+        .await?;
+    Ok(())
+}
+
+/// Updates `last_check_status` after a probe acks a job.
+pub async fn update_last_check_status<C: ConnectionTrait>(
+    conn: &C,
+    id: &str,
+    status: &str,
+) -> Result<(), errors::Error> {
+    Entity::update_many()
+        .col_expr(Column::LastCheckStatus, Expr::value(status.to_owned()))
         .filter(Column::Id.eq(id))
         .exec(conn)
         .await?;
@@ -313,35 +375,57 @@ async fn list_models<C: ConnectionTrait>(
     q.all(conn).await
 }
 
-/// Sets all mutable fields on an `ActiveModel` from a `Monitor`.
-/// Does NOT set immutable fields (id, org_id, created_at, monitor_type).
+fn pack_settings(monitor: &Monitor) -> Result<serde_json::Value, errors::Error> {
+    Ok(serde_json::to_value(MonitorSettings {
+        retries: monitor.retries,
+        cooldown_secs: monitor.cooldown_secs,
+        wait_before_retry_secs: monitor.wait_before_retry_secs,
+        alert_if_fails: monitor.alert_if_fails,
+        collect_rum_data: monitor.collect_rum_data,
+        session_replay: monitor.session_replay,
+        auth: monitor.auth.clone(),
+        variables: monitor.variables.clone(),
+    })?)
+}
+
 fn update_mutable_fields(am: &mut ActiveModel, monitor: &Monitor) -> Result<(), errors::Error> {
     let locations = serde_json::to_value(&monitor.locations)?;
     let destinations = serde_json::to_value(&monitor.destinations)?;
-    am.folder_id = Set(monitor.folder_id.clone());
+    let tags = serde_json::to_value(&monitor.tags)?;
+    let frequency = serde_json::to_value(&monitor.frequency)?;
+    let settings = pack_settings(monitor)?;
+    am.folder_id = Set(monitor.folder_id);
+    am.tz_offset = Set(monitor.tz_offset);
     am.name = Set(monitor.name.clone());
+    am.description = Set(monitor.description.clone());
+    am.tags = Set(tags);
     am.target = Set(monitor.target.clone());
     am.config = Set(monitor.config.clone());
-    am.interval_secs = Set(monitor.interval_secs);
+    am.frequency = Set(frequency);
     am.locations = Set(locations);
     am.enabled = Set(monitor.enabled);
     am.destinations = Set(destinations);
+    am.settings = Set(settings);
     Ok(())
 }
 
-/// Builds an `ActiveModel` from a `Monitor` for all mutable fields.
-/// Caller must still set: id, org_id, folder_id, monitor_type, created_at, updated_at, next_run_at.
 fn build_active_model(monitor: &Monitor) -> Result<ActiveModel, errors::Error> {
     let locations = serde_json::to_value(&monitor.locations)?;
     let destinations = serde_json::to_value(&monitor.destinations)?;
+    let tags = serde_json::to_value(&monitor.tags)?;
+    let frequency = serde_json::to_value(&monitor.frequency)?;
+    let settings = pack_settings(monitor)?;
     Ok(ActiveModel {
         name: Set(monitor.name.clone()),
+        description: Set(monitor.description.clone()),
+        tags: Set(tags),
         target: Set(monitor.target.clone()),
         config: Set(monitor.config.clone()),
-        interval_secs: Set(monitor.interval_secs),
+        frequency: Set(frequency),
         locations: Set(locations),
         enabled: Set(monitor.enabled),
         destinations: Set(destinations),
+        settings: Set(settings),
         ..Default::default()
     })
 }
@@ -366,7 +450,7 @@ trait ApplyMonitorFilters {
 impl ApplyMonitorFilters for sea_orm::Select<Entity> {
     fn apply_filters(self, params: &ListMonitorsParams) -> Self {
         let mut q = self;
-        if let Some(folder_id) = &params.folder_id {
+        if let Some(folder_id) = params.folder_id {
             q = q.filter(Column::FolderId.eq(folder_id));
         }
         if let Some(monitor_type) = &params.monitor_type {
@@ -388,21 +472,26 @@ mod tests {
         Model {
             id: "mon-1".to_string(),
             org_id: "org1".to_string(),
-            folder_id: "default".to_string(),
+            folder_id: 1,
             name: "Login Flow".to_string(),
             monitor_type: "browser".to_string(),
             target: "https://app.example.com".to_string(),
+            description: "Monitors the login flow".to_string(),
+            tags: serde_json::json!(["prod"]),
             config: serde_json::json!({
                 "browser_devices": [{"browser": "chromium", "device": "laptop_large"}],
                 "steps": []
             }),
-            interval_secs: 300,
+            frequency: serde_json::json!({"type": "minutes", "interval": 5, "cron": ""}),
             locations: serde_json::json!(["aws-us-east-1"]),
             enabled: true,
+            destinations: serde_json::json!([]),
+            settings: serde_json::json!({"retries": 1, "cooldown_secs": 0, "wait_before_retry_secs": 5, "alert_if_fails": 1, "collect_rum_data": false, "session_replay": false, "variables": []}),
             next_run_at: 0,
+            last_triggered_at: 0,
+            last_check_status: "unknown".to_string(),
             created_at: 1750000000000000,
             updated_at: 1750000000000000,
-            destinations: serde_json::json!([]),
         }
     }
 
@@ -413,6 +502,11 @@ mod tests {
         assert_eq!(monitor.monitor_type, MonitorType::Browser);
         assert_eq!(monitor.locations, vec!["aws-us-east-1"]);
         assert!(monitor.enabled);
+        assert_eq!(monitor.frequency.interval, 5);
+        assert_eq!(
+            monitor.frequency.frequency_type,
+            config::meta::synthetics::MonitorFrequencyType::Minutes
+        );
     }
 
     #[test]
@@ -430,5 +524,17 @@ mod tests {
         assert_eq!(monitor_type_to_str(&MonitorType::Tcp), "tcp");
         assert_eq!(monitor_type_to_str(&MonitorType::Tls), "tls");
         assert_eq!(monitor_type_to_str(&MonitorType::Ssh), "ssh");
+    }
+
+    #[test]
+    fn test_try_from_preserves_scheduler_fields() {
+        let mut m = make_model();
+        m.next_run_at = 1750000001000000;
+        m.last_triggered_at = 1750000000500000;
+        m.last_check_status = "up".to_string();
+        let monitor = Monitor::try_from(m).unwrap();
+        assert_eq!(monitor.next_run_at, 1750000001000000);
+        assert_eq!(monitor.last_triggered_at, 1750000000500000);
+        assert_eq!(monitor.last_check_status, MonitorStatus::Up);
     }
 }

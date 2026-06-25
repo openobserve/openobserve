@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! DB functions for `synthetics_pending_checks`.
+//! DB functions for `synthetics_jobs`.
 //!
 //! All operations use raw SQL. Sea-orm's query builder does not support
 //! `FOR UPDATE SKIP LOCKED` or `RETURNING`, which are both required here.
@@ -60,7 +60,7 @@ pub async fn enqueue<C: ConnectionTrait>(
     p: EnqueueParams<'_>,
 ) -> Result<(), errors::Error> {
     let sql = r#"
-        INSERT INTO synthetics_pending_checks
+        INSERT INTO synthetics_jobs
             (monitor_id, org_id, location, pool, browser_engine, device,
              scheduled_ts, valid_until, status, attempts)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 0, 0)
@@ -98,7 +98,7 @@ pub async fn get_by_id<C: ConnectionTrait>(
     let sql = r#"
         SELECT id, monitor_id, org_id, location, pool,
                browser_engine, device, scheduled_ts, valid_until
-        FROM synthetics_pending_checks
+        FROM synthetics_jobs
         WHERE id = $1
     "#;
     let rows = conn
@@ -133,7 +133,7 @@ pub async fn drain_monitor<C: ConnectionTrait>(
     conn: &C,
     monitor_id: &str,
 ) -> Result<u64, errors::Error> {
-    let sql = "DELETE FROM synthetics_pending_checks WHERE monitor_id = $1";
+    let sql = "DELETE FROM synthetics_jobs WHERE monitor_id = $1";
     let res = conn
         .execute(Statement::from_sql_and_values(
             conn.get_database_backend(),
@@ -159,14 +159,14 @@ pub async fn lease_batch<C: ConnectionTrait>(
     let lease_expires_at = now_us + lease_secs * 1_000_000;
 
     let sql = r#"
-        UPDATE synthetics_pending_checks SET
+        UPDATE synthetics_jobs SET
             status           = 1,
             claimed_by       = $1,
             claimed_at       = $2,
             lease_expires_at = $3,
             attempts         = attempts + 1
         WHERE id IN (
-            SELECT id FROM synthetics_pending_checks
+            SELECT id FROM synthetics_jobs
             WHERE pool = $4
               AND status = 0
               AND valid_until > $2
@@ -215,7 +215,7 @@ pub async fn lease_batch<C: ConnectionTrait>(
 /// Deletes a leased row when the probe successfully POSTs its result.
 /// Returns true if the row was found and deleted.
 pub async fn ack_delete<C: ConnectionTrait>(conn: &C, job_id: i64) -> Result<bool, errors::Error> {
-    let sql = "DELETE FROM synthetics_pending_checks WHERE id = $1";
+    let sql = "DELETE FROM synthetics_jobs WHERE id = $1";
     let res = conn
         .execute(Statement::from_sql_and_values(
             conn.get_database_backend(),
@@ -235,7 +235,7 @@ pub async fn requeue_expired<C: ConnectionTrait>(
     max_attempts: i32,
 ) -> Result<u64, errors::Error> {
     let sql = r#"
-        UPDATE synthetics_pending_checks
+        UPDATE synthetics_jobs
         SET status = 0, claimed_by = NULL, claimed_at = NULL, lease_expires_at = NULL
         WHERE status = 1
           AND lease_expires_at < $1
@@ -258,7 +258,7 @@ pub async fn dead_letter_expired<C: ConnectionTrait>(
     max_attempts: i32,
 ) -> Result<u64, errors::Error> {
     let sql = r#"
-        UPDATE synthetics_pending_checks
+        UPDATE synthetics_jobs
         SET status = 2
         WHERE status = 1
           AND lease_expires_at < $1
@@ -277,7 +277,7 @@ pub async fn dead_letter_expired<C: ConnectionTrait>(
 /// Deletes stale Pending rows whose valid_until has passed (missed entirely).
 pub async fn prune_stale<C: ConnectionTrait>(conn: &C, now_us: i64) -> Result<u64, errors::Error> {
     let sql = r#"
-        DELETE FROM synthetics_pending_checks
+        DELETE FROM synthetics_jobs
         WHERE status = 0 AND valid_until < $1
     "#;
     let res = conn

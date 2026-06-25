@@ -1,11 +1,11 @@
-//! `SeaORM` Entity for synthetics_pending_checks table.
+//! `SeaORM` Entity for synthetics_jobs table.
 //! Note: actual DB operations use raw SQL (SKIP LOCKED, RETURNING) — this entity
 //! is used only for type definitions and is NOT used with ActiveModel CRUD.
 
 use sea_orm::entity::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
-#[sea_orm(table_name = "synthetics_pending_checks")]
+#[sea_orm(table_name = "synthetics_jobs")]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = true)]
     pub id: i64,

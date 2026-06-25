@@ -18,16 +18,14 @@ use sea_orm_migration::prelude::*;
 #[derive(DeriveMigrationName)]
 pub struct Migration;
 
-const SYNTHETICS_PENDING_CHECKS_DEQUEUE_IDX: &str = "synthetics_pending_checks_dequeue_idx";
-const SYNTHETICS_PENDING_CHECKS_MONITOR_IDX: &str = "synthetics_pending_checks_monitor_idx";
-const SYNTHETICS_PENDING_CHECKS_DEDUP_UQ: &str = "synthetics_pending_checks_dedup_uq";
+const SYNTHETICS_PENDING_CHECKS_DEQUEUE_IDX: &str = "synthetics_jobs_dequeue_idx";
+const SYNTHETICS_PENDING_CHECKS_MONITOR_IDX: &str = "synthetics_jobs_monitor_idx";
+const SYNTHETICS_PENDING_CHECKS_DEDUP_UQ: &str = "synthetics_jobs_dedup_uq";
 
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        manager
-            .create_table(create_synthetics_pending_checks_table())
-            .await?;
+        manager.create_table(create_synthetics_jobs_table()).await?;
         manager.create_index(create_dequeue_idx()).await?;
         manager.create_index(create_monitor_idx()).await?;
         manager.create_index(create_dedup_uq()).await?;
@@ -39,7 +37,7 @@ impl MigrationTrait for Migration {
             .drop_index(
                 Index::drop()
                     .name(SYNTHETICS_PENDING_CHECKS_DEDUP_UQ)
-                    .table(SyntheticsPendingChecks::Table)
+                    .table(SyntheticsJobs::Table)
                     .to_owned(),
             )
             .await?;
@@ -47,7 +45,7 @@ impl MigrationTrait for Migration {
             .drop_index(
                 Index::drop()
                     .name(SYNTHETICS_PENDING_CHECKS_MONITOR_IDX)
-                    .table(SyntheticsPendingChecks::Table)
+                    .table(SyntheticsJobs::Table)
                     .to_owned(),
             )
             .await?;
@@ -55,95 +53,87 @@ impl MigrationTrait for Migration {
             .drop_index(
                 Index::drop()
                     .name(SYNTHETICS_PENDING_CHECKS_DEQUEUE_IDX)
-                    .table(SyntheticsPendingChecks::Table)
+                    .table(SyntheticsJobs::Table)
                     .to_owned(),
             )
             .await?;
         manager
-            .drop_table(
-                Table::drop()
-                    .table(SyntheticsPendingChecks::Table)
-                    .to_owned(),
-            )
+            .drop_table(Table::drop().table(SyntheticsJobs::Table).to_owned())
             .await?;
         Ok(())
     }
 }
 
-fn create_synthetics_pending_checks_table() -> TableCreateStatement {
+fn create_synthetics_jobs_table() -> TableCreateStatement {
     Table::create()
-        .table(SyntheticsPendingChecks::Table)
+        .table(SyntheticsJobs::Table)
         .if_not_exists()
         .col(
-            ColumnDef::new(SyntheticsPendingChecks::Id)
+            ColumnDef::new(SyntheticsJobs::Id)
                 .big_integer()
                 .not_null()
                 .auto_increment()
                 .primary_key(),
         )
         .col(
-            ColumnDef::new(SyntheticsPendingChecks::MonitorId)
+            ColumnDef::new(SyntheticsJobs::MonitorId)
                 .string_len(256)
                 .not_null(),
         )
         .col(
-            ColumnDef::new(SyntheticsPendingChecks::OrgId)
+            ColumnDef::new(SyntheticsJobs::OrgId)
                 .string_len(100)
                 .not_null(),
         )
         .col(
-            ColumnDef::new(SyntheticsPendingChecks::Location)
+            ColumnDef::new(SyntheticsJobs::Location)
                 .string_len(256)
                 .not_null(),
         )
         .col(
-            ColumnDef::new(SyntheticsPendingChecks::Pool)
+            ColumnDef::new(SyntheticsJobs::Pool)
                 .string_len(256)
                 .not_null(),
         )
         .col(
-            ColumnDef::new(SyntheticsPendingChecks::BrowserEngine)
+            ColumnDef::new(SyntheticsJobs::BrowserEngine)
                 .string_len(64)
                 .null(),
         )
+        .col(ColumnDef::new(SyntheticsJobs::Device).string_len(64).null())
         .col(
-            ColumnDef::new(SyntheticsPendingChecks::Device)
-                .string_len(64)
-                .null(),
-        )
-        .col(
-            ColumnDef::new(SyntheticsPendingChecks::ScheduledTs)
+            ColumnDef::new(SyntheticsJobs::ScheduledTs)
                 .big_integer()
                 .not_null(),
         )
         .col(
-            ColumnDef::new(SyntheticsPendingChecks::ValidUntil)
+            ColumnDef::new(SyntheticsJobs::ValidUntil)
                 .big_integer()
                 .not_null(),
         )
         .col(
-            ColumnDef::new(SyntheticsPendingChecks::Status)
+            ColumnDef::new(SyntheticsJobs::Status)
                 .integer()
                 .not_null()
                 .default(0_i32),
         )
         .col(
-            ColumnDef::new(SyntheticsPendingChecks::ClaimedBy)
+            ColumnDef::new(SyntheticsJobs::ClaimedBy)
                 .string_len(256)
                 .null(),
         )
         .col(
-            ColumnDef::new(SyntheticsPendingChecks::ClaimedAt)
+            ColumnDef::new(SyntheticsJobs::ClaimedAt)
                 .big_integer()
                 .null(),
         )
         .col(
-            ColumnDef::new(SyntheticsPendingChecks::LeaseExpiresAt)
+            ColumnDef::new(SyntheticsJobs::LeaseExpiresAt)
                 .big_integer()
                 .null(),
         )
         .col(
-            ColumnDef::new(SyntheticsPendingChecks::Attempts)
+            ColumnDef::new(SyntheticsJobs::Attempts)
                 .integer()
                 .not_null()
                 .default(0_i32),
@@ -155,11 +145,11 @@ fn create_dequeue_idx() -> IndexCreateStatement {
     sea_query::Index::create()
         .if_not_exists()
         .name(SYNTHETICS_PENDING_CHECKS_DEQUEUE_IDX)
-        .table(SyntheticsPendingChecks::Table)
-        .col(SyntheticsPendingChecks::Pool)
-        .col(SyntheticsPendingChecks::Status)
-        .col(SyntheticsPendingChecks::ValidUntil)
-        .col(SyntheticsPendingChecks::ScheduledTs)
+        .table(SyntheticsJobs::Table)
+        .col(SyntheticsJobs::Pool)
+        .col(SyntheticsJobs::Status)
+        .col(SyntheticsJobs::ValidUntil)
+        .col(SyntheticsJobs::ScheduledTs)
         .to_owned()
 }
 
@@ -167,8 +157,8 @@ fn create_monitor_idx() -> IndexCreateStatement {
     sea_query::Index::create()
         .if_not_exists()
         .name(SYNTHETICS_PENDING_CHECKS_MONITOR_IDX)
-        .table(SyntheticsPendingChecks::Table)
-        .col(SyntheticsPendingChecks::MonitorId)
+        .table(SyntheticsJobs::Table)
+        .col(SyntheticsJobs::MonitorId)
         .to_owned()
 }
 
@@ -176,17 +166,18 @@ fn create_dedup_uq() -> IndexCreateStatement {
     sea_query::Index::create()
         .if_not_exists()
         .name(SYNTHETICS_PENDING_CHECKS_DEDUP_UQ)
-        .table(SyntheticsPendingChecks::Table)
-        .col(SyntheticsPendingChecks::MonitorId)
-        .col(SyntheticsPendingChecks::Pool)
-        .col(SyntheticsPendingChecks::Device)
-        .col(SyntheticsPendingChecks::ScheduledTs)
+        .table(SyntheticsJobs::Table)
+        .col(SyntheticsJobs::MonitorId)
+        .col(SyntheticsJobs::Location)
+        .col(SyntheticsJobs::Pool)
+        .col(SyntheticsJobs::Device)
+        .col(SyntheticsJobs::ScheduledTs)
         .unique()
         .to_owned()
 }
 
 #[derive(DeriveIden)]
-enum SyntheticsPendingChecks {
+enum SyntheticsJobs {
     Table,
     Id,
     MonitorId,
@@ -213,9 +204,9 @@ mod tests {
     #[test]
     fn postgres() {
         collapsed_eq!(
-            &create_synthetics_pending_checks_table().to_string(PostgresQueryBuilder),
+            &create_synthetics_jobs_table().to_string(PostgresQueryBuilder),
             r#"
-                CREATE TABLE IF NOT EXISTS "synthetics_pending_checks" (
+                CREATE TABLE IF NOT EXISTS "synthetics_jobs" (
                 "id" bigint NOT NULL PRIMARY KEY AUTO_INCREMENT,
                 "monitor_id" varchar(256) NOT NULL,
                 "org_id" varchar(100) NOT NULL,
@@ -233,24 +224,24 @@ mod tests {
         );
         assert_eq!(
             &create_dequeue_idx().to_string(PostgresQueryBuilder),
-            r#"CREATE INDEX IF NOT EXISTS "synthetics_pending_checks_dequeue_idx" ON "synthetics_pending_checks" ("pool", "status", "valid_until", "scheduled_ts")"#
+            r#"CREATE INDEX IF NOT EXISTS "synthetics_jobs_dequeue_idx" ON "synthetics_jobs" ("pool", "status", "valid_until", "scheduled_ts")"#
         );
         assert_eq!(
             &create_monitor_idx().to_string(PostgresQueryBuilder),
-            r#"CREATE INDEX IF NOT EXISTS "synthetics_pending_checks_monitor_idx" ON "synthetics_pending_checks" ("monitor_id")"#
+            r#"CREATE INDEX IF NOT EXISTS "synthetics_jobs_monitor_idx" ON "synthetics_jobs" ("monitor_id")"#
         );
         assert_eq!(
             &create_dedup_uq().to_string(PostgresQueryBuilder),
-            r#"CREATE UNIQUE INDEX IF NOT EXISTS "synthetics_pending_checks_dedup_uq" ON "synthetics_pending_checks" ("monitor_id", "pool", "scheduled_ts")"#
+            r#"CREATE UNIQUE INDEX IF NOT EXISTS "synthetics_jobs_dedup_uq" ON "synthetics_jobs" ("monitor_id", "location", "pool", "device", "scheduled_ts")"#
         );
     }
 
     #[test]
     fn sqlite() {
         collapsed_eq!(
-            &create_synthetics_pending_checks_table().to_string(SqliteQueryBuilder),
+            &create_synthetics_jobs_table().to_string(SqliteQueryBuilder),
             r#"
-                CREATE TABLE IF NOT EXISTS "synthetics_pending_checks" (
+                CREATE TABLE IF NOT EXISTS "synthetics_jobs" (
                 "id" bigint NOT NULL PRIMARY KEY AUTOINCREMENT,
                 "monitor_id" varchar(256) NOT NULL,
                 "org_id" varchar(100) NOT NULL,

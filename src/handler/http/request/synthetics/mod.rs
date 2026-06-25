@@ -213,6 +213,41 @@ pub async fn delete_monitor(Path((org_id, id)): Path<(String, String)>) -> Respo
     }
 }
 
+pub async fn set_monitor_enabled(
+    Path((org_id, id)): Path<(String, String)>,
+    Json(body): Json<serde_json::Value>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        let enabled = match body.get("enabled").and_then(|v| v.as_bool()) {
+            Some(v) => v,
+            None => return MetaHttpResponse::bad_request("missing boolean field 'enabled'"),
+        };
+        match o2_enterprise::enterprise::synthetics::service::set_monitor_enabled(
+            &org_id, &id, enabled,
+        )
+        .await
+        {
+            Ok(true) => MetaHttpResponse::ok(if enabled {
+                "monitor enabled"
+            } else {
+                "monitor paused"
+            }),
+            Ok(false) => MetaHttpResponse::not_found("monitor not found"),
+            Err(e) => {
+                tracing::error!("[synthetics] set_monitor_enabled: {e}");
+                MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
+                    .into_response()
+            }
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, id, body);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
 pub async fn run_monitor_now(Path((org_id, id)): Path<(String, String)>) -> Response {
     #[cfg(feature = "enterprise")]
     {
@@ -318,6 +353,19 @@ pub async fn job_ack(Json(body): Json<serde_json::Value>) -> Response {
 
         match o2_enterprise::enterprise::synthetics::job_api::ack(req).await {
             Ok(resp) => {
+                // Emit trigger usage record for synthetics telemetry.
+                crate::service::self_reporting::publish_triggers_usage(
+                    config::meta::self_reporting::usage::TriggerData {
+                        _timestamp: checked_at,
+                        org: resp.org_id.clone(),
+                        module: config::meta::self_reporting::usage::TriggerDataType::Synthetics,
+                        key: resp.monitor_id.clone(),
+                        start_time: checked_at,
+                        end_time: checked_at,
+                        ..Default::default()
+                    },
+                );
+
                 if !resp.destinations.is_empty() {
                     let org_id = resp.org_id.clone();
                     let monitor_name = resp.monitor_name.clone();
