@@ -19,7 +19,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       v-for="(node, index) in tree.children"
       :key="index"
-      class="tw:m-0"
+      class="tree-node tw:m-0"
+      data-test="query-plan-tree-node"
     >
       <QueryPlanNode
         :node="node"

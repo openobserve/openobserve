@@ -15,52 +15,55 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="plan-node">
+  <div class="plan-node" data-test="query-plan-node">
     <!-- Node content -->
     <div
-      class="node-line"
-      tw:flex tw:items-center tw:gap-0 tw:py-[2px] tw:whitespace-pre
+      class="node-line tw:flex tw:items-center tw:gap-0 tw:py-[2px] tw:whitespace-pre"
     >
       <!-- Parent prefix indentation -->
       <span
         v-if="parentPrefix"
-        tw:text-[rgba(0,0,0,0.3)] tw:font-bold tw:select-none tw:whitespace-pre tw:dark:text-[rgba(255,255,255,0.3)]
+        data-test="query-plan-node-tree-indent"
+        class="tw:text-[rgba(0,0,0,0.3)] tw:font-bold tw:select-none tw:whitespace-pre tw:dark:text-[rgba(255,255,255,0.3)]"
       >{{ parentPrefix }}</span>
 
       <!-- Tree connector -->
       <span
-        tw:text-[rgba(0,0,0,0.3)] tw:font-bold tw:select-none tw:pr-1 tw:dark:text-[rgba(255,255,255,0.3)]
+        data-test="query-plan-node-tree-connector"
+        class="tw:text-[rgba(0,0,0,0.3)] tw:font-bold tw:select-none tw:pr-1 tw:dark:text-[rgba(255,255,255,0.3)]"
       >{{ connector }}</span>
 
       <!-- Expand/collapse icon for nodes with children -->
       <span
         v-if="node.children.length > 0"
-        class="expand-icon"
-        tw:cursor-pointer tw:select-none tw:text-(--q-primary) tw:text-[10px] tw:w-4 tw:inline-block tw:text-center tw:hover:opacity-70
+        class="expand-icon tw:cursor-pointer tw:select-none tw:text-(--q-primary) tw:text-[10px] tw:w-4 tw:inline-block tw:text-center tw:hover:opacity-70"
+        data-test="query-plan-node-expand-icon"
         @click="toggleChildrenExpanded"
       >
         {{ childrenExpanded ? '▼' : '▶' }}
       </span>
       <span
         v-else
-        tw:w-4 tw:inline-block
+        data-test="query-plan-node-expand-icon-spacer"
+        class="tw:w-4 tw:inline-block"
       ></span>
 
       <!-- Operator name -->
       <span
-        tw:font-semibold tw:text-[rgba(0,0,0,0.87)] tw:pl-1 tw:dark:text-[rgba(255,255,255,0.87)]
+        data-test="query-plan-node-operator-name"
+        class="tw:font-semibold tw:text-[rgba(0,0,0,0.87)] tw:pl-1 tw:dark:text-[rgba(255,255,255,0.87)]"
       >{{ node.name }}</span>
 
       <!-- Inline details (clickable to expand if truncated) -->
       <span
         v-if="inlineDetails"
-        class="inline-details"
+        class="inline-details tw:text-[rgba(0,0,0,0.7)] tw:font-normal tw:text-xs tw:italic tw:dark:text-[rgba(255,255,255,0.7)]"
         :class="{
           'tw:cursor-pointer': hasLongDetails,
-          'tw:whitespace-nowrap tw:overflow-hidden tw:[text-overflow:ellipsis] tw:max-w-[600px]': !detailsExpanded && hasLongDetails,
+          'tw:whitespace-nowrap tw:overflow-hidden tw:[text-overflow:ellipsis] tw:max-w-[600px] truncated': !detailsExpanded && hasLongDetails,
           clickable: hasLongDetails,
         }"
-        tw:text-[rgba(0,0,0,0.7)] tw:font-normal tw:text-xs tw:italic tw:dark:text-[rgba(255,255,255,0.7)]
+        data-test="query-plan-node-inline-details"
         @click="hasLongDetails ? toggleDetailsExpanded() : null"
       >
         : {{ inlineDetails }}
@@ -69,24 +72,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Separator between details and metrics -->
       <span
         v-if="inlineDetails && (isAnalyze && hasMetrics)"
-        tw:text-[rgba(0,0,0,0.4)] tw:px-2 tw:font-normal tw:select-none tw:dark:text-[rgba(255,255,255,0.4)]
+        data-test="query-plan-node-separator"
+        class="tw:text-[rgba(0,0,0,0.4)] tw:px-2 tw:font-normal tw:select-none tw:dark:text-[rgba(255,255,255,0.4)]"
       >·</span>
 
       <!-- Metrics (for ANALYZE mode) -->
       <span
         v-if="isAnalyze && hasMetrics"
-        tw:flex tw:gap-2
+        data-test="query-plan-node-metrics-inline"
+        class="tw:flex tw:gap-2"
       >
         <span
           v-if="node.metrics.output_rows !== undefined"
-          tw:inline-flex tw:items-center tw:gap-1 tw:py-[2px] tw:px-2 tw:bg-[rgba(var(--q-primary-rgb),0.1)] tw:rounded tw:text-[11px] tw:font-medium tw:text-(--q-primary) tw:whitespace-nowrap tw:dark:bg-[rgba(var(--q-primary-rgb),0.2)]
+          data-test="query-plan-node-metric-badge"
+          class="tw:inline-flex tw:items-center tw:gap-1 tw:py-[2px] tw:px-2 tw:bg-[rgba(var(--q-primary-rgb),0.1)] tw:rounded tw:text-[11px] tw:font-medium tw:text-(--q-primary) tw:whitespace-nowrap tw:dark:bg-[rgba(var(--q-primary-rgb),0.2)]"
         >
           <OIcon name="format-list-numbered" size="xs" />
           {{ formatNumber(node.metrics.output_rows) }} rows
         </span>
         <span
           v-if="node.metrics.elapsed_compute"
-          tw:inline-flex tw:items-center tw:gap-1 tw:py-[2px] tw:px-2 tw:bg-[rgba(var(--q-primary-rgb),0.1)] tw:rounded tw:text-[11px] tw:font-medium tw:text-(--q-primary) tw:whitespace-nowrap tw:dark:bg-[rgba(var(--q-primary-rgb),0.2)]
+          data-test="query-plan-node-metric-badge"
+          class="tw:inline-flex tw:items-center tw:gap-1 tw:py-[2px] tw:px-2 tw:bg-[rgba(var(--q-primary-rgb),0.1)] tw:rounded tw:text-[11px] tw:font-medium tw:text-(--q-primary) tw:whitespace-nowrap tw:dark:bg-[rgba(var(--q-primary-rgb),0.2)]"
         >
           <OIcon name="schedule" size="xs" />
           {{ node.metrics.elapsed_compute }}
@@ -97,16 +104,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Expanded full details (shown when details are expanded) -->
     <div
       v-if="detailsExpanded && hasLongDetails"
-      tw:pt-[2px] tw:pb-[2px] tw:text-[rgba(0,0,0,0.7)] tw:text-xs tw:italic tw:whitespace-pre-wrap tw:break-words tw:dark:text-[rgba(255,255,255,0.7)]
+      data-test="query-plan-node-details"
+      class="tw:pt-[2px] tw:pb-[2px] tw:text-[rgba(0,0,0,0.7)] tw:text-xs tw:italic tw:whitespace-pre-wrap tw:break-words tw:dark:text-[rgba(255,255,255,0.7)]"
     >
       <span
-        tw:text-[rgba(0,0,0,0.3)] tw:font-bold tw:select-none tw:whitespace-pre tw:dark:text-[rgba(255,255,255,0.3)]
+        class="tw:text-[rgba(0,0,0,0.3)] tw:font-bold tw:select-none tw:whitespace-pre tw:dark:text-[rgba(255,255,255,0.3)]"
       >{{ childPrefix }}  </span>
       <span>{{ inlineDetails }}</span>
     </div>
 
     <!-- Children -->
-    <div v-if="childrenExpanded && node.children.length > 0">
+    <div
+      v-if="childrenExpanded && node.children.length > 0"
+      class="children"
+      data-test="query-plan-node-children"
+    >
       <QueryPlanNode
         v-for="(child, index) in node.children"
         :key="index"
