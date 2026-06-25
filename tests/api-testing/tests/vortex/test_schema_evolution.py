@@ -4,7 +4,8 @@ All tests run against a single ZO_FILE_FORMAT=vortex server — no restarts.
 Each test class uses a fresh stream (stream name includes class name) so
 tests are fully isolated and can run in parallel.
 
-Test plan coverage: scenarios 14–25 (schema evolution section).
+Test plan coverage: scenarios 14–25 (schema evolution section),
+scenarios 26–28 (diverge-then-converge stress).
 """
 from __future__ import annotations
 
@@ -370,3 +371,112 @@ class TestIncompatibleTypeChanges:
 
         matched = count_records(client, s, where="value > 1.2")
         assert matched == 5, f"WHERE value>1.2 should match only Batch 2 (5 records); got {matched}"
+
+
+# ─── Section 2.7: Diverge-then-converge ──────────────────────────────────────
+
+class TestSchemaDivergenceConvergence:
+    """Scenarios 26–28: three-batch schema drift simulating real field lifecycle.
+
+    Batch 1  [fa, fb, fc]          — initial deployment
+    Batch 2  [fa, fb, fd]          — update: fc dropped, fd introduced
+    Batch 3  [fa, fb, fc, fd, fe]  — redeployment: fc back, fd kept, fe added
+
+    Each batch is flushed to a separate file before the next batch is ingested.
+    This forces the query planner to reconcile three distinct on-disk schemas —
+    the path touched by 'perf: Batch schema evolution checks' (v0.80.0).
+
+    Without flush_and_wait between batches all records land in the same memtable
+    and OO sees the union schema immediately — no evolution occurs and the tests
+    prove nothing.
+    """
+
+    def test_26_nullability_per_batch(self, client):
+        """Scenario 26: each field is non-null in exactly the batches that sent it.
+
+        fa, fb  — all 15 rows
+        fc      — batch 1 + batch 3 = 10 rows; null in batch 2
+        fd      — batch 2 + batch 3 = 10 rows; null in batch 1
+        fe      — batch 3 only = 5 rows
+        """
+        s = _stream("dc_nullability")
+        b1 = [{"_timestamp": _ts(i),       "fa": "a", "fb": i, "fc": f"c{i}"} for i in range(5)]
+        b2 = [{"_timestamp": _ts(100 + i), "fa": "a", "fb": i, "fd": f"d{i}"} for i in range(5)]
+        b3 = [{"_timestamp": _ts(200 + i), "fa": "a", "fb": i, "fc": f"c{i}", "fd": f"d{i}", "fe": f"e{i}"} for i in range(5)]
+
+        ingest(client, s, b1)
+        flush_and_wait(client, s, expected=5)
+        ingest(client, s, b2)
+        flush_and_wait(client, s, expected=10)
+        ingest(client, s, b3)
+        flush_and_wait(client, s, expected=15)
+
+        assert count_records(client, s) == 15
+
+        fa_count = count_records(client, s, where="fa IS NOT NULL AND fa != ''")
+        assert fa_count == 15, f"fa should be in all 15 rows; got {fa_count}"
+
+        fc_present = count_records(client, s, where="fc IS NOT NULL AND fc != ''")
+        assert fc_present == 10, f"fc should be in batches 1+3 (10 rows); got {fc_present}"
+
+        fd_present = count_records(client, s, where="fd IS NOT NULL AND fd != ''")
+        assert fd_present == 10, f"fd should be in batches 2+3 (10 rows); got {fd_present}"
+
+        fe_present = count_records(client, s, where="fe IS NOT NULL AND fe != ''")
+        assert fe_present == 5, f"fe should be in batch 3 only (5 rows); got {fe_present}"
+
+    def test_27_cross_batch_aggregation(self, client):
+        """Scenario 27: numeric field absent in one batch — COUNT and range filter correct.
+
+        latency_ms is present in batches 1 and 3, absent in batch 2.
+        COUNT(*) must return 15. Filters on latency_ms must return 10.
+        """
+        s = _stream("dc_agg")
+        b1 = [{"_timestamp": _ts(i),       "host": "h1", "latency_ms": 100 + i} for i in range(5)]
+        b2 = [{"_timestamp": _ts(100 + i), "host": "h1"} for i in range(5)]
+        b3 = [{"_timestamp": _ts(200 + i), "host": "h1", "latency_ms": 200 + i} for i in range(5)]
+
+        ingest(client, s, b1)
+        flush_and_wait(client, s, expected=5)
+        ingest(client, s, b2)
+        flush_and_wait(client, s, expected=10)
+        ingest(client, s, b3)
+        flush_and_wait(client, s, expected=15)
+
+        total = count_records(client, s)
+        assert total == 15, f"total record count wrong: {total}"
+
+        with_latency = count_records(client, s, where="latency_ms IS NOT NULL AND latency_ms != ''")
+        assert with_latency == 10, f"latency_ms should be non-null in 10 rows; got {with_latency}"
+
+        # batch 1: values 100–104, batch 3: values 200–204 — all > 99
+        above_threshold = count_records(client, s, where="latency_ms > 99")
+        assert above_threshold == 10, f"latency_ms > 99 should match 10 rows; got {above_threshold}"
+
+    def test_28_field_coexistence_isolation(self, client):
+        """Scenario 28: intersection and exclusion queries correctly isolate each batch.
+
+        Only batch 3 has both fc and fd.
+        Only batch 1 has fc without fd.
+        Only batch 2 has fd without fc.
+        """
+        s = _stream("dc_isolation")
+        b1 = [{"_timestamp": _ts(i),       "fa": "shared", "fc": "from_b1"} for i in range(5)]
+        b2 = [{"_timestamp": _ts(100 + i), "fa": "shared", "fd": "from_b2"} for i in range(5)]
+        b3 = [{"_timestamp": _ts(200 + i), "fa": "shared", "fc": "from_b3", "fd": "from_b3"} for i in range(5)]
+
+        ingest(client, s, b1)
+        flush_and_wait(client, s, expected=5)
+        ingest(client, s, b2)
+        flush_and_wait(client, s, expected=10)
+        ingest(client, s, b3)
+        flush_and_wait(client, s, expected=15)
+
+        both = count_records(client, s, where="fc IS NOT NULL AND fc != '' AND fd IS NOT NULL AND fd != ''")
+        assert both == 5, f"only batch 3 should have both fc and fd (5 rows); got {both}"
+
+        fc_only = count_records(client, s, where="fc IS NOT NULL AND fc != '' AND (fd IS NULL OR fd = '')")
+        assert fc_only == 5, f"only batch 1 should have fc without fd (5 rows); got {fc_only}"
+
+        fd_only = count_records(client, s, where="fd IS NOT NULL AND fd != '' AND (fc IS NULL OR fc = '')")
+        assert fd_only == 5, f"only batch 2 should have fd without fc (5 rows); got {fd_only}"
