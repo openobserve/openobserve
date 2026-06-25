@@ -60,17 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Toolbar: Stream/Agent mode + matching picker aligned with the table actions. -->
       <template #toolbar>
         <div class="tw:flex tw:items-center tw:justify-end tw:gap-2 tw:flex-1 tw:min-w-0">
-          <!-- Toggle-shaped skeleton during the initial load so the whole
-               toolbar (toggle + picker) appears at once, not the toggle first
-               then the picker. -->
-          <SkeletonBox
-            v-if="!streamsLoaded"
-            width="7.25rem"
-            height="2.125rem"
-            rounded
-          />
           <OToggleGroup
-            v-else
             :model-value="filterMode"
             type="single"
             data-test="sessions-list-filter-mode"
