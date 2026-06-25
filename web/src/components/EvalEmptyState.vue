@@ -21,10 +21,11 @@
 
     <div class="tw:text-[0.88rem] tw:leading-[1.65] tw:text-[var(--color-text-secondary,#6b7280)] tw:max-w-[500px] tw:mb-6">{{ description }}</div>
 
-    <div v-if="chips && chips.length" class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap tw:justify-center tw:mb-8">
+    <div v-if="chips && chips.length" data-test="eval-empty-state-chips" class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap tw:justify-center tw:mb-8">
       <span
         v-for="(chip, idx) in chips"
         :key="idx"
+        data-test="eval-empty-state-chip"
         class="tw:inline-flex tw:items-center tw:gap-[5px] tw:text-xs tw:font-medium tw:text-(--color-text-secondary,#6b7280) tw:rounded-[20px] tw:py-1 tw:px-3 tw:border tw:border-solid"
         :class="isDark
           ? 'tw:bg-[rgba(255,255,255,0.06)] tw:border-[rgba(255,255,255,0.1)]'

@@ -9,6 +9,7 @@
     <!-- Height locked to 1.875rem = same as icon-toolbar expand button -->
     <div
       v-if="isAIMode"
+      :data-test="`${dataTestPrefix}-ai-input-bar`"
       :class="['tw:bg-[linear-gradient(135deg,rgba(139,92,246,0.05)_0%,rgba(236,72,153,0.05)_100%)] tw:border-b tw:border-b-(--o2-border-color) tw:h-9 tw:flex tw:items-center tw:gap-2 tw:px-2 tw:shrink-0 tw:z-10', props.hasExpandButton && 'tw:pr-10']"
     >
       <!-- Show streaming status with spinner + stop button -->

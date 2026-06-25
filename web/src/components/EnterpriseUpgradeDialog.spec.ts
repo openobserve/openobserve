@@ -211,10 +211,10 @@ describe("EnterpriseUpgradeDialog", () => {
 
     it("shows the standard 2-column features list (not cloud 3-column)", () => {
       const wrapper = createWrapper();
-      expect(wrapper.find(".features-list.cloud-three-column").exists()).toBe(
+      expect(wrapper.find('[data-test="enterprise-upgrade-features-list-cloud"]').exists()).toBe(
         false,
       );
-      expect(wrapper.find(".features-list").exists()).toBe(true);
+      expect(wrapper.find('[data-test="enterprise-upgrade-features-list-standard"]').exists()).toBe(true);
     });
   });
 
@@ -237,7 +237,7 @@ describe("EnterpriseUpgradeDialog", () => {
       const wrapper = createWrapper();
       expect(wrapper.find(".hero-panel").exists()).toBe(false);
       expect(wrapper.find(".cloud-layout").exists()).toBe(true);
-      expect(wrapper.find(".features-list.cloud-three-column").exists()).toBe(
+      expect(wrapper.find('[data-test="enterprise-upgrade-features-list-cloud"]').exists()).toBe(
         true,
       );
     });
@@ -395,7 +395,7 @@ describe("EnterpriseUpgradeDialog", () => {
 
     it("renders one feature-list-item per enterprise feature in Open Source layout", () => {
       const wrapper = createWrapper();
-      const items = wrapper.findAll(".feature-list-item");
+      const items = wrapper.findAll('[data-test="enterprise-upgrade-feature-item"]');
       // Open Source variant renders only enterprise features (21).
       expect(items.length).toBe(21);
     });
@@ -404,7 +404,7 @@ describe("EnterpriseUpgradeDialog", () => {
       (config as any).isCloud = "true";
       (config as any).isEnterprise = "true";
       const wrapper = createWrapper();
-      const items = wrapper.findAll(".feature-list-item");
+      const items = wrapper.findAll('[data-test="enterprise-upgrade-feature-item"]');
       // Cloud renders 11 core + 21 enterprise.
       expect(items.length).toBe(32);
     });

@@ -97,6 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="(cell, cellIdx) in level.cells"
               :key="'c_' + levelIdx + '_' + cellIdx"
               :data-test="`o2-table-pivot-th-${levelIdx}-${cellIdx}`"
+              :data-test-pivot-type="level.isLeaf ? 'value' : 'group'"
               :colspan="cell.colspan"
               :rowspan="cell.rowspan || 1"
               class="tw:px-2"

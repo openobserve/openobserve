@@ -136,11 +136,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Cloud 3-column layout -->
-          <div v-if="dialogConfig.isCloudLayout" class="tw:flex-1 tw:overflow-y-auto tw:pt-2 tw:pb-4 tw:px-8 tw:grid tw:grid-cols-3 tw:gap-y-[7px] tw:gap-x-[14px] tw:content-start">
+          <div v-if="dialogConfig.isCloudLayout" data-test="enterprise-upgrade-features-list-cloud" class="tw:flex-1 tw:overflow-y-auto tw:pt-2 tw:pb-4 tw:px-8 tw:grid tw:grid-cols-3 tw:gap-y-[7px] tw:gap-x-[14px] tw:content-start">
             <!-- Column 1: Core Features -->
             <div
               v-for="feature in coreFeatures"
               :key="feature.name"
+              data-test="enterprise-upgrade-feature-item"
               class="tw:flex tw:gap-[10px] tw:p-[8px_12px] tw:rounded-md tw:border tw:transition-all tw:duration-200"
               :class="[
                 isDark ? 'tw:border-[rgba(255,255,255,0.12)]' : 'tw:border-[rgba(0,0,0,0.08)]',
@@ -171,6 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="feature in enterpriseFeatures"
               v-show="!feature.cloudHidden"
               :key="feature.name"
+              data-test="enterprise-upgrade-feature-item"
               class="tw:flex tw:gap-[10px] tw:p-[8px_12px] tw:rounded-md tw:border tw:transition-all tw:duration-200"
               :class="[
                 isDark ? 'tw:border-[rgba(255,255,255,0.12)]' : 'tw:border-[rgba(0,0,0,0.08)]',
@@ -199,11 +201,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Standard 2-column layout for non-Cloud -->
-          <div v-else class="tw:flex-1 tw:overflow-y-auto tw:pt-2 tw:pb-4 tw:px-8 tw:grid tw:grid-cols-2 tw:gap-y-[7px] tw:gap-x-[14px] tw:content-start">
+          <div v-else data-test="enterprise-upgrade-features-list-standard" class="tw:flex-1 tw:overflow-y-auto tw:pt-2 tw:pb-4 tw:px-8 tw:grid tw:grid-cols-2 tw:gap-y-[7px] tw:gap-x-[14px] tw:content-start">
             <div
               v-for="feature in enterpriseFeatures"
               v-show="!feature.cloudOnly"
               :key="feature.name"
+              data-test="enterprise-upgrade-feature-item"
               class="tw:flex tw:gap-[10px] tw:p-[8px_12px] tw:rounded-md tw:border tw:transition-all tw:duration-200"
               :class="[
                 isDark ? 'tw:border-[rgba(255,255,255,0.12)]' : 'tw:border-[rgba(0,0,0,0.08)]',

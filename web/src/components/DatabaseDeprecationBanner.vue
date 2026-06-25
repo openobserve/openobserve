@@ -21,14 +21,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-if="showDeprecationWarning"
     role="region"
     aria-label="MySQL deprecation warning"
+    data-test="database-deprecation-banner-message"
   >
     <div class="tw:flex tw:items-center">
       <div class="tw:flex tw:flex-col">
-        <span class="tw:text-base tw:font-semibold tw:leading-6 tw:text-[var(--o2-text-primary)]">
+        <span
+          class="tw:text-base tw:font-semibold tw:leading-6 tw:text-[var(--o2-text-primary)]"
+          data-test="database-deprecation-banner-title"
+        >
           ⚠️ MySQL support is DEPRECATED and will be removed in future.
         </span>
         <br />
-        <span class="tw:text-sm tw:font-normal tw:leading-5 tw:text-[var(--o2-text-secondary)]">
+        <span
+          class="tw:text-sm tw:font-normal tw:leading-5 tw:text-[var(--o2-text-secondary)]"
+          data-test="database-deprecation-banner-subtitle"
+        >
           Please migrate to PostgreSQL to ensure continued support.
         </span>
       </div>
