@@ -1,5 +1,6 @@
 <template>
   <div
+    data-test="add-script-toolbar"
     class="tw:pb-1.5 tw:w-full tw:flex tw:justify-between tw:items-center"
   >
     <div class="tw:flex tw:items-center">
@@ -50,7 +51,7 @@
         </div>
       </div>
     </div>
-    <div class="tw:flex tw:items-center tw:gap-2">
+    <div data-test="add-script-actions" class="tw:flex tw:items-center tw:gap-2">
       <OButton
         data-test="add-script-fullscreen-btn"
         v-close-popup="true"
