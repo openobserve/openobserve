@@ -5203,6 +5203,25 @@ export class LogsPage {
         ).toHaveCount(0);
     }
 
+    /**
+     * Close a column by clicking the X (close) button on its header.
+     * Used by FTS default-column tests to verify that closing the auto-picked
+     * column triggers re-resolution on the next search.
+     * @param {string} fieldName - The field/column name to close (e.g. 'message')
+     */
+    async clickCloseColumnButton(fieldName) {
+        const closeBtn = this.page.locator(
+            `[data-test="logs-search-result-table-th-remove-${fieldName}-btn"]`,
+        );
+        // The close button is hidden by default (CSS invisible class) and
+        // appears on column-header hover. Force-click to bypass visibility.
+        await closeBtn.click({ force: true });
+        // Wait for the column to disappear from the DOM header row
+        await expect(
+            this.page.locator(`[data-test="log-search-result-table-th-${fieldName}"]`),
+        ).toHaveCount(0, { timeout: 10000 });
+    }
+
     // New POM methods for PR tests
 
     async executeBlankQueryWithKeyboardShortcut() {

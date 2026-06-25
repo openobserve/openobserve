@@ -1,0 +1,12 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/Logs/ftsDefaultColumn.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/Logs/logstable.spec.js",
+    "tests/ui-testing/playwright-tests/Logs/logspage.spec.js",
+    "tests/ui-testing/playwright-tests/Logs/logsquickmode.spec.js",
+    "tests/ui-testing/playwright-tests/Logs/indexquery.spec.js"
+  ],
+  "needs_registration": false,
+  "rationale": "No existing E2E test covers the FTS default-column auto-pick behavior. The diff updates existing tests (logstable, indexquery, logsquickmode) for compatibility with the FTS feature — they no longer assume the 'source' column is always present — but none exercise the feature's workflows (auto-pick on search, user-override clearing, SQL-mode exclusion, reset re-resolution, close-then-rerun). A dedicated spec is warranted. playwright.config.js auto-discovers specs under playwright-tests/, so no registration needed."
+}
