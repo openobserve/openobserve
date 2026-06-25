@@ -1,6 +1,9 @@
 <template>
     <div style="display: flex; flex-direction: row" class="tw:pl-2">
-      <div class="tw:text-sm tw:whitespace-nowrap tw:flex tw:items-center tw:min-w-21.5">{{ t("panel.operations") }}</div>
+      <div
+        data-test="promql-operations-list-label"
+        class="tw:text-sm tw:whitespace-nowrap tw:flex tw:items-center tw:min-w-21.5"
+      >{{ t("panel.operations") }}</div>
       <span class="tw:flex tw:items-center tw:ml-0.5 tw:mr-0.5">:</span>
       <div class="tw:m-0.5 tw:flex tw:gap-2 tw:flex-wrap tw:items-center scroll">
         <!-- Operations with Drag and Drop -->
@@ -13,7 +16,7 @@
           class="tw:flex tw:gap-2 tw:flex-wrap tw:items-center"
         >
           <template v-for="(element, index) in props.operations">
-            <div>
+            <div data-test="promql-operation-item">
               <OButtonGroup class="axis-field" radius="sm">
                 <OButton
                   variant="outline"

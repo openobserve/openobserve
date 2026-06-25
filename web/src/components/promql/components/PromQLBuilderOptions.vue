@@ -5,13 +5,28 @@
     <!-- Options Row: Query Type Tabs + Legend + Step Value -->
     <div>
       <div class="tw:flex tw:flex-row tw:items-center tw:pl-2">
-        <div class="tw:whitespace-nowrap tw:min-w-21.5 tw:text-sm tw:flex tw:items-center">{{ t("panel.options") }}</div>
+        <div
+          data-test="promql-builder-options-label"
+          class="tw:whitespace-nowrap tw:min-w-21.5 tw:text-sm tw:flex tw:items-center"
+        >{{ t("panel.options") }}</div>
         <span class="tw:flex tw:items-center tw:ml-0.5 tw:mr-0.5">:</span>
-        <div class="tw:my-0.5 tw:mx-1.25 tw:flex tw:gap-2 tw:flex-wrap tw:items-center">
+        <div
+          data-test="promql-builder-options-axis-container"
+          class="tw:my-0.5 tw:mx-1.25 tw:flex tw:gap-2 tw:flex-wrap tw:items-center"
+        >
           <!-- Legend -->
-          <div class="tw:flex tw:flex-row tw:items-center tw:gap-2 tw:ml-2.5">
-            <span class="tw:text-[11px] tw:font-medium tw:whitespace-nowrap tw:opacity-85">{{ t("dashboard.legendLabel") }}</span>
-            <div class="tw:relative tw:inline-block">
+          <div
+            data-test="promql-builder-options-field-wrapper"
+            class="tw:flex tw:flex-row tw:items-center tw:gap-2 tw:ml-2.5"
+          >
+            <span
+              data-test="promql-builder-options-field-label"
+              class="tw:text-[11px] tw:font-medium tw:whitespace-nowrap tw:opacity-85"
+            >{{ t("dashboard.legendLabel") }}</span>
+            <div
+              data-test="promql-builder-options-field-input-wrapper"
+              class="tw:relative tw:inline-block"
+            >
               <OCombobox
                 v-model="
                   dashboardPanelData.data.queries[
@@ -27,6 +42,7 @@
               <OIcon
                 name="info"
                 size="sm"
+                data-test="promql-builder-options-field-info-icon"
                 class="tw:cursor-pointer tw:absolute tw:right-2 tw:top-1/2 tw:-translate-y-1/2 tw:z-10 tw:opacity-60 tw:hover:opacity-100 tw:pointer-events-auto"
               >
                 <OTooltip side="top" max-width="250px">
@@ -42,8 +58,14 @@
           </div>
 
           <!-- Step Value -->
-          <div class="tw:flex tw:flex-row tw:items-center tw:gap-2 tw:ml-2.5">
-            <span class="tw:text-[11px] tw:font-medium tw:whitespace-nowrap tw:opacity-85">{{ t("dashboard.stepValue") }}</span>
+          <div
+            data-test="promql-builder-options-field-wrapper"
+            class="tw:flex tw:flex-row tw:items-center tw:gap-2 tw:ml-2.5"
+          >
+            <span
+              data-test="promql-builder-options-field-label"
+              class="tw:text-[11px] tw:font-medium tw:whitespace-nowrap tw:opacity-85"
+            >{{ t("dashboard.stepValue") }}</span>
             <OInput
               v-model="
                 dashboardPanelData.data.queries[
@@ -73,8 +95,14 @@
           </div>
 
           <!-- Query Type Select (Range/Instant) -->
-          <div class="tw:flex tw:flex-row tw:items-center tw:gap-2 tw:ml-2.5">
-            <span class="tw:text-[11px] tw:font-medium tw:whitespace-nowrap tw:opacity-85">{{ t("common.type") }}</span>
+          <div
+            data-test="promql-builder-options-field-wrapper"
+            class="tw:flex tw:flex-row tw:items-center tw:gap-2 tw:ml-2.5"
+          >
+            <span
+              data-test="promql-builder-options-field-label"
+              class="tw:text-[11px] tw:font-medium tw:whitespace-nowrap tw:opacity-85"
+            >{{ t("common.type") }}</span>
             <OSelect
               v-model="
                 dashboardPanelData.data.queries[

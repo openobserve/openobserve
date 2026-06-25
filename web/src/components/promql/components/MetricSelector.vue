@@ -1,7 +1,10 @@
 <template>
-  <div class="tw:mb-2">
+  <div data-test="promql-metric-selector" class="tw:mb-2">
     <div style="display: flex; flex-direction: row" class="tw:pl-3">
-      <div class="tw:text-sm tw:whitespace-nowrap tw:flex tw:items-center tw:min-w-32.5">{{ t("panel.metric") }}</div>
+      <div
+        data-test="promql-metric-selector-label"
+        class="tw:text-sm tw:whitespace-nowrap tw:flex tw:items-center tw:min-w-32.5"
+      >{{ t("panel.metric") }}</div>
       <span class="tw:flex tw:items-center tw:ml-0.5 tw:mr-0.5">:</span>
       <div class="tw:m-1.25 tw:flex-1">
         <OSelect

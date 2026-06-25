@@ -1,13 +1,17 @@
 <template>
-  <div>
+  <div data-test="promql-label-filter-editor">
     <div style="display: flex; flex-direction: row" class="tw:pl-2">
-      <div class="tw:text-sm tw:whitespace-nowrap tw:flex tw:items-center tw:min-w-21.5">{{ t("panel.labelFilters") }}</div>
+      <div
+        data-test="promql-label-filter-editor-label"
+        class="tw:text-sm tw:whitespace-nowrap tw:flex tw:items-center tw:min-w-21.5"
+      >{{ t("panel.labelFilters") }}</div>
       <span class="tw:flex tw:items-center tw:ml-0.5 tw:mr-0.5">:</span>
       <div class="tw:m-0.5 tw:flex tw:gap-2 tw:flex-wrap tw:items-center scroll">
         <!-- Label Filter Items -->
         <div
           v-for="(label, index) in props.labels"
           :key="index"
+          data-test="promql-label-filter-item"
           class="tw:flex tw:items-center"
         >
           <OButtonGroup class="axis-field" radius="sm">

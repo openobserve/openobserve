@@ -87,17 +87,19 @@ describe("LabelFilterEditor", () => {
   describe("Component Rendering", () => {
     it("should render label filter editor", () => {
       wrapper = createWrapper();
-      expect(wrapper.find(".label-filter-editor").exists()).toBe(true);
+      expect(wrapper.find('[data-test="promql-label-filter-editor"]').exists()).toBe(true);
     });
 
     it("should display layout name", () => {
       wrapper = createWrapper();
-      expect(wrapper.find(".layout-name").text()).toBe("Label Filters");
+      expect(
+        wrapper.find('[data-test="promql-label-filter-editor-label"]').text(),
+      ).toBe("Label Filters");
     });
 
     it("should render label filter items", () => {
       wrapper = createWrapper();
-      const filterItems = wrapper.findAll(".label-filter-item");
+      const filterItems = wrapper.findAll('[data-test="promql-label-filter-item"]');
       expect(filterItems.length).toBe(mockLabels.length);
     });
 
@@ -182,7 +184,7 @@ describe("LabelFilterEditor", () => {
 
       // Assert: the component renders without error and shows the correct number
       // of filter items (both existing filters are rendered).
-      const filterItems = wrapper.findAll(".label-filter-item");
+      const filterItems = wrapper.findAll('[data-test="promql-label-filter-item"]');
       expect(filterItems.length).toBe(2);
     });
 
