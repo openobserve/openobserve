@@ -1,0 +1,36 @@
+{
+  "feature_slug": "fts-default-column",
+  "feature_title": "FTS Default Column Selection",
+  "area": "Logs",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "ftsDefaultColumn.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Logs/ftsDefaultColumn.spec.js",
+  "playwright_group": "Logs-Core",
+  "source_files": [
+    "web/src/composables/useLogs.ts",
+    "web/src/plugins/logs/SearchResult.vue",
+    "web/src/plugins/logs/TenstackTable.vue",
+    "web/src/plugins/logs/IndexList.vue",
+    "web/src/plugins/logs/SearchBar.vue",
+    "web/src/plugins/logs/Index.vue",
+    "web/src/composables/useLogs/logsUtils.ts",
+    "web/src/composables/useLogs/searchState.ts",
+    "web/src/composables/useLogs/useSearchBar.ts",
+    "web/src/composables/useLogs/useStreamFields.ts",
+    "web/src/utils/logs/constants.ts",
+    "web/src/utils/query/sqlDiagnostics.ts"
+  ],
+  "existing_tests_in_diff": true,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "All changed file paths (web/src/** and tests/ui-testing/**) live in the OSS source tree. No paths under enterprise/, o2_enterprise/, or any enterprise-gated module. The diff touches open-source Vue components, composables, and E2E test helpers — no enterprise keywords (SAML, SSO, RBAC, SDR) in the paths or symbol names. Edition is oss.",
+    "skip": "The change is not skipped. No explicit opt-out (tests-added label or skip comment) was provided — trigger_comment.txt and feature_hint.txt are both empty. The diff touches multiple user-facing Vue components (SearchResult.vue, TenstackTable.vue, IndexList.vue, SearchBar.vue, Index.vue), so it is not a docs-only or CI-only change. Dev-authored E2E specs exist in the diff but that never triggers a skip — the Architect reads them to decide whether to extend or append.",
+    "e2e": "E2E is warranted. The change introduces a new FTS default-column feature: when no columns are pinned, the log results table auto-selects and renders the best-filled full-text search field (e.g. body/message/log) as its own column instead of the generic source column. This alters a core user-facing UI flow — which column renders by default, how column selections persist, how stream/sql-mode transitions behave — and must be verified end-to-end across the default view, SQL mode, saved views, and stream changes.",
+    "area": "Area is Logs. The bulk of the production code changes live in web/src/plugins/logs/ (SearchResult.vue, TenstackTable.vue, IndexList.vue, SearchBar.vue, Index.vue) and web/src/composables/useLogs/ (useLogs.ts, logsUtils.ts, searchState.ts, useSearchBar.ts, useStreamFields.ts). The existing Playwright specs that were updated to accommodate this feature are all in tests/ui-testing/playwright-tests/Logs/.",
+    "group": "Logs-Core is the best fit. This new default-column-selection feature changes fundamental log table rendering and search-result display behavior — it is not a builder/filter/quickmode feature. The Logs-Core group already houses logspage.spec.js, logstable.spec.js, and logsqueries.spec.js which exercise exactly the same rendering paths. The new spec should join that shard.",
+    "existing_tests": "Three Playwright E2E specs were modified in the diff: indexquery.spec.js (Logs-Features), logsquickmode.spec.js (Logs-Builder-Advanced), and logstable.spec.js (Logs-Core). These were updated to adapt existing assertions (e.g. waitForSearchResults → expectLogTableColumnSourceVisible) to the new FTS default-column behavior. They cover side-effects of the feature within their existing test scenarios but do not add dedicated tests for the FTS default-column logic itself (resolveDefaultColumns fill-rate selection, isFtsDefaultColumn marker lifecycle, SQL-mode guard, stream-change clearance, and persistence prevention). The three Vitest unit tests in the diff (useLogs.spec.ts, useSearchBar.spec.ts, SearchResult.spec.ts) are not E2E coverage and are irrelevant to this flag."
+  }
+}

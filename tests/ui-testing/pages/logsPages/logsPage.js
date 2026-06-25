@@ -10524,4 +10524,44 @@ export class LogsPage {
         await option.waitFor({ state: 'visible', timeout: 10000 });
         await option.click();
     }
+
+    // =========================================================================
+    // FTS DEFAULT COLUMN ASSERTION METHODS (feature: fts-default-column)
+    // =========================================================================
+
+    /**
+     * Asserts that the FTS auto-pick has replaced the generic "source" column
+     * with a named FTS text column. Checks that:
+     * 1. The source column header is NOT present (replaced by FTS default).
+     * 2. The results table is visible with at least one data row rendered.
+     *
+     * Field-name-agnostic: does not assert on a specific field name since the
+     * auto-pick depends on fill-rate heuristics at runtime.
+     */
+    async expectFTSDefaultColumnActive() {
+        // Source column header must NOT be present — the FTS auto-pick replaced it
+        const sourceHeader = this.page.locator('[data-test="log-search-result-table-th-source"]');
+        await expect(sourceHeader).toHaveCount(0, { timeout: 10000 });
+        testLogger.debug('expectFTSDefaultColumnActive: source column header confirmed absent');
+
+        // Results table must be visible
+        await expect(this.page.locator(this.logsTable)).toBeVisible({ timeout: 15000 });
+
+        // At least one data row rendered (any first-row cell in the table)
+        await expect(
+            this.page.locator('[data-test^="log-table-column-0-"]').first(),
+        ).toBeVisible({ timeout: 10000 });
+
+        testLogger.info('expectFTSDefaultColumnActive: FTS default column is active (source absent, results rendered)');
+    }
+
+    /**
+     * Asserts that the generic "source" column header is visible in the results
+     * table. This confirms the fallback path (no FTS candidate, or SQL mode).
+     */
+    async expectSourceColumnVisible() {
+        const sourceHeader = this.page.locator('[data-test="log-search-result-table-th-source"]');
+        await expect(sourceHeader).toBeVisible({ timeout: 15000 });
+        testLogger.info('expectSourceColumnVisible: source column header is visible');
+    }
 }
