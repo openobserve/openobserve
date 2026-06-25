@@ -280,8 +280,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon name="notifications" size="md" />
           </span>
           <span class="tw:flex-1 tw:min-w-0 tw:flex tw:flex-col tw:gap-[0.125rem]">
-            <span class="tw:text-(--text-sm) tw:font-semibold tw:text-(--color-text-primary) tw:truncate">{{ t('overview.emptyActionAlerts') }}</span>
-            <span class="tw:text-(--text-xs) tw:text-(--color-text-secondary) tw:leading-[1.4]">{{ t('overview.emptyActionAlertsDesc') }}</span>
+            <span class="tw:text-(length:--text-sm) tw:font-semibold tw:text-(--color-text-primary) tw:truncate">{{ t('overview.emptyActionAlerts') }}</span>
+            <span class="tw:text-(length:--text-xs) tw:text-(--color-text-secondary) tw:leading-[1.4]">{{ t('overview.emptyActionAlertsDesc') }}</span>
           </span>
           <OIcon name="chevron-right" size="sm" class="tw:shrink-0 tw:text-(--color-text-disabled) tw:transition-[transform,color] tw:duration-150 tw:group-hover:translate-x-[0.125rem] tw:group-hover:text-(--color-primary-600)" />
         </button>
@@ -291,8 +291,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon name="search" size="md" />
           </span>
           <span class="tw:flex-1 tw:min-w-0 tw:flex tw:flex-col tw:gap-[0.125rem]">
-            <span class="tw:text-(--text-sm) tw:font-semibold tw:text-(--color-text-primary) tw:truncate">{{ t('overview.emptyActionLogs') }}</span>
-            <span class="tw:text-(--text-xs) tw:text-(--color-text-secondary) tw:leading-[1.4]">{{ t('overview.emptyActionLogsDesc') }}</span>
+            <span class="tw:text-(length:--text-sm) tw:font-semibold tw:text-(--color-text-primary) tw:truncate">{{ t('overview.emptyActionLogs') }}</span>
+            <span class="tw:text-(length:--text-xs) tw:text-(--color-text-secondary) tw:leading-[1.4]">{{ t('overview.emptyActionLogsDesc') }}</span>
           </span>
           <OIcon name="chevron-right" size="sm" class="tw:shrink-0 tw:text-(--color-text-disabled) tw:transition-[transform,color] tw:duration-150 tw:group-hover:translate-x-[0.125rem] tw:group-hover:text-(--color-primary-600)" />
         </button>
@@ -302,8 +302,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon name="account-tree" size="md" />
           </span>
           <span class="tw:flex-1 tw:min-w-0 tw:flex tw:flex-col tw:gap-[0.125rem]">
-            <span class="tw:text-(--text-sm) tw:font-semibold tw:text-(--color-text-primary) tw:truncate">{{ t('overview.emptyActionTraces') }}</span>
-            <span class="tw:text-(--text-xs) tw:text-(--color-text-secondary) tw:leading-[1.4]">{{ t('overview.emptyActionTracesDesc') }}</span>
+            <span class="tw:text-(length:--text-sm) tw:font-semibold tw:text-(--color-text-primary) tw:truncate">{{ t('overview.emptyActionTraces') }}</span>
+            <span class="tw:text-(length:--text-xs) tw:text-(--color-text-secondary) tw:leading-[1.4]">{{ t('overview.emptyActionTracesDesc') }}</span>
           </span>
           <OIcon name="chevron-right" size="sm" class="tw:shrink-0 tw:text-(--color-text-disabled) tw:transition-[transform,color] tw:duration-150 tw:group-hover:translate-x-[0.125rem] tw:group-hover:text-(--color-primary-600)" />
         </button>
