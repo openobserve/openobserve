@@ -32,7 +32,7 @@ Usage:
 - <ChunkedContent :data="value" :field-key="'field_name'" :query-string="highlightQuery" />
 -->
 <template>
-  <div class="tw:inline-block tw:w-full">
+  <div data-test="logs-chunked-content-container" class="tw:inline-block tw:w-full">
     <!-- Display the visible content with highlighting -->
     <LogsHighLighting
       :data="visibleContent"
