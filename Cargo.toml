@@ -22,22 +22,11 @@ publish = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-default = ["enterprise", "vectorscan", "vortex"]
-enterprise = [
-    "dep:o2_enterprise",
-    "dep:o2_openfga",
-    "dep:o2_dex",
-    "dep:o2_ratelimit",
-    "config/enterprise",
-]
-vectorscan = ["o2_enterprise/vectorscan"]
-cloud = ["infra/cloud", "enterprise", "o2_enterprise/cloud"]
-vortex = [
-    "dep:vortex",
-    "dep:vortex-datafusion",
-    "config/vortex",
-    "o2_enterprise?/vortex",
-]
+default = []
+enterprise = []
+vectorscan = []
+cloud = []
+vortex = ["config/vortex"]
 mimalloc = ["dep:mimalloc"]
 jemalloc = ["dep:tikv-jemallocator"]
 profiling = [
@@ -94,8 +83,6 @@ argon2.workspace = true
 async-trait.workspace = true
 async-recursion.workspace = true
 aws-sdk-sns.workspace = true
-aws-sdk-marketplacemetering.workspace = true
-aws-sdk-sqs.workspace = true
 base64.workspace = true
 bitflags = "2.11"
 blake3 = { version = "1.8", features = ["rayon"] }
@@ -122,8 +109,6 @@ arrow-json.workspace = true
 arrow-schema.workspace = true
 parquet.workspace = true
 object_store.workspace = true
-vortex = { workspace = true, optional = true }
-vortex-datafusion = { workspace = true, optional = true }
 env_logger.workspace = true
 faststr.workspace = true
 flate2.workspace = true
@@ -139,10 +124,6 @@ maxminddb = "0.27"
 md5.workspace = true
 memchr.workspace = true
 mimalloc = { version = "0.1.48", features = ["v3"], optional = true }
-o2_dex = { version = "0.1.0", path = "../o2-enterprise/o2_dex", optional = true }
-o2_enterprise = { version = "0.1.0", path = "../o2-enterprise/o2_enterprise", optional = true, default-features = false }
-o2_openfga = { version = "0.1.0", path = "../o2-enterprise/o2_openfga", optional = true }
-o2_ratelimit = { version = "0.1.0", path = "../o2-enterprise/o2_ratelimit", optional = true }
 opentelemetry.workspace = true
 opentelemetry_sdk.workspace = true
 opentelemetry-otlp.workspace = true
@@ -162,7 +143,6 @@ reqwest.workspace = true
 rquickjs.workspace = true
 rust-embed-for-web = "11.3"
 rustls.workspace = true
-rustls-pemfile.workspace = true
 rustls-native-certs.workspace = true
 webpki-roots.workspace = true
 sea-orm.workspace = true
@@ -239,11 +219,10 @@ futures-core = "0.3.31"
 derive_more = { version = "2.1", features = ["full"] }
 brotli = "8.0.2"
 tokio-rustls.workspace = true
+roaring.workspace = true
 flight.workspace = true
 async-stream.workspace = true
 sourcemap = "9.3.2"
-aws-config.workspace = true
-aws-credential-types.workspace = true
 
 [dev-dependencies]
 expect-test.workspace = true
@@ -322,18 +301,7 @@ async-stream = "0.3"
 async-trait = "0.1"
 async-recursion = "1.0"
 aws-config = "1.8"
-aws-credential-types = "1.2.14"
-aws-sdk-sns = { version = "1.98", default-features = false, features = [
-    "behavior-version-latest",
-    "default-https-client",
-    "rt-tokio",
-] }
-aws-sdk-marketplacemetering = { version = "1.101", default-features = false, features = [
-    "behavior-version-latest",
-    "default-https-client",
-    "rt-tokio",
-] }
-aws-sdk-sqs = { version = "1.97", default-features = false, features = [
+aws-sdk-sns = { version = "1.97", default-features = false, features = [
     "behavior-version-latest",
     "default-https-client",
     "rt-tokio",
@@ -363,10 +331,6 @@ arrow-schema = { version = "58", features = ["serde"] }
 parquet = { version = "58", features = ["arrow", "async", "object_store"] }
 object_store = { version = "0.13.2", features = ["aws", "azure", "gcp"] }
 sqlparser = { version = "0.62", features = ["serde", "visitor"] }
-vortex = { git = "https://github.com/openobserve/vortex", branch = "0.75.0-fix", features = [
-    "tokio",
-] }
-vortex-datafusion = { git = "https://github.com/openobserve/vortex", branch = "0.75.0-fix" }
 dotenv_config = "0.2"
 dotenvy = "0.15"
 env_logger = "0.11"
@@ -379,7 +343,6 @@ hashbrown = { version = "0.16", features = ["serde"] }
 hex = "0.4"
 indexmap = { version = "2.8", features = ["serde"] }
 itertools = "0.14"
-jsonschema = "0.29"
 lettre = { version = "0.11", default-features = false, features = [
     "builder",
     "hostname",
@@ -436,8 +399,8 @@ reqwest = { version = "0.13", default-features = false, features = [
     "query",
     "form",
 ] }
+roaring = "0.11.3"
 rquickjs = { version = "0.11.0", features = ["array-buffer", "classes"] }
-rustls-pemfile = "2"
 rustls = { version = "0.23", default-features = false, features = [
     "std",
     "tls12",
@@ -503,7 +466,7 @@ url = "2.5"
 urlencoding = "2.1"
 utoipa = { version = "5.4", features = ["axum_extras", "openapi_extensions"] }
 utoipa-axum = "0.2"
-utoipa-swagger-ui = { version = "9", features = ["axum"] }
+utoipa-swagger-ui = { version = "9", features = ["axum", "vendored"] }
 uuid = { version = "1.20", features = ["v7"] }
 vector-enrichment = { version = "0.1.0", package = "enrichment", git = "https://github.com/openobserve/vector", branch = "branch-v0.54" }
 vrl = { version = "0.31", features = [
