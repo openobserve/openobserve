@@ -398,6 +398,8 @@ export const convertPromQLData = async (
     tooltip: {
       show: true,
       trigger: "axis",
+      appendToBody: true,
+      className: "o2-echarts-tooltip",
       textStyle: {
         color: store.state.theme === "dark" ? "#fff" : "#000",
         fontSize: 12,
