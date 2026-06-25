@@ -782,6 +782,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OInput
                   v-model="triggerThreshold"
                   type="number"
+                  data-test="alert-trigger-threshold-input"
                   style="min-width: 60px; max-width: 80px;"
                   min="1"
                   :error="!!triggerThresholdError"
