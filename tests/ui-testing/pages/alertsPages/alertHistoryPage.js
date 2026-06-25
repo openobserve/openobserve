@@ -37,15 +37,19 @@ export class AlertHistoryPage {
 
   async selectAlert(alertName) {
     await this.page.locator(this.searchSelect).click();
+    // Wait for q-select's input to appear BEFORE checking option visibility.
+    // The previous pattern waited 3000ms for the option first, which let the
+    // dropdown close; by the time the else-branch ran, input.waitFor failed.
+    const input = this.page.locator(`${this.searchSelect} input`);
+    await input.waitFor({ state: 'visible', timeout: 5000 });
     const option = this.page.getByRole('option', { name: alertName });
-    if (await option.isVisible({ timeout: 3000 }).catch(() => false)) {
+    if (await option.isVisible({ timeout: 500 }).catch(() => false)) {
       await option.click();
     } else {
-      const input = this.page.locator(`${this.searchSelect} input`);
-      await input.waitFor({ state: 'visible', timeout: 3000 });
       await input.fill(alertName);
-      await this.page.getByRole('option', { name: alertName }).waitFor({ state: 'visible', timeout: 5000 });
-      await this.page.getByRole('option', { name: alertName }).click();
+      await this.page.waitForTimeout(300);
+      await option.waitFor({ state: 'visible', timeout: 10000 });
+      await option.click();
     }
     await this.page.getByRole('listbox').waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
     await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
