@@ -1428,9 +1428,6 @@
 .o2-table tr td {
   border-bottom: 1px solid var(--o2-border-color) !important;
 }
-.o2-table thead tr {
-  background: var(--o2-table-header-bg) !important;
-}
 .o2-table-header-sticky thead {
   position: sticky;
   top: 0;
