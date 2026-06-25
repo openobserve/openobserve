@@ -354,21 +354,21 @@
         ],
         "results": [
           [
-            "CC-BETA",
-            "SORT-X1",
-            "manual, hybrid",
-            "4"
-          ],
-          [
             "CC-GAMMA",
             "SORT-A7",
             "hybrid, auto",
             "4"
           ],
           [
+            "CC-BETA",
+            "SORT-X1",
+            "manual, hybrid",
+            "4"
+          ],
+          [
             "CC-DELTA",
             "SORT-M3",
-            "auto, manual",
+            "manual, auto",
             "3"
           ],
           [
@@ -844,7 +844,8 @@
           "cid",
           "count_s"
         ],
-        "note": "String trimming with rtrim/ltrim, spath, array_element, cast_to_arr \u2014 OO-specific, skip_sqllogictest"
+        "note": "String trimming with rtrim/ltrim, spath, array_element, cast_to_arr \u2014 OO-specific, skip_sqllogictest",
+        "skip_sqllogictest": true
       },
       "time_offset": {
         "start_offset": 9659000000,
@@ -901,9 +902,9 @@
         ],
         "results": [
           [
-            "ZONE-4",
+            "ZONE-2",
             "auto",
-            "SORT-ZONE-4",
+            "SORT-ZONE-2",
             "29",
             "2"
           ],
@@ -915,9 +916,9 @@
             "2"
           ],
           [
-            "ZONE-2",
+            "ZONE-4",
             "auto",
-            "SORT-ZONE-2",
+            "SORT-ZONE-4",
             "29",
             "2"
           ],
@@ -929,23 +930,16 @@
             "2"
           ],
           [
-            "ZONE-3",
-            "manual",
-            "SORT-ZONE-3",
-            "29",
-            "1"
-          ],
-          [
-            "ZONE-3",
-            "manual",
-            "SORT-ZONE-3",
+            "ZONE-4",
+            "hybrid",
+            "SORT-ZONE-4",
             "58",
             "1"
           ],
           [
-            "ZONE-4",
+            "ZONE-3",
             "hybrid",
-            "SORT-ZONE-4",
+            "SORT-ZONE-3",
             "29",
             "1"
           ],
@@ -957,16 +951,23 @@
             "1"
           ],
           [
-            "ZONE-4",
-            "hybrid",
-            "SORT-ZONE-4",
-            "58",
+            "ZONE-3",
+            "manual",
+            "SORT-ZONE-3",
+            "29",
             "1"
           ],
           [
             "ZONE-3",
-            "hybrid",
+            "manual",
             "SORT-ZONE-3",
+            "58",
+            "1"
+          ],
+          [
+            "ZONE-4",
+            "hybrid",
+            "SORT-ZONE-4",
             "29",
             "1"
           ]
@@ -992,18 +993,11 @@
         ],
         "results": [
           [
-            "SearchItems",
-            "SEARCH",
+            "ArchiveLog",
+            "ARCHIV",
             "False",
             "2",
-            "45.0"
-          ],
-          [
-            "MergeBatch",
-            "MERGEB",
-            "False",
-            "2",
-            "3200.0"
+            "1900.0"
           ],
           [
             "RetryScan",
@@ -1013,6 +1007,13 @@
             "15.0"
           ],
           [
+            "MergeBatch",
+            "MERGEB",
+            "False",
+            "2",
+            "3200.0"
+          ],
+          [
             "UpdateBatch",
             "UPDATE",
             "False",
@@ -1020,18 +1021,11 @@
             "230.0"
           ],
           [
-            "ArchiveLog",
-            "ARCHIV",
+            "SearchItems",
+            "SEARCH",
             "False",
             "2",
-            "1900.0"
-          ],
-          [
-            "CheckThreshold",
-            "CHECKT",
-            "False",
-            "1",
-            "78.0"
+            "45.0"
           ],
           [
             "DeleteRecord",
@@ -1041,11 +1035,11 @@
             "1450.0"
           ],
           [
-            "RerouteTrack",
-            "REROUT",
+            "CheckThreshold",
+            "CHECKT",
             "False",
             "1",
-            "567.0"
+            "78.0"
           ],
           [
             "SyncZone",
@@ -1053,6 +1047,13 @@
             "False",
             "1",
             "12.0"
+          ],
+          [
+            "RerouteTrack",
+            "REROUT",
+            "False",
+            "1",
+            "567.0"
           ]
         ],
         "results_mode": "rowsort"
@@ -1075,34 +1076,6 @@
           "avg_items"
         ],
         "results": [
-          [
-            "AP-SOUTH-ZONE-2-AUT",
-            "1",
-            "0",
-            "0",
-            "500.0"
-          ],
-          [
-            "AP-EAST-ZONE-3-MAN",
-            "1",
-            "1",
-            "0",
-            "50.0"
-          ],
-          [
-            "EU-WEST-ZONE-2-MAN",
-            "1",
-            "1",
-            "0",
-            "275.0"
-          ],
-          [
-            "SA-EAST-ZONE-4-HYB",
-            "1",
-            "0",
-            "0",
-            "120.0"
-          ],
           [
             "US-WEST-ZONE-1-AUT",
             "1",
@@ -1146,6 +1119,27 @@
             "50.0"
           ],
           [
+            "US-CENTRAL-ZONE-3-HYB",
+            "1",
+            "0",
+            "0",
+            "200.0"
+          ],
+          [
+            "EU-WEST-ZONE-2-MAN",
+            "1",
+            "1",
+            "0",
+            "275.0"
+          ],
+          [
+            "SA-EAST-ZONE-4-HYB",
+            "1",
+            "0",
+            "0",
+            "120.0"
+          ],
+          [
             "AP-CENTRAL-ZONE-3-MAN",
             "1",
             "1",
@@ -1160,18 +1154,25 @@
             "155.0"
           ],
           [
-            "US-CENTRAL-ZONE-3-HYB",
-            "1",
-            "0",
-            "0",
-            "200.0"
-          ],
-          [
             "EU-NORTH-ZONE-1-MAN",
             "1",
             "0",
             "0",
             "60.0"
+          ],
+          [
+            "AP-SOUTH-ZONE-2-AUT",
+            "1",
+            "0",
+            "0",
+            "500.0"
+          ],
+          [
+            "AP-EAST-ZONE-3-MAN",
+            "1",
+            "1",
+            "0",
+            "50.0"
           ]
         ],
         "results_mode": "rowsort"
@@ -1433,16 +1434,16 @@
         ],
         "results": [
           [
-            "cartPage",
-            "E004"
-          ],
-          [
             "searchPage",
             "E003"
           ],
           [
             "itemPage",
             "E005"
+          ],
+          [
+            "cartPage",
+            "E004"
           ],
           [
             "checkoutPage",
@@ -2067,15 +2068,15 @@
             "2"
           ],
           [
+            "DataIntegrityException:",
+            "1"
+          ],
+          [
             "NullPointerException",
             "1"
           ],
           [
             "SecurityException:",
-            "1"
-          ],
-          [
-            "DataIntegrityException:",
             "1"
           ]
         ],
@@ -2127,19 +2128,19 @@
         ],
         "results": [
           [
-            "temp-regulator/rk-warehouse-006 (inbound)",
-            "2"
-          ],
-          [
             "sorter-engine/rk-warehouse-008 (internal)",
             "2"
           ],
           [
-            "conveyor-driver/rk-warehouse-009 (inbound)",
-            "1"
+            "temp-regulator/rk-warehouse-006 (inbound)",
+            "2"
           ],
           [
             "lane-monitor/rk-warehouse-005 (internal)",
+            "1"
+          ],
+          [
+            "conveyor-driver/rk-warehouse-009 (inbound)",
             "1"
           ],
           [
@@ -2191,12 +2192,16 @@
         ],
         "results": [
           [
+            "staging-high",
+            "2"
+          ],
+          [
             "dev-high",
             "2"
           ],
           [
-            "staging-high",
-            "2"
+            "dev-medium",
+            "1"
           ],
           [
             "prod-critical",
@@ -2204,10 +2209,6 @@
           ],
           [
             "staging-critical",
-            "1"
-          ],
-          [
-            "dev-medium",
             "1"
           ]
         ],
@@ -2230,13 +2231,13 @@
         ],
         "results": [
           [
-            "WAREHOUSE-NORTH",
-            "internal",
+            "WAREHOUSE-CENTRAL",
+            "outbound",
             "2"
           ],
           [
-            "WAREHOUSE-CENTRAL",
-            "outbound",
+            "WAREHOUSE-NORTH",
+            "internal",
             "2"
           ],
           [
@@ -2245,13 +2246,13 @@
             "1"
           ],
           [
-            "WAREHOUSE-WEST",
-            "outbound",
+            "WAREHOUSE-SOUTH",
+            "inbound",
             "1"
           ],
           [
-            "WAREHOUSE-SOUTH",
-            "inbound",
+            "WAREHOUSE-WEST",
+            "outbound",
             "1"
           ]
         ],
@@ -2304,17 +2305,17 @@
         ],
         "results": [
           [
+            "BS-2026-C3",
+            "BS-2",
+            "2"
+          ],
+          [
             "BS-2025-D4",
             "BS-2",
             "2"
           ],
           [
             "BS-2026-B2",
-            "BS-2",
-            "2"
-          ],
-          [
-            "BS-2026-C3",
             "BS-2",
             "2"
           ],
@@ -3323,6 +3324,685 @@
           ],
           [
             "PL-004-ZONE-2"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q923",
+      "sql": "SELECT UPPER(COALESCE(component_name, 'unknown')) AS comp_upper, LOWER(COALESCE(scan_category, 'none')) AS scan_lower, LENGTH(COALESCE(exception_message, '')) AS error_len, COUNT(*) AS cnt FROM \"{stream}\" GROUP BY comp_upper, scan_lower, error_len ORDER BY cnt DESC LIMIT 12",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 55319000000,
+        "end_offset": 55393000000
+      },
+      "expected": {
+        "columns": [
+          "comp_upper",
+          "scan_lower",
+          "error_len",
+          "cnt"
+        ],
+        "results": [
+          [
+            "TRACK-ROUTER",
+            "internal",
+            "59",
+            "2"
+          ],
+          [
+            "ZONE-CONTROLLER",
+            "inbound",
+            "59",
+            "2"
+          ],
+          [
+            "SCAN-HUB",
+            "outbound",
+            "58",
+            "1"
+          ],
+          [
+            "BATCH-SYNC",
+            "inbound",
+            "65",
+            "1"
+          ],
+          [
+            "CONVEYOR-DRIVER",
+            "inbound",
+            "51",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q924",
+      "sql": "SELECT TRIM(COALESCE(build_signature, build_version)) AS build_id, SUBSTRING(COALESCE(build_signature, build_version), 1, 4) AS prefix, COUNT(*) AS cnt FROM \"{stream}\" GROUP BY build_id, prefix ORDER BY cnt DESC LIMIT 10",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 55379000000,
+        "end_offset": 55453000000
+      },
+      "expected": {
+        "columns": [
+          "build_id",
+          "prefix",
+          "cnt"
+        ],
+        "results": [
+          [
+            "BS-2026-B2",
+            "BS-2",
+            "2"
+          ],
+          [
+            "BS-2025-D4",
+            "BS-2",
+            "2"
+          ],
+          [
+            "BS-2026-A1",
+            "BS-2",
+            "2"
+          ],
+          [
+            "BS-2026-C3",
+            "BS-2",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q925",
+      "sql": "SELECT CONCAT(component_name, '/', COALESCE(route_key, 'no-route'), ' (', scan_category, ')') AS full_route, COUNT(*) AS cnt FROM \"{stream}\" GROUP BY full_route ORDER BY cnt DESC LIMIT 10",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 55439000000,
+        "end_offset": 55513000000
+      },
+      "expected": {
+        "columns": [
+          "full_route",
+          "cnt"
+        ],
+        "results": [
+          [
+            "temp-regulator/rk-warehouse-006 (inbound)",
+            "2"
+          ],
+          [
+            "sorter-engine/rk-warehouse-008 (internal)",
+            "2"
+          ],
+          [
+            "charge-checker/rk-warehouse-007 (outbound)",
+            "1"
+          ],
+          [
+            "conveyor-driver/rk-warehouse-009 (inbound)",
+            "1"
+          ],
+          [
+            "lane-monitor/rk-warehouse-005 (internal)",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q926",
+      "sql": "SELECT REPLACE(REPLACE(COALESCE(page_url, endpoint_path, '/'), 'https://', ''), 'http://', '') AS clean_path, COUNT(*) AS cnt FROM \"{stream}\" WHERE page_url IS NOT NULL OR endpoint_path IS NOT NULL GROUP BY clean_path ORDER BY cnt DESC LIMIT 10",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 55499000000,
+        "end_offset": 55573000000
+      },
+      "expected": {
+        "columns": [
+          "clean_path",
+          "cnt"
+        ],
+        "results": [
+          [
+            "shop.example.com/item/1007",
+            "2"
+          ],
+          [
+            "shop.example.com/item/1002",
+            "2"
+          ],
+          [
+            "shop.example.com/search?q=test",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q927",
+      "sql": "SELECT split_part(COALESCE(exception_message, 'Unknown error'), chr(32), 1) AS first_word, COUNT(*) AS cnt FROM \"{stream}\" GROUP BY first_word ORDER BY cnt DESC LIMIT 10",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 55559000000,
+        "end_offset": 55633000000
+      },
+      "expected": {
+        "columns": [
+          "first_word",
+          "cnt"
+        ],
+        "results": [
+          [
+            "ResourceExhaustedException:",
+            "2"
+          ],
+          [
+            "ConfigurationException:",
+            "2"
+          ],
+          [
+            "DataIntegrityException:",
+            "1"
+          ],
+          [
+            "SecurityException:",
+            "1"
+          ],
+          [
+            "NetworkException:",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q928",
+      "sql": "SELECT CASE WHEN LENGTH(CONCAT(COALESCE(exception_message, ''), COALESCE(log_message, ''))) < 50 THEN 'short' WHEN LENGTH(CONCAT(COALESCE(exception_message, ''), COALESCE(log_message, ''))) < 100 THEN 'medium' ELSE 'long' END AS msg_class, COUNT(*) AS cnt FROM \"{stream}\" GROUP BY msg_class ORDER BY cnt DESC",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 55619000000,
+        "end_offset": 55693000000
+      },
+      "expected": {
+        "columns": [
+          "msg_class",
+          "cnt"
+        ],
+        "results": [
+          [
+            "long",
+            "4"
+          ],
+          [
+            "medium",
+            "3"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q929",
+      "sql": "SELECT CAST(tag_a AS VARCHAR) || '-' || CAST(tag_b AS VARCHAR) AS combined_tag, COUNT(*) AS cnt FROM \"{stream}\" GROUP BY combined_tag ORDER BY cnt DESC LIMIT 10",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 55679000000,
+        "end_offset": 55753000000
+      },
+      "expected": {
+        "columns": [
+          "combined_tag",
+          "cnt"
+        ],
+        "results": [
+          [
+            "staging-critical",
+            "2"
+          ],
+          [
+            "dev-high",
+            "2"
+          ],
+          [
+            "prod-low",
+            "2"
+          ],
+          [
+            "prod-medium",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q930",
+      "sql": "SELECT UPPER(COALESCE(org_name, site_name, region_code, 'UNKNOWN')) AS location, LOWER(scan_category) AS scan_type, COUNT(*) AS cnt FROM \"{stream}\" GROUP BY location, scan_type ORDER BY cnt DESC LIMIT 15",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 55739000000,
+        "end_offset": 55813000000
+      },
+      "expected": {
+        "columns": [
+          "location",
+          "scan_type",
+          "cnt"
+        ],
+        "results": [
+          [
+            "WAREHOUSE-EAST",
+            "inbound",
+            "2"
+          ],
+          [
+            "WAREHOUSE-SOUTH",
+            "outbound",
+            "2"
+          ],
+          [
+            "WAREHOUSE-NORTH",
+            "inbound",
+            "1"
+          ],
+          [
+            "WAREHOUSE-CENTRAL",
+            "internal",
+            "1"
+          ],
+          [
+            "WAREHOUSE-WEST",
+            "outbound",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q931",
+      "sql": "SELECT spath(request_payload, 'message.endpoint') AS endpoint, COUNT(*) AS cnt FROM \"{stream}\" WHERE str_match_ignore_case(request_payload, 'endpoint') GROUP BY endpoint ORDER BY cnt DESC LIMIT 5",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 55799000000,
+        "end_offset": 55873000000
+      },
+      "expected": {
+        "skip_sqllogictest": true
+      }
+    },
+    {
+      "id": "Q932",
+      "sql": "SELECT spath(request_payload, 'message.status') AS msg_status, COUNT(*) AS cnt FROM \"{stream}\" WHERE str_match_ignore_case(request_payload, 'status') GROUP BY msg_status ORDER BY cnt DESC LIMIT 5",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 55859000000,
+        "end_offset": 55933000000
+      },
+      "expected": {
+        "skip_sqllogictest": true
+      }
+    },
+    {
+      "id": "Q933",
+      "sql": "SELECT COALESCE(bot_flag, info_tag, passthrough_flag, CAST(auth_result AS VARCHAR)) AS fallback_tag, COUNT(*) AS cnt FROM \"{stream}\" GROUP BY fallback_tag ORDER BY cnt DESC",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 55919000000,
+        "end_offset": 55993000000
+      },
+      "expected": {
+        "columns": [
+          "fallback_tag",
+          "cnt"
+        ],
+        "results": [
+          [
+            "false",
+            "4"
+          ],
+          [
+            "true",
+            "1"
+          ],
+          [
+            "verified_bot",
+            "1"
+          ],
+          [
+            "Blocklisted",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q934",
+      "sql": "SELECT array_extract(regexp_match(COALESCE(exception_message, ''), '([A-Za-z]+Exception)'), 1) AS exc_type, COUNT(*) AS cnt FROM \"{stream}\" GROUP BY exc_type HAVING exc_type IS NOT NULL ORDER BY cnt DESC LIMIT 10",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 55979000000,
+        "end_offset": 56053000000
+      },
+      "expected": {
+        "skip_sqllogictest": true
+      }
+    },
+    {
+      "id": "Q935",
+      "sql": "SELECT array_extract(regexp_match(COALESCE(ack_detail, ''), 'batchIdList:([A-Z0-9-]+)'), 1) AS batch_id, COUNT(*) AS cnt FROM \"{stream}\" GROUP BY batch_id HAVING batch_id IS NOT NULL ORDER BY cnt DESC LIMIT 10",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 56039000000,
+        "end_offset": 56113000000
+      },
+      "expected": {
+        "skip_sqllogictest": true
+      }
+    },
+    {
+      "id": "Q936",
+      "sql": "SELECT COALESCE(os_platform, 'unknown') AS platform, COALESCE(client_agent, 'unknown') AS agent, LENGTH(COALESCE(client_agent, '')) AS agent_len, COUNT(*) AS cnt FROM \"{stream}\" GROUP BY platform, agent, agent_len ORDER BY cnt DESC LIMIT 12",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 56099000000,
+        "end_offset": 56173000000
+      },
+      "expected": {
+        "columns": [
+          "platform",
+          "agent",
+          "agent_len",
+          "cnt"
+        ],
+        "results": [
+          [
+            "Android 14",
+            "node-fetch/3.3.2 (tracking-service)",
+            "35",
+            "2"
+          ],
+          [
+            "Mac OS X (iPhone)",
+            "okhttp/4.12.0 (Android; sort-app)",
+            "33",
+            "2"
+          ],
+          [
+            "Android 13",
+            "axios/1.6.0 (Node.js; warehouse-ui)",
+            "35",
+            "1"
+          ],
+          [
+            "Windows 11",
+            "Alamofire/5.8.0 (iOS; scan-app)",
+            "31",
+            "1"
+          ],
+          [
+            "iOS 18.1",
+            "Mozilla/5.0 WarehouseScanner/1.0",
+            "32",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q937",
+      "sql": "SELECT regexp_like(COALESCE(user_agent_str, ''), 'Mozilla') AS is_browser, regexp_like(COALESCE(user_agent_str, ''), 'curl') AS is_curl, COUNT(*) AS cnt FROM \"{stream}\" GROUP BY is_browser, is_curl ORDER BY cnt DESC",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 56159000000,
+        "end_offset": 56233000000
+      },
+      "expected": {
+        "skip_sqllogictest": true
+      }
+    },
+    {
+      "id": "Q938",
+      "sql": "SELECT source_ip, visitor_session_id, COUNT(*) AS cnt FROM \"{stream}\" WHERE source_ip IS NOT NULL AND TRIM(CAST(source_ip AS VARCHAR)) <> '' AND visitor_session_id IS NOT NULL AND LENGTH(CAST(visitor_session_id AS VARCHAR)) >= 8 GROUP BY source_ip, visitor_session_id ORDER BY cnt DESC LIMIT 10",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 56219000000,
+        "end_offset": 56293000000
+      },
+      "expected": {
+        "columns": [
+          "source_ip",
+          "visitor_session_id",
+          "cnt"
+        ],
+        "results": [
+          [
+            "192.168.2.23",
+            "sess_002",
+            "2"
+          ],
+          [
+            "192.168.1.10",
+            "sess_002",
+            "2"
+          ],
+          [
+            "192.168.2.24",
+            "sess_003",
+            "1"
+          ],
+          [
+            "192.168.2.22",
+            "sess_001",
+            "1"
+          ],
+          [
+            "192.168.1.11",
+            "sess_001",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q939",
+      "sql": "SELECT str_match_ignore_case(event_detail, 'batch') AS has_batch, str_match_ignore_case(event_detail, 'segment') AS has_segment, str_match_ignore_case(event_detail, 'track') AS has_track, COUNT(*) AS cnt FROM \"{stream}\" GROUP BY has_batch, has_segment, has_track ORDER BY cnt DESC",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 56279000000,
+        "end_offset": 56353000000
+      },
+      "expected": {
+        "columns": [
+          "has_batch",
+          "has_segment",
+          "has_track",
+          "cnt"
+        ],
+        "results": [
+          [
+            "True",
+            "False",
+            "False",
+            "4"
+          ],
+          [
+            "False",
+            "True",
+            "False",
+            "2"
+          ],
+          [
+            "False",
+            "False",
+            "True",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q940",
+      "sql": "SELECT json_get_str(request_payload, 'message.endpoint') AS endpoint, COUNT(*) AS cnt FROM \"{stream}\" WHERE request_payload IS NOT NULL GROUP BY endpoint ORDER BY cnt DESC LIMIT 10",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 56339000000,
+        "end_offset": 56413000000
+      },
+      "expected": {
+        "columns": [
+          "endpoint",
+          "cnt"
+        ],
+        "results": [
+          [
+            "syncZone",
+            "2"
+          ],
+          [
+            "updateBatch",
+            "2"
+          ],
+          [
+            "retryScan",
+            "1"
+          ],
+          [
+            "searchItems",
+            "1"
+          ],
+          [
+            "deleteRecord",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true,
+        "skip_row_count": true,
+        "skip_column_check": true
+      }
+    },
+    {
+      "id": "Q941",
+      "sql": "SELECT json_get_str(json_get_json(request_payload, 'message'), 'endpoint') AS nested_endpoint, COUNT(*) AS cnt FROM \"{stream}\" WHERE request_payload IS NOT NULL GROUP BY nested_endpoint ORDER BY cnt DESC LIMIT 10",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 56399000000,
+        "end_offset": 56473000000
+      },
+      "expected": {
+        "columns": [
+          "nested_endpoint",
+          "cnt"
+        ],
+        "results": [
+          [
+            "rerouteTrack",
+            "2"
+          ],
+          [
+            "deleteRecord",
+            "2"
+          ],
+          [
+            "scanPallet",
+            "1"
+          ],
+          [
+            "mergeBatch",
+            "1"
+          ],
+          [
+            "updateBatch",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q942",
+      "sql": "SELECT datacenter, COUNT(*) AS cnt, STRING_AGG(DISTINCT CAST(component_name AS VARCHAR), ', ' ORDER BY CAST(component_name AS VARCHAR)) AS components FROM \"{stream}\" WHERE datacenter IS NOT NULL GROUP BY datacenter ORDER BY cnt DESC",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 56459000000,
+        "end_offset": 56533000000
+      },
+      "expected": {
+        "columns": [
+          "datacenter",
+          "cnt",
+          "components"
+        ],
+        "results": [
+          [
+            "dc-east",
+            "3",
+            "conveyor-driver, temp-regulator"
+          ],
+          [
+            "dc-central",
+            "2",
+            "charge-checker"
+          ],
+          [
+            "dc-west",
+            "2",
+            "sorter-engine, zone-controller"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q943",
+      "sql": "SELECT CASE WHEN str_match_ignore_case(COALESCE(exception_message, log_message), 'timeout') THEN 'timeout' WHEN str_match_ignore_case(COALESCE(exception_message, log_message), 'null') THEN 'null_error' WHEN str_match_ignore_case(COALESCE(exception_message, log_message), 'security') THEN 'security' ELSE 'other' END AS error_category, COUNT(*) AS cnt FROM \"{stream}\" GROUP BY error_category ORDER BY cnt DESC",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 56519000000,
+        "end_offset": 56593000000
+      },
+      "expected": {
+        "skip_sqllogictest": true
+      }
+    },
+    {
+      "id": "Q944",
+      "sql": "SELECT re_match(COALESCE(exception_message, ''), '[A-Z][a-z]+Exception') AS has_java_exc, re_not_match(COALESCE(exception_message, ''), 'Network') AS not_network, COUNT(*) AS cnt FROM \"{stream}\" GROUP BY has_java_exc, not_network ORDER BY cnt DESC",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 56579000000,
+        "end_offset": 56653000000
+      },
+      "expected": {
+        "columns": [
+          "has_java_exc",
+          "not_network",
+          "cnt"
+        ],
+        "results": [
+          [
+            "True",
+            "True",
+            "5"
+          ],
+          [
+            "True",
+            "False",
+            "2"
           ]
         ],
         "results_mode": "rowsort"
