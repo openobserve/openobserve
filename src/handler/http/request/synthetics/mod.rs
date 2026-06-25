@@ -618,6 +618,43 @@ pub async fn job_ack(Json(body): Json<serde_json::Value>) -> Response {
                     },
                 );
 
+                // Ingest result into synthetics_results stream so list_results /
+                // get_summary have data to query.
+                {
+                    use crate::common::meta::ingestion::{
+                        IngestUser, IngestionRequest, IngestionValueType, SystemJobType,
+                    };
+                    let record = serde_json::json!({
+                        "_timestamp": checked_at,
+                        "job_id": resp.job_id,
+                        "monitor_id": resp.monitor_id,
+                        "location": resp.location,
+                        "pool": resp.pool,
+                        "status": status,
+                        "response_time_ms": response_time_ms,
+                        "error": error.as_deref().unwrap_or(""),
+                        "browser_engine": resp.browser_engine.as_deref().unwrap_or(""),
+                        "device": resp.device.as_deref().unwrap_or(""),
+                        "trigger_type": resp.trigger_type,
+                    });
+                    let org_id_ingest = resp.org_id.clone();
+                    tokio::spawn(async move {
+                        if let Err(e) = crate::service::logs::ingest::ingest(
+                            0,
+                            &org_id_ingest,
+                            "synthetics_results",
+                            IngestionRequest::JsonValues(IngestionValueType::Bulk, vec![record]),
+                            IngestUser::SystemJob(SystemJobType::Synthetics),
+                            None,
+                            false,
+                        )
+                        .await
+                        {
+                            tracing::warn!("[synthetics] result ingest failed: {e}");
+                        }
+                    });
+                }
+
                 if !resp.destinations.is_empty() {
                     let org_id = resp.org_id.clone();
                     let monitor_name = resp.monitor_name.clone();

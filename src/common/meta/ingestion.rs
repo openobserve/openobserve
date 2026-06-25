@@ -33,6 +33,7 @@ pub enum SystemJobType {
     SelfReporting,
     InternalGrpc,
     AnomalyDetection,
+    Synthetics,
 }
 
 impl SystemJobType {
@@ -44,6 +45,7 @@ impl SystemJobType {
             SystemJobType::SelfReporting => "self_reporting",
             SystemJobType::InternalGrpc => "internal_grpc",
             SystemJobType::AnomalyDetection => "anomaly_detection",
+            SystemJobType::Synthetics => "synthetics",
         }
     }
 }
