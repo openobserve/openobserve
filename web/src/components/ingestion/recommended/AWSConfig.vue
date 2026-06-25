@@ -17,10 +17,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="tw:m-3 tw:mt-1">
     <div class="tw:mb-4">
-      <div class="tw:text-2xl tw:font-semibold tw:leading-[1.3] tw:m-0 tw:mb-1.5" :class="store.state.theme === 'dark' ? 'tw:text-[#e0e0e0]' : 'tw:text-[#1a1a1a]'">
+      <div data-test="aws-config-page-title" class="tw:text-2xl tw:font-semibold tw:leading-[1.3] tw:m-0 tw:mb-1.5" :class="store.state.theme === 'dark' ? 'tw:text-[#e0e0e0]' : 'tw:text-[#1a1a1a]'">
         AWS Integrations
       </div>
-      <div class="tw:text-sm tw:m-0 tw:mb-4" :class="store.state.theme === 'dark' ? 'tw:text-[#b0b0b0]' : 'tw:text-[#666]'">
+      <div data-test="aws-config-page-description" class="tw:text-sm tw:m-0 tw:mb-4" :class="store.state.theme === 'dark' ? 'tw:text-[#b0b0b0]' : 'tw:text-[#666]'">
         Set up AWS monitoring in one click or configure individual services for granular control.
       </div>
 
