@@ -97,8 +97,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OBadge
               v-if="row.auth_type"
               :variant="row.auth_type === 'SSO' ? 'primary-outline' : 'default-outline'"
-              size="sm"
-              class="o2-role-chip"
+              size="md"
+              class="o2-role-chip tw:rounded-md!"
             >
               {{ row.auth_type }}
             </OBadge>
@@ -114,7 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :key="`${roleName}-${idx}`"
                 :variant="isBuiltinRole(roleName) ? 'warning-outline' : 'error-outline'"
                 size="md"
-                class="o2-role-chip"
+                class="o2-role-chip tw:rounded-md!"
               >
                 {{ isBuiltinRole(roleName) ? toCamelCase(roleName) : roleName }}
               </OBadge>
