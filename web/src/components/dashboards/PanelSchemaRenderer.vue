@@ -159,7 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :title="noData"
         :backdrop="false"
         data-test="no-data"
-        class="noData tw:absolute tw:inset-0 tw:w-full tw:h-full tw:!min-h-0 tw:!p-2 tw:[container-type:size]"
+        class="noData tw:absolute! tw:inset-0 tw:w-full tw:h-full tw:!min-h-0 tw:!p-2 tw:[container-type:size]"
       />
       <div
         v-if="
