@@ -15,10 +15,11 @@
 
 use chrono::FixedOffset;
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 // ── Frequency ─────────────────────────────────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum MonitorFrequencyType {
     Seconds,
@@ -31,7 +32,7 @@ pub enum MonitorFrequencyType {
     Cron,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct MonitorFrequency {
     #[serde(rename = "type", default)]
     pub frequency_type: MonitorFrequencyType,
@@ -97,7 +98,7 @@ impl MonitorFrequency {
 
 // ── Core monitor (stored in Postgres) ────────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, ToSchema)]
 pub struct Monitor {
     pub id: String,
     pub org_id: String,
@@ -168,7 +169,7 @@ pub struct Monitor {
 
 // ── MonitorType ───────────────────────────────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum MonitorType {
     #[default]
@@ -182,7 +183,7 @@ pub enum MonitorType {
 
 // ── MonitorStatus ─────────────────────────────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum MonitorStatus {
     Up,
@@ -196,7 +197,7 @@ pub enum MonitorStatus {
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum MonitorAuth {
     Basic {
@@ -214,7 +215,7 @@ pub enum MonitorAuth {
 
 // ── Variables ─────────────────────────────────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct MonitorVariable {
     pub name: String,
     /// Inline value OR reference to a secret (prefixed "$secret:name").
@@ -264,7 +265,7 @@ pub enum TriggerType {
 
 // ── List response (monitor + computed fields) ─────────────────────────────────
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct MonitorListItem {
     pub id: String,
     pub org_id: String,
@@ -290,13 +291,13 @@ pub struct MonitorListItem {
     pub status_24h: Vec<StatusBucket>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct StatusBucket {
     pub ts: i64,
     pub status: BucketStatus,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum BucketStatus {
     Up,
@@ -319,7 +320,7 @@ pub struct ListMonitorsParams {
     pub page_size: Option<u64>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct MonitorListResponse {
     pub monitors: Vec<MonitorListItem>,
     pub total: i64,

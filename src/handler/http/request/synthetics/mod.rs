@@ -24,6 +24,28 @@ use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 
 // ── Results API ───────────────────────────────────────────────────────────────
 
+#[utoipa::path(
+    get,
+    path = "/{org_id}/synthetics/monitors/{id}/results",
+    context_path = "/api",
+    tag = "Synthetics",
+    operation_id = "ListSyntheticsResults",
+    summary = "List check results for a monitor",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("id" = String, Path, description = "Monitor ID"),
+        ("start_time" = Option<i64>, Query, description = "Start time (microseconds)"),
+        ("end_time" = Option<i64>, Query, description = "End time (microseconds)"),
+        ("location" = Option<String>, Query, description = "Filter by location"),
+        ("page" = Option<u64>, Query, description = "Page number"),
+        ("page_size" = Option<u64>, Query, description = "Page size"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 500, description = "Error",   content_type = "application/json", body = Object),
+    ),
+)]
 pub async fn list_results(
     Path((org_id, id)): Path<(String, String)>,
     Query(params): Query<config::meta::synthetics::ListResultsParams>,
@@ -38,6 +60,25 @@ pub async fn list_results(
     }
 }
 
+#[utoipa::path(
+    get,
+    path = "/{org_id}/synthetics/monitors/{id}/results/{job_id}",
+    context_path = "/api",
+    tag = "Synthetics",
+    operation_id = "GetSyntheticsResult",
+    summary = "Get a single check result",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("id" = String, Path, description = "Monitor ID"),
+        ("job_id" = i64, Path, description = "Job ID"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 404, description = "Not found"),
+        (status = 500, description = "Error",   content_type = "application/json", body = Object),
+    ),
+)]
 pub async fn get_result(Path((org_id, id, job_id)): Path<(String, String, String)>) -> Response {
     let job_id: i64 = match job_id.parse() {
         Ok(v) => v,
@@ -54,6 +95,24 @@ pub async fn get_result(Path((org_id, id, job_id)): Path<(String, String, String
     }
 }
 
+#[utoipa::path(
+    get,
+    path = "/{org_id}/synthetics/monitors/{id}/results/{job_id}/artifact",
+    context_path = "/api",
+    tag = "Synthetics",
+    operation_id = "GetSyntheticsArtifactUrl",
+    summary = "Get presigned URL for check artifact (screenshot/trace)",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("id" = String, Path, description = "Monitor ID"),
+        ("job_id" = i64, Path, description = "Job ID"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 501, description = "Not implemented"),
+    ),
+)]
 pub async fn get_artifact_url(
     Path((_org_id, _id, _job_id)): Path<(String, String, String)>,
 ) -> Response {
@@ -64,6 +123,25 @@ pub async fn get_artifact_url(
         .into_response()
 }
 
+#[utoipa::path(
+    get,
+    path = "/{org_id}/synthetics/monitors/{id}/summary",
+    context_path = "/api",
+    tag = "Synthetics",
+    operation_id = "GetSyntheticsSummary",
+    summary = "Get uptime summary and status history for a monitor",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("id" = String, Path, description = "Monitor ID"),
+        ("start_time" = Option<i64>, Query, description = "Start time (microseconds)"),
+        ("end_time" = Option<i64>, Query, description = "End time (microseconds)"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 500, description = "Error",   content_type = "application/json", body = Object),
+    ),
+)]
 pub async fn get_summary(
     Path((org_id, id)): Path<(String, String)>,
     Query(params): Query<config::meta::synthetics::SummaryParams>,
@@ -82,6 +160,29 @@ pub async fn get_summary(
 
 // ── Monitors ──────────────────────────────────────────────────────────────────
 
+#[utoipa::path(
+    get,
+    path = "/{org_id}/synthetics/monitors",
+    context_path = "/api",
+    tag = "Synthetics",
+    operation_id = "ListSyntheticsMonitors",
+    summary = "List synthetic monitors",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("folder_id" = Option<i64>, Query, description = "Filter by folder ID"),
+        ("type" = Option<String>, Query, description = "Filter by monitor type (http|browser|tcp|tls|ssh)"),
+        ("enabled" = Option<bool>, Query, description = "Filter by enabled status"),
+        ("location" = Option<String>, Query, description = "Filter by location"),
+        ("tag" = Option<String>, Query, description = "Filter by tag"),
+        ("page" = Option<u64>, Query, description = "Page number (0-indexed)"),
+        ("page_size" = Option<u64>, Query, description = "Results per page"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::synthetics::MonitorListResponse),
+        (status = 500, description = "Error",   content_type = "application/json", body = Object),
+    ),
+)]
 pub async fn list_monitors(
     Path(org_id): Path<String>,
     Query(params): Query<config::meta::synthetics::ListMonitorsParams>,
@@ -123,6 +224,23 @@ pub async fn list_monitors(
     }
 }
 
+#[utoipa::path(
+    post,
+    path = "/{org_id}/synthetics/monitors",
+    context_path = "/api",
+    tag = "Synthetics",
+    operation_id = "CreateSyntheticsMonitor",
+    summary = "Create a synthetic monitor",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    request_body(content = config::meta::synthetics::Monitor, description = "Monitor definition", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Created", content_type = "application/json", body = config::meta::synthetics::Monitor),
+        (status = 500, description = "Error",   content_type = "application/json", body = Object),
+    ),
+)]
 pub async fn create_monitor(
     Path(org_id): Path<String>,
     Json(body): Json<config::meta::synthetics::Monitor>,
@@ -145,6 +263,24 @@ pub async fn create_monitor(
     }
 }
 
+#[utoipa::path(
+    get,
+    path = "/{org_id}/synthetics/monitors/{id}",
+    context_path = "/api",
+    tag = "Synthetics",
+    operation_id = "GetSyntheticsMonitor",
+    summary = "Get a synthetic monitor by ID",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("id" = String, Path, description = "Monitor ID"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::synthetics::Monitor),
+        (status = 404, description = "Not found"),
+        (status = 500, description = "Error",   content_type = "application/json", body = Object),
+    ),
+)]
 pub async fn get_monitor(Path((org_id, id)): Path<(String, String)>) -> Response {
     #[cfg(feature = "enterprise")]
     {
@@ -165,6 +301,25 @@ pub async fn get_monitor(Path((org_id, id)): Path<(String, String)>) -> Response
     }
 }
 
+#[utoipa::path(
+    put,
+    path = "/{org_id}/synthetics/monitors/{id}",
+    context_path = "/api",
+    tag = "Synthetics",
+    operation_id = "UpdateSyntheticsMonitor",
+    summary = "Update a synthetic monitor",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("id" = String, Path, description = "Monitor ID"),
+    ),
+    request_body(content = config::meta::synthetics::Monitor, description = "Updated monitor definition", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Updated",   content_type = "application/json", body = config::meta::synthetics::Monitor),
+        (status = 404, description = "Not found"),
+        (status = 500, description = "Error",     content_type = "application/json", body = Object),
+    ),
+)]
 pub async fn update_monitor(
     Path((org_id, id)): Path<(String, String)>,
     Json(body): Json<config::meta::synthetics::Monitor>,
@@ -193,6 +348,24 @@ pub async fn update_monitor(
     }
 }
 
+#[utoipa::path(
+    delete,
+    path = "/{org_id}/synthetics/monitors/{id}",
+    context_path = "/api",
+    tag = "Synthetics",
+    operation_id = "DeleteSyntheticsMonitor",
+    summary = "Delete a synthetic monitor",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("id" = String, Path, description = "Monitor ID"),
+    ),
+    responses(
+        (status = 200, description = "Deleted"),
+        (status = 404, description = "Not found"),
+        (status = 500, description = "Error", content_type = "application/json", body = Object),
+    ),
+)]
 pub async fn delete_monitor(Path((org_id, id)): Path<(String, String)>) -> Response {
     #[cfg(feature = "enterprise")]
     {
@@ -213,6 +386,26 @@ pub async fn delete_monitor(Path((org_id, id)): Path<(String, String)>) -> Respo
     }
 }
 
+#[utoipa::path(
+    put,
+    path = "/{org_id}/synthetics/monitors/{id}/enable",
+    context_path = "/api",
+    tag = "Synthetics",
+    operation_id = "SetSyntheticsMonitorEnabled",
+    summary = "Enable or pause a synthetic monitor",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("id" = String, Path, description = "Monitor ID"),
+    ),
+    request_body(content = Object, description = r#"{"enabled": true}"#, content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success"),
+        (status = 400, description = "Missing enabled field"),
+        (status = 404, description = "Not found"),
+        (status = 500, description = "Error", content_type = "application/json", body = Object),
+    ),
+)]
 pub async fn set_monitor_enabled(
     Path((org_id, id)): Path<(String, String)>,
     Json(body): Json<serde_json::Value>,
@@ -248,6 +441,24 @@ pub async fn set_monitor_enabled(
     }
 }
 
+#[utoipa::path(
+    post,
+    path = "/{org_id}/synthetics/monitors/{id}/run",
+    context_path = "/api",
+    tag = "Synthetics",
+    operation_id = "RunSyntheticsMonitorNow",
+    summary = "Trigger an immediate run of a monitor",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("id" = String, Path, description = "Monitor ID"),
+    ),
+    responses(
+        (status = 202, description = "Accepted — scheduler will fire within 5 seconds"),
+        (status = 404, description = "Not found"),
+        (status = 500, description = "Error", content_type = "application/json", body = Object),
+    ),
+)]
 pub async fn run_monitor_now(Path((org_id, id)): Path<(String, String)>) -> Response {
     #[cfg(feature = "enterprise")]
     {
@@ -273,6 +484,21 @@ pub async fn run_monitor_now(Path((org_id, id)): Path<(String, String)>) -> Resp
 
 // ── Job API (probe-facing, bypass RBAC, authenticated via o2syn_ token) ──────
 
+#[utoipa::path(
+    post,
+    path = "/synthetics/jobs/resolve",
+    context_path = "/api",
+    tag = "Synthetics",
+    operation_id = "SyntheticsJobResolve",
+    summary = "Resolve a job — probe fetches monitor config (authenticated via o2syn_ token)",
+    security(("Authorization" = [])),
+    request_body(content = Object, description = r#"{"job_id": 42}"#, content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 404, description = "Job not found"),
+        (status = 500, description = "Error", content_type = "application/json", body = Object),
+    ),
+)]
 pub async fn job_resolve(Json(body): Json<serde_json::Value>) -> Response {
     #[cfg(feature = "enterprise")]
     {
@@ -305,6 +531,20 @@ pub async fn job_resolve(Json(body): Json<serde_json::Value>) -> Response {
     }
 }
 
+#[utoipa::path(
+    post,
+    path = "/synthetics/jobs/lease",
+    context_path = "/api",
+    tag = "Synthetics",
+    operation_id = "SyntheticsJobLease",
+    summary = "Lease a batch of jobs for a probe pool (authenticated via o2syn_ token)",
+    security(("Authorization" = [])),
+    request_body(content = Object, description = r#"{"pool": "aws-browser-chromium", "limit": 10}"#, content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 500, description = "Error",   content_type = "application/json", body = Object),
+    ),
+)]
 pub async fn job_lease(Json(body): Json<serde_json::Value>) -> Response {
     #[cfg(feature = "enterprise")]
     {
@@ -333,6 +573,20 @@ pub async fn job_lease(Json(body): Json<serde_json::Value>) -> Response {
     }
 }
 
+#[utoipa::path(
+    post,
+    path = "/synthetics/jobs/ack",
+    context_path = "/api",
+    tag = "Synthetics",
+    operation_id = "SyntheticsJobAck",
+    summary = "Acknowledge a completed check — probe submits result (authenticated via o2syn_ token)",
+    security(("Authorization" = [])),
+    request_body(content = Object, description = r#"{"job_id": 42, "status": "up", "response_time_ms": 1200, "error": null}"#, content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 500, description = "Error",   content_type = "application/json", body = Object),
+    ),
+)]
 pub async fn job_ack(Json(body): Json<serde_json::Value>) -> Response {
     #[cfg(feature = "enterprise")]
     {
@@ -409,6 +663,21 @@ pub async fn job_ack(Json(body): Json<serde_json::Value>) -> Response {
 
 // ── Locations ─────────────────────────────────────────────────────────────────
 
+#[utoipa::path(
+    get,
+    path = "/{org_id}/synthetics/monitors/locations",
+    context_path = "/api",
+    tag = "Synthetics",
+    operation_id = "ListSyntheticsLocations",
+    summary = "List available probe locations",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+)]
 pub async fn list_locations(Path(_org_id): Path<String>) -> Response {
     #[cfg(feature = "enterprise")]
     {

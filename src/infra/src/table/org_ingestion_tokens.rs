@@ -43,7 +43,6 @@ pub struct OrgIngestionTokenRecord {
     pub created_by: String,
     pub created_at: i64,
     pub updated_at: i64,
-    pub token_type: String,
 }
 
 impl From<Model> for OrgIngestionTokenRecord {
@@ -59,7 +58,6 @@ impl From<Model> for OrgIngestionTokenRecord {
             created_by: model.created_by,
             created_at: model.created_at,
             updated_at: model.updated_at,
-            token_type: model.token_type,
         }
     }
 }
@@ -81,14 +79,8 @@ pub fn generate_token() -> String {
     format!("{}{}", ORG_INGESTION_TOKEN_PREFIX, random_part)
 }
 
-/// Generate a new synthetics agent token with the `o2syn_` prefix.
-pub fn generate_synthetics_token() -> String {
-    let random_part = config::utils::rand::generate_random_string(32);
-    format!("{}{}", SYNTHETICS_TOKEN_PREFIX, random_part)
-}
-
-/// Find a synthetics token by its value (globally, no org_id needed).
-/// Returns the record if the token exists, is enabled, and has token_type='synthetics'.
+/// Find a synthetics agent token by value (global lookup — no org_id needed).
+/// The `o2syn_` prefix is the only distinguisher; no DB type column is required.
 pub async fn find_enabled_synthetics_token(
     token: &str,
 ) -> Result<Option<OrgIngestionTokenRecord>, errors::Error> {
@@ -96,7 +88,6 @@ pub async fn find_enabled_synthetics_token(
     let record = Entity::find()
         .filter(Column::Token.eq(token))
         .filter(Column::Enabled.eq(true))
-        .filter(Column::TokenType.eq("synthetics"))
         .one(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
@@ -118,7 +109,6 @@ pub async fn add(record: &OrgIngestionTokenRecord) -> Result<(), errors::Error> 
         created_by: Set(record.created_by.clone()),
         created_at: Set(now),
         updated_at: Set(now),
-        token_type: Set(record.token_type.clone()),
     };
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
@@ -154,7 +144,6 @@ pub async fn upsert(record: &OrgIngestionTokenRecord) -> Result<(), errors::Erro
         created_by: Set(record.created_by.clone()),
         created_at: Set(record.created_at),
         updated_at: Set(record.updated_at),
-        token_type: Set(record.token_type.clone()),
     };
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
@@ -169,7 +158,6 @@ pub async fn upsert(record: &OrgIngestionTokenRecord) -> Result<(), errors::Erro
                     Column::IsDefault,
                     Column::Enabled,
                     Column::UpdatedAt,
-                    Column::TokenType,
                 ])
                 .to_owned(),
         )
@@ -377,7 +365,6 @@ mod tests {
             created_by: "admin@test.com".to_string(),
             created_at: 1000,
             updated_at: 2000,
-            token_type: "ingest".to_string(),
         };
         let record = OrgIngestionTokenRecord::from(model);
         assert_eq!(record.id, "id-1");
