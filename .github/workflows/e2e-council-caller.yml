@@ -49,11 +49,11 @@ permissions:
   pull-requests: write   # post the ack comment on the OSS PR (this run is in OSS context)
   issues: write
 
-concurrency:
-  # One caller run per PR so rapid /e2e comments don't fan out into redundant dispatches. The engine
-  # has its OWN concurrency too; this just collapses duplicate dispatches at the door.
-  group: e2e-council-caller-${{ github.event.issue.number || github.event.pull_request.number || inputs.pr_number }}
-  cancel-in-progress: true
+# NO caller-level concurrency on purpose. issue_comment fires the caller for EVERY comment on a PR
+# (the /e2e filter is only in the job `if:`), and a run enters the concurrency group BEFORE its `if:`
+# is evaluated — so cancel-in-progress:true would let an unrelated comment cancel an in-flight /e2e
+# DISPATCH. Dedup of duplicate /e2e is owned by the ENGINE's concurrency (keyed on source_repo+pr,
+# cancel-in-progress for workflow_dispatch). Mirrors docgen-caller.yml (no caller concurrency).
 
 jobs:
   dispatch-e2e:
@@ -107,8 +107,10 @@ jobs:
           fi
           ACTOR=$(printf '%s' "$ACTOR" | tr -cd 'A-Za-z0-9-')   # GitHub login charset; defensive
           { echo "pr=$PR"; echo "dry=$DRY"; echo "force=$FORCE"; echo "actor=$ACTOR"; } >> "$GITHUB_OUTPUT"
-          # feature_hint may contain arbitrary text — pass via a file-free env to the dispatch step.
-          printf 'hint<<EOF\n%s\nEOF\n' "$HINT" >> "$GITHUB_OUTPUT"
+          # feature_hint may contain arbitrary (even multiline) text — use a RANDOM heredoc delimiter so
+          # a hint containing a line "EOF" can't break/inject the multiline $GITHUB_OUTPUT write.
+          DELIM="hintEOF_$(openssl rand -hex 16 2>/dev/null || echo "${RANDOM}${RANDOM}${RANDOM}")"
+          printf 'hint<<%s\n%s\n%s\n' "$DELIM" "$HINT" "$DELIM" >> "$GITHUB_OUTPUT"
 
       - name: Dispatch the E2E Council engine (o2-enterprise) via the org-admin PAT
         env:
