@@ -534,11 +534,13 @@ function getIcon(data, ioType) {
       <!-- Error Badge for Function Nodes -->
       <div
         v-if="hasNodeError"
+        data-test="pipeline-node-error-badge"
         class="tw:absolute tw:top-[-12px] tw:right-[-12px] tw:w-[20px] tw:h-[20px] tw:bg-[#ef4444] tw:border-2 tw:border-white tw:rounded-full tw:flex tw:items-center tw:justify-center tw:cursor-pointer tw:z-[15] tw:shadow-[0_2px_6px_rgba(239,68,68,0.5)] tw:transition-all tw:duration-200 error-badge"
         @click.stop="navigateToFunction(data.name)"
       >
         <OIcon name="error" size="sm" />
         <span
+          data-test="pipeline-node-error-count"
           v-if="
             pipelineObj.currentSelectedPipeline?.last_error?.node_errors?.[id]
               ?.error_count

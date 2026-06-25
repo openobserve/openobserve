@@ -101,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         position="top-left">
     </Controls>
     </VueFlow>
-    <div v-if="isCanvasEmpty" class="tw:absolute tw:top-1/2 tw:left-1/2 tw:-translate-x-1/2 tw:-translate-y-1/2 tw:text-[#888] tw:text-[1.5em] tw:text-center tw:pointer-events-none tw:z-10">
+    <div v-if="isCanvasEmpty" data-test="pipeline-flow-empty-text" class="tw:absolute tw:top-1/2 tw:left-1/2 tw:-translate-x-1/2 tw:-translate-y-1/2 tw:text-[#888] tw:text-[1.5em] tw:text-center tw:pointer-events-none tw:z-10">
       {{ t('pipeline.dragDropNodesHere') }}
     </div>
     <!-- Add UI elements or buttons to interact with the methods -->
