@@ -3184,7 +3184,18 @@ export class LogsPage {
     }
 
     async clickLogTableColumnSource() {
-        return await this.page.locator(this.logTableColumnSource).click();
+        // Open the first result row's detail/search-around. With the FTS
+        // default-column feature the first cell may be the generic "source"
+        // column OR the FTS "body" column (e.g. log/message/body), so click
+        // whichever first-row cell is rendered rather than "source" only.
+        // The cell can also detach mid-click while the table re-renders, so
+        // Playwright's auto-retrying click is allowed to settle via a short
+        // post-condition wait on the detail dialog by callers.
+        const firstRowCell = this.page
+            .locator('[data-test^="log-table-column-0-"]')
+            .first();
+        await firstRowCell.waitFor({ state: 'visible', timeout: 30000 });
+        return await firstRowCell.click();
     }
 
     async clickIncludeExcludeFieldButton() {
@@ -3704,7 +3715,10 @@ export class LogsPage {
     async waitForSearchResults(timeout = 30000) {
         const table = this.page.locator(this.logsTable);
         await table.waitFor({ state: 'visible', timeout });
-        const firstRow = this.page.locator(this.logTableColumnSource);
+        // The default view may render the generic "source" column OR the FTS
+        // "body" column, so wait for any first-row cell rather than "source"
+        // specifically — both mean "results rendered".
+        const firstRow = this.page.locator('[data-test^="log-table-column-0-"]').first();
         await firstRow.waitFor({ state: 'visible', timeout });
         return true;
     }
@@ -4570,11 +4584,29 @@ export class LogsPage {
         return await this.page.locator(this.logsDetailTableSearchAroundBtn).click();
     }
 
+    /**
+     * Assert that the results table rendered at least one data row.
+     *
+     * Historically the default logs view always showed a single generic "source"
+     * column (full row as JSON). With the FTS default-column feature, a plain
+     * (non-SQL, no-pin) view instead promotes the best-fill full-text "body"
+     * field (e.g. "log"/"message"/"body") to its own column, so "source" is no
+     * longer guaranteed. Custom SQL queries and aggregates still render "source".
+     *
+     * This helper therefore passes when EITHER the "source" column OR any other
+     * first-row column cell is visible — i.e. "results rendered", independent of
+     * which default column the view chose. Use expectLogTableColumnVisible(name)
+     * when a specific column must be asserted.
+     */
     async expectLogTableColumnSourceVisible() {
-        const element = this.page.locator(this.logTableColumnSource);
-        // Wait for the element to be visible with a timeout
-        await element.waitFor({ state: 'visible', timeout: 30000 });
-        return await expect(element).toBeVisible();
+        const sourceCol = this.page.locator(this.logTableColumnSource);
+        const anyFirstRowCol = this.page.locator('[data-test^="log-table-column-0-"]').first();
+        // Whichever appears first satisfies "results rendered".
+        await Promise.race([
+            sourceCol.waitFor({ state: 'visible', timeout: 30000 }).catch(() => {}),
+            anyFirstRowCol.waitFor({ state: 'visible', timeout: 30000 }).catch(() => {}),
+        ]);
+        return await expect(anyFirstRowCol).toBeVisible();
     }
 
     /**
@@ -5163,8 +5195,12 @@ export class LogsPage {
     }
 
     async expectFieldNotInTableHeader(fieldName) {
-        // When field is removed, the source column should be visible again
-        return await expect(this.page.locator('[data-test="log-search-result-table-th-source"]').getByText('source')).toBeVisible();
+        // After removing a field, its column header must no longer be present.
+        // (Asserting on the removed field is mode-agnostic: the default view may
+        // fall back to the generic "source" column or the FTS "body" column.)
+        return await expect(
+            this.page.locator(`[data-test="log-search-result-table-th-${fieldName}"]`),
+        ).toHaveCount(0);
     }
 
     // New POM methods for PR tests
@@ -6353,17 +6389,15 @@ export class LogsPage {
 
             for (const row of rows) {
                 const text = row.textContent;
-                // Find the color indicator div - it's a div with inline backgroundColor style
-                // The div has classes like "tw:absolute tw:left-0 tw:inset-y-0 tw:w-1 tw:z-10"
-                // Use multiple selector approaches for robustness
-                let colorDiv = row.querySelector('div[style*="background"]');
+                // The status color bar carries data-test="log-table-row-status-color"
+                // and data-test-status-level="<level>". This makes the detected
+                // severity/level machine-readable regardless of which column is
+                // shown (the FTS "body" column hides the raw "source" JSON).
+                let colorDiv = row.querySelector('[data-test="log-table-row-status-color"]');
 
-                // Fallback: try class-based selector with escaped colon
-                if (!colorDiv) {
-                    colorDiv = row.querySelector('div[class*="tw\\:absolute"]');
-                }
-
-                // Fallback: try finding the first absolute positioned child div
+                // Fallbacks for older renders: inline-style / absolute-positioned div.
+                if (!colorDiv) colorDiv = row.querySelector('div[style*="background"]');
+                if (!colorDiv) colorDiv = row.querySelector('div[class*="tw\\:absolute"]');
                 if (!colorDiv) {
                     const divs = row.querySelectorAll('div');
                     for (const div of divs) {
@@ -6378,29 +6412,29 @@ export class LogsPage {
                 if (!colorDiv) continue;
 
                 const bgColor = window.getComputedStyle(colorDiv).backgroundColor;
-
-                // Skip if no valid background color
                 if (!bgColor || bgColor === 'rgba(0, 0, 0, 0)' || bgColor === 'transparent') continue;
 
-                // Check for severity value in the row text - look for various patterns
+                const level = colorDiv.getAttribute('data-test-status-level') || null;
+
+                // Best-effort: also recover the raw severity number when the JSON
+                // source column is visible (kept for backward compatibility).
+                let severity = null;
                 for (let sev = 0; sev <= 7; sev++) {
-                    // Match "severity":"X", "severity":X, "severity": X, or severity: X patterns
                     const patterns = [
                         `"severity":"${sev}"`,
                         `"severity":${sev},`,
                         `"severity":${sev}}`,
                         `"severity": ${sev}`,
-                        `severity: ${sev}`
+                        `severity: ${sev}`,
                     ];
-
                     if (patterns.some(pattern => text.includes(pattern))) {
-                        findings.push({
-                            severity: sev,
-                            color: bgColor
-                        });
+                        severity = sev;
                         break;
                     }
                 }
+
+                if (level === null && severity === null) continue;
+                findings.push({ severity, level, color: bgColor });
             }
 
             return findings;
