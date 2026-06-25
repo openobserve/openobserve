@@ -3704,7 +3704,10 @@ export class LogsPage {
     async waitForSearchResults(timeout = 30000) {
         const table = this.page.locator(this.logsTable);
         await table.waitFor({ state: 'visible', timeout });
-        const firstRow = this.page.locator(this.logTableColumnSource);
+        // The default view may render the generic "source" column OR the FTS
+        // "body" column, so wait for any first-row cell rather than "source"
+        // specifically — both mean "results rendered".
+        const firstRow = this.page.locator('[data-test^="log-table-column-0-"]').first();
         await firstRow.waitFor({ state: 'visible', timeout });
         return true;
     }
@@ -5181,8 +5184,12 @@ export class LogsPage {
     }
 
     async expectFieldNotInTableHeader(fieldName) {
-        // When field is removed, the source column should be visible again
-        return await expect(this.page.locator('[data-test="log-search-result-table-th-source"]').getByText('source')).toBeVisible();
+        // After removing a field, its column header must no longer be present.
+        // (Asserting on the removed field is mode-agnostic: the default view may
+        // fall back to the generic "source" column or the FTS "body" column.)
+        return await expect(
+            this.page.locator(`[data-test="log-search-result-table-th-${fieldName}"]`),
+        ).toHaveCount(0);
     }
 
     // New POM methods for PR tests
@@ -6371,17 +6378,15 @@ export class LogsPage {
 
             for (const row of rows) {
                 const text = row.textContent;
-                // Find the color indicator div - it's a div with inline backgroundColor style
-                // The div has classes like "tw:absolute tw:left-0 tw:inset-y-0 tw:w-1 tw:z-10"
-                // Use multiple selector approaches for robustness
-                let colorDiv = row.querySelector('div[style*="background"]');
+                // The status color bar carries data-test="log-table-row-status-color"
+                // and data-test-status-level="<level>". This makes the detected
+                // severity/level machine-readable regardless of which column is
+                // shown (the FTS "body" column hides the raw "source" JSON).
+                let colorDiv = row.querySelector('[data-test="log-table-row-status-color"]');
 
-                // Fallback: try class-based selector with escaped colon
-                if (!colorDiv) {
-                    colorDiv = row.querySelector('div[class*="tw\\:absolute"]');
-                }
-
-                // Fallback: try finding the first absolute positioned child div
+                // Fallbacks for older renders: inline-style / absolute-positioned div.
+                if (!colorDiv) colorDiv = row.querySelector('div[style*="background"]');
+                if (!colorDiv) colorDiv = row.querySelector('div[class*="tw\\:absolute"]');
                 if (!colorDiv) {
                     const divs = row.querySelectorAll('div');
                     for (const div of divs) {
@@ -6396,29 +6401,29 @@ export class LogsPage {
                 if (!colorDiv) continue;
 
                 const bgColor = window.getComputedStyle(colorDiv).backgroundColor;
-
-                // Skip if no valid background color
                 if (!bgColor || bgColor === 'rgba(0, 0, 0, 0)' || bgColor === 'transparent') continue;
 
-                // Check for severity value in the row text - look for various patterns
+                const level = colorDiv.getAttribute('data-test-status-level') || null;
+
+                // Best-effort: also recover the raw severity number when the JSON
+                // source column is visible (kept for backward compatibility).
+                let severity = null;
                 for (let sev = 0; sev <= 7; sev++) {
-                    // Match "severity":"X", "severity":X, "severity": X, or severity: X patterns
                     const patterns = [
                         `"severity":"${sev}"`,
                         `"severity":${sev},`,
                         `"severity":${sev}}`,
                         `"severity": ${sev}`,
-                        `severity: ${sev}`
+                        `severity: ${sev}`,
                     ];
-
                     if (patterns.some(pattern => text.includes(pattern))) {
-                        findings.push({
-                            severity: sev,
-                            color: bgColor
-                        });
+                        severity = sev;
                         break;
                     }
                 }
+
+                if (level === null && severity === null) continue;
+                findings.push({ severity, level, color: bgColor });
             }
 
             return findings;
