@@ -19,8 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <Transition name="fade">
       <div
         v-if="modelValue"
-        class="retry-dialog-backdrop"
-        tw:fixed tw:top-0 tw:left-0 tw:w-full tw:h-full tw:bg-[rgba(0,0,0,0.5)] tw:flex tw:justify-center tw:items-center tw:z-[9999]
+        class="retry-dialog-backdrop tw:fixed tw:top-0 tw:left-0 tw:w-full tw:h-full tw:bg-[rgba(0,0,0,0.5)] tw:flex tw:justify-center tw:items-center tw:z-[9999]"
         @click="handleBackdropClick"
       >
         <div
@@ -78,8 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <OIcon name="warning" size="sm" class="tw:text-[#ff9800] tw:shrink-0" />
               <div
-                class="warning-text"
-                tw:flex-1
+                class="warning-text tw:flex-1"
               >
                 <strong>Range requests not supported</strong>
                 <p>
@@ -92,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Retry Options (only shown if range is supported) -->
             <div
               v-if="supportsRange"
-              tw:mt-5
+              class="tw:mt-5"
             >
               <p
                 class="options-title tw:font-semibold tw:mb-4 tw:text-[#333] tw:dark:text-[var(--o2-border)]"
@@ -148,7 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     name="retryOption"
                     :value="true"
                     v-model="resumeFromLast"
-                    tw:absolute tw:opacity-0 tw:cursor-pointer
+                    class="tw:absolute tw:opacity-0 tw:cursor-pointer"
                   />
                   <div
                     class="tw:flex tw:flex-col tw:gap-2"
@@ -184,7 +182,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="outline"
               size="sm-action"
               @click="handleCancel"
-              class="tw:min-w-[100px]""
+              class="tw:min-w-[100px]"
             >
               Cancel
             </OButton>

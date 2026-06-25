@@ -73,7 +73,10 @@
             </div>
           </div>
           <div class="tw:flex tw:items-center tw:justify-between tw:gap-4 tw:mt-4">
-            <div class="tw:text-sm tw:w-28.75 tw:h-7.5 tw:rounded-sm tw:flex tw:items-center tw:justify-center tw:bg-(--o2-theme-color) tw:text-white">
+            <div
+              data-test="enrichment-schema-total-fields"
+              class="tw:text-sm tw:w-28.75 tw:h-7.5 tw:rounded-sm tw:flex tw:items-center tw:justify-center tw:bg-(--o2-theme-color) tw:text-white"
+            >
                 All Fields ({{ schemaData.schema.length }})
             </div>
                 <OSearchInput
