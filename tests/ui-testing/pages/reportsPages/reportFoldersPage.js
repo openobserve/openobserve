@@ -37,6 +37,16 @@ export class ReportFoldersPage {
     this.allFoldersToggle = '[data-test="report-list-search-across-folders-toggle"]';
     this.moveReportBtn = (name) => `[data-test="report-list-${name}-move-report"]`;
 
+    // Bulk operations (visible only when reports are selected)
+    this.reportTable = '[data-test="report-list-table"]';
+    this.bulkMoveBtn = '[data-test="report-list-move-reports-btn"]';
+    this.bulkPauseBtn = '[data-test="report-list-pause-reports-btn"]';
+    this.bulkResumeBtn = '[data-test="report-list-resume-reports-btn"]';
+    this.bulkDeleteBtn = '[data-test="report-list-delete-reports-btn"]';
+    this.bulkDeleteConfirmDialog = '[data-test="dialog-box"]';
+    this.bulkDeleteConfirmBtn = '[data-test="confirm-button"]';
+    this.bulkDeleteCancelBtn = '[data-test="cancel-button"]';
+
     // Page title
     this.pageTitle = '[data-test="report-list-title"]';
   }
@@ -242,5 +252,64 @@ export class ReportFoldersPage {
       return true;
     }
     return false;
+  }
+
+  // ===== BULK OPERATION METHODS =====
+
+  async selectAllReports() {
+    const headerCheckbox = this.page.locator(`${this.reportTable} thead .q-checkbox`).first();
+    await headerCheckbox.waitFor({ state: 'visible', timeout: 5000 });
+    await headerCheckbox.click();
+    await this.page.waitForTimeout(300);
+  }
+
+  async expectBulkButtonsVisible() {
+    await expect(this.page.locator(this.bulkMoveBtn)).toBeVisible({ timeout: 5000 });
+    await expect(this.page.locator(this.bulkPauseBtn)).toBeVisible({ timeout: 5000 });
+    await expect(this.page.locator(this.bulkDeleteBtn)).toBeVisible({ timeout: 5000 });
+  }
+
+  async expectBulkButtonsHidden() {
+    await expect(this.page.locator(this.bulkMoveBtn)).not.toBeVisible({ timeout: 3000 });
+  }
+
+  async clickBulkMove() {
+    await this.page.locator(this.bulkMoveBtn).click();
+    await expect(this.page.locator(this.moveDialogHeader)).toBeVisible({ timeout: 5000 });
+  }
+
+  async clickBulkPause() {
+    await this.page.locator(this.bulkPauseBtn).click();
+    await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+  }
+
+  async clickBulkResume() {
+    await this.page.locator(this.bulkResumeBtn).click();
+    await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+  }
+
+  async clickBulkDelete() {
+    await this.page.locator(this.bulkDeleteBtn).click();
+    await expect(this.page.locator(this.bulkDeleteConfirmDialog)).toBeVisible({ timeout: 5000 });
+  }
+
+  async confirmBulkDelete() {
+    await this.page.locator(this.bulkDeleteConfirmBtn).click();
+    await this.page.locator(this.bulkDeleteConfirmDialog).waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
+    await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+  }
+
+  async cancelBulkDelete() {
+    await this.page.locator(this.bulkDeleteCancelBtn).click();
+    await this.page.locator(this.bulkDeleteConfirmDialog).waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+  }
+
+  async getSelectedReportCount() {
+    const rows = this.page.locator(`${this.reportTable} tbody tr.selected`);
+    return await rows.count();
+  }
+
+  async isBulkResumeBtnVisible() {
+    return await this.page.locator(this.bulkResumeBtn).isVisible({ timeout: 2000 }).catch(() => false);
   }
 }
