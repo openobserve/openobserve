@@ -1,6 +1,4 @@
 //! `SeaORM` Entity for synthetics_jobs table.
-//! Note: actual DB operations use raw SQL (SKIP LOCKED, RETURNING) — this entity
-//! is used only for type definitions and is NOT used with ActiveModel CRUD.
 
 use sea_orm::entity::prelude::*;
 

@@ -15,13 +15,18 @@
 
 //! DB functions for `synthetics_jobs`.
 //!
-//! All operations use raw SQL. Sea-orm's query builder does not support
-//! `FOR UPDATE SKIP LOCKED` or `RETURNING`, which are both required here.
-//! No `get_lock()` — SKIP LOCKED handles concurrency at the DB level.
+//! `lease_batch` uses the sea-orm query builder (SELECT → UPDATE → SELECT)
+//! so it works on both SQLite and Postgres without raw SQL dialect branches.
+//! Other functions use `Statement::from_sql_and_values` which handles
+//! placeholder translation ($N → ?) automatically per backend.
 
-use sea_orm::{ConnectionTrait, DbErr, Statement, Value};
+use sea_orm::{
+    ColumnTrait, ConnectionTrait, DbErr, EntityTrait, QueryFilter, QueryOrder, QuerySelect,
+    Statement, Value, sea_query::Expr,
+};
 use serde::Serialize;
 
+use super::entity::synthetics_jobs::{Column, Entity};
 use crate::errors;
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -146,8 +151,10 @@ pub async fn drain_monitor<C: ConnectionTrait>(
 
 // ── Dispatcher: lease ─────────────────────────────────────────────────────────
 
-/// Atomically leases up to `limit` pending checks from a pool using SKIP LOCKED.
-/// Sets status=1, records claimed_by/claimed_at, and sets lease_expires_at.
+/// Leases up to `limit` pending checks from a pool.
+///
+/// Three steps: SELECT candidate IDs → UPDATE status/lease fields → SELECT
+/// full rows. No raw SQL, works on SQLite and Postgres.
 pub async fn lease_batch<C: ConnectionTrait>(
     conn: &C,
     pool: &str,
@@ -158,56 +165,54 @@ pub async fn lease_batch<C: ConnectionTrait>(
 ) -> Result<Vec<LeasedRow>, errors::Error> {
     let lease_expires_at = now_us + lease_secs * 1_000_000;
 
-    let sql = r#"
-        UPDATE synthetics_jobs SET
-            status           = 1,
-            claimed_by       = $1,
-            claimed_at       = $2,
-            lease_expires_at = $3,
-            attempts         = attempts + 1
-        WHERE id IN (
-            SELECT id FROM synthetics_jobs
-            WHERE pool = $4
-              AND status = 0
-              AND valid_until > $2
-            ORDER BY scheduled_ts
-            FOR UPDATE SKIP LOCKED
-            LIMIT $5
-        )
-        RETURNING id, monitor_id, org_id, location, pool,
-                  browser_engine, device, scheduled_ts, valid_until
-    "#;
-
-    let rows = conn
-        .query_all(Statement::from_sql_and_values(
-            conn.get_database_backend(),
-            sql,
-            [
-                Value::from(claimed_by),
-                Value::from(now_us),
-                Value::from(lease_expires_at),
-                Value::from(pool),
-                Value::from(limit),
-            ],
-        ))
+    // Step 1: pick candidate IDs.
+    let ids: Vec<i64> = Entity::find()
+        .select_only()
+        .column(Column::Id)
+        .filter(Column::Pool.eq(pool))
+        .filter(Column::Status.eq(0i32))
+        .filter(Column::ValidUntil.gt(now_us))
+        .order_by_asc(Column::ScheduledTs)
+        .limit(limit as u64)
+        .into_tuple::<i64>()
+        .all(conn)
         .await?;
 
-    rows.into_iter()
-        .map(|row| {
-            Ok(LeasedRow {
-                id: row.try_get("", "id")?,
-                monitor_id: row.try_get("", "monitor_id")?,
-                org_id: row.try_get("", "org_id")?,
-                location: row.try_get("", "location")?,
-                pool: row.try_get("", "pool")?,
-                browser_engine: row.try_get("", "browser_engine")?,
-                device: row.try_get("", "device")?,
-                scheduled_ts: row.try_get("", "scheduled_ts")?,
-                valid_until: row.try_get("", "valid_until")?,
-            })
+    if ids.is_empty() {
+        return Ok(vec![]);
+    }
+
+    // Step 2: mark them leased.
+    Entity::update_many()
+        .col_expr(Column::Status, Expr::value(1i32))
+        .col_expr(Column::ClaimedBy, Expr::value(claimed_by))
+        .col_expr(Column::ClaimedAt, Expr::value(now_us))
+        .col_expr(Column::LeaseExpiresAt, Expr::value(lease_expires_at))
+        .col_expr(Column::Attempts, Expr::col(Column::Attempts).add(1i32))
+        .filter(Column::Id.is_in(ids.clone()))
+        .exec(conn)
+        .await?;
+
+    // Step 3: return the leased rows.
+    let models = Entity::find()
+        .filter(Column::Id.is_in(ids))
+        .all(conn)
+        .await?;
+
+    Ok(models
+        .into_iter()
+        .map(|m| LeasedRow {
+            id: m.id,
+            monitor_id: m.monitor_id,
+            org_id: m.org_id,
+            location: m.location,
+            pool: m.pool,
+            browser_engine: m.browser_engine,
+            device: m.device,
+            scheduled_ts: m.scheduled_ts,
+            valid_until: m.valid_until,
         })
-        .collect::<Result<Vec<_>, DbErr>>()
-        .map_err(errors::Error::from)
+        .collect())
 }
 
 // ── Job API: ack ──────────────────────────────────────────────────────────────
