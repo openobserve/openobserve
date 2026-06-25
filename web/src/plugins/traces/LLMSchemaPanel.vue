@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div
           v-if="panel.subtitle"
-          class="tw:text-[0.7rem] tw:text-[var(--o2-text-muted)] tw:mt-[0.1rem]"
+          class="tw:text-[0.7rem] tw:leading-normal tw:mt-[0.1rem]"
         >
           {{ panel.subtitle }}
         </div>

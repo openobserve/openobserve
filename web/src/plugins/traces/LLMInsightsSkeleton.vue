@@ -21,6 +21,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'
     "
   >
+    <!-- Toolbar: Stream/Agent toggle + picker. Only in the full-page skeleton
+         (the kpiOnly variant renders beneath the real toolbar). Mirrors the
+         toolbar's justify-end layout + py so the streamsLoaded flip doesn't
+         shift the KPI row down when the real toggle/picker appear. -->
+    <div
+      v-if="!kpiOnly"
+      class="tw:flex tw:items-center tw:justify-end tw:gap-[0.5rem] tw:py-[0.5rem]"
+    >
+      <SkeletonBox width="116px" height="32px" rounded />
+      <SkeletonBox width="14rem" height="36px" rounded />
+    </div>
+
     <!-- Row 1: 5 KPI cards -->
     <div class="tw:grid tw:grid-cols-5 tw:gap-[0.625rem]">
       <div
@@ -117,7 +129,10 @@ const store = useStore();
 
 <style scoped lang="scss">
 .llm-insights-skeleton {
-  padding-top: 0.625rem;
+  // No padding-top: the real content spaces its first row with mt-[0.625rem]
+  // (live KPI grid + the kpiOnly call-site class), and the full-page skeleton's
+  // toolbar row sits flush like the real toolbar. Adding pt here would
+  // double-count and shift every row down on the skeleton→content swap.
 }
 
 .kpi-tile,
@@ -144,7 +159,7 @@ const store = useStore();
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  height: 130px;
+  height: 134px;
 
   &__spark {
     display: flex;
