@@ -29,14 +29,14 @@ const logoSrc = computed(() =>
       </div>
 
       <div class="welcome-hero__heading-block tw:flex tw:items-center">
-        <h1 class="welcome-hero__title tw:m-0 tw:text-[32px] tw:font-bold tw:tracking-[-0.01em] tw:leading-[1.15] tw:text-[var(--color-typography-body)] tw:flex tw:items-center tw:gap-2">
+        <div class="welcome-hero__title tw:m-0 tw:text-[32px] tw:font-bold tw:tracking-[-0.01em] tw:leading-[1.15] tw:text-[var(--color-typography-body)] tw:flex tw:items-center tw:gap-2">
           {{ greeting }}
           <span class="welcome-hero__wave tw:text-[26px] tw:leading-none tw:inline-block tw:[animation:wave_2.4s_ease-in-out_0.4s_2] tw:[transform-origin:70%_70%]" aria-hidden="true">👋</span>
-        </h1>
+        </div>
       </div>
     </div>
 
-    <p class="welcome-hero__tagline tw:mt-1 tw:text-[13.5px] tw:leading-[1.6] tw:text-[var(--color-typography-meta)] tw:max-w-[38rem] tw:m-0">
+    <div class="welcome-hero__tagline tw:mt-1 tw:text-[13.5px] tw:leading-[1.6] tw:text-[var(--color-typography-meta)] tw:max-w-[38rem] tw:m-0">
       {{ t("aiAssistant.welcome.taglineLead") }}
       <span class="welcome-hero__highlight tw:font-semibold tw:bg-[linear-gradient(90deg,#f59e0b,#ec4899,#7b61ff)] tw:[background-clip:text] tw:[-webkit-background-clip:text] tw:text-transparent">{{
         t("aiAssistant.welcome.taglineHighlight")
@@ -53,7 +53,7 @@ const logoSrc = computed(() =>
         t("aiAssistant.welcome.taglinePromql")
       }}</span>
       — {{ t("aiAssistant.welcome.taglineAnd") }}
-    </p>
+    </div>
 
     <div v-if="email" class="welcome-hero__meta tw:inline-flex tw:flex-wrap tw:items-center tw:justify-center tw:gap-x-2 tw:gap-y-[0.375rem] tw:mt-[0.375rem] tw:py-[0.375rem] tw:px-3 tw:rounded-full tw:bg-[color-mix(in_srgb,var(--color-border-default)_30%,transparent)] tw:text-[11.5px]">
       <span class="welcome-hero__meta-item tw:inline-flex tw:items-center tw:gap-1">

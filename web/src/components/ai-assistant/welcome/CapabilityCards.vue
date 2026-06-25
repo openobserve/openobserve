@@ -37,12 +37,12 @@ const emit = defineEmits<{ (e: "select", prompt: string): void }>();
       >
         <OIcon :name="card.icon" size="md" :class="card.iconColorClass" />
       </div>
-      <h3 class="capability-card__title tw:relative tw:z-[1] tw:m-0 tw:text-sm tw:font-semibold tw:leading-[1.3] tw:text-[var(--color-typography-body)] tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis">
+      <div class="capability-card__title tw:relative tw:z-[1] tw:m-0 tw:text-sm tw:font-semibold tw:leading-[1.3] tw:text-[var(--color-typography-body)] tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis">
         {{ t(`aiAssistant.capabilities.${card.id}.title`) }}
-      </h3>
-      <p class="capability-card__desc tw:relative tw:z-[1] tw:mt-[0.375rem] tw:mb-0 tw:text-xs tw:leading-[1.45] tw:text-[var(--color-text-secondary)]">
+      </div>
+      <div class="capability-card__desc tw:relative tw:z-[1] tw:mt-[0.375rem] tw:mb-0 tw:text-xs tw:leading-[1.45] tw:text-[var(--color-text-secondary)]">
         {{ t(`aiAssistant.capabilities.${card.id}.description`) }}
-      </p>
+      </div>
       <span
         class="capability-card__chevron tw:z-[1] tw:absolute tw:top-[0.875rem] tw:right-[0.875rem] tw:w-[22px] tw:h-[22px] tw:inline-flex tw:items-center tw:justify-center tw:rounded-full tw:bg-[rgba(var(--accent),0.15)] tw:text-[rgba(var(--accent),1)] tw:opacity-0 tw:translate-x-[-4px] tw:translate-y-[4px] tw:transition-[opacity,transform] tw:duration-200 tw:ease-[ease] tw:group-hover/card:opacity-100 tw:group-hover/card:translate-x-0 tw:group-hover/card:translate-y-0"
         aria-hidden="true"
