@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- ── Header ──────────────────────────────────────────────────────── -->
     <div class="tw:flex tw:items-start tw:gap-3 tw:mb-2">
-      <div class="tw:w-12 tw:h-12 tw:rounded-lg tw:flex tw:items-center tw:justify-center tw:shrink-0 tw:bg-[color-mix(in_srgb,var(--o2-primary-color)_12%,var(--o2-card-bg))] tw:text-(--o2-primary-color)">
+      <div data-test="feature-comparison-table-icon-wrapper" class="tw:w-12 tw:h-12 tw:rounded-lg tw:flex tw:items-center tw:justify-center tw:shrink-0 tw:bg-[color-mix(in_srgb,var(--o2-primary-color)_12%,var(--o2-card-bg))] tw:text-(--o2-primary-color)">
         <OIcon name="compare-arrows" size="md" />
       </div>
       <div>
@@ -38,11 +38,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-for="ed in editionList"
         :key="ed.id"
+        data-test="feature-comparison-table-edition-card"
+        :data-test-active="buildType === ed.id ? 'true' : undefined"
         class="tw:relative tw:flex tw:flex-col tw:bg-(--o2-card-bg) tw:rounded-xl tw:p-6 tw:max-[1024px]:p-4 tw:border tw:border-(--o2-border-color)"
         :class="{ 'tw:border-2 tw:border-(--o2-primary-color) tw:pt-7 tw:max-[1024px]:pt-5': buildType === ed.id }"
       >
         <!-- Your Plan badge (floats above the card top border) -->
-        <div v-if="buildType === ed.id" class="tw:absolute tw:top-[-14px] tw:left-1/2 tw:-translate-x-1/2 tw:inline-flex tw:items-center tw:py-1 tw:px-[0.875rem] tw:rounded-full tw:text-[0.625rem] tw:font-bold tw:uppercase tw:tracking-[0.08em] tw:whitespace-nowrap tw:bg-(--o2-primary-color) tw:text-(--o2-primary-foreground)">
+        <div v-if="buildType === ed.id" data-test="feature-comparison-table-your-plan-badge" class="tw:absolute tw:top-[-14px] tw:left-1/2 tw:-translate-x-1/2 tw:inline-flex tw:items-center tw:py-1 tw:px-[0.875rem] tw:rounded-full tw:text-[0.625rem] tw:font-bold tw:uppercase tw:tracking-[0.08em] tw:whitespace-nowrap tw:bg-(--o2-primary-color) tw:text-(--o2-primary-foreground)">
           <OIcon name="arrow-upward" size="sm" class="tw:mr-1" />
           Your Plan
         </div>
@@ -59,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="tw:bg-[color-mix(in_srgb,var(--o2-primary-color)_5%,var(--o2-card-bg))] tw:border tw:border-[color-mix(in_srgb,var(--o2-primary-color)_15%,transparent)] tw:rounded-lg tw:p-3 tw:mb-4">
           <div class="tw:text-[0.5625rem] tw:font-bold tw:uppercase tw:tracking-[0.12em] tw:text-(--o2-text-label) tw:m-0 tw:mb-2">ALL FIVE PILLARS</div>
           <div class="tw:flex tw:flex-wrap tw:gap-1.5 tw:mb-1.5">
-            <span v-for="pillarId in PILLAR_IDS" :key="pillarId" class="tw:inline-flex tw:items-center tw:py-[0.1875rem] tw:px-2 tw:rounded tw:text-[0.6875rem] tw:font-medium tw:bg-[color-mix(in_srgb,var(--o2-primary-color)_10%,var(--o2-card-bg))] tw:text-(--o2-primary-color) tw:border tw:border-[color-mix(in_srgb,var(--o2-primary-color)_20%,transparent)] tw:mr-[0.375rem] tw:mb-[0.375rem]">
+            <span v-for="pillarId in PILLAR_IDS" :key="pillarId" data-test="feature-comparison-table-pillar-chip" class="tw:inline-flex tw:items-center tw:py-[0.1875rem] tw:px-2 tw:rounded tw:text-[0.6875rem] tw:font-medium tw:bg-[color-mix(in_srgb,var(--o2-primary-color)_10%,var(--o2-card-bg))] tw:text-(--o2-primary-color) tw:border tw:border-[color-mix(in_srgb,var(--o2-primary-color)_20%,transparent)] tw:mr-[0.375rem] tw:mb-[0.375rem]">
               {{ t(`about.feature_${pillarId}`) }}
             </span>
           </div>
@@ -71,6 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <li
             v-for="feature in listFeatures"
             :key="feature.id"
+            data-test="feature-comparison-table-feature-item"
             class="tw:flex tw:items-start tw:gap-2 tw:py-[0.4375rem] tw:text-[0.8125rem] tw:border-b tw:border-(--o2-border-color) tw:last:border-b-0"
             :class="{
               'tw:text-[var(--o2-text-body)]': getFeatureStatus(feature, ed.id) !== 'unavailable',
@@ -107,11 +110,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="tw:mt-4">
           <div class="tw:h-px tw:bg-(--o2-border-color) tw:mb-3"></div>
           <div class="tw:mb-[0.875rem]">
-            <div class="tw:flex tw:justify-between tw:items-baseline tw:text-[0.8125rem] tw:py-[0.125rem]">
+            <div data-test="feature-comparison-table-footer-row" class="tw:flex tw:justify-between tw:items-baseline tw:text-[0.8125rem] tw:py-[0.125rem]">
               <span class="tw:text-(--o2-text-muted) tw:font-medium">{{ t('about.feature_license') }}</span>
               <span class="tw:text-(--o2-text-body) tw:font-semibold">{{ ed.license }}</span>
             </div>
-            <div class="tw:flex tw:justify-between tw:items-baseline tw:text-[0.8125rem] tw:py-[0.125rem]">
+            <div data-test="feature-comparison-table-footer-row" class="tw:flex tw:justify-between tw:items-baseline tw:text-[0.8125rem] tw:py-[0.125rem]">
               <span class="tw:text-(--o2-text-muted) tw:font-medium">{{ t('about.feature_support') }}</span>
               <span class="tw:text-(--o2-text-body) tw:font-semibold">{{ ed.support }}</span>
             </div>
@@ -120,11 +123,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="ed.ctaUrl"
             :href="ed.ctaUrl"
             target="_blank"
+            data-test="feature-comparison-table-cta-btn"
+            data-test-cta="action"
             class="tw:block tw:w-full tw:py-2 tw:px-4 tw:rounded-md tw:text-sm tw:font-semibold tw:text-center tw:no-underline tw:cursor-pointer tw:transition-all tw:duration-200 tw:border-[1.5px] tw:border-solid tw:bg-[color-mix(in_srgb,var(--o2-primary-color)_10%,var(--o2-card-bg))] tw:text-(--o2-primary-color) tw:border-[color-mix(in_srgb,var(--o2-primary-color)_30%,transparent)] tw:hover:bg-[color-mix(in_srgb,var(--o2-primary-color)_18%,var(--o2-card-bg))] tw:hover:border-(--o2-primary-color)"
           >
             {{ ed.ctaLabel }}
           </a>
-          <button v-else class="tw:block tw:w-full tw:py-2 tw:px-4 tw:rounded-md tw:text-sm tw:font-semibold tw:text-center tw:no-underline tw:cursor-default tw:transition-all tw:duration-200 tw:border-[1.5px] tw:border-solid tw:bg-transparent tw:text-(--o2-text-muted) tw:border-(--o2-border-color)" disabled>
+          <button v-else data-test="feature-comparison-table-cta-btn" data-test-cta="current" class="tw:block tw:w-full tw:py-2 tw:px-4 tw:rounded-md tw:text-sm tw:font-semibold tw:text-center tw:no-underline tw:cursor-default tw:transition-all tw:duration-200 tw:border-[1.5px] tw:border-solid tw:bg-transparent tw:text-(--o2-text-muted) tw:border-(--o2-border-color)" disabled>
             {{ ed.ctaLabel }}
           </button>
         </div>
