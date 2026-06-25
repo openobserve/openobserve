@@ -4,10 +4,13 @@ Assertion-integrity analyzer for the E2E Council pipeline (deterministic — no 
 
 Two modes:
   fingerprint <spec.js>                         -> print a JSON fingerprint of the spec's assertions
-  check <spec.js> [--baseline <fingerprint.json>] [--allow-weakening]
+  check <spec.js> [--baseline <fingerprint.json>] [--allow-weakening] [--strengthen]
                                                 -> static anti-pattern scan + (optional) diff-aware
                                                    heal-weakening check; writes nothing, prints a JSON
                                                    verdict, exits 2 if any CRITICAL finding.
+                                                   --strengthen (Refiner mode): permit ADDED negative
+                                                   matchers (assert-absence is valid strengthening);
+                                                   still blocks any DROP of assertions.
 
 Conservative by design: only HIGH-CONFIDENCE patterns are flagged as critical, because a gate with
 false positives gets disabled by humans (the same trap that made mutation-testing a poor fit).
@@ -166,11 +169,17 @@ def swallowed_assertion_tests(lines):
     return flagged
 
 
-def check(spec_path, baseline=None, allow_weakening=False):
+def check(spec_path, baseline=None, allow_weakening=False, strengthen=False):
     """Run the static anti-pattern scan (tautologies, conditional-only assertions) and, when a
     baseline is given, the diff-aware heal-weakening guard. Returns a verdict dict; never raises on
     a malformed/partial baseline — missing baseline keys fall back to the current value (skip that
-    comparison) rather than crashing the gate."""
+    comparison) rather than crashing the gate.
+
+    `strengthen` (Refiner mode): the Refiner's job is to STRENGTHEN weak/mismatched tests, which can
+    legitimately ADD negative matchers (e.g. assert a column is *absent* before a re-search). In that
+    mode we relax ONLY the crude `heal-inverted-assertions` heuristic (negatives-rose) — a genuine
+    positive→negative FLIP still drops the expect() count and is caught by `heal-removed-assertions`.
+    Removed-assertions and over-skip guards (and every static anti-pattern check) STILL apply."""
     src = open(spec_path, encoding='utf-8').read()
     lines = src.split('\n')
     findings = []
@@ -207,7 +216,7 @@ def check(spec_path, baseline=None, allow_weakening=False):
         if fp['expects'] < base_expects:
             findings.append({'severity': 'critical', 'rule': 'heal-removed-assertions',
                              'detail': f"expect() count dropped {base_expects} -> {fp['expects']} during heal"})
-        if fp['negatives'] > base_negatives:
+        if fp['negatives'] > base_negatives and not strengthen:
             findings.append({'severity': 'critical', 'rule': 'heal-inverted-assertions',
                              'detail': f"negative matchers rose {base_negatives} -> {fp['negatives']} during heal (positive flipped to negative?)"})
         if fp['skips'] > base_skips:
@@ -226,13 +235,15 @@ def main():
     if mode == 'fingerprint':
         print(json.dumps(fingerprint(open(spec, encoding='utf-8').read())))
         return
-    baseline, allow = None, False
+    baseline, allow, strengthen = None, False, False
     args = sys.argv[3:]
     if '--baseline' in args:
         baseline = json.load(open(args[args.index('--baseline') + 1]))
     if '--allow-weakening' in args:
         allow = True
-    result = check(spec, baseline, allow)
+    if '--strengthen' in args:
+        strengthen = True
+    result = check(spec, baseline, allow, strengthen)
     print(json.dumps(result, indent=2))
     sys.exit(2 if result['verdict'] == 'FAIL' else 0)
 
