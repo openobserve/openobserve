@@ -173,7 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- -- Left sidebar -- -->
             <template #before>
               <div
-                class="card-container tw:h-full tw:min-h-0 tw:flex tw:flex-col tw:bg-white tw:dark:bg-[#202223]!"
+                class="tw:h-full tw:min-h-0 tw:flex tw:flex-col tw:bg-surface-overlay"
               >
                 <!-- Search -->
                   <div
@@ -204,7 +204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <template v-if="group.streams.length > 0">
                         <div
-                          class="tw:flex tw:items-center tw:justify-between tw:py-1.5 tw:px-2 tw:bg-(--q-color-grey-2,#f5f5f5) tw:border-b tw:border-solid tw:border-(--o2-border) tw:sticky tw:top-0 tw:z-10 tw:cursor-pointer tw:dark:bg-[#202223]! tw:dark:border-[rgba(255,255,255,0.1)]"
+                          class="tw:flex tw:items-center tw:justify-between tw:py-1.5 tw:px-2 tw:bg-(--o2-section-header-bg) tw:border-b tw:border-solid tw:border-(--o2-border) tw:sticky tw:top-0 tw:z-10 tw:cursor-pointer"
                           @click="toggleGroupCollapse(group.id)"
                         >
                           <div class="tw:flex tw:items-center tw:gap-[0.375rem] tw:text-[0.6875rem] tw:font-bold tw:uppercase tw:tracking-[0.05em] tw:opacity-75">
@@ -502,7 +502,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <!-- Header -->
             <div
-              class="tw:p-3 tw:border-b tw:border-solid tw:border-(--o2-border-color) tw:bg-white tw:dark:bg-[#1e1e1e]"
+              class="tw:p-3 tw:border-b tw:border-solid tw:border-(--o2-border-color) tw:bg-surface-panel"
             >
               <div class="tw:flex tw:items-center tw:gap-3">
                 <OIcon name="hub" size="md" />
@@ -578,7 +578,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </ODrawer>
 
   <!-- Embedded Tabs Mode -->
-  <div v-else class="tw:flex tw:flex-col tw:h-full tw:w-full tw:bg-white! tw:dark:bg-[#1e1e1e]!">
+  <div v-else class="tw:flex tw:flex-col tw:h-full tw:w-full tw:bg-surface-panel">
     <!-- Dimensions Display - Stable (matched) and Unstable (additional) -->
     <DimensionFiltersBar
       v-if="!props.hideDimensionFilters"
@@ -675,7 +675,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- -- Left sidebar -- -->
           <template #before>
             <div
-              class="card-container tw:h-full tw:min-h-0 tw:flex tw:flex-col tw:bg-white tw:dark:bg-[#202223]!"
+              class="tw:h-full tw:min-h-0 tw:flex tw:flex-col tw:bg-surface-overlay"
             >
             <div
               class="dimension-sidebar-search-container tw:p-[0.625rem] tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
@@ -705,7 +705,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <template v-if="group.streams.length > 0">
                       <div
-                        class="tw:flex tw:items-center tw:justify-between tw:py-1.5 tw:px-2 tw:bg-(--q-color-grey-2,#f5f5f5) tw:border-b tw:border-solid tw:border-(--o2-border) tw:sticky tw:top-0 tw:z-10 tw:cursor-pointer tw:dark:bg-[#202223]! tw:dark:border-[rgba(255,255,255,0.1)]"
+                        class="tw:flex tw:items-center tw:justify-between tw:py-1.5 tw:px-2 tw:bg-(--o2-section-header-bg) tw:border-b tw:border-solid tw:border-(--o2-border) tw:sticky tw:top-0 tw:z-10 tw:cursor-pointer"
                         @click="toggleGroupCollapse(group.id)"
                       >
                         <div class="tw:flex tw:items-center tw:gap-[0.375rem] tw:text-[0.6875rem] tw:font-bold tw:uppercase tw:tracking-[0.05em] tw:opacity-75">
@@ -1002,7 +1002,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <!-- Header -->
           <div
-            class="tw:p-3 tw:border-b tw:border-solid tw:border-(--o2-border-color) tw:bg-white tw:dark:bg-[#1e1e1e]"
+            class="tw:p-3 tw:border-b tw:border-solid tw:border-(--o2-border-color) tw:bg-surface-panel"
           >
             <div class="tw:flex tw:items-center tw:gap-3">
               <OIcon name="hub" size="md" />
@@ -1103,7 +1103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Group section — tw:hidden when no streams match -->
           <template v-if="group.streams.length > 0">
             <!-- Group header -->
-            <div class="tw:flex tw:items-center tw:justify-between tw:py-1.5 tw:px-2 tw:bg-(--q-color-grey-2,#f5f5f5) tw:border-b tw:border-solid tw:border-(--o2-border) tw:sticky tw:top-0 tw:z-10 tw:dark:bg-[#202223]! tw:dark:border-[rgba(255,255,255,0.1)]">
+            <div class="tw:flex tw:items-center tw:justify-between tw:py-1.5 tw:px-2 tw:bg-(--o2-section-header-bg) tw:border-b tw:border-solid tw:border-(--o2-border) tw:sticky tw:top-0 tw:z-10">
               <div class="tw:flex tw:items-center tw:gap-[0.375rem] tw:text-[0.6875rem] tw:font-bold tw:uppercase tw:tracking-[0.05em] tw:opacity-75">
                 <OIcon v-if="typeof group.icon === 'string'" :name="group.icon" size="xs" class="tw:mr-0.5" />
                 <component v-else :is="group.icon" />
