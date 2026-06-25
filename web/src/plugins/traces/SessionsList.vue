@@ -517,6 +517,15 @@ function statusDotClass(s: SessionRow["status"]): string {
   }
 }
 
+// Load the trace-stream list at most once per mount. Both the initial mount
+// and the (parent-driven) session load await the SAME promise, so a load can
+// neither race ahead of the stream list nor trigger a second stream fetch.
+let streamsPromise: Promise<void> | null = null;
+function ensureStreamsLoaded(): Promise<void> {
+  if (!streamsPromise) streamsPromise = loadTraceStreams();
+  return streamsPromise;
+}
+
 async function loadTraceStreams() {
   streamsLoaded.value = false;
   try {
@@ -587,6 +596,18 @@ async function loadSessions(startTime?: number, endTime?: number) {
   if (!start || !end) return;
   localStorage.setItem(MODE_LS_KEY, filterMode.value);
 
+  // Hold the table skeleton across the whole load. We await the stream list and
+  // (in Agent mode) the agents API before `fetchPage`, which is the only thing
+  // that flips `loading`. Setting it true up front means the table shows one
+  // continuous skeleton instead of flashing its empty body between phases.
+  loading.value = true;
+
+  // Stream-mode reads `effectiveStream` from `activeStream`, which is only set
+  // once the stream list loads — so make sure that's done before we fetch,
+  // regardless of whether this call raced ahead of the mount's stream load.
+  await ensureStreamsLoaded();
+
+  // Agents API is only relevant in Agent mode — don't touch it in Stream mode.
   if (filterMode.value === "agent") {
     await loadAgents(start, end);
     if (pendingAgentName.value) {
@@ -600,7 +621,6 @@ async function loadSessions(startTime?: number, endTime?: number) {
     localStorage.setItem(AGENT_LS_KEY, activeAgent.value);
   } else {
     localStorage.setItem(STREAM_LS_KEY, activeStream.value);
-    loadAgents(start, end);
   }
 
   syncFilterUrl();
@@ -608,6 +628,7 @@ async function loadSessions(startTime?: number, endTime?: number) {
   const stream = effectiveStream.value;
   if (!stream) {
     clearSessionRows();
+    loading.value = false; // nothing to fetch — release the held skeleton
     return;
   }
   await fetchPage(
@@ -681,13 +702,11 @@ watch(loading, (isLoading, wasLoading) => {
 
 defineExpose({ refresh, lastRunAt, loading });
 
-onMounted(async () => {
-  if (!streamsLoaded.value) {
-    await loadTraceStreams();
-  }
-  if (activeStream.value || filterMode.value === "agent") {
-    loadSessions();
-  }
+onMounted(() => {
+  // Only kick off the stream-list load here. The session fetch is driven by the
+  // parent (its DateTime fires an initial `on:date-change` on mount, plus the
+  // refresh button) — a single owner, so we don't double-fetch on load.
+  ensureStreamsLoaded();
 });
 
 onUnmounted(() => {
