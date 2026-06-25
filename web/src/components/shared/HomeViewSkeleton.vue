@@ -8,10 +8,11 @@
   >
     <!-- 1st section - Streams container -->
     <div
+      data-test="home-view-skeleton-streams-container"
       class="feature-card tw:bg-(--tile-bg) tw:border-[0.0625rem] tw:border-(--o2-border-color) tw:rounded-lg tw:p-4"
     >
       <!-- Header -->
-      <div class="tw:flex tw:justify-between tw:items-center tw:mb-4">
+      <div data-test="home-view-skeleton-streams-header" class="tw:flex tw:justify-between tw:items-center tw:mb-4">
         <div class="tw:flex tw:items-center tw:gap-2">
           <SkeletonBox variant="avatar" width="40px" height="40px" />
           <SkeletonBox variant="title" width="100px" />
@@ -21,7 +22,7 @@
 
       <!-- Tiles using same grid as HomeView -->
       <div class="tiles-grid tw:grid tw:gap-4" style="grid-template-columns: repeat(auto-fit, minmax(240px, 1fr))">
-        <div v-for="n in 5" :key="n" class="tw:rounded-[0.325rem] tw:border-[0.0625rem] tw:border-(--o2-border-color)">
+        <div v-for="n in 5" :key="n" data-test="home-view-skeleton-tile" class="tw:rounded-[0.325rem] tw:border-[0.0625rem] tw:border-(--o2-border-color)">
           <div
             class="tile-content tw:h-full tw:p-4 tw:rounded-lg tw:gap-2 tw:rounded tw:text-center tw:flex tw:flex-col tw:justify-between tw:bg-(--tile-bg) tw:border tw:border-(--tile-border) tw:text-(--text-primary)"
             :class="
