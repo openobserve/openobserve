@@ -5203,6 +5203,17 @@ export class LogsPage {
         ).toHaveCount(0);
     }
 
+    /**
+     * Click the remove/close button on a table column header.
+     * @param {string} fieldName - The field/column name (e.g. 'message')
+     */
+    async clickRemoveColumnHeaderButton(fieldName) {
+        const removeBtn = this.page.locator(`[data-test="logs-search-result-table-th-remove-${fieldName}-btn"]`);
+        await removeBtn.waitFor({ state: 'visible', timeout: 10000 });
+        await removeBtn.click();
+        testLogger.info(`Clicked remove button on column header: ${fieldName}`);
+    }
+
     // New POM methods for PR tests
 
     async executeBlankQueryWithKeyboardShortcut() {

@@ -1,0 +1,28 @@
+{
+  "feature_slug": "fts-default-column",
+  "feature_title": "FTS Default Column Selection",
+  "area": "Logs",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "ftsDefaultColumn.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Logs/ftsDefaultColumn.spec.js",
+  "playwright_group": "Logs-Core",
+  "source_files": [
+    "web/src/composables/useLogs.ts",
+    "web/src/plugins/logs/SearchResult.vue",
+    "web/src/plugins/logs/TenstackTable.vue",
+    "web/src/composables/useLogs/useStreamFields.ts",
+    "web/src/composables/useLogs/useSearchBar.ts",
+    "web/src/composables/useLogs/logsUtils.ts",
+    "web/src/composables/useLogs/searchState.ts",
+    "web/src/plugins/logs/IndexList.vue",
+    "web/src/plugins/logs/SearchBar.vue",
+    "web/src/plugins/logs/Index.vue",
+    "web/src/utils/logs/constants.ts",
+    "web/src/utils/query/sqlDiagnostics.ts"
+  ],
+  "existing_tests_in_diff": true,
+  "skip": false,
+  "skip_reason": ""
+}

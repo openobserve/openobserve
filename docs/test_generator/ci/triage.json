@@ -1,0 +1,36 @@
+{
+  "feature_slug": "fts-default-column",
+  "feature_title": "FTS Default Column Selection",
+  "area": "Logs",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "ftsDefaultColumn.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Logs/ftsDefaultColumn.spec.js",
+  "playwright_group": "Logs-Core",
+  "source_files": [
+    "web/src/composables/useLogs.ts",
+    "web/src/plugins/logs/SearchResult.vue",
+    "web/src/plugins/logs/TenstackTable.vue",
+    "web/src/composables/useLogs/useStreamFields.ts",
+    "web/src/composables/useLogs/useSearchBar.ts",
+    "web/src/composables/useLogs/logsUtils.ts",
+    "web/src/composables/useLogs/searchState.ts",
+    "web/src/plugins/logs/IndexList.vue",
+    "web/src/plugins/logs/SearchBar.vue",
+    "web/src/plugins/logs/Index.vue",
+    "web/src/utils/logs/constants.ts",
+    "web/src/utils/query/sqlDiagnostics.ts"
+  ],
+  "existing_tests_in_diff": true,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "All changed file paths are under web/src/ (OSS frontend) and tests/ui-testing/ (OSS tests). No paths under enterprise/, o2_enterprise/, or src/enterprise/ directories. No enterprise keywords (cipher/SSO/SAML/RBAC/SDR/sensitive-data/logo-management) appear in the changed paths or symbol names.",
+    "skip": "Not skipping — the change is user-facing. It introduces an FTS default-column feature that changes which column renders by default in the logs results table (promoting a full-text-search body column instead of the generic source JSON). No explicit opt-out label or skip comment was present.",
+    "e2e": "E2E is warranted — the feature alters the default logs results table view, column pinning/removal persistence, stream-switch column clearing, SQL-mode column authority, and severity color rendering. These are all user-visible UI interactions that need verification across modes (quick mode, SQL mode, histogram mode) and user actions (pin, remove, field toggle, stream change, saved view load).",
+    "area": "All changed source files live under web/src/plugins/logs/ and web/src/composables/useLogs/, with corresponding test specs under tests/ui-testing/playwright-tests/Logs/. The Logs product area is the only logical choice.",
+    "group": "Logs-Core — the feature fundamentally changes the default rendering behavior of every logs search result view, not an optional add-on. The heavily modified severity-color spec (logstable.spec.js) already lives in Logs-Core. Another reasonable alternative is Logs-Features (where indexquery.spec.js lives), but the core/universal nature of this rendering change favors Logs-Core.",
+    "existing_tests": "Three Playwright E2E specs are modified in the diff: indexquery.spec.js, logsquickmode.spec.js, and logstable.spec.js — all under tests/ui-testing/playwright-tests/Logs/. These adaptations adjust existing assertions to accommodate the new default column (e.g., using ftsDefaultColumn selectors, relaxing column-specific assertions). They do not exhaustively test the new feature's behavior (system-pick-vs-user-pick semantics, SQL-mode exclusion, stream-change clearing, persistence prevention), so a dedicated spec is still warranted. The Vitest unit tests (useLogs.spec.ts, useSearchBar.spec.ts, SearchResult.spec.ts) are not E2E coverage and are cited here only for completeness — they do not affect the existing_tests_in_diff flag."
+  }
+}
