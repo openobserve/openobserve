@@ -60,7 +60,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Toolbar: Stream/Agent mode + matching picker aligned with the table actions. -->
       <template #toolbar>
         <div class="tw:flex tw:items-center tw:justify-end tw:gap-2 tw:flex-1 tw:min-w-0">
+          <!-- Toggle-shaped skeleton during the initial load so the whole
+               toolbar (toggle + picker) appears at once, not the toggle first
+               then the picker. -->
+          <SkeletonBox
+            v-if="!streamsLoaded"
+            width="7.25rem"
+            height="2.125rem"
+            rounded
+          />
           <OToggleGroup
+            v-else
             :model-value="filterMode"
             type="single"
             data-test="sessions-list-filter-mode"
@@ -76,7 +86,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="sessions-list-stream-selector"
               class="tw:w-[14rem] tw:flex-shrink-0"
             >
+              <!-- Hold a picker-shaped skeleton until the stream list lands, so
+                   the selector doesn't flash an empty dropdown then populate. -->
+              <SkeletonBox
+                v-if="!streamsLoaded"
+                width="100%"
+                height="2.125rem"
+                rounded
+              />
               <OSelect
+                v-else
                 v-model="activeStream"
                 :label="t('traces.sessionsList.streamLabel')"
                 label-position="inside"
@@ -92,7 +111,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="sessions-list-agent-selector"
               class="tw:w-[14rem] tw:flex-shrink-0"
             >
+              <!-- Same treatment for agents: toggling to Agent mode kicks off the
+                   listAgents fetch, so show the skeleton until it resolves
+                   instead of an empty agent picker. -->
+              <SkeletonBox
+                v-if="!agentsLoaded"
+                width="100%"
+                height="2.125rem"
+                rounded
+              />
               <OSelect
+                v-else
                 v-model="activeAgent"
                 label="Agent"
                 label-position="inside"
@@ -234,6 +263,7 @@ import EvalEmptyState from "@/components/EvalEmptyState.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import SkeletonBox from "@/components/shared/SkeletonBox.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import genAiAgentMappingService, {
