@@ -219,6 +219,7 @@ jobs:
                 "logsAnalyzeDimensions.spec.js",
                 "monaco-query-prefill.spec.js",
                 "logsqueries.matchall.spec.js",
+                "ftsDefaultColumn.spec.js",
               ]
           - testfolder: "Logs-Features"
             browser: "chrome"
