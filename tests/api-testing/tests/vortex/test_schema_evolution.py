@@ -15,8 +15,9 @@ Test plan coverage:
   Scenarios 44–46  — multiple divergence cycles
   Scenarios 47–51  — complex queries (SELECT *, CASE WHEN, subquery, CTE, WHERE)
   Scenarios 52–55  — time-range queries across evolving schemas
-  Scenarios 56–57  — full-text search on evolved schemas
+  Scenarios 56–57b — full-text search on evolved schemas (57b uses match_all FTS UDF)
   Scenarios 58–59  — high-field-count divergence
+  Negative tests   — phantom values, graceful unknown-field handling, count invariant
 """
 from __future__ import annotations
 
@@ -642,6 +643,31 @@ class TestAggregationsOnPartialFields:
         count = int(hits[0].get("c", 0)) if hits else 0
         assert count == 10, f"COUNT(DISTINCT latency_ms) must be 10; got {count}"
 
+    def test_35b_count_distinct_deduplicates_cross_batch(self, client):
+        """Scenario 35b: COUNT(DISTINCT) must deduplicate values that appear in multiple batches.
+
+        Both batch 1 and batch 3 send latency_ms=100. COUNT(DISTINCT latency_ms) must
+        return 1 — not 2 (one per batch) or 10 (one per row). Catches the double-count
+        bug where schema reconciliation creates duplicate dictionary entries per file.
+        """
+        s = _stream("agg_35b")
+        b1 = [{"_timestamp": _ts(i),       "host": "h1", "latency_ms": 100} for i in range(5)]
+        b2 = [{"_timestamp": _ts(100 + i), "host": "h1"} for i in range(5)]
+        b3 = [{"_timestamp": _ts(200 + i), "host": "h1", "latency_ms": 100} for i in range(5)]
+        ingest(client, s, b1)
+        flush_and_wait(client, s, expected=5)
+        ingest(client, s, b2)
+        flush_and_wait(client, s, expected=10)
+        ingest(client, s, b3)
+        flush_and_wait(client, s, expected=15)
+        start, end = _wide_window()
+        sql = f'SELECT COUNT(DISTINCT latency_ms) AS c FROM "{s}"'
+        resp = client.post("_search?type=logs", json=search_payload(sql, start_time=start, end_time=end, size=1))
+        assert resp.status_code == 200, resp.text
+        hits = resp.json().get("hits", [])
+        count = int(hits[0].get("c", 0)) if hits else 0
+        assert count == 1, f"COUNT(DISTINCT) must deduplicate latency_ms=100 across batches 1+3; got {count}"
+
     def test_36_sum_of_always_present_field_covers_all_rows(self, client):
         """Scenario 36: SUM on a field present in all batches must include all 15 rows."""
         s = _stream("agg_36")
@@ -1060,6 +1086,34 @@ class TestFTSEvolved:
         assert alpha == 5, f"keyword_alpha must match batch 1 only (5 rows); got {alpha}"
         assert beta  == 5, f"keyword_beta must match batch 3 only (5 rows); got {beta}"
 
+    def test_57b_match_all_fts_excludes_absent_batch(self, client):
+        """Scenario 57b: match_all() FTS must not return batch 2 rows where fc was never ingested.
+
+        Uses OO's match_all() SQL UDF for a genuine full-text search rather than an
+        exact-match WHERE filter. If the FTS index is corrupted across schema batches,
+        batch 2 rows could appear even though fc was never written for them.
+        Skipped automatically if match_all is not available in this OO build.
+        """
+        s = _stream("fts_57b")
+        b1 = [{"_timestamp": _ts(i),       "fa": "a", "fc": "uniqueterm"} for i in range(5)]
+        b2 = [{"_timestamp": _ts(100 + i), "fa": "a"} for i in range(5)]
+        b3 = [{"_timestamp": _ts(200 + i), "fa": "a", "fc": "uniqueterm"} for i in range(5)]
+        ingest(client, s, b1)
+        flush_and_wait(client, s, expected=5)
+        ingest(client, s, b2)
+        flush_and_wait(client, s, expected=10)
+        ingest(client, s, b3)
+        flush_and_wait(client, s, expected=15)
+        start, end = _wide_window()
+        sql = f"SELECT COUNT(*) AS c FROM \"{s}\" WHERE match_all('uniqueterm')"
+        resp = client.post("_search?type=logs", json=search_payload(sql, start_time=start, end_time=end, size=1))
+        if resp.status_code == 400 and "match_all" in resp.text.lower():
+            pytest.skip("match_all UDF not available in this OO build")
+        assert resp.status_code == 200, resp.text
+        hits = resp.json().get("hits", [])
+        count = int(hits[0].get("c", 0)) if hits else 0
+        assert count == 10, f"match_all FTS must match batches 1+3 only (10 rows); got {count}"
+
 
 # ─── Group 9: High field count with divergence ────────────────────────────────
 
@@ -1105,3 +1159,74 @@ class TestHighFieldCountDivergence:
             field_name = f"b{batch_idx}_field_0"
             n = count_records(client, s, where=f"{field_name} IS NOT NULL AND {field_name} != ''")
             assert n == 5, f"{field_name} must be in batch {batch_idx} only (5 rows); got {n}"
+
+
+# ─── Negative tests ────────────────────────────────────────────────────────────
+
+class TestNegativeCases:
+    """Negative tests: OO must not silently return wrong data under schema drift.
+
+    These tests assert that schema evolution never causes phantom values on absent
+    fields, never silently drops records, and handles queries on non-existent fields
+    without crashing.
+    """
+
+    def test_neg1_absent_field_has_no_phantom_values(self, client):
+        """Absent numeric field must be NULL — not defaulted to 0 or any phantom value.
+
+        If schema reconciliation incorrectly fills absent fields with 0, then
+        WHERE latency_ms BETWEEN 0 AND 99999 would return 15 rows instead of 10.
+        Catches silent data fabrication, not just data loss.
+        """
+        s = _stream("neg1")
+        b1 = [{"_timestamp": _ts(i),       "host": "h1", "latency_ms": 100 + i} for i in range(5)]
+        b2 = [{"_timestamp": _ts(100 + i), "host": "h1"} for i in range(5)]
+        b3 = [{"_timestamp": _ts(200 + i), "host": "h1", "latency_ms": 200 + i} for i in range(5)]
+        ingest(client, s, b1)
+        flush_and_wait(client, s, expected=5)
+        ingest(client, s, b2)
+        flush_and_wait(client, s, expected=10)
+        ingest(client, s, b3)
+        flush_and_wait(client, s, expected=15)
+        # If batch 2 rows got phantom latency_ms=0 this returns 15 not 10
+        phantom_check = count_records(client, s, where="latency_ms BETWEEN 0 AND 99999")
+        assert phantom_check == 10, (
+            f"absent field must not get phantom value; BETWEEN 0 AND 99999 must match "
+            f"batches 1+3 only (10 rows); got {phantom_check}"
+        )
+
+    def test_neg2_query_nonexistent_field_returns_gracefully(self, client):
+        """A field never ingested in any batch must return 0 rows — not crash or 500.
+
+        OO must treat a completely unknown field as universally NULL rather than
+        raising a column-not-found error.
+        """
+        s = _stream("neg2")
+        records = [{"_timestamp": _ts(i), "host": "h1", "val": i} for i in range(5)]
+        ingest(client, s, records)
+        flush_and_wait(client, s, expected=5)
+        result = count_records(client, s, where="completely_absent_field_xyz IS NOT NULL")
+        assert result == 0, f"never-ingested field must match 0 rows; got {result}"
+
+    def test_neg3_record_count_monotonically_increases(self, client):
+        """COUNT(*) must equal the cumulative ingest count after every batch — no silent drops.
+
+        Schema drift must never cause previously flushed records to disappear.
+        Checked after each flush so a regression is pinned to the exact batch that caused it.
+        """
+        s = _stream("neg3")
+        b1 = [{"_timestamp": _ts(i),       "fa": "a", "fc": f"c{i}"} for i in range(5)]
+        b2 = [{"_timestamp": _ts(100 + i), "fa": "a", "fd": f"d{i}"} for i in range(5)]
+        b3 = [{"_timestamp": _ts(200 + i), "fa": "a", "fc": f"c{i}", "fd": f"d{i}", "fe": f"e{i}"} for i in range(5)]
+
+        ingest(client, s, b1)
+        flush_and_wait(client, s, expected=5)
+        assert count_records(client, s) == 5, "after batch 1: must have exactly 5 records"
+
+        ingest(client, s, b2)
+        flush_and_wait(client, s, expected=10)
+        assert count_records(client, s) == 10, "after batch 2: schema change must not drop batch 1 records"
+
+        ingest(client, s, b3)
+        flush_and_wait(client, s, expected=15)
+        assert count_records(client, s) == 15, "after batch 3: schema convergence must not drop any records"
