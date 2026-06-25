@@ -100,8 +100,13 @@
       :footer-title="activeTab === 'browser' ? 'Browser Tests' : activeTab === 'api' ? 'API Tests' : 'Monitors'"
       :empty-message="activeTab === 'browser' ? 'No browser tests found.' : activeTab === 'api' ? 'No API tests found.' : 'No monitors found. Adjust filters or create your first monitor.'"
       data-test="synthetic-monitoring-monitors-table"
+      :toggle-loading-map="toggleLoadingMap"
       @row-click="openDetail"
       @edit="openEdit"
+      @toggle-enabled="toggleEnabled"
+      @duplicate="duplicateMonitor"
+      @run="runMonitor"
+      @delete="deleteMonitor"
     />
 
     <!-- ── PRIVATE LOCATIONS ── -->
@@ -198,6 +203,34 @@
       data-test="synthetic-monitoring-monitor-form-drawer"
       @save="() => {}"
     />
+
+    <!-- Duplicate monitor dialog -->
+    <ODialog
+      v-model:open="showDuplicateDialog"
+      size="sm"
+      title="Duplicate Monitor"
+      primary-button-label="Save"
+      secondary-button-label="Cancel"
+      :primary-button-disabled="isDuplicating || !duplicateName.trim()"
+      data-test="synthetic-monitoring-duplicate-dialog"
+      @click:primary="saveDuplicate"
+      @click:secondary="showDuplicateDialog = false"
+    >
+      <div class="tw:flex tw:flex-col tw:gap-3 tw:py-1">
+        <OInput
+          v-model="duplicateName"
+          label="Name"
+          placeholder="Monitor name"
+          data-test="synthetic-monitoring-duplicate-name-input"
+        />
+        <OInput
+          v-model="duplicateFolder"
+          label="Folder"
+          placeholder="default"
+          data-test="synthetic-monitoring-duplicate-folder-input"
+        />
+      </div>
+    </ODialog>
   </div>
 </template>
 
@@ -213,10 +246,13 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 import MonitorTable from "@/components/synthetic-monitoring/MonitorTable.vue";
+import { mapResponseToBrowserCheck, buildCreateBrowserTestPayload } from '@/utils/synthetics/buildPayload'
 import PrivateLocations, { type PrivateLocation } from '@/components/synthetic-monitoring/PrivateLocations.vue'
 import MonitorFormDrawer from '@/components/synthetic-monitoring/MonitorFormDrawer.vue'
 import syntheticsService from '@/services/synthetics'
+import { toast } from '@/lib/feedback/Toast/useToast'
 
 const router  = useRouter();
 const route   = useRoute();
@@ -335,6 +371,12 @@ const locationFilter = ref("all");
 const search         = ref("");
 const showDrawer     = ref(false);
 const editTarget     = ref<any>(null);
+
+const showDuplicateDialog = ref(false)
+const duplicateTarget     = ref<any>(null)
+const duplicateName       = ref('')
+const duplicateFolder     = ref('default')
+const isDuplicating       = ref(false)
 
 onUnmounted(() => {
   if (mapTipTimer) clearTimeout(mapTipTimer);
@@ -571,7 +613,106 @@ const filteredMonitors = computed(() =>
 )
 
 const openCreate = () => router.push({ name: 'synthetic-new' })
-const openEdit   = (m: any) => { editTarget.value = m; showDrawer.value = true }
+const openEdit = (m: any) => {
+  router.push({ name: 'synthetic-new', query: { edit: String(m.id) } })
+}
+
+const toggleLoadingMap = ref<Record<string, boolean>>({})
+
+async function toggleEnabled(m: any) {
+  const org = orgIdentifier.value
+  const newEnabled = !m.enabled
+  const id = String(m.id)
+  toggleLoadingMap.value[id] = true
+  const dismiss = toast({ variant: 'loading', message: newEnabled ? 'Enabling monitor…' : 'Pausing monitor…', timeout: 0 })
+  try {
+    await syntheticsService.enable(org, id, { enabled: newEnabled })
+    const found = monitors.value.find((mon) => String(mon.id) === id)
+    if (found) found.enabled = newEnabled
+    dismiss()
+    toast({ variant: 'success', message: newEnabled ? 'Monitor enabled.' : 'Monitor paused.' })
+  } catch (err: any) {
+    dismiss()
+    toast({
+      variant: 'error',
+      message: err?.response?.data?.message || err?.response?.data?.error || 'Failed to update monitor.',
+    })
+    console.error('[synthetics] toggle enable failed', err)
+  } finally {
+    toggleLoadingMap.value[id] = false
+  }
+}
+
+function duplicateMonitor(m: any) {
+  duplicateTarget.value = m
+  duplicateName.value = `Copy of ${m.name}`
+  duplicateFolder.value = m.folder || 'default'
+  showDuplicateDialog.value = true
+}
+
+async function saveDuplicate() {
+  if (!duplicateTarget.value) return
+  isDuplicating.value = true
+  const dismiss = toast({ variant: 'loading', message: 'Duplicating monitor…', timeout: 0 })
+  try {
+    const org = orgIdentifier.value
+    const res = await syntheticsService.get(org, String(duplicateTarget.value.id))
+    const check = mapResponseToBrowserCheck(res.data as Record<string, unknown>)
+    check.name = duplicateName.value
+    check.folder = duplicateFolder.value
+    delete (check as any).id
+    const payload = buildCreateBrowserTestPayload(check)
+    await syntheticsService.create(org, payload)
+    dismiss()
+    toast({ variant: 'success', message: 'Monitor duplicated successfully.' })
+    showDuplicateDialog.value = false
+    await loadMonitors()
+  } catch (err: any) {
+    dismiss()
+    toast({
+      variant: 'error',
+      message: err?.response?.data?.message || err?.response?.data?.error || 'Failed to duplicate monitor.',
+    })
+    console.error('[synthetics] duplicate failed', err)
+  } finally {
+    isDuplicating.value = false
+  }
+}
+
+async function runMonitor(m: any) {
+  const org = orgIdentifier.value
+  const dismiss = toast({ variant: 'loading', message: 'Triggering monitor…', timeout: 0 })
+  try {
+    await syntheticsService.run(org, String(m.id), {})
+    dismiss()
+    toast({ variant: 'success', message: 'Monitor triggered successfully.' })
+  } catch (err: any) {
+    dismiss()
+    toast({
+      variant: 'error',
+      message: err?.response?.data?.message || err?.response?.data?.error || 'Failed to trigger monitor.',
+    })
+    console.error('[synthetics] run failed', err)
+  }
+}
+
+async function deleteMonitor(m: any) {
+  const org = orgIdentifier.value
+  const dismiss = toast({ variant: 'loading', message: 'Deleting monitor…', timeout: 0 })
+  try {
+    await syntheticsService.delete(org, String(m.id))
+    monitors.value = monitors.value.filter((mon) => String(mon.id) !== String(m.id))
+    dismiss()
+    toast({ variant: 'success', message: 'Monitor deleted.' })
+  } catch (err: any) {
+    dismiss()
+    toast({
+      variant: 'error',
+      message: err?.response?.data?.message || err?.response?.data?.error || 'Failed to delete monitor.',
+    })
+    console.error('[synthetics] delete failed', err)
+  }
+}
 </script>
 
 <style scoped>

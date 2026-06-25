@@ -1,13 +1,14 @@
 <script setup lang="ts">
 // Copyright 2026 OpenObserve Inc.
 import { computed, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { useStore } from 'vuex'
 import type { BrowserCheck } from '@/types/synthetics'
 import useSyntheticsRecorder from '@/composables/useSyntheticsRecorder'
 import { journeyToWireSteps } from '@/utils/synthetics/mapRecordedStep'
-import { buildCreateBrowserTestPayload } from '@/utils/synthetics/buildPayload'
+import { buildCreateBrowserTestPayload, mapResponseToBrowserCheck } from '@/utils/synthetics/buildPayload'
 import syntheticsService from '@/services/synthetics'
+import { toast } from '@/lib/feedback/Toast/useToast'
 import AppPageHeader from '@/components/common/AppPageHeader.vue'
 import OButton from '@/lib/core/Button/OButton.vue'
 import OIcon from '@/lib/core/Icon/OIcon.vue'
@@ -19,6 +20,7 @@ import BrowserJourney from '@/components/synthetics/journey/BrowserJourney.vue'
 import CheckConfigure from '@/components/synthetics/configure/CheckConfigure.vue'
 
 const router = useRouter()
+const route = useRoute()
 const store = useStore()
 
 // Three top-level phases:
@@ -30,6 +32,8 @@ const currentStep = ref(1)
 const journeyStepDone = ref(false)
 const checkName = ref('')
 const startUrl = ref('')
+const editId = ref<string | null>(null)
+const isLoadingEdit = ref(false)
 
 // Extension setup state — persists across phases in this session.
 // `extensionInstalled` is now driven by a real runtime probe (not a manual click).
@@ -49,11 +53,35 @@ async function probeExtension() {
   return extensionInstalled.value
 }
 
+async function loadForEdit(id: string) {
+  isLoadingEdit.value = true
+  try {
+    const org = store.state.selectedOrganization.identifier
+    const res = await syntheticsService.get(org, id)
+    const mapped = mapResponseToBrowserCheck(res.data as Record<string, unknown>)
+    check.value = mapped
+    checkName.value = mapped.name
+    startUrl.value = mapped.url
+    editId.value = id
+    journeyStepDone.value = true
+    phase.value = 'editor'
+  } catch (err) {
+    console.error('[synthetics] failed to load check for edit', err)
+  } finally {
+    isLoadingEdit.value = false
+  }
+}
+
 onMounted(() => {
   // Warm detection so an already-installed extension lets Record skip setup.
   probeExtension()
     .then((installed) => { extensionReady.value = installed })
     .catch(() => { /* extension messaging unavailable — handled in setup screen */ })
+
+  const editQueryId = route.query.edit
+  if (typeof editQueryId === 'string' && editQueryId) {
+    loadForEdit(editQueryId).catch(console.error)
+  }
 })
 
 // When true, BrowserJourney starts recording immediately on mount
@@ -116,12 +144,27 @@ const apiPayload = computed(() => buildCreateBrowserTestPayload(check.value))
 
 async function saveCheck() {
   isSaving.value = true
+  const dismiss = toast({ variant: 'loading', message: 'Saving check…', timeout: 0 })
   try {
     const org = store.state.selectedOrganization.identifier
-    const res = await syntheticsService.create(org, apiPayload.value)
-    const id = res.data?.id ?? crypto.randomUUID()
-    router.push({ name: 'synthetic-detail', params: { id }, query: { tab: 'results', saved: '1' } })
-  } catch (err) {
+    if (editId.value) {
+      await syntheticsService.update(org, editId.value, apiPayload.value)
+      dismiss()
+      toast({ variant: 'success', message: 'Check updated successfully.' })
+      router.push({ name: 'synthetic' })
+    } else {
+      const res = await syntheticsService.create(org, apiPayload.value)
+      const savedId = res.data?.id ?? crypto.randomUUID()
+      dismiss()
+      toast({ variant: 'success', message: 'Check saved successfully.' })
+      router.push({ name: 'synthetic-detail', params: { id: savedId }, query: { tab: 'results', saved: '1' } })
+    }
+  } catch (err: any) {
+    dismiss()
+    toast({
+      variant: 'error',
+      message: err?.response?.data?.message || err?.response?.data?.error || 'Failed to save check.',
+    })
     console.error('[synthetics] save failed', err)
   } finally {
     isSaving.value = false
@@ -158,11 +201,22 @@ const replayStatus = computed<{ text: string; tone: 'muted' | 'success' | 'error
 </script>
 
 <template>
+  <!-- ── Edit mode loading ── -->
+  <main
+    v-if="isLoadingEdit"
+    class="tw:min-h-screen tw:flex tw:items-center tw:justify-center tw:bg-[var(--o2-body-primary-bg)]"
+  >
+    <div class="tw:flex tw:flex-col tw:items-center tw:gap-3">
+      <OIcon name="hourglass-empty" size="lg" class="tw:text-[var(--o2-primary-color)] tw:animate-spin" />
+      <p class="tw:text-[var(--o2-text-secondary)]">Loading check…</p>
+    </div>
+  </main>
+
   <!-- ── Gate phase: URL + name ── -->
-  <main v-if="phase === 'gate'" class="tw:min-h-screen tw:flex tw:flex-col tw:items-center tw:justify-center tw:bg-[var(--o2-body-primary-bg)]">
+  <main v-else-if="phase === 'gate'" class="tw:min-h-screen tw:flex tw:flex-col tw:items-center tw:justify-center tw:bg-[var(--o2-body-primary-bg)]">
     <div class="tw:max-w-lg tw:w-full tw:mx-auto tw:py-16 tw:px-4">
-      <h1 class="tw:mb-3">New browser check</h1>
-      <p class="tw:mb-8">
+      <h1 class="tw:mb-3 tw:pb-4">New browser check</h1>
+      <p class="tw:mb-8 tw:pb-4">
         Tell us where to start — you'll record the journey next. Everything else (schedule, alerts, RUM) gets set up after.
       </p>
 
@@ -400,7 +454,7 @@ const replayStatus = computed<{ text: string; tone: 'muted' | 'success' | 'error
           Back
         </OButton>
         <OButton variant="primary" size="sm" :loading="isSaving" data-test="synthetics-create-save-btn" @click="saveCheck">
-          Save check
+          {{ editId ? 'Update check' : 'Save check' }}
           <template #suffix><OIcon name="save" size="sm" /></template>
         </OButton>
       </template>

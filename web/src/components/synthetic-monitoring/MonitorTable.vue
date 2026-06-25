@@ -108,19 +108,79 @@
 
     <!-- Row actions -->
     <template #cell-actions="{ row }">
-      <div class="row-actions" @click.stop>
-        <OButton variant="ghost" size="icon" title="Run now" :data-test="`${dataTest}-run-btn`" @click.stop>
-          <OIcon name="play-arrow" size="sm" />
-        </OButton>
-        <OButton variant="ghost" size="icon" title="Edit" :data-test="`${dataTest}-edit-btn`" @click.stop="emit('edit', row)">
-          <OIcon name="edit" size="sm" />
-        </OButton>
-        <OButton v-if="mode === 'monitors'" variant="ghost" size="icon" title="Pause" :data-test="`${dataTest}-pause-btn`" @click.stop>
-          <OIcon name="pause" size="sm" />
-        </OButton>
-        <OButton variant="ghost" size="icon" title="Delete" :data-test="`${dataTest}-delete-btn`" @click.stop>
-          <OIcon name="delete" size="sm" />
-        </OButton>
+      <div class="tw:flex tw:items-center row-actions" @click.stop>
+        <!-- Enable/Pause toggle with per-row spinner -->
+        <div
+          v-if="props.toggleLoadingMap[(row as any).id]"
+          class="tw:flex tw:items-center tw:justify-center tw:w-7 tw:h-8"
+          :title="(row as any).enabled ? 'Pausing…' : 'Enabling…'"
+          :data-test="`${dataTest}-toggle-spinner`"
+        >
+          <OSpinner size="xs" />
+        </div>
+        <OButton
+          v-else
+          :variant="(row as any).enabled ? 'ghost-destructive' : 'ghost'"
+          size="icon-sm"
+          :icon-left="(row as any).enabled ? 'pause' : 'play-arrow'"
+          :title="(row as any).enabled ? 'Pause' : 'Enable'"
+          :data-test="`${dataTest}-${(row as any).enabled ? 'pause' : 'enable'}-btn`"
+          @click.stop="emit('toggle-enabled', row)"
+        />
+
+        <!-- Edit -->
+        <OButton
+          variant="ghost"
+          size="icon-sm"
+          icon-left="edit"
+          title="Edit"
+          :data-test="`${dataTest}-edit-btn`"
+          @click.stop="emit('edit', row)"
+        />
+
+        <!-- Duplicate -->
+        <OButton
+          variant="ghost"
+          size="icon-sm"
+          icon-left="content-copy"
+          title="Duplicate"
+          :data-test="`${dataTest}-duplicate-btn`"
+          @click.stop="emit('duplicate', row)"
+        />
+
+        <!-- More menu: Trigger + Delete -->
+        <ODropdown>
+          <template #trigger>
+            <OButton
+              variant="ghost"
+              size="icon-sm"
+              icon-left="more-vert"
+              title="More"
+              :data-test="`${dataTest}-more-btn`"
+              @click.stop
+            />
+          </template>
+
+          <ODropdownItem :data-test="`${dataTest}-run-item`" @select="emit('run', row)">
+            <template #icon-left>
+              <OIcon name="sound-sampler" size="sm" />
+            </template>
+            Trigger
+          </ODropdownItem>
+
+          <ODropdownSeparator />
+
+          <ODropdownItem
+            variant="destructive"
+            :data-test="`${dataTest}-delete-item`"
+            @select="emit('delete', row)"
+          >
+            <template #icon-left>
+              <OIcon name="delete" size="sm" />
+            </template>
+            Delete
+          </ODropdownItem>
+        </ODropdown>
       </div>
     </template>
   </OTable>
@@ -171,6 +231,10 @@ import OButton from '@/lib/core/Button/OButton.vue'
 import OIcon from '@/lib/core/Icon/OIcon.vue'
 import OBadge from '@/lib/core/Badge/OBadge.vue'
 import OProgressBar from '@/lib/data/ProgressBar/OProgressBar.vue'
+import OSpinner from '@/lib/feedback/Spinner/OSpinner.vue'
+import ODropdown from '@/lib/overlay/Dropdown/ODropdown.vue'
+import ODropdownItem from '@/lib/overlay/Dropdown/ODropdownItem.vue'
+import ODropdownSeparator from '@/lib/overlay/Dropdown/ODropdownSeparator.vue'
 
 type Mode = 'monitors' | 'browser' | 'api'
 
@@ -180,15 +244,21 @@ const props = withDefaults(defineProps<{
   footerTitle?: string
   emptyMessage?: string
   dataTest?: string
+  toggleLoadingMap?: Record<string, boolean>
 }>(), {
   footerTitle: 'Monitors',
   emptyMessage: 'No results found.',
   dataTest: 'monitor-table',
+  toggleLoadingMap: () => ({}),
 })
 
 const emit = defineEmits<{
   'row-click': [row: any]
   'edit': [row: any]
+  'toggle-enabled': [row: any]
+  'duplicate': [row: any]
+  'run': [row: any]
+  'delete': [row: any]
 }>()
 
 // ── Column definitions per mode ─────────────────────────────────────
@@ -270,7 +340,7 @@ const ASSERTIONS_COL: OTableColumnDef = {
 }
 const ACTIONS_COL: OTableColumnDef = {
   id: 'actions', header: '', accessorKey: 'id',
-  size: 120, minSize: 120, sortable: false, isAction: true,
+  size: 160, minSize: 160, sortable: false, isAction: true,
 }
 
 const columns = computed<OTableColumnDef[]>(() => {
