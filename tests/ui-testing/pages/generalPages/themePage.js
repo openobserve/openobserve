@@ -155,14 +155,18 @@ export class ThemePage {
 
     async selectLightModeTab() {
         await this.lightModeTab.click();
-        // Wait for tab to become active
-        await expect(this.lightModeTab).toHaveAttribute('data-state', 'active', { timeout: 3000 });
+        // Wait for tab to become active. These tabs are an OToggleGroup (Reka UI),
+        // whose selected item exposes aria-pressed="true" / data-state="on" — not
+        // data-state="active" (that's Reka Tabs, a different primitive).
+        await expect(this.lightModeTab).toHaveAttribute('aria-pressed', 'true', { timeout: 3000 });
     }
 
     async selectDarkModeTab() {
         await this.darkModeTab.click();
-        // Wait for tab to become active
-        await expect(this.darkModeTab).toHaveAttribute('data-state', 'active', { timeout: 3000 });
+        // Wait for tab to become active. These tabs are an OToggleGroup (Reka UI),
+        // whose selected item exposes aria-pressed="true" / data-state="on" — not
+        // data-state="active" (that's Reka Tabs, a different primitive).
+        await expect(this.darkModeTab).toHaveAttribute('aria-pressed', 'true', { timeout: 3000 });
     }
 
     /**
