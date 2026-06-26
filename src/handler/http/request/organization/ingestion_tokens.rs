@@ -58,13 +58,12 @@ use crate::{
     )
 )]
 pub async fn list_ingestion_tokens(
-    Headers(user_email): Headers<UserEmail>,
+    Headers(_user_email): Headers<UserEmail>,
     Path(org_id): Path<String>,
 ) -> Response {
-    let user_id = user_email.user_id.as_str();
-
     #[cfg(not(feature = "enterprise"))]
     {
+        let user_id = _user_email.user_id.as_str();
         if !crate::common::utils::auth::is_root_user(user_id) {
             match crate::service::users::get_user(Some(&org_id), user_id).await {
                 Some(initiator)
