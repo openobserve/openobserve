@@ -94,9 +94,12 @@ export class AlertHistoryPage {
   }
 
   async clickViewDetails(index = 0) {
-    // Wait for skeleton loading state to finish before interacting with action buttons
+    // Wait for the skeleton to finish and OTable to complete loading
     await this.page.locator('[data-test="o2-table-skeleton-body"]')
       .waitFor({ state: 'hidden', timeout: 15000 })
+      .catch(() => {});
+    await this.page.locator('[data-test="o2-table"][data-test-loading="false"]')
+      .waitFor({ state: 'visible', timeout: 10000 })
       .catch(() => {});
 
     const byDataTest = this.page.locator(this.viewDetailsBtn);
@@ -104,9 +107,9 @@ export class AlertHistoryPage {
     const btn = (await byDataTest.count() > 0) ? byDataTest.nth(index) : byCell;
     await btn.waitFor({ state: 'visible', timeout: 10000 });
     await btn.scrollIntoViewIfNeeded();
-    // Use evaluate to fire a native click — bypasses OTooltip coordinate interception
-    // while still routing through OButton's handleClick → emit("click") → showDetailsDialog
-    await btn.evaluate(el => el.click());
+    // Standard Playwright click dispatches trusted mouse events via CDP —
+    // required so OButton's Reka UI Primitive properly routes through handleClick
+    await btn.click();
   }
 
   async expectViewDetailsBtnVisible() {
