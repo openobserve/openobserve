@@ -219,6 +219,30 @@ pub async fn delete<C: ConnectionTrait>(
     Ok(res.rows_affected > 0)
 }
 
+/// Moves a batch of monitors to a different folder.
+pub async fn move_to_folder<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    ids: &[String],
+    dst_folder_id: &str,
+) -> Result<u64, errors::Error> {
+    let _lock = super::get_lock().await;
+    if ids.is_empty() {
+        return Ok(0);
+    }
+    let res = Entity::update_many()
+        .col_expr(Column::FolderId, Expr::value(dst_folder_id.to_owned()))
+        .col_expr(
+            Column::UpdatedAt,
+            Expr::value(config::utils::time::now_micros()),
+        )
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::Id.is_in(ids.to_vec()))
+        .exec(conn)
+        .await?;
+    Ok(res.rows_affected)
+}
+
 /// Sets the `enabled` flag — used by the enable/pause API.
 pub async fn set_enabled<C: ConnectionTrait>(
     conn: &C,

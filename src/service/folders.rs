@@ -330,7 +330,7 @@ async fn permitted_folders(
         ),
         FolderType::Synthetics => (
             OFGA_MODELS.get("synfolder").unwrap().key,
-            OFGA_MODELS.get("synthetics_monitors").unwrap().key,
+            OFGA_MODELS.get("synthetics").unwrap().key,
         ),
     };
 

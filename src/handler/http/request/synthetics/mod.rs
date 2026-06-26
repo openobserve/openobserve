@@ -19,8 +19,53 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
+use serde::Deserialize;
 
 use crate::common::meta::http::HttpResponse as MetaHttpResponse;
+
+// ── Local query / body types ──────────────────────────────────────────────────
+
+#[derive(Debug, Default, Deserialize)]
+pub(crate) struct ListSyntheticsQuery {
+    pub folder: Option<String>,
+    #[serde(rename = "type")]
+    pub monitor_type: Option<config::meta::synthetics::SyntheticType>,
+    pub enabled: Option<bool>,
+    pub location: Option<String>,
+    pub tag: Option<String>,
+    pub page: Option<u64>,
+    pub page_size: Option<u64>,
+}
+
+impl From<ListSyntheticsQuery> for config::meta::synthetics::ListSyntheticsParams {
+    fn from(q: ListSyntheticsQuery) -> Self {
+        Self {
+            folder_id: q.folder,
+            monitor_type: q.monitor_type,
+            enabled: q.enabled,
+            location: q.location,
+            tag: q.tag,
+            page: q.page,
+            page_size: q.page_size,
+        }
+    }
+}
+
+#[derive(Debug, Default, Deserialize)]
+pub(crate) struct FolderQuery {
+    pub folder: Option<String>,
+}
+
+#[derive(Debug, serde::Deserialize, utoipa::ToSchema)]
+pub struct BulkDeleteSyntheticsRequestBody {
+    pub ids: Vec<String>,
+}
+
+#[derive(Debug, serde::Deserialize, utoipa::ToSchema)]
+pub struct MoveSyntheticsRequestBody {
+    pub synthetic_ids: Vec<String>,
+    pub dst_folder_id: String,
+}
 
 // ── Results API ───────────────────────────────────────────────────────────────
 
@@ -170,7 +215,7 @@ pub async fn get_summary(
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("folder_id" = Option<String>, Query, description = "Filter by folder ID (KSUID)"),
+        ("folder" = Option<String>, Query, description = "Filter by folder ID (KSUID)"),
         ("type" = Option<String>, Query, description = "Filter by monitor type (http|browser|tcp|tls|ssh)"),
         ("enabled" = Option<bool>, Query, description = "Filter by enabled status"),
         ("location" = Option<String>, Query, description = "Filter by location"),
@@ -185,8 +230,9 @@ pub async fn get_summary(
 )]
 pub async fn list_synthetics(
     Path(org_id): Path<String>,
-    Query(params): Query<config::meta::synthetics::ListSyntheticsParams>,
+    Query(query): Query<ListSyntheticsQuery>,
 ) -> Response {
+    let params: config::meta::synthetics::ListSyntheticsParams = query.into();
     #[cfg(feature = "enterprise")]
     {
         match o2_enterprise::enterprise::synthetics::service::list_synthetics(&org_id, &params)
@@ -233,6 +279,7 @@ pub async fn list_synthetics(
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
+        ("folder" = Option<String>, Query, description = "Folder ID to create the synthetic in"),
     ),
     request_body(content = config::meta::synthetics::Synthetic, description = "Synthetic definition", content_type = "application/json"),
     responses(
@@ -242,6 +289,7 @@ pub async fn list_synthetics(
 )]
 pub async fn create_synthetic(
     Path(org_id): Path<String>,
+    Query(_folder_query): Query<FolderQuery>,
     Json(body): Json<config::meta::synthetics::Synthetic>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
@@ -312,6 +360,7 @@ pub async fn get_synthetic(Path((org_id, id)): Path<(String, String)>) -> Respon
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("id" = String, Path, description = "Monitor ID"),
+        ("folder" = Option<String>, Query, description = "Current folder ID of the synthetic (for RBAC)"),
     ),
     request_body(content = config::meta::synthetics::Synthetic, description = "Updated synthetic definition", content_type = "application/json"),
     responses(
@@ -322,6 +371,7 @@ pub async fn get_synthetic(Path((org_id, id)): Path<(String, String)>) -> Respon
 )]
 pub async fn update_synthetic(
     Path((org_id, id)): Path<(String, String)>,
+    Query(_folder_query): Query<FolderQuery>,
     Json(body): Json<config::meta::synthetics::Synthetic>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
@@ -359,6 +409,7 @@ pub async fn update_synthetic(
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("id" = String, Path, description = "Monitor ID"),
+        ("folder" = Option<String>, Query, description = "Current folder ID of the synthetic (for RBAC)"),
     ),
     responses(
         (status = 200, description = "Deleted"),
@@ -366,7 +417,10 @@ pub async fn update_synthetic(
         (status = 500, description = "Error", content_type = "application/json", body = Object),
     ),
 )]
-pub async fn delete_synthetic(Path((org_id, id)): Path<(String, String)>) -> Response {
+pub async fn delete_synthetic(
+    Path((org_id, id)): Path<(String, String)>,
+    Query(_folder_query): Query<FolderQuery>,
+) -> Response {
     #[cfg(feature = "enterprise")]
     {
         match o2_enterprise::enterprise::synthetics::service::delete_synthetic(&org_id, &id).await {
@@ -382,6 +436,100 @@ pub async fn delete_synthetic(Path((org_id, id)): Path<(String, String)>) -> Res
     #[cfg(not(feature = "enterprise"))]
     {
         let _ = (org_id, id);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+#[utoipa::path(
+    delete,
+    path = "/{org_id}/synthetics",
+    context_path = "/api",
+    tag = "Synthetics",
+    operation_id = "BulkDeleteSynthetics",
+    summary = "Bulk delete synthetics",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("folder" = Option<String>, Query, description = "Folder ID of the synthetics (for RBAC)"),
+    ),
+    request_body(content = BulkDeleteSyntheticsRequestBody, description = "IDs to delete", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Deleted"),
+        (status = 500, description = "Error", content_type = "application/json", body = Object),
+    ),
+)]
+pub async fn delete_synthetics_bulk(
+    Path(org_id): Path<String>,
+    Query(_folder_query): Query<FolderQuery>,
+    Json(body): Json<BulkDeleteSyntheticsRequestBody>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        match o2_enterprise::enterprise::synthetics::service::delete_synthetics_bulk(
+            &org_id,
+            &body.ids,
+            _folder_query.folder.as_deref(),
+        )
+        .await
+        {
+            Ok(_) => MetaHttpResponse::ok("monitors deleted"),
+            Err(e) => {
+                tracing::error!("[synthetics] delete_synthetics_bulk: {e}");
+                MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
+                    .into_response()
+            }
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, body);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+#[utoipa::path(
+    patch,
+    path = "/v2/{org_id}/synthetics/move",
+    context_path = "/api",
+    tag = "Synthetics",
+    operation_id = "MoveSynthetics",
+    summary = "Move synthetics to a different folder",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("folder" = Option<String>, Query, description = "Source folder ID (for RBAC)"),
+    ),
+    request_body(content = MoveSyntheticsRequestBody, description = "IDs and destination folder", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Moved"),
+        (status = 500, description = "Error", content_type = "application/json", body = Object),
+    ),
+)]
+pub async fn move_synthetics(
+    Path(org_id): Path<String>,
+    Query(_folder_query): Query<FolderQuery>,
+    Json(body): Json<MoveSyntheticsRequestBody>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        match o2_enterprise::enterprise::synthetics::service::move_synthetics(
+            &org_id,
+            &body.synthetic_ids,
+            &body.dst_folder_id,
+        )
+        .await
+        {
+            Ok(_) => MetaHttpResponse::ok("monitors moved"),
+            Err(e) => {
+                tracing::error!("[synthetics] move_synthetics: {e}");
+                MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
+                    .into_response()
+            }
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, body);
         MetaHttpResponse::forbidden("Not Supported")
     }
 }
