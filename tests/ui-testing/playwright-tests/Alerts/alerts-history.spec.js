@@ -105,6 +105,26 @@ async function deleteTestAlert(page, alertName) {
   }
 }
 
+// Poll GET /api/v2/${org}/alerts/${alertId} until last_triggered_at advances past
+// beforeTs, confirming the backend has written a history record for our trigger.
+async function pollForAlertFired(page, alertId, beforeTs, timeoutMs = 60000, intervalMs = 5000) {
+  const org = getOrgIdentifier();
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const resp = await apiCall(page, 'GET', `/api/v2/${org}/alerts/${alertId}`);
+    if (resp.status === 200) {
+      const ts = resp.data?.last_triggered_at || 0;
+      if (ts > beforeTs) {
+        testLogger.info('Alert fire confirmed via API', { last_triggered_at: ts });
+        return true;
+      }
+    }
+    await page.waitForTimeout(intervalMs);
+  }
+  testLogger.warn('Alert fire not confirmed within timeout — proceeding anyway');
+  return false;
+}
+
 // ============================================================================
 // TESTS
 // ============================================================================
@@ -167,6 +187,63 @@ test.describe("Alert History Page", () => {
     await pm.alertHistoryPage.expectPageTitleVisible();
     await pm.alertHistoryPage.expectManualSearchBtnVisible();
     testLogger.info('Page remained stable after refresh');
+  });
+
+  test("P1: Alert history populates after triggering alert and view details works", {
+    tag: ['@alertHistory', '@functional', '@P1']
+  }, async ({ page }) => {
+    const ts = Date.now();
+    const alertName = `e2e_hist_${ts}`;
+    const templateName = `e2e_hist_tmpl_${ts}`;
+    const destinationName = `e2e_hist_dest_${ts}`;
+    const org = getOrgIdentifier();
+
+    testLogger.info('Creating template, destination and alert', { alertName, templateName, destinationName });
+    await ensureTemplate(page, templateName);
+    await ensureDestination(page, destinationName, templateName);
+    const createResp = await createHistoryTestAlert(page, alertName, destinationName);
+    if (createResp.status !== 200) {
+      throw new Error(`Failed to create alert: ${createResp.status} — ${JSON.stringify(createResp.data)}`);
+    }
+
+    // Snapshot pre-trigger state so we can detect when the backend processes our trigger
+    const alertId = await getAlertId(page, alertName);
+    const preState = alertId
+      ? await apiCall(page, 'GET', `/api/v2/${org}/alerts/${alertId}`)
+      : null;
+    const beforeTs = preState?.data?.last_triggered_at || 0;
+
+    testLogger.info('Triggering alert manually via UI', { alertName });
+    await pm.alertsPage.triggerAlertManually(alertName);
+
+    // Wait for the backend to confirm it processed the trigger — avoids racing the history page
+    if (alertId) {
+      await pollForAlertFired(page, alertId, beforeTs, 60000, 5000);
+    }
+
+    testLogger.info('Navigating to alert history page');
+    await pm.alertHistoryPage.navigate();
+
+    testLogger.info('Selecting alert and running search', { alertName });
+    await pm.alertHistoryPage.selectAlert(alertName);
+    await pm.alertHistoryPage.clickManualSearch();
+
+    testLogger.info('Asserting history rows are present');
+    await pm.alertHistoryPage.expectTableHasRows();
+
+    testLogger.info('Clicking view details on first row');
+    await pm.alertHistoryPage.clickViewDetails(0);
+
+    testLogger.info('Verifying details dialog is visible');
+    await pm.alertHistoryPage.expectDetailsDialogVisible();
+
+    testLogger.info('Alert history populated and view details works');
+
+    // Cleanup
+    await deleteTestAlert(page, alertName);
+    await apiCall(page, 'DELETE', `/api/${org}/alerts/destinations/${destinationName}`);
+    await apiCall(page, 'DELETE', `/api/${org}/alerts/templates/${templateName}`);
+    testLogger.info('Cleaned up alert, destination, and template');
   });
 
   // ===== P2: EDGE CASE TESTS =====
