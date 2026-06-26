@@ -49,7 +49,7 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 45;
+pub const DB_SCHEMA_VERSION: u64 = 46;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -1495,10 +1495,10 @@ pub struct Limit {
     #[env_config(name = "ZO_MAX_FILE_RETENTION_TIME", default = 600)] // seconds
     pub max_file_retention_time: u64,
     // MB, per log file size limit on disk
-    #[env_config(name = "ZO_MAX_FILE_SIZE_ON_DISK", default = 256)]
+    #[env_config(name = "ZO_MAX_FILE_SIZE_ON_DISK", default = 512)]
     pub max_file_size_on_disk: usize,
     // MB, per data file size limit in memory
-    #[env_config(name = "ZO_MAX_FILE_SIZE_IN_MEMORY", default = 256)]
+    #[env_config(name = "ZO_MAX_FILE_SIZE_IN_MEMORY", default = 512)]
     pub max_file_size_in_memory: usize,
     #[deprecated(
         since = "0.14.1",
@@ -1537,7 +1537,7 @@ pub struct Limit {
     pub wal_write_buffer_size: usize,
     #[env_config(name = "ZO_WAL_WRITE_QUEUE_SIZE", default = 10000)] // 10k messages
     pub wal_write_queue_size: usize,
-    #[env_config(name = "ZO_FILE_PUSH_INTERVAL", default = 10)] // seconds
+    #[env_config(name = "ZO_FILE_PUSH_INTERVAL", default = 2)] // seconds
     pub file_push_interval: u64,
     #[env_config(name = "ZO_FILE_PUSH_LIMIT", default = 0)] // files
     pub file_push_limit: usize,
@@ -2638,11 +2638,7 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
     // HACK for move_file_thread_num equal to CPU core
     if cfg.limit.file_move_thread_num == 0 {
-        if cfg.common.local_mode {
-            cfg.limit.file_move_thread_num = std::cmp::max(1, cpu_num / 2);
-        } else {
-            cfg.limit.file_move_thread_num = cpu_num;
-        }
+        cfg.limit.file_move_thread_num = cpu_num;
     }
     // HACK for file_merge_thread_num equal to CPU core
     if cfg.limit.file_merge_thread_num == 0 {
@@ -2771,13 +2767,13 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
     // check max_file_size_on_disk to MB
     if cfg.limit.max_file_size_on_disk == 0 {
-        cfg.limit.max_file_size_on_disk = 256 * 1024 * 1024; // 256MB
+        cfg.limit.max_file_size_on_disk = 512 * 1024 * 1024; // 512MB
     } else {
         cfg.limit.max_file_size_on_disk *= 1024 * 1024;
     }
     // check max_file_size_in_memory to MB
     if cfg.limit.max_file_size_in_memory == 0 {
-        cfg.limit.max_file_size_in_memory = 256 * 1024 * 1024; // 256MB
+        cfg.limit.max_file_size_in_memory = 512 * 1024 * 1024; // 512MB
     } else {
         cfg.limit.max_file_size_in_memory *= 1024 * 1024;
     }

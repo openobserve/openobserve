@@ -177,9 +177,10 @@ ${whereClause}
 GROUP BY x_axis_1
 ORDER BY x_axis_1`;
 
-    // Calculate panel position (3 columns)
-    const col = index % 3;
-    const row = Math.floor(index / 3);
+    // Calculate panel position based on panel width
+    const cols = Math.floor(192 / panelWidth);
+    const col = index % cols;
+    const row = Math.floor(index / cols);
 
     return {
       id: `panel_${stream.stream_name}_${index}`,

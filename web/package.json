@@ -18,9 +18,9 @@
     "test:coverage:check": "./coverage.sh check",
     "test:e2e": "start-server-and-test preview :4173 'cypress run --e2e'",
     "test:e2e:dev": "start-server-and-test 'vite dev --port 4173' :4173 'cypress open --e2e'",
-    "build-only": "vite build",
-    "build-only-alpha1": "vite build --mode=alpha1",
-    "build-only-cloud-prod": "vite build --mode=production",
+    "build-only": "NODE_OPTIONS='--max-old-space-size=8192' vite build",
+    "build-only-alpha1": "NODE_OPTIONS='--max-old-space-size=8192' vite build --mode=alpha1",
+    "build-only-cloud-prod": "NODE_OPTIONS='--max-old-space-size=8192' vite build --mode=production",
     "type-check": "vue-tsc --noEmit -p tsconfig.vitest.json --composite false",
     "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix",
     "lint:ci": "eslint \"src/**/*.vue\" --no-fix"

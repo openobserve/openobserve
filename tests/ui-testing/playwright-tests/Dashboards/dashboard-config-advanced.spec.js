@@ -122,19 +122,12 @@ test.describe("ConfigPanel — Advanced Settings", () => {
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying override config persists after save");
     await reopenPanelConfig(page, pm);
-    await pm.dashboardPanelConfigs.overrideConfig.click();
-    const fieldSelect = page.locator('[data-test="dashboard-addpanel-config-unit-config-select-column-0"]');
-    await fieldSelect.waitFor({ state: "visible", timeout: 10000 });
-    // Verify a field was persisted — trigger's data-test-selected-value is non-empty when a value is selected
-    await expect(fieldSelect.locator('[data-test="dashboard-addpanel-config-unit-config-select-column-0-trigger"]')).not.toHaveAttribute("data-test-selected-value", "");
-    // Close via the ODialog × button; Escape doesn't reliably bubble to reka-ui's
-    // DialogContent when q-select pickers steal focus.
-    await page
-      .locator('[data-test="override-config-popup-dialog"] [data-test="o-dialog-close-btn"]')
-      .click();
-    await page
-      .locator('[data-test="override-config-popup-dialog"]')
-      .waitFor({ state: "hidden", timeout: 5000 });
+    await pm.dashboardPanelConfigs.openOverrideConfig();
+    // Verify the saved override persisted — the field row reappears and its
+    // unit override (Bytes) round-tripped.
+    await expect(pm.dashboardPanelConfigs.getOverrideFieldRow(0)).toBeVisible();
+    await expect(pm.dashboardPanelConfigs.getOverrideUnitSelect()).toContainText("Bytes");
+    await pm.dashboardPanelConfigs.closeOverrideConfig();
 
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);

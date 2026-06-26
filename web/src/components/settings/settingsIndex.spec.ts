@@ -4,6 +4,7 @@ import { mount, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
 import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
+import enLocale from "@/locales/languages/en.json";
 import SettingsIndex from "./index.vue";
 
 // Mock composables and config with factory functions
@@ -83,47 +84,13 @@ const mockStore = createStore({
   actions: {},
 });
 
+// Use the real en.json so section/group labels resolve exactly as in the app.
+// Group labels (e.g. "General", "Destinations & Templates") are now translated via
+// t("settings.groupGeneral") etc.; sourcing the real dictionary keeps this spec in sync.
 const mockI18n = createI18n({
   locale: "en",
   messages: {
-    en: {
-      settings: {
-        header: "Settings",
-        generalLabel: "General",
-        orgLabel: "Organization",
-        queryManagement: "Query Management",
-        cipherKeys: "Cipher Keys",
-        nodes: "Nodes",
-        ssoDomainRestrictions: "SSO Management",
-        organizationManagement: "Organization Management",
-        correlationSettings: "Correlation Settings",
-        llmModelPricing: "LLM Model Pricing",
-        license: "License",
-      },
-      alert_destinations: {
-        header: "Alert Destinations",
-      },
-      pipeline_destinations: {
-        header: "Pipeline Destinations",
-      },
-      alert_templates: {
-        header: "Alert Templates",
-      },
-      regex_patterns: {
-        header: "Regex Patterns",
-        title: "Regex Patterns",
-      },
-      storage_settings: {
-        tabLabel: "Storage Settings",
-      },
-      llmProviders: {
-        tabLabel: "LLM Providers",
-      },
-      cipherKey: {
-        add: "Add Cipher Key",
-        update: "Update Cipher Key",
-      },
-    },
+    en: enLocale,
   },
 });
 

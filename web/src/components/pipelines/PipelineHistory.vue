@@ -536,15 +536,16 @@ const columns = ref([
     header: "Pipeline Name",
     accessorKey: "pipeline_name",
     sortable: true,
-    size: COL.name,
-    meta: { align: "left" as const, autoWidth: true },
+    size: 320,
+    minSize: 320,
+    meta: { align: "left" as const },
   },
   {
     id: "is_realtime",
     header: "Type",
     accessorKey: "is_realtime",
     sortable: true,
-    size: 90,
+    size: 70,
     meta: { align: "center" as const },
   },
   {
@@ -552,7 +553,7 @@ const columns = ref([
     header: "Is Silenced",
     accessorKey: "is_silenced",
     sortable: true,
-    size: 130,
+    size: 100,
     meta: { align: "center" as const },
   },
   {
@@ -584,7 +585,7 @@ const columns = ref([
     header: "Duration",
     accessorFn: (row: any) => row.end_time - row.start_time,
     sortable: true,
-    size: 110,
+    size: 90,
     meta: { align: "right" as const },
   },
   {
