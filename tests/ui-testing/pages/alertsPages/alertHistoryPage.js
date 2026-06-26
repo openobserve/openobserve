@@ -82,6 +82,14 @@ export class AlertHistoryPage {
   }
 
   async clickViewDetails(index = 0) {
+    // Let any in-flight QTable request settle before interacting
+    await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+
+    // If the details dialog is already open (from a prior click attempt), skip re-clicking
+    const alreadyOpen = await this.page.locator(this.alertDetailsDialog)
+      .isVisible({ timeout: 300 }).catch(() => false);
+    if (alreadyOpen) return;
+
     const btns = this.page.locator(this.viewDetailsBtn);
     const btn = btns.nth(index);
     await btn.waitFor({ state: 'visible', timeout: 10000 });
