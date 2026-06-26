@@ -1,0 +1,14 @@
+{
+  "name": "kinora-poc",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Self-contained POC suite to evaluate Kinora (self-hosted) as a Playwright reporting dashboard.",
+  "scripts": {
+    "test": "playwright test",
+    "test:break": "KINORA_POC_BREAK=1 playwright test"
+  },
+  "devDependencies": {
+    "@kinora/reporter": "latest",
+    "@playwright/test": "1.50.0"
+  }
+}
