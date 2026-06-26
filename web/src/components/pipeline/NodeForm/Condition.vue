@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
 
 
-    <div class="tw:min-w-[45vw] tw:rounded-lg tw:max-w-[47vw] tw:px-3 stream-routing-container">
+    <div class="tw:w-full tw:rounded-lg tw:px-3 stream-routing-container">
       <div>
         <div
           class="showLabelOnTop tw:font-bold text-h7"
@@ -796,6 +796,11 @@ const validateSqlQuery = () => {
 
 <style>
 /* Override FilterGroup styles for pipeline context */
+/* Force the root group box to span the full drawer width (FilterGroup defaults to w-fit) */
+.pipeline-filter-group-wrapper > .el-border {
+  width: 100% !important;
+}
+
 .pipeline-filter-group-wrapper .group-container {
   white-space: normal !important;
   overflow-x: visible !important;
