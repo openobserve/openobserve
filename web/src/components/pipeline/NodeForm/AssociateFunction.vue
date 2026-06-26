@@ -137,10 +137,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Info note explaining RAF/RBF -->
           <div class="tw:bg-[#f9f290] tw:text-[#2d3748] tw:w-full tw:rounded-md tw:p-3 tw:flex tw:flex-col tw:gap-2">
-            <div class="tw:text-sm tw:text-gray-800">
+            <div class="tw:text-sm tw:text-[#2d3748]">
               Function Execution Guidelines:
             </div>
-            <div class="tw:flex tw:flex-col tw:gap-1 tw:text-sm tw:text-gray-800">
+            <div class="tw:flex tw:flex-col tw:gap-1 tw:text-sm tw:text-[#2d3748]">
               <div class="tw:flex tw:items-start tw:gap-2">
                 <OIcon
                   name="info"
@@ -148,7 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="tw:shrink-0 tw:mt-0.5 tw:text-amber-500"
                 />
                 <span>
-                  <span class="highlight">RBF (Run Before Flattening):</span>
+                  <span class="tw:font-bold tw:text-[#007bff]">RBF (Run Before Flattening):</span>
                   Function executes before data structure is flattened
                 </span>
               </div>
@@ -159,7 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="tw:shrink-0 tw:mt-0.5 tw:text-amber-500"
                 />
                 <span>
-                  <span class="highlight">RAF (Run After Flattening):</span>
+                  <span class="tw:font-bold tw:text-[#007bff]">RAF (Run After Flattening):</span>
                   Function executes after data structure is flattened
                 </span>
               </div>
