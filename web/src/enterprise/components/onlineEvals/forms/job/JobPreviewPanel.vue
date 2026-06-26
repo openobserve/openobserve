@@ -3,15 +3,15 @@
     <section class="tw:py-[14px] tw:px-4 tw:mb-3 tw:border tw:border-(--color-dialog-header-border,var(--o2-border)) tw:rounded-md">
       <header class="tw:flex tw:items-center tw:gap-[6px] tw:mb-[6px] tw:text-(--color-text-secondary,var(--o2-text-secondary))">
         <OIcon name="visibility" size="xs" />
-        <h3 class="tw:m-0 tw:text-[13px] tw:font-semibold tw:text-(--color-text-primary,currentColor)">{{ t("onlineEvals.job.preview.title") }}</h3>
+        <span class="tw:m-0 tw:text-[0.8125rem] tw:font-semibold tw:text-(--color-text-primary,currentColor)">{{ t("onlineEvals.job.preview.title") }}</span>
       </header>
-      <p class="tw:m-0 tw:text-text-secondary tw:text-xs tw:leading-normal">{{ t("onlineEvals.job.preview.hint") }}</p>
+      <div class="tw:m-0 tw:text-text-secondary tw:text-xs tw:leading-normal">{{ t("onlineEvals.job.preview.hint") }}</div>
     </section>
 
     <section class="tw:py-[14px] tw:px-4 tw:mb-0 tw:border tw:border-(--color-dialog-header-border,var(--o2-border)) tw:rounded-md">
       <header class="tw:flex tw:items-center tw:gap-[6px] tw:mb-[6px] tw:text-(--color-text-secondary,var(--o2-text-secondary))">
         <OIcon name="info" size="xs" />
-        <h3 class="tw:m-0 tw:text-[13px] tw:font-semibold tw:text-(--color-text-primary,currentColor)">{{ t("onlineEvals.job.preview.summaryTitle") }}</h3>
+        <span class="tw:m-0 tw:text-[0.8125rem] tw:font-semibold tw:text-(--color-text-primary,currentColor)">{{ t("onlineEvals.job.preview.summaryTitle") }}</span>
       </header>
       <dl class="tw:grid tw:grid-cols-[96px_1fr] tw:gap-x-3 tw:gap-y-2 tw:m-0 tw:text-xs [&_dt]:tw:text-text-secondary [&_dd]:tw:m-0 [&_dd]:tw:text-text-primary">
         <dt>{{ t("onlineEvals.job.preview.summaryName") }}</dt>
