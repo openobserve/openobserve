@@ -164,7 +164,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
 import { useI18n } from "vue-i18n";
+import { useStore } from "vuex";
 import { formatDate } from "@/utils/date";
+import { timestampToTimezoneDate } from "@/utils/timezone";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -187,6 +189,7 @@ const emit = defineEmits<{
 
 // Composables
 const { t } = useI18n();
+const store = useStore();
 
 // State
 const selectedWindow = ref<string>("5min");
@@ -219,7 +222,11 @@ const isValid = computed(() => {
  */
 const formatTimestamp = (timestamp: number): string => {
   const ms = Math.floor(timestamp / 1000);
-  return formatDate(ms, "YYYY-MM-DD HH:mm:ss.SSS");
+  return timestampToTimezoneDate(
+    ms,
+    store.state.timezone || "UTC",
+    "yyyy-MM-dd HH:mm:ss.SSS",
+  );
 };
 
 /**

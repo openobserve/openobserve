@@ -311,7 +311,7 @@ import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import TenstackTable from "@/plugins/logs/TenstackTable.vue";
 import DimensionFiltersBar from "./DimensionFiltersBar.vue";
 import CorrelationEventHeader from "./CorrelationEventHeader.vue";
-import { formatDate } from "@/utils/date";
+import { timestampToTimezoneDate } from "@/utils/timezone";
 import { copyToClipboard } from "@/utils/clipboard";
 import type { ColumnDef } from "@tanstack/vue-table";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
@@ -959,7 +959,11 @@ const showingDefaultColumns = computed(() => {
 const formatTimestamp = (timestamp: number): string => {
   // Convert microseconds to milliseconds
   const ms = Math.floor(timestamp / 1000);
-  return formatDate(ms, "YYYY-MM-DD HH:mm:ss.SSS");
+  return timestampToTimezoneDate(
+    ms,
+    store.state.timezone || "UTC",
+    "yyyy-MM-dd HH:mm:ss.SSS",
+  );
 };
 
 /**

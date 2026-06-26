@@ -676,6 +676,7 @@ import { useI18n } from "vue-i18n";
 import { byString } from "../../utils/json";
 import { getImageURL, useLocalWrapContent } from "../../utils/zincutils";
 import { formatLargeNumber } from "@/utils/formatters";
+import { CUSTOM_THEME_NAME, THEME_STORAGE_KEYS } from "@/constants/themes";
 import useLogs from "../../composables/useLogs";
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
 import usePatterns from "@/composables/useLogs/usePatterns";
@@ -1157,16 +1158,16 @@ export default defineComponent({
     // Watch for theme color changes in localStorage
     const handleThemeColorChange = () => {
       const currentMode = store.state.theme === "dark" ? "dark" : "light";
-      const appliedThemeKey =
-        currentMode === "light" ? "appliedLightTheme" : "appliedDarkTheme";
-      const appliedTheme = localStorage.getItem(appliedThemeKey);
+      const appliedThemeName = localStorage.getItem(
+        THEME_STORAGE_KEYS[currentMode].appliedName,
+      );
 
-      // If -1, user is picking custom color - debounce to avoid performance issues
-      if (appliedTheme === "-1") {
+      // Custom color: user may be dragging the picker — debounce to avoid jank
+      if (appliedThemeName === CUSTOM_THEME_NAME) {
         if (debounceTimer) clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => reDrawChart(), 300);
       } else {
-        // Predefined theme applied - re-render immediately
+        // Predefined / default theme applied - re-render immediately
         if (debounceTimer) clearTimeout(debounceTimer);
         reDrawChart();
       }
