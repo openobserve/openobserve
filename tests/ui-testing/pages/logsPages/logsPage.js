@@ -3226,7 +3226,11 @@ export class LogsPage {
 
     // ===== LOG DETAIL SIDEBAR METHODS (Bug #9724) =====
     /**
-     * Opens the log detail sidebar by clicking on a log row
+     * Opens the log detail sidebar by clicking the first result row.
+     * Clicks whichever first-row cell is rendered (matched by the
+     * `log-table-column-0-` prefix) — the default column may be the generic
+     * "source" column OR the FTS "body"/message column — then waits for the
+     * detail dialog. Includes a force-click fallback for transient instability.
      * @returns {Promise<void>}
      */
     async openLogDetailSidebar() {
@@ -5209,6 +5213,15 @@ export class LogsPage {
         throw new Error(`Field expand button not found for: ${fieldName}`);
     }
 
+    /**
+     * Adds a field to the logs results table.
+     * The add button is only revealed while the field row is hovered, so under CI
+     * load this scrolls the row into view and re-hovers (up to 3 attempts) until the
+     * button surfaces, then waits for the add to commit (remove toggle or column header).
+     * Throws if the add button never surfaces.
+     * @param {string} fieldName - The field to add to the table
+     * @returns {Promise<void>}
+     */
     async clickAddFieldToTableButton(fieldName) {
         const addBtn = this.page.locator(`[data-test="log-search-index-list-add-${fieldName}-field-btn"]`);
         const expandBtn = this.page.locator(`[data-test="log-search-expand-${fieldName}-field-btn"]`);

@@ -187,6 +187,14 @@ test.describe("Logs Highlighting Regression Bug Fixes", () => {
 
     testLogger.info('Ingestion response:', response);
 
+    // Fail fast (with the actual payload) if ingestion never succeeded — sendRequest
+    // returns parsed JSON ({ code: 200, status: [...] } on success, { code: 400, ... }
+    // or { error: ... } otherwise), so don't let a non-deletion failure (auth, network,
+    // persistent deletion) slip through and surface later as a confusing "stream not found".
+    if (response?.code !== 200) {
+      throw new Error(`Ingestion into "${STREAM_NAME}" did not succeed: ${JSON.stringify(response)}`);
+    }
+
     // Wait for data to be indexed (cloud indexing can take longer)
     testLogger.info(`Waiting for stream "${STREAM_NAME}" to be indexed...`);
     await pm.logsPage.clickMenuLinkLogsItem();
