@@ -82,24 +82,31 @@ export class AlertHistoryPage {
   }
 
   async expectTableHasRows() {
-    const rows = this.page.locator(`${this.table} tbody tr`);
+    // Exclude OTableLoading skeleton tbody to avoid false positives before real data loads
+    const rows = this.page.locator(`${this.table} tbody:not([data-test="o2-table-skeleton-body"]) tr`);
     await expect(rows.first()).toBeVisible({ timeout: 10000 });
   }
 
   async getTableRowCount() {
-    const rows = this.page.locator(`${this.table} tbody tr`);
+    // Exclude OTableLoading skeleton tbody rows
+    const rows = this.page.locator(`${this.table} tbody:not([data-test="o2-table-skeleton-body"]) tr`);
     return await rows.count();
   }
 
   async clickViewDetails(index = 0) {
-    // Prefer data-test selector; fall back to the first button inside the OTable
-    // actions cell when data-test doesn't propagate through reka-ui's Primitive.
+    // Wait for skeleton loading state to finish before interacting with action buttons
+    await this.page.locator('[data-test="o2-table-skeleton-body"]')
+      .waitFor({ state: 'hidden', timeout: 15000 })
+      .catch(() => {});
+
     const byDataTest = this.page.locator(this.viewDetailsBtn);
     const byCell = this.page.locator('[data-test="o2-table-cell-actions"]').nth(index).locator('button').first();
     const btn = (await byDataTest.count() > 0) ? byDataTest.nth(index) : byCell;
     await btn.waitFor({ state: 'visible', timeout: 10000 });
     await btn.scrollIntoViewIfNeeded();
-    await btn.click({ force: true });
+    // Use evaluate to fire a native click — bypasses OTooltip coordinate interception
+    // while still routing through OButton's handleClick → emit("click") → showDetailsDialog
+    await btn.evaluate(el => el.click());
   }
 
   async expectViewDetailsBtnVisible() {
