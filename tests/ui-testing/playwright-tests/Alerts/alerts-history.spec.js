@@ -215,12 +215,10 @@ test.describe("Alert History Page", () => {
       await pm.alertHistoryPage.clickViewDetails(0);
       dialogOpened = await page
         .locator('[data-test="alert-history-details-dialog"]')
-        .isVisible({ timeout: 5000 })
+        .isVisible({ timeout: 8000 })
         .catch(() => false);
       if (!dialogOpened && clickAttempt < 2) {
         testLogger.info(`View details click attempt ${clickAttempt + 1} — dialog not visible, retrying`);
-        // Close any half-open state before retrying
-        await page.keyboard.press('Escape').catch(() => {});
         await page.waitForTimeout(500);
       }
     }

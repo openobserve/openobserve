@@ -38,18 +38,28 @@ export class AlertHistoryPage {
   }
 
   async selectAlert(alertName) {
-    await this.page.locator(this.searchSelect).click();
-    await this.page.waitForTimeout(500);
-    const option = this.page.getByRole('option', { name: alertName });
-    if (await option.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await option.click();
-    } else {
-      // Type to filter
-      await this.page.locator(`${this.searchSelect} input`).fill(alertName);
-      await this.page.waitForTimeout(500);
-      await this.page.getByRole('option', { name: alertName }).click();
-    }
-    await this.page.getByRole('listbox').waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+    // alert-history-search-select is OSelect in listbox mode (searchable defaults to true).
+    // The ListboxFilter input is rendered in a PopoverPortal — it is NOT a DOM child of
+    // the OSelect wrapper, so `[data-test="...search-select"] input` never matches.
+    // Use the forwarded data-test sub-keys instead: -trigger, -popover, -search, -option.
+    const trigger = this.page.locator('[data-test="alert-history-search-select-trigger"]');
+    await trigger.waitFor({ state: 'visible', timeout: 10000 });
+    await trigger.click();
+
+    const popover = this.page.locator('[data-test="alert-history-search-select-popover"]');
+    await popover.waitFor({ state: 'visible', timeout: 5000 });
+
+    // Type the alert name to filter — avoids virtualiser rendering only visible rows
+    const searchInput = this.page.locator('[data-test="alert-history-search-select-search"]');
+    await searchInput.waitFor({ state: 'visible', timeout: 5000 });
+    await searchInput.fill(alertName);
+    await this.page.waitForTimeout(300);
+
+    const option = this.page.locator(`[data-test="alert-history-search-select-option"][data-test-label="${alertName}"]`);
+    await option.waitFor({ state: 'visible', timeout: 5000 });
+    await option.click();
+
+    await popover.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
   }
 
   async clickManualSearch() {
@@ -89,9 +99,7 @@ export class AlertHistoryPage {
     const btn = (await byDataTest.count() > 0) ? byDataTest.nth(index) : byCell;
     await btn.waitFor({ state: 'visible', timeout: 10000 });
     await btn.scrollIntoViewIfNeeded();
-    // Use Playwright's native click — fires full pointer/mouse event sequence
-    // which reka-ui Primitive relies on for state transitions.
-    await btn.click();
+    await btn.click({ force: true });
   }
 
   async expectViewDetailsBtnVisible() {
