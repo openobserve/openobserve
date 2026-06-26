@@ -172,6 +172,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :sort-by="searchObj.meta.resultGrid.sortBy"
           :sort-order="searchObj.meta.resultGrid.sortOrder"
           :search-mode="searchObj.meta.searchMode"
+          :ai-enabled="aiEnabled"
+          :stream-doc-time-range="streamDocTimeRange"
+          :query-window-us="queryWindowUs"
           @row-click="expandRowDetail"
           @page-change="changePage"
           @rows-per-page-change="changeRowsPerPage"
@@ -179,6 +182,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @widen-range="(p) => $emit('widen-range', p)"
           @remove-filter="$emit('remove-filter')"
           @jump-to-stream-data="(from, to) => $emit('jump-to-stream-data', from, to)"
+          @ask-ai="$emit('ask-ai')"
+          @send-to-ai-chat="(v) => $emit('send-to-ai-chat', v)"
         />
       </div>
     </div>
@@ -230,6 +235,18 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    aiEnabled: {
+      type: Boolean,
+      default: false,
+    },
+    streamDocTimeRange: {
+      type: Object,
+      default: undefined,
+    },
+    queryWindowUs: {
+      type: Object,
+      default: undefined,
+    },
   },
   emits: [
     "update:scroll",
@@ -244,6 +261,8 @@ export default defineComponent({
     "remove-filter",
     "jump-to-stream-data",
     "error-only-toggled",
+    "ask-ai",
+    "send-to-ai-chat",
   ],
   methods: {
     toggleErrorOnly() {

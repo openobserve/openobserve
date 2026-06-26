@@ -21,10 +21,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- ════════════════════ Empty State ════════════════════ -->
     <TracesNoEventsState
       v-if="noResults"
+      :ai-enabled="aiEnabled"
+      :stream-doc-time-range="streamDocTimeRange"
+      :query-window-us="queryWindowUs"
       data-test="traces-search-result-not-found-text"
       @widen-range="(p) => emit('widen-range', p)"
       @remove-filter="emit('remove-filter')"
       @jump-to-stream-data="(from, to) => emit('jump-to-stream-data', from, to)"
+      @ask-ai="emit('ask-ai')"
     />
 
     <!-- ════════════════════ Traces List Section ════════════════════ -->
@@ -221,6 +225,12 @@ interface Props {
   searchMode?: TraceSearchMode;
   /** Whether to show CellActions overlay on table cells. Default: true */
   showCellActions?: boolean;
+  /** Whether the AI copilot is enabled — gates the "Ask AI" empty-state button. */
+  aiEnabled?: boolean;
+  /** Authoritative stream doc time range (µs) for the empty-state jump card. */
+  streamDocTimeRange?: { min: number; max: number };
+  /** Resolved query window (µs) for empty-state overlap detection. */
+  queryWindowUs?: { start: number; end: number };
 }
 
 const { t } = useI18n();
@@ -238,6 +248,9 @@ const props = withDefaults(defineProps<Props>(), {
   sortOrder: undefined,
   searchMode: "traces",
   showCellActions: true,
+  aiEnabled: false,
+  streamDocTimeRange: undefined,
+  queryWindowUs: undefined,
 });
 
 const emit = defineEmits<{
@@ -250,6 +263,7 @@ const emit = defineEmits<{
   "widen-range": [period: string];
   "remove-filter": [];
   "jump-to-stream-data": [fromUs: number, toUs: number];
+  "ask-ai": [];
 }>();
 
 const copyToClipboard = (field: string, value: any) =>

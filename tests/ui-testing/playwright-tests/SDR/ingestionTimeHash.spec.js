@@ -99,10 +99,10 @@ test.describe("Ingestion Time Hash - Combined Test", { tag: '@enterprise' }, () 
     // STEP 1: Ingest data WITHOUT any SDR patterns - all fields should be visible
     testLogger.info('STEP 1: Ingest 4 lines of data WITHOUT any SDR patterns linked');
     const dataToIngest = patternsToTest.map(p => ({ fieldName: p.field, fieldValue: p.value }));
-    await pm.logsPage.ingestMultipleFields(testStreamName, dataToIngest);
+    const markerStep1 = await pm.logsPage.ingestMultipleFields(testStreamName, dataToIngest);
 
     const fieldsToVerifyStep1 = patternsToTest.map(p => ({ fieldName: p.field, shouldBeHashed: false }));
-    await pm.sdrVerificationPage.verifyMultipleFields(pm.logsPage, testStreamName, fieldsToVerifyStep1);
+    await pm.sdrVerificationPage.verifyMultipleFields(pm.logsPage, testStreamName, fieldsToVerifyStep1, markerStep1);
     testLogger.info('✓ STEP 1 PASSED: All fields visible without SDR');
 
     // STEP 2: Create all 4 SDR patterns
@@ -137,11 +137,13 @@ test.describe("Ingestion Time Hash - Combined Test", { tag: '@enterprise' }, () 
     testLogger.info('✓ STEP 3 PASSED: All 4 patterns linked to fields with HASH action');
 
     // STEP 4: Ingest data WITH SDR patterns linked - all fields should be HASHED
+    // Ingestion-time hashing is baked in at write time, so this is a NEW batch
+    // (new marker) — distinct from the still-visible STEP 1 batch on the same stream.
     testLogger.info('STEP 4: Ingest 4 lines of data WITH SDR patterns linked');
-    await pm.logsPage.ingestMultipleFields(testStreamName, dataToIngest);
+    const markerStep4 = await pm.logsPage.ingestMultipleFields(testStreamName, dataToIngest);
 
     const fieldsToVerifyStep4 = patternsToTest.map(p => ({ fieldName: p.field, shouldBeHashed: true }));
-    await pm.sdrVerificationPage.verifyMultipleFields(pm.logsPage, testStreamName, fieldsToVerifyStep4);
+    await pm.sdrVerificationPage.verifyMultipleFields(pm.logsPage, testStreamName, fieldsToVerifyStep4, markerStep4);
     testLogger.info('✓ STEP 4 PASSED: All fields are HASHED (present with hashed values)');
 
     testLogger.info('=== ✓ COMBINED HASH TEST COMPLETED SUCCESSFULLY ===');

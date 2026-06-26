@@ -2706,15 +2706,23 @@ export class LogsPage {
             ? process.env.INGESTION_URL.slice(0, -1)
             : process.env.INGESTION_URL;
 
+        // Unique per-batch marker. Verification queries the search API by this exact
+        // value (WHERE sdr_test_id = '<marker>'), so it inspects ONLY the records this
+        // call ingested — never stale data from an earlier batch on the same stream.
+        // This is what makes SDR verification deterministic instead of relying on the
+        // virtualized results table rendering the right rows at the right time.
+        const marker = `sdr-${require('crypto').randomUUID()}`;
+
         const baseTimestamp = Date.now() * 1000;
         const logData = dataObjects.map(({ fieldName, fieldValue }, index) => ({
             level: "info",
             [fieldName]: fieldValue,
             log: `Test log with ${fieldName} field - entry ${index}`,
+            sdr_test_id: marker,
             _timestamp: baseTimestamp + (index * 1000000)
         }));
 
-        testLogger.info(`Preparing to ingest ${logData.length} separate log entries`);
+        testLogger.info(`Preparing to ingest ${logData.length} separate log entries (marker: ${marker})`);
 
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
             try {
@@ -2732,9 +2740,10 @@ export class LogsPage {
                     testLogger.info('Ingestion successful, waiting for stream to be indexed...');
                     // NOTE: This is a backend async indexing wait, not a UI wait.
                     // waitForLoadState won't help as no page navigation occurs.
-                    // Consider using waitForStreamData() polling for production tests.
+                    // Verification polls the search API for this marker, so this is just
+                    // a small head start to reduce poll iterations — not the readiness gate.
                     await this.page.waitForTimeout(5000);
-                    return;
+                    return marker;
                 }
 
                 const errorMessage = responseBody?.message || JSON.stringify(responseBody);
@@ -3216,7 +3225,18 @@ export class LogsPage {
      * @returns {Promise<void>}
      */
     async openLogDetailSidebar() {
-        await this.page.locator(this.logTableColumnSource).click();
+        const sourceCell = this.page.locator(this.logTableColumnSource).first();
+        // Under CI load the row can resolve in the DOM while the results table is still
+        // streaming/re-rendering, so a plain click waits out its timeout on "element is not
+        // stable". Wait for the cell to be visible, bring it into view, then click with a
+        // force fallback to push past any transient instability or overlay.
+        await sourceCell.waitFor({ state: 'visible', timeout: 30000 });
+        await sourceCell.scrollIntoViewIfNeeded().catch(() => {});
+        try {
+            await sourceCell.click({ timeout: 15000 });
+        } catch {
+            await sourceCell.click({ force: true });
+        }
         await this.page.locator(this.logDetailDialog).waitFor({ state: 'visible', timeout: 10000 });
         testLogger.info('Log detail sidebar opened');
     }
@@ -5167,7 +5187,15 @@ export class LogsPage {
 
     async clickAddFieldToTableButton(fieldName) {
         const addBtn = this.page.locator(`[data-test="log-search-index-list-add-${fieldName}-field-btn"]`);
-        await addBtn.waitFor({ state: 'visible', timeout: 5000 });
+        try {
+            await addBtn.waitFor({ state: 'visible', timeout: 5000 });
+        } catch {
+            // The add button is only revealed while the field row is hovered. Under CI load
+            // the hover state can be lost (or never settled) before the click — re-hover the
+            // field row and wait again before giving up.
+            await this.page.locator(`[data-test="log-search-expand-${fieldName}-field-btn"]`).hover().catch(() => {});
+            await addBtn.waitFor({ state: 'visible', timeout: 10000 });
+        }
         await addBtn.click();
         // The add operation commits when both (a) the toggle inverts to a remove
         // button in the sidebar, and (b) the field column header appears in the
