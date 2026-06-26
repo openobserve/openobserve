@@ -133,7 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OTooltip :content="t('settings.resetToDefaultColors')" side="top" />
               </div>
             </div>
-            <span class="individual-setting-description tw:self-start">
+            <span class="individual-setting-description tw:self-start tw:text-[13px] tw:opacity-70">
               {{ t("settings.themeManagementDescription") }}
             </span>
           </div>
@@ -295,7 +295,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
           </div>
-          <span class="individual-setting-description tw:-translate-y-[5px]">
+          <span class="individual-setting-description tw:-translate-y-[5px] tw:text-[13px] tw:opacity-70">
               {{ t("settings.customLogoLightDescription") }}
             </span>
           </div>
@@ -366,7 +366,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
           </div>
-          <span class="individual-setting-description tw:-translate-y-[5px]">
+          <span class="individual-setting-description tw:-translate-y-[5px] tw:text-[13px] tw:opacity-70">
               {{ t("settings.customLogoDarkDescription") }}
             </span>
           </div>
@@ -1075,4 +1075,19 @@ export default defineComponent({
   },
 });
 </script>
+
+<style>
+/* The theme chips' dark background/border are set via `tw:dark:*` utilities,
+   which don't apply in this app (dark mode is toggled by `body.body--dark`,
+   not the OS media query Tailwind's `dark:` variant targets). Restore them
+   with class-based rules so the chips keep their fill + border in dark mode. */
+.body--dark [data-test="theme-light-chip"],
+.body--dark [data-test="theme-dark-chip"] {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+.body--dark [data-test="reset-theme-colors-btn"] {
+  border-color: rgba(255, 255, 255, 0.25);
+}
+</style>
 
