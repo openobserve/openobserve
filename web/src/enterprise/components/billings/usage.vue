@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="tw:flex tw:flex-col tw:justify-between">
                 <!-- Title row -->
                 <div class="tw:flex tw:justify-between tw:items-center">
-                  <div class="tw:text-(--text-sm) tw:font-semibold tw:leading-(--leading-base) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left"> Action Scripts</div>
+                  <div class="tw:text-(length:--text-sm) tw:font-semibold tw:leading-(--leading-base) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left"> Action Scripts</div>
                   <div style="opacity: 0.8;">
                     <img :src="actionScriptIcon" />
                   </div>
@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
             <!-- Bottom Section (40%) -->
-            <div class="tw:text-(--text-2xl) tw:font-semibold tw:leading-(--leading-xl) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left tw:flex tw:items-end ">
+            <div class="tw:text-(length:--text-2xl) tw:font-semibold tw:leading-(--leading-xl) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left tw:flex tw:items-end ">
               2
             </div>
             </div>
@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="tw:flex tw:flex-col tw:justify-between">
                 <!-- Title row -->
                 <div class="tw:flex tw:justify-between tw:items-center">
-                  <div class="tw:text-(--text-sm) tw:font-semibold tw:leading-(--leading-base) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left">Error Tracking</div>
+                  <div class="tw:text-(length:--text-sm) tw:font-semibold tw:leading-(--leading-base) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left">Error Tracking</div>
                   <div style="opacity: 0.8;">
                     <img :src="errorTrackingIcon" />
                   </div>
@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
             <!-- Bottom Section (40%) -->
-            <div class="tw:text-(--text-2xl) tw:font-semibold tw:leading-(--leading-xl) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left tw:flex tw:items-end ">
+            <div class="tw:text-(length:--text-2xl) tw:font-semibold tw:leading-(--leading-xl) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left tw:flex tw:items-end ">
               300
             </div>
             </div>
@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="tw:flex tw:flex-col tw:justify-between">
                 <!-- Title row -->
                 <div class="tw:flex tw:justify-between tw:items-center">
-                  <div class="tw:text-(--text-sm) tw:font-semibold tw:leading-(--leading-base) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left" data-test="billings-usage-tile-title">RUM Session</div>
+                  <div class="tw:text-(length:--text-sm) tw:font-semibold tw:leading-(--leading-base) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left" data-test="billings-usage-tile-title">RUM Session</div>
                   <div style="opacity: 0.8;">
                     <img :src="rumSessionIcon" />
                   </div>
@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
             <!-- Bottom Section (40%) -->
-            <div class="tw:text-(--text-2xl) tw:font-semibold tw:leading-(--leading-xl) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left tw:flex tw:items-end ">
+            <div class="tw:text-(length:--text-2xl) tw:font-semibold tw:leading-(--leading-xl) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left tw:flex tw:items-end ">
               20
             </div>
             </div>
@@ -104,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="tw:flex tw:flex-col tw:justify-between">
                 <!-- Title row -->
                 <div class="tw:flex tw:justify-between tw:items-center">
-                  <div class="tw:text-(--text-sm) tw:font-semibold tw:leading-(--leading-base) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left" data-test="billings-usage-tile-title"> Ingestion</div>
+                  <div class="tw:text-(length:--text-sm) tw:font-semibold tw:leading-(--leading-base) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left" data-test="billings-usage-tile-title"> Ingestion</div>
                   <div style="opacity: 0.8;">
                     <img :src="ingestionIcon" />
                   </div>
@@ -112,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
             <!-- Bottom Section (40%) -->
-            <div class="tw:text-(--text-2xl) tw:font-semibold tw:leading-(--leading-xl) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left tw:flex tw:items-end ">
+            <div class="tw:text-(length:--text-2xl) tw:font-semibold tw:leading-(--leading-xl) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left tw:flex tw:items-end ">
                {{ usageData.ingestion }} {{ usageDataType.toUpperCase() }} {{ usageCost.ingestion ? '| $ '+ usageCost.ingestion : '' }}
             </div>
             </div>
@@ -123,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="tw:flex tw:flex-col tw:justify-between">
                     <!-- Title row -->
                     <div class="tw:flex tw:justify-between tw:items-center">
-                    <div class="tw:text-(--text-sm) tw:font-semibold tw:leading-(--leading-base) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left" data-test="billings-usage-tile-title">Search</div>
+                    <div class="tw:text-(length:--text-sm) tw:font-semibold tw:leading-(--leading-base) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left" data-test="billings-usage-tile-title">Search</div>
                     <div style="opacity: 0.8;">
                         <img :src="searchIcon" />
                     </div>
@@ -131,7 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <!-- Bottom Section (40%) -->
-                <div class="tw:text-(--text-2xl) tw:font-semibold tw:leading-(--leading-xl) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left tw:flex tw:items-end ">
+                <div class="tw:text-(length:--text-2xl) tw:font-semibold tw:leading-(--leading-xl) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left tw:flex tw:items-end ">
                 {{ usageData.search }} {{ usageDataType.toUpperCase() }} {{ usageCost.search ? '| $ '+ usageCost.search : '' }}
                 </div>
                 </div>
@@ -142,7 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="tw:flex tw:flex-col tw:justify-between">
                     <!-- Title row -->
                     <div class="tw:flex tw:justify-between tw:items-center">
-                    <div class="tw:text-(--text-sm) tw:font-semibold tw:leading-(--leading-base) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left" data-test="billings-usage-tile-title">Functions</div>
+                    <div class="tw:text-(length:--text-sm) tw:font-semibold tw:leading-(--leading-base) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left" data-test="billings-usage-tile-title">Functions</div>
                     <div style="opacity: 0.8;">
                         <img :src="functionsIcon" />
                     </div>
@@ -150,7 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <!-- Bottom Section (40%) -->
-                <div class="tw:text-(--text-2xl) tw:font-semibold tw:leading-(--leading-xl) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left tw:flex tw:items-end ">
+                <div class="tw:text-(length:--text-2xl) tw:font-semibold tw:leading-(--leading-xl) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left tw:flex tw:items-end ">
                 {{ usageData.functions }} {{ usageDataType.toUpperCase() }} {{ usageCost.functions ? '| $ '+ usageCost.functions : '' }}
                 </div>
                 </div>
@@ -161,13 +161,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="tw:flex tw:flex-col tw:justify-between tw:rounded-[0.325rem] tw:h-full tw:gap-4 ">
                 <div class="tw:flex tw:flex-col tw:justify-between">
                     <div class="tw:flex tw:justify-between tw:items-center">
-                    <div class="tw:text-(--text-sm) tw:font-semibold tw:leading-(--leading-base) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left">{{ t("billing.aiCredits") }}</div>
+                    <div class="tw:text-(length:--text-sm) tw:font-semibold tw:leading-(--leading-base) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left">{{ t("billing.aiCredits") }}</div>
                     <div style="opacity: 0.8;">
                         <img :src="aiIcon" />
                     </div>
                     </div>
                 </div>
-                <div class="tw:text-(--text-2xl) tw:font-semibold tw:leading-(--leading-xl) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left tw:flex tw:items-end ">
+                <div class="tw:text-(length:--text-2xl) tw:font-semibold tw:leading-(--leading-xl) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left tw:flex tw:items-end ">
                 {{ usageData.ai_credits }} Credits {{ usageCost.ai_credits ? '| $ '+ usageCost.ai_credits : '' }}
                 </div>
                 </div>
@@ -178,7 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="tw:flex tw:flex-col tw:justify-between">
                     <!-- Title row -->
                     <div class="tw:flex tw:justify-between tw:items-center">
-                    <div class="tw:text-(--text-sm) tw:font-semibold tw:leading-(--leading-base) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left">Pipelines</div>
+                    <div class="tw:text-(length:--text-sm) tw:font-semibold tw:leading-(--leading-base) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left">Pipelines</div>
                     <div style="opacity: 0.8;" class="tw:bg-[#E6EFFE] tw:flex tw:items-center tw:justify-center tw:rounded-[9px] tw:h-[33px] tw:w-[33px]">
                         <img :src="pipelineIcon" class="tw:h-[18px] tw:w-[18px] tw:mx-[7px] tw:my-[7px]" />
                     </div>
@@ -186,7 +186,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <!-- Bottom Section (40%) -->
-                <div class="tw:text-(--text-2xl) tw:font-semibold tw:leading-(--leading-xl) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left tw:flex tw:items-end ">
+                <div class="tw:text-(length:--text-2xl) tw:font-semibold tw:leading-(--leading-xl) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left tw:flex tw:items-end ">
                 {{ usageData.pipeline }} {{ usageDataType.toUpperCase() }} {{ usageCost.pipeline ? '| $ '+ usageCost.pipeline : '' }}
                 </div>
                 </div>
@@ -197,7 +197,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="tw:flex tw:flex-col tw:justify-between">
                     <!-- Title row -->
                     <div class="tw:flex tw:justify-between tw:items-center">
-                    <div class="tw:text-(--text-sm) tw:font-semibold tw:leading-(--leading-base) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left">Remote Pipelines</div>
+                    <div class="tw:text-(length:--text-sm) tw:font-semibold tw:leading-(--leading-base) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left">Remote Pipelines</div>
                     <div style="opacity: 0.8;" class="tw:bg-[#F2DCF5] tw:flex tw:items-center tw:justify-center tw:rounded-[9px] tw:h-[33px] tw:w-[33px]">
                         <img :src="remotePipelineIcon" class="tw:h-[18px] tw:w-[18px] tw:mx-[7px] tw:my-[7px]" />
                     </div>
@@ -205,7 +205,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <!-- Bottom Section (40%) -->
-                <div class="tw:text-(--text-2xl) tw:font-semibold tw:leading-(--leading-xl) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left tw:flex tw:items-end ">
+                <div class="tw:text-(length:--text-2xl) tw:font-semibold tw:leading-(--leading-xl) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left tw:flex tw:items-end ">
                 {{ usageData.remotepipeline }} {{ usageDataType.toUpperCase() }} {{ usageCost.remotepipeline ? '| $ '+ usageCost.remotepipeline : '' }}
                 </div>
                 </div>
@@ -216,7 +216,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="tw:flex tw:flex-col tw:justify-between">
                     <!-- Title row -->
                     <div class="tw:flex tw:justify-between tw:items-center">
-                    <div class="tw:text-(--text-sm) tw:font-semibold tw:leading-(--leading-base) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left">Data Retention</div>
+                    <div class="tw:text-(length:--text-sm) tw:font-semibold tw:leading-(--leading-base) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left">Data Retention</div>
                     <div style="opacity: 0.8;" class="tw:bg-[#FFF4E6] tw:flex tw:items-center tw:justify-center tw:rounded-[9px] tw:h-[33px] tw:w-[33px]">
                         <img :src="dataRetentionIcon" class="tw:h-[18px] tw:w-[18px] tw:mx-[7px] tw:my-[7px]" />
                     </div>
@@ -224,7 +224,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <!-- Bottom Section (40%) -->
-                <div class="tw:text-(--text-2xl) tw:font-semibold tw:leading-(--leading-xl) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left tw:flex tw:items-end ">
+                <div class="tw:text-(length:--text-2xl) tw:font-semibold tw:leading-(--leading-xl) tw:tracking-normal tw:text-(--color-text-heading) tw:text-left tw:flex tw:items-end ">
                 {{ usageData.dataretention }} {{ usageDataType.toUpperCase() }} {{ usageCost.dataretention ? '| $ '+ usageCost.dataretention : '' }}
                 </div>
                 </div>
