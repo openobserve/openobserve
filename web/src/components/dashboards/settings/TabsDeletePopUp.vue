@@ -49,9 +49,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 val="move"
                 :disabled="moveTabOptions.length === 0"
                 data-test="dashboard-tab-delete-tab-panels-move"
-              >
-                Move panels to another tab
-              </ORadio>
+                label="Move panels to another tab"
+              />
               <div v-if="action === 'move'" class="tw:ml-5 tw:min-w-50 tw:max-w-75 tw:mb-2.5">
                 <OSelect
                   v-model="selectedTabToMovePanels"
@@ -63,9 +62,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <ORadio
               val="delete"
               data-test="dashboard-tab-delete-tab-panels-delete"
-            >
-              Delete all the panels of this tab
-            </ORadio>
+              label="Delete all the panels of this tab"
+            />
           </ORadioGroup>
         </div>
       </div>
