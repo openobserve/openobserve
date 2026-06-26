@@ -1284,6 +1284,16 @@ async function save() {
 </script>
 
 <style>
+/* The global `label:not(.o-input-label)` rule (unlayered) overrides these
+   field labels' `tw:text-(--color-text-primary)`/`font-semibold`/`text-xs`
+   utilities, graying them out. This higher-specificity selector restores the
+   dark primary color + weight/size, matching main's scoped `.scorer-field__label`. */
+.scorer-form__main label:not(.o-input-label) {
+  color: var(--color-text-primary, currentColor);
+  font-weight: 600;
+  font-size: 12px;
+}
+
 .scorer-form__main textarea {
   max-height: 280px;
   overflow-y: auto;
