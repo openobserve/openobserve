@@ -163,8 +163,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTimeCell
                 :value="row.last_triggered_at"
                 unit="us"
+                mode="absolute"
                 :timezone="store.state.timezone"
-                empty-label="N/A"
+                empty-label="Never"
               />
             </template>
 
@@ -359,7 +360,7 @@ const columns: OTableColumnDef[] = [
   { id: "time_range", header: "Time Range", accessorKey: "start_time", sortable: true, size: COL.date, meta: { align: "left" } },
   { id: "progress_percent", header: "Progress", accessorKey: "progress_percent", sortable: true, size: 400, meta: { align: "left" } },
   { id: "created_at", header: "Created", accessorKey: "created_at", sortable: true, size: COL.createdAt, meta: { align: "left" } },
-  { id: "last_triggered_at", header: "Last Triggered", accessorKey: "last_triggered_at", sortable: true, size: COL.createdAt, meta: { align: "left" } },
+  { id: "last_triggered_at", header: "Last Triggered", accessorKey: "last_triggered_at", sortable: true, size: COL.dateAbsolute, meta: { align: "left" } },
   { id: "actions", header: "Actions", accessorKey: "actions", meta: { align: "center", actionCount: 4 }, isAction: true, size: 128 },
 ];
 

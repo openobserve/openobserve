@@ -151,6 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTimeCell
             :value="row.last_alert_at"
             unit="us"
+            mode="absolute"
             :timezone="store.state.timezone"
             empty-label="—"
           />
@@ -331,7 +332,7 @@ export default defineComponent({
         sortable: true,
         resizable: true,
         hideable: true,
-        size: 180,
+        size: COL.dateAbsolute,
         meta: { align: "left" },
       },
       {

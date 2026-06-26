@@ -580,7 +580,7 @@ const columns = ref([
     header: "Timestamp",
     accessorKey: "timestamp",
     sortable: true,
-    size: 160,
+    size: COL.dateAbsolute,
     meta: { align: "left" as const },
   },
   {
@@ -588,7 +588,7 @@ const columns = ref([
     header: "Start Time",
     accessorKey: "start_time",
     sortable: true,
-    size: 160,
+    size: COL.dateAbsolute,
     meta: { align: "left" as const },
   },
   {
@@ -596,7 +596,7 @@ const columns = ref([
     header: "End Time",
     accessorKey: "end_time",
     sortable: true,
-    size: 160,
+    size: COL.dateAbsolute,
     meta: { align: "left" as const },
   },
   {

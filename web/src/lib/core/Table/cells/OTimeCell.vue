@@ -3,10 +3,10 @@
 //
 // OTimeCell — the ONE timestamp renderer for every table (audit §2.1).
 // Default display is relative ("2m ago"); set mode="absolute" to show the full
-// timezone-aware datetime instead. The hover tooltip (OTooltip, not the native
-// browser title) always shows the COMPLEMENTARY form: relative cells reveal the
-// absolute datetime on hover, absolute cells reveal "x ago". Empty/zero values
-// render a muted label instead of a blank cell.
+// timezone-aware datetime instead. Relative cells get a hover tooltip (OTooltip,
+// not the native browser title) revealing the full absolute datetime; absolute/
+// date cells already show the full datetime, so they have NO tooltip. Empty/zero
+// values render a muted label instead of a blank cell.
 //
 //   <OTimeCell :value="row.last_triggered_at" unit="iso" empty-label="Never" />
 //   <OTimeCell :value="row.timestamp" unit="ms" :timezone="store.state.timezone" />
@@ -153,15 +153,13 @@ const display = computed(() => {
 });
 
 /**
- * Hover tooltip shows the *complementary* representation of what's displayed:
- * relative display → absolute datetime on hover; absolute/date display →
- * relative ("x ago") on hover. Suppressed when it would duplicate the cell.
+ * Hover tooltip — shown for RELATIVE mode only, revealing the full absolute
+ * datetime. Absolute/date cells already show the full datetime, so they get no
+ * tooltip. Suppressed when it would duplicate the cell text.
  */
 const tooltip = computed(() => {
-  const text =
-    props.mode === "absolute" || props.mode === "date"
-      ? relative.value
-      : absolute.value;
+  if (props.mode !== "relative") return null;
+  const text = absolute.value;
   return text && text !== display.value ? text : null;
 });
 </script>

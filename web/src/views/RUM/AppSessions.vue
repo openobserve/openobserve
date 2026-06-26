@@ -401,7 +401,7 @@ const tableColumns = [
     header: t("rum.errorCount"),
     accessorKey: "error_count",
     sortable: true,
-    size: COL.count,
+    size: 120,
     meta: { align: "right" },
   },
   {
@@ -409,7 +409,7 @@ const tableColumns = [
     header: t("rum.frustrationCount"),
     accessorFn: (row: any) => row["frustration_count"] || 0,
     sortable: true,
-    size: COL.count,
+    size: 160,
     meta: { align: "left" },
   },
   {

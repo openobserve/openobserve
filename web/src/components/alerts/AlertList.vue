@@ -239,6 +239,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OTimeCell
                     :value="row.last_trained_at"
                     unit="iso"
+                    mode="absolute"
                     :timezone="store.state.timezone"
                     empty-label="—"
                   />
@@ -1056,7 +1057,7 @@ export default defineComponent({
           sortable: true,
           resizable: true,
           hideable: true,
-          size: 240,
+          size: COL.dateAbsolute,
           meta: { align: "left" },
         },
         {
@@ -1067,7 +1068,7 @@ export default defineComponent({
           sortable: true,
           resizable: true,
           hideable: true,
-          size: 240,
+          size: COL.dateAbsolute,
           meta: { align: "left" },
         },
         // Anomaly Detection columns — shown on anomalyDetection and all tabs
@@ -1081,7 +1082,7 @@ export default defineComponent({
                 sortable: true,
                 resizable: true,
                 hideable: true,
-                size: 160,
+                size: COL.dateAbsolute,
                 meta: { align: "left" },
               } as OTableColumnDef,
               {

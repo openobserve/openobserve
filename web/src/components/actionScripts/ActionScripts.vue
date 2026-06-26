@@ -83,6 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTimeCell
                 :value="row.last_run_at_raw"
                 unit="us"
+                mode="absolute"
                 :timezone="store.state.timezone"
                 empty-label="Never"
               />
@@ -91,6 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTimeCell
                 :value="row.last_successful_at_raw"
                 unit="us"
+                mode="absolute"
                 :timezone="store.state.timezone"
                 empty-label="Never"
               />
@@ -410,7 +412,7 @@ export default defineComponent({
         header: t("alerts.lastRunAt"),
         accessorKey: "last_run_at",
         sortable: true,
-        size: COL.date,
+        size: COL.dateAbsolute,
         meta: { align: "left" },
       },
       {
@@ -418,7 +420,7 @@ export default defineComponent({
         header: t("alerts.lastSuccessfulAt"),
         accessorKey: "last_successful_at",
         sortable: true,
-        size: COL.date,
+        size: COL.dateAbsolute,
         meta: { align: "left" },
       },
       {

@@ -86,6 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTimeCell
             :value="row.last_triggered_at_raw"
             unit="us"
+            mode="absolute"
             :timezone="store.state.timezone"
             empty-label="Never"
           />
@@ -316,7 +317,7 @@ const columns: OTableColumnDef[] = [
     header: t("reports.lastTriggeredAt"),
     accessorKey: "last_triggered_at",
     sortable: false,
-    size: COL.date,
+    size: COL.dateAbsolute,
     meta: { align: "left" },
   },
   {

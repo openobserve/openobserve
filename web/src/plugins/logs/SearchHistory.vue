@@ -329,7 +329,7 @@ export default defineComponent({
           header: t("search_history.executed_at"),
           accessorKey: "executed_time",
           sortable: true,
-          size: COL.createdAt,
+          size: COL.dateAbsolute,
           meta: { align: "left" },
         },
         {

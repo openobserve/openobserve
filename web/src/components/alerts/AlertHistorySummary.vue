@@ -51,6 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTimeCell
           :value="row.last_evaluation"
           unit="us"
+          mode="absolute"
           :timezone="store.state.timezone"
           empty-label="—"
         />
@@ -146,7 +147,7 @@ const columns: OTableColumnDef[] = [
     header: t("alerts.lastEvaluation"),
     accessorKey: "last_evaluation",
     sortable: true,
-    size: COL.date,
+    size: COL.dateAbsolute,
     meta: { align: "left" },
   },
 ];

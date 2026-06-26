@@ -191,7 +191,7 @@ const variantClasses: Record<NonNullable<BadgeProps["variant"]>, string> = {
 // ── Size class map ────────────────────────────────────────────────────────
 const sizeClasses: Record<NonNullable<BadgeProps["size"]>, string> = {
   sm: "tw:px-2.5 tw:py-1.5 tw:text-[11px] tw:gap-1",
-  md: "tw:px-3 tw:py-2 tw:text-xs tw:gap-1.5",
+  md: "tw:px-2.5 tw:py-2 tw:text-xs tw:gap-1.5",
 };
 
 // ── Trailing segment padding per size ────────────────────────────────────
@@ -204,7 +204,7 @@ const classes = computed(() => [
   // Base — layout + typography + shape.
   // Weight 600 per the design-system weight scale (HANDOFF §2.2: badges = 600).
   // Pill shape (rounded-full) per HANDOFF §11 + this component's own contract.
-  "tw:inline-flex tw:items-center tw:whitespace-nowrap tw:rounded-md",
+  "tw:inline-flex tw:items-center tw:whitespace-nowrap tw:rounded-full",
   "tw:font-medium tw:leading-none",
   "tw:transition-colors tw:duration-150",
   // Variant + size
