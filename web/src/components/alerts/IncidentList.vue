@@ -156,32 +156,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </template>
         <template #cell-actions="{ row }">
-          <div class="tw:flex tw:items-center tw:justify-center tw:gap-2">
-            <span class="tw:w-8 tw:flex tw:justify-center">
-              <OButton
-                v-if="row.status === 'open'"
-                variant="ghost-warning"
-                size="icon-sm"
-                @click.stop="acknowledgeIncident(row)"
-                data-test="incident-ack-btn"
-              ><OIcon name="visibility" size="sm" /><OTooltip :content="t('alerts.incidents.acknowledge')" /></OButton>
-              <OButton
-                v-else-if="row.status === 'resolved'"
-                variant="ghost-warning"
-                size="icon-sm"
-                @click.stop="reopenIncident(row)"
-                data-test="incident-reopen-btn"
-              ><OIcon name="restart-alt" size="sm" /><OTooltip :content="t('alerts.incidents.reopen')" /></OButton>
-            </span>
-            <span class="tw:w-8 tw:flex tw:justify-center">
-              <OButton
-                v-if="row.status !== 'resolved'"
-                variant="ghost-primary"
-                size="icon-sm"
-                @click.stop="resolveIncident(row)"
-                data-test="incident-resolve-btn"
-              ><OIcon name="task-alt" size="sm" /><OTooltip :content="t('alerts.incidents.resolve')" /></OButton>
-            </span>
+          <div class="action-buttons">
+            <OButton
+              v-if="row.status === 'open'"
+              variant="ghost-warning"
+              size="icon-sm"
+              @click.stop="acknowledgeIncident(row)"
+              data-test="incident-ack-btn"
+            ><OIcon name="visibility" size="sm" /><OTooltip :content="t('alerts.incidents.acknowledge')" /></OButton>
+            <OButton
+              v-if="row.status !== 'resolved'"
+              variant="ghost-primary"
+              size="icon-sm"
+              @click.stop="resolveIncident(row)"
+              data-test="incident-resolve-btn"
+            ><OIcon name="task-alt" size="sm" /><OTooltip :content="t('alerts.incidents.resolve')" /></OButton>
+            <OButton
+              v-if="row.status === 'resolved'"
+              variant="ghost-warning"
+              size="icon-sm"
+              @click.stop="reopenIncident(row)"
+              data-test="incident-reopen-btn"
+            ><OIcon name="restart-alt" size="sm" /><OTooltip :content="t('alerts.incidents.reopen')" /></OButton>
           </div>
         </template>
 
@@ -812,4 +808,9 @@ body.body--dark {
 }
 
 /* Action buttons styling */
+.action-buttons {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+}
 </style>
