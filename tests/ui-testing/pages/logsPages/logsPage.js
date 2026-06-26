@@ -5213,36 +5213,16 @@ export class LogsPage {
         throw new Error(`Field expand button not found for: ${fieldName}`);
     }
 
-    /**
-     * Adds a field to the logs results table.
-     * The add button is only revealed while the field row is hovered, so under CI
-     * load this scrolls the row into view and re-hovers (up to 3 attempts) until the
-     * button surfaces, then waits for the add to commit (remove toggle or column header).
-     * Throws if the add button never surfaces.
-     * @param {string} fieldName - The field to add to the table
-     * @returns {Promise<void>}
-     */
     async clickAddFieldToTableButton(fieldName) {
         const addBtn = this.page.locator(`[data-test="log-search-index-list-add-${fieldName}-field-btn"]`);
-        const expandBtn = this.page.locator(`[data-test="log-search-expand-${fieldName}-field-btn"]`);
         try {
             await addBtn.waitFor({ state: 'visible', timeout: 5000 });
         } catch {
             // The add button is only revealed while the field row is hovered. Under CI load
-            // the hover state can be lost (or never settled) before the click — and a single
-            // re-hover can miss if the row is still below the fold. Scroll the field row into
-            // view and re-hover a few times until the add button actually surfaces.
-            let revealed = false;
-            for (let attempt = 1; attempt <= 3 && !revealed; attempt++) {
-                await expandBtn.scrollIntoViewIfNeeded().catch(() => {});
-                await expandBtn.hover().catch(() => {});
-                revealed = await addBtn.waitFor({ state: 'visible', timeout: 5000 })
-                    .then(() => true)
-                    .catch(() => false);
-            }
-            if (!revealed) {
-                throw new Error(`clickAddFieldToTableButton: add button never surfaced for "${fieldName}" after re-hover retries`);
-            }
+            // the hover state can be lost (or never settled) before the click — re-hover the
+            // field row and wait again before giving up.
+            await this.page.locator(`[data-test="log-search-expand-${fieldName}-field-btn"]`).hover().catch(() => {});
+            await addBtn.waitFor({ state: 'visible', timeout: 10000 });
         }
         await addBtn.click();
         // The add operation commits when both (a) the toggle inverts to a remove
