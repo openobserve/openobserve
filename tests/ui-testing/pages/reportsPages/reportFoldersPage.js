@@ -219,8 +219,9 @@ export class ReportFoldersPage {
 
   async clickDeleteFolder(folderName) {
     await this.clickMoreIcon(folderName);
-    await this.deleteFolderIcon.click({ force: true });
-    await expect(this.confirmDeleteDialog).toBeVisible({ timeout: 5000 });
+    await this.deleteFolderIcon.waitFor({ state: 'visible', timeout: 5000 });
+    await this.deleteFolderIcon.click();
+    await expect(this.confirmDeleteDialog).toBeVisible({ timeout: 10000 });
   }
 
   async confirmDelete() {
@@ -304,11 +305,14 @@ export class ReportFoldersPage {
   async clickMove() {
     await this.moveSubmitBtn.click();
     await this.moveDialog.waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
+    // Wait for ODialog close animation to finish before next interaction
+    await this.page.locator('[data-test="o-dialog-overlay"]').waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
   }
 
   async cancelMove() {
     await this.moveCancelBtn.first().click();
     await this.moveDialog.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+    await this.page.locator('[data-test="o-dialog-overlay"]').waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
   }
 
   async expectDefaultFolderExists() {
