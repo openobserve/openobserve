@@ -5272,26 +5272,27 @@ export class LogsPage {
      * Used by FTS default-column tests to verify that closing the auto-picked
      * column triggers re-resolution on the next search.
      *
-     * The close button is rendered with a CSS `invisible` class and only becomes
-     * visible on column-header hover, so a normal click would time out on the
-     * visibility check. We force-click to bypass that hover-gated visibility.
-     * Risk: `force: true` skips Playwright's actionability checks, so it would not
-     * catch a regression that makes the button genuinely non-interactable — the
-     * follow-up `toHaveCount(0)` assertion guards against a silent no-op.
+     * The close button has a CSS `invisible` class and only appears on
+     * column-header hover, so we hover the header to reveal it, then click it
+     * normally — keeping Playwright's actionability checks (a `force` click would
+     * skip them and mask a regression that makes the button non-interactable).
      * @param {string} fieldName - The field/column name to close (e.g. 'message')
      * @returns {Promise<void>}
      */
     async clickCloseColumnButton(fieldName) {
+        const header = this.page.locator(
+            `[data-test="log-search-result-table-th-${fieldName}"]`,
+        );
         const closeBtn = this.page.locator(
             `[data-test="logs-search-result-table-th-remove-${fieldName}-btn"]`,
         );
-        // The close button is hidden by default (CSS invisible class) and
-        // appears on column-header hover. Force-click to bypass visibility.
-        await closeBtn.click({ force: true });
+        // Hover the column header to reveal its hover-gated X, then click normally
+        // so the actionability check still runs (no force).
+        await header.hover();
+        await expect(closeBtn).toBeVisible({ timeout: 5000 });
+        await closeBtn.click();
         // Wait for the column to disappear from the DOM header row
-        await expect(
-            this.page.locator(`[data-test="log-search-result-table-th-${fieldName}"]`),
-        ).toHaveCount(0, { timeout: 10000 });
+        await expect(header).toHaveCount(0, { timeout: 10000 });
     }
 
     // New POM methods for PR tests
