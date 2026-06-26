@@ -1,5 +1,5 @@
 ﻿<template>
-  <section class="tw:flex tw:flex-col tw:gap-3 tw:px-5 tw:pt-4 tw:pb-6 tw:min-h-0 tw:overflow-auto" data-test="quality-detail-panel">
+  <section class="tw:flex tw:flex-col tw:gap-3 tw:px-5 tw:pt-4 tw:pb-6 tw:min-h-full tw:overflow-auto" data-test="quality-detail-panel">
     <!-- Title row + type badge + version + description moved up into the
          ODrawer header (QualityPage) so the panel content starts straight
          from the KPI tiles without a duplicated identification block. -->

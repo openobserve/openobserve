@@ -45,7 +45,7 @@
            the inner panel no longer renders its own title row. -->
       <template #header-right>
         <span
-          class="qpd-type tw:inline-flex tw:py-0 tw:px-1 tw:rounded-[2px] tw:font-bold tw:text-[8px] tw:leading-[1.4] tw:tracking-[0.02em]"
+          class="qpd-type tw:inline-flex tw:py-0 tw:px-1 tw:rounded-[2px] tw:font-bold tw:text-[13px] tw:leading-[1.4] tw:tracking-[0.02em]"
           :class="{
             'tw:bg-[color-mix(in_srgb,#6b76e3_14%,transparent)] tw:text-[#4f5bcf]': detailDataType === 'numeric',
             'tw:bg-[color-mix(in_srgb,#9333ea_14%,transparent)] tw:text-[#7c3aed]': detailDataType === 'categorical',
