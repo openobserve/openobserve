@@ -1454,6 +1454,14 @@ body {
   line-height: var(--leading-base);
 }
 
+/*
+ * Element typography resets must live in `@layer base` so Tailwind utilities
+ * (which live in `@layer utilities`) can override them. Unlayered rules beat
+ * any layered rule regardless of specificity, so leaving these outside a layer
+ * would silently suppress utilities like `tw:mb-4` / `tw:text-base` applied to
+ * bare <p>/<h2>/… elements.
+ */
+@layer base {
 h1, h2, h3, h4, h5, h6 {
   color: var(--o2-text-heading);
   margin: 0;
@@ -1527,6 +1535,7 @@ label:not(.o-input-label) {
   font-size: var(--text-sm);
   color: var(--o2-text-label);
   font-weight: var(--font-normal);
+}
 }
 
 @layer base {
