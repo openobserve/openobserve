@@ -57,7 +57,28 @@ use crate::{
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
-pub async fn list_ingestion_tokens(Path(org_id): Path<String>) -> Response {
+pub async fn list_ingestion_tokens(
+    Headers(user_email): Headers<UserEmail>,
+    Path(org_id): Path<String>,
+) -> Response {
+    let user_id = user_email.user_id.as_str();
+
+    #[cfg(not(feature = "enterprise"))]
+    {
+        if !crate::common::utils::auth::is_root_user(user_id) {
+            match crate::service::users::get_user(Some(&org_id), user_id).await {
+                Some(initiator)
+                    if initiator.role == config::meta::user::UserRole::Admin
+                        || initiator.role == config::meta::user::UserRole::Root => {}
+                _ => {
+                    return MetaHttpResponse::forbidden(
+                        "Admin or Root role required to list ingestion tokens",
+                    );
+                }
+            }
+        }
+    }
+
     match ingestion_tokens::list_tokens(&org_id).await {
         Ok(tokens) => MetaHttpResponse::json(OrgIngestionTokenListResponse { data: tokens }),
         Err(e) => MetaHttpResponse::internal_error(e),
