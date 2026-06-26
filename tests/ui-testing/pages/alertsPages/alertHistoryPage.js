@@ -36,14 +36,13 @@ export class AlertHistoryPage {
   }
 
   async selectAlert(alertName) {
-    // q-select with use-input + @filter: the inner input has width:0 when the
-    // dropdown is closed, so waiting for it to be "visible" before the popup
-    // opens always times out. Click first, wait for the Quasar popup (.q-menu),
-    // THEN fill the input to trigger @filter.
+    // q-select with use-input: the inner input has width:0 when closed so
+    // Playwright's fill() visibility check always times out. Click to open the
+    // menu (which also focuses the input), then use keyboard.type() to send
+    // keystrokes to the already-focused input without a visibility check.
     await this.page.locator(this.searchSelect).click();
     await this.page.locator('.q-menu').waitFor({ state: 'visible', timeout: 5000 });
-    const input = this.page.locator(`${this.searchSelect} input`);
-    await input.fill(alertName);
+    await this.page.keyboard.type(alertName);
     await this.page.waitForTimeout(300);
     const option = this.page.getByRole('option', { name: alertName });
     await option.waitFor({ state: 'visible', timeout: 10000 });
