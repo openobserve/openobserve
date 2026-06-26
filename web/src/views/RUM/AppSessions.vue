@@ -89,6 +89,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 endTime: dateTime.endTime,
               }"
               :stream-name="rumSessionStreamName"
+              stream-type="logs"
+              :enable-grouping="true"
               :query="completeQuery"
               :show-count="false"
               @event-emitted="handleSidebarEvent"

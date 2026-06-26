@@ -15,8 +15,33 @@
         :loading="loading"
         @update:current-page="currentPage = $event"
         @update:expanded-ids="onExpandedIdsChange"
+        @update:search="searchTerm = $event"
         @row-click="onRowClick"
       >
+        <!-- Group header (only rendered for grouped/label rows) -->
+        <template #group-header="{ row, groupName }">
+          <div
+            class="field-group-header tw:h-full tw:w-full tw:flex tw:justify-between tw:items-center tw:rounded-[0.25rem]"
+            :data-test="`search-field-list-group-${row.group}-header`"
+            @click="toggleGroup(row.group)"
+          >
+            <div class="tw:flex-1 tw:min-w-0 tw:truncate">
+              {{ groupName }} ({{ groupFieldCount[row.group] ?? 0 }})
+            </div>
+            <OButton
+              v-if="(groupFieldCount[row.group] ?? 0) > 0"
+              variant="ghost"
+              size="icon"
+              class="tw:flex-shrink-0"
+            >
+              <OIcon
+                :name="expandGroupRows[row.group] !== false ? 'expand-more' : 'chevron-right'"
+                size="sm"
+              />
+            </OButton>
+          </div>
+        </template>
+
         <!-- Field row: render field name with expand chevron + actions inside OFieldRow -->
         <template #field-row="{ row }">
           <OFieldRow :highlight="!!expandedRows[row.name]">
@@ -179,10 +204,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, type Ref } from "vue";
+import { computed, ref, watch, onMounted, type Ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import useFieldValuesStream from "@/composables/useFieldValuesStream";
+import useFieldGrouping from "@/composables/useFieldGrouping";
+import { applyCollapseFilter, type FieldObj } from "@/utils/fieldCategories";
 import FieldValuesPanel from "@/components/common/FieldValuesPanel.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -233,6 +260,12 @@ const props = defineProps({
     default: false,
   },
   loading: {
+    type: Boolean,
+    default: false,
+  },
+  // Opt-in semantic field grouping (same mechanism as the logs field sidebar).
+  // Off by default so existing flat consumers are unaffected.
+  enableGrouping: {
     type: Boolean,
     default: false,
   },
@@ -339,8 +372,92 @@ const parsedFilters = computed(() => walkFilters((props as any).query));
 const activeIncludeFilterValues = computed(() => parsedFilters.value.include);
 const activeExcludeFilterValues = computed(() => parsedFilters.value.exclude);
 
-// Build field items — pass all fields, rendering handles expandable vs non
-const fieldListItems = computed(() => props.fields as any[]);
+// ─── Semantic field grouping (opt-in) ────────────────────────────────
+// Reuses the exact mechanism the logs field sidebar uses: load the org's
+// semantic groups / key fields / grouping config, bucket fields under label
+// header rows, and collapse/expand groups. When grouping is disabled or no
+// semantic index is configured, fields fall back to a flat list unchanged.
+
+const { semanticIndex, loadGroupingContext, groupFields } = useFieldGrouping();
+const searchTerm = ref("");
+const expandGroupRows = ref<Record<string, boolean>>({});
+
+onMounted(() => {
+  if (props.enableGrouping) {
+    loadGroupingContext(props.streamType).catch(() => {
+      // grouping is best-effort — on failure the list stays flat
+    });
+  }
+});
+
+const groupingActive = computed(
+  () => props.enableGrouping && semanticIndex.value !== null,
+);
+
+// Map raw schema fields → FieldObj, bucket them, and annotate label rows so
+// OFieldList renders group headers (isGroup) vs field rows.
+const groupedFields = computed<any[]>(() => {
+  if (!groupingActive.value) return props.fields as any[];
+
+  const fieldObjs: FieldObj[] = (props.fields as any[]).map((f) => ({
+    ...f,
+    name: f.name,
+    dataType: f.dataType ?? f.type ?? "",
+    ftsKey: !!f.ftsKey,
+    isSchemaField: true,
+    showValues: !!f.showValues,
+    isInterestingField: false,
+    group: "",
+    streams: [],
+  }));
+
+  return groupFields(fieldObjs).map((row: any) => ({
+    ...row,
+    isGroup: !!row.label,
+    groupName: row.label ? row.name : undefined,
+  }));
+});
+
+// Count of non-group fields per group key — shown in the group header.
+const groupFieldCount = computed<Record<string, number>>(() => {
+  const counts: Record<string, number> = {};
+  if (!groupingActive.value) return counts;
+  for (const row of groupedFields.value) {
+    if (!row.isGroup && row.group) {
+      counts[row.group] = (counts[row.group] ?? 0) + 1;
+    }
+  }
+  return counts;
+});
+
+// Seed expand state to "expanded" for any newly seen group.
+watch(
+  groupedFields,
+  (list) => {
+    for (const row of list) {
+      if (row.isGroup && row.group && !(row.group in expandGroupRows.value)) {
+        expandGroupRows.value[row.group] = true;
+      }
+    }
+  },
+  { immediate: true },
+);
+
+function toggleGroup(group: string) {
+  expandGroupRows.value[group] = expandGroupRows.value[group] === false;
+}
+
+// Build field items — flat passthrough, or grouped + collapse-filtered.
+// applyCollapseFilter bypasses collapse while a search term is active so
+// matches inside collapsed groups remain findable.
+const fieldListItems = computed(() => {
+  if (!groupingActive.value) return props.fields as any[];
+  return applyCollapseFilter(
+    groupedFields.value as FieldObj[],
+    expandGroupRows.value,
+    searchTerm.value,
+  );
+});
 
 // ─── Field value streaming ──────────────────────────────────────────
 
@@ -608,6 +725,15 @@ const copyContentValue = (value: string) => {
   color: var(--o2-text-primary) !important;
   border-radius: 0.25rem !important;
   overflow: visible !important;
+}
+
+.field-group-header {
+  font-weight: 600;
+  font-size: 0.75rem;
+  padding: 0 0.325rem;
+  cursor: pointer;
+  background-color: var(--color-surface-subtle);
+  color: var(--color-field-list-group-text);
 }
 
 .index-menu {
