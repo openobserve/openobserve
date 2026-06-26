@@ -16,23 +16,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="tw:rounded-md tw:p-0" style="min-height: inherit">
     <!-- Header -->
-    <div class="tw:flex tw:items-center tw:flex-nowrap tw:mx-3 tw:pt-2">
-      <div class="tw:flex tw:items-center tw:py-2">
-        <div
-          class="el-border tw:w-6 tw:h-6 tw:flex tw:items-center tw:justify-center tw:cursor-pointer el-border-radius tw:mr-2"
-          :title="t('common.goBack')"
-          @click="$emit('cancel:hideform')"
-        >
-          <OIcon name="arrow-back-ios-new" size="xs" />
-        </div>
-        <div class="tw:flex tw:flex-col">
-          <div class="tw:text-xl tw:font-semibold">
-            {{ isEditing ? t("aiToolset.update") : t("aiToolset.add") }}
-          </div>
-        </div>
-      </div>
-    </div>
-    <OSeparator />
+    <AppPageHeader
+      :title="isEditing ? t('aiToolset.update') : t('aiToolset.add')"
+      :back="{
+        label: t('aiToolset.header'),
+        onClick: () => $emit('cancel:hideform'),
+        dataTest: 'ai-toolset-back-btn',
+      }"
+      class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+    />
 
     <div
       style="height: calc(100vh - 120px); overflow: auto"
@@ -112,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-for="(header, idx) in mcpHeaders"
             :key="idx"
-            class="tw:flex tw:gap-2 tw:mb-2"
+            class="tw:flex tw:items-end tw:gap-2 tw:mb-2"
           >
             <OInput
               v-model="header.key"
@@ -141,7 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon name="delete" size="xs" />
             </OButton>
           </div>
-          <OButton variant="ghost" size="sm" class="tw:mb-4" @click="addHeader" icon-left="add">
+          <OButton variant="outline" size="sm" class="tw:mb-4" @click="addHeader" icon-left="add">
             {{ t("aiToolset.addHeader") }}
           </OButton>
         </template>
@@ -221,7 +213,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-for="(env, idx) in cliEnvVars"
             :key="'env-' + idx"
-            class="tw:flex tw:gap-2 tw:mb-2"
+            class="tw:flex tw:items-end tw:gap-2 tw:mb-2"
           >
             <OInput
               v-model="env.key"
@@ -250,7 +242,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon name="delete" size="xs" />
             </OButton>
           </div>
-          <OButton variant="ghost" size="sm" class="tw:mb-4" @click="addEnvVar" icon-left="add">
+          <OButton variant="outline" size="sm" class="tw:mb-4" @click="addEnvVar" icon-left="add">
             {{ t("aiToolset.addEnvVar") }}
           </OButton>
 
@@ -290,7 +282,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
           <OButton
-            variant="ghost"
+            variant="outline"
             size="sm"
             class="tw:mb-4"
             @click="addCredFile"
@@ -326,7 +318,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Footer -->
       <div
-        class="tw:flex tw:items-center tw:gap-2 tw:px-4 tw:py-3 tw:border-t-[1px] tw:sticky tw:bottom-0 tw:bg-white tw:dark:bg-[#1a1a1a]"
+        class="tw:flex tw:items-center tw:gap-2 tw:px-4 tw:py-3 tw:border-t tw:border-border-default tw:sticky tw:bottom-0"
+        :class="store.state.theme === 'dark' ? 'tw:bg-(--o2-primary-background)' : 'tw:bg-white'"
       >
         <OButton
           data-test="ai-toolset-save-btn"
@@ -369,7 +362,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import type { ToolsetKind } from "@/services/ai_toolsets";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
@@ -379,7 +372,7 @@ const QueryEditor = defineAsyncComponent(
 
 export default defineComponent({
   name: "AddAiToolset",
-  components: { OSeparator, OBadge, OButton, OIcon, OInput, OSelect, OSwitch, OTextarea, QueryEditor },
+  components: { AppPageHeader, OBadge, OButton, OIcon, OInput, OSelect, OSwitch, OTextarea, QueryEditor },
   emits: ["cancel:hideform"],
   setup(_, { emit }) {
     const store = useStore();
