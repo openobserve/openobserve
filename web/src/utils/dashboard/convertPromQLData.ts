@@ -33,6 +33,8 @@ import {
   ColorModeWithoutMinMax,
   getMetricMinMaxValue,
   getSeriesColor,
+  getAreaStyleOverride,
+  getGridLineStyle,
 } from "./colorPalette";
 import { getAnnotationsData } from "@/utils/dashboard/getAnnotationsData";
 import {
@@ -98,6 +100,8 @@ export const convertPromQLData = async (
     panelSchema?.config?.show_gridlines !== undefined
       ? panelSchema.config.show_gridlines
       : true;
+  // Subtle dashed grid lines so they recede behind the data
+  const gridLineStyle = getGridLineStyle(store.state.theme);
 
   await importMoment();
 
@@ -398,6 +402,8 @@ export const convertPromQLData = async (
     tooltip: {
       show: true,
       trigger: "axis",
+      appendToBody: true,
+      className: "o2-echarts-tooltip",
       textStyle: {
         color: store.state.theme === "dark" ? "#fff" : "#000",
         fontSize: 12,
@@ -522,9 +528,7 @@ export const convertPromQLData = async (
       },
       splitLine: {
         show: showGridlines,
-        lineStyle: {
-          opacity: 0.5,
-        },
+        lineStyle: gridLineStyle,
       },
       axisLabel: {
         // hide axis label if overlaps
@@ -559,9 +563,7 @@ export const convertPromQLData = async (
       },
       splitLine: {
         show: showGridlines,
-        lineStyle: {
-          opacity: 0.5,
-        },
+        lineStyle: gridLineStyle,
       },
     },
     toolbox: {
@@ -623,6 +625,7 @@ export const convertPromQLData = async (
       (axis) => {
         // if (!axis.splitLine) axis.splitLine = {};
         axis.splitLine.show = showGridlines;
+        axis.splitLine.lineStyle = gridLineStyle;
       },
     );
   }
@@ -631,6 +634,7 @@ export const convertPromQLData = async (
       (axis) => {
         // if (!axis.splitLine) axis.splitLine = {};
         axis.splitLine.show = showGridlines;
+        axis.splitLine.lineStyle = gridLineStyle;
       },
     );
   }
@@ -696,6 +700,23 @@ export const convertPromQLData = async (
                 panelSchema.queries[index].config.promql_legend,
               );
 
+              const resolvedSeriesColor = (() => {
+                try {
+                  return getSeriesColor(
+                    panelSchema?.config?.color,
+                    seriesName,
+                    metric.values.map((value: any) => value[1]),
+                    chartMin,
+                    chartMax,
+                    store.state.theme,
+                    panelSchema?.config?.color?.colorBySeries,
+                  );
+                } catch (error) {
+                  console.warn("Failed to get series color:", error);
+                  return undefined; // fallback to default color
+                }
+              })();
+
               return {
                 name: seriesName,
                 label: {
@@ -715,22 +736,7 @@ export const convertPromQLData = async (
                   : false,
                 showSymbol: panelSchema.config?.show_symbol ?? false,
                 itemStyle: {
-                  color: (() => {
-                    try {
-                      return getSeriesColor(
-                        panelSchema?.config?.color,
-                        seriesName,
-                        metric.values.map((value: any) => value[1]),
-                        chartMin,
-                        chartMax,
-                        store.state.theme,
-                        panelSchema?.config?.color?.colorBySeries,
-                      );
-                    } catch (error) {
-                      console.warn("Failed to get series color:", error);
-                      return undefined; // fallback to default color
-                    }
-                  })(),
+                  color: resolvedSeriesColor,
                 },
                 // if utc then simply return the values by removing z from string
                 // else convert time from utc to zoned
@@ -741,6 +747,13 @@ export const convertPromQLData = async (
                   seriesDataObj[value[0]] ?? null,
                 ]),
                 ...seriesPropsBasedOnChartType,
+                ...getAreaStyleOverride(
+                  panelSchema.type,
+                  seriesPropsBasedOnChartType?.areaStyle,
+                  resolvedSeriesColor,
+                  seriesName,
+                  store.state.theme,
+                ),
                 // markLine if exist
                 markLine: {
                   silent: true,
@@ -771,6 +784,23 @@ export const convertPromQLData = async (
                 panelSchema.queries[index].config.promql_legend,
               );
 
+              const resolvedVectorColor = (() => {
+                try {
+                  return getSeriesColor(
+                    panelSchema?.config?.color,
+                    seriesName,
+                    values.map((value: any) => value[1]),
+                    chartMin,
+                    chartMax,
+                    store.state.theme,
+                    panelSchema?.config?.color?.colorBySeries,
+                  );
+                } catch (error) {
+                  console.warn("Failed to get series color:", error);
+                  return undefined;
+                }
+              })();
+
               return {
                 name: seriesName,
                 label: {
@@ -789,22 +819,7 @@ export const convertPromQLData = async (
                   : false,
                 showSymbol: panelSchema.config?.show_symbol ?? false,
                 itemStyle: {
-                  color: (() => {
-                    try {
-                      return getSeriesColor(
-                        panelSchema?.config?.color,
-                        seriesName,
-                        values.map((value: any) => value[1]),
-                        chartMin,
-                        chartMax,
-                        store.state.theme,
-                        panelSchema?.config?.color?.colorBySeries,
-                      );
-                    } catch (error) {
-                      console.warn("Failed to get series color:", error);
-                      return undefined;
-                    }
-                  })(),
+                  color: resolvedVectorColor,
                 },
                 data: values.map((value: any) => [
                   store.state.timezone != "UTC"
@@ -813,6 +828,13 @@ export const convertPromQLData = async (
                   value[1],
                 ]),
                 ...seriesPropsBasedOnChartType,
+                ...getAreaStyleOverride(
+                  panelSchema.type,
+                  seriesPropsBasedOnChartType?.areaStyle,
+                  resolvedVectorColor,
+                  seriesName,
+                  store.state.theme,
+                ),
                 markLine: {
                   silent: true,
                   animation: false,

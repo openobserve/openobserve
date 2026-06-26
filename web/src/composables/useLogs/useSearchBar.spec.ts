@@ -19,6 +19,7 @@ import { mount } from "@vue/test-utils";
 import { createI18n } from "vue-i18n";
 import store from "@/test/unit/helpers/store";
 import useSearchBar from "./useSearchBar";
+import searchState from "./searchState";
 
 const i18n = createI18n({
   legacy: false,
@@ -195,6 +196,22 @@ describe("useSearchBar Composable", () => {
 
     it("should expose setDateTime", () => {
       expect(typeof wrapper.vm.setDateTime).toBe("function");
+    });
+  });
+
+  describe("onStreamChange", () => {
+    it("clears carried-over selectedFields so FTS re-selects for the new stream", async () => {
+      // Carried over from a previously selected stream. "field1" even exists
+      // in the new stream's schema (per the getStream mock), but switching
+      // streams should still drop it so the post-search fill-rate check picks
+      // a fresh default column for the new stream.
+      const { searchObj } = searchState();
+      searchObj.data.stream.selectedStream = ["new_stream"];
+      searchObj.data.stream.selectedFields = ["log", "field1"];
+
+      await wrapper.vm.onStreamChange("");
+
+      expect(searchObj.data.stream.selectedFields).toEqual([]);
     });
   });
 
