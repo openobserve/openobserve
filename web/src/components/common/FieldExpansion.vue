@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data-test="`log-search-expand-${field.name}-field-btn`"
         :highlight="isFieldSelected"
       >
-        <span class="tw:w-[0.55rem] tw:shrink-0 tw:flex tw:items-center tw:justify-center">
+        <span class="tw:w-[0.55rem] tw:shrink-0 tw:flex tw:items-center tw:justify-center tw:mr-1">
           <OIcon
             class="tw:inline-flex tw:items-center tw:justify-center tw:shrink-0 tw:w-4 tw:text-[var(--o2-text-muted)]"
             :name="isExpanded ? 'expand-more' : 'chevron-right'"
