@@ -60,13 +60,9 @@ export class ReportFoldersPage {
       `${process.env["ZO_BASE_URL"]}/web/reports?org_identifier=${process.env["ORGNAME"]}`,
       { waitUntil: 'domcontentloaded' }
     );
-    await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {
-      console.warn('navigateToReports: networkidle timed out, continuing');
-    });
+    await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
     await expect(this.page.locator(this.pageTitle)).toContainText('Reports');
-    await this.page.locator(this.folderTabsContainer).waitFor({ state: 'visible', timeout: 15000 }).catch(() => {
-      console.warn('navigateToReports: folderTabsContainer not visible, continuing');
-    });
+    await this.page.locator(this.folderTabsContainer).waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
   }
 
   async clickAddFolder() {
@@ -319,5 +315,17 @@ export class ReportFoldersPage {
 
   async isBulkResumeBtnVisible() {
     return await this.page.locator(this.bulkResumeBtn).isVisible({ timeout: 2000 }).catch(() => false);
+  }
+
+  async expectBulkPauseSuccessVisible() {
+    await expect(this.page.getByText(/paused successfully/i)).toBeVisible({ timeout: 10000 });
+  }
+
+  async expectBulkResumeSuccessVisible() {
+    await expect(this.page.getByText(/resumed successfully/i)).toBeVisible({ timeout: 10000 });
+  }
+
+  async expectBulkDeleteSuccessVisible() {
+    await expect(this.page.getByText(/deleted successfully/i)).toBeVisible({ timeout: 10000 });
   }
 }

@@ -112,7 +112,7 @@ test.describe("Report Bulk Operations", () => {
     await pm.reportFoldersPage.clickBulkPause();
 
     testLogger.info('Verifying success notification after bulk pause');
-    await expect(page.getByText(/paused successfully/i)).toBeVisible({ timeout: 10000 });
+    await pm.reportFoldersPage.expectBulkPauseSuccessVisible();
 
     // Cleanup
     await pm.apiCleanup.deleteReport(`${REPORT_1}_pause`);
@@ -133,13 +133,13 @@ test.describe("Report Bulk Operations", () => {
     // First pause it
     await pm.reportFoldersPage.selectAllReports();
     await pm.reportFoldersPage.clickBulkPause();
-    await expect(page.getByText(/paused successfully/i)).toBeVisible({ timeout: 10000 });
+    await pm.reportFoldersPage.expectBulkPauseSuccessVisible();
     await page.waitForTimeout(1000);
 
     testLogger.info('Now resuming the paused report(s)');
     await pm.reportFoldersPage.selectAllReports();
     await pm.reportFoldersPage.clickBulkResume();
-    await expect(page.getByText(/resumed successfully/i)).toBeVisible({ timeout: 10000 });
+    await pm.reportFoldersPage.expectBulkResumeSuccessVisible();
     testLogger.info('Reports resumed successfully');
 
     // Cleanup
@@ -167,7 +167,7 @@ test.describe("Report Bulk Operations", () => {
     await pm.reportFoldersPage.confirmBulkDelete();
 
     testLogger.info('Verifying success notification after bulk delete');
-    await expect(page.getByText(/deleted successfully/i)).toBeVisible({ timeout: 10000 });
+    await pm.reportFoldersPage.expectBulkDeleteSuccessVisible();
 
     testLogger.info('Verifying deleted reports are no longer in the table');
     await pm.reportFoldersPage.expectReportNotVisibleInTable(`${REPORT_2}_del`);
