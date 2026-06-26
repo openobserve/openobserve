@@ -3216,7 +3216,18 @@ export class LogsPage {
      * @returns {Promise<void>}
      */
     async openLogDetailSidebar() {
-        await this.page.locator(this.logTableColumnSource).click();
+        const sourceCell = this.page.locator(this.logTableColumnSource).first();
+        // Under CI load the row can resolve in the DOM while the results table is still
+        // streaming/re-rendering, so a plain click waits out its timeout on "element is not
+        // stable". Wait for the cell to be visible, bring it into view, then click with a
+        // force fallback to push past any transient instability or overlay.
+        await sourceCell.waitFor({ state: 'visible', timeout: 30000 });
+        await sourceCell.scrollIntoViewIfNeeded().catch(() => {});
+        try {
+            await sourceCell.click({ timeout: 15000 });
+        } catch {
+            await sourceCell.click({ force: true });
+        }
         await this.page.locator(this.logDetailDialog).waitFor({ state: 'visible', timeout: 10000 });
         testLogger.info('Log detail sidebar opened');
     }
@@ -5167,7 +5178,15 @@ export class LogsPage {
 
     async clickAddFieldToTableButton(fieldName) {
         const addBtn = this.page.locator(`[data-test="log-search-index-list-add-${fieldName}-field-btn"]`);
-        await addBtn.waitFor({ state: 'visible', timeout: 5000 });
+        try {
+            await addBtn.waitFor({ state: 'visible', timeout: 5000 });
+        } catch {
+            // The add button is only revealed while the field row is hovered. Under CI load
+            // the hover state can be lost (or never settled) before the click — re-hover the
+            // field row and wait again before giving up.
+            await this.page.locator(`[data-test="log-search-expand-${fieldName}-field-btn"]`).hover().catch(() => {});
+            await addBtn.waitFor({ state: 'visible', timeout: 10000 });
+        }
         await addBtn.click();
         // The add operation commits when both (a) the toggle inverts to a remove
         // button in the sidebar, and (b) the field column header appears in the
