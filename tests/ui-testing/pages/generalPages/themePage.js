@@ -56,12 +56,16 @@ export class ThemePage {
 
     /**
      * Returns the theme card locator for a given theme name and mode.
-     * Cards expose `data-test="predefined-themes-card-{mode}-{slug}"` (added in
-     * PredefinedThemes.vue) so we no longer depend on text-based filters.
+     * The PredefinedThemes.vue redesign merged each predefined theme's card and
+     * Apply control into a single clickable `<button class="theme-row">` whose
+     * data-test is `predefined-themes-apply-btn-{mode}-{slug}` — there is no
+     * separate `predefined-themes-card-*` element for predefined themes anymore
+     * (only the Custom Color row keeps a `-card-` slug; see getCustomColorCard).
+     * So the row button IS the card.
      */
     getThemeCard(themeName, mode = 'light') {
         const slug = themeName.toLowerCase().replace(/\s+/g, '-');
-        return this.page.locator(`[data-test="predefined-themes-card-${mode}-${slug}"]`);
+        return this.page.locator(`[data-test="predefined-themes-apply-btn-${mode}-${slug}"]`);
     }
 
     getApplyButton(themeName, mode = 'light') {
