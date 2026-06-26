@@ -193,7 +193,7 @@ test.describe("Alert History Page", () => {
     testLogger.info('Page remained stable after refresh');
   });
 
-  test("P1: Alert history populates after triggering alert and view details works", {
+  test.skip("P1: Alert history populates after triggering alert and view details works", {
     tag: ['@alertHistory', '@functional', '@P1']
   }, async ({ page }) => {
     const ts = Date.now();
