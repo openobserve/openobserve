@@ -174,7 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="dashboard-import-error-container"
               class="card-container tw:h-[calc(100vh-110px)] tw:border-l tw:border-border-default"
             >
-              <div class="tw:text-center tw:text-xl tw:font-semibold tw:py-2">Error Validations</div>
+              <div class="tw:text-center tw:text-[1.0625rem] tw:font-semibold tw:leading-[1.45] tw:tracking-[-0.02em] tw:text-text-primary tw:py-2">Error Validations</div>
               <OSeparator class="tw:mt-4" />
               <div
                 class="error-section tw:p-[10px] tw:mb-[10px]"
