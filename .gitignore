@@ -25,6 +25,10 @@ flamegraph.html
 /integration-tests
 /download/
 
+# node dependencies / tooling caches
+/node_modules/
+/web/node_modules/
+
 # web distribution
 /web/dist
 /web/.env
