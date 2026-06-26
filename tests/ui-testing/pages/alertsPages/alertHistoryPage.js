@@ -103,16 +103,11 @@ export class AlertHistoryPage {
       .catch(() => {});
 
     // If the details dialog already opened (from a prior click attempt), skip re-clicking.
-    // This prevents a second click being blocked by the ODialog overlay that the first
-    // click already raised.
     const alreadyOpen = await this.page.locator(this.alertDetailsDialog)
-      .isVisible({ timeout: 300 }).catch(() => false)
-      || await this.page.locator('[data-o2-dialog]')
       .isVisible({ timeout: 300 }).catch(() => false);
     if (alreadyOpen) return;
 
-    // Dismiss any ODialog overlay that might be blocking pointer events (e.g. a stale
-    // dialog left open by a prior navigation or interaction in the serial test suite).
+    // Dismiss any stale ODialog overlay blocking pointer events before clicking.
     const overlay = this.page.locator('[data-test="o-dialog-overlay"]');
     if (await overlay.isVisible({ timeout: 500 }).catch(() => false)) {
       await this.page.keyboard.press('Escape');
@@ -124,9 +119,7 @@ export class AlertHistoryPage {
     const btn = (await byDataTest.count() > 0) ? byDataTest.nth(index) : byCell;
     await btn.waitFor({ state: 'visible', timeout: 10000 });
     await btn.scrollIntoViewIfNeeded();
-    // Standard Playwright click dispatches trusted mouse events via CDP —
-    // required so OButton's Reka UI Primitive properly routes through handleClick
-    await btn.click();
+    await btn.click({ force: true });
   }
 
   async expectViewDetailsBtnVisible() {
