@@ -171,16 +171,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <div class="tw:flex tw:gap-x-2 tw:items-center">
-          <OInput
-            data-test="domain-management-new-domain-input"
-            v-model="newDomain"
-            class="domain-input tw:w-75"
-            @keydown.enter="addDomain"
-            :placeholder="t('settings.domainPlaceholder')"
-            :error="!!domainError"
-            :error-message="domainError"
-            @update:model-value="domainError = ''"
-          />
+          <!-- Fixed-width wrapper: OInput fills its parent (w-full), so
+               constraining the parent sizes the input without overriding it. -->
+          <div class="tw:w-[18.75rem] tw:shrink-0">
+            <OInput
+              data-test="domain-management-new-domain-input"
+              v-model="newDomain"
+              class="domain-input"
+              @keydown.enter="addDomain"
+              :placeholder="t('settings.domainPlaceholder')"
+              :error="!!domainError"
+              :error-message="domainError"
+              @update:model-value="domainError = ''"
+            />
+          </div>
           <OButton
             data-test="domain-management-add-domain-btn"
             variant="primary"
