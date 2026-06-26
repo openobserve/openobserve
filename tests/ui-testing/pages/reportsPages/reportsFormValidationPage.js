@@ -139,25 +139,29 @@ export class ReportsFormValidationPage {
     }
 
     async selectFirstDashboardFolder() {
-        // Wait for the folder fetch to complete before opening the dropdown.
-        // getDashboaordFolders() runs in onBeforeMount (async, non-blocking). The trigger's
-        // loading spinner disappears once the fetch completes and options are populated.
         const folderTrigger = this.page.locator('[data-test="add-report-dashboard-folder-select-trigger"]');
         await folderTrigger.waitFor({ state: 'visible', timeout: 10000 });
-        // Wait for the folders API call to complete before opening the dropdown.
-        // getDashboaordFolders() fires in onBeforeMount async — networkidle ensures it has resolved.
         await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
-        await folderTrigger.click();
-        await this.page.locator(this.dashboardFolderPopover).waitFor({ state: 'visible', timeout: 10000 });
-        // Wait for any option to appear (virtualizer renders items after measuring
-        // the container height) — this attached-state wait is the deterministic
-        // readiness signal that replaces a fixed settle delay.
+
         const anyOpt = this.page.locator('[data-test^="add-report-dashboard-folder-select-option"]').first();
-        await anyOpt.waitFor({ state: 'attached', timeout: 10000 });
-        // Prefer the "default" folder, but fall back to the first rendered option
-        // when the virtualizer has not materialised "default" into the DOM window.
+        let optionsReady = false;
+
+        // folderOptions is fetched async in onBeforeMount — if the API hasn't resolved by the
+        // time we click, OSelect renders 0 items. Close and reopen to let data load.
+        for (let attempt = 0; attempt < 3; attempt++) {
+            await folderTrigger.click();
+            await this.page.locator(this.dashboardFolderPopover).waitFor({ state: 'visible', timeout: 10000 });
+            optionsReady = await anyOpt.waitFor({ state: 'attached', timeout: 8000 }).then(() => true).catch(() => false);
+            if (optionsReady) break;
+            await this.page.keyboard.press('Escape').catch(() => {});
+            await this.page.locator(this.dashboardFolderPopover).waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+            await this.page.waitForTimeout(2000);
+        }
+
+        if (!optionsReady) throw new Error('Dashboard folder options failed to appear after 3 attempts');
+
         const defaultOpt = this.page.locator(`[data-test="add-report-dashboard-folder-select-option"][data-test-value="default"]`);
-        const hasDefault = await defaultOpt.waitFor({ state: 'attached', timeout: 5000 }).then(() => true).catch(() => false);
+        const hasDefault = await defaultOpt.waitFor({ state: 'attached', timeout: 3000 }).then(() => true).catch(() => false);
         await (hasDefault ? defaultOpt : anyOpt).click({ force: true });
         await this.page.locator(this.dashboardFolderPopover).waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
     }
