@@ -2706,15 +2706,23 @@ export class LogsPage {
             ? process.env.INGESTION_URL.slice(0, -1)
             : process.env.INGESTION_URL;
 
+        // Unique per-batch marker. Verification queries the search API by this exact
+        // value (WHERE sdr_test_id = '<marker>'), so it inspects ONLY the records this
+        // call ingested — never stale data from an earlier batch on the same stream.
+        // This is what makes SDR verification deterministic instead of relying on the
+        // virtualized results table rendering the right rows at the right time.
+        const marker = `sdr-${require('crypto').randomUUID()}`;
+
         const baseTimestamp = Date.now() * 1000;
         const logData = dataObjects.map(({ fieldName, fieldValue }, index) => ({
             level: "info",
             [fieldName]: fieldValue,
             log: `Test log with ${fieldName} field - entry ${index}`,
+            sdr_test_id: marker,
             _timestamp: baseTimestamp + (index * 1000000)
         }));
 
-        testLogger.info(`Preparing to ingest ${logData.length} separate log entries`);
+        testLogger.info(`Preparing to ingest ${logData.length} separate log entries (marker: ${marker})`);
 
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
             try {
@@ -2732,9 +2740,10 @@ export class LogsPage {
                     testLogger.info('Ingestion successful, waiting for stream to be indexed...');
                     // NOTE: This is a backend async indexing wait, not a UI wait.
                     // waitForLoadState won't help as no page navigation occurs.
-                    // Consider using waitForStreamData() polling for production tests.
+                    // Verification polls the search API for this marker, so this is just
+                    // a small head start to reduce poll iterations — not the readiness gate.
                     await this.page.waitForTimeout(5000);
-                    return;
+                    return marker;
                 }
 
                 const errorMessage = responseBody?.message || JSON.stringify(responseBody);
@@ -3184,7 +3193,18 @@ export class LogsPage {
     }
 
     async clickLogTableColumnSource() {
-        return await this.page.locator(this.logTableColumnSource).click();
+        // Open the first result row's detail/search-around. With the FTS
+        // default-column feature the first cell may be the generic "source"
+        // column OR the FTS "body" column (e.g. log/message/body), so click
+        // whichever first-row cell is rendered rather than "source" only.
+        // The cell can also detach mid-click while the table re-renders, so
+        // Playwright's auto-retrying click is allowed to settle via a short
+        // post-condition wait on the detail dialog by callers.
+        const firstRowCell = this.page
+            .locator('[data-test^="log-table-column-0-"]')
+            .first();
+        await firstRowCell.waitFor({ state: 'visible', timeout: 30000 });
+        return await firstRowCell.click();
     }
 
     async clickIncludeExcludeFieldButton() {
@@ -3205,7 +3225,18 @@ export class LogsPage {
      * @returns {Promise<void>}
      */
     async openLogDetailSidebar() {
-        await this.page.locator(this.logTableColumnSource).click();
+        const sourceCell = this.page.locator(this.logTableColumnSource).first();
+        // Under CI load the row can resolve in the DOM while the results table is still
+        // streaming/re-rendering, so a plain click waits out its timeout on "element is not
+        // stable". Wait for the cell to be visible, bring it into view, then click with a
+        // force fallback to push past any transient instability or overlay.
+        await sourceCell.waitFor({ state: 'visible', timeout: 30000 });
+        await sourceCell.scrollIntoViewIfNeeded().catch(() => {});
+        try {
+            await sourceCell.click({ timeout: 15000 });
+        } catch {
+            await sourceCell.click({ force: true });
+        }
         await this.page.locator(this.logDetailDialog).waitFor({ state: 'visible', timeout: 10000 });
         testLogger.info('Log detail sidebar opened');
     }
@@ -3704,7 +3735,10 @@ export class LogsPage {
     async waitForSearchResults(timeout = 30000) {
         const table = this.page.locator(this.logsTable);
         await table.waitFor({ state: 'visible', timeout });
-        const firstRow = this.page.locator(this.logTableColumnSource);
+        // The default view may render the generic "source" column OR the FTS
+        // "body" column, so wait for any first-row cell rather than "source"
+        // specifically — both mean "results rendered".
+        const firstRow = this.page.locator('[data-test^="log-table-column-0-"]').first();
         await firstRow.waitFor({ state: 'visible', timeout });
         return true;
     }
@@ -4570,11 +4604,29 @@ export class LogsPage {
         return await this.page.locator(this.logsDetailTableSearchAroundBtn).click();
     }
 
+    /**
+     * Assert that the results table rendered at least one data row.
+     *
+     * Historically the default logs view always showed a single generic "source"
+     * column (full row as JSON). With the FTS default-column feature, a plain
+     * (non-SQL, no-pin) view instead promotes the best-fill full-text "body"
+     * field (e.g. "log"/"message"/"body") to its own column, so "source" is no
+     * longer guaranteed. Custom SQL queries and aggregates still render "source".
+     *
+     * This helper therefore passes when EITHER the "source" column OR any other
+     * first-row column cell is visible — i.e. "results rendered", independent of
+     * which default column the view chose. Use expectLogTableColumnVisible(name)
+     * when a specific column must be asserted.
+     */
     async expectLogTableColumnSourceVisible() {
-        const element = this.page.locator(this.logTableColumnSource);
-        // Wait for the element to be visible with a timeout
-        await element.waitFor({ state: 'visible', timeout: 30000 });
-        return await expect(element).toBeVisible();
+        const sourceCol = this.page.locator(this.logTableColumnSource);
+        const anyFirstRowCol = this.page.locator('[data-test^="log-table-column-0-"]').first();
+        // Whichever appears first satisfies "results rendered".
+        await Promise.race([
+            sourceCol.waitFor({ state: 'visible', timeout: 30000 }).catch(() => {}),
+            anyFirstRowCol.waitFor({ state: 'visible', timeout: 30000 }).catch(() => {}),
+        ]);
+        return await expect(anyFirstRowCol).toBeVisible();
     }
 
     /**
@@ -5135,7 +5187,15 @@ export class LogsPage {
 
     async clickAddFieldToTableButton(fieldName) {
         const addBtn = this.page.locator(`[data-test="log-search-index-list-add-${fieldName}-field-btn"]`);
-        await addBtn.waitFor({ state: 'visible', timeout: 5000 });
+        try {
+            await addBtn.waitFor({ state: 'visible', timeout: 5000 });
+        } catch {
+            // The add button is only revealed while the field row is hovered. Under CI load
+            // the hover state can be lost (or never settled) before the click — re-hover the
+            // field row and wait again before giving up.
+            await this.page.locator(`[data-test="log-search-expand-${fieldName}-field-btn"]`).hover().catch(() => {});
+            await addBtn.waitFor({ state: 'visible', timeout: 10000 });
+        }
         await addBtn.click();
         // The add operation commits when both (a) the toggle inverts to a remove
         // button in the sidebar, and (b) the field column header appears in the
@@ -5163,8 +5223,12 @@ export class LogsPage {
     }
 
     async expectFieldNotInTableHeader(fieldName) {
-        // When field is removed, the source column should be visible again
-        return await expect(this.page.locator('[data-test="log-search-result-table-th-source"]').getByText('source')).toBeVisible();
+        // After removing a field, its column header must no longer be present.
+        // (Asserting on the removed field is mode-agnostic: the default view may
+        // fall back to the generic "source" column or the FTS "body" column.)
+        return await expect(
+            this.page.locator(`[data-test="log-search-result-table-th-${fieldName}"]`),
+        ).toHaveCount(0);
     }
 
     // New POM methods for PR tests
@@ -6262,10 +6326,25 @@ export class LogsPage {
      */
     async ingestData(streamName, data) {
         const fetch = (await import('node-fetch')).default;
+        const http = require('http');
+        const https = require('https');
         const orgId = getOrgIdentifier();
         const authHeaders = getAuthHeaders();
 
         testLogger.info('Ingesting data', { streamName, recordCount: data.length });
+
+        // node-fetch 2.x reuses keep-alive sockets by default. With records sent
+        // one-by-one (spaced 500ms apart), CI servers close the idle keep-alive
+        // connection between requests, surfacing as a "Premature close" error
+        // while reading the response body — even though the server returns HTTP
+        // 200 and ingests the record. Forcing a fresh connection per request
+        // (keepAlive: false) eliminates that socket-reuse race.
+        const httpAgent = new http.Agent({ keepAlive: false });
+        const httpsAgent = new https.Agent({ keepAlive: false });
+        const agent = (parsedURL) => (parsedURL.protocol === 'https:' ? httpsAgent : httpAgent);
+
+        const ingestUrl = `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`;
+        const maxAttempts = 3;
 
         let successCount = 0;
         let failCount = 0;
@@ -6273,31 +6352,49 @@ export class LogsPage {
         // Send records one by one to ensure each is treated as unique
         for (let i = 0; i < data.length; i++) {
             const record = data[i];
+            let ingested = false;
+            let lastError = null;
 
-            try {
-                const response = await fetch(`${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`, {
-                    method: 'POST',
-                    headers: authHeaders,
-                    body: JSON.stringify([record])  // Send as single-element array
-                });
+            // Retry transient connection failures (e.g. "Premature close") so a
+            // single dropped socket does not fail the whole test.
+            for (let attempt = 1; attempt <= maxAttempts && !ingested; attempt++) {
+                try {
+                    const response = await fetch(ingestUrl, {
+                        method: 'POST',
+                        headers: authHeaders,
+                        body: JSON.stringify([record]),  // Send as single-element array
+                        agent
+                    });
 
-                const responseData = await response.json();
+                    const responseData = await response.json();
 
-                if (response.status === 200 && responseData.code === 200) {
-                    successCount++;
-                    testLogger.debug(`Ingested record ${i+1}/${data.length}`, { name: record.name, test_id: record.test_id || 'no_id', unique_id: record.unique_id });
-                } else {
-                    failCount++;
-                    testLogger.error(`Failed to ingest record ${i+1}/${data.length}`, { response: responseData, test_id: record.test_id || record.name });
+                    if (response.status === 200 && responseData.code === 200) {
+                        ingested = true;
+                        testLogger.debug(`Ingested record ${i+1}/${data.length}`, { name: record.name, test_id: record.test_id || 'no_id', unique_id: record.unique_id });
+                    } else {
+                        lastError = `status=${response.status} code=${responseData.code}`;
+                        testLogger.error(`Failed to ingest record ${i+1}/${data.length} (attempt ${attempt}/${maxAttempts})`, { response: responseData, test_id: record.test_id || record.name });
+                    }
+                } catch (error) {
+                    lastError = error.message;
+                    testLogger.error(`Error ingesting record ${i+1}/${data.length} (attempt ${attempt}/${maxAttempts})`, { error: error.message });
                 }
 
-                // Small delay between records
-                await new Promise(resolve => setTimeout(resolve, 500));
-
-            } catch (error) {
-                failCount++;
-                testLogger.error(`Error ingesting record ${i+1}/${data.length}`, { error: error.message });
+                // Back off briefly before retrying the same record
+                if (!ingested && attempt < maxAttempts) {
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                }
             }
+
+            if (ingested) {
+                successCount++;
+            } else {
+                failCount++;
+                testLogger.error(`Giving up on record ${i+1}/${data.length} after ${maxAttempts} attempts`, { lastError, test_id: record.test_id || record.name });
+            }
+
+            // Small delay between records
+            await new Promise(resolve => setTimeout(resolve, 500));
         }
 
         testLogger.info('Ingestion complete', { streamName, total: data.length, success: successCount, failed: failCount });
@@ -6320,17 +6417,15 @@ export class LogsPage {
 
             for (const row of rows) {
                 const text = row.textContent;
-                // Find the color indicator div - it's a div with inline backgroundColor style
-                // The div has classes like "tw:absolute tw:left-0 tw:inset-y-0 tw:w-1 tw:z-10"
-                // Use multiple selector approaches for robustness
-                let colorDiv = row.querySelector('div[style*="background"]');
+                // The status color bar carries data-test="log-table-row-status-color"
+                // and data-test-status-level="<level>". This makes the detected
+                // severity/level machine-readable regardless of which column is
+                // shown (the FTS "body" column hides the raw "source" JSON).
+                let colorDiv = row.querySelector('[data-test="log-table-row-status-color"]');
 
-                // Fallback: try class-based selector with escaped colon
-                if (!colorDiv) {
-                    colorDiv = row.querySelector('div[class*="tw\\:absolute"]');
-                }
-
-                // Fallback: try finding the first absolute positioned child div
+                // Fallbacks for older renders: inline-style / absolute-positioned div.
+                if (!colorDiv) colorDiv = row.querySelector('div[style*="background"]');
+                if (!colorDiv) colorDiv = row.querySelector('div[class*="tw\\:absolute"]');
                 if (!colorDiv) {
                     const divs = row.querySelectorAll('div');
                     for (const div of divs) {
@@ -6345,29 +6440,29 @@ export class LogsPage {
                 if (!colorDiv) continue;
 
                 const bgColor = window.getComputedStyle(colorDiv).backgroundColor;
-
-                // Skip if no valid background color
                 if (!bgColor || bgColor === 'rgba(0, 0, 0, 0)' || bgColor === 'transparent') continue;
 
-                // Check for severity value in the row text - look for various patterns
+                const level = colorDiv.getAttribute('data-test-status-level') || null;
+
+                // Best-effort: also recover the raw severity number when the JSON
+                // source column is visible (kept for backward compatibility).
+                let severity = null;
                 for (let sev = 0; sev <= 7; sev++) {
-                    // Match "severity":"X", "severity":X, "severity": X, or severity: X patterns
                     const patterns = [
                         `"severity":"${sev}"`,
                         `"severity":${sev},`,
                         `"severity":${sev}}`,
                         `"severity": ${sev}`,
-                        `severity: ${sev}`
+                        `severity: ${sev}`,
                     ];
-
                     if (patterns.some(pattern => text.includes(pattern))) {
-                        findings.push({
-                            severity: sev,
-                            color: bgColor
-                        });
+                        severity = sev;
                         break;
                     }
                 }
+
+                if (level === null && severity === null) continue;
+                findings.push({ severity, level, color: bgColor });
             }
 
             return findings;

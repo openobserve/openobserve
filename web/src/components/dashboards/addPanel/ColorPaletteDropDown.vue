@@ -15,35 +15,103 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div data-test="dashboard-color-palette-root">
     <div
       data-test="dashboard-color-palette-flex-container"
-      style="display: flex; align-items: center"
+      class="color-palette-row"
     >
       <!-- dropdown to select color palette type/mode -->
       <OSelect
         data-test="dashboard-color-palette-select"
         v-model="dashboardPanelData.data.config.color.mode"
-        :options="colorOptions"
         :label="t('dashboard.colorPalette')"
-        class="showLabelOnTop"
+        class="showLabelOnTop tw:flex-1"
         @update:model-value="onColorModeChange"
-        style="width: 100%"
         :dropdownStyle="{ width: '240px' }"
-      />
+      >
+        <template #trigger>
+          <div class="trigger-preview">
+            <span
+              v-if="selectedOptionPalette.length"
+              class="palette-preview"
+              aria-hidden="true"
+            >
+              <span
+                v-for="(color, i) in selectedOptionPalette.slice(0, 3)"
+                :key="i"
+                class="palette-preview-dot"
+                :style="{ background: color }"
+              />
+            </span>
+            <span class="trigger-label">{{ selectedOptionLabel }}</span>
+          </div>
+        </template>
+
+        <!-- By Series group -->
+        <OSelectGroup :label="t('dashboard.colorBySeries')">
+          <OSelectItem
+            v-for="opt in colorOptionsByGroup.bySeries"
+            :key="opt.value"
+            :value="opt.value"
+            :label="opt.label"
+          >
+            <div class="color-option-row">
+              <span v-if="opt.colorPalette?.length" class="palette-preview" aria-hidden="true">
+                <span
+                  v-for="(c, i) in opt.colorPalette.slice(0, 5)"
+                  :key="i"
+                  class="palette-preview-dot"
+                  :style="{ background: c }"
+                />
+              </span>
+              <span class="color-option-label">{{ opt.label }}</span>
+            </div>
+          </OSelectItem>
+
+          <OSelectItem value="fixed" :label="t('dashboard.colorSingleColor')" />
+          <OSelectItem value="shades" :label="t('dashboard.colorShadesOfSpecificColor')" />
+        </OSelectGroup>
+
+        <!-- By Value group -->
+        <OSelectGroup :label="t('dashboard.colorByValue')">
+          <OSelectItem
+            v-for="opt in colorOptionsByGroup.byValue"
+            :key="opt.value"
+            :value="opt.value"
+            :label="opt.label"
+          >
+            <div class="color-option-row">
+              <span
+                v-if="opt.colorPalette?.length"
+                class="gradient-preview"
+                aria-hidden="true"
+                :style="{ background: `linear-gradient(to right, ${opt.colorPalette.join(', ')})` }"
+              />
+              <span class="color-option-label">{{ opt.label }}</span>
+            </div>
+          </OSelectItem>
+        </OSelectGroup>
+      </OSelect>
 
       <!-- color picker for fixed and shades typed color mode -->
       <div
+        v-if="['fixed', 'shades'].includes(dashboardPanelData.data.config.color.mode)"
+        class="color-swatch-wrapper"
         data-test="dashboard-color-palette-color-input-wrapper"
-        class="color-input-wrapper"
-        v-if="
-          ['fixed', 'shades'].includes(
-            dashboardPanelData.data.config.color.mode,
-          )
-        "
-        style="margin-top: 30px; margin-left: 5px"
       >
+        <button
+          type="button"
+          class="color-swatch-btn"
+          :aria-label="`Panel color: ${dashboardPanelData.data.config.color.fixedColor[0]}`"
+          :style="{ background: dashboardPanelData.data.config.color.fixedColor[0] }"
+          data-test="dashboard-color-palette-swatch-btn"
+          @click="$refs.colorInput.click()"
+        />
         <input
-          data-test="dashboard-color-palette-color-input"
+          ref="colorInput"
           type="color"
+          class="color-input-hidden"
           v-model="dashboardPanelData.data.config.color.fixedColor[0]"
+          data-test="dashboard-color-palette-color-input"
+          tabindex="-1"
+          aria-hidden="true"
         />
       </div>
     </div>
@@ -73,10 +141,12 @@ import { useI18n } from "vue-i18n";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OSelectItem from "@/lib/forms/Select/OSelectItem.vue";
+import OSelectGroup from "@/lib/forms/Select/OSelectGroup.vue";
 
 export default defineComponent({
   name: "ColorPaletteDropdown",
-  components: { OToggleGroup, OToggleGroupItem, OSelect },
+  components: { OToggleGroup, OToggleGroupItem, OSelect, OSelectItem, OSelectGroup },
   setup() {
     const { t } = useI18n();
 
@@ -115,19 +185,18 @@ export default defineComponent({
         label: t("dashboard.colorPaletteClassic"),
         subLabel: t("dashboard.colorPaletteClassicSubLabel"),
         colorPalette: [
-          "#5470c6",
-          "#91cc75",
-          "#fac858",
-          "#ee6666",
-          "#73c0de",
-          "#3ba272",
-          "#fc8452",
-          "#9a60b4",
-          "#ea7ccc",
-          "#59c4e6",
-          "#edafda",
-          "#93b7e3",
-          "#a5e7f0",
+          "#5b8ef0",
+          "#34d399",
+          "#fb923c",
+          "#f472b6",
+          "#a78bfa",
+          "#fbbf24",
+          "#38bdf8",
+          "#f87171",
+          "#2dd4bf",
+          "#4ade80",
+          "#e879f9",
+          "#facc15",
         ],
         value: "palette-classic",
       },
@@ -189,6 +258,23 @@ export default defineComponent({
         : t("dashboard.colorPaletteClassicBySeries");
     });
 
+    const colorOptionsByGroup = computed(() => ({
+      bySeries: colorOptions.filter(
+        (o) => !o.header && !o.value?.startsWith("continuous") && o.value !== "fixed" && o.value !== "shades",
+      ),
+      byValue: colorOptions.filter((o) => o.value?.startsWith("continuous")),
+    }));
+
+    const selectedOptionPalette = computed<string[]>(() => {
+      const mode = dashboardPanelData?.data?.config?.color?.mode ?? "palette-classic-by-series";
+      if (["fixed", "shades"].includes(mode)) {
+        const fixed = dashboardPanelData?.data?.config?.color?.fixedColor?.[0];
+        return fixed ? [fixed] : [];
+      }
+      const option = colorOptions.find((o) => o.value === mode);
+      return (option as any)?.colorPalette ?? [];
+    });
+
     const onColorModeChange = (value: string) => {
       const selectedOption = colorOptions.find((opt: any) => opt.value === value);
       // if value is fixed or shades, assign ["#53ca53"] to fixedcolor as a default
@@ -211,8 +297,10 @@ export default defineComponent({
       dashboardPanelData,
       promqlMode,
       colorOptions,
+      colorOptionsByGroup,
       onColorModeChange,
       selectedOptionLabel,
+      selectedOptionPalette,
     };
   },
 });
@@ -222,36 +310,111 @@ export default defineComponent({
   text-transform: none !important;
 }
 
+.color-palette-row {
+  display: flex;
+  align-items: center;
+}
+
 .space {
   margin-top: 10px;
   margin-bottom: 10px;
 }
 
-.color-input-wrapper {
-  height: 25px;
-  width: 25px;
-  overflow: hidden;
-  border-radius: 50%;
+.color-swatch-wrapper {
   display: inline-flex;
   align-items: center;
+  flex-shrink: 0;
+  margin-top: 1.875rem;
+  margin-left: 0.375rem;
   position: relative;
 }
 
-.color-input-wrapper input[type="color"] {
+.color-swatch-btn {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  border: 2px solid var(--color-border-default);
+  cursor: pointer;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+  flex-shrink: 0;
+
+  &:hover {
+    border-color: var(--color-button-primary);
+    box-shadow: 0 0 0 0.125rem var(--color-button-primary-focus-ring);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-button-primary-focus-ring);
+    outline-offset: 0.125rem;
+  }
+}
+
+.color-input-hidden {
   position: absolute;
-  height: 4em;
-  width: 4em;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  overflow: hidden;
-  border: none;
-  margin: 0;
-  padding: 0;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .color-container {
   display: flex;
-  height: 8px;
+  height: 0.5rem;
+}
+
+.palette-preview {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.1875rem;
+  flex-shrink: 0;
+}
+
+.palette-preview-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.trigger-preview {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.trigger-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.875rem;
+  color: var(--color-text-primary);
+}
+
+.color-option-row {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  width: 100%;
+  min-width: 0;
+}
+
+.color-option-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gradient-preview {
+  display: block;
+  width: 2.5rem;
+  height: 0.5rem;
+  border-radius: 0.1875rem;
+  flex-shrink: 0;
 }
 </style>

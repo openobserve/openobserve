@@ -137,6 +137,11 @@ const activeSectionItem = computed(() =>
 // Group order: Monitor before Evaluate.
 const sectionGroupOrder = ["Monitor", "Evaluate"];
 
+const groupLabels = computed<Record<string, string>>(() => ({
+  Monitor: t("aiObservability.sections.monitor"),
+  Evaluate: t("aiObservability.sections.evaluate"),
+}));
+
 const sectionGroups = computed<SectionHubGroup[]>(() => {
   const buckets = new Map<string, SectionHubItem[]>();
   for (const item of sectionItems.value) {
@@ -150,7 +155,7 @@ const sectionGroups = computed<SectionHubGroup[]>(() => {
   };
   return [...buckets.keys()]
     .sort((a, b) => rank(a) - rank(b))
-    .map((label) => ({ label, items: buckets.get(label)! }));
+    .map((key) => ({ label: groupLabels.value[key] ?? key, items: buckets.get(key)! }));
 });
 
 // Reserved for future per-section header chrome wiring (mirrors Settings'

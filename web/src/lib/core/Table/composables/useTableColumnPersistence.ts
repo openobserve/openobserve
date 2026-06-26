@@ -4,15 +4,30 @@
  * Persists column widths and column visibility to localStorage.
  * Only active when both `enabled` is true and a `tableId` is provided.
  *
- * Storage key schema:
- *   o2-table-{tableId}-column-sizes-v2     → Record<string, number>
- *   o2-table-{tableId}-column-visibility   → Record<string, boolean>
+ * Storage schema — a SINGLE global entry holds the state for every table,
+ * nested by `tableId`:
  *
- * The sizes key is versioned (-v2): the Excel-style resize model changed what a
- * persisted width means (a frozen fixed width, not a hint), so pre-existing
- * sizes are intentionally discarded on upgrade.
+ *   o2-tables-column-state-v1 → {
+ *     [tableId]: {
+ *       sizes:      Record<string, number>,   // frozen fixed widths
+ *       visibility: Record<string, boolean>,  // shown/hidden per column
+ *     }
+ *   }
+ *
+ * The key is versioned (-v1). The width model is Excel-style (a persisted width
+ * is a frozen fixed width, not a hint). Pre-existing per-table entries from the
+ * older schema (`o2-table-{tableId}-column-sizes-v2` / `-column-visibility`) are
+ * intentionally not migrated and become orphaned on upgrade.
  */
-const COLUMN_SIZES_KEY = "column-sizes-v2";
+const GLOBAL_STORAGE_KEY = "o2-tables-column-state-v1";
+
+interface TableState {
+  sizes?: Record<string, number>;
+  visibility?: Record<string, boolean>;
+}
+
+type AllTablesState = Record<string, TableState>;
+
 export function useTableColumnPersistence(options: {
   tableId: string | undefined;
   enabled: boolean;
@@ -21,65 +36,60 @@ export function useTableColumnPersistence(options: {
 
   const isActive = enabled && !!tableId;
 
-  function storageKey(suffix: string) {
-    return `o2-table-${tableId}-${suffix}`;
+  function readAll(): AllTablesState {
+    try {
+      const raw = localStorage.getItem(GLOBAL_STORAGE_KEY);
+      if (!raw) return {};
+      const parsed = JSON.parse(raw);
+      if (typeof parsed !== "object" || parsed === null) return {};
+      return parsed as AllTablesState;
+    } catch {
+      return {};
+    }
+  }
+
+  function writeAll(state: AllTablesState): void {
+    try {
+      localStorage.setItem(GLOBAL_STORAGE_KEY, JSON.stringify(state));
+    } catch {
+      // localStorage may be unavailable (private mode, quota exceeded)
+    }
   }
 
   function loadColumnSizes(): Record<string, number> | null {
-    if (!isActive) return null;
-    try {
-      const raw = localStorage.getItem(storageKey(COLUMN_SIZES_KEY));
-      if (!raw) return null;
-      const parsed = JSON.parse(raw);
-      if (typeof parsed !== "object" || parsed === null) return null;
-      return parsed as Record<string, number>;
-    } catch {
-      return null;
-    }
+    if (!isActive || !tableId) return null;
+    const sizes = readAll()[tableId]?.sizes;
+    return sizes && typeof sizes === "object" ? sizes : null;
   }
 
   function saveColumnSizes(sizes: Record<string, number>): void {
-    if (!isActive) return;
-    try {
-      localStorage.setItem(storageKey(COLUMN_SIZES_KEY), JSON.stringify(sizes));
-    } catch {
-      // localStorage may be unavailable (private mode, quota exceeded)
-    }
+    if (!isActive || !tableId) return;
+    // Read-modify-write: only touch this table's slice so other tables sharing
+    // the global entry are never clobbered.
+    const all = readAll();
+    all[tableId] = { ...all[tableId], sizes };
+    writeAll(all);
   }
 
   function loadColumnVisibility(): Record<string, boolean> | null {
-    if (!isActive) return null;
-    try {
-      const raw = localStorage.getItem(storageKey("column-visibility"));
-      if (!raw) return null;
-      const parsed = JSON.parse(raw);
-      if (typeof parsed !== "object" || parsed === null) return null;
-      return parsed as Record<string, boolean>;
-    } catch {
-      return null;
-    }
+    if (!isActive || !tableId) return null;
+    const visibility = readAll()[tableId]?.visibility;
+    return visibility && typeof visibility === "object" ? visibility : null;
   }
 
   function saveColumnVisibility(visibility: Record<string, boolean>): void {
-    if (!isActive) return;
-    try {
-      localStorage.setItem(
-        storageKey("column-visibility"),
-        JSON.stringify(visibility),
-      );
-    } catch {
-      // localStorage may be unavailable (private mode, quota exceeded)
-    }
+    if (!isActive || !tableId) return;
+    const all = readAll();
+    all[tableId] = { ...all[tableId], visibility };
+    writeAll(all);
   }
 
   function clearPersistedState(): void {
     if (!tableId) return;
-    try {
-      localStorage.removeItem(storageKey(COLUMN_SIZES_KEY));
-      localStorage.removeItem(storageKey("column-visibility"));
-    } catch {
-      // no-op
-    }
+    const all = readAll();
+    if (!(tableId in all)) return;
+    delete all[tableId];
+    writeAll(all);
   }
 
   return {

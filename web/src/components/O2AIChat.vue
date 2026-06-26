@@ -1081,6 +1081,26 @@
               </div>
             </div>
           </div>
+          <!-- Completed tool calls during streaming - keep progress visible
+               so each step stays on screen instead of flashing away while it
+               sits in pendingToolCalls waiting for the assistant's text. -->
+          <div
+            v-for="(block, pIdx) in pendingToolCalls"
+            v-show="block.type === 'tool_call'"
+            :key="'pending-tc-' + pIdx"
+            class="tool-call-indicator completed"
+            :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'"
+          >
+            <div class="tool-call-content">
+              <OIcon
+                :name="block.success === false ? 'error' : 'check-circle'"
+                size="sm"
+              />
+              <div class="tool-call-info">
+                <span class="tool-call-message">{{ block.message }}</span>
+              </div>
+            </div>
+          </div>
           <!-- Tool call indicator - shows outside message box -->
           <div
             v-if="activeToolCall"
@@ -1274,7 +1294,7 @@
                   size="sm"
                   :class="store.state.theme == 'dark' ? 'tw:text-white' : 'tw:text-gray-600'"
                 />
-                <OTooltip content="Attach images (PNG, JPEG, max 2MB)" />
+                <OTooltip :content="t('aiAssistant.attachImageTooltip')" />
               </OButton>
               <div v-else class="tw:w-8"></div>
 
@@ -1301,12 +1321,12 @@
                       : ''
                   ]"
                 />
-                <span class="auto-nav-label tw:ml-1">Auto Navigation</span>
+                <span class="auto-nav-label tw:ml-1">{{ t('aiAssistant.autoNavigation.label') }}</span>
                 <OTooltip
                   :content="
                     isAutoNavigationEnabled
-                      ? 'Auto navigation enabled - O2 Assistant will auto navigate without confirmation'
-                      : 'Auto navigation disabled - O2 Assistant will ask before navigating'
+                      ? t('aiAssistant.autoNavigation.enabledTooltip')
+                      : t('aiAssistant.autoNavigation.disabledTooltip')
                   "
                 />
               </OButton>
@@ -1997,6 +2017,33 @@ export default defineComponent({
           }
         }
 
+        // Persist any tool calls that completed before the user hit Stop.
+        // During the tool phase (before the assistant streams text) completed
+        // steps sit in pendingToolCalls and aren't attached to a message yet,
+        // so without this they'd vanish on cancel. Runs after the partial-
+        // message cleanup above so the empty-assistant-message pop can't drop
+        // the message we attach them to.
+        if (pendingToolCalls.value.length) {
+          const lastMessage =
+            chatMessages.value[chatMessages.value.length - 1];
+          if (lastMessage && lastMessage.role === "assistant") {
+            if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
+            // Tools ran before any text, so place them ahead of it.
+            lastMessage.contentBlocks.unshift(...pendingToolCalls.value);
+          } else {
+            const stoppedNote = "_[Response stopped by user]_";
+            chatMessages.value.push({
+              role: "assistant",
+              content: stoppedNote,
+              contentBlocks: [
+                ...pendingToolCalls.value,
+                { type: "text", text: stoppedNote },
+              ],
+            });
+          }
+          pendingToolCalls.value = [];
+        }
+
         // Reset streaming state
         currentStreamingMessage.value = "";
         currentTextSegment.value = "";
@@ -2218,10 +2265,13 @@ export default defineComponent({
         if (!chatId && resultId) {
           if (isActive()) {
             currentChatId.value = resultId;
-            if (pendingAutoNavigation.value) {
-              autoNavigationPreferences.value.set(resultId, true);
-              saveAutoNavigationPreferences();
-            }
+            // Carry the new-chat preference onto the chat id. Persist the actual
+            // value (ON by default) so an explicit user disable is honored.
+            autoNavigationPreferences.value.set(
+              resultId,
+              pendingAutoNavigation.value,
+            );
+            saveAutoNavigationPreferences();
           } else {
             ctxChatId = resultId;
           }
@@ -2537,6 +2587,30 @@ export default defineComponent({
                         pendingToolCalls.value.push(completedToolBlock);
                       }
                       if (isActive()) activeToolCall.value = null;
+                    }
+                    // Flush any tool calls that completed before the assistant
+                    // produced text. With opencode, action-only turns (dashboard/
+                    // alert creation, navigation) finish without any `message`
+                    // event, so these blocks would otherwise stay stranded in
+                    // pendingToolCalls and never render — the user sees progress
+                    // "flash and disappear".
+                    if (pendingToolCalls.value.length) {
+                      let lastMessage = msgs[msgs.length - 1];
+                      if (lastMessage && lastMessage.role === "assistant") {
+                        if (!lastMessage.contentBlocks)
+                          lastMessage.contentBlocks = [];
+                        lastMessage.contentBlocks.push(
+                          ...pendingToolCalls.value,
+                        );
+                      } else {
+                        msgs.push({
+                          role: "assistant",
+                          content: "",
+                          contentBlocks: [...pendingToolCalls.value],
+                        });
+                      }
+                      pendingToolCalls.value = [];
+                      if (isActive()) await throttledSaveCtx(true);
                     }
                     continue;
                   }
@@ -3362,11 +3436,13 @@ export default defineComponent({
         if (!currentChatId.value && chatId) {
           currentChatId.value = chatId;
 
-          // Apply pending auto navigation preference to the new chat
-          if (pendingAutoNavigation.value) {
-            autoNavigationPreferences.value.set(chatId, true);
-            saveAutoNavigationPreferences();
-          }
+          // Apply pending auto navigation preference to the new chat. Persist the
+          // actual value (ON by default) so an explicit user disable is honored.
+          autoNavigationPreferences.value.set(
+            chatId,
+            pendingAutoNavigation.value,
+          );
+          saveAutoNavigationPreferences();
         }
       } catch (error) {
         console.error("Error saving chat history:", error);
@@ -3500,7 +3576,7 @@ export default defineComponent({
       shouldAutoScroll.value = true; // Reset auto-scroll for new chat
       resetTitleState(); // Clear AI-generated title for new chat
       resetTypewriterState(); // Clear typewriter animation state for new chat
-      pendingAutoNavigation.value = false; // Reset auto navigation for new chat
+      pendingAutoNavigation.value = true; // Auto navigation is ON by default for new chats
       showScrollToBottom.value = false; // Reset scroll-to-bottom button for new chat
       store.dispatch("setCurrentChatTimestamp", null);
       store.dispatch("setChatUpdated", true);
@@ -5693,6 +5769,7 @@ export default defineComponent({
       closeImagePreview,
       contextReferences,
       handleReferencesUpdate,
+      t,
     };
   },
 });
@@ -6659,6 +6736,18 @@ export default defineComponent({
   &.dark-mode {
     background: linear-gradient(135deg, #1e2235 0%, #252a3d 100%);
     border: 1px solid #3a3f55;
+  }
+
+  // Completed step shown live during streaming — more compact and subdued
+  // than the active (spinner) indicator so the in-flight step still stands out.
+  &.completed {
+    padding: 8px 16px;
+    margin: 4px 0;
+
+    .tool-call-message {
+      font-weight: 500;
+      opacity: 0.85;
+    }
   }
 
   .tool-call-content {

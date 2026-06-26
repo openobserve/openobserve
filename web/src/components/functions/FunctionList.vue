@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <AppPageHeader
         :title="t('function.header')"
         icon="function"
-        :subtitle="'Reusable VRL functions applied in pipelines'"
+        :subtitle="t('function.subtitle')"
         tabs-below
         class="tw:shrink-0 tw:px-4"
       >
@@ -273,7 +273,7 @@ export default defineComponent({
       {
         id: "name",
         accessorKey: "name",
-        header: t("function.name"),
+        header: t("common.name"),
         sortable: true,
         meta: { align: "left", autoWidth: true },
       },

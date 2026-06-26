@@ -247,7 +247,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           {}
                         "
                         :initialVariableValues="initialVariableValues"
-                        :style="{ marginBottom: '8px' }"
+                        class="panel-variables-margin"
                         data-test="panel-variables-selector"
                       />
                     </div>
@@ -1714,12 +1714,12 @@ export default defineComponent({
 
 .gridBackground {
   background: transparent !important;
-  border-radius: 4px;
-  border-color: #c2c2c27a !important;
+  border-radius: 0.5rem;
+  border-color: var(--color-border-default) !important;
 }
 
 .gridBackground.dark {
-  border-color: rgba(204, 204, 220, 0.12) !important;
+  border-color: var(--color-border-default) !important;
 }
 
 /* Optimized GridStack layout styles for better performance and visual feedback */
@@ -1737,23 +1737,20 @@ export default defineComponent({
 
 .grid-stack-item {
   background: transparent;
+  transition: box-shadow 0.2s ease;
 
   &.dark {
-    border-color: rgba(204, 204, 220, 0.12) !important;
+    border-color: var(--color-border-default) !important;
 
-    /* The visible panel outline lives on the content child; in dark mode pull
-       it onto the design token (clean solid edge) instead of the bright
-       #c2c2c27a gray, which reads too light against the dark canvas. */
     .grid-stack-item-content {
       border-color: var(--color-border-default);
     }
   }
   .grid-stack-item-content {
-    border: 1px solid #c2c2c27a;
-    border-radius: 4px;
+    border: 1px solid var(--color-border-default);
+    border-radius: 0.375rem;
     overflow: visible;
-    border-radius: inherit;
-    // height: 100%;
+    box-shadow: var(--shadow-sm);
   }
 }
 
@@ -1761,6 +1758,10 @@ export default defineComponent({
   height: 100%;
   display: flex;
   flex-direction: column;
+}
+
+.panel-variables-margin {
+  margin-bottom: 0.5rem;
 }
 
 /* GridStack theme overrides */
@@ -1773,7 +1774,8 @@ export default defineComponent({
     &.ui-draggable-dragging {
       opacity: 0.8;
       z-index: 1000;
-      transition: transform 0.15s ease;
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+      box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.15);
     }
 
     &.ui-resizable-resizing {
@@ -1786,11 +1788,11 @@ export default defineComponent({
       &.ui-resizable-se {
         background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'><path d='M8 2 L8 8 L2 8' stroke='%23999999' stroke-width='1.5' fill='none' stroke-linecap='round'/></svg>")
           no-repeat center;
-        background-size: 8px 8px;
-        width: 16px;
-        height: 16px;
-        bottom: 2px;
-        right: 2px;
+        background-size: 0.5rem 0.5rem;
+        width: 1rem;
+        height: 1rem;
+        bottom: 0.125rem;
+        right: 0.125rem;
         cursor: se-resize;
         transform: rotate(0deg) !important;
       }

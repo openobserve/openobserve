@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <AppPageHeader
         :title="t('dashboard.header')"
         icon="dashboard"
-        subtitle="Create, organize, and share dashboards across folders"
+        :subtitle="t('dashboard.subtitle')"
       >
       <template #actions>
         <!-- import dashboard button with dropdown -->
@@ -50,9 +50,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="dashboard-import-custom"
           >
             <div class="tw:flex tw:flex-col">
-              <span>Custom</span>
+              <span>{{ t('dashboard.importCustom') }}</span>
               <span class="tw:text-xs tw:text-dropdown-item-text tw:opacity-60"
-                >Import from JSON file or URL</span
+                >{{ t('dashboard.importCustomDesc') }}</span
               >
             </div>
           </ODropdownItem>
@@ -61,9 +61,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="dashboard-import-templates"
           >
             <div class="tw:flex tw:flex-col">
-              <span>Templates</span>
+              <span>{{ t('dashboard.importTemplates') }}</span>
               <span class="tw:text-xs tw:text-dropdown-item-text tw:opacity-60"
-                >Browse and import from gallery</span
+                >{{ t('dashboard.importTemplatesDesc') }}</span
               >
             </div>
           </ODropdownItem>
@@ -149,15 +149,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           size="xs"
                           icon-left="folder-outline"
                           data-test="dashboard-search-scope-current"
-                          title="Search only this folder"
-                        >This folder</OToggleGroupItem>
+                          :title="t('dashboard.searchThisFolderTitle')"
+                        >{{ t('dashboard.searchThisFolder') }}</OToggleGroupItem>
                         <OToggleGroupItem
                           value="all"
                           size="xs"
                           icon-left="search"
                           data-test="dashboard-search-across-folders-toggle"
-                          title="Search across all folders"
-                        >All folders</OToggleGroupItem>
+                          :title="t('dashboard.searchAllFoldersTitle')"
+                        >{{ t('dashboard.searchAllFolders') }}</OToggleGroupItem>
                       </OToggleGroup>
                     </template>
                   </OInput>
@@ -171,7 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="icon-sm"
                 icon-left="refresh"
                 :loading="loading"
-                title="Reload dashboards"
+                :title="t('dashboard.reloadDashboards')"
                 data-test="dashboard-list-refresh"
                 @click="getDashboards"
               />
@@ -303,7 +303,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @click="moveMultipleDashboards"
                     icon-left="drive-file-move"
                   >
-                    Move
+                    {{ t('common.move') }}
                   </OButton>
                   <OButton
                     variant="outline"
@@ -312,7 +312,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="dashboard-list-export-dashboards-btn"
                     @click="multipleExportDashboard"
                   >
-                    Export
+                    {{ t('common.export') }}
                   </OButton>
                   <OButton
                     variant="outline-destructive"
@@ -321,7 +321,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="dashboard-list-delete-dashboards-btn"
                     @click="openBulkDeleteDialog"
                   >
-                    Delete
+                    {{ t('common.delete') }}
                   </OButton>
                 </div>
               </div>
@@ -390,9 +390,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- delete dashboard dialog -->
           <ConfirmDialog
-            title="Delete dashboard"
+            :title="t('dashboard.deleteDashboardConfirmTitle')"
             data-test="dashboard-confirm-dialog"
-            message="Are you sure you want to delete the dashboard?"
+            :message="t('dashboard.deleteDashboardConfirmMsg')"
             @update:ok="deleteDashboard"
             @update:cancel="confirmDeleteDialog = false"
             v-model="confirmDeleteDialog"
@@ -400,9 +400,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- delete folder dialog -->
           <ConfirmDialog
-            title="Delete Folder"
+            :title="t('dashboard.deleteFolder')"
             data-test="dashboard-confirm-delete-folder-dialog"
-            message="Are you sure you want to delete this Folder?"
+            :message="t('dashboard.deleteFolderMessage')"
             @update:ok="deleteFolder"
             @update:cancel="confirmDeleteFolderDialog = false"
             v-model="confirmDeleteFolderDialog"
@@ -410,9 +410,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- bulk delete dashboards dialog -->
           <ConfirmDialog
-            title="Delete Dashboards"
+            :title="t('dashboard.deleteDashboardsConfirmTitle')"
             data-test="dashboard-confirm-bulk-delete-dialog"
-            :message="`Are you sure you want to delete ${selectedIds.length} dashboard(s)?`"
+            :message="t('dashboard.deleteDashboardsConfirmMsg', { count: selectedIds.length })"
             @update:ok="bulkDeleteDashboards"
             @update:cancel="confirmBulkDelete = false"
             v-model="confirmBulkDelete"

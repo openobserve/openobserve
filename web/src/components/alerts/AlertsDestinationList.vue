@@ -325,7 +325,7 @@ export default defineComponent({
         resizable: true,
         hideable: true,
         size: COL.name,
-        minSize: 160,
+        minSize: 320,
         meta: { align: "left", flex: true },
       },
       {
@@ -335,7 +335,7 @@ export default defineComponent({
         sortable: true,
         resizable: true,
         hideable: true,
-        size: COL.type,
+        size: 170,
         meta: { align: "left" },
       },
       {

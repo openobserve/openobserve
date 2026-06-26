@@ -1138,8 +1138,27 @@ async fn values_v1(
                 if columns.len() < 2 {
                     return MetaHttpResponse::bad_request("Invalid filter format");
                 }
-                let vals = columns[1].split(',').collect::<Vec<_>>().join("','");
-                format!("{default_sql} WHERE {} IN ('{vals}')", columns[0])
+                let col = columns[0];
+                // Validate that the column name exists in the stream schema to
+                // prevent SQL injection via identifier injection.
+                let schema = match infra::schema::get(org_id, stream_name, stream_type).await {
+                    Ok(s) => s,
+                    Err(_) => {
+                        return MetaHttpResponse::bad_request("Failed to load stream schema");
+                    }
+                };
+                if !schema.fields().iter().any(|f| f.name() == col) {
+                    return MetaHttpResponse::bad_request("Unknown filter column");
+                }
+                // Quote the column identifier (DataFusion style: double-quote, doubling any
+                // embedded double-quotes) and escape single-quotes in each value.
+                let quoted_col = format!("\"{}\"", col.replace('"', "\"\""));
+                let vals = columns[1]
+                    .split(',')
+                    .map(|val| val.replace('\'', "''"))
+                    .collect::<Vec<_>>()
+                    .join("','");
+                format!("{default_sql} WHERE {quoted_col} IN ('{vals}')")
             }
         }
     };
