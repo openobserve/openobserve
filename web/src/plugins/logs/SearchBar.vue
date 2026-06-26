@@ -1229,8 +1229,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="tw:py-2"
       />
       <div>
-        <label class="o-input-label tw:text-sm tw:font-semibold tw:leading-tight tw:pr-2 tw:text-[#262626] tw:dark:text-[#e5e5e5]">{{ t("search.fileType") }}</label
-        ><br />
+        <div
+          class="tw:text-sm tw:font-semibold tw:leading-tight tw:pr-2"
+          :class="store.state.theme === 'dark' ? 'tw:text-[#e5e5e5]' : 'tw:text-[#262626]'"
+        >{{ t("search.fileType") }}</div>
         <OButtonGroup
           data-test="custom-download-file-type-button-group"
           class="file-type-button-group tw:mt-1"
