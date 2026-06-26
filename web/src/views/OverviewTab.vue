@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
           <div class="tw:flex-1 tw:min-w-0">
             <div class="tw:text-sm tw:font-medium tw:text-(--o2-text-primary) tw:flex tw:items-center tw:flex-wrap tw:gap-1">
-              <span class="tw:inline-block tw:text-[0.625rem] tw:font-bold tw:py-[0.1rem] tw:px-[0.35rem] tw:rounded-[0.2rem] tw:tracking-[0.04em]" :class="severityBadgeClass(inc.severity)">
+              <span class="tw:inline-block tw:text-[0.625rem] tw:leading-5 tw:font-bold tw:py-[0.1rem] tw:px-[0.35rem] tw:rounded-[0.2rem] tw:tracking-[0.04em]" :class="severityBadgeClass(inc.severity)">
                 {{ (inc.severity || 'P4').toUpperCase() }}
               </span>
               {{ inc.title || t('overview.untitledIncident') }}
