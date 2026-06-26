@@ -135,7 +135,7 @@ jobs:
         # dispatch 403'd on a missing PAT permission, etc.). Only on a human /e2e comment.
         if: github.event_name == 'issue_comment' && success()
         env:
-          GH_TOKEN: ${{ github.token }}   # OSS context → bot can comment on the OSS PR
+          GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}   # PAT only — post as the human, NEVER github-actions[bot]
           PR: ${{ steps.ctx.outputs.pr }}
           DRY: ${{ steps.ctx.outputs.dry }}
         run: |
@@ -150,7 +150,7 @@ jobs:
         # the /e2e commenter would otherwise get NO feedback. Tell them + link the caller run.
         if: github.event_name == 'issue_comment' && failure()
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}   # PAT only — post as the human, NEVER github-actions[bot]
           PR: ${{ steps.ctx.outputs.pr }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
