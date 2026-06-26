@@ -7,7 +7,7 @@
  *   - auto-pick on first search (TC-FTS-001)
  *   - user-added field is additive and stops FTS re-injection (TC-FTS-002)
  *   - FTS default re-resolves on subsequent searches / time-range changes (TC-FTS-003)
- *   - reset clears the FTS default (TC-FTS-004 — fixme, documented feature gap)
+ *   - reset clears the query but preserves the FTS default (TC-FTS-004)
  *   - FTS default is skipped in SQL mode (TC-FTS-005)
  *   - closing the column re-resolves it on the next search (TC-FTS-006)
  *   - FTS default is not injected over user-pinned fields (TC-FTS-007)
