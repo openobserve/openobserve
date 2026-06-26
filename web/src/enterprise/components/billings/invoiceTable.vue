@@ -88,7 +88,7 @@ const columns: OTableColumnDef[] = [
     accessorKey: "amount",
     sortable: true,
     size: COL.price,
-    meta: { align: "left" },
+    meta: { align: "right" },
   },
   {
     id: "paid",
@@ -96,7 +96,7 @@ const columns: OTableColumnDef[] = [
     accessorKey: "paid",
     sortable: true,
     size: COL.price,
-    meta: { align: "left" },
+    meta: { align: "right" },
   },
   {
     id: "start_date",

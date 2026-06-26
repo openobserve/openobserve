@@ -387,7 +387,7 @@ export default defineComponent({
         accessorKey: "created_by",
         sortable: true,
         size: COL.owner,
-        meta: { align: "center" },
+        meta: { align: "left" },
       },
       {
         id: "created_at",

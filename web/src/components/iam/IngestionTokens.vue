@@ -227,7 +227,7 @@ export default defineComponent({
         hideable: true,
         size: COL.name,
         minSize: 160,
-        meta: { cellClass: 'tw:pl-4!', headerClass: 'tw:pl-4!', flex: true },
+        meta: { align: "left", cellClass: 'tw:pl-4!', headerClass: 'tw:pl-4!', flex: true },
       },
       {
         id: "token",
@@ -238,6 +238,7 @@ export default defineComponent({
         hideable: true,
         // Wide enough for the truncated token (code max-w 280) + gap + copy btn.
         size: 340,
+        meta: { align: "left" },
       },
       {
         id: "created_by",
@@ -247,6 +248,7 @@ export default defineComponent({
         resizable: true,
         hideable: true,
         size: COL.owner,
+        meta: { align: "left" },
       },
       {
         id: "actions",
@@ -255,6 +257,7 @@ export default defineComponent({
         sortable: false,
         isAction: true,
         size: 80,
+        meta: { align: "center", actionCount: 1 },
       },
     ];
 

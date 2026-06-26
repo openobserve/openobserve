@@ -219,6 +219,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OTimeCell
                     :value="row.last_triggered_at"
                     unit="iso"
+                    mode="absolute"
                     :timezone="store.state.timezone"
                     empty-label="Never"
                   />
@@ -228,6 +229,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OTimeCell
                     :value="row.last_satisfied_at"
                     unit="iso"
+                    mode="absolute"
                     :timezone="store.state.timezone"
                     empty-label="Never"
                   />
@@ -1011,7 +1013,7 @@ export default defineComponent({
           sortable: true,
           resizable: true,
           hideable: true,
-          size: 120,
+          size: COL.owner,
           meta: { align: "left" },
         },
         // "period" (Look back window) — all tabs except realTime
@@ -1025,8 +1027,8 @@ export default defineComponent({
                 sortable: true,
                 resizable: true,
                 hideable: true,
-                size: COL.frequency,
-                meta: { align: "center" },
+                size: 150,
+                meta: { align: "left" },
               } as OTableColumnDef,
             ]
           : []),
@@ -1054,7 +1056,7 @@ export default defineComponent({
           sortable: true,
           resizable: true,
           hideable: true,
-          size: 160,
+          size: 240,
           meta: { align: "left" },
         },
         {
@@ -1065,7 +1067,7 @@ export default defineComponent({
           sortable: true,
           resizable: true,
           hideable: true,
-          size: 160,
+          size: 240,
           meta: { align: "left" },
         },
         // Anomaly Detection columns — shown on anomalyDetection and all tabs
@@ -1116,7 +1118,7 @@ export default defineComponent({
           resizable: true,
           hideable: true,
           size: COL.folder,
-          meta: { align: "center" },
+          meta: { align: "left" },
         } as OTableColumnDef);
       }
 

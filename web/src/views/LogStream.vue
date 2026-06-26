@@ -128,9 +128,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #cell-name="{ row }">
             <span :data-test="`log-stream-name-cell-${row.name}`" class="tw:text-text-primary">{{ row.name }}</span>
           </template>
-          <template #cell-stream_type="{ row }">
-            <OTag type="streamType" :value="row.stream_type" />
-          </template>
           <template #cell-actions="{ row }">
              <div class="tw:flex tw:items-center actions-container">
               <OButton
@@ -275,7 +272,6 @@ import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 
 import OTable from "@/lib/core/Table/OTable.vue";
-import OTag from "@/lib/core/Badge/OTag.vue";
 import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import PageLayout from "@/components/common/PageLayout.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
@@ -320,7 +316,6 @@ export default defineComponent({
     OSearchInput,
     OCheckbox,
     OTable,
-    OTag,
   },
   emits: [],
   setup(props, { emit }) {
@@ -379,15 +374,6 @@ export default defineComponent({
         meta: { align: "left", flex: true },
       },
       {
-        id: "stream_type",
-        accessorKey: "stream_type",
-        header: t("logStream.type"),
-        size: COL.streamType,
-        resizable: true,
-        hideable: true,
-        meta: { align: "left" },
-      },
-      {
         id: "doc_num",
         accessorFn: (row: any) =>
           row.doc_num?.toLocaleString?.() ?? row.doc_num,
@@ -395,7 +381,7 @@ export default defineComponent({
         sortable: true,
         resizable: true,
         hideable: true,
-        size: COL.count,
+        size: 150,
         meta: { align: "right" },
       },
       {

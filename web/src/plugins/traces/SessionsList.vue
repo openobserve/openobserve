@@ -303,7 +303,7 @@ const tableColumns = computed(() => [
     size: 90,
     sortable: false,
     hideable: true,
-    meta: { align: "center" },
+    meta: { align: "right" },
   },
   {
     id: "durationNanos",
@@ -312,7 +312,7 @@ const tableColumns = computed(() => [
     size: 120,
     sortable: false,
     hideable: true,
-    meta: { align: "center" },
+    meta: { align: "left" },
   },
   {
     id: "tokens",
@@ -321,7 +321,7 @@ const tableColumns = computed(() => [
     size: 250,
     sortable: false,
     hideable: true,
-    meta: { align: "center" },
+    meta: { align: "right" },
   },
   {
     id: "cost",
@@ -330,7 +330,7 @@ const tableColumns = computed(() => [
     size: 100,
     sortable: false,
     hideable: true,
-    meta: { align: "center" },
+    meta: { align: "right" },
   },
   {
     id: "status",
@@ -339,7 +339,7 @@ const tableColumns = computed(() => [
     size: 100,
     sortable: false,
     hideable: true,
-    meta: { align: "center", disableCellAction: true },
+    meta: { align: "left", disableCellAction: true },
   },
 ].map((c: any) => ({
   ...c,

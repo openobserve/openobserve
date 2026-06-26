@@ -565,7 +565,7 @@ const columns = ref([
     accessorKey: "is_realtime",
     sortable: true,
     size: 70,
-    meta: { align: "center" as const },
+    meta: { align: "left" as const },
   },
   {
     id: "is_silenced",
@@ -573,7 +573,7 @@ const columns = ref([
     accessorKey: "is_silenced",
     sortable: true,
     size: 100,
-    meta: { align: "center" as const },
+    meta: { align: "left" as const },
   },
   {
     id: "timestamp",
@@ -621,7 +621,7 @@ const columns = ref([
     accessorKey: "retries",
     sortable: true,
     size: 50,
-    meta: { align: "center" as const },
+    meta: { align: "right" as const },
   },
   {
     id: "is_partial",
@@ -629,7 +629,7 @@ const columns = ref([
     accessorKey: "is_partial",
     sortable: false,
     size: 60,
-    meta: { align: "center" as const },
+    meta: { align: "left" as const },
   },
   {
     id: "delay_in_secs",

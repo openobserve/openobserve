@@ -371,7 +371,7 @@ const tableColumns = [
     accessorKey: "action_play",
     sortable: false,
     size: 56,
-    meta: { align: "center" },
+    meta: { align: "left" },
   },
   {
     id: "timestamp",
@@ -402,7 +402,7 @@ const tableColumns = [
     accessorKey: "error_count",
     sortable: true,
     size: COL.count,
-    meta: { align: "left" },
+    meta: { align: "right" },
   },
   {
     id: "frustration_count",

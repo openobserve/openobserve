@@ -8,6 +8,7 @@ Global checks for every table below:
 - [ ] No raw/empty cells — blanks show `—` (or "Never").
 - [ ] No grey "disabled-looking" text anywhere.
 - [ ] Sorting/filtering still works on the changed columns.
+- [ ] **Column header alignment matches its values**, per the type policy in [`TABLE_HEADER_ALIGNMENT.md`](TABLE_HEADER_ALIGNMENT.md): numbers → right; text/badge/datetime/interval/icon → left; `center` only for select/actions. Header label + sort icon sit on the same side as the values. (See that doc for the per-column audit + UI paths to verify each table.)
 - [ ] Light **and** dark mode both read well.
 
 ---
@@ -18,14 +19,19 @@ Global checks for every table below:
 |---|---|---|
 | `OTag` (typed badge) | `Badge/OTag.vue` | colour/icon/dot resolve per `type`; unknown value → neutral badge |
 | Badge registry | `Badge/badgeGroups.ts` (+ `.spec.ts`) | groups: alertType, alertStatus, incidentStatus, severity, logLevel, pipelineType, streamType, invoiceStatus, evalStatus, queryStatus, serviceStatus, userRole, authType, httpMethod, fieldType, destinationType, enrichmentType, booleanState |
-| `OTimeCell` | `Table/cells/OTimeCell.vue` | relative under 30d, absolute date when older; `mode="absolute"` shows full datetime; hover tooltip; respects timezone |
+| `OTimeCell` | `Table/cells/OTimeCell.vue` | relative under 30d, absolute date when older; `mode="absolute"` shows full datetime; **hover tooltip uses `OTooltip` in child mode (same as the Alerts name cell — manual mouseenter listeners, NOT reka's pointer-based TooltipTrigger which didn't fire for inline cell spans) and shows the COMPLEMENTARY form** — relative cells reveal absolute on hover, absolute cells reveal "x ago"; only one tooltip appears; respects timezone |
 | `ONumberCell` | `Table/cells/ONumberCell.vue` | right-aligned, tabular, formatters (number/bytes/duration/percent) |
 | `ODataBarCell` | `Table/cells/ODataBarCell.vue` | number with magnitude bar **below** it; bar scales to per-page max |
 | `OCodeCell` | `Table/cells/OCodeCell.vue` | monospace + copy-on-hover |
 | `OUserCell` | `Table/cells/OUserCell.vue` | **plain email/name, no avatar, not truncated** (current state) |
 | `statusVariant` | `Table/cells/statusVariant.ts` (+ `.spec.ts`) | generic fallback colour mapping |
+| `OTableHeader` | `Table/sub-components/OTableHeader.vue` | **header text follows `meta.align`** — right/center columns (numbers, sizes, counts) have their header label + sort icon aligned over the values, not stuck left. Applies to **all tables**. |
 
 > Note: `OStatusBadge.vue` was removed and replaced by `OTag`.
+>
+> Note: `OBadge` soft variants restyled — light `-50` fill + matching inset
+> border ring, `rounded-md` (was pill), slightly more padding. Affects every
+> `OTag`/badge app-wide.
 
 ---
 
@@ -33,7 +39,7 @@ Global checks for every table below:
 
 | Page / File | Columns changed | What to verify |
 |---|---|---|
-| **Streams list** — `views/LogStream.vue` | `stream_type` → `OTag streamType` (icon badge); `doc_num`/`storage_size`/`compressed_size`/`index_size` → **plain formatted counts** (data bars removed) | type shows logs/metrics/traces/metadata badge with icon; numbers plain & right-aligned, no bars |
+| **Streams list** — `views/LogStream.vue` | **`stream_type` column removed** (redundant with the Logs/Metrics/Traces/Metadata tab filter); `doc_num`/`storage_size`/`compressed_size`/`index_size` → **plain formatted counts** (data bars removed); **Events (`doc_num`) default width widened to 150px** | no Type column; stream type is conveyed by the active tab filter; numbers plain & right-aligned, no bars; Events column wide enough for large counts without truncation |
 | **Stream schema** — `components/logstream/schema.vue` | field `type` → `OTag fieldType` | string/int/float/bool render as colour-coded type badges |
 
 ---
@@ -42,14 +48,12 @@ Global checks for every table below:
 
 | Page / File | Columns changed | What to verify |
 |---|---|---|
-| **Alerts list** — `components/alerts/AlertList.vue` | timestamps (`last_triggered_at`, `last_satisfied_at`, `last_trained_at`) → `OTimeCell`; `status` → `OTag alertStatus`; `owner` → `OUserCell`; blanks → "Never" | relative times, status dot-badges, failed-status tooltip still works, owner is plain email |
+| **Alerts list** — `components/alerts/AlertList.vue` | timestamps (`last_triggered_at`, `last_satisfied_at`, `last_trained_at`) → `OTimeCell`; **`last_triggered_at` & `last_satisfied_at` → `mode="absolute"` (full datetime shown, relative "x ago" on hover); both widened to 240px**; `status` → `OTag alertStatus`; `owner` → `OUserCell`; **owner column width → `COL.owner` (220px), matching Dashboards**; **`period` (Look back window) width → 150px so the header isn't truncated**; name cell long-name tooltip → `OTooltip`; blanks → "Never" | absolute datetimes for last-triggered/satisfied with relative-on-hover; relative times elsewhere; status dot-badges, failed-status tooltip still works, owner is plain email & not truncated; "Look back window" header fully visible; only one tooltip on hover |
 | **Incident list** — `components/alerts/IncidentList.vue` | `status` → `OTag incidentStatus`; `severity` → dot badge; `last_alert_at` → `OTimeCell` | open/acknowledged/resolved colours; P1–P4 severity colours |
 | **Alert history (full page)** — `components/alerts/AlertHistory.vue` | `timestamp`/`start_time`/`end_time` → `OTimeCell mode="absolute"` | **full datetime**, not relative |
-| **Alert history (drawer)** — `components/alerts/AlertHistoryDrawer.vue` | `timestamp` → full datetime inline | **full datetime**, not "x min ago" |
 | **Alert history summary** — `components/alerts/AlertHistorySummary.vue` | `current_state` → `OTag`; `last_evaluation` → `OTimeCell` (relative) | state badge; last-evaluation relative is intentional |
 | **Destinations** — `components/alerts/AlertsDestinationList.vue` | grey text fix only (type badge already existed) | type/icon unchanged, no grey |
 | **Pipeline destinations** — `components/alerts/PipelinesDestinationList.vue` | `destination_type`/`output_format` → soft badge chips | type/format as chips |
-| **Anomaly detection** — `components/anomaly_detection/AnomalyDetectionList.vue` | timestamps → `OTimeCell`; grey fixes | relative times; status badge (pre-existing) unchanged |
 
 ---
 

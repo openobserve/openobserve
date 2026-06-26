@@ -224,7 +224,7 @@ const columns = computed(() => [
     accessorFn: (row: EvalJob) => (row.scorers || []).length,
     sortable: true,
     size: COL.count,
-    meta: { align: "left" },
+    meta: { align: "right" },
   },
   {
     id: "lastRun",

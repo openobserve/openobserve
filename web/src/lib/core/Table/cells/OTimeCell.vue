@@ -2,9 +2,11 @@
 // Copyright 2026 OpenObserve Inc.
 //
 // OTimeCell — the ONE timestamp renderer for every table (audit §2.1).
-// Default display is relative ("2m ago"); the absolute, timezone-aware
-// timestamp is shown on hover via a native title tooltip (cheap at table
-// scale). Empty/zero values render a muted label instead of a blank cell.
+// Default display is relative ("2m ago"); set mode="absolute" to show the full
+// timezone-aware datetime instead. The hover tooltip (OTooltip, not the native
+// browser title) always shows the COMPLEMENTARY form: relative cells reveal the
+// absolute datetime on hover, absolute cells reveal "x ago". Empty/zero values
+// render a muted label instead of a blank cell.
 //
 //   <OTimeCell :value="row.last_triggered_at" unit="iso" empty-label="Never" />
 //   <OTimeCell :value="row.timestamp" unit="ms" :timezone="store.state.timezone" />
@@ -12,6 +14,7 @@
 import { computed } from "vue";
 import { formatDistanceToNowStrict } from "date-fns";
 import { formatInTimeZone } from "date-fns-tz";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 type TimeUnit = "auto" | "iso" | "s" | "ms" | "us" | "ns";
 
@@ -148,6 +151,19 @@ const display = computed(() => {
   if (props.mode === "date") return dateOnly.value;
   return relative.value;
 });
+
+/**
+ * Hover tooltip shows the *complementary* representation of what's displayed:
+ * relative display → absolute datetime on hover; absolute/date display →
+ * relative ("x ago") on hover. Suppressed when it would duplicate the cell.
+ */
+const tooltip = computed(() => {
+  const text =
+    props.mode === "absolute" || props.mode === "date"
+      ? relative.value
+      : absolute.value;
+  return text && text !== display.value ? text : null;
+});
 </script>
 
 <template>
@@ -155,9 +171,8 @@ const display = computed(() => {
     v-if="display === null"
     class="tw:text-text-primary tw:text-xs"
   >{{ emptyLabel }}</span>
-  <span
-    v-else
-    class="tw:tabular-nums tw:whitespace-nowrap"
-    :title="absolute ?? undefined"
-  >{{ display }}</span>
+  <template v-else>
+    <span class="tw:tabular-nums tw:whitespace-nowrap">{{ display }}</span>
+    <OTooltip v-if="tooltip" :content="tooltip" />
+  </template>
 </template>

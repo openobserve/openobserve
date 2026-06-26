@@ -563,7 +563,7 @@ const columns = ref<OTableColumnDef[]>([
     minSize: 37,
     maxSize: 37,
     cell: " ",
-    meta: { align: "center" },
+    meta: { align: "left" },
   },
   {
     id: "is_silenced",
@@ -574,7 +574,7 @@ const columns = ref<OTableColumnDef[]>([
     minSize: 37,
     maxSize: 37,
     cell: " ",
-    meta: { align: "center" },
+    meta: { align: "left" },
   },
   {
     id: "timestamp",
@@ -633,7 +633,7 @@ const columns = ref<OTableColumnDef[]>([
     sortable: true,
     size: 64,
     maxSize: 64,
-    meta: { align: "center" },
+    meta: { align: "right" },
   },
   {
     id: "dedup",
@@ -642,7 +642,7 @@ const columns = ref<OTableColumnDef[]>([
     size: 80,
     maxSize: 80,
     cell: " ",
-    meta: { align: "center" },
+    meta: { align: "left" },
   },
   {
     id: "actions",

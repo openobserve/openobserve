@@ -115,7 +115,7 @@ const columns: OTableColumnDef[] = [
     accessorKey: "total_evaluations",
     sortable: true,
     size: COL.count,
-    meta: { align: "center" },
+    meta: { align: "right" },
   },
   {
     id: "firing_count",
@@ -123,7 +123,7 @@ const columns: OTableColumnDef[] = [
     accessorKey: "firing_count",
     sortable: true,
     size: COL.count,
-    meta: { align: "center" },
+    meta: { align: "right" },
   },
   {
     id: "current_state",
@@ -131,7 +131,7 @@ const columns: OTableColumnDef[] = [
     accessorKey: "current_state",
     sortable: true,
     size: COL.status,
-    meta: { align: "center" },
+    meta: { align: "left" },
   },
   {
     id: "frequency",
@@ -139,7 +139,7 @@ const columns: OTableColumnDef[] = [
     accessorKey: "frequency",
     sortable: true,
     size: COL.frequency,
-    meta: { align: "center" },
+    meta: { align: "left" },
   },
   {
     id: "last_evaluation",
@@ -147,7 +147,7 @@ const columns: OTableColumnDef[] = [
     accessorKey: "last_evaluation",
     sortable: true,
     size: COL.date,
-    meta: { align: "center" },
+    meta: { align: "left" },
   },
 ];
 
