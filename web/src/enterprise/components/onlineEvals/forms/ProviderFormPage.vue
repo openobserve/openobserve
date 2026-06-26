@@ -1,5 +1,11 @@
 <template>
-  <form class="provider-form" @submit.prevent="save">
+  <OForm
+    class="provider-form"
+    :schema="providerFormSchema"
+    :default-values="providerFormDefaults"
+    @submit="save"
+    v-slot="{ isSubmitting }"
+  >
     <div class="provider-form__top">
       <OButton
         variant="outline"
@@ -7,6 +13,7 @@
         icon-left="arrow-back-ios-new"
         data-test="provider-form-back-btn"
         :title="t('onlineEvals.provider.backTo')"
+        :disabled="isSubmitting"
         @click="$emit('cancel')"
       />
       <h1 class="provider-form__title">
@@ -23,6 +30,7 @@
         class="provider-form__close"
         :aria-label="t('onlineEvals.buttons.cancel')"
         data-test="provider-form-close-btn"
+        :disabled="isSubmitting"
         @click="$emit('cancel')"
       >
         <svg
@@ -56,8 +64,8 @@
               <span class="provider-field__req">*</span>
               <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="provider-field__lock" />
             </label>
-            <OInput
-              v-model.trim="form.name"
+            <OFormInput
+              name="name"
               :placeholder="t('onlineEvals.provider.namePlaceholder')"
               size="sm"
               :disabled="mode === 'edit'"
@@ -74,8 +82,8 @@
               <span class="provider-field__req">*</span>
               <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="provider-field__lock" />
             </label>
-            <OSelect
-              v-model="form.providerType"
+            <OFormSelect
+              name="providerType"
               :options="providerTypeOptions"
               size="md"
               :disabled="mode === 'edit'"
@@ -86,8 +94,8 @@
 
         <div class="provider-field">
           <label class="provider-field__label">{{ t("onlineEvals.provider.endpointLabel") }}</label>
-          <OInput
-            v-model.trim="form.endpoint"
+          <OFormInput
+            name="endpoint"
             :placeholder="t('onlineEvals.provider.endpointPlaceholder')"
             size="sm"
             data-test="provider-form-endpoint-input"
@@ -100,8 +108,8 @@
               {{ t("onlineEvals.provider.defaultModelLabel") }}
               <span class="provider-field__req">*</span>
             </label>
-            <OInput
-              v-model.trim="form.defaultModel"
+            <OFormInput
+              name="defaultModel"
               :placeholder="t('onlineEvals.provider.defaultModelPlaceholder')"
               size="sm"
               data-test="provider-form-default-model-input"
@@ -110,8 +118,8 @@
 
           <div class="provider-field">
             <label class="provider-field__label">{{ t("onlineEvals.provider.availableModelsLabel") }}</label>
-            <OInput
-              v-model.trim="form.availableModels"
+            <OFormInput
+              name="availableModels"
               :placeholder="t('onlineEvals.provider.availableModelsPlaceholder')"
               size="sm"
               data-test="provider-form-available-models-input"
@@ -138,8 +146,8 @@
             {{ t("onlineEvals.provider.apiKeyLabel") }}
             <span v-if="mode === 'create'" class="provider-field__req">*</span>
           </label>
-          <OInput
-            v-model.trim="form.apiKey"
+          <OFormInput
+            name="apiKey"
             type="password"
             size="sm"
             :placeholder="t('onlineEvals.provider.apiKeyPlaceholder')"
@@ -156,6 +164,7 @@
         type="button"
         variant="outline"
         size="sm-action"
+        :disabled="isSubmitting"
         @click="$emit('cancel')"
       >
         {{ t("onlineEvals.buttons.cancel") }}
@@ -165,30 +174,34 @@
         type="submit"
         variant="primary"
         size="sm-action"
-        :loading="isSaving"
+        :loading="isSubmitting"
       >
         {{ mode === "create" ? t("onlineEvals.buttons.create") : t("onlineEvals.buttons.save") }}
       </OButton>
     </footer>
-  </form>
+  </OForm>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import onlineEvalsService, { type Provider } from "@/services/online-evals.service";
 import {
   availableModelsOf,
-  booleanOf,
   defaultModelOf,
   providerTypeOf,
 } from "../utils/evalEntity";
 import { showError, splitCsv } from "../utils/evalFormat";
+import {
+  makeProviderFormSchema,
+  type ProviderForm,
+} from "./ProviderFormPage.schema";
 
 const props = defineProps<{
   orgId: string;
@@ -202,8 +215,16 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18n();
-const form = ref(initForm(props.row));
-const isSaving = ref(false);
+
+// Co-located Zod schema (factory keeps messages i18n-driven and branches the
+// apiKey-required rule on create-vs-edit `mode`). The form is mounted fresh for
+// each create/edit action, so capturing `props.mode` once is safe.
+const providerFormSchema = makeProviderFormSchema(t, props.mode);
+
+// DYNAMIC (edit-prefill) defaults → typed component computed (can't live in the
+// pure schema file). Seeds OForm once at mount: blank for create, the existing
+// record for edit (auth is write-only → apiKey always seeds blank).
+const providerFormDefaults = computed((): ProviderForm => initForm(props.row));
 
 const providerTypeOptions = computed(() => [
   { label: "OpenAI", value: "openai" },
@@ -215,7 +236,7 @@ const providerTypeOptions = computed(() => [
   { label: "Other", value: "other" },
 ]);
 
-function initForm(row: Provider | null) {
+function initForm(row: Provider | null): ProviderForm {
   if (!row) {
     return {
       name: "",
@@ -239,20 +260,24 @@ function initForm(row: Provider | null) {
   };
 }
 
-async function save() {
+// @submit handler — OForm only calls this once the whole schema passes, so the
+// schema (not a manual guard) gates the save. `value` carries the RAW field
+// values (the schema validates but does not transform), so trim/split here just
+// as the old `v-model.trim` did. OForm awaits this promise → the Save button
+// spinner spans the whole save (no manual `isSaving` ref).
+async function save(value: ProviderForm) {
   if (!props.orgId) return;
-  isSaving.value = true;
   try {
     const payload = {
-      name: form.value.name,
-      providerType: form.value.providerType,
-      endpoint: form.value.endpoint || null,
-      defaultModel: form.value.defaultModel,
-      availableModels: splitCsv(form.value.availableModels),
+      name: value.name.trim(),
+      providerType: value.providerType,
+      endpoint: value.endpoint.trim() || null,
+      defaultModel: value.defaultModel.trim(),
+      availableModels: splitCsv(value.availableModels),
       // Backend expects an authConfig object; the form only collects an
       // API key, which is the only auth secret the supported providers
       // need today. Wrap it as { api_key: <value> }.
-      authConfig: { api_key: form.value.apiKey },
+      authConfig: { api_key: value.apiKey },
       // `isDefault` is no longer surfaced in the form. Always send false;
       // backend defaults to non-default and the user manages default-ness
       // (if ever needed) outside this create/edit flow.
@@ -271,8 +296,6 @@ async function save() {
     emit("saved");
   } catch (err: any) {
     showError(err, t("onlineEvals.provider.saveError"));
-  } finally {
-    isSaving.value = false;
   }
 }
 </script>
