@@ -937,6 +937,11 @@ export class LogsPage {
                     await popoverSearch.fill(stream).catch(() => {});
                 }
 
+                // Wait for the virtualized list to filter and re-render the option row.
+                // Without this, isVisible often fails because the Vue virtualizer
+                // has not yet rendered the matching option into the DOM.
+                await option.first().waitFor({ state: 'attached', timeout: 5000 }).catch(() => {});
+
                 testLogger.debug(`selectStream: Looking for option [data-test="log-search-index-list-select-stream-option"][data-test-value="${stream}"]`);
                 const visible = await option
                     .first()
@@ -5133,6 +5138,20 @@ export class LogsPage {
         return await btn.click({ force: true });
     }
 
+    /**
+     * Click the field-list reset icon (FieldListPagination "Clear" button).
+     * Clears selectedFields and sets isFtsDefaultColumn to false, used by
+     * FTS default-column tests to verify re-resolution after a reset.
+     * @returns {Promise<void>}
+     */
+    async clickFieldListResetIcon() {
+        const btn = this.page.locator(this.fieldListResetIcon).first();
+        await expect(btn).toBeVisible({ timeout: 5000 });
+        await btn.click();
+        // Wait for the field sidebar to settle after reset trims selectedFields.
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    }
+
     async expectTimestampFieldVisible() {
         // Post-OFieldList migration: data-test="logs-field-list-item-_timestamp"
         // Clear any active field-search filter and switch back to All Fields view —
@@ -5229,6 +5248,51 @@ export class LogsPage {
         return await expect(
             this.page.locator(`[data-test="log-search-result-table-th-${fieldName}"]`),
         ).toHaveCount(0);
+    }
+
+    /**
+     * Resolve which FTS default column is currently rendered in the results table.
+     * Both `message` and `log` are valid FTS candidates (`message` has the higher
+     * FTS priority). Waits for *either* header to appear and returns whichever is
+     * present — this replaces the "wait the full timeout on `message`, then fall
+     * back to `log`" try/catch pattern, which cost ~10-15s on every call whenever
+     * `log` was the active field.
+     * @param {number} timeout - Max ms to wait for an FTS header to appear.
+     * @returns {Promise<'message'|'log'>} The FTS field currently in the header.
+     */
+    async resolveFtsDefaultField(timeout = 15000) {
+        const message = this.page.locator('[data-test="log-search-result-table-th-message"]');
+        const log = this.page.locator('[data-test="log-search-result-table-th-log"]');
+        await expect(message.or(log).first()).toBeVisible({ timeout });
+        return (await message.isVisible().catch(() => false)) ? 'message' : 'log';
+    }
+
+    /**
+     * Close a column by clicking the X (close) button on its header.
+     * Used by FTS default-column tests to verify that closing the auto-picked
+     * column triggers re-resolution on the next search.
+     *
+     * The close button has a CSS `invisible` class and only appears on
+     * column-header hover, so we hover the header to reveal it, then click it
+     * normally — keeping Playwright's actionability checks (a `force` click would
+     * skip them and mask a regression that makes the button non-interactable).
+     * @param {string} fieldName - The field/column name to close (e.g. 'message')
+     * @returns {Promise<void>}
+     */
+    async clickCloseColumnButton(fieldName) {
+        const header = this.page.locator(
+            `[data-test="log-search-result-table-th-${fieldName}"]`,
+        );
+        const closeBtn = this.page.locator(
+            `[data-test="logs-search-result-table-th-remove-${fieldName}-btn"]`,
+        );
+        // Hover the column header to reveal its hover-gated X, then click normally
+        // so the actionability check still runs (no force).
+        await header.hover();
+        await expect(closeBtn).toBeVisible({ timeout: 5000 });
+        await closeBtn.click();
+        // Wait for the column to disappear from the DOM header row
+        await expect(header).toHaveCount(0, { timeout: 10000 });
     }
 
     // New POM methods for PR tests
