@@ -126,8 +126,10 @@ export class ReportFoldersPage {
 
   async clickDeleteFolder(folderName) {
     await this.clickMoreIcon(folderName);
-    await this.page.locator(this.deleteFolderIcon).click({ force: true });
-    await expect(this.page.locator(this.confirmDeleteDialog)).toBeVisible({ timeout: 5000 });
+    const deleteBtn = this.page.locator(this.deleteFolderIcon);
+    await deleteBtn.waitFor({ state: 'visible', timeout: 5000 });
+    await deleteBtn.click();
+    await expect(this.page.locator(this.confirmDeleteDialog)).toBeVisible({ timeout: 10000 });
   }
 
   async confirmDelete() {
@@ -180,11 +182,14 @@ export class ReportFoldersPage {
   async clickMove() {
     await this.page.locator(this.moveSubmitBtn).click();
     await this.page.locator(this.moveDialogHeader).waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
+    // Wait for Quasar dialog backdrop close animation before interacting with the page
+    await this.page.locator('.q-dialog__backdrop').waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
   }
 
   async cancelMove() {
     await this.page.locator(this.moveCancelBtn).first().click();
     await this.page.locator(this.moveDialogHeader).waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+    await this.page.locator('.q-dialog__backdrop').waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
   }
 
   async expectDefaultFolderExists() {
