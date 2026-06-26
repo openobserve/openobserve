@@ -29,8 +29,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OIcon :name="icon" size="md" />
     </span>
     <span class="es-ing-card__body tw:flex-1 tw:min-w-0 tw:flex tw:flex-col tw:gap-0.5">
-      <span class="tw:text-sm tw:font-semibold tw:text-text-primary tw:truncate">{{ label }}</span>
-      <span v-if="sublabel" class="tw:text-xs tw:text-text-secondary tw:leading-snug">{{ sublabel }}</span>
+      <span class="tw:text-[length:var(--text-sm)] tw:font-semibold tw:text-text-primary tw:truncate">{{ label }}</span>
+      <span v-if="sublabel" class="tw:text-[length:var(--text-xs)] tw:text-text-secondary tw:leading-[1.4]">{{ sublabel }}</span>
     </span>
     <OIcon name="chevron-right" size="sm" class="es-ing-card__chevron tw:shrink-0 tw:text-text-disabled tw:transition-[transform,color] tw:duration-150" />
   </button>

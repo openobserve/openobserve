@@ -1529,12 +1529,14 @@ label:not(.o-input-label) {
   font-weight: var(--font-normal);
 }
 
-code {
-  font-family: var(--font-mono);
-  font-size: var(--text-sm);
-  color: var(--o2-text-code);
-  font-feature-settings: "tnum";
-  letter-spacing: -0.2px;
+@layer base {
+  code {
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    color: var(--o2-text-code);
+    font-feature-settings: "tnum";
+    letter-spacing: -0.2px;
+  }
 }
 
 ::placeholder {
