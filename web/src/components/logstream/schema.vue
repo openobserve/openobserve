@@ -2731,7 +2731,7 @@ export default defineComponent({
 
 .indexDetailsContainer .o2-schema-table thead tr {
   height: 2.5rem;
-  background: var(--o2-table-header-bg) !important;
+  background: var(--color-table-header-bg) !important;
 }
 
 .indexDetailsContainer .o2-schema-table thead tr th {
