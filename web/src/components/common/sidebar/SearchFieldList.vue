@@ -315,14 +315,16 @@ function walkFilters(
           }
         }
       } else if (op === "IS") {
+        // IS NULL maps to the synthetic "null" key used by the value list so
+        // the null row's checkbox round-trips (matches value.key === "null").
         if (node.left?.type === "column_ref") {
           const col = extractColName(node.left.column);
-          if (col) push(include, col, "");
+          if (col) push(include, col, "null");
         }
       } else if (op === "IS NOT") {
         if (node.left?.type === "column_ref") {
           const col = extractColName(node.left.column);
-          if (col) push(exclude, col, "");
+          if (col) push(exclude, col, "null");
         }
       }
     };
