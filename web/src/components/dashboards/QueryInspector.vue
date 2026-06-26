@@ -415,7 +415,7 @@ export default defineComponent({
   background: rgba(128, 128, 128, 0.4);
 }
 
-mark {
+.inspector-query-editor mark {
   all: unset;
   background-color: #facc15;
   color: black;
@@ -424,7 +424,7 @@ mark {
 }
 
 /* Ensure Monaco colorized content looks good */
-.mtk1 {
+.inspector-query-editor .mtk1 {
   color: inherit;
 }
 </style>
