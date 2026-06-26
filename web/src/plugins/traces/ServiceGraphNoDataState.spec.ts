@@ -14,42 +14,21 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
-import { reactive } from "vue";
+import { mount, VueWrapper } from "@vue/test-utils";
 import i18n from "@/locales";
 
-// ---------------------------------------------------------------------------
-// Shared reactive mock — mutated per test to drive computed properties
-// ---------------------------------------------------------------------------
-const mockSearchObj = reactive({
-  data: {
-    datetime: {
-      type: "relative" as string,
-      relativeTimePeriod: "15m" as string,
-    },
-  },
-});
-
-// vi.mock() is hoisted — must be declared before the component import
-vi.mock("@/composables/useTraces", () => ({
-  default: () => ({ searchObj: mockSearchObj }),
-}));
+// No composable dependency — the component is now a pure wrapper.
+// No vi.mock() calls needed.
 
 import ServiceGraphNoDataState from "./ServiceGraphNoDataState.vue";
 
 // ---------------------------------------------------------------------------
-// Stubs
+// Stub OEmptyState — captures the props passed to it so tests can assert them.
 // ---------------------------------------------------------------------------
 const OEmptyStateStub = {
-  template: "<div><slot name=\"actions\" /></div>",
-};
-
-const EmptyStateActionCardStub = {
-  template:
-    "<button @click=\"$emit('click')\" :data-test=\"$attrs['data-test']\" />",
-  inheritAttrs: false,
-  emits: ["click"],
-  props: ["icon", "label", "sublabel"],
+  name: "OEmptyState",
+  template: '<div data-test="o-empty-state" />',
+  props: ["preset", "size", "hideAction"],
 };
 
 // ---------------------------------------------------------------------------
@@ -61,7 +40,6 @@ function mountComponent() {
       plugins: [i18n],
       stubs: {
         OEmptyState: OEmptyStateStub,
-        EmptyStateActionCard: EmptyStateActionCardStub,
       },
     },
   });
@@ -74,9 +52,6 @@ describe("ServiceGraphNoDataState", () => {
   let wrapper: VueWrapper;
 
   beforeEach(() => {
-    // Reset to relative mode with 15m so each test starts from a known state
-    mockSearchObj.data.datetime.type = "relative";
-    mockSearchObj.data.datetime.relativeTimePeriod = "15m";
     wrapper = mountComponent();
   });
 
@@ -85,148 +60,33 @@ describe("ServiceGraphNoDataState", () => {
     vi.clearAllMocks();
   });
 
-  // -------------------------------------------------------------------------
-  // Rendering
-  // -------------------------------------------------------------------------
   describe("rendering", () => {
-    it("should mount without errors", () => {
+    it("mounts without errors", () => {
       expect(wrapper.exists()).toBe(true);
     });
 
-    it("should render the expand-range action card", () => {
-      const card = wrapper.find(
-        '[data-test="service-graph-empty-expand-range-card"]',
-      );
-      expect(card.exists()).toBe(true);
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // Sublabel — relative mode
-  // -------------------------------------------------------------------------
-  describe("expandRangeSublabel — relative mode", () => {
-    it('should show "Past 15 Minutes → Past 1 Day" for relativeTimePeriod "15m"', async () => {
-      // 15m = 15 mins ≤ 60 → nextWiderPeriod = "1d"
-      mockSearchObj.data.datetime.relativeTimePeriod = "15m";
-      await flushPromises();
-
-      expect(wrapper.vm.expandRangeSublabel).toBe(
-        "Past 15 Minutes → Past 1 Day",
-      );
+    it("renders the OEmptyState component", () => {
+      expect(wrapper.find('[data-test="o-empty-state"]').exists()).toBe(true);
     });
 
-    it('should show "Past 1 Day → Past 7 Days" for relativeTimePeriod "1d"', async () => {
-      // 1d = 1440 mins ≤ 1440 → nextWiderPeriod = "7d"
-      mockSearchObj.data.datetime.relativeTimePeriod = "1d";
-      await flushPromises();
-
-      expect(wrapper.vm.expandRangeSublabel).toBe("Past 1 Day → Past 7 Days");
+    it("passes preset='no-service-graph' to OEmptyState", () => {
+      const stub = wrapper.findComponent({ name: "OEmptyState" });
+      expect(stub.props("preset")).toBe("no-service-graph");
     });
 
-    it('should show "Past 7 Days → Past 30 Days" for relativeTimePeriod "7d"', async () => {
-      // 7d = 10080 mins > 1440 → nextWiderPeriod = "30d"
-      mockSearchObj.data.datetime.relativeTimePeriod = "7d";
-      await flushPromises();
-
-      expect(wrapper.vm.expandRangeSublabel).toBe(
-        "Past 7 Days → Past 30 Days",
-      );
+    it("passes size='block' to OEmptyState", () => {
+      const stub = wrapper.findComponent({ name: "OEmptyState" });
+      expect(stub.props("size")).toBe("block");
     });
 
-    it('should use singular form "Past 1 Day" not "Past 1 Days" for value 1', async () => {
-      mockSearchObj.data.datetime.relativeTimePeriod = "1d";
-      await flushPromises();
-
-      expect(wrapper.vm.expandRangeSublabel).toContain("Past 1 Day");
-      expect(wrapper.vm.expandRangeSublabel).not.toContain("Past 1 Days");
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // Sublabel — absolute mode
-  // -------------------------------------------------------------------------
-  describe("expandRangeSublabel — absolute mode", () => {
-    it("should show the i18n expandRangeDescAbsolute message when type is absolute", async () => {
-      mockSearchObj.data.datetime.type = "absolute";
-      mockSearchObj.data.datetime.relativeTimePeriod = "";
-      await flushPromises();
-
-      // The component falls back to t("traces.noEvents.expandRangeDescAbsolute")
-      expect(wrapper.vm.expandRangeSublabel).toBe(
-        "Switch to a wider relative time range",
-      );
+    it("passes hide-action=true to OEmptyState so no action card is rendered", () => {
+      const stub = wrapper.findComponent({ name: "OEmptyState" });
+      // hideAction (camelCase) corresponds to hide-action prop binding
+      expect(stub.props("hideAction")).toBe(true);
     });
 
-    it("should show the i18n expandRangeDescAbsolute message when relativeTimePeriod is empty", async () => {
-      mockSearchObj.data.datetime.type = "relative";
-      mockSearchObj.data.datetime.relativeTimePeriod = "";
-      await flushPromises();
-
-      expect(wrapper.vm.expandRangeSublabel).toBe(
-        "Switch to a wider relative time range",
-      );
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // Emit — widen-range
-  // -------------------------------------------------------------------------
-  describe('emit "widen-range"', () => {
-    it('should emit "widen-range" with "1d" when card is clicked and period is "15m"', async () => {
-      // 15m ≤ 60 mins → suggestedPeriod = "1d"
-      mockSearchObj.data.datetime.relativeTimePeriod = "15m";
-      await flushPromises();
-
-      const card = wrapper.find(
-        '[data-test="service-graph-empty-expand-range-card"]',
-      );
-      expect(card.exists()).toBe(true);
-      await card.trigger("click");
-
-      expect(wrapper.emitted("widen-range")).toBeTruthy();
-      expect(wrapper.emitted("widen-range")![0]).toEqual(["1d"]);
-    });
-
-    it('should emit "widen-range" with "7d" when type is absolute', async () => {
-      // absolute mode → suggestedPeriod falls back to "7d"
-      mockSearchObj.data.datetime.type = "absolute";
-      mockSearchObj.data.datetime.relativeTimePeriod = "";
-      await flushPromises();
-
-      const card = wrapper.find(
-        '[data-test="service-graph-empty-expand-range-card"]',
-      );
-      expect(card.exists()).toBe(true);
-      await card.trigger("click");
-
-      expect(wrapper.emitted("widen-range")).toBeTruthy();
-      expect(wrapper.emitted("widen-range")![0]).toEqual(["7d"]);
-    });
-
-    it('should emit "widen-range" with "7d" when period is "1d"', async () => {
-      // 1d = 1440 mins ≤ 1440 → suggestedPeriod = "7d"
-      mockSearchObj.data.datetime.relativeTimePeriod = "1d";
-      await flushPromises();
-
-      const card = wrapper.find(
-        '[data-test="service-graph-empty-expand-range-card"]',
-      );
-      await card.trigger("click");
-
-      expect(wrapper.emitted("widen-range")![0]).toEqual(["7d"]);
-    });
-
-    it('should emit "widen-range" with "30d" when period is "7d"', async () => {
-      // 7d = 10080 mins > 1440 → suggestedPeriod = "30d"
-      mockSearchObj.data.datetime.relativeTimePeriod = "7d";
-      await flushPromises();
-
-      const card = wrapper.find(
-        '[data-test="service-graph-empty-expand-range-card"]',
-      );
-      await card.trigger("click");
-
-      expect(wrapper.emitted("widen-range")![0]).toEqual(["30d"]);
+    it("does not emit widen-range (feature removed)", () => {
+      expect(wrapper.emitted("widen-range")).toBeUndefined();
     });
   });
 });
