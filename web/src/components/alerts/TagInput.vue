@@ -34,7 +34,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`tag-chip-${index}`"
           variant="default"
           size="sm"
-          class="tag-chip tw:m-0! tw:shrink-0 tw:grow-0 tw:basis-auto tw:bg-[color-mix(in_srgb,var(--o2-primary-btn-bg)_20%,white_10%)]"
+          class="tag-chip tw:m-0! tw:shrink-0 tw:grow-0 tw:basis-auto"
+          style="background-color: color-mix(in srgb, var(--o2-primary-btn-bg) 20%, white 10%)"
         >
           {{ tag }}
           <template #trailing>
