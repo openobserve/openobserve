@@ -35,15 +35,16 @@ describe("useSyntheticResults", () => {
       .mockResolvedValueOnce([
         { total_runs: 100, passed_runs: 99, failed_runs: 1, p95_duration: 2940 },
       ])
-      .mockResolvedValueOnce([{ status: "passed", ts: 1_700_000_000_000_000 }])
+      .mockResolvedValueOnce([{ status: "up", ts: 1_700_000_000_000_000 }])
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([
         {
           ts: 1_700_000_000_000_000,
-          status: "failed",
+          status: "down",
           duration: 1760,
           location: "us-east-1",
-          trigger: "Manual",
+          device: "desktop",
+          error: "Timeout",
         },
       ]);
 

@@ -6462,7 +6462,7 @@
       "started": "Started",
       "duration": "Duration",
       "location": "Location",
-      "trigger": "Trigger",
+      "device": "Device",
       "passed": "Passed",
       "failed": "Failed"
     },

@@ -59,7 +59,13 @@ describe("syntheticResultsSchema query builders", () => {
     const sql = buildRunsSql("mon-1", 50);
     expect(sql).toContain("LIMIT 50");
     expect(sql).toContain(`${SYNTHETIC_FIELDS.location} as location`);
-    expect(sql).toContain(`${SYNTHETIC_FIELDS.trigger} as trigger`);
+    expect(sql).toContain(`${SYNTHETIC_FIELDS.device} as device`);
+    expect(sql).toContain(`${SYNTHETIC_FIELDS.error} as error`);
+  });
+
+  it("should target the configured stream name", () => {
+    expect(SYNTHETIC_RESULTS_STREAM).toBe("synthetics_results");
+    expect(SYNTHETIC_FIELDS.duration).toBe("response_time_ms");
   });
 
   it("should escape single quotes in the monitor id to prevent injection", () => {
@@ -85,7 +91,7 @@ describe("mapKpi", () => {
         failed_runs: 1,
         p95_duration: 2940,
       },
-      { status: "passed", ts: 1_700_000_000_000_000 },
+      { status: "up", ts: 1_700_000_000_000_000 },
     );
     expect(kpi.totalRuns).toBe(288);
     expect(kpi.failedRuns).toBe(1);
@@ -117,20 +123,23 @@ describe("mapRun", () => {
   it("should map a raw hit to the typed run model and normalise status", () => {
     const run = mapRun({
       ts: 1_700_000_000_000_000,
-      status: "failed",
+      status: "down",
       duration: 1760,
       location: "ap-southeast-1",
-      trigger: "Scheduled",
+      device: "desktop",
+      error: "Timeout waiting for selector",
     });
     expect(run.timestamp).toBe(1_700_000_000_000);
     expect(run.status).toBe("failed");
     expect(run.durationMs).toBe(1760);
     expect(run.location).toBe("ap-southeast-1");
-    expect(run.trigger).toBe("Scheduled");
+    expect(run.device).toBe("desktop");
+    expect(run.error).toBe("Timeout waiting for selector");
   });
 
-  it("should default any non-failed status to passed", () => {
-    expect(mapRun({ status: "passed" }).status).toBe("passed");
+  it("should map raw 'down' to failed and anything else to passed", () => {
+    expect(mapRun({ status: "up" }).status).toBe("passed");
+    expect(mapRun({ status: "down" }).status).toBe("failed");
     expect(mapRun({ status: "weird" }).status).toBe("passed");
   });
 });

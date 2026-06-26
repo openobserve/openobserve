@@ -29,18 +29,25 @@
 
 // ── Stream + field config (the single source of truth) ───────────────────
 
-export const SYNTHETIC_RESULTS_STREAM = "synthetic_monitor_results";
+export const SYNTHETIC_RESULTS_STREAM = "synthetics_results";
 
 export const SYNTHETIC_FIELDS = {
   monitorId: "monitor_id",
-  status: "status", // values compared against STATUS_VALUES below
+  status: "status", // raw values mapped via STATUS_VALUES below
   timestamp: "_timestamp", // microseconds (OpenObserve convention)
-  duration: "duration", // milliseconds
+  duration: "response_time_ms", // milliseconds
   location: "location",
-  trigger: "trigger",
+  device: "device",
+  error: "error",
 } as const;
 
-export const STATUS_VALUES = { passed: "passed", failed: "failed" } as const;
+/**
+ * Maps the semantic pass/fail notion onto the raw `status` stream values.
+ * The stream stores `"up"` (run passed) / `"down"` (run failed); the typed
+ * UI model exposes `"passed"` / `"failed"`. Change the right-hand values here
+ * if the stream encoding ever changes.
+ */
+export const STATUS_VALUES = { passed: "up", failed: "down" } as const;
 
 // ── Typed UI models (stable regardless of stream schema) ─────────────────
 
@@ -67,7 +74,9 @@ export interface SyntheticRun {
   status: RunStatus;
   durationMs: number;
   location: string;
-  trigger: string;
+  device: string;
+  /** Failure reason for `down` runs (empty for passing runs). */
+  error: string;
 }
 
 export interface SyntheticBucket {
@@ -101,11 +110,9 @@ function str(value: unknown): string {
   return value == null ? "" : String(value);
 }
 
-/** Map a raw status field value onto the typed RunStatus. */
+/** Map a raw status field value onto the typed (semantic) RunStatus. */
 function toRunStatus(raw: unknown): RunStatus {
-  return str(raw) === STATUS_VALUES.failed
-    ? STATUS_VALUES.failed
-    : STATUS_VALUES.passed;
+  return str(raw) === STATUS_VALUES.failed ? "failed" : "passed";
 }
 
 /**
@@ -194,7 +201,7 @@ ORDER BY ts`;
 /** Most-recent runs for the Runs table. */
 export function buildRunsSql(monitorId: string, limit: number): string {
   const id = escapeSqlLiteral(monitorId);
-  return `SELECT ${F.timestamp} as ts, ${F.status} as status, ${F.duration} as duration, ${F.location} as location, ${F.trigger} as trigger
+  return `SELECT ${F.timestamp} as ts, ${F.status} as status, ${F.duration} as duration, ${F.location} as location, ${F.device} as device, ${F.error} as error
 FROM ${TABLE}
 WHERE ${F.monitorId} = '${id}'
 ORDER BY ${F.timestamp} DESC
@@ -229,7 +236,8 @@ export function mapRun(rawHit: Record<string, unknown>): SyntheticRun {
     status: toRunStatus(rawHit.status),
     durationMs: num(rawHit.duration),
     location: str(rawHit.location),
-    trigger: str(rawHit.trigger),
+    device: str(rawHit.device),
+    error: str(rawHit.error),
   };
 }
 

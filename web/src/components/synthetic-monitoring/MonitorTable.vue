@@ -1,12 +1,14 @@
 // Copyright 2026 OpenObserve Inc.
 <template>
   <OTable
+    v-model:selected-ids="localSelectedIds"
     :columns="columns"
     :data="data"
     pagination="client"
     :page-size="20"
     :page-size-options="[10, 20, 25, 50]"
     row-key="id"
+    selection="multiple"
     :show-global-filter="false"
     :enable-column-resize="true"
     :footer-title="footerTitle"
@@ -42,6 +44,11 @@
     <!-- Assertions count (API mode) -->
     <template #cell-assertions="{ row }">
       <span class="tw:text-secondary">{{ (row as any).assertions }} checks</span>
+    </template>
+
+    <!-- Folder name (cross-folder search mode) -->
+    <template #cell-folder_name="{ row }">
+      <span class="tw:text-sm">{{ (row as any).folder_name ?? '—' }}</span>
     </template>
 
     <!-- Type badge (monitors mode) -->
@@ -183,6 +190,33 @@
         </ODropdown>
       </div>
     </template>
+
+    <!-- Footer with count + bulk action buttons -->
+    <template #bottom>
+      <div class="tw:flex tw:items-center tw:gap-2 tw:px-4 tw:py-2">
+        <span class="tw:text-sm tw:text-secondary">{{ data.length }} {{ footerTitle }}</span>
+        <template v-if="localSelectedIds.length > 0">
+          <OButton
+            variant="outline"
+            size="sm"
+            :data-test="`${dataTest}-move-selected-btn`"
+            @click="emit('move-selected')"
+          >
+            <OIcon name="drive-file-move" size="sm" />
+            <span class="tw:ml-1">Move</span>
+          </OButton>
+          <OButton
+            variant="outline-destructive"
+            size="sm"
+            :data-test="`${dataTest}-delete-selected-btn`"
+            @click="emit('delete-selected')"
+          >
+            <OIcon name="delete" size="sm" />
+            <span class="tw:ml-1">Delete</span>
+          </OButton>
+        </template>
+      </div>
+    </template>
   </OTable>
 
   <!-- Locations tooltip -->
@@ -245,11 +279,15 @@ const props = withDefaults(defineProps<{
   emptyMessage?: string
   dataTest?: string
   toggleLoadingMap?: Record<string, boolean>
+  selectedIds?: string[]
+  showFolderColumn?: boolean
 }>(), {
   footerTitle: 'Monitors',
   emptyMessage: 'No results found.',
   dataTest: 'monitor-table',
   toggleLoadingMap: () => ({}),
+  selectedIds: () => [],
+  showFolderColumn: false,
 })
 
 const emit = defineEmits<{
@@ -259,7 +297,15 @@ const emit = defineEmits<{
   'duplicate': [row: any]
   'run': [row: any]
   'delete': [row: any]
+  'update:selectedIds': [ids: string[]]
+  'delete-selected': []
+  'move-selected': []
 }>()
+
+const localSelectedIds = computed({
+  get: () => props.selectedIds ?? [],
+  set: (val: string[]) => emit('update:selectedIds', val),
+})
 
 // ── Column definitions per mode ─────────────────────────────────────
 
@@ -342,15 +388,25 @@ const ACTIONS_COL: OTableColumnDef = {
   id: 'actions', header: '', accessorKey: 'id',
   size: 160, minSize: 160, sortable: false, isAction: true,
 }
+const FOLDER_COL: OTableColumnDef = {
+  id: 'folder_name', header: 'Folder', accessorKey: 'folder_name',
+  size: 120, minSize: 90, sortable: true, hideable: true,
+}
 
 const columns = computed<OTableColumnDef[]>(() => {
+  let cols: OTableColumnDef[]
   if (props.mode === 'browser') {
-    return [STATUS_COL, TEST_NAME_COL, URL_COL, STEPS_COL, HISTORY_COL, PAGE_LOAD_COL, UPTIME_COL, LAST_RUN_COL, ACTIONS_COL]
+    cols = [STATUS_COL, TEST_NAME_COL, URL_COL, STEPS_COL, HISTORY_COL, PAGE_LOAD_COL, UPTIME_COL, LAST_RUN_COL, ACTIONS_COL]
+  } else if (props.mode === 'api') {
+    cols = [STATUS_COL, TEST_NAME_COL, METHOD_COL, ENDPOINT_COL, ASSERTIONS_COL, HISTORY_COL, P50_COL, UPTIME_COL, LAST_RUN_COL, ACTIONS_COL]
+  } else {
+    cols = [STATUS_COL, NAME_COL, URL_COL, TYPE_COL, HISTORY_COL, RESPONSE_TIME_COL, UPTIME_COL, LOCATIONS_COL, INTERVAL_COL, LAST_CHECK_COL, ACTIONS_COL]
   }
-  if (props.mode === 'api') {
-    return [STATUS_COL, TEST_NAME_COL, METHOD_COL, ENDPOINT_COL, ASSERTIONS_COL, HISTORY_COL, P50_COL, UPTIME_COL, LAST_RUN_COL, ACTIONS_COL]
+  if (props.showFolderColumn) {
+    const nameIdx = cols.findIndex(c => c.id === 'name')
+    cols.splice(nameIdx + 1, 0, FOLDER_COL)
   }
-  return [STATUS_COL, NAME_COL, URL_COL, TYPE_COL, HISTORY_COL, RESPONSE_TIME_COL, UPTIME_COL, LOCATIONS_COL, INTERVAL_COL, LAST_CHECK_COL, ACTIONS_COL]
+  return cols
 })
 
 // ── Utilities ────────────────────────────────────────────────────────

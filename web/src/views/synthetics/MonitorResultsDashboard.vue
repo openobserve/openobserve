@@ -107,17 +107,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="synthetic-monitor-results-runs-table"
         >
           <template #cell-status="{ row }">
-            <span
-              class="run-status"
-              :class="`run-status--${(row as RunRow).status}`"
-            >
-              <span class="run-status-dot" />
-              {{
-                (row as RunRow).status === "failed"
-                  ? t("synthetics.results.failed")
-                  : t("synthetics.results.passed")
-              }}
-            </span>
+            <div class="tw:flex tw:flex-col tw:gap-[0.125rem]">
+              <span
+                class="run-status"
+                :class="`run-status--${(row as RunRow).status}`"
+              >
+                <span class="run-status-dot" />
+                {{
+                  (row as RunRow).status === "failed"
+                    ? t("synthetics.results.failed")
+                    : t("synthetics.results.passed")
+                }}
+              </span>
+              <small
+                v-if="(row as RunRow).status === 'failed' && (row as RunRow).error"
+                class="tw:text-[var(--o2-text-caption)] tw:truncate tw:max-w-[18rem]"
+                :title="(row as RunRow).error"
+              >
+                {{ (row as RunRow).error }}
+              </small>
+            </div>
           </template>
           <template #cell-started="{ row }">
             {{ relativeFromNow((row as RunRow).timestamp) }}
@@ -223,7 +232,8 @@ interface RunRow {
   status: "passed" | "failed";
   durationMs: number;
   location: string;
-  trigger: string;
+  device: string;
+  error: string;
 }
 
 const runRows = computed<RunRow[]>(() =>
@@ -235,7 +245,7 @@ const runColumns = computed<OTableColumnDef[]>(() => [
   { id: "started", header: t("synthetics.results.started"), accessorKey: "timestamp", size: 160, minSize: 120, sortable: true },
   { id: "duration", header: t("synthetics.results.duration"), accessorKey: "durationMs", size: 140, minSize: 100, sortable: true, meta: { align: "right" } },
   { id: "location", header: t("synthetics.results.location"), accessorKey: "location", size: 160, minSize: 120, sortable: true },
-  { id: "trigger", header: t("synthetics.results.trigger"), accessorKey: "trigger", size: 140, minSize: 100, sortable: true },
+  { id: "device", header: t("synthetics.results.device"), accessorKey: "device", size: 140, minSize: 100, sortable: true },
 ]);
 
 // ── Relative-time formatting ("2 min ago") ───────────────────────────────

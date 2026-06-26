@@ -104,8 +104,8 @@ describe("MonitorResultsDashboard", () => {
       { tsMs: 2, avgMs: 1600, p95Ms: 2100, uptimePct: 99, failedRuns: 1 },
     ];
     mockRuns.value = [
-      { timestamp: Date.now(), status: "passed", durationMs: 1820, location: "us-east-1", trigger: "Manual" },
-      { timestamp: Date.now(), status: "failed", durationMs: 1760, location: "ap-southeast-1", trigger: "Scheduled" },
+      { timestamp: Date.now(), status: "passed", durationMs: 1820, location: "us-east-1", device: "desktop", error: "" },
+      { timestamp: Date.now(), status: "failed", durationMs: 1760, location: "ap-southeast-1", device: "mobile", error: "Timeout" },
     ];
   });
 
