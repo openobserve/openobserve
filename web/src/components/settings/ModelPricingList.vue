@@ -209,8 +209,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span
                 v-for="(price, key) in getVisiblePrices(row)"
                 :key="key"
-                class="tw:inline-flex tw:items-center tw:gap-[2px] tw:py-[2px] tw:px-2 tw:rounded-md tw:text-[11px] tw:font-normal tw:whitespace-nowrap tw:border tw:border-[#d1d5db] tw:text-inherit tw:dark:text-white tw:dark:border-[#4b5563]"
-                :class="getPriceKeyColorClass(key as string)"
+                class="tw:inline-flex tw:items-center tw:gap-[2px] tw:py-[2px] tw:px-2 tw:rounded-md tw:text-[11px] tw:font-normal tw:whitespace-nowrap tw:border"
+                :class="[
+                  getPriceKeyColorClass(key as string),
+                  store.state.theme === 'dark'
+                    ? 'tw:text-white tw:border-[#4b5563]'
+                    : 'tw:text-inherit tw:border-[#d1d5db]',
+                ]"
               >
                 <span class="tw:font-medium">{{
                   formatPriceKey(key as string)
@@ -219,7 +224,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </span>
               <span
                 v-if="getOverflowCount(row) > 0"
-                class="tw:inline-flex tw:items-center tw:gap-[2px] tw:py-[2px] tw:px-2 tw:rounded-md tw:text-[11px] tw:whitespace-nowrap tw:border-0 tw:bg-[#e5e7eb] tw:text-[#6b7280] tw:font-medium tw:cursor-pointer tw:dark:bg-[#4b5563] tw:dark:text-[#d1d5db]"
+                class="tw:inline-flex tw:items-center tw:gap-[2px] tw:py-[2px] tw:px-2 tw:rounded-md tw:text-[11px] tw:whitespace-nowrap tw:border-0 tw:font-medium tw:cursor-pointer"
+                :class="
+                  store.state.theme === 'dark'
+                    ? 'tw:bg-[#4b5563] tw:text-[#d1d5db]'
+                    : 'tw:bg-[#e5e7eb] tw:text-[#6b7280]'
+                "
                 @click.stop="openPricingDialog(row)"
               >
                 +{{ getOverflowCount(row) }}
