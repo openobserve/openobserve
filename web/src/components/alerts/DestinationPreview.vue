@@ -324,6 +324,14 @@ const copyTemplate = () => {
 </script>
 
 <style>
+/* The global `a { color: var(--o2-text-link) }` rule (unlayered) outranks the
+   inline `tw:text-[#06ac38]` utility, turning this link the theme link color.
+   This selector's specificity wins it back to PagerDuty green, like main. */
+.pagerduty-link a {
+  color: #06ac38;
+  text-decoration: none;
+}
+
 .opsgenie-content .opsgenie-actions button {
   background: #172b4d;
   color: white;
