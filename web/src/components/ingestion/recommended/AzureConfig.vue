@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="tw:flex-shrink-0"
       />
       <div>
-        <div class="tw:text-lg tw:font-bold tw:m-0 tw:mb-1" :class="store.state.theme === 'dark' ? 'tw:text-[#e0e0e0]' : 'tw:text-[#1a1a1a]'">
+        <div class="tw:text-sm tw:font-medium tw:m-0 tw:mb-1" :class="store.state.theme === 'dark' ? 'tw:text-[#e0e0e0]' : 'tw:text-[#1a1a1a]'">
           Azure Activity Logs
         </div>
         <div class="tw:text-sm tw:m-0" :class="store.state.theme === 'dark' ? 'tw:text-[#b0b0b0]' : 'tw:text-[#666]'">
