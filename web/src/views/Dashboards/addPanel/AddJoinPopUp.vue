@@ -128,7 +128,7 @@
       >
         <div class="tw:mb-2 tw:font-medium">Clause {{ argIndex + 1 }}</div>
         <div class="tw:flex tw:items-center tw:gap-2.5">
-          <div class="tw:flex-1">
+          <div class="tw:flex-1 tw:min-w-0 tw:overflow-hidden">
             <StreamFieldSelect
               :streams="getStreamsBasedJoinIndex()"
               v-model="modelValue.conditions[argIndex].leftField"
@@ -136,7 +136,7 @@
             />
           </div>
 
-          <div class="tw:flex-1">
+          <div class="tw:flex-1 tw:min-w-0 tw:overflow-hidden">
             <OSelect
               :label-position="'inside'"
               v-model="modelValue.conditions[argIndex].operation"
@@ -146,7 +146,7 @@
             />
           </div>
 
-          <div class="tw:flex-1">
+          <div class="tw:flex-1 tw:min-w-0 tw:overflow-hidden">
             <StreamFieldSelect
               :streams="rightFieldStreams"
               v-model="modelValue.conditions[argIndex].rightField"
