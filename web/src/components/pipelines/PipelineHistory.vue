@@ -593,7 +593,7 @@ const columns = ref([
     header: "Status",
     accessorKey: "status",
     sortable: true,
-    size: 150,
+    size: 200,
     meta: { align: "center" as const },
   },
   {
