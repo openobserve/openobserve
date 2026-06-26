@@ -174,7 +174,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :stream-doc-time-range="streamDocTimeRange"
                         :query-window-us="queryWindowUs"
                         :timezone="store.state.timezone"
-                        @widen-range="onWidenRange"
                         @jump-to-stream-data="onJumpToStreamData"
                         @open-history="showSearchHistoryfn"
                         @ask-ai="onAskAiFixQuery"

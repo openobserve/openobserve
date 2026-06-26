@@ -179,7 +179,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @page-change="changePage"
           @rows-per-page-change="changeRowsPerPage"
           @sort-change="changeSortBy"
-          @widen-range="(p) => $emit('widen-range', p)"
           @remove-filter="$emit('remove-filter')"
           @jump-to-stream-data="(from, to) => $emit('jump-to-stream-data', from, to)"
           @ask-ai="$emit('ask-ai')"
@@ -257,7 +256,6 @@ export default defineComponent({
     "get:traceDetails",
     "metrics:filters-updated",
     "run-query",
-    "widen-range",
     "remove-filter",
     "jump-to-stream-data",
     "error-only-toggled",

@@ -190,7 +190,7 @@
               v-else-if="!graphData.nodes.length"
               class="tw:flex tw:h-full tw:items-center tw:justify-center"
             >
-              <ServiceGraphNoDataState @widen-range="$emit('widen-range', $event)" />
+              <ServiceGraphNoDataState />
             </div>
             <div
               v-else
@@ -306,7 +306,7 @@ export default defineComponent({
     OCardSection,
     ServiceGraphNoDataState,
   },
-  emits: ["view-traces", "request:stream-change", "widen-range"],
+  emits: ["view-traces", "request:stream-change"],
   setup(props, { emit }) {
     const store = useStore();
     const router = useRouter();

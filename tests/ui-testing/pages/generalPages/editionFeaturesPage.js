@@ -132,9 +132,23 @@ export class EditionFeaturesPage {
       locator.click(),
     ]);
     try {
-      await popup.waitForURL(/openobserve\.ai/, { timeout: 30000 });
-      // Wait for any in-page JS redirects to settle before sampling the URL
-      await popup.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+      // Resolve as soon as the o2.ws short link commits to an openobserve.ai URL.
+      // Use waitUntil:'commit' (not the default 'load') — the marketing/docs pages
+      // are heavy and frequently never fire the 'load' event within the timeout in
+      // CI, which previously burned the full 30s on every link and blew past the
+      // test timeout (24 links × ~45s).
+      await popup.waitForURL(/openobserve\.ai/, { timeout: 20000, waitUntil: 'commit' });
+      // A couple of pages (sre_agent, ent_install_guide) issue an in-page JS
+      // redirect. Let the URL settle so we sample the final destination, but cap it
+      // tightly — do NOT wait for networkidle (a live marketing site with chat /
+      // analytics widgets never goes idle, so that always burned its full timeout).
+      let lastUrl = popup.url();
+      for (let i = 0; i < 6; i++) {
+        await popup.waitForTimeout(500);
+        const currentUrl = popup.url();
+        if (currentUrl === lastUrl) break;
+        lastUrl = currentUrl;
+      }
       return popup.url();
     } catch (e) {
       testLogger.error('Popup never reached openobserve.ai — returning current URL', {
