@@ -937,6 +937,11 @@ export class LogsPage {
                     await popoverSearch.fill(stream).catch(() => {});
                 }
 
+                // Wait for the virtualized list to filter and re-render the option row.
+                // Without this, isVisible often fails because the Vue virtualizer
+                // has not yet rendered the matching option into the DOM.
+                await option.first().waitFor({ state: 'attached', timeout: 5000 }).catch(() => {});
+
                 testLogger.debug(`selectStream: Looking for option [data-test="log-search-index-list-select-stream-option"][data-test-value="${stream}"]`);
                 const visible = await option
                     .first()
