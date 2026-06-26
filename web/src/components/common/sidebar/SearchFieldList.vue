@@ -44,7 +44,7 @@
 
         <!-- Field row: render field name with expand chevron + actions inside OFieldRow -->
         <template #field-row="{ row }">
-          <OFieldRow :highlight="!!expandedRows[row.name]">
+          <OFieldRow>
             <span class="field-type-container">
               <OIcon
                 class="field-expand-icon"
@@ -694,6 +694,15 @@ const copyContentValue = (value: string) => {
 </script>
 
 <style lang="scss" scoped>
+// Expanded field values should read as inline content, not a selected card —
+// drop the bordered/rounded panel treatment so no border or background lingers
+// once the row is expanded and the pointer moves away.
+:deep(.o-field-list__expansion) {
+  border: none;
+  border-radius: 0;
+  margin-bottom: 0;
+}
+
 .field-list-pagination {
   display: flex;
   align-items: center;
