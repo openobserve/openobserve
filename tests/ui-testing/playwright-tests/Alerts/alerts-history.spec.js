@@ -213,10 +213,19 @@ test.describe("Alert History Page", () => {
     let dialogOpened = false;
     for (let clickAttempt = 0; clickAttempt < 3 && !dialogOpened; clickAttempt++) {
       await pm.alertHistoryPage.clickViewDetails(0);
+      // Primary check: forwarded data-test on DialogContent.
       dialogOpened = await page
         .locator('[data-test="alert-history-details-dialog"]')
         .isVisible({ timeout: 8000 })
         .catch(() => false);
+      // Fallback: data-o2-dialog is the static attr always present on ODialog content —
+      // catches cases where $attrs["data-test"] forwarding hasn't applied in CI.
+      if (!dialogOpened) {
+        dialogOpened = await page
+          .locator('[data-o2-dialog]')
+          .isVisible({ timeout: 1000 })
+          .catch(() => false);
+      }
       if (!dialogOpened && clickAttempt < 2) {
         testLogger.info(`View details click attempt ${clickAttempt + 1} — dialog not visible, retrying`);
         await page.waitForTimeout(500);

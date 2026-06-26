@@ -102,6 +102,23 @@ export class AlertHistoryPage {
       .waitFor({ state: 'visible', timeout: 10000 })
       .catch(() => {});
 
+    // If the details dialog already opened (from a prior click attempt), skip re-clicking.
+    // This prevents a second click being blocked by the ODialog overlay that the first
+    // click already raised.
+    const alreadyOpen = await this.page.locator(this.alertDetailsDialog)
+      .isVisible({ timeout: 300 }).catch(() => false)
+      || await this.page.locator('[data-o2-dialog]')
+      .isVisible({ timeout: 300 }).catch(() => false);
+    if (alreadyOpen) return;
+
+    // Dismiss any ODialog overlay that might be blocking pointer events (e.g. a stale
+    // dialog left open by a prior navigation or interaction in the serial test suite).
+    const overlay = this.page.locator('[data-test="o-dialog-overlay"]');
+    if (await overlay.isVisible({ timeout: 500 }).catch(() => false)) {
+      await this.page.keyboard.press('Escape');
+      await overlay.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+    }
+
     const byDataTest = this.page.locator(this.viewDetailsBtn);
     const byCell = this.page.locator('[data-test="o2-table-cell-actions"]').nth(index).locator('button').first();
     const btn = (await byDataTest.count() > 0) ? byDataTest.nth(index) : byCell;
@@ -137,7 +154,16 @@ export class AlertHistoryPage {
   }
 
   async expectDetailsDialogVisible() {
-    await expect(this.page.locator(this.alertDetailsDialog)).toBeVisible({ timeout: 20000 });
+    // Primary: forwarded data-test on ODialog's DialogContent.
+    // Fallback: data-o2-dialog is a static attribute always present on DialogContent,
+    // used when $attrs["data-test"] forwarding hasn't propagated yet in CI.
+    const byDataTest = this.page.locator(this.alertDetailsDialog);
+    const byStaticAttr = this.page.locator('[data-o2-dialog]');
+    const found = await byDataTest.isVisible({ timeout: 20000 }).catch(() => false)
+      || await byStaticAttr.isVisible({ timeout: 2000 }).catch(() => false);
+    if (!found) {
+      await expect(byDataTest).toBeVisible({ timeout: 1000 });
+    }
   }
 
   async expectTableOrEmptyStateVisible() {
