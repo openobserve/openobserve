@@ -203,9 +203,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </template>
             <template #cell-service_name="{ row }">
-              <div v-if="row.__type === 'group'" class="tw:flex tw:items-center tw:gap-2">
+              <div v-if="row.__type === 'group'" class="tw:flex tw:items-center tw:gap-2 tw:ml-2">
                 <span class="tw:font-semibold">{{ row.service_name }}</span>
-                <span class="instance-count-badge tw:inline-flex tw:items-center tw:py-[0.0625rem] tw:px-2 tw:rounded-[0.625rem] tw:text-[0.6875rem] tw:font-medium tw:bg-[#e5e7eb] tw:text-[#6b7280]" :class="store.state.theme === 'dark' ? 'tw:bg-[#4b5563] tw:text-[#d1d5db]' : ''">
+                <span class="instance-count-badge tw:inline-flex tw:items-center tw:py-[0.0625rem] tw:px-2 tw:rounded-[0.625rem] tw:text-[0.6875rem] tw:font-medium" :class="store.state.theme === 'dark' ? 'tw:bg-[#4b5563] tw:text-[#d1d5db]' : 'tw:bg-[#e5e7eb] tw:text-[#6b7280]'">
                   {{ row.instances.length }}
                   {{
                     row.instances.length === 1
@@ -215,7 +215,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </span>
               </div>
               <div v-else class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap">
-                <span class="set-id-badge tw:inline-flex tw:items-center tw:py-[0.0625rem] tw:px-2 tw:rounded-[0.625rem] tw:text-[0.6875rem] tw:font-semibold tw:bg-[#ede9fe] tw:text-[#5b21b6] tw:border tw:border-[#a78bfa] tw:whitespace-nowrap tw:shrink-0" :class="store.state.theme === 'dark' ? 'tw:bg-[rgba(109,40,217,0.2)] tw:text-[#c4b5fd] tw:border-[#7c3aed]' : ''">{{ row.set_id }}</span>
+                <span class="set-id-badge tw:inline-flex tw:items-center tw:py-[0.0625rem] tw:px-2 tw:rounded-[0.625rem] tw:text-[0.6875rem] tw:font-semibold tw:border tw:whitespace-nowrap tw:shrink-0" :class="store.state.theme === 'dark' ? 'tw:bg-[rgba(109,40,217,0.2)] tw:text-[#c4b5fd] tw:border-[#7c3aed]' : 'tw:bg-[#ede9fe] tw:text-[#5b21b6] tw:border-[#a78bfa]'">{{ row.set_id }}</span>
                 <span
                   v-for="[key, value] in Object.entries(
                     row.disambiguation,
@@ -359,7 +359,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="service-side-panel"
     >
       <template #header-right>
-        <span class="set-id-badge tw:inline-flex tw:items-center tw:py-[0.0625rem] tw:px-2 tw:rounded-[0.625rem] tw:text-[0.6875rem] tw:font-semibold tw:bg-[#ede9fe] tw:text-[#5b21b6] tw:border tw:border-[#a78bfa] tw:whitespace-nowrap tw:shrink-0" :class="store.state.theme === 'dark' ? 'tw:bg-[rgba(109,40,217,0.2)] tw:text-[#c4b5fd] tw:border-[#7c3aed]' : ''">{{ selectedService?.set_id }}</span>
+        <span class="set-id-badge tw:inline-flex tw:items-center tw:py-[0.0625rem] tw:px-2 tw:rounded-[0.625rem] tw:text-[0.6875rem] tw:font-semibold tw:border tw:whitespace-nowrap tw:shrink-0" :class="store.state.theme === 'dark' ? 'tw:bg-[rgba(109,40,217,0.2)] tw:text-[#c4b5fd] tw:border-[#7c3aed]' : 'tw:bg-[#ede9fe] tw:text-[#5b21b6] tw:border-[#a78bfa]'">{{ selectedService?.set_id }}</span>
       </template>
 
       <!-- Default set warning banner -->
@@ -430,8 +430,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span
                     v-for="stream in selectedService.logs_streams"
                     :key="stream"
-                    class="stream-name-badge tw:inline-flex tw:items-center tw:py-[0.0625rem] tw:px-[0.4375rem] tw:rounded tw:text-[0.6875rem] tw:font-mono tw:bg-[#f3f4f6] tw:text-[#374151] tw:border tw:border-[#e5e7eb] tw:whitespace-nowrap"
-                    :class="store.state.theme === 'dark' ? 'tw:bg-[#1f2937] tw:text-[#d1d5db] tw:border-[#374151]' : ''"
+                    class="stream-name-badge tw:inline-flex tw:items-center tw:py-[0.0625rem] tw:px-[0.4375rem] tw:rounded tw:text-[0.6875rem] tw:font-mono tw:border tw:whitespace-nowrap"
+                    :class="store.state.theme === 'dark' ? 'tw:bg-[#1f2937] tw:text-[#d1d5db] tw:border-[#374151]' : 'tw:bg-[#f3f4f6] tw:text-[#374151] tw:border-[#e5e7eb]'"
                     >{{ stream }}</span
                   >
                 </div>
@@ -454,8 +454,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span
                     v-for="stream in selectedService.traces_streams"
                     :key="stream"
-                    class="stream-name-badge tw:inline-flex tw:items-center tw:py-[0.0625rem] tw:px-[0.4375rem] tw:rounded tw:text-[0.6875rem] tw:font-mono tw:bg-[#f3f4f6] tw:text-[#374151] tw:border tw:border-[#e5e7eb] tw:whitespace-nowrap"
-                    :class="store.state.theme === 'dark' ? 'tw:bg-[#1f2937] tw:text-[#d1d5db] tw:border-[#374151]' : ''"
+                    class="stream-name-badge tw:inline-flex tw:items-center tw:py-[0.0625rem] tw:px-[0.4375rem] tw:rounded tw:text-[0.6875rem] tw:font-mono tw:border tw:whitespace-nowrap"
+                    :class="store.state.theme === 'dark' ? 'tw:bg-[#1f2937] tw:text-[#d1d5db] tw:border-[#374151]' : 'tw:bg-[#f3f4f6] tw:text-[#374151] tw:border-[#e5e7eb]'"
                     >{{ stream }}</span
                   >
                 </div>
@@ -478,8 +478,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span
                     v-for="stream in selectedService.metrics_streams"
                     :key="stream"
-                    class="stream-name-badge tw:inline-flex tw:items-center tw:py-[0.0625rem] tw:px-[0.4375rem] tw:rounded tw:text-[0.6875rem] tw:font-mono tw:bg-[#f3f4f6] tw:text-[#374151] tw:border tw:border-[#e5e7eb] tw:whitespace-nowrap"
-                    :class="store.state.theme === 'dark' ? 'tw:bg-[#1f2937] tw:text-[#d1d5db] tw:border-[#374151]' : ''"
+                    class="stream-name-badge tw:inline-flex tw:items-center tw:py-[0.0625rem] tw:px-[0.4375rem] tw:rounded tw:text-[0.6875rem] tw:font-mono tw:border tw:whitespace-nowrap"
+                    :class="store.state.theme === 'dark' ? 'tw:bg-[#1f2937] tw:text-[#d1d5db] tw:border-[#374151]' : 'tw:bg-[#f3f4f6] tw:text-[#374151] tw:border-[#e5e7eb]'"
                     >{{ stream }}</span
                   >
                 </div>
@@ -506,13 +506,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ).sort(([a], [b]) => a.localeCompare(b))"
               :key="raw"
             >
-              <span class="mapping-key tw:font-mono tw:text-[0.6875rem] tw:py-[0.0625rem] tw:px-[0.375rem] tw:rounded tw:bg-[#f3f4f6] tw:text-[#374151] tw:border tw:border-[#e5e7eb] tw:whitespace-nowrap" :class="store.state.theme === 'dark' ? 'tw:bg-[#1f2937] tw:text-[#d1d5db] tw:border-[#374151]' : ''">{{ raw }}</span>
+              <span class="mapping-key tw:font-mono tw:text-[0.6875rem] tw:py-[0.0625rem] tw:px-[0.375rem] tw:rounded tw:border tw:whitespace-nowrap" :class="store.state.theme === 'dark' ? 'tw:bg-[#1f2937] tw:text-[#d1d5db] tw:border-[#374151]' : 'tw:bg-[#f3f4f6] tw:text-[#374151] tw:border-[#e5e7eb]'">{{ raw }}</span>
               <OIcon
                 name="arrow-forward"
                 size="xs"
                 class="tw:text-gray-400 tw:justify-self-center"
               />
-              <span class="mapping-val tw:font-mono tw:text-[0.6875rem] tw:py-[0.0625rem] tw:px-[0.375rem] tw:rounded tw:bg-[#ecfdf5] tw:text-[#065f46] tw:border tw:border-[#a7f3d0] tw:whitespace-nowrap" :class="store.state.theme === 'dark' ? 'tw:bg-[rgba(6,95,70,0.2)] tw:text-[#6ee7b7] tw:border-[#065f46]' : ''">{{ mapped }}</span>
+              <span class="mapping-val tw:font-mono tw:text-[0.6875rem] tw:py-[0.0625rem] tw:px-[0.375rem] tw:rounded tw:border tw:whitespace-nowrap" :class="store.state.theme === 'dark' ? 'tw:bg-[rgba(6,95,70,0.2)] tw:text-[#6ee7b7] tw:border-[#065f46]' : 'tw:bg-[#ecfdf5] tw:text-[#065f46] tw:border-[#a7f3d0]'">{{ mapped }}</span>
             </template>
           </div>
         </div>
