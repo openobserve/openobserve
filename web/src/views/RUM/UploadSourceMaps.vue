@@ -39,160 +39,109 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <!-- Form Content Area -->
-    <div class="form-content-area card-container tw:mb-[0.675rem] tw:p-6" style="height: calc(100vh - 172px); overflow: auto">
-      <div class="upload-form">
-        <!-- Input Fields -->
-        <div class="tw:grid tw:grid-cols-1 md:tw:grid-cols-3 tw:gap-4 tw:mb-6">
-          <!-- Service Input -->
-          <div>
-            <div class="tw:text-sm tw:font-medium text-weight-medium tw:mb-2">Service *</div>
-            <OInput
+    <OForm
+      id="upload-source-maps-form"
+      :schema="uploadSourceMapsSchema"
+      :default-values="uploadSourceMapsDefaults"
+      @submit="uploadSourceMaps"
+      v-slot="{ isSubmitting }"
+    >
+      <!-- Form Content Area -->
+      <div class="form-content-area card-container tw:mb-[0.675rem] tw:p-6" style="height: calc(100vh - 172px); overflow: auto">
+        <div class="upload-form">
+          <!-- Input Fields -->
+          <div class="tw:grid tw:grid-cols-1 md:tw:grid-cols-3 tw:gap-4 tw:mb-6">
+            <!-- Service Input -->
+            <OFormInput
+              name="service"
               data-test="rum-upload-source-maps-service-input"
-              v-model="formData.service"
+              label="Service"
+              required
               placeholder="Enter service name"
-              :error="!!serviceError"
-              :error-message="serviceError"
-              @update:model-value="serviceError = ''"
             />
-          </div>
 
-          <!-- Version Input -->
-          <div>
-            <div class="tw:text-sm tw:font-medium text-weight-medium tw:mb-2">Version *</div>
-            <OInput
+            <!-- Version Input -->
+            <OFormInput
+              name="version"
               data-test="rum-upload-source-maps-version-input"
-              v-model="formData.version"
+              label="Version"
+              required
               placeholder="Enter version (e.g., 1.0.0)"
-              :error="!!versionError"
-              :error-message="versionError"
-              @update:model-value="versionError = ''"
             />
-          </div>
 
-          <!-- Environment Input -->
-          <div>
-            <div class="tw:text-sm tw:font-medium text-weight-medium tw:mb-2">Environment</div>
-            <OInput
+            <!-- Environment Input -->
+            <OFormInput
+              name="environment"
               data-test="rum-upload-source-maps-environment-input"
-              v-model="formData.environment"
+              label="Environment"
               placeholder="Enter environment (optional)"
             />
           </div>
-        </div>
 
-        <!-- File Upload Area -->
-        <div class="tw:mb-6">
-          <div class="tw:text-sm tw:font-medium text-weight-medium tw:mb-2">Source Map ZIP File *</div>
-          <div
-            data-test="rum-upload-source-maps-file-dropzone"
-            class="upload-area"
-            :class="{ 'drag-over': isDragging, 'has-file': formData.file }"
-            @dragover.prevent="isDragging = true"
-            @dragleave.prevent="isDragging = false"
-            @drop.prevent="handleDrop"
-            @click="triggerFileInput"
-          >
-            <input
-              ref="fileInputRef"
-              data-test="rum-upload-source-maps-file-input"
-              type="file"
-              accept=".zip"
-              style="display: none"
-              @change="handleFileInput"
-            />
-
-            <div v-if="!formData.file" class="upload-content">
-              <OIcon name="backup" size="xl" class="tw:mb-3" />
-              <div class="tw:text-xl tw:font-semibold tw:text-gray-500 tw:mb-2">Drop your file here</div>
-              <div class="tw:text-sm tw:text-gray-400 tw:mb-3">or click to browse</div>
-              <div class="tw:text-xs tw:text-gray-400">.zip files only</div>
-            </div>
-
-            <div v-else class="file-info">
-              <div class="tw:flex tw:items-center tw:justify-between">
-                <div class="tw:flex tw:items-center tw:gap-3">
-                  <OIcon name="draft" size="lg" />
-                  <div>
-                    <div class="tw:text-sm tw:font-medium text-weight-medium">{{ formData.file.name }}</div>
-                    <div class="tw:text-xs tw:text-gray-400">{{ formatFileSize(formData.file.size) }}</div>
-                  </div>
-                </div>
-                <OButton
-                  variant="ghost"
-                  size="icon"
-                  icon-left="close"
-                  @click.stop="removeFile"
-                />
-              </div>
-            </div>
+          <!-- File Upload Area (form-owned `file` field, schema-validated) -->
+          <div class="tw:mb-6">
+            <div class="tw:text-sm tw:font-medium text-weight-medium tw:mb-2">Source Map ZIP File *</div>
+            <SourceMapDropzone name="file" />
           </div>
         </div>
       </div>
-    </div>
 
-    <!-- Bottom Action Bar -->
-    <div class="action-bar card-container tw:flex tw:items-center tw:justify-end tw:gap-3 tw:py-3 tw:pr-3"
-      style="position: sticky; z-index: 2">
-      <OButton
-        data-test="rum-upload-source-maps-cancel-btn"
-        variant="outline"
-        size="sm-action"
-        @click="navigateBack"
-        :disabled="isUploading"
-      >Cancel</OButton>
-      <OButton
-        data-test="rum-upload-source-maps-upload-btn"
-        variant="primary"
-        size="sm-action"
-        :loading="isUploading"
-        :disabled="isUploading"
-        @click="uploadSourceMaps"
-      >Upload</OButton>
-    </div>
+      <!-- Bottom Action Bar -->
+      <div class="action-bar card-container tw:flex tw:items-center tw:justify-end tw:gap-3 tw:py-3 tw:pr-3"
+        style="position: sticky; z-index: 2">
+        <OButton
+          data-test="rum-upload-source-maps-cancel-btn"
+          variant="outline"
+          size="sm-action"
+          type="button"
+          @click="navigateBack"
+          :disabled="isSubmitting"
+        >Cancel</OButton>
+        <OButton
+          data-test="rum-upload-source-maps-upload-btn"
+          variant="primary"
+          size="sm-action"
+          type="submit"
+          :loading="isSubmitting"
+        >Upload</OButton>
+      </div>
+    </OForm>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { computed } from "vue";
+import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
 import sourcemapsService from "@/services/sourcemaps";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import SourceMapDropzone from "./SourceMapDropzone.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import {
+  makeUploadSourceMapsSchema,
+  type UploadSourceMapsForm,
+} from "./UploadSourceMaps.schema";
 
+const { t } = useI18n();
 const store = useStore();
 const router = useRouter();
 const route = useRoute();
 
-// Form data
-const formData = ref({
-  service: "",
-  version: "",
-  environment: "",
-  file: null as File | null,
-});
+const uploadSourceMapsSchema = makeUploadSourceMapsSchema(t);
 
-const isUploading = ref(false);
-const isDragging = ref(false);
-const fileInputRef = ref<HTMLInputElement | null>(null);
-const serviceError = ref("");
-const versionError = ref("");
-
-// Pre-fill form data from query parameters on mount
-onMounted(() => {
-  if (route.query.service) {
-    formData.value.service = route.query.service as string;
-  }
-  if (route.query.version) {
-    formData.value.version = route.query.version as string;
-  }
-  if (route.query.environment) {
-    formData.value.environment = route.query.environment as string;
-  }
-});
+// Dynamic (query-param prefill) defaults → a typed component computed. The
+// service/version/environment are seeded from the route query; `file` always
+// starts empty.
+const uploadSourceMapsDefaults = computed((): UploadSourceMapsForm => ({
+  service: (route.query.service as string) || "",
+  version: (route.query.version as string) || "",
+  environment: (route.query.environment as string) || "",
+  file: null,
+}));
 
 // Navigate back to source maps list
 const navigateBack = () => {
@@ -204,85 +153,16 @@ const navigateBack = () => {
   });
 };
 
-// Trigger file input click
-const triggerFileInput = () => {
-  fileInputRef.value?.click();
-};
-
-// Handle file input change
-const handleFileInput = (event: Event) => {
-  const target = event.target as HTMLInputElement;
-  const file = target.files?.[0];
-  if (file) {
-    validateAndSetFile(file);
-  }
-};
-
-// Handle drag and drop
-const handleDrop = (event: DragEvent) => {
-  isDragging.value = false;
-  const file = event.dataTransfer?.files[0];
-  if (file) {
-    validateAndSetFile(file);
-  }
-};
-
-// Validate and set file
-const validateAndSetFile = (file: File) => {
-  if (!file.name.endsWith('.zip')) {
-    toast({
-      variant: "error",
-      message: "Only ZIP files are allowed",
-    });
-    return;
-  }
-  formData.value.file = file;
-};
-
-// Remove file
-const removeFile = () => {
-  formData.value.file = null;
-  if (fileInputRef.value) {
-    fileInputRef.value.value = "";
-  }
-};
-
-// Format file size
-const formatFileSize = (bytes: number): string => {
-  if (bytes === 0) return "0 Bytes";
-  const k = 1024;
-  const sizes = ["Bytes", "KB", "MB", "GB"];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return Math.round(bytes / Math.pow(k, i) * 100) / 100 + " " + sizes[i];
-};
-
-// Upload source maps
-const uploadSourceMaps = async () => {
-  // Validate every required field top-to-bottom and surface all errors at once:
-  // Service / Version as inline field errors, the ZIP file as a toast.
-  serviceError.value = formData.value.service ? "" : "Service is required";
-  versionError.value = formData.value.version ? "" : "Version is required";
-
-  let hasError = !formData.value.service || !formData.value.version;
-
-  if (!formData.value.file) {
-    toast({
-      variant: "error",
-      message: "Please select a ZIP file to upload",
-    });
-    hasError = true;
-  }
-
-  if (hasError) return;
-
-  isUploading.value = true;
-
+// Upload source maps. @submit fires only once the schema passes, so service /
+// version are non-empty and `file` is a `.zip` File — no imperative guards.
+// Loading is form-driven (OForm awaits this handler → the Upload button spins).
+const uploadSourceMaps = async (value: UploadSourceMapsForm) => {
   try {
     const uploadData = new FormData();
-    uploadData.append("service", formData.value.service);
-    uploadData.append("version", formData.value.version);
-    uploadData.append("env", formData.value.environment);
-    uploadData.append("file", formData.value.file);
+    uploadData.append("service", value.service);
+    uploadData.append("version", value.version);
+    uploadData.append("env", value.environment ?? "");
+    uploadData.append("file", value.file as File);
 
     await sourcemapsService.uploadSourceMaps(
       store.state.selectedOrganization.identifier,
@@ -302,8 +182,6 @@ const uploadSourceMaps = async () => {
       variant: "error",
       message: error?.response?.data?.message || error?.message || "Failed to upload source maps",
     });
-  } finally {
-    isUploading.value = false;
   }
 };
 </script>
@@ -335,60 +213,6 @@ const uploadSourceMaps = async () => {
   border-top: 1px solid var(--q-border-color, #e0e0e0);
 }
 
-.upload-area {
-  border: 2px dashed var(--q-border-color, #e0e0e0);
-  border-radius: 8px;
-  padding: 2rem 2rem;
-  text-align: center;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  background-color: var(--q-background);
-
-  &:hover {
-    border-color: var(--q-primary);
-    background-color: rgba(var(--q-primary-rgb), 0.02);
-  }
-
-  &.drag-over {
-    border-color: var(--q-primary);
-    background-color: rgba(var(--q-primary-rgb), 0.05);
-    border-style: solid;
-  }
-
-  &.has-file {
-    padding: 1.5rem;
-    text-align: left;
-    border-style: solid;
-    border-color: var(--q-positive);
-    background-color: rgba(var(--q-positive-rgb), 0.02);
-  }
-}
-
-.upload-content {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-}
-
-.file-info {
-}
-
-:deep(.q-dark) {
-  .upload-area {
-    border-color: rgba(255, 255, 255, 0.1);
-
-    &:hover {
-      background-color: rgba(var(--q-primary-rgb), 0.05);
-    }
-
-    &.drag-over {
-      background-color: rgba(var(--q-primary-rgb), 0.1);
-    }
-
-    &.has-file {
-      background-color: rgba(var(--q-positive-rgb), 0.05);
-    }
-  }
-}
+/* The dropzone styles (.upload-area / .upload-content / dark-mode) moved to
+   SourceMapDropzone.vue along with the dropzone markup. */
 </style>
