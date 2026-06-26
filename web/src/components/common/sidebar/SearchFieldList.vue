@@ -703,6 +703,15 @@ const copyContentValue = (value: string) => {
   margin-bottom: 0;
 }
 
+// Tighten the gap between expanded field values. FieldValuesPanel stacks
+// padding on both the <li> and its inner <label> (tw:py-1 on each), which
+// reads as too much vertical space in the dense RUM sidebar. Drop the <li>
+// padding here (RUM-scoped) and keep the label padding as the click target.
+:deep(.o-field-list__expansion [data-test="field-values-panel-values-list"] > li) {
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
 .field-list-pagination {
   display: flex;
   align-items: center;
