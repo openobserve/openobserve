@@ -22,7 +22,9 @@ import { createI18n } from "vue-i18n";
 const i18n = createI18n({
   legacy: false,
   locale: "en",
-  messages: { en: { common: { label: "Label" } } },
+  messages: {
+    en: { common: { label: "Label", required: "A value is required" } },
+  },
 });
 
 describe("BuildFieldPopUp", () => {
@@ -133,8 +135,12 @@ describe("BuildFieldPopUp", () => {
 
     it("should update label value", async () => {
       wrapper = createWrapper();
+      await flushPromises();
       const input = wrapper.find('input[type="text"]');
       await input.setValue("New Label");
+      await flushPromises();
+      // `label` is now form-owned; the form value is synced back out to the
+      // parent's modelValue (the same contract the old v-model provided).
       expect(wrapper.vm.modelValue.label).toBe("New Label");
     });
 
@@ -499,6 +505,46 @@ describe("BuildFieldPopUp", () => {
       wrapper = createWrapper();
       const translation = wrapper.vm.t("nonexistent.key");
       expect(translation).toBeDefined();
+    });
+  });
+
+  // Real-OForm validation wiring (playbook §5): mount the real <OForm> and prove
+  // the schema actually gates an empty `label` — an unwired `:schema` (e.g. not
+  // returned from setup) would be caught here.
+  describe("OForm schema validation (real form)", () => {
+    const submitForm = async (w: any) => {
+      await w.vm.buildFieldFormRef.form.handleSubmit();
+      await flushPromises();
+    };
+
+    it("shows no error before submit (R3 — submit-then-change)", () => {
+      wrapper = createWrapper({ modelValue: { label: "", isDerived: false } });
+      expect(wrapper.text()).not.toContain("A value is required");
+    });
+
+    it("is invalid when the label is empty (restored required rule)", async () => {
+      wrapper = createWrapper({ modelValue: { label: "", isDerived: false } });
+      await submitForm(wrapper);
+      expect(wrapper.vm.buildFieldFormRef.form.state.isValid).toBe(false);
+      expect(wrapper.text()).toContain("A value is required");
+    });
+
+    it("is valid when the label is non-empty", async () => {
+      wrapper = createWrapper({
+        modelValue: { label: "My Field", isDerived: false },
+      });
+      await submitForm(wrapper);
+      expect(wrapper.vm.buildFieldFormRef.form.state.isValid).toBe(true);
+    });
+
+    it("clears the error on change after the first submit", async () => {
+      wrapper = createWrapper({ modelValue: { label: "", isDerived: false } });
+      await submitForm(wrapper);
+      expect(wrapper.text()).toContain("A value is required");
+
+      wrapper.vm.buildFieldFormRef.form.setFieldValue("label", "fixed");
+      await flushPromises();
+      expect(wrapper.text()).not.toContain("A value is required");
     });
   });
 });

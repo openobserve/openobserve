@@ -20,14 +20,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     style="padding: 3px 16px 16px 16px; display: flex; gap: 16px"
   >
     <div data-test="dashboard-build-field-popup-left-section">
-      <OInput
-        data-test="dashboard-x-item-input"
-        :label="t('common.label')"
-        v-model="modelValue.label"
-        :error="labelTouched && !modelValue.label"
-        :error-message="t('common.required') || 'Required'"
-        @blur="labelTouched = true"
-      />
+      <OForm
+        id="dashboard-build-field-popup-form"
+        ref="buildFieldFormRef"
+        :schema="buildFieldPopUpSchema"
+        :default-values="buildFieldPopUpDefaults"
+      >
+        <OFormInput
+          data-test="dashboard-x-item-input"
+          name="label"
+          :label="t('common.label')"
+          required
+        />
+      </OForm>
       <div v-if="!customQuery && modelValue.isDerived">
         <SortByBtnGrp :fieldObj="modelValue" />
       </div>
@@ -46,19 +51,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, inject, ref } from "vue";
+import { computed, defineComponent, ref, watch } from "vue";
 
 import SortByBtnGrp from "@/components/dashboards/addPanel/SortByBtnGrp.vue";
 import DynamicFunctionPopUp from "@/components/dashboards/addPanel/dynamicFunction/DynamicFunctionPopUp.vue";
 import { useI18n } from "vue-i18n";
-import OInput from "@/lib/forms/Input/OInput.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import {
+  makeBuildFieldPopUpSchema,
+  type BuildFieldPopUpForm,
+} from "./BuildFieldPopUp.schema";
 
 export default defineComponent({
   name: "BuildFieldPopUp",
   components: {
     SortByBtnGrp,
     DynamicFunctionPopUp,
-    OInput,
+    OForm,
+    OFormInput,
   },
   props: {
     modelValue: {
@@ -74,14 +85,56 @@ export default defineComponent({
       default: "bar",
     },
   },
+  emits: ["update:modelValue"],
   setup(props, { emit }) {
     const { t } = useI18n();
-    const labelTouched = ref(false);
+
+    const buildFieldFormRef: any = ref(null);
+    const buildFieldPopUpSchema = makeBuildFieldPopUpSchema(t);
+
+    // The form owns `label`; seed it from the incoming modelValue (read once at
+    // mount — this is a plain fragment, not a remounting overlay).
+    const buildFieldPopUpDefaults = computed(
+      (): BuildFieldPopUpForm => ({
+        label: props.modelValue?.label ?? "",
+      }),
+    );
+
+    // Sync the form-owned `label` OUT to the parent's modelValue so the existing
+    // contract (parent reads modelValue.label) is preserved. This is a
+    // form → parent value handoff (the same direction the old v-model wrote),
+    // NOT a banned mirror of a form-owned field back INTO the form.
+    let stopLabelWatch: (() => void) | null = null;
+    watch(
+      () => buildFieldFormRef.value,
+      (formRef: any) => {
+        stopLabelWatch?.();
+        stopLabelWatch = null;
+        if (formRef?.form) {
+          const labelStore = formRef.form.useStore(
+            (s: any) => s.values?.label,
+          );
+          stopLabelWatch = watch(
+            labelStore,
+            (v: any) => {
+              if (props.modelValue) props.modelValue.label = v ?? "";
+            },
+            // immediate so the current form value is flushed out to modelValue as
+            // soon as the subscription is (re)established — covers the case where
+            // a change lands before the post-mount subscription runs.
+            { immediate: true },
+          );
+        }
+      },
+      { immediate: true },
+    );
 
     return {
       t,
       emit,
-      labelTouched,
+      buildFieldFormRef,
+      buildFieldPopUpSchema,
+      buildFieldPopUpDefaults,
     };
   },
 });
