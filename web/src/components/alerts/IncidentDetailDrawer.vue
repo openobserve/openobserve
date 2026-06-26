@@ -64,38 +64,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTooltip v-if="incidentDetails && incidentDetails.title.length > 35" :content="incidentDetails.title" />
         </span>
 
-        <!-- Status, Severity, Alerts badges — grouped with title as metadata -->
+        <!-- Status, Severity, Alerts badges — match the soft dot-badge variant
+             used in the Incident list (no heavy ring/icon). -->
         <template v-if="incidentDetails && !isEditingTitle">
           <OBadge
             :variant="getStatusVariant(incidentDetails.status)"
-            class="tw:cursor-default tw:h-7 tw:px-2.5 tw:ring-1 tw:ring-inset tw:ring-current tw:ring-opacity-40"
+            dot
+            size="sm"
+            class="tw:cursor-default"
           >
-            <div class="tw:flex tw:items-center tw:gap-1">
-              <OIcon name="info" size="xs" />
-              <span>{{ getStatusLabel(incidentDetails.status) }}</span>
-            </div>
+            {{ getStatusLabel(incidentDetails.status) }}
             <OTooltip :delay="200" :content="t('alerts.incidents.status') + ': ' + getStatusLabel(incidentDetails.status)" />
           </OBadge>
 
           <OBadge
             :variant="getSeverityVariant(incidentDetails.severity)"
-            class="tw:cursor-default tw:h-7 tw:px-2.5 tw:ring-1 tw:ring-inset tw:ring-current tw:ring-opacity-40"
+            dot
+            size="sm"
+            class="tw:cursor-default"
           >
-            <div class="tw:flex tw:items-center tw:gap-1">
-              <OIcon name="warning" size="xs" />
-              <span>{{ incidentDetails.severity }}</span>
-            </div>
+            {{ incidentDetails.severity }}
             <OTooltip :delay="200" :content="t('alerts.incidents.severity') + ': ' + incidentDetails.severity" />
           </OBadge>
 
           <OBadge
             variant="primary-soft"
-            class="tw:cursor-default tw:h-7 tw:px-2.5 tw:ring-1 tw:ring-inset tw:ring-current tw:ring-opacity-40"
+            dot
+            size="sm"
+            class="tw:cursor-default"
           >
-            <div class="tw:flex tw:items-center tw:gap-1">
-              <OIcon name="notifications-active" size="xs" />
-              <span>{{ triggers.length }} Alerts</span>
-            </div>
+            {{ triggers.length }} Alerts
             <OTooltip :delay="200" :content="t('alerts.incidents.alertCount') + ': ' + triggers.length + ' correlated alerts'" />
           </OBadge>
         </template>

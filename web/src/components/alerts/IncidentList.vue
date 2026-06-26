@@ -117,19 +117,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
         <template #cell-dimensions="{ row }">
-          <div class="tw:flex tw:flex-wrap tw:gap-1">
+          <div class="tw:flex tw:flex-nowrap tw:items-center tw:gap-1 tw:min-w-0 tw:overflow-hidden">
             <span
               v-for="[key, value] in getSortedDimensions(row.group_values).slice(0, 2)"
               :key="key"
-              class="dimension-badge"
-              :class="getDimensionColorClass(key)"
+              class="tw:inline-flex tw:min-w-0"
             >
-              <span>{{ key }}</span>=<span>{{ value }}</span>
+              <OBadge :variant="getDimensionVariant(key)" size="sm" class="tw:min-w-0 tw:!p-0 tw:overflow-hidden">
+                <span class="tw:inline-flex tw:items-stretch tw:min-w-0">
+                  <span class="tw:ps-2.5 tw:pe-1 tw:py-1.5 tw:shrink-0 tw:whitespace-nowrap tw:bg-current/8 tw:opacity-90">{{ key }}</span>
+                  <span class="tw:ps-1 tw:pe-2.5 tw:py-1.5 tw:truncate tw:min-w-0 tw:font-semibold">{{ value }}</span>
+                </span>
+              </OBadge>
               <OTooltip :delay="300" :content="key + '=' + value" />
             </span>
-            <span
+            <OBadge
               v-if="getSortedDimensions(row.group_values).length > 2"
-              class="dimension-badge badge-more"
+              variant="default-soft"
+              size="sm"
+              class="tw:shrink-0"
             >
               +{{ getSortedDimensions(row.group_values).length - 2 }} more
               <OTooltip :delay="300" :max-width="'28rem'">
@@ -144,7 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </template>
               </OTooltip>
-            </span>
+            </OBadge>
           </div>
         </template>
         <template #cell-last_alert_at="{ row }">
@@ -231,6 +237,7 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import { BADGE_GROUPS, normalizeKey } from "@/lib/core/Badge/badgeGroups";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
@@ -313,7 +320,7 @@ export default defineComponent({
         accessorKey: "group_values",
         resizable: true,
         hideable: true,
-        size: 400,
+        size: 500,
         meta: { align: "left" },
       },
       {
@@ -565,6 +572,24 @@ export default defineComponent({
       return classes[Math.abs(hash) % classes.length];
     };
 
+    const DIMENSION_FALLBACK_VARIANTS: BadgeVariant[] = [
+      'default-soft', 'amber-soft', 'purple-soft', 'blue-soft', 'teal-soft', 'indigo-soft',
+    ];
+    const getDimensionVariant = (key: string): BadgeVariant => {
+      const values = BADGE_GROUPS.dimensionKey.values as Record<string, { variant: BadgeVariant }>;
+      const nk = normalizeKey(key);
+      if (values[nk]) return values[nk].variant;
+      for (const [pattern, cfg] of Object.entries(values)) {
+        if (nk.includes(pattern)) return cfg.variant;
+      }
+      let hash = 0;
+      for (let i = 0; i < key.length; i++) {
+        hash = ((hash << 5) - hash) + key.charCodeAt(i);
+        hash = hash & hash;
+      }
+      return DIMENSION_FALLBACK_VARIANTS[Math.abs(hash) % DIMENSION_FALLBACK_VARIANTS.length];
+    };
+
     const restoreStateFromStore = (): boolean => {
       const savedState = store.state.incidents.incidents;
       const cachedData = store.state.incidents.cachedData;
@@ -659,6 +684,7 @@ export default defineComponent({
       formatDimensions,
       getSortedDimensions,
       getDimensionColorClass,
+      getDimensionVariant,
       qTableRef,
       store,
     };

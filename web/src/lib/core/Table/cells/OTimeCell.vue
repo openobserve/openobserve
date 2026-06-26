@@ -130,7 +130,7 @@ const absolute = computed(() => {
     return formatInTimeZone(
       new Date(epochMs.value),
       zone.value,
-      "yyyy-MM-dd HH:mm:ss zzz",
+      "yyyy-MM-dd HH:mm:ss",
     );
   } catch {
     return new Date(epochMs.value).toISOString();

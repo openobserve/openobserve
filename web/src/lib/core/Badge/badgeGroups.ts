@@ -289,6 +289,33 @@ export const BADGE_GROUPS = {
     },
   },
 
+  // Incident / correlation DIMENSION keys — colour a dimension chip by its key
+  // name (k8s-cluster, k8s-namespace, service, env, …). Plain mode: the chip
+  // draws its own key|value layout, only the colour is sourced from here.
+  // Callers match exact-normalised first, then substring (so "k8s-cluster"
+  // resolves via "cluster"), then hash for variety. Keep specific keys BEFORE
+  // generic ones so substring matching favours the longer token.
+  dimensionKey: {
+    mode: "plain",
+    values: {
+      deployment: { variant: "blue-soft" },
+      namespace: { variant: "orange-soft" },
+      environment: { variant: "success-soft" },
+      env: { variant: "success-soft" },
+      hostname: { variant: "purple-soft" },
+      host: { variant: "purple-soft" },
+      servicename: { variant: "cyan-soft" },
+      service: { variant: "cyan-soft" },
+      region: { variant: "error-soft" },
+      zone: { variant: "error-soft" },
+      cluster: { variant: "indigo-soft" },
+      pod: { variant: "teal-soft" },
+      container: { variant: "error-soft" },
+      application: { variant: "amber-soft" },
+      app: { variant: "amber-soft" },
+    },
+  },
+
   // Generic enabled/yes/true vs disabled/no/false — dot.
   booleanState: {
     mode: "dot",
