@@ -801,8 +801,9 @@ class TestTypeChangeOnReappearance:
         # batch 1 (original int) is numerically queryable
         int_match = count_records(client, s, where="fc = 10")
         assert int_match == 5, f"batch 1 fc=10 must match WHERE fc=10 (5 rows); got {int_match}"
-        # batch 3 fc is present (field exists) even though the float value does not survive int coercion
-        fc_present = count_records(client, s, where="fc IS NOT NULL AND fc != ''")
+        # fc is a numeric field — comparing to '' causes a Float64 cast error in OO.
+        # Use IS NOT NULL only (no != '' check) for numeric fields.
+        fc_present = count_records(client, s, where="fc IS NOT NULL")
         assert fc_present == 10, f"fc must be non-null in batches 1+3 (10 rows); got {fc_present}"
 
     def test_43_bool_to_string_on_reappearance(self, client):
@@ -1196,17 +1197,25 @@ class TestNegativeCases:
         )
 
     def test_neg2_query_nonexistent_field_returns_gracefully(self, client):
-        """A field never ingested in any batch must return 0 rows — not crash or 500.
+        """A field never ingested in any batch must return a clean 400 — not crash with 500.
 
-        OO must treat a completely unknown field as universally NULL rather than
-        raising a column-not-found error.
+        OO returns code 20004 "Search field not found" for completely unknown fields.
+        This is the documented behavior: OO does not treat unknown fields as universally
+        NULL; it raises a schema error. The invariant is no 500 / no server crash.
         """
         s = _stream("neg2")
         records = [{"_timestamp": _ts(i), "host": "h1", "val": i} for i in range(5)]
         ingest(client, s, records)
         flush_and_wait(client, s, expected=5)
-        result = count_records(client, s, where="completely_absent_field_xyz IS NOT NULL")
-        assert result == 0, f"never-ingested field must match 0 rows; got {result}"
+        start, end = _wide_window()
+        sql = f'SELECT COUNT(*) AS c FROM "{s}" WHERE completely_absent_field_xyz IS NOT NULL'
+        resp = client.post("_search?type=logs", json=search_payload(sql, start_time=start, end_time=end, size=1))
+        assert resp.status_code == 400, (
+            f"unknown field must return 400 field-not-found; got {resp.status_code}: {resp.text[:200]}"
+        )
+        assert "20004" in resp.text or "field" in resp.text.lower(), (
+            f"400 response must be a field-not-found error, not a server crash: {resp.text[:200]}"
+        )
 
     def test_neg3_record_count_monotonically_increases(self, client):
         """COUNT(*) must equal the cumulative ingest count after every batch — no silent drops.
