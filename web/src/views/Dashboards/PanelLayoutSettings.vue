@@ -28,7 +28,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
     data-test="panel-layout-settings-content"
     class="tw:p-0"
-    :class="store.state.theme == 'dark' ? 'tw:bg-(--o2-primary-background)' : 'tw:bg-white'"
     style="min-height: inherit"
   >
     <div>
