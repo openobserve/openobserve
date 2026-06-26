@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       labelKey="label"
       valueKey="value"
       class="textbox tw:flex tw:flex-col no-case o2-custom-select-dashboard"
-      :loading="variableItem.isLoading"
+      :loading="variableItem.isLoading && !isOpen"
       :data-test="`variable-selector-${variableItem.name}-inner`"
       :multiple="variableItem.multiSelect"
       @search="onSearch"
@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >{{ displayValue }}</span>
       </template>
       <template #before-options>
-        <template v-if="computedOptions.length > 0">
+        <template v-if="hasVisibleFilteredOptions">
           <!-- multiSelect: show checkbox + Select All -->
           <div
             v-if="variableItem.multiSelect"
@@ -64,17 +64,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <span>All</span>
           </div>
+        </template>
+      </template>
+      <!-- Custom suggestion rendered AFTER the matching options so real results
+           take priority. The no-match case is handled by the #empty slot below. -->
+      <template #after-options>
+        <template
+          v-if="
+            hasVisibleFilteredOptions &&
+            currentSearchTerm &&
+            !isSearchTermExistingOption
+          "
+        >
           <OSeparator />
           <div
-            v-if="currentSearchTerm && !isSearchTermExistingOption"
             class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:cursor-pointer"
             @click.stop="handleCustomValue(currentSearchTerm)"
           >
             {{ currentSearchTerm }}
             <span class="tw:text-gray-400 tw:text-xs tw:italic">(Custom)</span>
           </div>
-          <OSeparator v-if="currentSearchTerm && !isSearchTermExistingOption" />
         </template>
+        <div
+          v-if="variableItem.isLoading && hasVisibleFilteredOptions"
+          class="tw:flex tw:justify-center tw:items-center tw:py-2"
+          data-test="variable-query-value-selector-loading-more"
+        >
+          <OSpinner size="sm" />
+        </div>
       </template>
       <template #empty>
         <div v-if="variableItem.isLoading" class="tw:flex tw:justify-center tw:items-center tw:py-3">
@@ -82,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div
           v-else-if="currentSearchTerm && !isSearchTermExistingOption"
-          class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:cursor-pointer"
+          class="tw:flex tw:items-center tw:gap-2 tw:cursor-pointer tw:text-select-text"
           @click.stop="handleCustomValue(currentSearchTerm)"
         >
           {{ currentSearchTerm }}
@@ -205,6 +222,16 @@ export default defineComponent({
         }
         return false;
       });
+    });
+
+    const hasVisibleFilteredOptions = computed(() => {
+      const term = currentSearchTerm.value?.trim().toLowerCase();
+      if (!term) return computedOptions.value.length > 0;
+      return computedOptions.value.some(
+        (opt: any) =>
+          typeof opt.label === "string" &&
+          opt.label.toLowerCase().includes(term),
+      );
     });
 
     const isAllSelected = computed(() => {
@@ -409,6 +436,8 @@ export default defineComponent({
     };
 
     return {
+      isOpen,
+      hasVisibleFilteredOptions,
       selectedValue,
       oSelectModelValue,
       computedOptions,

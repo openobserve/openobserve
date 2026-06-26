@@ -318,6 +318,8 @@ class="tw:mr-1" />
                   ?.isExpandedRow
               "
               class="tw:absolute tw:left-0 tw:inset-y-0 tw:w-1 tw:z-10"
+              data-test="log-table-row-status-color"
+              :data-test-status-level="getRowStatusLevel(tableRows[virtualRow.index])"
               :style="{
                 backgroundColor: getRowStatusColor(tableRows[virtualRow.index]),
               }"
@@ -644,6 +646,13 @@ const highlightQuery = computed(() => {
 const getRowStatusColor = (rowData: any) => {
   const statusInfo = extractStatusFromLog(rowData);
   return statusInfo.color;
+};
+
+// Detected severity/level for the row, exposed as a data attribute on the status
+// color bar. This keeps the severity machine-readable regardless of which column
+// is displayed (e.g. the FTS "body" column instead of the raw "source" JSON).
+const getRowStatusLevel = (rowData: any) => {
+  return extractStatusFromLog(rowData).level;
 };
 
 watch(

@@ -925,7 +925,9 @@ export default defineComponent({
 
     const setValue = (value: string) => {
       if (editorObj?.setValue) {
-        editorObj.setValue(value);
+        // Monaco's setValue throws "Illegal argument" for null/undefined —
+        // coerce to a string so mode switches (e.g. PromQL → SQL) can't crash the editor
+        editorObj.setValue(value ?? "");
         editorObj?.layout();
       }
     };

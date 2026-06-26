@@ -888,6 +888,8 @@ export default defineComponent({
       }
     },
     closeColumn(col: any) {
+      // Explicit user action — clear the system-pick marker so the result persists.
+      this.searchObj.meta.isFtsDefaultColumn = false;
       let selectedFields = this.reorderSelectedFields();
 
       const RGIndex = this.searchObj.data.resultGrid.columns.indexOf(col.id);
@@ -1034,7 +1036,7 @@ export default defineComponent({
     const { updatedLocalLogFilterField } = logsUtils();
     const { extractFTSFields, filterHitsColumns } = useStreamFields();
 
-    const { reorderSelectedFields, getFilterExpressionByFieldType } = useLogs();
+    const { reorderSelectedFields, getFilterExpressionByFieldType, resolveDefaultColumns } = useLogs();
 
     const { searchObj } = searchState();
 
@@ -1616,6 +1618,9 @@ export default defineComponent({
     });
 
     function addFieldToTable(fieldName: string) {
+      // Explicit user action — this selection is now user-owned, so allow it to
+      // persist (clears any prior system-pick FTS-default marker).
+      searchObj.meta.isFtsDefaultColumn = false;
       if (searchObj.data.stream.selectedFields.includes(fieldName)) {
         searchObj.data.stream.selectedFields =
           searchObj.data.stream.selectedFields.filter(
@@ -1770,6 +1775,39 @@ export default defineComponent({
       (loading, wasLoading) => {
         if (wasLoading && !loading && searchObj.meta.searchApplied) {
           searchObj.meta.lastRunAt = Date.now();
+          // FTS default columns are a convenience for the default logs view only.
+          // In SQL mode the user authored the exact SELECT list (custom queries,
+          // CTEs, aggregates), so their result columns are authoritative — never
+          // inject an FTS default over a hand-written query.
+          if (searchObj.meta.sqlMode) {
+            return;
+          }
+          // Only the system may overwrite a column the system itself picked.
+          // isFtsDefaultColumn is the authoritative "current columns are a system
+          // pick" signal: it is true only when this watcher set the columns, and
+          // is cleared the moment the user takes any explicit column action (pin,
+          // toggle, remove, reset). So we re-evaluate the FTS default ONLY when
+          // there is no selection at all, or the existing selection is a prior
+          // system pick. A user-chosen selection (flag false, non-empty) — even
+          // if it happens to be FTS fields like "message" — is left untouched.
+          const currentFields = searchObj.data.stream.selectedFields;
+          const canResolveDefault =
+            !currentFields.length || searchObj.meta.isFtsDefaultColumn;
+          if (canResolveDefault) {
+            const hits = searchObj.data.queryResults?.hits || [];
+            const globalFtsKeys = store?.state?.zoConfig?.default_fts_keys || [];
+            const ftsDefaults = resolveDefaultColumns(
+              searchObj.data.stream.selectedStreamFields,
+              globalFtsKeys,
+              hits,
+            );
+            // ftsDefaults is [] when no candidate has filled values → falls through to _source
+            searchObj.data.stream.selectedFields = ftsDefaults;
+            // Mark this as a system pick so it is not persisted to logFilterField.
+            // A stale persisted FTS default would otherwise leak back into later
+            // searches (and SQL mode) as if the user had chosen it.
+            searchObj.meta.isFtsDefaultColumn = ftsDefaults.length > 0;
+          }
         }
       },
     );
@@ -1966,6 +2004,7 @@ export default defineComponent({
       openCorrelationPanel,
       openCorrelationFromLog,
       openLogDetailsWithCorrelation,
+      resolveDefaultColumns,
     };
   },
   computed: {

@@ -1,3 +1,4 @@
+<!-- Copyright 2026 OpenObserve Inc. -->
 <!-- Unified Query Editor Component
   Supports: SQL, PromQL, VRL, JavaScript
   Features: NL Mode (AI), Language Switching, Auto-detection
@@ -452,15 +453,18 @@ watch(() => props.query, (newQuery) => {
   if (!editorRef.value?.getValue) return;
 
   const currentValue = editorRef.value.getValue();
+  // Coerce to string so a null/undefined query (e.g. switching PromQL → SQL)
+  // doesn't reach Monaco's setValue, which throws "Illegal argument"
+  const nextValue = newQuery ?? "";
 
   // Compare trimmed values to avoid cursor jumps from whitespace differences
   // This prevents setValue calls when user is typing trailing spaces
-  if (currentValue?.trim() === newQuery?.trim()) {
+  if (currentValue?.trim() === nextValue.trim()) {
     return;
   }
 
   if (editorRef.value.setValue) {
-    editorRef.value.setValue(newQuery);
+    editorRef.value.setValue(nextValue);
   }
 });
 

@@ -184,7 +184,7 @@ export default defineComponent({
           .iterations(2)
         )
         .force('x', forceX((d: any) => {
-          // Position nodes left-to-right based on their depth, starting from extreme left
+          // Position nodes left-to-right based on their temporal-edge depth.
           const depth = nodeDepth.get(d.id) || 0;
           const maxDepth = Math.max(...Array.from(nodeDepth.values()));
           const leftMargin = 80; // Left margin to prevent nodes from touching the edge
@@ -193,14 +193,12 @@ export default defineComponent({
           const spacing = maxDepth > 0 ? availableWidth / maxDepth : 0;
           return leftMargin + spacing * depth;
         }).strength(1.5)) // Strong horizontal positioning
-        .force('y', forceY((d: any) => {
-          // Stronger vertical centering for root nodes (depth 0)
-          const depth = nodeDepth.get(d.id) || 0;
+        .force('y', forceY(() => {
           return height / 2;
         }).strength((d: any) => {
-          // Stronger centering for root nodes
+          // Stronger centering for root nodes (depth 0).
           const depth = nodeDepth.get(d.id) || 0;
-          return depth === 0 ? 0.8 : 0.1; // Much stronger centering for root nodes
+          return depth === 0 ? 0.8 : 0.1;
         }))
         .force('collision', forceCollide()
           .radius((d: any) => (d.symbolSize || 60) / 2 + 50)
@@ -235,8 +233,161 @@ export default defineComponent({
       return "#3b82f6"; // blue-500 - normal
     };
 
-    const getNodeSize = (node: AlertNode): number => {
-      return 60; // Fixed size for all nodes
+    const getNodeSize = (node: AlertNode, nodes: AlertNode[], maxSize = 120): number => {
+      // Scale node size based on alert_count relative to the max count in the dataset
+      const minSize = 30;
+      const maxCount = Math.max(...nodes.map(n => n.alert_count || 0), 1);
+      if (maxCount === 0) return minSize;
+      const ratio = (node.alert_count || 0) / maxCount;
+      return Math.round(minSize + ratio * (maxSize - minSize));
+    };
+
+    // Above this raw-node count the graph is bucketed by time to stay legible;
+    // at or below it every firing is shown 1:1 (preserving the clean timeline).
+    // Kept low because the backend already caps nodes well below the alert count
+    // (e.g. 434 alerts -> 42 nodes), and the force layout blobs past ~15 nodes.
+    const NODE_CAP = 15;
+    // Pick the smallest time unit that yields no more than this many windows.
+    // Kept low so dense incidents collapse into a coarse, readable timeline
+    // rather than dozens of overlapping nodes.
+    const BUCKET_TARGET_MAX = 24;
+    // Bucket-unit ladder in microseconds (backend timestamps are microseconds).
+    const US = 1000; // microseconds per millisecond
+    const BUCKET_UNITS_US = [
+      60 * US * 1000,            // 1 minute
+      5 * 60 * US * 1000,        // 5 minutes
+      15 * 60 * US * 1000,       // 15 minutes
+      60 * 60 * US * 1000,       // 1 hour
+      6 * 60 * 60 * US * 1000,   // 6 hours
+      24 * 60 * 60 * US * 1000,  // 1 day
+      7 * 24 * 60 * 60 * US * 1000, // 7 days
+    ];
+
+    // Format a bucket window start (microseconds) for the node label, using a
+    // time-of-day form for sub-day units and a date for day+ units.
+    const formatWindow = (startUs: number, unitUs: number): string => {
+      const d = new Date(startUs / 1000);
+      if (unitUs >= 24 * 60 * 60 * US * 1000) {
+        return d.toLocaleDateString();
+      }
+      return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    };
+
+    /**
+     * Collapse many alert firings into time-window buckets, keyed by
+     * (window x alert_name) so distinct alerts never merge. With a single alert
+     * name (the common case) this degrades to one node per non-empty window —
+     * a pure left-to-right timeline. Edges are rebuilt by collapsing the
+     * backend's raw edges onto the buckets, so both within-alert sequences AND
+     * cross-alert temporal correlations are preserved.
+     */
+    const bucketFiringsByTime = (
+      rawNodes: any[],
+      rawEdges: any[],
+    ): { nodes: any[]; edges: any[] } => {
+      const times = rawNodes.map((n) => n.first_fired_at);
+      const minTime = Math.min(...times);
+      const maxTime = Math.max(...rawNodes.map((n) => n.last_fired_at));
+      const span = Math.max(maxTime - minTime, 1);
+
+      // Choose the smallest ladder unit whose window count fits the target. For
+      // spans so long even the largest ladder unit exceeds the target, derive a
+      // custom unit so the window count is ALWAYS capped at BUCKET_TARGET_MAX.
+      const unitUs =
+        BUCKET_UNITS_US.find((u) => Math.ceil(span / u) <= BUCKET_TARGET_MAX) ??
+        Math.ceil(span / BUCKET_TARGET_MAX);
+
+      const buckets = new Map<string, {
+        alert_id: string;
+        alert_name: string;
+        service_name: string;
+        alert_count: number;
+        first_fired_at: number;
+        last_fired_at: number;
+        windowStart: number;
+        serviceCounts: Map<string, number>;
+      }>();
+
+      // Track which bucket key each raw node index falls into, for edge rebuild.
+      const rawIdxToKey = new Map<number, string>();
+
+      rawNodes.forEach((node, rawIdx) => {
+        const windowIdx = Math.floor((node.first_fired_at - minTime) / unitUs);
+        const name = node.alert_name || "unknown";
+        const key = `${windowIdx}|${name}`;
+        rawIdxToKey.set(rawIdx, key);
+        if (!buckets.has(key)) {
+          buckets.set(key, {
+            alert_id: node.alert_id,
+            alert_name: name,
+            service_name: node.service_name,
+            alert_count: 0,
+            first_fired_at: node.first_fired_at,
+            last_fired_at: node.last_fired_at,
+            windowStart: minTime + windowIdx * unitUs,
+            serviceCounts: new Map(),
+          });
+        }
+        const b = buckets.get(key)!;
+        b.alert_count += node.alert_count;
+        if (node.first_fired_at < b.first_fired_at) b.first_fired_at = node.first_fired_at;
+        if (node.last_fired_at > b.last_fired_at) b.last_fired_at = node.last_fired_at;
+        const svc = node.service_name || "";
+        b.serviceCounts.set(svc, (b.serviceCounts.get(svc) || 0) + 1);
+      });
+
+      // Materialize bucket nodes, sorted chronologically. Each node keeps its
+      // bucket `key` so the raw edges can be remapped onto buckets below. The
+      // force layout positions them by temporal depth, so no explicit
+      // coordinates are needed here.
+      const nodes = Array.from(buckets.entries())
+        .map(([key, b]) => {
+          let bestSvc = b.service_name;
+          let bestCount = 0;
+          b.serviceCounts.forEach((count, svc) => {
+            if (count > bestCount) {
+              bestCount = count;
+              bestSvc = svc;
+            }
+          });
+          return {
+            key,
+            alert_id: b.alert_id,
+            alert_name: b.alert_name,
+            service_name: bestSvc,
+            alert_count: b.alert_count,
+            first_fired_at: b.first_fired_at,
+            last_fired_at: b.last_fired_at,
+            // Label shows name + count + window, e.g. "go_gc_rate_high x42 14:05"
+            display_label: `${b.alert_name} x${b.alert_count} ${formatWindow(b.windowStart, unitUs)}`,
+          };
+        })
+        .sort((a, b) => a.first_fired_at - b.first_fired_at);
+
+      // Map each bucket key to its final (post-sort) node index.
+      const keyToIdx = new Map<string, number>();
+      nodes.forEach((n, idx) => keyToIdx.set(n.key, idx));
+
+      // Rebuild edges by collapsing the backend's raw edges onto buckets. This
+      // preserves both within-alert sequences and cross-alert correlations.
+      // Drop self-loops (both endpoints in the same bucket) and de-duplicate.
+      const seen = new Set<string>();
+      const edges: any[] = [];
+      for (const e of rawEdges) {
+        const srcKey = rawIdxToKey.get(e.from_node_index);
+        const tgtKey = rawIdxToKey.get(e.to_node_index);
+        if (srcKey === undefined || tgtKey === undefined) continue;
+        const srcIdx = keyToIdx.get(srcKey);
+        const tgtIdx = keyToIdx.get(tgtKey);
+        if (srcIdx === undefined || tgtIdx === undefined) continue;
+        if (srcIdx === tgtIdx) continue; // self-loop within one bucket
+        const dedupe = `${srcIdx}->${tgtIdx}|${e.edge_type}`;
+        if (seen.has(dedupe)) continue;
+        seen.add(dedupe);
+        edges.push({ from_node_index: srcIdx, to_node_index: tgtIdx, edge_type: e.edge_type });
+      }
+
+      return { nodes, edges };
     };
 
     const chartData = computed(() => {
@@ -244,13 +395,35 @@ export default defineComponent({
         return { options: {}, notMerge: true };
       }
 
-      const { nodes, edges } = graphData.value;
+      const { nodes: rawNodes, edges: rawEdges } = graphData.value;
 
-      // Prepare nodes for D3-force simulation
+      // Adaptive node construction:
+      //  - Detail mode (<= NODE_CAP firings): render each firing 1:1 with the
+      //    backend's edges, preserving the clean left-to-right timeline.
+      //  - Bucketed mode (> NODE_CAP): collapse firings into time-window x name
+      //    buckets so the graph stays legible at high alert counts.
+      let nodes: any[];
+      let edges: any[];
+      if (rawNodes.length > NODE_CAP) {
+        const bucketed = bucketFiringsByTime(rawNodes, rawEdges);
+        nodes = bucketed.nodes;
+        edges = bucketed.edges;
+      } else {
+        nodes = rawNodes;
+        // Backend edges are index-based into the raw node array; in detail mode
+        // the node array IS the raw array, so indices are used directly.
+        edges = rawEdges;
+      }
+
+      // Prepare nodes for D3-force simulation. Bucketed nodes carry a
+      // display_label (name + count + window); detail nodes show the alert name.
+      // Bucketed nodes use a uniform size so the timeline reads as evenly-spaced
+      // circles (like the detail/main layout) rather than lumpy count-scaled blobs.
+      const bucketed = rawNodes.length > NODE_CAP;
       const preparedNodes = nodes.map((node, index) => ({
-        name: node.alert_name, // Show only alert name for cleaner labels
+        name: node.display_label || node.alert_name,
         id: index.toString(),
-        symbolSize: getNodeSize(node),
+        symbolSize: bucketed ? 60 : getNodeSize(node, nodes),
         originalNode: node,
         originalIndex: index,
       }));
@@ -275,7 +448,11 @@ export default defineComponent({
           y: nodePositions.value.get(n.id)!.y,
         }));
       } else {
-        // Compute new positions and cache them with wider canvas for left-to-right layout
+        // Both modes use the same force-directed layout (main's algorithm),
+        // which positions nodes left-to-right by temporal depth and lets the
+        // charge/collision forces fan them into an organic vertical wave that
+        // fills the canvas. Bucketing already caps the node count (~24), so the
+        // simulation stays in the regime where it reads cleanly.
         positionedNodes = computeForceLayout(preparedNodes, preparedEdges, 1200, 400);
         positionedNodes.forEach((node: any) => {
           nodePositions.value.set(node.id, { x: node.x, y: node.y });
@@ -294,6 +471,7 @@ export default defineComponent({
           y: node.y,
           fixed: true, // Lock position so ECharts doesn't re-layout
           symbolSize: node.symbolSize,
+          originalNode: node.originalNode,
           itemStyle: {
             color: getNodeColor(originalNode, index),
             borderColor: index === 0 ? "#dc2626" : getNodeColor(originalNode, index),

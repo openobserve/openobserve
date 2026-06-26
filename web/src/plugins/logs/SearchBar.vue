@@ -3230,6 +3230,10 @@ export default defineComponent({
             store.dispatch("setSavedViewFlag", true);
             const extractedObj = res.data.data;
 
+            // A saved view's columns are an explicit user choice, not a system
+            // FTS default, so they must persist and never be auto-overridden.
+            searchObj.meta.isFtsDefaultColumn = false;
+
             // Resetting columns as its not required in searchObj
             // As we reassign columns from selectedFields and search results
             extractedObj.data.resultGrid.columns = [];

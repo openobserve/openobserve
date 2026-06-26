@@ -1085,15 +1085,29 @@ export const useStreamFields = () => {
         );
       }
 
-      let selectedFields = (
-        (logFilterField && logFieldSelectedValue) ||
-        []
-      ).filter(
-        (_field) =>
+      // In SQL mode the user's query authors the exact result columns. Neither
+      // the persisted selection (logFilterField, a quick-mode convenience) nor a
+      // lingering system-picked FTS default may drive SQL-mode rendering —
+      // otherwise a stale "body" column overrides an explicit SELECT. When
+      // entering SQL mode with a system-picked default still in memory, drop it
+      // so columns come only from the query (defaulting to the raw "source").
+      if (searchObj.meta.sqlMode && searchObj.meta.isFtsDefaultColumn) {
+        searchObj.data.stream.selectedFields = [];
+        searchObj.meta.isFtsDefaultColumn = false;
+      }
+
+      let selectedFields = searchObj.meta.sqlMode
+        ? []
+        : (logFilterField && logFieldSelectedValue) || [];
+      selectedFields = selectedFields.filter(
+        (_field: string) =>
           _field !== (store?.state?.zoConfig?.timestamp_column || "_timestamp"),
       );
 
+      // Restore the persisted column selection (logFilterField) only outside SQL
+      // mode (see above).
       if (
+        !searchObj.meta.sqlMode &&
         searchObj.data.stream.selectedFields.length == 0 &&
         selectedFields.length > 0
       ) {
@@ -1101,9 +1115,13 @@ export const useStreamFields = () => {
       }
 
       // As in saved view, we observed field getting duplicated in selectedFields
-      // So, we are removing duplicates before applying saved view
+      // So, we are removing duplicates before applying saved view.
+      // In SQL mode an explicit user pin can still populate selectedFields, but a
+      // system FTS default never should (handled above).
       if (searchObj.data.stream.selectedFields?.length) {
-        selectedFields = [...new Set(searchObj.data.stream.selectedFields)];
+        selectedFields = searchObj.meta.sqlMode
+          ? [...searchObj.data.stream.selectedFields]
+          : [...new Set(searchObj.data.stream.selectedFields)];
       }
 
       const parsedSQL: any = fnParsedSQL();
