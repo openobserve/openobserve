@@ -11,7 +11,7 @@
 const { test, expect, navigateToBase } = require('../../utils/enhanced-baseFixtures.js');
 const testLogger = require('../../utils/test-logger.js');
 const PageManager = require('../../../pages/page-manager.js');
-const { getHeaders, getIngestionUrl, sendRequest } = require('../../utils/data-ingestion.js');
+const { getHeaders, getIngestionUrl, sendRequest, waitForStreamData } = require('../../utils/data-ingestion.js');
 const { getOrgIdentifier } = require('../../utils/cloud-auth.js');
 
 // Test data containing edge cases for bug #9754
@@ -181,6 +181,13 @@ test.describe("Logs Highlighting Regression Bug Fixes", () => {
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     const streamAvailable = await pm.logsPage.waitForStreamAvailable(STREAM_NAME, 90000, 3000);
     testLogger.info(`Stream "${STREAM_NAME}" available: ${streamAvailable}`);
+
+    // waitForStreamAvailable only confirms the stream exists in the list — it does not
+    // guarantee the ingested rows are searchable yet. Under CI load that gap left the
+    // later queries hitting an empty table (expectLogsTableVisible / selectStream flakes).
+    // Poll the search API until the rows are actually queryable before the tests run.
+    const dataReady = await waitForStreamData(page, STREAM_NAME, BUG_9754_TEST_LOGS.length, 60000);
+    testLogger.info(`Stream "${STREAM_NAME}" searchable data ready: ${dataReady}`);
 
     testLogger.info('Test data ingested successfully');
   });
