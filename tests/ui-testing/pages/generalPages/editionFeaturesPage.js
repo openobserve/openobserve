@@ -132,9 +132,15 @@ export class EditionFeaturesPage {
       locator.click(),
     ]);
     try {
-      await popup.waitForURL(/openobserve\.ai/, { timeout: 30000 });
-      // Wait for any in-page JS redirects to settle before sampling the URL
-      await popup.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+      await popup.waitForURL(/openobserve\.ai/, { timeout: 20000 });
+      // Settle any in-page JS redirects before sampling the URL. Deliberately
+      // NOT networkidle: external marketing pages load trackers that keep the
+      // network busy, so networkidle never fires and would burn its full
+      // timeout on every one of the ~24 popups (blowing the test budget). A
+      // short domcontentloaded + fixed pause covers the handful of pages that
+      // do a client-side redirect (sre_agent, ent_install_guide).
+      await popup.waitForLoadState('domcontentloaded', { timeout: 5000 }).catch(() => {});
+      await popup.waitForTimeout(1500);
       return popup.url();
     } catch (e) {
       testLogger.error('Popup never reached openobserve.ai — returning current URL', {
