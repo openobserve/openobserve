@@ -21,8 +21,8 @@ limitations under the License. -->
         :key="type.id"
         data-test="destination-type-card"
         :data-type="type.id"
-        class="destination-card tw:group/dest-card tw:relative tw:py-5 tw:px-3 tw:border-2 tw:border-[var(--o2-border-color)] tw:rounded-xl tw:bg-[var(--o2-card-bg)] tw:cursor-pointer tw:transition-all tw:duration-300 tw:[min-height:7.5rem] tw:flex tw:flex-col tw:hover:-translate-y-0.5 tw:hover:shadow-[0_0.25rem_0.75rem_rgba(25,118,210,0.15)] tw:hover:border-[var(--o2-primary-color)]"
-        :class="{ selected: selectedType === type.id, 'tw:border-[var(--o2-primary-color)] tw:bg-[color-mix(in_srgb,var(--o2-primary-color)_10%,var(--o2-card-bg))] tw:shadow-[0_0.25rem_1rem_rgba(25,118,210,0.2)]': selectedType === type.id }"
+        class="destination-card tw:group/dest-card tw:relative tw:py-5 tw:px-3 tw:border-2 tw:border-[var(--o2-border-color)] tw:rounded-xl tw:cursor-pointer tw:transition-all tw:duration-300 tw:[min-height:7.5rem] tw:flex tw:flex-col tw:hover:-translate-y-0.5 tw:hover:shadow-[0_0.25rem_0.75rem_rgba(25,118,210,0.15)] tw:hover:border-[var(--o2-primary-color)]"
+        :class="selectedType === type.id ? 'selected tw:border-[var(--o2-primary-color)] tw:bg-[color-mix(in_srgb,var(--o2-primary-color)_10%,var(--o2-card-bg))] tw:shadow-[0_0.25rem_1rem_rgba(25,118,210,0.2)]' : 'tw:bg-[var(--o2-card-bg)]'"
         @click="selectType(type.id)"
       >
         <!-- Card Content -->
@@ -43,14 +43,14 @@ limitations under the License. -->
           </div>
 
           <!-- Name -->
-          <h3 data-test="destination-type-name" class="card-title tw:text-[0.8125rem] tw:font-medium tw:mt-1 tw:mb-0 tw:text-[var(--q-text-primary)] tw:[line-height:1.3] tw:text-center">
+          <div data-test="destination-type-name" class="card-title tw:text-[0.8125rem] tw:font-medium tw:mt-1 tw:mb-0 tw:text-[var(--o2-text-primary)] tw:[line-height:1.3] tw:text-center">
             {{ type.name }}
-          </h3>
+          </div>
 
           <!-- Description -->
-          <p data-test="destination-type-description" class="card-description tw:text-[0.6875rem] tw:text-[var(--q-text-secondary)] tw:mt-1 tw:mb-0 tw:[line-height:1.2] tw:grow tw:text-center tw:hidden">
+          <div data-test="destination-type-description" class="card-description tw:text-[0.6875rem] tw:text-[var(--o2-text-secondary)] tw:mt-1 tw:mb-0 tw:[line-height:1.2] tw:grow tw:text-center tw:hidden">
             {{ type.description }}
-          </p>
+          </div>
         </div>
 
         <!-- Selection Indicator -->
@@ -66,20 +66,20 @@ limitations under the License. -->
       <div
         data-test="destination-type-card"
         data-type="custom"
-        class="destination-card custom-card tw:group/dest-card tw:relative tw:py-5 tw:px-3 tw:border-2 tw:border-[var(--o2-border-color)] tw:border-dashed tw:rounded-xl tw:bg-[var(--o2-card-bg)] tw:cursor-pointer tw:transition-all tw:duration-300 tw:[min-height:7.5rem] tw:flex tw:flex-col tw:hover:-translate-y-0.5 tw:hover:shadow-[0_0.25rem_0.75rem_rgba(25,118,210,0.15)] tw:hover:border-[var(--o2-primary-color)]"
-        :class="{ selected: selectedType === 'custom', 'tw:border-[var(--o2-primary-color)] tw:bg-[color-mix(in_srgb,var(--o2-primary-color)_10%,var(--o2-card-bg))] tw:shadow-[0_0.25rem_1rem_rgba(25,118,210,0.2)]': selectedType === 'custom' }"
+        class="destination-card custom-card tw:group/dest-card tw:relative tw:py-5 tw:px-3 tw:border-2 tw:border-[var(--o2-border-color)] tw:border-dashed tw:rounded-xl tw:cursor-pointer tw:transition-all tw:duration-300 tw:[min-height:7.5rem] tw:flex tw:flex-col tw:hover:-translate-y-0.5 tw:hover:shadow-[0_0.25rem_0.75rem_rgba(25,118,210,0.15)] tw:hover:border-[var(--o2-primary-color)]"
+        :class="selectedType === 'custom' ? 'selected tw:border-[var(--o2-primary-color)] tw:bg-[color-mix(in_srgb,var(--o2-primary-color)_10%,var(--o2-card-bg))] tw:shadow-[0_0.25rem_1rem_rgba(25,118,210,0.2)]' : 'tw:bg-[var(--o2-card-bg)]'"
         @click="selectType('custom')"
       >
         <div class="card-content tw:flex tw:flex-col tw:items-center tw:text-center tw:h-full tw:relative">
           <div data-test="destination-type-icon" class="tw:mb-2 tw:text-[var(--o2-icon-color)] tw:group-[.selected]/dest-card:text-[var(--o2-primary-color)]">
             <OIcon name="settings" size="md" />
           </div>
-          <h3 data-test="destination-type-name" class="card-title tw:text-[0.8125rem] tw:font-medium tw:mt-1 tw:mb-0 tw:text-[var(--q-text-primary)] tw:[line-height:1.3] tw:text-center">
+          <div data-test="destination-type-name" class="card-title tw:text-[0.8125rem] tw:font-medium tw:mt-1 tw:mb-0 tw:text-[var(--o2-text-primary)] tw:[line-height:1.3] tw:text-center">
             {{ t('alerts.customDestination') }}
-          </h3>
-          <p data-test="destination-type-description" class="card-description tw:text-[0.6875rem] tw:text-[var(--q-text-secondary)] tw:mt-1 tw:mb-0 tw:[line-height:1.2] tw:grow tw:text-center tw:hidden">
+          </div>
+          <div data-test="destination-type-description" class="card-description tw:text-[0.6875rem] tw:text-[var(--o2-text-secondary)] tw:mt-1 tw:mb-0 tw:[line-height:1.2] tw:grow tw:text-center tw:hidden">
             {{ t('alerts.customDestinationDescription') }}
-          </p>
+          </div>
         </div>
 
         <!-- Selection Indicator -->
