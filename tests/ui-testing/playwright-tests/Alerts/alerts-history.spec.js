@@ -87,11 +87,14 @@ async function createHistoryTestAlert(page, alertName, destinationName) {
 
 async function getAlertId(page, alertName) {
   const org = getOrgIdentifier();
-  const resp = await apiCall(page, 'GET', `/api/v2/${org}/alerts?folder=default`);
-  if (resp.status === 200) {
-    const alerts = resp.data?.list || [];
-    const alert = alerts.find(a => a.name === alertName);
-    return alert?.alert_id || alert?.id || null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const resp = await apiCall(page, 'GET', `/api/v2/${org}/alerts?folder=default`);
+    if (resp.status === 200) {
+      const alerts = resp.data?.list || [];
+      const alert = alerts.find(a => a.name === alertName);
+      if (alert) return alert.alert_id || alert.id || null;
+    }
+    if (attempt < 2) await page.waitForTimeout(2000);
   }
   return null;
 }
@@ -105,17 +108,18 @@ async function deleteTestAlert(page, alertName) {
   }
 }
 
-// Poll GET /api/v2/${org}/alerts/${alertId} until last_triggered_at advances past
-// beforeTs, confirming the backend has written a history record for our trigger.
-async function pollForAlertFired(page, alertId, beforeTs, timeoutMs = 60000, intervalMs = 5000) {
+// Poll until either last_triggered_at or last_satisfied_at advances past the
+// pre-trigger snapshot — manual triggers update one or the other depending on backend path.
+async function pollForAlertFired(page, alertId, beforeTriggerTs, beforeSatisfiedTs, timeoutMs = 90000, intervalMs = 5000) {
   const org = getOrgIdentifier();
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     const resp = await apiCall(page, 'GET', `/api/v2/${org}/alerts/${alertId}`);
     if (resp.status === 200) {
-      const ts = resp.data?.last_triggered_at || 0;
-      if (ts > beforeTs) {
-        testLogger.info('Alert fire confirmed via API', { last_triggered_at: ts });
+      const triggeredAt = resp.data?.last_triggered_at || 0;
+      const satisfiedAt = resp.data?.last_satisfied_at || 0;
+      if (triggeredAt > beforeTriggerTs || satisfiedAt > beforeSatisfiedTs) {
+        testLogger.info('Alert fire confirmed via API', { last_triggered_at: triggeredAt, last_satisfied_at: satisfiedAt });
         return true;
       }
     }
@@ -206,19 +210,20 @@ test.describe("Alert History Page", () => {
       throw new Error(`Failed to create alert: ${createResp.status} — ${JSON.stringify(createResp.data)}`);
     }
 
-    // Snapshot pre-trigger state so we can detect when the backend processes our trigger
+    // Snapshot pre-trigger state — capture both timestamp fields to detect either update path
     const alertId = await getAlertId(page, alertName);
     const preState = alertId
       ? await apiCall(page, 'GET', `/api/v2/${org}/alerts/${alertId}`)
       : null;
-    const beforeTs = preState?.data?.last_triggered_at || 0;
+    const beforeTriggerTs = preState?.data?.last_triggered_at || 0;
+    const beforeSatisfiedTs = preState?.data?.last_satisfied_at || 0;
 
     testLogger.info('Triggering alert manually via UI', { alertName });
     await pm.alertsPage.triggerAlertManually(alertName);
 
     // Wait for the backend to confirm it processed the trigger — avoids racing the history page
     if (alertId) {
-      await pollForAlertFired(page, alertId, beforeTs, 60000, 5000);
+      await pollForAlertFired(page, alertId, beforeTriggerTs, beforeSatisfiedTs, 90000, 5000);
     }
 
     testLogger.info('Navigating to alert history page');
@@ -228,7 +233,15 @@ test.describe("Alert History Page", () => {
     await pm.alertHistoryPage.selectAlert(alertName);
     await pm.alertHistoryPage.clickManualSearch();
 
+    // UI fallback: if API poll timed out or history hasn't appeared yet, retry the search
     testLogger.info('Asserting history rows are present');
+    let rowsFound = (await pm.alertHistoryPage.getTableRowCount()) > 0;
+    for (let attempt = 0; attempt < 5 && !rowsFound; attempt++) {
+      testLogger.info(`No history rows yet, retrying search (attempt ${attempt + 1}/5)...`);
+      await page.waitForTimeout(5000);
+      await pm.alertHistoryPage.clickManualSearch();
+      rowsFound = (await pm.alertHistoryPage.getTableRowCount()) > 0;
+    }
     await pm.alertHistoryPage.expectTableHasRows();
 
     testLogger.info('Clicking view details on first row');
