@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="answers">
           <div class="tw:mb-[5px]">
             <div class="tw:text-xs tw:ml-[5px]">
-              <ul class="tw:px-[10px] tw:mt-[10px] tw:mb-0">
+              <ul class="tw:px-[10px] tw:mt-[10px] tw:mb-0 tw:text-[14px] tw:leading-[23px]">
                 <li>
                   For instant vector selectors, use
                   <span class="bg-highlight tw:px-[5px]" :class="store.state.theme == 'dark' ? 'tw:bg-[#747474]' : 'tw:bg-[#e7e6e6]'"
@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="answers">
           <div class="tw:mb-[5px]">
             <div class="tw:text-xs tw:ml-[5px]">
-              <ul class="tw:px-[10px] tw:mt-[10px] tw:mb-0">
+              <ul class="tw:px-[10px] tw:mt-[10px] tw:mb-0 tw:text-[14px] tw:leading-[23px]">
                 <li>
                   For full text search of value 'error' use
                   <span class="bg-highlight tw:px-[5px]" :class="store.state.theme == 'dark' ? 'tw:bg-[#747474]' : 'tw:bg-[#e7e6e6]'"

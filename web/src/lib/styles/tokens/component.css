@@ -1537,6 +1537,15 @@ label:not(.o-input-label) {
     font-feature-settings: "tnum";
     letter-spacing: -0.2px;
   }
+
+  pre,
+  kbd,
+  samp,
+  .log-line {
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    line-height: 1.6;
+  }
 }
 
 ::placeholder {
