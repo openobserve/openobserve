@@ -101,7 +101,7 @@ test.describe("Theme Management Tests", () => {
       testLogger.info('Switched back to Light Mode tab');
 
       // Verify predefined theme options (Light tab is currently active)
-      const expectedThemes = ['Ocean Breeze', 'Purple Dream', 'Indigo Night', 'Sky Blue'];
+      const expectedThemes = ['O2 Signature', 'O2 Pulse', 'O2 Horizon', 'O2 Beacon'];
       for (const themeName of expectedThemes) {
         await pm.themePage.expectThemeCardVisible(themeName, 'light');
         testLogger.info(`Theme "${themeName}" is visible`);
@@ -128,22 +128,22 @@ test.describe("Theme Management Tests", () => {
       // Open predefined themes dialog
       await pm.themePage.openPredefinedThemesDialog();
 
-      // Apply "Ocean Breeze" theme
-      await pm.themePage.applyThemeByName('Ocean Breeze');
-      testLogger.info('Applied Ocean Breeze theme');
+      // Apply "O2 Pulse" theme
+      await pm.themePage.applyThemeByName('O2 Pulse');
+      testLogger.info('Applied O2 Pulse theme');
 
       // Verify notification
       await pm.themePage.expectNotificationContains('applied');
       testLogger.info('Theme application notification shown');
 
       // Verify "Applied" badge appears
-      const isApplied = await pm.themePage.isThemeApplied('Ocean Breeze');
+      const isApplied = await pm.themePage.isThemeApplied('O2 Pulse');
       expect(isApplied).toBe(true);
-      testLogger.info('Applied badge shown for Ocean Breeze');
+      testLogger.info('Applied badge shown for O2 Pulse');
 
       // Now test reset - Apply a different theme first
-      await pm.themePage.applyThemeByName('Purple Dream');
-      testLogger.info('Applied Purple Dream theme');
+      await pm.themePage.applyThemeByName('O2 Horizon');
+      testLogger.info('Applied O2 Horizon theme');
 
       // Reset to default
       await pm.themePage.resetToDefaultTheme();
@@ -178,9 +178,9 @@ test.describe("Theme Management Tests", () => {
       // Select dark mode tab
       await pm.themePage.selectDarkModeTab();
 
-      // Apply "Sky Blue" theme for dark mode
-      await pm.themePage.applyThemeByName('Sky Blue', 'dark');
-      testLogger.info('Applied Sky Blue theme in dark mode');
+      // Apply "O2 Beacon" theme for dark mode
+      await pm.themePage.applyThemeByName('O2 Beacon', 'dark');
+      testLogger.info('Applied O2 Beacon theme in dark mode');
 
       // Verify notification
       await pm.themePage.expectNotificationContains('applied');
