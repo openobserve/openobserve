@@ -1,3 +1,19 @@
+/**
+ * FTS Default Column Selection — E2E suite
+ *
+ * Verifies how the Logs results table auto-picks a full-text-search (FTS) default
+ * column (`message` preferred over `log`) and how that default interacts with
+ * explicit user actions:
+ *   - auto-pick on first search (TC-FTS-001)
+ *   - user-added field is additive and stops FTS re-injection (TC-FTS-002)
+ *   - FTS default re-resolves on subsequent searches / time-range changes (TC-FTS-003)
+ *   - reset clears the FTS default (TC-FTS-004 — fixme, documented feature gap)
+ *   - FTS default is skipped in SQL mode (TC-FTS-005)
+ *   - closing the column re-resolves it on the next search (TC-FTS-006)
+ *   - FTS default is not injected over user-pinned fields (TC-FTS-007)
+ *
+ * Regression coverage for openobserve/openobserve#12857.
+ */
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
@@ -49,16 +65,8 @@ test.describe("FTS Default Column Selection testcases", () => {
     // Results must have rendered
     await pm.logsPage.expectLogTableColumnSourceVisible();
 
-    // At least one FTS column header should be visible.
-    // message has higher FTS_PRIORITY than log; try message first, fall back to log.
-    let ftsField = null;
-    try {
-      await pm.logsPage.expectFieldInTableHeader('message', 15000);
-      ftsField = 'message';
-    } catch {
-      await pm.logsPage.expectFieldInTableHeader('log', 15000);
-      ftsField = 'log';
-    }
+    // At least one FTS column header should be visible (message preferred over log).
+    const ftsField = await pm.logsPage.resolveFtsDefaultField(15000);
 
     // The FTS cell content in row 0 must be non-empty.
     await pm.logsPage.expectLogTableColumnVisible(ftsField, 0);
@@ -72,13 +80,7 @@ test.describe("FTS Default Column Selection testcases", () => {
     testLogger.info('TC-FTS-002: verifying user field toggle stops FTS re-injection');
 
     // Verify FTS default column is active (message or log)
-    let ftsField = 'message';
-    try {
-      await pm.logsPage.expectFieldInTableHeader('message', 10000);
-    } catch {
-      await pm.logsPage.expectFieldInTableHeader('log', 10000);
-      ftsField = 'log';
-    }
+    const ftsField = await pm.logsPage.resolveFtsDefaultField(10000);
 
     // Add a non-FTS field from the sidebar: kubernetes_container_name
     // addFieldToTable is additive — it does not remove existing columns,
@@ -86,8 +88,8 @@ test.describe("FTS Default Column Selection testcases", () => {
     // the user's explicit selection on the next search.
     const userField = 'kubernetes_container_name';
     await pm.logsPage.fillIndexFieldSearchInput(userField);
-    // Allow field search to filter
-    await page.waitForTimeout(500);
+    // hoverOnFieldExpandButton waits for the field's expand button to be visible,
+    // which is the real signal that the sidebar field search has filtered.
     await pm.logsPage.hoverOnFieldExpandButton(userField);
     await pm.logsPage.clickAddFieldToTableButton(userField);
 
@@ -122,27 +124,16 @@ test.describe("FTS Default Column Selection testcases", () => {
     testLogger.info('TC-FTS-003: verifying FTS default re-resolves on new search');
 
     // Verify FTS default column is active
-    let firstField = 'message';
-    try {
-      await pm.logsPage.expectFieldInTableHeader('message', 10000);
-    } catch {
-      await pm.logsPage.expectFieldInTableHeader('log', 10000);
-      firstField = 'log';
-    }
+    await pm.logsPage.resolveFtsDefaultField(10000);
 
-    // Change time range and run another search — use page-object method
+    // Change time range and confirm it took effect before re-running the search
     await pm.logsPage.clickRelativeTimeButton('1-h');
+    await pm.logsPage.verifySchedule(/1\s*Hour/i);
     await pm.logsPage.clickSearchBarRefreshButton();
     await pm.logsPage.waitForSearchResults(30000);
 
     // FTS column must still be present (re-resolved; could be same or different field)
-    let secondField = 'message';
-    try {
-      await pm.logsPage.expectFieldInTableHeader('message', 10000);
-    } catch {
-      await pm.logsPage.expectFieldInTableHeader('log', 10000);
-      secondField = 'log';
-    }
+    const secondField = await pm.logsPage.resolveFtsDefaultField(10000);
 
     // The FTS column cell content must be non-empty
     await pm.logsPage.expectLogTableColumnVisible(secondField, 0);
@@ -161,13 +152,7 @@ test.describe("FTS Default Column Selection testcases", () => {
     );
 
     // Verify FTS default column is active
-    let ftsField = 'message';
-    try {
-      await pm.logsPage.expectFieldInTableHeader('message', 10000);
-    } catch {
-      await pm.logsPage.expectFieldInTableHeader('log', 10000);
-      ftsField = 'log';
-    }
+    const ftsField = await pm.logsPage.resolveFtsDefaultField(10000);
 
     // Click Reset
     await pm.logsPage.clickResetFiltersButton();
@@ -180,11 +165,7 @@ test.describe("FTS Default Column Selection testcases", () => {
     await pm.logsPage.waitForSearchResults(30000);
 
     // The FTS column must be back
-    try {
-      await pm.logsPage.expectFieldInTableHeader('message', 15000);
-    } catch {
-      await pm.logsPage.expectFieldInTableHeader('log', 15000);
-    }
+    await pm.logsPage.resolveFtsDefaultField(15000);
 
     testLogger.info('TC-FTS-004 completed: reset cleared and FTS re-resolved');
   });
@@ -195,16 +176,16 @@ test.describe("FTS Default Column Selection testcases", () => {
     testLogger.info('TC-FTS-005: verifying FTS default not applied in SQL mode');
 
     // Verify FTS default column is active in non-SQL mode
-    let ftsField = 'message';
-    try {
-      await pm.logsPage.expectFieldInTableHeader('message', 10000);
-    } catch {
-      await pm.logsPage.expectFieldInTableHeader('log', 10000);
-      ftsField = 'log';
-    }
+    await pm.logsPage.resolveFtsDefaultField(10000);
 
-    // Toggle SQL mode ON
+    // Toggle SQL mode ON and confirm it actually engaged — otherwise a silently
+    // failed toggle would leave FTS mode active and the test would pass for the
+    // wrong reason (FTS column gone because we never left FTS mode).
     await pm.logsPage.clickSQLModeToggle();
+    expect(
+      await pm.logsPage.isSqlModeEnabled(),
+      'SQL mode should be active after toggling before asserting FTS removal',
+    ).toBe(true);
 
     // Run the auto-generated SQL query — updateGridColumns (which clears FTS
     // fields when sqlMode && isFtsDefaultColumn) only runs on search response.
@@ -226,13 +207,7 @@ test.describe("FTS Default Column Selection testcases", () => {
     testLogger.info('TC-FTS-006: verifying close column + re-run re-resolves FTS default');
 
     // Verify FTS default column is active
-    let ftsField = 'message';
-    try {
-      await pm.logsPage.expectFieldInTableHeader('message', 10000);
-    } catch {
-      await pm.logsPage.expectFieldInTableHeader('log', 10000);
-      ftsField = 'log';
-    }
+    const ftsField = await pm.logsPage.resolveFtsDefaultField(10000);
 
     // Close the FTS column via the X button on its header
     await pm.logsPage.clickCloseColumnButton(ftsField);
@@ -245,11 +220,7 @@ test.describe("FTS Default Column Selection testcases", () => {
     await pm.logsPage.waitForSearchResults(30000);
 
     // The FTS column must reappear (could be same or different field)
-    try {
-      await pm.logsPage.expectFieldInTableHeader('message', 15000);
-    } catch {
-      await pm.logsPage.expectFieldInTableHeader('log', 15000);
-    }
+    await pm.logsPage.resolveFtsDefaultField(15000);
 
     testLogger.info('TC-FTS-006 completed: close column + re-run re-resolved FTS default');
   });
@@ -266,20 +237,15 @@ test.describe("FTS Default Column Selection testcases", () => {
     // First, explicitly close the FTS default column so it is no longer
     // in selectedFields. (addFieldToTable is additive — it does not clear
     // the existing FTS column, so we must close it first.)
-    let ftsField = 'message';
-    try {
-      await pm.logsPage.expectFieldInTableHeader('message', 10000);
-    } catch {
-      await pm.logsPage.expectFieldInTableHeader('log', 10000);
-      ftsField = 'log';
-    }
+    const ftsField = await pm.logsPage.resolveFtsDefaultField(10000);
     await pm.logsPage.clickCloseColumnButton(ftsField);
     await pm.logsPage.expectFieldNotInTableHeader(ftsField);
 
     // Now add a user-pinned field
     const userField = 'kubernetes_container_name';
     await pm.logsPage.fillIndexFieldSearchInput(userField);
-    await page.waitForTimeout(500);
+    // hoverOnFieldExpandButton waits for the field's expand button, i.e. the real
+    // signal that the sidebar field search has filtered to our field.
     await pm.logsPage.hoverOnFieldExpandButton(userField);
     await pm.logsPage.clickAddFieldToTableButton(userField);
 

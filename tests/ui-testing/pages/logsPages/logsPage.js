@@ -5223,10 +5223,35 @@ export class LogsPage {
     }
 
     /**
+     * Resolve which FTS default column is currently rendered in the results table.
+     * Both `message` and `log` are valid FTS candidates (`message` has the higher
+     * FTS priority). Waits for *either* header to appear and returns whichever is
+     * present — this replaces the "wait the full timeout on `message`, then fall
+     * back to `log`" try/catch pattern, which cost ~10-15s on every call whenever
+     * `log` was the active field.
+     * @param {number} timeout - Max ms to wait for an FTS header to appear.
+     * @returns {Promise<'message'|'log'>} The FTS field currently in the header.
+     */
+    async resolveFtsDefaultField(timeout = 15000) {
+        const message = this.page.locator('[data-test="log-search-result-table-th-message"]');
+        const log = this.page.locator('[data-test="log-search-result-table-th-log"]');
+        await expect(message.or(log).first()).toBeVisible({ timeout });
+        return (await message.isVisible().catch(() => false)) ? 'message' : 'log';
+    }
+
+    /**
      * Close a column by clicking the X (close) button on its header.
      * Used by FTS default-column tests to verify that closing the auto-picked
      * column triggers re-resolution on the next search.
+     *
+     * The close button is rendered with a CSS `invisible` class and only becomes
+     * visible on column-header hover, so a normal click would time out on the
+     * visibility check. We force-click to bypass that hover-gated visibility.
+     * Risk: `force: true` skips Playwright's actionability checks, so it would not
+     * catch a regression that makes the button genuinely non-interactable — the
+     * follow-up `toHaveCount(0)` assertion guards against a silent no-op.
      * @param {string} fieldName - The field/column name to close (e.g. 'message')
+     * @returns {Promise<void>}
      */
     async clickCloseColumnButton(fieldName) {
         const closeBtn = this.page.locator(
