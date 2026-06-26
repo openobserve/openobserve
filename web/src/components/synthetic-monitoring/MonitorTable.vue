@@ -4,6 +4,7 @@
     v-model:selected-ids="localSelectedIds"
     :columns="columns"
     :data="data"
+    :loading="loading"
     pagination="client"
     :page-size="20"
     :page-size-options="[10, 20, 25, 50]"
@@ -275,6 +276,7 @@ type Mode = 'monitors' | 'browser' | 'api'
 const props = withDefaults(defineProps<{
   mode: Mode
   data: any[]
+  loading?: boolean
   footerTitle?: string
   emptyMessage?: string
   dataTest?: string
@@ -282,6 +284,7 @@ const props = withDefaults(defineProps<{
   selectedIds?: string[]
   showFolderColumn?: boolean
 }>(), {
+  loading: false,
   footerTitle: 'Monitors',
   emptyMessage: 'No results found.',
   dataTest: 'monitor-table',

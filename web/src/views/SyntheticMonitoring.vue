@@ -136,6 +136,7 @@
           v-if="activeTab === 'monitors' || activeTab === 'browser' || activeTab === 'api'"
           :mode="monitorTableMode"
           :data="activeTab === 'browser' ? browserMonitors : activeTab === 'api' ? apiMonitors : filteredMonitors"
+          :loading="loading"
           :footer-title="activeTab === 'browser' ? 'Browser Tests' : activeTab === 'api' ? 'API Tests' : 'Monitors'"
           :empty-message="activeTab === 'browser' ? 'No browser tests found.' : activeTab === 'api' ? 'No API tests found.' : 'No monitors found. Adjust filters or create your first monitor.'"
           :selected-ids="selectedMonitorIds"
@@ -407,7 +408,9 @@ function mapMonitor(m: ApiMonitor) {
 type DisplayMonitor = ReturnType<typeof mapMonitor>
 
 // ── Data loading ───────────────────────────────────────────────────────
-const loading = ref(false)
+// Start in loading state so the table shows the skeleton on first render
+// instead of briefly flashing the empty state before the fetch completes.
+const loading = ref(true)
 
 const orgIdentifier = computed<string>(
   () => (store.state as any).selectedOrganization?.identifier ?? ''
