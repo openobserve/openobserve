@@ -18,6 +18,7 @@ import {
 import type { ServiceDetectionConfig } from "@/ts/interfaces/traces/serviceDetection.types";
 import { useSpanServiceDetection } from "@/utils/traces/useSpanServiceDetection";
 import { getOrSetServiceColor } from "@/utils/traces/serviceColorRegistry";
+import { timestampToTimezoneDate } from "@/utils/timezone";
 
 /**
  * Composable for trace data processing
@@ -499,22 +500,24 @@ export function formatDuration(durationMs: number): string {
 
 /**
  * Format timestamp for display
- * Example: "16 Feb 11:40:40:049 (10m ago)"
+ * Example: "16 Feb 11:40:40.049 (10m ago)"
+ *
+ * The absolute date is rendered in the user-selected timezone (same as the
+ * Logs page). Falls back to the browser timezone when none is provided.
  */
-export function formatTimestamp(timestamp: number): string {
+export function formatTimestamp(
+  timestamp: number,
+  timezone: string = Intl.DateTimeFormat().resolvedOptions().timeZone,
+): string {
   // Convert from nanoseconds to milliseconds
   const timestampMs = timestamp / 1000000;
-  const date = new Date(timestampMs);
 
-  // Format: "16 Feb 11:40:40:049"
-  const day = date.getDate();
-  const month = date.toLocaleString("en-US", { month: "short" });
-  const hours = date.getHours().toString().padStart(2, "0");
-  const minutes = date.getMinutes().toString().padStart(2, "0");
-  const seconds = date.getSeconds().toString().padStart(2, "0");
-  const milliseconds = date.getMilliseconds().toString().padStart(3, "0");
-
-  const formattedDate = `${day} ${month} ${hours}:${minutes}:${seconds}:${milliseconds}`;
+  // Format: "16 Feb 11:40:40.049" in the selected timezone
+  const formattedDate = timestampToTimezoneDate(
+    timestampMs,
+    timezone,
+    "dd MMM HH:mm:ss.SSS",
+  );
 
   // Calculate relative time
   const now = Date.now();
