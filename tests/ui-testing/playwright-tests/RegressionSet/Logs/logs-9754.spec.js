@@ -170,8 +170,20 @@ test.describe("Logs Highlighting Regression Bug Fixes", () => {
     const headers = getHeaders();
     const url = getIngestionUrl(orgId, STREAM_NAME);
 
-    // Ingest the test logs
-    const response = await sendRequest(page, url, BUG_9754_TEST_LOGS, headers);
+    // Ingest the test logs.
+    // This block runs in serial mode, so any test failure triggers a full retry of the
+    // block — but the afterAll cleanup (deleteStream) from the prior attempt can still be
+    // settling server-side, making re-ingestion return 400 "stream [...] is being deleted".
+    // That cascades into every downstream test ("stream not found"/selectStream failures),
+    // so retry ingestion until the deletion settles and the stream accepts data again.
+    let response;
+    for (let attempt = 1; attempt <= 5; attempt++) {
+      response = await sendRequest(page, url, BUG_9754_TEST_LOGS, headers);
+      const beingDeleted = JSON.stringify(response || {}).includes('is being deleted');
+      if (!beingDeleted) break;
+      testLogger.warn(`Stream "${STREAM_NAME}" still being deleted (attempt ${attempt}/5); waiting before retrying ingestion`);
+      await page.waitForTimeout(3000);
+    }
 
     testLogger.info('Ingestion response:', response);
 
