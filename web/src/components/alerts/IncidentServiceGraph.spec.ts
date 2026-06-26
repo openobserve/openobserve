@@ -959,42 +959,40 @@ describe("IncidentServiceGraph.vue", () => {
     });
   });
 
-  describe("Node Aggregation", () => {
-    it("should aggregate nodes with the same alert_name into a single node", async () => {
+  describe("Adaptive layout (detail vs. time-bucketed)", () => {
+    it("renders every firing 1:1 below the node cap (detail mode)", async () => {
+      // 5 raw nodes is well below NODE_CAP, so no bucketing: each firing is its
+      // own node and the backend's edges are preserved unchanged.
       wrapper = mountComponent({ topologyContext: mockDuplicatedNodes });
       await flushPromises();
 
       const chartData = wrapper.vm.chartData;
       const nodes = chartData.options.series[0].data;
+      const links = chartData.options.series[0].links;
 
-      // 5 raw nodes should aggregate into 2 distinct alert_names
-      expect(nodes).toHaveLength(2);
-
-      // Memory_Utilization node: aggregated count = 10 + 20 + 5 = 35
-      const memNode = nodes.find((n: any) => n.name === "Memory_Utilization");
-      expect(memNode).toBeDefined();
-      expect(memNode.originalNode.alert_count).toBe(35);
-      expect(memNode.originalNode.first_fired_at).toBe(1000000); // min
-      expect(memNode.originalNode.last_fired_at).toBe(3100000);  // max
-
-      // Scheduler_Down node: aggregated count = 3 + 7 = 10
-      const schedNode = nodes.find((n: any) => n.name === "Scheduler_Down");
-      expect(schedNode).toBeDefined();
-      expect(schedNode.originalNode.alert_count).toBe(10);
+      // 5 raw nodes stay as 5 nodes (NOT collapsed by name).
+      expect(nodes).toHaveLength(5);
+      // Backend's 3 edges are used directly.
+      expect(links).toHaveLength(3);
     });
 
-    it("should cap nodes to a maximum of 100 (top by alert_count)", { timeout: 15000 }, async () => {
-      // Build 150 nodes, each with unique alert_name, varying counts
+    it("collapses many firings into far fewer time-bucket nodes (bucketed mode)", { timeout: 15000 }, async () => {
+      // 60 firings of a single alert over a ~60-minute span. Above NODE_CAP, so
+      // they bucket by time into a small, legible set.
       const manyNodes = {
-        nodes: Array.from({ length: 150 }, (_, i) => ({
+        nodes: Array.from({ length: 60 }, (_, i) => ({
           alert_id: `alert_${i}`,
-          alert_name: `Alert_${i}`,
+          alert_name: "Scheduler_Down",
           service_name: `service-${i % 5}`,
-          alert_count: i + 1, // ascending: Alert_149 has highest count
-          first_fired_at: 1000000 + i * 1000,
-          last_fired_at: 2000000 + i * 1000,
+          alert_count: i + 1,
+          first_fired_at: 1000000 + i * 60 * 1000 * 1000, // 1-minute steps (us)
+          last_fired_at: 1000000 + i * 60 * 1000 * 1000 + 1000,
         })),
-        edges: [],
+        edges: Array.from({ length: 59 }, (_, i) => ({
+          from_node_index: i,
+          to_node_index: i + 1,
+          edge_type: "temporal",
+        })),
         stats: { total_services: 5, total_alerts: 0, services_with_alerts: 0 },
       };
 
@@ -1004,55 +1002,57 @@ describe("IncidentServiceGraph.vue", () => {
       const chartData = wrapper.vm.chartData;
       const nodes = chartData.options.series[0].data;
 
-      // Should be capped at 100
-      expect(nodes.length).toBeLessThanOrEqual(100);
+      // Far fewer than the 60 raw firings, and bounded by the bucket target.
+      expect(nodes.length).toBeLessThan(60);
+      expect(nodes.length).toBeLessThanOrEqual(24);
+      expect(nodes.length).toBeGreaterThan(1);
 
-      // The kept nodes should be those with highest alert_count (largest i values)
-      const names = nodes.map((n: any) => n.name);
-      expect(names).toContain("Alert_149");   // highest count -> kept
-      expect(names).not.toContain("Alert_0"); // lowest count -> dropped
+      // Bucket labels carry the name + aggregated count + window.
+      expect(nodes[0].name).toMatch(/Scheduler_Down x\d+/);
     });
 
-    it("should size nodes proportionally to aggregated alert_count", async () => {
-      wrapper = mountComponent({ topologyContext: mockDuplicatedNodes });
+    it("preserves cross-alert correlation edges in bucketed mode", async () => {
+      // Two alert names that the backend links to each other; above the cap so
+      // bucketing runs. The cross-name edge must survive the bucket remap.
+      const crossNodes = {
+        nodes: Array.from({ length: 40 }, (_, i) => ({
+          alert_id: `alert_${i}`,
+          alert_name: i % 2 === 0 ? "Scheduler_Down" : "Memory_Utilization",
+          service_name: "service-a",
+          alert_count: 1,
+          first_fired_at: 1000000 + i * 60 * 1000 * 1000,
+          last_fired_at: 1000000 + i * 60 * 1000 * 1000 + 1000,
+        })),
+        // Each even->odd edge crosses from Scheduler_Down to Memory_Utilization.
+        edges: Array.from({ length: 39 }, (_, i) => ({
+          from_node_index: i,
+          to_node_index: i + 1,
+          edge_type: "temporal",
+        })),
+        stats: { total_services: 1, total_alerts: 0, services_with_alerts: 0 },
+      };
+
+      wrapper = mountComponent({ topologyContext: crossNodes });
       await flushPromises();
 
       const chartData = wrapper.vm.chartData;
       const nodes = chartData.options.series[0].data;
-      expect(nodes.length).toBeGreaterThanOrEqual(2);
-
-      // Memory_Utilization (count=35) should be larger than Scheduler_Down (count=10)
-      const memNode = nodes.find((n: any) => n.name === "Memory_Utilization");
-      const schedNode = nodes.find((n: any) => n.name === "Scheduler_Down");
-      expect(memNode.symbolSize).toBeGreaterThan(schedNode.symbolSize);
-    });
-
-    it("should rebuild edges after aggregation: deduplicate and remove self-loops", async () => {
-      wrapper = mountComponent({ topologyContext: mockDuplicatedNodes });
-      await flushPromises();
-
-      const chartData = wrapper.vm.chartData;
       const links = chartData.options.series[0].links;
 
-      // Original edges:
-      //   0(MemUtil) → 3(Scheduler_Down)  → keeps: MemUtil→Sched
-      //   3(Scheduler_Down) → 1(MemUtil)  → Sched→MemUtil (different direction, keeps)
-      //   1(MemUtil) → 2(MemUtil)         → self-loop: dropped after aggregation
-      // Should end up with 2 unique directed edges between the 2 aggregated nodes
-      expect(links.length).toBe(2);
-
-      // Both edges should go between the two aggregated nodes (source/target != same index)
-      const memIdx = chartData.options.series[0].data.findIndex(
-        (n: any) => n.name === "Memory_Utilization"
+      // At least one edge connects nodes of different alert names.
+      const nameOf = (id: string) => {
+        const n = nodes.find((nn: any) => nn.id === id);
+        // display_label is "<name> x<count> <window>" — take the leading name token.
+        return (n?.originalNode?.alert_name) as string;
+      };
+      const hasCrossEdge = links.some(
+        (l: any) => nameOf(l.source) !== nameOf(l.target)
       );
-      const schedIdx = chartData.options.series[0].data.findIndex(
-        (n: any) => n.name === "Scheduler_Down"
-      );
-      expect(memIdx).not.toBe(-1);
-      expect(schedIdx).not.toBe(-1);
+      expect(hasCrossEdge).toBe(true);
 
-      for (const link of links) {
-        expect(link.source).not.toBe(link.target);
+      // No self-loops survived the bucket remap.
+      for (const l of links) {
+        expect(l.source).not.toBe(l.target);
       }
     });
   });
