@@ -140,13 +140,9 @@ export class ReportFoldersPage {
       `${process.env["ZO_BASE_URL"]}/web/reports?org_identifier=${process.env["ORGNAME"]}`,
       { waitUntil: 'domcontentloaded' }
     );
-    await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {
-      console.warn('navigateToReports: networkidle timed out, continuing');
-    });
+    await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
     await expect(this.pageTitle).toContainText('Reports');
-    await this.folderTabsContainer.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {
-      console.warn('navigateToReports: folderTabsContainer not visible, continuing');
-    });
+    await this.folderTabsContainer.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
   }
 
   async clickAddFolder() {
@@ -437,5 +433,11 @@ export class ReportFoldersPage {
     const cancelBtn = this.page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-secondary-btn"]');
     await cancelBtn.click();
     await this.page.locator('[data-test="confirm-dialog"]').waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+  }
+
+  async expectBulkDeleteSuccessVisible() {
+    await expect(
+      this.page.locator('[data-test="o-toast-message"]').filter({ hasText: /deleted successfully/i })
+    ).toBeVisible({ timeout: 10000 });
   }
 }
