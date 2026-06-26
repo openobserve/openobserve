@@ -65,6 +65,13 @@ test.describe("Pre-Test Cleanup", () => {
     // Clean up all reports owned by automation user
     await pm.apiCleanup.cleanupReports();
 
+    // Clean up leftover report folders from previous runs.
+    // bulk_test_folder_<timestamp> is created by reports-bulk-operations.spec.js;
+    // when its inline cleanup fails the duplicates accumulate and break the next run.
+    await pm.apiCleanup.cleanupReportFolders([
+      'bulk_test_folder_'
+    ]);
+
     // Clean up all dashboards owned by automation user
     // This includes: Joins_Test_* (dashboard joins parallel tests), and other test dashboards
     await pm.apiCleanup.cleanupDashboards();
