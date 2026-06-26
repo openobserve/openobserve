@@ -584,7 +584,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="logs-search-bar-visualize-cancel-btn"
                   :title="t('search.cancel')"
                   variant="ghost"
-                  class="tw:p-0 tw:h-[1.875rem]! tw:text-[var(--text-xs)] tw:[font-weight:var(--font-medium)]! tw:leading-4! tw:px-1! tw:w-[5.875rem]! tw:whitespace-normal tw:break-words tw:text-center tw:[transition:box-shadow_0.3s_ease,opacity_0.2s_ease] tw:bg-[var(--o2-cancel-query-bg)]! tw:text-[var(--o2-primary-btn-text)]! element-box-shadow tw:[border-radius:0.375rem_0_0_0.375rem]!"
+                  size="sm-toolbar"
+                  class="tw:p-0 tw:h-[1.875rem]! tw:[font-weight:var(--font-medium)]! tw:leading-4! tw:px-1! tw:w-[5.875rem]! tw:whitespace-normal tw:break-words tw:text-center tw:[transition:box-shadow_0.3s_ease,opacity_0.2s_ease] tw:bg-[var(--o2-cancel-query-bg)]! tw:text-[var(--o2-primary-btn-text)]! element-box-shadow tw:[border-radius:0.375rem_0_0_0.375rem]!"
                   @click="cancelVisualizeQueries"
                   >{{ t("search.cancel") }}</OButton
                 >
@@ -604,11 +605,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       !searchObj.meta.nlpMode &&
                       !searchObj.data.stream.selectedStream.length)
                   "
+                  :size="
+                    isNaturalLanguageDetected && !searchObj.meta.nlpMode
+                      ? 'md'
+                      : 'sm-toolbar'
+                  "
                   class="tw:p-0 tw:h-[1.875rem]! element-box-shadow"
                   :class="[
                     isNaturalLanguageDetected && !searchObj.meta.nlpMode
                       ? 'o2-ai-generate-button tw:[border-radius:0.375rem_0_0_0.375rem]!'
-                      : 'tw:text-[var(--text-xs)] tw:[font-weight:var(--font-medium)]! tw:leading-4! tw:px-1! tw:w-[5.875rem]! tw:whitespace-normal tw:break-words tw:text-center tw:[transition:box-shadow_0.3s_ease,opacity_0.2s_ease] tw:bg-[var(--o2-primary-btn-bg)]! tw:text-[var(--o2-primary-btn-text)]! tw:hover:opacity-90 tw:hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--o2-primary-btn-bg),transparent_30%)]',
+                      : 'tw:[font-weight:var(--font-medium)]! tw:leading-4! tw:px-1! tw:w-[5.875rem]! tw:whitespace-normal tw:break-words tw:text-center tw:[transition:box-shadow_0.3s_ease,opacity_0.2s_ease] tw:bg-[var(--o2-primary-btn-bg)]! tw:text-[var(--o2-primary-btn-text)]! tw:hover:opacity-90 tw:hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--o2-primary-btn-bg),transparent_30%)]',
                     'tw:[border-radius:0.375rem_0_0_0.375rem]!',
                   ]"
                   @click="
@@ -680,7 +686,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="logs-search-bar-visualize-cancel-btn"
                   variant="ghost"
                   :title="t('search.cancel')"
-                  class="tw:p-0 tw:h-[1.875rem]! tw:text-[var(--text-xs)] tw:[font-weight:var(--font-medium)]! tw:leading-4! tw:px-1! tw:w-[5.875rem]! tw:whitespace-normal tw:break-words tw:text-center tw:[transition:box-shadow_0.3s_ease,opacity_0.2s_ease] tw:bg-[var(--o2-cancel-query-bg)]! tw:text-[var(--o2-primary-btn-text)]! element-box-shadow tw:[border-radius:0.375rem_0_0_0.375rem]!"
+                  size="sm-toolbar"
+                  class="tw:p-0 tw:h-[1.875rem]! tw:[font-weight:var(--font-medium)]! tw:leading-4! tw:px-1! tw:w-[5.875rem]! tw:whitespace-normal tw:break-words tw:text-center tw:[transition:box-shadow_0.3s_ease,opacity_0.2s_ease] tw:bg-[var(--o2-cancel-query-bg)]! tw:text-[var(--o2-primary-btn-text)]! element-box-shadow tw:[border-radius:0.375rem_0_0_0.375rem]!"
                   @click="cancelVisualizeQueries"
                   >{{ t("search.cancel") }}</OButton
                 >
@@ -701,11 +708,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       !searchObj.meta.nlpMode &&
                       !searchObj.data.stream.selectedStream.length)
                   "
+                  :size="
+                    isNaturalLanguageDetected && !searchObj.meta.nlpMode
+                      ? 'md'
+                      : 'sm-toolbar'
+                  "
                   class="tw:p-0 tw:h-[1.875rem]! element-box-shadow"
                   :class="[
                     isNaturalLanguageDetected && !searchObj.meta.nlpMode
                       ? 'o2-ai-generate-button tw:[border-radius:0.375rem_0_0_0.375rem]!'
-                      : 'tw:text-[var(--text-xs)] tw:[font-weight:var(--font-medium)]! tw:leading-4! tw:px-1! tw:w-[5.875rem]! tw:whitespace-normal tw:break-words tw:text-center tw:[transition:box-shadow_0.3s_ease,opacity_0.2s_ease] tw:bg-[var(--o2-primary-btn-bg)]! tw:text-[var(--o2-primary-btn-text)]! tw:hover:opacity-90 tw:hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--o2-primary-btn-bg),transparent_30%)]',
+                      : 'tw:[font-weight:var(--font-medium)]! tw:leading-4! tw:px-1! tw:w-[5.875rem]! tw:whitespace-normal tw:break-words tw:text-center tw:[transition:box-shadow_0.3s_ease,opacity_0.2s_ease] tw:bg-[var(--o2-primary-btn-bg)]! tw:text-[var(--o2-primary-btn-text)]! tw:hover:opacity-90 tw:hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--o2-primary-btn-bg),transparent_30%)]',
                     'tw:[border-radius:0.375rem_0_0_0.375rem]!',
                   ]"
                   @click="
@@ -781,7 +793,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="logs-search-bar-patterns-cancel-btn"
                 variant="ghost"
                 :title="t('search.cancel')"
-                class="tw:p-0 tw:h-[1.875rem]! tw:text-[var(--text-xs)] tw:[font-weight:var(--font-medium)]! tw:leading-4! tw:px-1! tw:w-[5.875rem]! tw:whitespace-normal tw:break-words tw:text-center tw:[transition:box-shadow_0.3s_ease,opacity_0.2s_ease] tw:bg-[var(--o2-cancel-query-bg)]! tw:text-[var(--o2-primary-btn-text)]! element-box-shadow tw:rounded-md"
+                size="sm-toolbar"
+                class="tw:p-0 tw:h-[1.875rem]! tw:[font-weight:var(--font-medium)]! tw:leading-4! tw:px-1! tw:w-[5.875rem]! tw:whitespace-normal tw:break-words tw:text-center tw:[transition:box-shadow_0.3s_ease,opacity_0.2s_ease] tw:bg-[var(--o2-cancel-query-bg)]! tw:text-[var(--o2-primary-btn-text)]! element-box-shadow tw:rounded-md"
                 @click="cancelPatterns"
                 >{{ t("search.cancel") }}</OButton
               >
@@ -798,7 +811,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-cy="search-bar-refresh-button"
                 variant="primary"
                 :title="t('search.cancel')"
-                class="tw:p-0 tw:h-[1.875rem]! tw:text-[var(--text-xs)] tw:[font-weight:var(--font-medium)]! tw:leading-4! tw:px-1! tw:w-[5.875rem]! tw:whitespace-normal tw:break-words tw:text-center tw:[transition:box-shadow_0.3s_ease,opacity_0.2s_ease] tw:bg-[var(--o2-cancel-query-bg)]! tw:text-[var(--o2-primary-btn-text)]! element-box-shadow"
+                size="sm-toolbar"
+                class="tw:p-0 tw:h-[1.875rem]! tw:[font-weight:var(--font-medium)]! tw:leading-4! tw:px-1! tw:w-[5.875rem]! tw:whitespace-normal tw:break-words tw:text-center tw:[transition:box-shadow_0.3s_ease,opacity_0.2s_ease] tw:bg-[var(--o2-cancel-query-bg)]! tw:text-[var(--o2-primary-btn-text)]! element-box-shadow"
                 :class="
                   config.isEnterprise == 'true'
                     ? 'tw:[border-radius:0.375rem_0_0_0.375rem]!'
@@ -818,11 +832,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     ? t('search.generateQueryTooltip')
                     : t('search.runQuery')
                 "
+                :size="
+                  isNaturalLanguageDetected && !searchObj.meta.nlpMode
+                    ? 'md'
+                    : 'sm-toolbar'
+                "
                 class="tw:p-0 tw:h-[1.875rem]! element-box-shadow"
                 :class="[
                   isNaturalLanguageDetected && !searchObj.meta.nlpMode
                     ? 'o2-ai-generate-button'
-                    : 'tw:text-[var(--text-xs)] tw:[font-weight:var(--font-medium)]! tw:leading-4! tw:px-1! tw:w-[5.875rem]! tw:whitespace-normal tw:break-words tw:text-center tw:[transition:box-shadow_0.3s_ease,opacity_0.2s_ease] tw:bg-[var(--o2-primary-btn-bg)]! tw:text-[var(--o2-primary-btn-text)]! tw:hover:opacity-90 tw:hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--o2-primary-btn-bg),transparent_30%)]',
+                    : 'tw:[font-weight:var(--font-medium)]! tw:leading-4! tw:px-1! tw:w-[5.875rem]! tw:whitespace-normal tw:break-words tw:text-center tw:[transition:box-shadow_0.3s_ease,opacity_0.2s_ease] tw:bg-[var(--o2-primary-btn-bg)]! tw:text-[var(--o2-primary-btn-text)]! tw:hover:opacity-90 tw:hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--o2-primary-btn-bg),transparent_30%)]',
                   store.state.zoConfig.auto_query_enabled
                     ? 'tw:[border-radius:0.375rem_0_0_0.375rem]!'
                     : 'tw:rounded-md',
