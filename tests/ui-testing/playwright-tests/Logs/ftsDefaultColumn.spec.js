@@ -11,6 +11,8 @@
  *   - FTS default is skipped in SQL mode (TC-FTS-005)
  *   - closing the column re-resolves it on the next search (TC-FTS-006)
  *   - FTS default is not injected over user-pinned fields (TC-FTS-007)
+ *   - stream change clears FTS and re-resolves for new stream (TC-FTS-008)
+ *   - field reset clears FTS default and re-resolves on next search (TC-FTS-009)
  *
  * Regression coverage for openobserve/openobserve#12857.
  */
@@ -292,5 +294,94 @@ test.describe("FTS Default Column Selection testcases", () => {
     await pm.logsPage.expectFieldNotInTableHeader('log');
 
     testLogger.info('TC-FTS-007 completed: FTS default not injected over user fields');
+  });
+
+  // -----------------------------------------------------------------------
+  // P1 — Stream change and field reset
+  // -----------------------------------------------------------------------
+
+  test("should clear FTS selection on stream change and re-resolve for new stream", {
+    tag: ['@ftsDefaultColumn', '@all', '@logs']
+  }, async ({ page }) => {
+    testLogger.info('TC-FTS-008: verifying stream change clears FTS and re-resolves');
+
+    // Verify FTS default column is active on the current stream (e2e_automate)
+    const firstFtsField = await pm.logsPage.resolveFtsDefaultField(10000);
+    await pm.logsPage.expectFieldInTableHeader(firstFtsField);
+
+    // Ingest the same test data to a second stream so it has FTS-key fields.
+    const secondStream = 'e2e_automate_fts2_tc008';
+    await ingestTestData(page, secondStream);
+    await page.waitForLoadState('domcontentloaded');
+    await waitForStreamData(page, secondStream, 1, 30000);
+
+    // Switch to the second stream (stay on the same page — skipNavigation).
+    await pm.logsPage.selectStream(secondStream, 5, null, true);
+
+    // Run a search so the watcher re-resolves FTS for the new stream.
+    let resultsReady = false;
+    for (let attempt = 1; attempt <= 3 && !resultsReady; attempt++) {
+      await pm.logsPage.clickSearchBarRefreshButton();
+      resultsReady = await pm.logsPage
+        .waitForSearchResults(20000)
+        .then(() => true)
+        .catch(() => false);
+      if (!resultsReady) {
+        testLogger.info(`TC-FTS-008 search results not ready (attempt ${attempt}/3), retrying refresh...`);
+      }
+    }
+    expect(resultsReady, 'Search results did not render on second stream').toBe(true);
+
+    // Assert that the FTS default column re-resolved on the new stream.
+    const secondFtsField = await pm.logsPage.resolveFtsDefaultField(15000);
+    await pm.logsPage.expectLogTableColumnVisible(secondFtsField, 0);
+
+    // Assert that the prior stream's FTS field was NOT carried over
+    // (onStreamChange cleared selectedFields & isFtsDefaultColumn).
+    if (firstFtsField !== secondFtsField) {
+      await pm.logsPage.expectFieldNotInTableHeader(firstFtsField);
+    }
+
+    testLogger.info('TC-FTS-008 completed: stream change re-resolved FTS default');
+  });
+
+  test("should clear FTS default on field reset and re-resolve on next search", {
+    tag: ['@ftsDefaultColumn', '@all', '@logs']
+  }, async ({ page }) => {
+    testLogger.info('TC-FTS-009: verifying field reset clears FTS default and re-resolves');
+
+    // Verify FTS default column is active
+    const firstFtsField = await pm.logsPage.resolveFtsDefaultField(10000);
+    await pm.logsPage.expectFieldInTableHeader(firstFtsField);
+
+    // Click the field-list reset icon — this clears selectedFields and sets
+    // isFtsDefaultColumn to false, so the FTS column should disappear from
+    // the table immediately.
+    await pm.logsPage.clickFieldListResetIcon();
+
+    // After reset, the auto-picked FTS column must be gone.
+    await pm.logsPage.expectFieldNotInTableHeader(firstFtsField);
+
+    // Run a search — the watcher sees selectedFields is now empty, and
+    // isFtsDefaultColumn was cleared, so canResolveDefault is true and
+    // the FTS default re-resolves.
+    let resultsReady = false;
+    for (let attempt = 1; attempt <= 3 && !resultsReady; attempt++) {
+      await pm.logsPage.clickSearchBarRefreshButton();
+      resultsReady = await pm.logsPage
+        .waitForSearchResults(20000)
+        .then(() => true)
+        .catch(() => false);
+      if (!resultsReady) {
+        testLogger.info(`TC-FTS-009 search results not ready (attempt ${attempt}/3), retrying refresh...`);
+      }
+    }
+    expect(resultsReady, 'Search results did not render after field reset').toBe(true);
+
+    // Assert that an FTS default column re-appears (could be same or different field).
+    const secondFtsField = await pm.logsPage.resolveFtsDefaultField(15000);
+    await pm.logsPage.expectLogTableColumnVisible(secondFtsField, 0);
+
+    testLogger.info('TC-FTS-009 completed: field reset re-resolved FTS default');
   });
 });

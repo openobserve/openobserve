@@ -5133,6 +5133,20 @@ export class LogsPage {
         return await btn.click({ force: true });
     }
 
+    /**
+     * Click the field-list reset icon (FieldListPagination "Clear" button).
+     * Clears selectedFields and sets isFtsDefaultColumn to false, used by
+     * FTS default-column tests to verify re-resolution after a reset.
+     * @returns {Promise<void>}
+     */
+    async clickFieldListResetIcon() {
+        const btn = this.page.locator(this.fieldListResetIcon).first();
+        await expect(btn).toBeVisible({ timeout: 5000 });
+        await btn.click();
+        // Wait for the field sidebar to settle after reset trims selectedFields.
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    }
+
     async expectTimestampFieldVisible() {
         // Post-OFieldList migration: data-test="logs-field-list-item-_timestamp"
         // Clear any active field-search filter and switch back to All Fields view —

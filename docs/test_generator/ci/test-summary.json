@@ -1,0 +1,12 @@
+[
+  {
+    "title": "should clear FTS selection on stream change and re-resolve for new stream",
+    "action": "extend",
+    "verifies": "switching streams clears the carried-over FTS default selection, then re-resolves the FTS default column for the new stream on the next search"
+  },
+  {
+    "title": "should clear FTS default on field reset and re-resolve on next search",
+    "action": "extend",
+    "verifies": "clicking the field-list reset icon clears the auto-picked FTS default column from the table, then running a new search re-resolves it"
+  }
+]
