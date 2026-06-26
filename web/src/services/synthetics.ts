@@ -9,7 +9,7 @@ const syntheticsService = {
 
   update: (orgIdentifier: string, id: string, payload: unknown, folderId?: string) => {
     const params = folderId ? `?folder=${folderId}` : ''
-    return http().put(`/api/${orgIdentifier}/synthetics/${id}${params}`, payload)
+    return http().put(`/api/${orgIdentifier}/synthetics/${id}`, payload)
   },
 
   get: (orgIdentifier: string, id: string) =>
@@ -44,6 +44,9 @@ const syntheticsService = {
 
   results: (orgIdentifier: string, id: string) =>
     http().get(`/api/${orgIdentifier}/synthetics/${id}/results`),
+
+  getLocations: (orgIdentifier: string) =>
+    http().get(`/api/${orgIdentifier}/synthetics/locations`),
 }
 
 export default syntheticsService

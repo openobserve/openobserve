@@ -1,4 +1,5 @@
 // Copyright 2026 OpenObserve Inc.
+import { DateTime } from 'luxon'
 import type { BrowserCheck, BrowserCheckFrequency, BrowserCheckSchedule } from '@/types/synthetics'
 import { journeyToWireSteps, mapWireSteps } from './mapRecordedStep'
 
@@ -23,7 +24,14 @@ function buildFrequency(s: BrowserCheckSchedule): BrowserCheckFrequency {
   }
 
   if (s.startType === 'later' && s.startDate && s.startTime) {
-    freq.start_time = new Date(`${s.startDate}T${s.startTime}`).getTime()
+    const [year, month, day] = s.startDate.split('-')
+    const [hour, minute] = s.startTime.split(':')
+    const dt = DateTime.fromObject(
+      { year: +year, month: +month, day: +day, hour: +hour, minute: +minute },
+      { zone: s.timezone ?? 'UTC' }
+    )
+    freq.start_time = dt.toMillis()
+    freq.timezone = s.timezone
   }
 
   return freq
@@ -101,8 +109,9 @@ function mapFrequencyToSchedule(freq: any): BrowserCheck['schedule'] {
     intervalUnit: isHours ? 'hours' : 'minutes',
     ...(freq.start_time && {
       startType: 'later' as const,
-      startDate: new Date(freq.start_time).toISOString().split('T')[0],
-      startTime: new Date(freq.start_time).toTimeString().slice(0, 5),
+      timezone: freq.timezone,
+      startDate: DateTime.fromMillis(freq.start_time, { zone: freq.timezone ?? 'UTC' }).toFormat('yyyy-MM-dd'),
+      startTime: DateTime.fromMillis(freq.start_time, { zone: freq.timezone ?? 'UTC' }).toFormat('HH:mm'),
     }),
   }
 }

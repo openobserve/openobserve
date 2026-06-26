@@ -38,12 +38,6 @@ function updateSchedule(patch: Partial<BrowserCheckSchedule>) {
   })
 }
 
-function updateNotifications(patch: Partial<BrowserCheck['notifications']>) {
-  emit('update:check', {
-    ...props.check,
-    notifications: { ...props.check.notifications, ...patch },
-  })
-}
 
 // ─── frequency preset ─────────────────────────────────────────────────────────
 
@@ -133,7 +127,14 @@ const timezone = computed({
 
 const startType = computed({
   get: () => props.check.schedule.startType ?? 'now',
-  set: (v: string) => updateSchedule({ startType: v as 'now' | 'later' }),
+  set: (v: string) => {
+    const patch: Partial<BrowserCheckSchedule> = { startType: v as 'now' | 'later' }
+    if (v === 'later' && !props.check.schedule.timezone) {
+      try { patch.timezone = Intl.DateTimeFormat().resolvedOptions().timeZone }
+      catch { patch.timezone = 'UTC' }
+    }
+    updateSchedule(patch)
+  },
 })
 
 const startDate = computed({
@@ -149,20 +150,20 @@ const startTime = computed({
 // ─── retries ──────────────────────────────────────────────────────────────────
 
 const retries = computed({
-  get: () => props.check.schedule.retries ?? 0,
-  set: (v: string | number) => updateSchedule({ retries: Number(v) }),
+  get: () => props.check.retries ?? 0,
+  set: (v: string | number) => emit('update:check', { ...props.check, retries: Number(v) }),
 })
 
 const retryDelayMs = computed({
-  get: () => props.check.schedule.retryDelayMs ?? 0,
-  set: (v: string | number) => updateSchedule({ retryDelayMs: Number(v) }),
+  get: () => props.check.waitBeforeRetrySecs ?? 0,
+  set: (v: string | number) => emit('update:check', { ...props.check, waitBeforeRetrySecs: Number(v) }),
 })
 
 // ─── alert threshold ──────────────────────────────────────────────────────────
 
 const failureThreshold = computed({
-  get: () => props.check.notifications.failureThreshold ?? 1,
-  set: (v: string | number) => updateNotifications({ failureThreshold: Number(v) }),
+  get: () => props.check.alertIfFails ?? 1,
+  set: (v: string | number) => emit('update:check', { ...props.check, alertIfFails: Number(v) }),
 })
 
 // ─── destinations ─────────────────────────────────────────────────────────────
@@ -171,7 +172,7 @@ const localDestinations = computed({
   get: () => props.check.notifications.destinations,
   set: (v: string[]) => {
     destinationError.value = v.length === 0
-    updateNotifications({ destinations: v })
+    emit('update:check', { ...props.check, notifications: { destinations: v } })
   },
 })
 
@@ -179,7 +180,7 @@ const destinationError = ref(false)
 
 function onDestinationsChange(v: string[]) {
   destinationError.value = v.length === 0
-  updateNotifications({ destinations: v })
+  emit('update:check', { ...props.check, notifications: { destinations: v } })
 }
 
 function routeToCreateDestination() {
@@ -196,8 +197,8 @@ function routeToCreateDestination() {
 // ─── cooldown ─────────────────────────────────────────────────────────────────
 
 const silenceMinutes = computed({
-  get: () => props.check.notifications.silenceMinutes,
-  set: (v: string | number) => updateNotifications({ silenceMinutes: Number(v) }),
+  get: () => props.check.cooldownSecs ?? 60,
+  set: (v: string | number) => emit('update:check', { ...props.check, cooldownSecs: Number(v) }),
 })
 </script>
 

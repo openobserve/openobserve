@@ -3,11 +3,13 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useStore } from 'vuex'
-import type { BrowserCheck } from '@/types/synthetics'
+import type { BrowserCheck, SyntheticsLocation, SyntheticsFolder } from '@/types/synthetics'
 import useSyntheticsRecorder from '@/composables/useSyntheticsRecorder'
 import { journeyToWireSteps } from '@/utils/synthetics/mapRecordedStep'
 import { buildCreateBrowserTestPayload, mapResponseToBrowserCheck } from '@/utils/synthetics/buildPayload'
+import { getFoldersListByType } from '@/utils/commons'
 import syntheticsService from '@/services/synthetics'
+import destinationService from '@/services/alert_destination'
 import { toast } from '@/lib/feedback/Toast/useToast'
 import AppPageHeader from '@/components/common/AppPageHeader.vue'
 import OButton from '@/lib/core/Button/OButton.vue'
@@ -54,6 +56,46 @@ async function probeExtension() {
   return extensionInstalled.value
 }
 
+// Server-driven lists fetched once here and threaded down to CheckConfigure.
+const locations = ref<SyntheticsLocation[]>([])
+const destinations = ref<string[]>([])
+const folders = ref<SyntheticsFolder[]>([])
+
+async function fetchFolders() {
+  try {
+    const res = await getFoldersListByType(store, 'synthetics')
+    folders.value = (res ?? []) as SyntheticsFolder[]
+  } catch {
+    folders.value = []
+  }
+}
+
+async function fetchLocations() {
+  try {
+    const org = store.state.selectedOrganization.identifier
+    const res = await syntheticsService.getLocations(org)
+    locations.value = (res.data ?? []) as SyntheticsLocation[]
+  } catch {
+    // Enterprise-gated endpoint — community builds return 403; fall back to empty.
+    locations.value = []
+  }
+}
+
+async function fetchDestinations() {
+  try {
+    const res = await destinationService.list({
+      org_identifier: store.state.selectedOrganization.identifier,
+      page_num: 1,
+      page_size: 1000,
+      sort_by: 'name',
+      desc: false,
+    })
+    destinations.value = (res.data ?? []).map((d: any) => d.name as string)
+  } catch {
+    destinations.value = []
+  }
+}
+
 async function loadForEdit(id: string) {
   isLoadingEdit.value = true
   try {
@@ -79,9 +121,19 @@ onMounted(() => {
     .then((installed) => { extensionReady.value = installed })
     .catch(() => { /* extension messaging unavailable — handled in setup screen */ })
 
+  fetchFolders()
+  fetchLocations()
+  fetchDestinations()
+
   const editQueryId = route.query.edit
   if (typeof editQueryId === 'string' && editQueryId) {
     loadForEdit(editQueryId).catch(console.error)
+  } else {
+    // Preselect the folder the user came from (New Monitor within a folder).
+    const folderQuery = route.query.folder
+    if (typeof folderQuery === 'string' && folderQuery) {
+      check.value = { ...check.value, folder: folderQuery }
+    }
   }
 })
 
@@ -95,9 +147,13 @@ const check = ref<BrowserCheck>({
   folder: 'default',
   tags: [],
   journey: [],
-  schedule: { type: 'interval', intervalValue: 5, intervalUnit: 'minutes', retries: 0 },
-  locations: ['us-east-1'],
-  notifications: { destinations: [], silenceMinutes: 60 },
+  schedule: { type: 'interval', intervalValue: 5, intervalUnit: 'minutes' },
+  locations: ['aws-us-east-1'],
+  retries: 0,
+  waitBeforeRetrySecs: 5,
+  alertIfFails: 1,
+  cooldownSecs: 60,
+  notifications: { destinations: [] },
   rum: { collect: true, sessionReplay: false },
 })
 
@@ -149,16 +205,16 @@ async function saveCheck() {
   try {
     const org = store.state.selectedOrganization.identifier
     if (editId.value) {
-      await syntheticsService.update(org, editId.value, apiPayload.value)
+      await syntheticsService.update(org, editId.value, apiPayload.value, check.value.folder)
       dismiss()
       toast({ variant: 'success', message: 'Check updated successfully.' })
       router.push({ name: 'synthetic' })
     } else {
-      const res = await syntheticsService.create(org, apiPayload.value)
+      const res = await syntheticsService.create(org, apiPayload.value, check.value.folder)
       const savedId = res.data?.id ?? crypto.randomUUID()
       dismiss()
       toast({ variant: 'success', message: 'Check saved successfully.' })
-      router.push({ name: 'synthetic-detail', params: { id: savedId }, query: { tab: 'results', saved: '1' } })
+      router.push({ name: 'synthetic' })
     }
   } catch (err: any) {
     dismiss()
@@ -427,6 +483,7 @@ const replayStatus = computed<{ text: string; tone: 'muted' | 'success' | 'error
           @need-extension-setup="onNeedExtensionSetup"
           @replay="onReplay"
           @stop-replay="onStopReplay"
+          @auto-record-consumed="autoRecord = false"
         />
       </OStep>
       <OStep
@@ -435,7 +492,15 @@ const replayStatus = computed<{ text: string; tone: 'muted' | 'success' | 'error
         icon="tune"
         :done="false"
       >
-        <CheckConfigure v-model:check="check" check-type="browser" class="tw:border-t! tw:border-border-default! tw:w-full!" />
+        <CheckConfigure
+          v-model:check="check"
+          check-type="browser"
+          :locations="locations"
+          :destinations="destinations"
+          :folders="folders"
+          class="tw:border-t! tw:border-border-default! tw:w-full!"
+          @refresh:destinations="fetchDestinations"
+        />
       </OStep>
     </OStepper>
 

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // Copyright 2026 OpenObserve Inc.
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import type { BrowserStep } from '@/types/synthetics'
 import useSyntheticsRecorder from '@/composables/useSyntheticsRecorder'
 import OButton from '@/lib/core/Button/OButton.vue'
@@ -23,6 +23,7 @@ const emit = defineEmits<{
   'need-extension-setup': []
   'replay': []
   'stop-replay': []
+  'auto-record-consumed': []
 }>()
 
 // ── Filter / expand state ──────────────────────────────────────────────────
@@ -35,6 +36,7 @@ const expandedSteps = ref<Set<string>>(new Set())
 const recorder = useSyntheticsRecorder()
 const isRecording = recorder.isRecording
 const capturedSteps = recorder.liveSteps
+const externalStopSteps = recorder.externalStopSteps
 const currentUrl = recorder.currentUrl
 const recordingError = recorder.error
 
@@ -63,7 +65,23 @@ function onRecordButtonClick() {
 }
 
 onMounted(() => {
-  if (props.autoRecord) startRecording()
+  if (props.autoRecord) {
+    startRecording()
+    emit('auto-record-consumed')
+  }
+})
+
+// Justified watcher: auto-commit steps when the extension window is closed
+// externally (without clicking Stop & Review). Uses externalStopSteps, which is
+// snapshotted inside the composable at the exact moment recordingStopped /
+// port.onDisconnect fires — immune to subsequent setActions([]) cleanup messages
+// the extension may send after stopping. cancelRecording() clears the snapshot,
+// so this watcher is a no-op for explicit cancels.
+watch(isRecording, (nowRecording, wasRecording) => {
+  if (!nowRecording && wasRecording && externalStopSteps.value.length > 0) {
+    emit('update:modelValue', [...props.modelValue, ...externalStopSteps.value])
+    externalStopSteps.value = []
+  }
 })
 
 onUnmounted(() => recorder.cleanup())

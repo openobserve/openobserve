@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Copyright 2026 OpenObserve Inc.
 import { computed, ref } from 'vue'
-import type { BrowserCheck } from '@/types/synthetics'
+import type { BrowserCheck, SyntheticsFolder } from '@/types/synthetics'
 import OInput from '@/lib/forms/Input/OInput.vue'
 import OSelect from '@/lib/forms/Select/OSelect.vue'
 import OSwitch from '@/lib/forms/Switch/OSwitch.vue'
@@ -9,7 +9,7 @@ import OButton from '@/lib/core/Button/OButton.vue'
 import OIcon from '@/lib/core/Icon/OIcon.vue'
 import CheckAuthNetwork from './CheckAuthNetwork.vue'
 
-const props = defineProps<{ check: BrowserCheck }>()
+const props = defineProps<{ check: BrowserCheck; folders?: SyntheticsFolder[] }>()
 const emit = defineEmits<{ 'update:check': [value: BrowserCheck] }>()
 
 function update(patch: Partial<BrowserCheck>) {
@@ -43,12 +43,11 @@ const description = computed({
 
 const tagInput = ref('')
 
-const folderOptions = [
-  { label: 'Default', value: 'default' },
-  { label: 'E-commerce', value: 'ecommerce' },
-  { label: 'Auth', value: 'auth' },
-  { label: 'Marketing', value: 'marketing' },
-]
+const folderOptions = computed(() => {
+  const opts = (props.folders ?? []).map((f) => ({ label: f.name, value: f.folderId }))
+  // Defensive fallback so the bound value always has a matching option.
+  return opts.length ? opts : [{ label: 'Default', value: 'default' }]
+})
 
 function addTag() {
   const tag = tagInput.value.trim()

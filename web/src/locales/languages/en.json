@@ -6504,8 +6504,10 @@
     },
     "locations": {
       "title": "Locations",
+      "subtitle": "Select the locations the journey runs from",
       "locationAwsEast": "AWS · us-east-1",
-      "comingSoon": "More regions & private locations — Coming soon"
+      "comingSoon": "More regions & private locations — Coming soon",
+      "empty": "No locations available"
     }
   }
 }

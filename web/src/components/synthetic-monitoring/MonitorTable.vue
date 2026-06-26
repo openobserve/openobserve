@@ -47,9 +47,14 @@
       <span class="tw:text-secondary">{{ (row as any).assertions }} checks</span>
     </template>
 
-    <!-- Folder name (cross-folder search mode) -->
+    <!-- Folder name (cross-folder search mode) — click navigates sidebar to that folder -->
     <template #cell-folder_name="{ row }">
-      <span class="tw:text-sm">{{ (row as any).folder_name ?? '—' }}</span>
+      <button
+        class="tw:text-sm tw:text-[var(--o2-text-link)] tw:cursor-pointer tw:bg-transparent tw:border-0 tw:p-0 tw:hover:underline"
+        @click.stop="emit('navigate-to-folder', (row as any).folderId)"
+      >
+        {{ (row as any).folder_name ?? '—' }}
+      </button>
     </template>
 
     <!-- Type badge (monitors mode) -->
@@ -303,6 +308,7 @@ const emit = defineEmits<{
   'update:selectedIds': [ids: string[]]
   'delete-selected': []
   'move-selected': []
+  'navigate-to-folder': [folderId: string]
 }>()
 
 const localSelectedIds = computed({

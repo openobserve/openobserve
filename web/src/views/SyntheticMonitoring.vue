@@ -152,6 +152,7 @@
           @update:selected-ids="selectedMonitorIds = $event"
           @delete-selected="openBulkDeleteConfirm"
           @move-selected="moveMultipleMonitors"
+          @navigate-to-folder="(id) => { searchAcrossFolders = false; updateActiveFolderId(id) }"
         />
 
         <!-- ── PRIVATE LOCATIONS ── -->
@@ -771,9 +772,13 @@ const filteredMonitors = computed(() =>
   )
 )
 
-const openCreate = () => router.push({ name: 'synthetic-new' })
+const openCreate = () =>
+  router.push({ name: 'synthetic-new', query: { folder: activeFolderId.value } })
 const openEdit = (m: any) => {
-  router.push({ name: 'synthetic-new', query: { edit: String(m.id) } })
+  router.push({
+    name: 'synthetic-new',
+    query: { edit: String(m.id), folder: activeFolderId.value },
+  })
 }
 
 const toggleLoadingMap = ref<Record<string, boolean>>({})

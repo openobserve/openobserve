@@ -25,12 +25,17 @@ const RECORDING_PORT_NAME = 'synthetics-recorder'
  * methods. See ../playwright-crx/.docs/synthetics-recorder.md → "Web-side integration".
  */
 const useSyntheticsRecorder = () => {
-  const extensionId = "jpeegljpiapbjajeohcoccnimjfpigla";
+  // Extension public key/id to match the extension
+  const extensionId = "hliehalmlioilejmkoaidkdmplalamki";
 
   const isSupported = ref(typeof chrome !== 'undefined' && !!chrome.runtime)
   const isInstalled = ref(false)
   const isRecording = ref(false)
   const liveSteps = ref<BrowserStep[]>([])
+  // Steps captured when recording stops externally (port disconnect / recordingStopped).
+  // Snapshotted at the moment of the stop event so subsequent setActions([]) from
+  // extension cleanup cannot wipe them before the watcher in BrowserJourney commits.
+  const externalStopSteps = ref<BrowserStep[]>([])
   const currentUrl = ref('')
   const mode = ref<RecorderMode>('recording')
   const error = ref('')
@@ -101,6 +106,8 @@ const useSyntheticsRecorder = () => {
         isRecording.value = true
         break
       case 'recordingStopped':
+        // Snapshot steps NOW — before any cleanup setActions([]) the extension may send next.
+        externalStopSteps.value = [...liveSteps.value]
         isRecording.value = false
         break
       case 'setMode':
@@ -124,6 +131,11 @@ const useSyntheticsRecorder = () => {
       port.onMessage.addListener(handlePortMessage)
       port.onDisconnect.addListener(() => {
         port = null
+        // Only snapshot if recordingStopped hasn't already done so (which is authoritative).
+        // This covers the case where the port drops without a recordingStopped message.
+        if (isRecording.value && externalStopSteps.value.length === 0) {
+          externalStopSteps.value = [...liveSteps.value]
+        }
         isRecording.value = false
       })
       return true
@@ -146,6 +158,7 @@ const useSyntheticsRecorder = () => {
   async function startRecording(targetUrl: string): Promise<void> {
     error.value = ''
     liveSteps.value = []
+    externalStopSteps.value = []
     currentUrl.value = targetUrl
     mode.value = 'recording'
 
@@ -177,8 +190,9 @@ const useSyntheticsRecorder = () => {
   /** Abandon the current recording without persisting any steps. */
   function cancelRecording() {
     teardownPort()
-    isRecording.value = false
+    externalStopSteps.value = []
     liveSteps.value = []
+    isRecording.value = false
   }
 
   /**
@@ -221,6 +235,7 @@ const useSyntheticsRecorder = () => {
     isInstalled,
     isRecording,
     liveSteps,
+    externalStopSteps,
     currentUrl,
     mode,
     error,

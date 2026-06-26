@@ -150,11 +150,24 @@ export interface BrowserCheckSchedule {
   intervalUnit?: 'minutes' | 'hours'
   cron?: string
   timezone?: string
-  retries?: number
-  retryDelayMs?: number
   startType?: 'now' | 'later'
   startDate?: string
   startTime?: string
+}
+
+// Synthetics folder (from GET /api/v2/{org}/folders/synthetics)
+export interface SyntheticsFolder {
+  folderId: string
+  name: string
+  description?: string
+}
+
+// Available probe location returned by GET /api/{org}/synthetics/locations
+export interface SyntheticsLocation {
+  id: string
+  name: string
+  region: string
+  provider: string
 }
 
 export interface BrowserCheck {

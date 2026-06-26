@@ -31,7 +31,7 @@ const sessionReplay = computed({
 
 <template>
   <div class="tw:rounded-lg tw:border tw:border-[var(--o2-border-color)] tw:bg-[var(--o2-card-bg)] tw:p-6 tw:mb-4">
-    <h3 class="tw:text-base tw:font-semibold tw:text-[var(--o2-text-heading)] tw:mb-4">RUM &amp; Session Replay</h3>
+    <h3 class="tw:text-base tw:font-semibold tw:text-[var(--o2-text-heading)] tw:pb-4">RUM &amp; Session Replay</h3>
     <div class="tw:flex tw:flex-col tw:gap-4">
       <div>
         <OSwitch
@@ -39,7 +39,7 @@ const sessionReplay = computed({
           label="Collect RUM data"
           data-test="synthetics-check-rum-collect-switch"
         />
-        <p class="tw:mt-1 tw:text-sm tw:text-[var(--o2-text-secondary)]">
+        <p class="tw:mt-1 tw:text-xs! tw:text-[var(--o2-text-secondary)] tw:pl-9">
           Captures Web Vitals, resource waterfall, console errors, and a full session for each run.
         </p>
       </div>
