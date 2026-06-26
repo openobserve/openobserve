@@ -22,8 +22,9 @@ export class ReportFoldersPage {
     this.folderSaveBtn = '[data-test="dashboard-folder-add-save"]';
     this.folderCancelBtn = '[data-test="dashboard-folder-add-cancel"]';
 
-    // Delete confirmation dialog
-    this.confirmDeleteDialog = '[data-test="dashboard-confirm-delete-folder-dialog"]';
+    // Delete confirmation dialog — ConfirmDialog.vue renders data-test="dialog-box" on
+    // the q-card; the component-level data-test attr does not flow into the portal DOM.
+    this.confirmDeleteDialog = '[data-test="dialog-box"]';
     this.confirmButton = '[data-test="confirm-button"]';
 
     // Move dialog
