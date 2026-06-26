@@ -17,5 +17,6 @@ tonic-prost.workspace = true
 tokio.workspace = true
 
 [build-dependencies]
+cargo_metadata = "0.19"
 prost-build = { version = "0.14.1" }
 tonic-prost-build = { version = "0.14.1" }

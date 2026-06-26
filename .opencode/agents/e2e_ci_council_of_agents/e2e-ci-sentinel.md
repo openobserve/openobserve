@@ -45,12 +45,27 @@ If `run-context.json` is missing or `skip: true`, stop.
    exceptions. (Page object files are exempt — see scope above.)
 2. **Missing assertions** — every test must have ≥1 real assertion.
 3. **Vacuous / always-pass assertions** — `expect(true).toBe(true)`, `expect(1).toBe(1)`,
-   `if (visible) {...} else { expect(true).toBe(true) }`. Check **what** is asserted, not just
-   that an `expect` exists.
-4. **`console.log`** present (use `testLogger`).
-5. **Missing `await`** on async operations.
-6. **Hardcoded credentials** — `password` / `secret` / `apiKey` / `token` literals (only
+   **`toBeGreaterThanOrEqual(0)` / `toBeGreaterThan(-1)` on a count** (always true),
+   `.toBeTruthy()` on a guaranteed-truthy value. Check **what** is asserted, not just that an
+   `expect` exists.
+4. **Conditional-only assertions** — a test where **every** `expect(...)` sits inside an `if (...)`
+   whose `else` does not also assert (so the test can reach its end having checked nothing). The
+   real assertion must not be skippable.
+5. **Negative-only on the feature under test** — if the spec's feature is about a component that
+   should APPEAR (e.g. a "fix-query card" for a query-error feature) and **every** assertion about
+   that component is `not.toBeVisible()` / `toBeHidden()`, BLOCK: "test asserts the feature is
+   absent — it likely certifies an incomplete feature and will break when it's finished."
+6. **Test-name / assertion mismatch** — the title claims something the body never checks (title
+   says "fix-query card" but the card is never asserted visible; title says "while loading" but no
+   assertion runs during a loading state). The test must actually verify what its name promises.
+7. **`console.log`** present (use `testLogger`).
+8. **Missing `await`** on async operations.
+9. **Hardcoded credentials** — `password` / `secret` / `apiKey` / `token` literals (only
    `process.env.*` is allowed).
+
+> Checks 3–6 are the **assertion-quality** rules. A deterministic gate in the workflow also enforces
+> 3 and 4 (and rejects any heal that deleted/inverted/skipped assertions), so do not rely on it —
+> apply 3–6 yourself: a green spec that tests nothing is the failure mode we most need you to catch.
 
 ## AUTO-FIX (apply silently, then continue — these do NOT fail the run)
 

@@ -1,8 +1,15 @@
 import fs from 'fs';
 import path from 'path';
+import http from 'http';
 
 // Cache cloud config to avoid re-reading on every call
 let _cachedCloudConfig = null;
+
+// node-fetch v2 keep-alive pooling + gzip decompression is the root cause of
+// "Premature close" / ECONNRESET flakiness in CI. A fresh connection per
+// request (keepAlive: false) + skipping the Gunzip stream (compress: false)
+// eliminates both failure modes.
+const noKeepAliveAgent = new http.Agent({ keepAlive: false });
 
 export const getHeaders = () => {
   // On cloud, use email:passcode from cloud-config.json (written by global-setup-alpha1.js)
@@ -48,6 +55,8 @@ export const sendRequest = async (page, url, payload, headers) => {
     method: "POST",
     headers: headers,
     body: JSON.stringify(payload),
+    compress: false,
+    agent: noKeepAliveAgent,
   });
 
   return await response.json();

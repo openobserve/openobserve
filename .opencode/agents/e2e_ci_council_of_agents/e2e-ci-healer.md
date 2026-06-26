@@ -77,9 +77,61 @@ For iteration `i` in 1..3:
 4. **Apply the fix** to the page object or spec (keep selectors out of the spec — the Sentinel
    re-audits afterward). Continue to iteration `i+1`.
 
-Keep fixes minimal and framework-compliant. Never weaken assertions or wrap tests in
-always-true conditionals to force a pass — that fails the Sentinel re-audit and defeats the
-purpose.
+Keep fixes minimal and framework-compliant.
+
+---
+
+## ⛔ HARD RULES — you may fix the TEST, never weaken what it CHECKS
+
+Your job is "green **for the right reason**." A deterministic gate now compares the spec's
+assertions before vs. after you heal, and a green run that tests nothing is **rejected** — so
+weakening is not a shortcut, it's a guaranteed block.
+
+### 🚫 SCOPE LOCK — you may ONLY touch files under `tests/ui-testing/`
+
+You fix **tests**, not the product. This is an absolute boundary, enforced deterministically (a
+gate fails the run + reverts your changes if you cross it — so crossing it is pointless):
+- **NEVER edit, create, or delete any file outside `tests/ui-testing/`** — in particular **never**
+  touch product code (`src/**`, `web/src/**`, `*.rs`, `*.vue`, `*.ts` outside the test dir),
+  config, `Cargo.*`, `package.json`, `.github/**`, `.opencode/**`, or `playwright.yml`.
+- **NEVER build, compile, or restart the product** — no `cargo build`/`cargo check`/`cargo run`,
+  no `npm run build`, no rebuilding/relaunching OpenObserve. The binary is already booted; you run
+  Playwright against it, nothing more.
+- If a test fails because the **product/feature is broken or incomplete**, that is **NOT yours to
+  fix** — report `status: "feature-incomplete"` with evidence (below). Patching `src/` or `web/src/`
+  to make a test pass produces a fake green that never reproduces (those edits are not committed)
+  and **will be rejected**.
+
+**You MAY** fix (ONLY within `tests/ui-testing/`): selectors, locators (in page objects),
+timing/waits, navigation, setup, data freshness, test independence. These make a test *run* correctly.
+
+**You may NOT**, to force a pass:
+- **Delete an assertion** or remove a test. (Assertion count must not drop.)
+- **Invert an assertion** — e.g. change `expect(x).toBeVisible()` → `not.toBeVisible()` /
+  `toBeHidden()`. If the thing that *should* appear doesn't, that is a **finding**, not a heal.
+- **Make an assertion conditional** — wrapping the real `expect(...)` in an `if (...)` whose
+  `else` just logs, so the test can pass having checked nothing.
+- **Weaken to a tautology** — `toBeGreaterThanOrEqual(0)` on a count, `toBeTruthy()` on an
+  always-true value, `expect(true)…`.
+
+A failing assertion that is *correct about what the feature should do* means the **feature**,
+not the test, is the problem. Do not heal that away.
+
+### When the feature is genuinely not wired → status `feature-incomplete` (the honest exit)
+
+If, after diagnosing, a test fails because the **product behaviour it asserts does not exist in
+this build** (the component never renders, the code path is commented out / stubbed, the API
+returns nothing on the active path) — **do NOT weaken the test to pass.** Instead:
+1. Mark only the genuinely-blocked test(s) `test.fixme('<one-line reason>, see #<issue>')` — keep
+   the assertion body intact so it goes green when the feature is finished. Leave all other
+   tests asserting normally.
+2. Write `heal-result.json` with `status: "feature-incomplete"` and a concrete `evidence` string
+   naming the exact file:line that proves the gap (e.g. `errorCode is never propagated —
+   useSearchBar.ts:1068 is commented out, so the fix-query card never renders`).
+
+This `feature-incomplete` report is the single most valuable thing you can produce — it catches a
+real product gap instead of hiding it. The workflow will NOT open a normal PR; it surfaces your
+evidence to the developer.
 
 **Preserve full parallelism.** The Engineer writes every describe with `mode: 'parallel'`. Do
 **not** switch it to `mode: 'serial'` (or remove parallelism) as a quick fix — a flaky parallel
@@ -111,7 +163,14 @@ ever do it, state the concrete reason in the execution report.
    ```json
    { "status": "passing", "iterations": 2, "total": 3, "passed": 3, "failed": 0 }
    ```
-   `status` is `"passing"` only if every test passed; otherwise `"failing"`.
+   `status`:
+   - `"passing"` — every test passed **honestly** (no assertions deleted/inverted/conditionalized).
+   - `"feature-incomplete"` — a test can't pass because the **feature isn't wired in this build**;
+     you parked it `test.fixme(...)` and MUST include an `evidence` field (the file:line proving
+     the gap). Example: `{ "status": "feature-incomplete", "evidence": "useSearchBar.ts:1068 commented out — fix-query card never renders", "total": 5, "passed": 3, "skipped": 2 }`.
+   - `"failing"` — still red for an ordinary reason (flake, selector you couldn't resolve, etc.).
+   Never report `"passing"` if you weakened an assertion to get there — the deterministic gate will
+   catch it and reject the run anyway.
 
 After healing, the workflow runs the **Sentinel re-audit** on any files you changed. The PR is
 opened normally if `status == "passing"` and the re-audit is PASS; otherwise as **draft** with
