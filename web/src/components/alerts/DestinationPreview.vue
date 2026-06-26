@@ -332,6 +332,13 @@ const copyTemplate = () => {
   text-decoration: none;
 }
 
+/* Same issue as the link above: the global `p { color: var(--o2-text-body) }`
+   rule (light text in dark mode) overrides the inline utility, making this
+   message unreadable on the email card's fixed light background. */
+.email-alert-info p {
+  color: #6c757d;
+}
+
 .opsgenie-content .opsgenie-actions button {
   background: #172b4d;
   color: white;
