@@ -252,23 +252,24 @@ pub async fn validate_credentials(
         path_columns.pop();
     }
 
-    // Synthetics probe job API — no org_id in path. Use global token lookup
-    // so a regular org ingestion token (o2oi_) can authenticate these routes.
+    // Synthetics probe job API — no org_id in path. Look up exclusively in
+    // synthetics_probe_tokens (o2syn_ prefix). Separate table from o2oi_ ingest tokens.
     let is_synthetics_job_path =
         path_columns.first() == Some(&"synthetics") && path_columns.get(1) == Some(&"jobs");
     if is_synthetics_job_path
-        && user_password.starts_with(infra::table::org_ingestion_tokens::ORG_INGESTION_TOKEN_PREFIX)
+        && user_password
+            .starts_with(infra::table::synthetics_probe_tokens::SYNTHETICS_PROBE_TOKEN_PREFIX)
     {
-        match infra::table::org_ingestion_tokens::find_enabled_token_global(user_password).await {
-            Ok(Some(record)) => {
+        match infra::table::synthetics_probe_tokens::find_global(user_password).await {
+            Ok(Some(_)) => {
                 return Ok(TokenValidationResponse {
                     is_valid: true,
                     user_email: user_id.to_string(),
                     is_internal_user: true,
                     user_role: None,
-                    user_name: record.name.clone(),
+                    user_name: "synthetics-probe".to_string(),
                     family_name: "".to_string(),
-                    given_name: record.name,
+                    given_name: "synthetics-probe".to_string(),
                 });
             }
             Ok(None) => {

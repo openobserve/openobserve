@@ -63,6 +63,7 @@ pub mod short_urls;
 pub mod source_maps;
 pub mod synthetics_jobs;
 pub mod synthetics_monitors;
+pub mod synthetics_probe_tokens;
 pub mod system_prompts;
 pub mod system_settings;
 pub mod templates;
