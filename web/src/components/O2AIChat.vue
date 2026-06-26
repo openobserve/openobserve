@@ -6461,9 +6461,9 @@ export default defineComponent({
   border: 1px solid #3a3f55;
 }
 
-  // Completed step shown live during streaming — more compact and subdued
-  // than the active (spinner) indicator so the in-flight step still stands out.
-  .tool-call-indicator.completed {
+/* Completed step shown live during streaming — more compact and subdued
+ than the active (spinner) indicator so the in-flight step still stands out. */
+.tool-call-indicator.completed {
     padding: 8px 16px;
     margin: 4px 0;
 
