@@ -103,6 +103,12 @@ test.describe("FTS Default Column Selection testcases", () => {
     await pm.logsPage.expectFieldInTableHeader(userField);
     await pm.logsPage.expectFieldInTableHeader(ftsField);
 
+    // Assert the other FTS candidate was NOT re-injected — this is what
+    // "stop FTS re-injection" actually means: the resolver should not
+    // inject a new FTS column on top of the user's explicit selection.
+    const otherField = ftsField === 'message' ? 'log' : 'message';
+    await pm.logsPage.expectFieldNotInTableHeader(otherField);
+
     testLogger.info('TC-FTS-002 completed: user toggle additive, FTS re-injection stopped');
   });
 
