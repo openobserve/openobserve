@@ -2711,7 +2711,7 @@ export class LogsPage {
         // call ingested — never stale data from an earlier batch on the same stream.
         // This is what makes SDR verification deterministic instead of relying on the
         // virtualized results table rendering the right rows at the right time.
-        const marker = `sdr-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+        const marker = `sdr-${require('crypto').randomUUID()}`;
 
         const baseTimestamp = Date.now() * 1000;
         const logData = dataObjects.map(({ fieldName, fieldValue }, index) => ({

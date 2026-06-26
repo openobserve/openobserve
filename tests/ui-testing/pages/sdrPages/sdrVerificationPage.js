@@ -78,10 +78,18 @@ export class SDRVerificationPage {
       try {
         const response = await this.page.request.post(
           `${baseUrl}/api/${orgName}/_search?type=logs`,
-          { headers, data: searchPayload }
+          { headers, data: searchPayload, timeout: 15000 }
         );
-        const data = await response.json().catch(() => null);
-        hits = data?.hits || [];
+        if (!response.ok()) {
+          // A non-2xx is a real failure (auth/server error), not indexing lag —
+          // surface it distinctly instead of silently treating it as "no records yet".
+          const body = await response.text().catch(() => '');
+          testLogger.warn(`fetchRecordsByMarker attempt ${attempt}: search returned HTTP ${response.status()} — ${body.slice(0, 200)}`);
+          hits = [];
+        } else {
+          const data = await response.json().catch(() => null);
+          hits = data?.hits || [];
+        }
       } catch (error) {
         testLogger.warn(`fetchRecordsByMarker attempt ${attempt}: search request failed: ${error.message}`);
         hits = [];

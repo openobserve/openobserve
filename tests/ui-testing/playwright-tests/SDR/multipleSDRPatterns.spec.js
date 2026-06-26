@@ -10,7 +10,7 @@ async function ingestSingleLog(page, streamName, fieldName, fieldValue, maxRetri
 
   // Unique marker so verification can query the search API for THIS exact record
   // (WHERE sdr_test_id = '<marker>') instead of guessing which rendered row is latest.
-  const marker = `sdr-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  const marker = `sdr-${require('crypto').randomUUID()}`;
 
   const logEntry = {
     level: "info",
