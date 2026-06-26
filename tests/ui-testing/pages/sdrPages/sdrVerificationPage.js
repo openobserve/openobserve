@@ -88,6 +88,15 @@ export class SDRVerificationPage {
     await this.navigateToLogsQuick();
     await logsPage.selectStream(streamName);
 
+    // The field key is expected to be present unless it is being dropped (redacted/visible
+    // both keep the key). Use that to gate the retry on content rather than mere presence
+    // of a row — under CI load the latest row can render before the freshly-ingested field
+    // is searchable, so breaking on the first non-null row asserts against stale data.
+    const fieldAsJsonKey = `"${fieldName}":`;
+    const fieldAsKey = `${fieldName}:`;
+    const expectFieldPresent = !shouldBeDropped;
+    const hasField = (text) => text.includes(fieldAsJsonKey) || text.includes(fieldAsKey);
+
     // Retry loop: wait for logs to appear after ingestion (CI can be slow to index)
     const maxRetries = 5;
     let logText = null;
@@ -100,15 +109,16 @@ export class SDRVerificationPage {
 
       logText = await this.getLatestLogText();
 
-      testLogger.info(`Attempt ${attempt}/${maxRetries}: ${logText ? 'Log entry found' : 'No logs found'}`);
+      const fieldReady = logText !== null && (!expectFieldPresent || hasField(logText));
+      testLogger.info(`Attempt ${attempt}/${maxRetries}: ${logText ? (fieldReady ? 'Log entry ready' : 'Log entry found but field not yet indexed') : 'No logs found'}`);
 
-      if (logText) {
+      if (fieldReady) {
         break;
       }
 
       if (attempt < maxRetries) {
         const waitTime = attempt * 3000;
-        testLogger.info(`No logs found yet, waiting ${waitTime / 1000}s before retry...`);
+        testLogger.info(`Log not ready yet, waiting ${waitTime / 1000}s before retry...`);
         await this.page.waitForTimeout(waitTime);
       }
     }
@@ -118,9 +128,7 @@ export class SDRVerificationPage {
     testLogger.info(`Latest log text (first 300 chars): ${logText?.substring(0, 300)}...`);
 
     // Check if field exists in the log
-    const fieldAsJsonKey = `"${fieldName}":`;
-    const fieldAsKey = `${fieldName}:`;
-    const fieldFound = logText.includes(fieldAsJsonKey) || logText.includes(fieldAsKey);
+    const fieldFound = hasField(logText);
 
     if (shouldBeDropped) {
       // Field should NOT be present at all
@@ -142,12 +150,24 @@ export class SDRVerificationPage {
   /**
    * Fetch all log entry texts with full retry and 3-tier locator fallback.
    * Navigates to Logs, selects stream, waits until at least minCount entries appear.
+   *
+   * Row count alone is an unreliable readiness signal: under CI load the search can
+   * return a partial/stale result set (or the loose `tbody tr` fallback can count
+   * non-data rows) where the row count is satisfied but freshly-ingested fields are
+   * not yet searchable. When `requiredFields` is supplied, the fetch additionally
+   * waits until every one of those field names actually appears in the fetched logs,
+   * making readiness content-aware rather than purely count-based.
+   *
+   * @param {string[]} requiredFields - Field names that must appear before returning.
    * @returns {string[]} Array of log text strings (may be fewer than minCount on timeout).
    */
-  async fetchAllLogTexts(logsPage, streamName, minCount = 1) {
+  async fetchAllLogTexts(logsPage, streamName, minCount = 1, requiredFields = []) {
     await this.closeStreamDetailSidebarIfOpen();
     await this.navigateToLogsQuick();
     await logsPage.selectStream(streamName);
+
+    const hasField = (text, field) =>
+      text.includes(`"${field}":`) || text.includes(`${field}:`);
 
     const maxRetries = 5;
     let logTexts = [];
@@ -176,7 +196,19 @@ export class SDRVerificationPage {
           const text = await locator.nth(i).textContent();
           logTexts.push(text);
         }
-        if (logTexts.length >= minCount) break;
+
+        // Content gate: only treat the result set as "ready" once every required
+        // field is actually present. Otherwise the freshly-ingested data is still
+        // indexing — keep retrying so we don't assert against a partial result set.
+        const missingFields = requiredFields.filter(
+          (field) => !logTexts.some((text) => hasField(text, field))
+        );
+
+        if (logTexts.length >= minCount && missingFields.length === 0) break;
+
+        if (missingFields.length > 0) {
+          testLogger.info(`fetchAllLogTexts attempt ${attempt}/${maxRetries}: ${logTexts.length} entries found but fields not yet indexed: ${missingFields.join(', ')}`);
+        }
       }
 
       testLogger.info(`fetchAllLogTexts attempt ${attempt}/${maxRetries}: found ${logTexts.length} entries (need ${minCount})`);
@@ -198,7 +230,13 @@ export class SDRVerificationPage {
   async verifyMultipleFields(logsPage, streamName, fieldsToVerify) {
     testLogger.info(`Verifying ${fieldsToVerify.length} fields in stream: ${streamName}`);
 
-    const logTexts = await this.fetchAllLogTexts(logsPage, streamName, fieldsToVerify.length);
+    // Fields that must be present (everything except dropped fields) gate the fetch so we
+    // wait for them to be searchable instead of asserting against a partially-indexed result.
+    const requiredFields = fieldsToVerify
+      .filter(({ shouldBeDropped }) => !shouldBeDropped)
+      .map(({ fieldName }) => fieldName);
+
+    const logTexts = await this.fetchAllLogTexts(logsPage, streamName, fieldsToVerify.length, requiredFields);
     expect(logTexts.length, 'No logs found in the stream after multiple retries').toBeGreaterThan(0);
 
     for (const { fieldName, shouldBeDropped, shouldBeRedacted, shouldBeHashed } of fieldsToVerify) {
