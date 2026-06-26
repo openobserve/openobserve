@@ -2706,15 +2706,23 @@ export class LogsPage {
             ? process.env.INGESTION_URL.slice(0, -1)
             : process.env.INGESTION_URL;
 
+        // Unique per-batch marker. Verification queries the search API by this exact
+        // value (WHERE sdr_test_id = '<marker>'), so it inspects ONLY the records this
+        // call ingested — never stale data from an earlier batch on the same stream.
+        // This is what makes SDR verification deterministic instead of relying on the
+        // virtualized results table rendering the right rows at the right time.
+        const marker = `sdr-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+
         const baseTimestamp = Date.now() * 1000;
         const logData = dataObjects.map(({ fieldName, fieldValue }, index) => ({
             level: "info",
             [fieldName]: fieldValue,
             log: `Test log with ${fieldName} field - entry ${index}`,
+            sdr_test_id: marker,
             _timestamp: baseTimestamp + (index * 1000000)
         }));
 
-        testLogger.info(`Preparing to ingest ${logData.length} separate log entries`);
+        testLogger.info(`Preparing to ingest ${logData.length} separate log entries (marker: ${marker})`);
 
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
             try {
@@ -2732,9 +2740,10 @@ export class LogsPage {
                     testLogger.info('Ingestion successful, waiting for stream to be indexed...');
                     // NOTE: This is a backend async indexing wait, not a UI wait.
                     // waitForLoadState won't help as no page navigation occurs.
-                    // Consider using waitForStreamData() polling for production tests.
+                    // Verification polls the search API for this marker, so this is just
+                    // a small head start to reduce poll iterations — not the readiness gate.
                     await this.page.waitForTimeout(5000);
-                    return;
+                    return marker;
                 }
 
                 const errorMessage = responseBody?.message || JSON.stringify(responseBody);
