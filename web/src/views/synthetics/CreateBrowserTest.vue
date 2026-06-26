@@ -261,7 +261,7 @@ const replayStatus = computed<{ text: string; tone: 'muted' | 'success' | 'error
   <!-- ── Edit mode loading ── -->
   <main
     v-if="isLoadingEdit"
-    class="tw:min-h-screen tw:flex tw:items-center tw:justify-center tw:bg-[var(--o2-body-primary-bg)]"
+    class="tw:min-h-full tw:flex tw:items-center tw:justify-center tw:bg-[var(--o2-body-primary-bg)]"
   >
     <div class="tw:flex tw:flex-col tw:items-center tw:gap-3">
       <OIcon name="hourglass-empty" size="lg" class="tw:text-[var(--o2-primary-color)] tw:animate-spin" />
@@ -270,7 +270,7 @@ const replayStatus = computed<{ text: string; tone: 'muted' | 'success' | 'error
   </main>
 
   <!-- ── Gate phase: URL + name ── -->
-  <main v-else-if="phase === 'gate'" class="tw:min-h-screen tw:flex tw:flex-col tw:items-center tw:justify-center tw:bg-[var(--o2-body-primary-bg)]">
+  <main v-else-if="phase === 'gate'" class="tw:min-h-full tw:flex tw:flex-col tw:items-center tw:justify-center tw:bg-[var(--o2-body-primary-bg)]">
     <div class="tw:max-w-[48rem] tw:w-full tw:mx-auto tw:py-4 tw:px-4">
       <div class="tw:flex tw:justify-center tw:mb-6">
         <EmptyBrowserCheck :width="140" />
@@ -316,7 +316,7 @@ const replayStatus = computed<{ text: string; tone: 'muted' | 'success' | 'error
           @click="onRecordClick"
         >
           <template #prefix>
-            <OIcon name="fiber-manual-record" size="sm" />
+            <OIcon name="smart-display" size="sm" />
           </template>
           Record journey
         </OButton>
@@ -341,7 +341,7 @@ const replayStatus = computed<{ text: string; tone: 'muted' | 'success' | 'error
   </main>
 
   <!-- ── Extension setup phase (only when extension not yet installed) ── -->
-  <main v-else-if="phase === 'extension-setup'" class="tw:min-h-screen tw:flex tw:flex-col tw:items-center tw:justify-center tw:bg-[var(--o2-body-primary-bg)]">
+  <main v-else-if="phase === 'extension-setup'" class="tw:min-h-full tw:flex tw:flex-col tw:items-center tw:justify-center tw:bg-[var(--o2-body-primary-bg)]">
     <div class="tw:max-w-[48rem] tw:w-full tw:mx-auto tw:py-4 tw:px-4">
       <div class="tw:flex tw:justify-center tw:mb-6">
         <div class="tw:rounded-2xl tw:border tw:border-[var(--o2-border-color)] tw:bg-[var(--o2-card-bg)] tw:p-6 tw:flex tw:items-center tw:justify-center">
@@ -435,6 +435,7 @@ const replayStatus = computed<{ text: string; tone: 'muted' | 'success' | 'error
         class="tw:w-full tw:mb-4"
         :disabled="!extensionInstalled || !incognitoAllowed"
         data-test="synthetics-setup-open-record-btn"
+        icon-left="smart-display"
         @click="onExtensionSetupRecord"
       >
         Open &amp; Record

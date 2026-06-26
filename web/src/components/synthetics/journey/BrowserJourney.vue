@@ -160,41 +160,70 @@ function duplicateCapturedStep(index: number, step: BrowserStep) {
         :disabled="readonly"
         data-test="synthetics-journey-add-step-btn"
         @click="addStep"
+        icon-left="add"
       >
-        <OIcon name="add" size="sm" class="tw:mr-1" aria-hidden="true" />
         Add Step
       </OButton>
+
       <OButton
-        v-if="!isReplaying"
+        v-if="isRecording"
+        variant="outline"
+        size="sm"
+        data-test="synthetics-journey-cancel-btn"
+        @click="cancelRecording"
+      >
+        Cancel
+      </OButton>
+      <OButton
+        v-else-if="!isReplaying"
         variant="outline"
         size="sm"
         :disabled="readonly || isRecording || modelValue.length === 0"
         data-test="synthetics-journey-replay-btn"
         @click="emit('replay')"
+        icon-left="replay"
       >
-        <OIcon name="replay" size="sm" class="tw:mr-1" aria-hidden="true" />
         Replay
       </OButton>
       <OButton
         v-else
-        variant="outline"
+        variant="destructive"
         size="sm"
         data-test="synthetics-journey-stop-replay-btn"
         @click="emit('stop-replay')"
+        icon-left="stop"
       >
-        <OIcon name="stop" size="sm" class="tw:mr-1" aria-hidden="true" />
         Stop Replay
       </OButton>
+
+
       <OButton
+        v-if="isRecording"
+        variant="destructive"
+        size="sm"
+        data-test="synthetics-journey-stop-btn"
+        @click="stopRecording"
+        icon-left="stop"
+      >
+        Stop
+      </OButton>
+      <OButton
+      v-else
         variant="primary"
         size="sm"
         :disabled="readonly || isRecording"
         data-test="synthetics-journey-record-btn"
         @click="onRecordButtonClick"
+        icon-left="smart-display"
       >
-        <OIcon name="fiber-manual-record" size="sm" class="tw:mr-1" aria-hidden="true" />
         Record
       </OButton>
+
+
+              <!-- <OButton variant="ghost" size="sm" data-test="synthetics-journey-cancel-btn" @click="cancelRecording">Cancel</OButton>
+        <OButton variant="primary" size="sm" data-test="synthetics-journey-stop-btn" @click="stopRecording">
+          Stop &amp; Review
+        </OButton> -->
     </div>
 
     <!-- Recorder error (extension missing / failed to start) -->
@@ -221,10 +250,6 @@ function duplicateCapturedStep(index: number, step: BrowserStep) {
           <span class="tw:truncate">{{ currentUrl }}</span>
         </span>
         <span class="tw:text-xs tw:text-[var(--o2-text-muted)]">{{ capturedSteps.length }} steps</span>
-        <OButton variant="ghost" size="sm" data-test="synthetics-journey-cancel-btn" @click="cancelRecording">Cancel</OButton>
-        <OButton variant="primary" size="sm" data-test="synthetics-journey-stop-btn" @click="stopRecording">
-          Stop &amp; Review
-        </OButton>
       </div>
 
       <div v-if="capturedSteps.length > 0" class="tw:flex tw:flex-col tw:gap-1">
