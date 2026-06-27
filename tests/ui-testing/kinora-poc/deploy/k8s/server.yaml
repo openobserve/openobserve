@@ -1,0 +1,55 @@
+# Kinora API server (Node). The Service MUST be named `server` — the web nginx
+# reverse-proxies to http://server:3000 (see web-nginx-config.yaml).
+apiVersion: v1
+kind: Service
+metadata:
+  name: server
+spec:
+  selector:
+    app: kinora-server
+  ports:
+    - port: 3000
+      targetPort: 3000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kinora-server
+  template:
+    metadata:
+      labels:
+        app: kinora-server
+    spec:
+      # Wait for Postgres to accept connections before the app boots.
+      initContainers:
+        - name: wait-for-postgres
+          image: postgres:18.1
+          command: ["sh", "-c", "until pg_isready -h $POSTGRES_HOST -p $POSTGRES_PORT -U $POSTGRES_USER; do echo waiting for postgres; sleep 3; done"]
+          envFrom:
+            - configMapRef: { name: kinora-env }
+      containers:
+        - name: server
+          # TODO(infra): image built & pushed from kinora/packages/server/Dockerfile to ACR.
+          image: IMAGE_REGISTRY/kinora-server:TAG
+          ports:
+            - containerPort: 3000
+          envFrom:
+            - configMapRef: { name: kinora-env }
+            - secretRef: { name: kinora-secrets }
+          # PORT defaults to 3000 in the image; BASE_URL/WEB_ORIGIN come from the ConfigMap.
+          readinessProbe:
+            httpGet: { path: /healthcheck, port: 3000 }
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /healthcheck, port: 3000 }
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          resources:
+            requests: { cpu: "250m", memory: "512Mi" }
+            limits: { cpu: "1", memory: "1Gi" }

@@ -1,0 +1,30 @@
+# Non-secret environment for the Kinora server + migrate Job.
+# Secrets (passwords, keys) live in a separate Secret — see secret.example.yaml.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kinora-env
+data:
+  # --- Public URL ---------------------------------------------------------
+  # TODO(infra): the real public HTTPS URL. MUST match the Ingress host AND the
+  # value the web image was BUILT with (VITE_KINORA_SERVER_URL) — it is baked in.
+  BASE_URL: "https://kinora.internal.example.com"
+  WEB_ORIGIN: "https://kinora.internal.example.com"
+
+  # --- Self-host flags ----------------------------------------------------
+  KINORA_CLOUD: "false"   # keep hosted billing off
+  COOKIE_DOMAIN: ""       # empty = single-origin host-only cookie
+
+  # --- Postgres (non-secret parts) ---------------------------------------
+  # OPTION A (in-cluster): host is the postgres Service below.
+  # OPTION B (managed Azure DB): TODO(infra) set to your Flexible Server FQDN.
+  POSTGRES_HOST: "postgres"            # TODO(infra): managed → e.g. kinora-db.postgres.database.azure.com
+  POSTGRES_PORT: "5432"
+  POSTGRES_DB: "kinora"
+  POSTGRES_USER: "kinora"              # TODO(infra): managed often needs user@server form
+
+  # --- S3-compatible trace storage (non-secret parts) ---------------------
+  # TODO(infra): point at our object storage. Keys go in the Secret, not here.
+  S3_ENDPOINT: ""        # e.g. https://<account>.blob.core.windows.net or MinIO/S3 endpoint
+  S3_REGION: ""          # e.g. eastus / us-east-1
+  S3_BUCKET: ""          # e.g. kinora-traces

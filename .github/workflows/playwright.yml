@@ -47,6 +47,10 @@ env:
   ZO_SSRF_ALLOW_LOOPBACK: true
   ZO_MODEL_PRICING_ENABLED: true
   UPLOAD_TO_TESTDINO: ${{ vars.UPLOAD_TO_TESTDINO || 'false' }}
+  # Self-hosted Kinora dashboard (Playwright run history + trace viewer).
+  # Runs ALONGSIDE TestDino during evaluation. Default off; flip the repo
+  # variable UPLOAD_TO_KINORA=true once the server + secrets are in place.
+  UPLOAD_TO_KINORA: ${{ vars.UPLOAD_TO_KINORA || 'false' }}
 
 jobs:
   check_changes:
@@ -973,6 +977,33 @@ jobs:
           ls -la playwright-results/html-report/
           echo "Checking report.json:"
           ls -lh playwright-results/report.json
+
+      - name: Upload results to Kinora
+        # Runs on EVERY run (pass or fail), unlike TestDino which only uploads
+        # failures — Kinora's value is per-test flaky/fail history over time.
+        # continue-on-error + the gate mean this can never fail the build.
+        if: ${{ always() && env.UPLOAD_TO_KINORA == 'true' }}
+        continue-on-error: true
+        working-directory: tests/ui-testing
+        env:
+          KINORA_TOKEN: ${{ secrets.KINORA_TOKEN }}
+          KINORA_URL: ${{ vars.KINORA_URL }}
+          # git + CI metadata (sha, branch, repo URL, run link) auto-detect from GITHUB_*
+        run: |
+          if [ ! -f "playwright-results/report.json" ]; then
+            echo "::notice::Skipping Kinora upload - no report.json (tests may have been skipped due to rerun optimization)"
+            exit 0
+          fi
+          # Skip empty reports (e.g. all shards skipped on an optimized rerun) to
+          # avoid creating zero-test runs in the dashboard.
+          TOTAL=$(jq -r '((.stats.expected//0)+(.stats.unexpected//0)+(.stats.flaky//0)+(.stats.skipped//0))' playwright-results/report.json)
+          if [ "${TOTAL:-0}" -eq 0 ]; then
+            echo "::notice::Skipping Kinora upload - report has 0 tests"
+            exit 0
+          fi
+          echo "::notice::Uploading $TOTAL-test run to Kinora"
+          npx --yes @kinora/cli upload playwright-results/report.json \
+            --project openobserve-e2e
 
       - name: Cache test failures to TestDino
         if: ${{ needs.ui_integration_tests.result == 'failure' }}

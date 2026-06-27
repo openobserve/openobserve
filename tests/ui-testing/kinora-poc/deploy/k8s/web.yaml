@@ -1,0 +1,50 @@
+# Kinora web (nginx) — serves the dashboard + trace viewer and proxies the API.
+# IMPORTANT: the web image bakes the public URL at BUILD time
+# (VITE_KINORA_SERVER_URL=PUBLIC_URL). If the public URL changes, rebuild the image.
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+spec:
+  selector:
+    app: kinora-web
+  ports:
+    - port: 80
+      targetPort: 80
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kinora-web
+  template:
+    metadata:
+      labels:
+        app: kinora-web
+    spec:
+      containers:
+        - name: web
+          # TODO(infra): image built & pushed from kinora/packages/web/Dockerfile to ACR,
+          # with build-arg VITE_KINORA_SERVER_URL=<the public https URL>.
+          image: IMAGE_REGISTRY/kinora-web:TAG
+          ports:
+            - containerPort: 80
+          volumeMounts:
+            - name: nginx-conf
+              mountPath: /etc/nginx/conf.d/default.conf
+              subPath: default.conf
+          readinessProbe:
+            httpGet: { path: /, port: 80 }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests: { cpu: "50m", memory: "64Mi" }
+            limits: { cpu: "250m", memory: "256Mi" }
+      volumes:
+        - name: nginx-conf
+          configMap:
+            name: kinora-web-nginx

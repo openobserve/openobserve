@@ -1,0 +1,70 @@
+# OPTION A — in-cluster Postgres (cheapest; we own backups).
+# DELETE this whole file (and its line in kustomization.yaml) if using a managed
+# Azure Database for PostgreSQL — in that case just point POSTGRES_HOST in
+# configmap-env.yaml at the managed FQDN and set the password in the Secret.
+#
+# Backups (if you keep this): schedule a nightly `pg_dump` to blob storage, e.g. a
+# CronJob, plus a retention prune (see README "Retention").
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+spec:
+  clusterIP: None        # headless, for the StatefulSet
+  selector:
+    app: kinora-postgres
+  ports:
+    - port: 5432
+      targetPort: 5432
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+spec:
+  serviceName: postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kinora-postgres
+  template:
+    metadata:
+      labels:
+        app: kinora-postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:18.1
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              valueFrom: { configMapKeyRef: { name: kinora-env, key: POSTGRES_USER } }
+            - name: POSTGRES_DB
+              valueFrom: { configMapKeyRef: { name: kinora-env, key: POSTGRES_DB } }
+            - name: POSTGRES_PASSWORD
+              valueFrom: { secretKeyRef: { name: kinora-secrets, key: POSTGRES_PASSWORD } }
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          readinessProbe:
+            exec: { command: ["pg_isready", "-U", "kinora", "-d", "kinora"] }
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+          resources:
+            requests: { cpu: "250m", memory: "512Mi" }
+            limits: { cpu: "1", memory: "2Gi" }
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        # TODO(infra): set our storage class (e.g. managed-csi / managed-premium).
+        # storageClassName: managed-csi
+        resources:
+          requests:
+            # TODO(infra): size for retention. ~5-10 GB/month growth; 90-day
+            # retention ≈ 15-30 GB. Start with headroom.
+            storage: 50Gi

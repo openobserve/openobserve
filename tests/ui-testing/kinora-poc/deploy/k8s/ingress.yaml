@@ -1,0 +1,31 @@
+# Public HTTPS entry point -> web Service. ALL infra-specific bits are TODO(infra).
+# The body-size annotation matters: CI trace uploads are large (default limits
+# return HTTP 413). The annotation below is for the nginx ingress controller; use
+# the equivalent for AGIC/Traefik if that's our controller.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: kinora
+  annotations:
+    # TODO(infra): match our ingress controller. nginx-ingress example:
+    nginx.ingress.kubernetes.io/proxy-body-size: "500m"
+    # cert-manager example (delete if certs are issued another way):
+    # cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  # TODO(infra): our ingress class (nginx / azure-application-gateway / traefik).
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - kinora.internal.example.com   # TODO(infra): real host (must match PUBLIC_URL)
+      secretName: kinora-tls            # TODO(infra): existing cert secret, or cert-manager-managed
+  rules:
+    - host: kinora.internal.example.com  # TODO(infra): real host
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web
+                port:
+                  number: 80

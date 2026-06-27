@@ -1,0 +1,23 @@
+# One-shot DB migration. Runs `node dist/scripts/migrate.mjs latest` (idempotent)
+# and MUST complete before the server starts. Uses the same image as the server.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kinora-migrate
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        app: kinora-migrate
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: migrate
+          # TODO(infra): image built & pushed from kinora/packages/server/Dockerfile
+          # to our registry (ACR). Same image as the server.
+          image: IMAGE_REGISTRY/kinora-server:TAG
+          command: ["node", "dist/scripts/migrate.mjs", "latest"]
+          envFrom:
+            - configMapRef: { name: kinora-env }
+            - secretRef: { name: kinora-secrets }

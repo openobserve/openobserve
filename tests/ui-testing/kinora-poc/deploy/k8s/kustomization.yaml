@@ -1,0 +1,27 @@
+# Kinora self-host — Kubernetes (AKS) starter manifests.
+#
+# These are a REVIEWABLE STARTING POINT, not a turnkey deploy. Everything that
+# depends on our infrastructure is marked `# TODO(infra):` — fill those in (or
+# move into your infra repo) before applying. See ../README.md for the full guide
+# and ../GITHUB-SETUP.md for the CI secrets/variables.
+#
+# Apply order matters (migrate Job must finish before the server starts):
+#   kubectl apply -f namespace.yaml
+#   kubectl apply -f web-nginx-config.yaml -f configmap-env.yaml
+#   kubectl apply -f <your real secret>            # NOT secret.example.yaml
+#   kubectl apply -f postgres.yaml                 # OPTION A only (skip if managed DB)
+#   kubectl apply -f migrate-job.yaml && kubectl -n kinora wait --for=condition=complete job/kinora-migrate --timeout=300s
+#   kubectl apply -f server.yaml -f web.yaml -f ingress.yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: kinora
+resources:
+  - namespace.yaml
+  - configmap-env.yaml
+  - web-nginx-config.yaml
+  # - secret.example.yaml        # DO NOT commit/apply real secrets here — create out-of-band
+  - postgres.yaml                # OPTION A: in-cluster Postgres. Delete this line if using managed Azure DB.
+  - migrate-job.yaml
+  - server.yaml
+  - web.yaml
+  - ingress.yaml

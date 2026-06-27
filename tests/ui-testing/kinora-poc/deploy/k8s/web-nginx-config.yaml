@@ -1,0 +1,54 @@
+# The self-host nginx config for the web container. It serves the SPA + trace
+# viewer and reverse-proxies the API to the `server` Service (single origin).
+# Mounted at /etc/nginx/conf.d/default.conf in web.yaml.
+# Source: kinora/selfhost/nginx.conf (keep in sync if upstream changes).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kinora-web-nginx
+data:
+  default.conf: |
+    server {
+      listen 80;
+      server_name _;
+      client_max_body_size 500m; # trace.zip uploads (bumped for large real-CI traces)
+
+      location /api/ {
+        proxy_pass http://server:3000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+      }
+      location /trpc/ {
+        proxy_pass http://server:3000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+      }
+      location /artifacts/ {
+        proxy_pass http://server:3000;
+        proxy_set_header Host $host;
+        proxy_buffering off; # stream trace.zip + honor Range
+      }
+      location = /healthcheck {
+        proxy_pass http://server:3000;
+      }
+
+      location = /trace {
+        return 301 /trace/;
+      }
+      location /trace/ {
+        root /usr/share/nginx/html;
+        try_files $uri $uri/ /trace/index.html;
+      }
+      location /assets/ {
+        root /usr/share/nginx/html;
+        try_files $uri =404;
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+      }
+      location / {
+        root /usr/share/nginx/html;
+        try_files $uri $uri/ /index.html;
+      }
+    }
