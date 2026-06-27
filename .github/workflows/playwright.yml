@@ -223,6 +223,7 @@ jobs:
                 "logsAnalyzeDimensions.spec.js",
                 "monaco-query-prefill.spec.js",
                 "logsqueries.matchall.spec.js",
+                "ftsDefaultColumn.spec.js",
               ]
           - testfolder: "Logs-Features"
             browser: "chrome"
@@ -248,6 +249,7 @@ jobs:
                 "alerts-metrics-notification.spec.js",
                 "alerts-destinations-prebuilt.spec.js",
                 "alerts-vrl-encoding.spec.js",
+                "alerts-history.spec.js",
                 "alerts-template-prebuilt-guard.spec.js",
                 "alerts-form-validation.spec.js",
                 "anomaly-detection-form-validation.spec.js",
@@ -339,6 +341,7 @@ jobs:
                 "reportsScheduleNow.spec.js",
                 "reportsScheduleLater.spec.js",
                 "reportFolders.spec.js",
+                "reports-bulk-operations.spec.js",
                 "reports-form-validation.spec.js",
               ]
           - testfolder: "Streams"

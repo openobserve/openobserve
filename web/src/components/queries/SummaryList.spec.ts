@@ -225,7 +225,7 @@ describe("SummaryList.vue", () => {
     expect(columns[0].meta.align).toBe("left");
     expect(columns[1].meta.align).toBe("left");
     expect(columns[2].meta.align).toBe("left");
-    expect(columns[3].meta.align).toBe("left");
+    expect(columns[3].meta.align).toBe("right");
     expect(columns[4].meta.align).toBe("left");
     expect(columns[5].meta.align).toBe("left");
     expect(columns[6].meta.align).toBe("center");

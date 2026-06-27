@@ -86,7 +86,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="tw:h-full"
               @view-traces="handleServiceGraphViewTraces"
               @request:stream-change="onChildStreamChangeRequest"
-              @widen-range="onWidenTracesRange"
             />
           </div>
 
@@ -100,7 +99,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="tw:h-full"
               @view-traces="handleServicesCatalogViewTraces"
               @request:stream-change="onChildStreamChangeRequest"
-              @widen-range="onWidenTracesRange"
             />
           </div>
 
@@ -268,7 +266,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @shareLink="copyTracesUrl"
                       @metrics:filters-updated="onMetricsFiltersUpdated"
                       @run-query="searchData"
-                      @widen-range="onWidenTracesRange"
                       @remove-filter="onRemoveTracesFilter"
                       @jump-to-stream-data="onJumpToTracesStreamData"
                       @error-only-toggled="onErrorOnlyToggled"
@@ -1794,13 +1791,6 @@ const isStreamSelected = computed(() => {
 const onRemoveTracesFilter = () => {
   searchObj.data.editorValue = "";
   searchBarRef.value?.updateQuery?.();
-  searchObj.runQuery = true;
-};
-
-const onWidenTracesRange = (period: string) => {
-  searchBarRef.value?.dateTimeRef?.setRelativeTime(period);
-  searchObj.data.datetime.relativeTimePeriod = period;
-  searchObj.data.datetime.type = "relative";
   searchObj.runQuery = true;
 };
 

@@ -85,7 +85,7 @@ const KNOWN_COLUMN_META: Record<
     header: "Spans",
     size: 100,
     meta: {
-      align: "center",
+      align: "right",
       slot: false,
       cellClass: "tw:text-[var(--o2-text-1)]!",
     },
@@ -94,19 +94,19 @@ const KNOWN_COLUMN_META: Record<
   span_kind: {
     header: "Span Kind",
     size: 120,
-    meta: { align: "center", slot: false, closable: true },
+    meta: { align: "left", slot: false, closable: true },
     accessorFn: (row: any) =>
       SPAN_KIND_MAP[row.span_kind] ?? row.span_kind ?? "",
   },
   span_status: {
     header: "Span Status",
     size: 120,
-    meta: { align: "center", slot: true, disableCellAction: true },
+    meta: { align: "left", slot: true, disableCellAction: true },
   },
   status: {
     header: "Status",
     size: 120,
-    meta: { align: "center", slot: true, disableCellAction: true },
+    meta: { align: "left", slot: true, disableCellAction: true },
   },
   service_latency: {
     header: "Service Latency",
