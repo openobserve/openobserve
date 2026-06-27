@@ -783,6 +783,10 @@ jobs:
           MERGE_STATS: ${{ needs.merge_and_upload_reports.outputs.stats }}
         run: |
           set -uo pipefail
+          # Forks / unconfigured repos: skip entirely (no API call, no rate-limit spend).
+          if [ -z "${O2_REPORTING_INGEST_BASE:-}" ] || [ -z "${O2_REPORTING_AUTH:-}" ]; then
+            echo "::notice::O2_REPORTING_* secrets not set — skipping metrics ingest"; exit 0
+          fi
           # Per-job metadata (durations + conclusions) for THIS run attempt.
           curl -s -H "Authorization: token $GH_TOKEN" -H "Accept: application/vnd.github.v3+json" \
             "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}/jobs?per_page=100" \
@@ -817,7 +821,12 @@ jobs:
                 trigger: \$trigger,
                 actor: \$actor,
                 branch: \$branch,
-                conclusion: (if (\$build_result==\"success\" and \$ui_result==\"success\") then \"success\" else \"failure\" end),
+                conclusion: (
+                  if (\$build_result==\"cancelled\" or \$ui_result==\"cancelled\" or \$merge_result==\"cancelled\") then \"cancelled\"
+                  elif (\$build_result==\"success\" and \$ui_result==\"success\") then \"success\"
+                  elif (\$ui_result==\"skipped\" and \$build_result!=\"failure\") then \"skipped\"
+                  else \"failure\" end
+                ),
                 build_result: \$build_result,
                 ui_result: \$ui_result,
                 merge_result: \$merge_result,
@@ -829,6 +838,7 @@ jobs:
                 shards_total: ([ \$j[] | select(.name|startswith(\"e2e /\")) ] | length),
                 shards_passed: ([ \$j[] | select((.name|startswith(\"e2e /\")) and .conclusion==\"success\") ] | length),
                 shards_failed: ([ \$j[] | select((.name|startswith(\"e2e /\")) and .conclusion==\"failure\") ] | length),
+                shards_skipped: ([ \$j[] | select((.name|startswith(\"e2e /\")) and (.conclusion==\"skipped\" or .conclusion==\"cancelled\")) ] | length),
                 shards: [ \$j[] | select(.name|startswith(\"e2e /\")) | {name: .name, conclusion: .conclusion, duration_sec: ($dur)} ],
                 tests_total: (if \$stats then ((\$stats.expected//0)+(\$stats.unexpected//0)+(\$stats.flaky//0)+(\$stats.skipped//0)) else null end),
                 tests_passed: (if \$stats then (\$stats.expected//0) else null end),

@@ -19,28 +19,32 @@ passcode just shows up as an ingest `::warning::` with no metric for that run.
 Identical name + value in each repo (Settings → Secrets and variables → Actions). These can
 also be **org-level** secrets scoped to both repos instead of per-repo.
 
+> ⚠️ This file lives in a **public** repo — it deliberately contains **no** real host, org id,
+> IP, or credential. The concrete values live only in the GitHub Actions secrets below. Ask the
+> infra/QA owner for the actual ingest URL + passcode.
+
 **Secrets** (Settings → Secrets and variables → Actions → *Secrets*):
 
-| Secret | Value |
+| Secret | Value (format) |
 |---|---|
-| `O2_REPORTING_INGEST_BASE` | `https://o2latestmainapi.o2aks1.external.zinclabs.dev/api/3FhRJ0oGe6RhPZF4YJPndnRRtp0` (org `default` on o2latestmain, **external/public** endpoint) |
-| `O2_REPORTING_AUTH` | `base64("latestmain@openobserve.ai:<passcode>")` — e.g. `printf '%s' 'latestmain@openobserve.ai:<passcode>' \| base64` |
+| `O2_REPORTING_INGEST_BASE` | `https://<external-host>/api/<org-identifier>` — use the **externally-reachable** host (see note) |
+| `O2_REPORTING_AUTH` | `base64("<email>:<passcode>")` — e.g. `printf '%s' '<email>:<passcode>' \| base64` |
 
-> **Use the `external` host, not `internal`.** `o2latestmainapi.o2aks1.**internal**.zinclabs.dev`
-> resolves to a private VPC IP (`10.10.96.222`) that public GitHub/ubicloud runners cannot reach.
-> The `**external**` twin (`48.202.72.109`) is public and serves a **valid TLS cert** — verified by
-> a 200 test-ingest — so no `-k` and no `O2_REPORTING_INSECURE` variable are needed.
+> **Use an externally-reachable host.** An `*.internal.*` ingest host typically resolves to a
+> private VPC IP that public GitHub/ubicloud runners cannot reach (ingests then fail as harmless
+> `HTTP 000` warnings, no data lands). Use the public/`external` endpoint of the same instance,
+> which normally serves a valid TLS cert — then no `-k` / `O2_REPORTING_INSECURE` is needed.
 
-> Optional variable `O2_REPORTING_INSECURE=true` exists only as a fallback for a host with a
-> self-signed cert (it makes the poster use `curl -k`). Not needed for the external host above.
+> Optional variable `O2_REPORTING_INSECURE=true` (a GitHub Actions **variable**, not a secret) is
+> a fallback for a host with a self-signed cert — it makes the poster use `curl -k`. Leave it
+> unset for a host with a valid cert.
 
 > The passcode **rotates**. When it does, regenerate `O2_REPORTING_AUTH` in both repos.
 > Until the secrets exist the report job is a no-op (logs a skip warning) — safe to merge first,
 > add secrets after.
 
-> ℹ️ Final reachability (public IP + valid cert strongly indicate runners can reach it) is
-> confirmed on the first real CI run — a non-2xx/000 just warns and drops that run's metrics,
-> never failing the build.
+> ℹ️ Final reachability is confirmed on the first real CI run — a non-2xx/000 just warns and
+> drops that run's metrics, never failing the build.
 
 The PAT used by the engine report jobs for cross-repo PR-URL lookups is the existing
 `ORG_ADMIN_TOKEN` (no new token needed).
