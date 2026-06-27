@@ -69,7 +69,8 @@ test.describe("Pre-Test Cleanup", () => {
     // bulk_test_folder_<timestamp> is created by reports-bulk-operations.spec.js;
     // when its inline cleanup fails the duplicates accumulate and break the next run.
     await pm.apiCleanup.cleanupReportFolders([
-      'bulk_test_folder_'
+      'bulk_test_folder_',
+      'cancel_folder_'
     ]);
 
     // Clean up all dashboards owned by automation user

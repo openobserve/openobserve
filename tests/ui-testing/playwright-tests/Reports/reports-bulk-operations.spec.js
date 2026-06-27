@@ -88,10 +88,10 @@ test.describe("Report Bulk Operations", () => {
     await pm.reportFoldersPage.clickFolderTab('default');
     await pm.reportFoldersPage.expectReportNotVisibleInTable(`${REPORT_1}_move`);
 
-    // Cleanup
-    await pm.apiCleanup.deleteReport(`${REPORT_1}_move`);
-    await pm.apiCleanup.deleteReport(`${REPORT_2}_move`);
-    await pm.reportFoldersPage.deleteFolderIfExists(BULK_FOLDER);
+    // Cleanup — delete the folder via API. cleanupReportFolders cascades
+    // into the folder and removes the reports first (the v1 name-based delete
+    // returns 404 for reports that have been moved out of the default folder).
+    await pm.apiCleanup.cleanupReportFolders([BULK_FOLDER]);
   });
 
   test("P1: Bulk pause selected reports", {
@@ -224,8 +224,8 @@ test.describe("Report Bulk Operations", () => {
     await pm.reportFoldersPage.clickFolderTab('default');
     await pm.reportFoldersPage.expectReportVisibleInTable(`${REPORT_1}_cancel_move`);
 
-    // Cleanup
+    // Cleanup — folder deleted via API (see note in P1 bulk-move test).
     await pm.apiCleanup.deleteReport(`${REPORT_1}_cancel_move`);
-    await pm.reportFoldersPage.deleteFolderIfExists(cancelFolder);
+    await pm.apiCleanup.cleanupReportFolders([cancelFolder]);
   });
 });
