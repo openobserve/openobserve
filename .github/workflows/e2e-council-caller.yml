@@ -121,7 +121,10 @@ jobs:
           ACTOR: ${{ steps.ctx.outputs.actor }}
           HINT: ${{ steps.ctx.outputs.hint }}
         run: |
-          gh workflow run e2e-council.yml --repo openobserve/o2-enterprise \
+          # --ref pins the engine to the v0.80.0 variant in o2-enterprise (the main engine is hardcoded
+          # to 'main' fallbacks; the v0.80.0 engine is pinned to 'branch-v0.80.0'). Without this flag,
+          # gh defaults to the o2-enterprise default branch (main) and you'd get the wrong engine.
+          gh workflow run e2e-council.yml --repo openobserve/o2-enterprise --ref branch-v0.80.0 \
             -f source_repo=openobserve \
             -f pr_number="$PR" \
             -f dry_run="$DRY" \
