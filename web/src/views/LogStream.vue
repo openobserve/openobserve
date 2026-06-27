@@ -374,15 +374,6 @@ export default defineComponent({
         meta: { align: "left", flex: true },
       },
       {
-        id: "stream_type",
-        accessorKey: "stream_type",
-        header: t("logStream.type"),
-        size: COL.streamType,
-        resizable: true,
-        hideable: true,
-        meta: { align: "left" },
-      },
-      {
         id: "doc_num",
         accessorFn: (row: any) =>
           row.doc_num?.toLocaleString?.() ?? row.doc_num,
@@ -390,7 +381,7 @@ export default defineComponent({
         sortable: true,
         resizable: true,
         hideable: true,
-        size: COL.count,
+        size: 150,
         meta: { align: "right" },
       },
       {

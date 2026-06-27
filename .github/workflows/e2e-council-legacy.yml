@@ -1,5 +1,12 @@
-name: E2E Council (Test Generation)
+name: E2E Council (LEGACY — retiring)
 
+# ⚠️ RETIRED / SUPERSEDED (2026-06-25): the live E2E Council now runs as the ENGINE in the private
+# o2-enterprise repo (.github/workflows/e2e-council.yml), dispatched by the thin OSS caller
+# .github/workflows/e2e-council-caller.yml. This file is kept ONLY as a manual fallback during the
+# cutover and will be DELETED once the ENT engine is proven end-to-end. Its automatic triggers
+# (issue_comment `/e2e`, pull_request auto-on-merge) have been REMOVED so it can never double-fire
+# with the caller — it now runs ONLY via manual `workflow_dispatch`. Do not extend this file.
+#
 # Manual-first pipeline that generates Playwright E2E tests via OpenCode + DeepSeek.
 # v1 scope: OSS only. In dry-run it posts a triage decision comment and stops. With dry_run=false:
 #   Job 1 triage → Job 2 generate (branch autoe2e/<orig> + commit + push)
@@ -55,18 +62,9 @@ on:
         type: boolean
         required: false
         default: true
-  issue_comment:
-    types: [created]
-  # Auto-on-merge (Trigger 3) — OFF by default. Fires only when the repo variable
-  # E2E_AUTO_ON_MERGE == 'true' (gated in the triage `if`). Runs when a PR targeting main is
-  # CLOSED; the `if` further requires it was actually merged. Lets the pipeline auto-generate
-  # tests for a feature once it lands, without anyone typing /e2e.
-  # ⚠️ ENABLING THIS generates a test PR for (potentially) EVERY merged PR to main — only flip
-  #    E2E_AUTO_ON_MERGE on if the team has capacity to review the resulting test PRs. The triage
-  #    candidate-criteria filters out non-UI/ENT/docs changes, but expect more test-PR volume.
-  pull_request:
-    types: [closed]
-    branches: [main]
+  # NOTE: issue_comment (`/e2e`) and pull_request (auto-on-merge) triggers were REMOVED on retirement
+  # so this legacy workflow can never double-fire with e2e-council-caller.yml. The live triggers now
+  # live in the caller; this file runs ONLY via the manual workflow_dispatch above (cutover fallback).
 
 # Least privilege at the top level: the live (triage) path only reads code and posts comments.
 # Jobs that need to write code/PRs (pr_back) request elevated permissions at the job level.

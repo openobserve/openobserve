@@ -1,269 +1,207 @@
 const { expect } = require('@playwright/test');
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
+const { getAuthHeaders, getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
 
+/**
+ * SDR (Sensitive Data Redaction) verification.
+ *
+ * Verification reads the Search API (`/_search`) directly instead of scraping the
+ * logs results table. The search response IS the source of truth for SDR:
+ *   - query-time redaction/hashing/drop is applied server-side in the search
+ *     pipeline, so the API hits already contain `[REDACTED]` / `[REDACTED:hash]`
+ *     or omit dropped fields — exactly what the UI would render;
+ *   - ingestion-time transforms are baked into the stored record, so they show up
+ *     in the hits too.
+ *
+ * Every ingest tags its records with a unique `sdr_test_id` marker (see
+ * `logsPage.ingestMultipleFields` / the specs' `ingestSingleLog`). Verification
+ * queries by that marker, so it inspects ONLY the batch under test and never races
+ * against stale rows, virtualization, or highlight-HTML in the DOM table. Readiness
+ * is a precise count gate (we know exactly how many records we ingested), not a
+ * best-effort retry against the rendered table.
+ */
 export class SDRVerificationPage {
   constructor(page) {
     this.page = page;
-
-    // Locators
-    this.cancelButton = { role: 'button', name: 'Cancel' };
-    this.logsMenuItem = '[data-test="menu-link-\\/logs-item"]';
-    this.logTableColumnSource = '[data-test="log-table-column-0-source"]';
-    this.logTableBodyRowsAlt = '.logs-result-table tbody tr[role="row"]';
-    this.logTableBodyRows = 'tbody tr';
-  }
-
-  async closeStreamDetailSidebarIfOpen() {
-    const cancelButton = this.page.getByRole(this.cancelButton.role, { name: this.cancelButton.name });
-    const cancelVisible = await cancelButton.isVisible({ timeout: 1000 }).catch(() => false);
-    if (cancelVisible) {
-      await cancelButton.click();
-      testLogger.info('Closed stream detail sidebar');
-    }
-  }
-
-  async navigateToLogsQuick() {
-    await this.page.locator(this.logsMenuItem).click();
-    await this.page.waitForLoadState('domcontentloaded');
-    // Use short networkidle with catch — Logs page may have persistent connections
-    await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-    testLogger.info('Navigated to Logs (fast - no VRL wait)');
   }
 
   /**
-   * Wait for the loading indicator to disappear.
-   * @param {number} timeout - Max milliseconds to wait (default 15000)
+   * Field-state predicates over a single search hit (a record object).
+   * `[REDACTED:<32 hex>]` is the hash marker; a bare `[REDACTED]` is a redaction.
+   * Note `'[REDACTED:abc]'.includes('[REDACTED]')` is false, so redact and hash
+   * never alias each other.
    */
-  async waitForLoadingToDisappear(timeout = 15000) {
-    const loadingIndicator = this.page.getByText('Loading...').first();
-    await loadingIndicator.waitFor({ state: 'hidden', timeout }).catch(() => {
-      testLogger.info(`Loading indicator still visible after ${timeout}ms`);
-    });
+  static _fieldValue(hit, fieldName) {
+    const value = hit?.[fieldName];
+    return value === undefined || value === null ? null : String(value);
+  }
+  static _isPresent(hit, fieldName) {
+    return SDRVerificationPage._fieldValue(hit, fieldName) !== null;
+  }
+  static _isRedacted(value) {
+    return typeof value === 'string' && value.includes('[REDACTED]');
+  }
+  static _isHashed(value) {
+    return typeof value === 'string' && /\[REDACTED:[0-9a-f]{32}\]/i.test(value);
+  }
+  static _looksRedactedOrHashed(value) {
+    return typeof value === 'string' && /\[REDACTED/.test(value);
   }
 
   /**
-   * Get log entry count and the matching locator.
-   * Tries the source column first, falls back to tbody rows.
-   * @returns {{ locator: import('@playwright/test').Locator, count: number }}
+   * Poll the Search API for records tagged with `marker` until at least `minCount`
+   * are searchable. Records are returned newest-first. The poll only waits out async
+   * ingestion indexing for THIS batch — once `minCount` records appear, any SDR
+   * transform on them is already final, so the result is deterministic.
+   *
+   * @returns {Promise<Object[]>} hit objects (may be fewer than minCount on timeout)
    */
-  async getLogEntries() {
-    let locator = this.page.locator(this.logTableColumnSource);
-    let count = await locator.count();
+  async fetchRecordsByMarker(streamName, marker, minCount = 1) {
+    expect(marker, 'SDR verification requires an ingest marker — pass the value returned by ingestMultipleFields/ingestSingleLog').toBeTruthy();
 
-    if (count === 0) {
-      locator = this.page.locator(this.logTableBodyRows);
-      count = await locator.count();
-    }
+    const headers = getAuthHeaders();
+    const baseUrl = process.env['ZO_BASE_URL'];
+    const orgName = getOrgIdentifier();
+    const sql = `SELECT * FROM "${streamName}" WHERE sdr_test_id = '${marker}' ORDER BY _timestamp DESC`;
 
-    return { locator, count };
-  }
+    const maxAttempts = 20; // ~60s ceiling at 3s/attempt — generous for CI index lag
+    let hits = [];
 
-  async getLatestLogText() {
-    const { locator, count } = await this.getLogEntries();
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      const endTime = (Date.now() + 60000) * 1000; // +1m future buffer (microseconds)
+      const startTime = endTime - 60 * 60 * 1000 * 1000; // 60-minute lookback window
 
-    testLogger.info(`Found ${count} log entries in the UI`);
+      const searchPayload = {
+        query: { sql, start_time: startTime, end_time: endTime, from: 0, size: 1000 },
+      };
 
-    if (count === 0) {
-      return null;
-    }
-
-    // Get the first log entry (most recent)
-    const logText = await locator.nth(0).textContent();
-    return logText;
-  }
-
-  /**
-   * Verify a single field in the latest log entry with retry logic for CI.
-   * @param {Object} logsPage - The logsPage instance from PageManager
-   * @param {string} streamName - Name of the stream
-   * @param {string} fieldName - Name of the field to verify
-   * @param {boolean} shouldBeDropped - Whether field should be dropped
-   * @param {boolean} shouldBeRedacted - Whether field should be redacted
-   */
-  async verifySingleFieldInLatestLog(logsPage, streamName, fieldName, shouldBeDropped, shouldBeRedacted) {
-    testLogger.info(`Verifying field: ${fieldName}, shouldBeDropped: ${shouldBeDropped}, shouldBeRedacted: ${shouldBeRedacted}`);
-
-    // Use page object functions to navigate and get log
-    await this.closeStreamDetailSidebarIfOpen();
-    await this.navigateToLogsQuick();
-    await logsPage.selectStream(streamName);
-
-    // Retry loop: wait for logs to appear after ingestion (CI can be slow to index)
-    const maxRetries = 5;
-    let logText = null;
-
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      await this.page.waitForTimeout(1000);
-      await logsPage.clickRefreshButton();
-      await this.waitForLoadingToDisappear(15000);
-      await this.page.waitForTimeout(2000);
-
-      logText = await this.getLatestLogText();
-
-      testLogger.info(`Attempt ${attempt}/${maxRetries}: ${logText ? 'Log entry found' : 'No logs found'}`);
-
-      if (logText) {
-        break;
+      try {
+        const response = await this.page.request.post(
+          `${baseUrl}/api/${orgName}/_search?type=logs`,
+          { headers, data: searchPayload, timeout: 15000 }
+        );
+        if (!response.ok()) {
+          // A non-2xx is a real failure (auth/server error), not indexing lag —
+          // surface it distinctly instead of silently treating it as "no records yet".
+          const body = await response.text().catch(() => '');
+          testLogger.warn(`fetchRecordsByMarker attempt ${attempt}: search returned HTTP ${response.status()} — ${body.slice(0, 200)}`);
+          hits = [];
+        } else {
+          const data = await response.json().catch(() => null);
+          hits = data?.hits || [];
+        }
+      } catch (error) {
+        testLogger.warn(`fetchRecordsByMarker attempt ${attempt}: search request failed: ${error.message}`);
+        hits = [];
       }
 
-      if (attempt < maxRetries) {
-        const waitTime = attempt * 3000;
-        testLogger.info(`No logs found yet, waiting ${waitTime / 1000}s before retry...`);
-        await this.page.waitForTimeout(waitTime);
+      if (hits.length >= minCount) {
+        testLogger.info(`fetchRecordsByMarker: ${hits.length} record(s) for marker ${marker} (need ${minCount})`);
+        return hits;
+      }
+
+      testLogger.info(`fetchRecordsByMarker attempt ${attempt}/${maxAttempts}: ${hits.length}/${minCount} records for marker ${marker}, waiting for indexing...`);
+      if (attempt < maxAttempts) {
+        await this.page.waitForTimeout(3000);
       }
     }
 
-    expect(logText, 'No logs found in the stream after multiple retries').not.toBeNull();
+    testLogger.warn(`fetchRecordsByMarker: returning ${hits.length} record(s) for marker ${marker} after ${maxAttempts} attempts (needed ${minCount})`);
+    return hits;
+  }
 
-    testLogger.info(`Latest log text (first 300 chars): ${logText?.substring(0, 300)}...`);
+  /**
+   * Verify a single field on the record just ingested with `marker`.
+   * Used by sequential flows that re-ingest to the same stream and assert on the
+   * latest write (and on query-time transforms applied to an existing record by
+   * reusing that record's marker).
+   *
+   * @param {Object} logsPage - kept for call-site compatibility (unused; API-based)
+   * @param {string} marker   - marker returned by the ingest that wrote this record
+   */
+  async verifySingleFieldInLatestLog(logsPage, streamName, fieldName, shouldBeDropped, shouldBeRedacted, marker) {
+    testLogger.info(`Verifying field: ${fieldName}, shouldBeDropped: ${shouldBeDropped}, shouldBeRedacted: ${shouldBeRedacted}, marker: ${marker}`);
 
-    // Check if field exists in the log
-    const fieldAsJsonKey = `"${fieldName}":`;
-    const fieldAsKey = `${fieldName}:`;
-    const fieldFound = logText.includes(fieldAsJsonKey) || logText.includes(fieldAsKey);
+    const hits = await this.fetchRecordsByMarker(streamName, marker, 1);
+    expect(hits.length, `No record found for marker ${marker} in stream ${streamName}`).toBeGreaterThan(0);
+
+    const hit = hits[0];
+    const value = SDRVerificationPage._fieldValue(hit, fieldName);
 
     if (shouldBeDropped) {
-      // Field should NOT be present at all
-      expect(fieldFound, `Field ${fieldName} should have been DROPPED but was found in log`).toBe(false);
-      testLogger.info(`✓ Field ${fieldName} is correctly DROPPED (not present)`);
+      expect(value, `Field ${fieldName} should have been DROPPED but was found: ${value}`).toBeNull();
+      testLogger.info(`✓ Field ${fieldName} is correctly DROPPED (absent from record)`);
     } else if (shouldBeRedacted) {
-      // Field should be present with [REDACTED]
-      expect(fieldFound, `Field ${fieldName} should be present but was not found in log`).toBe(true);
-      expect(logText, `Field ${fieldName} should be REDACTED but [REDACTED] marker not found`).toContain('[REDACTED]');
+      expect(value, `Field ${fieldName} should be present but was not found in record`).not.toBeNull();
+      expect(SDRVerificationPage._isRedacted(value), `Field ${fieldName} should be REDACTED but value was: ${value}`).toBe(true);
       testLogger.info(`✓ Field ${fieldName} is correctly REDACTED`);
     } else {
-      // Field should be visible with actual value
-      expect(fieldFound, `Field ${fieldName} should be visible but was not found in log`).toBe(true);
-      expect(logText, `Field ${fieldName} should be visible but is REDACTED`).not.toContain('[REDACTED]');
-      testLogger.info(`✓ Field ${fieldName} is visible with actual value (as expected)`);
+      expect(value, `Field ${fieldName} should be visible but was not found in record`).not.toBeNull();
+      expect(SDRVerificationPage._looksRedactedOrHashed(value), `Field ${fieldName} should be visible but appears redacted/hashed: ${value}`).toBe(false);
+      testLogger.info(`✓ Field ${fieldName} is visible with actual value`);
     }
   }
 
   /**
-   * Fetch all log entry texts with full retry and 3-tier locator fallback.
-   * Navigates to Logs, selects stream, waits until at least minCount entries appear.
-   * @returns {string[]} Array of log text strings (may be fewer than minCount on timeout).
+   * Verify multiple fields written by one ingest batch (each field lives in its own
+   * record). Each descriptor: { fieldName, shouldBeDropped?, shouldBeRedacted?, shouldBeHashed? }.
+   * Default (all flags false/absent): field must be present and not redacted/hashed.
+   *
+   * @param {Object} logsPage - kept for call-site compatibility (unused; API-based)
+   * @param {string} marker   - marker returned by the ingest under test
    */
-  async fetchAllLogTexts(logsPage, streamName, minCount = 1) {
-    await this.closeStreamDetailSidebarIfOpen();
-    await this.navigateToLogsQuick();
-    await logsPage.selectStream(streamName);
+  async verifyMultipleFields(logsPage, streamName, fieldsToVerify, marker) {
+    testLogger.info(`Verifying ${fieldsToVerify.length} fields in stream: ${streamName} (marker: ${marker})`);
 
-    const maxRetries = 5;
-    let logTexts = [];
-
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      await this.page.waitForTimeout(1000);
-      await logsPage.clickRefreshButton();
-      await this.page.waitForTimeout(2000);
-
-      let locator = this.page.locator(this.logTableColumnSource);
-      let count = await locator.count();
-
-      if (count < minCount) {
-        locator = this.page.locator(this.logTableBodyRowsAlt);
-        count = await locator.count();
-      }
-
-      if (count < minCount) {
-        locator = this.page.locator(this.logTableBodyRows);
-        count = await locator.count();
-      }
-
-      if (count > 0) {
-        logTexts = [];
-        for (let i = 0; i < count; i++) {
-          const text = await locator.nth(i).textContent();
-          logTexts.push(text);
-        }
-        if (logTexts.length >= minCount) break;
-      }
-
-      testLogger.info(`fetchAllLogTexts attempt ${attempt}/${maxRetries}: found ${logTexts.length} entries (need ${minCount})`);
-
-      if (attempt < maxRetries) {
-        await this.page.waitForTimeout(attempt * 3000);
-      }
-    }
-
-    testLogger.info(`fetchAllLogTexts: returning ${logTexts.length} log entries`);
-    return logTexts;
-  }
-
-  /**
-   * Verify multiple fields across log entries with a single navigation + retry.
-   * Each field descriptor: { fieldName, shouldBeDropped?, shouldBeRedacted?, shouldBeHashed? }
-   * Default (no flag / all false): field must be present and not redacted.
-   */
-  async verifyMultipleFields(logsPage, streamName, fieldsToVerify) {
-    testLogger.info(`Verifying ${fieldsToVerify.length} fields in stream: ${streamName}`);
-
-    const logTexts = await this.fetchAllLogTexts(logsPage, streamName, fieldsToVerify.length);
-    expect(logTexts.length, 'No logs found in the stream after multiple retries').toBeGreaterThan(0);
+    const hits = await this.fetchRecordsByMarker(streamName, marker, fieldsToVerify.length);
+    expect(hits.length, `Expected ${fieldsToVerify.length} records for marker ${marker} but found ${hits.length}`).toBeGreaterThanOrEqual(fieldsToVerify.length);
 
     for (const { fieldName, shouldBeDropped, shouldBeRedacted, shouldBeHashed } of fieldsToVerify) {
       testLogger.info(`Verifying field: ${fieldName}`);
 
-      let foundLog = null;
-      for (const logText of logTexts) {
-        if (logText.includes(`"${fieldName}":`) || logText.includes(`${fieldName}:`)) {
-          foundLog = logText;
-          break;
-        }
-      }
+      // The record carrying this field (present-and-non-null). For a dropped field
+      // no record will carry it, which is exactly what we assert below.
+      const carrier = hits.find((hit) => SDRVerificationPage._isPresent(hit, fieldName));
+      const value = carrier ? SDRVerificationPage._fieldValue(carrier, fieldName) : null;
 
       if (shouldBeDropped) {
-        expect(foundLog, `Field ${fieldName} should be DROPPED but was found in logs`).toBeNull();
+        expect(carrier, `Field ${fieldName} should be DROPPED but was found in a record: ${value}`).toBeFalsy();
         testLogger.info(`✓ Field ${fieldName} is correctly DROPPED`);
       } else if (shouldBeRedacted) {
-        expect(foundLog, `Field ${fieldName} should be present but was not found`).not.toBeNull();
-        expect(foundLog, `Field ${fieldName} should contain [REDACTED] marker`).toContain('[REDACTED]');
+        expect(carrier, `Field ${fieldName} should be present but was not found`).toBeTruthy();
+        expect(SDRVerificationPage._isRedacted(value), `Field ${fieldName} should contain [REDACTED] marker but was: ${value}`).toBe(true);
         testLogger.info(`✓ Field ${fieldName} is correctly REDACTED`);
       } else if (shouldBeHashed) {
-        expect(foundLog, `Field ${fieldName} should be present but was not found`).not.toBeNull();
-        const hashPattern = /\[REDACTED:[0-9a-f]{32}\]/i;
-        expect(hashPattern.test(foundLog), `Field ${fieldName} should be in [REDACTED:hash] format`).toBe(true);
-        const hashMatch = foundLog.match(/\[REDACTED:([0-9a-f]{32})\]/i);
-        testLogger.info(`✓ Field ${fieldName} is correctly HASHED: [REDACTED:${hashMatch?.[1]}]`);
+        expect(carrier, `Field ${fieldName} should be present but was not found`).toBeTruthy();
+        expect(SDRVerificationPage._isHashed(value), `Field ${fieldName} should be in [REDACTED:hash] format but was: ${value}`).toBe(true);
+        testLogger.info(`✓ Field ${fieldName} is correctly HASHED: ${value}`);
       } else {
-        // shouldBeDropped/Redacted/Hashed all false or absent — field must be visible
-        expect(foundLog, `Field ${fieldName} should be visible but was not found`).not.toBeNull();
-        const redactedPresent = /\[REDACTED/.test(foundLog);
-        expect(redactedPresent, `Field ${fieldName} should be visible but appears redacted/hashed`).toBe(false);
+        expect(carrier, `Field ${fieldName} should be visible but was not found`).toBeTruthy();
+        expect(SDRVerificationPage._looksRedactedOrHashed(value), `Field ${fieldName} should be visible but appears redacted/hashed: ${value}`).toBe(false);
         testLogger.info(`✓ Field ${fieldName} is visible with actual value`);
       }
     }
   }
 
   /**
-   * Verify that fields are completely absent from the most recent N log entries.
-   * Use this for ingestion-time DROP where older logs still contain the fields.
-   * @param {string[]} fieldNames - Plain array of field name strings
+   * Verify that every field in `fieldNames` is absent from the batch tagged with
+   * `marker`. Used for ingestion-time DROP, where the dropped fields never reach
+   * storage for the post-pattern batch.
+   *
+   * @param {Object} logsPage - kept for call-site compatibility (unused; API-based)
+   * @param {string} marker   - marker of the post-drop ingest batch
    */
-  async verifyFieldsAreAbsent(logsPage, streamName, fieldNames) {
-    testLogger.info(`Verifying ${fieldNames.length} fields are ABSENT in recent logs`);
+  async verifyFieldsAreAbsent(logsPage, streamName, fieldNames, marker) {
+    testLogger.info(`Verifying ${fieldNames.length} fields are ABSENT in stream ${streamName} (marker: ${marker})`);
 
-    const logTexts = await this.fetchAllLogTexts(logsPage, streamName, fieldNames.length);
-    expect(logTexts.length, 'No logs found in the stream after multiple retries').toBeGreaterThan(0);
-
-    // Only inspect the most recent N entries — older logs pre-date the drop pattern
-    const recentTexts = logTexts.slice(0, fieldNames.length);
-    testLogger.info(`Checking ${recentTexts.length} most recent log entries for absence of fields`);
+    const hits = await this.fetchRecordsByMarker(streamName, marker, fieldNames.length);
+    expect(hits.length, `Expected ${fieldNames.length} records for marker ${marker} but found ${hits.length}`).toBeGreaterThanOrEqual(fieldNames.length);
 
     for (const fieldName of fieldNames) {
-      testLogger.info(`Verifying field ${fieldName} is ABSENT in recent logs`);
-
-      let foundInRecent = false;
-      for (const logText of recentTexts) {
-        if (logText.includes(`"${fieldName}":`) || logText.includes(`${fieldName}:`)) {
-          foundInRecent = true;
-          testLogger.error(`Field ${fieldName} unexpectedly found: ${logText.substring(0, 200)}`);
-          break;
-        }
-      }
-
-      expect(foundInRecent, `Field ${fieldName} should be DROPPED but was found in recent logs`).toBe(false);
-      testLogger.info(`✓ Field ${fieldName} is correctly absent from recent logs`);
+      const carrier = hits.find((hit) => SDRVerificationPage._isPresent(hit, fieldName));
+      const value = carrier ? SDRVerificationPage._fieldValue(carrier, fieldName) : null;
+      expect(carrier, `Field ${fieldName} should be DROPPED but was found in a record: ${value}`).toBeFalsy();
+      testLogger.info(`✓ Field ${fieldName} is correctly absent`);
     }
   }
 }

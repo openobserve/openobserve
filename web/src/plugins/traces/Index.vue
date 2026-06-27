@@ -86,7 +86,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="tw:h-full"
               @view-traces="handleServiceGraphViewTraces"
               @request:stream-change="onChildStreamChangeRequest"
-              @widen-range="onWidenTracesRange"
             />
           </div>
 
@@ -100,7 +99,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="tw:h-full"
               @view-traces="handleServicesCatalogViewTraces"
               @request:stream-change="onChildStreamChangeRequest"
-              @widen-range="onWidenTracesRange"
             />
           </div>
 
@@ -146,7 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                     :ai-enabled="isAiEnabled"
                     data-test="traces-no-streams-in-org-text"
-                    @ask-ai="onAskAiTracing"
+                    @ask-ai="onAskAiSetupTracing"
                   />
                   <div
                     v-else-if="
@@ -259,16 +257,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <search-result
                       ref="searchResultRef"
                       :show-error-only="showErrorOnly"
+                      :ai-enabled="isAiEnabled"
+                      :stream-doc-time-range="streamDocTimeRange"
+                      :query-window-us="queryWindowUs"
                       @update:datetime="setHistogramDate"
                       @update:scroll="getMoreData"
                       @update:sort="runQueryOnSort"
                       @shareLink="copyTracesUrl"
                       @metrics:filters-updated="onMetricsFiltersUpdated"
                       @run-query="searchData"
-                      @widen-range="onWidenTracesRange"
                       @remove-filter="onRemoveTracesFilter"
                       @jump-to-stream-data="onJumpToTracesStreamData"
                       @error-only-toggled="onErrorOnlyToggled"
+                      @ask-ai="onAskAiTracing"
+                      @send-to-ai-chat="sendToAiChat"
                     />
                   </div>
                 </div>
@@ -387,6 +389,8 @@ const activeTab = computed(() => {
 });
 const router = useRouter();
 const { t } = useI18n();
+// Bubbles AI-chat requests up to MainLayout, which opens the O2AIChat panel.
+const emit = defineEmits(["sendToAiChat"]);
 const {
   searchObj,
   resetSearchObj,
@@ -1254,6 +1258,8 @@ const updateNewDateTime = (startTime: number, endTime: number) => {
 async function extractFields() {
   try {
     searchObj.data.stream.selectedStreamFields = [];
+    // Cleared here so a stream with no stats doesn't inherit the previous one's.
+    selectedStreamStats.value = null;
 
     if (!searchObj.data.stream?.selectedStream?.value) return;
 
@@ -1279,6 +1285,12 @@ async function extractFields() {
       if (streamResultEntry && stream?.stats) {
         streamResultEntry.stats = stream.stats;
       }
+      // Capture the authoritative stats for the selected stream so the empty
+      // state's "jump to latest data" works even if streamResults.list (from
+      // the streams name-list) is missing stats. This is the same value the
+      // query uses, fetched via getStream(force) above.
+      selectedStreamStats.value =
+        stream?.stats ?? streamResultEntry?.stats ?? null;
       searchObj.data.datetime.queryRangeRestrictionInHour = -1;
       if (
         (stream.settings.max_query_range > 0 ||
@@ -1782,13 +1794,6 @@ const onRemoveTracesFilter = () => {
   searchObj.runQuery = true;
 };
 
-const onWidenTracesRange = (period: string) => {
-  searchBarRef.value?.dateTimeRef?.setRelativeTime(period);
-  searchObj.data.datetime.relativeTimePeriod = period;
-  searchObj.data.datetime.type = "relative";
-  searchObj.runQuery = true;
-};
-
 const onJumpToTracesStreamData = (fromUs: number, toUs: number) => {
   searchBarRef.value?.dateTimeRef?.setAbsoluteTime(fromUs, toUs);
   searchObj.data.datetime.startTime = fromUs;
@@ -1818,8 +1823,99 @@ const isAiEnabled = computed(
   () => config.isEnterprise === "true" && !!store.state.zoConfig.ai_enabled,
 );
 
+// Authoritative doc time range for the selected stream, captured from
+// getStream(force) in extractFields. Drives the empty-state "jump to latest
+// data" card. Held in the parent (like the logs page) so it never depends on
+// the streams name-list response carrying stats.
+const selectedStreamStats = ref<{
+  doc_time_min: number;
+  doc_time_max: number;
+} | null>(null);
+
+const streamDocTimeRange = computed<
+  { min: number; max: number } | undefined
+>(() => {
+  const selected = searchObj.data?.stream?.selectedStream?.value;
+  if (!selected) return undefined;
+
+  let min = Infinity;
+  let max = -Infinity;
+
+  const consider = (st: any) => {
+    if (!st) return;
+    // Ignore non-positive values: the schema endpoint can return a stats
+    // object with doc_time_min/max = 0, which must not mask the real stats
+    // coming from the streams name-list.
+    if (st.doc_time_min > 0 && st.doc_time_min < min) min = st.doc_time_min;
+    if (st.doc_time_max > 0 && st.doc_time_max > max) max = st.doc_time_max;
+  };
+
+  // Primary: streams name-list stats — the same source the logs page uses.
+  for (const s of searchObj.data?.streamResults?.list ?? []) {
+    if (s.name === selected) consider(s.stats);
+  }
+  // Fallback/merge: stats captured from getStream(force) in extractFields.
+  consider(selectedStreamStats.value);
+
+  if (!isFinite(min) || !isFinite(max)) return undefined;
+  return { min, max };
+});
+
+const queryWindowUs = computed<{ start: number; end: number } | undefined>(
+  () => {
+    const dt = searchObj.data.datetime;
+    if (dt?.type === "absolute" && dt.startTime && dt.endTime) {
+      return { start: Number(dt.startTime), end: Number(dt.endTime) };
+    }
+    if (dt?.type === "relative" && dt.relativeTimePeriod) {
+      const r = getConsumableRelativeTime(dt.relativeTimePeriod);
+      if (r) return { start: r.startTime, end: r.endTime };
+    }
+    return undefined;
+  },
+);
+
+// Relay AI-chat requests from row cell actions (carrying an explicit message)
+// straight up to MainLayout's O2AIChat panel.
+const sendToAiChat = (value: any, append: boolean = true) => {
+  emit("sendToAiChat", value, append);
+};
+
+// "Ask AI" from the no-events / error empty state: build a natural-language
+// prompt describing the failed traces query, then open the AI chat with it.
+// Mirrors the logs page's onAskAiFixQuery.
 const onAskAiTracing = () => {
-  router.push({ name: "ingestion", query: { org_identifier: store.state.selectedOrganization?.identifier } });
+  const filter = searchObj.data.editorValue?.trim() || "(none)";
+
+  // errorMsg may contain HTML (e.g. a <br><span>TraceID…</span>) — strip to text.
+  const el = document.createElement("div");
+  el.innerHTML = searchObj.data.errorMsg || "";
+  const errorText = (el.textContent ?? "").trim();
+  const errorContext = errorText ? ` Error: ${errorText}.` : "";
+
+  const outcome = errorContext
+    ? `The traces query produced an error.${errorContext}`
+    : `The traces query ran successfully but returned no results.`;
+
+  const mode = searchObj.meta.searchMode === "spans" ? "spans" : "traces";
+  const stream = searchObj.data.stream.selectedStream?.value || "unknown";
+  const timeRange = searchObj.data.datetime.relativeTimePeriod || "custom";
+
+  emit(
+    "sendToAiChat",
+    `${outcome} I am searching ${mode}. The filter expression is: ${filter}. This is a WHERE-clause filter — not a full SQL query. Stream: ${stream}. Time range: ${timeRange}. Can you help me adjust the filter to get results?`,
+    false,
+  );
+};
+
+// "Ask AI" from the no-streams empty state: open the AI chat asking how to
+// start sending traces, instead of navigating away to the ingestion page.
+const onAskAiSetupTracing = () => {
+  emit(
+    "sendToAiChat",
+    `I don't have any trace streams in OpenObserve yet and want to start sending traces. How do I instrument my services to send traces (e.g. via OpenTelemetry / OTLP)?`,
+    false,
+  );
 };
 
 /**

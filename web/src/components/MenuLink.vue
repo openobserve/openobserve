@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="tw:absolute tw:right-1 tw:top-3 tw:transition-opacity tw:duration-150"
       :class="isActive || expanded
         ? 'tw:opacity-100 tw:text-primary-600'
-        : 'tw:opacity-0 tw:group-hover:opacity-70 tw:text-tabs-inactive-text'"
+        : 'tw:opacity-70 tw:group-hover:opacity-100 tw:text-tabs-inactive-text'"
       aria-hidden="true"
     >
       <OIcon name="chevron-right" size="xs" />
@@ -224,7 +224,6 @@ export default defineComponent({
     const rootProps = computed<Record<string, any>>(() => {
       const common: Record<string, any> = {
         "data-test": `menu-link-${props.link}-item`,
-        title: props.title,
         "aria-label": ariaLabel.value,
       };
       if (props.external) {

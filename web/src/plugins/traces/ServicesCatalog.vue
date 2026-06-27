@@ -213,7 +213,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:flex-1"
       data-test="services-catalog-empty"
     >
-      <ServicesCatalogNoDataState @widen-range="$emit('widen-range', $event)" />
+      <ServicesCatalogNoDataState />
     </div>
 
     <!-- Table -->
@@ -407,7 +407,6 @@ const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } =
 const emit = defineEmits<{
   "view-traces": [data: string | Record<string, any>];
   "request:stream-change": [stream: string];
-  "widen-range": [period: string];
 }>();
 
 // p99 > 1 second triggers the orange highlight

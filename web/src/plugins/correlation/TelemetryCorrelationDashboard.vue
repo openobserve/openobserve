@@ -2578,22 +2578,17 @@ const onClose = () => {
 // Helper function to format time range
 const formatTimeRange = (range: TimeRange) => {
   // range.startTime and range.endTime are in microseconds (16 digits)
-  // Convert to milliseconds by dividing by 1000
-  const startDate = new Date(range.startTime / 1000);
-  const endDate = new Date(range.endTime / 1000);
-
-  const formatTime = (date: Date) => {
-    const hours = String(date.getHours()).padStart(2, "0");
-    const minutes = String(date.getMinutes()).padStart(2, "0");
-    const seconds = String(date.getSeconds()).padStart(2, "0");
-    return `${hours}:${minutes}:${seconds}`;
-  };
+  // Convert to milliseconds by dividing by 1000, then render in the
+  // user-selected timezone (falls back to UTC).
+  const timezone = store.state.timezone || "UTC";
+  const formatTime = (micros: number) =>
+    timestampToTimezoneDate(Math.floor(micros / 1000), timezone, "HH:mm:ss");
 
   // Calculate duration in microseconds, then convert to minutes
   const durationMicros = range.endTime - range.startTime;
   const durationMinutes = Math.round(durationMicros / 1000 / 60000);
 
-  return `${formatTime(startDate)} - ${formatTime(endDate)} (${durationMinutes} min)`;
+  return `${formatTime(range.startTime)} - ${formatTime(range.endTime)} (${durationMinutes} min)`;
 };
 
 // ============= TRACE CORRELATION FUNCTIONS =============

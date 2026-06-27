@@ -38,6 +38,15 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 24
+          cache: npm
+          cache-dependency-path: scripts/ai-review/package-lock.json
+
+      - name: Install AI review dependencies
+        working-directory: scripts/ai-review
+        run: npm ci
+
+      - name: Set trace ID
+        run: echo "O2_TRACE_ID=$(openssl rand -hex 16)" >> "$GITHUB_ENV"
 
       - name: Set PR number
         id: pr
@@ -81,6 +90,14 @@ jobs:
           PR_NUMBER: ${{ steps.pr.outputs.pr_number }}
           FORCE_FULL: ${{ steps.skip.outputs.force_full }}
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          O2_TRACE_INGEST_URL: ${{ secrets.O2_TRACE_INGEST_URL }}
+          O2_TRACE_ORG: ${{ secrets.O2_TRACE_ORG }}
+          O2_TRACE_USERNAME: ${{ secrets.O2_TRACE_USERNAME }}
+          O2_TRACE_PASSWORD: ${{ secrets.O2_TRACE_PASSWORD }}
+          O2_TRACE_AUTH: ${{ secrets.O2_TRACE_AUTH }}
+          O2_TRACE_STREAM: ${{ secrets.O2_TRACE_STREAM }}
+          O2_TRACE_EXPORT_TIMEOUT_MS: ${{ vars.O2_TRACE_EXPORT_TIMEOUT_MS }}
+          O2_TRACE_EXPORT_BATCH_SIZE: ${{ vars.O2_TRACE_EXPORT_BATCH_SIZE }}
         run: node scripts/ai-review/run-review.mjs
 
       - name: Log skip

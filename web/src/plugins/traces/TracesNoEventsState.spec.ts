@@ -66,6 +66,7 @@ const OEmptyStateStub = defineComponent({
         slots.title?.(),
         slots.description?.(),
         slots.actions?.(),
+        slots.extra?.(),
       ]);
   },
 });
@@ -73,7 +74,7 @@ const OEmptyStateStub = defineComponent({
 /**
  * Renders the sublabel as text content (so we can assert on it) and
  * forwards the data-test attribute from the parent binding.
- * Emits "click" on click so widen-range / remove-filter tests work.
+ * Emits "click" on click so jump-to-stream-data tests work.
  */
 const EmptyStateActionCardStub = defineComponent({
   name: "EmptyStateActionCard",
@@ -108,10 +109,12 @@ function mountComponent() {
   });
 }
 
-/** Used by jump-to-stream-data tests: the store is required because
- *  jumpTargetSublabel reads store.state.timezone via useStore(). */
-function mountComponentWithStore() {
+/** Used by jump-to-stream-data and ask-ai tests: the store is required because
+ *  jumpTargetSublabel reads store.state.timezone and useAiIcon reads
+ *  store.state.theme via useStore(). */
+function mountComponentWithStore(props: Record<string, unknown> = {}) {
   return mount(TracesNoEventsState, {
+    props,
     global: {
       plugins: [i18n, store],
       stubs: {
@@ -120,19 +123,6 @@ function mountComponentWithStore() {
       },
     },
   });
-}
-
-// ---------------------------------------------------------------------------
-// Convenience setters
-// ---------------------------------------------------------------------------
-function setRelative(period: string) {
-  mockSearchObj.data.datetime.type = "relative";
-  mockSearchObj.data.datetime.relativeTimePeriod = period;
-}
-
-function setAbsolute() {
-  mockSearchObj.data.datetime.type = "absolute";
-  mockSearchObj.data.datetime.relativeTimePeriod = "";
 }
 
 // ---------------------------------------------------------------------------
@@ -145,7 +135,8 @@ describe("TracesNoEventsState", () => {
     mockSearchObj.data.editorValue = "";
     mockSearchObj.data.stream.selectedStream = [];
     mockSearchObj.data.streamResults.list = [];
-    setRelative("15m");
+    mockSearchObj.data.datetime.type = "relative";
+    mockSearchObj.data.datetime.relativeTimePeriod = "15m";
     wrapper = mountComponent();
   });
 
@@ -162,13 +153,13 @@ describe("TracesNoEventsState", () => {
       expect(wrapper.exists()).toBe(true);
     });
 
-    it("should always render the expand range card", () => {
+    it("should NOT render any expand range card (feature removed)", () => {
       expect(
         wrapper.find('[data-test="traces-no-events-expand-range-card"]').exists(),
-      ).toBe(true);
+      ).toBe(false);
     });
 
-    it("should NOT render the remove filter card when editorValue is empty", () => {
+    it("should NOT render any remove filter card (removed from traces)", () => {
       expect(
         wrapper
           .find('[data-test="traces-no-events-remove-filter-card"]')
@@ -176,126 +167,177 @@ describe("TracesNoEventsState", () => {
       ).toBe(false);
     });
 
-    it("should render the remove filter card when editorValue is non-empty", async () => {
+    it("should NOT render the expand range card when a filter is applied", async () => {
       mockSearchObj.data.editorValue = "service_name = 'frontend'";
       await flushPromises();
 
       expect(
         wrapper
+          .find('[data-test="traces-no-events-expand-range-card"]')
+          .exists(),
+      ).toBe(false);
+      // and definitely no remove-filter card either
+      expect(
+        wrapper
           .find('[data-test="traces-no-events-remove-filter-card"]')
           .exists(),
+      ).toBe(false);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // 2. Ask AI button (gated by aiEnabled)
+  // -------------------------------------------------------------------------
+  describe("ask-ai button", () => {
+    it("should NOT render the Ask AI button when aiEnabled is false", () => {
+      const localWrapper = mountComponentWithStore({ aiEnabled: false });
+
+      expect(
+        localWrapper.find('[data-test="traces-no-events-ask-ai-btn"]').exists(),
+      ).toBe(false);
+
+      localWrapper.unmount();
+    });
+
+    it("should render the Ask AI button when aiEnabled is true and the window overlaps data", () => {
+      // streamResults.list is empty → streamDocTimeRange undefined →
+      // windowHasStreamData true and jumpTarget null, so the button shows.
+      const localWrapper = mountComponentWithStore({ aiEnabled: true });
+
+      expect(
+        localWrapper.find('[data-test="traces-no-events-ask-ai-btn"]').exists(),
       ).toBe(true);
+
+      localWrapper.unmount();
+    });
+
+    it("should emit ask-ai with no payload when the Ask AI button is clicked", async () => {
+      const localWrapper = mountComponentWithStore({ aiEnabled: true });
+
+      await localWrapper
+        .find('[data-test="traces-no-events-ask-ai-btn"]')
+        .trigger("click");
+
+      expect(localWrapper.emitted("ask-ai")).toBeTruthy();
+      expect(localWrapper.emitted("ask-ai")![0]).toEqual([]);
+
+      localWrapper.unmount();
+    });
+
+    it("should NOT render the Ask AI button when the window is out of range (jumpTarget active)", async () => {
+      // A window entirely before the stream's data range → jumpTarget is set,
+      // so the Ask AI button is suppressed in favour of the jump card.
+      mockSearchObj.data.stream.selectedStream = { value: "default" } as any;
+      mockSearchObj.data.streamResults.list = [
+        { name: "default", stats: { doc_time_min: 5_000_000, doc_time_max: 10_000_000 } },
+      ];
+      mockSearchObj.data.datetime = {
+        type: "absolute",
+        startTime: 100_000_000,
+        endTime: 200_000_000,
+        relativeTimePeriod: "",
+      };
+      const localWrapper = mountComponentWithStore({ aiEnabled: true });
+      await flushPromises();
+
+      expect(
+        localWrapper.find('[data-test="traces-no-events-jump-to-data-card"]').exists(),
+      ).toBe(true);
+      expect(
+        localWrapper.find('[data-test="traces-no-events-ask-ai-btn"]').exists(),
+      ).toBe(false);
+
+      localWrapper.unmount();
     });
   });
 
   // -------------------------------------------------------------------------
-  // 2. Emit: widen-range
+  // 3. Parent-provided range (authoritative props win over streamResults)
   // -------------------------------------------------------------------------
-  describe("emit widen-range", () => {
-    it("should emit widen-range with '1d' when relativeTimePeriod is '15m' (≤60 mins)", async () => {
-      setRelative("15m");
+  describe("parent-provided streamDocTimeRange / queryWindowUs", () => {
+    it("renders the jump card from props even when streamResults has no stats", async () => {
+      // Production scenario: streamResults.list carries no stats, but the parent
+      // (traces Index) supplies the authoritative range via props.
+      mockSearchObj.data.streamResults.list = [];
+      const localWrapper = mountComponentWithStore({
+        streamDocTimeRange: { min: 1_000_000, max: 10_000_000 },
+        // Window is entirely AFTER the data → out of range → jump.
+        queryWindowUs: { start: 100_000_000, end: 200_000_000 },
+      });
       await flushPromises();
 
-      await wrapper
-        .find('[data-test="traces-no-events-expand-range-card"]')
-        .trigger("click");
-
-      expect(wrapper.emitted("widen-range")).toBeTruthy();
-      expect(wrapper.emitted("widen-range")![0]).toEqual(["1d"]);
-    });
-
-    it("should emit widen-range with '7d' when relativeTimePeriod is '6h'", async () => {
-      setRelative("6h");
-      await flushPromises();
-
-      await wrapper
-        .find('[data-test="traces-no-events-expand-range-card"]')
-        .trigger("click");
-
-      expect(wrapper.emitted("widen-range")![0]).toEqual(["7d"]);
-    });
-
-    it("should emit widen-range with '30d' when relativeTimePeriod is '3d'", async () => {
-      setRelative("3d");
-      await flushPromises();
-
-      await wrapper
-        .find('[data-test="traces-no-events-expand-range-card"]')
-        .trigger("click");
-
-      expect(wrapper.emitted("widen-range")![0]).toEqual(["30d"]);
-    });
-
-    it("should emit widen-range with '7d' fallback when datetime type is 'absolute'", async () => {
-      setAbsolute();
-      await flushPromises();
-
-      await wrapper
-        .find('[data-test="traces-no-events-expand-range-card"]')
-        .trigger("click");
-
-      expect(wrapper.emitted("widen-range")![0]).toEqual(["7d"]);
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // 3. Emit: remove-filter
-  // -------------------------------------------------------------------------
-  describe("emit remove-filter", () => {
-    it("should emit remove-filter with no payload when the remove filter card is clicked", async () => {
-      mockSearchObj.data.editorValue = "service_name = 'api'";
-      await flushPromises();
-
-      const card = wrapper.find('[data-test="traces-no-events-remove-filter-card"]');
+      const card = localWrapper.find(
+        '[data-test="traces-no-events-jump-to-data-card"]',
+      );
       expect(card.exists()).toBe(true);
-      await card.trigger("click");
 
-      expect(wrapper.emitted("remove-filter")).toBeTruthy();
-      expect(wrapper.emitted("remove-filter")![0]).toEqual([]);
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // 4. Expand range sublabel
-  // -------------------------------------------------------------------------
-  describe("expand range sublabel", () => {
-    it("should show 'Past 15 Minutes → Past 1 Day' for relativeTimePeriod '15m'", async () => {
-      setRelative("15m");
-      await flushPromises();
-
-      const card = wrapper.find('[data-test="traces-no-events-expand-range-card"]');
-      expect(card.text()).toContain("Past 15 Minutes");
-      expect(card.text()).toContain("Past 1 Day");
+      localWrapper.unmount();
     });
 
-    it("should show the absolute fallback string from i18n when type is 'absolute'", async () => {
-      setAbsolute();
+    it("emits jump-to-stream-data with a 15-min window ending at doc_time_max from props", async () => {
+      const FIFTEEN_MINS_US = 15 * 60 * 1_000_000;
+      const END_NUDGE_US = 1_000_000;
+      const max = 50_000_000_000;
+      const localWrapper = mountComponentWithStore({
+        streamDocTimeRange: { min: 1_000_000, max },
+        queryWindowUs: { start: max + 100_000_000, end: max + 200_000_000 },
+      });
       await flushPromises();
 
-      const card = wrapper.find('[data-test="traces-no-events-expand-range-card"]');
-      // i18n key traces.noEvents.expandRangeDescAbsolute = "Switch to a wider relative time range"
-      expect(card.text()).toContain("wider relative time range");
+      await localWrapper
+        .find('[data-test="traces-no-events-jump-to-data-card"]')
+        .trigger("click");
+
+      expect(localWrapper.emitted("jump-to-stream-data")![0]).toEqual([
+        max - FIFTEEN_MINS_US,
+        max + END_NUDGE_US,
+      ]);
+
+      localWrapper.unmount();
     });
-  });
 
-  // -------------------------------------------------------------------------
-  // 5. Remove filter sublabel
-  // -------------------------------------------------------------------------
-  describe("remove filter sublabel", () => {
-    it("should say 'You have 1 active condition on this query' for a single condition", async () => {
-      mockSearchObj.data.editorValue = "service_name = 'api'";
+    it("renders the jump card when the window overlaps the data but no filter is applied (gap)", async () => {
+      // No filter + zero results means the data sits in a gap of the selected
+      // window, so we offer a jump to the most recent data.
+      mockSearchObj.data.editorValue = "";
+      const localWrapper = mountComponentWithStore({
+        streamDocTimeRange: { min: 1_000_000, max: 100_000_000 },
+        // Window sits inside the data range → overlap, but no records here.
+        queryWindowUs: { start: 10_000_000, end: 90_000_000 },
+      });
       await flushPromises();
 
-      const card = wrapper.find('[data-test="traces-no-events-remove-filter-card"]');
-      expect(card.text()).toBe("You have 1 active condition on this query");
+      expect(
+        localWrapper
+          .find('[data-test="traces-no-events-jump-to-data-card"]')
+          .exists(),
+      ).toBe(true);
+
+      localWrapper.unmount();
     });
 
-    it("should say 'You have 3 active conditions on this query' for 'a AND b AND c'", async () => {
-      mockSearchObj.data.editorValue = "a AND b AND c";
+    it("does NOT render the jump card when the window overlaps the data and a filter is applied", async () => {
+      // A filter — not the range — is excluding records, so jumping won't help.
+      mockSearchObj.data.editorValue = "service_name='api'";
+      const localWrapper = mountComponentWithStore({
+        streamDocTimeRange: { min: 1_000_000, max: 100_000_000 },
+        queryWindowUs: { start: 10_000_000, end: 90_000_000 },
+      });
       await flushPromises();
 
-      const card = wrapper.find('[data-test="traces-no-events-remove-filter-card"]');
-      expect(card.text()).toBe("You have 3 active conditions on this query");
+      expect(
+        localWrapper
+          .find('[data-test="traces-no-events-jump-to-data-card"]')
+          .exists(),
+      ).toBe(false);
+      // Expand-range card was removed from the component — it should not be present.
+      expect(
+        localWrapper
+          .find('[data-test="traces-no-events-expand-range-card"]')
+          .exists(),
+      ).toBe(false);
+
+      localWrapper.unmount();
     });
   });
 });

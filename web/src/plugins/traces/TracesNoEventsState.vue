@@ -19,28 +19,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
   Three distinct states based on stream stats vs. current window:
 
-    1. Window misses the stream's data entirely (doc_time_max outside window)
+    1. The selected range has no data but the stream does — either the window
+       misses the data entirely, or (with no filter) it overlaps the stream's
+       min/max envelope yet lands in a gap with no records
        → "Jump to latest data" card (last 15 min around doc_time_max)
 
-    2. Window overlaps stream data but query returned nothing (filters too tight)
-       → "Adjust your filters" message + expand-range + remove-filter cards
+    2. Window overlaps stream data but a filter excluded everything
+       → "relax your filters" message (no action card; Ask AI available)
 
     3. No stream stats available (fallback)
-       → generic "Expand time range" card
+       → generic message (no action card; Ask AI available)
 -->
 <template>
   <OEmptyState illustration="trace" size="hero" :hide-action="true">
     <template #title>{{ t("traces.noEvents.title") }}</template>
 
     <template #description>
+      <!-- Filter applied within an overlapping window: relax the query. -->
       <span v-if="windowHasStreamData && hasFilters" v-html="t('traces.noEvents.descWithFilters')" />
-      <span v-else-if="windowHasStreamData && !hasFilters" v-html="t('traces.noEvents.descDataAtBoundary')" />
+      <!-- We know where the stream's last data is: offer to jump to it. -->
       <span v-else-if="jumpTarget">{{ t("traces.noEvents.descOutOfRange") }}</span>
+      <!-- No stream stats: generic fallback. -->
       <span v-else>{{ t("traces.noEvents.descNoFilters", { range: currentPeriodLabel }) }}</span>
     </template>
 
     <template #actions>
-      <!-- Window is outside the stream's data range: offer a precise jump -->
+      <!-- The selected range has no data but the stream does (out of range, or a
+           no-filter window in a gap): offer a precise jump to the latest data. -->
       <EmptyStateActionCard
         v-if="jumpTarget"
         icon="schedule"
@@ -49,42 +54,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="traces-no-events-jump-to-data-card"
         @click="emit('jump-to-stream-data', jumpTarget.from, jumpTarget.to)"
       />
-      <!-- No stream stats: expand + optionally remove-filter -->
-      <template v-else-if="!streamDocTimeRange">
-        <EmptyStateActionCard
-          icon="schedule"
-          :label="t('traces.noEvents.expandRange')"
-          :sublabel="expandRangeSublabel"
-          data-test="traces-no-events-expand-range-card"
-          @click="onWidenRange"
-        />
-        <EmptyStateActionCard
-          v-if="hasFilters"
-          icon="filter-list"
-          :label="t('traces.noEvents.removeFilter')"
-          :sublabel="removeFilterSublabel"
-          data-test="traces-no-events-remove-filter-card"
-          @click="onRemoveFilter"
-        />
-      </template>
-      <!-- windowHasStreamData: show expand + optionally remove-filter -->
-      <template v-else>
-        <EmptyStateActionCard
-          icon="schedule"
-          :label="t('traces.noEvents.expandRange')"
-          :sublabel="expandRangeSublabel"
-          data-test="traces-no-events-expand-range-card"
-          @click="onWidenRange"
-        />
-        <EmptyStateActionCard
-          v-if="hasFilters"
-          icon="filter-list"
-          :label="t('traces.noEvents.removeFilter')"
-          :sublabel="removeFilterSublabel"
-          data-test="traces-no-events-remove-filter-card"
-          @click="onRemoveFilter"
-        />
-      </template>
+      <!-- Filter excluded everything within an overlapping window: no action
+           card — the user is guided to relax the query themselves (and Ask AI). -->
+    </template>
+
+    <template #extra>
+      <div class="tw:flex tw:items-center tw:justify-center tw:gap-2 tw:flex-wrap">
+        <OButton
+          v-if="aiEnabled && windowHasStreamData && !jumpTarget"
+          variant="ghost"
+          size="sm"
+          class="ai-hover-btn"
+          data-test="traces-no-events-ask-ai-btn"
+          @click="emit('ask-ai')"
+        >
+          <template #icon-left>
+            <img :src="aiIconSrc" class="tw:w-4 tw:h-4 tw:shrink-0" alt="" />
+          </template>
+          {{ t("traces.noEvents.askAi") }}
+        </OButton>
+      </div>
     </template>
   </OEmptyState>
 </template>
@@ -96,20 +85,38 @@ import { useStore } from "vuex";
 import { DateTime } from "luxon";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import useTraces from "@/composables/useTraces";
 import useWidenRange from "@/composables/useWidenRange";
+import { useAiIcon } from "@/composables/useAiIcon";
 import { getConsumableRelativeTime } from "@/utils/date";
 
 const FIFTEEN_MINS_US = 15 * 60 * 1_000_000;
 const END_NUDGE_US = 1_000_000;
 
+const props = defineProps<{
+  /** Whether the AI copilot is enabled — gates the "Ask AI" button. */
+  aiEnabled?: boolean;
+  /**
+   * Authoritative stream doc time range (µs), provided by the parent (traces
+   * Index) from the same getStream() the query uses. When present it takes
+   * precedence over the streamResults-derived fallback below.
+   */
+  streamDocTimeRange?: { min: number; max: number };
+  /** Resolved query window (µs), provided by the parent. */
+  queryWindowUs?: { start: number; end: number };
+}>();
+
 const { t } = useI18n();
 const store = useStore();
+const { aiIconSrc } = useAiIcon();
 const emit = defineEmits<{
-  "widen-range": [period: string];
-  "remove-filter": [];
   "jump-to-stream-data": [fromUs: number, toUs: number];
+  "ask-ai": [];
 }>();
+
+// `aiEnabled` is consumed via props in the template; alias avoids an unused warning.
+const aiEnabled = computed(() => !!props.aiEnabled);
 
 const { searchObj } = useTraces();
 
@@ -120,16 +127,12 @@ const hasFilters = computed(() => {
   return q.length > 0;
 });
 
-const conditionCount = computed(() => {
-  const q = (searchObj.data?.editorValue || "").trim();
-  if (!q) return 0;
-  const matches = q.match(/\b(AND|OR)\b/gi);
-  return (matches?.length ?? 0) + 1;
-});
-
 // --- stream doc time range (from stream stats) --------------------------------
 
 const streamDocTimeRange = computed(() => {
+  // Parent-provided range (authoritative) wins; fall back to deriving it from
+  // streamResults when used standalone (e.g. in unit tests).
+  if (props.streamDocTimeRange) return props.streamDocTimeRange;
   const selected = searchObj.data?.stream?.selectedStream?.value;
   if (!selected) return undefined;
   const list: any[] = searchObj.data?.streamResults?.list ?? [];
@@ -149,6 +152,7 @@ const streamDocTimeRange = computed(() => {
 // --- query window (resolved microsecond bounds) ------------------------------
 
 const queryWindowUs = computed(() => {
+  if (props.queryWindowUs) return props.queryWindowUs;
   const dt = searchObj.data?.datetime;
   if (!dt) return undefined;
   if (dt.type === "absolute" && dt.startTime && dt.endTime) {
@@ -172,9 +176,17 @@ const windowHasStreamData = computed(() => {
 });
 
 const jumpTarget = computed(() => {
-  if (windowHasStreamData.value) return null;
   const r = streamDocTimeRange.value;
   if (!r) return null;
+  // When the window overlaps the stream's range but a filter is applied, the
+  // filter — not the range — is excluding records, so jumping won't help; the
+  // user should relax the query instead.
+  if (windowHasStreamData.value && hasFilters.value) return null;
+  // Otherwise point at the stream's most recent data. This covers both a window
+  // entirely outside the data range AND a no-filter window that overlaps the
+  // [min,max] envelope but lands in a gap with no records — since there are no
+  // filters and zero results, doc_time_max is guaranteed to sit outside the
+  // window, so a 15-minute jump there always surfaces data.
   return { from: r.max - FIFTEEN_MINS_US, to: r.max + END_NUDGE_US };
 });
 
@@ -194,11 +206,9 @@ const jumpTargetSublabel = computed(() => {
 
 // --- time-range helpers (via shared composable) -----------------------------
 
-const {
-  suggestedPeriod,
-  currentPeriodLabel,
-  expandRangeSublabel,
-} = useWidenRange(
+// `currentPeriodLabel` feeds the "descNoFilters" message; the widen-range
+// action card was removed because widening never surfaces more data here.
+const { currentPeriodLabel } = useWidenRange(
   () => searchObj.data?.datetime?.type ?? "",
   () => searchObj.data?.datetime?.relativeTimePeriod ?? "",
   {
@@ -206,17 +216,4 @@ const {
     absoluteExpandDesc: t("traces.noEvents.expandRangeDescAbsolute"),
   },
 );
-
-// --- action card sublabels --------------------------------------------------
-
-const removeFilterSublabel = computed(() => {
-  const n = conditionCount.value;
-  const noun = n === 1 ? "condition" : "conditions";
-  return `You have ${n} active ${noun} on this query`;
-});
-
-// --- actions ----------------------------------------------------------------
-
-const onWidenRange = () => emit("widen-range", suggestedPeriod.value);
-const onRemoveFilter = () => emit("remove-filter");
 </script>
