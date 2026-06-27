@@ -8,6 +8,10 @@
 # shared o2-report.sh. Live re-runs append one doc per attempt; dashboards keep the latest
 # attempt per run_id (row_number() dedup), so retries become an attribute, not duplicate rows.
 #
+# Optional EXTRA_JSON (env): a JSON OBJECT the caller can pass to fold extra fields into the run
+# doc (e.g. test-case counts). Shallow-merged via jq `*` (EXTRA_JSON keys win on conflict). On any
+# parse/merge error the base payload is kept unchanged.
+#
 # Never fails the workflow: missing secrets or any API/ingest error only warns.
 set -uo pipefail
 : "${STREAM:?STREAM required}"
@@ -73,10 +77,14 @@ printf '%s' "$RUN_JSON" | jq \
      retry_wasted_sec: (($total-$final)|round)
    }' > "$PAYLOAD_FILE" 2>/dev/null || { echo "::warning::payload build failed"; exit 0; }
 
-# Optional EXTRA_JSON (e.g. test-case counts) merged into the doc by the caller.
+# Optional EXTRA_JSON: shallow-merge caller-supplied fields into the doc (e.g. test counts).
+# On any merge error, keep the base payload (never fail the report).
 if [ -n "${EXTRA_JSON:-}" ] && printf '%s' "$EXTRA_JSON" | jq -e . >/dev/null 2>&1; then
-  jq -s '.[0] * .[1]' "$PAYLOAD_FILE" <(printf '%s' "$EXTRA_JSON") > "$PAYLOAD_FILE.m" 2>/dev/null \
-    && mv "$PAYLOAD_FILE.m" "$PAYLOAD_FILE"
+  if jq -s '.[0] * .[1]' "$PAYLOAD_FILE" <(printf '%s' "$EXTRA_JSON") > "$PAYLOAD_FILE.m" 2>/dev/null; then
+    mv "$PAYLOAD_FILE.m" "$PAYLOAD_FILE"
+  else
+    echo "::warning::EXTRA_JSON merge failed — keeping base payload"; rm -f "$PAYLOAD_FILE.m"
+  fi
 fi
 
 bash "$(dirname "$0")/o2-report.sh" "$STREAM" "$PAYLOAD_FILE"

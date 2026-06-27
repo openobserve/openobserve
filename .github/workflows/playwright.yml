@@ -1187,7 +1187,8 @@ jobs:
           if [ "$TESTS" = "failure" ] || [ "$BUILD" = "failure" ]; then CONCLUSION=failure
           elif [ "$TESTS" = "cancelled" ] || [ "$BUILD" = "cancelled" ]; then CONCLUSION=cancelled
           else CONCLUSION=success; fi
-          # Per-test counts from the merged report.json stats (excludes skipped from "executed").
+          # Per-test counts from the merged report.json. tests_total is the FULL total (includes
+          # skipped, matching regression); the dashboard derives executed = passed+failed+flaky.
           if [ -n "${MERGE_STATS:-}" ] && [ "$MERGE_STATS" != "null" ] && [ "$MERGE_STATS" != "{}" ]; then
             EXTRA_JSON=$(printf '%s' "$MERGE_STATS" | jq -c '{tests_total:((.expected//0)+(.unexpected//0)+(.flaky//0)+(.skipped//0)), tests_passed:(.expected//0), tests_failed:(.unexpected//0), tests_flaky:(.flaky//0), tests_skipped:(.skipped//0)}' 2>/dev/null || echo "")
             [ -n "$EXTRA_JSON" ] && export EXTRA_JSON
