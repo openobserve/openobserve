@@ -73,4 +73,10 @@ printf '%s' "$RUN_JSON" | jq \
      retry_wasted_sec: (($total-$final)|round)
    }' > "$PAYLOAD_FILE" 2>/dev/null || { echo "::warning::payload build failed"; exit 0; }
 
+# Optional EXTRA_JSON (e.g. test-case counts) merged into the doc by the caller.
+if [ -n "${EXTRA_JSON:-}" ] && printf '%s' "$EXTRA_JSON" | jq -e . >/dev/null 2>&1; then
+  jq -s '.[0] * .[1]' "$PAYLOAD_FILE" <(printf '%s' "$EXTRA_JSON") > "$PAYLOAD_FILE.m" 2>/dev/null \
+    && mv "$PAYLOAD_FILE.m" "$PAYLOAD_FILE"
+fi
+
 bash "$(dirname "$0")/o2-report.sh" "$STREAM" "$PAYLOAD_FILE"
