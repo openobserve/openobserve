@@ -794,6 +794,23 @@ jobs:
 
           STATS="${MERGE_STATS:-}"; [ -z "$STATS" ] && STATS=null
 
+          # Retry-aware: this attempt's wall-clock + total summed across all attempts (so the
+          # latest-attempt doc carries the cumulative compute; dashboards keep latest per run_id).
+          ATT="${GITHUB_RUN_ATTEMPT:-1}"
+          awall(){ jq '[.jobs[]|select(.completed_at!=null and .started_at!=null)] as $j | (if ($j|length)>0 then (($j|map(.completed_at|fromdateiso8601)|max)-($j|map(.started_at|fromdateiso8601)|min)) else 0 end) | if . < 0 then 0 else . end'; }
+          FINAL_DUR=$(awall < jobs.json 2>/dev/null || echo 0)
+          TOTAL_DUR="$FINAL_DUR"
+          if [ "$ATT" -gt 1 ] 2>/dev/null; then
+            SUM="$FINAL_DUR"
+            for n in $(seq 1 $((ATT-1))); do
+              W=$(curl -s -H "Authorization: token $GH_TOKEN" -H "Accept: application/vnd.github.v3+json" \
+                "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${n}/jobs?per_page=100" | awall 2>/dev/null || echo 0)
+              SUM=$(awk -v a="$SUM" -v b="$W" 'BEGIN{print a+b}')
+            done
+            TOTAL_DUR="$SUM"
+          fi
+          COMMIT="${GITHUB_SHA:0:12}"
+
           dur='if (.completed_at and .started_at) then ((.completed_at|fromdateiso8601)-(.started_at|fromdateiso8601)) else null end'
           jq -n \
             --slurpfile jb jobs.json \
@@ -809,6 +826,9 @@ jobs:
             --arg ui_result "$UI_RESULT" \
             --arg merge_result "$MERGE_RESULT" \
             --argjson stats "$STATS" \
+            --argjson final "${FINAL_DUR:-0}" \
+            --argjson total "${TOTAL_DUR:-0}" \
+            --arg commit "$COMMIT" \
             "
             (\$jb[0].jobs // []) as \$j
             | [ \$j[] | select(.conclusion != null) ] as \$done
@@ -820,7 +840,16 @@ jobs:
                 run_url: \$run_url,
                 trigger: \$trigger,
                 actor: \$actor,
+                author: \$actor,
                 branch: \$branch,
+                suite: \"regression\",
+                ingest_source: \"live\",
+                commit_sha: \$commit,
+                retries: ((\$run_attempt|tonumber)-1),
+                was_retried: ((\$run_attempt|tonumber)>1),
+                final_duration_sec: \$final,
+                total_duration_sec: \$total,
+                retry_wasted_sec: (\$total-\$final),
                 conclusion: (
                   if (\$build_result==\"cancelled\" or \$ui_result==\"cancelled\" or \$merge_result==\"cancelled\") then \"cancelled\"
                   elif (\$build_result==\"success\" and \$ui_result==\"success\") then \"success\"

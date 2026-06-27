@@ -491,3 +491,36 @@ jobs:
             echo "API tests failed: integration=${{ needs.api_integration_tests.result }}, query_agent=${{ needs.api_query_agent_tests.result }}, regression=${{ needs.api_regression_tests.result }}"
             exit 1
           fi
+
+  # Non-fatal metrics sidecar: one retry-aware run-summary doc to OpenObserve (stream ci_test_runs,
+  # suite=api). Re-runs append one doc per attempt; the dashboard keeps the latest attempt per run_id.
+  report_to_openobserve:
+    name: Report run metrics to OpenObserve
+    needs: [check_changes, api_integration_tests, api_query_agent_tests, api_regression_tests]
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - name: Clone the current repo
+        uses: actions/checkout@v5
+      - name: Report run metrics
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          O2_REPORTING_INGEST_BASE: ${{ secrets.O2_REPORTING_INGEST_BASE }}
+          O2_REPORTING_AUTH: ${{ secrets.O2_REPORTING_AUTH }}
+          O2_REPORTING_INSECURE: ${{ vars.O2_REPORTING_INSECURE }}
+          INTEG: ${{ needs.api_integration_tests.result }}
+          AGENT: ${{ needs.api_query_agent_tests.result }}
+          REG: ${{ needs.api_regression_tests.result }}
+        run: |
+          if [ "$INTEG" = "skipped" ] && [ "$AGENT" = "skipped" ] && [ "$REG" = "skipped" ]; then
+            echo "::notice::no API tests ran (no relevant changes) — skipping metrics"; exit 0
+          fi
+          if [ "$INTEG" = "failure" ] || [ "$AGENT" = "failure" ] || [ "$REG" = "failure" ]; then CONCLUSION=failure
+          elif [ "$INTEG" = "cancelled" ] || [ "$AGENT" = "cancelled" ] || [ "$REG" = "cancelled" ]; then CONCLUSION=cancelled
+          else CONCLUSION=success; fi
+          export CONCLUSION STREAM=ci_test_runs SUITE=api
+          bash .github/scripts/o2-run-report.sh
