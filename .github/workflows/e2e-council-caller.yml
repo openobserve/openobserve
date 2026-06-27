@@ -17,6 +17,9 @@ name: E2E Council Caller (openobserve)
 #   o2-enterprise:  Actions: R/W (dispatch) + Issues/Pull requests: R/W (engine comments)
 #   openobserve:    Issues/Pull requests: R/W + Contents: R/W (engine comments + autoe2e/* branches + test PR)
 #   NOTE: "Actions" (run triggering) is a DIFFERENT permission from "Workflows" (file editing).
+#   This PAT also posts THIS caller's own "started" ack as the human (not github-actions[bot]); REQUIRED
+#   — if it's missing the dispatch step fails first, so the ack (gated on dispatch success) never runs.
+#   The dispatch-FAILURE notice falls back to the run token so a broken PAT can't also silence the error.
 # KILL SWITCH: the engine honors the E2E_COUNCIL_DISABLED variable; auto-on-merge honors E2E_AUTO_ON_MERGE.
 
 on:
@@ -135,7 +138,7 @@ jobs:
         # dispatch 403'd on a missing PAT permission, etc.). Only on a human /e2e comment.
         if: github.event_name == 'issue_comment' && success()
         env:
-          GH_TOKEN: ${{ github.token }}   # OSS context → bot can comment on the OSS PR
+          GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}   # PAT only — post as the human, NEVER github-actions[bot]
           PR: ${{ steps.ctx.outputs.pr }}
           DRY: ${{ steps.ctx.outputs.dry }}
         run: |
@@ -150,12 +153,19 @@ jobs:
         # the /e2e commenter would otherwise get NO feedback. Tell them + link the caller run.
         if: github.event_name == 'issue_comment' && failure()
         env:
-          GH_TOKEN: ${{ github.token }}
+          PAT: ${{ secrets.ORG_ADMIN_TOKEN }}
+          BOT: ${{ github.token }}
           PR: ${{ steps.ctx.outputs.pr }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           [ -n "$PR" ] || exit 0
-          gh pr comment "$PR" --repo openobserve/openobserve --body \
-          "### ❌ E2E Council — could not start
+          BODY="### ❌ E2E Council — could not start
 
-          Dispatching the E2E Council engine failed (likely an expired/insufficient \`ORG_ADMIN_TOKEN\`, a missing engine workflow on o2-enterprise main, or a transient error). See the [caller run logs]($RUN_URL) and retry \`/e2e\` once resolved." || true
+          Dispatching the E2E Council engine failed (likely an expired/insufficient \`ORG_ADMIN_TOKEN\`, a missing engine workflow on o2-enterprise main, or a transient error). See the [caller run logs]($RUN_URL) and retry \`/e2e\` once resolved."
+          # Post as the human PAT first. BUT this notice fires when the DISPATCH failed — and an
+          # expired/insufficient PAT is a likely cause — so if the PAT itself can't post, fall back to
+          # the run token so the author STILL hears about the failure. This is the ONE error-delivery
+          # channel that must survive a broken PAT; every routine/result comment stays PAT-only.
+          GH_TOKEN="$PAT" gh pr comment "$PR" --repo openobserve/openobserve --body "$BODY" \
+            || GH_TOKEN="$BOT" gh pr comment "$PR" --repo openobserve/openobserve --body "$BODY" \
+            || true
