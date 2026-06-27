@@ -886,6 +886,10 @@ jobs:
     permissions:
       contents: read
       actions: read
+    outputs:
+      # Compact Playwright stats (expected/unexpected/flaky/skipped) from the merged report.json,
+      # consumed by report_to_openobserve to record per-test counts in ci_test_runs.
+      stats: ${{ steps.report_stats.outputs.stats }}
 
     steps:
       - name: Clone the current repo
@@ -974,6 +978,19 @@ jobs:
           ls -la playwright-results/html-report/
           echo "Checking report.json:"
           ls -lh playwright-results/report.json
+
+      - name: Extract report stats for OpenObserve
+        id: report_stats
+        if: always()
+        run: |
+          cd tests/ui-testing
+          if [ -f playwright-results/report.json ]; then
+            STATS=$(jq -c '.stats // {}' playwright-results/report.json 2>/dev/null || echo '{}')
+          else
+            STATS='{}'
+          fi
+          echo "stats=$STATS" >> "$GITHUB_OUTPUT"
+          echo "report stats: $STATS"
 
       - name: Cache test failures to TestDino
         if: ${{ needs.ui_integration_tests.result == 'failure' }}
@@ -1141,7 +1158,7 @@ jobs:
   # suite=ui). Re-runs append one doc per attempt; the dashboard keeps the latest attempt per run_id.
   report_to_openobserve:
     name: Report run metrics to OpenObserve
-    needs: [check_changes, build_binary, ui_integration_tests]
+    needs: [check_changes, build_binary, ui_integration_tests, merge_and_upload_reports]
     if: always()
     runs-on: ubuntu-latest
     permissions:
@@ -1159,6 +1176,7 @@ jobs:
           O2_REPORTING_INSECURE: ${{ vars.O2_REPORTING_INSECURE }}
           BUILD: ${{ needs.build_binary.result }}
           TESTS: ${{ needs.ui_integration_tests.result }}
+          MERGE_STATS: ${{ needs.merge_and_upload_reports.outputs.stats }}
         run: |
           # No relevant changes → tests were skipped → no run to record.
           if [ "$TESTS" = "skipped" ] && [ "$BUILD" = "skipped" ]; then
@@ -1167,5 +1185,11 @@ jobs:
           if [ "$TESTS" = "failure" ] || [ "$BUILD" = "failure" ]; then CONCLUSION=failure
           elif [ "$TESTS" = "cancelled" ] || [ "$BUILD" = "cancelled" ]; then CONCLUSION=cancelled
           else CONCLUSION=success; fi
+          # Per-test counts from the merged report.json. tests_total is the FULL total (includes
+          # skipped, matching regression); the dashboard derives executed = passed+failed+flaky.
+          if [ -n "${MERGE_STATS:-}" ] && [ "$MERGE_STATS" != "null" ] && [ "$MERGE_STATS" != "{}" ]; then
+            EXTRA_JSON=$(printf '%s' "$MERGE_STATS" | jq -c '{tests_total:((.expected//0)+(.unexpected//0)+(.flaky//0)+(.skipped//0)), tests_passed:(.expected//0), tests_failed:(.unexpected//0), tests_flaky:(.flaky//0), tests_skipped:(.skipped//0)}' 2>/dev/null || echo "")
+            [ -n "$EXTRA_JSON" ] && export EXTRA_JSON
+          fi
           export CONCLUSION STREAM=ci_test_runs SUITE=ui
           bash .github/scripts/o2-run-report.sh
