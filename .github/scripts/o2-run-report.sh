@@ -17,13 +17,22 @@ CONCLUSION="${CONCLUSION:-}"
 if [ -z "${O2_REPORTING_INGEST_BASE:-}" ] || [ -z "${O2_REPORTING_AUTH:-}" ]; then
   echo "::notice::O2_REPORTING_* secrets not set — skipping metrics ingest"; exit 0
 fi
+if [ -z "${GH_TOKEN:-}" ]; then
+  echo "::warning::GH_TOKEN not set — skipping metrics ingest"; exit 0
+fi
+
+# Unique payload file (no fixed /tmp path), cleaned up on exit.
+PAYLOAD_FILE=$(mktemp "${TMPDIR:-/tmp}/o2_run_payload.XXXXXX")
+trap 'rm -f "$PAYLOAD_FILE"' EXIT
 
 API="${GITHUB_API_URL:-https://api.github.com}"
 gh_get(){ curl -s -H "Authorization: token ${GH_TOKEN}" -H "Accept: application/vnd.github+json" "$API/$1"; }
 
-# wall-clock of one attempt = max(completed) - min(started) across its jobs.
+# wall-clock of one attempt = max(completed) - min(started) across its jobs (clamped non-negative
+# to guard against clock-skew where a completed_at precedes a started_at).
 attempt_wall(){ jq '[.jobs[]|select(.completed_at!=null and .started_at!=null)] as $j
-  | if ($j|length)>0 then (($j|map(.completed_at|fromdateiso8601)|max)-($j|map(.started_at|fromdateiso8601)|min)) else 0 end'; }
+  | (if ($j|length)>0 then (($j|map(.completed_at|fromdateiso8601)|max)-($j|map(.started_at|fromdateiso8601)|min)) else 0 end)
+  | if . < 0 then 0 else . end'; }
 
 RUN_JSON=$(gh_get "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" 2>/dev/null)
 [ -n "$RUN_JSON" ] || { echo "::warning::could not fetch run object — skipping"; exit 0; }
@@ -62,6 +71,6 @@ printf '%s' "$RUN_JSON" | jq \
      run_url: $run_url,
      final_duration_sec: ($final|round), total_duration_sec: ($total|round),
      retry_wasted_sec: (($total-$final)|round)
-   }' > /tmp/o2_run_payload.json 2>/dev/null || { echo "::warning::payload build failed"; exit 0; }
+   }' > "$PAYLOAD_FILE" 2>/dev/null || { echo "::warning::payload build failed"; exit 0; }
 
-bash "$(dirname "$0")/o2-report.sh" "$STREAM" /tmp/o2_run_payload.json
+bash "$(dirname "$0")/o2-report.sh" "$STREAM" "$PAYLOAD_FILE"
