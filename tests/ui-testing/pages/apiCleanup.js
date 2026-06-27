@@ -266,6 +266,37 @@ class APICleanup {
     }
 
     /**
+     * Create a minimal dashboard for use as a report dependency.
+     * Returns { dashboardId, folderId } or throws on failure.
+     */
+    async createMinimalDashboard(title = 'E2E Setup Dashboard', folderId = 'default') {
+        const payload = {
+            title,
+            description: '',
+            role: '',
+            owner: this.email,
+            tabs: [{ tabId: 'default', name: 'Default', panels: [] }],
+            variables: {}
+        };
+        const response = await this._fetch(
+            `${this.baseUrl}/api/${this.org}/dashboards?folder=${encodeURIComponent(folderId)}`,
+            {
+                method: 'POST',
+                headers: { 'Authorization': this.authHeader, 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            }
+        );
+        if (!response.ok) {
+            const body = await response.text();
+            throw new Error(`createMinimalDashboard: HTTP ${response.status} — ${body}`);
+        }
+        const result = await response.json();
+        const dashboardId = result.dashboard_id || result.dashboardId || result.id;
+        testLogger.info('Created minimal dashboard', { dashboardId, folderId });
+        return { dashboardId, folderId };
+    }
+
+    /**
      * Delete a single dashboard
      * @param {string} dashboardId - The dashboard ID
      * @param {string} folderId - The folder ID
@@ -890,8 +921,50 @@ class APICleanup {
     }
 
     /**
-     * Clean up report folders matching specified name prefixes
-     * @param {Array<string>} namePrefixes - Array of folder name prefixes to match (e.g., ['test_folder_', 'test_special_'])
+     * Fetch reports in a specific folder (v2 endpoint).
+     * @param {string} folderId
+     * @returns {Promise<Array>} list of report objects with `report_id`
+     */
+    async fetchReportsInFolder(folderId) {
+        try {
+            const response = await this._fetch(`${this.baseUrl}/api/v2/${this.org}/reports?folder=${encodeURIComponent(folderId)}`, {
+                method: 'GET',
+                headers: { 'Authorization': this.authHeader, 'Content-Type': 'application/json' }
+            });
+            if (!response.ok) return [];
+            const data = await response.json();
+            return data.data || data.list || data || [];
+        } catch (error) {
+            testLogger.error('Failed to fetch reports in folder', { folderId, error: error.message });
+            return [];
+        }
+    }
+
+    /**
+     * Delete a report by its v2 report_id. Works regardless of which folder
+     * the report lives in (unlike the v1 name-based endpoint which only
+     * resolves reports in the default folder).
+     * @param {string} reportId
+     */
+    async deleteReportById(reportId) {
+        try {
+            const response = await this._fetch(`${this.baseUrl}/api/v2/${this.org}/reports/${reportId}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': this.authHeader, 'Content-Type': 'application/json' }
+            });
+            return { code: response.ok ? 200 : response.status };
+        } catch (error) {
+            return { code: 500, error: error.message };
+        }
+    }
+
+    /**
+     * Clean up report folders matching specified name prefixes.
+     * Cascades into the folder: deletes any reports inside (v2, by report_id)
+     * before deleting the folder itself — the v2 folder DELETE rejects
+     * non-empty folders with "Folder contains reports, please move/delete
+     * reports from folder".
+     * @param {Array<string>} namePrefixes
      */
     async cleanupReportFolders(namePrefixes = []) {
         testLogger.info('Starting report folders cleanup', { prefixes: namePrefixes });
@@ -914,11 +987,17 @@ class APICleanup {
             let failedCount = 0;
 
             for (const folder of matchingFolders) {
+                // Empty the folder first — server rejects DELETE on non-empty folders.
+                const reports = await this.fetchReportsInFolder(folder.folderId);
+                for (const r of reports) {
+                    if (r.report_id) await this.deleteReportById(r.report_id);
+                }
+
                 const result = await this.deleteReportFolder(folder.folderId);
 
                 if (result.code === 200) {
                     deletedCount++;
-                    testLogger.info('Deleted report folder', { name: folder.name, folderId: folder.folderId });
+                    testLogger.info('Deleted report folder', { name: folder.name, folderId: folder.folderId, emptiedReports: reports.length });
                 } else {
                     failedCount++;
                     testLogger.warn('Failed to delete report folder', { name: folder.name, folderId: folder.folderId, result });

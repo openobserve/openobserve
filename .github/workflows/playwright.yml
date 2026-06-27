@@ -175,6 +175,7 @@ jobs:
                 # "alerts-scheduled-features.spec.js",
                 "alerts-destinations-prebuilt.spec.js",
                 "alerts-vrl-encoding.spec.js",
+                "alerts-history.spec.js",
               ]
           - testfolder: "Dashboards-Core"
             browser: "chrome"
@@ -254,7 +255,8 @@ jobs:
             run_files: [
               "reportsScheduleNow.spec.js",
               "reportsScheduleLater.spec.js",
-              "reportFolders.spec.js"
+              "reportFolders.spec.js",
+              "reports-bulk-operations.spec.js",
               ]
           - testfolder: "Streams"
             browser: "chrome"
