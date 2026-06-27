@@ -843,6 +843,7 @@ jobs:
                 author: \$actor,
                 branch: \$branch,
                 suite: \"regression\",
+                ingest_source: \"live\",
                 commit_sha: \$commit,
                 retries: ((\$run_attempt|tonumber)-1),
                 was_retried: ((\$run_attempt|tonumber)>1),

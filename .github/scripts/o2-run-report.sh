@@ -62,7 +62,7 @@ printf '%s' "$RUN_JSON" | jq \
   '($attempt|tonumber) as $a |
    {
      _timestamp: ((.run_started_at // .created_at | fromdateiso8601) * 1000000 | floor),
-     workflow: $wf, suite: $suite, repo: $repo,
+     workflow: $wf, suite: $suite, repo: $repo, ingest_source: "live",
      run_id: $run_id, run_attempt: $a, retries: ($a-1), was_retried: ($a>1),
      conclusion: (if $conclusion=="" then .conclusion else $conclusion end),
      trigger: .event, author: (.actor.login // null), branch: .head_branch,
