@@ -1226,7 +1226,7 @@ export default defineComponent({
     );
 
     watch(
-      () => props.span,
+      [() => props.span, () => store.state.timezone],
       () => {
         tags.value = {};
         spanDetails.value = getFormattedSpanDetails();

@@ -108,7 +108,7 @@ const tableColumns = [
     accessorKey: "error_count",
     sortable: true,
     size: COL.count,
-    meta: { align: "left" },
+    meta: { align: "right" },
   },
   {
     id: "initial_view_name",
