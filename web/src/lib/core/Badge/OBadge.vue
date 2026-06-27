@@ -91,17 +91,17 @@ const variantClasses: Record<NonNullable<BadgeProps["variant"]>, string> = {
     "tw:text-badge-purple-ol-text",
     "tw:ring-1 tw:ring-inset tw:ring-badge-purple-ol-border",
   ].join(" "),
-  // Soft (light tinted bg, dark text — no ring)
+  // Soft (light tinted bg, dark text, subtle matching inset border)
   "default-soft":
-    "tw:bg-badge-default-soft-bg tw:text-badge-default-soft-text",
+    "tw:bg-badge-default-soft-bg tw:text-badge-default-soft-text tw:ring-1 tw:ring-inset tw:ring-badge-default-ol-border/30",
   "primary-soft":
-    "tw:bg-badge-primary-soft-bg tw:text-badge-primary-soft-text",
+    "tw:bg-badge-primary-soft-bg tw:text-badge-primary-soft-text tw:ring-1 tw:ring-inset tw:ring-badge-primary-ol-border/30",
   "success-soft":
-    "tw:bg-badge-success-soft-bg tw:text-badge-success-soft-text",
+    "tw:bg-badge-success-soft-bg tw:text-badge-success-soft-text tw:ring-1 tw:ring-inset tw:ring-badge-success-ol-border/30",
   "warning-soft":
-    "tw:bg-badge-warning-soft-bg tw:text-badge-warning-soft-text",
+    "tw:bg-badge-warning-soft-bg tw:text-badge-warning-soft-text tw:ring-1 tw:ring-inset tw:ring-badge-warning-ol-border/30",
   "error-soft":
-    "tw:bg-badge-error-soft-bg tw:text-badge-error-soft-text",
+    "tw:bg-badge-error-soft-bg tw:text-badge-error-soft-text tw:ring-1 tw:ring-inset tw:ring-badge-error-ol-border/30",
 
   // NEW: Extended color families for correlation dimensions
   // Teal
@@ -113,7 +113,7 @@ const variantClasses: Record<NonNullable<BadgeProps["variant"]>, string> = {
     "tw:ring-1 tw:ring-inset tw:ring-badge-teal-ol-border",
   ].join(" "),
   "teal-soft":
-    "tw:bg-badge-teal-soft-bg tw:text-badge-teal-soft-text",
+    "tw:bg-badge-teal-soft-bg tw:text-badge-teal-soft-text tw:ring-1 tw:ring-inset tw:ring-badge-teal-ol-border/30",
 
   // Orange
   orange:
@@ -124,7 +124,7 @@ const variantClasses: Record<NonNullable<BadgeProps["variant"]>, string> = {
     "tw:ring-1 tw:ring-inset tw:ring-badge-orange-ol-border",
   ].join(" "),
   "orange-soft":
-    "tw:bg-badge-orange-soft-bg tw:text-badge-orange-soft-text",
+    "tw:bg-badge-orange-soft-bg tw:text-badge-orange-soft-text tw:ring-1 tw:ring-inset tw:ring-badge-orange-ol-border/30",
 
   // Lime
   lime:
@@ -135,7 +135,7 @@ const variantClasses: Record<NonNullable<BadgeProps["variant"]>, string> = {
     "tw:ring-1 tw:ring-inset tw:ring-badge-lime-ol-border",
   ].join(" "),
   "lime-soft":
-    "tw:bg-badge-lime-soft-bg tw:text-badge-lime-soft-text",
+    "tw:bg-badge-lime-soft-bg tw:text-badge-lime-soft-text tw:ring-1 tw:ring-inset tw:ring-badge-lime-ol-border/30",
 
   // Amber
   amber:
@@ -146,7 +146,7 @@ const variantClasses: Record<NonNullable<BadgeProps["variant"]>, string> = {
     "tw:ring-1 tw:ring-inset tw:ring-badge-amber-ol-border",
   ].join(" "),
   "amber-soft":
-    "tw:bg-badge-amber-soft-bg tw:text-badge-amber-soft-text",
+    "tw:bg-badge-amber-soft-bg tw:text-badge-amber-soft-text tw:ring-1 tw:ring-inset tw:ring-badge-amber-ol-border/30",
 
   // Cyan
   cyan:
@@ -157,7 +157,7 @@ const variantClasses: Record<NonNullable<BadgeProps["variant"]>, string> = {
     "tw:ring-1 tw:ring-inset tw:ring-badge-cyan-ol-border",
   ].join(" "),
   "cyan-soft":
-    "tw:bg-badge-cyan-soft-bg tw:text-badge-cyan-soft-text",
+    "tw:bg-badge-cyan-soft-bg tw:text-badge-cyan-soft-text tw:ring-1 tw:ring-inset tw:ring-badge-cyan-ol-border/30",
 
   // Blue
   blue:
@@ -168,13 +168,13 @@ const variantClasses: Record<NonNullable<BadgeProps["variant"]>, string> = {
     "tw:ring-1 tw:ring-inset tw:ring-badge-blue-ol-border",
   ].join(" "),
   "blue-soft":
-    "tw:bg-badge-blue-soft-bg tw:text-badge-blue-soft-text",
+    "tw:bg-badge-blue-soft-bg tw:text-badge-blue-soft-text tw:ring-1 tw:ring-inset tw:ring-badge-blue-ol-border/30",
 
   // Purple (solid/soft variants for correlation)
   purple:
     "tw:bg-badge-purple-solid-bg tw:text-badge-purple-solid-text",
   "purple-soft":
-    "tw:bg-badge-purple-soft-bg tw:text-badge-purple-soft-text",
+    "tw:bg-badge-purple-soft-bg tw:text-badge-purple-soft-text tw:ring-1 tw:ring-inset tw:ring-badge-purple-ol-border/30",
 
   // Indigo
   indigo:
@@ -185,13 +185,13 @@ const variantClasses: Record<NonNullable<BadgeProps["variant"]>, string> = {
     "tw:ring-1 tw:ring-inset tw:ring-badge-indigo-ol-border",
   ].join(" "),
   "indigo-soft":
-    "tw:bg-badge-indigo-soft-bg tw:text-badge-indigo-soft-text",
+    "tw:bg-badge-indigo-soft-bg tw:text-badge-indigo-soft-text tw:ring-1 tw:ring-inset tw:ring-badge-indigo-ol-border/30",
 };
 
 // ── Size class map ────────────────────────────────────────────────────────
 const sizeClasses: Record<NonNullable<BadgeProps["size"]>, string> = {
-  sm: "tw:px-2 tw:py-[3px] tw:text-[11px] tw:gap-1",
-  md: "tw:px-2.5 tw:py-1 tw:text-xs tw:gap-1.5",
+  sm: "tw:px-2.5 tw:py-1.5 tw:text-[11px] tw:gap-1",
+  md: "tw:px-2.5 tw:py-2 tw:text-xs tw:gap-1.5",
 };
 
 // ── Trailing segment padding per size ────────────────────────────────────

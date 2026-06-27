@@ -12,10 +12,14 @@ export async function createReportViaApi(api, reportName, folderId = 'default') 
     testLogger.info('Creating report via API', { reportName, folderId });
 
     try {
-        const dashboards = await api.fetchDashboardsInFolder(folderId);
+        let dashboards = await api.fetchDashboardsInFolder(folderId);
         if (dashboards.length === 0) {
-            testLogger.error('No dashboards found in folder, cannot create report', { folderId });
-            return { success: false, error: 'No dashboards available' };
+            testLogger.info('No dashboards in folder — creating minimal setup dashboard', { folderId });
+            await api.createMinimalDashboard(`e2e_setup_dashboard_${Date.now()}`, folderId);
+            dashboards = await api.fetchDashboardsInFolder(folderId);
+            if (dashboards.length === 0) {
+                return { success: false, error: 'Could not create a setup dashboard for report' };
+            }
         }
 
         const dashboard = dashboards[0];

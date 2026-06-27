@@ -337,7 +337,7 @@ const columns = computed<OTableColumnDef[]>(() => [
     header: t("rum.files"),
     accessorKey: "fileCount",
     sortable: true,
-    meta: { align: "left" },
+    meta: { align: "right" },
   },
   {
     id: "uploaded_at",
