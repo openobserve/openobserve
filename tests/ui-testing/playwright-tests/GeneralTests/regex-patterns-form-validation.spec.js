@@ -62,6 +62,11 @@ test.describe("Regex Patterns form validation", () => {
         // (vee-validate blocks the @submit handler while the form is invalid).
         await pm.regexPatternsFormValidation.clickSave();
 
+        // vee-validate blocks the @submit handler while the form is invalid, so
+        // no save fires and the drawer must stay open — guards against an
+        // accidental side-effect submit on the empty form.
+        await expect(pm.regexPatternsFormValidation.getDrawerLocator()).toBeVisible();
+
         // OFormInput validator: '* Name is required'
         await expect(pm.regexPatternsFormValidation.getNameErrorLocator()).toBeVisible();
         await expect(pm.regexPatternsFormValidation.getNameErrorLocator()).toContainText('* Name is required');
